@@ -168,6 +168,37 @@ pub fn firewall_remove() -> Result<(), FirewallError> {
     }
 }
 
+/// Remove the rules Windows itself created for this binary.
+///
+/// When Guardiana first listens on the LAN, Windows asks "allow access?" and, on
+/// yes, writes its own rules named after the executable. They are not ours, so
+/// turning Home Mode off leaves them alone - but after an uninstall they point at
+/// a program that no longer exists, and they survived the uninstall on the test
+/// machine (16 sep 2026). This is only called from the uninstaller.
+pub fn firewall_remove_program_rules() -> Result<(), FirewallError> {
+    #[cfg(target_os = "windows")]
+    {
+        let exe = std::env::current_exe().map_err(|e| FirewallError::Command(e.to_string()))?;
+        run_checked(
+            "netsh",
+            &[
+                "advfirewall",
+                "firewall",
+                "delete",
+                "rule",
+                "name=all",
+                &format!("program={}", exe.display()),
+            ],
+        )
+        .map(|_| ())
+        .map_err(|e| FirewallError::Command(e.to_string()))
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(())
+    }
+}
+
 /// Addresses the resolver and panel must listen on in Home Mode.
 #[must_use]
 pub fn lan_listen_addrs(lan: Ipv4Addr) -> (std::net::SocketAddr, std::net::SocketAddr) {

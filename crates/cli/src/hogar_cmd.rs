@@ -120,6 +120,12 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
             ledger.set_setting(SETTING_HOME_IP, "")?;
             // The uninstaller runs `hogar off --desinstalando`: the record says who asked.
             let who = if opts.has("desinstalando") {
+                // Only when the program is leaving: the rules Windows wrote by
+                // itself for this binary point at a file that is about to
+                // disappear, and they were still there after uninstalling on the
+                // test machine. Turning Home Mode off is not the same thing and
+                // must not touch them, or Windows would ask again next time.
+                let _ = home::firewall_remove_program_rules();
                 "desinstalador"
             } else {
                 "terminal"
