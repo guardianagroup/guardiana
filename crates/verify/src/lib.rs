@@ -118,6 +118,10 @@ pub struct Report {
     pub ledger_events: u64,
     /// Chain check result.
     pub chain_ok: Option<bool>,
+    /// The ledger file is there but this user cannot open it. Without it, nothing
+    /// can be said about the DNS or the extract: the answer is "run it as
+    /// administrator", not a confident "Guardiana has not changed the DNS".
+    pub ledger_unreadable: bool,
 }
 
 fn sha256_file(path: &Path) -> std::io::Result<String> {
@@ -305,6 +309,11 @@ pub fn run() -> Report {
         .and_then(|l| l.setting(SETTING_BACKUP).ok().flatten())
         .filter(|v| !v.is_empty())
         .and_then(|v| serde_json::from_str::<sysdns::Backup>(&v).ok());
+    // Opening the ledger can fail for two very different reasons, and telling a
+    // person the wrong one is worse than saying nothing: the file may not exist
+    // yet (fresh install), or it may exist and belong to root (the normal case
+    // on Linux, where the service runs as root and the user runs `verify`).
+    let ledger_unreadable = paths::unreadable_here(&paths::ledger_path());
     let (dns_changed, home_mode, home_ip, ledger_events, chain_ok) =
         match Ledger::open(&paths::ledger_path(), identity::genesis()) {
             Ok(l) => (
@@ -364,6 +373,7 @@ pub fn run() -> Report {
         lists,
         ledger_events,
         chain_ok,
+        ledger_unreadable,
     }
 }
 
@@ -442,7 +452,12 @@ pub fn render_with(t: &guardiana_core::i18n::Texts, report: &Report) -> String {
         "verify.dns"
     };
     out.push(t.cli(dns_key).replace("{dns}", &dns));
-    out.push(
+    out.push(if report.ledger_unreadable {
+        // Sin el extracto no se sabe si el cambio de DNS lo hizo Guardiana. Decir
+        // «no lo ha cambiado» sería mentir con seguridad, que es lo peor que puede
+        // hacer aquí: se dice lo que pasa y cómo verlo de verdad.
+        t.cli("verify.extracto.sin_permiso").to_owned()
+    } else {
         match (report.dns_changed_by_guardiana, report.guardian_is_primary) {
             // What happened to the resolver that was there before is not the same
             // on every machine, so it is a second sentence and not a guess.
@@ -458,8 +473,8 @@ pub fn render_with(t: &guardiana_core::i18n::Texts, report: &Report) -> String {
             (true, Some(false)) => t.cli("verify.dns.guardiana_no_primario").to_owned(),
             (true, None) => t.cli("verify.dns.guardiana_desconocido").to_owned(),
             (false, _) => t.cli("verify.dns.sin_cambiar").to_owned(),
-        },
-    );
+        }
+    });
     out.push(if report.home_mode {
         t.cli("verify.hogar.on")
             .replace("{ip}", report.home_ip.as_deref().unwrap_or("-"))
@@ -490,6 +505,7 @@ pub fn render_with(t: &guardiana_core::i18n::Texts, report: &Report) -> String {
             .cli("verify.cadena.ok")
             .replace("{n}", &report.ledger_events.to_string()),
         Some(false) => t.cli("verify.cadena.mal").to_owned(),
+        None if report.ledger_unreadable => t.cli("verify.cadena.sin_permiso").to_owned(),
         None => t.cli("verify.cadena.sin_extracto").to_owned(),
     });
     out.join("\n")

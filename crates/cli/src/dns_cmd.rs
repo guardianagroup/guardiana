@@ -19,7 +19,17 @@ pub(crate) fn open_or_create(opts: &Opts) -> Result<Ledger, Box<dyn Error>> {
     if let Some(parent) = db.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    Ok(Ledger::open(&db, identity::genesis())?)
+    Ledger::open(&db, identity::genesis()).map_err(|e| {
+        // The service runs as root and the extract is its file, so a person who
+        // types `guardiana dns` without sudo gets "unable to open database file",
+        // which explains nothing. If the file is there, the answer is always the
+        // same and it fits in one sentence.
+        if paths::unreadable_here(&db) {
+            i18n::current().cli("cli.extracto.sin_permiso").into()
+        } else {
+            Box::new(e) as Box<dyn Error>
+        }
+    })
 }
 
 fn stored_backup(ledger: &Ledger) -> Result<Option<Backup>, Box<dyn Error>> {
@@ -149,8 +159,19 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
             t.cli("dns.restaurando")
                 .replace("{n}", &backup.interfaces.len().to_string())
         );
-        sysdns::restore(&backup)?;
+        // El vigilante del servicio reaplica el cambio mientras exista la copia
+        // (engine::reapply_dns_if_dropped). Si se deshace primero y se borra la
+        // copia después, hay unos segundos en los que el vigilante ve el DNS
+        // «caído» y lo vuelve a poner: medido en la VM el 16 sep 2026, dejaba el
+        // DNS global de systemd-resolved apuntando a Guardiana después de un
+        // restaurado que decía «exactamente como estaba». Se le quita la razón
+        // antes de tocar nada, y si deshacer falla se devuelve la copia: perderla
+        // dejaría el equipo apuntando a Guardiana sin manera de volver.
         ledger.set_setting(SETTING_BACKUP, "")?;
+        if let Err(e) = sysdns::restore(&backup) {
+            ledger.set_setting(SETTING_BACKUP, &serde_json::to_string(&backup)?)?;
+            return Err(Box::new(e));
+        }
         ledger.record_change(now_ms(), guardiana_core::ChangeKind::DnsOff, "terminal", "")?;
         println!("{}", t.cli("dns.restaurado"));
         return Ok(());

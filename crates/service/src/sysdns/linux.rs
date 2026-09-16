@@ -413,10 +413,20 @@ pub(crate) fn restore(backup: &Backup) -> Result<(), Error> {
             if backup.made_dropin_dir {
                 let _ = std::fs::remove_dir(RESOLVED_DROPIN_DIR);
             }
-            // Restart first, so the stub is listening again before the file that
-            // points at it comes back: no gap without a resolver either way.
+            // El orden importa, y al revés de como parecía. Reiniciar primero deja
+            // a systemd-resolved leyendo el /etc/resolv.conf que todavía es el
+            // nuestro («nameserver 127.0.0.1»), y cuando resolv.conf no es su
+            // enlace al stub, resolved toma esos servidores como DNS **global**:
+            // medido en la VM el 16 sep 2026, después de un restaurado que decía
+            // «exactamente como estaba» quedaba `Global: 127.0.0.1` hasta el
+            // siguiente reinicio del servicio. Así que primero se devuelve
+            // resolv.conf y después se reinicia, que además es el orden que deja
+            // a resolved releyéndolo todo de cero. Los enlaces ya están revertidos
+            // arriba, así que durante esos milisegundos el equipo resuelve por el
+            // stub, no se queda sin DNS.
+            resolv_conf_restore(backup)?;
             run_checked("systemctl", &["restart", "systemd-resolved"])?;
-            resolv_conf_restore(backup)
+            Ok(())
         }
         Method::NetworkManager => {
             for i in &backup.interfaces {

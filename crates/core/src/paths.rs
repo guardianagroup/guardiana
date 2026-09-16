@@ -98,3 +98,18 @@ pub fn harden_data_dir(dir: &Path) -> std::io::Result<()> {
         Ok(())
     }
 }
+
+/// Whether the extract is there but this process cannot read it.
+///
+/// On Linux the service runs as root and `/var/lib/guardiana` is root-only, so a
+/// person who types `guardiana verify` without sudo cannot open the ledger. Asking
+/// `Path::exists()` is no good: the directory is not even traversable, so the
+/// answer comes back "it does not exist" and the program then says something false
+/// and confident — that Guardiana has not changed the DNS. What the file system is
+/// really saying is EACCES, and that is a different sentence for the person.
+pub fn unreadable_here(path: &std::path::Path) -> bool {
+    matches!(
+        std::fs::File::open(path).err().map(|e| e.kind()),
+        Some(std::io::ErrorKind::PermissionDenied)
+    )
+}

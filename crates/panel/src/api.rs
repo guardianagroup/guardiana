@@ -251,13 +251,29 @@ pub(crate) async fn dns_restaurar(
     let backup: sysdns::Backup = serde_json::from_str(&json).map_err(internal)?;
     let st = state.clone();
     let result = tokio::task::spawn_blocking(move || -> Result<(), String> {
-        sysdns::restore(&backup).map_err(|e| e.to_string())?;
+        // La copia se borra ANTES de deshacer: mientras exista, el vigilante del
+        // servicio vuelve a aplicar el cambio y el «restaurado» queda a medias
+        // (decisión 118). Si deshacer falla, la copia se devuelve.
+        {
+            let l = st
+                .ledger
+                .lock()
+                .map_err(|_| "ledger lock poisoned".to_owned())?;
+            l.set_setting(SETTING_BACKUP, "")
+                .map_err(|e| e.to_string())?;
+        }
+        if let Err(e) = sysdns::restore(&backup) {
+            if let Ok(l) = st.ledger.lock() {
+                if let Ok(json) = serde_json::to_string(&backup) {
+                    let _ = l.set_setting(SETTING_BACKUP, &json);
+                }
+            }
+            return Err(e.to_string());
+        }
         let l = st
             .ledger
             .lock()
             .map_err(|_| "ledger lock poisoned".to_owned())?;
-        l.set_setting(SETTING_BACKUP, "")
-            .map_err(|e| e.to_string())?;
         l.record_change(now_ms(), ChangeKind::DnsOff, "panel", "")
             .map_err(|e| e.to_string())
     })
