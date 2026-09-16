@@ -386,7 +386,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-classify"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "guardiana-core",
  "guardiana-lists",
@@ -396,7 +396,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-cli"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "guardiana-classify",
  "guardiana-core",
@@ -415,7 +415,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "rusqlite",
  "serde",
@@ -425,14 +425,14 @@ dependencies = [
 
 [[package]]
 name = "guardiana-devices"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "guardiana-core",
 ]
 
 [[package]]
 name = "guardiana-dns"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "guardiana-core",
@@ -444,7 +444,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-license"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "guardiana-core",
  "minisign-verify",
@@ -456,7 +456,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-lists"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "guardiana-core",
  "serde",
@@ -465,7 +465,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-panel"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "axum",
  "getrandom 0.4.3",
@@ -483,7 +483,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-service"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "guardiana-core",
  "serde",
@@ -493,7 +493,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-verify"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "guardiana-core",
  "guardiana-lists",

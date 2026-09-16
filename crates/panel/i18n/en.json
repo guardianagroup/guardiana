@@ -154,6 +154,7 @@
     "dns.consentimiento_si": "To accept, repeat the command with --yes.",
     "dns.reserva_secundario": "The resolver you have now stays as the secondary: if Guardiana stops, the machine keeps resolving through it.",
     "dns.solo_guardiana": "On this machine Guardiana becomes the only resolver. That is what stops any query slipping past it: systemd-resolved picks among the servers it has, it does not ask them in order, so leaving the old one as a second would mean part of the queries are never seen. The service comes back by itself if it stops, and guardiana dns --restore puts everything back exactly as it was.",
+    "verify.dns.guardiana_con_reserva": "System DNS: Guardiana (127.0.0.1), with {dns} as the fallback. If Guardiana stops, the machine asks the fallback and those queries are not written down.",
     "verify.dns.por_guardiana": "System DNS: Guardiana (127.0.0.1), which forwards to {dns}."
   },
   "panel": {

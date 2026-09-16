@@ -154,6 +154,7 @@
     "dns.consentimiento_si": "Para aceptar, repite el comando con --yes.",
     "dns.reserva_secundario": "El resolutor que tienes ahora queda de secundario: si Guardiana se para, el equipo sigue resolviendo por él.",
     "dns.solo_guardiana": "En este equipo Guardiana pasa a ser el único resolutor. Es lo que hace que no se le escape ninguna consulta: systemd-resolved elige entre los servidores que tenga, no los pregunta por orden, así que dejar el antiguo de segundo significaría que parte de las consultas no se ven. El servicio vuelve a levantarse solo si se para, y guardiana dns --restore lo deja todo exactamente como estaba.",
+    "verify.dns.guardiana_con_reserva": "DNS del sistema: Guardiana (127.0.0.1) y, de reserva, {dns}. Si Guardiana se para, el equipo pregunta al de reserva y esas consultas no quedan anotadas.",
     "verify.dns.por_guardiana": "DNS del sistema: Guardiana (127.0.0.1), que reenvía a {dns}."
   },
   "panel": {
