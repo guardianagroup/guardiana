@@ -117,7 +117,13 @@
       <RegistryValue Root="HKCU" Key="Software\Guardiana" Name="desktop" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 
-    <!-- Uninstall only (not on upgrade): after the service is stopped and before it is deleted. -->
+    <!-- Uninstall only: after the service is stopped and before it is deleted.
+         Not on upgrade (UPGRADINGPRODUCTCODE) and not on repair (REINSTALL): a
+         "Repair" from Programs and Features sets REMOVE=ALL for the components
+         without setting UPGRADINGPRODUCTCODE, so with only the first condition a
+         repair turned Home Mode off and put the old DNS back - measured on the
+         test Windows on 16 sep 2026, and the phones in the house lost their DNS
+         without anyone asking for it. Repairing must never remove protection. -->
     <CustomAction Id="HomeOff"
                   Directory="INSTALLFOLDER"
                   ExeCommand="&quot;[INSTALLFOLDER]guardiana.exe&quot; hogar off --desinstalando"
@@ -131,8 +137,8 @@
                   Impersonate="no"
                   Return="ignore" />
     <InstallExecuteSequence>
-      <Custom Action="HomeOff" After="StopServices" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
-      <Custom Action="RestoreDns" After="HomeOff" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="HomeOff" After="StopServices" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND NOT REINSTALL" />
+      <Custom Action="RestoreDns" After="HomeOff" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND NOT REINSTALL" />
     </InstallExecuteSequence>
   </Package>
 </Wix>
