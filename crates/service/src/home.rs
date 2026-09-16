@@ -41,14 +41,14 @@ pub fn ip_is_dynamic(ip: Ipv4Addr) -> Option<bool> {
         if origin.is_empty() {
             return None;
         }
-        return Some(origin == "dhcp");
+        Some(origin == "dhcp")
     }
     #[cfg(target_os = "linux")]
     {
         let out = run_checked("ip", &["-4", "-o", "addr", "show"]).ok()?;
         let needle = format!("inet {ip}/");
         let line = out.lines().find(|l| l.contains(&needle))?;
-        return Some(line.contains(" dynamic"));
+        Some(line.contains(" dynamic"))
     }
     #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     {
@@ -83,7 +83,7 @@ pub fn sleep_after_minutes() -> Option<(u32, u32)> {
         }
         let ac = values.get(n - 2)?;
         let dc = values.get(n - 1)?;
-        return Some((ac / 60, dc / 60));
+        Some((ac / 60, dc / 60))
     }
     #[cfg(not(target_os = "windows"))]
     {

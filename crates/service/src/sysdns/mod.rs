@@ -145,10 +145,10 @@ pub fn current_resolvers() -> Option<CurrentResolvers> {
             .filter_map(|l| parse_ip(l.trim()))
             .filter(|ip| !is_loopback_stub(*ip))
             .collect();
-        return (!ips.is_empty()).then(|| CurrentResolvers {
+        (!ips.is_empty()).then(|| CurrentResolvers {
             servers: with_port(ips),
             source: ResolverSource::WindowsDnsClient,
-        });
+        })
     }
     #[cfg(target_os = "macos")]
     {
@@ -583,7 +583,7 @@ pub fn guardian_is_primary() -> Option<bool> {
         if firsts.is_empty() {
             return None;
         }
-        return Some(firsts.iter().all(|f| *f == "127.0.0.1"));
+        Some(firsts.iter().all(|f| *f == "127.0.0.1"))
     }
     #[cfg(target_os = "linux")]
     {
@@ -606,7 +606,7 @@ pub fn guardian_is_primary() -> Option<bool> {
             let links_ok = links.iter().all(|rest| rest.trim() == "127.0.0.1");
             return Some(links_ok && resolv_conf_points_at_guardian());
         }
-        return Some(resolv_conf_points_at_guardian());
+        Some(resolv_conf_points_at_guardian())
     }
     #[cfg(target_os = "macos")]
     {
