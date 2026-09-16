@@ -1,0 +1,11 @@
+#!/bin/sh
+# Guardiana .deb: the extract stays in /var/lib/guardiana on remove; only a
+# purge deletes it (Debian convention; the data belongs to the user).
+set -e
+if [ "$1" = "purge" ]; then
+    rm -rf /var/lib/guardiana
+fi
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
+fi
+exit 0

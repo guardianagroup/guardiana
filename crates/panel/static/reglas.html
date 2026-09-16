@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Guardiana · Reglas</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-page="reglas">
+<header class="top">
+  <span class="brand">Guardiana</span>
+  <nav>
+    <a href="/" data-t="nav_radiografia">Radiografía</a>
+    <a href="/ia" data-t="nav_ia">Tu IA</a>
+    <a href="/extracto" data-t="nav_extracto">Extracto</a>
+    <a href="/dispositivos" data-t="nav_dispositivos">Dispositivos</a>
+    <a href="/sabe-de-ti" data-t="nav_sabe">Lo que Guardiana sabe de ti</a>
+    <a href="/reglas" aria-current="page" data-t="nav_reglas">Reglas</a>
+    <a href="/informe" data-t="nav_informe">Informe semanal</a>
+    <a href="/hogar" data-t="nav_hogar">Modo Hogar</a>
+    <a href="/licencia" data-t="nav_licencia">Licencia</a>
+    <a href="/verify" data-t="nav_verify">Verificar</a>
+    <a href="/estado" data-t="nav_estado">Estado</a>
+  </nav>
+</header>
+<main>
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<h1 data-t="reglas_titulo"></h1>
+<p class="lead" data-t="reglas_lead"></p>
+<p class="limit" data-t="reglas_inviolables"></p>
+<h2 data-t="reglas_nueva_titulo"></h2>
+<p class="lead" data-t="reglas_nueva_lead"></p>
+<form id="nueva" class="filters">
+  <label><span data-t="f_alcance"></span><select name="scope" id="n-scope"><option value="home" data-t="alcance_casa"></option><option value="device" data-t="alcance_dispositivo"></option></select></label>
+  <label id="n-device-wrap" class="hidden"><span data-t="f_dispositivo"></span><select name="device_id" id="n-device"></select></label>
+  <label><span data-t="f_tipo"></span><select name="match_kind" id="n-kind"><option value="domain" data-t="tipo_domain"></option><option value="suffix" data-t="tipo_suffix"></option><option value="category" data-t="tipo_category"></option></select></label>
+  <label><span data-t="f_patron"></span><input name="pattern" id="n-pattern" placeholder="ejemplo.com"></label>
+  <label><span data-t="f_accion"></span><select name="action"><option value="cortar" data-t="accion_cortar"></option><option value="permitir" data-t="accion_permitir"></option></select></label>
+  <button type="submit" data-t="crear_regla"></button>
+</form>
+<p id="n-msg" class="muted"></p>
+<h2 data-t="reglas_lista_titulo"></h2>
+<p><button id="undo-today" class="secondary" data-t="deshacer_hoy"></button> <span id="undo-msg" class="ok"></span></p>
+<div class="card wrap"><table><thead><tr><th>#</th><th data-t="col_estado"></th><th data-t="col_alcance"></th><th data-t="col_tipo"></th><th data-t="col_patron"></th><th data-t="col_accion"></th><th data-t="col_quien"></th><th data-t="col_creada"></th><th></th></tr></thead><tbody id="r-rows"></tbody></table></div>
+<h2 data-t="modo_bloqueo_titulo"></h2>
+<p class="lead" data-t="modo_bloqueo_lead"></p>
+<p><label><input type="radio" name="modo" value="nxdomain"> <span data-t="modo_nxdomain"></span></label> &nbsp; <label><input type="radio" name="modo" value="zero"> <span data-t="modo_zero"></span></label> &nbsp; <button id="modo-guardar" class="secondary" data-t="guardar"></button> <span id="modo-msg" class="ok"></span></p>
+</main>
+<footer><span data-t="pie"></span></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

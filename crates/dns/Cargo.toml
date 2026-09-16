@@ -1,0 +1,21 @@
+[package]
+name = "guardiana-dns"
+description = "Local DNS resolver: listen, forward, cache, block answers, canary, checker"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+guardiana-core = { workspace = true }
+tokio = { workspace = true }
+hickory-server = { workspace = true }
+hickory-resolver = { workspace = true }
+hickory-proto = { workspace = true }
+async-trait = { workspace = true }
+
+[lints]
+workspace = true

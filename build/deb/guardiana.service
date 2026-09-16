@@ -1,0 +1,37 @@
+[Unit]
+Description=Guardiana: guardián DNS de la casa. Todo ocurre en este equipo; sin cuenta ni servidor.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/guardiana service run
+# El guardián es el único resolutor del equipo mientras vigila: si se cae,
+# nadie más responde. Vuelve siempre, no solo cuando termina con error.
+Restart=always
+RestartSec=5
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+WorkingDirectory=/var/lib/guardiana
+# Hardening (docs/SEGURIDAD.md): the service runs as root because it changes
+# the system DNS; everything else is fenced off.
+NoNewPrivileges=yes
+# «yes» y no «full»: «full» deja /etc de solo lectura, y con ReadWritePaths=/etc
+# NO se recupera —medido en Ubuntu 24.04: «Read-only file system»—, porque /etc es
+# el propio punto que «full» remonta. Y el servicio necesita escribir dentro de /etc:
+# sustituir /etc/resolv.conf (en Ubuntu es un enlace, y cambiarlo es borrar y crear
+# dentro de /etc) y crear /etc/systemd/resolved.conf.d/guardiana.conf. Con «yes»,
+# /usr, /boot y /efi siguen de solo lectura.
+ProtectSystem=yes
+ReadWritePaths=/var/lib/guardiana /run/systemd/resolve
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

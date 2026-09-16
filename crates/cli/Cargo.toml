@@ -1,0 +1,62 @@
+[package]
+name = "guardiana-cli"
+description = "Guardiana: the home computer as the household DNS guardian (guardiana observe | ledger | export | hogar | verify | update)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[[bin]]
+name = "guardiana"
+path = "src/main.rs"
+
+[dependencies]
+guardiana-core = { workspace = true }
+guardiana-dns = { workspace = true }
+guardiana-lists = { workspace = true }
+guardiana-classify = { workspace = true }
+guardiana-service = { workspace = true }
+guardiana-panel = { workspace = true }
+guardiana-devices = { workspace = true }
+guardiana-verify = { workspace = true }
+guardiana-license = { workspace = true }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-service = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
+[lints]
+workspace = true
+
+# Debian package (brief §11). Built with `cargo deb --no-build --target
+# x86_64-unknown-linux-gnu` from build/package.sh; paths are relative to this
+# crate. The unit file is shipped as a file; postinst enables it, prerm restores
+# the DNS, postrm purges the extract only on purge.
+[package.metadata.deb]
+name = "guardiana"
+maintainer = "Guardiana <hola@guardianagroup.com>"
+copyright = "2026, Guardiana. GPL-3.0-or-later."
+license-file = ["../../LICENSE", "0"]
+extended-description = """Convierte el computador en el guardián DNS de la casa: ve a qué servicios \
+intenta hablar cada dispositivo, lo explica en una frase y corta solo lo que el \
+usuario decida. Todo ocurre en el equipo; sin cuenta, sin servidor, cero telemetría."""
+section = "net"
+priority = "optional"
+depends = "libc6 (>= 2.30), systemd"
+maintainer-scripts = "../../build/deb"
+assets = [
+    ["target/release/guardiana", "usr/bin/", "755"],
+    ["../../build/deb/guardiana.service", "lib/systemd/system/", "644"],
+    ["../../build/tarball/LEEME.txt", "usr/share/doc/guardiana/", "644"],
+    ["../../docs/WHAT_IT_DOES_NOT_DO.md", "usr/share/doc/guardiana/", "644"],
+    ["../../docs/VERIFY.md", "usr/share/doc/guardiana/", "644"],
+    ["../../docs/HOGAR.md", "usr/share/doc/guardiana/", "644"],
+    ["../../docs/LISTS.md", "usr/share/doc/guardiana/", "644"],
+]

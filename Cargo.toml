@@ -1,0 +1,89 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/dns",
+    "crates/lists",
+    "crates/classify",
+    "crates/devices",
+    "crates/panel",
+    "crates/service",
+    "crates/license",
+    "crates/verify",
+    "crates/cli",
+]
+
+[workspace.package]
+version = "0.2.0"
+edition = "2021"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/guardiana/guardiana"
+authors = ["Guardiana"]
+
+# Every dependency is declared once here and justified in a comment.
+# Crates only pull what they need with `workspace = true`.
+[workspace.dependencies]
+# libc: only to reset SIGPIPE to its default on Unix so `guardiana ... | head`
+# exits quietly instead of panicking (already a transitive dependency).
+libc = "0.2"
+guardiana-core = { path = "crates/core" }
+guardiana-dns = { path = "crates/dns" }
+guardiana-lists = { path = "crates/lists" }
+guardiana-classify = { path = "crates/classify" }
+guardiana-devices = { path = "crates/devices" }
+guardiana-panel = { path = "crates/panel" }
+guardiana-service = { path = "crates/service" }
+guardiana-license = { path = "crates/license" }
+guardiana-verify = { path = "crates/verify" }
+guardiana-cli = { path = "crates/cli" }
+
+# --- third-party, each justified (brief §2) ---
+# SQLite for the ledger (brief §3). `bundled` compiles SQLite in so every
+# install carries the same, known version instead of whatever the OS ships.
+rusqlite = { version = "0.40", features = ["bundled"] }
+# SHA-256 for the hash chain: row_hash = sha256(prev_hash || fields) (brief §3).
+sha2 = "0.11"
+# JSON export, `signals_json` column and every on-disk/JSON structure (brief §3, §8).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Async runtime for the resolver and the panel (brief §2).
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "macros", "sync", "io-util", "signal"] }
+# DNS server, forwarding resolver with TTL cache, and wire types (brief §2, §4).
+hickory-server = { version = "0.26", default-features = false }
+hickory-resolver = { version = "0.26", default-features = false, features = ["tokio"] }
+hickory-proto = { version = "0.26", default-features = false }
+# Required to implement hickory-server's `RequestHandler` trait, which is declared with it.
+async-trait = "0.1"
+# Local HTTP panel on 127.0.0.1 (brief §2, §8): routing, JSON, query strings. No TLS, no extras.
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json", "query"] }
+# OS randomness for the per-installation panel token (brief §8). Already in the tree via hickory.
+getrandom = "0.4"
+# Windows service control manager integration (brief §2, §11): install, run, stop.
+windows-service = "0.8"
+# The only HTTP client, for the connections the user starts (brief §9 licence
+# activation, §5 list updates, §12 update check), each recorded in `outbound`.
+ureq = { version = "3", default-features = false, features = ["rustls", "platform-verifier"] }
+# Verifies the minisign signature of the installed binary against the embedded key (brief §10).
+minisign-verify = "0.2"
+# QR code for the Home Mode page (brief §7). Rendered as SVG text, no image crate.
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+
+[workspace.lints.rust]
+# Brief §2: `unsafe` is forbidden unless justified in a comment.
+# `deny` (not `forbid`) so a justified item can carry `#[allow(unsafe_code)]` next to its comment.
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+
+# Release binaries: small, stripped, reproducible (brief §10).
+[profile.release]
+strip = true
+lto = "thin"
+codegen-units = 1
+opt-level = 3

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Guardiana · Tu IA</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-page="ia">
+<header class="top">
+  <span class="brand">Guardiana</span>
+  <nav>
+    <a href="/"  data-t="nav_radiografia">Radiografía</a>
+    <a href="/ia" aria-current="page" data-t="nav_ia">Tu IA</a>
+    <a href="/extracto"  data-t="nav_extracto">Extracto</a>
+    <a href="/dispositivos"  data-t="nav_dispositivos">Dispositivos</a>
+    <a href="/sabe-de-ti"  data-t="nav_sabe">Lo que Guardiana sabe de ti</a>
+    <a href="/reglas" data-t="nav_reglas">Reglas</a>
+    <a href="/informe" data-t="nav_informe">Informe semanal</a>
+    <a href="/hogar" data-t="nav_hogar">Modo Hogar</a>
+    <a href="/licencia" data-t="nav_licencia">Licencia</a>
+    <a href="/verify" data-t="nav_verify">Verificar</a>
+    <a href="/estado" data-t="nav_estado">Estado</a>
+  </nav>
+</header>
+<main id="arriba">
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<h1 data-t="ia_titulo"></h1>
+<p class="lead" data-t="ia_lead"></p>
+<p class="limit" data-t="ia_limite"></p>
+
+<h2 data-t="ia_servicios_titulo"></h2>
+<p class="lead" data-t="ia_servicios_lead"></p>
+<div class="card wrap"><table><thead><tr><th data-t="ia_col_servicio"></th><th data-t="col_dispositivo"></th><th data-t="ia_col_nombres"></th><th data-t="col_consultas"></th><th data-t="col_ultima"></th></tr></thead><tbody id="ia-servicios"></tbody></table></div>
+
+<h2 data-t="alcance_titulo"></h2>
+<p class="lead" data-t="alcance_lead"></p>
+<div id="alcances"></div>
+
+<div class="card">
+  <h2 data-t="alcance_nuevo_titulo"></h2>
+  <p class="lead" data-t="alcance_nuevo_lead"></p>
+  <form id="alcance-form" class="filters">
+    <label><span data-t="col_dispositivo"></span><select name="device_id" id="a-device"></select></label>
+    <label><span data-t="alcance_campo"></span><textarea name="patrones" id="a-patrones" rows="5" class="mono wide" placeholder="api.anthropic.com&#10;github.com"></textarea></label>
+    <button type="submit" data-t="alcance_guardar"></button> <span id="a-msg" class="ok"></span>
+  </form>
+</div>
+<p class="limit" data-t="alcance_limite"></p>
+</main>
+<footer><span data-t="pie"></span></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

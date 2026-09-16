@@ -1,0 +1,33 @@
+# Rust
+/target/
+**/target/
+# Cargo.lock is committed on purpose (cargo build --locked). Do not ignore it.
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local runtime data (never commit)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+*.log
+
+# Keys and secrets: NEVER in the repository (brief §10)
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+minisign.key
+secrets/
+keys/
+
+# Build outputs
+/dist/
+/release/
+redes-videos/

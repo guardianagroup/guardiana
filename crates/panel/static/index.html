@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Guardiana · Radiografía</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-page="radiografia">
+<header class="top">
+  <span class="brand">Guardiana</span> <span class="print-only" data-t="pdf_pie"></span>
+  <nav>
+    <a href="/" aria-current="page" data-t="nav_radiografia">Radiografía</a>
+    <a href="/ia" data-t="nav_ia">Tu IA</a>
+    <a href="/extracto"  data-t="nav_extracto">Extracto</a>
+    <a href="/dispositivos"  data-t="nav_dispositivos">Dispositivos</a>
+    <a href="/sabe-de-ti"  data-t="nav_sabe">Lo que Guardiana sabe de ti</a>
+    <a href="/reglas" data-t="nav_reglas">Reglas</a>
+    <a href="/informe" data-t="nav_informe">Informe semanal</a>
+    <a href="/hogar" data-t="nav_hogar">Modo Hogar</a>
+    <a href="/licencia" data-t="nav_licencia">Licencia</a>
+    <a href="/verify" data-t="nav_verify">Verificar</a>
+    <a href="/estado"  data-t="nav_estado">Estado</a>
+  </nav>
+</header>
+<main>
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<h1 data-t="radiografia_titulo"></h1>
+<p class="lead" data-t="radiografia_lead"></p>
+<p><button id="share-open" class="secondary" data-t="compartir"></button> <button id="r-pdf" type="button" class="secondary" data-t="exportar_pdf"></button> <span id="r-pdf-msg" class="muted"></span></p>
+<div id="share" class="card hidden">
+  <h2 data-t="compartir_titulo"></h2>
+  <p class="lead" data-t="compartir_lead"></p>
+  <canvas id="share-canvas" width="1080" height="1080"></canvas>
+  <p><a id="share-download" class="btn" href="#" download="guardiana-radiografia.png" data-t="compartir_tarjeta"></a> <a id="share-wa" class="btn" href="#" target="_blank" rel="noopener noreferrer" data-t="informe_abrir_whatsapp"></a> <button id="share-close" class="secondary" data-t="compartir_cerrar"></button></p>
+</div>
+<div class="counters">
+  <div class="counter"><div class="n" id="c-servicios">–</div><div class="l" data-t="c_servicios"></div></div>
+  <div class="counter"><div class="n" id="c-rastreadores">–</div><div class="l" data-t="c_rastreadores"></div></div>
+  <div class="counter"><div class="n" id="c-nuevos">–</div><div class="l" data-t="c_nuevos"></div></div>
+  <div class="counter"><div class="n" id="c-esperados">–</div><div class="l" data-t="c_esperados"></div></div>
+  <div class="counter"><div class="n" id="c-cortados">–</div><div class="l" data-t="c_cortados"></div></div>
+</div>
+<p id="hueco" class="limit hidden"></p>
+<div id="dns-card" class="card hidden"><h2 data-t="dns_card_titulo"></h2><p data-t="dns_card_texto"></p><p><button id="dns-apply" data-t="dns_card_boton"></button> <span id="dns-msg" class="muted"></span></p></div>
+<div id="plus-card" class="card hidden"><p data-t="licencia_invitacion"></p><p><a class="btn" href="/licencia" data-t="licencia_probar_titulo"></a> <button id="plus-no" class="secondary" data-t="licencia_probar_ahora_no"></button></p></div>
+<div class="card wrap"><table><thead><tr><th data-t="col_hora"></th><th data-t="col_nombre"></th><th data-t="col_categoria"></th><th data-t="col_dispositivo"></th><th data-t="col_veredicto"></th><th></th></tr></thead><tbody id="live"></tbody></table></div>
+<p class="limit" data-t="radiografia_limite"></p>
+</main>
+<footer><span data-t="pie"></span></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

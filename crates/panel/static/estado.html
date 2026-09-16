@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Guardiana · Estado</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-page="estado">
+<header class="top">
+  <span class="brand">Guardiana</span>
+  <nav>
+    <a href="/"  data-t="nav_radiografia">Radiografía</a>
+    <a href="/ia" data-t="nav_ia">Tu IA</a>
+    <a href="/extracto"  data-t="nav_extracto">Extracto</a>
+    <a href="/dispositivos"  data-t="nav_dispositivos">Dispositivos</a>
+    <a href="/sabe-de-ti"  data-t="nav_sabe">Lo que Guardiana sabe de ti</a>
+    <a href="/reglas" data-t="nav_reglas">Reglas</a>
+    <a href="/informe" data-t="nav_informe">Informe semanal</a>
+    <a href="/hogar" data-t="nav_hogar">Modo Hogar</a>
+    <a href="/licencia" data-t="nav_licencia">Licencia</a>
+    <a href="/verify" data-t="nav_verify">Verificar</a>
+    <a href="/estado" aria-current="page" data-t="nav_estado">Estado</a>
+  </nav>
+</header>
+<main>
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<h1 data-t="estado_titulo"></h1>
+<div class="card">
+  <p><span data-t="e_version"></span> <span id="e-version"></span></p>
+  <p><span data-t="e_escucha"></span> <span class="mono" id="e-escucha"></span></p>
+  <p><span data-t="e_upstream"></span> <span class="mono" id="e-upstream"></span></p>
+  <p><span data-t="e_dns"></span> <span id="e-dns"></span></p>
+  <p><button id="e-dns-apply" class="hidden" data-t="e_dns_aplicar"></button><button id="e-dns-restore" class="secondary hidden" data-t="e_dns_restaurar"></button> <span id="e-dns-msg" class="muted"></span></p>
+</div>
+<h2 data-t="e_listas"></h2>
+<div class="card wrap"><table><thead><tr><th data-t="col_lista"></th><th data-t="col_entradas"></th><th data-t="col_fecha"></th></tr></thead><tbody id="e-listas"></tbody></table></div>
+<p class="limit" data-t="estado_limite"></p>
+<div class="card"><h2 data-t="cambios_titulo"></h2><p class="lead" data-t="cambios_lead"></p><ul id="cambios" class="muted"></ul></div>
+</main>
+<footer><span data-t="pie"></span></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

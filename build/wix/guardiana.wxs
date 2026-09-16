@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Guardiana Windows installer (brief §11), WiX v4/v5 schema.
+  Built by build/msi.ps1 (on Windows, WiX 5) with:
+    wix build -arch x64 -culture es-ES -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext \
+      -d Version=<x.y.z> -d Exe=<path to guardiana.exe> -d Readme=build/wix/LEEME.txt \
+      -d Welcome=build/wix/bienvenida.rtf -o dist/<v>/guardiana-<v>-windows-x64.msi build/wix/guardiana.wxs
+  What it does: copies guardiana.exe to Program Files\Guardiana, registers and
+  starts the "guardiana" service (same arguments as `guardiana service install`),
+  adds a Start menu shortcut that opens the panel. It does NOT change the system
+  DNS: that happens from the panel with consent. On uninstall: the service is
+  stopped, then Home Mode is closed (firewall rule removed) and the DNS is
+  restored exactly as it was, then the service is deleted and the files removed.
+  The extract in ProgramData\Guardiana stays: it belongs to the user.
+  UpgradeCode never changes between versions (it is what makes upgrades replace
+  the previous version instead of installing twice).
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <!-- Language 10 is neutral Spanish: the file properties say "Español" and not "Español (España,
+       internacional)", which is what LCID 3082 showed and read like a claim about where the
+       program comes from (15 sep 2026). The installer UI text keeps coming from the es-ES
+       localisation of WixUI, which is only the wording of its buttons. -->
+  <Package Name="Guardiana"
+           Manufacturer="Guardiana"
+           Version="$(var.Version)"
+           UpgradeCode="0d4fae13-1842-4b29-a2e6-1939a9564b47"
+           Language="10"
+           Codepage="1252"
+           Scope="perMachine"
+           InstallerVersion="500"
+           Compressed="yes">
+
+    <SummaryInformation Description="Guardiana: guardián DNS de la casa" Manufacturer="Guardiana" />
+
+    <!-- Two screens only: what the installer does and does not (build/wix/bienvenida.rtf) with
+         "Instalar", then "Finalizar" with "Abrir Guardiana" ticked, which opens the panel in the
+         browser as the user (not elevated). No folder choice, no options. -->
+    <ui:WixUI Id="WixUI_Minimal" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.Welcome)" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Abrir el panel de Guardiana" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <SetProperty Id="WixShellExecTarget" Value="[MenuDir]Guardiana.lnk" After="CostFinalize" Sequence="ui" />
+    <CustomAction Id="LaunchPanel" DllEntry="WixShellExec" Impersonate="yes" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" />
+    <UI>
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchPanel" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+    </UI>
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="Ya hay una versión más nueva de Guardiana instalada." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Guardiana" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="MenuDir" Name="Guardiana" />
+    </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder" />
+
+    <!-- The brand icon (build/wix/guardiana.ico): shortcuts and the "Programs" list. -->
+    <Icon Id="guardiana.ico" SourceFile="$(var.Icon)" />
+    <Property Id="ARPPRODUCTICON" Value="guardiana.ico" />
+
+    <Feature Id="Main" Title="Guardiana" Level="1">
+      <ComponentRef Id="Exe" />
+      <ComponentRef Id="Readme" />
+      <ComponentRef Id="Shortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+
+    <Component Id="Exe" Directory="INSTALLFOLDER" Guid="3ddbdec9-0a69-4313-a914-1b9797819a7f">
+      <File Id="GuardianaExe" Name="guardiana.exe" Source="$(var.Exe)" KeyPath="yes" />
+      <ServiceInstall Id="Svc"
+                      Name="guardiana"
+                      DisplayName="Guardiana"
+                      Description="Guardiana: guardián DNS de la casa. Todo ocurre en este equipo; sin cuenta ni servidor."
+                      Type="ownProcess"
+                      Start="auto"
+                      ErrorControl="normal"
+                      Arguments="service run"
+                      Account="LocalSystem"
+                      Vital="yes" />
+      <ServiceControl Id="SvcCtl" Name="guardiana" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+    </Component>
+
+    <Component Id="Readme" Directory="INSTALLFOLDER" Guid="6ee79eff-4700-48d1-93d8-35f8a726cd99">
+      <File Id="Leeme" Name="LEEME.txt" Source="$(var.Readme)" KeyPath="yes" />
+    </Component>
+
+    <Component Id="Shortcut" Directory="MenuDir" Guid="21398cf1-e897-4661-a755-bb36e4a4eb16">
+      <Shortcut Id="PanelShortcut"
+                Name="Guardiana"
+                Description="Abrir el panel de Guardiana"
+                Target="[INSTALLFOLDER]guardiana.exe"
+                Arguments="panel"
+                Icon="guardiana.ico"
+                WorkingDirectory="INSTALLFOLDER" />
+      <Shortcut Id="MenuShortcut"
+                Name="Guardiana (menú)"
+                Description="Menú de Guardiana en una ventana de texto"
+                Target="[INSTALLFOLDER]guardiana.exe"
+                Arguments="menu"
+                Icon="guardiana.ico"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="RemoveMenuDir" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\Guardiana" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="9a1f6c2e-3d47-4b8a-9c05-6e2f1b7d4a10">
+      <Shortcut Id="DesktopPanelShortcut"
+                Name="Guardiana"
+                Description="Abrir el panel de Guardiana"
+                Target="[INSTALLFOLDER]guardiana.exe"
+                Arguments="panel"
+                Icon="guardiana.ico"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\Guardiana" Name="desktop" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- Uninstall only (not on upgrade): after the service is stopped and before it is deleted. -->
+    <CustomAction Id="HomeOff"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[INSTALLFOLDER]guardiana.exe&quot; hogar off --desinstalando"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
+    <CustomAction Id="RestoreDns"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[INSTALLFOLDER]guardiana.exe&quot; dns --restore"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="HomeOff" After="StopServices" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="RestoreDns" After="HomeOff" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

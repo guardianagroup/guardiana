@@ -1,0 +1,27 @@
+[package]
+name = "guardiana-panel"
+description = "Local HTTP server, JSON API and static panel pages"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+guardiana-core = { workspace = true }
+guardiana-lists = { workspace = true }
+guardiana-service = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+getrandom = { workspace = true }
+qrcode = { workspace = true }
+guardiana-devices = { workspace = true }
+guardiana-verify = { workspace = true }
+guardiana-license = { workspace = true }
+
+[lints]
+workspace = true

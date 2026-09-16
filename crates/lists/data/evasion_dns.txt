@@ -1,0 +1,52 @@
+# Guardiana — resolutores cifrados conocidos (DoH/DoT), para la señal
+# `evasion_dns` (brief §4 y §5). Una consulta a uno de estos nombres significa
+# que un programa intenta resolver por su cuenta, fuera de la vista de Guardiana.
+# Se anota; no se corta salvo regla del usuario. Coincide con dominio y subdominios.
+
+dns.google
+dns.google.com
+cloudflare-dns.com
+mozilla.cloudflare-dns.com
+chrome.cloudflare-dns.com
+security.cloudflare-dns.com
+family.cloudflare-dns.com
+one.one.one.one
+dns.quad9.net
+dns9.quad9.net
+dns10.quad9.net
+dns11.quad9.net
+dns.adguard.com
+dns.adguard-dns.com
+dns-family.adguard.com
+unfiltered.adguard-dns.com
+doh.opendns.com
+doh.familyshield.opendns.com
+dns.nextdns.io
+doh.dns.sb
+dns.alidns.com
+doh.pub
+dot.pub
+dns.twnic.tw
+dns.switch.ch
+doh.cleanbrowsing.org
+security-filter-dns.cleanbrowsing.org
+family-filter-dns.cleanbrowsing.org
+adult-filter-dns.cleanbrowsing.org
+dns.controld.com
+doh.libredns.gr
+dns.mullvad.net
+adblock.dns.mullvad.net
+doh.applied-privacy.net
+dns.digitale-gesellschaft.ch
+dns.njal.la
+doh.ffmuc.net
+dns.comss.one
+dns.umbrella.com
+doh.umbrella.com
+public.dns.iij.jp
+odvr.nic.cz
+dns.dnswarden.com
+freedns.controld.com
+doh.tiar.app
+dot.tiar.app
+dns.decloudus.com

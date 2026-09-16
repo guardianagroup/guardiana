@@ -1,0 +1,49 @@
+GUARDIANA para Windows
+======================
+
+Guardiana convierte este PC en el guardián DNS de la casa: ve a qué
+servicios intenta hablar cada dispositivo, lo explica en una frase y corta solo
+lo que tú decidas. Todo ocurre en este equipo. Sin cuenta, sin servidor, cero
+telemetría.
+
+Qué ha hecho el instalador
+--------------------------
+- Ha copiado el programa a "Archivos de programa\Guardiana".
+- Ha registrado el servicio "Guardiana", que arranca solo con Windows.
+- Ha creado dos accesos en el menú Inicio: "Guardiana" (abre el panel en el
+  navegador) y "Guardiana (menú)" (ventana de texto con opciones numeradas).
+
+Qué NO ha hecho
+---------------
+- No ha cambiado el DNS de este equipo. Eso se hace desde el panel, con tu
+  permiso, y se deshace en el mismo sitio.
+- No ha abierto ningún puerto a la red. Solo el Modo Hogar, cuando tú lo
+  actives, abre los puertos en la Wi-Fi de casa; apagarlo los cierra.
+
+Después de instalar
+-------------------
+Menú Inicio > Guardiana. Se abre el panel. Arriba verás un aviso: "Este PC
+todavía no pasa por Guardiana"; pulsa el botón y el DNS del PC apunta a
+Guardiana, dejando el de ahora de secundario por si Guardiana se para. Desde
+ese momento verás las consultas. Primero 24 horas observando; el botón
+"cortar" no existe antes. Todo esto es gratis y no caduca, Modo Hogar
+incluido. Plus (informe semanal, extracto sin límite) se prueba 7 días gratis
+desde la página "Licencia", sin tarjeta; después, al mes o al año.
+
+Desinstalar
+-----------
+Configuración > Aplicaciones > Guardiana > Desinstalar. Al desinstalar,
+Guardiana apaga el Modo Hogar, quita su regla del cortafuegos y deja el DNS
+tal como estaba. El extracto queda en C:\ProgramData\Guardiana; bórralo a mano
+si no lo quieres.
+
+Comprobar la instalación
+------------------------
+Menú "Guardiana (menú)" > opción de comprobar, o en una ventana de comandos:
+    "C:\Program Files\Guardiana\guardiana.exe" verify
+
+Antes de instalar: comprueba la huella del archivo .msi y compárala con la de
+SHA256SUMS y con el registro público (ledger.jsonl). Cómo hacerlo, paso a
+paso, en VERIFY.md de la web.
+
+Lo que Guardiana no hace está en WHAT_IT_DOES_NOT_DO.md. Léelo.

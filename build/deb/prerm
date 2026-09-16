@@ -1,0 +1,12 @@
+#!/bin/sh
+# Guardiana .deb: stop the service first (its watchdog would re-apply the
+# DNS), then restore the DNS exactly as it was and close Home Mode (brief §11).
+set -e
+if [ "$1" = "remove" ] || [ "$1" = "deconfigure" ]; then
+    if [ -d /run/systemd/system ]; then
+        systemctl disable --now guardiana.service || true
+    fi
+    /usr/bin/guardiana hogar off --desinstalando >/dev/null 2>&1 || true
+    /usr/bin/guardiana dns --restore >/dev/null 2>&1 || true
+fi
+exit 0

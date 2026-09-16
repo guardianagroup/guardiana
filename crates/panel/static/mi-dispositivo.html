@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Guardiana · Mi dispositivo</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-page="miDispositivo">
+<header class="top">
+  <span class="brand">Guardiana</span> <span class="print-only" data-t="pdf_pie"></span>
+  <nav><a href="/mi-dispositivo" aria-current="page" data-t="nav_mi">Mi dispositivo</a> <a href="/hogar" data-t="nav_hogar">Modo Hogar</a></nav>
+</header>
+<main>
+<div id="consent" class="card hidden"><p data-t="mi_consentimiento"></p><p><button id="consent-ok" data-t="mi_entendido"></button></p></div>
+<h1 data-t="mi_titulo"></h1>
+<p class="lead" data-t="mi_lead"></p>
+<div id="mi-self" class="card hidden"><p data-t="mi_no_lan"></p></div>
+<div id="mi-body">
+  <p id="mi-pasa" class="ok"></p>
+  <div class="counters">
+    <div class="counter"><div class="n" id="m-consultas">–</div><div class="l" data-t="col_consultas"></div></div>
+    <div class="counter"><div class="n" id="m-rastreadores">–</div><div class="l" data-t="c_rastreadores"></div></div>
+    <div class="counter"><div class="n" id="m-esperados">–</div><div class="l" data-t="c_esperados"></div></div>
+    <div class="counter"><div class="n" id="m-cortados">–</div><div class="l" data-t="c_cortados"></div></div>
+  </div>
+  <div class="card">
+    <form id="mi-nombre" class="filters"><label><span data-t="mi_nombre"></span><input name="name" maxlength="60" autocomplete="off" autocapitalize="words"></label><button type="submit" data-t="mi_nombre_guardar"></button> <span id="mi-nombre-msg" class="ok"></span></form>
+    <p><label><input type="checkbox" id="mi-compartir"> <span data-t="mi_compartir"></span></label><br><span class="muted" data-t="mi_compartir_texto"></span></p>
+  </div>
+  <p id="mi-gate" class="muted"></p>
+  <div id="mi-avisos"></div>
+  <div class="card"><h2 data-t="lectura_empresas"></h2><p class="lead" data-t="lectura_empresas_lead"></p><ul id="mi-empresas"></ul></div>
+  <p><button id="mi-pdf" type="button" class="secondary" data-t="exportar_pdf"></button> <span id="mi-pdf-msg" class="muted"></span></p>
+  <div class="card wrap"><table><thead><tr><th data-t="col_hora"></th><th data-t="col_nombre"></th><th data-t="col_categoria"></th><th data-t="col_veredicto"></th><th></th></tr></thead><tbody id="mi-rows"></tbody></table></div>
+  <h2 data-t="mi_reglas_titulo"></h2>
+  <p class="lead" data-t="mi_reglas_lead"></p>
+  <div class="card wrap"><table><thead><tr><th data-t="col_tipo"></th><th data-t="col_patron"></th><th data-t="col_accion"></th><th data-t="col_estado"></th><th></th></tr></thead><tbody id="mi-reglas"></tbody></table></div>
+</div>
+<p class="limit" data-t="hogar_limite"></p>
+</main>
+<footer><span data-t="pie"></span></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

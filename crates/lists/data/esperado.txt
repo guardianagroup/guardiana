@@ -1,0 +1,94 @@
+# Guardiana — lista "esperado" (brief §5): tráfico que no es una fuga.
+# Mantenida por nosotros, abierta. Una entrada por línea; coincide con el
+# dominio y con todos sus subdominios. Las secciones @ marcan el tipo, que
+# decide la frase de confirmación de la sección 6 del brief.
+# Se muestra con el mismo peso que "rastreador": esperado no significa invisible.
+
+@actualizaciones
+# Windows
+windowsupdate.com
+update.microsoft.com
+delivery.mp.microsoft.com
+dl.delivery.mp.microsoft.com
+tlu.dl.delivery.mp.microsoft.com
+download.windowsupdate.com
+ctldl.windowsupdate.com
+fe3.delivery.mp.microsoft.com
+sls.update.microsoft.com
+adl.windows.com
+go.microsoft.com
+# Apple
+swscan.apple.com
+swcdn.apple.com
+swdist.apple.com
+mesu.apple.com
+gdmf.apple.com
+updates.cdn-apple.com
+updates-http.cdn-apple.com
+appldnld.apple.com
+ocsp.apple.com
+ocsp2.apple.com
+valid.apple.com
+# Debian y Ubuntu
+deb.debian.org
+security.debian.org
+ftp.debian.org
+archive.ubuntu.com
+security.ubuntu.com
+ports.ubuntu.com
+ppa.launchpad.net
+changelogs.ubuntu.com
+motd.ubuntu.com
+snapcraft.io
+api.snapcraft.io
+# Fedora
+fedoraproject.org
+mirrors.fedoraproject.org
+download.fedoraproject.org
+# Arch
+archlinux.org
+geo.mirror.pkgbuild.com
+# Flatpak
+flathub.org
+dl.flathub.org
+# Mozilla y navegadores (actualizaciones, no telemetría)
+aus5.mozilla.org
+download.mozilla.org
+firefox.settings.services.mozilla.com
+content-signature-2.cdn.mozilla.net
+edgedl.me.gvt1.com
+update.googleapis.com
+
+@hora
+pool.ntp.org
+ntp.org
+time.windows.com
+time.apple.com
+time.google.com
+time.cloudflare.com
+time.nist.gov
+ntp.ubuntu.com
+time.euro.apple.com
+
+@mensajeria
+whatsapp.net
+whatsapp.com
+signal.org
+telegram.org
+t.me
+ess.apple.com
+ess-apple.com.akadns.net
+push.apple.com
+courier.push.apple.com
+mtalk.google.com
+
+@videollamada
+zoom.us
+zoomgov.com
+meet.google.com
+teams.microsoft.com
+teams.live.com
+facetime.apple.com
+
+@guardiana
+# El dominio propio de Guardiana se añade cuando exista (decisión pendiente).

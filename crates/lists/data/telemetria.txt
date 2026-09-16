@@ -1,0 +1,37 @@
+# Guardiana — lista "telemetria" (brief §5): destinos documentados por los
+# propios fabricantes como telemetría o diagnóstico. Mantenida por nosotros,
+# abierta. Coincide con el dominio y sus subdominios. No es un veredicto:
+# describe qué es el destino, no si hace daño.
+
+# Microsoft (documentación pública de puntos de conexión de datos de diagnóstico)
+vortex.data.microsoft.com
+vortex-win.data.microsoft.com
+v10.events.data.microsoft.com
+v10.vortex-win.data.microsoft.com
+v20.events.data.microsoft.com
+settings-win.data.microsoft.com
+watson.telemetry.microsoft.com
+watson.microsoft.com
+telemetry.microsoft.com
+oca.telemetry.microsoft.com
+self.events.data.microsoft.com
+browser.events.data.msn.com
+# Apple
+metrics.apple.com
+metrics.icloud.com
+xp.apple.com
+# Mozilla
+incoming.telemetry.mozilla.org
+telemetry.mozilla.org
+# Google y Chrome
+clientservices.googleapis.com
+clients2.google.com
+crashreports.google.com
+# Ubuntu y Canonical
+metrics.ubuntu.com
+popcon.ubuntu.com
+# Fabricantes de hardware y apps de escritorio
+telemetry.nvidia.com
+gfe.nvidia.com
+telemetry.dell.com
+data.microsoft.com

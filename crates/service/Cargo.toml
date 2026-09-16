@@ -1,0 +1,21 @@
+[package]
+name = "guardiana-service"
+description = "Daemon: Windows SCM and systemd; system DNS change and restore; watchdog"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+guardiana-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-service = { workspace = true }
+
+[lints]
+workspace = true

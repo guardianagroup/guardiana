@@ -1,0 +1,12 @@
+#!/bin/sh
+# Guardiana .deb: enable and start the service. The system DNS is NOT changed
+# here; that happens from the panel, with consent, on first use (brief §11).
+set -e
+mkdir -p /var/lib/guardiana
+chmod 700 /var/lib/guardiana
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
+    systemctl enable --now guardiana.service || true
+fi
+echo "Guardiana instalada. Abre el panel con: guardiana panel"
+exit 0

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Guardiana · Modo Hogar</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-page="hogar">
+<header class="top">
+  <span class="brand">Guardiana</span>
+  <nav>
+    <a href="/" data-t="nav_radiografia">Radiografía</a>
+    <a href="/ia" data-t="nav_ia">Tu IA</a>
+    <a href="/extracto" data-t="nav_extracto">Extracto</a>
+    <a href="/dispositivos" data-t="nav_dispositivos">Dispositivos</a>
+    <a href="/sabe-de-ti" data-t="nav_sabe">Lo que Guardiana sabe de ti</a>
+    <a href="/reglas" data-t="nav_reglas">Reglas</a>
+    <a href="/informe" data-t="nav_informe">Informe semanal</a>
+    <a href="/hogar" aria-current="page" data-t="nav_hogar">Modo Hogar</a>
+    <a href="/licencia" data-t="nav_licencia">Licencia</a>
+    <a href="/verify" data-t="nav_verify">Verificar</a>
+    <a href="/estado" data-t="nav_estado">Estado</a>
+  </nav>
+</header>
+<main>
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<h1 data-t="hogar_titulo"></h1>
+<p class="lead" data-t="hogar_lead"></p>
+<div class="card">
+  <p id="h-estado"></p>
+  <p id="h-ip-aviso" class="muted"></p>
+  <p id="h-suspension" class="muted"></p>
+  <p><button id="h-toggle"></button> <span id="h-aviso" class="bad"></span></p>
+  <p class="muted" data-t="hogar_que_pasa"></p>
+</div>
+<div id="h-conectar" class="hidden">
+  <h2 data-t="hogar_qr_titulo"></h2>
+  <p class="lead" data-t="hogar_qr_lead"></p>
+  <div class="card"><div id="h-qr"></div><p><span data-t="hogar_url"></span> <span class="mono" id="h-url"></span></p></div>
+  <h2 data-t="hogar_router_titulo"></h2>
+  <div class="card"><p id="h-router"></p></div>
+  <h2 data-t="hogar_iphone_titulo"></h2>
+  <div class="card"><p id="h-iphone"></p></div>
+  <h2 data-t="hogar_android_titulo"></h2>
+  <div class="card"><p id="h-android"></p></div>
+  <h2 data-t="hogar_comprobar_titulo"></h2>
+  <div class="card"><p data-t="hogar_comprobar_texto"></p></div>
+</div>
+<p class="muted" data-t="hogar_prueba"></p>
+<p class="limit" data-t="hogar_limite"></p>
+</main>
+<footer><span data-t="pie"></span></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

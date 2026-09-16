@@ -1,0 +1,19 @@
+{
+  "fetched": "2026-09-08T20:30:57Z",
+  "lists": [
+    {
+      "id": "easyprivacy",
+      "file": "easyprivacy.txt",
+      "url": "https://easylist.to/easylist/easyprivacy.txt",
+      "sha256": "f27b70b2d76ac29b0c0326f3415be97e8c8908e5e19488658c94dbbd1482a9b1",
+      "entries": 43028
+    },
+    {
+      "id": "peterlowe",
+      "file": "peterlowe.txt",
+      "url": "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext",
+      "sha256": "06c202980b9fdb1c3277494a276c4fb7c9e9c0364c9bf9a2525245ec852b3bb9",
+      "entries": 3542
+    }
+  ]
+}
