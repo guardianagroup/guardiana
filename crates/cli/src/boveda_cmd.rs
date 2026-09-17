@@ -41,7 +41,12 @@ fn dir(opts: &Opts) -> PathBuf {
 }
 
 fn password(prompt: &str) -> Result<Zeroizing<Vec<u8>>, Box<dyn Error>> {
-    let s = Zeroizing::new(rpassword::prompt_password(format!("{prompt}: "))?);
+    // The prompt goes through stdout (UTF-8), not through rpassword: on Windows the console
+    // would print the accents in the OEM code page ("Contrase├▒a").
+    print!("{prompt}: ");
+    io::stdout().flush()?;
+    let s = Zeroizing::new(rpassword::read_password()?);
+    println!();
     Ok(Zeroizing::new(s.as_bytes().to_vec()))
 }
 

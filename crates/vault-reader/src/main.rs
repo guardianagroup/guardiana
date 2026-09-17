@@ -40,7 +40,10 @@ fn master(
         let e = lector::entropy_from_words(&words)?;
         lector::master_key(h, "palabras", &e)
     } else {
-        let p = rpassword::prompt_password(format!("{}: ", t(m, "clave")))?;
+        print!("{}: ", t(m, "clave"));
+        io::stdout().flush()?;
+        let p = rpassword::read_password()?;
+        println!();
         lector::master_key(h, "contrasena", p.as_bytes())
     }
 }
