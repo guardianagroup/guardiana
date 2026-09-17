@@ -2,24 +2,6 @@
 
 *Versión en español: [README.md](README.md).*
 
-> **In 30 seconds.** You let an AI talk to the network: GUARDIANA names the services it called —
-> never the content — and lets you cut the line. For the first 24 hours it only watches. Free, open
-> source (GPL‑3.0), Windows and Linux. **Version 1.0: 5 October 2026, 15:00 UTC.** There is no
-> download here until that day: there is the code it is built from, and the hash of every release is
-> published before the file itself.
->
-> To try it from source, without touching the machine's DNS or asking for administrator rights:
->
-> ```bash
-> cargo build --locked
-> GUARDIANA_DATA=/tmp/guardiana ./target/debug/guardiana observe --listen 127.0.0.1:5335 --upstream 1.1.1.1
-> dig -p 5335 @127.0.0.1 example.com     # in another terminal
-> GUARDIANA_DATA=/tmp/guardiana ./target/debug/guardiana ledger
-> ```
->
-> That starts the guardian on an unprivileged port, resolves one query and prints what it wrote down.
-
-
 A program for Windows and Linux that turns the computer into the **DNS guardian of the home**:
 first of itself, then of the phones, the TV and everything that uses the Wi‑Fi, without
 installing anything on them. It sees which services each device tries to talk to, classifies it,
@@ -33,15 +15,15 @@ the lists) and each one is recorded in the ledger itself.
 - What it does not do, in those words: [docs/WHAT_IT_DOES_NOT_DO.md](docs/WHAT_IT_DOES_NOT_DO.md)
 - Threat model: [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)
 - How to check that what you installed is what was published: [docs/VERIFY.md](docs/VERIFY.md)
+- The vault: open format and independent reader: [docs/BOVEDA.md](docs/BOVEDA.md) (Spanish)
 - Home Mode (phones without an app): [docs/HOGAR.md](docs/HOGAR.md) and the guides for the
   [router](docs/guias/router.md), [iPhone](docs/guias/iphone.md) and [Android](docs/guias/android.md)
 - Which lists are used and under which licence: [docs/LISTS.md](docs/LISTS.md)
 - Closed beta guide: [docs/BETA.md](docs/BETA.md)
-- Decisions taken and the test log live in the working repository; everything that affects what the
-  program promises is here (above) and at https://guardianagroup.com
+- Decisions taken and tests done: [docs/DECISIONES.md](docs/DECISIONES.md), [docs/PRUEBAS.md](docs/PRUEBAS.md)
 
 The documentation is written in Spanish; the program's interface is in Spanish, with English on
-the way.
+the way (see decision 45 in `docs/DECISIONES.md`).
 
 ## Install
 
@@ -64,6 +46,7 @@ download. After installing, `guardiana verify` checks it on your machine.
 ```
 guardiana panel          opens the panel in the browser (the only interface)
 guardiana verify         fingerprint, signature, service, system DNS, ports, lists, chain
+guardiana boveda         the encrypted vault: create, store, extract, log, recover (docs/BOVEDA.md)
 guardiana dns --status   where the system DNS points
 guardiana hogar status   Home Mode status
 guardiana ledger --check checks the ledger chain

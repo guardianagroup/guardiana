@@ -1,0 +1,33 @@
+[package]
+name = "guardiana-vault-reader"
+description = "guardiana-lector: reads a GUARDIANA vault with nothing but the published format (DECISIONES #103)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+name = "guardiana_vault_reader"
+path = "src/lib.rs"
+
+[[bin]]
+name = "guardiana-lector"
+path = "src/main.rs"
+
+[dependencies]
+# The same two primitives the format names, and nothing of the product.
+argon2 = { workspace = true }
+chacha20poly1305 = { workspace = true }
+sha2 = { workspace = true }
+serde_json = { workspace = true }
+rpassword = { workspace = true }
+
+[dev-dependencies]
+# Only to prove in a test that what the product writes, this reader opens.
+guardiana-vault = { workspace = true }
+
+[lints]
+workspace = true

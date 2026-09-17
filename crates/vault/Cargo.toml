@@ -1,0 +1,27 @@
+[package]
+name = "guardiana-vault"
+description = "HumanVault: the encrypted container on the user's machine (format, keys, objects, access log, recovery)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+# Argon2id: the master password becomes a key slowly and with a lot of memory (concept §04, DECISIONES #103).
+argon2 = { workspace = true }
+# XChaCha20-Poly1305: every object is encrypted and authenticated; one flipped byte fails loudly (concept §04).
+chacha20poly1305 = { workspace = true }
+# Keys are wiped from memory when they go out of scope (concept §05.5).
+zeroize = { workspace = true }
+# OS randomness for the master key, salts, nonces and the recovery words. Already in the tree.
+getrandom = { workspace = true }
+# SHA-256 for the access-log chain and the 24-word checksum. Already in the tree.
+sha2 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

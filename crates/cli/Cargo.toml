@@ -23,6 +23,9 @@ guardiana-panel = { workspace = true }
 guardiana-devices = { workspace = true }
 guardiana-verify = { workspace = true }
 guardiana-license = { workspace = true }
+guardiana-vault = { workspace = true }
+rpassword = { workspace = true }
+zeroize = { workspace = true }
 tokio = { workspace = true }
 serde_json = { workspace = true }
 
