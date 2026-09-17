@@ -29,7 +29,17 @@ commit="$(git rev-parse HEAD)"
 date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 [ -f "$keys/minisign.key" ] || { echo "release.sh: no $keys/minisign.key (run build/keys.sh on the release machine)" >&2; exit 1; }
-command -v minisign >/dev/null 2>&1 || { echo "release.sh: minisign is required" >&2; exit 1; }
+# The signer: minisign, or rsign (cargo install rsign2), which writes the same format.
+# The release Mac has no Homebrew, so minisign is not installable there; rsign is, and
+# it was the one used for the 16 sep 2026 rehearsal (decision 120).
+if command -v minisign >/dev/null 2>&1; then
+    firmar() { minisign -Sm "$1" -s "$keys/minisign.key" -t "$2"; }
+elif command -v rsign >/dev/null 2>&1; then
+    firmar() { rsign sign -s "$keys/minisign.key" -x "$1.minisig" -t "$2" "$1"; }
+else
+    echo "release.sh: minisign or rsign is required (cargo install rsign2)" >&2
+    exit 1
+fi
 if grep -q DEV-NOT-A-KEY build/pubkey/minisign.pub; then
     echo "release.sh: build/pubkey/minisign.pub is the development placeholder; run build/keys.sh first" >&2
     exit 1
@@ -47,7 +57,7 @@ win="$out/guardiana-$version-windows-x86_64.exe"
 
 # 2. minisign signatures over the unsigned binaries.
 for f in "$linux" "$win"; do
-    minisign -Sm "$f" -s "$keys/minisign.key" -t "guardiana $version $(basename "$f")"
+    firmar "$f" "guardiana $version $(basename "$f")"
 done
 sha_linux="$(sha256sum "$linux" | cut -d' ' -f1)"
 sha_win_unsigned="$(sha256sum "$win" | cut -d' ' -f1)"
@@ -100,14 +110,37 @@ PY
 
 # 6. Rekor: sign the line itself and upload; the uuid goes into the line.
 echo "$line" > "$out/ledger-line.json"
-minisign -Sm "$out/ledger-line.json" -s "$keys/minisign.key"
+firmar "$out/ledger-line.json" "guardiana $version ledger line"
 rekor_uuid=""
 if command -v rekor-cli >/dev/null 2>&1; then
     rekor_uuid="$(rekor-cli upload --artifact "$out/ledger-line.json" --signature "$out/ledger-line.json.minisig" \
         --pki-format minisign --public-key build/pubkey/minisign.pub --format json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("Location","").rsplit("/",1)[-1])')"
     line="$(python3 -c 'import json,sys; l=json.loads(sys.argv[1]); l["rekor_uuid"]=sys.argv[2]; print(json.dumps(l, separators=(",",":")))' "$line" "$rekor_uuid")"
 else
-    echo "release.sh: rekor-cli not found; upload $out/ledger-line.json by hand and fill rekor_uuid before publishing." >&2
+    # No rekor-cli: the public log takes the same entry over its REST API, which is
+    # all this needs and one dependency less. Rehearsed on 16 sep 2026 (decision 120);
+    # note that the staging instance refuses "rekord" entries, so a rehearsal that
+    # wants a real uuid has to use the production log, like the release does.
+    rekor_uuid="$(python3 - "$out/ledger-line.json" "$out/ledger-line.json.minisig" build/pubkey/minisign.pub <<'PYREKOR'
+import base64, json, sys, urllib.request, urllib.error
+art, sig, pub = (open(p, "rb").read() for p in sys.argv[1:4])
+cuerpo = {"apiVersion": "0.0.1", "kind": "rekord", "spec": {
+    "data": {"content": base64.b64encode(art).decode()},
+    "signature": {"format": "minisign", "content": base64.b64encode(sig).decode(),
+                  "publicKey": {"content": base64.b64encode(pub).decode()}}}}
+req = urllib.request.Request("https://rekor.sigstore.dev/api/v1/log/entries",
+                             data=json.dumps(cuerpo).encode(),
+                             headers={"Content-Type": "application/json"})
+try:
+    with urllib.request.urlopen(req, timeout=30) as r:
+        print(r.headers.get("Location", "").rsplit("/", 1)[-1])
+except urllib.error.HTTPError as e:
+    print("", file=sys.stdout)
+    print("release.sh: Rekor refused the entry: %s %s" % (e.code, e.read()[:200].decode("utf-8", "replace")), file=sys.stderr)
+PYREKOR
+)"
+    [ -n "$rekor_uuid" ] || echo "release.sh: no rekor uuid; upload $out/ledger-line.json by hand before publishing." >&2
+    line="$(python3 -c 'import json,sys; l=json.loads(sys.argv[1]); l["rekor_uuid"]=sys.argv[2]; print(json.dumps(l, separators=(",",":")))' "$line" "$rekor_uuid")"
 fi
 
 # 7. Append and commit. The download is published only after this commit is pushed.
