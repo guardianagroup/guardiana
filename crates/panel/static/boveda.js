@@ -40,6 +40,7 @@
   async function refresh() {
     estado = await api('/api/estado');
     $('ruta').textContent = estado.ruta;
+    $('volver').href = estado.panel; $('volver2').href = estado.panel;
     show('s-crear', !estado.existe);
     show('s-abrir', estado.existe && !estado.abierta);
     // While the 24 words are on screen, nothing else: the person reads and copies them first.

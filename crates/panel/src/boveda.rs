@@ -41,6 +41,8 @@ const MAX_UPLOAD: usize = 2 * 1024 * 1024 * 1024;
 struct Estado {
     dir: PathBuf,
     token: String,
+    /// The main panel, with its token when this process can read the token file (same as the launcher).
+    panel_url: String,
     kdf: KdfParams,
     vault: Mutex<Option<Vault>>,
     last: Mutex<Instant>,
@@ -82,6 +84,12 @@ impl Servidor {
         format!("http://{}/?t={}", self.addr, self.token)
     }
 
+    /// A handle that stops the server from another thread (Enter in the terminal).
+    #[must_use]
+    pub fn parada(&self) -> Parada {
+        Parada(self.estado.clone())
+    }
+
     /// Serve until the page says "Salir" or the server has been idle for half an hour.
     pub async fn run(self) {
         let estado = self.estado.clone();
@@ -114,6 +122,17 @@ impl Servidor {
     }
 }
 
+/// Stops a running vault page: locks the vault and lets the server return.
+pub struct Parada(Arc<Estado>);
+
+impl Parada {
+    /// Lock and stop.
+    pub fn parar(&self) {
+        self.0.lock_vault();
+        self.0.stop.notify_waiters();
+    }
+}
+
 /// Bind the vault page on a free loopback port with a fresh token. `dir` is the vault folder
 /// (it may not exist yet: the page offers to create it).
 pub async fn bind(dir: PathBuf) -> Result<Servidor, Error> {
@@ -130,9 +149,14 @@ pub async fn bind_with(dir: PathBuf, kdf: KdfParams) -> Result<Servidor, Error> 
         .await
         .map_err(|e| Error::Bind(listen, e))?;
     let addr = listener.local_addr().map_err(|e| Error::Bind(listen, e))?;
+    let panel_url =
+        std::fs::read_to_string(guardiana_core::paths::data_dir().join(crate::TOKEN_FILE))
+            .map(|t| format!("http://127.0.0.1:{}/?t={}", crate::DEFAULT_PORT, t.trim()))
+            .unwrap_or_else(|_| format!("http://127.0.0.1:{}/", crate::DEFAULT_PORT));
     let estado = Arc::new(Estado {
         dir,
         token: token.clone(),
+        panel_url,
         kdf,
         vault: Mutex::new(None),
         last: Mutex::new(Instant::now()),
@@ -300,6 +324,8 @@ struct EstadoJson {
     abierta: bool,
     ruta: String,
     id: Option<String>,
+    /// Where "back to the panel" goes.
+    panel: String,
 }
 
 async fn estado_api(State(s): State<Arc<Estado>>, _: Llave) -> Result<Json<EstadoJson>, Response> {
@@ -315,6 +341,7 @@ async fn estado_api(State(s): State<Arc<Estado>>, _: Llave) -> Result<Json<Estad
         abierta,
         ruta: s.dir.display().to_string(),
         id,
+        panel: s.panel_url.clone(),
     }))
 }
 
@@ -367,6 +394,7 @@ async fn abrir(
         abierta: true,
         ruta: s.dir.display().to_string(),
         id: Some(id),
+        panel: s.panel_url.clone(),
     }))
 }
 

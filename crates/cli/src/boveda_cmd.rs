@@ -335,9 +335,19 @@ fn panel(t: &i18n::Texts, d: &Path, abrir: bool) -> Result<(), Box<dyn Error>> {
         let s = guardiana_panel::boveda::bind(d.to_owned()).await?;
         let url = s.url();
         println!("{}", t.cli("boveda_panel_abriendo").replace("{url}", &url));
+        println!("{}", t.cli("boveda_panel_volver"));
         if abrir {
             crate::engine::open_in_browser(&url);
         }
+        // Enter in this terminal closes the page and comes back (to the menu, or to the prompt).
+        // End of input without a line (a pipe, a service) is not a request to stop.
+        let parada = s.parada();
+        std::thread::spawn(move || {
+            let mut linea = String::new();
+            if matches!(io::stdin().lock().read_line(&mut linea), Ok(n) if n > 0) {
+                parada.parar();
+            }
+        });
         s.run().await;
         Ok::<(), Box<dyn Error>>(())
     })

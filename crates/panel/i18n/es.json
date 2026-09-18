@@ -195,7 +195,8 @@
     "boveda_err_cadena": "La cadena del registro se rompe en la línea {n}.",
     "menu.boveda_archivo": "Ruta del archivo que quieres guardar en la bóveda: ",
     "menu.boveda_cual": "ID o nombre del archivo que quieres sacar: ",
-    "boveda_panel_abriendo": "La página de la bóveda está en {url} (solo en este equipo). Se cierra sola con «Salir» o tras media hora sin usarla; Ctrl+C también la cierra."
+    "boveda_panel_abriendo": "La página de la bóveda está en {url} (solo en este equipo). Se cierra con «Salir», con Intro aquí, o sola tras media hora sin usarla.",
+    "boveda_panel_volver": "Pulsa Intro aquí para cerrar la página y volver."
   },
   "panel": {
     "nav_radiografia": "Radiografía",
@@ -572,8 +573,9 @@
     "bov_clave_corta": "La contraseña debe tener al menos 10 caracteres.",
     "bov_clave_distinta": "Las dos contraseñas no coinciden.",
     "bov_cerrada": "La bóveda está cerrada. Ábrela con la contraseña.",
-    "bov_salido": "La bóveda está cerrada y esta página ya no responde. Puedes cerrar la pestaña.",
+    "bov_salido": "La bóveda está cerrada y esta página ya no responde. Puedes cerrar la pestaña o volver al panel.",
     "bov_limite": "Límites, dichos aquí: la contraseña viaja de esta página al programa dentro de tu equipo (127.0.0.1), nunca fuera. Las claves se borran de la memoria al cerrar la bóveda. No hay puerta trasera: si pierdes la contraseña y las 24 palabras, el contenido se pierde. El formato es público y hay un lector aparte que abre la bóveda sin GUARDIANA.",
-    "bov_espera": "Un momento: la contraseña se convierte en clave despacio, a propósito."
+    "bov_espera": "Un momento: la contraseña se convierte en clave despacio, a propósito.",
+    "bov_volver": "← Panel de GUARDIANA"
   }
 }

@@ -195,7 +195,8 @@
     "boveda_err_cadena": "The log chain breaks at line {n}.",
     "menu.boveda_archivo": "Path of the file you want to store in the vault: ",
     "menu.boveda_cual": "ID or name of the file you want out: ",
-    "boveda_panel_abriendo": "The vault page is at {url} (only on this machine). It closes with «Exit» or after half an hour idle; Ctrl+C closes it too."
+    "boveda_panel_abriendo": "The vault page is at {url} (only on this machine). It closes with «Exit», with Enter here, or by itself after half an hour idle.",
+    "boveda_panel_volver": "Press Enter here to close the page and go back."
   },
   "panel": {
     "nav_radiografia": "Snapshot",
@@ -572,8 +573,9 @@
     "bov_clave_corta": "The password needs at least 10 characters.",
     "bov_clave_distinta": "The two passwords do not match.",
     "bov_cerrada": "The vault is locked. Open it with the password.",
-    "bov_salido": "The vault is locked and this page no longer answers. You can close the tab.",
+    "bov_salido": "The vault is locked and this page no longer answers. You can close the tab or go back to the panel.",
     "bov_limite": "Limits, said here: the password travels from this page to the program inside your machine (127.0.0.1), never outside. Keys are wiped from memory when the vault is locked. There is no back door: lose the password and the 24 words and the content is lost. The format is public and a separate reader opens the vault without GUARDIANA.",
-    "bov_espera": "One moment: the password is turned into a key slowly, on purpose."
+    "bov_espera": "One moment: the password is turned into a key slowly, on purpose.",
+    "bov_volver": "← GUARDIANA panel"
   }
 }
