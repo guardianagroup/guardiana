@@ -74,7 +74,7 @@
     "observe.panel_error": "The panel could not start: {error}. Guardiana keeps watching without a panel.",
     "observe.retencion": "Retention on: detail 24 hours, daily totals 7 days (free plan).",
     "menu.titulo": "GUARDIANA · test menu (development version)",
-    "menu.opciones": "  1  Watch in test mode (changes nothing) and open the panel\n  2  See the logbook\n  3  Watch for real: change this machine's DNS, with your permission\n  4  Undo the DNS change\n  5  DNS status\n  6  Home Mode: turn on\n  7  Home Mode: turn off\n  8  Home Mode: status\n  9  Service: install (Guardiana starts with Windows and watches without a window)\n 10  Service: remove\n 11  Open the panel in the browser\n 12  Service: status\n 14  Licence: status\n 13  Verify: fingerprint, signature, DNS, ports, lists (guardiana verify)\n  0  Exit",
+    "menu.opciones": "  1  Watch in test mode (changes nothing) and open the panel\n  2  See the logbook\n  3  Watch for real: change this machine's DNS, with your permission\n  4  Undo the DNS change\n  5  DNS status\n  6  Home Mode: turn on\n  7  Home Mode: turn off\n  8  Home Mode: status\n  9  Service: install (Guardiana starts with Windows and watches without a window)\n 10  Service: remove\n 11  Open the panel in the browser\n 12  Service: status\n 13  Verify: fingerprint, signature, DNS, ports, lists (guardiana verify)\n 14  Licence: status\n 15  Vault: create (shows the 24 words once)\n 16  Vault: store a file, encrypted\n 17  Vault: see what is inside\n 18  Vault: write a decrypted copy\n 19  Vault: log of openings\n  0  Exit",
     "menu.elige": "Choose a number and press Enter: ",
     "menu.no_entiendo": "I did not understand the option. Type only the number.",
     "menu.volver": "Press Enter to go back to the menu.",
@@ -192,7 +192,9 @@
     "boveda_err_existe": "There is already a vault at {ruta}.",
     "boveda_err_no_hay": "No vault at {ruta}. Create it with «guardiana boveda crear».",
     "boveda_err_objeto": "No object «{que}» in the vault.",
-    "boveda_err_cadena": "The log chain breaks at line {n}."
+    "boveda_err_cadena": "The log chain breaks at line {n}.",
+    "menu.boveda_archivo": "Path of the file you want to store in the vault: ",
+    "menu.boveda_cual": "ID or name of the file you want out: "
   },
   "panel": {
     "nav_radiografia": "Snapshot",

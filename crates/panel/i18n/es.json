@@ -74,7 +74,7 @@
     "observe.panel_error": "No se pudo arrancar el panel: {error}. Guardiana sigue observando sin panel.",
     "observe.retencion": "Retención en marcha: detalle 24 horas, totales diarios 7 días (plan gratis).",
     "menu.titulo": "GUARDIANA · menú de pruebas (versión de desarrollo)",
-    "menu.opciones": "  1  Observar en modo prueba (no cambia nada) y abrir el panel\n  2  Ver el cuaderno de registro\n  3  Vigilar de verdad: cambiar el DNS de este equipo, con tu permiso\n  4  Deshacer el cambio de DNS\n  5  Estado del DNS\n  6  Modo Hogar: encender\n  7  Modo Hogar: apagar\n  8  Modo Hogar: estado\n  9  Servicio: instalar (Guardiana arranca sola con Windows y vigila sin ventana)\n 10  Servicio: quitar\n 11  Abrir el panel en el navegador\n 12  Servicio: estado\n 14  Licencia: estado\n 13  Verificar: huella, firma, DNS, puertos, listas (guardiana verify)\n  0  Salir",
+    "menu.opciones": "  1  Observar en modo prueba (no cambia nada) y abrir el panel\n  2  Ver el cuaderno de registro\n  3  Vigilar de verdad: cambiar el DNS de este equipo, con tu permiso\n  4  Deshacer el cambio de DNS\n  5  Estado del DNS\n  6  Modo Hogar: encender\n  7  Modo Hogar: apagar\n  8  Modo Hogar: estado\n  9  Servicio: instalar (Guardiana arranca sola con Windows y vigila sin ventana)\n 10  Servicio: quitar\n 11  Abrir el panel en el navegador\n 12  Servicio: estado\n 13  Verificar: huella, firma, DNS, puertos, listas (guardiana verify)\n 14  Licencia: estado\n 15  Bóveda: crear (te enseña las 24 palabras una sola vez)\n 16  Bóveda: guardar un archivo cifrado\n 17  Bóveda: ver lo que hay dentro\n 18  Bóveda: sacar una copia descifrada\n 19  Bóveda: registro de aperturas\n  0  Salir",
     "menu.elige": "Elige un número y pulsa Intro: ",
     "menu.no_entiendo": "No he entendido la opción. Escribe solo el número.",
     "menu.volver": "Pulsa Intro para volver al menú.",
@@ -192,7 +192,9 @@
     "boveda_err_existe": "Ya hay una bóveda en {ruta}.",
     "boveda_err_no_hay": "No hay ninguna bóveda en {ruta}. Créala con «guardiana boveda crear».",
     "boveda_err_objeto": "No hay ningún objeto «{que}» en la bóveda.",
-    "boveda_err_cadena": "La cadena del registro se rompe en la línea {n}."
+    "boveda_err_cadena": "La cadena del registro se rompe en la línea {n}.",
+    "menu.boveda_archivo": "Ruta del archivo que quieres guardar en la bóveda: ",
+    "menu.boveda_cual": "ID o nombre del archivo que quieres sacar: "
   },
   "panel": {
     "nav_radiografia": "Radiografía",

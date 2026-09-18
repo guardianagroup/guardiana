@@ -110,6 +110,16 @@ fn watch_for_real() -> Result<(), Box<dyn Error>> {
     result
 }
 
+/// One `guardiana boveda` action from the menu (the vault lives in the person's folder, decision 126).
+fn boveda(cmd: &str, arg: Option<&str>) -> Result<(), Box<dyn Error>> {
+    let mut o = Opts::default();
+    o.positional_push(cmd);
+    if let Some(a) = arg {
+        o.positional_push(a);
+    }
+    crate::boveda_cmd::run(&o)
+}
+
 fn run_choice(choice: &str) -> Result<bool, Box<dyn Error>> {
     let t = i18n::current();
     match choice {
@@ -171,6 +181,25 @@ fn run_choice(choice: &str) -> Result<bool, Box<dyn Error>> {
         "11" => crate::panel_cmd::run(&Opts::default())?,
         "12" => crate::service_cmd::status()?,
         "13" => crate::verify_cmd::run(&Opts::default())?,
+        "14" => crate::licencia_cmd::run(&Opts::default())?,
+        "15" => boveda("crear", None)?,
+        "16" => {
+            if let Some(p) = ask(t.cli("menu.boveda_archivo")) {
+                let p = p.trim_matches('"').trim();
+                if !p.is_empty() {
+                    boveda("guardar", Some(p))?;
+                }
+            }
+        }
+        "17" => boveda("lista", None)?,
+        "18" => {
+            if let Some(q) = ask(t.cli("menu.boveda_cual")) {
+                if !q.is_empty() {
+                    boveda("sacar", Some(&q))?;
+                }
+            }
+        }
+        "19" => boveda("registro", None)?,
         "0" | "q" | "salir" => return Ok(false),
         _ => println!("{}", t.cli("menu.no_entiendo")),
     }
