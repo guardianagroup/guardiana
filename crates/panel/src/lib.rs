@@ -11,6 +11,7 @@
 
 mod api;
 mod auth;
+pub mod boveda;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -134,11 +135,14 @@ pub fn panel_url(addr: SocketAddr, token: &str) -> String {
     format!("http://{addr}/?t={token}")
 }
 
-fn static_response(body: &'static str, content_type: &'static str) -> Response {
+pub(crate) fn static_response(body: &'static str, content_type: &'static str) -> Response {
     ([(header::CONTENT_TYPE, content_type)], body).into_response()
 }
 
-async fn add_security_headers(req: axum::extract::Request, next: middleware::Next) -> Response {
+pub(crate) async fn add_security_headers(
+    req: axum::extract::Request,
+    next: middleware::Next,
+) -> Response {
     let mut res = next.run(req).await;
     let h = res.headers_mut();
     h.insert(

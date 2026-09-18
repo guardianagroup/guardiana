@@ -52,6 +52,8 @@ header.top .lang { margin-left: auto; font-size: 0.8rem; padding: 0.3rem 0.7rem;
 #share-canvas { max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 10px; }
 .wide { width: 100%; }
 .wrap-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+/* The vault page: the 24 recovery words in three columns (no inline styles: CSP). */
+.palabras { columns: 3; font-size: 1rem; }
 .print-only { display: none; }
 
 /* "Guardar en PDF": the browser prints the page; hide what is not the document. */

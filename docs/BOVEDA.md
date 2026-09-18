@@ -123,6 +123,19 @@ recuperación (decisión 103): sin el equipo, con la contraseña o las 24 palabr
 - No hay puerta trasera, ni de soporte: quien pierda la contraseña **y** las 24 palabras **y** tres
   trozos pierde el contenido. Se dice antes de crear la bóveda.
 
+## La página de la bóveda
+
+`guardiana boveda panel` (o la opción 20 del menú de doble clic) arranca un servidor pequeño **en el
+propio equipo** (127.0.0.1, puerto libre, un token nuevo por arranque que viaja en la URL una vez y
+después en una cabecera) y abre el navegador. La página es la misma hoja de estilo del panel: crear
+la bóveda (enseña las 24 palabras una sola vez), abrirla, guardar un archivo (se sube por HTTP dentro
+del equipo y se cifra aquí), ver lo que hay, sacar una copia, el registro de aperturas con su cadena,
+cambiar la contraseña, recuperar con las 24 palabras. Va aparte del panel principal a propósito: el
+panel corre dentro del servicio del sistema y la bóveda es de la persona; así las claves viven en un
+proceso de la persona y **se borran al cerrar la bóveda, a los 10 minutos sin usarla, y el servidor
+se apaga con «Salir» o a la media hora**. `Host` comprobado, sin código de terceros, sin cookies.
+La contraseña sale de la página al programa por 127.0.0.1 y no va a ningún otro sitio.
+
 ## Cómo se usa (terminal)
 
 ```
@@ -136,5 +149,6 @@ guardiana boveda recuperar                  entra con las 24 palabras y pone con
 guardiana boveda trozos                     parte las palabras en 5 trozos
 guardiana boveda juntar                     3 trozos → las 24 palabras
 guardiana boveda capsula CARPETA            copia a un disco externo, con el lector
+guardiana boveda panel [--no-open]          la página de la bóveda en el navegador (solo en este equipo)
 guardiana-lector lista|sacar|registro CARPETA [--palabras]    lo mismo sin GUARDIANA
 ```

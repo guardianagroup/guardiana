@@ -22,6 +22,11 @@ qrcode = { workspace = true }
 guardiana-devices = { workspace = true }
 guardiana-verify = { workspace = true }
 guardiana-license = { workspace = true }
+guardiana-vault = { workspace = true }
+
+[dev-dependencies]
+# Only the vault page test talks HTTP to itself.
+ureq = { workspace = true, features = ["json"] }
 
 [lints]
 workspace = true

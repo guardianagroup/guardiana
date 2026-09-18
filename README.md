@@ -44,6 +44,7 @@ descarga. Después de instalar, `guardiana verify` lo comprueba en tu equipo.
 guardiana panel          abre el panel en el navegador (la única interfaz)
 guardiana verify         huella, firma, servicio, DNS del sistema, puertos, listas, cadena
 guardiana boveda         la bóveda cifrada: crear, guardar, sacar, registro, recuperar (docs/BOVEDA.md)
+guardiana boveda panel   la página de la bóveda en el navegador, solo en este equipo
 guardiana dns --status   a dónde apunta el DNS del sistema
 guardiana hogar status   estado del Modo Hogar
 guardiana ledger --check comprueba la cadena del extracto

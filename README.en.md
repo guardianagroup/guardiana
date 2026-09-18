@@ -47,6 +47,7 @@ download. After installing, `guardiana verify` checks it on your machine.
 guardiana panel          opens the panel in the browser (the only interface)
 guardiana verify         fingerprint, signature, service, system DNS, ports, lists, chain
 guardiana boveda         the encrypted vault: create, store, extract, log, recover (docs/BOVEDA.md)
+guardiana boveda panel   the vault page in the browser, on this machine only
 guardiana dns --status   where the system DNS points
 guardiana hogar status   Home Mode status
 guardiana ledger --check checks the ledger chain

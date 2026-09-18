@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Guardiana · Bóveda</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-page="boveda">
+<header class="top">
+  <span class="brand">Guardiana · <span data-t="bov_marca">Bóveda</span></span>
+  <nav><span class="muted" data-t="bov_solo_aqui"></span></nav>
+</header>
+<main id="arriba">
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<h1 data-t="bov_titulo"></h1>
+<p class="lead" data-t="bov_lead"></p>
+<p class="muted"><span data-t="bov_ruta"></span> <code id="ruta" class="mono"></code></p>
+
+<section id="s-crear" class="hidden">
+  <div class="card">
+    <h2 data-t="bov_crear_titulo"></h2>
+    <p class="lead" data-t="bov_crear_lead"></p>
+    <form id="f-crear" class="filters">
+      <label><span data-t="bov_clave"></span><input type="password" name="a" autocomplete="new-password" required minlength="10"></label>
+      <label><span data-t="bov_clave_repite"></span><input type="password" name="b" autocomplete="new-password" required minlength="10"></label>
+      <button type="submit" data-t="bov_crear_boton"></button> <span id="m-crear" class="bad"></span>
+    </form>
+  </div>
+</section>
+
+<section id="s-palabras" class="hidden">
+  <div class="card">
+    <h2 data-t="bov_palabras_titulo"></h2>
+    <p class="lead" data-t="bov_palabras_texto"></p>
+    <ol id="palabras" class="mono palabras"></ol>
+    <button id="b-palabras-listo" data-t="bov_palabras_listo"></button>
+  </div>
+</section>
+
+<section id="s-abrir" class="hidden">
+  <div class="card">
+    <h2 data-t="bov_abrir_titulo"></h2>
+    <form id="f-abrir" class="filters">
+      <label><span data-t="bov_clave"></span><input type="password" name="a" autocomplete="current-password" required></label>
+      <button type="submit" data-t="bov_abrir_boton"></button> <span id="m-abrir" class="bad"></span>
+    </form>
+  </div>
+  <details class="card">
+    <summary data-t="bov_recuperar_titulo"></summary>
+    <p class="lead" data-t="bov_recuperar_lead"></p>
+    <form id="f-recuperar" class="filters">
+      <label class="wide"><span data-t="bov_palabras_campo"></span><textarea name="palabras" rows="3" class="mono wide" required></textarea></label>
+      <label><span data-t="bov_clave_nueva"></span><input type="password" name="nueva" autocomplete="new-password" required minlength="10"></label>
+      <label><span data-t="bov_clave_repite"></span><input type="password" name="nueva2" autocomplete="new-password" required minlength="10"></label>
+      <button type="submit" data-t="bov_recuperar_boton"></button> <span id="m-recuperar" class="bad"></span>
+    </form>
+  </details>
+</section>
+
+<section id="s-abierta" class="hidden">
+  <p><span class="ok" data-t="bov_abierta"></span> · <span class="muted" data-t="bov_bloqueo"></span> · <button id="b-cerrar" class="secondary" data-t="bov_cerrar"></button> <button id="b-salir" class="secondary" data-t="bov_salir"></button></p>
+  <div class="card">
+    <h2 data-t="bov_guardar_titulo"></h2>
+    <p class="lead" data-t="bov_guardar_lead"></p>
+    <form id="f-subir" class="filters">
+      <label><span data-t="bov_archivo"></span><input type="file" name="archivo" required></label>
+      <button type="submit" data-t="bov_guardar_boton"></button> <span id="m-subir" class="ok"></span>
+    </form>
+  </div>
+  <h2 data-t="bov_lista_titulo"></h2>
+  <p id="vacia" class="lead hidden" data-t="bov_vacia"></p>
+  <div class="card wrap"><table><thead><tr><th data-t="bov_col_nombre"></th><th data-t="bov_col_tamano"></th><th data-t="bov_col_guardado"></th><th data-t="bov_col_huella"></th><th></th></tr></thead><tbody id="objetos"></tbody></table></div>
+  <details class="card">
+    <summary data-t="bov_cambiar_titulo"></summary>
+    <form id="f-contrasena" class="filters">
+      <label><span data-t="bov_clave_nueva"></span><input type="password" name="nueva" autocomplete="new-password" required minlength="10"></label>
+      <label><span data-t="bov_clave_repite"></span><input type="password" name="nueva2" autocomplete="new-password" required minlength="10"></label>
+      <button type="submit" data-t="bov_cambiar_boton"></button> <span id="m-contrasena" class="ok"></span>
+    </form>
+  </details>
+</section>
+
+<section id="s-registro" class="hidden">
+  <h2 data-t="bov_registro_titulo"></h2>
+  <p id="cadena" class="lead"></p>
+  <div class="card wrap"><table><thead><tr><th data-t="bov_col_n"></th><th data-t="bov_col_hora"></th><th data-t="bov_col_accion"></th><th data-t="bov_col_objeto"></th><th data-t="bov_col_detalle"></th></tr></thead><tbody id="registro"></tbody></table></div>
+</section>
+
+<p id="salido" class="card hidden" data-t="bov_salido"></p>
+<p class="limit" data-t="bov_limite"></p>
+</main>
+<footer><span data-t="pie"></span></footer>
+<script src="/static/boveda.js"></script>
+</body>
+</html>

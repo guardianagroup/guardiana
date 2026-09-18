@@ -327,6 +327,22 @@ fn capsula(t: &i18n::Texts, d: &Path, dest: &Path) -> Result<(), Box<dyn Error>>
     Ok(())
 }
 
+/// `guardiana boveda panel`: the vault's own page, served by this process on a loopback port until
+/// the page says "Salir", half an hour idle, or Ctrl+C (decision 131).
+fn panel(t: &i18n::Texts, d: &Path, abrir: bool) -> Result<(), Box<dyn Error>> {
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(async {
+        let s = guardiana_panel::boveda::bind(d.to_owned()).await?;
+        let url = s.url();
+        println!("{}", t.cli("boveda_panel_abriendo").replace("{url}", &url));
+        if abrir {
+            crate::engine::open_in_browser(&url);
+        }
+        s.run().await;
+        Ok::<(), Box<dyn Error>>(())
+    })
+}
+
 /// Entry point of `guardiana boveda`.
 pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
     let t = i18n::current();
@@ -343,6 +359,7 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
         (Some("trozos"), _) => trozos(t, &d),
         (Some("juntar"), _) => juntar(t),
         (Some("capsula" | "cápsula"), Some(p)) => capsula(t, &d, Path::new(p)),
+        (Some("panel"), _) => panel(t, &d, !opts.has("no-open")),
         _ => {
             println!(
                 "{}",

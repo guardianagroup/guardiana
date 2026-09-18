@@ -55,7 +55,7 @@ pub(crate) async fn check_host(
     next.run(req).await
 }
 
-fn strip_port(host: &str) -> &str {
+pub(crate) fn strip_port(host: &str) -> &str {
     if let Some(rest) = host.strip_prefix('[') {
         return rest.split(']').next().unwrap_or("");
     }
@@ -108,7 +108,7 @@ impl<S: Send + Sync> FromRequestParts<S> for Lang {
     }
 }
 
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+pub(crate) fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
     }

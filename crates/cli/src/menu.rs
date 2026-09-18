@@ -200,6 +200,7 @@ fn run_choice(choice: &str) -> Result<bool, Box<dyn Error>> {
             }
         }
         "19" => boveda("registro", None)?,
+        "20" => boveda("panel", None)?,
         "0" | "q" | "salir" => return Ok(false),
         _ => println!("{}", t.cli("menu.no_entiendo")),
     }

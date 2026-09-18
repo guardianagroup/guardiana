@@ -18,6 +18,7 @@ const SWITCHES: &[&str] = &[
     "open",
     "no-panel",
     "self-test",
+    "no-open",
 ];
 
 /// Parsed options after the command word.
