@@ -1,0 +1,65 @@
+# Guardiana — lista "entrega": nombres que son la carretera, no el destino.
+#
+# Una red de entrega (CDN) reparte el contenido de otras empresas. Cuando un
+# aparato pide `e673.dsce9.akamaiedge.net`, no está hablando con Akamai como
+# servicio: está recogiendo lo que otro le sirve a través de Akamai. Ponerlo
+# junto a los demás nombres, sin decirlo, hacía que una consulta de reparto
+# pareciera un destino más.
+#
+# Solo entran sufijos que **únicamente** se usan para repartir. Por eso no está
+# `amazon.com` (es una tienda) aunque sí `cloudfront.net`, ni `google.com`
+# aunque sí `gvt1.com`. Cada sección @ es la red; cada línea, un sufijo suyo.
+# Fuente: la documentación pública de cada red y los propios nombres servidos.
+# Como la lista de empresas: dice quién reparte, nunca qué hace (decisión 61).
+
+@Akamai
+akamaiedge.net
+akamai.net
+akamaized.net
+akadns.net
+edgekey.net
+edgesuite.net
+akstat.io
+
+@Cloudflare
+cloudflare.net
+cdn.cloudflare.net
+cloudflarestorage.com
+
+@Fastly
+fastly.net
+fastlylb.net
+fastly-edge.com
+
+@Amazon CloudFront
+cloudfront.net
+
+@Google
+gvt1.com
+gvt2.com
+1e100.net
+ggpht.com
+
+@Apple
+aaplimg.com
+cdn-apple.com
+
+@Microsoft
+azureedge.net
+azurefd.net
+trafficmanager.net
+
+@Edgecast
+edgecastcdn.net
+
+@Limelight
+llnwd.net
+
+@CDN77
+cdn77.org
+
+@StackPath
+stackpathdns.com
+
+@ByteDance
+ttdns2.com

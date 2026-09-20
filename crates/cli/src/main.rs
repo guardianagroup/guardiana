@@ -45,7 +45,16 @@ fn main() {
     let code = match run() {
         Ok(()) => 0,
         Err(e) => {
-            eprintln!("guardiana: {e}");
+            // Un extracto pertenece a una identidad: el que se creó con otra clave no se abre.
+            // El mensaje interno ("ledger was created for another public key…") es inglés
+            // técnico con dos huellas de 64 caracteres, y el día que le toque a alguien tiene
+            // que poder entender qué le pasa y qué hacer.
+            let texto = e.to_string();
+            if texto.contains("ledger was created for another public key") {
+                eprintln!("{}", i18n::current().cli("extracto.otra_clave"));
+            } else {
+                eprintln!("guardiana: {texto}");
+            }
             1
         }
     };
@@ -56,6 +65,13 @@ fn run() -> Result<(), Box<dyn Error>> {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     let (command, opts) = args::parse(&argv);
     let t = i18n::current();
+    // `guardiana observe --help` pedía ayuda y en su lugar intentaba arrancar: en una instalación
+    // normal la carpeta de datos es del sistema, así que lo que veía la persona era
+    // «sqlite: attempt to write a readonly database». Pedir ayuda no abre nada y no falla nunca.
+    if argv.iter().any(|a| a == "--help" || a == "-h") {
+        println!("{}", t.cli("uso"));
+        return Ok(());
+    }
     match command.as_deref() {
         Some("observe") => observe::run(&opts),
         Some("boveda" | "bóveda" | "vault") => boveda_cmd::run(&opts),

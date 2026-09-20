@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Publish a version (brief §10), in this exact order:
 #   1. reproducible build (build/repro.sh) → SHA-256 of each binary (unsigned)
+#      plus, on a Mac, GUARDIANA.app zipped (it cannot be cross-built)
 #   2. minisign signature of each binary with the release key (never in CI)
 #   3. Windows code signing (optional; fails clearly if not configured; timestamped)
 #   4. SHA-256 of the signed Windows binary
@@ -60,6 +61,26 @@ for f in "$linux" "$win"; do
     firmar "$f" "guardiana $version $(basename "$f")"
 done
 sha_linux="$(sha256sum "$linux" | cut -d' ' -f1)"
+
+# 2 bis. macOS: the .app can only be built on a Mac, so this step runs when the release machine
+# is one and is skipped, loudly, when it is not. The app is not notarised (Apple asks for a paid
+# developer account): the person sees Gatekeeper's warning and the install page explains it, the
+# same way the Windows one is explained. What replaces notarisation here is the same thing as on
+# Linux: the hash and the minisign signature, published before the download exists.
+mac=""; sha_mac=""; sig_mac=""
+if [ "$(uname)" = "Darwin" ]; then
+    cargo build --release --locked -p guardiana-cli
+    build/mac/crear-app.sh "$out/app" >/dev/null
+    mac="$out/guardiana-$version-macos.app.zip"
+    rm -f "$mac"
+    # -y stores the symlinks inside the bundle instead of following them.
+    (cd "$out/app" && zip -qry "../$(basename "$mac")" GUARDIANA.app)
+    firmar "$mac" "guardiana $version $(basename "$mac")"
+    sha_mac="$(sha256sum "$mac" | cut -d' ' -f1)"
+    sig_mac="$(sed -n '2p' "$mac.minisig")"
+else
+    echo "release.sh: not on a Mac, so no macOS app is built. Run this step on the Mac before publishing." >&2
+fi
 sha_win_unsigned="$(sha256sum "$win" | cut -d' ' -f1)"
 
 # 3. Windows code signing, optional, always timestamped.
@@ -98,13 +119,17 @@ fi
 # 5. The ledger line.
 sig_linux="$(sed -n '2p' "$linux.minisig")"
 sig_win="$(sed -n '2p' "$win.minisig")"
-line=$(python3 - "$version" "$commit" "$date" "$linux" "$sha_linux" "$sig_linux" "$win" "$sha_win_unsigned" "$sha_win_signed" "$sig_win" <<'PY'
+line=$(python3 - "$version" "$commit" "$date" "$linux" "$sha_linux" "$sig_linux" "$win" "$sha_win_unsigned" "$sha_win_signed" "$sig_win" "$mac" "$sha_mac" "$sig_mac" <<'PY'
 import json, sys, os
-v, c, d, lx, shl, sgl, wn, shwu, shws, sgw = sys.argv[1:]
-print(json.dumps({"version": v, "commit": c, "date": d, "files": [
+v, c, d, lx, shl, sgl, wn, shwu, shws, sgw, mc, shm, sgm = sys.argv[1:]
+files = [
   {"name": os.path.basename(lx), "sha256_unsigned": shl, "sha256_signed": shl, "minisign": sgl},
   {"name": os.path.basename(wn), "sha256_unsigned": shwu, "sha256_signed": shws, "minisign": sgw},
-], "rekor_uuid": ""}, separators=(",", ":")))
+]
+if mc:
+    # The Mac app is not code-signed by Apple, so signed and unsigned are the same file.
+    files.append({"name": os.path.basename(mc), "sha256_unsigned": shm, "sha256_signed": shm, "minisign": sgm})
+print(json.dumps({"version": v, "commit": c, "date": d, "files": files, "rekor_uuid": ""}, separators=(",", ":")))
 PY
 )
 

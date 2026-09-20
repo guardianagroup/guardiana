@@ -27,12 +27,23 @@ mkdir -p "$out"
 chmod 700 "$out"
 
 # ---- 1. minisign -------------------------------------------------------------
-if ! command -v minisign >/dev/null 2>&1; then
+# rsign (cargo install rsign2) writes exactly the same format and is what release.sh already
+# falls back to. The release Mac has no Homebrew, so minisign cannot be installed there and the
+# script refused to generate the identity on the very machine that will sign the releases.
+signer=""
+if command -v minisign >/dev/null 2>&1; then
+    signer=minisign
+elif command -v rsign >/dev/null 2>&1; then
+    signer=rsign
+elif [ -x "$HOME/.cargo/bin/rsign" ]; then
+    signer="$HOME/.cargo/bin/rsign"
+fi
+if [ -z "$signer" ]; then
     cat >&2 <<'MSG'
-keys.sh: minisign is not installed.
+keys.sh: neither minisign nor rsign is installed.
   Debian/Ubuntu:  sudo apt install minisign
   Fedora:         sudo dnf install minisign
-  macOS:          download from https://jedisct1.github.io/minisign/ (or brew install minisign)
+  macOS:          cargo install rsign2      (same format, no Homebrew needed)
   Windows:        download from https://jedisct1.github.io/minisign/
 MSG
     exit 1
@@ -41,8 +52,12 @@ if [ -e "$out/minisign.key" ]; then
     echo "keys.sh: $out/minisign.key already exists; refusing to overwrite an identity." >&2
     exit 1
 fi
-echo "Generating the minisign key pair. You will be asked for a password: choose a long one and keep it with the backup."
-minisign -G -p "$out/minisign.pub" -s "$out/minisign.key" -c "Guardiana release key, generated $(date -u +%Y-%m-%d)"
+echo "Generating the signing key pair with $signer. You will be asked for a password: choose a long one and keep it with the backup."
+if [ "$signer" = "minisign" ]; then
+    minisign -G -p "$out/minisign.pub" -s "$out/minisign.key" -c "Guardiana release key, generated $(date -u +%Y-%m-%d)"
+else
+    "$signer" generate -p "$out/minisign.pub" -s "$out/minisign.key" -c "Guardiana release key, generated $(date -u +%Y-%m-%d)"
+fi
 chmod 600 "$out/minisign.key"
 
 # Only the PUBLIC key enters the repository: it is embedded in every binary

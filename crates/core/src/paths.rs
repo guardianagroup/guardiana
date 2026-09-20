@@ -25,9 +25,16 @@ pub fn data_dir() -> PathBuf {
     {
         PathBuf::from("/var/lib/guardiana")
     }
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    #[cfg(target_os = "macos")]
     {
-        // macOS: development only (brief §1: macOS is out of 1.0).
+        // System-wide, like ProgramData on Windows and /var/lib on Linux: the daemon runs as
+        // root under launchd and the ledger belongs to the machine, not to one user. Pointing
+        // this at the user's home made `guardiana verify` read an empty folder and then say,
+        // confidently and wrongly, that there was no ledger and that Home Mode was off.
+        PathBuf::from("/Library/Application Support/Guardiana")
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+    {
         let home = std::env::var_os("HOME").map_or_else(|| PathBuf::from("."), PathBuf::from);
         home.join("Library/Application Support/Guardiana")
     }

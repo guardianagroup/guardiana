@@ -1,8 +1,8 @@
 # Guardiana
 
-*English version: [README.en.md](README.en.md).*
+*Idiomas: **Español** · [English](README.en.md) · [Português](README.pt.md)*
 
-Programa para Windows y Linux que convierte el PC en el **guardián DNS de la casa**:
+Programa para Windows, Linux y macOS que convierte el PC en el **guardián DNS de la casa**:
 primero de sí mismo, después de los teléfonos, el televisor y todo lo que use la Wi‑Fi, sin
 instalar nada en ellos. Ve a qué servicios intenta hablar cada dispositivo, lo clasifica, lo
 explica en una frase, lo anota en un extracto encadenado por hash y corta solo lo que el usuario
@@ -71,4 +71,6 @@ Compilación reproducible en un contenedor fijado por digest: `build/repro.sh` (
 ## Licencia
 
 GPL‑3.0‑or‑later. Las listas de terceros conservan su licencia (EasyPrivacy: GPL‑3.0 / CC BY‑SA
-3.0; lista de Peter Lowe: uso libre con atribución). Detalle en `docs/LISTS.md`.
+3.0; lista de Peter Lowe: uso libre con atribución). Detalle en `docs/LISTS.md`. Las tipografías
+que el panel sirve desde el propio equipo (IBM Plex y Unbounded) van con su licencia OFL 1.1 al
+lado, en [`crates/panel/static/fonts`](crates/panel/static/fonts/LEEME.md).

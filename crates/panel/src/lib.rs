@@ -17,7 +17,8 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use axum::http::{header, HeaderValue};
+use axum::extract::Path as RutaUrl;
+use axum::http::{header, HeaderValue, StatusCode};
 use axum::middleware;
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
@@ -133,6 +134,40 @@ impl Running {
 #[must_use]
 pub fn panel_url(addr: SocketAddr, token: &str) -> String {
     format!("http://{addr}/?t={token}")
+}
+
+/// The site's own typefaces, carried inside the binary. The panel never asks the internet for
+/// anything (brief, section 6), so looking like guardianagroup.com cannot mean fetching a font
+/// from a CDN: the six files travel with the program. Latin subset only, which is all Spanish,
+/// English and Portuguese need.
+async fn fuente(RutaUrl(archivo): RutaUrl<String>) -> Response {
+    let cuerpo: &'static [u8] = match archivo.as_str() {
+        "IBMPlexSans-400-latin.woff2" => {
+            include_bytes!("../static/fonts/IBMPlexSans-400-latin.woff2")
+        }
+        "IBMPlexSans-500-latin.woff2" => {
+            include_bytes!("../static/fonts/IBMPlexSans-500-latin.woff2")
+        }
+        "IBMPlexSans-600-latin.woff2" => {
+            include_bytes!("../static/fonts/IBMPlexSans-600-latin.woff2")
+        }
+        "IBMPlexMono-400-latin.woff2" => {
+            include_bytes!("../static/fonts/IBMPlexMono-400-latin.woff2")
+        }
+        "IBMPlexMono-500-latin.woff2" => {
+            include_bytes!("../static/fonts/IBMPlexMono-500-latin.woff2")
+        }
+        "Unbounded-latin.woff2" => include_bytes!("../static/fonts/Unbounded-latin.woff2"),
+        _ => return StatusCode::NOT_FOUND.into_response(),
+    };
+    (
+        [
+            (header::CONTENT_TYPE, "font/woff2"),
+            (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
+        ],
+        cuerpo,
+    )
+        .into_response()
 }
 
 pub(crate) fn static_response(body: &'static str, content_type: &'static str) -> Response {
@@ -261,6 +296,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
                     .into_response()
             }),
         )
+        .route("/static/fonts/{archivo}", get(fuente))
         .route(
             "/static/app.js",
             get(|| async {
@@ -276,9 +312,12 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/cambios", get(api::cambios))
         .route("/api/ia", get(api::ia))
         .route("/api/ia/alcance", post(api::alcance))
+        .route("/api/ia/alcance/anadir", post(api::alcance_anadir))
         .route("/api/dns/aplicar", post(api::dns_aplicar))
         .route("/api/dns/restaurar", post(api::dns_restaurar))
         .route("/api/radiografia", get(api::radiografia))
+        .route("/api/rafagas", get(api::rafagas))
+        .route("/api/recibo", get(api::recibo))
         .route("/api/extracto", get(api::extracto))
         .route("/api/extracto/comprobar", get(api::comprobar))
         .route("/api/extracto/exportar", get(api::exportar))

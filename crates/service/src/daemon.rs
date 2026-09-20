@@ -1,5 +1,5 @@
 //! Running as a system service (brief §2, §11): registration with the
-//! Windows Service Control Manager and with systemd on Linux. The service
+//! Windows Service Control Manager, with systemd on Linux and with launchd on macOS. The service
 //! process is `guardiana service run`; this module installs, removes,
 //! starts, stops and reports it. The engine itself lives in the CLI crate.
 
@@ -16,7 +16,7 @@ pub const DESCRIPTION: &str =
 /// Errors of service management.
 #[derive(Debug)]
 pub enum Error {
-    /// Not supported on this platform (macOS is development only).
+    /// Not supported on this platform.
     Unsupported,
     /// A system call or command failed.
     System(String),
@@ -27,7 +27,7 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Unsupported => f.write_str("the service is only available on Windows and Linux"),
+            Self::Unsupported => f.write_str("the service is not available on this platform"),
             Self::System(s) => write!(f, "service: {s}"),
             Self::Privileges => f.write_str("administrator privileges required"),
         }
@@ -250,7 +250,133 @@ mod imp {
     }
 }
 
-#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+// ---------------------------------------------------------------------------
+// macOS (launchd)
+// ---------------------------------------------------------------------------
+
+#[cfg(target_os = "macos")]
+mod imp {
+    use std::path::Path;
+
+    use super::{Error, State};
+    use crate::sysdns::run_checked;
+
+    /// The same label and path the Mac installer uses, so both agree on what is installed.
+    const LABEL: &str = "com.guardianagroup.guardiana";
+    const PLIST: &str = "/Library/LaunchDaemons/com.guardianagroup.guardiana.plist";
+    const DATA: &str = "/Library/Application Support/Guardiana";
+
+    fn launchctl(args: &[&str]) -> Result<String, Error> {
+        run_checked("launchctl", args).map_err(|e| {
+            let text = e.to_string();
+            if text.contains("Operation not permitted") || text.contains("Permission denied") {
+                Error::Privileges
+            } else {
+                Error::System(text)
+            }
+        })
+    }
+
+    /// The resolvers the Mac uses today, which become the daemon's upstream. Without one,
+    /// pointing the Mac at a resolver with nothing behind it would leave it with no names.
+    fn upstreams() -> Vec<String> {
+        run_checked("scutil", &["--dns"])
+            .map(|t| {
+                let mut v: Vec<String> = crate::sysdns::parse_scutil_dns(&t)
+                    .into_iter()
+                    .filter(|ip| !ip.is_loopback() && ip.is_ipv4())
+                    .map(|ip| ip.to_string())
+                    .collect();
+                v.dedup();
+                v
+            })
+            .unwrap_or_default()
+    }
+
+    pub(super) fn install(exe: &Path) -> Result<(), Error> {
+        let ups = upstreams();
+        if ups.is_empty() {
+            return Err(Error::System(
+                "no current DNS found (scutil --dns): nothing was changed".to_owned(),
+            ));
+        }
+        let args: String = ups
+            .iter()
+            .map(|u| format!("<string>--upstream</string><string>{u}</string>"))
+            .collect();
+        let plist = format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+             <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
+             <plist version=\"1.0\"><dict>\n\
+             <key>Label</key><string>{LABEL}</string>\n\
+             <key>ProgramArguments</key><array><string>{}</string><string>observe</string>\
+             <string>--listen</string><string>127.0.0.1:53</string>{args}\
+             <string>--panel-listen</string><string>127.0.0.1:7443</string></array>\n\
+             <key>EnvironmentVariables</key><dict><key>GUARDIANA_DATA</key><string>{DATA}</string></dict>\n\
+             <key>RunAtLoad</key><true/>\n<key>KeepAlive</key><true/>\n\
+             <key>StandardOutPath</key><string>{DATA}/guardiana.log</string>\n\
+             <key>StandardErrorPath</key><string>{DATA}/guardiana.log</string>\n\
+             </dict></plist>\n",
+            exe.display()
+        );
+        std::fs::create_dir_all(DATA).map_err(|e| Error::System(e.to_string()))?;
+        std::fs::write(PLIST, plist).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                Error::Privileges
+            } else {
+                Error::System(e.to_string())
+            }
+        })?;
+        let _ = launchctl(&["bootout", "system", PLIST]);
+        launchctl(&["bootstrap", "system", PLIST]).map(|_| ())
+    }
+
+    pub(super) fn uninstall() -> Result<(), Error> {
+        let _ = launchctl(&["bootout", "system", PLIST]);
+        std::fs::remove_file(PLIST).or_else(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                Ok(())
+            } else if e.kind() == std::io::ErrorKind::PermissionDenied {
+                Err(Error::Privileges)
+            } else {
+                Err(Error::System(e.to_string()))
+            }
+        })
+    }
+
+    pub(super) fn start() -> Result<(), Error> {
+        if !Path::new(PLIST).exists() {
+            return Err(Error::System("the service is not installed".to_owned()));
+        }
+        // Already loaded: restart it. Not loaded: load it.
+        if launchctl(&["print", &format!("system/{LABEL}")]).is_ok() {
+            launchctl(&["kickstart", "-k", &format!("system/{LABEL}")]).map(|_| ())
+        } else {
+            launchctl(&["bootstrap", "system", PLIST]).map(|_| ())
+        }
+    }
+
+    pub(super) fn stop() -> Result<(), Error> {
+        // launchd restarts a KeepAlive job, so stopping means taking it out of the
+        // session; the plist stays, which is what "installed but stopped" means here.
+        launchctl(&["bootout", "system", PLIST]).map(|_| ())
+    }
+
+    pub(super) fn state() -> Result<State, Error> {
+        if !Path::new(PLIST).exists() {
+            return Ok(State::NotInstalled);
+        }
+        Ok(
+            if launchctl(&["print", &format!("system/{LABEL}")]).is_ok() {
+                State::Running
+            } else {
+                State::Stopped
+            },
+        )
+    }
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
 mod imp {
     use std::path::Path;
 

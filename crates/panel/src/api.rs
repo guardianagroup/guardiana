@@ -45,7 +45,7 @@ fn with_ledger<T>(
 }
 
 /// An event as the pages show it: with device name and the signal sentences.
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub(crate) struct EventView {
     id: i64,
     ts: i64,
@@ -63,6 +63,37 @@ pub(crate) struct EventView {
     empresa: Option<&'static str>,
     /// The artificial-intelligence service the name belongs to (decision 62), or `None`.
     ia: Option<&'static str>,
+    /// The delivery network that serves the name (decision 148), or `None`. Used to say
+    /// "delivery" instead of "unknown" for a name that is the road, not the destination.
+    entrega: Option<&'static str>,
+    /// Whether the name is the home network talking to itself (decision 148): reverse
+    /// lookups, mDNS and service discovery, which are not a destination at all.
+    local: bool,
+    /// What the company behind the name does for a living, in one sentence (decision 149).
+    /// `None` when it is not written: a company name is not a trade, and guessing one would be
+    /// exactly the invented verdict this program refuses to give.
+    oficio: Option<String>,
+}
+
+/// The sentence for a name: first the name itself and its parent domains, then the company
+/// that owns it. `app-measurement.com` belongs to Google, whose trade does not fit in one
+/// sentence, but that name alone does: Firebase measurement. Looking at the name first is what
+/// lets a broad owner still carry a precise line where one is true.
+fn oficio_de(t: &Texts, qname: &str) -> Option<String> {
+    let name = qname.trim_end_matches('.').to_ascii_lowercase();
+    let mut rest = name.as_str();
+    loop {
+        if let Some(f) = t.oficio(rest) {
+            return Some(f.to_owned());
+        }
+        match rest.split_once('.') {
+            Some((_, r)) if r.contains('.') => rest = r,
+            _ => break,
+        }
+    }
+    guardiana_lists::company_of(qname)
+        .and_then(|c| t.oficio(c))
+        .map(str::to_owned)
 }
 
 fn view(t: &Texts, e: Event, names: &HashMap<String, Option<String>>) -> EventView {
@@ -71,6 +102,9 @@ fn view(t: &Texts, e: Event, names: &HashMap<String, Option<String>>) -> EventVi
         device_name: names.get(&e.device_id).cloned().flatten(),
         empresa: guardiana_lists::company_of(&e.qname),
         ia: guardiana_lists::ai_service_of(&e.qname),
+        entrega: guardiana_lists::delivery_of(&e.qname),
+        local: guardiana_lists::is_local_name(&e.qname),
+        oficio: oficio_de(t, &e.qname),
         id: e.id,
         ts: e.ts,
         qname: e.qname,
@@ -123,11 +157,7 @@ fn filter_from(q: &HashMap<String, String>) -> Result<EventFilter, Response> {
 
 /// The whole texts file, so pages and CLI share every sentence.
 pub(crate) async fn textos(Lang(t): Lang) -> Response {
-    let body = if std::ptr::eq(t, i18n::en()) {
-        i18n::EN_JSON
-    } else {
-        i18n::ES_JSON
-    };
+    let body = i18n::json_of(t);
     (
         [(header::CONTENT_TYPE, "application/json; charset=utf-8")],
         body,
@@ -297,6 +327,9 @@ pub(crate) struct Estado {
     dns_aplicado: bool,
     listas: Vec<ListaInfo>,
     panel_puerto: u16,
+    /// Which system this is running on. The panel uses it to say, on a Mac, that Home Mode is
+    /// not part of 1.0 there: the site says so and the program must not offer it silently.
+    so: &'static str,
 }
 
 #[derive(Serialize)]
@@ -345,6 +378,13 @@ pub(crate) async fn estado(State(state): State<Arc<AppState>>, _s: Session) -> A
         dns_aplicado,
         listas,
         panel_puerto: crate::DEFAULT_PORT,
+        so: if cfg!(target_os = "macos") {
+            "macos"
+        } else if cfg!(target_os = "windows") {
+            "windows"
+        } else {
+            "linux"
+        },
     }))
 }
 
@@ -474,6 +514,12 @@ fn scope_key(device_id: &str) -> String {
     format!("alcance:{device_id}")
 }
 
+/// Whether the declared scope cuts or only reports, per device. The engine reads this
+/// same key on its own beat (`crates/cli/src/engine.rs`).
+fn scope_mode_key(device_id: &str) -> String {
+    format!("alcance_modo:{device_id}")
+}
+
 /// A name is inside the declared scope when it equals a pattern or hangs below it.
 fn in_scope(patterns: &[String], qname: &str) -> bool {
     let name = qname.trim_end_matches('.').to_ascii_lowercase();
@@ -505,6 +551,12 @@ pub(crate) struct AlcanceView {
     fuera_total: usize,
     /// Distinct names inside it.
     dentro_total: usize,
+    /// Whether the person asked for what falls outside to be cut, not just listed
+    /// (decision 154). Off unless they turn it on.
+    cortar: bool,
+    /// When a temporary pass is running, the moment it ends and the cut comes back.
+    /// For the person who sends a long job and walks away (decision 155).
+    pase_hasta: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -545,6 +597,10 @@ pub(crate) async fn ia(State(state): State<Arc<AppState>>, _s: Session) -> ApiRe
                     slot.1 = slot.1.max(e.ts);
                 }
             }
+            let modo = l.setting(&scope_mode_key(&d.id))?.unwrap_or_default();
+            let pase_hasta = modo
+                .strip_prefix("observar:")
+                .and_then(|x| x.parse::<i64>().ok());
             let patrones: Vec<String> = l
                 .setting(&scope_key(&d.id))?
                 .unwrap_or_default()
@@ -582,6 +638,8 @@ pub(crate) async fn ia(State(state): State<Arc<AppState>>, _s: Session) -> ApiRe
                 fuera,
                 fuera_total,
                 dentro_total: dentro.len(),
+                cortar: modo == "cortar" || pase_hasta.is_some_and(|t| now >= t),
+                pase_hasta: pase_hasta.filter(|t| now < *t),
             });
         }
         let names = names_of(&devices);
@@ -609,6 +667,13 @@ pub(crate) async fn ia(State(state): State<Arc<AppState>>, _s: Session) -> ApiRe
 #[derive(Deserialize)]
 pub(crate) struct AlcanceBody {
     device_id: String,
+    /// "cortar" to stop what falls outside; anything else only reports it.
+    #[serde(default)]
+    modo: Option<String>,
+    /// Hours of temporary pass: nothing is cut until they are up, then the cut is back
+    /// on its own. For sending a long job and walking away.
+    #[serde(default)]
+    pase_horas: Option<i64>,
     /// The declared destinations as typed, one per line. Empty clears the declaration.
     patrones: String,
 }
@@ -635,7 +700,59 @@ pub(crate) async fn alcance(
         .filter(|x| !x.is_empty() && x.contains('.') && !x.contains(' ') && !x.contains('/'))
         .collect();
     with_ledger(&state, |l| {
-        l.set_setting(&scope_key(&body.device_id), &cleaned.join("\n"))
+        l.set_setting(&scope_key(&body.device_id), &cleaned.join("\n"))?;
+        if let Some(h) = body.pase_horas {
+            let hasta = now_ms() + h.clamp(1, 24) * 3600 * 1000;
+            l.set_setting(
+                &scope_mode_key(&body.device_id),
+                &format!("observar:{hasta}"),
+            )?;
+        } else if let Some(m) = &body.modo {
+            let modo = if m == "cortar" { "cortar" } else { "observar" };
+            l.set_setting(&scope_mode_key(&body.device_id), modo)?;
+        }
+        Ok(())
+    })?;
+    ia(State(state), _s).await
+}
+
+/// Body of "add this name to the scope".
+#[derive(Deserialize)]
+pub(crate) struct AnadirBody {
+    device_id: String,
+    nombre: String,
+}
+
+/// Add one name to a device's declared scope. This is the answer to a name that was cut
+/// for falling outside it: from now on it goes through. What was already cut stays cut in
+/// the ledger, because it happened.
+pub(crate) async fn alcance_anadir(
+    State(state): State<Arc<AppState>>,
+    _s: Session,
+    Json(body): Json<AnadirBody>,
+) -> ApiResult<IaView> {
+    let nombre = body
+        .nombre
+        .trim()
+        .trim_start_matches("*.")
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
+    if nombre.is_empty() || !nombre.contains('.') || nombre.contains(' ') || nombre.contains('/') {
+        return Err((StatusCode::BAD_REQUEST, "bad name").into_response());
+    }
+    with_ledger(&state, |l| {
+        let key = scope_key(&body.device_id);
+        let mut lineas: Vec<String> = l
+            .setting(&key)?
+            .unwrap_or_default()
+            .lines()
+            .map(|x| x.trim().to_owned())
+            .filter(|x| !x.is_empty())
+            .collect();
+        if !lineas.iter().any(|x| x == &nombre) {
+            lineas.push(nombre.clone());
+        }
+        l.set_setting(&key, &lineas.join("\n"))
     })?;
     ia(State(state), _s).await
 }
@@ -686,6 +803,227 @@ pub(crate) async fn radiografia(
         cortados: c.blocked,
         eventos,
     }))
+}
+
+/// A burst: several different names asked by the same device within a couple of seconds.
+///
+/// A row on its own says little; the cluster is the story. When a phone asks for the shop, two
+/// of the shop's own tracking hosts, an attribution company and a product-analytics company in
+/// the same second, that is one act, not six. Nothing here is inferred about content: it is the
+/// same events the ledger already holds, read together instead of one by one.
+#[derive(Serialize)]
+pub(crate) struct Rafaga {
+    /// When the first name of the burst was asked.
+    ts: i64,
+    device_id: String,
+    device_name: Option<String>,
+    /// How long the burst lasted, in milliseconds.
+    duracion_ms: i64,
+    /// The distinct names, in the order they were asked.
+    nombres: Vec<EventView>,
+    /// The distinct companies behind them, as far as the lists know.
+    empresas: Vec<String>,
+    /// How many of those companies have a written trade (measurement, attribution, ads...).
+    con_oficio: usize,
+}
+
+/// Bursts inside one device's events, oldest first: groups separated by less than two seconds
+/// with at least `minimo` distinct names. Shared by the bursts list and the receipt.
+fn rafagas_de(evs: &[EventView], minimo: usize) -> Vec<Rafaga> {
+    const HUECO_MS: i64 = 2000;
+    let mut salida: Vec<Rafaga> = Vec::new();
+    let mut grupo: Vec<&EventView> = Vec::new();
+    let cerrar = |grupo: &Vec<&EventView>, salida: &mut Vec<Rafaga>| {
+        let mut vistos: Vec<&EventView> = Vec::new();
+        for e in grupo {
+            if !vistos.iter().any(|v| v.qname == e.qname) {
+                vistos.push(e);
+            }
+        }
+        if vistos.len() < minimo {
+            return;
+        }
+        let mut empresas: Vec<String> = Vec::new();
+        for e in &vistos {
+            if let Some(c) = e.empresa {
+                if !empresas.iter().any(|x| x == c) {
+                    empresas.push(c.to_owned());
+                }
+            }
+        }
+        let ts = vistos.first().map_or(0, |e| e.ts);
+        let fin = vistos.last().map_or(ts, |e| e.ts);
+        salida.push(Rafaga {
+            ts,
+            device_id: vistos
+                .first()
+                .map_or(String::new(), |e| e.device_id.clone()),
+            device_name: vistos.first().and_then(|e| e.device_name.clone()),
+            duracion_ms: fin - ts,
+            con_oficio: vistos.iter().filter(|e| e.oficio.is_some()).count(),
+            empresas,
+            nombres: vistos.iter().map(|e| (**e).clone()).collect(),
+        });
+    };
+    for e in evs {
+        if grupo.last().is_some_and(|u| e.ts - u.ts > HUECO_MS) {
+            cerrar(&grupo, &mut salida);
+            grupo.clear();
+        }
+        grupo.push(e);
+    }
+    cerrar(&grupo, &mut salida);
+    salida
+}
+
+/// Bursts of the last hours, newest first. `horas` (default 24) and `min` (default 4 names).
+pub(crate) async fn rafagas(
+    Lang(t): Lang,
+    State(state): State<Arc<AppState>>,
+    _s: Session,
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult<Vec<Rafaga>> {
+    let horas: i64 = q.get("horas").and_then(|s| s.parse().ok()).unwrap_or(24);
+    let minimo: usize = q.get("min").and_then(|s| s.parse().ok()).unwrap_or(4);
+    let since = now_ms() - horas.clamp(1, 24 * 30) * 3600 * 1000;
+    let (events, devices) = with_ledger(&state, |l| {
+        let events = l.events(&EventFilter {
+            since: Some(since),
+            limit: Some(5000),
+            ..EventFilter::default()
+        })?;
+        Ok((events, l.devices()?))
+    })?;
+    let names = names_of(&devices);
+    // Oldest first, so a burst is read in the order it happened. Sorted, not reversed: the
+    // order the ledger hands them back is not part of its contract, and assuming it produced
+    // one burst of 817 names with a negative duration.
+    let mut evs: Vec<EventView> = events.into_iter().map(|e| view(t, e, &names)).collect();
+    evs.sort_by_key(|e| e.ts);
+
+    let mut por_aparato: HashMap<String, Vec<EventView>> = HashMap::new();
+    for e in evs {
+        por_aparato.entry(e.device_id.clone()).or_default().push(e);
+    }
+    let mut salida: Vec<Rafaga> = Vec::new();
+    for (_, evs) in por_aparato {
+        salida.extend(rafagas_de(&evs, minimo));
+    }
+    salida.sort_by_key(|r| std::cmp::Reverse(r.ts));
+    salida.truncate(20);
+    Ok(Json(salida))
+}
+
+/// The receipt of one device over a window: the few lines a person can repeat out loud.
+///
+/// The ledger of ten thousand rows convinces nobody; this does. Every figure here is counted
+/// from the same events, and the window is published with it because on the free plan the
+/// detail only goes back a day. Nothing about content: the last line says so.
+#[derive(Serialize)]
+pub(crate) struct Recibo {
+    device_id: String,
+    device_name: Option<String>,
+    desde: i64,
+    hasta: i64,
+    /// Distinct names asked in the window.
+    nombres: usize,
+    /// Distinct companies behind them, as far as the lists know.
+    empresas: usize,
+    /// Of those, how many have a written trade (measurement, attribution, ads...).
+    empresas_con_oficio: usize,
+    /// The names of those companies, for the sentence.
+    oficios: Vec<String>,
+    /// Heartbeats seen: name and period in minutes.
+    latidos: Vec<(String, u32)>,
+    /// Attempts to leave through encrypted DNS, which this ledger cannot see inside.
+    evasiones: usize,
+    /// Queries answered with a cut in the window.
+    cortadas: usize,
+    /// The largest burst of the window, when there was one.
+    rafaga: Option<Rafaga>,
+}
+
+/// One receipt per device. `dias` (default 7) is trimmed to what the ledger actually holds.
+pub(crate) async fn recibo(
+    Lang(t): Lang,
+    State(state): State<Arc<AppState>>,
+    _s: Session,
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult<Vec<Recibo>> {
+    let dias: i64 = q.get("dias").and_then(|s| s.parse().ok()).unwrap_or(7);
+    let hasta = now_ms();
+    let desde = hasta - dias.clamp(1, 90) * 24 * 3600 * 1000;
+    let (events, devices) = with_ledger(&state, |l| {
+        let events = l.events(&EventFilter {
+            since: Some(desde),
+            limit: Some(20000),
+            ..EventFilter::default()
+        })?;
+        Ok((events, l.devices()?))
+    })?;
+    let names = names_of(&devices);
+    let mut evs: Vec<EventView> = events.into_iter().map(|e| view(t, e, &names)).collect();
+    evs.sort_by_key(|e| e.ts);
+
+    let mut por_aparato: HashMap<String, Vec<EventView>> = HashMap::new();
+    for e in evs {
+        por_aparato.entry(e.device_id.clone()).or_default().push(e);
+    }
+    let mut salida: Vec<Recibo> = Vec::new();
+    for (device_id, evs) in por_aparato {
+        let mut nombres: Vec<&str> = Vec::new();
+        let mut empresas: Vec<&str> = Vec::new();
+        let mut oficios: Vec<String> = Vec::new();
+        let mut latidos: Vec<(String, u32)> = Vec::new();
+        let mut evasiones = 0usize;
+        let mut cortadas = 0usize;
+        for e in &evs {
+            if !nombres.contains(&e.qname.as_str()) {
+                nombres.push(&e.qname);
+            }
+            if let Some(c) = e.empresa {
+                if !empresas.contains(&c) {
+                    empresas.push(c);
+                    if e.oficio.is_some() {
+                        oficios.push(c.to_owned());
+                    }
+                }
+            }
+            for s in &e.signals {
+                match s {
+                    Signal::Baliza { minutes } => {
+                        if !latidos.iter().any(|(n, _)| n == &e.qname) {
+                            latidos.push((e.qname.clone(), *minutes));
+                        }
+                    }
+                    Signal::EvasionDns => evasiones += 1,
+                    _ => {}
+                }
+            }
+            if e.verdict == "cortado" {
+                cortadas += 1;
+            }
+        }
+        let rafaga = rafagas_de(&evs, 4)
+            .into_iter()
+            .max_by_key(|r| r.nombres.len());
+        salida.push(Recibo {
+            device_name: evs.first().and_then(|e| e.device_name.clone()),
+            device_id,
+            desde: evs.first().map_or(desde, |e| e.ts),
+            hasta,
+            nombres: nombres.len(),
+            empresas: empresas.len(),
+            empresas_con_oficio: oficios.len(),
+            oficios,
+            latidos,
+            evasiones,
+            cortadas,
+            rafaga,
+        });
+    }
+    salida.sort_by_key(|r| std::cmp::Reverse(r.nombres));
+    Ok(Json(salida))
 }
 
 #[derive(Serialize)]
@@ -921,16 +1259,27 @@ pub(crate) async fn sabe_de_ti(
     State(state): State<Arc<AppState>>,
     _s: Session,
 ) -> ApiResult<SabeDeTi> {
-    let (counts, outbound, plus) = with_ledger(&state, |l| {
-        let plus = guardiana_license::status(l, &state.token, now_ms())
-            .map(|s| s.plus_activo)
-            .unwrap_or(false);
-        Ok((l.table_counts()?, l.outbound()?, plus))
+    let (counts, outbound, estado) = with_ledger(&state, |l| {
+        let estado = guardiana_license::status(l, &state.token, now_ms()).ok();
+        Ok((l.table_counts()?, l.outbound()?, estado))
     })?;
-    let retention_key = if plus || Retention::FREE.detail_ms.is_none() {
-        "retencion_ilimitada"
+    let completa = estado.as_ref().is_some_and(|s| s.retencion_completa);
+    let plus = estado.as_ref().is_some_and(|s| s.plus_activo);
+    // Three states, not two: Plus, the grace after Plus (decision 168) and the free plan. Saying
+    // "24 hours" during the grace would be a lie in the direction that matters, because the
+    // person would export in a hurry what is not going anywhere yet.
+    let hasta = estado.as_ref().and_then(|s| s.retencion_gratis_desde);
+    let retencion = if plus || Retention::FREE.detail_ms.is_none() {
+        t.panel("retencion_ilimitada").to_owned()
+    } else if completa {
+        t.panel("retencion_gracia").replace(
+            "{fecha}",
+            &hasta.map_or_else(String::new, |ms| {
+                guardiana_core::time::rfc3339_utc(ms)[..10].to_owned()
+            }),
+        )
     } else {
-        "retencion_gratis"
+        t.panel("retencion_gratis").to_owned()
     };
     Ok(Json(SabeDeTi {
         eventos: counts.events,
@@ -938,7 +1287,7 @@ pub(crate) async fn sabe_de_ti(
         reglas: counts.rules,
         nombres_vistos: counts.seen_domains,
         ruta: state.db_path.display().to_string(),
-        retencion: t.panel(retention_key).to_owned(),
+        retencion,
         outbound: outbound
             .into_iter()
             .map(|o| OutboundView {
@@ -1727,9 +2076,19 @@ fn licencia_texto(t: &Texts, s: &guardiana_license::Status) -> String {
             .panel("licencia_prueba")
             .replace("{d}", &dias_restantes.to_string())
             .replace("{fecha}", &day(*termina)),
-        Plan::PruebaAgotada { termino } => t
-            .panel("licencia_prueba_agotada")
-            .replace("{fecha}", &day(*termino)),
+        Plan::PruebaAgotada { termino } => {
+            let mut text = t
+                .panel("licencia_prueba_agotada")
+                .replace("{fecha}", &day(*termino));
+            if let Some(hasta) = s.retencion_gratis_desde.filter(|_| s.retencion_completa) {
+                text.push(' ');
+                text.push_str(
+                    &t.panel("licencia_retencion_gracia")
+                        .replace("{fecha}", &day(hasta)),
+                );
+            }
+            text
+        }
         Plan::Plus {
             origen,
             desde,
@@ -1753,6 +2112,14 @@ fn licencia_texto(t: &Texts, s: &guardiana_license::Status) -> String {
                 .replace("{fecha}", &day(*desde))
                 .replace("{titular}", titular.as_deref().unwrap_or("-"));
             match (periodo_dias, proxima_comprobacion, comprobacion) {
+                // Una licencia comprada una vez no tiene periodo ni próxima comprobación, así
+                // que sin esta rama el panel se quedaba callado justo con quien más pagó. Se
+                // dice lo bueno y lo otro: no caduca por estar sin conexión, pero una
+                // devolución sí la termina.
+                (Some(p), _, _) if *p == guardiana_license::DE_POR_VIDA => {
+                    text.push(' ');
+                    text.push_str(t.panel("licencia_de_por_vida"));
+                }
                 (Some(p), Some(next), Some(c)) => {
                     let key = match c {
                         Comprobacion::AlDia => "licencia_comprobacion_al_dia",
@@ -1786,13 +2153,25 @@ fn licencia_texto(t: &Texts, s: &guardiana_license::Status) -> String {
             }
             text
         }
-        Plan::PlusTerminado { termino, motivo } => t
-            .panel(match motivo.as_str() {
-                "cancelada" => "licencia_plus_cancelada",
-                "caducada" => "licencia_plus_caducada",
-                _ => "licencia_plus_sin_comprobar",
-            })
-            .replace("{fecha}", &day(*termino)),
+        Plan::PlusTerminado { termino, motivo } => {
+            let mut text = t
+                .panel(match motivo.as_str() {
+                    "cancelada" => "licencia_plus_cancelada",
+                    "caducada" => "licencia_plus_caducada",
+                    _ => "licencia_plus_sin_comprobar",
+                })
+                .replace("{fecha}", &day(*termino));
+            if s.retencion_completa {
+                if let Some(hasta) = s.retencion_gratis_desde {
+                    text.push(' ');
+                    text.push_str(
+                        &t.panel("licencia_retencion_gracia")
+                            .replace("{fecha}", &day(hasta)),
+                    );
+                }
+            }
+            text
+        }
     }
 }
 
@@ -1907,4 +2286,58 @@ pub(crate) async fn licencia_archivo(
         return Err((StatusCode::CONFLICT, e).into_response());
     }
     Ok(Json(licencia_view(t, &state)?))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use guardiana_license::{Plan, Status, RETENCION_GRACIA_DIAS};
+
+    fn estado(plan: Plan, retencion_completa: bool, desde: Option<i64>) -> Status {
+        Status {
+            plan,
+            plus_activo: false,
+            hogar_permitido: true,
+            observado_ms: 0,
+            puede_probar: false,
+            retencion_completa,
+            retencion_gratis_desde: desde,
+        }
+    }
+
+    #[test]
+    fn la_pantalla_de_licencia_dice_hasta_cuando_no_se_borra_nada() {
+        let t = guardiana_core::i18n::es();
+        let fin = 1_760_000_000_000;
+        let hasta = fin + RETENCION_GRACIA_DIAS * guardiana_core::time::DAY_MS;
+        let dentro = licencia_texto(
+            t,
+            &estado(
+                Plan::PlusTerminado {
+                    termino: fin,
+                    motivo: "cancelada".to_owned(),
+                },
+                true,
+                Some(hasta),
+            ),
+        );
+        // La fecha hasta la que no se borra nada tiene que estar escrita, no insinuada.
+        let dia = guardiana_core::time::rfc3339_utc(hasta)[..10].to_owned();
+        assert!(dentro.contains(&dia), "{dentro}");
+        assert!(dentro.contains("no se toca"), "{dentro}");
+
+        // Pasada la gracia, la pantalla no promete lo que ya no se cumple.
+        let fuera = licencia_texto(
+            t,
+            &estado(
+                Plan::PlusTerminado {
+                    termino: fin,
+                    motivo: "cancelada".to_owned(),
+                },
+                false,
+                Some(hasta),
+            ),
+        );
+        assert!(!fuera.contains(&dia), "{fuera}");
+    }
 }

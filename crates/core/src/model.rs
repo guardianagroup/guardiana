@@ -85,6 +85,11 @@ str_enum! {
         ReglaUsuario => "regla_usuario",
         /// Nobody: plain observation.
         Nadie => "nadie",
+        /// The name fell outside the scope the user declared for that device, and the
+        /// device is set to cut what is outside it (decision 154). Kept apart from
+        /// `ReglaUsuario` because the person did not name this destination: they named
+        /// what the agent was allowed, and this was not in it.
+        AlcanceDeclarado => "alcance_declarado",
     }
 }
 

@@ -84,6 +84,31 @@ struct Inner {
     devices_seen: HashMap<String, i64>,
     rules: RuleCache,
     recorded: u64,
+    /// Declared scope per device: whether to cut what is outside it, and the patterns.
+    /// Read from the settings and refreshed on the same 2-second beat as the rules,
+    /// because `decide` runs on the resolver's hot path and must not touch the disk
+    /// on every query.
+    alcances: HashMap<String, Alcance>,
+    alcances_vistos: Option<Instant>,
+}
+
+/// What a device's declared scope says (decision 154).
+#[derive(Clone, Default)]
+struct Alcance {
+    /// The user asked for what falls outside to be cut, not just shown.
+    cortar: bool,
+    /// Domains allowed for this device; a name matches if it is one of them or under it.
+    patrones: Vec<String>,
+}
+
+impl Alcance {
+    /// Whether the name falls inside the declared scope.
+    fn cubre(&self, name: &str) -> bool {
+        let n = name.trim_end_matches('.').to_ascii_lowercase();
+        self.patrones
+            .iter()
+            .any(|p| n == *p || n.ends_with(&format!(".{p}")))
+    }
 }
 
 /// What `decide` worked out, kept until `record` writes the event.
@@ -91,6 +116,8 @@ struct Pending {
     device_id: String,
     ip: String,
     classified: Classified,
+    /// Cut because it fell outside the declared scope, not because of a rule.
+    fuera_de_alcance: bool,
 }
 
 type PendingKey = (SocketAddr, String, String, i64);
@@ -108,6 +135,48 @@ fn key_of(q: &Query) -> PendingKey {
 }
 
 impl Inner {
+    /// The declared scope of one device, from the settings, re-read at most every two
+    /// seconds. A device with no scope written gets an empty one, which never cuts.
+    fn alcance_de(&mut self, device_id: &str) -> Alcance {
+        let caducado = self
+            .alcances_vistos
+            .is_none_or(|t| t.elapsed() >= Duration::from_secs(2));
+        if caducado {
+            self.alcances.clear();
+            self.alcances_vistos = Some(Instant::now());
+        }
+        if let Some(a) = self.alcances.get(device_id) {
+            return a.clone();
+        }
+        let patrones = self
+            .ledger
+            .setting(&format!("alcance:{device_id}"))
+            .unwrap_or_default()
+            .unwrap_or_default()
+            .lines()
+            .map(|x| x.trim().to_ascii_lowercase())
+            .filter(|x| !x.is_empty())
+            .collect();
+        // The mode is "cortar", "observar", or a temporary pass: "observar:<ms>", which is
+        // for the person who sends a long job and leaves. Until that moment nothing is cut,
+        // so the work does not die halfway with nobody there to answer; after it, the cut is
+        // back by itself. A pass that has to be turned off by hand is a pass somebody forgets.
+        let modo = self
+            .ledger
+            .setting(&format!("alcance_modo:{device_id}"))
+            .unwrap_or_default()
+            .unwrap_or_default();
+        let cortar = match modo.split_once(':') {
+            Some(("observar", hasta)) => hasta
+                .parse::<i64>()
+                .is_ok_and(|t| guardiana_core::time::now_ms() >= t),
+            _ => modo == "cortar",
+        };
+        let a = Alcance { cortar, patrones };
+        self.alcances.insert(device_id.to_owned(), a.clone());
+        a
+    }
+
     fn refresh_rules(&mut self) {
         if self.rules.checked.elapsed() < Duration::from_secs(2) {
             return;
@@ -170,6 +239,28 @@ impl Policy for EnginePolicy {
             },
             _ => Decision::Forward,
         };
+        // The declared scope, when the person asked for it to cut (decision 154). It only
+        // applies where a cut already applies: an explicit rule wins, a rule that allows
+        // wins, and nothing is cut on a device with less than 24 hours observed. The name
+        // is not resolved, so the connection never starts; the panel then asks whether to
+        // add it to the scope. It cannot undo what was already sent, and it does not reach
+        // an agent that skips this resolver.
+        let mut fuera_de_alcance = false;
+        let decision = if matches!(decision, Decision::Forward) {
+            let alcance = inner.alcance_de(&device_id);
+            if alcance.cortar
+                && !alcance.patrones.is_empty()
+                && !alcance.cubre(&q.name)
+                && guardiana_core::rules::observation_complete(q.ts - first_seen)
+            {
+                fuera_de_alcance = true;
+                Decision::Block { rule_id: None }
+            } else {
+                decision
+            }
+        } else {
+            decision
+        };
         drop(inner);
         if let Ok(mut pending) = self.pending.lock() {
             pending.insert(
@@ -178,6 +269,7 @@ impl Policy for EnginePolicy {
                     device_id,
                     ip,
                     classified,
+                    fuera_de_alcance,
                 },
             );
             // Never let a lost `record` grow the map without bound.
@@ -189,7 +281,7 @@ impl Policy for EnginePolicy {
     }
 
     fn record(&self, q: &Query, outcome: Outcome) {
-        let (verdict, decided_by, rule_id) = match outcome {
+        let (verdict, mut decided_by, rule_id) = match outcome {
             Outcome::Refused => return,
             Outcome::Forwarded { .. } | Outcome::UpstreamFailed => {
                 (Verdict::Observado, DecidedBy::Nadie, None)
@@ -205,6 +297,11 @@ impl Policy for EnginePolicy {
         else {
             return;
         };
+        // A cut with no rule behind it came from the declared scope: the ledger has to say
+        // so, because the person never named this destination.
+        if p.fuera_de_alcance && verdict == Verdict::Cortado {
+            decided_by = DecidedBy::AlcanceDeclarado;
+        }
         let Ok(mut inner) = self.inner.lock() else {
             return;
         };
@@ -381,6 +478,8 @@ async fn run_once<F: Future<Output = ()>>(
                 checked: Instant::now(),
             },
             recorded: 0,
+            alcances: HashMap::new(),
+            alcances_vistos: None,
         }),
         pending: Mutex::new(HashMap::new()),
         devices: guardiana_devices::Resolver::default(),
@@ -564,12 +663,18 @@ async fn run_once<F: Future<Output = ()>>(
                     if let Ok(mut l) = Ledger::open(&keep_db, identity::genesis()) {
                         // The once-per-period check of a Plus key (decision 52) and
                         // the retention of the plan in force: Plus keeps everything,
-                        // free keeps 24 h of detail and 7 days of totals.
+                        // free keeps 24 h of detail and 7 days of totals. For 30 days
+                        // after Plus ends nothing is deleted yet (decision 168), so
+                        // what was paid for can still be exported.
                         let _ = guardiana_license::check_if_due(&mut l, &keep_secret, now_ms());
-                        let plus = guardiana_license::status(&l, &keep_secret, now_ms())
-                            .map(|s| s.plus_activo)
+                        let completa = guardiana_license::status(&l, &keep_secret, now_ms())
+                            .map(|s| s.retencion_completa)
                             .unwrap_or(false);
-                        let policy = if plus { Retention::UNLIMITED } else { Retention::FREE };
+                        let policy = if completa {
+                            Retention::UNLIMITED
+                        } else {
+                            Retention::FREE
+                        };
                         let _ = l.prune(policy, now_ms());
                     }
                 }
@@ -633,4 +738,39 @@ pub fn open_in_browser(url: &str) {
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     let result = std::process::Command::new("xdg-open").arg(url).spawn();
     let _ = result;
+}
+
+#[cfg(test)]
+mod tests_alcance {
+    use super::Alcance;
+
+    /// The scope covers a domain and everything under it, and nothing else. A cut that
+    /// depended on a sloppy match here would break a work tool, so this is exact.
+    #[test]
+    fn scope_covers_the_domain_and_its_subdomains_only() {
+        let a = Alcance {
+            cortar: true,
+            patrones: vec!["github.com".into(), "api.anthropic.com".into()],
+        };
+        assert!(a.cubre("github.com"));
+        assert!(a.cubre("api.github.com"));
+        assert!(a.cubre("GitHub.com")); // asked in any case
+        assert!(a.cubre("github.com.")); // with the root dot, as the wire carries it
+        assert!(a.cubre("api.anthropic.com"));
+        // Not covered: a different domain that merely ends the same way, which is how
+        // a look-alike name would slip through.
+        assert!(!a.cubre("notgithub.com"));
+        assert!(!a.cubre("github.com.evil.net"));
+        assert!(!a.cubre("anthropic.com")); // the parent of an allowed subdomain
+        assert!(!a.cubre("mixpanel.com"));
+    }
+
+    /// An empty scope never cuts: nothing is written, nothing is enforced.
+    #[test]
+    fn an_empty_scope_covers_nothing_and_is_never_enforced() {
+        let a = Alcance::default();
+        assert!(!a.cortar);
+        assert!(a.patrones.is_empty());
+        assert!(!a.cubre("github.com"));
+    }
 }

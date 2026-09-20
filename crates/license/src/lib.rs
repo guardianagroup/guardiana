@@ -1,7 +1,8 @@
 //! Licensing (brief §9, decisions 52 and 53).
 //!
 //! The free guardian needs no licence and never expires: the PC and Home
-//! Mode are free. Plus is a subscription, monthly or yearly:
+//! Mode are free. Plus is a subscription, monthly or yearly — or, for the
+//! launch's limited "Fundador" licence, a single payment that never expires:
 //!
 //! - a 7-day trial that lives in the local settings, started by the user
 //!   (from the panel or `guardiana licencia probar`) and never before 24 h of
@@ -42,7 +43,7 @@ pub const SETTING_LICENSE_CHECKED_AT: &str = "license_checked_at";
 pub const SETTING_LICENSE_CHECK_FAILED_AT: &str = "license_check_failed_at";
 /// Settings key: Unix ms when the gateway said the key is no longer valid.
 pub const SETTING_LICENSE_ENDED_AT: &str = "license_ended_at";
-/// Settings key: days per billing period (30 or 365).
+/// Settings key: days per billing period (30, 365, or 0 for a licence bought once).
 pub const SETTING_LICENSE_PERIOD_DAYS: &str = "license_period_days";
 /// Trial length.
 pub const TRIAL_DAYS: i64 = 7;
@@ -52,6 +53,15 @@ pub const GRACE_DAYS: i64 = 7;
 pub const MONTH_DAYS: i64 = 30;
 /// Billing period assumed for a yearly key.
 pub const YEAR_DAYS: i64 = 365;
+/// A licence sold once, for good: it is never checked against a clock. Stored as 0 so an older
+/// installation that does not know about it falls back to the monthly rule instead of crashing.
+pub const DE_POR_VIDA: i64 = 0;
+/// Days after Plus ends in which nothing of the history is deleted yet (decision 168, asked for
+/// by the owner). Without it the hourly prune went back to `Retention::FREE` within the hour and
+/// someone who had paid for a year lost the detail of that year the moment they cancelled, with
+/// no warning. Thirty days, the same window as the refund: whoever cancels, thinks better of it
+/// and comes back finds their history whole. It costs nothing — the data is on their own disk.
+pub const RETENCION_GRACIA_DIAS: i64 = 30;
 /// Observation required before the trial can start (decision 53).
 pub const MIN_OBSERVATION_MS: i64 = 24 * HOUR_MS;
 /// The gateway (decision 50: Dodo Payments). Its licence endpoints are public.
@@ -211,13 +221,14 @@ pub enum Plan {
         desde: i64,
         /// Holder if known.
         titular: Option<String>,
-        /// Days per billing period for a key (30 or 365); `None` for a file.
+        /// Days per billing period for a key (30, 365, or 0 when it was bought once and
+        /// never expires); `None` for a file.
         periodo_dias: Option<i64>,
         /// Last successful validation, Unix ms (key only).
         comprobada: Option<i64>,
-        /// When the next validation is due, Unix ms (key only).
+        /// When the next validation is due, Unix ms (key only); `None` for a licence bought once.
         proxima_comprobacion: Option<i64>,
-        /// Hard end, Unix ms: file expiry, or end of grace for a key.
+        /// Hard end, Unix ms: file expiry, or end of grace for a key; `None` when nothing ends it.
         caduca_ms: Option<i64>,
         /// State of the periodic check (key only).
         comprobacion: Option<Comprobacion>,
@@ -245,6 +256,11 @@ pub struct Status {
     pub observado_ms: i64,
     /// Whether the user may start the trial now.
     pub puede_probar: bool,
+    /// Whether the whole history is still kept: Plus on, or inside the grace days after it ended.
+    pub retencion_completa: bool,
+    /// When the grace ends and the free retention starts to apply, Unix ms; `None` while Plus is
+    /// on and for anyone who never had it.
+    pub retencion_gratis_desde: Option<i64>,
 }
 
 /// Canonical bytes that are signed: the `licencia` object as compact JSON
@@ -334,10 +350,21 @@ struct ValidationResponse {
     valid: bool,
 }
 
-/// Billing period from the product name: yearly if it says so, monthly otherwise.
+/// Billing period from the product name: a one-off licence never expires, a yearly one is a year,
+/// anything else is a month. The lifetime case is not a detail: a person who paid once for a
+/// "Fundador" licence and then left the machine off for five weeks would have had Plus switched
+/// off by the `sin_comprobar` rule below, which exists for subscriptions and has no business
+/// touching something that was sold as permanent.
 fn period_days_from_product(name: Option<&str>) -> i64 {
     let n = name.unwrap_or("").to_lowercase();
-    if n.contains("anual") || n.contains("annual") || n.contains("year") || n.contains("año") {
+    if n.contains("fundador")
+        || n.contains("founder")
+        || n.contains("vitalicia")
+        || n.contains("lifetime")
+    {
+        DE_POR_VIDA
+    } else if n.contains("anual") || n.contains("annual") || n.contains("year") || n.contains("año")
+    {
         YEAR_DAYS
     } else {
         MONTH_DAYS
@@ -359,8 +386,18 @@ fn finish(ledger: &Ledger, plan: Plan, now: i64) -> Result<Status, Error> {
     let plus_activo = matches!(plan, Plan::Plus { .. } | Plan::Prueba { .. });
     let observado_ms = observed_ms(ledger, now)?;
     let trial_used = ledger.setting(SETTING_TRIAL_STARTED)?.is_some();
+    // The trial ending is the same cliff as the subscription ending, so it gets the same grace:
+    // in both the person watched Guardiana keep everything and would lose it without warning.
+    let fin_de_plus = match &plan {
+        Plan::PlusTerminado { termino, .. } | Plan::PruebaAgotada { termino } => Some(*termino),
+        _ => None,
+    };
+    let retencion_gratis_desde =
+        fin_de_plus.map(|t| t.saturating_add(RETENCION_GRACIA_DIAS * DAY_MS));
     Ok(Status {
         puede_probar: !plus_activo && !trial_used && observado_ms >= MIN_OBSERVATION_MS,
+        retencion_completa: plus_activo || retencion_gratis_desde.is_some_and(|hasta| now < hasta),
+        retencion_gratis_desde,
         plus_activo,
         hogar_permitido: true,
         observado_ms,
@@ -438,9 +475,19 @@ pub fn status(ledger: &Ledger, secret: &str, now: i64) -> Result<Status, Error> 
             let since = setting_i64(ledger, SETTING_LICENSE_KEY_AT)?.unwrap_or(now);
             let period = setting_i64(ledger, SETTING_LICENSE_PERIOD_DAYS)?.unwrap_or(MONTH_DAYS);
             let checked = setting_i64(ledger, SETTING_LICENSE_CHECKED_AT)?.unwrap_or(since);
-            let next = checked + period * DAY_MS;
-            let hard_end = next + GRACE_DAYS * DAY_MS;
-            if now >= hard_end {
+            // Una licencia de por vida no caduca por no haberse podido comprobar. Se sigue
+            // preguntando cuando se puede —si la pasarela dice que ya no vale, lo dice por
+            // SETTING_LICENSE_ENDED_AT, que se atiende más arriba y sigue mandando—, pero un
+            // equipo apagado, sin internet o detrás de un cortafuegos nunca apaga lo que se
+            // vendió como permanente.
+            let de_por_vida = period == DE_POR_VIDA;
+            let next = if de_por_vida {
+                i64::MAX
+            } else {
+                checked + period * DAY_MS
+            };
+            let hard_end = next.saturating_add(GRACE_DAYS * DAY_MS);
+            if !de_por_vida && now >= hard_end {
                 return finish(
                     ledger,
                     Plan::PlusTerminado {
@@ -467,8 +514,11 @@ pub fn status(ledger: &Ledger, secret: &str, now: i64) -> Result<Status, Error> 
                     .filter(|s| !s.is_empty()),
                 periodo_dias: Some(period),
                 comprobada: Some(checked),
-                proxima_comprobacion: Some(next),
-                caduca_ms: Some(hard_end),
+                // Nada de fechas inventadas: una licencia de por vida no tiene próxima
+                // comprobación ni fecha de fin, y enseñar el año 292.277.026.596 sería peor
+                // que no enseñar nada.
+                proxima_comprobacion: if de_por_vida { None } else { Some(next) },
+                caduca_ms: if de_por_vida { None } else { Some(hard_end) },
                 comprobacion: Some(comprobacion),
             };
             return finish(ledger, plan, now);
@@ -829,6 +879,111 @@ mod tests {
     }
 
     #[test]
+    fn al_terminar_plus_no_se_borra_nada_durante_treinta_dias() {
+        // El fallo que arregla (decisión 168): antes, al cancelar, el repaso de la hora
+        // siguiente volvía a la retención gratis y quien había pagado un año perdía el
+        // detalle de ese año sin haber visto un aviso.
+        let l = ledger_observing();
+        let t0 = 24 * HOUR_MS;
+        let s = start_trial(&l, "tok", t0).unwrap();
+        assert!(s.plus_activo);
+        assert!(s.retencion_completa);
+        assert_eq!(s.retencion_gratis_desde, None);
+
+        // La prueba se agota: ya no hay Plus, pero todavía no se borra nada.
+        let fin = t0 + TRIAL_DAYS * DAY_MS;
+        let s = status(&l, "tok", fin).unwrap();
+        assert!(matches!(s.plan, Plan::PruebaAgotada { .. }));
+        assert!(!s.plus_activo);
+        assert!(s.retencion_completa);
+        assert_eq!(
+            s.retencion_gratis_desde,
+            Some(fin + RETENCION_GRACIA_DIAS * DAY_MS)
+        );
+
+        // El último día de gracia sigue entero; el siguiente ya es plan gratis.
+        let s = status(&l, "tok", fin + RETENCION_GRACIA_DIAS * DAY_MS - 1).unwrap();
+        assert!(s.retencion_completa);
+        let s = status(&l, "tok", fin + RETENCION_GRACIA_DIAS * DAY_MS).unwrap();
+        assert!(!s.retencion_completa);
+        assert!(!s.plus_activo);
+    }
+
+    #[test]
+    fn una_suscripcion_cancelada_tambien_tiene_los_treinta_dias() {
+        let l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        store_key(&l, "tok", 0, "GUARDIANA Plus · mensual");
+        assert!(status(&l, "tok", DAY_MS).unwrap().plus_activo);
+
+        // La pasarela dice que ya no vale: Plus se apaga en el momento.
+        let fin = 10 * DAY_MS;
+        l.set_setting(SETTING_LICENSE_ENDED_AT, &fin.to_string())
+            .unwrap();
+        let s = status(&l, "tok", fin + DAY_MS).unwrap();
+        assert!(!s.plus_activo);
+        assert!(matches!(s.plan, Plan::PlusTerminado { ref motivo, .. } if motivo == "cancelada"));
+        // Pero el historial no: treinta días para llevárselo.
+        assert!(s.retencion_completa);
+        assert_eq!(
+            s.retencion_gratis_desde,
+            Some(fin + RETENCION_GRACIA_DIAS * DAY_MS)
+        );
+        assert!(
+            !status(&l, "tok", fin + RETENCION_GRACIA_DIAS * DAY_MS)
+                .unwrap()
+                .retencion_completa
+        );
+    }
+
+    #[test]
+    fn una_licencia_de_por_vida_no_caduca_por_no_comprobarse() {
+        // El caso que habría roto al primer Fundador: paga una vez, apaga el equipo cinco
+        // semanas y al volver se encuentra el Plus apagado por la regla de las suscripciones.
+        let l = Ledger::open_in_memory(guardiana_core::Hash::of(b"x")).unwrap();
+        l.set_setting(SETTING_LICENSE_KEY, "GUARDIANA-FUNDADOR")
+            .unwrap();
+        let activacion = r#"{"id":"inst_1","product":{"name":"GUARDIANA Fundador"}}"#;
+        l.set_setting(SETTING_LICENSE_ACTIVATION, activacion)
+            .unwrap();
+        l.set_setting(
+            SETTING_LICENSE_KEY_MARK,
+            &key_mark("tok", "GUARDIANA-FUNDADOR", activacion),
+        )
+        .unwrap();
+        l.set_setting(SETTING_LICENSE_KEY_AT, "0").unwrap();
+        l.set_setting(
+            SETTING_LICENSE_PERIOD_DAYS,
+            &period_days_from_product(Some("GUARDIANA Fundador")).to_string(),
+        )
+        .unwrap();
+        // Diez años después, sin una sola comprobación con éxito.
+        let diez_anos = 3650 * DAY_MS;
+        let s = status(&l, "tok", diez_anos).unwrap();
+        assert!(
+            s.plus_activo,
+            "una licencia comprada una vez no caduca sola"
+        );
+        match s.plan {
+            Plan::Plus {
+                proxima_comprobacion,
+                caduca_ms,
+                periodo_dias,
+                ..
+            } => {
+                assert_eq!(periodo_dias, Some(DE_POR_VIDA));
+                assert_eq!(proxima_comprobacion, None, "no hay próxima comprobación");
+                assert_eq!(caduca_ms, None, "no hay fecha de fin");
+            }
+            otro => unreachable!("esperaba Plus, llegó {otro:?}"),
+        }
+        // Pero si la pasarela dice que ya no vale (devolución, por ejemplo), termina igual.
+        l.set_setting(SETTING_LICENSE_ENDED_AT, &(2 * DAY_MS).to_string())
+            .unwrap();
+        let s2 = status(&l, "tok", diez_anos).unwrap();
+        assert!(!s2.plus_activo);
+    }
+
+    #[test]
     fn period_comes_from_the_product_name() {
         assert_eq!(
             period_days_from_product(Some("GUARDIANA Plus · mensual")),
@@ -864,7 +1019,17 @@ mod tests {
     }
 
     #[test]
-    fn dev_key_refuses_licence_files() {
-        assert!(matches!(verify_license_file("{}", 0), Err(Error::DevKey)));
+    fn licence_files_are_refused_by_key_state() {
+        // Esta prueba daba por hecho que el binario llevaba la clave de desarrollo, así que el
+        // día que se generó la clave real (19 sep 2026) se puso roja sin que nada estuviera mal.
+        // Lo que hay que fijar es la regla en los dos mundos: con la clave de pruebas no se
+        // comprueba ninguna licencia, y con la real un archivo que no es una licencia se rechaza
+        // por malformado, nunca se acepta.
+        let r = verify_license_file("{}", 0);
+        if identity::public_key_is_dev() {
+            assert!(matches!(r, Err(Error::DevKey)), "clave de pruebas: {r:?}");
+        } else {
+            assert!(matches!(r, Err(Error::Malformed(_))), "clave real: {r:?}");
+        }
     }
 }

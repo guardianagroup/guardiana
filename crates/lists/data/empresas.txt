@@ -612,3 +612,57 @@ duolingo.com
 
 @Deriv
 deriv.com
+
+# Medición, atribución y perfilado (decisión 149). Estas empresas salían como
+# «fuera de las listas» en un extracto real, y no lo son: se sabe perfectamente
+# quiénes son y de qué viven. Dominios tomados de su propia documentación.
+
+@AppsFlyer
+appsflyer.com
+appsflyersdk.com
+
+@Mixpanel
+mixpanel.com
+mxpnl.com
+
+@Amplitude
+amplitude.com
+
+@PostHog
+posthog.com
+
+@Segment
+segment.com
+segment.io
+
+@Adjust
+adjust.com
+adjust.io
+
+@Branch
+branch.io
+
+@Kochava
+kochava.com
+
+@Singular
+singular.net
+
+@Customer.io
+customer.io
+customeriomail.com
+
+@HUMAN Security
+perimeterx.net
+px-cloud.net
+humansecurity.com
+
+@Temu
+temu.com
+kwcdn.com
+
+@Moloco
+moloco.com
+
+@Iterable
+iterable.com

@@ -108,6 +108,10 @@ pub struct Report {
     pub home_mode: bool,
     /// LAN address Home Mode uses, if on.
     pub home_ip: Option<String>,
+    /// Devices with Guard mode on: everything outside their declared scope is being cut
+    /// (decision 154). `verify` exists to say what this installation is really doing, and
+    /// cutting most of a machine's traffic is the loudest thing it can be doing.
+    pub vigilante: Vec<String>,
     /// Guardiana ports found open on non-loopback addresses, as `proto/port`.
     pub lan_ports_open: Vec<String>,
     /// Whether the port list could be read at all.
@@ -314,7 +318,7 @@ pub fn run() -> Report {
     // yet (fresh install), or it may exist and belong to root (the normal case
     // on Linux, where the service runs as root and the user runs `verify`).
     let ledger_unreadable = paths::unreadable_here(&paths::ledger_path());
-    let (dns_changed, home_mode, home_ip, ledger_events, chain_ok) =
+    let (dns_changed, home_mode, home_ip, ledger_events, chain_ok, vigilante) =
         match Ledger::open(&paths::ledger_path(), identity::genesis()) {
             Ok(l) => (
                 l.setting(SETTING_BACKUP)
@@ -331,8 +335,26 @@ pub fn run() -> Report {
                     .filter(|v| !v.is_empty()),
                 l.event_count().unwrap_or(0),
                 l.check().ok().map(|r| r.is_ok()),
+                l.devices()
+                    .map(|ds| {
+                        ds.into_iter()
+                            .filter(|d| {
+                                l.setting(&format!("alcance_modo:{}", d.id))
+                                    .ok()
+                                    .flatten()
+                                    .as_deref()
+                                    == Some("cortar")
+                                    && l.setting(&format!("alcance:{}", d.id))
+                                        .ok()
+                                        .flatten()
+                                        .is_some_and(|v| !v.trim().is_empty())
+                            })
+                            .map(|d| d.name.unwrap_or(d.id))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
             ),
-            Err(_) => (false, false, None, 0, None),
+            Err(_) => (false, false, None, 0, None, Vec::new()),
         };
     // With Guardiana as the only resolver there is nothing left on the system but
     // the loopback, which `current_resolvers` leaves out on purpose. Saying "-"
@@ -367,6 +389,7 @@ pub fn run() -> Report {
         guardian_is_sole: sysdns::guardian_is_sole_resolver(),
         dns_changed_by_guardiana: dns_changed,
         home_mode,
+        vigilante,
         home_ip,
         lan_ports_open: lan_ports,
         lan_ports_checked,
@@ -438,7 +461,16 @@ pub fn render_with(t: &guardiana_core::i18n::Texts, report: &Report) -> String {
     };
     // Different sentence when the guardian is the only resolver: the servers listed
     // are the ones it forwards to, not the ones the machine asks.
-    let dns_key = if report.dns_changed_by_guardiana && report.guardian_is_sole {
+    let dns_key = if !report.dns_changed_by_guardiana
+        && report.system_dns.is_empty()
+        && report.guardian_is_primary == Some(true)
+    {
+        // El equipo pregunta al guardián y no hay nada más: `current_resolvers` deja fuera el
+        // loopback a propósito, así que sin esta rama la respuesta era «DNS del sistema: -»
+        // seguida de «Guardiana no ha cambiado el DNS», y quien la leía entendía justo lo
+        // contrario de lo que pasa (decisión 140).
+        "verify.dns.solo_guardiana_sin_copia"
+    } else if report.dns_changed_by_guardiana && report.guardian_is_sole {
         "verify.dns.por_guardiana"
     } else if report.dns_changed_by_guardiana && report.guardian_is_primary == Some(true) {
         // Windows keeps the old resolver as the second one so the machine never
@@ -472,9 +504,32 @@ pub fn render_with(t: &guardiana_core::i18n::Texts, report: &Report) -> String {
             ),
             (true, Some(false)) => t.cli("verify.dns.guardiana_no_primario").to_owned(),
             (true, None) => t.cli("verify.dns.guardiana_desconocido").to_owned(),
+            // Apunta al guardián, pero el cambio no lo hizo él y no hay copia de lo que había
+            // antes: hay que decir las dos cosas, porque la segunda es la que se nota el día
+            // que se desinstale.
+            (false, Some(true)) => t.cli("verify.dns.apunta_sin_copia").to_owned(),
             (false, _) => t.cli("verify.dns.sin_cambiar").to_owned(),
         }
     });
+    if !report.vigilante.is_empty() {
+        out.push(
+            t.cli("verify.vigilante").replace(
+                "{aparatos}",
+                &report
+                    .vigilante
+                    .iter()
+                    .map(|d| {
+                        if d == guardiana_core::SELF_DEVICE_ID {
+                            t.cli("verify.este_equipo").to_owned()
+                        } else {
+                            d.clone()
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ),
+        );
+    }
     out.push(if report.home_mode {
         t.cli("verify.hogar.on")
             .replace("{ip}", report.home_ip.as_deref().unwrap_or("-"))
@@ -514,6 +569,58 @@ pub fn render_with(t: &guardiana_core::i18n::Texts, report: &Report) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn informe_vacio() -> Report {
+        Report {
+            version: "0.0.0".into(),
+            binary: "/tmp/guardiana".into(),
+            sha256: "0".repeat(64),
+            signature: SignatureState::DevKey,
+            public_key: String::new(),
+            ledger: LedgerMatch::NoLedgerFile,
+            service: "running".into(),
+            system_dns: Vec::new(),
+            guardian_is_primary: None,
+            guardian_is_sole: false,
+            dns_changed_by_guardiana: false,
+            home_mode: false,
+            home_ip: None,
+            vigilante: Vec::new(),
+            lan_ports_open: Vec::new(),
+            lan_ports_checked: true,
+            lists: Vec::new(),
+            ledger_events: 0,
+            chain_ok: None,
+            ledger_unreadable: false,
+        }
+    }
+
+    #[test]
+    fn dns_que_apunta_al_guardian_sin_copia_no_dice_que_no_ha_cambiado() {
+        // El caso real del Mac del 19 sep 2026: los tres servicios de red apuntan a 127.0.0.1 y
+        // `verify` respondía «DNS del sistema: -» y «Guardiana no ha cambiado el DNS del sistema»,
+        // es decir, lo contrario de lo que pasaba, en la orden que existe para dar confianza.
+        let mut r = informe_vacio();
+        r.guardian_is_primary = Some(true);
+        let salida = render(&r);
+        assert!(
+            salida.contains("127.0.0.1") && salida.contains("pasan por ella"),
+            "tiene que decir que el equipo pregunta al guardián: {salida}"
+        );
+        assert!(
+            !salida.contains("Guardiana no ha cambiado el DNS del sistema."),
+            "no puede negar el cambio cuando el equipo apunta al guardián: {salida}"
+        );
+        assert!(
+            salida.contains("no tiene anotado qué DNS había antes"),
+            "y tiene que avisar de que no podrá devolverlo: {salida}"
+        );
+        // Sin guardián delante, el mensaje de siempre se mantiene.
+        let mut r2 = informe_vacio();
+        r2.guardian_is_primary = Some(false);
+        r2.system_dns = vec!["192.168.1.1".into()];
+        assert!(render(&r2).contains("Guardiana no ha cambiado el DNS del sistema."));
+    }
 
     #[test]
     fn netstat_formats() {

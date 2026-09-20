@@ -15,8 +15,18 @@
   // Language (decision 45): the person's choice, kept in this browser; otherwise the browser's own.
   let LANG = '';
   try { LANG = localStorage.getItem('guardiana_lang') || ''; } catch (_) {}
-  if (LANG !== 'es' && LANG !== 'en') LANG = ((navigator.language || 'es').slice(0, 2) === 'en') ? 'en' : 'es';
+  if (LANG !== 'es' && LANG !== 'en' && LANG !== 'pt') {
+    const dos = (navigator.language || 'es').slice(0, 2);
+    LANG = (dos === 'en' || dos === 'pt') ? dos : 'es';
+  }
   try { document.documentElement.lang = LANG; } catch (_) {}
+  // Night mode (owner's request, 20 Sep 2026). The panel ships with the website's light design;
+  // whoever prefers a dark screen chooses it here, and the choice stays in this browser: it is
+  // never sent anywhere, because there is nowhere to send it to.
+  let TEMA = '';
+  try { TEMA = localStorage.getItem('guardiana_tema') || ''; } catch (_) {}
+  if (TEMA !== 'noche' && TEMA !== 'dia') TEMA = 'dia';
+  try { if (TEMA === 'noche') document.documentElement.dataset.tema = 'noche'; } catch (_) {}
 
   let T = { panel: {}, categorias: {}, veredictos: {}, senales: {}, decidido_por: {} };
   const t = (k) => (T.panel && T.panel[k]) || k;
@@ -164,7 +174,7 @@
     });
   }
   const pdfName = (what) => 'guardiana-' + what + '-' + new Date().toISOString().slice(0, 10) + '.pdf';
-  const pdfHead = (doc, heading) => doc.line('GUARDIANA · ' + heading, 16, true).line(t('pdf_generado').replace('{fecha}', new Date().toLocaleString()), 9, false, 0.4).gap(6);
+  const pdfHead = (doc, heading) => doc.line('GUARDIANA · ' + heading, 16, true).line(t('pdf_generado').replace('{fecha}', new Date().toLocaleString(LOC, DIA_HORA)), 9, false, 0.4).gap(6);
   const catName = (c) => T.categorias[c] || c;
   const verdictName = (v) => T.veredictos[v] || v;
   const deviceName = (ev) => ev.device_name || (ev.device_id === 'self' ? t('este_computador') : ev.device_id);
@@ -190,12 +200,35 @@
   }
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const clock = (ms) => new Date(ms).toLocaleTimeString();
-  const when = (ms) => new Date(ms).toLocaleString();
-  const cat = (c) => `<span class="tag ${esc(c)}">${esc(T.categorias[c] || c)}</span>`;
+  // Dates follow the panel's language, not the computer's: someone reading the panel in English
+  // on a Spanish machine was getting «18/9/2026», and in English that reads as the 9th of a month
+  // that does not exist here. English gets a named month so the two can never be swapped.
+  const LOC = LANG === 'en' ? 'en-GB' : (LANG === 'pt' ? 'pt-BR' : 'es');
+  const DIA = LANG === 'en' ? { day: 'numeric', month: 'short', year: 'numeric' } : undefined;
+  const DIA_HORA = LANG === 'en' ? { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false } : undefined;
+  const clock = (ms) => new Date(ms).toLocaleTimeString(LOC);
+  const when = (ms) => new Date(ms).toLocaleString(LOC, DIA_HORA);
+  // «Unknown» was 88% of every table: a word that told the person nothing while the program
+  // already knew who owned 86% of those names. The stored category does not change -- the ledger
+  // keeps what was decided at the time -- but what is SHOWN now says what is actually known:
+  // the network that delivers somebody else's content, the company the name belongs to, or,
+  // when nothing is known, that no open list knows it either. Never a verdict (brief §6).
+  const catTexto = (ev) => {
+    if (ev.category !== 'desconocido') return T.categorias[ev.category] || ev.category;
+    if (ev.local) return t('cat_red_local');
+    if (ev.entrega) return t('cat_entrega');
+    if (ev.empresa || ev.ia) return t('cat_de_empresa').replace('{empresa}', ev.empresa || ev.ia);
+    return T.categorias.desconocido;
+  };
+  const catClase = (ev) => (ev.category !== 'desconocido' ? '' : (ev.local || ev.entrega) ? ' entrega' : (ev.empresa || ev.ia) ? ' propio' : ' sinlista');
+  const cat = (ev) => `<span class="tag ${esc(ev.category)}${catClase(ev)}">${esc(catTexto(ev))}</span>`;
   const verdict = (v) => `<span class="verdict ${esc(v)}">${esc(T.veredictos[v] || v)}</span>`;
-  const phrases = (ev) => (ev.frases || []).map((f) => `<span class="phrase">· ${esc(f)}</span>`).join('');
-  const company = (ev) => (ev.ia ? ` <span class="tag ia">${esc(ev.ia)}</span>` : '') + (ev.empresa && ev.empresa !== ev.ia ? ` <span class="tag empresa">${esc(ev.empresa)}</span>` : '');
+  // The trade goes first: reading «AppsFlyer» tells a person nothing, and reading what
+  // AppsFlyer sells tells them everything they need to decide. It is a fact about the
+  // company, not about this query, and it is only printed where one is written.
+  const phrases = (ev) => (ev.oficio ? `<span class="phrase oficio">· ${esc(ev.oficio)}</span>` : '')
+    + (ev.frases || []).map((f) => `<span class="phrase">· ${esc(f)}</span>`).join('');
+  const company = (ev) => (ev.ia && !(ev.category === 'desconocido' && !ev.entrega && !ev.empresa) ? ` <span class="tag ia">${esc(ev.ia)}</span>` : '') + (ev.empresa && ev.empresa !== ev.ia && !(ev.category === 'desconocido' && !ev.entrega) ? ` <span class="tag empresa">${esc(ev.empresa)}</span>` : '');
   const hints = (l) => [l && l.callado_min != null ? t('lectura_callado').replace('{min}', l.callado_min) : '', l && l.relay ? t('lectura_relay') : '', l && l.evasiones ? (l.evasiones === 1 ? t('lectura_evasion_una') : t('lectura_evasiones').replace('{n}', l.evasiones)) : ''].filter(Boolean);
   const device = (ev) => esc(ev.device_name || (ev.device_id === 'self' ? t('este_computador') : ev.device_id));
 
@@ -218,11 +251,30 @@
       devs.forEach((d) => { gate[d.id] = d; });
     } catch (_) {}
   }
+  // Names this person has already cut, so the state survives a redraw. The snapshot table
+  // repaints every two seconds: without this, a button turned red by a cut went back to grey
+  // as if nothing had happened, and the person would cut the same name twice.
+  const CORTADOS = new Set();
+  const claveCorte = (dev, nombre) => dev + '|' + nombre;
+  async function cargarCortados() {
+    try {
+      const r = await api('/api/reglas');
+      (r.reglas || []).forEach((x) => {
+        if (x.activa && x.action === 'cortar' && x.match_kind === 'domain') {
+          CORTADOS.add(claveCorte(x.device_id || 'home', x.pattern));
+        }
+      });
+    } catch (_) {}
+  }
+  function yaCortado(ev) {
+    return CORTADOS.has(claveCorte(ev.device_id, ev.qname)) || CORTADOS.has(claveCorte('home', ev.qname));
+  }
   function cutCell(ev) {
     if (ev.verdict === 'cortado') return '';
     const d = gate[ev.device_id];
     if (!d) return '';
     if (!d.puede_cortar) return `<span class="muted">${esc(t('observando').replace('{h}', d.horas_observadas))}</span>`;
+    if (yaCortado(ev)) return `<button class="cut cortado" disabled>${esc(t('cortado_boton'))}</button>`;
     return `<button class="secondary cut" data-device="${esc(ev.device_id)}" data-name="${esc(ev.qname)}">${esc(t('cortar'))}</button>`;
   }
   async function createRule(body, path = '/api/reglas') {
@@ -234,6 +286,57 @@
     if (r.mensaje && !r.creada) { alert(r.mensaje); return null; }
     return r.creada;
   }
+  // A burst is several different names asked by one device within a couple of seconds: one
+  // act (you opened an app), not six unrelated rows. The names inside are the same events the
+  // table already shows, with the company and, where one is written, its trade.
+  async function pintarRafagas() {
+    const caja = $('rafagas');
+    if (!caja) return;
+    const rs = await api('/api/rafagas?horas=24');
+    if (!rs.length) { caja.innerHTML = `<p class="muted">${esc(t('rafagas_ninguna'))}</p>`; return; }
+    caja.innerHTML = rs.map((r) => {
+      const resumen = t('rafagas_resumen').replace('{n}', r.nombres.length).replace('{seg}', (r.duracion_ms / 1000).toFixed(1));
+      const quien = esc(r.device_name || (r.device_id === 'self' ? t('este_computador') : r.device_id));
+      const oficio = r.con_oficio ? ` · ${esc(t('rafagas_oficio').replace('{n}', r.con_oficio))}` : '';
+      const filas = r.nombres.map((e) => `<tr><td><span class="mono">${esc(e.qname)}</span>${company(e)}${phrases(e)}</td><td>${cat(e)}</td></tr>`).join('');
+      return `<details class="card"><summary><span class="mono">${clock(r.ts)}</span> · ${quien} · ${esc(resumen)}${oficio}`
+        + (r.empresas.length ? `<br><span class="muted">${esc(r.empresas.join(' · '))}</span>` : '')
+        + `</summary><div class="wrap"><table>${filas}</table></div></details>`;
+    }).join('');
+  }
+
+  // The receipt: the few lines a person can say out loud, per device. The table above is the
+  // detail; this is what convinces. Every figure comes from the same ledger, and the window is
+  // printed with it because the free plan only keeps a day of detail.
+  async function pintarRecibos() {
+    const caja = $('recibos');
+    if (!caja) return;
+    const rs = await api('/api/recibo?dias=7');
+    if (!rs.length) { caja.innerHTML = `<p class="muted">${esc(t('recibo_ninguno'))}</p>`; return; }
+    caja.innerHTML = rs.map((r) => {
+      const quien = esc(r.device_name || (r.device_id === 'self' ? t('este_computador') : r.device_id));
+      const lineas = [];
+      lineas.push(esc(t('recibo_nombres').replace('{n}', r.nombres)));
+      const emp = r.empresas_con_oficio
+        ? t('recibo_empresas').replace('{n}', r.empresas).replace('{m}', r.empresas_con_oficio)
+        : t('recibo_empresas_sin').replace('{n}', r.empresas);
+      lineas.push(esc(emp) + (r.oficios.length ? `<br><span class="muted">${esc(r.oficios.join(' · '))}</span>` : ''));
+      if (r.latidos.length) {
+        const lista = r.latidos.slice(0, 3).map(([n, m]) => t('recibo_latido').replace('{nombre}', n).replace('{min}', m)).join(' · ');
+        lineas.push(esc(t('recibo_latidos').replace('{lista}', lista)));
+      }
+      if (r.evasiones) lineas.push(esc(t('recibo_evasiones').replace('{n}', r.evasiones)));
+      if (r.cortadas) lineas.push(esc(t('recibo_cortadas').replace('{n}', r.cortadas)));
+      if (r.rafaga) {
+        lineas.push(esc(t('recibo_rafaga').replace('{n}', r.rafaga.nombres.length).replace('{seg}', (r.rafaga.duracion_ms / 1000).toFixed(1)))
+          + (r.rafaga.empresas.length ? `<br><span class="muted">${esc(r.rafaga.empresas.slice(0, 6).join(' · '))}</span>` : ''));
+      }
+      return `<div class="card"><h3>${quien}</h3>`
+        + `<p class="muted">${esc(t('recibo_desde').replace('{fecha}', when(r.desde)))}</p>`
+        + `<ul class="recibo">${lineas.map((l) => `<li>${l}</li>`).join('')}</ul></div>`;
+    }).join('');
+  }
+
   function bindCutButtons(container, path) {
     container.addEventListener('click', async (e) => {
       const b = e.target.closest('button.cut');
@@ -241,25 +344,56 @@
       const name = b.dataset.name, dev = b.dataset.device;
       if (!confirm(t('cortar_confirmar_dispositivo').replace('{nombre}', name))) return;
       const created = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'cortar' }, path);
-      if (created) { b.textContent = '✓'; b.disabled = true; }
+      // A grey tick did not say what had happened. The button turns into the state: red and
+      // with the word, in the language of the panel.
+      if (created) {
+        CORTADOS.add(claveCorte(dev, name));
+        b.textContent = t('cortado_boton'); b.disabled = true; b.classList.remove('secondary'); b.classList.add('cortado');
+      }
     });
   }
 
+  // One connection asks the same name several ways at once: the IPv4 address (A), the IPv6 one
+  // (AAAA) and the HTTPS record. Printed as one row each, the table looked like it was repeating
+  // itself, and a person reading it counted the same service two or three times. They are folded
+  // into a single row, with how many times and, on hover, the ways it was asked. Nothing is
+  // hidden: the export and the JSON keep every query as it happened.
+  function foldEvents(events) {
+    const out = [];
+    for (const ev of events) {
+      const last = out[out.length - 1];
+      if (last && last.qname === ev.qname && last.device_id === ev.device_id
+          && last.category === ev.category && last.verdict === ev.verdict
+          && Math.abs(last.ts - ev.ts) <= 2000) {
+        last._n += 1;
+        if (ev.qtype && !last._types.includes(ev.qtype)) last._types.push(ev.qtype);
+        last.ts = Math.max(last.ts, ev.ts);
+        continue;
+      }
+      out.push(Object.assign({}, ev, { _n: 1, _types: ev.qtype ? [ev.qtype] : [] }));
+    }
+    return out;
+  }
   function eventRows(events) {
-    return events.map((ev) => `<tr><td class="mono">${clock(ev.ts)}</td><td><span class="mono">${esc(ev.qname)}</span>${company(ev)}${phrases(ev)}</td><td>${cat(ev.category)}</td><td>${device(ev)}</td><td>${verdict(ev.verdict)}</td><td>${cutCell(ev)}</td></tr>`).join('');
+    return foldEvents(events).map((ev) => {
+      const veces = ev._n > 1 ? ` <span class="muted">×${ev._n}</span>` : '';
+      const como = ev._types.length ? ` title="${esc(ev._types.join(', '))}"` : '';
+      return `<tr><td class="mono">${clock(ev.ts)}</td><td><span class="mono"${como}>${esc(ev.qname)}</span>${veces}${company(ev)}${phrases(ev)}</td><td>${cat(ev)}</td><td>${device(ev)}</td><td>${verdict(ev.verdict)}</td><td>${cutCell(ev)}</td></tr>`;
+    }).join('');
   }
 
-  const PAGE_TITLE = { radiografia: 'nav_radiografia', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo' };
+  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo' };
   function applyTexts() {
     document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.getAttribute('data-t')); });
     document.querySelectorAll('[data-t-html]').forEach((el) => { el.innerHTML = t(el.getAttribute('data-t-html')); });
     // Filter options and fixed headers carry stored values (Spanish keys); their labels follow the language.
-    const maps = { category: T.categorias, signal: T.senales, verdict: T.veredictos };
-    const short = { baliza: 'baliza', destino_nuevo: 'destino nuevo', fuera_de_horas: 'fuera de horas', evasion_dns: 'evasión de DNS', volumen: 'volumen' };
-    const shortEn = { baliza: 'beacon', destino_nuevo: 'new destination', fuera_de_horas: 'out of hours', evasion_dns: 'DNS evasion', volumen: 'volume' };
+    // Las etiquetas cortas vivían aquí, en los dos idiomas, hasta el 19 sep 2026. Estaban bien
+    // traducidas, pero texto de interfaz dentro del código es lo que la regla del proyecto prohíbe:
+    // la siguiente señal que se añada es la que sale sin traducir. Ahora vienen de i18n.
+    const maps = { category: T.categorias, signal: T.senales_corto, verdict: T.veredictos };
     Object.entries(maps).forEach(([name, map]) => {
       document.querySelectorAll('select[name=' + name + '] option[value]:not([value=""])').forEach((o) => {
-        o.textContent = name === 'signal' ? (LANG === 'en' ? shortEn : short)[o.value] || o.value : (map && map[o.value]) || o.value;
+        o.textContent = (map && map[o.value]) || o.value;
       });
     });
     document.querySelectorAll('th[data-cat]').forEach((th) => { th.textContent = (T.categorias && T.categorias[th.getAttribute('data-cat')]) || th.getAttribute('data-cat'); });
@@ -268,11 +402,47 @@
     // The language switch lives in the header of every page; the choice is kept in this browser only.
     const header = document.querySelector('header.top');
     if (header && !$('lang-toggle')) {
-      const b = document.createElement('button');
-      b.id = 'lang-toggle'; b.type = 'button'; b.className = 'secondary lang';
-      b.textContent = LANG === 'en' ? 'Español' : 'English';
-      b.setAttribute('aria-label', LANG === 'en' ? 'Cambiar a español' : 'Switch to English');
-      b.addEventListener('click', () => { try { localStorage.setItem('guardiana_lang', LANG === 'en' ? 'es' : 'en'); } catch (_) {} location.reload(); });
+      // Los tres idiomas a la vista, como en la web: un botón que va rotando escondía el tercero
+      // justo a quien lo estaba buscando. El de esta pantalla queda marcado y no se puede pulsar.
+      const b = document.createElement('div');
+      b.id = 'lang-toggle'; b.className = 'idiomas';
+      const CORTO = { es: 'ES', en: 'EN', pt: 'PT' };
+      const CAMBIAR = { es: 'Cambiar a español', en: 'Switch to English', pt: 'Mudar para português' };
+      ['es', 'en', 'pt'].forEach((l) => {
+        const a = document.createElement('button');
+        a.type = 'button';
+        a.className = 'secondary lang' + (l === LANG ? ' actual' : '');
+        a.textContent = CORTO[l];
+        a.setAttribute('lang', l);
+        if (l === LANG) {
+          a.setAttribute('aria-current', 'true');
+          a.disabled = true;
+        } else {
+          a.setAttribute('aria-label', CAMBIAR[l]);
+          a.addEventListener('click', () => {
+            try { localStorage.setItem('guardiana_lang', l); } catch (_) {}
+            location.reload();
+          });
+        }
+        b.appendChild(a);
+      });
+      const n = document.createElement('button');
+      n.id = 'tema-toggle'; n.type = 'button'; n.className = 'secondary lang tema';
+      const OTRO = TEMA === 'noche' ? 'dia' : 'noche';
+      const NOMBRE_TEMA = {
+        es: { noche: 'Modo noche', dia: 'Modo dia' },
+        en: { noche: 'Night mode', dia: 'Day mode' },
+        pt: { noche: 'Modo noite', dia: 'Modo dia' },
+      };
+      n.textContent = (NOMBRE_TEMA[LANG] || NOMBRE_TEMA.es)[OTRO];
+      n.setAttribute('aria-label', n.textContent);
+      n.addEventListener('click', () => {
+        try { localStorage.setItem('guardiana_tema', OTRO); } catch (_) {}
+        location.reload();
+      });
+      // El botón del tema viaja con los idiomas: sueltos en la cabecera, en inglés se caían a una
+      // segunda línea porque el menú es más largo que en español.
+      b.appendChild(n);
       header.appendChild(b);
     }
   }
@@ -281,14 +451,14 @@
   function drawCard(canvas, r) {
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
-    const dark = matchMedia('(prefers-color-scheme: dark)').matches;
-    ctx.fillStyle = dark ? '#14171a' : '#f6f7f4';
+    const dark = document.documentElement.dataset.tema === 'noche';
+    ctx.fillStyle = dark ? '#0B1020' : '#F4F6FA';
     ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = dark ? '#e8ebe6' : '#1d221c';
+    ctx.fillStyle = dark ? '#E8ECF6' : '#0B1020';
     ctx.font = '700 64px -apple-system, "Segoe UI", Roboto, sans-serif';
     ctx.fillText('Guardiana', 80, 140);
     ctx.font = '400 40px -apple-system, "Segoe UI", Roboto, sans-serif';
-    ctx.fillStyle = dark ? '#a0a89c' : '#5b6358';
+    ctx.fillStyle = dark ? '#98A1B8' : '#5B6275';
     ctx.fillText(t('tarjeta_titulo'), 80, 210);
     const rows = [
       [r.servicios, t('c_servicios'), null],
@@ -299,18 +469,18 @@
     ];
     let y = 340;
     for (const [n, label, color] of rows) {
-      ctx.fillStyle = color || (dark ? '#e8ebe6' : '#1d221c');
+      ctx.fillStyle = color || (dark ? '#E8ECF6' : '#0B1020');
       ctx.font = '700 96px -apple-system, "Segoe UI", Roboto, sans-serif';
       ctx.fillText(String(n), 80, y);
-      ctx.fillStyle = dark ? '#a0a89c' : '#5b6358';
+      ctx.fillStyle = dark ? '#98A1B8' : '#5B6275';
       ctx.font = '400 40px -apple-system, "Segoe UI", Roboto, sans-serif';
       ctx.fillText(label, 360, y - 8);
       y += 130;
     }
-    ctx.fillStyle = dark ? '#a0a89c' : '#5b6358';
+    ctx.fillStyle = dark ? '#98A1B8' : '#5B6275';
     ctx.font = '400 32px -apple-system, "Segoe UI", Roboto, sans-serif';
     ctx.fillText(t('tarjeta_pie'), 80, H - 70);
-    ctx.fillText(new Date(r.hasta).toLocaleString(), 80, H - 120);
+    ctx.fillText(new Date(r.hasta).toLocaleString(LOC, DIA_HORA), 80, H - 120);
   }
   const waLink = (text) => 'https://wa.me/?text=' + encodeURIComponent(text);
 
@@ -318,7 +488,7 @@
   const pages = {
     async informe() {
       const r = await api('/api/informe');
-      $('i-periodo').textContent = t('informe_periodo').replace('{desde}', new Date(r.desde).toLocaleDateString()).replace('{hasta}', new Date(r.hasta).toLocaleDateString());
+      $('i-periodo').textContent = t('informe_periodo').replace('{desde}', new Date(r.desde).toLocaleDateString(LOC, DIA)).replace('{hasta}', new Date(r.hasta).toLocaleDateString(LOC, DIA));
       // Free plan: the table is a marked example and the Plus card shows, with "Ahora no" (decision 53).
       $('i-ejemplo').classList.toggle('hidden', !r.ejemplo);
       if (r.ejemplo) document.querySelector('[data-t=informe_lead]').textContent = t('informe_lead_ejemplo');
@@ -401,6 +571,7 @@
         return { name: pdfName('radiografia'), doc };
       });
       await loadGate();
+      await cargarCortados();
       // Until the system DNS points at Guardiana, this PC's own queries never arrive: say so and offer the change (brief §4).
       try {
         const est = await api('/api/estado');
@@ -444,11 +615,15 @@
       };
       await refresh();
       setInterval(() => refresh().catch(() => {}), 2000);
+      // Bursts change slowly and cost a query over the whole day: painted once, not every
+      // two seconds like the live table.
+      pintarRafagas().catch(() => {});
     },
     async extracto() {
       const form = $('filters');
       paintChanges().catch(() => {});
       await loadGate();
+      await cargarCortados();
       let lastR = null, lastFilters = '';
       savePdf('export-pdf', () => {
         const doc = pdfDocument('GUARDIANA · ' + t('nav_extracto'));
@@ -509,6 +684,7 @@
       await load();
     },
     async dispositivos() {
+      pintarRecibos().catch(() => {});
       const devs = await api('/api/dispositivos');
       $('devices').innerHTML = devs.map((d) => `<tr>
         <td>${esc(d.name || (d.id === 'self' ? t('este_computador') : t('dispositivo_nuevo')))}<br><span class="mono muted">${esc(d.last_ip || '')}</span>${hints(d.lectura).map((h) => `<br><span class="phrase">· ${esc(h)}</span>`).join('')}</td>
@@ -532,6 +708,11 @@
       });
     },
     async hogar() {
+      // On a Mac, say it plainly: Home Mode works there but is not part of 1.0, and the site says
+      // the same. Offering it in silence would make the program and the page disagree.
+      api('/api/estado').then((e) => {
+        if (e && e.so === 'macos') $('hogar-mac').classList.remove('hidden');
+      }).catch(() => {});
       const render = (r, aviso) => {
         $('h-estado').textContent = r.encendido
           ? t('hogar_estado_on').replace('{fecha}', r.desde ? when(r.desde) : '').replace('{ip}', r.ip || '')
@@ -599,7 +780,7 @@
         const lect = r.lectura || {};
         $('mi-empresas').innerHTML = (lect.empresas && lect.empresas.length) ? lect.empresas.map((e) => `<li><b>${esc(e[0])}</b> · ${e[1]}</li>`).join('') + `<li class="muted">${esc(t('lectura_empresas_total').replace('{n}', lect.empresas_total))}</li>` : `<li class="muted">${esc(t('lectura_empresas_ninguna'))}</li>`;
         $('mi-avisos').innerHTML = hints(lect).map((h) => `<p class="limit">${esc(h)}</p>`).join('');
-        $('mi-rows').innerHTML = r.eventos.map((ev) => `<tr><td class="mono">${clock(ev.ts)}</td><td><span class="mono">${esc(ev.qname)}</span>${company(ev)}${phrases(ev)}</td><td>${cat(ev.category)}</td><td>${verdict(ev.verdict)}</td><td>${ev.verdict !== 'cortado' && can ? `<button class="secondary cut" data-device="${esc(ev.device_id)}" data-name="${esc(ev.qname)}">${esc(t('cortar'))}</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`;
+        $('mi-rows').innerHTML = r.eventos.map((ev) => `<tr><td class="mono">${clock(ev.ts)}</td><td><span class="mono">${esc(ev.qname)}</span>${company(ev)}${phrases(ev)}</td><td>${cat(ev)}</td><td>${verdict(ev.verdict)}</td><td>${ev.verdict !== 'cortado' && can ? `<button class="secondary cut" data-device="${esc(ev.device_id)}" data-name="${esc(ev.qname)}">${esc(t('cortar'))}</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`;
         const rules = await api('/api/mi-dispositivo/reglas');
         lastRules = rules.reglas;
         $('mi-reglas').innerHTML = rules.reglas.map((x) => `<tr><td>${esc(t('tipo_' + x.match_kind))}</td><td class="mono">${esc(x.pattern)}</td><td>${esc(t('accion_' + x.action))}</td><td>${x.activa ? esc(t('regla_activa')) : esc(t('regla_deshecha'))}</td><td>${x.activa ? `<button class="secondary undo" data-id="${x.id}">${esc(t('deshacer'))}</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('reglas_ninguna'))}</td></tr>`;
@@ -628,9 +809,16 @@
           <h3>${esc(a.device_name || (a.device_id === 'self' ? t('este_computador') : a.device_id))}</h3>
           <p class="mono muted">${a.patrones.map(esc).join(' · ')}</p>
           <p>${esc(t('alcance_dentro').replace('{n}', a.dentro_total))} · <b>${esc(t('alcance_fuera').replace('{n}', a.fuera_total))}</b></p>
-          ${a.fuera.length ? `<div class="wrap"><table><tbody>${a.fuera.map((f) => `<tr><td class="mono">${esc(f[0])}</td><td>${f[1]}</td></tr>`).join('')}</tbody></table></div>`
+          <p class="vigilante"><label><input type="checkbox" class="a-cortar" data-device="${esc(a.device_id)}"${a.cortar ? ' checked' : ''}> <b>${esc(t('alcance_cortar'))}</b></label>
+            <br><span class="muted">${esc(t(a.cortar ? 'alcance_cortar_on' : 'alcance_cortar_off'))}</span>
+            <br><span class="muted">${esc(t('alcance_cortar_todo'))}</span></p>
+          ${a.pase_hasta ? `<p class="ok">${esc(t('alcance_pase_activo').replace('{hora}', when(a.pase_hasta)))}</p>`
+            : (a.cortar ? `<p><button class="secondary a-pase" data-device="${esc(a.device_id)}" data-horas="4">${esc(t('alcance_pase').replace('{h}', 4))}</button></p>` : '')}
+          ${a.fuera.length ? `<div class="wrap"><table><tbody>${a.fuera.map((f) => `<tr><td class="mono">${esc(f[0])}</td><td>${f[1]}</td>`
+            + `<td><button class="secondary a-anadir" data-device="${esc(a.device_id)}" data-name="${esc(f[0])}">${esc(t('alcance_anadir'))}</button></td></tr>`).join('')}</tbody></table></div>`
             : `<p class="ok">${esc(t('alcance_fuera_ninguno'))}</p>`}
-          <p class="limit">${esc(t('alcance_esperado_nota'))}</p></div>`).join('');
+          <p class="limit">${esc(t('alcance_esperado_nota'))}</p>
+          ${a.cortar ? `<p class="limit">${esc(t('alcance_cortado_aviso'))}</p>` : ''}</div>`).join('');
         const opts = r.alcances.map((a) => [a.device_id, a.device_name, a.patrones.join('\n')])
           .concat(r.sin_alcance.map((d) => [d[0], d[1], '']));
         const sel = $('a-device');
@@ -648,6 +836,47 @@
         const r = await api('/api/ia/alcance', { method: 'POST', body: { device_id: $('a-device').value, patrones } });
         $('a-msg').textContent = patrones.trim() ? t('alcance_guardado') : t('alcance_borrado');
         setTimeout(() => { $('a-msg').textContent = ''; }, 5000);
+        paint(r);
+      });
+      // Turning the cut on or off, and answering a name that was cut for falling outside.
+      // Both are the person's decision, one name at a time, as the brief requires.
+      $('alcances').addEventListener('change', async (e) => {
+        const c = e.target.closest('input.a-cortar');
+        if (!c) return;
+        const dev = c.dataset.device;
+        const actual = await api('/api/ia');
+        const yo = (actual.alcances || []).find((x) => x.device_id === dev);
+        // Turning this on cuts everything outside the list on the WHOLE device, because
+        // Guardiana cannot tell which program asked. On a machine someone works on that is
+        // most of the internet, so the warning is built from their own last 24 hours: the
+        // number and a few of the names that would have been cut.
+        if (c.checked && yo) {
+          const ejemplos = (yo.fuera || []).slice(0, 4).map((f) => f[0]).join(', ') || '—';
+          const aviso = t('alcance_cortar_aviso').replace('{n}', yo.fuera_total).replace('{ejemplos}', ejemplos);
+          if (!confirm(aviso)) { c.checked = false; return; }
+        }
+        const r = await api('/api/ia/alcance', {
+          method: 'POST',
+          body: { device_id: dev, patrones: (yo ? yo.patrones : []).join('\n'), modo: c.checked ? 'cortar' : 'observar' },
+        });
+        paint(r);
+      });
+      $('alcances').addEventListener('click', async (e) => {
+        const p = e.target.closest('button.a-pase');
+        if (p) {
+          p.disabled = true;
+          const actual = await api('/api/ia');
+          const yo = (actual.alcances || []).find((x) => x.device_id === p.dataset.device);
+          paint(await api('/api/ia/alcance', {
+            method: 'POST',
+            body: { device_id: p.dataset.device, patrones: (yo ? yo.patrones : []).join('\n'), pase_horas: Number(p.dataset.horas) },
+          }));
+          return;
+        }
+        const b = e.target.closest('button.a-anadir');
+        if (!b) return;
+        b.disabled = true;
+        const r = await api('/api/ia/alcance/anadir', { method: 'POST', body: { device_id: b.dataset.device, nombre: b.dataset.name } });
         paint(r);
       });
     },
@@ -698,8 +927,23 @@
     },
   };
 
+  // The texts arrive from /api/textos, and until they do the page still shows the Spanish written
+  // into the HTML. On an English panel that is half a screen in the wrong language on every load,
+  // which is what «it mixes everything» looked like. The last answer is kept per language and
+  // applied before asking again, so only the very first load can show the fallback.
+  const CACHE = 'guardiana_textos_' + LANG;
+  function cached() {
+    try { const raw = localStorage.getItem(CACHE); return raw ? JSON.parse(raw) : null; } catch (_) { return null; }
+  }
+  function remember() {
+    try { localStorage.setItem(CACHE, JSON.stringify(T)); } catch (_) {}
+  }
+
   async function main() {
-    try { T = await api('/api/textos'); } catch (_) {}
+    document.documentElement.lang = LANG;
+    const previo = cached();
+    if (previo) { T = previo; applyTexts(); }
+    try { T = await api('/api/textos'); remember(); } catch (_) {}
     applyTexts();
     const page = document.body.getAttribute('data-page');
     if (pages[page]) {

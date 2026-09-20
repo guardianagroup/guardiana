@@ -14,12 +14,20 @@ use crate::model::{Category, DecidedBy, Signal, Verdict};
 pub const ES_JSON: &str = include_str!("../../panel/i18n/es.json");
 /// The English texts, embedded from `crates/panel/i18n/en.json` (decision 45): same keys, never text in code.
 pub const EN_JSON: &str = include_str!("../../panel/i18n/en.json");
+/// The Brazilian Portuguese texts (decision 175): same keys again, because Brazil is the largest
+/// market of the region and the site speaks it since 19 Sep 2026.
+pub const PT_JSON: &str = include_str!("../../panel/i18n/pt.json");
 
 /// All interface texts, grouped as in the JSON file.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Texts {
     /// Category labels, keyed by the stored text (`rastreador`, ...).
     pub categorias: HashMap<String, String>,
+    /// The two-word label of each signal, for the filter dropdown and the chips. Lived hardcoded in
+    /// app.js until 19 Sep 2026: both languages were there, but interface text in code is exactly
+    /// what the project rule forbids, because the next one added is the one that ships untranslated.
+    #[serde(default)]
+    pub senales_corto: HashMap<String, String>,
     /// One sentence per signal, keyed by signal name; `{n}` is replaced for `baliza`.
     pub senales: HashMap<String, String>,
     /// Verdict labels.
@@ -31,10 +39,16 @@ pub struct Texts {
     /// Texts of the panel pages, keyed by identifier.
     #[serde(default)]
     pub panel: HashMap<String, String>,
+    /// What each company does for a living, in one sentence, keyed by the company name of the
+    /// "empresas" list (decision 149). Not a verdict: AppsFlyer selling attribution is its
+    /// trade, and saying so is what stops the panel from calling it "unknown".
+    #[serde(default)]
+    pub oficios: HashMap<String, String>,
 }
 
 static TEXTS: OnceLock<Texts> = OnceLock::new();
 static TEXTS_EN: OnceLock<Texts> = OnceLock::new();
+static TEXTS_PT: OnceLock<Texts> = OnceLock::new();
 
 /// The Spanish texts. The embedded file is validated by a test, so a
 /// malformed file fails the build's tests rather than the user's session.
@@ -47,13 +61,38 @@ pub fn en() -> &'static Texts {
     TEXTS_EN.get_or_init(|| serde_json::from_str(EN_JSON).unwrap_or_else(|_| Texts::empty()))
 }
 
-/// Texts for a language code (`en`, `en-US`, `es`...): English when it starts with `en`, Spanish otherwise.
+/// The Portuguese texts.
+pub fn pt() -> &'static Texts {
+    TEXTS_PT.get_or_init(|| serde_json::from_str(PT_JSON).unwrap_or_else(|_| Texts::empty()))
+}
+
+/// Texts for a language code (`en`, `en-US`, `pt-BR`, `es`...): English when it starts with `en`,
+/// Portuguese when it starts with `pt`, Spanish otherwise. Spanish stays the fallback because it
+/// is what the person installed when nothing says otherwise (the Windows service has no locale).
 #[must_use]
 pub fn by_code(code: &str) -> &'static Texts {
-    if code.trim().to_ascii_lowercase().starts_with("en") {
+    let code = code.trim().to_ascii_lowercase();
+    if code.starts_with("en") {
         en()
+    } else if code.starts_with("pt") {
+        pt()
     } else {
         es()
+    }
+}
+
+/// The raw JSON behind a `Texts`, for whoever has to hand the whole file over instead of a
+/// sentence — the panel gives it to the browser. It lives here, next to the three constants, so
+/// that adding a language is one place and not a chain of "is it English?" in every caller: that
+/// exact shortcut is what left the panel answering in Spanish to a Portuguese browser.
+#[must_use]
+pub fn json_of(t: &'static Texts) -> &'static str {
+    if std::ptr::eq(t, en()) {
+        EN_JSON
+    } else if std::ptr::eq(t, pt()) {
+        PT_JSON
+    } else {
+        ES_JSON
     }
 }
 
@@ -75,11 +114,13 @@ impl Texts {
     fn empty() -> Self {
         Self {
             categorias: HashMap::new(),
+            senales_corto: HashMap::new(),
             senales: HashMap::new(),
             veredictos: HashMap::new(),
             decidido_por: HashMap::new(),
             cli: HashMap::new(),
             panel: HashMap::new(),
+            oficios: HashMap::new(),
         }
     }
 
@@ -126,6 +167,14 @@ impl Texts {
     pub fn panel<'a>(&'a self, key: &'a str) -> &'a str {
         Self::get(&self.panel, key)
     }
+
+    /// What a company does, in one sentence, or `None` when it is not written yet. Unlike the
+    /// other lookups this does not fall back to the key: a company name is not a sentence, and
+    /// printing it as if it were would be worse than saying nothing.
+    #[must_use]
+    pub fn oficio(&self, empresa: &str) -> Option<&str> {
+        self.oficios.get(empresa).map(String::as_str)
+    }
 }
 
 #[cfg(test)]
@@ -147,6 +196,7 @@ mod tests {
         }
         for k in crate::model::SignalKind::ALL {
             assert!(t.senales.contains_key(k.as_str()), "{k}");
+            assert!(t.senales_corto.contains_key(k.as_str()), "corto: {k}");
         }
         assert_eq!(
             es().signal(&Signal::Baliza { minutes: 7 }),
@@ -157,23 +207,42 @@ mod tests {
 
     #[test]
     fn english_file_has_exactly_the_same_keys() {
+        // And Portuguese too: a third language is exactly when a missing key stops being noticed,
+        // so the same test guards all three.
         let es_v: serde_json::Value = serde_json::from_str(ES_JSON).unwrap();
-        let en_v: serde_json::Value = serde_json::from_str(EN_JSON).unwrap();
-        for (section, es_map) in es_v.as_object().unwrap() {
-            let en_map = en_v[section].as_object().unwrap();
-            let mut a: Vec<&String> = es_map.as_object().unwrap().keys().collect();
-            let mut b: Vec<&String> = en_map.keys().collect();
-            a.sort();
-            b.sort();
-            assert_eq!(a, b, "keys of {section}");
+        for (otro, json) in [("en", EN_JSON), ("pt", PT_JSON)] {
+            let v: serde_json::Value = serde_json::from_str(json).unwrap();
+            for (section, es_map) in es_v.as_object().unwrap() {
+                assert!(
+                    v.get(section).is_some(),
+                    "{otro}: section {section} missing"
+                );
+                let map = v[section].as_object().unwrap();
+                let mut a: Vec<&String> = es_map.as_object().unwrap().keys().collect();
+                let mut b: Vec<&String> = map.keys().collect();
+                a.sort();
+                b.sort();
+                assert_eq!(a, b, "keys of {section} in {otro}");
+            }
         }
         assert_eq!(en().category(Category::Rastreador), "tracker");
         assert_eq!(
             en().signal(&Signal::Baliza { minutes: 7 }),
             "Contacts the same destination every 7 minutes, like a heartbeat."
         );
+        assert_eq!(pt().category(Category::Rastreador), "rastreador");
+        assert_eq!(
+            pt().signal(&Signal::Baliza { minutes: 7 }),
+            "Contata o mesmo destino a cada 7 minutos, como uma batida."
+        );
         assert!(std::ptr::eq(by_code("en-GB"), en()));
         assert!(std::ptr::eq(by_code("es-CO"), es()));
+        assert!(std::ptr::eq(by_code("pt-BR"), pt()));
+        // Whoever hands the whole file over must hand the right one (the panel does).
+        assert_eq!(json_of(by_code("pt-BR")), PT_JSON);
+        assert_eq!(json_of(by_code("en-US")), EN_JSON);
+        assert_eq!(json_of(by_code("es")), ES_JSON);
+        assert!(std::ptr::eq(by_code("PT"), pt()));
         assert!(std::ptr::eq(by_code(""), es()));
     }
 }

@@ -1,8 +1,8 @@
 # Guardiana
 
-*Versión en español: [README.md](README.md).*
+*Languages: [Español](README.md) · **English** · [Português](README.pt.md)*
 
-A program for Windows and Linux that turns the computer into the **DNS guardian of the home**:
+A program for Windows, Linux and macOS that turns the computer into the **DNS guardian of the home**:
 first of itself, then of the phones, the TV and everything that uses the Wi‑Fi, without
 installing anything on them. It sees which services each device tries to talk to, classifies it,
 explains it in one sentence, writes it down in a hash-chained ledger and blocks only what the
@@ -74,4 +74,6 @@ Reproducible build in a digest-pinned container: `build/repro.sh` (see
 ## Licence
 
 GPL‑3.0‑or‑later. Third-party lists keep their own licence (EasyPrivacy: GPL‑3.0 / CC BY‑SA 3.0;
-Peter Lowe's list: free use with attribution). Details in `docs/LISTS.md`.
+Peter Lowe's list: free use with attribution). Details in `docs/LISTS.md`. The typefaces the
+panel serves from the machine itself (IBM Plex and Unbounded) travel with their OFL 1.1 licence
+next to them, in [`crates/panel/static/fonts`](crates/panel/static/fonts/LEEME.md).

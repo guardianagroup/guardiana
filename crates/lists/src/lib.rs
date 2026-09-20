@@ -37,9 +37,14 @@ pub const EMPRESAS: &str = include_str!("../data/empresas.txt");
 /// Guardiana's own "IA" list: which names belong to an artificial-intelligence service (decision 62).
 pub const IA: &str = include_str!("../data/ia.txt");
 
+/// Guardiana's own "entrega" list: names that are the road, not the destination (decision 148).
+pub const ENTREGA: &str = include_str!("../data/entrega.txt");
+
 static COMPANIES: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
     std::sync::OnceLock::new();
 static AI_SERVICES: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
+    std::sync::OnceLock::new();
+static DELIVERY: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
     std::sync::OnceLock::new();
 
 /// Longest matching domain of a name map: `graph.facebook.com` matches an entry `facebook.com`.
@@ -62,6 +67,38 @@ fn lookup(map: &HashMap<&'static str, &'static str>, qname: &str) -> Option<&'st
 pub fn ai_service_of(qname: &str) -> Option<&'static str> {
     let map = AI_SERVICES.get_or_init(|| {
         parse_guardiana(IA)
+            .filter_map(|(section, domain)| section.map(|c| (domain, c)))
+            .collect()
+    });
+    lookup(map, qname)
+}
+
+/// Whether a name is the machine's own network talking, not a service on the internet.
+///
+/// Reverse lookups (`192.168.1.15.in-addr.arpa`, `…ip6.arpa`), multicast DNS (`.local`) and
+/// service discovery (`_dns-sd._udp`, `_ipp._tcp`) are how devices find the printer, the TV
+/// or each other. They have no owner and no list knows them, so they were being shown next
+/// to real destinations as if nobody knew what they were. They are not a destination at all.
+#[must_use]
+pub fn is_local_name(qname: &str) -> bool {
+    let n = qname.trim_end_matches('.').to_ascii_lowercase();
+    n.ends_with(".arpa")
+        || n.ends_with(".local")
+        || n.ends_with(".home.arpa")
+        || n.contains("_dns-sd.")
+        || n.contains("._tcp.")
+        || n.contains("._udp.")
+}
+
+/// The delivery network a name belongs to, or `None`. A content delivery network carries
+/// somebody else's content: asking for `e673.dsce9.akamaiedge.net` is not talking to Akamai
+/// as a service, it is picking up what another company serves through it. Saying so turns a
+/// fifth of the "unknown" rows into something a person can understand, without claiming
+/// anything the name does not prove.
+#[must_use]
+pub fn delivery_of(qname: &str) -> Option<&'static str> {
+    let map = DELIVERY.get_or_init(|| {
+        parse_guardiana(ENTREGA)
             .filter_map(|(section, domain)| section.map(|c| (domain, c)))
             .collect()
     });

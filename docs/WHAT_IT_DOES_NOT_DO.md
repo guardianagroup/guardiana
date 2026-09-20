@@ -61,12 +61,31 @@ La regla: nunca "100 % seguro", nunca "invisible", nunca "protegido" sin objeto,
   de arriba y el proveedor de internet ven las consultas reenviadas. Se muestra cuál es el resolutor.
 - **No cifra el panel dentro de la Wi‑Fi de casa.** En el propio PC el panel va por `http://127.0.0.1`, que no sale del equipo y el navegador trata como seguro. En Modo Hogar, el teléfono abre `http://<IP del PC>:7443` sin cifrar: quien pueda leer tu Wi‑Fi (tiene la contraseña de la red) podría ver nombres de servicios y la llave de sesión del panel. No hay certificados válidos para direcciones de casa y uno autofirmado haría saltar avisos rojos en cada teléfono; es el mismo trato que hacen routers e impresoras. La Wi‑Fi de casa es el perímetro. Un certificado propio instalado al conectar el teléfono por QR queda para después de la 1.0.
 
+- **El Modo Vigilante vale para todo el aparato, no solo para el agente.** GUARDIANA ve nombres, no
+  programas: no puede saber si una consulta la pidió el agente o el navegador. En un equipo donde
+  además trabajas, encenderlo corta también tus webs. Medido en el equipo de pruebas: con un alcance
+  de dos servicios declarados, en 24 horas se habrían cortado 476 nombres distintos, entre ellos
+  `claude.ai`, `www.google.com` y `chatgpt.com`. Por eso el panel avisa antes de encenderlo, con esa
+  cuenta hecha sobre las últimas 24 horas del propio equipo y algunos de los nombres que caerían.
+- **El Modo Vigilante corta nombres, no acciones.** Cuando está encendido, lo que no está en el
+  alcance que declaraste no se resuelve, así que la conexión no llega a empezar. Eso es todo lo que
+  hace, y no es poco, pero conviene saber lo que **no** es: no impide que un agente borre, escriba o
+  lea archivos de tu disco (para eso no pregunta ningún nombre); no deshace lo que ya se envió antes
+  de encenderlo; y no alcanza a un agente que ya tenga la dirección guardada, que use su propio DNS
+  cifrado o que salga por una VPN. Tampoco corta nada en un aparato con menos de 24 horas
+  observadas, ni las actualizaciones del sistema, la hora, los resolutores y la mensajería
+  reconocida, que nunca cuentan como «fuera».
+- **Un pase temporal deja pasar todo mientras dura.** Está para quien manda un trabajo largo y se
+  va; mientras corre, nada se corta, aunque todo se sigue anotando. Caduca solo, con un máximo de
+  24 horas, y entonces el corte vuelve.
+
 - **La prueba de 7 días de Plus vive en tu equipo** (Modo Hogar es gratis y no tiene prueba; decisión 52). "Este contador vive en tu equipo. Reinstalar lo
   reinicia. Confiamos en ti." Sin urgencia falsa.
 
 ## Lo que no incluye la 1.0
 
-- macOS (fuera del lanzamiento).
+- Modo Hogar en macOS: el guardián del propio Mac sí entra en la 1.0, pero los teléfonos y la tele no pueden pasar por un Mac, porque eso necesita tocar el cortafuegos de macOS y no se publica sin probarlo en una máquina que no sea la de desarrollo.
+- La aplicación de Mac no está notarizada por Apple: macOS avisa la primera vez y hay que abrirla con clic derecho. Está explicado en la página de instalar.
 - Bloqueo por aplicación y sensores por proceso (2.0).
 - Actualización automática silenciosa: nunca. `guardiana update` avisa y solo instala si el usuario
   lo pide y la firma coincide con el registro público.
