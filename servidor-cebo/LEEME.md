@@ -1,5 +1,7 @@
 # El servidor del cebo
 
+**En marcha:** <https://guardiana-cebo.guardianagroup.deno.net>
+
 **Qué es:** un servicio diminuto que apunta quién visita las direcciones que GUARDIANA deja dentro
 de sus archivos trampa **en nuestras mediciones publicadas**.
 
