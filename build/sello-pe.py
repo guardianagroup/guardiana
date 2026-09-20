@@ -10,6 +10,7 @@ same for everyone building that commit.
 
     python3 build/sello-pe.py <archivo.exe> <epoch>
 """
+import os
 import struct
 import sys
 
@@ -34,7 +35,14 @@ def sellar(ruta, epoch):
         if rva and tam:
             print(f"sello-pe: AVISO: {ruta} lleva directorio de depuración ({tam} bytes): "
                   "puede llevar otro sello dentro y no quedar reproducible", file=sys.stderr)
-    open(ruta, "wb").write(datos)
+    # Se escribe al lado y se reemplaza, en vez de abrir el original para escritura: en el flujo
+    # de GitHub los archivos salen del contenedor con dueño root y no se pueden abrir para
+    # escribir, pero la carpeta sí es nuestra, así que reemplazar funciona (y además es atómico).
+    temporal = ruta + ".sellando"
+    with open(temporal, "wb") as f:
+        f.write(datos)
+    os.chmod(temporal, 0o644)
+    os.replace(temporal, ruta)
     print(f"sello-pe: {ruta}: {antes} → {epoch}")
 
 
