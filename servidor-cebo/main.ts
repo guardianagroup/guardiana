@@ -51,7 +51,15 @@ async function anotar(cebo: string, ruta: string, ip: string, agente: string) {
 async function visitas(): Promise<Array<Record<string, unknown>>> {
   const salida: Array<Record<string, unknown>> = [];
   for await (const e of kv.list({ prefix: ["visitas"] }, { reverse: true, limit: 500 })) {
-    salida.push(e.value as Record<string, unknown>);
+    const v = e.value as Record<string, unknown>;
+    // Las primeras pruebas se guardaron con la dirección entera, antes de que el recorte pasara a
+    // hacerse al escribir. Esas filas se borran en cuanto se las ve: aquí no se queda una
+    // dirección completa de nadie, ni siquiera de una prueba nuestra.
+    if ("ip" in v) {
+      await kv.delete(e.key);
+      continue;
+    }
+    salida.push(v);
   }
   return salida;
 }
