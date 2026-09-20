@@ -15,12 +15,20 @@
 const kv = await Deno.openKv();
 const DIAS = 90;
 
-/** La red de una dirección, sin enseñar la dirección entera: `200.14.x.x`, `2801:1e::`. */
+/** La red de una dirección, sin la dirección entera: `200.14.x.x`, `2801:1e::`.
+ *
+ * Esto se aplica **antes de guardar**, no al enseñar: la dirección completa de quien llama no se
+ * escribe en ningún sitio. La primera visita de prueba enseñó por qué hacía falta afinarlo: llegó
+ * como `::ffff:181.63.26.36`, que es una dirección de las de siempre vestida de IPv6, y el
+ * recorte la dejaba casi entera. */
 function red(ip: string): string {
-  const limpia = ip.trim();
-  if (limpia === "" || limpia === "::1" || limpia === "127.0.0.1") return "desconocida";
+  let limpia = ip.trim().toLowerCase();
+  if (limpia.startsWith("[") && limpia.endsWith("]")) limpia = limpia.slice(1, -1);
+  // `::ffff:1.2.3.4` es una IPv4 dentro de una IPv6: se trata como lo que es.
+  const mapeada = limpia.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (mapeada) limpia = mapeada[1];
+  if (limpia === "" || limpia === "::1" || limpia.startsWith("127.")) return "desconocida";
   if (limpia.includes(":")) {
-    // IPv6: los dos primeros grupos que no estén vacíos, que es de donde sale la red.
     const grupos = limpia.split(":").filter((g) => g !== "").slice(0, 2);
     return grupos.length ? grupos.join(":") + "::" : "desconocida";
   }
@@ -34,7 +42,8 @@ function escapar(s: string): string {
 
 async function anotar(cebo: string, ruta: string, ip: string, agente: string) {
   const ahora = Date.now();
-  await kv.set(["visitas", ahora, crypto.randomUUID()], { ahora, cebo, ruta, ip, agente }, {
+  // Se guarda la red, no la dirección: lo que no se escribe no se puede filtrar después.
+  await kv.set(["visitas", ahora, crypto.randomUUID()], { ahora, cebo, ruta, red: red(ip), agente }, {
     expireIn: DIAS * 24 * 60 * 60 * 1000,
   });
 }
@@ -66,8 +75,8 @@ trampa <strong>en nuestras propias mediciones</strong>. No forma parte del progr
 que se instala en un computador no habla nunca con este servidor, y una trampa puesta por una
 persona se detecta dentro de su equipo, sin que nada salga de ahí.</p>
 <p>De cada visita se guarda la hora, qué cebo, qué dirección pidió, con qué nombre se presentó el
-programa y de dónde vino. Aquí se enseña la red de origen, no la dirección entera. Todo se borra
-a los ${DIAS} días.</p>
+programa y <strong>la red</strong> de la que vino. La dirección completa no se guarda en ningún
+momento: se recorta antes de escribirla. Todo se borra solo a los ${DIAS} días.</p>
 ${filas}
 </main></body></html>`;
 
@@ -91,8 +100,7 @@ Deno.serve(async (req: Request, info: Deno.ServeHandlerInfo) => {
   }
 
   if (url.pathname === "/visitas.json") {
-    const v = (await visitas()).map((x) => ({ ...x, ip: red(String(x.ip)) }));
-    return Response.json(v);
+    return Response.json(await visitas());
   }
 
   const v = await visitas();
@@ -103,7 +111,7 @@ Deno.serve(async (req: Request, info: Deno.ServeHandlerInfo) => {
         `<tr><td><code>${escapar(new Date(Number(x.ahora)).toISOString())}</code></td>` +
         `<td><code>${escapar(String(x.cebo))}</code></td>` +
         `<td><code>${escapar(String(x.ruta))}</code></td>` +
-        `<td><code>${escapar(red(String(x.ip)))}</code></td>` +
+        `<td><code>${escapar(String(x.red ?? "desconocida"))}</code></td>` +
         `<td>${escapar(String(x.agente).slice(0, 120))}</td></tr>`
       ).join("") + "</table>";
   return new Response(PAGINA(filas), { headers: { "content-type": "text/html; charset=utf-8" } });
