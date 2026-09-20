@@ -113,6 +113,7 @@
     "servicio.parado": "Servicio parado.",
     "servicio.estado.running": "Servicio: en marcha (arranca solo con el sistema).",
     "servicio.estado.stopped": "Servicio: instalado pero parado.",
+    "servicio.estado.stopped_motivo": "Servicio: instalado pero parado. La última vez que intentó arrancar dijo esto: {motivo}",
     "servicio.estado.none": "Servicio: no instalado. Guardiana solo funciona mientras esta ventana esté abierta.",
     "servicio.privilegios": "Instalar, quitar o parar el servicio necesita permiso de administrador.",
     "servicio.no_soportado": "El servicio solo existe en Windows y Linux.",

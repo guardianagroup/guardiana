@@ -56,8 +56,27 @@ out="build/out"
 linux="$out/guardiana-$version-linux-x86_64"
 win="$out/guardiana-$version-windows-x86_64.exe"
 
-# 2. minisign signatures over the unsigned binaries.
-for f in "$linux" "$win"; do
+# 1 bis. Los paquetes que la gente descarga de verdad. La página de instalación dice, con estas
+# palabras, «compara la huella del .msi con la del registro público», y hasta el 20 de septiembre
+# de 2026 el registro solo llevaba los dos binarios sueltos: quien siguiera la instrucción el día
+# del lanzamiento no habría encontrado su archivo. Los envoltorios se construyen desde los mismos
+# binarios del contenedor y entran en la misma línea, cada uno diciendo si es reproducible.
+cp "$linux" target/x86_64-unknown-linux-gnu/release/guardiana
+cp "$win" target/x86_64-pc-windows-gnu/release/guardiana.exe
+build/package.sh --no-build
+paquetes="dist/$version"
+msi="$paquetes/guardiana-$version-windows-x64.msi"
+deb="$paquetes/guardiana_${version}_amd64.deb"
+tarball="$paquetes/guardiana-$version-linux-x86_64.tar.gz"
+if [ ! -f "$msi" ]; then
+    echo "release.sh: falta $msi." >&2
+    echo "release.sh: el MSI se construye en Windows (build/msi.ps1) desde este mismo .exe y se deja ahí" >&2
+    echo "release.sh: antes de publicar, porque la web dice que su huella está en el registro." >&2
+    exit 1
+fi
+
+# 2. minisign signatures over everything that gets published.
+for f in "$linux" "$win" "$msi" "$deb" "$tarball"; do
     firmar "$f" "guardiana $version $(basename "$f")"
 done
 sha_linux="$(sha256sum "$linux" | cut -d' ' -f1)"
@@ -116,22 +135,40 @@ else
     echo "release.sh: Windows will warn until the signature gathers reputation; see docs/FIRMA-CODIGO.md." >&2
 fi
 
-# 5. The ledger line.
-sig_linux="$(sed -n '2p' "$linux.minisig")"
-sig_win="$(sed -n '2p' "$win.minisig")"
-line=$(python3 - "$version" "$commit" "$date" "$linux" "$sha_linux" "$sig_linux" "$win" "$sha_win_unsigned" "$sha_win_signed" "$sig_win" "$mac" "$sha_mac" "$sig_mac" <<'PY'
-import json, sys, os
-v, c, d, lx, shl, sgl, wn, shwu, shws, sgw, mc, shm, sgm = sys.argv[1:]
-files = [
-  {"name": os.path.basename(lx), "sha256_unsigned": shl, "sha256_signed": shl, "minisign": sgl},
-  {"name": os.path.basename(wn), "sha256_unsigned": shwu, "sha256_signed": shws, "minisign": sgw},
-]
-if mc:
-    # The Mac app is not code-signed by Apple, so signed and unsigned are the same file.
-    files.append({"name": os.path.basename(mc), "sha256_unsigned": shm, "sha256_signed": shm, "minisign": sgm})
-print(json.dumps({"version": v, "commit": c, "date": d, "files": files, "rekor_uuid": ""}, separators=(",", ":")))
-PY
-)
+# 5. The ledger line: one entry per file that anyone can download, not only the two raw binaries.
+# `reproducible` says the truth about each one: the two binaries come out of the pinned container
+# and two builds of the same commit give the same hash (comprobado el 20 sep 2026, después de fijar
+# el sello de tiempo del .exe); los envoltorios —MSI, .deb, tarball, .app.zip— se construyen una
+# vez y lo que se publica de ellos es su huella y su firma, que es lo que la persona compara.
+entradas=""
+anotar() {  # archivo  reproducible(true|false)  [huella ya firmada]
+    local f="$1" repro="$2" firmado="${3:-}" sha sig fila
+    sha="$(sha256sum "$f" | cut -d' ' -f1)"
+    sig="$(sed -n '2p' "$f.minisig")"
+    # printf -v y no $( ), que se come el salto de línea final y dejaría todo en una sola fila.
+    printf -v fila '%s\t%s\t%s\t%s\t%s\n' "$(basename "$f")" "$sha" "${firmado:-$sha}" "$sig" "$repro"
+    entradas="$entradas$fila"
+}
+anotar "$linux" true
+anotar "$win" true "$sha_win_signed"
+anotar "$msi" false
+anotar "$deb" false
+anotar "$tarball" false
+[ -n "$mac" ] && anotar "$mac" false
+
+line=$(printf '%s' "$entradas" | python3 -c '
+import json, sys
+v, c, d = sys.argv[1:4]
+files = []
+for linea in sys.stdin.read().splitlines():
+    if not linea.strip():
+        continue
+    nombre, sha, firmado, sig, repro = linea.split("\t")
+    files.append({"name": nombre, "sha256_unsigned": sha, "sha256_signed": firmado,
+                  "minisign": sig, "reproducible": repro == "true"})
+print(json.dumps({"version": v, "commit": c, "date": d, "files": files, "rekor_uuid": ""},
+                 separators=(",", ":")))
+' "$version" "$commit" "$date")
 
 # 6. Rekor: sign the line itself and upload; the uuid goes into the line.
 echo "$line" > "$out/ledger-line.json"

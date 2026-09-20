@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 pub const DATA_ENV: &str = "GUARDIANA_DATA";
 /// File name of the ledger database inside the data directory.
 pub const LEDGER_FILE: &str = "ledger.db";
+/// File where a service that could not start leaves the reason, next to the ledger.
+pub const MOTIVO_FILE: &str = "ultimo-error.txt";
 
 /// The data directory for this platform (not created here).
 #[must_use]
@@ -119,4 +121,63 @@ pub fn unreadable_here(path: &std::path::Path) -> bool {
         std::fs::File::open(path).err().map(|e| e.kind()),
         Some(std::io::ErrorKind::PermissionDenied)
     )
+}
+
+/// Full path of the file where a failed service start leaves its reason.
+#[must_use]
+pub fn motivo_path() -> PathBuf {
+    data_dir().join(MOTIVO_FILE)
+}
+
+/// Writes why the service could not run, with the time, next to the ledger.
+///
+/// A Windows service has nowhere to print. Until 20 September 2026 the error was dropped and the
+/// service stopped with exit code 0: on the test machine, whose ledger belonged to the previous
+/// signing key, Windows said "installed but stopped" and neither the event log nor `verify` nor
+/// the panel said a word about why. Best effort: if the file cannot be written the service still
+/// stops with a code that is not "everything went fine".
+pub fn guardar_motivo(texto: &str, ahora_ms: i64) {
+    guardar_motivo_en(&data_dir(), texto, ahora_ms);
+}
+
+/// The last reason a service start failed: when (ms) and the text, if it is there.
+#[must_use]
+pub fn leer_motivo() -> Option<(i64, String)> {
+    leer_motivo_en(&data_dir())
+}
+
+/// Same, against a given directory: what the two above use, and what the test can check without
+/// touching the environment of the whole process.
+pub fn guardar_motivo_en(dir: &Path, texto: &str, ahora_ms: i64) {
+    let _ = std::fs::create_dir_all(dir);
+    let _ = std::fs::write(dir.join(MOTIVO_FILE), format!("{ahora_ms}\n{texto}\n"));
+}
+
+/// The reason written in `dir`, if any.
+#[must_use]
+pub fn leer_motivo_en(dir: &Path) -> Option<(i64, String)> {
+    let texto = std::fs::read_to_string(dir.join(MOTIVO_FILE)).ok()?;
+    let (cuando, resto) = texto.split_once('\n')?;
+    let resto = resto.trim_end();
+    if resto.is_empty() {
+        return None;
+    }
+    Some((cuando.trim().parse().ok()?, resto.to_owned()))
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod pruebas_motivo {
+    use super::*;
+
+    #[test]
+    fn el_motivo_se_escribe_y_se_lee() {
+        let dir = std::env::temp_dir().join(format!("guardiana-motivo-{}", std::process::id()));
+        guardar_motivo_en(&dir, "el extracto es de otra clave", 1_700_000_000_000);
+        let (cuando, texto) = leer_motivo_en(&dir).expect("debería haber motivo");
+        assert_eq!(cuando, 1_700_000_000_000);
+        assert_eq!(texto, "el extracto es de otra clave");
+        std::fs::remove_dir_all(&dir).ok();
+        assert!(leer_motivo_en(&dir).is_none());
+    }
 }

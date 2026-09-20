@@ -113,6 +113,7 @@
     "servicio.parado": "Service stopped.",
     "servicio.estado.running": "Service: running (starts with the system).",
     "servicio.estado.stopped": "Service: installed but stopped.",
+    "servicio.estado.stopped_motivo": "Service: installed but stopped. The last time it tried to start, it said this: {motivo}",
     "servicio.estado.none": "Service: not installed. Guardiana only works while this window is open.",
     "servicio.privilegios": "Installing, removing or stopping the service needs administrator permission.",
     "servicio.no_soportado": "The service only exists on Windows and Linux.",

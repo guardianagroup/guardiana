@@ -24,6 +24,10 @@ if [ "${1:-}" != "--no-build" ]; then
 fi
 [ -f "$LINUX_BIN" ] && [ -f "$WIN_BIN" ] || { echo "release binaries missing; run without --no-build"; exit 1; }
 
+# Mismo sello de tiempo que build/repro.sh: sin esto, el .exe de aquí y el del contenedor no
+# pueden coincidir nunca, por mucho que el código sea el mismo.
+python3 build/sello-pe.py "$WIN_BIN" "$(git log -1 --format=%ct 2>/dev/null || date +%s)"
+
 # Keep an MSI built on Windows (build/msi.ps1) that may already be in $OUT.
 mkdir -p "$OUT"
 find "$OUT" -type f ! -name '*.msi' -delete

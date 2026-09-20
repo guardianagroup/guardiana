@@ -151,7 +151,7 @@ mod windows {
         };
         let _ = handle.set_service_status(status(ServiceState::Running, Duration::ZERO));
         let cfg = EngineConfig::default_service();
-        let _ = rt.block_on(engine::run(cfg, async move {
+        let resultado = rt.block_on(engine::run(cfg, async move {
             // The stop request arrives on a plain thread; poll it without blocking the runtime.
             loop {
                 if rx.try_recv().is_ok() {
@@ -160,7 +160,24 @@ mod windows {
                 tokio::time::sleep(Duration::from_millis(250)).await;
             }
         }));
-        let _ = handle.set_service_status(status(ServiceState::Stopped, Duration::ZERO));
+        // A service has nowhere to print. Until 20 Sep 2026 the error was dropped here and the
+        // service stopped with exit code 0: on the test PC, whose ledger belonged to the previous
+        // signing key, Windows said "stopped" and neither the event log, nor `verify`, nor the
+        // panel said why. The reason now goes to a file next to the ledger, `verify` reads it, and
+        // the service stops with a code that is not "everything went fine".
+        let salida = match &resultado {
+            Ok(()) => ServiceExitCode::Win32(0),
+            Err(e) => {
+                guardiana_core::paths::guardar_motivo(
+                    &crate::motivo(&e.to_string()),
+                    guardiana_core::time::now_ms(),
+                );
+                ServiceExitCode::ServiceSpecific(1)
+            }
+        };
+        let mut fin = status(ServiceState::Stopped, Duration::ZERO);
+        fin.exit_code = salida;
+        let _ = handle.set_service_status(fin);
     }
 
     pub(super) fn run() -> Result<(), Box<dyn Error>> {

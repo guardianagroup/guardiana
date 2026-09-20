@@ -49,16 +49,23 @@ fn main() {
             // El mensaje interno ("ledger was created for another public key…") es inglés
             // técnico con dos huellas de 64 caracteres, y el día que le toque a alguien tiene
             // que poder entender qué le pasa y qué hacer.
-            let texto = e.to_string();
-            if texto.contains("ledger was created for another public key") {
-                eprintln!("{}", i18n::current().cli("extracto.otra_clave"));
-            } else {
-                eprintln!("guardiana: {texto}");
-            }
+            eprintln!("{}", motivo(&e.to_string()));
             1
         }
     };
     std::process::exit(code);
+}
+
+/// The reason a run failed, in the words of whoever is reading it. The service uses the same
+/// function: until 20 Sep 2026 it threw the error away and stopped with exit code 0, so a Windows
+/// machine whose ledger belonged to another key showed "service: installed but stopped" and not
+/// one word about why (found while rehearsing the 1.0 upgrade on the test PC).
+pub(crate) fn motivo(texto: &str) -> String {
+    if texto.contains("ledger was created for another public key") {
+        i18n::current().cli("extracto.otra_clave").to_owned()
+    } else {
+        format!("guardiana: {texto}")
+    }
 }
 
 fn run() -> Result<(), Box<dyn Error>> {

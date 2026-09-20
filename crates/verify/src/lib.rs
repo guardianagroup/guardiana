@@ -445,15 +445,21 @@ pub fn render_with(t: &guardiana_core::i18n::Texts, report: &Report) -> String {
                 },
             ),
     });
-    out.push(
-        match report.service.as_str() {
-            "running" => t.cli("servicio.estado.running"),
-            "stopped" => t.cli("servicio.estado.stopped"),
-            "not_installed" => t.cli("servicio.estado.none"),
-            _ => t.cli("verify.servicio.desconocido"),
-        }
-        .to_owned(),
-    );
+    // Un servicio parado sin motivo no dice nada. Si el arranque dejó escrito por qué —lo escribe
+    // el propio servicio al fallar, porque no tiene dónde imprimir— se enseña aquí, que es donde
+    // mira la persona cuando algo no va (20 sep 2026, ensayando la actualización a la 1.0).
+    let parado = match guardiana_core::paths::leer_motivo() {
+        Some((_, motivo)) => t
+            .cli("servicio.estado.stopped_motivo")
+            .replace("{motivo}", &motivo),
+        None => t.cli("servicio.estado.stopped").to_owned(),
+    };
+    out.push(match report.service.as_str() {
+        "running" => t.cli("servicio.estado.running").to_owned(),
+        "stopped" => parado,
+        "not_installed" => t.cli("servicio.estado.none").to_owned(),
+        _ => t.cli("verify.servicio.desconocido").to_owned(),
+    });
     let dns = if report.system_dns.is_empty() {
         "-".to_owned()
     } else {

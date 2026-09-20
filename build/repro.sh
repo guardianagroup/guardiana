@@ -33,6 +33,11 @@ docker run --rm \
         cp target/x86_64-pc-windows-gnu/release/guardiana.exe "/out/guardiana-'"$version"'-windows-x86_64.exe"
         chmod 644 /out/*
     '
+# El sello de tiempo que el enlazador mete en el .exe es el reloj de la máquina, así que dos
+# compilaciones del mismo código daban dos huellas distintas (visto el 20 sep 2026, la primera vez
+# que esto se pudo correr dos veces seguidas). Se reescribe con la fecha del commit.
+python3 build/sello-pe.py "build/out/guardiana-$version-windows-x86_64.exe" "$epoch"
+
 (cd build/out && sha256sum guardiana-* > SHA256SUMS)
 echo "== hashes:"
 cat build/out/SHA256SUMS
