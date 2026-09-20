@@ -15,11 +15,17 @@
 const kv = await Deno.openKv();
 const DIAS = 90;
 
-/** La red de una dirección, sin guardar la dirección entera: 200.14.x.x / 2801:1e:: */
+/** La red de una dirección, sin enseñar la dirección entera: `200.14.x.x`, `2801:1e::`. */
 function red(ip: string): string {
-  if (ip.includes(":")) return ip.split(":").slice(0, 2).join(":") + "::";
-  const p = ip.split(".");
-  return p.length === 4 ? `${p[0]}.${p[1]}.x.x` : ip;
+  const limpia = ip.trim();
+  if (limpia === "" || limpia === "::1" || limpia === "127.0.0.1") return "desconocida";
+  if (limpia.includes(":")) {
+    // IPv6: los dos primeros grupos que no estén vacíos, que es de donde sale la red.
+    const grupos = limpia.split(":").filter((g) => g !== "").slice(0, 2);
+    return grupos.length ? grupos.join(":") + "::" : "desconocida";
+  }
+  const p = limpia.split(".");
+  return p.length === 4 ? `${p[0]}.${p[1]}.x.x` : "desconocida";
 }
 
 function escapar(s: string): string {
