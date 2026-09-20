@@ -1,0 +1,46 @@
+# Reproducible build (brief §10) on a machine that is not ours.
+#
+# The release Mac has no Docker and cannot install it (no Homebrew, no admin), so until today
+# build/repro.sh could not run anywhere: the site promised "anyone can compile this and get the
+# same hash" and nobody had ever checked it. A GitHub runner has Docker, starts from nothing every
+# time and is not our machine, which is exactly what makes its answer worth something.
+#
+# It signs nothing and publishes nothing: the private key never comes near CI (brief §10). It only
+# builds and prints the hashes, which is the half that can be automated.
+name: repro
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*', 'repro-*']
+
+permissions:
+  contents: read
+
+jobs:
+  hashes:
+    name: SHA-256 of the Linux and Windows binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # repro.sh reads the commit date with git show
+      - name: reproducible build
+        run: build/repro.sh HEAD
+      - name: the hashes
+        run: cat build/out/SHA256SUMS
+      - name: build twice and compare
+        # Reproducible means the same input gives the same output, so the only honest check is to
+        # do it again and compare. If these two differ, the word does not apply and the release
+        # must not be published.
+        run: |
+          cp build/out/SHA256SUMS /tmp/primera
+          build/repro.sh HEAD
+          diff -u /tmp/primera build/out/SHA256SUMS && echo "the two builds match"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: guardiana-repro
+          path: |
+            build/out/SHA256SUMS
+            build/out/guardiana-*
+          retention-days: 14
