@@ -21,16 +21,21 @@ mkdir -p build/out build/src-export
 git archive --format=tar "$commit" | tar -x -C build/src-export
 
 docker build -t guardiana-repro -f build/Dockerfile build
+# El código entra de solo lectura y lo que compila vive dentro del contenedor: así la compilación
+# no puede tocar el árbol exportado, y sobre todo no lo deja lleno de archivos de root que la
+# segunda pasada no puede borrar. Eso es lo que hacía fallar la comprobación de «dos veces da lo
+# mismo» en el flujo de GitHub el 20 sep 2026, antes de haber comparado ninguna huella.
 docker run --rm \
-    -v "$PWD/build/src-export:/src" \
+    -v "$PWD/build/src-export:/src:ro" \
     -v "$PWD/build/out:/out" \
     -e SOURCE_DATE_EPOCH="$epoch" \
+    -e CARGO_TARGET_DIR=/tmp/target \
     guardiana-repro \
     bash -euxc '
         cargo zigbuild --release --locked -p guardiana-cli --target x86_64-unknown-linux-gnu
         cargo zigbuild --release --locked -p guardiana-cli --target x86_64-pc-windows-gnu
-        cp target/x86_64-unknown-linux-gnu/release/guardiana "/out/guardiana-'"$version"'-linux-x86_64"
-        cp target/x86_64-pc-windows-gnu/release/guardiana.exe "/out/guardiana-'"$version"'-windows-x86_64.exe"
+        cp /tmp/target/x86_64-unknown-linux-gnu/release/guardiana "/out/guardiana-'"$version"'-linux-x86_64"
+        cp /tmp/target/x86_64-pc-windows-gnu/release/guardiana.exe "/out/guardiana-'"$version"'-windows-x86_64.exe"
         chmod 644 /out/*
     '
 # El sello de tiempo que el enlazador mete en el .exe es el reloj de la máquina, así que dos
