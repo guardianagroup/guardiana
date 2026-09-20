@@ -546,6 +546,11 @@ pub(crate) struct IaServicio {
     nombres: usize,
     consultas: u64,
     ultima: i64,
+    /// Qué programas hicieron esas consultas, de más a menos, cuando el sistema lo dijo (Windows,
+    /// este equipo). Es la pregunta que de verdad importa en esta pantalla: no solo que el equipo
+    /// habló con Anthropic, sino que quien habló fue el agente y no el navegador. Vacío en los
+    /// teléfonos y en los sistemas donde no se puede saber.
+    programas: Vec<(String, u64)>,
 }
 
 #[derive(Serialize)]
@@ -586,7 +591,8 @@ pub(crate) async fn ia(State(state): State<Arc<AppState>>, _s: Session) -> ApiRe
     let view = with_ledger(&state, |l| {
         let devices = l.devices()?;
         // Per (device, AI service): how many queries for each distinct name, and the last time.
-        type PorServicio = HashMap<(String, &'static str), (HashMap<String, u64>, i64)>;
+        type PorServicio =
+            HashMap<(String, &'static str), (HashMap<String, u64>, i64, HashMap<String, u64>)>;
         let mut servicios: PorServicio = HashMap::new();
         let mut alcances = Vec::new();
         let mut sin_alcance = Vec::new();
@@ -601,9 +607,12 @@ pub(crate) async fn ia(State(state): State<Arc<AppState>>, _s: Session) -> ApiRe
                 if let Some(servicio) = guardiana_lists::ai_service_of(&e.qname) {
                     let slot = servicios
                         .entry((d.id.clone(), servicio))
-                        .or_insert_with(|| (HashMap::new(), 0));
+                        .or_insert_with(|| (HashMap::new(), 0, HashMap::new()));
                     *slot.0.entry(e.qname.clone()).or_insert(0) += 1;
                     slot.1 = slot.1.max(e.ts);
+                    if let Some(p) = &e.process {
+                        *slot.2.entry(p.nombre.clone()).or_insert(0) += 1;
+                    }
                 }
             }
             let modo = l.setting(&scope_mode_key(&d.id))?.unwrap_or_default();
@@ -654,13 +663,19 @@ pub(crate) async fn ia(State(state): State<Arc<AppState>>, _s: Session) -> ApiRe
         let names = names_of(&devices);
         let mut servicios: Vec<IaServicio> = servicios
             .into_iter()
-            .map(|((device_id, servicio), (nombres, ultima))| IaServicio {
-                servicio,
-                device_name: names.get(&device_id).cloned().flatten(),
-                device_id,
-                nombres: nombres.len(),
-                consultas: nombres.values().sum(),
-                ultima,
+            .map(|((device_id, servicio), (nombres, ultima, por_programa))| {
+                let mut programas: Vec<(String, u64)> = por_programa.into_iter().collect();
+                programas.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+                programas.truncate(4);
+                IaServicio {
+                    servicio,
+                    device_name: names.get(&device_id).cloned().flatten(),
+                    device_id,
+                    nombres: nombres.len(),
+                    consultas: nombres.values().sum(),
+                    ultima,
+                    programas,
+                }
             })
             .collect();
         servicios.sort_by_key(|s| std::cmp::Reverse(s.ultima));

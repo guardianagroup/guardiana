@@ -57,7 +57,8 @@ done
 
 echo
 if command -v sha256sum >/dev/null 2>&1; then suma="sha256sum"; else suma="shasum -a 256"; fi
-(cd "$carpeta" && rm -f SHA256SUMS && $suma guardiana* > SHA256SUMS)
+# Solo los paquetes: las firmas no se firman a sí mismas, y meterlas aquí era ruido.
+(cd "$carpeta" && rm -f SHA256SUMS && $suma $(ls guardiana* | grep -v '\.minisig$') > SHA256SUMS)
 echo "== Huellas en $carpeta/SHA256SUMS:"
 cat "$carpeta/SHA256SUMS"
 echo

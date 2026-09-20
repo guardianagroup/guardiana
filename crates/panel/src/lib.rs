@@ -296,6 +296,53 @@ pub async fn start(config: Config) -> Result<Running, Error> {
                     .into_response()
             }),
         )
+        // Alias: la dirección con «.html» al final lleva a la misma página. Escribirla así es
+        // lo natural cuando alguien copia el nombre del archivo, y el 404 que salía a cambio
+        // parecía que el programa estaba roto (20 sep 2026).
+        .route(
+            "/licencia.html",
+            get(|| async { Html(include_str!("../static/licencia.html")) }),
+        )
+        .route(
+            "/verify.html",
+            get(|| async { Html(include_str!("../static/verify.html")) }),
+        )
+        .route(
+            "/reglas.html",
+            get(|| async { Html(include_str!("../static/reglas.html")) }),
+        )
+        .route(
+            "/hogar.html",
+            get(|| async { Html(include_str!("../static/hogar.html")) }),
+        )
+        .route(
+            "/mi-dispositivo.html",
+            get(|| async { Html(include_str!("../static/mi-dispositivo.html")) }),
+        )
+        .route(
+            "/extracto.html",
+            get(|| async { Html(include_str!("../static/extracto.html")) }),
+        )
+        .route(
+            "/dispositivos.html",
+            get(|| async { Html(include_str!("../static/dispositivos.html")) }),
+        )
+        .route(
+            "/sabe-de-ti.html",
+            get(|| async { Html(include_str!("../static/sabe-de-ti.html")) }),
+        )
+        .route(
+            "/estado.html",
+            get(|| async { Html(include_str!("../static/estado.html")) }),
+        )
+        .route(
+            "/ia.html",
+            get(|| async { Html(include_str!("../static/ia.html")) }),
+        )
+        .route(
+            "/informe.html",
+            get(|| async { Html(include_str!("../static/informe.html")) }),
+        )
         .route("/static/fonts/{archivo}", get(fuente))
         .route(
             "/static/app.js",

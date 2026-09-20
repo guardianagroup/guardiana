@@ -813,9 +813,14 @@
     },
     async ia() {
       const paint = (r) => {
+        // Quién habló con ese servicio, si el sistema lo dijo: en esta pantalla es la pregunta
+        // que importa —que hablara el agente y no el navegador—, así que va pegado al aparato.
+        const quien = (x) => (x.programas && x.programas.length
+          ? '<br>' + x.programas.map((p) => `<span class="tag app" title="${esc(t('ia_programa_titulo'))}">${esc(p[0])} ×${p[1]}</span>`).join(' ')
+          : '');
         $('ia-servicios').innerHTML = r.servicios.map((x) => `<tr>
           <td><span class="tag ia">${esc(x.servicio)}</span></td>
-          <td>${esc(x.device_name || (x.device_id === 'self' ? t('este_computador') : x.device_id))}</td>
+          <td>${esc(x.device_name || (x.device_id === 'self' ? t('este_computador') : x.device_id))}${quien(x)}</td>
           <td>${x.nombres}</td><td>${x.consultas}</td><td class="muted">${when(x.ultima)}</td></tr>`).join('')
           || `<tr><td colspan="5" class="muted">${esc(t('ia_sin_servicios'))}</td></tr>`;
         $('alcances').innerHTML = r.alcances.map((a) => `<div class="card">
