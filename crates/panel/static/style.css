@@ -90,6 +90,8 @@ tbody tr:last-child td { border-bottom: 0; }
 .tag.desconocido.sinlista { color: var(--desconocido); border-style: dashed; }
 .tag.ia { color: var(--accent); font-size: 10px; margin-left: 5px; }
 .tag.empresa { color: var(--muted); border-color: var(--line); font-size: 10px; margin-left: 5px; }
+.tag.app { border-color: var(--accent); color: var(--accent); font-family: var(--mono); }
+.tag.trampa { border-color: var(--cortado); color: var(--cortado); font-weight: 600; letter-spacing: 0.04em; }
 .verdict.cortado { color: var(--cortado); font-weight: 600; }
 .verdict.respondido { color: var(--respondido); }
 .phrase { display: block; color: var(--muted); font-size: 13px; }

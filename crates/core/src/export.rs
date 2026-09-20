@@ -9,7 +9,8 @@ use crate::time::rfc3339_utc;
 
 /// Column order of the CSV export.
 pub const CSV_HEADER: &str = "id,ts,ts_utc,device_id,client_ip,qname,qtype,category,list_source,\
-                              signals,verdict,decided_by,rule_id,prev_hash,row_hash";
+                              signals,verdict,decided_by,rule_id,prev_hash,row_hash,\
+                              programa,programa_ruta,programa_sha256";
 
 /// Write events as a JSON array, one object per event, hashes as hex.
 pub fn write_json<W: Write>(events: &[Event], mut w: W) -> Result<()> {
@@ -45,6 +46,20 @@ pub fn write_csv<W: Write>(events: &[Event], mut w: W) -> Result<()> {
             rule,
             e.prev_hash.to_hex(),
             e.row_hash.to_hex(),
+            // El programa que lo pidió, cuando el sistema lo dijo (Windows, este equipo). Vacío en
+            // todo lo demás, que es lo normal: un hueco, nunca una invención.
+            e.process
+                .as_ref()
+                .map(|p| p.nombre.clone())
+                .unwrap_or_default(),
+            e.process
+                .as_ref()
+                .map(|p| p.ruta.clone())
+                .unwrap_or_default(),
+            e.process
+                .as_ref()
+                .map(|p| p.sha256.clone())
+                .unwrap_or_default(),
         ];
         let line = fields
             .iter()

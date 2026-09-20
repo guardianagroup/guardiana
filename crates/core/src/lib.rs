@@ -24,6 +24,7 @@ mod retention;
 pub mod rules;
 mod stats;
 pub mod time;
+pub mod trampas;
 
 pub use changes::{Change, ChangeKind};
 pub use error::{Error, Result};
@@ -32,8 +33,8 @@ pub use gaps::{Gap, GAP_THRESHOLD_MS, KEY_HEARTBEAT};
 pub use hash::{chain_hash, Hash, HashInput};
 pub use ledger::{ChainFault, CheckReport, EventFilter, Ledger};
 pub use model::{
-    Action, Category, DecidedBy, Device, Event, MatchKind, NewEvent, NewRule, Outbound, Purpose,
-    Rule, Scope, Signal, SignalKind, Verdict,
+    Action, Category, DecidedBy, Device, Event, MatchKind, NewEvent, NewRule, Outbound, Proceso,
+    Purpose, Rule, Scope, Signal, SignalKind, Verdict,
 };
 pub use report::{DeviceWeek, WeekSummary};
 pub use retention::{DailyTotal, PruneReport, Retention};

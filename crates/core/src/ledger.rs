@@ -47,7 +47,10 @@ CREATE TABLE IF NOT EXISTS events (
     decided_by   TEXT    NOT NULL,
     rule_id      INTEGER,
     prev_hash    BLOB    NOT NULL,
-    row_hash     BLOB    NOT NULL
+    row_hash     BLOB    NOT NULL,
+    -- El programa que pidió el nombre, cuando el sistema puede decirlo (Windows, este equipo).
+    -- Vacío en todo lo demás, que es la mayoría: se guarda el nombre del programa, no lo que hace.
+    process_json TEXT    NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
 CREATE INDEX IF NOT EXISTS events_device_ts ON events(device_id, ts);
@@ -98,7 +101,8 @@ CREATE TABLE IF NOT EXISTS daily_totals (
 ";
 
 const EVENT_COLUMNS: &str = "id, ts, device_id, client_ip, qname, qtype, category, list_source, \
-                             signals_json, verdict, decided_by, rule_id, prev_hash, row_hash";
+                             signals_json, verdict, decided_by, rule_id, prev_hash, row_hash, \
+                             process_json";
 
 /// Handle to the ledger database.
 pub struct Ledger {
@@ -184,6 +188,7 @@ impl Ledger {
         ledger.ensure_gaps_table()?;
         ledger.ensure_changes_table()?;
         ledger.migrate_rules_confirmed()?;
+        ledger.migrate_events_process()?;
         match ledger.setting(KEY_GENESIS)? {
             None => {
                 ledger.set_setting(KEY_GENESIS, &genesis.to_hex())?;
@@ -268,6 +273,10 @@ impl Ledger {
             }
         };
         let signals_json = serde_json::to_string(&new.signals)?;
+        let process_json = match &new.process {
+            Some(p) => serde_json::to_string(p)?,
+            None => String::new(),
+        };
         let row_hash = chain_hash(
             &prev_hash,
             &HashInput {
@@ -282,12 +291,13 @@ impl Ledger {
                 verdict: new.verdict.as_str(),
                 decided_by: new.decided_by.as_str(),
                 rule_id: new.rule_id,
+                process_json: &process_json,
             },
         );
         tx.execute(
             "INSERT INTO events (ts, device_id, client_ip, qname, qtype, category, list_source, \
-             signals_json, verdict, decided_by, rule_id, prev_hash, row_hash) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+             signals_json, verdict, decided_by, rule_id, prev_hash, row_hash, process_json) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             params![
                 new.ts,
                 new.device_id,
@@ -302,6 +312,7 @@ impl Ledger {
                 new.rule_id,
                 prev_hash.0.as_slice(),
                 row_hash.0.as_slice(),
+                process_json,
             ],
         )?;
         let id = tx.last_insert_rowid();
@@ -319,6 +330,7 @@ impl Ledger {
             verdict: new.verdict,
             decided_by: new.decided_by,
             rule_id: new.rule_id,
+            process: new.process,
             prev_hash,
             row_hash,
         })
@@ -542,6 +554,24 @@ impl Ledger {
 
     // ----- rules ----------------------------------------------------------
 
+    /// Older databases lack `events.process_json`; add it once. Rows written before it keep an
+    /// empty value, which is exactly what the hash treats as "there was no program here", so the
+    /// chain of an old ledger still verifies after the upgrade.
+    fn migrate_events_process(&self) -> Result<()> {
+        let has: bool = self
+            .conn
+            .prepare("PRAGMA table_info(events)")?
+            .query_map([], |r| r.get::<_, String>(1))?
+            .filter_map(std::result::Result::ok)
+            .any(|c| c == "process_json");
+        if !has {
+            self.conn.execute_batch(
+                "ALTER TABLE events ADD COLUMN process_json TEXT NOT NULL DEFAULT ''",
+            )?;
+        }
+        Ok(())
+    }
+
     /// Older databases lack `rules.confirmed`; add it once.
     fn migrate_rules_confirmed(&self) -> Result<()> {
         let has: bool = self
@@ -722,6 +752,7 @@ struct RawEvent {
     rule_id: Option<i64>,
     prev_hash: Hash,
     row_hash: Hash,
+    process_json: String,
 }
 
 impl RawEvent {
@@ -738,6 +769,7 @@ impl RawEvent {
             verdict: &self.verdict,
             decided_by: &self.decided_by,
             rule_id: self.rule_id,
+            process_json: &self.process_json,
         }
     }
 }
@@ -759,6 +791,7 @@ fn raw_from_row(row: &Row<'_>) -> Result<RawEvent> {
         rule_id: row.get(11)?,
         prev_hash: Hash::from_bytes(&prev)?,
         row_hash: Hash::from_bytes(&cur)?,
+        process_json: row.get(14).unwrap_or_default(),
     })
 }
 
@@ -784,6 +817,11 @@ fn event_from_row(row: &Row<'_>) -> rusqlite::Result<Event> {
         verdict: raw.verdict.parse().map_err(to_sql_err)?,
         decided_by: raw.decided_by.parse().map_err(to_sql_err)?,
         rule_id: raw.rule_id,
+        process: if raw.process_json.is_empty() {
+            None
+        } else {
+            serde_json::from_str(&raw.process_json).map_err(|e| to_sql_err(Error::Json(e)))?
+        },
         prev_hash: raw.prev_hash,
         row_hash: raw.row_hash,
     })

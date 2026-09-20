@@ -8,6 +8,10 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
+    // La identidad del programa: si cambia la clave pública y cargo no se entera, el binario sigue
+    // llevando la anterior y `verify` comprueba firmas contra una clave que ya no firma nada. Pasó
+    // a punto de pasar el 20 de septiembre de 2026, al hacer la clave nueva.
+    println!("cargo:rerun-if-changed=../../build/pubkey/minisign.pub");
     let dir = Path::new("../panel/i18n");
     println!("cargo:rerun-if-changed={}", dir.display());
     let Ok(entradas) = fs::read_dir(dir) else {

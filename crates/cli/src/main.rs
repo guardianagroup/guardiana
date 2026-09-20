@@ -3,6 +3,7 @@
 //! Every sentence printed comes from `crates/panel/i18n/es.json` through
 //! `guardiana_core::i18n`; nothing user-facing is written here.
 
+mod apps_cmd;
 mod args;
 mod boveda_cmd;
 mod dns_cmd;
@@ -18,6 +19,7 @@ mod panel_cmd;
 mod reglas_cmd;
 mod service_cmd;
 mod show;
+mod trampa_cmd;
 mod verify_cmd;
 
 use std::error::Error;
@@ -92,6 +94,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("reglas") => reglas_cmd::run(&opts),
         Some("service" | "servicio") => service_cmd::run(&opts),
         Some("panel") => panel_cmd::run(&opts),
+        Some("apps") => apps_cmd::run(&opts),
+        Some("trampa" | "trampas") => trampa_cmd::run(&opts),
         Some("verify" | "verificar") => verify_cmd::run(&opts),
         Some("version" | "--version" | "-V") => {
             println!("guardiana {}", env!("CARGO_PKG_VERSION"));

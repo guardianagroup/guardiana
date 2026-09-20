@@ -21,6 +21,8 @@ guardiana-classify = { workspace = true }
 guardiana-service = { workspace = true }
 guardiana-panel = { workspace = true }
 guardiana-devices = { workspace = true }
+guardiana-apps = { workspace = true }
+getrandom = { workspace = true }
 guardiana-verify = { workspace = true }
 guardiana-license = { workspace = true }
 guardiana-vault = { workspace = true }

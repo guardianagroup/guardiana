@@ -6,10 +6,16 @@ La regla: nunca "100 % seguro", nunca "invisible", nunca "protegido" sin objeto,
 
 ## Lo que no ve
 
-- **No ve qué app pidió cada nombre.** Ve nombres de servicios, no aplicaciones. En Modo Hogar,
-  para teléfonos y televisores, esto es todo lo que se puede saber por DNS. Frase en pantalla:
-  "En Modo Hogar, Guardiana ve nombres de servicios, no qué app los pidió."
-  (Extra de la sección 12: "qué app" en Windows, solo lectura, solo si llega probado el día 24.)
+- **No ve qué app pidió cada nombre, salvo en este computador y solo en Windows.** Desde el 20 de
+  septiembre de 2026 (decisión 183), en Windows y solo para el equipo donde está instalada,
+  Guardiana sí puede decir qué programa pidió cada nombre: se lo cuenta el propio Windows por su
+  canal de sucesos, y lo que guarda es el nombre del programa, su ruta y su huella. En Modo Hogar,
+  para teléfonos y televisores, sigue sin poder saberse: "En Modo Hogar, Guardiana ve nombres de
+  servicios, no qué app los pidió." Y en ningún caso corta por programa: eso es 2.0.
+- **No mira archivos, ni siquiera los suyos.** Los «archivos trampa» (decisión 184) no son
+  vigilancia del sistema de archivos: el cebo es un nombre único escrito dentro del archivo, y lo
+  único que Guardiana ve —como siempre— es si alguien pregunta por ese nombre. Nunca abre el
+  archivo, y un programa que lo lea y no siga el enlace no aparece en ningún sitio.
 - **No ve contenido.** Ni páginas, ni mensajes, ni qué se hizo en cada servicio.
 - **No ve cuántos bytes.** Solo que se preguntó por un nombre, cuándo y cuántas veces.
 - **No anota respuestas.** Solo consultas: nombre, tipo, dispositivo, hora, categoría, veredicto.

@@ -112,6 +112,12 @@ pub struct HashInput<'a> {
     pub decided_by: &'a str,
     /// Rule that caused the verdict, if any.
     pub rule_id: Option<i64>,
+    /// The program that asked, as stored JSON, or empty when it is not known.
+    ///
+    /// Only Windows can say this today, and only for this computer, so most rows will never have
+    /// it. It is hashed **only when it is there**: a row without it hashes exactly as it did
+    /// before this field existed, and every ledger written until 20 September 2026 still verifies.
+    pub process_json: &'a str,
 }
 
 /// Compute `sha256(prev_hash || fields)` for one ledger row.
@@ -138,6 +144,13 @@ pub fn chain_hash(prev: &Hash, input: &HashInput<'_>) -> Hash {
         h.update(len.to_be_bytes());
         h.update(field.as_bytes());
     }
+    // Al final y solo si hay algo: así una fila sin programa da el mismo hash que antes de que
+    // este campo existiera, y las cadenas ya escritas siguen comprobando.
+    if !input.process_json.is_empty() {
+        let len = u32::try_from(input.process_json.len()).unwrap_or(u32::MAX);
+        h.update(len.to_be_bytes());
+        h.update(input.process_json.as_bytes());
+    }
     let digest = h.finalize();
     let mut out = [0u8; 32];
     out.copy_from_slice(&digest);
@@ -161,7 +174,30 @@ mod tests {
             verdict: "observado",
             decided_by: "nadie",
             rule_id: None,
+            process_json: "",
         }
+    }
+
+    #[test]
+    fn el_programa_no_cambia_el_hash_de_las_filas_que_no_lo_llevan() {
+        // La razón de que este campo vaya al final y solo cuando existe: un extracto escrito antes
+        // del 20 de septiembre de 2026 tiene que seguir comprobando después de actualizar.
+        let anterior = Hash::of(b"ancla");
+        let sin = chain_hash(&anterior, &sample());
+        let mut con = sample();
+        con.process_json = "{\"pid\":1234,\"nombre\":\"claude.exe\"}";
+        assert_ne!(
+            sin,
+            chain_hash(&anterior, &con),
+            "con programa tiene que cambiar"
+        );
+        let mut vacio = sample();
+        vacio.process_json = "";
+        assert_eq!(
+            sin,
+            chain_hash(&anterior, &vacio),
+            "sin programa, el hash de siempre"
+        );
     }
 
     #[test]

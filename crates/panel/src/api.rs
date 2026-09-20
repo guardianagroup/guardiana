@@ -73,6 +73,13 @@ pub(crate) struct EventView {
     /// `None` when it is not written: a company name is not a trade, and guessing one would be
     /// exactly the invented verdict this program refuses to give.
     oficio: Option<String>,
+    /// The program that asked, when the system said so (Windows, this computer). `None` on the
+    /// phones of Home Mode, on the other systems, and whenever the system did not say: an empty
+    /// space, never a guess.
+    programa: Option<guardiana_core::Proceso>,
+    /// Identifier of the trap file, when this name is one. A query for it means that file was
+    /// read: Guardiana never looked at the file, it only ever saw the name.
+    trampa: Option<String>,
 }
 
 /// The sentence for a name: first the name itself and its parent domains, then the company
@@ -105,6 +112,8 @@ fn view(t: &Texts, e: Event, names: &HashMap<String, Option<String>>) -> EventVi
         entrega: guardiana_lists::delivery_of(&e.qname),
         local: guardiana_lists::is_local_name(&e.qname),
         oficio: oficio_de(t, &e.qname),
+        programa: e.process,
+        trampa: guardiana_core::trampas::id_de(&e.qname),
         id: e.id,
         ts: e.ts,
         qname: e.qname,

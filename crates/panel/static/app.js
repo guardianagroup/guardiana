@@ -230,7 +230,20 @@
     + (ev.frases || []).map((f) => `<span class="phrase">· ${esc(f)}</span>`).join('');
   const company = (ev) => (ev.ia && !(ev.category === 'desconocido' && !ev.entrega && !ev.empresa) ? ` <span class="tag ia">${esc(ev.ia)}</span>` : '') + (ev.empresa && ev.empresa !== ev.ia && !(ev.category === 'desconocido' && !ev.entrega) ? ` <span class="tag empresa">${esc(ev.empresa)}</span>` : '');
   const hints = (l) => [l && l.callado_min != null ? t('lectura_callado').replace('{min}', l.callado_min) : '', l && l.relay ? t('lectura_relay') : '', l && l.evasiones ? (l.evasiones === 1 ? t('lectura_evasion_una') : t('lectura_evasiones').replace('{n}', l.evasiones)) : ''].filter(Boolean);
-  const device = (ev) => esc(ev.device_name || (ev.device_id === 'self' ? t('este_computador') : ev.device_id));
+  const device = (ev) => esc(ev.device_name || (ev.device_id === 'self' ? t('este_computador') : ev.device_id)) + programa(ev);
+  // Qué programa pidió el nombre, cuando el sistema lo dijo (Windows, este equipo). Va pegado al
+  // aparato, que es donde se lee «este PC · claude.exe», en vez de una columna que estaría vacía
+  // en todas las filas de los teléfonos. Sin dato no se enseña nada: un hueco, nunca una
+  // suposición. La ruta entera y la huella van en el título, para quien quiera comprobarlas.
+  // Un nombre de trampa en el extracto significa una cosa concreta: ese archivo se leyó. Se
+  // enseña en rojo y con su frase, porque es de las pocas cosas de este panel que piden mirar.
+  const trampa = (ev) => (ev.trampa ? ` <span class="tag trampa" title="${esc(t('trampa_frase'))}">${esc(t('trampa_etiqueta'))}</span>` : '');
+  const programa = (ev) => {
+    const p = ev.programa;
+    if (!p || !p.nombre) return '';
+    const detalle = [p.ruta, p.sha256 ? p.sha256.slice(0, 16) + '…' : ''].filter(Boolean).join(' · ');
+    return ` <span class="tag app" title="${esc(detalle)}">${esc(p.nombre)}</span>`;
+  };
 
   // The changes Guardiana made on someone's order (Home Mode, system DNS), with who asked.
   async function paintChanges() {
@@ -378,7 +391,7 @@
     return foldEvents(events).map((ev) => {
       const veces = ev._n > 1 ? ` <span class="muted">×${ev._n}</span>` : '';
       const como = ev._types.length ? ` title="${esc(ev._types.join(', '))}"` : '';
-      return `<tr><td class="mono">${clock(ev.ts)}</td><td><span class="mono"${como}>${esc(ev.qname)}</span>${veces}${company(ev)}${phrases(ev)}</td><td>${cat(ev)}</td><td>${device(ev)}</td><td>${verdict(ev.verdict)}</td><td>${cutCell(ev)}</td></tr>`;
+      return `<tr><td class="mono">${clock(ev.ts)}</td><td><span class="mono"${como}>${esc(ev.qname)}</span>${veces}${trampa(ev)}${company(ev)}${phrases(ev)}</td><td>${cat(ev)}</td><td>${device(ev)}</td><td>${verdict(ev.verdict)}</td><td>${cutCell(ev)}</td></tr>`;
     }).join('');
   }
 

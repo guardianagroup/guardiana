@@ -194,6 +194,27 @@ str_enum! {
     }
 }
 
+/// The program that asked for a name, when the system can say so.
+///
+/// Windows can, through its own DNS client's event channel, and only for this computer: the
+/// phones and the TV in Home Mode are seen by name and nothing else, and that is said on every
+/// screen. Guardiana looks at **which program asked**, never at what it reads or sends.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Proceso {
+    /// Process id at the time of the query. It is reused by the system, so it is context, not identity.
+    pub pid: u32,
+    /// File name of the program (`claude.exe`).
+    pub nombre: String,
+    /// Full path, when it could be read.
+    pub ruta: String,
+    /// SHA-256 of the program file, so the same name cannot pass for two different programs.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub sha256: String,
+    /// Who signs the program, as the system reports it; empty when unsigned or not checked yet.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub firmado_por: String,
+}
+
 /// One stored query. Answers are never stored (brief §4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Event {
@@ -221,6 +242,9 @@ pub struct Event {
     pub decided_by: DecidedBy,
     /// Rule that caused the verdict, if any.
     pub rule_id: Option<i64>,
+    /// The program that asked, when the system could say (Windows, this computer only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub process: Option<Proceso>,
     /// Hash of the previous row (or the chain anchor).
     pub prev_hash: Hash,
     /// `sha256(prev_hash || fields)`.
@@ -252,6 +276,8 @@ pub struct NewEvent {
     pub decided_by: DecidedBy,
     /// Rule that caused the verdict, if any.
     pub rule_id: Option<i64>,
+    /// The program that asked, when the system could say.
+    pub process: Option<Proceso>,
 }
 
 impl NewEvent {
@@ -271,6 +297,7 @@ impl NewEvent {
             verdict: Verdict::Observado,
             decided_by: DecidedBy::Nadie,
             rule_id: None,
+            process: None,
         }
     }
 }

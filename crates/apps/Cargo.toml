@@ -1,0 +1,27 @@
+[package]
+name = "guardiana-apps"
+description = "Which program asked for each name, on Windows and read-only (brief §12.3)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+guardiana-core = { path = "../core" }
+
+# Solo en Windows, y solo para leer:
+# - ferrisetw: envoltorio seguro del consumidor de ETW, que es el canal por el que el propio
+#   Windows cuenta qué proceso pidió cada nombre. Es la librería que el brief nombra (§12.3);
+#   la alternativa era llamar a la API de ETW con `unsafe`, que este proyecto no permite.
+# - windows-sys: ya entra en el árbol por otras dependencias; se usa para traducir un número de
+#   proceso a la ruta de su programa, y nada más.
+[target.'cfg(windows)'.dependencies]
+ferrisetw = "1.2"
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_Threading",
+] }
+sha2 = { workspace = true }

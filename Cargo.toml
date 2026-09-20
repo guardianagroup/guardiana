@@ -6,6 +6,7 @@ members = [
     "crates/lists",
     "crates/classify",
     "crates/devices",
+    "crates/apps",
     "crates/panel",
     "crates/service",
     "crates/license",
@@ -16,7 +17,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.0.0-rc.2"
+version = "1.0.0-rc.3"
 edition = "2021"
 rust-version = "1.85"
 license = "GPL-3.0-or-later"
@@ -34,6 +35,7 @@ guardiana-dns = { path = "crates/dns" }
 guardiana-lists = { path = "crates/lists" }
 guardiana-classify = { path = "crates/classify" }
 guardiana-devices = { path = "crates/devices" }
+guardiana-apps = { path = "crates/apps" }
 guardiana-panel = { path = "crates/panel" }
 guardiana-service = { path = "crates/service" }
 guardiana-license = { path = "crates/license" }

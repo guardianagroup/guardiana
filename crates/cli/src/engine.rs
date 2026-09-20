@@ -3,7 +3,7 @@
 //! `guardiana observe` (foreground, Ctrl+C) and by the service (SCM or
 //! systemd stop).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::error::Error;
 use std::future::Future;
 use std::net::{IpAddr, SocketAddr};
@@ -128,7 +128,24 @@ struct EnginePolicy {
     devices: guardiana_devices::Resolver,
     texts: &'static Texts,
     print_events: bool,
+    /// Quién pidió cada nombre, cuando el sistema lo dice (Windows, este equipo). `None` en los
+    /// demás sistemas y también en Windows si la sesión de sucesos no se pudo abrir: entonces el
+    /// extracto queda como siempre, con el aparato y sin el programa.
+    apps: Option<Arc<guardiana_apps::Observador>>,
+    /// Consultas de este equipo esperando a saber qué programa las pidió.
+    ///
+    /// Windows entrega los sucesos por tandas, con un temporizador cuyo mínimo es **un segundo**,
+    /// y Guardiana anota la consulta a los pocos milisegundos: cuando llega el aviso de quién
+    /// preguntó, la fila ya estaría escrita, y una fila escrita no se toca —la cadena de hashes
+    /// existe justamente para eso—. Así que la anotación de este equipo espera un momento en esta
+    /// cola, en el mismo orden en que llegó, y se escribe cuando ya se puede decir quién fue.
+    /// Lo que no espera es la respuesta al programa, que sale igual de rápido que siempre.
+    cola_apps: Arc<Mutex<VecDeque<guardiana_core::NewEvent>>>,
 }
+
+/// Cuánto espera una consulta de este equipo antes de anotarse, para darle tiempo a Windows a
+/// decir quién la pidió. Un poco más que el segundo del temporizador de sucesos.
+const ESPERA_APPS_MS: i64 = 1_300;
 
 fn key_of(q: &Query) -> PendingKey {
     (q.client, q.name.clone(), q.qtype.to_string(), q.ts)
@@ -313,6 +330,19 @@ impl Policy for EnginePolicy {
         event.verdict = verdict;
         event.decided_by = decided_by;
         event.rule_id = rule_id;
+        // Solo para este equipo: de un teléfono en Modo Hogar se ve el nombre y nada más, y eso
+        // lo dice cada pantalla. Si el sistema no lo dijo, el hueco se queda vacío.
+        if p.device_id == guardiana_core::SELF_DEVICE_ID {
+            if let Some(cola) = self.apps.as_ref().and(Some(&self.cola_apps)) {
+                // A la cola, en orden. Quien la vacía pregunta por el programa y anota.
+                if let Ok(mut c) = cola.lock() {
+                    if c.len() < 10_000 {
+                        c.push_back(event);
+                        return;
+                    }
+                }
+            }
+        }
         match inner.ledger.append(event) {
             Ok(e) => {
                 if self.print_events {
@@ -485,6 +515,17 @@ async fn run_once<F: Future<Output = ()>>(
         devices: guardiana_devices::Resolver::default(),
         texts: t,
         print_events: cfg.print_events,
+        apps: match guardiana_apps::Observador::arrancar() {
+            Ok(o) => Some(Arc::new(o)),
+            Err(guardiana_apps::Error::NoSoportado) => None,
+            Err(e) => {
+                // Se dice y se sigue: saber qué programa pidió cada nombre es un extra, y sin él
+                // Guardiana hace exactamente lo que hacía antes.
+                eprintln!("guardiana: {e}");
+                None
+            }
+        },
+        cola_apps: Arc::default(),
     };
 
     let mut dns_cfg = Config::local(upstreams.clone());
@@ -549,6 +590,55 @@ async fn run_once<F: Future<Output = ()>>(
             upstream: upstreams.iter().map(ToString::to_string).collect(),
             dev_key: identity::public_key_is_dev(),
         },
+    });
+
+    // Quien vacía la cola: cada poco, escribe las consultas de este equipo que ya han esperado
+    // bastante, preguntando primero qué programa las pidió. Va en orden y con su propia conexión
+    // al extracto, como hace el resto de tareas de fondo.
+    // Una copia del asa de la cola para poder vaciarla al cerrar, cuando la política ya se la ha
+    // llevado el resolutor.
+    let policy_cola = Arc::clone(&policy.cola_apps);
+    let vaciador = policy.apps.as_ref().map(|obs| {
+        let obs = Arc::clone(obs);
+        let cola = Arc::clone(&policy.cola_apps);
+        let db = cfg.db.clone();
+        let imprimir = cfg.print_events;
+        tokio::spawn(async move {
+            let mut cada = tokio::time::interval(Duration::from_millis(250));
+            loop {
+                cada.tick().await;
+                let ahora = now_ms();
+                let mut listos: Vec<guardiana_core::NewEvent> = Vec::new();
+                if let Ok(mut c) = cola.lock() {
+                    while let Some(e) = c.front() {
+                        if ahora - e.ts >= ESPERA_APPS_MS {
+                            if let Some(e) = c.pop_front() {
+                                listos.push(e);
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                if listos.is_empty() {
+                    continue;
+                }
+                let Ok(mut l) = Ledger::open(&db, identity::genesis()) else {
+                    continue;
+                };
+                for mut e in listos {
+                    e.process = obs.quien_pidio(&e.qname, e.ts);
+                    match l.append(e) {
+                        Ok(anotado) => {
+                            if imprimir {
+                                println!("{}", crate::show::line(t, &anotado, None));
+                            }
+                        }
+                        Err(err) => eprintln!("guardiana: {err}"),
+                    }
+                }
+            }
+        })
     });
 
     let running = match dns::start(dns_cfg, policy).await {
@@ -701,6 +791,22 @@ async fn run_once<F: Future<Output = ()>>(
     };
 
     housekeeping.abort();
+    // Lo que quedara esperando a saber su programa se anota igual, sin él: al cerrar, una consulta
+    // sin anotar sería una consulta perdida, y eso sí que no.
+    if let Some(v) = vaciador {
+        v.abort();
+        let pendientes: Vec<guardiana_core::NewEvent> = match policy_cola.lock() {
+            Ok(mut c) => c.drain(..).collect(),
+            Err(_) => Vec::new(),
+        };
+        if !pendientes.is_empty() {
+            if let Ok(mut l) = Ledger::open(&cfg.db, identity::genesis()) {
+                for e in pendientes {
+                    let _ = l.append(e);
+                }
+            }
+        }
+    }
     if let Some(p) = panel {
         p.shutdown().await;
     }
