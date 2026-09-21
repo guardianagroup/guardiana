@@ -282,11 +282,17 @@
   function yaCortado(ev) {
     return CORTADOS.has(claveCorte(ev.device_id, ev.qname)) || CORTADOS.has(claveCorte('home', ev.qname));
   }
+  // "1 horas de 24" no lo escribe nadie: una hora es singular.
+  function mirando(h) {
+    return t(h === 1 ? 'observando_una' : 'observando').replace('{h}', h);
+  }
   function cutCell(ev) {
     if (ev.verdict === 'cortado') return '';
     const d = gate[ev.device_id];
     if (!d) return '';
-    if (!d.puede_cortar) return `<span class="muted">${esc(t('observando').replace('{h}', d.horas_observadas))}</span>`;
+    // Cortar ESTE nombre no espera a las 24 horas (decisión del responsable, 20 sep 2026): es su
+    // decisión sobre una cosa concreta, y el servidor le pide confirmación mientras lleve menos
+    // de un día mirando. Lo que sigue esperando es lo ancho: categorías, toda la casa, Vigilante.
     if (yaCortado(ev)) return `<button class="cut cortado" disabled>${esc(t('cortado_boton'))}</button>`;
     return `<button class="secondary cut" data-device="${esc(ev.device_id)}" data-name="${esc(ev.qname)}">${esc(t('cortar'))}</button>`;
   }
@@ -536,7 +542,7 @@
     async reglas() {
       const devs = await api('/api/dispositivos');
       const sel = $('n-device');
-      devs.forEach((d) => { const o = document.createElement('option'); o.value = d.id; o.textContent = (d.name || (d.id === 'self' ? t('este_computador') : d.id)) + (d.puede_cortar ? '' : ' · ' + t('observando').replace('{h}', d.horas_observadas)); sel.appendChild(o); });
+      devs.forEach((d) => { const o = document.createElement('option'); o.value = d.id; o.textContent = (d.name || (d.id === 'self' ? t('este_computador') : d.id)) + (d.puede_cortar ? '' : ' · ' + mirando(d.horas_observadas)); sel.appendChild(o); });
       $('n-scope').addEventListener('change', () => $('n-device-wrap').classList.toggle('hidden', $('n-scope').value !== 'device'));
       $('n-kind').addEventListener('change', () => { $('n-pattern').placeholder = $('n-kind').value === 'category' ? 'rastreador / publicidad / telemetria / desconocido' : 'ejemplo.com'; });
       const load = async () => {
@@ -788,8 +794,10 @@
         if (r.dispositivo && document.activeElement !== nameInput && !nameInput.dataset.dirty) { nameInput.value = r.dispositivo.name || ''; }
         if (r.dispositivo && document.activeElement !== $('mi-compartir')) { $('mi-compartir').checked = !!r.dispositivo.share_detail_with_home; }
         const me = r.dispositivo;
-        const can = !!(me && me.puede_cortar);
-        $('mi-gate').textContent = me && !can ? t('observando').replace('{h}', me.horas_observadas) : '';
+        // Un nombre suelto se corta desde el primer minuto (el servidor pide confirmación si el
+        // aparato lleva menos de un día); arriba se dice cuánto lleva mirando, como información.
+        const can = true;
+        $('mi-gate').textContent = me && !me.puede_cortar ? mirando(me.horas_observadas) : '';
         const lect = r.lectura || {};
         $('mi-empresas').innerHTML = (lect.empresas && lect.empresas.length) ? lect.empresas.map((e) => `<li><b>${esc(e[0])}</b> · ${e[1]}</li>`).join('') + `<li class="muted">${esc(t('lectura_empresas_total').replace('{n}', lect.empresas_total))}</li>` : `<li class="muted">${esc(t('lectura_empresas_ninguna'))}</li>`;
         $('mi-avisos').innerHTML = hints(lect).map((h) => `<p class="limit">${esc(h)}</p>`).join('');
@@ -873,11 +881,19 @@
           const aviso = t('alcance_cortar_aviso').replace('{n}', yo.fuera_total).replace('{ejemplos}', ejemplos);
           if (!confirm(aviso)) { c.checked = false; return; }
         }
-        const r = await api('/api/ia/alcance', {
-          method: 'POST',
-          body: { device_id: dev, patrones: (yo ? yo.patrones : []).join('\n'), modo: c.checked ? 'cortar' : 'observar' },
-        });
-        paint(r);
+        try {
+          const r = await api('/api/ia/alcance', {
+            method: 'POST',
+            body: { device_id: dev, patrones: (yo ? yo.patrones : []).join('\n'), modo: c.checked ? 'cortar' : 'observar' },
+          });
+          paint(r);
+        } catch (err) {
+          // El servidor no deja encenderlo antes de las 24 horas: se dice por qué y el
+          // interruptor vuelve solo a su sitio, en vez de quedarse encendido sin serlo.
+          c.checked = false;
+          $('a-msg').textContent = String(err.message || err);
+          setTimeout(() => { $('a-msg').textContent = ''; }, 8000);
+        }
       });
       $('alcances').addEventListener('click', async (e) => {
         const p = e.target.closest('button.a-pase');

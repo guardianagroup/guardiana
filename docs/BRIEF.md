@@ -124,7 +124,12 @@ guardiana/
 
 ## 6 · Bloqueo: reglas inviolables
 
-- Antes de 24 horas de observación de un dispositivo, el botón "cortar" no existe para él; en su lugar, "Guardiana está observando: X horas de 24".
+- **Cortar un nombre concreto que elige la persona no espera**: está desde el primer minuto, y mientras el
+  dispositivo lleve menos de 24 horas observado pide confirmación diciendo cuántas lleva y que todavía no
+  se puede avisar de qué deja de funcionar. **Lo ancho sí espera las 24 horas** —una regla por categoría,
+  una regla para toda la casa y el Modo Vigilante—; en su lugar, "Guardiana está observando: X horas de 24".
+  (Cambio del 20 sep 2026, decidido por el responsable sobre la regla original, que no dejaba cortar nada
+  antes de 24 horas; el porqué está en la decisión 187.)
 - Nunca se cortan, aunque el usuario lo pida en una regla por categoría: resolutores del sistema, dominios de actualización del sistema y del propio Guardiana, hora (NTP), mensajería y videollamada reconocidas. Una regla explícita por dominio sobre uno de estos pide confirmación con el texto: "Esto puede dejar sin actualizaciones / sin mensajes a este dispositivo."
 - Deshacer siempre visible: cada regla tiene "deshacer" y "deshacer todo lo de hoy". Deshacer no borra el evento: anota que se deshizo.
 - Reglas por casa solo desde el panel del computador (con token). Reglas por dispositivo también desde la página del propio dispositivo.

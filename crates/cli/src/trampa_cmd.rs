@@ -66,12 +66,19 @@ fn quitar(l: &mut Ledger, opts: &Opts) -> Result<(), Box<dyn Error>> {
         return Err("".into());
     };
     let todas = trampas::listar(l)?;
-    let Some(trampa) = todas.iter().find(|x| &x.id == id).cloned() else {
+    // Por identificador o por la ruta del archivo: la lista enseña las dos cosas y cualquiera de
+    // las dos es lo que una persona copia. Antes solo valía el identificador, que la lista ni
+    // siquiera imprimía: no había manera de acertar (visto en el repaso del 20 sep 2026).
+    let Some(trampa) = todas
+        .iter()
+        .find(|x| &x.id == id || &x.archivo == id)
+        .cloned()
+    else {
         eprintln!("{}", t.cli("trampa.no_esta").replace("{id}", id));
         return Err("".into());
     };
     let _ = std::fs::remove_file(&trampa.archivo);
-    let quedan: Vec<Trampa> = todas.into_iter().filter(|x| &x.id != id).collect();
+    let quedan: Vec<Trampa> = todas.into_iter().filter(|x| x.id != trampa.id).collect();
     trampas::guardar(l, &quedan)?;
     println!(
         "{}",
@@ -89,15 +96,23 @@ fn lista(l: &Ledger) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
     for trampa in &todas {
-        // ¿Alguien preguntó por su nombre? Eso es todo lo que hay que mirar: el extracto.
-        let picadas = l.events(&EventFilter {
-            limit: Some(5_000),
+        // ¿Alguien preguntó por su nombre? Eso es todo lo que hay que mirar: el extracto. Se le
+        // pregunta por el nombre exacto, sin límite: una picada de hace meses cuenta igual.
+        let nombre = trampa.nombre();
+        let suyas = l.events(&EventFilter {
+            qname: Some(nombre.clone()),
             ..EventFilter::default()
         })?;
-        let nombre = trampa.nombre();
-        let suyas: Vec<_> = picadas.iter().filter(|e| e.qname == nombre).collect();
-        println!("{}", trampa.archivo);
+        println!("{}  [{}]", trampa.archivo, trampa.id);
         println!("   {}", nombre);
+        // Si alguien borró el archivo, la trampa ya no puede saltar. Decirlo, en vez de dejar
+        // creer que sigue puesta: una protección que no existe es peor que ninguna.
+        if !std::path::Path::new(&trampa.archivo).exists() {
+            println!(
+                "   {}",
+                t.cli("trampa.sin_archivo").replace("{id}", &trampa.id)
+            );
+        }
         if let Some(e) = suyas.first() {
             let quien = e.process.as_ref().map_or_else(
                 || t.cli("trampa.sin_programa").to_owned(),

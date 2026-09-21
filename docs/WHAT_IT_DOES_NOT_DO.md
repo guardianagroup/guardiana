@@ -61,6 +61,15 @@ La regla: nunca "100 % seguro", nunca "invisible", nunca "protegido" sin objeto,
   y no ser vista ni cortada. Límite conocido, documentado, no escondido.
 - **No garantiza aislamiento fuerte entre dispositivos de la misma Wi‑Fi.** Cada dispositivo ve su
   detalle por su IP; en una red doméstica se asume que nadie suplanta la IP de otro.
+- **En un Windows con varias cuentas, el extracto no es privado entre ellas.** La carpeta de datos
+  (`C:\ProgramData\Guardiana`) se cierra al arrancar: se quita la herencia y solo quedan SYSTEM,
+  Administradores y **la cuenta que esté en la consola en ese momento**, con permiso de modificar,
+  para que el panel y `guardiana verify` funcionen sin pedir elevación. En un equipo de una sola
+  persona eso es exactamente «solo el usuario». En un equipo familiar con varias cuentas, cada
+  cuenta que haya usado el computador acaba con ese permiso, así que **una puede leer el extracto
+  y la llave del panel de las demás**. Es el precio de un solo servicio para todo el equipo, y se
+  dice en vez de esconderse. Quien necesite separación de verdad: una cuenta por persona en
+  equipos distintos, o esperar a que la 1.1 guarde un extracto por cuenta.
 - **No impide manipulación por quien tenga administrador en el computador.** La cadena de hashes
   detecta alteraciones a posteriori; no las evita.
 - **No cifra el reenvío al resolutor de arriba.** Sin DoH/DoT propio ni DNSSEC en 1.0. El resolutor

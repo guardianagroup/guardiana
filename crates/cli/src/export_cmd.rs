@@ -13,6 +13,10 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
     let t = i18n::current();
     let ledger = ledger_cmd::open(opts)?;
     let filter = EventFilter {
+        qname: opts
+            .get("nombre")
+            .or_else(|| opts.get("name"))
+            .map(String::from),
         device_id: opts.get("device").map(String::from),
         category: opts.get("category").map(str::parse).transpose()?,
         signal: opts.get("signal").map(str::parse).transpose()?,

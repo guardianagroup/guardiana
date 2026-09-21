@@ -137,6 +137,7 @@ fn names_of(devices: &[Device]) -> HashMap<String, Option<String>> {
 fn filter_from(q: &HashMap<String, String>) -> Result<EventFilter, Response> {
     let bad = |e: guardiana_core::Error| (StatusCode::BAD_REQUEST, e.to_string()).into_response();
     Ok(EventFilter {
+        qname: None,
         device_id: q.get("device_id").filter(|s| !s.is_empty()).cloned(),
         category: q
             .get("category")
@@ -705,6 +706,7 @@ pub(crate) struct AlcanceBody {
 /// Declare (or clear) what a device may talk to. Nothing is cut: Guardiana reports what went
 /// beyond, and cutting stays a separate, explicit decision in Rules.
 pub(crate) async fn alcance(
+    Lang(t): Lang,
     State(state): State<Arc<AppState>>,
     _s: Session,
     Json(body): Json<AlcanceBody>,
@@ -723,6 +725,18 @@ pub(crate) async fn alcance(
         })
         .filter(|x| !x.is_empty() && x.contains('.') && !x.contains(' ') && !x.contains('/'))
         .collect();
+    // El Modo Vigilante corta TODO lo que no esté en la lista, así que la regla 6 del brief le
+    // vale igual que a un corte suelto: antes de 24 horas observando, no. Sin esto era la manera
+    // más fácil de saltársela, y encima la más dañina —y el aviso que enseña el panel se calcula
+    // sobre las últimas 24 horas, o sea que en un equipo recién instalado dice un número
+    // tranquilizador porque todavía no hay historia. Visto en el repaso del 20 sep 2026.
+    if body.modo.as_deref() == Some("cortar") && body.pase_horas.is_none() {
+        let dev = with_ledger(&state, |l| l.device(&body.device_id))?;
+        let observado = dev.map_or(0, |d| now_ms() - d.first_seen);
+        if !observation_complete(observado) {
+            return Err((StatusCode::CONFLICT, frase_observando(t, observado)).into_response());
+        }
+    }
     with_ledger(&state, |l| {
         l.set_setting(&scope_key(&body.device_id), &cleaned.join("\n"))?;
         if let Some(h) = body.pase_horas {
@@ -1823,6 +1837,33 @@ pub(crate) struct AltaRegla {
     mensaje: Option<String>,
 }
 
+/// Cuánto lleva GUARDIANA mirando **esta casa**: el propio computador si ya está en el extracto y,
+/// si no, el aparato más antiguo que haya. Un corte que vale para toda la casa se mide con esto,
+/// igual que el de un aparato se mide con el suyo.
+///
+/// Sin esto, la regla 6 del brief —«antes de 24 horas de observación el botón cortar no existe»—
+/// se saltaba por la puerta de delante: bastaba elegir «toda la casa» en el formulario de reglas,
+/// que además es la opción que viene puesta. Visto en el repaso del 20 sep 2026.
+fn observado_casa(state: &AppState) -> Result<i64, Response> {
+    let devices = with_ledger(state, |l| l.devices())?;
+    let desde = devices
+        .iter()
+        .find(|d| d.id == SELF_DEVICE_ID)
+        .map(|d| d.first_seen)
+        .or_else(|| devices.iter().map(|d| d.first_seen).min());
+    Ok(desde.map_or(0, |f| now_ms() - f))
+}
+
+/// «Guardiana está observando: N horas de 24», con la frase en singular cuando toca.
+fn frase_observando(t: &Texts, observado: i64) -> String {
+    let h = observed_hours(observado);
+    if h == 1 {
+        t.panel("observando_una").to_owned()
+    } else {
+        t.panel("observando").replace("{h}", &h.to_string())
+    }
+}
+
 fn create_rule(
     t: &Texts,
     state: &AppState,
@@ -1879,20 +1920,40 @@ fn create_rule(
                 mensaje: Some(t.panel("regla_esperado_prohibido").to_owned()),
             });
         }
-        // The 24-hour gate for a device rule.
-        if let Some(d) = device_id.as_deref() {
+        // La espera de 24 horas, con la línea donde el responsable la puso el 20 sep 2026:
+        // **un nombre concreto que elige la persona se corta desde el primer minuto**, porque esa
+        // es su decisión sobre una cosa que puede señalar con el dedo y deshacer en un clic. Lo
+        // que sigue esperando el día entero es todo lo ANCHO —una categoría entera, toda la casa
+        // y el Modo Vigilante—, porque ahí nadie puede saber qué se lleva por delante hasta que
+        // Guardiana haya visto un día de esta casa. Antes de las 24 h, el corte de un nombre pide
+        // confirmación y dice cuánto lleva mirando: la persona decide sabiendo lo que no se sabe.
+        let ancho = scope == Scope::Home || match_kind == MatchKind::Category;
+        let observed = if let Some(d) = device_id.as_deref() {
             let dev = with_ledger(state, |l| l.device(d))?;
             let Some(dev) = dev else {
                 return Err(bad(t.panel("regla_patron_invalido").to_owned()));
             };
-            let observed = now_ms() - dev.first_seen;
-            if !observation_complete(observed) {
+            now_ms() - dev.first_seen
+        } else {
+            observado_casa(state)?
+        };
+        if !observation_complete(observed) {
+            if ancho {
                 return Ok(AltaRegla {
                     creada: None,
                     necesita: None,
+                    mensaje: Some(frase_observando(t, observed)),
+                });
+            }
+            if !body.confirmed {
+                return Ok(AltaRegla {
+                    creada: None,
+                    necesita: Some("confirmar".to_owned()),
+                    // Sin el número de horas: el responsable leyó la frase larga en pantalla y
+                    // no la entendió («eso no hay quien lo entienda»). Dos frases y el nombre.
                     mensaje: Some(
-                        t.panel("observando")
-                            .replace("{h}", &observed_hours(observed).to_string()),
+                        t.panel("cortar_pronto_confirmar")
+                            .replace("{nombre}", &pattern),
                     ),
                 });
             }

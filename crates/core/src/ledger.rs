@@ -160,6 +160,12 @@ pub struct EventFilter {
     pub category: Option<Category>,
     /// Only events carrying this signal.
     pub signal: Option<SignalKind>,
+    /// Only this exact queried name.
+    ///
+    /// A trap asks one question of the ledger -- "did anybody ever ask for my name?" -- and
+    /// before this field it had to be answered by pulling the last few thousand rows into memory
+    /// and looking through them, which missed a bite older than that window.
+    pub qname: Option<String>,
     /// Only this verdict.
     pub verdict: Option<Verdict>,
     /// Only `ts >= since`.
@@ -359,6 +365,10 @@ impl Ledger {
         if let Some(v) = filter.verdict {
             sql.push_str(" AND verdict = ?");
             args.push(Box::new(v.as_str()));
+        }
+        if let Some(n) = &filter.qname {
+            sql.push_str(" AND qname = ?");
+            args.push(Box::new(n.clone()));
         }
         if let Some(s) = filter.signal {
             sql.push_str(" AND instr(signals_json, ?) > 0");
@@ -980,6 +990,34 @@ mod tests {
             })
             .unwrap();
         assert!(none.is_empty());
+    }
+
+    #[test]
+    fn el_filtro_por_nombre_encuentra_una_picada_vieja() {
+        // La pregunta de una trampa: «¿alguien preguntó alguna vez por mi nombre?». Antes se
+        // respondía trayendo las últimas filas y mirándolas, así que una picada enterrada bajo
+        // miles de consultas posteriores no se veía. Aquí la trampa es la fila 1 de 3.000.
+        let mut l = Ledger::open_in_memory(genesis()).unwrap();
+        l.append(ev(1, "abcd1234.trampa.guardianagroup.com"))
+            .unwrap();
+        for i in 2..3_000 {
+            l.append(ev(i, "relleno.example")).unwrap();
+        }
+        let suyas = l
+            .events(&EventFilter {
+                qname: Some("abcd1234.trampa.guardianagroup.com".into()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(suyas.len(), 1, "la picada tiene que aparecer");
+        assert_eq!(suyas[0].ts, 1);
+        let ninguna = l
+            .events(&EventFilter {
+                qname: Some("otra.trampa.guardianagroup.com".into()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(ninguna.is_empty(), "un nombre que nadie pidió no da filas");
     }
 
     #[test]
