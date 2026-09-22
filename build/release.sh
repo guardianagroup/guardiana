@@ -51,8 +51,34 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 
 # 1. Reproducible build.
-build/repro.sh HEAD
+#
+# Normalmente lo hace aquí mismo `build/repro.sh`, que necesita Docker. El Mac de publicación no
+# lo tiene, así que también se admiten los binarios que ya ha construido la compilación
+# reproducible de GitHub (`.github/workflows/repro.yml`), que corre en una máquina que no es
+# nuestra y los deja como artefacto:
+#
+#     build/release.sh --binarios ~/Descargas/guardiana-repro
+#
+# Se comprueban contra el SHA256SUMS que viene con ellos antes de tocar nada: si una huella no
+# cuadra, no se publica. Es la misma promesa —cualquiera puede recompilar y sale lo mismo— hecha
+# en la máquina de otro, que es la única que vale (22 sep 2026).
 out="build/out"
+binarios=""
+if [ "${1:-}" = "--binarios" ]; then
+    binarios="${2:?--binarios necesita la carpeta}"
+    [ -f "$binarios/SHA256SUMS" ] || { echo "release.sh: falta $binarios/SHA256SUMS" >&2; exit 1; }
+    mkdir -p "$out"
+    cp "$binarios"/guardiana-* "$out/" 2>/dev/null || true
+    cp "$binarios/SHA256SUMS" "$out/SHA256SUMS"
+    (cd "$out" && sha256sum -c SHA256SUMS) || {
+        echo "release.sh: las huellas de $binarios no cuadran con su propio SHA256SUMS." >&2
+        echo "release.sh: no se publica nada." >&2
+        exit 1
+    }
+    echo "release.sh: binarios tomados de $binarios, huellas comprobadas."
+else
+    build/repro.sh HEAD
+fi
 linux="$out/guardiana-$version-linux-x86_64"
 win="$out/guardiana-$version-windows-x86_64.exe"
 

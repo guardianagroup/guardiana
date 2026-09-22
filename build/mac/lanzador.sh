@@ -1,7 +1,7 @@
 #!/bin/bash
-# GUARDIANA.app on the development Mac (internal tool, DECISIONES #55; macOS is
-# out of 1.0). Double-click: opens the panel. First time: offers to install the
-# daemon; macOS itself asks for the administrator password (we never see it).
+# GUARDIANA.app, the Mac version that ships with 1.0. Double-click: opens the
+# panel. First time: offers to install the daemon; macOS itself asks for the
+# administrator password (we never see it).
 # From the same icon the daemon can be removed and the previous DNS restored.
 RES="$(cd "$(dirname "$0")/../Resources" && pwd)"
 DATA="/Library/Application Support/Guardiana"

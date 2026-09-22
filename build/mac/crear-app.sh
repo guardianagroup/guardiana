@@ -1,6 +1,8 @@
 #!/bin/sh
 # Builds GUARDIANA.app for the development Mac and leaves a copy on the Desktop.
-# Internal tool (DECISIONES #55): macOS is out of 1.0, nothing here is published.
+# macOS ships with 1.0: this is the .app that release.sh zips, signs and publishes. The old
+# note said it was an internal tool because macOS used to be out of 1.0 (decision 55); it came
+# in later and the note stayed until 22 sep 2026.
 #   build/mac/crear-app.sh [output folder, default dist/mac]
 set -e
 cd "$(dirname "$0")/../.."
