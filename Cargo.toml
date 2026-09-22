@@ -11,8 +11,6 @@ members = [
     "crates/service",
     "crates/license",
     "crates/verify",
-    "crates/vault",
-    "crates/vault-reader",
     "crates/cli",
 ]
 
@@ -40,7 +38,6 @@ guardiana-panel = { path = "crates/panel" }
 guardiana-service = { path = "crates/service" }
 guardiana-license = { path = "crates/license" }
 guardiana-verify = { path = "crates/verify" }
-guardiana-vault = { path = "crates/vault" }
 guardiana-cli = { path = "crates/cli" }
 
 # --- third-party, each justified (brief §2) ---
@@ -71,15 +68,6 @@ windows-service = "0.8"
 ureq = { version = "3", default-features = false, features = ["rustls", "platform-verifier"] }
 # Verifies the minisign signature of the installed binary against the embedded key (brief §10).
 minisign-verify = "0.2"
-# --- the vault (DECISIONES #103 and #126): the two primitives the concept names, nothing else ---
-# Argon2id key derivation from the master password / the 24 recovery words.
-argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
-# XChaCha20-Poly1305 authenticated encryption of every object and of the wrapped keys.
-chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc", "getrandom"] }
-# Wipes keys from memory when dropped. Already a transitive dependency of the crypto crates.
-zeroize = "1"
-# Hidden password prompt in the terminal (no echo) for `guardiana boveda`.
-rpassword = "7"
 # QR code for the Home Mode page (brief §7). Rendered as SVG text, no image crate.
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 

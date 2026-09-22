@@ -72,7 +72,7 @@ prefieres cifrar, dilo en el primer correo y te paso una clave.
 terceros, no degradar el servicio de nadie y no publicar datos personales que encuentres por el
 camino. Si para demostrar el fallo hace falta cruzar alguna de esas líneas, escríbeme antes.
 
-**Qué entra:** el programa (el resolutor, el panel, el servicio, la CLI, la bóveda), los
+**Qué entra:** el programa (el resolutor, el panel, el servicio, la CLI), los
 instaladores publicados, el sitio `guardianagroup.com` y la cadena de publicación (huellas, firmas,
 registro público). Lo que está fuera de nuestro control —la pasarela de pago, el proveedor del
 boletín, GitHub— hay que reportarlo a ellos; si me avisas, lo traslado y lo digo aquí.

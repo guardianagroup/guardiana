@@ -11,7 +11,6 @@
 
 mod api;
 mod auth;
-pub mod boveda;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -447,12 +446,8 @@ mod textos {
             include_str!("../static/verify.html"),
             include_str!("../static/ia.html"),
             include_str!("../static/comprobador.html"),
-            include_str!("../static/boveda.html"),
         ];
-        const SCRIPTS: &[&str] = &[
-            include_str!("../static/app.js"),
-            include_str!("../static/boveda.js"),
-        ];
+        const SCRIPTS: &[&str] = &[include_str!("../static/app.js")];
         // The keys asked for with a literal: `data-t="x"` in the pages, `t('x')` in the scripts.
         // The ones built at run time (`t('cambio_' + x)`) cannot be read here and are covered by
         // the tests of whatever produces them.

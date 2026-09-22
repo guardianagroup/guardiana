@@ -142,8 +142,6 @@ footer { max-width: 1180px; margin: 26px auto 40px; padding: 0 22px; color: var(
 #share-canvas { max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 12px; }
 .wide { width: 100%; }
 .wrap-text { white-space: pre-wrap; overflow-wrap: anywhere; }
-/* The vault page: the 24 recovery words in three columns (no inline styles: CSP). */
-.palabras { columns: 3; font-family: var(--mono); font-size: 14px; }
 .print-only { display: none; }
 
 /* "Guardar en PDF": the browser prints the page; hide what is not the document. */

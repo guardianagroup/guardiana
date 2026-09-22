@@ -5,7 +5,6 @@
 
 mod apps_cmd;
 mod args;
-mod boveda_cmd;
 mod dns_cmd;
 mod engine;
 mod export_cmd;
@@ -83,7 +82,6 @@ fn run() -> Result<(), Box<dyn Error>> {
     }
     match command.as_deref() {
         Some("observe") => observe::run(&opts),
-        Some("boveda" | "bóveda" | "vault") => boveda_cmd::run(&opts),
         Some("ledger") => ledger_cmd::run(&opts),
         Some("export") => export_cmd::run(&opts),
         Some("dns") => dns_cmd::run(&opts),
