@@ -506,7 +506,7 @@
     "cat_entrega": "entrega",
     "leyenda_desconocido": "«Rede local» são os aparelhos da sua casa se procurando entre eles: não sai para a internet. «Entrega» é uma rede que distribui o conteúdo de outras empresas: não é o destino, é o caminho. «Da Apple», «do Google»… diz de quem é o nome: um rótulo, nunca um veredito. «Sem classificar» quer dizer que nenhuma lista pública de rastreamento o conhece; não que seja suspeito.",
     "alcance_cortar_todo": "Vale para o aparelho inteiro, não só para o agente: a GUARDIANA vê nomes, não programas.",
-    "alcance_cortar_aviso": "O Modo Vigilante corta TUDO o que não estiver na sua lista, no aparelho inteiro.\n\nCom a lista de agora, no último dia teriam sido cortados {n} nomes: {ejemplos}.\n\nSe você trabalha neste computador, fica sem esses sites. Ligo?",
+    "alcance_cortar_aviso": "O Modo Vigia corta TUDO o que não estiver na sua lista, no aparelho inteiro.\n\nCom a lista de agora, no último dia teriam sido cortados {n} nomes: {ejemplos}.\n\nSe você trabalha neste computador, fica sem esses sites. Ligo?",
     "alcance_cortar": "Modo Vigia",
     "alcance_cortar_off": "Desligado. A GUARDIANA anota o que sai do trabalho, mas não corta nada.",
     "alcance_cortar_on": "Ligado. Enquanto a IA trabalha, ela só chega ao que está na lista. Todo o resto é cortado e aparece aqui para você decidir.",

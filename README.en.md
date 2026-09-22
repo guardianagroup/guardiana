@@ -15,7 +15,6 @@ the lists) and each one is recorded in the ledger itself.
 - What it does not do, in those words: [docs/WHAT_IT_DOES_NOT_DO.md](docs/WHAT_IT_DOES_NOT_DO.md)
 - Threat model: [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)
 - How to check that what you installed is what was published: [docs/VERIFY.md](docs/VERIFY.md)
-- The vault: open format and independent reader: [docs/BOVEDA.md](docs/BOVEDA.md) (Spanish)
 - Home Mode (phones without an app): [docs/HOGAR.md](docs/HOGAR.md) and the guides for the
   [router](docs/guias/router.md), [iPhone](docs/guias/iphone.md) and [Android](docs/guias/android.md)
 - Which lists are used and under which licence: [docs/LISTS.md](docs/LISTS.md)
@@ -46,16 +45,15 @@ download. After installing, `guardiana verify` checks it on your machine.
 ```
 guardiana panel          opens the panel in the browser (the only interface)
 guardiana verify         fingerprint, signature, service, system DNS, ports, lists, chain
-guardiana boveda         the encrypted vault: create, store, extract, log, recover (docs/BOVEDA.md)
-guardiana boveda panel   the vault page in the browser, on this machine only
 guardiana dns --status   where the system DNS points
 guardiana hogar status   Home Mode status
 guardiana ledger --check checks the ledger chain
 guardiana export         exports the ledger as CSV or JSON
 ```
 
-Nothing is blocked without the user's decision, never before 24 hours observing a device, always
-with a visible "undo". No signal is a verdict; the interface never says "malicious".
+Nothing is blocked without the user's decision, always with a visible "undo": a specific name is
+cut from the first minute, and wide cuts —by category, for the whole home, or the mode that cuts
+everything not declared— wait until Guardiana has been watching that device for 24 hours. No signal is a verdict; the interface never says "malicious".
 
 ## Build
 

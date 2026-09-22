@@ -15,7 +15,6 @@ actualizar listas) y cada una queda anotada en el propio extracto.
 - Lo que no hace, dicho con esas palabras: [docs/WHAT_IT_DOES_NOT_DO.md](docs/WHAT_IT_DOES_NOT_DO.md)
 - Modelo de amenazas: [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)
 - Cómo comprobar que lo instalado es lo publicado: [docs/VERIFY.md](docs/VERIFY.md)
-- La bóveda: el formato abierto y el lector independiente: [docs/BOVEDA.md](docs/BOVEDA.md)
 - Modo Hogar (teléfonos sin app): [docs/HOGAR.md](docs/HOGAR.md) y las guías de
   [router](docs/guias/router.md), [iPhone](docs/guias/iphone.md) y [Android](docs/guias/android.md)
 - Listas que se usan y con qué licencia: [docs/LISTS.md](docs/LISTS.md)
@@ -43,16 +42,15 @@ descarga. Después de instalar, `guardiana verify` lo comprueba en tu equipo.
 ```
 guardiana panel          abre el panel en el navegador (la única interfaz)
 guardiana verify         huella, firma, servicio, DNS del sistema, puertos, listas, cadena
-guardiana boveda         la bóveda cifrada: crear, guardar, sacar, registro, recuperar (docs/BOVEDA.md)
-guardiana boveda panel   la página de la bóveda en el navegador, solo en este equipo
 guardiana dns --status   a dónde apunta el DNS del sistema
 guardiana hogar status   estado del Modo Hogar
 guardiana ledger --check comprueba la cadena del extracto
 guardiana export         exporta el extracto en CSV o JSON
 ```
 
-Nada se bloquea sin decisión del usuario, nunca antes de 24 horas observando un dispositivo,
-siempre con "deshacer" visible. Ninguna señal es un veredicto; la interfaz nunca dice "malicioso".
+Nada se bloquea sin decisión del usuario, siempre con "deshacer" visible: un nombre concreto se
+corta desde el primer minuto, y los cortes anchos —por categoría, para toda la casa o el modo que
+corta todo lo no declarado— esperan a que Guardiana lleve 24 horas mirando ese dispositivo. Ninguna señal es un veredicto; la interfaz nunca dice "malicioso".
 
 ## Compilar
 

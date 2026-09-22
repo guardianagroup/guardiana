@@ -14,7 +14,6 @@ fica anotada no próprio extrato.
 - O que ele não faz, dito com essas palavras: [docs/WHAT_IT_DOES_NOT_DO.md](docs/WHAT_IT_DOES_NOT_DO.md)
 - Modelo de ameaças: [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)
 - Como conferir que o instalado é o publicado: [docs/VERIFY.md](docs/VERIFY.md)
-- O cofre: o formato aberto e o leitor independente: [docs/BOVEDA.md](docs/BOVEDA.md)
 - Modo Casa (celulares sem app): [docs/HOGAR.md](docs/HOGAR.md) e os guias de
   [roteador](docs/guias/router.md), [iPhone](docs/guias/iphone.md) e [Android](docs/guias/android.md)
 - Listas usadas e com qual licença: [docs/LISTS.md](docs/LISTS.md)
@@ -42,16 +41,15 @@ Depois de instalar, `guardiana verify` confere isso no seu computador.
 ```
 guardiana panel          abre o painel no navegador (a única interface)
 guardiana verify         impressão, assinatura, serviço, DNS do sistema, portas, listas, cadeia
-guardiana boveda         o cofre criptografado: criar, guardar, tirar, registro, recuperar (docs/BOVEDA.md)
-guardiana boveda panel   a página do cofre no navegador, só neste computador
 guardiana dns --status   para onde aponta o DNS do sistema
 guardiana hogar status   estado do Modo Casa
 guardiana ledger --check confere a cadeia do extrato
 guardiana export         exporta o extrato em CSV ou JSON
 ```
 
-Nada é bloqueado sem decisão do usuário, nunca antes de 24 horas observando um aparelho, sempre
-com "desfazer" à vista. Nenhum sinal é um veredito; a interface nunca diz "malicioso".
+Nada é bloqueado sem decisão do usuário, sempre com "desfazer" à vista: um nome concreto é
+cortado desde o primeiro minuto, e os cortes largos —por categoria, para a casa inteira ou o modo
+que corta tudo o que não foi declarado— esperam a Guardiana olhar esse aparelho por 24 horas. Nenhum sinal é um veredito; a interface nunca diz "malicioso".
 
 ## Compilar
 
