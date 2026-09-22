@@ -1,22 +1,16 @@
 GUARDIANA para Windows
 ======================
 
-Guardiana convierte este PC en el guardián DNS de la casa: ve a qué
-servicios intenta hablar cada dispositivo, lo explica en una frase y corta solo
-lo que tú decidas. Todo ocurre en este equipo. Sin cuenta, sin servidor, cero
-telemetría.
+Guardiana te enseña con qué servicios habla tu IA y, con Modo Hogar, cada
+aparato de tu Wi-Fi: lo explica en una frase y corta solo lo que tú decidas.
+Todo ocurre en este equipo. Sin cuenta, sin servidor, cero telemetría.
 
 Qué ha hecho el instalador
 --------------------------
 - Ha copiado el programa a "Archivos de programa\Guardiana".
 - Ha registrado el servicio "Guardiana", que arranca solo con Windows.
-- Ha creado dos accesos en el menú Inicio: "Guardiana" (abre el panel en el
-  navegador) y "Guardiana (menú)" (ventana de texto con opciones numeradas).
-
-Qué NO ha hecho
----------------
-- No ha cambiado el DNS de este equipo. Eso se hace desde el panel, con tu
-  permiso, y se deshace en el mismo sitio.
+- Ha creado los accesos "Guardiana" y "Guardiana (menú)" en el menú Inicio.
+- No ha cambiado el DNS de este equipo: eso lo decides tú desde el panel.
 - No ha abierto ningún puerto a la red. Solo el Modo Hogar, cuando tú lo
   actives, abre los puertos en la Wi-Fi de casa; apagarlo los cierra.
 
@@ -25,10 +19,12 @@ Después de instalar
 Menú Inicio > Guardiana. Se abre el panel. Arriba verás un aviso: "Este PC
 todavía no pasa por Guardiana"; pulsa el botón y el DNS del PC apunta a
 Guardiana, dejando el de ahora de secundario por si Guardiana se para. Desde
-ese momento verás las consultas. Primero 24 horas observando; el botón
-"cortar" no existe antes. Todo esto es gratis y no caduca, Modo Hogar
-incluido. Plus (informe semanal, extracto sin límite) se prueba 7 días gratis
-desde la página "Licencia", sin tarjeta; después, al mes o al año.
+ese momento verás las consultas. Cortar un nombre concreto se puede desde el
+primer minuto; los cortes anchos, por categoría o para toda la casa, esperan a
+que Guardiana lleve 24 horas mirando ese aparato.
+
+Son siete días con todo y sin tarjeta, Modo Hogar incluido. Después hace falta
+una suscripción; lo anotado se queda en tu disco, pagues o no.
 
 Desinstalar
 -----------

@@ -1,0 +1,19 @@
+GUARDIANA for Windows
+
+Guardiana shows you which services your AI talks to and, with Home Mode, every device on your Wi-Fi: it explains each one in a sentence and cuts only what you decide. Everything happens on this PC. No account, no server of ours, zero telemetry.
+
+What this installer will do
+- Copy the program to "Program Files\Guardiana".
+- Register the "Guardiana" service, which starts with Windows.
+- Add the "Guardiana" shortcut to the Start menu, which opens the panel in your browser.
+
+What it will NOT do
+- It does not change this PC's DNS: you decide that in the panel, with one button, and you undo it in the same place.
+- It opens no port to the network. Only Home Mode, when you turn it on, listens on your home Wi-Fi; turning it off closes it.
+
+After installing
+The panel opens when the installer finishes. At the top you will see "This PC does not go through Guardiana yet": press the button and within a minute you will see the queries. Cutting one specific name works from the first minute; wide cuts, by category or for the whole home, wait until Guardiana has been watching that device for 24 hours.
+
+Seven days with everything and no card; after that you need a subscription. What was written down stays on your disk, whether you pay or not.
+
+Program licence: GNU GPL 3.0 or later. Open source: you can read it, build it and check that it does what it says. What Guardiana does not do is in WHAT_IT_DOES_NOT_DO.md on the website.

@@ -7,11 +7,16 @@
 #
 # Usage:
 #   powershell -NoProfile -File build\msi.ps1 -Exe target\x86_64-pc-windows-gnu\release\guardiana.exe `
-#       -Version 0.1.0 -Out dist\0.1.0\guardiana-0.1.0-windows-x64.msi [-Wix C:\path\to\wix.dll]
+#       -Version 0.1.0 -Out dist\0.1.0\guardiana-0.1.0-windows-x64.msi [-Idioma es|en|pt] [-Wix C:\path\to\wix.dll]
+#
+# -Idioma picks the language of the installer: the two screens, the shortcut names, the service
+# description and the readme that is installed next to the program. Someone downloading from the
+# English page must not be handed a Spanish installer (22 Sep 2026).
 param(
     [Parameter(Mandatory = $true)][string]$Exe,
     [Parameter(Mandatory = $true)][string]$Version,
     [Parameter(Mandatory = $true)][string]$Out,
+    [ValidateSet("es", "en", "pt")][string]$Idioma = "es",
     [string]$Wix = "wix",
     [string]$CertSha1 = "",
     [string]$SignTool = "",
@@ -20,8 +25,20 @@ param(
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $wxs = Join-Path $here "wix\guardiana.wxs"
-$readme = Join-Path $here "wix\LEEME.txt"
-$welcome = Join-Path $here "wix\bienvenida.rtf"
+# Culture for WiX (its own buttons and ours); the package itself is language neutral.
+#
+# The three installers MUST share one ProductLanguage. With one LCID per language (10, 1033,
+# 1046) Windows Installer treated them as three different products: installing the English one
+# over the Spanish left BOTH registered in Programs and Features, both sets of shortcuts and two
+# readme files in the folder - measured on the test Windows on 22 Sep 2026. Neutral (0) is also
+# the honest value for a program that speaks three languages and picks by the system's own.
+$culturas = @{ es = "es-ES"; en = "en-US"; pt = "pt-BR" }
+$cultura = $culturas[$Idioma]
+$lcid = 0
+$readme = Join-Path $here "wix\textos\leeme-$Idioma.txt"
+$welcome = Join-Path $here "wix\textos\bienvenida-$Idioma.rtf"
+$loc = Join-Path $here "wix\loc-$cultura.wxl"
+foreach ($f in @($readme, $welcome, $loc)) { if (-not (Test-Path $f)) { throw "Falta $f" } }
 $icon = Join-Path $here "wix\guardiana.ico"
 # The exe must carry a version resource. Without one, Windows Installer compares timestamps
 # instead of versions and can silently keep the old binary on an upgrade (DECISIONES #93).
@@ -36,7 +53,8 @@ if ($outDir -and -not (Test-Path $outDir)) { New-Item -ItemType Directory -Path 
 if ($Wix -like "*.dll") { $cmd = "dotnet"; $pre = @($Wix) } else { $cmd = $Wix; $pre = @() }
 # The UI and Util extensions (WixUI_Minimal, WixShellExec) come from NuGet once:
 #   dotnet wix.dll extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
-& $cmd @pre build -arch x64 -culture es-ES -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d "Version=$Version" -d "Exe=$Exe" -d "Readme=$readme" -d "Welcome=$welcome" -d "Icon=$icon" -o $Out $wxs
+Write-Host "idioma del instalador: $Idioma ($cultura, LCID $lcid)"
+& $cmd @pre build -arch x64 -culture $cultura -loc $loc -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d "Version=$Version" -d "Lang=$lcid" -d "Exe=$Exe" -d "Readme=$readme" -d "Welcome=$welcome" -d "Icon=$icon" -o $Out $wxs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 # Code signing of the MSI itself (decision 66): the installer is what the person double-clicks, so
 # it must carry the certificate too, not only guardiana.exe. Pass -CertSha1 with the thumbprint of

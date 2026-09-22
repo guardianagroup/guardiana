@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The installer's texts in English. Someone downloading from the English page used to get a
+     Spanish installer, which is no way to ask for their trust (22 Sep 2026). -->
+<WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="en-US" Codepage="1252">
+  <String Id="Descripcion" Value="Guardiana: see who your AI talks to. Everything happens on this machine; no account, no server." />
+  <String Id="AbrirPanel" Value="Open the Guardiana panel" />
+  <String Id="VersionMasNueva" Value="A newer version of Guardiana is already installed." />
+  <String Id="ServicioDescripcion" Value="Guardiana: see who your AI and every device at home talk to. Everything happens on this machine; no account, no server." />
+  <String Id="AccesoMenu" Value="Guardiana (menu)" />
+  <String Id="AccesoMenuDescripcion" Value="The Guardiana menu in a text window" />
+  <String Id="ArchivoLeeme" Value="README.txt" />
+</WixLocalization>

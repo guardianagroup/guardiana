@@ -57,17 +57,35 @@ rm -rf "$STAGE"
 cargo deb -p guardiana-cli --no-build --no-strip --target x86_64-unknown-linux-gnu \
     -o "$OUT/guardiana_${VERSION}_amd64.deb"
 
-# 3. Windows MSI. WiX 4/5 rejects Directory/@Name when it runs on Linux or
-# macOS (it assumes a C:\ root); on those hosts the MSI is built on Windows
-# with build/msi.ps1 from the same guardiana.exe and added to $OUT by hand
-# before the hashes (DECISIONES #34).
-if ! wix build -arch x64 \
-    -culture es-ES -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext \
-    -d "Version=$VERSION" -d "Exe=$WIN_BIN" -d "Readme=build/wix/LEEME.txt" -d "Welcome=build/wix/bienvenida.rtf" -d "Icon=build/wix/guardiana.ico" \
-    -o "$OUT/guardiana-$VERSION-windows-x64.msi" build/wix/guardiana.wxs 2>/dev/null; then
-    rm -f "$OUT/guardiana-$VERSION-windows-x64.msi"
+# 3. Windows MSI, one per language: whoever downloads from the English page must not be handed
+# a Spanish installer (22 sep 2026). The three are the same package with the same neutral
+# ProductLanguage, so one replaces another cleanly; only the words change.
+# WiX 4/5 rejects Directory/@Name when it runs on Linux or macOS (it assumes a C:\ root); on
+# those hosts the MSIs are built on Windows with build/msi.ps1 from the same guardiana.exe and
+# added to $OUT by hand before the hashes (DECISIONES #34).
+falta_msi=""
+for idioma in es en pt; do
+    case "$idioma" in
+        es) cultura=es-ES; sufijo="" ;;
+        en) cultura=en-US; sufijo="-en" ;;
+        pt) cultura=pt-BR; sufijo="-pt" ;;
+    esac
+    salida="$OUT/guardiana-$VERSION-windows-x64$sufijo.msi"
+    if ! wix build -arch x64 \
+        -culture "$cultura" -loc "build/wix/loc-$cultura.wxl" \
+        -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext \
+        -d "Version=$VERSION" -d "Lang=0" -d "Exe=$WIN_BIN" \
+        -d "Readme=build/wix/textos/leeme-$idioma.txt" \
+        -d "Welcome=build/wix/textos/bienvenida-$idioma.rtf" \
+        -d "Icon=build/wix/guardiana.ico" \
+        -o "$salida" build/wix/guardiana.wxs 2>/dev/null; then
+        rm -f "$salida"
+        falta_msi="sí"
+    fi
+done
+if [ -n "$falta_msi" ]; then
     cp "$WIN_BIN" "$OUT/guardiana.exe"
-    echo "MSI not built on this host: run build/msi.ps1 on Windows with $OUT/guardiana.exe" >&2
+    echo "MSI not built on this host: run build/msi.ps1 -Idioma es|en|pt on Windows with $OUT/guardiana.exe" >&2
 fi
 
 # 4. Hashes.

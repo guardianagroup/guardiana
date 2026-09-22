@@ -28,7 +28,7 @@ the way (see decision 45 in `docs/DECISIONES.md`).
 
 | System | Package | How |
 |---|---|---|
-| Windows 10/11 (64-bit) | `guardiana-<version>-windows-x64.msi` | Double-click. Installs into Program Files and registers the service. |
+| Windows 10/11 (64-bit) | `guardiana-<version>-windows-x64-en.msi` (Spanish: `…-x64.msi`; Portuguese: `…-x64-pt.msi`) | Double-click. Installs into Program Files and registers the service. |
 | Debian, Ubuntu and derivatives | `guardiana_<version>_amd64.deb` | `sudo apt install ./guardiana_<version>_amd64.deb` |
 | Other Linux with systemd | `guardiana-<version>-linux-x86_64.tar.gz` | Unpack and `sudo ./instalar.sh` |
 

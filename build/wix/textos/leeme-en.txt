@@ -1,0 +1,47 @@
+GUARDIANA for Windows
+=====================
+
+Guardiana shows you which services your AI talks to and, with Home Mode, every
+device on your Wi-Fi: it explains each one in a sentence and cuts only what you
+decide. Everything happens on this machine. No account, no server, zero
+telemetry.
+
+What the installer did
+----------------------
+- Copied the program to "Program Files\Guardiana".
+- Registered the "Guardiana" service, which starts with Windows.
+- Added the "Guardiana" and "Guardiana (menu)" shortcuts to the Start menu.
+- It did not change this machine's DNS: you decide that in the panel.
+- It opened no port to the network. Only Home Mode, when you turn it on, opens
+  ports on your home Wi-Fi; turning it off closes them.
+
+After installing
+----------------
+Start menu > Guardiana. The panel opens. At the top you will see a notice,
+"This PC does not go through Guardiana yet": press the button and the PC's DNS
+points at Guardiana, keeping your current one as the backup in case Guardiana
+stops. From then on you will see the queries. Cutting one specific name works
+from the first minute; wide cuts, by category or for the whole home, wait until
+Guardiana has been watching that device for 24 hours.
+
+It is seven days with everything and no card, Home Mode included. After that
+you need a subscription; what was written down stays on your disk, whether you
+pay or not.
+
+Uninstalling
+------------
+Settings > Apps > Guardiana > Uninstall. On uninstall, Guardiana turns Home
+Mode off, removes its firewall rule and puts the DNS back as it was. The
+statement stays in C:\ProgramData\Guardiana; delete it by hand if you do not
+want it.
+
+Checking the installation
+-------------------------
+"Guardiana (menu)" > the check option, or in a command window:
+    "C:\Program Files\Guardiana\guardiana.exe" verify
+
+Before installing: check the hash of the .msi file and compare it with
+SHA256SUMS and with the public ledger (ledger.jsonl). How to do it, step by
+step, in VERIFY.md on the website.
+
+What Guardiana does not do is in WHAT_IT_DOES_NOT_DO.md. Read it.

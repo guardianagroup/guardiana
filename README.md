@@ -25,7 +25,7 @@ actualizar listas) y cada una queda anotada en el propio extracto.
 
 | Sistema | Paquete | Cómo |
 |---|---|---|
-| Windows 10/11 (64 bits) | `guardiana-<versión>-windows-x64.msi` | Doble clic. Instala en Archivos de programa y registra el servicio. |
+| Windows 10/11 (64 bits) | `guardiana-<versión>-windows-x64.msi` (en inglés, `…-x64-en.msi`; en portugués, `…-x64-pt.msi`) | Doble clic. Instala en Archivos de programa y registra el servicio. |
 | Debian, Ubuntu y derivados | `guardiana_<versión>_amd64.deb` | `sudo apt install ./guardiana_<versión>_amd64.deb` |
 | Otro Linux con systemd | `guardiana-<versión>-linux-x86_64.tar.gz` | Descomprimir y `sudo ./instalar.sh` |
 

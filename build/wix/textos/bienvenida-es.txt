@@ -1,0 +1,19 @@
+GUARDIANA para Windows
+
+Guardiana te enseña con qué servicios habla tu IA y, con Modo Hogar, cada aparato de tu Wi-Fi: lo explica en una frase y corta solo lo que tú decidas. Todo ocurre en este PC. Sin cuenta, sin servidor nuestro, cero telemetría.
+
+Qué va a hacer este instalador
+- Copiar el programa a "Archivos de programa\Guardiana".
+- Registrar el servicio "Guardiana", que arranca solo con Windows.
+- Crear el acceso "Guardiana" en el menú Inicio, que abre el panel en tu navegador.
+
+Qué NO va a hacer
+- No cambia el DNS de este PC: eso lo decides tú desde el panel, con un botón, y se deshace en el mismo sitio.
+- No abre ningún puerto a la red. Solo el Modo Hogar, cuando tú lo enciendas, escucha en la Wi-Fi de casa; apagarlo lo cierra.
+
+Después de instalar
+Al terminar se abre el panel. Arriba verás "Este PC todavía no pasa por Guardiana": pulsa el botón y en un minuto verás las consultas. Cortar un nombre concreto se puede desde el primer minuto; los cortes anchos, por categoría o para toda la casa, esperan a que Guardiana lleve 24 horas mirando ese aparato.
+
+Siete días con todo y sin tarjeta; después hace falta una suscripción. Lo anotado se queda en tu disco, pagues o no.
+
+Licencia del programa: GNU GPL 3.0 o posterior. Código abierto: puedes leerlo, compilarlo y comprobar que hace lo que dice. Lo que Guardiana no hace está en WHAT_IT_DOES_NOT_DO.md de la web.

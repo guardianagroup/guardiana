@@ -18,35 +18,40 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
-  <!-- Language 10 is neutral Spanish: the file properties say "Español" and not "Español (España,
-       internacional)", which is what LCID 3082 showed and read like a claim about where the
-       program comes from (15 sep 2026). The installer UI text keeps coming from the es-ES
-       localisation of WixUI, which is only the wording of its buttons. -->
+  <!-- The package is language neutral (-d Lang=0) in the three builds, and the words a person
+       reads come from build/wix/loc-<culture>.wxl. It has to be one ProductLanguage for the
+       three: with one LCID each, Windows Installer saw three different products and installing
+       the English one over the Spanish left both registered (measured, 22 sep 2026). Neutral
+       also replaces the LCID 10 of 15 sep 2026, which said "Español" of a program that speaks
+       three languages and picks by the system's own. -->
   <Package Name="Guardiana"
            Manufacturer="Guardiana"
            Version="$(var.Version)"
            UpgradeCode="0d4fae13-1842-4b29-a2e6-1939a9564b47"
-           Language="10"
+           Language="$(var.Lang)"
            Codepage="1252"
            Scope="perMachine"
            InstallerVersion="500"
            Compressed="yes">
 
-    <SummaryInformation Description="Guardiana: guardián DNS de la casa" Manufacturer="Guardiana" />
+    <SummaryInformation Description="!(loc.Descripcion)" Manufacturer="Guardiana" />
 
-    <!-- Two screens only: what the installer does and does not (build/wix/bienvenida.rtf) with
-         "Instalar", then "Finalizar" with "Abrir Guardiana" ticked, which opens the panel in the
-         browser as the user (not elevated). No folder choice, no options. -->
+    <!-- Two screens only: what the installer does and does not (build/wix/textos/bienvenida-XX.rtf)
+         with "Install", then "Finish" with "Open Guardiana" ticked, which opens the panel in the
+         browser as the user (not elevated). No folder choice, no options. Everything a person
+         reads comes from build/wix/loc-<culture>.wxl, so the same package builds in Spanish,
+         English and Portuguese: whoever downloads from the English page must not be handed a
+         Spanish installer (22 Sep 2026). -->
     <ui:WixUI Id="WixUI_Minimal" />
     <WixVariable Id="WixUILicenseRtf" Value="$(var.Welcome)" />
-    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Abrir el panel de Guardiana" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="!(loc.AbrirPanel)" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <SetProperty Id="WixShellExecTarget" Value="[MenuDir]Guardiana.lnk" After="CostFinalize" Sequence="ui" />
     <CustomAction Id="LaunchPanel" DllEntry="WixShellExec" Impersonate="yes" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" />
     <UI>
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchPanel" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
     </UI>
-    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="Ya hay una versión más nueva de Guardiana instalada." />
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="!(loc.VersionMasNueva)" />
     <MediaTemplate EmbedCab="yes" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -73,7 +78,7 @@
       <ServiceInstall Id="Svc"
                       Name="guardiana"
                       DisplayName="Guardiana"
-                      Description="Guardiana: guardián DNS de la casa. Todo ocurre en este equipo; sin cuenta ni servidor."
+                      Description="!(loc.ServicioDescripcion)"
                       Type="ownProcess"
                       Start="auto"
                       ErrorControl="normal"
@@ -84,20 +89,20 @@
     </Component>
 
     <Component Id="Readme" Directory="INSTALLFOLDER" Guid="6ee79eff-4700-48d1-93d8-35f8a726cd99">
-      <File Id="Leeme" Name="LEEME.txt" Source="$(var.Readme)" KeyPath="yes" />
+      <File Id="Leeme" Name="!(loc.ArchivoLeeme)" Source="$(var.Readme)" KeyPath="yes" />
     </Component>
 
     <Component Id="Shortcut" Directory="MenuDir" Guid="21398cf1-e897-4661-a755-bb36e4a4eb16">
       <Shortcut Id="PanelShortcut"
                 Name="Guardiana"
-                Description="Abrir el panel de Guardiana"
+                Description="!(loc.AbrirPanel)"
                 Target="[INSTALLFOLDER]guardiana.exe"
                 Arguments="panel"
                 Icon="guardiana.ico"
                 WorkingDirectory="INSTALLFOLDER" />
       <Shortcut Id="MenuShortcut"
-                Name="Guardiana (menú)"
-                Description="Menú de Guardiana en una ventana de texto"
+                Name="!(loc.AccesoMenu)"
+                Description="!(loc.AccesoMenuDescripcion)"
                 Target="[INSTALLFOLDER]guardiana.exe"
                 Arguments="menu"
                 Icon="guardiana.ico"
@@ -109,7 +114,7 @@
     <Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="9a1f6c2e-3d47-4b8a-9c05-6e2f1b7d4a10">
       <Shortcut Id="DesktopPanelShortcut"
                 Name="Guardiana"
-                Description="Abrir el panel de Guardiana"
+                Description="!(loc.AbrirPanel)"
                 Target="[INSTALLFOLDER]guardiana.exe"
                 Arguments="panel"
                 Icon="guardiana.ico"

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Os textos do instalador em português do Brasil (22 set 2026). -->
+<WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="pt-BR" Codepage="1252">
+  <String Id="Descripcion" Value="Guardiana: veja com quem a sua IA fala. Tudo acontece neste computador; sem conta e sem servidor." />
+  <String Id="AbrirPanel" Value="Abrir o painel da Guardiana" />
+  <String Id="VersionMasNueva" Value="Já existe uma versão mais nova da Guardiana instalada." />
+  <String Id="ServicioDescripcion" Value="Guardiana: veja com quem a sua IA e cada aparelho da casa falam. Tudo acontece neste computador; sem conta e sem servidor." />
+  <String Id="AccesoMenu" Value="Guardiana (menu)" />
+  <String Id="AccesoMenuDescripcion" Value="O menu da Guardiana numa janela de texto" />
+  <String Id="ArchivoLeeme" Value="LEIAME.txt" />
+</WixLocalization>

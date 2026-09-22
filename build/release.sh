@@ -65,18 +65,25 @@ cp "$linux" target/x86_64-unknown-linux-gnu/release/guardiana
 cp "$win" target/x86_64-pc-windows-gnu/release/guardiana.exe
 build/package.sh --no-build
 paquetes="dist/$version"
+# Un instalador por idioma (22 sep 2026): el mismo paquete con las mismas palabras que la web
+# de ese idioma. Los tres van al registro público, porque los tres se descargan.
 msi="$paquetes/guardiana-$version-windows-x64.msi"
+msi_en="$paquetes/guardiana-$version-windows-x64-en.msi"
+msi_pt="$paquetes/guardiana-$version-windows-x64-pt.msi"
 deb="$paquetes/guardiana_${version}_amd64.deb"
 tarball="$paquetes/guardiana-$version-linux-x86_64.tar.gz"
-if [ ! -f "$msi" ]; then
-    echo "release.sh: falta $msi." >&2
-    echo "release.sh: el MSI se construye en Windows (build/msi.ps1) desde este mismo .exe y se deja ahí" >&2
-    echo "release.sh: antes de publicar, porque la web dice que su huella está en el registro." >&2
-    exit 1
-fi
+for m in "$msi" "$msi_en" "$msi_pt"; do
+    if [ ! -f "$m" ]; then
+        echo "release.sh: falta $m." >&2
+        echo "release.sh: los MSI se construyen en Windows (build/msi.ps1 -Idioma es|en|pt) desde este" >&2
+        echo "release.sh: mismo .exe y se dejan ahí antes de publicar, porque la web dice que su huella" >&2
+        echo "release.sh: está en el registro." >&2
+        exit 1
+    fi
+done
 
 # 2. minisign signatures over everything that gets published.
-for f in "$linux" "$win" "$msi" "$deb" "$tarball"; do
+for f in "$linux" "$win" "$msi" "$msi_en" "$msi_pt" "$deb" "$tarball"; do
     firmar "$f" "guardiana $version $(basename "$f")"
 done
 sha_linux="$(sha256sum "$linux" | cut -d' ' -f1)"
@@ -152,6 +159,8 @@ anotar() {  # archivo  reproducible(true|false)  [huella ya firmada]
 anotar "$linux" true
 anotar "$win" true "$sha_win_signed"
 anotar "$msi" false
+anotar "$msi_en" false
+anotar "$msi_pt" false
 anotar "$deb" false
 anotar "$tarball" false
 [ -n "$mac" ] && anotar "$mac" false
