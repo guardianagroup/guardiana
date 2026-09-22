@@ -50,3 +50,9 @@ freedns.controld.com
 doh.tiar.app
 dot.tiar.app
 dns.decloudus.com
+
+# El «DNS seguro» de un antivirus es exactamente esto: el programa resuelve por su cuenta y
+# Guardiana deja de ver los nombres de ese equipo. Se anota para poder DECIRLO, no para cortarlo.
+# Solo van aquí los que la propia marca documenta; no se adivina ninguno.
+# Avast, documentado en https://www.avast.com/dns (consultado el 21 sep 2026).
+secure.avastdns.com

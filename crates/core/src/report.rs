@@ -92,13 +92,18 @@ impl Ledger {
             }
         }
 
-        // Days already rolled up by retention.
+        // Days already rolled up by retention. Bounded above as well as below so the same
+        // function can be asked for the week BEFORE this one without dragging in this one's
+        // totals; `until`'s own day is never rolled up (retention keeps 24 h of detail), so it
+        // comes from `events` above and is not lost by the upper bound.
         {
             let first_day = day_utc(since);
+            let last_day = day_utc(until);
             let mut stmt = self.conn.prepare(
-                "SELECT device_id, category, verdict, count FROM daily_totals WHERE day >= ?1",
+                "SELECT device_id, category, verdict, count FROM daily_totals \
+                 WHERE day >= ?1 AND day < ?2",
             )?;
-            let rows = stmt.query_map([first_day], |r| {
+            let rows = stmt.query_map(params![first_day, last_day], |r| {
                 Ok((
                     r.get::<_, String>(0)?,
                     r.get::<_, String>(1)?,
@@ -151,6 +156,69 @@ impl Ledger {
             total,
         })
     }
+
+    /// Destinations the house had never asked for before the seven days ending at `until`.
+    ///
+    /// `seen_domains` remembers when each (device, name) pair first appeared and survives
+    /// pruning; the count, the device and the category come from `events`. With the free plan's
+    /// 24 hours of detail there is nothing left to count after a day, which is why the panel
+    /// only offers this with Plus: it is not a feature held back, it is a question that cannot
+    /// be answered without the memory Plus keeps.
+    pub fn new_destinations(&self, until: i64, limit: usize) -> Result<Vec<NewDestination>> {
+        let since = until - 7 * DAY_MS;
+        let names: BTreeMap<String, Option<String>> = self
+            .devices()?
+            .into_iter()
+            .map(|d| (d.id, d.name))
+            .collect();
+        let mut stmt = self.conn.prepare(
+            "SELECT s.qname, s.device_id, s.first_seen, COUNT(e.id) AS n, \
+                    (SELECT e2.category FROM events e2 \
+                      WHERE e2.qname = s.qname AND e2.device_id = s.device_id \
+                      ORDER BY e2.id DESC LIMIT 1) AS cat \
+             FROM seen_domains s \
+             JOIN events e ON e.qname = s.qname AND e.device_id = s.device_id \
+                          AND e.ts >= ?1 AND e.ts < ?2 \
+             WHERE s.first_seen >= ?1 AND s.first_seen < ?2 \
+             GROUP BY s.qname, s.device_id \
+             ORDER BY n DESC, s.first_seen DESC \
+             LIMIT ?3",
+        )?;
+        let rows = stmt.query_map(params![since, until, limit as i64], |r| {
+            Ok(NewDestination {
+                qname: r.get(0)?,
+                device_id: r.get(1)?,
+                name: None,
+                first_seen: r.get(2)?,
+                queries: r.get(3)?,
+                category: r.get::<_, Option<String>>(4)?.unwrap_or_default(),
+            })
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            let mut d = row?;
+            d.name = names.get(&d.device_id).cloned().flatten();
+            out.push(d);
+        }
+        Ok(out)
+    }
+}
+
+/// A destination asked for this week and never before.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
+pub struct NewDestination {
+    /// The name asked for.
+    pub qname: String,
+    /// Which device asked.
+    pub device_id: String,
+    /// Name the user gave that device, if any.
+    pub name: Option<String>,
+    /// Category of its most recent query.
+    pub category: String,
+    /// Times it was asked for inside the window.
+    pub queries: i64,
+    /// When it first appeared, Unix ms.
+    pub first_seen: i64,
 }
 
 #[cfg(test)]
@@ -204,5 +272,74 @@ mod tests {
         assert_eq!(w.devices[0].device_id, "mac:phone");
         assert_eq!(w.devices[0].trackers, 2);
         assert_eq!(w.devices[1].device_id, "self");
+    }
+
+    /// What Plus answers and the free plan cannot: which destinations are new this week.
+    #[test]
+    fn new_destinations_are_the_ones_never_asked_for_before() {
+        let mut l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        let day0 = 1_700_000_000_000i64;
+        let now = day0 + 30 * DAY_MS;
+        // An old acquaintance: first seen a month ago, still busy this week.
+        l.first_time("self", "viejo.example", day0).unwrap();
+        let mut viejo = NewEvent::observed(day0, "self", "127.0.0.1", "viejo.example", "A");
+        viejo.category = Category::Rastreador;
+        l.append(viejo).unwrap();
+        for i in 0..5 {
+            let mut e = NewEvent::observed(
+                now - (i + 1) * HOUR_MS,
+                "self",
+                "127.0.0.1",
+                "viejo.example",
+                "A",
+            );
+            e.category = Category::Rastreador;
+            l.append(e).unwrap();
+        }
+        // New this week, asked for three times.
+        l.first_time("self", "nuevo.example", now - 2 * DAY_MS)
+            .unwrap();
+        for i in 0..3 {
+            let mut e = NewEvent::observed(
+                now - 2 * DAY_MS + i * HOUR_MS,
+                "self",
+                "127.0.0.1",
+                "nuevo.example",
+                "A",
+            );
+            e.category = Category::Publicidad;
+            l.append(e).unwrap();
+        }
+        let n = l.new_destinations(now, 10).unwrap();
+        assert_eq!(n.len(), 1, "{n:?}");
+        assert_eq!(n[0].qname, "nuevo.example");
+        assert_eq!(n[0].queries, 3);
+        assert_eq!(n[0].category, "publicidad");
+        assert_eq!(n[0].device_id, "self");
+    }
+
+    /// The week before this one, asked of the same function: it must not drag in this week's
+    /// rolled-up totals, or the comparison Plus offers would always say "the same".
+    ///
+    /// Pruned with the Plus policy on purpose. With the free one the answer is zero whatever the
+    /// query does, because a week-old total has already been deleted: that is why the comparison
+    /// is a Plus answer and not a switch we could flip.
+    #[test]
+    fn the_previous_week_does_not_include_this_one() {
+        let mut l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        let day0 = 1_700_000_000_000i64;
+        let now = day0 + 20 * DAY_MS;
+        // Two queries last week, one this week.
+        for ts in [now - 9 * DAY_MS, now - 8 * DAY_MS, now - 2 * DAY_MS] {
+            let mut e = NewEvent::observed(ts, "self", "127.0.0.1", "a.example", "A");
+            e.category = Category::Rastreador;
+            l.append(e).unwrap();
+        }
+        l.prune(Retention::UNLIMITED, now).unwrap();
+        assert_eq!(l.week_summary(now).unwrap().total.queries, 1);
+        assert_eq!(l.week_summary(now - 7 * DAY_MS).unwrap().total.queries, 2);
+        // And with the free policy the older week is simply gone.
+        l.prune(Retention::FREE, now).unwrap();
+        assert_eq!(l.week_summary(now - 7 * DAY_MS).unwrap().total.queries, 0);
     }
 }

@@ -109,6 +109,38 @@ pub fn delivery_of(qname: &str) -> Option<&'static str> {
 /// (`graph.facebook.com` → `Meta`). `None` when no list entry owns it.
 #[must_use]
 pub fn company_of(qname: &str) -> Option<&'static str> {
+    seccion_de(qname).map(|s| s.split('|').next().unwrap_or(s))
+}
+
+/// The country the owning company answers to, as a two-letter ISO code (`graph.facebook.com` →
+/// `US`). `None` when the name has no owner in the list, or the owner has no country written.
+///
+/// Es el país de la **empresa dueña del nombre**, no el del servidor que contesta. Esa distinción
+/// no es un matiz: casi todo lo grande va por una red de reparto y el servidor que responde suele
+/// estar en el país de quien pregunta, así que un «país» sacado de la dirección IP diría
+/// «Colombia» de un servicio cuyos datos acaban en Estados Unidos. Lo que se puede sostener —y lo
+/// que la persona quiere saber— es a qué empresa, y bajo qué leyes, pertenece el nombre.
+#[must_use]
+pub fn country_of(qname: &str) -> Option<&'static str> {
+    seccion_de(qname)
+        .and_then(|s| s.split('|').nth(1))
+        .filter(|p| p.len() == 2)
+}
+
+/// The city where the owning company has its seat (`graph.facebook.com` → `Menlo Park`).
+/// `None` when the name has no owner, or the owner's city has not been written.
+///
+/// Se escribe la de hoy y se cambia cuando cambie: una empresa se muda y el archivo se corrige,
+/// como con el país. Y como con el país, si no está comprobada no se pone: media ciudad
+/// inventada es peor que una columna vacía.
+#[must_use]
+pub fn city_of(qname: &str) -> Option<&'static str> {
+    seccion_de(qname)
+        .and_then(|s| s.split('|').nth(2))
+        .filter(|c| !c.is_empty())
+}
+
+fn seccion_de(qname: &str) -> Option<&'static str> {
     let map = COMPANIES.get_or_init(|| {
         parse_guardiana(EMPRESAS)
             .filter_map(|(section, domain)| section.map(|c| (domain, c)))
@@ -178,6 +210,10 @@ pub enum ExpectedKind {
     Mensajeria,
     /// Video calls.
     Videollamada,
+    /// Certificate checks: is this certificate still valid, or revoked.
+    Certificados,
+    /// The operating system's own safety checks: is this file or this destination known.
+    Seguridad,
     /// The system resolvers.
     Resolutores,
     /// Guardiana's own domain.
@@ -188,6 +224,8 @@ impl ExpectedKind {
     fn from_section(name: &str) -> Option<Self> {
         Some(match name {
             "actualizaciones" => Self::Actualizaciones,
+            "certificados" => Self::Certificados,
+            "seguridad" => Self::Seguridad,
             "hora" => Self::Hora,
             "mensajeria" => Self::Mensajeria,
             "videollamada" => Self::Videollamada,
@@ -424,6 +462,25 @@ mod tests {
         assert_eq!(c.category("example.invalid"), Category::Desconocido);
         assert!(c.is_evasion_resolver("mozilla.cloudflare-dns.com"));
         assert!(!c.is_evasion_resolver("cloudflare.com"));
+    }
+
+    /// Windows' own safety check is not tracking, and no tracking list knows it, so it used to sit
+    /// in the statement as "sin clasificar" next to Criteo. Cutting it leaves the machine without
+    /// the warning Windows shows before an unknown file runs.
+    #[test]
+    fn the_systems_own_safety_checks_are_expected_not_unclassified() {
+        let c = Catalog::bundled();
+        for name in [
+            "smartscreen.microsoft.com",
+            "ping.nav.smartscreen.microsoft.com",
+            "urs.microsoft.com",
+        ] {
+            let m = c.lookup(name);
+            assert!(m.is_some(), "{name} is not in the catalog");
+            let m = m.unwrap();
+            assert_eq!(m.category, Category::Esperado, "{name}");
+            assert_eq!(m.expected, Some(ExpectedKind::Seguridad), "{name}");
+        }
     }
 
     #[test]

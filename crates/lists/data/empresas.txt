@@ -3,8 +3,21 @@
 # dominio que le pertenece (coincide con el dominio y con sus subdominios). Solo
 # dice el dueño del nombre, nunca qué hace: es una etiqueta, no un veredicto.
 # Fuentes: los propios dominios de cada empresa y sus políticas publicadas.
+#
+# FORMATO: `@Empresa|XX|Ciudad`. El país es un código ISO de dos letras; la ciudad se escribe
+# entera, en español, y es la de la sede de hoy: si la empresa se muda, se corrige aquí y ya.
+# Cualquiera de las dos se puede dejar vacía (`@Empresa`, `@Empresa|XX`) cuando no se ha podido
+# comprobar.
+#
+# EL PAÍS (`@Empresa|XX`, código ISO de dos letras): es el de la **sede del grupo**, no el de la
+# filial que firme una web concreta. Una multinacional tiene una sociedad en cada país y cualquiera
+# de ellas puede aparecer en un aviso legal; lo que le sirve a la persona que lee el panel es de
+# dónde es la empresa y bajo qué leyes está, que es una sola respuesta. Cuando el país está
+# comprobado en un registro público o en la propia empresa, la fuente va en el comentario de al
+# lado. Si no se ha podido comprobar, **se deja sin país**: se escribe `@Empresa` a secas y el
+# panel no enseña ninguno. Un país inventado es peor que un hueco.
 
-@Google
+@Google|US|Mountain View
 google.com
 google.com.co
 google.es
@@ -19,6 +32,7 @@ googlesyndication.com
 googleadservices.com
 google-analytics.com
 googletagmanager.com
+pki.goog
 googletagservices.com
 app-measurement.com
 gvt1.com
@@ -35,7 +49,7 @@ recaptcha.net
 nest.com
 fitbit.com
 
-@Apple
+@Apple|US|Cupertino
 apple.com
 icloud.com
 apple-dns.net
@@ -49,7 +63,9 @@ icloud-content.com
 me.com
 apple.news
 
-@Microsoft
+@Microsoft|US|Redmond
+msftstatic.com
+microsoftpersonalcontent.com
 microsoft.com
 windows.com
 windows.net
@@ -80,7 +96,7 @@ github.com
 githubusercontent.com
 github.io
 
-@Amazon
+@Amazon|US|Seattle
 amazon.com
 amazon.es
 amazonaws.com
@@ -99,7 +115,7 @@ ring.com
 audible.com
 amazonalexa.com
 
-@Meta
+@Meta|US|Menlo Park
 facebook.com
 facebook.net
 fbcdn.net
@@ -115,7 +131,7 @@ oculus.com
 threads.net
 threads.com
 
-@ByteDance
+@ByteDance|CN|Pekín
 tiktok.com
 tiktokv.com
 tiktokcdn.com
@@ -130,7 +146,8 @@ musical.ly
 ttdns2.com
 byteintl.com
 
-@Samsung
+@Samsung|KR|Suwon
+samsungmobile.com
 samsung.com
 samsungcloudsolution.com
 samsungcloudsolution.net
@@ -144,7 +161,7 @@ samsungrs.com
 samsungapps.com
 samsungcloud.com
 
-@LG
+@LG|KR|Seúl
 lgtvsdp.com
 lgappstv.com
 lge.com
@@ -152,23 +169,23 @@ lgsmartad.com
 lgtvcommon.com
 lgtvonline.lge.com
 
-@Roku
+@Roku|US|San José (California)
 roku.com
 ravm.tv
 
-@Netflix
+@Netflix|US|Los Gatos
 netflix.com
 nflxvideo.net
 nflximg.net
 nflxext.com
 nflxso.net
 
-@Spotify
+@Spotify|SE|Estocolmo
 spotify.com
 scdn.co
 spotifycdn.com
 
-@Disney
+@Disney|US|Burbank
 disneyplus.com
 disney-plus.net
 bamgrid.com
@@ -177,42 +194,42 @@ disney.com
 hotstar.com
 espn.com
 
-@Warner Bros. Discovery
+@Warner Bros. Discovery|US|Nueva York
 hbomax.com
 max.com
 warnermediacdn.com
 hbo.com
 
-@Xiaomi
+@Xiaomi|CN|Pekín
 xiaomi.com
 mi.com
 miui.com
 xiaomi.net
 
-@Huawei
+@Huawei|CN|Shenzhen
 huawei.com
 hicloud.com
 dbankcloud.com
 hicloud.cn
 
-@Sony
+@Sony|JP|Tokio
 sony.com
 playstation.net
 playstation.com
 sonyentertainmentnetwork.com
 
-@Nintendo
+@Nintendo|JP|Kioto
 nintendo.net
 nintendo.com
 
-@Cloudflare
+@Cloudflare|US|San Francisco
 cloudflare.com
 cloudflare-dns.com
 one.one.one.one
 cloudflareinsights.com
 cloudflare.net
 
-@Akamai
+@Akamai|US|Cambridge (Massachusetts)
 akamai.net
 akamaiedge.net
 akadns.net
@@ -221,11 +238,11 @@ akamaized.net
 edgekey.net
 edgesuite.net
 
-@Fastly
+@Fastly|US|San Francisco
 fastly.net
 fastlylb.net
 
-@Adobe
+@Adobe|US|San José (California)
 adobe.com
 omtrdc.net
 demdex.net
@@ -235,14 +252,14 @@ adobe.io
 adobedtm.com
 everesttech.net
 
-@Oracle
+@Oracle|US|Austin
 oracle.com
 bluekai.com
 addthis.com
 moatads.com
 eloqua.com
 
-@Salesforce
+@Salesforce|US|San Francisco
 salesforce.com
 force.com
 krxd.net
@@ -250,37 +267,46 @@ exacttarget.com
 pardot.com
 salesforceliveagent.com
 
-@Criteo
+@Criteo|FR|París
 criteo.com
 criteo.net
+# BidSwitch es de IPONWEB, que Criteo compró en 2022 (nota de prensa de Criteo, dic 2021; cierre
+# en 2022). El país es el del grupo, Francia, como manda la regla de la cabecera.
+bidswitch.net
+bidswitch.com
+iponweb.com
 
-@The Trade Desk
+@The Trade Desk|US|Ventura (California)
 adsrvr.org
 
-@Magnite
+@Magnite|US|Nueva York
 rubiconproject.com
 magnite.com
 
-@PubMatic
+@PubMatic|US|Redwood City
 pubmatic.com
 
-@Taboola
+@Taboola|IL|Tel Aviv
 taboola.com
 
-@Outbrain
+@Outbrain|US|Nueva York
+# Outbrain Inc., Nueva York. (Decía Israel por sus fundadores: la empresa es estadounidense.)
 outbrain.com
 
-@Teads
+@Teads|US|Nueva York
+# Nació en Francia y Luxemburgo. Outbrain la compró en febrero de 2025 y en junio de 2025 el
+# grupo entero se renombró Teads Holding Co., con sede en Nueva York; cotiza en el Nasdaq como
+# TEAD. La sede del grupo es la que manda (comprobado el 21 sep 2026 en la nota a inversores).
 teads.tv
 
-@Index Exchange
+@Index Exchange|CA|Toronto
 casalemedia.com
 indexww.com
 
-@OpenX
+@OpenX|US|Pasadena
 openx.net
 
-@Yahoo
+@Yahoo|US|Nueva York
 yahoo.com
 yimg.com
 oath.com
@@ -288,44 +314,45 @@ advertising.com
 yahoodns.net
 aol.com
 
-@X
+@X|US
 twitter.com
 x.com
 twimg.com
 t.co
 
-@Snap
+@Snap|US|Santa Mónica
 snapchat.com
 sc-cdn.net
 snap.com
 
-@Pinterest
+@Pinterest|US|San Francisco
 pinterest.com
 pinimg.com
 
-@Reddit
+@Reddit|US|San Francisco
 reddit.com
 redd.it
 redditstatic.com
 redditmedia.com
 
-@Zoom
+@Zoom|US|San José (California)
 zoom.us
+zoomgov.com
 
-@Discord
+@Discord|US|San Francisco
 discord.com
 discordapp.com
 discord.gg
 discordapp.net
 
-@Telegram
+@Telegram|AE|Dubái
 telegram.org
 t.me
 
-@Signal
+@Signal|US|Mountain View
 signal.org
 
-@Mercado Libre
+@Mercado Libre|AR|Buenos Aires
 mercadolibre.com
 mercadolibre.com.co
 mlstatic.com
@@ -335,334 +362,511 @@ mercadoclics.com
 meli.com
 mercadolivre.com
 
-@Rappi
+@Rappi|CO|Bogotá
 rappi.com
 rappi.com.co
 
-@Claro
+@Claro|MX|Ciudad de México
 claro.com.co
 claro.com
 
-@Telefónica
+@Telefónica|ES|Madrid
 movistar.com.co
 movistar.es
 movistar.com
 telefonica.com
 
-@Tigo
+@Tigo|LU|Luxemburgo
 tigo.com.co
 tigoune.com.co
 
-@Bancolombia
+@Bancolombia|CO|Medellín
 bancolombia.com
 bancolombia.com.co
 nequi.com.co
 nequi.co
 
-@Davivienda
+@Davivienda|CO|Bogotá
 davivienda.com
 
-@Hotjar
+@Contentsquare|FR|París
+# Contentsquare compró Hotjar en 2021 y el 1 de julio de 2025 Hotjar Ltd (Malta) se fusionó
+# dentro del grupo, que tiene su sede en París: la sociedad maltesa ya no existe (comprobado el
+# 21 sep 2026 en la documentación de la propia Hotjar).
+contentsquare.com
 hotjar.com
 
-@Piano
+@Piano|US|Filadelfia
 piano.io
 tinypass.com
 
-@Permutive
+@Permutive|GB|Londres
 permutive.com
 permutive.app
 
-@Chartbeat
+@Chartbeat|US|Nueva York
 chartbeat.com
 chartbeat.net
 
-@Comscore
+@Comscore|US|Reston (Virginia)
 scorecardresearch.com
 comscore.com
 
-@Nielsen
+@Nielsen|US|Nueva York
 imrworldwide.com
 nielsen.com
 
-@Quantcast
+@Quantcast|US|San Francisco
 quantserve.com
 quantcount.com
 
-@LiveRamp
+@LiveRamp|US|San Francisco
 rlcdn.com
 liveramp.com
 pippio.com
+# ATS, «Authenticated Traffic Solution»: su propia documentación (docs.liveramp.com) dice que se
+# sirve desde ats-wrapper.privacymanager.io y que convierte a quien ha iniciado sesión en un
+# «RampID». Es exactamente el negocio de unir identidades entre webs.
+privacymanager.io
 
-@ID5
+@ID5|GB|Londres
+# ID5 TECHNOLOGY LIMITED, Londres, Companies House 10735438. (Decía Francia: estaba mal.)
 id5-sync.com
 
-@Sharethrough
+@Equativ|FR|París
+smartadserver.com
+# Sharethrough era canadiense; se fusionó con Equativ en 2024 y desde entonces todo opera bajo
+# la marca Equativ, con sede en París (comprobado el 21 sep 2026 en la nota de Equativ).
 sharethrough.com
 
-@Equativ
-smartadserver.com
-
-@Datadog
+@Datadog|US|Nueva York
 datadoghq.com
 
-@Sentry
+@Sentry|US|San Francisco
 sentry.io
 
-@Twilio
+@Twilio|US|San Francisco
 segment.io
 segment.com
 twilio.com
 sendgrid.net
 
-@Braze
+@Braze|US|Nueva York
 braze.com
 appboy.com
 
-@OneSignal
+@OneSignal|US|San Mateo
 onesignal.com
 os.tc
 
-@Intercom
+@Intercom|US|San Francisco
+# Intercom, Inc., San Francisco, sociedad de Delaware. (Decía Irlanda por sus fundadores.)
 intercom.io
 intercomcdn.com
 
-@Stripe
+@Stripe|US|South San Francisco
 stripe.com
 stripe.network
 
-@PayPal
+@PayPal|US|San José (California)
 paypal.com
 paypalobjects.com
 
-@Anthropic
+@Anthropic|US|San Francisco
 anthropic.com
 claude.ai
 claudeusercontent.com
 
-@OpenAI
+@OpenAI|US|San Francisco
 openai.com
 chatgpt.com
 oaistatic.com
 oaiusercontent.com
 
-@Zoho
+@Zoho|IN|Chennai
 zoho.com
 zohostatic.com
 zohocdn.com
 
-@Mozilla
+@Mozilla|US|San Francisco
 mozilla.org
 mozilla.net
 mozilla.com
 firefox.com
 getpocket.com
 
-@Brave
+@Brave|US|San Francisco
 brave.com
 bravesoftware.com
 
-@DuckDuckGo
+@DuckDuckGo|US|Paoli (Pensilvania)
 duckduckgo.com
 duck.com
 
-@Opera
+@Opera|NO|Oslo
 opera.com
 operacdn.com
 
-@Automattic
+@Automattic|US|San Francisco
 wordpress.com
 wp.com
 gravatar.com
 
-@Wix
+@Wix|IL|Tel Aviv
 wix.com
 wixstatic.com
 parastorage.com
 
-@Shopify
+@Shopify|CA|Ottawa
 shopify.com
 shopifycdn.com
 
-@Canva
+@Canva|AU|Sídney
 canva.com
 
-@Dropbox
+@Dropbox|US|San Francisco
 dropbox.com
 dropboxusercontent.com
 
-@Slack
+@Slack|US|San Francisco
 slack.com
 slack-edge.com
 
-@Epic Games
+@Epic Games|US|Cary (Carolina del Norte)
 epicgames.com
 unrealengine.com
 
-@Roblox
+@Roblox|US|San Mateo
 roblox.com
 rbxcdn.com
 
-@Valve
+@Valve|US|Bellevue (Washington)
 steampowered.com
 steamcommunity.com
 steamstatic.com
 steamcontent.com
 
-@Electronic Arts
+@Electronic Arts|US|Redwood City
 ea.com
 
-@Activision
+@Activision|US|Santa Mónica
 activision.com
 callofduty.com
 
-@Ubisoft
+@Ubisoft|FR
 ubisoft.com
 ubi.com
 
-@Riot Games
+@Riot Games|US|Los Ángeles
 riotgames.com
 
-@Supercell
+@Supercell|FI|Helsinki
 supercell.com
 
-@Unity
-unity3d.com
-unity.com
-
-@AppLovin
+@AppLovin|US|Palo Alto
 applovin.com
 applvn.com
 
-@ironSource
+@Unity|US|San Francisco
+unity3d.com
+unity.com
+# ironSource era israelí. La fusión se cerró el 7 de noviembre de 2022 y quedó como filial al
+# 100 % de Unity Software (comprobado el 21 sep 2026 en el 8-K de Unity ante la SEC).
 ironsrc.com
 ironsource.com
 supersonicads.com
 
-@Chartboost
+@Chartboost|US
 chartboost.com
 
-@Vungle
+@Vungle|US
 vungle.com
 
-@AdColony
+@AdColony|US
 adcolony.com
 
-@InMobi
+@InMobi|IN|Bangalore
 inmobi.com
 
-@Gen Digital
+@Gen Digital|US|Tempe (Arizona)
 avast.com
+avastdns.com
 avcdn.net
 norton.com
 symantec.com
 
-@McAfee
+@McAfee|US|San José (California)
 mcafee.com
 
-@NVIDIA
+@NVIDIA|US|Santa Clara
 nvidia.com
 
-@Intel
+@Intel|US|Santa Clara
 intel.com
 
-@Dell
+@Dell|US|Round Rock (Texas)
 dell.com
 
-@HP
+@HP|US|Palo Alto
 hp.com
 
-@Logitech
+@Logitech|CH|Lausana
 logitech.com
 logi.com
 
 @TP-Link
+# Sin país, y no por pereza: está en disputa. Desde octubre de 2024 la empresa dice que
+# TP-Link Systems Inc. (Irvine, California) es la matriz de todo lo que no sea China continental,
+# que queda para TP-Link Technologies (Shenzhen). Una investigación de Bloomberg de abril de 2026
+# y el comité del Congreso de Estados Unidos ponen en duda que la separación sea real. Escribir
+# «US» o «CN» sería tomar partido en algo que no está resuelto (repasado el 21 sep 2026).
 tplinkcloud.com
 tplinkra.com
 tp-link.com
 
-@Tuya
+@Tuya|CN|Hangzhou
 tuya.com
 tuyaeu.com
 tuyaus.com
 
-@iRobot
+@iRobot|US|Bedford (Massachusetts)
 irobot.com
 irobotapi.com
 
-@Garmin
+@Garmin|CH|Schaffhausen
 garmin.com
 
-@Strava
+@Strava|US|San Francisco
 strava.com
 
-@Uber
+@Uber|US|San Francisco
 uber.com
 ubercdn.com
 
-@Booking
+@Booking|NL|Ámsterdam
 booking.com
 bstatic.com
 
-@Airbnb
+@Airbnb|US|San Francisco
 airbnb.com
 
-@Duolingo
+@Duolingo|US|Pittsburgh
 duolingo.com
 
-@Deriv
+@Deriv|GG
+# Sus propios términos dicen que Deriv.com Limited, registrada en Guernsey, es la sociedad que
+# posee a todas las demás (Labuan, Islas Vírgenes Británicas, Caimán, Mauricio, Vanuatu, Samoa,
+# San Vicente). La del grupo es Guernsey (comprobado el 21 sep 2026 en deriv.com).
 deriv.com
 
 # Medición, atribución y perfilado (decisión 149). Estas empresas salían como
 # «fuera de las listas» en un extracto real, y no lo son: se sabe perfectamente
 # quiénes son y de qué viven. Dominios tomados de su propia documentación.
 
-@AppsFlyer
+@AppsFlyer|IL|Herzliya
 appsflyer.com
 appsflyersdk.com
 
-@Mixpanel
+@Mixpanel|US|San Francisco
 mixpanel.com
 mxpnl.com
 
-@Amplitude
+@Amplitude|US|San Francisco
 amplitude.com
 
-@PostHog
+@PostHog|US|San Francisco
 posthog.com
 
-@Segment
+@Segment|US|San Francisco
 segment.com
 segment.io
 
-@Adjust
+@Adjust|DE|Berlín
 adjust.com
 adjust.io
 
-@Branch
+@Branch|US|Palo Alto
 branch.io
 
-@Kochava
+@Kochava|US|Sandpoint (Idaho)
 kochava.com
 
-@Singular
+@Singular|US|San Francisco
 singular.net
 
-@Customer.io
+@Customer.io|US|Portland (Oregón)
 customer.io
 customeriomail.com
 
-@HUMAN Security
+@HUMAN Security|US|Nueva York
 perimeterx.net
 px-cloud.net
 humansecurity.com
 
 @Temu
+# Sin país, y no por pereza: hay dos respuestas oficiales que se contradicen. PDD Holdings
+# declara ante la SEC que sus oficinas ejecutivas principales están en Dublín, y a la vez dijo
+# públicamente, en mayo de 2023, que «su sede estará siempre en Shanghái, China, y no cambiará».
+# Mientras las dos frases sigan en pie, aquí no va ninguna (repasado el 21 sep 2026).
 temu.com
 kwcdn.com
 
-@Moloco
+@Moloco|US|Redwood City
 moloco.com
 
-@Iterable
+@Iterable|US|San Francisco
 iterable.com
+
+# --- Publicidad que salía como «sin clasificar» en un equipo real (21 sep 2026) -------------
+# Se miraron 5.000 consultas del PC de pruebas: un tercio salía «sin clasificar», y buena parte
+# eran estos. Cada dueño está comprobado en una fuente de la propia empresa o en un registro
+# público; los que no se pudieron comprobar (trvdp.com, a-mo.net, amx1.net, dnacdn.net,
+# servg1.net, sensic.net) NO se añaden: un dueño inventado es peor que un hueco.
+
+@Verve Group|SE|Estocolmo
+# Verve Group SE, sede social en Estocolmo (Humlegårdsgatan 19 A), Societas Europaea inscrita en
+# Suecia con el número 517100-0143; antes se llamaba Media and Games Invest SE y cambió de nombre
+# el 13 de junio de 2024. Compró LKQD —plataforma de vídeo publicitario— en 2021, y Smaato es
+# parte del grupo.
+#
+# CORREGIDO el 21 sep 2026, y el error merece quedar escrito: aquí ponía «Estados Unidos» porque
+# se leyó el aviso legal de verve.com, que es el de **Verve Group, Inc.**, su filial de Nueva
+# York. Lo vio el responsable de un vistazo («Verve Group es sueca»). De ahí sale la regla de
+# arriba: el país es el de la SEDE del grupo, no el de la filial que resulte que firma una web.
+lkqd.net
+smaato.net
+smaato.com
+
+@RTB House|PL|Varsovia
+# «Operamos bajo el dominio creativecdn.com», su propia política de privacidad. RTB HOUSE S.A.,
+# Varsovia. Retargeting: te vuelve a enseñar lo que miraste.
+creativecdn.com
+rtbhouse.com
+
+@FreeWheel|US|Nueva York
+# Empresa de Comcast (corporate.comcast.com lista FreeWheel entre sus negocios). Publicidad de
+# televisión y vídeo; `user-sync` en el nombre es emparejar identificadores entre empresas.
+fwmrm.net
+freewheel.com
+
+@Sparteo|FR|París
+# SPARTEO, Tourcoing (Francia), registro mercantil francés 824 623 003.
+sparteo.com
+
+@OneTag|GB|Londres
+# ONETAG LIMITED, Reino Unido, Companies House 09905190.
+onetag-sys.com
+onetag.com
+
+# --- Medios y servicios que también salían sin clasificar ----------------------------------
+@PRISA|ES|Madrid
+# Diario AS, del grupo PRISA (España). Es un periódico, no publicidad: sale aquí para que deje
+# de aparecer como un nombre que nadie conoce.
+as.com
+prisa.com
+prisasd.com
+
+@BBC|GB|Londres
+bbc.com
+bbc.co.uk
+
+@Didomi|FR|París
+# Plataforma de consentimiento. Su documentación (developers.didomi.io) dice que sirve su SDK
+# desde sdk.privacy-center.org: es la ventana de cookies que sale al entrar en una web.
+privacy-center.org
+didomi.io
+
+@Marfeel|ES|Barcelona
+# Marfeel Solutions, S.L., Barcelona. Analítica y publicidad para periódicos.
+mrf.io
+marfeel.com
+
+@Adventori|FR|París
+# ADventori SAS, 28 rue du Sentier, 75002 París, RCS de París 518 634 027 (comprobado el
+# 21 sep 2026 en su propio aviso legal).
+adventori.com
+
+@Nexx360|FR|Neuilly-sur-Seine
+# NEXX360 SAS, 8 rue de l'Hôtel de Ville, 92200 Neuilly-sur-Seine, RCS 891 857 674 (comprobado
+# el 21 sep 2026 en su propio aviso legal).
+nexx360.io
+
+@Disqus|US|San Francisco
+disqus.com
+disquscdn.com
+
+# --- Quién hay detrás de lo que sale como «normal» -------------------------------------------
+# Las comprobaciones de certificados, la hora y las actualizaciones del sistema aparecían con un
+# guion en la columna de empresa y en la de país: el panel decía «normal» pero no sabía decir de
+# quién era el nombre. Son las entidades más comprobables que hay —casi todas fundaciones o
+# autoridades de certificación con registro público— y no tenerlas era un hueco tonto
+# (21 sep 2026, repaso profundo del panel).
+
+@Internet Security Research Group|US|San Francisco
+# ISRG, la fundación de California detrás de Let's Encrypt, que da los certificados gratis.
+lencr.org
+letsencrypt.org
+
+@DigiCert|US|Lehi (Utah)
+digicert.com
+
+@Sectigo|GB
+sectigo.com
+
+@GlobalSign|BE|Lovaina
+globalsign.com
+
+@Entrust|US|Shakopee (Minnesota)
+entrust.net
+
+@IdenTrust|US
+identrust.com
+
+@GoDaddy|US|Tempe (Arizona)
+godaddy.com
+
+@NTP Pool Project
+# Sin país: es una red de voluntarios coordinada por una persona, sin sociedad ni fundación
+# detrás. No hay sede que comprobar, así que no se escribe ninguna.
+pool.ntp.org
+ntp.org
+
+@NIST|US|Gaithersburg (Maryland)
+# Instituto Nacional de Estándares y Tecnología de Estados Unidos: da la hora oficial.
+nist.gov
+
+@Debian|US|Nueva York
+# Proyecto Debian, con Software in the Public Interest (Nueva York) como entidad legal.
+debian.org
+
+@Canonical|GB|Londres
+# La empresa detrás de Ubuntu y de Snap.
+ubuntu.com
+launchpad.net
+snapcraft.io
+
+@Fedora|US|Raleigh (Carolina del Norte)
+# Proyecto Fedora, patrocinado por Red Hat.
+fedoraproject.org
+
+@Arch Linux|US|Nueva York
+# El proyecto está asociado a Software in the Public Interest, la fundación sin ánimo de lucro
+# de Nueva York que también respalda a Debian y hace de entidad legal (comprobado el 21 sep 2026
+# en la lista de proyectos de SPI).
+archlinux.org
+pkgbuild.com
+
+@Flathub|US
+# Flathub LLC, sociedad estadounidense sin ánimo de lucro levantada por la GNOME Foundation
+# (California) junto con KDE e.V. para que el repositorio tenga entidad propia.
+flathub.org
+
+@TripleLift|US|Nueva York
+# Intercambio de publicidad, Nueva York.
+3lift.com
+triplelift.com
+
+@NextRoll|US|San Francisco
+# La empresa detrás de AdRoll, San Francisco.
+adroll.com
+nextroll.com

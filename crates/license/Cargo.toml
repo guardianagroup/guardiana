@@ -1,6 +1,6 @@
 [package]
 name = "guardiana-license"
-description = "7-day trial, one-connection activation, signed license file"
+description = "7-day trial and one-connection activation"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,7 +11,6 @@ publish = false
 
 [dependencies]
 guardiana-core = { workspace = true }
-minisign-verify = { workspace = true }
 sha2 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

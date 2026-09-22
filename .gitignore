@@ -29,5 +29,7 @@ keys/
 
 # Build outputs
 /dist/
+# Lo que produce la compilación reproducible y los paquetes: salida, no fuente.
+/build/out/
 /release/
 redes-videos/

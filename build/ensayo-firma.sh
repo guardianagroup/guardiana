@@ -39,8 +39,12 @@ for f in "${archivos[@]}"; do echo "   $(basename "$f")"; done
 echo "== La contraseña se pide una vez por archivo. No se escribe en ningún registro ni se sube nada."
 echo
 
+i=0
 for f in "${archivos[@]}"; do
-    echo "-- firmando $(basename "$f")"
+    i=$((i + 1))
+    # Decir por dónde va: la contraseña se pide una vez por archivo y, sin esto, la persona no
+    # sabe cuántas veces más le van a preguntar (repaso del 21 sep 2026).
+    echo "-- firmando $i de ${#archivos[@]}: $(basename "$f")"
     firmar "$f" "guardiana $version $(basename "$f")"
 done
 

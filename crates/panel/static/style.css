@@ -90,6 +90,12 @@ tbody tr:last-child td { border-bottom: 0; }
 .tag.desconocido.sinlista { color: var(--desconocido); border-style: dashed; }
 .tag.ia { color: var(--accent); font-size: 10px; margin-left: 5px; }
 .tag.empresa { color: var(--muted); border-color: var(--line); font-size: 10px; margin-left: 5px; }
+/* El país de la empresa dueña del nombre. Se distingue de la empresa con un punto delante,
+   para que se lean como dos datos y no como un nombre largo. */
+/* La columna de país: en gris y sin envolver, para que no compita con el nombre del
+   servicio, que es lo que se lee primero. */
+td.pais, td.empresa-col { color: var(--muted); white-space: nowrap; }
+td.empresa-col { color: var(--fg); }
 .tag.app { border-color: var(--accent); color: var(--accent); font-family: var(--mono); }
 .tag.trampa { border-color: var(--cortado); color: var(--cortado); font-weight: 600; letter-spacing: 0.04em; }
 .verdict.cortado { color: var(--cortado); font-weight: 600; }
@@ -105,10 +111,15 @@ button:hover, .btn:hover { background: var(--accent-dark); color: var(--accent-f
 button.secondary, .btn.secondary { background: transparent; color: var(--fg); border: 1px solid var(--line); }
 button.secondary:hover, .btn.secondary:hover { background: transparent; border-color: var(--fg); color: var(--fg); }
 button.danger { background: var(--cortado); color: #fff; }
-/* After cutting, the button stops being a button and becomes a state: red and with the word,
-   because a grey tick told the person nothing about what had just happened. */
-button.cut, button.cortado, button.cortado[disabled] { white-space: nowrap; }
-button.cortado, button.cortado[disabled] { background: transparent; color: var(--cortado); border: 1px solid var(--cortado); cursor: default; opacity: 1; }
+/* Cortar en rojo, desbloquear en verde: el color dice lo que hace el botón antes de leerlo
+   (pedido del responsable, 21 sep 2026). Y los dos son botones de verdad, con su mano encima:
+   cuando «cortado» era un cartel apagado nadie adivinaba que se podía pulsar para deshacerlo. */
+button.cut, button.cortado { white-space: nowrap; cursor: pointer; }
+button.cut { background: transparent; color: var(--cortado); border: 1px solid var(--cortado); }
+button.cut:hover { background: var(--cortado); color: #fff; border-color: var(--cortado); }
+button.cortado { background: transparent; color: var(--esperado); border: 1px solid var(--esperado); opacity: 1; }
+button.cortado:hover { background: var(--esperado); color: #fff; border-color: var(--esperado); }
+button.cortado[disabled] { cursor: progress; opacity: .6; }
 
 p.vigilante { border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; background: var(--card); }
 p.vigilante b { font-size: 16px; }
@@ -117,6 +128,8 @@ ul.recibo li { padding: 8px 0; border-top: 1px dashed var(--line); font-size: 15
 ul.recibo li:first-child { border-top: 0; }
 
 form.filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin: 10px 0 18px; }
+/* Los tres botones de llevarse el extracto, en fila y siempre juntos. */
+p.exportar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 18px; }
 form.filters label { display: flex; flex-direction: column; gap: 4px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 input, select { font: 400 14px/1.4 var(--texto); padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--fg); }
 input:focus, select:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -147,3 +160,16 @@ footer { max-width: 1180px; margin: 26px auto 40px; padding: 0 22px; color: var(
   .print-only { display: inline; font-size: 12px; color: #444; }
   .counter { background: #fff; border: 1px solid #999; }
 }
+
+/* La franja de licencia, arriba de todas las páginas: ámbar mientras corre la prueba, rojo
+   cuando el programa ya se ha apartado. No es decoración: es la diferencia entre enterarte y
+   que se te acabe sin avisar. */
+.card.prueba{border-left:4px solid var(--publicidad);background:rgba(138,90,15,.06)}
+.card.caducado{border-left:4px solid var(--cortado);background:rgba(192,48,26,.06)}
+.card.caducado strong,.card.prueba strong{display:block;margin-bottom:4px}
+.card.caducado .btn{margin-right:8px}
+
+/* La ciudad de la sede, debajo del país y en gris: el país dice bajo qué leyes está la empresa,
+   la ciudad dice dónde está de verdad. Se escribe en la lista de empresas y se corrige cuando
+   alguna se muda (21 sep 2026). */
+.pais .ciudad{display:block;color:var(--muted);font-size:12.5px;line-height:1.35;margin-top:2px}

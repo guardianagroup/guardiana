@@ -35,13 +35,18 @@
   <label><span data-t="f_veredicto"></span><select name="verdict"><option value=""></option><option value="observado">observado</option><option value="respondido">respondido</option><option value="cortado">cortado</option></select></label>
   <label><span data-t="f_limite"></span><input name="limit" type="number" min="1" max="5000" value="200"></label>
   <button type="submit" data-t="filtrar"></button>
+</form>
+<!-- Las tres formas de llevarse el extracto, juntas y en su propia fila: dentro del formulario
+     de filtros se mezclaban con los desplegables y, al estrecharse la ventana, «Guardar en PDF»
+     se iba solo a la línea de abajo (lo vio el responsable, 21 sep 2026). -->
+<p class="exportar">
   <a id="export-csv" class="btn secondary" href="#" data-t="exportar_csv"></a>
   <a id="export-json" class="btn secondary" href="#" data-t="exportar_json"></a>
   <button id="export-pdf" type="button" class="secondary" data-t="exportar_pdf"></button>
-</form>
-<p id="export-pdf-msg" class="muted"></p>
+  <span id="export-pdf-msg" class="muted"></span>
+</p>
 <p class="muted" id="total"></p>
-<div class="card wrap"><table><thead><tr><th data-t="col_hora"></th><th data-t="col_nombre"></th><th data-t="col_categoria"></th><th data-t="col_dispositivo"></th><th data-t="col_veredicto"></th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="card wrap"><table><thead><tr><th data-t="col_hora"></th><th data-t="col_nombre"></th><th data-t="col_empresa_n"></th><th data-t="col_categoria"></th><th data-t="col_pais"></th><th data-t="col_dispositivo"></th><th data-t="col_veredicto"></th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
 <h2 data-t="cadena_titulo"></h2>
 <p class="lead" data-t="cadena_lead"></p>
 <p><button id="check" class="secondary" data-t="cadena_boton"></button> <span id="check-result"></span></p>

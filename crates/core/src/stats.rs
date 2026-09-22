@@ -18,6 +18,10 @@ pub struct Counters {
     pub services: i64,
     /// Queries categorised as `rastreador`.
     pub trackers: i64,
+    /// Queries categorised as `publicidad`. It is the commonest category of all, so leaving it
+    /// out of the live counters made the radiography say "18 services · 0 trackers · 0 normal"
+    /// for a page full of advertising (21 Sep 2026).
+    pub ads: i64,
     /// Queries carrying `destino_nuevo`.
     pub new_destinations: i64,
     /// Queries categorised as `esperado`.
@@ -68,6 +72,7 @@ impl Ledger {
         let row = self.conn.query_row(
             "SELECT COUNT(DISTINCT qname), \
                     SUM(category = 'rastreador'), \
+                    SUM(category = 'publicidad'), \
                     SUM(instr(signals_json, '\"destino_nuevo\"') > 0), \
                     SUM(category = 'esperado'), \
                     SUM(verdict = 'cortado') \
@@ -79,9 +84,10 @@ impl Ledger {
                     until,
                     services: r.get::<_, i64>(0)?,
                     trackers: r.get::<_, Option<i64>>(1)?.unwrap_or(0),
-                    new_destinations: r.get::<_, Option<i64>>(2)?.unwrap_or(0),
-                    expected: r.get::<_, Option<i64>>(3)?.unwrap_or(0),
-                    blocked: r.get::<_, Option<i64>>(4)?.unwrap_or(0),
+                    ads: r.get::<_, Option<i64>>(2)?.unwrap_or(0),
+                    new_destinations: r.get::<_, Option<i64>>(3)?.unwrap_or(0),
+                    expected: r.get::<_, Option<i64>>(4)?.unwrap_or(0),
+                    blocked: r.get::<_, Option<i64>>(5)?.unwrap_or(0),
                 })
             },
         )?;
@@ -151,23 +157,31 @@ mod tests {
             "A",
         ))
         .unwrap();
+        // Advertising is its own counter: it is the commonest category, and while it was missing
+        // the radiography put those queries in no bucket at all.
+        let mut d = NewEvent::observed(40, "self", "127.0.0.1", "ads.example", "A");
+        d.category = Category::Publicidad;
+        l.append(d).unwrap();
 
         let c = l.counters(0, 100).unwrap();
-        assert_eq!(c.services, 2);
+        assert_eq!(c.services, 3);
         assert_eq!(c.trackers, 1);
+        assert_eq!(c.ads, 1);
         assert_eq!(c.new_destinations, 1);
         assert_eq!(c.expected, 1);
         assert_eq!(c.blocked, 1);
-        assert_eq!(l.counters(25, 100).unwrap().services, 1);
+        // From t=25 on there are two names left: the tracker asked again and the advertising one.
+        assert_eq!(l.counters(25, 100).unwrap().services, 2);
 
         let t = l.device_totals(None).unwrap();
         assert_eq!(t[0].device_id, "self");
-        assert_eq!(t[0].queries, 2);
+        assert_eq!(t[0].queries, 3);
         assert_eq!(t[0].rastreador, 1);
+        assert_eq!(t[0].publicidad, 1);
         assert_eq!(t[0].cortado, 1);
         assert_eq!(t[1].desconocido, 1);
 
         let n = l.table_counts().unwrap();
-        assert_eq!(n.events, 3);
+        assert_eq!(n.events, 4);
     }
 }

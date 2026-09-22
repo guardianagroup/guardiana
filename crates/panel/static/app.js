@@ -37,7 +37,10 @@
   // which covers Spanish. Tables break across pages; every page gets a footer. Saving goes
   // through the browser's "save as" dialog where it exists (Chrome and Edge on a PC) and
   // through a normal download elsewhere (Safari, Firefox, phones).
-  const PDF_W = 595.28, PDF_H = 841.89, PDF_M = 40;
+  // A4. El margen de arriba es mayor que el de los lados a propósito: con los 40 del resto, el
+  // título salía pegado al borde de la hoja y el papel parecía un volante (lo vio el responsable
+  // al abrir su extracto, 21 sep 2026).
+  const PDF_W = 595.28, PDF_H = 841.89, PDF_M = 40, PDF_ARRIBA = 62;
   // Helvetica advance widths, thousandths of the size, WinAnsi code points 32-255.
   const HELV = '278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584,376,744,556,222,556,333,1000,556,556,333,1000,667,333,1000,556,611,556,556,222,222,333,333,350,556,1000,333,1000,500,333,944,556,500,667,278,333,556,556,556,556,260,556,333,737,370,556,584,0,737,333,400,549,333,333,333,576,537,278,333,333,365,556,834,834,834,611,667,667,667,667,667,667,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,500,556,556,556,556,278,278,278,278,556,556,556,556,556,556,556,549,611,556,556,556,556,500,556,500'.split(',').map(Number);
   // Unicode code points that WinAnsi keeps in the 0x80-0x9F slots, plus spaces and hyphens
@@ -79,7 +82,7 @@
     const pages = []; let ops = []; let y = 0;
     const usable = PDF_W - 2 * PDF_M;
     const n = (v) => v.toFixed(2);
-    const newPage = () => { ops = []; pages.push(ops); y = PDF_H - PDF_M; };
+    const newPage = () => { ops = []; pages.push(ops); y = PDF_H - PDF_ARRIBA; };
     const text = (x, yy, bin, size, bold, gray) => { ops.push(n(gray || 0) + ' g BT /' + (bold ? 'F2' : 'F1') + ' ' + n(size) + ' Tf ' + n(x) + ' ' + n(yy) + ' Td (' + pdfEscape(bin) + ') Tj ET'); };
     const need = (h) => { if (y - h < PDF_M + 18) newPage(); };
     newPage();
@@ -90,6 +93,13 @@
         return doc;
       },
       gap(h = 8) { y -= h; return doc; },
+      // La raya fina que separa el encabezado del contenido, igual que en el panel.
+      // Un título de sección: el mismo aire en los cuatro PDF del panel.
+      seccion(titulo, lead) { doc.gap(18).juntos(46).line(titulo, 12, true); if (lead) doc.gap(2).line(lead, 9, false, 0.45); doc.gap(8); return doc; },
+      regla() { need(12); y -= 7; ops.push('0.78 G 0.6 w ' + n(PDF_M) + ' ' + n(y) + ' m ' + n(PDF_M + usable) + ' ' + n(y) + ' l S'); return doc; },
+      // Pide sitio para lo que viene: sin esto, el nombre de una empresa se quedaba al final de
+      // una página y la frase que explica qué vende se iba a la siguiente.
+      juntos(h) { need(h); return doc; },
       // cols: [{ title, w (fraction of the width) }]; rows: arrays of strings, or { cells, bold }.
       table(cols, rows, size = 9) {
         const lh = size * 1.25, pad = 3;
@@ -174,18 +184,53 @@
     });
   }
   const pdfName = (what) => 'guardiana-' + what + '-' + new Date().toISOString().slice(0, 10) + '.pdf';
-  const pdfHead = (doc, heading) => doc.line('GUARDIANA · ' + heading, 16, true).line(t('pdf_generado').replace('{fecha}', new Date().toLocaleString(LOC, DIA_HORA)), 9, false, 0.4).gap(6);
+  const pdfHead = (doc, heading) => doc.line('GUARDIANA · ' + heading, 16, true).gap(3)
+    .line(t('pdf_generado').replace('{fecha}', new Date().toLocaleString(LOC, DIA_HORA)), 9, false, 0.45)
+    .regla().gap(14);
   const catName = (c) => T.categorias[c] || c;
   const verdictName = (v) => T.veredictos[v] || v;
   const deviceName = (ev) => ev.device_name || (ev.device_id === 'self' ? t('este_computador') : ev.device_id);
   const nameCell = (ev) => [ev.qname + (ev.ia ? ' · IA: ' + ev.ia : '') + (ev.empresa && ev.empresa !== ev.ia ? ' · ' + ev.empresa : '')].concat((ev.frases || []).map((f) => '· ' + f)).join('\n');
+  // El PDF tiene que decir lo MISMO que la pantalla. Enseñaba `catName(ev.category)`, la
+  // categoría en bruto, así que todo lo que en pantalla pone «entrega», «red local» o «de
+  // Google» salía en el papel como «sin clasificar»; y el país no salía en absoluto (lo vio el
+  // responsable al abrir su extracto en PDF, 21 sep 2026).
   const eventCols = (withDevice) => withDevice
-    ? [{ title: t('col_hora'), w: 0.12 }, { title: t('col_nombre'), w: 0.42 }, { title: t('col_categoria'), w: 0.14 }, { title: t('col_dispositivo'), w: 0.18 }, { title: t('col_veredicto'), w: 0.14 }]
-    : [{ title: t('col_hora'), w: 0.14 }, { title: t('col_nombre'), w: 0.50 }, { title: t('col_categoria'), w: 0.18 }, { title: t('col_veredicto'), w: 0.18 }];
+    ? [{ title: t('col_hora'), w: 0.10 }, { title: t('col_nombre'), w: 0.28 }, { title: t('col_empresa_n'), w: 0.15 }, { title: t('col_categoria'), w: 0.13 }, { title: t('col_pais'), w: 0.12 }, { title: t('col_dispositivo'), w: 0.12 }, { title: t('col_veredicto'), w: 0.10 }]
+    : [{ title: t('col_hora'), w: 0.12 }, { title: t('col_nombre'), w: 0.33 }, { title: t('col_empresa_n'), w: 0.17 }, { title: t('col_categoria'), w: 0.15 }, { title: t('col_pais'), w: 0.13 }, { title: t('col_veredicto'), w: 0.10 }];
+  // En el papel no hay dos líneas por celda: la ciudad va en la misma, debajo, como en la
+  // pantalla, porque la columna de país se lee de arriba abajo.
+  const dondeCell = (ev) => [ev.pais || '', ev.ciudad || ''].filter(Boolean).join('\n');
   const eventCells = (ev, withDevice) => withDevice
-    ? [clock(ev.ts), nameCell(ev), catName(ev.category), deviceName(ev), verdictName(ev.verdict)]
-    : [clock(ev.ts), nameCell(ev), catName(ev.category), verdictName(ev.verdict)];
+    ? [clock(ev.ts), nameCell(ev), ev.empresa || '', catTexto(ev), dondeCell(ev), deviceName(ev), verdictName(ev.verdict)]
+    : [clock(ev.ts), nameCell(ev), ev.empresa || '', catTexto(ev), dondeCell(ev), verdictName(ev.verdict)];
 
+
+  // «Quién hay detrás», al final del PDF: las empresas que de verdad salen en estas consultas,
+  // con lo que vende cada una en una línea. Un extracto lleno de nombres como
+  // `ats-wrapper.privacymanager.io` no le dice nada a nadie; «LiveRamp · convierte a quien
+  // inicia sesión en un identificador que sirve para reconocerte en webs distintas» sí (pedido
+  // del responsable, 21 sep 2026). Solo salen las que tienen su frase escrita y comprobada: de
+  // las demás se dice el nombre en la tabla y nada más, que es lo honesto.
+  function pdfQuienHayDetras(doc, eventos) {
+    const por = new Map();
+    for (const ev of eventos || []) {
+      if (!ev.empresa || !ev.oficio) continue;
+      const e = por.get(ev.empresa) || { n: 0, pais: ev.pais || '', oficio: ev.oficio };
+      e.n += 1;
+      por.set(ev.empresa, e);
+    }
+    if (!por.size) return;
+    const lista = [...por.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 12);
+    doc.seccion(t('pdf_detras_t'), t('pdf_detras_lead'));
+    for (const [nombre, e] of lista) {
+      // «1 consultas» no lo escribe nadie.
+      const veces = e.n === 1 ? t('pdf_detras_una') : t('pdf_detras_veces').replace('{n}', e.n);
+      const cabeza = nombre + (e.pais ? ' · ' + e.pais : '') + ' · ' + veces;
+      // El nombre y su frase no se separan nunca: se pide de una vez el alto de las dos.
+      doc.juntos(10 * 1.25 + 9 * 1.25 * 2).line(cabeza, 10, true).line(e.oficio, 9, false, 0.25).gap(3);
+    }
+  }
   async function api(path, opts = {}) {
     const headers = Object.assign({ 'X-Guardiana-Token': token, 'X-Guardiana-Lang': LANG }, opts.headers || {});
     if (opts.body && typeof opts.body !== 'string') { opts.body = JSON.stringify(opts.body); headers['Content-Type'] = 'application/json'; }
@@ -217,18 +262,54 @@
     if (ev.category !== 'desconocido') return T.categorias[ev.category] || ev.category;
     if (ev.local) return t('cat_red_local');
     if (ev.entrega) return t('cat_entrega');
-    if (ev.empresa || ev.ia) return t('cat_de_empresa').replace('{empresa}', ev.empresa || ev.ia);
+    // «de ByteDance» dejó de tener sentido el día que la empresa ganó su propia columna: la fila
+    // decía «ByteDance | de ByteDance». La categoría vuelve a decir lo único que sabe de la
+    // categoría —que ninguna lista lo clasifica— y quién es lo dice la columna de al lado.
     return T.categorias.desconocido;
   };
+  // El borde discontinuo se reserva para lo que de verdad no se sabe de quién es: si la columna
+  // de empresa dice un nombre, la fila ya no es un hueco y no hace falta subrayarla.
   const catClase = (ev) => (ev.category !== 'desconocido' ? '' : (ev.local || ev.entrega) ? ' entrega' : (ev.empresa || ev.ia) ? ' propio' : ' sinlista');
-  const cat = (ev) => `<span class="tag ${esc(ev.category)}${catClase(ev)}">${esc(catTexto(ev))}</span>`;
+  // Qué quiere decir esa palabra, en el propio sitio donde está: la leyenda del pie existía,
+  // pero está lejos de la tabla y el responsable tuvo que preguntar qué era «entrega».
+  const catQue = (ev) => {
+    const q = T.categorias_que || {};
+    if (ev.category !== 'desconocido') return q[ev.category] || '';
+    if (ev.local) return q.red_local || '';
+    if (ev.entrega) return q.entrega || '';
+    if (ev.empresa || ev.ia) return q.de_empresa || '';
+    return q.desconocido || '';
+  };
+  const cat = (ev) => {
+    const q = catQue(ev);
+    return `<span class="tag ${esc(ev.category)}${catClase(ev)}"${q ? ` title="${esc(q)}"` : ''}>${esc(catTexto(ev))}</span>`;
+  };
   const verdict = (v) => `<span class="verdict ${esc(v)}">${esc(T.veredictos[v] || v)}</span>`;
   // The trade goes first: reading «AppsFlyer» tells a person nothing, and reading what
   // AppsFlyer sells tells them everything they need to decide. It is a fact about the
   // company, not about this query, and it is only printed where one is written.
   const phrases = (ev) => (ev.oficio ? `<span class="phrase oficio">· ${esc(ev.oficio)}</span>` : '')
     + (ev.frases || []).map((f) => `<span class="phrase">· ${esc(f)}</span>`).join('');
-  const company = (ev) => (ev.ia && !(ev.category === 'desconocido' && !ev.entrega && !ev.empresa) ? ` <span class="tag ia">${esc(ev.ia)}</span>` : '') + (ev.empresa && ev.empresa !== ev.ia && !(ev.category === 'desconocido' && !ev.entrega) ? ` <span class="tag empresa">${esc(ev.empresa)}</span>` : '');
+  // El país va pegado a la empresa, y es el de la EMPRESA, no el del servidor que responde:
+  // casi todo lo grande contesta desde un servidor cercano, así que el país de la dirección IP
+  // diría «Colombia» de algo cuyos datos acaban en Estados Unidos. Lo que se puede sostener es
+  // a quién pertenece el nombre y bajo qué leyes está (pedido del responsable, 21 sep 2026).
+  // Columna propia, no etiqueta pegada al nombre: el responsable la quiere «al lado de
+  // categoría y dispositivo», que se lee mucho mejor en una tabla (21 sep 2026).
+  // El país dice bajo qué leyes está la empresa; la ciudad, debajo y en gris, lo hace concreto:
+  // «Estados Unidos» son muchos sitios, «Menlo Park» es uno (pedido del responsable, 21 sep 2026).
+  const paisCelda = (ev) => `<td class="pais"${ev.pais ? ` title="${esc(t('pais_titulo'))}"` : ''}>`
+    + (ev.pais ? esc(ev.pais) : '<span class="muted">—</span>')
+    + (ev.ciudad ? `<span class="ciudad">${esc(ev.ciudad)}</span>` : '') + '</td>';
+  // El servicio de IA sigue pegado al nombre —es el nombre dicho de otra manera—, pero la
+  // EMPRESA pasa a su propia columna, al lado de la categoría y el país: así la tabla dice
+  // quién es, qué es y de dónde, cada cosa en su sitio (pedido del responsable, 21 sep 2026).
+  const company = (ev) => (ev.ia && !(ev.category === 'desconocido' && !ev.entrega && !ev.empresa) ? ` <span class="tag ia">${esc(ev.ia)}</span>` : '');
+  const empresaCelda = (ev) => `<td class="empresa-col">${ev.empresa ? esc(ev.empresa) : '<span class="muted">—</span>'}</td>`;
+  // Dónde acaba lo de este aparato, sumado: los países de las empresas dueñas de los nombres.
+  const paisesDe = (l) => (l && l.paises && l.paises.length
+    ? `<br><span class="phrase">${esc(t('lectura_paises'))} ` + l.paises.map((x) => `${esc(x[0])} <b>${x[1]}</b>`).join(' · ') + '</span>'
+    : '');
   const hints = (l) => [l && l.callado_min != null ? t('lectura_callado').replace('{min}', l.callado_min) : '', l && l.relay ? t('lectura_relay') : '', l && l.evasiones ? (l.evasiones === 1 ? t('lectura_evasion_una') : t('lectura_evasiones').replace('{n}', l.evasiones)) : ''].filter(Boolean);
   const device = (ev) => esc(ev.device_name || (ev.device_id === 'self' ? t('este_computador') : ev.device_id)) + programa(ev);
   // Qué programa pidió el nombre, cuando el sistema lo dijo (Windows, este equipo). Va pegado al
@@ -267,20 +348,26 @@
   // Names this person has already cut, so the state survives a redraw. The snapshot table
   // repaints every two seconds: without this, a button turned red by a cut went back to grey
   // as if nothing had happened, and the person would cut the same name twice.
-  const CORTADOS = new Set();
+  // Un mapa y no un conjunto: para deshacer un corte desde el mismo botón hace falta el número
+  // de la regla que lo hizo (petición del responsable, 21 sep 2026).
+  const CORTADOS = new Map();
   const claveCorte = (dev, nombre) => dev + '|' + nombre;
   async function cargarCortados() {
     try {
       const r = await api('/api/reglas');
       (r.reglas || []).forEach((x) => {
         if (x.activa && x.action === 'cortar' && x.match_kind === 'domain') {
-          CORTADOS.add(claveCorte(x.device_id || 'home', x.pattern));
+          CORTADOS.set(claveCorte(x.device_id || 'home', x.pattern), x.id);
         }
       });
     } catch (_) {}
   }
+  function reglaDeCorte(ev) {
+    const propia = CORTADOS.get(claveCorte(ev.device_id, ev.qname));
+    return propia === undefined ? CORTADOS.get(claveCorte('home', ev.qname)) : propia;
+  }
   function yaCortado(ev) {
-    return CORTADOS.has(claveCorte(ev.device_id, ev.qname)) || CORTADOS.has(claveCorte('home', ev.qname));
+    return reglaDeCorte(ev) !== undefined;
   }
   // "1 horas de 24" no lo escribe nadie: una hora es singular.
   function mirando(h) {
@@ -288,14 +375,23 @@
   }
   function cutCell(ev) {
     if (ev.verdict === 'cortado') return '';
-    const d = gate[ev.device_id];
-    if (!d) return '';
+    // Ya no se mira aquí cuántas horas lleva el aparato: la espera vive en el servidor y solo
+    // para los cortes anchos. Además, la página del propio aparato no tiene esa lista, y mirarla
+    // hacía desaparecer el botón allí.
     // Cortar ESTE nombre no espera a las 24 horas (decisión del responsable, 20 sep 2026): es su
     // decisión sobre una cosa concreta, y el servidor le pide confirmación mientras lleve menos
     // de un día mirando. Lo que sigue esperando es lo ancho: categorías, toda la casa, Vigilante.
-    if (yaCortado(ev)) return `<button class="cut cortado" disabled>${esc(t('cortado_boton'))}</button>`;
+    // Cortado no es un callejón sin salida: el mismo botón lo deshace, que es lo que espera
+    // cualquiera que acabe de cortar algo por error.
+    const regla = reglaDeCorte(ev);
+    if (regla !== undefined) {
+      return `<button class="cut cortado" data-deshacer="${regla}" data-device="${esc(ev.device_id)}" data-name="${esc(ev.qname)}">${esc(t('desbloquear_boton'))}</button>`;
+    }
     return `<button class="secondary cut" data-device="${esc(ev.device_id)}" data-name="${esc(ev.qname)}">${esc(t('cortar'))}</button>`;
   }
+  // Una sola ventana al cortar, y la pregunta la escribe el servidor, que es quien sabe si este
+  // aparato lleva más o menos de un día mirado. Antes preguntaba el panel y, encima, el servidor
+  // volvía a preguntar: dos ventanas seguidas para un botón que se deshace con el mismo clic.
   async function createRule(body, path = '/api/reglas') {
     let r = await api(path, { method: 'POST', body });
     if (r.necesita === 'confirmar') {
@@ -361,13 +457,28 @@
       const b = e.target.closest('button.cut');
       if (!b) return;
       const name = b.dataset.name, dev = b.dataset.device;
-      if (!confirm(t('cortar_confirmar_dispositivo').replace('{nombre}', name))) return;
+      if (b.dataset.deshacer) {
+        // Desbloquear: se deshace la regla y el botón vuelve a ofrecer cortar.
+        b.disabled = true;
+        try {
+          await api(`${path}/${b.dataset.deshacer}/deshacer`, { method: 'POST' });
+          CORTADOS.delete(claveCorte(dev, name));
+          delete b.dataset.deshacer;
+          b.textContent = t('cortar'); b.classList.remove('cortado'); b.classList.add('secondary');
+        } catch (err) {
+          alert(String(err.message || err));
+        }
+        b.disabled = false;
+        return;
+      }
+      // Sin confirm aquí: lo pide el servidor con la frase que corresponda (una sola ventana).
       const created = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'cortar' }, path);
       // A grey tick did not say what had happened. The button turns into the state: red and
       // with the word, in the language of the panel.
       if (created) {
-        CORTADOS.add(claveCorte(dev, name));
-        b.textContent = t('cortado_boton'); b.disabled = true; b.classList.remove('secondary'); b.classList.add('cortado');
+        CORTADOS.set(claveCorte(dev, name), created.id);
+        b.dataset.deshacer = created.id;
+        b.textContent = t('desbloquear_boton'); b.classList.remove('secondary'); b.classList.add('cortado');
       }
     });
   }
@@ -397,7 +508,7 @@
     return foldEvents(events).map((ev) => {
       const veces = ev._n > 1 ? ` <span class="muted">×${ev._n}</span>` : '';
       const como = ev._types.length ? ` title="${esc(ev._types.join(', '))}"` : '';
-      return `<tr><td class="mono">${clock(ev.ts)}</td><td><span class="mono"${como}>${esc(ev.qname)}</span>${veces}${trampa(ev)}${company(ev)}${phrases(ev)}</td><td>${cat(ev)}</td><td>${device(ev)}</td><td>${verdict(ev.verdict)}</td><td>${cutCell(ev)}</td></tr>`;
+      return `<tr><td class="mono">${clock(ev.ts)}</td><td><span class="mono"${como}>${esc(ev.qname)}</span>${veces}${trampa(ev)}${company(ev)}${phrases(ev)}</td>${empresaCelda(ev)}<td>${cat(ev)}</td>${paisCelda(ev)}<td>${device(ev)}</td><td>${verdict(ev.verdict)}</td><td>${cutCell(ev)}</td></tr>`;
     }).join('');
   }
 
@@ -482,6 +593,7 @@
     const rows = [
       [r.servicios, t('c_servicios'), null],
       [r.rastreadores, t('c_rastreadores'), '#b23a3a'],
+      [r.publicidad, t('c_publicidad'), '#b23a3a'],
       [r.destinos_nuevos, t('c_nuevos'), null],
       [r.esperados, t('c_esperados'), '#1f6f4a'],
       [r.cortados, t('c_cortados'), '#b23a3a'],
@@ -509,30 +621,57 @@
       const r = await api('/api/informe');
       $('i-periodo').textContent = t('informe_periodo').replace('{desde}', new Date(r.desde).toLocaleDateString(LOC, DIA)).replace('{hasta}', new Date(r.hasta).toLocaleDateString(LOC, DIA));
       // Free plan: the table is a marked example and the Plus card shows, with "Ahora no" (decision 53).
-      $('i-ejemplo').classList.toggle('hidden', !r.ejemplo);
-      if (r.ejemplo) document.querySelector('[data-t=informe_lead]').textContent = t('informe_lead_ejemplo');
       $('i-whatsapp').classList.toggle('hidden', !r.plus);
-      let dismissed = false;
-      try { dismissed = localStorage.getItem('guardiana_plus_no_informe') === '1'; } catch (_) {}
-      $('i-plus').classList.toggle('hidden', r.plus || dismissed);
-      $('i-plus-no').addEventListener('click', () => { try { localStorage.setItem('guardiana_plus_no_informe', '1'); } catch (_) {} $('i-plus').classList.add('hidden'); });
       const row = (label, f) => `<td>${label}</td><td>${f.consultas}</td><td>${f.rastreadores}</td><td>${f.publicidad}</td><td>${f.telemetria}</td><td>${f.esperados}</td><td>${f.desconocidos}</td><td>${f.cortados}</td>`;
       $('i-rows').innerHTML = r.dispositivos.map((d) => `<tr>${row(esc(d.name || (d.id === 'self' ? t('este_computador') : d.id)), d.fila)}</tr>`).join('') || `<tr><td colspan="8" class="muted">${esc(t('informe_sin_datos'))}</td></tr>`;
       $('i-total').innerHTML = row('<strong>Total</strong>', r.total);
       $('i-texto').textContent = r.texto_whatsapp;
       $('i-wa').href = waLink(r.texto_whatsapp);
+      // Lo que solo Plus puede contestar, porque hace falta memoria: qué cambió respecto a la
+      // semana pasada y qué destinos son nuevos. Con el plan gratis se dice por qué no está,
+      // en vez de enseñar una sección vacía que se leería como «no ha cambiado nada».
+      const comparacion = (f) => {
+        const campos = [['col_consultas', 'consultas'], ['c_rastreadores', 'rastreadores'], ['col_publicidad', 'publicidad'], ['col_telemetria', 'telemetria'], ['col_desconocidos', 'desconocidos'], ['col_cortados', 'cortados']];
+        return campos.map(([clave, campo]) => {
+          const d = r.total[campo] - f[campo];
+          const frase = d === 0 ? t('cambio_igual') : t(d > 0 ? 'cambio_mas' : 'cambio_menos').replace('{n}', Math.abs(d));
+          return `<li>${esc(t(clave))}: <strong>${r.total[campo]}</strong> · ${esc(frase)}</li>`;
+        }).join('');
+      };
+      $('i-cambio').classList.toggle('hidden', !r.anterior);
+      if (r.anterior) $('i-cambio-lista').innerHTML = comparacion(r.anterior);
+      $('i-novedades').classList.toggle('hidden', !r.plus);
+      if (r.plus) {
+        $('i-nuevos-rows').innerHTML = r.novedades.map((n2) => `<tr><td class="mono">${esc(n2.nombre)}</td><td>${esc(n2.empresa)}</td><td>${esc(catName(n2.categoria))}</td><td>${esc(n2.dispositivo === 'self' ? t('este_computador') : n2.dispositivo)}</td><td>${n2.consultas}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('informe_nuevos_ninguno'))}</td></tr>`;
+      }
       savePdf('i-pdf', () => {
         const doc = pdfDocument('GUARDIANA · ' + t('nav_informe'));
-        pdfHead(doc, t('nav_informe') + (r.ejemplo ? ' · EJEMPLO' : ''));
+        pdfHead(doc, t('nav_informe'));
         doc.line($('i-periodo').textContent, 10);
-        if (r.ejemplo) doc.line(t('informe_ejemplo_aviso'), 9, true);
         doc.gap(6);
         const cols = [{ title: t('col_dispositivo'), w: 0.16 }, { title: t('col_consultas'), w: 0.12 }, { title: t('c_rastreadores'), w: 0.12 }, { title: t('col_publicidad'), w: 0.12 }, { title: t('col_telemetria'), w: 0.12 }, { title: t('col_esperados'), w: 0.12 }, { title: t('col_desconocidos'), w: 0.12 }, { title: t('col_cortados'), w: 0.12 }];
         const cells = (label, f) => [label, f.consultas, f.rastreadores, f.publicidad, f.telemetria, f.esperados, f.desconocidos, f.cortados].map(String);
         const rows = r.dispositivos.map((d) => cells(d.name || (d.id === 'self' ? t('este_computador') : d.id), d.fila));
         rows.push({ cells: cells('Total', r.total), bold: true });
         doc.table(cols, rows, 8);
-        if (r.plus) doc.gap(10).line(t('informe_whatsapp_titulo'), 12, true).line(r.texto_whatsapp, 10);
+        if (r.anterior) {
+          doc.seccion(t('informe_cambio_titulo'), t('informe_cambio_lead'));
+          for (const [clave, campo] of [['col_consultas', 'consultas'], ['c_rastreadores', 'rastreadores'], ['col_publicidad', 'publicidad'], ['col_telemetria', 'telemetria'], ['col_desconocidos', 'desconocidos'], ['col_cortados', 'cortados']]) {
+            const d = r.total[campo] - r.anterior[campo];
+            const frase = d === 0 ? t('cambio_igual') : t(d > 0 ? 'cambio_mas' : 'cambio_menos').replace('{n}', Math.abs(d));
+            doc.line('· ' + t(clave) + ': ' + r.total[campo] + ' · ' + frase, 10);
+          }
+        }
+        if (r.plus) {
+          doc.seccion(t('informe_nuevos_titulo'), t('informe_nuevos_lead'));
+          if (r.novedades.length) {
+            doc.table([{ title: t('col_nombre'), w: 0.34 }, { title: t('col_empresa_n'), w: 0.2 }, { title: t('col_categoria'), w: 0.16 }, { title: t('col_dispositivo'), w: 0.18 }, { title: t('col_consultas'), w: 0.12 }],
+              r.novedades.map((n2) => [n2.nombre, n2.empresa, catName(n2.categoria), n2.dispositivo === 'self' ? t('este_computador') : n2.dispositivo, String(n2.consultas)]), 8);
+          } else {
+            doc.line(t('informe_nuevos_ninguno'), 10);
+          }
+        }
+        if (r.plus) doc.seccion(t('informe_whatsapp_titulo')).line(r.texto_whatsapp, 10);
         return { name: pdfName('informe-semanal'), doc };
       });
       $('i-copiar').addEventListener('click', async () => {
@@ -584,9 +723,10 @@
         const doc = pdfDocument('GUARDIANA · ' + t('radiografia_titulo'));
         pdfHead(doc, t('radiografia_titulo'));
         const r = last || { servicios: 0, rastreadores: 0, destinos_nuevos: 0, esperados: 0, cortados: 0, eventos: [] };
-        doc.line([['c_servicios', r.servicios], ['c_rastreadores', r.rastreadores], ['c_nuevos', r.destinos_nuevos], ['c_esperados', r.esperados], ['c_cortados', r.cortados]].map(([k, v]) => t(k) + ': ' + v).join(' · '), 10);
+        doc.line([['c_servicios', r.servicios], ['c_rastreadores', r.rastreadores], ['c_publicidad', r.publicidad], ['c_nuevos', r.destinos_nuevos], ['c_esperados', r.esperados], ['c_cortados', r.cortados]].map(([k, v]) => t(k) + ': ' + v).join(' · '), 10);
         if (r.hueco) doc.line(t('hueco').replace('{desde}', when(r.hueco.desde)).replace('{hasta}', when(r.hueco.hasta)), 9, false, 0.4);
-        doc.gap(6).table(eventCols(true), r.eventos.length ? r.eventos.map((ev) => eventCells(ev, true)) : [[ '', t('sin_consultas_aun'), '', '', '' ]]);
+        doc.gap(6).table(eventCols(true), r.eventos.length ? r.eventos.map((ev) => eventCells(ev, true)) : [[ '', t('sin_consultas_aun'), '', '', '', '', '' ]]);
+        pdfQuienHayDetras(doc, r.eventos);
         return { name: pdfName('radiografia'), doc };
       });
       await loadGate();
@@ -600,15 +740,6 @@
           try { const r = await api('/api/dns/aplicar', { method: 'POST' }); $('dns-msg').textContent = r.mensaje; setTimeout(() => $('dns-card').classList.add('hidden'), 6000); }
           catch (err) { $('dns-msg').textContent = String(err.message || err); $('dns-apply').disabled = false; }
         });
-      } catch (_) {}
-      // The first Plus moment (decision 53): after 24 h, once, dismissable, never daily.
-      try {
-        const dismissed = localStorage.getItem('guardiana_plus_no_inicio') === '1';
-        if (!dismissed) {
-          const lic = await api('/api/licencia');
-          if (lic.invitar) $('plus-card').classList.remove('hidden');
-        }
-        $('plus-no').addEventListener('click', () => { try { localStorage.setItem('guardiana_plus_no_inicio', '1'); } catch (_) {} $('plus-card').classList.add('hidden'); });
       } catch (_) {}
       bindCutButtons($('live'), '/api/reglas');
       $('share-open').addEventListener('click', () => {
@@ -625,10 +756,11 @@
         last = r;
         $('c-servicios').textContent = r.servicios;
         $('c-rastreadores').textContent = r.rastreadores;
+        $('c-publicidad').textContent = r.publicidad;
         $('c-nuevos').textContent = r.destinos_nuevos;
         $('c-esperados').textContent = r.esperados;
         $('c-cortados').textContent = r.cortados;
-        $('live').innerHTML = eventRows(r.eventos) || `<tr><td colspan="5" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`;
+        $('live').innerHTML = eventRows(r.eventos) || `<tr><td colspan="7" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`;
         $('hueco').textContent = r.hueco ? t('hueco').replace('{desde}', when(r.hueco.desde)).replace('{hasta}', when(r.hueco.hasta)) : '';
         $('hueco').classList.toggle('hidden', !r.hueco);
       };
@@ -651,7 +783,8 @@
         doc.line(t('mostrando').replace('{n}', r.eventos.length).replace('{total}', r.total), 10);
         if (lastFilters) doc.line(lastFilters, 9, false, 0.4);
         (r.huecos || []).forEach((h) => doc.line(t('hueco').replace('{desde}', when(h.desde)).replace('{hasta}', when(h.hasta)), 9, false, 0.4));
-        doc.gap(6).table(eventCols(true), r.eventos.length ? r.eventos.map((ev) => eventCells(ev, true)) : [[ '', t('sin_resultados'), '', '', '' ]]);
+        doc.gap(6).table(eventCols(true), r.eventos.length ? r.eventos.map((ev) => eventCells(ev, true)) : [[ '', t('sin_resultados'), '', '', '', '', '' ]]);
+        pdfQuienHayDetras(doc, r.eventos);
         return { name: pdfName('extracto'), doc };
       });
       bindCutButtons($('rows'), '/api/reglas');
@@ -661,7 +794,7 @@
         const r = await api('/api/extracto?' + q.toString());
         lastR = r;
         lastFilters = [...q].filter(([k]) => k !== 'limit').map(([k, v]) => t('f_' + ({ device_id: 'dispositivo', category: 'categoria', signal: 'senal', verdict: 'veredicto' }[k] || k)) + ': ' + (k === 'device_id' ? ($('f-device').selectedOptions[0] || {}).textContent || v : v)).join(' · ');
-        $('rows').innerHTML = eventRows(r.eventos) || `<tr><td colspan="5" class="muted">${esc(t('sin_resultados'))}</td></tr>`;
+        $('rows').innerHTML = eventRows(r.eventos) || `<tr><td colspan="7" class="muted">${esc(t('sin_resultados'))}</td></tr>`;
         $('total').textContent = t('mostrando').replace('{n}', r.eventos.length).replace('{total}', r.total);
         $('huecos').innerHTML = (r.huecos || []).map((h) => `<li>${esc(t('hueco').replace('{desde}', when(h.desde)).replace('{hasta}', when(h.hasta)))}</li>`).join('');
         $('huecos-card').classList.toggle('hidden', !(r.huecos && r.huecos.length));
@@ -706,7 +839,7 @@
       pintarRecibos().catch(() => {});
       const devs = await api('/api/dispositivos');
       $('devices').innerHTML = devs.map((d) => `<tr>
-        <td>${esc(d.name || (d.id === 'self' ? t('este_computador') : t('dispositivo_nuevo')))}<br><span class="mono muted">${esc(d.last_ip || '')}</span>${hints(d.lectura).map((h) => `<br><span class="phrase">· ${esc(h)}</span>`).join('')}</td>
+        <td>${esc(d.name || (d.id === 'self' ? t('este_computador') : t('dispositivo_nuevo')))}<br><span class="mono muted">${esc(d.last_ip || '')}</span>${hints(d.lectura).map((h) => `<br><span class="phrase">· ${esc(h)}</span>`).join('')}${paisesDe(d.lectura)}</td>
         <td>${d.totales.consultas}</td><td>${d.totales.rastreadores}</td><td>${d.totales.publicidad}</td><td>${d.totales.telemetria}</td><td>${d.totales.esperados}</td><td>${d.totales.cortados}</td>
         <td title="${esc((d.lectura.empresas || []).map((e) => e[0] + ' ' + e[1]).join(', '))}">${d.lectura.empresas_total || 0}<br><span class="muted">${esc((d.lectura.empresas || []).slice(0, 3).map((e) => e[0]).join(', '))}</span></td>
         <td class="muted">${when(d.last_seen)}</td>
@@ -773,7 +906,7 @@
         doc.line([['col_consultas', r.totales.consultas], ['c_rastreadores', r.totales.rastreadores], ['c_esperados', r.totales.esperados], ['c_cortados', r.totales.cortados]].map(([k, v]) => t(k) + ': ' + v).join(' · '), 10);
         doc.gap(6).table(eventCols(false), r.eventos.length ? r.eventos.map((ev) => eventCells(ev, false)) : [[ '', t('sin_consultas_aun'), '', '' ]]);
         if (lastRules.length) {
-          doc.gap(10).line(t('mi_reglas_titulo'), 12, true).gap(4);
+          doc.seccion(t('mi_reglas_titulo'));
           doc.table([{ title: t('col_tipo'), w: 0.2 }, { title: t('col_patron'), w: 0.4 }, { title: t('col_accion'), w: 0.2 }, { title: t('col_estado'), w: 0.2 }], lastRules.map((x) => [t('tipo_' + x.match_kind), x.pattern, t('accion_' + x.action), x.activa ? t('regla_activa') : t('regla_deshecha')]));
         }
         return { name: pdfName('mi-dispositivo'), doc };
@@ -801,7 +934,7 @@
         const lect = r.lectura || {};
         $('mi-empresas').innerHTML = (lect.empresas && lect.empresas.length) ? lect.empresas.map((e) => `<li><b>${esc(e[0])}</b> · ${e[1]}</li>`).join('') + `<li class="muted">${esc(t('lectura_empresas_total').replace('{n}', lect.empresas_total))}</li>` : `<li class="muted">${esc(t('lectura_empresas_ninguna'))}</li>`;
         $('mi-avisos').innerHTML = hints(lect).map((h) => `<p class="limit">${esc(h)}</p>`).join('');
-        $('mi-rows').innerHTML = r.eventos.map((ev) => `<tr><td class="mono">${clock(ev.ts)}</td><td><span class="mono">${esc(ev.qname)}</span>${company(ev)}${phrases(ev)}</td><td>${cat(ev)}</td><td>${verdict(ev.verdict)}</td><td>${ev.verdict !== 'cortado' && can ? `<button class="secondary cut" data-device="${esc(ev.device_id)}" data-name="${esc(ev.qname)}">${esc(t('cortar'))}</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`;
+        $('mi-rows').innerHTML = r.eventos.map((ev) => `<tr><td class="mono">${clock(ev.ts)}</td><td><span class="mono">${esc(ev.qname)}</span>${company(ev)}${phrases(ev)}</td>${empresaCelda(ev)}<td>${cat(ev)}</td>${paisCelda(ev)}<td>${verdict(ev.verdict)}</td><td>${ev.verdict !== 'cortado' && can ? cutCell(ev) : ''}</td></tr>`).join('') || `<tr><td colspan="7" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`;
         const rules = await api('/api/mi-dispositivo/reglas');
         lastRules = rules.reglas;
         $('mi-reglas').innerHTML = rules.reglas.map((x) => `<tr><td>${esc(t('tipo_' + x.match_kind))}</td><td class="mono">${esc(x.pattern)}</td><td>${esc(t('accion_' + x.action))}</td><td>${x.activa ? esc(t('regla_activa')) : esc(t('regla_deshecha'))}</td><td>${x.activa ? `<button class="secondary undo" data-id="${x.id}">${esc(t('deshacer'))}</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('reglas_ninguna'))}</td></tr>`;
@@ -919,27 +1052,16 @@
       const render = (r) => {
         $('l-estado').textContent = r.texto;
         $('l-prueba').textContent = r.estado.plan === 'prueba' ? t('licencia_prueba_texto') : '';
-        $('l-probar-card').classList.toggle('hidden', !r.invitar);
         $('l-dev').classList.toggle('hidden', !r.clave_dev);
         $('l-clave-lead').textContent = t('licencia_clave_lead').replace('{host}', r.host_activacion);
         $('l-conexiones').innerHTML = r.conexiones.map((o) => `<tr><td>${when(o.ts)}</td><td class="mono">${esc(o.host)}</td><td>${o.bytes}</td></tr>`).join('') || `<tr><td colspan="3" class="muted">${esc(t('licencia_conexiones_ninguna'))}</td></tr>`;
       };
       render(await api('/api/licencia'));
-      $('l-probar').addEventListener('click', async () => {
-        $('l-probar-msg').textContent = '…';
-        try { render(await api('/api/licencia/probar', { method: 'POST' })); $('l-probar-msg').textContent = ''; }
-        catch (err) { $('l-probar-msg').textContent = String(err.message || err); }
-      });
       $('l-clave').addEventListener('submit', async (e) => {
         e.preventDefault();
         $('l-clave-msg').textContent = '…';
         try { render(await api('/api/licencia/activar-clave', { method: 'POST', body: { clave: new FormData($('l-clave')).get('clave') } })); $('l-clave-msg').textContent = t('licencia_activada'); }
         catch (err) { $('l-clave-msg').textContent = String(err.message || err); render(await api('/api/licencia')); }
-      });
-      $('l-archivo').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        try { render(await api('/api/licencia/activar-archivo', { method: 'POST', body: { texto: new FormData($('l-archivo')).get('texto') } })); $('l-archivo-msg').textContent = t('licencia_activada'); }
-        catch (err) { $('l-archivo-msg').textContent = String(err.message || err); }
       });
     },
     async verify() {
@@ -973,12 +1095,37 @@
     try { localStorage.setItem(CACHE, JSON.stringify(T)); } catch (_) {}
   }
 
+  // Una franja arriba de TODAS las páginas cuando el programa se ha apartado, y una cuenta atrás
+  // honesta mientras dura la prueba. Que la prueba se acabe no puede ser una sorpresa, y que el
+  // programa haya dejado de mirar tiene que verse en la página en la que estés, no solo en la de
+  // la licencia.
+  async function franjaLicencia() {
+    let e;
+    try { e = await api('/api/estado'); } catch (_) { return; }
+    if (!e.caducado && !(e.prueba_dias !== null && e.prueba_dias !== undefined)) return;
+    const caja = document.createElement('div');
+    caja.className = 'card ' + (e.caducado ? 'caducado' : 'prueba');
+    if (e.caducado) {
+      caja.innerHTML = `<strong>${esc(t('caducado_titulo'))}</strong> <span>${esc(t('caducado_texto'))}</span>
+        <p><a class="btn" href="/licencia">${esc(t('caducado_activar'))}</a>
+        <a class="btn secondary" href="/extracto">${esc(t('caducado_exportar'))}</a></p>`;
+    } else {
+      const d = e.prueba_dias;
+      caja.innerHTML = `<strong>${esc(t(d === 1 ? 'prueba_queda_uno' : 'prueba_quedan').replace('{d}', d))}</strong>
+        <span>${esc(t('prueba_franja_texto'))}</span>
+        <a href="/licencia">${esc(t('prueba_franja_enlace'))}</a>`;
+    }
+    const main2 = document.querySelector('main');
+    if (main2) main2.insertBefore(caja, main2.firstChild);
+  }
+
   async function main() {
     document.documentElement.lang = LANG;
     const previo = cached();
     if (previo) { T = previo; applyTexts(); }
     try { T = await api('/api/textos'); remember(); } catch (_) {}
     applyTexts();
+    franjaLicencia().catch(() => {});
     const page = document.body.getAttribute('data-page');
     if (pages[page]) {
       try { await pages[page](); } catch (e) { console.error(e); }

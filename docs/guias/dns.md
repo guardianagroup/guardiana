@@ -22,7 +22,8 @@ GUARDIANA convierte tu PC en quien contesta esas preguntas dentro de tu Wi‑Fi.
 - **Lo ves**: qué servicios pide cada aparato, con su categoría (publicidad, rastreador, telemetría,
   esperado) y una frase por señal.
 - **Lo cortas si quieres**: una regla tuya hace que ese nombre «no exista» para toda la casa, o para
-  un aparato. Nunca antes de 24 horas observando, siempre con deshacer.
+  un aparato. Un nombre suelto, desde el primer minuto; los cortes que afectan a toda una categoría o
+  a toda la casa esperan a que Guardiana lleve un día mirando. Siempre con deshacer.
 - **No sale nada de casa**: el guardián está en tu PC; no hay servidor nuestro ni cuenta.
 
 Para que los teléfonos y la tele pasen por él, se les dice que usen el PC como DNS: en el router una

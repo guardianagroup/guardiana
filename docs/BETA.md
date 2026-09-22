@@ -97,8 +97,8 @@ Tres cosas que tienes que saber, dichas ahora y no después:
 - **Solo en la Wi‑Fi de casa, por nombre de servicio.** Con datos móviles el teléfono no pasa por
   Guardiana. Guardiana ve nombres de servicios, no qué app los pidió, ni contenido.
 
-La prueba de Modo Hogar dura 7 días y el contador vive en tu equipo. Para la beta os daremos un
-archivo de licencia firmado que la extiende, sin conexión ninguna.
+La prueba dura 7 días y el contador vive en tu equipo. Para la beta os daremos una clave de
+licencia que la extiende.
 
 ## 6 · Qué queremos que nos cuentes
 

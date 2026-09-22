@@ -35,7 +35,7 @@ El marco es de permiso, no de miedo: Guardiana existe para poder soltarle el tra
 - Panel local en el navegador: radiografía de 60 segundos, extracto, dispositivos, Modo Hogar (QR, comprobador, guías), "lo que Guardiana sabe de ti", informe semanal, compartir, licencia, verify.
 - Bloqueo por DNS con reglas inviolables, por dispositivo y por casa.
 - **Capa de agentes:** lista propia de servicios de inteligencia artificial, etiqueta por consulta, página `/ia` del panel y **alcance declarado por dispositivo** (el usuario escribe los servicios permitidos; Guardiana informa de lo que se salió en las últimas 24 horas y no corta nada por su cuenta). Se comprueban destinos, nunca procesos ni archivos.
-- Prueba de 7 días de Modo Hogar; plan Hogar con activación de una sola conexión y alternativa por archivo firmado.
+- Prueba de 7 días con todas las funciones; después, licencia activada con una sola conexión (decisiones 180 y 182).
 - Firma minisign, hashes, `ledger.jsonl`, Rekor, `guardiana verify`, script de compilación reproducible publicado.
 - Instaladores: Windows (MSI) y Linux (.deb y tarball).
 
@@ -59,7 +59,7 @@ guardiana/
     devices/    identificación de dispositivos en la LAN (IP, MAC, nombre), consentimiento
     panel/      servidor HTTP local, API JSON, páginas estáticas del panel (reutilizan el CSS de la web)
     service/    daemon: Windows SCM y systemd; cambio y restauración del DNS del sistema; watchdog
-    license/    prueba de 7 días, activación con una conexión, archivo de licencia firmado
+    license/    prueba de 7 días, activación con una conexión
     verify/     guardiana verify: hashes, firma, puertos, servicio, DNS del sistema, listas
     cli/        guardiana observe | ledger | export | hogar | verify | update
   build/        Dockerfile fijado por digest, repro.sh, release.sh (hashes, minisign, firma de código, ledger, rekor)
@@ -153,7 +153,7 @@ guardiana/
   - `/mi-dispositivo` (desde un teléfono): su radiografía, sus reglas, interruptor de compartir detalle, compartir.
   - `/sabe-de-ti`: todo lo que Guardiana guarda, la tabla `outbound`, botón de borrar todo.
   - `/informe`: informe semanal de la casa (totales por dispositivo) y texto listo para WhatsApp.
-  - `/licencia`: estado, activar con clave, activar con archivo firmado, qué conexión hace y cuándo la hizo.
+  - `/licencia`: estado, activar con clave, qué conexión hace y cuándo la hizo.
   - `/verify`: salida de `guardiana verify` en pantalla.
   - `/ia`: la capa de agentes, primera página del menú. Qué servicios de inteligencia artificial habló cada dispositivo en los últimos 7 días y el alcance declarado de cada uno, con la lista de lo que se salió en 24 horas. El límite («comprueba a dónde habla, no qué lee») va arriba de esa página, no en letra pequeña.
 - Compartir: tarjeta PNG generada en el navegador (Canvas) a partir de los totales, sin nombres de servicios por defecto; texto para WhatsApp por enlace `wa.me` que abre la app del usuario (acción del usuario, nada se envía por Guardiana). Las cifras de la tarjeta son las reales del extracto; ninguna cifra se redondea "hacia arriba".
@@ -166,7 +166,7 @@ guardiana/
 > **Plus por suscripción** (mensual o anual, 7 días de prueba local sin tarjeta, nunca antes de 24 h
 > observando). Una suscripción exige comprobar la clave **una vez por periodo de pago**, no «nunca más»;
 > cada comprobación queda en `outbound` y en `/sabe-de-ti`, con periodo de gracia de 7 días si la
-> pasarela no responde. El archivo firmado se emite por periodo. Lo demás de este apartado sigue vigente.
+> pasarela no responde. La activación por archivo firmado se retiró el 21 sep 2026 (decisión 182). Lo demás de este apartado sigue vigente.
 > Implementado en `crates/license` (decisión 53 para los momentos en que se ofrece Plus).
 
 - Prueba de 7 días de Modo Hogar: contador local en `settings`, con el texto en pantalla "Este contador vive en tu equipo. Reinstalar lo reinicia. Confiamos en ti."

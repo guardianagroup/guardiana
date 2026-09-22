@@ -16,7 +16,7 @@ use guardiana_classify::{Classified, Classifier, Input};
 use guardiana_core::i18n::{self, Texts};
 use guardiana_core::rules::{self, RuleInput};
 use guardiana_core::time::now_ms;
-use guardiana_core::{identity, paths, DecidedBy, Ledger, NewEvent, Retention, Rule, Verdict};
+use guardiana_core::{identity, paths, DecidedBy, Ledger, NewEvent, Rule, Verdict};
 use guardiana_dns::{self as dns, BlockMode, Config, Decision, Outcome, Policy, Query};
 use guardiana_lists::Catalog;
 use guardiana_service::home::{self, SETTING_HOME_IP, SETTING_HOME_MODE};
@@ -366,6 +366,9 @@ impl Policy for EnginePolicy {
 enum Exit {
     /// The caller asked to stop.
     Shutdown,
+    /// The trial or the subscription ended while running: stand down and come back as the
+    /// stopped program (panel only), without killing the process or the machine's DNS.
+    Caducado,
     /// The home LAN appeared, went away or changed address, or Home Mode was
     /// switched: the listeners are rebuilt without stopping the process.
     Reconfigure,
@@ -388,6 +391,7 @@ pub async fn run<F: Future<Output = ()>>(
                 println!("{}", i18n::current().cli("observe.reconfigurando"));
                 first = false;
             }
+            Exit::Caducado => first = false,
         }
     }
 }
@@ -408,6 +412,47 @@ fn home_lan_wanted(ledger: &Ledger, secret: &str) -> Option<std::net::Ipv4Addr> 
     let _ = secret;
     guardiana_devices::local_lan_ipv4()
         .filter(|lan| guardiana_devices::is_private_lan(IpAddr::V4(*lan)))
+}
+
+/// Stand down: the trial or the subscription is over.
+///
+/// The program stops being the guardian, but it must never leave the machine without a resolver:
+/// the system DNS goes back to exactly what it was before Guardiana touched it, Home Mode is
+/// switched off so nothing on the LAN is left pointing at a listener that is closing, and both
+/// changes are written into the ledger like any other. The extract stays on the disk, whole: it
+/// belongs to the person, whatever they decide about paying.
+fn stand_down(ledger: &Ledger) {
+    if let Ok(Some(json)) = ledger.setting(SETTING_BACKUP) {
+        if !json.is_empty() {
+            if let Ok(backup) = serde_json::from_str::<Backup>(&json) {
+                let _ = ledger.set_setting(SETTING_BACKUP, "");
+                if sysdns::restore(&backup).is_ok() {
+                    let _ = ledger.record_change(
+                        now_ms(),
+                        guardiana_core::ChangeKind::DnsOff,
+                        "licencia",
+                        "",
+                    );
+                }
+            }
+        }
+    }
+    if ledger.setting(SETTING_HOME_MODE).ok().flatten().as_deref() == Some("1") {
+        let _ = ledger.set_setting(SETTING_HOME_MODE, "0");
+        let _ = ledger.record_change(
+            now_ms(),
+            guardiana_core::ChangeKind::HogarOff,
+            "licencia",
+            "",
+        );
+    }
+}
+
+/// Whether the program may watch right now: the trial or a subscription is on.
+fn puede_funcionar(ledger: &Ledger, secret: &str) -> bool {
+    guardiana_license::status(ledger, secret, now_ms())
+        .map(|s| s.puede_funcionar)
+        .unwrap_or(true)
 }
 
 /// One pass: open the ledger, build the listeners for the current network,
@@ -483,6 +528,47 @@ async fn run_once<F: Future<Output = ()>>(
     };
     if upstreams.contains(&cfg.listen) {
         return Err(t.cli("observe.bucle").into());
+    }
+
+    // La prueba o la suscripción terminaron: Guardiana se aparta. No abre el resolutor, devuelve
+    // el DNS del sistema a como estaba y apaga el Modo Hogar; solo queda el panel en pie para que
+    // se pueda activar Plus o llevarse el extracto. Nunca se queda en medio sin resolver: eso
+    // dejaría el equipo sin internet el día que caduca una suscripción.
+    if !puede_funcionar(&ledger, &secret) {
+        stand_down(&ledger);
+        println!("{}", t.cli("observe.caducado"));
+        let panel_cfg = cfg.panel.then(|| guardiana_panel::Config {
+            listen: vec![cfg.panel_listen],
+            optional_listen: Vec::new(),
+            db_path: cfg.db.clone(),
+            genesis: identity::genesis(),
+            token_path: paths::data_dir().join(guardiana_panel::TOKEN_FILE),
+            extra_hosts: Vec::new(),
+            info: guardiana_panel::RuntimeInfo {
+                version: env!("CARGO_PKG_VERSION").to_owned(),
+                listen_dns: Vec::new(),
+                upstream: Vec::new(),
+                dev_key: identity::public_key_is_dev(),
+            },
+        });
+        let panel = match panel_cfg {
+            Some(pc) => match guardiana_panel::start(pc).await {
+                Ok(p) => {
+                    println!("{}", t.cli("observe.panel").replace("{url}", &p.url()));
+                    if first && cfg.open_browser {
+                        open_in_browser(&p.url());
+                    }
+                    Some(p)
+                }
+                Err(_) => None,
+            },
+            None => None,
+        };
+        shutdown.as_mut().await;
+        if let Some(p) = panel {
+            p.shutdown().await;
+        }
+        return Ok(Exit::Shutdown);
     }
 
     let mut classifier = Classifier::new(Arc::new(Catalog::bundled()));
@@ -705,8 +791,10 @@ async fn run_once<F: Future<Output = ()>>(
     let keep_dir = cfg.db.parent().map(std::path::Path::to_path_buf);
     let keep_secret = secret.clone();
     let (reconfigure_tx, mut reconfigure) = tokio::sync::oneshot::channel::<()>();
+    let (caducado_tx, mut caducado) = tokio::sync::oneshot::channel::<()>();
     let housekeeping = tokio::spawn(async move {
         let mut reconfigure_tx = Some(reconfigure_tx);
+        let mut caducado_tx = Some(caducado_tx);
         let mut beat = tokio::time::interval(Duration::from_secs(30));
         let mut lan_check = tokio::time::interval(Duration::from_secs(15));
         let mut minute = tokio::time::interval(Duration::from_secs(60));
@@ -739,7 +827,16 @@ async fn run_once<F: Future<Output = ()>>(
                 }
                 _ = minute.tick() => {
                     if let Ok(l) = Ledger::open(&keep_db, identity::genesis()) {
-                        reapply_dns_if_dropped(&l);
+                        // Se mira cada minuto, no cada hora: el día que termina la prueba, el
+                        // programa tiene que apartarse ese día, no hasta una hora después.
+                        if caducado_tx.is_some() && !puede_funcionar(&l, &keep_secret) {
+                            stand_down(&l);
+                            if let Some(tx) = caducado_tx.take() {
+                                let _ = tx.send(());
+                            }
+                        } else {
+                            reapply_dns_if_dropped(&l);
+                        }
                     }
                 }
                 _ = ten_min.tick() => {
@@ -751,21 +848,11 @@ async fn run_once<F: Future<Output = ()>>(
                 }
                 _ = hour.tick() => {
                     if let Ok(mut l) = Ledger::open(&keep_db, identity::genesis()) {
-                        // The once-per-period check of a Plus key (decision 52) and
-                        // the retention of the plan in force: Plus keeps everything,
-                        // free keeps 24 h of detail and 7 days of totals. For 30 days
-                        // after Plus ends nothing is deleted yet (decision 168), so
-                        // what was paid for can still be exported.
+                        // The once-per-period check of a Plus key (decision 52). Nothing is
+                        // pruned any more: there is one plan, and while it is on the whole
+                        // history is kept. The extract is the person's, and deleting a piece of
+                        // it to sell them the rest is not something this program does.
                         let _ = guardiana_license::check_if_due(&mut l, &keep_secret, now_ms());
-                        let completa = guardiana_license::status(&l, &keep_secret, now_ms())
-                            .map(|s| s.retencion_completa)
-                            .unwrap_or(false);
-                        let policy = if completa {
-                            Retention::UNLIMITED
-                        } else {
-                            Retention::FREE
-                        };
-                        let _ = l.prune(policy, now_ms());
                     }
                 }
             }
@@ -788,6 +875,7 @@ async fn run_once<F: Future<Output = ()>>(
     let exit = tokio::select! {
         _ = &mut shutdown => Exit::Shutdown,
         _ = &mut reconfigure => Exit::Reconfigure,
+        _ = &mut caducado => Exit::Caducado,
     };
 
     housekeeping.abort();

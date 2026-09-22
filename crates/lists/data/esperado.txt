@@ -59,6 +59,49 @@ content-signature-2.cdn.mozilla.net
 edgedl.me.gvt1.com
 update.googleapis.com
 
+@certificados
+# Comprobar si un certificado sigue siendo válido o lo han revocado. Lo hace el navegador y el
+# sistema, solos, en cada conexión segura: es lo contrario de una fuga, y salía como «sin
+# clasificar» porque ninguna lista de rastreo lo conoce —no tiene por qué, no es rastreo—.
+# Cortar uno de estos deja al equipo sin poder comprobar certificados (visto en el PC del
+# responsable el 21 sep 2026, con lencr.org y c.pki.goog entre los nombres sin clasificar).
+lencr.org
+c.lencr.org
+o.lencr.org
+r3.o.lencr.org
+pki.goog
+c.pki.goog
+o.pki.goog
+ocsp.digicert.com
+crl3.digicert.com
+crl4.digicert.com
+ocsp.sectigo.com
+crl.sectigo.com
+ocsp.globalsign.com
+crl.globalsign.com
+ocsp.entrust.net
+crl.identrust.com
+isrg.trustid.ocsp.identrust.com
+ocsp.godaddy.com
+crl.microsoft.com
+ctldl.windowsupdate.com
+
+@seguridad
+# Las comprobaciones de seguridad del propio sistema: ¿este archivo que vas a abrir, o este destino,
+# los conoce alguien? Las hace Windows solo, sin que nadie se lo pida. No son publicidad ni rastreo,
+# y ninguna lista de rastreo las conoce, así que salían como «sin clasificar» junto a Criteo o
+# Taboola. Cortar una de estas deja al equipo sin el aviso de Windows ante un archivo desconocido:
+# es lo contrario de protegerse (visto en una lectura externa del extracto, 21 sep 2026).
+smartscreen.microsoft.com
+nav.smartscreen.microsoft.com
+ping.nav.smartscreen.microsoft.com
+urs.microsoft.com
+checkappexec.microsoft.com
+smartscreen-prod.microsoft.com
+wdcp.microsoft.com
+wdcpalt.microsoft.com
+definitionupdates.microsoft.com
+
 @hora
 pool.ntp.org
 ntp.org

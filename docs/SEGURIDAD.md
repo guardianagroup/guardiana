@@ -24,7 +24,7 @@ con su informe publicado.
 | Órdenes al sistema (`netsh`, `powershell`, `resolvectl`, `nmcli`, `ip`) | Se lanzan con argumentos separados, nunca por una shell; lo que se interpola son índices numéricos y direcciones IP ya analizadas. | Correcto. |
 | Resolutor | Solo atiende consultas estándar (`QUERY`); reenvío con la biblioteca hickory (puertos de origen aleatorios, identificadores aleatorios, EDNS); caché con tope; respuestas de bloqueo con TTL corto. | Correcto. Sin DNSSEC en 1.0 (documentado). |
 | Puertos hacia la red | Solo se abren con Modo Hogar, solo en una dirección privada de la LAN, nunca en `0.0.0.0`; la regla del cortafuegos de Windows es solo para perfil privado; apagar Modo Hogar los cierra y `guardiana verify` lo demuestra. | Correcto. |
-| Licencia | La respuesta de activación se analiza como JSON estricto y se guarda con una marca local; el archivo de licencia se verifica con minisign contra la clave incrustada; ninguna comprobación periódica. | Correcto. |
+| Licencia | La respuesta de activación se analiza como JSON estricto y se guarda con una marca local; una comprobación por periodo de pago, anotada en `outbound`. Desde el 21 sep 2026 no hay activación por archivo (decisión 182): una sola vía, la clave. | Correcto. |
 | Dependencias | `cargo audit` sin avisos; `cargo deny` limpio (licencias, orígenes, duplicados). | Correcto el 10 sep 2026. |
 
 ## Hallazgos y correcciones
@@ -46,3 +46,33 @@ con su informe publicado.
 2. Compilación reproducible verificada por una persona ajena (sección 12 del brief).
 3. Firma de código y registro público con claves reales (hasta entonces, versiones de desarrollo).
 4. Pruebas de robustez del resolutor con consultas malformadas (fuzzing) en 1.x.
+
+## Divulgación responsable: cómo avisar de un fallo
+
+Esta es la política a la que apunta el campo `Policy` de
+[`/.well-known/security.txt`](https://guardianagroup.com/.well-known/security.txt). Antes apuntaba
+al propio `security.txt`, es decir, a sí misma; lo señaló una lectura externa del sitio el 21 de
+septiembre de 2026 y tenía razón.
+
+**A dónde escribir:** `hola@guardianagroup.com`. Responde una persona, no un formulario. Si
+prefieres cifrar, dilo en el primer correo y te paso una clave.
+
+**Qué prometo, con plazos:**
+
+1. **Acuso recibo en 72 horas.** Si no llega ese acuse, vuelve a escribir: es que no me llegó.
+2. **En 7 días te digo** si lo confirmo, qué gravedad le pongo y cuándo pienso corregirlo.
+3. **Publico el arreglo** en las notas de la versión y, si quieres, tu nombre en ellas.
+4. **No hay recompensa en dinero** y no la va a haber mientras esto sea una persona sola. Lo digo
+   antes para que nadie pierda el tiempo.
+5. **No hay acuerdo de silencio.** No te pido que esperes a publicarlo, aunque agradezco el margen
+   de los plazos de arriba.
+6. **No denuncio** a quien investigue de buena fe y no toque datos de otras personas.
+
+**Qué cuenta como buena fe:** probar contra tu propia instalación, no tocar equipos ni datos de
+terceros, no degradar el servicio de nadie y no publicar datos personales que encuentres por el
+camino. Si para demostrar el fallo hace falta cruzar alguna de esas líneas, escríbeme antes.
+
+**Qué entra:** el programa (el resolutor, el panel, el servicio, la CLI, la bóveda), los
+instaladores publicados, el sitio `guardianagroup.com` y la cadena de publicación (huellas, firmas,
+registro público). Lo que está fuera de nuestro control —la pasarela de pago, el proveedor del
+boletín, GitHub— hay que reportarlo a ellos; si me avisas, lo traslado y lo digo aquí.

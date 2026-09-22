@@ -18,7 +18,7 @@ use guardiana_core::time::now_ms;
 use guardiana_core::ChangeKind;
 use guardiana_core::{
     write_csv, write_json, Action, Category, DecidedBy, Device, Event, EventFilter, Ledger,
-    MatchKind, NewRule, Retention, Rule, Scope, Signal, Verdict, SELF_DEVICE_ID,
+    MatchKind, NewRule, Rule, Scope, Signal, Verdict, SELF_DEVICE_ID,
 };
 use guardiana_service::home::{self, SETTING_HOME_IP, SETTING_HOME_MODE, SETTING_HOME_SINCE};
 use guardiana_service::sysdns::SETTING_BACKUP;
@@ -61,6 +61,15 @@ pub(crate) struct EventView {
     frases: Vec<String>,
     /// Who owns the name, from the "empresas" list (decision 61); a label, never a verdict.
     empresa: Option<&'static str>,
+    /// The country that company answers to, as its name in the language of the panel.
+    ///
+    /// Es el país de la EMPRESA, no el del servidor que responde: casi todo lo grande va por una
+    /// red de reparto y el servidor suele estar en el país de quien pregunta, así que un país
+    /// sacado de la dirección IP diría «Colombia» de algo cuyos datos acaban en Estados Unidos.
+    pais: Option<String>,
+    /// La ciudad de la sede de la empresa dueña del nombre, cuando está comprobada. Va debajo
+    /// del país: «Estados Unidos» sitúa bajo qué leyes está; «Menlo Park» lo hace concreto.
+    ciudad: Option<String>,
     /// The artificial-intelligence service the name belongs to (decision 62), or `None`.
     ia: Option<&'static str>,
     /// The delivery network that serves the name (decision 148), or `None`. Used to say
@@ -103,11 +112,21 @@ fn oficio_de(t: &Texts, qname: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// El país de la empresa dueña del nombre, ya dicho en el idioma del panel. Si el código no
+/// tiene nombre escrito en ese idioma, no se enseña nada: dos letras sueltas no informan.
+fn pais_de(t: &Texts, qname: &str) -> Option<String> {
+    let codigo = guardiana_lists::country_of(qname)?;
+    let nombre = t.pais(codigo);
+    (!nombre.is_empty()).then(|| nombre.to_owned())
+}
+
 fn view(t: &Texts, e: Event, names: &HashMap<String, Option<String>>) -> EventView {
     EventView {
         frases: e.signals.iter().map(|s| t.signal(s)).collect(),
         device_name: names.get(&e.device_id).cloned().flatten(),
         empresa: guardiana_lists::company_of(&e.qname),
+        pais: pais_de(t, &e.qname),
+        ciudad: guardiana_lists::city_of(&e.qname).map(str::to_owned),
         ia: guardiana_lists::ai_service_of(&e.qname),
         entrega: guardiana_lists::delivery_of(&e.qname),
         local: guardiana_lists::is_local_name(&e.qname),
@@ -340,6 +359,13 @@ pub(crate) struct Estado {
     /// Which system this is running on. The panel uses it to say, on a Mac, that Home Mode is
     /// not part of 1.0 there: the site says so and the program must not offer it silently.
     so: &'static str,
+    /// True when the trial or the subscription is over: Guardiana has stood down, given the
+    /// system DNS back and stopped watching. Every page says so, and only activating and taking
+    /// your own extract away still make sense.
+    caducado: bool,
+    /// Days left of the trial while it runs, so every page can count down honestly instead of
+    /// letting the day arrive as a surprise. `None` with a subscription.
+    prueba_dias: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -360,6 +386,9 @@ pub(crate) async fn estado(State(state): State<Arc<AppState>>, _s: Session) -> A
             .map_err(internal)?
             == Some(true);
     }
+    let licencia = with_ledger(&state, |l| {
+        Ok(guardiana_license::status(l, &state.token, now_ms()).ok())
+    })?;
     let manifest = guardiana_lists::manifest().map_err(internal)?;
     let mut listas: Vec<ListaInfo> = manifest
         .lists
@@ -395,6 +424,11 @@ pub(crate) async fn estado(State(state): State<Arc<AppState>>, _s: Session) -> A
         } else {
             "linux"
         },
+        caducado: !licencia.as_ref().is_none_or(|s| s.puede_funcionar),
+        prueba_dias: licencia.as_ref().and_then(|s| match s.plan {
+            guardiana_license::Plan::Prueba { dias_restantes, .. } => Some(dias_restantes),
+            _ => None,
+        }),
     }))
 }
 
@@ -404,6 +438,7 @@ pub(crate) struct Radiografia {
     hasta: i64,
     servicios: i64,
     rastreadores: i64,
+    publicidad: i64,
     destinos_nuevos: i64,
     esperados: i64,
     cortados: i64,
@@ -454,6 +489,9 @@ pub(crate) struct Lectura {
     empresas: Vec<(String, u64)>,
     /// Distinct companies in the last 24 h.
     empresas_total: usize,
+    /// (país, consultas) de las últimas 24 h, el que más primero, como mucho seis. Es el país de
+    /// la EMPRESA dueña del nombre, no el del servidor: ver `guardiana_lists::country_of`.
+    paises: Vec<(String, u64)>,
     /// Minutes since its last query when it has been quiet for a while but the house has not.
     callado_min: Option<i64>,
     /// Queried iCloud Private Relay names in the last 24 h.
@@ -465,6 +503,7 @@ pub(crate) struct Lectura {
 const SILENCE_MIN: i64 = 30;
 
 fn lectura(
+    t: &Texts,
     l: &Ledger,
     id: &str,
     last_seen: i64,
@@ -478,11 +517,15 @@ fn lectura(
         ..EventFilter::default()
     })?;
     let mut by_company: HashMap<&'static str, u64> = HashMap::new();
+    let mut by_country: HashMap<&'static str, u64> = HashMap::new();
     let mut relay = false;
     let mut evasiones = 0;
     for e in &events {
         if let Some(c) = guardiana_lists::company_of(&e.qname) {
             *by_company.entry(c).or_insert(0) += 1;
+        }
+        if let Some(p) = guardiana_lists::country_of(&e.qname) {
+            *by_country.entry(p).or_insert(0) += 1;
         }
         let q = e.qname.to_ascii_lowercase();
         if q == "mask.icloud.com"
@@ -504,6 +547,15 @@ fn lectura(
     empresas.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
     let empresas_total = empresas.len();
     empresas.truncate(8);
+    let mut paises: Vec<(String, u64)> = by_country
+        .into_iter()
+        .filter_map(|(c, n)| {
+            let nombre = t.pais(c);
+            (!nombre.is_empty()).then(|| (nombre.to_owned(), n))
+        })
+        .collect();
+    paises.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    paises.truncate(6);
     let quiet_for = (now - last_seen) / 60_000;
     let callado_min =
         (!events.is_empty() && quiet_for >= SILENCE_MIN && now - house_last < 5 * 60_000)
@@ -511,6 +563,7 @@ fn lectura(
     Ok(Lectura {
         empresas,
         empresas_total,
+        paises,
         callado_min,
         relay,
         evasiones,
@@ -836,6 +889,7 @@ pub(crate) async fn radiografia(
         hasta: until,
         servicios: c.services,
         rastreadores: c.trackers,
+        publicidad: c.ads,
         destinos_nuevos: c.new_destinations,
         esperados: c.expected,
         cortados: c.blocked,
@@ -1200,6 +1254,7 @@ struct Totales {
 }
 
 pub(crate) async fn dispositivos(
+    Lang(t): Lang,
     State(state): State<Arc<AppState>>,
     _s: Session,
 ) -> ApiResult<Vec<DispositivoView>> {
@@ -1212,7 +1267,7 @@ pub(crate) async fn dispositivos(
         for d in &devices {
             lecturas.insert(
                 d.id.clone(),
-                lectura(l, &d.id, d.last_seen, house_last, now)?,
+                lectura(t, l, &d.id, d.last_seen, house_last, now)?,
             );
         }
         Ok((devices, totals, lecturas))
@@ -1297,28 +1352,10 @@ pub(crate) async fn sabe_de_ti(
     State(state): State<Arc<AppState>>,
     _s: Session,
 ) -> ApiResult<SabeDeTi> {
-    let (counts, outbound, estado) = with_ledger(&state, |l| {
-        let estado = guardiana_license::status(l, &state.token, now_ms()).ok();
-        Ok((l.table_counts()?, l.outbound()?, estado))
-    })?;
-    let completa = estado.as_ref().is_some_and(|s| s.retencion_completa);
-    let plus = estado.as_ref().is_some_and(|s| s.plus_activo);
-    // Three states, not two: Plus, the grace after Plus (decision 168) and the free plan. Saying
-    // "24 hours" during the grace would be a lie in the direction that matters, because the
-    // person would export in a hurry what is not going anywhere yet.
-    let hasta = estado.as_ref().and_then(|s| s.retencion_gratis_desde);
-    let retencion = if plus || Retention::FREE.detail_ms.is_none() {
-        t.panel("retencion_ilimitada").to_owned()
-    } else if completa {
-        t.panel("retencion_gracia").replace(
-            "{fecha}",
-            &hasta.map_or_else(String::new, |ms| {
-                guardiana_core::time::rfc3339_utc(ms)[..10].to_owned()
-            }),
-        )
-    } else {
-        t.panel("retencion_gratis").to_owned()
-    };
+    let (counts, outbound) = with_ledger(&state, |l| Ok((l.table_counts()?, l.outbound()?)))?;
+    // Un solo plan y ninguna poda: mientras Guardiana mire, lo guarda todo, y si deja de mirar
+    // lo anotado sigue en el disco hasta que la persona lo borre. No hay nada que matizar.
+    let retencion = t.panel("retencion_ilimitada").to_owned();
     Ok(Json(SabeDeTi {
         eventos: counts.events,
         dispositivos: counts.devices,
@@ -1547,7 +1584,7 @@ pub(crate) async fn mi_dispositivo(
         })?;
         let house_last = l.devices()?.iter().map(|d| d.last_seen).max().unwrap_or(0);
         let lectura = match &device {
-            Some(d) => lectura(l, &id, d.last_seen, house_last, now)?,
+            Some(d) => lectura(t, l, &id, d.last_seen, house_last, now)?,
             None => Lectura::default(),
         };
         Ok((device, totals, events, lectura))
@@ -1627,7 +1664,23 @@ pub(crate) struct Informe {
     hasta: i64,
     dispositivos: Vec<InformeDispositivo>,
     total: InformeFila,
+    /// The same week, seven days earlier, so the report can say what changed. Only with Plus:
+    /// the free plan has already deleted a week-old total.
+    anterior: Option<InformeFila>,
+    /// Destinations asked for this week and never before, busiest first. Only with Plus, for
+    /// the same reason: counting them needs the detail the free plan drops after a day.
+    novedades: Vec<InformeNovedad>,
     texto_whatsapp: String,
+}
+
+#[derive(Serialize)]
+struct InformeNovedad {
+    nombre: String,
+    empresa: String,
+    categoria: String,
+    dispositivo: String,
+    consultas: i64,
+    visto: i64,
 }
 
 #[derive(Serialize)]
@@ -1665,53 +1718,38 @@ pub(crate) async fn informe(
     State(state): State<Arc<AppState>>,
     _s: Session,
 ) -> ApiResult<Informe> {
-    let (w, plus) = with_ledger(&state, |l| {
-        let plus = guardiana_license::status(l, &state.token, now_ms())
+    let ahora = now_ms();
+    let (w, anterior, novedades, plus) = with_ledger(&state, |l| {
+        let plus = guardiana_license::status(l, &state.token, ahora)
             .map(|s| s.plus_activo)
             .unwrap_or(false);
-        Ok((l.week_summary(now_ms())?, plus))
+        let semana = l.week_summary(ahora)?;
+        // Only asked for with Plus: without the memory Plus keeps, both answers are empty by
+        // construction and printing an empty one would read as "nothing changed".
+        let (anterior, novedades) = if plus {
+            (
+                Some(l.week_summary(ahora - 7 * 24 * 60 * 60 * 1000)?),
+                l.new_destinations(ahora, 12)?,
+            )
+        } else {
+            (None, Vec::new())
+        };
+        Ok((semana, anterior, novedades, plus))
     })?;
     if !plus {
-        // Free plan: a sample clearly marked as an example, never the household's data.
-        let sample = |q, tr, ads, tel, exp, unk, blk| InformeFila {
-            consultas: q,
-            rastreadores: tr,
-            publicidad: ads,
-            telemetria: tel,
-            esperados: exp,
-            desconocidos: unk,
-            cortados: blk,
-        };
-        let rows = vec![
-            (
-                t.panel("informe_ejemplo_pc").to_owned(),
-                sample(412, 31, 22, 9, 297, 53, 4),
-            ),
-            (
-                t.panel("informe_ejemplo_tele").to_owned(),
-                sample(188, 44, 12, 61, 63, 8, 6),
-            ),
-            (
-                t.panel("informe_ejemplo_telefono").to_owned(),
-                sample(255, 39, 27, 14, 158, 17, 2),
-            ),
-        ];
-        let total = sample(855, 114, 61, 84, 518, 78, 12);
+        // There is no free plan any more: reaching this means the trial or the subscription is
+        // over and Guardiana has stood down. It shows nothing rather than an invented example —
+        // the work is what is paid for. Taking your own raw data away still works, from the
+        // extract page, because that data is yours.
         return Ok(Json(Informe {
             plus: false,
-            ejemplo: true,
+            ejemplo: false,
+            anterior: None,
+            novedades: Vec::new(),
             desde: w.since,
             hasta: w.until,
-            dispositivos: rows
-                .into_iter()
-                .enumerate()
-                .map(|(i, (name, fila))| InformeDispositivo {
-                    id: format!("ejemplo-{i}"),
-                    name: Some(name),
-                    fila,
-                })
-                .collect(),
-            total,
+            dispositivos: Vec::new(),
+            total: InformeFila::default(),
             texto_whatsapp: String::new(),
         }));
     }
@@ -1737,6 +1775,20 @@ pub(crate) async fn informe(
             })
             .collect(),
         total: fila(&w.total),
+        anterior: anterior.as_ref().map(|a| fila(&a.total)),
+        novedades: novedades
+            .into_iter()
+            .map(|n| InformeNovedad {
+                empresa: guardiana_lists::company_of(&n.qname)
+                    .unwrap_or_default()
+                    .to_owned(),
+                nombre: n.qname,
+                categoria: n.category,
+                dispositivo: n.name.unwrap_or(n.device_id),
+                consultas: n.queries,
+                visto: n.first_seen,
+            })
+            .collect(),
         texto_whatsapp,
     }))
 }
@@ -1937,36 +1989,37 @@ fn create_rule(
         } else {
             observado_casa(state)?
         };
-        if !observation_complete(observed) {
-            if ancho {
-                return Ok(AltaRegla {
-                    creada: None,
-                    necesita: None,
-                    mensaje: Some(frase_observando(t, observed)),
-                });
-            }
-            if !body.confirmed {
-                return Ok(AltaRegla {
-                    creada: None,
-                    necesita: Some("confirmar".to_owned()),
-                    // Sin el número de horas: el responsable leyó la frase larga en pantalla y
-                    // no la entendió («eso no hay quien lo entienda»). Dos frases y el nombre.
-                    mensaje: Some(
-                        t.panel("cortar_pronto_confirmar")
-                            .replace("{nombre}", &pattern),
-                    ),
-                });
-            }
+        if ancho && !observation_complete(observed) {
+            return Ok(AltaRegla {
+                creada: None,
+                necesita: None,
+                mensaje: Some(frase_observando(t, observed)),
+            });
         }
-        // Explicit rule on expected traffic: needs the confirmation sentence.
-        if match_kind != MatchKind::Category && !body.confirmed {
+        // Cortar un nombre no pregunta nada: el botón se convierte en «desbloquear» y deshacerlo
+        // es el mismo clic, así que la ventana de «¿seguro?» solo estorbaba (el responsable la
+        // quitó el 21 sep 2026: «quita el primer aviso al cortar, no es necesario»).
+        //
+        // Quedan las dos que NO son formalidad y no se quitan:
+        //   · un nombre de los que el equipo necesita —actualizaciones, hora, mensajería—, que es
+        //     palabra por palabra la regla 6 del brief y puede dejar el aparato sin ellas;
+        //   · y el aparato con menos de un día mirado, que es la decisión 187 de él mismo.
+        if !body.confirmed && !ancho {
             let catalog = guardiana_lists::Catalog::bundled();
-            let protected = catalog.category(&pattern) == Category::Esperado;
-            if protected {
+            let frase = if catalog.category(&pattern) == Category::Esperado {
+                Some(t.panel("regla_esperado_confirmar"))
+            } else if observation_complete(observed) {
+                None
+            } else {
+                // Sin el número de horas: el responsable leyó la frase larga en pantalla y no la
+                // entendió («eso no hay quien lo entienda»). Dos frases y el nombre.
+                Some(t.panel("cortar_pronto_confirmar"))
+            };
+            if let Some(frase) = frase {
                 return Ok(AltaRegla {
                     creada: None,
                     necesita: Some("confirmar".to_owned()),
-                    mensaje: Some(t.panel("regla_esperado_confirmar").to_owned()),
+                    mensaje: Some(frase.replace("{nombre}", &pattern)),
                 });
             }
         }
@@ -2114,45 +2167,28 @@ pub(crate) struct LicenciaView {
     host_activacion: &'static str,
     /// Hours observed so far (the trial needs 24).
     horas_observadas: i64,
-    /// Show the "try Plus" invitation (decision 53): free, trial unused, 24 h observed.
-    invitar: bool,
     conexiones: Vec<OutboundView>,
 }
 
 fn licencia_error(t: &Texts, e: &guardiana_license::Error) -> String {
     match e {
-        guardiana_license::Error::DevKey => t.panel("licencia_dev").to_owned(),
         guardiana_license::Error::Malformed(_) => t.panel("licencia_err_formato").to_owned(),
-        guardiana_license::Error::BadSignature => t.panel("licencia_err_firma").to_owned(),
-        guardiana_license::Error::Expired => t.panel("licencia_err_caducada").to_owned(),
         guardiana_license::Error::KeyRejected(why) => {
             t.panel("licencia_err_clave").replace("{motivo}", why)
         }
         guardiana_license::Error::Network(why) => {
             t.panel("licencia_err_red").replace("{motivo}", why)
         }
-        guardiana_license::Error::TrialTooEarly { horas } => t
-            .panel("licencia_prueba_pronto")
-            .replace("{h}", &horas.to_string()),
-        guardiana_license::Error::TrialUsed => t.panel("licencia_prueba_usada").to_owned(),
         guardiana_license::Error::AlreadyPlus => t.panel("licencia_ya_plus").to_owned(),
         guardiana_license::Error::Ledger(err) => err.to_string(),
     }
 }
 
 fn licencia_texto(t: &Texts, s: &guardiana_license::Status) -> String {
-    use guardiana_core::time::{rfc3339_utc, HOUR_MS};
+    use guardiana_core::time::rfc3339_utc;
     use guardiana_license::{Comprobacion, Plan};
     let day = |ms: i64| rfc3339_utc(ms)[..10].to_owned();
     match &s.plan {
-        Plan::Gratis => {
-            if s.puede_probar {
-                t.panel("licencia_gratis_puede_probar").to_owned()
-            } else {
-                t.panel("licencia_gratis")
-                    .replace("{h}", &(s.observado_ms / HOUR_MS).to_string())
-            }
-        }
         Plan::Prueba {
             termina,
             dias_restantes,
@@ -2161,21 +2197,10 @@ fn licencia_texto(t: &Texts, s: &guardiana_license::Status) -> String {
             .panel("licencia_prueba")
             .replace("{d}", &dias_restantes.to_string())
             .replace("{fecha}", &day(*termina)),
-        Plan::PruebaAgotada { termino } => {
-            let mut text = t
-                .panel("licencia_prueba_agotada")
-                .replace("{fecha}", &day(*termino));
-            if let Some(hasta) = s.retencion_gratis_desde.filter(|_| s.retencion_completa) {
-                text.push(' ');
-                text.push_str(
-                    &t.panel("licencia_retencion_gracia")
-                        .replace("{fecha}", &day(hasta)),
-                );
-            }
-            text
-        }
+        Plan::PruebaAgotada { termino } => t
+            .panel("licencia_prueba_agotada")
+            .replace("{fecha}", &day(*termino)),
         Plan::Plus {
-            origen,
             desde,
             titular,
             periodo_dias,
@@ -2186,14 +2211,7 @@ fn licencia_texto(t: &Texts, s: &guardiana_license::Status) -> String {
         } => {
             let mut text = t
                 .panel("licencia_plus")
-                .replace(
-                    "{origen}",
-                    if origen == "clave" {
-                        t.panel("licencia_origen_clave")
-                    } else {
-                        t.panel("licencia_origen_archivo")
-                    },
-                )
+                .replace("{origen}", t.panel("licencia_origen_clave"))
                 .replace("{fecha}", &day(*desde))
                 .replace("{titular}", titular.as_deref().unwrap_or("-"));
             match (periodo_dias, proxima_comprobacion, comprobacion) {
@@ -2229,34 +2247,18 @@ fn licencia_texto(t: &Texts, s: &guardiana_license::Status) -> String {
                 _ => {
                     if let Some(c) = caduca_ms {
                         text.push(' ');
-                        text.push_str(
-                            &t.panel("licencia_archivo_caduca")
-                                .replace("{fecha}", &day(*c)),
-                        );
+                        text.push_str(&t.panel("licencia_caduca").replace("{fecha}", &day(*c)));
                     }
                 }
             }
             text
         }
-        Plan::PlusTerminado { termino, motivo } => {
-            let mut text = t
-                .panel(match motivo.as_str() {
-                    "cancelada" => "licencia_plus_cancelada",
-                    "caducada" => "licencia_plus_caducada",
-                    _ => "licencia_plus_sin_comprobar",
-                })
-                .replace("{fecha}", &day(*termino));
-            if s.retencion_completa {
-                if let Some(hasta) = s.retencion_gratis_desde {
-                    text.push(' ');
-                    text.push_str(
-                        &t.panel("licencia_retencion_gracia")
-                            .replace("{fecha}", &day(hasta)),
-                    );
-                }
-            }
-            text
-        }
+        Plan::PlusTerminado { termino, motivo } => t
+            .panel(match motivo.as_str() {
+                "cancelada" => "licencia_plus_cancelada",
+                _ => "licencia_plus_sin_comprobar",
+            })
+            .replace("{fecha}", &day(*termino)),
     }
 }
 
@@ -2275,7 +2277,6 @@ fn licencia_view(t: &Texts, state: &AppState) -> Result<LicenciaView, Response> 
         clave_dev: guardiana_core::identity::public_key_is_dev(),
         host_activacion: guardiana_license::gateway_host(),
         horas_observadas: estado.observado_ms / guardiana_core::time::HOUR_MS,
-        invitar: estado.puede_probar,
         conexiones: outbound
             .into_iter()
             .filter(|o| o.purpose == guardiana_core::Purpose::Licencia)
@@ -2289,23 +2290,6 @@ fn licencia_view(t: &Texts, state: &AppState) -> Result<LicenciaView, Response> 
             .collect(),
         estado,
     })
-}
-
-/// Start the 7-day Plus trial (decision 53): the user asks for it, never before 24 h.
-pub(crate) async fn licencia_probar(
-    Lang(t): Lang,
-    State(state): State<Arc<AppState>>,
-    _s: Session,
-) -> ApiResult<LicenciaView> {
-    let result = with_ledger(&state, |l| {
-        Ok(guardiana_license::start_trial(l, &state.token, now_ms())
-            .map(|_| ())
-            .map_err(|e| licencia_error(t, &e)))
-    })?;
-    if let Err(e) = result {
-        return Err((StatusCode::CONFLICT, e).into_response());
-    }
-    Ok(Json(licencia_view(t, &state)?))
 }
 
 pub(crate) async fn licencia(
@@ -2349,80 +2333,48 @@ pub(crate) async fn licencia_clave(
     Ok(Json(licencia_view(t, &state)?))
 }
 
-#[derive(Deserialize)]
-pub(crate) struct ArchivoBody {
-    texto: String,
-}
-
-pub(crate) async fn licencia_archivo(
-    Lang(t): Lang,
-    State(state): State<Arc<AppState>>,
-    _s: Session,
-    Json(body): Json<ArchivoBody>,
-) -> ApiResult<LicenciaView> {
-    let result = with_ledger(&state, |l| {
-        Ok(
-            guardiana_license::activate_with_file(l, &body.texto, &state.token, now_ms())
-                .map(|_| ())
-                .map_err(|e| licencia_error(t, &e)),
-        )
-    })?;
-    if let Err(e) = result {
-        return Err((StatusCode::CONFLICT, e).into_response());
-    }
-    Ok(Json(licencia_view(t, &state)?))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use guardiana_license::{Plan, Status, RETENCION_GRACIA_DIAS};
+    use guardiana_license::{Plan, Status};
 
-    fn estado(plan: Plan, retencion_completa: bool, desde: Option<i64>) -> Status {
+    fn estado(plan: Plan, puede_funcionar: bool) -> Status {
         Status {
             plan,
-            plus_activo: false,
+            plus_activo: puede_funcionar,
+            puede_funcionar,
             hogar_permitido: true,
             observado_ms: 0,
-            puede_probar: false,
-            retencion_completa,
-            retencion_gratis_desde: desde,
         }
     }
 
+    /// Cuando la prueba se acaba, la pantalla de licencia lo dice con su fecha y no promete
+    /// nada más. Antes hablaba de un plan gratis al que se volvía; ese plan ya no existe.
     #[test]
-    fn la_pantalla_de_licencia_dice_hasta_cuando_no_se_borra_nada() {
+    fn al_acabarse_la_prueba_la_pantalla_lo_dice_con_su_fecha() {
         let t = guardiana_core::i18n::es();
         let fin = 1_760_000_000_000;
-        let hasta = fin + RETENCION_GRACIA_DIAS * guardiana_core::time::DAY_MS;
-        let dentro = licencia_texto(
+        let texto = licencia_texto(t, &estado(Plan::PruebaAgotada { termino: fin }, false));
+        let dia = guardiana_core::time::rfc3339_utc(fin)[..10].to_owned();
+        assert!(texto.contains(&dia), "{texto}");
+    }
+
+    /// Mientras la prueba corre, la pantalla dice cuántos días quedan: que se acabe no puede
+    /// ser una sorpresa.
+    #[test]
+    fn mientras_corre_la_prueba_se_dicen_los_dias_que_quedan() {
+        let t = guardiana_core::i18n::es();
+        let texto = licencia_texto(
             t,
             &estado(
-                Plan::PlusTerminado {
-                    termino: fin,
-                    motivo: "cancelada".to_owned(),
+                Plan::Prueba {
+                    empieza: 0,
+                    termina: 7 * guardiana_core::time::DAY_MS,
+                    dias_restantes: 3,
                 },
                 true,
-                Some(hasta),
             ),
         );
-        // La fecha hasta la que no se borra nada tiene que estar escrita, no insinuada.
-        let dia = guardiana_core::time::rfc3339_utc(hasta)[..10].to_owned();
-        assert!(dentro.contains(&dia), "{dentro}");
-        assert!(dentro.contains("no se toca"), "{dentro}");
-
-        // Pasada la gracia, la pantalla no promete lo que ya no se cumple.
-        let fuera = licencia_texto(
-            t,
-            &estado(
-                Plan::PlusTerminado {
-                    termino: fin,
-                    motivo: "cancelada".to_owned(),
-                },
-                false,
-                Some(hasta),
-            ),
-        );
-        assert!(!fuera.contains(&dia), "{fuera}");
+        assert!(texto.contains('3'), "{texto}");
     }
 }

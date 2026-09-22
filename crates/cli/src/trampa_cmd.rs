@@ -39,6 +39,22 @@ fn crear(l: &mut Ledger, opts: &Opts) -> Result<(), Box<dyn Error>> {
         .or_else(|| opts.get("name"))
         .unwrap_or("claves-copia.txt");
     let archivo = carpeta.join(nombre_archivo);
+    // Dos trampas en el mismo archivo no pueden existir: la segunda reescribe el archivo con SU
+    // nombre y la primera queda muerta sin decirlo —sigue en la lista y nunca va a saltar—. Se
+    // vio en el PC de pruebas el 21 sep 2026, con cuatro trampas para dos archivos.
+    let ya = trampas::listar(l)?;
+    if let Some(vieja) = ya
+        .iter()
+        .find(|x| x.archivo == archivo.display().to_string())
+    {
+        eprintln!(
+            "{}",
+            t.cli("trampa.ya_hay")
+                .replace("{archivo}", &vieja.archivo)
+                .replace("{id}", &vieja.id)
+        );
+        return Err("".into());
+    }
     let trampa = Trampa {
         id,
         archivo: archivo.display().to_string(),
@@ -46,7 +62,7 @@ fn crear(l: &mut Ledger, opts: &Opts) -> Result<(), Box<dyn Error>> {
     };
     std::fs::create_dir_all(&carpeta)?;
     std::fs::write(&archivo, trampas::contenido(&trampa))?;
-    let mut todas = trampas::listar(l)?;
+    let mut todas = ya;
     todas.push(trampa.clone());
     trampas::guardar(l, &todas)?;
     println!(

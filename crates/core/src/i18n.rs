@@ -23,6 +23,11 @@ pub const PT_JSON: &str = include_str!("../../panel/i18n/pt.json");
 pub struct Texts {
     /// Category labels, keyed by the stored text (`rastreador`, ...).
     pub categorias: HashMap<String, String>,
+    /// Una línea que dice qué significa cada categoría, para enseñarla justo donde está la
+    /// palabra. La leyenda del pie de la página existía, pero está lejos de la tabla: el
+    /// responsable leyó «sin clasificar» y «entrega» y tuvo que preguntar (21 sep 2026).
+    #[serde(default)]
+    pub categorias_que: HashMap<String, String>,
     /// The two-word label of each signal, for the filter dropdown and the chips. Lived hardcoded in
     /// app.js until 19 Sep 2026: both languages were there, but interface text in code is exactly
     /// what the project rule forbids, because the next one added is the one that ships untranslated.
@@ -44,6 +49,11 @@ pub struct Texts {
     /// trade, and saying so is what stops the panel from calling it "unknown".
     #[serde(default)]
     pub oficios: HashMap<String, String>,
+    /// El nombre de cada país, por su código ISO de dos letras, en el idioma de esta ficha.
+    /// La lista `empresas` guarda el código para no repetir el nombre tres veces, y aquí se dice
+    /// como lo diría una persona de ese idioma.
+    #[serde(default)]
+    pub paises: HashMap<String, String>,
 }
 
 static TEXTS: OnceLock<Texts> = OnceLock::new();
@@ -120,7 +130,9 @@ impl Texts {
             decidido_por: HashMap::new(),
             cli: HashMap::new(),
             panel: HashMap::new(),
+            categorias_que: HashMap::new(),
             oficios: HashMap::new(),
+            paises: HashMap::new(),
         }
     }
 
@@ -174,6 +186,13 @@ impl Texts {
     #[must_use]
     pub fn oficio(&self, empresa: &str) -> Option<&str> {
         self.oficios.get(empresa).map(String::as_str)
+    }
+
+    /// El nombre del país por su código de dos letras, o vacío si no está escrito. Como con el
+    /// oficio, no se cae al identificador: «CN» a secas no le dice nada a nadie.
+    #[must_use]
+    pub fn pais<'a>(&'a self, codigo: &str) -> &'a str {
+        self.paises.get(codigo).map_or("", String::as_str)
     }
 }
 

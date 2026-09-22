@@ -225,8 +225,6 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         )
         .route("/api/licencia", get(api::licencia))
         .route("/api/licencia/activar-clave", post(api::licencia_clave))
-        .route("/api/licencia/activar-archivo", post(api::licencia_archivo))
-        .route("/api/licencia/probar", post(api::licencia_probar))
         .route(
             "/verify",
             get(|| async { Html(include_str!("../static/verify.html")) }),
@@ -424,4 +422,85 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         stop,
         tasks,
     })
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod textos {
+    /// Every text the panel's pages and script ask for must exist in the `panel` section of the
+    /// three files. It is not enough for the three to agree with each other: `t()` falls back to
+    /// the key itself, so a text that lives only in the `cli` section reaches the screen as
+    /// `trampa_etiqueta`, which is exactly what happened with the trap tag until 21 Sep 2026.
+    #[test]
+    fn every_text_the_screen_asks_for_exists() {
+        const PAGES: &[&str] = &[
+            include_str!("../static/index.html"),
+            include_str!("../static/extracto.html"),
+            include_str!("../static/dispositivos.html"),
+            include_str!("../static/mi-dispositivo.html"),
+            include_str!("../static/hogar.html"),
+            include_str!("../static/informe.html"),
+            include_str!("../static/licencia.html"),
+            include_str!("../static/reglas.html"),
+            include_str!("../static/sabe-de-ti.html"),
+            include_str!("../static/estado.html"),
+            include_str!("../static/verify.html"),
+            include_str!("../static/ia.html"),
+            include_str!("../static/comprobador.html"),
+            include_str!("../static/boveda.html"),
+        ];
+        const SCRIPTS: &[&str] = &[
+            include_str!("../static/app.js"),
+            include_str!("../static/boveda.js"),
+        ];
+        // The keys asked for with a literal: `data-t="x"` in the pages, `t('x')` in the scripts.
+        // The ones built at run time (`t('cambio_' + x)`) cannot be read here and are covered by
+        // the tests of whatever produces them.
+        let mut asked: Vec<String> = Vec::new();
+        for page in PAGES {
+            for part in page.split("data-t=\"").skip(1) {
+                if let Some(k) = part.split('"').next() {
+                    asked.push(k.to_owned());
+                }
+            }
+        }
+        for script in SCRIPTS {
+            // `t('clave')` and nothing else: the character before the `t` must not be part of a
+            // longer name, or `createElement('div')` would look like a text of ours. A key that
+            // ends in `_` is the start of one built at run time (`t('cambio_' + x)`) and is left
+            // to whoever builds it.
+            let bytes = script.as_bytes();
+            for (i, _) in script.match_indices("t('") {
+                let before = if i == 0 { b' ' } else { bytes[i - 1] };
+                if before.is_ascii_alphanumeric() || before == b'_' || before == b'.' {
+                    continue;
+                }
+                let rest = &script[i + 3..];
+                if let Some(k) = rest.split('\'').next() {
+                    if !k.is_empty()
+                        && !k.ends_with('_')
+                        && k.chars()
+                            .all(|c| c.is_ascii_lowercase() || c == '_' || c.is_ascii_digit())
+                    {
+                        asked.push(k.to_owned());
+                    }
+                }
+            }
+        }
+        assert!(
+            asked.len() > 100,
+            "se leyeron pocas claves: {}",
+            asked.len()
+        );
+        for (name, json) in [
+            ("es", guardiana_core::i18n::ES_JSON),
+            ("en", guardiana_core::i18n::EN_JSON),
+            ("pt", guardiana_core::i18n::PT_JSON),
+        ] {
+            let v: serde_json::Value = serde_json::from_str(json).unwrap();
+            let panel = v["panel"].as_object().unwrap();
+            let missing: Vec<&String> = asked.iter().filter(|k| !panel.contains_key(*k)).collect();
+            assert!(missing.is_empty(), "{name}: faltan en «panel» {missing:?}");
+        }
+    }
 }
