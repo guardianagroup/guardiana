@@ -18,6 +18,8 @@
 //! and the interface says so: "Este contador vive en tu equipo. Reinstalar lo
 //! reinicia. Confiamos en ti."
 
+pub mod ancla;
+
 use guardiana_core::time::DAY_MS;
 use guardiana_core::{identity, Ledger, Purpose};
 use serde::{Deserialize, Serialize};
@@ -373,8 +375,25 @@ pub fn status(ledger: &Ledger, secret: &str, now: i64) -> Result<Status, Error> 
             return finish(ledger, plan, now);
         }
     }
-    // 3. Trial.
-    match setting_i64(ledger, SETTING_TRIAL_STARTED)? {
+    // 3. Trial. The date is kept twice: in the ledger, which travels with the person's data,
+    // and in a mark only an administrator can remove (`ancla`). The earlier of the two wins, so
+    // deleting one does not restart the seven days and editing one does not extend them. If one
+    // of the two is missing, it is written back from the other.
+    let en_extracto = setting_i64(ledger, SETTING_TRIAL_STARTED)?;
+    let anclado = ancla::leer();
+    let empezo = match (en_extracto, anclado) {
+        (Some(a), Some(b)) => Some(a.min(b)),
+        (a, b) => a.or(b),
+    };
+    if let Some(started) = empezo {
+        if en_extracto != Some(started) {
+            ledger.set_setting(SETTING_TRIAL_STARTED, &started.to_string())?;
+        }
+        if anclado != Some(started) {
+            ancla::escribir(started);
+        }
+    }
+    match empezo {
         Some(started) => {
             let ends = started + TRIAL_DAYS * DAY_MS;
             if now < ends {
@@ -396,6 +415,7 @@ pub fn status(ledger: &Ledger, secret: &str, now: i64) -> Result<Status, Error> 
             // runs, and the first run is this call. Writing it here and not in the engine means
             // the clock is the same however Guardiana was started (service, terminal or panel).
             ledger.set_setting(SETTING_TRIAL_STARTED, &now.to_string())?;
+            ancla::escribir(now);
             finish(
                 ledger,
                 Plan::Prueba {
@@ -531,6 +551,19 @@ mod tests {
     use super::*;
     use guardiana_core::Hash;
 
+    /// Cada prueba que llama a `status` toma el cerrojo del módulo `ancla` y trabaja en su propia
+    /// carpeta: así ninguna escribe la marca de verdad de esta máquina. La primera versión de
+    /// esto no lo hacía y una prueba dejó un archivo con fecha 0 en la carpeta de datos del Mac
+    /// del responsable, que con el código nuevo habría dado la prueba por caducada.
+    fn a_solas() -> std::sync::MutexGuard<'static, ()> {
+        let dir = std::env::temp_dir().join(format!(
+            "guardiana-lic-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        ancla::a_solas_en(&dir)
+    }
+
     fn ledger_observing() -> Ledger {
         let mut l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
         // The PC has been observing since t=0.
@@ -538,11 +571,49 @@ mod tests {
         l
     }
 
+    /// Borrar los datos no devuelve siete días nuevos. La fecha vive en dos sitios —el extracto
+    /// y una marca que solo un administrador puede quitar— y manda la más antigua de las dos.
+    /// Sin esto, un archivo menos y la prueba empezaba otra vez (aviso del responsable, 22 sep
+    /// 2026: «eso sería malo porque lo utilizarían gratis»).
+    #[test]
+    fn borrar_el_extracto_no_devuelve_la_prueba() {
+        let _a_solas = a_solas();
+        let empezo = 1_790_000_000_000;
+
+        // Primera vez: se anotan las dos marcas.
+        let mut l = ledger_observing();
+        let s = status(&l, "k", empezo).unwrap();
+        assert!(matches!(s.plan, Plan::Prueba { .. }));
+        assert_eq!(ancla::leer(), Some(empezo), "la marca de fuera se escribió");
+
+        // El extracto desaparece entero (lo borra la persona) y se empieza uno nuevo.
+        l = ledger_observing();
+        let dia_seis = empezo + 6 * DAY_MS;
+        let s = status(&l, "k", dia_seis).unwrap();
+        let Plan::Prueba {
+            empieza,
+            dias_restantes,
+            ..
+        } = s.plan
+        else {
+            unreachable!("debería seguir en prueba: {:?}", s.plan)
+        };
+        assert_eq!(empieza, empezo, "sigue contando desde el primer día");
+        assert_eq!(dias_restantes, 1, "queda un día, no siete");
+
+        // Y al octavo día se acabó, aunque el extracto sea nuevo.
+        let l = ledger_observing();
+        let s = status(&l, "k", empezo + 8 * DAY_MS).unwrap();
+        assert!(matches!(s.plan, Plan::PruebaAgotada { .. }), "{:?}", s.plan);
+        assert!(!s.puede_funcionar);
+    }
+
     /// There is one program and one plan: the first run starts the seven days by itself, and
     /// seven days later the program may not watch any more. Nobody has to press anything to
     /// start the trial, and nobody discovers on day eight that it never started.
     #[test]
     fn the_first_run_starts_the_trial_and_it_ends_seven_days_later() {
+        let _a_solas = a_solas();
         let l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
         let s = status(&l, "tok", 0).unwrap();
         assert!(
@@ -606,6 +677,7 @@ mod tests {
 
     #[test]
     fn stored_key_needs_the_local_mark() {
+        let _a_solas = a_solas();
         let l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
         store_key(&l, "tok", 5, "GUARDIANA Plus · mensual");
         let s = status(&l, "tok", 10).unwrap();
@@ -625,6 +697,7 @@ mod tests {
 
     #[test]
     fn key_subscription_is_checked_per_period_with_grace() {
+        let _a_solas = a_solas();
         let l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
         store_key(&l, "tok", 0, "GUARDIANA Plus · anual");
         let year = YEAR_DAYS * DAY_MS;
@@ -692,6 +765,7 @@ mod tests {
     /// pagado un año perdía el detalle de ese año sin haber visto un aviso (decisión 168).
     #[test]
     fn al_pararse_el_programa_no_se_borra_nada() {
+        let _a_solas = a_solas();
         let l = ledger_observing();
         // La prueba corre desde la primera consulta al estado.
         let s = status(&l, "tok", 0).unwrap();
@@ -713,6 +787,7 @@ mod tests {
 
     #[test]
     fn una_licencia_de_por_vida_no_caduca_por_no_comprobarse() {
+        let _a_solas = a_solas();
         // El caso que habría roto al primer Fundador: paga una vez, apaga el equipo cinco
         // semanas y al volver se encuentra el Plus apagado por la regla de las suscripciones.
         let l = Ledger::open_in_memory(guardiana_core::Hash::of(b"x")).unwrap();

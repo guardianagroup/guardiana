@@ -13,6 +13,8 @@ import pathlib
 import sys
 
 AQUI = pathlib.Path(__file__).resolve().parent
+# Los leeme-*.txt se guardan en UTF-8 CON BOM: el Bloc de notas de Windows abre así los acentos
+# bien en todas sus versiones, y ese archivo es de los primeros que mira quien instala.
 CABECERA = (
     "{\\rtf1\\ansi\\ansicpg1252\\deff0"
     "{\\fonttbl{\\f0\\fswiss\\fcharset0 Segoe UI;}}\\f0\\fs20\n"

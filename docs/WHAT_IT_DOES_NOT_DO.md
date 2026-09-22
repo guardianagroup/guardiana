@@ -94,8 +94,11 @@ La regla: nunca "100 % seguro", nunca "invisible", nunca "protegido" sin objeto,
   va; mientras corre, nada se corta, aunque todo se sigue anotando. Caduca solo, con un máximo de
   24 horas, y entonces el corte vuelve.
 
-- **La prueba de 7 días de Plus vive en tu equipo** (Modo Hogar es gratis y no tiene prueba; decisión 52). "Este contador vive en tu equipo. Reinstalar lo
-  reinicia. Confiamos en ti." Sin urgencia falsa.
+- **La prueba de 7 días vive en tu equipo** y se cuenta en dos sitios: tu extracto y una marca
+  aparte que solo un administrador puede quitar —el registro en Windows, `/etc/guardiana` en Linux
+  y en Mac—. Esa marca lleva la fecha en que empezaron los siete días y nada más; la pantalla de
+  licencia dice dónde está. Así desinstalar, reinstalar o borrar el extracto no devuelve siete
+  días nuevos. Sin urgencia falsa y sin marcas escondidas (decisión 187 bis).
 
 ## Lo que no incluye la 1.0
 

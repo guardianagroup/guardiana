@@ -562,7 +562,7 @@
     "licencia_titulo": "Licencia",
     "licencia_lead": "Un solo programa: 7 días de prueba con todo, y después hace falta una suscripción. Mientras esté activa, GUARDIANA mira y lo guarda todo; cuando deje de estarlo, deja de mirar y devuelve el DNS de este equipo tal y como estaba. Lo anotado se queda en tu disco.",
     "licencia_prueba": "Prueba: quedan {d} días (termina el {fecha}). No se cobra nada; al terminar, GUARDIANA deja de mirar hasta que actives una suscripción.",
-    "licencia_prueba_texto": "Este contador vive en tu equipo. Reinstalar lo reinicia. Confiamos en ti.",
+    "licencia_prueba_texto": "Los siete días se cuentan en tu equipo, en dos sitios: tu extracto y una marca aparte que solo un administrador puede quitar ({donde}). Esa marca lleva la fecha en que empezaron y nada más. Lo decimos aquí porque no escondemos nada de lo que hacemos en tu equipo.",
     "licencia_prueba_agotada": "La prueba terminó el {fecha}. GUARDIANA ha dejado de mirar y ha devuelto el DNS de este equipo tal y como estaba: tu internet funciona igual. Lo anotado sigue entero en tu disco y puedes exportarlo. Para volver a vigilar, activa tu clave de licencia.",
     "licencia_origen_clave": "activado con clave",
     "licencia_clave_titulo": "Activar con clave",

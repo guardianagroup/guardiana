@@ -2163,6 +2163,9 @@ pub(crate) async fn verify(Lang(t): Lang, _s: Session) -> ApiResult<VerifyView> 
 pub(crate) struct LicenciaView {
     estado: guardiana_license::Status,
     texto: String,
+    /// Dónde está la marca que impide que borrar el extracto devuelva los siete días. Se enseña
+    /// porque no se esconde: el programa no deja nada en el equipo que no cuente.
+    marca_prueba: String,
     clave_dev: bool,
     host_activacion: &'static str,
     /// Hours observed so far (the trial needs 24).
@@ -2274,6 +2277,7 @@ fn licencia_view(t: &Texts, state: &AppState) -> Result<LicenciaView, Response> 
     })?;
     Ok(LicenciaView {
         texto: licencia_texto(t, &estado),
+        marca_prueba: guardiana_license::ancla::donde(),
         clave_dev: guardiana_core::identity::public_key_is_dev(),
         host_activacion: guardiana_license::gateway_host(),
         horas_observadas: estado.observado_ms / guardiana_core::time::HOUR_MS,

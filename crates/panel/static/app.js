@@ -1051,7 +1051,9 @@
     async licencia() {
       const render = (r) => {
         $('l-estado').textContent = r.texto;
-        $('l-prueba').textContent = r.estado.plan === 'prueba' ? t('licencia_prueba_texto') : '';
+        $('l-prueba').textContent = r.estado.plan === 'prueba'
+          ? t('licencia_prueba_texto').replace('{donde}', r.marca_prueba || '')
+          : '';
         $('l-dev').classList.toggle('hidden', !r.clave_dev);
         $('l-clave-lead').textContent = t('licencia_clave_lead').replace('{host}', r.host_activacion);
         $('l-conexiones').innerHTML = r.conexiones.map((o) => `<tr><td>${when(o.ts)}</td><td class="mono">${esc(o.host)}</td><td>${o.bytes}</td></tr>`).join('') || `<tr><td colspan="3" class="muted">${esc(t('licencia_conexiones_ninguna'))}</td></tr>`;

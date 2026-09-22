@@ -1,4 +1,4 @@
-GUARDIANA for Windows
+﻿GUARDIANA for Windows
 =====================
 
 Guardiana shows you which services your AI talks to and, with Home Mode, every

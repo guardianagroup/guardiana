@@ -1,4 +1,4 @@
-GUARDIANA para Windows
+﻿GUARDIANA para Windows
 ======================
 
 A Guardiana mostra com quais serviços a sua IA fala e, com o Modo Casa, cada

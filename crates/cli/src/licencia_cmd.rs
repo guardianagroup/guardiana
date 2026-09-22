@@ -116,7 +116,11 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
     };
     println!("{}", describe(t, &status));
     if matches!(status.plan, Plan::Prueba { .. }) {
-        println!("{}", t.panel("licencia_prueba_texto"));
+        println!(
+            "{}",
+            t.panel("licencia_prueba_texto")
+                .replace("{donde}", &license::ancla::donde())
+        );
     }
     Ok(())
 }

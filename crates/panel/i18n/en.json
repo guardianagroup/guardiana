@@ -562,7 +562,7 @@
     "licencia_titulo": "Licence",
     "licencia_lead": "One program: 7 days free with everything, and after that it needs a subscription. While it is active GUARDIANA watches and keeps everything; when it is not, it stops watching and puts this machine’s DNS back as it was. What was written down stays on your disk.",
     "licencia_prueba": "Trial: {d} days left (ends on {fecha}). Nothing is charged; when it ends GUARDIANA stops watching until you activate a subscription.",
-    "licencia_prueba_texto": "This counter lives on your machine. Reinstalling resets it. We trust you.",
+    "licencia_prueba_texto": "The seven days are counted on your machine, in two places: your ledger and a separate mark that only an administrator can remove ({donde}). That mark holds the date they started and nothing else. We say so here because we hide nothing we do on your machine.",
     "licencia_prueba_agotada": "The trial ended on {fecha}. GUARDIANA has stopped watching and has put this machine’s DNS back as it was: your internet works the same. What was written down is whole on your disk and you can export it. To watch again, activate your licence key.",
     "licencia_origen_clave": "activated with a key",
     "licencia_clave_titulo": "Activate with a key",
