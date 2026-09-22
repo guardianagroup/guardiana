@@ -7,16 +7,16 @@
 //!
 //! ```text
 //! cargo run -p guardiana-lists --example quien -- hotjar.com teads.tv
-//! cargo run -p guardiana-lists --example quien            (las que se quedan sin país)
+//! cargo run -p guardiana-lists --example quien            (las que se quedan sin país o sin ciudad)
 //! ```
 fn main() {
     let nombres: Vec<String> = std::env::args().skip(1).collect();
     if nombres.is_empty() {
-        println!("Empresas sin país, que es una decisión y no un olvido:\n");
+        println!("Empresas sin país o sin ciudad, que es una decisión y no un olvido:\n");
         let mut sin: Vec<&str> = guardiana_lists::EMPRESAS
             .lines()
-            .filter_map(|l| l.strip_prefix('@'))
-            .filter(|s| !s.contains('|'))
+            .filter_map(|l| l.split('#').next().unwrap_or("").trim().strip_prefix('@'))
+            .filter(|s| s.split('|').nth(2).is_none_or(str::is_empty))
             .collect();
         sin.sort_unstable();
         for empresa in sin {
@@ -28,6 +28,9 @@ fn main() {
     for n in nombres {
         let empresa = guardiana_lists::company_of(&n).unwrap_or("—");
         let pais = guardiana_lists::country_of(&n).unwrap_or("—");
-        println!("{n:28} {empresa:30} {pais}");
+        // La ciudad también: es lo que el panel enseña debajo del país, y mirarla aquí es la
+        // única manera de ver que una sección mal escrita se quedó sin ella.
+        let ciudad = guardiana_lists::city_of(&n).unwrap_or("—");
+        println!("{n:28} {empresa:26} {pais:4} {ciudad}");
     }
 }

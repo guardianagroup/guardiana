@@ -314,7 +314,7 @@ advertising.com
 yahoodns.net
 aol.com
 
-@X|US
+@X|US|Bastrop  # sede en Bastrop, Texas, desde sep 2024; el grupo es SpaceXAI (X Corp + xAI) desde el 2 feb 2026
 twitter.com
 x.com
 twimg.com
@@ -553,7 +553,7 @@ ea.com
 activision.com
 callofduty.com
 
-@Ubisoft|FR
+@Ubisoft|FR|Saint-Mandé  # sede mundial, 2 avenue Pasteur, en su propia página de empleo
 ubisoft.com
 ubi.com
 
@@ -576,13 +576,13 @@ ironsrc.com
 ironsource.com
 supersonicads.com
 
-@Chartboost|US
+@Chartboost|GB|Londres  # la compró LoopMe (Londres) a Zynga en dic 2024
 chartboost.com
 
-@Vungle|US
+@Vungle|US|Redwood City  # hoy Liftoff Mobile, de la fusión de Liftoff y Vungle en 2021
 vungle.com
 
-@AdColony|US
+@AdColony|US|Austin  # de Digital Turbine desde 2021, 110 San Antonio St., Austin
 adcolony.com
 
 @InMobi|IN|Bangalore
@@ -614,7 +614,7 @@ hp.com
 logitech.com
 logi.com
 
-@TP-Link
+@TP-Link|US|Irvine  # TP-Link Systems Inc., sede mundial desde oct 2024; separada de TP-LINK Technologies (Shenzhen), que solo vende en China
 # Sin país, y no por pereza: está en disputa. Desde octubre de 2024 la empresa dice que
 # TP-Link Systems Inc. (Irvine, California) es la matriz de todo lo que no sea China continental,
 # que queda para TP-Link Technologies (Shenzhen). Una investigación de Bloomberg de abril de 2026
@@ -653,7 +653,7 @@ airbnb.com
 @Duolingo|US|Pittsburgh
 duolingo.com
 
-@Deriv|GG
+@Deriv|GG|St Peter Port  # sede registrada; las operaciones están en Cyberjaya (Malasia)
 # Sus propios términos dicen que Deriv.com Limited, registrada en Guernsey, es la sociedad que
 # posee a todas las demás (Labuan, Islas Vírgenes Británicas, Caimán, Mauricio, Vanuatu, Samoa,
 # San Vicente). La del grupo es Guernsey (comprobado el 21 sep 2026 en deriv.com).
@@ -703,7 +703,7 @@ perimeterx.net
 px-cloud.net
 humansecurity.com
 
-@Temu
+@Temu|IE|Dublín  # PDD Holdings trasladó su sede principal a Dublín en 2023; registrada en Islas Caimán; el negocio nació en China
 # Sin país, y no por pereza: hay dos respuestas oficiales que se contradicen. PDD Holdings
 # declara ante la SEC que sus oficinas ejecutivas principales están en Dublín, y a la vez dijo
 # públicamente, en mayo de 2023, que «su sede estará siempre en Shanghái, China, y no cambiará».
@@ -810,7 +810,7 @@ letsencrypt.org
 @DigiCert|US|Lehi (Utah)
 digicert.com
 
-@Sectigo|GB
+@Sectigo|US|Scottsdale  # sede en Scottsdale (Arizona) desde 2023; los certificados los emite Sectigo Limited, del Reino Unido
 sectigo.com
 
 @GlobalSign|BE|Lovaina
@@ -819,13 +819,13 @@ globalsign.com
 @Entrust|US|Shakopee (Minnesota)
 entrust.net
 
-@IdenTrust|US
+@IdenTrust|US|Salt Lake City  # parte de HID Global (grupo ASSA ABLOY)
 identrust.com
 
 @GoDaddy|US|Tempe (Arizona)
 godaddy.com
 
-@NTP Pool Project
+@NTP Pool Project  # proyecto de voluntarios, sin empresa ni sede: por eso va sin país y sin ciudad
 # Sin país: es una red de voluntarios coordinada por una persona, sin sociedad ni fundación
 # detrás. No hay sede que comprobar, así que no se escribe ninguna.
 pool.ntp.org
@@ -856,7 +856,7 @@ fedoraproject.org
 archlinux.org
 pkgbuild.com
 
-@Flathub|US
+@Flathub|US|Orinda  # la aloja legalmente la GNOME Foundation, en Orinda (California); Flathub LLC en constitución
 # Flathub LLC, sociedad estadounidense sin ánimo de lucro levantada por la GNOME Foundation
 # (California) junto con KDE e.V. para que el repositorio tenga entidad propia.
 flathub.org
