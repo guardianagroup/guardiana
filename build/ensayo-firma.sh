@@ -30,8 +30,10 @@ else
 fi
 
 archivos=()
+# Solo los paquetes. Lo que no empieza por «guardiana» es cosa nuestra —un LEEME, una nota— y
+# firmarlo no significa nada (22 sep 2026).
 while IFS= read -r f; do archivos+=("$f"); done < <(find "$carpeta" -maxdepth 1 -type f \
-    ! -name '*.minisig' ! -name 'SHA256SUMS' | sort)
+    -name 'guardiana*' ! -name '*.minisig' | sort)
 [ "${#archivos[@]}" -gt 0 ] || { echo "ensayo-firma: no hay nada que firmar en $carpeta" >&2; exit 1; }
 
 echo "== Voy a firmar ${#archivos[@]} archivos de la versión $version:"
