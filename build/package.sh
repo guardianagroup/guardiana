@@ -71,21 +71,41 @@ for idioma in es en pt; do
         pt) cultura=pt-BR; sufijo="-pt" ;;
     esac
     salida="$OUT/guardiana-$VERSION-windows-x64$sufijo.msi"
-    if ! wix build -arch x64 \
+    # Se construye a un lado y solo se mueve si sale bien. Antes se escribía directamente sobre
+    # `$salida` y, al fallar (que en el Mac falla siempre, ver arriba), un `rm -f` borraba el MSI
+    # que ya estaba ahí: el que se había traído de Windows. Y como release.sh llama a este guion
+    # antes de firmar, el día del lanzamiento habría borrado los tres instaladores y se habría
+    # parado justo después. Encontrado ensayando el 22 sep 2026.
+    if wix build -arch x64 \
         -culture "$cultura" -loc "build/wix/loc-$cultura.wxl" \
         -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext \
         -d "Version=$VERSION" -d "Lang=0" -d "Exe=$WIN_BIN" \
         -d "Readme=build/wix/textos/leeme-$idioma.txt" \
         -d "Welcome=build/wix/textos/bienvenida-$idioma.rtf" \
         -d "Icon=build/wix/guardiana.ico" \
-        -o "$salida" build/wix/guardiana.wxs 2>/dev/null; then
-        rm -f "$salida"
+        -o "$salida.nuevo" build/wix/guardiana.wxs 2>/dev/null; then
+        mv "$salida.nuevo" "$salida"
+    else
+        rm -f "$salida.nuevo"
         falta_msi="sí"
     fi
 done
 if [ -n "$falta_msi" ]; then
     cp "$WIN_BIN" "$OUT/guardiana.exe"
-    echo "MSI not built on this host: run build/msi.ps1 -Idioma es|en|pt on Windows with $OUT/guardiana.exe" >&2
+    echo "MSI not built on this host: run build/rehacer-msi.ps1 on Windows with $OUT/guardiana.exe" >&2
+    # Los que ya estén se conservan, pero hay que decir en voz alta de qué .exe tienen que venir:
+    # un MSI viejo al lado del .exe de hoy es peor que no tener ninguno, porque parece que está
+    # todo listo. La fecha del archivo no sirve para saberlo (se copian desde Windows y llegan con
+    # la fecha de la copia), así que se dice la regla y ya.
+    hay=""
+    for sufijo in "" "-en" "-pt"; do
+        m="$OUT/guardiana-$VERSION-windows-x64$sufijo.msi"
+        [ -f "$m" ] && hay="$hay $(basename "$m")"
+    done
+    if [ -n "$hay" ]; then
+        echo "package.sh: ya hay MSI aquí y se conservan:$hay" >&2
+        echo "package.sh: tienen que estar hechos de ESTE guardiana.exe. Si no, rehazlos." >&2
+    fi
 fi
 
 # 4. Hashes.
