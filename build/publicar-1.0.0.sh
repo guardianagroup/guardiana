@@ -170,16 +170,19 @@ fi
 url_web="$(printf '%s' "$url_codigo" | sed -E 's#guardiana(\.git)?$#guardianagroup.com.git#')"
 identidad
 ( cd "$TRABAJO/web" && identidad )
-# Antes de firmar nada: que este Mac pueda subir a los dos sitios. Si no, se para aquí, sin
-# haber firmado ni anotado nada en Rekor.
+# ¿Puede este Mac subir a GitHub? Si puede, sube él al final. Si no, no pasa nada: al final deja
+# un archivo con lo firmado para dárselo a Claude, que lo comprueba y lo sube desde allí.
+SIN_SUBIR=""
 if [ -z "$ENSAYO" ]; then
-  subir "$TRABAJO/guardiana" "$url_codigo" HEAD:main --dry-run \
-    || para "este Mac no puede subir a GitHub (ni por https con el llavero ni por ssh). No se ha firmado nada. Díselo a Claude."
-  url_codigo="$SUBIDO_POR"
-  subir "$TRABAJO/web" "$url_web" "HEAD:$RAMA_WEB" --dry-run \
-    || para "este Mac no puede subir a la web en GitHub. No se ha firmado nada. Díselo a Claude."
-  url_web="$SUBIDO_POR"
-  echo "Puede subir a GitHub ($url_codigo)."
+  if subir "$TRABAJO/guardiana" "$url_codigo" HEAD:main --dry-run && url_codigo="$SUBIDO_POR" \
+     && subir "$TRABAJO/web" "$url_web" "HEAD:$RAMA_WEB" --dry-run; then
+    url_web="$SUBIDO_POR"
+    echo "Puede subir a GitHub ($url_codigo)."
+  else
+    SIN_SUBIR=1
+    echo "Este Mac no tiene permiso para subir a GitHub. No pasa nada: al final te dejo un archivo"
+    echo "para dárselo a Claude, y Claude lo sube."
+  fi
 fi
 # La app de Mac lleva el icono de la web; crear-app.sh lo busca en site/. Se excluye aquí mismo
 # para que el árbol siga limpio (release.sh lo exige) sin tocar nada publicado.
@@ -294,9 +297,39 @@ paso "6/7 Registro público a GitHub (main)"
 if [ -n "$ENSAYO" ]; then
   echo "(ensayo: no se sube)"
   echo "$linea"
+elif [ -n "$SIN_SUBIR" ]; then
+  echo "(lo sube Claude: va en el archivo del final)"
+  git format-patch -q -1 HEAD -o "$TRABAJO/archivos/"
 else
   subir "$TRABAJO/guardiana" "$url_codigo" HEAD:main || para "no he podido subir ledger.jsonl. Lo firmado está en $TRABAJO/archivos. Díselo a Claude."
   echo "ledger.jsonl subido."
+fi
+
+if [ -n "$SIN_SUBIR" ]; then
+  paso "7/7 Archivo para Claude"
+  # Lo que Claude no tiene: los paquetes hechos aquí, todas las firmas, la línea del registro (la
+  # final y la firmada que fue a Rekor) y el commit de ledger.jsonl. Los .exe, binarios y MSI no
+  # van: son los mismos bytes que ya tiene, y los comprueba por su huella.
+  cp build/out/ledger-line.json "$TRABAJO/archivos/linea-firmada.json"
+  cp build/out/ledger-line.json.minisig "$TRABAJO/archivos/linea-firmada.json.minisig"
+  printf '%s\n' "$mac_arch" > "$TRABAJO/archivos/mac-arch.txt"
+  paquete="$HOME/guardiana-firmado-$VERSION.zip"
+  rm -f "$paquete"
+  (
+    cd "$TRABAJO/archivos"
+    extra=""
+    for f in "guardiana_${VERSION}_amd64.deb" "guardiana-$VERSION-linux-x86_64.tar.gz" "guardiana-$VERSION-macos.app.zip"; do
+      if [ -f "$f" ]; then extra="$extra $f"; fi
+    done
+    # shellcheck disable=SC2086
+    zip -q "$paquete" ./*.minisig ledger-line.json linea-firmada.json ./*.patch mac-arch.txt $extra
+  )
+  echo
+  echo "HECHO. Firmado y anotado en Rekor."
+  echo "Se abre una ventana con el archivo $(basename "$paquete"):"
+  echo "arrástralo al chat de Claude (o adjúntalo con el clip). Claude lo comprueba y lo publica."
+  if command -v open >/dev/null 2>&1; then open -R "$paquete" || true; fi
+  exit 0
 fi
 
 paso "7/7 Web: tabla de descargas en la rama $RAMA_WEB (la web publicada no cambia todavía)"
