@@ -40,6 +40,7 @@ The ledger is kept in $DATA."
 If I install it, the Mac will ask for your password. It installs a guardian that listens on 127.0.0.1 and forwards to the DNS you already used; the Mac's DNS does not change until you press the button in the panel, and it is undone right there. It observes first; it cuts nothing without your decision. It is removed from this same icon."
   M_LISTO="Done. The panel opens in the browser: press the button there so this Mac goes through GUARDIANA. This same GUARDIANA icon opens the panel again whenever you want."
   M_NO_INSTALADA="It could not be installed. Details:"
+  M_INTEL="This version of GUARDIANA needs a Mac with an Apple chip (M1 or later). This Mac has an Intel chip, so it cannot run here. Nothing was installed."
   ;;
 pt)
   B_OK="Entendi"; B_NO_AHORA="Agora não"; B_ACTUALIZAR="Atualizar"; B_QUITAR_MAC="Remover deste Mac"
@@ -60,6 +61,7 @@ O extrato fica guardado em $DATA."
 Se eu instalar, o Mac vai pedir sua senha. É instalado um guardião que escuta em 127.0.0.1 e encaminha para o DNS que você já usava; o DNS do Mac não muda até você apertar o botão do painel, e ali mesmo se desfaz. Primeiro observa; não corta nada sem a sua decisão. Remove-se por este mesmo ícone."
   M_LISTO="Pronto. O painel abre no navegador: aperte ali o botão para que este Mac passe pela GUARDIANA. Este mesmo ícone da GUARDIANA abre o painel de novo quando você quiser."
   M_NO_INSTALADA="Não foi possível instalar. Detalhe:"
+  M_INTEL="Esta versão da GUARDIANA precisa de um Mac com chip Apple (M1 ou posterior). Este Mac tem chip Intel, então ela não funciona aqui. Nada foi instalado."
   ;;
 *)
   B_OK="Entendido"; B_NO_AHORA="Ahora no"; B_ACTUALIZAR="Actualizar"; B_QUITAR_MAC="Quitar de este Mac"
@@ -80,6 +82,7 @@ El extracto se guarda en $DATA."
 Si lo instalo, el Mac pedirá tu contraseña. Se instala un guardián que escucha en 127.0.0.1 y reenvía al DNS que ya usabas; el DNS del Mac no cambia hasta que pulses el botón del panel, y ahí mismo se deshace. Primero observa; no corta nada sin tu decisión. Se quita desde este mismo icono."
   M_LISTO="Listo. Se abre el panel en el navegador: pulsa ahí el botón para que este Mac pase por GUARDIANA. Este mismo icono de GUARDIANA vuelve a abrir el panel cuando quieras."
   M_NO_INSTALADA="No se pudo instalar. Detalle:"
+  M_INTEL="Esta versión de GUARDIANA necesita un Mac con chip de Apple (M1 o posterior). Este Mac tiene chip Intel, así que aquí no puede funcionar. No se ha instalado nada."
   ;;
 esac
 
@@ -126,6 +129,13 @@ newer() {
   done
   return 1
 }
+
+# The program inside is built for Apple chips only (the site says so). On an Intel Mac it would
+# install and then never answer; say it plainly instead.
+if [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" != "1" ]; then
+  say "$M_INTEL"
+  exit 0
+fi
 
 if [ -f "$PLIST" ]; then
   # A newer build inside the app than the one installed: offer the update (root copies it and
