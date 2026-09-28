@@ -1,14 +1,15 @@
-# Ensayo del paso del Mac antes de firmar de verdad (28 sep 2026). Dos cosas:
-#   pruebas: que compile y pasen las pruebas en macOS;
-#   publicar: build/publicar-1.0.0.sh entero, con clave de usar y tirar, Rekor de mentira y
-#             sin subir nada. Solo lee de GitHub.
+# Ensayo del paso del Mac antes de firmar de verdad (28 sep 2026). Dos trabajos:
+#   pruebas:  que compile y pasen las pruebas en macOS;
+#   publicar: build/publicar-1.0.0.sh con clave de usar y tirar (contraseña «ensayo»), hasta
+#             donde se puede fuera del Mac: build/release.sh no corre en CI a propósito (protege
+#             la clave de verdad), así que el ensayo termina ahí, y aparte se comprueba que la
+#             contraseña escrita una vez contesta varias firmas seguidas. Solo lee de GitHub.
 name: ensayo-mac
 on:
   push:
     branches: ['ensayo-mac']
 permissions:
   contents: read
-  actions: read
 env:
   CARGO_TERM_COLOR: always
 jobs:
@@ -35,40 +36,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - uses: actions/download-artifact@v4
-        with:
-          name: guardiana-repro
-          path: ${{ runner.temp }}/descargas/guardiana-repro
-          run-id: 36447056747
-          github-token: ${{ github.token }}
-      - uses: actions/download-artifact@v4
-        with:
-          name: guardiana-instaladores
-          path: ${{ runner.temp }}/descargas/guardiana-instaladores
-          run-id: 36447056747
-          github-token: ${{ github.token }}
       - name: rsign, como en el Mac de publicación (sin Homebrew)
         run: |
           command -v minisign && echo "ojo: hay minisign" || echo "sin minisign, como el Mac"
+          command -v expect
           cargo install rsign2 --locked
-      - name: publicar-1.0.0.sh en modo ensayo
+      - name: publicar-1.0.0.sh en modo ensayo, hasta release.sh
         env:
           ENSAYO: '1'
-          DESCARGAS: ${{ runner.temp }}/descargas
+          DESCARGAS: /no/existe
           TRABAJO: ${{ runner.temp }}/trabajo
           REPO: /no/existe
-        # rsign lee la contraseña de la terminal; aquí no hay, así que se le da una con script(1)
-        # y un Enter para cada pregunta (la clave de ensayo no tiene contraseña).
         run: |
-          yes '' | script -q "$RUNNER_TEMP/salida.txt" bash build/publicar-1.0.0.sh || true
-          grep -q '^HECHO' "$RUNNER_TEMP/salida.txt"
-      - name: resultado
-        if: always()
+          bash build/publicar-1.0.0.sh < <(sleep 3600) 2>&1 | tee "$RUNNER_TEMP/salida.txt" || true
+          grep -q '^Clave correcta' "$RUNNER_TEMP/salida.txt"
+          grep -q 'never run in CI' "$RUNNER_TEMP/salida.txt"
+      - name: la contraseña una vez contesta varias firmas
+        env:
+          GUARDIANA_CLAVE: ensayo
         run: |
-          cd "$RUNNER_TEMP/trabajo" || exit 0
-          ls -la archivos || true
-          cat archivos/ledger-line.json || true
-          grep -o 'macOS 13[^<]*' web/instalar.html || true
-          grep -c 'descargas/1.0.0/' web/instalar.html web/en/install.html web/pt/instalar.html || true
-          lipo -archs guardiana/build/out/app/GUARDIANA.app/Contents/Resources/guardiana || true
+          T="$RUNNER_TEMP/trabajo"
+          for i in 1 2 3; do echo "archivo $i" > "$T/f$i"; done
+          cat > "$T/tres-firmas.sh" <<'SH'
+          set -e
+          for i in 1 2 3; do rsign sign -s "$1/clave-ensayo/minisign.key" -x "$1/f$i.minisig" -t "f$i" "$1/f$i"; done
+          SH
+          expect -f "$T/con-clave.exp" -- bash "$T/tres-firmas.sh" "$T" < <(sleep 600)
+          for i in 1 2 3; do rsign verify -p "$T/clave-ensayo/minisign.pub" -x "$T/f$i.minisig" "$T/f$i"; done

@@ -1,19 +1,19 @@
 #!/bin/bash
 # GUARDIANA 1.0.0 · firma, registro público y tabla de descargas, en el Mac de publicación.
 #
-# Lo único que se escribe a mano es la contraseña de la clave de firma: rsign/minisign la pide
-# una vez por archivo (unas diez veces). La clave privada no sale de ~/guardiana-claves.
+# Uso, en Terminal:  bash publicar-1.0.0.sh
 #
-# Antes: los dos .zip de la ejecución 36447056747 de GitHub en ~/Downloads
-# (guardiana-repro y guardiana-instaladores; si Safari los descomprimió, las carpetas valen igual).
-#
-# Uso:  bash publicar-1.0.0.sh
+# Lo único que se escribe a mano es la contraseña de la clave de firma, y una sola vez: el guion
+# se la da a cada firma (con expect, que viene con macOS). Si expect no está, rsign la pide en
+# cada archivo, unas diez veces. La clave privada no sale de ~/guardiana-claves y la contraseña
+# no se guarda en ningún archivo.
 #
 # Qué hace, en este orden, y dónde para si algo no cuadra:
 #   0. herramientas (instala rsign y cargo-deb si faltan)
-#   1. clona el código publicado en GitHub y exige que main sea exactamente COMMIT
-#   2. comprueba las huellas de lo que compiló GitHub
-#   3. firma un papel de prueba y exige que la clave de este Mac sea la que publica la web
+#   1. clona el código publicado y exige que main sea exactamente COMMIT
+#   2. comprueba las huellas de lo que compiló GitHub (va en la rama lanzamiento-1.0.0 de la web;
+#      si no estuviera, usa los dos .zip de la ejecución en ~/Downloads)
+#   3. pide la contraseña, firma un papel de prueba y exige que la clave sea la que publica la web
 #   4. build/release.sh: .deb, .tar.gz y app de Mac; firmas; línea del registro; Rekor; commit
 #   5. comprueba cada firma con la clave pública
 #   6. sube el registro (ledger.jsonl) a main
@@ -36,8 +36,8 @@ ENSAYO="${ENSAYO:-}"
 
 # Huellas de lo que compiló GitHub (ejecución 36447056747), comprobadas en el PC de pruebas.
 ESPERADAS=(
-  "65e7bf528bf50b5ad235f7ba084d7a52b8b6897884a9bbd610d07700bed9a33d  guardiana-1.0.0-windows-x86_64.exe"
   "8b13b586e094e845ba3b0add374aa5fb9661d7436b7f035b4b6d8c1876056549  guardiana-1.0.0-linux-x86_64"
+  "65e7bf528bf50b5ad235f7ba084d7a52b8b6897884a9bbd610d07700bed9a33d  guardiana-1.0.0-windows-x86_64.exe"
   "399187722f75118a85af98df60a4a664dc4153c86315ba524dc67d9129494fdd  guardiana-1.0.0-windows-x64.msi"
   "280c5288fae22dabfa2f36bd564f756629e3a44c4fbfaf97d4bbb2d31aafd84b  guardiana-1.0.0-windows-x64-en.msi"
   "193237858094804c0547737732b30e636308fb050549f633a34b059b89a6e5a8  guardiana-1.0.0-windows-x64-pt.msi"
@@ -64,25 +64,10 @@ if [ -z "$ENSAYO" ]; then
   [ -f "$KEYS/minisign.key" ] || para "no está $KEYS/minisign.key."
 fi
 
-# Los dos artefactos de GitHub: .zip, o carpeta si Safari ya los descomprimió.
 if [ -e "$TRABAJO" ]; then
   mv "$TRABAJO" "$TRABAJO.anterior-$(date +%Y%m%d%H%M%S)"
 fi
-mkdir -p "$TRABAJO/zip" "$TRABAJO/todo" "$TRABAJO/archivos" "$TRABAJO/bin"
-fuente() {
-  if [ -f "$DESCARGAS/$1.zip" ]; then
-    unzip -q -o "$DESCARGAS/$1.zip" -d "$TRABAJO/zip/$1"
-    echo "$TRABAJO/zip/$1"
-  elif [ -d "$DESCARGAS/$1" ]; then
-    echo "$DESCARGAS/$1"
-  else
-    return 1
-  fi
-}
-if ! repro="$(fuente guardiana-repro)" || ! instaladores="$(fuente guardiana-instaladores)"; then
-  command -v open >/dev/null 2>&1 && open "https://github.com/guardianagroup/guardiana/actions/runs/$RUN" || true
-  para "faltan en $DESCARGAS guardiana-repro y/o guardiana-instaladores. Bájalos de la página que se acaba de abrir (abajo, «Artifacts») y vuelve a ejecutar esto."
-fi
+mkdir -p "$TRABAJO/zip" "$TRABAJO/todo" "$TRABAJO/archivos" "$TRABAJO/bin" "$TRABAJO/repro"
 
 # macOS no siempre trae sha256sum; release.sh lo usa. shasum hace lo mismo.
 if ! command -v sha256sum >/dev/null 2>&1; then
@@ -90,6 +75,33 @@ if ! command -v sha256sum >/dev/null 2>&1; then
   chmod +x "$TRABAJO/bin/sha256sum"
 fi
 export PATH="$TRABAJO/bin:$PATH"
+
+# La contraseña una sola vez: expect lanza la orden y contesta cada «Password:» con ella. Lo
+# demás que la orden pregunte lo sigue viendo y contestando la persona.
+CON_CLAVE=""
+if command -v expect >/dev/null 2>&1; then
+  CON_CLAVE="$TRABAJO/con-clave.exp"
+  cat > "$CON_CLAVE" <<'EXP'
+set timeout -1
+log_user 1
+spawn -noecho {*}$argv
+interact {
+    -o
+    -re {Password[^\r\n]*: *$} {
+        send -- "$env(GUARDIANA_CLAVE)\r"
+    }
+}
+set r [wait]
+exit [lindex $r 3]
+EXP
+fi
+con_clave() {
+  if [ -n "$CON_CLAVE" ] && [ -n "${GUARDIANA_CLAVE:-}" ]; then
+    expect -f "$CON_CLAVE" -- "$@"
+  else
+    "$@"
+  fi
+}
 
 identidad() {  # copia quién firma los commits desde el repositorio de siempre de este Mac
   if [ -d "$REPO/.git" ]; then
@@ -135,15 +147,51 @@ mkdir -p site
 cp "$TRABAJO/web/icon-512.png" site/icon-512.png
 echo "/site/" >> .git/info/exclude
 
+paso "2/7 Lo que compiló GitHub y sus huellas"
+origen="$TRABAJO/web/descargas/$VERSION"
+if [ ! -f "$origen/guardiana-$VERSION-windows-x86_64.exe" ]; then
+  # Plan B: los dos artefactos de la ejecución, en .zip o en carpeta si Safari los descomprimió.
+  fuente() {
+    if [ -f "$DESCARGAS/$1.zip" ]; then
+      unzip -q -o "$DESCARGAS/$1.zip" -d "$TRABAJO/zip/$1"
+      echo "$TRABAJO/zip/$1"
+    elif [ -d "$DESCARGAS/$1" ]; then
+      echo "$DESCARGAS/$1"
+    else
+      return 1
+    fi
+  }
+  if ! r="$(fuente guardiana-repro)" || ! m="$(fuente guardiana-instaladores)"; then
+    command -v open >/dev/null 2>&1 && open "https://github.com/guardianagroup/guardiana/actions/runs/$RUN" || true
+    para "no encuentro lo que compiló GitHub. Baja guardiana-repro y guardiana-instaladores de la página que se acaba de abrir (abajo, «Artifacts») y vuelve a ejecutar esto."
+  fi
+  origen="$TRABAJO/todo"
+  cp "$r"/guardiana-* "$origen/"
+  find "$m" -name '*.msi' -exec cp {} "$origen/" \;
+fi
+( cd "$origen" && printf '%s\n' "${ESPERADAS[@]}" | sha256sum -c - )
+repro="$TRABAJO/repro"
+cp "$origen/guardiana-$VERSION-linux-x86_64" "$origen/guardiana-$VERSION-windows-x86_64.exe" "$repro/"
+printf '%s\n' "${ESPERADAS[0]}" "${ESPERADAS[1]}" > "$repro/SHA256SUMS"
+mkdir -p "dist/$VERSION" target/x86_64-unknown-linux-gnu/release target/x86_64-pc-windows-gnu/release
+cp "$origen"/guardiana-"$VERSION"-windows-x64*.msi "dist/$VERSION/"
+
+if command -v minisign >/dev/null 2>&1; then
+  firmar() { con_clave minisign -Sm "$1" -s "$KEYS/minisign.key" -t "$2"; }
+  comprobar() { minisign -Vm "$1" -p "$TRABAJO/guardiana/build/pubkey/minisign.pub" >/dev/null; }
+  generar() { con_clave minisign -G -p "$1/minisign.pub" -s "$1/minisign.key"; }
+else
+  firmar() { con_clave rsign sign -s "$KEYS/minisign.key" -x "$1.minisig" -t "$2" "$1"; }
+  comprobar() { rsign verify -p "$TRABAJO/guardiana/build/pubkey/minisign.pub" -x "$1.minisig" "$1" >/dev/null; }
+  generar() { con_clave rsign generate -p "$1/minisign.pub" -s "$1/minisign.key"; }
+fi
+
 if [ -n "$ENSAYO" ]; then
-  echo "(ensayo: clave de usar y tirar y Rekor de mentira)"
+  echo "(ensayo: clave de usar y tirar con contraseña «ensayo», y Rekor de mentira)"
+  export GUARDIANA_CLAVE=ensayo
   KEYS="$TRABAJO/clave-ensayo"
   mkdir -p "$KEYS"
-  if command -v minisign >/dev/null 2>&1; then
-    minisign -G -W -p "$KEYS/minisign.pub" -s "$KEYS/minisign.key"
-  else
-    rsign generate -W -p "$KEYS/minisign.pub" -s "$KEYS/minisign.key"
-  fi
+  generar "$KEYS"
   cp "$KEYS/minisign.pub" build/pubkey/minisign.pub
   git commit -q -am "ensayo: clave de usar y tirar"
   printf '#!/bin/sh\ncat >/dev/null\necho "{\\"Location\\":\\"/api/v1/log/entries/ENSAYO0000000000\\"}"\n' > "$TRABAJO/bin/rekor-cli"
@@ -151,29 +199,36 @@ if [ -n "$ENSAYO" ]; then
 fi
 export GUARDIANA_KEYS="$KEYS"
 
-if command -v minisign >/dev/null 2>&1; then
-  firmar() { minisign -Sm "$1" -s "$KEYS/minisign.key" -t "$2"; }
-  comprobar() { minisign -Vm "$1" -p "$TRABAJO/guardiana/build/pubkey/minisign.pub" >/dev/null; }
-else
-  firmar() { rsign sign -s "$KEYS/minisign.key" -x "$1.minisig" -t "$2" "$1"; }
-  comprobar() { rsign verify -p "$TRABAJO/guardiana/build/pubkey/minisign.pub" -x "$1.minisig" "$1" >/dev/null; }
-fi
-
-paso "2/7 Lo que compiló GitHub y sus huellas"
-cp "$repro"/guardiana-* "$TRABAJO/todo/"
-find "$instaladores" -name '*.msi' -exec cp {} "$TRABAJO/todo/" \;
-( cd "$TRABAJO/todo" && printf '%s\n' "${ESPERADAS[@]}" | sha256sum -c - )
-mkdir -p "dist/$VERSION" target/x86_64-unknown-linux-gnu/release target/x86_64-pc-windows-gnu/release
-cp "$TRABAJO"/todo/*.msi "dist/$VERSION/"
-
-paso "3/7 La clave de este Mac es la que publica la web (primera contraseña)"
+paso "3/7 Contraseña de la clave y prueba de que es la clave de la web"
 printf 'GUARDIANA %s: prueba de la clave\n' "$VERSION" > "$TRABAJO/prueba-clave.txt"
-firmar "$TRABAJO/prueba-clave.txt" "GUARDIANA $VERSION prueba de la clave"
+intentos=0
+while :; do
+  intentos=$((intentos + 1))
+  if [ -n "$CON_CLAVE" ] && [ -z "$ENSAYO" ]; then
+    printf 'Escribe la contraseña de la clave de firma y pulsa Enter (mientras escribes no se ve nada): '
+    IFS= read -r -s GUARDIANA_CLAVE
+    echo
+    export GUARDIANA_CLAVE
+  elif [ -z "$CON_CLAVE" ]; then
+    echo "(rsign te pedirá la contraseña en cada firma)"
+  fi
+  rm -f "$TRABAJO/prueba-clave.txt.minisig"
+  if firmar "$TRABAJO/prueba-clave.txt" "GUARDIANA $VERSION prueba de la clave"; then
+    break
+  fi
+  [ "$intentos" -lt 3 ] || para "tres intentos sin poder firmar. No se ha firmado nada más."
+  echo "No ha podido firmar: seguramente la contraseña no es esa. Otra vez."
+done
 comprobar "$TRABAJO/prueba-clave.txt" || para "la clave de $KEYS no es la de build/pubkey/minisign.pub. No se ha firmado nada más."
 echo "Clave correcta."
 
-paso "4/7 Paquetes, firmas, registro público y Rekor (una contraseña por archivo)"
-build/release.sh --binarios "$repro"
+if [ -n "$CON_CLAVE" ]; then
+  paso "4/7 Paquetes, firmas, registro público y Rekor (10–15 minutos; la contraseña va sola)"
+else
+  paso "4/7 Paquetes, firmas, registro público y Rekor (10–15 minutos; una contraseña por archivo)"
+fi
+con_clave build/release.sh --binarios "$repro"
+unset GUARDIANA_CLAVE
 
 paso "5/7 Compruebo cada firma con la clave pública"
 linea="$(tail -n 1 ledger.jsonl)"
