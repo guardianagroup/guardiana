@@ -28,6 +28,10 @@ jobs:
         run: cargo test --workspace --locked --no-fail-fast
       - name: crear-app.sh
         run: |
+          set -x
+          # El icono sale de la web, como en publicar-*.sh (crear-app.sh lo busca en site/).
+          mkdir -p site
+          curl -fsSL https://raw.githubusercontent.com/guardianagroup/guardianagroup.com/main/icon-512.png -o site/icon-512.png
           build/mac/crear-app.sh "$RUNNER_TEMP/app"
           APP="$RUNNER_TEMP/app/GUARDIANA.app"
           v=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
