@@ -58,7 +58,11 @@ jobs:
           DESCARGAS: ${{ runner.temp }}/descargas
           TRABAJO: ${{ runner.temp }}/trabajo
           REPO: /no/existe
-        run: bash build/publicar-1.0.0.sh
+        # rsign lee la contraseña de la terminal; aquí no hay, así que se le da una con script(1)
+        # y un Enter para cada pregunta (la clave de ensayo no tiene contraseña).
+        run: |
+          yes '' | script -q "$RUNNER_TEMP/salida.txt" bash build/publicar-1.0.0.sh || true
+          grep -q '^HECHO' "$RUNNER_TEMP/salida.txt"
       - name: resultado
         if: always()
         run: |
