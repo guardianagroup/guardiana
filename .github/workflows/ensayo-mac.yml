@@ -69,21 +69,32 @@ jobs:
             echo "$(printf "$arr" | tr '\n' ' ') -> $(idioma)"
           done
       - name: instalar, usar y quitar como lo hace el icono
+        # Cada comprobación que falla deja una anotación con lo que se vio (las anotaciones se
+        # leen sin permisos; el registro completo no).
         run: |
+          set +e
           APP="$RUNNER_TEMP/app/GUARDIANA.app"
           RES="$APP/Contents/Resources"
-          out=$(sudo "$RES/instalar.sh" "$RES/guardiana" "$USER" en)
+          DATA="/Library/Application Support/Guardiana"
+          fallos=0
+          nota() { local t="$1"; shift; local m; m="$(printf '%s' "$*" | tail -c 3000 | sed -e 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}')"; echo "::error title=$t::$m"; fallos=$((fallos+1)); }
+          aviso() { local t="$1"; shift; local m; m="$(printf '%s' "$*" | tail -c 3000 | sed -e 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}')"; echo "::warning title=$t::$m"; }
+          aviso "antes: puerto 53" "$(sudo lsof -nP -iUDP:53 -iTCP:53 2>&1 | head -20)"
+          aviso "antes: scutil" "$(scutil --dns | grep -m6 nameserver)"
+          out=$(sudo "$RES/instalar.sh" "$RES/guardiana" "$USER" en 2>&1); rc=$?
           echo "$out"
-          echo "$out" | tail -n 1 | grep -q '^Forwards to: '
-          dig +short @127.0.0.1 example.com | grep -q .
-          curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:7443/ | grep -q 200
-          tok=$(tr -d '[:space:]' < "/Library/Application Support/Guardiana/panel.token")
-          [ ${#tok} = 64 ]
-          /usr/local/guardiana/guardiana --version
-          out=$(sudo "$RES/desinstalar.sh" pt)
+          [ $rc = 0 ] && echo "$out" | tail -n 1 | grep -q '^Forwards to: ' || nota "instalar.sh (rc=$rc)" "$out"
+          aviso "instalar.sh dijo" "$out"
+          d=$(dig +short +time=3 +tries=2 @127.0.0.1 example.com 2>&1); echo "$d" | grep -qE '^[0-9]' || nota "dig 127.0.0.1" "$d"
+          c=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:7443/); [ "$c" = 200 ] || nota "panel" "http $c"
+          tok=$(sudo cat "$DATA/panel.token" 2>&1 | tr -d '[:space:]'); [ ${#tok} = 64 ] || nota "token" "${#tok} caracteres"
+          aviso "guardiana.log" "$(sudo tail -n 40 "$DATA/guardiana.log" 2>&1)"
+          /usr/local/guardiana/guardiana --version || nota "version" "no responde"
+          out=$(sudo "$RES/desinstalar.sh" pt 2>&1); rc=$?
           echo "$out"
-          echo "$out" | tail -n 1 | grep -q '^O extrato continua em '
-          ! [ -f /Library/LaunchDaemons/com.guardianagroup.guardiana.plist ]
-          ! [ -e /usr/local/guardiana ]
-          dig +short +time=2 +tries=1 @127.0.0.1 example.com | grep -q . && { echo "sigue escuchando"; exit 1; } || true
-          scutil --dns | grep -m3 nameserver
+          echo "$out" | tail -n 1 | grep -q '^O extrato continua em ' || nota "desinstalar.sh (rc=$rc)" "$out"
+          [ -f /Library/LaunchDaemons/com.guardianagroup.guardiana.plist ] && nota "plist" "sigue ahí"
+          [ -e /usr/local/guardiana ] && nota "binario" "sigue ahí"
+          d=$(dig +short +time=2 +tries=1 @127.0.0.1 example.com 2>&1); echo "$d" | grep -qE '^[0-9]' && nota "tras quitar" "127.0.0.1:53 sigue contestando: $d"
+          aviso "después: scutil" "$(scutil --dns | grep -m6 nameserver)"
+          exit $fallos
