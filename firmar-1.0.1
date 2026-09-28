@@ -1,0 +1,317 @@
+#!/bin/bash
+# GUARDIANA 1.0.1 · firma y registro público, en el Mac de publicación.
+#
+# Uso, en Terminal:  bash firmar-1.0.1
+#
+# Lo único que se escribe a mano es la contraseña de la clave de firma, y una sola vez: el guion
+# se la da a cada firma (con expect, que viene con macOS). La clave privada no sale de
+# ~/guardiana-claves y la contraseña no se guarda en ningún archivo.
+#
+# Qué hace, en este orden, y dónde para si algo no cuadra:
+#   0. herramientas (instala rsign y cargo-deb si faltan)
+#   1. clona el código publicado y exige que main sea exactamente COMMIT
+#   2. comprueba las huellas de lo que compiló GitHub: los dos .zip de la ejecución RUN
+#      (guardiana-repro y guardiana-instaladores), en ~/Downloads
+#   3. pide la contraseña, firma un papel de prueba y exige que la clave sea la que publica la web
+#   4. build/release.sh: .deb, .tar.gz y app de Mac; firmas; línea del registro; Rekor; commit
+#   5. comprueba cada firma con la clave pública
+#   6. y 7. deja en tu carpeta un .zip con lo firmado para dárselo a Claude, que lo comprueba,
+#      sube el registro y publica la web (este Mac no sube nada a GitHub)
+set -euo pipefail
+
+VERSION=1.0.1
+COMMIT=52aa1bf5afaf6c8936014e5e292d10e90d8d7231
+RUN=36473167217
+CODIGO=https://github.com/guardianagroup/guardiana.git
+WEB=https://github.com/guardianagroup/guardianagroup.com.git
+REPO="${REPO:-}"
+DESCARGAS="${DESCARGAS:-$HOME/Downloads}"
+KEYS="${GUARDIANA_KEYS:-$HOME/guardiana-claves}"
+TRABAJO="${TRABAJO:-$HOME/guardiana-publicar-$VERSION}"
+# Solo para el ensayo en GitHub Actions: clave de usar y tirar, Rekor de mentira y nada se sube.
+ENSAYO="${ENSAYO:-}"
+
+# Huellas de lo que compiló GitHub (ejecución 36473167217, dos compilaciones idénticas), leídas de
+# los avisos de esa ejecución.
+ESPERADAS=(
+  "526516193b1321c1b4c57fa21acb9888d8e498ab2803b65389fded0b188d543a  guardiana-1.0.1-linux-x86_64"
+  "9eba6845598004ca060262850d0e2541997ece0363deb1bf85956f7fc59844e9  guardiana-1.0.1-windows-x86_64.exe"
+  "c98a0b600cd04835d2a60dac76face77922c300a7caf49a209b492ac31fad6c3  guardiana-1.0.1-windows-x64.msi"
+  "9acb8ac8ba753005fb00ca185f40a518543bc63096efb9046dbfa2c0846bbb42  guardiana-1.0.1-windows-x64-en.msi"
+  "7c72a3ba94b19e3d15cc6b1aa2644ce60725c56dfb54db3e45204e14c7e8653b  guardiana-1.0.1-windows-x64-pt.msi"
+)
+
+paso() { printf '\n== %s\n' "$*"; }
+para() { printf '\nPARO: %s\n' "$*" >&2; exit 1; }
+
+export PATH="$HOME/.cargo/bin:$PATH"
+
+paso "0/7 Herramientas"
+for c in git python3 unzip zip cargo; do
+  command -v "$c" >/dev/null 2>&1 || para "falta $c en este Mac."
+done
+if ! command -v minisign >/dev/null 2>&1 && ! command -v rsign >/dev/null 2>&1; then
+  echo "Instalo rsign (firma en el formato de minisign)…"
+  cargo install rsign2 --locked
+fi
+if ! cargo deb --version >/dev/null 2>&1; then
+  echo "Instalo cargo-deb…"
+  cargo install cargo-deb --locked
+fi
+if [ -z "$ENSAYO" ]; then
+  [ -f "$KEYS/minisign.key" ] || para "no está $KEYS/minisign.key."
+fi
+
+if [ -e "$TRABAJO" ]; then
+  mv "$TRABAJO" "$TRABAJO.anterior-$(date +%Y%m%d%H%M%S)"
+fi
+mkdir -p "$TRABAJO/zip" "$TRABAJO/todo" "$TRABAJO/archivos" "$TRABAJO/bin" "$TRABAJO/repro"
+
+# macOS no siempre trae sha256sum; release.sh lo usa. shasum hace lo mismo.
+if ! command -v sha256sum >/dev/null 2>&1; then
+  printf '#!/bin/sh\nexec shasum -a 256 "$@"\n' > "$TRABAJO/bin/sha256sum"
+  chmod +x "$TRABAJO/bin/sha256sum"
+fi
+export PATH="$TRABAJO/bin:$PATH"
+
+# La contraseña una sola vez: expect lanza la orden y contesta cada «Password:» con ella. Lo
+# demás que la orden pregunte lo sigue viendo y contestando la persona.
+CON_CLAVE=""
+if command -v expect >/dev/null 2>&1; then
+  CON_CLAVE="$TRABAJO/con-clave.exp"
+  cat > "$CON_CLAVE" <<'EXP'
+set timeout -1
+log_user 1
+spawn -noecho {*}$argv
+interact {
+    -o
+    -re {Password[^\r\n]*: *$} {
+        send -- "$env(GUARDIANA_CLAVE)\r"
+    }
+}
+set r [wait]
+exit [lindex $r 3]
+EXP
+fi
+con_clave() {
+  if [ -n "$CON_CLAVE" ] && [ -n "${GUARDIANA_CLAVE:-}" ]; then
+    expect -f "$CON_CLAVE" -- "$@"
+  else
+    "$@"
+  fi
+}
+
+# El repositorio de siempre de este Mac (para copiar quién firma los commits y por dónde sube).
+# Solo se mira en carpetas que macOS no protege, para que no salten avisos de permisos.
+if [ -z "$REPO" ]; then
+  for d in "$HOME/guardiana" "$HOME/Developer/guardiana" "$HOME/dev/guardiana" "$HOME/proyectos/guardiana" \
+           "$HOME/Projects/guardiana" "$HOME/src/guardiana" "$HOME/code/guardiana" "$HOME/repos/guardiana" "$HOME/git/guardiana"; do
+    if [ -d "$d/.git" ]; then REPO="$d"; break; fi
+  done
+fi
+
+# Subir a GitHub: primero por donde ya sube el repositorio de siempre; si no, https con el llavero
+# de macOS y, si tampoco, ssh. GIT_TERMINAL_PROMPT=0: si https no tiene la llave guardada, que falle
+# en vez de pedir un usuario y una contraseña que GitHub ya no acepta.
+alternativa() {
+  case "$1" in
+    https://github.com/*) printf 'git@github.com:%s' "${1#https://github.com/}" ;;
+    git@github.com:*) printf 'https://github.com/%s' "${1#git@github.com:}" ;;
+  esac
+}
+subir() {  # carpeta  url  destino  [--dry-run]; deja en SUBIDO_POR la url que funcionó
+  local dir="$1" url="$2" ref="$3" seco="${4:-}" u
+  for u in "$url" "$(alternativa "$url")"; do
+    [ -n "$u" ] || continue
+    if GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new" \
+       git -C "$dir" push $seco "$u" "$ref" >/dev/null 2>&1; then
+      SUBIDO_POR="$u"
+      return 0
+    fi
+  done
+  return 1
+}
+
+identidad() {  # copia quién firma los commits desde el repositorio de siempre de este Mac
+  if [ -n "$REPO" ] && [ -d "$REPO/.git" ]; then
+    for k in user.name user.email user.signingkey gpg.format gpg.ssh.program commit.gpgsign; do
+      v="$(git -C "$REPO" config --get "$k" 2>/dev/null || true)"
+      [ -n "$v" ] && git config "$k" "$v"
+    done
+  fi
+  if [ -z "$(git config --get user.email || true)" ]; then
+    git config user.name "GUARDIANA GROUP"
+    git config user.email "guardianagroup@users.noreply.github.com"
+  fi
+  # Un commit de prueba que se deshace: si la firma del commit falla aquí, mejor ahora que
+  # después de Rekor.
+  local antes
+  antes="$(git rev-parse HEAD)"
+  if ! git commit -q --allow-empty -m "prueba (se deshace)" >/dev/null 2>&1; then
+    git config commit.gpgsign false
+    git commit -q --allow-empty -m "prueba (se deshace)" >/dev/null 2>&1 || para "git no puede hacer commits en $(pwd)."
+  fi
+  git reset -q --hard "$antes"
+}
+
+paso "1/7 Código publicado en GitHub: $COMMIT"
+git clone -q "$CODIGO" "$TRABAJO/guardiana"
+git clone -q --depth 1 "$WEB" "$TRABAJO/web"
+cd "$TRABAJO/guardiana"
+[ "$(git rev-parse HEAD)" = "$COMMIT" ] || para "main de GitHub está en $(git rev-parse HEAD), no en $COMMIT. Avisa a Claude."
+identidad
+# Este Mac no sube nada: al final deja un archivo con lo firmado para Claude, que lo comprueba y
+# lo sube desde allí (así se publicó 1.0.0, el 28 sep 2026).
+SIN_SUBIR=""
+[ -n "$ENSAYO" ] || SIN_SUBIR=1
+# La app de Mac lleva el icono de la web; crear-app.sh lo busca en site/. Se excluye aquí mismo
+# para que el árbol siga limpio (release.sh lo exige) sin tocar nada publicado.
+mkdir -p site
+cp "$TRABAJO/web/icon-512.png" site/icon-512.png
+echo "/site/" >> .git/info/exclude
+
+paso "2/7 Lo que compiló GitHub y sus huellas"
+# Los dos artefactos de la ejecución, en .zip o en carpeta si Safari los descomprimió. Se toma el
+# más reciente si hay varios (Safari añade « 2», «-1»... al nombre cuando ya existe uno).
+fuente() {
+  local z d
+  z="$(ls -t "$DESCARGAS/$1"*.zip 2>/dev/null | head -n 1 || true)"
+  d="$(ls -td "$DESCARGAS/$1"*/ 2>/dev/null | head -n 1 || true)"
+  if [ -n "$z" ] && { [ -z "$d" ] || [ "$z" -nt "$d" ]; }; then
+    rm -rf "$TRABAJO/zip/$1"
+    unzip -q -o "$z" -d "$TRABAJO/zip/$1"
+    echo "$TRABAJO/zip/$1"
+  elif [ -n "$d" ]; then
+    echo "${d%/}"
+  else
+    return 1
+  fi
+}
+abrir_run() { command -v open >/dev/null 2>&1 && open "https://github.com/guardianagroup/guardiana/actions/runs/$RUN" || true; }
+if ! r="$(fuente guardiana-repro)" || ! m="$(fuente guardiana-instaladores)"; then
+  abrir_run
+  para "no encuentro lo que compiló GitHub. En la página que se acaba de abrir, abajo, en «Artifacts», pulsa guardiana-repro y guardiana-instaladores (hace falta haber entrado en GitHub). Cuando estén en Descargas, vuelve a ejecutar esto."
+fi
+origen="$TRABAJO/todo"
+cp "$r"/guardiana-* "$origen/"
+find "$m" -name '*.msi' -exec cp {} "$origen/" \;
+if ! ( cd "$origen" && printf '%s\n' "${ESPERADAS[@]}" | sha256sum -c - ); then
+  abrir_run
+  para "lo que hay en Descargas no es de la ejecución $RUN (las huellas no cuadran). Borra de Descargas guardiana-repro y guardiana-instaladores, bájalos otra vez de la página que se acaba de abrir y vuelve a ejecutar esto."
+fi
+repro="$TRABAJO/repro"
+cp "$origen/guardiana-$VERSION-linux-x86_64" "$origen/guardiana-$VERSION-windows-x86_64.exe" "$repro/"
+printf '%s\n' "${ESPERADAS[0]}" "${ESPERADAS[1]}" > "$repro/SHA256SUMS"
+mkdir -p "dist/$VERSION" target/x86_64-unknown-linux-gnu/release target/x86_64-pc-windows-gnu/release
+cp "$origen"/guardiana-"$VERSION"-windows-x64*.msi "dist/$VERSION/"
+
+if command -v minisign >/dev/null 2>&1; then
+  firmar() { con_clave minisign -Sm "$1" -s "$KEYS/minisign.key" -t "$2"; }
+  comprobar() { minisign -Vm "$1" -p "$TRABAJO/guardiana/build/pubkey/minisign.pub" >/dev/null; }
+  generar() { con_clave minisign -G -p "$1/minisign.pub" -s "$1/minisign.key"; }
+else
+  firmar() { con_clave rsign sign -s "$KEYS/minisign.key" -x "$1.minisig" -t "$2" "$1"; }
+  comprobar() { rsign verify -p "$TRABAJO/guardiana/build/pubkey/minisign.pub" -x "$1.minisig" "$1" >/dev/null; }
+  generar() { con_clave rsign generate -p "$1/minisign.pub" -s "$1/minisign.key"; }
+fi
+
+if [ -n "$ENSAYO" ]; then
+  echo "(ensayo: clave de usar y tirar con contraseña «ensayo», y Rekor de mentira)"
+  export GUARDIANA_CLAVE=ensayo
+  KEYS="$TRABAJO/clave-ensayo"
+  mkdir -p "$KEYS"
+  generar "$KEYS"
+  cp "$KEYS/minisign.pub" build/pubkey/minisign.pub
+  git commit -q -am "ensayo: clave de usar y tirar"
+  printf '#!/bin/sh\ncat >/dev/null\necho "{\\"Location\\":\\"/api/v1/log/entries/ENSAYO0000000000\\"}"\n' > "$TRABAJO/bin/rekor-cli"
+  chmod +x "$TRABAJO/bin/rekor-cli"
+fi
+export GUARDIANA_KEYS="$KEYS"
+
+paso "3/7 Contraseña de la clave y prueba de que es la clave de la web"
+printf 'GUARDIANA %s: prueba de la clave\n' "$VERSION" > "$TRABAJO/prueba-clave.txt"
+intentos=0
+while :; do
+  intentos=$((intentos + 1))
+  if [ -n "$CON_CLAVE" ] && [ -z "$ENSAYO" ]; then
+    printf 'Escribe la contraseña de la clave de firma y pulsa Enter (mientras escribes no se ve nada): '
+    IFS= read -r -s GUARDIANA_CLAVE
+    echo
+    export GUARDIANA_CLAVE
+  elif [ -z "$CON_CLAVE" ]; then
+    echo "(rsign te pedirá la contraseña en cada firma)"
+  fi
+  rm -f "$TRABAJO/prueba-clave.txt.minisig"
+  if firmar "$TRABAJO/prueba-clave.txt" "GUARDIANA $VERSION prueba de la clave"; then
+    break
+  fi
+  [ "$intentos" -lt 3 ] || para "tres intentos sin poder firmar. No se ha firmado nada más."
+  echo "No ha podido firmar: seguramente la contraseña no es esa. Otra vez."
+done
+comprobar "$TRABAJO/prueba-clave.txt" || para "la clave de $KEYS no es la de build/pubkey/minisign.pub. No se ha firmado nada más."
+echo "Clave correcta."
+
+if [ -n "$CON_CLAVE" ]; then
+  paso "4/7 Paquetes, firmas, registro público y Rekor (10–15 minutos; la contraseña va sola)"
+else
+  paso "4/7 Paquetes, firmas, registro público y Rekor (10–15 minutos; una contraseña por archivo)"
+fi
+con_clave build/release.sh --binarios "$repro"
+unset GUARDIANA_CLAVE
+
+paso "5/7 Compruebo cada firma con la clave pública"
+linea="$(tail -n 1 ledger.jsonl)"
+printf '%s\n' "$linea" > "$TRABAJO/archivos/ledger-line.json"
+nombres="$(python3 -c 'import json,sys; print("\n".join(f["name"] for f in json.loads(sys.argv[1])["files"]))' "$linea")"
+while IFS= read -r n; do
+  f=""
+  for d in build/out "dist/$VERSION"; do
+    if [ -f "$d/$n" ]; then f="$d/$n"; break; fi
+  done
+  [ -n "$f" ] || para "no encuentro $n."
+  comprobar "$f" || para "la firma de $n no cuadra con la clave pública."
+  cp "$f" "$f.minisig" "$TRABAJO/archivos/"
+  echo "ok  $n"
+done <<< "$nombres"
+mac_arch=""
+app_bin="build/out/app/GUARDIANA.app/Contents/Resources/guardiana"
+if [ -f "$app_bin" ]; then
+  mac_arch="$(lipo -archs "$app_bin" 2>/dev/null || uname -m)"
+fi
+
+paso "6/7 Registro público a GitHub (main)"
+if [ -n "$ENSAYO" ]; then
+  echo "(ensayo: no se sube)"
+  echo "$linea"
+elif [ -n "$SIN_SUBIR" ]; then
+  echo "(lo sube Claude: va en el archivo del final)"
+  git format-patch -q -1 HEAD -o "$TRABAJO/archivos/"
+fi
+
+if [ -n "$SIN_SUBIR" ]; then
+  paso "7/7 Archivo para Claude"
+  # Lo que Claude no tiene: los paquetes hechos aquí, todas las firmas, la línea del registro (la
+  # final y la firmada que fue a Rekor) y el commit de ledger.jsonl. Los .exe, binarios y MSI no
+  # van: son los mismos bytes que ya tiene, y los comprueba por su huella.
+  cp build/out/ledger-line.json "$TRABAJO/archivos/linea-firmada.json"
+  cp build/out/ledger-line.json.minisig "$TRABAJO/archivos/linea-firmada.json.minisig"
+  printf '%s\n' "$mac_arch" > "$TRABAJO/archivos/mac-arch.txt"
+  paquete="$HOME/guardiana-firmado-$VERSION.zip"
+  rm -f "$paquete"
+  (
+    cd "$TRABAJO/archivos"
+    extra=""
+    for f in "guardiana_${VERSION}_amd64.deb" "guardiana-$VERSION-linux-x86_64.tar.gz" "guardiana-$VERSION-macos.app.zip"; do
+      if [ -f "$f" ]; then extra="$extra $f"; fi
+    done
+    # shellcheck disable=SC2086
+    zip -q "$paquete" ./*.minisig ledger-line.json linea-firmada.json ./*.patch mac-arch.txt $extra
+  )
+  echo
+  echo "HECHO. Firmado y anotado en Rekor."
+  echo "Se abre una ventana con el archivo $(basename "$paquete"):"
+  echo "arrástralo al chat de Claude, o mándatelo por correo y bájalo en el PC como la otra vez."
+  echo "Claude lo comprueba y lo publica."
+  if command -v open >/dev/null 2>&1; then open -R "$paquete" || true; fi
+  exit 0
+fi
