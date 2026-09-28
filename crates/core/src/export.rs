@@ -19,9 +19,25 @@ pub fn write_json<W: Write>(events: &[Event], mut w: W) -> Result<()> {
     Ok(())
 }
 
-/// Write events as CSV with a header row.
-pub fn write_csv<W: Write>(events: &[Event], mut w: W) -> Result<()> {
-    writeln!(w, "{CSV_HEADER}")?;
+/// Write events as CSV with a header row (RFC 4180: commas, no byte-order mark).
+pub fn write_csv<W: Write>(events: &[Event], w: W) -> Result<()> {
+    write_csv_with(events, ',', false, w)
+}
+
+/// CSV the way a spreadsheet opens it with a double click (the panel's «Export CSV»): UTF-8 with
+/// a byte-order mark, so Excel does not garble accents, and the separator of the person's
+/// spreadsheet. Spanish- and Portuguese-speaking countries write decimals with a comma, so their
+/// Excel splits columns on `;` and showed a comma-separated file as one long column (found
+/// exporting the published 1.0.0, 28 Sep 2026). The command line keeps plain RFC 4180.
+pub fn write_csv_for_spreadsheet<W: Write>(events: &[Event], sep: char, w: W) -> Result<()> {
+    write_csv_with(events, sep, true, w)
+}
+
+fn write_csv_with<W: Write>(events: &[Event], sep: char, bom: bool, mut w: W) -> Result<()> {
+    if bom {
+        w.write_all("\u{feff}".as_bytes())?;
+    }
+    writeln!(w, "{}", CSV_HEADER.replace(',', &sep.to_string()))?;
     for e in events {
         let signals = e
             .signals
@@ -63,17 +79,17 @@ pub fn write_csv<W: Write>(events: &[Event], mut w: W) -> Result<()> {
         ];
         let line = fields
             .iter()
-            .map(|f| quote(f))
+            .map(|f| quote(f, sep))
             .collect::<Vec<_>>()
-            .join(",");
+            .join(&sep.to_string());
         writeln!(w, "{line}")?;
     }
     Ok(())
 }
 
 /// RFC 4180 quoting: wrap in quotes when needed, double inner quotes.
-fn quote(field: &str) -> String {
-    if field.contains([',', '"', '\n', '\r']) {
+fn quote(field: &str, sep: char) -> String {
+    if field.contains([sep, '"', '\n', '\r']) {
         format!("\"{}\"", field.replace('"', "\"\""))
     } else {
         field.to_owned()
@@ -90,9 +106,33 @@ mod tests {
 
     #[test]
     fn csv_quotes_only_when_needed() {
-        assert_eq!(quote("plain"), "plain");
-        assert_eq!(quote("a,b"), "\"a,b\"");
-        assert_eq!(quote("say \"hi\""), "\"say \"\"hi\"\"\"");
+        assert_eq!(quote("plain", ','), "plain");
+        assert_eq!(quote("a,b", ','), "\"a,b\"");
+        assert_eq!(quote("a,b", ';'), "a,b");
+        assert_eq!(quote("a;b", ';'), "\"a;b\"");
+        assert_eq!(quote("say \"hi\"", ','), "\"say \"\"hi\"\"\"");
+    }
+
+    #[test]
+    fn spreadsheet_csv_has_a_bom_and_the_asked_separator() {
+        let mut l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        l.append(NewEvent::observed(1, "self", "127.0.0.1", "a.example", "A"))
+            .unwrap();
+        let events = l.events(&Default::default()).unwrap();
+        let mut csv = Vec::new();
+        write_csv_for_spreadsheet(&events, ';', &mut csv).unwrap();
+        assert!(csv.starts_with(&[0xEF, 0xBB, 0xBF]));
+        let text = String::from_utf8(csv[3..].to_vec()).unwrap();
+        let mut lines = text.lines();
+        assert_eq!(lines.next().unwrap(), CSV_HEADER.replace(',', ";"));
+        assert!(lines
+            .next()
+            .unwrap()
+            .starts_with("1;1;1970-01-01T00:00:00.001Z;self;127.0.0.1;a.example;A;"));
+        // The command-line CSV stays plain RFC 4180: no mark, commas.
+        let mut plano = Vec::new();
+        write_csv(&events, &mut plano).unwrap();
+        assert!(plano.starts_with(b"id,ts,"));
     }
 
     #[test]

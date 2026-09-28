@@ -28,7 +28,7 @@ pub mod trampas;
 
 pub use changes::{Change, ChangeKind};
 pub use error::{Error, Result};
-pub use export::{write_csv, write_json};
+pub use export::{write_csv, write_csv_for_spreadsheet, write_json};
 pub use gaps::{Gap, GAP_THRESHOLD_MS, KEY_HEARTBEAT};
 pub use hash::{chain_hash, Hash, HashInput};
 pub use ledger::{ChainFault, CheckReport, EventFilter, Ledger};

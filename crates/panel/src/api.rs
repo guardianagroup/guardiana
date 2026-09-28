@@ -17,8 +17,8 @@ use guardiana_core::rules::{observation_complete, observed_hours};
 use guardiana_core::time::now_ms;
 use guardiana_core::ChangeKind;
 use guardiana_core::{
-    write_csv, write_json, Action, Category, DecidedBy, Device, Event, EventFilter, Ledger,
-    MatchKind, NewRule, Rule, Scope, Signal, Verdict, SELF_DEVICE_ID,
+    write_csv_for_spreadsheet, write_json, Action, Category, DecidedBy, Device, Event, EventFilter,
+    Ledger, MatchKind, NewRule, Rule, Scope, Signal, Verdict, SELF_DEVICE_ID,
 };
 use guardiana_service::home::{self, SETTING_HOME_IP, SETTING_HOME_MODE, SETTING_HOME_SINCE};
 use guardiana_service::sysdns::SETTING_BACKUP;
@@ -1199,18 +1199,31 @@ pub(crate) async fn comprobar(
 }
 
 pub(crate) async fn exportar(
+    Lang(t): Lang,
     State(state): State<Arc<AppState>>,
     _s: Session,
     Query(q): Query<HashMap<String, String>>,
 ) -> Result<Response, Response> {
-    let filter = filter_from(&q)?;
+    // Everything the filters select, not only the rows the page is showing: the page asks for
+    // the newest 200, and exporting sent those 200 and nothing else, while the panel promises
+    // that the whole extract is yours to take (found exporting 441 events from 1.0.0, 28 Sep
+    // 2026: the CSV and the JSON had 200).
+    let mut filter = filter_from(&q)?;
+    filter.limit = None;
     let events = with_ledger(&state, |l| l.events(&filter))?;
     let json = q.get("formato").is_some_and(|f| f == "json");
     let mut body = Vec::new();
     if json {
         write_json(&events, &mut body).map_err(internal)?;
     } else {
-        write_csv(&events, &mut body).map_err(internal)?;
+        // The separator of the person's spreadsheet: `;` where decimals are written with a
+        // comma (the Spanish- and Portuguese-speaking world), `,` in English.
+        let sep = if std::ptr::eq(t, i18n::en()) {
+            ','
+        } else {
+            ';'
+        };
+        write_csv_for_spreadsheet(&events, sep, &mut body).map_err(internal)?;
     }
     let (ctype, name) = if json {
         ("application/json; charset=utf-8", "guardiana-extracto.json")
