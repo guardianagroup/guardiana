@@ -359,6 +359,7 @@
     "borrar_titulo": "Apagar tudo",
     "borrar_lead": "Apaga o extrato, os aparelhos, as regras e este registro. Não dá para desfazer.",
     "borrar_boton": "Apagar tudo o que a Guardiana guarda",
+    "borrar_palabra": "APAGAR",
     "borrar_confirmar": "Isto apaga tudo e não dá para desfazer. Escreva APAGAR para confirmar:",
     "estado_titulo": "Estado",
     "e_version": "Versão:",

@@ -872,9 +872,12 @@
       $('s-retencion').textContent = r.retencion;
       $('outbound').innerHTML = r.outbound.map((o) => `<tr><td>${when(o.ts)}</td><td>${esc(o.purpose)}</td><td class="mono">${esc(o.host)}</td><td>${o.bytes}</td></tr>`).join('') || `<tr><td colspan="4" class="ok">${esc(t('outbound_vacio'))}</td></tr>`;
       $('wipe').addEventListener('click', async () => {
+        // The word is the one the question asks for in the panel's language (BORRAR, DELETE,
+        // APAGAR). Until 1.0.1 only BORRAR was accepted, so in English and Portuguese typing the
+        // word the panel asked for did nothing at all. The server keeps its one fixed word.
         const word = prompt(t('borrar_confirmar'));
-        if (word !== 'BORRAR') return;
-        await api('/api/sabe-de-ti/borrar', { method: 'POST', body: { confirmacion: word } });
+        if ((word || '').trim().toUpperCase() !== t('borrar_palabra').toUpperCase()) return;
+        await api('/api/sabe-de-ti/borrar', { method: 'POST', body: { confirmacion: 'BORRAR' } });
         location.reload();
       });
     },

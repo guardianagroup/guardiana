@@ -359,6 +359,7 @@
     "borrar_titulo": "Delete everything",
     "borrar_lead": "Deletes the ledger, the devices, the rules and this record. It cannot be undone.",
     "borrar_boton": "Delete everything Guardiana stores",
+    "borrar_palabra": "DELETE",
     "borrar_confirmar": "This deletes everything and cannot be undone. Type DELETE to confirm:",
     "estado_titulo": "Status",
     "e_version": "Version:",

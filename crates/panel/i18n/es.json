@@ -359,6 +359,7 @@
     "borrar_titulo": "Borrar todo",
     "borrar_lead": "Borra el extracto, los dispositivos, las reglas y este registro. No se puede deshacer.",
     "borrar_boton": "Borrar todo lo que Guardiana guarda",
+    "borrar_palabra": "BORRAR",
     "borrar_confirmar": "Esto borra todo y no se puede deshacer. Escribe BORRAR para confirmar:",
     "estado_titulo": "Estado",
     "e_version": "Versión:",
