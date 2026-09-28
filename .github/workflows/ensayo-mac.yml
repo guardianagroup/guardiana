@@ -1,0 +1,35 @@
+# Ensayo del paso del Mac antes de firmar (28 sep 2026): que compile y pase las pruebas en macOS
+# y que la app se pueda montar desde un clon limpio. No firma ni publica nada.
+name: ensayo-mac
+on:
+  push:
+    branches: ['ensayo-mac']
+permissions:
+  contents: read
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: build
+        run: cargo build --workspace --locked
+      - name: clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: test
+        run: cargo test --workspace --locked
+      - name: app
+        run: |
+          mkdir -p site
+          curl -fsSL https://raw.githubusercontent.com/guardianagroup/guardianagroup.com/main/icon-512.png -o site/icon-512.png
+          build/mac/crear-app.sh build/out/app
+          file build/out/app/GUARDIANA.app/Contents/Resources/guardiana
+          (cd build/out/app && zip -qry ../guardiana-mac-ensayo.zip GUARDIANA.app)
+          ls -la build/out
+      - name: cargo-deb
+        run: |
+          cargo install cargo-deb --locked
+          cargo deb --version
