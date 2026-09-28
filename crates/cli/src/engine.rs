@@ -424,6 +424,14 @@ fn give_dns_back_while_stopped(db: &std::path::Path) {
 /// The LAN address Home Mode should be listening on right now: `None` when
 /// Home Mode is off, not allowed by the licence, or the computer has no
 /// private LAN address (yet).
+/// How a cut name is answered, as the panel last saved it (Rules › how to answer).
+fn block_mode_of(ledger: &Ledger) -> BlockMode {
+    match ledger.setting(SETTING_BLOCK_MODE).ok().flatten().as_deref() {
+        Some("zero") => BlockMode::ZeroIp,
+        _ => BlockMode::NxDomain,
+    }
+}
+
 fn home_lan_wanted(ledger: &Ledger, secret: &str) -> Option<std::net::Ipv4Addr> {
     let on = ledger
         .setting(SETTING_HOME_MODE)
@@ -605,10 +613,7 @@ async fn run_once<F: Future<Output = ()>>(
             let _ = classifier.load_profile(&d.id, json);
         }
     }
-    let block_mode = match ledger.setting(SETTING_BLOCK_MODE)?.as_deref() {
-        Some("zero") => BlockMode::ZeroIp,
-        _ => BlockMode::NxDomain,
-    };
+    let block_mode = block_mode_of(&ledger);
     let initial_rules = ledger.rules().unwrap_or_default();
     let initial_version = ledger.rules_version().unwrap_or(0);
     let policy = EnginePolicy {
@@ -843,6 +848,7 @@ async fn run_once<F: Future<Output = ()>>(
     // What the resolver forwards to in this pass, to notice when the network changes it.
     let seguir_red = cfg.upstreams.is_empty() && cfg!(target_os = "windows");
     let keep_upstreams: Vec<IpAddr> = upstreams.iter().map(SocketAddr::ip).collect();
+    let keep_block_mode = block_mode;
     let (reconfigure_tx, mut reconfigure) = tokio::sync::oneshot::channel::<()>();
     let (caducado_tx, mut caducado) = tokio::sync::oneshot::channel::<()>();
     let housekeeping = tokio::spawn(async move {
@@ -867,10 +873,14 @@ async fn run_once<F: Future<Output = ()>>(
                 }
                 _ = lan_check.tick() => {
                     // Home LAN appeared, vanished, changed address, or Home
-                    // Mode was switched: ask for the listeners to be rebuilt.
+                    // Mode was switched: ask for the listeners to be rebuilt. The same for
+                    // the way a cut name is answered: the resolver takes it when it is built,
+                    // and until 1.0.1 a change saved in the panel waited for the next restart.
                     if reconfigure_tx.is_some() {
                         if let Ok(l) = Ledger::open(&keep_db, identity::genesis()) {
-                            if home_lan_wanted(&l, &keep_secret) != home_lan {
+                            if home_lan_wanted(&l, &keep_secret) != home_lan
+                                || block_mode_of(&l) != keep_block_mode
+                            {
                                 if let Some(tx) = reconfigure_tx.take() {
                                     let _ = tx.send(());
                                 }

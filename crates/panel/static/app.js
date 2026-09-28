@@ -685,7 +685,22 @@
       const sel = $('n-device');
       devs.forEach((d) => { const o = document.createElement('option'); o.value = d.id; o.textContent = (d.name || (d.id === 'self' ? t('este_computador') : d.id)) + (d.puede_cortar ? '' : ' · ' + mirando(d.horas_observadas)); sel.appendChild(o); });
       $('n-scope').addEventListener('change', () => $('n-device-wrap').classList.toggle('hidden', $('n-scope').value !== 'device'));
-      $('n-kind').addEventListener('change', () => { $('n-pattern').placeholder = $('n-kind').value === 'category' ? 'rastreador / publicidad / telemetria / desconocido' : 'ejemplo.com'; });
+      // The category is written the way the panel shows it, in the panel's language («tracker»,
+      // «advertising»): until 1.0.1 only the Spanish code was accepted, and the English page even
+      // suggested the Spanish words. Both are understood; the server gets the code.
+      const CATS_CORTABLES = ['rastreador', 'publicidad', 'telemetria', 'desconocido'];
+      const ejemplo = { es: 'ejemplo.com', en: 'example.com', pt: 'exemplo.com' }[LANG] || 'example.com';
+      const pista = () => { $('n-pattern').placeholder = $('n-kind').value === 'category' ? CATS_CORTABLES.map(catName).join(' / ') : ejemplo; };
+      const categoriaDe = (texto) => {
+        const x = texto.trim().toLowerCase();
+        const sinTilde = (v) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        for (const [codigo, nombre] of Object.entries(T.categorias || {})) {
+          if (sinTilde(x) === sinTilde(codigo) || sinTilde(x) === sinTilde(String(nombre).toLowerCase())) return codigo;
+        }
+        return texto.trim();
+      };
+      $('n-kind').addEventListener('change', pista);
+      pista();
       const load = async () => {
         const r = await api('/api/reglas');
         document.querySelectorAll('input[name=modo]').forEach((i) => { i.checked = i.value === r.modo_bloqueo; });
@@ -694,7 +709,9 @@
       $('nueva').addEventListener('submit', async (e) => {
         e.preventDefault();
         const f = new FormData($('nueva'));
-        const body = { scope: f.get('scope'), device_id: f.get('device_id') || null, match_kind: f.get('match_kind'), pattern: f.get('pattern'), action: f.get('action') };
+        const kind = f.get('match_kind');
+        const pattern = kind === 'category' ? categoriaDe(f.get('pattern') || '') : f.get('pattern');
+        const body = { scope: f.get('scope'), device_id: f.get('device_id') || null, match_kind: kind, pattern, action: f.get('action') };
         try {
           const created = await createRule(body);
           $('n-msg').textContent = created ? t('regla_creada') : '';
