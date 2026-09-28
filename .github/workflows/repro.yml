@@ -31,7 +31,11 @@ jobs:
       - name: reproducible build
         run: build/repro.sh HEAD
       - name: the hashes
-        run: cat build/out/SHA256SUMS
+        # Also as notices: they show on the run page and through the public API without signing
+        # in, so the release Mac can be given the expected hashes without anyone opening a log.
+        run: |
+          cat build/out/SHA256SUMS
+          while read -r h n; do echo "::notice title=${n#\*}::$h"; done < build/out/SHA256SUMS
       - name: build twice and compare
         # Reproducible means the same input gives the same output, so the only honest check is to
         # do it again and compare. If these two differ, the word does not apply and the release
@@ -92,6 +96,10 @@ jobs:
             "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
           } | Set-Content -Encoding ascii "dist/$version/SHA256SUMS-msi"
           Get-Content "dist/$version/SHA256SUMS-msi"
+          Get-Content "dist/$version/SHA256SUMS-msi" | ForEach-Object {
+            $p = $_ -split '\s+'
+            Write-Output "::notice title=$($p[1])::$($p[0])"
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: guardiana-instaladores
