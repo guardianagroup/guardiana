@@ -1,13 +1,18 @@
-# Ensayo del paso del Mac antes de firmar (28 sep 2026): que compile y pase las pruebas en macOS
-# y que la app se pueda montar desde un clon limpio. No firma ni publica nada.
+# Ensayo del paso del Mac antes de firmar de verdad (28 sep 2026). Dos cosas:
+#   pruebas: que compile y pasen las pruebas en macOS;
+#   publicar: build/publicar-1.0.0.sh entero, con clave de usar y tirar, Rekor de mentira y
+#             sin subir nada. Solo lee de GitHub.
 name: ensayo-mac
 on:
   push:
     branches: ['ensayo-mac']
 permissions:
   contents: read
+  actions: read
+env:
+  CARGO_TERM_COLOR: always
 jobs:
-  mac:
+  pruebas:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,15 +26,42 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: test
         run: cargo test --workspace --locked
-      - name: app
+
+  publicar:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/download-artifact@v4
+        with:
+          name: guardiana-repro
+          path: ${{ runner.temp }}/descargas/guardiana-repro
+          run-id: 36447056747
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: guardiana-instaladores
+          path: ${{ runner.temp }}/descargas/guardiana-instaladores
+          run-id: 36447056747
+          github-token: ${{ github.token }}
+      - name: rsign, como en el Mac de publicación (sin Homebrew)
         run: |
-          mkdir -p site
-          curl -fsSL https://raw.githubusercontent.com/guardianagroup/guardianagroup.com/main/icon-512.png -o site/icon-512.png
-          build/mac/crear-app.sh build/out/app
-          file build/out/app/GUARDIANA.app/Contents/Resources/guardiana
-          (cd build/out/app && zip -qry ../guardiana-mac-ensayo.zip GUARDIANA.app)
-          ls -la build/out
-      - name: cargo-deb
+          command -v minisign && echo "ojo: hay minisign" || echo "sin minisign, como el Mac"
+          cargo install rsign2 --locked
+      - name: publicar-1.0.0.sh en modo ensayo
+        env:
+          ENSAYO: '1'
+          DESCARGAS: ${{ runner.temp }}/descargas
+          TRABAJO: ${{ runner.temp }}/trabajo
+          REPO: /no/existe
+        run: bash build/publicar-1.0.0.sh
+      - name: resultado
+        if: always()
         run: |
-          cargo install cargo-deb --locked
-          cargo deb --version
+          cd "$RUNNER_TEMP/trabajo" || exit 0
+          ls -la archivos || true
+          cat archivos/ledger-line.json || true
+          grep -o 'macOS 13[^<]*' web/instalar.html || true
+          grep -c 'descargas/1.0.0/' web/instalar.html web/en/install.html web/pt/instalar.html || true
+          lipo -archs guardiana/build/out/app/GUARDIANA.app/Contents/Resources/guardiana || true
