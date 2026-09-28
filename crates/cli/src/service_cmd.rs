@@ -150,6 +150,25 @@ mod windows {
             return;
         };
         let _ = handle.set_service_status(status(ServiceState::Running, Duration::ZERO));
+        // If the service dies or stops with an error, Windows starts it again (5 s, 15 s, then
+        // every minute). While it is down the machine has its old DNS back
+        // (engine::give_dns_back_while_stopped); restarting is what gets the watching back. Set
+        // here and not in the MSI: the MSI tables for it broke the repair (28 Sep 2026).
+        std::thread::spawn(|| {
+            let _ = std::process::Command::new("sc.exe")
+                .args([
+                    "failure",
+                    super::SERVICE,
+                    "reset=",
+                    "86400",
+                    "actions=",
+                    "restart/5000/restart/15000/restart/60000",
+                ])
+                .output();
+            let _ = std::process::Command::new("sc.exe")
+                .args(["failureflag", super::SERVICE, "1"])
+                .output();
+        });
         let cfg = EngineConfig::default_service();
         let resultado = rt.block_on(engine::run(cfg, async move {
             // The stop request arrives on a plain thread; poll it without blocking the runtime.

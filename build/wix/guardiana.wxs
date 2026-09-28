@@ -90,15 +90,10 @@
                       Account="LocalSystem"
                       Vital="yes" />
       <ServiceControl Id="SvcCtl" Name="guardiana" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
-      <!-- Windows restarts the service if it dies or stops with an error. While it is down the
-           machine has its old DNS back (engine::give_dns_back_while_stopped), so nobody is left
-           without internet; restarting is what gets the watching back (28 Sep 2026). -->
-      <ServiceConfig ServiceName="guardiana" OnInstall="yes" OnReinstall="yes" FailureActionsWhen="failedToStopOrReturnedError" />
-      <ServiceConfigFailureActions ServiceName="guardiana" OnInstall="yes" OnReinstall="yes" ResetPeriod="86400">
-        <Failure Action="restart" Delay="5000" />
-        <Failure Action="restart" Delay="15000" />
-        <Failure Action="restart" Delay="60000" />
-      </ServiceConfigFailureActions>
+      <!-- What Windows does when the service dies is set by the service itself, with sc.exe, each
+           time it starts (service_cmd.rs). The MSI tables for it (ServiceConfig and
+           ServiceConfigFailureActions) made the repair fail on the test PC on 28 Sep 2026 with
+           "the service could not be configured", and a failed repair rolls back. -->
     </Component>
 
     <Component Id="Readme" Directory="INSTALLFOLDER" Guid="6ee79eff-4700-48d1-93d8-35f8a726cd99">

@@ -11,6 +11,9 @@ ref="${1:-HEAD}"
 commit="$(git rev-parse "$ref")"
 version="$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')"
 epoch="$(git show -s --format=%ct "$commit")"
+# The fourth number of the Windows file version counts commits (crates/cli/build.rs). The tree
+# exported below has no .git, so it is counted here and handed in: same commit, same number.
+count="$(git rev-list --count "$commit")"
 
 command -v docker >/dev/null 2>&1 || { echo "repro.sh: docker is required" >&2; exit 1; }
 
@@ -29,6 +32,7 @@ docker run --rm \
     -v "$PWD/build/src-export:/src:ro" \
     -v "$PWD/build/out:/out" \
     -e SOURCE_DATE_EPOCH="$epoch" \
+    -e GUARDIANA_COMMIT_COUNT="$count" \
     -e CARGO_TARGET_DIR=/tmp/target \
     guardiana-repro \
     bash -euxc '

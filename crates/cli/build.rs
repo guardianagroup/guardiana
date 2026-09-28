@@ -20,6 +20,7 @@ fn main() {
     // which is what the fourth version component counts.
     println!("cargo:rerun-if-changed=../../.git/HEAD");
     println!("cargo:rerun-if-changed=../../.git/logs/HEAD");
+    println!("cargo:rerun-if-env-changed=GUARDIANA_COMMIT_COUNT");
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }
@@ -100,7 +101,18 @@ FILETYPE 0x1
 
 /// How many commits lead to HEAD, capped at 65535; 0 when git is not available. Monotonic, so a
 /// newer build always looks newer to Windows Installer.
+///
+/// The reproducible build compiles an exported tree with no `.git` inside, so it gets the count
+/// from `build/repro.sh` in GUARDIANA_COMMIT_COUNT. Without it every reproducible build said
+/// 1.0.0.0, older than any build made from a checkout, and upgrading over one of those left
+/// Program Files without guardiana.exe (measured on the test PC, 28 Sep 2026).
 fn commit_count() -> u16 {
+    if let Some(n) = env::var("GUARDIANA_COMMIT_COUNT")
+        .ok()
+        .and_then(|v| v.trim().parse::<u32>().ok())
+    {
+        return n.min(65_535) as u16;
+    }
     let Ok(out) = Command::new("git")
         .args(["rev-list", "--count", "HEAD"])
         .output()
