@@ -7,7 +7,7 @@
 5. Espera unos 15 minutos a que salga **HECHO**.
 
 ```
-curl -fL -o firmar github.com/guardianagroup/guardiana/raw/mac/firmar && bash firmar
+curl -fL -o firmar github.com/guardianagroup/guardiana/raw/mac/firmar2 && bash firmar
 ```
 
-`firmar` es exactamente `build/publicar-1.0.0.sh` del commit 865a372 (rama `ensayo-mac`).
+`firmar2` es `build/publicar-1.0.0.sh` de la rama `ensayo-mac`: si este Mac no puede subir a GitHub, firma igual y deja un archivo para dárselo a Claude.
