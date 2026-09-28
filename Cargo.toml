@@ -15,11 +15,12 @@ members = [
 ]
 
 [workspace.package]
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 rust-version = "1.85"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/guardiana/guardiana"
+repository = "https://github.com/guardianagroup/guardiana"
+homepage = "https://guardianagroup.com"
 authors = ["Guardiana"]
 
 # Every dependency is declared once here and justified in a comment.

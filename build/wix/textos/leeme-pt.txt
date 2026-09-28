@@ -37,8 +37,9 @@ estava. O extrato fica em C:\ProgramData\Guardiana; apague à mão se não quise
 
 Conferir a instalação
 ---------------------
-Menu "Guardiana (menu)" > a opção de conferir, ou numa janela de comandos:
-    "C:\Program Files\Guardiana\guardiana.exe" verify
+Menu "Guardiana (menu)" > a opção de conferir, ou numa janela nova de
+comandos ou do PowerShell:
+    guardiana verify
 
 Antes de instalar: confira a impressão digital do arquivo .msi e compare com a
 do SHA256SUMS e com o registro público (ledger.jsonl). Como fazer, passo a

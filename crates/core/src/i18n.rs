@@ -76,18 +76,22 @@ pub fn pt() -> &'static Texts {
     TEXTS_PT.get_or_init(|| serde_json::from_str(PT_JSON).unwrap_or_else(|_| Texts::empty()))
 }
 
-/// Texts for a language code (`en`, `en-US`, `pt-BR`, `es`...): English when it starts with `en`,
-/// Portuguese when it starts with `pt`, Spanish otherwise. Spanish stays the fallback because it
-/// is what the person installed when nothing says otherwise (the Windows service has no locale).
+/// Texts for a language code (`es-CO`, `en-US`, `pt-BR`, `de-DE`...): Spanish, Portuguese or
+/// English when it starts with `es`, `pt` or `en`; English for any other language, because a
+/// person reading German or French is far likelier to read English than Spanish (28 Sep 2026:
+/// a browser in German got the whole panel in Spanish). Spanish stays the answer only when
+/// nothing is said at all — an empty code, or the `C`/`POSIX` locale of a bare system or of the
+/// Windows service — because that is the language the program was written in.
 #[must_use]
 pub fn by_code(code: &str) -> &'static Texts {
     let code = code.trim().to_ascii_lowercase();
-    if code.starts_with("en") {
-        en()
+    let sin_idioma = code.is_empty() || code == "c" || code.starts_with("c.") || code == "posix";
+    if code.starts_with("es") || sin_idioma {
+        es()
     } else if code.starts_with("pt") {
         pt()
     } else {
-        es()
+        en()
     }
 }
 
@@ -107,8 +111,9 @@ pub fn json_of(t: &'static Texts) -> &'static str {
 }
 
 /// The language the CLI speaks: `GUARDIANA_LANG` first, then the system's `LC_ALL`, `LC_MESSAGES`
-/// or `LANG`; Spanish unless one of them starts with `en`. The Windows service has none of them
-/// and stays in Spanish, which is what the person installed.
+/// or `LANG`. Windows sets none of those, so there it is the language of the Windows account
+/// (`HKCU\Control Panel\International\LocaleName`): a German Windows answers in English, a
+/// Colombian one in Spanish. Spanish when nothing says anything (see [`by_code`]).
 pub fn current() -> &'static Texts {
     for var in ["GUARDIANA_LANG", "LC_ALL", "LC_MESSAGES", "LANG"] {
         if let Ok(v) = std::env::var(var) {
@@ -117,7 +122,49 @@ pub fn current() -> &'static Texts {
             }
         }
     }
+    #[cfg(windows)]
+    if let Some(code) = windows_locale() {
+        return by_code(code);
+    }
     es()
+}
+
+/// The Windows account's locale name (`es-CO`, `de-DE`...), read once per run with `reg`, the
+/// tool Windows ships for it: no extra dependency and no `unsafe` for one string.
+#[cfg(windows)]
+fn windows_locale() -> Option<&'static str> {
+    static LOCALE: OnceLock<Option<String>> = OnceLock::new();
+    LOCALE
+        .get_or_init(|| {
+            use std::os::windows::process::CommandExt;
+            // The reg.exe of Windows itself, by full path, never one found elsewhere on PATH.
+            // CREATE_NO_WINDOW: no console flashing when this runs from the service.
+            let raiz = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".to_owned());
+            let out = std::process::Command::new(format!(r"{raiz}\System32\reg.exe"))
+                .args([
+                    "query",
+                    r"HKCU\Control Panel\International",
+                    "/v",
+                    "LocaleName",
+                ])
+                .creation_flags(0x0800_0000)
+                .output()
+                .ok()?;
+            locale_de_reg(&String::from_utf8_lossy(&out.stdout))
+        })
+        .as_deref()
+}
+
+/// The value of `LocaleName` in the output of `reg query` (`    LocaleName    REG_SZ    es-CO`).
+#[cfg_attr(not(windows), allow(dead_code))]
+fn locale_de_reg(salida: &str) -> Option<String> {
+    salida.lines().find_map(|l| {
+        let mut partes = l.split_whitespace();
+        if partes.next()? != "LocaleName" {
+            return None;
+        }
+        partes.nth(1).map(str::to_owned)
+    })
 }
 
 impl Texts {
@@ -263,5 +310,16 @@ mod tests {
         assert_eq!(json_of(by_code("es")), ES_JSON);
         assert!(std::ptr::eq(by_code("PT"), pt()));
         assert!(std::ptr::eq(by_code(""), es()));
+        // Any other language reads English, not Spanish; a locale that names no language stays
+        // in Spanish.
+        assert!(std::ptr::eq(by_code("de-DE,de;q=0.9,en;q=0.8"), en()));
+        assert!(std::ptr::eq(by_code("fr"), en()));
+        assert!(std::ptr::eq(by_code("it_IT.UTF-8"), en()));
+        assert!(std::ptr::eq(by_code("C.UTF-8"), es()));
+        assert!(std::ptr::eq(by_code("POSIX"), es()));
+        assert!(std::ptr::eq(by_code("es_ES.UTF-8"), es()));
+        let reg = "\r\nHKEY_CURRENT_USER\\Control Panel\\International\r\n    LocaleName    REG_SZ    de-DE\r\n\r\n";
+        assert_eq!(locale_de_reg(reg).as_deref(), Some("de-DE"));
+        assert_eq!(locale_de_reg("ERROR: nada"), None);
     }
 }

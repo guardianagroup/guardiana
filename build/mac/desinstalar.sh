@@ -9,6 +9,7 @@
 #   2. close Home Mode, which also writes the change into the ledger signed as an uninstall.
 #   3. the program's own undo, from the exact backup the panel took when it changed the DNS.
 #   4. only then the safety net, and only for services still pointing at this machine.
+# Its one argument is the language of the launcher's dialog that shows its last line (es|en|pt).
 DATA="/Library/Application Support/Guardiana"
 PLIST="/Library/LaunchDaemons/com.guardianagroup.guardiana.plist"
 BIN=/usr/local/guardiana/guardiana
@@ -54,4 +55,8 @@ killall -HUP mDNSResponder 2>/dev/null || true
 rm -f "$PLIST"
 rm -rf /usr/local/guardiana
 mv "$DATA/dns-anterior.txt" "$DATA/dns-anterior.restaurado.txt" 2>/dev/null || true
-echo "El extracto sigue en $DATA."
+case "${1:-es}" in
+  en) echo "The ledger is still in $DATA." ;;
+  pt) echo "O extrato continua em $DATA." ;;
+  *) echo "El extracto sigue en $DATA." ;;
+esac

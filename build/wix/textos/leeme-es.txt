@@ -36,8 +36,9 @@ si no lo quieres.
 
 Comprobar la instalación
 ------------------------
-Menú "Guardiana (menú)" > opción de comprobar, o en una ventana de comandos:
-    "C:\Program Files\Guardiana\guardiana.exe" verify
+Menú "Guardiana (menú)" > opción de comprobar, o en una ventana nueva de
+comandos o de PowerShell:
+    guardiana verify
 
 Antes de instalar: comprueba la huella del archivo .msi y compárala con la de
 SHA256SUMS y con el registro público (ledger.jsonl). Cómo hacerlo, paso a

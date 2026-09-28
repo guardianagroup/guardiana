@@ -1,20 +1,24 @@
 #!/bin/bash
 # Installs the GUARDIANA daemon on a Mac (runs as root, called by lanzador.sh through
 # the macOS administrator prompt). Internal tool for the development Mac (DECISIONES #55).
-#   instalar.sh <path to the guardiana binary> <console user>
+#   instalar.sh <path to the guardiana binary> <console user> [es|en|pt]
+# The language is the one of the launcher's dialogs, which show this script's last line.
 # Does: copies the binary to /usr/local/guardiana, creates the data folder owned by the
 # console user (so the launcher can read the panel token), records the DNS servers in
 # use per network service (a safety copy for desinstalar.sh) and starts a LaunchDaemon
 # on 127.0.0.1:53 forwarding to those servers. It never touches the Mac's DNS (brief
 # §11): the panel offers the change with its button, as on Windows, and undoes it.
 set -e
-BIN_SRC="$1"; USER_NAME="$2"
+BIN_SRC="$1"; USER_NAME="$2"; L="${3:-es}"
+m() {  # m <es> <en> <pt>: the text in the launcher's language
+  case "$L" in en) echo "$2" ;; pt) echo "$3" ;; *) echo "$1" ;; esac
+}
 BIN_DIR="/usr/local/guardiana"
 DATA="/Library/Application Support/Guardiana"
 PLIST="/Library/LaunchDaemons/com.guardianagroup.guardiana.plist"
 LABEL="com.guardianagroup.guardiana"
-[ -f "$BIN_SRC" ] || { echo "no encuentro el binario $BIN_SRC"; exit 1; }
-[ -n "$USER_NAME" ] || { echo "falta el usuario"; exit 1; }
+[ -f "$BIN_SRC" ] || { m "No encuentro el programa en $BIN_SRC." "I can't find the program at $BIN_SRC." "Não encontro o programa em $BIN_SRC."; exit 1; }
+[ -n "$USER_NAME" ] || { m "Falta el usuario." "The user is missing." "Falta o usuário."; exit 1; }
 
 # 1. The DNS servers the Mac uses today become the upstream. Refuse to continue
 #    without one: switching the DNS to a resolver with no upstream leaves the Mac offline.
@@ -25,7 +29,7 @@ fi
 if [ -z "$UPSTREAMS" ]; then
   UPSTREAMS="$(scutil --dns | awk '/nameserver\[/{print $3}' | grep -v '^127\.' | grep -v ':' | sort -u | tr '\n' ' ')"
 fi
-[ -n "$UPSTREAMS" ] || { echo "no encuentro el DNS actual del Mac (scutil --dns); no cambio nada"; exit 1; }
+[ -n "$UPSTREAMS" ] || { m "No encuentro el DNS actual del Mac (scutil --dns); no cambio nada." "I can't find the Mac's current DNS (scutil --dns); nothing was changed." "Não encontro o DNS atual do Mac (scutil --dns); nada foi alterado."; exit 1; }
 
 # 2. Binary and data folder.
 mkdir -p "$BIN_DIR"; cp "$BIN_SRC" "$BIN_DIR/guardiana"; chown root:wheel "$BIN_DIR/guardiana"; chmod 755 "$BIN_DIR/guardiana"
@@ -70,5 +74,5 @@ for i in $(seq 1 20); do
   if dig +short +time=2 +tries=1 @127.0.0.1 example.com 2>/dev/null | grep -q . && [ "$(curl -s -m 2 -o /dev/null -w '%{http_code}' http://127.0.0.1:7443/)" = "200" ]; then ok=1; break; fi
   sleep 0.5
 done
-[ "$ok" = 1 ] || { echo "el daemon no responde. Mira $DATA/guardiana.log"; exit 1; }
-echo "Reenvía a: $UPSTREAMS"
+[ "$ok" = 1 ] || { m "El guardián no responde. Mira $DATA/guardiana.log." "The guardian does not answer. Look at $DATA/guardiana.log." "O guardião não responde. Veja $DATA/guardiana.log."; exit 1; }
+m "Reenvía a: $UPSTREAMS" "Forwards to: $UPSTREAMS" "Encaminha para: $UPSTREAMS"

@@ -37,6 +37,10 @@ jobs:
       - name: clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: test
+        # The tests read the Spanish texts; Windows would otherwise speak the runner's English
+        # (the CLI follows the Windows account's language since 1.0.1).
+        env:
+          GUARDIANA_LANG: es
         run: cargo test --workspace --locked
 
   supply-chain:

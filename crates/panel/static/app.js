@@ -16,8 +16,10 @@
   let LANG = '';
   try { LANG = localStorage.getItem('guardiana_lang') || ''; } catch (_) {}
   if (LANG !== 'es' && LANG !== 'en' && LANG !== 'pt') {
-    const dos = (navigator.language || 'es').slice(0, 2);
-    LANG = (dos === 'en' || dos === 'pt') ? dos : 'es';
+    // Spanish or Portuguese browsers get their language; any other one gets English, not Spanish
+    // (28 Sep 2026: a browser in German got the whole panel in Spanish).
+    const dos = (navigator.language || 'es').slice(0, 2).toLowerCase();
+    LANG = (dos === 'es' || dos === 'pt') ? dos : 'en';
   }
   try { document.documentElement.lang = LANG; } catch (_) {}
   // Night mode (owner's request, 20 Sep 2026). The panel ships with the website's light design;
@@ -1058,6 +1060,9 @@
         $('l-clave-lead').textContent = t('licencia_clave_lead').replace('{host}', r.host_activacion);
         $('l-conexiones').innerHTML = r.conexiones.map((o) => `<tr><td>${when(o.ts)}</td><td class="mono">${esc(o.host)}</td><td>${o.bytes}</td></tr>`).join('') || `<tr><td colspan="3" class="muted">${esc(t('licencia_conexiones_ninguna'))}</td></tr>`;
       };
+      // Where to buy: the page of the website in the panel's language. A plain link the person
+      // clicks; the panel itself still sends nothing anywhere.
+      $('l-comprar').href = t('licencia_comprar_url');
       render(await api('/api/licencia'));
       $('l-clave').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -1109,7 +1114,8 @@
     caja.className = 'card ' + (e.caducado ? 'caducado' : 'prueba');
     if (e.caducado) {
       caja.innerHTML = `<strong>${esc(t('caducado_titulo'))}</strong> <span>${esc(t('caducado_texto'))}</span>
-        <p><a class="btn" href="/licencia">${esc(t('caducado_activar'))}</a>
+        <p><a class="btn" href="${esc(t('licencia_comprar_url'))}" target="_blank" rel="noopener">${esc(t('caducado_comprar'))}</a>
+        <a class="btn secondary" href="/licencia">${esc(t('caducado_activar'))}</a>
         <a class="btn secondary" href="/extracto">${esc(t('caducado_exportar'))}</a></p>`;
     } else {
       const d = e.prueba_dias;

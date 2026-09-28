@@ -1,0 +1,44 @@
+GUARDIANA para Linux
+====================
+
+A Guardiana transforma este PC no guardião DNS da casa: vê com quais serviços
+cada aparelho tenta falar, explica isso numa frase e corta só o que você
+decidir. Tudo acontece neste computador. Sem conta, sem servidor, zero
+telemetria.
+
+Instalar (pacote .deb, Debian e Ubuntu)
+---------------------------------------
+    sudo apt install ./guardiana_*.deb
+
+Instalar (tarball, qualquer distribuição com systemd)
+-----------------------------------------------------
+    tar xzf guardiana-*-linux-x86_64.tar.gz
+    cd guardiana-*-linux-x86_64
+    sudo ./instalar.sh
+
+Instalar NÃO muda o DNS do sistema. Isso se faz pelo painel, com a sua
+permissão, e pode ser desfeito no mesmo lugar.
+
+Depois de instalar
+------------------
+    guardiana panel          abre o painel no navegador
+    guardiana verify         confere a instalação (impressão digital, assinatura, portas)
+    guardiana dns --status   diz para onde aponta o DNS do sistema
+    guardiana hogar status   estado do Modo Casa
+
+Desinstalar
+-----------
+    sudo apt remove guardiana        (pacote .deb)
+    sudo ./desinstalar.sh            (tarball)
+
+Desinstalar devolve o DNS ao que era e desliga o Modo Casa. O extrato fica em
+/var/lib/guardiana; apague com "sudo apt purge guardiana" ou
+"sudo ./desinstalar.sh --purge".
+
+Antes de instalar: confira a impressão digital
+----------------------------------------------
+    sha256sum guardiana_*.deb
+Compare com a do SHA256SUMS e com o registro público (ledger.jsonl).
+Como fazer, passo a passo: VERIFY.md.
+
+O que a Guardiana não faz está em WHAT_IT_DOES_NOT_DO.md. Leia.

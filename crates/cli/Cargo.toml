@@ -1,11 +1,12 @@
 [package]
 name = "guardiana-cli"
-description = "Guardiana: the home computer as the household DNS guardian (guardiana observe | ledger | export | hogar | verify | update)"
+description = "Guardiana: the home computer as the household DNS guardian (guardiana observe | ledger | export | hogar | verify)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
 authors.workspace = true
 publish = false
 
@@ -57,6 +58,8 @@ assets = [
     ["target/release/guardiana", "usr/bin/", "755"],
     ["../../build/deb/guardiana.service", "lib/systemd/system/", "644"],
     ["../../build/tarball/LEEME.txt", "usr/share/doc/guardiana/", "644"],
+    ["../../build/tarball/README.txt", "usr/share/doc/guardiana/", "644"],
+    ["../../build/tarball/LEIAME.txt", "usr/share/doc/guardiana/", "644"],
     ["../../docs/WHAT_IT_DOES_NOT_DO.md", "usr/share/doc/guardiana/", "644"],
     ["../../docs/VERIFY.md", "usr/share/doc/guardiana/", "644"],
     ["../../docs/HOGAR.md", "usr/share/doc/guardiana/", "644"],

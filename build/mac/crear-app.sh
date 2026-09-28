@@ -11,6 +11,12 @@ APP="$OUT/GUARDIANA.app"
 cargo build --release --locked -p guardiana-cli
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp build/mac/Info.plist "$APP/Contents/Info.plist"
+# The version Finder shows is the one of the program inside, not a number typed by hand (1.0.0
+# shipped saying 0.2.0 in Get Info).
+V="$(target/release/guardiana --version | awk '{print $2}')"
+[ -n "$V" ] || { echo "no sé la versión del programa"; exit 1; }
+plutil -replace CFBundleVersion -string "$V" "$APP/Contents/Info.plist"
+plutil -replace CFBundleShortVersionString -string "$V" "$APP/Contents/Info.plist"
 cp build/mac/lanzador.sh "$APP/Contents/MacOS/GUARDIANA"
 cp build/mac/instalar.sh build/mac/desinstalar.sh "$APP/Contents/Resources/"
 cp target/release/guardiana "$APP/Contents/Resources/guardiana"

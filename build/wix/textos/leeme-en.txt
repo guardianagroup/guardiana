@@ -38,8 +38,9 @@ want it.
 
 Checking the installation
 -------------------------
-"Guardiana (menu)" > the check option, or in a command window:
-    "C:\Program Files\Guardiana\guardiana.exe" verify
+"Guardiana (menu)" > the check option, or in a new command window or
+PowerShell:
+    guardiana verify
 
 Before installing: check the hash of the .msi file and compare it with
 SHA256SUMS and with the public ledger (ledger.jsonl). How to do it, step by

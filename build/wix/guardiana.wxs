@@ -48,6 +48,11 @@
          Spanish installer (22 Sep 2026). -->
     <ui:WixUI Id="WixUI_Minimal" />
     <WixVariable Id="WixUILicenseRtf" Value="$(var.Welcome)" />
+    <!-- The brand instead of WiX's red sample artwork (1.0.1): the grid, the dot and the name of
+         the site, on the left of the first and last screens (493x312) and on the right of the
+         top band of the others (493x58), where WiX leaves room free of text. -->
+    <WixVariable Id="WixUIDialogBmp" Value="$(sys.SOURCEFILEDIR)dialogo.bmp" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(sys.SOURCEFILEDIR)banner.bmp" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="!(loc.AbrirPanel)" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <SetProperty Id="WixShellExecTarget" Value="[MenuDir]Guardiana.lnk" After="CostFinalize" Sequence="ui" />
@@ -79,6 +84,9 @@
 
     <Component Id="Exe" Directory="INSTALLFOLDER" Guid="3ddbdec9-0a69-4313-a914-1b9797819a7f">
       <File Id="GuardianaExe" Name="guardiana.exe" Source="$(var.Exe)" KeyPath="yes" />
+      <!-- `guardiana verify` in any new command window or PowerShell, which does not accept the
+           quoted path followed by a word that the readme gave (1.0.1). Removed on uninstall. -->
+      <Environment Id="PathGuardiana" Name="PATH" Value="[INSTALLFOLDER]" Part="last" Action="set" System="yes" Permanent="no" />
       <ServiceInstall Id="Svc"
                       Name="guardiana"
                       DisplayName="Guardiana"

@@ -231,7 +231,32 @@ struct ActivationResponse {
 #[derive(Debug, Deserialize, Default)]
 struct ActivationProduct {
     #[serde(default)]
+    product_id: Option<String>,
+    #[serde(default)]
     name: Option<String>,
+}
+
+/// The three products sold at guardianagroup.com/comprar.html, by their Dodo Payments id. The id
+/// decides the period before the name does: the monthly and the yearly subscription are both
+/// shown to the buyer as "GUARDIANA Plus", and a name can be edited in the gateway any day, while
+/// the id of a product never changes (1.0.1).
+const PRODUCTO_MENSUAL: &str = "pdt_0NnxPZGJy7PYHrGx1oBki";
+const PRODUCTO_ANUAL: &str = "pdt_0NnxPZ40xI6mR2MOoaAMt";
+const PRODUCTO_FUNDADOR: &str = "pdt_0NnxfRzo4H78OnLGFOS2H";
+
+/// Billing period of an activation: by product id when it is one of ours, else by name.
+fn period_days_of(product: Option<&ActivationProduct>) -> i64 {
+    period_days_from_id(product.and_then(|p| p.product_id.as_deref()))
+        .unwrap_or_else(|| period_days_from_product(product.and_then(|p| p.name.as_deref())))
+}
+
+fn period_days_from_id(id: Option<&str>) -> Option<i64> {
+    match id? {
+        PRODUCTO_MENSUAL => Some(MONTH_DAYS),
+        PRODUCTO_ANUAL => Some(YEAR_DAYS),
+        PRODUCTO_FUNDADOR => Some(DE_POR_VIDA),
+        _ => None,
+    }
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -324,7 +349,17 @@ pub fn status(ledger: &Ledger, secret: &str, now: i64) -> Result<Status, Error> 
             }
             let parsed: ActivationResponse = serde_json::from_str(&activation).unwrap_or_default();
             let since = setting_i64(ledger, SETTING_LICENSE_KEY_AT)?.unwrap_or(now);
-            let period = setting_i64(ledger, SETTING_LICENSE_PERIOD_DAYS)?.unwrap_or(MONTH_DAYS);
+            // The product id in the stored activation (covered by the mark) wins over the period
+            // saved next to it, so a key activated with 1.0.0, which read the period only from
+            // the product name, gets the right one without activating again.
+            let id = parsed
+                .product
+                .as_ref()
+                .and_then(|p| p.product_id.as_deref());
+            let period = match period_days_from_id(id) {
+                Some(p) => p,
+                None => setting_i64(ledger, SETTING_LICENSE_PERIOD_DAYS)?.unwrap_or(MONTH_DAYS),
+            };
             let checked = setting_i64(ledger, SETTING_LICENSE_CHECKED_AT)?.unwrap_or(since);
             // Una licencia de por vida no caduca por no haberse podido comprobar. Se sigue
             // preguntando cuando se puede —si la pasarela dice que ya no vale, lo dice por
@@ -482,7 +517,7 @@ pub fn activate_with_key(
     if parsed.id.is_empty() {
         return Err(Error::Malformed("sin id de activación".to_owned()));
     }
-    let period = period_days_from_product(parsed.product.as_ref().and_then(|p| p.name.as_deref()));
+    let period = period_days_of(parsed.product.as_ref());
     ledger.set_setting(SETTING_LICENSE_KEY, key)?;
     ledger.set_setting(SETTING_LICENSE_ACTIVATION, &text)?;
     ledger.set_setting(SETTING_LICENSE_KEY_MARK, &key_mark(secret, key, &text))?;
@@ -846,6 +881,66 @@ mod tests {
         );
         assert_eq!(period_days_from_product(Some("Plus yearly")), 365);
         assert_eq!(period_days_from_product(None), 30);
+    }
+
+    #[test]
+    fn period_comes_from_the_product_id_before_the_name() {
+        let producto = |id: &str, name: &str| ActivationProduct {
+            product_id: Some(id.to_owned()),
+            name: Some(name.to_owned()),
+        };
+        // Monthly and yearly are both called "GUARDIANA Plus" at the checkout.
+        assert_eq!(
+            period_days_of(Some(&producto(PRODUCTO_MENSUAL, "GUARDIANA Plus"))),
+            MONTH_DAYS
+        );
+        assert_eq!(
+            period_days_of(Some(&producto(PRODUCTO_ANUAL, "GUARDIANA Plus"))),
+            YEAR_DAYS
+        );
+        assert_eq!(
+            period_days_of(Some(&producto(PRODUCTO_FUNDADOR, "GUARDIANA Plus"))),
+            DE_POR_VIDA
+        );
+        // An id that is not ours falls back to the name; nothing at all is a month.
+        assert_eq!(
+            period_days_of(Some(&producto("pdt_otro", "Plus anual"))),
+            YEAR_DAYS
+        );
+        assert_eq!(period_days_of(None), MONTH_DAYS);
+    }
+
+    #[test]
+    fn a_key_activated_by_1_0_0_gets_the_period_of_its_product_id() {
+        let _a_solas = a_solas();
+        let l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        // 1.0.0 saved 30 days for a Founder licence whose name did not say "Fundador".
+        let activacion = format!(
+            r#"{{"id":"lki_9","product":{{"product_id":"{PRODUCTO_FUNDADOR}","name":"GUARDIANA Plus"}}}}"#
+        );
+        l.set_setting(SETTING_LICENSE_KEY, "KEY-9").unwrap();
+        l.set_setting(SETTING_LICENSE_ACTIVATION, &activacion)
+            .unwrap();
+        l.set_setting(
+            SETTING_LICENSE_KEY_MARK,
+            &key_mark("tok", "KEY-9", &activacion),
+        )
+        .unwrap();
+        l.set_setting(SETTING_LICENSE_KEY_AT, "0").unwrap();
+        l.set_setting(SETTING_LICENSE_PERIOD_DAYS, "30").unwrap();
+        let s = status(&l, "tok", 400 * DAY_MS).unwrap();
+        assert!(s.plus_activo, "{:?}", s.plan);
+        assert!(
+            matches!(
+                s.plan,
+                Plan::Plus {
+                    periodo_dias: Some(DE_POR_VIDA),
+                    ..
+                }
+            ),
+            "{:?}",
+            s.plan
+        );
     }
 
     #[test]

@@ -36,8 +36,13 @@ find "$OUT" -type f ! -name '*.msi' -delete
 TAR_DIR="guardiana-$VERSION-linux-x86_64"
 STAGE=$(mktemp -d)
 mkdir -p "$STAGE/$TAR_DIR"
-cp "$LINUX_BIN" build/tarball/instalar.sh build/tarball/desinstalar.sh build/tarball/LEEME.txt "$STAGE/$TAR_DIR/"
+cp "$LINUX_BIN" build/tarball/instalar.sh build/tarball/desinstalar.sh build/tarball/LEEME.txt \
+    build/tarball/README.txt build/tarball/LEIAME.txt "$STAGE/$TAR_DIR/"
 cp docs/WHAT_IT_DOES_NOT_DO.md docs/VERIFY.md docs/HOGAR.md docs/LISTS.md LICENSE "$STAGE/$TAR_DIR/"
+# Modes set here, not inherited: the binary that release.sh packs comes out of a GitHub artifact,
+# which drops the exec bit, and 1.0.0 shipped a `guardiana` that could not be run in place.
+chmod 644 "$STAGE/$TAR_DIR"/*
+chmod 755 "$STAGE/$TAR_DIR/guardiana" "$STAGE/$TAR_DIR/instalar.sh" "$STAGE/$TAR_DIR/desinstalar.sh"
 # Fixed mtime, owner and file order so the tarball is reproducible from the
 # same inputs (GNU tar in the container, bsdtar on a Mac).
 EPOCH=$(git log -1 --format=%ct 2>/dev/null || date +%s)
