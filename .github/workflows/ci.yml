@@ -41,7 +41,15 @@ jobs:
         # (the CLI follows the Windows account's language since 1.0.1).
         env:
           GUARDIANA_LANG: es
-        run: cargo test --workspace --locked
+        # Failing tests also as annotations: they can be read from the run page and the public
+        # API without signing in, the log cannot.
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --workspace --locked 2>&1 | tee "$RUNNER_TEMP/test.log" && exit 0
+          grep -E "^test .* FAILED$|panicked at|^---- " "$RUNNER_TEMP/test.log" | head -30 | while IFS= read -r l; do echo "::error title=cargo test::$l"; done
+          grep -A12 "panicked at" "$RUNNER_TEMP/test.log" | head -60 | sed -e 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}' | sed 's/^/::error title=detalle::/'; echo
+          exit 1
 
   supply-chain:
     name: audit and deny
