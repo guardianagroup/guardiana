@@ -68,7 +68,10 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
         std::io::stdout().flush()?;
         let mut line = String::new();
         std::io::stdin().lock().read_line(&mut line)?;
-        if line.trim() == "BORRAR" {
+        // The word the question asks for in the language it was asked (BORRAR, DELETE, APAGAR);
+        // until 1.0.1 only BORRAR worked, whatever the question said.
+        let dicha = line.trim().to_uppercase();
+        if dicha == t.cli("ledger.wipe.palabra") || dicha == "BORRAR" {
             ledger.wipe()?;
             println!("{}", t.cli("ledger.wipe.hecho"));
         } else {

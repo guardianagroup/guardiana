@@ -89,7 +89,9 @@ fn watch_for_real() -> Result<(), Box<dyn Error>> {
     println!("{}", t.cli("dns.consentimiento"));
     println!("{}", t.cli(dns_cmd::sole_or_secondary_key()));
     println!();
-    if ask(t.cli("menu.confirmar_si")).as_deref() != Some("SI") {
+    // SI, YES or SIM, as the question asks in its language (only SI worked until 1.0.1).
+    let dicha = ask(t.cli("menu.confirmar_si")).map(|r| r.trim().to_uppercase());
+    if dicha.as_deref() != Some(t.cli("menu.palabra_si")) && dicha.as_deref() != Some("SI") {
         println!("{}", t.cli("menu.nada_cambiado"));
         return Ok(());
     }
