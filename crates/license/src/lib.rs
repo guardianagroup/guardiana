@@ -47,6 +47,13 @@ pub const SETTING_LICENSE_PERIOD_DAYS: &str = "license_period_days";
 pub const TRIAL_DAYS: i64 = 7;
 /// Days a key subscription keeps working after a validation could not be done.
 pub const GRACE_DAYS: i64 = 7;
+/// Days after activating a subscription key when it is checked for the first time. Monthly and
+/// yearly start at the gateway with 7 free days and no card, and the key arrives on day one; if
+/// no card is added, the gateway puts the subscription on hold on day 7 and disables the key.
+/// Checking only once per period left Plus on for up to ~37 days without paying; checking the
+/// day after those 7 days cuts it then (1.0.1, at the owner's request). After that first
+/// check, once per billing period as before.
+pub const PRIMERA_COMPROBACION_DIAS: i64 = TRIAL_DAYS + 1;
 /// Billing period assumed for a monthly key.
 pub const MONTH_DAYS: i64 = 30;
 /// Billing period assumed for a yearly key.
@@ -369,6 +376,11 @@ pub fn status(ledger: &Ledger, secret: &str, now: i64) -> Result<Status, Error> 
             let de_por_vida = period == DE_POR_VIDA;
             let next = if de_por_vida {
                 i64::MAX
+            } else if checked <= since {
+                // Never checked since it was activated: the first check is when the gateway's
+                // own trial is over (see PRIMERA_COMPROBACION_DIAS), or earlier if the period is
+                // shorter.
+                (checked + period * DAY_MS).min(since + PRIMERA_COMPROBACION_DIAS * DAY_MS)
             } else {
                 checked + period * DAY_MS
             };
@@ -504,6 +516,9 @@ pub fn activate_with_key(
     now: i64,
 ) -> Result<Status, Error> {
     let key = key.trim();
+    if let Some(st) = revalidate_stored_key(ledger, key, secret, now)? {
+        return Ok(st);
+    }
     let instance = format!("guardiana-{}", &mark(secret, "instance")[..8]);
     let body = serde_json::json!({ "license_key": key, "name": instance });
     let sent = serde_json::to_vec(&body).map(|v| v.len()).unwrap_or(0);
@@ -527,6 +542,48 @@ pub fn activate_with_key(
     ledger.set_setting(SETTING_LICENSE_CHECK_FAILED_AT, "")?;
     ledger.set_setting(SETTING_LICENSE_ENDED_AT, "")?;
     status(ledger, secret, now)
+}
+
+/// The same key typed again on a machine that already activated it: ask the gateway whether it
+/// is valid now, with the activation already made, instead of activating a second time. This is
+/// the way back after the gateway disabled the key (trial over without a card, a payment that
+/// failed) and the person then paid: the key is enabled again at the gateway, and a new
+/// activation could hit the key's activation limit. `None` when the key is not the stored one.
+fn revalidate_stored_key(
+    ledger: &mut Ledger,
+    key: &str,
+    secret: &str,
+    now: i64,
+) -> Result<Option<Status>, Error> {
+    let stored = ledger.setting(SETTING_LICENSE_KEY)?.unwrap_or_default();
+    let activation = ledger
+        .setting(SETTING_LICENSE_ACTIVATION)?
+        .unwrap_or_default();
+    let marked = ledger
+        .setting(SETTING_LICENSE_KEY_MARK)?
+        .is_some_and(|m| m == key_mark(secret, &stored, &activation));
+    let instance: ActivationResponse = serde_json::from_str(&activation).unwrap_or_default();
+    if stored.is_empty() || stored != key || !marked || instance.id.is_empty() {
+        return Ok(None);
+    }
+    let body = serde_json::json!({ "license_key": key, "license_key_instance_id": instance.id });
+    let sent = serde_json::to_vec(&body).map(|v| v.len()).unwrap_or(0);
+    let _ = ledger.record_outbound(now, Purpose::Licencia, gateway_host(), sent as i64, true);
+    let (code, text) = post_json(&validate_url(), &body)?;
+    if !(200..300).contains(&code) {
+        return Err(Error::KeyRejected(short(&text)));
+    }
+    let parsed: ValidationResponse =
+        serde_json::from_str(&text).map_err(|e| Error::Malformed(e.to_string()))?;
+    if !parsed.valid {
+        return Err(Error::KeyRejected(
+            "not active yet (the subscription is waiting for a payment)".to_owned(),
+        ));
+    }
+    ledger.set_setting(SETTING_LICENSE_CHECKED_AT, &now.to_string())?;
+    ledger.set_setting(SETTING_LICENSE_CHECK_FAILED_AT, "")?;
+    ledger.set_setting(SETTING_LICENSE_ENDED_AT, "")?;
+    status(ledger, secret, now).map(Some)
 }
 
 /// Whether a periodic validation is due now.
@@ -941,6 +998,46 @@ mod tests {
             "{:?}",
             s.plan
         );
+    }
+
+    #[test]
+    fn a_new_subscription_is_checked_when_the_gateway_trial_ends() {
+        let _a_solas = a_solas();
+        let l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        store_key(&l, "tok", 0, "GUARDIANA Plus · mensual");
+        // Day 7: no check due yet, and the next one is announced for day 8, not day 30.
+        let s = status(&l, "tok", 7 * DAY_MS).unwrap();
+        match s.plan {
+            Plan::Plus {
+                proxima_comprobacion,
+                comprobacion,
+                ..
+            } => {
+                assert_eq!(
+                    proxima_comprobacion,
+                    Some(PRIMERA_COMPROBACION_DIAS * DAY_MS)
+                );
+                assert_eq!(comprobacion, Some(Comprobacion::AlDia));
+            }
+            otro => unreachable!("esperaba Plus, llegó {otro:?}"),
+        }
+        // Day 8: the check is due.
+        assert!(check_due(&l, "tok", PRIMERA_COMPROBACION_DIAS * DAY_MS + 1).unwrap());
+        // Once it passed, the next one is a whole period later.
+        l.set_setting(
+            SETTING_LICENSE_CHECKED_AT,
+            &(PRIMERA_COMPROBACION_DIAS * DAY_MS + 1).to_string(),
+        )
+        .unwrap();
+        let s = status(&l, "tok", 9 * DAY_MS).unwrap();
+        assert!(matches!(
+            s.plan,
+            Plan::Plus { proxima_comprobacion: Some(p), .. } if p == (PRIMERA_COMPROBACION_DIAS + MONTH_DAYS) * DAY_MS + 1
+        ));
+        // A Founder licence is never on a clock.
+        let f = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        store_key(&f, "tok", 0, "GUARDIANA Fundador");
+        assert!(!check_due(&f, "tok", 400 * DAY_MS).unwrap());
     }
 
     #[test]
