@@ -1,0 +1,454 @@
+#!/bin/bash
+# GUARDIANA 1.0.0 · firma, registro público y tabla de descargas, en el Mac de publicación.
+#
+# Uso, en Terminal:  bash publicar-1.0.0.sh
+#
+# Lo único que se escribe a mano es la contraseña de la clave de firma, y una sola vez: el guion
+# se la da a cada firma (con expect, que viene con macOS). Si expect no está, rsign la pide en
+# cada archivo, unas diez veces. La clave privada no sale de ~/guardiana-claves y la contraseña
+# no se guarda en ningún archivo.
+#
+# Qué hace, en este orden, y dónde para si algo no cuadra:
+#   0. herramientas (instala rsign y cargo-deb si faltan)
+#   1. clona el código publicado y exige que main sea exactamente COMMIT
+#   2. comprueba las huellas de lo que compiló GitHub (va en la rama lanzamiento-1.0.0 de la web;
+#      si no estuviera, usa los dos .zip de la ejecución en ~/Downloads)
+#   3. pide la contraseña, firma un papel de prueba y exige que la clave sea la que publica la web
+#   4. build/release.sh: .deb, .tar.gz y app de Mac; firmas; línea del registro; Rekor; commit
+#   5. comprueba cada firma con la clave pública
+#   6. sube el registro (ledger.jsonl) a main
+#   7. monta la tabla de descargas en la rama lanzamiento-1.0.0 de la web y la sube
+#      (la web publicada no cambia: eso lo hace Claude después de revisarla)
+set -euo pipefail
+
+VERSION=1.0.0
+COMMIT=a24bc90b2cffe17dada2c8d7eb80f89a62ff0da3
+RUN=36447056747
+CODIGO=https://github.com/guardianagroup/guardiana.git
+WEB=https://github.com/guardianagroup/guardianagroup.com.git
+RAMA_WEB=lanzamiento-1.0.0
+REPO="${REPO:-}"
+DESCARGAS="${DESCARGAS:-$HOME/Downloads}"
+KEYS="${GUARDIANA_KEYS:-$HOME/guardiana-claves}"
+TRABAJO="${TRABAJO:-$HOME/guardiana-publicar-$VERSION}"
+# Solo para el ensayo en GitHub Actions: clave de usar y tirar, Rekor de mentira y nada se sube.
+ENSAYO="${ENSAYO:-}"
+
+# Huellas de lo que compiló GitHub (ejecución 36447056747), comprobadas en el PC de pruebas.
+ESPERADAS=(
+  "8b13b586e094e845ba3b0add374aa5fb9661d7436b7f035b4b6d8c1876056549  guardiana-1.0.0-linux-x86_64"
+  "65e7bf528bf50b5ad235f7ba084d7a52b8b6897884a9bbd610d07700bed9a33d  guardiana-1.0.0-windows-x86_64.exe"
+  "399187722f75118a85af98df60a4a664dc4153c86315ba524dc67d9129494fdd  guardiana-1.0.0-windows-x64.msi"
+  "280c5288fae22dabfa2f36bd564f756629e3a44c4fbfaf97d4bbb2d31aafd84b  guardiana-1.0.0-windows-x64-en.msi"
+  "193237858094804c0547737732b30e636308fb050549f633a34b059b89a6e5a8  guardiana-1.0.0-windows-x64-pt.msi"
+)
+
+paso() { printf '\n== %s\n' "$*"; }
+para() { printf '\nPARO: %s\n' "$*" >&2; exit 1; }
+
+export PATH="$HOME/.cargo/bin:$PATH"
+
+paso "0/7 Herramientas"
+for c in git python3 unzip zip cargo; do
+  command -v "$c" >/dev/null 2>&1 || para "falta $c en este Mac."
+done
+if ! command -v minisign >/dev/null 2>&1 && ! command -v rsign >/dev/null 2>&1; then
+  echo "Instalo rsign (firma en el formato de minisign)…"
+  cargo install rsign2 --locked
+fi
+if ! cargo deb --version >/dev/null 2>&1; then
+  echo "Instalo cargo-deb…"
+  cargo install cargo-deb --locked
+fi
+if [ -z "$ENSAYO" ]; then
+  [ -f "$KEYS/minisign.key" ] || para "no está $KEYS/minisign.key."
+fi
+
+if [ -e "$TRABAJO" ]; then
+  mv "$TRABAJO" "$TRABAJO.anterior-$(date +%Y%m%d%H%M%S)"
+fi
+mkdir -p "$TRABAJO/zip" "$TRABAJO/todo" "$TRABAJO/archivos" "$TRABAJO/bin" "$TRABAJO/repro"
+
+# macOS no siempre trae sha256sum; release.sh lo usa. shasum hace lo mismo.
+if ! command -v sha256sum >/dev/null 2>&1; then
+  printf '#!/bin/sh\nexec shasum -a 256 "$@"\n' > "$TRABAJO/bin/sha256sum"
+  chmod +x "$TRABAJO/bin/sha256sum"
+fi
+export PATH="$TRABAJO/bin:$PATH"
+
+# La contraseña una sola vez: expect lanza la orden y contesta cada «Password:» con ella. Lo
+# demás que la orden pregunte lo sigue viendo y contestando la persona.
+CON_CLAVE=""
+if command -v expect >/dev/null 2>&1; then
+  CON_CLAVE="$TRABAJO/con-clave.exp"
+  cat > "$CON_CLAVE" <<'EXP'
+set timeout -1
+log_user 1
+spawn -noecho {*}$argv
+interact {
+    -o
+    -re {Password[^\r\n]*: *$} {
+        send -- "$env(GUARDIANA_CLAVE)\r"
+    }
+}
+set r [wait]
+exit [lindex $r 3]
+EXP
+fi
+con_clave() {
+  if [ -n "$CON_CLAVE" ] && [ -n "${GUARDIANA_CLAVE:-}" ]; then
+    expect -f "$CON_CLAVE" -- "$@"
+  else
+    "$@"
+  fi
+}
+
+# El repositorio de siempre de este Mac (para copiar quién firma los commits y por dónde sube).
+# Solo se mira en carpetas que macOS no protege, para que no salten avisos de permisos.
+if [ -z "$REPO" ]; then
+  for d in "$HOME/guardiana" "$HOME/Developer/guardiana" "$HOME/dev/guardiana" "$HOME/proyectos/guardiana" \
+           "$HOME/Projects/guardiana" "$HOME/src/guardiana" "$HOME/code/guardiana" "$HOME/repos/guardiana" "$HOME/git/guardiana"; do
+    if [ -d "$d/.git" ]; then REPO="$d"; break; fi
+  done
+fi
+
+# Subir a GitHub: primero por donde ya sube el repositorio de siempre; si no, https con el llavero
+# de macOS y, si tampoco, ssh. GIT_TERMINAL_PROMPT=0: si https no tiene la llave guardada, que falle
+# en vez de pedir un usuario y una contraseña que GitHub ya no acepta.
+alternativa() {
+  case "$1" in
+    https://github.com/*) printf 'git@github.com:%s' "${1#https://github.com/}" ;;
+    git@github.com:*) printf 'https://github.com/%s' "${1#git@github.com:}" ;;
+  esac
+}
+subir() {  # carpeta  url  destino  [--dry-run]; deja en SUBIDO_POR la url que funcionó
+  local dir="$1" url="$2" ref="$3" seco="${4:-}" u
+  for u in "$url" "$(alternativa "$url")"; do
+    [ -n "$u" ] || continue
+    if GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new" \
+       git -C "$dir" push $seco "$u" "$ref" >/dev/null 2>&1; then
+      SUBIDO_POR="$u"
+      return 0
+    fi
+  done
+  return 1
+}
+
+identidad() {  # copia quién firma los commits desde el repositorio de siempre de este Mac
+  if [ -n "$REPO" ] && [ -d "$REPO/.git" ]; then
+    for k in user.name user.email user.signingkey gpg.format gpg.ssh.program commit.gpgsign; do
+      v="$(git -C "$REPO" config --get "$k" 2>/dev/null || true)"
+      [ -n "$v" ] && git config "$k" "$v"
+    done
+  fi
+  if [ -z "$(git config --get user.email || true)" ]; then
+    git config user.name "GUARDIANA GROUP"
+    git config user.email "guardianagroup@users.noreply.github.com"
+  fi
+  # Un commit de prueba que se deshace: si la firma del commit falla aquí, mejor ahora que
+  # después de Rekor.
+  local antes
+  antes="$(git rev-parse HEAD)"
+  if ! git commit -q --allow-empty -m "prueba (se deshace)" >/dev/null 2>&1; then
+    git config commit.gpgsign false
+    git commit -q --allow-empty -m "prueba (se deshace)" >/dev/null 2>&1 || para "git no puede hacer commits en $(pwd)."
+  fi
+  git reset -q --hard "$antes"
+}
+
+paso "1/7 Código publicado en GitHub: $COMMIT"
+git clone -q "$CODIGO" "$TRABAJO/guardiana"
+git clone -q --branch "$RAMA_WEB" "$WEB" "$TRABAJO/web"
+cd "$TRABAJO/guardiana"
+[ "$(git rev-parse HEAD)" = "$COMMIT" ] || para "main de GitHub está en $(git rev-parse HEAD), no en $COMMIT. Avisa a Claude."
+# Por dónde se sube: el mismo remoto con el que este Mac ya sube, si lo hay.
+url_codigo="$CODIGO"
+if [ -n "$REPO" ] && [ -d "$REPO/.git" ]; then
+  u="$(git -C "$REPO" remote -v | awk '$3=="(push)" && $2 ~ /guardianagroup\/guardiana(\.git)?$/ {print $2; exit}')"
+  [ -n "$u" ] && url_codigo="$u"
+fi
+url_web="$(printf '%s' "$url_codigo" | sed -E 's#guardiana(\.git)?$#guardianagroup.com.git#')"
+identidad
+( cd "$TRABAJO/web" && identidad )
+# Antes de firmar nada: que este Mac pueda subir a los dos sitios. Si no, se para aquí, sin
+# haber firmado ni anotado nada en Rekor.
+if [ -z "$ENSAYO" ]; then
+  subir "$TRABAJO/guardiana" "$url_codigo" HEAD:main --dry-run \
+    || para "este Mac no puede subir a GitHub (ni por https con el llavero ni por ssh). No se ha firmado nada. Díselo a Claude."
+  url_codigo="$SUBIDO_POR"
+  subir "$TRABAJO/web" "$url_web" "HEAD:$RAMA_WEB" --dry-run \
+    || para "este Mac no puede subir a la web en GitHub. No se ha firmado nada. Díselo a Claude."
+  url_web="$SUBIDO_POR"
+  echo "Puede subir a GitHub ($url_codigo)."
+fi
+# La app de Mac lleva el icono de la web; crear-app.sh lo busca en site/. Se excluye aquí mismo
+# para que el árbol siga limpio (release.sh lo exige) sin tocar nada publicado.
+mkdir -p site
+cp "$TRABAJO/web/icon-512.png" site/icon-512.png
+echo "/site/" >> .git/info/exclude
+
+paso "2/7 Lo que compiló GitHub y sus huellas"
+origen="$TRABAJO/web/descargas/$VERSION"
+if [ ! -f "$origen/guardiana-$VERSION-windows-x86_64.exe" ]; then
+  # Plan B: los dos artefactos de la ejecución, en .zip o en carpeta si Safari los descomprimió.
+  fuente() {
+    if [ -f "$DESCARGAS/$1.zip" ]; then
+      unzip -q -o "$DESCARGAS/$1.zip" -d "$TRABAJO/zip/$1"
+      echo "$TRABAJO/zip/$1"
+    elif [ -d "$DESCARGAS/$1" ]; then
+      echo "$DESCARGAS/$1"
+    else
+      return 1
+    fi
+  }
+  if ! r="$(fuente guardiana-repro)" || ! m="$(fuente guardiana-instaladores)"; then
+    command -v open >/dev/null 2>&1 && open "https://github.com/guardianagroup/guardiana/actions/runs/$RUN" || true
+    para "no encuentro lo que compiló GitHub. Baja guardiana-repro y guardiana-instaladores de la página que se acaba de abrir (abajo, «Artifacts») y vuelve a ejecutar esto."
+  fi
+  origen="$TRABAJO/todo"
+  cp "$r"/guardiana-* "$origen/"
+  find "$m" -name '*.msi' -exec cp {} "$origen/" \;
+fi
+( cd "$origen" && printf '%s\n' "${ESPERADAS[@]}" | sha256sum -c - )
+repro="$TRABAJO/repro"
+cp "$origen/guardiana-$VERSION-linux-x86_64" "$origen/guardiana-$VERSION-windows-x86_64.exe" "$repro/"
+printf '%s\n' "${ESPERADAS[0]}" "${ESPERADAS[1]}" > "$repro/SHA256SUMS"
+mkdir -p "dist/$VERSION" target/x86_64-unknown-linux-gnu/release target/x86_64-pc-windows-gnu/release
+cp "$origen"/guardiana-"$VERSION"-windows-x64*.msi "dist/$VERSION/"
+
+if command -v minisign >/dev/null 2>&1; then
+  firmar() { con_clave minisign -Sm "$1" -s "$KEYS/minisign.key" -t "$2"; }
+  comprobar() { minisign -Vm "$1" -p "$TRABAJO/guardiana/build/pubkey/minisign.pub" >/dev/null; }
+  generar() { con_clave minisign -G -p "$1/minisign.pub" -s "$1/minisign.key"; }
+else
+  firmar() { con_clave rsign sign -s "$KEYS/minisign.key" -x "$1.minisig" -t "$2" "$1"; }
+  comprobar() { rsign verify -p "$TRABAJO/guardiana/build/pubkey/minisign.pub" -x "$1.minisig" "$1" >/dev/null; }
+  generar() { con_clave rsign generate -p "$1/minisign.pub" -s "$1/minisign.key"; }
+fi
+
+if [ -n "$ENSAYO" ]; then
+  echo "(ensayo: clave de usar y tirar con contraseña «ensayo», y Rekor de mentira)"
+  export GUARDIANA_CLAVE=ensayo
+  KEYS="$TRABAJO/clave-ensayo"
+  mkdir -p "$KEYS"
+  generar "$KEYS"
+  cp "$KEYS/minisign.pub" build/pubkey/minisign.pub
+  git commit -q -am "ensayo: clave de usar y tirar"
+  printf '#!/bin/sh\ncat >/dev/null\necho "{\\"Location\\":\\"/api/v1/log/entries/ENSAYO0000000000\\"}"\n' > "$TRABAJO/bin/rekor-cli"
+  chmod +x "$TRABAJO/bin/rekor-cli"
+fi
+export GUARDIANA_KEYS="$KEYS"
+
+paso "3/7 Contraseña de la clave y prueba de que es la clave de la web"
+printf 'GUARDIANA %s: prueba de la clave\n' "$VERSION" > "$TRABAJO/prueba-clave.txt"
+intentos=0
+while :; do
+  intentos=$((intentos + 1))
+  if [ -n "$CON_CLAVE" ] && [ -z "$ENSAYO" ]; then
+    printf 'Escribe la contraseña de la clave de firma y pulsa Enter (mientras escribes no se ve nada): '
+    IFS= read -r -s GUARDIANA_CLAVE
+    echo
+    export GUARDIANA_CLAVE
+  elif [ -z "$CON_CLAVE" ]; then
+    echo "(rsign te pedirá la contraseña en cada firma)"
+  fi
+  rm -f "$TRABAJO/prueba-clave.txt.minisig"
+  if firmar "$TRABAJO/prueba-clave.txt" "GUARDIANA $VERSION prueba de la clave"; then
+    break
+  fi
+  [ "$intentos" -lt 3 ] || para "tres intentos sin poder firmar. No se ha firmado nada más."
+  echo "No ha podido firmar: seguramente la contraseña no es esa. Otra vez."
+done
+comprobar "$TRABAJO/prueba-clave.txt" || para "la clave de $KEYS no es la de build/pubkey/minisign.pub. No se ha firmado nada más."
+echo "Clave correcta."
+
+if [ -n "$CON_CLAVE" ]; then
+  paso "4/7 Paquetes, firmas, registro público y Rekor (10–15 minutos; la contraseña va sola)"
+else
+  paso "4/7 Paquetes, firmas, registro público y Rekor (10–15 minutos; una contraseña por archivo)"
+fi
+con_clave build/release.sh --binarios "$repro"
+unset GUARDIANA_CLAVE
+
+paso "5/7 Compruebo cada firma con la clave pública"
+linea="$(tail -n 1 ledger.jsonl)"
+printf '%s\n' "$linea" > "$TRABAJO/archivos/ledger-line.json"
+nombres="$(python3 -c 'import json,sys; print("\n".join(f["name"] for f in json.loads(sys.argv[1])["files"]))' "$linea")"
+while IFS= read -r n; do
+  f=""
+  for d in build/out "dist/$VERSION"; do
+    if [ -f "$d/$n" ]; then f="$d/$n"; break; fi
+  done
+  [ -n "$f" ] || para "no encuentro $n."
+  comprobar "$f" || para "la firma de $n no cuadra con la clave pública."
+  cp "$f" "$f.minisig" "$TRABAJO/archivos/"
+  echo "ok  $n"
+done <<< "$nombres"
+mac_arch=""
+app_bin="build/out/app/GUARDIANA.app/Contents/Resources/guardiana"
+if [ -f "$app_bin" ]; then
+  mac_arch="$(lipo -archs "$app_bin" 2>/dev/null || uname -m)"
+fi
+
+paso "6/7 Registro público a GitHub (main)"
+if [ -n "$ENSAYO" ]; then
+  echo "(ensayo: no se sube)"
+  echo "$linea"
+else
+  subir "$TRABAJO/guardiana" "$url_codigo" HEAD:main || para "no he podido subir ledger.jsonl. Lo firmado está en $TRABAJO/archivos. Díselo a Claude."
+  echo "ledger.jsonl subido."
+fi
+
+paso "7/7 Web: tabla de descargas en la rama $RAMA_WEB (la web publicada no cambia todavía)"
+cat > "$TRABAJO/descargas.py" <<'PY'
+#!/usr/bin/env python3
+"""Fill the download box of the three install pages from the published ledger line.
+
+Usage: descargas.py <site-repo> <folder-with-files> <ledger-line.json>
+Copies every published file (and its .minisig) to <site>/descargas/<version>/ and replaces the
+"no download yet" box in instalar.html, en/install.html and pt/instalar.html with a table:
+file, size, SHA-256, signature. Nothing is invented: every figure comes from the ledger line,
+and each hash is recomputed from the file before it is written.
+"""
+import hashlib
+import html
+import json
+import os
+import pathlib
+import re
+import shutil
+import sys
+
+site = pathlib.Path(sys.argv[1])
+src = pathlib.Path(sys.argv[2])
+line = json.loads(pathlib.Path(sys.argv[3]).read_text())
+version = line["version"]
+# The day comes from the ledger line itself (UTC), so the page never says a day the ledger does not.
+_y, _m, _d = (int(x) for x in line["date"][:10].split("-"))
+MESES = {
+    "es": "enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre".split(),
+    "en": "January February March April May June July August September October November December".split(),
+    "pt": "janeiro fevereiro março abril maio junho julho agosto setembro outubro novembro dezembro".split(),
+}
+FECHA = {
+    "es": f"{_d} de {MESES['es'][_m - 1]} de {_y}",
+    "en": f"{_d} {MESES['en'][_m - 1]} {_y}",
+    "pt": f"{_d} de {MESES['pt'][_m - 1]} de {_y}",
+}
+dest = site / "descargas" / version
+dest.mkdir(parents=True, exist_ok=True)
+
+files = {f["name"]: f for f in line["files"]}
+for name, f in files.items():
+    p = src / name
+    sha = hashlib.sha256(p.read_bytes()).hexdigest()
+    if sha != f["sha256_signed"]:
+        sys.exit(f"{name}: hash on disk {sha} != ledger {f['sha256_signed']}")
+    shutil.copy2(p, dest / name)
+    shutil.copy2(src / (name + ".minisig"), dest / (name + ".minisig"))
+
+
+def size(name):
+    n = (dest / name).stat().st_size
+    return f"{n / 1_000_000:.1f} MB"
+
+
+ROWS = {
+    "es": [
+        ("Windows 10 y 11 · español", f"guardiana-{version}-windows-x64.msi"),
+        ("Windows 10 y 11 · inglés", f"guardiana-{version}-windows-x64-en.msi"),
+        ("Windows 10 y 11 · portugués", f"guardiana-{version}-windows-x64-pt.msi"),
+        ("Debian, Ubuntu y derivados", f"guardiana_{version}_amd64.deb"),
+        ("Otro Linux con systemd", f"guardiana-{version}-linux-x86_64.tar.gz"),
+        ("macOS 13 o posterior", f"guardiana-{version}-macos.app.zip"),
+    ],
+    "en": [
+        ("Windows 10 and 11 · English", f"guardiana-{version}-windows-x64-en.msi"),
+        ("Windows 10 and 11 · Spanish", f"guardiana-{version}-windows-x64.msi"),
+        ("Windows 10 and 11 · Portuguese", f"guardiana-{version}-windows-x64-pt.msi"),
+        ("Debian, Ubuntu and derivatives", f"guardiana_{version}_amd64.deb"),
+        ("Any other Linux with systemd", f"guardiana-{version}-linux-x86_64.tar.gz"),
+        ("macOS 13 or later", f"guardiana-{version}-macos.app.zip"),
+    ],
+    "pt": [
+        ("Windows 10 e 11 · português", f"guardiana-{version}-windows-x64-pt.msi"),
+        ("Windows 10 e 11 · espanhol", f"guardiana-{version}-windows-x64.msi"),
+        ("Windows 10 e 11 · inglês", f"guardiana-{version}-windows-x64-en.msi"),
+        ("Debian, Ubuntu e derivados", f"guardiana_{version}_amd64.deb"),
+        ("Outro Linux com systemd", f"guardiana-{version}-linux-x86_64.tar.gz"),
+        ("macOS 13 ou posterior", f"guardiana-{version}-macos.app.zip"),
+    ],
+}
+TEXT = {
+    "es": dict(id="descargar", head=("Sistema", "Archivo", "Huella SHA-256", "Firma"),
+               intro=f"<strong>Versión {version}, publicada el {FECHA['es']}.</strong> Antes de abrir un archivo, compara su huella con la de esta tabla y con la del <a href=\"https://github.com/guardianagroup/guardiana/blob/main/ledger.jsonl\">registro público</a>, donde se anotó antes que la descarga{{rekor}}.",
+               sig="firma"),
+    "en": dict(id="download", head=("System", "File", "SHA-256 hash", "Signature"),
+               intro=f"<strong>Version {version}, published on {FECHA['en']}.</strong> Before you open a file, compare its hash with this table and with the <a href=\"https://github.com/guardianagroup/guardiana/blob/main/ledger.jsonl\">public ledger</a>, where it was written before the download existed{{rekor}}.",
+               sig="signature"),
+    "pt": dict(id="baixar", head=("Sistema", "Arquivo", "Impressão SHA-256", "Assinatura"),
+               intro=f"<strong>Versão {version}, publicada em {FECHA['pt']}.</strong> Antes de abrir um arquivo, compare a impressão digital com a desta tabela e com a do <a href=\"https://github.com/guardianagroup/guardiana/blob/main/ledger.jsonl\">registro público</a>, onde foi anotada antes do download{{rekor}}.",
+               sig="assinatura"),
+}
+REKOR = {
+    "es": " (y en Rekor, entrada <code>{u}</code>)",
+    "en": " (and in Rekor, entry <code>{u}</code>)",
+    "pt": " (e no Rekor, entrada <code>{u}</code>)",
+}
+PAGES = {"es": "instalar.html", "en": "en/install.html", "pt": "pt/instalar.html"}
+
+# The Mac app holds one native binary, built on the release Mac: say which chip it runs on
+# instead of letting an Intel Mac download something that will not open.
+CHIP = {
+    "arm64": {"es": " · chip Apple (M1 o posterior)", "en": " · Apple chip (M1 or later)", "pt": " · chip Apple (M1 ou posterior)"},
+    "x86_64": {"es": " · Intel", "en": " · Intel", "pt": " · Intel"},
+}.get(os.environ.get("GUARDIANA_MAC_ARCH", "").strip())
+if CHIP:
+    for lang, rows in ROWS.items():
+        ROWS[lang] = [(lab + CHIP[lang] if name.endswith("macos.app.zip") else lab, name) for lab, name in rows]
+
+for lang, page in PAGES.items():
+    t = TEXT[lang]
+    rekor = REKOR[lang].format(u=html.escape(line["rekor_uuid"][:16])) if line.get("rekor_uuid") else ""
+    rows = []
+    for label, name in ROWS[lang]:
+        if name not in files:
+            continue
+        sha = files[name]["sha256_signed"]
+        rows.append(
+            f'<tr><td>{label}</td><td><a href="/descargas/{version}/{name}" download>{name}</a><br><span class="muted">{size(name)}</span></td>'
+            f'<td><code class="huella">{sha}</code></td><td><a href="/descargas/{version}/{name}.minisig">{t["sig"]}</a></td></tr>'
+        )
+    h = t["head"]
+    block = (
+        f'<div class="box" id="{t["id"]}"><p>{t["intro"].replace("{rekor}", rekor)}</p>\n'
+        f'<div class="tabla-descargas"><table>\n<thead><tr><th>{h[0]}</th><th>{h[1]}</th><th>{h[2]}</th><th>{h[3]}</th></tr></thead>\n<tbody>\n'
+        + "\n".join(rows)
+        + "\n</tbody></table></div></div>"
+    )
+    p = site / page
+    s = p.read_text(encoding="utf-8")
+    new, n = re.subn(r'<div class="box"><p><strong>(Todavía no hay descarga|There is no download yet|Ainda não há download)\.</strong>.*?</p></div>', lambda m: block, s, count=1, flags=re.S)
+    if n != 1:
+        sys.exit(f"{page}: download box not found")
+    if ".tabla-descargas" not in new:
+        new = new.replace("</style>", ".tabla-descargas{overflow-x:auto}.tabla-descargas table{width:100%;border-collapse:collapse;font-size:.9rem}.tabla-descargas td,.tabla-descargas th{padding:.45rem .5rem;border-top:1px solid var(--linea,#ddd);text-align:left;vertical-align:top}code.huella{display:block;word-break:break-all;font-size:.75rem}@media (max-width:640px){.tabla-descargas thead{display:none}.tabla-descargas tr{display:block;border-top:1px solid var(--linea,#ddd);padding:.6rem 0}.tabla-descargas td{display:block;border:0;padding:.15rem 0}.tabla-descargas td:first-child{font-weight:600}}\n</style>", 1)
+    p.write_text(new, encoding="utf-8")
+    print(page, len(rows), "files")
+PY
+cd "$TRABAJO/web"
+GUARDIANA_MAC_ARCH="$mac_arch" python3 "$TRABAJO/descargas.py" . "$TRABAJO/archivos" "$TRABAJO/archivos/ledger-line.json"
+git add -A descargas instalar.html en/install.html pt/instalar.html
+git commit -q -m "Downloads for $VERSION: files, hashes and signatures from ledger.jsonl"
+if [ -n "$ENSAYO" ]; then
+  echo "(ensayo: no se sube)"
+  git show --stat HEAD | cat
+else
+  subir "$TRABAJO/web" "$url_web" "HEAD:$RAMA_WEB" || para "no he podido subir la rama $RAMA_WEB de la web. Todo está en $TRABAJO. Díselo a Claude."
+  echo "Rama $RAMA_WEB de la web subida."
+fi
+
+echo
+echo "HECHO. Firmado, anotado en el registro público y en Rekor, y la tabla de descargas preparada."
+echo "Todo lo firmado está en $TRABAJO/archivos."
+echo "Dile a Claude «ya está»: revisa la web y la publica."
