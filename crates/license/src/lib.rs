@@ -792,6 +792,10 @@ mod tests {
         let _a_solas = a_solas();
         let l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
         store_key(&l, "tok", 0, "GUARDIANA Plus · anual");
+        // The first check, when the gateway's 7-day trial ends, is tested on its own below; here
+        // it already happened (activated a moment before the last successful check), so the
+        // clock is the yearly one.
+        l.set_setting(SETTING_LICENSE_KEY_AT, "-1").unwrap();
         let year = YEAR_DAYS * DAY_MS;
         let s = status(&l, "tok", year - 1).unwrap();
         assert!(matches!(
