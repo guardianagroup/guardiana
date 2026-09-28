@@ -1,0 +1,85 @@
+# Ensayo de 1.0.1 en un Mac de GitHub (28 sep 2026): compila y prueba, arma GUARDIANA.app con
+# build/mac/crear-app.sh, y hace de verdad lo que hace el icono: instala el guardián con
+# instalar.sh (el runner tiene sudo sin contraseña), comprueba DNS y panel, y lo quita con
+# desinstalar.sh. Los diálogos no se pueden pulsar aquí; su AppleScript se compila con osacompile
+# y las funciones del lanzador se prueban con lo que dice este Mac. No firma ni publica nada.
+name: ensayo-mac
+on:
+  push:
+    branches: ['ensayo-mac-*']
+permissions:
+  contents: read
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: test
+        env:
+          GUARDIANA_LANG: es
+        run: cargo test --workspace --locked --no-fail-fast
+      - name: crear-app.sh
+        run: |
+          build/mac/crear-app.sh "$RUNNER_TEMP/app"
+          APP="$RUNNER_TEMP/app/GUARDIANA.app"
+          v=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
+          b=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")
+          echo "Info.plist: $v ($b)"
+          [ "$v" = "$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)" ] && [ "$b" = "$v" ]
+          plutil -lint "$APP/Contents/Info.plist"
+          ls -l "$APP/Contents/MacOS" "$APP/Contents/Resources"
+      - name: AppleScript de los diálogos compila
+        run: |
+          osacompile -o "$RUNNER_TEMP/say.scpt" -e 'on run argv' \
+            -e 'display dialog (item 1 of argv) buttons {item 2 of argv} default button 1 with title "GUARDIANA" with icon (POSIX file (item 3 of argv))' -e 'end run'
+          osacompile -o "$RUNNER_TEMP/ask.scpt" -e 'on run argv' \
+            -e 'button returned of (display dialog (item 1 of argv) buttons {item 2 of argv, item 3 of argv} default button (item 3 of argv) with title "GUARDIANA" with icon (POSIX file (item 4 of argv)))' -e 'end run'
+          osacompile -o "$RUNNER_TEMP/admin.scpt" -e 'on run argv' -e 'do shell script (item 1 of argv) with administrator privileges' -e 'end run'
+          # Las mismas tres líneas que usa el lanzador, sacadas de él: si alguien las cambia allí
+          # sin cambiar esto, que falle aquí.
+          for s in 'display dialog (item 1 of argv) buttons {item 2 of argv} default button 1' \
+                   'button returned of (display dialog (item 1 of argv) buttons {item 2 of argv, item 3 of argv}' \
+                   'do shell script (item 1 of argv) with administrator privileges'; do
+            grep -qF "$s" build/mac/lanzador.sh || { echo "el lanzador ya no dice: $s"; exit 1; }
+          done
+      - name: funciones del lanzador con lo que dice este Mac
+        run: |
+          eval "$(sed -n '/^idioma() {/,/^}/p;/^newer() {/,/^}/p;/^version_of() {/p' build/mac/lanzador.sh)"
+          echo "AppleLanguages:"; defaults read -g AppleLanguages
+          echo "idioma: $(idioma)"
+          case "$(idioma)" in es|en|pt) ;; *) exit 1 ;; esac
+          APP="$RUNNER_TEMP/app/GUARDIANA.app"
+          echo "versión dentro de la app: $(version_of "$APP/Contents/Resources/guardiana")"
+          newer 1.0.1 1.0.0 && ! newer 1.0.0 1.0.1 && ! newer 1.0.1 1.0.1 && newer 1.0.10 1.0.9
+          # Otros idiomas del Mac
+          for arr in '(\n    "de-DE"\n)' '(\n    "pt-BR",\n    en\n)' '(\n    "es-419"\n)' '(\n    en\n)'; do
+            defaults() { printf "$arr\n"; }
+            echo "$(printf "$arr" | tr '\n' ' ') -> $(idioma)"
+          done
+      - name: instalar, usar y quitar como lo hace el icono
+        run: |
+          APP="$RUNNER_TEMP/app/GUARDIANA.app"
+          RES="$APP/Contents/Resources"
+          out=$(sudo "$RES/instalar.sh" "$RES/guardiana" "$USER" en)
+          echo "$out"
+          echo "$out" | tail -n 1 | grep -q '^Forwards to: '
+          dig +short @127.0.0.1 example.com | grep -q .
+          curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:7443/ | grep -q 200
+          tok=$(tr -d '[:space:]' < "/Library/Application Support/Guardiana/panel.token")
+          [ ${#tok} = 64 ]
+          /usr/local/guardiana/guardiana --version
+          out=$(sudo "$RES/desinstalar.sh" pt)
+          echo "$out"
+          echo "$out" | tail -n 1 | grep -q '^O extrato continua em '
+          ! [ -f /Library/LaunchDaemons/com.guardianagroup.guardiana.plist ]
+          ! [ -e /usr/local/guardiana ]
+          dig +short +time=2 +tries=1 @127.0.0.1 example.com | grep -q . && { echo "sigue escuchando"; exit 1; } || true
+          scutil --dns | grep -m3 nameserver
