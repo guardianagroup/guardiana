@@ -52,7 +52,7 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
     println!(
         "{}",
         t.panel("informe_texto")
-            .replace("{dispositivos}", &w.devices.len().to_string())
+            .replace("{dispositivos}", &t.cuantos_dispositivos(w.devices.len()))
             .replace("{consultas}", &w.total.queries.to_string())
             .replace("{rastreadores}", &w.total.trackers.to_string())
             .replace("{publicidad}", &w.total.ads.to_string())

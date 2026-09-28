@@ -50,7 +50,12 @@ fn main() {
             // El mensaje interno ("ledger was created for another public key…") es inglés
             // técnico con dos huellas de 64 caracteres, y el día que le toque a alguien tiene
             // que poder entender qué le pasa y qué hacer.
-            eprintln!("{}", motivo(&e.to_string()));
+            // An empty error means the command already said why (`apps` on Linux printed a
+            // bare «guardiana: » line after its own explanation).
+            let texto = e.to_string();
+            if !texto.is_empty() {
+                eprintln!("{}", motivo(&texto));
+            }
             1
         }
     };

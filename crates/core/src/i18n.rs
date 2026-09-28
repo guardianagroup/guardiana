@@ -227,6 +227,18 @@ impl Texts {
         Self::get(&self.panel, key)
     }
 
+    /// «1 dispositivo» or «3 dispositivos», in this language: the weekly report's share text,
+    /// which read «1 dispositivos» in a home with only this PC until 1.0.1.
+    #[must_use]
+    pub fn cuantos_dispositivos(&self, n: usize) -> String {
+        if n == 1 {
+            self.panel("informe_dispositivos_uno").to_owned()
+        } else {
+            self.panel("informe_dispositivos_n")
+                .replace("{n}", &n.to_string())
+        }
+    }
+
     /// What a company does, in one sentence, or `None` when it is not written yet. Unlike the
     /// other lookups this does not fall back to the key: a company name is not a sentence, and
     /// printing it as if it were would be worse than saying nothing.
