@@ -25,7 +25,10 @@ jobs:
       - name: clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: test
-        run: cargo test --workspace --locked
+        # Las pruebas comprueban las frases en español; el Mac de GitHub viene en inglés (LANG).
+        env:
+          GUARDIANA_LANG: es
+        run: cargo test --workspace --locked --no-fail-fast
 
   publicar:
     runs-on: macos-latest
