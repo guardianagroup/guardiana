@@ -13,6 +13,9 @@ on:
   workflow_dispatch:
   push:
     tags: ['v*', 'repro-*']
+    # A branch with the same name works too: from some machines a tag cannot be pushed, and
+    # the build that anyone can repeat must not depend on which machine asks for it.
+    branches: ['repro-*']
 
 permissions:
   contents: read
