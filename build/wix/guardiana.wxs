@@ -7,8 +7,12 @@
       -d Welcome=build/wix/bienvenida.rtf -o dist/<v>/guardiana-<v>-windows-x64.msi build/wix/guardiana.wxs
   What it does: copies guardiana.exe to Program Files\Guardiana, registers and
   starts the "guardiana" service (same arguments as `guardiana service install`),
-  adds a Start menu shortcut that opens the panel. It does NOT change the system
-  DNS: that happens from the panel with consent. On uninstall: the service is
+  adds a Start menu shortcut that opens the panel and, on a first install, points
+  this PC's DNS at Guardiana (`guardiana dns --apply --yes`, with an exact backup;
+  the welcome screen says so before "Install", and VIGILAR=0 on the msiexec line
+  leaves it for the panel). Until 28 Sep 2026 that step was a button in the panel,
+  and a person who installed and did not find the button saw an empty panel and
+  concluded the program did not work. On uninstall: the service is
   stopped, then Home Mode is closed (firewall rule removed) and the DNS is
   restored exactly as it was, then the service is deleted and the files removed.
   The extract in ProgramData\Guardiana stays: it belongs to the user.
@@ -86,6 +90,15 @@
                       Account="LocalSystem"
                       Vital="yes" />
       <ServiceControl Id="SvcCtl" Name="guardiana" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+      <!-- Windows restarts the service if it dies or stops with an error. While it is down the
+           machine has its old DNS back (engine::give_dns_back_while_stopped), so nobody is left
+           without internet; restarting is what gets the watching back (28 Sep 2026). -->
+      <ServiceConfig ServiceName="guardiana" OnInstall="yes" OnReinstall="yes" FailureActionsWhen="failedToStopOrReturnedError" />
+      <ServiceConfigFailureActions ServiceName="guardiana" OnInstall="yes" OnReinstall="yes" ResetPeriod="86400">
+        <Failure Action="restart" Delay="5000" />
+        <Failure Action="restart" Delay="15000" />
+        <Failure Action="restart" Delay="60000" />
+      </ServiceConfigFailureActions>
     </Component>
 
     <Component Id="Readme" Directory="INSTALLFOLDER" Guid="6ee79eff-4700-48d1-93d8-35f8a726cd99">
@@ -141,7 +154,18 @@
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
+    <!-- First install only: point this PC's DNS at Guardiana once the service is listening.
+         Never on an upgrade or a repair (the person may have undone it on purpose) and never
+         allowed to fail the install: if it cannot be done, the panel still has its button. -->
+    <Property Id="VIGILAR" Value="1" Secure="yes" />
+    <CustomAction Id="ApplyDns"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[INSTALLFOLDER]guardiana.exe&quot; dns --apply --yes"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
     <InstallExecuteSequence>
+      <Custom Action="ApplyDns" After="StartServices" Condition="VIGILAR=&quot;1&quot; AND NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE" />
       <Custom Action="HomeOff" After="StopServices" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND NOT REINSTALL" />
       <Custom Action="RestoreDns" After="HomeOff" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND NOT REINSTALL" />
     </InstallExecuteSequence>

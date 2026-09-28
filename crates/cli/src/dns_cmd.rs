@@ -75,11 +75,7 @@ fn status(ledger: &Ledger) -> Result<(), Box<dyn Error>> {
 /// Which sentence tells the truth on this machine about what happens to the
 /// resolver that was there before.
 pub(crate) fn sole_or_secondary_key() -> &'static str {
-    if sysdns::guardian_is_sole_resolver() {
-        "dns.solo_guardiana"
-    } else {
-        "dns.reserva_secundario"
-    }
+    sysdns::sole_or_secondary_key()
 }
 
 pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
@@ -143,8 +139,19 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
                 .collect::<Vec<_>>()
                 .join(", "),
         )?;
+        // Asking is the only way to know the queries really arrive (27 Sep 2026). The installer
+        // runs this command right after starting the service, so the resolver is there.
         if cfg!(target_os = "windows") {
-            println!("{}", t.cli("dns.limite_windows"));
+            std::thread::sleep(std::time::Duration::from_millis(800));
+            let llega = sysdns::system_reaches_guardian(std::time::Duration::from_secs(4));
+            println!(
+                "{}",
+                t.cli(if llega {
+                    "dns.camino_ok"
+                } else {
+                    "dns.camino_no"
+                })
+            );
         }
         return Ok(());
     }

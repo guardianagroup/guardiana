@@ -31,6 +31,18 @@ pub use hickory_proto::rr::RecordType;
 pub const CANARY_NAME: &str = "use-application-dns.net";
 /// Name that only Guardiana resolves; loading it proves a device goes through us (brief §4).
 pub const CHECKER_NAME: &str = "comprobar.guardiana.hogar";
+/// Names under this suffix are always answered with the loopback, never forwarded and never
+/// written down: the self-check that proves the machine's own queries arrive here.
+pub use guardiana_core::SELF_CHECK_SUFFIX;
+
+/// Whether `name` (lowercase, no trailing dot) is one of the self-check names.
+#[must_use]
+pub fn is_self_check(name: &str) -> bool {
+    name == SELF_CHECK_SUFFIX
+        || name
+            .strip_suffix(SELF_CHECK_SUFFIX)
+            .is_some_and(|head| head.ends_with('.'))
+}
 /// TTL of blocked and built-in answers: short, so an undo takes effect fast.
 pub const BUILTIN_TTL: u32 = 30;
 
@@ -49,6 +61,9 @@ pub enum BlockMode {
 pub struct Config {
     /// Addresses to listen on, UDP and TCP. Each must be loopback or a private LAN address.
     pub listen: Vec<SocketAddr>,
+    /// Addresses to listen on if they can be bound, skipped silently if not (`[::1]:53` on a
+    /// machine with IPv6 switched off must not stop the resolver). Same privacy rule as `listen`.
+    pub optional_listen: Vec<SocketAddr>,
     /// Upstream resolvers, tried in order: the ones the system had before Guardiana.
     pub upstreams: Vec<SocketAddr>,
     /// How blocked names are answered.
@@ -69,6 +84,7 @@ impl Config {
     pub fn local(upstreams: Vec<SocketAddr>) -> Self {
         Self {
             listen: vec![SocketAddr::from((Ipv4Addr::LOCALHOST, 53))],
+            optional_listen: Vec::new(),
             upstreams,
             block_mode: BlockMode::NxDomain,
             canary_enabled: false,
@@ -205,7 +221,7 @@ pub async fn start<P: Policy>(config: Config, policy: P) -> Result<Running, Erro
     if config.upstreams.is_empty() {
         return Err(Error::NoUpstream);
     }
-    for addr in &config.listen {
+    for addr in config.listen.iter().chain(&config.optional_listen) {
         if !is_private_listen_addr(addr.ip()) {
             return Err(Error::NotPrivate(*addr));
         }
@@ -231,6 +247,23 @@ pub async fn start<P: Policy>(config: Config, policy: P) -> Result<Running, Erro
             .await
             .map_err(|e| Error::Bind(*addr, e))?;
         tcp_addrs.push(tcp.local_addr().map_err(|e| Error::Bind(*addr, e))?);
+        server.register_listener(tcp, Duration::from_secs(5), 4096);
+    }
+    for addr in &config.optional_listen {
+        // Both or neither: a UDP port without its TCP twin would answer short replies and fail
+        // the long ones, which is harder to understand than not listening there at all.
+        let Ok(udp) = UdpSocket::bind(addr).await else {
+            continue;
+        };
+        let Ok(tcp) = TcpListener::bind(addr).await else {
+            continue;
+        };
+        let (Ok(u), Ok(t)) = (udp.local_addr(), tcp.local_addr()) else {
+            continue;
+        };
+        udp_addrs.push(u);
+        tcp_addrs.push(t);
+        server.register_socket(udp);
         server.register_listener(tcp, Duration::from_secs(5), 4096);
     }
     let token = server.shutdown_token().clone();
@@ -270,5 +303,14 @@ mod tests {
             let ip: IpAddr = bad.parse().expect("ip");
             assert!(!is_private_listen_addr(ip), "{bad}");
         }
+    }
+
+    #[test]
+    fn self_check_names() {
+        assert!(is_self_check("prueba.guardiana.hogar"));
+        assert!(is_self_check("g123x9.prueba.guardiana.hogar"));
+        assert!(!is_self_check("xprueba.guardiana.hogar"));
+        assert!(!is_self_check("prueba.guardiana.hogar.example.com"));
+        assert!(!is_self_check("comprobar.guardiana.hogar"));
     }
 }

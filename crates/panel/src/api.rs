@@ -269,16 +269,21 @@ pub(crate) async fn dns_aplicar(
             .cli("dns.aplicado_panel")
             .replace("{originales}", &originals);
         msg.push(' ');
-        msg.push_str(
-            t.cli(if guardiana_service::sysdns::guardian_is_sole_resolver() {
-                "dns.solo_guardiana"
-            } else {
-                "dns.reserva_secundario"
-            }),
-        );
+        msg.push_str(t.cli(guardiana_service::sysdns::sole_or_secondary_key()));
+        // Not what Windows was told, but whether a query really arrives: the settings said
+        // "127.0.0.1 first" on 27 Sep 2026 and nothing came, and this screen said "done".
         if cfg!(target_os = "windows") {
+            std::thread::sleep(std::time::Duration::from_millis(800));
             msg.push(' ');
-            msg.push_str(t.cli("dns.limite_windows"));
+            msg.push_str(t.cli(
+                if guardiana_service::sysdns::system_reaches_guardian(
+                    std::time::Duration::from_secs(4),
+                ) {
+                    "dns.camino_ok"
+                } else {
+                    "dns.camino_no"
+                },
+            ));
         }
         Ok(msg)
     })

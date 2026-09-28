@@ -384,15 +384,40 @@ pub async fn run<F: Future<Output = ()>>(
 ) -> Result<(), Box<dyn Error>> {
     tokio::pin!(shutdown);
     let mut first = true;
-    loop {
-        match run_once(&cfg, shutdown.as_mut(), first).await? {
-            Exit::Shutdown => return Ok(()),
-            Exit::Reconfigure => {
+    let result = loop {
+        match run_once(&cfg, shutdown.as_mut(), first).await {
+            Ok(Exit::Shutdown) => break Ok(()),
+            Ok(Exit::Reconfigure) => {
                 println!("{}", i18n::current().cli("observe.reconfigurando"));
                 first = false;
             }
-            Exit::Caducado => first = false,
+            Ok(Exit::Caducado) => first = false,
+            Err(e) => break Err(e),
         }
+    };
+    give_dns_back_while_stopped(&cfg.db);
+    result
+}
+
+/// On Windows Guardiana is the machine's only resolver while it runs (sysdns::windows), so a
+/// stopped or failed service must not leave it pointing at a port nobody answers: that is a
+/// machine without internet. The old DNS goes back, the backup stays, and the next start points
+/// the machine at Guardiana again (`run_once`, right after the resolver is listening).
+fn give_dns_back_while_stopped(db: &std::path::Path) {
+    if !cfg!(target_os = "windows") {
+        return;
+    }
+    let Ok(ledger) = Ledger::open(db, identity::genesis()) else {
+        return;
+    };
+    let Ok(Some(json)) = ledger.setting(SETTING_BACKUP) else {
+        return;
+    };
+    if json.is_empty() {
+        return;
+    }
+    if let Ok(backup) = serde_json::from_str::<Backup>(&json) {
+        let _ = sysdns::restore(&backup);
     }
 }
 
@@ -499,9 +524,12 @@ async fn run_once<F: Future<Output = ()>>(
     };
     let upstreams: Vec<SocketAddr> = if !cfg.upstreams.is_empty() {
         cfg.upstreams.clone()
-    } else if let Some(backup) = saved.filter(|b| !b.original_servers().is_empty()) {
-        let servers: Vec<SocketAddr> = backup
-            .original_servers()
+    } else if let Some(servers) = saved
+        .as_ref()
+        .map(sysdns::upstreams_for)
+        .filter(|v| !v.is_empty())
+    {
+        let servers: Vec<SocketAddr> = servers
             .into_iter()
             .map(|ip| SocketAddr::new(ip, 53))
             .collect();
@@ -616,6 +644,15 @@ async fn run_once<F: Future<Output = ()>>(
 
     let mut dns_cfg = Config::local(upstreams.clone());
     dns_cfg.listen = vec![cfg.listen];
+    // The IPv6 loopback too, when the machine has it: Windows asks its IPv6 resolvers first,
+    // and Guardiana is the first of those (sysdns::windows). Where it cannot be bound, IPv4
+    // alone keeps working.
+    if cfg.listen.ip().is_loopback() {
+        dns_cfg.optional_listen = vec![SocketAddr::new(
+            IpAddr::V6(std::net::Ipv6Addr::LOCALHOST),
+            cfg.listen.port(),
+        )];
+    }
     dns_cfg.canary_enabled = cfg.canary;
     dns_cfg.block_mode = block_mode;
 
@@ -735,6 +772,19 @@ async fn run_once<F: Future<Output = ()>>(
         }
         Err(e) => return Err(Box::<dyn Error>::from(e)),
     };
+    // Now that something answers on 127.0.0.1 and ::1, point the machine back at it: the last
+    // stop gave the old DNS back (give_dns_back_while_stopped), and an update from a version that
+    // left a reserve behind or ignored IPv6 is corrected here, on the first start, not a minute
+    // later.
+    if cfg!(target_os = "windows") {
+        let db = cfg.db.clone();
+        let _ = tokio::task::spawn_blocking(move || {
+            if let Ok(l) = Ledger::open(&db, identity::genesis()) {
+                reapply_dns_if_dropped(&l);
+            }
+        })
+        .await;
+    }
     let ups = upstreams
         .iter()
         .map(ToString::to_string)
@@ -790,6 +840,9 @@ async fn run_once<F: Future<Output = ()>>(
     let keep_db = cfg.db.clone();
     let keep_dir = cfg.db.parent().map(std::path::Path::to_path_buf);
     let keep_secret = secret.clone();
+    // What the resolver forwards to in this pass, to notice when the network changes it.
+    let seguir_red = cfg.upstreams.is_empty() && cfg!(target_os = "windows");
+    let keep_upstreams: Vec<IpAddr> = upstreams.iter().map(SocketAddr::ip).collect();
     let (reconfigure_tx, mut reconfigure) = tokio::sync::oneshot::channel::<()>();
     let (caducado_tx, mut caducado) = tokio::sync::oneshot::channel::<()>();
     let housekeeping = tokio::spawn(async move {
@@ -836,6 +889,20 @@ async fn run_once<F: Future<Output = ()>>(
                             }
                         } else {
                             reapply_dns_if_dropped(&l);
+                            // A laptop that moved from home to the office: the resolvers that
+                            // came automatically are now the office's. Rebuild with them.
+                            if seguir_red && reconfigure_tx.is_some() {
+                                if let Ok(Some(json)) = l.setting(SETTING_BACKUP) {
+                                    if let Ok(b) = serde_json::from_str::<Backup>(&json) {
+                                        let ahora = sysdns::upstreams_for(&b);
+                                        if !ahora.is_empty() && ahora != keep_upstreams {
+                                            if let Some(tx) = reconfigure_tx.take() {
+                                                let _ = tx.send(());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -11,16 +11,17 @@ What the installer did
 - Copied the program to "Program Files\Guardiana".
 - Registered the "Guardiana" service, which starts with Windows.
 - Added the "Guardiana" and "Guardiana (menu)" shortcuts to the Start menu.
-- It did not change this machine's DNS: you decide that in the panel.
+- Made Guardiana this machine's DNS, over IPv6 too, with an exact copy of the
+  previous setting. If the service stops, the machine gets its previous DNS
+  back; uninstalling leaves it exactly as it was.
 - It opened no port to the network. Only Home Mode, when you turn it on, opens
   ports on your home Wi-Fi; turning it off closes them.
 
 After installing
 ----------------
-Start menu > Guardiana. The panel opens. At the top you will see a notice,
-"This PC does not go through Guardiana yet": press the button and the PC's DNS
-points at Guardiana, keeping your current one as the backup in case Guardiana
-stops. From then on you will see the queries. Cutting one specific name works
+Start menu > Guardiana. The panel opens and you will see this machine's
+queries from the first minute. To put the DNS back as it was without
+uninstalling: panel, "Status". Cutting one specific name works
 from the first minute; wide cuts, by category or for the whole home, wait until
 Guardiana has been watching that device for 24 hours.
 

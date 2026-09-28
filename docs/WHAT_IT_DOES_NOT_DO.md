@@ -56,9 +56,15 @@ La regla: nunca "100 % seguro", nunca "invisible", nunca "protegido" sin objeto,
 ## Lo que no promete
 
 - **No protege "el teléfono".** Protege "en la Wi‑Fi de casa, por nombre de dominio".
-- **No garantiza que el corte llegue a toda consulta en Windows.** Windows puede preguntar al DNS
-  primario y al secundario en paralelo en algunos casos; una consulta puede llegar al secundario
-  y no ser vista ni cortada. Límite conocido, documentado, no escondido.
+- **En Windows, mientras el servicio está parado, no mira.** Desde el 28 sep 2026 Guardiana es
+  el único DNS de Windows, por IPv4 y por IPv6: con el antiguo de secundario, Windows y Edge se
+  iban por él (Edge, además, cifrado hacia Cloudflare) y no se veía nada. Para que nadie se quede
+  sin internet, cuando el servicio se para el equipo recupera su DNS de antes hasta que vuelve a
+  arrancar; esas consultas no se anotan. `guardiana verify` hace una consulta de verdad y dice si
+  llega a Guardiana.
+- **No ve lo que un programa resuelve por su cuenta.** Un navegador con DNS cifrado elegido a mano,
+  una VPN o un antivirus con su propio DNS no preguntan al sistema. Se anota como señal
+  («evasión de DNS») cuando se detecta, pero lo que viaja por ahí no se ve.
 - **No garantiza aislamiento fuerte entre dispositivos de la misma Wi‑Fi.** Cada dispositivo ve su
   detalle por su IP; en una red doméstica se asume que nadie suplanta la IP de otro.
 - **En un Windows con varias cuentas, el extracto no es privado entre ellas.** La carpeta de datos

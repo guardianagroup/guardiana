@@ -10,16 +10,17 @@ Qué ha hecho el instalador
 - Ha copiado el programa a "Archivos de programa\Guardiana".
 - Ha registrado el servicio "Guardiana", que arranca solo con Windows.
 - Ha creado los accesos "Guardiana" y "Guardiana (menú)" en el menú Inicio.
-- No ha cambiado el DNS de este equipo: eso lo decides tú desde el panel.
+- Ha puesto a Guardiana como DNS de este equipo, también por IPv6, con una
+  copia exacta del ajuste anterior. Si el servicio se para, el equipo recupera
+  su DNS de antes; al desinstalar queda tal como estaba.
 - No ha abierto ningún puerto a la red. Solo el Modo Hogar, cuando tú lo
   actives, abre los puertos en la Wi-Fi de casa; apagarlo los cierra.
 
 Después de instalar
 -------------------
-Menú Inicio > Guardiana. Se abre el panel. Arriba verás un aviso: "Este PC
-todavía no pasa por Guardiana"; pulsa el botón y el DNS del PC apunta a
-Guardiana, dejando el de ahora de secundario por si Guardiana se para. Desde
-ese momento verás las consultas. Cortar un nombre concreto se puede desde el
+Menú Inicio > Guardiana. Se abre el panel y verás las consultas de este
+equipo desde el primer minuto. Para devolver el DNS a como estaba sin
+desinstalar: panel, «Estado». Cortar un nombre concreto se puede desde el
 primer minuto; los cortes anchos, por categoría o para toda la casa, esperan a
 que Guardiana lleve 24 horas mirando ese aparato.
 

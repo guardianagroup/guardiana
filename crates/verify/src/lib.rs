@@ -104,6 +104,11 @@ pub struct Report {
     pub guardian_is_sole: bool,
     /// Whether a DNS backup is stored (Guardiana changed the DNS).
     pub dns_changed_by_guardiana: bool,
+    /// Whether a name asked through the system's own resolver really arrived at Guardiana
+    /// (Windows, once the DNS was changed). The settings are what Windows was told; this is
+    /// what it does (27 Sep 2026).
+    #[serde(default)]
+    pub camino_real: Option<bool>,
     /// Home Mode on.
     pub home_mode: bool,
     /// LAN address Home Mode uses, if on.
@@ -361,8 +366,7 @@ pub fn run() -> Report {
     // would read as "you have no DNS": show where the guardian forwards instead.
     if system_dns.is_empty() {
         if let Some(b) = stored_backup.as_ref() {
-            system_dns = b
-                .original_servers()
+            system_dns = sysdns::upstreams_for(b)
                 .iter()
                 .map(ToString::to_string)
                 .collect();
@@ -388,6 +392,8 @@ pub fn run() -> Report {
         guardian_is_primary: sysdns::guardian_is_primary(),
         guardian_is_sole: sysdns::guardian_is_sole_resolver(),
         dns_changed_by_guardiana: dns_changed,
+        camino_real: (cfg!(target_os = "windows") && dns_changed)
+            .then(|| sysdns::system_reaches_guardian(std::time::Duration::from_secs(4))),
         home_mode,
         vigilante,
         home_ip,
@@ -502,10 +508,12 @@ pub fn render_with(t: &guardiana_core::i18n::Texts, report: &Report) -> String {
             (true, Some(true)) => format!(
                 "{} {}",
                 t.cli("verify.dns.guardiana_primario"),
-                t.cli(if report.guardian_is_sole {
-                    "dns.solo_guardiana"
-                } else {
+                t.cli(if !report.guardian_is_sole {
                     "dns.reserva_secundario"
+                } else if cfg!(target_os = "windows") {
+                    "dns.solo_guardiana_windows"
+                } else {
+                    "dns.solo_guardiana"
                 })
             ),
             (true, Some(false)) => t.cli("verify.dns.guardiana_no_primario").to_owned(),
@@ -517,6 +525,11 @@ pub fn render_with(t: &guardiana_core::i18n::Texts, report: &Report) -> String {
             (false, _) => t.cli("verify.dns.sin_cambiar").to_owned(),
         }
     });
+    match report.camino_real {
+        Some(true) => out.push(t.cli("verify.dns.camino_ok").to_owned()),
+        Some(false) => out.push(t.cli("verify.dns.camino_no").to_owned()),
+        None => {}
+    }
     if !report.vigilante.is_empty() {
         out.push(
             t.cli("verify.vigilante").replace(
@@ -589,6 +602,7 @@ mod tests {
             guardian_is_primary: None,
             guardian_is_sole: false,
             dns_changed_by_guardiana: false,
+            camino_real: None,
             home_mode: false,
             home_ip: None,
             vigilante: Vec::new(),
@@ -626,6 +640,18 @@ mod tests {
         r2.guardian_is_primary = Some(false);
         r2.system_dns = vec!["192.168.1.1".into()];
         assert!(render(&r2).contains("Guardiana no ha cambiado el DNS del sistema."));
+    }
+
+    #[test]
+    fn dice_si_las_consultas_llegan_de_verdad() {
+        // 27 Sep 2026: los ajustes decían «127.0.0.1 primero» y no llegó ni una consulta.
+        let mut r = informe_vacio();
+        r.dns_changed_by_guardiana = true;
+        r.guardian_is_primary = Some(true);
+        r.camino_real = Some(false);
+        assert!(render(&r).contains(guardiana_core::i18n::current().cli("verify.dns.camino_no")));
+        r.camino_real = Some(true);
+        assert!(render(&r).contains(guardiana_core::i18n::current().cli("verify.dns.camino_ok")));
     }
 
     #[test]

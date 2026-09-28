@@ -6,13 +6,14 @@ O que este instalador vai fazer
 - Copiar o programa para "Arquivos de Programas\Guardiana".
 - Registrar o serviço "Guardiana", que liga junto com o Windows.
 - Criar o atalho "Guardiana" no menu Iniciar, que abre o painel no seu navegador.
+- Colocar a Guardiana como DNS deste computador, também por IPv6, para que comece a olhar desde o primeiro minuto. Antes guarda uma cópia exata do seu ajuste; se o serviço parar, o computador recupera o DNS de antes, e ao desinstalar fica exatamente como estava.
 
 O que NÃO vai fazer
-- Não muda o DNS deste computador: isso você decide no painel, com um botão, e desfaz no mesmo lugar.
+- Não lê o que você envia nem o que recebe: só o nome do serviço, a hora e o aparelho.
 - Não abre nenhuma porta para a rede. Só o Modo Casa, quando você ligar, escuta no Wi-Fi de casa; desligá-lo fecha tudo.
 
 Depois de instalar
-Ao terminar, o painel abre. Em cima você vai ver "Este computador ainda não passa pela Guardiana": aperte o botão e em um minuto verá as consultas. Cortar um nome específico dá para fazer desde o primeiro minuto; os cortes largos, por categoria ou para a casa inteira, esperam a Guardiana olhar esse aparelho por 24 horas.
+Ao terminar, o painel abre e em um minuto você verá as consultas deste computador. Para devolver o DNS como estava sem desinstalar: painel, "Estado". Cortar um nome específico dá para fazer desde o primeiro minuto; os cortes largos, por categoria ou para a casa inteira, esperam a Guardiana olhar esse aparelho por 24 horas.
 
 Sete dias com tudo e sem cartão; depois é preciso uma assinatura. O que foi anotado fica no seu disco, pagando ou não.
 

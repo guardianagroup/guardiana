@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use guardiana_dns::{
     start, BlockMode, Config, Decision, Error, Outcome, Policy, Query, RecordType, Running,
-    CANARY_NAME, CHECKER_NAME,
+    CANARY_NAME, CHECKER_NAME, SELF_CHECK_SUFFIX,
 };
 use hickory_proto::op::{Message, MessageType, Metadata, OpCode, Query as DnsQuery, ResponseCode};
 use hickory_proto::rr::rdata::A;
@@ -287,6 +287,43 @@ async fn checker_name_resolves_to_lan_ip_only_in_home_mode() {
     let msg = ask_udp(g_off.udp_addrs[0], CHECKER_NAME, RecordType::A).await;
     assert!(a_records(&msg).is_empty());
     assert_eq!(hits.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn self_check_names_answer_the_loopback_and_never_go_upstream() {
+    let (up, hits, _upstream) = fake_upstream().await;
+    let policy = Recorder::default();
+    let g = guardiana(up, policy.clone(), |_| {}).await;
+    let name = format!("g1x2.{SELF_CHECK_SUFFIX}");
+    let msg = ask_udp(g.udp_addrs[0], &name, RecordType::A).await;
+    assert_eq!(a_records(&msg), vec![Ipv4Addr::LOCALHOST]);
+    let msg = ask_udp(g.udp_addrs[0], &name, RecordType::AAAA).await;
+    assert_eq!(aaaa_records(&msg), vec![Ipv6Addr::LOCALHOST]);
+    assert_eq!(hits.load(Ordering::SeqCst), 0);
+    assert!(policy.seen().iter().all(|(_, o)| *o == Outcome::Checker));
+}
+
+#[tokio::test]
+async fn optional_listen_addresses_are_skipped_when_taken() {
+    let (up, _hits, _upstream) = fake_upstream().await;
+    let taken = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    let taken_addr = taken.local_addr().unwrap();
+    let g = guardiana(up, Recorder::default(), |c| {
+        c.optional_listen = vec![taken_addr, "127.0.0.1:0".parse().unwrap()];
+    })
+    .await;
+    assert_eq!(g.udp_addrs.len(), 2);
+    assert!(!g.udp_addrs.contains(&taken_addr));
+    let msg = ask_udp(g.udp_addrs[1], "a.test", RecordType::A).await;
+    assert_eq!(a_records(&msg), vec![Ipv4Addr::new(1, 2, 3, 4)]);
+
+    let mut cfg = Config::local(vec![up]);
+    cfg.listen = vec!["127.0.0.1:0".parse().unwrap()];
+    cfg.optional_listen = vec!["0.0.0.0:0".parse().unwrap()];
+    assert!(matches!(
+        start(cfg, Recorder::default()).await,
+        Err(Error::NotPrivate(_))
+    ));
 }
 
 #[tokio::test]

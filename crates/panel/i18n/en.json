@@ -83,7 +83,6 @@
     "dns.restaurado": "System DNS restored exactly as it was.",
     "dns.no_hay_copia": "There is no change by Guardiana to undo.",
     "dns.no_soportado": "Changing the system DNS is only available on Windows, Linux and, with administrator rights, macOS.",
-    "dns.limite_windows": "Windows notice: in some cases Windows queries the primary and the secondary at once; a query may go through the secondary without Guardiana seeing it.",
     "uso.doble_clic": "This program is run from a terminal, or with the double-click files that come with it (1-observar, 2-preguntar, 3-ver-cuaderno).",
     "uso.pulsa_intro": "Press Enter to close this window.",
     "observe.upstream_copia": "Upstream resolver taken from the copy saved before the DNS was changed: {servers}.",
@@ -198,8 +197,13 @@
     "dns.consentimiento_si": "To accept, repeat the command with --yes.",
     "dns.reserva_secundario": "The resolver you have now stays as the secondary: if Guardiana stops, the machine keeps resolving through it.",
     "dns.solo_guardiana": "On this machine Guardiana becomes the only resolver. That is what stops any query slipping past it: systemd-resolved picks among the servers it has, it does not ask them in order, so leaving the old one as a second would mean part of the queries are never seen. The service comes back by itself if it stops, and guardiana dns --restore puts everything back exactly as it was.",
+    "dns.solo_guardiana_windows": "On this machine Guardiana becomes the only DNS, over IPv6 too. That way no query slips past it and Edge does not go off to an encrypted DNS of its own. Guardiana keeps asking the servers you had, from the inside. If the service stops, the machine gets its previous DNS back until it starts again, and uninstalling leaves it exactly as it was.",
+    "dns.camino_ok": "Checked: a query made by Windows just now reached Guardiana.",
+    "dns.camino_no": "WARNING: a query made by Windows just now did NOT reach Guardiana, so you will not see anything yet. Disconnect the Wi-Fi and connect it again (or restart) and check again in \"Verify\". If it stays like this, write to hola@guardianagroup.com.",
     "verify.dns.guardiana_con_reserva": "System DNS: Guardiana (127.0.0.1), with {dns} as the fallback. If Guardiana stops, the machine asks the fallback and those queries are not written down.",
     "verify.dns.por_guardiana": "System DNS: Guardiana (127.0.0.1), which forwards to {dns}.",
+    "verify.dns.camino_ok": "Real test: a query made by the system just now reached Guardiana.",
+    "verify.dns.camino_no": "Real test: a query made by the system just now did NOT reach Guardiana. The settings say one thing and Windows does another. Disconnect the network and connect it again, or restart; if it stays like this, write to us.",
     "observe.caducado": "The trial is over and there is no active subscription. GUARDIANA has put this machine’s DNS back exactly as it was and has stopped watching: your internet keeps working the same. Your extract is whole on your disk and you can take it with you. To watch again, activate Plus in the panel."
   },
   "paises": {

@@ -133,6 +133,22 @@ impl<P: Policy> Handler<P> {
         }
     }
 
+    /// The self-check answer: the loopback of the family asked, nothing for other types.
+    fn self_check_answer(name: &Name, qtype: RecordType) -> Answer {
+        let rdata = match qtype {
+            RecordType::A => Some(RData::A(A::from(Ipv4Addr::LOCALHOST))),
+            RecordType::AAAA => Some(RData::AAAA(AAAA::from(Ipv6Addr::LOCALHOST))),
+            _ => None,
+        };
+        Answer {
+            code: ResponseCode::NoError,
+            answers: rdata
+                .map(|r| vec![Record::from_rdata(name.clone(), BUILTIN_TTL, r)])
+                .unwrap_or_default(),
+            authorities: Vec::new(),
+        }
+    }
+
     async fn forward(&self, name: &Name, qtype: RecordType) -> (Answer, Outcome) {
         match self.upstream.lookup(name.clone(), qtype).await {
             Ok(lookup) => (
@@ -213,6 +229,10 @@ impl<P: Policy> RequestHandler for Handler<P> {
                 },
                 Outcome::Canary,
             )
+        } else if crate::is_self_check(&query.name) {
+            // Answered here and never handed to the policy, so it is never written down: it is
+            // Guardiana checking its own path, not something this machine wanted.
+            (Self::self_check_answer(&name, qtype), Outcome::Checker)
         } else if let (CHECKER_NAME, Some(ip)) = (query.name.as_str(), self.checker_ip) {
             (Self::checker_answer(&name, qtype, ip), Outcome::Checker)
         } else {

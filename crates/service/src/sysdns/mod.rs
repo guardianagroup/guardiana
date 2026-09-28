@@ -430,6 +430,53 @@ pub fn apply(backup: &Backup, guardian: IpAddr) -> Result<(), Error> {
     }
 }
 
+/// The resolvers Guardiana should forward to right now, given what the machine had before.
+///
+/// On Windows, resolvers that came automatically follow the network the machine is on now
+/// (a laptop set up at home must not keep asking the home router at the office); resolvers
+/// typed by hand stay the person's choice. Elsewhere, the ones recorded in the backup.
+#[must_use]
+pub fn upstreams_for(backup: &Backup) -> Vec<IpAddr> {
+    #[cfg(target_os = "windows")]
+    {
+        let v = windows::upstreams_for(backup);
+        if !v.is_empty() {
+            return v;
+        }
+    }
+    backup
+        .original_servers()
+        .into_iter()
+        .filter(|ip| !is_loopback_stub(*ip))
+        .collect()
+}
+
+/// Whether a name asked through this machine's own resolver really arrives at Guardiana.
+///
+/// It asks a fresh `<something>.prueba.guardiana.hogar`, which only Guardiana answers (with
+/// the loopback) and nobody writes down. The settings can say "127.0.0.1 first" while the
+/// queries go elsewhere: that is what happened on 27 Sep 2026, and only asking tells.
+#[must_use]
+pub fn system_reaches_guardian(timeout: std::time::Duration) -> bool {
+    use std::net::ToSocketAddrs;
+    let name = format!(
+        "g{}x{}.{}",
+        guardiana_core::time::now_ms(),
+        std::process::id(),
+        guardiana_core::SELF_CHECK_SUFFIX
+    );
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let ips: Vec<IpAddr> = (name.as_str(), 80)
+            .to_socket_addrs()
+            .map(|it| it.map(|a| a.ip()).collect())
+            .unwrap_or_default();
+        let _ = tx.send(ips);
+    });
+    rx.recv_timeout(timeout)
+        .is_ok_and(|ips| !ips.is_empty() && ips.iter().all(IpAddr::is_loopback))
+}
+
 /// Put back exactly what `backup` recorded.
 pub fn restore(backup: &Backup) -> Result<(), Error> {
     #[cfg(target_os = "windows")]
@@ -552,9 +599,30 @@ pub fn guardian_is_sole_resolver() -> bool {
     {
         linux::have_resolvectl()
     }
-    #[cfg(not(target_os = "linux"))]
+    // Windows too since 28 Sep 2026: with the old resolver left behind as a reserve, Edge saw
+    // a resolver it knows how to encrypt (1.1.1.1) and took every name to Cloudflare over HTTPS,
+    // where Guardiana cannot see it. The reserve now lives inside Guardiana (it forwards there)
+    // and the service gives the machine its old DNS back whenever it stops.
+    #[cfg(target_os = "windows")]
+    {
+        true
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     {
         false
+    }
+}
+
+/// Which sentence tells the truth on this machine about the resolver that was there before:
+/// gone from the system's list (Linux with systemd-resolved, Windows) or kept as a reserve.
+#[must_use]
+pub fn sole_or_secondary_key() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "dns.solo_guardiana_windows"
+    } else if guardian_is_sole_resolver() {
+        "dns.solo_guardiana"
+    } else {
+        "dns.reserva_secundario"
     }
 }
 
@@ -564,26 +632,7 @@ pub fn guardian_is_sole_resolver() -> bool {
 pub fn guardian_is_primary() -> Option<bool> {
     #[cfg(target_os = "windows")]
     {
-        let out = run_checked(
-            "powershell",
-            &[
-                "-NoProfile",
-                "-NonInteractive",
-                "-Command",
-                // Connected interfaces only (a disconnected adapter keeps its old DNS and must not count).
-                "Get-NetIPInterface -AddressFamily IPv4 | Where-Object { $_.ConnectionState -eq 'Connected' -and $_.InterfaceAlias -notlike 'Loopback*' } | ForEach-Object { Get-DnsClientServerAddress -InterfaceIndex $_.InterfaceIndex -AddressFamily IPv4 } | Where-Object { $_.ServerAddresses.Count -gt 0 } | ForEach-Object { $_.ServerAddresses[0] }",
-            ],
-        )
-        .ok()?;
-        let firsts: Vec<&str> = out
-            .lines()
-            .map(str::trim)
-            .filter(|l| !l.is_empty())
-            .collect();
-        if firsts.is_empty() {
-            return None;
-        }
-        Some(firsts.iter().all(|f| *f == "127.0.0.1"))
+        windows::guardian_is_primary()
     }
     #[cfg(target_os = "linux")]
     {

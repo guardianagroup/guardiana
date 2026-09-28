@@ -42,3 +42,11 @@ pub use stats::{Counters, DeviceTotals, TableCounts};
 
 /// Identifier of the computer running Guardiana in the `devices` table (brief §3).
 pub const SELF_DEVICE_ID: &str = "self";
+
+/// Names under this suffix are answered by Guardiana itself (`127.0.0.1` / `::1`) and by
+/// nobody else in the world. Asking one through the system's own resolver is the only honest
+/// way to know whether this machine's queries really reach Guardiana: reading the DNS settings
+/// only says what Windows was told, not what it does. On 27 Sep 2026 the settings said
+/// "127.0.0.1 first" and not one query arrived, because the Wi-Fi also handed out IPv6
+/// resolvers and Windows asked those. Nothing asked under this suffix is written down.
+pub const SELF_CHECK_SUFFIX: &str = "prueba.guardiana.hogar";

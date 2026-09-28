@@ -83,7 +83,6 @@
     "dns.restaurado": "DNS del sistema restaurado exactamente como estaba.",
     "dns.no_hay_copia": "No hay ningún cambio de Guardiana que deshacer.",
     "dns.no_soportado": "Cambiar el DNS del sistema solo está disponible en Windows, Linux y, con permisos de administrador, macOS.",
-    "dns.limite_windows": "Aviso Windows: en algunos casos Windows consulta primario y secundario a la vez; una consulta puede pasar por el secundario sin que Guardiana la vea.",
     "uso.doble_clic": "Este programa se maneja desde una terminal, o con los archivos de doble clic que lo acompañan (1-observar, 2-preguntar, 3-ver-cuaderno).",
     "uso.pulsa_intro": "Pulsa Intro para cerrar esta ventana.",
     "observe.upstream_copia": "Resolutor de arriba tomado de la copia guardada antes de cambiar el DNS: {servers}.",
@@ -198,8 +197,13 @@
     "dns.consentimiento_si": "Para aceptar, repite el comando con --yes.",
     "dns.reserva_secundario": "El resolutor que tienes ahora queda de secundario: si Guardiana se para, el equipo sigue resolviendo por él.",
     "dns.solo_guardiana": "En este equipo Guardiana pasa a ser el único resolutor. Es lo que hace que no se le escape ninguna consulta: systemd-resolved elige entre los servidores que tenga, no los pregunta por orden, así que dejar el antiguo de segundo significaría que parte de las consultas no se ven. El servicio vuelve a levantarse solo si se para, y guardiana dns --restore lo deja todo exactamente como estaba.",
+    "dns.solo_guardiana_windows": "En este equipo Guardiana pasa a ser el único DNS, también por IPv6. Así no se le escapa ninguna consulta y Edge no se va por su cuenta a un DNS cifrado. Guardiana sigue preguntando por dentro a los servidores que tenías. Si el servicio se para, el equipo recupera su DNS de antes hasta que vuelve a arrancar, y al desinstalar queda exactamente como estaba.",
+    "dns.camino_ok": "Comprobado: una consulta hecha ahora mismo por Windows ha llegado a Guardiana.",
+    "dns.camino_no": "ATENCIÓN: una consulta hecha ahora mismo por Windows NO ha llegado a Guardiana, así que todavía no verás nada. Desconecta la Wi-Fi y vuelve a conectarla (o reinicia) y comprueba de nuevo en «Verificar». Si sigue así, escríbenos a hola@guardianagroup.com.",
     "verify.dns.guardiana_con_reserva": "DNS del sistema: Guardiana (127.0.0.1) y, de reserva, {dns}. Si Guardiana se para, el equipo pregunta al de reserva y esas consultas no quedan anotadas.",
     "verify.dns.por_guardiana": "DNS del sistema: Guardiana (127.0.0.1), que reenvía a {dns}.",
+    "verify.dns.camino_ok": "Prueba real: una consulta hecha ahora por el sistema ha llegado a Guardiana.",
+    "verify.dns.camino_no": "Prueba real: una consulta hecha ahora por el sistema NO ha llegado a Guardiana. Los ajustes dicen una cosa y Windows hace otra. Desconecta la red y vuelve a conectarla, o reinicia; si sigue así, escríbenos.",
     "observe.caducado": "La prueba terminó y no hay suscripción activa. GUARDIANA ha devuelto el DNS de este equipo tal y como estaba y ha dejado de mirar: tu internet sigue funcionando igual. El extracto está entero en tu disco y puedes llevártelo. Para volver a vigilar, activa Plus en el panel."
   },
   "paises": {
