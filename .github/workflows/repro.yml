@@ -77,8 +77,16 @@ jobs:
           New-Item -ItemType Directory -Force -Path "dist/$version" | Out-Null
           foreach ($idioma in @("es", "en", "pt")) {
             $sufijo = if ($idioma -eq "es") { "" } else { "-$idioma" }
-            & powershell -NoProfile -ExecutionPolicy Bypass -File build/msi.ps1 -Exe $exe -Version $version -Idioma $idioma -Out "dist/$version/guardiana-$version-windows-x64$sufijo.msi"
-            if ($LASTEXITCODE -ne 0) { throw "msi.ps1 failed for $idioma" }
+            $salida = & powershell -NoProfile -ExecutionPolicy Bypass -File build/msi.ps1 -Exe $exe -Version $version -Idioma $idioma -Out "dist/$version/guardiana-$version-windows-x64$sufijo.msi" 2>&1 | Out-String
+            Write-Output $salida
+            if ($LASTEXITCODE -ne 0) {
+              # Annotations show on the run page without signing in; the log does not. Whoever
+              # reads why it failed may not have a GitHub session on that machine.
+              $corto = ($salida -replace "`r?`n", " | ")
+              if ($corto.Length -gt 1800) { $corto = $corto.Substring($corto.Length - 1800) }
+              Write-Output "::error title=msi.ps1 $idioma::$corto"
+              exit 1
+            }
           }
           Get-ChildItem "dist/$version" -Filter *.msi | ForEach-Object {
             "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
