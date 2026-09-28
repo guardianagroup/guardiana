@@ -1,7 +1,7 @@
 # GUARDIANA 1.0.1 · firma en el Mac
 
 Antes: en Safari, con la sesión de GitHub abierta, baja los dos archivos de la ejecución
-[36473167217](https://github.com/guardianagroup/guardiana/actions/runs/36473167217) (abajo, «Artifacts»):
+[36484545176](https://github.com/guardianagroup/guardiana/actions/runs/36484545176) (abajo, «Artifacts»):
 **guardiana-repro** y **guardiana-instaladores**. Se quedan en Descargas.
 
 1. Pulsa el botón de copiar del recuadro de abajo (a la derecha, dos cuadraditos).

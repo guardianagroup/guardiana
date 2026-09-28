@@ -20,8 +20,8 @@
 set -euo pipefail
 
 VERSION=1.0.1
-COMMIT=52aa1bf5afaf6c8936014e5e292d10e90d8d7231
-RUN=36473167217
+COMMIT=88d4367738d7cd218fa071ef5430fbfd5a4ef339
+RUN=36484545176
 CODIGO=https://github.com/guardianagroup/guardiana.git
 WEB=https://github.com/guardianagroup/guardianagroup.com.git
 REPO="${REPO:-}"
@@ -31,14 +31,14 @@ TRABAJO="${TRABAJO:-$HOME/guardiana-publicar-$VERSION}"
 # Solo para el ensayo en GitHub Actions: clave de usar y tirar, Rekor de mentira y nada se sube.
 ENSAYO="${ENSAYO:-}"
 
-# Huellas de lo que compiló GitHub (ejecución 36473167217, dos compilaciones idénticas), leídas de
+# Huellas de lo que compiló GitHub (ejecución 36484545176, dos compilaciones idénticas), leídas de
 # los avisos de esa ejecución.
 ESPERADAS=(
-  "526516193b1321c1b4c57fa21acb9888d8e498ab2803b65389fded0b188d543a  guardiana-1.0.1-linux-x86_64"
-  "9eba6845598004ca060262850d0e2541997ece0363deb1bf85956f7fc59844e9  guardiana-1.0.1-windows-x86_64.exe"
-  "c98a0b600cd04835d2a60dac76face77922c300a7caf49a209b492ac31fad6c3  guardiana-1.0.1-windows-x64.msi"
-  "9acb8ac8ba753005fb00ca185f40a518543bc63096efb9046dbfa2c0846bbb42  guardiana-1.0.1-windows-x64-en.msi"
-  "7c72a3ba94b19e3d15cc6b1aa2644ce60725c56dfb54db3e45204e14c7e8653b  guardiana-1.0.1-windows-x64-pt.msi"
+  "62f7dbc307568a98def9f1a6f2ca8686e91b1fefa628a4de54fadb29918c5a00  guardiana-1.0.1-linux-x86_64"
+  "f407cf9af48f6ab5320ef02fb02cfec75141ae8cc4421e1721ea37305b88b227  guardiana-1.0.1-windows-x86_64.exe"
+  "434308e683a1f44ce54229f62e1f824ddfa0feca5ac6ed95a2813a2bc322a827  guardiana-1.0.1-windows-x64.msi"
+  "d413692633f6c85210b31a31476a16f2914c168e1b135100ce0392c09bab6dfc  guardiana-1.0.1-windows-x64-en.msi"
+  "c90a4b777e25ac5a86da14651c6b230fff553ea617fa1dad555162a1e66a832f  guardiana-1.0.1-windows-x64-pt.msi"
 )
 
 paso() { printf '\n== %s\n' "$*"; }
