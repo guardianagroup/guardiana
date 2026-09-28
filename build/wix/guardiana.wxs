@@ -8,7 +8,7 @@
   What it does: copies guardiana.exe to Program Files\Guardiana, registers and
   starts the "guardiana" service (same arguments as `guardiana service install`),
   adds a Start menu shortcut that opens the panel and, on a first install, points
-  this PC's DNS at Guardiana (`guardiana dns --apply --yes`, with an exact backup;
+  this PC's DNS at Guardiana (the `dns` command with apply and yes, with an exact backup;
   the welcome screen says so before "Install", and VIGILAR=0 on the msiexec line
   leaves it for the panel). Until 28 Sep 2026 that step was a button in the panel,
   and a person who installed and did not find the button saw an empty panel and
