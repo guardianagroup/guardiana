@@ -1,7 +1,11 @@
 //! Rule evaluation (brief §6). Pure: given the active rules and one query,
 //! which rule, if any, cuts it. The inviolable rules live here:
 //!
-//! - nothing is cut for a device observed for less than 24 hours;
+//! - nothing WIDE is cut for a device observed for less than 24 hours: a whole category or a
+//!   rule for the whole home waits the day. A name the person picked for one device (an exact
+//!   name or a suffix) is cut from the first minute, as the panel promises when it creates it
+//!   (decision of 20 Sep 2026). Until 1.0.1 the engine still made those wait too: the button
+//!   turned into «desbloquear» and the name kept resolving for the rest of the first day;
 //! - `esperado` names (system updates, resolvers, time, messaging, calls)
 //!   are never cut by a category rule, and only by an explicit domain or
 //!   suffix rule the user confirmed;
@@ -12,7 +16,7 @@
 use crate::model::{Action, Category, MatchKind, Rule, Scope};
 use crate::time::HOUR_MS;
 
-/// Hours a device must be observed before any cut applies (brief §6).
+/// Hours a device must be observed before a wide cut (category, whole home) applies (brief §6).
 pub const OBSERVATION_HOURS: i64 = 24;
 
 /// One query to evaluate.
@@ -54,6 +58,13 @@ fn name_matches(kind: MatchKind, pattern: &str, name: &str, category: Category) 
     }
 }
 
+/// A rule that reaches further than one name the person pointed at: a whole category, or any
+/// rule for the whole home. Those wait for 24 hours of observation.
+#[must_use]
+pub fn is_wide(rule: &Rule) -> bool {
+    rule.scope == Scope::Home || rule.match_kind == MatchKind::Category
+}
+
 fn specificity(kind: MatchKind) -> u8 {
     match kind {
         MatchKind::Domain => 3,
@@ -66,12 +77,15 @@ fn specificity(kind: MatchKind) -> u8 {
 /// `rule.action == Cortar` means block; `Permitir` means an explicit allow.
 #[must_use]
 pub fn decide<'r>(rules: &'r [Rule], input: RuleInput<'_>, now: i64) -> Option<&'r Rule> {
-    if !observation_complete(input.observed_ms) {
-        return None;
-    }
+    let observed = observation_complete(input.observed_ms);
     let protected = input.category == Category::Esperado;
     let mut best: Option<(&Rule, (u8, u8, u8))> = None;
     for rule in rules.iter().filter(|r| r.is_active(now)) {
+        // The same line the panel draws when it creates the rule (`create_rule`, «ancho»): what
+        // is wide waits for the day of observation, a name picked for this device does not.
+        if !observed && is_wide(rule) {
+            continue;
+        }
         let in_scope = match rule.scope {
             Scope::Home => true,
             Scope::Device => rule.device_id.as_deref() == Some(input.device_id),
@@ -153,9 +167,70 @@ mod tests {
         assert!(decide(&rules, i, 10).is_none());
         i.observed_ms = 24 * HOUR_MS;
         assert_eq!(decide(&rules, i, 10).map(|r| r.id), Some(1));
+        // A whole-home rule for one name is wide too: it waits.
+        let casa = vec![rule(
+            2,
+            Scope::Home,
+            None,
+            MatchKind::Domain,
+            "t.example",
+            Action::Cortar,
+            true,
+        )];
+        i.observed_ms = HOUR_MS;
+        assert!(decide(&casa, i, 10).is_none());
         assert!(!observation_complete(HOUR_MS));
         assert_eq!(observed_hours(HOUR_MS * 5), 5);
         assert_eq!(observed_hours(HOUR_MS * 50), 24);
+    }
+
+    #[test]
+    fn a_name_picked_for_this_device_is_cut_from_the_first_minute() {
+        // What the panel promises when it creates the rule: one name, for one device, cut now.
+        // Before 1.0.1 the button said «desbloquear» and the name kept resolving for a day.
+        let rules = vec![
+            rule(
+                1,
+                Scope::Device,
+                Some("self"),
+                MatchKind::Domain,
+                "doubleclick.net",
+                Action::Cortar,
+                true,
+            ),
+            rule(
+                2,
+                Scope::Device,
+                Some("self"),
+                MatchKind::Suffix,
+                "tiktok.com",
+                Action::Cortar,
+                true,
+            ),
+            rule(
+                3,
+                Scope::Device,
+                Some("self"),
+                MatchKind::Category,
+                "publicidad",
+                Action::Cortar,
+                true,
+            ),
+        ];
+        let mut i = input("self", "doubleclick.net", Category::Publicidad);
+        i.observed_ms = 60_000;
+        assert_eq!(decide(&rules, i, 10).map(|r| r.id), Some(1));
+        i.name = "ads.tiktok.com";
+        assert_eq!(decide(&rules, i, 10).map(|r| r.id), Some(2));
+        // The category rule is wide: it waits for the day.
+        i.name = "otro-anuncio.example";
+        assert!(decide(&rules, i, 10).is_none());
+        i.observed_ms = 25 * HOUR_MS;
+        assert_eq!(decide(&rules, i, 10).map(|r| r.id), Some(3));
+        // Another device's rule never applies here, early or late.
+        i.device_id = "phone";
+        i.name = "doubleclick.net";
+        assert!(decide(&rules, i, 10).is_none());
     }
 
     #[test]
