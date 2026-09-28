@@ -27,7 +27,7 @@ RUN=36447056747
 CODIGO=https://github.com/guardianagroup/guardiana.git
 WEB=https://github.com/guardianagroup/guardianagroup.com.git
 RAMA_WEB=lanzamiento-1.0.0
-REPO="${REPO:-$HOME/guardiana}"
+REPO="${REPO:-}"
 DESCARGAS="${DESCARGAS:-$HOME/Downloads}"
 KEYS="${GUARDIANA_KEYS:-$HOME/guardiana-claves}"
 TRABAJO="${TRABAJO:-$HOME/guardiana-publicar-$VERSION}"
@@ -103,8 +103,39 @@ con_clave() {
   fi
 }
 
+# El repositorio de siempre de este Mac (para copiar quién firma los commits y por dónde sube).
+# Solo se mira en carpetas que macOS no protege, para que no salten avisos de permisos.
+if [ -z "$REPO" ]; then
+  for d in "$HOME/guardiana" "$HOME/Developer/guardiana" "$HOME/dev/guardiana" "$HOME/proyectos/guardiana" \
+           "$HOME/Projects/guardiana" "$HOME/src/guardiana" "$HOME/code/guardiana" "$HOME/repos/guardiana" "$HOME/git/guardiana"; do
+    if [ -d "$d/.git" ]; then REPO="$d"; break; fi
+  done
+fi
+
+# Subir a GitHub: primero por donde ya sube el repositorio de siempre; si no, https con el llavero
+# de macOS y, si tampoco, ssh. GIT_TERMINAL_PROMPT=0: si https no tiene la llave guardada, que falle
+# en vez de pedir un usuario y una contraseña que GitHub ya no acepta.
+alternativa() {
+  case "$1" in
+    https://github.com/*) printf 'git@github.com:%s' "${1#https://github.com/}" ;;
+    git@github.com:*) printf 'https://github.com/%s' "${1#git@github.com:}" ;;
+  esac
+}
+subir() {  # carpeta  url  destino  [--dry-run]; deja en SUBIDO_POR la url que funcionó
+  local dir="$1" url="$2" ref="$3" seco="${4:-}" u
+  for u in "$url" "$(alternativa "$url")"; do
+    [ -n "$u" ] || continue
+    if GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new" \
+       git -C "$dir" push $seco "$u" "$ref" >/dev/null 2>&1; then
+      SUBIDO_POR="$u"
+      return 0
+    fi
+  done
+  return 1
+}
+
 identidad() {  # copia quién firma los commits desde el repositorio de siempre de este Mac
-  if [ -d "$REPO/.git" ]; then
+  if [ -n "$REPO" ] && [ -d "$REPO/.git" ]; then
     for k in user.name user.email user.signingkey gpg.format gpg.ssh.program commit.gpgsign; do
       v="$(git -C "$REPO" config --get "$k" 2>/dev/null || true)"
       [ -n "$v" ] && git config "$k" "$v"
@@ -130,17 +161,26 @@ git clone -q "$CODIGO" "$TRABAJO/guardiana"
 git clone -q --branch "$RAMA_WEB" "$WEB" "$TRABAJO/web"
 cd "$TRABAJO/guardiana"
 [ "$(git rev-parse HEAD)" = "$COMMIT" ] || para "main de GitHub está en $(git rev-parse HEAD), no en $COMMIT. Avisa a Claude."
-# Por dónde se sube: el mismo remoto con el que este Mac ya sube (ssh o https con llavero).
-subir="$CODIGO"
-if [ -d "$REPO/.git" ]; then
+# Por dónde se sube: el mismo remoto con el que este Mac ya sube, si lo hay.
+url_codigo="$CODIGO"
+if [ -n "$REPO" ] && [ -d "$REPO/.git" ]; then
   u="$(git -C "$REPO" remote -v | awk '$3=="(push)" && $2 ~ /guardianagroup\/guardiana(\.git)?$/ {print $2; exit}')"
-  [ -n "$u" ] && subir="$u"
+  [ -n "$u" ] && url_codigo="$u"
 fi
-subir_web="$(printf '%s' "$subir" | sed -E 's#guardiana(\.git)?$#guardianagroup.com.git#')"
-git remote set-url --push origin "$subir"
-git -C "$TRABAJO/web" remote set-url --push origin "$subir_web"
+url_web="$(printf '%s' "$url_codigo" | sed -E 's#guardiana(\.git)?$#guardianagroup.com.git#')"
 identidad
 ( cd "$TRABAJO/web" && identidad )
+# Antes de firmar nada: que este Mac pueda subir a los dos sitios. Si no, se para aquí, sin
+# haber firmado ni anotado nada en Rekor.
+if [ -z "$ENSAYO" ]; then
+  subir "$TRABAJO/guardiana" "$url_codigo" HEAD:main --dry-run \
+    || para "este Mac no puede subir a GitHub (ni por https con el llavero ni por ssh). No se ha firmado nada. Díselo a Claude."
+  url_codigo="$SUBIDO_POR"
+  subir "$TRABAJO/web" "$url_web" "HEAD:$RAMA_WEB" --dry-run \
+    || para "este Mac no puede subir a la web en GitHub. No se ha firmado nada. Díselo a Claude."
+  url_web="$SUBIDO_POR"
+  echo "Puede subir a GitHub ($url_codigo)."
+fi
 # La app de Mac lleva el icono de la web; crear-app.sh lo busca en site/. Se excluye aquí mismo
 # para que el árbol siga limpio (release.sh lo exige) sin tocar nada publicado.
 mkdir -p site
@@ -255,7 +295,8 @@ if [ -n "$ENSAYO" ]; then
   echo "(ensayo: no se sube)"
   echo "$linea"
 else
-  git push origin HEAD:main || para "no he podido subir ledger.jsonl. Lo firmado está en $TRABAJO/archivos. Díselo a Claude."
+  subir "$TRABAJO/guardiana" "$url_codigo" HEAD:main || para "no he podido subir ledger.jsonl. Lo firmado está en $TRABAJO/archivos. Díselo a Claude."
+  echo "ledger.jsonl subido."
 fi
 
 paso "7/7 Web: tabla de descargas en la rama $RAMA_WEB (la web publicada no cambia todavía)"
@@ -403,7 +444,8 @@ if [ -n "$ENSAYO" ]; then
   echo "(ensayo: no se sube)"
   git show --stat HEAD | cat
 else
-  git push origin "HEAD:$RAMA_WEB" || para "no he podido subir la rama $RAMA_WEB de la web. Todo está en $TRABAJO. Díselo a Claude."
+  subir "$TRABAJO/web" "$url_web" "HEAD:$RAMA_WEB" || para "no he podido subir la rama $RAMA_WEB de la web. Todo está en $TRABAJO. Díselo a Claude."
+  echo "Rama $RAMA_WEB de la web subida."
 fi
 
 echo
