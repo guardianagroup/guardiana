@@ -44,3 +44,47 @@ jobs:
             build/out/SHA256SUMS
             build/out/guardiana-*
           retention-days: 14
+
+  instaladores:
+    # The three Windows installers, built from the very .exe the job above produced and
+    # compared twice, on a Windows machine that is not ours (28 Sep 2026). Until then they were
+    # built by hand on the test PC and carried to the Mac, which is one more place where the
+    # "same .exe" promise could quietly break. Signs nothing: the minisign signature is made on
+    # the release machine by build/release.sh, the only place the private key exists.
+    name: Windows installers (es, en, pt)
+    needs: hashes
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: guardiana-repro
+          path: build/out
+      - name: WiX 5
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
+      - name: three installers from the reproducible .exe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+          $exe = "build/out/guardiana-$version-windows-x86_64.exe"
+          New-Item -ItemType Directory -Force -Path "dist/$version" | Out-Null
+          foreach ($idioma in @("es", "en", "pt")) {
+            $sufijo = if ($idioma -eq "es") { "" } else { "-$idioma" }
+            & powershell -NoProfile -ExecutionPolicy Bypass -File build/msi.ps1 -Exe $exe -Version $version -Idioma $idioma -Out "dist/$version/guardiana-$version-windows-x64$sufijo.msi"
+            if ($LASTEXITCODE -ne 0) { throw "msi.ps1 failed for $idioma" }
+          }
+          Get-ChildItem "dist/$version" -Filter *.msi | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
+          } | Set-Content -Encoding ascii "dist/$version/SHA256SUMS-msi"
+          Get-Content "dist/$version/SHA256SUMS-msi"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: guardiana-instaladores
+          path: |
+            dist/*/*.msi
+            dist/*/SHA256SUMS-msi
+          retention-days: 14
