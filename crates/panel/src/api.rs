@@ -1773,7 +1773,16 @@ pub(crate) async fn informe(
     }
     let texto_whatsapp = t
         .panel("informe_texto")
-        .replace("{dispositivos}", &w.devices.len().to_string())
+        // «1 dispositivos» was what a home with only this PC read (1.0.0).
+        .replace(
+            "{dispositivos}",
+            &if w.devices.len() == 1 {
+                t.panel("informe_dispositivos_uno").to_owned()
+            } else {
+                t.panel("informe_dispositivos_n")
+                    .replace("{n}", &w.devices.len().to_string())
+            },
+        )
         .replace("{consultas}", &w.total.queries.to_string())
         .replace("{rastreadores}", &w.total.trackers.to_string())
         .replace("{publicidad}", &w.total.ads.to_string())
