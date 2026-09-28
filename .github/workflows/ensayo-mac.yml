@@ -9,6 +9,7 @@ on:
     branches: ['ensayo-mac-*']
 permissions:
   contents: read
+  actions: read
 env:
   CARGO_TERM_COLOR: always
 jobs:
@@ -98,3 +99,39 @@ jobs:
           d=$(dig +short +time=2 +tries=1 @127.0.0.1 example.com 2>&1); echo "$d" | grep -qE '^[0-9]' && nota "tras quitar" "127.0.0.1:53 sigue contestando: $d"
           aviso "después: scutil" "$(scutil --dns | grep -m6 nameserver)"
           exit $fallos
+
+  firmar:
+    # firmar-1.0.1 (rama mac) como en el Mac de publicación, con los dos artefactos de la ejecución
+    # que va a firmar puestos en «Descargas» y una clave de usar y tirar: hasta release.sh, que no
+    # corre en CI a propósito.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 36473167217
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/Downloads
+      - name: rsign, como en el Mac de publicación
+        run: cargo install rsign2 --locked
+      - name: firmar-1.0.1 en modo ensayo
+        env:
+          ENSAYO: '1'
+          DESCARGAS: ${{ runner.temp }}/Downloads
+          TRABAJO: ${{ runner.temp }}/trabajo
+        run: |
+          ls -R "$DESCARGAS" | head -30
+          git fetch -q origin mac
+          git show FETCH_HEAD:firmar-1.0.1 > "$RUNNER_TEMP/firmar"
+          set +e
+          bash "$RUNNER_TEMP/firmar" < <(sleep 3600) > "$RUNNER_TEMP/salida.txt" 2>&1
+          set -e
+          cat "$RUNNER_TEMP/salida.txt"
+          nota() { m="$(tail -c 3000 "$RUNNER_TEMP/salida.txt" | sed -e 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}')"; echo "::$1 title=$2::$m"; }
+          if grep -q ': OK$' "$RUNNER_TEMP/salida.txt" && grep -q '^Clave correcta' "$RUNNER_TEMP/salida.txt" && grep -q 'never run in CI' "$RUNNER_TEMP/salida.txt"; then
+            nota notice "firmar-1.0.1 llegó a release.sh"
+          else
+            nota error "firmar-1.0.1"
+            exit 1
+          fi
