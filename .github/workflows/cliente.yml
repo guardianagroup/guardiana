@@ -27,6 +27,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Windows prints to a cp1252 console by default and the first run's annotations arrived as «�».
+  PYTHONIOENCODING: utf-8
+  PYTHONUTF8: '1'
+
 jobs:
   windows:
     name: Windows (MSI en español, y la actualización desde la 1.0.0)

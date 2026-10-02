@@ -40,13 +40,23 @@ DIA_MS = 24 * 3600 * 1000
 fallos = []
 
 
+buenos = []
+
+
+def limpio(t):
+    return str(t).replace("\r", " ").replace("\n", " ")[:900]
+
+
 def ok(titulo, detalle=""):
-    print(f"::notice title=OK · {titulo}::{detalle}"[:4000], flush=True)
+    # Plain log line now, and all the good ones in one notice at the end: GitHub keeps only ten
+    # notices and ten errors per step, and on the first run the cap hid half of the results.
+    buenos.append(f"{titulo}: {limpio(detalle)}" if detalle else titulo)
+    print(f"  ok  {titulo} · {limpio(detalle)}", flush=True)
 
 
 def mal(titulo, detalle=""):
-    fallos.append(titulo)
-    print(f"::error title=FALLO · {titulo}::{detalle}"[:4000], flush=True)
+    fallos.append(f"{titulo}: {limpio(detalle)}" if detalle else titulo)
+    print(f"::error title=FALLO · {titulo}::{limpio(detalle)}", flush=True)
 
 
 def nota(texto):
@@ -263,8 +273,10 @@ def token():
         return ""
 
 
-def panel(ruta, con_llave=True):
-    req = urllib.request.Request(PANEL + ruta)
+def panel(ruta, con_llave=True, post=False):
+    req = urllib.request.Request(PANEL + ruta, data=b"{}" if post else None, method="POST" if post else "GET")
+    if post:
+        req.add_header("Content-Type", "application/json")
     if con_llave:
         req.add_header("x-guardiana-token", token())
     try:
@@ -274,6 +286,19 @@ def panel(ruta, con_llave=True):
         return e.code, e.read().decode("utf-8", "replace")
     except Exception as e:  # noqa: BLE001
         return 0, str(e)
+
+
+def duenos_de_puertos():
+    """Who listens on 53 and 80 outside the loopback: address, port and program."""
+    if SISTEMA == "Windows":
+        _, out = ps("$p=@{}; Get-Process | ForEach-Object { $p[$_.Id]=$_.ProcessName }; "
+                    "Get-NetTCPConnection -State Listen -LocalPort 53,80 -ErrorAction SilentlyContinue | ForEach-Object { 'tcp ' + $_.LocalAddress + ':' + $_.LocalPort + ' ' + $p[[int]$_.OwningProcess] }; "
+                    "Get-NetUDPEndpoint -LocalPort 53 -ErrorAction SilentlyContinue | ForEach-Object { 'udp ' + $_.LocalAddress + ':' + $_.LocalPort + ' ' + $p[[int]$_.OwningProcess] }")
+    elif SISTEMA == "Darwin":
+        _, out = run(["lsof", "-nP", "-i:53", "-i:80"], sudo=True)
+    else:
+        _, out = run(["ss", "-lntup", "( sport = :53 or sport = :80 )"], sudo=True)
+    return [l.strip() for l in out.splitlines() if l.strip() and "127.0.0.1" not in l and "[::1]" not in l and "::1:" not in l][:12]
 
 
 def buscar(obj, clave):
@@ -304,11 +329,15 @@ def prueba_actual():
 
 
 def marca_prueba():
+    """(where, value) of the trial mark, or (None, what was looked at)."""
     if SISTEMA == "Windows":
         code, out = run(["reg", "query", r"HKLM\SOFTWARE\Guardiana", "/v", "prueba"])
-        return out.split()[-1] if code == 0 and out.split() else None
-    code, out = run(["cat", "/etc/guardiana/prueba-empezada"], sudo=True)
-    return out.strip() if code == 0 else None
+        return (r"HKLM\SOFTWARE\Guardiana\prueba", out.split()[-1]) if code == 0 and out.split() else (None, "HKLM")
+    for p in ("/etc/guardiana/prueba-empezada", os.path.join(datos(), "prueba-empezada")):
+        code, out = run(["cat", p], sudo=True)
+        if code == 0 and out.strip():
+            return p, out.strip()
+    return None, "/etc/guardiana/prueba-empezada ni la carpeta de datos"
 
 
 # ----- install and uninstall, per package ----------------------------------------------------
@@ -443,7 +472,17 @@ def tarde(tipo, paquete, version):
         firma = rep.get("signature")
         (ok if firma == "valid" else mal)("verify · firma del programa", str(firma))
         (ok if rep.get("service") == "running" else mal)("verify · servicio", str(rep.get("service")))
-        (ok if not rep.get("lan_ports_open") else mal)("verify · ningún puerto abierto a la red", str(rep.get("lan_ports_open")))
+        abiertos = rep.get("lan_ports_open") or []
+        if not abiertos:
+            ok("verify · ningún puerto abierto a la red")
+        else:
+            duenos = duenos_de_puertos()
+            de_guardiana = [d for d in duenos if "guardiana" in d.lower()]
+            if de_guardiana:
+                mal("Guardiana no abre puertos a la red con Modo Hogar apagado", "; ".join(de_guardiana))
+            else:
+                ok("Guardiana no abre puertos a la red con Modo Hogar apagado", "los que hay son de otros programas: " + "; ".join(duenos))
+                mal("verify culpa a Guardiana de puertos de otros programas", f"verify lista {abiertos}; sus dueños: {'; '.join(duenos) or 'desconocidos'}")
         (ok if rep.get("chain_ok") in (True, None) else mal)("verify · cadena del extracto", str(rep.get("chain_ok")))
         led = rep.get("ledger")
         if isinstance(led, dict) and "found" in json.dumps(led).lower():
@@ -454,9 +493,19 @@ def tarde(tipo, paquete, version):
     # 5. Pointing the computer at Guardiana (the Windows installer already does; elsewhere, the
     #    panel's button, which is the same command).
     if not guardiana_primero(dns_actual()):
-        code, out = cli("dns", "--apply", "--yes")
-        if code != 0:
-            mal("apuntar el DNS a Guardiana", out[-1200:])
+        # The panel's button, as the customer presses it: the change is made by the service,
+        # with the service's permissions. Run from a root terminal instead, it would succeed
+        # where the button fails (the .tar.gz unit's ProtectSystem=full makes /etc read-only
+        # for the service, review entry 8), and the test would say yes where the customer
+        # gets an error.
+        code, body = panel("/api/dns/aplicar", post=True)
+        if code == 200 and '"dns_aplicado":true' in body.replace(" ", ""):
+            ok("el botón del panel apunta el DNS a Guardiana", body[:200])
+        else:
+            mal("el botón del panel apunta el DNS a Guardiana", f"{code} {body[:600]}")
+            code, out = cli("dns", "--apply", "--yes")
+            if code != 0:
+                mal("apuntar el DNS desde la terminal", out[-800:])
     if esperar(lambda: guardiana_primero(dns_actual()), 20):
         ok("el DNS del equipo apunta a Guardiana", str(dns_actual()))
     else:
@@ -494,14 +543,21 @@ def tarde(tipo, paquete, version):
     if guardiana_primero(dns_actual()) and servicio() != "running":
         mal("el DNS no apunta a un servicio parado", str(dns_actual()))
 
-    arrancar()
+    code, out = arrancar()
     if esperar(lambda: servicio() == "running", 40):
         ok("el servicio vuelve a arrancar")
     else:
-        mal("el servicio vuelve a arrancar", servicio())
+        mal("el servicio vuelve a arrancar", f"{servicio()} · {out.strip()[-300:]}")
+    esperar(lambda: panel("/", con_llave=False)[0] == 200, 30)
     if esperar(lambda: guardiana_primero(dns_actual()), 30) or cli("dns", "--apply", "--yes")[0] == 0:
         vaciar_cache()
-        (ok if esperar(pasa_por_guardiana, 30, 2) else mal)("al arrancar, Guardiana vuelve a ser el DNS", str(dns_actual()))
+        if esperar(pasa_por_guardiana, 30, 2):
+            ok("al arrancar, Guardiana vuelve a ser el DNS", str(dns_actual()))
+        else:
+            extra = ""
+            if SISTEMA == "Darwin":
+                extra = run(["tail", "-n", "15", os.path.join(datos(), "guardiana.log")], sudo=True)[1]
+            mal("al arrancar, Guardiana vuelve a ser el DNS", f"{dns_actual()} · servicio {servicio()} · {extra[-600:]}")
 
     # 7. Uninstall: the DNS exactly as it was, and the program gone.
     bien, out = desinstalar(tipo, paquete, carpeta)
@@ -518,8 +574,13 @@ def tarde(tipo, paquete, version):
         restaurar_dns(antes)
     hay, cual = hay_internet()
     (ok if hay else mal)("internet después de desinstalar", cual)
-    marca = marca_prueba()
-    (ok if marca else mal)("la fecha de la prueba se queda, como dice la web", str(marca))
+    donde, valor = marca_prueba()
+    if not donde:
+        mal("la fecha de la prueba se queda, como dice la web", f"no está en {valor}")
+    elif SISTEMA != "Windows" and donde != "/etc/guardiana/prueba-empezada":
+        mal("la fecha de la prueba está donde dice la web", f"la web dice /etc/guardiana/prueba-empezada; está en {donde}, dentro de la carpeta de datos, y borrarla devuelve los 7 días")
+    else:
+        ok("la fecha de la prueba se queda, como dice la web", donde)
 
     # 8. Installing again does not give the 7 days back.
     bien, out = instalar(tipo, paquete, carpeta)
@@ -582,6 +643,10 @@ def main():
                 actualizacion(viejo, paquete, version)
     finally:
         restaurar_dns(antes)
+    if buenos:
+        print("::notice title=%s · lo que está bien (%d)::%s" % (SISTEMA, len(buenos), "%0A".join(buenos)), flush=True)
+    if fallos:
+        print("::error title=%s · todos los fallos (%d)::%s" % (SISTEMA, len(fallos), "%0A".join(fallos)), flush=True)
     print(f"\n{len(fallos)} fallos" + (":\n  - " + "\n  - ".join(fallos) if fallos else ""), flush=True)
     return 1 if fallos else 0
 

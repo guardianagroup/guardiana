@@ -38,12 +38,18 @@ PAGES = {"es": "/instalar.html", "en": "/en/install.html", "pt": "/pt/instalar.h
 fallos = []
 
 
+buenos = []
+
+
 def ok(titulo, detalle=""):
-    print(f"::notice title=OK · {titulo}::{detalle}")
+    # A plain line in the log; all the good ones go out together at the end as one notice,
+    # because GitHub keeps only ten notices per step and the failures must never be the ones lost.
+    buenos.append(f"{titulo}: {detalle}" if detalle else titulo)
+    print(f"  ok  {titulo} · {detalle}")
 
 
 def mal(titulo, detalle=""):
-    fallos.append(titulo)
+    fallos.append(f"{titulo}: {detalle}" if detalle else titulo)
     print(f"::error title=FALLO · {titulo}::{detalle}")
 
 
@@ -128,8 +134,11 @@ def main():
         return finish()
     digest = hashlib.sha256(data).hexdigest()
 
-    # 1. The table of the install page, in the three languages.
-    for lang, path in PAGES.items():
+    # 1. The table of the install page, in the three languages. Only for the version the page
+    #    offers today: an older one (kept for the record) is checked against the ledger and its
+    #    signature, which is what still applies to it.
+    actual = latest_version()
+    for lang, path in (PAGES.items() if version == actual else []):
         try:
             html = get(SITE + path)
         except Exception as e:  # noqa: BLE001
@@ -192,7 +201,9 @@ def main():
 
 
 def finish():
-    print(f"\n{len(fallos)} fallos" + (": " + ", ".join(fallos) if fallos else ""))
+    if buenos:
+        print("::notice title=Descarga · lo que está bien (%d)::%s" % (len(buenos), "%0A".join(buenos)))
+    print(f"\n{len(fallos)} fallos" + (": " + "; ".join(fallos) if fallos else ""))
     return 1 if fallos else 0
 
 
