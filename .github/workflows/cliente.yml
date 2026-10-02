@@ -1,0 +1,103 @@
+# The customer test: what someone does who has just found GUARDIANA, on machines that are not ours.
+#
+# Each job starts from a fresh computer GitHub lends for the run (Windows Server, Ubuntu, a Mac
+# with an Apple chip), downloads the published files from guardianagroup.com exactly as a customer
+# would, checks them the way the install page asks (the hash on the page in three languages, in the
+# public ledger, and the minisign signature with the published key), then installs, uses, stops,
+# uninstalls and installs again, checking what the page and the panel promise at every step.
+# Written on 1 Oct 2026, when the owner asked for "every test, as a customer, with nothing loose",
+# and the only Windows PC at hand could not be reached.
+#
+# It changes the DNS and installs services on those throwaway machines, which is the point: a
+# customer's computer goes through exactly that. It signs nothing and publishes nothing.
+# Results are GitHub annotations: readable on the run page and through the public API without
+# signing in. A red job is a promise the published program does not keep.
+name: cliente
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to test (empty = the latest in ledger.jsonl)
+        required: false
+  push:
+    tags: ['cliente-*']
+    branches: ['cliente-*']
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows (MSI en español, y la actualización desde la 1.0.0)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet cryptography
+      - name: descargar y comprobar, como un cliente
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $v = "${{ github.event.inputs.version }}"
+          $arg = @(); if ($v) { $arg = @('--version', $v) }
+          python build/cliente/descarga.py 'guardiana-{v}-windows-x64.msi' --dir paquetes @arg
+          python build/cliente/descarga.py 'guardiana-{v}-windows-x64-en.msi' --dir otros @arg
+          python build/cliente/descarga.py 'guardiana-{v}-windows-x64-pt.msi' --dir otros @arg
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: la versión anterior, para probar la actualización
+        continue-on-error: true
+        run: python build/cliente/descarga.py guardiana-1.0.0-windows-x64.msi --version 1.0.0 --dir anterior
+      - name: instalar, usar, parar, desinstalar y reinstalar
+        run: python build/cliente/instalacion.py --tipo msi --dir paquetes --anterior anterior
+
+  ubuntu:
+    name: Ubuntu (.deb)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install --quiet --break-system-packages cryptography || pip install --quiet cryptography
+      - name: descargar y comprobar, como un cliente
+        continue-on-error: true
+        run: |
+          v="${{ github.event.inputs.version }}"
+          python3 build/cliente/descarga.py 'guardiana_{v}_amd64.deb' --dir paquetes ${v:+--version $v}
+      - name: instalar, usar, parar, desinstalar y reinstalar
+        run: python3 build/cliente/instalacion.py --tipo deb --dir paquetes
+
+  ubuntu-tarball:
+    name: Otro Linux con systemd (.tar.gz)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install --quiet --break-system-packages cryptography || pip install --quiet cryptography
+      - name: descargar y comprobar, como un cliente
+        continue-on-error: true
+        run: |
+          v="${{ github.event.inputs.version }}"
+          python3 build/cliente/descarga.py 'guardiana-{v}-linux-x86_64.tar.gz' --dir paquetes ${v:+--version $v}
+      - name: instalar, usar, parar, desinstalar y reinstalar
+        run: python3 build/cliente/instalacion.py --tipo tar --dir paquetes
+
+  mac:
+    name: macOS con chip Apple (GUARDIANA.app)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install --quiet --break-system-packages cryptography || python3 -m pip install --quiet cryptography
+      - name: descargar y comprobar, como un cliente
+        continue-on-error: true
+        run: |
+          v="${{ github.event.inputs.version }}"
+          python3 build/cliente/descarga.py 'guardiana-{v}-macos.app.zip' --dir paquetes ${v:+--version $v}
+      - name: instalar, usar, parar, desinstalar y reinstalar
+        # What a machine cannot see: the Gatekeeper warning a customer meets when opening the app
+        # (a file fetched with curl carries no quarantine flag) and the app's own dialogs. Those
+        # are checked by hand and described, with screenshots, on the install page.
+        run: python3 build/cliente/instalacion.py --tipo app --dir paquetes
