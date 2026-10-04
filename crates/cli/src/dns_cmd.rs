@@ -131,7 +131,7 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
         ledger.record_change(
             now_ms(),
             guardiana_core::ChangeKind::DnsOn,
-            "terminal",
+            guardiana_core::ChangeWho::Terminal,
             &backup
                 .original_servers()
                 .iter()
@@ -179,7 +179,12 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
             ledger.set_setting(SETTING_BACKUP, &serde_json::to_string(&backup)?)?;
             return Err(Box::new(e));
         }
-        ledger.record_change(now_ms(), guardiana_core::ChangeKind::DnsOff, "terminal", "")?;
+        ledger.record_change(
+            now_ms(),
+            guardiana_core::ChangeKind::DnsOff,
+            guardiana_core::ChangeWho::Terminal,
+            "",
+        )?;
         println!("{}", t.cli("dns.restaurado"));
         return Ok(());
     }

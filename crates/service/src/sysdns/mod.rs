@@ -444,6 +444,13 @@ pub fn upstreams_for(backup: &Backup) -> Vec<IpAddr> {
             return v;
         }
     }
+    #[cfg(target_os = "macos")]
+    {
+        let v = macos::upstreams_for(backup);
+        if !v.is_empty() {
+            return v;
+        }
+    }
     backup
         .original_servers()
         .into_iter()

@@ -373,3 +373,22 @@ async fn shutdown_stops_the_server() {
         .expect("server did not stop")
         .unwrap();
 }
+
+/// The question the engine asks before stepping aside and before coming back. It must not
+/// depend on the network the tests run on: a first version asked a TEST-NET address and
+/// "passed" at home, then failed in a café whose network answers DNS sent to any address.
+#[tokio::test]
+async fn the_probe_tells_a_silent_upstream_from_one_that_answers() {
+    // Nothing listens on port 1 of the loopback: silence, and quickly.
+    let dead: SocketAddr = "127.0.0.1:1".parse().unwrap();
+    let started = std::time::Instant::now();
+    assert!(!guardiana_dns::upstream_answers(&[dead], Duration::from_millis(300)).await);
+    assert!(started.elapsed() < Duration::from_secs(5));
+    assert!(!guardiana_dns::upstream_answers(&[], Duration::from_millis(300)).await);
+    // An upstream that answers "nothing under that name" is alive: any answer counts.
+    let (addr, hits, _server) = fake_upstream().await;
+    assert!(guardiana_dns::upstream_answers(&[addr], Duration::from_millis(800)).await);
+    assert!(hits.load(Ordering::SeqCst) >= 1);
+    // One silent and one alive is alive.
+    assert!(guardiana_dns::upstream_answers(&[dead, addr], Duration::from_millis(800)).await);
+}

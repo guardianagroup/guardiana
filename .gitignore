@@ -33,3 +33,15 @@ keys/
 /build/out/
 /release/
 redes-videos/
+
+# Los archivos publicados viven en el repositorio de la web, no aquí: 45 MB por versión.
+# Se copian para poder comprobarlos (huellas, firmas, enlaces) sin engordar este repositorio.
+site/descargas/
+
+# Python and Claude Code local files. On the Mac they were ignored by the user's global git config
+# (~/.config/git/ignore and .git/info/exclude), which a new machine does not have: the Windows PC
+# showed them as new files on 4 Oct 2026. Here they are ignored wherever the repository lives.
+__pycache__/
+*.pyc
+.claude/settings.local.json
+.claude/worktrees/

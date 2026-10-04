@@ -1,0 +1,150 @@
+# The customer test, before a release exists: the same afternoon as cliente.yml, run on the
+# packages this branch would publish, built the way the release builds them.
+#
+# Linux and Windows binaries come from build/repro.sh (the build anyone can repeat), the .deb and
+# the .tar.gz are packed from that Linux binary, the three MSIs from that .exe with WiX 5 on
+# Windows, and the Mac app on a Mac. Then a fresh machine per system installs, uses, stops,
+# uninstalls and reinstalls, and on Windows updates from the version people have today.
+# Nothing is signed here (the key never comes near CI), so the download check of cliente.yml does
+# not apply: that one runs on what is published, after the release.
+# Written on 1 Oct 2026, so that 1.0.2 is tested as a customer would, before it reaches one.
+name: candidato
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['candidato-*']
+
+permissions:
+  contents: read
+
+env:
+  PYTHONIOENCODING: utf-8
+  PYTHONUTF8: '1'
+
+jobs:
+  binarios:
+    name: binarios reproducibles, .deb y .tar.gz
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: compilación reproducible
+        run: build/repro.sh HEAD
+      - name: .deb y .tar.gz del binario reproducible
+        run: |
+          set -euo pipefail
+          v=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          mkdir -p paquetes target/release
+          install -m 755 "build/out/guardiana-$v-linux-x86_64" target/release/guardiana
+          cargo install cargo-deb --locked --quiet
+          cargo deb -p guardiana-cli --no-build --no-strip -o "paquetes/guardiana_${v}_amd64.deb"
+          d="guardiana-$v-linux-x86_64"; mkdir -p "/tmp/$d"
+          cp target/release/guardiana build/tarball/instalar.sh build/tarball/desinstalar.sh \
+             build/tarball/LEEME.txt build/tarball/README.txt build/tarball/LEIAME.txt "/tmp/$d/"
+          cp docs/WHAT_IT_DOES_NOT_DO.md docs/VERIFY.md docs/HOGAR.md docs/LISTS.md LICENSE "/tmp/$d/"
+          chmod 644 "/tmp/$d"/*; chmod 755 "/tmp/$d/guardiana" "/tmp/$d/instalar.sh" "/tmp/$d/desinstalar.sh"
+          tar -C /tmp -czf "paquetes/$d.tar.gz" "$d"
+          cp "build/out/guardiana-$v-windows-x86_64.exe" paquetes/
+          (cd paquetes && sha256sum *) | tee paquetes/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidato-linux
+          path: paquetes/
+          retention-days: 7
+
+  msi:
+    name: instaladores de Windows
+    needs: binarios
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidato-linux
+          path: paquetes
+      - name: WiX 5 y los tres MSI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+          $exe = "paquetes/guardiana-$version-windows-x86_64.exe"
+          New-Item -ItemType Directory -Force -Path msi | Out-Null
+          foreach ($idioma in @("es", "en", "pt")) {
+            $sufijo = if ($idioma -eq "es") { "" } else { "-$idioma" }
+            $salida = & powershell -NoProfile -ExecutionPolicy Bypass -File build/msi.ps1 -Exe $exe -Version $version -Idioma $idioma -Out "msi/guardiana-$version-windows-x64$sufijo.msi" 2>&1 | Out-String
+            Write-Output $salida
+            if ($LASTEXITCODE -ne 0) { Write-Output "::error title=msi.ps1 $idioma::$($salida -replace "`r?`n", ' | ')"; exit 1 }
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidato-msi
+          path: msi/
+          retention-days: 7
+
+  windows:
+    name: cliente en Windows (y actualización desde lo publicado)
+    needs: msi
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet cryptography
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidato-msi
+          path: paquetes
+      - name: la versión que la gente tiene hoy, para actualizar desde ella
+        continue-on-error: true
+        run: python build/cliente/descarga.py 'guardiana-{v}-windows-x64.msi' --dir anterior
+      - name: instalar, usar, parar, desinstalar, reinstalar y actualizar
+        run: python build/cliente/instalacion.py --tipo msi --dir paquetes --anterior anterior
+
+  ubuntu:
+    name: cliente en Ubuntu (.deb)
+    needs: binarios
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidato-linux
+          path: paquetes
+      - run: python3 build/cliente/instalacion.py --tipo deb --dir paquetes
+
+  ubuntu-tarball:
+    name: cliente en otro Linux (.tar.gz)
+    needs: binarios
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidato-linux
+          path: paquetes
+      - run: python3 build/cliente/instalacion.py --tipo tar --dir paquetes
+
+  mac:
+    name: cliente en macOS (GUARDIANA.app)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: la app, como la hace release.sh en el Mac
+        run: |
+          set -euo pipefail
+          v=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          build/mac/crear-app.sh "$PWD/app" >/dev/null
+          mkdir -p paquetes
+          (cd app && zip -qry "../paquetes/guardiana-$v-macos.app.zip" GUARDIANA.app)
+      - run: python3 build/cliente/instalacion.py --tipo app --dir paquetes

@@ -26,7 +26,7 @@ mod stats;
 pub mod time;
 pub mod trampas;
 
-pub use changes::{Change, ChangeKind};
+pub use changes::{Change, ChangeKind, ChangeWho};
 pub use error::{Error, Result};
 pub use export::{write_csv, write_csv_for_spreadsheet, write_json};
 pub use gaps::{Gap, GAP_THRESHOLD_MS, KEY_HEARTBEAT};

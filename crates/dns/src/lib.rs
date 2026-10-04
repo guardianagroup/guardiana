@@ -25,6 +25,9 @@ use std::time::Duration;
 use hickory_server::server::Server;
 use tokio::net::{TcpListener, UdpSocket};
 
+// The answer code inside `Outcome::Forwarded`, so a caller can name it without depending on
+// hickory itself.
+pub use hickory_proto::op::ResponseCode;
 pub use hickory_proto::rr::RecordType;
 
 /// Name Firefox queries to decide whether to use its own DoH (brief §4).
@@ -106,6 +109,34 @@ pub struct Query {
     pub qtype: RecordType,
     /// Unix time in milliseconds when it arrived.
     pub ts: i64,
+}
+
+/// Whether at least one of these upstreams answers right now.
+///
+/// One lookup of a fixed name with the same client the resolver uses. An answer of any kind
+/// (even "no such name") means the upstream is reachable; only a transport failure (timeout,
+/// refused, unreachable) counts as silence. The engine asks this once a minute while it has
+/// stepped aside because the upstreams went quiet, to know when to take the DNS back.
+pub async fn upstream_answers(upstreams: &[SocketAddr], timeout: Duration) -> bool {
+    use hickory_proto::rr::{Name, RecordType};
+    use hickory_resolver::net::{DnsError, NetError};
+    if upstreams.is_empty() {
+        return false;
+    }
+    let mut cfg = Config::local(upstreams.to_vec());
+    cfg.upstream_timeout = timeout;
+    cfg.cache_size = 0;
+    let Ok(client) = upstream::build(&cfg) else {
+        return false;
+    };
+    let Ok(name) = Name::from_ascii("example.com.") else {
+        return false;
+    };
+    match client.lookup(name, RecordType::A).await {
+        Ok(_) => true,
+        Err(NetError::Dns(DnsError::NoRecordsFound(_))) => true,
+        Err(_) => false,
+    }
 }
 
 /// What the policy wants done with a query.
