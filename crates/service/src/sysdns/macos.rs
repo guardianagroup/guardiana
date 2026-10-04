@@ -1,6 +1,6 @@
-//! macOS, development Mac only (DECISIONES #55; macOS stays out of 1.0): per
-//! enabled network service through `networksetup`, which needs root. The
-//! daemon has it under launchd; the CLI needs `sudo`.
+//! macOS (in 1.0 since 21 Sep 2026): per enabled network service through
+//! `networksetup`, which needs root. The daemon has it under launchd; the CLI
+//! needs `sudo`. The live upstream comes from the DHCP lease (`ipconfig getpacket`).
 
 use std::net::IpAddr;
 
@@ -96,6 +96,93 @@ pub(crate) fn restore(backup: &Backup) -> Result<(), Error> {
     Ok(())
 }
 
+/// `networksetup -listallhardwareports`: `Hardware Port: Wi-Fi` followed by `Device: en0`,
+/// one block per port. The port name is the network service name `snapshot` recorded.
+pub(crate) fn parse_hardware_ports(text: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let mut port: Option<String> = None;
+    for line in text.lines().map(str::trim) {
+        if let Some(p) = line.strip_prefix("Hardware Port:") {
+            port = Some(p.trim().to_owned());
+        } else if let Some(d) = line.strip_prefix("Device:") {
+            if let Some(p) = port.take() {
+                out.push((p, d.trim().to_owned()));
+            }
+        }
+    }
+    out
+}
+
+/// DNS servers in the DHCP lease of one device, from `ipconfig getpacket <dev>`:
+/// `domain_name_server (ip_mult): {10.50.0.1, 1.1.1.1}` or `domain_name_server (ip): 10.50.0.1`.
+/// Nothing when the device has no lease (Wi-Fi off, cable out).
+pub(crate) fn parse_dhcp_dns(text: &str) -> Vec<IpAddr> {
+    text.lines()
+        .map(str::trim)
+        .filter(|l| l.starts_with("domain_name_server"))
+        .filter_map(|l| l.split(':').nth(1))
+        .flat_map(|v| {
+            v.trim()
+                .trim_matches(|c| c == '{' || c == '}')
+                .split(',')
+                .filter_map(|ip| ip.trim().parse::<IpAddr>().ok())
+                .collect::<Vec<_>>()
+        })
+        .filter(|ip| !ip.is_loopback())
+        .collect()
+}
+
+/// What the resolver should forward to **right now**: for every service the backup recorded as
+/// automatic, the DNS servers of its current DHCP lease; for a service set by hand, what it had.
+///
+/// This is the macOS twin of the Windows one. Without it, the servers saved when Guardiana took
+/// over stay frozen for ever: a laptop installed at home and opened in a café forwards to the
+/// home router, which is not there, and every name times out until macOS gives up and uses the
+/// café's DNS by itself. That is exactly what happened to the owner's Mac on 1 Oct 2026.
+/// `ipconfig getpacket` needs no root and is what the lease says, not what `scutil` shows (which
+/// is Guardiana itself once it is first). Empty when no automatic service has a lease: the
+/// caller then keeps the saved servers.
+pub(crate) fn upstreams_for(backup: &Backup) -> Vec<IpAddr> {
+    let ports = run_checked("networksetup", &["-listallhardwareports"])
+        .map(|t| parse_hardware_ports(&t))
+        .unwrap_or_default();
+    let mut out: Vec<IpAddr> = Vec::new();
+    let mut any_lease = false;
+    for i in &backup.interfaces {
+        let now: Vec<IpAddr> = if i.automatic {
+            let dev = ports
+                .iter()
+                .find(|(p, _)| *p == i.name)
+                .map(|(_, d)| d.as_str());
+            let lease = dev
+                .and_then(|d| run_checked("ipconfig", &["getpacket", d]).ok())
+                .map(|t| parse_dhcp_dns(&t))
+                .unwrap_or_default();
+            if lease.is_empty() {
+                continue;
+            }
+            any_lease = true;
+            lease
+        } else {
+            i.servers
+                .iter()
+                .copied()
+                .filter(|ip| !ip.is_loopback())
+                .collect()
+        };
+        for ip in now {
+            if !out.contains(&ip) {
+                out.push(ip);
+            }
+        }
+    }
+    if any_lease {
+        out
+    } else {
+        Vec::new()
+    }
+}
+
 pub(crate) fn guardian_is_primary() -> Option<bool> {
     let text = run_checked("scutil", &["--dns"]).ok()?;
     let first = first_nameserver(&text)?;
@@ -117,6 +204,65 @@ mod tests {
         assert!(parse_servers("There aren't any DNS Servers set on Wi-Fi.\n").is_empty());
         let v = parse_servers("192.168.1.1\n1.1.1.1\n");
         assert_eq!(v.len(), 2);
+    }
+
+    #[test]
+    fn hardware_ports_pair_name_and_device() {
+        let text = "\nHardware Port: USB 10/100/1000 LAN\nDevice: en3\nEthernet Address: 00:e0:4c:68:09:c2\n\nHardware Port: Wi-Fi\nDevice: en0\nEthernet Address: 10:a1:da:3d:e5:85\n\nVLAN Configurations\n===================\n";
+        let v = parse_hardware_ports(text);
+        assert_eq!(
+            v,
+            vec![
+                ("USB 10/100/1000 LAN".to_owned(), "en3".to_owned()),
+                ("Wi-Fi".to_owned(), "en0".to_owned())
+            ]
+        );
+    }
+
+    #[test]
+    fn dhcp_dns_both_forms_and_no_loopback() {
+        let multi = "op = BOOTREPLY\nyiaddr = 10.50.1.29\ndomain_name_server (ip_mult): {10.50.0.1, 1.1.1.1}\nrouter (ip_mult): {10.50.0.1}\n";
+        let v = parse_dhcp_dns(multi);
+        assert_eq!(v.len(), 2);
+        assert_eq!(
+            v[0],
+            "10.50.0.1"
+                .parse::<IpAddr>()
+                .ok()
+                .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED))
+        );
+        let single = "domain_name_server (ip): 192.168.1.1\n";
+        assert_eq!(parse_dhcp_dns(single).len(), 1);
+        assert!(parse_dhcp_dns("domain_name_server (ip): 127.0.0.1\n").is_empty());
+        assert!(parse_dhcp_dns("").is_empty());
+    }
+
+    /// Only on a real Mac with a DHCP lease: `cargo test -p guardiana-service -- --ignored`.
+    /// Proves the live path end to end on the development Mac (1 Oct 2026, network 10.50.x).
+    #[test]
+    #[ignore]
+    fn live_upstreams_come_from_the_dhcp_lease() {
+        let backup = Backup {
+            taken_at: 0,
+            method: Method::MacNetworkSetup,
+            interfaces: vec![InterfaceDns {
+                id: "Wi-Fi".to_owned(),
+                name: "Wi-Fi".to_owned(),
+                servers: vec!["192.168.1.1"
+                    .parse()
+                    .ok()
+                    .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED))],
+                automatic: true,
+                extra: None,
+            }],
+            resolv_conf: None,
+            resolv_link: None,
+            made_dropin_dir: false,
+        };
+        let live = upstreams_for(&backup);
+        eprintln!("live upstreams: {live:?}");
+        assert!(!live.is_empty(), "no DHCP lease found for Wi-Fi");
+        assert!(live.iter().all(|ip| !ip.is_loopback()));
     }
 
     #[test]

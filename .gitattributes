@@ -1,0 +1,39 @@
+# Line endings are the same in every working copy, on every machine (4 Oct 2026).
+#
+# Git for Windows ships with core.autocrlf=true, and on the Windows PC that took over from the
+# Mac, 457 of the 544 files came out with CRLF: the shell scripts (release.sh, repro.sh,
+# zig-cc.sh) stop working under bash, and the texts the program embeds (include_str! of the
+# panel's pages and of the i18n files) change, so a binary built there could never match the
+# reproducible build. These rules win over core.autocrlf.
+* text=auto eol=lf
+
+# Kept byte for byte as they are stored: published data (CSV with CRLF, as Excel expects it)
+# and licence texts as their authors distribute them.
+*.csv -text
+OFL-*.txt -text
+
+# Windows batch files need CRLF: cmd.exe misreads labels without it.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary, never converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.bmp binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.mp4 binary
+*.webm binary
+*.msi binary
+*.zip binary
+*.gz binary
+*.jks binary
+*.exe binary
+*.wasm binary

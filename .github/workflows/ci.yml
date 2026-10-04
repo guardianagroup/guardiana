@@ -1,5 +1,8 @@
-# CI: every check from CLAUDE.md, on Linux and Windows (brief §11).
+# CI: every check from CLAUDE.md, on Linux, Windows and macOS (brief §11).
 # CI never holds signing keys and never publishes anything (brief §10).
+# macOS joined on 4 Oct 2026: the development Mac was sold the next day, and the code behind
+# cfg(target_os = "macos") -- the Mac's DNS, launchd, the DHCP lease -- was only ever compiled
+# and tested on it. Now it is checked on every push, on a Mac that is not ours.
 name: ci
 
 on:
@@ -23,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

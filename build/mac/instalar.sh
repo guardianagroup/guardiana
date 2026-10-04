@@ -20,8 +20,12 @@ LABEL="com.guardianagroup.guardiana"
 [ -f "$BIN_SRC" ] || { m "No encuentro el programa en $BIN_SRC." "I can't find the program at $BIN_SRC." "Não encontro o programa em $BIN_SRC."; exit 1; }
 [ -n "$USER_NAME" ] || { m "Falta el usuario." "The user is missing." "Falta o usuário."; exit 1; }
 
-# 1. The DNS servers the Mac uses today become the upstream. Refuse to continue
-#    without one: switching the DNS to a resolver with no upstream leaves the Mac offline.
+# 1. The Mac must have a DNS upstream today, or installing would leave it without names.
+#    It is only CHECKED here, not written into the daemon: until 1 Oct 2026 the servers found
+#    at install time were passed as --upstream and frozen for ever, so a Mac installed at home
+#    and opened elsewhere forwarded every name to the home router, which was not there, and the
+#    owner's own Mac lost its internet. Now the daemon runs `service run`: it takes the servers
+#    the panel saved when it changed the DNS and follows the DHCP lease when the network changes.
 UPSTREAMS=""
 if [ -s "$DATA/dns-anterior.txt" ]; then
   UPSTREAMS="$(awk -F'\t' '$2 != "empty" {print $2}' "$DATA/dns-anterior.txt" | tr ' ' '\n' | grep -v '^127\.' | sort -u | tr '\n' ' ')"
@@ -49,15 +53,20 @@ if [ ! -s "$DATA/dns-anterior.txt" ]; then
 fi
 
 # 4. The daemon: root, port 53 on loopback, panel on 7443, restarted by launchd if it dies.
-ARGS=""
-for u in $UPSTREAMS; do ARGS="$ARGS<string>--upstream</string><string>$u</string>"; done
+#    `service run` is the quiet service body (the same one systemd runs): no line per query, so
+#    the log stops growing by the megabyte, and the upstream follows the network (see step 1).
+#    The old log is started afresh: on the owner's Mac it had reached 29 MB of every name asked.
+#    No GUARDIANA_DATA in the environment: the data folder is already this one by default on a
+#    Mac, and the variable also moves the trial mark INTO the data folder (it exists for tests),
+#    so in 1.0.1 deleting that folder gave the seven days back, and the mark was not where the
+#    install page says, /etc/guardiana/prueba-empezada. Found by the customer test, 1 Oct 2026.
+: > "$DATA/guardiana.log" 2>/dev/null || true
 cat > "$PLIST" <<PL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>Label</key><string>$LABEL</string>
-<key>ProgramArguments</key><array><string>$BIN_DIR/guardiana</string><string>observe</string><string>--listen</string><string>127.0.0.1:53</string>$ARGS<string>--panel-listen</string><string>127.0.0.1:7443</string></array>
-<key>EnvironmentVariables</key><dict><key>GUARDIANA_DATA</key><string>$DATA</string></dict>
+<key>ProgramArguments</key><array><string>$BIN_DIR/guardiana</string><string>service</string><string>run</string></array>
 <key>RunAtLoad</key><true/>
 <key>KeepAlive</key><true/>
 <key>StandardOutPath</key><string>$DATA/guardiana.log</string>
@@ -75,4 +84,4 @@ for i in $(seq 1 20); do
   sleep 0.5
 done
 [ "$ok" = 1 ] || { m "El guardián no responde. Mira $DATA/guardiana.log." "The guardian does not answer. Look at $DATA/guardiana.log." "O guardião não responde. Veja $DATA/guardiana.log."; exit 1; }
-m "Reenvía a: $UPSTREAMS" "Forwards to: $UPSTREAMS" "Encaminha para: $UPSTREAMS"
+m "Reenvía hoy a: $UPSTREAMS (y sigue a la red cuando cambie)" "Forwards today to: $UPSTREAMS (and follows the network when it changes)" "Encaminha hoje para: $UPSTREAMS (e segue a rede quando ela mudar)"

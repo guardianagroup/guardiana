@@ -122,9 +122,88 @@ struct Pending {
 
 type PendingKey = (SocketAddr, String, String, i64);
 
+/// How the upstreams are doing, counted by the policy as answers come back: forwarded queries
+/// that got any answer, and queries the upstreams never answered. Read and reset once a minute.
+#[derive(Default)]
+struct Salud {
+    ok: std::sync::atomic::AtomicU64,
+    fallos: std::sync::atomic::AtomicU64,
+}
+
+impl Salud {
+    fn anota(&self, outcome: Outcome) {
+        use std::sync::atomic::Ordering::Relaxed;
+        match outcome {
+            Outcome::Forwarded { .. } => {
+                self.ok.fetch_add(1, Relaxed);
+            }
+            Outcome::UpstreamFailed => {
+                self.fallos.fetch_add(1, Relaxed);
+            }
+            _ => {}
+        }
+    }
+
+    /// The minute's numbers, and back to zero.
+    fn minuto(&self) -> (u64, u64) {
+        use std::sync::atomic::Ordering::Relaxed;
+        (self.ok.swap(0, Relaxed), self.fallos.swap(0, Relaxed))
+    }
+}
+
+/// A minute in which the upstreams answered nothing at all, with enough queries to mean it.
+/// Three is the floor: one lost packet is not a dead network, and a quiet minute (nobody asked)
+/// says nothing either way.
+fn minuto_sin_arriba(ok: u64, fallos: u64) -> bool {
+    ok == 0 && fallos >= 3
+}
+
+/// Stepping aside when the upstreams go quiet, and coming back when they answer.
+///
+/// The guardian is the machine's resolver; when what it forwards to stops answering (a laptop
+/// that woke up on another network, a router that died, a captive portal), every lookup on the
+/// machine fails, which the person experiences as "no internet". After a minute in which the
+/// upstreams answered nothing, the guardian asks them one name itself; if that goes unanswered
+/// too, it gives the DNS back exactly as it was, writes it in the ledger, and then asks once a
+/// minute until one answers, when it takes the DNS again. The owner's own Mac spent a day like
+/// this on 1 Oct 2026, with nothing telling him why.
+#[derive(Default)]
+struct Aparte {
+    apartado: bool,
+}
+
+/// What the minute asks the engine to do.
+#[derive(Debug, PartialEq, Eq)]
+enum Paso {
+    Nada,
+    /// A silent minute: ask the upstreams directly, and step aside if they stay silent. The
+    /// question is what decides: a machine that only asked for names that do not resolve is
+    /// not a machine without a network.
+    Comprobar,
+    /// Already aside: ask whether the upstreams answer again, and if so take the DNS back.
+    Sondear,
+}
+
+impl Aparte {
+    fn minuto(&self, ok: u64, fallos: u64) -> Paso {
+        if self.apartado {
+            Paso::Sondear
+        } else if minuto_sin_arriba(ok, fallos) {
+            Paso::Comprobar
+        } else {
+            Paso::Nada
+        }
+    }
+}
+
+/// How long the guardian waits for the upstreams when it asks them itself.
+const SONDA: Duration = Duration::from_secs(2);
+
 struct EnginePolicy {
     inner: Mutex<Inner>,
     pending: Mutex<HashMap<PendingKey, Pending>>,
+    /// Answers and silences of the upstreams, for the minute watch that steps aside.
+    salud: Arc<Salud>,
     devices: guardiana_devices::Resolver,
     texts: &'static Texts,
     print_events: bool,
@@ -298,6 +377,7 @@ impl Policy for EnginePolicy {
     }
 
     fn record(&self, q: &Query, outcome: Outcome) {
+        self.salud.anota(outcome);
         let (verdict, mut decided_by, rule_id) = match outcome {
             Outcome::Refused => return,
             Outcome::Forwarded { .. } | Outcome::UpstreamFailed => {
@@ -399,14 +479,17 @@ pub async fn run<F: Future<Output = ()>>(
     result
 }
 
-/// On Windows Guardiana is the machine's only resolver while it runs (sysdns::windows), so a
-/// stopped or failed service must not leave it pointing at a port nobody answers: that is a
-/// machine without internet. The old DNS goes back, the backup stays, and the next start points
-/// the machine at Guardiana again (`run_once`, right after the resolver is listening).
+/// While it runs, Guardiana is the machine's resolver, so a stopped service must not leave the
+/// machine pointing at a port nobody answers: that is a machine without internet. The old DNS
+/// goes back, the backup stays, and the next start points the machine at Guardiana again
+/// (`run_once`, right after the resolver is listening).
+///
+/// Until 1 Oct 2026 this ran on Windows only. On Linux (resolved drop-in or a rewritten
+/// resolv.conf) Guardiana is the only resolver just the same, and `systemctl stop guardiana`
+/// left Ubuntu without names while the screen said "Servicio parado." On a Mac the original
+/// servers stay behind 127.0.0.1 as a fallback, so it limps instead of dying, but every lookup
+/// waits for a timeout first. A crash does not reach this function; the next start re-applies.
 fn give_dns_back_while_stopped(db: &std::path::Path) {
-    if !cfg!(target_os = "windows") {
-        return;
-    }
     let Ok(ledger) = Ledger::open(db, identity::genesis()) else {
         return;
     };
@@ -449,6 +532,70 @@ fn home_lan_wanted(ledger: &Ledger, secret: &str) -> Option<std::net::Ipv4Addr> 
 
 /// Stand down: the trial or the subscription is over.
 ///
+/// The upstreams of this pass, as the person reads them.
+fn lista_de(upstreams: &[SocketAddr]) -> String {
+    upstreams
+        .iter()
+        .map(|s| s.ip().to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// The upstreams are silent: give the system DNS back from the saved copy and write it down.
+/// The copy stays (this is not the end of anything: the guardian comes back when they answer).
+/// `true` when this call undid the change; `false` when there was no copy (nothing of ours to
+/// undo), the machine already pointed elsewhere, or the undo failed -- then the next minute
+/// tries again, because the machine is still pointing at a resolver that cannot answer.
+fn devolver_por_silencio(ledger: &Ledger, lista: &str) -> bool {
+    let Ok(Some(json)) = ledger.setting(SETTING_BACKUP) else {
+        return false;
+    };
+    if json.is_empty() {
+        return false;
+    }
+    let Ok(backup) = serde_json::from_str::<Backup>(&json) else {
+        return false;
+    };
+    if sysdns::guardian_is_primary() == Some(false) || sysdns::restore(&backup).is_err() {
+        return false;
+    }
+    let _ = ledger.record_change(
+        now_ms(),
+        guardiana_core::ChangeKind::DnsOff,
+        guardiana_core::ChangeWho::SinArriba,
+        lista,
+    );
+    true
+}
+
+/// An upstream answers again: point the machine at the guardian as before. `true` when done,
+/// or when there is no copy to apply (the person undid the change meanwhile, or never made it).
+fn volver_con_arriba(ledger: &Ledger) -> bool {
+    let t = i18n::current();
+    let copia = match ledger.setting(SETTING_BACKUP) {
+        Ok(Some(json)) if !json.is_empty() => serde_json::from_str::<Backup>(&json).ok(),
+        Ok(_) => {
+            println!("{}", t.cli("observe.vuelve_arriba"));
+            return true;
+        }
+        Err(_) => return false,
+    };
+    let Some(backup) = copia else {
+        return false;
+    };
+    if sysdns::apply(&backup, IpAddr::V4(std::net::Ipv4Addr::LOCALHOST)).is_err() {
+        return false;
+    }
+    let _ = ledger.record_change(
+        now_ms(),
+        guardiana_core::ChangeKind::DnsOn,
+        guardiana_core::ChangeWho::ConArriba,
+        "",
+    );
+    println!("{}", t.cli("observe.vuelve_arriba"));
+    true
+}
+
 /// The program stops being the guardian, but it must never leave the machine without a resolver:
 /// the system DNS goes back to exactly what it was before Guardiana touched it, Home Mode is
 /// switched off so nothing on the LAN is left pointing at a listener that is closing, and both
@@ -458,12 +605,18 @@ fn stand_down(ledger: &Ledger) {
     if let Ok(Some(json)) = ledger.setting(SETTING_BACKUP) {
         if !json.is_empty() {
             if let Ok(backup) = serde_json::from_str::<Backup>(&json) {
-                let _ = ledger.set_setting(SETTING_BACKUP, "");
+                // The copy is cleared only once the undo really happened. It used to be cleared
+                // first: one interface that no longer exists (the trip's VPN) made restore()
+                // fail, and the only record of the previous DNS was gone -- a machine pointing
+                // at a guardian that had stepped aside, and a panel saying there was nothing to
+                // undo. Found in the review of 1 Oct 2026. The other three undo paths already
+                // checked first; this was the one that did not.
                 if sysdns::restore(&backup).is_ok() {
+                    let _ = ledger.set_setting(SETTING_BACKUP, "");
                     let _ = ledger.record_change(
                         now_ms(),
                         guardiana_core::ChangeKind::DnsOff,
-                        "licencia",
+                        guardiana_core::ChangeWho::Licencia,
                         "",
                     );
                 }
@@ -475,7 +628,7 @@ fn stand_down(ledger: &Ledger) {
         let _ = ledger.record_change(
             now_ms(),
             guardiana_core::ChangeKind::HogarOff,
-            "licencia",
+            guardiana_core::ChangeWho::Licencia,
             "",
         );
     }
@@ -616,7 +769,9 @@ async fn run_once<F: Future<Output = ()>>(
     let block_mode = block_mode_of(&ledger);
     let initial_rules = ledger.rules().unwrap_or_default();
     let initial_version = ledger.rules_version().unwrap_or(0);
+    let salud = Arc::new(Salud::default());
     let policy = EnginePolicy {
+        salud: Arc::clone(&salud),
         inner: Mutex::new(Inner {
             ledger,
             classifier,
@@ -780,8 +935,8 @@ async fn run_once<F: Future<Output = ()>>(
     // Now that something answers on 127.0.0.1 and ::1, point the machine back at it: the last
     // stop gave the old DNS back (give_dns_back_while_stopped), and an update from a version that
     // left a reserve behind or ignored IPv6 is corrected here, on the first start, not a minute
-    // later.
-    if cfg!(target_os = "windows") {
+    // later. On every system since 1.0.2, because every system now gives the DNS back on stop.
+    {
         let db = cfg.db.clone();
         let _ = tokio::task::spawn_blocking(move || {
             if let Ok(l) = Ledger::open(&db, identity::genesis()) {
@@ -846,8 +1001,14 @@ async fn run_once<F: Future<Output = ()>>(
     let keep_dir = cfg.db.parent().map(std::path::Path::to_path_buf);
     let keep_secret = secret.clone();
     // What the resolver forwards to in this pass, to notice when the network changes it.
-    let seguir_red = cfg.upstreams.is_empty() && cfg!(target_os = "windows");
+    // Only when the upstreams came automatically: a person who typed --upstream chose. It was
+    // Windows-only until 1 Oct 2026; macOS reads the DHCP lease now, and Linux falls back to the
+    // saved servers until it has a live source of its own (then this just starts working).
+    let seguir_red = cfg.upstreams.is_empty();
     let keep_upstreams: Vec<IpAddr> = upstreams.iter().map(SocketAddr::ip).collect();
+    let keep_upstream_addrs: Vec<SocketAddr> = upstreams.clone();
+    let keep_salud = Arc::clone(&salud);
+    let mut aparte = Aparte::default();
     let keep_block_mode = block_mode;
     let (reconfigure_tx, mut reconfigure) = tokio::sync::oneshot::channel::<()>();
     let (caducado_tx, mut caducado) = tokio::sync::oneshot::channel::<()>();
@@ -898,7 +1059,38 @@ async fn run_once<F: Future<Output = ()>>(
                                 let _ = tx.send(());
                             }
                         } else {
-                            reapply_dns_if_dropped(&l);
+                            let (ok, fallos) = keep_salud.minuto();
+                            match aparte.minuto(ok, fallos) {
+                                Paso::Nada => {}
+                                Paso::Comprobar => {
+                                    if !dns::upstream_answers(&keep_upstream_addrs, SONDA).await {
+                                        let lista = lista_de(&keep_upstream_addrs);
+                                        println!(
+                                            "{}",
+                                            i18n::current()
+                                                .cli("observe.sin_arriba")
+                                                .replace("{upstream}", &lista)
+                                        );
+                                        devolver_por_silencio(&l, &lista);
+                                        aparte.apartado = true;
+                                    }
+                                }
+                                Paso::Sondear => {
+                                    if dns::upstream_answers(&keep_upstream_addrs, SONDA).await {
+                                        if volver_con_arriba(&l) {
+                                            aparte.apartado = false;
+                                        }
+                                    } else if sysdns::guardian_is_primary() == Some(true) {
+                                        // The undo failed last minute, or someone pointed the
+                                        // machine back here while the network is still quiet:
+                                        // it goes back again, or they are left without names.
+                                        devolver_por_silencio(&l, &lista_de(&keep_upstream_addrs));
+                                    }
+                                }
+                            }
+                            if !aparte.apartado {
+                                reapply_dns_if_dropped(&l);
+                            }
                             // A laptop that moved from home to the office: the resolvers that
                             // came automatically are now the office's. Rebuild with them.
                             if seguir_red && reconfigure_tx.is_some() {
@@ -1043,5 +1235,45 @@ mod tests_alcance {
         assert!(!a.cortar);
         assert!(a.patrones.is_empty());
         assert!(!a.cubre("github.com"));
+    }
+}
+
+#[cfg(test)]
+mod aparte_tests {
+    use super::*;
+
+    #[test]
+    fn a_quiet_minute_or_one_lost_packet_is_not_a_dead_network() {
+        assert!(!minuto_sin_arriba(0, 0));
+        assert!(!minuto_sin_arriba(0, 2));
+        assert!(!minuto_sin_arriba(1, 50));
+        assert!(minuto_sin_arriba(0, 3));
+    }
+
+    #[test]
+    fn a_silent_minute_asks_and_once_aside_it_only_probes() {
+        let mut a = Aparte::default();
+        assert_eq!(a.minuto(5, 0), Paso::Nada);
+        assert_eq!(a.minuto(0, 2), Paso::Nada);
+        assert_eq!(a.minuto(3, 40), Paso::Nada);
+        assert_eq!(a.minuto(0, 10), Paso::Comprobar);
+        a.apartado = true;
+        assert_eq!(a.minuto(0, 10), Paso::Sondear);
+        assert_eq!(a.minuto(9, 0), Paso::Sondear);
+        a.apartado = false;
+        assert_eq!(a.minuto(9, 0), Paso::Nada);
+    }
+
+    #[test]
+    fn the_health_counter_reads_and_resets() {
+        let s = Salud::default();
+        s.anota(Outcome::UpstreamFailed);
+        s.anota(Outcome::UpstreamFailed);
+        s.anota(Outcome::Forwarded {
+            rcode: dns::ResponseCode::NoError,
+        });
+        s.anota(Outcome::Canary);
+        assert_eq!(s.minuto(), (1, 2));
+        assert_eq!(s.minuto(), (0, 0));
     }
 }

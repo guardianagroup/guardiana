@@ -15,11 +15,11 @@ use axum::Json;
 use guardiana_core::i18n::{self, Texts};
 use guardiana_core::rules::{observation_complete, observed_hours};
 use guardiana_core::time::now_ms;
-use guardiana_core::ChangeKind;
 use guardiana_core::{
     write_csv_for_spreadsheet, write_json, Action, Category, DecidedBy, Device, Event, EventFilter,
     Ledger, MatchKind, NewRule, Rule, Scope, Signal, Verdict, SELF_DEVICE_ID,
 };
+use guardiana_core::{ChangeKind, ChangeWho};
 use guardiana_service::home::{self, SETTING_HOME_IP, SETTING_HOME_MODE, SETTING_HOME_SINCE};
 use guardiana_service::sysdns::SETTING_BACKUP;
 use serde::{Deserialize, Serialize};
@@ -263,7 +263,7 @@ pub(crate) async fn dns_aplicar(
             .collect::<Vec<_>>()
             .join(", ");
         if let Ok(l) = st.ledger.lock() {
-            let _ = l.record_change(now_ms(), ChangeKind::DnsOn, "panel", &originals);
+            let _ = l.record_change(now_ms(), ChangeKind::DnsOn, ChangeWho::Panel, &originals);
         }
         let mut msg = t
             .cli("dns.aplicado_panel")
@@ -338,7 +338,7 @@ pub(crate) async fn dns_restaurar(
             .ledger
             .lock()
             .map_err(|_| "ledger lock poisoned".to_owned())?;
-        l.record_change(now_ms(), ChangeKind::DnsOff, "panel", "")
+        l.record_change(now_ms(), ChangeKind::DnsOff, ChangeWho::Panel, "")
             .map_err(|e| e.to_string())
     })
     .await
@@ -1533,7 +1533,12 @@ pub(crate) async fn hogar_activar(
         l.set_setting(SETTING_HOME_MODE, "1")?;
         l.set_setting(SETTING_HOME_IP, &lan.to_string())?;
         l.set_setting(SETTING_HOME_SINCE, &now_ms().to_string())?;
-        l.record_change(now_ms(), ChangeKind::HogarOn, "panel", &lan.to_string())
+        l.record_change(
+            now_ms(),
+            ChangeKind::HogarOn,
+            ChangeWho::Panel,
+            &lan.to_string(),
+        )
     })?;
     Ok(Json(HogarCambio {
         hogar: hogar_view(&state)?,
@@ -1553,7 +1558,7 @@ pub(crate) async fn hogar_desactivar(
     with_ledger(&state, |l| {
         l.set_setting(SETTING_HOME_MODE, "0")?;
         l.set_setting(SETTING_HOME_IP, "")?;
-        l.record_change(now_ms(), ChangeKind::HogarOff, "panel", "")
+        l.record_change(now_ms(), ChangeKind::HogarOff, ChangeWho::Panel, "")
     })?;
     Ok(Json(HogarCambio {
         hogar: hogar_view(&state)?,

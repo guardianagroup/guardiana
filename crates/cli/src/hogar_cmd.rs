@@ -95,7 +95,12 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
             ledger.set_setting(SETTING_HOME_MODE, "1")?;
             ledger.set_setting(SETTING_HOME_IP, &lan.to_string())?;
             ledger.set_setting(SETTING_HOME_SINCE, &now_ms().to_string())?;
-            ledger.record_change(now_ms(), ChangeKind::HogarOn, "terminal", &lan.to_string())?;
+            ledger.record_change(
+                now_ms(),
+                ChangeKind::HogarOn,
+                guardiana_core::ChangeWho::Terminal,
+                &lan.to_string(),
+            )?;
             println!(
                 "{}",
                 t.cli("hogar.on.hecho").replace("{ip}", &lan.to_string())
@@ -126,9 +131,9 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
                 // test machine. Turning Home Mode off is not the same thing and
                 // must not touch them, or Windows would ask again next time.
                 let _ = home::firewall_remove_program_rules();
-                "desinstalador"
+                guardiana_core::ChangeWho::Desinstalador
             } else {
-                "terminal"
+                guardiana_core::ChangeWho::Terminal
             };
             ledger.record_change(now_ms(), ChangeKind::HogarOff, who, "")?;
             println!("{}", t.cli("hogar.off.hecho"));

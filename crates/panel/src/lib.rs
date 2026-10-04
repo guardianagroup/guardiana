@@ -498,4 +498,27 @@ mod textos {
             assert!(missing.is_empty(), "{name}: faltan en «panel» {missing:?}");
         }
     }
+
+    /// The list of changes builds its key at run time (`t('quien_' + c.quien)`), which the test
+    /// above cannot read. Every value the program can write as "who" must have its text: in
+    /// 1.0.1 "licencia" had none and the panel printed `quien_licencia` when a trial ended.
+    #[test]
+    fn every_who_of_a_change_has_its_text() {
+        for (name, json) in [
+            ("es", guardiana_core::i18n::ES_JSON),
+            ("en", guardiana_core::i18n::EN_JSON),
+            ("pt", guardiana_core::i18n::PT_JSON),
+        ] {
+            let v: serde_json::Value = serde_json::from_str(json).unwrap();
+            let panel = v["panel"].as_object().unwrap();
+            for who in guardiana_core::ChangeWho::ALL {
+                let key = format!("quien_{}", who.as_str());
+                assert!(panel.contains_key(&key), "{name}: falta «{key}»");
+            }
+            for kind in ["hogar_on", "hogar_off", "dns_on", "dns_off"] {
+                let key = format!("cambio_{kind}");
+                assert!(panel.contains_key(&key), "{name}: falta «{key}»");
+            }
+        }
+    }
 }
