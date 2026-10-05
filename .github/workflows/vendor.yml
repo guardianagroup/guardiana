@@ -1,0 +1,25 @@
+# Temporary: the crates this commit builds with, pushed as a branch so a machine without access to
+# crates.io can build and test offline (5 Oct 2026). Not part of any release.
+name: vendor
+on:
+  push:
+    branches: ['vendor-*']
+permissions:
+  contents: write
+jobs:
+  vendor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: cargo vendor
+        run: |
+          set -euo pipefail
+          cargo vendor --locked crates-vendor > vendor-config.toml
+          du -sh crates-vendor
+          git config user.name "GUARDIANA GROUP"
+          git config user.email "guardianagroup@users.noreply.github.com"
+          git checkout --orphan crates-vendor-1.0.2
+          git rm -rq --cached .
+          git add -f crates-vendor vendor-config.toml Cargo.lock
+          git commit -qm "Vendored crates for offline builds of $(git rev-parse --short "$GITHUB_SHA") (temporary)"
+          git push -f origin HEAD:crates-vendor-1.0.2
