@@ -49,6 +49,9 @@ jobs:
           tar -C /tmp -czf "paquetes/$d.tar.gz" "$d"
           cp "build/out/guardiana-$v-windows-x86_64.exe" paquetes/
           (cd paquetes && sha256sum *) | tee paquetes/SHA256SUMS
+          # As notices too: they show on the run page without signing in, so the release machine
+          # can be told the expected hashes without anyone opening a log.
+          while read -r h n; do echo "::notice title=${n#\*}::$h"; done < paquetes/SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
           name: candidato-linux
@@ -80,6 +83,13 @@ jobs:
             $salida = & powershell -NoProfile -ExecutionPolicy Bypass -File build/msi.ps1 -Exe $exe -Version $version -Idioma $idioma -Out "msi/guardiana-$version-windows-x64$sufijo.msi" 2>&1 | Out-String
             Write-Output $salida
             if ($LASTEXITCODE -ne 0) { Write-Output "::error title=msi.ps1 $idioma::$($salida -replace "`r?`n", ' | ')"; exit 1 }
+          }
+      - name: huellas de los MSI
+        shell: pwsh
+        run: |
+          Get-ChildItem msi -Filter *.msi | ForEach-Object {
+            $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            Write-Output "::notice title=$($_.Name)::$h"
           }
       - uses: actions/upload-artifact@v4
         with:
@@ -167,4 +177,11 @@ jobs:
             tail -25 /tmp/crear-app.log | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}' | sed 's/^/::error title=crear-app.sh::/'; echo; exit 1; }
           mkdir -p paquetes
           (cd app && zip -qry "../paquetes/guardiana-$v-macos.app.zip" GUARDIANA.app)
+          echo "::notice title=guardiana-$v-macos.app.zip::$(shasum -a 256 "paquetes/guardiana-$v-macos.app.zip" | cut -d' ' -f1)"
+          echo "::notice title=chip del Mac::$(lipo -archs app/GUARDIANA.app/Contents/Resources/guardiana)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidato-mac
+          path: paquetes/
+          retention-days: 7
       - run: python3 build/cliente/instalacion.py --tipo app --dir paquetes --candidato
