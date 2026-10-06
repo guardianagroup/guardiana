@@ -561,8 +561,11 @@ mod company_tests {
     #[test]
     fn ai_services_are_labelled_by_owner() {
         use super::ai_service_of;
-        assert_eq!(ai_service_of("api.anthropic.com"), Some("Anthropic"));
-        assert_eq!(ai_service_of("chatgpt.com."), Some("OpenAI"));
+        assert_eq!(
+            ai_service_of("api.anthropic.com"),
+            Some("Anthropic (Claude)")
+        );
+        assert_eq!(ai_service_of("chatgpt.com."), Some("OpenAI (ChatGPT)"));
         assert_eq!(
             ai_service_of("api.individual.githubcopilot.com"),
             Some("Microsoft Copilot")

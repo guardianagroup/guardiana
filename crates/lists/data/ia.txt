@@ -1,18 +1,20 @@
 # Guardiana — lista "IA": servicios de inteligencia artificial y herramientas de agente
 # (decisión 62). Mantenida por nosotros, abierta. Cada sección @ es el servicio; cada
 # línea un dominio suyo (coincide con el dominio y sus subdominios).
+# Cuando la empresa y su IA se llaman distinto, van las dos: «OpenAI (ChatGPT)». Es lo que
+# la gente reconoce en el panel (6 oct 2026).
 #
 # Marcar un nombre como "IA" NO es un veredicto ni cambia su categoría: dice que ese
 # destino pertenece a un servicio de inteligencia artificial, para que se pueda ver
 # aparte a dónde habla un agente. Guardiana ve nombres, no lo que el agente lee.
 
-@Anthropic
+@Anthropic (Claude)
 anthropic.com
 claude.ai
 claudeusercontent.com
 claude.com
 
-@OpenAI
+@OpenAI (ChatGPT)
 openai.com
 chatgpt.com
 oaistatic.com
@@ -41,11 +43,11 @@ substrate.office.com
 meta.ai
 llama.com
 
-@xAI
+@xAI (Grok)
 x.ai
 grok.com
 
-@Mistral
+@Mistral (Le Chat)
 mistral.ai
 chat.mistral.ai
 

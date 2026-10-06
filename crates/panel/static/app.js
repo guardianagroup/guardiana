@@ -270,13 +270,24 @@
   // keeps what was decided at the time -- but what is SHOWN now says what is actually known:
   // the network that delivers somebody else's content, the company the name belongs to, or,
   // when nothing is known, that no open list knows it either. Never a verdict (brief §6).
+  // Ad auctions name their servers with the words of the trade: prebid, rtb, ssp, dsp, cookie
+  // syncing. No list has caught them all, but the word is in the name itself, so the panel says
+  // that (and only that): what the name says, not a verdict (6 Oct 2026: they were most of what
+  // was still "unclassified").
+  const PALABRAS_SUBASTA = /(^|[.-])(prebid|rtb|ortb|dsp|ssp|usync|csync|pbs|bids?|hb-?bid|adserver)([.-]|$)|cookie-?sync/;
+  const pistaAnuncios = (ev) => ev.category === 'desconocido' && !ev.empresa && !ev.ia && !ev.entrega && !ev.local
+    && PALABRAS_SUBASTA.test(String(ev.qname || '').toLowerCase());
   const catTexto = (ev) => {
     if (ev.category !== 'desconocido') return T.categorias[ev.category] || ev.category;
     if (ev.local) return t('cat_red_local');
     if (ev.entrega) return t('cat_entrega');
     // «de ByteDance» dejó de tener sentido el día que la empresa ganó su propia columna: la fila
-    // decía «ByteDance | de ByteDance». La categoría vuelve a decir lo único que sabe de la
-    // categoría —que ninguna lista lo clasifica— y quién es lo dice la columna de al lado.
+    // decía «ByteDance | de ByteDance». Pero «sin clasificar» al lado de «Microsoft» tampoco: el
+    // 6 oct 2026 era el 90 % de las filas de un PC normal y el responsable lo vio como «no sabe
+    // nada». Si se sabe de quién es, es un servicio de esa empresa (su web, su app, sus
+    // servidores), y eso es lo que dice; «sin clasificar» queda para lo que nadie conoce.
+    if (ev.empresa || ev.ia) return t('cat_servicio');
+    if (pistaAnuncios(ev)) return t('cat_pista_anuncios');
     return T.categorias.desconocido;
   };
   // El borde discontinuo se reserva para lo que de verdad no se sabe de quién es: si la columna
@@ -290,6 +301,7 @@
     if (ev.local) return q.red_local || '';
     if (ev.entrega) return q.entrega || '';
     if (ev.empresa || ev.ia) return q.de_empresa || '';
+    if (pistaAnuncios(ev)) return q.pista_anuncios || '';
     return q.desconocido || '';
   };
   const cat = (ev) => {
@@ -644,6 +656,9 @@
     ctx.fillText(t('tarjeta_pie'), 80, H - 64);
   }
   const waLink = (text) => 'https://wa.me/?text=' + encodeURIComponent(text);
+  // The person's own mail program, with the subject and the text written: like WhatsApp, Guardiana
+  // sends nothing; whoever presses "send" there is the person (6 Oct 2026, the owner asked for it).
+  const mailLink = (text) => 'mailto:?subject=' + encodeURIComponent(t('informe_correo_asunto')) + '&body=' + encodeURIComponent(text);
 
   // ----- pages -------------------------------------------------------------
   const pages = {
@@ -658,6 +673,7 @@
       $('i-total').innerHTML = r.plus ? row('<strong>Total</strong>', r.total) : '';
       $('i-texto').textContent = r.texto_whatsapp;
       $('i-wa').href = waLink(r.texto_whatsapp);
+      $('i-correo').href = mailLink(r.texto_whatsapp);
       // Lo que solo Plus puede contestar, porque hace falta memoria: qué cambió respecto a la
       // semana pasada y qué destinos son nuevos. Con el plan gratis se dice por qué no está,
       // en vez de enseñar una sección vacía que se leería como «no ha cambiado nada».
