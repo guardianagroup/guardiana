@@ -70,11 +70,21 @@ fi
 # en la máquina de otro, que es la única que vale (22 sep 2026).
 out="build/out"
 binarios=""
+paquetes_ci=""
+# `--paquetes <carpeta>` (1.0.2): la carpeta trae TODO lo que probó la prueba de cliente de GitHub
+# (los dos binarios, el .deb, el .tar.gz, los tres MSI y la app de Mac, con su SHA256SUMS). Es
+# `--binarios` más los paquetes, que ya no se vuelven a construir aquí: lo que se firma es, byte a
+# byte, lo que se probó. Hace falta desde que no hay Mac: la app de Mac no se puede hacer en otro
+# sitio, y el .deb y el .tar.gz hechos aquí no serían los probados.
+if [ "${1:-}" = "--paquetes" ]; then
+    paquetes_ci="${2:?--paquetes necesita la carpeta}"
+    set -- --binarios "$paquetes_ci"
+fi
 if [ "${1:-}" = "--binarios" ]; then
     binarios="${2:?--binarios necesita la carpeta}"
     [ -f "$binarios/SHA256SUMS" ] || { echo "release.sh: falta $binarios/SHA256SUMS" >&2; exit 1; }
     mkdir -p "$out"
-    cp "$binarios"/guardiana-* "$out/" 2>/dev/null || true
+    cp "$binarios"/guardiana* "$out/" 2>/dev/null || true
     cp "$binarios/SHA256SUMS" "$out/SHA256SUMS"
     (cd "$out" && sha256sum -c SHA256SUMS) || {
         echo "release.sh: las huellas de $binarios no cuadran con su propio SHA256SUMS." >&2
@@ -93,9 +103,20 @@ win="$out/guardiana-$version-windows-x86_64.exe"
 # de 2026 el registro solo llevaba los dos binarios sueltos: quien siguiera la instrucción el día
 # del lanzamiento no habría encontrado su archivo. Los envoltorios se construyen desde los mismos
 # binarios del contenedor y entran en la misma línea, cada uno diciendo si es reproducible.
-cp "$linux" target/x86_64-unknown-linux-gnu/release/guardiana
-cp "$win" target/x86_64-pc-windows-gnu/release/guardiana.exe
-build/package.sh --no-build
+if [ -n "$paquetes_ci" ]; then
+    # Todo viene probado de GitHub: se copia a dist/<versión> sin tocarlo.
+    mkdir -p "dist/$version"
+    for f in "guardiana_${version}_amd64.deb" "guardiana-$version-linux-x86_64.tar.gz" \
+             "guardiana-$version-windows-x64.msi" "guardiana-$version-windows-x64-en.msi" \
+             "guardiana-$version-windows-x64-pt.msi" "guardiana-$version-macos.app.zip"; do
+        [ -f "$paquetes_ci/$f" ] || { echo "release.sh: falta $paquetes_ci/$f" >&2; exit 1; }
+        cp "$paquetes_ci/$f" "dist/$version/$f"
+    done
+else
+    cp "$linux" target/x86_64-unknown-linux-gnu/release/guardiana
+    cp "$win" target/x86_64-pc-windows-gnu/release/guardiana.exe
+    build/package.sh --no-build
+fi
 paquetes="dist/$version"
 # Un instalador por idioma (22 sep 2026): el mismo paquete con las mismas palabras que la web
 # de ese idioma. Los tres van al registro público, porque los tres se descargan.
@@ -126,7 +147,13 @@ sha_linux="$(sha256sum "$linux" | cut -d' ' -f1)"
 # same way the Windows one is explained. What replaces notarisation here is the same thing as on
 # Linux: the hash and the minisign signature, published before the download exists.
 mac=""; sha_mac=""; sig_mac=""
-if [ "$(uname)" = "Darwin" ]; then
+if [ -n "$paquetes_ci" ]; then
+    mac="$out/guardiana-$version-macos.app.zip"
+    cp "$paquetes/guardiana-$version-macos.app.zip" "$mac"
+    firmar "$mac" "guardiana $version $(basename "$mac")"
+    sha_mac="$(sha256sum "$mac" | cut -d' ' -f1)"
+    sig_mac="$(sed -n '2p' "$mac.minisig")"
+elif [ "$(uname)" = "Darwin" ]; then
     cargo build --release --locked -p guardiana-cli
     build/mac/crear-app.sh "$out/app" >/dev/null
     mac="$out/guardiana-$version-macos.app.zip"
