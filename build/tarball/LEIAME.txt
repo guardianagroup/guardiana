@@ -21,10 +21,10 @@ permissão, e pode ser desfeito no mesmo lugar.
 
 Depois de instalar
 ------------------
-    guardiana panel          abre o painel no navegador
-    guardiana verify         confere a instalação (impressão digital, assinatura, portas)
-    guardiana dns --status   diz para onde aponta o DNS do sistema
-    guardiana hogar status   estado do Modo Casa
+    sudo guardiana panel         dá o link do painel para abrir no navegador
+    guardiana verify             confere a instalação (impressão digital, assinatura, portas)
+    sudo guardiana dns --status  diz para onde aponta o DNS do sistema
+    sudo guardiana hogar status  estado do Modo Casa
 
 Desinstalar
 -----------

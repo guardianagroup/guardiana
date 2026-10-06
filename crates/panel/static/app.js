@@ -32,6 +32,12 @@
 
   let T = { panel: {}, categorias: {}, veredictos: {}, senales: {}, decidido_por: {} };
   const t = (k) => (T.panel && T.panel[k]) || k;
+  // A text that counts: its `_uno` form when there is one thing (until 1.0.2 the panel said
+  // «1 reglas deshechas», «1 nombres distintos»), with {n} filled in.
+  // Who made a rule, in words: the stored codes («usuario (panel)») were shown as they are, in
+  // Spanish on every panel (review of 5 Oct 2026).
+  const creadaPor = (c) => (c === 'usuario (panel)' ? t('creada_panel') : c === 'usuario (dispositivo)' ? t('creada_dispositivo') : c);
+  const tn = (k, n) => t(n === 1 && T.panel && T.panel[k + '_uno'] ? k + '_uno' : k).replace('{n}', n);
 
   // ----- "Guardar en PDF" ----------------------------------------------------
   // The PDF is written here, in the page, with no third-party code (brief §8): A4 pages,
@@ -192,7 +198,7 @@
   const catName = (c) => T.categorias[c] || c;
   const verdictName = (v) => T.veredictos[v] || v;
   const deviceName = (ev) => ev.device_name || (ev.device_id === 'self' ? t('este_computador') : ev.device_id);
-  const nameCell = (ev) => [ev.qname + (ev.ia ? ' · IA: ' + ev.ia : '') + (ev.empresa && ev.empresa !== ev.ia ? ' · ' + ev.empresa : '')].concat((ev.frases || []).map((f) => '· ' + f)).join('\n');
+  const nameCell = (ev) => [ev.qname + (ev.ia ? ' · ' + t('ia_prefijo') + ': ' + ev.ia : '') + (ev.empresa && ev.empresa !== ev.ia ? ' · ' + ev.empresa : '')].concat((ev.frases || []).map((f) => '· ' + f)).join('\n');
   // El PDF tiene que decir lo MISMO que la pantalla. Enseñaba `catName(ev.category)`, la
   // categoría en bruto, así que todo lo que en pantalla pone «entrega», «red local» o «de
   // Google» salía en el papel como «sin clasificar»; y el país no salía en absoluto (lo vio el
@@ -234,7 +240,9 @@
     }
   }
   async function api(path, opts = {}) {
-    const headers = Object.assign({ 'X-Guardiana-Token': token, 'X-Guardiana-Lang': LANG }, opts.headers || {});
+    // The browser's offset in minutes east of UTC, so the dates written into sentences are the
+    // person's own day (getTimezoneOffset counts the other way round).
+    const headers = Object.assign({ 'X-Guardiana-Token': token, 'X-Guardiana-Lang': LANG, 'X-Guardiana-Tz': String(-new Date().getTimezoneOffset()) }, opts.headers || {});
     if (opts.body && typeof opts.body !== 'string') { opts.body = JSON.stringify(opts.body); headers['Content-Type'] = 'application/json'; }
     const r = await fetch(path, Object.assign({}, opts, { headers }));
     if (r.status === 401) { showNoSession(); throw new Error('sin sesión'); }
@@ -246,6 +254,8 @@
     if (el) el.classList.remove('hidden');
   }
   const $ = (id) => document.getElementById(id);
+  // Rows of devices that keep their detail to themselves: a number, never the names.
+  const ocultosTexto = (n) => (n ? ' ' + t(n === 1 ? 'mostrando_ocultos_uno' : 'mostrando_ocultos').replace('{n}', n) : '');
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   // Dates follow the panel's language, not the computer's: someone reading the panel in English
   // on a Spanish machine was getting «18/9/2026», and in English that reads as the 9th of a month
@@ -412,7 +422,7 @@
     const rs = await api('/api/rafagas?horas=24');
     if (!rs.length) { caja.innerHTML = `<p class="muted">${esc(t('rafagas_ninguna'))}</p>`; return; }
     caja.innerHTML = rs.map((r) => {
-      const resumen = t('rafagas_resumen').replace('{n}', r.nombres.length).replace('{seg}', (r.duracion_ms / 1000).toFixed(1));
+      const resumen = tn('rafagas_resumen', r.nombres.length).replace('{seg}', (r.duracion_ms / 1000).toFixed(1));
       const quien = esc(r.device_name || (r.device_id === 'self' ? t('este_computador') : r.device_id));
       const oficio = r.con_oficio ? ` · ${esc(t('rafagas_oficio').replace('{n}', r.con_oficio))}` : '';
       const filas = r.nombres.map((e) => `<tr><td><span class="mono">${esc(e.qname)}</span>${company(e)}${phrases(e)}</td><td>${cat(e)}</td></tr>`).join('');
@@ -433,19 +443,19 @@
     caja.innerHTML = rs.map((r) => {
       const quien = esc(r.device_name || (r.device_id === 'self' ? t('este_computador') : r.device_id));
       const lineas = [];
-      lineas.push(esc(t('recibo_nombres').replace('{n}', r.nombres)));
+      lineas.push(esc(tn('recibo_nombres', r.nombres)));
       const emp = r.empresas_con_oficio
-        ? t('recibo_empresas').replace('{n}', r.empresas).replace('{m}', r.empresas_con_oficio)
-        : t('recibo_empresas_sin').replace('{n}', r.empresas);
+        ? tn('recibo_empresas', r.empresas).replace('{m}', r.empresas_con_oficio)
+        : tn('recibo_empresas_sin', r.empresas);
       lineas.push(esc(emp) + (r.oficios.length ? `<br><span class="muted">${esc(r.oficios.join(' · '))}</span>` : ''));
       if (r.latidos.length) {
         const lista = r.latidos.slice(0, 3).map(([n, m]) => t('recibo_latido').replace('{nombre}', n).replace('{min}', m)).join(' · ');
         lineas.push(esc(t('recibo_latidos').replace('{lista}', lista)));
       }
-      if (r.evasiones) lineas.push(esc(t('recibo_evasiones').replace('{n}', r.evasiones)));
-      if (r.cortadas) lineas.push(esc(t('recibo_cortadas').replace('{n}', r.cortadas)));
+      if (r.evasiones) lineas.push(esc(tn('recibo_evasiones', r.evasiones)));
+      if (r.cortadas) lineas.push(esc(tn('recibo_cortadas', r.cortadas)));
       if (r.rafaga) {
-        lineas.push(esc(t('recibo_rafaga').replace('{n}', r.rafaga.nombres.length).replace('{seg}', (r.rafaga.duracion_ms / 1000).toFixed(1)))
+        lineas.push(esc(tn('recibo_rafaga', r.rafaga.nombres.length).replace('{seg}', (r.rafaga.duracion_ms / 1000).toFixed(1)))
           + (r.rafaga.empresas.length ? `<br><span class="muted">${esc(r.rafaga.empresas.slice(0, 6).join(' · '))}</span>` : ''));
       }
       return `<div class="card"><h3>${quien}</h3>`
@@ -562,7 +572,7 @@
       n.id = 'tema-toggle'; n.type = 'button'; n.className = 'secondary lang tema';
       const OTRO = TEMA === 'noche' ? 'dia' : 'noche';
       const NOMBRE_TEMA = {
-        es: { noche: 'Modo noche', dia: 'Modo dia' },
+        es: { noche: 'Modo noche', dia: 'Modo día' },
         en: { noche: 'Night mode', dia: 'Day mode' },
         pt: { noche: 'Modo noite', dia: 'Modo dia' },
       };
@@ -580,40 +590,58 @@
   }
 
   // ----- share card (brief §8): drawn in the browser, real figures, no names ----
-  function drawCard(canvas, r) {
+  // The card people share. Until 1.0.2 its last row sat on top of the date, it used the system
+  // font and colours outside the palette (review of 28 Sep 2026, G2): now the panel's own fonts,
+  // loaded before drawing (a canvas draws with whatever is loaded at that moment), and its colour
+  // variables, so day and night look like the panel.
+  async function drawCard(canvas, r) {
+    try {
+      await Promise.all([
+        document.fonts.load("600 88px Unbounded"),
+        document.fonts.load("400 40px 'IBM Plex Sans'"),
+        document.fonts.load("500 30px 'IBM Plex Mono'"),
+      ]);
+    } catch (_) { /* the fallbacks below still draw */ }
+    const css = getComputedStyle(document.documentElement);
+    const v = (name) => css.getPropertyValue(name).trim();
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
-    const dark = document.documentElement.dataset.tema === 'noche';
-    ctx.fillStyle = dark ? '#0B1020' : '#F4F6FA';
+    const DISPLAY = "Unbounded, 'IBM Plex Sans', sans-serif";
+    const TEXTO = "'IBM Plex Sans', system-ui, sans-serif";
+    ctx.fillStyle = v('--bg');
     ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = dark ? '#E8ECF6' : '#0B1020';
-    ctx.font = '700 64px -apple-system, "Segoe UI", Roboto, sans-serif';
+    ctx.fillStyle = v('--fg');
+    ctx.font = `600 60px ${DISPLAY}`;
     ctx.fillText('Guardiana', 80, 140);
-    ctx.font = '400 40px -apple-system, "Segoe UI", Roboto, sans-serif';
-    ctx.fillStyle = dark ? '#98A1B8' : '#5B6275';
-    ctx.fillText(t('tarjeta_titulo'), 80, 210);
+    ctx.fillStyle = v('--muted');
+    ctx.font = `400 40px ${TEXTO}`;
+    ctx.fillText(t('tarjeta_titulo'), 80, 205);
     const rows = [
-      [r.servicios, t('c_servicios'), null],
-      [r.rastreadores, t('c_rastreadores'), '#b23a3a'],
-      [r.publicidad, t('c_publicidad'), '#b23a3a'],
-      [r.destinos_nuevos, t('c_nuevos'), null],
-      [r.esperados, t('c_esperados'), '#1f6f4a'],
-      [r.cortados, t('c_cortados'), '#b23a3a'],
+      [r.servicios, 'c_servicios', '--fg'],
+      [r.rastreadores, 'c_rastreadores', '--rastreador'],
+      [r.publicidad, 'c_publicidad', '--publicidad'],
+      [r.destinos_nuevos, 'c_nuevos', '--fg'],
+      [r.esperados, 'c_esperados', '--esperado'],
+      [r.cortados, 'c_cortados', '--cortado'],
     ];
-    let y = 340;
-    for (const [n, label, color] of rows) {
-      ctx.fillStyle = color || (dark ? '#E8ECF6' : '#0B1020');
-      ctx.font = '700 96px -apple-system, "Segoe UI", Roboto, sans-serif';
-      ctx.fillText(String(n), 80, y);
-      ctx.fillStyle = dark ? '#98A1B8' : '#5B6275';
-      ctx.font = '400 40px -apple-system, "Segoe UI", Roboto, sans-serif';
-      ctx.fillText(label, 360, y - 8);
-      y += 130;
+    // Six rows of 108 px from 330: the last baseline is 870, well above the date (H − 120).
+    let y = 330;
+    for (const [n, key, color] of rows) {
+      const num = Number(n || 0).toLocaleString(LOC);
+      ctx.fillStyle = v(color);
+      ctx.font = `600 84px ${DISPLAY}`;
+      ctx.fillText(num, 80, y);
+      const x = Math.max(380, 80 + ctx.measureText(num).width + 36);
+      ctx.fillStyle = v('--muted');
+      ctx.font = `400 40px ${TEXTO}`;
+      ctx.fillText(t(key), x, y - 10);
+      y += 108;
     }
-    ctx.fillStyle = dark ? '#98A1B8' : '#5B6275';
-    ctx.font = '400 32px -apple-system, "Segoe UI", Roboto, sans-serif';
-    ctx.fillText(t('tarjeta_pie'), 80, H - 70);
+    ctx.fillStyle = v('--muted');
+    ctx.font = `500 30px 'IBM Plex Mono', monospace`;
     ctx.fillText(new Date(r.hasta).toLocaleString(LOC, DIA_HORA), 80, H - 120);
+    ctx.font = `400 32px ${TEXTO}`;
+    ctx.fillText(t('tarjeta_pie'), 80, H - 64);
   }
   const waLink = (text) => 'https://wa.me/?text=' + encodeURIComponent(text);
 
@@ -625,8 +653,9 @@
       // Free plan: the table is a marked example and the Plus card shows, with "Ahora no" (decision 53).
       $('i-whatsapp').classList.toggle('hidden', !r.plus);
       const row = (label, f) => `<td>${label}</td><td>${f.consultas}</td><td>${f.rastreadores}</td><td>${f.publicidad}</td><td>${f.telemetria}</td><td>${f.esperados}</td><td>${f.desconocidos}</td><td>${f.cortados}</td>`;
-      $('i-rows').innerHTML = r.dispositivos.map((d) => `<tr>${row(esc(d.name || (d.id === 'self' ? t('este_computador') : d.id)), d.fila)}</tr>`).join('') || `<tr><td colspan="8" class="muted">${esc(t('informe_sin_datos'))}</td></tr>`;
-      $('i-total').innerHTML = row('<strong>Total</strong>', r.total);
+      // Stood aside, there is no week to report: a table of zeros would be figures nobody counted.
+      $('i-rows').innerHTML = r.dispositivos.map((d) => `<tr>${row(esc(d.name || (d.id === 'self' ? t('este_computador') : d.id)), d.fila)}</tr>`).join('') || `<tr><td colspan="8" class="muted">${esc(t(r.plus ? 'informe_sin_datos' : 'informe_apartado'))}</td></tr>`;
+      $('i-total').innerHTML = r.plus ? row('<strong>Total</strong>', r.total) : '';
       $('i-texto').textContent = r.texto_whatsapp;
       $('i-wa').href = waLink(r.texto_whatsapp);
       // Lo que solo Plus puede contestar, porque hace falta memoria: qué cambió respecto a la
@@ -642,8 +671,15 @@
       };
       $('i-cambio').classList.toggle('hidden', !r.anterior);
       if (r.anterior) $('i-cambio-lista').innerHTML = comparacion(r.anterior);
+      // Until the week before this one was watched whole there is nothing to compare with, and
+      // every destination would read as "new": the page says from when it will be there.
       $('i-novedades').classList.toggle('hidden', !r.plus);
-      if (r.plus) {
+      if (r.plus && r.comparar_desde) {
+        $('i-cambio').classList.remove('hidden');
+        $('i-cambio-lista').innerHTML = `<li class="muted">${esc(t('informe_comparar_desde').replace('{fecha}', new Date(r.comparar_desde).toLocaleDateString(LOC, DIA)))}</li>`;
+        $('i-novedades').classList.add('hidden');
+      }
+      if (r.plus && !r.comparar_desde) {
         $('i-nuevos-rows').innerHTML = r.novedades.map((n2) => `<tr><td class="mono">${esc(n2.nombre)}</td><td>${esc(n2.empresa)}</td><td>${esc(catName(n2.categoria))}</td><td>${esc(n2.dispositivo === 'self' ? t('este_computador') : n2.dispositivo)}</td><td>${n2.consultas}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('informe_nuevos_ninguno'))}</td></tr>`;
       }
       savePdf('i-pdf', () => {
@@ -664,7 +700,9 @@
             doc.line('· ' + t(clave) + ': ' + r.total[campo] + ' · ' + frase, 10);
           }
         }
-        if (r.plus) {
+        if (r.plus && r.comparar_desde) {
+          doc.seccion(t('informe_cambio_titulo')).line(t('informe_comparar_desde').replace('{fecha}', new Date(r.comparar_desde).toLocaleDateString(LOC, DIA)), 10);
+        } else if (r.plus) {
           doc.seccion(t('informe_nuevos_titulo'), t('informe_nuevos_lead'));
           if (r.novedades.length) {
             doc.table([{ title: t('col_nombre'), w: 0.34 }, { title: t('col_empresa_n'), w: 0.2 }, { title: t('col_categoria'), w: 0.16 }, { title: t('col_dispositivo'), w: 0.18 }, { title: t('col_consultas'), w: 0.12 }],
@@ -704,7 +742,8 @@
       const load = async () => {
         const r = await api('/api/reglas');
         document.querySelectorAll('input[name=modo]').forEach((i) => { i.checked = i.value === r.modo_bloqueo; });
-        $('r-rows').innerHTML = r.reglas.map((x) => `<tr><td>${x.id}</td><td>${x.activa ? esc(t('regla_activa')) : esc(t('regla_deshecha'))}</td><td>${x.scope === 'home' ? esc(t('alcance_casa')) : esc(x.device_name || x.device_id || '')}</td><td>${esc(t('tipo_' + x.match_kind))}</td><td class="mono">${esc(x.pattern)}</td><td class="verdict ${x.action === 'cortar' ? 'cortado' : ''}">${esc(t('accion_' + x.action))}</td><td>${esc(x.created_by)}</td><td class="muted">${when(x.created_at)}</td><td>${x.activa ? `<button class="secondary undo" data-id="${x.id}">${esc(t('deshacer'))}</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="9" class="muted">${esc(t('reglas_ninguna'))}</td></tr>`;
+        $('r-ocultas').textContent = r.ocultas ? t(r.ocultas === 1 ? 'reglas_ocultas_uno' : 'reglas_ocultas').replace('{n}', r.ocultas) : '';
+        $('r-rows').innerHTML = r.reglas.map((x) => `<tr><td>${x.id}</td><td>${x.activa ? esc(t('regla_activa')) : esc(t('regla_deshecha'))}</td><td>${x.scope === 'home' ? esc(t('alcance_casa')) : esc(x.device_name || (x.device_id === 'self' ? t('este_computador') : x.device_id) || '')}</td><td>${esc(t('tipo_' + x.match_kind))}</td><td class="mono">${esc(x.pattern)}</td><td class="verdict ${x.action === 'cortar' ? 'cortado' : ''}">${esc(t('accion_' + x.action))}</td><td>${esc(creadaPor(x.created_by))}</td><td class="muted">${when(x.created_at)}</td><td>${x.activa ? `<button class="secondary undo" data-id="${x.id}">${esc(t('deshacer'))}</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="9" class="muted">${esc(t('reglas_ninguna'))}</td></tr>`;
       };
       $('nueva').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -726,7 +765,7 @@
       });
       $('undo-today').addEventListener('click', async () => {
         const n = await api('/api/reglas/deshacer-hoy', { method: 'POST' });
-        $('undo-msg').textContent = t('deshechas').replace('{n}', n);
+        $('undo-msg').textContent = tn('deshechas', n);
         await load();
       });
       $('modo-guardar').addEventListener('click', async () => {
@@ -753,7 +792,9 @@
       // Until the system DNS points at Guardiana, this PC's own queries never arrive: say so and offer the change (brief §4).
       try {
         const est = await api('/api/estado');
-        $('dns-card').classList.toggle('hidden', est.dns_aplicado);
+        // With the trial over and no Plus, Guardiana is not watching: offering to point the DNS at
+        // it only broke names (review of 28 Sep 2026, G6).
+        $('dns-card').classList.toggle('hidden', est.dns_aplicado || est.caducado);
         $('dns-apply').addEventListener('click', async () => {
           $('dns-msg').textContent = t('dns_aplicando'); $('dns-apply').disabled = true;
           try { const r = await api('/api/dns/aplicar', { method: 'POST' }); $('dns-msg').textContent = r.mensaje; setTimeout(() => $('dns-card').classList.add('hidden'), 6000); }
@@ -761,9 +802,9 @@
         });
       } catch (_) {}
       bindCutButtons($('live'), '/api/reglas');
-      $('share-open').addEventListener('click', () => {
+      $('share-open').addEventListener('click', async () => {
         if (!last) return;
-        drawCard($('share-canvas'), last);
+        await drawCard($('share-canvas'), last);
         $('share-download').href = $('share-canvas').toDataURL('image/png');
         const text = t('compartir_texto').replace('{servicios}', last.servicios).replace('{rastreadores}', last.rastreadores).replace('{nuevos}', last.destinos_nuevos).replace('{esperados}', last.esperados).replace('{cortados}', last.cortados);
         $('share-wa').href = waLink(text);
@@ -799,7 +840,7 @@
         const doc = pdfDocument('GUARDIANA · ' + t('nav_extracto'));
         pdfHead(doc, t('nav_extracto'));
         const r = lastR || { eventos: [], total: 0, huecos: [] };
-        doc.line(t('mostrando').replace('{n}', r.eventos.length).replace('{total}', r.total), 10);
+        doc.line(t('mostrando').replace('{n}', r.eventos.length).replace('{total}', r.total) + ocultosTexto(r.ocultos), 10);
         if (lastFilters) doc.line(lastFilters, 9, false, 0.4);
         (r.huecos || []).forEach((h) => doc.line(t('hueco').replace('{desde}', when(h.desde)).replace('{hasta}', when(h.hasta)), 9, false, 0.4));
         doc.gap(6).table(eventCols(true), r.eventos.length ? r.eventos.map((ev) => eventCells(ev, true)) : [[ '', t('sin_resultados'), '', '', '', '', '' ]]);
@@ -814,7 +855,7 @@
         lastR = r;
         lastFilters = [...q].filter(([k]) => k !== 'limit').map(([k, v]) => t('f_' + ({ device_id: 'dispositivo', category: 'categoria', signal: 'senal', verdict: 'veredicto' }[k] || k)) + ': ' + (k === 'device_id' ? ($('f-device').selectedOptions[0] || {}).textContent || v : v)).join(' · ');
         $('rows').innerHTML = eventRows(r.eventos) || `<tr><td colspan="7" class="muted">${esc(t('sin_resultados'))}</td></tr>`;
-        $('total').textContent = t('mostrando').replace('{n}', r.eventos.length).replace('{total}', r.total);
+        $('total').textContent = t('mostrando').replace('{n}', r.eventos.length).replace('{total}', r.total) + ocultosTexto(r.ocultos);
         $('huecos').innerHTML = (r.huecos || []).map((h) => `<li>${esc(t('hueco').replace('{desde}', when(h.desde)).replace('{hasta}', when(h.hasta)))}</li>`).join('');
         $('huecos-card').classList.toggle('hidden', !(r.huecos && r.huecos.length));
         // Exports go through fetch with the token in a header: the token never
@@ -843,7 +884,7 @@
         const out = $('check-result');
         if (r.ok) {
           out.className = 'ok';
-          out.textContent = (r.anchor_is_genesis ? t('cadena_ok') : t('cadena_ok_recortada')).replace('{n}', r.checked).replace('{p}', r.pruned);
+          out.textContent = (r.anchor_is_genesis ? tn('cadena_ok', r.checked) : t('cadena_ok_recortada').replace('{n}', r.checked)).replace('{p}', r.pruned);
         } else {
           out.className = 'bad';
           out.textContent = t('cadena_rota').replace('{id}', r.fallo.id).replace('{motivo}', r.fallo.motivo);
@@ -870,7 +911,7 @@
       $('s-reglas').textContent = r.reglas; $('s-nombres').textContent = r.nombres_vistos;
       $('s-ruta').textContent = r.ruta;
       $('s-retencion').textContent = r.retencion;
-      $('outbound').innerHTML = r.outbound.map((o) => `<tr><td>${when(o.ts)}</td><td>${esc(o.purpose)}</td><td class="mono">${esc(o.host)}</td><td>${o.bytes}</td></tr>`).join('') || `<tr><td colspan="4" class="ok">${esc(t('outbound_vacio'))}</td></tr>`;
+      $('outbound').innerHTML = r.outbound.map((o) => `<tr><td>${when(o.ts)}</td><td>${esc(t('proposito_' + o.purpose))}</td><td class="mono">${esc(o.host)}</td><td>${o.bytes}</td></tr>`).join('') || `<tr><td colspan="4" class="ok">${esc(t('outbound_vacio'))}</td></tr>`;
       $('wipe').addEventListener('click', async () => {
         // The word is the one the question asks for in the panel's language (BORRAR, DELETE,
         // APAGAR). Until 1.0.1 only BORRAR was accepted, so in English and Portuguese typing the
@@ -890,15 +931,16 @@
       const render = (r, aviso) => {
         $('h-estado').textContent = r.encendido
           ? t('hogar_estado_on').replace('{fecha}', r.desde ? when(r.desde) : '').replace('{ip}', r.ip || '')
-          : t('hogar_estado_off');
+          : r.aparcado ? t('hogar_estado_aparcado') : t('hogar_estado_off');
+        if (r.encendido && r.fuera_de_casa) $('h-estado').textContent = t('hogar_estado_fuera');
         const ipKey = r.ip_dinamica === true ? 'hogar_ip_dinamica' : r.ip_dinamica === false ? 'hogar_ip_fija' : 'hogar_ip_desconocida';
         $('h-ip-aviso').textContent = r.ip ? t(ipKey).replace('{ip}', r.ip) : t('hogar_sin_lan');
-        const sv = (n) => n === 0 ? t('hogar_suspension_nunca_valor') : t('hogar_suspension_valor').replace('{n}', n);
+        const sv = (n) => n === 0 ? t('hogar_suspension_nunca_valor') : tn('hogar_suspension_valor', n);
         const sl = r.suspension;
         $('h-suspension').textContent = !sl ? '' : (sl[0] === 0 && sl[1] === 0) ? t('hogar_suspension_nunca') : t('hogar_suspension').replace('{ac}', sv(sl[0])).replace('{dc}', sv(sl[1]));
-        $('h-toggle').textContent = r.encendido ? t('hogar_desactivar') : t('hogar_activar');
+        $('h-toggle').textContent = r.encendido ? t('hogar_desactivar') : r.aparcado ? t('hogar_desactivar_relevo') : t('hogar_activar');
         if (r.licencia) { $('h-ip-aviso').textContent += ' ' + r.licencia; }
-        $('h-toggle').dataset.on = r.encendido ? '1' : '0';
+        $('h-toggle').dataset.on = (r.encendido || r.aparcado) ? '1' : '0';
         $('h-aviso').textContent = aviso || '';
         $('h-conectar').classList.toggle('hidden', !r.encendido);
         if (r.encendido) {
@@ -948,13 +990,15 @@
         const nameInput = document.querySelector('#mi-nombre input');
         if (r.dispositivo && document.activeElement !== nameInput && !nameInput.dataset.dirty) { nameInput.value = r.dispositivo.name || ''; }
         if (r.dispositivo && document.activeElement !== $('mi-compartir')) { $('mi-compartir').checked = !!r.dispositivo.share_detail_with_home; }
+        // Known only by its address on the network: say what that means for this checkbox.
+        $('mi-por-ip').classList.toggle('hidden', !(r.dispositivo && String(r.dispositivo.id || '').startsWith('ip:')));
         const me = r.dispositivo;
         // Un nombre suelto se corta desde el primer minuto (el servidor pide confirmación si el
         // aparato lleva menos de un día); arriba se dice cuánto lleva mirando, como información.
         const can = true;
         $('mi-gate').textContent = me && !me.puede_cortar ? mirando(me.horas_observadas) : '';
         const lect = r.lectura || {};
-        $('mi-empresas').innerHTML = (lect.empresas && lect.empresas.length) ? lect.empresas.map((e) => `<li><b>${esc(e[0])}</b> · ${e[1]}</li>`).join('') + `<li class="muted">${esc(t('lectura_empresas_total').replace('{n}', lect.empresas_total))}</li>` : `<li class="muted">${esc(t('lectura_empresas_ninguna'))}</li>`;
+        $('mi-empresas').innerHTML = (lect.empresas && lect.empresas.length) ? lect.empresas.map((e) => `<li><b>${esc(e[0])}</b> · ${e[1]}</li>`).join('') + `<li class="muted">${esc(tn('lectura_empresas_total', lect.empresas_total))}</li>` : `<li class="muted">${esc(t('lectura_empresas_ninguna'))}</li>`;
         $('mi-avisos').innerHTML = hints(lect).map((h) => `<p class="limit">${esc(h)}</p>`).join('');
         $('mi-rows').innerHTML = r.eventos.map((ev) => `<tr><td class="mono">${clock(ev.ts)}</td><td><span class="mono">${esc(ev.qname)}</span>${company(ev)}${phrases(ev)}</td>${empresaCelda(ev)}<td>${cat(ev)}</td>${paisCelda(ev)}<td>${verdict(ev.verdict)}</td><td>${ev.verdict !== 'cortado' && can ? cutCell(ev) : ''}</td></tr>`).join('') || `<tr><td colspan="7" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`;
         const rules = await api('/api/mi-dispositivo/reglas');
@@ -989,7 +1033,7 @@
         $('alcances').innerHTML = r.alcances.map((a) => `<div class="card">
           <h3>${esc(a.device_name || (a.device_id === 'self' ? t('este_computador') : a.device_id))}</h3>
           <p class="mono muted">${a.patrones.map(esc).join(' · ')}</p>
-          <p>${esc(t('alcance_dentro').replace('{n}', a.dentro_total))} · <b>${esc(t('alcance_fuera').replace('{n}', a.fuera_total))}</b></p>
+          <p>${esc(tn('alcance_dentro', a.dentro_total))} · <b>${esc(tn('alcance_fuera', a.fuera_total))}</b></p>
           <p class="vigilante"><label><input type="checkbox" class="a-cortar" data-device="${esc(a.device_id)}"${a.cortar ? ' checked' : ''}> <b>${esc(t('alcance_cortar'))}</b></label>
             <br><span class="muted">${esc(t(a.cortar ? 'alcance_cortar_on' : 'alcance_cortar_off'))}</span>
             <br><span class="muted">${esc(t('alcance_cortar_todo'))}</span></p>
@@ -1014,7 +1058,14 @@
       $('alcance-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const patrones = $('a-patrones').value;
-        const r = await api('/api/ia/alcance', { method: 'POST', body: { device_id: $('a-device').value, patrones } });
+        let r;
+        try {
+          r = await api('/api/ia/alcance', { method: 'POST', body: { device_id: $('a-device').value, patrones } });
+        } catch (err) {
+          // A line that is no name is said, and nothing is saved: the person fixes it and saves.
+          $('a-msg').textContent = String(err.message || err);
+          return;
+        }
         $('a-msg').textContent = patrones.trim() ? t('alcance_guardado') : t('alcance_borrado');
         setTimeout(() => { $('a-msg').textContent = ''; }, 5000);
         paint(r);
@@ -1073,9 +1124,12 @@
     async licencia() {
       const render = (r) => {
         $('l-estado').textContent = r.texto;
-        $('l-prueba').textContent = r.estado.plan === 'prueba'
-          ? t('licencia_prueba_texto').replace('{donde}', r.marca_prueba || '')
-          : '';
+        // The mark is named only when it is really there, and a paid licence says where its copy
+        // is kept: nothing the program leaves on the machine goes unsaid.
+        const plan = r.estado.plan.plan;
+        $('l-prueba').textContent = plan === 'prueba'
+          ? t(r.marca_puesta ? 'licencia_prueba_texto' : 'licencia_prueba_sin_marca').replace('{donde}', r.marca_prueba || '')
+          : plan === 'plus' ? t('licencia_ancla_texto').replace('{donde}', r.marca_licencia || '') : '';
         $('l-dev').classList.toggle('hidden', !r.clave_dev);
         $('l-clave-lead').textContent = t('licencia_clave_lead').replace('{host}', r.host_activacion);
         $('l-conexiones').innerHTML = r.conexiones.map((o) => `<tr><td>${when(o.ts)}</td><td class="mono">${esc(o.host)}</td><td>${o.bytes}</td></tr>`).join('') || `<tr><td colspan="3" class="muted">${esc(t('licencia_conexiones_ninguna'))}</td></tr>`;
@@ -1098,12 +1152,12 @@
     },
     async estado() {
       paintChanges().catch(() => {});
-      const r = await api('/api/estado');
+      const r = await api('/api/estado?detalle=1');
       $('e-version').textContent = r.version + (r.clave_dev ? ' · ' + t('clave_dev') : '');
       $('e-escucha').textContent = r.escucha.join(', ');
       $('e-upstream').textContent = r.upstream.join(', ');
-      const paintDns = (on) => { $('e-dns').textContent = on ? t('dns_aplicado') : t('dns_no_aplicado'); $('e-dns-apply').classList.toggle('hidden', on); $('e-dns-restore').classList.toggle('hidden', !on); };
-      paintDns(r.dns_aplicado);
+      const paintDns = (on, cubre) => { $('e-dns').textContent = on ? (cubre === false ? t('dns_aplicado_falta') : t('dns_aplicado')) : t('dns_no_aplicado'); $('e-dns-apply').classList.toggle('hidden', on || r.caducado); $('e-dns-restore').classList.toggle('hidden', !on); };
+      paintDns(r.dns_aplicado, r.dns_cubre);
       $('e-dns-apply').addEventListener('click', async () => { $('e-dns-msg').textContent = t('dns_aplicando'); try { const x = await api('/api/dns/aplicar', { method: 'POST' }); $('e-dns-msg').textContent = x.mensaje; paintDns(x.dns_aplicado); paintChanges().catch(() => {}); } catch (err) { $('e-dns-msg').textContent = String(err.message || err); } });
       $('e-dns-restore').addEventListener('click', async () => { $('e-dns-msg').textContent = '…'; try { const x = await api('/api/dns/restaurar', { method: 'POST' }); $('e-dns-msg').textContent = x.mensaje; paintDns(x.dns_aplicado); paintChanges().catch(() => {}); } catch (err) { $('e-dns-msg').textContent = String(err.message || err); } });
       $('e-listas').innerHTML = r.listas.map((l) => `<tr><td>${esc(l.id)}</td><td>${l.entries}</td><td class="muted">${esc(l.fetched)}</td></tr>`).join('');
@@ -1133,7 +1187,7 @@
     const caja = document.createElement('div');
     caja.className = 'card ' + (e.caducado ? 'caducado' : 'prueba');
     if (e.caducado) {
-      caja.innerHTML = `<strong>${esc(t('caducado_titulo'))}</strong> <span>${esc(t('caducado_texto'))}</span>
+      caja.innerHTML = `<strong>${esc(t(e.caducado_plus ? 'caducado_titulo_plus' : 'caducado_titulo'))}</strong> <span>${esc(t('caducado_texto'))}</span>${e.hogar_aparcado ? ` <span>${esc(t('caducado_hogar_relevo'))}</span>` : ''}
         <p><a class="btn" href="${esc(t('licencia_comprar_url'))}" target="_blank" rel="noopener">${esc(t('caducado_comprar'))}</a>
         <a class="btn secondary" href="/licencia">${esc(t('caducado_activar'))}</a>
         <a class="btn secondary" href="/extracto">${esc(t('caducado_exportar'))}</a></p>`;

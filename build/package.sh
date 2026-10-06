@@ -7,6 +7,12 @@
 #
 # Needs: cargo-zigbuild + zig, cargo-deb, dotnet + `dotnet tool install -g wix`.
 set -euo pipefail
+# The Python to use. On Windows, Git Bash finds a "python3" that is only the Microsoft Store
+# shortcut and fails ("Python was not found"); the real one is "python" (found on the Windows PC
+# that took over from the Mac, 4 Oct 2026). PYTHON in the environment wins.
+if [ -z "${PYTHON:-}" ]; then
+    if python3 -c 'import sys' >/dev/null 2>&1; then PYTHON=python3; else PYTHON=python; fi
+fi
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
@@ -26,7 +32,7 @@ fi
 
 # Mismo sello de tiempo que build/repro.sh: sin esto, el .exe de aquí y el del contenedor no
 # pueden coincidir nunca, por mucho que el código sea el mismo.
-python3 build/sello-pe.py "$WIN_BIN" "$(git log -1 --format=%ct 2>/dev/null || date +%s)"
+"$PYTHON" build/sello-pe.py "$WIN_BIN" "$(git log -1 --format=%ct 2>/dev/null || date +%s)"
 
 # Keep an MSI built on Windows (build/msi.ps1) that may already be in $OUT.
 mkdir -p "$OUT"

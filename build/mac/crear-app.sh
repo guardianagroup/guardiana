@@ -21,11 +21,15 @@ cp build/mac/lanzador.sh "$APP/Contents/MacOS/GUARDIANA"
 cp build/mac/instalar.sh build/mac/desinstalar.sh "$APP/Contents/Resources/"
 cp target/release/guardiana "$APP/Contents/Resources/guardiana"
 chmod 755 "$APP/Contents/MacOS/GUARDIANA" "$APP/Contents/Resources/"*.sh "$APP/Contents/Resources/guardiana"
-# Icon from the site's 512 px logo, with the tools macOS ships (sips, iconutil).
+# Icon from the 512 px logo, with the tools macOS ships (sips, iconutil). The logo is kept here,
+# in build/mac, because site/ is not part of the public code repository: built from a clean
+# checkout on a Mac that was not the development one (the GitHub Mac of candidato.yml, 4 Oct
+# 2026), this script stopped at the first sips. It is the same file as site/icon-512.png.
+ICONO=build/mac/icono-512.png
 SET="$(mktemp -d)/guardiana.iconset"; mkdir -p "$SET"
 for s in 16 32 128 256 512; do
-  sips -z "$s" "$s" site/icon-512.png --out "$SET/icon_${s}x${s}.png" >/dev/null
-  d=$((s * 2)); [ "$d" -le 1024 ] && sips -z "$d" "$d" site/icon-512.png --out "$SET/icon_${s}x${s}@2x.png" >/dev/null
+  sips -z "$s" "$s" "$ICONO" --out "$SET/icon_${s}x${s}.png" >/dev/null
+  d=$((s * 2)); [ "$d" -le 1024 ] && sips -z "$d" "$d" "$ICONO" --out "$SET/icon_${s}x${s}@2x.png" >/dev/null
 done
 iconutil -c icns "$SET" -o "$APP/Contents/Resources/guardiana.icns"
 rm -rf "$(dirname "$SET")"

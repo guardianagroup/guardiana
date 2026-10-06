@@ -38,6 +38,9 @@ PANEL = "http://127.0.0.1:7443"
 SUFIJO = "prueba.guardiana.hogar"
 DIA_MS = 24 * 3600 * 1000
 fallos = []
+# --candidato: packages built by CI from a branch, not released. They carry no signature and are
+# not in the public ledger yet; everything else must hold exactly as for a release.
+CANDIDATO = False
 
 
 buenos = []
@@ -470,7 +473,11 @@ def tarde(tipo, paquete, version):
         mal("guardiana verify", out[-800:])
     else:
         firma = rep.get("signature")
-        (ok if firma == "valid" else mal)("verify · firma del programa", str(firma))
+        if CANDIDATO and firma == "no_signature_file":
+            # A candidate is built by CI, which never holds the key (brief §10): no .minisig yet.
+            ok("verify · firma del programa: un candidato no va firmado (esperado)", str(firma))
+        else:
+            (ok if firma == "valid" else mal)("verify · firma del programa", str(firma))
         (ok if rep.get("service") == "running" else mal)("verify · servicio", str(rep.get("service")))
         abiertos = rep.get("lan_ports_open") or []
         if not abiertos:
@@ -487,6 +494,9 @@ def tarde(tipo, paquete, version):
         led = rep.get("ledger")
         if isinstance(led, dict) and "found" in json.dumps(led).lower():
             ok("verify · registro público", json.dumps(led)[:300])
+        elif CANDIDATO and json.dumps(led).strip('"') in ("not_found", "no_ledger_file"):
+            # Its hash is written in ledger.jsonl only when it is released.
+            ok("verify · registro público: un candidato aún no está en el registro (esperado)", json.dumps(led)[:120])
         else:
             mal("verify · registro público", f"verify dice {json.dumps(led)[:300]}: la web promete que verify repite la comprobación solo")
 
@@ -627,7 +637,10 @@ def main():
     ap.add_argument("--tipo", required=True, choices=["msi", "deb", "tar", "app"])
     ap.add_argument("--dir", required=True)
     ap.add_argument("--anterior", help="carpeta con el MSI de la versión anterior (solo Windows)")
+    ap.add_argument("--candidato", action="store_true", help="paquetes sin publicar: sin firma ni registro todavía")
     a = ap.parse_args()
+    global CANDIDATO
+    CANDIDATO = a.candidato
     paquete = paquete_de(a.tipo, a.dir)
     if not paquete:
         mal("paquete", f"no hay paquete {a.tipo} en {a.dir}")

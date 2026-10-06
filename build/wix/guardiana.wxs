@@ -153,7 +153,7 @@
                   Return="ignore" />
     <CustomAction Id="RestoreDns"
                   Directory="INSTALLFOLDER"
-                  ExeCommand="&quot;[INSTALLFOLDER]guardiana.exe&quot; dns --restore"
+                  ExeCommand="&quot;[INSTALLFOLDER]guardiana.exe&quot; dns --restore --desinstalando"
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
@@ -163,7 +163,7 @@
     <Property Id="VIGILAR" Value="1" Secure="yes" />
     <CustomAction Id="ApplyDns"
                   Directory="INSTALLFOLDER"
-                  ExeCommand="&quot;[INSTALLFOLDER]guardiana.exe&quot; dns --apply --yes"
+                  ExeCommand="&quot;[INSTALLFOLDER]guardiana.exe&quot; dns --apply --yes --instalador"
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />

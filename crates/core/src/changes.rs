@@ -46,7 +46,63 @@ impl ChangeKind {
     }
 }
 
-/// Who asked: `panel`, `terminal`, `desinstalador` (the uninstaller) or `servicio` (the watchdog).
+/// Who asked for a change. The panel shows it with the text `quien_<stored text>`, so every
+/// value here needs that key in the three languages, and a test in the panel crate walks `ALL`
+/// to check. In 1.0.1 this was a free string: the engine wrote "licencia" when a trial ended,
+/// no text existed for it, and the panel printed the raw key on the very day the person was
+/// deciding whether to pay (review of 1 Oct 2026).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChangeWho {
+    /// The button in the panel.
+    Panel,
+    /// A command typed in the terminal.
+    Terminal,
+    /// The uninstaller.
+    Desinstalador,
+    /// The installer (Windows points the DNS at Guardiana when it installs). Until 1.0.2 it was
+    /// written down as the terminal (review of 5 Oct 2026, Windows medium).
+    Instalador,
+    /// The service's own watchdog.
+    Servicio,
+    /// The trial or the subscription ended and the program stepped down.
+    Licencia,
+    /// The network's DNS stopped answering and the guardian stepped aside.
+    SinArriba,
+    /// The network's DNS answered again and the guardian came back.
+    ConArriba,
+}
+
+impl ChangeWho {
+    /// Every value, for the test that checks each one has its text.
+    pub const ALL: [Self; 8] = [
+        Self::Panel,
+        Self::Terminal,
+        Self::Desinstalador,
+        Self::Instalador,
+        Self::Servicio,
+        Self::Licencia,
+        Self::SinArriba,
+        Self::ConArriba,
+    ];
+
+    /// Stored text; the panel looks up `quien_` + this.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Panel => "panel",
+            Self::Terminal => "terminal",
+            Self::Desinstalador => "desinstalador",
+            Self::Instalador => "instalador",
+            Self::Servicio => "servicio",
+            Self::Licencia => "licencia",
+            Self::SinArriba => "sin_arriba",
+            Self::ConArriba => "con_arriba",
+        }
+    }
+}
+
+/// One recorded change. `who` is the stored text of a [`ChangeWho`]; it stays a string here
+/// because rows written by older versions are read back as they are.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Change {
     /// Row id.
@@ -78,10 +134,16 @@ impl Ledger {
     }
 
     /// Record a change with who asked for it.
-    pub fn record_change(&self, ts: i64, kind: ChangeKind, who: &str, detail: &str) -> Result<()> {
+    pub fn record_change(
+        &self,
+        ts: i64,
+        kind: ChangeKind,
+        who: ChangeWho,
+        detail: &str,
+    ) -> Result<()> {
         self.conn.execute(
             "INSERT INTO changes (ts, kind, who, detail) VALUES (?1, ?2, ?3, ?4)",
-            params![ts, kind.as_str(), who, detail],
+            params![ts, kind.as_str(), who.as_str(), detail],
         )?;
         Ok(())
     }
@@ -125,9 +187,9 @@ mod tests {
     #[test]
     fn records_and_lists_newest_first() {
         let l = Ledger::open_in_memory(Hash::of(b"g")).unwrap_or_else(|_| unreachable!());
-        l.record_change(10, ChangeKind::HogarOn, "panel", "192.168.1.39")
+        l.record_change(10, ChangeKind::HogarOn, ChangeWho::Panel, "192.168.1.39")
             .unwrap_or_else(|_| unreachable!());
-        l.record_change(20, ChangeKind::HogarOff, "desinstalador", "")
+        l.record_change(20, ChangeKind::HogarOff, ChangeWho::Desinstalador, "")
             .unwrap_or_else(|_| unreachable!());
         let v = l.changes(10).unwrap_or_else(|_| unreachable!());
         assert_eq!(v.len(), 2);

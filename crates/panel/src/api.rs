@@ -15,16 +15,19 @@ use axum::Json;
 use guardiana_core::i18n::{self, Texts};
 use guardiana_core::rules::{observation_complete, observed_hours};
 use guardiana_core::time::now_ms;
-use guardiana_core::ChangeKind;
 use guardiana_core::{
     write_csv_for_spreadsheet, write_json, Action, Category, DecidedBy, Device, Event, EventFilter,
     Ledger, MatchKind, NewRule, Rule, Scope, Signal, Verdict, SELF_DEVICE_ID,
 };
-use guardiana_service::home::{self, SETTING_HOME_IP, SETTING_HOME_MODE, SETTING_HOME_SINCE};
-use guardiana_service::sysdns::SETTING_BACKUP;
+use guardiana_core::{ChangeKind, ChangeWho};
+use guardiana_service::home::{
+    self, SETTING_HOME_APARCADO, SETTING_HOME_IP, SETTING_HOME_MODE, SETTING_HOME_RED,
+    SETTING_HOME_SINCE,
+};
+use guardiana_service::sysdns::{SETTING_BACKUP, SETTING_BACKUP_APARCADA};
 use serde::{Deserialize, Serialize};
 
-use crate::auth::{Lang, Session};
+use crate::auth::{Lang, PorDireccion, Session, Zona};
 use crate::AppState;
 
 type ApiResult<T> = Result<Json<T>, Response>;
@@ -33,15 +36,29 @@ fn internal(e: impl std::fmt::Display) -> Response {
     (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
 }
 
+/// Run `f` on the panel's ledger connection.
+///
+/// The panel shares the runtime with the resolver, and SQLite blocks: an export of 600,000 rows
+/// held a worker thread for seconds and a DNS answer waited 5.9 s behind it (review of 5 Oct
+/// 2026, serious 12). On the service's multi-threaded runtime the work is done "in place":
+/// tokio hands this worker's other tasks, the resolver's among them, to another thread first.
+/// Waiting for the lock counts as blocking too, so it is inside. A runtime with one thread (the
+/// tests) cannot do that and runs it as before.
 fn with_ledger<T>(
     state: &AppState,
     f: impl FnOnce(&mut Ledger) -> guardiana_core::Result<T>,
 ) -> Result<T, Response> {
-    let mut guard = state
-        .ledger
-        .lock()
-        .map_err(|_| internal("ledger lock poisoned"))?;
-    f(&mut guard).map_err(internal)
+    let run = || {
+        let mut guard = state
+            .ledger
+            .lock()
+            .map_err(|_| internal("ledger lock poisoned"))?;
+        f(&mut guard).map_err(internal)
+    };
+    match tokio::runtime::Handle::try_current().map(|h| h.runtime_flavor()) {
+        Ok(tokio::runtime::RuntimeFlavor::MultiThread) => tokio::task::block_in_place(run),
+        _ => run(),
+    }
 }
 
 /// An event as the pages show it: with device name and the signal sentences.
@@ -198,6 +215,7 @@ pub(crate) async fn textos(Lang(t): Lang) -> Response {
 pub(crate) async fn me(
     State(state): State<Arc<AppState>>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    _p: PorDireccion,
 ) -> ApiResult<Option<Device>> {
     let id = if peer.ip().is_loopback() {
         SELF_DEVICE_ID.to_owned()
@@ -224,6 +242,15 @@ pub(crate) async fn dns_aplicar(
     _s: Session,
 ) -> ApiResult<DnsCambio> {
     use guardiana_service::sysdns;
+    // With the trial over and no Plus the guardian is not answering: pointing the system at it
+    // would leave the computer on its secondary resolver, or on none (review of 28 Sep 2026, G6).
+    let puede = with_ledger(&state, |l| {
+        Ok(guardiana_license::status(l, &state.token, now_ms()).ok())
+    })?
+    .is_none_or(|s| s.puede_funcionar);
+    if !puede {
+        return Err((StatusCode::CONFLICT, t.panel("caducado_dns").to_owned()).into_response());
+    }
     let already =
         with_ledger(&state, |l| l.setting(SETTING_BACKUP))?.is_some_and(|v| !v.is_empty());
     if already {
@@ -263,7 +290,7 @@ pub(crate) async fn dns_aplicar(
             .collect::<Vec<_>>()
             .join(", ");
         if let Ok(l) = st.ledger.lock() {
-            let _ = l.record_change(now_ms(), ChangeKind::DnsOn, "panel", &originals);
+            let _ = l.record_change(now_ms(), ChangeKind::DnsOn, ChangeWho::Panel, &originals);
         }
         let mut msg = t
             .cli("dns.aplicado_panel")
@@ -306,10 +333,23 @@ pub(crate) async fn dns_restaurar(
 ) -> ApiResult<DnsCambio> {
     use guardiana_service::sysdns;
     let stored = with_ledger(&state, |l| l.setting(SETTING_BACKUP))?.filter(|v| !v.is_empty());
+    // Undoing by hand is also saying no to the copy parked when the trial ended: it is not
+    // applied again when the licence comes back.
+    let aparcada =
+        with_ledger(&state, |l| l.setting(SETTING_BACKUP_APARCADA))?.is_some_and(|v| !v.is_empty());
+    if aparcada {
+        with_ledger(&state, |l| l.set_setting(SETTING_BACKUP_APARCADA, ""))?;
+    }
     let Some(json) = stored else {
         return Ok(Json(DnsCambio {
             dns_aplicado: false,
-            mensaje: t.cli("dns.no_hay_copia").to_owned(),
+            mensaje: t
+                .cli(if aparcada {
+                    "dns.aparcada_borrada"
+                } else {
+                    "dns.no_hay_copia"
+                })
+                .to_owned(),
         }));
     };
     let backup: sysdns::Backup = serde_json::from_str(&json).map_err(internal)?;
@@ -338,7 +378,7 @@ pub(crate) async fn dns_restaurar(
             .ledger
             .lock()
             .map_err(|_| "ledger lock poisoned".to_owned())?;
-        l.record_change(now_ms(), ChangeKind::DnsOff, "panel", "")
+        l.record_change(now_ms(), ChangeKind::DnsOff, ChangeWho::Panel, "")
             .map_err(|e| e.to_string())
     })
     .await
@@ -359,6 +399,12 @@ pub(crate) struct Estado {
     escucha: Vec<String>,
     upstream: Vec<String>,
     dns_aplicado: bool,
+    /// Only when asked (`?detalle=1`, the Estado page; on Windows asking is a PowerShell, too
+    /// slow for the banner every page loads): whether every connection of this machine asks the
+    /// guardian right now. With the change applied and this `false`, the page says that one
+    /// connection is not covered yet instead of a flat "pointed at Guardiana" (review of 5 Oct
+    /// 2026, serious 10).
+    dns_cubre: Option<bool>,
     listas: Vec<ListaInfo>,
     panel_puerto: u16,
     /// Which system this is running on. The panel uses it to say, on a Mac, that Home Mode is
@@ -368,6 +414,12 @@ pub(crate) struct Estado {
     /// system DNS back and stopped watching. Every page says so, and only activating and taking
     /// your own extract away still make sense.
     caducado: bool,
+    /// Stood down because a subscription ended, not the trial: the banner says which, so a
+    /// customer who paid is not told "the trial is over".
+    caducado_plus: bool,
+    /// While stood down: Home Mode was on, so the router still sends the house here and a relay
+    /// passes their queries on without looking. The panel says so, and asks for the router back.
+    hogar_aparcado: bool,
     /// Days left of the trial while it runs, so every page can count down honestly instead of
     /// letting the day arrive as a surprise. `None` with a subscription.
     prueba_dias: Option<i64>,
@@ -380,20 +432,32 @@ struct ListaInfo {
     fetched: String,
 }
 
-pub(crate) async fn estado(State(state): State<Arc<AppState>>, _s: Session) -> ApiResult<Estado> {
+pub(crate) async fn estado(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<HashMap<String, String>>,
+    _s: Session,
+) -> ApiResult<Estado> {
     // Applied by Guardiana (a backup exists) or pointed here by other means (the
     // system says 127.0.0.1 is the primary): either way this PC passes through it.
-    let mut dns_aplicado =
-        with_ledger(&state, |l| l.setting(SETTING_BACKUP))?.is_some_and(|v| !v.is_empty());
-    if !dns_aplicado {
-        dns_aplicado = tokio::task::spawn_blocking(guardiana_service::sysdns::guardian_is_primary)
+    let copia = with_ledger(&state, |l| l.setting(SETTING_BACKUP))?.is_some_and(|v| !v.is_empty());
+    let primario = if !copia || q.contains_key("detalle") {
+        tokio::task::spawn_blocking(guardiana_service::sysdns::guardian_is_primary)
             .await
             .map_err(internal)?
-            == Some(true);
-    }
+    } else {
+        None
+    };
+    let dns_aplicado = copia || primario == Some(true);
+    let dns_cubre = if q.contains_key("detalle") {
+        primario
+    } else {
+        None
+    };
     let licencia = with_ledger(&state, |l| {
         Ok(guardiana_license::status(l, &state.token, now_ms()).ok())
     })?;
+    let hogar_aparcado =
+        with_ledger(&state, |l| l.setting(SETTING_HOME_APARCADO))?.is_some_and(|v| v == "1");
     let manifest = guardiana_lists::manifest().map_err(internal)?;
     let mut listas: Vec<ListaInfo> = manifest
         .lists
@@ -420,6 +484,7 @@ pub(crate) async fn estado(State(state): State<Arc<AppState>>, _s: Session) -> A
         escucha: state.info.listen_dns.clone(),
         upstream: state.info.upstream.clone(),
         dns_aplicado,
+        dns_cubre,
         listas,
         panel_puerto: crate::DEFAULT_PORT,
         so: if cfg!(target_os = "macos") {
@@ -430,6 +495,10 @@ pub(crate) async fn estado(State(state): State<Arc<AppState>>, _s: Session) -> A
             "linux"
         },
         caducado: !licencia.as_ref().is_none_or(|s| s.puede_funcionar),
+        caducado_plus: licencia
+            .as_ref()
+            .is_some_and(|s| matches!(s.plan, guardiana_license::Plan::PlusTerminado { .. })),
+        hogar_aparcado,
         prueba_dias: licencia.as_ref().and_then(|s| match s.plan {
             guardiana_license::Plan::Prueba { dias_restantes, .. } => Some(dias_restantes),
             _ => None,
@@ -507,6 +576,17 @@ pub(crate) struct Lectura {
 
 const SILENCE_MIN: i64 = 30;
 
+/// Who is asking for the reading: the household panel, or the device about itself.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Lector {
+    /// The home panel (token). A device that did not share its detail yields an empty reading:
+    /// companies and countries are names read sideways, not totals (review of 1 Oct 2026,
+    /// entry 1). Its figures are in `totales`, which do not pass through here.
+    Casa,
+    /// The device itself, from its own screen, identified by its IP.
+    ElMismo,
+}
+
 fn lectura(
     t: &Texts,
     l: &Ledger,
@@ -514,13 +594,18 @@ fn lectura(
     last_seen: i64,
     house_last: i64,
     now: i64,
+    lector: Lector,
 ) -> guardiana_core::Result<Lectura> {
-    let events = l.events(&EventFilter {
+    let filter = EventFilter {
         device_id: Some(id.to_owned()),
         since: Some(now - 24 * guardiana_core::time::HOUR_MS),
         limit: Some(5000),
         ..EventFilter::default()
-    })?;
+    };
+    let events = match lector {
+        Lector::Casa => l.events(&filter)?,
+        Lector::ElMismo => l.own_events(id, &filter)?,
+    };
     let mut by_company: HashMap<&'static str, u64> = HashMap::new();
     let mut by_country: HashMap<&'static str, u64> = HashMap::new();
     let mut relay = false;
@@ -592,8 +677,8 @@ fn scope_mode_key(device_id: &str) -> String {
 fn in_scope(patterns: &[String], qname: &str) -> bool {
     let name = qname.trim_end_matches('.').to_ascii_lowercase();
     patterns.iter().any(|p| {
-        let p = p.trim().trim_start_matches("*.").trim_end_matches('.');
-        !p.is_empty() && (name == p || name.ends_with(&format!(".{p}")))
+        guardiana_core::rules::normalizar_nombre(p)
+            .is_some_and(|(p, _)| name == p || name.ends_with(&format!(".{p}")))
     })
 }
 
@@ -772,17 +857,31 @@ pub(crate) async fn alcance(
     if body.patrones.len() > 8_000 {
         return Err((StatusCode::BAD_REQUEST, "scope too long").into_response());
     }
-    let cleaned: Vec<String> = body
+    // Each line as the name a query carries (`https://github.com/x` is `github.com`). A line that is
+    // no name at all is said, not dropped: with Guard mode on, a line lost in silence is a service
+    // the agent needs and that gets cut (G4, 28 Sep 2026).
+    let mut cleaned: Vec<String> = Vec::new();
+    let mut malas: Vec<String> = Vec::new();
+    for linea in body
         .patrones
         .lines()
-        .map(|x| {
-            x.trim()
-                .trim_start_matches("*.")
-                .trim_end_matches('.')
-                .to_ascii_lowercase()
-        })
-        .filter(|x| !x.is_empty() && x.contains('.') && !x.contains(' ') && !x.contains('/'))
-        .collect();
+        .map(str::trim)
+        .filter(|x| !x.is_empty())
+    {
+        match guardiana_core::rules::normalizar_nombre(linea) {
+            Some((n, _)) if !cleaned.contains(&n) => cleaned.push(n),
+            Some(_) => {}
+            None => malas.push(linea.chars().take(80).collect()),
+        }
+    }
+    if !malas.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            t.panel("alcance_lineas_malas")
+                .replace("{lineas}", &malas.join(", ")),
+        )
+            .into_response());
+    }
     // El Modo Vigilante corta TODO lo que no esté en la lista, así que la regla 6 del brief le
     // vale igual que a un corte suelto: antes de 24 horas observando, no. Sin esto era la manera
     // más fácil de saltársela, y encima la más dañina —y el aviso que enseña el panel se calcula
@@ -827,15 +926,9 @@ pub(crate) async fn alcance_anadir(
     _s: Session,
     Json(body): Json<AnadirBody>,
 ) -> ApiResult<IaView> {
-    let nombre = body
-        .nombre
-        .trim()
-        .trim_start_matches("*.")
-        .trim_end_matches('.')
-        .to_ascii_lowercase();
-    if nombre.is_empty() || !nombre.contains('.') || nombre.contains(' ') || nombre.contains('/') {
+    let Some((nombre, _)) = guardiana_core::rules::normalizar_nombre(&body.nombre) else {
         return Err((StatusCode::BAD_REQUEST, "bad name").into_response());
-    }
+    };
     with_ledger(&state, |l| {
         let key = scope_key(&body.device_id);
         let mut lineas: Vec<String> = l
@@ -866,6 +959,9 @@ fn huecos(l: &Ledger, since: i64, limit: usize) -> guardiana_core::Result<Vec<Hu
         .collect())
 }
 
+/// The live counters and the latest names. The counters add up every device of the house; the
+/// names come through `Ledger::events`, which leaves out the devices whose owner did not share
+/// their detail (review of 1 Oct 2026, entry 1): totals yes, names no.
 pub(crate) async fn radiografia(
     Lang(t): Lang,
     State(state): State<Arc<AppState>>,
@@ -1088,10 +1184,8 @@ pub(crate) async fn recibo(
             }
             for s in &e.signals {
                 match s {
-                    Signal::Baliza { minutes } => {
-                        if !latidos.iter().any(|(n, _)| n == &e.qname) {
-                            latidos.push((e.qname.clone(), *minutes));
-                        }
+                    Signal::Baliza { minutes } if !latidos.iter().any(|(n, _)| n == &e.qname) => {
+                        latidos.push((e.qname.clone(), *minutes));
                     }
                     Signal::EvasionDns => evasiones += 1,
                     _ => {}
@@ -1125,12 +1219,20 @@ pub(crate) async fn recibo(
 
 #[derive(Serialize)]
 pub(crate) struct Extracto {
+    /// Stored rows the household may read: what the filters can ever reach.
     total: u64,
+    /// Stored rows of devices that do not share their detail: said as a number, never listed.
+    ocultos: u64,
     eventos: Vec<EventView>,
     /// Periods in which the service was not watching, newest first.
     huecos: Vec<HuecoView>,
 }
 
+/// The household's extract. `?device_id=` of a device whose owner did not share its detail
+/// returns no rows: the consent check lives in `Ledger::events`, not here, so the export, the
+/// radiography and the report cannot drift from it (review of 1 Oct 2026, entry 1). `total`
+/// counts the rows the household may read and `ocultos` the rest: «Mostrando 200 de 5.000» used
+/// to count rows no filter could ever show (review of 5 Oct 2026, privacy item 3).
 pub(crate) async fn extracto(
     Lang(t): Lang,
     State(state): State<Arc<AppState>>,
@@ -1141,9 +1243,10 @@ pub(crate) async fn extracto(
     if filter.limit.is_none() {
         filter.limit = Some(200);
     }
-    let (events, total, devices, huecos) = with_ledger(&state, |l| {
+    let (events, total, todos, devices, huecos) = with_ledger(&state, |l| {
         Ok((
             l.events(&filter)?,
+            l.shared_event_count()?,
             l.event_count()?,
             l.devices()?,
             huecos(l, 0, 20)?,
@@ -1154,6 +1257,7 @@ pub(crate) async fn extracto(
     eventos.reverse();
     Ok(Json(Extracto {
         total,
+        ocultos: todos.saturating_sub(total),
         eventos,
         huecos,
     }))
@@ -1186,6 +1290,9 @@ pub(crate) async fn comprobar(
             guardiana_core::ChainFault::BrokenLink { .. } => t.cli("ledger.fallo.enlace"),
             guardiana_core::ChainFault::AlteredRow { .. } => t.cli("ledger.fallo.alterado"),
             guardiana_core::ChainFault::Unreadable(_) => t.cli("ledger.fallo.ilegible"),
+            // The newest rows are gone (review of 1 Oct 2026, entry 17).
+            guardiana_core::ChainFault::Truncated { .. } => t.cli("ledger.fallo.recortado"),
+            guardiana_core::ChainFault::HeadMissing => t.cli("ledger.fallo.sin_cabeza"),
         }
         .to_owned(),
     });
@@ -1207,7 +1314,9 @@ pub(crate) async fn exportar(
     // Everything the filters select, not only the rows the page is showing: the page asks for
     // the newest 200, and exporting sent those 200 and nothing else, while the panel promises
     // that the whole extract is yours to take (found exporting 441 events from 1.0.0, 28 Sep
-    // 2026: the CSV and the JSON had 200).
+    // 2026: the CSV and the JSON had 200). "Yours" is the household's: a phone that did not
+    // share its detail is not in the file either, by the same `Ledger::events` the page uses
+    // (review of 1 Oct 2026, entry 1).
     let mut filter = filter_from(&q)?;
     filter.limit = None;
     let events = with_ledger(&state, |l| l.events(&filter))?;
@@ -1285,7 +1394,7 @@ pub(crate) async fn dispositivos(
         for d in &devices {
             lecturas.insert(
                 d.id.clone(),
-                lectura(t, l, &d.id, d.last_seen, house_last, now)?,
+                lectura(t, l, &d.id, d.last_seen, house_last, now, Lector::Casa)?,
             );
         }
         Ok((devices, totals, lecturas))
@@ -1458,6 +1567,12 @@ pub(crate) struct Hogar {
     escuchando_en_lan: bool,
     dispositivos: usize,
     licencia: String,
+    /// Home Mode was on when the trial ended: off for now, a relay keeps the house resolving,
+    /// and it comes back on with the licence. Switching it off clears that.
+    aparcado: bool,
+    /// On, but the computer is on another network than the one it was switched on in: no port
+    /// is open there until it is back home (review of 5 Oct 2026).
+    fuera_de_casa: bool,
 }
 
 fn qr_svg(text: &str) -> Option<String> {
@@ -1471,15 +1586,25 @@ fn qr_svg(text: &str) -> Option<String> {
 }
 
 fn hogar_view(state: &AppState) -> Result<Hogar, Response> {
-    let (on, ip, since, devices) = with_ledger(state, |l| {
+    let (on, ip, since, devices, aparcado, red) = with_ledger(state, |l| {
         Ok((
             l.setting(SETTING_HOME_MODE)?.is_some_and(|v| v == "1"),
             l.setting(SETTING_HOME_IP)?.filter(|v| !v.is_empty()),
             l.setting(SETTING_HOME_SINCE)?
                 .and_then(|v| v.parse::<i64>().ok()),
             l.devices()?.len(),
+            l.setting(SETTING_HOME_APARCADO)?.is_some_and(|v| v == "1"),
+            l.setting(SETTING_HOME_RED)?.unwrap_or_default(),
         ))
     })?;
+    let fuera_de_casa = on
+        && match (
+            guardiana_devices::Red::de_texto(&red),
+            guardiana_service::sysdns::default_gateway().map(guardiana_devices::Red::de_puerta),
+        ) {
+            (Some(casa), Some(ahora)) => !casa.misma(&ahora),
+            _ => false,
+        };
     let lan = guardiana_devices::local_lan_ipv4();
     let shown_ip = if on { ip } else { lan.map(|i| i.to_string()) };
     let parsed: Option<std::net::Ipv4Addr> = shown_ip.as_deref().and_then(|s| s.parse().ok());
@@ -1499,6 +1624,8 @@ fn hogar_view(state: &AppState) -> Result<Hogar, Response> {
         desde: since,
         escuchando_en_lan: state.info.listen_dns.iter().any(|a| !a.starts_with("127.")),
         dispositivos: devices,
+        aparcado: aparcado && !on,
+        fuera_de_casa,
     })
 }
 
@@ -1523,17 +1650,40 @@ pub(crate) async fn hogar_activar(
     if !guardiana_devices::is_private_lan(std::net::IpAddr::V4(lan)) {
         return Err((StatusCode::CONFLICT, t.panel("hogar_sin_lan").to_owned()).into_response());
     }
-    // Home Mode is free (decision 52): no trial, no licence gate.
+    // Home Mode is free (decision 52): no plan of its own. But with the trial over and no Plus
+    // the program has stood aside and nothing listens on the LAN: switching it on would show the
+    // QR and the router steps for a port nobody answers (review of 5 Oct 2026, serious 14).
+    let puede = with_ledger(&state, |l| {
+        Ok(guardiana_license::status(l, &state.token, now_ms()).ok())
+    })?
+    .is_none_or(|s| s.puede_funcionar);
+    if !puede {
+        return Err((StatusCode::CONFLICT, t.panel("caducado_hogar").to_owned()).into_response());
+    }
     let aviso = match home::firewall_allow() {
         Ok(()) => None,
         Err(home::FirewallError::Manual) => Some(t.panel("hogar_firewall_manual").to_owned()),
         Err(home::FirewallError::Command(_)) => Some(t.panel("hogar_no_admin").to_owned()),
     };
+    // The network it is switched on in is home: on any other no port opens (5 Oct 2026).
+    let red = tokio::task::spawn_blocking(|| {
+        guardiana_service::sysdns::default_gateway()
+            .map(|p| guardiana_devices::Red::de_puerta(p).texto())
+            .unwrap_or_default()
+    })
+    .await
+    .map_err(internal)?;
     with_ledger(&state, |l| {
         l.set_setting(SETTING_HOME_MODE, "1")?;
         l.set_setting(SETTING_HOME_IP, &lan.to_string())?;
+        l.set_setting(SETTING_HOME_RED, &red)?;
         l.set_setting(SETTING_HOME_SINCE, &now_ms().to_string())?;
-        l.record_change(now_ms(), ChangeKind::HogarOn, "panel", &lan.to_string())
+        l.record_change(
+            now_ms(),
+            ChangeKind::HogarOn,
+            ChangeWho::Panel,
+            &lan.to_string(),
+        )
     })?;
     Ok(Json(HogarCambio {
         hogar: hogar_view(&state)?,
@@ -1553,7 +1703,9 @@ pub(crate) async fn hogar_desactivar(
     with_ledger(&state, |l| {
         l.set_setting(SETTING_HOME_MODE, "0")?;
         l.set_setting(SETTING_HOME_IP, "")?;
-        l.record_change(now_ms(), ChangeKind::HogarOff, "panel", "")
+        // Off is off: not even the relay of a stood-down program, nor back on with the licence.
+        l.set_setting(SETTING_HOME_APARCADO, "")?;
+        l.record_change(now_ms(), ChangeKind::HogarOff, ChangeWho::Panel, "")
     })?;
     Ok(Json(HogarCambio {
         hogar: hogar_view(&state)?,
@@ -1572,7 +1724,7 @@ pub(crate) struct MiDispositivo {
     lectura: Lectura,
 }
 
-fn identity_of(peer: SocketAddr) -> String {
+pub(crate) fn identity_of(peer: SocketAddr) -> String {
     if peer.ip().is_loopback() {
         SELF_DEVICE_ID.to_owned()
     } else {
@@ -1586,23 +1738,27 @@ pub(crate) async fn mi_dispositivo(
     Lang(t): Lang,
     State(state): State<Arc<AppState>>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    _p: PorDireccion,
 ) -> ApiResult<MiDispositivo> {
     let id = identity_of(peer);
     let now = now_ms();
     let (device, totals, events, lectura) = with_ledger(&state, |l| {
         let device = l.device(&id)?;
-        let totals = l
-            .device_totals(None)?
-            .into_iter()
-            .find(|t| t.device_id == id);
-        let events = l.events(&EventFilter {
-            device_id: Some(id.clone()),
-            limit: Some(100),
-            ..EventFilter::default()
-        })?;
+        // This device's rows only, through the (device, time) index: the totals of the whole
+        // house took 2.6 s with 600,000 rows, and every phone asks every 5 seconds.
+        let totals = l.device_totals_of(&id, None)?;
+        // The device reading about itself: its rows in full, whatever its sharing flag says.
+        // The identity comes from the caller's IP, so a phone only ever reaches its own.
+        let events = l.own_events(
+            &id,
+            &EventFilter {
+                limit: Some(100),
+                ..EventFilter::default()
+            },
+        )?;
         let house_last = l.devices()?.iter().map(|d| d.last_seen).max().unwrap_or(0);
         let lectura = match &device {
-            Some(d) => lectura(t, l, &id, d.last_seen, house_last, now)?,
+            Some(d) => lectura(t, l, &id, d.last_seen, house_last, now, Lector::ElMismo)?,
             None => Lectura::default(),
         };
         Ok((device, totals, events, lectura))
@@ -1630,6 +1786,7 @@ pub(crate) async fn mi_dispositivo(
 pub(crate) async fn mi_nombre(
     State(state): State<Arc<AppState>>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    _p: PorDireccion,
     Json(body): Json<Nombre>,
 ) -> ApiResult<Option<Device>> {
     let name = body.name.trim().to_owned();
@@ -1661,6 +1818,7 @@ pub(crate) struct Compartir {
 pub(crate) async fn mi_compartir(
     State(state): State<Arc<AppState>>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    _p: PorDireccion,
     Json(body): Json<Compartir>,
 ) -> ApiResult<Option<Device>> {
     let id = identity_of(peer);
@@ -1688,6 +1846,10 @@ pub(crate) struct Informe {
     /// Destinations asked for this week and never before, busiest first. Only with Plus, for
     /// the same reason: counting them needs the detail the free plan drops after a day.
     novedades: Vec<InformeNovedad>,
+    /// When the week before this one was not watched whole, the moment from which it will be:
+    /// until then there is nothing to compare with and nothing is "new" (review of 5 Oct 2026:
+    /// the first week compared with zeros and called every destination new).
+    comparar_desde: Option<i64>,
     texto_whatsapp: String,
 }
 
@@ -1737,22 +1899,30 @@ pub(crate) async fn informe(
     _s: Session,
 ) -> ApiResult<Informe> {
     let ahora = now_ms();
-    let (w, anterior, novedades, plus) = with_ledger(&state, |l| {
+    const SEMANA: i64 = 7 * 24 * 60 * 60 * 1000;
+    let (w, anterior, novedades, plus, comparar_desde) = with_ledger(&state, |l| {
         let plus = guardiana_license::status(l, &state.token, ahora)
             .map(|s| s.plus_activo)
             .unwrap_or(false);
         let semana = l.week_summary(ahora)?;
+        // Both comparisons need the previous week watched whole: since the first device was seen.
+        let mirando_desde = l.devices()?.iter().map(|d| d.first_seen).min();
+        let comparable = mirando_desde.is_some_and(|d| d <= ahora - 2 * SEMANA);
+        let comparar_desde = (!comparable).then(|| mirando_desde.unwrap_or(ahora) + 2 * SEMANA);
         // Only asked for with Plus: without the memory Plus keeps, both answers are empty by
-        // construction and printing an empty one would read as "nothing changed".
-        let (anterior, novedades) = if plus {
+        // construction and printing an empty one would read as "nothing changed". The week is
+        // figures per device, so every device is in it; the new destinations carry names, so a
+        // device whose owner did not share its detail is left out of them by the ledger itself
+        // (review of 1 Oct 2026, entry 1).
+        let (anterior, novedades) = if plus && comparable {
             (
-                Some(l.week_summary(ahora - 7 * 24 * 60 * 60 * 1000)?),
+                Some(l.week_summary(ahora - SEMANA)?),
                 l.new_destinations(ahora, 12)?,
             )
         } else {
             (None, Vec::new())
         };
-        Ok((semana, anterior, novedades, plus))
+        Ok((semana, anterior, novedades, plus, comparar_desde))
     })?;
     if !plus {
         // There is no free plan any more: reaching this means the trial or the subscription is
@@ -1764,6 +1934,7 @@ pub(crate) async fn informe(
             ejemplo: false,
             anterior: None,
             novedades: Vec::new(),
+            comparar_desde: None,
             desde: w.since,
             hasta: w.until,
             dispositivos: Vec::new(),
@@ -1807,6 +1978,7 @@ pub(crate) async fn informe(
                 visto: n.first_seen,
             })
             .collect(),
+        comparar_desde,
         texto_whatsapp,
     }))
 }
@@ -1853,9 +2025,21 @@ fn rule_view(r: Rule, names: &HashMap<String, Option<String>>, now: i64) -> Regl
 #[derive(Serialize)]
 pub(crate) struct Reglas {
     reglas: Vec<ReglaView>,
+    /// Rules left out of this list because a device that does not share made them for itself.
+    ocultas: usize,
     modo_bloqueo: String,
 }
 
+/// `created_by` of a rule made in the household panel.
+const CREADA_EN_PANEL: &str = "usuario (panel)";
+/// `created_by` of a rule a device made from its own page.
+const CREADA_EN_DISPOSITIVO: &str = "usuario (dispositivo)";
+
+/// The rules as `only_device` may read them: a device's own page gets its device rules; the
+/// household gets everything except the rules a device that does not share made for itself.
+/// Those name what the phone wanted to stop seeing, which is its detail: the household learns
+/// how many there are, not which (review of 5 Oct 2026, privacy item 5). Rules the household
+/// itself set on a device stay listed, so it can always undo them.
 fn list_rules(state: &AppState, only_device: Option<&str>) -> Result<Reglas, Response> {
     let now = now_ms();
     let (rules, devices, mode) = with_ledger(state, |l| {
@@ -1867,16 +2051,32 @@ fn list_rules(state: &AppState, only_device: Option<&str>) -> Result<Reglas, Res
         ))
     })?;
     let names = names_of(&devices);
+    let comparte = |id: &str| {
+        id == SELF_DEVICE_ID
+            || devices
+                .iter()
+                .any(|d| d.id == id && d.share_detail_with_home)
+    };
+    let mut ocultas = 0;
     let reglas = rules
         .into_iter()
         .filter(|r| match only_device {
             Some(d) => r.scope == Scope::Device && r.device_id.as_deref() == Some(d),
-            None => true,
+            None => {
+                let suya_y_callada = r.scope == Scope::Device
+                    && r.created_by == CREADA_EN_DISPOSITIVO
+                    && !r.device_id.as_deref().is_some_and(comparte);
+                if suya_y_callada {
+                    ocultas += 1;
+                }
+                !suya_y_callada
+            }
         })
         .map(|r| rule_view(r, &names, now))
         .collect();
     Ok(Reglas {
         reglas,
+        ocultas,
         modo_bloqueo: mode,
     })
 }
@@ -1946,7 +2146,7 @@ fn create_rule(
         .scope
         .parse()
         .map_err(|e: guardiana_core::Error| bad(e.to_string()))?;
-    let match_kind: MatchKind = body
+    let mut match_kind: MatchKind = body
         .match_kind
         .parse()
         .map_err(|e: guardiana_core::Error| bad(e.to_string()))?;
@@ -1954,7 +2154,7 @@ fn create_rule(
         .action
         .parse()
         .map_err(|e: guardiana_core::Error| bad(e.to_string()))?;
-    let pattern = body
+    let mut pattern = body
         .pattern
         .trim()
         .trim_end_matches('.')
@@ -1962,8 +2162,21 @@ fn create_rule(
     if pattern.is_empty() || pattern.len() > 253 {
         return Err(bad(t.panel("regla_patron_invalido").to_owned()));
     }
-    if match_kind == MatchKind::Category && pattern.parse::<Category>().is_err() {
-        return Err(bad(t.panel("regla_patron_invalido").to_owned()));
+    if match_kind == MatchKind::Category {
+        if pattern.parse::<Category>().is_err() {
+            return Err(bad(t.panel("regla_patron_invalido").to_owned()));
+        }
+    } else {
+        // What a query carries, whatever was typed: `https://www.x.com/…` is `www.x.com`, and
+        // `*.x.com` is `x.com` and everything below it (G4, 28 Sep 2026). Until 1.0.2 such a rule
+        // was listed as cutting and never matched anything.
+        let Some((nombre, comodin)) = guardiana_core::rules::normalizar_nombre(&pattern) else {
+            return Err(bad(t.panel("regla_patron_invalido").to_owned()));
+        };
+        pattern = nombre;
+        if comodin {
+            match_kind = MatchKind::Suffix;
+        }
     }
     let device_id = match (scope, forced_device) {
         (Scope::Device, Some(d)) => Some(d.to_owned()),
@@ -2022,11 +2235,16 @@ fn create_rule(
         //   · un nombre de los que el equipo necesita —actualizaciones, hora, mensajería—, que es
         //     palabra por palabra la regla 6 del brief y puede dejar el aparato sin ellas;
         //   · y el aparato con menos de un día mirado, que es la decisión 187 de él mismo.
-        if !body.confirmed && !ancho {
+        //
+        // The first one also for a rule for the whole home: a name the device needs is the same
+        // name whoever the rule is for, and the resolver never cuts it without the "yes". Until
+        // 1.0.2 a home rule on one skipped the question, was created unconfirmed, and was listed
+        // as cutting while it cut nothing (G4, 28 Sep 2026).
+        if !body.confirmed && match_kind != MatchKind::Category {
             let catalog = guardiana_lists::Catalog::bundled();
             let frase = if catalog.category(&pattern) == Category::Esperado {
                 Some(t.panel("regla_esperado_confirmar"))
-            } else if observation_complete(observed) {
+            } else if ancho || observation_complete(observed) {
                 None
             } else {
                 // Sin el número de horas: el responsable leyó la frase larga en pantalla y no la
@@ -2071,7 +2289,7 @@ pub(crate) async fn nueva_regla(
     _s: Session,
     Json(body): Json<NuevaRegla>,
 ) -> ApiResult<AltaRegla> {
-    Ok(Json(create_rule(t, &state, body, None, "usuario (panel)")?))
+    Ok(Json(create_rule(t, &state, body, None, CREADA_EN_PANEL)?))
 }
 
 pub(crate) async fn deshacer_regla(
@@ -2115,6 +2333,7 @@ pub(crate) async fn modo_bloqueo(
 pub(crate) async fn mi_reglas(
     State(state): State<Arc<AppState>>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    _p: PorDireccion,
 ) -> ApiResult<Reglas> {
     let id = identity_of(peer);
     Ok(Json(list_rules(&state, Some(&id))?))
@@ -2124,6 +2343,7 @@ pub(crate) async fn mi_nueva_regla(
     Lang(t): Lang,
     State(state): State<Arc<AppState>>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    _p: PorDireccion,
     Json(body): Json<NuevaRegla>,
 ) -> ApiResult<AltaRegla> {
     let id = identity_of(peer);
@@ -2132,13 +2352,14 @@ pub(crate) async fn mi_nueva_regla(
         &state,
         body,
         Some(&id),
-        "usuario (dispositivo)",
+        CREADA_EN_DISPOSITIVO,
     )?))
 }
 
 pub(crate) async fn mi_deshacer_regla(
     State(state): State<Arc<AppState>>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    _p: PorDireccion,
     Path(rule_id): Path<i64>,
 ) -> ApiResult<bool> {
     let me = identity_of(peer);
@@ -2170,7 +2391,7 @@ pub(crate) async fn verify(Lang(t): Lang, _s: Session) -> ApiResult<VerifyView> 
         .await
         .map_err(internal)?;
     Ok(Json(VerifyView {
-        texto: guardiana_verify::render_with(t, &informe),
+        texto: guardiana_verify::render_para_panel(t, &informe),
         informe,
     }))
 }
@@ -2184,6 +2405,12 @@ pub(crate) struct LicenciaView {
     /// Dónde está la marca que impide que borrar el extracto devuelva los siete días. Se enseña
     /// porque no se esconde: el programa no deja nada en el equipo que no cuente.
     marca_prueba: String,
+    /// Whether the trial mark is really there: written as best effort, read back before it is
+    /// named (review of 1 Oct 2026, entry 24; app.js claimed it without looking until 1.0.2).
+    marca_puesta: bool,
+    /// Where the copy of a paid licence lives (key, activation number, product), for the same
+    /// reason the trial mark is named.
+    marca_licencia: String,
     clave_dev: bool,
     host_activacion: &'static str,
     /// Hours observed so far (the trial needs 24).
@@ -2197,6 +2424,9 @@ fn licencia_error(t: &Texts, e: &guardiana_license::Error) -> String {
         guardiana_license::Error::KeyRejected(why) => {
             t.panel("licencia_err_clave").replace("{motivo}", why)
         }
+        // Refused by the licence crate before anything leaves the machine (review of 1 Oct
+        // 2026, entry 26); `licencia_clave` below already answers 400 for it.
+        guardiana_license::Error::EmptyKey => t.panel("licencia_err_clave_vacia").to_owned(),
         guardiana_license::Error::Network(why) => {
             t.panel("licencia_err_red").replace("{motivo}", why)
         }
@@ -2205,17 +2435,20 @@ fn licencia_error(t: &Texts, e: &guardiana_license::Error) -> String {
     }
 }
 
-fn licencia_texto(t: &Texts, s: &guardiana_license::Status) -> String {
-    use guardiana_core::time::rfc3339_utc;
+fn licencia_texto(t: &Texts, s: &guardiana_license::Status, zona: i64) -> String {
     use guardiana_license::{Comprobacion, Plan};
-    let day = |ms: i64| rfc3339_utc(ms)[..10].to_owned();
+    let day = |ms: i64| guardiana_core::time::local_day(ms, zona);
     match &s.plan {
         Plan::Prueba {
             termina,
             dias_restantes,
             ..
         } => t
-            .panel("licencia_prueba")
+            .panel(if *dias_restantes == 1 {
+                "licencia_prueba_uno"
+            } else {
+                "licencia_prueba"
+            })
             .replace("{d}", &dias_restantes.to_string())
             .replace("{fecha}", &day(*termina)),
         Plan::PruebaAgotada { termino } => t
@@ -2243,6 +2476,11 @@ fn licencia_texto(t: &Texts, s: &guardiana_license::Status) -> String {
                 (Some(p), _, _) if *p == guardiana_license::DE_POR_VIDA => {
                     text.push(' ');
                     text.push_str(t.panel("licencia_de_por_vida"));
+                    // The gateway turned the key down: from when it stops, said with its date.
+                    if let Some(c) = caduca_ms {
+                        text.push(' ');
+                        text.push_str(&t.panel("licencia_caduca").replace("{fecha}", &day(*c)));
+                    }
                 }
                 (Some(p), Some(next), Some(c)) => {
                     let key = match c {
@@ -2262,7 +2500,9 @@ fn licencia_texto(t: &Texts, s: &guardiana_license::Status) -> String {
                                 },
                             )
                             .replace("{fecha}", &day(*next))
-                            .replace("{limite}", &day(caduca_ms.unwrap_or(*next))),
+                            // The deadline exists only once a check has failed: before that it
+                            // was the date the check fell due, already past (licence item 2).
+                            .replace("{limite}", &caduca_ms.map(day).unwrap_or_default()),
                     );
                 }
                 _ => {
@@ -2277,13 +2517,14 @@ fn licencia_texto(t: &Texts, s: &guardiana_license::Status) -> String {
         Plan::PlusTerminado { termino, motivo } => t
             .panel(match motivo.as_str() {
                 "cancelada" => "licencia_plus_cancelada",
+                "rechazada" => "licencia_plus_rechazada",
                 _ => "licencia_plus_sin_comprobar",
             })
             .replace("{fecha}", &day(*termino)),
     }
 }
 
-fn licencia_view(t: &Texts, state: &AppState) -> Result<LicenciaView, Response> {
+fn licencia_view(t: &Texts, state: &AppState, zona: i64) -> Result<LicenciaView, Response> {
     let (estado, outbound) = with_ledger(state, |l| {
         let s = guardiana_license::status(l, &state.token, now_ms()).map_err(|e| {
             guardiana_core::Error::UnknownValue {
@@ -2294,8 +2535,10 @@ fn licencia_view(t: &Texts, state: &AppState) -> Result<LicenciaView, Response> 
         Ok((s, l.outbound()?))
     })?;
     Ok(LicenciaView {
-        texto: licencia_texto(t, &estado),
+        texto: licencia_texto(t, &estado, zona),
         marca_prueba: guardiana_license::ancla::donde(),
+        marca_puesta: guardiana_license::ancla::leer().is_some(),
+        marca_licencia: guardiana_license::ancla::donde_licencia(),
         clave_dev: guardiana_core::identity::public_key_is_dev(),
         host_activacion: guardiana_license::gateway_host(),
         horas_observadas: estado.observado_ms / guardiana_core::time::HOUR_MS,
@@ -2316,10 +2559,11 @@ fn licencia_view(t: &Texts, state: &AppState) -> Result<LicenciaView, Response> 
 
 pub(crate) async fn licencia(
     Lang(t): Lang,
+    Zona(zona): Zona,
     State(state): State<Arc<AppState>>,
     _s: Session,
 ) -> ApiResult<LicenciaView> {
-    Ok(Json(licencia_view(t, &state)?))
+    Ok(Json(licencia_view(t, &state, zona)?))
 }
 
 #[derive(Deserialize)]
@@ -2329,13 +2573,18 @@ pub(crate) struct ClaveBody {
 
 pub(crate) async fn licencia_clave(
     Lang(t): Lang,
+    Zona(zona): Zona,
     State(state): State<Arc<AppState>>,
     _s: Session,
     Json(body): Json<ClaveBody>,
 ) -> ApiResult<LicenciaView> {
     let key = body.clave.trim().to_owned();
     if key.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "clave vacía").into_response());
+        return Err((
+            StatusCode::BAD_REQUEST,
+            t.panel("licencia_err_clave_vacia").to_owned(),
+        )
+            .into_response());
     }
     let st = state.clone();
     // The network call blocks: keep it off the async workers.
@@ -2352,7 +2601,7 @@ pub(crate) async fn licencia_clave(
     if let Err(e) = result {
         return Err((StatusCode::CONFLICT, e).into_response());
     }
-    Ok(Json(licencia_view(t, &state)?))
+    Ok(Json(licencia_view(t, &state, zona)?))
 }
 
 #[cfg(test)]
@@ -2376,7 +2625,7 @@ mod tests {
     fn al_acabarse_la_prueba_la_pantalla_lo_dice_con_su_fecha() {
         let t = guardiana_core::i18n::es();
         let fin = 1_760_000_000_000;
-        let texto = licencia_texto(t, &estado(Plan::PruebaAgotada { termino: fin }, false));
+        let texto = licencia_texto(t, &estado(Plan::PruebaAgotada { termino: fin }, false), 0);
         let dia = guardiana_core::time::rfc3339_utc(fin)[..10].to_owned();
         assert!(texto.contains(&dia), "{texto}");
     }
@@ -2396,7 +2645,24 @@ mod tests {
                 },
                 true,
             ),
+            0,
         );
         assert!(texto.contains('3'), "{texto}");
+    }
+
+    /// The end of the trial is the person's own day: 21:55 in Bogotá on the 4th is the 5th in UTC
+    /// (review of 5 Oct 2026, licence medium).
+    #[test]
+    fn la_fecha_es_la_del_dia_de_quien_mira() {
+        let t = guardiana_core::i18n::es();
+        let fin = 1_791_168_900_000; // 2026-10-05T02:55Z
+        let bogota = licencia_texto(
+            t,
+            &estado(Plan::PruebaAgotada { termino: fin }, false),
+            -300,
+        );
+        assert!(bogota.contains("2026-10-04"), "{bogota}");
+        let madrid = licencia_texto(t, &estado(Plan::PruebaAgotada { termino: fin }, false), 120);
+        assert!(madrid.contains("2026-10-05"), "{madrid}");
     }
 }

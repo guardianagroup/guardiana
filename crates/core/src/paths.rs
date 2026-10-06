@@ -17,6 +17,14 @@ pub fn data_dir() -> PathBuf {
     if let Some(p) = std::env::var_os(DATA_ENV) {
         return PathBuf::from(p);
     }
+    system_data_dir()
+}
+
+/// The platform's own data directory, whatever `GUARDIANA_DATA` says: where the installed
+/// service keeps the machine's ledger. The licence anchor compares against it, so a daemon
+/// started with the variable pointing here is not taken for a test instance.
+#[must_use]
+pub fn system_data_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
         let base = std::env::var_os("ProgramData")
@@ -79,24 +87,23 @@ pub fn harden_data_dir(dir: &Path) -> std::io::Result<()> {
                 String::from_utf8_lossy(&out.stderr).into_owned(),
             ));
         }
-        let user = Command::new("powershell")
+        // The console user by SID, never by name. The name comes out of PowerShell in the
+        // console's OEM code page, so "José" or "João" arrived as "Jos\u{fffd}", failed the
+        // character check that stood here and was never granted: the panel did not open for anyone whose
+        // account has an accent (review of 5 Oct 2026, serious 9). A SID is ASCII everywhere.
+        let sid = Command::new("powershell")
             .args([
                 "-NoProfile",
                 "-NonInteractive",
                 "-Command",
-                "(Get-CimInstance Win32_ComputerSystem).UserName",
+                "$u = (Get-CimInstance Win32_ComputerSystem).UserName; if ($u) { (New-Object System.Security.Principal.NTAccount($u)).Translate([System.Security.Principal.SecurityIdentifier]).Value }",
             ])
             .output()?;
-        let user = String::from_utf8_lossy(&user.stdout).trim().to_owned();
-        // Nobody at the console yet (service start at boot): the grant happens
-        // on a later pass. Names with quotes or newlines are not passed on.
-        if !user.is_empty()
-            && user
-                .chars()
-                .all(|c| c.is_alphanumeric() || "\\ ._-".contains(c))
-        {
+        let sid = String::from_utf8_lossy(&sid.stdout).trim().to_owned();
+        // Nobody at the console yet (service start at boot): the grant happens on a later pass.
+        if sid_de_cuenta(&sid) {
             let _ = Command::new("icacls")
-                .args([dir_s.as_str(), "/grant", &format!("{user}:(OI)(CI)M")])
+                .args([dir_s.as_str(), "/grant", &format!("*{sid}:(OI)(CI)M")])
                 .output();
         }
         Ok(())
@@ -106,6 +113,18 @@ pub fn harden_data_dir(dir: &Path) -> std::io::Result<()> {
         let _ = dir;
         Ok(())
     }
+}
+
+/// Whether `s` is the SID of an ordinary account (`S-1-5-21-…`, local or domain) and nothing else:
+/// it goes on icacls' command line.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn sid_de_cuenta(s: &str) -> bool {
+    s.strip_prefix("S-1-5-21-").is_some_and(|resto| {
+        !resto.is_empty()
+            && resto
+                .split('-')
+                .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
+    })
 }
 
 /// Whether the extract is there but this process cannot read it.
@@ -169,6 +188,19 @@ pub fn leer_motivo_en(dir: &Path) -> Option<(i64, String)> {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod pruebas_motivo {
     use super::*;
+
+    #[test]
+    fn solo_pasa_el_sid_de_una_cuenta() {
+        assert!(sid_de_cuenta(
+            "S-1-5-21-3623811015-3361044348-30300820-1013"
+        ));
+        assert!(!sid_de_cuenta(""));
+        assert!(!sid_de_cuenta("S-1-5-18")); // SYSTEM: already there, and not a person
+        assert!(!sid_de_cuenta("S-1-5-21-"));
+        assert!(!sid_de_cuenta("S-1-5-21-1--2"));
+        assert!(!sid_de_cuenta("S-1-5-21-1 /grant Everyone:F"));
+        assert!(!sid_de_cuenta("Jos\u{fffd}"));
+    }
 
     #[test]
     fn el_motivo_se_escribe_y_se_lee() {

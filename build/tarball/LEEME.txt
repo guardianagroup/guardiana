@@ -21,10 +21,10 @@ permiso, y se puede deshacer en el mismo sitio.
 
 Después de instalar
 -------------------
-    guardiana panel          abre el panel en el navegador
-    guardiana verify         comprueba la instalación (huella, firma, puertos)
-    guardiana dns --status   dice a dónde apunta el DNS del sistema
-    guardiana hogar status   estado del Modo Hogar
+    sudo guardiana panel         da el enlace del panel para abrirlo en el navegador
+    guardiana verify             comprueba la instalación (huella, firma, puertos)
+    sudo guardiana dns --status  dice a dónde apunta el DNS del sistema
+    sudo guardiana hogar status  estado del Modo Hogar
 
 Desinstalar
 -----------

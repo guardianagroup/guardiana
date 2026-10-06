@@ -90,6 +90,35 @@ impl FromRequestParts<Arc<AppState>> for Session {
     }
 }
 
+/// Extractor for the pages a device reads about itself, by its address and with no key: a phone
+/// on the Wi-Fi is who its address says. When the device asking is this computer (the loopback,
+/// or its own LAN address in Home Mode), "this device" is the computer, and any program or other
+/// account on it could read its whole history and undo its rules without the key. From there the
+/// key is required, as everywhere else in the panel; the panel's own pages always send it
+/// (review of 5 Oct 2026, core medium).
+pub(crate) struct PorDireccion;
+
+impl FromRequestParts<Arc<AppState>> for PorDireccion {
+    type Rejection = Response;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &Arc<AppState>,
+    ) -> Result<Self, Self::Rejection> {
+        let es_este_equipo = parts
+            .extensions
+            .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+            .is_none_or(|c| crate::api::identity_of(c.0) == guardiana_core::SELF_DEVICE_ID);
+        if es_este_equipo {
+            Session::from_request_parts(parts, state)
+                .await
+                .map(|_| Self)
+        } else {
+            Ok(Self)
+        }
+    }
+}
+
 /// Extractor: the language of the request. The pages send `X-Guardiana-Lang` (the person's
 /// choice, kept in the browser); a first visit falls back to `Accept-Language`; Spanish otherwise.
 pub(crate) struct Lang(pub(crate) &'static guardiana_core::i18n::Texts);
@@ -105,6 +134,26 @@ impl<S: Send + Sync> FromRequestParts<S> for Lang {
             .and_then(|v| v.to_str().ok())
             .unwrap_or("es");
         Ok(Self(guardiana_core::i18n::by_code(code)))
+    }
+}
+
+/// Minutes east of UTC of the browser asking (`X-Guardiana-Tz`), so the dates the panel writes
+/// into its sentences are the person's own day. Without the header, this machine's offset.
+pub(crate) struct Zona(pub(crate) i64);
+
+impl<S: Send + Sync> FromRequestParts<S> for Zona {
+    type Rejection = std::convert::Infallible;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let dicho = parts
+            .headers
+            .get("x-guardiana-tz")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.trim().parse::<i64>().ok())
+            .filter(|m| m.abs() <= 14 * 60);
+        Ok(Self(
+            dicho.unwrap_or_else(guardiana_core::time::local_offset_min),
+        ))
     }
 }
 

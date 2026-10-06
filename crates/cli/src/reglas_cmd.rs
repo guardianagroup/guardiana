@@ -29,10 +29,7 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
         (Some("deshacer-hoy"), _) => {
             let now = now_ms();
             let n = ledger.undo_rules_since(now - DAY_MS, now)?;
-            println!(
-                "{}",
-                t.cli("reglas.deshechas_hoy").replace("{n}", &n.to_string())
-            );
+            println!("{}", t.cli_n("reglas.deshechas_hoy", n as i64));
             Ok(())
         }
         _ => {

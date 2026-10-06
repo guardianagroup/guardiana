@@ -4,7 +4,12 @@
 //! network connection. The ledger is one SQLite file per installation whose
 //! `events` rows form a hash chain: each row carries the hash of the previous
 //! row, so a deleted or altered row breaks the chain and
-//! [`Ledger::check`] reports exactly where.
+//! [`Ledger::check`] reports exactly where. The hash of the last row written
+//! is kept beside the rows, so removing the newest ones is reported too.
+//!
+//! What the household may read by name is decided here as well: a device
+//! whose owner did not share its detail is counted, never listed
+//! ([`Ledger::events`] against [`Ledger::own_events`]).
 //!
 //! Only DNS *queries* are ever stored: name, type, device, time, category,
 //! signals and verdict. Answers are never stored (brief §4).
@@ -26,7 +31,7 @@ mod stats;
 pub mod time;
 pub mod trampas;
 
-pub use changes::{Change, ChangeKind};
+pub use changes::{Change, ChangeKind, ChangeWho};
 pub use error::{Error, Result};
 pub use export::{write_csv, write_csv_for_spreadsheet, write_json};
 pub use gaps::{Gap, GAP_THRESHOLD_MS, KEY_HEARTBEAT};

@@ -21,10 +21,10 @@ your permission, and can be undone in the same place.
 
 After installing
 ----------------
-    guardiana panel          opens the panel in the browser
-    guardiana verify         checks the installation (hash, signature, ports)
-    guardiana dns --status   says where the system DNS points
-    guardiana hogar status   Home Mode status
+    sudo guardiana panel         gives the panel link to open in the browser
+    guardiana verify             checks the installation (hash, signature, ports)
+    sudo guardiana dns --status  says where the system DNS points
+    sudo guardiana hogar status  Home Mode status
 
 Uninstall
 ---------

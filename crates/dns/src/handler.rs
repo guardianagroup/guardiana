@@ -3,7 +3,7 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 
-use hickory_proto::op::{Header, HeaderCounts, MessageType, Metadata, OpCode, ResponseCode};
+use hickory_proto::op::{Edns, Header, HeaderCounts, MessageType, Metadata, OpCode, ResponseCode};
 use hickory_proto::rr::rdata::{A, AAAA};
 use hickory_proto::rr::{DNSClass, Name, RData, Record, RecordType};
 use hickory_resolver::net::runtime::Time;
@@ -11,6 +11,9 @@ use hickory_resolver::net::{DnsError, NetError, NoRecords};
 use hickory_resolver::TokioResolver;
 use hickory_server::server::{Request, RequestHandler, ResponseHandler, ResponseInfo};
 use hickory_server::zone_handler::MessageResponseBuilder;
+
+/// The largest UDP answer offered to a client that speaks EDNS (DNS flag day 2020).
+const MAX_UDP_PAYLOAD: u16 = 1232;
 
 use crate::{BlockMode, Decision, Outcome, Policy, Query, BUILTIN_TTL, CANARY_NAME, CHECKER_NAME};
 
@@ -20,6 +23,7 @@ pub(crate) struct Handler<P: Policy> {
     pub(crate) block_mode: BlockMode,
     pub(crate) canary_enabled: bool,
     pub(crate) checker_ip: Option<Ipv4Addr>,
+    pub(crate) self_check: bool,
 }
 
 /// Records to put in a response, owned so they outlive the builder.
@@ -62,7 +66,21 @@ impl<P: Policy> Handler<P> {
         let mut metadata = Metadata::response_from_request(&request.metadata);
         metadata.recursion_available = true;
         metadata.response_code = answer.code;
-        let builder = MessageResponseBuilder::from_message_request(request);
+        let mut builder = MessageResponseBuilder::from_message_request(request);
+        // EDNS back to a client that spoke it, with the size it can take (at most 1232, the
+        // size the DNS flag day of 2020 settled on). Without it every answer over UDP was cut at
+        // 512 bytes and marked truncated, and the client asked again over TCP: a second round
+        // trip for any name with a few addresses (review of 5 Oct 2026, core medium).
+        let edns = request.edns.as_ref().map(|pedido| {
+            let mut e = Edns::new();
+            e.set_max_payload(pedido.max_payload().clamp(512, MAX_UDP_PAYLOAD));
+            e.set_version(0);
+            e.set_dnssec_ok(false);
+            e
+        });
+        if let Some(e) = edns.as_ref() {
+            builder.edns(e);
+        }
         let msg = builder.build(
             metadata,
             answer.answers.iter(),
@@ -231,8 +249,19 @@ impl<P: Policy> RequestHandler for Handler<P> {
             )
         } else if crate::is_self_check(&query.name) {
             // Answered here and never handed to the policy, so it is never written down: it is
-            // Guardiana checking its own path, not something this machine wanted.
-            (Self::self_check_answer(&name, qtype), Outcome::Checker)
+            // Guardiana checking its own path, not something this machine wanted. A relay that
+            // is not watching says the name does not exist, so the check tells the truth.
+            if self.self_check {
+                (Self::self_check_answer(&name, qtype), Outcome::Checker)
+            } else {
+                (
+                    Answer {
+                        code: ResponseCode::NXDomain,
+                        ..Answer::default()
+                    },
+                    Outcome::Checker,
+                )
+            }
         } else if let (CHECKER_NAME, Some(ip)) = (query.name.as_str(), self.checker_ip) {
             (Self::checker_answer(&name, qtype, ip), Outcome::Checker)
         } else {

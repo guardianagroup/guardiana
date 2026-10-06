@@ -21,7 +21,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use serde::{Deserialize, Serialize};
 
-use super::{run_checked, Backup, Error, InterfaceDns, Method};
+use super::{run_checked, undo_each, Backup, Error, InterfaceDns, Method};
 
 const SNAPSHOT_SCRIPT: &str = r#"
 $ErrorActionPreference = 'Stop'
@@ -201,59 +201,95 @@ fn set_servers(index: &str, servers: &[IpAddr]) -> Result<(), Error> {
 /// Guardiana alone, in both families. If the interface has no IPv6 at all the cmdlet
 /// refuses the `::1`, and then IPv4 alone is the honest best: with no IPv6 there is no
 /// IPv6 resolver to go around it.
+///
+/// An interface that is gone (the trip's VPN, a dock left at the office) is skipped, not an
+/// error. Until 1.0.2 it stopped the loop: every interface after it in the copy, the Wi-Fi
+/// included, was never pointed at Guardiana again, and the watchdog failed on it every minute
+/// for ever (review of 5 Oct 2026, serious 10).
 pub(crate) fn apply(backup: &Backup, guardian: IpAddr) -> Result<(), Error> {
     let guardian6 = IpAddr::V6(Ipv6Addr::LOCALHOST);
     for i in &backup.interfaces {
-        if set_servers(&i.id, &[guardian, guardian6]).is_err() {
-            set_servers(&i.id, &[guardian])?;
+        if set_servers(&i.id, &[guardian, guardian6]).is_ok() {
+            continue;
+        }
+        match set_servers(&i.id, &[guardian]) {
+            Ok(()) => {}
+            Err(e) if interface_is_gone(&e.to_string()) => {}
+            Err(e) => return Err(e),
         }
     }
     Ok(())
 }
 
-pub(crate) fn restore(backup: &Backup) -> Result<(), Error> {
-    for i in &backup.interfaces {
-        match win_extra(i) {
-            Some(x) => {
-                // Back to automatic in both families, then the hand-typed ones, if there were
-                // any, exactly as they were. `-ResetServerAddresses` is what Settings calls
-                // "Automatic (DHCP)"; the `netsh` line is there because on some builds the reset
-                // leaves the IPv6 list alone, and a `::1` left behind would point at a program
-                // that is no longer there.
-                let mut manual = x.manual4.clone();
-                manual.extend(x.manual6.iter().copied());
-                let set = if manual.is_empty() {
-                    String::new()
-                } else {
-                    format!(
-                        "Set-DnsClientServerAddress -InterfaceIndex {} -ServerAddresses ({}); ",
-                        i.id,
-                        quoted(&manual)
-                    )
-                };
-                let fix6 = if x.manual6.is_empty() {
-                    format!(
-                        "$d6 = Get-DnsClientServerAddress -InterfaceIndex {id} -AddressFamily IPv6 -ErrorAction SilentlyContinue; if ($d6 -and (@($d6.ServerAddresses) -contains '::1')) {{ netsh interface ipv6 set dnsservers name={id} source=dhcp | Out-Null }}; ",
-                        id = i.id
-                    )
-                } else {
-                    String::new()
-                };
-                powershell(&format!(
-                    "$ErrorActionPreference='Stop'; Set-DnsClientServerAddress -InterfaceIndex {} -ResetServerAddresses; {set}{fix6}Clear-DnsClientCache",
-                    i.id
-                ))?;
-            }
-            None if i.automatic => {
-                powershell(&format!(
-                    "$ErrorActionPreference='Stop'; Set-DnsClientServerAddress -InterfaceIndex {} -ResetServerAddresses",
-                    i.id
-                ))?;
-            }
-            None => set_servers(&i.id, &i.servers)?,
+/// The PowerShell that puts one interface back, built apart so a test can read it.
+///
+/// It starts by asking whether the interface is still there: one that is gone (the trip's
+/// VPN, a USB adapter back in its drawer) has nothing to put back, and the cmdlets would fail
+/// on it in the language of the machine, which no text match can rely on.
+fn restore_script(i: &InterfaceDns) -> String {
+    let guard = format!(
+        "$ErrorActionPreference='Stop'; if (-not (Get-NetIPInterface -InterfaceIndex {} -ErrorAction SilentlyContinue)) {{ exit 0 }}; ",
+        i.id
+    );
+    match win_extra(i) {
+        Some(x) => {
+            // Back to automatic in both families, then the hand-typed ones, if there were
+            // any, exactly as they were. `-ResetServerAddresses` is what Settings calls
+            // "Automatic (DHCP)"; the `netsh` line is there because on some builds the reset
+            // leaves the IPv6 list alone, and a `::1` left behind would point at a program
+            // that is no longer there.
+            let mut manual = x.manual4.clone();
+            manual.extend(x.manual6.iter().copied());
+            let set = if manual.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "Set-DnsClientServerAddress -InterfaceIndex {} -ServerAddresses ({}); ",
+                    i.id,
+                    quoted(&manual)
+                )
+            };
+            let fix6 = if x.manual6.is_empty() {
+                format!(
+                    "$d6 = Get-DnsClientServerAddress -InterfaceIndex {id} -AddressFamily IPv6 -ErrorAction SilentlyContinue; if ($d6 -and (@($d6.ServerAddresses) -contains '::1')) {{ netsh interface ipv6 set dnsservers name={id} source=dhcp | Out-Null }}; ",
+                    id = i.id
+                )
+            } else {
+                String::new()
+            };
+            format!(
+                "{guard}Set-DnsClientServerAddress -InterfaceIndex {} -ResetServerAddresses; {set}{fix6}Clear-DnsClientCache",
+                i.id
+            )
         }
+        None if i.automatic => format!(
+            "{guard}Set-DnsClientServerAddress -InterfaceIndex {} -ResetServerAddresses",
+            i.id
+        ),
+        None => format!(
+            "{guard}Set-DnsClientServerAddress -InterfaceIndex {} -ServerAddresses ({}); Clear-DnsClientCache",
+            i.id,
+            quoted(&i.servers)
+        ),
     }
-    Ok(())
+}
+
+/// What PowerShell prints when the interface index matches nothing: the error identifier is
+/// the same in every language, unlike the sentence above it.
+pub(crate) fn interface_is_gone(stderr: &str) -> bool {
+    stderr.contains("CmdletizationQuery_NotFound")
+}
+
+/// Every interface, to the end: the first failure is reported once all were tried (review of
+/// 1 Oct 2026). An interface that is gone is nothing to put back, not a failure.
+pub(crate) fn restore(backup: &Backup) -> Result<(), Error> {
+    undo_each(&backup.interfaces, |i| {
+        match powershell(&restore_script(i)) {
+            Ok(_) => Ok(()),
+            Err(e) if interface_is_gone(&e.to_string()) => Ok(()),
+            Err(e) => Err(e),
+        }
+    })
 }
 
 /// Parse one line of [`PRIMARY_SCRIPT`]: whether Windows sees Guardiana and nothing else.
@@ -387,5 +423,41 @@ mod tests {
         assert!(!line_is_guarded("127.0.0.1|2800:e0::ac1d:f00d:3"));
         // A reserve that Edge upgrades to encrypted DNS is a way round it too.
         assert!(!line_is_guarded("127.0.0.1,1.1.1.1|::1"));
+    }
+
+    /// Each of the three shapes of undo asks first whether the interface is still there, and
+    /// then does what the backup says: automatic, hand-typed, or the pre-28-Sep shape.
+    #[test]
+    fn restore_script_checks_the_interface_exists_then_puts_it_back() {
+        let dhcp = r#"{"index":3,"alias":"Wi-Fi","dhcp":true,"servers":["192.168.1.1"],"guid":true,"static4":"","static6":""}"#;
+        let v = parse_snapshot(dhcp).unwrap_or_default();
+        let s = restore_script(&v[0]);
+        assert!(s.starts_with("$ErrorActionPreference='Stop'; if (-not (Get-NetIPInterface -InterfaceIndex 3 -ErrorAction SilentlyContinue)) { exit 0 }; "));
+        assert!(s.contains("-InterfaceIndex 3 -ResetServerAddresses"));
+        assert!(s.contains("netsh interface ipv6 set dnsservers name=3 source=dhcp"));
+        assert!(!s.contains("-ServerAddresses ("));
+
+        let typed = r#"{"index":7,"alias":"Ethernet","dhcp":true,"servers":["1.1.1.1","1.0.0.1"],"guid":true,"static4":"1.1.1.1,1.0.0.1","static6":""}"#;
+        let v = parse_snapshot(typed).unwrap_or_default();
+        let s = restore_script(&v[0]);
+        assert!(s.contains("Get-NetIPInterface -InterfaceIndex 7"));
+        assert!(s.contains("-InterfaceIndex 7 -ResetServerAddresses; Set-DnsClientServerAddress -InterfaceIndex 7 -ServerAddresses ('1.1.1.1','1.0.0.1')"));
+
+        let old = r#"{"index":12,"alias":"Ethernet","dhcp":false,"servers":["8.8.8.8"]}"#;
+        let v = parse_snapshot(old).unwrap_or_default();
+        let s = restore_script(&v[0]);
+        assert!(s.contains("Get-NetIPInterface -InterfaceIndex 12"));
+        assert!(s.ends_with("Set-DnsClientServerAddress -InterfaceIndex 12 -ServerAddresses ('8.8.8.8'); Clear-DnsClientCache"));
+    }
+
+    /// The error record PowerShell prints for an index that matches nothing; the identifier on
+    /// the last line is what is matched, because the first line comes out in the machine's
+    /// language.
+    #[test]
+    fn a_missing_interface_is_told_by_its_error_id() {
+        let gone = "Set-DnsClientServerAddress : No MSFT_DNSClientServerAddress objects found with property 'InterfaceIndex' equal to '99'.  Verify the value of the property and retry.\nAt line:1 char:1\n    + CategoryInfo          : ObjectNotFound: (99:UInt32) [Set-DnsClientServerAddress], CimJobException\n    + FullyQualifiedErrorId : CmdletizationQuery_NotFound_InterfaceIndex,Set-DnsClientServerAddress\n";
+        assert!(interface_is_gone(gone));
+        let denied = "Set-DnsClientServerAddress : Access is denied.\n    + CategoryInfo          : PermissionDenied: (MSFT_DNSClientServerAddress:root/StandardCimv2/...) [Set-DnsClientServerAddress], CimException\n    + FullyQualifiedErrorId : Windows System Error 5,Set-DnsClientServerAddress\n";
+        assert!(!interface_is_gone(denied));
     }
 }

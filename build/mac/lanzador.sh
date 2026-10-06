@@ -25,6 +25,8 @@ en)
   B_OK="OK"; B_NO_AHORA="Not now"; B_ACTUALIZAR="Update"; B_QUITAR_MAC="Remove from this Mac"
   B_ABRIR="Open the panel"; B_ARRANCAR="Start it again"; B_CANCELAR="Cancel"; B_QUITAR="Remove"; B_INSTALAR="Install"
   M_SIN_CLAVE="I can't find the panel key in $DATA. Remove GUARDIANA from this icon and install it again."
+  M_OTRA_CUENTA="GUARDIANA was installed from another account on this Mac, and its data (the ledger and the panel key) belong to that account. Shall I hand them to this one? The Mac will ask for an administrator password, and the other account will need to do the same to open the panel again."
+  B_DAR_ACCESO="Use it from this account"
   M_ACTUALIZO="This copy of GUARDIANA is newer than the one installed on this Mac. Shall I update it? The Mac will ask for your password; the DNS does not change and the ledger is kept."
   M_ACTUALIZADA="GUARDIANA was updated and is running again."
   M_ACTUALIZADA_SIN_PANEL="The new version was copied but the panel does not answer. Look at $DATA/guardiana.log."
@@ -46,6 +48,8 @@ pt)
   B_OK="Entendi"; B_NO_AHORA="Agora não"; B_ACTUALIZAR="Atualizar"; B_QUITAR_MAC="Remover deste Mac"
   B_ABRIR="Abrir o painel"; B_ARRANCAR="Iniciar de novo"; B_CANCELAR="Cancelar"; B_QUITAR="Remover"; B_INSTALAR="Instalar"
   M_SIN_CLAVE="Não encontro a chave do painel em $DATA. Remova a GUARDIANA por este ícone e instale de novo."
+  M_OTRA_CUENTA="A GUARDIANA foi instalada a partir de outra conta deste Mac, e os dados dela (o extrato e a chave do painel) pertencem a essa conta. Passo para esta? O Mac vai pedir uma senha de administrador, e a outra conta terá de fazer o mesmo para voltar a abrir o painel."
+  B_DAR_ACCESO="Usar a partir desta conta"
   M_ACTUALIZO="Esta cópia da GUARDIANA é mais nova que a instalada no Mac. Atualizo? O Mac vai pedir sua senha; o DNS não muda e o extrato é mantido."
   M_ACTUALIZADA="A GUARDIANA foi atualizada e já está funcionando de novo."
   M_ACTUALIZADA_SIN_PANEL="A versão nova foi copiada, mas o painel não responde. Veja $DATA/guardiana.log."
@@ -67,6 +71,8 @@ Se eu instalar, o Mac vai pedir sua senha. É instalado um guardião que escuta 
   B_OK="Entendido"; B_NO_AHORA="Ahora no"; B_ACTUALIZAR="Actualizar"; B_QUITAR_MAC="Quitar de este Mac"
   B_ABRIR="Abrir el panel"; B_ARRANCAR="Arrancar de nuevo"; B_CANCELAR="Cancelar"; B_QUITAR="Quitar"; B_INSTALAR="Instalar"
   M_SIN_CLAVE="No encuentro la clave del panel en $DATA. Quita GUARDIANA desde este icono y vuelve a instalarlo."
+  M_OTRA_CUENTA="GUARDIANA se instaló desde otra cuenta de este Mac, y sus datos (el extracto y la llave del panel) son de esa cuenta. ¿Se los paso a esta? El Mac pedirá una contraseña de administrador, y la otra cuenta tendrá que hacer lo mismo para volver a abrir el panel."
+  B_DAR_ACCESO="Usarlo desde esta cuenta"
   M_ACTUALIZO="Esta copia de GUARDIANA es más nueva que la instalada en el Mac. ¿La actualizo? El Mac pedirá tu contraseña; el DNS no cambia y el extracto se conserva."
   M_ACTUALIZADA="GUARDIANA se actualizó y ya está de nuevo en marcha."
   M_ACTUALIZADA_SIN_PANEL="Se copió la versión nueva pero el panel no responde. Mira $DATA/guardiana.log."
@@ -108,6 +114,15 @@ q() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 panel_up() { [ "$(curl -s -m 2 -o /dev/null -w '%{http_code}' http://127.0.0.1:7443/)" = "200" ]; }
 open_panel() {
   local token
+  # A second account on the Mac: the data folder belongs to the account that installed, and
+  # until 1.0.2 the only advice was to reinstall (review of 5 Oct 2026, Mac medium). One account
+  # at a time, like the console user on Windows: handing it over asks for an administrator.
+  if [ -e "$DATA/panel.token" ] && [ ! -r "$DATA/panel.token" ]; then
+    local dar
+    dar="$(ask "$M_OTRA_CUENTA" "$B_CANCELAR" "$B_DAR_ACCESO")"
+    [ "$dar" = "$B_DAR_ACCESO" ] || return 1
+    as_admin "chown -R $(q "$USER") $(q "$DATA")" >/dev/null
+  fi
   token="$(tr -d '[:space:]' < "$DATA/panel.token" 2>/dev/null)"
   if [ -z "$token" ]; then say "$M_SIN_CLAVE"; return 1; fi
   open "http://127.0.0.1:7443/?t=$token"
@@ -145,7 +160,12 @@ if [ -f "$PLIST" ]; then
     if [ -z "$installed" ] || newer "$(version_of "$RES/guardiana")" "$installed"; then
       up="$(ask "$M_ACTUALIZO" "$B_NO_AHORA" "$B_ACTUALIZAR")"
       if [ "$up" = "$B_ACTUALIZAR" ]; then
-        as_admin "cp $(q "$RES/guardiana") $BIN && chown root:wheel $BIN && chmod 755 $BIN && launchctl kickstart -k system/com.guardianagroup.guardiana" >/dev/null
+        # The installer, not a copy: it also rewrites the daemon's plist. Until 1.0.2 the update
+        # copied the program only, so a Mac that came from 1.0.0 or 1.0.1 kept `observe
+        # --upstream` frozen, no DNS given back on stop and the panel's key in the log; and `cp`
+        # over the running program can get it killed by macOS for an invalid signature (review
+        # of 5 Oct 2026, serious 6). instalar.sh removes the old file first and restarts it.
+        as_admin "$(q "$RES/instalar.sh") $(q "$RES/guardiana") $(q "$USER") $L" >/dev/null
         if wait_panel; then open_panel; say "$M_ACTUALIZADA"; else say "$M_ACTUALIZADA_SIN_PANEL"; fi
         exit 0
       fi

@@ -44,6 +44,50 @@ pub fn observed_hours(observed_ms: i64) -> i64 {
     (observed_ms / HOUR_MS).clamp(0, OBSERVATION_HOURS)
 }
 
+/// A name as people write it, turned into the name a DNS query carries: `https://www.tiktok.com/
+/// @x` is `www.tiktok.com`, `*.tiktok.com` is `tiktok.com` with everything below it (the `true`).
+/// `None` when what is left is not a host name a query could ask for (no dot, spaces, letters
+/// outside ASCII, a label longer than 63).
+///
+/// Until 1.0.2 a rule kept what was typed, and `https://…` or `*.tiktok.com` were rules that the
+/// panel listed as cutting and that never matched a single query; the declared scope of Guard
+/// mode dropped any line with a `/` without a word, so `https://github.com` there meant github
+/// cut (review of 28 Sep 2026, G4).
+#[must_use]
+pub fn normalizar_nombre(raw: &str) -> Option<(String, bool)> {
+    let mut s = raw.trim().to_ascii_lowercase();
+    if let Some((_, resto)) = s.split_once("://") {
+        s = resto.to_owned();
+    }
+    if let Some(fin) = s.find(['/', '?', '#']) {
+        s.truncate(fin);
+    }
+    if let Some((_, host)) = s.rsplit_once('@') {
+        s = host.to_owned();
+    }
+    if let Some((host, puerto)) = s.rsplit_once(':') {
+        if !puerto.is_empty() && puerto.bytes().all(|b| b.is_ascii_digit()) {
+            s = host.to_owned();
+        }
+    }
+    let mut comodin = false;
+    let mut s = s.as_str();
+    while let Some(r) = s.strip_prefix("*.").or_else(|| s.strip_prefix('.')) {
+        comodin = true;
+        s = r;
+    }
+    let s = s.trim_end_matches('.');
+    let valido = s.contains('.')
+        && s.len() <= 253
+        && s.split('.').all(|l| {
+            !l.is_empty()
+                && l.len() <= 63
+                && l.bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_')
+        });
+    valido.then(|| (s.to_owned(), comodin))
+}
+
 fn name_matches(kind: MatchKind, pattern: &str, name: &str, category: Category) -> bool {
     let pattern = pattern.trim().trim_end_matches('.').to_ascii_lowercase();
     match kind {
@@ -115,6 +159,33 @@ pub fn decide<'r>(rules: &'r [Rule], input: RuleInput<'_>, now: i64) -> Option<&
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_name_is_what_a_query_carries_whatever_was_typed() {
+        let n = |s: &str| normalizar_nombre(s);
+        assert_eq!(n("tiktok.com"), Some(("tiktok.com".into(), false)));
+        assert_eq!(n("  TikTok.COM. "), Some(("tiktok.com".into(), false)));
+        assert_eq!(
+            n("https://www.tiktok.com/@x?y=1#z"),
+            Some(("www.tiktok.com".into(), false))
+        );
+        assert_eq!(
+            n("http://user@api.example.com:8443/v1"),
+            Some(("api.example.com".into(), false))
+        );
+        assert_eq!(n("*.tiktok.com"), Some(("tiktok.com".into(), true)));
+        assert_eq!(n(".tiktok.com"), Some(("tiktok.com".into(), true)));
+        assert_eq!(
+            n("_dmarc.example.com"),
+            Some(("_dmarc.example.com".into(), false))
+        );
+        assert_eq!(n("localhost"), None);
+        assert_eq!(n("tik tok.com"), None);
+        assert_eq!(n("españa.es"), None);
+        assert_eq!(n("https://"), None);
+        assert_eq!(n("a..b"), None);
+        assert_eq!(n(&format!("{}.com", "a".repeat(64))), None);
+    }
 
     fn rule(
         id: i64,

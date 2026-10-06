@@ -167,11 +167,47 @@ mod imp {
 // Linux (systemd)
 // ---------------------------------------------------------------------------
 
+/// The systemd unit the .deb ships. `service install` (the .tar.gz path) writes the same one,
+/// built from this text, so there is a single copy to get right. There used to be two: the
+/// .deb's was fixed after measuring on Ubuntu 24.04 that `ProtectSystem=full` leaves /etc
+/// read-only, so the DNS could never be pointed at the guardian on systemd-resolved; the one
+/// in this file kept `full`, and every .tar.gz install got a guardian that could not be
+/// switched on (review of 1 Oct 2026, entry 8).
+#[cfg(any(target_os = "linux", test))]
+const DEB_UNIT: &str = include_str!("../../../build/deb/guardiana.service");
+
+/// The unit text for a program installed at `exe`: the .deb's unit with its `ExecStart` line
+/// pointing at `exe`, everything else (hardening, `Restart=always`, the comments that say why)
+/// untouched.
+#[cfg(any(target_os = "linux", test))]
+fn systemd_unit(exe: &Path) -> String {
+    // systemd reads `%` as a specifier and splits the command line on spaces.
+    let exe = exe.display().to_string().replace('%', "%%");
+    let exe = if exe.contains(char::is_whitespace) {
+        format!("\"{exe}\"")
+    } else {
+        exe
+    };
+    let mut unit: String = DEB_UNIT
+        .lines()
+        .map(|line| {
+            if line.starts_with("ExecStart=") {
+                format!("ExecStart={exe} service run")
+            } else {
+                line.to_owned()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    unit.push('\n');
+    unit
+}
+
 #[cfg(target_os = "linux")]
 mod imp {
     use std::path::Path;
 
-    use super::{Error, State, DESCRIPTION, SERVICE_NAME};
+    use super::{Error, State, SERVICE_NAME};
     use crate::sysdns::run_checked;
 
     const UNIT_PATH: &str = "/etc/systemd/system/guardiana.service";
@@ -188,18 +224,7 @@ mod imp {
     }
 
     pub(super) fn install(exe: &Path) -> Result<(), Error> {
-        let unit = format!(
-            "[Unit]\nDescription={DESCRIPTION}\nAfter=network-online.target\nWants=network-online.target\n\n\
-             [Service]\nType=simple\nExecStart={} service run\nRestart=on-failure\nRestartSec=5\n\
-             AmbientCapabilities=CAP_NET_BIND_SERVICE\nWorkingDirectory=/var/lib/guardiana\n\
-             NoNewPrivileges=yes\nProtectSystem=full\n\
-             ReadWritePaths=/var/lib/guardiana /etc/resolv.conf /run/systemd/resolve\n\
-             ProtectHome=yes\nPrivateTmp=yes\nProtectKernelTunables=yes\nProtectKernelModules=yes\n\
-             ProtectControlGroups=yes\nRestrictSUIDSGID=yes\nRestrictRealtime=yes\nLockPersonality=yes\n\
-             SystemCallArchitectures=native\n\n\
-             [Install]\nWantedBy=multi-user.target\n",
-            exe.display()
-        );
+        let unit = super::systemd_unit(exe);
         std::fs::create_dir_all("/var/lib/guardiana").map_err(|e| Error::System(e.to_string()))?;
         std::fs::write(UNIT_PATH, unit).map_err(|e| {
             if e.kind() == std::io::ErrorKind::PermissionDenied {
@@ -209,7 +234,13 @@ mod imp {
             }
         })?;
         systemctl(&["daemon-reload"])?;
-        systemctl(&["enable", "--now", SERVICE_NAME])?;
+        systemctl(&["enable", SERVICE_NAME])?;
+        // `enable --now` leaves a service that is already running alone, so an update over a
+        // running install kept the old program and the old unit's sandbox in memory until the
+        // next boot (the 1.0.1 .tar.gz unit is exactly what has to go). `restart` starts it
+        // when stopped and replaces it when running; the stop gives the DNS back and the start
+        // points the machine at the guardian again (review of 1 Oct 2026, entry 8).
+        systemctl(&["restart", SERVICE_NAME])?;
         Ok(())
     }
 
@@ -254,6 +285,44 @@ mod imp {
 // macOS (launchd)
 // ---------------------------------------------------------------------------
 
+/// The data folder of the Mac daemon, where its log goes.
+#[cfg(any(target_os = "macos", test))]
+const MAC_DATA: &str = "/Library/Application Support/Guardiana";
+
+/// The LaunchDaemon for a program installed at `exe`, the same one `build/mac/instalar.sh`
+/// writes: `service run`, which follows the network and gives the DNS back when it stops.
+///
+/// Until 1.0.2 `service install` wrote the plist of 1.0.0: `observe --upstream <the servers of
+/// the day>`, frozen for ever (a Mac installed at home and opened elsewhere forwarded every
+/// name to a router that was not there), with no DNS given back on stop and the panel's key
+/// written into the log (review of 5 Oct 2026, serious 6). One text now, checked against the
+/// installer by a test.
+#[cfg(any(target_os = "macos", test))]
+fn launchd_plist(exe: &Path) -> String {
+    let xml = |s: &str| {
+        s.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+    };
+    format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+         <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
+         <plist version=\"1.0\"><dict>\n\
+         <key>Label</key><string>{MAC_LABEL}</string>\n\
+         <key>ProgramArguments</key><array><string>{}</string><string>service</string><string>run</string></array>\n\
+         <key>RunAtLoad</key><true/>\n\
+         <key>KeepAlive</key><true/>\n\
+         <key>StandardOutPath</key><string>{MAC_DATA}/guardiana.log</string>\n\
+         <key>StandardErrorPath</key><string>{MAC_DATA}/guardiana.log</string>\n\
+         </dict></plist>\n",
+        xml(&exe.display().to_string())
+    )
+}
+
+/// The launchd label, the same the Mac installer uses.
+#[cfg(any(target_os = "macos", test))]
+const MAC_LABEL: &str = "com.guardianagroup.guardiana";
+
 #[cfg(target_os = "macos")]
 mod imp {
     use std::path::Path;
@@ -262,9 +331,9 @@ mod imp {
     use crate::sysdns::run_checked;
 
     /// The same label and path the Mac installer uses, so both agree on what is installed.
-    const LABEL: &str = "com.guardianagroup.guardiana";
+    const LABEL: &str = super::MAC_LABEL;
     const PLIST: &str = "/Library/LaunchDaemons/com.guardianagroup.guardiana.plist";
-    const DATA: &str = "/Library/Application Support/Guardiana";
+    const DATA: &str = super::MAC_DATA;
 
     fn launchctl(args: &[&str]) -> Result<String, Error> {
         run_checked("launchctl", args).map_err(|e| {
@@ -277,50 +346,12 @@ mod imp {
         })
     }
 
-    /// The resolvers the Mac uses today, which become the daemon's upstream. Without one,
-    /// pointing the Mac at a resolver with nothing behind it would leave it with no names.
-    fn upstreams() -> Vec<String> {
-        run_checked("scutil", &["--dns"])
-            .map(|t| {
-                let mut v: Vec<String> = crate::sysdns::parse_scutil_dns(&t)
-                    .into_iter()
-                    .filter(|ip| !ip.is_loopback() && ip.is_ipv4())
-                    .map(|ip| ip.to_string())
-                    .collect();
-                v.dedup();
-                v
-            })
-            .unwrap_or_default()
-    }
-
     pub(super) fn install(exe: &Path) -> Result<(), Error> {
-        let ups = upstreams();
-        if ups.is_empty() {
-            return Err(Error::System(
-                "no current DNS found (scutil --dns): nothing was changed".to_owned(),
-            ));
-        }
-        let args: String = ups
-            .iter()
-            .map(|u| format!("<string>--upstream</string><string>{u}</string>"))
-            .collect();
-        let plist = format!(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
-             <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
-             <plist version=\"1.0\"><dict>\n\
-             <key>Label</key><string>{LABEL}</string>\n\
-             <key>ProgramArguments</key><array><string>{}</string><string>observe</string>\
-             <string>--listen</string><string>127.0.0.1:53</string>{args}\
-             <string>--panel-listen</string><string>127.0.0.1:7443</string></array>\n\
-             <key>EnvironmentVariables</key><dict><key>GUARDIANA_DATA</key><string>{DATA}</string></dict>\n\
-             <key>RunAtLoad</key><true/>\n<key>KeepAlive</key><true/>\n\
-             <key>StandardOutPath</key><string>{DATA}/guardiana.log</string>\n\
-             <key>StandardErrorPath</key><string>{DATA}/guardiana.log</string>\n\
-             </dict></plist>\n",
-            exe.display()
-        );
+        // No check of today's DNS and no `--upstream`: the daemon does not touch the Mac's DNS
+        // (the panel does, with consent) and finds its upstreams by itself, following the
+        // network (`service run`).
         std::fs::create_dir_all(DATA).map_err(|e| Error::System(e.to_string()))?;
-        std::fs::write(PLIST, plist).map_err(|e| {
+        std::fs::write(PLIST, super::launchd_plist(exe)).map_err(|e| {
             if e.kind() == std::io::ErrorKind::PermissionDenied {
                 Error::Privileges
             } else {
@@ -422,4 +453,92 @@ pub fn stop() -> Result<(), Error> {
 /// Current state.
 pub fn state() -> Result<State, Error> {
     imp::state()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::{launchd_plist, systemd_unit, DEB_UNIT, DESCRIPTION};
+
+    /// The lines systemd reads: no comments, no blanks.
+    fn directives(unit: &str) -> Vec<&str> {
+        unit.lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .collect()
+    }
+
+    /// `service install` on a Mac and the Mac installer write the same daemon: `service run`,
+    /// no frozen upstream, no GUARDIANA_DATA (review of 5 Oct 2026, serious 6).
+    #[test]
+    fn the_mac_plist_runs_the_service_like_the_installer() {
+        let plist = launchd_plist(Path::new("/usr/local/guardiana/guardiana"));
+        let args = "<key>ProgramArguments</key><array><string>/usr/local/guardiana/guardiana</string><string>service</string><string>run</string></array>";
+        assert!(plist.contains(args), "{plist}");
+        assert!(!plist.contains("--upstream"));
+        assert!(!plist.contains("observe"));
+        assert!(!plist.contains("GUARDIANA_DATA"));
+        assert!(plist.contains("<key>KeepAlive</key><true/>"));
+        let instalador = include_str!("../../../build/mac/instalar.sh");
+        assert!(
+            instalador.contains(
+                "<key>ProgramArguments</key><array><string>$BIN_DIR/guardiana</string><string>service</string><string>run</string></array>"
+            ),
+            "build/mac/instalar.sh no longer writes `service run`"
+        );
+        assert!(!instalador.contains("<key>EnvironmentVariables</key>"));
+        // A path with characters XML reads as markup stays one string.
+        assert!(launchd_plist(Path::new("/opt/a&b/guardiana")).contains("/opt/a&amp;b/guardiana"));
+    }
+
+    #[test]
+    fn the_written_unit_is_the_deb_unit_with_the_path_changed() {
+        // Review of 1 Oct 2026, entry 8: the unit written by `service install` had
+        // `ProtectSystem=full` (so /etc was read-only and the DNS could never be pointed at the
+        // guardian with systemd-resolved) and `Restart=on-failure`, while the .deb's had been
+        // fixed long before. One text now, so they cannot drift again.
+        let tarball = systemd_unit(Path::new("/usr/local/bin/guardiana"));
+        let got = directives(&tarball);
+        assert!(got.contains(&"ExecStart=/usr/local/bin/guardiana service run"));
+        assert!(got.contains(&"ProtectSystem=yes"));
+        assert!(!got.contains(&"ProtectSystem=full"));
+        assert!(got.contains(&"Restart=always"));
+        // Each path with «-»: a machine without systemd-resolved has no /run/systemd/resolve,
+        // and without the dash systemd refuses to start the service at all (review of 5 Oct
+        // 2026: Debian, Arch, openSUSE, status=226/NAMESPACE).
+        assert!(got.contains(&"ReadWritePaths=-/var/lib/guardiana -/run/systemd/resolve"));
+        let rw = got
+            .iter()
+            .filter(|l| l.starts_with("ReadWritePaths="))
+            .flat_map(|l| l["ReadWritePaths=".len()..].split_whitespace())
+            .collect::<Vec<_>>();
+        assert!(
+            rw.iter().all(|p| p.starts_with('-')),
+            "every ReadWritePaths entry must be optional: {rw:?}"
+        );
+        assert!(
+            !got.iter().any(|l| l.contains("/etc/resolv.conf")),
+            "no directive may name /etc/resolv.conf: /etc is writable through ProtectSystem=yes"
+        );
+        assert!(got.contains(&format!("Description={DESCRIPTION}").as_str()));
+        // Every directive of the .deb unit but ExecStart is there, unchanged.
+        for line in directives(DEB_UNIT)
+            .iter()
+            .filter(|l| !l.starts_with("ExecStart="))
+        {
+            assert!(got.contains(line), "missing from the written unit: {line}");
+        }
+        assert_eq!(got.len(), directives(DEB_UNIT).len());
+        // And with the .deb's own path the two texts are identical, comments included.
+        assert_eq!(systemd_unit(Path::new("/usr/bin/guardiana")), DEB_UNIT);
+    }
+
+    #[test]
+    fn a_path_with_spaces_or_percent_is_safe_for_systemd() {
+        let unit = systemd_unit(Path::new("/opt/my tools/100%/guardiana"));
+        assert!(
+            directives(&unit).contains(&"ExecStart=\"/opt/my tools/100%%/guardiana\" service run")
+        );
+    }
 }

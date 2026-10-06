@@ -56,9 +56,10 @@ La regla: nunca "100 % seguro", nunca "invisible", nunca "protegido" sin objeto,
 ## Lo que no promete
 
 - **No protege "el teléfono".** Protege "en la Wi‑Fi de casa, por nombre de dominio".
-- **En Windows, mientras el servicio está parado, no mira.** Desde el 28 sep 2026 Guardiana es
-  el único DNS de Windows, por IPv4 y por IPv6: con el antiguo de secundario, Windows y Edge se
-  iban por él (Edge, además, cifrado hacia Cloudflare) y no se veía nada. Para que nadie se quede
+- **En Windows y en el Mac, mientras el servicio está parado, no mira.** Desde el 28 sep 2026
+  Guardiana es el único DNS de Windows, por IPv4 y por IPv6, y desde la 1.0.2 también del Mac:
+  con el antiguo de secundario, el sistema y los navegadores se iban por él (Edge y Chrome,
+  además, cifrado hacia Cloudflare o Google) y no se veía nada. Para que nadie se quede
   sin internet, cuando el servicio se para el equipo recupera su DNS de antes hasta que vuelve a
   arrancar; esas consultas no se anotan. `guardiana verify` hace una consulta de verdad y dice si
   llega a Guardiana.

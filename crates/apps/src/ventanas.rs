@@ -26,6 +26,10 @@ const PROVEEDOR: &str = "1c95126e-7eea-49a9-a3fe-a378b03ddb4d";
 /// existe `guardiana apps --escuchar`: enseña en vivo lo que llega, con su número de suceso.
 const EVENTO_CONSULTA: u16 = 3006;
 
+/// Cuánto vale lo que se sabe del programa detrás de un número de proceso antes de volver a
+/// preguntárselo a Windows.
+const VIGENCIA_RUTA_MS: i64 = 5_000;
+
 /// Nombre de la sesión de sucesos. Es fijo a propósito, para poder cerrarla si quedó abierta.
 const SESION: &str = "Guardiana-DNS-Client";
 /// La del diagnóstico, aparte, para que una cosa no pise la otra.
@@ -51,9 +55,12 @@ struct Oida {
 #[derive(Default)]
 struct Compartido {
     cola: VecDeque<Oida>,
-    /// Número de proceso → (nombre, ruta). Windows reutiliza los números, así que esto es una
-    /// ayuda para no abrir el mismo proceso mil veces, no una identidad: se limpia con la cola.
-    rutas: HashMap<u32, (String, String)>,
+    /// Número de proceso → (nombre, ruta, cuándo se miró). Windows reutiliza los números, así
+    /// que esto es una ayuda para no abrir el mismo proceso mil veces, no una identidad: cada
+    /// entrada vale unos segundos (`VIGENCIA_RUTA_MS`). Hasta la 1.0.2 valía hasta que la tabla
+    /// se llenaba, y un número reutilizado ponía el programa equivocado en el extracto para
+    /// siempre (revisión del 5 oct 2026, Windows medio).
+    rutas: HashMap<u32, (String, String, i64)>,
     /// Ruta → huella del archivo. Calcular un SHA-256 de 10 MB por consulta sería absurdo.
     huellas: HashMap<String, String>,
 }
@@ -150,11 +157,11 @@ fn anotar(datos: &Arc<Mutex<Compartido>>, registro: &EventRecord, esquemas: &Sch
     };
     limpiar(&mut d, ahora);
     let (nombre, ruta) = match d.rutas.get(&pid) {
-        Some(x) => x.clone(),
-        None => {
-            let x = programa_de(pid);
-            d.rutas.insert(pid, x.clone());
-            x
+        Some((n, r, visto)) if ahora - *visto < VIGENCIA_RUTA_MS => (n.clone(), r.clone()),
+        _ => {
+            let (n, r) = programa_de(pid);
+            d.rutas.insert(pid, (n.clone(), r.clone(), ahora));
+            (n, r)
         }
     };
     let sha256 = if ruta.is_empty() {

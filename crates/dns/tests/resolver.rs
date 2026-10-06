@@ -46,6 +46,17 @@ impl RequestHandler for Upstream {
                 300,
                 RData::A(A::from(Ipv4Addr::new(1, 2, 3, 4))),
             )]
+        } else if text == "muchas.test." && q.query_type() == RecordType::A {
+            // Forty addresses: about 650 bytes, more than the 512 of plain DNS over UDP.
+            (1..=40)
+                .map(|i| {
+                    Record::from_rdata(
+                        name.clone(),
+                        300,
+                        RData::A(A::from(Ipv4Addr::new(10, 0, 0, i))),
+                    )
+                })
+                .collect()
         } else {
             Vec::new()
         };
@@ -304,6 +315,63 @@ async fn self_check_names_answer_the_loopback_and_never_go_upstream() {
 }
 
 #[tokio::test]
+async fn a_relay_says_the_self_check_names_do_not_exist_and_forwards_the_rest() {
+    // The relay a stood-down program keeps on the LAN: it passes the household's queries on, but
+    // nobody is watching, so the "do my queries arrive at Guardiana?" check must say no.
+    let (up, hits, _upstream) = fake_upstream().await;
+    let g = guardiana(up, Recorder::default(), |c| c.self_check = false).await;
+    let name = format!("g1x2.{SELF_CHECK_SUFFIX}");
+    let msg = ask_udp(g.udp_addrs[0], &name, RecordType::A).await;
+    assert_eq!(msg.metadata.response_code, ResponseCode::NXDomain);
+    assert!(a_records(&msg).is_empty());
+    assert_eq!(hits.load(Ordering::SeqCst), 0, "never sent upstream");
+    let msg = ask_udp(g.udp_addrs[0], "a.test", RecordType::A).await;
+    assert_eq!(a_records(&msg), vec![Ipv4Addr::new(1, 2, 3, 4)]);
+    assert_eq!(hits.load(Ordering::SeqCst), 1);
+}
+
+/// A client that speaks EDNS gets a big answer whole over UDP, with EDNS back; one that does not
+/// gets it cut at 512 bytes and marked truncated, as the protocol says (review of 5 Oct 2026: every
+/// client got the second, and asked again over TCP).
+#[tokio::test]
+async fn edns_clients_get_big_answers_whole_over_udp() {
+    let (up, _hits, _upstream) = fake_upstream().await;
+    let g = guardiana(up, Recorder::default(), |_| {}).await;
+    let sock = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let mut msg = Message::new(4243, MessageType::Query, OpCode::Query);
+    msg.metadata.recursion_desired = true;
+    msg.add_query(DnsQuery::query(
+        Name::from_ascii("muchas.test").unwrap(),
+        RecordType::A,
+    ));
+    let mut edns = hickory_proto::op::Edns::new();
+    edns.set_max_payload(4096);
+    msg.set_edns(edns);
+    sock.send_to(&msg.to_vec().unwrap(), g.udp_addrs[0])
+        .await
+        .unwrap();
+    let mut buf = vec![0u8; 4096];
+    let (n, _) = tokio::time::timeout(Duration::from_secs(10), sock.recv_from(&mut buf))
+        .await
+        .unwrap()
+        .unwrap();
+    let r = Message::from_vec(&buf[..n]).unwrap();
+    assert!(!r.metadata.truncation, "answered whole");
+    assert_eq!(a_records(&r).len(), 40);
+    assert_eq!(
+        r.edns.as_ref().map(hickory_proto::op::Edns::max_payload),
+        Some(1232)
+    );
+
+    let plain = ask_udp(g.udp_addrs[0], "muchas.test", RecordType::A).await;
+    assert!(
+        plain.metadata.truncation,
+        "a client without EDNS gets 512 bytes, marked"
+    );
+    assert!(plain.edns.is_none());
+}
+
+#[tokio::test]
 async fn optional_listen_addresses_are_skipped_when_taken() {
     let (up, _hits, _upstream) = fake_upstream().await;
     let taken = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
@@ -372,4 +440,23 @@ async fn shutdown_stops_the_server() {
         .await
         .expect("server did not stop")
         .unwrap();
+}
+
+/// The question the engine asks before stepping aside and before coming back. It must not
+/// depend on the network the tests run on: a first version asked a TEST-NET address and
+/// "passed" at home, then failed in a café whose network answers DNS sent to any address.
+#[tokio::test]
+async fn the_probe_tells_a_silent_upstream_from_one_that_answers() {
+    // Nothing listens on port 1 of the loopback: silence, and quickly.
+    let dead: SocketAddr = "127.0.0.1:1".parse().unwrap();
+    let started = std::time::Instant::now();
+    assert!(!guardiana_dns::upstream_answers(&[dead], Duration::from_millis(300)).await);
+    assert!(started.elapsed() < Duration::from_secs(5));
+    assert!(!guardiana_dns::upstream_answers(&[], Duration::from_millis(300)).await);
+    // An upstream that answers "nothing under that name" is alive: any answer counts.
+    let (addr, hits, _server) = fake_upstream().await;
+    assert!(guardiana_dns::upstream_answers(&[addr], Duration::from_millis(800)).await);
+    assert!(hits.load(Ordering::SeqCst) >= 1);
+    // One silent and one alive is alive.
+    assert!(guardiana_dns::upstream_answers(&[dead, addr], Duration::from_millis(800)).await);
 }

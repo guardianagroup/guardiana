@@ -8,7 +8,7 @@ use std::net::{IpAddr, Ipv4Addr};
 
 use guardiana_core::time::{now_ms, rfc3339_utc};
 use guardiana_core::{i18n, identity, paths, Ledger};
-use guardiana_service::sysdns::{self, Backup, SETTING_BACKUP};
+use guardiana_service::sysdns::{self, Backup, SETTING_BACKUP, SETTING_BACKUP_APARCADA};
 
 use crate::args::Opts;
 
@@ -30,6 +30,17 @@ pub(crate) fn open_or_create(opts: &Opts) -> Result<Ledger, Box<dyn Error>> {
             Box::new(e) as Box<dyn Error>
         }
     })
+}
+
+/// Whether the trial or the subscription is over, so the program has stood aside and nothing
+/// answers on 127.0.0.1. Unknown counts as "not over", like the service does.
+pub(crate) fn apartado(ledger: &Ledger) -> bool {
+    let Ok(secret) =
+        guardiana_panel::load_or_create_token(&paths::data_dir().join(guardiana_panel::TOKEN_FILE))
+    else {
+        return false;
+    };
+    guardiana_license::status(ledger, &secret, now_ms()).is_ok_and(|s| !s.puede_funcionar)
 }
 
 fn stored_backup(ledger: &Ledger) -> Result<Option<Backup>, Box<dyn Error>> {
@@ -87,6 +98,13 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
             println!("{}", t.cli("dns.ya_aplicado"));
             return Ok(());
         }
+        // Stood aside, nothing answers on 127.0.0.1: pointing the machine there would leave it
+        // without names. The panel already refused (G6, 28 Sep 2026); the terminal, and with it
+        // the installer of a program reinstalled after the trial, did not until 1.0.2.
+        if apartado(&ledger) {
+            println!("{}", t.panel("caducado_dns"));
+            return Ok(());
+        }
         if !opts.has("yes") {
             println!("{}", t.cli("dns.consentimiento"));
             println!("{}", t.cli(sole_or_secondary_key()));
@@ -99,6 +117,7 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
                 println!("{}", t.cli("dns.no_soportado"));
                 return Ok(());
             }
+            Err(e) if e.falta_administrador() => return Err(t.cli("dns.sin_admin").into()),
             Err(e) => return Err(Box::new(e)),
         };
         println!(
@@ -111,8 +130,18 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
         ledger.set_setting(SETTING_BACKUP, &serde_json::to_string(&backup)?)?;
         let guardian = IpAddr::V4(Ipv4Addr::LOCALHOST);
         if let Err(e) = sysdns::apply(&backup, guardian) {
-            let _ = sysdns::restore(&backup);
-            ledger.set_setting(SETTING_BACKUP, "")?;
+            if e.falta_administrador() {
+                println!("{}", t.cli("dns.sin_admin"));
+            }
+            // A change that failed half-way is rolled back; the copy is cleared only when the
+            // rollback really happened. Until the review of 1 Oct 2026 it was cleared either
+            // way, and a rollback that failed on one interface left the machine half pointed at
+            // Guardiana with "nothing to undo" on the screen.
+            if sysdns::restore(&backup).is_ok() {
+                ledger.set_setting(SETTING_BACKUP, "")?;
+            } else {
+                println!("{}", t.cli("dns.deshacer_pendiente"));
+            }
             return Err(Box::new(e));
         }
         println!(
@@ -131,7 +160,12 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
         ledger.record_change(
             now_ms(),
             guardiana_core::ChangeKind::DnsOn,
-            "terminal",
+            // The Windows installer runs this command; the record says who asked.
+            if opts.has("instalador") {
+                guardiana_core::ChangeWho::Instalador
+            } else {
+                guardiana_core::ChangeWho::Terminal
+            },
             &backup
                 .original_servers()
                 .iter()
@@ -157,8 +191,18 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
     }
 
     if opts.has("restore") {
+        // Undoing by hand is also saying no to the copy parked when the trial ended: it is not
+        // applied again when the licence comes back.
+        let aparcada = ledger
+            .setting(SETTING_BACKUP_APARCADA)?
+            .is_some_and(|v| !v.is_empty());
         let Some(backup) = stored_backup(&ledger)? else {
-            println!("{}", t.cli("dns.no_hay_copia"));
+            if aparcada {
+                ledger.set_setting(SETTING_BACKUP_APARCADA, "")?;
+                println!("{}", t.cli("dns.aparcada_borrada"));
+            } else {
+                println!("{}", t.cli("dns.no_hay_copia"));
+            }
             return Ok(());
         };
         println!(
@@ -177,9 +221,24 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
         ledger.set_setting(SETTING_BACKUP, "")?;
         if let Err(e) = sysdns::restore(&backup) {
             ledger.set_setting(SETTING_BACKUP, &serde_json::to_string(&backup)?)?;
+            if e.falta_administrador() {
+                return Err(t.cli("dns.sin_admin").into());
+            }
             return Err(Box::new(e));
         }
-        ledger.record_change(now_ms(), guardiana_core::ChangeKind::DnsOff, "terminal", "")?;
+        if aparcada {
+            ledger.set_setting(SETTING_BACKUP_APARCADA, "")?;
+        }
+        ledger.record_change(
+            now_ms(),
+            guardiana_core::ChangeKind::DnsOff,
+            if opts.has("desinstalando") {
+                guardiana_core::ChangeWho::Desinstalador
+            } else {
+                guardiana_core::ChangeWho::Terminal
+            },
+            "",
+        )?;
         println!("{}", t.cli("dns.restaurado"));
         return Ok(());
     }

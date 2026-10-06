@@ -97,7 +97,8 @@ pub fn parse_scutil_dns(text: &str) -> Vec<IpAddr> {
             continue;
         }
         if in_first_block && t.starts_with("nameserver[") {
-            if let Some(ip) = t.split(':').nth(1).and_then(|s| parse_ip(s.trim())) {
+            // At the first colon only: an IPv6 address is full of them (serious 7, 5 Oct 2026).
+            if let Some(ip) = t.split_once(':').and_then(|(_, s)| parse_ip(s.trim())) {
                 if !is_loopback_stub(ip) && !out.contains(&ip) {
                     out.push(ip);
                 }
@@ -210,6 +211,15 @@ mod tests {
     }
 
     #[test]
+    fn scutil_keeps_ipv6_nameservers_whole() {
+        let text =
+            "resolver #1\n  nameserver[0] : 2800:e2:5c00::1\n  nameserver[1] : 192.168.1.1\n";
+        let v = parse_scutil_dns(text);
+        assert_eq!(v.len(), 2);
+        assert_eq!(v[0].to_string(), "2800:e2:5c00::1");
+    }
+
+    #[test]
     fn scutil_reads_first_resolver_block_only() {
         let text = "DNS configuration\n\nresolver #1\n  nameserver[0] : 192.168.1.1\n  nameserver[1] : 192.168.1.2\n  flags    : Request A records\n\nresolver #2\n  domain   : local\n  nameserver[0] : 10.0.0.1\n";
         let v = parse_scutil_dns(text);
@@ -229,15 +239,33 @@ mod tests {
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(target_os = "linux")]
+// Also compiled for the tests of any unix: the development machine is a Mac, and the parsers
+// of what resolvectl, nmcli and networkctl print are pure, so their tests can run here. The
+// functions that touch the system are never called outside Linux.
+#[cfg(any(target_os = "linux", all(test, unix)))]
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 mod linux;
-#[cfg(target_os = "macos")]
+// The parsers of what scutil, networksetup and ipconfig print are pure, and their tests run on
+// every machine: since the Mac was sold there is none to run them on (5 Oct 2026).
+#[cfg(any(target_os = "macos", test))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod macos;
-#[cfg(target_os = "windows")]
+// Same for Windows: the PowerShell it builds and the error ids it reads are strings, and the
+// tests about them run on the development Mac.
+#[cfg(any(target_os = "windows", test))]
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 mod windows;
 
 /// Settings key holding the JSON [`Backup`] while Guardiana's change is applied.
 pub const SETTING_BACKUP: &str = "dns_backup";
+
+/// Settings key holding the [`Backup`] of a change that was undone because the trial or the
+/// subscription ended: the system DNS is back as it was, and this copy says the person had chosen
+/// Guardiana, so it is applied again the moment the licence is back. Until 1.0.2 the copy was
+/// simply cleared, and a customer who paid got the watching back but not the DNS: nothing
+/// arrived (review of 5 Oct 2026, serious 4). Undoing by hand (`dns --restore`, the panel)
+/// clears it too: then the person has said no.
+pub const SETTING_BACKUP_APARCADA: &str = "dns_backup_aparcada";
 
 /// How the platform's DNS configuration is managed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -344,6 +372,34 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+impl Error {
+    /// Whether this failed for want of administrator rights, told by what does not change with
+    /// the system's language: the I/O error kind, PowerShell's error category and id (its message
+    /// comes out in Spanish or Portuguese), and the words `nmcli`, `resolvectl` and `networksetup`
+    /// use. Until 1.0.2 the person got the raw command and its stderr instead of "run it as
+    /// administrator" (review of 5 Oct 2026, Windows medium).
+    #[must_use]
+    pub fn falta_administrador(&self) -> bool {
+        match self {
+            Self::Io(e) => e.kind() == std::io::ErrorKind::PermissionDenied,
+            Self::Command(s) => [
+                "PermissionDenied",
+                "Windows System Error 5,",
+                "Access is denied",
+                "Permission denied",
+                "Operation not permitted",
+                "Not authorized",
+                "Insufficient privileges",
+                "requires root",
+                "must be root",
+            ]
+            .iter()
+            .any(|m| s.contains(m)),
+            _ => false,
+        }
+    }
+}
+
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Self {
         Self::Io(e)
@@ -374,6 +430,183 @@ pub fn run_checked(cmd: &str, args: &[&str]) -> Result<String, Error> {
         )));
     }
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// Undo on every interface, whatever happens to the others: the first error is kept and
+/// returned once all of them were tried.
+///
+/// Until the review of 1 Oct 2026 each platform's undo loop stopped at the first interface
+/// that failed -- a VPN or a USB adapter that no longer existed -- and left the rest pointing
+/// at a guardian that was stepping aside. Applying stays strict (a change that cannot be made
+/// whole is rolled back); undoing goes to the end, because every interface put back is one
+/// the person can use again.
+#[cfg_attr(
+    not(any(target_os = "linux", target_os = "windows", target_os = "macos")),
+    allow(dead_code)
+)]
+pub(crate) fn undo_each<F>(interfaces: &[InterfaceDns], mut undo: F) -> Result<(), Error>
+where
+    F: FnMut(&InterfaceDns) -> Result<(), Error>,
+{
+    let mut first: Option<Error> = None;
+    for i in interfaces {
+        if let Err(e) = undo(i) {
+            if first.is_none() {
+                first = Some(e);
+            }
+        }
+    }
+    first.map_or(Ok(()), Err)
+}
+
+/// Whether an address can be forwarded to: never the loopback (that is the guardian itself,
+/// or another resolver on this machine) and never an IPv6 link-local address, which needs the
+/// zone it was read with and has none once stored.
+#[must_use]
+pub fn usable_upstream(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => !v4.is_loopback(),
+        IpAddr::V6(v6) => !v6.is_loopback() && !v6.is_unicast_link_local(),
+    }
+}
+
+/// Whether `ip` belongs to this machine: the loopback, "any", or an address one of its
+/// interfaces holds (the system lets a socket be bound to it only then).
+///
+/// A resolver on this machine is never an upstream for Guardiana: it is Guardiana itself, or
+/// something Guardiana is supposed to stand in front of. The case that matters is Home Mode: the
+/// router hands every device the computer's own address as DNS, the computer takes it too from
+/// the same DHCP, and Guardiana forwarded every query of the house back to itself until each one
+/// timed out (review of 5 Oct 2026, critical 3).
+#[must_use]
+pub fn is_this_machine(ip: IpAddr) -> bool {
+    if ip.is_loopback() || ip.is_unspecified() {
+        return true;
+    }
+    std::net::UdpSocket::bind(SocketAddr::new(ip, 0)).is_ok()
+}
+
+/// `ips` without the addresses of this machine and without repeats, order kept. Two adapters
+/// often share the router as DNS; the list compared minute by minute has to be the same list
+/// the pass was built with, or the resolver is rebuilt every minute.
+#[must_use]
+pub fn away_from_self(ips: Vec<IpAddr>) -> Vec<IpAddr> {
+    let mut out: Vec<IpAddr> = Vec::new();
+    for ip in ips {
+        if !is_this_machine(ip) && !out.contains(&ip) {
+            out.push(ip);
+        }
+    }
+    out
+}
+
+/// The default gateway: the router, on a home network. Asked only when every resolver the
+/// machine knows of turned out to be the machine itself; most home routers answer DNS, and it
+/// is the network's own, not a public resolver nobody chose.
+#[must_use]
+pub fn default_gateway() -> Option<IpAddr> {
+    #[cfg(target_os = "linux")]
+    {
+        parse_proc_net_route(&std::fs::read_to_string("/proc/net/route").ok()?)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        parse_route_get(&run("route", &["-n", "get", "default"])?)
+    }
+    #[cfg(target_os = "windows")]
+    {
+        parse_next_hops(&run(
+            "powershell",
+            &[
+                "-NoProfile",
+                "-Command",
+                "Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Sort-Object RouteMetric | Select-Object -ExpandProperty NextHop",
+            ],
+        )?)
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+    {
+        None
+    }
+}
+
+fn a_gateway(ip: IpAddr) -> bool {
+    !ip.is_unspecified() && !ip.is_loopback() && !ip.is_multicast()
+}
+
+/// The gateway of the default route with the lowest metric, from `/proc/net/route` (Linux):
+/// addresses there are hexadecimal, in the machine's byte order (little-endian on every PC).
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn parse_proc_net_route(text: &str) -> Option<IpAddr> {
+    let mut best: Option<(u32, IpAddr)> = None;
+    for line in text.lines().skip(1) {
+        let f: Vec<&str> = line.split_whitespace().collect();
+        let [_, dest, gw, flags, _, _, metric, ..] = f.as_slice() else {
+            continue;
+        };
+        let up_with_gateway = u32::from_str_radix(flags, 16).is_ok_and(|v| v & 0x3 == 0x3);
+        if *dest != "00000000" || !up_with_gateway {
+            continue;
+        }
+        let Ok(raw) = u32::from_str_radix(gw, 16) else {
+            continue;
+        };
+        let ip = IpAddr::V4(std::net::Ipv4Addr::from(raw.swap_bytes()));
+        let metric = metric.parse::<u32>().unwrap_or(u32::MAX);
+        if a_gateway(ip) && best.is_none_or(|(m, _)| metric < m) {
+            best = Some((metric, ip));
+        }
+    }
+    best.map(|(_, ip)| ip)
+}
+
+/// The `gateway:` line of `route -n get default` (macOS).
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn parse_route_get(text: &str) -> Option<IpAddr> {
+    text.lines()
+        .filter_map(|l| l.trim().strip_prefix("gateway:"))
+        .filter_map(|v| parse_ip(v.trim()))
+        .find(|ip| a_gateway(*ip))
+}
+
+/// The first usable next hop, one per line, as PowerShell lists them (Windows).
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn parse_next_hops(text: &str) -> Option<IpAddr> {
+    text.lines()
+        .filter_map(|l| parse_ip(l.trim()))
+        .find(|ip| a_gateway(*ip))
+}
+
+/// `backup` plus the interfaces of `fresh` it does not know yet, when both were taken the same
+/// way and that way works interface by interface (Windows, Mac, NetworkManager). `None` when
+/// there is nothing new.
+///
+/// The copy taken when the DNS was pointed here listed the interfaces of that day. One that
+/// appeared later (a dock, the office Wi-Fi, a new network service on the Mac) was never
+/// pointed at Guardiana, and the watchdog, seeing it, re-applied the old copy every minute for
+/// nothing while the panel said "pointed at Guardiana" (review of 5 Oct 2026, serious 10). New
+/// ones are added to the copy first, so the undo puts them back too, and then applied.
+#[must_use]
+pub fn with_new_interfaces(backup: &Backup, fresh: &Backup) -> Option<Backup> {
+    let per_interface = matches!(
+        backup.method,
+        Method::WindowsDnsClient | Method::MacNetworkSetup | Method::NetworkManager
+    );
+    if !per_interface || fresh.method != backup.method {
+        return None;
+    }
+    let nuevas: Vec<InterfaceDns> = fresh
+        .interfaces
+        .iter()
+        .filter(|f| !backup.interfaces.iter().any(|b| b.id == f.id))
+        .cloned()
+        .collect();
+    if nuevas.is_empty() {
+        return None;
+    }
+    let mut out = backup.clone();
+    out.interfaces.extend(nuevas);
+    Some(out)
 }
 
 /// The list Guardiana installs: itself first, then the originals (never itself twice).
@@ -432,9 +665,12 @@ pub fn apply(backup: &Backup, guardian: IpAddr) -> Result<(), Error> {
 
 /// The resolvers Guardiana should forward to right now, given what the machine had before.
 ///
-/// On Windows, resolvers that came automatically follow the network the machine is on now
-/// (a laptop set up at home must not keep asking the home router at the office); resolvers
-/// typed by hand stay the person's choice. Elsewhere, the ones recorded in the backup.
+/// Resolvers that came automatically follow the network the machine is on now (a laptop set
+/// up at home must not keep asking the home router at the office); resolvers typed by hand
+/// stay the person's choice. Windows reads the DHCP servers from the registry, macOS the DHCP
+/// lease, and Linux (since the review of 1 Oct 2026) what NetworkManager, systemd-networkd or
+/// systemd-resolved say the link has. When no live source answers, the ones recorded in the
+/// backup.
 #[must_use]
 pub fn upstreams_for(backup: &Backup) -> Vec<IpAddr> {
     #[cfg(target_os = "windows")]
@@ -444,10 +680,29 @@ pub fn upstreams_for(backup: &Backup) -> Vec<IpAddr> {
             return v;
         }
     }
+    #[cfg(target_os = "macos")]
+    {
+        let v = macos::upstreams_for(backup);
+        if !v.is_empty() {
+            return v;
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let v = linux::upstreams_for(backup);
+        if !v.is_empty() {
+            return v;
+        }
+    }
+    // The same sieve as the live sources, so the two lists agree whenever they say the same
+    // thing. A copy taken by 1.0.1 may hold `fe80::1` (a link-local read with its zone and
+    // stored without it): kept here and dropped there, the heartbeat would see a different
+    // list each time the live source went quiet for a minute and rebuild the resolver back
+    // and forth (review of 1 Oct 2026, second round).
     backup
         .original_servers()
         .into_iter()
-        .filter(|ip| !is_loopback_stub(*ip))
+        .filter(|ip| usable_upstream(*ip))
         .collect()
 }
 
@@ -584,6 +839,145 @@ mod change_tests {
         assert_eq!(back, b);
         assert_eq!(b.original_servers().len(), 1);
     }
+
+    fn iface(id: &str) -> InterfaceDns {
+        InterfaceDns {
+            id: id.to_owned(),
+            name: id.to_owned(),
+            servers: Vec::new(),
+            automatic: true,
+            extra: None,
+        }
+    }
+
+    /// The undo of 1.0.1 stopped at the first interface that failed (review of 1 Oct 2026):
+    /// a VPN that was no longer there left the Wi-Fi pointing at a guardian that had gone.
+    #[test]
+    fn undo_tries_every_interface_and_reports_the_first_failure() {
+        let ifaces = vec![iface("wlan0"), iface("tun0"), iface("eth0"), iface("wg0")];
+        let mut tried: Vec<String> = Vec::new();
+        let r = undo_each(&ifaces, |i| {
+            tried.push(i.id.clone());
+            if i.id == "tun0" || i.id == "wg0" {
+                Err(Error::Command(format!("{} is gone", i.id)))
+            } else {
+                Ok(())
+            }
+        });
+        assert_eq!(tried, vec!["wlan0", "tun0", "eth0", "wg0"]);
+        match r {
+            Err(Error::Command(s)) => assert_eq!(s, "tun0 is gone"),
+            other => unreachable!("expected the first error, got {other:?}"),
+        }
+        assert!(undo_each(&ifaces, |_| Ok(())).is_ok());
+        assert!(undo_each(&[], |_| Err(Error::NothingToChange)).is_ok());
+    }
+
+    #[test]
+    fn this_machine_is_its_loopback_its_any_and_its_own_addresses_only() {
+        let ip = |s: &str| {
+            s.parse::<IpAddr>()
+                .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::LOCALHOST))
+        };
+        assert!(is_this_machine(ip("127.0.0.1")));
+        assert!(is_this_machine(ip("127.0.0.53")));
+        assert!(is_this_machine(ip("0.0.0.0")));
+        assert!(is_this_machine(ip("::1")));
+        // Documentation addresses: never assigned to a real interface.
+        assert!(!is_this_machine(ip("192.0.2.1")));
+        assert!(!is_this_machine(ip("2001:db8::1")));
+        assert_eq!(
+            away_from_self(vec![
+                ip("192.0.2.1"),
+                ip("127.0.0.1"),
+                ip("198.51.100.7"),
+                ip("192.0.2.1")
+            ]),
+            vec![ip("192.0.2.1"), ip("198.51.100.7")]
+        );
+    }
+
+    #[test]
+    fn the_gateway_is_read_from_each_system() {
+        // Linux: two default routes (Wi-Fi metric 600, cable 100) and a local network.
+        let proc_route =
+            "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n\
+wlan0\t00000000\t0101A8C0\t0003\t0\t0\t600\t00000000\t0\t0\t0\n\
+eth0\t00000000\tFE00000A\t0003\t0\t0\t100\t00000000\t0\t0\t0\n\
+eth0\t0000000A\t00000000\t0001\t0\t0\t100\t00FFFFFF\t0\t0\t0\n";
+        assert_eq!(
+            parse_proc_net_route(proc_route).map(|i| i.to_string()),
+            Some("10.0.0.254".to_owned())
+        );
+        assert_eq!(parse_proc_net_route("Iface\tDestination\n"), None);
+        let mac = "   route to: default\ndestination: default\n       mask: default\n    gateway: 192.168.1.1\n  interface: en0\n";
+        assert_eq!(
+            parse_route_get(mac).map(|i| i.to_string()),
+            Some("192.168.1.1".to_owned())
+        );
+        assert_eq!(
+            parse_next_hops("0.0.0.0\r\n192.168.0.1\r\n").map(|i| i.to_string()),
+            Some("192.168.0.1".to_owned())
+        );
+        assert_eq!(parse_next_hops(""), None);
+    }
+
+    #[test]
+    fn wanting_administrator_rights_is_told_in_any_language() {
+        let ps_es = Error::Command("powershell ...: Set-DnsClientServerAddress : Acceso denegado.\n    + CategoryInfo          : PermissionDenied: (MSFT_DNSClientServerAddress...) [Set-DnsClientServerAddress], CimException\n    + FullyQualifiedErrorId : Windows System Error 5,Set-DnsClientServerAddress".into());
+        assert!(ps_es.falta_administrador());
+        assert!(
+            Error::Io(std::io::Error::from(std::io::ErrorKind::PermissionDenied))
+                .falta_administrador()
+        );
+        assert!(Error::Command(
+            "nmcli connection modify x: Error: Not authorized to control networking.".into()
+        )
+        .falta_administrador());
+        assert!(
+            !Error::Command("nmcli: Error: unknown connection 'x'.".into()).falta_administrador()
+        );
+        assert!(!Error::NothingToChange.falta_administrador());
+    }
+
+    #[test]
+    fn a_new_interface_joins_the_copy_and_nothing_else_changes() {
+        let copia = |method: Method, ids: &[&str]| Backup {
+            taken_at: 1,
+            method,
+            interfaces: ids.iter().map(|i| iface(i)).collect(),
+            resolv_conf: None,
+            resolv_link: None,
+            made_dropin_dir: false,
+        };
+        let antes = copia(Method::WindowsDnsClient, &["12", "3"]);
+        let ahora = copia(Method::WindowsDnsClient, &["3", "21"]);
+        let junta = with_new_interfaces(&antes, &ahora).unwrap_or_else(|| antes.clone());
+        let ids: Vec<&str> = junta.interfaces.iter().map(|i| i.id.as_str()).collect();
+        // What was there stays (the undo still needs "12" even if it is gone), the new one is
+        // added, and the copy keeps its date.
+        assert_eq!(ids, vec!["12", "3", "21"]);
+        assert_eq!(junta.taken_at, 1);
+        assert!(with_new_interfaces(&antes, &copia(Method::WindowsDnsClient, &["3"])).is_none());
+        // A machine-wide method has nothing to add, and two methods are never mixed.
+        assert!(with_new_interfaces(
+            &copia(Method::ResolvConf, &["eth0"]),
+            &copia(Method::ResolvConf, &["wlan0"])
+        )
+        .is_none());
+        assert!(with_new_interfaces(&antes, &copia(Method::MacNetworkSetup, &["Wi-Fi"])).is_none());
+    }
+
+    #[test]
+    fn an_upstream_is_never_the_loopback_nor_a_link_local_v6() {
+        let ok = |s: &str| s.parse::<IpAddr>().is_ok_and(usable_upstream);
+        assert!(ok("192.168.1.1"));
+        assert!(ok("2001:4860:4860::8888"));
+        assert!(!ok("127.0.0.1"));
+        assert!(!ok("::1"));
+        // What `fe80::1%wlan0` becomes once the zone is stripped: unreachable as it stands.
+        assert!(!ok("fe80::1"));
+    }
 }
 
 /// Whether, on this machine, Guardiana ends up as the *only* resolver.
@@ -603,11 +997,11 @@ pub fn guardian_is_sole_resolver() -> bool {
     // a resolver it knows how to encrypt (1.1.1.1) and took every name to Cloudflare over HTTPS,
     // where Guardiana cannot see it. The reserve now lives inside Guardiana (it forwards there)
     // and the service gives the machine its old DNS back whenever it stops.
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
     {
         true
     }
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
     {
         false
     }
@@ -619,6 +1013,8 @@ pub fn guardian_is_sole_resolver() -> bool {
 pub fn sole_or_secondary_key() -> &'static str {
     if cfg!(target_os = "windows") {
         "dns.solo_guardiana_windows"
+    } else if cfg!(target_os = "macos") {
+        "dns.solo_guardiana_mac"
     } else if guardian_is_sole_resolver() {
         "dns.solo_guardiana"
     } else {

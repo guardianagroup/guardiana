@@ -15,7 +15,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 rust-version = "1.85"
 license = "GPL-3.0-or-later"
@@ -56,6 +56,10 @@ tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "macros",
 hickory-server = { version = "0.26", default-features = false }
 hickory-resolver = { version = "0.26", default-features = false, features = ["tokio"] }
 hickory-proto = { version = "0.26", default-features = false }
+# A larger receive buffer on the resolver's UDP sockets, so a burst of queries is not dropped by
+# the kernel before it is read (measured 5 Oct 2026: a cold burst of 500 lost 180 to
+# RcvbufErrors). Already in the tree via tokio, same version; no unsafe of our own for it.
+socket2 = "0.6"
 # Required to implement hickory-server's `RequestHandler` trait, which is declared with it.
 async-trait = "0.1"
 # Local HTTP panel on 127.0.0.1 (brief §2, §8): routing, JSON, query strings. No TLS, no extras.

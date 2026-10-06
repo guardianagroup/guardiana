@@ -15,6 +15,14 @@ pub const SETTING_HOME_MODE: &str = "home_mode";
 pub const SETTING_HOME_IP: &str = "home_ip";
 /// Settings key: Unix ms when Home Mode was last activated.
 pub const SETTING_HOME_SINCE: &str = "home_since";
+/// "1" when Home Mode was on the day the trial or the subscription ended. The program steps
+/// aside, but the router still sends the whole house here: until the licence is back it keeps
+/// passing their queries on without looking at them, and then Home Mode comes back on by itself
+/// (review of 5 Oct 2026, critical 2 and serious 4). Turning Home Mode off clears it.
+pub const SETTING_HOME_APARCADO: &str = "home_mode_aparcado";
+/// The network Home Mode was switched on in (`guardiana_devices::Red::texto`). On any other the
+/// LAN ports stay closed until the computer is back home.
+pub const SETTING_HOME_RED: &str = "home_red";
 /// Name of the Windows firewall rule (brief §7).
 pub const FIREWALL_RULE_NAME: &str = "Guardiana Modo Hogar";
 /// Panel port opened on the LAN.
@@ -111,13 +119,19 @@ impl std::fmt::Display for FirewallError {
 
 impl std::error::Error for FirewallError {}
 
-/// Allow DNS (53 UDP/TCP) and the panel port, inbound, private profile only.
+/// Allow DNS (53 UDP/TCP), the panel port and the check page, inbound, to Guardiana only, from
+/// the local subnet, on private networks only.
 pub fn firewall_allow() -> Result<(), FirewallError> {
     #[cfg(target_os = "windows")]
     {
         // Idempotent: turning Home Mode on twice must not leave the rules
         // twice (seen on the test Windows with eight rules of the same name).
         let _ = firewall_remove();
+        // For this program and the local network only. Until 1.0.2 the rules opened the ports to
+        // any program and any address of a private network: another program listening on port
+        // 80 got the door Guardiana asked for (review of 5 Oct 2026, Windows medium).
+        let exe = std::env::current_exe().map_err(|e| FirewallError::Command(e.to_string()))?;
+        let programa = format!("program={}", exe.display());
         let rules = [("UDP", "53"), ("TCP", "53"), ("TCP", "7443"), ("TCP", "80")];
         for (proto, port) in rules {
             run_checked(
@@ -131,6 +145,8 @@ pub fn firewall_allow() -> Result<(), FirewallError> {
                     "dir=in",
                     "action=allow",
                     "profile=private",
+                    programa.as_str(),
+                    "remoteip=localsubnet",
                     &format!("protocol={proto}"),
                     &format!("localport={port}"),
                 ],

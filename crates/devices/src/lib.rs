@@ -147,6 +147,56 @@ impl Resolver {
     }
 }
 
+/// The network a machine is on, told by its router: the gateway's address and, when the neighbour
+/// table knows it, the gateway's MAC. Home Mode remembers the one it was switched on in, and opens
+/// no port on any other (review of 5 Oct 2026: a laptop carried it to a café or a hotel, where the
+/// strangers on the Wi-Fi could use it as their DNS and their queries landed in the owner's
+/// extract).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Red {
+    /// The default gateway.
+    pub puerta: IpAddr,
+    /// Its MAC, lowercase with colons, when known.
+    pub mac: Option<String>,
+}
+
+impl Red {
+    /// The network behind this gateway, with its MAC if the neighbour table has it.
+    #[must_use]
+    pub fn de_puerta(puerta: IpAddr) -> Self {
+        Self {
+            puerta,
+            mac: Resolver::default().identify(puerta).mac,
+        }
+    }
+
+    /// As stored in the settings: `192.168.1.1|aa:bb:cc:dd:ee:ff` (the MAC may be empty).
+    #[must_use]
+    pub fn texto(&self) -> String {
+        format!("{}|{}", self.puerta, self.mac.as_deref().unwrap_or(""))
+    }
+
+    /// Read back from [`Self::texto`].
+    #[must_use]
+    pub fn de_texto(s: &str) -> Option<Self> {
+        let (ip, mac) = s.split_once('|').unwrap_or((s, ""));
+        Some(Self {
+            puerta: ip.trim().parse().ok()?,
+            mac: normalize_mac(mac.trim()),
+        })
+    }
+
+    /// The same network: the same router by its MAC when both are known, else the same gateway
+    /// address. A café's router at 192.168.1.1 is a different MAC from the one at home.
+    #[must_use]
+    pub fn misma(&self, otra: &Self) -> bool {
+        match (&self.mac, &otra.mac) {
+            (Some(a), Some(b)) => a == b,
+            _ => self.puerta == otra.puerta,
+        }
+    }
+}
+
 /// The IPv4 address of the interface that reaches the LAN/default route.
 /// Uses a connected UDP socket, which sends nothing. `None` when offline.
 #[must_use]
@@ -216,5 +266,27 @@ mod tests {
         assert!(!is_private_lan(
             "8.8.8.8".parse().unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST))
         ));
+    }
+}
+
+#[cfg(test)]
+mod red_tests {
+    use super::*;
+
+    #[test]
+    fn the_home_network_is_its_router() {
+        let casa = Red::de_texto("192.168.1.1|AA-BB-CC-DD-EE-01").unwrap_or_else(|| unreachable!());
+        assert_eq!(casa.mac.as_deref(), Some("aa:bb:cc:dd:ee:01"));
+        assert_eq!(Red::de_texto(&casa.texto()), Some(casa.clone()));
+        let cafe = Red::de_texto("192.168.1.1|aa:bb:cc:dd:ee:99").unwrap_or_else(|| unreachable!());
+        assert!(!casa.misma(&cafe), "same address, another router");
+        let sin_mac = Red::de_texto("192.168.1.1|").unwrap_or_else(|| unreachable!());
+        assert!(
+            casa.misma(&sin_mac) && sin_mac.misma(&casa),
+            "a MAC not learned yet is no reason to stop"
+        );
+        let hotel = Red::de_texto("10.0.0.1|").unwrap_or_else(|| unreachable!());
+        assert!(!casa.misma(&hotel));
+        assert!(Red::de_texto("no es una ip|").is_none());
     }
 }

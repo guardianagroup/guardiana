@@ -5,6 +5,14 @@
 //! kept in `settings` as the *anchor*, so the surviving rows still form a
 //! verifiable chain that starts at the anchor. Before anything is pruned the
 //! anchor is the *genesis*: the hash of the installer's public key.
+//!
+//! Chain head. The `row_hash` of the last row appended is kept in `settings`
+//! too, written in the same transaction as the row. Without it, removing the
+//! newest rows left a chain that verified perfectly: every surviving row still
+//! linked to the one before it, and nothing recorded where the chain was
+//! supposed to end (review of 1 Oct 2026, entry 17). The head is the one piece
+//! of state outside the rows; it needs no signature to catch a plain deletion,
+//! and it does not pretend to stop whoever rewrites the whole file.
 
 use std::path::Path;
 
@@ -17,6 +25,7 @@ use crate::model::{
     Action, Category, Device, Event, MatchKind, NewEvent, NewRule, Outbound, Purpose, Rule, Scope,
     Signal, Verdict,
 };
+use crate::SELF_DEVICE_ID;
 
 /// Settings key: hash of the public key this database was created for.
 pub(crate) const KEY_GENESIS: &str = "chain_genesis";
@@ -24,11 +33,53 @@ pub(crate) const KEY_GENESIS: &str = "chain_genesis";
 pub(crate) const KEY_ANCHOR: &str = "chain_anchor";
 /// Settings key: how many events were pruned so far (informational).
 pub(crate) const KEY_PRUNED: &str = "chain_pruned_events";
+/// Settings key: `row_hash` of the last event appended, as hex. The chain's recorded end.
+pub(crate) const KEY_HEAD: &str = "chain_head";
+/// Settings key: events appended since the genesis (or the last wipe), pruned ones included.
+/// With the head's hash it says how many rows are missing at the end. Ledgers written before
+/// 1.0.2 have neither key and gain both on their next append.
+pub(crate) const KEY_HEAD_COUNT: &str = "chain_head_count";
+/// Settings key: id of the first row appended after the head went missing in a file that kept
+/// one. Where `check()` says the chain broke when [`SCHEMA_HEAD_LOST`] is set.
+pub(crate) const KEY_HEAD_LOST_AT: &str = "chain_head_lost_at";
+
+/// `PRAGMA user_version` of a file that keeps a chain head (1.0.2 on). Ledgers written before
+/// have 0 and are the only ones where a missing head is normal. The mark lives in the file
+/// header, not in `settings`, so a `DELETE FROM settings` cannot make a 1.0.2 file pass for an
+/// old one (review of 5 Oct 2026, privacy item 6).
+pub(crate) const SCHEMA_HEAD: i64 = 1;
+/// `PRAGMA user_version` once a file that kept a head was found without it. The next append has
+/// to write somewhere, but the loss stays on record until the person wipes the ledger: without
+/// this mark the resolver's next query would quietly heal the deletion.
+pub(crate) const SCHEMA_HEAD_LOST: i64 = 2;
+
+/// SQL condition: the rows the household may read by name. This computer's own rows, and the
+/// rows of the devices whose owner turned "share my detail with the home panel" on. The first
+/// placeholder is bound to [`SELF_DEVICE_ID`].
+///
+/// The panel and the published privacy policy promise that the detail of a phone is only seen
+/// from that phone unless its owner shares it; until 1.0.1 the flag only painted a label and
+/// every listing returned the names anyway (review of 1 Oct 2026, entry 1). A device with no row
+/// in `devices` has not consented either, so it is not listed.
+const SHARED_WITH_HOME: &str =
+    "(device_id = ? OR device_id IN (SELECT id FROM devices WHERE share_detail_with_home != 0))";
 
 const SCHEMA: &str = "
 PRAGMA journal_mode = WAL;
+-- NORMAL, not the default FULL: with the write-ahead log the file is never left damaged by a
+-- crash or a power cut either way; FULL only adds a disk flush to every commit, and every query
+-- is a commit. Measured on 5 Oct 2026: 500 queries at once lost 40 % to the waiting. What a
+-- power cut can take with NORMAL is the last commits, events and chain head together, so the
+-- chain still verifies, and the gap shows as time not watched.
+PRAGMA synchronous = NORMAL;
 PRAGMA busy_timeout = 5000;
 PRAGMA foreign_keys = ON;
+-- Zero deleted content when it costs no extra writes. «Borrar todo» does not rely on this: it
+-- rebuilds the file with VACUUM and cuts the write-ahead log, which is what leaves no name behind
+-- (review of 1 Oct 2026, entry 16). FULL (ON) rewrote every freed page during the wipe, holding
+-- the write lock long enough on a big ledger for the resolver's next append to wait on it
+-- (review of 5 Oct 2026, privacy item 4). Per connection, hence set at every open.
+PRAGMA secure_delete = FAST;
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -128,6 +179,18 @@ pub enum ChainFault {
     },
     /// A column holds a value outside the model.
     Unreadable(String),
+    /// The chain ends before its recorded end: the newest rows were removed. Reported with the
+    /// id that would follow the last surviving row (review of 1 Oct 2026, entry 17).
+    Truncated {
+        /// Hash of the last row ever appended, which no surviving row carries.
+        expected_head: Hash,
+        /// How many rows are missing at the end, when the count was kept.
+        missing: Option<u64>,
+    },
+    /// The record of where the chain ends is gone from a file that kept one, so nobody can tell
+    /// whether the newest rows were removed. Reported at the first row written after the loss,
+    /// or after the last row when nothing was written since (review of 5 Oct 2026).
+    HeadMissing,
 }
 
 /// Result of `guardiana ledger --check`.
@@ -200,6 +263,10 @@ impl Ledger {
                 ledger.set_setting(KEY_GENESIS, &genesis.to_hex())?;
                 ledger.set_setting(KEY_ANCHOR, &genesis.to_hex())?;
                 ledger.set_setting(KEY_PRUNED, "0")?;
+                // A new ledger starts with its head at the anchor: nothing written, nothing missing.
+                ledger.set_setting(KEY_HEAD, &genesis.to_hex())?;
+                ledger.set_setting(KEY_HEAD_COUNT, "0")?;
+                set_schema(&ledger.conn, SCHEMA_HEAD)?;
             }
             Some(stored) if stored == genesis.to_hex() => {}
             Some(stored) => {
@@ -222,12 +289,7 @@ impl Ledger {
 
     /// Read a setting.
     pub fn setting(&self, key: &str) -> Result<Option<String>> {
-        Ok(self
-            .conn
-            .query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| {
-                r.get(0)
-            })
-            .optional()?)
+        setting_in(&self.conn, key)
     }
 
     /// Write a setting.
@@ -246,36 +308,47 @@ impl Ledger {
         Hash::from_hex(&hex)
     }
 
-    pub(crate) fn pruned_count(&self) -> Result<u64> {
-        Ok(self
-            .setting(KEY_PRUNED)?
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0))
-    }
-
     // ----- events ---------------------------------------------------------
 
-    /// Append one event, computing `prev_hash` and `row_hash` atomically.
+    /// Append one event, computing `prev_hash` and `row_hash` atomically, and move the chain
+    /// head to the new row in the same transaction.
     pub fn append(&mut self, new: NewEvent) -> Result<Event> {
         let tx = self
             .conn
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-        let prev: Option<Vec<u8>> = tx
+        let last: Option<Vec<u8>> = tx
             .query_row(
                 "SELECT row_hash FROM events ORDER BY id DESC LIMIT 1",
                 [],
                 |r| r.get(0),
             )
             .optional()?;
-        let prev_hash = match prev {
+        let anchor = Hash::from_hex(&setting_in(&tx, KEY_ANCHOR)?.unwrap_or_default())?;
+        // Where the table says the chain ends.
+        let tail = match last {
             Some(b) => Hash::from_bytes(&b)?,
-            None => {
-                let hex: String = tx.query_row(
-                    "SELECT value FROM settings WHERE key = ?1",
-                    [KEY_ANCHOR],
-                    |r| r.get(0),
-                )?;
-                Hash::from_hex(&hex)?
+            None => anchor,
+        };
+        // Where the last append said it ends.
+        let head = setting_in(&tx, KEY_HEAD)?
+            .map(|h| Hash::from_hex(&h))
+            .transpose()?;
+        let head_count: Option<u64> = setting_in(&tx, KEY_HEAD_COUNT)?.and_then(|c| c.parse().ok());
+        let schema = schema_in(&tx)?;
+        let (prev_hash, count) = match (head, head_count) {
+            (Some(h), Some(n)) if h == tail => (tail, n + 1),
+            // The recorded end is not in the table any more: the newest rows were removed
+            // since the last append. Chain the new row from the recorded end, not from what
+            // survived, so the gap stays visible to `check()` as a broken link instead of
+            // being healed by the next query the resolver writes (review of 1 Oct 2026,
+            // entry 17).
+            (Some(h), Some(n)) if !in_chain(&tx, &h, &anchor)? => (h, n + 1),
+            // No head yet (a ledger written before 1.0.2), or rows added after the head by a
+            // program that did not keep it (an older version): adopt the table's end and
+            // count what is there.
+            _ => {
+                let stored: i64 = tx.query_row("SELECT COUNT(*) FROM events", [], |r| r.get(0))?;
+                (tail, pruned_count_in(&tx)? + stored.unsigned_abs() + 1)
             }
         };
         let signals_json = serde_json::to_string(&new.signals)?;
@@ -322,6 +395,29 @@ impl Ledger {
             ],
         )?;
         let id = tx.last_insert_rowid();
+        tx.execute(
+            "INSERT INTO settings(key, value) VALUES (?1, ?2), (?3, ?4) \
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![
+                KEY_HEAD,
+                row_hash.to_hex(),
+                KEY_HEAD_COUNT,
+                count.to_string()
+            ],
+        )?;
+        if schema == 0 {
+            // A ledger from before 1.0.2 has just gained its head: from now on it keeps one.
+            set_schema(&tx, SCHEMA_HEAD)?;
+        } else if schema == SCHEMA_HEAD && head.is_none() {
+            // This file kept a head and someone removed it. Write the row (the resolver has to
+            // keep going) but leave the loss on record, at this row, until a wipe.
+            set_schema(&tx, SCHEMA_HEAD_LOST)?;
+            tx.execute(
+                "INSERT INTO settings(key, value) VALUES (?1, ?2) \
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![KEY_HEAD_LOST_AT, id.to_string()],
+            )?;
+        }
         tx.commit()?;
         Ok(Event {
             id,
@@ -350,13 +446,72 @@ impl Ledger {
             .unsigned_abs())
     }
 
-    /// List events matching `filter`, oldest first.
+    /// Number of stored events the household may read by name: the same rows [`Ledger::events`]
+    /// can return. `event_count()` minus this is what devices that do not share are keeping to
+    /// themselves; the panel says how many, never which (review of 5 Oct 2026, privacy item 3).
+    pub fn shared_event_count(&self) -> Result<u64> {
+        Ok(self
+            .conn
+            .query_row(
+                &format!("SELECT COUNT(*) FROM events WHERE {SHARED_WITH_HOME}"),
+                [SELF_DEVICE_ID],
+                |r| r.get::<_, i64>(0),
+            )?
+            .unsigned_abs())
+    }
+
+    /// Whether the household may read this device's rows by name: this computer always, any
+    /// other device only when its owner turned sharing on. A device the ledger has never seen
+    /// has not consented.
+    pub fn shares_detail(&self, device_id: &str) -> Result<bool> {
+        if device_id == SELF_DEVICE_ID {
+            return Ok(true);
+        }
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT share_detail_with_home FROM devices WHERE id = ?1",
+                [device_id],
+                |r| r.get::<_, i64>(0),
+            )
+            .optional()?
+            .is_some_and(|s| s != 0))
+    }
+
+    /// List events matching `filter`, oldest first, as the household reads them: this
+    /// computer's own rows and the rows of the devices whose owner turned "share my detail with
+    /// the home panel" on. A device that did not share is still counted (`device_totals`,
+    /// `week_summary`, `counters`) but is never listed by name here, whatever `filter.device_id`
+    /// asks for. The command line and the exports go through this same door: the privacy policy
+    /// makes no exception for them (review of 1 Oct 2026, entry 1).
     pub fn events(&self, filter: &EventFilter) -> Result<Vec<Event>> {
+        self.events_for(None, filter)
+    }
+
+    /// The rows of one device for that device itself, whatever its sharing flag: the page a
+    /// phone opens from its own screen, which the panel identifies by the caller's IP. Only that
+    /// device's rows come back; `filter.device_id` is ignored.
+    pub fn own_events(&self, device_id: &str, filter: &EventFilter) -> Result<Vec<Event>> {
+        self.events_for(Some(device_id), filter)
+    }
+
+    fn events_for(&self, own: Option<&str>, filter: &EventFilter) -> Result<Vec<Event>> {
         let mut sql = format!("SELECT {EVENT_COLUMNS} FROM events WHERE 1=1");
         let mut args: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
-        if let Some(d) = &filter.device_id {
-            sql.push_str(" AND device_id = ?");
-            args.push(Box::new(d.clone()));
+        match own {
+            Some(device) => {
+                sql.push_str(" AND device_id = ?");
+                args.push(Box::new(device.to_owned()));
+            }
+            None => {
+                sql.push_str(" AND ");
+                sql.push_str(SHARED_WITH_HOME);
+                args.push(Box::new(SELF_DEVICE_ID));
+                if let Some(d) = &filter.device_id {
+                    sql.push_str(" AND device_id = ?");
+                    args.push(Box::new(d.clone()));
+                }
+            }
         }
         if let Some(c) = filter.category {
             sql.push_str(" AND category = ?");
@@ -402,22 +557,35 @@ impl Ledger {
         Ok(events)
     }
 
-    /// Walk every surviving row from the anchor and verify both links.
+    /// Walk every surviving row from the anchor and verify both links, then check that the
+    /// chain ends where the last append said it would (the head).
     pub fn check(&self) -> Result<CheckReport> {
-        let genesis = self.setting(KEY_GENESIS)?.unwrap_or_default();
-        let anchor = self.anchor()?;
-        let pruned = self.pruned_count()?;
+        // One snapshot for the settings and the rows: a row appended between reading the head
+        // and walking the table would otherwise look like one that is missing.
+        let tx = self.conn.unchecked_transaction()?;
+        let genesis = setting_in(&tx, KEY_GENESIS)?.unwrap_or_default();
+        let anchor = Hash::from_hex(&setting_in(&tx, KEY_ANCHOR)?.unwrap_or_default())?;
+        let pruned = pruned_count_in(&tx)?;
+        let head = setting_in(&tx, KEY_HEAD)?
+            .map(|h| Hash::from_hex(&h))
+            .transpose()?;
+        let head_count: Option<u64> = setting_in(&tx, KEY_HEAD_COUNT)?.and_then(|c| c.parse().ok());
         let mut report = CheckReport {
             checked: 0,
             pruned,
             anchor_is_genesis: anchor.to_hex() == genesis,
             first_fault: None,
         };
-        let mut stmt = self.conn.prepare(&format!(
+        let mut stmt = tx.prepare(&format!(
             "SELECT {EVENT_COLUMNS} FROM events ORDER BY id ASC"
         ))?;
         let mut rows = stmt.query([])?;
         let mut expected = anchor;
+        // Whether the recorded end was met on the way: at the anchor (everything up to it was
+        // pruned, or nothing was ever written) or as a surviving row. Rows appended after the
+        // head by a program that does not keep it (an older version) are not a truncation.
+        let mut head_seen = head == Some(anchor);
+        let mut last_id = 0i64;
         while let Some(row) = rows.next()? {
             let id: i64 = row.get(0)?;
             let ev = match raw_from_row(row) {
@@ -449,12 +617,44 @@ impl Ledger {
                 return Ok(report);
             }
             expected = ev.row_hash;
+            if Some(ev.row_hash) == head {
+                head_seen = true;
+            }
+            last_id = id;
             report.checked += 1;
+        }
+        // A file that kept a head and lost it cannot say where it ended. Before the schema mark,
+        // deleting the head's row in `settings` made `check()` take a 1.0.2 file for a 1.0.1 one
+        // and pass it (review of 5 Oct 2026, privacy item 6).
+        let schema = schema_in(&tx)?;
+        if schema == SCHEMA_HEAD_LOST {
+            let at = setting_in(&tx, KEY_HEAD_LOST_AT)?
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(last_id + 1);
+            report.first_fault = Some((at, ChainFault::HeadMissing));
+            return Ok(report);
+        }
+        if schema >= SCHEMA_HEAD && head.is_none() {
+            report.first_fault = Some((last_id + 1, ChainFault::HeadMissing));
+            return Ok(report);
+        }
+        if let Some(expected_head) = head {
+            if !head_seen {
+                report.first_fault = Some((
+                    last_id + 1,
+                    ChainFault::Truncated {
+                        expected_head,
+                        missing: head_count
+                            .map(|n| n.saturating_sub(pruned + report.checked))
+                            .filter(|m| *m > 0),
+                    },
+                ));
+            }
         }
         Ok(report)
     }
 
-    /// Delete everything and reset the anchor to the genesis. Irreversible;
+    /// Delete everything and reset the anchor and the head to the genesis. Irreversible;
     /// callers must confirm with the user first (brief §3).
     pub fn wipe(&mut self) -> Result<()> {
         let genesis = self.setting(KEY_GENESIS)?.unwrap_or_default();
@@ -472,7 +672,37 @@ impl Ledger {
             "UPDATE settings SET value = '0' WHERE key = ?1",
             [KEY_PRUNED],
         )?;
+        tx.execute(
+            "INSERT INTO settings(key, value) VALUES (?1, ?2), (?3, '0') \
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![KEY_HEAD, genesis, KEY_HEAD_COUNT],
+        )?;
+        // A fresh start keeps a head and has lost nothing.
+        tx.execute("DELETE FROM settings WHERE key = ?1", [KEY_HEAD_LOST_AT])?;
+        // The rules are gone, and the resolver has to hear it: it reloads them only when this
+        // number moves. Until 1.0.2 it did not, and the names cut before «Borrar todo» went on
+        // being cut until the next restart (review of 5 Oct 2026, serious 13). Guard mode's
+        // declared scopes are rules of a device too, and the devices are gone: they go as well.
+        tx.execute(
+            "INSERT INTO settings(key, value) VALUES ('rules_version', '1') \
+             ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + 1",
+            [],
+        )?;
+        tx.execute(
+            "DELETE FROM settings WHERE key LIKE 'alcance:%' OR key LIKE 'alcance_modo:%'",
+            [],
+        )?;
+        set_schema(&tx, SCHEMA_HEAD)?;
         tx.commit()?;
+        // Gone from the tables is not gone from the file: a DELETE only marks pages free, and
+        // «Borrar todo» left every name readable with a plain text search of ledger.db (review of
+        // 1 Oct 2026, entry 16). The checkpoint folds the write-ahead log into the file and cuts
+        // the log to zero bytes; VACUUM rebuilds the file from what is left, which is nothing of
+        // the person's; the second checkpoint empties the log VACUUM itself wrote through. None
+        // of this can run inside the transaction above.
+        self.conn.execute_batch(
+            "PRAGMA wal_checkpoint(TRUNCATE); VACUUM; PRAGMA wal_checkpoint(TRUNCATE);",
+        )?;
         Ok(())
     }
 
@@ -747,6 +977,52 @@ impl Ledger {
     }
 }
 
+/// Read a setting through any connection or transaction.
+fn setting_in(conn: &Connection, key: &str) -> Result<Option<String>> {
+    Ok(conn
+        .query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| {
+            r.get(0)
+        })
+        .optional()?)
+}
+
+fn pruned_count_in(conn: &Connection) -> Result<u64> {
+    Ok(setting_in(conn, KEY_PRUNED)?
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0))
+}
+
+/// Whether `hash` is somewhere in the chain the table holds: the anchor, or the `row_hash` of a
+/// surviving row. Asked only when the head and the table disagree, so the scan over `row_hash`
+/// (no index) runs once per disagreement, never per query.
+fn in_chain(conn: &Connection, hash: &Hash, anchor: &Hash) -> Result<bool> {
+    if hash == anchor {
+        return Ok(true);
+    }
+    Ok(conn
+        .query_row(
+            "SELECT 1 FROM events WHERE row_hash = ?1 LIMIT 1",
+            [hash.0.as_slice()],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some())
+}
+
+/// The file's chain-head schema mark (`PRAGMA user_version`): 0 before 1.0.2,
+/// [`SCHEMA_HEAD`] when it keeps a head, [`SCHEMA_HEAD_LOST`] once the head went missing.
+fn schema_in(conn: &Connection) -> Result<i64> {
+    Ok(conn.query_row("PRAGMA user_version", [], |r| r.get(0))?)
+}
+
+/// Set the chain-head schema mark. It is written to the file header inside the caller's
+/// transaction, so it commits or rolls back with the rows.
+fn set_schema(conn: &Connection, v: i64) -> Result<()> {
+    // PRAGMA takes no bound parameters; `v` is one of the two constants above.
+    conn.execute_batch(&format!("PRAGMA user_version = {v}"))?;
+    Ok(())
+}
+
 /// A row read back with its stored text columns, before parsing into enums.
 struct RawEvent {
     ts: i64,
@@ -963,6 +1239,10 @@ mod tests {
         let mut phone = ev(2, "p.example");
         phone.device_id = "mac:aa".into();
         l.append(phone).unwrap();
+        // A phone is listed to the household only once its owner shares its detail.
+        l.upsert_device("mac:aa", None, Some("10.0.0.2"), 2)
+            .unwrap();
+        l.set_share_detail("mac:aa", true).unwrap();
 
         let all = l.events(&EventFilter::default()).unwrap();
         assert_eq!(all.len(), 2);
@@ -1084,15 +1364,517 @@ mod tests {
         assert!(o[0].initiated_by_user);
     }
 
+    /// Serious 13 of 5 Oct 2026: after «Borrar todo» the resolver kept cutting what the rules
+    /// said, because the number it watches to reload them did not move.
+    #[test]
+    fn wipe_tells_the_resolver_the_rules_and_scopes_are_gone() {
+        let mut l = Ledger::open_in_memory(genesis()).unwrap();
+        l.add_rule(NewRule {
+            scope: Scope::Home,
+            device_id: None,
+            match_kind: MatchKind::Suffix,
+            pattern: "ads.example".into(),
+            action: Action::Cortar,
+            created_at: 100,
+            created_by: "usuario".into(),
+            expires_at: None,
+            confirmed: false,
+        })
+        .unwrap();
+        l.set_setting("alcance:self", "github.com").unwrap();
+        l.set_setting("alcance_modo:self", "cortar").unwrap();
+        l.set_setting("home_mode", "1").unwrap();
+        let antes = l.rules_version().unwrap();
+        l.wipe().unwrap();
+        assert!(l.rules_version().unwrap() > antes);
+        assert!(l.rules().unwrap().is_empty());
+        assert_eq!(l.setting("alcance:self").unwrap(), None);
+        assert_eq!(l.setting("alcance_modo:self").unwrap(), None);
+        // What is not the person's history or their rules stays.
+        assert_eq!(l.setting("home_mode").unwrap().as_deref(), Some("1"));
+        // And on a ledger that never had a rule, the number starts.
+        let mut nuevo = Ledger::open_in_memory(genesis()).unwrap();
+        nuevo.wipe().unwrap();
+        assert_eq!(nuevo.rules_version().unwrap(), 1);
+    }
+
     #[test]
     fn wipe_resets_to_genesis() {
         let mut l = Ledger::open_in_memory(genesis()).unwrap();
         l.append(ev(1, "a.example")).unwrap();
         l.wipe().unwrap();
         assert_eq!(l.event_count().unwrap(), 0);
+        assert!(l.check().unwrap().is_ok(), "an empty ledger verifies");
         let a = l.append(ev(2, "b.example")).unwrap();
         assert_eq!(a.id, 1);
         assert_eq!(a.prev_hash, genesis());
         assert!(l.check().unwrap().is_ok());
+        assert_eq!(l.setting(KEY_HEAD_COUNT).unwrap().as_deref(), Some("1"));
+    }
+
+    fn temp_db(tag: &str) -> (std::path::PathBuf, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!("guardiana-core-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("ledger.db");
+        (dir, path)
+    }
+
+    fn file_holds(path: &Path, needle: &[u8]) -> bool {
+        match std::fs::read(path) {
+            Ok(bytes) => bytes.windows(needle.len()).any(|w| w == needle),
+            Err(_) => false,
+        }
+    }
+
+    /// «Borrar todo» promised a file with nothing of the person's in it and left every name
+    /// readable with a plain text search (review of 1 Oct 2026, entry 16).
+    #[test]
+    fn wipe_leaves_no_name_in_the_file_nor_in_the_log() {
+        let (dir, path) = temp_db("wipe");
+        let wal = dir.join("ledger.db-wal");
+        let name = b"clinica-ejemplo";
+        {
+            let mut l = Ledger::open(&path, genesis()).unwrap();
+            for i in 0..400 {
+                l.append(ev(i, "clinica-ejemplo.example")).unwrap();
+            }
+            l.upsert_device("mac:aa", Some("aa:bb"), Some("10.0.0.2"), 1)
+                .unwrap();
+            l.rename_device("mac:aa", "Movil de Ana").unwrap();
+            l.first_time("mac:aa", "clinica-ejemplo.example", 1)
+                .unwrap();
+            assert!(
+                file_holds(&path, name) || file_holds(&wal, name),
+                "before the wipe the name is on disk, or the test proves nothing"
+            );
+            l.wipe().unwrap();
+            assert_eq!(l.event_count().unwrap(), 0);
+            for f in [&path, &wal] {
+                assert!(!file_holds(f, name), "{} still holds the name", f.display());
+                assert!(
+                    !file_holds(f, b"Movil de Ana"),
+                    "{} still holds the device name",
+                    f.display()
+                );
+            }
+            // The ledger still works after being rebuilt.
+            l.append(ev(1, "otra.example")).unwrap();
+            assert!(l.check().unwrap().is_ok());
+        }
+        // Closing the connection writes nothing old back.
+        for f in [&path, &wal] {
+            assert!(
+                !file_holds(f, name),
+                "{} holds the name after close",
+                f.display()
+            );
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ----- the recorded end of the chain (review of 1 Oct 2026, entry 17) -------------------
+
+    fn delete_row(l: &Ledger, id: i64) {
+        l.conn
+            .execute("DELETE FROM events WHERE id = ?1", [id])
+            .unwrap();
+    }
+
+    #[test]
+    fn deleting_the_newest_rows_is_reported_as_truncation() {
+        let mut l = Ledger::open_in_memory(genesis()).unwrap();
+        l.append(ev(1, "a.example")).unwrap();
+        let b = l.append(ev(2, "b.example")).unwrap();
+        let c = l.append(ev(3, "c.example")).unwrap();
+        assert!(l.check().unwrap().is_ok());
+
+        delete_row(&l, c.id);
+        let r = l.check().unwrap();
+        assert_eq!(r.checked, 2, "the surviving rows still link");
+        let (id, fault) = r.first_fault.expect("the missing end must be reported");
+        assert_eq!(id, c.id, "reported at the first row that is missing");
+        assert_eq!(
+            fault,
+            ChainFault::Truncated {
+                expected_head: c.row_hash,
+                missing: Some(1)
+            }
+        );
+
+        delete_row(&l, b.id);
+        let r = l.check().unwrap();
+        let (id, fault) = r.first_fault.expect("still missing");
+        assert_eq!(id, b.id);
+        assert!(matches!(
+            fault,
+            ChainFault::Truncated {
+                missing: Some(2),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn deleting_every_row_is_reported_as_truncation() {
+        let mut l = Ledger::open_in_memory(genesis()).unwrap();
+        l.append(ev(1, "a.example")).unwrap();
+        l.append(ev(2, "b.example")).unwrap();
+        l.conn.execute("DELETE FROM events", []).unwrap();
+        let r = l.check().unwrap();
+        assert_eq!(r.checked, 0);
+        let (id, fault) = r.first_fault.expect("must fail");
+        assert_eq!(id, 1);
+        assert!(matches!(
+            fault,
+            ChainFault::Truncated {
+                missing: Some(2),
+                ..
+            }
+        ));
+    }
+
+    /// Pruning moves the anchor forward, never the head: a tail removed before the prune is
+    /// still missing after it.
+    #[test]
+    fn truncation_is_still_seen_after_pruning() {
+        use crate::retention::Retention;
+        use crate::time::DAY_MS;
+        let mut l = Ledger::open_in_memory(genesis()).unwrap();
+        l.append(ev(1, "a.example")).unwrap();
+        l.append(ev(2, "b.example")).unwrap();
+        let c = l.append(ev(3, "c.example")).unwrap();
+        delete_row(&l, c.id);
+        let pruned = l.prune(Retention::FREE, 2 * DAY_MS).unwrap();
+        assert_eq!(pruned.events_pruned, 2);
+        let r = l.check().unwrap();
+        assert_eq!(r.pruned, 2);
+        assert!(matches!(
+            r.first_fault,
+            Some((
+                1,
+                ChainFault::Truncated {
+                    missing: Some(1),
+                    ..
+                }
+            ))
+        ));
+        // And an intact ledger pruned to nothing verifies: the head is the anchor.
+        let mut l = Ledger::open_in_memory(genesis()).unwrap();
+        l.append(ev(1, "a.example")).unwrap();
+        l.prune(Retention::FREE, 2 * DAY_MS).unwrap();
+        assert_eq!(l.event_count().unwrap(), 0);
+        assert!(l.check().unwrap().is_ok());
+    }
+
+    /// Once the resolver writes again, the gap must not heal: the new row links to the recorded
+    /// end, so the missing rows show as a broken link for as long as the chain is kept.
+    #[test]
+    fn appending_after_a_truncation_keeps_the_gap_visible() {
+        let mut l = Ledger::open_in_memory(genesis()).unwrap();
+        l.append(ev(1, "a.example")).unwrap();
+        let b = l.append(ev(2, "b.example")).unwrap();
+        let c = l.append(ev(3, "c.example")).unwrap();
+        delete_row(&l, c.id);
+        let d = l.append(ev(4, "d.example")).unwrap();
+        assert_eq!(d.prev_hash, c.row_hash, "chained from the recorded end");
+        let r = l.check().unwrap();
+        assert_eq!(r.checked, 2);
+        assert_eq!(
+            r.first_fault,
+            Some((
+                d.id,
+                ChainFault::BrokenLink {
+                    found: c.row_hash,
+                    expected: b.row_hash
+                }
+            ))
+        );
+        assert_eq!(l.setting(KEY_HEAD_COUNT).unwrap().as_deref(), Some("4"));
+        // The head now sits on the new row: nothing else is missing.
+        let e = l.append(ev(5, "e.example")).unwrap();
+        assert_eq!(e.prev_hash, d.row_hash);
+    }
+
+    /// A ledger written before 1.0.2 has no head. It verifies as it always did, cannot tell a
+    /// missing tail yet, and gains the head on its next append.
+    #[test]
+    fn a_ledger_without_a_head_verifies_as_before_and_gains_one() {
+        let mut l = Ledger::open_in_memory(genesis()).unwrap();
+        l.append(ev(1, "a.example")).unwrap();
+        let b = l.append(ev(2, "b.example")).unwrap();
+        let c = l.append(ev(3, "c.example")).unwrap();
+        l.conn
+            .execute(
+                "DELETE FROM settings WHERE key IN (?1, ?2)",
+                [KEY_HEAD, KEY_HEAD_COUNT],
+            )
+            .unwrap();
+        // What 1.0.1 left behind: no head and no schema mark in the file header.
+        set_schema(&l.conn, 0).unwrap();
+        assert!(l.check().unwrap().is_ok());
+        delete_row(&l, c.id);
+        let r = l.check().unwrap();
+        assert!(
+            r.is_ok(),
+            "without a head there is nothing to compare: {r:?}"
+        );
+        assert_eq!(r.checked, 2);
+
+        let d = l.append(ev(4, "d.example")).unwrap();
+        assert_eq!(d.prev_hash, b.row_hash, "adopts the table's end");
+        assert_eq!(
+            l.setting(KEY_HEAD).unwrap(),
+            Some(d.row_hash.to_hex()),
+            "the head is written on the first append"
+        );
+        assert_eq!(
+            l.setting(KEY_HEAD_COUNT).unwrap().as_deref(),
+            Some("3"),
+            "two rows were there, one was added"
+        );
+        assert!(l.check().unwrap().is_ok());
+        assert_eq!(
+            schema_in(&l.conn).unwrap(),
+            SCHEMA_HEAD,
+            "and keeps one from now on"
+        );
+        delete_row(&l, d.id);
+        assert!(matches!(
+            l.check().unwrap().first_fault,
+            Some((
+                _,
+                ChainFault::Truncated {
+                    missing: Some(1),
+                    ..
+                }
+            ))
+        ));
+    }
+
+    /// Removing the head from a file that keeps one does not turn it into an old ledger: the
+    /// check says the end is unknown, and the resolver's next append does not heal it. A wipe
+    /// starts clean (review of 5 Oct 2026, privacy item 6).
+    #[test]
+    fn removing_the_head_from_a_new_ledger_is_a_fault_that_stays() {
+        let mut l = Ledger::open_in_memory(genesis()).unwrap();
+        assert_eq!(schema_in(&l.conn).unwrap(), SCHEMA_HEAD);
+        l.append(ev(1, "a.example")).unwrap();
+        let b = l.append(ev(2, "b.example")).unwrap();
+        let c = l.append(ev(3, "c.example")).unwrap();
+        delete_row(&l, c.id);
+        l.conn
+            .execute(
+                "DELETE FROM settings WHERE key IN (?1, ?2)",
+                [KEY_HEAD, KEY_HEAD_COUNT],
+            )
+            .unwrap();
+        assert_eq!(
+            l.check().unwrap().first_fault,
+            Some((b.id + 1, ChainFault::HeadMissing))
+        );
+        let d = l.append(ev(4, "d.example")).unwrap();
+        let e = l.append(ev(5, "e.example")).unwrap();
+        let r = l.check().unwrap();
+        assert_eq!(
+            r.first_fault,
+            Some((d.id, ChainFault::HeadMissing)),
+            "the loss stays at the first row written after it, two appends later"
+        );
+        assert_eq!(schema_in(&l.conn).unwrap(), SCHEMA_HEAD_LOST);
+        // Deleting the marker row does not clear it either: the mark is in the file header.
+        l.conn
+            .execute("DELETE FROM settings WHERE key = ?1", [KEY_HEAD_LOST_AT])
+            .unwrap();
+        assert_eq!(
+            l.check().unwrap().first_fault,
+            Some((e.id + 1, ChainFault::HeadMissing))
+        );
+        l.wipe().unwrap();
+        assert!(l.check().unwrap().is_ok());
+        assert_eq!(schema_in(&l.conn).unwrap(), SCHEMA_HEAD);
+        l.append(ev(6, "f.example")).unwrap();
+        assert!(l.check().unwrap().is_ok());
+    }
+
+    /// The schema mark is written in the same transaction as the row: a file opened, written and
+    /// reopened keeps it.
+    #[test]
+    fn the_schema_mark_survives_reopening_the_file() {
+        let dir = std::env::temp_dir().join(format!("guardiana-schema-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("ledger.db");
+        {
+            let mut l = Ledger::open(&path, genesis()).unwrap();
+            l.append(ev(1, "a.example")).unwrap();
+        }
+        let l = Ledger::open(&path, genesis()).unwrap();
+        assert_eq!(schema_in(&l.conn).unwrap(), SCHEMA_HEAD);
+        assert!(l.check().unwrap().is_ok());
+        drop(l);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Rows appended by a program that does not keep the head (an older version run on the
+    /// same file) are not a truncation: the head is behind, not ahead. The next append catches
+    /// the head up and recounts.
+    #[test]
+    fn rows_appended_by_an_older_program_are_not_a_truncation() {
+        let mut l = Ledger::open_in_memory(genesis()).unwrap();
+        l.append(ev(1, "a.example")).unwrap();
+        let b = l.append(ev(2, "b.example")).unwrap();
+        let c = l.append(ev(3, "c.example")).unwrap();
+        // Pretend the third row was written by 1.0.1: the head still points at the second.
+        l.set_setting(KEY_HEAD, &b.row_hash.to_hex()).unwrap();
+        l.set_setting(KEY_HEAD_COUNT, "2").unwrap();
+        assert!(l.check().unwrap().is_ok());
+        let d = l.append(ev(4, "d.example")).unwrap();
+        assert_eq!(d.prev_hash, c.row_hash, "links to what is really last");
+        assert_eq!(l.setting(KEY_HEAD_COUNT).unwrap().as_deref(), Some("4"));
+        assert!(l.check().unwrap().is_ok());
+    }
+
+    /// A head that is missing or unreadable in a file created by 1.0.2 is not invented: the
+    /// append treats it like an old ledger and writes a fresh one.
+    #[test]
+    fn an_unreadable_head_count_is_recounted() {
+        let mut l = Ledger::open_in_memory(genesis()).unwrap();
+        l.append(ev(1, "a.example")).unwrap();
+        l.set_setting(KEY_HEAD_COUNT, "not a number").unwrap();
+        l.append(ev(2, "b.example")).unwrap();
+        assert_eq!(l.setting(KEY_HEAD_COUNT).unwrap().as_deref(), Some("2"));
+        assert!(l.check().unwrap().is_ok());
+    }
+
+    // ----- who may read whose rows (review of 1 Oct 2026, entry 1) --------------------------
+
+    fn phone(ts: i64, device: &str, name: &str) -> NewEvent {
+        NewEvent::observed(ts, device, "10.0.0.2", name, "A")
+    }
+
+    /// The household panel sees this computer's rows and the rows of the devices that share;
+    /// a phone that did not share is counted, never listed. The phone itself sees everything.
+    #[test]
+    fn a_device_that_did_not_share_is_counted_but_not_listed_for_the_household() {
+        let mut l = Ledger::open_in_memory(genesis()).unwrap();
+        l.upsert_device("mac:callado", Some("aa:01"), Some("10.0.0.2"), 1)
+            .unwrap();
+        l.upsert_device("mac:abierto", Some("aa:02"), Some("10.0.0.3"), 1)
+            .unwrap();
+        l.set_share_detail("mac:abierto", true).unwrap();
+        l.append(ev(1, "equipo.example")).unwrap();
+        l.append(phone(2, "mac:callado", "clinica.example"))
+            .unwrap();
+        l.append(phone(3, "mac:callado", "citas.example")).unwrap();
+        l.append(phone(4, "mac:abierto", "tienda.example")).unwrap();
+        // Never registered as a device: nobody consented for it either.
+        l.append(phone(5, "mac:fantasma", "fantasma.example"))
+            .unwrap();
+
+        let names = |evs: Vec<Event>| -> Vec<String> { evs.into_iter().map(|e| e.qname).collect() };
+        assert_eq!(
+            names(l.events(&EventFilter::default()).unwrap()),
+            ["equipo.example", "tienda.example"]
+        );
+        // Asking for the silent phone by id gives nothing, with or without a limit.
+        for limit in [None, Some(10)] {
+            let f = EventFilter {
+                device_id: Some("mac:callado".into()),
+                limit,
+                ..Default::default()
+            };
+            assert!(l.events(&f).unwrap().is_empty(), "limit {limit:?}");
+        }
+        assert!(l
+            .events(&EventFilter {
+                device_id: Some("mac:fantasma".into()),
+                ..Default::default()
+            })
+            .unwrap()
+            .is_empty());
+        // Nor by the name it asked for.
+        assert!(l
+            .events(&EventFilter {
+                qname: Some("clinica.example".into()),
+                ..Default::default()
+            })
+            .unwrap()
+            .is_empty());
+
+        // The phone's own page sees its own rows in full, and only its own.
+        assert_eq!(
+            names(
+                l.own_events("mac:callado", &EventFilter::default())
+                    .unwrap()
+            ),
+            ["clinica.example", "citas.example"]
+        );
+        let other = EventFilter {
+            device_id: Some(SELF_DEVICE_ID.into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            names(l.own_events("mac:callado", &other).unwrap()),
+            ["clinica.example", "citas.example"],
+            "filter.device_id cannot widen an own-device query"
+        );
+
+        // Totals keep counting every device.
+        let totals = l.device_totals(None).unwrap();
+        let callado = totals
+            .iter()
+            .find(|t| t.device_id == "mac:callado")
+            .unwrap();
+        assert_eq!(callado.queries, 2);
+        assert_eq!(l.counters(0, 100).unwrap().services, 5);
+        // The household's count is what it can list; the rest is said as a number.
+        assert_eq!(l.event_count().unwrap(), 5);
+        assert_eq!(l.shared_event_count().unwrap(), 2);
+        assert!(l.shares_detail(SELF_DEVICE_ID).unwrap());
+        assert!(l.shares_detail("mac:abierto").unwrap());
+        assert!(!l.shares_detail("mac:callado").unwrap());
+        assert!(!l.shares_detail("mac:fantasma").unwrap());
+
+        // Sharing opens the door; closing it shuts it again.
+        l.set_share_detail("mac:callado", true).unwrap();
+        assert_eq!(l.events(&EventFilter::default()).unwrap().len(), 4);
+        assert_eq!(l.shared_event_count().unwrap(), 4);
+        l.set_share_detail("mac:callado", false).unwrap();
+        assert_eq!(l.events(&EventFilter::default()).unwrap().len(), 2);
+    }
+
+    /// The weekly report's new destinations carry a name and a device: the same rule applies.
+    #[test]
+    fn new_destinations_skip_a_device_that_did_not_share() {
+        use crate::time::DAY_MS;
+        let mut l = Ledger::open_in_memory(genesis()).unwrap();
+        let now = 30 * DAY_MS;
+        l.upsert_device("mac:callado", Some("aa:01"), Some("10.0.0.2"), now - DAY_MS)
+            .unwrap();
+        l.first_time("mac:callado", "clinica.example", now - DAY_MS)
+            .unwrap();
+        l.append(phone(now - DAY_MS, "mac:callado", "clinica.example"))
+            .unwrap();
+        l.first_time(SELF_DEVICE_ID, "nuevo.example", now - DAY_MS)
+            .unwrap();
+        l.append(ev(now - DAY_MS, "nuevo.example")).unwrap();
+
+        let shown: Vec<String> = l
+            .new_destinations(now, 10)
+            .unwrap()
+            .into_iter()
+            .map(|n| n.qname)
+            .collect();
+        assert_eq!(shown, ["nuevo.example"]);
+        // The week's figures still count the phone.
+        let week = l.week_summary(now).unwrap();
+        assert!(week
+            .devices
+            .iter()
+            .any(|d| d.device_id == "mac:callado" && d.queries == 1));
+
+        l.set_share_detail("mac:callado", true).unwrap();
+        assert_eq!(l.new_destinations(now, 10).unwrap().len(), 2);
     }
 }

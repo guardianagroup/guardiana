@@ -464,13 +464,18 @@ mod textos {
             // longer name, or `createElement('div')` would look like a text of ours. A key that
             // ends in `_` is the start of one built at run time (`t('cambio_' + x)`) and is left
             // to whoever builds it.
+            // `tn('clave', n)` too, the counting form.
             let bytes = script.as_bytes();
-            for (i, _) in script.match_indices("t('") {
+            let llamadas = script
+                .match_indices("t('")
+                .map(|(i, _)| (i, 3))
+                .chain(script.match_indices("tn('").map(|(i, _)| (i, 4)));
+            for (i, largo) in llamadas {
                 let before = if i == 0 { b' ' } else { bytes[i - 1] };
                 if before.is_ascii_alphanumeric() || before == b'_' || before == b'.' {
                     continue;
                 }
-                let rest = &script[i + 3..];
+                let rest = &script[i + largo..];
                 if let Some(k) = rest.split('\'').next() {
                     if !k.is_empty()
                         && !k.ends_with('_')
@@ -496,6 +501,29 @@ mod textos {
             let panel = v["panel"].as_object().unwrap();
             let missing: Vec<&String> = asked.iter().filter(|k| !panel.contains_key(*k)).collect();
             assert!(missing.is_empty(), "{name}: faltan en «panel» {missing:?}");
+        }
+    }
+
+    /// The list of changes builds its key at run time (`t('quien_' + c.quien)`), which the test
+    /// above cannot read. Every value the program can write as "who" must have its text: in
+    /// 1.0.1 "licencia" had none and the panel printed `quien_licencia` when a trial ended.
+    #[test]
+    fn every_who_of_a_change_has_its_text() {
+        for (name, json) in [
+            ("es", guardiana_core::i18n::ES_JSON),
+            ("en", guardiana_core::i18n::EN_JSON),
+            ("pt", guardiana_core::i18n::PT_JSON),
+        ] {
+            let v: serde_json::Value = serde_json::from_str(json).unwrap();
+            let panel = v["panel"].as_object().unwrap();
+            for who in guardiana_core::ChangeWho::ALL {
+                let key = format!("quien_{}", who.as_str());
+                assert!(panel.contains_key(&key), "{name}: falta «{key}»");
+            }
+            for kind in ["hogar_on", "hogar_off", "dns_on", "dns_off"] {
+                let key = format!("cambio_{kind}");
+                assert!(panel.contains_key(&key), "{name}: falta «{key}»");
+            }
         }
     }
 }

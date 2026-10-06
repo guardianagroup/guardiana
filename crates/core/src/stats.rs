@@ -16,17 +16,17 @@ pub struct Counters {
     pub until: i64,
     /// Distinct names queried.
     pub services: i64,
-    /// Queries categorised as `rastreador`.
+    /// Distinct names categorised as `rastreador`.
     pub trackers: i64,
-    /// Queries categorised as `publicidad`. It is the commonest category of all, so leaving it
+    /// Distinct names categorised as `publicidad`. It is the commonest category of all, so leaving it
     /// out of the live counters made the radiography say "18 services · 0 trackers · 0 normal"
     /// for a page full of advertising (21 Sep 2026).
     pub ads: i64,
-    /// Queries carrying `destino_nuevo`.
+    /// Distinct names carrying `destino_nuevo`.
     pub new_destinations: i64,
-    /// Queries categorised as `esperado`.
+    /// Distinct names categorised as `esperado`.
     pub expected: i64,
-    /// Queries with verdict `cortado`.
+    /// Distinct names with verdict `cortado`.
     pub blocked: i64,
 }
 
@@ -70,12 +70,17 @@ impl Ledger {
     /// Counters over `since <= ts < until`.
     pub fn counters(&self, since: i64, until: i64) -> Result<Counters> {
         let row = self.conn.query_row(
+            // Every counter counts names, like the first one: until 1.0.2 the first counted
+            // names and the rest counted queries, so the radiography read «65 distinct services
+            // · 101 advertising» and the shared text «885 trackers» for ten tracker names
+            // (review of 28 Sep 2026, G1).
             "SELECT COUNT(DISTINCT qname), \
-                    SUM(category = 'rastreador'), \
-                    SUM(category = 'publicidad'), \
-                    SUM(instr(signals_json, '\"destino_nuevo\"') > 0), \
-                    SUM(category = 'esperado'), \
-                    SUM(verdict = 'cortado') \
+                    COUNT(DISTINCT CASE WHEN category = 'rastreador' THEN qname END), \
+                    COUNT(DISTINCT CASE WHEN category = 'publicidad' THEN qname END), \
+                    COUNT(DISTINCT CASE WHEN instr(signals_json, '\"destino_nuevo\"') > 0 \
+                                        THEN qname END), \
+                    COUNT(DISTINCT CASE WHEN category = 'esperado' THEN qname END), \
+                    COUNT(DISTINCT CASE WHEN verdict = 'cortado' THEN qname END) \
              FROM events WHERE ts >= ?1 AND ts < ?2",
             params![since, until],
             |r| {
@@ -116,6 +121,35 @@ impl Ledger {
             })
         })?;
         rows.map(|r| r.map_err(Into::into)).collect()
+    }
+
+    /// [`Self::device_totals`] for one device, read through the `(device_id, ts)` index instead
+    /// of the whole table. `None` when the device has no rows since `since`.
+    pub fn device_totals_of(
+        &self,
+        device_id: &str,
+        since: Option<i64>,
+    ) -> Result<Option<DeviceTotals>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT COUNT(*), \
+                    SUM(category = 'rastreador'), SUM(category = 'publicidad'), \
+                    SUM(category = 'telemetria'), SUM(category = 'esperado'), \
+                    SUM(category = 'desconocido'), SUM(verdict = 'cortado') \
+             FROM events WHERE device_id = ?1 AND ts >= ?2",
+        )?;
+        let t = stmt.query_row(rusqlite::params![device_id, since.unwrap_or(0)], |r| {
+            Ok(DeviceTotals {
+                device_id: device_id.to_owned(),
+                queries: r.get(0)?,
+                rastreador: r.get::<_, Option<i64>>(1)?.unwrap_or(0),
+                publicidad: r.get::<_, Option<i64>>(2)?.unwrap_or(0),
+                telemetria: r.get::<_, Option<i64>>(3)?.unwrap_or(0),
+                esperado: r.get::<_, Option<i64>>(4)?.unwrap_or(0),
+                desconocido: r.get::<_, Option<i64>>(5)?.unwrap_or(0),
+                cortado: r.get::<_, Option<i64>>(6)?.unwrap_or(0),
+            })
+        })?;
+        Ok((t.queries > 0).then_some(t))
     }
 
     /// Row counts of every table.
@@ -180,8 +214,32 @@ mod tests {
         assert_eq!(t[0].publicidad, 1);
         assert_eq!(t[0].cortado, 1);
         assert_eq!(t[1].desconocido, 1);
+        // One device's totals are the same numbers, read through its index.
+        assert_eq!(
+            l.device_totals_of("self", None).unwrap().as_ref(),
+            Some(&t[0])
+        );
+        assert_eq!(
+            l.device_totals_of("mac:aa", None).unwrap().as_ref(),
+            Some(&t[1])
+        );
+        assert_eq!(
+            l.device_totals_of("self", Some(25))
+                .unwrap()
+                .map(|x| x.queries),
+            Some(1)
+        );
+        assert!(l.device_totals_of("ip:10.0.0.9", None).unwrap().is_none());
 
         let n = l.table_counts().unwrap();
         assert_eq!(n.events, 4);
+
+        // A tracker asked a hundred times is one tracker, not a hundred.
+        for i in 0..100 {
+            let mut e = NewEvent::observed(50 + i, "self", "127.0.0.1", "t.example", "A");
+            e.category = Category::Rastreador;
+            l.append(e).unwrap();
+        }
+        assert_eq!(l.counters(0, 200).unwrap().trackers, 1);
     }
 }

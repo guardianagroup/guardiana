@@ -25,6 +25,9 @@ use std::time::Duration;
 use hickory_server::server::Server;
 use tokio::net::{TcpListener, UdpSocket};
 
+// The answer code inside `Outcome::Forwarded`, so a caller can name it without depending on
+// hickory itself.
+pub use hickory_proto::op::ResponseCode;
 pub use hickory_proto::rr::RecordType;
 
 /// Name Firefox queries to decide whether to use its own DoH (brief §4).
@@ -72,6 +75,12 @@ pub struct Config {
     pub canary_enabled: bool,
     /// LAN IP answered for the checker name, if Home Mode is on.
     pub checker_ip: Option<Ipv4Addr>,
+    /// Whether the self-check names are answered with the loopback ("the queries of this
+    /// machine arrive at Guardiana"). Off for the relay a stood-down program keeps on the LAN:
+    /// it is Guardiana's process, but nobody is watching, and a check that says "they arrive"
+    /// would tell the panel and `verify` that the machine is protected. Off, those names are
+    /// answered "does not exist", still without going upstream.
+    pub self_check: bool,
     /// Maximum cached answers.
     pub cache_size: u64,
     /// Upstream timeout per attempt.
@@ -89,6 +98,7 @@ impl Config {
             block_mode: BlockMode::NxDomain,
             canary_enabled: false,
             checker_ip: None,
+            self_check: true,
             cache_size: 4096,
             upstream_timeout: Duration::from_secs(2),
         }
@@ -106,6 +116,34 @@ pub struct Query {
     pub qtype: RecordType,
     /// Unix time in milliseconds when it arrived.
     pub ts: i64,
+}
+
+/// Whether at least one of these upstreams answers right now.
+///
+/// One lookup of a fixed name with the same client the resolver uses. An answer of any kind
+/// (even "no such name") means the upstream is reachable; only a transport failure (timeout,
+/// refused, unreachable) counts as silence. The engine asks this once a minute while it has
+/// stepped aside because the upstreams went quiet, to know when to take the DNS back.
+pub async fn upstream_answers(upstreams: &[SocketAddr], timeout: Duration) -> bool {
+    use hickory_proto::rr::{Name, RecordType};
+    use hickory_resolver::net::{DnsError, NetError};
+    if upstreams.is_empty() {
+        return false;
+    }
+    let mut cfg = Config::local(upstreams.to_vec());
+    cfg.upstream_timeout = timeout;
+    cfg.cache_size = 0;
+    let Ok(client) = upstream::build(&cfg) else {
+        return false;
+    };
+    let Ok(name) = Name::from_ascii("example.com.") else {
+        return false;
+    };
+    match client.lookup(name, RecordType::A).await {
+        Ok(_) => true,
+        Err(NetError::Dns(DnsError::NoRecordsFound(_))) => true,
+        Err(_) => false,
+    }
 }
 
 /// What the policy wants done with a query.
@@ -216,6 +254,17 @@ impl Running {
     }
 }
 
+/// Receive buffer asked for each UDP socket. The system's default (about 200 KB on Linux, less on
+/// Windows) held some 280 queries: a cold burst of 500 from one machine lost 180 of them in the
+/// kernel before the resolver could read them (5 Oct 2026). Linux grants up to its `rmem_max`
+/// and doubles it; Windows and macOS grant what is asked.
+const RECV_BUFFER: usize = 4 * 1024 * 1024;
+
+/// Best effort: a system that refuses keeps its default and the resolver works as before.
+fn ensanchar(udp: &UdpSocket) {
+    let _ = socket2::SockRef::from(udp).set_recv_buffer_size(RECV_BUFFER);
+}
+
 /// Bind every listen address and start serving with `policy`.
 pub async fn start<P: Policy>(config: Config, policy: P) -> Result<Running, Error> {
     if config.upstreams.is_empty() {
@@ -233,6 +282,7 @@ pub async fn start<P: Policy>(config: Config, policy: P) -> Result<Running, Erro
         block_mode: config.block_mode,
         canary_enabled: config.canary_enabled,
         checker_ip: config.checker_ip,
+        self_check: config.self_check,
     };
     let mut server = Server::new(handler);
     let mut udp_addrs = Vec::new();
@@ -241,6 +291,7 @@ pub async fn start<P: Policy>(config: Config, policy: P) -> Result<Running, Erro
         let udp = UdpSocket::bind(addr)
             .await
             .map_err(|e| Error::Bind(*addr, e))?;
+        ensanchar(&udp);
         udp_addrs.push(udp.local_addr().map_err(|e| Error::Bind(*addr, e))?);
         server.register_socket(udp);
         let tcp = TcpListener::bind(addr)
@@ -255,6 +306,7 @@ pub async fn start<P: Policy>(config: Config, policy: P) -> Result<Running, Erro
         let Ok(udp) = UdpSocket::bind(addr).await else {
             continue;
         };
+        ensanchar(&udp);
         let Ok(tcp) = TcpListener::bind(addr).await else {
             continue;
         };

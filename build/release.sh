@@ -17,6 +17,12 @@
 #                       SSL.com eSigner (CodeSignTool) for the Windows signature; optional
 #   CODESIGNTOOL        path to CodeSignTool.sh (optional)
 set -euo pipefail
+# The Python to use. On Windows, Git Bash finds a "python3" that is only the Microsoft Store
+# shortcut and fails ("Python was not found"); the real one is "python" (found on the Windows PC
+# that took over from the Mac, 4 Oct 2026). PYTHON in the environment wins.
+if [ -z "${PYTHON:-}" ]; then
+    if python3 -c 'import sys' >/dev/null 2>&1; then PYTHON=python3; else PYTHON=python; fi
+fi
 
 if [ -n "${CI:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ]; then
     echo "release.sh: never run in CI: the private key must not be there (brief §10)." >&2
@@ -191,7 +197,7 @@ anotar "$deb" false
 anotar "$tarball" false
 [ -n "$mac" ] && anotar "$mac" false
 
-line=$(printf '%s' "$entradas" | python3 -c '
+line=$(printf '%s' "$entradas" | "$PYTHON" -c '
 import json, sys
 v, c, d = sys.argv[1:4]
 files = []
@@ -211,14 +217,14 @@ firmar "$out/ledger-line.json" "guardiana $version ledger line"
 rekor_uuid=""
 if command -v rekor-cli >/dev/null 2>&1; then
     rekor_uuid="$(rekor-cli upload --artifact "$out/ledger-line.json" --signature "$out/ledger-line.json.minisig" \
-        --pki-format minisign --public-key build/pubkey/minisign.pub --format json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("Location","").rsplit("/",1)[-1])')"
-    line="$(python3 -c 'import json,sys; l=json.loads(sys.argv[1]); l["rekor_uuid"]=sys.argv[2]; print(json.dumps(l, separators=(",",":")))' "$line" "$rekor_uuid")"
+        --pki-format minisign --public-key build/pubkey/minisign.pub --format json | "$PYTHON" -c 'import json,sys; print(json.load(sys.stdin).get("Location","").rsplit("/",1)[-1])')"
+    line="$("$PYTHON" -c 'import json,sys; l=json.loads(sys.argv[1]); l["rekor_uuid"]=sys.argv[2]; print(json.dumps(l, separators=(",",":")))' "$line" "$rekor_uuid")"
 else
     # No rekor-cli: the public log takes the same entry over its REST API, which is
     # all this needs and one dependency less. Rehearsed on 16 sep 2026 (decision 120);
     # note that the staging instance refuses "rekord" entries, so a rehearsal that
     # wants a real uuid has to use the production log, like the release does.
-    rekor_uuid="$(python3 - "$out/ledger-line.json" "$out/ledger-line.json.minisig" build/pubkey/minisign.pub <<'PYREKOR'
+    rekor_uuid="$("$PYTHON" - "$out/ledger-line.json" "$out/ledger-line.json.minisig" build/pubkey/minisign.pub <<'PYREKOR'
 import base64, json, sys, urllib.request, urllib.error
 art, sig, pub = (open(p, "rb").read() for p in sys.argv[1:4])
 cuerpo = {"apiVersion": "0.0.1", "kind": "rekord", "spec": {
@@ -237,7 +243,7 @@ except urllib.error.HTTPError as e:
 PYREKOR
 )"
     [ -n "$rekor_uuid" ] || echo "release.sh: no rekor uuid; upload $out/ledger-line.json by hand before publishing." >&2
-    line="$(python3 -c 'import json,sys; l=json.loads(sys.argv[1]); l["rekor_uuid"]=sys.argv[2]; print(json.dumps(l, separators=(",",":")))' "$line" "$rekor_uuid")"
+    line="$("$PYTHON" -c 'import json,sys; l=json.loads(sys.argv[1]); l["rekor_uuid"]=sys.argv[2]; print(json.dumps(l, separators=(",",":")))' "$line" "$rekor_uuid")"
 fi
 
 # 7. Append and commit. The download is published only after this commit is pushed.

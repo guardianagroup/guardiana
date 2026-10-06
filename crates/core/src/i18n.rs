@@ -227,6 +227,32 @@ impl Texts {
         Self::get(&self.panel, key)
     }
 
+    /// A CLI text that counts: `key_uno` when there is one thing and that text exists, `key`
+    /// otherwise, with `{n}` replaced. Until 1.0.2 the program said «1 reglas deshechas» or
+    /// «quedan 1 días» (review of 5 Oct 2026).
+    #[must_use]
+    pub fn cli_n(&self, key: &str, n: i64) -> String {
+        let uno = format!("{key}_uno");
+        let elegida = if n == 1 && self.cli.contains_key(&uno) {
+            uno.as_str()
+        } else {
+            key
+        };
+        Self::get(&self.cli, elegida).replace("{n}", &n.to_string())
+    }
+
+    /// The same for a panel text.
+    #[must_use]
+    pub fn panel_n(&self, key: &str, n: i64) -> String {
+        let uno = format!("{key}_uno");
+        let elegida = if n == 1 && self.panel.contains_key(&uno) {
+            uno.as_str()
+        } else {
+            key
+        };
+        Self::get(&self.panel, elegida).replace("{n}", &n.to_string())
+    }
+
     /// «1 dispositivo» or «3 dispositivos», in this language: the weekly report's share text,
     /// which read «1 dispositivos» in a home with only this PC until 1.0.1.
     #[must_use]

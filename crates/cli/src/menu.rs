@@ -82,6 +82,16 @@ fn observe_test() -> Result<(), Box<dyn Error>> {
 
 fn watch_for_real() -> Result<(), Box<dyn Error>> {
     let t = i18n::current();
+    // Installed, the service already watches and owns the DNS change. Until 1.0.2 this option ran
+    // a second Guardiana in front of it and, on leaving, undid the DNS change the installer had
+    // made: the protection was off and nothing said so (review of 5 Oct 2026, Windows medium).
+    if matches!(
+        guardiana_service::daemon::state(),
+        Ok(guardiana_service::daemon::State::Running | guardiana_service::daemon::State::Stopped)
+    ) {
+        println!("{}", t.cli("menu.ya_servicio"));
+        return Ok(());
+    }
     let mut status = Opts::default();
     status.set("status", None);
     dns_cmd::run(&status)?;
@@ -95,6 +105,15 @@ fn watch_for_real() -> Result<(), Box<dyn Error>> {
         println!("{}", t.cli("menu.nada_cambiado"));
         return Ok(());
     }
+    // A change that was already there before this option is not this option's to undo.
+    let ya_estaba = dns_cmd::open_or_create(&Opts::default())
+        .ok()
+        .and_then(|l| {
+            l.setting(guardiana_service::sysdns::SETTING_BACKUP)
+                .ok()
+                .flatten()
+        })
+        .is_some_and(|v| !v.is_empty());
     let mut apply = Opts::default();
     apply.set("apply", None);
     apply.set("yes", None);
@@ -106,9 +125,11 @@ fn watch_for_real() -> Result<(), Box<dyn Error>> {
     o.set("open", None);
     let result = observe::run(&o);
     println!();
-    let mut restore = Opts::default();
-    restore.set("restore", None);
-    let _ = dns_cmd::run(&restore);
+    if !ya_estaba {
+        let mut restore = Opts::default();
+        restore.set("restore", None);
+        let _ = dns_cmd::run(&restore);
+    }
     result
 }
 

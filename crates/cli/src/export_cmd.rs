@@ -42,8 +42,7 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
             std::fs::write(path, &buf)?;
             eprintln!(
                 "{}",
-                t.cli("export.hecho")
-                    .replace("{n}", &events.len().to_string())
+                t.cli_n("export.hecho", events.len() as i64)
                     .replace("{ruta}", path)
             );
         }

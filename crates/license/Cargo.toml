@@ -15,6 +15,10 @@ sha2 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 ureq = { workspace = true }
+# OS randomness for the licence's own secret, made once per installation (review of 1 Oct
+# 2026, entry 9: the panel token used to play that role, and losing it lost the licence).
+# Already in the tree: the panel uses it for its token.
+getrandom = { workspace = true }
 
 [lints]
 workspace = true

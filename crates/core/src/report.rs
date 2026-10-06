@@ -11,6 +11,7 @@ use serde::Serialize;
 use crate::error::Result;
 use crate::ledger::Ledger;
 use crate::time::{day_utc, DAY_MS};
+use crate::SELF_DEVICE_ID;
 
 /// One device's week.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
@@ -164,6 +165,11 @@ impl Ledger {
     /// 24 hours of detail there is nothing left to count after a day, which is why the panel
     /// only offers this with Plus: it is not a feature held back, it is a question that cannot
     /// be answered without the memory Plus keeps.
+    ///
+    /// Each row names a destination and the device that asked for it, so it is detail, not a
+    /// total: a device whose owner did not share its detail with the home panel is left out, as
+    /// in [`Ledger::events`] (review of 1 Oct 2026, entry 1). Its week still appears, as
+    /// figures, in [`Ledger::week_summary`].
     pub fn new_destinations(&self, until: i64, limit: usize) -> Result<Vec<NewDestination>> {
         let since = until - 7 * DAY_MS;
         let names: BTreeMap<String, Option<String>> = self
@@ -180,11 +186,13 @@ impl Ledger {
              JOIN events e ON e.qname = s.qname AND e.device_id = s.device_id \
                           AND e.ts >= ?1 AND e.ts < ?2 \
              WHERE s.first_seen >= ?1 AND s.first_seen < ?2 \
+               AND (s.device_id = ?4 OR s.device_id IN \
+                    (SELECT id FROM devices WHERE share_detail_with_home != 0)) \
              GROUP BY s.qname, s.device_id \
              ORDER BY n DESC, s.first_seen DESC \
              LIMIT ?3",
         )?;
-        let rows = stmt.query_map(params![since, until, limit as i64], |r| {
+        let rows = stmt.query_map(params![since, until, limit as i64, SELF_DEVICE_ID], |r| {
             Ok(NewDestination {
                 qname: r.get(0)?,
                 device_id: r.get(1)?,

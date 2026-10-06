@@ -16,6 +16,8 @@ hickory-server = { workspace = true }
 hickory-resolver = { workspace = true }
 hickory-proto = { workspace = true }
 async-trait = { workspace = true }
+# SO_RCVBUF on the UDP sockets (see the workspace Cargo.toml).
+socket2 = { workspace = true }
 
 [lints]
 workspace = true

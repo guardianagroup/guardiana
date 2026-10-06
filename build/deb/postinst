@@ -6,7 +6,17 @@ mkdir -p /var/lib/guardiana
 chmod 700 /var/lib/guardiana
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload || true
-    systemctl enable --now guardiana.service || true
+    systemctl enable guardiana.service || true
+    # restart, not «enable --now»: on an upgrade the old process is still running, and
+    # «--now» leaves it there, with its deleted binary, until the next reboot. None of the new
+    # version's fixes were active (review of 5 Oct 2026). restart also starts a stopped one.
+    systemctl restart guardiana.service || true
 fi
-echo "Guardiana instalada. Abre el panel con: guardiana panel"
+# In the terminal's language, as the .tar.gz installer does (review of 5 Oct 2026). The panel key
+# belongs to the service, so a person opens the panel with sudo, which prints the link.
+case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
+    es* | "" | C | C.* | POSIX) echo "Guardiana instalada. Para abrir el panel: sudo guardiana panel" ;;
+    pt*) echo "Guardiana instalada. Para abrir o painel: sudo guardiana panel" ;;
+    *) echo "Guardiana installed. To open the panel: sudo guardiana panel" ;;
+esac
 exit 0

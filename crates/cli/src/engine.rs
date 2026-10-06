@@ -19,11 +19,20 @@ use guardiana_core::time::now_ms;
 use guardiana_core::{identity, paths, DecidedBy, Ledger, NewEvent, Rule, Verdict};
 use guardiana_dns::{self as dns, BlockMode, Config, Decision, Outcome, Policy, Query};
 use guardiana_lists::Catalog;
-use guardiana_service::home::{self, SETTING_HOME_IP, SETTING_HOME_MODE};
-use guardiana_service::sysdns::{self, Backup, SETTING_BACKUP};
+use guardiana_service::home::{
+    self, SETTING_HOME_APARCADO, SETTING_HOME_IP, SETTING_HOME_MODE, SETTING_HOME_RED,
+};
+use guardiana_service::sysdns::{self, Backup, SETTING_BACKUP, SETTING_BACKUP_APARCADA};
 
 /// Settings key: `nxdomain` (default) or `zero` (brief §4).
 pub const SETTING_BLOCK_MODE: &str = "block_mode";
+/// The last upstreams that came automatically from the network and were not this machine,
+/// comma-separated. Used only when every resolver the network hands out is this machine
+/// itself: the router of a house in Home Mode gives the computer its own address as DNS.
+const SETTING_UPSTREAM_BUENO: &str = "upstream_bueno";
+/// "1" once the program looked, the first time it stood aside, for what 1.0.1 left without
+/// parking (`heredar_apartado`).
+const SETTING_APARTADO_HEREDADO: &str = "apartado_heredado_1_0_2";
 
 /// How the engine should run.
 #[derive(Debug, Clone)]
@@ -77,11 +86,18 @@ struct RuleCache {
     checked: Instant,
 }
 
+/// How often a device's last activity and address are written while it keeps asking.
+const DEVICE_TOUCH_MS: i64 = 60_000;
+
 struct Inner {
     ledger: Ledger,
     classifier: Classifier,
     /// Device id → first time seen, for the 24-hour gate.
     devices_seen: HashMap<String, i64>,
+    /// Device id → when its last activity and address were last written. The device row is
+    /// refreshed at most once a minute: until 1.0.2 it was written only on the first query of
+    /// each run, so «Última actividad» stayed frozen (review of 28 Sep 2026, G5).
+    devices_touched: HashMap<String, i64>,
     rules: RuleCache,
     recorded: u64,
     /// Declared scope per device: whether to cut what is outside it, and the patterns.
@@ -122,12 +138,94 @@ struct Pending {
 
 type PendingKey = (SocketAddr, String, String, i64);
 
+/// How the upstreams are doing, counted by the policy as answers come back: forwarded queries
+/// that got any answer, and queries the upstreams never answered. Read and reset once a minute.
+#[derive(Default)]
+struct Salud {
+    ok: std::sync::atomic::AtomicU64,
+    fallos: std::sync::atomic::AtomicU64,
+}
+
+impl Salud {
+    fn anota(&self, outcome: Outcome) {
+        use std::sync::atomic::Ordering::Relaxed;
+        match outcome {
+            Outcome::Forwarded { .. } => {
+                self.ok.fetch_add(1, Relaxed);
+            }
+            Outcome::UpstreamFailed => {
+                self.fallos.fetch_add(1, Relaxed);
+            }
+            _ => {}
+        }
+    }
+
+    /// The minute's numbers, and back to zero.
+    fn minuto(&self) -> (u64, u64) {
+        use std::sync::atomic::Ordering::Relaxed;
+        (self.ok.swap(0, Relaxed), self.fallos.swap(0, Relaxed))
+    }
+}
+
+/// A minute in which the upstreams answered nothing at all, with enough queries to mean it.
+/// Three is the floor: one lost packet is not a dead network, and a quiet minute (nobody asked)
+/// says nothing either way.
+fn minuto_sin_arriba(ok: u64, fallos: u64) -> bool {
+    ok == 0 && fallos >= 3
+}
+
+/// Stepping aside when the upstreams go quiet, and coming back when they answer.
+///
+/// The guardian is the machine's resolver; when what it forwards to stops answering (a laptop
+/// that woke up on another network, a router that died, a captive portal), every lookup on the
+/// machine fails, which the person experiences as "no internet". After a minute in which the
+/// upstreams answered nothing, the guardian asks them one name itself; if that goes unanswered
+/// too, it gives the DNS back exactly as it was, writes it in the ledger, and then asks once a
+/// minute until one answers, when it takes the DNS again. The owner's own Mac spent a day like
+/// this on 1 Oct 2026, with nothing telling him why.
+#[derive(Default)]
+struct Aparte {
+    apartado: bool,
+}
+
+/// What the minute asks the engine to do.
+#[derive(Debug, PartialEq, Eq)]
+enum Paso {
+    Nada,
+    /// A silent minute: ask the upstreams directly, and step aside if they stay silent. The
+    /// question is what decides: a machine that only asked for names that do not resolve is
+    /// not a machine without a network.
+    Comprobar,
+    /// Already aside: ask whether the upstreams answer again, and if so take the DNS back.
+    Sondear,
+}
+
+impl Aparte {
+    fn minuto(&self, ok: u64, fallos: u64) -> Paso {
+        if self.apartado {
+            Paso::Sondear
+        } else if minuto_sin_arriba(ok, fallos) {
+            Paso::Comprobar
+        } else {
+            Paso::Nada
+        }
+    }
+}
+
+/// How long the guardian waits for the upstreams when it asks them itself.
+const SONDA: Duration = Duration::from_secs(2);
+
 struct EnginePolicy {
     inner: Mutex<Inner>,
     pending: Mutex<HashMap<PendingKey, Pending>>,
+    /// Answers and silences of the upstreams, for the minute watch that steps aside.
+    salud: Arc<Salud>,
     devices: guardiana_devices::Resolver,
     texts: &'static Texts,
     print_events: bool,
+    /// Devices whose queries `observe` is not printing because their owner does not share the
+    /// detail; each is named once, so the person knows why it is silent.
+    callados_avisados: Mutex<std::collections::HashSet<String>>,
     /// Quién pidió cada nombre, cuando el sistema lo dice (Windows, este equipo). `None` en los
     /// demás sistemas y también en Windows si la sesión de sucesos no se pudo abrir: entonces el
     /// extracto queda como siempre, con el aparato y sin el programa.
@@ -146,6 +244,23 @@ struct EnginePolicy {
 /// Cuánto espera una consulta de este equipo antes de anotarse, para darle tiempo a Windows a
 /// decir quién la pidió. Un poco más que el segundo del temporizador de sucesos.
 const ESPERA_APPS_MS: i64 = 1_300;
+
+/// The rules as the resolver matches them. A rule saved before 1.0.2 may hold what was typed
+/// (`https://x.com/…`, `*.x.com`) and never match a query: it is read as the name a query carries
+/// (G4, 28 Sep 2026). At start and at every reload, the same.
+fn reglas_legibles(mut all: Vec<Rule>) -> Vec<Rule> {
+    for r in &mut all {
+        if r.match_kind != guardiana_core::MatchKind::Category {
+            if let Some((n, comodin)) = guardiana_core::rules::normalizar_nombre(&r.pattern) {
+                r.pattern = n;
+                if comodin {
+                    r.match_kind = guardiana_core::MatchKind::Suffix;
+                }
+            }
+        }
+    }
+    all
+}
 
 fn key_of(q: &Query) -> PendingKey {
     (q.client, q.name.clone(), q.qtype.to_string(), q.ts)
@@ -171,8 +286,9 @@ impl Inner {
             .unwrap_or_default()
             .unwrap_or_default()
             .lines()
-            .map(|x| x.trim().to_ascii_lowercase())
-            .filter(|x| !x.is_empty())
+            // The name a query carries, as the panel now saves it; a scope saved before 1.0.2 may
+            // still hold a line it would not have kept.
+            .filter_map(|x| guardiana_core::rules::normalizar_nombre(x).map(|(n, _)| n))
             .collect();
         // The mode is "cortar", "observar", or a temporary pass: "observar:<ms>", which is
         // for the person who sends a long job and leaves. Until that moment nothing is cut,
@@ -202,10 +318,34 @@ impl Inner {
         let version = self.ledger.rules_version().unwrap_or(0);
         if version != self.rules.version {
             if let Ok(all) = self.ledger.rules() {
-                self.rules.rules = all;
+                self.rules.rules = reglas_legibles(all);
                 self.rules.version = version;
             }
         }
+    }
+}
+
+impl EnginePolicy {
+    /// What `decide` would have noted for a query the resolver answered by itself.
+    fn sin_decidir(&self, q: &Query) -> Option<Pending> {
+        let who = self.devices.identify(q.client.ip());
+        let mut inner = self.inner.lock().ok()?;
+        let first_time = inner
+            .ledger
+            .first_time(&who.id, &q.name, q.ts)
+            .unwrap_or(false);
+        let classified = inner.classifier.classify(&Input {
+            device_id: &who.id,
+            name: &q.name,
+            ts: q.ts,
+            first_time,
+        });
+        Some(Pending {
+            device_id: who.id,
+            ip: q.client.ip().to_string(),
+            classified,
+            fuera_de_alcance: false,
+        })
     }
 }
 
@@ -227,9 +367,20 @@ impl Policy for EnginePolicy {
                     .upsert_device(&device_id, who.mac.as_deref(), Some(&ip), q.ts)
                     .map_or(q.ts, |d| d.first_seen);
                 inner.devices_seen.insert(device_id.clone(), first);
+                inner.devices_touched.insert(device_id.clone(), q.ts);
                 first
             }
         };
+        if inner
+            .devices_touched
+            .get(&device_id)
+            .is_some_and(|t| q.ts - *t >= DEVICE_TOUCH_MS)
+        {
+            let _ = inner
+                .ledger
+                .upsert_device(&device_id, who.mac.as_deref(), Some(&ip), q.ts);
+            inner.devices_touched.insert(device_id.clone(), q.ts);
+        }
         let first_time = inner
             .ledger
             .first_time(&device_id, &q.name, q.ts)
@@ -265,9 +416,14 @@ impl Policy for EnginePolicy {
         let mut fuera_de_alcance = false;
         let decision = if matches!(decision, Decision::Forward) {
             let alcance = inner.alcance_de(&device_id);
+            // Never what the machine needs to keep itself alive (updates, time, certificate
+            // checks, resolvers, messaging): Guard mode is a wide cut, and the inviolable rule
+            // of brief §6 covers it like a category rule. Until 1.0.2 it cut them while the
+            // panel left them out of its count (G3, 28 Sep 2026).
             if alcance.cortar
                 && !alcance.patrones.is_empty()
                 && !alcance.cubre(&q.name)
+                && classified.category != guardiana_core::Category::Esperado
                 && guardiana_core::rules::observation_complete(q.ts - first_seen)
             {
                 fuera_de_alcance = true;
@@ -298,6 +454,7 @@ impl Policy for EnginePolicy {
     }
 
     fn record(&self, q: &Query, outcome: Outcome) {
+        self.salud.anota(outcome);
         let (verdict, mut decided_by, rule_id) = match outcome {
             Outcome::Refused => return,
             Outcome::Forwarded { .. } | Outcome::UpstreamFailed => {
@@ -306,12 +463,19 @@ impl Policy for EnginePolicy {
             Outcome::Canary | Outcome::Checker => (Verdict::Respondido, DecidedBy::Nadie, None),
             Outcome::Blocked { rule_id } => (Verdict::Cortado, DecidedBy::ReglaUsuario, rule_id),
         };
-        let Some(p) = self
+        let pendiente = self
             .pending
             .lock()
             .ok()
-            .and_then(|mut m| m.remove(&key_of(q)))
-        else {
+            .and_then(|mut m| m.remove(&key_of(q)));
+        let Some(p) = pendiente.or_else(|| {
+            // Firefox's canary is answered by the resolver itself, before anything is asked of
+            // the policy, so nothing was waiting for it here and it was never written down
+            // (review of 5 Oct 2026, core medium). It is a query this device made, and the
+            // answer it got decides whether Firefox goes around Guardiana: it goes in the
+            // extract like any other. The self-check names stay out on purpose.
+            matches!(outcome, Outcome::Canary).then(|| self.sin_decidir(q))?
+        }) else {
             return;
         };
         // A cut with no rule behind it came from the declared scope: the ledger has to say
@@ -346,7 +510,30 @@ impl Policy for EnginePolicy {
         match inner.ledger.append(event) {
             Ok(e) => {
                 if self.print_events {
-                    println!("{}", crate::show::line(self.texts, &e, None));
+                    // The live list on the screen is the household reading too: a phone that
+                    // does not share its detail is not printed name by name (review of 5 Oct
+                    // 2026, privacy item 5). It is named once, so its silence has a reason.
+                    if inner.ledger.shares_detail(&e.device_id).unwrap_or(false) {
+                        println!("{}", crate::show::line(self.texts, &e, None));
+                    } else if self
+                        .callados_avisados
+                        .lock()
+                        .is_ok_and(|mut v| v.insert(e.device_id.clone()))
+                    {
+                        let nombre = inner
+                            .ledger
+                            .device(&e.device_id)
+                            .ok()
+                            .flatten()
+                            .and_then(|d| d.name)
+                            .unwrap_or_else(|| e.device_id.clone());
+                        println!(
+                            "{}",
+                            self.texts
+                                .cli("observe.no_comparte")
+                                .replace("{dispositivo}", &nombre)
+                        );
+                    }
                 }
             }
             Err(e) => eprintln!("guardiana: {e}"),
@@ -399,14 +586,17 @@ pub async fn run<F: Future<Output = ()>>(
     result
 }
 
-/// On Windows Guardiana is the machine's only resolver while it runs (sysdns::windows), so a
-/// stopped or failed service must not leave it pointing at a port nobody answers: that is a
-/// machine without internet. The old DNS goes back, the backup stays, and the next start points
-/// the machine at Guardiana again (`run_once`, right after the resolver is listening).
+/// While it runs, Guardiana is the machine's resolver, so a stopped service must not leave the
+/// machine pointing at a port nobody answers: that is a machine without internet. The old DNS
+/// goes back, the backup stays, and the next start points the machine at Guardiana again
+/// (`run_once`, right after the resolver is listening).
+///
+/// Until 1 Oct 2026 this ran on Windows only. On Linux (resolved drop-in or a rewritten
+/// resolv.conf) Guardiana is the only resolver just the same, and `systemctl stop guardiana`
+/// left Ubuntu without names while the screen said "Servicio parado." On a Mac the original
+/// servers stay behind 127.0.0.1 as a fallback, so it limps instead of dying, but every lookup
+/// waits for a timeout first. A crash does not reach this function; the next start re-applies.
 fn give_dns_back_while_stopped(db: &std::path::Path) {
-    if !cfg!(target_os = "windows") {
-        return;
-    }
     let Ok(ledger) = Ledger::open(db, identity::genesis()) else {
         return;
     };
@@ -445,39 +635,435 @@ fn home_lan_wanted(ledger: &Ledger, secret: &str) -> Option<std::net::Ipv4Addr> 
     let _ = secret;
     guardiana_devices::local_lan_ipv4()
         .filter(|lan| guardiana_devices::is_private_lan(IpAddr::V4(*lan)))
+        .filter(|_| en_red_de_casa(ledger))
+}
+
+/// Whether the computer is on the network Home Mode was switched on in (`SETTING_HOME_RED`).
+///
+/// Until 1.0.2 Home Mode opened its ports on whatever private network the computer was on: a
+/// laptop took it to a café or a hotel, where anyone on the Wi-Fi could use it as their DNS and
+/// their queries went into the owner's extract (review of 5 Oct 2026, Linux medium; Windows
+/// limits the firewall rule to the local subnet, which is the café's there). Now only at home.
+/// A Home Mode switched on before 1.0.2 has no network written down: the one it is on the first
+/// time is taken as home. When the router cannot be told (no gateway), it is not held against
+/// the person: the ports stay as they were.
+///
+/// Asked at most every five minutes for the same address and the same stored network: on
+/// Windows reading the router is a PowerShell, and the LAN is checked every 15 seconds.
+fn en_red_de_casa(ledger: &Ledger) -> bool {
+    type Visto = Option<(Option<std::net::Ipv4Addr>, String, Instant, bool)>;
+    static VISTO: Mutex<Visto> = Mutex::new(None);
+    let lan = guardiana_devices::local_lan_ipv4();
+    let guardada = ledger
+        .setting(SETTING_HOME_RED)
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    if let Ok(v) = VISTO.lock() {
+        if let Some((l, g, t, r)) = v.as_ref() {
+            if *l == lan && *g == guardada && t.elapsed() < Duration::from_secs(300) {
+                return *r;
+            }
+        }
+    }
+    let actual = sysdns::default_gateway().map(guardiana_devices::Red::de_puerta);
+    let casa = guardiana_devices::Red::de_texto(&guardada);
+    let (resultado, nueva) = match (casa, actual) {
+        (Some(c), Some(a)) if c.misma(&a) => {
+            // The router's MAC learned since: written down, so a café with the same address is
+            // told apart from now on.
+            let mejor = (c.mac.is_none() && a.mac.is_some()).then(|| a.texto());
+            (true, mejor)
+        }
+        (Some(_), Some(_)) => (false, None),
+        (None, Some(a)) => (true, Some(a.texto())),
+        (_, None) => (true, None),
+    };
+    let guardada = match nueva {
+        Some(t) if ledger.set_setting(SETTING_HOME_RED, &t).is_ok() => t,
+        _ => guardada,
+    };
+    if let Ok(mut v) = VISTO.lock() {
+        *v = Some((lan, guardada, Instant::now(), resultado));
+    }
+    resultado
 }
 
 /// Stand down: the trial or the subscription is over.
 ///
+/// The upstreams of this pass, as the person reads them.
+fn lista_de(upstreams: &[SocketAddr]) -> String {
+    upstreams
+        .iter()
+        .map(|s| s.ip().to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// The upstreams are silent: give the system DNS back from the saved copy and write it down.
+/// The copy stays (this is not the end of anything: the guardian comes back when they answer).
+/// `true` when this call undid the change; `false` when there was no copy (nothing of ours to
+/// undo), the machine already pointed elsewhere, or the undo failed -- then the next minute
+/// tries again, because the machine is still pointing at a resolver that cannot answer.
+fn devolver_por_silencio(ledger: &Ledger, lista: &str) -> bool {
+    let Ok(Some(json)) = ledger.setting(SETTING_BACKUP) else {
+        return false;
+    };
+    if json.is_empty() {
+        return false;
+    }
+    let Ok(backup) = serde_json::from_str::<Backup>(&json) else {
+        return false;
+    };
+    if sysdns::guardian_is_primary() == Some(false) || sysdns::restore(&backup).is_err() {
+        return false;
+    }
+    let _ = ledger.record_change(
+        now_ms(),
+        guardiana_core::ChangeKind::DnsOff,
+        guardiana_core::ChangeWho::SinArriba,
+        lista,
+    );
+    true
+}
+
+/// An upstream answers again: point the machine at the guardian as before. `true` when done,
+/// or when there is no copy to apply (the person undid the change meanwhile, or never made it).
+fn volver_con_arriba(ledger: &Ledger) -> bool {
+    let t = i18n::current();
+    let copia = match ledger.setting(SETTING_BACKUP) {
+        Ok(Some(json)) if !json.is_empty() => serde_json::from_str::<Backup>(&json).ok(),
+        Ok(_) => {
+            println!("{}", t.cli("observe.vuelve_arriba"));
+            return true;
+        }
+        Err(_) => return false,
+    };
+    let Some(backup) = copia else {
+        return false;
+    };
+    if reapuntar(ledger, backup).is_err() {
+        return false;
+    }
+    let _ = ledger.record_change(
+        now_ms(),
+        guardiana_core::ChangeKind::DnsOn,
+        guardiana_core::ChangeWho::ConArriba,
+        "",
+    );
+    println!("{}", t.cli("observe.vuelve_arriba"));
+    true
+}
+
 /// The program stops being the guardian, but it must never leave the machine without a resolver:
 /// the system DNS goes back to exactly what it was before Guardiana touched it, Home Mode is
-/// switched off so nothing on the LAN is left pointing at a listener that is closing, and both
-/// changes are written into the ledger like any other. The extract stays on the disk, whole: it
-/// belongs to the person, whatever they decide about paying.
+/// switched off, and both changes are written into the ledger like any other. The extract stays
+/// on the disk, whole: it belongs to the person, whatever they decide about paying.
+///
+/// Both are parked, not forgotten: the person chose them, and they come back on by themselves
+/// when the licence does (`volver_del_apartado`). Until 1.0.2 they were simply cleared, and a
+/// customer who paid got a program that watched nothing, because nothing pointed at it any more
+/// (review of 5 Oct 2026, serious 4). A parked Home Mode also keeps a relay on the LAN while the
+/// program is stood down, because the router still sends the whole house here (critical 2).
 fn stand_down(ledger: &Ledger) {
-    if let Ok(Some(json)) = ledger.setting(SETTING_BACKUP) {
-        if !json.is_empty() {
-            if let Ok(backup) = serde_json::from_str::<Backup>(&json) {
-                let _ = ledger.set_setting(SETTING_BACKUP, "");
-                if sysdns::restore(&backup).is_ok() {
-                    let _ = ledger.record_change(
-                        now_ms(),
-                        guardiana_core::ChangeKind::DnsOff,
-                        "licencia",
-                        "",
-                    );
-                }
-            }
-        }
-    }
+    heredar_apartado(ledger);
+    devolver_dns_al_apartarse(ledger);
     if ledger.setting(SETTING_HOME_MODE).ok().flatten().as_deref() == Some("1") {
+        let _ = ledger.set_setting(SETTING_HOME_APARCADO, "1");
         let _ = ledger.set_setting(SETTING_HOME_MODE, "0");
         let _ = ledger.record_change(
             now_ms(),
             guardiana_core::ChangeKind::HogarOff,
-            "licencia",
+            guardiana_core::ChangeWho::Licencia,
             "",
         );
+    }
+}
+
+/// 1.0.1 stood aside without parking anything: it cleared the DNS copy and switched Home Mode
+/// off, and wrote both into the ledger as done by the licence. The trials of the first
+/// downloads ended on 2 Oct 2026, so there are machines in that state today, and houses whose
+/// router still points at one of them. Once, the first time 1.0.2 stands aside: if the last
+/// Home Mode change was that one, Home Mode is parked (the relay starts, and it comes back on
+/// with the licence); if the last DNS change was that one, the DNS as it is now is parked, so
+/// it is pointed at Guardiana again with the licence. Anything the person did since (a change
+/// by the panel or the terminal is newer) leaves it alone.
+fn heredar_apartado(ledger: &Ledger) {
+    use guardiana_core::{ChangeKind, ChangeWho};
+    if ledger
+        .setting(SETTING_APARTADO_HEREDADO)
+        .ok()
+        .flatten()
+        .as_deref()
+        == Some("1")
+    {
+        return;
+    }
+    let _ = ledger.set_setting(SETTING_APARTADO_HEREDADO, "1");
+    let Ok(cambios) = ledger.changes(500) else {
+        return;
+    };
+    let vacio = |k: &str| {
+        ledger
+            .setting(k)
+            .ok()
+            .flatten()
+            .is_none_or(|v| v.is_empty())
+    };
+    let por_licencia = |c: &guardiana_core::Change, kind: ChangeKind| {
+        c.kind == kind && c.who == ChangeWho::Licencia.as_str()
+    };
+    let ultimo_hogar = cambios
+        .iter()
+        .find(|c| matches!(c.kind, ChangeKind::HogarOn | ChangeKind::HogarOff));
+    if ultimo_hogar.is_some_and(|c| por_licencia(c, ChangeKind::HogarOff))
+        && ledger.setting(SETTING_HOME_MODE).ok().flatten().as_deref() != Some("1")
+        && vacio(SETTING_HOME_APARCADO)
+    {
+        let _ = ledger.set_setting(SETTING_HOME_APARCADO, "1");
+    }
+    let ultimo_dns = cambios
+        .iter()
+        .find(|c| matches!(c.kind, ChangeKind::DnsOn | ChangeKind::DnsOff));
+    if ultimo_dns.is_some_and(|c| por_licencia(c, ChangeKind::DnsOff))
+        && vacio(SETTING_BACKUP)
+        && vacio(SETTING_BACKUP_APARCADA)
+    {
+        if let Some(json) = sysdns::snapshot(now_ms())
+            .ok()
+            .and_then(|b| serde_json::to_string(&b).ok())
+        {
+            let _ = ledger.set_setting(SETTING_BACKUP_APARCADA, &json);
+        }
+    }
+}
+
+/// Give the system DNS back on standing down and park the copy. `true` when nothing of ours is
+/// left pointing at the guardian.
+///
+/// The copy moves only once the undo really happened. It used to be cleared first: one interface
+/// that no longer exists (the trip's VPN) made restore() fail, and the only record of the
+/// previous DNS was gone (review of 1 Oct 2026). An undo that failed on such an interface while
+/// every connected one no longer points here is done all the same: retrying it would fail
+/// forever. Otherwise the stood-down program tries again every minute (`esperar_licencia`).
+fn devolver_dns_al_apartarse(ledger: &Ledger) -> bool {
+    let Ok(Some(json)) = ledger.setting(SETTING_BACKUP) else {
+        return true;
+    };
+    if json.is_empty() {
+        return true;
+    }
+    let Ok(backup) = serde_json::from_str::<Backup>(&json) else {
+        return true;
+    };
+    let hecho = sysdns::restore(&backup).is_ok() || sysdns::guardian_is_primary() == Some(false);
+    if hecho {
+        let _ = ledger.set_setting(SETTING_BACKUP_APARCADA, &json);
+        let _ = ledger.set_setting(SETTING_BACKUP, "");
+        let _ = ledger.record_change(
+            now_ms(),
+            guardiana_core::ChangeKind::DnsOff,
+            guardiana_core::ChangeWho::Licencia,
+            "",
+        );
+    }
+    hecho
+}
+
+/// The licence is back: what standing down parked comes back on. Returns whether the system DNS
+/// (the copy, to be applied by the next pass once the resolver listens) and Home Mode came back.
+///
+/// The copy taken now, not the parked one: while the program stood aside the person may have
+/// moved to another network or changed the DNS by hand, and the undo has to put back what there
+/// is today. The parked one only if a fresh one cannot be taken.
+fn volver_del_apartado(ledger: &Ledger) -> (bool, bool) {
+    let mut dns = false;
+    if let Ok(Some(aparcada)) = ledger.setting(SETTING_BACKUP_APARCADA) {
+        if !aparcada.is_empty() {
+            let libre = ledger
+                .setting(SETTING_BACKUP)
+                .ok()
+                .flatten()
+                .is_none_or(|v| v.is_empty());
+            if libre {
+                let copia = sysdns::snapshot(now_ms())
+                    .ok()
+                    .or_else(|| serde_json::from_str::<Backup>(&aparcada).ok());
+                if let Some(json) = copia.as_ref().and_then(|b| serde_json::to_string(b).ok()) {
+                    if ledger.set_setting(SETTING_BACKUP, &json).is_ok() {
+                        dns = true;
+                        let originales = copia
+                            .map(|b| {
+                                b.original_servers()
+                                    .iter()
+                                    .map(ToString::to_string)
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            })
+                            .unwrap_or_default();
+                        let _ = ledger.record_change(
+                            now_ms(),
+                            guardiana_core::ChangeKind::DnsOn,
+                            guardiana_core::ChangeWho::Licencia,
+                            &originales,
+                        );
+                    }
+                }
+            }
+            let _ = ledger.set_setting(SETTING_BACKUP_APARCADA, "");
+        }
+    }
+    let mut hogar = false;
+    if ledger
+        .setting(SETTING_HOME_APARCADO)
+        .ok()
+        .flatten()
+        .as_deref()
+        == Some("1")
+    {
+        let _ = ledger.set_setting(SETTING_HOME_MODE, "1");
+        let _ = ledger.set_setting(SETTING_HOME_APARCADO, "");
+        let _ = ledger.record_change(
+            now_ms(),
+            guardiana_core::ChangeKind::HogarOn,
+            guardiana_core::ChangeWho::Licencia,
+            "",
+        );
+        hogar = true;
+    }
+    (dns, hogar)
+}
+
+/// The LAN address the relay of a stood-down program should listen on: `None` unless Home Mode
+/// was parked and the computer has a private LAN address.
+fn relevo_wanted(ledger: &Ledger) -> Option<std::net::Ipv4Addr> {
+    let aparcado = ledger
+        .setting(SETTING_HOME_APARCADO)
+        .ok()
+        .flatten()
+        .is_some_and(|v| v == "1");
+    if !aparcado {
+        return None;
+    }
+    guardiana_devices::local_lan_ipv4()
+        .filter(|lan| guardiana_devices::is_private_lan(IpAddr::V4(*lan)))
+        .filter(|_| en_red_de_casa(ledger))
+}
+
+/// The relay's policy: pass everything on, write nothing down. The program is not watching, and
+/// the household's queries are not its to keep.
+struct Relevo;
+
+impl Policy for Relevo {
+    fn decide(&self, _: &Query) -> Decision {
+        Decision::Forward
+    }
+    fn record(&self, _: &Query, _: Outcome) {}
+}
+
+/// Start the relay of a stood-down program on the LAN, or say why it could not.
+async fn arrancar_relevo(
+    lan: std::net::Ipv4Addr,
+    port: u16,
+    upstreams: &[SocketAddr],
+) -> Option<dns::Running> {
+    let t = i18n::current();
+    let addr = SocketAddr::new(IpAddr::V4(lan), port);
+    let arriba: Vec<SocketAddr> = upstreams.iter().copied().filter(|u| *u != addr).collect();
+    if arriba.is_empty() {
+        println!("{}", t.cli("observe.relevo_sin_arriba"));
+        return None;
+    }
+    let mut c = Config::local(arriba.clone());
+    c.listen = vec![addr];
+    c.self_check = false;
+    match dns::start(c, Relevo).await {
+        Ok(r) => {
+            println!(
+                "{}",
+                t.cli("observe.relevo")
+                    .replace("{addr}", &addr.to_string())
+                    .replace("{upstream}", &lista_de(&arriba))
+            );
+            Some(r)
+        }
+        Err(e) => {
+            eprintln!(
+                "{}",
+                t.cli("observe.relevo_error")
+                    .replace("{error}", &e.to_string())
+            );
+            None
+        }
+    }
+}
+
+/// Why a stood-down program stops waiting.
+enum Vuelta {
+    /// The program may work again.
+    Licencia,
+    /// The relay must be rebuilt or closed: Home Mode was switched off, or the LAN changed.
+    Relevo,
+}
+
+/// How often a stood-down program reads the licence again: a key typed in the panel brings it
+/// back within this, not at the next restart.
+const LICENCIA_RELECTURA: Duration = Duration::from_secs(15);
+/// How often a stood-down program retries a check that could not be done, like a running one.
+const LICENCIA_REINTENTO: Duration = Duration::from_secs(60 * 60);
+/// How often a stood-down program tries again to give back a DNS it could not give back.
+const DEVOLVER_REINTENTO: Duration = Duration::from_secs(60);
+
+/// Returns once the program may work again: a key was activated, the gateway answered a retried
+/// check, or the clock says so; or once the relay has to change. Each read opens the ledger
+/// afresh, so what the panel wrote is seen.
+async fn esperar_licencia(
+    db: std::path::PathBuf,
+    secret: String,
+    relevo: Option<std::net::Ipv4Addr>,
+) -> Vuelta {
+    let mut ultimo_intento: Option<Instant> = None;
+    let mut ultima_devolucion = Instant::now();
+    loop {
+        tokio::time::sleep(LICENCIA_RELECTURA).await;
+        let toca = ultimo_intento.is_none_or(|t| t.elapsed() >= LICENCIA_REINTENTO);
+        let devolver = ultima_devolucion.elapsed() >= DEVOLVER_REINTENTO;
+        if devolver {
+            ultima_devolucion = Instant::now();
+        }
+        let (db2, secret2) = (db.clone(), secret.clone());
+        // The ledger and the gateway are blocking: off the runtime's threads.
+        let lista = tokio::task::spawn_blocking(move || {
+            let mut l = Ledger::open(&db2, identity::genesis()).ok()?;
+            if devolver {
+                // A DNS that could not be given back when standing down (licence medium item).
+                devolver_dns_al_apartarse(&l);
+            }
+            if toca {
+                // What 1.0.1 left that is not taken on trust: asked once (licence item 7).
+                let _ = guardiana_license::revisar_herencia(&mut l, &secret2, now_ms());
+                if guardiana_license::check_due(&l, &secret2, now_ms()).unwrap_or(false) {
+                    let _ = guardiana_license::check_if_due(&mut l, &secret2, now_ms());
+                }
+            }
+            let puede =
+                guardiana_license::status(&l, &secret2, now_ms()).is_ok_and(|s| s.puede_funcionar);
+            Some((puede, relevo_wanted(&l)))
+        })
+        .await
+        .ok()
+        .flatten();
+        // Whatever came of it, a turn that could ask has asked: the next one is in an hour. Until
+        // 1.0.2 only an answer counted, and with no network the inherited licence was asked
+        // about every 15 seconds, 239 times an hour (review of 5 Oct 2026, licence medium).
+        if toca {
+            ultimo_intento = Some(Instant::now());
+        }
+        match lista {
+            Some((true, _)) => return Vuelta::Licencia,
+            Some((false, ahora)) if ahora != relevo => return Vuelta::Relevo,
+            _ => {}
+        }
     }
 }
 
@@ -486,6 +1072,155 @@ fn puede_funcionar(ledger: &Ledger, secret: &str) -> bool {
     guardiana_license::status(ledger, secret, now_ms())
         .map(|s| s.puede_funcionar)
         .unwrap_or(true)
+}
+
+/// The upstreams that come automatically, as `IpAddr:53`, never this machine itself, with the
+/// start-up line that says where they came from.
+///
+/// In order: the live resolvers of the network behind the saved copy (or the parked one while
+/// the program stands aside), what the system uses now, the last good ones the network gave,
+/// the ones recorded in the copy, and the router. The live source alone was not enough: with
+/// Home Mode the router hands every device the computer's own address as DNS, the computer
+/// takes it too, and until 1.0.2 Guardiana forwarded the whole house back to itself until each
+/// query timed out (review of 5 Oct 2026, critical 3). Never a public resolver nobody chose.
+fn arriba_automatico(ledger: &Ledger) -> Result<Vec<SocketAddr>, String> {
+    let t = i18n::current();
+    let saved: Option<Backup> = [SETTING_BACKUP, SETTING_BACKUP_APARCADA]
+        .iter()
+        .find_map(|k| match ledger.setting(k) {
+            Ok(Some(json)) if !json.is_empty() => serde_json::from_str(&json).ok(),
+            _ => None,
+        });
+    let vivos = saved
+        .as_ref()
+        .map(sysdns::upstreams_for)
+        .unwrap_or_default();
+    let buenos: Vec<IpAddr> = ledger
+        .setting(SETTING_UPSTREAM_BUENO)
+        .ok()
+        .flatten()
+        .unwrap_or_default()
+        .split(',')
+        .filter_map(|s| s.trim().parse().ok())
+        .collect();
+    let copia: Vec<IpAddr> = saved
+        .as_ref()
+        .map(|b| {
+            b.original_servers()
+                .into_iter()
+                .filter(|ip| sysdns::usable_upstream(*ip))
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut fuente_sistema = String::new();
+    let sistema = || {
+        sysdns::current_resolvers()
+            .map(|c| {
+                fuente_sistema = format!("{:?}", c.source);
+                c.servers.iter().map(SocketAddr::ip).collect()
+            })
+            .unwrap_or_default()
+    };
+    match escoger_arriba(vivos, sistema, buenos, copia, sysdns::default_gateway) {
+        Ok((fuente, v)) => {
+            let linea = match fuente {
+                Fuente::Copia => t.cli("observe.upstream_copia"),
+                Fuente::Sistema => t.cli("observe.upstream_auto"),
+                Fuente::Respaldo => t.cli("observe.upstream_propio"),
+            };
+            if fuente != Fuente::Respaldo {
+                guardar_buenos(ledger, &v);
+            }
+            println!(
+                "{}",
+                linea
+                    .replace("{servers}", &lista_de(&v))
+                    .replace("{fuente}", &fuente_sistema)
+            );
+            Ok(v)
+        }
+        Err(todo_propio) => Err(t
+            .cli(if todo_propio {
+                "observe.solo_propio"
+            } else {
+                "observe.sin_upstream"
+            })
+            .to_owned()),
+    }
+}
+
+/// Where the automatic upstreams of a pass came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Fuente {
+    /// The live resolvers behind the saved copy.
+    Copia,
+    /// What the system uses now.
+    Sistema,
+    /// A fallback, because every live answer was this machine.
+    Respaldo,
+}
+
+/// The first list, in the order of [`arriba_automatico`], that holds an address that is not this
+/// machine, with port 53 and only those addresses. The system and the router are asked only
+/// when needed: on Windows each is a PowerShell. `Err(true)` when there were resolvers and every
+/// one was this machine; `Err(false)` when there were none at all.
+fn escoger_arriba(
+    vivos: Vec<IpAddr>,
+    sistema: impl FnOnce() -> Vec<IpAddr>,
+    buenos: Vec<IpAddr>,
+    copia: Vec<IpAddr>,
+    puerta: impl FnOnce() -> Option<IpAddr>,
+) -> Result<(Fuente, Vec<SocketAddr>), bool> {
+    let ajenas = |ips: Vec<IpAddr>| -> Vec<SocketAddr> {
+        let mut out: Vec<SocketAddr> = Vec::new();
+        for ip in sysdns::away_from_self(ips) {
+            let a = SocketAddr::new(ip, 53);
+            if !out.contains(&a) {
+                out.push(a);
+            }
+        }
+        out
+    };
+    let mut habia = !vivos.is_empty();
+    let v = ajenas(vivos);
+    if !v.is_empty() {
+        return Ok((Fuente::Copia, v));
+    }
+    let sistema = sistema();
+    habia |= !sistema.is_empty();
+    let v = ajenas(sistema);
+    if !v.is_empty() {
+        return Ok((Fuente::Sistema, v));
+    }
+    for lista in [buenos, copia] {
+        let v = ajenas(lista);
+        if !v.is_empty() {
+            return Ok((Fuente::Respaldo, v));
+        }
+    }
+    let v = ajenas(puerta().into_iter().collect());
+    if !v.is_empty() {
+        return Ok((Fuente::Respaldo, v));
+    }
+    Err(habia)
+}
+
+/// Remember the upstreams the network gave this time, for the day it gives only this machine.
+fn guardar_buenos(ledger: &Ledger, v: &[SocketAddr]) {
+    let texto = v
+        .iter()
+        .map(|s| s.ip().to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    if ledger
+        .setting(SETTING_UPSTREAM_BUENO)
+        .ok()
+        .flatten()
+        .as_deref()
+        != Some(texto.as_str())
+    {
+        let _ = ledger.set_setting(SETTING_UPSTREAM_BUENO, &texto);
+    }
 }
 
 /// One pass: open the ledger, build the listeners for the current network,
@@ -523,56 +1258,47 @@ async fn run_once<F: Future<Output = ()>>(
             .unwrap_or_default();
     // Home Mode is free (decision 52): no licence gate.
     let home_allowed = home_on;
+    // Only on the network it was switched on in (see `en_red_de_casa`).
+    let fuera_de_casa = home_allowed && !en_red_de_casa(&ledger);
 
-    // Upstream: what the caller said; else the resolvers saved before Guardiana
-    // changed the system DNS (brief §4); else whatever the system uses now.
-    let saved: Option<Backup> = match ledger.setting(SETTING_BACKUP)? {
-        Some(json) if !json.is_empty() => serde_json::from_str(&json).ok(),
-        _ => None,
-    };
-    let upstreams: Vec<SocketAddr> = if !cfg.upstreams.is_empty() {
-        cfg.upstreams.clone()
-    } else if let Some(servers) = saved
-        .as_ref()
-        .map(sysdns::upstreams_for)
-        .filter(|v| !v.is_empty())
-    {
-        let servers: Vec<SocketAddr> = servers
-            .into_iter()
-            .map(|ip| SocketAddr::new(ip, 53))
-            .collect();
-        println!(
-            "{}",
-            t.cli("observe.upstream_copia").replace(
-                "{servers}",
-                &servers
-                    .iter()
-                    .map(|s| s.ip().to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )
-        );
-        servers
+    // Upstream: what the caller said; else the resolvers saved before Guardiana changed the
+    // system DNS (brief §4), the parked copy while it stands aside, or whatever the system uses
+    // now; never this machine itself (critical 3 of 5 Oct 2026, see `arriba_automatico`).
+    let arriba: Result<Vec<SocketAddr>, String> = if cfg.upstreams.is_empty() {
+        arriba_automatico(&ledger)
     } else {
-        let current = sysdns::current_resolvers().ok_or_else(|| t.cli("observe.sin_upstream"))?;
-        println!(
-            "{}",
-            t.cli("observe.upstream_auto")
-                .replace("{fuente}", &format!("{:?}", current.source))
-        );
-        current.servers
+        Ok(cfg.upstreams.clone())
     };
-    if upstreams.contains(&cfg.listen) {
-        return Err(t.cli("observe.bucle").into());
-    }
 
     // La prueba o la suscripción terminaron: Guardiana se aparta. No abre el resolutor, devuelve
-    // el DNS del sistema a como estaba y apaga el Modo Hogar; solo queda el panel en pie para que
+    // el DNS del sistema a como estaba y aparca el Modo Hogar; solo queda el panel en pie para que
     // se pueda activar Plus o llevarse el extracto. Nunca se queda en medio sin resolver: eso
-    // dejaría el equipo sin internet el día que caduca una suscripción.
+    // dejaría el equipo sin internet el día que caduca una suscripción. Y si el Modo Hogar estaba
+    // encendido, el router sigue mandando aquí a toda la casa: un relevo en la LAN pasa sus
+    // consultas sin mirarlas hasta que el router se devuelva o vuelva la licencia.
     if !puede_funcionar(&ledger, &secret) {
         stand_down(&ledger);
-        println!("{}", t.cli("observe.caducado"));
+        // A customer whose subscription lapsed is not told "the trial is over".
+        let fue_plus = guardiana_license::status(&ledger, &secret, now_ms())
+            .is_ok_and(|s| matches!(s.plan, guardiana_license::Plan::PlusTerminado { .. }));
+        println!(
+            "{}",
+            t.cli(if fue_plus {
+                "observe.caducado_plus"
+            } else {
+                "observe.caducado"
+            })
+        );
+        let relevo_lan = relevo_wanted(&ledger);
+        let relevo = match (relevo_lan, arriba.as_ref()) {
+            (Some(lan), Ok(ups)) => arrancar_relevo(lan, cfg.listen.port(), ups).await,
+            (Some(_), Err(e)) => {
+                println!("{e}");
+                println!("{}", t.cli("observe.relevo_sin_arriba"));
+                None
+            }
+            (None, _) => None,
+        };
         let panel_cfg = cfg.panel.then(|| guardiana_panel::Config {
             listen: vec![cfg.panel_listen],
             optional_listen: Vec::new(),
@@ -590,7 +1316,11 @@ async fn run_once<F: Future<Output = ()>>(
         let panel = match panel_cfg {
             Some(pc) => match guardiana_panel::start(pc).await {
                 Ok(p) => {
-                    println!("{}", t.cli("observe.panel").replace("{url}", &p.url()));
+                    println!(
+                        "{}",
+                        t.cli("observe.panel")
+                            .replace("{url}", &panel_link(&p, cfg.print_events))
+                    );
                     if first && cfg.open_browser {
                         open_in_browser(&p.url());
                     }
@@ -600,11 +1330,69 @@ async fn run_once<F: Future<Output = ()>>(
             },
             None => None,
         };
-        shutdown.as_mut().await;
+        // Stood down is not stopped. Until 1.0.2 this branch only waited for shutdown: a
+        // subscription cut because it could not be checked was never asked about again, and a
+        // key activated in the panel, or a payment the gateway took, changed nothing until the
+        // machine restarted. A customer who paid stayed unwatched (review of 5 Oct 2026, licence
+        // item 3). Now the licence is read again every few seconds, a check that could not be
+        // done is retried every hour, and the moment the program may work it comes back, with
+        // the DNS and Home Mode it had.
+        let exit = tokio::select! {
+            () = shutdown.as_mut() => Exit::Shutdown,
+            v = esperar_licencia(cfg.db.clone(), secret.clone(), relevo_lan) => match v {
+                Vuelta::Licencia => {
+                    let db = cfg.db.clone();
+                    let (dns_vuelve, hogar_vuelve) = tokio::task::spawn_blocking(move || {
+                        Ledger::open(&db, identity::genesis())
+                            .map(|l| volver_del_apartado(&l))
+                            .unwrap_or_default()
+                    })
+                    .await
+                    .unwrap_or_default();
+                    println!(
+                        "{}",
+                        t.cli(if dns_vuelve {
+                            "observe.vuelve_licencia"
+                        } else {
+                            "observe.vuelve_licencia_sin_dns"
+                        })
+                    );
+                    if hogar_vuelve {
+                        println!("{}", t.cli("observe.vuelve_hogar"));
+                    }
+                    Exit::Reconfigure
+                }
+                Vuelta::Relevo => Exit::Reconfigure,
+            }
+        };
         if let Some(p) = panel {
             p.shutdown().await;
         }
-        return Ok(Exit::Shutdown);
+        if let Some(r) = relevo {
+            r.shutdown();
+            let _ = r.wait().await;
+        }
+        return Ok(exit);
+    }
+
+    let upstreams = arriba.map_err(Box::<dyn Error>::from)?;
+    // A typed upstream that is one of the addresses this pass listens on would send every query
+    // back to itself until it timed out.
+    let mut escucha_propia = vec![cfg.listen];
+    if cfg.listen.ip().is_loopback() {
+        escucha_propia.push(SocketAddr::new(
+            IpAddr::V6(std::net::Ipv6Addr::LOCALHOST),
+            cfg.listen.port(),
+        ));
+    }
+    if let Some(lan) = home_allowed
+        .then(guardiana_devices::local_lan_ipv4)
+        .flatten()
+    {
+        escucha_propia.push(SocketAddr::new(IpAddr::V4(lan), cfg.listen.port()));
+    }
+    if upstreams.iter().any(|u| escucha_propia.contains(u)) {
+        return Err(t.cli("observe.bucle").into());
     }
 
     let mut classifier = Classifier::new(Arc::new(Catalog::bundled()));
@@ -614,13 +1402,16 @@ async fn run_once<F: Future<Output = ()>>(
         }
     }
     let block_mode = block_mode_of(&ledger);
-    let initial_rules = ledger.rules().unwrap_or_default();
+    let initial_rules = reglas_legibles(ledger.rules().unwrap_or_default());
     let initial_version = ledger.rules_version().unwrap_or(0);
+    let salud = Arc::new(Salud::default());
     let policy = EnginePolicy {
+        salud: Arc::clone(&salud),
         inner: Mutex::new(Inner {
             ledger,
             classifier,
             devices_seen: HashMap::new(),
+            devices_touched: HashMap::new(),
             rules: RuleCache {
                 rules: initial_rules,
                 version: initial_version,
@@ -634,6 +1425,7 @@ async fn run_once<F: Future<Output = ()>>(
         devices: guardiana_devices::Resolver::default(),
         texts: t,
         print_events: cfg.print_events,
+        callados_avisados: Mutex::default(),
         apps: match guardiana_apps::Observador::arrancar() {
             Ok(o) => Some(Arc::new(o)),
             Err(guardiana_apps::Error::NoSoportado) => None,
@@ -666,7 +1458,10 @@ async fn run_once<F: Future<Output = ()>>(
     let mut home_lan: Option<std::net::Ipv4Addr> = None;
     let mut panel_listen: Vec<SocketAddr> = vec![cfg.panel_listen];
     let mut panel_optional: Vec<SocketAddr> = Vec::new();
-    if home_allowed {
+    if fuera_de_casa {
+        println!("{}", t.cli("observe.hogar_otra_red"));
+    }
+    if home_allowed && !fuera_de_casa {
         match guardiana_devices::local_lan_ipv4() {
             Some(lan) if guardiana_devices::is_private_lan(IpAddr::V4(lan)) => {
                 let (dns_addr, panel_addr) = home::lan_listen_addrs(lan);
@@ -780,8 +1575,8 @@ async fn run_once<F: Future<Output = ()>>(
     // Now that something answers on 127.0.0.1 and ::1, point the machine back at it: the last
     // stop gave the old DNS back (give_dns_back_while_stopped), and an update from a version that
     // left a reserve behind or ignored IPv6 is corrected here, on the first start, not a minute
-    // later.
-    if cfg!(target_os = "windows") {
+    // later. On every system since 1.0.2, because every system now gives the DNS back on stop.
+    {
         let db = cfg.db.clone();
         let _ = tokio::task::spawn_blocking(move || {
             if let Ok(l) = Ledger::open(&db, identity::genesis()) {
@@ -809,8 +1604,14 @@ async fn run_once<F: Future<Output = ()>>(
     let panel = match panel_cfg {
         Some(pc) => match guardiana_panel::start(pc).await {
             Ok(p) => {
-                println!("{}", t.cli("observe.panel").replace("{url}", &p.url()));
-                println!("{}", t.cli("observe.panel_nota"));
+                println!(
+                    "{}",
+                    t.cli("observe.panel")
+                        .replace("{url}", &panel_link(&p, cfg.print_events))
+                );
+                if cfg.print_events {
+                    println!("{}", t.cli("observe.panel_nota"));
+                }
                 for (addr, why) in &p.failed_optional {
                     println!(
                         "{}",
@@ -846,8 +1647,20 @@ async fn run_once<F: Future<Output = ()>>(
     let keep_dir = cfg.db.parent().map(std::path::Path::to_path_buf);
     let keep_secret = secret.clone();
     // What the resolver forwards to in this pass, to notice when the network changes it.
-    let seguir_red = cfg.upstreams.is_empty() && cfg!(target_os = "windows");
+    // Only when the upstreams came automatically: a person who typed --upstream chose. It was
+    // Windows-only until 1 Oct 2026; macOS reads the DHCP lease now, and Linux asks whoever
+    // configures the link (NetworkManager, systemd-networkd, resolved) since the review of that
+    // day. A system with no live source returns nothing, and the saved servers stay.
+    let seguir_red = cfg.upstreams.is_empty();
+    // The address this pass started on. When it changes (the laptop woke up in another network,
+    // the cable went in) the pass is rebuilt within 15 seconds with the new network's resolvers.
+    // Until 1.0.2 only the minute check noticed, and a Mac waking up elsewhere could go up to a
+    // minute without names, asking a router that was not there (review of 5 Oct 2026).
+    let lan_inicial = guardiana_devices::local_lan_ipv4();
     let keep_upstreams: Vec<IpAddr> = upstreams.iter().map(SocketAddr::ip).collect();
+    let keep_upstream_addrs: Vec<SocketAddr> = upstreams.clone();
+    let keep_salud = Arc::clone(&salud);
+    let mut aparte = Aparte::default();
     let keep_block_mode = block_mode;
     let (reconfigure_tx, mut reconfigure) = tokio::sync::oneshot::channel::<()>();
     let (caducado_tx, mut caducado) = tokio::sync::oneshot::channel::<()>();
@@ -880,6 +1693,8 @@ async fn run_once<F: Future<Output = ()>>(
                         if let Ok(l) = Ledger::open(&keep_db, identity::genesis()) {
                             if home_lan_wanted(&l, &keep_secret) != home_lan
                                 || block_mode_of(&l) != keep_block_mode
+                                || (seguir_red
+                                    && guardiana_devices::local_lan_ipv4() != lan_inicial)
                             {
                                 if let Some(tx) = reconfigure_tx.take() {
                                     let _ = tx.send(());
@@ -898,13 +1713,47 @@ async fn run_once<F: Future<Output = ()>>(
                                 let _ = tx.send(());
                             }
                         } else {
-                            reapply_dns_if_dropped(&l);
+                            let (ok, fallos) = keep_salud.minuto();
+                            match aparte.minuto(ok, fallos) {
+                                Paso::Nada => {}
+                                Paso::Comprobar => {
+                                    if !dns::upstream_answers(&keep_upstream_addrs, SONDA).await {
+                                        let lista = lista_de(&keep_upstream_addrs);
+                                        println!(
+                                            "{}",
+                                            i18n::current()
+                                                .cli("observe.sin_arriba")
+                                                .replace("{upstream}", &lista)
+                                        );
+                                        devolver_por_silencio(&l, &lista);
+                                        aparte.apartado = true;
+                                    }
+                                }
+                                Paso::Sondear => {
+                                    if dns::upstream_answers(&keep_upstream_addrs, SONDA).await {
+                                        if volver_con_arriba(&l) {
+                                            aparte.apartado = false;
+                                        }
+                                    } else if sysdns::guardian_is_primary() == Some(true) {
+                                        // The undo failed last minute, or someone pointed the
+                                        // machine back here while the network is still quiet:
+                                        // it goes back again, or they are left without names.
+                                        devolver_por_silencio(&l, &lista_de(&keep_upstream_addrs));
+                                    }
+                                }
+                            }
+                            if !aparte.apartado {
+                                reapply_dns_if_dropped(&l);
+                            }
                             // A laptop that moved from home to the office: the resolvers that
                             // came automatically are now the office's. Rebuild with them.
                             if seguir_red && reconfigure_tx.is_some() {
                                 if let Ok(Some(json)) = l.setting(SETTING_BACKUP) {
                                     if let Ok(b) = serde_json::from_str::<Backup>(&json) {
-                                        let ahora = sysdns::upstreams_for(&b);
+                                        // The same sieve as at the start of the pass: a list
+                                        // that is only this machine is no reason to rebuild.
+                                        let ahora =
+                                            sysdns::away_from_self(sysdns::upstreams_for(&b));
                                         if !ahora.is_empty() && ahora != keep_upstreams {
                                             if let Some(tx) = reconfigure_tx.take() {
                                                 let _ = tx.send(());
@@ -924,13 +1773,19 @@ async fn run_once<F: Future<Output = ()>>(
                     }
                 }
                 _ = hour.tick() => {
-                    if let Ok(mut l) = Ledger::open(&keep_db, identity::genesis()) {
-                        // The once-per-period check of a Plus key (decision 52). Nothing is
-                        // pruned any more: there is one plan, and while it is on the whole
-                        // history is kept. The extract is the person's, and deleting a piece of
-                        // it to sell them the rest is not something this program does.
-                        let _ = guardiana_license::check_if_due(&mut l, &keep_secret, now_ms());
-                    }
+                    // The once-per-period check of a Plus key (decision 52). Nothing is pruned any
+                    // more: there is one plan, and while it is on the whole history is kept. The
+                    // extract is the person's, and deleting a piece of it to sell them the rest is
+                    // not something this program does. Off the runtime's threads: the call can
+                    // wait 20 seconds for the gateway, and the resolver runs on these threads
+                    // (review of 5 Oct 2026, licence medium).
+                    let (db, secreto) = (keep_db.clone(), keep_secret.clone());
+                    let _ = tokio::task::spawn_blocking(move || {
+                        if let Ok(mut l) = Ledger::open(&db, identity::genesis()) {
+                            let _ = guardiana_license::check_if_due(&mut l, &secreto, now_ms());
+                        }
+                    })
+                    .await;
                 }
             }
         }
@@ -994,20 +1849,107 @@ fn reapply_dns_if_dropped(ledger: &Ledger) {
         return;
     };
     if sysdns::guardian_is_primary() == Some(false) {
-        let _ = sysdns::apply(&backup, IpAddr::V4(std::net::Ipv4Addr::LOCALHOST));
+        let _ = reapuntar(ledger, backup);
+    }
+}
+
+/// Point the machine at the guardian with `backup`, after adding to it any interface that
+/// appeared since it was taken (`sysdns::with_new_interfaces`). The copy that grew is written
+/// down before anything changes, so the undo covers what this changes.
+fn reapuntar(ledger: &Ledger, backup: Backup) -> Result<(), sysdns::Error> {
+    let backup = match sysdns::snapshot(now_ms())
+        .ok()
+        .and_then(|fresca| sysdns::with_new_interfaces(&backup, &fresca))
+    {
+        Some(junta) => match serde_json::to_string(&junta) {
+            Ok(json) if ledger.set_setting(SETTING_BACKUP, &json).is_ok() => junta,
+            _ => backup,
+        },
+        None => backup,
+    };
+    sysdns::apply(&backup, IpAddr::V4(std::net::Ipv4Addr::LOCALHOST))
+}
+
+/// The panel's address as the start-up line shows it: with the session key when a person is
+/// reading the terminal (`guardiana observe`), without it when the line goes to the service
+/// log. The log is kept by the system, survives reboots and "delete everything", and on Linux
+/// is readable by every member of `adm` or `systemd-journal`: a key written there is a key
+/// shared (review of 1 Oct 2026, finding 15). The launcher reads the key from its file instead.
+fn panel_link(p: &guardiana_panel::Running, with_token: bool) -> String {
+    link_text(p.addrs.first().copied(), &p.token, with_token)
+}
+
+fn link_text(addr: Option<SocketAddr>, token: &str, with_token: bool) -> String {
+    match addr {
+        None => String::new(),
+        Some(a) if with_token => guardiana_panel::panel_url(a, token),
+        Some(a) => format!("http://{a}/"),
+    }
+}
+
+/// The text of `url` as an AppleScript string literal, quotes and backslashes escaped.
+#[cfg(any(test, target_os = "macos"))]
+fn applescript_string(url: &str) -> String {
+    let mut out = String::with_capacity(url.len() + 2);
+    out.push('"');
+    for c in url.chars() {
+        if c == '"' || c == '\\' {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out.push('"');
+    out
+}
+
+/// Open `url` on macOS without putting it on any command line: `osascript` reads the script
+/// from its standard input, and `open location` hands the URL to the default browser through
+/// Launch Services. `open <url>` would show the session key to `ps` for as long as it runs
+/// (review of 1 Oct 2026, finding 15).
+#[cfg(target_os = "macos")]
+fn open_via_osascript(url: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let mut child = Command::new("osascript")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(format!("open location {}\n", applescript_string(url)).as_bytes())?;
+    }
+    if child.wait()?.success() {
+        Ok(())
+    } else {
+        Err(std::io::Error::other("osascript could not open the url"))
     }
 }
 
 /// Open the panel URL in the default browser, best effort.
+///
+/// On Windows another standard user cannot read this process's command line, and on macOS
+/// the URL travels on standard input (`open_via_osascript`). On Linux `xdg-open` and the
+/// browser it starts carry the URL in their arguments, which `/proc` shows to every local
+/// user: the honest fix is a one-use ticket issued by the panel instead of the key in the
+/// URL, which belongs to the panel crate (review of 1 Oct 2026, finding 15).
 pub fn open_in_browser(url: &str) {
     #[cfg(target_os = "windows")]
     let result = std::process::Command::new("cmd")
         .args(["/C", "start", "", url])
-        .spawn();
+        .spawn()
+        .map(|_| ());
     #[cfg(target_os = "macos")]
-    let result = std::process::Command::new("open").arg(url).spawn();
+    let result = open_via_osascript(url).or_else(|_| {
+        std::process::Command::new("open")
+            .arg(url)
+            .spawn()
+            .map(|_| ())
+    });
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    let result = std::process::Command::new("xdg-open").arg(url).spawn();
+    let result = std::process::Command::new("xdg-open")
+        .arg(url)
+        .spawn()
+        .map(|_| ());
     let _ = result;
 }
 
@@ -1043,5 +1985,359 @@ mod tests_alcance {
         assert!(!a.cortar);
         assert!(a.patrones.is_empty());
         assert!(!a.cubre("github.com"));
+    }
+}
+
+#[cfg(test)]
+mod panel_link_tests {
+    use super::{applescript_string, link_text};
+
+    /// The session key is never written where a log can keep it: the service line shows the
+    /// address alone, the terminal line the full link (review of 1 Oct 2026, finding 15).
+    #[test]
+    fn the_service_line_has_no_key_and_the_terminal_line_has_it() {
+        let addr: std::net::SocketAddr =
+            "127.0.0.1:7443".parse().unwrap_or_else(|_| unreachable!());
+        assert_eq!(
+            link_text(Some(addr), "s3cret", true),
+            "http://127.0.0.1:7443/?t=s3cret"
+        );
+        let service = link_text(Some(addr), "s3cret", false);
+        assert_eq!(service, "http://127.0.0.1:7443/");
+        assert!(!service.contains("s3cret"));
+        assert_eq!(link_text(None, "s3cret", false), "");
+    }
+
+    #[test]
+    fn applescript_literal_escapes_quotes_and_backslashes() {
+        assert_eq!(
+            applescript_string("http://127.0.0.1:7443/?t=abc"),
+            "\"http://127.0.0.1:7443/?t=abc\""
+        );
+        assert_eq!(applescript_string("a\"b\\c"), "\"a\\\"b\\\\c\"");
+    }
+}
+
+#[cfg(test)]
+mod aparte_tests {
+    use super::*;
+
+    #[test]
+    fn a_quiet_minute_or_one_lost_packet_is_not_a_dead_network() {
+        assert!(!minuto_sin_arriba(0, 0));
+        assert!(!minuto_sin_arriba(0, 2));
+        assert!(!minuto_sin_arriba(1, 50));
+        assert!(minuto_sin_arriba(0, 3));
+    }
+
+    #[test]
+    fn a_silent_minute_asks_and_once_aside_it_only_probes() {
+        let mut a = Aparte::default();
+        assert_eq!(a.minuto(5, 0), Paso::Nada);
+        assert_eq!(a.minuto(0, 2), Paso::Nada);
+        assert_eq!(a.minuto(3, 40), Paso::Nada);
+        assert_eq!(a.minuto(0, 10), Paso::Comprobar);
+        a.apartado = true;
+        assert_eq!(a.minuto(0, 10), Paso::Sondear);
+        assert_eq!(a.minuto(9, 0), Paso::Sondear);
+        a.apartado = false;
+        assert_eq!(a.minuto(9, 0), Paso::Nada);
+    }
+
+    #[test]
+    fn the_health_counter_reads_and_resets() {
+        let s = Salud::default();
+        s.anota(Outcome::UpstreamFailed);
+        s.anota(Outcome::UpstreamFailed);
+        s.anota(Outcome::Forwarded {
+            rcode: dns::ResponseCode::NoError,
+        });
+        s.anota(Outcome::Canary);
+        assert_eq!(s.minuto(), (1, 2));
+        assert_eq!(s.minuto(), (0, 0));
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod apartarse_tests {
+    use super::*;
+    use guardiana_core::ChangeKind;
+
+    fn ledger(tag: &str) -> Ledger {
+        let dir = std::env::temp_dir().join(format!("guardiana-cli-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        Ledger::open(&dir.join("ledger.db"), identity::genesis()).unwrap()
+    }
+
+    fn ip(s: &str) -> IpAddr {
+        s.parse().unwrap()
+    }
+
+    /// Critical 3 of 5 Oct 2026: the router gives the computer its own address as DNS. That
+    /// address, the loopback and "any" are never an upstream; the next list is used, and the
+    /// system and the router are asked only when the lists before them had nothing.
+    #[test]
+    fn the_upstream_is_never_this_machine_and_falls_back_in_order() {
+        let mut preguntado = false;
+        let r = escoger_arriba(
+            vec![ip("127.0.0.1"), ip("0.0.0.0")],
+            || vec![ip("::1")],
+            vec![ip("192.0.2.1")],
+            vec![ip("198.51.100.7")],
+            || {
+                preguntado = true;
+                Some(ip("192.0.2.254"))
+            },
+        );
+        assert_eq!(
+            r,
+            Ok((Fuente::Respaldo, vec!["192.0.2.1:53".parse().unwrap()]))
+        );
+        assert!(
+            !preguntado,
+            "the router is asked only when nothing else is left"
+        );
+
+        // The live list wins when it holds something else, and keeps only that.
+        let r = escoger_arriba(
+            vec![ip("127.0.0.53"), ip("192.0.2.9"), ip("192.0.2.9")],
+            Vec::new,
+            Vec::new(),
+            Vec::new(),
+            || None,
+        );
+        assert_eq!(
+            r,
+            Ok((Fuente::Copia, vec!["192.0.2.9:53".parse().unwrap()]))
+        );
+
+        // The router, when it is all there is.
+        let r = escoger_arriba(
+            vec![ip("127.0.0.1")],
+            Vec::new,
+            Vec::new(),
+            Vec::new(),
+            || Some(ip("192.0.2.254")),
+        );
+        assert_eq!(
+            r,
+            Ok((Fuente::Respaldo, vec!["192.0.2.254:53".parse().unwrap()]))
+        );
+
+        // Only this machine: said as such, not as "no resolver found".
+        assert_eq!(
+            escoger_arriba(
+                vec![ip("127.0.0.1")],
+                Vec::new,
+                Vec::new(),
+                Vec::new(),
+                || None
+            ),
+            Err(true)
+        );
+        assert_eq!(
+            escoger_arriba(Vec::new(), Vec::new, Vec::new(), Vec::new(), || None),
+            Err(false)
+        );
+    }
+
+    /// The computer's real LAN address counts as this machine too, whatever it is here.
+    #[test]
+    fn the_lan_address_of_this_computer_is_this_machine() {
+        if let Some(lan) = guardiana_devices::local_lan_ipv4() {
+            assert!(sysdns::is_this_machine(IpAddr::V4(lan)));
+            assert_eq!(
+                escoger_arriba(
+                    vec![IpAddr::V4(lan)],
+                    Vec::new,
+                    Vec::new(),
+                    Vec::new(),
+                    || None
+                ),
+                Err(true)
+            );
+        }
+    }
+
+    /// Critical 2 and serious 4: Home Mode is parked, not forgotten, and comes back with the
+    /// licence, written into the ledger both times. (No DNS copy here: undoing it would touch
+    /// the system DNS of the machine running the tests.)
+    #[test]
+    fn home_mode_is_parked_on_standing_down_and_back_with_the_licence() {
+        let l = ledger("aparcar-hogar");
+        l.set_setting(SETTING_HOME_MODE, "1").unwrap();
+        stand_down(&l);
+        assert_eq!(l.setting(SETTING_HOME_MODE).unwrap().as_deref(), Some("0"));
+        assert_eq!(
+            l.setting(SETTING_HOME_APARCADO).unwrap().as_deref(),
+            Some("1")
+        );
+        // Standing down twice (each pass of a stood-down program does it) changes nothing.
+        stand_down(&l);
+        assert_eq!(
+            l.setting(SETTING_HOME_APARCADO).unwrap().as_deref(),
+            Some("1")
+        );
+        let (dns, hogar) = volver_del_apartado(&l);
+        assert!(!dns, "there was no DNS copy to bring back");
+        assert!(hogar);
+        assert_eq!(l.setting(SETTING_HOME_MODE).unwrap().as_deref(), Some("1"));
+        assert_eq!(
+            l.setting(SETTING_HOME_APARCADO).unwrap().as_deref(),
+            Some("")
+        );
+        let kinds: Vec<(ChangeKind, String)> = l
+            .changes(10)
+            .unwrap()
+            .into_iter()
+            .map(|c| (c.kind, c.who))
+            .collect();
+        assert!(kinds.contains(&(ChangeKind::HogarOff, "licencia".to_owned())));
+        assert!(kinds.contains(&(ChangeKind::HogarOn, "licencia".to_owned())));
+        assert_eq!(relevo_wanted(&l), None, "nothing parked, no relay");
+    }
+
+    /// The parked DNS copy becomes the copy again on return, so the next pass points the
+    /// machine back at Guardiana once it listens; and it never overwrites a newer one.
+    #[test]
+    fn the_parked_dns_copy_comes_back_with_the_licence() {
+        let l = ledger("aparcar-dns");
+        let parked = Backup {
+            taken_at: 1,
+            method: sysdns::Method::ResolvConf,
+            interfaces: vec![sysdns::InterfaceDns {
+                id: "eth0".into(),
+                name: "eth0".into(),
+                servers: vec![ip("192.0.2.1")],
+                automatic: true,
+                extra: None,
+            }],
+            resolv_conf: Some("nameserver 192.0.2.1\n".into()),
+            resolv_link: None,
+            made_dropin_dir: false,
+        };
+        l.set_setting(
+            SETTING_BACKUP_APARCADA,
+            &serde_json::to_string(&parked).unwrap(),
+        )
+        .unwrap();
+        let (dns, hogar) = volver_del_apartado(&l);
+        assert!(dns);
+        assert!(!hogar);
+        let copia = l.setting(SETTING_BACKUP).unwrap().unwrap_or_default();
+        assert!(serde_json::from_str::<Backup>(&copia).is_ok());
+        assert_eq!(
+            l.setting(SETTING_BACKUP_APARCADA).unwrap().as_deref(),
+            Some("")
+        );
+        assert!(l
+            .changes(10)
+            .unwrap()
+            .iter()
+            .any(|c| c.kind == ChangeKind::DnsOn && c.who == "licencia"));
+
+        // A copy that is already there (the person pointed the DNS again by hand) stays.
+        l.set_setting(SETTING_BACKUP, "{\"mine\":1}").unwrap();
+        l.set_setting(
+            SETTING_BACKUP_APARCADA,
+            &serde_json::to_string(&parked).unwrap(),
+        )
+        .unwrap();
+        let (dns, _) = volver_del_apartado(&l);
+        assert!(!dns);
+        assert_eq!(
+            l.setting(SETTING_BACKUP).unwrap().as_deref(),
+            Some("{\"mine\":1}")
+        );
+        assert_eq!(
+            l.setting(SETTING_BACKUP_APARCADA).unwrap().as_deref(),
+            Some("")
+        );
+    }
+}
+
+#[cfg(test)]
+mod reglas_tests {
+    use super::*;
+    use guardiana_core::{Action, MatchKind, Scope};
+
+    /// A rule 1.0.1 stored as typed matches the name it meant (G4, 28 Sep 2026).
+    #[test]
+    fn a_rule_stored_as_typed_is_read_as_a_name() {
+        let regla = |pattern: &str, kind: MatchKind| Rule {
+            id: 1,
+            scope: Scope::Home,
+            device_id: None,
+            match_kind: kind,
+            pattern: pattern.to_owned(),
+            action: Action::Cortar,
+            created_at: 0,
+            created_by: "panel".to_owned(),
+            expires_at: None,
+            undone_at: None,
+            confirmed: false,
+        };
+        let r = reglas_legibles(vec![
+            regla("https://www.tiktok.com/@x", MatchKind::Domain),
+            regla("*.ejemplo.com", MatchKind::Domain),
+            regla("rastreador", MatchKind::Category),
+        ]);
+        assert_eq!(r[0].pattern, "www.tiktok.com");
+        assert_eq!(r[0].match_kind, MatchKind::Domain);
+        assert_eq!(r[1].pattern, "ejemplo.com");
+        assert_eq!(r[1].match_kind, MatchKind::Suffix);
+        assert_eq!(r[2].pattern, "rastreador");
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod heredado_tests {
+    use super::*;
+    use guardiana_core::{ChangeKind, ChangeWho};
+
+    fn ledger(tag: &str) -> Ledger {
+        let dir = std::env::temp_dir().join(format!("guardiana-cli-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        Ledger::open(&dir.join("ledger.db"), identity::genesis()).unwrap()
+    }
+
+    /// What 1.0.1 left on a machine whose trial ended: Home Mode off "by the licence", nothing
+    /// parked. 1.0.2 parks it once, so the house gets its relay and Home Mode returns with Plus.
+    #[test]
+    fn what_101_left_is_parked_once() {
+        let l = ledger("heredado-101");
+        l.record_change(1, ChangeKind::HogarOn, ChangeWho::Panel, "192.168.1.20")
+            .unwrap();
+        l.record_change(2, ChangeKind::HogarOff, ChangeWho::Licencia, "")
+            .unwrap();
+        l.set_setting(SETTING_HOME_MODE, "0").unwrap();
+        stand_down(&l);
+        assert_eq!(
+            l.setting(SETTING_HOME_APARCADO).unwrap().as_deref(),
+            Some("1")
+        );
+        // Switched off by hand afterwards: never parked again.
+        l.set_setting(SETTING_HOME_APARCADO, "").unwrap();
+        stand_down(&l);
+        assert_eq!(
+            l.setting(SETTING_HOME_APARCADO).unwrap().as_deref(),
+            Some("")
+        );
+    }
+
+    /// A change the person made after the licence one wins: nothing is parked.
+    #[test]
+    fn a_newer_change_by_the_person_is_left_alone() {
+        let l = ledger("heredado-persona");
+        l.record_change(2, ChangeKind::HogarOff, ChangeWho::Licencia, "")
+            .unwrap();
+        l.record_change(3, ChangeKind::HogarOff, ChangeWho::Panel, "")
+            .unwrap();
+        stand_down(&l);
+        assert_eq!(l.setting(SETTING_HOME_APARCADO).unwrap(), None);
     }
 }

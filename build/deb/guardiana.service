@@ -22,7 +22,10 @@ NoNewPrivileges=yes
 # dentro de /etc) y crear /etc/systemd/resolved.conf.d/guardiana.conf. Con «yes»,
 # /usr, /boot y /efi siguen de solo lectura.
 ProtectSystem=yes
-ReadWritePaths=/var/lib/guardiana /run/systemd/resolve
+# El «-» delante: si la carpeta no existe, se ignora. /run/systemd/resolve solo existe con
+# systemd-resolved en marcha; sin el «-», en Debian, Arch u openSUSE el servicio no arrancaba
+# nunca (status=226/NAMESPACE en bucle; revisión del 5 oct 2026, crítico 1).
+ReadWritePaths=-/var/lib/guardiana -/run/systemd/resolve
 ProtectHome=yes
 PrivateTmp=yes
 ProtectKernelTunables=yes
