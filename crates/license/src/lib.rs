@@ -1511,7 +1511,11 @@ mod tests {
         // clock is the yearly one.
         l.set_setting(SETTING_LICENSE_KEY_AT, "-1").unwrap();
         let year = YEAR_DAYS * DAY_MS;
-        let s = status(&l, "tok", year - 1).unwrap();
+        // A day short of the year, not a millisecond: the licence clock also counts the time the
+        // process really ran since the last reading (a monotonic floor), and on Windows the first
+        // status call, which spawns `reg`, takes more than the one millisecond this test left.
+        let casi = year - DAY_MS;
+        let s = status(&l, "tok", casi).unwrap();
         assert!(matches!(
             s.plan,
             Plan::Plus {
@@ -1520,7 +1524,7 @@ mod tests {
                 ..
             }
         ));
-        assert!(!check_due(&l, "tok", year - 1).unwrap());
+        assert!(!check_due(&l, "tok", casi).unwrap());
         // Due: still Plus, no end date yet, because nothing has failed.
         let s = status(&l, "tok", year + DAY_MS).unwrap();
         assert!(s.plus_activo);
