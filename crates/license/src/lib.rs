@@ -65,12 +65,14 @@ pub const SETTING_CLOCK_SEEN: &str = "license_clock_seen";
 pub const TRIAL_DAYS: i64 = 7;
 /// Days a key subscription keeps working after its first failed validation attempt.
 pub const GRACE_DAYS: i64 = 7;
-/// Days after activating a subscription key when it is checked for the first time. Monthly and
-/// yearly start at the gateway with 7 free days and no card, and the key arrives on day one; if
-/// no card is added, the gateway puts the subscription on hold on day 7 and disables the key.
-/// Checking only once per period left Plus on for up to ~37 days without paying; checking the
-/// day after those 7 days cuts it then (1.0.1, at the owner's request). After that first
-/// check, once per billing period as before.
+/// Days after activating a subscription key when it is checked for the first time. Until 5 Oct
+/// 2026 monthly and yearly started at the gateway with 7 free days and no card, and the key
+/// arrived on day one; if no card was added, the gateway put the subscription on hold on day 7
+/// and disabled the key. Checking only once per period left Plus on for up to ~37 days without
+/// paying; checking the day after those 7 days cut it then (1.0.1, at the owner's request).
+/// Since 5 Oct 2026 the gateway charges at purchase (the only free week is the program's own);
+/// the day-8 check stays, for subscriptions bought before and for a refund to reach the
+/// machine soon. After that first check, once per billing period as before.
 pub const PRIMERA_COMPROBACION_DIAS: i64 = TRIAL_DAYS + 1;
 /// Billing period assumed for a monthly key.
 pub const MONTH_DAYS: i64 = 30;

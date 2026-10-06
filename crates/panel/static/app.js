@@ -1141,7 +1141,24 @@
       $('l-clave').addEventListener('submit', async (e) => {
         e.preventDefault();
         $('l-clave-msg').textContent = '…';
-        try { render(await api('/api/licencia/activar-clave', { method: 'POST', body: { clave: new FormData($('l-clave')).get('clave') } })); $('l-clave-msg').textContent = t('licencia_activada'); }
+        try {
+          render(await api('/api/licencia/activar-clave', { method: 'POST', body: { clave: new FormData($('l-clave')).get('clave') } }));
+          // The service sees the new licence on its next read of the ledger (seconds) and starts
+          // watching again; until then every page still has the "not watching" strip it drew when
+          // it loaded. Wait for the service and reload, so nobody has to refresh by hand
+          // (5 Oct 2026: the owner had to).
+          $('l-clave-msg').textContent = t('licencia_arrancando');
+          const hasta = Date.now() + 60000;
+          const mirar = async () => {
+            let e = null;
+            try { e = await api('/api/estado'); } catch (_) {}
+            // The licence is good as soon as the panel says so; the service reads it within five
+            // seconds and puts the DNS back, so the reload waits that long more.
+            if ((e && !e.caducado) || Date.now() > hasta) { setTimeout(() => location.reload(), 6000); return; }
+            setTimeout(mirar, 2000);
+          };
+          setTimeout(mirar, 1500);
+        }
         catch (err) { $('l-clave-msg').textContent = String(err.message || err); render(await api('/api/licencia')); }
       });
     },

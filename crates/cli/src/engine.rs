@@ -1011,7 +1011,7 @@ enum Vuelta {
 
 /// How often a stood-down program reads the licence again: a key typed in the panel brings it
 /// back within this, not at the next restart.
-const LICENCIA_RELECTURA: Duration = Duration::from_secs(15);
+const LICENCIA_RELECTURA: Duration = Duration::from_secs(5);
 /// How often a stood-down program retries a check that could not be done, like a running one.
 const LICENCIA_REINTENTO: Duration = Duration::from_secs(60 * 60);
 /// How often a stood-down program tries again to give back a DNS it could not give back.
