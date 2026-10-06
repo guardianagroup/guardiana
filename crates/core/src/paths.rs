@@ -115,15 +115,19 @@ pub fn harden_data_dir(dir: &Path) -> std::io::Result<()> {
     }
 }
 
-/// Whether `s` is the SID of an ordinary account (`S-1-5-21-…`, local or domain) and nothing else:
-/// it goes on icacls' command line.
+/// Whether `s` is the SID of an ordinary account and nothing else: it goes on icacls' command
+/// line. `S-1-5-21-…` is a local or domain account; `S-1-12-1-…` is an Entra ID (Azure AD) one,
+/// which is what `Translate` returns for `AzureAD\Name` and which 1.0.2's first check refused
+/// (review of 5 Oct 2026, second pass).
 #[cfg_attr(not(windows), allow(dead_code))]
 fn sid_de_cuenta(s: &str) -> bool {
-    s.strip_prefix("S-1-5-21-").is_some_and(|resto| {
-        !resto.is_empty()
-            && resto
-                .split('-')
-                .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
+    ["S-1-5-21-", "S-1-12-1-"].iter().any(|prefijo| {
+        s.strip_prefix(prefijo).is_some_and(|resto| {
+            !resto.is_empty()
+                && resto
+                    .split('-')
+                    .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
+        })
     })
 }
 
@@ -194,6 +198,9 @@ mod pruebas_motivo {
         assert!(sid_de_cuenta(
             "S-1-5-21-3623811015-3361044348-30300820-1013"
         ));
+        // An Entra ID (Azure AD) account.
+        assert!(sid_de_cuenta("S-1-12-1-1234567-89012-345-6789"));
+        assert!(!sid_de_cuenta("S-1-12-1-"));
         assert!(!sid_de_cuenta(""));
         assert!(!sid_de_cuenta("S-1-5-18")); // SYSTEM: already there, and not a person
         assert!(!sid_de_cuenta("S-1-5-21-"));

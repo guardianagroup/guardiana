@@ -15,7 +15,11 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
     let words = opts.positional();
     match (words.first().map(String::as_str), words.get(1)) {
         (Some("deshacer"), Some(id)) => {
-            let ok = ledger.undo_rule(id.parse()?, now_ms())?;
+            let Ok(numero) = id.parse::<i64>() else {
+                // Not "invalid digit found in string".
+                return Err(t.cli("reglas.numero_malo").replace("{id}", id).into());
+            };
+            let ok = ledger.undo_rule(numero, now_ms())?;
             println!(
                 "{}",
                 t.cli(if ok {

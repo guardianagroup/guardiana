@@ -422,6 +422,18 @@ impl Catalog {
             .map_or(Category::Desconocido, |m| m.category)
     }
 
+    /// True when `name`, or any name under it, is one the computer needs (`esperado`): updates,
+    /// time, messaging. What `*.microsoft.com` would reach, though `microsoft.com` itself is not
+    /// in the list.
+    #[must_use]
+    pub fn has_expected_at_or_under(&self, name: &str) -> bool {
+        let n = normalize(name);
+        let debajo = format!(".{n}");
+        self.entries
+            .iter()
+            .any(|(k, e)| e.category == Category::Esperado && (*k == n || k.ends_with(&debajo)))
+    }
+
     /// True when `name` is (or is under) a known encrypted resolver.
     #[must_use]
     pub fn is_evasion_resolver(&self, name: &str) -> bool {
@@ -447,6 +459,18 @@ impl Catalog {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_domain_is_asked_about_when_something_expected_is_under_it() {
+        let c = Catalog::bundled();
+        // `microsoft.com` is no entry of `esperado`, the update servers under it are.
+        assert_ne!(c.category("microsoft.com"), Category::Esperado);
+        assert!(c.has_expected_at_or_under("microsoft.com"));
+        assert!(c.has_expected_at_or_under("dl.delivery.mp.microsoft.com"));
+        assert!(!c.has_expected_at_or_under("doubleclick.net"));
+        // Not a plain suffix of the text: `xmicrosoft.com` is another domain.
+        assert!(!c.has_expected_at_or_under("xmicrosoft.com"));
+    }
 
     #[test]
     fn bundled_catalog_loads_and_matches_known_names() {

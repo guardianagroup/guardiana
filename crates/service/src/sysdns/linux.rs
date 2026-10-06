@@ -682,6 +682,11 @@ pub(crate) fn apply(backup: &Backup, guardian: IpAddr) -> Result<(), Error> {
 /// happened to the others, and every later step runs whatever happened to the links. The
 /// first error is the one returned (review of 1 Oct 2026: a `?` on the first link stopped the
 /// whole undo, and a VPN that was no longer there left the machine pointing at nothing).
+/// Whether Guardiana's hold on resolved (the drop-in file) is still in place.
+pub(crate) fn dropin_present() -> bool {
+    Path::new(RESOLVED_DROPIN).exists()
+}
+
 pub(crate) fn restore(backup: &Backup) -> Result<(), Error> {
     match backup.method {
         Method::SystemdResolved => {

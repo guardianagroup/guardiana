@@ -117,7 +117,9 @@ open_panel() {
   # A second account on the Mac: the data folder belongs to the account that installed, and
   # until 1.0.2 the only advice was to reinstall (review of 5 Oct 2026, Mac medium). One account
   # at a time, like the console user on Windows: handing it over asks for an administrator.
-  if [ -e "$DATA/panel.token" ] && [ ! -r "$DATA/panel.token" ]; then
+  # The folder itself is closed to the other account (mode 750/700), so the token inside is not
+  # even seen: it is the folder that is tested, not only the file.
+  if [ -d "$DATA" ] && { [ ! -x "$DATA" ] || { [ -e "$DATA/panel.token" ] && [ ! -r "$DATA/panel.token" ]; }; }; then
     local dar
     dar="$(ask "$M_OTRA_CUENTA" "$B_CANCELAR" "$B_DAR_ACCESO")"
     [ "$dar" = "$B_DAR_ACCESO" ] || return 1

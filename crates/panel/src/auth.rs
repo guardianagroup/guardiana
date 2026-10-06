@@ -52,7 +52,35 @@ pub(crate) async fn check_host(
     if !state.allowed_hosts.iter().any(|h| h == host) {
         return (StatusCode::MISDIRECTED_REQUEST, "host not recognised").into_response();
     }
+    // A page of another site, opened in a browser on this network, can send a POST that needs no
+    // preflight (one with no body, like undoing a rule) to the address of this panel, and the
+    // Host check above passes because it is our own address. Browsers say where the page came
+    // from; a change that comes from a page that is not the panel is refused.
+    if !matches!(
+        *req.method(),
+        axum::http::Method::GET | axum::http::Method::HEAD | axum::http::Method::OPTIONS
+    ) {
+        let origen = req
+            .headers()
+            .get(header::ORIGIN)
+            .and_then(|v| v.to_str().ok());
+        let anfitrion = req
+            .headers()
+            .get(header::HOST)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default();
+        if origen.is_some_and(|o| !origin_es_este_panel(o, anfitrion)) {
+            return (StatusCode::FORBIDDEN, "cross-site request refused").into_response();
+        }
+    }
     next.run(req).await
+}
+
+/// Whether the `Origin` of a request names the same authority as its `Host`.
+fn origin_es_este_panel(origin: &str, host: &str) -> bool {
+    origin
+        .split_once("://")
+        .is_some_and(|(_, autoridad)| autoridad.eq_ignore_ascii_case(host))
 }
 
 pub(crate) fn strip_port(host: &str) -> &str {
@@ -108,7 +136,13 @@ impl FromRequestParts<Arc<AppState>> for PorDireccion {
         let es_este_equipo = parts
             .extensions
             .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-            .is_none_or(|c| crate::api::identity_of(c.0) == guardiana_core::SELF_DEVICE_ID);
+            .is_none_or(|c| {
+                // Only whether it is this computer: no need to read the neighbour table, which
+                // is a process per request (the handler reads it once, for who it is).
+                c.0.ip().is_loopback()
+                    || guardiana_devices::local_lan_ipv4()
+                        .is_some_and(|lan| c.0.ip() == std::net::IpAddr::V4(lan))
+            });
         if es_este_equipo {
             Session::from_request_parts(parts, state)
                 .await
@@ -150,7 +184,7 @@ impl<S: Send + Sync> FromRequestParts<S> for Zona {
             .get("x-guardiana-tz")
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.trim().parse::<i64>().ok())
-            .filter(|m| m.abs() <= 14 * 60);
+            .filter(|m| (-14 * 60..=14 * 60).contains(m));
         Ok(Self(
             dicho.unwrap_or_else(guardiana_core::time::local_offset_min),
         ))
@@ -173,6 +207,31 @@ mod tests {
         assert_eq!(strip_port("127.0.0.1:7443"), "127.0.0.1");
         assert_eq!(strip_port("localhost"), "localhost");
         assert_eq!(strip_port("[::1]:7443"), "::1");
+    }
+
+    #[test]
+    fn a_change_from_another_site_is_refused() {
+        assert!(origin_es_este_panel(
+            "http://127.0.0.1:7443",
+            "127.0.0.1:7443"
+        ));
+        assert!(origin_es_este_panel(
+            "http://192.168.1.10:7443",
+            "192.168.1.10:7443"
+        ));
+        assert!(origin_es_este_panel(
+            "http://LOCALHOST:7443",
+            "localhost:7443"
+        ));
+        assert!(!origin_es_este_panel(
+            "http://evil.example",
+            "192.168.1.10:7443"
+        ));
+        assert!(!origin_es_este_panel(
+            "http://192.168.1.10:8080",
+            "192.168.1.10:7443"
+        ));
+        assert!(!origin_es_este_panel("null", "192.168.1.10:7443"));
     }
 
     #[test]

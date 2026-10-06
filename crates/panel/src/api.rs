@@ -55,9 +55,16 @@ fn with_ledger<T>(
             .map_err(|_| internal("ledger lock poisoned"))?;
         f(&mut guard).map_err(internal)
     };
+    en_hilo_aparte(run)
+}
+
+/// `f`, which blocks (a database, a process, the network), without holding up the resolver that
+/// shares these threads: "in place" on a multi-threaded runtime, as it is on a runtime with one
+/// thread (the tests), which cannot hand its other tasks away.
+fn en_hilo_aparte<T>(f: impl FnOnce() -> T) -> T {
     match tokio::runtime::Handle::try_current().map(|h| h.runtime_flavor()) {
-        Ok(tokio::runtime::RuntimeFlavor::MultiThread) => tokio::task::block_in_place(run),
-        _ => run(),
+        Ok(tokio::runtime::RuntimeFlavor::MultiThread) => tokio::task::block_in_place(f),
+        _ => f(),
     }
 }
 
@@ -1600,7 +1607,8 @@ fn hogar_view(state: &AppState) -> Result<Hogar, Response> {
     let fuera_de_casa = on
         && match (
             guardiana_devices::Red::de_texto(&red),
-            guardiana_service::sysdns::default_gateway().map(guardiana_devices::Red::de_puerta),
+            en_hilo_aparte(guardiana_service::sysdns::default_gateway)
+                .map(guardiana_devices::Red::de_puerta),
         ) {
             (Some(casa), Some(ahora)) => !casa.misma(&ahora),
             _ => false,
@@ -1612,8 +1620,8 @@ fn hogar_view(state: &AppState) -> Result<Hogar, Response> {
     Ok(Hogar {
         licencia: String::new(),
         encendido: on,
-        ip_dinamica: parsed.and_then(home::ip_is_dynamic),
-        suspension: home::sleep_after_minutes(),
+        ip_dinamica: parsed.and_then(|ip| en_hilo_aparte(|| home::ip_is_dynamic(ip))),
+        suspension: en_hilo_aparte(home::sleep_after_minutes),
         qr_svg: if on {
             url.as_deref().and_then(qr_svg)
         } else {
@@ -1728,9 +1736,13 @@ pub(crate) fn identity_of(peer: SocketAddr) -> String {
     if peer.ip().is_loopback() {
         SELF_DEVICE_ID.to_owned()
     } else {
-        guardiana_devices::Resolver::default()
-            .identify(peer.ip())
-            .id
+        // Reads the neighbour table: a process on Windows and on Linux, and a phone asks this
+        // every five seconds.
+        en_hilo_aparte(|| {
+            guardiana_devices::Resolver::default()
+                .identify(peer.ip())
+                .id
+        })
     }
 }
 
@@ -2159,7 +2171,8 @@ fn create_rule(
         .trim()
         .trim_end_matches('.')
         .to_ascii_lowercase();
-    if pattern.is_empty() || pattern.len() > 253 {
+    // A pasted address can be long (tracking parameters): the length is that of the name, below.
+    if pattern.is_empty() || pattern.len() > 2048 {
         return Err(bad(t.panel("regla_patron_invalido").to_owned()));
     }
     if match_kind == MatchKind::Category {
@@ -2173,6 +2186,9 @@ fn create_rule(
         let Some((nombre, comodin)) = guardiana_core::rules::normalizar_nombre(&pattern) else {
             return Err(bad(t.panel("regla_patron_invalido").to_owned()));
         };
+        if nombre.len() > 253 {
+            return Err(bad(t.panel("regla_patron_invalido").to_owned()));
+        }
         pattern = nombre;
         if comodin {
             match_kind = MatchKind::Suffix;
@@ -2242,7 +2258,12 @@ fn create_rule(
         // as cutting while it cut nothing (G4, 28 Sep 2026).
         if !body.confirmed && match_kind != MatchKind::Category {
             let catalog = guardiana_lists::Catalog::bundled();
-            let frase = if catalog.category(&pattern) == Category::Esperado {
+            // A wildcard (`*.microsoft.com`) reaches whatever is under it: the same question when
+            // something the computer needs is there, or it was listed as cutting a family whose
+            // update servers it never cut (second pass of 5 Oct 2026).
+            let toca_esperado = catalog.category(&pattern) == Category::Esperado
+                || (match_kind == MatchKind::Suffix && catalog.has_expected_at_or_under(&pattern));
+            let frase = if toca_esperado {
                 Some(t.panel("regla_esperado_confirmar"))
             } else if ancho || observation_complete(observed) {
                 None

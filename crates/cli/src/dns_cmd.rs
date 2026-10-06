@@ -131,6 +131,14 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
         let guardian = IpAddr::V4(Ipv4Addr::LOCALHOST);
         if let Err(e) = sysdns::apply(&backup, guardian) {
             if e.falta_administrador() {
+                // Refused before anything changed: the copy is not kept either, or the service
+                // would apply it a minute later and do what the person was just told it could
+                // not (review of 5 Oct 2026, second pass).
+                if sysdns::guardian_still_set() == Some(false)
+                    && ledger.set_setting(SETTING_BACKUP, "").is_ok()
+                {
+                    return Err(t.cli("dns.sin_admin").into());
+                }
                 println!("{}", t.cli("dns.sin_admin"));
             }
             // A change that failed half-way is rolled back; the copy is cleared only when the

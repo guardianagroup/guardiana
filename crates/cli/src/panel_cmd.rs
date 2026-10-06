@@ -16,7 +16,12 @@ pub fn run(_opts: &Opts) -> Result<(), Box<dyn Error>> {
         // (review of 5 Oct 2026, Linux medium). The real reason, and what to type.
         let clave =
             if e.kind() == std::io::ErrorKind::PermissionDenied || paths::unreadable_here(&path) {
-                "panel.sin_permiso"
+                // On Windows "sudo" does not exist: another sentence.
+                if cfg!(windows) {
+                    "panel.sin_permiso_windows"
+                } else {
+                    "panel.sin_permiso"
+                }
             } else {
                 "panel.sin_token"
             };

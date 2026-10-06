@@ -54,9 +54,14 @@ fi
 # Invalid"). A new file gets a new inode; the running daemon keeps the old one until it restarts
 # below (review of 5 Oct 2026, serious 6).
 mkdir -p "$BIN_DIR"; rm -f "$BIN_DIR/guardiana"; cp "$BIN_SRC" "$BIN_DIR/guardiana"; chown root:wheel "$BIN_DIR/guardiana"; chmod 755 "$BIN_DIR/guardiana"
-mkdir -p "$DATA"; chown "$USER_NAME" "$DATA"; chmod 750 "$DATA"
+# The folder belongs to the account that installed. An update pressed from another account
+# leaves it there: taking it over silently left the first account with "reinstall" as the only
+# advice; the launcher offers the handover instead (review of 5 Oct 2026, second pass).
+if [ ! -d "$DATA" ]; then mkdir -p "$DATA"; chown "$USER_NAME" "$DATA"; fi
+chmod 750 "$DATA"
+OWNER="$(stat -f %Su "$DATA" 2>/dev/null || true)"; [ -n "$OWNER" ] || OWNER="$USER_NAME"
 if ! grep -qE '^[0-9a-f]{64}$' "$DATA/panel.token" 2>/dev/null; then
-  sudo -u "$USER_NAME" sh -c "umask 077; openssl rand -hex 32 > '$DATA/panel.token'"
+  sudo -u "$OWNER" sh -c "umask 077; openssl rand -hex 32 > '$DATA/panel.token'"
 fi
 
 # 3. Record the DNS per enabled service before touching it (once; a reinstall keeps the original).
@@ -66,7 +71,7 @@ if [ ! -s "$DATA/dns-anterior.txt" ]; then
     case "$cur" in *"aren't any"*|"") cur="empty" ;; esac
     printf '%s\t%s\n' "$svc" "$cur"
   done > "$DATA/dns-anterior.txt"
-  chown "$USER_NAME" "$DATA/dns-anterior.txt"
+  chown "$OWNER" "$DATA/dns-anterior.txt"
 fi
 
 # 4. The daemon: root, port 53 on loopback, panel on 7443, restarted by launchd if it dies.
@@ -92,6 +97,9 @@ cat > "$PLIST" <<PL
 PL
 chown root:wheel "$PLIST"; chmod 644 "$PLIST"
 launchctl bootout system "$PLIST" >/dev/null 2>&1 || true
+# bootout can return before the old daemon has gone, and bootstrap then fails (error 5 or 36)
+# and ends this script with the daemon unloaded: wait for it, as the uninstaller does.
+n=0; while pgrep -qf "$BIN_DIR/guardiana service" && [ "$n" -lt 20 ]; do sleep 0.5; n=$((n + 1)); done
 launchctl bootstrap system "$PLIST"
 
 # 5. Wait until it answers on port 53 and on the panel.

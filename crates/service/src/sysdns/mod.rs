@@ -520,7 +520,7 @@ pub fn default_gateway() -> Option<IpAddr> {
             &[
                 "-NoProfile",
                 "-Command",
-                "Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Sort-Object RouteMetric | Select-Object -ExpandProperty NextHop",
+                "Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' -PolicyStore ActiveStore -ErrorAction SilentlyContinue | ForEach-Object { $m = $_.RouteMetric + (Get-NetIPInterface -InterfaceIndex $_.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue).InterfaceMetric; [pscustomobject]@{ M = $m; H = $_.NextHop } } | Sort-Object M | Select-Object -ExpandProperty H",
             ],
         )?)
     }
@@ -1056,6 +1056,43 @@ pub fn guardian_is_primary() -> Option<bool> {
     #[cfg(target_os = "macos")]
     {
         macos::guardian_is_primary()
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+    {
+        None
+    }
+}
+
+/// Whether anything of the machine's DNS still points at Guardiana. The opposite reading of
+/// [`guardian_is_primary`], which is true only when every interface does: an undo that put back
+/// one interface and failed on another is *not* done, and a stood-down program that thought it
+/// was left the other one asking a loopback nobody listened on (review of 5 Oct 2026, second
+/// pass). `Some(false)` means nothing is left; `None` when it cannot be told.
+#[must_use]
+pub fn guardian_still_set() -> Option<bool> {
+    #[cfg(target_os = "windows")]
+    {
+        windows::guardian_still_set()
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if linux::dropin_present() || resolv_conf_points_at_guardian() {
+            return Some(true);
+        }
+        if linux::have_resolvectl() {
+            let out = run_checked("resolvectl", &["dns"]).ok()?;
+            let alguna = out
+                .lines()
+                .filter(|l| l.trim_start().starts_with("Link "))
+                .filter_map(|l| l.split_once(':').map(|(_, rest)| rest))
+                .any(|rest| rest.split_whitespace().any(|a| a == "127.0.0.1"));
+            return Some(alguna);
+        }
+        Some(false)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        macos::guardian_still_set()
     }
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     {

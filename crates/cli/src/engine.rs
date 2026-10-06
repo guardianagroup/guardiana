@@ -715,7 +715,7 @@ fn devolver_por_silencio(ledger: &Ledger, lista: &str) -> bool {
     let Ok(backup) = serde_json::from_str::<Backup>(&json) else {
         return false;
     };
-    if sysdns::guardian_is_primary() == Some(false) || sysdns::restore(&backup).is_err() {
+    if sysdns::guardian_still_set() == Some(false) || sysdns::restore(&backup).is_err() {
         return false;
     }
     let _ = ledger.record_change(
@@ -856,7 +856,10 @@ fn devolver_dns_al_apartarse(ledger: &Ledger) -> bool {
     let Ok(backup) = serde_json::from_str::<Backup>(&json) else {
         return true;
     };
-    let hecho = sysdns::restore(&backup).is_ok() || sysdns::guardian_is_primary() == Some(false);
+    // Done when the undo worked, or when it failed only on something that no longer exists and
+    // nothing at all still asks the guardian. Not "some interface does not": one put back and
+    // another left behind is a loopback nobody listens on.
+    let hecho = sysdns::restore(&backup).is_ok() || sysdns::guardian_still_set() == Some(false);
     if hecho {
         let _ = ledger.set_setting(SETTING_BACKUP_APARCADA, &json);
         let _ = ledger.set_setting(SETTING_BACKUP, "");
@@ -1022,6 +1025,7 @@ async fn esperar_licencia(
     secret: String,
     relevo: Option<std::net::Ipv4Addr>,
 ) -> Vuelta {
+    let desde = Instant::now();
     let mut ultimo_intento: Option<Instant> = None;
     let mut ultima_devolucion = Instant::now();
     loop {
@@ -1061,7 +1065,17 @@ async fn esperar_licencia(
         }
         match lista {
             Some((true, _)) => return Vuelta::Licencia,
-            Some((false, ahora)) if ahora != relevo => return Vuelta::Relevo,
+            // A relay that is wanted and is not running (it could not start: the address was not
+            // ready yet, or there was no upstream) is tried again every minute, not never. One
+            // that has to change or close is rebuilt at once (second pass of 5 Oct 2026).
+            Some((false, ahora))
+                if ahora != relevo
+                    && (relevo.is_some()
+                        || ahora.is_none()
+                        || desde.elapsed() >= DEVOLVER_REINTENTO) =>
+            {
+                return Vuelta::Relevo
+            }
             _ => {}
         }
     }
@@ -1085,6 +1099,34 @@ fn puede_funcionar(ledger: &Ledger, secret: &str) -> bool {
 /// query timed out (review of 5 Oct 2026, critical 3). Never a public resolver nobody chose.
 fn arriba_automatico(ledger: &Ledger) -> Result<Vec<SocketAddr>, String> {
     let t = i18n::current();
+    match elegir_arriba(ledger) {
+        Ok((fuente, v, fuente_sistema)) => {
+            let linea = match fuente {
+                Fuente::Copia => t.cli("observe.upstream_copia"),
+                Fuente::Sistema => t.cli("observe.upstream_auto"),
+                Fuente::Respaldo => t.cli("observe.upstream_propio"),
+            };
+            println!(
+                "{}",
+                linea
+                    .replace("{servers}", &lista_de(&v))
+                    .replace("{fuente}", &fuente_sistema)
+            );
+            Ok(v)
+        }
+        Err(todo_propio) => Err(t
+            .cli(if todo_propio {
+                "observe.solo_propio"
+            } else {
+                "observe.sin_upstream"
+            })
+            .to_owned()),
+    }
+}
+
+/// [`arriba_automatico`] without saying anything: where the list came from, the list, and the
+/// name the system gave its source. `Err(true)` when every resolver was this machine.
+fn elegir_arriba(ledger: &Ledger) -> Result<(Fuente, Vec<SocketAddr>, String), bool> {
     let saved: Option<Backup> = [SETTING_BACKUP, SETTING_BACKUP_APARCADA]
         .iter()
         .find_map(|k| match ledger.setting(k) {
@@ -1121,32 +1163,32 @@ fn arriba_automatico(ledger: &Ledger) -> Result<Vec<SocketAddr>, String> {
             })
             .unwrap_or_default()
     };
-    match escoger_arriba(vivos, sistema, buenos, copia, sysdns::default_gateway) {
-        Ok((fuente, v)) => {
-            let linea = match fuente {
-                Fuente::Copia => t.cli("observe.upstream_copia"),
-                Fuente::Sistema => t.cli("observe.upstream_auto"),
-                Fuente::Respaldo => t.cli("observe.upstream_propio"),
-            };
-            if fuente != Fuente::Respaldo {
-                guardar_buenos(ledger, &v);
-            }
-            println!(
-                "{}",
-                linea
-                    .replace("{servers}", &lista_de(&v))
-                    .replace("{fuente}", &fuente_sistema)
-            );
-            Ok(v)
-        }
-        Err(todo_propio) => Err(t
-            .cli(if todo_propio {
-                "observe.solo_propio"
-            } else {
-                "observe.sin_upstream"
-            })
-            .to_owned()),
+    let (fuente, v) = escoger_arriba(
+        vivos,
+        sistema,
+        buenos,
+        copia,
+        sysdns::default_gateway,
+        responden_ahora,
+    )?;
+    if fuente != Fuente::Respaldo {
+        guardar_buenos(ledger, &v);
     }
+    Ok((fuente, v, fuente_sistema))
+}
+
+/// Whether these upstreams answer a question right now. On a thread of its own, with a runtime
+/// of its own: it is called from the middle of the start-up, whatever runtime that is on.
+fn responden_ahora(v: &[SocketAddr]) -> bool {
+    let v = v.to_vec();
+    std::thread::spawn(move || {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .is_ok_and(|rt| rt.block_on(dns::upstream_answers(&v, SONDA)))
+    })
+    .join()
+    .unwrap_or(false)
 }
 
 /// Where the automatic upstreams of a pass came from.
@@ -1170,6 +1212,7 @@ fn escoger_arriba(
     buenos: Vec<IpAddr>,
     copia: Vec<IpAddr>,
     puerta: impl FnOnce() -> Option<IpAddr>,
+    mut responde: impl FnMut(&[SocketAddr]) -> bool,
 ) -> Result<(Fuente, Vec<SocketAddr>), bool> {
     let ajenas = |ips: Vec<IpAddr>| -> Vec<SocketAddr> {
         let mut out: Vec<SocketAddr> = Vec::new();
@@ -1192,14 +1235,25 @@ fn escoger_arriba(
     if !v.is_empty() {
         return Ok((Fuente::Sistema, v));
     }
+    // Only the first of these that answers: the last good list may be the café's, kept from a
+    // day when the computer was there, and at home it answers nothing (review of 5 Oct 2026,
+    // second pass). When none answers, the first one there is, as before.
+    let mut primera: Option<Vec<SocketAddr>> = None;
     for lista in [buenos, copia] {
         let v = ajenas(lista);
-        if !v.is_empty() {
+        if v.is_empty() {
+            continue;
+        }
+        if responde(&v) {
             return Ok((Fuente::Respaldo, v));
         }
+        primera.get_or_insert(v);
     }
     let v = ajenas(puerta().into_iter().collect());
-    if !v.is_empty() {
+    if !v.is_empty() && (primera.is_none() || responde(&v)) {
+        return Ok((Fuente::Respaldo, v));
+    }
+    if let Some(v) = primera {
         return Ok((Fuente::Respaldo, v));
     }
     Err(habia)
@@ -1249,13 +1303,20 @@ async fn run_once<F: Future<Output = ()>>(
                 .replace("{hasta}", &guardiana_core::time::rfc3339_utc(gap.to_ts))
         );
     }
-    let home_on = ledger.setting(SETTING_HOME_MODE)?.is_some_and(|v| v == "1");
-
     // Home Mode needs the trial or the Home plan (brief §9): without either it
     // stays off with a notice, and the computer's own DNS never breaks.
     let secret =
         guardiana_panel::load_or_create_token(&paths::data_dir().join(guardiana_panel::TOKEN_FILE))
             .unwrap_or_default();
+    // A licence that came back while nobody was waiting for it: a customer of 1.0.1 who paid
+    // after it stood aside, or a key typed while the service was stopped. What standing down
+    // parked, or 1.0.1 left behind, comes back now, before this pass reads Home Mode and the
+    // DNS copy (review of 5 Oct 2026, second pass).
+    if puede_funcionar(&ledger, &secret) {
+        heredar_apartado(&ledger);
+        let _ = volver_del_apartado(&ledger);
+    }
+    let home_on = ledger.setting(SETTING_HOME_MODE)?.is_some_and(|v| v == "1");
     // Home Mode is free (decision 52): no licence gate.
     let home_allowed = home_on;
     // Only on the network it was switched on in (see `en_red_de_casa`).
@@ -1339,7 +1400,11 @@ async fn run_once<F: Future<Output = ()>>(
         // the DNS and Home Mode it had.
         let exit = tokio::select! {
             () = shutdown.as_mut() => Exit::Shutdown,
-            v = esperar_licencia(cfg.db.clone(), secret.clone(), relevo_lan) => match v {
+            v = esperar_licencia(
+                cfg.db.clone(),
+                secret.clone(),
+                relevo.as_ref().and(relevo_lan),
+            ) => match v {
                 Vuelta::Licencia => {
                     let db = cfg.db.clone();
                     let (dns_vuelve, hogar_vuelve) = tokio::task::spawn_blocking(move || {
@@ -1472,6 +1537,14 @@ async fn run_once<F: Future<Output = ()>>(
                 panel_listen.push(panel_addr);
                 panel_optional.push(home::lan_checker_addr(lan));
                 home_lan = Some(lan);
+                // The rules of the firewall, written again by this program on every start:
+                // those 1.0.1 wrote let any program and any address in, and an update never
+                // touched them; and `program=` must be the binary that really listens, which is
+                // the service, not whichever copy ran `hogar on` (review of 5 Oct 2026, second
+                // pass). Windows only; without administrator rights it changes nothing.
+                if cfg!(windows) {
+                    let _ = tokio::task::spawn_blocking(home::firewall_allow).await;
+                }
                 println!(
                     "{}",
                     t.cli("observe.hogar")
@@ -1946,8 +2019,12 @@ pub fn open_in_browser(url: &str) {
             .map(|_| ())
     });
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    // Its complaints ("www-browser: not found" ... on a server with no browser) say nothing the
+    // person can use: the link was printed above, to open where there is one.
     let result = std::process::Command::new("xdg-open")
         .arg(url)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .spawn()
         .map(|_| ());
     let _ = result;
@@ -2090,6 +2167,7 @@ mod apartarse_tests {
                 preguntado = true;
                 Some(ip("192.0.2.254"))
             },
+            |_| true,
         );
         assert_eq!(
             r,
@@ -2107,6 +2185,7 @@ mod apartarse_tests {
             Vec::new(),
             Vec::new(),
             || None,
+            |_| true,
         );
         assert_eq!(
             r,
@@ -2120,6 +2199,7 @@ mod apartarse_tests {
             Vec::new(),
             Vec::new(),
             || Some(ip("192.0.2.254")),
+            |_| true,
         );
         assert_eq!(
             r,
@@ -2133,12 +2213,20 @@ mod apartarse_tests {
                 Vec::new,
                 Vec::new(),
                 Vec::new(),
-                || None
+                || None,
+                |_| true
             ),
             Err(true)
         );
         assert_eq!(
-            escoger_arriba(Vec::new(), Vec::new, Vec::new(), Vec::new(), || None),
+            escoger_arriba(
+                Vec::new(),
+                Vec::new,
+                Vec::new(),
+                Vec::new(),
+                || None,
+                |_| true
+            ),
             Err(false)
         );
     }
@@ -2154,11 +2242,57 @@ mod apartarse_tests {
                     Vec::new,
                     Vec::new(),
                     Vec::new(),
-                    || None
+                    || None,
+                    |_| true
                 ),
                 Err(true)
             );
         }
+    }
+
+    /// Second pass of 5 Oct 2026: the last good list is the café's, and at home it answers
+    /// nothing. The one that answers wins, and the router is asked only if none before it did.
+    #[test]
+    fn a_fallback_that_does_not_answer_gives_way_to_one_that_does() {
+        let cafe: Vec<SocketAddr> = vec!["10.10.0.1:53".parse().unwrap()];
+        let r = escoger_arriba(
+            vec![ip("127.0.0.1")],
+            Vec::new,
+            vec![ip("10.10.0.1")],
+            vec![ip("198.51.100.7")],
+            || Some(ip("192.168.1.1")),
+            |v| v != cafe.as_slice(),
+        );
+        assert_eq!(
+            r,
+            Ok((Fuente::Respaldo, vec!["198.51.100.7:53".parse().unwrap()]))
+        );
+        // Only the router answers.
+        let r = escoger_arriba(
+            vec![ip("127.0.0.1")],
+            Vec::new,
+            vec![ip("10.10.0.1")],
+            Vec::new(),
+            || Some(ip("192.168.1.1")),
+            |v| v[0].ip() == ip("192.168.1.1"),
+        );
+        assert_eq!(
+            r,
+            Ok((Fuente::Respaldo, vec!["192.168.1.1:53".parse().unwrap()]))
+        );
+        // Nobody answers (no network at all): the first list there is, as before.
+        let r = escoger_arriba(
+            vec![ip("127.0.0.1")],
+            Vec::new,
+            vec![ip("10.10.0.1")],
+            Vec::new(),
+            || Some(ip("192.168.1.1")),
+            |_| false,
+        );
+        assert_eq!(
+            r,
+            Ok((Fuente::Respaldo, vec!["10.10.0.1:53".parse().unwrap()]))
+        );
     }
 
     /// Critical 2 and serious 4: Home Mode is parked, not forgotten, and comes back with the

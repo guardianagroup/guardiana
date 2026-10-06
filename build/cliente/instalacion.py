@@ -494,7 +494,12 @@ def tarde(tipo, paquete, version):
         led = rep.get("ledger")
         if isinstance(led, dict) and "found" in json.dumps(led).lower():
             ok("verify · registro público", json.dumps(led)[:300])
-        elif CANDIDATO and json.dumps(led).strip('"') in ("not_found", "no_ledger_file"):
+        elif CANDIDATO and (
+            json.dumps(led).strip('"') in ("not_found", "no_ledger_file")
+            # On the Mac the ledger lists the .zip, which the installed app cannot reproduce; for a
+            # version that is not released yet there is no line to find (zip: null).
+            or led == {"zip_only": {"zip": None}}
+        ):
             # Its hash is written in ledger.jsonl only when it is released.
             ok("verify · registro público: un candidato aún no está en el registro (esperado)", json.dumps(led)[:120])
         else:

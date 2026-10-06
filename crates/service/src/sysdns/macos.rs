@@ -4,7 +4,9 @@
 
 use std::net::IpAddr;
 
-use super::{parse_ip, run_checked, undo_each, Backup, Error, InterfaceDns, Method};
+#[cfg(test)]
+use super::parse_ip;
+use super::{run_checked, undo_each, Backup, Error, InterfaceDns, Method};
 
 /// Enabled services from `networksetup -listallnetworkservices`: the first line
 /// is a notice and a leading `*` marks a disabled service.
@@ -41,6 +43,7 @@ pub(crate) fn parse_servers(text: &str) -> Vec<IpAddr> {
 /// at every colon, a Mac whose first resolver was IPv6 gave `None` here, `guardian_is_primary`
 /// could not tell, and the Mac was never pointed back at Guardiana after a stop or a restart
 /// (review of 5 Oct 2026, serious 7).
+#[cfg(test)]
 pub(crate) fn first_nameserver(text: &str) -> Option<IpAddr> {
     text.lines()
         .map(str::trim)
@@ -95,8 +98,18 @@ fn set_servers(service: &str, servers: &[String]) -> Result<(), Error> {
 /// (1.1.1.1, 8.8.8.8), took every name to it over HTTPS, where Guardiana cannot see it (review
 /// of 5 Oct 2026, serious 8). The reserve lives inside Guardiana now (it forwards there), and the
 /// service gives the Mac its DNS back whenever it stops.
+///
+/// A service that is gone from the network settings (an old VPN, "iPhone USB") is skipped, as in
+/// the undo: `networksetup` refuses it, and one refusal stopped every service after it from being
+/// pointed here, the new Ethernet adapter among them (review of 5 Oct 2026, second pass).
 pub(crate) fn apply(backup: &Backup, guardian: IpAddr) -> Result<(), Error> {
+    let present = run_checked("networksetup", &["-listallnetworkservices"])
+        .ok()
+        .map(|t| parse_all_services(&t));
     for i in &backup.interfaces {
+        if present.as_ref().is_some_and(|p| !p.contains(&i.id)) {
+            continue;
+        }
         set_servers(&i.id, &[guardian.to_string()])?;
     }
     Ok(())
@@ -211,9 +224,26 @@ pub(crate) fn upstreams_for(backup: &Backup) -> Vec<IpAddr> {
 }
 
 pub(crate) fn guardian_is_primary() -> Option<bool> {
-    let text = run_checked("scutil", &["--dns"]).ok()?;
-    let first = first_nameserver(&text)?;
-    Some(first == IpAddr::V4(std::net::Ipv4Addr::LOCALHOST))
+    services_guarded().map(|v| v.iter().all(|g| *g))
+}
+
+/// Whether any service still asks Guardiana: what an undo that is done leaves false.
+pub(crate) fn guardian_still_set() -> Option<bool> {
+    services_guarded().map(|v| v.iter().any(|g| *g))
+}
+
+/// For every enabled service, whether it asks Guardiana and nobody else. Read from the service
+/// itself, not from `scutil`: a 1.0.1 Mac was left with `[127.0.0.1, 8.8.8.8]`, whose first
+/// resolver was already the guardian, so the reserve stayed behind it after the update and the
+/// check said all was well (review of 5 Oct 2026, second pass).
+fn services_guarded() -> Option<Vec<bool>> {
+    let list = run_checked("networksetup", &["-listallnetworkservices"]).ok()?;
+    let mut out = Vec::new();
+    for svc in parse_services(&list) {
+        let servers = parse_servers(&run_checked("networksetup", &["-getdnsservers", &svc]).ok()?);
+        out.push(servers == [IpAddr::V4(std::net::Ipv4Addr::LOCALHOST)]);
+    }
+    (!out.is_empty()).then_some(out)
 }
 
 #[cfg(test)]

@@ -82,17 +82,14 @@ struct WinExtra {
     manual6: Vec<IpAddr>,
 }
 
+/// No `-ExecutionPolicy Bypass`: the policy only governs script *files*, never a `-Command`
+/// string, so the flag changed nothing here -- and it is the most recognised marker of malware
+/// that starts PowerShell. Defender called guardiana.exe `Trojan:Win32/Wacatac.H!ml` on
+/// 5 Oct 2026 (a machine-learning guess); this is one fewer thing in it that looks like malware.
 fn powershell(script: &str) -> Result<String, Error> {
     run_checked(
         "powershell",
-        &[
-            "-NoProfile",
-            "-NonInteractive",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            script,
-        ],
+        &["-NoProfile", "-NonInteractive", "-Command", script],
     )
 }
 
@@ -314,6 +311,21 @@ pub(crate) fn guardian_is_primary() -> Option<bool> {
         return None;
     }
     Some(lines.iter().all(|l| line_is_guarded(l)))
+}
+
+/// Whether any connected interface still asks Guardiana. The mirror of [`guardian_is_primary`]:
+/// a undo that left one interface behind is not an undo that is done. `None` when PowerShell
+/// could not say.
+pub(crate) fn guardian_still_set() -> Option<bool> {
+    let out = powershell(PRIMARY_SCRIPT).ok()?;
+    let mut hay = false;
+    let mut alguna = false;
+    for l in out.lines().map(str::trim).filter(|l| !l.is_empty()) {
+        hay = true;
+        let (v4, _) = l.split_once('|').unwrap_or((l, ""));
+        alguna |= parse_list(v4).contains(&IpAddr::V4(Ipv4Addr::LOCALHOST));
+    }
+    hay.then_some(alguna)
 }
 
 /// What Guardiana should forward to right now. Hand-typed resolvers stay the person's
