@@ -105,6 +105,23 @@ jobs:
       - name: la versión que la gente tiene hoy, para actualizar desde ella
         continue-on-error: true
         run: python build/cliente/descarga.py 'guardiana-{v}-windows-x64.msi' --dir anterior
+      - name: Defender mira los instaladores (solo informa, no falla)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          # On 5 Oct 2026 Defender called the published 1.0.1 exe Trojan:Win32/Wacatac.H!ml on a
+          # customer's PC. This scans the published MSI and the candidate's with the runner's own
+          # Defender, without removing anything, so a release is not made blind.
+          $mp = Get-ChildItem "$env:ProgramData\Microsoft\Windows Defender\Platform" -Recurse -Filter MpCmdRun.exe -ErrorAction SilentlyContinue | Sort-Object FullName | Select-Object -Last 1
+          if (-not $mp) { Write-Output "::warning title=Defender::MpCmdRun.exe no está en este runner"; exit 0 }
+          & $mp.FullName -SignatureUpdate | Out-Null
+          foreach ($f in Get-ChildItem -Path anterior, paquetes -Filter *.msi -Recurse -ErrorAction SilentlyContinue) {
+            $r = & $mp.FullName -Scan -ScanType 3 -File $f.FullName -DisableRemediation 2>&1 | Out-String
+            $veredicto = if ($LASTEXITCODE -eq 0) { "limpio" } elseif ($LASTEXITCODE -eq 2) { "AMENAZA" } else { "código $LASTEXITCODE" }
+            Write-Output "::notice title=Defender $($f.Name)::$veredicto"
+            Write-Output $r
+          }
+          Get-MpThreatDetection | Select-Object ThreatID, Resources | Format-List
       - name: instalar, usar, parar, desinstalar, reinstalar y actualizar
         run: python build/cliente/instalacion.py --tipo msi --dir paquetes --anterior anterior --candidato
 
