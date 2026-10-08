@@ -33,7 +33,8 @@
 #
 # Varias filiales del mismo grupo se inscriben con la misma web (TransUnion, Equifax, Experian,
 # Deloitte, Nielsen…): el dominio va con la inscrita cuyo nombre lo lleva, y las demás no salen.
-# Si el registro cambia, se vuelve a generar desde el CSV nuevo y se anota aquí la fecha y la huella.
+# Si el registro cambia, se vuelve a generar con build/corredores.py desde el CSV nuevo, que
+# anota aquí la fecha y la huella.
 
 @01Advertising Inc.|US|g|https://www.01advertising.com/legal/dsar/
 01advertising.com
@@ -968,9 +969,6 @@ t-mobile.com
 
 @Traackr, Inc.|US||https://www.traackr.com/legal/privacy-policy
 traackr.com
-
-@TransUnion|US|m|https://www.transunion.com
-transunion.com
 
 @Trestle Solutions, Inc.|US||https://trestleiq.com/privacy-policy/
 trestleiq.com
@@ -1937,6 +1935,9 @@ meettie.com
 enformion.com
 tracers.com
 go.enformion.com
+
+@TransUnion|US|m|https://www.transunion.com
+transunion.com
 
 @TripleLift, Inc.|US|g|https://triplelift.com/user-rights-policy-and-opt-out/
 triplelift.com
