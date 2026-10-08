@@ -71,3 +71,10 @@ GPL‑3.0‑or‑later. As listas de terceiros mantêm a sua licença (EasyPriva
 3.0; lista de Peter Lowe: uso livre com atribuição). Detalhe em `docs/LISTS.md`. As tipografias que o
 painel serve a partir do próprio computador (IBM Plex e Unbounded) vão com a sua licença OFL 1.1
 ao lado, em [`crates/panel/static/fonts`](crates/panel/static/fonts/LEEME.md).
+
+## Quem faz
+
+A GUARDIANA é um projeto de código aberto mantido por **Francisco Salvatierra Sánchez** (GUARDIANA
+GROUP, Torre Empresarial PRODEGI, 18º andar, Bocagrande, Cartagena das Índias, Colômbia), que assina
+cada versão com a chave minisign publicada em `build/pubkey/minisign.pub` e responde em
+hola@guardianagroup.com. Site: https://guardianagroup.com.

@@ -75,3 +75,10 @@ GPL‑3.0‑or‑later. Third-party lists keep their own licence (EasyPrivacy: G
 Peter Lowe's list: free use with attribution). Details in `docs/LISTS.md`. The typefaces the
 panel serves from the machine itself (IBM Plex and Unbounded) travel with their OFL 1.1 licence
 next to them, in [`crates/panel/static/fonts`](crates/panel/static/fonts/LEEME.md).
+
+## Who makes it
+
+GUARDIANA is an open-source project maintained by **Francisco Salvatierra Sánchez** (GUARDIANA
+GROUP, Torre Empresarial PRODEGI, 18th floor, Bocagrande, Cartagena de Indias, Colombia), who signs
+every release with the minisign key published in `build/pubkey/minisign.pub` and answers at
+hola@guardianagroup.com. Website: https://guardianagroup.com.
