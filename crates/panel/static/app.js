@@ -198,7 +198,7 @@
   const catName = (c) => T.categorias[c] || c;
   const verdictName = (v) => T.veredictos[v] || v;
   const deviceName = (ev) => ev.device_name || (ev.device_id === 'self' ? t('este_computador') : ev.device_id);
-  const nameCell = (ev) => [ev.qname + (ev.ia ? ' · ' + t('ia_prefijo') + ': ' + ev.ia : '') + (ev.empresa && ev.empresa !== ev.ia ? ' · ' + ev.empresa : '')].concat((ev.frases || []).map((f) => '· ' + f)).join('\n');
+  const nameCell = (ev) => [ev.qname + (ev._n > 1 ? ' ×' + ev._n : '') + (ev.ia ? ' · ' + t('ia_prefijo') + ': ' + ev.ia : '')].concat((ev.frases || []).map((f) => '· ' + f)).join('\n');
   // El PDF tiene que decir lo MISMO que la pantalla. Enseñaba `catName(ev.category)`, la
   // categoría en bruto, así que todo lo que en pantalla pone «entrega», «red local» o «de
   // Google» salía en el papel como «sin clasificar»; y el país no salía en absoluto (lo vio el
@@ -266,7 +266,14 @@
   const LOC = LANG === 'en' ? 'en-GB' : (LANG === 'pt' ? 'pt-BR' : 'es');
   const DIA = LANG === 'en' ? { day: 'numeric', month: 'short', year: 'numeric' } : undefined;
   const DIA_HORA = LANG === 'en' ? { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false } : undefined;
-  const clock = (ms) => new Date(ms).toLocaleTimeString(LOC);
+  // La hora sola solo vale para hoy: con un filtro, 200 filas abarcan varios días y se leían
+  // como si fueran uno (revisión del 8 oct 2026). Si la fila no es de hoy, lleva el día delante.
+  const clock = (ms) => {
+    const d = new Date(ms);
+    const hoy = new Date();
+    const mismoDia = d.getFullYear() === hoy.getFullYear() && d.getMonth() === hoy.getMonth() && d.getDate() === hoy.getDate();
+    return mismoDia ? d.toLocaleTimeString(LOC) : d.toLocaleDateString(LOC, { day: 'numeric', month: 'numeric' }) + ' ' + d.toLocaleTimeString(LOC);
+  };
   const when = (ms) => new Date(ms).toLocaleString(LOC, DIA_HORA);
   // «Unknown» was 88% of every table: a word that told the person nothing while the program
   // already knew who owned 86% of those names. The stored category does not change -- the ledger
@@ -284,12 +291,12 @@
   // delante del dominio y se dice esa palabra, nada más: una pista que da el nombre, no una
   // comprobación. El orden importa: «cuenta» o «medición» antes que «contenido» o «web».
   const PISTAS = [
-    ['anuncios', /^(prebid|rtb|ortb|dsp|ssp|usync|csync|cs|pbs|bids?|hb-?bid|adserver|ads?|adsystem|banners?|cookies?|cookiesync)$/],
+    ['anuncios', /^(prebid|rtb|ortb|ssp|usync|csync|bids?|hb-?bid|adserver|ads?|adsystem|banners?|cookiesync)$/],
     ['pago', /^(checkout|pay|payments?|billing|invoices?|cart|orders?|subscribe|subscriptions?)$/],
-    ['cuenta', /^(accounts?|login|signin|sign-?in|logon|auth|authn?|oauth2?|oauthaccountmanager|sso|identity|idp|passport|myaccount|my|appleid|tokens?|session|profile)$/],
+    ['cuenta', /^(accounts?|login|signin|sign-?in|logon|auth|authn?|oauth2?|oauthaccountmanager|sso|identity|idp|passport|myaccount|appleid|tokens?|session|profile)$/],
     ['medicion', /^(analytics|metrics?|stats?|statistics|telemetry|pixels?|beacons?|track(ing|er)?|trk|collect(or)?|logs?|logging|events?|insights|measure|reports?|monitor(ing)?|probe|diagnostics?|crash(es|lytics)?|perf|rum|nel|sentry|bugsnag|px)$/],
     ['notificaciones', /^(push|notify|notifications?|wns|fcm|gcm|apns|alerts?)$/],
-    ['actualizaciones', /^(updates?|upgrade|autoupdate|swupdate|patch(es)?|release|dist|setup|installer|download(s|center)?|dl)$/],
+    ['actualizaciones', /^(updates?|upgrade|autoupdate|swupdate|patch(es)?|release|dist|installer|download(s|center)?|dl)$/],
     ['seguridad', /^(safebrowsing|safe|antiphishing|smartscreen|threat|security|protect(ion)?|urs|shield|captcha|recaptcha|hcaptcha)$/],
     ['correo', /^(mail|smtp|imap|pop3?|mx\d*|webmail|email)$/],
     ['mensajes', /^(chat|msg|messages?|messaging|im|xmpp|mqtt)$/],
@@ -297,7 +304,7 @@
     ['contenido', /^(cdn|static|assets?|img|images?|image|media|fonts?|video|videos?|content|files?|storage|cache|js|css|thumbs?|pics?|photos?|resources?|scripts?|styles?|s3|blob)$/],
     ['configuracion', /^(config|configuration|settings?|flags?|features?|remoteconfig|clients?\d*|bootstrap|discovery|geo|ip|whatismyip)$/],
     ['app', /^(api|apis|ws|wss|rpc|grpc|gateway|gw|backend|bridge|graph|mobile|app|apps|edge|services?|srv|data|query|search|sockets?|websockets?|realtime|live|ec2|compute|lb|elb)$/],
-    ['web', /^(www\d*|web|m|home|portal|es|en|pt|fr|de|it|br|co|mx|ar|us|uk)$/],
+    ['web', /^(www\d*|web|home|portal)$/],
   ];
   // The registrable part of a name: two labels, or three under a country code with a generic
   // second level (mercadolibre.com.co, bbc.co.uk).
@@ -306,14 +313,17 @@
   const pista = (ev) => {
     if (ev.category !== 'desconocido' || ev.local || ev.entrega) return '';
     const q = String(ev.qname || '').toLowerCase().replace(/\.$/, '');
-    if (!ev.empresa && !ev.ia && PALABRAS_SUBASTA.test(q)) return 'anuncios';
+    if (!ev.empresa && !ev.ia) return PALABRAS_SUBASTA.test(q) ? 'anuncios' : '';
     // Only what comes before the registrable domain: the last two labels are the company's name.
     const todas = q.split('.');
     const labels = todas.slice(0, -nLabelsDominio(todas));
-    // The bare domain of a known company or AI service is its own site or app.
-    if (!labels.length && (ev.empresa || ev.ia)) return 'web';
+    // The bare domain of a known company or AI service is its own site or app; so is a
+    // language code alone in front of it (es.tradingview.com).
+    if (!labels.length || (labels.length === 1 && /^(es|en|pt|fr|de|it|br|mx|ar)$/.test(labels[0]))) return 'web';
     const words = [];
-    labels.forEach((l) => l.split(/[-_]+/).forEach((w) => { if (w) words.push(w.replace(/\d+$/, '')); }));
+    // Trailing digits are a counter (api2, cdn3); they go unless what is left is too short to
+    // mean anything (s3, ec2, us4 stay as they are).
+    labels.forEach((l) => l.split(/[-_]+/).forEach((w) => { if (w) { const sin = w.replace(/\d+$/, ''); words.push(sin.length >= 3 ? sin : w); } }));
     for (const [clave, re] of PISTAS) if (words.some((w) => re.test(w))) return clave;
     return '';
   };
@@ -872,7 +882,7 @@
         const r = last || { servicios: 0, rastreadores: 0, destinos_nuevos: 0, esperados: 0, cortados: 0, eventos: [] };
         doc.line([['c_servicios', r.servicios], ['c_rastreadores', r.rastreadores], ['c_publicidad', r.publicidad], ['c_nuevos', r.destinos_nuevos], ['c_esperados', r.esperados], ['c_cortados', r.cortados]].map(([k, v]) => t(k) + ': ' + v).join(' · '), 10);
         if (r.hueco) doc.line(t('hueco').replace('{desde}', when(r.hueco.desde)).replace('{hasta}', when(r.hueco.hasta)), 9, false, 0.4);
-        doc.gap(6).table(eventCols(true), r.eventos.length ? r.eventos.map((ev) => eventCells(ev, true)) : [[ '', t('sin_consultas_aun'), '', '', '', '', '' ]]);
+        doc.gap(6).table(eventCols(true), r.eventos.length ? foldEvents(r.eventos).map((ev) => eventCells(ev, true)) : [[ '', t('sin_consultas_aun'), '', '', '', '', '' ]]);
         pdfQuienHayDetras(doc, r.eventos);
         return { name: pdfName('radiografia'), doc };
       });
@@ -932,7 +942,7 @@
         doc.line(t('mostrando').replace('{n}', r.eventos.length).replace('{total}', r.total) + ocultosTexto(r.ocultos), 10);
         if (lastFilters) doc.line(lastFilters, 9, false, 0.4);
         (r.huecos || []).forEach((h) => doc.line(t('hueco').replace('{desde}', when(h.desde)).replace('{hasta}', when(h.hasta)), 9, false, 0.4));
-        doc.gap(6).table(eventCols(true), r.eventos.length ? r.eventos.map((ev) => eventCells(ev, true)) : [[ '', t('sin_resultados'), '', '', '', '', '' ]]);
+        doc.gap(6).table(eventCols(true), r.eventos.length ? foldEvents(r.eventos).map((ev) => eventCells(ev, true)) : [[ '', t('sin_resultados'), '', '', '', '', '' ]]);
         pdfQuienHayDetras(doc, r.eventos);
         return { name: pdfName('extracto'), doc };
       });
@@ -942,7 +952,7 @@
         for (const [k, v] of [...q]) if (!v) q.delete(k);
         const r = await api('/api/extracto?' + q.toString());
         lastR = r;
-        lastFilters = [...q].filter(([k]) => k !== 'limit').map(([k, v]) => t('f_' + ({ device_id: 'dispositivo', category: 'categoria', signal: 'senal', verdict: 'veredicto' }[k] || k)) + ': ' + (k === 'device_id' ? ($('f-device').selectedOptions[0] || {}).textContent || v : v)).join(' · ');
+        lastFilters = [...q].filter(([k]) => k !== 'limit').map(([k, v]) => t('f_' + ({ device_id: 'dispositivo', category: 'categoria', signal: 'senal', verdict: 'veredicto' }[k] || k)) + ': ' + (k === 'device_id' ? ($('f-device').selectedOptions[0] || {}).textContent || v : k === 'category' ? catName(v) : k === 'verdict' ? verdictName(v) : v)).join(' · ');
         $('rows').innerHTML = eventRows(r.eventos) || `<tr><td colspan="7" class="muted">${esc(t('sin_resultados'))}</td></tr>`;
         $('total').textContent = t('mostrando').replace('{n}', r.eventos.length).replace('{total}', r.total) + ocultosTexto(r.ocultos);
         $('huecos').innerHTML = (r.huecos || []).map((h) => `<li>${esc(t('hueco').replace('{desde}', when(h.desde)).replace('{hasta}', when(h.hasta)))}</li>`).join('');
@@ -1057,7 +1067,7 @@
         const r = lastR || { totales: { consultas: 0, rastreadores: 0, esperados: 0, cortados: 0 }, eventos: [] };
         if (r.dispositivo) doc.line((r.dispositivo.name || (r.dispositivo.id === 'self' ? t('este_computador') : r.dispositivo.id)) + (r.dispositivo.ip ? ' · ' + r.dispositivo.ip : ''), 10, true);
         doc.line([['col_consultas', r.totales.consultas], ['c_rastreadores', r.totales.rastreadores], ['c_esperados', r.totales.esperados], ['c_cortados', r.totales.cortados]].map(([k, v]) => t(k) + ': ' + v).join(' · '), 10);
-        doc.gap(6).table(eventCols(false), r.eventos.length ? r.eventos.map((ev) => eventCells(ev, false)) : [[ '', t('sin_consultas_aun'), '', '' ]]);
+        doc.gap(6).table(eventCols(false), r.eventos.length ? foldEvents(r.eventos).map((ev) => eventCells(ev, false)) : [[ '', t('sin_consultas_aun'), '', '' ]]);
         if (lastRules.length) {
           doc.seccion(t('mi_reglas_titulo'));
           doc.table([{ title: t('col_tipo'), w: 0.2 }, { title: t('col_patron'), w: 0.4 }, { title: t('col_accion'), w: 0.2 }, { title: t('col_estado'), w: 0.2 }], lastRules.map((x) => [t('tipo_' + x.match_kind), x.pattern, t('accion_' + x.action), x.activa ? t('regla_activa') : t('regla_deshecha')]));

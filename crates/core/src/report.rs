@@ -181,6 +181,35 @@ impl Ledger {
         rows.map(|r| r.map_err(crate::Error::from)).collect()
     }
 
+    /// Every (device, name, program) asked for between `since` and `until`, with how many times
+    /// and when last, over every device (the AI page reads it per device and shows each device
+    /// its own; the household rule of [`Ledger::events`] is applied by the caller, which only
+    /// lists devices the panel may name). Grouped in SQL so a week of a busy house is a few
+    /// thousand rows and not a capped sample: the AI page said "last 7 days" while reading the
+    /// 20 000 newest rows per device, which on a normal PC was half a week (review of 8 Oct 2026).
+    pub fn names_grouped(&self, since: i64, until: i64) -> Result<Vec<NameGroup>> {
+        let mut stmt = self.conn.prepare(
+            // `process_json` is '' for rows without a program (and in databases older than the
+            // column): json_extract on '' is an error, not NULL.
+            "SELECT device_id, qname, \
+                    CASE WHEN process_json = '' THEN NULL \
+                         ELSE json_extract(process_json, '$.nombre') END AS programa, \
+                    COUNT(*), MAX(ts) \
+             FROM events WHERE ts >= ?1 AND ts < ?2 \
+             GROUP BY device_id, qname, programa",
+        )?;
+        let rows = stmt.query_map(params![since, until], |r| {
+            Ok(NameGroup {
+                device_id: r.get(0)?,
+                qname: r.get(1)?,
+                process: r.get::<_, Option<String>>(2)?.filter(|p| !p.is_empty()),
+                queries: u64::try_from(r.get::<_, i64>(3)?).unwrap_or(0),
+                last_ts: r.get(4)?,
+            })
+        })?;
+        rows.map(|r| r.map_err(crate::Error::from)).collect()
+    }
+
     /// Destinations the house had never asked for before the seven days ending at `until`.
     ///
     /// `seen_domains` remembers when each (device, name) pair first appeared and survives
@@ -233,6 +262,21 @@ impl Ledger {
         }
         Ok(out)
     }
+}
+
+/// A (device, name, program) group of a window: how many times and when last.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
+pub struct NameGroup {
+    /// Which device asked.
+    pub device_id: String,
+    /// The name asked for.
+    pub qname: String,
+    /// The program that asked, when the system said so; `None` for rows without one.
+    pub process: Option<String>,
+    /// Times it was asked for inside the window.
+    pub queries: u64,
+    /// The last time, Unix ms.
+    pub last_ts: i64,
 }
 
 /// A name and how many times it was asked for in a window.

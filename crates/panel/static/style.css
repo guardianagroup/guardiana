@@ -94,11 +94,11 @@ tbody tr:last-child td { border-bottom: 0; }
    para que se lean como dos datos y no como un nombre largo. */
 /* La columna de país: en gris y sin envolver, para que no compita con el nombre del
    servicio, que es lo que se lee primero. */
-td.pais, td.empresa-col { color: var(--muted); white-space: nowrap; }
+td.pais { color: var(--muted); }
 td.empresa-col { color: var(--fg); }
 .tag.app { border-color: var(--accent); color: var(--accent); font-family: var(--mono); }
 .tag.trampa { border-color: var(--cortado); color: var(--cortado); font-weight: 600; letter-spacing: 0.04em; }
-.tag.corredor { color: var(--rastreador); font-size: 10px; margin-left: 5px; }
+.tag.corredor { color: var(--rastreador); font-size: 10px; display: block; width: max-content; margin-top: 4px; }
 .verdict.cortado { color: var(--cortado); font-weight: 600; }
 .verdict.respondido { color: var(--respondido); }
 .phrase { display: block; color: var(--muted); font-size: 13px; }

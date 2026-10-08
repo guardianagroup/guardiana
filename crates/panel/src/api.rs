@@ -679,7 +679,8 @@ fn lectura(
     let filter = EventFilter {
         device_id: Some(id.to_owned()),
         since: Some(now - 24 * guardiana_core::time::HOUR_MS),
-        limit: Some(5000),
+        // A normal PC asks ~6 000 names a day; 5 000 cut the "24 h" short (review of 8 Oct 2026).
+        limit: Some(50_000),
         ..EventFilter::default()
     };
     let events = match lector {
@@ -820,25 +821,25 @@ pub(crate) async fn ia(State(state): State<Arc<AppState>>, _s: Session) -> ApiRe
         let mut servicios: PorServicio = HashMap::new();
         let mut alcances = Vec::new();
         let mut sin_alcance = Vec::new();
-        for d in &devices {
-            let week = l.events(&EventFilter {
-                device_id: Some(d.id.clone()),
-                since: Some(now - 7 * 24 * guardiana_core::time::HOUR_MS),
-                limit: Some(20_000),
-                ..EventFilter::default()
-            })?;
-            for e in &week {
-                if let Some(servicio) = guardiana_lists::ai_service_of(&e.qname) {
-                    let slot = servicios
-                        .entry((d.id.clone(), servicio))
-                        .or_insert_with(|| (HashMap::new(), 0, HashMap::new()));
-                    *slot.0.entry(e.qname.clone()).or_insert(0) += 1;
-                    slot.1 = slot.1.max(e.ts);
-                    if let Some(p) = &e.process {
-                        *slot.2.entry(p.nombre.clone()).or_insert(0) += 1;
-                    }
-                }
+        // The whole week, grouped in the database: no cap, so "last 7 days" is the last 7 days.
+        let semana = l.names_grouped(now - 7 * 24 * guardiana_core::time::HOUR_MS, now + 1)?;
+        for g in &semana {
+            let Some(servicio) = guardiana_lists::ai_service_of(&g.qname) else {
+                continue;
+            };
+            if !devices.iter().any(|d| d.id == g.device_id) {
+                continue;
             }
+            let slot = servicios
+                .entry((g.device_id.clone(), servicio))
+                .or_insert_with(|| (HashMap::new(), 0, HashMap::new()));
+            *slot.0.entry(g.qname.clone()).or_insert(0) += g.queries;
+            slot.1 = slot.1.max(g.last_ts);
+            if let Some(p) = &g.process {
+                *slot.2.entry(p.clone()).or_insert(0) += g.queries;
+            }
+        }
+        for d in &devices {
             let modo = l.setting(&scope_mode_key(&d.id))?.unwrap_or_default();
             let pase_hasta = modo
                 .strip_prefix("observar:")
@@ -856,13 +857,17 @@ pub(crate) async fn ia(State(state): State<Arc<AppState>>, _s: Session) -> ApiRe
             }
             // Expected traffic (updates, time, resolvers, messaging) never counts as "beyond":
             // it is the machine keeping itself alive, not the agent going somewhere else.
+            // The scope reads one day of this device; the category is needed to leave the
+            // expected traffic out, so these are the rows themselves (a day, not a week).
+            let dia = l.events(&EventFilter {
+                device_id: Some(d.id.clone()),
+                since: Some(now - 24 * guardiana_core::time::HOUR_MS),
+                limit: Some(50_000),
+                ..EventFilter::default()
+            })?;
             let mut fuera: HashMap<String, u64> = HashMap::new();
             let mut dentro: std::collections::HashSet<String> = std::collections::HashSet::new();
-            for e in week
-                .iter()
-                .filter(|e| e.ts >= now - 24 * guardiana_core::time::HOUR_MS)
-                .filter(|e| e.category != Category::Esperado)
-            {
+            for e in dia.iter().filter(|e| e.category != Category::Esperado) {
                 if in_scope(&patrones, &e.qname) {
                     dentro.insert(e.qname.clone());
                 } else {
@@ -1229,7 +1234,10 @@ pub(crate) async fn recibo(
     let (events, devices) = with_ledger(&state, |l| {
         let events = l.events(&EventFilter {
             since: Some(desde),
-            limit: Some(20000),
+            // One PC asks ~40 000 names a week; the old cap of 20 000 made "7 days" read as
+            // three or four (review of 8 Oct 2026). A very busy house can still hit this one,
+            // and then `desde` says from when the receipt really counts.
+            limit: Some(150_000),
             ..EventFilter::default()
         })?;
         Ok((events, l.devices()?))
@@ -2478,7 +2486,8 @@ pub(crate) async fn modo_bloqueo(
 ) -> ApiResult<String> {
     let modo = match body.modo.as_str() {
         "zero" => "zero",
-        _ => "nxdomain",
+        "nxdomain" => "nxdomain",
+        _ => return Err((StatusCode::BAD_REQUEST, "unknown block mode").into_response()),
     };
     with_ledger(&state, |l| l.set_setting("block_mode", modo))?;
     Ok(Json(modo.to_owned()))
