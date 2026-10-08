@@ -277,9 +277,46 @@
   // syncing. No list has caught them all, but the word is in the name itself, so the panel says
   // that (and only that): what the name says, not a verdict (6 Oct 2026: they were most of what
   // was still "unclassified").
-  const PALABRAS_SUBASTA = /(^|[.-])(prebid|rtb|ortb|dsp|ssp|usync|csync|pbs|bids?|hb-?bid|adserver)([.-]|$)|cookie-?sync/;
-  const pistaAnuncios = (ev) => ev.category === 'desconocido' && !ev.empresa && !ev.ia && !ev.entrega && !ev.local
-    && PALABRAS_SUBASTA.test(String(ev.qname || '').toLowerCase());
+  const PALABRAS_SUBASTA = /(^|[.-])(prebid|rtb|ortb|dsp|ssp|usync|csync|pbs|bids?|hb-?bid|adserver)([.-]|$)|cookie-?sync|user-?sync|pixel-?sync/;
+  // «Servicio» tampoco decía nada (8 oct 2026: el responsable lo vio como el «sin clasificar» de
+  // antes con otro nombre). El propio nombre casi siempre dice para qué es: «login.», «api.»,
+  // «cdn.», «config.», «analytics.», «push.», «update.»… Se mira palabra a palabra en lo que va
+  // delante del dominio y se dice esa palabra, nada más: una pista que da el nombre, no una
+  // comprobación. El orden importa: «cuenta» o «medición» antes que «contenido» o «web».
+  const PISTAS = [
+    ['anuncios', /^(prebid|rtb|ortb|dsp|ssp|usync|csync|cs|pbs|bids?|hb-?bid|adserver|ads?|adsystem|banners?|cookies?|cookiesync)$/],
+    ['pago', /^(checkout|pay|payments?|billing|invoices?|cart|orders?|subscribe|subscriptions?)$/],
+    ['cuenta', /^(accounts?|login|signin|sign-?in|logon|auth|authn?|oauth2?|oauthaccountmanager|sso|identity|idp|passport|myaccount|my|appleid|tokens?|session|profile)$/],
+    ['medicion', /^(analytics|metrics?|stats?|statistics|telemetry|pixels?|beacons?|track(ing|er)?|trk|collect(or)?|logs?|logging|events?|insights|measure|reports?|monitor(ing)?|probe|diagnostics?|crash(es|lytics)?|perf|rum|nel|sentry|bugsnag|px)$/],
+    ['notificaciones', /^(push|notify|notifications?|wns|fcm|gcm|apns|alerts?)$/],
+    ['actualizaciones', /^(updates?|upgrade|autoupdate|swupdate|patch(es)?|release|dist|setup|installer|download(s|center)?|dl)$/],
+    ['seguridad', /^(safebrowsing|safe|antiphishing|smartscreen|threat|security|protect(ion)?|urs|shield|captcha|recaptcha|hcaptcha)$/],
+    ['correo', /^(mail|smtp|imap|pop3?|mx\d*|webmail|email)$/],
+    ['mensajes', /^(chat|msg|messages?|messaging|im|xmpp|mqtt)$/],
+    ['sincronizacion', /^(backup|drive|onedrive|dropbox)$/],
+    ['contenido', /^(cdn|static|assets?|img|images?|image|media|fonts?|video|videos?|content|files?|storage|cache|js|css|thumbs?|pics?|photos?|resources?|scripts?|styles?|s3|blob)$/],
+    ['configuracion', /^(config|configuration|settings?|flags?|features?|remoteconfig|clients?\d*|bootstrap|discovery|geo|ip|whatismyip)$/],
+    ['app', /^(api|apis|ws|wss|rpc|grpc|gateway|gw|backend|bridge|graph|mobile|app|apps|edge|services?|srv|data|query|search|sockets?|websockets?|realtime|live|ec2|compute|lb|elb)$/],
+    ['web', /^(www\d*|web|m|home|portal|es|en|pt|fr|de|it|br|co|mx|ar|us|uk)$/],
+  ];
+  // The registrable part of a name: two labels, or three under a country code with a generic
+  // second level (mercadolibre.com.co, bbc.co.uk).
+  const nLabelsDominio = (labels) => (labels.length >= 3 && labels[labels.length - 1].length === 2
+    && /^(com|co|net|org|gov|edu|ac|or|ne|gob)$/.test(labels[labels.length - 2]) ? 3 : 2);
+  const pista = (ev) => {
+    if (ev.category !== 'desconocido' || ev.local || ev.entrega) return '';
+    const q = String(ev.qname || '').toLowerCase().replace(/\.$/, '');
+    if (!ev.empresa && !ev.ia && PALABRAS_SUBASTA.test(q)) return 'anuncios';
+    // Only what comes before the registrable domain: the last two labels are the company's name.
+    const todas = q.split('.');
+    const labels = todas.slice(0, -nLabelsDominio(todas));
+    // The bare domain of a known company or AI service is its own site or app.
+    if (!labels.length && (ev.empresa || ev.ia)) return 'web';
+    const words = [];
+    labels.forEach((l) => l.split(/[-_]+/).forEach((w) => { if (w) words.push(w.replace(/\d+$/, '')); }));
+    for (const [clave, re] of PISTAS) if (words.some((w) => re.test(w))) return clave;
+    return '';
+  };
   const catTexto = (ev) => {
     if (ev.category !== 'desconocido') return T.categorias[ev.category] || ev.category;
     if (ev.local) return t('cat_red_local');
@@ -289,8 +326,9 @@
     // 6 oct 2026 era el 90 % de las filas de un PC normal y el responsable lo vio como «no sabe
     // nada». Si se sabe de quién es, es un servicio de esa empresa (su web, su app, sus
     // servidores), y eso es lo que dice; «sin clasificar» queda para lo que nadie conoce.
+    const p = pista(ev);
+    if (p) return t('cat_pista_' + p);
     if (ev.empresa || ev.ia) return t('cat_servicio');
-    if (pistaAnuncios(ev)) return t('cat_pista_anuncios');
     return T.categorias.desconocido;
   };
   // El borde discontinuo se reserva para lo que de verdad no se sabe de quién es: si la columna
@@ -303,8 +341,9 @@
     if (ev.category !== 'desconocido') return q[ev.category] || '';
     if (ev.local) return q.red_local || '';
     if (ev.entrega) return q.entrega || '';
+    const p = pista(ev);
+    if (p) return q['pista_' + p] || '';
     if (ev.empresa || ev.ia) return q.de_empresa || '';
-    if (pistaAnuncios(ev)) return q.pista_anuncios || '';
     return q.desconocido || '';
   };
   const cat = (ev) => {

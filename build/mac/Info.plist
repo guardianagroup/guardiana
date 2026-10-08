@@ -5,8 +5,8 @@
   <key>CFBundleName</key><string>GUARDIANA</string>
   <key>CFBundleDisplayName</key><string>GUARDIANA</string>
   <key>CFBundleIdentifier</key><string>com.guardianagroup.guardiana.mac</string>
-  <key>CFBundleVersion</key><string>1.0.4</string>
-  <key>CFBundleShortVersionString</key><string>1.0.4</string>
+  <key>CFBundleVersion</key><string>1.0.5</string>
+  <key>CFBundleShortVersionString</key><string>1.0.5</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>GUARDIANA</string>
   <key>CFBundleIconFile</key><string>guardiana</string>
