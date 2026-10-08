@@ -48,6 +48,8 @@ withgoogle.com
 recaptcha.net
 nest.com
 fitbit.com
+nel.goog
+googlezip.net
 
 @Apple|US|Cupertino
 apple.com
@@ -62,6 +64,7 @@ itunes.com
 icloud-content.com
 me.com
 apple.news
+icloud-sandbox.com
 
 @Microsoft|US|Redmond
 msftstatic.com
@@ -95,6 +98,12 @@ licdn.com
 github.com
 githubusercontent.com
 github.io
+msedge.net
+sharepoint.com
+sfx.ms
+microsoft365.com
+cloud.microsoft
+githubassets.com
 
 @Amazon|US|Seattle
 amazon.com
@@ -114,6 +123,8 @@ a2z.com
 ring.com
 audible.com
 amazonalexa.com
+on.aws
+amazon.dev
 
 @Meta|US|Menlo Park
 facebook.com
@@ -130,6 +141,7 @@ meta.com
 oculus.com
 threads.net
 threads.com
+wa.me
 
 @ByteDance|CN|Pekín
 tiktok.com
@@ -274,6 +286,7 @@ criteo.net
 # en 2022). El país es el del grupo, Francia, como manda la regla de la cabecera.
 bidswitch.net
 bidswitch.com
+hlserve.com  # HookLogic, comprada por Criteo en 2016
 iponweb.com
 
 @The Trade Desk|US|Ventura (California)
@@ -282,6 +295,9 @@ adsrvr.org
 @Magnite|US|Nueva York
 rubiconproject.com
 magnite.com
+spotxchange.com  # SpotX, comprada por Magnite en 2021
+spotx.tv
+telaria.com  # Telaria, unida a Magnite en 2020
 
 @PubMatic|US|Redwood City
 pubmatic.com
@@ -292,6 +308,8 @@ taboola.com
 @Outbrain|US|Nueva York
 # Outbrain Inc., Nueva York. (Decía Israel por sus fundadores: la empresa es estadounidense.)
 outbrain.com
+outbrainimg.com
+zemanta.com  # Zemanta, de Outbrain desde 2017
 
 @Teads|US|Nueva York
 # Nació en Francia y Luxemburgo. Outbrain la compró en febrero de 2025 y en junio de 2025 el
@@ -319,6 +337,8 @@ twitter.com
 x.com
 twimg.com
 t.co
+grok.com
+x.ai
 
 @Snap|US|Santa Mónica
 snapchat.com
@@ -487,6 +507,8 @@ oaiusercontent.com
 zoho.com
 zohostatic.com
 zohocdn.com
+zoho.in
+zohopublic.in
 
 @Mozilla|US|San Francisco
 mozilla.org
@@ -566,6 +588,8 @@ supercell.com
 @AppLovin|US|Palo Alto
 applovin.com
 applvn.com
+adjust.com  # Adjust, comprada por AppLovin en 2021
+mopub.com  # MoPub, comprada a Twitter en 2022
 
 @Unity|US|San Francisco
 unity3d.com
@@ -870,3 +894,137 @@ triplelift.com
 # La empresa detrás de AdRoll, San Francisco.
 adroll.com
 nextroll.com
+
+# Añadidas el 6 oct 2026, de los nombres «sin clasificar» más preguntados en el PC del responsable.
+# Solo el dueño del nombre, que es el de la propia marca; el país y la ciudad se dejan vacíos hasta
+# comprobarlos en un registro público, como pide la cabecera.
+@TradingView
+tradingview.com
+
+@Dodo Payments
+dodopayments.com
+dodopayments.tech
+
+@beehiiv
+beehiiv.com
+
+@Porkbun
+porkbun.com
+
+@Rust Foundation
+crates.io
+
+@Y Combinator
+ycombinator.com
+
+@Product Hunt
+producthunt.com
+
+@hCaptcha
+hcaptcha.com
+
+@Reverso
+reverso.net
+
+@Yandex
+yandex.com
+yandex.ru
+yastatic.net
+
+@HubSpot
+hubspot.com
+hs-scripts.com
+hs-analytics.net
+hsforms.com
+hsforms.net
+hscollectedforms.net
+hs-banner.com
+hsadspixel.net
+hubspot.net
+hsappstatic.net
+hubapi.com
+hubspotusercontent-na1.net
+hubspotlinks.com
+
+@Help Scout
+helpscout.net
+
+@iubenda
+iubenda.com
+
+@RudderStack
+rudderstack.com
+rudderlabs.com
+
+@Insider
+useinsider.com
+
+@Ada
+ada.support
+
+@Stape
+stape.io
+stapecdn.com
+
+@Seedtag
+seedtag.com
+
+@AdKernel
+adkernel.com
+
+@NoBid
+nobid.io
+servenobid.com
+
+@Next Millennium
+nextmillmedia.com
+
+@GfK
+sensic.net
+
+@GUARDIANA
+# Este mismo programa y su web: activar la licencia, la página de comprar, las guías.
+guardianagroup.com
+
+@Eskimi
+eskimi.com
+
+@Adsmovil
+adsmovil.com
+
+@Ogury
+ogury.com
+presage.io
+
+@Pubstack
+pbstck.com
+
+@vdo.ai
+vdo.ai
+
+@Minute Media
+minutemedia.com
+minutemedia-prebid.com
+
+@Viously
+viously.com
+
+@SundaySky
+sundaysky.com
+
+@Impactify
+impactify.io
+impactify.media
+
+@Optidigital
+optidigital.com
+
+@Airwallex
+airwallex.com
+
+@OpenWeb
+openweb.com
+openwebmp.com
+
+@Forter
+forter.com

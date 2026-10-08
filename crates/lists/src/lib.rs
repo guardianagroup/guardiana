@@ -40,6 +40,107 @@ pub const IA: &str = include_str!("../data/ia.txt");
 /// Guardiana's own "entrega" list: names that are the road, not the destination (decision 148).
 pub const ENTREGA: &str = include_str!("../data/entrega.txt");
 
+/// Guardiana's own "corredores" list: companies registered as data brokers in California, from
+/// the public registry of the California Privacy Protection Agency (decision 194). A label about
+/// what a company is registered as, never a verdict about what this query carried.
+pub const CORREDORES: &str = include_str!("../data/corredores.txt");
+
+/// A company registered as a data broker: under California law, one that collects and sells to
+/// third parties the personal information of people it has no direct relationship with. Every
+/// field is copied from the company's own entry in the public registry; nothing is inferred.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct DataBroker {
+    /// The name in the registry: the trade name it declared, otherwise its legal name.
+    pub name: &'static str,
+    /// Two-letter country the registrant wrote for itself, when it did.
+    pub country: Option<&'static str>,
+    /// Letters for what the registrant itself ticked in the registry (`corredores.txt` says
+    /// which letter is which): minors, precise location, biometrics, foreign actors, the US
+    /// federal government, the police, developers of generative AI.
+    pub declared: &'static str,
+    /// The page the registrant itself declared for people to ask for their data to be deleted or
+    /// not sold, when it gave one.
+    pub rights_url: Option<&'static str>,
+}
+
+impl DataBroker {
+    /// Whether the registrant ticked `letter` in the registry (`g` for precise location...).
+    #[must_use]
+    pub fn declares(&self, letter: char) -> bool {
+        self.declared.contains(letter)
+    }
+}
+
+/// Domains → registrant, and `empresas.txt` company → registrant (the `=Empresa` lines).
+type BrokerMaps = (
+    HashMap<&'static str, DataBroker>,
+    HashMap<&'static str, DataBroker>,
+);
+static BROKERS: std::sync::OnceLock<BrokerMaps> = std::sync::OnceLock::new();
+
+/// A `@Nombre|XX|declara|url` header, or `None` for a header without a name.
+fn broker_header(head: &'static str) -> Option<DataBroker> {
+    let mut parts = head.split('|');
+    let name = parts.next()?.trim();
+    let country = parts.next().map(str::trim).filter(|c| c.len() == 2);
+    let declared = parts.next().map(str::trim).unwrap_or("");
+    let rights_url = parts.next().map(str::trim).filter(|u| !u.is_empty());
+    (!name.is_empty()).then_some(DataBroker {
+        name,
+        country,
+        declared,
+        rights_url,
+    })
+}
+
+/// The list's lines with their comments stripped, blank ones skipped.
+fn broker_lines() -> impl Iterator<Item = &'static str> {
+    CORREDORES
+        .lines()
+        .map(|l| l.split('#').next().unwrap_or("").trim())
+        .filter(|l| !l.is_empty())
+}
+
+fn parse_brokers() -> BrokerMaps {
+    let mut by_domain = HashMap::new();
+    let mut by_company = HashMap::new();
+    let mut current: Option<DataBroker> = None;
+    for line in broker_lines() {
+        if let Some(head) = line.strip_prefix('@') {
+            current = broker_header(head);
+        } else if let Some(company) = line.strip_prefix('=') {
+            if let Some(b) = current {
+                by_company.insert(company.trim(), b);
+            }
+        } else if let Some(b) = current {
+            if parse::looks_like_domain(line) {
+                by_domain.insert(line, b);
+            }
+        }
+    }
+    (by_domain, by_company)
+}
+
+/// The registered data broker a queried name belongs to, or `None`. First by the name itself
+/// (`trc.taboola.com` → the registrant that declared `taboola.com`), then by the company that
+/// owns the name in `empresas.txt` when that company is a registrant (`rlcdn.com` is LiveRamp's,
+/// and LiveRamp is registered). A fact from a public register about the owner of the name; what
+/// this particular query carried, Guardiana does not know and does not say.
+#[must_use]
+pub fn data_broker_of(qname: &str) -> Option<DataBroker> {
+    let (by_domain, by_company) = BROKERS.get_or_init(parse_brokers);
+    lookup(by_domain, qname).or_else(|| company_of(qname).and_then(|c| by_company.get(c).copied()))
+}
+
+/// Every registrant of the list, in file order, for whoever lists or counts them.
+#[must_use]
+pub fn data_brokers() -> Vec<DataBroker> {
+    broker_lines()
+        .filter_map(|l| l.strip_prefix('@'))
+        .filter_map(broker_header)
+        .collect()
+}
+
 static COMPANIES: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
     std::sync::OnceLock::new();
 static AI_SERVICES: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
@@ -48,12 +149,12 @@ static DELIVERY: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
     std::sync::OnceLock::new();
 
 /// Longest matching domain of a name map: `graph.facebook.com` matches an entry `facebook.com`.
-fn lookup(map: &HashMap<&'static str, &'static str>, qname: &str) -> Option<&'static str> {
+fn lookup<V: Copy>(map: &HashMap<&'static str, V>, qname: &str) -> Option<V> {
     let name = qname.trim_end_matches('.').to_ascii_lowercase();
     let mut rest = name.as_str();
     loop {
         if let Some(v) = map.get(rest) {
-            return Some(v);
+            return Some(*v);
         }
         let i = rest.find('.')?;
         rest = &rest[i + 1..];
@@ -561,8 +662,11 @@ mod company_tests {
     #[test]
     fn ai_services_are_labelled_by_owner() {
         use super::ai_service_of;
-        assert_eq!(ai_service_of("api.anthropic.com"), Some("Anthropic"));
-        assert_eq!(ai_service_of("chatgpt.com."), Some("OpenAI"));
+        assert_eq!(
+            ai_service_of("api.anthropic.com"),
+            Some("Anthropic (Claude)")
+        );
+        assert_eq!(ai_service_of("chatgpt.com."), Some("OpenAI (ChatGPT)"));
         assert_eq!(
             ai_service_of("api.individual.githubcopilot.com"),
             Some("Microsoft Copilot")
@@ -571,5 +675,84 @@ mod company_tests {
         // google.com as a whole is not an AI service: only the names of the list are.
         assert_eq!(ai_service_of("www.google.com"), None);
         assert_eq!(ai_service_of("eltiempo.com"), None);
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod broker_tests {
+    use super::{company_of, data_broker_of, data_brokers, CORREDORES};
+
+    #[test]
+    fn a_registrants_own_name_and_its_subdomains_are_labelled() {
+        let t = data_broker_of("trc.taboola.com.").expect("taboola is registered");
+        assert_eq!(t.name, "Taboola, Inc.");
+        assert_eq!(t.country, Some("US"));
+        assert!(t.rights_url.is_some_and(|u| u.starts_with("https://")));
+        let a = data_broker_of("acxiom.com").expect("acxiom is registered");
+        assert!(a.declares('g') && a.declares('m') && !a.declares('b'));
+    }
+
+    #[test]
+    fn a_company_of_the_empresas_list_counts_when_it_is_the_registrant() {
+        // rlcdn.com is LiveRamp's tracking name (empresas.txt); LiveRamp is registered.
+        assert_eq!(company_of("idsync.rlcdn.com"), Some("LiveRamp"));
+        assert_eq!(
+            data_broker_of("idsync.rlcdn.com").map(|b| b.name),
+            Some("LiveRamp Holdings, Inc.")
+        );
+        // The name itself wins over the owning company: sharethrough.com belongs to Equativ in
+        // empresas.txt, but the registrant is Sharethrough.
+        assert_eq!(
+            data_broker_of("match.sharethrough.com").map(|b| b.name),
+            Some("Sharethrough")
+        );
+    }
+
+    #[test]
+    fn names_nobody_registered_are_none() {
+        assert_eq!(data_broker_of("www.google.com"), None);
+        assert_eq!(data_broker_of("graph.facebook.com"), None);
+        assert_eq!(data_broker_of("eltiempo.com"), None);
+        assert_eq!(data_broker_of("smartadserver.com"), None);
+    }
+
+    #[test]
+    fn the_list_is_well_formed() {
+        let all = data_brokers();
+        assert!(all.len() > 550, "{} registrants", all.len());
+        let mut names = std::collections::HashSet::new();
+        for b in &all {
+            assert!(names.insert(b.name), "{} twice", b.name);
+            assert!(
+                b.declared.chars().all(|c| "mgbxfpi".contains(c)),
+                "{}: {}",
+                b.name,
+                b.declared
+            );
+            if let Some(c) = b.country {
+                assert!(
+                    c.len() == 2 && c.chars().all(|x| x.is_ascii_uppercase()),
+                    "{}: {c}",
+                    b.name
+                );
+            }
+            if let Some(u) = b.rights_url {
+                assert!(
+                    u.starts_with("http://") || u.starts_with("https://"),
+                    "{}: {u}",
+                    b.name
+                );
+            }
+        }
+        // Every `=Empresa` line names a section of empresas.txt, or it would never match.
+        for line in CORREDORES.lines() {
+            let line = line.split('#').next().unwrap_or("").trim();
+            if let Some(c) = line.strip_prefix('=') {
+                let known = super::parse_guardiana(super::EMPRESAS)
+                    .any(|(s, _)| s.map(|s| s.split('|').next().unwrap_or(s)) == Some(c.trim()));
+                assert!(known, "=`{c}` is not a company of empresas.txt");
+            }
+        }
     }
 }

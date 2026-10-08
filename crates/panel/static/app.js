@@ -209,9 +209,12 @@
   // En el papel no hay dos líneas por celda: la ciudad va en la misma, debajo, como en la
   // pantalla, porque la columna de país se lee de arriba abajo.
   const dondeCell = (ev) => [ev.pais || '', ev.ciudad || ''].filter(Boolean).join('\n');
+  // En el papel, la etiqueta «compra y venta de datos» va debajo del nombre de la empresa, como
+  // en la pantalla va a su lado.
+  const empresaTexto = (ev) => (ev.empresa || '') + (ev.corredor ? '\n' + t('corredor_etiqueta') : '');
   const eventCells = (ev, withDevice) => withDevice
-    ? [clock(ev.ts), nameCell(ev), ev.empresa || '', catTexto(ev), dondeCell(ev), deviceName(ev), verdictName(ev.verdict)]
-    : [clock(ev.ts), nameCell(ev), ev.empresa || '', catTexto(ev), dondeCell(ev), verdictName(ev.verdict)];
+    ? [clock(ev.ts), nameCell(ev), empresaTexto(ev), catTexto(ev), dondeCell(ev), deviceName(ev), verdictName(ev.verdict)]
+    : [clock(ev.ts), nameCell(ev), empresaTexto(ev), catTexto(ev), dondeCell(ev), verdictName(ev.verdict)];
 
 
   // «Quién hay detrás», al final del PDF: las empresas que de verdad salen en estas consultas,
@@ -270,13 +273,24 @@
   // keeps what was decided at the time -- but what is SHOWN now says what is actually known:
   // the network that delivers somebody else's content, the company the name belongs to, or,
   // when nothing is known, that no open list knows it either. Never a verdict (brief §6).
+  // Ad auctions name their servers with the words of the trade: prebid, rtb, ssp, dsp, cookie
+  // syncing. No list has caught them all, but the word is in the name itself, so the panel says
+  // that (and only that): what the name says, not a verdict (6 Oct 2026: they were most of what
+  // was still "unclassified").
+  const PALABRAS_SUBASTA = /(^|[.-])(prebid|rtb|ortb|dsp|ssp|usync|csync|pbs|bids?|hb-?bid|adserver)([.-]|$)|cookie-?sync/;
+  const pistaAnuncios = (ev) => ev.category === 'desconocido' && !ev.empresa && !ev.ia && !ev.entrega && !ev.local
+    && PALABRAS_SUBASTA.test(String(ev.qname || '').toLowerCase());
   const catTexto = (ev) => {
     if (ev.category !== 'desconocido') return T.categorias[ev.category] || ev.category;
     if (ev.local) return t('cat_red_local');
     if (ev.entrega) return t('cat_entrega');
     // «de ByteDance» dejó de tener sentido el día que la empresa ganó su propia columna: la fila
-    // decía «ByteDance | de ByteDance». La categoría vuelve a decir lo único que sabe de la
-    // categoría —que ninguna lista lo clasifica— y quién es lo dice la columna de al lado.
+    // decía «ByteDance | de ByteDance». Pero «sin clasificar» al lado de «Microsoft» tampoco: el
+    // 6 oct 2026 era el 90 % de las filas de un PC normal y el responsable lo vio como «no sabe
+    // nada». Si se sabe de quién es, es un servicio de esa empresa (su web, su app, sus
+    // servidores), y eso es lo que dice; «sin clasificar» queda para lo que nadie conoce.
+    if (ev.empresa || ev.ia) return t('cat_servicio');
+    if (pistaAnuncios(ev)) return t('cat_pista_anuncios');
     return T.categorias.desconocido;
   };
   // El borde discontinuo se reserva para lo que de verdad no se sabe de quién es: si la columna
@@ -290,6 +304,7 @@
     if (ev.local) return q.red_local || '';
     if (ev.entrega) return q.entrega || '';
     if (ev.empresa || ev.ia) return q.de_empresa || '';
+    if (pistaAnuncios(ev)) return q.pista_anuncios || '';
     return q.desconocido || '';
   };
   const cat = (ev) => {
@@ -301,7 +316,13 @@
   // AppsFlyer sells tells them everything they need to decide. It is a fact about the
   // company, not about this query, and it is only printed where one is written.
   const phrases = (ev) => (ev.oficio ? `<span class="phrase oficio">· ${esc(ev.oficio)}</span>` : '')
+    + declara(ev)
     + (ev.frases || []).map((f) => `<span class="phrase">· ${esc(f)}</span>`).join('');
+  // Lo que la empresa marcó ella misma en el registro de corredores de datos (ubicación exacta,
+  // menores, a quién vendió): una frase debajo del nombre, solo cuando marcó algo. Es su propia
+  // declaración, copiada; no una conclusión de Guardiana (pedido del responsable, 6 oct 2026).
+  const declara = (ev) => (ev.corredor && ev.corredor.declara && ev.corredor.declara.length
+    ? `<span class="phrase">· ${esc(t('corredor_declara').replace('{lista}', ev.corredor.declara.join(', ')))}</span>` : '');
   // El país va pegado a la empresa, y es el de la EMPRESA, no el del servidor que responde:
   // casi todo lo grande contesta desde un servidor cercano, así que el país de la dirección IP
   // diría «Colombia» de algo cuyos datos acaban en Estados Unidos. Lo que se puede sostener es
@@ -317,7 +338,14 @@
   // EMPRESA pasa a su propia columna, al lado de la categoría y el país: así la tabla dice
   // quién es, qué es y de dónde, cada cosa en su sitio (pedido del responsable, 21 sep 2026).
   const company = (ev) => (ev.ia && !(ev.category === 'desconocido' && !ev.entrega && !ev.empresa) ? ` <span class="tag ia">${esc(ev.ia)}</span>` : '');
-  const empresaCelda = (ev) => `<td class="empresa-col">${ev.empresa ? esc(ev.empresa) : '<span class="muted">—</span>'}</td>`;
+  // Al lado de la empresa, a lo que se dedica cuando está inscrita como corredora de datos:
+  // «compra y venta de datos», con el nombre con el que se inscribió y su país en el título.
+  // El registro es público y la frase es la de la ley; cortarla o no es decisión de la persona
+  // (pedido del responsable, 6 oct 2026).
+  const corredorTag = (ev) => (ev.corredor
+    ? ` <span class="tag corredor" title="${esc(t('corredor_titulo').replace('{nombre}', ev.corredor.nombre).replace('{pais}', ev.corredor.pais ? ' (' + ev.corredor.pais + ')' : ''))}">${esc(t('corredor_etiqueta'))}</span>`
+    : '');
+  const empresaCelda = (ev) => `<td class="empresa-col">${ev.empresa ? esc(ev.empresa) : '<span class="muted">—</span>'}${corredorTag(ev)}</td>`;
   // Dónde acaba lo de este aparato, sumado: los países de las empresas dueñas de los nombres.
   const paisesDe = (l) => (l && l.paises && l.paises.length
     ? `<br><span class="phrase">${esc(t('lectura_paises'))} ` + l.paises.map((x) => `${esc(x[0])} <b>${x[1]}</b>`).join(' · ') + '</span>'
@@ -644,6 +672,9 @@
     ctx.fillText(t('tarjeta_pie'), 80, H - 64);
   }
   const waLink = (text) => 'https://wa.me/?text=' + encodeURIComponent(text);
+  // The person's own mail program, with the subject and the text written: like WhatsApp, Guardiana
+  // sends nothing; whoever presses "send" there is the person (6 Oct 2026, the owner asked for it).
+  const mailLink = (text) => 'mailto:?subject=' + encodeURIComponent(t('informe_correo_asunto')) + '&body=' + encodeURIComponent(text);
 
   // ----- pages -------------------------------------------------------------
   const pages = {
@@ -658,6 +689,7 @@
       $('i-total').innerHTML = r.plus ? row('<strong>Total</strong>', r.total) : '';
       $('i-texto').textContent = r.texto_whatsapp;
       $('i-wa').href = waLink(r.texto_whatsapp);
+      $('i-correo').href = mailLink(r.texto_whatsapp);
       // Lo que solo Plus puede contestar, porque hace falta memoria: qué cambió respecto a la
       // semana pasada y qué destinos son nuevos. Con el plan gratis se dice por qué no está,
       // en vez de enseñar una sección vacía que se leería como «no ha cambiado nada».
@@ -678,6 +710,15 @@
         $('i-cambio').classList.remove('hidden');
         $('i-cambio-lista').innerHTML = `<li class="muted">${esc(t('informe_comparar_desde').replace('{fecha}', new Date(r.comparar_desde).toLocaleDateString(LOC, DIA)))}</li>`;
         $('i-novedades').classList.add('hidden');
+      }
+      // Las empresas inscritas como corredoras de datos con las que habló la casa: nombre, país,
+      // cuántas veces, lo que declaran y dónde pedir que borren tus datos (decisión 194).
+      const derechos = (c) => (c.derechos ? `<a href="${esc(c.derechos)}" target="_blank" rel="noopener noreferrer">${esc(t('corredor_derechos'))}</a>` : '<span class="muted">—</span>');
+      $('i-corredores').classList.toggle('hidden', !r.plus);
+      if (r.plus) {
+        $('i-corredores-total').textContent = r.corredores.length ? tn('informe_corredores_texto', r.corredores.length).replace('{consultas}', r.corredores_consultas) : '';
+        $('i-corredores-rows').innerHTML = r.corredores.map((c) => `<tr><td>${esc(c.nombre)}</td><td>${c.pais ? esc(c.pais) : '<span class="muted">—</span>'}</td><td>${c.consultas}</td><td>${c.nombres}</td><td>${c.declara.length ? esc(c.declara.join(', ')) : '<span class="muted">—</span>'}</td><td>${derechos(c)}</td></tr>`).join('')
+          || `<tr><td colspan="6" class="muted">${esc(t('informe_corredores_ninguna'))}</td></tr>`;
       }
       if (r.plus && !r.comparar_desde) {
         $('i-nuevos-rows').innerHTML = r.novedades.map((n2) => `<tr><td class="mono">${esc(n2.nombre)}</td><td>${esc(n2.empresa)}</td><td>${esc(catName(n2.categoria))}</td><td>${esc(n2.dispositivo === 'self' ? t('este_computador') : n2.dispositivo)}</td><td>${n2.consultas}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('informe_nuevos_ninguno'))}</td></tr>`;
@@ -709,6 +750,15 @@
               r.novedades.map((n2) => [n2.nombre, n2.empresa, catName(n2.categoria), n2.dispositivo === 'self' ? t('este_computador') : n2.dispositivo, String(n2.consultas)]), 8);
           } else {
             doc.line(t('informe_nuevos_ninguno'), 10);
+          }
+        }
+        if (r.plus) {
+          doc.seccion(t('informe_corredores_titulo'), t('informe_corredores_lead'));
+          if (r.corredores.length) {
+            doc.table([{ title: t('col_empresa_n'), w: 0.26 }, { title: t('col_pais'), w: 0.14 }, { title: t('col_consultas'), w: 0.1 }, { title: t('col_nombres_n'), w: 0.1 }, { title: t('col_declara'), w: 0.4 }],
+              r.corredores.map((c) => [c.nombre, c.pais || '', String(c.consultas), String(c.nombres), c.declara.join(', ')]), 8);
+          } else {
+            doc.line(t('informe_corredores_ninguna'), 10);
           }
         }
         if (r.plus) doc.seccion(t('informe_whatsapp_titulo')).line(r.texto_whatsapp, 10);

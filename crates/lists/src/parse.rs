@@ -19,7 +19,7 @@ fn is_domain_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '.' || c == '-'
 }
 
-fn looks_like_domain(s: &str) -> bool {
+pub(crate) fn looks_like_domain(s: &str) -> bool {
     !s.is_empty()
         && s.contains('.')
         && !s.starts_with('.')

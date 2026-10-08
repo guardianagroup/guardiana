@@ -1,0 +1,2038 @@
+# Guardiana — lista "corredores": empresas registradas como corredoras de datos (data brokers).
+#
+# Un corredor de datos, según la ley de California (Civil Code 1798.99.80), es una empresa que
+# recoge y vende a terceros datos personales de personas con las que no tiene relación directa.
+# Desde 2024 todas tienen que inscribirse en el registro público de la Agencia de Protección de
+# la Privacidad de California (CPPA), que es la fuente de este archivo:
+#
+#   https://cppa.ca.gov/data_broker_registry/   (archivo registry.csv)
+#   Copia del 8 de octubre de 2026, 603 inscripciones,
+#   SHA-256 del CSV: 449fcfbc6587d67f2a7ba4ff86685e78257b2b89d9ffc9fca6b1262a1a6c7fa2
+#
+# Es una etiqueta, nunca un veredicto: el panel dice «esta empresa está inscrita como corredora
+# de datos» y de dónde es, y la persona decide si la corta. Nada de lo que hay aquí lo inventa
+# Guardiana: el nombre, el país, lo que declara y la página de derechos vienen del registro; los
+# dominios de rastreo añadidos a mano llevan al lado de quién son y desde cuándo.
+#
+# FORMATO: `@Nombre|XX|declara|url`
+#   Nombre   el que figura en el registro (su marca comercial si la declaró; si no, la razón social)
+#   XX       país de la inscrita, código ISO de dos letras, tal como lo escribió ella en el registro
+#   declara  letras de lo que la propia empresa marcó en el registro:
+#              m  recoge datos de menores
+#              g  recoge la ubicación exacta
+#              b  recoge datos biométricos
+#              x  vendió o compartió datos con actores extranjeros el último año
+#              f  vendió o compartió datos con el Gobierno federal de EE. UU. el último año
+#              p  vendió o compartió datos con la policía sin orden judicial el último año
+#              i  vendió o compartió datos con desarrolladores de IA generativa el último año
+#   url      la página que ella misma declaró para pedir que borren o no vendan tus datos
+# Debajo, una línea por dominio (coincide con el dominio y sus subdominios): primero el sitio
+# principal que declaró en el registro; después, con comentario, los nombres de rastreo que usa y
+# que el registro no pide. Una línea `=Empresa` dice que esa sección de empresas.txt ES la
+# inscrita (o su grupo): todos los nombres de esa empresa cuentan como suyos.
+#
+# Varias filiales del mismo grupo se inscriben con la misma web (TransUnion, Equifax, Experian,
+# Deloitte, Nielsen…): el dominio va con la inscrita cuyo nombre lo lleva, y las demás no salen.
+# Si el registro cambia, se vuelve a generar desde el CSV nuevo y se anota aquí la fecha y la huella.
+
+@01Advertising Inc.|US|g|https://www.01advertising.com/legal/dsar/
+01advertising.com
+
+@33 Mile Radius LLC|US||https://www.33mileradius.com
+33mileradius.com
+
+@33Across, Inc.|US||https://www.33across.com
+33across.com
+tynt.com  # Tynt, de 33Across desde 2013
+
+@5x5 US, LLC|US|g|https://privacy.5x5data.com/5x5/opt-out
+5x5data.com
+
+@6sense Insights, Inc.|US||https://6sense.com/privacy-policy/
+6sense.com
+6sc.co
+
+@Accudata Integrated Marketing, LLC|US||https://deepsync.com/accudata/
+acculeads.com
+
+@Accurate Append Inc.|US||https://accurateappend.com/privacy-policy/
+accurateappend.com
+
+@ACH, Address Clearing House|US||https://www.achcoop.com/
+achcoop.com
+
+@Acronymix LLC|US|g|https://Acronymix.com
+acronymix.com
+
+@Acxiom LLC|US|mgf|https://www.acxiom.com/privacy
+acxiom.com
+acxiom-online.com
+
+@AdeptID, Inc.|US||https://www.adept-id.com/opt-out-preferences/
+adept-id.com
+
+@adsquare GmbH|DE|g|https://adsquare.com/
+adsquare.com
+
+@Adstra LLC|US||https://www.adstradata.com/privacy-policy/
+adstradata.com
+
+@AdsWizz, Inc.|US||https://www.adswizz.com
+adswizz.com
+
+@Affinity Answers Corporation|US||https://www.affinityanswers.com/your-privacy-choices/
+affinityanswers.com
+
+@Affinity Solutions Inc.|US||https://affinitysolutions-privacy.my.onetrust.com/webform/a564cfa1-53bf-4c10-bf95-cd907432d7e8/7e4e6bf3-6562-454e-8c73-6a7bd1f4b336
+affinity.solutions
+
+@AggKnowledge Inc.|US||https://www.aggknowledge.ai/privacypolicy
+aggknowledge.ai
+
+@Agile Education Marketing, LLC|US|f|https://agile-ed.com/california-privacy-rights/
+agile-ed.com
+
+@AGR Marketing Solutions LLC|US||https://www.agrmarketingsolutions.com
+agrmarketingsolutions.com
+
+@Aidentified, Inc.|US||https://www.aidentified.com/privacy--policy
+aidentified.com
+
+@Airlines Reporting Corporation|US|mfp|https://www2.arccorp.com/site-privacy-policy/
+arccorp.com
+
+@Alliant Cooperative Data Solutions LLC|US||https://alliantinsight.com/alliant-privacy-policy/
+alliantinsight.com
+
+@Alphonso Inc.|US||https://alphonso.tv/privacy/consumer
+alphonso.tv
+
+@Altair Data Resources, Inc|US||https://www.altairdata.com/consumer-info
+altairdata.com
+
+@Altrata, Inc.|US||https://altrata.com/privacy-policy
+altrata.com
+
+@AnalyticsIQ Inc|US||https://analytics-iq.com/privacy-policy/
+analytics-iq.com
+
+@Anchor Computer Inc.|US||http://www.anchorcomputer.com/
+anchorcomputer.com
+
+@App Science, Inc|US||https://www.appscience.ai/
+appscience.ai
+
+@AppLovin Corporation|US||https://legal.applovin.com/privacy/
+applovin.com
+=AppLovin
+
+@Aristotle International, Inc.|US||https://www.aristotle.com/privacy/addendum-for-california-residents/
+aristotle.com
+
+@Asset International, Inc.|US|xf|https://www.issgovernance.com/privacy-legal/ccpa/
+issmarketintelligence.com
+
+@AtData, LLC|US||https://www.atdata.com
+atdata.com
+
+@Attribits|US||https://www.attribits.com/privacy-policy
+attribits.com
+
+@AutoWeb, Inc.|US|g|https://www.autoweb.com
+autoweb.com
+
+@AWL Holdings, LLC|US||https://privacyportal-eu.onetrust.com/webform/031dc37f-2093-4055-9d04-22f83329fe9f/a4fb8ed6-8389-4a17-a3be-ca808c6b300e
+allwebleads.com
+insurancequotes.com
+usinsuranceonline.com
+affordable-home-insurance.org
+discount-car-insurance-rates.com
+general-liability-insurance-rates.com
+affordable-health-insurance-plans.org
+affordable-life-insurance-rates.org
+
+@Azerion US Inc.|US|g|https://www.hybridtheory.com/privacy-notice/
+azerion.com
+
+@Babel Street, Inc.|US|gfp|https://www.babelstreet.com/privacy
+babelstreet.com
+
+@Baron App, Inc.|US||https://legal.cameo.com/privacypolicy
+candl.app
+cameo.com
+
+@BDEX, LLC|US||https://www.bdex.com/privacy-policy/
+bdex.com
+
+@BDO GCI, LLC|US|m|https://www.bdo.com
+bdo.com
+
+@BECAUSAL, INC.|US|g|https://www.becausal.com/personal-information
+becausal.com
+
+@BeenVerified, LLC and its subsidiaries and affiliates|US||https://www.beenverified.com/svc/optout/search/comprehensive_optouts
+beenverified.com
+peoplelooker.com
+numberguru.com
+ownerly.com
+neighborwho.com
+peoplesmart.com
+bumper.com
+freephonetracer.com
+emailfinder.com
+moneybot5000.com
+reversephone.com
+wingmate.com
+famfinder.com
+
+@Beeswax|US|g|https://www.beeswax.com
+beeswax.com
+bidr.io
+
+@Belardi Ostroy, ALC, LLC|US||https://belardiwong.com/
+belardiwong.com
+
+@Best Pick Reports, LLC|US||https://www.bestpickreports.com
+bestpickreports.com
+
+@Biscred|US||https://www.biscred.com/do-not-sell-my-information
+biscred.com
+
+@Black Pearl Group Limited|NZ||https://www.blackpearl.com/your-privacy-choices
+blackpearl.com
+
+@Blackbaud, Inc|US||https://www.blackbaud.com/
+blackbaud.com
+
+@Blis Global Ltd|GB|g|https://www.blis.com
+blis.com
+
+@Blue Action Inc.|US||https://blueaction.io/do-not-sell/
+blueaction.io
+
+@Blueprint Audiences|US||https://blueprintaudiences.com
+blueprintaudiences.com
+
+@Bombora, Inc.|US||https://www.bombora.com
+bombora.com
+ml314.com
+
+@Bridg, a division of Cardlytics, Inc.|US||https://www.bridg.com/privacy-policy
+bridg.com
+
+@Brooks Integrated Marketing, LLC|US||https://www.brooksim.com/privacy-policy
+brooksim.com
+
+@Buildertrend Solutions, Inc.|US||https://buildertrend.com/privacy-notice/
+buildertrend.com
+toolbeltdata.com
+
+@Bushwick Growbots LLC|US||https://growbots.com
+growbots.com
+
+@Buxton Company, LLC|US|g|https://www.buxtonco.com/privacy
+buxtonco.com
+
+@Buyerlink Inc.|US|g|https://www.buyerlink.co
+buyerlink.co
+
+@BV Insights LLC|US|mi|https://big-village.com/privacy-policy/
+big-village.com
+
+@Cadent LLC|US|g|https://www.cadent.tv
+cadent.tv
+
+@Captify Technologies|GB||https://www.captifytechnologies.com/data-subject-rights-request/
+captifytechnologies.com
+
+@Captiv8 Inc.|US||https://captiv8.io/policy/
+captiv8.io
+
+@Catalist LLC|US||https://catalist.us/privacy-policy
+catalist.us
+
+@CHECKPEOPLE, LLC|US|g|https://checkpeople.com/privacy-rights
+checkpeople.com
+
+@Choreograph LLC|US|g|https://www.choreograph.com
+choreograph.com
+
+@Circana, LLC|US||https://www.circana.com/the-circana-group-global-privacy-policy-and-notice
+circana.com
+
+@Civis Analytics, Inc.|US||https://www.civisanalytics.com/legal-pages/supplemental-privacy-notice
+civisanalytics.com
+
+@Clay Labs, Inc.|US|i|https://privacy.clay.com/policies
+clay.com
+
+@Clearview AI, Inc.|US|bfp|https://www.clearview.ai/privacy-and-requests
+clearview.ai
+
+@Coast Technology, LLC|US|g|https://coasttechnology.com/
+coasttechnology.com
+
+@Collective Data Solutions, LLC|US|g|https://collectivedata.io
+collectivedata.io
+
+@Commerce Signals, Inc.|US||https://www.commercesignals.com
+commercesignals.com
+
+@Complete Medical Lists, Inc.|US||https://www.completemedicallists.com/privacy.php
+completemedicallists.com
+
+@Connatix Native Exchange Inc.|US||https://www.jwx.com
+jwx.com
+
+@Connected Investors, LLC|US||https://connectedinvestors.com/privacy-policy
+connectedinvestors.com
+
+@ContactOut Limited|US||https://contactout.com/privacy_data_subjects
+contactout.com
+
+@Converge Marketing LLC|US||https://www.convergemarketing.com/privacy/
+convergemarketing.com
+
+@Convex Labs LLC|US||https://www.convex.com
+convex.com
+
+@CoStar Realty Information, Inc.|US|gxf|https://www.costar.com/about/privacy-notice
+costar.com
+
+@Cox Automotive, Inc.|US|gb|https://www.coxautoinc.com/privacy-statement/
+coxautoinc.com
+autotrader.com
+fordblueadvantage.com
+kbb.com
+
+@Crisil Irvena US LLC|US||https://www.crisil.com/content/crisilcom/en/home/crisil-privacy-notice.html
+greenwich.com
+
+@Criteo Corp.|US||https://www.criteo.com/privacy/
+criteo.com
+=Criteo
+
+@Cross Pixel Media, Inc.|CA||https://privacy.crsspxl.com/
+crosspixel.net
+
+@CTAM LeadShare Corp.|US||https://www.smartmove.us/company/privacy
+smartmove.us
+
+@Cuebiq Group, LLC|US|g|https://cuebiq.com/privacy-request/
+cuebiq.com
+
+@Cybba Inc.|US|g|https://cybba.com
+cybba.com
+
+@DataDelivers, LLC|US|g|https://datadelivers.com
+datadelivers.com
+
+@Datafy, LLC|US|g|https://www.datafy.com/opt-out
+datafy.com
+
+@Dataline, Inc.|US||https://datalinedata.com/privacy-portal/
+datalinedata.com
+
+@Datonics LLC|US||https://datonics.com/
+datonics.com
+pro-market.net
+
+@DealerSocket, LLC (US)|US||https://dealersocket.com/privacy-policy/
+dealersocket.com
+
+@DealerX Partners LLC|US||https://dealerx.com/privacy-options/
+dealerx.com
+
+@Dealfront Group GmbH|DE||https://www.leadfeeder.com/privacy/privacy-notice/
+leadfeeder.com
+
+@Deep Root Analytics, LLC|US||https://deeprootanalytics.com
+deeprootanalytics.com
+
+@Deloitte Consulting LLP|US|f|https://datasubject.deloitte.com/
+deloitte.com
+healthprism.ai
+peopleprism.ai
+giveprism.ai
+
+@Demandbase, Inc.|US||https://www.demandbase.com/privacy-center.html?ketch_preferences_tab=rightsTab
+demandbase.com
+company-target.com
+
+@Digital Media Solutions, LLC|US||https://dmsunsub.io
+digitalmediasolutions.com
+
+@Disco Technology Inc|US||https://disconetwork.com
+disconetwork.com
+
+@Draup, Inc.|US||https://www.draup.com
+draup.com
+
+@DSPolitical, LLC|US||https://www.dspolitical.com/privacy-policy/
+dspolitical.com
+
+@Dstillery, Inc.|US||https://dstillery.com
+dstillery.com
+media6degrees.com  # Dstillery se llamaba Media6Degrees
+
+@DTN, LLC|US|gfp|https://www.dtn.com
+dtn.com
+
+@e.Republic, LLC|US||https://erepublic.my.salesforce-sites.com/PrivacyRequest/
+erepublic.com
+govtech.com
+governing.com
+marketing.governmentnavigator.com
+insider.govtech.com
+
+@EAB Global, Inc.|US|m|https://eab.com/privacy-policy/
+eab.com
+
+@Edvisors Network, Inc.|US||https://www.edvisors.com/your-privacy-choices/
+edvisors.com
+
+@El Toro.com, LLC|US|g|https://eltoro.com/your-privacy-choices/
+eltoro.com
+
+@Electronic Voice Services, Inc.|US||https://www.telephonelists.biz/privacy-notice-for-residents-of-california
+telephonelists.biz
+
+@eLocal USA, LLC|US||https://www.elocal.com
+elocal.com
+
+@Enigma Technologies, Inc.|US||https://enigma.com/company/privacy-policy
+enigma.com
+
+@Epsilon Data Management, LLC|US|x|https://legal.epsilon.com/dsr/
+epsilon.com
+conversantmedia.com  # Conversant, de Epsilon
+dotomi.com
+mediaplex.com
+fastclick.net  # ValueClick, que pasó a ser Conversant
+
+@Equifax Information Services LLC|US|mbfpi|https://www.equifax.com/personal/my-privacy/
+equifax.com
+
+@Equifax Workforce Solutions LLC|US|mbfp|https://www.equifax.com/personal/my-privacy/
+theworknumber.com
+
+@Evorra Ltd|GB|f|https://evorra.com/privacy-data-policies/product-privacy-policy/
+evorra.com
+
+@Exact Match Marketing Inc|US||https://exactmatchmarketing.com/privacy-policy
+exactmatchmarketing.com
+app.exactmatchmarketing.com
+exactmatch.io
+
+@Experian Information Solutions, Inc|US|f|https://www.experian.com/privacy/us-consumer-data-privacy-policy
+experian.com
+
+@Eyeota Pte Ltd|SG|i|https://www.eyeota.com/
+eyeota.com
+eyeota.net
+
+@Family Tree Now, LLC|US||https://www.familytreenow.com/privacy
+familytreenow.com
+
+@Famous Birthdays LLC|US|m|https://www.famousbirthdays.com/privacy/
+famousbirthdays.com
+pro.famousbirthdays.com
+
+@Faraday, Inc.|US||https://faraday.ai/privacy-options
+faraday.ai
+
+@Fetch Rewards, LLC|US|g|https://fetch.com/privacy-policy
+fetch.com
+fetchrewards.com
+
+@FI Navigator Corporation|US||https://www.fi-navigator.com/remove/
+fi-navigator.com
+
+@Fideo Intelligence, Inc.|US|f|https://app.fideo.ai/your-privacy-choices
+fideo.ai
+
+@Findem, Inc.|US||https://www.findem.ai/privacy-policy-platform
+findem.ai
+
+@Fog Data science LLC|US|gfp|https://www.fogdatascience.com/opt-out
+fogdatascience.com
+
+@Forager.ai, LLC|US||https://app.forager.ai/privacy
+forager.ai
+
+@Four Corner Media Corp|US||https://fourcornerhome.com/data-privacy-form/
+fourcornerhome.com
+jacksgutters.com
+bennetandsons.com
+
+@Fourleaf LLC|US||https://www.fourleafdata.com/
+fourleafdata.com
+
+@Foursquare Labs, Inc.|US|g|https://foursquare.com
+foursquare.com
+placed.com  # Placed, de Foursquare desde 2019
+factual.com  # Factual, unida a Foursquare en 2020
+
+@Fraiser LLC|US||https://fraiser.org
+fraiser.org
+
+@FREEPEOPLESEARCH.COM, LLC|US|g|https://freepeoplesearch.com/privacy-rights/
+freepeoplesearch.com
+
+@FreeWheel Media Inc|US|g|https://www.freewheel.com
+freewheel.com
+=FreeWheel
+
+@Fushia Media, LLC|US||https://www.fushiamedia.com/request-delete
+fushiamedia.com
+
+@General Motors LLC|US|g|https://www.gm.com/consumer-privacy
+gm.com
+
+@Giant Partners, Inc.|US||https://www.giantpartners.com
+giantpartners.com
+listgiant.com
+
+@Global Source Data Solutions Inc|US|g|https://gsdsi.com/privacy
+gsdsi.com
+
+@Grassroots Analytics|US||https://www.grassrootsanalytics.com/california-consumer-privacy-act-ccpa
+grassrootsanalytics.com
+
+@GrayHair Software LLC|US||https://grayhairsoftware.com/privacy-policy/
+grayhairsoftware.com
+
+@Graze Social PBC|US||https://www.graze.social/privacy-policy
+graze.social
+
+@Growing Libraries, LLC|US||https://www.growinglibraries.com
+growinglibraries.com
+
+@GrowthCode, LLC|US||https://growthcode.io/do-not-sell-or-share-my-personal-information
+growthcode.io
+
+@H1 Insights, Inc.|US||https://www.h1.co
+h1.co
+
+@Health Union, LLC|US||https://privacyportal.onetrust.com/webform/c402d2db-7536-4212-a23d-ed4a33c1b3b2/e3aec736-7c0a-4313-a3e7-132ff601397a
+health-union.com
+
+@HealthWise Data|US||https://www.healthwisedata.com
+healthwisedata.com
+
+@Helix Campaigns LLC|US||https://www.helixcampaigns.com/privacy
+helixcampaigns.com
+
+@HubSpot, Inc.|US|x|https://legal.hubspot.com/privacy-policy
+hubspot.com
+clearbit.com
+=HubSpot
+
+@Hunter Web Services, Inc|US|x|https://hunter.io/dashboard
+hunter.io
+
+@i360, LLC|US|f|https://www.i-360.com/ccpa
+i-360.com
+
+@IDMAP Inc|US|g|https://idmap.ai/privacy-policy.html
+idmap.ai
+
+@iLeads.com, LLC|US||https://ileads.com/submitrequest/
+ileads.com
+
+@Index Exchange Inc.|CA|g|https://www.indexexchange.com/privacy/exchange-platform-privacy-policy/
+indexexchange.com
+=Index Exchange
+
+@Infomatics LLC|US||https://privatereports.com
+privatereports.com
+mugshotlook.com
+publicsearcher.com
+
+@Informa Group Limited|GB||https://privacy.informa.com/policies/en/
+informa.com
+
+@INFORMATION.COM, LLC|US|g|https://information.com/privacy-rights/
+information.com
+
+@Inmar Brand Solutions, Inc.|US||https://www.inmar.com/about/privacy-policy
+inmar.com
+
+@Innovative Database Solutions, Inc.|US||https://idatabasesolutions.com/personal-information-request-all-other-states/
+idatabasesolutions.com
+
+@Insightbridge LLC|US||https://www.mylife.com
+mylife.com
+
+@Institutional Shareholder Services Inc.|US|xf|https://www.issgovernance.com/privacy-legal/ccpa/
+issgovernance.com
+
+@Intent IQ LLC|US|g|https://www.intentiq.com/opt-out/
+intentiq.com
+
+@Intentsify, LLC|US||https://intentsify.io/privacy-policy/consumer-data-privacy-policy/
+intentsify.io
+
+@Interactive Data, LLC|US|fp|https://www.ididata.com/idis-privacy-statement/
+ididata.com
+
+@IQVIA Digital Inc.|US||https://privacyportal.onetrust.com/webform/07e8dc4d-6686-403e-9b11-39fe7347d2f4/2f999bd2-c826-498c-a504-894eaf543b6f
+iqviadigital.com
+iqvia.com
+
+@Irys, Inc|US||https://irys.us/do-not-sell-ccpa
+irys.us
+
+@iSpot.tv, Inc.|US|gi|https://www.ispot.tv/privacy
+ispot.tv
+
+@J.D. Power|US||https://www.jdpower.com/privacy/california
+jdpower.com
+
+@Juicebox App, Inc.|US||https://juicebox.ai/
+juicebox.ai
+
+@Kargo Global LLC|US||https://kargo.com
+kargo.com
+
+@Keyword Connects LLC|US||https://keywordconnects.com/
+keywordconnects.com
+
+@Kind Skiptracing, Inc|US||https://kindskiptracing.com
+kindskiptracing.com
+
+@Kloudend, Inc.|US||https://ipapi.co/donotsell/
+ipapi.co
+
+@Koddi, Inc|US||https://koddi.com
+koddi.com
+
+@L.S Mobile Apps Holdings LTD|IL|x|https://www.lsmapps.com/ccpa
+lsmapps.com
+
+@LeadIQ, Inc|US||https://leadiq.com/privacy-center
+leadiq.com
+
+@LeadPost LLC|US||https://leadpost.com/privacy-policy/
+leadpost.com
+
+@Leadspace Inc|US||https://www.leadspace.com/do-not-sell-form
+leadspace.com
+
+@LearnMore, LLC|US|g|https://learnmore.com/privacy-rights/
+learnmore.com
+
+@Leidos Digital Solutions, Inc.|US|f|https://www.leidosiq.com
+leidosiq.com
+
+@LexisNexis Risk Solutions FL Inc.|US|mgfp|https://risk.lexisnexis.com/state-privacy-act-notice
+risk.lexisnexis.com
+threatmetrix.com  # ThreatMetrix, de LexisNexis Risk desde 2018
+online-metrix.net  # la huella de dispositivo de ThreatMetrix
+
+@ListKit LLC|US||https://www.listkit.io/privacy
+listkit.io
+
+@Live Data Technologies, Inc.|US||https://www.livedatatechnologies.com/opt-out
+livedatatechnologies.com
+
+@LiveIntent|US|g|https://www.liveintent.com/privacy-policy/
+liveintent.com
+liadm.com
+
+@LiveRamp Holdings, Inc.|US||https://www.liveramp.com
+liveramp.com
+=LiveRamp
+
+@LizDev,Inc|US||https://lizdev.com/privacy-policy/
+lizdev.com
+
+@Lob.com, Inc.|US||https://www.lob.com/privacy
+lob.com
+
+@Lookify.io|US||https://lookify.io/ccpa-privacy-statement
+lookify.io
+
+@M1 Data & Analytics, LLC|US|g|https://m1-data.com/unsubscribe/
+m1-data.com
+
+@Magnite Inc|US|g|https://www.magnite.com/legal/user-choice-portal/
+magnite.com
+=Magnite
+
+@Malvern Media Inc.|US||https://www.malvernmedia.com/privacy-policy
+malvernmedia.com
+
+@Marketing Architects, Inc.|US||https://www.marketingarchitects.com/privacy-policy-ProductAndService
+marketingarchitects.com
+
+@MarketOps LLC|US||https://marketops.com/privacy-options/
+marketops.com
+
+@Marriott International, Inc.|US|mg|https://www.marriott.com/about/privacy.mi
+marriott.com
+
+@Matchbook Data, LLC|US|g|https://www.matchbookdata.com/privacy-policy/
+matchbookdata.com
+
+@Media.net Advertising FZ, LLC|AE||https://www.media.net/privacy-policy/
+media.net
+
+@MediaWallah Inc|US||https://www.mediawallah.com
+mediawallah.com
+
+@Meltwater News US, Inc.|US|xfpi|https://meltwater.com/privacy
+meltwater.com
+
+@Merkle Inc.|US||https://www.merkle.com/en/privacy-policy.html
+merkle.com
+merkleinc.com
+rkdms.com
+
+@Message Digital LLC|US||https://messagedigital.com/my-data
+messagedigital.com
+
+@MH Sub I, LLC|US||https://www.internetbrands.com
+internetbrands.com
+
+@Moody's Corporation|US|xfpi|https://www.moodys.com/web/en/us/legal/privacy-policy.html
+moodys.com
+
+@Narvar, Inc|US||https://corp.narvar.com/legal/privacy-policy
+corp.narvar.com
+
+@National Opinion Institute, LLC|US|f|https://nationalopinioninstitute.com/ca-privacy
+nationalopinioninstitute.com
+
+@Neptune Ops LLC|US||https://neptuneaii.com/legal/privacy-policy
+neptuneops.com
+
+@New Mexico Data Insights|US||https://newmexicodatainsights.com
+newmexicodatainsights.com
+
+@Nexxen Inc|US||https://nexxen.com
+nexxen.com
+unrulymedia.com  # Unruly, de Nexxen
+tremorhub.com
+amobee.com  # Amobee, de Nexxen desde 2022
+turn.com  # Turn, de Amobee desde 2017
+
+@Nordic Data Resources AS|NO||https://www.nordicdataresources.com/netprivacypolicy
+nordicdataresources.com
+
+@NumLookup LLC.|US||https://www.numlookup.com/privacy-policy
+numlookup.com
+
+@Nuwber Inc|US||https://nuwber.com/policy
+nuwber.com
+
+@Ogury Ltd|GB|x|https://privacy.ogury.com/
+ogury.com
+=Ogury
+
+@ONAUDIENCE LTD|GB||https://onaudience.com/do-not-sell-my-personal-info/
+onaudience.com
+
+@OpenX Technologies, Inc.|US||https://www.openx.com/privacy-center/
+openx.com
+=OpenX
+
+@Outlogic, LLC|US|g|https://outlogic.io/opt-out-form/
+outlogic.io
+
+@PaeDae, Inc.|US|g|https://infillion.com/privacy-policy/
+infillion.com
+
+@People Data Labs|US||https://privacy.peopledatalabs.com/policies?name=privacy-policy
+peopledatalabs.com
+
+@Peoplewhiz, Inc|US||https://www.peoplewhiz.com
+peoplewhiz.com
+
+@Pipl, Inc.|US|fp|https://pipl.com
+pipl.com
+
+@PitchBook Data Inc|US|xfpi|https://pitchbook.com/privacy-policy
+pitchbook.com
+
+@Place Exchange, Inc.|US|g|https://www.placeexchange.com/privacy
+placeexchange.com
+
+@PMG Worldwide, LLC|US||https://www.pmg.com
+pmg.com
+
+@PossibleNOW, Inc.|US||https://www.possiblenow.com/privacy-statement-california
+possiblenow.com
+
+@Postie, Inc|US||https://postie.com/your-privacy-choices/
+postie.com
+
+@PostPilot, Inc.|US||https://www.postpilot.com/privacy-policy
+postpilot.com
+
+@Preqin Ltd|GB|xfp|https://www.preqin.com
+preqin.com
+
+@Private Records LLC|US||https://www.privaterecords.net
+privaterecords.net
+peoplesearch123.com
+backgroundcheckers.net
+personsearchers.com
+
+@PropertyRadar, Inc.|US|gfp|https://www.propertyradar.com/privacy-policy
+propertyradar.com
+
+@ProspectBase UK Limited|GB||https://www.prospectbase.com
+prospectbase.com
+
+@PublicRecordCom, LLC|US|g|https://publicrecord.com/privacy-rights/
+publicrecord.com
+
+@Quadrant Global Pte. Ltd.|SG|g|https://www.quadrant.io/manage-my-data
+quadrant.io
+
+@Quorum Data, Inc|US|g|https://quorum.inc/privacy
+quorum.inc
+app.quorum.live
+
+@Rainbarrel USA LLC|US|g|https://www.rbarrel.com/opt-out
+knowertech.com
+
+@REAL INTENT INC|US||https://www.realintent.co/privacy-policy
+realintent.co
+
+@Realeflow LLC|US||https://www.realeflow.com
+realeflow.com
+leadflow.com
+
+@RealSource, Inc|US||https://www.realsourcedata.com/privacy-policy
+realsourcedata.com
+
+@RecruitBot|US||https://recruitbot.com/ccpa/
+recruitbot.com
+
+@Redi-Data Inc|US||https://www.redidata.com/privacy-policy/
+redidata.com
+
+@RelPro, Inc.|US||https://relpro.com/privacy-policy
+relpro.com
+
+@Remodeling.com, LLC|US||https://remodeling.com
+remodeling.com
+
+@Resonate|US||https://www.resonate.com/privacy-policy/
+resonate.com
+reson8.com
+
+@Response America, Inc.|US||https://responseamerica.net/privacy_dec.html
+responseamerica.net
+
+@RevContent, LLC|US||
+revcontent.com
+
+@Reveal Mobile, Inc.|US|g|https://revealmobile.com/privacy/
+revealmobile.com
+
+@Revelio Labs, Inc.|US||https://www.reveliolabs.com/privacy/
+reveliolabs.com
+
+@RevOptimal, LLC|US||https://revoptimal.com/privacy/
+revoptimal.com
+
+@Rich Media LLC|US||https://richmediallc.com/privacy-policy/
+richmediallc.com
+
+@Ripple Effect Strategies|US||https://www.ripple-roi.com/privacy-policy
+ripple-fx.com
+ripple-roi.com
+
+@RocketReach LLC|US|fpi|https://rocketreach.co/privacy
+rocketreach.co
+
+@Roq.ad Inc.|US||
+roq.ad
+
+@Round Sky, Inc.|US||https://www.roundsky.com/supplemental-privacy-notice/
+roundsky.com
+
+@SalesIntel Research, Inc.|US||https://www.salesintel.io
+salesintel.io
+
+@Salutary Data LLC.|US||https://salutarydata.com
+salutarydata.com
+
+@Samba TV, Inc.|US||https://www.samba.tv/users/privacy-policy?lang=en
+samba.tv
+
+@SBFE, LLC|US||https://www.sbfe.org/connect/ccpa
+sbfe.org
+
+@SEMANTIQ INC|US||https://semantiqhealth.com/privacy-policy
+semantiqhealth.com
+
+@Semcasting, Inc.|US|gx|https://privacychoice.com/
+semcasting.com
+
+@Share Local Media, Inc.|US||https://www.sharelocalmedia.com/privacy-policy
+sharelocalmedia.com
+
+@Sharethrough|CA|g|https://www.sharethrough.com/
+sharethrough.com
+
+@Similarweb Ltd.|IL|xi|https://similarweb.com/
+similarweb.com
+
+@Simio Cloud, LLC|US||https://simiocloud.com/simiocloud-products-services-privacy-policy/
+simiocloud.com
+
+@Site Impact LLC|US||https://www.siteimpact.com/privacypolicy.php
+siteimpact.com
+
+@Skydeo Inc.|US||https://skydeo.com
+skydeo.com
+
+@Snovio Inc|US|x|https://snov.io/do-not-sell-my-personal-information
+snov.io
+
+@Source Path Digital|US||https://sourcepathdigital.com
+sourcepathdigital.com
+
+@Sovrn, Inc.|US|i|https://www.sovrn.com/privacy-policy/policy-center/
+sovrn.com
+lijit.com
+
+@Sports Innovation Lab, inc.|US||https://www.sportsilab.com/privacy-choices
+sportsilab.com
+
+@Sprout Social, Inc.|US|i|https://sproutsocial.com/legal/privacy-policy/
+sproutsocial.com
+
+@SpyCloud Inc.|US|mgfp|https://spycloud.com/legal/privacy-policy/
+spycloud.com
+
+@Statara Solutions LLC|US||https://statara.com/privacy/
+statara.com
+
+@Steppingblocks, Inc.|US||https://www.steppingblocks.com/privacy-ccpa
+steppingblocks.com
+
+@Sterling Data Company LLC|US||https://sterling.ai
+sterling.ai
+
+@Strategic Data Intelligence, LLC|US||https://www.strategicdataintelligence.com
+strategicdataintelligence.com
+
+@Subgraph, Inc|US||https://subgraph.tech/privacy-rights
+subgraph.tech
+
+@Swarm Holdings, Inc.|US|i|https://www.theswarm.com/privacy
+theswarm.com
+
+@Swoop.com Inc|US||https://swoop.com/your-privacy-choices/
+swoop.com
+
+@Taboola, Inc.|US||https://www.taboola.com/
+taboola.com
+=Taboola
+
+@TargetSmart Communications LLC|US||https://privacy.targetsmart.com/
+targetsmart.com
+
+@Tauxbe Data Inc.|US||https://www.tauxbe.com/privacy-policy
+tauxbe.com
+natcrim.com
+
+@Teads Holding Co|US||https://www.outbrain.com/privacy/user-policy
+outbrain.com
+=Outbrain  # Outbrain pasó a llamarse Teads en 2025
+
+@Teads Inc|US||https://privacy-policy.teads.com
+teads.com
+=Teads
+
+@Telesign Corporation|US||https://www.telesign.com/privacy-requests
+telesign.com
+
+@The Data Group, LLC|US||https://thedatagroup.com/california-consumer-privacy-act/
+thedatagroup.com
+
+@THE LINEA 1 MKT SL|ES||https://Www.tl1mkt.com
+tl1mkt.com
+
+@The People Searchers LLC|US||http://peopesearcher.cm
+peoplesearcher.com
+secretinfo.org
+
+@T-Mobile USA, Inc.|US|g|https://www.t-mobile.com/advertising-solutions
+t-mobile.com
+
+@Traackr, Inc.|US||https://www.traackr.com/legal/privacy-policy
+traackr.com
+
+@TransUnion|US|m|https://www.transunion.com
+transunion.com
+
+@Trestle Solutions, Inc.|US||https://trestleiq.com/privacy-policy/
+trestleiq.com
+
+@True Blue Analytics LLC|US||https://trueblueanalytics.org/
+trueblueanalytics.org
+
+@Truth Now LLC|US||https://checksecrets.com
+checksecrets.com
+peoplesearchusa.org
+inmatesearcher.com
+sealedrecords.net
+
+@Truthed, Inc|US||https://www.truthed.com/optout
+truthed.com
+
+@Tunnl, LLC|US||https://tunnldata.com
+tunnldata.com
+
+@UNMASK, LLC|US|g|https://unmask.com/privacy-rights/
+unmask.com
+
+@Uplead LLC|US||https://www.uplead.com/opt-out/
+uplead.com
+
+@UPS Capital Corporation|US||https://upscapital.com
+upscapital.com
+insureshield.com
+
+@US Data Corporation|US||https://www.usdatacorporation.com/do-not-sell-my-info/?utm_source=google_ads&utm_medium=ppc&utm_term=us&gclid=undefined
+usdatacorporation.com
+
+@USPeopleSearch.com, LLC|US|g|https://uspeoplesearch.com/privacy-rights/
+uspeoplesearch.com
+
+@Veeva Systems Inc.|US||https://veeva.com/privacy
+veeva.com
+
+@VentiveIQ LLC|US||https://ventiveiq.com
+ventiveiq.com
+
+@Veraset, LLC|US|gf|
+veraset.com
+
+@Vi Technologies, Inc.|US|g|https://www.vi.co
+vi.co
+
+@VideoAmp, Inc.|US|g|https://www.videoamp.com
+videoamp.com
+
+@VisitIQ LLC|US|g|https://visitiq.io/opt-out/
+visitiq.io
+
+@Vistar Media Inc.|US|g|https://www.vistarmedia.com
+vistarmedia.com
+
+@Visual Visitor L.L.C.|US||https://www.visualvisitor.com/legal-agreements/
+visualvisitor.com
+
+@VIZIO Services, LLC|US||https://privacyportal-cdn.onetrust.com/dsarwebform/41aebd10-58ee-4c98-9dd5-aa66c9be664a/0099df9c-c0aa-4bf7-bd5f-7f4ff46768f6.html
+vizio.com
+inscape.tv
+
+@VRTCAL Markets Inc.|US|mg|https://www.vrtcal.com/docs/PrivacyPolicy-Advertising.pdf
+vrtcal.com
+
+@Warmly, Inc.|US|i|https://www.warmly.ai/p/privacy-policy
+warmly.ai
+
+@We Inform LLC|US||https://www.weinform.org
+weinform.org
+truthrecord.org
+
+@WealthFeed, Inc.|US||https://www.wealthfeed.com
+wealthfeed.com
+
+@Webbula, LLC|US||https://webbula.com/privacy-center/
+webbula.com
+
+@West Publishing Corp|US|fpi|https://www.thomsonreuters.com/en/privacy-statement
+thomsonreuters.com
+
+@Whitepages, Inc|US||https://www.whitepages.com/privacy
+whitepages.com
+
+@Wiland, Inc.|US||https://wiland.com/privacy-choices/
+wiland.com
+
+@Windfall Data, Inc.|US||https://www.windfall.com/your-privacy-choices
+windfall.com
+
+@Wiza, Inc.|US||https://www.wiza.co
+wiza.com
+
+@Xcelerated Data LLC|US||https://xcelerated.com
+xcelerated.com
+
+@Yieldmo, Inc.|US||https://yieldmo.com
+yieldmo.com
+
+@ZeroToOne.AI Inc.|US|g|https://www.zerotoone.ai/privacy-policy
+zerotoone.ai
+
+@Zeta Global|US|g|https://www.zetaglobal.com
+zetaglobal.com
+zetaglobal.net
+rezync.com
+
+@ZS Associates, Inc.|US||https://www.zs.com
+zs.com
+
+@Subdirect LLC|US||https://360-media-direct.privacy.saymine.io/360_Media_Direct
+www360mediadirect.com
+
+@Above Data|US||https://www.abovedata.io/opt-out/
+abovedata.io
+
+@ActivImpact|US||https://activimpact.ai/privacy-policy
+activimpact.ai
+
+@Adagio|FR|gx|https://adagio.io
+adagio.io
+
+@Viant US LLC|US|g|https://www.viantinc.com
+viantinc.com
+adelphic.com  # Adelphic, el DSP de Viant
+
+@Adprime|US||https://www.adprime.com/privacy-policy
+adprime.com
+
+@Adttribution|US|g|https://adttribution.com/privacy-policy.php
+adttribution.com
+
+@Affinity|US|i|https://www.affinity.co/legal/privacy-policy
+affinity.co
+
+@agedleadstore.com|US||https://agedleadstore.com
+agedleadstore.com
+nextwavemarketingstrategies.com
+
+@The Alesco Group LLC|US|fp|https://www.alescodata.com
+alescodata.com
+
+@AlikeAudience|US||https://www.alikeaudience.com/
+alikeaudience.com
+
+@Allant Group, LLC|US||https://allantgroup.com/privacy-policy
+allantgroup.com
+
+@Amplemarket|US||https://portal.usepylon.com/amplemarket/forms/privacy-request-form
+amplemarket.com
+
+@Anteriad, LLC|US||https://anteriad.com/
+anteriad.com
+
+@Apollo.io|US||https://www.apollo.io/
+apollo.io
+
+@Astoria Company|US||https://astoriacompany.com
+astoriacompany.com
+
+@Atlas|US||https://www.huntclub.com/privacy
+app.exploreatlas.io
+
+@Atlas Influence Targeting|US||
+unearthcampaigns.com
+atlasinfluence.com
+
+@Audience Acuity|US||https://audienceacuity.com/
+audienceacuity.com
+
+@AudienceMix|US|g|https://www.audiencemix.net/do-no-sell-or-share-my-personal-informat
+audiencemix.net
+
+@Audigent|US||https://audigent.com/privacy-center
+audigent.com
+ad.gt
+
+@Aviato|US|g|https://www.aviato.co/legal/privacy
+aviato.co
+
+@Azira. LLC|US|g|https://azira.com/privacy-policy
+azira.com
+
+@BatchLeads|US||https://www.batchleads.io
+batchleads.io
+
+@BB Direct Inc|US||https://www.bbdirect.com/about/privacy-compliance.html
+bbdirect.com
+
+@Benutech Inc|US||https://www.benutech.com
+benutech.com
+
+@Biointelli|US||https://www.biointelli.com
+biointelli.com
+
+@Solar Connect, LLC|US||https://www.bluefireleads.com/privacy-policy.php
+bluefireleads.com
+homeupgradepros.us
+americanroofers.org
+homeupgradepros.net
+homeupgradeprofessionals.us
+xpertroofers.com
+homeupgradepros.org
+homeupgradepros.io
+homeupgradeprofessionals.net
+kwikac.com
+homeupgradeprofessionals.com
+kwiksiding.com
+kwik-kitchen.com
+upgradepros.services
+betterhousenow.com
+kwikroofs.com
+
+@Boam AI|US||https://boam.ai/
+boam.ai
+
+@Bookyourdata|US||https://www.bookyourdata.com
+bookyourdata.com
+
+@Brandwatch|US|xfpi|https://portals.dporganizer.com/fa778b0e-817f-4c96-b13d-e2b614470033
+brandwatch.com
+
+@BRIDGE|US||https://www.thebridgecorp.com/our-approach-to-data-privacy/
+thebridgecorp.com
+
+@J2 Global Canada Inc.|CA||https://www.campaigner.com/legal/privacy-policy
+campaigner.com
+smtp.com
+
+@Carney Direct Marketing|US||https://www.carneydirect.com/privacy-policy/
+carneydirect.com
+
+@Cashmere|US||https://cashmereai.com
+cashmereai.com
+
+@Catalina Marketing|US|g|https://www.catalina.com
+catalina.com
+
+@CB Insights|US||https://www.cbinsights.com/privacy-policy
+cbinsights.com
+
+@CDK|US||https://cdkglobal.com
+cdkglobal.com
+
+@Censai Analytics|US|f|https://rushmorelabs.com/california-privacy-notice
+rushmorelabs.com
+censaianalytics.com
+
+@Censia|US||https://www.censia.com
+censia.com
+
+@Chris Holbert|US||https://getelevar.com
+getelevar.com
+
+@CinqDI|US||
+cinqdi.com
+
+@Cision|US|xf|https://portals.dporganizer.com/fa778b0e-817f-4c96-b13d-e2b614470033
+cision.com
+
+@CityData.AI|US|g|https://www.citydata.ai/privacy
+citydata.ai
+
+@Claritas LLC|US||https://www.claritas.com
+claritas.com
+
+@Clarivate|US|f|https://privacyportal.onetrust.com/webform/7636e208-dda4-4218-8026-e1bc155873fc/draft/8651c266-68d4-43a8-b7ca-7bd8398843d6
+clarivate.com
+
+@ClearCo|US||https://www.clearcompany.com/privacy-policy/
+clearcompany.com
+
+@Clickagy|US||https://www.clickagy.com/privacy-center/
+clickagy.com
+
+@Client Command|US||https://clientcommand.com/client-command-privacy-notice/
+clientcommand.com
+
+@Cognism|US||https://www.cognism.com
+cognism.com
+
+@Complementics|US|g|https://www.complementics.com/optout-donotsell
+complementics.com
+
+@Complete Mailing Lists LLC|US||https://completemailinglists.com/do-not-sell-my-information
+completemailinglists.com
+
+@Comscore Inc|US|m|https://www.comscore.com/About/Privacy-Policy
+comscore.com
+=Comscore
+
+@Crunchbase|US|fpi|https://about.crunchbase.com/terms-of-service/privacy-policy
+crunchbase.com
+
+@Mississippi Tornado Alley, LLC|US||https://www.advancedbackgroundchecks.com/privacy
+advancedbackgroundchecks.com
+cyberbackgroundchecks.com
+fastbackgroundcheck.com
+fastpeoplesearch.com
+peoplesearchnow.com
+phonebooks.com
+searchpeoplefree.com
+smartbackgroundchecks.com
+usa-people-search.com
+usphonebook.com
+
+@Data Axle|US|mi|https://www.data-axle.com
+data-axle.com
+
+@Data Decisions Group|US||https://datadecisionsgroup.com/privacy-policy/
+datadecisionsgroup.com
+
+@Data Trust|US||https://thedatatrust.com/do-not-sell-my-personal-information/
+thedatatrust.com
+
+@Datadesk|CA||https://datadesk.io/help/do-not-sell-my-personal-info
+datadesk.io
+
+@Datalane|US||https://www.datalane.com
+datalane.com
+
+@Dataman Group Inc|US||https://www.datamangroup.com/privacy/
+datamangroup.com
+
+@Datanyze|US||https://www.datanyze.com/privacy-center
+datanyze.com
+
+@DataPartners|US||https://datapartners.com/donotsellmyinformation/
+datapartners.com
+
+@Datasys|US||https://datasys.com/privacy-policy
+datasys.com
+
+@Date Detective|US||https://www.date-detective.app/agreements/privacy-policy
+date-detective.app
+date-detective.com
+
+@DealMachine|US||https://privacyrequest.dealmachine.com/remove
+dealmachine.com
+
+@Decide|US|g|https://decide.co/privacy
+decide.co
+
+@DecisionLinks|US||https://www.decisionlinks.com/legal-pages/your-privacy-choices
+decisionlinks.com
+
+@Deep Sync|US||https://privacy.deepsync.com
+deepsync.com
+
+@Definitive Healthcare|SE|f|https://account.monocl.com
+account.monocl.com
+definitivehc.com
+
+@Demand Science|US||https://demandscience.com/
+demandscience.com
+
+@Dialog Direct|US||https://www.qualfon.com/privacy-policy/consumer-privacy-choices/
+qualfon.com
+
+@Dice.com|US||https://www.dice.com/about/ccpa
+dice.com
+
+@Digital Viking Media Inc|US|g|https://www.digitalvikingmedia.com/privacy-policy
+digitalvikingmedia.com
+
+@Disqus|US|g|https://www.Disqus.com
+disqus.com
+=Disqus
+
+@Dojomojo|US||https://www.proxima.ai
+proxima.ai
+
+@DonorBase|US||https://donorbase.com
+donorbase.com
+
+@DonorBureau|US||https://donorbureau.com/california-privacy-rights-for-california-residents-only/
+donorbureau.com
+
+@Dresden Direct inc.|US||http://dresdendirect.com
+dresdendirect.com
+
+@Dun and Bradstreet AB|US||https://www.netwisedata.com
+netwisedata.com
+
+@Dun and Bradstreet Inc.|US|fpi|https://www.dnb.com/en-us/why-dnb/data-transparency.html
+dnb.com
+
+@Lightcast, LLC|US|xf|https://privacyportal.onetrust.com/webform/0f61f895-d08d-410f-b96d-ecfd34fd42e3/8d4dfe0d-998d-4c1d-ab6d-4357670fa8e9
+lightcast.io
+rhetorik.com
+
+@Endgame|US|i|https://docs.endgame.io/trust/privacy
+endgame.io
+
+@Enlyft|US||https://enlyft.com/tech/check-email
+enlyft.com
+
+@Enrich Layer|US||https://enrichlayer.com/privacy-policy
+enrichlayer.com
+
+@ListsOnline.com, Inc.|US||https://www.everleads.com/privacy
+everleads.com
+
+@EverView HoldCo, Inc|US|g|https://www.evertrue.com/privacy-policy/
+evertrue.com
+
+@Exa|US||https://exa.ai
+exa.ai
+
+@Exact Customer|US||https://www.exactcustomer.com
+exactcustomer.com
+
+@Exact Data|US|mi|https://www.exactdata.com
+exactdata.com
+
+@Experience.com|US||https://www.experience.com/privacy-notice
+experience.com
+
+@Explorium|US||https://www.explorium.ai/do-not-sell-my-personal-info/
+explorium.ai
+
+@Fifty Technology Ltd|GB||https://fifty.io/privacy-policy
+fifty.io
+
+@FindANeighborhood|US||https://www.peoplefinders.com/about/privacy
+peoplefinders.com
+findaneighborhood.com
+
+@FinSum|US||https://www.finsum.com/what-we-do/your-privacy-choices
+finsum.com
+
+@First Direct, Inc.|US||https://compliance.firstdirectmarketing.com/
+firstdirectmarketing.com
+nationallistcounts.com
+
+@First Orion Corp|US||https://www.firstorion.com
+firstorion.com
+
+@Five Star Rated|US||https://www.fivestarrated.com
+fivestarrated.com
+
+@Focus USA|US||https://www.focus-usa.com/your-privacy-choices/
+focus-usa.com
+
+@FordDirect|US||https://www.forddirectprivacy.com
+forddirect.com
+
+@FourthWall|US|g|https://www.fourthwall.tv/privacy-fourthwall
+fourthwall.tv
+
+@J2 Martech Corp|US|i|https://platform.fullcontact.com/your-privacy-choices
+fullcontact.com
+
+@Fusable|US|i|https://fusable.com/legal/website-terms-and-privacy-notice/
+fusable.com
+
+@Fusion92|US|g|https://www.fusion92.com/privacy-policy
+fusion92.com
+
+@GetRev|US||https://getrev.ai
+getrev.ai
+
+@Great Lakes List Management|US||https://greatlakeslists.com/privacy-policy
+greatlakeslists.com
+
+@GroundTruth|US|g|https://www.groundtruth.com/privacy-policy/
+groundtruth.com
+xad.com  # GroundTruth se llamaba xAd
+
+@Healthcare.com|US|gx|https://www.healthcare.com/privacy-policy
+healthcare.com
+pivothealth.com
+
+@HealthLink Dimensions|US||https://healthlinkdimensions.com/consumerprivacyrights
+healthlinkdimensions.com
+
+@Heartbeat AI|US||https://heartbeat.ai/policy
+heartbeat.ai
+
+@Hightouch|US||https://preferences.hightouch.com
+hightouch.com
+
+@hireEZ|US|f|https://app.hireez.com/ownyourdata
+hireez.com
+
+@ID5|GB||https://id5.io
+id5.io
+=ID5
+
+@Integrated Direct Marketing, LLC|US||https://www.idm.us.com/do-not-sell-my-personal-information/
+idm.us.com
+
+@illumin Inc.|CA||https://illumin.com/legalcenter/
+illumin.com
+
+@Inbound Insight|US||https://inboundinsight.com/ccpa
+inboundinsight.com
+
+@Informa TechTarget|US||https://techtarget.zendesk.com/hc/en-us/requests/new?ticket_form_id=360004852434
+informatechtarget.com
+techtarget.com
+
+@InfoPay, Inc|US||https://www.infopay.com/privacy
+infopay.com
+infotracer.com
+propertychecker.com
+goodcar.com
+statecourts.org
+courtcasefinder.com
+thepublicindex.org
+entitycheck.com
+sentinex.org
+idstrong.com
+courtrecords.us
+staterecords.org
+
+@InfutorData|US|i|https://infutor.com/privacy-center/
+infutor.com
+
+@InMarket|US|g|https://preferences.inmarket.com
+inmarket.com
+
+@Instant Checkmate|US||https://www.instantcheckmate.com/privacy-center
+instantcheckmate.com
+cellphonedirectory.com
+cheaterslie.com
+freepeople-search.com
+
+@Instantly.ai|US||https://app.instantly.ai/privacy/info
+instantly.ai
+
+@Intelius, LLC|US||https://www.intelius.com/privacy-center
+intelius.com
+ussearch.com
+pro.ussearch.com
+arrestrecordsearch.com
+criminalrecords.com
+peoplefinder.com
+peoplefind.com
+telephonenumberlookups.com
+reversephonelookup.com
+brbpub.com
+callercomplaints.com
+courtreference.com
+easybackgroundchecks.com
+freebackgroundchecksusa.com
+onlinesearches.com
+snoopstation.com
+zabasearch.com
+addresses.com
+publicrecords.com
+publicrecords.onlinesearches.com
+peoplelookup.com
+publicrecords360.com
+
+@JDM LIST SERVICES|US||https://jdmlistservices.com/privacy-policy
+jdmlistservices.com
+
+@JMR Media|US||https://jmr-media.com/privacy-notice
+jmr-media.com
+
+@Kalibrate|US||https://kalibrate.com/data-subject-access-request-form/
+intalytics.com
+
+@KB Synergy|US||https://hiy.ywv.mybluehost.me/website_8088244e/privacy-policy-ccpa-do-not-sell-my-information/
+kbsynergy.com
+
+@Key Marketing Advantage|US||https://keymarketingadvantage.com/do_not_use_my_personal_information
+keymarketingadvantage.com
+
+@Scalable Commerce LLC|US|gb|https://www.kidslivesafe.com/help-center/privacy
+kidslivesafe.com
+quickpublicrecords.com
+
+@Kindsight|CA||
+kindsight.io
+
+@Komodo Health, Inc.|US|i|https://www.komodohealth.com/
+komodohealth.com
+
+@Kontext Data|US||https://www.kontextdata.com
+kontextdata.com
+
+@Labels & Lists, Inc|US|gf|https://www.l2-data.com/wp-content/uploads/2025/08/L2-Privacy-Notice-19Aug25v3.pdf
+l2-data.com
+
+@LEAD ENHANCE LLC|US||https://bathroom-remodel-today.com/privacy/
+lead-enhance.com
+
+@Lead Me Media LLC|US|g|https://leadmemedia.com
+leadmemedia.com
+
+@Lead411 Corporation|US|i|https://www.lead411.com/your-privacy-choices/
+lead411.com
+growjo.com
+quickenrich.io
+
+@LeadSherpa|US||https://www.propertyreach.com/privacy
+propertyreach.com
+leadsherpa.com
+
+@LexisNexis|US|fp|https://www.lexisnexis.com/global/privacy/en/privacy-center-us.page
+lexisnexis.com
+
+@LiftEngine|US||https://www.liftbasedata.com/request-to-know/
+liftbasedata.com
+liftengine.com
+launchpadltv.com
+
+@LightBox Parent, L.P.|US|x|https://www.lightboxre.com/lightbox-individual-data-rights-request/
+lightboxre.com
+
+@Nachal Inc.|US|g|https://getliminal.com/privacypolicy
+getliminal.com
+
+@LionShare Marketing, Inc|US||https://www.lionsharemarketing.com
+lionsharemarketing.com
+
+@LoopMe Limited|GB|g|https://loopme.com
+loopme.com
+loopme.me
+
+@Lusha|US||https://www.lusha.com/legal/privacy-notice/
+lusha.com
+
+@M+R|US||https://www.mrss.com
+mrss.com
+
+@Madhive|US|g|https://www.madhive.com/legal/privacy-policy
+madhive.com
+
+@Mailinglists.com|US||https://mailinglists.com/about/privacy-policy
+mailinglists.com
+
+@MaxMind|US|xfpi|https://www.maxmind.com/en/privacy-policy
+maxmind.com
+
+@MedPro Systems|US||https://www.medprosystems.com/privacy-policy/
+medprosystems.com
+
+@Melissa|US|fp|https://www.melissa.com/privacy
+melissa.com
+
+@Milestone Marketing Solutions|US||https://www.milestonemarketingsolutions.com/privacy-policy
+milestonemarketingsolutions.com
+
+@Minerva|US||https://preferences.minerva.io/
+minerva.io
+
+@MissionWired|US||https://info.missionwired.com/coop-optout
+missionwired.com
+
+@MixRank|US||https://www.omginc.xyz
+omginc.xyz
+mixrank.com
+
+@MobileFuse|US||https://mobilefuse.com
+mobilefuse.com
+
+@Mobilewalla|US|g|https://www.mobilewalla.com/global-opt-out-request
+mobilewalla.com
+
+@R.L. Polk & Co.|US||https://www.mobiityglobal.com
+mobilityglobal.com
+
+@ModFx Labs|IN|g|https://modfxlabs.com/privacy
+modfxlabs.com
+
+@Modigie|US||https://modigie.com/privacy-policy/
+modigie.com
+
+@MonitorBase|US||https://my.monitorbase.com/privacypolicy
+monitorbase.com
+
+@Apollo Interactive, LLC|US||https://www.apollointeractive.com/privacy-policy.php
+apollointeractive.com
+mortgageratespro.com
+online-mortgage-loans.com
+final-expense-quotes.com
+greatlifeinsurancegroup.com
+lifeinsurancepro.org
+nationalhomequotes.com
+bestautoinsurance.com
+blueskycoverage.com
+nationalautoquotes.com
+affordablehealthquotesforyou.com
+online-health-insurance.com
+healthplansamerica.org
+medicarecoveragefinder.com
+medicareinfo.org
+medicare-providers.net
+direct-mortgage-quotes.com
+insuranceplanmarket.com
+petinsurancemarket.com
+autopolicymarket.com
+healthplanmarket.com
+yourpolicyguide.com
+medicaremarket.com
+medicareplan.net
+
+@MULTIMEDIA LISTS, INC.|US||https://www.multimedialists.com
+multimedialists.com
+
+@Networx Systems Inc|US||https://www.networx.com/privacy
+networx.com
+
+@NextRoll Inc|US||https://www.nextroll.com/privacy
+nextroll.com
+=NextRoll
+
+@NFocus|US|gb|https://www.n-focus.com/privacy-policy/
+n-focus.com
+
+@The Nielsen Company, LLC|US||https://www.nielsen.com
+nielsen.com
+=Nielsen
+
+@Consumer Canvas, LLC|US||https://www.consumercanvas.net/privacy/
+consumercanvas.net
+
+@FinThrive Healthcare, Inc.|US||https://finthrive.com/privacy-policy-overview
+finthrive.com
+
+@ExlService.com, LLC|US||https://www.exlservice.com/privacy-policy
+exlservice.com
+
+@Online Advertising Network sp. z o.o.|PL||https://oan.pl/do-not-sell-my-personal-info/
+oan.pl
+ai.oan.pl
+
+@Ocean Global Inc|US|i|https://www.ocean.io/
+ocean.io
+
+@OnSpot Data|US|g|https://www.onspotdata.com/privacy-policy/
+onspotdata.com
+
+@Opensend|US||https://opensend.com/privacy-polic
+opensend.com
+
+@Optable|US||https://terms.optable.co/privacy/privacy-policies/products-and-services
+optable.co
+
+@Outward Media Inc.|US||https://outwardmedia.com/privacypolicy
+outwardmedia.com
+
+@PacificEast Research|US||https://www.pacificeast.com
+pacificeast.com
+
+@Paramount Direct Marketing|US||https://www.paramountdirectmarketing.com/privacy-policy.php
+paramountdirectmarketing.com
+
+@Path2Response, LLC|US||https://privacyportal-cdn.onetrust.com/dsarwebform/2de26f06-de6f-45a7-8e1d-7d1148a3f301/draft/7a5dc7d1-cc7e-43a8-9f24-702807deb65b.html
+path2response.com
+
+@PayNet|US||https://www.equifax.com/personal/my-privacy/
+sbinsights.paynetonline.com
+
+@Penlink|US|gfp|https://www.penlink.com/privacy-policy/
+penlink.com
+
+@Perion|CA|g|https://www.perion.com
+perion.com
+
+@Persistent.id|US||https://persistent.id/privacy-policy
+persistent.id
+
+@PeoplefindersDaaS|US||https://www.peoplefindersdaas.com
+peoplefindersdaas.com
+
+@Datamentors LLC|US||https://www.porchgroupmedia.com
+porchgroupmedia.com
+
+@Plug Industries|US||https://www.plug-industries.com
+plug-industries.com
+
+@Plunge Digital|US||https://www.plungedigital.com
+plungedigital.com
+
+@Podscribe|US||https://podscribe.com/privacy
+podscribe.com
+
+@Pop Acta Media|US||https://popacta.com/privacy-policy/
+popacta.com
+
+@Precisely|US|g|https://www.precisely.com/legal/california-notice-at-collection-and-privacy-notice
+precisely.com
+cloud.precisely.com
+cloudnative.precisely.com
+data.precisely.com
+developer.precisely.com
+geotax.com
+mapinfomarketplace.precisely.com
+portal.spectrum.precisely.com
+
+@PrivCo Media LLC|US||https://www.privco.com/privacy-policy
+privco.com
+
+@Propensity|US||https://www.propensity.com/
+propensity.com
+
+@publicdatacheck.com|US|gb|https://publicdatacheck.com
+publicdatacheck.com
+
+@publicinfoservices.com|US|gb|https://www.publicinfoservices.com/help-center/privacy
+publicinfoservices.com
+
+@PublicNSA LLC dba BIGDBM|US||https://optout.bigdbm.com/
+bigdbm.com
+optout.bigdbm.com
+
+@PulsePoint|US||https://www.pulsepoint.com/legal/platform-privacy-policy
+pulsepoint.com
+contextweb.com  # PulsePoint se llamaba ContextWeb
+
+@Quad Graphics, Inc.|US||https://www.quad.com/legal/privacy-policy
+quad.com
+
+@RampedUp|US||https://basic.rampedup.io/app/donotsell
+rampedup.io
+
+@Ray CDP, Inc.|US||https://www.rayinsights.com
+rayinsights.com
+raycdp.com
+
+@Records Finder Inc|US||https://recordsfinder.com/optout/
+recordsfinder.com
+peoplepublicrecords.org
+
+@Redmob|US||https://redmob.io/
+redmob.io
+
+@Reklaim|CA||https://www.reklaimyours.com/privacy-policy
+reklaimyours.com
+
+@GETEMAILS LLC|US||https://www.retention.com
+retention.com
+rb2b.com
+
+@RevenueBase|US||https://revenuebase.ai/privacy-policy
+revenuebase.ai
+
+@RGR Marketing|US||https://www.rgrmarketing.com/
+rgrmarketing.com
+
+@ROR Partners|US||https://rorpartners.com/privacy-policy
+rorpartners.com
+
+@S&P Global Inc|US|g|https://www.spglobal.com/en
+spglobal.com
+
+@Sabio Inc|US||https://www.sabioctv.com/
+sabioctv.com
+
+@SalesAssistIQ|US||https://salesassistiq.ai/about
+aniline.ai
+salesassistiq.ai
+
+@SciLeads Ltd|GB||https://scileads.com/privacy-policy/
+scileads.com
+
+@Seamless|US||https://preferences.seamless.ai/
+seamless.ai
+
+@searchpublicrecords.com|US|gb|https://www.searchpublicrecords.com/help-center/privacy
+searchpublicrecords.com
+
+@SeekOut|US||https://www.seekout.com/privacy/choices
+seekout.com
+
+@Semasio|DE||https://www.semasio.com/legal/semasio-privacy-policy
+semasio.com
+semasio.net
+
+@SG360|US||https://sg360.com/do-not-sell-my-info/
+sg360.com
+
+@ShareThis|US||https://www.predactiv.cm
+predactiv.com
+
+@SheerID|US||https://www.sheerid.com/global-privacy-policy/
+sheerid.com
+
+@Slashdot Media, LLC|US||https://slashdotmedia.com/privacy-statement/
+slashdotmedia.com
+sourceforge.net
+slashdot.org
+voipreview.org
+linuxjournal.com
+myrateplan.com
+wirefly.com
+
+@SMARTe Inc|US||https://www.smarte.pro
+smarte.pro
+
+@Social Catfish, LLC|US||https://socialcatfish.com
+socialcatfish.com
+
+@Effyis, Inc.|US|xi|https://www.socialgist.ai/privacy-and-terms
+socialgist.ai
+
+@Sojern|US||https://www.sojern.com/privacy/privacy-policy
+sojern.com
+
+@Solar Direct Marketing|US||https://Connectionholdings.com
+connectionholdings.com
+
+@Specialists Marketing Services, Inc.|US||https://sms-inc.com/privacy-notice/
+sms-inc.com
+
+@Speedeon Data LLC|US||https://www.speedeondata.com
+speedeondata.com
+
+@Spokeo, Inc.|US|fp|https://www.spokeo.com/privacy-policy
+spokeo.com
+freepeopledirectory.com
+thatsthem.com
+peoplewin.com
+anywho.com
+family.me
+
+@Spydialer.com|US||https://spydialer.com/privacy.aspx
+spydialer.com
+
+@Digital Safety Products, LLC|US|gb|https://www.spyfly.com/help-center/privacy
+spyfly.com
+publicrecordreports.com
+
+@StackAdapt|CA|g|https://stackadapt.com
+stackadapt.com
+
+@Intermedia Ventures, LLC|US||https://staterecords.org/optout
+californiacourtrecords.us
+
+@StatSocial|US||https://www.statsocial.com/privacy-policy
+statsocial.com
+
+@Stirista, LLC|US||https://www.stirista.com/privacy-policy/
+stirista.com
+lbdigitaldata.com
+mediasourcesolutions.com
+ameribase.com
+lighthouselist.com
+andrewswharton.com
+listconnection.net
+magnetik.com
+
+@Supplier.io|US||https://supplier.io/privacy-policy
+supplier.io
+
+@Swordfish AI|US||https://swordfish.ai/policy
+swordfish.ai
+
+@The Org|US|x|https://theorg.com/do-not-sell
+theorg.com
+
+@Think Data Group|US||https://thinkdatagroup.com
+thinkdatagroup.com
+
+@Tie|US|g|https://meettie.com
+meettie.com
+
+@Enformion, LLC|US|gfp|https://www.enformion.com/privacy-policy/
+enformion.com
+tracers.com
+go.enformion.com
+
+@TripleLift, Inc.|US|g|https://triplelift.com/user-rights-policy-and-opt-out/
+triplelift.com
+=TripleLift
+
+@TrueData|US||https://www.truedata.co/wp-content/uploads/2026/01/TD-Privacy-Policy-effective-16-Jan-2026.pdf
+truedata.co
+
+@TruePeopleSearch.com|US||https://www.truepeoplesearch.com/privacy
+truepeoplesearch.com
+
+@Trust & Will|US||https://trustandwill.com/security/privacy-policy
+trustandwill.com
+
+@TruthFinder|US||https://www.truthfinder.com/privacy-center/
+truthfinder.com
+courthousedirectory.us
+getfullreport.com
+unitedstatesbackgroundchecks.com
+courtlocations.com
+locaterecord.net
+recordlocator.net
+backgroundchecks.us
+
+@Unacast|US|gf|https://www.unacast.com/privacy-policy
+unacast.com
+
+@upcell|US||https://www.upcell.io/data-claim
+upcell.io
+
+@Urban Science Applications, Inc.|US||https://www.urbanscience.com/privacy/
+urbanscience.com
+
+@Us marketing Group|US||https://usmarketinggrp.com/privacy-policy
+usmarketinggrp.com
+
+@USADATA Inc|US||https://www.usadata.com/ccpa
+usadata.com
+
+@Valassis Communications, Inc.|US|g|https://www.rrd.com/privacy-policy/valassis
+rrd.com
+
+@Vector|US||https://www.vector.co/opt-out
+vector.co
+
+@Vendelux|US||https://vendelux.com/privacy-center/
+vendelux.com
+
+@Venntel|US|gf|https://www.venntel.com/privacy-policy
+venntel.com
+
+@Versar Data Solutions Inc|US||https://versium.com/california-privacy-policy/
+versium.com
+datafinder.com
+
+@Verve for Advertisers|US||https://jungroup.com
+jungroup.com
+
+@WINR Data|AU||https://www.winrdata.com/privacy-policy-us/
+winrdata.com
+
+@Wunderkind|US||https://www.wunderkind.co/privacy/
+wunderkind.co
+bounceexchange.com  # Wunderkind se llamaba BounceX
+
+@WURL|US||https://www.wurl.com/
+wurl.com
+
+@PubMatic Inc.|US|g|https://pubmatic.com/
+pubmatic.com
+=PubMatic
+
+@Yobi AI|US||https://www.yobi.ai/opt-out
+yobi.ai
+
+@Ziff Davis LLC|US|gx|https://www.ziffdavis.com
+ziffdavis.com
+
+@ZoomInfo|US||https://www.zoominfo.com/trust-center/your-privacy
+zoominfo.com
+
+@Tapad|US||https://tapad.com/global-privacy-notice
+tapad.com  # Tapad: el identificador «cross-device» de Experian
+
+@iovation Inc.|US||https://www.transunion.com
+iovation.com
+iesnare.com  # la huella de dispositivo de iovation (TransUnion)
+
+@Neustar Information Services, Inc.|US|mgf|https://www.transunion.com
+agkn.com  # AdAdvisor, de Neustar (TransUnion)
+
+@eXelate, Inc.|US||https://www.nielsen.com
+exelator.com  # eXelate, de Nielsen
+
+@PlaceIQ, Inc.|US|g|https://www.precisely.com/legal/placeiq-california-notice-at-collection-and-privacy-notice
+placeiq.com
+
+@Chartboost, LLC|US|x|https://loopme.ai/chartboost/
+=Chartboost

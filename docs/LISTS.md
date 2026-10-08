@@ -35,8 +35,11 @@ AdGuard DNS filter (GPL-3.0, ~176 000 dominios, mezcla publicidad y rastreo) y S
 | `esperado.txt` | `esperado` | Actualizaciones de sistema (Windows, Apple, Debian, Ubuntu, Fedora, Arch, Flatpak, navegadores), hora (NTP), mensajería y videollamada reconocidas, y el dominio propio de Guardiana cuando exista. Las secciones `@actualizaciones`, `@hora`, `@mensajeria`, `@videollamada`, `@guardiana` deciden la frase de confirmación de la sección 6 del brief. |
 | `telemetria.txt` | `telemetria` | Destinos que los propios fabricantes documentan como telemetría o diagnóstico (Microsoft, Apple, Mozilla, Google, Canonical, NVIDIA, Dell). |
 | `evasion_dns.txt` | señal `evasion_dns` | Nombres de resolutores DoH/DoT conocidos. Consultarlos indica que un programa resuelve por su cuenta, fuera de la vista de Guardiana. Se anota; no se corta salvo regla del usuario. |
+| `empresas.txt` | etiqueta (no categoría) | Quién es dueño de cada nombre, con su país y su ciudad cuando están comprobados (decisión 61). |
+| `ia.txt`, `entrega.txt` | etiqueta | El servicio de IA al que pertenece un nombre (decisión 62) y las redes de reparto que son carretera y no destino (decisión 148). |
+| `corredores.txt` | etiqueta «compra y venta de datos» | Las empresas inscritas en el registro público de corredores de datos de California (CPPA): su nombre, su país, lo que ellas mismas marcaron (ubicación exacta, menores, a quién vendieron) y la página que declararon para pedir que borren tus datos. Copia fechada del CSV del registro, con su huella en la cabecera, más los nombres de rastreo de cada inscrita comentados uno a uno (decisión 194). No cambia la categoría ni corta nada: dice qué es la dueña del nombre, y la persona decide. |
 
-Cualquiera puede proponer cambios a estas tres listas con un cambio en el repositorio.
+Cualquiera puede proponer cambios a estas listas con un cambio en el repositorio.
 
 ## Prioridad cuando varias listas coinciden
 

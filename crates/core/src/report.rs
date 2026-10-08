@@ -158,6 +158,29 @@ impl Ledger {
         })
     }
 
+    /// Every name asked for in the seven days ending at `until`, most asked first, with how many
+    /// times, over the rows the household may read (this computer and the devices that share
+    /// their detail, as in [`Ledger::events`]). Names rather than rows: a week of a busy house is
+    /// tens of thousands of rows and a few thousand names, and what is asked of this is who owns
+    /// the names (the registered data brokers of the weekly report, decision 194).
+    pub fn week_names(&self, until: i64) -> Result<Vec<NameCount>> {
+        let since = until - 7 * DAY_MS;
+        let mut stmt = self.conn.prepare(
+            "SELECT qname, COUNT(*) AS n FROM events \
+             WHERE ts >= ?1 AND ts < ?2 \
+               AND (device_id = ?3 OR device_id IN \
+                    (SELECT id FROM devices WHERE share_detail_with_home != 0)) \
+             GROUP BY qname ORDER BY n DESC, qname ASC",
+        )?;
+        let rows = stmt.query_map(params![since, until, SELF_DEVICE_ID], |r| {
+            Ok(NameCount {
+                qname: r.get(0)?,
+                queries: r.get(1)?,
+            })
+        })?;
+        rows.map(|r| r.map_err(crate::Error::from)).collect()
+    }
+
     /// Destinations the house had never asked for before the seven days ending at `until`.
     ///
     /// `seen_domains` remembers when each (device, name) pair first appeared and survives
@@ -210,6 +233,15 @@ impl Ledger {
         }
         Ok(out)
     }
+}
+
+/// A name and how many times it was asked for in a window.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
+pub struct NameCount {
+    /// The name asked for.
+    pub qname: String,
+    /// Times it was asked for inside the window.
+    pub queries: i64,
 }
 
 /// A destination asked for this week and never before.

@@ -63,3 +63,7 @@ stackpathdns.com
 
 @ByteDance
 ttdns2.com
+
+@jsDelivr
+# Red pública que reparte librerías de código abierto para las webs.
+jsdelivr.net

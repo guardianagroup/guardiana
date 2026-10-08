@@ -113,6 +113,66 @@ pub(crate) struct EventView {
     /// Identifier of the trap file, when this name is one. A query for it means that file was
     /// read: Guardiana never looked at the file, it only ever saw the name.
     trampa: Option<String>,
+    /// The registered data broker that owns the name (decision 194), when one does: a company
+    /// that told the State of California it collects and sells personal data of people it has no
+    /// relationship with. Copied from that public register; never a verdict about this query.
+    corredor: Option<CorredorView>,
+}
+
+/// A registered data broker as the pages show it: who, from where, what it ticked in the
+/// register, and where it said people can ask for their data back.
+#[derive(Serialize, Clone)]
+pub(crate) struct CorredorView {
+    nombre: &'static str,
+    /// The country the registrant wrote for itself, named in the language of the panel.
+    pais: Option<String>,
+    /// What the registrant ticked, one short sentence each, already in the panel's language.
+    declara: Vec<String>,
+    /// The page it declared for people to ask that their data be deleted or not sold.
+    derechos: Option<&'static str>,
+}
+
+/// The letters of `corredores.txt` and the text key that says each one. The order is the order
+/// the sentences are shown in: what it collects first, who it sold to after.
+const DECLARA: [(char, &str); 7] = [
+    ('g', "corredor_declara_g"),
+    ('m', "corredor_declara_m"),
+    ('b', "corredor_declara_b"),
+    ('x', "corredor_declara_x"),
+    ('f', "corredor_declara_f"),
+    ('p', "corredor_declara_p"),
+    ('i', "corredor_declara_i"),
+];
+
+fn corredor_de(t: &Texts, qname: &str) -> Option<CorredorView> {
+    let b = guardiana_lists::data_broker_of(qname)?;
+    Some(CorredorView {
+        nombre: b.name,
+        pais: b
+            .country
+            .map(|c| t.pais(c))
+            .filter(|n| !n.is_empty())
+            .map(str::to_owned),
+        declara: DECLARA
+            .iter()
+            .filter(|(letra, _)| b.declares(*letra))
+            .map(|(_, clave)| t.panel(clave).to_owned())
+            .collect(),
+        derechos: b.rights_url,
+    })
+}
+
+/// Who owns the name: the company of `empresas.txt`, or, when that list does not know it, the
+/// registrant of `corredores.txt`. A registered broker's own name is as good an owner as any.
+fn empresa_de(qname: &str) -> Option<&'static str> {
+    guardiana_lists::company_of(qname)
+        .or_else(|| guardiana_lists::data_broker_of(qname).map(|b| b.name))
+}
+
+/// The two-letter country of the owner, the same way round: the company's, else the registrant's.
+fn pais_codigo_de(qname: &str) -> Option<&'static str> {
+    guardiana_lists::country_of(qname)
+        .or_else(|| guardiana_lists::data_broker_of(qname).and_then(|b| b.country))
 }
 
 /// The sentence for a name: first the name itself and its parent domains, then the company
@@ -131,15 +191,27 @@ fn oficio_de(t: &Texts, qname: &str) -> Option<String> {
             _ => break,
         }
     }
-    guardiana_lists::company_of(qname)
-        .and_then(|c| t.oficio(c))
-        .map(str::to_owned)
+    if let Some(f) = guardiana_lists::company_of(qname).and_then(|c| t.oficio(c)) {
+        return Some(f.to_owned());
+    }
+    // No trade written, but the register says what the owner is registered as: that sentence is
+    // the trade, and it is the company's own declaration rather than ours.
+    let b = guardiana_lists::data_broker_of(qname)?;
+    let pais = b.country.map(|c| t.pais(c)).filter(|n| !n.is_empty());
+    Some(
+        t.panel("corredor_frase")
+            .replace("{nombre}", b.name)
+            .replace(
+                "{pais}",
+                &pais.map(|p| format!(" · {p}")).unwrap_or_default(),
+            ),
+    )
 }
 
 /// El país de la empresa dueña del nombre, ya dicho en el idioma del panel. Si el código no
 /// tiene nombre escrito en ese idioma, no se enseña nada: dos letras sueltas no informan.
 fn pais_de(t: &Texts, qname: &str) -> Option<String> {
-    let codigo = guardiana_lists::country_of(qname)?;
+    let codigo = pais_codigo_de(qname)?;
     let nombre = t.pais(codigo);
     (!nombre.is_empty()).then(|| nombre.to_owned())
 }
@@ -148,8 +220,9 @@ fn view(t: &Texts, e: Event, names: &HashMap<String, Option<String>>) -> EventVi
     EventView {
         frases: e.signals.iter().map(|s| t.signal(s)).collect(),
         device_name: names.get(&e.device_id).cloned().flatten(),
-        empresa: guardiana_lists::company_of(&e.qname),
+        empresa: empresa_de(&e.qname),
         pais: pais_de(t, &e.qname),
+        corredor: corredor_de(t, &e.qname),
         ciudad: guardiana_lists::city_of(&e.qname).map(str::to_owned),
         ia: guardiana_lists::ai_service_of(&e.qname),
         entrega: guardiana_lists::delivery_of(&e.qname),
@@ -618,10 +691,10 @@ fn lectura(
     let mut relay = false;
     let mut evasiones = 0;
     for e in &events {
-        if let Some(c) = guardiana_lists::company_of(&e.qname) {
+        if let Some(c) = empresa_de(&e.qname) {
             *by_company.entry(c).or_insert(0) += 1;
         }
-        if let Some(p) = guardiana_lists::country_of(&e.qname) {
+        if let Some(p) = pais_codigo_de(&e.qname) {
             *by_country.entry(p).or_insert(0) += 1;
         }
         let q = e.qname.to_ascii_lowercase();
@@ -1862,7 +1935,49 @@ pub(crate) struct Informe {
     /// until then there is nothing to compare with and nothing is "new" (review of 5 Oct 2026:
     /// the first week compared with zeros and called every destination new).
     comparar_desde: Option<i64>,
+    /// The registered data brokers some device of the house talked to this week, most asked
+    /// first (decision 194): a company's own entry in a public register, shown with its country
+    /// and what it ticked there. Whether to cut them is the person's call; the report only says
+    /// who they are. Only with Plus, like everything else here.
+    corredores: Vec<InformeCorredor>,
+    /// Queries of the week that went to those registrants, all of them together.
+    corredores_consultas: i64,
     texto_whatsapp: String,
+}
+
+#[derive(Serialize)]
+struct InformeCorredor {
+    nombre: &'static str,
+    pais: Option<String>,
+    /// Queries of the week to names this registrant owns.
+    consultas: i64,
+    /// How many distinct names of its the house asked for.
+    nombres: i64,
+    declara: Vec<String>,
+    derechos: Option<&'static str>,
+}
+
+/// The week's names grouped by the registered data broker that owns them, most queried first.
+fn corredores_de(t: &Texts, nombres: &[guardiana_core::NameCount]) -> Vec<InformeCorredor> {
+    let mut por: HashMap<&'static str, InformeCorredor> = HashMap::new();
+    for n in nombres {
+        let Some(c) = corredor_de(t, &n.qname) else {
+            continue;
+        };
+        let e = por.entry(c.nombre).or_insert_with(|| InformeCorredor {
+            nombre: c.nombre,
+            pais: c.pais,
+            consultas: 0,
+            nombres: 0,
+            declara: c.declara,
+            derechos: c.derechos,
+        });
+        e.consultas += n.queries;
+        e.nombres += 1;
+    }
+    let mut v: Vec<InformeCorredor> = por.into_values().collect();
+    v.sort_by(|a, b| b.consultas.cmp(&a.consultas).then(a.nombre.cmp(b.nombre)));
+    v
 }
 
 #[derive(Serialize)]
@@ -1912,7 +2027,7 @@ pub(crate) async fn informe(
 ) -> ApiResult<Informe> {
     let ahora = now_ms();
     const SEMANA: i64 = 7 * 24 * 60 * 60 * 1000;
-    let (w, anterior, novedades, plus, comparar_desde) = with_ledger(&state, |l| {
+    let (w, anterior, novedades, plus, comparar_desde, nombres) = with_ledger(&state, |l| {
         let plus = guardiana_license::status(l, &state.token, ahora)
             .map(|s| s.plus_activo)
             .unwrap_or(false);
@@ -1934,7 +2049,14 @@ pub(crate) async fn informe(
         } else {
             (None, Vec::new())
         };
-        Ok((semana, anterior, novedades, plus, comparar_desde))
+        // The week's names, for the registered data brokers among them: only with Plus, like
+        // the rest of the report, and the detail a device kept to itself is not in them.
+        let nombres = if plus {
+            l.week_names(ahora)?
+        } else {
+            Vec::new()
+        };
+        Ok((semana, anterior, novedades, plus, comparar_desde, nombres))
     })?;
     if !plus {
         // There is no free plan any more: reaching this means the trial or the subscription is
@@ -1947,6 +2069,8 @@ pub(crate) async fn informe(
             anterior: None,
             novedades: Vec::new(),
             comparar_desde: None,
+            corredores: Vec::new(),
+            corredores_consultas: 0,
             desde: w.since,
             hasta: w.until,
             dispositivos: Vec::new(),
@@ -1954,13 +2078,24 @@ pub(crate) async fn informe(
             texto_whatsapp: String::new(),
         }));
     }
-    let texto_whatsapp = t
+    let corredores = corredores_de(t, &nombres);
+    let corredores_consultas: i64 = corredores.iter().map(|c| c.consultas).sum();
+    let mut texto_whatsapp = t
         .panel("informe_texto")
         .replace("{dispositivos}", &t.cuantos_dispositivos(w.devices.len()))
         .replace("{consultas}", &w.total.queries.to_string())
         .replace("{rastreadores}", &w.total.trackers.to_string())
         .replace("{publicidad}", &w.total.ads.to_string())
         .replace("{cortados}", &w.total.blocked.to_string());
+    if !corredores.is_empty() {
+        // One more sentence, only when there is something to say: how many queries went to
+        // companies registered as data brokers, and how many of them.
+        texto_whatsapp.push(' ');
+        texto_whatsapp.push_str(
+            &t.panel_n("informe_corredores_texto", corredores.len() as i64)
+                .replace("{consultas}", &corredores_consultas.to_string()),
+        );
+    }
     Ok(Json(Informe {
         plus: true,
         ejemplo: false,
@@ -1980,9 +2115,7 @@ pub(crate) async fn informe(
         novedades: novedades
             .into_iter()
             .map(|n| InformeNovedad {
-                empresa: guardiana_lists::company_of(&n.qname)
-                    .unwrap_or_default()
-                    .to_owned(),
+                empresa: empresa_de(&n.qname).unwrap_or_default().to_owned(),
                 nombre: n.qname,
                 categoria: n.category,
                 dispositivo: n.name.unwrap_or(n.device_id),
@@ -1991,6 +2124,8 @@ pub(crate) async fn informe(
             })
             .collect(),
         comparar_desde,
+        corredores,
+        corredores_consultas,
         texto_whatsapp,
     }))
 }
