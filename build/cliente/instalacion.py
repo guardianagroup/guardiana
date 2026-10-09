@@ -659,6 +659,11 @@ def main():
             viejo = paquete_de("msi", a.anterior)
             if viejo:
                 actualizacion(viejo, paquete, version)
+            else:
+                # The update from the version people have is a promise too: when its installer
+                # could not be fetched, the run says so instead of skipping it in silence
+                # (review of 9 Oct 2026).
+                mal("actualización", f"no hay instalador anterior en {a.anterior}: la actualización no se probó")
     finally:
         restaurar_dns(antes)
     if buenos:

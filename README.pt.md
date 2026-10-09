@@ -45,7 +45,7 @@ consentimento, e se desfaz no mesmo lugar. No Windows, a primeira instalação c
 como DNS (a tela de boas-vindas avisa antes de «Instalar») e isso se desfaz no painel, em «Estado». Desinstalar desliga o Modo Casa, tira a regra do firewall e restaura o DNS
 exatamente como estava.
 
-Antes de instalar, compare a impressão SHA‑256 do arquivo com a de `SHA256SUMS` e com a linha
+Antes de instalar, compare a impressão SHA‑256 do arquivo com a da página de download e com a linha
 correspondente de [`ledger.jsonl`](ledger.jsonl), o registro público que sai antes do download.
 Depois de instalar, `guardiana verify` confere isso no seu computador.
 
@@ -75,8 +75,7 @@ cargo test --workspace --locked
 
 Compilação reproduzível em um contêiner fixado por digest: `build/repro.sh` (veja
 [docs/VERIFY.md](docs/VERIFY.md)). Pacotes: `build/package.sh` (Linux) e `build/msi.ps1`
-(Windows). Estrutura do código e regras de trabalho: [CLAUDE.md](CLAUDE.md) e
-[docs/BRIEF.md](docs/BRIEF.md).
+(Windows). Estrutura do código e regras de trabalho: [docs/BRIEF.md](docs/BRIEF.md).
 
 ## Licença
 

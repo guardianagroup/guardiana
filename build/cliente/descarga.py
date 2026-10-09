@@ -61,10 +61,22 @@ def get(url, binary=False):
 
 
 def latest_version():
-    # GUARDIANA's latest: a line «zero-<version>» is the browser, published on its own.
-    lines = [l for l in get(LEDGER).splitlines() if l.strip().startswith("{")]
-    versions = [json.loads(l)["version"] for l in lines]
-    return [v for v in versions if not v.startswith("zero-")][-1]
+    # GUARDIANA's latest: a line «zero-<version>» is the browser, published on its own. A line
+    # that does not parse is skipped here (ledger_entry does the same); no GUARDIANA line at all
+    # is an error the run reports, not a traceback (review of 9 Oct 2026).
+    versions = []
+    for l in get(LEDGER).splitlines():
+        if not l.strip().startswith("{"):
+            continue
+        try:
+            v = json.loads(l).get("version", "")
+        except ValueError:
+            continue
+        if v and not v.startswith("zero-"):
+            versions.append(v)
+    if not versions:
+        raise ValueError("ledger.jsonl no tiene ninguna versión de GUARDIANA")
+    return versions[-1]
 
 
 def ledger_entry(version):
@@ -121,7 +133,12 @@ def main():
     ap.add_argument("--version")
     ap.add_argument("--dir", default=".")
     a = ap.parse_args()
-    version = a.version or latest_version()
+    try:
+        actual = latest_version()
+    except Exception as e:  # noqa: BLE001 - the ledger could not be read: say so, as a result
+        mal("registro público", f"{LEDGER}: {e}")
+        return finish()
+    version = a.version or actual
     name = a.archivo.replace("{v}", version)
     os.makedirs(a.dir, exist_ok=True)
     print(f"Comprobando {name} (versión {version}) como lo haría un cliente")
@@ -129,7 +146,6 @@ def main():
     url = f"{SITE}/descargas/{version}/{name}"
     try:
         data = get(url, binary=True)
-        open(os.path.join(a.dir, name), "wb").write(data)
         ok("descarga", f"{url} · {len(data)} bytes")
     except Exception as e:  # noqa: BLE001 - a customer just sees "it did not download"
         mal("descarga", f"{url}: {e}")
@@ -139,7 +155,6 @@ def main():
     # 1. The table of the install page, in the three languages. Only for the version the page
     #    offers today: an older one (kept for the record) is checked against the ledger and its
     #    signature, which is what still applies to it.
-    actual = latest_version()
     for lang, path in (PAGES.items() if version == actual else []):
         try:
             html = get(SITE + path)
@@ -157,17 +172,21 @@ def main():
             mal(f"enlace de descarga ({lang})", f"{path} no enlaza /descargas/{version}/{name}")
 
     # 2. The public ledger.
-    entry = ledger_entry(version)
+    try:
+        entry = ledger_entry(version)
+    except Exception as e:  # noqa: BLE001
+        mal("registro público", f"{LEDGER}: {e}")
+        entry = None
     if not entry:
         mal("registro público", f"ledger.jsonl no tiene la versión {version}")
     else:
         f = next((x for x in entry.get("files", []) if x.get("name") == name), None)
         if not f:
             mal("registro público", f"la línea {version} no anota {name}")
-        elif digest in (f.get("sha256_signed"), f.get("sha256_unsigned")):
+        elif digest == f.get("sha256_signed"):
             ok("registro público", f"versión {version}, commit {entry.get('commit', '')[:8]}, rekor {entry.get('rekor_uuid', '')[:16]}…")
         else:
-            mal("registro público", f"el archivo da {digest}; el registro dice {f.get('sha256_signed') or f.get('sha256_unsigned')}")
+            mal("registro público", f"el archivo da {digest}; el registro dice {f.get('sha256_signed')}")
 
     # 3. The signature, with the key of the page AND the key of the repository.
     try:
@@ -182,7 +201,11 @@ def main():
     except OSError:
         pass
     page_key = None
-    m = re.search(r"RW[A-Za-z0-9+/]{54}", get(SITE + PAGES["es"]))
+    try:
+        m = re.search(r"RW[A-Za-z0-9+/]{54}", get(SITE + PAGES["es"]))
+    except Exception as e:  # noqa: BLE001
+        mal("clave pública (página)", f"{PAGES['es']}: {e}")
+        m = None
     if m:
         page_key = m.group(0)
     if repo_key and page_key and page_key not in repo_key:
@@ -193,12 +216,16 @@ def main():
             continue
         try:
             comment, kid = verify_minisign(key, sig_text, data)
-            if name not in comment or version not in comment:
+            if comment != f"guardiana {version} {name}":
                 mal(f"firma ({origen})", f"verifica, pero el comentario de confianza dice «{comment}»")
             else:
                 ok(f"firma ({origen})", f"clave {kid} · «{comment}»")
         except Exception as e:  # noqa: BLE001
             mal(f"firma ({origen})", str(e))
+    # Only a file that checked out is left for the install test: until 1.0.9 it was saved before
+    # any check, so a later step could install what had just failed.
+    if not fallos:
+        open(os.path.join(a.dir, name), "wb").write(data)
     return finish()
 
 

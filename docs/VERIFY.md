@@ -39,7 +39,21 @@ Una línea por versión publicada, en este repositorio, **antes** de que exista 
   la firma se añade dentro del archivo). En Linux ambas coinciden.
 - `minisign`: la firma minisign del binario sin firmar.
 - `rekor_uuid`: la entrada en Rekor (registro de transparencia público de Sigstore) donde se subió
-  esta misma línea. Sirve para demostrar que la línea existía en esa fecha y no se cambió después.
+  esta línea. Sirve para demostrar que la línea existía en esa fecha y no se cambió después.
+- `reproducible`: si el archivo sale idéntico de `build/repro.sh` (`true`) o no (`false`: los
+  instaladores y el navegador se compilan en las máquinas de GitHub y se comprueban por su huella).
+
+Lo que se sube a Rekor es la línea **antes** de saber su `rekor_uuid` (no se puede meter dentro de
+una entrada su propio número). Para comprobarla: toma la línea de `ledger.jsonl`, pon
+`"rekor_uuid":""`, escríbela sin espacios y con un salto de línea al final, y su SHA‑256 tiene que
+ser el `data.hash` de la entrada de Rekor:
+
+```bash
+tail -n 1 ledger.jsonl | python3 -c 'import json,sys; l=json.loads(sys.stdin.read()); u=l["rekor_uuid"]; l["rekor_uuid"]=""; open("linea.json","w").write(json.dumps(l,separators=(",",":"))+"\n"); print(u)'
+sha256sum linea.json   # igual al hash de https://rekor.sigstore.dev/api/v1/log/entries/<uuid>
+```
+
+La firma minisign de esa misma línea va dentro de la entrada de Rekor, con la clave pública.
 
 ## Reproducir la compilación
 

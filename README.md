@@ -46,8 +46,8 @@ consentimiento, y se deshace en el mismo sitio. En Windows, la primera instalaci
 como DNS (la pantalla de bienvenida lo dice antes de «Instalar») y se deshace en el panel, en «Estado». Desinstalar apaga Modo Hogar, quita la regla del cortafuegos y
 restaura el DNS exactamente como estaba.
 
-Antes de instalar, compara la huella SHA‑256 del archivo con la de `SHA256SUMS` y con la línea
-correspondiente de [`ledger.jsonl`](ledger.jsonl), el registro público que se publica antes que la
+Antes de instalar, compara la huella SHA‑256 del archivo con la que da la página de descarga y con
+la línea correspondiente de [`ledger.jsonl`](ledger.jsonl), el registro público que se publica antes que la
 descarga. Después de instalar, `guardiana verify` lo comprueba en tu equipo.
 
 ## Usar
@@ -76,8 +76,7 @@ cargo test --workspace --locked
 
 Compilación reproducible en un contenedor fijado por digest: `build/repro.sh` (véase
 [docs/VERIFY.md](docs/VERIFY.md)). Paquetes: `build/package.sh` (Linux) y `build/msi.ps1`
-(Windows). Estructura del código y reglas de trabajo: [CLAUDE.md](CLAUDE.md) y
-[docs/BRIEF.md](docs/BRIEF.md).
+(Windows). Estructura del código y reglas de trabajo: [docs/BRIEF.md](docs/BRIEF.md).
 
 ## Licencia
 

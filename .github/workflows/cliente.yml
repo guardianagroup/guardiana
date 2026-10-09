@@ -44,20 +44,28 @@ jobs:
           python-version: '3.12'
       - run: pip install --quiet cryptography
       - name: descargar y comprobar, como un cliente
+        id: descarga
         continue-on-error: true
         shell: pwsh
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          $v = "${{ github.event.inputs.version }}"
-          $arg = @(); if ($v) { $arg = @('--version', $v) }
-          python build/cliente/descarga.py 'guardiana-{v}-windows-x64.msi' --dir paquetes @arg
-          python build/cliente/descarga.py 'guardiana-{v}-windows-x64-en.msi' --dir otros @arg
-          python build/cliente/descarga.py 'guardiana-{v}-windows-x64-pt.msi' --dir otros @arg
-          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $arg = @(); if ($env:VERSION) { $arg = @('--version', $env:VERSION) }
+          $mal = 0
+          python build/cliente/descarga.py 'guardiana-{v}-windows-x64.msi' --dir paquetes @arg; if ($LASTEXITCODE -ne 0) { $mal = 1 }
+          python build/cliente/descarga.py 'guardiana-{v}-windows-x64-en.msi' --dir otros @arg; if ($LASTEXITCODE -ne 0) { $mal = 1 }
+          python build/cliente/descarga.py 'guardiana-{v}-windows-x64-pt.msi' --dir otros @arg; if ($LASTEXITCODE -ne 0) { $mal = 1 }
+          exit $mal
       - name: la versión anterior, para probar la actualización
         continue-on-error: true
         run: python build/cliente/descarga.py guardiana-1.0.0-windows-x64.msi --version 1.0.0 --dir anterior
       - name: instalar, usar, parar, desinstalar y reinstalar
         run: python build/cliente/instalacion.py --tipo msi --dir paquetes --anterior anterior
+      - name: la comprobación de la descarga decide el resultado
+        # The steps above go on after a failed check so every result is readable; this one makes
+        # the job red when what a customer downloads did not check out (review of 9 Oct 2026).
+        if: steps.descarga.outcome == 'failure'
+        run: exit 1
 
   ubuntu:
     name: Ubuntu (.deb)
@@ -67,12 +75,17 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: pip install --quiet --break-system-packages cryptography || pip install --quiet cryptography
       - name: descargar y comprobar, como un cliente
+        id: descarga
         continue-on-error: true
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          v="${{ github.event.inputs.version }}"
-          python3 build/cliente/descarga.py 'guardiana_{v}_amd64.deb' --dir paquetes ${v:+--version $v}
+          python3 build/cliente/descarga.py 'guardiana_{v}_amd64.deb' --dir paquetes ${VERSION:+--version "$VERSION"}
       - name: instalar, usar, parar, desinstalar y reinstalar
         run: python3 build/cliente/instalacion.py --tipo deb --dir paquetes
+      - name: la comprobación de la descarga decide el resultado
+        if: steps.descarga.outcome == 'failure'
+        run: exit 1
 
   ubuntu-tarball:
     name: Otro Linux con systemd (.tar.gz)
@@ -82,12 +95,17 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: pip install --quiet --break-system-packages cryptography || pip install --quiet cryptography
       - name: descargar y comprobar, como un cliente
+        id: descarga
         continue-on-error: true
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          v="${{ github.event.inputs.version }}"
-          python3 build/cliente/descarga.py 'guardiana-{v}-linux-x86_64.tar.gz' --dir paquetes ${v:+--version $v}
+          python3 build/cliente/descarga.py 'guardiana-{v}-linux-x86_64.tar.gz' --dir paquetes ${VERSION:+--version "$VERSION"}
       - name: instalar, usar, parar, desinstalar y reinstalar
         run: python3 build/cliente/instalacion.py --tipo tar --dir paquetes
+      - name: la comprobación de la descarga decide el resultado
+        if: steps.descarga.outcome == 'failure'
+        run: exit 1
 
   mac:
     name: macOS con chip Apple (GUARDIANA.app)
@@ -97,12 +115,17 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: python3 -m pip install --quiet --break-system-packages cryptography || python3 -m pip install --quiet cryptography
       - name: descargar y comprobar, como un cliente
+        id: descarga
         continue-on-error: true
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          v="${{ github.event.inputs.version }}"
-          python3 build/cliente/descarga.py 'guardiana-{v}-macos.app.zip' --dir paquetes ${v:+--version $v}
+          python3 build/cliente/descarga.py 'guardiana-{v}-macos.app.zip' --dir paquetes ${VERSION:+--version "$VERSION"}
       - name: instalar, usar, parar, desinstalar y reinstalar
         # What a machine cannot see: the Gatekeeper warning a customer meets when opening the app
         # (a file fetched with curl carries no quarantine flag) and the app's own dialogs. Those
         # are checked by hand and described, with screenshots, on the install page.
         run: python3 build/cliente/instalacion.py --tipo app --dir paquetes
+      - name: la comprobación de la descarga decide el resultado
+        if: steps.descarga.outcome == 'failure'
+        run: exit 1

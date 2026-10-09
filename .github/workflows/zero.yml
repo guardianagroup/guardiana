@@ -84,9 +84,14 @@ jobs:
           # The published name carries the version, like GUARDIANA's own files.
           v=$(sed -n 's/^version = "\(.*\)"/\1/p' zero/navegador/Cargo.toml | head -n 1)
           nombre="guardiana-zero-$v-windows-x64.exe"
-          if [ -f "$exe" ]; then
+          # The browser travels only when every step passed: an artifact from a red run must never
+          # be the one that gets signed (review of 9 Oct 2026). The test's screenshots always do.
+          if [ -f "$exe" ] && [ "${{ job.status }}" = "success" ]; then
             cp "$exe" "dist/$nombre"
             (cd dist && sha256sum "$nombre" > SHA256SUMS && echo "::notice title=sha256 $nombre::$(cut -d' ' -f1 SHA256SUMS)")
+            echo "$GITHUB_SHA" > dist/COMMIT
+          elif [ -f "$exe" ]; then
+            echo "::warning title=sin navegador::la ejecución no pasó entera, así que el artefacto no lleva el .exe"
           fi
           cp zero/navegador/Cargo.lock dist/ 2>/dev/null || true
           cp -r "$RUNNER_TEMP/e2e" dist/prueba 2>/dev/null || true

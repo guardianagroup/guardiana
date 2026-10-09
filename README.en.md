@@ -49,8 +49,8 @@ with consent, and undone in the same place. On Windows, a first install makes Gu
 welcome screen says so before “Install”), and it is undone in the panel, under “Status”. Uninstalling turns Home Mode off, removes the firewall rule and restores
 the DNS exactly as it was.
 
-Before installing, compare the SHA‑256 fingerprint of the file with `SHA256SUMS` and with the
-matching line of [`ledger.jsonl`](ledger.jsonl), the public ledger that is published before the
+Before installing, compare the SHA‑256 fingerprint of the file with the one on the download page
+and with the matching line of [`ledger.jsonl`](ledger.jsonl), the public ledger that is published before the
 download. After installing, `guardiana verify` checks it on your machine.
 
 ## Use
@@ -79,8 +79,7 @@ cargo test --workspace --locked
 
 Reproducible build in a digest-pinned container: `build/repro.sh` (see
 [docs/VERIFY.md](docs/VERIFY.md)). Packages: `build/package.sh` (Linux) and `build/msi.ps1`
-(Windows). Code layout and working rules: [CLAUDE.md](CLAUDE.md) and
-[docs/BRIEF.md](docs/BRIEF.md).
+(Windows). Code layout and working rules: [docs/BRIEF.md](docs/BRIEF.md).
 
 ## Licence
 
