@@ -60,7 +60,8 @@ header.top .lang:hover { border-color: var(--fg); color: var(--fg); }
 header.top .idiomas { margin-left: auto; display: inline-flex; flex-wrap: nowrap; gap: 6px; align-items: center; }
 header.top .idiomas .lang { margin-left: 0; }
 header.top .lang.actual { border-color: var(--accent); color: var(--accent); background: transparent; opacity: 1; cursor: default; }
-header.top .tema { margin-left: 8px; }
+header.top .tema { margin-left: 8px; width: 32px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+header.top .tema svg { width: 15px; height: 15px; display: block; }
 
 main { max-width: 1180px; margin: 0 auto; padding: 26px 22px 40px; }
 h1 { font-family: var(--display); font-weight: 600; font-size: 25px; line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 6px; }
