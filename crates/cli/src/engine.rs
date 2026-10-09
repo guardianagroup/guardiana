@@ -2104,10 +2104,35 @@ fn open_via_osascript(url: &str) -> std::io::Result<()> {
 /// URL, which belongs to the panel crate (review of 1 Oct 2026, finding 15).
 pub fn open_in_browser(url: &str) {
     #[cfg(target_os = "windows")]
-    let result = std::process::Command::new("cmd")
-        .args(["/C", "start", "", url])
-        .spawn()
-        .map(|_| ());
+    let result = {
+        // No window of its own and no standard handles: `start` needs neither, and a caller
+        // that has released its console (the panel launcher) must not hand down dead ones.
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", url])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .and_then(|mut c| c.wait())
+            .and_then(|st| {
+                st.success()
+                    .then_some(())
+                    .ok_or_else(|| std::io::Error::other("start failed"))
+            })
+            // Explorer opens a file or a URL with its default program too, without a console.
+            .or_else(|_| {
+                std::process::Command::new("explorer.exe")
+                    .arg(url)
+                    .stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .spawn()
+                    .map(|_| ())
+            })
+    };
     #[cfg(target_os = "macos")]
     let result = open_via_osascript(url).or_else(|_| {
         std::process::Command::new("open")

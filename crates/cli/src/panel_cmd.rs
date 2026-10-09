@@ -155,9 +155,12 @@ pub fn run(_opts: &Opts) -> Result<(), Box<dyn Error>> {
         let espera = ruta_de_espera();
         if std::fs::write(&espera, pagina_de_espera(t, &url)).is_ok() {
             println!("{}", t.cli("panel.abriendo_espera"));
+            // The browser first, the console after: released before, the child `cmd /C start`
+            // inherited handles of a console that no longer existed and never started, so 1.0.6
+            // opened nothing at all (owner's report, 8 Oct 2026, minutes after publishing).
+            crate::engine::open_in_browser(&espera.display().to_string());
             #[cfg(windows)]
             soltar_consola();
-            crate::engine::open_in_browser(&espera.display().to_string());
             return Ok(());
         }
         // The page could not be written: the old wait, in the terminal.
@@ -167,8 +170,8 @@ pub fn run(_opts: &Opts) -> Result<(), Box<dyn Error>> {
         }
     }
     println!("{}", t.cli("panel.abriendo").replace("{url}", &url));
+    crate::engine::open_in_browser(&url);
     #[cfg(windows)]
     soltar_consola();
-    crate::engine::open_in_browser(&url);
     Ok(())
 }
