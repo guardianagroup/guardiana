@@ -751,26 +751,47 @@ fn post_json(url: &str, body: &serde_json::Value) -> Result<(u16, String), Error
     Ok((code, text))
 }
 
+/// The gateway's own error code in a non-2xx answer: Dodo answers `{"code": "INACTIVE_LICENSE_KEY",
+/// "message": ...}`, a code in capitals and underscores (docs.dodopayments.com/api-reference/
+/// error-codes). A proxy, a captive portal or a WAF does not answer in that shape.
+fn codigo_de_la_pasarela(code: u16, body: &str) -> Option<String> {
+    if !(400..500).contains(&code) || matches!(code, 401 | 407 | 429) {
+        return None;
+    }
+    let v: serde_json::Value = serde_json::from_str(body.trim()).ok()?;
+    let c = v.get("code")?.as_str()?;
+    (!c.is_empty() && c.bytes().all(|b| b.is_ascii_uppercase() || b == b'_')).then(|| c.to_owned())
+}
+
 /// Whether a non-2xx answer is the gateway itself talking about the key, and not a proxy, a
-/// captive portal, a WAF or an outage in between. Only a 4xx whose body is the gateway's JSON
-/// (with `message` or `code`) counts, and never 401/403/407/429, which are what proxies and
-/// rate limits say. Until 1.0.5 any 4xx was "the gateway rejected the key", and a corporate
-/// proxy answering 403 for a week ended a Founder licence for good; and a 502 page was shown as
-/// "the gateway did not accept the key" (review of 8 Oct 2026).
+/// captive portal, a WAF or an outage in between: a 4xx with the gateway's error code, or (for
+/// any 4xx but 401/403/407/429, which are what proxies and rate limits say) its JSON with a
+/// `message`. Until 1.0.5 any 4xx was "the gateway rejected the key", and a corporate proxy
+/// answering 403 for a week ended a Founder licence for good; and a 502 page was shown as "the
+/// gateway did not accept the key" (review of 8 Oct 2026). Dodo answers an inactive key with a
+/// 403 and its code: that one is the gateway's word (review of 9 Oct 2026).
 fn es_palabra_de_la_pasarela(code: u16, body: &str) -> bool {
+    if codigo_de_la_pasarela(code, body).is_some() {
+        return true;
+    }
     if !(400..500).contains(&code) || matches!(code, 401 | 403 | 407 | 429) {
         return false;
     }
     serde_json::from_str::<serde_json::Value>(body.trim())
         .ok()
-        .is_some_and(|v| v.get("message").is_some() || v.get("code").is_some())
+        .is_some_and(|v| v.get("message").is_some() || v.get("error").is_some())
 }
 
-/// The error a non-2xx answer becomes: the gateway's own reason, the activation limit, or a
-/// network problem for anything that is not the gateway talking.
+/// The error a non-2xx answer becomes: the gateway's own reason, an inactive key, the activation
+/// limit, or a network problem for anything that is not the gateway talking.
 fn error_de_respuesta(code: u16, body: &str) -> Error {
     if !es_palabra_de_la_pasarela(code, body) {
         return Error::Network(format!("HTTP {code}"));
+    }
+    match codigo_de_la_pasarela(code, body).as_deref() {
+        Some("INACTIVE_LICENSE_KEY") => return Error::KeyInactive,
+        Some("LICENSE_KEY_LIMIT_REACHED") => return Error::ActivationLimit,
+        _ => {}
     }
     let motivo = short(body);
     let m = motivo.to_lowercase();
@@ -1064,7 +1085,9 @@ fn aplicar_revision(
                 None => Ok(false),
             }
         }
-        Ok((code, _)) if (400..500).contains(&code) => {
+        // The gateway's own word about the key counts as the review done; a proxy's 403 does
+        // not (second pass, 8 Oct 2026).
+        Ok((code, text)) if es_palabra_de_la_pasarela(code, &text) => {
             revisada(ledger)?;
             Ok(false)
         }
@@ -1124,6 +1147,39 @@ pub fn check_if_due_hourly(
 mod tests {
     use super::*;
     use guardiana_core::Hash;
+
+    #[test]
+    fn the_gateways_codes_are_told_from_a_proxys_page() {
+        let inactive = r#"{"code":"INACTIVE_LICENSE_KEY","message":"License key is not active"}"#;
+        assert!(matches!(
+            error_de_respuesta(403, inactive),
+            Error::KeyInactive
+        ));
+        let limit = r#"{"code":"LICENSE_KEY_LIMIT_REACHED","message":"License key activation limit reached"}"#;
+        assert!(matches!(
+            error_de_respuesta(422, limit),
+            Error::ActivationLimit
+        ));
+        let not_found = r#"{"code":"LICENSE_KEY_NOT_FOUND","message":"not found"}"#;
+        assert!(matches!(
+            error_de_respuesta(404, not_found),
+            Error::KeyRejected(_)
+        ));
+        // A proxy's or a portal's 403, a rate limit, an outage: not the gateway's word.
+        assert!(matches!(
+            error_de_respuesta(403, "<html>Forbidden</html>"),
+            Error::Network(_)
+        ));
+        assert!(matches!(
+            error_de_respuesta(403, r#"{"message":"blocked by policy"}"#),
+            Error::Network(_)
+        ));
+        assert!(matches!(error_de_respuesta(429, limit), Error::Network(_)));
+        assert!(matches!(
+            error_de_respuesta(502, "bad gateway"),
+            Error::Network(_)
+        ));
+    }
 
     /// Cada prueba que llama a `status` toma el cerrojo del módulo `ancla` y trabaja en su propia
     /// carpeta, vacía al empezar: así ninguna escribe la marca de verdad de esta máquina. La

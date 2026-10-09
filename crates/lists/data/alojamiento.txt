@@ -1,0 +1,37 @@
+# Guardiana — lista "alojamiento": nubes donde otras empresas alquilan sus servidores.
+#
+# No es "entrega" (una red que solo reparte lo de otros): `mi-agente.vercel.app` o
+# `x.herokuapp.com` son el destino propio de quien los alquila, y GUARDIANA existe justo
+# para enseñar esos destinos. Pero tampoco son "la empresa de la nube": la app de un banco
+# colombiano alojada en AWS no habla "con Amazon". Por eso estos nombres quedan fuera de
+# "con quién habló" y de los países, y en la fila se ven como lo que son (revisión del 9 oct
+# 2026; el 8 se metieron en "entrega" y salían en verde, como "normal").
+# Cada sección @ es la nube; cada línea, un sufijo suyo.
+
+@Amazon Web Services
+amazonaws.com
+awsglobalaccelerator.com
+
+@Microsoft Azure
+core.windows.net
+azurewebsites.net
+azure-api.net
+cloudapp.net
+
+@Google Cloud
+firebaseio.com
+appspot.com
+run.app
+cloudfunctions.net
+
+@GitHub Pages
+github.io
+
+@Vercel
+vercel.app
+
+@Netlify
+netlify.app
+
+@Heroku
+herokuapp.com

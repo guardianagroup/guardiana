@@ -213,7 +213,7 @@
   const dondeCell = (ev) => [ev.pais || '', ev.ciudad || ''].filter(Boolean).join('\n');
   // En el papel, la etiqueta «compra y venta de datos» va debajo del nombre de la empresa, como
   // en la pantalla va a su lado.
-  const empresaTexto = (ev) => (ev.empresa || '') + (ev.corredor ? '\n' + t('corredor_etiqueta') : '');
+  const empresaTexto = (ev) => (ev.empresa || (ev.alojado ? t('alojado_en').replace('{nube}', ev.alojado) : '')) + (ev.corredor ? '\n' + t('corredor_etiqueta') : '');
   const eventCells = (ev, withDevice) => withDevice
     ? [clock(ev.ts), nameCell(ev), empresaTexto(ev), catTexto(ev), dondeCell(ev), deviceName(ev), verdictName(ev.verdict)]
     : [clock(ev.ts), nameCell(ev), empresaTexto(ev), catTexto(ev), dondeCell(ev), verdictName(ev.verdict)];
@@ -432,7 +432,9 @@
   const corredorTag = (ev) => (ev.corredor
     ? ` <span class="tag corredor" title="${esc(t('corredor_titulo').replace('{nombre}', ev.corredor.nombre).replace('{pais}', ev.corredor.pais ? ' (' + ev.corredor.pais + ')' : ''))}">${esc(t('corredor_etiqueta'))}</span>`
     : '');
-  const empresaCelda = (ev) => `<td class="empresa-col">${ev.empresa ? esc(ev.empresa) : '<span class="muted">—</span>'}${corredorTag(ev)}</td>`;
+  // A rented server on a cloud is whoever rents it: the cell says where it is hosted, not that
+  // the cloud is the company (review of 9 Oct 2026).
+  const empresaCelda = (ev) => `<td class="empresa-col">${ev.empresa ? esc(ev.empresa) : ev.alojado ? `<span class="muted">${esc(t('alojado_en').replace('{nube}', ev.alojado))}</span>` : '<span class="muted">—</span>'}${corredorTag(ev)}</td>`;
   // Dónde acaba lo de este aparato, sumado: los países de las empresas dueñas de los nombres.
   const paisesDe = (l) => (l && l.paises && l.paises.length
     ? `<br><span class="phrase">${esc(t('lectura_paises'))} ` + l.paises.map((x) => `${esc(x[0])} <b>${x[1]}</b>`).join(' · ') + '</span>'
@@ -474,11 +476,20 @@
   const PERMITIDOS = new Map();
   const claveCorte = (dev, nombre) => dev + '|' + nombre;
   const sinPunto = (n) => String(n || '').toLowerCase().replace(/\.$/, '');
+  // Every rule id the page can see, and the active ones: a row that was blocked by a rule
+  // undone since (the table keeps the query for a minute) is not blocked any more, and
+  // offering «unblock» there created a permanent allow (review of 9 Oct 2026).
+  const REGLAS_VISTAS = new Set();
+  const REGLAS_ACTIVAS = new Set();
+  // Names let through the declared scope from this page since it loaded.
+  const DEJADOS_PASAR = new Set();
   async function cargarCortados(path = '/api/reglas') {
     try {
       const r = await api(path);
-      CORTADOS.clear(); PERMITIDOS.clear();
+      CORTADOS.clear(); PERMITIDOS.clear(); REGLAS_VISTAS.clear(); REGLAS_ACTIVAS.clear();
       (r.reglas || []).forEach((x) => {
+        REGLAS_VISTAS.add(x.id);
+        if (x.activa) REGLAS_ACTIVAS.add(x.id);
         if (!x.activa || x.match_kind !== 'domain') return;
         const mapa = x.action === 'cortar' ? CORTADOS : x.action === 'permitir' ? PERMITIDOS : null;
         if (mapa) mapa.set(claveCorte(x.device_id || 'home', sinPunto(x.pattern)), x.id);
@@ -512,14 +523,27 @@
     if (corte !== undefined) {
       return `<button class="cut cortado" data-deshacer="${corte}" ${d}>${esc(t('desbloquear_boton'))}</button>`;
     }
+    const permiso = reglaDePermiso(ev);
+    const bloquear = `<button class="secondary cut" ${permiso !== undefined ? `data-permiso="${permiso}" ` : ''}${d}>${esc(t('cortar'))}</button>`;
     if (ev.verdict === 'cortado') {
+      // Lifted since the query was written down: an allow of this name, the name let into the
+      // scope from this page, or the rule that blocked it undone. The row keeps saying what
+      // happened then; the button offers what can be done now.
+      if (permiso !== undefined || DEJADOS_PASAR.has(claveCorte(ev.device_id, sinPunto(ev.qname)))) return bloquear;
+      if (ev.rule_id != null && REGLAS_VISTAS.has(ev.rule_id) && !REGLAS_ACTIVAS.has(ev.rule_id)) return bloquear;
+      const enSuPagina = document.body.getAttribute('data-page') === 'miDispositivo';
       if (ev.decided_by === 'alcance_declarado') {
+        // The scope belongs to the home's panel: from the phone's own page there is no key for
+        // it, so the row says where to change it instead of a button that would fail.
+        if (enSuPagina) return `<span class="muted">${esc(t('mi_fuera_alcance'))}</span>`;
         return `<button class="cut cortado" data-alcance="1" ${d}>${esc(t('desbloquear_boton'))}</button>`;
       }
+      // Blocked by a rule this page does not hold: on the phone's own page that is the home's
+      // rule, which only the home's panel lifts (the server refuses it too).
+      if (enSuPagina) return `<span class="muted">${esc(t('mi_bloqueo_de_la_casa'))}</span>`;
       return `<button class="cut cortado" data-permitir="1" ${d}>${esc(t('desbloquear_boton'))}</button>`;
     }
-    const permiso = reglaDePermiso(ev);
-    return `<button class="secondary cut" ${permiso !== undefined ? `data-permiso="${permiso}" ` : ''}${d}>${esc(t('cortar'))}</button>`;
+    return bloquear;
   }
   // Una sola ventana al cortar, y la pregunta la escribe el servidor, que es quien sabe si este
   // aparato lleva más o menos de un día mirado. Antes preguntaba el panel y, encima, el servidor
@@ -601,22 +625,35 @@
         } else if (b.dataset.alcance) {
           // Fuera del alcance declarado: el nombre entra en el alcance de ese aparato.
           await api('/api/ia/alcance/anadir', { method: 'POST', body: { device_id: dev, nombre: name } });
+          DEJADOS_PASAR.add(claveCorte(dev, sinPunto(name)));
           aBloquear();
         } else if (b.dataset.permitir) {
-          // Bloqueado por una regla ancha: una regla concreta que lo permite gana a la ancha.
-          const created = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'permitir' }, path);
-          if (created) { PERMITIDOS.set(claveCorte(dev, sinPunto(name)), created.id); b.dataset.permiso = created.id; aBloquear(); }
+          // The map is from when the page loaded: a rule of this name made since then (another
+          // tab, the Rules page) is undone, not covered with an allow (second pass, 8 Oct 2026).
+          await cargarCortados(path);
+          const corte = CORTADOS.get(claveCorte(dev, sinPunto(name))) ?? CORTADOS.get(claveCorte('home', sinPunto(name)));
+          if (corte !== undefined) {
+            await api(`${path}/${corte}/deshacer`, { method: 'POST' });
+            CORTADOS.delete(claveCorte(dev, sinPunto(name))); CORTADOS.delete(claveCorte('home', sinPunto(name)));
+            aBloquear();
+          } else {
+            // Bloqueado por una regla ancha: una regla concreta que lo permite gana a la ancha.
+            const created = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'permitir' }, path);
+            if (created) { PERMITIDOS.set(claveCorte(dev, sinPunto(name)), created.id); b.dataset.permiso = created.id; aBloquear(); }
+          }
         } else {
-          if (b.dataset.permiso) {
+          // Sin confirm aquí: lo pide el servidor con la frase que corresponda (una sola ventana).
+          const created = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'cortar' }, path);
+          // The allow made by hand goes only once the block exists: undone first, a cancelled
+          // confirmation left the wide rule blocking the name again (review of 9 Oct 2026).
+          if (created && b.dataset.permiso) {
             await api(`${path}/${b.dataset.permiso}/deshacer`, { method: 'POST' });
             PERMITIDOS.delete(claveCorte(dev, sinPunto(name)));
             delete b.dataset.permiso;
           }
-          // Sin confirm aquí: lo pide el servidor con la frase que corresponda (una sola ventana).
-          const created = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'cortar' }, path);
           // A grey tick did not say what had happened. The button turns into the state: red and
           // with the word, in the language of the panel.
-          if (created) { CORTADOS.set(claveCorte(dev, sinPunto(name)), created.id); b.dataset.deshacer = created.id; aDesbloquear(); }
+          if (created) { CORTADOS.set(claveCorte(dev, sinPunto(name)), created.id); DEJADOS_PASAR.delete(claveCorte(dev, sinPunto(name))); b.dataset.deshacer = created.id; aDesbloquear(); }
         }
       } catch (err) {
         alert(String(err.message || err));
@@ -1290,9 +1327,17 @@
       render(await api('/api/licencia'));
       $('l-clave').addEventListener('submit', async (e) => {
         e.preventDefault();
+        // One activation at a time: a second Enter during the gateway's wait spent a second
+        // activation (second pass, 8 Oct 2026).
+        if ($('l-clave').dataset.enviando) return;
+        // Read before disabling: a disabled field is left out of FormData, and the key went out
+        // empty («write the key») on every activation.
+        const clave = new FormData($('l-clave')).get('clave');
+        $('l-clave').dataset.enviando = '1';
+        $('l-clave').querySelectorAll('button,input').forEach((el) => { el.disabled = true; });
         $('l-clave-msg').textContent = '…';
         try {
-          render(await api('/api/licencia/activar-clave', { method: 'POST', body: { clave: new FormData($('l-clave')).get('clave') } }));
+          render(await api('/api/licencia/activar-clave', { method: 'POST', body: { clave } }));
           // The service sees the new licence on its next read of the ledger (seconds) and starts
           // watching again; until then every page still has the "not watching" strip it drew when
           // it loaded. Wait for the service and reload, so nobody has to refresh by hand
@@ -1309,7 +1354,15 @@
           };
           setTimeout(mirar, 1500);
         }
-        catch (err) { $('l-clave-msg').textContent = String(err.message || err); render(await api('/api/licencia')); }
+        catch (err) {
+          $('l-clave-msg').textContent = String(err.message || err);
+          try { render(await api('/api/licencia')); } catch (_) {}
+        }
+        finally {
+          // Whatever happened, the form can be used again.
+          delete $('l-clave').dataset.enviando;
+          $('l-clave').querySelectorAll('button,input').forEach((el) => { el.disabled = false; });
+        }
       });
     },
     async verify() {

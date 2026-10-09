@@ -79,7 +79,7 @@ fn write_csv_with<W: Write>(events: &[Event], sep: char, bom: bool, mut w: W) ->
         ];
         let line = fields
             .iter()
-            .map(|f| quote(f, sep))
+            .map(|f| quote(f, sep, bom))
             .collect::<Vec<_>>()
             .join(&sep.to_string());
         writeln!(w, "{line}")?;
@@ -88,12 +88,14 @@ fn write_csv_with<W: Write>(events: &[Event], sep: char, bom: bool, mut w: W) ->
 }
 
 /// RFC 4180 quoting: wrap in quotes when needed, double inner quotes.
-fn quote(field: &str, sep: char) -> String {
+fn quote(field: &str, sep: char, para_hoja: bool) -> String {
     // A name is typed by whoever asked it, on any device of the home, and a spreadsheet opened
     // with a double click evaluates a cell that starts with `=`, `+`, `-` or `@` as a formula,
     // quoted or not. A leading apostrophe makes it text again, and the name stays readable
-    // (review of 8 Oct 2026).
-    let formula = field.starts_with(['=', '+', '-', '@', '\t', '\r']);
+    // (review of 8 Oct 2026). Only in the file made for a spreadsheet: the command line's
+    // RFC 4180 CSV carries the value as written down, so the hashes can be recomputed from it
+    // (review of 9 Oct 2026).
+    let formula = para_hoja && field.starts_with(['=', '+', '-', '@', '\t', '\r']);
     if formula {
         format!("\"'{}\"", field.replace('"', "\"\""))
     } else if field.contains([sep, '"', '\n', '\r']) {
@@ -111,20 +113,22 @@ mod tests {
 
     #[test]
     fn a_name_that_looks_like_a_formula_is_quoted_as_text() {
-        assert_eq!(quote("=HYPERLINK(1).x", ';'), "\"'=HYPERLINK(1).x\"");
-        assert_eq!(quote("-5.example", ';'), "\"'-5.example\"");
-        assert_eq!(quote("www.example", ';'), "www.example");
+        assert_eq!(quote("=HYPERLINK(1).x", ';', true), "\"'=HYPERLINK(1).x\"");
+        assert_eq!(quote("-5.example", ';', true), "\"'-5.example\"");
+        assert_eq!(quote("www.example", ';', true), "www.example");
+        // The command line's CSV keeps the value as written down.
+        assert_eq!(quote("-5.example", ',', false), "-5.example");
     }
     use crate::ledger::Ledger;
     use crate::model::{Event, NewEvent, Signal};
 
     #[test]
     fn csv_quotes_only_when_needed() {
-        assert_eq!(quote("plain", ','), "plain");
-        assert_eq!(quote("a,b", ','), "\"a,b\"");
-        assert_eq!(quote("a,b", ';'), "a,b");
-        assert_eq!(quote("a;b", ';'), "\"a;b\"");
-        assert_eq!(quote("say \"hi\"", ','), "\"say \"\"hi\"\"\"");
+        assert_eq!(quote("plain", ',', false), "plain");
+        assert_eq!(quote("a,b", ',', false), "\"a,b\"");
+        assert_eq!(quote("a,b", ';', false), "a,b");
+        assert_eq!(quote("a;b", ';', false), "\"a;b\"");
+        assert_eq!(quote("say \"hi\"", ',', false), "\"say \"\"hi\"\"\"");
     }
 
     #[test]

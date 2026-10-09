@@ -624,6 +624,8 @@ pub async fn run<F: Future<Output = ()>>(
 /// servers stay behind 127.0.0.1 as a fallback, so it limps instead of dying, but every lookup
 /// waits for a timeout first. A crash does not reach this function; the next start re-applies.
 fn give_dns_back_while_stopped(db: &std::path::Path) {
+    // One change of the DNS at a time; the copy is read with the lock held.
+    let _cambio = sysdns::un_cambio_a_la_vez();
     let Ok(ledger) = Ledger::open(db, identity::genesis()) else {
         return;
     };
@@ -739,6 +741,8 @@ fn lista_de(upstreams: &[SocketAddr]) -> String {
 /// undo), the machine already pointed elsewhere, or the undo failed -- then the next minute
 /// tries again, because the machine is still pointing at a resolver that cannot answer.
 fn devolver_por_silencio(ledger: &Ledger, lista: &str) -> bool {
+    // One change of the DNS at a time; the copy is read with the lock held.
+    let _cambio = sysdns::un_cambio_a_la_vez();
     let Ok(Some(json)) = ledger.setting(SETTING_BACKUP) else {
         return false;
     };
@@ -763,6 +767,8 @@ fn devolver_por_silencio(ledger: &Ledger, lista: &str) -> bool {
 /// An upstream answers again: point the machine at the guardian as before. `true` when done,
 /// or when there is no copy to apply (the person undid the change meanwhile, or never made it).
 fn volver_con_arriba(ledger: &Ledger) -> bool {
+    // One change of the DNS at a time; the copy is read with the lock held.
+    let _cambio = sysdns::un_cambio_a_la_vez();
     let t = i18n::current();
     let copia = match ledger.setting(SETTING_BACKUP) {
         Ok(Some(json)) if !json.is_empty() => serde_json::from_str::<Backup>(&json).ok(),
@@ -1773,6 +1779,13 @@ async fn run_once<F: Future<Output = ()>>(
     let keep_db = cfg.db.clone();
     let keep_dir = cfg.db.parent().map(std::path::Path::to_path_buf);
     let keep_secret = secret.clone();
+    // Home Mode wanted but <lan>:53 could not be opened (another program held it, or the address
+    // moved between the check and the bind): the 15-second check retries once the port is free.
+    // Until 1.0.6 nothing changed in what it compared, so the pass never rebuilt and the phones
+    // stayed without their guardian although the log said «tried again» (review of 9 Oct 2026).
+    let hogar_sin_puerto: Option<SocketAddr> = home_lan
+        .filter(|lan| !running.udp_addrs.iter().any(|a| a.ip() == IpAddr::V4(*lan)))
+        .map(|lan| SocketAddr::new(IpAddr::V4(lan), cfg.listen.port()));
     // What the resolver forwards to in this pass, to notice when the network changes it.
     // Only when the upstreams came automatically: a person who typed --upstream chose. It was
     // Windows-only until 1 Oct 2026; macOS reads the DHCP lease now, and Linux asks whoever
@@ -1822,6 +1835,8 @@ async fn run_once<F: Future<Output = ()>>(
                                 || block_mode_of(&l) != keep_block_mode
                                 || (seguir_red
                                     && guardiana_devices::local_lan_ipv4() != lan_inicial)
+                                || hogar_sin_puerto
+                                    .is_some_and(|a| std::net::UdpSocket::bind(a).is_ok())
                             {
                                 if let Some(tx) = reconfigure_tx.take() {
                                     let _ = tx.send(());
@@ -1966,6 +1981,10 @@ async fn run_once<F: Future<Output = ()>>(
     };
 
     housekeeping.abort();
+    // Wait for it to be gone: aborting takes effect at its next await, and a watchdog caught
+    // inside a re-point (PowerShell, seconds) could finish it after the caller gave the DNS back,
+    // leaving the machine on 127.0.0.1 with nobody listening (review of 9 Oct 2026).
+    let _ = housekeeping.await;
     if let Some(p) = panel {
         p.shutdown().await;
     }
@@ -1978,6 +1997,8 @@ async fn run_once<F: Future<Output = ()>>(
     // sin anotar sería una consulta perdida, y eso sí que no.
     if let Some(v) = vaciador {
         v.abort();
+        // Gone before the queue is emptied here, so no row is written twice or half.
+        let _ = v.await;
         let pendientes: Vec<guardiana_core::NewEvent> = match policy_cola.lock() {
             Ok(mut c) => c.drain(..).collect(),
             Err(_) => Vec::new(),
@@ -2009,6 +2030,8 @@ fn aparte_del_resolutor<R>(f: impl FnOnce() -> R) -> R {
 /// network stack (DHCP renew, NetworkManager) can silently put the old
 /// servers back.
 fn reapply_dns_if_dropped(ledger: &Ledger) {
+    // One change of the DNS at a time; the copy is read with the lock held.
+    let _cambio = sysdns::un_cambio_a_la_vez();
     let Ok(Some(json)) = ledger.setting(SETTING_BACKUP) else {
         return;
     };
@@ -2104,10 +2127,35 @@ fn open_via_osascript(url: &str) -> std::io::Result<()> {
 /// URL, which belongs to the panel crate (review of 1 Oct 2026, finding 15).
 pub fn open_in_browser(url: &str) {
     #[cfg(target_os = "windows")]
-    let result = std::process::Command::new("cmd")
-        .args(["/C", "start", "", url])
-        .spawn()
-        .map(|_| ());
+    let result = {
+        // No window of its own and no standard handles: `start` needs neither, and a caller
+        // that has released its console (the panel launcher) must not hand down dead ones.
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", url])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .and_then(|mut c| c.wait())
+            .and_then(|st| {
+                st.success()
+                    .then_some(())
+                    .ok_or_else(|| std::io::Error::other("start failed"))
+            })
+            // Explorer opens a file or a URL with its default program too, without a console.
+            .or_else(|_| {
+                std::process::Command::new("explorer.exe")
+                    .arg(url)
+                    .stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .spawn()
+                    .map(|_| ())
+            })
+    };
     #[cfg(target_os = "macos")]
     let result = open_via_osascript(url).or_else(|_| {
         std::process::Command::new("open")

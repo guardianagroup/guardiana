@@ -5,12 +5,12 @@
 Programa para Windows, Linux y macOS que convierte el PC en el **guardián DNS de la casa**:
 primero de sí mismo, después de los teléfonos, el televisor y todo lo que use la Wi‑Fi, sin
 instalar nada en ellos. Ve a qué servicios intenta hablar cada dispositivo, lo clasifica, lo
-explica en una frase, lo anota en un extracto encadenado por hash y corta solo lo que el usuario
+explica en una frase, lo anota en un extracto encadenado por hash y bloquea solo lo que el usuario
 decida.
 
 **Todo ocurre en la casa.** Sin cuenta, sin servidor nuestro, cero telemetría. Las únicas
-conexiones salientes son las que el usuario provoca (activar licencia, comprobar versión,
-actualizar listas) y cada una queda anotada en el propio extracto.
+conexiones salientes son las que el usuario provoca (activar la licencia y la comprobación periódica de la
+suscripción) y cada una queda anotada en el propio extracto.
 
 - Lo que no hace, dicho con esas palabras: [docs/WHAT_IT_DOES_NOT_DO.md](docs/WHAT_IT_DOES_NOT_DO.md)
 - Modelo de amenazas: [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)
@@ -29,8 +29,9 @@ actualizar listas) y cada una queda anotada en el propio extracto.
 | Debian, Ubuntu y derivados | `guardiana_<versión>_amd64.deb` | `sudo apt install ./guardiana_<versión>_amd64.deb` |
 | Otro Linux con systemd | `guardiana-<versión>-linux-x86_64.tar.gz` | Descomprimir y `sudo ./instalar.sh` |
 
-Instalar **no cambia el DNS del sistema**: eso se hace desde el panel, con consentimiento, y se
-deshace en el mismo sitio. Desinstalar apaga Modo Hogar, quita la regla del cortafuegos y
+En Linux y en el Mac, instalar **no cambia el DNS del sistema**: eso se hace desde el panel, con
+consentimiento, y se deshace en el mismo sitio. En Windows, la primera instalación pone a Guardiana
+como DNS (la pantalla de bienvenida lo dice antes de «Instalar») y se deshace en el panel, en «Estado». Desinstalar apaga Modo Hogar, quita la regla del cortafuegos y
 restaura el DNS exactamente como estaba.
 
 Antes de instalar, compara la huella SHA‑256 del archivo con la de `SHA256SUMS` y con la línea
@@ -48,9 +49,9 @@ guardiana ledger --check comprueba la cadena del extracto
 guardiana export         exporta el extracto en CSV o JSON
 ```
 
-Nada se bloquea sin decisión del usuario, siempre con "deshacer" visible: un nombre concreto se
-corta desde el primer minuto, y los cortes anchos —por categoría, para toda la casa o el modo que
-corta todo lo no declarado— esperan a que Guardiana lleve 24 horas mirando ese dispositivo. Ninguna señal es un veredicto; la interfaz nunca dice "malicioso".
+Nada se bloquea sin decisión del usuario, siempre con «desbloquear» visible: un nombre concreto se
+bloquea desde el primer minuto, y los bloqueos anchos —por categoría, para toda la casa o el modo que
+bloquea todo lo no declarado— esperan a que Guardiana lleve 24 horas mirando ese dispositivo. Ninguna señal es un veredicto; la interfaz nunca dice «malicioso».
 
 ## Compilar
 

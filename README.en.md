@@ -9,8 +9,8 @@ explains it in one sentence, writes it down in a hash-chained ledger and blocks 
 user decides.
 
 **Everything happens at home.** No account, no server of ours, zero telemetry. The only outgoing
-connections are the ones the user triggers (activate a licence, check for a new version, update
-the lists) and each one is recorded in the ledger itself.
+connections are the ones the user triggers (activating the licence and the periodic subscription
+check) and each one is recorded in the ledger itself.
 
 - What it does not do, in those words: [docs/WHAT_IT_DOES_NOT_DO.md](docs/WHAT_IT_DOES_NOT_DO.md)
 - Threat model: [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)
@@ -21,8 +21,8 @@ the lists) and each one is recorded in the ledger itself.
 - Closed beta guide: [docs/BETA.md](docs/BETA.md)
 - Decisions taken and tests done: [docs/DECISIONES.md](docs/DECISIONES.md), [docs/PRUEBAS.md](docs/PRUEBAS.md)
 
-The documentation is written in Spanish; the program's interface is in Spanish, with English on
-the way (see decision 45 in `docs/DECISIONES.md`).
+The documentation is written in Spanish; the program's interface is in Spanish, English and
+Portuguese.
 
 ## Install
 
@@ -32,12 +32,13 @@ the way (see decision 45 in `docs/DECISIONES.md`).
 | Debian, Ubuntu and derivatives | `guardiana_<version>_amd64.deb` | `sudo apt install ./guardiana_<version>_amd64.deb` |
 | Other Linux with systemd | `guardiana-<version>-linux-x86_64.tar.gz` | Unpack and `sudo ./instalar.sh` |
 
-Installing **does not change the system DNS**: that is done from the panel, with consent, and
-undone in the same place. Uninstalling turns Home Mode off, removes the firewall rule and restores
+On Linux and on the Mac, installing **does not change the system DNS**: that is done from the panel,
+with consent, and undone in the same place. On Windows, a first install makes Guardiana the DNS (the
+welcome screen says so before “Install”), and it is undone in the panel, under “Status”. Uninstalling turns Home Mode off, removes the firewall rule and restores
 the DNS exactly as it was.
 
 Before installing, compare the SHA‑256 fingerprint of the file with `SHA256SUMS` and with the
-matching line of [`ledger.jsonl`](ledger.jsonl), the public record that is published before the
+matching line of [`ledger.jsonl`](ledger.jsonl), the public ledger that is published before the
 download. After installing, `guardiana verify` checks it on your machine.
 
 ## Use
@@ -51,9 +52,9 @@ guardiana ledger --check checks the ledger chain
 guardiana export         exports the ledger as CSV or JSON
 ```
 
-Nothing is blocked without the user's decision, always with a visible "undo": a specific name is
-cut from the first minute, and wide cuts —by category, for the whole home, or the mode that cuts
-everything not declared— wait until Guardiana has been watching that device for 24 hours. No signal is a verdict; the interface never says "malicious".
+Nothing is blocked without the user's decision, always with a visible “unblock”: a specific name can be
+blocked from the first minute, and wide blocks —by category, for the whole home, or the mode that blocks
+everything not declared— wait until Guardiana has been watching that device for 24 hours. No signal is a verdict; the interface never says “malicious”.
 
 ## Build
 

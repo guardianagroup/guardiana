@@ -621,6 +621,20 @@ pub fn guarded_servers(guardian: IpAddr, originals: &[IpAddr]) -> Vec<IpAddr> {
     v
 }
 
+/// One change of the system DNS at a time in this process. The panel's «apply» and «restore»
+/// and the service's own watchdog run in the same process: until 1.0.6 a watchdog that had read
+/// the copy just before the person pressed «restore» re-pointed the machine right after it, and
+/// the restore the person asked for was undone (review of 9 Oct 2026). Whoever changes the DNS
+/// holds this, and reads the copy again once it holds it.
+static CAMBIO: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Take the one-change-at-a-time lock (see `CAMBIO`). A poisoned lock is still a lock.
+pub fn un_cambio_a_la_vez() -> std::sync::MutexGuard<'static, ()> {
+    CAMBIO
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 /// Read the current configuration in a restorable form. Changes nothing.
 pub fn snapshot(now: i64) -> Result<Backup, Error> {
     #[cfg(target_os = "windows")]
@@ -1042,12 +1056,19 @@ pub fn guardian_is_primary() -> Option<bool> {
             let links: Vec<&str> = out
                 .lines()
                 .filter(|l| l.trim_start().starts_with("Link "))
+                // A physical link that appeared since (a USB dock, a phone on a cable, another
+                // Wi-Fi card) counts too: left out, it kept the router's DNS, resolved split the
+                // queries between it and the guardian, and nothing re-pointed it (review of 9 Oct
+                // 2026). Virtual links that are not in the copy (VPN tunnels, bridges) stay out.
                 .filter(|l| {
                     copia.is_empty()
-                        || l.split_whitespace()
-                            .nth(2)
-                            .map(|n| n.trim_matches(|c| c == '(' || c == ')'))
-                            .is_some_and(|n| copia.iter().any(|c| c == n))
+                        || linux::link_name_of(l).is_some_and(|n| {
+                            copia.contains(&n)
+                                || std::path::Path::new("/sys/class/net")
+                                    .join(&n)
+                                    .join("device")
+                                    .exists()
+                        })
                 })
                 .filter_map(|l| l.split_once(':').map(|(_, rest)| rest.trim()))
                 .filter(|rest| !rest.is_empty())

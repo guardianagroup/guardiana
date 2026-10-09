@@ -32,8 +32,14 @@ pub(crate) fn build(config: &Config) -> Result<TokioResolver, Error> {
     opts.num_concurrent_reqs = 1;
     opts.server_ordering_strategy = ServerOrderingStrategy::QueryStatistics;
     // Random letter case in the question (0x20): the answer has to echo it, which makes a
-    // forged reply from outside that much harder to slip in.
-    opts.case_randomization = true;
+    // forged reply from outside that much harder to slip in. Only towards public resolvers: a
+    // home router that lowercases the question would make hickory retry every query over
+    // TCP, and the ones that do not answer TCP would leave the home without names (second
+    // pass, 8 Oct 2026).
+    opts.case_randomization = config
+        .upstreams
+        .iter()
+        .all(|a| !crate::is_private_listen_addr(a.ip()));
     opts.cache_size = config.cache_size;
     opts.use_hosts_file = ResolveHosts::Never;
     opts.edns0 = true;

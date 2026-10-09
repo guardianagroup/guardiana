@@ -96,6 +96,9 @@ pub(crate) struct AppState {
     /// take the second snapshot after the first apply and keep Guardiana's own address as
     /// «the original» (review of 8 Oct 2026).
     pub(crate) dns_cambio: tokio::sync::Mutex<()>,
+    /// One activation at a time: two clicks within the gateway's 20 seconds activated twice
+    /// (two of the five activations spent) and wrote two secrets (second pass, 8 Oct 2026).
+    pub(crate) licencia_cambio: tokio::sync::Mutex<()>,
     pub(crate) token: String,
     pub(crate) allowed_hosts: Vec<String>,
     pub(crate) info: RuntimeInfo,
@@ -223,6 +226,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
     let state = Arc::new(AppState {
         ledger: Mutex::new(ledger),
         dns_cambio: tokio::sync::Mutex::new(()),
+        licencia_cambio: tokio::sync::Mutex::new(()),
         token: token.clone(),
         allowed_hosts,
         info: config.info,

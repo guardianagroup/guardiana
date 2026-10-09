@@ -1,11 +1,11 @@
 GUARDIANA for Windows
 
-Guardiana shows you which services your AI talks to and, with Home Mode, every device on your Wi-Fi: it explains each one in a sentence and cuts only what you decide. Everything happens on this PC. No account, no server of ours, zero telemetry.
+Guardiana shows you which services your AI talks to and, with Home Mode, every device on your Wi-Fi: it explains each one in a sentence and blocks only what you decide. Everything happens on this PC. No account, no server of ours, zero telemetry.
 
 What this installer will do
-- Copy the program to "Program Files\Guardiana".
-- Register the "Guardiana" service, which starts with Windows.
-- Add the "Guardiana" shortcut to the Start menu, which opens the panel in your browser.
+- Copy the program to “Program Files\Guardiana”.
+- Register the “Guardiana” service, which starts with Windows.
+- Add the “Guardiana” shortcut, which opens the panel in your browser, to the Start menu and the desktop, and the “Guardiana (menu)” shortcut to the Start menu.
 - Make Guardiana this PC's DNS, over IPv6 too, so it starts watching from the first minute. It first keeps an exact copy of your setting; if the service stops, the PC gets its previous DNS back, and uninstalling leaves it exactly as it was.
 
 What it will NOT do
@@ -13,8 +13,8 @@ What it will NOT do
 - It opens no port to the network. Only Home Mode, when you turn it on, listens on your home Wi-Fi; turning it off closes it.
 
 After installing
-The panel opens when the installer finishes and within a minute you will see this PC's queries. To put the DNS back as it was without uninstalling: panel, "Status". Cutting one specific name works from the first minute; wide cuts, by category or for the whole home, wait until Guardiana has been watching that device for 24 hours.
+The panel opens when the installer finishes and within a minute you will see this PC's queries. To put the DNS back as it was without uninstalling: panel, “Status”. Blocking one specific name works from the first minute; wide blocks, by category or for the whole home, wait until Guardiana has been watching that device for 24 hours.
 
 Seven days with everything and no card; after that you need a subscription. What was written down stays on your disk, whether you pay or not.
 
-Program licence: GNU GPL 3.0 or later. Open source: you can read it, build it and check that it does what it says. What Guardiana does not do is in WHAT_IT_DOES_NOT_DO.md on the website.
+Program licence: GNU GPL 3.0 or later. Open source: you can read it, build it and check that it does what it says. What Guardiana does not do is in WHAT_IT_DOES_NOT_DO.md, in the published source code (github.com/guardianagroup/guardiana).

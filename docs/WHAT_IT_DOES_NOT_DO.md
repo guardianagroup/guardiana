@@ -122,7 +122,9 @@ La regla: nunca "100 % seguro", nunca "invisible", nunca "protegido" sin objeto,
   web, se comprueba su huella contra el registro público y se instala encima.
 - Cortafuegos de IA (2.0).
 - Interfaz de escritorio nativa (egui): el panel en el navegador es la única interfaz.
-- IPv6: el resolutor escucha en IPv4 (`127.0.0.1` y la IP LAN IPv4). Un dispositivo que use un
-  servidor DNS IPv6 no pasa por Guardiana. Se dice en `/hogar`.
+- IPv6: el resolutor escucha en IPv4 (`127.0.0.1` y la IP LAN IPv4) y, en este equipo, también en
+  `::1`. Un dispositivo de la casa que use un servidor DNS IPv6 no pasa por Guardiana (se dice en
+  `/hogar`); y en Windows, una conexión que solo reciba servidores DNS IPv6 (ninguno IPv4) no se
+  apunta a Guardiana: la copia del DNS se toma de la lista IPv4.
 - Verificación de reproducibilidad por terceros, aviso de actualización y "qué app" en Windows:
   extras de la sección 12, solo si están probados en una máquina ajena el día 24.

@@ -309,8 +309,18 @@ fn line_is_guarded(line: &str) -> bool {
     // An interface with IPv6 resolvers only (a network that hands out no IPv4 DNS) is
     // guarded when those are the guardian: until 1.0.5 it was not even listed, so it was
     // never re-pointed and never seen as still pointed (review of 8 Oct 2026).
-    let v4_ok = v4 == [IpAddr::V4(Ipv4Addr::LOCALHOST)] || (v4.is_empty() && !v6.is_empty());
-    v4_ok && (v6.is_empty() || v6 == [IpAddr::V6(Ipv6Addr::LOCALHOST)])
+    // And an interface with no real resolvers at all (a virtual switch, a VM adapter: only the
+    // fec0: markers) is not Guardiana's business: the copy never takes it, so counting it as
+    // «not guarded» re-applied the copy every minute (second pass, 8 Oct 2026).
+    // The same for an interface with no IPv4 resolvers at all: the copy is taken from the IPv4
+    // list, so it never holds that interface, and «not guarded» there re-applied the copy every
+    // minute without ever pointing it (review of 9 Oct 2026). A network that hands out only IPv6
+    // resolvers is a limit, written in WHAT_IT_DOES_NOT_DO, not something to retry for ever.
+    if v4.is_empty() {
+        return true;
+    }
+    v4 == [IpAddr::V4(Ipv4Addr::LOCALHOST)]
+        && (v6.is_empty() || v6 == [IpAddr::V6(Ipv6Addr::LOCALHOST)])
 }
 
 /// Whether every connected interface with resolvers asks Guardiana and only Guardiana,

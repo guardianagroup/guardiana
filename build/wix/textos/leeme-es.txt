@@ -2,14 +2,15 @@
 ======================
 
 Guardiana te enseña con qué servicios habla tu IA y, con Modo Hogar, cada
-aparato de tu Wi-Fi: lo explica en una frase y corta solo lo que tú decidas.
+aparato de tu Wi-Fi: lo explica en una frase y bloquea solo lo que tú decidas.
 Todo ocurre en este equipo. Sin cuenta, sin servidor, cero telemetría.
 
 Qué ha hecho el instalador
 --------------------------
-- Ha copiado el programa a "Archivos de programa\Guardiana".
-- Ha registrado el servicio "Guardiana", que arranca solo con Windows.
-- Ha creado los accesos "Guardiana" y "Guardiana (menú)" en el menú Inicio.
+- Ha copiado el programa a «Archivos de programa\Guardiana».
+- Ha registrado el servicio «Guardiana», que arranca solo con Windows.
+- Ha creado los accesos «Guardiana» y «Guardiana (menú)» en el menú Inicio, y «Guardiana»
+  en el escritorio.
 - Ha puesto a Guardiana como DNS de este equipo, también por IPv6, con una
   copia exacta del ajuste anterior. Si el servicio se para, el equipo recupera
   su DNS de antes; al desinstalar queda tal como estaba.
@@ -20,8 +21,8 @@ Después de instalar
 -------------------
 Menú Inicio > Guardiana. Se abre el panel y verás las consultas de este
 equipo desde el primer minuto. Para devolver el DNS a como estaba sin
-desinstalar: panel, «Estado». Cortar un nombre concreto se puede desde el
-primer minuto; los cortes anchos, por categoría o para toda la casa, esperan a
+desinstalar: panel, «Estado». Bloquear un nombre concreto se puede desde el
+primer minuto; los bloqueos anchos, por categoría o para toda la casa, esperan a
 que Guardiana lleve 24 horas mirando ese aparato.
 
 Son siete días con todo y sin tarjeta, Modo Hogar incluido. Después hace falta
@@ -36,12 +37,12 @@ si no lo quieres.
 
 Comprobar la instalación
 ------------------------
-Menú "Guardiana (menú)" > opción de comprobar, o en una ventana nueva de
+Menú «Guardiana (menú)» > opción de comprobar, o en una ventana nueva de
 comandos o de PowerShell:
     guardiana verify
 
 Antes de instalar: comprueba la huella del archivo .msi y compárala con la de
 SHA256SUMS y con el registro público (ledger.jsonl). Cómo hacerlo, paso a
-paso, en VERIFY.md de la web.
+paso, en VERIFY.md, en el código publicado (github.com/guardianagroup/guardiana).
 
 Lo que Guardiana no hace está en WHAT_IT_DOES_NOT_DO.md. Léelo.

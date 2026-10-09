@@ -67,36 +67,3 @@ ttdns2.com
 @jsDelivr
 # Red pública que reparte librerías de código abierto para las webs.
 jsdelivr.net
-
-# Alojamiento: nubes donde otras empresas ponen sus servidores. La app de un banco
-# colombiano alojada en AWS no habla «con Amazon»: habla con el banco, a través de
-# Amazon. Hasta la 1.0.5 esos nombres contaban como «Amazon · Estados Unidos» en
-# «con quién habló» y en los países (revisión del 8 oct 2026).
-@Amazon Web Services
-amazonaws.com
-awsglobalaccelerator.com
-
-@Microsoft Azure
-windows.net
-azurewebsites.net
-azure-api.net
-cloudapp.net
-
-@Google Cloud
-googleusercontent.com
-firebaseio.com
-appspot.com
-run.app
-cloudfunctions.net
-
-@GitHub Pages
-github.io
-
-@Vercel
-vercel.app
-
-@Netlify
-netlify.app
-
-@Heroku
-herokuapp.com

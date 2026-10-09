@@ -45,6 +45,9 @@ a:hover { color: var(--accent-dark); }
 /* the top bar of the site: the brand with its blue dot, and the sections in small mono capitals */
 header.top { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; align-items: center; padding: 14px 22px; border-bottom: 1px solid var(--line); background: var(--card); }
 header.top .brand { font-family: var(--display); font-weight: 600; font-size: 15px; letter-spacing: 0.02em; display: inline-flex; align-items: center; gap: 9px; }
+/* «Tus datos, bajo tu control» under the brand, as on the website (9 Oct 2026). */
+header.top .brand-txt { display: flex; flex-direction: column; gap: 2px; line-height: 1.05; }
+header.top .brand-txt small { font-family: var(--texto); font-weight: 500; font-size: 11px; letter-spacing: 0.01em; color: var(--muted); }
 header.top .brand::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); display: inline-block; }
 header.top nav { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 header.top nav a { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none; color: var(--muted); padding: 4px 0; border-bottom: 2px solid transparent; }

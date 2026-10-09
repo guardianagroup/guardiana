@@ -2,7 +2,7 @@ GUARDIANA for Linux
 ===================
 
 Guardiana turns this PC into the household's DNS guardian: it sees which
-services each device tries to talk to, explains it in one sentence and cuts
+services each device tries to talk to, explains it in one sentence and blocks
 only what you decide. Everything happens on this computer. No account, no
 server, zero telemetry.
 
@@ -32,12 +32,13 @@ Uninstall
     sudo ./desinstalar.sh            (tarball)
 
 Uninstalling puts the DNS back as it was and turns Home Mode off. The ledger
-stays in /var/lib/guardiana; delete it with "sudo apt purge guardiana" or
-"sudo ./desinstalar.sh --purge".
+stays in /var/lib/guardiana; delete it with “sudo apt purge guardiana” or
+“sudo ./desinstalar.sh --purge”.
 
 Before installing: check the hash
 ---------------------------------
-    sha256sum guardiana_*.deb
+    sha256sum guardiana_*.deb                       (.deb package)
+    sha256sum guardiana-*-linux-x86_64.tar.gz       (tarball)
 Compare it with the one in SHA256SUMS and with the public ledger
 (ledger.jsonl). How to do it, step by step: VERIFY.md.
 

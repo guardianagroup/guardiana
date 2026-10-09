@@ -99,6 +99,10 @@ pub(crate) struct EventView {
     /// The delivery network that serves the name (decision 148), or `None`. Used to say
     /// "delivery" instead of "unknown" for a name that is the road, not the destination.
     entrega: Option<&'static str>,
+    /// The cloud the name is a rented server on (`x.herokuapp.com` → Heroku): the name is
+    /// whoever rents it, so the cloud is neither the company nor the country of the row.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    alojado: Option<&'static str>,
     /// Whether the name is the home network talking to itself (decision 148): reverse
     /// lookups, mDNS and service discovery, which are not a destination at all.
     local: bool,
@@ -217,17 +221,21 @@ fn pais_de(t: &Texts, qname: &str) -> Option<String> {
 }
 
 fn view(t: &Texts, e: Event, names: &HashMap<String, Option<String>>) -> EventView {
+    let alojado = guardiana_lists::hosting_of(&e.qname);
     EventView {
         frases: e.signals.iter().map(|s| t.signal(s)).collect(),
         device_name: names.get(&e.device_id).cloned().flatten(),
-        empresa: empresa_de(&e.qname),
-        pais: pais_de(t, &e.qname),
+        empresa: empresa_de(&e.qname).filter(|_| alojado.is_none()),
+        pais: pais_de(t, &e.qname).filter(|_| alojado.is_none()),
+        alojado,
         corredor: corredor_de(t, &e.qname),
-        ciudad: guardiana_lists::city_of(&e.qname).map(str::to_owned),
+        ciudad: guardiana_lists::city_of(&e.qname)
+            .filter(|_| alojado.is_none())
+            .map(str::to_owned),
         ia: guardiana_lists::ai_service_of(&e.qname),
         entrega: guardiana_lists::delivery_of(&e.qname),
         local: guardiana_lists::is_local_name(&e.qname),
-        oficio: oficio_de(t, &e.qname),
+        oficio: oficio_de(t, &e.qname).filter(|_| alojado.is_none()),
         programa: e.process,
         trampa: guardiana_core::trampas::id_de(&e.qname),
         id: e.id,
@@ -328,6 +336,8 @@ pub(crate) async fn dns_aplicar(
     }
     let st = state.clone();
     let result = tokio::task::spawn_blocking(move || -> Result<String, String> {
+        // The service's watchdog changes the DNS too: one change at a time (review of 9 Oct 2026).
+        let _cambio = sysdns::un_cambio_a_la_vez();
         let backup = match sysdns::snapshot(now_ms()) {
             Ok(b) => b,
             Err(sysdns::Error::Unsupported) => return Err(t.cli("dns.no_soportado").to_owned()),
@@ -423,6 +433,8 @@ pub(crate) async fn dns_restaurar(
     let backup: sysdns::Backup = serde_json::from_str(&json).map_err(internal)?;
     let st = state.clone();
     let result = tokio::task::spawn_blocking(move || -> Result<(), String> {
+        // The service's watchdog changes the DNS too: one change at a time (review of 9 Oct 2026).
+        let _cambio = sysdns::un_cambio_a_la_vez();
         // La copia se borra ANTES de deshacer: mientras exista, el vigilante del
         // servicio vuelve a aplicar el cambio y el «restaurado» queda a medias
         // (decisión 118). Si deshacer falla, la copia se devuelve.
@@ -684,7 +696,8 @@ fn lectura(
         // hosting cloud says who carries it, not who the device talked to, and it is left out
         // of «who it talked to» and of the countries (review of 8 Oct 2026: a bank's app on
         // AWS counted as «Amazon · United States»).
-        let entrega = guardiana_lists::delivery_of(&e.qname).is_some();
+        let entrega = guardiana_lists::delivery_of(&e.qname).is_some()
+            || guardiana_lists::hosting_of(&e.qname).is_some();
         if let Some(c) = empresa_de(&e.qname).filter(|_| !entrega) {
             *by_company.entry(c).or_insert(0) += 1;
         }
@@ -2354,6 +2367,36 @@ fn create_rule(
         }
         (Scope::Home, None) => None,
     };
+    // A device's own page has no key, so it cannot lift what the household decided for it: an
+    // allow made there would beat a home-wide block or a block the panel set on this device
+    // (the more specific and the device's own rule wins), and anyone holding the phone could
+    // undo the home's rule from its page (review of 9 Oct 2026). Allowing a name nobody else
+    // blocks is still the phone's own business.
+    if let (Some(dev), Action::Permitir) = (forced_device, action) {
+        let ajenas: Vec<guardiana_core::Rule> = with_ledger(state, |l| l.rules())?
+            .into_iter()
+            .filter(|r| r.scope == Scope::Home || r.created_by != CREADA_EN_DISPOSITIVO)
+            .collect();
+        let categoria = guardiana_lists::Catalog::bundled().category(&pattern);
+        let la_casa_bloquea = guardiana_core::rules::decide(
+            &ajenas,
+            guardiana_core::rules::RuleInput {
+                device_id: dev,
+                name: &pattern,
+                category: categoria,
+                observed_ms: i64::MAX,
+            },
+            now_ms(),
+        )
+        .is_some_and(|r| r.action == Action::Cortar);
+        if la_casa_bloquea {
+            return Err((
+                StatusCode::FORBIDDEN,
+                t.panel("mi_bloqueo_de_la_casa").to_owned(),
+            )
+                .into_response());
+        }
+    }
     if scope == Scope::Device && device_id.is_none() {
         return Err(bad(t.panel("regla_patron_invalido").to_owned()));
     }
@@ -2758,6 +2801,7 @@ pub(crate) async fn licencia_clave(
         )
             .into_response());
     }
+    let _una = state.licencia_cambio.lock().await;
     let st = state.clone();
     // The network call blocks: keep it off the async workers, and off the panel's own ledger
     // lock: with the lock held, every page of the panel waited the gateway's 20-second timeout

@@ -52,7 +52,7 @@ maintainer = "Guardiana <hola@guardianagroup.com>"
 copyright = "2026, Guardiana. GPL-3.0-or-later."
 license-file = ["../../LICENSE", "0"]
 extended-description = """Convierte el computador en el guardián DNS de la casa: ve a qué servicios \
-intenta hablar cada dispositivo, lo explica en una frase y corta solo lo que el \
+intenta hablar cada dispositivo, lo explica en una frase y bloquea solo lo que el \
 usuario decida. Todo ocurre en el equipo; sin cuenta, sin servidor, cero telemetría."""
 section = "net"
 priority = "optional"

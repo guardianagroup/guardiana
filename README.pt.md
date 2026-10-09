@@ -5,10 +5,10 @@
 Programa para Windows, Linux e macOS que transforma o computador no **guardião DNS da casa**:
 primeiro dele mesmo, depois dos celulares, da TV e de tudo o que usa o Wi‑Fi, sem instalar nada
 neles. Vê com quais serviços cada aparelho tenta falar, classifica, explica em uma frase, anota
-em um extrato encadeado por hash e corta apenas o que o usuário decidir.
+em um extrato encadeado por hash e bloqueia apenas o que o usuário decidir.
 
 **Tudo acontece na casa.** Sem conta, sem servidor nosso, zero telemetria. As únicas conexões de
-saída são as que o usuário provoca (ativar licença, conferir versão, atualizar listas) e cada uma
+saída são as que o usuário provoca (ativar a licença e a verificação periódica da assinatura) e cada uma
 fica anotada no próprio extrato.
 
 - O que ele não faz, dito com essas palavras: [docs/WHAT_IT_DOES_NOT_DO.md](docs/WHAT_IT_DOES_NOT_DO.md)
@@ -28,8 +28,9 @@ fica anotada no próprio extrato.
 | Debian, Ubuntu e derivados | `guardiana_<versão>_amd64.deb` | `sudo apt install ./guardiana_<versão>_amd64.deb` |
 | Outro Linux com systemd | `guardiana-<versão>-linux-x86_64.tar.gz` | Descompactar e `sudo ./instalar.sh` |
 
-Instalar **não muda o DNS do sistema**: isso se faz pelo painel, com consentimento, e se desfaz
-no mesmo lugar. Desinstalar desliga o Modo Casa, tira a regra do firewall e restaura o DNS
+No Linux e no Mac, instalar **não muda o DNS do sistema**: isso se faz pelo painel, com
+consentimento, e se desfaz no mesmo lugar. No Windows, a primeira instalação coloca a Guardiana
+como DNS (a tela de boas-vindas avisa antes de «Instalar») e isso se desfaz no painel, em «Estado». Desinstalar desliga o Modo Casa, tira a regra do firewall e restaura o DNS
 exatamente como estava.
 
 Antes de instalar, compare a impressão SHA‑256 do arquivo com a de `SHA256SUMS` e com a linha
@@ -47,9 +48,9 @@ guardiana ledger --check confere a cadeia do extrato
 guardiana export         exporta o extrato em CSV ou JSON
 ```
 
-Nada é bloqueado sem decisão do usuário, sempre com "desfazer" à vista: um nome concreto é
-cortado desde o primeiro minuto, e os cortes largos —por categoria, para a casa inteira ou o modo
-que corta tudo o que não foi declarado— esperam a Guardiana olhar esse aparelho por 24 horas. Nenhum sinal é um veredito; a interface nunca diz "malicioso".
+Nada é bloqueado sem decisão do usuário, sempre com «desbloquear» à vista: um nome concreto é
+bloqueado desde o primeiro minuto, e os bloqueios amplos —por categoria, para a casa inteira ou o modo
+que bloqueia tudo o que não foi declarado— esperam a Guardiana olhar esse aparelho por 24 horas. Nenhum sinal é um veredito; a interface nunca diz «malicioso».
 
 ## Compilar
 

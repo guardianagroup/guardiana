@@ -349,7 +349,7 @@ mod tests {
         assert_eq!(pt().category(Category::Rastreador), "rastreador");
         assert_eq!(
             pt().signal(&Signal::Baliza { minutes: 7 }),
-            "Contata o mesmo destino a cada 7 minutos, como uma batida."
+            "Contata o mesmo destino a cada 7 minutos, como um batimento."
         );
         assert!(std::ptr::eq(by_code("en-GB"), en()));
         assert!(std::ptr::eq(by_code("es-CO"), es()));

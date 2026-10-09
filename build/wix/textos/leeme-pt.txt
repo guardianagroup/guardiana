@@ -2,15 +2,16 @@
 ======================
 
 A Guardiana mostra com quais serviços a sua IA fala e, com o Modo Casa, cada
-aparelho do seu Wi-Fi: explica cada um em uma frase e corta só o que você
+aparelho do seu Wi-Fi: explica cada um em uma frase e bloqueia só o que você
 decidir. Tudo acontece neste computador. Sem conta, sem servidor, zero
 telemetria.
 
 O que o instalador fez
 ----------------------
-- Copiou o programa para "Arquivos de Programas\Guardiana".
-- Registrou o serviço "Guardiana", que liga junto com o Windows.
-- Criou os atalhos "Guardiana" e "Guardiana (menu)" no menu Iniciar.
+- Copiou o programa para «Arquivos de Programas\Guardiana».
+- Registrou o serviço «Guardiana», que liga junto com o Windows.
+- Criou os atalhos «Guardiana» e «Guardiana (menu)» no menu Iniciar, e «Guardiana»
+  na área de trabalho.
 - Colocou a Guardiana como DNS deste computador, também por IPv6, com uma
   cópia exata do ajuste anterior. Se o serviço parar, o computador recupera o
   DNS de antes; ao desinstalar fica exatamente como estava.
@@ -21,8 +22,8 @@ Depois de instalar
 ------------------
 Menu Iniciar > Guardiana. O painel abre e você verá as consultas deste
 computador desde o primeiro minuto. Para devolver o DNS como estava sem
-desinstalar: painel, "Estado". Cortar um nome
-específico dá para fazer desde o primeiro minuto; os cortes largos, por
+desinstalar: painel, «Estado». Bloquear um nome
+específico dá para fazer desde o primeiro minuto; os bloqueios amplos, por
 categoria ou para a casa inteira, esperam a Guardiana olhar esse aparelho por
 24 horas.
 
@@ -37,12 +38,12 @@ estava. O extrato fica em C:\ProgramData\Guardiana; apague à mão se não quise
 
 Conferir a instalação
 ---------------------
-Menu "Guardiana (menu)" > a opção de conferir, ou numa janela nova de
+Menu «Guardiana (menu)» > a opção de conferir, ou numa janela nova de
 comandos ou do PowerShell:
     guardiana verify
 
 Antes de instalar: confira a impressão digital do arquivo .msi e compare com a
 do SHA256SUMS e com o registro público (ledger.jsonl). Como fazer, passo a
-passo, no VERIFY.md do site.
+passo, no VERIFY.md, no código publicado (github.com/guardianagroup/guardiana).
 
 O que a Guardiana não faz está no WHAT_IT_DOES_NOT_DO.md. Leia.

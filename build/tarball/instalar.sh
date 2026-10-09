@@ -44,7 +44,7 @@ if systemctl is-active --quiet guardiana; then
 else
     m "Guardiana está instalada, pero el servicio no está en marcha. Mira por qué con: journalctl -u guardiana -n 20" \
       "Guardiana is installed, but the service is not running. See why with: journalctl -u guardiana -n 20" \
-      "A Guardiana está instalada, mas o serviço não está em andamento. Veja o motivo com: journalctl -u guardiana -n 20"
+      "A Guardiana está instalada, mas o serviço não está em execução. Veja o motivo com: journalctl -u guardiana -n 20"
 fi
 if [ "$primera" = 1 ]; then
     m "El DNS del sistema no ha cambiado. Se cambia desde el panel, con tu permiso." \

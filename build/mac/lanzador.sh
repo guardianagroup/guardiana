@@ -39,7 +39,7 @@ The ledger is kept in $DATA."
   M_QUITADA="GUARDIANA was removed from this Mac and the previous DNS is back."
   M_INSTALO="GUARDIANA is not installed on this Mac.
 
-If I install it, the Mac will ask for your password. It installs a guardian that listens on 127.0.0.1 and forwards to the DNS you already used; the Mac's DNS does not change until you press the button in the panel, and it is undone right there. It observes first; it cuts nothing without your decision. It is removed from this same icon."
+If I install it, the Mac will ask for your password. It installs a guardian that listens on 127.0.0.1 and forwards to the DNS you already used; the Mac's DNS does not change until you press the button in the panel, and it is undone right there. It observes first; it blocks nothing without your decision. It is removed from this same icon."
   M_LISTO="Done. The panel opens in the browser: press the button there so this Mac goes through GUARDIANA. This same GUARDIANA icon opens the panel again whenever you want."
   M_NO_INSTALADA="It could not be installed. Details:"
   M_INTEL="This version of GUARDIANA needs a Mac with an Apple chip (M1 or later). This Mac has an Intel chip, so it cannot run here. Nothing was installed."
@@ -62,7 +62,7 @@ O extrato fica guardado em $DATA."
   M_QUITADA="A GUARDIANA foi removida deste Mac e o DNS anterior está de volta."
   M_INSTALO="A GUARDIANA não está instalada neste Mac.
 
-Se eu instalar, o Mac vai pedir sua senha. É instalado um guardião que escuta em 127.0.0.1 e encaminha para o DNS que você já usava; o DNS do Mac não muda até você apertar o botão do painel, e ali mesmo se desfaz. Primeiro observa; não corta nada sem a sua decisão. Remove-se por este mesmo ícone."
+Se eu instalar, o Mac vai pedir sua senha. É instalado um guardião que escuta em 127.0.0.1 e encaminha para o DNS que você já usava; o DNS do Mac não muda até você apertar o botão do painel, e ali mesmo se desfaz. Primeiro observa; não bloqueia nada sem a sua decisão. Remove-se por este mesmo ícone."
   M_LISTO="Pronto. O painel abre no navegador: aperte ali o botão para que este Mac passe pela GUARDIANA. Este mesmo ícone da GUARDIANA abre o painel de novo quando você quiser."
   M_NO_INSTALADA="Não foi possível instalar. Detalhe:"
   M_INTEL="Esta versão da GUARDIANA precisa de um Mac com chip Apple (M1 ou posterior). Este Mac tem chip Intel, então ela não funciona aqui. Nada foi instalado."
@@ -70,22 +70,22 @@ Se eu instalar, o Mac vai pedir sua senha. É instalado um guardião que escuta 
 *)
   B_OK="Entendido"; B_NO_AHORA="Ahora no"; B_ACTUALIZAR="Actualizar"; B_QUITAR_MAC="Quitar de este Mac"
   B_ABRIR="Abrir el panel"; B_ARRANCAR="Arrancar de nuevo"; B_CANCELAR="Cancelar"; B_QUITAR="Quitar"; B_INSTALAR="Instalar"
-  M_SIN_CLAVE="No encuentro la clave del panel en $DATA. Quita GUARDIANA desde este icono y vuelve a instalarlo."
+  M_SIN_CLAVE="No encuentro la llave del panel en $DATA. Quita GUARDIANA desde este icono y vuelve a instalarla."
   M_OTRA_CUENTA="GUARDIANA se instaló desde otra cuenta de este Mac, y sus datos (el extracto y la llave del panel) son de esa cuenta. ¿Se los paso a esta? El Mac pedirá una contraseña de administrador, y la otra cuenta tendrá que hacer lo mismo para volver a abrir el panel."
-  B_DAR_ACCESO="Usarlo desde esta cuenta"
+  B_DAR_ACCESO="Usarla desde esta cuenta"
   M_ACTUALIZO="Esta copia de GUARDIANA es más nueva que la instalada en el Mac. ¿La actualizo? El Mac pedirá tu contraseña; el DNS no cambia y el extracto se conserva."
   M_ACTUALIZADA="GUARDIANA se actualizó y ya está de nuevo en marcha."
   M_ACTUALIZADA_SIN_PANEL="Se copió la versión nueva pero el panel no responde. Mira $DATA/guardiana.log."
   M_EN_MARCHA="GUARDIANA está en marcha en este Mac.
 
 El extracto se guarda en $DATA."
-  M_SIN_PANEL="GUARDIANA está instalado pero el panel no responde. Puedo arrancarlo de nuevo (el Mac pedirá tu contraseña) o quitarlo."
+  M_SIN_PANEL="GUARDIANA está instalada pero el panel no responde. Puedo arrancarla de nuevo (el Mac pedirá tu contraseña) o quitarla."
   M_SIGUE_SIN="Sigue sin responder. Mira $DATA/guardiana.log."
   M_SEGURO="Se apaga GUARDIANA, el DNS del Mac vuelve a ser el de antes y el extracto se conserva en $DATA. El Mac pedirá tu contraseña."
   M_QUITADA="GUARDIANA se quitó de este Mac y el DNS anterior está de vuelta."
-  M_INSTALO="GUARDIANA no está instalado en este Mac.
+  M_INSTALO="GUARDIANA no está instalada en este Mac.
 
-Si lo instalo, el Mac pedirá tu contraseña. Se instala un guardián que escucha en 127.0.0.1 y reenvía al DNS que ya usabas; el DNS del Mac no cambia hasta que pulses el botón del panel, y ahí mismo se deshace. Primero observa; no corta nada sin tu decisión. Se quita desde este mismo icono."
+Si la instalo, el Mac pedirá tu contraseña. Se instala un guardián que escucha en 127.0.0.1 y reenvía al DNS que ya usabas; el DNS del Mac no cambia hasta que pulses el botón del panel, y ahí mismo se deshace. Primero observa; no bloquea nada sin tu decisión. Se quita desde este mismo icono."
   M_LISTO="Listo. Se abre el panel en el navegador: pulsa ahí el botón para que este Mac pase por GUARDIANA. Este mismo icono de GUARDIANA vuelve a abrir el panel cuando quieras."
   M_NO_INSTALADA="No se pudo instalar. Detalle:"
   M_INTEL="Esta versión de GUARDIANA necesita un Mac con chip de Apple (M1 o posterior). Este Mac tiene chip Intel, así que aquí no puede funcionar. No se ha instalado nada."

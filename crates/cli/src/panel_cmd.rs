@@ -19,17 +19,144 @@ fn panel_responde() -> bool {
     std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(500)).is_ok()
 }
 
-/// Waits, up to [`ESPERA_ARRANQUE`], for the token file to exist (the service writes it as it
-/// starts, a second or two in). Returns whether it did.
+/// Whether the file holds a whole key: 64 hexadecimal characters, the same test the panel
+/// applies when it loads it. The service's write is not atomic, and a read in between gave an
+/// empty key in the wait page's link (second pass, 8 Oct 2026).
+fn llave_completa(path: &std::path::Path) -> bool {
+    std::fs::read_to_string(path).is_ok_and(|t| {
+        let t = t.trim();
+        t.len() == 64 && t.bytes().all(|b| b.is_ascii_hexdigit())
+    })
+}
+
+/// Waits, up to [`ESPERA_ARRANQUE`], for the token file to hold a whole key (the service
+/// writes it as it starts, a second or two in). Returns whether it did.
 fn esperar_la_llave(path: &std::path::Path) -> bool {
     let fin = std::time::Instant::now() + ESPERA_ARRANQUE;
-    while !path.exists() {
+    while !llave_completa(path) {
         if std::time::Instant::now() >= fin {
             return false;
         }
         std::thread::sleep(std::time::Duration::from_millis(300));
     }
     true
+}
+
+/// Writes the wait page so that only this user can read it: it carries the session key in
+/// its link. On Unix the file is created new with mode 0600 (a stale one is removed first);
+/// on Windows the user's temp folder is already the user's own.
+fn escribir_espera(path: &std::path::Path, html: &str) -> std::io::Result<()> {
+    let _ = std::fs::remove_file(path);
+    #[cfg(unix)]
+    {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(path)?;
+        f.write_all(html.as_bytes())
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::write(path, html)
+    }
+}
+
+/// The default browser's command line on Windows, by the `http` protocol's user choice: the
+/// wait page is a file, and `start` would open it with whatever is associated to `.html`
+/// (an editor, for some people), not with the browser (second pass, 8 Oct 2026). `None` when
+/// the registry does not say; the caller then falls back to `start`.
+#[cfg(windows)]
+fn navegador_por_defecto() -> Option<Vec<String>> {
+    fn reg(clave: &str, valor: Option<&str>) -> Option<String> {
+        let mut args = vec!["query", clave];
+        match valor {
+            Some(v) => args.extend(["/v", v]),
+            None => args.push("/ve"),
+        }
+        let out = std::process::Command::new("reg")
+            .args(&args)
+            .output()
+            .ok()?;
+        let text = String::from_utf8_lossy(&out.stdout);
+        // `    ProgId    REG_SZ    ChromeHTML`
+        let line = text
+            .lines()
+            .find(|l| l.contains("REG_SZ") || l.contains("REG_EXPAND_SZ"))?;
+        let (_, dato) = line
+            .split_once("REG_EXPAND_SZ")
+            .or_else(|| line.split_once("REG_SZ"))?;
+        let dato = dato.trim();
+        (!dato.is_empty()).then(|| dato.to_owned())
+    }
+    let progid = reg(
+        r"HKCU\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice",
+        Some("ProgId"),
+    )?;
+    let comando = reg(&format!(r"HKCR\{progid}\shell\open\command"), None)?;
+    // `"C:\...\chrome.exe" --single-argument %1` or `C:\...\browser.exe "%1"`.
+    let mut partes: Vec<String> = Vec::new();
+    let mut resto = comando.trim();
+    while !resto.is_empty() {
+        resto = resto.trim_start();
+        if let Some(sin) = resto.strip_prefix('"') {
+            let (dentro, despues) = sin.split_once('"')?;
+            partes.push(dentro.to_owned());
+            resto = despues;
+        } else {
+            let fin = resto.find(' ').unwrap_or(resto.len());
+            partes.push(resto[..fin].to_owned());
+            resto = &resto[fin..];
+        }
+    }
+    (!partes.is_empty() && partes.iter().any(|p| p.contains("%1"))).then_some(partes)
+}
+
+/// The wait page as a `file:///` address with everything but plain letters, digits and `/:._-~`
+/// percent-encoded. Chromium-based browsers take `--single-argument %1` raw, quotes included,
+/// so a temp folder with a space in it (a user called «Juan Perez») opened an error page and
+/// never reached the panel (review of 9 Oct 2026). An address has no spaces to quote.
+fn url_de_archivo(ruta: &std::path::Path) -> String {
+    let texto = ruta.to_string_lossy().replace('\\', "/");
+    let mut url = String::from("file://");
+    if !texto.starts_with('/') {
+        url.push('/');
+    }
+    for b in texto.bytes() {
+        if b.is_ascii_alphanumeric() || b"/:._-~".contains(&b) {
+            url.push(char::from(b));
+        } else {
+            url.push_str(&format!("%{b:02X}"));
+        }
+    }
+    url
+}
+
+/// Opens the wait page in the browser: on Windows with the default browser itself when the
+/// registry names it, otherwise like any URL.
+fn abrir_espera(ruta: &std::path::Path) {
+    let destino = url_de_archivo(ruta);
+    #[cfg(windows)]
+    if let Some(partes) = navegador_por_defecto() {
+        let exe = &partes[0];
+        let args: Vec<String> = partes[1..]
+            .iter()
+            .map(|p| p.replace("%1", &destino))
+            .collect();
+        if std::process::Command::new(exe)
+            .args(args)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .is_ok()
+        {
+            return;
+        }
+    }
+    crate::engine::open_in_browser(&destino);
 }
 
 /// The page the browser shows while the service comes up: the logo, one sentence, and a
@@ -153,11 +280,14 @@ pub fn run(_opts: &Opts) -> Result<(), Box<dyn Error>> {
         // The service is still coming up: the browser opens on the wait page, which goes to
         // the panel by itself the moment it answers.
         let espera = ruta_de_espera();
-        if std::fs::write(&espera, pagina_de_espera(t, &url)).is_ok() {
+        if escribir_espera(&espera, &pagina_de_espera(t, &url)).is_ok() {
             println!("{}", t.cli("panel.abriendo_espera"));
+            // The browser first, the console after: released before, the child `cmd /C start`
+            // inherited handles of a console that no longer existed and never started, so 1.0.6
+            // opened nothing at all (owner's report, 8 Oct 2026, minutes after publishing).
+            abrir_espera(&espera);
             #[cfg(windows)]
             soltar_consola();
-            crate::engine::open_in_browser(&espera.display().to_string());
             return Ok(());
         }
         // The page could not be written: the old wait, in the terminal.
@@ -167,8 +297,28 @@ pub fn run(_opts: &Opts) -> Result<(), Box<dyn Error>> {
         }
     }
     println!("{}", t.cli("panel.abriendo").replace("{url}", &url));
+    crate::engine::open_in_browser(&url);
     #[cfg(windows)]
     soltar_consola();
-    crate::engine::open_in_browser(&url);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::url_de_archivo;
+
+    #[test]
+    fn the_wait_page_address_has_no_spaces() {
+        let u = url_de_archivo(std::path::Path::new(
+            "/tmp/Juan Perez/guardiana-arrancando.html",
+        ));
+        assert_eq!(u, "file:///tmp/Juan%20Perez/guardiana-arrancando.html");
+        let w = url_de_archivo(std::path::Path::new(
+            r"C:\Users\José Pérez\AppData\Local\Temp\guardiana-arrancando.html",
+        ));
+        assert_eq!(
+            w,
+            "file:///C:/Users/Jos%C3%A9%20P%C3%A9rez/AppData/Local/Temp/guardiana-arrancando.html"
+        );
+    }
 }

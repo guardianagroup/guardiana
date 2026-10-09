@@ -1,11 +1,11 @@
 GUARDIANA para Windows
 
-A Guardiana mostra com quais serviços a sua IA fala e, com o Modo Casa, cada aparelho do seu Wi-Fi: explica cada um em uma frase e corta só o que você decidir. Tudo acontece neste computador. Sem conta, sem servidor nosso, zero telemetria.
+A Guardiana mostra com quais serviços a sua IA fala e, com o Modo Casa, cada aparelho do seu Wi-Fi: explica cada um em uma frase e bloqueia só o que você decidir. Tudo acontece neste computador. Sem conta, sem servidor nosso, zero telemetria.
 
 O que este instalador vai fazer
-- Copiar o programa para "Arquivos de Programas\Guardiana".
-- Registrar o serviço "Guardiana", que liga junto com o Windows.
-- Criar o atalho "Guardiana" no menu Iniciar, que abre o painel no seu navegador.
+- Copiar o programa para «Arquivos de Programas\Guardiana».
+- Registrar o serviço «Guardiana», que liga junto com o Windows.
+- Criar o atalho «Guardiana», que abre o painel no seu navegador, no menu Iniciar e na área de trabalho, e o atalho «Guardiana (menu)» no menu Iniciar.
 - Colocar a Guardiana como DNS deste computador, também por IPv6, para que comece a olhar desde o primeiro minuto. Antes guarda uma cópia exata do seu ajuste; se o serviço parar, o computador recupera o DNS de antes, e ao desinstalar fica exatamente como estava.
 
 O que NÃO vai fazer
@@ -13,8 +13,8 @@ O que NÃO vai fazer
 - Não abre nenhuma porta para a rede. Só o Modo Casa, quando você ligar, escuta no Wi-Fi de casa; desligá-lo fecha tudo.
 
 Depois de instalar
-Ao terminar, o painel abre e em um minuto você verá as consultas deste computador. Para devolver o DNS como estava sem desinstalar: painel, "Estado". Cortar um nome específico dá para fazer desde o primeiro minuto; os cortes largos, por categoria ou para a casa inteira, esperam a Guardiana olhar esse aparelho por 24 horas.
+Ao terminar, o painel abre e em um minuto você verá as consultas deste computador. Para devolver o DNS como estava sem desinstalar: painel, «Estado». Bloquear um nome específico dá para fazer desde o primeiro minuto; os bloqueios amplos, por categoria ou para a casa inteira, esperam a Guardiana olhar esse aparelho por 24 horas.
 
 Sete dias com tudo e sem cartão; depois é preciso uma assinatura. O que foi anotado fica no seu disco, pagando ou não.
 
-Licença do programa: GNU GPL 3.0 ou posterior. Código aberto: você pode ler, compilar e conferir que faz o que diz. O que a Guardiana não faz está no WHAT_IT_DOES_NOT_DO.md do site.
+Licença do programa: GNU GPL 3.0 ou posterior. Código aberto: você pode ler, compilar e conferir que faz o que diz. O que a Guardiana não faz está no WHAT_IT_DOES_NOT_DO.md, no código publicado (github.com/guardianagroup/guardiana).

@@ -125,17 +125,24 @@ pub(crate) fn backup_link_ids() -> Option<Vec<String>> {
 // ----- systemd-resolved -----------------------------------------------------
 
 /// `resolvectl dns` prints `Global: ...` and `Link N (name): servers...`.
+/// The link name of one `resolvectl dns` line: `Link 2 (wlp3s0): 127.0.0.1` → `wlp3s0`.
+pub(crate) fn link_name_of(line: &str) -> Option<String> {
+    let (head, _) = line.split_once(':')?;
+    Some(
+        head.trim()
+            .strip_prefix("Link ")?
+            .split_once(" (")?
+            .1
+            .trim_end_matches(')')
+            .to_owned(),
+    )
+}
+
 pub(crate) fn parse_resolvectl_dns(text: &str) -> Vec<InterfaceDns> {
     text.lines()
         .filter_map(|line| {
-            let (head, rest) = line.split_once(':')?;
-            let head = head.trim();
-            let name = head
-                .strip_prefix("Link ")?
-                .split_once(" (")?
-                .1
-                .trim_end_matches(')')
-                .to_owned();
+            let (_, rest) = line.split_once(':')?;
+            let name = link_name_of(line)?;
             let servers: Vec<IpAddr> = rest.split_whitespace().filter_map(parse_ip).collect();
             (!servers.is_empty()).then_some(InterfaceDns {
                 id: name.clone(),
@@ -246,7 +253,14 @@ fn resolv_conf_to_guardian(guardian: IpAddr, backup: &Backup) -> Result<(), Erro
     // The search list and the domain of the original file stay: the programs that read this
     // file instead of asking resolved (Go without cgo, musl, scripts) lost `ssh nas` without
     // them (review of 8 Oct 2026). Only the resolver lines are replaced.
-    for line in original.lines() {
+    // With resolved the file is usually a symlink to its stub, and the copy keeps the link,
+    // not the lines: the search list is read through the link then.
+    let con_busqueda = if original.is_empty() {
+        std::fs::read_to_string(RESOLV_CONF).unwrap_or_default()
+    } else {
+        original.to_owned()
+    };
+    for line in con_busqueda.lines() {
         let l = line.trim();
         if l.starts_with("search ") || l.starts_with("domain ") {
             text.push_str(l);
@@ -810,6 +824,18 @@ pub(crate) fn restore(backup: &Backup) -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn link_name_is_the_part_in_brackets() {
+        // The watchdog compared `(wlp3s0):` with `wlp3s0` and never matched (review of 8 Oct
+        // 2026, second pass): the copy's links were all dropped and nothing was re-pointed.
+        assert_eq!(
+            link_name_of("Link 2 (wlp3s0): 127.0.0.1").as_deref(),
+            Some("wlp3s0")
+        );
+        assert_eq!(link_name_of("Link 3 (wlan0):").as_deref(), Some("wlan0"));
+        assert_eq!(link_name_of("Global: 127.0.0.1"), None);
+    }
 
     #[test]
     fn resolvectl_dns_lists_links_with_servers() {

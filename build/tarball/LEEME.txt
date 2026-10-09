@@ -2,7 +2,7 @@ GUARDIANA para Linux
 ====================
 
 Guardiana convierte este PC en el guardián DNS de la casa: ve a qué
-servicios intenta hablar cada dispositivo, lo explica en una frase y corta solo
+servicios intenta hablar cada dispositivo, lo explica en una frase y bloquea solo
 lo que tú decidas. Todo ocurre en este equipo. Sin cuenta, sin servidor, cero
 telemetría.
 
@@ -32,12 +32,13 @@ Desinstalar
     sudo ./desinstalar.sh            (tarball)
 
 Desinstalar restaura el DNS tal como estaba y apaga el Modo Hogar. El
-extracto queda en /var/lib/guardiana; bórralo con "sudo apt purge guardiana" o
-"sudo ./desinstalar.sh --purge".
+extracto queda en /var/lib/guardiana; bórralo con «sudo apt purge guardiana» o
+«sudo ./desinstalar.sh --purge».
 
 Antes de instalar: comprueba la huella
 --------------------------------------
-    sha256sum guardiana_*.deb
+    sha256sum guardiana_*.deb                       (paquete .deb)
+    sha256sum guardiana-*-linux-x86_64.tar.gz       (tarball)
 Compárala con la de SHA256SUMS y con el registro público (ledger.jsonl).
 Cómo hacerlo, paso a paso: VERIFY.md.
 

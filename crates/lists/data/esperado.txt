@@ -133,21 +133,6 @@ teams.microsoft.com
 teams.live.com
 facetime.apple.com
 
-@resolutores
-# Los resolutores públicos que la gente pone a mano y los servidores de los fabricantes de
-# routers, por su nombre: «cortar los resolutores» dejaría al equipo sin nombres. El panel ya
-# prometía que nunca se tocan (revisión del 8 oct 2026: la sección no existía).
-one.one.one.one
-cloudflare-dns.com
-dns.google
-dns.quad9.net
-dns.adguard.com
-dns.nextdns.io
-doh.opendns.com
-dns.opendns.com
-resolver1.opendns.com
-resolver2.opendns.com
-
 @seguridad
 # Las comprobaciones de «¿hay internet?» del sistema y del navegador. Sin ellas Windows, Android,
 # iPhone y Firefox dicen «sin conexión» aunque la haya, y los teléfonos de la casa se cambian a

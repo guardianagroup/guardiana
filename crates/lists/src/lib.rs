@@ -39,6 +39,9 @@ pub const IA: &str = include_str!("../data/ia.txt");
 
 /// Guardiana's own "entrega" list: names that are the road, not the destination (decision 148).
 pub const ENTREGA: &str = include_str!("../data/entrega.txt");
+/// Guardiana's own "alojamiento" list: clouds where other companies rent their servers. Neither
+/// the road nor the owner of the name (review of 9 Oct 2026).
+pub const ALOJAMIENTO: &str = include_str!("../data/alojamiento.txt");
 
 /// Guardiana's own "corredores" list: companies registered as data brokers in California, from
 /// the public registry of the California Privacy Protection Agency (decision 194). A label about
@@ -145,6 +148,8 @@ static COMPANIES: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
     std::sync::OnceLock::new();
 static AI_SERVICES: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
     std::sync::OnceLock::new();
+static HOSTING: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
+    std::sync::OnceLock::new();
 static DELIVERY: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
     std::sync::OnceLock::new();
 
@@ -200,6 +205,18 @@ pub fn is_local_name(qname: &str) -> bool {
 pub fn delivery_of(qname: &str) -> Option<&'static str> {
     let map = DELIVERY.get_or_init(|| {
         parse_guardiana(ENTREGA)
+            .filter_map(|(section, domain)| section.map(|c| (domain, c)))
+            .collect()
+    });
+    lookup(map, qname)
+}
+
+/// The cloud a queried name is hosted on, when it is a rented server there (`x.herokuapp.com` →
+/// `Heroku`): the name belongs to whoever rents it, not to the cloud.
+#[must_use]
+pub fn hosting_of(qname: &str) -> Option<&'static str> {
+    let map = HOSTING.get_or_init(|| {
+        parse_guardiana(ALOJAMIENTO)
             .filter_map(|(section, domain)| section.map(|c| (domain, c)))
             .collect()
     });
