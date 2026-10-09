@@ -51,7 +51,8 @@ version="$(sed -n 's/^version = "\(.*\)"/\1/p' zero/navegador/Cargo.toml | head 
 nombre="guardiana-zero-$version-windows-x64.exe"
 [ -f "$carpeta/$nombre" ] || { echo "release-zero.sh: $carpeta has no $nombre (zero/navegador is $version)" >&2; exit 1; }
 [ -f "$carpeta/SHA256SUMS" ] || { echo "release-zero.sh: $carpeta has no SHA256SUMS" >&2; exit 1; }
-(cd "$carpeta" && grep -F "  $nombre" SHA256SUMS | sha256sum -c -) || {
+# sha256sum on Windows writes «hash *name» (binary mode) and on Linux «hash  name»: both count.
+(cd "$carpeta" && tr -d '\r' < SHA256SUMS | grep -E "^[0-9a-f]{64} [ *]$nombre\$" | sed 's/ \*/  /' | sha256sum -c -) || {
     echo "release-zero.sh: $nombre does not match the SHA256SUMS that came with it; nothing is published." >&2
     exit 1
 }
