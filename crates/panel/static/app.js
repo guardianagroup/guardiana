@@ -490,13 +490,27 @@
   const REGLAS_ACTIVAS = new Set();
   // Names let through the declared scope from this page since it loaded.
   const DEJADOS_PASAR = new Set();
+  // When each rule was made and undone (Unix ms), and when a name was let into the scope here:
+  // the status says «bloqueado a las…» / «desbloqueado a las…» with the time of that change
+  // (the responsible, 9 Oct 2026: the state and its time, nothing more).
+  const HORAS_REGLA = new Map();
+  const HORA_DEJADO = new Map();
+  // The latest time a block of each name was undone (device|name → Unix ms): a row that only
+  // passed is «desbloqueado a las…» once its name was blocked and unblocked after it.
+  const DESBLOQUEOS = new Map();
+  const anotaDesbloqueo = (k, ms) => { if (typeof ms === 'number' && !(DESBLOQUEOS.get(k) >= ms)) DESBLOQUEOS.set(k, ms); };
   async function cargarCortados(path = '/api/reglas') {
     try {
       const r = await api(path);
       CORTADOS.clear(); PERMITIDOS.clear(); REGLAS_VISTAS.clear(); REGLAS_ACTIVAS.clear();
+      DESBLOQUEOS.clear();
       (r.reglas || []).forEach((x) => {
         REGLAS_VISTAS.add(x.id);
+        HORAS_REGLA.set(x.id, { creada: x.created_at, deshecha: x.undone_at ?? null });
         if (x.activa) REGLAS_ACTIVAS.add(x.id);
+        if (x.match_kind === 'domain' && x.action === 'cortar' && x.undone_at != null) {
+          anotaDesbloqueo(claveCorte(x.device_id || 'home', sinPunto(x.pattern)), x.undone_at);
+        }
         if (!x.activa || x.match_kind !== 'domain') return;
         const mapa = x.action === 'cortar' ? CORTADOS : x.action === 'permitir' ? PERMITIDOS : null;
         if (mapa) mapa.set(claveCorte(x.device_id || 'home', sinPunto(x.pattern)), x.id);
@@ -536,13 +550,32 @@
   // that query (the responsible, 9 Oct 2026: «no se puede bloquear una cosa que ya está
   // bloqueada»). What happened at the time of the query is still on the row, in small letters
   // under the status, and the export keeps it exactly as it was.
+  // When the block of this row was lifted: the allow made for it, the scope it was let into
+  // from this page, or the undoing of the rule that blocked it — the latest of those.
+  function horaLevantado(ev) {
+    const k = claveCorte(ev.device_id, sinPunto(ev.qname));
+    const momentos = [HORA_DEJADO.get(k)];
+    const permiso = reglaDePermiso(ev);
+    if (permiso !== undefined) momentos.push(HORAS_REGLA.get(permiso)?.creada);
+    if (ev.rule_id != null) momentos.push(HORAS_REGLA.get(ev.rule_id)?.deshecha);
+    const hay = momentos.filter((m) => typeof m === 'number');
+    return hay.length ? Math.max(...hay) : null;
+  }
+  const aLas = (ms) => (ms == null ? '' : `<br><span class="muted small">${esc(t('estado_a_las').replace('{hora}', clock(ms)))}</span>`);
   function estadoCelda(ev) {
-    const hora = clock(ev.ts);
     if (levantado(ev)) {
-      return `<span class="verdict levantado">${esc(t('estado_desbloqueado'))}</span><br><span class="muted small">${esc(t('estado_antes_bloqueado').replace('{hora}', hora))}</span>`;
+      return `<span class="verdict levantado">${esc(t('estado_desbloqueado'))}</span>${aLas(horaLevantado(ev))}`;
     }
-    if (ev.verdict !== 'cortado' && reglaDeCorte(ev) !== undefined) {
-      return `${verdict('cortado')}<br><span class="muted small">${esc(t('estado_antes_paso').replace('{hora}', hora))}</span>`;
+    const corte = reglaDeCorte(ev);
+    if (corte !== undefined) {
+      // Blocked by a rule of this very name: blocked since that rule was made.
+      return `${verdict('cortado')}${aLas(HORAS_REGLA.get(corte)?.creada ?? null)}`;
+    }
+    // Blocked and unblocked after this query: unblocked, and when.
+    const n = sinPunto(ev.qname);
+    const des = Math.max(DESBLOQUEOS.get(claveCorte(ev.device_id, n)) ?? -1, DESBLOQUEOS.get(claveCorte('home', n)) ?? -1);
+    if (ev.verdict !== 'cortado' && des >= Number(ev.ts)) {
+      return `<span class="verdict levantado">${esc(t('estado_desbloqueado'))}</span>${aLas(des)}`;
     }
     return verdict(ev.verdict);
   }
@@ -651,9 +684,9 @@
         lineas.push(esc(tn('recibo_rafaga', r.rafaga.nombres.length).replace('{seg}', (r.rafaga.duracion_ms / 1000).toFixed(1)))
           + (r.rafaga.empresas.length ? `<br><span class="muted">${esc(r.rafaga.empresas.slice(0, 6).join(' · '))}</span>` : ''));
       }
-      return `<div class="card"><h3>${quien}</h3>`
-        + `<p class="muted">${esc(t('recibo_desde').replace('{fecha}', when(r.desde)))}</p>`
-        + `<ul class="recibo">${lineas.map((l) => `<li>${l}</li>`).join('')}</ul></div>`;
+      return `<section class="card disp"><div class="disp-cab"><h3>${quien}</h3>`
+        + `<span class="muted small">${esc(t('recibo_desde').replace('{fecha}', when(r.desde)))}</span></div>`
+        + `<ul class="recibo">${lineas.map((l) => `<li>${l}</li>`).join('')}</ul></section>`;
     }).join('');
   }
 
@@ -663,19 +696,28 @@
       if (!b) return;
       const name = b.dataset.name, dev = b.dataset.device;
       const k = claveCorte(dev, sinPunto(name)), kCasa = claveCorte('home', sinPunto(name));
-      const deshecha = (id) => { REGLAS_ACTIVAS.delete(Number(id)); };
-      const creada = (id) => { REGLAS_VISTAS.add(Number(id)); REGLAS_ACTIVAS.add(Number(id)); };
+      const deshecha = (id) => {
+        REGLAS_ACTIVAS.delete(Number(id));
+        const h = HORAS_REGLA.get(Number(id));
+        HORAS_REGLA.set(Number(id), { creada: h ? h.creada : null, deshecha: Date.now() });
+      };
+      const creada = (id) => {
+        REGLAS_VISTAS.add(Number(id)); REGLAS_ACTIVAS.add(Number(id));
+        HORAS_REGLA.set(Number(id), { creada: Date.now(), deshecha: null });
+      };
       b.disabled = true;
       try {
         if (b.dataset.deshacer) {
           // Desbloquear: se deshace la regla de este nombre.
           await api(`${path}/${b.dataset.deshacer}/deshacer`, { method: 'POST' });
           deshecha(b.dataset.deshacer);
+          anotaDesbloqueo(CORTADOS.get(k) === Number(b.dataset.deshacer) ? k : kCasa, Date.now());
           if (CORTADOS.get(k) === Number(b.dataset.deshacer)) CORTADOS.delete(k); else CORTADOS.delete(kCasa);
         } else if (b.dataset.alcance) {
           // Fuera del alcance declarado: el nombre entra en el alcance de ese aparato.
           await api('/api/ia/alcance/anadir', { method: 'POST', body: { device_id: dev, nombre: name } });
           DEJADOS_PASAR.add(k);
+          HORA_DEJADO.set(k, Date.now());
         } else if (b.dataset.permitir) {
           // The map is from when the page loaded: a rule of this name made since then (another
           // tab, the Rules page) is undone, not covered with an allow (second pass, 8 Oct 2026).
@@ -684,6 +726,7 @@
           if (corte !== undefined) {
             await api(`${path}/${corte}/deshacer`, { method: 'POST' });
             deshecha(corte);
+            anotaDesbloqueo(CORTADOS.get(k) === corte ? k : kCasa, Date.now());
             CORTADOS.delete(k); CORTADOS.delete(kCasa);
           } else {
             // Bloqueado por una regla ancha: una regla concreta que lo permite gana a la ancha.
@@ -1195,12 +1238,34 @@
     async dispositivos() {
       pintarRecibos().catch(() => {});
       const devs = await api('/api/dispositivos');
-      $('devices').innerHTML = devs.map((d) => `<tr>
-        <td>${esc(d.name || (d.id === 'self' ? t('este_computador') : t('dispositivo_nuevo')))}<br><span class="mono muted">${esc(d.last_ip || '')}</span>${hints(d.lectura).map((h) => `<br><span class="phrase">· ${esc(h)}</span>`).join('')}${paisesDe(d.lectura)}</td>
-        <td>${d.totales.consultas}</td><td>${d.totales.rastreadores}</td><td>${d.totales.publicidad}</td><td>${d.totales.telemetria}</td><td>${d.totales.esperados}</td><td>${d.totales.cortados}</td>
-        <td title="${esc((d.lectura.empresas || []).map((e) => e[0] + ' ' + e[1]).join(', '))}">${d.lectura.empresas_total || 0}<br><span class="muted">${esc((d.lectura.empresas || []).slice(0, 3).map((e) => e[0]).join(', '))}</span></td>
-        <td class="muted">${when(d.last_seen)}</td>
-        <td>${d.detalle_visible ? esc(t('detalle_si')) : esc(t('detalle_no'))}</td></tr>`).join('') || `<tr><td colspan="10" class="muted">${esc(t('sin_dispositivos'))}</td></tr>`;
+      // One card per device (the responsible, 9 Oct 2026: the ten-column table «no guarda
+      // geometría»): its name and address, when it was last heard and whether its detail can be
+      // seen from here; its figures as the same counters the home page uses; then the companies
+      // and the countries, each on its own line.
+      const cat = (k) => (T.categorias && T.categorias[k]) || k;
+      const cifra = (n, l, cls = '') => `<div class="counter${cls}"><div class="n">${Number(n || 0).toLocaleString(LANG)}</div><div class="l">${esc(l)}</div></div>`;
+      $('devices').innerHTML = devs.map((d) => {
+        const nombre = esc(d.name || (d.id === 'self' ? t('este_computador') : t('dispositivo_nuevo')));
+        const emp = d.lectura.empresas || [];
+        const pistas = hints(d.lectura).map((x) => `<li>${esc(x)}</li>`).join('');
+        const paises = d.lectura && d.lectura.paises && d.lectura.paises.length
+          ? `<div class="disp-linea"><span class="k">${esc(t('lectura_paises').replace(/:\s*$/, ''))}</span><span>${d.lectura.paises.map((x) => `${esc(x[0])} <b>${Number(x[1]).toLocaleString(LANG)}</b>`).join(' · ')}</span></div>`
+          : '';
+        return `<section class="card disp">
+          <div class="disp-cab">
+            <div><h3>${nombre}</h3>${d.last_ip ? `<span class="mono muted">${esc(d.last_ip)}</span>` : ''}</div>
+            <dl class="disp-meta"><div><dt>${esc(t('col_ultima'))}</dt><dd>${when(d.last_seen)}</dd></div><div><dt>${esc(t('col_detalle'))}</dt><dd>${esc(t(d.detalle_visible ? 'detalle_si' : 'detalle_no'))}</dd></div></dl>
+          </div>
+          <div class="counters disp-cifras">
+            ${cifra(d.totales.consultas, t('col_consultas'))}${cifra(d.totales.cortados, t('col_cortados'), ' bloq')}
+            ${cifra(d.totales.rastreadores, cat('rastreador'), ' c-rastreador')}${cifra(d.totales.publicidad, cat('publicidad'), ' c-publicidad')}
+            ${cifra(d.totales.telemetria, cat('telemetria'), ' c-telemetria')}${cifra(d.totales.esperados, cat('esperado'), ' c-esperado')}
+          </div>
+          <div class="disp-linea"><span class="k">${esc(t('col_empresas'))}</span><span title="${esc(emp.map((e) => e[0] + ' ' + e[1]).join(', '))}"><b>${Number(d.lectura.empresas_total || 0).toLocaleString(LANG)}</b>${emp.length ? ' · ' + esc(emp.slice(0, 6).map((e) => e[0]).join(', ')) : ''}</span></div>
+          ${paises}
+          ${pistas ? `<ul class="disp-pistas">${pistas}</ul>` : ''}
+        </section>`;
+      }).join('') || `<div class="card muted">${esc(t('sin_dispositivos'))}</div>`;
     },
     async sabeDeTi() {
       const r = await api('/api/sabe-de-ti');

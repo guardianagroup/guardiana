@@ -136,7 +136,13 @@ button.danger { background: var(--cortado); color: #fff; }
    cuando «cortado» era un cartel apagado nadie adivinaba que se podía pulsar para deshacerlo. */
 /* Bloquear and Desbloquear share one outer size, whatever the word and the language, so the
    column keeps its geometry (the responsible, 9 Oct 2026); the word sits centred inside. */
-button.cut, button.cortado { white-space: nowrap; cursor: pointer; width: 140px; padding-left: 0; padding-right: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; }
+button.cut, button.cortado { white-space: nowrap; cursor: pointer; width: 128px; padding-left: 0; padding-right: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; }
+/* The button column: as narrow as its button, with the same margin on the right as the first
+   column has on the left, and always in view — when a long row makes the table scroll sideways,
+   it stays pinned to the right edge instead of being cut by it (the responsible, 9 Oct 2026). */
+.wrap th:first-child, .wrap td:first-child { padding-left: 16px; }
+td.accion { width: 1%; white-space: nowrap; padding-right: 16px; position: sticky; right: 0; background: var(--card); }
+@media print { td.accion { position: static; } }
 button.cut { background: transparent; color: var(--cortado); border: 1px solid var(--cortado); }
 button.cut:hover { background: var(--cortado); color: #fff; border-color: var(--cortado); }
 button.cortado { background: transparent; color: var(--esperado); border: 1px solid var(--esperado); opacity: 1; }
@@ -145,6 +151,28 @@ button.cortado[disabled] { cursor: progress; opacity: .6; }
 
 p.vigilante { border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; background: var(--card); }
 p.vigilante b { font-size: 16px; }
+/* Dispositivos: one card per device, the same geometry for each (9 Oct 2026). */
+.card.disp { padding: 20px 22px; }
+.disp-cab { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 10px 24px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.disp-cab h3 { font-family: var(--display); font-weight: 600; font-size: 18px; letter-spacing: -0.01em; margin: 0 0 2px; }
+.disp-cab > span.small { padding-top: 4px; }
+.disp-meta { display: flex; gap: 28px; margin: 0; }
+.disp-meta div { display: grid; gap: 2px; }
+.disp-meta dt, .disp-linea .k { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.disp-meta dd { margin: 0; font-size: 14px; }
+.disp-cifras { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin: 16px 0; }
+.disp-cifras .counter { padding: 12px 14px; }
+.disp-cifras .counter .n { font-size: 24px; }
+.disp-cifras .counter.bloq .n { color: var(--cortado); }
+.disp-cifras .c-rastreador .l::before, .disp-cifras .c-publicidad .l::before, .disp-cifras .c-telemetria .l::before, .disp-cifras .c-esperado .l::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.disp-cifras .c-rastreador .l::before { background: var(--rastreador); }
+.disp-cifras .c-publicidad .l::before { background: var(--publicidad); }
+.disp-cifras .c-telemetria .l::before { background: var(--telemetria); }
+.disp-cifras .c-esperado .l::before { background: var(--esperado); }
+.disp-linea { display: grid; grid-template-columns: 220px 1fr; gap: 4px 16px; padding: 10px 0; border-top: 1px dashed var(--line); font-size: 14px; align-items: baseline; }
+.disp-linea b { font-variant-numeric: tabular-nums; }
+.disp-pistas { list-style: none; margin: 0; padding: 10px 0 0; border-top: 1px dashed var(--line); color: var(--muted); font-size: 14px; display: grid; gap: 4px; }
+@media (max-width: 700px) { .disp-linea { grid-template-columns: 1fr; } .disp-meta { gap: 18px; } }
 ul.recibo { list-style: none; padding: 0; margin: 8px 0 0; }
 ul.recibo li { padding: 8px 0; border-top: 1px dashed var(--line); font-size: 15px; }
 ul.recibo li:first-child { border-top: 0; }
