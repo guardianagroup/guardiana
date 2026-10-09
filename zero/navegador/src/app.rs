@@ -1573,7 +1573,10 @@ pub fn arranca() {
     // time, in a folder outside it (Roaming), so emptying one does not start the week again.
     let ancla = std::env::var_os("GUARDIANA_ZERO_DATOS")
         .map(|_| base.join("marca"))
-        .or_else(|| std::env::var_os("APPDATA").map(|a| PathBuf::from(a).join("GUARDIANA ZERO").join("marca")))
+        .or_else(|| {
+            std::env::var_os("APPDATA")
+                .map(|a| PathBuf::from(a).join("GUARDIANA ZERO").join("marca"))
+        })
         .unwrap_or_else(|| base.join("marca"));
     let lugar = LugarLicencia::nuevo(&datos, ancla);
     let _ = LUGAR.set(lugar.clone());
