@@ -198,8 +198,14 @@
   en('ajustes', (m) => {
     $('a-proteccion').checked = !!m.cortar_seguimiento;
     $('e-proteccion').checked = !!m.cortar_seguimiento;
-    $('a-buscador').innerHTML = (m.buscadores || []).map((b) => `<option value="${esc(b.id)}"${b.id === m.buscador ? ' selected' : ''}>${esc(b.nombre)}</option>`).join('');
+    // Two groups: the engines that say they keep no record of who searches what, and the rest.
+    const opcion = (b) => `<option value="${esc(b.id)}"${b.id === m.buscador ? ' selected' : ''}>${esc(b.nombre)}</option>`;
+    const grupo = (clave, lista) => (lista.length ? `<optgroup label="${esc(t(clave))}">${lista.map(opcion).join('')}</optgroup>` : '');
+    const todos = m.buscadores || [];
+    $('a-buscador').innerHTML = grupo('buscador_privados', todos.filter((b) => b.privado))
+      + grupo('buscador_otros', todos.filter((b) => !b.privado));
     $('a-idioma').value = m.idioma || '';
+    document.querySelectorAll('.temas button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tema === (m.tema || ''))));
     $('a-borrar-palabra').placeholder = t('borrar_confirma', { palabra: t('borrar_palabra') });
     $('a-huella').textContent = m.huella_clave ? t('ajustes_huella', { huella: m.huella_clave }) : '';
     // The sites the person told not to ask about again, each with its way back.
@@ -214,6 +220,9 @@
   });
   $('a-proteccion').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'cortar_seguimiento', valor: e.target.checked }));
   $('a-buscador').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'buscador', valor: e.target.value }));
+  document.querySelector('.temas [data-tema="dia"]').innerHTML = Z.ICONO.sol;
+  document.querySelector('.temas [data-tema="noche"]').innerHTML = Z.ICONO.luna;
+  document.querySelectorAll('.temas button').forEach((b) => b.addEventListener('click', () => manda({ tipo: 'ajuste', clave: 'tema', valor: b.dataset.tema })));
   $('a-idioma').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'idioma', valor: e.target.value }));
   $('a-aislada').addEventListener('click', () => manda({ tipo: 'pestana_aislada' }));
   $('a-borrar-palabra').addEventListener('input', (e) => { $('a-borrar').disabled = e.target.value.trim().toUpperCase() !== t('borrar_palabra'); });

@@ -11,6 +11,10 @@ body { background-image: linear-gradient(color-mix(in srgb, var(--tinta) 4%, tra
 .marca { position: fixed; top: 22px; left: 28px; display: flex; align-items: center; gap: 9px; color: var(--gris); }
 .marca i { width: 9px; height: 9px; border-radius: 50%; background: var(--azul); box-shadow: 0 0 0 3px var(--azul-suave); }
 .marca b { font: 600 12px/1 var(--display); letter-spacing: .03em; color: var(--tinta); }
+/* Day or night: a moon by day, a sun by night (the icon says where it takes you). */
+#tema { position: fixed; top: 14px; right: 20px; width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border-radius: 50%; border: 1px solid var(--linea); background: var(--hoja); color: var(--gris); box-shadow: var(--sombra); }
+#tema:hover { color: var(--tinta); border-color: var(--gris-suave); }
+#tema svg { width: 18px; height: 18px; }
 .marca span { font-size: 12.5px; }
 main { max-width: 780px; margin: 0 auto; padding: 15vh 28px 64px; }
 #frase { font: 600 clamp(24px, 3.4vw, 36px)/1.22 var(--display); letter-spacing: -.02em; margin: 0 0 30px; text-wrap: balance; font-variant-numeric: tabular-nums; }
@@ -20,7 +24,11 @@ main { max-width: 780px; margin: 0 auto; padding: 15vh 28px 64px; }
 form { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 20px; border-radius: 28px; background: var(--hoja); border: 1px solid var(--linea); box-shadow: var(--sombra); }
 form:focus-within { border-color: var(--azul); box-shadow: 0 0 0 4px var(--azul-suave), var(--sombra); }
 form svg { width: 20px; height: 20px; color: var(--gris); flex: none; }
-#q { flex: 1; border: 0; outline: none; background: none; font-size: 17px; }
+#q { flex: 1; min-width: 0; border: 0; outline: none; background: none; font-size: 17px; }
+/* The engine, right there in the box: one click to change where searches go. */
+#motor { flex: none; max-width: 40%; height: 36px; margin-right: -8px; padding: 0 30px 0 14px; border: 0; border-left: 1px solid var(--linea); border-radius: 0 18px 18px 0; background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='%237A8299' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center / 12px; color: var(--gris); font-size: 14px; font-weight: 500; appearance: none; -webkit-appearance: none; cursor: pointer; text-overflow: ellipsis; }
+#motor:hover, #motor:focus-visible { color: var(--tinta); outline: none; }
+#motor optgroup, #motor option { color: var(--tinta); background: var(--hoja); font-weight: 400; }
 .hechos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: 34px 0 0; border-top: 1px solid var(--linea); }
 .hecho { padding: 14px 16px 0 0; }
 .hecho b { display: block; font: 600 24px/1.1 var(--display); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
@@ -47,13 +55,15 @@ a.hecho:hover span { color: var(--tinta); text-decoration: underline; text-under
 </head>
 <body>
 <div class="marca"><i></i><b data-t="app_nombre"></b><span data-t="lema"></span></div>
+<button id="tema" type="button"></button>
 <main>
   <h1 id="frase"></h1>
   <form id="buscar" autocomplete="off">
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8.6" cy="8.6" r="5.6"/><path d="M13 13l4 4"/></svg>
     <input id="q" spellcheck="false" autofocus data-t-ph="buscar_ph_inicio">
+    <select id="motor" data-t-title="buscador"></select>
   </form>
-  <p class="motor"><span id="motor-nota"></span> <button class="enlace" id="motor-cambiar" data-t="buscar_cambiar"></button></p>
+  <p class="motor"><span id="motor-nota"></span></p>
   <div class="hechos">
     <a class="hecho rojo" href="cortes.html"><b id="h-cortadas">0</b><span data-t="inicio_peticiones"></span></a>
     <a class="hecho" href="cortes.html#dato"><b id="h-datos">0</b><span data-t="inicio_datos"></span></a>

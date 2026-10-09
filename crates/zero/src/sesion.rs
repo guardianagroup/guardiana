@@ -274,6 +274,8 @@ struct Preferencias {
     buscador: String,
     /// `""` follows the system.
     idioma: String,
+    /// Day or night for the browser's own pages: `"dia"`, `"noche"`, or `""` like Windows.
+    tema: String,
     /// Sites where the form guard does not ask (outside mandates).
     sin_preguntar: BTreeSet<String>,
 }
@@ -303,6 +305,9 @@ struct Pestana {
     lista: bool,
     /// The site's icon as a `data:` PNG, as the engine fetched it (through the same checks).
     icono: String,
+    /// The tab the person was on when this one opened for them (the list of cuts opens in a tab
+    /// of its own): its «Back» button returns there.
+    vuelve: Option<u32>,
 }
 
 impl Pestana {
@@ -323,6 +328,7 @@ impl Pestana {
             al_libro: BTreeSet::new(),
             lista: false,
             icono: String::new(),
+            vuelve: None,
         }
     }
 }
@@ -432,6 +438,14 @@ fn envia(a: Origen, v: &Value) -> Orden {
         a,
         json: v.to_string(),
     }
+}
+
+/// The engines as the settings and the new tab's search box show them.
+fn lista_buscadores() -> Vec<Value> {
+    BUSCADORES
+        .iter()
+        .map(|b| json!({ "id": b.id, "nombre": b.nombre, "privado": b.privado }))
+        .collect()
 }
 
 fn sin_fragmento(url: &str) -> &str {
@@ -907,21 +921,23 @@ impl Sesion {
         o
     }
 
+    fn msg_tema(&self) -> Value {
+        json!({ "tipo": "tema", "tema": self.prefs.tema })
+    }
+
     fn msg_textos(&self) -> Value {
         json!({ "tipo": "textos", "textos": self.textos.todos(), "idioma": self.textos.idioma().codigo() })
     }
 
     fn msg_ajustes(&self) -> Value {
-        let lista: Vec<Value> = BUSCADORES
-            .iter()
-            .map(|b| json!({ "id": b.id, "nombre": b.nombre }))
-            .collect();
+        let lista = lista_buscadores();
         json!({
             "tipo": "ajustes",
             "cortar_seguimiento": self.prefs.reglas.cortar_seguimiento,
             "buscador": buscador(&self.prefs.buscador).id,
             "buscadores": lista,
             "idioma": self.prefs.idioma,
+            "tema": self.prefs.tema,
             "sin_preguntar": self.prefs.sin_preguntar,
             "huella_clave": self.huella_clave(),
         })
@@ -1013,6 +1029,8 @@ impl Sesion {
             "protege": self.licencia.protege(),
             "motor": buscador(&self.prefs.buscador).nombre,
             "motor_privado": buscador(&self.prefs.buscador).privado,
+            "motor_id": buscador(&self.prefs.buscador).id,
+            "motores": lista_buscadores(),
             "hoy": self.diario.total(&hoy, &hoy),
             "mes": self.diario.total(&mes, &hoy),
         })
@@ -1054,6 +1072,48 @@ impl Sesion {
         }];
         o.extend(self.activar(id));
         o
+    }
+
+    /// The list of cuts, in a tab of its own that remembers where the person was. Already on
+    /// it: it stays, no second copy.
+    fn abre_cortes(&mut self) -> Vec<Orden> {
+        let de = self.activa;
+        if self
+            .pestana(de)
+            .is_some_and(|p| sin_fragmento(&p.url) == CORTES)
+        {
+            return self.activar(de);
+        }
+        let o = self.nueva_pestana(Perfil::General, CORTES);
+        let nueva = self.activa;
+        let vuelve = self.pestana(de).map(|q| q.id);
+        if let Some(p) = self.pestana_mut(nueva) {
+            p.vuelve = vuelve;
+        }
+        o
+    }
+
+    /// «Back» on the browser's own pages: the page before, if there is one; otherwise the tab
+    /// it was opened from (this one closes); otherwise the new tab page.
+    fn volver(&mut self, id: u32) -> Vec<Orden> {
+        let Some(p) = self.pestana(id) else {
+            return Vec::new();
+        };
+        if p.atras {
+            return vec![Orden::Atras { id }];
+        }
+        match p.vuelve.filter(|v| self.pestana(*v).is_some()) {
+            Some(v) => {
+                self.activa = v;
+                let mut o = self.cerrar(id);
+                o.extend(self.activar(v));
+                o
+            }
+            None => vec![Orden::Navega {
+                id,
+                url: INICIO.to_string(),
+            }],
+        }
     }
 
     fn activar(&mut self, id: u32) -> Vec<Orden> {
@@ -1168,10 +1228,16 @@ impl Sesion {
                 // The new tab may only do what its own buttons do.
                 let permitido = matches!(
                     tipo.as_str(),
-                    "listo" | "navegar" | "panel" | "guardar_imagen" | "cortes" | "exportar_cortes"
+                    "listo"
+                        | "navegar"
+                        | "panel"
+                        | "guardar_imagen"
+                        | "cortes"
+                        | "exportar_cortes"
+                        | "volver"
                 ) || (tipo == "ajuste"
-                    && texto(&m, "clave") == "cortar_seguimiento"
-                    && si(&m, "valor"));
+                    && ((texto(&m, "clave") == "cortar_seguimiento" && si(&m, "valor"))
+                        || matches!(texto(&m, "clave"), "buscador" | "tema")));
                 if !permitido {
                     return Vec::new();
                 }
@@ -1271,7 +1337,11 @@ impl Sesion {
                 }
                 _ => Vec::new(),
             },
-            "abrir_cortes" => self.nueva_pestana(Perfil::General, CORTES),
+            "abrir_cortes" => self.abre_cortes(),
+            "volver" => match origen {
+                Origen::Pestana(id) => self.volver(id),
+                _ => Vec::new(),
+            },
             "preguntar_otra_vez" => {
                 let sitio_q = texto(m, "sitio").to_string();
                 if self.prefs.sin_preguntar.remove(&sitio_q) {
@@ -1365,6 +1435,7 @@ impl Sesion {
         match origen {
             Origen::Barra => {
                 let mut o = vec![
+                    envia(Origen::Barra, &self.msg_tema()),
                     envia(Origen::Barra, &self.msg_textos()),
                     self.estado(),
                     self.titulo_ventana(),
@@ -1378,6 +1449,7 @@ impl Sesion {
             }
             Origen::Panel => {
                 let mut o = vec![
+                    envia(Origen::Panel, &self.msg_tema()),
                     envia(Origen::Panel, &self.msg_textos()),
                     envia(Origen::Panel, &self.msg_ajustes()),
                     envia(Origen::Panel, &self.msg_acerca()),
@@ -1402,6 +1474,7 @@ impl Sesion {
                     p.lista = true;
                 }
                 [
+                    self.a_pestana(id, &self.msg_tema()),
                     self.a_pestana(id, &self.msg_textos()),
                     self.a_pestana(id, &self.msg_hoy()),
                 ]
@@ -1436,6 +1509,22 @@ impl Sesion {
                 }
                 let mut o = vec![envia(Origen::Panel, &self.msg_ajustes())];
                 o.extend(self.a_paginas_propias(&self.msg_hoy()));
+                o
+            }
+            "tema" => {
+                let v = valor.as_str().unwrap_or("");
+                if !matches!(v, "" | "dia" | "noche") {
+                    return Vec::new();
+                }
+                self.prefs.tema = v.to_string();
+                self.guarda_prefs();
+                let tema = self.msg_tema();
+                let mut o = vec![
+                    envia(Origen::Barra, &tema),
+                    envia(Origen::Panel, &tema),
+                    envia(Origen::Panel, &self.msg_ajustes()),
+                ];
+                o.extend(self.a_paginas_propias(&tema));
                 o
             }
             "idioma" => {

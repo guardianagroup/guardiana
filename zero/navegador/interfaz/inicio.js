@@ -14,7 +14,35 @@
   });
   document.querySelectorAll('.acciones button').forEach((b) => b.addEventListener('click', () => manda({ tipo: 'panel', vista: b.dataset.vista })));
   $('encender').addEventListener('click', () => manda({ tipo: 'ajuste', clave: 'cortar_seguimiento', valor: true }));
-  $('motor-cambiar').addEventListener('click', () => manda({ tipo: 'panel', vista: 'ajustes' }));
+  // Choosing the engine right in the search box; the program keeps it and says where searches go.
+  $('motor').addEventListener('change', (e) => {
+    manda({ tipo: 'ajuste', clave: 'buscador', valor: e.target.value });
+    $('q').focus();
+  });
+  function pintaMotores(m) {
+    const sel = $('motor');
+    if (!m.motores || sel.matches(':focus')) { if (m.motor_id) sel.value = m.motor_id; return; }
+    const opcion = (b) => `<option value="${Z.esc(b.id)}"${b.id === m.motor_id ? ' selected' : ''}>${Z.esc(b.nombre)}</option>`;
+    const grupo = (clave, lista) => (lista.length ? `<optgroup label="${Z.esc(t(clave))}">${lista.map(opcion).join('')}</optgroup>` : '');
+    sel.innerHTML = grupo('buscador_privados', m.motores.filter((b) => b.privado))
+      + grupo('buscador_otros', m.motores.filter((b) => !b.privado));
+    sel.value = m.motor_id;
+  }
+
+  // The sun or the moon: shows where a click takes the page, and the program keeps the choice
+  // for every page of the browser.
+  function pintaTema() {
+    const noche = Z.oscuro();
+    const b = $('tema');
+    b.innerHTML = noche ? Z.ICONO.sol : Z.ICONO.luna;
+    b.title = t(noche ? 'tema_dia' : 'tema_noche');
+    b.setAttribute('aria-label', b.title);
+  }
+  $('tema').addEventListener('click', () => manda({ tipo: 'ajuste', clave: 'tema', valor: Z.oscuro() ? 'dia' : 'noche' }));
+  en('tema', pintaTema);
+  en('textos', pintaTema);
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', pintaTema);
+  pintaTema();
 
   // The numbers count up once, the first time the page opens: the one moment of motion here.
   function cifra(el, valor) {
@@ -50,6 +78,7 @@
     $('mes-frase').textContent = fraseMes(mes, nombreMes);
     // Where searches go, said plainly, with the way to change it.
     $('motor-nota').textContent = m.motor ? t(m.motor_privado ? 'buscar_nota_privado' : 'buscar_nota_perfil', { motor: m.motor }) : '';
+    pintaMotores(m);
   });
 
   // «Your month in data» as an image: only the month's figures, never a website or the history.

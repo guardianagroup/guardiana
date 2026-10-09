@@ -29,6 +29,8 @@
     abierta = -1;
     pide();
   }));
+  // Back to the page the person was on: this list opens in its own tab, with nothing behind it.
+  $('volver').addEventListener('click', () => manda({ tipo: 'volver' }));
   $('pdf').addEventListener('click', () => manda({ tipo: 'exportar_cortes', periodo, formato: 'pdf' }));
   $('csv').addEventListener('click', () => manda({ tipo: 'exportar_cortes', periodo, formato: 'csv' }));
   $('f-motivo').addEventListener('change', pintaFilas);

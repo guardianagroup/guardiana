@@ -1033,3 +1033,122 @@ fn a_mandate_open_when_the_trial_ends_is_closed() {
     assert!(s.mandato.is_none());
     assert!(o.iter().any(|x| matches!(x, Orden::CierraPestana { .. })));
 }
+
+#[test]
+fn the_list_of_cuts_has_a_way_back_to_the_page_the_person_was_on() {
+    let (mut s, _, web) = con_pagina(true);
+    // From the shield: the list opens in a tab of its own, with nothing behind it.
+    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"abrir_cortes"}"#);
+    let lista = s.activa();
+    assert_ne!(lista, web);
+    assert!(o.iter().any(|x| matches!(x,
+        Orden::CreaPestana { id, url: Some(u), .. } if *id == lista && u == CORTES)));
+    // Asking for it again does not open a second copy.
+    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"abrir_cortes"}"#);
+    assert!(!o.iter().any(|x| matches!(x, Orden::CreaPestana { .. })));
+    assert_eq!(s.activa(), lista);
+    let _ = s.navegacion_empieza(lista, CORTES, false);
+    let _ = s.pagina_nueva(lista, CORTES);
+    // «Back» closes it and returns to the web, as it was.
+    let o = s.mensaje(Origen::Pestana(lista), CORTES, r#"{"tipo":"volver"}"#);
+    assert!(o
+        .iter()
+        .any(|x| matches!(x, Orden::CierraPestana { id } if *id == lista)));
+    assert!(o
+        .iter()
+        .any(|x| matches!(x, Orden::Activa { id } if *id == web)));
+    assert_eq!(s.activa(), web);
+    assert!(!o.iter().any(|x| matches!(x, Orden::Navega { .. })));
+}
+
+#[test]
+fn back_on_the_list_goes_to_the_page_before_or_to_the_new_tab() {
+    let (mut s, _, id) = con_pagina(true);
+    // Opened from the new tab's link, in the same tab: back is the page before.
+    let _ = s.navegacion_empieza(id, CORTES, false);
+    let _ = s.pagina_nueva(id, CORTES);
+    let _ = s.historial(id, true, false);
+    let o = s.mensaje(Origen::Pestana(id), CORTES, r#"{"tipo":"volver"}"#);
+    assert!(matches!(o.as_slice(), [Orden::Atras { id: a }] if *a == id));
+    // Nothing before and nowhere it came from: the new tab page, never a dead end.
+    let _ = s.historial(id, false, false);
+    let o = s.mensaje(Origen::Pestana(id), CORTES, r#"{"tipo":"volver"}"#);
+    assert!(matches!(o.as_slice(), [Orden::Navega { id: a, url }] if *a == id && url == INICIO));
+    // A web page cannot ask for it.
+    let _ = abre_pagina(&mut s, id, "https://www.eltiempo.com/");
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        "https://www.eltiempo.com/",
+        r#"{"tipo":"volver"}"#,
+    );
+    assert!(o.is_empty());
+}
+
+#[test]
+fn the_new_tab_lists_the_engines_and_can_change_the_one_in_use() {
+    let (mut s, _, id) = con_pagina(true);
+    let _ = s.navegacion_empieza(id, INICIO, false);
+    let _ = s.pagina_nueva(id, INICIO);
+    let hoy = s.msg_hoy();
+    assert_eq!(hoy["motor_id"], "duckduckgo");
+    assert_eq!(
+        hoy["motores"].as_array().map(Vec::len),
+        Some(BUSCADORES.len())
+    );
+    let _ = s.mensaje(Origen::Pestana(id), INICIO, r#"{"tipo":"listo"}"#);
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        INICIO,
+        r#"{"tipo":"ajuste","clave":"buscador","valor":"qwant"}"#,
+    );
+    assert_eq!(s.msg_hoy()["motor_id"], "qwant");
+    assert_eq!(
+        del_tipo(&o, Origen::Pestana(id), "hoy").unwrap_or_default()["motor_id"],
+        "qwant"
+    );
+    // Any other setting stays out of a page's reach.
+    let _ = s.mensaje(
+        Origen::Pestana(id),
+        INICIO,
+        r#"{"tipo":"ajuste","clave":"idioma","valor":"en"}"#,
+    );
+    assert_eq!(s.msg_ajustes()["idioma"], "");
+}
+
+#[test]
+fn day_or_night_is_kept_and_reaches_every_page_of_the_browser() {
+    let (mut s, d, id) = con_pagina(true);
+    let _ = s.navegacion_empieza(id, INICIO, false);
+    let _ = s.pagina_nueva(id, INICIO);
+    let o = s.mensaje(Origen::Pestana(id), INICIO, r#"{"tipo":"listo"}"#);
+    assert_eq!(
+        del_tipo(&o, Origen::Pestana(id), "tema").unwrap_or_default()["tema"],
+        ""
+    );
+    // The moon on the new tab: night, for the bar, the panel and the page itself.
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        INICIO,
+        r#"{"tipo":"ajuste","clave":"tema","valor":"noche"}"#,
+    );
+    for a in [Origen::Barra, Origen::Panel, Origen::Pestana(id)] {
+        assert_eq!(del_tipo(&o, a, "tema").unwrap_or_default()["tema"], "noche");
+    }
+    assert_eq!(s.msg_ajustes()["tema"], "noche");
+    // Anything else is not a theme.
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"tema","valor":"rosa"}"#,
+    );
+    assert!(o.is_empty());
+    // Kept for the next run.
+    let (s2, _) = Sesion::abre(Arranque {
+        datos: d.join("datos"),
+        descargas: d.join("descargas"),
+        idioma_sistema: "es-CO".into(),
+        version: "0.1.0".into(),
+        reloj,
+    });
+    assert_eq!(s2.msg_ajustes()["tema"], "noche");
+}

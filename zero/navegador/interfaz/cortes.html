@@ -9,6 +9,8 @@
 html, body { min-height: 100%; background: var(--hoja); }
 body { background-image: linear-gradient(color-mix(in srgb, var(--tinta) 4%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--tinta) 4%, transparent) 1px, transparent 1px); background-size: 44px 44px; background-position: -1px -1px; }
 main { max-width: 1120px; margin: 0 auto; padding: 26px 28px 64px; }
+.arriba { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.volver { display: inline-flex; align-items: center; gap: 6px; }
 .marca { display: flex; align-items: center; gap: 9px; color: var(--gris); }
 .marca i { width: 9px; height: 9px; border-radius: 50%; background: var(--azul); box-shadow: 0 0 0 3px var(--azul-suave); }
 .marca b { font: 600 12px/1 var(--display); letter-spacing: .03em; color: var(--tinta); }
@@ -101,7 +103,7 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
   :root { color-scheme: light; --hoja: #fff; --campo: #F3F5F9; --tinta: #0B1020; --gris: #4A5163; --linea: #D9DEE8; --rojo: #B3261E; }
   body { background: #fff; }
   main { max-width: none; padding: 0; }
-  .controles, .filtros, #aviso { display: none !important; }
+  .controles, .filtros, #aviso, .volver { display: none !important; }
   .informe { display: block; }
   tr.detalle { display: none !important; }
   tbody tr { break-inside: avoid; }
@@ -122,7 +124,10 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
 </head>
 <body>
 <main>
-  <div class="marca"><i></i><b data-t="app_nombre"></b><span data-t="lema"></span></div>
+  <div class="arriba">
+    <button class="boton volver" id="volver" data-t="cortes_volver" data-t-title="cortes_volver_titulo"></button>
+    <div class="marca"><i></i><b data-t="app_nombre"></b><span data-t="lema"></span></div>
+  </div>
   <div class="cabeza">
     <h1 data-t="cortes_titulo"></h1>
     <div class="controles">
@@ -130,7 +135,7 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
         <button data-periodo="hoy" data-t="cortes_hoy" aria-pressed="true"></button>
         <button data-periodo="7" data-t="cortes_7" aria-pressed="false"></button>
         <button data-periodo="mes" data-t="cortes_mes" aria-pressed="false"></button>
-        <button data-periodo="31" data-t="cortes_31" aria-pressed="false"></button>
+        <button data-periodo="31" data-t="cortes_31" data-t-title="cortes_31_titulo" aria-pressed="false"></button>
       </div>
       <button class="boton" id="pdf" data-t="cortes_pdf"></button>
       <button class="boton" id="csv" data-t="cortes_csv"></button>

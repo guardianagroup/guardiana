@@ -19,7 +19,8 @@ pub struct Buscador {
     pub privado: bool,
 }
 
-/// The engines on offer. The first is the default: it does not build a profile of the person.
+/// The engines on offer, the ones that say they keep no record first (the settings list them
+/// apart). The first is the default: it does not build a profile of the person.
 pub const BUSCADORES: &[Buscador] = &[
     Buscador {
         id: "duckduckgo",
@@ -46,6 +47,24 @@ pub const BUSCADORES: &[Buscador] = &[
         privado: true,
     },
     Buscador {
+        id: "qwant",
+        nombre: "Qwant",
+        plantilla: "https://www.qwant.com/?q={}",
+        privado: true,
+    },
+    Buscador {
+        id: "mojeek",
+        nombre: "Mojeek",
+        plantilla: "https://www.mojeek.com/search?q={}",
+        privado: true,
+    },
+    Buscador {
+        id: "swisscows",
+        nombre: "Swisscows",
+        plantilla: "https://swisscows.com/web?query={}",
+        privado: true,
+    },
+    Buscador {
         id: "google",
         nombre: "Google",
         plantilla: "https://www.google.com/search?q={}",
@@ -55,6 +74,30 @@ pub const BUSCADORES: &[Buscador] = &[
         id: "bing",
         nombre: "Bing",
         plantilla: "https://www.bing.com/search?q={}",
+        privado: false,
+    },
+    Buscador {
+        id: "yahoo",
+        nombre: "Yahoo",
+        plantilla: "https://search.yahoo.com/search?p={}",
+        privado: false,
+    },
+    Buscador {
+        id: "perplexity",
+        nombre: "Perplexity",
+        plantilla: "https://www.perplexity.ai/search?q={}",
+        privado: false,
+    },
+    Buscador {
+        id: "yandex",
+        nombre: "Yandex",
+        plantilla: "https://yandex.com/search/?text={}",
+        privado: false,
+    },
+    Buscador {
+        id: "baidu",
+        nombre: "Baidu",
+        plantilla: "https://www.baidu.com/s?wd={}",
         privado: false,
     },
 ];
@@ -162,5 +205,22 @@ mod tests {
             a_direccion("javascript:alert(1)", d),
             "https://duckduckgo.com/?q=javascript%3Aalert%281%29"
         );
+    }
+
+    #[test]
+    fn every_engine_is_https_with_one_query_and_the_private_ones_come_first() {
+        let mut vistos = std::collections::BTreeSet::new();
+        for b in BUSCADORES {
+            assert!(vistos.insert(b.id), "{} twice", b.id);
+            assert!(b.plantilla.starts_with("https://"), "{}", b.id);
+            assert_eq!(b.plantilla.matches("{}").count(), 1, "{}", b.id);
+            assert_eq!(buscador(b.id).id, b.id);
+        }
+        let primer_otro = BUSCADORES
+            .iter()
+            .position(|b| !b.privado)
+            .unwrap_or(BUSCADORES.len());
+        assert!(BUSCADORES[primer_otro..].iter().all(|b| !b.privado));
+        assert!(BUSCADORES[0].privado);
     }
 }
