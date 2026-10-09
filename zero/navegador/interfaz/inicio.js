@@ -1,4 +1,4 @@
-// The new tab: what today's pages tried and what was stopped, then the search.
+// The new tab: a greeting, the search, and what today's pages tried and what was stopped, live.
 'use strict';
 (() => {
   const { manda, en, t, tn, $, n } = Z;
@@ -44,6 +44,17 @@
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', pintaTema);
   pintaTema();
 
+  // The greeting and the date follow the clock, so the top of the page is never stale.
+  function pintaSaludo() {
+    const ahora = new Date();
+    const h = ahora.getHours();
+    $('saludo').textContent = t(h >= 5 && h < 12 ? 'saludo_manana' : (h >= 12 && h < 20 ? 'saludo_tarde' : 'saludo_noche'));
+    const f = ahora.toLocaleDateString(document.documentElement.lang || 'es', { weekday: 'long', day: 'numeric', month: 'long' });
+    $('fecha').textContent = f.charAt(0).toLocaleUpperCase() + f.slice(1);
+  }
+  en('textos', pintaSaludo);
+  setInterval(pintaSaludo, 30000);
+
   // The numbers count up once, the first time the page opens: the one moment of motion here.
   function cifra(el, valor) {
     const fin = Number(valor || 0);
@@ -62,11 +73,16 @@
     const frase = $('frase');
     if (h.empresas) {
       frase.classList.remove('cero');
-      frase.innerHTML = `<span>${Z.esc(tn('inicio_hoy_1', h.empresas, { empresas: n(h.empresas) }))}</span> <span class="azul">${Z.esc(tn('inicio_hoy_2', h.empresas_cortadas, { cortadas: n(h.empresas_cortadas) }))}</span>`;
+      frase.innerHTML = `${Z.esc(tn('inicio_hoy_1', h.empresas, { empresas: n(h.empresas) }))} <b class="rojo">${Z.esc(tn('inicio_hoy_2', h.empresas_cortadas, { cortadas: n(h.empresas_cortadas) }))}</b>`;
+      $('barra').style.width = `${Math.round((100 * (h.empresas_cortadas || 0)) / h.empresas)}%`;
+      $('l-cortadas').textContent = tn('inicio_barra_cortadas', h.empresas_cortadas, { n: n(h.empresas_cortadas) });
+      $('l-intentaron').textContent = tn('inicio_barra_intentaron', h.empresas, { n: n(h.empresas) });
     } else {
       frase.classList.add('cero');
       frase.textContent = t('inicio_hoy_cero');
     }
+    // Live while protecting; amber, not green, when the cuts are off.
+    $('hoy').classList.toggle('apagada', !m.cortando);
     cifra($('h-cortadas'), h.cortadas);
     cifra($('h-datos'), h.datos_salvados);
     cifra($('h-parametros'), h.parametros_quitados);
@@ -76,8 +92,6 @@
     mes = m.mes || {};
     const nombreMes = new Date().toLocaleDateString(document.documentElement.lang, { month: 'long' });
     $('mes-frase').textContent = fraseMes(mes, nombreMes);
-    // Where searches go, said plainly, with the way to change it.
-    $('motor-nota').textContent = m.motor ? t(m.motor_privado ? 'buscar_nota_privado' : 'buscar_nota_perfil', { motor: m.motor }) : '';
     pintaMotores(m);
   });
 

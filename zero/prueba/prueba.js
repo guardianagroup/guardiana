@@ -175,10 +175,10 @@ function pantalla(nombre) {
   await espera(500);
   pantalla('04-pestanas.png');
 
-  // The new tab: our search box, saying where searches go, and the day's cuts one click away.
+  // The new tab: our search box with its engine inside, and the day's cuts one click away.
   const nueva = await paginaQue(nav, (u) => u.endsWith('/inicio.html'));
   comprueba(await hasta(async () => (await nueva.getAttribute('#q', 'placeholder')) === 'Busca en la web o escribe una dirección'), 'la caja de búsqueda es nuestra');
-  comprueba(await hasta(async () => (await nueva.textContent('#motor-nota')).includes('DuckDuckGo')), 'y dice a dónde van las búsquedas');
+  comprueba(await hasta(() => nueva.evaluate(() => (document.querySelector('#motor').selectedOptions[0] || {}).textContent === 'DuckDuckGo')), 'y lleva dentro el buscador, a la vista');
   let cortadasHoy = 0;
   await hasta(async () => { cortadasHoy = Number((await nueva.textContent('#h-cortadas')).replace(/\D/g, '')); return cortadasHoy >= 3; });
   comprueba(cortadasHoy >= 3, `la pestaña nueva cuenta las peticiones cortadas (${cortadasHoy})`);
