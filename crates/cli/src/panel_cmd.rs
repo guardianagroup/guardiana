@@ -100,15 +100,17 @@ fn ruta_de_espera() -> std::path::PathBuf {
 /// On Windows, `guardiana panel` from the Start menu shortcut comes with a console window of
 /// its own, and that black window was the whole "screen" while the service came up. It is
 /// released at once: what the person sees is the page in the browser.
+///
+/// `unsafe` is forbidden in this project unless justified (CLAUDE.md), and this is the
+/// justification: `FreeConsole` takes no pointers and only detaches this process from its
+/// console; the process keeps running, nothing here writes to the console afterwards, and the
+/// libraries the project uses have no safe wrapper for it. Its result is ignored on purpose: with
+/// no console to release there is nothing to do.
 #[cfg(windows)]
+#[allow(unsafe_code)]
 fn soltar_consola() {
-    // SAFETY: `FreeConsole` takes no pointers and only detaches this process from its console;
-    // the process keeps running and nothing else here writes to the console afterwards. This is
-    // the justified exception of CLAUDE.md: there is no safe wrapper for it in the libraries the
-    // project uses.
-    unsafe {
-        windows_sys::Win32::System::Console::FreeConsole();
-    }
+    // SAFETY: see above; no pointers, no handles, no state shared with anything else.
+    let _ = unsafe { windows_sys::Win32::System::Console::FreeConsole() };
 }
 
 pub fn run(_opts: &Opts) -> Result<(), Box<dyn Error>> {
