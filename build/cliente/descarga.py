@@ -61,8 +61,10 @@ def get(url, binary=False):
 
 
 def latest_version():
+    # GUARDIANA's latest: a line «zero-<version>» is the browser, published on its own.
     lines = [l for l in get(LEDGER).splitlines() if l.strip().startswith("{")]
-    return json.loads(lines[-1])["version"]
+    versions = [json.loads(l)["version"] for l in lines]
+    return [v for v in versions if not v.startswith("zero-")][-1]
 
 
 def ledger_entry(version):
