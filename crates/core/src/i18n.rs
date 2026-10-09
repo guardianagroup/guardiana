@@ -110,6 +110,18 @@ pub fn json_of(t: &'static Texts) -> &'static str {
     }
 }
 
+/// The two-letter code of a `Texts`, for a `lang` attribute: the same three constants.
+#[must_use]
+pub fn code_of(t: &'static Texts) -> &'static str {
+    if std::ptr::eq(t, en()) {
+        "en"
+    } else if std::ptr::eq(t, pt()) {
+        "pt"
+    } else {
+        "es"
+    }
+}
+
 /// The language the CLI speaks: `GUARDIANA_LANG` first, then the system's `LC_ALL`, `LC_MESSAGES`
 /// or `LANG`. Windows sets none of those, so there it is the language of the Windows account
 /// (`HKCU\Control Panel\International\LocaleName`): a German Windows answers in English, a

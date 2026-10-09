@@ -81,12 +81,19 @@ propio, sin DNSSEC), y lo dice. El usuario elige el resolutor en el panel y ve c
 
 ## 4 · Fallos seguros
 
-- Si el servicio cae, el sistema sigue resolviendo por el DNS secundario (el original). Al volver, se
-  anota "Guardiana no estaba vigilando entre X e Y". Windows puede consultar ambos en paralelo: límite
-  conocido, documentado.
+- Guardiana es el único resolutor del equipo (desde la 1.0.2: Windows consultaba el secundario en
+  paralelo y el guardián no veía esas consultas). Si el servicio se para de forma ordenada, caduca o
+  se desinstala, devuelve el DNS original antes de irse. Si cae de golpe, el equipo se queda sin
+  nombres hasta que el sistema lo relanza (5 s en Linux; 5/15/60 s en Windows; inmediato con launchd),
+  y el propio servicio comprueba cada 15 s que su resolutor sigue vivo y lo levanta si no. Al volver,
+  se anota "Guardiana no estaba vigilando entre X e Y".
 - Sin licencia y sin prueba: Modo Hogar se apaga con aviso; el DNS del computador nunca se rompe.
 - Desinstalar restaura exactamente la configuración de DNS anterior y quita la regla de cortafuegos.
-- Nunca se corta nada antes de 24 h de observación, ni sin decisión del usuario, ni sin deshacer.
+- Nada ancho (una categoría, toda la casa, el Modo Vigilante) se corta antes de 24 h de observación
+  del aparato. Un nombre concreto en un aparato concreto sí puede cortarse desde el primer minuto,
+  porque es una decisión del usuario sobre una cosa que está viendo (decisión del 20 sep 2026); el
+  panel pide confirmación mientras lleve menos de un día mirando. Nunca sin decisión del usuario, ni
+  sin deshacer.
 
 ## 5 · Lo que este modelo no cubre
 

@@ -31,6 +31,10 @@ serde_json = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-service = { workspace = true }
+# windows-sys ya entra en el árbol por otras dependencias; aquí solo para soltar la consola
+# negra que Windows abre al lanzar «guardiana panel» desde el acceso del menú Inicio: la pantalla
+# de espera es una página en el navegador, con el logo, y la consola ya no dice nada (8 oct 2026).
+windows-sys = { version = "0.61", features = ["Win32_System_Console"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }

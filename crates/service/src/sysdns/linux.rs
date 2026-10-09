@@ -104,6 +104,24 @@ fn resolv_backup_path() -> PathBuf {
     guardiana_core::paths::data_dir().join("resolv.conf.guardiana-backup")
 }
 
+/// The links the copy covers, one name per line, next to the resolv.conf copy: what the
+/// watchdog's check reads to leave the other links (a VPN, a bridge) out of the question.
+fn links_path() -> PathBuf {
+    guardiana_core::paths::data_dir().join("resolved-links.guardiana-backup")
+}
+
+/// The link names written by the last apply, if the copy is in place.
+pub(crate) fn backup_link_ids() -> Option<Vec<String>> {
+    let text = std::fs::read_to_string(links_path()).ok()?;
+    Some(
+        text.lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .map(str::to_owned)
+            .collect(),
+    )
+}
+
 // ----- systemd-resolved -----------------------------------------------------
 
 /// `resolvectl dns` prints `Global: ...` and `Link N (name): servers...`.
@@ -214,6 +232,8 @@ fn resolv_conf_to_guardian(guardian: IpAddr, backup: &Backup) -> Result<(), Erro
         None => backup_path.display().to_string(),
     };
     std::fs::write(&backup_path, original)?;
+    let links: Vec<&str> = backup.interfaces.iter().map(|i| i.id.as_str()).collect();
+    std::fs::write(links_path(), links.join("\n") + "\n")?;
     let mut text = String::new();
     text.push_str("# Guardiana: el guardián es el único resolutor de este equipo.\n");
     text.push_str("# Lo que había antes: ");
@@ -223,6 +243,16 @@ fn resolv_conf_to_guardian(guardian: IpAddr, backup: &Backup) -> Result<(), Erro
     text.push_str("nameserver ");
     text.push_str(&guardian.to_string());
     text.push('\n');
+    // The search list and the domain of the original file stay: the programs that read this
+    // file instead of asking resolved (Go without cgo, musl, scripts) lost `ssh nas` without
+    // them (review of 8 Oct 2026). Only the resolver lines are replaced.
+    for line in original.lines() {
+        let l = line.trim();
+        if l.starts_with("search ") || l.starts_with("domain ") {
+            text.push_str(l);
+            text.push('\n');
+        }
+    }
     text.push_str("options edns0 trust-ad\n");
     if std::fs::read_to_string(RESOLV_CONF).is_ok_and(|old| old == text)
         && !std::fs::symlink_metadata(RESOLV_CONF).is_ok_and(|m| m.file_type().is_symlink())
@@ -256,6 +286,7 @@ fn resolv_conf_restore(backup: &Backup) -> Result<(), Error> {
         std::fs::write(RESOLV_CONF, text)?;
     }
     let _ = std::fs::remove_file(resolv_backup_path());
+    let _ = std::fs::remove_file(links_path());
     Ok(())
 }
 
@@ -632,9 +663,23 @@ pub(crate) fn apply(backup: &Backup, guardian: IpAddr) -> Result<(), Error> {
             // Door three, after the restart because per-link settings live in
             // memory and the restart clears them: the link itself, with nothing
             // but the guardian on it and every domain routed through it.
+            // A link in the copy that is gone now (a VPN tunnel, a dock) is skipped, as in the
+            // undo: until 1.0.5 it stopped the loop and the links after it, the Wi-Fi included,
+            // were left pointing at the router (review of 8 Oct 2026).
             for i in &backup.interfaces {
-                run_checked("resolvectl", &["dns", i.id.as_str(), g.as_str()])?;
-                run_checked("resolvectl", &["domain", i.id.as_str(), "~."])?;
+                if !link_exists(&i.id) {
+                    continue;
+                }
+                for args in [
+                    ["dns", i.id.as_str(), g.as_str()],
+                    ["domain", i.id.as_str(), "~."],
+                ] {
+                    match run_checked("resolvectl", &args) {
+                        Ok(_) => {}
+                        Err(e) if link_is_gone(&e.to_string()) => break,
+                        Err(e) => return Err(e),
+                    }
+                }
             }
             Ok(())
         }

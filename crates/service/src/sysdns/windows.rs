@@ -23,10 +23,18 @@ use serde::{Deserialize, Serialize};
 
 use super::{run_checked, undo_each, Backup, Error, InterfaceDns, Method};
 
+/// Tunnel (131) and virtual (53) adapters are left alone, in the copy and in the watch: a VPN
+/// brings its own resolver for its own names, and pointing it here sent the office names to the
+/// home router and fought the VPN client every minute (review of 8 Oct 2026). What the VPN
+/// resolves, Guardiana does not see, and the panel says so.
 const SNAPSHOT_SCRIPT: &str = r#"
 $ErrorActionPreference = 'Stop'
 $out = @()
 Get-NetIPInterface -AddressFamily IPv4 | Where-Object { $_.ConnectionState -eq 'Connected' -and $_.InterfaceAlias -notlike 'Loopback*' } | ForEach-Object {
+  if (Get-Command Get-NetAdapter -ErrorAction SilentlyContinue) {
+    $a = Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue
+    if ($a -and ($a.InterfaceType -in 131, 53)) { return }
+  }
   $i = $_
   $d = Get-DnsClientServerAddress -InterfaceIndex $i.InterfaceIndex -AddressFamily IPv4
   $g = $null
@@ -45,11 +53,15 @@ ConvertTo-Json -InputObject $out -Compress -Depth 3
 /// One line per connected interface with resolvers: `v4,list|v6,list`.
 const PRIMARY_SCRIPT: &str = r#"
 Get-NetIPInterface -AddressFamily IPv4 | Where-Object { $_.ConnectionState -eq 'Connected' -and $_.InterfaceAlias -notlike 'Loopback*' } | ForEach-Object {
+  if (Get-Command Get-NetAdapter -ErrorAction SilentlyContinue) {
+    $a = Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue
+    if ($a -and ($a.InterfaceType -in 131, 53)) { return }
+  }
   $v4 = @((Get-DnsClientServerAddress -InterfaceIndex $_.InterfaceIndex -AddressFamily IPv4).ServerAddresses | Where-Object { $_ })
   $d6 = Get-DnsClientServerAddress -InterfaceIndex $_.InterfaceIndex -AddressFamily IPv6 -ErrorAction SilentlyContinue
   $v6 = @()
   if ($d6) { $v6 = @($d6.ServerAddresses | Where-Object { $_ }) }
-  if ($v4.Count -gt 0) { ($v4 -join ',') + '|' + ($v6 -join ',') }
+  if ($v4.Count -gt 0 -or $v6.Count -gt 0) { ($v4 -join ',') + '|' + ($v6 -join ',') }
 }
 "#;
 
@@ -294,8 +306,11 @@ fn line_is_guarded(line: &str) -> bool {
     let (v4, v6) = line.split_once('|').unwrap_or((line, ""));
     let v4: Vec<IpAddr> = parse_list(v4);
     let v6 = real_v6(&parse_list(v6));
-    v4 == [IpAddr::V4(Ipv4Addr::LOCALHOST)]
-        && (v6.is_empty() || v6 == [IpAddr::V6(Ipv6Addr::LOCALHOST)])
+    // An interface with IPv6 resolvers only (a network that hands out no IPv4 DNS) is
+    // guarded when those are the guardian: until 1.0.5 it was not even listed, so it was
+    // never re-pointed and never seen as still pointed (review of 8 Oct 2026).
+    let v4_ok = v4 == [IpAddr::V4(Ipv4Addr::LOCALHOST)] || (v4.is_empty() && !v6.is_empty());
+    v4_ok && (v6.is_empty() || v6 == [IpAddr::V6(Ipv6Addr::LOCALHOST)])
 }
 
 /// Whether every connected interface with resolvers asks Guardiana and only Guardiana,
@@ -322,8 +337,9 @@ pub(crate) fn guardian_still_set() -> Option<bool> {
     let mut alguna = false;
     for l in out.lines().map(str::trim).filter(|l| !l.is_empty()) {
         hay = true;
-        let (v4, _) = l.split_once('|').unwrap_or((l, ""));
-        alguna |= parse_list(v4).contains(&IpAddr::V4(Ipv4Addr::LOCALHOST));
+        let (v4, v6) = l.split_once('|').unwrap_or((l, ""));
+        alguna |= parse_list(v4).contains(&IpAddr::V4(Ipv4Addr::LOCALHOST))
+            || parse_list(v6).contains(&IpAddr::V6(Ipv6Addr::LOCALHOST));
     }
     hay.then_some(alguna)
 }

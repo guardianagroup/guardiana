@@ -47,7 +47,7 @@
   "veredictos": {
     "observado": "observed",
     "respondido": "answered",
-    "cortado": "cut"
+    "cortado": "blocked"
   },
   "decidido_por": {
     "alcance_declarado": "outside the scope you declared",
@@ -185,7 +185,7 @@
     "panel.sin_permiso": "The panel key is kept by the service at {ruta} and only the administrator can read it. Type “sudo guardiana panel”: it gives you the link to open in your browser.",
     "panel.sin_permiso_windows": "Windows will not let this user read the panel key ({ruta}). Open the Start menu, look for “GUARDIANA” and open it from there, or open “Command Prompt” with “Run as administrator” and type “guardiana panel”.",
     "panel.enlace_sudo": "Open this link in your browser (it carries your session key; do not share it): {url}",
-    "panel.esperando": "Guardiana is starting; the panel opens as soon as it answers…",
+    "panel.esperando": "Guardiana is starting. The panel opens by itself as soon as the service answers.",
     "panel.abriendo": "Opening the panel: {url}",
     "observe.puerto80": "Could not open {addr} for the checker page ({motivo}). Phones can use http://{addr}:7443/mi-dispositivo.",
     "informe.cabecera": "Weekly report of the home ({desde} → {hasta})",
@@ -268,7 +268,11 @@
     "verify.registro.mac_zip": "Public record: on a Mac the record lists the .zip you downloaded, not the program inside it, so this fingerprint cannot be in it. Compare the .zip's fingerprint with the one on the website.",
     "verify.registro.mac_zip_huella": "Public record: on a Mac the record lists the .zip, not the program inside it. This version's is {archivo}, fingerprint {sha}: compare it with the .zip you downloaded.",
     "verify.puertos.de_otros": "Other programs hold these ports open towards the local network; they are not Guardiana's: {puertos}.",
-    "verify.puertos.dueno_desconocido": "These ports are open towards the local network by a program the system will not name without administrator rights: {puertos}. They are not put down to Guardiana; to see whose they are, run verify again as administrator."
+    "verify.puertos.dueno_desconocido": "These ports are open towards the local network by a program the system will not name without administrator rights: {puertos}. They are not put down to Guardiana; to see whose they are, run verify again as administrator.",
+    "observe.hogar_puerto_ocupado": "Home mode: {addr} could not be opened for the home's devices (another program holds it or the address changed). This computer is still watched; it is tried again at the next check.",
+    "observe.resolutor_caido": "The resolver stopped answering on its own; Guardiana brings it back up.",
+    "panel.tarda": "This is taking longer than usual. If it does not open within a minute, open the Start menu, look for “GUARDIANA” and open it from there.",
+    "panel.abriendo_espera": "Guardiana is starting: the browser opens the panel as soon as it answers."
   },
   "paises": {
     "AE": "United Arab Emirates",
@@ -400,7 +404,7 @@
     "c_publicidad": "advertising",
     "c_nuevos": "new destinations",
     "c_esperados": "normal",
-    "c_cortados": "cut",
+    "c_cortados": "blocked",
     "col_hora": "time",
     "col_nombre": "service",
     "col_empresa_n": "company",
@@ -412,7 +416,7 @@
     "trampa_frase": "This name only exists inside one of your trap files. Guardiana did not open that file or any other: all it saw is that something asked for this name, and that name cannot be known without having read the file.",
     "ia_programa_titulo": "The program that made those queries, according to Windows itself. Only on this computer: from a phone in Home Mode you see the service name and nothing else.",
     "col_consultas": "queries",
-    "col_cortados": "cut",
+    "col_cortados": "blocked",
     "col_ultima": "last activity",
     "col_detalle": "detail",
     "col_fecha": "date",
@@ -463,7 +467,7 @@
     "s_no_respuestas": "Only queries are recorded: name, type, device, time, category and verdict; on Windows, for this computer's own, also which program asked: its name, its path on disk (which may include your user name) and the file's fingerprint. Never the answers, never the content.",
     "retencion_ilimitada": "no limit: nothing is deleted, not even when you stop paying",
     "outbound_titulo": "What Guardiana has sent out",
-    "outbound_lead": "Every connection the program made by itself: activating the licence, the subscription check (8 days after activation and once per period), checking the version or updating lists. With whom, when and how many bytes.",
+    "outbound_lead": "Every connection the program made by itself: activating the licence and the subscription check (8 days after activating it and once per period). There is no other: the lists ship inside the program and new versions are installed by you. With whom, when and how many bytes.",
     "outbound_vacio": "Guardiana has sent nothing out of this machine.",
     "ia_prefijo": "AI",
     "creada_panel": "you, in the panel",
@@ -613,6 +617,13 @@
     "cat_pista_app": "its server",
     "cat_pista_web": "its site",
     "leyenda_desconocido": "“Local network” is the devices of your home finding each other: it does not go out to the internet. “Delivery” is a network that carries other companies’ content: not the destination, the road. “Its site”, “your account”, “its server”, “content”, “settings”, “measurement”… is what the name itself says (www, login, api, cdn, config, analytics…): a hint, not a check. “Service” is a name of a known company that no list marks and whose name does not say what it is for. “Unclassified” means neither any public list nor our company list knows it; not that it is suspicious.",
+    "leyenda_colores": "<b>The three colours of the category.</b> <span class=\"nivel-pt verde\">Green</span>: normal, what a service needs to work (its website, its server, your account, updates, content, your home network). <span class=\"nivel-pt naranja\">Orange</span>: worth a look; it measures what you do, serves ads or nobody knows it (advertising, telemetry, measurement, unclassified). <span class=\"nivel-pt rojo\">Red</span>: alert; a public list recognises it as tracking, the company is registered as a data broker, or it tries to dodge the watch. It is a way of reading the category, not a verdict: click the label to learn what it means, and block or unblock each row with its button.",
+    "nivel_verde": "green: normal",
+    "nivel_naranja": "orange: worth a look",
+    "nivel_rojo": "red: alert",
+    "cat_enlace_web": "Open {dominio} in a new tab",
+    "cat_enlace_guia": "Click to learn what it means",
+    "guia_categorias_url": "https://guardianagroup.com/en/guides/categories.html",
     "alcance_cortar_todo": "It applies to the whole device, not only to the agent: the cut is by name, for any program. On Windows Guardiana tells you afterwards which program asked, but it cannot cut just one.",
     "alcance_cortar_aviso": "Guard Mode cuts EVERYTHING that is not on your list, on the whole device.\n\nWith the list as it is, {n} names would have been cut in the last day: {ejemplos}.\n\nIf you work on this machine, you lose those sites. Switch it on?",
     "alcance_cortar": "Guard Mode",
@@ -648,10 +659,10 @@
     "rafagas_oficio": "{n} with a written trade (measurement, attribution, ads)",
     "rafagas_ninguna": "None in the last 24 hours yet.",
     "rafagas_limite": "This is what the device asked for at once. It does not say which app did it or what was sent: GUARDIANA sees names, not content.",
-    "cortar_pronto_confirmar": "Cut \"{nombre}\"?\n\nGuardiana has not been on this machine long and does not know yet whether some program needs it. If anything breaks, one click undoes it under Rules.",
-    "cortar_limite": "Cutting a name cuts the question in this home. It does not erase what was already sent, and it does not stop anyone who already has the address saved or uses their own DNS.",
+    "cortar_pronto_confirmar": "Block \"{nombre}\"?\n\nGuardiana has not been on this machine long and does not know yet whether some program needs it. If anything breaks, one click undoes it under Rules.",
+    "cortar_limite": "Blocking a name blocks the question in this home. It does not erase what was already sent, and it does not stop anyone who already has the address saved or uses their own DNS.",
     "desbloquear_boton": "unblock",
-    "cortar": "cut",
+    "cortar": "block",
     "permitir": "allow",
     "observando": "Guardiana is watching: {h} hours of 24",
     "observando_una": "Guardiana is watching: 1 hour of 24",
@@ -667,7 +678,7 @@
     "guardar": "Save",
     "guardado": "Saved. Applied when Guardiana restarts.",
     "mi_reglas_titulo": "Rules of this device",
-    "mi_reglas_lead": "Only you, from this device, can create and undo them.",
+    "mi_reglas_lead": "The rules of this device: the ones you created from here and the ones the home's panel set for it. You can undo any of them from here; nobody else in the home sees the detail of what you ask unless you share it.",
     "nav_verify": "Verify",
     "verify_titulo": "Verify",
     "verify_lead": "The same thing guardiana verify prints: facts, not promises. If something does not add up, it shows here.",
@@ -682,7 +693,7 @@
     "licencia_prueba_sin_marca": "The seven days are counted on your machine, in your ledger. The separate mark that stops them from starting over ({donde}) could not be written because GUARDIANA has no administrator rights, so for now the date is only in the ledger.",
     "licencia_ancla_texto": "A copy of your key, of this activation's number and of the product is also kept in {donde}, where only an administrator can touch it, so losing the data folder does not lose what you paid for. Not your name, not your e-mail.",
     "licencia_err_clave_vacia": "Type the licence key you received by e-mail. Nothing was sent.",
-    "licencia_plus_rechazada": "The gateway has been turning the key down for 7 days (after a refund, for instance), so the licence ended on {fecha}. GUARDIANA has stopped watching and has put the DNS back as it was; what was written down stays on your disk. If you think this is a mistake, write to hola@guardianagroup.com.",
+    "licencia_plus_rechazada": "The gateway has been saying for 7 days that the key is not valid (after a refund, for instance, or after disabling it), so the licence ended on {fecha}. GUARDIANA has stopped watching and has given the DNS back as it was; what was written down stays on your disk. If you think this is a mistake, write to hola@guardianagroup.com.",
     "licencia_prueba_agotada": "The trial ended on {fecha}. GUARDIANA has stopped watching and has put this machine’s DNS back as it was: your internet works the same. What was written down is whole on your disk and you can export it. To watch again, activate your licence key.",
     "licencia_origen_clave": "activated with a key",
     "licencia_clave_titulo": "Activate with a key",
@@ -830,6 +841,8 @@
     "prueba_quedan": "{d} days of trial left.",
     "prueba_queda_uno": "1 day of trial left.",
     "prueba_franja_texto": "After that GUARDIANA stops watching and puts the DNS back as it was; what was written down stays on your disk.",
-    "prueba_franja_enlace": "See the licence →"
+    "prueba_franja_enlace": "See the licence →",
+    "licencia_err_inactiva": "The gateway knows the key, but it is not active yet: the subscription is waiting for its first payment (or the payment failed). As soon as the gateway records it, type the key here again and it activates.",
+    "licencia_err_limite": "This key has already been used on every computer it allows. To free one or add more, write to hola@guardianagroup.com with the key: it is sorted out the same day."
   }
 }

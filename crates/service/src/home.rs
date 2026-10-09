@@ -134,7 +134,9 @@ pub fn firewall_allow() -> Result<(), FirewallError> {
         let programa = format!("program={}", exe.display());
         let rules = [("UDP", "53"), ("TCP", "53"), ("TCP", "7443"), ("TCP", "80")];
         for (proto, port) in rules {
-            run_checked(
+            // A door opened and the next one refused: the ones already open are closed again,
+            // so the firewall is either as Guardiana wants it or as it was (review of 8 Oct 2026).
+            let abierta = run_checked(
                 "netsh",
                 &[
                     "advfirewall",
@@ -150,8 +152,11 @@ pub fn firewall_allow() -> Result<(), FirewallError> {
                     &format!("protocol={proto}"),
                     &format!("localport={port}"),
                 ],
-            )
-            .map_err(|e| FirewallError::Command(e.to_string()))?;
+            );
+            if let Err(e) = abierta {
+                let _ = firewall_remove();
+                return Err(FirewallError::Command(e.to_string()));
+            }
         }
         Ok(())
     }

@@ -291,20 +291,6 @@ pub(crate) async fn textos(Lang(t): Lang) -> Response {
         .into_response()
 }
 
-/// The calling device's own record, by IP. Loopback is this computer.
-pub(crate) async fn me(
-    State(state): State<Arc<AppState>>,
-    ConnectInfo(peer): ConnectInfo<SocketAddr>,
-    _p: PorDireccion,
-) -> ApiResult<Option<Device>> {
-    let id = if peer.ip().is_loopback() {
-        SELF_DEVICE_ID.to_owned()
-    } else {
-        format!("ip:{}", peer.ip())
-    };
-    Ok(Json(with_ledger(&state, |l| l.device(&id))?))
-}
-
 // ----- home panel (token) ---------------------------------------------------
 
 #[derive(Serialize)]
@@ -331,6 +317,7 @@ pub(crate) async fn dns_aplicar(
     if !puede {
         return Err((StatusCode::CONFLICT, t.panel("caducado_dns").to_owned()).into_response());
     }
+    let _uno = state.dns_cambio.lock().await;
     let already =
         with_ledger(&state, |l| l.setting(SETTING_BACKUP))?.is_some_and(|v| !v.is_empty());
     if already {
@@ -412,6 +399,7 @@ pub(crate) async fn dns_restaurar(
     _s: Session,
 ) -> ApiResult<DnsCambio> {
     use guardiana_service::sysdns;
+    let _uno = state.dns_cambio.lock().await;
     let stored = with_ledger(&state, |l| l.setting(SETTING_BACKUP))?.filter(|v| !v.is_empty());
     // Undoing by hand is also saying no to the copy parked when the trial ended: it is not
     // applied again when the licence comes back.
@@ -692,10 +680,15 @@ fn lectura(
     let mut relay = false;
     let mut evasiones = 0;
     for e in &events {
-        if let Some(c) = empresa_de(&e.qname) {
+        // The road is not the destination: a name served through a delivery network or a
+        // hosting cloud says who carries it, not who the device talked to, and it is left out
+        // of «who it talked to» and of the countries (review of 8 Oct 2026: a bank's app on
+        // AWS counted as «Amazon · United States»).
+        let entrega = guardiana_lists::delivery_of(&e.qname).is_some();
+        if let Some(c) = empresa_de(&e.qname).filter(|_| !entrega) {
             *by_company.entry(c).or_insert(0) += 1;
         }
-        if let Some(p) = pais_codigo_de(&e.qname) {
+        if let Some(p) = pais_codigo_de(&e.qname).filter(|_| !entrega) {
             *by_country.entry(p).or_insert(0) += 1;
         }
         let q = e.qname.to_ascii_lowercase();
@@ -972,7 +965,9 @@ pub(crate) async fn alcance(
     // más fácil de saltársela, y encima la más dañina —y el aviso que enseña el panel se calcula
     // sobre las últimas 24 horas, o sea que en un equipo recién instalado dice un número
     // tranquilizador porque todavía no hay historia. Visto en el repaso del 20 sep 2026.
-    if body.modo.as_deref() == Some("cortar") && body.pase_horas.is_none() {
+    // A pass («observe for N hours, then cut again») is a way of turning the cut on too: it
+    // waits for the same day (review of 8 Oct 2026).
+    if body.modo.as_deref() == Some("cortar") || body.pase_horas.is_some() {
         let dev = with_ledger(&state, |l| l.device(&body.device_id))?;
         let observado = dev.map_or(0, |d| now_ms() - d.first_seen);
         if !observation_complete(observado) {
@@ -1014,6 +1009,9 @@ pub(crate) async fn alcance_anadir(
     let Some((nombre, _)) = guardiana_core::rules::normalizar_nombre(&body.nombre) else {
         return Err((StatusCode::BAD_REQUEST, "bad name").into_response());
     };
+    if with_ledger(&state, |l| l.device(&body.device_id))?.is_none() {
+        return Err((StatusCode::NOT_FOUND, "unknown device").into_response());
+    }
     with_ledger(&state, |l| {
         let key = scope_key(&body.device_id);
         let mut lineas: Vec<String> = l
@@ -1328,9 +1326,9 @@ pub(crate) async fn extracto(
     Query(q): Query<HashMap<String, String>>,
 ) -> ApiResult<Extracto> {
     let mut filter = filter_from(&q)?;
-    if filter.limit.is_none() {
-        filter.limit = Some(200);
-    }
+    // The page offers up to 5 000; a hand-typed limit above that would build a JSON of the
+    // whole ledger in memory (review of 8 Oct 2026).
+    filter.limit = Some(filter.limit.unwrap_or(200).min(5_000));
     let (events, total, todos, devices, huecos) = with_ledger(&state, |l| {
         Ok((
             l.events(&filter)?,
@@ -1749,7 +1747,8 @@ pub(crate) async fn hogar_activar(
     if !puede {
         return Err((StatusCode::CONFLICT, t.panel("caducado_hogar").to_owned()).into_response());
     }
-    let aviso = match home::firewall_allow() {
+    // netsh/ufw take seconds on Windows: off the workers that answer queries.
+    let aviso = match en_hilo_aparte(home::firewall_allow) {
         Ok(()) => None,
         Err(home::FirewallError::Manual) => Some(t.panel("hogar_firewall_manual").to_owned()),
         Err(home::FirewallError::Command(_)) => Some(t.panel("hogar_no_admin").to_owned()),
@@ -1785,7 +1784,7 @@ pub(crate) async fn hogar_desactivar(
     State(state): State<Arc<AppState>>,
     _s: Session,
 ) -> ApiResult<HogarCambio> {
-    let aviso = match home::firewall_remove() {
+    let aviso = match en_hilo_aparte(home::firewall_remove) {
         Ok(()) | Err(home::FirewallError::Manual) => None,
         Err(home::FirewallError::Command(_)) => Some(t.panel("hogar_no_admin").to_owned()),
     };
@@ -1813,17 +1812,23 @@ pub(crate) struct MiDispositivo {
     lectura: Lectura,
 }
 
-pub(crate) fn identity_of(peer: SocketAddr) -> String {
+pub(crate) fn identity_of(state: &AppState, peer: SocketAddr) -> String {
+    quien_es(state, peer).id
+}
+
+/// Who asks, by the panel's one neighbour-table reader: a `Resolver` made per request read the
+/// table (a process: `arp`, PowerShell) on every call, and any phone of the Wi-Fi could keep the
+/// guardian running it in a loop (review of 8 Oct 2026). The shared one re-reads at most every
+/// thirty seconds.
+pub(crate) fn quien_es(state: &AppState, peer: SocketAddr) -> guardiana_devices::Identity {
     if peer.ip().is_loopback() {
-        SELF_DEVICE_ID.to_owned()
+        guardiana_devices::Identity {
+            id: SELF_DEVICE_ID.to_owned(),
+            mac: None,
+            ip: peer.ip(),
+        }
     } else {
-        // Reads the neighbour table: a process on Windows and on Linux, and a phone asks this
-        // every five seconds.
-        en_hilo_aparte(|| {
-            guardiana_devices::Resolver::default()
-                .identify(peer.ip())
-                .id
-        })
+        en_hilo_aparte(|| state.vecinos.identify(peer.ip()))
     }
 }
 
@@ -1833,7 +1838,7 @@ pub(crate) async fn mi_dispositivo(
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     _p: PorDireccion,
 ) -> ApiResult<MiDispositivo> {
-    let id = identity_of(peer);
+    let id = identity_of(&state, peer);
     let now = now_ms();
     let (device, totals, events, lectura) = with_ledger(&state, |l| {
         let device = l.device(&id)?;
@@ -1891,7 +1896,7 @@ pub(crate) async fn mi_nombre(
     let (id, mac, ip) = if peer.ip().is_loopback() {
         (SELF_DEVICE_ID.to_owned(), None, None)
     } else {
-        let who = guardiana_devices::Resolver::default().identify(peer.ip());
+        let who = quien_es(&state, peer);
         (who.id, who.mac, Some(peer.ip().to_string()))
     };
     Ok(Json(with_ledger(&state, |l| {
@@ -1914,7 +1919,7 @@ pub(crate) async fn mi_compartir(
     _p: PorDireccion,
     Json(body): Json<Compartir>,
 ) -> ApiResult<Option<Device>> {
-    let id = identity_of(peer);
+    let id = identity_of(&state, peer);
     Ok(Json(with_ledger(&state, |l| {
         l.set_share_detail(&id, body.compartir)?;
         l.device(&id)
@@ -2500,7 +2505,7 @@ pub(crate) async fn mi_reglas(
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     _p: PorDireccion,
 ) -> ApiResult<Reglas> {
-    let id = identity_of(peer);
+    let id = identity_of(&state, peer);
     Ok(Json(list_rules(&state, Some(&id))?))
 }
 
@@ -2511,7 +2516,7 @@ pub(crate) async fn mi_nueva_regla(
     _p: PorDireccion,
     Json(body): Json<NuevaRegla>,
 ) -> ApiResult<AltaRegla> {
-    let id = identity_of(peer);
+    let id = identity_of(&state, peer);
     Ok(Json(create_rule(
         t,
         &state,
@@ -2527,7 +2532,7 @@ pub(crate) async fn mi_deshacer_regla(
     _p: PorDireccion,
     Path(rule_id): Path<i64>,
 ) -> ApiResult<bool> {
-    let me = identity_of(peer);
+    let me = identity_of(&state, peer);
     let now = now_ms();
     Ok(Json(with_ledger(&state, |l| {
         let own = l.rules()?.into_iter().any(|r| {
@@ -2586,6 +2591,8 @@ pub(crate) struct LicenciaView {
 fn licencia_error(t: &Texts, e: &guardiana_license::Error) -> String {
     match e {
         guardiana_license::Error::Malformed(_) => t.panel("licencia_err_formato").to_owned(),
+        guardiana_license::Error::KeyInactive => t.panel("licencia_err_inactiva").to_owned(),
+        guardiana_license::Error::ActivationLimit => t.panel("licencia_err_limite").to_owned(),
         guardiana_license::Error::KeyRejected(why) => {
             t.panel("licencia_err_clave").replace("{motivo}", why)
         }
@@ -2752,12 +2759,12 @@ pub(crate) async fn licencia_clave(
             .into_response());
     }
     let st = state.clone();
-    // The network call blocks: keep it off the async workers.
+    // The network call blocks: keep it off the async workers, and off the panel's own ledger
+    // lock: with the lock held, every page of the panel waited the gateway's 20-second timeout
+    // (review of 8 Oct 2026). A connection of its own, like the housekeeping's.
     let result = tokio::task::spawn_blocking(move || {
-        let Ok(mut guard) = st.ledger.lock() else {
-            return Err("ledger lock poisoned".to_owned());
-        };
-        guardiana_license::activate_with_key(&mut guard, &key, &st.token, now_ms())
+        let mut propio = Ledger::open(&st.db_path, st.genesis).map_err(|e| e.to_string())?;
+        guardiana_license::activate_with_key(&mut propio, &key, &st.token, now_ms())
             .map(|_| ())
             .map_err(|e| licencia_error(t, &e))
     })

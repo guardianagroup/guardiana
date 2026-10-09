@@ -321,11 +321,33 @@ impl Inner {
                 self.rules.rules = reglas_legibles(all);
                 self.rules.version = version;
             }
+            // «Borrar todo» bumps the version too: what this pass remembered about the devices
+            // (first seen, hours profile) is read again from the ledger, so a scope declared
+            // after the wipe waits its day like the panel says (review of 8 Oct 2026).
+            self.devices_seen.clear();
+            self.devices_touched.clear();
+            self.alcances_vistos = None;
         }
     }
 }
 
 impl EnginePolicy {
+    /// The hours profiles the classifier changed, written to the ledger.
+    fn volcar_perfiles(inner: &mut Inner) {
+        let dirty = inner.classifier.take_dirty_profiles();
+        for (id, json) in dirty {
+            let _ = inner.ledger.set_hours_profile(&id, &json);
+        }
+    }
+
+    /// Everything the classifier learned and had not written yet: called when a pass ends, so
+    /// the last fifty queries' worth of profile is not lost with it.
+    fn al_cerrar(&self) {
+        if let Ok(mut inner) = self.inner.lock() {
+            Self::volcar_perfiles(&mut inner);
+        }
+    }
+
     /// What `decide` would have noted for a query the resolver answered by itself.
     fn sin_decidir(&self, q: &Query) -> Option<Pending> {
         let who = self.devices.identify(q.client.ip());
@@ -392,7 +414,7 @@ impl Policy for EnginePolicy {
             first_time,
         });
         inner.refresh_rules();
-        let decision = match rules::decide(
+        let regla = rules::decide(
             &inner.rules.rules,
             RuleInput {
                 device_id: &device_id,
@@ -401,7 +423,8 @@ impl Policy for EnginePolicy {
                 observed_ms: q.ts - first_seen,
             },
             q.ts,
-        ) {
+        );
+        let decision = match regla {
             Some(rule) if rule.action == guardiana_core::Action::Cortar => Decision::Block {
                 rule_id: Some(rule.id),
             },
@@ -414,7 +437,10 @@ impl Policy for EnginePolicy {
         // add it to the scope. It cannot undo what was already sent, and it does not reach
         // an agent that skips this resolver.
         let mut fuera_de_alcance = false;
-        let decision = if matches!(decision, Decision::Forward) {
+        // An explicit rule that allows the name wins over the declared scope too: until 1.0.5
+        // the allow was lost on the way here and Guard mode cut the name regardless of what the
+        // rules page said (review of 8 Oct 2026).
+        let decision = if matches!(decision, Decision::Forward) && regla.is_none() {
             let alcance = inner.alcance_de(&device_id);
             // Never what the machine needs to keep itself alive (updates, time, certificate
             // checks, resolvers, messaging): Guard mode is a wide cut, and the inviolable rule
@@ -496,6 +522,14 @@ impl Policy for EnginePolicy {
         event.rule_id = rule_id;
         // Solo para este equipo: de un teléfono en Modo Hogar se ve el nombre y nada más, y eso
         // lo dice cada pantalla. Si el sistema no lo dijo, el hueco se queda vacío.
+        // Counted here, before the Windows queue takes the event: until 1.0.5 the count lived
+        // after the append, the queue returned early, and on Windows the hours profile was never
+        // written down, so «out of hours» started from zero at every restart (review of 8 Oct
+        // 2026).
+        inner.recorded += 1;
+        if inner.recorded % 50 == 0 {
+            Self::volcar_perfiles(&mut inner);
+        }
         if p.device_id == guardiana_core::SELF_DEVICE_ID {
             if let Some(cola) = self.apps.as_ref().and(Some(&self.cola_apps)) {
                 // A la cola, en orden. Quien la vacía pregunta por el programa y anota.
@@ -537,13 +571,6 @@ impl Policy for EnginePolicy {
                 }
             }
             Err(e) => eprintln!("guardiana: {e}"),
-        }
-        inner.recorded += 1;
-        if inner.recorded % 50 == 0 {
-            let dirty = inner.classifier.take_dirty_profiles();
-            for (id, json) in dirty {
-                let _ = inner.ledger.set_hours_profile(&id, &json);
-            }
         }
     }
 }
@@ -604,6 +631,12 @@ fn give_dns_back_while_stopped(db: &std::path::Path) {
         return;
     };
     if json.is_empty() {
+        return;
+    }
+    // Nothing points here any more: nothing to give back. A start that fails every five seconds
+    // (port 53 taken) ran the restore each time, and on Linux-resolved that is a restart of
+    // resolved every few seconds for as long as it lasts (review of 8 Oct 2026).
+    if sysdns::guardian_still_set() == Some(false) {
         return;
     }
     if let Ok(backup) = serde_json::from_str::<Backup>(&json) {
@@ -1470,7 +1503,7 @@ async fn run_once<F: Future<Output = ()>>(
     let initial_rules = reglas_legibles(ledger.rules().unwrap_or_default());
     let initial_version = ledger.rules_version().unwrap_or(0);
     let salud = Arc::new(Salud::default());
-    let policy = EnginePolicy {
+    let policy = Arc::new(EnginePolicy {
         salud: Arc::clone(&salud),
         inner: Mutex::new(Inner {
             ledger,
@@ -1502,7 +1535,8 @@ async fn run_once<F: Future<Output = ()>>(
             }
         },
         cola_apps: Arc::default(),
-    };
+    });
+    let policy_al_cerrar = Arc::clone(&policy);
 
     let mut dns_cfg = Config::local(upstreams.clone());
     dns_cfg.listen = vec![cfg.listen];
@@ -1531,7 +1565,11 @@ async fn run_once<F: Future<Output = ()>>(
             Some(lan) if guardiana_devices::is_private_lan(IpAddr::V4(lan)) => {
                 let (dns_addr, panel_addr) = home::lan_listen_addrs(lan);
                 let dns_addr = SocketAddr::new(dns_addr.ip(), cfg.listen.port());
-                dns_cfg.listen.push(dns_addr);
+                // Optional: if the LAN address moved between the check and the bind, or something
+                // else holds <lan>:53, the home's phones wait for the next check, but this
+                // machine keeps its guardian. Until 1.0.5 the whole pass failed, the DNS was given
+                // back, and the service restarted every five seconds (review of 8 Oct 2026).
+                dns_cfg.optional_listen.push(dns_addr);
                 dns_cfg.checker_ip = Some(lan);
                 dns_cfg.canary_enabled = true;
                 panel_listen.push(panel_addr);
@@ -1601,6 +1639,7 @@ async fn run_once<F: Future<Output = ()>>(
         let imprimir = cfg.print_events;
         tokio::spawn(async move {
             let mut cada = tokio::time::interval(Duration::from_millis(250));
+            let mut conexion: Option<Ledger> = None;
             loop {
                 cada.tick().await;
                 let ahora = now_ms();
@@ -1619,7 +1658,13 @@ async fn run_once<F: Future<Output = ()>>(
                 if listos.is_empty() {
                     continue;
                 }
-                let Ok(mut l) = Ledger::open(&db, identity::genesis()) else {
+                // One connection, opened when first needed and kept: opening the ledger
+                // (schema, migrations, pragmas) four times a second was most of this task's
+                // work (review of 8 Oct 2026).
+                if conexion.is_none() {
+                    conexion = Ledger::open(&db, identity::genesis()).ok();
+                }
+                let Some(l) = conexion.as_mut() else {
                     continue;
                 };
                 for mut e in listos {
@@ -1669,6 +1714,15 @@ async fn run_once<F: Future<Output = ()>>(
             .replace("{addr}", &running.udp_addrs[0].to_string())
             .replace("{upstream}", &ups)
     );
+    if let Some(lan) = home_lan {
+        if !running.udp_addrs.iter().any(|a| a.ip() == IpAddr::V4(lan)) {
+            eprintln!(
+                "{}",
+                t.cli("observe.hogar_puerto_ocupado")
+                    .replace("{addr}", &format!("{lan}:{}", cfg.listen.port()))
+            );
+        }
+    }
     if cfg!(target_os = "macos") {
         println!("{}", t.cli("observe.limite_mac"));
     }
@@ -1777,6 +1831,18 @@ async fn run_once<F: Future<Output = ()>>(
                     }
                 }
                 _ = minute.tick() => {
+                    // A licence check that is due, at most once an hour counted in the ledger
+                    // (review of 8 Oct 2026: the hourly timer restarted with every rebuild of
+                    // the pass, and a laptop changing networks never checked).
+                    {
+                        let (db, secreto) = (keep_db.clone(), keep_secret.clone());
+                        let _ = tokio::task::spawn_blocking(move || {
+                            if let Ok(mut l) = Ledger::open(&db, identity::genesis()) {
+                                let _ = guardiana_license::check_if_due_hourly(&mut l, &secreto, now_ms());
+                            }
+                        })
+                        .await;
+                    }
                     if let Ok(l) = Ledger::open(&keep_db, identity::genesis()) {
                         // Se mira cada minuto, no cada hora: el día que termina la prueba, el
                         // programa tiene que apartarse ese día, no hasta una hora después.
@@ -1798,25 +1864,25 @@ async fn run_once<F: Future<Output = ()>>(
                                                 .cli("observe.sin_arriba")
                                                 .replace("{upstream}", &lista)
                                         );
-                                        devolver_por_silencio(&l, &lista);
+                                        aparte_del_resolutor(|| devolver_por_silencio(&l, &lista));
                                         aparte.apartado = true;
                                     }
                                 }
                                 Paso::Sondear => {
                                     if dns::upstream_answers(&keep_upstream_addrs, SONDA).await {
-                                        if volver_con_arriba(&l) {
+                                        if aparte_del_resolutor(|| volver_con_arriba(&l)) {
                                             aparte.apartado = false;
                                         }
-                                    } else if sysdns::guardian_is_primary() == Some(true) {
+                                    } else if aparte_del_resolutor(sysdns::guardian_is_primary) == Some(true) {
                                         // The undo failed last minute, or someone pointed the
                                         // machine back here while the network is still quiet:
                                         // it goes back again, or they are left without names.
-                                        devolver_por_silencio(&l, &lista_de(&keep_upstream_addrs));
+                                        aparte_del_resolutor(|| devolver_por_silencio(&l, &lista_de(&keep_upstream_addrs)));
                                     }
                                 }
                             }
                             if !aparte.apartado {
-                                reapply_dns_if_dropped(&l);
+                                aparte_del_resolutor(|| reapply_dns_if_dropped(&l));
                             }
                             // A laptop that moved from home to the office: the resolvers that
                             // came automatically are now the office's. Rebuild with them.
@@ -1825,8 +1891,9 @@ async fn run_once<F: Future<Output = ()>>(
                                     if let Ok(b) = serde_json::from_str::<Backup>(&json) {
                                         // The same sieve as at the start of the pass: a list
                                         // that is only this machine is no reason to rebuild.
-                                        let ahora =
-                                            sysdns::away_from_self(sysdns::upstreams_for(&b));
+                                        let ahora = aparte_del_resolutor(|| {
+                                            sysdns::away_from_self(sysdns::upstreams_for(&b))
+                                        });
                                         if !ahora.is_empty() && ahora != keep_upstreams {
                                             if let Some(tx) = reconfigure_tx.take() {
                                                 let _ = tx.send(());
@@ -1851,11 +1918,13 @@ async fn run_once<F: Future<Output = ()>>(
                     // extract is the person's, and deleting a piece of it to sell them the rest is
                     // not something this program does. Off the runtime's threads: the call can
                     // wait 20 seconds for the gateway, and the resolver runs on these threads
-                    // (review of 5 Oct 2026, licence medium).
+                    // (review of 5 Oct 2026, licence medium). The minute's tick does the same
+                    // with the hour counted in the ledger, so a pass rebuilt often still checks;
+                    // this one stays for a pass that lives the whole hour.
                     let (db, secreto) = (keep_db.clone(), keep_secret.clone());
                     let _ = tokio::task::spawn_blocking(move || {
                         if let Ok(mut l) = Ledger::open(&db, identity::genesis()) {
-                            let _ = guardiana_license::check_if_due(&mut l, &secreto, now_ms());
+                            let _ = guardiana_license::check_if_due_hourly(&mut l, &secreto, now_ms());
                         }
                     })
                     .await;
@@ -1877,13 +1946,34 @@ async fn run_once<F: Future<Output = ()>>(
         });
     }
 
-    let exit = tokio::select! {
-        _ = &mut shutdown => Exit::Shutdown,
-        _ = &mut reconfigure => Exit::Reconfigure,
-        _ = &mut caducado => Exit::Caducado,
+    // The resolver's own pulse: if its task ended on its own (a socket error the server could
+    // not recover from), the machine still points here and nobody answers. It is rebuilt, as
+    // after a network change (review of 8 Oct 2026).
+    let mut pulso = tokio::time::interval(Duration::from_secs(15));
+    pulso.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    let exit = loop {
+        tokio::select! {
+            _ = &mut shutdown => break Exit::Shutdown,
+            _ = &mut reconfigure => break Exit::Reconfigure,
+            _ = &mut caducado => break Exit::Caducado,
+            _ = pulso.tick() => {
+                if running.is_dead() {
+                    eprintln!("{}", t.cli("observe.resolutor_caido"));
+                    break Exit::Reconfigure;
+                }
+            }
+        }
     };
 
     housekeeping.abort();
+    if let Some(p) = panel {
+        p.shutdown().await;
+    }
+    // The resolver first, the queue after: what `record` put in the queue while the resolver was
+    // still answering is written down too (until 1.0.5 the queue was emptied first and those
+    // last queries were lost; review of 8 Oct 2026).
+    running.shutdown();
+    let _ = running.wait().await;
     // Lo que quedara esperando a saber su programa se anota igual, sin él: al cerrar, una consulta
     // sin anotar sería una consulta perdida, y eso sí que no.
     if let Some(v) = vaciador {
@@ -1900,12 +1990,19 @@ async fn run_once<F: Future<Output = ()>>(
             }
         }
     }
-    if let Some(p) = panel {
-        p.shutdown().await;
-    }
-    running.shutdown();
-    let _ = running.wait().await;
+    policy_al_cerrar.al_cerrar();
     Ok(exit)
+}
+
+/// Run a call that talks to the system (PowerShell, resolvectl, networksetup: one to three
+/// seconds each on Windows) off the thread that answers queries. On the multi-thread runtime
+/// the worker steps aside; on a current-thread one (tests) it just runs (review of 8 Oct 2026:
+/// the minute's checks ran on the resolver's own threads while the hour's were already moved).
+fn aparte_del_resolutor<R>(f: impl FnOnce() -> R) -> R {
+    match tokio::runtime::Handle::try_current().map(|h| h.runtime_flavor()) {
+        Ok(tokio::runtime::RuntimeFlavor::MultiThread) => tokio::task::block_in_place(f),
+        _ => f(),
+    }
 }
 
 /// While a DNS backup exists, make sure the guardian is still first; the

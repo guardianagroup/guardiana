@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
       - name: compilación reproducible
@@ -39,7 +39,7 @@ jobs:
           v=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
           mkdir -p paquetes target/release
           install -m 755 "build/out/guardiana-$v-linux-x86_64" target/release/guardiana
-          cargo install cargo-deb --locked --quiet
+          cargo install cargo-deb@3.8.0 --locked --quiet
           cargo deb -p guardiana-cli --no-build --no-strip -o "paquetes/guardiana_${v}_amd64.deb"
           d="guardiana-$v-linux-x86_64"; mkdir -p "/tmp/$d"
           cp target/release/guardiana build/tarball/instalar.sh build/tarball/desinstalar.sh \
@@ -52,7 +52,7 @@ jobs:
           # As notices too: they show on the run page without signing in, so the release machine
           # can be told the expected hashes without anyone opening a log.
           while read -r h n; do echo "::notice title=${n#\*}::$h"; done < paquetes/SHA256SUMS
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: candidato-linux
           path: paquetes/
@@ -64,8 +64,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: candidato-linux
           path: paquetes
@@ -91,7 +91,7 @@ jobs:
             $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
             Write-Output "::notice title=$($_.Name)::$h"
           }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: candidato-msi
           path: msi/
@@ -103,12 +103,12 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
       - run: pip install --quiet cryptography
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: candidato-msi
           path: paquetes
@@ -141,8 +141,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: candidato-linux
           path: paquetes
@@ -154,8 +154,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: candidato-linux
           path: paquetes
@@ -166,7 +166,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: la app, como la hace release.sh en el Mac
         run: |
           set -euo pipefail
@@ -177,9 +177,12 @@ jobs:
             tail -25 /tmp/crear-app.log | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}' | sed 's/^/::error title=crear-app.sh::/'; echo; exit 1; }
           mkdir -p paquetes
           (cd app && zip -qry "../paquetes/guardiana-$v-macos.app.zip" GUARDIANA.app)
+          # SHA256SUMS like the other jobs: release.sh --paquetes checks every file it signs
+          # against this list, and the Mac app had none (review of 8 Oct 2026).
+          (cd paquetes && shasum -a 256 "guardiana-$v-macos.app.zip" | tee SHA256SUMS)
           echo "::notice title=guardiana-$v-macos.app.zip::$(shasum -a 256 "paquetes/guardiana-$v-macos.app.zip" | cut -d' ' -f1)"
           echo "::notice title=chip del Mac::$(lipo -archs app/GUARDIANA.app/Contents/Resources/guardiana)"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: candidato-mac
           path: paquetes/

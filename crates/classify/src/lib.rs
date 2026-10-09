@@ -313,9 +313,9 @@ mod tests {
     #[test]
     fn volume_fires_above_five_times_the_median_and_the_floor() {
         let mut c = classifier();
-        // Three quiet hours of 10 queries each.
+        // Three quiet hours of 60 queries each.
         for hour in 0..3 {
-            for i in 0..10 {
+            for i in 0..60 {
                 c.classify(&Input {
                     device_id: "self",
                     name: "q.example",
@@ -324,9 +324,9 @@ mod tests {
                 });
             }
         }
-        // Hour 3: 5 × median = 50, floor 50 → the 51st query fires.
+        // Hour 3: 5 × median = 300, floor 300 → the 301st query fires.
         let mut fired_at = None;
-        for i in 0..60 {
+        for i in 0..320 {
             let out = c.classify(&Input {
                 device_id: "self",
                 name: "q.example",
@@ -337,6 +337,6 @@ mod tests {
                 fired_at = fired_at.or(Some(i + 1));
             }
         }
-        assert_eq!(fired_at, Some(51));
+        assert_eq!(fired_at, Some(301));
     }
 }

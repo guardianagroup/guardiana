@@ -32,7 +32,8 @@ impl Default for Thresholds {
             beacon_min_samples: 4,
             profile_learn_days: 3,
             volume_factor: 5,
-            volume_floor: 50,
+            // A normal PC asks a few hundred names an hour; below this nothing is "much more".
+            volume_floor: 300,
             volume_history_hours: 24,
         }
     }
@@ -77,6 +78,8 @@ impl HoursProfile {
 }
 
 /// Timestamps of recent queries to one name.
+/// Queries closer than this are the same contact asked several ways (A, AAAA, HTTPS).
+const SAME_CONTACT_MS: i64 = 2_000;
 const BEACON_WINDOW: usize = 64;
 /// Names tracked per device before old ones are dropped.
 const MAX_NAMES_PER_DEVICE: usize = 5000;
@@ -103,6 +106,16 @@ impl DeviceState {
                 .retain(|_, times| times.back().is_some_and(|&last| last >= cutoff));
         }
         let times = self.recent.entry(name.to_owned()).or_default();
+        // One call asks the same name several ways at once (A and AAAA, then HTTPS): a few
+        // milliseconds apart, not a new contact. Counted as separate samples they put a tiny
+        // interval between every real one and the median collapsed to zero, so a beacon every
+        // five minutes was never regular on Windows or macOS (review of 8 Oct 2026).
+        if times
+            .back()
+            .is_some_and(|&last| ts - last < SAME_CONTACT_MS)
+        {
+            return None;
+        }
         times.push_back(ts);
         while times.len() > BEACON_WINDOW {
             times.pop_front();
@@ -151,7 +164,19 @@ impl DeviceState {
         if self.completed_hours.len() < 3 {
             return false;
         }
-        let mut sorted: Vec<u32> = self.completed_hours.iter().copied().collect();
+        // Hours without a single query say the machine was off or asleep, not that it usually
+        // asks nothing: with them in, a PC used from nine to five had a median of zero and every
+        // working hour was "much more than usual" from its fifty-first name on (review of
+        // 8 Oct 2026). The median is of the hours in which the device actually spoke.
+        let mut sorted: Vec<u32> = self
+            .completed_hours
+            .iter()
+            .copied()
+            .filter(|&n| n > 0)
+            .collect();
+        if sorted.len() < 3 {
+            return false;
+        }
         sorted.sort_unstable();
         let median = sorted[sorted.len() / 2];
         let limit = median.saturating_mul(t.volume_factor).max(t.volume_floor);
@@ -199,6 +224,46 @@ mod tests {
         assert_eq!(regular_period(&[0, 20 * m, 45 * m, 65 * m], &t), None);
         // Too short a span.
         assert_eq!(regular_period(&[0, 5 * m, 10 * m, 15 * m], &t), None);
+    }
+
+    #[test]
+    fn volume_ignores_hours_the_device_was_off() {
+        let t = Thresholds::default();
+        let mut d = DeviceState::default();
+        // Three busy hours of 400, then sixteen hours off (no queries at all).
+        for h in 0..3 {
+            for _ in 0..400 {
+                d.volume(h * HOUR_MS, &t);
+            }
+        }
+        // Back after the night: the 301st query of the morning is not "much more than usual".
+        let morning = 20 * HOUR_MS;
+        let mut flagged = false;
+        for _ in 0..400 {
+            flagged |= d.volume(morning, &t);
+        }
+        assert!(!flagged);
+        // Ten times the usual is.
+        let mut flagged = false;
+        for _ in 0..4_000 {
+            flagged |= d.volume(morning + HOUR_MS, &t);
+        }
+        assert!(flagged);
+    }
+
+    #[test]
+    fn beacon_folds_a_and_aaaa_pairs() {
+        let t = Thresholds::default();
+        let mut d = DeviceState::default();
+        let m = 60_000;
+        let mut period = None;
+        for i in 0..8 {
+            let ts = i * 10 * m;
+            period = d.beacon("x.example", ts, &t);
+            // The AAAA a millisecond later is the same contact.
+            d.beacon("x.example", ts + 1, &t);
+        }
+        assert_eq!(period, Some(10));
     }
 
     #[test]

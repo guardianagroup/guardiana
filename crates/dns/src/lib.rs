@@ -190,6 +190,17 @@ pub trait Policy: Send + Sync + 'static {
     fn record(&self, query: &Query, outcome: Outcome);
 }
 
+/// A shared policy is a policy: the engine keeps a handle to its own to write the last
+/// things down when a pass ends (review of 8 Oct 2026).
+impl<P: Policy> Policy for std::sync::Arc<P> {
+    fn decide(&self, query: &Query) -> Decision {
+        (**self).decide(query)
+    }
+    fn record(&self, query: &Query, outcome: Outcome) {
+        (**self).record(query, outcome);
+    }
+}
+
 /// Errors starting the resolver.
 #[derive(Debug)]
 pub enum Error {
@@ -229,7 +240,8 @@ pub fn is_private_listen_addr(ip: IpAddr) -> bool {
     }
 }
 
-/// A running resolver. Drop it or call [`Running::shutdown`] to stop.
+/// A running resolver. Drop it or call [`Running::shutdown`] to stop (dropping stops it too:
+/// until 1.0.5 the doc said so and nothing did it, and the port stayed bound).
 pub struct Running {
     /// UDP addresses actually bound (useful when port 0 was requested).
     pub udp_addrs: Vec<SocketAddr>,
@@ -245,12 +257,25 @@ impl Running {
         (self.shutdown)();
     }
 
+    /// Whether the server task has ended on its own: the sockets are closed and nobody answers
+    /// on the listen addresses while the machine still points here (review of 8 Oct 2026).
+    #[must_use]
+    pub fn is_dead(&self) -> bool {
+        self.task.is_finished()
+    }
+
     /// Wait until the server stops.
-    pub async fn wait(self) -> Result<(), Error> {
-        match self.task.await {
+    pub async fn wait(mut self) -> Result<(), Error> {
+        match (&mut self.task).await {
             Ok(r) => r,
             Err(e) => Err(Error::Server(e.to_string())),
         }
+    }
+}
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        (self.shutdown)();
     }
 }
 

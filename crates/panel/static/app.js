@@ -191,7 +191,9 @@
       } catch (e) { if (msg) msg.textContent = String(e.message || e); }
     });
   }
-  const pdfName = (what) => 'guardiana-' + what + '-' + new Date().toISOString().slice(0, 10) + '.pdf';
+  // The day in the file name is the person's day, not UTC's: at eight in the evening in Bogotá
+  // the file said tomorrow (review of 8 Oct 2026).
+  const pdfName = (what) => { const d = new Date(); const dd = (n) => String(n).padStart(2, '0'); return 'guardiana-' + what + '-' + d.getFullYear() + '-' + dd(d.getMonth() + 1) + '-' + dd(d.getDate()) + '.pdf'; };
   const pdfHead = (doc, heading) => doc.line('GUARDIANA · ' + heading, 16, true).gap(3)
     .line(t('pdf_generado').replace('{fecha}', new Date().toLocaleString(LOC, DIA_HORA)), 9, false, 0.45)
     .regla().gap(14);
@@ -356,9 +358,45 @@
     if (ev.empresa || ev.ia) return q.de_empresa || '';
     return q.desconocido || '';
   };
+  // Tres colores, con su leyenda en la propia página (petición del responsable, 8 oct 2026):
+  // verde para lo normal, naranja para lo que conviene mirar, rojo para estar alerta. Es una
+  // forma de leer la categoría de un vistazo, no un veredicto nuevo: cada color sale de lo que
+  // ya dice la etiqueta (la lista que lo reconoce, la palabra del nombre, el registro de
+  // corredores, la señal de evasión), y la leyenda dice exactamente qué entra en cada uno.
+  const nivel = (ev) => {
+    if (ev.category === 'rastreador' || ev.corredor || (ev.signals || []).includes('evasion_dns')) return 'rojo';
+    if (ev.category === 'publicidad' || ev.category === 'telemetria') return 'naranja';
+    if (ev.category === 'desconocido' && !ev.local && !ev.entrega) {
+      const p = pista(ev);
+      if (p === 'anuncios' || p === 'medicion') return 'naranja';
+      if (!p && !ev.empresa && !ev.ia) return 'naranja';
+    }
+    return 'verde';
+  };
+  // The registrable domain of the name (bing.com, mercadolibre.com.co): where «its website» is.
+  const dominioDe = (qname) => {
+    const todas = String(qname || '').toLowerCase().replace(/\.$/, '').split('.');
+    return todas.slice(-nLabelsDominio(todas)).join('.');
+  };
+  // The chip links somewhere useful: «its website» opens that website; every other label opens
+  // the page that explains what the word means (the person asked where to click to know more).
+  const catEnlace = (ev) => {
+    if (ev.category === 'desconocido' && !ev.local && !ev.entrega && (ev.empresa || ev.ia) && pista(ev) === 'web') {
+      return { href: 'https://' + dominioDe(ev.qname), titulo: t('cat_enlace_web').replace('{dominio}', dominioDe(ev.qname)) };
+    }
+    let ancla = ev.category;
+    if (ev.category === 'desconocido') {
+      const p = pista(ev);
+      ancla = ev.local ? 'red-local' : ev.entrega ? 'entrega' : p ? 'pista-' + p : (ev.empresa || ev.ia) ? 'servicio' : 'sin-clasificar';
+    }
+    return { href: t('guia_categorias_url') + '#' + ancla, titulo: t('cat_enlace_guia') };
+  };
   const cat = (ev) => {
     const q = catQue(ev);
-    return `<span class="tag ${esc(ev.category)}${catClase(ev)}"${q ? ` title="${esc(q)}"` : ''}>${esc(catTexto(ev))}</span>`;
+    const n = nivel(ev);
+    const e = catEnlace(ev);
+    const titulo = (q ? q + ' ' : '') + '(' + t('nivel_' + n) + ') · ' + e.titulo;
+    return `<a class="tag ${esc(ev.category)}${catClase(ev)} nivel-${n}" href="${esc(e.href)}" target="_blank" rel="noopener noreferrer" title="${esc(titulo)}">${esc(catTexto(ev))}</a>`;
   };
   const verdict = (v) => `<span class="verdict ${esc(v)}">${esc(T.veredictos[v] || v)}</span>`;
   // The trade goes first: reading «AppsFlyer» tells a person nothing, and reading what
@@ -425,58 +463,63 @@
     } catch (_) {}
   }
 
-  // Devices and their 24-hour gate (brief §6), loaded by the pages that cut.
-  let gate = {};
-  async function loadGate() {
-    try {
-      const devs = await api('/api/dispositivos');
-      gate = {};
-      devs.forEach((d) => { gate[d.id] = d; });
-    } catch (_) {}
-  }
   // Names this person has already cut, so the state survives a redraw. The snapshot table
   // repaints every two seconds: without this, a button turned red by a cut went back to grey
   // as if nothing had happened, and the person would cut the same name twice.
   // Un mapa y no un conjunto: para deshacer un corte desde el mismo botón hace falta el número
   // de la regla que lo hizo (petición del responsable, 21 sep 2026).
   const CORTADOS = new Map();
+  // Y las reglas que permiten un nombre concreto: son las que deshace «bloquear» en una fila
+  // que se desbloqueó a mano (8 oct 2026).
+  const PERMITIDOS = new Map();
   const claveCorte = (dev, nombre) => dev + '|' + nombre;
-  async function cargarCortados() {
+  const sinPunto = (n) => String(n || '').toLowerCase().replace(/\.$/, '');
+  async function cargarCortados(path = '/api/reglas') {
     try {
-      const r = await api('/api/reglas');
+      const r = await api(path);
+      CORTADOS.clear(); PERMITIDOS.clear();
       (r.reglas || []).forEach((x) => {
-        if (x.activa && x.action === 'cortar' && x.match_kind === 'domain') {
-          CORTADOS.set(claveCorte(x.device_id || 'home', x.pattern), x.id);
-        }
+        if (!x.activa || x.match_kind !== 'domain') return;
+        const mapa = x.action === 'cortar' ? CORTADOS : x.action === 'permitir' ? PERMITIDOS : null;
+        if (mapa) mapa.set(claveCorte(x.device_id || 'home', sinPunto(x.pattern)), x.id);
       });
     } catch (_) {}
   }
-  function reglaDeCorte(ev) {
-    const propia = CORTADOS.get(claveCorte(ev.device_id, ev.qname));
-    return propia === undefined ? CORTADOS.get(claveCorte('home', ev.qname)) : propia;
+  function reglaDe(mapa, ev) {
+    const propia = mapa.get(claveCorte(ev.device_id, sinPunto(ev.qname)));
+    return propia === undefined ? mapa.get(claveCorte('home', sinPunto(ev.qname))) : propia;
   }
-  function yaCortado(ev) {
-    return reglaDeCorte(ev) !== undefined;
-  }
+  const reglaDeCorte = (ev) => reglaDe(CORTADOS, ev);
+  const reglaDePermiso = (ev) => reglaDe(PERMITIDOS, ev);
   // "1 horas de 24" no lo escribe nadie: una hora es singular.
   function mirando(h) {
     return t(h === 1 ? 'observando_una' : 'observando').replace('{h}', h);
   }
+  // Cada fila tiene su botón, siempre (petición del responsable, 8 oct 2026: una fila decía
+  // «bloqueado» y no había forma de desbloquearla). Qué hace depende de por qué está así:
+  //  · bloqueada por una regla de este nombre → «desbloquear» deshace esa regla;
+  //  · bloqueada por el Modo Vigilante (fuera del alcance) → «desbloquear» mete el nombre en
+  //    el alcance de ese aparato;
+  //  · bloqueada por una regla ancha (categoría, sufijo, toda la casa) → «desbloquear» crea una
+  //    regla que permite este nombre en este aparato, que gana a la ancha por ser más concreta;
+  //  · no bloqueada → «bloquear» crea la regla de este nombre (y deshace antes el permiso a
+  //    mano, si lo había).
+  // Bloquear un nombre no espera a las 24 horas (decisión del responsable, 20 sep 2026): el
+  // servidor pide confirmación mientras lleve menos de un día mirando. Lo ancho sigue esperando.
   function cutCell(ev) {
-    if (ev.verdict === 'cortado') return '';
-    // Ya no se mira aquí cuántas horas lleva el aparato: la espera vive en el servidor y solo
-    // para los cortes anchos. Además, la página del propio aparato no tiene esa lista, y mirarla
-    // hacía desaparecer el botón allí.
-    // Cortar ESTE nombre no espera a las 24 horas (decisión del responsable, 20 sep 2026): es su
-    // decisión sobre una cosa concreta, y el servidor le pide confirmación mientras lleve menos
-    // de un día mirando. Lo que sigue esperando es lo ancho: categorías, toda la casa, Vigilante.
-    // Cortado no es un callejón sin salida: el mismo botón lo deshace, que es lo que espera
-    // cualquiera que acabe de cortar algo por error.
-    const regla = reglaDeCorte(ev);
-    if (regla !== undefined) {
-      return `<button class="cut cortado" data-deshacer="${regla}" data-device="${esc(ev.device_id)}" data-name="${esc(ev.qname)}">${esc(t('desbloquear_boton'))}</button>`;
+    const d = `data-device="${esc(ev.device_id)}" data-name="${esc(ev.qname)}"`;
+    const corte = reglaDeCorte(ev);
+    if (corte !== undefined) {
+      return `<button class="cut cortado" data-deshacer="${corte}" ${d}>${esc(t('desbloquear_boton'))}</button>`;
     }
-    return `<button class="secondary cut" data-device="${esc(ev.device_id)}" data-name="${esc(ev.qname)}">${esc(t('cortar'))}</button>`;
+    if (ev.verdict === 'cortado') {
+      if (ev.decided_by === 'alcance_declarado') {
+        return `<button class="cut cortado" data-alcance="1" ${d}>${esc(t('desbloquear_boton'))}</button>`;
+      }
+      return `<button class="cut cortado" data-permitir="1" ${d}>${esc(t('desbloquear_boton'))}</button>`;
+    }
+    const permiso = reglaDePermiso(ev);
+    return `<button class="secondary cut" ${permiso !== undefined ? `data-permiso="${permiso}" ` : ''}${d}>${esc(t('cortar'))}</button>`;
   }
   // Una sola ventana al cortar, y la pregunta la escribe el servidor, que es quien sabe si este
   // aparato lleva más o menos de un día mirado. Antes preguntaba el panel y, encima, el servidor
@@ -546,29 +589,39 @@
       const b = e.target.closest('button.cut');
       if (!b) return;
       const name = b.dataset.name, dev = b.dataset.device;
-      if (b.dataset.deshacer) {
-        // Desbloquear: se deshace la regla y el botón vuelve a ofrecer cortar.
-        b.disabled = true;
-        try {
+      const aBloquear = () => { delete b.dataset.deshacer; delete b.dataset.alcance; delete b.dataset.permitir; b.textContent = t('cortar'); b.classList.remove('cortado'); b.classList.add('secondary'); };
+      const aDesbloquear = () => { delete b.dataset.permiso; b.textContent = t('desbloquear_boton'); b.classList.remove('secondary'); b.classList.add('cortado'); };
+      b.disabled = true;
+      try {
+        if (b.dataset.deshacer) {
+          // Desbloquear: se deshace la regla y el botón vuelve a ofrecer bloquear.
           await api(`${path}/${b.dataset.deshacer}/deshacer`, { method: 'POST' });
-          CORTADOS.delete(claveCorte(dev, name));
-          delete b.dataset.deshacer;
-          b.textContent = t('cortar'); b.classList.remove('cortado'); b.classList.add('secondary');
-        } catch (err) {
-          alert(String(err.message || err));
+          CORTADOS.delete(claveCorte(dev, sinPunto(name)));
+          aBloquear();
+        } else if (b.dataset.alcance) {
+          // Fuera del alcance declarado: el nombre entra en el alcance de ese aparato.
+          await api('/api/ia/alcance/anadir', { method: 'POST', body: { device_id: dev, nombre: name } });
+          aBloquear();
+        } else if (b.dataset.permitir) {
+          // Bloqueado por una regla ancha: una regla concreta que lo permite gana a la ancha.
+          const created = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'permitir' }, path);
+          if (created) { PERMITIDOS.set(claveCorte(dev, sinPunto(name)), created.id); b.dataset.permiso = created.id; aBloquear(); }
+        } else {
+          if (b.dataset.permiso) {
+            await api(`${path}/${b.dataset.permiso}/deshacer`, { method: 'POST' });
+            PERMITIDOS.delete(claveCorte(dev, sinPunto(name)));
+            delete b.dataset.permiso;
+          }
+          // Sin confirm aquí: lo pide el servidor con la frase que corresponda (una sola ventana).
+          const created = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'cortar' }, path);
+          // A grey tick did not say what had happened. The button turns into the state: red and
+          // with the word, in the language of the panel.
+          if (created) { CORTADOS.set(claveCorte(dev, sinPunto(name)), created.id); b.dataset.deshacer = created.id; aDesbloquear(); }
         }
-        b.disabled = false;
-        return;
+      } catch (err) {
+        alert(String(err.message || err));
       }
-      // Sin confirm aquí: lo pide el servidor con la frase que corresponda (una sola ventana).
-      const created = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'cortar' }, path);
-      // A grey tick did not say what had happened. The button turns into the state: red and
-      // with the word, in the language of the panel.
-      if (created) {
-        CORTADOS.set(claveCorte(dev, name), created.id);
-        b.dataset.deshacer = created.id;
-        b.textContent = t('desbloquear_boton'); b.classList.remove('secondary'); b.classList.add('cortado');
-      }
+      b.disabled = false;
     });
   }
 
@@ -886,7 +939,6 @@
         pdfQuienHayDetras(doc, r.eventos);
         return { name: pdfName('radiografia'), doc };
       });
-      await loadGate();
       await cargarCortados();
       // Until the system DNS points at Guardiana, this PC's own queries never arrive: say so and offer the change (brief §4).
       try {
@@ -919,7 +971,7 @@
         $('c-nuevos').textContent = r.destinos_nuevos;
         $('c-esperados').textContent = r.esperados;
         $('c-cortados').textContent = r.cortados;
-        $('live').innerHTML = eventRows(r.eventos) || `<tr><td colspan="7" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`;
+        $('live').innerHTML = eventRows(r.eventos) || `<tr><td colspan="8" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`;
         $('hueco').textContent = r.hueco ? t('hueco').replace('{desde}', when(r.hueco.desde)).replace('{hasta}', when(r.hueco.hasta)) : '';
         $('hueco').classList.toggle('hidden', !r.hueco);
       };
@@ -932,7 +984,6 @@
     async extracto() {
       const form = $('filters');
       paintChanges().catch(() => {});
-      await loadGate();
       await cargarCortados();
       let lastR = null, lastFilters = '';
       savePdf('export-pdf', () => {
@@ -953,7 +1004,7 @@
         const r = await api('/api/extracto?' + q.toString());
         lastR = r;
         lastFilters = [...q].filter(([k]) => k !== 'limit').map(([k, v]) => t('f_' + ({ device_id: 'dispositivo', category: 'categoria', signal: 'senal', verdict: 'veredicto' }[k] || k)) + ': ' + (k === 'device_id' ? ($('f-device').selectedOptions[0] || {}).textContent || v : k === 'category' ? catName(v) : k === 'verdict' ? verdictName(v) : v)).join(' · ');
-        $('rows').innerHTML = eventRows(r.eventos) || `<tr><td colspan="7" class="muted">${esc(t('sin_resultados'))}</td></tr>`;
+        $('rows').innerHTML = eventRows(r.eventos) || `<tr><td colspan="8" class="muted">${esc(t('sin_resultados'))}</td></tr>`;
         $('total').textContent = t('mostrando').replace('{n}', r.eventos.length).replace('{total}', r.total) + ocultosTexto(r.ocultos);
         $('huecos').innerHTML = (r.huecos || []).map((h) => `<li>${esc(t('hueco').replace('{desde}', when(h.desde)).replace('{hasta}', when(h.hasta)))}</li>`).join('');
         $('huecos-card').classList.toggle('hidden', !(r.huecos && r.huecos.length));
@@ -1094,12 +1145,12 @@
         const me = r.dispositivo;
         // Un nombre suelto se corta desde el primer minuto (el servidor pide confirmación si el
         // aparato lleva menos de un día); arriba se dice cuánto lleva mirando, como información.
-        const can = true;
         $('mi-gate').textContent = me && !me.puede_cortar ? mirando(me.horas_observadas) : '';
         const lect = r.lectura || {};
         $('mi-empresas').innerHTML = (lect.empresas && lect.empresas.length) ? lect.empresas.map((e) => `<li><b>${esc(e[0])}</b> · ${e[1]}</li>`).join('') + `<li class="muted">${esc(tn('lectura_empresas_total', lect.empresas_total))}</li>` : `<li class="muted">${esc(t('lectura_empresas_ninguna'))}</li>`;
         $('mi-avisos').innerHTML = hints(lect).map((h) => `<p class="limit">${esc(h)}</p>`).join('');
-        $('mi-rows').innerHTML = r.eventos.map((ev) => `<tr><td class="mono">${clock(ev.ts)}</td><td><span class="mono">${esc(ev.qname)}</span>${company(ev)}${phrases(ev)}</td>${empresaCelda(ev)}<td>${cat(ev)}</td>${paisCelda(ev)}<td>${verdict(ev.verdict)}</td><td>${ev.verdict !== 'cortado' && can ? cutCell(ev) : ''}</td></tr>`).join('') || `<tr><td colspan="7" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`;
+        await cargarCortados('/api/mi-dispositivo/reglas');
+        $('mi-rows').innerHTML = r.eventos.map((ev) => `<tr><td class="mono">${clock(ev.ts)}</td><td><span class="mono">${esc(ev.qname)}</span>${company(ev)}${phrases(ev)}</td>${empresaCelda(ev)}<td>${cat(ev)}</td>${paisCelda(ev)}<td>${verdict(ev.verdict)}</td><td>${cutCell(ev)}</td></tr>`).join('') || `<tr><td colspan="7" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`;
         const rules = await api('/api/mi-dispositivo/reglas');
         lastRules = rules.reglas;
         $('mi-reglas').innerHTML = rules.reglas.map((x) => `<tr><td>${esc(t('tipo_' + x.match_kind))}</td><td class="mono">${esc(x.pattern)}</td><td>${esc(t('accion_' + x.action))}</td><td>${x.activa ? esc(t('regla_activa')) : esc(t('regla_deshecha'))}</td><td>${x.activa ? `<button class="secondary undo" data-id="${x.id}">${esc(t('deshacer'))}</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('reglas_ninguna'))}</td></tr>`;
@@ -1274,7 +1325,7 @@
       $('e-upstream').textContent = r.upstream.join(', ');
       const paintDns = (on, cubre) => { $('e-dns').textContent = on ? (cubre === false ? t('dns_aplicado_falta') : t('dns_aplicado')) : t('dns_no_aplicado'); $('e-dns-apply').classList.toggle('hidden', on || r.caducado); $('e-dns-restore').classList.toggle('hidden', !on); };
       paintDns(r.dns_aplicado, r.dns_cubre);
-      $('e-dns-apply').addEventListener('click', async () => { $('e-dns-msg').textContent = t('dns_aplicando'); try { const x = await api('/api/dns/aplicar', { method: 'POST' }); $('e-dns-msg').textContent = x.mensaje; paintDns(x.dns_aplicado); paintChanges().catch(() => {}); } catch (err) { $('e-dns-msg').textContent = String(err.message || err); } });
+      $('e-dns-apply').addEventListener('click', async (e) => { e.target.disabled = true; $('e-dns-msg').textContent = t('dns_aplicando'); try { const x = await api('/api/dns/aplicar', { method: 'POST' }); $('e-dns-msg').textContent = x.mensaje; paintDns(x.dns_aplicado); paintChanges().catch(() => {}); } catch (err) { $('e-dns-msg').textContent = String(err.message || err); } e.target.disabled = false; });
       $('e-dns-restore').addEventListener('click', async () => { $('e-dns-msg').textContent = '…'; try { const x = await api('/api/dns/restaurar', { method: 'POST' }); $('e-dns-msg').textContent = x.mensaje; paintDns(x.dns_aplicado); paintChanges().catch(() => {}); } catch (err) { $('e-dns-msg').textContent = String(err.message || err); } });
       $('e-listas').innerHTML = r.listas.map((l) => `<tr><td>${esc(l.id)}</td><td>${l.entries}</td><td class="muted">${esc(l.fetched)}</td></tr>`).join('');
     },

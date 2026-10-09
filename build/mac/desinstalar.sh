@@ -21,7 +21,7 @@ n=0; while pgrep -qf "$BIN" && [ "$n" -lt 20 ]; do sleep 0.5; n=$((n + 1)); done
 # 2 and 3. Home Mode off and the program's own undo, both recorded in the ledger.
 if [ -x "$BIN" ]; then
   GUARDIANA_DATA="$DATA" "$BIN" hogar off --desinstalando >/dev/null 2>&1 || true
-  GUARDIANA_DATA="$DATA" "$BIN" dns --restore >/dev/null 2>&1 || true
+  GUARDIANA_DATA="$DATA" "$BIN" dns --restore --desinstalando >/dev/null 2>&1 || true
 fi
 
 # 4. Safety net for anything still pointing at this machine. Only those: a service the person

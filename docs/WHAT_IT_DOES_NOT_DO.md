@@ -36,8 +36,10 @@ La regla: nunca "100 % seguro", nunca "invisible", nunca "protegido" sin objeto,
 
 - **No dice "malicioso".** Dice qué observó: la categoría de la lista y la señal, cada una con una
   frase. Ninguna señal es un veredicto.
-- **No corta nada por su cuenta.** Ningún bloqueo antes de 24 horas observando un dispositivo,
-  ninguno sin decisión del usuario, ninguno sin "deshacer" visible.
+- **No corta nada por su cuenta.** Ningún bloqueo ancho (categoría, toda la casa, Modo Vigilante)
+  antes de 24 horas observando un dispositivo; un nombre concreto en un aparato concreto se puede
+  bloquear desde el primer minuto, con confirmación mientras lleve menos de un día mirando. Ninguno
+  sin decisión del usuario, ninguno sin "desbloquear" visible en la misma fila.
 - **No corta actualizaciones, hora, resolutores, mensajería ni videollamada reconocidas** aunque
   una regla por categoría lo pida. Una regla explícita por dominio sobre uno de estos pide
   confirmación: "Esto puede dejar sin actualizaciones / sin mensajes a este dispositivo."
@@ -48,8 +50,10 @@ La regla: nunca "100 % seguro", nunca "invisible", nunca "protegido" sin objeto,
 
 - **No contacta ningún servidor nuestro.** Nunca. No hay telemetría, no hay cuenta, no hay
   "comprobación periódica".
-- **Solo sale del equipo lo que el usuario provoca**: activar licencia (una llamada), comprobar
-  versión, actualizar listas. Cada una aparece en `/sabe-de-ti` con host, fecha y bytes.
+- **Solo sale del equipo lo que el usuario provoca**: activar la licencia (una llamada) y la
+  comprobación periódica de la suscripción. No hay más: las listas van dentro del programa, con su
+  fecha, y las versiones nuevas las descarga e instala el usuario desde la web. Cada conexión aparece
+  en `/sabe-de-ti` con host, fecha y bytes.
 - **No envía el informe semanal ni la tarjeta.** El botón "Compartir" abre la app del usuario
   (WhatsApp por enlace); Guardiana no envía nada.
 
@@ -103,8 +107,9 @@ La regla: nunca "100 % seguro", nunca "invisible", nunca "protegido" sin objeto,
 
 - **La prueba de 7 días vive en tu equipo** y se cuenta en dos sitios: tu extracto y una marca
   aparte que solo un administrador puede quitar —el registro en Windows, `/etc/guardiana` en Linux
-  y en Mac—. Esa marca lleva la fecha en que empezaron los siete días y nada más; la pantalla de
-  licencia dice dónde está. Así desinstalar, reinstalar o borrar el extracto no devuelve siete
+  y en Mac—. Esa marca lleva la fecha en que empezaron los siete días, la última hora del reloj
+  que vio (para que atrasar la fecha no alargue la prueba) y una copia de la licencia activada;
+  la pantalla de licencia dice exactamente qué hay y dónde está. Así desinstalar, reinstalar o borrar el extracto no devuelve siete
   días nuevos. Sin urgencia falsa y sin marcas escondidas (decisión 187 bis).
 
 ## Lo que no incluye la 1.0
@@ -112,8 +117,9 @@ La regla: nunca "100 % seguro", nunca "invisible", nunca "protegido" sin objeto,
 - Modo Hogar en macOS: el guardián del propio Mac sí entra en la 1.0, pero los teléfonos y la tele no pueden pasar por un Mac, porque eso necesita tocar el cortafuegos de macOS y no se publica sin probarlo en una máquina que no sea la de desarrollo.
 - La aplicación de Mac no está notarizada por Apple: macOS avisa la primera vez y hay que abrirla con clic derecho. Está explicado en la página de instalar.
 - Bloqueo por aplicación y sensores por proceso (2.0).
-- Actualización automática silenciosa: nunca. `guardiana update` avisa y solo instala si el usuario
-  lo pide y la firma coincide con el registro público.
+- Actualización automática: nunca, ni silenciosa ni con aviso. No existe la orden `guardiana update`
+  ni ninguna comprobación de versión: el programa no sabe si hay una versión nueva. Se descarga de la
+  web, se comprueba su huella contra el registro público y se instala encima.
 - Cortafuegos de IA (2.0).
 - Interfaz de escritorio nativa (egui): el panel en el navegador es la única interfaz.
 - IPv6: el resolutor escucha en IPv4 (`127.0.0.1` y la IP LAN IPv4). Un dispositivo que use un

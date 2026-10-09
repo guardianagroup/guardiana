@@ -64,7 +64,15 @@ pub fn id_for_ip(ip: IpAddr) -> String {
 struct Cache {
     table: HashMap<IpAddr, String>,
     refreshed: Option<Instant>,
+    /// This computer's own LAN address, read with the table: opening a socket for it on every
+    /// query was the cost of `identify` on the resolver's path (review of 8 Oct 2026).
+    lan: Option<Ipv4Addr>,
 }
+
+/// A second read of the table for an address it does not have is worth it right after a phone
+/// joins, and not worth it when the "new" addresses come from somebody forging them on the
+/// Wi-Fi: at most one forced read every ten seconds (review of 8 Oct 2026; it was two).
+const FORCED_REFRESH_EVERY: Duration = Duration::from_secs(10);
 
 /// Resolves client IPs to identities with a cached neighbour table.
 pub struct Resolver {
@@ -86,6 +94,7 @@ impl Resolver {
             cache: Mutex::new(Cache {
                 table: HashMap::new(),
                 refreshed: None,
+                lan: None,
             }),
             ttl,
         }
@@ -97,6 +106,7 @@ impl Resolver {
             for n in read_neighbors() {
                 cache.table.insert(n.ip, n.mac);
             }
+            cache.lan = local_lan_ipv4();
             cache.refreshed = Some(Instant::now());
         }
     }
@@ -107,12 +117,13 @@ impl Resolver {
     pub fn identify(&self, ip: IpAddr) -> Identity {
         // Loopback is this computer; so is a query that arrives through this computer's own
         // LAN address (the PC asking the guardian by its LAN IP is still the PC, not a device).
-        if ip.is_loopback() || local_lan_ipv4().is_some_and(|lan| ip == IpAddr::V4(lan)) {
-            return Identity {
-                id: SELF_DEVICE_ID.to_owned(),
-                mac: None,
-                ip,
-            };
+        let propio = Identity {
+            id: SELF_DEVICE_ID.to_owned(),
+            mac: None,
+            ip,
+        };
+        if ip.is_loopback() {
+            return propio;
         }
         let Ok(mut cache) = self.cache.lock() else {
             return Identity {
@@ -122,12 +133,15 @@ impl Resolver {
             };
         };
         self.refresh_if_stale(&mut cache, false);
+        if cache.lan.is_some_and(|lan| ip == IpAddr::V4(lan)) {
+            return propio;
+        }
         if !cache.table.contains_key(&ip) {
             // A new client: the table has probably just learned it. Read once
-            // more, but only if the last read is older than a couple of seconds.
+            // more, but only if the last read is older than a few seconds.
             let recent = cache
                 .refreshed
-                .is_some_and(|t| t.elapsed() < Duration::from_secs(2));
+                .is_some_and(|t| t.elapsed() < FORCED_REFRESH_EVERY);
             if !recent {
                 self.refresh_if_stale(&mut cache, true);
             }

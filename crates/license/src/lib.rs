@@ -53,6 +53,10 @@ pub const SETTING_LICENSE_ENDED_AT: &str = "license_ended_at";
 /// a refund looks like when the gateway does not answer `valid:false` (review of 5 Oct 2026,
 /// licence item 8); a check that could not be done never counts here.
 pub const SETTING_LICENSE_REJECTED_AT: &str = "license_rejected_at";
+/// When the last periodic check was attempted (ms), answered or not: the limit of one attempt an
+/// hour lives here and not in a timer, so a pass rebuilt every few minutes (a laptop changing
+/// networks) still checks (review of 8 Oct 2026).
+pub const SETTING_LICENSE_TRIED_AT: &str = "license_check_tried_at";
 /// Settings key: "1" once this version has asked the gateway again about an end that 1.0.1
 /// stored, or about a 1.0.1 licence whose local mark no longer verifies (licence item 7).
 pub const SETTING_LICENSE_REVISADA: &str = "license_revisada_1_0_2";
@@ -143,6 +147,11 @@ pub enum Error {
     Malformed(String),
     /// The gateway answered that the key is not valid.
     KeyRejected(String),
+    /// The gateway knows the key but it is not active (a subscription waiting for its first
+    /// payment, a trial over without a card): not a bad key, a pending one.
+    KeyInactive,
+    /// The key has used every activation it allows: nothing to type, one line to write to us.
+    ActivationLimit,
     /// The key typed is empty: nothing was sent (review of 1 Oct 2026, entry 26).
     EmptyKey,
     /// The network call failed.
@@ -158,6 +167,8 @@ impl std::fmt::Display for Error {
         match self {
             Self::Malformed(s) => write!(f, "gateway answer: {s}"),
             Self::KeyRejected(s) => write!(f, "key rejected: {s}"),
+            Self::KeyInactive => f.write_str("key not active"),
+            Self::ActivationLimit => f.write_str("activation limit reached"),
             Self::EmptyKey => f.write_str("empty key"),
             Self::Network(s) => write!(f, "network: {s}"),
             Self::AlreadyPlus => f.write_str("Plus already active"),
@@ -610,9 +621,14 @@ fn plan_de_clave(ledger: &Ledger, g: &Guardada, reloj: i64) -> Result<Plan, Erro
     .map(|f| f.saturating_add(GRACE_DAYS * DAY_MS));
     if let Some(fin) = caduca {
         if reloj >= fin {
+            // A subscription whose key the gateway itself turned down for the whole grace is
+            // "rejected" too, not "could not be checked": the person was told "no connection"
+            // while the gateway had said the key was disabled (review of 8 Oct 2026).
+            let rechazada = setting_i64(ledger, SETTING_LICENSE_REJECTED_AT)?
+                .is_some_and(|r| reloj >= r.saturating_add(GRACE_DAYS * DAY_MS));
             return Ok(Plan::PlusTerminado {
                 termino: fin,
-                motivo: if de_por_vida {
+                motivo: if de_por_vida || rechazada {
                     "rechazada"
                 } else {
                     "sin_comprobar"
@@ -735,6 +751,35 @@ fn post_json(url: &str, body: &serde_json::Value) -> Result<(u16, String), Error
     Ok((code, text))
 }
 
+/// Whether a non-2xx answer is the gateway itself talking about the key, and not a proxy, a
+/// captive portal, a WAF or an outage in between. Only a 4xx whose body is the gateway's JSON
+/// (with `message` or `code`) counts, and never 401/403/407/429, which are what proxies and
+/// rate limits say. Until 1.0.5 any 4xx was "the gateway rejected the key", and a corporate
+/// proxy answering 403 for a week ended a Founder licence for good; and a 502 page was shown as
+/// "the gateway did not accept the key" (review of 8 Oct 2026).
+fn es_palabra_de_la_pasarela(code: u16, body: &str) -> bool {
+    if !(400..500).contains(&code) || matches!(code, 401 | 403 | 407 | 429) {
+        return false;
+    }
+    serde_json::from_str::<serde_json::Value>(body.trim())
+        .ok()
+        .is_some_and(|v| v.get("message").is_some() || v.get("code").is_some())
+}
+
+/// The error a non-2xx answer becomes: the gateway's own reason, the activation limit, or a
+/// network problem for anything that is not the gateway talking.
+fn error_de_respuesta(code: u16, body: &str) -> Error {
+    if !es_palabra_de_la_pasarela(code, body) {
+        return Error::Network(format!("HTTP {code}"));
+    }
+    let motivo = short(body);
+    let m = motivo.to_lowercase();
+    if m.contains("activation") && m.contains("limit") {
+        return Error::ActivationLimit;
+    }
+    Error::KeyRejected(motivo)
+}
+
 fn short(body: &str) -> String {
     let t = body.trim();
     let msg = serde_json::from_str::<serde_json::Value>(t)
@@ -744,7 +789,7 @@ fn short(body: &str) -> String {
                 .or_else(|| v.get("error"))
                 .and_then(|m| m.as_str().map(str::to_owned))
         })
-        .unwrap_or_else(|| t.to_owned());
+        .unwrap_or_else(|| "HTTP".to_owned());
     msg.chars().take(200).collect()
 }
 
@@ -784,7 +829,7 @@ pub fn activate_with_key(
     let _ = ledger.record_outbound(now, Purpose::Licencia, gateway_host(), sent as i64, true);
     let (code, text) = post_json(&activate_url(), &body)?;
     if !(200..300).contains(&code) {
-        return Err(Error::KeyRejected(short(&text)));
+        return Err(error_de_respuesta(code, &text));
     }
     let parsed: ActivationResponse =
         serde_json::from_str(&text).map_err(|e| Error::Malformed(e.to_string()))?;
@@ -835,17 +880,13 @@ fn revalidate_stored_key(
     let _ = ledger.record_outbound(now, Purpose::Licencia, gateway_host(), sent as i64, true);
     let (code, text) = post_json(&validate_url(), &body)?;
     if !(200..300).contains(&code) {
-        return Err(Error::KeyRejected(short(&text)));
+        return Err(error_de_respuesta(code, &text));
     }
     let parsed: ValidationResponse =
         serde_json::from_str(&text).map_err(|e| Error::Malformed(e.to_string()))?;
     match parsed.valid {
         Some(true) => {}
-        Some(false) => {
-            return Err(Error::KeyRejected(
-                "not active yet (the subscription is waiting for a payment)".to_owned(),
-            ))
-        }
+        Some(false) => return Err(Error::KeyInactive),
         None => return Err(Error::Malformed("sin campo valid".to_owned())),
     }
     marcar_comprobada(ledger, reloj)?;
@@ -900,9 +941,9 @@ fn aplicar_comprobacion(
     answer: Result<(u16, String), Error>,
     reloj: i64,
 ) -> Result<(), Error> {
-    // A 4xx is the gateway answering about the key; a 5xx, a timeout or no network is a check
-    // that could not be done.
-    let rechazada = matches!(&answer, Ok((code, _)) if (400..500).contains(code));
+    // A 4xx in the gateway's own words is the gateway answering about the key; a 5xx, a proxy's
+    // 403, a timeout or no network is a check that could not be done.
+    let rechazada = matches!(&answer, Ok((code, text)) if es_palabra_de_la_pasarela(*code, text));
     let veredicto = match answer {
         Ok((code, text)) if (200..300).contains(&code) => {
             serde_json::from_str::<ValidationResponse>(&text)
@@ -1055,6 +1096,27 @@ pub fn check_if_due(ledger: &mut Ledger, secret: &str, now: i64) -> Result<Optio
     let answer = post_json(&validate_url(), &body);
     aplicar_comprobacion(ledger, answer, reloj)?;
     status(ledger, secret, now).map(Some)
+}
+
+/// [`check_if_due`], at most once an hour counted from the last attempt written down, whatever
+/// happened to the timers in between. Until 1.0.5 the only trigger was an hourly timer that
+/// started again with every rebuild of the pass, and a laptop that changed network more than
+/// once an hour never checked at all (review of 8 Oct 2026).
+pub fn check_if_due_hourly(
+    ledger: &mut Ledger,
+    secret: &str,
+    now: i64,
+) -> Result<Option<Status>, Error> {
+    const HOUR_MS: i64 = 3_600_000;
+    if !check_due(ledger, secret, now)? {
+        return Ok(None);
+    }
+    let tried = setting_i64(ledger, SETTING_LICENSE_TRIED_AT)?;
+    if tried.is_some_and(|t| now < t.saturating_add(HOUR_MS) && now >= t) {
+        return Ok(None);
+    }
+    ledger.set_setting(SETTING_LICENSE_TRIED_AT, &now.to_string())?;
+    check_if_due(ledger, secret, now)
 }
 
 #[cfg(test)]

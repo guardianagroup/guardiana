@@ -1034,9 +1034,21 @@ pub fn guardian_is_primary() -> Option<bool> {
     {
         if linux::have_resolvectl() {
             let out = run_checked("resolvectl", &["dns"]).ok()?;
+            // Only the links of the copy are Guardiana's business: a VPN tunnel or a virtual
+            // bridge with a resolver of its own made this `false` every minute, and the
+            // watchdog re-applied a copy that was already applied for as long as the VPN was
+            // up (review of 8 Oct 2026). With no copy to read, every link counts.
+            let copia: Vec<String> = linux::backup_link_ids().unwrap_or_default();
             let links: Vec<&str> = out
                 .lines()
                 .filter(|l| l.trim_start().starts_with("Link "))
+                .filter(|l| {
+                    copia.is_empty()
+                        || l.split_whitespace()
+                            .nth(2)
+                            .map(|n| n.trim_matches(|c| c == '(' || c == ')'))
+                            .is_some_and(|n| copia.iter().any(|c| c == n))
+                })
                 .filter_map(|l| l.split_once(':').map(|(_, rest)| rest.trim()))
                 .filter(|rest| !rest.is_empty())
                 .collect();

@@ -92,10 +92,19 @@ impl std::error::Error for Error {}
 /// Shared state of every handler.
 pub(crate) struct AppState {
     pub(crate) ledger: Mutex<Ledger>,
+    /// One change of the system DNS at a time: two «apply» clicks in the same second could
+    /// take the second snapshot after the first apply and keep Guardiana's own address as
+    /// «the original» (review of 8 Oct 2026).
+    pub(crate) dns_cambio: tokio::sync::Mutex<()>,
     pub(crate) token: String,
     pub(crate) allowed_hosts: Vec<String>,
     pub(crate) info: RuntimeInfo,
     pub(crate) db_path: PathBuf,
+    /// The chain's genesis, to open a connection of one's own for a call that must not hold
+    /// the panel's lock (activating a key waits on the network).
+    pub(crate) genesis: Hash,
+    /// The one reader of the neighbour table (who is which phone), shared by every handler.
+    pub(crate) vecinos: guardiana_devices::Resolver,
 }
 
 /// A running panel.
@@ -194,7 +203,10 @@ pub(crate) async fn add_security_headers(
         header::REFERRER_POLICY,
         HeaderValue::from_static("no-referrer"),
     );
-    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    // The fonts say `immutable` for themselves; everything else is never stored (review of
+    // 8 Oct 2026: `insert` overwrote the fonts' header and 700 KB came down on every page).
+    h.entry(header::CACHE_CONTROL)
+        .or_insert(HeaderValue::from_static("no-store"));
     res
 }
 
@@ -210,10 +222,13 @@ pub async fn start(config: Config) -> Result<Running, Error> {
     allowed_hosts.extend(config.extra_hosts.iter().cloned());
     let state = Arc::new(AppState {
         ledger: Mutex::new(ledger),
+        dns_cambio: tokio::sync::Mutex::new(()),
         token: token.clone(),
         allowed_hosts,
         info: config.info,
         db_path: config.db_path,
+        genesis: config.genesis,
+        vecinos: guardiana_devices::Resolver::default(),
     });
 
     let app = Router::new()
@@ -351,7 +366,6 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             }),
         )
         .route("/api/textos", get(api::textos))
-        .route("/api/me", get(api::me))
         .route("/api/estado", get(api::estado))
         .route("/api/cambios", get(api::cambios))
         .route("/api/ia", get(api::ia))

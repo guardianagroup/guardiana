@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
 CREATE INDEX IF NOT EXISTS events_device_ts ON events(device_id, ts);
+CREATE INDEX IF NOT EXISTS events_device_name ON events(device_id, qname, id);
 CREATE TABLE IF NOT EXISTS devices (
     id                     TEXT PRIMARY KEY,
     mac                    TEXT,

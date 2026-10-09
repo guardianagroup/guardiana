@@ -47,7 +47,7 @@
   "veredictos": {
     "observado": "observado",
     "respondido": "respondido",
-    "cortado": "cortado"
+    "cortado": "bloqueado"
   },
   "decidido_por": {
     "alcance_declarado": "fora do alcance que você declarou",
@@ -185,7 +185,7 @@
     "panel.sin_permiso": "A chave do painel fica guardada pelo serviço em {ruta} e só o administrador pode lê-la. Escreva «sudo guardiana panel»: ele dá o link para abrir no seu navegador.",
     "panel.sin_permiso_windows": "O Windows não deixa este usuário ler a chave do painel ({ruta}). Abra o menu Iniciar, procure «GUARDIANA» e abra por lá, ou abra o «Prompt de Comando» com «Executar como administrador» e escreva «guardiana panel».",
     "panel.enlace_sudo": "Abra este link no seu navegador (ele leva a chave da sua sessão; não o compartilhe): {url}",
-    "panel.esperando": "A Guardiana está iniciando; abro o painel assim que responder…",
+    "panel.esperando": "A Guardiana está iniciando. O painel abre sozinho assim que o serviço responder.",
     "panel.abriendo": "Abrindo o painel: {url}",
     "observe.puerto80": "Não deu para abrir {addr} para a página de conferência ({motivo}). Os celulares podem usar http://{addr}:7443/mi-dispositivo.",
     "informe.cabecera": "Relatório semanal da casa ({desde} → {hasta})",
@@ -268,7 +268,11 @@
     "verify.registro.mac_zip": "Registro público: no Mac o registro anota o .zip que você baixou, não o programa de dentro, então esta impressão digital não pode estar nele. Compare a do .zip com a do site.",
     "verify.registro.mac_zip_huella": "Registro público: no Mac o registro anota o .zip, não o programa de dentro. O desta versão é {archivo}, com impressão digital {sha}: compare com a do .zip que você baixou.",
     "verify.puertos.de_otros": "Outros programas mantêm abertas para a rede local estas portas, que não são da Guardiana: {puertos}.",
-    "verify.puertos.dueno_desconocido": "Estas portas estão abertas para a rede local por um programa que o sistema não nomeia sem permissões de administrador: {puertos}. Não são atribuídas à Guardiana; para ver de quem são, execute verify de novo como administrador."
+    "verify.puertos.dueno_desconocido": "Estas portas estão abertas para a rede local por um programa que o sistema não nomeia sem permissões de administrador: {puertos}. Não são atribuídas à Guardiana; para ver de quem são, execute verify de novo como administrador.",
+    "observe.hogar_puerto_ocupado": "Modo Casa: não foi possível abrir {addr} para os aparelhos da casa (outro programa o ocupa ou o endereço mudou). Este computador continua vigiado; tenta-se de novo na próxima verificação.",
+    "observe.resolutor_caido": "O resolvedor parou de responder por conta própria; a Guardiana o levanta de novo.",
+    "panel.tarda": "Está demorando mais do que o normal. Se não abrir em um minuto, abra o menu Iniciar, procure «GUARDIANA» e abra por lá.",
+    "panel.abriendo_espera": "A Guardiana está iniciando: o navegador abre o painel assim que ela responder."
   },
   "paises": {
     "AE": "Emirados Árabes Unidos",
@@ -400,7 +404,7 @@
     "c_publicidad": "publicidade",
     "c_nuevos": "destinos novos",
     "c_esperados": "normais",
-    "c_cortados": "cortados",
+    "c_cortados": "bloqueados",
     "col_hora": "hora",
     "col_nombre": "serviço",
     "col_empresa_n": "empresa",
@@ -412,7 +416,7 @@
     "trampa_frase": "Este nome só existe dentro de um arquivo armadilha seu. A GUARDIANA não abriu esse arquivo nem nenhum outro: tudo o que viu é que algo perguntou por este nome, e esse nome não se pode conhecer sem ter lido o arquivo.",
     "ia_programa_titulo": "O programa que fez essas consultas, segundo o próprio Windows. Só neste computador: de um celular no Modo Casa vê-se o nome do serviço e nada mais.",
     "col_consultas": "consultas",
-    "col_cortados": "cortados",
+    "col_cortados": "bloqueados",
     "col_ultima": "última atividade",
     "col_detalle": "detalhe",
     "col_fecha": "data",
@@ -463,7 +467,7 @@
     "s_no_respuestas": "Só se anotam consultas: nome, tipo, aparelho, hora, categoria e veredito; no Windows, para as deste computador, também qual programa pediu: o nome, o caminho no disco (que pode trazer o nome do seu usuário) e a impressão digital do arquivo. Nunca as respostas, nunca o conteúdo.",
     "retencion_ilimitada": "sem limite: nada é apagado, nem quando você deixar de pagar",
     "outbound_titulo": "O que a Guardiana enviou para fora",
-    "outbound_lead": "Cada conexão que o programa fez por conta própria: ativar a licença, a conferência da assinatura (8 dias depois de ativá-la e uma vez por período), checar versão ou atualizar listas. Com quem, quando e quantos bytes.",
+    "outbound_lead": "Cada conexão que o programa fez por conta própria: ativar a licença e a conferência da assinatura (8 dias depois de ativá-la e uma vez por período). Não há nenhuma outra: as listas vêm dentro do programa e as versões novas você mesmo instala. Com quem, quando e quantos bytes.",
     "outbound_vacio": "A Guardiana não enviou nada para fora deste computador.",
     "ia_prefijo": "IA",
     "creada_panel": "você, no painel",
@@ -613,6 +617,13 @@
     "cat_pista_app": "seu servidor",
     "cat_pista_web": "seu site",
     "leyenda_desconocido": "«Rede local» são os aparelhos da sua casa procurando-se entre si: não sai para a internet. «Entrega» é uma rede que distribui o conteúdo de outras empresas: não é o destino, é o caminho. «Seu site», «sua conta», «seu servidor», «conteúdo», «ajustes», «medição»… é o que o próprio nome diz (www, login, api, cdn, config, analytics…): uma pista, não uma verificação. «Serviço» é um nome de uma empresa conhecida que nenhuma lista marca e cujo nome não diz para que serve. «Sem classificar» significa que nem nenhuma lista pública nem a nossa de empresas o conhece; não que seja suspeito.",
+    "leyenda_colores": "<b>As três cores da categoria.</b> <span class=\"nivel-pt verde\">Verde</span>: normal, o que um serviço precisa para funcionar (o site dele, o servidor dele, a sua conta, atualizações, conteúdo, a rede da sua casa). <span class=\"nivel-pt naranja\">Laranja</span>: para olhar; mede o que você faz, serve anúncios ou ninguém o conhece (publicidade, telemetria, medição, sem classificar). <span class=\"nivel-pt rojo\">Vermelho</span>: alerta; uma lista pública o reconhece como rastreamento, a empresa está inscrita como corretora de dados ou tenta driblar a vigilância. É uma forma de ler a categoria, não um veredicto: clique na etiqueta para saber o que significa, e bloqueie ou desbloqueie cada linha com o botão dela.",
+    "nivel_verde": "verde: normal",
+    "nivel_naranja": "laranja: para olhar",
+    "nivel_rojo": "vermelho: alerta",
+    "cat_enlace_web": "Abrir {dominio} numa aba nova",
+    "cat_enlace_guia": "Clique para saber o que significa",
+    "guia_categorias_url": "https://guardianagroup.com/pt/guias/categorias.html",
     "alcance_cortar_todo": "Vale para o aparelho inteiro, não só para o agente: o corte é por nome, para qualquer programa. No Windows a Guardiana diz depois qual programa perguntou, mas não consegue cortar só um.",
     "alcance_cortar_aviso": "O Modo Vigia corta TUDO o que não estiver na sua lista, no aparelho inteiro.\n\nCom a lista de agora, no último dia teriam sido cortados {n} nomes: {ejemplos}.\n\nSe você trabalha neste computador, fica sem esses sites. Ligo?",
     "alcance_cortar": "Modo Vigia",
@@ -648,10 +659,10 @@
     "rafagas_oficio": "{n} com ofício escrito (medição, atribuição, anúncios)",
     "rafagas_ninguna": "Ainda não houve nenhuma nas últimas 24 horas.",
     "rafagas_limite": "Isto é o que o aparelho perguntou de uma vez. Não diz qual aplicativo foi nem o que foi enviado: a GUARDIANA vê nomes, não conteúdo.",
-    "cortar_pronto_confirmar": "Cortar «{nombre}»?\n\nA Guardiana está há pouco tempo neste computador e ainda não sabe se algum programa precisa dele. Se algo falhar, você desfaz em Regras num clique.",
-    "cortar_limite": "Cortar um nome corta a pergunta nesta casa. Não apaga o que já foi mandado, e não para quem já tem o endereço guardado ou usa o próprio DNS.",
+    "cortar_pronto_confirmar": "Bloquear «{nombre}»?\n\nA Guardiana está há pouco tempo neste computador e ainda não sabe se algum programa precisa dele. Se algo falhar, você desfaz em Regras num clique.",
+    "cortar_limite": "Bloquear um nome bloqueia a pergunta nesta casa. Não apaga o que já foi mandado, e não para quem já tem o endereço guardado ou usa o próprio DNS.",
     "desbloquear_boton": "desbloquear",
-    "cortar": "cortar",
+    "cortar": "bloquear",
     "permitir": "permitir",
     "observando": "A Guardiana está observando: {h} horas de 24",
     "observando_una": "A Guardiana está observando: 1 hora de 24",
@@ -667,7 +678,7 @@
     "guardar": "Salvar",
     "guardado": "Salvo. Vale a partir do reinício da Guardiana.",
     "mi_reglas_titulo": "Regras deste aparelho",
-    "mi_reglas_lead": "Só você, a partir deste aparelho, pode criá-las e desfazê-las.",
+    "mi_reglas_lead": "As regras deste aparelho: as que você criou daqui e as que o painel da casa definiu para ele. Você pode desfazer qualquer uma daqui; ninguém mais da casa vê o detalhe do que você consulta, a não ser que compartilhe.",
     "nav_verify": "Verificar",
     "verify_titulo": "Verificar",
     "verify_lead": "O mesmo que o guardiana verify imprime: fatos, não promessas. Se algo não bater, aparece aqui.",
@@ -682,7 +693,7 @@
     "licencia_prueba_sin_marca": "Os sete dias são contados no seu computador, no seu extrato. A marca à parte que impede recomeçá-los ({donde}) não pôde ser escrita porque a GUARDIANA não tem permissões de administrador, então por enquanto a data está só no extrato.",
     "licencia_ancla_texto": "Uma cópia da sua chave, do número desta ativação e do produto fica guardada também em {donde}, onde só um administrador pode mexer, para que perder a pasta de dados não te deixe sem o que você pagou. Nem o seu nome, nem o seu e-mail.",
     "licencia_err_clave_vacia": "Digite a chave de licença que chegou por e-mail. Nada foi enviado.",
-    "licencia_plus_rechazada": "O gateway está recusando a chave há 7 dias (por exemplo, depois de um reembolso), então a licença terminou em {fecha}. A GUARDIANA parou de olhar e devolveu o DNS ao que era; o anotado continua no seu disco. Se achar que é um erro, escreva para hola@guardianagroup.com.",
+    "licencia_plus_rechazada": "A passarela diz há 7 dias que a chave não vale (por exemplo, após um reembolso ou ao desativá-la), então a licença terminou em {fecha}. A GUARDIANA deixou de vigiar e devolveu o DNS como estava; o que foi anotado continua no seu disco. Se acha que é um erro, escreva para hola@guardianagroup.com.",
     "licencia_prueba_agotada": "O teste terminou em {fecha}. A GUARDIANA parou de olhar e devolveu o DNS deste computador ao que era: a sua internet funciona igual. O anotado continua inteiro no seu disco e você pode exportá-lo. Para voltar a vigiar, ative a sua chave de licença.",
     "licencia_origen_clave": "ativado com chave",
     "licencia_clave_titulo": "Ativar com chave",
@@ -830,6 +841,8 @@
     "prueba_quedan": "Faltam {d} dias de teste.",
     "prueba_queda_uno": "Falta 1 dia de teste.",
     "prueba_franja_texto": "Depois, a GUARDIANA para de olhar e devolve o DNS ao que era; o anotado fica no seu disco.",
-    "prueba_franja_enlace": "Ver a licença →"
+    "prueba_franja_enlace": "Ver a licença →",
+    "licencia_err_inactiva": "A passarela conhece a chave, mas ela ainda não está ativa: a assinatura está esperando o primeiro pagamento (ou o pagamento falhou). Assim que a passarela o registrar, digite a chave de novo aqui e ela ativa.",
+    "licencia_err_limite": "Esta chave já foi usada em todos os computadores que permite. Para liberar um ou ampliar, escreva para hola@guardianagroup.com com a chave: resolve-se no mesmo dia."
   }
 }

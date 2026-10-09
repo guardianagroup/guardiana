@@ -208,11 +208,7 @@ async fn this_computer_needs_the_key_for_its_own_page() {
     .expect("the panel starts");
     let addr = running.addrs[0];
     let token = running.token.clone();
-    for path in [
-        "/api/mi-dispositivo",
-        "/api/mi-dispositivo/reglas",
-        "/api/me",
-    ] {
+    for path in ["/api/mi-dispositivo", "/api/mi-dispositivo/reglas"] {
         assert_eq!(get(addr, None, path).await, 401, "{path} without the key");
         assert_eq!(
             get(addr, Some(&token), path).await,

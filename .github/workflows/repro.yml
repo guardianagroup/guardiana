@@ -25,7 +25,7 @@ jobs:
     name: SHA-256 of the Linux and Windows binaries
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0   # repro.sh reads the commit date with git show
       - name: reproducible build
@@ -44,7 +44,7 @@ jobs:
           cp build/out/SHA256SUMS /tmp/primera
           build/repro.sh HEAD
           diff -u /tmp/primera build/out/SHA256SUMS && echo "the two builds match"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: guardiana-repro
           path: |
@@ -62,8 +62,8 @@ jobs:
     needs: hashes
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: guardiana-repro
           path: build/out
@@ -100,7 +100,7 @@ jobs:
             $p = $_ -split '\s+'
             Write-Output "::notice title=$($p[1])::$($p[0])"
           }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: guardiana-instaladores
           path: |

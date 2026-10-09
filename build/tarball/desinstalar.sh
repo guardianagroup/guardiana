@@ -23,7 +23,7 @@ dns_ok=1
 if [ -x "$bin" ]; then
     "$bin" service stop >/dev/null 2>&1 || true
     "$bin" hogar off --desinstalando >/dev/null 2>&1 || true
-    "$bin" dns --restore || dns_ok=0
+    "$bin" dns --restore --desinstalando || dns_ok=0
     "$bin" service uninstall || true
     rm -f "$bin"
 fi

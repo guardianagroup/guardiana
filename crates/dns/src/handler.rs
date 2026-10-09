@@ -264,6 +264,16 @@ impl<P: Policy> RequestHandler for Handler<P> {
             }
         } else if let (CHECKER_NAME, Some(ip)) = (query.name.as_str(), self.checker_ip) {
             (Self::checker_answer(&name, qtype, ip), Outcome::Checker)
+        } else if query.name.as_str() == CHECKER_NAME {
+            // Home mode off: the private name does not exist, and it never goes upstream nor
+            // into the ledger as if it were a site (review of 8 Oct 2026).
+            (
+                Answer {
+                    code: ResponseCode::NXDomain,
+                    ..Answer::default()
+                },
+                Outcome::Checker,
+            )
         } else {
             match self.policy.decide(&query) {
                 Decision::Block { rule_id } => (

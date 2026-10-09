@@ -14,6 +14,8 @@ pub(crate) fn plain(t: &i18n::Texts, e: &license::Error) -> String {
     match e {
         license::Error::Malformed(_) => t.panel("licencia_err_formato").to_owned(),
         license::Error::KeyRejected(why) => t.panel("licencia_err_clave").replace("{motivo}", why),
+        license::Error::KeyInactive => t.panel("licencia_err_inactiva").to_owned(),
+        license::Error::ActivationLimit => t.panel("licencia_err_limite").to_owned(),
         // An empty key is refused before anything leaves the machine (review of 1 Oct 2026,
         // entry 26), and the gateway is not blamed for a key it never saw.
         license::Error::EmptyKey => t.panel("licencia_err_clave_vacia").to_owned(),

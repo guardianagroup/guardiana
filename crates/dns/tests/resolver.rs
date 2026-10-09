@@ -294,10 +294,14 @@ async fn checker_name_resolves_to_lan_ip_only_in_home_mode() {
     assert_eq!(aaaa.metadata.response_code, ResponseCode::NoError);
     assert!(aaaa.answers.is_empty());
 
-    let g_off = guardiana(up, Recorder::default(), |c| c.checker_ip = None).await;
+    // Home mode off: the private name does not exist, and it never goes upstream.
+    let off = Recorder::default();
+    let g_off = guardiana(up, off.clone(), |c| c.checker_ip = None).await;
     let msg = ask_udp(g_off.udp_addrs[0], CHECKER_NAME, RecordType::A).await;
     assert!(a_records(&msg).is_empty());
-    assert_eq!(hits.load(Ordering::SeqCst), 1);
+    assert_eq!(msg.metadata.response_code, ResponseCode::NXDomain);
+    assert_eq!(hits.load(Ordering::SeqCst), 0);
+    assert_eq!(off.seen()[0].1, Outcome::Checker);
 }
 
 #[tokio::test]

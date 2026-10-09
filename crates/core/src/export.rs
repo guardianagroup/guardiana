@@ -89,7 +89,14 @@ fn write_csv_with<W: Write>(events: &[Event], sep: char, bom: bool, mut w: W) ->
 
 /// RFC 4180 quoting: wrap in quotes when needed, double inner quotes.
 fn quote(field: &str, sep: char) -> String {
-    if field.contains([sep, '"', '\n', '\r']) {
+    // A name is typed by whoever asked it, on any device of the home, and a spreadsheet opened
+    // with a double click evaluates a cell that starts with `=`, `+`, `-` or `@` as a formula,
+    // quoted or not. A leading apostrophe makes it text again, and the name stays readable
+    // (review of 8 Oct 2026).
+    let formula = field.starts_with(['=', '+', '-', '@', '\t', '\r']);
+    if formula {
+        format!("\"'{}\"", field.replace('"', "\"\""))
+    } else if field.contains([sep, '"', '\n', '\r']) {
         format!("\"{}\"", field.replace('"', "\"\""))
     } else {
         field.to_owned()
@@ -101,6 +108,13 @@ fn quote(field: &str, sep: char) -> String {
 mod tests {
     use super::*;
     use crate::hash::Hash;
+
+    #[test]
+    fn a_name_that_looks_like_a_formula_is_quoted_as_text() {
+        assert_eq!(quote("=HYPERLINK(1).x", ';'), "\"'=HYPERLINK(1).x\"");
+        assert_eq!(quote("-5.example", ';'), "\"'-5.example\"");
+        assert_eq!(quote("www.example", ';'), "www.example");
+    }
     use crate::ledger::Ledger;
     use crate::model::{Event, NewEvent, Signal};
 
