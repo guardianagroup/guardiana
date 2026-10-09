@@ -23,6 +23,7 @@
   --rojo-suave: #FBE7E3;
   --ambar: #9A5B00;
   --ambar-suave: #FBF0DC;
+  --sobre: #FFFFFF;       /* text on a coloured button (blue, red) */
   --sombra: 0 1px 2px rgba(11, 16, 32, .06), 0 8px 24px -12px rgba(11, 16, 32, .18);
   --texto: 'Plex', 'Segoe UI', system-ui, sans-serif;
   --mono: 'PlexMono', Consolas, ui-monospace, monospace;
@@ -34,7 +35,7 @@
     --marco: #060914; --hoja: #0F1528; --campo: #182039; --tinta: #E8ECF6; --gris: #98A1B8;
     --gris-suave: #6E7891; --linea: #232C45; --azul: #7B98FF; --azul-suave: #1B2550;
     --verde: #3FC79A; --verde-suave: #10302A; --rojo: #FF7A6E; --rojo-suave: #3A1814;
-    --ambar: #E8AE55; --ambar-suave: #33270F;
+    --ambar: #E8AE55; --ambar-suave: #33270F; --sobre: #0B1020;
     --sombra: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .7);
     color-scheme: dark;
   }
@@ -43,7 +44,7 @@
   --marco: #060914; --hoja: #0F1528; --campo: #182039; --tinta: #E8ECF6; --gris: #98A1B8;
   --gris-suave: #6E7891; --linea: #232C45; --azul: #7B98FF; --azul-suave: #1B2550;
   --verde: #3FC79A; --verde-suave: #10302A; --rojo: #FF7A6E; --rojo-suave: #3A1814;
-  --ambar: #E8AE55; --ambar-suave: #33270F;
+  --ambar: #E8AE55; --ambar-suave: #33270F; --sobre: #0B1020;
   --sombra: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .7);
   color-scheme: dark;
 }
@@ -61,7 +62,7 @@ button { cursor: pointer; }
 /* Buttons: one quiet, one decided, one that cuts. */
 .boton { border: 1px solid var(--linea); background: var(--hoja); border-radius: 9px; padding: 7px 13px; font-weight: 500; }
 .boton:hover { border-color: var(--gris-suave); }
-.boton.principal { background: var(--azul); border-color: var(--azul); color: #fff; }
+.boton.principal { background: var(--azul); border-color: var(--azul); color: var(--sobre); }
 .boton.principal:hover { filter: brightness(1.08); }
 .boton.corta { color: var(--rojo); border-color: color-mix(in srgb, var(--rojo) 45%, transparent); background: transparent; }
 .boton.corta:hover { background: var(--rojo-suave); }

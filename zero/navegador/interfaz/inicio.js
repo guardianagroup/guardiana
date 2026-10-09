@@ -100,7 +100,6 @@
     const c = $('lienzo');
     const x = c.getContext('2d');
     await document.fonts.ready;
-    const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
     x.fillStyle = '#F4F6FA'; x.fillRect(0, 0, 1200, 630);
     x.strokeStyle = 'rgba(11,16,32,.05)';
     for (let i = 0; i < 1200; i += 44) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 630); x.stroke(); }
@@ -118,7 +117,7 @@
     }
     x.fillText(linea, 72, y);
     x.fillStyle = '#1F4BFF'; x.font = '500 20px PlexMono'; x.fillText('guardianagroup.com', 72, 570);
-    x.fillStyle = css('--gris') || '#5B6275'; x.font = '400 18px Plex'; x.fillText(t('lema'), 72, 540);
+    x.fillStyle = '#5B6275'; x.font = '400 18px Plex'; x.fillText(t('lema'), 72, 540);
     manda({ tipo: 'guardar_imagen', nombre: 'guardiana-zero-mes.png', datos: c.toDataURL('image/png') });
   });
 

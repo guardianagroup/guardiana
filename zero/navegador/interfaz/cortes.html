@@ -100,7 +100,14 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
 
 /* The PDF: the report, without the controls, on white. */
 @media print {
-  :root { color-scheme: light; --hoja: #fff; --campo: #F3F5F9; --tinta: #0B1020; --gris: #4A5163; --linea: #D9DEE8; --rojo: #B3261E; }
+  /* Paper is white whatever the screen shows: the night palette (chosen, or Windows') would print
+     near-white ink on white, so every themed root gets the day's colours back here. */
+  :root, :root[data-tema], :root:not([data-tema="dia"]) {
+    color-scheme: light; --marco: #E8ECF4; --hoja: #fff; --campo: #F3F5F9; --tinta: #0B1020; --gris: #4A5163;
+    --gris-suave: #8A91A3; --linea: #D9DEE8; --azul: #1F4BFF; --azul-suave: #E6ECFF; --verde: #0E8F6E;
+    --verde-suave: #E2F4EE; --rojo: #B3261E; --rojo-suave: #FBE7E3; --ambar: #9A5B00; --ambar-suave: #FBF0DC;
+    --sombra: none;
+  }
   body { background: #fff; }
   main { max-width: none; padding: 0; }
   .controles, .filtros, #aviso, .volver { display: none !important; }

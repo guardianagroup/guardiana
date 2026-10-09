@@ -30,9 +30,19 @@ pub fn esc(s: &str) -> String {
 }
 
 /// The page shown in place of a cut address. `texto` is the reason, already in the person's
-/// language; `url` the address that was not opened.
+/// language; `url` the address that was not opened; `tema` the person's day or night (`"dia"`,
+/// `"noche"`, or `""` to follow Windows), like the browser's own pages.
 #[must_use]
-pub fn pagina_cortada(t: &Textos, texto: &str, url: &str) -> String {
+pub fn pagina_cortada(t: &Textos, texto: &str, url: &str, tema: &str) -> String {
+    const NOCHE: &str = "--hoja:#0F1528;--marco:#060914;--tinta:#E8ECF6;--gris:#98A1B8;--linea:#232C45;--azul:#7B98FF;--rojo:#FF7A6E;--rojo-suave:#3A1814;--sobre:#0B1020";
+    let (esquema, noche) = match tema {
+        "dia" => ("light", String::new()),
+        "noche" => ("dark", format!(":root{{{NOCHE}}}")),
+        _ => (
+            "light dark",
+            format!("@media (prefers-color-scheme:dark){{:root{{{NOCHE}}}}}"),
+        ),
+    };
     let titulo = t.t("pagina_cortada_titulo");
     let mut url_visible: String = url.chars().take(300).collect();
     if url.chars().count() > 300 {
@@ -40,8 +50,8 @@ pub fn pagina_cortada(t: &Textos, texto: &str, url: &str) -> String {
     }
     format!(
         r#"<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="robots" content="noindex"><title>{titulo}</title><style>
-:root{{color-scheme:light dark;--hoja:#FFFFFF;--marco:#E8ECF4;--tinta:#0B1020;--gris:#5B6275;--linea:#D9DEE8;--azul:#1F4BFF;--rojo:#C0301A;--rojo-suave:#FBE7E3}}
-@media (prefers-color-scheme:dark){{:root{{--hoja:#0F1528;--marco:#060914;--tinta:#E8ECF6;--gris:#98A1B8;--linea:#232C45;--azul:#7B98FF;--rojo:#FF7A6E;--rojo-suave:#3A1814}}}}
+:root{{color-scheme:{esquema};--hoja:#FFFFFF;--marco:#E8ECF4;--tinta:#0B1020;--gris:#5B6275;--linea:#D9DEE8;--azul:#1F4BFF;--rojo:#C0301A;--rojo-suave:#FBE7E3;--sobre:#FFFFFF}}
+{noche}
 html,body{{margin:0;min-height:100%;background:var(--hoja);color:var(--tinta);font:16px/1.55 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif}}
 main{{max-width:600px;margin:0 auto;padding:16vh 28px 48px}}
 .marca{{display:flex;align-items:center;gap:10px;color:var(--gris);font-size:12.5px;font-weight:600;letter-spacing:.03em}}
@@ -49,7 +59,7 @@ main{{max-width:600px;margin:0 auto;padding:16vh 28px 48px}}
 h1{{font-size:28px;line-height:1.2;margin:20px 0 12px;letter-spacing:-.01em;font-weight:600}}
 p{{margin:0 0 12px;color:var(--gris)}}
 code{{display:block;margin-top:18px;padding:10px 12px;border-radius:10px;background:var(--marco);font:13px/1.45 Consolas,ui-monospace,monospace;color:var(--tinta);word-break:break-all}}
-a{{display:inline-block;margin-top:26px;padding:9px 18px;border-radius:19px;background:var(--azul);color:#fff;text-decoration:none;font-weight:600;font-size:14px}}
+a{{display:inline-block;margin-top:26px;padding:9px 18px;border-radius:19px;background:var(--azul);color:var(--sobre);text-decoration:none;font-weight:600;font-size:14px}}
 a:focus-visible{{outline:3px solid var(--linea);outline-offset:2px}}
 </style></head><body><main><div class="marca"><i></i>GUARDIANA ZERO</div><h1>{titulo}</h1><p>{texto}</p><code>{url}</code><a href="javascript:history.back()">{volver}</a></main></body></html>"#,
         lang = t.idioma().codigo(),
@@ -174,11 +184,27 @@ mod tests {
     #[test]
     fn the_cut_page_escapes_what_it_shows() {
         let t = Textos::de(Idioma::Es);
-        let p = pagina_cortada(&t, "Cortaste <b>x</b>.", "https://x.example/?a=<script>");
+        let p = pagina_cortada(
+            &t,
+            "Cortaste <b>x</b>.",
+            "https://x.example/?a=<script>",
+            "",
+        );
         assert!(p.contains("Cortaste &lt;b&gt;x&lt;/b&gt;."));
         assert!(p.contains("?a=&lt;script&gt;"));
         assert!(p.contains("lang=\"es\""));
         assert!(!p.contains("<script>"));
+    }
+
+    #[test]
+    fn the_cut_page_follows_day_or_night() {
+        let t = Textos::de(Idioma::Es);
+        let sistema = pagina_cortada(&t, "x", "https://x.example/", "");
+        assert!(sistema.contains("prefers-color-scheme:dark"));
+        let noche = pagina_cortada(&t, "x", "https://x.example/", "noche");
+        assert!(noche.contains("color-scheme:dark") && !noche.contains("prefers-color-scheme"));
+        let dia = pagina_cortada(&t, "x", "https://x.example/", "dia");
+        assert!(dia.contains("color-scheme:light;") && !dia.contains("#0F1528"));
     }
 
     #[test]

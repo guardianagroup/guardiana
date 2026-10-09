@@ -195,6 +195,12 @@ pub enum Orden {
         /// Strict.
         estricto: bool,
     },
+    /// Day or night for the window's own frame (title bar): `Some(true)` night, `Some(false)`
+    /// day, `None` like Windows.
+    Tema {
+        /// Night.
+        oscuro: Option<bool>,
+    },
     /// The window's title.
     Titulo {
         /// The text.
@@ -379,6 +385,8 @@ pub struct Sesion {
     hoy_sucio: bool,
     ultimo_guardado: i64,
     ultimo_hoy: i64,
+    /// The day the figures and the cut log were last brought up to, to notice midnight.
+    dia_visto: String,
     depura: bool,
     /// The engine reports requests of workers too (newer WebView2): said in the receipts.
     trabajadores: bool,
@@ -551,6 +559,7 @@ impl Sesion {
             hoy_sucio: false,
             ultimo_guardado: 0,
             ultimo_hoy: 0,
+            dia_visto: String::new(),
             depura: false,
             trabajadores: false,
             cortes_pend: Vec::new(),
@@ -561,7 +570,8 @@ impl Sesion {
             licencia_leida: 0,
             licencia_pedida: 0,
         };
-        cortes::poda(&s.datos.join("cortes"));
+        s.dia_visto = s.hoy();
+        s.poda_cortes();
         s.ultimo_guardado = (s.reloj)();
         let o = s.nueva_pestana(Perfil::General, INICIO);
         (s, o)
@@ -755,6 +765,15 @@ impl Sesion {
         fecha::dia((self.reloj)(), self.zona)
     }
 
+    /// The cut log keeps today and the 30 days before it: the same span «Todo» shows.
+    fn poda_cortes(&self) {
+        let dias = i64::try_from(cortes::DIAS).unwrap_or(31) - 1;
+        cortes::poda(
+            &self.datos.join("cortes"),
+            &fecha::dia_antes((self.reloj)(), self.zona, dias),
+        );
+    }
+
     fn guarda_prefs(&self) {
         escribe_json(&self.datos.join("preferencias.json"), &self.prefs);
     }
@@ -921,6 +940,16 @@ impl Sesion {
         o
     }
 
+    /// The person's day or night for the window frame: `None` follows Windows.
+    #[must_use]
+    pub fn tema_oscuro(&self) -> Option<bool> {
+        match self.prefs.tema.as_str() {
+            "noche" => Some(true),
+            "dia" => Some(false),
+            _ => None,
+        }
+    }
+
     fn msg_tema(&self) -> Value {
         json!({ "tipo": "tema", "tema": self.prefs.tema })
     }
@@ -1027,8 +1056,6 @@ impl Sesion {
             "tipo": "hoy",
             "cortando": self.prefs.reglas.cortar_seguimiento && self.licencia.protege(),
             "protege": self.licencia.protege(),
-            "motor": buscador(&self.prefs.buscador).nombre,
-            "motor_privado": buscador(&self.prefs.buscador).privado,
             "motor_id": buscador(&self.prefs.buscador).id,
             "motores": lista_buscadores(),
             "hoy": self.diario.total(&hoy, &hoy),
@@ -1520,6 +1547,9 @@ impl Sesion {
                 self.guarda_prefs();
                 let tema = self.msg_tema();
                 let mut o = vec![
+                    Orden::Tema {
+                        oscuro: self.tema_oscuro(),
+                    },
                     envia(Origen::Barra, &tema),
                     envia(Origen::Panel, &tema),
                     envia(Origen::Panel, &self.msg_ajustes()),
@@ -2479,6 +2509,7 @@ impl Sesion {
                         &self.textos,
                         &self.t("pagina_cortada_mandato_fin"),
                         url,
+                        &self.prefs.tema,
                     )
                 }),
             };
@@ -2648,7 +2679,7 @@ impl Sesion {
                 Some(m) => self.t(&format!("motivo_{}", cortes::motivo_clave(m))),
                 None => String::new(),
             };
-            paginas::pagina_cortada(&self.textos, &razon, url)
+            paginas::pagina_cortada(&self.textos, &razon, url, &self.prefs.tema)
         });
         Respuesta {
             cortar: true,
@@ -2700,6 +2731,15 @@ impl Sesion {
         }
         if self.libro_sucio && self.panel.as_deref() == Some("datos") {
             o.push(envia(Origen::Panel, &self.msg_libro()));
+        }
+        // Midnight: yesterday's figures must not stay under today's date on an open new tab, and
+        // the oldest day of the log goes.
+        let hoy = self.hoy();
+        if hoy != self.dia_visto {
+            self.dia_visto = hoy;
+            self.poda_cortes();
+            self.hoy_sucio = true;
+            self.ultimo_hoy = 0;
         }
         if self.hoy_sucio && ahora - self.ultimo_hoy >= 1000 {
             self.hoy_sucio = false;

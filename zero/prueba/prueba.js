@@ -213,11 +213,28 @@ function pantalla(nombre) {
   comprueba(!!pdf && pdf.subarray(0, 5).toString() === '%PDF-' && pdf.length > 5000, `«Guardar PDF» deja el informe en Descargas (${pdf ? pdf.length : 0} bytes)`);
   const csv = await guardado('#csv', 'csv');
   comprueba(!!csv && csv.toString('utf8').includes('Google') && csv.toString('utf8').split('\n').filter(Boolean).length === total + 1, '«Exportar CSV» guarda cada corte en una fila');
-  // From the shield, too.
+  // «Todo» is the whole log the browser keeps.
+  await cortes.click('.periodos button[data-periodo="31"]');
+  comprueba(await hasta(async () => (await cortes.textContent('.periodos button[data-periodo="31"]')) === 'Todo'), 'el periodo largo se llama «Todo»');
+  // From the shield, too. Already on the list: it stays, no second copy.
+  await barra.click('#b-escudo');
+  await hasta(() => panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa')));
+  await panel.click('#e-ver-todo');
+  await espera(1000);
+  comprueba((await barra.locator('.pestana').count()) === 2, 'desde la lista, «ver todo» no abre otra copia');
+  // From the web page: a tab of its own, and «Volver» brings the web back.
+  await barra.click('.pestana[aria-selected="false"]');
+  await espera(500);
+  const tituloWeb = await barra.textContent('.pestana[aria-selected="true"] .titulo');
   await barra.click('#b-escudo');
   await hasta(() => panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa')));
   await panel.click('#e-ver-todo');
   comprueba(await hasta(async () => (await barra.locator('.pestana').count()) === 3), 'el escudo también lleva a la lista');
+  const otra = await paginaQue(nav, (u) => u.endsWith('/cortes.html') && nav.contexts().some((c) => c.pages().filter((p) => p.url().endsWith('/cortes.html')).length === 2));
+  const lista2 = nav.contexts().flatMap((c) => c.pages()).filter((p) => p.url().endsWith('/cortes.html')).find((p) => p !== cortes) || otra;
+  await lista2.click('#volver');
+  comprueba(await hasta(async () => (await barra.locator('.pestana').count()) === 2), '«Volver» cierra la lista que se abrió aparte');
+  comprueba(await hasta(async () => (await barra.textContent('.pestana[aria-selected="true"] .titulo')) === tituloWeb), `y vuelve a la web en la que estabas (${tituloWeb})`);
 
   // Closing writes everything down.
   try { execSync('taskkill /IM guardiana-zero.exe', { stdio: 'ignore' }); } catch (_) {}

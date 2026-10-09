@@ -417,6 +417,10 @@ fn ejecuta(o: Orden) {
                 pon_seguimiento(&v.web, estricto);
             }
         }
+        Orden::Tema { oscuro } => {
+            let col = colores(oscuro);
+            pinta_marco_ventana(hwnd(), &col);
+        }
         Orden::Titulo { texto } => {
             let t = Ancho::de(&texto);
             let _ = unsafe { SetWindowTextW(hwnd(), t.p()) };
@@ -1417,8 +1421,9 @@ fn tema_oscuro() -> bool {
     r == ERROR_SUCCESS && valor == 0
 }
 
-fn colores() -> Colores {
-    let oscuro = tema_oscuro();
+/// The frame's colours: the person's day or night if they chose one, Windows' otherwise.
+fn colores(elegido: Option<bool>) -> Colores {
+    let oscuro = elegido.unwrap_or_else(tema_oscuro);
     // The same tokens as interfaz/comun.css: --marco and --hoja, light and dark.
     let (m, h) = if oscuro {
         ((0x06, 0x09, 0x14), (0x0F, 0x15, 0x28))
@@ -1583,9 +1588,10 @@ pub fn arranca() {
     let mut iniciales = iniciales;
     iniciales.extend(s.pon_lugar_licencia(lugar));
     let estricto = s.seguimiento_estricto();
+    let tema_elegido = s.tema_oscuro();
     SESION.with(|c| *c.borrow_mut() = Some(s));
 
-    let col = colores();
+    let col = colores(tema_elegido);
     let h = match crea_ventana(&col) {
         Ok(h) => h,
         Err(e) => {
@@ -1695,7 +1701,15 @@ fn crea_ventana(col: &Colores) -> windows::core::Result<HWND> {
                 Some(LPARAM(i.0 as isize)),
             );
         }
-        // The title bar takes the colour of the browser's frame (Windows 11) and the dark mode.
+        pinta_marco_ventana(hwnd, col);
+        Ok(hwnd)
+    }
+}
+
+/// The title bar takes the colour of the browser's frame (Windows 11) and its day or night.
+fn pinta_marco_ventana(hwnd: HWND, col: &Colores) {
+    // SAFETY: plain attribute calls on our own window with pointers to locals that outlive them.
+    unsafe {
         let oscuro = BOOL::from(col.oscuro);
         let _ = DwmSetWindowAttribute(
             hwnd,
@@ -1720,7 +1734,6 @@ fn crea_ventana(col: &Colores) -> windows::core::Result<HWND> {
             (&texto as *const COLORREF).cast::<c_void>(),
             std::mem::size_of::<COLORREF>() as u32,
         );
-        Ok(hwnd)
     }
 }
 

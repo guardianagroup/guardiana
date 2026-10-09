@@ -616,7 +616,7 @@ fn today_counts_what_was_decided() {
     assert_eq!(h["hoy"]["cortadas"], 2);
     assert_eq!(h["mes"]["terceros_cortados"], 2);
     assert_eq!(h["mes"]["empresas_cortadas"], 1);
-    assert_eq!(h["motor"], "DuckDuckGo");
+    assert_eq!(h["motor_id"], "duckduckgo");
     // Erasing everything starts the figures again, in a fresh tab.
     let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"borrar_todo"}"#);
     assert!(o.contains(&Orden::BorraNavegacion));
@@ -1134,6 +1134,8 @@ fn day_or_night_is_kept_and_reaches_every_page_of_the_browser() {
     for a in [Origen::Barra, Origen::Panel, Origen::Pestana(id)] {
         assert_eq!(del_tipo(&o, a, "tema").unwrap_or_default()["tema"], "noche");
     }
+    // And the window's own title bar.
+    assert!(o.contains(&Orden::Tema { oscuro: Some(true) }));
     assert_eq!(s.msg_ajustes()["tema"], "noche");
     // Anything else is not a theme.
     let o = s.mensaje(

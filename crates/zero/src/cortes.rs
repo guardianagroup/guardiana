@@ -187,19 +187,21 @@ pub fn lee(carpeta: &Path, desde: &str, hasta: &str) -> Vec<Corte> {
     out
 }
 
-/// Keep only the last [`DIAS`] days.
-pub fn poda(carpeta: &Path) {
+/// Keep only the last [`DIAS`] days: every day file dated before `desde` (`YYYY-MM-DD`, the
+/// first day still kept) goes. Until 1.0.1 it kept the 31 newest *files*, so for someone who
+/// browses now and then, cuts from months ago stayed on disk while the screen said 31 days.
+pub fn poda(carpeta: &Path, desde: &str) {
     let Ok(l) = fs::read_dir(carpeta) else {
         return;
     };
-    let mut dias: Vec<PathBuf> = l
-        .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.extension().is_some_and(|x| x == "jsonl"))
-        .collect();
-    dias.sort();
-    let sobran = dias.len().saturating_sub(DIAS);
-    for p in dias.into_iter().take(sobran) {
-        let _ = fs::remove_file(p);
+    for p in l.filter_map(|e| e.ok().map(|e| e.path())) {
+        let viejo = p.extension().is_some_and(|x| x == "jsonl")
+            && p.file_stem()
+                .and_then(|n| n.to_str())
+                .is_some_and(|dia| dia < desde);
+        if viejo {
+            let _ = fs::remove_file(p);
+        }
     }
 }
 
@@ -364,6 +366,33 @@ mod tests {
         );
         assert_eq!(csv.lines().count(), 4);
         assert!(csv.contains("cat_publicidad") || csv.contains("cat_rastreador"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_log_keeps_the_last_31_days_by_date_not_by_count() {
+        let dir = std::env::temp_dir().join(format!("zero-poda-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap_or_default();
+        for f in [
+            "2026-06-01.jsonl",
+            "2026-09-08.jsonl",
+            "2026-09-09.jsonl",
+            "2026-10-09.jsonl",
+            "nota.txt",
+        ] {
+            fs::write(dir.join(f), "").unwrap_or_default();
+        }
+        poda(&dir, "2026-09-09");
+        let mut quedan: Vec<String> = fs::read_dir(&dir)
+            .map(|l| {
+                l.filter_map(|e| e.ok())
+                    .map(|e| e.file_name().to_string_lossy().into_owned())
+                    .collect()
+            })
+            .unwrap_or_default();
+        quedan.sort();
+        assert_eq!(quedan, ["2026-09-09.jsonl", "2026-10-09.jsonl", "nota.txt"]);
         let _ = fs::remove_dir_all(&dir);
     }
 }
