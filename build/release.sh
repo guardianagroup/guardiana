@@ -118,6 +118,18 @@ else
     build/package.sh --no-build
 fi
 paquetes="dist/$version"
+# GUARDIANA ZERO (1.0.8): the browser's preview travels with the release when the folder brings it,
+# built and driven end to end by zero.yml on the same commit. It is signed and written in the same
+# ledger line as everything else, so its hash is public before its download exists.
+zero=""
+if [ -n "$paquetes_ci" ]; then
+    for z in "$paquetes_ci"/guardiana-zero-*-windows-x64.exe; do
+        [ -f "$z" ] || continue
+        [ -z "$zero" ] || { echo "release.sh: más de un guardiana-zero-*.exe en $paquetes_ci" >&2; exit 1; }
+        zero="$paquetes/$(basename "$z")"
+        cp "$z" "$zero"
+    done
+fi
 # Un instalador por idioma (22 sep 2026): el mismo paquete con las mismas palabras que la web
 # de ese idioma. Los tres van al registro público, porque los tres se descargan.
 msi="$paquetes/guardiana-$version-windows-x64.msi"
@@ -136,7 +148,7 @@ for m in "$msi" "$msi_en" "$msi_pt"; do
 done
 
 # 2. minisign signatures over everything that gets published.
-for f in "$linux" "$win" "$msi" "$msi_en" "$msi_pt" "$deb" "$tarball"; do
+for f in "$linux" "$win" "$msi" "$msi_en" "$msi_pt" "$deb" "$tarball" ${zero:+"$zero"}; do
     firmar "$f" "guardiana $version $(basename "$f")"
 done
 sha_linux="$(sha256sum "$linux" | cut -d' ' -f1)"
@@ -223,6 +235,7 @@ anotar "$msi_pt" false
 anotar "$deb" false
 anotar "$tarball" false
 [ -n "$mac" ] && anotar "$mac" false
+[ -n "$zero" ] && anotar "$zero" false
 
 line=$(printf '%s' "$entradas" | "$PYTHON" -c '
 import json, sys
