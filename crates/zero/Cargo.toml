@@ -1,0 +1,26 @@
+[package]
+name = "guardiana-zero"
+description = "GUARDIANA ZERO: the browser's portable core (destinations, marked data, redaction, mandates, signed receipts, data book)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+# The window, the tabs and the engine hooks live in zero/ (Windows, WebView2), a separate
+# workspace built on Windows only; everything that decides lives here and is tested everywhere.
+[dependencies]
+guardiana-lists = { workspace = true }
+guardiana-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+url = { workspace = true }
+idna = { workspace = true }
+ring = { workspace = true }
+base64 = { workspace = true }
+
+[lints]
+workspace = true

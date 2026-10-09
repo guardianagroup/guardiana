@@ -12,10 +12,11 @@ members = [
     "crates/license",
     "crates/verify",
     "crates/cli",
+    "crates/zero",
 ]
 
 [workspace.package]
-version = "1.0.7"
+version = "1.0.8"
 edition = "2021"
 rust-version = "1.85"
 license = "GPL-3.0-or-later"
@@ -40,8 +41,20 @@ guardiana-service = { path = "crates/service" }
 guardiana-license = { path = "crates/license" }
 guardiana-verify = { path = "crates/verify" }
 guardiana-cli = { path = "crates/cli" }
+guardiana-zero = { path = "crates/zero" }
 
 # --- third-party, each justified (brief §2) ---
+# --- GUARDIANA ZERO, the browser (decision 197). All four were already in the tree through
+# rustls/ureq; the browser's core uses them directly. ---
+# url: parse every address the browser asks for (host, scheme, query) the way the engine does.
+url = "2"
+# idna: turn the Public Suffix List's Unicode rules into the ASCII form hosts arrive in.
+idna = "1"
+# ring: ECDSA P-256 signatures on the receipts (a mandate, the data book), verifiable in any
+# browser with WebCrypto; the same audited crate rustls already uses.
+ring = "0.17"
+# base64: the receipts' signature and public key, and the base64 forms of marked data.
+base64 = "0.23"
 # SQLite for the ledger (brief §3). `bundled` compiles SQLite in so every
 # install carries the same, known version instead of whatever the OS ships.
 rusqlite = { version = "0.40", features = ["bundled"] }

@@ -47,6 +47,9 @@ pub const ALOJAMIENTO: &str = include_str!("../data/alojamiento.txt");
 /// the public registry of the California Privacy Protection Agency (decision 194). A label about
 /// what a company is registered as, never a verdict about what this query carried.
 pub const CORREDORES: &str = include_str!("../data/corredores.txt");
+/// GUARDIANA's own open list of what well-known websites do for a living (`sectores.txt`):
+/// sport, news, banking... A label for a site the person opened, never a verdict.
+pub const SECTORES: &str = include_str!("../data/sectores.txt");
 
 /// A company registered as a data broker: under California law, one that collects and sells to
 /// third parties the personal information of people it has no direct relationship with. Every
@@ -152,6 +155,8 @@ static HOSTING: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
     std::sync::OnceLock::new();
 static DELIVERY: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
     std::sync::OnceLock::new();
+static SECTORS: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
+    std::sync::OnceLock::new();
 
 /// Longest matching domain of a name map: `graph.facebook.com` matches an entry `facebook.com`.
 fn lookup<V: Copy>(map: &HashMap<&'static str, V>, qname: &str) -> Option<V> {
@@ -205,6 +210,20 @@ pub fn is_local_name(qname: &str) -> bool {
 pub fn delivery_of(qname: &str) -> Option<&'static str> {
     let map = DELIVERY.get_or_init(|| {
         parse_guardiana(ENTREGA)
+            .filter_map(|(section, domain)| section.map(|c| (domain, c)))
+            .collect()
+    });
+    lookup(map, qname)
+}
+
+/// What a well-known website does (`www.realmadrid.com` → `deporte`), from `sectores.txt`, or
+/// `None`. The panel says it instead of «sin clasificar» for the site's own address (the
+/// responsible, 9 Oct 2026: the Real Madrid's website read «sin clasificar»); a sub-name that
+/// says what it is (`cdn.`, `login.`) keeps saying that. A label, never a verdict.
+#[must_use]
+pub fn sector_of(qname: &str) -> Option<&'static str> {
+    let map = SECTORS.get_or_init(|| {
+        parse_guardiana(SECTORES)
             .filter_map(|(section, domain)| section.map(|c| (domain, c)))
             .collect()
     });

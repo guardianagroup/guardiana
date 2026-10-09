@@ -38,6 +38,7 @@ AdGuard DNS filter (GPL-3.0, ~176 000 dominios, mezcla publicidad y rastreo) y S
 | `empresas.txt` | etiqueta (no categoría) | Quién es dueño de cada nombre, con su país y su ciudad cuando están comprobados (decisión 61). |
 | `ia.txt`, `entrega.txt` | etiqueta | El servicio de IA al que pertenece un nombre (decisión 62) y las redes de reparto que son carretera y no destino (decisión 148). |
 | `corredores.txt` | etiqueta «compra y venta de datos» | Las empresas inscritas en el registro público de corredores de datos de California (CPPA): su nombre, su país, lo que ellas mismas marcaron (ubicación exacta, menores, a quién vendieron) y la página que declararon para pedir que borren tus datos. Copia fechada del CSV del registro, con su huella en la cabecera, más los nombres de rastreo de cada inscrita comentados uno a uno (decisión 194). No cambia la categoría ni corta nada: dice qué es la dueña del nombre, y la persona decide. |
+| `sectores.txt` | etiqueta de sector | A qué se dedica una web conocida (deporte, noticias, banca, compras, red social, gobierno…): unas 560 webs grandes de Colombia, España, América Latina, Brasil, Portugal y Estados Unidos, comprobadas por su propia web. El panel lo dice en lugar de «sin clasificar» para la dirección principal de esa web; un subnombre que dice lo que es (`cdn.`, `login.`) sigue diciendo eso. No cambia la categoría ni corta nada (9 oct 2026). |
 
 Cualquiera puede proponer cambios a estas listas con un cambio en el repositorio.
 

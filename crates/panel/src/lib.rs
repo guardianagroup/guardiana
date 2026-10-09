@@ -361,6 +361,15 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         )
         .route("/static/fonts/{archivo}", get(fuente))
         .route(
+            "/static/arranque.js",
+            get(|| async {
+                static_response(
+                    include_str!("../static/arranque.js"),
+                    "application/javascript; charset=utf-8",
+                )
+            }),
+        )
+        .route(
             "/static/app.js",
             get(|| async {
                 static_response(

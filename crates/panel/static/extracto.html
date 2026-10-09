@@ -4,18 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<title>Guardiana · Extracto</title>
+<title>GUARDIANA · Extracto</title>
 <link rel="stylesheet" href="/static/style.css">
+<link rel="preload" href="/static/fonts/IBMPlexSans-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/Unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
+<script src="/static/arranque.js"></script>
 </head>
 <body data-page="extracto">
 <header class="top">
-  <span class="brand"><span class="brand-txt">Guardiana<small data-t="lema"></small></span></span> <span class="print-only" data-t="pdf_pie"></span>
+  <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA<small data-t="lema"></small></span></a> <span class="print-only" data-t="pdf_pie"></span>
   <nav>
     <a href="/"  data-t="nav_radiografia">Radiografía</a>
     <a href="/ia" data-t="nav_ia">Tu IA</a>
     <a href="/extracto" aria-current="page" data-t="nav_extracto">Extracto</a>
     <a href="/dispositivos"  data-t="nav_dispositivos">Dispositivos</a>
-    <a href="/sabe-de-ti"  data-t="nav_sabe">Lo que Guardiana sabe de ti</a>
+    <a href="/sabe-de-ti"  data-t="nav_sabe">Lo que GUARDIANA sabe de ti</a>
     <a href="/reglas" data-t="nav_reglas">Reglas</a>
     <a href="/informe" data-t="nav_informe">Informe semanal</a>
     <a href="/hogar" data-t="nav_hogar">Modo Hogar</a>
@@ -30,9 +33,9 @@
 <p class="lead" data-t="extracto_lead"></p>
 <form id="filters" class="filters">
   <label><span data-t="f_dispositivo"></span><select name="device_id" id="f-device"><option value=""></option></select></label>
-  <label><span data-t="f_categoria"></span><select name="category"><option value=""></option><option value="rastreador">rastreador</option><option value="publicidad">publicidad</option><option value="telemetria">telemetría</option><option value="esperado">esperado</option><option value="desconocido">desconocido</option></select></label>
+  <label><span data-t="f_categoria"></span><select name="category"><option value=""></option><option value="rastreador">rastreador</option><option value="publicidad">publicidad</option><option value="telemetria">telemetría</option><option value="esperado">normal</option><option value="desconocido">sin clasificar</option></select></label>
   <label><span data-t="f_senal"></span><select name="signal"><option value=""></option><option value="baliza">baliza</option><option value="destino_nuevo">destino nuevo</option><option value="fuera_de_horas">fuera de horas</option><option value="evasion_dns">evasión de DNS</option><option value="volumen">volumen</option></select></label>
-  <label><span data-t="f_veredicto"></span><select name="verdict"><option value=""></option><option value="observado">observado</option><option value="respondido">respondido</option><option value="cortado">cortado</option></select></label>
+  <label><span data-t="f_veredicto"></span><select name="verdict"><option value=""></option><option value="observado">observado</option><option value="respondido">respondido</option><option value="cortado">bloqueado</option></select></label>
   <label><span data-t="f_limite"></span><input name="limit" type="number" min="1" max="5000" value="200"></label>
   <button type="submit" data-t="filtrar"></button>
 </form>

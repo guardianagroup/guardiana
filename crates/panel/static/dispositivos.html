@@ -4,18 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<title>Guardiana · Dispositivos</title>
+<title>GUARDIANA · Dispositivos</title>
 <link rel="stylesheet" href="/static/style.css">
+<link rel="preload" href="/static/fonts/IBMPlexSans-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/Unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
+<script src="/static/arranque.js"></script>
 </head>
 <body data-page="dispositivos">
 <header class="top">
-  <span class="brand"><span class="brand-txt">Guardiana<small data-t="lema"></small></span></span>
+  <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA<small data-t="lema"></small></span></a>
   <nav>
     <a href="/"  data-t="nav_radiografia">Radiografía</a>
     <a href="/ia" data-t="nav_ia">Tu IA</a>
     <a href="/extracto"  data-t="nav_extracto">Extracto</a>
     <a href="/dispositivos" aria-current="page" data-t="nav_dispositivos">Dispositivos</a>
-    <a href="/sabe-de-ti"  data-t="nav_sabe">Lo que Guardiana sabe de ti</a>
+    <a href="/sabe-de-ti"  data-t="nav_sabe">Lo que GUARDIANA sabe de ti</a>
     <a href="/reglas" data-t="nav_reglas">Reglas</a>
     <a href="/informe" data-t="nav_informe">Informe semanal</a>
     <a href="/hogar" data-t="nav_hogar">Modo Hogar</a>
@@ -28,7 +31,7 @@
 <div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
 <h1 data-t="dispositivos_titulo"></h1>
 <p class="lead" data-t="dispositivos_lead"></p>
-<div class="card wrap"><table><thead><tr><th data-t="col_dispositivo"></th><th data-t="col_consultas"></th><th data-cat="rastreador">rastreador</th><th data-cat="publicidad">publicidad</th><th data-cat="telemetria">telemetría</th><th data-cat="esperado">esperado</th><th data-t="col_cortados"></th><th data-t="col_empresas"></th><th data-t="col_ultima"></th><th data-t="col_detalle"></th></tr></thead><tbody id="devices"></tbody></table></div>
+<div class="card wrap"><table><thead><tr><th data-t="col_dispositivo"></th><th data-t="col_consultas"></th><th data-cat="rastreador">rastreador</th><th data-cat="publicidad">publicidad</th><th data-cat="telemetria">telemetría</th><th data-cat="esperado">normal</th><th data-t="col_cortados"></th><th data-t="col_empresas"></th><th data-t="col_ultima"></th><th data-t="col_detalle"></th></tr></thead><tbody id="devices"></tbody></table></div>
 <p class="limit" data-t="dispositivos_limite"></p>
 <h2 data-t="recibo_titulo"></h2>
 <p class="lead" data-t="recibo_lead"></p>

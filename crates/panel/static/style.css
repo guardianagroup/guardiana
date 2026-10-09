@@ -48,6 +48,8 @@ header.top .brand { font-family: var(--display); font-weight: 600; font-size: 15
 /* «Tus datos, bajo tu control» under the brand, as on the website (9 Oct 2026). */
 header.top .brand-txt { display: flex; flex-direction: column; gap: 2px; line-height: 1.05; }
 header.top .brand-txt small { font-family: var(--texto); font-weight: 500; font-size: 11px; letter-spacing: 0.01em; color: var(--muted); }
+header.top a.brand { color: inherit; text-decoration: none; }
+header.top a.brand:hover .brand-txt { text-decoration: underline; text-underline-offset: 3px; }
 header.top .brand::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); display: inline-block; }
 header.top nav { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 header.top nav a { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none; color: var(--muted); padding: 4px 0; border-bottom: 2px solid transparent; }
@@ -115,6 +117,8 @@ td.empresa-col { color: var(--fg); }
 .tag.trampa { border-color: var(--cortado); color: var(--cortado); font-weight: 600; letter-spacing: 0.04em; }
 .tag.corredor { color: var(--rastreador); font-size: 10px; display: block; width: max-content; margin-top: 4px; }
 .verdict.cortado { color: var(--cortado); font-weight: 600; }
+.verdict.levantado { color: var(--esperado); font-weight: 600; }
+.muted.small { font-size: 11px; }
 .verdict.respondido { color: var(--respondido); }
 .phrase { display: block; color: var(--muted); font-size: 13px; }
 .mono { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
@@ -130,7 +134,9 @@ button.danger { background: var(--cortado); color: #fff; }
 /* Cortar en rojo, desbloquear en verde: el color dice lo que hace el botón antes de leerlo
    (pedido del responsable, 21 sep 2026). Y los dos son botones de verdad, con su mano encima:
    cuando «cortado» era un cartel apagado nadie adivinaba que se podía pulsar para deshacerlo. */
-button.cut, button.cortado { white-space: nowrap; cursor: pointer; }
+/* Bloquear and Desbloquear share one outer size, whatever the word and the language, so the
+   column keeps its geometry (the responsible, 9 Oct 2026); the word sits centred inside. */
+button.cut, button.cortado { white-space: nowrap; cursor: pointer; width: 140px; padding-left: 0; padding-right: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; }
 button.cut { background: transparent; color: var(--cortado); border: 1px solid var(--cortado); }
 button.cut:hover { background: var(--cortado); color: #fff; border-color: var(--cortado); }
 button.cortado { background: transparent; color: var(--esperado); border: 1px solid var(--esperado); opacity: 1; }
@@ -187,3 +193,15 @@ footer { max-width: 1180px; margin: 26px auto 40px; padding: 0 22px; color: var(
    la ciudad dice dónde está de verdad. Se escribe en la lista de empresas y se corrige cuando
    alguna se muda (21 sep 2026). */
 .pais .ciudad{display:block;color:var(--muted);font-size:12.5px;line-height:1.35;margin-top:2px}
+
+/* New rows waiting while the person works on a live table: a notice at the bottom of the window,
+   over the page and outside its flow, so showing it moves nothing (9 Oct 2026). */
+button.nuevas { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 30; box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+
+/* Opening without a jump (9 Oct 2026): arranque.js marks the page as loading before it is drawn;
+   app.js takes the mark off once the texts, the trial banner and the first figures are in place,
+   and the page appears in one go. If app.js never does, the page shows itself after two seconds. */
+html.cargando body { opacity: 0; animation: guardiana-aparece 0s 2s forwards; }
+body { transition: opacity .18s ease-out; }
+@keyframes guardiana-aparece { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { body { transition: none; } }

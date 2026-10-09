@@ -1,7 +1,7 @@
 ﻿GUARDIANA para Windows
 ======================
 
-A Guardiana mostra com quais serviços a sua IA fala e, com o Modo Casa, cada
+A GUARDIANA mostra com quais serviços a sua IA fala e, com o Modo Casa, cada
 aparelho do seu Wi-Fi: explica cada um em uma frase e bloqueia só o que você
 decidir. Tudo acontece neste computador. Sem conta, sem servidor, zero
 telemetria.
@@ -9,14 +9,14 @@ telemetria.
 O que o instalador fez
 ----------------------
 - Copiou o programa para «Arquivos de Programas\Guardiana».
-- Registrou o serviço «Guardiana», que liga junto com o Windows.
+- Registrou o serviço «Guardiana», que inicia sozinho com o Windows.
 - Criou os atalhos «Guardiana» e «Guardiana (menu)» no menu Iniciar, e «Guardiana»
   na área de trabalho.
-- Colocou a Guardiana como DNS deste computador, também por IPv6, com uma
-  cópia exata do ajuste anterior. Se o serviço parar, o computador recupera o
+- Colocou a GUARDIANA como DNS deste computador, também por IPv6, com uma
+  cópia exata da configuração anterior. Se o serviço parar, o computador recupera o
   DNS de antes; ao desinstalar fica exatamente como estava.
-- Não abriu nenhuma porta para a rede. Só o Modo Casa, quando você ligar, abre
-  as portas no Wi-Fi de casa; desligá-lo fecha tudo.
+- Não abriu nenhuma porta para a rede. Só o Modo Casa, quando você o ligar, abre
+  portas no Wi-Fi de casa; desligá-lo fecha essas portas.
 
 Depois de instalar
 ------------------
@@ -24,8 +24,8 @@ Menu Iniciar > Guardiana. O painel abre e você verá as consultas deste
 computador desde o primeiro minuto. Para devolver o DNS como estava sem
 desinstalar: painel, «Estado». Bloquear um nome
 específico dá para fazer desde o primeiro minuto; os bloqueios amplos, por
-categoria ou para a casa inteira, esperam a Guardiana olhar esse aparelho por
-24 horas.
+categoria ou para a casa inteira, esperam até que a GUARDIANA tenha observado
+esse aparelho por 24 horas.
 
 São sete dias com tudo e sem cartão, Modo Casa incluído. Depois é preciso uma
 assinatura; o que foi anotado fica no seu disco, pagando ou não.
@@ -33,12 +33,12 @@ assinatura; o que foi anotado fica no seu disco, pagando ou não.
 Desinstalar
 -----------
 Configurações > Aplicativos > Guardiana > Desinstalar. Ao desinstalar, a
-Guardiana desliga o Modo Casa, tira a regra do firewall e deixa o DNS como
+GUARDIANA desliga o Modo Casa, tira a regra do firewall e deixa o DNS como
 estava. O extrato fica em C:\ProgramData\Guardiana; apague à mão se não quiser.
 
 Conferir a instalação
 ---------------------
-Menu «Guardiana (menu)» > a opção de conferir, ou numa janela nova de
+Menu «Guardiana (menu)» > opção 13, «Verificar», ou numa janela nova de
 comandos ou do PowerShell:
     guardiana verify
 
@@ -46,4 +46,4 @@ Antes de instalar: confira a impressão digital do arquivo .msi e compare com a
 do SHA256SUMS e com o registro público (ledger.jsonl). Como fazer, passo a
 passo, no VERIFY.md, no código publicado (github.com/guardianagroup/guardiana).
 
-O que a Guardiana não faz está no WHAT_IT_DOES_NOT_DO.md. Leia.
+O que a GUARDIANA não faz está no WHAT_IT_DOES_NOT_DO.md. Leia.

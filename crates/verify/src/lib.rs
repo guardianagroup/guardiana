@@ -1136,7 +1136,7 @@ mod tests {
             "tiene que decir que el equipo pregunta al guardián: {salida}"
         );
         assert!(
-            !salida.contains("Guardiana no ha cambiado el DNS del sistema."),
+            !salida.contains("GUARDIANA no ha cambiado el DNS del sistema."),
             "no puede negar el cambio cuando el equipo apunta al guardián: {salida}"
         );
         assert!(
@@ -1147,7 +1147,7 @@ mod tests {
         let mut r2 = informe_vacio();
         r2.guardian_is_primary = Some(false);
         r2.system_dns = vec!["192.168.1.1".into()];
-        assert!(render(&r2).contains("Guardiana no ha cambiado el DNS del sistema."));
+        assert!(render(&r2).contains("GUARDIANA no ha cambiado el DNS del sistema."));
     }
 
     #[test]

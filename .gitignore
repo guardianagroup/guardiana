@@ -45,3 +45,6 @@ __pycache__/
 *.pyc
 .claude/settings.local.json
 .claude/worktrees/
+
+# Test tooling installed by CI
+zero/prueba/node_modules/

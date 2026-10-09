@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title data-t="cortes_titulo">Lo que se cortó</title>
+<link rel="stylesheet" href="comun.css">
+<style>
+html, body { min-height: 100%; background: var(--hoja); }
+body { background-image: linear-gradient(color-mix(in srgb, var(--tinta) 4%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--tinta) 4%, transparent) 1px, transparent 1px); background-size: 44px 44px; background-position: -1px -1px; }
+main { max-width: 1120px; margin: 0 auto; padding: 26px 28px 64px; }
+.marca { display: flex; align-items: center; gap: 9px; color: var(--gris); }
+.marca i { width: 9px; height: 9px; border-radius: 50%; background: var(--azul); box-shadow: 0 0 0 3px var(--azul-suave); }
+.marca b { font: 600 12px/1 var(--display); letter-spacing: .03em; color: var(--tinta); }
+.marca span { font-size: 12.5px; }
+.cabeza { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin: 30px 0 22px; }
+h1 { font: 600 clamp(26px, 3.2vw, 38px)/1.1 var(--display); letter-spacing: -.02em; margin: 0; }
+.controles { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.periodos { display: flex; padding: 3px; border-radius: 12px; background: var(--campo); border: 1px solid var(--linea); }
+.periodos button { border: 0; background: none; padding: 6px 12px; border-radius: 9px; color: var(--gris); font-weight: 500; }
+.periodos button[aria-pressed="true"] { background: var(--hoja); color: var(--tinta); box-shadow: var(--sombra); }
+.informe { display: none; color: var(--gris); font-size: 12px; margin: -8px 0 16px; }
+
+/* The figures of the period: the same numbers the new tab shows. */
+.cifras { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 2px solid var(--tinta); border-bottom: 1px solid var(--linea); margin-bottom: 28px; }
+.cifra { padding: 16px 16px 16px 0; }
+.cifra b { display: block; font: 600 34px/1 var(--display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.cifra.roja b { color: var(--rojo); }
+.cifra span { display: block; margin-top: 8px; font-size: 13px; color: var(--gris); }
+
+.resumen { display: grid; grid-template-columns: 1.3fr 1fr; gap: 14px; margin-bottom: 30px; }
+.caja { border: 1px solid var(--linea); border-radius: 14px; background: var(--hoja); padding: 16px 18px; }
+.caja h2 { font-size: 13px; font-weight: 600; margin: 0 0 12px; color: var(--gris); }
+.caja.ancha { grid-row: span 3; }
+.barras { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.barras li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; align-items: baseline; }
+.barras .nombre { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.barras .nombre small { font-weight: 400; color: var(--gris); margin-left: 6px; font-size: 12px; }
+.barras .n { font-variant-numeric: tabular-nums; font-weight: 600; }
+.barras .barra { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--campo); overflow: hidden; }
+.barras .barra i { display: block; height: 100%; border-radius: 3px; background: var(--rojo); }
+.lista-simple { list-style: none; margin: 0; padding: 0; }
+.lista-simple li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--linea); font-size: 13.5px; }
+.lista-simple li:last-child { border-bottom: 0; }
+.lista-simple .n { font-variant-numeric: tabular-nums; font-weight: 600; }
+.fichas { display: flex; flex-wrap: wrap; gap: 6px; }
+.fichas .chip { font-size: 12.5px; padding: 6px 9px; }
+.fichas .chip b { margin-left: 6px; color: inherit; }
+
+.lista-cab { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.lista-cab h2 { font: 600 18px/1.2 var(--display); margin: 0; }
+.filtros { display: flex; gap: 8px; flex-wrap: wrap; }
+.filtros select, .filtros input { border: 1px solid var(--linea); background: var(--hoja); border-radius: 9px; padding: 7px 10px; }
+.filtros input { width: 300px; max-width: 100%; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--hoja); border: 1px solid var(--linea); border-radius: 12px; overflow: hidden; }
+thead th { text-align: left; font-weight: 600; font-size: 12px; color: var(--gris); padding: 9px 10px; border-bottom: 1px solid var(--linea); background: var(--campo); white-space: nowrap; }
+tbody tr.fila { cursor: pointer; }
+tbody tr.fila:hover td { background: color-mix(in srgb, var(--campo) 70%, transparent); }
+tbody td { padding: 8px 10px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+td.hora { font-variant-numeric: tabular-nums; color: var(--gris); white-space: nowrap; }
+td.quien b { font-weight: 600; }
+td.quien small { display: block; color: var(--gris); font-size: 11.5px; }
+td.destino { font-family: var(--mono); font-size: 12px; word-break: break-all; max-width: 280px; }
+td.destino span { color: var(--gris); }
+td.motivo { color: var(--rojo); white-space: nowrap; }
+td.pagina { color: var(--gris); white-space: nowrap; }
+tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); padding: 12px 14px 14px; }
+.det { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 26px; font-size: 13px; }
+.det p { margin: 0; }
+.det .mono { word-break: break-all; }
+.det a { color: var(--azul); font-weight: 600; }
+.vacio { padding: 28px 0; color: var(--gris); }
+.nota { margin-top: 22px; font-size: 12.5px; color: var(--gris); max-width: 72ch; }
+#aviso { position: fixed; left: 50%; bottom: 18px; transform: translate(-50%, 8px); padding: 10px 16px; border-radius: 10px; background: var(--tinta); color: var(--hoja); font-size: 13px; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
+#aviso.visto { opacity: 1; transform: translate(-50%, 0); }
+@media screen and (max-width: 860px) { .resumen { grid-template-columns: 1fr; } .caja.ancha { grid-row: auto; } .cifras { grid-template-columns: repeat(2, 1fr); } .det { grid-template-columns: 1fr; } }
+/* Narrow (the side panel open, a small window): each cut is a short card, nothing scrolls sideways. */
+@media screen and (max-width: 760px) {
+  main { padding: 20px 16px 48px; }
+  table, tbody { display: block; border-radius: 12px; }
+  thead { display: none; }
+  tbody tr.fila { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 10px; padding: 10px 12px; border-bottom: 1px solid var(--linea); }
+  tbody tr.fila td, tbody tr.fila:hover td { padding: 0; border: 0; background: none; }
+  tbody tr.fila:hover, tbody tr.fila[aria-expanded="true"] { background: color-mix(in srgb, var(--campo) 70%, transparent); }
+  td.hora { grid-column: 1; grid-row: 1; }
+  td.quien { grid-column: 2; grid-row: 1; }
+  td.motivo { grid-column: 3; grid-row: 1; text-align: right; white-space: normal; }
+  td.destino { grid-column: 1 / -1; max-width: none; }
+  td.que, td.tipo { grid-row: 3; font-size: 12px; color: var(--gris); }
+  td.que { grid-column: 1 / 3; }
+  td.tipo { grid-column: 3; text-align: right; }
+  td.pagina { grid-column: 1 / -1; font-size: 12px; }
+  tr.detalle { display: block; }
+  tr.detalle td { display: block; }
+  .filtros, .filtros input { width: 100%; }
+  .filtros select { flex: 1; }
+}
+
+/* The PDF: the report, without the controls, on white. */
+@media print {
+  :root { color-scheme: light; --hoja: #fff; --campo: #F3F5F9; --tinta: #0B1020; --gris: #4A5163; --linea: #D9DEE8; --rojo: #B3261E; }
+  body { background: #fff; }
+  main { max-width: none; padding: 0; }
+  .controles, .filtros, #aviso { display: none !important; }
+  .informe { display: block; }
+  tr.detalle { display: none !important; }
+  tbody tr { break-inside: avoid; }
+  .caja { break-inside: avoid; }
+  table { font-size: 10px; table-layout: fixed; }
+  thead th { white-space: normal; }
+  th:nth-child(1) { width: 9%; } th:nth-child(2) { width: 14%; } th:nth-child(3) { width: 27%; }
+  th:nth-child(4) { width: 14%; } th:nth-child(5) { width: 12%; } th:nth-child(6) { width: 12%; } th:nth-child(7) { width: 12%; }
+  td.destino { max-width: none; font-size: 9.5px; }
+  td.motivo, td.pagina { white-space: normal; word-break: break-word; }
+  td .chip { white-space: normal; line-height: 1.25; }
+  tbody tr.fila td { background: none !important; }
+  .lista-cab, h2 { break-after: avoid; page-break-after: avoid; }
+  thead { display: table-header-group; }
+}
+@page { margin: 14mm 12mm; }
+</style>
+</head>
+<body>
+<main>
+  <div class="marca"><i></i><b data-t="app_nombre"></b><span data-t="lema"></span></div>
+  <div class="cabeza">
+    <h1 data-t="cortes_titulo"></h1>
+    <div class="controles">
+      <div class="periodos" role="group">
+        <button data-periodo="hoy" data-t="cortes_hoy" aria-pressed="true"></button>
+        <button data-periodo="7" data-t="cortes_7" aria-pressed="false"></button>
+        <button data-periodo="mes" data-t="cortes_mes" aria-pressed="false"></button>
+        <button data-periodo="31" data-t="cortes_31" aria-pressed="false"></button>
+      </div>
+      <button class="boton" id="pdf" data-t="cortes_pdf"></button>
+      <button class="boton" id="csv" data-t="cortes_csv"></button>
+    </div>
+  </div>
+  <p class="informe" id="informe"></p>
+  <p class="informe" id="informe-filtro"></p>
+  <div class="cifras">
+    <div class="cifra roja"><b id="c-total">0</b><span data-t="cortes_n_peticiones"></span></div>
+    <div class="cifra"><b id="c-empresas">0</b><span data-t="cortes_n_empresas"></span></div>
+    <div class="cifra"><b id="c-paises">0</b><span data-t="cortes_n_paises"></span></div>
+    <div class="cifra"><b id="c-webs">0</b><span data-t="cortes_n_webs"></span></div>
+  </div>
+  <div class="resumen" id="resumen">
+    <section class="caja ancha"><h2 data-t="cortes_por_empresa"></h2><ul class="barras" id="r-empresas"></ul></section>
+    <section class="caja"><h2 data-t="cortes_por_pais"></h2><ul class="lista-simple" id="r-paises"></ul></section>
+    <section class="caja"><h2 data-t="cortes_por_motivo"></h2><div class="fichas" id="r-motivos"></div><h2 style="margin-top:16px" data-t="cortes_por_tipo"></h2><div class="fichas" id="r-tipos"></div></section>
+    <section class="caja"><h2 data-t="cortes_por_pagina"></h2><ul class="lista-simple" id="r-paginas"></ul></section>
+  </div>
+  <div class="lista-cab">
+    <h2 data-t="cortes_lista"></h2>
+    <div class="filtros">
+      <select id="f-motivo"></select>
+      <input id="f-texto" type="search" data-t-ph="cortes_buscar" spellcheck="false" autocomplete="off">
+    </div>
+  </div>
+  <p class="explica pequeno oculto" id="recortada"></p>
+  <table>
+    <thead><tr><th data-t="cortes_col_hora"></th><th data-t="cortes_col_empresa"></th><th data-t="cortes_col_destino"></th><th data-t="cortes_col_que"></th><th data-t="cortes_col_tipo"></th><th data-t="cortes_col_motivo"></th><th data-t="cortes_col_pagina"></th></tr></thead>
+    <tbody id="filas"></tbody>
+  </table>
+  <p class="vacio oculto" id="vacio"></p>
+  <p class="nota" data-t="cortes_nota"></p>
+</main>
+<div id="aviso" role="status" aria-live="polite"></div>
+<script src="puente.js"></script>
+<script src="cortes.js"></script>
+</body>
+</html>

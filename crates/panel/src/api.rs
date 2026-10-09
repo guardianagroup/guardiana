@@ -103,6 +103,10 @@ pub(crate) struct EventView {
     /// whoever rents it, so the cloud is neither the company nor the country of the row.
     #[serde(skip_serializing_if = "Option::is_none")]
     alojado: Option<&'static str>,
+    /// What a well-known website does (`sectores.txt`): sport, news, banking... `None` for
+    /// everything the list does not name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sector: Option<&'static str>,
     /// Whether the name is the home network talking to itself (decision 148): reverse
     /// lookups, mDNS and service discovery, which are not a destination at all.
     local: bool,
@@ -228,6 +232,7 @@ fn view(t: &Texts, e: Event, names: &HashMap<String, Option<String>>) -> EventVi
         empresa: empresa_de(&e.qname).filter(|_| alojado.is_none()),
         pais: pais_de(t, &e.qname).filter(|_| alojado.is_none()),
         alojado,
+        sector: guardiana_lists::sector_of(&e.qname).filter(|_| alojado.is_none()),
         corredor: corredor_de(t, &e.qname),
         ciudad: guardiana_lists::city_of(&e.qname)
             .filter(|_| alojado.is_none())

@@ -1,0 +1,85 @@
+# GUARDIANA ZERO, the browser: built and tested on a clean Windows (it runs only there).
+# Its brain (crates/zero) is checked by ci.yml on Linux, Windows and macOS like every crate; this
+# job builds the Windows program around it, starts it for real and drives it end to end
+# (zero/prueba/prueba.js), checking on a local server what left the browser and what did not.
+# CI never holds signing keys and never publishes anything (brief §10).
+name: zero
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'zero/**'
+      - 'crates/zero/**'
+      - 'crates/lists/**'
+      - 'crates/core/**'
+      - '.github/workflows/zero.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    name: GUARDIANA ZERO (Windows)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: zero/navegador
+      - name: fmt
+        working-directory: zero/navegador
+        run: cargo fmt --check
+      - name: clippy
+        working-directory: zero/navegador
+        # Errors also as annotations: readable from the run page and the public API.
+        run: |
+          r=0
+          cargo clippy --all-targets --locked --message-format=json -- -D warnings > "$RUNNER_TEMP/clippy.json" || r=$?
+          node ../prueba/anotaciones.js "$RUNNER_TEMP/clippy.json" zero/navegador/
+          exit $r
+      - name: build
+        working-directory: zero/navegador
+        run: |
+          r=0
+          cargo build --release --locked --message-format=json > "$RUNNER_TEMP/build.json" || r=$?
+          node ../prueba/anotaciones.js "$RUNNER_TEMP/build.json" zero/navegador/
+          exit $r
+      - name: end to end
+        working-directory: zero/prueba
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: |
+          npm install --no-audit --no-fund --no-save playwright-core@1.47.2
+          node prueba.js "$GITHUB_WORKSPACE/zero/navegador/target/release/guardiana-zero.exe" "$RUNNER_TEMP/e2e"
+      - name: package
+        if: always()
+        run: |
+          mkdir -p dist
+          exe=zero/navegador/target/release/guardiana-zero.exe
+          # The published name carries the version, like GUARDIANA's own files.
+          v=$(sed -n 's/^version = "\(.*\)"/\1/p' zero/navegador/Cargo.toml | head -n 1)
+          nombre="guardiana-zero-$v-windows-x64.exe"
+          if [ -f "$exe" ]; then
+            cp "$exe" "dist/$nombre"
+            (cd dist && sha256sum "$nombre" > SHA256SUMS && echo "::notice title=sha256 $nombre::$(cut -d' ' -f1 SHA256SUMS)")
+          fi
+          cp zero/navegador/Cargo.lock dist/ 2>/dev/null || true
+          cp -r "$RUNNER_TEMP/e2e" dist/prueba 2>/dev/null || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: guardiana-zero-windows
+          path: dist
+          if-no-files-found: warn

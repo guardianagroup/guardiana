@@ -1,7 +1,7 @@
 ﻿GUARDIANA for Windows
 =====================
 
-Guardiana shows you which services your AI talks to and, with Home Mode, every
+GUARDIANA shows you which services your AI talks to and, with Home Mode, every
 device on your Wi-Fi: it explains each one in a sentence and blocks only what you
 decide. Everything happens on this machine. No account, no server, zero
 telemetry.
@@ -12,7 +12,7 @@ What the installer did
 - Registered the “Guardiana” service, which starts with Windows.
 - Added the “Guardiana” and “Guardiana (menu)” shortcuts to the Start menu, and
   “Guardiana” to the desktop.
-- Made Guardiana this machine's DNS, over IPv6 too, with an exact copy of the
+- Made GUARDIANA this machine's DNS, over IPv6 too, with an exact copy of the
   previous setting. If the service stops, the machine gets its previous DNS
   back; uninstalling leaves it exactly as it was.
 - It opened no port to the network. Only Home Mode, when you turn it on, opens
@@ -23,28 +23,28 @@ After installing
 Start menu > Guardiana. The panel opens and you will see this machine's
 queries from the first minute. To put the DNS back as it was without
 uninstalling: panel, “Status”. Blocking one specific name works
-from the first minute; wide blocks, by category or for the whole home, wait until
-Guardiana has been watching that device for 24 hours.
+from the first minute; broad blocks, by category or for the whole home, wait until
+GUARDIANA has been watching that device for 24 hours.
 
-It is seven days with everything and no card, Home Mode included. After that
+It is seven days with every feature, Home Mode included, no card needed. After that
 you need a subscription; what was written down stays on your disk, whether you
 pay or not.
 
 Uninstalling
 ------------
-Settings > Apps > Guardiana > Uninstall. On uninstall, Guardiana turns Home
+Settings > Apps > Guardiana > Uninstall. On uninstall, GUARDIANA turns Home
 Mode off, removes its firewall rule and puts the DNS back as it was. The
 ledger stays in C:\ProgramData\Guardiana; delete it by hand if you do not
 want it.
 
 Checking the installation
 -------------------------
-“Guardiana (menu)” > the check option, or in a new command window or
+“Guardiana (menu)” > option 13, “Verify”, or in a new command window or
 PowerShell:
     guardiana verify
 
 Before installing: check the hash of the .msi file and compare it with
 SHA256SUMS and with the public ledger (ledger.jsonl). How to do it, step by
-step, in VERIFY.md, in the published source code (github.com/guardianagroup/guardiana).
+step, is in VERIFY.md, in the published source code (github.com/guardianagroup/guardiana).
 
-What Guardiana does not do is in WHAT_IT_DOES_NOT_DO.md. Read it.
+What GUARDIANA does not do is in WHAT_IT_DOES_NOT_DO.md. Read it.

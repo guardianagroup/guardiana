@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>GUARDIANA ZERO</title>
+<link rel="stylesheet" href="comun.css">
+<style>
+html, body { height: 100%; background: var(--hoja); }
+body { display: flex; flex-direction: column; border-left: 1px solid var(--linea); }
+header { flex: none; height: 50px; display: flex; align-items: center; gap: 10px; padding: 0 10px 0 20px; border-bottom: 1px solid var(--linea); }
+header h1 { flex: 1; margin: 0; font-size: 15px; font-weight: 600; }
+#cerrar { width: 30px; height: 30px; border: 0; border-radius: 8px; background: none; color: var(--gris); display: grid; place-items: center; }
+#cerrar:hover { background: var(--campo); color: var(--tinta); }
+main { flex: 1; overflow-y: auto; padding: 18px 20px 28px; }
+section.vista { display: none; }
+section.vista.vista-activa { display: block; }
+h2 { font-size: 13px; font-weight: 600; margin: 22px 0 8px; display: flex; align-items: baseline; gap: 8px; }
+h2 .cuenta { font-weight: 500; color: var(--gris); font-variant-numeric: tabular-nums; }
+p { margin: 0 0 10px; }
+.explica { color: var(--gris); font-size: 13px; }
+.pequeno { font-size: 12.5px; }
+.fila-acciones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+/* Shield ------------------------------------------------------------------------------------- */
+.sitio { font: 600 17px/1.25 var(--display); letter-spacing: -.01em; word-break: break-all; margin: 2px 0 8px; }
+.resumen { font-size: 14px; color: var(--tinta); margin-bottom: 14px; }
+.ajuste { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: var(--campo); }
+.ajuste label { font-weight: 500; display: block; }
+.ajuste .explica { margin: 3px 0 0; font-size: 12.5px; }
+.terceros { list-style: none; margin: 0; padding: 0; }
+.tercero { position: relative; padding: 9px 0 9px 13px; border-bottom: 1px solid var(--linea); display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; }
+.tercero::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--gris-suave); }
+.tercero.cortado::before { background: var(--rojo); }
+.tercero.sigue::before { background: var(--ambar); }
+.tercero .quien { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tercero .quien small { font-weight: 400; color: var(--gris); margin-left: 5px; font-size: 12px; }
+.tercero .detalle { grid-column: 1; font-size: 12.5px; color: var(--gris); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.tercero .detalle .motivo { color: var(--rojo); }
+.tercero .boton { grid-row: 1 / span 2; grid-column: 2; }
+.vacio { padding: 18px 0; color: var(--gris); }
+.hechos { margin-top: 18px; display: grid; gap: 6px; font-size: 13px; color: var(--gris); }
+
+/* Mandate ------------------------------------------------------------------------------------- */
+.etiqueta { display: block; font-weight: 500; margin: 14px 0 6px; }
+.casilla { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; font-size: 13px; color: var(--gris); }
+.casilla input { margin-top: 3px; }
+.tarjeta { border: 1px solid var(--linea); border-radius: 14px; padding: 14px 16px; margin-top: 12px; }
+.tarjeta.viva { border-color: var(--azul); box-shadow: 0 0 0 3px var(--azul-suave); }
+.tarjeta .titulo { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.tarjeta .titulo i { width: 8px; height: 8px; border-radius: 2px; background: var(--azul); }
+.sitios { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.senuelo { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 9px; background: var(--campo); margin: 8px 0 4px; }
+.senuelo code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font-family: var(--mono); font-size: 12.5px; }
+.pasos { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12.5px; max-height: 240px; overflow-y: auto; }
+.pasos li { display: grid; grid-template-columns: auto auto 1fr auto; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--linea); }
+.pasos time { color: var(--gris); font-variant-numeric: tabular-nums; }
+.pasos .que.cortado, .pasos .que.tinta { color: var(--rojo); }
+.pasos .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recibo { font-family: var(--mono); font-size: 12px; background: var(--campo); border-radius: 9px; padding: 10px 12px; white-space: pre-wrap; word-break: break-word; max-height: 160px; overflow: auto; }
+
+/* Redaction -------------------------------------------------------------------------------------- */
+.tachado { white-space: pre-wrap; word-break: break-word; border-radius: 10px; padding: 12px 14px; background: var(--campo); margin-top: 8px; }
+.tachado mark { background: var(--tinta); color: var(--hoja); border-radius: 4px; padding: 0 4px; font-family: var(--mono); font-size: .9em; }
+table.sust { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
+table.sust td { padding: 5px 0; border-bottom: 1px solid var(--linea); }
+table.sust td:first-child { font-family: var(--mono); width: 45%; }
+
+/* My data ------------------------------------------------------------------------------------- */
+.marcados { list-style: none; margin: 8px 0 0; padding: 0; }
+.marcados li { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--linea); }
+.marcados li .mono { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.nuevo-dato { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; margin-top: 10px; }
+.nuevo-dato select { border: 1px solid var(--linea); background: var(--campo); border-radius: 9px; padding: 0 8px; }
+.entrada { padding: 11px 0; border-bottom: 1px solid var(--linea); }
+.entrada .cab { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.entrada .cab b { font-weight: 600; }
+.entrada .datos { font-size: 12.5px; color: var(--gris); margin: 2px 0 6px; }
+.carta { margin-top: 10px; }
+.carta textarea { min-height: 220px; font-size: 12.5px; }
+
+/* Settings ------------------------------------------------------------------------------------ */
+.linea-ajuste { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--linea); }
+.linea-ajuste select { border: 1px solid var(--linea); background: var(--campo); border-radius: 8px; padding: 5px 8px; }
+.peligro { margin-top: 22px; padding: 14px; border: 1px solid color-mix(in srgb, var(--rojo) 35%, transparent); border-radius: 12px; }
+
+/* Question before data leaves ----------------------------------------------------------------- */
+.pregunta { border-radius: 14px; padding: 16px; background: var(--ambar-suave); }
+.pregunta .sitio { margin-bottom: 4px; }
+.pregunta .datos-lista { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+
+/* First run ------------------------------------------------------------------------------------ */
+.bienvenida h2 { font: 600 20px/1.25 var(--display); margin: 6px 0 12px; display: block; }
+.bienvenida .pregunta-grande { font-weight: 600; margin-top: 16px; }
+
+/* After a change: it holds from now on; a reload shows the whole page with it. */
+.recarga { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 9px 12px; border-radius: 10px; background: var(--azul-suave); color: var(--tinta); font-size: 12.5px; }
+.recarga span { flex: 1; }
+.linea-ajuste .que { display: grid; gap: 2px; }
+.ver-todo { margin: 16px 0 0; font-size: 13px; }
+.sin-preguntar { list-style: none; margin: 0; padding: 0; }
+.sin-preguntar li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--linea); font-size: 13px; }
+.linea-ajuste .que .explica { font-size: 12px; }
+/* What the browser just did, said once at the foot of the panel. */
+#aviso { position: fixed; left: 16px; right: 16px; bottom: 14px; padding: 10px 14px; border-radius: 10px; background: var(--tinta); color: var(--hoja); font-size: 13px; box-shadow: var(--sombra); opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s; pointer-events: none; }
+#aviso.visto { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+<header><h1 id="titulo"></h1><button id="cerrar" data-t-title="cerrar"><svg viewBox="0 0 14 14" width="12" height="12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2.5 2.5l9 9M11.5 2.5l-9 9"/></svg></button></header>
+<main>
+
+<section class="vista" id="v-escudo" data-titulo="escudo_titulo">
+  <div class="sitio" id="e-sitio"></div>
+  <p class="resumen" id="e-resumen"></p>
+  <div class="ajuste">
+    <input type="checkbox" class="interruptor" id="e-proteccion">
+    <div><label for="e-proteccion" data-t="proteccion"></label><p class="explica" data-t="proteccion_explica"></p></div>
+  </div>
+  <div id="e-cortados-caja"><h2><span data-t="escudo_cortados"></span><span class="cuenta" id="e-cortados-n"></span></h2><ul class="terceros" id="e-cortados"></ul></div>
+  <div id="e-vistos-caja"><h2><span data-t="escudo_vistos"></span><span class="cuenta" id="e-vistos-n"></span></h2><ul class="terceros" id="e-vistos"></ul></div>
+  <div class="recarga oculto" id="e-recarga"><span data-t="escudo_recarga"></span><button class="boton chico" id="e-recargar" data-t="recargar"></button></div>
+  <p class="vacio oculto" id="e-vacio" data-t="escudo_vacio"></p>
+  <div class="hechos" id="e-hechos"></div>
+  <p class="ver-todo"><button class="enlace" id="e-ver-todo" data-t="escudo_ver_todo"></button></p>
+</section>
+
+<section class="vista" id="v-mandato" data-titulo="mandato">
+  <div id="m-nuevo">
+    <p class="explica" data-t="mandato_explica"></p>
+    <label class="etiqueta" for="m-tarea" data-t="mandato_tarea"></label>
+    <textarea class="campo" id="m-tarea" rows="3" data-t-ph="mandato_tarea_ph"></textarea>
+    <label class="etiqueta" for="m-webs" data-t="mandato_webs"></label>
+    <textarea class="campo" id="m-webs" rows="4" spellcheck="false" data-t-ph="mandato_webs_ph"></textarea>
+    <label class="etiqueta" for="m-duracion" data-t="mandato_duracion"></label>
+    <select class="campo" id="m-duracion">
+      <option value="15" data-t="mandato_min_15"></option>
+      <option value="30" data-t="mandato_min_30" selected></option>
+      <option value="60" data-t="mandato_min_60"></option>
+      <option value="0" data-t="mandato_sin_limite"></option>
+    </select>
+    <label class="casilla"><input type="checkbox" id="m-estricto" checked><span data-t="mandato_estricto"></span></label>
+    <p class="explica oculto" id="m-error" data-t="mandato_webs_falta" style="color:var(--rojo);margin-top:8px"></p>
+    <div class="fila-acciones"><button class="boton principal" id="m-empezar" data-t="mandato_empezar"></button></div>
+  </div>
+  <div id="m-activo" class="oculto">
+    <div class="tarjeta viva">
+      <div class="titulo"><i></i><span data-t="mandato_activo"></span></div>
+      <p id="m-tarea-txt" style="margin:8px 0 0"></p>
+      <div class="sitios" id="m-sitios"></div>
+      <p class="pequeno" id="m-cuentas"></p>
+      <p class="pequeno gris" id="m-caduca"></p>
+    </div>
+    <h2 data-t="mandato_senuelo"></h2>
+    <p class="explica" data-t="mandato_senuelo_explica"></p>
+    <div class="senuelo"><code id="m-senuelo"></code><button class="boton chico" id="m-copiar" data-t="copiar"></button></div>
+    <ul class="pasos" id="m-pasos"></ul>
+    <div class="fila-acciones"><button class="boton principal" id="m-terminar" data-t="mandato_terminar"></button></div>
+  </div>
+  <div id="m-recibo" class="oculto">
+    <div class="tarjeta">
+      <div class="titulo" data-t="recibo_titulo"></div>
+      <p class="pequeno" id="r-cuentas" style="margin:8px 0"></p>
+      <p class="explica pequeno" data-t="recibo_explica"></p>
+      <p class="explica pequeno" data-t="recibo_cobertura"></p>
+      <p class="pequeno mono" id="r-huella"></p>
+      <div class="recibo" id="r-json"></div>
+      <div class="fila-acciones"><button class="boton principal" id="r-guardar" data-t="recibo_guardar"></button><button class="boton" id="r-nuevo" data-t="mandato_empezar"></button></div>
+      <p class="explica pequeno" id="r-ruta" style="margin-top:8px"></p>
+    </div>
+  </div>
+</section>
+
+<section class="vista" id="v-tachon" data-titulo="tachon">
+  <p class="explica" data-t="tachon_explica"></p>
+  <textarea class="campo" id="t-texto" rows="6" data-t-ph="tachon_ph"></textarea>
+  <div class="fila-acciones"><button class="boton principal" id="t-tachar" data-t="tachon_boton"></button></div>
+  <div id="t-resultado" class="oculto">
+    <h2 data-t="tachon_resultado"></h2>
+    <div class="tachado" id="t-salida"></div>
+    <div class="fila-acciones"><button class="boton principal" id="t-pegar" data-t="tachon_pegar"></button><button class="boton" id="t-copiar" data-t="copiar"></button></div>
+    <h2 data-t="tachon_tabla"></h2>
+    <table class="sust" id="t-tabla"></table>
+  </div>
+  <p class="explica oculto" id="t-nada" data-t="tachon_nada" style="margin-top:10px"></p>
+  <h2 data-t="tachon_respuesta"></h2>
+  <p class="explica" data-t="tachon_respuesta_explica"></p>
+  <button class="boton" id="t-respuesta" data-t="tachon_respuesta"></button>
+  <div class="tachado oculto" id="t-restaurada"></div>
+  <p class="explica pequeno" data-t="tachon_limite" style="margin-top:16px"></p>
+</section>
+
+<section class="vista" id="v-datos" data-titulo="mis_datos">
+  <h2 style="margin-top:0" data-t="tinta"></h2>
+  <p class="explica" data-t="tinta_explica"></p>
+  <ul class="marcados" id="d-marcados"></ul>
+  <p class="vacio oculto" id="d-marcados-vacio" data-t="tinta_vacia"></p>
+  <form class="nuevo-dato" id="d-nuevo">
+    <select id="d-tipo"></select>
+    <input class="campo" id="d-valor" data-t-ph="tinta_valor_ph" spellcheck="false" autocomplete="off">
+    <button class="boton principal" data-t="tinta_anadir"></button>
+  </form>
+  <h2 data-t="libro"></h2>
+  <p class="explica" data-t="libro_explica"></p>
+  <div id="d-libro"></div>
+  <p class="vacio oculto" id="d-libro-vacio" data-t="libro_vacio"></p>
+</section>
+
+<section class="vista" id="v-ajustes" data-titulo="ajustes">
+  <div class="ajuste">
+    <input type="checkbox" class="interruptor" id="a-proteccion">
+    <div><label for="a-proteccion" data-t="proteccion"></label><p class="explica" data-t="proteccion_explica"></p></div>
+  </div>
+  <div class="linea-ajuste"><span data-t="buscador"></span><select id="a-buscador"></select></div>
+  <div class="linea-ajuste"><span class="que"><span data-t="pestana_aislada"></span><span class="explica" data-t="pestana_aislada_explica"></span></span><button class="boton chico" id="a-aislada" data-t="nueva_pestana_aislada"></button></div>
+  <div class="linea-ajuste"><span data-t="idioma"></span><select id="a-idioma"><option value="">Windows</option><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option></select></div>
+  <div id="a-sin-preguntar-caja" class="oculto">
+    <h2 data-t="ajustes_sin_preguntar"></h2>
+    <ul class="sin-preguntar" id="a-sin-preguntar"></ul>
+  </div>
+  <h2 data-t="acerca"></h2>
+  <p class="pequeno" id="a-version"></p>
+  <p class="pequeno" id="a-motor"></p>
+  <p class="pequeno" id="a-huella"></p>
+  <p class="explica pequeno" data-t="sin_servidor"></p>
+  <p class="explica pequeno" data-t="limites"></p>
+  <div class="peligro">
+    <b data-t="borrar_todo"></b>
+    <p class="explica pequeno" data-t="borrar_todo_explica" style="margin-top:4px"></p>
+    <input class="campo" id="a-borrar-palabra" autocomplete="off">
+    <div class="fila-acciones"><button class="boton corta" id="a-borrar" data-t="borrar_todo" disabled></button></div>
+  </div>
+</section>
+
+<section class="vista" id="v-formulario" data-titulo="formulario_titulo">
+  <div class="pregunta">
+    <div class="sitio" id="f-sitio"></div>
+    <p class="pequeno gris" id="f-desde"></p>
+    <p id="f-texto"></p>
+    <div class="datos-lista" id="f-datos"></div>
+    <p class="pequeno" id="f-corredor" style="color:var(--rojo)"></p>
+    <p class="pequeno oculto" id="f-mandato" data-t="formulario_mandato"></p>
+    <label class="casilla" id="f-recordar-caja"><input type="checkbox" id="f-recordar"><span data-t="formulario_recordar"></span></label>
+    <div class="fila-acciones"><button class="boton principal" id="f-enviar" data-t="formulario_enviar"></button><button class="boton corta" id="f-no" data-t="formulario_no"></button></div>
+  </div>
+</section>
+
+<section class="vista bienvenida" id="v-bienvenida" data-titulo="app_nombre">
+  <h2 data-t="bienvenida_titulo"></h2>
+  <p data-t="bienvenida_texto"></p>
+  <p class="pregunta-grande" data-t="bienvenida_pregunta"></p>
+  <div class="fila-acciones"><button class="boton principal" id="b-si" data-t="bienvenida_si"></button><button class="boton" id="b-no" data-t="bienvenida_no"></button></div>
+  <p class="explica pequeno" data-t="bienvenida_nota" style="margin-top:14px"></p>
+</section>
+
+</main>
+<div id="aviso" role="status" aria-live="polite"></div>
+<script src="puente.js"></script>
+<script src="panel.js"></script>
+</body>
+</html>

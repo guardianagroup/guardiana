@@ -315,7 +315,11 @@
   const pista = (ev) => {
     if (ev.category !== 'desconocido' || ev.local || ev.entrega) return '';
     const q = String(ev.qname || '').toLowerCase().replace(/\.$/, '');
-    if (!ev.empresa && !ev.ia) return PALABRAS_SUBASTA.test(q) ? 'anuncios' : '';
+    if (!ev.empresa && !ev.ia && PALABRAS_SUBASTA.test(q)) return 'anuncios';
+    // Lo que dice el nombre vale también cuando no se sabe de quién es: «www.realmadrid.com» es
+    // una web aunque ninguna lista diga de quién (el responsable, 9 oct 2026: «al cliente no le
+    // sirve un sin clasificar»). De quién es sigue sin decirse: la columna de empresa queda vacía
+    // y el color se queda en naranja hasta que se sepa.
     // Only what comes before the registrable domain: the last two labels are the company's name.
     const todas = q.split('.');
     const labels = todas.slice(0, -nLabelsDominio(todas));
@@ -339,13 +343,14 @@
     // nada». Si se sabe de quién es, es un servicio de esa empresa (su web, su app, sus
     // servidores), y eso es lo que dice; «sin clasificar» queda para lo que nadie conoce.
     const p = pista(ev);
+    if (ev.sector && (!p || p === 'web')) return t('sector_' + ev.sector);
     if (p) return t('cat_pista_' + p);
     if (ev.empresa || ev.ia) return t('cat_servicio');
     return T.categorias.desconocido;
   };
   // El borde discontinuo se reserva para lo que de verdad no se sabe de quién es: si la columna
   // de empresa dice un nombre, la fila ya no es un hueco y no hace falta subrayarla.
-  const catClase = (ev) => (ev.category !== 'desconocido' ? '' : (ev.local || ev.entrega) ? ' entrega' : (ev.empresa || ev.ia) ? ' propio' : ' sinlista');
+  const catClase = (ev) => (ev.category !== 'desconocido' ? '' : (ev.local || ev.entrega) ? ' entrega' : (ev.empresa || ev.ia || ev.sector || pista(ev)) ? ' propio' : ' sinlista');
   // Qué quiere decir esa palabra, en el propio sitio donde está: la leyenda del pie existía,
   // pero está lejos de la tabla y el responsable tuvo que preguntar qué era «entrega».
   const catQue = (ev) => {
@@ -354,6 +359,7 @@
     if (ev.local) return q.red_local || '';
     if (ev.entrega) return q.entrega || '';
     const p = pista(ev);
+    if (ev.sector && (!p || p === 'web')) return (q.sector || '').replace('{sector}', t('sector_' + ev.sector));
     if (p) return q['pista_' + p] || '';
     if (ev.empresa || ev.ia) return q.de_empresa || '';
     return q.desconocido || '';
@@ -369,7 +375,7 @@
     if (ev.category === 'desconocido' && !ev.local && !ev.entrega) {
       const p = pista(ev);
       if (p === 'anuncios' || p === 'medicion') return 'naranja';
-      if (!p && !ev.empresa && !ev.ia) return 'naranja';
+      if (!ev.empresa && !ev.ia && !ev.sector) return 'naranja';
     }
     return 'verde';
   };
@@ -381,7 +387,8 @@
   // The chip links somewhere useful: «its website» opens that website; every other label opens
   // the page that explains what the word means (the person asked where to click to know more).
   const catEnlace = (ev) => {
-    if (ev.category === 'desconocido' && !ev.local && !ev.entrega && (ev.empresa || ev.ia) && pista(ev) === 'web') {
+    const pw = pista(ev);
+    if (ev.category === 'desconocido' && !ev.local && !ev.entrega && (ev.empresa || ev.ia || ev.sector) && (pw === 'web' || (ev.sector && !pw))) {
       return { href: 'https://' + dominioDe(ev.qname), titulo: t('cat_enlace_web').replace('{dominio}', dominioDe(ev.qname)) };
     }
     let ancla = ev.category;
@@ -517,6 +524,50 @@
   //    mano, si lo había).
   // Bloquear un nombre no espera a las 24 horas (decisión del responsable, 20 sep 2026): el
   // servidor pide confirmación mientras lleve menos de un día mirando. Lo ancho sigue esperando.
+  // A blocked query whose block was lifted since it was written down: an allow of this name, the
+  // name let into the scope from this page, or the rule that blocked it undone.
+  function levantado(ev) {
+    if (ev.verdict !== 'cortado' || reglaDeCorte(ev) !== undefined) return false;
+    if (reglaDePermiso(ev) !== undefined || DEJADOS_PASAR.has(claveCorte(ev.device_id, sinPunto(ev.qname)))) return true;
+    return ev.rule_id != null && REGLAS_VISTAS.has(ev.rule_id) && !REGLAS_ACTIVAS.has(ev.rule_id);
+  }
+  // The status beside the button says what holds NOW, so the two never contradict each other:
+  // a row read «bloqueado» next to a red «Bloquear» because the name had been unblocked after
+  // that query (the responsible, 9 Oct 2026: «no se puede bloquear una cosa que ya está
+  // bloqueada»). What happened at the time of the query is still on the row, in small letters
+  // under the status, and the export keeps it exactly as it was.
+  function estadoCelda(ev) {
+    const hora = clock(ev.ts);
+    if (levantado(ev)) {
+      return `<span class="verdict levantado">${esc(t('estado_desbloqueado'))}</span><br><span class="muted small">${esc(t('estado_antes_bloqueado').replace('{hora}', hora))}</span>`;
+    }
+    if (ev.verdict !== 'cortado' && reglaDeCorte(ev) !== undefined) {
+      return `${verdict('cortado')}<br><span class="muted small">${esc(t('estado_antes_paso').replace('{hora}', hora))}</span>`;
+    }
+    return verdict(ev.verdict);
+  }
+  // Every row carries what its status and its button are drawn from, so a click can redraw both
+  // (and those of every other row of the same name) at once. Before, the click changed only the
+  // button: a row the person had just unblocked kept reading «bloqueado» beside a red
+  // «Bloquear» until the next reload (the responsible, 9 Oct 2026, twice).
+  function filaAttrs(ev) {
+    return `data-dev="${esc(ev.device_id)}" data-q="${esc(ev.qname)}" data-v="${esc(ev.verdict)}" data-r="${ev.rule_id == null ? '' : esc(ev.rule_id)}" data-by="${esc(ev.decided_by || '')}" data-ts="${esc(ev.ts)}" data-k="${esc([ev.device_id, ev.qname, ev.verdict, ev._t0 ?? ev.ts].join('|'))}"`;
+  }
+  function evDeFila(tr) {
+    const d = tr.dataset;
+    return { device_id: d.dev, qname: d.q, verdict: d.v, rule_id: d.r === '' ? null : Number(d.r), decided_by: d.by, ts: Number(d.ts) };
+  }
+  const celdasEstado = (ev) => `<td class="estado">${estadoCelda(ev)}</td><td class="accion">${cutCell(ev)}</td>`;
+  function redibujaNombre(nombre) {
+    const n = sinPunto(nombre);
+    document.querySelectorAll('tr[data-q]').forEach((tr) => {
+      if (sinPunto(tr.dataset.q) !== n) return;
+      const ev = evDeFila(tr);
+      const est = tr.querySelector('td.estado'), acc = tr.querySelector('td.accion');
+      if (est) est.innerHTML = estadoCelda(ev);
+      if (acc) acc.innerHTML = cutCell(ev);
+    });
+  }
   function cutCell(ev) {
     const d = `data-device="${esc(ev.device_id)}" data-name="${esc(ev.qname)}"`;
     const corte = reglaDeCorte(ev);
@@ -526,11 +577,9 @@
     const permiso = reglaDePermiso(ev);
     const bloquear = `<button class="secondary cut" ${permiso !== undefined ? `data-permiso="${permiso}" ` : ''}${d}>${esc(t('cortar'))}</button>`;
     if (ev.verdict === 'cortado') {
-      // Lifted since the query was written down: an allow of this name, the name let into the
-      // scope from this page, or the rule that blocked it undone. The row keeps saying what
-      // happened then; the button offers what can be done now.
-      if (permiso !== undefined || DEJADOS_PASAR.has(claveCorte(ev.device_id, sinPunto(ev.qname)))) return bloquear;
-      if (ev.rule_id != null && REGLAS_VISTAS.has(ev.rule_id) && !REGLAS_ACTIVAS.has(ev.rule_id)) return bloquear;
+      // Lifted since: the status cell says «desbloqueado» (estadoCelda), and the button offers
+      // what can be done now.
+      if (levantado(ev)) return bloquear;
       const enSuPagina = document.body.getAttribute('data-page') === 'miDispositivo';
       if (ev.decided_by === 'alcance_declarado') {
         // The scope belongs to the home's panel: from the phone's own page there is no key for
@@ -613,52 +662,53 @@
       const b = e.target.closest('button.cut');
       if (!b) return;
       const name = b.dataset.name, dev = b.dataset.device;
-      const aBloquear = () => { delete b.dataset.deshacer; delete b.dataset.alcance; delete b.dataset.permitir; b.textContent = t('cortar'); b.classList.remove('cortado'); b.classList.add('secondary'); };
-      const aDesbloquear = () => { delete b.dataset.permiso; b.textContent = t('desbloquear_boton'); b.classList.remove('secondary'); b.classList.add('cortado'); };
+      const k = claveCorte(dev, sinPunto(name)), kCasa = claveCorte('home', sinPunto(name));
+      const deshecha = (id) => { REGLAS_ACTIVAS.delete(Number(id)); };
+      const creada = (id) => { REGLAS_VISTAS.add(Number(id)); REGLAS_ACTIVAS.add(Number(id)); };
       b.disabled = true;
       try {
         if (b.dataset.deshacer) {
-          // Desbloquear: se deshace la regla y el botón vuelve a ofrecer bloquear.
+          // Desbloquear: se deshace la regla de este nombre.
           await api(`${path}/${b.dataset.deshacer}/deshacer`, { method: 'POST' });
-          CORTADOS.delete(claveCorte(dev, sinPunto(name)));
-          aBloquear();
+          deshecha(b.dataset.deshacer);
+          if (CORTADOS.get(k) === Number(b.dataset.deshacer)) CORTADOS.delete(k); else CORTADOS.delete(kCasa);
         } else if (b.dataset.alcance) {
           // Fuera del alcance declarado: el nombre entra en el alcance de ese aparato.
           await api('/api/ia/alcance/anadir', { method: 'POST', body: { device_id: dev, nombre: name } });
-          DEJADOS_PASAR.add(claveCorte(dev, sinPunto(name)));
-          aBloquear();
+          DEJADOS_PASAR.add(k);
         } else if (b.dataset.permitir) {
           // The map is from when the page loaded: a rule of this name made since then (another
           // tab, the Rules page) is undone, not covered with an allow (second pass, 8 Oct 2026).
           await cargarCortados(path);
-          const corte = CORTADOS.get(claveCorte(dev, sinPunto(name))) ?? CORTADOS.get(claveCorte('home', sinPunto(name)));
+          const corte = CORTADOS.get(k) ?? CORTADOS.get(kCasa);
           if (corte !== undefined) {
             await api(`${path}/${corte}/deshacer`, { method: 'POST' });
-            CORTADOS.delete(claveCorte(dev, sinPunto(name))); CORTADOS.delete(claveCorte('home', sinPunto(name)));
-            aBloquear();
+            deshecha(corte);
+            CORTADOS.delete(k); CORTADOS.delete(kCasa);
           } else {
             // Bloqueado por una regla ancha: una regla concreta que lo permite gana a la ancha.
-            const created = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'permitir' }, path);
-            if (created) { PERMITIDOS.set(claveCorte(dev, sinPunto(name)), created.id); b.dataset.permiso = created.id; aBloquear(); }
+            const nueva = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'permitir' }, path);
+            if (nueva) { PERMITIDOS.set(k, nueva.id); creada(nueva.id); }
           }
         } else {
           // Sin confirm aquí: lo pide el servidor con la frase que corresponda (una sola ventana).
-          const created = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'cortar' }, path);
+          const nueva = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'cortar' }, path);
           // The allow made by hand goes only once the block exists: undone first, a cancelled
           // confirmation left the wide rule blocking the name again (review of 9 Oct 2026).
-          if (created && b.dataset.permiso) {
+          if (nueva && b.dataset.permiso) {
             await api(`${path}/${b.dataset.permiso}/deshacer`, { method: 'POST' });
-            PERMITIDOS.delete(claveCorte(dev, sinPunto(name)));
-            delete b.dataset.permiso;
+            deshecha(b.dataset.permiso);
+            PERMITIDOS.delete(k);
           }
-          // A grey tick did not say what had happened. The button turns into the state: red and
-          // with the word, in the language of the panel.
-          if (created) { CORTADOS.set(claveCorte(dev, sinPunto(name)), created.id); DEJADOS_PASAR.delete(claveCorte(dev, sinPunto(name))); b.dataset.deshacer = created.id; aDesbloquear(); }
+          if (nueva) { CORTADOS.set(k, nueva.id); creada(nueva.id); DEJADOS_PASAR.delete(k); }
         }
       } catch (err) {
         alert(String(err.message || err));
       }
+      // The button turns into what can be done now and the status beside it says what holds
+      // now, on this row and on every other row of the same name, in every table of the page.
       b.disabled = false;
+      redibujaNombre(name);
     });
   }
 
@@ -679,15 +729,73 @@
         last.ts = Math.max(last.ts, ev.ts);
         continue;
       }
-      out.push(Object.assign({}, ev, { _n: 1, _types: ev.qtype ? [ev.qtype] : [] }));
+      out.push(Object.assign({}, ev, { _n: 1, _t0: ev.ts, _types: ev.qtype ? [ev.qtype] : [] }));
     }
     return out;
+  }
+  // A table that refreshes by itself (the 60-second snapshot every two seconds, the phone's own
+  // page every five) never moves under the person (the responsible, 9 Oct 2026: «la página no se
+  // puede mover sola, la tiene que mover ella»):
+  //  · while the pointer is over it, it was touched in the last few seconds or a control in it has
+  //    the keyboard focus, new rows wait and a small notice at the bottom of the window says how
+  //    many there are; pressing it, or moving the pointer away, brings them in;
+  //  · when they come in and the person has scrolled into the table, the row at the top of the
+  //    window stays exactly where it was: the new rows go in above it, out of sight.
+  function tablaQuieta(tbody) {
+    const caja = tbody.closest('.card') || tbody.parentElement;
+    const aviso = document.createElement('button');
+    aviso.type = 'button';
+    aviso.className = 'nuevas hidden';
+    document.body.appendChild(aviso);
+    let encima = false, tocadaHasta = 0, mostrada = null, pendiente = null;
+    const claves = (html) => [...String(html).matchAll(/data-k="([^"]*)"/g)].map((m) => m[1]);
+    const ocupada = () => {
+      const f = document.activeElement;
+      return encima || Date.now() < tocadaHasta || (f && f !== document.body && caja.contains(f) && f.matches(':focus-visible'));
+    };
+    function aplica(html) {
+      const antes = tbody.getBoundingClientRect();
+      let ancla = null;
+      if (antes.top < 0 && antes.bottom > 0) {
+        for (const tr of tbody.querySelectorAll('tr[data-k]')) {
+          const r = tr.getBoundingClientRect();
+          if (r.bottom > 0) { ancla = { k: tr.dataset.k, top: r.top }; break; }
+        }
+      }
+      tbody.innerHTML = html;
+      mostrada = html; pendiente = null;
+      aviso.classList.add('hidden');
+      if (antes.bottom <= 0) {
+        // Reading something below the table: it stays where it was however the table grew.
+        window.scrollBy(0, tbody.getBoundingClientRect().bottom - antes.bottom);
+      } else if (ancla) {
+        const tr = [...tbody.querySelectorAll('tr[data-k]')].find((x) => x.dataset.k === ancla.k);
+        if (tr) window.scrollBy(0, tr.getBoundingClientRect().top - ancla.top);
+      }
+    }
+    // The browser's own scroll anchoring would correct the same jump a second time.
+    document.documentElement.style.overflowAnchor = 'none';
+    caja.addEventListener('pointerenter', () => { encima = true; });
+    caja.addEventListener('pointerleave', () => { encima = false; if (pendiente !== null && !ocupada()) aplica(pendiente); });
+    caja.addEventListener('pointerdown', () => { tocadaHasta = Date.now() + 4000; });
+    aviso.addEventListener('click', () => { if (pendiente !== null) aplica(pendiente); });
+    return {
+      pinta(html) {
+        if (html === mostrada) { pendiente = null; aviso.classList.add('hidden'); return; }
+        if (mostrada === null || !ocupada()) { aplica(html); return; }
+        pendiente = html;
+        const ya = new Set(claves(mostrada));
+        const n = claves(html).filter((k) => !ya.has(k)).length;
+        aviso.textContent = n ? tn('tabla_nuevas', n) : t('tabla_cambios');
+        aviso.classList.remove('hidden');
+      },
+    };
   }
   function eventRows(events) {
     return foldEvents(events).map((ev) => {
       const veces = ev._n > 1 ? ` <span class="muted">×${ev._n}</span>` : '';
       const como = ev._types.length ? ` title="${esc(ev._types.join(', '))}"` : '';
-      return `<tr><td class="mono">${clock(ev.ts)}</td><td><span class="mono"${como}>${esc(ev.qname)}</span>${veces}${trampa(ev)}${company(ev)}${phrases(ev)}</td>${empresaCelda(ev)}<td>${cat(ev)}</td>${paisCelda(ev)}<td>${device(ev)}</td><td>${verdict(ev.verdict)}</td><td>${cutCell(ev)}</td></tr>`;
+      return `<tr ${filaAttrs(ev)}><td class="mono">${clock(ev.ts)}</td><td><span class="mono"${como}>${esc(ev.qname)}</span>${veces}${trampa(ev)}${company(ev)}${phrases(ev)}</td>${empresaCelda(ev)}<td>${cat(ev)}</td>${paisCelda(ev)}<td>${device(ev)}</td>${celdasEstado(ev)}</tr>`;
     }).join('');
   }
 
@@ -695,6 +803,7 @@
   function applyTexts() {
     document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.getAttribute('data-t')); });
     document.querySelectorAll('[data-t-html]').forEach((el) => { el.innerHTML = t(el.getAttribute('data-t-html')); });
+    document.querySelectorAll('[data-t-title]').forEach((el) => { el.title = t(el.getAttribute('data-t-title')); });
     // Filter options and fixed headers carry stored values (Spanish keys); their labels follow the language.
     // Las etiquetas cortas vivían aquí, en los dos idiomas, hasta el 19 sep 2026. Estaban bien
     // traducidas, pero texto de interfaz dentro del código es lo que la regla del proyecto prohíbe:
@@ -707,7 +816,7 @@
     });
     document.querySelectorAll('th[data-cat]').forEach((th) => { th.textContent = (T.categorias && T.categorias[th.getAttribute('data-cat')]) || th.getAttribute('data-cat'); });
     const page = document.body.getAttribute('data-page');
-    if (PAGE_TITLE[page]) document.title = 'Guardiana · ' + t(PAGE_TITLE[page]);
+    if (PAGE_TITLE[page]) document.title = 'GUARDIANA · ' + t(PAGE_TITLE[page]);
     // The language switch lives in the header of every page; the choice is kept in this browser only.
     const header = document.querySelector('header.top');
     if (header && !$('lang-toggle')) {
@@ -779,7 +888,7 @@
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = v('--fg');
     ctx.font = `600 60px ${DISPLAY}`;
-    ctx.fillText('Guardiana', 80, 140);
+    ctx.fillText('GUARDIANA', 80, 140);
     ctx.fillStyle = v('--muted');
     ctx.font = `400 40px ${TEXTO}`;
     ctx.fillText(t('tarjeta_titulo'), 80, 205);
@@ -990,6 +1099,7 @@
         });
       } catch (_) {}
       bindCutButtons($('live'), '/api/reglas');
+      const vivo = tablaQuieta($('live'));
       $('share-open').addEventListener('click', async () => {
         if (!last) return;
         await drawCard($('share-canvas'), last);
@@ -1008,7 +1118,7 @@
         $('c-nuevos').textContent = r.destinos_nuevos;
         $('c-esperados').textContent = r.esperados;
         $('c-cortados').textContent = r.cortados;
-        $('live').innerHTML = eventRows(r.eventos) || `<tr><td colspan="8" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`;
+        vivo.pinta(eventRows(r.eventos) || `<tr><td colspan="8" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`, r.eventos.length);
         $('hueco').textContent = r.hueco ? t('hueco').replace('{desde}', when(r.hueco.desde)).replace('{hasta}', when(r.hueco.hasta)) : '';
         $('hueco').classList.toggle('hidden', !r.hueco);
       };
@@ -1187,12 +1297,13 @@
         $('mi-empresas').innerHTML = (lect.empresas && lect.empresas.length) ? lect.empresas.map((e) => `<li><b>${esc(e[0])}</b> · ${e[1]}</li>`).join('') + `<li class="muted">${esc(tn('lectura_empresas_total', lect.empresas_total))}</li>` : `<li class="muted">${esc(t('lectura_empresas_ninguna'))}</li>`;
         $('mi-avisos').innerHTML = hints(lect).map((h) => `<p class="limit">${esc(h)}</p>`).join('');
         await cargarCortados('/api/mi-dispositivo/reglas');
-        $('mi-rows').innerHTML = r.eventos.map((ev) => `<tr><td class="mono">${clock(ev.ts)}</td><td><span class="mono">${esc(ev.qname)}</span>${company(ev)}${phrases(ev)}</td>${empresaCelda(ev)}<td>${cat(ev)}</td>${paisCelda(ev)}<td>${verdict(ev.verdict)}</td><td>${cutCell(ev)}</td></tr>`).join('') || `<tr><td colspan="7" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`;
+        miTabla.pinta(r.eventos.map((ev) => `<tr ${filaAttrs(ev)}><td class="mono">${clock(ev.ts)}</td><td><span class="mono">${esc(ev.qname)}</span>${company(ev)}${phrases(ev)}</td>${empresaCelda(ev)}<td>${cat(ev)}</td>${paisCelda(ev)}${celdasEstado(ev)}</tr>`).join('') || `<tr><td colspan="7" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`, r.eventos.length);
         const rules = await api('/api/mi-dispositivo/reglas');
         lastRules = rules.reglas;
         $('mi-reglas').innerHTML = rules.reglas.map((x) => `<tr><td>${esc(t('tipo_' + x.match_kind))}</td><td class="mono">${esc(x.pattern)}</td><td>${esc(t('accion_' + x.action))}</td><td>${x.activa ? esc(t('regla_activa')) : esc(t('regla_deshecha'))}</td><td>${x.activa ? `<button class="secondary undo" data-id="${x.id}">${esc(t('deshacer'))}</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('reglas_ninguna'))}</td></tr>`;
       };
       bindCutButtons($('mi-rows'), '/api/mi-dispositivo/reglas');
+      const miTabla = tablaQuieta($('mi-rows'));
       $('mi-reglas').addEventListener('click', async (e) => {
         const b = e.target.closest('button.undo');
         if (!b) return;
@@ -1427,11 +1538,15 @@
     if (previo) { T = previo; applyTexts(); }
     try { T = await api('/api/textos'); remember(); } catch (_) {}
     applyTexts();
-    franjaLicencia().catch(() => {});
+    // The page is shown once its texts, the trial banner and its first figures are in place
+    // (or after a second and a half at most), so it opens in one go instead of jumping as each
+    // piece arrives (arranque.js held it back).
+    const franja = franjaLicencia().catch(() => {});
     const page = document.body.getAttribute('data-page');
-    if (pages[page]) {
-      try { await pages[page](); } catch (e) { console.error(e); }
-    }
+    const inicio = pages[page] ? pages[page]().catch((e) => console.error(e)) : Promise.resolve();
+    await Promise.race([Promise.all([franja, inicio]), new Promise((r) => setTimeout(r, 1500))]);
+    document.documentElement.classList.remove('cargando');
+    await inicio;
     if (token) {
       document.querySelectorAll('nav a').forEach((a) => { /* token stays in memory; links are plain */ });
     }

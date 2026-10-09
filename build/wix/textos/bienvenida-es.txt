@@ -1,20 +1,20 @@
 GUARDIANA para Windows
 
-Guardiana te enseña con qué servicios habla tu IA y, con Modo Hogar, cada aparato de tu Wi-Fi: lo explica en una frase y bloquea solo lo que tú decidas. Todo ocurre en este PC. Sin cuenta, sin servidor nuestro, cero telemetría.
+GUARDIANA te enseña con qué servicios habla tu IA y, con Modo Hogar, cada aparato de tu Wi-Fi: lo explica en una frase y bloquea solo lo que tú decidas. Todo ocurre en este PC. Sin cuenta, sin servidor nuestro, cero telemetría.
 
 Qué va a hacer este instalador
 - Copiar el programa a «Archivos de programa\Guardiana».
 - Registrar el servicio «Guardiana», que arranca solo con Windows.
-- Crear el acceso «Guardiana», que abre el panel en tu navegador, en el menú Inicio y en el escritorio, y el acceso «Guardiana (menú)» en el menú Inicio.
-- Poner a Guardiana como DNS de este PC, también por IPv6, para que empiece a mirar desde el primer minuto. Antes guarda una copia exacta de tu ajuste; si el servicio se para, el PC recupera su DNS de antes, y al desinstalar queda tal como estaba.
+- Crear en el menú Inicio y en el escritorio el acceso «Guardiana», que abre el panel en tu navegador, y en el menú Inicio el acceso «Guardiana (menú)».
+- Poner a GUARDIANA como DNS de este PC, también por IPv6, para que empiece a mirar desde el primer minuto. Antes guarda una copia exacta de tu ajuste; si el servicio se para, el PC recupera su DNS de antes, y al desinstalar queda tal como estaba.
 
 Qué NO va a hacer
 - No lee lo que envías ni lo que recibes: solo el nombre del servicio, la hora y el aparato.
-- No abre ningún puerto a la red. Solo el Modo Hogar, cuando tú lo enciendas, escucha en la Wi-Fi de casa; apagarlo lo cierra.
+- No abre ningún puerto a la red. Solo el Modo Hogar, cuando tú lo enciendas, abre puertos en la Wi-Fi de casa; apagarlo los cierra.
 
 Después de instalar
-Al terminar se abre el panel y en un minuto verás las consultas de este PC. Para devolver el DNS a como estaba sin desinstalar: panel, «Estado». Bloquear un nombre concreto se puede desde el primer minuto; los bloqueos anchos, por categoría o para toda la casa, esperan a que Guardiana lleve 24 horas mirando ese aparato.
+Al terminar se abre el panel y en un minuto verás las consultas de este PC. Para devolver el DNS a como estaba sin desinstalar: panel, «Estado». Bloquear un nombre concreto se puede desde el primer minuto; los bloqueos anchos, por categoría o para toda la casa, esperan a que GUARDIANA lleve 24 horas mirando ese aparato.
 
 Siete días con todo y sin tarjeta; después hace falta una suscripción. Lo anotado se queda en tu disco, pagues o no.
 
-Licencia del programa: GNU GPL 3.0 o posterior. Código abierto: puedes leerlo, compilarlo y comprobar que hace lo que dice. Lo que Guardiana no hace está en WHAT_IT_DOES_NOT_DO.md, en el código publicado (github.com/guardianagroup/guardiana).
+Licencia del programa: GNU GPL 3.0 o posterior. Código abierto: puedes leerlo, compilarlo y comprobar que hace lo que dice. Lo que GUARDIANA no hace está en WHAT_IT_DOES_NOT_DO.md, en el código publicado (github.com/guardianagroup/guardiana).

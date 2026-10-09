@@ -787,6 +787,7 @@ onetag.com
 # Diario AS, del grupo PRISA (España). Es un periódico, no publicidad: sale aquí para que deje
 # de aparecer como un nombre que nadie conoce.
 as.com
+elpais.com
 prisa.com
 prisasd.com
 
@@ -1028,3 +1029,79 @@ openwebmp.com
 
 @Forter
 forter.com
+
+# --- Clubes, ligas y medios grandes (petición del responsable, 9 oct 2026: la web del Real
+# Madrid salía «sin clasificar»). La sede es la del club o la entidad, que es su ciudad. ---------
+@Real Madrid C.F.|ES|Madrid
+realmadrid.com
+
+@FC Barcelona|ES|Barcelona
+fcbarcelona.com
+
+@Club Atlético de Madrid|ES|Madrid
+atleticodemadrid.com
+
+@LaLiga|ES|Madrid
+laliga.com
+
+@Manchester United|GB|Mánchester
+manutd.com
+
+@Manchester City|GB|Mánchester
+mancity.com
+
+@Liverpool FC|GB|Liverpool
+liverpoolfc.com
+
+@Premier League|GB|Londres
+premierleague.com
+
+@Juventus|IT|Turín
+juventus.com
+
+@FC Bayern de Múnich|DE|Múnich
+fcbayern.com
+
+@Paris Saint-Germain|FR|París
+psg.fr
+
+@UEFA|CH|Nyon
+uefa.com
+
+@FIFA|CH|Zúrich
+fifa.com
+
+@Atlético Nacional|CO|Medellín
+atlnacional.com.co
+
+@Millonarios FC|CO|Bogotá
+millonarios.com.co
+
+@Dimayor|CO|Bogotá
+dimayor.com.co
+
+@Boca Juniors|AR|Buenos Aires
+bocajuniors.com.ar
+
+@River Plate|AR|Buenos Aires
+cariverplate.com.ar
+
+@Flamengo|BR|Río de Janeiro
+flamengo.com.br
+
+@NBA|US|Nueva York
+nba.com
+
+@NFL|US|Nueva York
+nfl.com
+
+@Unidad Editorial|ES|Madrid
+# Editora de Marca, El Mundo y Expansión.
+marca.com
+elmundo.es
+expansion.com
+
+@Casa Editorial El Tiempo|CO|Bogotá
+eltiempo.com
+portafolio.co
+futbolred.com
