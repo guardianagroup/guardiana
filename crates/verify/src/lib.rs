@@ -241,16 +241,16 @@ fn check_signature(binary: &Path) -> SignatureState {
     }
 }
 
-/// Find `ledger.jsonl` next to the binary, in the data directory, or in the
-/// current directory.
+/// Find `ledger.jsonl` in the current directory first (the install page says to download it
+/// there and run verify from that folder), then next to the binary, then in the data directory.
+/// Until 1.0.5 the data directory won, so an old copy left there beat the one just downloaded
+/// and verify said the hash was not in the ledger (review of 8 Oct 2026).
 fn find_ledger_file(binary: &Path) -> Option<PathBuf> {
-    let mut candidates = vec![
-        paths::data_dir().join("ledger.jsonl"),
-        PathBuf::from("ledger.jsonl"),
-    ];
+    let mut candidates = vec![PathBuf::from("ledger.jsonl")];
     if let Some(dir) = binary.parent() {
-        candidates.insert(0, dir.join("ledger.jsonl"));
+        candidates.push(dir.join("ledger.jsonl"));
     }
+    candidates.push(paths::data_dir().join("ledger.jsonl"));
     candidates.into_iter().find(|p| p.is_file())
 }
 
@@ -813,7 +813,9 @@ fn render_con(t: &guardiana_core::i18n::Texts, report: &Report, en_panel: bool) 
                 "verify.firma.sin_archivo"
             })
             .replace("{archivo}", &format!("{}.minisig", published_name())),
-        SignatureState::Valid => t.cli("verify.firma.ok").to_owned(),
+        SignatureState::Valid => t
+            .cli("verify.firma.ok")
+            .replace("{clave}", report.public_key.trim()),
         SignatureState::Invalid => t.cli("verify.firma.mal").to_owned(),
     });
     out.push(match &report.ledger {

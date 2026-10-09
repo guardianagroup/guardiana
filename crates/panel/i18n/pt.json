@@ -208,7 +208,7 @@
     "verify.firma.sin_archivo_panel": "Assinatura: o painel não pode conferi-la, porque o serviço não vê a sua pasta de downloads. Baixe {archivo} da página de instalar, abra um terminal nessa pasta e escreva «guardiana verify»: ele confere a assinatura no seu computador, sem se conectar a nada.",
     "verify.firma.mac_zip": "Assinatura: no Mac o que se publica assinado é o .zip que você baixou, não o programa de dentro, então aqui não há assinatura para procurar. Confira a do .zip com o minisign, como explica a página de instalar.",
     "verify.registro.sin_archivo_panel": "Registro público: o painel não pode procurar a impressão digital, porque o serviço não vê a sua pasta de downloads. Baixe ledger.jsonl da página de instalar, abra um terminal nessa pasta e escreva «guardiana verify».",
-    "verify.firma.ok": "Assinatura: correta. O programa está assinado com a chave da Guardiana que ele leva dentro.",
+    "verify.firma.ok": "Assinatura: correta. O programa está assinado com a chave da Guardiana que ele leva dentro: {clave}. Compare com a publicada em guardianagroup.com/pt/instalar.html.",
     "verify.firma.mal": "Assinatura: NÃO bate. O programa ou a assinatura dele mudaram. Não use até esclarecer.",
     "verify.registro.sin_archivo": "Registro público: não há ledger.jsonl nesta pasta nem junto ao programa. Baixe-o da página de instalação para a mesma pasta e execute o verify a partir dela: ele procura esta impressão no registro, no seu computador.",
     "verify.registro.no_esta": "Registro público: esta impressão digital NÃO está no ledger.jsonl. Se for uma versão publicada, algo não bate.",

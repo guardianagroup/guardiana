@@ -208,7 +208,7 @@
     "verify.firma.sin_archivo_panel": "Signature: the panel cannot check it, because the service does not see your downloads folder. Download {archivo} from the install page, open a terminal in that folder and type “guardiana verify”: it checks the signature on your machine, without connecting to anything.",
     "verify.firma.mac_zip": "Signature: on a Mac what is published and signed is the .zip you downloaded, not the program inside it, so there is no signature to look for here. Check the .zip's with minisign, as the install page explains.",
     "verify.registro.sin_archivo_panel": "Public record: the panel cannot look up the fingerprint, because the service does not see your downloads folder. Download ledger.jsonl from the install page, open a terminal in that folder and type “guardiana verify”.",
-    "verify.firma.ok": "Signature: correct. The program is signed with the Guardiana key it carries inside.",
+    "verify.firma.ok": "Signature: correct. The program is signed with the Guardiana key it carries inside: {clave}. Compare it with the one published at guardianagroup.com/en/install.html.",
     "verify.firma.mal": "Signature: does NOT match. The program or its signature have changed. Do not use it until this is cleared up.",
     "verify.registro.sin_archivo": "Public ledger: there is no ledger.jsonl in this folder nor next to the program. Download it from the install page into the same folder and run verify from there: it looks this fingerprint up in the ledger, on your computer.",
     "verify.registro.no_esta": "Public record: this fingerprint is NOT in ledger.jsonl. If this is a released version, something is off.",

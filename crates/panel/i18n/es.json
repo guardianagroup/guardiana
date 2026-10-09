@@ -208,7 +208,7 @@
     "verify.firma.sin_archivo_panel": "Firma: el panel no puede comprobarla, porque el servicio no ve tu carpeta de descargas. Descarga {archivo} de la página de instalar, abre una terminal en esa carpeta y escribe «guardiana verify»: comprueba la firma en tu equipo, sin conectarse a nada.",
     "verify.firma.mac_zip": "Firma: en el Mac se publica firmado el .zip que descargaste, no el programa de dentro, así que aquí no hay firma que buscar. Comprueba la del .zip con minisign, como explica la página de instalar.",
     "verify.registro.sin_archivo_panel": "Registro público: el panel no puede buscar la huella, porque el servicio no ve tu carpeta de descargas. Descarga ledger.jsonl de la página de instalar, abre una terminal en esa carpeta y escribe «guardiana verify».",
-    "verify.firma.ok": "Firma: correcta. El programa está firmado con la clave de Guardiana que lleva dentro.",
+    "verify.firma.ok": "Firma: correcta. El programa está firmado con la clave de Guardiana que lleva dentro: {clave}. Compárala con la publicada en guardianagroup.com/instalar.html.",
     "verify.firma.mal": "Firma: NO coincide. El programa o su firma han cambiado. No lo uses hasta aclararlo.",
     "verify.registro.sin_archivo": "Registro público: no hay ledger.jsonl en esta carpeta ni junto al programa. Descárgalo de la página de instalar a la misma carpeta y ejecuta verify desde ella: busca esta huella en el registro, en tu equipo.",
     "verify.registro.no_esta": "Registro público: esta huella NO está en ledger.jsonl. Si es una versión publicada, algo no cuadra.",
