@@ -13,8 +13,14 @@ on:
       - 'crates/zero/**'
       - 'crates/lists/**'
       - 'crates/core/**'
+      - 'crates/license/**'
       - '.github/workflows/zero.yml'
   workflow_dispatch:
+    inputs:
+      lock:
+        description: "«actualizar» updates zero/navegador/Cargo.lock for a new dependency of crates/zero (it comes back in the artifact, to be committed)"
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -41,6 +47,13 @@ jobs:
       - name: fmt
         working-directory: zero/navegador
         run: cargo fmt --check
+      # Only when asked: the browser's brain gained a dependency (9 Oct 2026: the subscription
+      # brought guardiana-license). The rest of the lock stays as it was; every later step is
+      # --locked against the updated file, which the artifact carries back to be committed.
+      - name: update the lock
+        if: ${{ github.event.inputs.lock == 'actualizar' }}
+        working-directory: zero/navegador
+        run: cargo update -p guardiana-zero
       - name: clippy
         working-directory: zero/navegador
         # Errors also as annotations: readable from the run page and the public API.

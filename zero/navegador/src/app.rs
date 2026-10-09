@@ -14,6 +14,7 @@ use std::ffi::c_void;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
+use guardiana_zero::licencia::{Estado as EstadoLicencia, Fallo, Lugar as LugarLicencia};
 use guardiana_zero::sesion::{self, Arranque, Orden, Origen, Perfil, Sesion};
 use guardiana_zero::textos::{Idioma, Textos};
 use webview2_com::Microsoft::Web::WebView2::Win32::*;
@@ -152,6 +153,42 @@ thread_local! {
     static COLA: RefCell<VecDeque<Orden>> = const { RefCell::new(VecDeque::new()) };
     static REGISTRO: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
     static DEPURA: bool = std::env::var_os("GUARDIANA_ZERO_DEPURA").is_some();
+}
+
+/// Where the subscription lives, for the worker threads that talk to the payment gateway.
+static LUGAR: std::sync::OnceLock<LugarLicencia> = std::sync::OnceLock::new();
+/// What those threads found, picked up by the window on its next tick.
+static LICENCIA: std::sync::Mutex<VecDeque<DeLicencia>> = std::sync::Mutex::new(VecDeque::new());
+/// One periodic check at a time.
+static COMPROBANDO: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// A result from the payment gateway, done away from the window so it never freezes.
+enum DeLicencia {
+    Activada(Result<EstadoLicencia, Fallo>),
+    Comprobada(EstadoLicencia),
+}
+
+fn de_licencia(r: DeLicencia) {
+    LICENCIA
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .push_back(r);
+}
+
+/// Hand what the gateway threads found to the session.
+fn recoge_licencia() {
+    let hechos: Vec<DeLicencia> = LICENCIA
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .drain(..)
+        .collect();
+    for r in hechos {
+        let o = match r {
+            DeLicencia::Activada(r) => con_sesion(|s| s.licencia_activada(r)),
+            DeLicencia::Comprobada(e) => con_sesion(|s| s.pon_licencia(e)),
+        };
+        encola(o.unwrap_or_default());
+    }
 }
 
 fn con_sesion<R>(f: impl FnOnce(&mut Sesion) -> R) -> Option<R> {
@@ -386,6 +423,37 @@ fn ejecuta(o: Orden) {
         }
         Orden::CierraVentana => {
             let _ = unsafe { PostMessageW(Some(hwnd()), WM_CLOSE, WPARAM(0), LPARAM(0)) };
+        }
+        Orden::ActivaLicencia { clave } => {
+            let Some(lugar) = LUGAR.get().cloned() else {
+                de_licencia(DeLicencia::Activada(Err(Fallo::Disco)));
+                return;
+            };
+            let _ = std::thread::Builder::new()
+                .name("licencia".into())
+                .spawn(move || {
+                    let r = lugar.activar(&clave, sesion::ahora_sistema());
+                    de_licencia(DeLicencia::Activada(r));
+                });
+        }
+        Orden::ComprobarLicencia => {
+            let Some(lugar) = LUGAR.get().cloned() else {
+                return;
+            };
+            if COMPROBANDO.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                return;
+            }
+            let lanzado = std::thread::Builder::new()
+                .name("licencia".into())
+                .spawn(move || {
+                    if let Some(e) = lugar.comprobar(sesion::ahora_sistema()) {
+                        de_licencia(DeLicencia::Comprobada(e));
+                    }
+                    COMPROBANDO.store(false, std::sync::atomic::Ordering::SeqCst);
+                });
+            if lanzado.is_err() {
+                COMPROBANDO.store(false, std::sync::atomic::Ordering::SeqCst);
+            }
         }
     }
 }
@@ -1287,6 +1355,7 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
             LRESULT(0)
         }
         WM_TIMER => {
+            recoge_licencia();
             encola(con_sesion(Sesion::tic).unwrap_or_default());
             drena();
             LRESULT(0)
@@ -1500,6 +1569,16 @@ pub fn arranca() {
     });
     let mut s = s;
     s.pon_depuracion(DEPURA.with(|d| *d));
+    // The subscription: seven days of the browser's own, kept in its data folder and, a second
+    // time, in a folder outside it (Roaming), so emptying one does not start the week again.
+    let ancla = std::env::var_os("GUARDIANA_ZERO_DATOS")
+        .map(|_| base.join("marca"))
+        .or_else(|| std::env::var_os("APPDATA").map(|a| PathBuf::from(a).join("GUARDIANA ZERO").join("marca")))
+        .unwrap_or_else(|| base.join("marca"));
+    let lugar = LugarLicencia::nuevo(&datos, ancla);
+    let _ = LUGAR.set(lugar.clone());
+    let mut iniciales = iniciales;
+    iniciales.extend(s.pon_lugar_licencia(lugar));
     let estricto = s.seguimiento_estricto();
     SESION.with(|c| *c.borrow_mut() = Some(s));
 

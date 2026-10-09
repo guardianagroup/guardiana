@@ -555,6 +555,7 @@ version = "1.0.8"
 dependencies = [
  "base64",
  "guardiana-core",
+ "guardiana-license",
  "guardiana-lists",
  "idna",
  "ring",

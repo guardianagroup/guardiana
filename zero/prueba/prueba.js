@@ -103,6 +103,17 @@ function pantalla(nombre) {
   comprueba(await hasta(async () => (await barra.textContent('.pestana .titulo')) === 'Nueva pestaña'), 'cambiar el idioma a español cambia la barra al momento');
   comprueba(await hasta(async () => (await inicio.textContent('[data-t="inicio_mes"]')) === 'Tu mes en datos'), 'y la pestaña nueva también');
 
+  // The subscription: the browser's own seven days start with the first run, kept twice, and
+  // nothing has left for it yet.
+  await panel.click('#a-licencia-ver');
+  comprueba(await hasta(() => panel.evaluate(() => document.querySelector('#v-licencia').classList.contains('vista-activa'))), 'Ajustes lleva a «Suscripción»');
+  comprueba(await hasta(async () => (await panel.textContent('#l-estado')).includes('quedan 7 días')), `la prueba propia empieza con 7 días (${await panel.textContent('#l-estado')})`);
+  comprueba(fs.existsSync(path.join(base, 'marca', 'prueba-empezada')) && fs.existsSync(path.join(base, 'datos', 'licencia.db')), 'la fecha se guarda en dos sitios: los datos y una marca aparte');
+  comprueba(await panel.evaluate(() => !document.querySelector('#l-conexiones-vacio').classList.contains('oculto')), 'la suscripción no se ha conectado con nadie');
+  comprueba(await barra.evaluate(() => document.querySelector('#b-licencia').classList.contains('oculto')), 'con 7 días, la barra no dice nada de la prueba');
+  await espera(500);
+  pantalla('01b-suscripcion.png');
+
   // A page with trackers.
   await barra.fill('#campo-dir', `${SITIO}/prueba?utm_source=boletin&gclid=abc&id=7`);
   await barra.press('#campo-dir', 'Enter');
@@ -221,6 +232,45 @@ function pantalla(nombre) {
   comprueba(dias.length > 0 && dias.every((d) => !('sitio-prueba.test' in (d.terceros || {}))), 'la web que abres nunca cuenta como empresa de fuera');
   comprueba(dias.some((d) => d.parametros_quitados === 2), 'cuenta las 2 etiquetas de rastreo quitadas');
   comprueba((leer('libro.json') || { entradas: {} }).entradas['sitio-prueba.test'] !== undefined, 'el libro anota quién recibió el correo');
+
+  // Eight days later, without a subscription: the trial mark says it started eight days ago.
+  // The browser opens pages and does nothing of its own (decided 9 Oct 2026).
+  fs.writeFileSync(path.join(base, 'marca', 'prueba-empezada'), String(Date.now() - 8 * 86400000));
+  registro.length = 0;
+  salio = null;
+  const proceso2 = spawn(exe, [], {
+    env: { ...process.env, GUARDIANA_ZERO_DATOS: base, GUARDIANA_ZERO_DEPURA: '1', GUARDIANA_ZERO_ARGS: `--remote-debugging-port=9222 --host-resolver-rules="${reglas}"` },
+    stdio: 'ignore',
+  });
+  proceso2.on('exit', (c) => { salio = c; });
+  comprueba(await hasta(async () => (await fetch('http://127.0.0.1:9222/json/version')).ok, 90000), 'vuelve a arrancar con la prueba terminada');
+  const nav2 = await chromium.connectOverCDP('http://127.0.0.1:9222');
+  const barra2 = await paginaQue(nav2, (u) => u.endsWith('/barra.html'));
+  const panel2 = await paginaQue(nav2, (u) => u.endsWith('/panel.html'));
+  comprueba(await hasta(async () => (await barra2.textContent('#b-licencia')) === 'Prueba terminada: sin protección'), `la barra dice que ya no protege (${await barra2.textContent('#b-licencia')})`);
+  comprueba(await barra2.evaluate(() => document.querySelector('#b-escudo').classList.contains('oculto')), 'y el escudo, que no contaría nada, deja su sitio');
+  await barra2.fill('#campo-dir', `${SITIO}/prueba?utm_source=boletin&id=7`);
+  await barra2.press('#campo-dir', 'Enter');
+  const web2 = await paginaQue(nav2, (u) => u.startsWith(SITIO));
+  await web2.waitForLoadState('load').catch(() => {});
+  await espera(1500);
+  comprueba(registro.some((r) => r.host === 'sitio-prueba.test' && r.ruta.startsWith('/prueba')), 'las páginas se siguen abriendo');
+  comprueba(registro.some((r) => r.host === 'stats.g.doubleclick.net'), 'pero ya no se corta nada: el píxel de DoubleClick sale');
+  comprueba(registro.some((r) => r.ruta.includes('utm_source=boletin')), 'ni se limpian las direcciones');
+  await barra2.click('#b-mandato');
+  comprueba(await hasta(() => panel2.evaluate(() => document.querySelector('#v-licencia').classList.contains('vista-activa'))), 'los mandatos llevan a «Suscripción»');
+  comprueba(await hasta(async () => (await panel2.textContent('#l-detalle')).includes('La prueba terminó')), 'que explica qué dejó de hacer');
+  await espera(500);
+  pantalla('06-prueba-terminada.png');
+  await panel2.screenshot({ path: path.join(salida, 'panel-suscripcion.png') }).catch(() => {});
+  // A key the gateway does not know: one connection, made away from the window, and a reason.
+  await panel2.fill('#l-clave', 'CLAVE-DE-PRUEBA-QUE-NO-EXISTE');
+  await panel2.click('#l-activar');
+  comprueba(await hasta(async () => (await panel2.textContent('#l-error')).length > 10, 60000), `una clave que no vale dice por qué (${await panel2.textContent('#l-error')})`);
+  comprueba(await hasta(async () => (await panel2.textContent('#l-conexiones')).includes('dodopayments.com')), 'y la conexión con la pasarela queda anotada');
+  comprueba(await barra2.evaluate(() => !document.querySelector('#b-licencia').classList.contains('oculto')), 'sin clave válida sigue sin proteger');
+  try { execSync('taskkill /IM guardiana-zero.exe', { stdio: 'ignore' }); } catch (_) {}
+  comprueba(await hasta(async () => salio !== null, 20000), 'cierra otra vez sin forzar');
 })().catch((e) => { comprueba(false, `la prueba se interrumpió: ${e && e.message}`); }).finally(() => {
   try { execSync('taskkill /F /IM guardiana-zero.exe', { stdio: 'ignore' }); } catch (_) {}
   fs.writeFileSync(path.join(salida, 'servidor.json'), JSON.stringify(registro, null, 1));

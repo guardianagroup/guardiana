@@ -114,9 +114,30 @@ pub fn donde_licencia() -> String {
     }
 }
 
+/// A folder of its own for the marks, set by a program that is not the service: GUARDIANA ZERO
+/// runs as the person, without administrator rights, and has seven days of its own (decided by
+/// the owner on 9 Oct 2026), so its marks must neither read nor touch the service's. `None`
+/// (the default, and what the service always has) keeps the places described above.
+static CARPETA_PROPIA: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+/// Keep this process's marks in `dir` (or back in the usual places with `None`). Called once,
+/// before the first licence call, by a program that is not the service.
+pub fn usar_carpeta(dir: Option<PathBuf>) {
+    *CARPETA_PROPIA
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = dir;
+}
+
 /// In test or development mode (`GUARDIANA_DATA`), the marks go with the data. When the variable
 /// names the machine's own data folder it is not a test: the marks stay where they belong.
 fn carpeta_de_pruebas() -> Option<PathBuf> {
+    if let Some(dir) = CARPETA_PROPIA
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone()
+    {
+        return Some(dir);
+    }
     let dir = PathBuf::from(std::env::var_os(guardiana_core::paths::DATA_ENV)?);
     if misma_carpeta(&dir, &guardiana_core::paths::system_data_dir()) {
         return None;
@@ -380,6 +401,34 @@ mod tests {
         assert!(donde().starts_with(&dir.display().to_string()));
         std::env::remove_var("GUARDIANA_DATA");
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A program with a folder of its own (GUARDIANA ZERO) keeps its marks there and never sees
+    /// the service's; clearing it gives the usual places back.
+    #[test]
+    fn una_carpeta_propia_aparta_las_marcas_del_servicio() {
+        let servicio = carpeta("servicio");
+        let propia = carpeta("propia");
+        let _a_solas = a_solas_en(&servicio);
+        assert!(escribir(1_790_000_000_000), "marca del servicio");
+        let _ = std::fs::remove_dir_all(&propia);
+        usar_carpeta(Some(propia.clone()));
+        assert!(
+            leer().is_none(),
+            "la marca del servicio no se ve desde la carpeta propia"
+        );
+        assert!(escribir(1_791_000_000_000));
+        assert_eq!(leer(), Some(1_791_000_000_000));
+        assert!(donde().starts_with(&propia.display().to_string()));
+        usar_carpeta(None);
+        assert_eq!(
+            leer(),
+            Some(1_790_000_000_000),
+            "la del servicio sigue intacta"
+        );
+        std::env::remove_var("GUARDIANA_DATA");
+        std::fs::remove_dir_all(&servicio).ok();
+        std::fs::remove_dir_all(&propia).ok();
     }
 
     /// The clock mark and the licence copy go next to the trial mark and come back whole, and

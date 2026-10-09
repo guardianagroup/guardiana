@@ -101,6 +101,11 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
 .sin-preguntar { list-style: none; margin: 0; padding: 0; }
 .sin-preguntar li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--linea); font-size: 13px; }
 .linea-ajuste .que .explica { font-size: 12px; }
+/* Subscription ---------------------------------------------------------------------------------- */
+.tarjeta.sin-proteccion { border-color: var(--rojo); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rojo) 14%, transparent); }
+.tarjeta.prueba { border-color: var(--ambar); }
+#l-estado { font-weight: 600; margin: 0; }
+#l-conexiones li { grid-template-columns: auto 1fr; }
 /* What the browser just did, said once at the foot of the panel. */
 #aviso { position: fixed; left: 16px; right: 16px; bottom: 14px; padding: 10px 14px; border-radius: 10px; background: var(--tinta); color: var(--hoja); font-size: 13px; box-shadow: var(--sombra); opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s; pointer-events: none; }
 #aviso.visto { opacity: 1; transform: none; }
@@ -111,6 +116,7 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
 <main>
 
 <section class="vista" id="v-escudo" data-titulo="escudo_titulo">
+  <div class="tarjeta sin-proteccion oculto" id="e-licencia" style="margin:0 0 14px"><p class="pequeno" id="e-licencia-txt" style="margin:0"></p><div class="fila-acciones"><button class="boton principal chico" id="e-licencia-ver" data-t="licencia_ver"></button></div></div>
   <div class="sitio" id="e-sitio"></div>
   <p class="resumen" id="e-resumen"></p>
   <div class="ajuste">
@@ -211,6 +217,7 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
     <input type="checkbox" class="interruptor" id="a-proteccion">
     <div><label for="a-proteccion" data-t="proteccion"></label><p class="explica" data-t="proteccion_explica"></p></div>
   </div>
+  <div class="linea-ajuste"><span class="que"><span data-t="licencia_titulo"></span><span class="explica" id="a-licencia"></span></span><button class="boton chico" id="a-licencia-ver" data-t="licencia_abrir"></button></div>
   <div class="linea-ajuste"><span data-t="buscador"></span><select id="a-buscador"></select></div>
   <div class="linea-ajuste"><span class="que"><span data-t="pestana_aislada"></span><span class="explica" data-t="pestana_aislada_explica"></span></span><button class="boton chico" id="a-aislada" data-t="nueva_pestana_aislada"></button></div>
   <div class="linea-ajuste"><span data-t="idioma"></span><select id="a-idioma"><option value="">Windows</option><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option></select></div>
@@ -245,6 +252,25 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
   </div>
 </section>
 
+<section class="vista" id="v-licencia" data-titulo="licencia_titulo">
+  <div class="tarjeta" id="l-caja" style="margin-top:0"><p id="l-estado"></p><p class="explica pequeno" id="l-detalle" style="margin:8px 0 0"></p></div>
+  <p class="explica" data-t="licencia_incluida" style="margin-top:14px"></p>
+  <div class="fila-acciones" id="l-comprar-caja"><button class="boton principal" id="l-comprar" data-t="licencia_comprar"></button></div>
+  <div id="l-clave-caja">
+    <h2 data-t="licencia_clave_titulo"></h2>
+    <p class="explica pequeno" data-t="licencia_clave_explica"></p>
+    <form class="nuevo-dato" id="l-form" style="grid-template-columns:1fr auto">
+      <input class="campo" id="l-clave" data-t-ph="licencia_clave_campo" spellcheck="false" autocomplete="off">
+      <button class="boton" id="l-activar" data-t="licencia_clave_boton"></button>
+    </form>
+    <p class="pequeno oculto" id="l-ocupada" data-t="licencia_activando" style="margin-top:8px"></p>
+    <p class="pequeno oculto" id="l-error" style="margin-top:8px;color:var(--rojo)"></p>
+  </div>
+  <h2 data-t="licencia_conexiones_titulo"></h2>
+  <ul class="pasos" id="l-conexiones"></ul>
+  <p class="vacio oculto" id="l-conexiones-vacio" data-t="licencia_conexiones_ninguna" style="padding:6px 0"></p>
+  <p class="explica pequeno" id="l-donde" style="margin-top:16px"></p>
+</section>
 <section class="vista bienvenida" id="v-bienvenida" data-titulo="app_nombre">
   <h2 data-t="bienvenida_titulo"></h2>
   <p data-t="bienvenida_texto"></p>

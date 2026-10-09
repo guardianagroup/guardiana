@@ -14,6 +14,9 @@ publish = false
 [dependencies]
 guardiana-lists = { workspace = true }
 guardiana-core = { workspace = true }
+# The subscription (decided 9 Oct 2026): ZERO comes with GUARDIANA's, with seven days of its own,
+# and uses GUARDIANA's own licence rules and gateway calls instead of a second copy of them.
+guardiana-license = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

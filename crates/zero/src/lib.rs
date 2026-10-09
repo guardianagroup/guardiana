@@ -14,6 +14,7 @@ pub mod dominio;
 pub mod escudo;
 pub mod fecha;
 pub mod libro;
+pub mod licencia;
 pub mod mandato;
 mod md5;
 pub mod paginas;

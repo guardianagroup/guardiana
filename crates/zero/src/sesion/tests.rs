@@ -891,3 +891,145 @@ fn every_cut_can_be_examined_one_by_one_and_saved() {
         )
         .is_empty());
 }
+
+/// When the seven days end without a subscription the browser keeps opening pages, and does
+/// nothing of its own: no cut, no cleaning, no question, no mandate (decided 9 Oct 2026). A key
+/// that is activated brings everything back.
+#[test]
+fn after_the_trial_it_browses_without_protection_until_a_key_is_activated() {
+    let (mut s, _, id) = con_pagina(true);
+    let o = s.pon_licencia(EstadoLicencia::Prueba {
+        termina: reloj() + 86_400_000,
+        dias: 1,
+    });
+    let l = del_tipo(&o, Origen::Barra, "licencia").unwrap_or_default();
+    assert_eq!(l["estado"], "prueba");
+    assert_eq!(l["dias"], 1);
+    assert!(
+        s.peticion(
+            id,
+            "https://stats.g.doubleclick.net/g/collect",
+            "GET",
+            b"",
+            3
+        )
+        .cortar
+    );
+
+    let o = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
+    assert!(o.contains(&Orden::Seguimiento { estricto: false }));
+    assert!(!s.seguimiento_estricto());
+    let l = del_tipo(&o, Origen::Barra, "licencia").unwrap_or_default();
+    assert_eq!(l["estado"], "prueba_terminada");
+    assert_eq!(l["protege"], false);
+    let e = del_tipo(&o, Origen::Panel, "escudo").unwrap_or_default();
+    assert_eq!(e["cortando"], false);
+    // Pages open; nothing is cut, no address is cleaned.
+    assert!(
+        !s.peticion(
+            id,
+            "https://stats.g.doubleclick.net/g/collect",
+            "GET",
+            b"",
+            3
+        )
+        .cortar
+    );
+    let (cancela, _) = s.navegacion_empieza(id, "https://example.com/?utm_source=x", true);
+    assert!(!cancela);
+    assert!(
+        !s.peticion(id, "https://example.com/?utm_source=x", "GET", b"", 1)
+            .cortar
+    );
+    // The paid tools open the subscription view instead.
+    for m in [
+        r#"{"tipo":"mandato_empezar","tarea":"x","webs":["avianca.com"],"estricto":true}"#,
+        r#"{"tipo":"tachar","texto":"hola"}"#,
+        r#"{"tipo":"tinta_anadir","dato":"correo","valor":"ana@example.com"}"#,
+    ] {
+        let o = s.mensaje(Origen::Panel, PANEL, m);
+        assert!(!o.iter().any(|x| matches!(x, Orden::CreaPestana { .. })));
+        let v = del_tipo(&o, Origen::Panel, "vista").unwrap_or_default();
+        assert_eq!(v["vista"], "licencia", "{m}");
+    }
+    let o = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"panel","vista":"mandato"}"#,
+    );
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "vista").unwrap_or_default()["vista"],
+        "licencia"
+    );
+    // A web page cannot ask for an activation; the panel can, and the shell does it.
+    assert!(s
+        .mensaje(
+            Origen::Pestana(id),
+            "https://example.com/",
+            r#"{"tipo":"licencia_activar","clave":"K"}"#
+        )
+        .is_empty());
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"licencia_activar","clave":"  "}"#,
+    );
+    let l = del_tipo(&o, Origen::Panel, "licencia").unwrap_or_default();
+    assert!(l["error"].as_str().unwrap_or_default().contains("clave"));
+    assert!(!o.iter().any(|x| matches!(x, Orden::ActivaLicencia { .. })));
+    // Without a place for the licence (as in these tests) nothing is sent either.
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"licencia_activar","clave":"ABC-123"}"#,
+    );
+    assert!(!o.iter().any(|x| matches!(x, Orden::ActivaLicencia { .. })));
+    // Buying opens the shop in a tab.
+    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"licencia_comprar"}"#);
+    assert!(o.iter().any(|x| matches!(x, Orden::CreaPestana { url: Some(u), .. } if u == "https://guardianagroup.com/comprar.html")));
+
+    // An activation that failed says why; one that worked brings protection back.
+    let o = s.licencia_activada(Err(Fallo::Limite));
+    let l = del_tipo(&o, Origen::Panel, "licencia").unwrap_or_default();
+    assert!(l["error"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("hola@guardianagroup.com"));
+    let o = s.licencia_activada(Ok(EstadoLicencia::Suscrita {
+        desde: reloj(),
+        periodo: Some(30),
+        proxima: Some(reloj() + 8 * 86_400_000),
+        caduca: None,
+        fallida: false,
+    }));
+    assert!(o.contains(&Orden::Seguimiento { estricto: true }));
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "licencia").unwrap_or_default()["error"],
+        Value::Null
+    );
+    assert!(
+        s.peticion(
+            id,
+            "https://stats.g.doubleclick.net/g/collect",
+            "GET",
+            b"",
+            3
+        )
+        .cortar
+    );
+}
+
+/// A mandate that is open when the trial ends is closed: its limits would no longer be enforced.
+#[test]
+fn a_mandate_open_when_the_trial_ends_is_closed() {
+    let (mut s, _, _) = con_pagina(false);
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"mandato_empezar","tarea":"x","webs":["avianca.com"],"estricto":true}"#,
+    );
+    assert!(s.mandato.is_some());
+    let o = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
+    assert!(s.mandato.is_none());
+    assert!(o.iter().any(|x| matches!(x, Orden::CierraPestana { .. })));
+}

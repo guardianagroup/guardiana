@@ -1,7 +1,7 @@
 // The top of the window: tabs, the address, the shield and the guard line.
 'use strict';
 (() => {
-  const { manda, en, t, esc, $ } = Z;
+  const { manda, en, t, tn, esc, $ } = Z;
   let activa = null;      // id of the active tab
   let panel = null;       // view open in the side panel
   let cortesPrevios = -1; // to make the shield beat only when a new company is stopped
@@ -125,6 +125,26 @@
     clearTimeout(avisoTimer);
     avisoTimer = setTimeout(() => a.classList.remove('visto'), 2600);
   }
+
+  // --- the subscription ---------------------------------------------------------------------------
+  // Said in the bar only when it matters: in the trial's last two days, and when the browser no
+  // longer protects (then the shield, which would count nothing, gives its place to it).
+  let licencia = null;
+  function pintaLicencia(m) {
+    licencia = m;
+    const b = $('b-licencia');
+    const sin = m.protege === false;
+    let texto = '';
+    if (sin) texto = t(m.estado === 'prueba_terminada' ? 'licencia_pastilla_terminada' : 'licencia_pastilla_sin_suscripcion');
+    else if (m.estado === 'prueba' && m.dias <= 2) texto = tn('licencia_pastilla_dias', m.dias, { d: Z.n(m.dias) });
+    b.textContent = texto;
+    b.classList.toggle('oculto', !texto);
+    b.classList.toggle('sin-proteccion', sin);
+    $('b-escudo').classList.toggle('oculto', sin);
+  }
+  $('b-licencia').addEventListener('click', () => manda({ tipo: 'panel', vista: panel === 'licencia' ? null : 'licencia' }));
+  en('licencia', pintaLicencia);
+  en('textos', () => { if (licencia) pintaLicencia(licencia); });
 
   // --- what the program says ------------------------------------------------------------------
   en('estado', (m) => {

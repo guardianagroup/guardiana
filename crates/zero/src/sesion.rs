@@ -30,6 +30,7 @@ use crate::dominio::{host_de, sitio};
 use crate::escudo::{self, Diario, Tercero};
 use crate::fecha;
 use crate::libro::Libro;
+use crate::licencia::{Estado as EstadoLicencia, Fallo, Lugar as LugarLicencia};
 use crate::mandato::{Mandato, Recurso};
 use crate::paginas;
 use crate::recibo::{self, Recibo};
@@ -201,6 +202,17 @@ pub enum Orden {
     },
     /// Close the window (the last tab was closed).
     CierraVentana,
+    /// Activate a subscription key: one connection to the payment gateway, asked for by the
+    /// person. The shell does it away from the window ([`LugarLicencia::activar`]) and gives the result
+    /// to [`Sesion::licencia_activada`].
+    ActivaLicencia {
+        /// The key, as typed.
+        clave: String,
+    },
+    /// See whether the subscription's periodic check is due, and do it if so
+    /// ([`LugarLicencia::comprobar`],
+    /// away from the window); a new state goes to [`Sesion::pon_licencia`].
+    ComprobarLicencia,
 }
 
 /// The answer for one request.
@@ -366,6 +378,17 @@ pub struct Sesion {
     trabajadores: bool,
     /// Cuts not yet written to the day's file.
     cortes_pend: Vec<Corte>,
+    /// The subscription. Unknown until the shell gives the place it lives in: the browser works.
+    licencia: EstadoLicencia,
+    /// Where the subscription lives (`None` in tests that do not need it).
+    lugar: Option<LugarLicencia>,
+    /// A key is being activated.
+    licencia_ocupada: bool,
+    /// What the last activation failed with, in words, until the next try.
+    licencia_error: Option<String>,
+    /// When the state was last read from disk, and when the periodic check was last asked for.
+    licencia_leida: i64,
+    licencia_pedida: i64,
 }
 
 fn lee<T: DeserializeOwned + Default>(ruta: &Path) -> T {
@@ -517,6 +540,12 @@ impl Sesion {
             depura: false,
             trabajadores: false,
             cortes_pend: Vec::new(),
+            licencia: EstadoLicencia::Desconocido,
+            lugar: None,
+            licencia_ocupada: false,
+            licencia_error: None,
+            licencia_leida: 0,
+            licencia_pedida: 0,
         };
         cortes::poda(&s.datos.join("cortes"));
         s.ultimo_guardado = (s.reloj)();
@@ -548,7 +577,119 @@ impl Sesion {
     /// Whether the engine's tracking prevention should be strict.
     #[must_use]
     pub const fn seguimiento_estricto(&self) -> bool {
-        self.prefs.reglas.cortar_seguimiento
+        self.prefs.reglas.cortar_seguimiento && self.licencia.protege()
+    }
+
+    /// Whether the browser does its own work now: the trial or a subscription is on (or not known
+    /// yet). Without either it still opens pages, and does nothing else (decided 9 Oct 2026).
+    #[must_use]
+    pub const fn protege(&self) -> bool {
+        self.licencia.protege()
+    }
+
+    /// Where the subscription lives. Reads it at once (the first run ever starts the seven days).
+    pub fn pon_lugar_licencia(&mut self, lugar: LugarLicencia) -> Vec<Orden> {
+        let ahora = (self.reloj)();
+        let estado = lugar.estado(ahora);
+        self.lugar = Some(lugar);
+        self.licencia_leida = ahora;
+        estado.map(|e| self.pon_licencia(e)).unwrap_or_default()
+    }
+
+    /// The subscription's state, read again or after a check. When protection goes off, an
+    /// open mandate ends (its sites are no longer enforced) and the engine's own tracking
+    /// prevention goes back to its default.
+    pub fn pon_licencia(&mut self, e: EstadoLicencia) -> Vec<Orden> {
+        if e == self.licencia {
+            return Vec::new();
+        }
+        let antes = self.licencia.protege();
+        self.licencia = e;
+        let mut o = Vec::new();
+        if antes != self.licencia.protege() {
+            if !self.licencia.protege() && self.mandato.is_some() {
+                o.extend(self.cierra_mandato());
+            }
+            o.push(Orden::Seguimiento {
+                estricto: self.seguimiento_estricto(),
+            });
+            o.extend(self.escudo_activa(true));
+            o.extend(self.a_paginas_propias(&self.msg_hoy()));
+        }
+        o.extend(self.avisa_licencia());
+        o
+    }
+
+    /// The result of an activation the shell did ([`Orden::ActivaLicencia`]).
+    pub fn licencia_activada(&mut self, r: Result<EstadoLicencia, Fallo>) -> Vec<Orden> {
+        self.licencia_ocupada = false;
+        match r {
+            Ok(e) => {
+                self.licencia_error = None;
+                let mut o = self.pon_licencia(e);
+                o.extend(self.avisa_licencia());
+                o.push(self.aviso("licencia_activada", &[]));
+                o
+            }
+            Err(f) => {
+                let (clave, motivo) = f.clave();
+                self.licencia_error = Some(self.tf(clave, &[("motivo", motivo)]));
+                self.avisa_licencia()
+            }
+        }
+    }
+
+    fn avisa_licencia(&self) -> Vec<Orden> {
+        let m = self.msg_licencia();
+        vec![envia(Origen::Barra, &m), envia(Origen::Panel, &m)]
+    }
+
+    fn msg_licencia(&self) -> Value {
+        let mut m = json!({
+            "tipo": "licencia",
+            "estado": self.licencia.nombre(),
+            "protege": self.licencia.protege(),
+            "ocupada": self.licencia_ocupada,
+            "error": self.licencia_error,
+            "comprar": self.t("licencia_comprar_url"),
+        });
+        match &self.licencia {
+            EstadoLicencia::Desconocido => {}
+            EstadoLicencia::Prueba { termina, dias } => {
+                m["termina"] = json!(termina);
+                m["dias"] = json!(dias);
+            }
+            EstadoLicencia::Suscrita {
+                desde,
+                periodo,
+                proxima,
+                caduca,
+                fallida,
+            } => {
+                m["desde"] = json!(desde);
+                m["periodo"] = json!(periodo);
+                m["proxima"] = json!(proxima);
+                m["caduca"] = json!(caduca);
+                m["fallida"] = json!(fallida);
+            }
+            EstadoLicencia::PruebaTerminada { desde } => m["desde"] = json!(desde),
+            EstadoLicencia::SuscripcionTerminada { desde, motivo } => {
+                m["desde"] = json!(desde);
+                m["motivo"] = json!(motivo);
+            }
+        }
+        if let Some(l) = &self.lugar {
+            let (datos, ancla) = l.donde();
+            m["donde_datos"] = json!(datos);
+            m["donde_ancla"] = json!(ancla);
+            m["conexiones"] = Value::Array(
+                l.conexiones()
+                    .into_iter()
+                    .map(|c| json!({ "ms": c.ms, "host": c.host, "pedida": c.pedida }))
+                    .collect(),
+            );
+        }
+        m
     }
 
     /// The session a tab uses, if it exists.
@@ -745,7 +886,8 @@ impl Sesion {
             "tipo": "escudo",
             "pestana": p.id,
             "sitio": if es_interna(&p.url) { "" } else { p.escudo.sitio.as_str() },
-            "cortando": self.prefs.reglas.cortar_seguimiento,
+            "cortando": self.prefs.reglas.cortar_seguimiento && self.licencia.protege(),
+            "protege": self.licencia.protege(),
             "resumen": p.escudo.resumen(),
             "terceros": terceros,
             "parametros_quitados": p.escudo.parametros_quitados,
@@ -867,7 +1009,8 @@ impl Sesion {
         let mes = fecha::primero_del_mes(&hoy);
         json!({
             "tipo": "hoy",
-            "cortando": self.prefs.reglas.cortar_seguimiento,
+            "cortando": self.prefs.reglas.cortar_seguimiento && self.licencia.protege(),
+            "protege": self.licencia.protege(),
             "motor": buscador(&self.prefs.buscador).nombre,
             "motor_privado": buscador(&self.prefs.buscador).privado,
             "hoy": self.diario.total(&hoy, &hoy),
@@ -955,9 +1098,10 @@ impl Sesion {
 
     fn abre_panel(&mut self, vista: &str) -> Vec<Orden> {
         let vista = match vista {
-            "escudo" | "mandato" | "tachon" | "datos" | "ajustes" | "formulario" | "bienvenida" => {
-                vista
-            }
+            // Mandates and redaction are the subscription's: without it, the panel says so.
+            "mandato" | "tachon" if !self.licencia.protege() => "licencia",
+            "escudo" | "mandato" | "tachon" | "datos" | "ajustes" | "formulario" | "bienvenida"
+            | "licencia" => vista,
             _ => "escudo",
         };
         // Leaving a question unanswered is answering «no»: the form stays where it was.
@@ -979,7 +1123,9 @@ impl Sesion {
             "ajustes" => {
                 o.push(envia(Origen::Panel, &self.msg_ajustes()));
                 o.push(envia(Origen::Panel, &self.msg_acerca()));
+                o.push(envia(Origen::Panel, &self.msg_licencia()));
             }
+            "licencia" => o.push(envia(Origen::Panel, &self.msg_licencia())),
             _ => {}
         }
         o.push(self.estado());
@@ -1041,7 +1187,44 @@ impl Sesion {
 
     fn orden_de_pagina(&mut self, origen: Origen, tipo: &str, m: &Value) -> Vec<Orden> {
         let activa = self.activa;
+        let de_pago = matches!(
+            tipo,
+            "mandato_empezar"
+                | "mandato_anadir"
+                | "tachar"
+                | "tachon_pegar"
+                | "tinta_anadir"
+                | "carta"
+        );
+        if de_pago && !self.licencia.protege() {
+            let mut o = self.abre_panel("licencia");
+            o.push(self.aviso("licencia_hace_falta", &[]));
+            return o;
+        }
         match tipo {
+            "licencia_activar" => {
+                if self.licencia_ocupada {
+                    return Vec::new();
+                }
+                let clave: String = texto(m, "clave").trim().chars().take(200).collect();
+                if clave.is_empty() {
+                    self.licencia_error = Some(self.t("licencia_err_vacia"));
+                    return self.avisa_licencia();
+                }
+                if self.lugar.is_none() {
+                    self.licencia_error = Some(self.t("licencia_err_disco"));
+                    return self.avisa_licencia();
+                }
+                self.licencia_ocupada = true;
+                self.licencia_error = None;
+                let mut o = self.avisa_licencia();
+                o.push(Orden::ActivaLicencia { clave });
+                o
+            }
+            "licencia_comprar" => {
+                let url = self.t("licencia_comprar_url");
+                self.nueva_pestana(Perfil::General, &url)
+            }
             "listo" => self.listo(origen, m),
             "navegar" => {
                 let id = match origen {
@@ -1155,7 +1338,7 @@ impl Sesion {
                 self.prefs.bienvenida = true;
                 self.guarda_prefs();
                 let mut o = vec![Orden::Seguimiento {
-                    estricto: self.prefs.reglas.cortar_seguimiento,
+                    estricto: self.seguimiento_estricto(),
                 }];
                 o.extend(self.cierra_panel());
                 o.extend(self.escudo_activa(false));
@@ -1187,6 +1370,7 @@ impl Sesion {
                     self.titulo_ventana(),
                 ];
                 o.extend(self.escudo_activa(false));
+                o.push(envia(Origen::Barra, &self.msg_licencia()));
                 if !self.prefs.bienvenida {
                     o.extend(self.abre_panel("bienvenida"));
                 }
@@ -1200,6 +1384,7 @@ impl Sesion {
                     envia(Origen::Panel, &self.msg_tinta()),
                     envia(Origen::Panel, &self.msg_libro()),
                     envia(Origen::Panel, &self.msg_mandato()),
+                    envia(Origen::Panel, &self.msg_licencia()),
                 ];
                 if let Some(p) = self.pestana(self.activa) {
                     o.push(envia(Origen::Panel, &self.msg_escudo(p)));
@@ -1235,7 +1420,7 @@ impl Sesion {
                 self.guarda_prefs();
                 let mut o = vec![
                     Orden::Seguimiento {
-                        estricto: self.prefs.reglas.cortar_seguimiento,
+                        estricto: self.seguimiento_estricto(),
                     },
                     envia(Origen::Panel, &self.msg_ajustes()),
                 ];
@@ -1801,7 +1986,7 @@ impl Sesion {
             id,
             json: json!({ "zg": ficha, "id": id_pagina, "enviar": enviar }).to_string(),
         };
-        if encontradas.is_empty() || host.is_empty() {
+        if encontradas.is_empty() || host.is_empty() || !self.licencia.protege() {
             return vec![responde(true)];
         }
         // A site that already has these kinds of data from you is not asked about again; the
@@ -1972,13 +2157,14 @@ impl Sesion {
     ) -> (bool, Vec<Orden>) {
         let es_web =
             (url.starts_with("http://") || url.starts_with("https://")) && !es_interna(url);
+        let protege = self.licencia.protege();
         let Some(p) = self.pestana_mut(id) else {
             return (false, Vec::new());
         };
         // A server redirect to an address with tracking tags (a redirect is always a GET here):
         // cancelled and opened clean. Pages the person opens are cleaned when their request
         // leaves (`peticion`), which also keeps form posts intact.
-        if redirigida && es_web {
+        if redirigida && es_web && protege {
             if let Some((limpia, n)) = url_limpia::limpia(url) {
                 p.quitados += u32::try_from(n).unwrap_or(u32::MAX);
                 p.limpiando = Some(sin_fragmento(url).to_string());
@@ -2156,7 +2342,9 @@ impl Sesion {
         let web = ["http://", "https://", "ws://", "wss://"]
             .iter()
             .any(|e| url.starts_with(e));
-        if !web || es_interna(url) {
+        if !web || es_interna(url) || !self.licencia.protege() {
+            // Without the trial or a subscription the browser opens pages and does nothing of
+            // its own: no cut, no cleaning, no count.
             return Respuesta::default();
         }
         let ahora = (self.reloj)();
@@ -2384,6 +2572,19 @@ impl Sesion {
     pub fn tic(&mut self) -> Vec<Orden> {
         let ahora = (self.reloj)();
         let mut o = Vec::new();
+        // The subscription: read again every minute (the trial ends at a time of day, not at a
+        // start), and the periodic check asked for every ten minutes; it connects only when due,
+        // and at most once an hour.
+        if ahora - self.licencia_leida >= 60_000 {
+            self.licencia_leida = ahora;
+            if let Some(e) = self.lugar.as_ref().and_then(|l| l.estado(ahora)) {
+                o.extend(self.pon_licencia(e));
+            }
+        }
+        if self.lugar.is_some() && ahora - self.licencia_pedida >= 600_000 {
+            self.licencia_pedida = ahora;
+            o.push(Orden::ComprobarLicencia);
+        }
         if self
             .mandato
             .as_ref()

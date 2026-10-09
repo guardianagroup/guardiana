@@ -244,8 +244,71 @@
     try { const dn = new Intl.DisplayNames([document.documentElement.lang], { type: 'region' }); pais = (c) => { try { return dn.of(c); } catch (_) { return c; } }; } catch (_) {}
     pintaTipos();
     if (vista) muestra(vista);
+    if (lic) pintaLicencia(lic);
   });
   en('vista', (m) => muestra(m.vista));
+
+  // --- subscription -------------------------------------------------------------------------------
+  // Every line is drawn from the state the program sends; the dates in the person's language.
+  let lic = null;
+  function lineaLicencia(m) {
+    switch (m.estado) {
+      case 'prueba': return tn('licencia_prueba', m.dias, { d: n(m.dias), fecha: fecha(m.termina) });
+      case 'suscrita': return t('licencia_suscrita', { fecha: fecha(m.desde) });
+      case 'prueba_terminada': return t('licencia_prueba_terminada', { fecha: fecha(m.desde) });
+      case 'suscripcion_terminada': return t('licencia_terminada_' + (m.motivo || 'cancelada'), { fecha: fecha(m.desde) });
+      default: return '';
+    }
+  }
+  function pintaLicencia(m) {
+    lic = m;
+    const terminada = m.protege === false;
+    const suscrita = m.estado === 'suscrita';
+    const caja = $('l-caja');
+    caja.classList.toggle('sin-proteccion', terminada);
+    caja.classList.toggle('prueba', m.estado === 'prueba');
+    caja.classList.toggle('oculto', m.estado === 'desconocido');
+    // The end-of-trial text says everything itself; the others get their detail below.
+    $('l-estado').textContent = terminada ? '' : lineaLicencia(m);
+    $('l-estado').classList.toggle('oculto', terminada);
+    let detalle = '';
+    if (terminada) detalle = lineaLicencia(m);
+    else if (m.estado === 'prueba') detalle = t('licencia_al_terminar');
+    else if (suscrita) {
+      const partes = [];
+      if (m.periodo === 0 || m.periodo === 30 || m.periodo === 365) partes.push(t('licencia_periodo_' + m.periodo));
+      if (m.fallida && m.caduca) partes.push(t('licencia_fallida', { fecha: fecha(m.caduca) }));
+      else if (m.proxima && m.periodo !== 0) partes.push(t('licencia_proxima', { fecha: fecha(m.proxima) }));
+      detalle = partes.join(' ');
+    }
+    $('l-detalle').textContent = detalle;
+    $('l-detalle').style.color = terminada ? 'var(--tinta)' : '';
+    $('l-comprar-caja').classList.toggle('oculto', suscrita);
+    $('l-clave-caja').classList.toggle('oculto', suscrita && !m.fallida);
+    $('l-activar').classList.toggle('principal', terminada);
+    $('l-activar').disabled = !!m.ocupada;
+    $('l-ocupada').classList.toggle('oculto', !m.ocupada);
+    $('l-error').classList.toggle('oculto', !m.error);
+    $('l-error').textContent = m.error || '';
+    const con = m.conexiones || [];
+    $('l-conexiones').innerHTML = con.map((c) => `<li><time>${esc(fecha(c.ms))} ${esc(hora(c.ms))}</time><span><span class="mono">${esc(c.host)}</span> · ${esc(t(c.pedida ? 'licencia_conexion_pedida' : 'licencia_conexion_periodica'))}</span></li>`).join('');
+    $('l-conexiones-vacio').classList.toggle('oculto', con.length > 0);
+    $('l-donde').textContent = m.donde_datos ? t('licencia_donde', { datos: m.donde_datos, ancla: m.donde_ancla }) : '';
+    // Where the shield is, the same news; in the settings, one line.
+    $('e-licencia').classList.toggle('oculto', !terminada);
+    $('e-licencia-txt').textContent = terminada ? lineaLicencia(m) : '';
+    $('e-proteccion').disabled = terminada;
+    $('a-proteccion').disabled = terminada;
+    $('a-licencia').textContent = terminada ? t(m.estado === 'prueba_terminada' ? 'licencia_pastilla_terminada' : 'licencia_pastilla_sin_suscripcion') : lineaLicencia(m);
+  }
+  en('licencia', pintaLicencia);
+  $('l-comprar').addEventListener('click', () => manda({ tipo: 'licencia_comprar' }));
+  $('l-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    manda({ tipo: 'licencia_activar', clave: $('l-clave').value });
+  });
+  $('e-licencia-ver').addEventListener('click', () => manda({ tipo: 'panel', vista: 'licencia' }));
+  $('a-licencia-ver').addEventListener('click', () => manda({ tipo: 'panel', vista: 'licencia' }));
   let avisoTimer = 0;
   en('aviso', (m) => {
     const a = $('aviso');
