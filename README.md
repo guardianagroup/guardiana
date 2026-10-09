@@ -19,7 +19,19 @@ suscripción) y cada una queda anotada en el propio extracto.
   [router](docs/guias/router.md), [iPhone](docs/guias/iphone.md) y [Android](docs/guias/android.md)
 - Listas que se usan y con qué licencia: [docs/LISTS.md](docs/LISTS.md)
 - Guía de la beta cerrada: [docs/BETA.md](docs/BETA.md)
-- Decisiones tomadas y pruebas hechas: [docs/DECISIONES.md](docs/DECISIONES.md), [docs/PRUEBAS.md](docs/PRUEBAS.md)
+
+## GUARDIANA ZERO, el navegador
+
+Un navegador propio para Windows 10 y 11. Corta lo que las webs llaman por detrás (rastreadores,
+publicidad y corredores de datos inscritos) y enseña cada corte en directo: qué empresa, de qué país y
+por qué. Quita las etiquetas de rastreo de las direcciones, no deja salir tus datos marcados hacia otra
+empresa, abre mandatos para tu IA con un recibo firmado y tacha tus datos antes de preguntarle algo.
+Los primeros 7 días son gratis; después va incluido en la suscripción de GUARDIANA (la misma clave).
+
+- Descarga, huella y firma: [guardianagroup.com/zero.html](https://guardianagroup.com/zero.html); en
+  `ledger.jsonl`, sus líneas son las de versión `zero-<versión>`.
+- Código: `crates/zero` (todo lo que decide, probado en Windows, Linux y macOS) y `zero/navegador` (la
+  ventana, sobre WebView2). Se compila y se prueba de punta a punta en `.github/workflows/zero.yml`.
 
 ## Instalar
 

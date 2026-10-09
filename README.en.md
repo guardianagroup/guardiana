@@ -19,10 +19,22 @@ check) and each one is recorded in the ledger itself.
   [router](docs/guias/router.md), [iPhone](docs/guias/iphone.md) and [Android](docs/guias/android.md)
 - Which lists are used and under which licence: [docs/LISTS.md](docs/LISTS.md)
 - Closed beta guide: [docs/BETA.md](docs/BETA.md)
-- Decisions taken and tests done: [docs/DECISIONES.md](docs/DECISIONES.md), [docs/PRUEBAS.md](docs/PRUEBAS.md)
 
 The documentation is written in Spanish; the program's interface is in Spanish, English and
 Portuguese.
+
+## GUARDIANA ZERO, the browser
+
+A browser of our own for Windows 10 and 11. It cuts what websites call behind your back (trackers,
+advertising and registered data brokers) and shows every cut live: which company, from which country
+and why. It removes tracking tags from addresses, keeps your marked data from going out to another
+company, opens mandates for your AI with a signed receipt, and redacts your data before you ask it
+anything. The first 7 days are free; after that it comes with the GUARDIANA subscription (the same key).
+
+- Download, hash and signature: [guardianagroup.com/en/zero.html](https://guardianagroup.com/en/zero.html);
+  in `ledger.jsonl`, its lines are the ones with version `zero-<version>`.
+- Code: `crates/zero` (everything that decides, tested on Windows, Linux and macOS) and `zero/navegador`
+  (the window, on WebView2). It is built and tested end to end in `.github/workflows/zero.yml`.
 
 ## Install
 
