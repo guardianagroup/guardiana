@@ -255,7 +255,10 @@ function pantalla(nombre) {
   await web2.waitForLoadState('load').catch(() => {});
   await espera(1500);
   comprueba(registro.some((r) => r.host === 'sitio-prueba.test' && r.ruta.startsWith('/prueba')), 'las páginas se siguen abriendo');
-  comprueba(registro.some((r) => r.host === 'stats.g.doubleclick.net'), 'pero ya no se corta nada: el píxel de DoubleClick sale');
+  // Only the engine's own tracking prevention remains (balanced, Microsoft Edge's default): it
+  // still stops some known trackers by itself. What GUARDIANA ZERO cut and the engine does not,
+  // the ad frame, now arrives.
+  comprueba(registro.some((r) => r.host === 'googleads.g.doubleclick.net'), 'pero GUARDIANA ZERO ya no corta: el marco de anuncios llega');
   comprueba(registro.some((r) => r.ruta.includes('utm_source=boletin')), 'ni se limpian las direcciones');
   await barra2.click('#b-mandato');
   comprueba(await hasta(() => panel2.evaluate(() => document.querySelector('#v-licencia').classList.contains('vista-activa'))), 'los mandatos llevan a «Suscripción»');
