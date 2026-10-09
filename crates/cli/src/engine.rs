@@ -1750,6 +1750,7 @@ async fn run_once<F: Future<Output = ()>>(
                         "{}",
                         t.cli("observe.puerto80")
                             .replace("{addr}", &addr.to_string())
+                            .replace("{ip}", &url_host(addr.ip()))
                             .replace("{motivo}", why)
                     );
                 }
@@ -2173,6 +2174,15 @@ pub fn open_in_browser(url: &str) {
         .spawn()
         .map(|_| ());
     let _ = result;
+}
+
+/// An address as the host part of a URL: IPv6 goes in brackets. Until 1.0.10 the port-80 notice
+/// put the whole socket address there and printed `http://192.168.1.20:80:7443/…`.
+fn url_host(ip: std::net::IpAddr) -> String {
+    match ip {
+        std::net::IpAddr::V4(v4) => v4.to_string(),
+        std::net::IpAddr::V6(v6) => format!("[{v6}]"),
+    }
 }
 
 #[cfg(test)]
@@ -2618,5 +2628,23 @@ mod heredado_tests {
             .unwrap();
         stand_down(&l);
         assert_eq!(l.setting(SETTING_HOME_APARCADO).unwrap(), None);
+    }
+}
+
+#[cfg(test)]
+mod tests_url_host {
+    use super::url_host;
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+    #[test]
+    fn the_phone_link_has_the_address_without_its_port() {
+        assert_eq!(
+            url_host(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 20))),
+            "192.168.1.20"
+        );
+        assert_eq!(
+            url_host(IpAddr::V6(Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 1))),
+            "[fe80::1]"
+        );
     }
 }

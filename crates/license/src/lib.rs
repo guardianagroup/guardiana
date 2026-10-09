@@ -599,7 +599,13 @@ fn plan_de_clave(ledger: &Ledger, g: &Guardada, reloj: i64) -> Result<Plan, Erro
     // the shortest subscription: a refund has to reach the machine, as the panel and the terms
     // say it does. Until 1.0.1 it was never checked (review of 1 Oct 2026, entry 13).
     let intervalo = if de_por_vida { MONTH_DAYS } else { g.period };
-    let next = if checked <= g.since {
+    // A date the clock has not reached yet was not written by this program: activation and
+    // checks stamp the moment they happen. Moving them into the future pushed the next check out
+    // for good (review of 9 Oct 2026), so such a licence is asked about now.
+    let del_futuro = |x: i64| x > reloj.saturating_add(DAY_MS);
+    let next = if del_futuro(checked) || del_futuro(g.since) {
+        reloj
+    } else if checked <= g.since {
         // Never checked since it was activated: the first check is when the gateway's own
         // trial is over (see PRIMERA_COMPROBACION_DIAS), or earlier if the period is shorter.
         (checked + intervalo * DAY_MS).min(g.since + PRIMERA_COMPROBACION_DIAS * DAY_MS)
@@ -1813,6 +1819,25 @@ mod tests {
     /// Una licencia de por vida se comprueba —al mes, como la suscripción más corta— para que
     /// una devolución la termine, como dicen el panel y los términos; pero ningún fallo de red ni
     /// un equipo apagado meses la apaga (revisión del 1 oct 2026, hallazgo 13).
+    /// Activation and check dates moved years ahead in the ledger used to push the next check out
+    /// for good: a hand-made licence then never met the gateway (review of 9 Oct 2026).
+    #[test]
+    fn fechas_del_futuro_hacen_la_comprobacion_ahora() {
+        let _a_solas = a_solas();
+        let l = ledger_observing();
+        let ahora = 30 * DAY_MS;
+        let lejos = ahora + 50 * 365 * DAY_MS;
+        store_key(&l, "tok", lejos, "GUARDIANA Fundador");
+        assert!(check_due(&l, "tok", ahora).unwrap());
+        let s = status(&l, "tok", ahora).unwrap();
+        assert_eq!(plus_con(&s).0, Comprobacion::Pendiente);
+        // Only the check date in the future: the same.
+        store_key(&l, "tok", ahora - DAY_MS, "GUARDIANA Fundador");
+        l.set_setting(SETTING_LICENSE_CHECKED_AT, &lejos.to_string())
+            .unwrap();
+        assert!(check_due(&l, "tok", ahora).unwrap());
+    }
+
     #[test]
     fn una_licencia_de_por_vida_se_comprueba_pero_no_caduca_por_no_comprobarse() {
         let _a_solas = a_solas();

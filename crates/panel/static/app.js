@@ -890,11 +890,6 @@
       const n = document.createElement('button');
       n.id = 'tema-toggle'; n.type = 'button'; n.className = 'secondary lang tema';
       const OTRO = TEMA === 'noche' ? 'dia' : 'noche';
-      const NOMBRE_TEMA = {
-        es: { noche: 'Modo noche', dia: 'Modo día' },
-        en: { noche: 'Night mode', dia: 'Day mode' },
-        pt: { noche: 'Modo noite', dia: 'Modo dia' },
-      };
       // A moon by day (to go to night) and a sun by night: the icon says where it takes you,
       // the name stays in the tooltip and for screen readers.
       const ICONO_TEMA = {
@@ -902,7 +897,7 @@
         dia: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>',
       };
       n.innerHTML = ICONO_TEMA[OTRO];
-      n.title = (NOMBRE_TEMA[LANG] || NOMBRE_TEMA.es)[OTRO];
+      n.title = t(OTRO === 'noche' ? 'tema_noche' : 'tema_dia');
       n.setAttribute('aria-label', n.title);
       n.addEventListener('click', () => {
         try { localStorage.setItem('guardiana_tema', OTRO); } catch (_) {}

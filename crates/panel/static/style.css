@@ -142,6 +142,9 @@ button.cut, button.cortado { white-space: nowrap; cursor: pointer; width: 128px;
    column has on the left, and always in view — when a long row makes the table scroll sideways,
    it stays pinned to the right edge instead of being cut by it (the responsible, 9 Oct 2026). */
 .wrap th:first-child, .wrap td:first-child { padding-left: 16px; }
+/* The status column keeps one width whatever it says («pasó», «bloqueado / a las 17:25:51»,
+   «desbloqueado…»): with a short list its changing text used to resize every column on each click. */
+td.estado { width: 136px; }
 td.accion { width: 1%; white-space: nowrap; padding-right: 16px; position: sticky; right: 0; background: var(--card); }
 @media print { td.accion { position: static; } }
 button.cut { background: transparent; color: var(--cortado); border: 1px solid var(--cortado); }
@@ -197,6 +200,16 @@ footer { max-width: 1180px; margin: 26px auto 40px; padding: 0 22px; color: var(
 
 /* "Guardar en PDF": the browser prints the page; hide what is not the document. */
 @media print {
+  /* Paper is white whatever the screen shows: night mode prints with the day palette, or the
+     night's pale ink would land on white and vanish. */
+  :root[data-tema="noche"] {
+    --bg: #F4F6FA; --fg: #0B1020; --muted: #5B6275; --card: #FFFFFF; --line: #D9DEE8;
+    --accent: #1F4BFF; --accent-fg: #FFFFFF; --accent-dark: #0F2FB8;
+    --rastreador: #B3261E; --publicidad: #8A5A0F; --telemetria: #6B3FA0;
+    --esperado: #0E8F6E; --desconocido: #5B6275;
+    --cortado: #C0301A; --respondido: #0F2FB8;
+    --nivel-verde: #1E9E5A; --nivel-naranja: #E08A1E; --nivel-rojo: #D0301A;
+  }
   header.top nav, footer, button, .btn, form.filters, #share, #plus-card, #dns-card, #i-plus, #no-session, .cut, .undo { display: none !important; }
   body { background: #fff; color: #000; }
   main { max-width: none; padding: 0; }
