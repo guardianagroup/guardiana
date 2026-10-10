@@ -359,9 +359,14 @@ pub(crate) async fn dns_aplicar(
         }
         let guardian = std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
         if let Err(e) = sysdns::apply(&backup, guardian) {
-            let _ = sysdns::restore(&backup);
-            if let Ok(l) = st.ledger.lock() {
-                let _ = l.set_setting(SETTING_BACKUP, "");
+            // The copy goes only when undoing really happened, as `guardiana dns` does: a
+            // rollback that failed on one interface left the machine half pointed here with
+            // «nothing to undo» and no copy to give back at the next stop (review of
+            // 10 Oct 2026, system serious 3).
+            if sysdns::restore(&backup).is_ok() {
+                if let Ok(l) = st.ledger.lock() {
+                    let _ = l.set_setting(SETTING_BACKUP, "");
+                }
             }
             return Err(e.to_string());
         }

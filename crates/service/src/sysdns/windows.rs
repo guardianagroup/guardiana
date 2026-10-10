@@ -199,7 +199,22 @@ fn quoted(servers: &[IpAddr]) -> String {
         .join(",")
 }
 
-fn set_servers(index: &str, servers: &[IpAddr]) -> Result<(), Error> {
+/// The interface index, the only part of a backup that goes into a PowerShell line as text.
+///
+/// The copy lives in the extract (and in a plain file beside it), which the console user can
+/// write without being an administrator, while the service runs the line as SYSTEM: an `id` of
+/// `1; <anything>` ran that anything as SYSTEM within a minute (review of 10 Oct 2026, system
+/// serious 2). Snapshot writes a number; anything else is not an interface Windows has, and is
+/// left alone. The resolvers and `extra` are already typed (`IpAddr`), never raw text.
+fn indice(i: &InterfaceDns) -> Option<u32> {
+    let id = i.id.trim();
+    if id.is_empty() || id.len() > 10 || !id.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    id.parse().ok()
+}
+
+fn set_servers(index: u32, servers: &[IpAddr]) -> Result<(), Error> {
     powershell(&format!(
         "$ErrorActionPreference='Stop'; Set-DnsClientServerAddress -InterfaceIndex {index} -ServerAddresses ({}); Clear-DnsClientCache",
         quoted(servers)
@@ -218,10 +233,13 @@ fn set_servers(index: &str, servers: &[IpAddr]) -> Result<(), Error> {
 pub(crate) fn apply(backup: &Backup, guardian: IpAddr) -> Result<(), Error> {
     let guardian6 = IpAddr::V6(Ipv6Addr::LOCALHOST);
     for i in &backup.interfaces {
-        if set_servers(&i.id, &[guardian, guardian6]).is_ok() {
+        let Some(n) = indice(i) else {
+            continue;
+        };
+        if set_servers(n, &[guardian, guardian6]).is_ok() {
             continue;
         }
-        match set_servers(&i.id, &[guardian]) {
+        match set_servers(n, &[guardian]) {
             Ok(()) => {}
             Err(e) if interface_is_gone(&e.to_string()) => {}
             Err(e) => return Err(e),
@@ -235,12 +253,14 @@ pub(crate) fn apply(backup: &Backup, guardian: IpAddr) -> Result<(), Error> {
 /// It starts by asking whether the interface is still there: one that is gone (the trip's
 /// VPN, a USB adapter back in its drawer) has nothing to put back, and the cmdlets would fail
 /// on it in the language of the machine, which no text match can rely on.
-fn restore_script(i: &InterfaceDns) -> String {
+/// `None` for an entry whose index is not a number (see [`indice`]): there is nothing of
+/// Windows' own to put back there.
+fn restore_script(i: &InterfaceDns) -> Option<String> {
+    let id = indice(i)?;
     let guard = format!(
-        "$ErrorActionPreference='Stop'; if (-not (Get-NetIPInterface -InterfaceIndex {} -ErrorAction SilentlyContinue)) {{ exit 0 }}; ",
-        i.id
+        "$ErrorActionPreference='Stop'; if (-not (Get-NetIPInterface -InterfaceIndex {id} -ErrorAction SilentlyContinue)) {{ exit 0 }}; "
     );
-    match win_extra(i) {
+    Some(match win_extra(i) {
         Some(x) => {
             // Back to automatic in both families, then the hand-typed ones, if there were
             // any, exactly as they were. `-ResetServerAddresses` is what Settings calls
@@ -253,34 +273,29 @@ fn restore_script(i: &InterfaceDns) -> String {
                 String::new()
             } else {
                 format!(
-                    "Set-DnsClientServerAddress -InterfaceIndex {} -ServerAddresses ({}); ",
-                    i.id,
+                    "Set-DnsClientServerAddress -InterfaceIndex {id} -ServerAddresses ({}); ",
                     quoted(&manual)
                 )
             };
             let fix6 = if x.manual6.is_empty() {
                 format!(
-                    "$d6 = Get-DnsClientServerAddress -InterfaceIndex {id} -AddressFamily IPv6 -ErrorAction SilentlyContinue; if ($d6 -and (@($d6.ServerAddresses) -contains '::1')) {{ netsh interface ipv6 set dnsservers name={id} source=dhcp | Out-Null }}; ",
-                    id = i.id
+                    "$d6 = Get-DnsClientServerAddress -InterfaceIndex {id} -AddressFamily IPv6 -ErrorAction SilentlyContinue; if ($d6 -and (@($d6.ServerAddresses) -contains '::1')) {{ netsh interface ipv6 set dnsservers name={id} source=dhcp | Out-Null }}; "
                 )
             } else {
                 String::new()
             };
             format!(
-                "{guard}Set-DnsClientServerAddress -InterfaceIndex {} -ResetServerAddresses; {set}{fix6}Clear-DnsClientCache",
-                i.id
+                "{guard}Set-DnsClientServerAddress -InterfaceIndex {id} -ResetServerAddresses; {set}{fix6}Clear-DnsClientCache"
             )
         }
-        None if i.automatic => format!(
-            "{guard}Set-DnsClientServerAddress -InterfaceIndex {} -ResetServerAddresses",
-            i.id
-        ),
+        None if i.automatic => {
+            format!("{guard}Set-DnsClientServerAddress -InterfaceIndex {id} -ResetServerAddresses")
+        }
         None => format!(
-            "{guard}Set-DnsClientServerAddress -InterfaceIndex {} -ServerAddresses ({}); Clear-DnsClientCache",
-            i.id,
+            "{guard}Set-DnsClientServerAddress -InterfaceIndex {id} -ServerAddresses ({}); Clear-DnsClientCache",
             quoted(&i.servers)
         ),
-    }
+    })
 }
 
 /// What PowerShell prints when the interface index matches nothing: the error identifier is
@@ -293,7 +308,10 @@ pub(crate) fn interface_is_gone(stderr: &str) -> bool {
 /// 1 Oct 2026). An interface that is gone is nothing to put back, not a failure.
 pub(crate) fn restore(backup: &Backup) -> Result<(), Error> {
     undo_each(&backup.interfaces, |i| {
-        match powershell(&restore_script(i)) {
+        let Some(script) = restore_script(i) else {
+            return Ok(());
+        };
+        match powershell(&script) {
             Ok(_) => Ok(()),
             Err(e) if interface_is_gone(&e.to_string()) => Ok(()),
             Err(e) => Err(e),
@@ -359,19 +377,19 @@ pub(crate) fn guardian_still_set() -> Option<bool> {
 /// now: a laptop set up at home carries a router address (192.168.1.1) that does not exist
 /// at the office, and with Guardiana as the only resolver that would be no internet at all.
 pub(crate) fn upstreams_for(backup: &Backup) -> Vec<IpAddr> {
-    let automatic: Vec<&InterfaceDns> = backup
+    let automatic: Vec<(u32, &InterfaceDns)> = backup
         .interfaces
         .iter()
         .filter(|i| win_extra(i).is_some_and(|x| x.manual4.is_empty()))
+        .filter_map(|i| indice(i).map(|n| (n, i)))
         .collect();
     let mut dhcp: std::collections::HashMap<String, Vec<IpAddr>> = std::collections::HashMap::new();
     if !automatic.is_empty() {
         let script = automatic
             .iter()
-            .map(|i| {
+            .map(|(id, _)| {
                 format!(
-                    "$g = (Get-NetAdapter -InterfaceIndex {id} -ErrorAction SilentlyContinue).InterfaceGuid; if ($g) {{ '{id}|' + [string](Get-ItemProperty -Path \"HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\$g\" -Name DhcpNameServer -ErrorAction SilentlyContinue).DhcpNameServer }}",
-                    id = i.id
+                    "$g = (Get-NetAdapter -InterfaceIndex {id} -ErrorAction SilentlyContinue).InterfaceGuid; if ($g) {{ '{id}|' + [string](Get-ItemProperty -Path \"HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\$g\" -Name DhcpNameServer -ErrorAction SilentlyContinue).DhcpNameServer }}"
                 )
             })
             .collect::<Vec<_>>()
@@ -469,7 +487,7 @@ mod tests {
     fn restore_script_checks_the_interface_exists_then_puts_it_back() {
         let dhcp = r#"{"index":3,"alias":"Wi-Fi","dhcp":true,"servers":["192.168.1.1"],"guid":true,"static4":"","static6":""}"#;
         let v = parse_snapshot(dhcp).unwrap_or_default();
-        let s = restore_script(&v[0]);
+        let s = restore_script(&v[0]).unwrap_or_default();
         assert!(s.starts_with("$ErrorActionPreference='Stop'; if (-not (Get-NetIPInterface -InterfaceIndex 3 -ErrorAction SilentlyContinue)) { exit 0 }; "));
         assert!(s.contains("-InterfaceIndex 3 -ResetServerAddresses"));
         assert!(s.contains("netsh interface ipv6 set dnsservers name=3 source=dhcp"));
@@ -477,15 +495,46 @@ mod tests {
 
         let typed = r#"{"index":7,"alias":"Ethernet","dhcp":true,"servers":["1.1.1.1","1.0.0.1"],"guid":true,"static4":"1.1.1.1,1.0.0.1","static6":""}"#;
         let v = parse_snapshot(typed).unwrap_or_default();
-        let s = restore_script(&v[0]);
+        let s = restore_script(&v[0]).unwrap_or_default();
         assert!(s.contains("Get-NetIPInterface -InterfaceIndex 7"));
         assert!(s.contains("-InterfaceIndex 7 -ResetServerAddresses; Set-DnsClientServerAddress -InterfaceIndex 7 -ServerAddresses ('1.1.1.1','1.0.0.1')"));
 
         let old = r#"{"index":12,"alias":"Ethernet","dhcp":false,"servers":["8.8.8.8"]}"#;
         let v = parse_snapshot(old).unwrap_or_default();
-        let s = restore_script(&v[0]);
+        let s = restore_script(&v[0]).unwrap_or_default();
         assert!(s.contains("Get-NetIPInterface -InterfaceIndex 12"));
         assert!(s.ends_with("Set-DnsClientServerAddress -InterfaceIndex 12 -ServerAddresses ('8.8.8.8'); Clear-DnsClientCache"));
+    }
+
+    /// A copy edited by someone who is not an administrator cannot put a command into the line
+    /// the service runs as SYSTEM: an index that is not a number is no interface, and is left
+    /// alone (review of 10 Oct 2026, system serious 2).
+    #[test]
+    fn an_index_that_is_not_a_number_never_reaches_powershell() {
+        let malo = InterfaceDns {
+            id: "1; Start-Process calc".into(),
+            name: "Wi-Fi".into(),
+            servers: vec!["192.168.1.1"
+                .parse()
+                .unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST))],
+            automatic: true,
+            extra: Some(r#"{"manual4":[],"manual6":[]}"#.into()),
+        };
+        assert_eq!(indice(&malo), None);
+        assert_eq!(restore_script(&malo), None);
+        for id in ["", " ", "-1", "3 ", "12345678901", "0x10", "3;", "3\nexit"] {
+            let i = InterfaceDns {
+                id: id.into(),
+                ..malo.clone()
+            };
+            assert!(restore_script(&i).is_none() || id.trim() == "3", "{id:?}");
+        }
+        let bueno = InterfaceDns {
+            id: "7".into(),
+            ..malo
+        };
+        assert_eq!(indice(&bueno), Some(7));
+        assert!(restore_script(&bueno).is_some_and(|s| s.contains("-InterfaceIndex 7 ")));
     }
 
     /// The error record PowerShell prints for an index that matches nothing; the identifier on

@@ -44,6 +44,37 @@ pub(crate) fn apartado(ledger: &Ledger) -> bool {
     guardiana_license::status(ledger, &secret, now_ms()).is_ok_and(|s| !s.puede_funcionar)
 }
 
+/// `--restore` when the extract cannot be opened: the copy from its plain file, put back, and the
+/// file removed once it really was. `None` when there is no such copy (the caller then reports
+/// why the extract would not open).
+fn restore_from_file(opts: &Opts) -> Option<Result<(), Box<dyn Error>>> {
+    let t = i18n::current();
+    let db = opts
+        .get("db")
+        .map_or_else(paths::ledger_path, std::path::PathBuf::from);
+    let json = guardiana_core::copia_junto_al_extracto(&db, SETTING_BACKUP)?;
+    let backup: Backup = serde_json::from_str(&json).ok()?;
+    let _cambio = sysdns::un_cambio_a_la_vez();
+    println!(
+        "{}",
+        t.cli("dns.restaurando")
+            .replace("{n}", &backup.interfaces.len().to_string())
+    );
+    Some(match sysdns::restore(&backup) {
+        Ok(()) => {
+            for (_, archivo) in guardiana_core::COPIAS_EN_ARCHIVO {
+                if let Some(dir) = db.parent() {
+                    let _ = std::fs::remove_file(dir.join(archivo));
+                }
+            }
+            println!("{}", t.cli("dns.restaurado"));
+            Ok(())
+        }
+        Err(e) if e.falta_administrador() => Err(t.cli("dns.sin_admin").into()),
+        Err(e) => Err(Box::new(e)),
+    })
+}
+
 fn stored_backup(ledger: &Ledger) -> Result<Option<Backup>, Box<dyn Error>> {
     match ledger.setting(SETTING_BACKUP)? {
         // Restore leaves the key with an empty value: no backup.
@@ -169,7 +200,14 @@ fn system_reaches_guardian() -> bool {
 
 pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
     let t = i18n::current();
-    let ledger = open_or_create(opts)?;
+    let ledger = match open_or_create(opts) {
+        Ok(l) => l,
+        // An extract that will not open must not keep the machine without its DNS: undoing
+        // (by hand, or the uninstaller) works from the plain copy beside it (review of
+        // 10 Oct 2026, system serious 1).
+        Err(e) if opts.has("restore") => return restore_from_file(opts).ok_or(e)?,
+        Err(e) => return Err(e),
+    };
 
     if opts.has("apply") {
         if stored_backup(&ledger)?.is_some() {

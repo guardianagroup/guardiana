@@ -626,13 +626,20 @@ pub async fn run<F: Future<Output = ()>>(
 fn give_dns_back_while_stopped(db: &std::path::Path) {
     // One change of the DNS at a time; the copy is read with the lock held.
     let _cambio = sysdns::un_cambio_a_la_vez();
-    let Ok(ledger) = Ledger::open(db, identity::genesis()) else {
-        return;
+    // The copy, from the extract; from its plain file beside it when the extract will not open
+    // (damaged, or made with another key): without it the machine stayed pointed at a port
+    // nobody answers (review of 10 Oct 2026, system serious 1).
+    let json = match Ledger::open(db, identity::genesis()) {
+        Ok(ledger) => match ledger.setting(SETTING_BACKUP) {
+            Ok(Some(j)) => j,
+            _ => return,
+        },
+        Err(_) => match guardiana_core::copia_junto_al_extracto(db, SETTING_BACKUP) {
+            Some(j) => j,
+            None => return,
+        },
     };
-    let Ok(Some(json)) = ledger.setting(SETTING_BACKUP) else {
-        return;
-    };
-    if json.is_empty() {
+    if json.trim().is_empty() {
         return;
     }
     // Nothing points here any more: nothing to give back. A start that fails every five seconds
@@ -1334,6 +1341,9 @@ async fn run_once<F: Future<Output = ()>>(
         eprintln!("{}", t.cli("observe.clave_dev"));
     }
     let mut ledger = Ledger::open(&cfg.db, identity::genesis())?;
+    // The copy of the system DNS also as a plain file beside the extract (1.0.13), for copies
+    // taken before it existed.
+    ledger.refresca_copias_en_archivo();
     if let Some(gap) = ledger.record_gap_since_last_heartbeat(now_ms())? {
         println!(
             "{}",
@@ -1988,6 +1998,17 @@ async fn run_once<F: Future<Output = ()>>(
     let _ = housekeeping.await;
     if let Some(p) = panel {
         p.shutdown().await;
+    }
+    // Stopping for good: the machine gets its DNS back while the resolver still answers, so
+    // there are no seconds of «server not found» in between. Until 1.0.13 the resolver closed
+    // first and the restore (one PowerShell per interface on Windows) ran after, 3 to 8 s with
+    // the machine pointed at a port nobody listened on, at every stop, update and restart; and
+    // at shutdown Windows' few seconds could cut it half-way (review of 10 Oct 2026, system 4).
+    // `run` gives it back again after the loop, which is harmless: with nothing pointed here it
+    // returns at once.
+    if matches!(exit, Exit::Shutdown) {
+        let db = cfg.db.clone();
+        aparte_del_resolutor(move || give_dns_back_while_stopped(&db));
     }
     // The resolver first, the queue after: what `record` put in the queue while the resolver was
     // still answering is written down too (until 1.0.5 the queue was emptied first and those

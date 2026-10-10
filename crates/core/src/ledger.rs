@@ -161,6 +161,26 @@ pub struct Ledger {
     pub(crate) conn: Connection,
 }
 
+/// Settings that also live in a plain file beside the extract: the copy of the system DNS from
+/// before GUARDIANA (and the one parked when the licence ended). It is what gives the machine its
+/// DNS back when the service stops, and until 1.0.13 it lived only inside the extract, so an
+/// extract that would not open (damaged, or made with another key) left the machine pointed at
+/// 127.0.0.1 with nobody answering and nothing to undo it, even uninstalling (review of
+/// 10 Oct 2026, system serious 1). The file is read only when the extract cannot be.
+pub const COPIAS_EN_ARCHIVO: [(&str, &str); 2] = [
+    ("dns_backup", "dns-anterior.json"),
+    ("dns_backup_aparcada", "dns-anterior-aparcada.json"),
+];
+
+/// The plain copy of `key` kept beside the extract at `db` (see [`COPIAS_EN_ARCHIVO`]), for
+/// when the extract itself cannot be opened. `None` when there is none, or it is empty.
+#[must_use]
+pub fn copia_junto_al_extracto(db: &Path, key: &str) -> Option<String> {
+    let (_, archivo) = COPIAS_EN_ARCHIVO.iter().find(|(k, _)| *k == key)?;
+    let texto = std::fs::read_to_string(db.parent()?.join(archivo)).ok()?;
+    (!texto.trim().is_empty()).then_some(texto)
+}
+
 /// Why a row failed verification.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ChainFault {
@@ -300,7 +320,43 @@ impl Ledger {
              ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             params![key, value],
         )?;
+        if let Some((_, archivo)) = COPIAS_EN_ARCHIVO.iter().find(|(k, _)| *k == key) {
+            self.copia_en_archivo(archivo, value);
+        }
         Ok(())
+    }
+
+    /// Writes again, beside the extract, the plain copies of [`COPIAS_EN_ARCHIVO`] as the
+    /// extract has them now (the service does it when it starts, so a copy taken before 1.0.13
+    /// gets its file too). Best effort, like every write of those files.
+    pub fn refresca_copias_en_archivo(&self) {
+        for (clave, archivo) in COPIAS_EN_ARCHIVO {
+            if let Ok(valor) = self.setting(clave) {
+                self.copia_en_archivo(archivo, valor.as_deref().unwrap_or(""));
+            }
+        }
+    }
+
+    /// The plain copy of one setting, written whole or not at all (a temporary file renamed over
+    /// the old one), removed when the setting is emptied. Nothing for an extract in memory.
+    fn copia_en_archivo(&self, archivo: &str, valor: &str) {
+        let Some(dir) = self
+            .conn
+            .path()
+            .filter(|p| !p.is_empty())
+            .and_then(|p| Path::new(p).parent().map(Path::to_path_buf))
+        else {
+            return;
+        };
+        let destino = dir.join(archivo);
+        if valor.trim().is_empty() {
+            let _ = std::fs::remove_file(&destino);
+            return;
+        }
+        let tmp = dir.join(format!("{archivo}.tmp"));
+        if std::fs::write(&tmp, valor).is_ok() && std::fs::rename(&tmp, &destino).is_err() {
+            let _ = std::fs::remove_file(&tmp);
+        }
     }
 
     /// Current chain anchor.
@@ -1149,6 +1205,50 @@ fn rule_from_row(row: &Row<'_>) -> rusqlite::Result<Rule> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
+
+    /// The copy of the system DNS lives in a plain file beside the extract too, whole or not at
+    /// all, gone when the copy is emptied, and readable when the extract is not (review of
+    /// 10 Oct 2026, system serious 1).
+    #[test]
+    fn the_dns_copy_has_a_plain_file_beside_the_extract() {
+        let dir = std::env::temp_dir().join(format!("guardiana-copia-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap_or_default();
+        let db = dir.join("ledger.db");
+        let l = Ledger::open(&db, genesis()).unwrap();
+        l.set_setting("dns_backup", "{\"copia\":1}")
+            .unwrap_or_default();
+        assert_eq!(
+            copia_junto_al_extracto(&db, "dns_backup").as_deref(),
+            Some("{\"copia\":1}")
+        );
+        assert!(!dir.join("dns-anterior.json.tmp").exists());
+        // Another setting is not copied.
+        l.set_setting("otra", "x").unwrap_or_default();
+        assert_eq!(copia_junto_al_extracto(&db, "otra"), None);
+        // Emptied: the file goes.
+        l.set_setting("dns_backup", "").unwrap_or_default();
+        assert_eq!(copia_junto_al_extracto(&db, "dns_backup"), None);
+        assert!(!dir.join("dns-anterior.json").exists());
+        // A copy from before 1.0.13 gets its file when the service starts.
+        l.conn
+            .execute(
+                "UPDATE settings SET value = '{\"vieja\":1}' WHERE key = 'dns_backup'",
+                [],
+            )
+            .unwrap_or_default();
+        l.refresca_copias_en_archivo();
+        assert_eq!(
+            copia_junto_al_extracto(&db, "dns_backup").as_deref(),
+            Some("{\"vieja\":1}")
+        );
+        // An extract in memory writes nothing anywhere.
+        let m = Ledger::open_in_memory(genesis()).unwrap();
+        m.set_setting("dns_backup", "{}").unwrap_or_default();
+        drop(l);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     use super::*;
     use crate::model::{DecidedBy, Verdict};
 

@@ -36,7 +36,9 @@ pub use error::{Error, Result};
 pub use export::{write_csv, write_csv_for_spreadsheet, write_json};
 pub use gaps::{Gap, GAP_THRESHOLD_MS, KEY_HEARTBEAT};
 pub use hash::{chain_hash, Hash, HashInput};
-pub use ledger::{ChainFault, CheckReport, EventFilter, Ledger};
+pub use ledger::{
+    copia_junto_al_extracto, ChainFault, CheckReport, EventFilter, Ledger, COPIAS_EN_ARCHIVO,
+};
 pub use model::{
     Action, Category, DecidedBy, Device, Event, MatchKind, NewEvent, NewRule, Outbound, Proceso,
     Purpose, Rule, Scope, Signal, SignalKind, Verdict,
