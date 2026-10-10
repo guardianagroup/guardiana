@@ -23,7 +23,8 @@
     const cortado = x.ahora === 'cortado';
     const sigue = !cortado && (x.categoria === 'rastreador' || x.categoria === 'publicidad' || x.corredor);
     const li = document.createElement('li');
-    li.className = 'tercero' + (cortado ? ' cortado' : sigue ? ' sigue' : '');
+    li.className = 'tercero' + (cortado ? ' cortado' : sigue ? ' sigue' : '') + (movido && movido.sitio === x.sitio && Date.now() < movido.hasta ? ' recien' : '');
+    li.dataset.sitio = x.sitio;
     const paisTxt = x.pais ? `<small>${esc(pais(x.pais))}</small>` : '';
     // Every button has its way back: «Desbloquear» on what is cut, «Bloquear» on what passes,
     // «Volver a bloquear» on what the person unblocked; a chip says when the rule is theirs.
@@ -41,10 +42,33 @@
     ].join('');
     li.innerHTML = `<span class="quien">${esc(x.quien)}${paisTxt}</span>${boton}<span class="detalle">${detalle}</span>`;
     li.querySelector('button').addEventListener('click', (e) => {
+      // The row changes list (cut ↔ passing): remember it, to follow it there with its new
+      // button in sight (owner's report of 10 Oct 2026: «Volver a bloquear» seemed gone).
+      tocado = { sitio: x.sitio, antes: x.ahora + '|' + x.regla, hasta: Date.now() + 5000 };
       manda({ tipo: e.currentTarget.dataset.accion, sitio: x.sitio });
       $('e-recarga').classList.remove('oculto');
     });
     return li;
+  }
+  let tocado = null;
+  let movido = null;
+  // After a click, the first shield where that row changed: it is lit for a moment and brought
+  // into view, with the focus on its button.
+  function sigueFila(lista) {
+    if (!tocado || Date.now() > tocado.hasta) { tocado = null; return false; }
+    const x = lista.find((y) => y.sitio === tocado.sitio);
+    if (!x || x.ahora + '|' + x.regla === tocado.antes) return false;
+    movido = { sitio: x.sitio, hasta: Date.now() + 2500 };
+    tocado = null;
+    return true;
+  }
+  function enfocaMovido() {
+    const li = [...document.querySelectorAll('#v-escudo li.tercero')].find((l) => movido && l.dataset.sitio === movido.sitio);
+    if (!li) return;
+    li.classList.add('recien');
+    li.scrollIntoView({ block: 'nearest' });
+    li.querySelector('button').focus({ preventScroll: true });
+    setTimeout(() => document.querySelectorAll('#v-escudo li.recien').forEach((l) => l.classList.remove('recien')), 2600);
   }
   let sitioEscudo = null;
   // Today, across the whole browser, at the top of the shield: refreshed while it is open.
@@ -77,12 +101,22 @@
     lista.sort((a, b) => (b.cortadas - a.cortadas) || (b.vistas - a.vistas));
     const cortados = lista.filter((x) => x.ahora === 'cortado');
     const vistos = lista.filter((x) => x.ahora !== 'cortado');
+    const recienMovido = sigueFila(lista);
+    // The rows are drawn again on every request the page makes: a button that had the focus
+    // keeps it, on the same company's row.
+    const activo = document.activeElement;
+    const conFoco = activo && activo.closest && activo.closest('#v-escudo li.tercero') ? activo.closest('li.tercero').dataset.sitio : null;
     $('e-cortados').replaceChildren(...cortados.map(fila));
     $('e-vistos').replaceChildren(...vistos.map(fila));
+    if (conFoco) {
+      const li = [...document.querySelectorAll('#v-escudo li.tercero')].find((l) => l.dataset.sitio === conFoco);
+      if (li) li.querySelector('button').focus({ preventScroll: true });
+    }
     $('e-cortados-n').textContent = n(cortados.length);
     $('e-vistos-n').textContent = n(vistos.length);
     $('e-cortados-caja').classList.toggle('oculto', !cortados.length);
     $('e-vistos-caja').classList.toggle('oculto', !vistos.length);
+    if (recienMovido) enfocaMovido();
     $('e-vacio').classList.toggle('oculto', lista.length > 0);
     const hechos = [];
     if (m.parametros_quitados) hechos.push(tn('parametros_quitados', m.parametros_quitados, { n: n(m.parametros_quitados) }));

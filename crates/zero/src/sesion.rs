@@ -1845,18 +1845,25 @@ impl Sesion {
         if s.is_empty() || s.len() > 253 {
             return Vec::new();
         }
-        // Both ways, always: «Bloquear» and «Desbloquear» undo each other, and a site goes back
-        // to what the lists say for it rather than keeping a rule it no longer needs.
-        // The site as the shield saw it; if no tab shows it any more (the page moved on between
-        // the click and this message), as the lists see it.
-        let visto = self
+        // Both ways, always: «Desbloquear» lets the site through on every page and leaves
+        // «Volver a bloquear» on its row; «Volver a bloquear» puts it back as it was.
+        // «Desbloquear» is always the person's own rule, whatever cut the site: with maximum
+        // protection a site cut for one beacon may send another later, and an unblocked site
+        // that came back cut, or lost its way back, was the owner's report of 10 Oct 2026.
+        // Blocking, though, leans on the lists when they already cut the site: then no rule of
+        // the person's is needed, and turning the protection off still frees it.
+        // The site as the shields of every tab saw it (the lists cut it if they cut it in any of
+        // them); if no tab shows it any more (the page moved on between the click and this
+        // message), as the lists see it.
+        let vistos: Vec<Tercero> = self
             .pestanas
             .iter()
-            .find_map(|p| p.escudo.terceros.get(&s))
-            .cloned();
-        let t = visto.unwrap_or_else(|| {
+            .filter_map(|p| p.escudo.terceros.get(&s))
+            .cloned()
+            .collect();
+        let lista = if vistos.is_empty() {
             let d = crate::destino::clasifica(&s);
-            Tercero {
+            self.lo_corta_la_lista(&Tercero {
                 quien: d.quien().to_string(),
                 sitio: s.clone(),
                 pais: None,
@@ -1866,9 +1873,10 @@ impl Sesion {
                 cortadas: 0,
                 motivo: None,
                 balizas: 0,
-            }
-        });
-        let lista = self.lo_corta_la_lista(&t);
+            })
+        } else {
+            vistos.iter().any(|t| self.lo_corta_la_lista(t))
+        };
         let r = &mut self.prefs.reglas;
         if tipo == "bloquear_sitio" {
             r.permitidos.remove(&s);
@@ -1877,9 +1885,7 @@ impl Sesion {
             }
         } else {
             r.cortados.remove(&s);
-            if lista {
-                r.permitidos.insert(s);
-            }
+            r.permitidos.insert(s);
         }
         self.guarda_prefs();
         self.escudo_activa(true)

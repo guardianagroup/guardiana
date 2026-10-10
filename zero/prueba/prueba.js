@@ -142,6 +142,7 @@ function pantalla(nombre) {
   comprueba(await hasta(async () => (await barra.textContent('#aviso-corte')).includes('Google')), 'la barra dice a quién cortó');
   await barra.click('#b-escudo');
   comprueba(await hasta(async () => (await panel.locator('#e-cortados li').count()) >= 1), 'el panel lista lo cortado');
+  comprueba((await panel.textContent('#titulo')) === 'Conexiones con otras empresas', 'el escudo se titula «Conexiones con otras empresas»');
   const filas = await panel.locator('#e-cortados .quien').allTextContents();
   comprueba(filas.some((f) => f.includes('Google')), `el panel nombra a la empresa (${filas.join(', ')})`);
   // Every button has its way back: «Desbloquear», then «Volver a bloquear».
@@ -168,7 +169,8 @@ function pantalla(nombre) {
   await baliza('/baliza-3');
   comprueba(vio('collect.otra-empresa.io', '/baliza-3'), 'desbloqueado, ese aviso vuelve a salir');
   const balizaVista = panel.locator('#e-vistos li', { hasText: 'otra-empresa.io' });
-  await hasta(async () => (await balizaVista.count()) === 1);
+  comprueba(await hasta(async () => (await balizaVista.count()) === 1 && (await balizaVista.first().locator('button').textContent()) === 'Volver a bloquear'), 'con protección máxima, lo desbloqueado ofrece «Volver a bloquear» (informe del 10 oct 2026)');
+  comprueba(await panel.evaluate(() => { const b = document.activeElement; return !!b && !!b.closest('#e-vistos li') && b.textContent === 'Volver a bloquear'; }), 'y la fila se sigue: el foco queda en su botón «Volver a bloquear»');
   await balizaVista.first().locator('button').click();
   comprueba(await hasta(async () => (await filaBaliza().count()) === 1), 'y «Volver a bloquear» lo deja cortado otra vez');
   await panel.click('#e-maxima-quitar');

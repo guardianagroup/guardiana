@@ -253,7 +253,7 @@ fn trackers_are_cut_and_the_shield_says_what_holds_now() {
 }
 
 #[test]
-fn block_and_unblock_undo_each_other_and_leave_no_stale_rule() {
+fn block_and_unblock_undo_each_other_and_unblock_always_leaves_the_way_back() {
     let (mut s, _, id) = con_pagina(true);
     let _ = s.peticion(id, "https://stats.g.doubleclick.net/a", "GET", b"", 3);
     let _ = s.peticion(id, "https://cdn.otra.io/a.js", "GET", b"", 3);
@@ -287,12 +287,81 @@ fn block_and_unblock_undo_each_other_and_leave_no_stale_rule() {
         fila(&mut s, "doubleclick.net"),
         ("cortado".into(), json!("lista"))
     );
-    // Any other site: block, unblock — back to passing, no rule left.
+    assert!(s.prefs.reglas.cortados.is_empty() && s.prefs.reglas.permitidos.is_empty());
+    // Any other site: block, unblock — it passes, and its row offers «Volver a bloquear»
+    // (owner's report of 10 Oct 2026: after «Desbloquear» the way back was gone).
     manda(&mut s, "bloquear_sitio", "otra.io");
     assert_eq!(fila(&mut s, "otra.io"), ("cortado".into(), json!("tuya")));
     manda(&mut s, "desbloquear_sitio", "otra.io");
-    assert_eq!(fila(&mut s, "otra.io"), ("pasa".into(), Value::Null));
-    assert!(s.prefs.reglas.cortados.is_empty() && s.prefs.reglas.permitidos.is_empty());
+    assert_eq!(fila(&mut s, "otra.io"), ("pasa".into(), json!("permitido")));
+    manda(&mut s, "bloquear_sitio", "otra.io");
+    assert_eq!(fila(&mut s, "otra.io"), ("cortado".into(), json!("tuya")));
+    assert!(s.prefs.reglas.permitidos.is_empty());
+}
+
+#[test]
+fn with_maximum_protection_an_unblocked_site_stays_unblocked_and_can_be_blocked_again() {
+    let (mut s, _, id) = con_pagina(true);
+    s.prefs.reglas.maxima = true;
+    let fila = |s: &mut Sesion, sitio: &str| {
+        let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":"escudo"}"#);
+        let e = del_tipo(&o, Origen::Panel, "escudo").unwrap_or_default();
+        let t = e["terceros"]
+            .as_array()
+            .and_then(|l| l.iter().find(|t| t["sitio"] == sitio).cloned())
+            .unwrap_or_default();
+        (
+            t["ahora"].as_str().unwrap_or("").to_string(),
+            t["regla"].clone(),
+        )
+    };
+    let manda = |s: &mut Sesion, tipo: &str, sitio: &str| {
+        let _ = s.mensaje(
+            Origen::Panel,
+            PANEL,
+            &json!({ "tipo": tipo, "sitio": sitio }).to_string(),
+        );
+    };
+    // A site the person cut by hand, before it sent any beacon: unblocking it must not leave
+    // it to be cut again by its next beacon, and its row keeps the way back.
+    let _ = s.peticion(id, "https://cdn.otra.io/a.js", "GET", b"", 3);
+    manda(&mut s, "bloquear_sitio", "otra.io");
+    assert!(
+        s.peticion(id, "https://cdn.otra.io/b.js", "GET", b"", 3)
+            .cortar
+    );
+    manda(&mut s, "desbloquear_sitio", "otra.io");
+    assert!(
+        !s.peticion(id, "https://cdn.otra.io/ping", "POST", b"x", 14)
+            .cortar
+    );
+    assert_eq!(fila(&mut s, "otra.io"), ("pasa".into(), json!("permitido")));
+    // A beacon cut by maximum protection: the same, and «Volver a bloquear» leaves it to the
+    // lists again, with no rule of the person's.
+    let _ = s.peticion(id, "https://px.tercera.io/ping", "POST", b"x", 14);
+    assert_eq!(
+        fila(&mut s, "tercera.io"),
+        ("cortado".into(), json!("lista"))
+    );
+    manda(&mut s, "desbloquear_sitio", "tercera.io");
+    assert_eq!(
+        fila(&mut s, "tercera.io"),
+        ("pasa".into(), json!("permitido"))
+    );
+    assert!(
+        !s.peticion(id, "https://px.tercera.io/ping", "POST", b"x", 14)
+            .cortar
+    );
+    manda(&mut s, "bloquear_sitio", "tercera.io");
+    assert_eq!(
+        fila(&mut s, "tercera.io"),
+        ("cortado".into(), json!("lista"))
+    );
+    assert!(!s.prefs.reglas.cortados.contains("tercera.io"));
+    assert!(
+        s.peticion(id, "https://px.tercera.io/ping", "POST", b"x", 14)
+            .cortar
+    );
 }
 
 #[test]
