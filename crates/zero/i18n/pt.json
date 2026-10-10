@@ -445,5 +445,7 @@
   "tachon_paso_2_explica": "Abra o site da sua IA (ChatGPT, Gemini, Claude…), clique na caixa onde se escreve e clique em «Colar na IA».",
   "tachon_paso_3": "Leia a resposta com seus dados",
   "cortes_titulo_resumen": "Resumo da sua privacidade",
-  "cortes_sin_anotar": "Outros {n} cortes deste período contam nos números, mas não estão na lista: um dia só anota os primeiros 25.000."
+  "cortes_sin_anotar": "Outros {n} cortes deste período contam nos números, mas não estão na lista: um dia só anota os primeiros 25.000.",
+  "error_otra_version_titulo": "Há outra versão do GUARDIANA ZERO aberta",
+  "error_otra_version": "Há outra versão do GUARDIANA ZERO aberta e ela não pôde ser fechada sozinha. Feche-a no X da janela e abra esta de novo."
 }

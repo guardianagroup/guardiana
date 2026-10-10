@@ -32,7 +32,7 @@ use webview2_com::{
 use windows::core::{w, Interface, BOOL, PCWSTR, PWSTR};
 use windows::Win32::Foundation::{
     GetLastError, COLORREF, ERROR_ALREADY_EXISTS, ERROR_SUCCESS, E_POINTER, HINSTANCE, HWND,
-    LPARAM, LRESULT, POINT, RECT, S_FALSE, WPARAM,
+    LPARAM, LRESULT, POINT, RECT, S_FALSE, WAIT_ABANDONED, WAIT_OBJECT_0, WAIT_TIMEOUT, WPARAM,
 };
 use windows::Win32::Globalization::GetUserDefaultUILanguage;
 use windows::Win32::Graphics::Dwm::{
@@ -46,7 +46,7 @@ use windows::Win32::System::Com::{
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
-use windows::Win32::System::Threading::CreateMutexW;
+use windows::Win32::System::Threading::{CreateMutexW, WaitForSingleObject};
 use windows::Win32::UI::HiDpi::{
     GetDpiForWindow, SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
@@ -56,15 +56,15 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateIconFromResourceEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
-    FindWindowW, GetClientRect, GetMessageW, GetWindowLongPtrW, GetWindowRect, IsIconic,
-    LoadCursorW, MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassExW, SendMessageW,
-    SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow,
-    SystemParametersInfoW, TranslateMessage, GWL_STYLE, HICON, HWND_TOP, ICON_BIG, ICON_SMALL,
-    IDC_ARROW, LR_DEFAULTCOLOR, MB_ICONWARNING, MB_OK, MINMAXINFO, MSG, SIZE_MINIMIZED,
-    SPI_GETWORKAREA, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOZORDER, SW_RESTORE,
-    SW_SHOW, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WINDOW_EX_STYLE, WM_APP, WM_CLOSE,
-    WM_DESTROY, WM_DPICHANGED, WM_GETMINMAXINFO, WM_MOVE, WM_MOVING, WM_SETFOCUS, WM_SETICON,
-    WM_SIZE, WM_TIMER, WNDCLASSEXW, WS_OVERLAPPEDWINDOW,
+    FindWindowW, GetClientRect, GetMessageW, GetWindowLongPtrW, GetWindowRect,
+    GetWindowThreadProcessId, IsIconic, LoadCursorW, MessageBoxW, PostMessageW, PostQuitMessage,
+    RegisterClassExW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowPos,
+    SetWindowTextW, ShowWindow, SystemParametersInfoW, TranslateMessage, GWL_STYLE, HICON,
+    HWND_TOP, ICON_BIG, ICON_SMALL, IDC_ARROW, LR_DEFAULTCOLOR, MB_ICONWARNING, MB_OK, MINMAXINFO,
+    MSG, SIZE_MINIMIZED, SPI_GETWORKAREA, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOOWNERZORDER,
+    SWP_NOZORDER, SW_RESTORE, SW_SHOW, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+    WINDOW_EX_STYLE, WM_APP, WM_CLOSE, WM_DESTROY, WM_DPICHANGED, WM_GETMINMAXINFO, WM_MOVE,
+    WM_MOVING, WM_SETFOCUS, WM_SETICON, WM_SIZE, WM_TIMER, WNDCLASSEXW, WS_OVERLAPPEDWINDOW,
 };
 
 /// Height of the bar (tabs 38 + tools 46), in CSS pixels; see `interfaz/barra.html`.
@@ -1537,14 +1537,19 @@ pub fn arranca() {
     let idioma = idioma_sistema();
     let textos = Textos::de(Idioma::de_etiqueta(&idioma));
 
-    // One window: a second start brings the first one forward.
+    // One window: a second start of the same version brings the first one forward; a newer
+    // version closes the older one (it saves as on its own X) and takes its place, so updating
+    // is just opening the new file (the owner, 10 Oct 2026: «que se abra automática la última,
+    // así el cliente será más fácil»). Before, the new copy brought the old window forward and
+    // left without a word.
     let nombre_mutex = Ancho::de(&format!(
         "Local\\GuardianaZero-{}",
         base.to_string_lossy().replace('\\', "/")
     ));
+    let marca = datos.join(EN_MARCHA);
     unsafe {
         // The handle stays open for the life of the process: that is what marks it as running.
-        let _mutex = CreateMutexW(None, true, nombre_mutex.p());
+        let mutex = CreateMutexW(None, true, nombre_mutex.p());
         if GetLastError() == ERROR_ALREADY_EXISTS {
             // The first one may still be opening its window: give it a few seconds. A copy that
             // runs with no window at all used to make every new start end in silence (the
@@ -1557,25 +1562,58 @@ pub fn arranca() {
                 std::thread::sleep(std::time::Duration::from_millis(250));
                 otra = FindWindowW(CLASE, PCWSTR::null());
             }
-            match otra {
-                Ok(otra) => {
-                    if IsIconic(otra).as_bool() {
-                        let _ = ShowWindow(otra, SW_RESTORE);
-                    }
-                    let _ = SetForegroundWindow(otra);
+            let Ok(otra) = otra else {
+                registra("arranque", &"otra copia en marcha sin ventana");
+                aviso(&textos, "error_ya_abierto_titulo", "error_ya_abierto");
+                return;
+            };
+            let suya = version_en_marcha(&marca, otra);
+            let mia = version_de(env!("CARGO_PKG_VERSION")).unwrap_or_default();
+            // Up to 1.0.4 nothing wrote the mark: no mark means an older copy.
+            if suya.is_some_and(|v| v >= mia) {
+                if IsIconic(otra).as_bool() {
+                    let _ = ShowWindow(otra, SW_RESTORE);
                 }
-                Err(_) => {
-                    registra("arranque", &"otra copia en marcha sin ventana");
-                    aviso(&textos, "error_ya_abierto_titulo", "error_ya_abierto");
-                }
+                let _ = SetForegroundWindow(otra);
+                return;
             }
-            return;
+            registra(
+                "arranque",
+                &format!(
+                    "cierra la versión {} para abrir la {}",
+                    suya.map_or_else(
+                        || "anterior".to_string(),
+                        |(a, b, c)| format!("{a}.{b}.{c}")
+                    ),
+                    env!("CARGO_PKG_VERSION")
+                ),
+            );
+            let _ = PostMessageW(Some(otra), WM_CLOSE, WPARAM(0), LPARAM(0));
+            // The old copy owns the mutex until its process ends; waiting on it is waiting for
+            // that end (WAIT_ABANDONED), after its session is saved.
+            let fin = match &mutex {
+                Ok(h) => WaitForSingleObject(*h, 30_000),
+                Err(_) => WAIT_TIMEOUT,
+            };
+            if fin != WAIT_OBJECT_0 && fin != WAIT_ABANDONED {
+                registra("arranque", &"la versión anterior no se cerró");
+                aviso(&textos, "error_otra_version_titulo", "error_otra_version");
+                return;
+            }
+            // Its WebView2 processes share the data folder: let them finish.
+            std::thread::sleep(std::time::Duration::from_millis(1500));
         }
+        // Kept open on purpose until the process ends (see above).
+        std::mem::forget(mutex);
         registra(
             "arranque",
             &format!("GUARDIANA ZERO {}", env!("CARGO_PKG_VERSION")),
         );
     }
+    let _ = std::fs::write(
+        &marca,
+        format!("{} {}", env!("CARGO_PKG_VERSION"), std::process::id()),
+    );
 
     // The engine must be on the system (Windows 10 and 11 bring it; Windows Update keeps it).
     let mut version = PWSTR::null();
@@ -1676,6 +1714,34 @@ pub fn arranca() {
             DispatchMessageW(&msg);
         }
     }
+    // Only our own mark: a newer copy that took over has written its own.
+    if std::fs::read_to_string(&marca)
+        .is_ok_and(|t| t.split_whitespace().nth(1) == Some(&std::process::id().to_string()))
+    {
+        let _ = std::fs::remove_file(&marca);
+    }
+}
+
+/// The file in the data folder that says which version is running and in which process.
+const EN_MARCHA: &str = "en-marcha.txt";
+
+/// «1.0.5» as numbers, to compare versions.
+fn version_de(texto: &str) -> Option<(u32, u32, u32)> {
+    let mut p = texto.trim().split('.').map(|x| x.parse::<u32>().ok());
+    Some((p.next()??, p.next()??, p.next()??))
+}
+
+/// The version of the running copy that owns `ventana`, from its mark; `None` when there is no
+/// mark, or the mark is another process's (a copy up to 1.0.4, or a stale mark after a crash).
+fn version_en_marcha(marca: &std::path::Path, ventana: HWND) -> Option<(u32, u32, u32)> {
+    let texto = std::fs::read_to_string(marca).ok()?;
+    let mut partes = texto.split_whitespace();
+    let version = version_de(partes.next()?)?;
+    let pid: u32 = partes.next()?.parse().ok()?;
+    let mut suyo = 0u32;
+    // SAFETY: reads the owner process id of a window handle into a local.
+    unsafe { GetWindowThreadProcessId(ventana, Some(std::ptr::addr_of_mut!(suyo))) };
+    (suyo == pid).then_some(version)
 }
 
 fn crea_ventana(col: &Colores) -> windows::core::Result<HWND> {
