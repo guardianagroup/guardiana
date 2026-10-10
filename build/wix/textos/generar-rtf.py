@@ -41,7 +41,7 @@ def rtf(texto: str) -> str:
 
 def main() -> int:
     hechos = 0
-    for origen in sorted(AQUI.glob("bienvenida-*.txt")):
+    for origen in sorted(list(AQUI.glob("bienvenida-*.txt")) + list(AQUI.glob("zero-bienvenida-*.txt"))):
         destino = origen.with_suffix(".rtf")
         destino.write_text(rtf(origen.read_text(encoding="utf-8")), encoding="ascii")
         print(f"{destino.name}: {destino.stat().st_size} bytes")

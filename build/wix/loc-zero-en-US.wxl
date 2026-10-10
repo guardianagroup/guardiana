@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The GUARDIANA ZERO installer's words in English (GUARDIANA's are in loc-en-US.wxl). -->
+<WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="en-US" Codepage="1252">
+  <String Id="Descripcion" Value="GUARDIANA ZERO: the browser that shows you what it is saving you from. Everything happens on this machine; no account, no server." />
+  <String Id="AbrirZero" Value="Open GUARDIANA ZERO" />
+  <String Id="AccesoDescripcion" Value="The browser that shows you what it is saving you from" />
+  <String Id="VersionMasNueva" Value="A newer version of GUARDIANA ZERO is already installed." />
+  <String Id="ArchivoLeeme" Value="README.txt" />
+</WixLocalization>

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Publish GUARDIANA ZERO on its own, when GUARDIANA does not change (9 Oct 2026: the browser moved
-# to the subscription while GUARDIANA 1.0.8 stayed as it was). The same order as release.sh, for one
-# file:
-#   1. the browser built and driven end to end by zero.yml (the artifact's folder, with its
+# to the subscription while GUARDIANA 1.0.8 stayed as it was). The same order as release.sh, for
+# the browser's files (the .exe and, since 1.0.7, its three installers, one per language):
+#   1. the files built and driven end to end by zero.yml (the artifact's folder, with its
 #      SHA256SUMS), checked here before anything is signed
-#   2. minisign signature with the release key (never in CI)
-#   3. its line in ledger.jsonl, as version "zero-<version>" so it never passes for a GUARDIANA
+#   2. minisign signature of each with the release key (never in CI)
+#   3. one line in ledger.jsonl, as version "zero-<version>" so it never passes for a GUARDIANA
 #      version (build/cliente/descarga.py skips these lines when it looks for the latest one)
 #   4. the line signed and uploaded to Rekor; its uuid goes into the line
 #   5. commit ledger.jsonl — only then may the download be published
 #
-#     build/release-zero.sh <folder with guardiana-zero-<version>-windows-x64.exe and SHA256SUMS>
+#     build/release-zero.sh <folder with guardiana-zero-<version>-windows-x64.exe, its .msi and SHA256SUMS>
 #
 # Environment: GUARDIANA_KEYS (directory with minisign.key, default $HOME/guardiana-claves).
 set -euo pipefail
@@ -46,14 +46,21 @@ if [ -n "$(git status --porcelain)" ]; then
     exit 1
 fi
 
-# 1. The tested file, and only that one.
+# 1. The tested files, and only those: every guardiana-zero-<version>-* that SHA256SUMS names,
+#    the .exe first. A file the list names but the folder lacks stops everything.
 version="$(sed -n 's/^version = "\(.*\)"/\1/p' zero/navegador/Cargo.toml | head -n 1)"
 nombre="guardiana-zero-$version-windows-x64.exe"
 [ -f "$carpeta/$nombre" ] || { echo "release-zero.sh: $carpeta has no $nombre (zero/navegador is $version)" >&2; exit 1; }
 [ -f "$carpeta/SHA256SUMS" ] || { echo "release-zero.sh: $carpeta has no SHA256SUMS" >&2; exit 1; }
 # sha256sum on Windows writes «hash *name» (binary mode) and on Linux «hash  name»: both count.
-(cd "$carpeta" && tr -d '\r' < SHA256SUMS | grep -E "^[0-9a-f]{64} [ *]$nombre\$" | sed 's/ \*/  /' | sha256sum -c -) || {
-    echo "release-zero.sh: $nombre does not match the SHA256SUMS that came with it; nothing is published." >&2
+nombres="$(tr -d '\r' < "$carpeta/SHA256SUMS" | grep -E "^[0-9a-f]{64} [ *]guardiana-zero-$version-" | sed -E 's/^[0-9a-f]{64} [ *]//')"
+echo "$nombres" | grep -qx "$nombre" || { echo "release-zero.sh: SHA256SUMS does not name $nombre" >&2; exit 1; }
+nombres="$(printf '%s\n' "$nombre"; echo "$nombres" | grep -vx "$nombre" | sort)"
+for n in $nombres; do
+    [ -f "$carpeta/$n" ] || { echo "release-zero.sh: SHA256SUMS names $n and $carpeta lacks it; nothing is published." >&2; exit 1; }
+done
+(cd "$carpeta" && tr -d '\r' < SHA256SUMS | grep -E "^[0-9a-f]{64} [ *]guardiana-zero-$version-" | sed 's/ \*/  /' | sha256sum -c -) || {
+    echo "release-zero.sh: the files do not match the SHA256SUMS that came with them; nothing is published." >&2
     exit 1
 }
 etiqueta="zero-$version"
@@ -64,21 +71,32 @@ fi
 dist="dist/$etiqueta"
 out="build/out"
 mkdir -p "$dist" "$out"
-cp "$carpeta/$nombre" "$dist/$nombre"
+for n in $nombres; do
+    cp "$carpeta/$n" "$dist/$n"
+done
 
-# 2. The signature.
-firmar "$dist/$nombre" "guardiana $etiqueta $nombre"
-sha="$(sha256sum "$dist/$nombre" | cut -d' ' -f1)"
-sig="$(sed -n '2p' "$dist/$nombre.minisig")"
+# 2. The signatures, one per file (one password each), and the line's «files».
+archivos="[]"
+for n in $nombres; do
+    firmar "$dist/$n" "guardiana $etiqueta $n"
+    sha="$(sha256sum "$dist/$n" | cut -d' ' -f1)"
+    sig="$(sed -n '2p' "$dist/$n.minisig")"
+    archivos="$("$PYTHON" -c '
+import json, sys
+l, n, sha, sig = sys.argv[1:5]
+l = json.loads(l)
+l.append({"name": n, "sha256_unsigned": sha, "sha256_signed": sha, "minisign": sig, "reproducible": False})
+print(json.dumps(l, separators=(",", ":")))
+' "$archivos" "$n" "$sha" "$sig")"
+done
 
 # 3. The line.
 line="$("$PYTHON" -c '
 import json, sys
-v, c, d, n, sha, sig = sys.argv[1:7]
-print(json.dumps({"version": v, "commit": c, "date": d, "files": [{"name": n, "sha256_unsigned": sha,
-      "sha256_signed": sha, "minisign": sig, "reproducible": False}], "rekor_uuid": ""},
+v, c, d, archivos = sys.argv[1:5]
+print(json.dumps({"version": v, "commit": c, "date": d, "files": json.loads(archivos), "rekor_uuid": ""},
       separators=(",", ":")))
-' "$etiqueta" "$commit" "$date" "$nombre" "$sha" "$sig")"
+' "$etiqueta" "$commit" "$date" "$archivos")"
 
 # 4. Rekor, over its REST API, exactly as release.sh does it.
 echo "$line" > "$out/ledger-line.json"
