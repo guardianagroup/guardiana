@@ -3,7 +3,7 @@
 
 A GUARDIANA mostra com quais serviços a sua IA fala e, com o Modo Casa, cada
 aparelho do seu Wi-Fi: explica cada um em uma frase e bloqueia só o que você
-decidir. Tudo acontece neste computador. Sem conta, sem servidor, zero
+decidir. Tudo acontece neste computador. Sem conta, sem servidor nosso, zero
 telemetria.
 
 O que o instalador fez
@@ -28,7 +28,8 @@ categoria ou para a casa inteira, esperam até que a GUARDIANA tenha observado
 esse aparelho por 24 horas.
 
 São sete dias com tudo e sem cartão, Modo Casa incluído. Depois é preciso uma
-assinatura; o que foi anotado fica no seu disco, pagando ou não.
+licença (assinatura ou pagamento único); o que foi anotado fica no seu disco,
+pagando ou não.
 
 Desinstalar
 -----------

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Los textos del instalador de GUARDIANA ZERO en español (los de GUARDIANA están en loc-es-ES.wxl). -->
 <WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="es-ES" Codepage="1252">
-  <String Id="Descripcion" Value="GUARDIANA ZERO: el navegador que te enseña de qué te está salvando. Todo ocurre en este equipo; sin cuenta ni servidor." />
+  <String Id="Descripcion" Value="GUARDIANA ZERO: el navegador que te enseña de qué te está salvando. Todo ocurre en este equipo; sin cuenta ni servidor nuestro." />
   <String Id="AbrirZero" Value="Abrir GUARDIANA ZERO" />
   <String Id="AccesoDescripcion" Value="El navegador que te enseña de qué te está salvando" />
   <String Id="VersionMasNueva" Value="Ya hay una versión más nueva de GUARDIANA ZERO instalada." />

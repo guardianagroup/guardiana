@@ -37,11 +37,11 @@ else
       "O extrato continua em /var/lib/guardiana (apague com --purge)."
 fi
 if [ "$dns_ok" = 1 ]; then
-    m "Guardiana desinstalada. El DNS del sistema está como antes." \
-      "Guardiana uninstalled. The system DNS is as it was before." \
-      "Guardiana desinstalada. O DNS do sistema está como antes."
+    m "GUARDIANA desinstalada. El DNS del sistema está como antes." \
+      "GUARDIANA uninstalled. The system DNS is as it was before." \
+      "GUARDIANA desinstalada. O DNS do sistema está como antes."
 else
-    m "Guardiana desinstalada, pero NO se pudo devolver el DNS del sistema a como estaba. Compruébalo antes de cerrar: resolvectl status, o el archivo /etc/resolv.conf. Si apunta a 127.0.0.1, cámbialo por el DNS de tu router o por 1.1.1.1." \
-      "Guardiana uninstalled, but the system DNS could NOT be put back as it was. Check it before closing: resolvectl status, or the file /etc/resolv.conf. If it points at 127.0.0.1, change it to your router's DNS or to 1.1.1.1." \
-      "Guardiana desinstalada, mas NÃO foi possível devolver o DNS do sistema ao que era. Confira antes de fechar: resolvectl status, ou o arquivo /etc/resolv.conf. Se apontar para 127.0.0.1, troque pelo DNS do seu roteador ou por 1.1.1.1."
+    m "GUARDIANA desinstalada, pero NO se pudo devolver el DNS del sistema a como estaba. Compruébalo antes de cerrar: resolvectl status, o el archivo /etc/resolv.conf. Si apunta a 127.0.0.1, cámbialo por el DNS de tu router o por 1.1.1.1." \
+      "GUARDIANA uninstalled, but the system DNS could NOT be put back as it was. Check it before closing: resolvectl status, or the file /etc/resolv.conf. If it points at 127.0.0.1, change it to your router's DNS or to 1.1.1.1." \
+      "GUARDIANA desinstalada, mas NÃO foi possível devolver o DNS do sistema ao que era. Confira antes de fechar: resolvectl status, ou o arquivo /etc/resolv.conf. Se apontar para 127.0.0.1, troque pelo DNS do seu roteador ou por 1.1.1.1."
 fi

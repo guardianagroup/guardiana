@@ -3,7 +3,7 @@
 
 GUARDIANA te enseña con qué servicios habla tu IA y, con Modo Hogar, cada
 aparato de tu Wi-Fi: lo explica en una frase y bloquea solo lo que tú decidas.
-Todo ocurre en este equipo. Sin cuenta, sin servidor, cero telemetría.
+Todo ocurre en este equipo. Sin cuenta, sin servidor nuestro, cero telemetría.
 
 Qué ha hecho el instalador
 --------------------------
@@ -15,7 +15,7 @@ Qué ha hecho el instalador
   copia exacta del ajuste anterior. Si el servicio se para, el equipo recupera
   su DNS de antes; al desinstalar queda tal como estaba.
 - No ha abierto ningún puerto a la red. Solo el Modo Hogar, cuando tú lo
-  actives, abre los puertos en la Wi-Fi de casa; apagarlo los cierra.
+  enciendas, abre los puertos en la Wi-Fi de casa; apagarlo los cierra.
 
 Después de instalar
 -------------------
@@ -23,10 +23,11 @@ Menú Inicio > Guardiana. Se abre el panel y verás las consultas de este
 equipo desde el primer minuto. Para devolver el DNS a como estaba sin
 desinstalar: panel, «Estado». Bloquear un nombre concreto se puede desde el
 primer minuto; los bloqueos anchos, por categoría o para toda la casa, esperan a
-que GUARDIANA lleve 24 horas mirando ese aparato.
+que GUARDIANA lleve 24 horas observando ese aparato.
 
 Son siete días con todo y sin tarjeta, Modo Hogar incluido. Después hace falta
-una suscripción; lo anotado se queda en tu disco, pagues o no.
+una licencia (suscripción o pago único); lo anotado se queda en tu disco,
+pagues o no.
 
 Desinstalar
 -----------

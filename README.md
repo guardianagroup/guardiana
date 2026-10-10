@@ -1,4 +1,4 @@
-# Guardiana
+# GUARDIANA
 
 *Idiomas: **Español** · [English](README.en.md) · [Português](README.pt.md)*
 
@@ -42,7 +42,7 @@ Los primeros 7 días son gratis; después va incluido en la suscripción de GUAR
 | Otro Linux con systemd | `guardiana-<versión>-linux-x86_64.tar.gz` | Descomprimir y `sudo ./instalar.sh` |
 
 En Linux y en el Mac, instalar **no cambia el DNS del sistema**: eso se hace desde el panel, con
-consentimiento, y se deshace en el mismo sitio. En Windows, la primera instalación pone a Guardiana
+consentimiento, y se deshace en el mismo sitio. En Windows, la primera instalación pone a GUARDIANA
 como DNS (la pantalla de bienvenida lo dice antes de «Instalar») y se deshace en el panel, en «Estado». Desinstalar apaga Modo Hogar, quita la regla del cortafuegos y
 restaura el DNS exactamente como estaba.
 
@@ -63,7 +63,7 @@ guardiana export         exporta el extracto en CSV o JSON
 
 Nada se bloquea sin decisión del usuario, siempre con «desbloquear» visible: un nombre concreto se
 bloquea desde el primer minuto, y los bloqueos anchos —por categoría, para toda la casa o el modo que
-bloquea todo lo no declarado— esperan a que Guardiana lleve 24 horas mirando ese dispositivo. Ninguna señal es un veredicto; la interfaz nunca dice «malicioso».
+bloquea todo lo no declarado— esperan a que GUARDIANA lleve 24 horas observando ese dispositivo. Ninguna señal es un veredicto; la interfaz nunca dice «malicioso».
 
 ## Compilar
 

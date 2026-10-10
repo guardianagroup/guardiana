@@ -6,7 +6,7 @@ O que este instalador vai fazer
 - Copiar o programa para «Arquivos de Programas\Guardiana».
 - Registrar o serviço «Guardiana», que inicia sozinho com o Windows.
 - Criar o atalho «Guardiana», que abre o painel no seu navegador, no menu Iniciar e na área de trabalho, e o atalho «Guardiana (menu)» no menu Iniciar.
-- Colocar a GUARDIANA como DNS deste computador, também por IPv6, para que comece a olhar desde o primeiro minuto. Antes guarda uma cópia exata da sua configuração; se o serviço parar, o computador recupera o DNS de antes, e ao desinstalar fica exatamente como estava.
+- Colocar a GUARDIANA como DNS deste computador, também por IPv6, para que comece a vigiar desde o primeiro minuto. Antes guarda uma cópia exata da sua configuração; se o serviço parar, o computador recupera o DNS de antes, e ao desinstalar fica exatamente como estava.
 
 O que NÃO vai fazer
 - Não lê o que você envia nem o que recebe: só o nome do serviço, a hora e o aparelho.
@@ -15,6 +15,6 @@ O que NÃO vai fazer
 Depois de instalar
 Ao terminar, o painel abre e em um minuto você verá as consultas deste computador. Para devolver o DNS como estava sem desinstalar: painel, «Estado». Bloquear um nome específico dá para fazer desde o primeiro minuto; os bloqueios amplos, por categoria ou para a casa inteira, esperam até que a GUARDIANA tenha observado esse aparelho por 24 horas.
 
-Sete dias com tudo e sem cartão; depois é preciso uma assinatura. O que foi anotado fica no seu disco, pagando ou não.
+Sete dias com tudo e sem cartão; depois é preciso uma licença (assinatura ou pagamento único). O que foi anotado fica no seu disco, pagando ou não.
 
 Licença do programa: GNU GPL 3.0 ou posterior. Código aberto: você pode ler, compilar e conferir que faz o que diz. O que a GUARDIANA não faz está no WHAT_IT_DOES_NOT_DO.md, no código publicado (github.com/guardianagroup/guardiana).

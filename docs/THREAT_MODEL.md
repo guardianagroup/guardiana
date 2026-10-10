@@ -1,7 +1,7 @@
-# Guardiana — Modelo de amenazas
+# GUARDIANA — Modelo de amenazas
 
-Versión 1.0 · 8 de septiembre de 2026 · derivado de `docs/BRIEF.md` y `docs/HOGAR.md`.
-Este documento dice qué protege Guardiana, de quién, con qué medios, y qué queda fuera.
+Versión 1.0 · 8 de septiembre de 2026, revisado el 10 de octubre de 2026 · derivado de `docs/BRIEF.md` y `docs/HOGAR.md`.
+Este documento dice qué protege GUARDIANA, de quién, con qué medios, y qué queda fuera.
 Lo que queda fuera está también en `docs/WHAT_IT_DOES_NOT_DO.md` con las palabras que usa la interfaz.
 
 ## 1 · Qué protege (activos)
@@ -19,11 +19,12 @@ Lo que queda fuera está también en `docs/WHAT_IT_DOES_NOT_DO.md` con las palab
 ## 2 · De quién (adversarios) y qué puede cada uno
 
 ### A. Rastreadores, telemetría y publicidad dentro de apps y webs
-Lo que Guardiana existe para ver. Capacidad: emitir consultas DNS a nombres conocidos, a intervalos
+Lo que GUARDIANA existe para ver. Capacidad: emitir consultas DNS a nombres conocidos, a intervalos
 regulares, fuera de horas, en volumen. Mitigación: listas abiertas, categorías, las cinco señales
-(brief §5), corte por DNS tras 24 h de observación y solo por decisión del usuario (brief §6).
-Límite: si la app usa IP fija, DNS cifrado propio o VPN, Guardiana no la ve; lo anota como
-"tráfico fuera de vista" cuando lo detecta (señal `evasion_dns`) y no lo esconde.
+(brief §5), corte por DNS solo por decisión del usuario: lo ancho tras 24 h de observación; un
+nombre concreto, desde el primer minuto (brief §6).
+Límite: si la app usa IP fija, DNS cifrado propio o VPN, GUARDIANA no la ve; lo anota como
+«tráfico fuera de vista» cuando lo detecta (señal `evasion_dns`) y no lo esconde.
 
 ### B. Alguien dentro de la Wi‑Fi de casa
 Capacidad: enviar consultas al puerto 53 abierto en LAN, abrir el panel en `http://<ip>:7443`,
@@ -37,6 +38,9 @@ falsificar su IP o su MAC. Mitigación:
   lo demuestra. Comprobación de rango privado de la interfaz en cada arranque: nunca `0.0.0.0`
   hacia interfaces públicas.
 - Regla de cortafuegos solo para el perfil de red privada.
+- La página del teléfono (`http://<ip>:7443/mi-dispositivo`) va sin cifrar por la Wi‑Fi: quien tenga
+  la contraseña de la red podría leer lo que ve ese teléfono. Se dice en el propio panel y en
+  `docs/WHAT_IT_DOES_NOT_DO.md`.
 
 ### C. Una web maliciosa abierta en el navegador del computador (DNS rebinding, CSRF)
 Capacidad: hacer que el navegador hable con `127.0.0.1:7443` en nombre del usuario. Mitigación:
@@ -53,15 +57,15 @@ binarios instalados con la clave incrustada y con el registro. Dependencias audi
 
 ### E. Nosotros mismos (el fabricante)
 Capacidad que renunciamos: recibir datos. Mitigación: no hay servidor nuestro al que el programa
-hable. Las únicas conexiones salientes son las que el usuario provoca (activar licencia, comprobar
-versión, actualizar listas), cada una anotada en la tabla `outbound` con host, fecha y bytes, y
+hable. Las únicas conexiones salientes son las de la licencia (activarla, que provoca el usuario, y la
+comprobación periódica de la suscripción), cada una anotada en la tabla `outbound` con host, fecha y bytes, y
 visible en `/sabe-de-ti`. Código abierto desde el primer commit para que cualquiera lo compruebe.
 
 ### F. Un miembro de la casa que quiera vigilar a otro
 Capacidad: abrir el panel de la casa desde el computador. Mitigación: agregados por dispositivo;
-el detalle solo se ve desde ese dispositivo o si su dueño activó "compartir mi detalle". Aviso al
-abrir el panel desde un dispositivo nuevo: "Esta red usa Guardiana. Esto es lo que se anota de este
-dispositivo." Guardiana no es control parental y no ve contenido ni apps.
+el detalle solo se ve desde ese dispositivo o si su dueño activó «compartir mi detalle». Aviso al
+abrir el panel desde un dispositivo nuevo: «Esta red usa GUARDIANA. Esto es lo que se anota de este
+dispositivo». GUARDIANA no es control parental y no ve contenido ni apps.
 
 ### G. Software con privilegios en el propio computador (malware, otro usuario administrador)
 Fuera de alcance. Quien tiene administrador puede cambiar el DNS, leer o alterar la base de datos y
@@ -69,8 +73,9 @@ detener el servicio. La cadena de hashes detecta alteraciones a posteriori si se
 exportación anterior; no impide que ocurran.
 
 ### H. El resolutor de arriba (upstream) y el proveedor de internet
-Ven todas las consultas que Guardiana reenvía. Guardiana no cifra el reenvío en 1.0 (sin DoH/DoT
-propio, sin DNSSEC), y lo dice. El usuario elige el resolutor en el panel y ve cuál es.
+Ven todas las consultas que GUARDIANA reenvía. GUARDIANA no cifra el reenvío en 1.0 (sin DoH/DoT
+propio, sin DNSSEC), y lo dice. El panel muestra cuál es; se cambia con `--upstream` al arrancar
+`guardiana observe`.
 
 ## 3 · Supuestos
 
@@ -81,13 +86,15 @@ propio, sin DNSSEC), y lo dice. El usuario elige el resolutor en el panel y ve c
 
 ## 4 · Fallos seguros
 
-- Guardiana es el único resolutor del equipo (desde la 1.0.2: Windows consultaba el secundario en
+- GUARDIANA es el único resolutor del equipo (desde la 1.0.2: Windows consultaba el secundario en
   paralelo y el guardián no veía esas consultas). Si el servicio se para de forma ordenada, caduca o
   se desinstala, devuelve el DNS original antes de irse. Si cae de golpe, el equipo se queda sin
   nombres hasta que el sistema lo relanza (5 s en Linux; 5/15/60 s en Windows; inmediato con launchd),
   y el propio servicio comprueba cada 15 s que su resolutor sigue vivo y lo levanta si no. Al volver,
-  se anota "Guardiana no estaba vigilando entre X e Y".
-- Sin licencia y sin prueba: Modo Hogar se apaga con aviso; el DNS del computador nunca se rompe.
+  se anota «GUARDIANA no estaba vigilando entre X e Y».
+- Sin licencia y sin prueba: Modo Hogar queda apartado con aviso (el puerto 53 sigue pasando las
+  consultas de la casa, sin anotarlas, hasta que se devuelva el DNS del router); el DNS del
+  computador nunca se rompe.
 - Desinstalar restaura exactamente la configuración de DNS anterior y quita la regla de cortafuegos.
 - Nada ancho (una categoría, toda la casa, el Modo Vigilante) se corta antes de 24 h de observación
   del aparato. Un nombre concreto en un aparato concreto sí puede cortarse desde el primer minuto,

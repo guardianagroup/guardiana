@@ -12,7 +12,10 @@ param(
     [Parameter(Mandatory = $true)][string]$Version,
     [Parameter(Mandatory = $true)][string]$Out,
     [ValidateSet("es", "en", "pt")][string]$Idioma = "es",
-    [string]$Wix = "wix"
+    [string]$Wix = "wix",
+    # Only for zero/prueba/instalador.ps1: an «older» package of the same program, to try a real
+    # upgrade. Never for anything that is published.
+    [switch]$Prueba
 )
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -29,7 +32,8 @@ foreach ($f in @($readme, $welcome, $loc, $icon, $wxs)) { if (-not (Test-Path $f
 if (-not (Test-Path $Exe)) { throw "No existe $Exe" }
 $fv = (Get-Item $Exe).VersionInfo.FileVersion
 if ([string]::IsNullOrWhiteSpace($fv)) { throw "$Exe no tiene FileVersion" }
-if (-not $fv.StartsWith($Version)) { throw "$Exe dice FileVersion $fv y el instalador es $Version" }
+# Exactly this version («1.0.1» must not pass for an exe that says «1.0.12»).
+if (-not $Prueba -and ($fv -ne $Version) -and ($fv -ne "$Version.0")) { throw "$Exe dice FileVersion $fv y el instalador es $Version" }
 Write-Host "GUARDIANA ZERO.exe FileVersion = $fv"
 $outDir = Split-Path -Parent $Out
 if ($outDir -and -not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir | Out-Null }

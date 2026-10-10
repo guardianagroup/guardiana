@@ -98,12 +98,17 @@ jobs:
               exit 1
             }
           }
+          # The same program packaged as 1.0.0, only to try a real upgrade below; it never
+          # leaves this run (it is not in msi/, which is what gets packaged).
+          New-Item -ItemType Directory -Force -Path msi-prueba | Out-Null
+          $salida = & powershell -NoProfile -ExecutionPolicy Bypass -File build/msi-zero.ps1 -Exe $exe -Version 1.0.0 -Prueba -Out "$PWD/msi-prueba/viejo.msi" 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0) { Write-Output "::error title=msi-zero.ps1 viejo::$($salida -replace "`r?`n", ' | ')"; exit 1 }
       # And what a person gets from it, on this clean Windows: zero/prueba/instalador.ps1.
       - name: installer end to end
         shell: pwsh
         run: |
           $v = (Select-String -Path zero/navegador/Cargo.toml -Pattern '^version = "(.*)"' | Select-Object -First 1).Matches[0].Groups[1].Value
-          powershell -NoProfile -ExecutionPolicy Bypass -File zero/prueba/instalador.ps1 -Msi "msi/guardiana-zero-$v-windows-x64.msi" -Exe zero/navegador/target/release/guardiana-zero.exe -Version $v -Otros "msi/guardiana-zero-$v-windows-x64-en.msi","msi/guardiana-zero-$v-windows-x64-pt.msi"
+          powershell -NoProfile -ExecutionPolicy Bypass -File zero/prueba/instalador.ps1 -Msi "msi/guardiana-zero-$v-windows-x64.msi" -Viejo msi-prueba/viejo.msi -Exe zero/navegador/target/release/guardiana-zero.exe -Version $v -Otros "msi/guardiana-zero-$v-windows-x64-en.msi","msi/guardiana-zero-$v-windows-x64-pt.msi"
           if ($LASTEXITCODE -ne 0) { exit 1 }
           Copy-Item -Recurse -Force "$env:RUNNER_TEMP/instalador" "$env:RUNNER_TEMP/e2e/instalador" -ErrorAction SilentlyContinue
       - name: package

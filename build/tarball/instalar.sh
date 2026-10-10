@@ -38,13 +38,13 @@ echo
 # one). Give it a moment and ask systemd before saying so.
 sleep 2
 if systemctl is-active --quiet guardiana; then
-    m "Guardiana instalada y en marcha. Para abrir el panel: sudo guardiana panel" \
-      "Guardiana is installed and running. To open the panel: sudo guardiana panel" \
-      "A Guardiana está instalada e funcionando. Para abrir o painel: sudo guardiana panel"
+    m "GUARDIANA instalada y en marcha. Para abrir el panel: sudo guardiana panel" \
+      "GUARDIANA is installed and running. To open the panel: sudo guardiana panel" \
+      "A GUARDIANA está instalada e funcionando. Para abrir o painel: sudo guardiana panel"
 else
-    m "Guardiana está instalada, pero el servicio no está en marcha. Mira por qué con: journalctl -u guardiana -n 20" \
-      "Guardiana is installed, but the service is not running. See why with: journalctl -u guardiana -n 20" \
-      "A Guardiana está instalada, mas o serviço não está em execução. Veja o motivo com: journalctl -u guardiana -n 20"
+    m "GUARDIANA está instalada, pero el servicio no está en marcha. Mira por qué con: journalctl -u guardiana -n 20" \
+      "GUARDIANA is installed, but the service is not running. See why with: journalctl -u guardiana -n 20" \
+      "A GUARDIANA está instalada, mas o serviço não está em execução. Veja o motivo com: journalctl -u guardiana -n 20"
 fi
 if [ "$primera" = 1 ]; then
     m "El DNS del sistema no ha cambiado. Se cambia desde el panel, con tu permiso." \

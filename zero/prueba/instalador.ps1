@@ -1,14 +1,18 @@
 # The GUARDIANA ZERO installer, end to end on a clean Windows (zero.yml, after the browser's own
 # test): what a person gets after double-clicking it. Usage:
 #   powershell -NoProfile -File zero/prueba/instalador.ps1 -Msi dist/guardiana-zero-<v>-windows-x64.msi `
-#       -Exe zero/navegador/target/release/guardiana-zero.exe -Version <v> [-Otros dist/...-en.msi,dist/...-pt.msi]
-# It checks, in this order: the package asks for no administrator rights; installing leaves the
-# program (byte for byte the one GitHub built), the readme and the two shortcuts; the installed
-# program opens; installing again while it is open closes it (it saves) and replaces it in place;
-# uninstalling removes program and shortcuts and leaves the person's data. Every check prints
-# «OK» or «FALLO», and the run fails on any «FALLO».
+#       -Viejo msi/prueba-viejo.msi -Exe zero/navegador/target/release/guardiana-zero.exe -Version <v> `
+#       [-Otros dist/...-en.msi,dist/...-pt.msi]
+# It checks, in this order: the package asks for no administrator rights; an older version
+# (-Viejo, the same program packaged as 1.0.0) installs and opens; the new installer, run while the
+# older one is OPEN, closes it the way its own X does (it saves and exits by itself, never killed)
+# and replaces it in place, with one entry in «Apps»; the new program is byte for byte the one
+# GitHub built, with its readme and its two shortcuts, and opens; the other two languages install
+# over it; uninstalling removes program and shortcuts and leaves the person's data. Every check
+# prints «OK» or «FALLO», and the run fails on any «FALLO».
 param(
     [Parameter(Mandatory = $true)][string]$Msi,
+    [Parameter(Mandatory = $true)][string]$Viejo,
     [Parameter(Mandatory = $true)][string]$Exe,
     [Parameter(Mandatory = $true)][string]$Version,
     [string[]]$Otros = @()
@@ -19,9 +23,21 @@ $bien = 0
 function Comprueba([bool]$ok, [string]$que) {
     if ($ok) { $script:bien++; Write-Host "OK    $que" } else { $script:fallos++; Write-Host "FALLO $que"; Write-Host "::error title=instalador::$que" }
 }
-function Msiexec([string[]]$args, [string]$log) {
-    $p = Start-Process -FilePath msiexec.exe -ArgumentList ($args + @('/qn', '/norestart', '/l*v', $log)) -Wait -PassThru
+# Each argument quoted: runner paths have no spaces today, a person's may.
+function Msiexec([string[]]$argumentos, [string]$log) {
+    $todos = @($argumentos | ForEach-Object { if ($_ -match '^/') { $_ } else { '"' + $_ + '"' } }) + @('/qn', '/norestart', '/l*v', ('"' + $log + '"'))
+    $p = Start-Process -FilePath msiexec.exe -ArgumentList $todos -Wait -PassThru
     return $p.ExitCode
+}
+# Opens the installed program and waits for its own mark (en-marcha.txt: «<version> <pid>»).
+function Abre([string]$version) {
+    Remove-Item -Force -ErrorAction SilentlyContinue $enMarcha
+    $p = Start-Process -FilePath $instalado -PassThru
+    for ($i = 0; $i -lt 60; $i++) {
+        Start-Sleep -Milliseconds 500
+        if ((Test-Path $enMarcha) -and ((Get-Content $enMarcha -ErrorAction SilentlyContinue) -match "^$([regex]::Escape($version)) $($p.Id)$")) { return $p }
+    }
+    return $null
 }
 function Lee-Lnk([string]$ruta) {
     $sh = New-Object -ComObject WScript.Shell
@@ -53,21 +69,39 @@ function Propiedad([string]$nombre) {
     return $r.GetType().InvokeMember('StringData', 'GetProperty', $null, $r, @(1))
 }
 $allusers = Propiedad 'ALLUSERS'
-Comprueba (($null -eq $allusers) -or ($allusers -eq '') -or ($allusers -eq '2')) "ALLUSERS no fuerza la instalación para todos ($allusers)"
+Comprueba (($null -eq $allusers) -or ($allusers -eq '')) "ALLUSERS vacío: solo para este usuario ($allusers)"
 Comprueba ((Propiedad 'ProductName') -eq 'GUARDIANA ZERO') "el producto se llama GUARDIANA ZERO"
 Comprueba ((Propiedad 'ProductVersion') -eq $Version) "la versión del paquete es $Version"
 Comprueba ((Propiedad 'ProductLanguage') -eq '0') "el paquete es neutro de idioma"
 Comprueba ((Propiedad 'ARPNOMODIFY') -eq '1') "en «Aplicaciones» no hay «Modificar»"
 $codigo = Propiedad 'ProductCode'
+$enMarcha = Join-Path $datos "en-marcha.txt"
 
 # 2. A person's data from before (an earlier version, or the loose .exe) must survive.
 New-Item -ItemType Directory -Force -Path $datos | Out-Null
 $marca = Join-Path $datos "marca-de-prueba.txt"
 Set-Content -Path $marca -Value "antes de instalar"
 
-# 3. Install.
+# 3. An older version first, open, as a person who updates would have it.
+$r = Msiexec @('/i', (Resolve-Path $Viejo).Path) (Join-Path $logs "instalar-viejo.log")
+Comprueba ($r -eq 0) "la versión vieja (1.0.0) se instala ($r)"
+$viejo = Abre $Version  # the same program inside, packaged as 1.0.0
+Comprueba ($null -ne $viejo) "la versión vieja abre"
+$codigoViejo = (Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' | Where-Object { (Get-ItemProperty $_.PSPath).DisplayName -eq 'GUARDIANA ZERO' } | Select-Object -First 1).PSChildName
+
+# 4. The new installer while the old one is open: it must be asked to close (WM_CLOSE: it saves
+#    and exits by itself) and be replaced in place, with no «file in use» and no reboot.
 $r = Msiexec @('/i', (Resolve-Path $Msi).Path) (Join-Path $logs "instalar.log")
-Comprueba ($r -eq 0) "msiexec /i termina con 0 ($r)"
+Comprueba ($r -eq 0) "el instalador nuevo, con la vieja abierta, termina con 0 ($r)"
+if ($null -ne $viejo) {
+    $viejo.WaitForExit(15000) | Out-Null
+    Comprueba ($viejo.HasExited) "la versión vieja se cerró para dejar paso"
+    Comprueba ($viejo.ExitCode -eq 0) "y se cerró ella sola, sin que nadie la matara (código $($viejo.ExitCode))"
+    Comprueba (-not ((Get-Content $enMarcha -ErrorAction SilentlyContinue) -match " $($viejo.Id)$")) "y quitó su marca de en marcha al salir, como con su X"
+}
+$entradas = @(Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' | Where-Object { (Get-ItemProperty $_.PSPath).DisplayName -eq 'GUARDIANA ZERO' })
+Comprueba ($entradas.Count -eq 1) "una sola entrada GUARDIANA ZERO en «Aplicaciones» ($($entradas.Count))"
+Comprueba ($codigoViejo -ne $codigo) "la vieja era otro producto de la misma familia ($codigoViejo)"
 Comprueba (Test-Path $instalado) "deja GUARDIANA ZERO.exe en $carpeta"
 if (Test-Path $instalado) {
     Comprueba ((Get-FileHash -Algorithm SHA256 $instalado).Hash -eq $huella) "y es, byte a byte, el que compiló GitHub"
@@ -86,28 +120,12 @@ if (Test-Path $arp) {
 Comprueba (-not (Test-Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$codigo")) "nada en la parte de la máquina (HKLM)"
 Comprueba ((Get-Content $marca) -eq 'antes de instalar') "los datos de antes siguen ahí"
 
-# 4. The installed program opens (its own log says so: «arranque: GUARDIANA ZERO <v>», and
-#    en-marcha.txt carries its version and PID).
-$enMarcha = Join-Path $datos "en-marcha.txt"
-Remove-Item -Force -ErrorAction SilentlyContinue $enMarcha
-$proc = Start-Process -FilePath $instalado -PassThru
-$abierto = $false
-for ($i = 0; $i -lt 60; $i++) {
-    Start-Sleep -Milliseconds 500
-    if ((Test-Path $enMarcha) -and ((Get-Content $enMarcha -ErrorAction SilentlyContinue) -match "^$([regex]::Escape($Version)) $($proc.Id)$")) { $abierto = $true; break }
-}
-Comprueba $abierto "el programa instalado abre (en-marcha.txt: $(Get-Content $enMarcha -ErrorAction SilentlyContinue))"
-
-# 5. Install again while it is open: it must be asked to close (it saves) and be replaced in
-#    place, with no «file in use» and no reboot.
-$r = Msiexec @('/i', (Resolve-Path $Msi).Path) (Join-Path $logs "instalar-encima.log")
-Comprueba ($r -eq 0) "instalar encima con el programa abierto termina con 0 ($r)"
-Start-Sleep -Seconds 2
-Comprueba ($proc.HasExited) "el programa abierto se cerró solo para dejar paso"
-Comprueba ((Test-Path $instalado) -and ((Get-FileHash -Algorithm SHA256 $instalado).Hash -eq $huella)) "y el programa sigue en su sitio, entero"
-Comprueba ((Test-Path $inicio) -and (Test-Path $escritorio)) "con sus dos accesos"
+# 5. The new program opens (en-marcha.txt carries its version and PID), and its log says so.
+$nuevo = Abre $Version
+Comprueba ($null -ne $nuevo) "el programa nuevo abre (en-marcha.txt: $(Get-Content $enMarcha -ErrorAction SilentlyContinue))"
 $reg = Get-Content (Join-Path $datos "registro.txt") -ErrorAction SilentlyContinue
-Comprueba (($reg | Where-Object { $_ -match 'arranque: GUARDIANA ZERO ' + [regex]::Escape($Version) }).Count -ge 1) "y su registro anota el arranque"
+Comprueba (($reg | Where-Object { $_ -match 'arranque: GUARDIANA ZERO ' + [regex]::Escape($Version) }).Count -ge 1) "y su registro anota el arranque de la $Version"
+if ($null -ne $nuevo) { $nuevo.CloseMainWindow() | Out-Null; $nuevo.WaitForExit(15000) | Out-Null }
 
 # 6. The other languages install and uninstall too, with their own readme.
 foreach ($otro in $Otros) {

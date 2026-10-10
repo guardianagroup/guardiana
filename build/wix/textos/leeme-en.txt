@@ -3,8 +3,8 @@
 
 GUARDIANA shows you which services your AI talks to and, with Home Mode, every
 device on your Wi-Fi: it explains each one in a sentence and blocks only what you
-decide. Everything happens on this machine. No account, no server, zero
-telemetry.
+decide. Everything happens on this computer. No account, no server of ours,
+zero telemetry.
 
 What the installer did
 ----------------------
@@ -12,23 +12,23 @@ What the installer did
 - Registered the “Guardiana” service, which starts with Windows.
 - Added the “Guardiana” and “Guardiana (menu)” shortcuts to the Start menu, and
   “Guardiana” to the desktop.
-- Made GUARDIANA this machine's DNS, over IPv6 too, with an exact copy of the
-  previous setting. If the service stops, the machine gets its previous DNS
+- Made GUARDIANA this computer's DNS, over IPv6 too, with an exact copy of the
+  previous setting. If the service stops, the computer gets its previous DNS
   back; uninstalling leaves it exactly as it was.
 - It opened no port to the network. Only Home Mode, when you turn it on, opens
   ports on your home Wi-Fi; turning it off closes them.
 
 After installing
 ----------------
-Start menu > Guardiana. The panel opens and you will see this machine's
+Start menu > Guardiana. The panel opens and you will see this computer's
 queries from the first minute. To put the DNS back as it was without
 uninstalling: panel, “Status”. Blocking one specific name works
 from the first minute; broad blocks, by category or for the whole home, wait until
 GUARDIANA has been watching that device for 24 hours.
 
 It is seven days with every feature, Home Mode included, no card needed. After that
-you need a subscription; what was written down stays on your disk, whether you
-pay or not.
+you need a licence (a subscription or a single payment); what was written down
+stays on your disk, whether you pay or not.
 
 Uninstalling
 ------------
@@ -44,7 +44,7 @@ PowerShell:
     guardiana verify
 
 Before installing: check the hash of the .msi file and compare it with
-SHA256SUMS and with the public ledger (ledger.jsonl). How to do it, step by
+SHA256SUMS and with the public record (ledger.jsonl). How to do it, step by
 step, is in VERIFY.md, in the published source code (github.com/guardianagroup/guardiana).
 
 What GUARDIANA does not do is in WHAT_IT_DOES_NOT_DO.md. Read it.

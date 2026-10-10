@@ -1,4 +1,4 @@
-# Guardiana
+# GUARDIANA
 
 *Idiomas: [Español](README.md) · [English](README.en.md) · **Português***
 
@@ -22,7 +22,7 @@ fica anotada no próprio extrato.
 ## GUARDIANA ZERO, o navegador
 
 Um navegador próprio para Windows 10 e 11. Corta o que os sites chamam por trás (rastreadores,
-publicidade e corretores de dados inscritos) e mostra cada corte ao vivo: qual empresa, de que país e
+publicidade e corretoras de dados inscritas) e mostra cada corte ao vivo: qual empresa, de que país e
 por quê. Tira as etiquetas de rastreamento dos endereços, não deixa seus dados marcados saírem para outra
 empresa, abre mandatos para a sua IA com recibo assinado e risca seus dados antes de você perguntar algo a ela.
 Os primeiros 7 dias são grátis; depois ele vem incluído na assinatura da GUARDIANA (a mesma chave).
@@ -41,11 +41,11 @@ Os primeiros 7 dias são grátis; depois ele vem incluído na assinatura da GUAR
 | Outro Linux com systemd | `guardiana-<versão>-linux-x86_64.tar.gz` | Descompactar e `sudo ./instalar.sh` |
 
 No Linux e no Mac, instalar **não muda o DNS do sistema**: isso se faz pelo painel, com
-consentimento, e se desfaz no mesmo lugar. No Windows, a primeira instalação coloca a Guardiana
+consentimento, e se desfaz no mesmo lugar. No Windows, a primeira instalação coloca a GUARDIANA
 como DNS (a tela de boas-vindas avisa antes de «Instalar») e isso se desfaz no painel, em «Estado». Desinstalar desliga o Modo Casa, tira a regra do firewall e restaura o DNS
 exatamente como estava.
 
-Antes de instalar, compare a impressão SHA‑256 do arquivo com a da página de download e com a linha
+Antes de instalar, compare a impressão digital SHA‑256 do arquivo com a da página de download e com a linha
 correspondente de [`ledger.jsonl`](ledger.jsonl), o registro público que sai antes do download.
 Depois de instalar, `guardiana verify` confere isso no seu computador.
 
@@ -53,7 +53,7 @@ Depois de instalar, `guardiana verify` confere isso no seu computador.
 
 ```
 guardiana panel          abre o painel no navegador (a única interface)
-guardiana verify         impressão, assinatura, serviço, DNS do sistema, portas, listas, cadeia
+guardiana verify         impressão digital, assinatura, serviço, DNS do sistema, portas, listas, cadeia
 guardiana dns --status   para onde aponta o DNS do sistema
 guardiana hogar status   estado do Modo Casa
 guardiana ledger --check confere a cadeia do extrato
@@ -62,7 +62,7 @@ guardiana export         exporta o extrato em CSV ou JSON
 
 Nada é bloqueado sem decisão do usuário, sempre com «desbloquear» à vista: um nome concreto é
 bloqueado desde o primeiro minuto, e os bloqueios amplos —por categoria, para a casa inteira ou o modo
-que bloqueia tudo o que não foi declarado— esperam a Guardiana olhar esse aparelho por 24 horas. Nenhum sinal é um veredito; a interface nunca diz «malicioso».
+que bloqueia tudo o que não foi declarado— esperam a GUARDIANA observar esse aparelho por 24 horas. Nenhum sinal é um veredito; a interface nunca diz «malicioso».
 
 ## Compilar
 

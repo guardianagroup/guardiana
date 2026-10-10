@@ -3,8 +3,8 @@
 
 O GUARDIANA ZERO é um navegador próprio: enquanto você navega, vê na hora quais
 empresas cada página tenta chamar por trás e quais delas são barradas, com o
-país e o motivo. Tudo acontece neste PC. Sem conta, sem servidor nosso, zero
-telemetria.
+país e o motivo. Tudo acontece neste computador. Sem conta, sem servidor
+nosso, zero telemetria.
 
 O que o instalador fez
 ----------------------
@@ -15,9 +15,9 @@ O que o instalador fez
 
 Onde estão os seus dados
 ------------------------
-Em AppData\Local\GUARDIANA ZERO: seus ajustes, seus favoritos, seus dados
-marcados, as cifras de cada dia e os recibos. Só neste PC. Continuam lá mesmo se
-você desinstalar; apague à mão se não quiser.
+Em AppData\Local\GUARDIANA ZERO: suas configurações, seus favoritos, seus
+dados marcados, os números de cada dia e os recibos. Só neste computador.
+Continuam lá mesmo se você desinstalar; apague à mão se não quiser.
 
 Atualizar
 ---------

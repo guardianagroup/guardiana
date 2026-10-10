@@ -1,72 +1,73 @@
-# Guardiana — Lo que no hace
+# GUARDIANA — Lo que no hace
 
-Versión 1.0 · 8 de septiembre de 2026 · derivado de `docs/BRIEF.md` y `docs/HOGAR.md`.
+Versión 1.0 · 8 de septiembre de 2026, revisado el 10 de octubre de 2026 · derivado de `docs/BRIEF.md` y `docs/HOGAR.md`.
 Cada punto se dice también en la pantalla donde el usuario lo esperaría, con estas palabras.
-La regla: nunca "100 % seguro", nunca "invisible", nunca "protegido" sin objeto, nunca "malicioso".
+La regla: nunca «100 % seguro», nunca «invisible», nunca «protegido» sin objeto, nunca «malicioso».
 
 ## Lo que no ve
 
 - **No ve qué app pidió cada nombre, salvo en este computador y solo en Windows.** Desde el 20 de
   septiembre de 2026 (decisión 183), en Windows y solo para el equipo donde está instalada,
-  Guardiana sí puede decir qué programa pidió cada nombre: se lo cuenta el propio Windows por su
+  GUARDIANA sí puede decir qué programa pidió cada nombre: se lo cuenta el propio Windows por su
   canal de sucesos, y lo que guarda es el nombre del programa, su ruta y su huella. En Modo Hogar,
-  para teléfonos y televisores, sigue sin poder saberse: "En Modo Hogar, Guardiana ve nombres de
-  servicios, no qué app los pidió." Y en ningún caso corta por programa: eso es 2.0.
+  para teléfonos y televisores, sigue sin poder saberse: «En Modo Hogar, GUARDIANA ve nombres de
+  servicios, no qué app los pidió.» Y en ningún caso corta por programa: eso es 2.0.
 - **No mira archivos, ni siquiera los suyos.** Los «archivos trampa» (decisión 184) no son
   vigilancia del sistema de archivos: el cebo es un nombre único escrito dentro del archivo, y lo
-  único que Guardiana ve —como siempre— es si alguien pregunta por ese nombre. Nunca abre el
+  único que GUARDIANA ve —como siempre— es si alguien pregunta por ese nombre. Nunca abre el
   archivo, y un programa que lo lea y no siga el enlace no aparece en ningún sitio.
 - **No ve contenido.** Ni páginas, ni mensajes, ni qué se hizo en cada servicio.
 - **No ve cuántos bytes.** Solo que se preguntó por un nombre, cuándo y cuántas veces.
 - **No anota respuestas.** Solo consultas: nombre, tipo, dispositivo, hora, categoría, veredicto.
 - **No ve lo que esquiva el DNS.** Apps con IP fija, apps con su propio DNS cifrado (DoH/DoT), una
-  VPN en el teléfono, iCloud Private Relay en Safari. Cuando lo detecta, lo anota como "tráfico
-  fuera de vista"; no lo esconde ni lo cuenta como protegido.
+  VPN en el teléfono, iCloud Private Relay en Safari. Cuando lo detecta, lo anota como «tráfico
+  fuera de vista»; no lo esconde ni lo cuenta como protegido.
 - **No ve nada fuera de la Wi‑Fi de casa.** Con datos móviles o en otra red, el teléfono no pasa por
-  Guardiana. Frase: "Solo en la Wi‑Fi de casa, por nombre de dominio."
-- **No ve lo que hace el router por su cuenta.** El router es la puerta de la casa y Guardiana vive
+  GUARDIANA. Frase: «Solo en la Wi‑Fi de casa, por nombre de dominio.»
+- **No ve lo que hace el router por su cuenta.** El router es la puerta de la casa y GUARDIANA vive
   detrás de ella. Si el router copia tráfico o lo envía fuera en silencio, desde dentro no se ve.
-  Si el router usa Guardiana como DNS, sus propias consultas se anotan como las de cualquier otro
-  dispositivo. Frase: "Guardiana ve lo que pasa dentro de la Wi‑Fi, no lo que hace el router."
+  Si el router usa GUARDIANA como DNS, sus propias consultas se anotan como las de cualquier otro
+  dispositivo. Frase: «GUARDIANA ve lo que pasa dentro de la Wi‑Fi, no lo que hace el router.»
 - **No ve nada si el computador guardián está apagado o dormido.** Un portátil que se suspende
   deja de responder; Modo Hogar avisa si el equipo tiene la suspensión activada. Los dispositivos siguen resolviendo por
   el DNS secundario del router; nada se rompe y nada se anota.
 
 ## Lo que no decide
 
-- **No dice "malicioso".** Dice qué observó: la categoría de la lista y la señal, cada una con una
+- **No dice «malicioso».** Dice qué observó: la categoría de la lista y la señal, cada una con una
   frase. Ninguna señal es un veredicto.
 - **No corta nada por su cuenta.** Ningún bloqueo ancho (categoría, toda la casa, Modo Vigilante)
   antes de 24 horas observando un dispositivo; un nombre concreto en un aparato concreto se puede
   bloquear desde el primer minuto, con confirmación mientras lleve menos de un día mirando. Ninguno
-  sin decisión del usuario, ninguno sin "desbloquear" visible en la misma fila.
+  sin decisión del usuario, ninguno sin «desbloquear» visible en la misma fila.
 - **No corta actualizaciones, hora, resolutores, mensajería ni videollamada reconocidas** aunque
   una regla por categoría lo pida. Una regla explícita por dominio sobre uno de estos pide
-  confirmación: "Esto puede dejar sin actualizaciones / sin mensajes a este dispositivo."
+  confirmación: «Esto puede dejar sin actualizaciones / sin mensajes a este dispositivo.»
 - **No es control parental.** No ve contenido, no ve apps, no muestra el detalle de un dispositivo
   sin permiso de su dueño.
 
 ## Lo que no envía
 
-- **No contacta ningún servidor nuestro.** Nunca. No hay telemetría, no hay cuenta, no hay
-  "comprobación periódica".
+- **No contacta ningún servidor nuestro.** Nunca. No hay telemetría ni cuenta. La única conexión
+  periódica es la comprobación de la suscripción con la pasarela de pago, y está anotada en «Lo que
+  GUARDIANA sabe de ti».
 - **Solo sale del equipo lo que el usuario provoca**: activar la licencia (una llamada) y la
   comprobación periódica de la suscripción. No hay más: las listas van dentro del programa, con su
   fecha, y las versiones nuevas las descarga e instala el usuario desde la web. Cada conexión aparece
   en `/sabe-de-ti` con host, fecha y bytes.
-- **No envía el informe semanal ni la tarjeta.** El botón "Compartir" abre la app del usuario
-  (WhatsApp por enlace); Guardiana no envía nada.
+- **No envía el informe semanal ni la tarjeta.** El botón «Compartir» abre la app del usuario
+  (WhatsApp por enlace); GUARDIANA no envía nada.
 
 ## Lo que no promete
 
-- **No protege "el teléfono".** Protege "en la Wi‑Fi de casa, por nombre de dominio".
+- **No protege «el teléfono».** Protege «en la Wi‑Fi de casa, por nombre de dominio».
 - **En Windows y en el Mac, mientras el servicio está parado, no mira.** Desde el 28 sep 2026
-  Guardiana es el único DNS de Windows, por IPv4 y por IPv6, y desde la 1.0.2 también del Mac:
+  GUARDIANA es el único DNS de Windows, por IPv4 y por IPv6, y desde la 1.0.2 también del Mac:
   con el antiguo de secundario, el sistema y los navegadores se iban por él (Edge y Chrome,
   además, cifrado hacia Cloudflare o Google) y no se veía nada. Para que nadie se quede
   sin internet, cuando el servicio se para el equipo recupera su DNS de antes hasta que vuelve a
   arrancar; esas consultas no se anotan. `guardiana verify` hace una consulta de verdad y dice si
-  llega a Guardiana.
+  llega a GUARDIANA.
 - **No ve lo que un programa resuelve por su cuenta.** Un navegador con DNS cifrado elegido a mano,
   una VPN o un antivirus con su propio DNS no preguntan al sistema. Se anota como señal
   («evasión de DNS») cuando se detecta, pero lo que viaja por ahí no se ve.
@@ -118,13 +119,15 @@ La regla: nunca "100 % seguro", nunca "invisible", nunca "protegido" sin objeto,
 - La aplicación de Mac no está notarizada por Apple: macOS avisa la primera vez y hay que abrirla con clic derecho. Está explicado en la página de instalar.
 - Bloqueo por aplicación y sensores por proceso (2.0).
 - Actualización automática: nunca, ni silenciosa ni con aviso. No existe la orden `guardiana update`
-  ni ninguna comprobación de versión: el programa no sabe si hay una versión nueva. Se descarga de la
+  ni ninguna comprobación de versión: el programa no sabe si hay una versión nueva (GUARDIANA, el
+  programa de DNS; el navegador GUARDIANA ZERO busca actualización solo cuando se lo pides, y lo
+  anota). Se descarga de la
   web, se comprueba su huella contra el registro público y se instala encima.
 - Cortafuegos de IA (2.0).
 - Interfaz de escritorio nativa (egui): el panel en el navegador es la única interfaz.
 - IPv6: el resolutor escucha en IPv4 (`127.0.0.1` y la IP LAN IPv4) y, en este equipo, también en
-  `::1`. Un dispositivo de la casa que use un servidor DNS IPv6 no pasa por Guardiana (se dice en
+  `::1`. Un dispositivo de la casa que use un servidor DNS IPv6 no pasa por GUARDIANA (se dice en
   `/hogar`); y en Windows, una conexión que solo reciba servidores DNS IPv6 (ninguno IPv4) no se
-  apunta a Guardiana: la copia del DNS se toma de la lista IPv4.
-- Verificación de reproducibilidad por terceros, aviso de actualización y "qué app" en Windows:
-  extras de la sección 12, solo si están probados en una máquina ajena el día 24.
+  apunta a GUARDIANA: la copia del DNS se toma de la lista IPv4.
+- Verificación de reproducibilidad por terceros y aviso de actualización: extras de la sección 12
+  del brief, fuera de la 1.0.

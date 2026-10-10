@@ -1,6 +1,6 @@
 GUARDIANA ZERO for Windows
 
-GUARDIANA ZERO is a browser of its own. As you browse, you see at once which companies each page tries to call behind your back and which ones are cut off, with their country and the reason. Everything happens on this PC. No account, no server of ours, zero telemetry.
+GUARDIANA ZERO is a browser of its own. As you browse, you see at once which companies each page tries to call behind your back and which ones are blocked, with their country and the reason. Everything happens on this PC. No account, no server of ours, zero telemetry.
 
 What this installer will do
 - Copy the program to your user folder (AppData\Local\Programs\GUARDIANA ZERO). It does not ask for an administrator password.
@@ -10,7 +10,7 @@ What this installer will do
 
 What it will NOT do
 - It changes nothing in Windows or in your other browsers: not the default browser, not the DNS, not a single setting.
-- It does not read what you type or what you see: the browser only decides, on your machine, which of a page's requests leave and which do not.
+- It does not read what you type or what you see: the browser only decides, on your computer, which of a page's requests leave and which do not.
 
 After installing
 The first 7 days are free, with no account; after that it comes with the GUARDIANA subscription. Your settings, your marked data and your figures are kept only on this PC, in AppData\Local\GUARDIANA ZERO, and they stay even if you uninstall.

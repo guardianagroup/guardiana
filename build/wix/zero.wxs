@@ -59,12 +59,12 @@
     <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="!(loc.VersionMasNueva)" />
     <MediaTemplate EmbedCab="yes" />
 
-    <!-- «Programs and Features» / «Apps»: the icon, the site, no «Modify». -->
+    <!-- «Programs and Features» / «Apps»: the icon and the site. No «Modify»: WixUI_Minimal
+         already sets ARPNOMODIFY (declaring it again is error WIX0091). -->
     <Icon Id="zero.ico" SourceFile="$(var.Icon)" />
     <Property Id="ARPPRODUCTICON" Value="zero.ico" />
     <Property Id="ARPURLINFOABOUT" Value="https://guardianagroup.com/zero.html" />
     <Property Id="ARPHELPLINK" Value="https://guardianagroup.com/zero.html" />
-    <Property Id="ARPNOMODIFY" Value="1" />
 
     <!-- A running copy is asked to close before the files are replaced or removed: the same
          message as its own X (it saves and leaves). Never killed: if it does not close in 30 s,

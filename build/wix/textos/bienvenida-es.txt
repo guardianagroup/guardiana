@@ -13,8 +13,8 @@ Qué NO va a hacer
 - No abre ningún puerto a la red. Solo el Modo Hogar, cuando tú lo enciendas, abre puertos en la Wi-Fi de casa; apagarlo los cierra.
 
 Después de instalar
-Al terminar se abre el panel y en un minuto verás las consultas de este PC. Para devolver el DNS a como estaba sin desinstalar: panel, «Estado». Bloquear un nombre concreto se puede desde el primer minuto; los bloqueos anchos, por categoría o para toda la casa, esperan a que GUARDIANA lleve 24 horas mirando ese aparato.
+Al terminar se abre el panel y en un minuto verás las consultas de este PC. Para devolver el DNS a como estaba sin desinstalar: panel, «Estado». Bloquear un nombre concreto se puede desde el primer minuto; los bloqueos anchos, por categoría o para toda la casa, esperan a que GUARDIANA lleve 24 horas observando ese aparato.
 
-Siete días con todo y sin tarjeta; después hace falta una suscripción. Lo anotado se queda en tu disco, pagues o no.
+Siete días con todo y sin tarjeta; después hace falta una licencia (suscripción o pago único). Lo anotado se queda en tu disco, pagues o no.
 
 Licencia del programa: GNU GPL 3.0 o posterior. Código abierto: puedes leerlo, compilarlo y comprobar que hace lo que dice. Lo que GUARDIANA no hace está en WHAT_IT_DOES_NOT_DO.md, en el código publicado (github.com/guardianagroup/guardiana).

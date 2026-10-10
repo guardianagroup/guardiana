@@ -1,4 +1,4 @@
-# Guardiana
+# GUARDIANA
 
 *Languages: [Español](README.md) · **English** · [Português](README.pt.md)*
 
@@ -45,19 +45,19 @@ anything. The first 7 days are free; after that it comes with the GUARDIANA subs
 | Other Linux with systemd | `guardiana-<version>-linux-x86_64.tar.gz` | Unpack and `sudo ./instalar.sh` |
 
 On Linux and on the Mac, installing **does not change the system DNS**: that is done from the panel,
-with consent, and undone in the same place. On Windows, a first install makes Guardiana the DNS (the
+with consent, and undone in the same place. On Windows, a first install makes GUARDIANA the DNS (the
 welcome screen says so before “Install”), and it is undone in the panel, under “Status”. Uninstalling turns Home Mode off, removes the firewall rule and restores
 the DNS exactly as it was.
 
-Before installing, compare the SHA‑256 fingerprint of the file with the one on the download page
-and with the matching line of [`ledger.jsonl`](ledger.jsonl), the public ledger that is published before the
-download. After installing, `guardiana verify` checks it on your machine.
+Before installing, compare the SHA‑256 hash of the file with the one on the download page
+and with the matching line of [`ledger.jsonl`](ledger.jsonl), the public record that is published before the
+download. After installing, `guardiana verify` checks it on your computer.
 
 ## Use
 
 ```
 guardiana panel          opens the panel in the browser (the only interface)
-guardiana verify         fingerprint, signature, service, system DNS, ports, lists, chain
+guardiana verify         hash, signature, service, system DNS, ports, lists, chain
 guardiana dns --status   where the system DNS points
 guardiana hogar status   Home Mode status
 guardiana ledger --check checks the ledger chain
@@ -66,7 +66,7 @@ guardiana export         exports the ledger as CSV or JSON
 
 Nothing is blocked without the user's decision, always with a visible “unblock”: a specific name can be
 blocked from the first minute, and wide blocks —by category, for the whole home, or the mode that blocks
-everything not declared— wait until Guardiana has been watching that device for 24 hours. No signal is a verdict; the interface never says “malicious”.
+everything not declared— wait until GUARDIANA has been watching that device for 24 hours. No signal is a verdict; the interface never says “malicious”.
 
 ## Build
 

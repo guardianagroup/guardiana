@@ -2,7 +2,7 @@
 ==========================
 
 GUARDIANA ZERO is a browser of its own: as you browse, you see at once which
-companies each page tries to call behind your back and which ones are cut off,
+companies each page tries to call behind your back and which ones are blocked,
 with their country and the reason. Everything happens on this PC. No account,
 no server of ours, zero telemetry.
 
