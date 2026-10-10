@@ -1,7 +1,7 @@
 [package]
 name = "guardiana-zero-navegador"
 description = "GUARDIANA ZERO for Windows: the window, the tabs and the hooks into Microsoft Edge WebView2"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2021"
 rust-version = "1.85"
 license = "GPL-3.0-or-later"
