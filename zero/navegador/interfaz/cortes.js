@@ -77,6 +77,8 @@
       + (conDato ? `<option value="@dato">${esc(t('cortes_filtro_dato'))}</option>` : '')
       + d.motivos.map((x) => `<option value="${esc(x.motivo)}">${esc(t('motivo_' + x.motivo))}</option>`).join('');
     if ([...$('f-motivo').options].some((o) => o.value === elegido)) $('f-motivo').value = elegido;
+    $('sin-anotar').classList.toggle('oculto', !d.sin_anotar);
+    $('sin-anotar').textContent = d.sin_anotar ? t('cortes_sin_anotar', { n: n(d.sin_anotar) }) : '';
     $('recortada').classList.toggle('oculto', !d.recortada);
     $('recortada').textContent = d.recortada ? t('cortes_recortada', { n: n(d.lista.length) }) : '';
     const hoy = new Date().toLocaleString(lang(), { dateStyle: 'long', timeStyle: 'short' });

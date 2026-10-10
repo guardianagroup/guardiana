@@ -30,7 +30,20 @@ pub struct Tercero {
     /// Why the last cut happened.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub motivo: Option<Motivo>,
+    /// Pings or beacons of it cut by maximum protection: then the lists' cut covers this site
+    /// too, and «Desbloquear» lets them through (review of 10 Oct 2026: they had no undo).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub balizas: u32,
 }
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+const fn is_zero(n: &u32) -> bool {
+    *n == 0
+}
+
+/// Third parties kept per tab, sites per day: bounds against a page that calls endless names.
+const MAX_TERCEROS: usize = 2_000;
+const MAX_SITIOS_DIA: usize = 20_000;
 
 /// What the shield of one tab shows.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,6 +81,9 @@ impl Pestana {
         if !d.de_fuera() {
             return;
         }
+        if self.terceros.len() >= MAX_TERCEROS && !self.terceros.contains_key(&d.destino.sitio) {
+            return;
+        }
         let e = self
             .terceros
             .entry(d.destino.sitio.clone())
@@ -80,11 +96,15 @@ impl Pestana {
                 vistas: 0,
                 cortadas: 0,
                 motivo: None,
+                balizas: 0,
             });
         e.vistas += 1;
         if d.cortar {
             e.cortadas += 1;
             e.motivo = d.motivo;
+            if d.motivo == Some(Motivo::Baliza) {
+                e.balizas += 1;
+            }
         }
     }
 
@@ -242,7 +262,7 @@ impl Diario {
         if !d.de_fuera() {
             return;
         }
-        if e.terceros.len() < 20_000 {
+        if e.terceros.len() < MAX_SITIOS_DIA {
             e.terceros
                 .entry(d.destino.sitio.clone())
                 .or_insert_with(|| d.destino.quien().to_string());
@@ -252,7 +272,9 @@ impl Diario {
         }
         if d.cortar {
             e.cortadas += 1;
-            e.cortados.insert(d.destino.sitio.clone());
+            if e.cortados.len() < MAX_SITIOS_DIA {
+                e.cortados.insert(d.destino.sitio.clone());
+            }
         }
         let sigue = d.destino.sigue() || d.destino.corredor.is_some();
         if let (true, Some(p)) = (sigue, pagina) {

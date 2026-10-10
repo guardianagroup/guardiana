@@ -97,6 +97,38 @@ pub struct Mandato {
     pub desbordados: std::collections::BTreeMap<String, u32>,
 }
 
+/// The sites a mandate allows for what the person wrote: each entry becomes its registrable site
+/// (`maps.google.com` → `google.com`, as the limit really applies), once. An entry that is not a
+/// web address with a dot (`flights`, `a.com;`) is left out rather than allowed as written. The
+/// panel shows exactly this list before the mandate starts.
+#[must_use]
+pub fn sitios_de(direcciones: &[String]) -> Vec<String> {
+    let mut permitidos: Vec<String> = Vec::new();
+    for d in direcciones {
+        let d = d.trim();
+        let host = crate::dominio::host_de(d)
+            .or_else(|| crate::dominio::host_de(&format!("https://{d}")))
+            .unwrap_or_default();
+        let valido = host.contains('.')
+            && !host.starts_with('.')
+            && !host.ends_with('.')
+            && host
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.');
+        if !valido {
+            continue;
+        }
+        let s = sitio(&host);
+        if !s.is_empty() && !permitidos.contains(&s) {
+            permitidos.push(s);
+        }
+        if permitidos.len() >= 40 {
+            break;
+        }
+    }
+    permitidos
+}
+
 impl Mandato {
     /// A new mandate for `tarea` limited to the sites of `direcciones` (addresses or names).
     #[must_use]
@@ -107,19 +139,7 @@ impl Mandato {
         senuelo: String,
         ahora: i64,
     ) -> Self {
-        let mut permitidos: Vec<String> = Vec::new();
-        for d in direcciones {
-            let host = crate::dominio::host_de(d)
-                .or_else(|| crate::dominio::host_de(&format!("https://{}", d.trim())))
-                .unwrap_or_default();
-            if host.is_empty() {
-                continue;
-            }
-            let s = sitio(&host);
-            if !permitidos.contains(&s) {
-                permitidos.push(s);
-            }
-        }
+        let permitidos = sitios_de(direcciones);
         Self {
             id,
             tarea: tarea.trim().to_string(),
@@ -234,5 +254,21 @@ mod tests {
         // Two attempts within a second are one line of the log, and two attempts in the count.
         assert_eq!(m.pasos.len(), 3);
         assert_eq!(m.cuentas(), (1, 2, 2, 1));
+    }
+
+    #[test]
+    fn the_sites_are_what_the_limit_really_allows() {
+        let w = |l: &[&str]| sitios_de(&l.iter().map(|s| (*s).to_string()).collect::<Vec<_>>());
+        assert_eq!(
+            w(&[
+                "https://www.maps.google.com/x",
+                "a.com;",
+                "b.com",
+                "flights",
+                "B.COM"
+            ]),
+            ["google.com", "b.com"]
+        );
+        assert!(w(&["javascript:alert(1)", ".com", "x."]).is_empty());
     }
 }

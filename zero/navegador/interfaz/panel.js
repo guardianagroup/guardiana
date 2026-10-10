@@ -106,15 +106,22 @@
     precios: ['amazon.com', 'ebay.com', 'google.com'],
     investigar: ['wikipedia.org', 'google.com', 'britannica.com'],
   };
-  // What the websites box will allow, as the person types: one chip per website.
-  const websDe = (texto) => [...new Set(texto.split(/[\s,;]+/).map((w) => w.trim().toLowerCase()
-    .replace(/^[a-z]+:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0]).filter((w) => /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(w)))];
+  // What the websites box will allow, as the person types: the program answers with the exact
+  // list the limit will use (each website's registrable site, entries that are not websites left
+  // out), and that same list is what starts the mandate.
+  const trozos = () => $('m-webs').value.split(/[\s,;]+/).map((w) => w.trim()).filter(Boolean);
+  let permitidos = [];
+  let previaTimer = 0;
   function vistaWebs() {
-    const webs = websDe($('m-webs').value);
-    $('m-webs-vista').innerHTML = webs.length
-      ? `<span class="pequeno gris">${esc(t('mandato_podra'))}</span>` + webs.map((w) => `<span class="chip azul mono">${esc(w)}</span>`).join('')
-      : '';
+    clearTimeout(previaTimer);
+    previaTimer = setTimeout(() => manda({ tipo: 'mandato_previa', webs: trozos() }), 200);
   }
+  en('mandato_previa', (m) => {
+    permitidos = m.permitidos || [];
+    $('m-webs-vista').innerHTML = permitidos.length
+      ? `<span class="pequeno gris">${esc(t('mandato_podra'))}</span>` + permitidos.map((w) => `<span class="chip azul mono">${esc(w)}</span>`).join('')
+      : '';
+  });
   $('m-webs').addEventListener('input', () => { vistaWebs(); $('m-error').classList.add('oculto'); });
   document.querySelectorAll('#m-ideas .idea').forEach((b) => b.addEventListener('click', () => {
     document.querySelectorAll('#m-ideas .idea').forEach((x) => x.classList.toggle('elegida', x === b));
@@ -130,7 +137,7 @@
     $('m-tarea').focus();
   }));
   $('m-empezar').addEventListener('click', () => {
-    const webs = $('m-webs').value.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+    const webs = trozos();
     $('m-error').classList.toggle('oculto', webs.length > 0);
     if (!webs.length) return;
     manda({ tipo: 'mandato_empezar', tarea: $('m-tarea').value, webs, estricto: $('m-estricto').checked, minutos: Number($('m-duracion').value) });

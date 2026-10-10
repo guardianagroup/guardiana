@@ -160,6 +160,17 @@ function pantalla(nombre) {
   comprueba(await hasta(() => panel.evaluate(() => !document.querySelector('#e-maxima-activa').classList.contains('oculto'))), '«Activar protección máxima» se enciende');
   await baliza('/baliza-2');
   comprueba(!vio('collect.otra-empresa.io', '/baliza-2'), 'con protección máxima, ese aviso ya no sale');
+  // And it has its way back, like any other cut (review of 10 Oct 2026).
+  const filaBaliza = () => panel.locator('#e-cortados li', { hasText: 'otra-empresa.io' });
+  comprueba(await hasta(async () => (await filaBaliza().count()) === 1 && (await filaBaliza().first().locator('button').textContent()) === 'Desbloquear'), 'lo que corta la protección máxima sale como cortado, con «Desbloquear»');
+  await filaBaliza().first().locator('button').click();
+  await espera(300);
+  await baliza('/baliza-3');
+  comprueba(vio('collect.otra-empresa.io', '/baliza-3'), 'desbloqueado, ese aviso vuelve a salir');
+  const balizaVista = panel.locator('#e-vistos li', { hasText: 'otra-empresa.io' });
+  await hasta(async () => (await balizaVista.count()) === 1);
+  await balizaVista.first().locator('button').click();
+  comprueba(await hasta(async () => (await filaBaliza().count()) === 1), 'y «Volver a bloquear» lo deja cortado otra vez');
   await panel.click('#e-maxima-quitar');
   comprueba(await hasta(() => panel.evaluate(() => document.querySelector('#e-maxima-activa').classList.contains('oculto'))), 'y se puede volver a la normal');
   await espera(600);
@@ -206,8 +217,16 @@ function pantalla(nombre) {
   comprueba(await hasta(() => nueva.evaluate(() => (document.querySelector('#motor').selectedOptions[0] || {}).textContent === 'DuckDuckGo')), 'y lleva dentro el buscador, a la vista');
   comprueba(await hasta(async () => (await nueva.locator('#favs-rejilla .fav').count()) === 1), 'la web guardada con la estrella sale en la pestaña nueva');
   comprueba((await nueva.textContent('.hoy-cab .enlace')) === 'Ver resumen', 'el enlace del día dice «Ver resumen»');
+  // The figure counts up when it first appears: read it once it has stopped moving.
   let cortadasHoy = 0;
-  await hasta(async () => { cortadasHoy = Number((await nueva.textContent('#h-cortadas')).replace(/\D/g, '')); return cortadasHoy >= 3; });
+  let anterior = -1;
+  await hasta(async () => {
+    cortadasHoy = Number((await nueva.textContent('#h-cortadas')).replace(/\D/g, ''));
+    const quieto = cortadasHoy === anterior && cortadasHoy >= 3;
+    anterior = cortadasHoy;
+    if (!quieto) await espera(400);
+    return quieto;
+  });
   comprueba(cortadasHoy >= 3, `la pestaña nueva cuenta las peticiones cortadas (${cortadasHoy})`);
   await nueva.click('a.hecho.rojo');
   const cortes = await paginaQue(nav, (u) => u.endsWith('/cortes.html'));

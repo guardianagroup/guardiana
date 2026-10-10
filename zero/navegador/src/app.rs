@@ -500,6 +500,8 @@ fn guarda_pdf(id: u32, ruta: PathBuf) {
         vista_de(Origen::Pestana(id)),
         con_vistas(|v| v.entorno.clone()).flatten(),
     ) else {
+        // The page waits for an answer (the summary keeps its list hidden until then).
+        encola(con_sesion(|s| s.pdf_hecho(id, &ruta, false)).unwrap_or_default());
         return;
     };
     let r = (|| unsafe {

@@ -31,8 +31,8 @@ h1 { font: 600 clamp(26px, 3.2vw, 38px)/1.1 var(--display); letter-spacing: -.02
 .cifra span { display: block; margin-top: 8px; font-size: 13px; color: var(--gris); }
 .cifras.segunda { border-top: 0; margin-top: -28px; }
 .t-resumen { display: none; }
-body.solo-resumen .t-resumen { display: inline; }
-body.solo-resumen .t-normal { display: none; }
+.explica { color: var(--gris); }
+.pequeno { font-size: 12.5px; }
 .cifras.segunda .cifra b { font-size: 26px; }
 .rastro-caja { margin-bottom: 14px; }
 .rastro-caja .explica { margin: -6px 0 8px; }
@@ -121,6 +121,8 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
   main { max-width: none; padding: 0; }
   .controles, .filtros, #aviso, .volver { display: none !important; }
   /* «Resumen en PDF»: the same report without the list of every cut. */
+  body.solo-resumen .t-resumen { display: inline; }
+  body.solo-resumen .t-normal { display: none; }
   body.solo-resumen .lista-cab, body.solo-resumen table, body.solo-resumen #recortada,
   body.solo-resumen #vacio, body.solo-resumen #informe-filtro { display: none !important; }
   .rastro-caja { break-inside: avoid; }
@@ -196,6 +198,7 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
     </div>
   </div>
   <p class="explica pequeno oculto" id="recortada"></p>
+  <p class="explica pequeno oculto" id="sin-anotar"></p>
   <table>
     <thead><tr><th data-t="cortes_col_hora"></th><th data-t="cortes_col_empresa"></th><th data-t="cortes_col_destino"></th><th data-t="cortes_col_que"></th><th data-t="cortes_col_tipo"></th><th data-t="cortes_col_motivo"></th><th data-t="cortes_col_pagina"></th></tr></thead>
     <tbody id="filas"></tbody>

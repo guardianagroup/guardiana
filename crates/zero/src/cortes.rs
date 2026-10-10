@@ -22,6 +22,8 @@ use crate::mandato::Recurso;
 pub const DIAS: usize = 31;
 /// Lines sent to the page at most (the summaries count all of them).
 pub const MAX_LISTA: usize = 3000;
+/// Lines written per day at most; the day's figures go on counting past it.
+pub const MAX_DIA: usize = 25_000;
 
 /// One cut.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

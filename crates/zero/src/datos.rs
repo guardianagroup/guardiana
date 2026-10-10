@@ -290,12 +290,26 @@ fn dnis(t: &[u8], out: &mut Vec<Trozo>) {
     }
 }
 
-fn marcados(texto: &str, lista: &[Marcado], out: &mut Vec<Trozo>) {
-    let bajo = texto.to_lowercase();
-    // `to_lowercase` can change byte lengths outside ASCII; only search when it did not.
-    if bajo.len() != texto.len() {
-        return;
+/// `texto` in lower case, with, for each byte of it, where its character starts and ends in
+/// `texto`. Lowering can change a character's length («İ», «ẞ», the Kelvin sign): searching the
+/// lowered text and mapping back keeps every other match in place. Skipping the search whenever
+/// lengths changed, as before, let one such letter anywhere switch marked data off (review of
+/// 10 Oct 2026).
+fn en_minusculas(texto: &str) -> (String, Vec<(usize, usize)>) {
+    let mut bajo = String::with_capacity(texto.len());
+    let mut mapa = Vec::with_capacity(texto.len());
+    for (i, c) in texto.char_indices() {
+        let fin = i + c.len_utf8();
+        for l in c.to_lowercase() {
+            bajo.push(l);
+            mapa.extend(std::iter::repeat_n((i, fin), l.len_utf8()));
+        }
     }
+    (bajo, mapa)
+}
+
+fn marcados(texto: &str, lista: &[Marcado], out: &mut Vec<Trozo>) {
+    let (bajo, mapa) = en_minusculas(texto);
     for m in lista {
         let valor = m.valor.trim().to_lowercase();
         if valor.chars().count() < 3 {
@@ -311,12 +325,15 @@ fn marcados(texto: &str, lista: &[Marcado], out: &mut Vec<Trozo>) {
         let mut desde = 0;
         while let Some(p) = bajo[desde..].find(&valor) {
             let inicio = desde + p;
-            out.push(Trozo {
-                inicio,
-                fin: inicio + valor.len(),
-                clase,
-            });
-            desde = inicio + valor.len();
+            let fin = inicio + valor.len();
+            if let (Some(&(a, _)), Some(&(_, b))) = (mapa.get(inicio), mapa.get(fin - 1)) {
+                out.push(Trozo {
+                    inicio: a,
+                    fin: b,
+                    clase,
+                });
+            }
+            desde = fin;
         }
     }
 }
@@ -414,5 +431,29 @@ mod tests {
         assert_eq!(v.len(), 1);
         assert_eq!(&t[v[0].inicio..v[0].fin], "FRANCISCO SALVATIERRA");
         assert_eq!(v[0].clase, Clase::Nombre);
+    }
+
+    #[test]
+    fn a_letter_that_changes_length_when_lowered_does_not_hide_marked_data() {
+        let lista = [Marcado {
+            tipo: Tipo::Nombre,
+            valor: "Juan Perez".into(),
+        }];
+        for texto in [
+            "Ali İnan\nJuan Perez",
+            "\u{212A}elvin y JUAN PEREZ",
+            "STRAẞE: Juan Perez",
+        ] {
+            let t = detecta(texto, &lista);
+            assert_eq!(t.len(), 1, "{texto}");
+            assert_eq!(
+                texto[t[0].inicio..t[0].fin].to_lowercase(),
+                "juan perez",
+                "{texto}"
+            );
+        }
+        // The match maps back to the original letters even when they changed length themselves.
+        let t = detecta("İİ Juan Perez İ", &lista);
+        assert_eq!(&"İİ Juan Perez İ"[t[0].inicio..t[0].fin], "Juan Perez");
     }
 }

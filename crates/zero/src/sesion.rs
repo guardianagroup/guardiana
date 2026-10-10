@@ -976,8 +976,18 @@ impl Sesion {
         Orden::Titulo { texto }
     }
 
+    /// Whether tab `id` is an isolated one (nothing of it is kept).
+    fn es_aislada(&self, id: u32) -> bool {
+        self.pestana(id)
+            .is_some_and(|p| p.perfil == Perfil::Aislada)
+    }
+
     /// Whether a site is cut now, and by which rule: what the shield's button must offer.
+    /// Without the trial or a subscription nothing is cut, and the shield says so.
     fn estado_sitio(&self, t: &Tercero) -> (&'static str, Option<&'static str>) {
+        if !self.licencia.protege() {
+            return ("pasa", None);
+        }
         let r = &self.prefs.reglas;
         if r.cortados.contains(&t.sitio) {
             return ("cortado", Some("tuya"));
@@ -996,7 +1006,7 @@ impl Sesion {
         let r = &self.prefs.reglas;
         let sigue = matches!(t.categoria.as_str(), "rastreador" | "publicidad")
             || t.corredor.is_some()
-            || (r.maxima && t.categoria == "telemetria");
+            || (r.maxima && (t.categoria == "telemetria" || t.balizas > 0));
         r.cortar_seguimiento && sigue
     }
 
@@ -1584,6 +1594,23 @@ impl Sesion {
                 vec![Orden::AbreFuera { url }]
             }
             "mandato_empezar" => self.mandato_empezar(m),
+            "mandato_previa" => {
+                let webs: Vec<String> = m
+                    .get("webs")
+                    .and_then(Value::as_array)
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(Value::as_str)
+                            .take(80)
+                            .map(str::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                vec![envia(
+                    Origen::Panel,
+                    &json!({ "tipo": "mandato_previa", "permitidos": crate::mandato::sitios_de(&webs) }),
+                )]
+            }
             "mandato_terminar" => self.cierra_mandato(),
             "mandato_nuevo" => {
                 self.terminado = None;
@@ -1744,8 +1771,15 @@ impl Sesion {
             }
             "rechazar_cookies" => {
                 self.prefs.cookies_sin_tocar = !valor.as_bool().unwrap_or(true);
+                // Maximum protection includes refusing cookie notices: leaving them as they come
+                // is no longer maximum, and the shield must not say it is.
+                if self.prefs.cookies_sin_tocar {
+                    self.prefs.reglas.maxima = false;
+                }
                 self.guarda_prefs();
-                vec![envia(Origen::Panel, &self.msg_ajustes())]
+                let mut o = vec![envia(Origen::Panel, &self.msg_ajustes())];
+                o.extend(self.escudo_activa(false));
+                o
             }
             "tema" => {
                 let v = valor.as_str().unwrap_or("");
@@ -1813,11 +1847,28 @@ impl Sesion {
         }
         // Both ways, always: «Bloquear» and «Desbloquear» undo each other, and a site goes back
         // to what the lists say for it rather than keeping a rule it no longer needs.
-        let lista = self
+        // The site as the shield saw it; if no tab shows it any more (the page moved on between
+        // the click and this message), as the lists see it.
+        let visto = self
             .pestanas
             .iter()
             .find_map(|p| p.escudo.terceros.get(&s))
-            .is_some_and(|t| self.lo_corta_la_lista(t));
+            .cloned();
+        let t = visto.unwrap_or_else(|| {
+            let d = crate::destino::clasifica(&s);
+            Tercero {
+                quien: d.quien().to_string(),
+                sitio: s.clone(),
+                pais: None,
+                categoria: d.categoria.to_string(),
+                corredor: d.corredor.as_ref().map(|c| c.nombre.to_string()),
+                vistas: 0,
+                cortadas: 0,
+                motivo: None,
+                balizas: 0,
+            }
+        });
+        let lista = self.lo_corta_la_lista(&t);
         let r = &mut self.prefs.reglas;
         if tipo == "bloquear_sitio" {
             r.permitidos.remove(&s);
@@ -2194,11 +2245,14 @@ impl Sesion {
         );
         let paginas = cuenta(cortes::cuenta(&lista, |c| c.pagina.clone()), "pagina");
         let recientes: Vec<&Corte> = lista.iter().rev().take(cortes::MAX_LISTA).collect();
+        let dia = self.diario.total(&desde, &hasta);
+        let sin_anotar = (dia.cortadas as usize).saturating_sub(total);
         let v = json!({
             "tipo": "cortes", "periodo": periodo, "desde": desde, "hasta": hasta,
             "total": total, "empresas": empresas, "paises": paises, "motivos": motivos,
             "tipos": tipos, "paginas": paginas, "lista": recientes,
-            "dia": self.diario.total(&desde, &hasta),
+            "dia": dia,
+            "sin_anotar": sin_anotar,
             "rastro": self.diario.rastro(&desde, &hasta, 10),
             "recortada": total > cortes::MAX_LISTA,
         });
@@ -2383,8 +2437,11 @@ impl Sesion {
             .is_some_and(|e| encontradas.iter().all(|c| e.clases.contains(c)));
         if !mandato && (ya_lo_tiene || self.prefs.sin_preguntar.contains(&s)) {
             let ahora = (self.reloj)();
-            self.libro.anota(&host, &encontradas, ahora);
-            self.libro_sucio = true;
+            // An isolated tab leaves nothing behind, not even a line in the book.
+            if !self.es_aislada(id) {
+                self.libro.anota(&host, &encontradas, ahora);
+                self.libro_sucio = true;
+            }
             if let Some(p) = self.pestana_mut(id) {
                 p.al_libro.insert(s.clone());
             }
@@ -2425,9 +2482,12 @@ impl Sesion {
             return Vec::new();
         };
         let ahora = (self.reloj)();
+        let aislada = self.es_aislada(q.pestana);
         if enviar {
-            self.libro.anota(&q.host, &q.clases, ahora);
-            self.guarda_libro();
+            if !aislada {
+                self.libro.anota(&q.host, &q.clases, ahora);
+                self.guarda_libro();
+            }
             // Written once: the request that carries it is the same sending.
             if let Some(p) = self.pestana_mut(q.pestana) {
                 p.al_libro.insert(q.sitio.clone());
@@ -2439,7 +2499,7 @@ impl Sesion {
                     self.mandato_sucio = true;
                 }
             }
-            if recordar && !q.mandato {
+            if recordar && !q.mandato && !aislada {
                 self.prefs.sin_preguntar.insert(q.sitio.clone());
                 self.guarda_prefs();
             }
@@ -2835,13 +2895,22 @@ impl Sesion {
         let p = &mut self.pestanas[i];
         p.escudo.anota(&d);
         let perfil = p.perfil;
-        let web = (perfil != Perfil::Aislada && !es_interna(&p.url) && !p.escudo.sitio.is_empty())
+        // The person's own webs of the day: not an isolated tab, and not the AI's mandate tab.
+        let web = (perfil == Perfil::General && !es_interna(&p.url) && !p.escudo.sitio.is_empty())
             .then(|| p.escudo.sitio.clone());
         self.diario.anota(&hoy, &d, web.as_deref());
+        // A day's list of cuts stops at `cortes::MAX_DIA` lines (a page calling endless names
+        // must not fill the disk); the day's figures still count every one, and the list says
+        // how many were left out.
+        let cabe = self
+            .diario
+            .dias
+            .get(&hoy)
+            .is_none_or(|e| e.cortadas as usize <= cortes::MAX_DIA);
         if recurso == Recurso::Documento && !d.cortar {
             self.diario.dias.entry(hoy).or_default().paginas += 1;
         }
-        if d.cortar && d.de_fuera() && self.cortes_pend.len() < 20_000 {
+        if d.cortar && d.de_fuera() && cabe && self.cortes_pend.len() < 20_000 {
             let dato = d
                 .hallazgos
                 .first()
@@ -2879,7 +2948,10 @@ impl Sesion {
                     }
                 }
             }
-            if !cl.is_empty() && self.pestanas[i].al_libro.insert(d.destino.sitio.clone()) {
+            if !cl.is_empty()
+                && perfil != Perfil::Aislada
+                && self.pestanas[i].al_libro.insert(d.destino.sitio.clone())
+            {
                 self.libro.anota(&d.destino.host, &cl, ahora);
                 self.libro_sucio = true;
             }

@@ -311,6 +311,36 @@ fn maximum_protection_turns_everything_on_and_goes_with_the_cut() {
     assert!(r.cortar, "a beacon to another company is cut");
     let e = del_tipo(&s.tic(), Origen::Barra, "escudo").unwrap_or_default();
     assert_eq!(e["maxima"], true);
+    // The site shows as cut by the lists, and «Desbloquear» lets its beacons through again.
+    let fila = e["terceros"]
+        .as_array()
+        .and_then(|l| l.iter().find(|t| t["sitio"] == "otra.io").cloned())
+        .unwrap_or_default();
+    assert_eq!(
+        (fila["ahora"].as_str(), fila["regla"].as_str()),
+        (Some("cortado"), Some("lista"))
+    );
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"desbloquear_sitio","sitio":"otra.io"}"#,
+    );
+    assert!(
+        !s.peticion(id, "https://cdn.otra.io/ping", "POST", b"x", 14)
+            .cortar
+    );
+    // Leaving cookie notices alone is no longer maximum protection.
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"rechazar_cookies","valor":false}"#,
+    );
+    assert!(!s.prefs.reglas.maxima);
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"maxima","valor":true}"#,
+    );
     // Turning the cut off turns maximum off with it.
     let _ = s.mensaje(
         Origen::Panel,
@@ -1458,4 +1488,69 @@ fn the_shield_shows_the_whole_day_above_the_page() {
         hoy["hoy"].is_object(),
         "el panel recibe las cifras del día al abrir el escudo"
     );
+}
+
+#[test]
+fn after_the_trial_the_shield_no_longer_says_cut() {
+    let (mut s, _, id) = con_pagina(true);
+    let _ = s.peticion(id, "https://stats.g.doubleclick.net/a", "GET", b"", 3);
+    let _ = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
+    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":"escudo"}"#);
+    let o = if del_tipo(&o, Origen::Panel, "escudo").is_some() {
+        o
+    } else {
+        s.tic()
+    };
+    if let Some(e) =
+        del_tipo(&o, Origen::Panel, "escudo").or_else(|| del_tipo(&o, Origen::Barra, "escudo"))
+    {
+        for t in e["terceros"].as_array().into_iter().flatten() {
+            assert_eq!(t["ahora"], "pasa");
+        }
+    }
+    assert!(
+        !s.peticion(id, "https://stats.g.doubleclick.net/b", "GET", b"", 3)
+            .cortar
+    );
+}
+
+#[test]
+fn an_isolated_tab_writes_nothing_to_the_book() {
+    let (mut s, _, _) = con_pagina(false);
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"tinta_anadir","dato":"correo","valor":"ana@correo.co"}"#,
+    );
+    let _ = s.tecla(u32::from('N'), true, true, false);
+    let id = s.activa();
+    assert!(s.es_aislada(id));
+    let web = "https://www.secreto.example/registro";
+    let _ = abre_pagina(&mut s, id, web);
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        web,
+        r#"{"tipo":"zg_formulario","zg":"a","id":1,"accion":"https://www.secreto.example/alta","valores":["ana@correo.co"]}"#,
+    );
+    if let Some(q) = del_tipo(&o, Origen::Panel, "pregunta_formulario") {
+        let _ = s.mensaje(
+            Origen::Panel,
+            PANEL,
+            &json!({ "tipo": "formulario_respuesta", "id": q["id"], "enviar": true, "recordar": true })
+                .to_string(),
+        );
+    }
+    let _ = s.peticion(
+        id,
+        "https://www.secreto.example/alta?e=ana@correo.co",
+        "GET",
+        b"",
+        7,
+    );
+    assert!(
+        s.libro.entradas.is_empty(),
+        "{:?}",
+        s.libro.entradas.keys().collect::<Vec<_>>()
+    );
+    assert!(s.prefs.sin_preguntar.is_empty());
 }
