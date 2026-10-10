@@ -578,19 +578,54 @@ fn parse_next_hops(text: &str) -> Option<IpAddr> {
 }
 
 /// `backup` plus the interfaces of `fresh` it does not know yet, when both were taken the same
-/// way and that way works interface by interface (Windows, Mac, NetworkManager). `None` when
-/// there is nothing new.
+/// way and that way works interface by interface (Windows, Mac, NetworkManager, and the links
+/// of systemd-resolved). `None` when there is nothing new.
 ///
 /// The copy taken when the DNS was pointed here listed the interfaces of that day. One that
 /// appeared later (a dock, the office Wi-Fi, a new network service on the Mac) was never
 /// pointed at Guardiana, and the watchdog, seeing it, re-applied the old copy every minute for
 /// nothing while the panel said "pointed at Guardiana" (review of 5 Oct 2026, serious 10). New
 /// ones are added to the copy first, so the undo puts them back too, and then applied.
+///
+/// With systemd-resolved only physical links join (the ones `guardian_is_primary` asks about):
+/// a VPN tunnel or a bridge keeps its own resolver and its own domains. Until this was added,
+/// a physical link that appeared later kept the router's DNS for good, because the apply only
+/// walks the links of the copy.
 #[must_use]
 pub fn with_new_interfaces(backup: &Backup, fresh: &Backup) -> Option<Backup> {
+    with_new_interfaces_where(backup, fresh, |i| {
+        backup.method != Method::SystemdResolved || physical_link(&i.id)
+    })
+}
+
+/// Whether the network link `name` is a physical device (it has a `device` in sysfs). Virtual
+/// links (VPN tunnels, bridges, the loopback) do not.
+#[must_use]
+pub fn physical_link(name: &str) -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        linux::is_physical_link(name)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = name;
+        false
+    }
+}
+
+/// [`with_new_interfaces`] with the test of which new interfaces may join given apart, so the
+/// merge is tested without reading the machine.
+fn with_new_interfaces_where(
+    backup: &Backup,
+    fresh: &Backup,
+    may_join: impl Fn(&InterfaceDns) -> bool,
+) -> Option<Backup> {
     let per_interface = matches!(
         backup.method,
-        Method::WindowsDnsClient | Method::MacNetworkSetup | Method::NetworkManager
+        Method::WindowsDnsClient
+            | Method::MacNetworkSetup
+            | Method::NetworkManager
+            | Method::SystemdResolved
     );
     if !per_interface || fresh.method != backup.method {
         return None;
@@ -599,6 +634,7 @@ pub fn with_new_interfaces(backup: &Backup, fresh: &Backup) -> Option<Backup> {
         .interfaces
         .iter()
         .filter(|f| !backup.interfaces.iter().any(|b| b.id == f.id))
+        .filter(|f| may_join(f))
         .cloned()
         .collect();
     if nuevas.is_empty() {
@@ -1062,13 +1098,8 @@ pub fn guardian_is_primary() -> Option<bool> {
                 // 2026). Virtual links that are not in the copy (VPN tunnels, bridges) stay out.
                 .filter(|l| {
                     copia.is_empty()
-                        || linux::link_name_of(l).is_some_and(|n| {
-                            copia.contains(&n)
-                                || std::path::Path::new("/sys/class/net")
-                                    .join(&n)
-                                    .join("device")
-                                    .exists()
-                        })
+                        || linux::link_name_of(l)
+                            .is_some_and(|n| copia.contains(&n) || linux::is_physical_link(&n))
                 })
                 .filter_map(|l| l.split_once(':').map(|(_, rest)| rest.trim()))
                 .filter(|rest| !rest.is_empty())

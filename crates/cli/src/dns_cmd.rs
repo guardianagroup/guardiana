@@ -4,7 +4,8 @@
 //! Windows or Linux machine before the panel exists (decision 20).
 
 use std::error::Error;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::time::{Duration, Instant};
 
 use guardiana_core::time::{now_ms, rfc3339_utc};
 use guardiana_core::{i18n, identity, paths, Ledger};
@@ -89,6 +90,83 @@ pub(crate) fn sole_or_secondary_key() -> &'static str {
     sysdns::sole_or_secondary_key()
 }
 
+/// Where the machine is pointed, and where the guardian is asked before that happens.
+const GUARDIAN: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 53);
+
+/// How long `--apply` waits for the guardian to answer on 127.0.0.1:53. The Windows installer
+/// runs this command right after starting the service, which may still be opening its port.
+const ESPERA_GUARDIAN: Duration = Duration::from_secs(10);
+
+/// What `dns --apply --yes` does at each step, from what it saw. Kept apart from the system
+/// calls so the decision is tested without touching the machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Paso {
+    /// Nothing that is Guardiana answers on 127.0.0.1:53: nothing is touched, no copy taken.
+    NoTocar,
+    /// The guardian answers: take the copy and point the machine at it.
+    Cambiar,
+    /// After the change a query made by the system reached the guardian: keep it.
+    Mantener,
+    /// After the change no query made by the system reached it: everything goes back and the
+    /// copy is dropped, on every system.
+    Deshacer,
+}
+
+/// Before anything changes. Pointing the machine at 127.0.0.1 with nobody answering there is a
+/// machine without names (21 Sep 2026, on the responsible's own Mac).
+pub(crate) fn antes_de_cambiar(guardian_contesta: bool) -> Paso {
+    if guardian_contesta {
+        Paso::Cambiar
+    } else {
+        Paso::NoTocar
+    }
+}
+
+/// After the change. Until this check ran everywhere, only Windows asked, and even there a "no"
+/// only printed a warning and kept the change.
+pub(crate) fn despues_de_cambiar(sistema_llega: bool) -> Paso {
+    if sistema_llega {
+        Paso::Mantener
+    } else {
+        Paso::Deshacer
+    }
+}
+
+/// Whether Guardiana itself answers on 127.0.0.1:53, asked directly (not through the system's
+/// resolver, which is what is about to change), for up to `espera`.
+fn guardian_listening(espera: Duration) -> bool {
+    let Ok(rt) = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    else {
+        return false;
+    };
+    rt.block_on(async {
+        let hasta = Instant::now() + espera;
+        loop {
+            if guardiana_dns::probe::guardian_answers(GUARDIAN, Duration::from_secs(1)).await {
+                return true;
+            }
+            if Instant::now() >= hasta {
+                return false;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+    })
+}
+
+/// Whether a name asked through the system's resolver now arrives at Guardiana. Asked twice:
+/// a network stack may take a moment to use servers it was just given.
+fn system_reaches_guardian() -> bool {
+    for pausa in [800, 2000] {
+        std::thread::sleep(Duration::from_millis(pausa));
+        if sysdns::system_reaches_guardian(Duration::from_secs(4)) {
+            return true;
+        }
+    }
+    false
+}
+
 pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
     let t = i18n::current();
     let ledger = open_or_create(opts)?;
@@ -111,6 +189,9 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
             println!("{}", t.cli("dns.consentimiento_si"));
             return Ok(());
         }
+        if antes_de_cambiar(guardian_listening(ESPERA_GUARDIAN)) == Paso::NoTocar {
+            return Err(t.cli("dns.guardiana_no_contesta").into());
+        }
         let backup = match sysdns::snapshot(now_ms()) {
             Ok(b) => b,
             Err(sysdns::Error::Unsupported) => {
@@ -127,9 +208,9 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
                 .replace("{metodo}", &format!("{:?}", backup.method))
         );
         // The backup is stored before anything changes, so a crash mid-way is still restorable.
-        ledger.set_setting(SETTING_BACKUP, &serde_json::to_string(&backup)?)?;
-        let guardian = IpAddr::V4(Ipv4Addr::LOCALHOST);
-        if let Err(e) = sysdns::apply(&backup, guardian) {
+        let copia = serde_json::to_string(&backup)?;
+        ledger.set_setting(SETTING_BACKUP, &copia)?;
+        if let Err(e) = sysdns::apply(&backup, GUARDIAN.ip()) {
             if e.falta_administrador() {
                 // Refused before anything changed: the copy is not kept either, or the service
                 // would apply it a minute later and do what the person was just told it could
@@ -151,6 +232,22 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
                 println!("{}", t.cli("dns.deshacer_pendiente"));
             }
             return Err(Box::new(e));
+        }
+        // Asking is the only way to know the queries really arrive (27 Sep 2026): the settings
+        // can say "127.0.0.1 first" while they go elsewhere.
+        if despues_de_cambiar(system_reaches_guardian()) == Paso::Deshacer {
+            // The service's watchdog points the machine at Guardiana again while the copy
+            // exists, so the copy goes first, and comes back if undoing fails (as `--restore`).
+            ledger.set_setting(SETTING_BACKUP, "")?;
+            if let Err(e) = sysdns::restore(&backup) {
+                ledger.set_setting(SETTING_BACKUP, &copia)?;
+                println!("{}", t.cli("dns.deshacer_pendiente"));
+                return Err(Box::new(e));
+            }
+            return Err(t.cli("dns.camino_no_deshecho").into());
+        }
+        if cfg!(target_os = "windows") {
+            println!("{}", t.cli("dns.camino_ok"));
         }
         println!(
             "{}",
@@ -181,20 +278,6 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
                 .collect::<Vec<_>>()
                 .join(", "),
         )?;
-        // Asking is the only way to know the queries really arrive (27 Sep 2026). The installer
-        // runs this command right after starting the service, so the resolver is there.
-        if cfg!(target_os = "windows") {
-            std::thread::sleep(std::time::Duration::from_millis(800));
-            let llega = sysdns::system_reaches_guardian(std::time::Duration::from_secs(4));
-            println!(
-                "{}",
-                t.cli(if llega {
-                    "dns.camino_ok"
-                } else {
-                    "dns.camino_no"
-                })
-            );
-        }
         return Ok(());
     }
 
@@ -252,4 +335,31 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
     }
 
     status(&ledger)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Nothing answering on 127.0.0.1:53 means nothing is touched; a guardian that answers lets
+    /// the change go ahead.
+    #[test]
+    fn without_a_guardian_answering_nothing_changes() {
+        assert_eq!(antes_de_cambiar(false), Paso::NoTocar);
+        assert_eq!(antes_de_cambiar(true), Paso::Cambiar);
+    }
+
+    /// A change the system's own queries do not follow is undone, whatever the system.
+    #[test]
+    fn a_change_that_does_not_reach_the_guardian_is_undone() {
+        assert_eq!(despues_de_cambiar(false), Paso::Deshacer);
+        assert_eq!(despues_de_cambiar(true), Paso::Mantener);
+    }
+
+    /// The address asked before the change is the one the machine is pointed at.
+    #[test]
+    fn the_guardian_asked_is_the_one_pointed_at() {
+        assert_eq!(GUARDIAN.ip(), IpAddr::V4(Ipv4Addr::LOCALHOST));
+        assert_eq!(GUARDIAN.port(), 53);
+    }
 }

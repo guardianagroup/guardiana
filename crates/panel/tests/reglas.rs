@@ -219,3 +219,85 @@ async fn this_computer_needs_the_key_for_its_own_page() {
     let (st, _) = post(addr, "", "/api/mi-dispositivo/reglas/1/deshacer", "").await;
     assert_eq!(st, 401);
 }
+
+/// A device's own page undoes the rules it made for itself, never one the household panel set
+/// on it: that is the home's decision, and the page has no key. Here "the device" is this
+/// computer's page, reached with the key, which goes through the same handler a phone does.
+#[tokio::test]
+async fn a_device_page_cannot_lift_a_rule_the_panel_set_on_it() {
+    let (db, token_path) = prepare("deshacer-ajena");
+    let running = start(Config {
+        listen: vec!["127.0.0.1:0".parse().unwrap()],
+        optional_listen: Vec::new(),
+        db_path: db.clone(),
+        genesis: genesis(),
+        token_path,
+        extra_hosts: Vec::new(),
+        info: RuntimeInfo::default(),
+    })
+    .await
+    .expect("the panel starts");
+    let addr = running.addrs[0];
+    let token = running.token.clone();
+    let regla = |pattern: &str| {
+        format!(
+            r#"{{"scope":"device","device_id":"{SELF_DEVICE_ID}","match_kind":"domain","pattern":"{pattern}","action":"cortar","confirmed":true}}"#
+        )
+    };
+    let id_de = |body: &str| -> i64 {
+        let v: serde_json::Value = serde_json::from_str(body).unwrap();
+        v["creada"]["id"].as_i64().expect("a created rule")
+    };
+
+    let (st, body) = post(addr, &token, "/api/reglas", &regla("de-la-casa.example")).await;
+    assert_eq!(st, 200, "{body}");
+    let de_la_casa = id_de(&body);
+    let (st, body) = post(
+        addr,
+        &token,
+        "/api/mi-dispositivo/reglas",
+        &regla("del-aparato.example"),
+    )
+    .await;
+    assert_eq!(st, 200, "{body}");
+    let del_aparato = id_de(&body);
+
+    // The panel's rule stays.
+    let (st, body) = post(
+        addr,
+        &token,
+        &format!("/api/mi-dispositivo/reglas/{de_la_casa}/deshacer"),
+        "",
+    )
+    .await;
+    assert_eq!(st, 200, "{body}");
+    assert_eq!(body.trim(), "false");
+    // The device's own rule goes.
+    let (st, body) = post(
+        addr,
+        &token,
+        &format!("/api/mi-dispositivo/reglas/{del_aparato}/deshacer"),
+        "",
+    )
+    .await;
+    assert_eq!(st, 200, "{body}");
+    assert_eq!(body.trim(), "true");
+
+    let l = Ledger::open(&db, genesis()).unwrap();
+    let now = now_ms();
+    let reglas = l.rules().unwrap();
+    let activa = |id: i64| reglas.iter().find(|r| r.id == id).unwrap().is_active(now);
+    assert!(activa(de_la_casa), "the household's rule must still hold");
+    assert!(!activa(del_aparato));
+
+    // The household panel still undoes its own rule.
+    let (st, body) = post(
+        addr,
+        &token,
+        &format!("/api/reglas/{de_la_casa}/deshacer"),
+        "",
+    )
+    .await;
+    assert_eq!(st, 200, "{body}");
+    assert_eq!(body.trim(), "true");
+}

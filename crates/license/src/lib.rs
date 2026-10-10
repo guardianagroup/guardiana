@@ -104,6 +104,15 @@ const RELOJ_PASO_EXTRACTO_MS: i64 = 60 * 1000;
 const RELOJ_PASO_ANCLA_MS: i64 = HOUR_MS;
 /// How far past real time the remembered clock may move between two of this process's writes.
 const RELOJ_HOLGURA_MS: i64 = 5 * 60 * 1000;
+/// A first reading of a process this far ahead of the stored clock is held back (see
+/// `RELOJ_PENDIENTE`).
+const RELOJ_MARGEN_PRIMERA_MS: i64 = 10 * 60 * 1000;
+/// How long a held-back first reading has to keep pace with this process's monotonic clock
+/// before it is remembered.
+const RELOJ_CONFIRMA_MS: i64 = 5 * 60 * 1000;
+/// How far a later reading may stray from the held-back one plus the time that passed and still
+/// count as the same clock.
+const RELOJ_DESVIO_MS: i64 = 60 * 1000;
 
 /// The last clock reading this process remembered, and when, by the monotonic clock. A reading
 /// that runs ahead of the time that really passed in this process is not remembered beyond it:
@@ -111,6 +120,15 @@ const RELOJ_HOLGURA_MS: i64 = 5 * 60 * 1000;
 /// (review of 5 Oct 2026, licence item 6). The first write of a process has nothing to compare
 /// with and is believed.
 static RELOJ_PROCESO: std::sync::Mutex<Option<(std::time::Instant, i64)>> =
+    std::sync::Mutex::new(None);
+
+/// A first reading of this process that ran more than `RELOJ_MARGEN_PRIMERA_MS` ahead of the
+/// stored clock, and when it was read, by the monotonic clock. It is not remembered until later
+/// readings have kept pace with it for `RELOJ_CONFIRMA_MS`: a machine that boots with its
+/// hardware clock days ahead, before the network sets it right, ended the trial for good when
+/// that first reading was believed (the stored clock never goes back). A clock set right in the
+/// meantime is never written down. Lock order: `RELOJ_PROCESO` first, then this.
+static RELOJ_PENDIENTE: std::sync::Mutex<Option<(std::time::Instant, i64)>> =
     std::sync::Mutex::new(None);
 
 /// Where licence calls go. The test gateway is only reachable from a build that
@@ -432,6 +450,19 @@ fn reloj(ledger: &Ledger, marcas: &ancla::Marcas, now: i64) -> Result<i64, Error
         }
         _ => reloj,
     };
+    // The first reading of this process, well ahead of what is stored: held back until it proves
+    // steady. The decision of this moment still follows it (`reloj` is returned); only what is
+    // remembered waits. Setting the clock back is unaffected: the stored clock stays the floor.
+    let mut pendiente = RELOJ_PENDIENTE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let adelantada = proceso.is_none()
+        && visto.is_some_and(|v| recordable > v.saturating_add(RELOJ_MARGEN_PRIMERA_MS));
+    if adelantada && !primera_lectura_confirmada(&mut pendiente, now, std::time::Instant::now()) {
+        return Ok(reloj);
+    }
+    *pendiente = None;
+    drop(pendiente);
     let mut escrito = false;
     if en_extracto.is_none_or(|v| recordable >= v + RELOJ_PASO_EXTRACTO_MS) {
         ledger.set_setting(SETTING_CLOCK_SEEN, &recordable.to_string())?;
@@ -451,10 +482,35 @@ fn reloj(ledger: &Ledger, marcas: &ancla::Marcas, now: i64) -> Result<i64, Error
     Ok(reloj)
 }
 
+/// Whether the held-back first reading in `pendiente` is confirmed by the system reading `now`:
+/// `now` is that reading plus the time this process really waited since, give or take
+/// `RELOJ_DESVIO_MS`, and at least `RELOJ_CONFIRMA_MS` have passed. A reading that strays (the
+/// clock was set right, or moved again) starts the wait afresh from itself.
+/// `ahora` is the monotonic clock of this call.
+fn primera_lectura_confirmada(
+    pendiente: &mut Option<(std::time::Instant, i64)>,
+    now: i64,
+    ahora: std::time::Instant,
+) -> bool {
+    if let Some((desde, lectura)) = *pendiente {
+        let pasado =
+            i64::try_from(ahora.saturating_duration_since(desde).as_millis()).unwrap_or(i64::MAX);
+        if now.abs_diff(lectura.saturating_add(pasado)) <= RELOJ_DESVIO_MS.unsigned_abs() {
+            return pasado >= RELOJ_CONFIRMA_MS;
+        }
+    }
+    *pendiente = Some((ahora, now));
+    false
+}
+
 /// Tests run many "processes" in one: each step that stands for a new start forgets this one.
 #[cfg(test)]
 pub(crate) fn olvidar_proceso() {
-    *RELOJ_PROCESO
+    let mut proceso = RELOJ_PROCESO
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    *proceso = None;
+    *RELOJ_PENDIENTE
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
 }
@@ -553,9 +609,11 @@ fn licencia_guardada(
     // Nothing usable in the ledger: read the licence back from the anchor, under the licence's
     // own secret (a new one if the ledger lost that too). The activation is rebuilt with what the
     // gateway needs and the period needs; the holder's name is not kept, so it is not shown until
-    // the gateway is asked again. The check history starts afresh, so it is asked at the next
-    // pass. An end the ledger still records stays: restoring from the anchor used to clear it,
-    // and a refunded licence came back by deleting three rows (licence item 7).
+    // the gateway is asked again. The date of the last good check starts afresh, so it is asked
+    // at the next pass. An end the ledger still records stays: restoring from the anchor used to
+    // clear it, and a refunded licence came back by deleting three rows (licence item 7). So do
+    // a rejection and a failed check already under way: clearing them restarted the grace, and
+    // deleting the same three rows bought a rejected key a new one each time.
     let Some(a) = anclada else {
         return Ok(None);
     };
@@ -574,8 +632,6 @@ fn licencia_guardada(
     ledger.set_setting(SETTING_LICENSE_KEY_AT, &a.desde.to_string())?;
     ledger.set_setting(SETTING_LICENSE_PERIOD_DAYS, &a.periodo.to_string())?;
     ledger.set_setting(SETTING_LICENSE_CHECKED_AT, "")?;
-    ledger.set_setting(SETTING_LICENSE_CHECK_FAILED_AT, "")?;
-    ledger.set_setting(SETTING_LICENSE_REJECTED_AT, "")?;
     let period = periodo_guardado(ledger, &activacion)?;
     Ok(Some(Guardada {
         activation: activacion,
@@ -1224,6 +1280,20 @@ mod tests {
         g
     }
 
+    /// A new start of the program at `now` whose first reading has already kept pace with the
+    /// monotonic clock long enough to be remembered: what a start after the machine was really
+    /// off for a while looks like a few minutes in. A test stands for days with these.
+    fn arranque_estable(l: &Ledger, secret: &str, now: i64) -> Status {
+        olvidar_proceso();
+        let espera =
+            std::time::Duration::from_millis(u64::try_from(RELOJ_CONFIRMA_MS + 60_000).unwrap());
+        // A machine that compiled this has been up for more than six minutes.
+        let desde = std::time::Instant::now().checked_sub(espera).unwrap();
+        let pasado = i64::try_from(espera.as_millis()).unwrap();
+        *RELOJ_PENDIENTE.lock().unwrap() = Some((desde, now - pasado));
+        status(l, secret, now).unwrap()
+    }
+
     fn ledger_observing() -> Ledger {
         let mut l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
         // The PC has been observing since t=0.
@@ -1345,8 +1415,7 @@ mod tests {
         ));
         // Six days later (a test stands for them with a new start: within one start, the
         // remembered clock only moves as fast as real time).
-        olvidar_proceso();
-        let s = status(&l, "tok", t + 6 * DAY_MS).unwrap();
+        let s = arranque_estable(&l, "tok", t + 6 * DAY_MS);
         assert!(matches!(
             s.plan,
             Plan::Prueba {
@@ -1381,9 +1450,8 @@ mod tests {
             s.plan
         );
         // Over on day eight, and still over when the clock is set back to day one.
-        olvidar_proceso();
         assert!(matches!(
-            status(&l, "tok", t + 8 * DAY_MS).unwrap().plan,
+            arranque_estable(&l, "tok", t + 8 * DAY_MS).plan,
             Plan::PruebaAgotada { .. }
         ));
         assert!(matches!(
@@ -1630,9 +1698,22 @@ mod tests {
             "{:?}",
             s.plan
         );
-        // Setting the clock back is still caught: what was remembered stays the floor.
+        // Setting the clock back is still caught: what was remembered stays the floor, in this
+        // start and in the next.
+        let _ = arranque_estable(&l, "", t0 + 3 * DAY_MS);
+        let s = status(&l, "", t0).unwrap();
+        assert!(
+            matches!(
+                s.plan,
+                Plan::Prueba {
+                    dias_restantes: 4,
+                    ..
+                }
+            ),
+            "{:?}",
+            s.plan
+        );
         olvidar_proceso();
-        let _ = status(&l, "", t0 + 3 * DAY_MS).unwrap();
         let s = status(&l, "", t0).unwrap();
         assert!(
             matches!(
@@ -2197,5 +2278,126 @@ mod tests {
             assert_eq!(gateway_host(), GATEWAY_HOST);
             std::env::remove_var(TEST_GATEWAY_ENV);
         }
+    }
+
+    /// A start whose clock is days ahead (the hardware clock, before the network sets it right)
+    /// decides with that clock for the moment, but does not write it down: once the clock is
+    /// right, even after another start, the trial has its days. Until this change the first
+    /// reading of a start was believed and stored, and the stored clock never goes back.
+    #[test]
+    fn arrancar_con_el_reloj_adelantado_no_acaba_la_prueba() {
+        let _a_solas = a_solas();
+        let l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        let t0 = 1_790_000_000_000;
+        assert!(matches!(
+            status(&l, "", t0).unwrap().plan,
+            Plan::Prueba {
+                dias_restantes: 7,
+                ..
+            }
+        ));
+        let visto_antes = setting_i64(&l, SETTING_CLOCK_SEEN).unwrap();
+        let ancla_antes = ancla::leer_todo().visto;
+        // A new start, an hour later, with the clock thirty days ahead.
+        olvidar_proceso();
+        let s = status(&l, "", t0 + HOUR_MS + 30 * DAY_MS).unwrap();
+        assert!(matches!(s.plan, Plan::PruebaAgotada { .. }), "{:?}", s.plan);
+        assert_eq!(setting_i64(&l, SETTING_CLOCK_SEEN).unwrap(), visto_antes);
+        assert_eq!(ancla::leer_todo().visto, ancla_antes);
+        // The network sets it right a moment later: the trial is there, with its days…
+        let s = status(&l, "", t0 + HOUR_MS).unwrap();
+        assert!(
+            matches!(
+                s.plan,
+                Plan::Prueba {
+                    dias_restantes: 7,
+                    ..
+                }
+            ),
+            "{:?}",
+            s.plan
+        );
+        // …and in the next start too.
+        olvidar_proceso();
+        let s = status(&l, "", t0 + 2 * HOUR_MS).unwrap();
+        assert!(
+            matches!(
+                s.plan,
+                Plan::Prueba {
+                    dias_restantes: 7,
+                    ..
+                }
+            ),
+            "{:?}",
+            s.plan
+        );
+    }
+
+    /// The held-back first reading is remembered once later readings have kept pace with it for
+    /// a few minutes of this process's own clock; a reading that strays starts the wait again.
+    #[test]
+    fn una_primera_lectura_adelantada_se_recuerda_cuando_se_mantiene() {
+        let t = 1_790_000_000_000;
+        let inicio = std::time::Instant::now();
+        let mas = |ms: i64| inicio + std::time::Duration::from_millis(u64::try_from(ms).unwrap());
+        let mut p = None;
+        // First sight: held.
+        assert!(!primera_lectura_confirmada(&mut p, t, inicio));
+        assert_eq!(p, Some((inicio, t)));
+        // Two minutes later, in step: still waiting.
+        assert!(!primera_lectura_confirmada(
+            &mut p,
+            t + 120_000,
+            mas(120_000)
+        ));
+        // Five minutes in, in step (within a minute): remembered.
+        assert!(primera_lectura_confirmada(
+            &mut p,
+            t + RELOJ_CONFIRMA_MS + 30_000,
+            mas(RELOJ_CONFIRMA_MS)
+        ));
+        // A clock that jumps meanwhile (set right, or moved again) starts afresh from itself.
+        let mut p = Some((inicio, t));
+        let corregido = t - 30 * DAY_MS;
+        assert!(!primera_lectura_confirmada(
+            &mut p,
+            corregido,
+            mas(RELOJ_CONFIRMA_MS)
+        ));
+        assert_eq!(p, Some((mas(RELOJ_CONFIRMA_MS), corregido)));
+    }
+
+    /// Restoring the licence from the anchor keeps a rejection and a failed check already under
+    /// way: clearing them restarted the grace each time the licence rows were deleted.
+    #[test]
+    fn recuperar_del_ancla_no_borra_un_rechazo_ni_un_fallo() {
+        let _a_solas = a_solas();
+        let l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        store_key(&l, "tok", 5, "GUARDIANA Plus · mensual");
+        assert!(status(&l, "tok", 10).unwrap().plus_activo);
+        l.set_setting(SETTING_LICENSE_REJECTED_AT, "12").unwrap();
+        l.set_setting(SETTING_LICENSE_CHECK_FAILED_AT, "11")
+            .unwrap();
+        for k in [
+            SETTING_LICENSE_KEY,
+            SETTING_LICENSE_ACTIVATION,
+            SETTING_LICENSE_KEY_MARK,
+        ] {
+            l.set_setting(k, "").unwrap();
+        }
+        let _ = status(&l, "tok", 20).unwrap();
+        assert_eq!(
+            l.setting(SETTING_LICENSE_KEY).unwrap().as_deref(),
+            Some("KEY-1"),
+            "restored from the anchor"
+        );
+        assert_eq!(
+            setting_i64(&l, SETTING_LICENSE_REJECTED_AT).unwrap(),
+            Some(12)
+        );
+        assert_eq!(
+            setting_i64(&l, SETTING_LICENSE_CHECK_FAILED_AT).unwrap(),
+            Some(11)
+        );
     }
 }

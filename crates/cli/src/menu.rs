@@ -117,13 +117,22 @@ fn watch_for_real() -> Result<(), Box<dyn Error>> {
     let mut apply = Opts::default();
     apply.set("apply", None);
     apply.set("yes", None);
-    dns_cmd::run(&apply)?;
+    // `dns --apply` points the machine at 127.0.0.1 only once a Guardiana answers there, and the
+    // one this option runs starts below: the change is made beside it, as soon as it answers.
+    // Made first, as until now, it would be refused (or, before that check, leave the machine
+    // without names whenever the resolver then failed to start).
+    let aplicar = std::thread::spawn(move || {
+        if let Err(e) = dns_cmd::run(&apply) {
+            println!("{e}");
+        }
+    });
     println!();
     println!("{}", t.cli("menu.navega"));
     println!("{}", t.cli("menu.parar"));
     let mut o = Opts::default();
     o.set("open", None);
     let result = observe::run(&o);
+    let _ = aplicar.join();
     println!();
     if !ya_estaba {
         let mut restore = Opts::default();

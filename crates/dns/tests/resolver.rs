@@ -318,6 +318,23 @@ async fn self_check_names_answer_the_loopback_and_never_go_upstream() {
     assert!(policy.seen().iter().all(|(_, o)| *o == Outcome::Checker));
 }
 
+/// The check `guardiana dns --apply` makes before pointing the machine at 127.0.0.1: a watching
+/// guardian says yes; a stood-aside relay and an empty port say no.
+#[tokio::test]
+async fn guardian_answers_only_when_a_watching_guardian_is_there() {
+    let (up, _hits, _upstream) = fake_upstream().await;
+    let wait = Duration::from_secs(3);
+    let g = guardiana(up, Recorder::default(), |_| {}).await;
+    assert!(guardiana_dns::probe::guardian_answers(g.udp_addrs[0], wait).await);
+    let relay = guardiana(up, Recorder::default(), |c| c.self_check = false).await;
+    assert!(!guardiana_dns::probe::guardian_answers(relay.udp_addrs[0], wait).await);
+    let empty = {
+        let s = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+        s.local_addr().unwrap()
+    };
+    assert!(!guardiana_dns::probe::guardian_answers(empty, Duration::from_millis(500)).await);
+}
+
 #[tokio::test]
 async fn a_relay_says_the_self_check_names_do_not_exist_and_forwards_the_rest() {
     // The relay a stood-down program keeps on the LAN: it passes the household's queries on, but

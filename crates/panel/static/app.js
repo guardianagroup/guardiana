@@ -488,6 +488,10 @@
   // offering «unblock» there created a permanent allow (review of 9 Oct 2026).
   const REGLAS_VISTAS = new Set();
   const REGLAS_ACTIVAS = new Set();
+  // Rules this device did not make for itself (the household panel set them on it): on the
+  // device's own page they are the home's decision, which only the home's panel undoes.
+  const REGLAS_DE_LA_CASA = new Set();
+  const esDeLaCasa = (x) => x.created_by !== 'usuario (dispositivo)';
   // Names let through the declared scope from this page since it loaded.
   const DEJADOS_PASAR = new Set();
   // When each rule was made and undone (Unix ms), and when a name was let into the scope here:
@@ -503,9 +507,10 @@
     try {
       const r = await api(path);
       CORTADOS.clear(); PERMITIDOS.clear(); REGLAS_VISTAS.clear(); REGLAS_ACTIVAS.clear();
-      DESBLOQUEOS.clear();
+      DESBLOQUEOS.clear(); REGLAS_DE_LA_CASA.clear();
       (r.reglas || []).forEach((x) => {
         REGLAS_VISTAS.add(x.id);
+        if (esDeLaCasa(x)) REGLAS_DE_LA_CASA.add(x.id);
         HORAS_REGLA.set(x.id, { creada: x.created_at, deshecha: x.undone_at ?? null });
         if (x.activa) REGLAS_ACTIVAS.add(x.id);
         if (x.match_kind === 'domain' && x.action === 'cortar' && x.undone_at != null) {
@@ -603,17 +608,22 @@
   }
   function cutCell(ev) {
     const d = `data-device="${esc(ev.device_id)}" data-name="${esc(ev.qname)}"`;
+    const enSuPagina = document.body.getAttribute('data-page') === 'miDispositivo';
     const corte = reglaDeCorte(ev);
     if (corte !== undefined) {
+      // A block the household panel set on this device: its own page cannot lift it (the
+      // server refuses it too), so the row says where it is changed instead of a button.
+      if (enSuPagina && REGLAS_DE_LA_CASA.has(corte)) return `<span class="muted">${esc(t('mi_bloqueo_de_la_casa'))}</span>`;
       return `<button class="cut cortado" data-deshacer="${corte}" ${d}>${esc(t('desbloquear_boton'))}</button>`;
     }
+    // Blocking a name undoes the hand-made allow first, but only one this page may undo.
     const permiso = reglaDePermiso(ev);
-    const bloquear = `<button class="secondary cut" ${permiso !== undefined ? `data-permiso="${permiso}" ` : ''}${d}>${esc(t('cortar'))}</button>`;
+    const permisoPropio = permiso !== undefined && !(enSuPagina && REGLAS_DE_LA_CASA.has(permiso));
+    const bloquear = `<button class="secondary cut" ${permisoPropio ? `data-permiso="${permiso}" ` : ''}${d}>${esc(t('cortar'))}</button>`;
     if (ev.verdict === 'cortado') {
       // Lifted since: the status cell says «desbloqueado» (estadoCelda), and the button offers
       // what can be done now.
       if (levantado(ev)) return bloquear;
-      const enSuPagina = document.body.getAttribute('data-page') === 'miDispositivo';
       if (ev.decided_by === 'alcance_declarado') {
         // The scope belongs to the home's panel: from the phone's own page there is no key for
         // it, so the row says where to change it instead of a button that would fail.
@@ -1367,7 +1377,7 @@
         miTabla.pinta(r.eventos.map((ev) => `<tr ${filaAttrs(ev)}><td class="mono">${clock(ev.ts)}</td><td><span class="mono">${esc(ev.qname)}</span>${company(ev)}${phrases(ev)}</td>${empresaCelda(ev)}<td>${cat(ev)}</td>${paisCelda(ev)}${celdasEstado(ev)}</tr>`).join('') || `<tr><td colspan="7" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`, r.eventos.length);
         const rules = await api('/api/mi-dispositivo/reglas');
         lastRules = rules.reglas;
-        $('mi-reglas').innerHTML = rules.reglas.map((x) => `<tr><td>${esc(t('tipo_' + x.match_kind))}</td><td class="mono">${esc(x.pattern)}</td><td>${esc(t('accion_' + x.action))}</td><td>${x.activa ? esc(t('regla_activa')) : esc(t('regla_deshecha'))}</td><td>${x.activa ? `<button class="secondary undo" data-id="${x.id}">${esc(t('deshacer'))}</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('reglas_ninguna'))}</td></tr>`;
+        $('mi-reglas').innerHTML = rules.reglas.map((x) => `<tr><td>${esc(t('tipo_' + x.match_kind))}</td><td class="mono">${esc(x.pattern)}</td><td>${esc(t('accion_' + x.action))}</td><td>${x.activa ? esc(t('regla_activa')) : esc(t('regla_deshecha'))}</td><td>${!x.activa ? '' : esDeLaCasa(x) ? `<span class="muted">${esc(t('mi_regla_de_la_casa'))}</span>` : `<button class="secondary undo" data-id="${x.id}">${esc(t('deshacer'))}</button>`}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('reglas_ninguna'))}</td></tr>`;
       };
       bindCutButtons($('mi-rows'), '/api/mi-dispositivo/reglas');
       const miTabla = tablaQuieta($('mi-rows'));

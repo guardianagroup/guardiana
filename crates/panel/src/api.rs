@@ -2574,6 +2574,16 @@ pub(crate) async fn mi_nueva_regla(
     )?))
 }
 
+/// Whether a device's own page (no key) may undo `rule`: only a rule that device made for itself
+/// from that page. A rule the household panel set on the device is the home's decision, which
+/// only the panel lifts. Before this check the phone could undo it just because the rule carried
+/// its device id.
+fn phone_may_undo(rule: &guardiana_core::Rule, device: &str) -> bool {
+    rule.scope == Scope::Device
+        && rule.device_id.as_deref() == Some(device)
+        && rule.created_by == CREADA_EN_DISPOSITIVO
+}
+
 pub(crate) async fn mi_deshacer_regla(
     State(state): State<Arc<AppState>>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
@@ -2583,11 +2593,10 @@ pub(crate) async fn mi_deshacer_regla(
     let me = identity_of(&state, peer);
     let now = now_ms();
     Ok(Json(with_ledger(&state, |l| {
-        let own = l.rules()?.into_iter().any(|r| {
-            r.id == rule_id
-                && r.scope == Scope::Device
-                && r.device_id.as_deref() == Some(me.as_str())
-        });
+        let own = l
+            .rules()?
+            .iter()
+            .any(|r| r.id == rule_id && phone_may_undo(r, &me));
         if own {
             l.undo_rule(rule_id, now)
         } else {

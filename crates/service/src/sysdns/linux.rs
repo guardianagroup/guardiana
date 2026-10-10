@@ -124,6 +124,17 @@ pub(crate) fn backup_link_ids() -> Option<Vec<String>> {
 
 // ----- systemd-resolved -----------------------------------------------------
 
+/// Whether the network link `name` is a physical device: it has a `device` in sysfs, which
+/// VPN tunnels, bridges and the loopback do not.
+pub(crate) fn is_physical_link(name: &str) -> bool {
+    !name.is_empty()
+        && !name.contains('/')
+        && Path::new("/sys/class/net")
+            .join(name)
+            .join("device")
+            .exists()
+}
+
 /// `resolvectl dns` prints `Global: ...` and `Link N (name): servers...`.
 /// The link name of one `resolvectl dns` line: `Link 2 (wlp3s0): 127.0.0.1` → `wlp3s0`.
 pub(crate) fn link_name_of(line: &str) -> Option<String> {
@@ -1013,5 +1024,50 @@ mod tests {
             Some(4),
             "Error: Failed to modify connection 'Casa': Insufficient privileges.\n"
         ));
+    }
+
+    /// systemd-resolved: a physical link that appeared after the change joins the copy with the
+    /// servers it had (what the undo and the upstreams need), so the next apply points it at the
+    /// guardian; a VPN tunnel that appeared does not, and the links already there keep what the
+    /// copy recorded for them, not the 127.0.0.1 they show now.
+    #[test]
+    fn a_new_physical_link_joins_a_resolved_copy_and_a_tunnel_does_not() {
+        let antes_txt = "Global:\nLink 2 (wlp3s0): 192.168.1.1 fe80::1\n";
+        let ahora_txt = "Global:\nLink 2 (wlp3s0): 127.0.0.1\nLink 5 (enx00e04c): 10.0.0.1\nLink 9 (tun0): 10.8.0.1\n";
+        let copia = |text: &str| Backup {
+            taken_at: 1,
+            method: Method::SystemdResolved,
+            interfaces: parse_resolvectl_dns(text),
+            resolv_conf: Some("x".into()),
+            resolv_link: Some("../run/systemd/resolve/stub-resolv.conf".into()),
+            made_dropin_dir: true,
+        };
+        let antes = copia(antes_txt);
+        let ahora = copia(ahora_txt);
+        let fisico = |i: &InterfaceDns| i.id != "tun0";
+        let Some(junta) = super::super::with_new_interfaces_where(&antes, &ahora, fisico) else {
+            unreachable!("a new physical link joins the copy");
+        };
+        let ids: Vec<&str> = junta.interfaces.iter().map(|i| i.id.as_str()).collect();
+        assert_eq!(ids, vec!["wlp3s0", "enx00e04c"]);
+        assert_eq!(
+            junta.interfaces[0].servers,
+            vec![
+                IpAddr::from([192, 168, 1, 1]),
+                IpAddr::from([0xfe80_u16, 0, 0, 0, 0, 0, 0, 1])
+            ]
+        );
+        assert_eq!(
+            junta.interfaces[1].servers,
+            vec![IpAddr::from([10, 0, 0, 1])]
+        );
+        // The rest of the copy (resolv.conf, its link, the drop-in folder) is the day's own.
+        assert_eq!(junta.resolv_link, antes.resolv_link);
+        assert_eq!(junta.resolv_conf, antes.resolv_conf);
+        assert!(junta.made_dropin_dir);
+        assert_eq!(junta.taken_at, 1);
+        // Nothing new but the tunnel: nothing to add.
+        let solo_tunel = copia("Link 2 (wlp3s0): 127.0.0.1\nLink 9 (tun0): 10.8.0.1\n");
+        assert!(super::super::with_new_interfaces_where(&antes, &solo_tunel, fisico).is_none());
     }
 }
