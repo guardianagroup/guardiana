@@ -44,6 +44,46 @@
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', pintaTema);
   pintaTema();
 
+  // Favourites: eight at a glance, all on request. Each one opens in this tab; its × forgets it.
+  let favs = { lista: [], importar: [] };
+  let todos = false;
+  const VISIBLES = 8;
+  function pintaFavoritos() {
+    const lista = favs.lista || [];
+    const ver = todos ? lista : lista.slice(0, VISIBLES);
+    $('favs-rejilla').innerHTML = ver.map((f, i) => {
+      let host = '';
+      try { host = new URL(f.url).hostname.replace(/^www\./, ''); } catch (_) {}
+      const nombre = f.titulo || host || f.url;
+      const ic = f.icono ? `<img src="${Z.esc(f.icono)}" alt="">` : Z.esc((host || nombre).charAt(0).toUpperCase());
+      return `<a class="fav" href="#" data-i="${i}" title="${Z.esc(nombre)}\n${Z.esc(f.url)}"><span class="fav-ic">${ic}</span><span>${Z.esc(nombre)}</span><button class="quita" data-q="${i}" title="${Z.esc(t('favorito_quitar'))}" aria-label="${Z.esc(t('favorito_quitar'))}">×</button></a>`;
+    }).join('');
+    $('favs-vacio').classList.toggle('oculto', lista.length > 0);
+    const imp = (favs.importar || []).map((n) => `<button class="enlace" data-de="${Z.esc(n)}">${Z.esc(t('favoritos_importar_de', { navegador: n }))}</button>`).join(' · ');
+    $('favs-importar').innerHTML = lista.length ? '' : imp;
+    const b = $('favs-todos');
+    b.classList.toggle('oculto', lista.length <= VISIBLES);
+    b.textContent = todos ? t('favoritos_ver_menos') : t('favoritos_ver_todos', { n: n(lista.length) });
+  }
+  $('favs-rejilla').addEventListener('click', (e) => {
+    const q = e.target.closest('.quita');
+    const a = e.target.closest('.fav');
+    if (!a) return;
+    e.preventDefault();
+    const lista = favs.lista || [];
+    if (q) { const f = lista[Number(q.dataset.q)]; if (f) manda({ tipo: 'favorito_quitar', url: f.url }); return; }
+    const f = lista[Number(a.dataset.i)];
+    if (f) manda({ tipo: 'navegar', texto: f.url });
+  });
+  $('favs-importar').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-de]');
+    if (b) manda({ tipo: 'importar_favoritos', de: b.dataset.de });
+  });
+  $('favs-todos').addEventListener('click', () => { todos = !todos; pintaFavoritos(); });
+  en('favoritos', (m) => { favs = m; pintaFavoritos(); });
+  en('favoritos_importados', (m) => { $('favs-hecho').textContent = m.texto || ''; });
+  en('textos', pintaFavoritos);
+
   // The greeting and the date follow the clock, so the top of the page is never stale.
   function pintaSaludo() {
     const ahora = new Date();

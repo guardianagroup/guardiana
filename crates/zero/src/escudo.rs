@@ -43,6 +43,9 @@ pub struct Pestana {
     pub parametros_quitados: u32,
     /// Marked values cut on their way out.
     pub datos_salvados: u32,
+    /// The page's cookie notice: its consent manager and what was done (`rechazado`, or
+    /// `escondido` when it had no «reject all»).
+    pub cookies: Option<(String, String)>,
 }
 
 impl Pestana {

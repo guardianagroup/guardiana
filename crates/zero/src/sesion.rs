@@ -28,6 +28,7 @@ use crate::decision::{decide, Ajustes, Motivo, Peticion};
 use crate::direccion::{a_direccion, buscador, codifica, BUSCADORES};
 use crate::dominio::{host_de, sitio};
 use crate::escudo::{self, Diario, Tercero};
+use crate::favoritos::{self, Favoritos};
 use crate::fecha;
 use crate::libro::Libro;
 use crate::licencia::{Estado as EstadoLicencia, Fallo, Lugar as LugarLicencia};
@@ -195,6 +196,10 @@ pub enum Orden {
         /// Strict.
         estricto: bool,
     },
+    /// Read the public ledger for a newer GUARDIANA ZERO (the person pressed «Buscar
+    /// actualización»), away from the window; the answer comes back through
+    /// [`Sesion::version_encontrada`].
+    BuscaVersion,
     /// Day or night for the window's own frame (title bar): `Some(true)` night, `Some(false)`
     /// day, `None` like Windows.
     Tema {
@@ -282,6 +287,9 @@ struct Preferencias {
     idioma: String,
     /// Day or night for the browser's own pages: `"dia"`, `"noche"`, or `""` like Windows.
     tema: String,
+    /// Leave cookie notices as they come (the person turned «reject cookie notices» off; it is
+    /// on unless they do).
+    cookies_sin_tocar: bool,
     /// Sites where the form guard does not ask (outside mandates).
     sin_preguntar: BTreeSet<String>,
 }
@@ -367,6 +375,7 @@ pub struct Sesion {
     formas_mandato: Vec<Forma>,
     libro: Libro,
     diario: Diario,
+    favoritos: Favoritos,
     pestanas: Vec<Pestana>,
     activa: u32,
     siguiente: u32,
@@ -387,6 +396,8 @@ pub struct Sesion {
     ultimo_hoy: i64,
     /// The day the figures and the cut log were last brought up to, to notice midnight.
     dia_visto: String,
+    /// A version check is under way.
+    buscando_version: bool,
     depura: bool,
     /// The engine reports requests of workers too (newer WebView2): said in the receipts.
     trabajadores: bool,
@@ -517,6 +528,7 @@ impl Sesion {
         let prefs: Preferencias = lee(&a.datos.join("preferencias.json"));
         let tinta: Vec<Marcado> = lee(&a.datos.join("tinta.json"));
         let libro: Libro = lee(&a.datos.join("libro.json"));
+        let favoritos: Favoritos = lee(&a.datos.join("favoritos.json"));
         let mut diario: Diario = lee(&a.datos.join("diario.json"));
         while diario.dias.len() > 400 {
             diario.dias.pop_first();
@@ -541,6 +553,7 @@ impl Sesion {
             prefs,
             libro,
             diario,
+            favoritos,
             pestanas: Vec::new(),
             activa: 0,
             siguiente: 1,
@@ -560,6 +573,7 @@ impl Sesion {
             ultimo_guardado: 0,
             ultimo_hoy: 0,
             dia_visto: String::new(),
+            buscando_version: false,
             depura: false,
             trabajadores: false,
             cortes_pend: Vec::new(),
@@ -709,7 +723,7 @@ impl Sesion {
             m["conexiones"] = Value::Array(
                 l.conexiones()
                     .into_iter()
-                    .map(|c| json!({ "ms": c.ms, "host": c.host, "pedida": c.pedida }))
+                    .map(|c| json!({ "ms": c.ms, "host": c.host, "pedida": c.pedida, "version": c.version }))
                     .collect(),
             );
         }
@@ -780,6 +794,79 @@ impl Sesion {
 
     fn guarda_tinta(&self) {
         escribe_json(&self.datos.join("tinta.json"), &self.tinta);
+    }
+
+    fn guarda_favoritos(&self) {
+        escribe_json(&self.datos.join("favoritos.json"), &self.favoritos);
+    }
+
+    /// The favourites for the new tab, and which other browsers' favourites can be brought over.
+    fn msg_favoritos(&self) -> Value {
+        json!({
+            "tipo": "favoritos",
+            "lista": self.favoritos.lista,
+            "importar": favoritos::otros_navegadores().into_iter().map(|(n, _)| n).collect::<Vec<_>>(),
+        })
+    }
+
+    /// The star in the address bar: keep the page of the active tab, or forget it.
+    fn favorito_activa(&mut self) -> Vec<Orden> {
+        let Some(p) = self.pestana(self.activa) else {
+            return Vec::new();
+        };
+        if es_interna(&p.url) || p.url.is_empty() {
+            return Vec::new();
+        }
+        let (url, titulo, icono) = (p.url.clone(), self.titulo_de(p), p.icono.clone());
+        if self.favoritos.contiene(&url) {
+            self.favoritos.quita(&url);
+        } else {
+            self.favoritos.anade(&url, &titulo, &icono);
+        }
+        self.guarda_favoritos();
+        // The star itself says it (filled or not); the new tab gets the list.
+        let mut o = vec![self.estado()];
+        o.extend(self.a_paginas_propias(&self.msg_favoritos()));
+        o
+    }
+
+    fn favorito_quita(&mut self, url: &str) -> Vec<Orden> {
+        if !self.favoritos.quita(url) {
+            return Vec::new();
+        }
+        self.guarda_favoritos();
+        let mut o = vec![self.estado()];
+        o.extend(self.a_paginas_propias(&self.msg_favoritos()));
+        o
+    }
+
+    /// Bring the favourites of another browser on this computer, when the person asks.
+    fn importa_favoritos(&mut self, de: &str) -> Vec<Orden> {
+        let Some((nombre, ruta)) = favoritos::otros_navegadores()
+            .into_iter()
+            .find(|(n, _)| n.eq_ignore_ascii_case(de))
+        else {
+            return vec![self.aviso("favoritos_no_hay", &[])];
+        };
+        let lista = fs::read_to_string(&ruta)
+            .map(|t| favoritos::de_chromium(&t))
+            .unwrap_or_default();
+        let n = self.favoritos.importa(&lista);
+        self.guarda_favoritos();
+        let n_txt = n.to_string();
+        let mut o = vec![
+            self.estado(),
+            self.aviso(
+                "favoritos_importados",
+                &[("n", n_txt.as_str()), ("navegador", nombre)],
+            ),
+        ];
+        o.extend(self.a_paginas_propias(&self.msg_favoritos()));
+        o.extend(self.a_paginas_propias(&json!({
+            "tipo": "favoritos_importados",
+            "texto": self.tf("favoritos_importados", &[("n", n_txt.as_str()), ("navegador", nombre)]),
+        })));
+        o
     }
 
     fn guarda_libro(&mut self) {
@@ -864,6 +951,7 @@ impl Sesion {
                 "segura": p.url.starts_with("https://"),
                 "interna": es_interna(&p.url),
                 "mandato": p.perfil == Perfil::Mandato,
+                "favorito": self.favoritos.contiene(&p.url),
             })
         });
         json!({ "tipo": "estado", "pestanas": pestanas, "activa": activa, "panel": self.panel })
@@ -925,6 +1013,7 @@ impl Sesion {
             "terceros": terceros,
             "parametros_quitados": p.escudo.parametros_quitados,
             "datos_salvados": p.escudo.datos_salvados,
+            "cookies": p.escudo.cookies.as_ref().map(|(g, a)| json!({ "gestor": g, "accion": a })),
         })
     }
 
@@ -936,6 +1025,23 @@ impl Sesion {
         let mut o = vec![envia(Origen::Barra, &m)];
         if tambien_panel || self.panel.as_deref() == Some("escudo") {
             o.push(envia(Origen::Panel, &m));
+        }
+        o
+    }
+
+    /// What the public ledger said about the newest GUARDIANA ZERO.
+    pub fn version_encontrada(&mut self, r: Result<String, String>) -> Vec<Orden> {
+        self.buscando_version = false;
+        let m = match r {
+            Ok(v) if crate::licencia::compara_versiones(&v, &self.version).is_gt() => {
+                json!({ "tipo": "version", "estado": "nueva", "version": v })
+            }
+            Ok(_) => json!({ "tipo": "version", "estado": "al_dia", "version": self.version }),
+            Err(e) => json!({ "tipo": "version", "estado": "error", "error": e }),
+        };
+        let mut o = vec![envia(Origen::Panel, &m)];
+        if self.panel.as_deref() == Some("licencia") {
+            o.push(envia(Origen::Panel, &self.msg_licencia()));
         }
         o
     }
@@ -967,6 +1073,8 @@ impl Sesion {
             "buscadores": lista,
             "idioma": self.prefs.idioma,
             "tema": self.prefs.tema,
+            "rechazar_cookies": !self.prefs.cookies_sin_tocar,
+            "importar": favoritos::otros_navegadores().into_iter().map(|(n, _)| n).collect::<Vec<_>>(),
             "sin_preguntar": self.prefs.sin_preguntar,
             "huella_clave": self.huella_clave(),
         })
@@ -1245,10 +1353,11 @@ impl Sesion {
         let propia = es_interna(fuente);
         match origen {
             Origen::Pestana(id) if !propia => {
-                return if tipo == "zg_formulario" {
-                    self.formulario(id, fuente, &m)
-                } else {
-                    Vec::new()
+                return match tipo.as_str() {
+                    "zg_formulario" => self.formulario(id, fuente, &m),
+                    "zg_cookies_pide" => self.cookies_pide(id, &m),
+                    "zg_cookies" => self.cookies_hecho(id, &m),
+                    _ => Vec::new(),
                 };
             }
             Origen::Pestana(_) => {
@@ -1262,6 +1371,8 @@ impl Sesion {
                         | "cortes"
                         | "exportar_cortes"
                         | "volver"
+                        | "favorito_quitar"
+                        | "importar_favoritos"
                 ) || (tipo == "ajuste"
                     && ((texto(&m, "clave") == "cortar_seguimiento" && si(&m, "valor"))
                         || matches!(texto(&m, "clave"), "buscador" | "tema")));
@@ -1365,6 +1476,26 @@ impl Sesion {
                 _ => Vec::new(),
             },
             "abrir_cortes" => self.abre_cortes(),
+            "buscar_version" => {
+                if self.buscando_version {
+                    return Vec::new();
+                }
+                self.buscando_version = true;
+                vec![
+                    Orden::BuscaVersion,
+                    envia(
+                        Origen::Panel,
+                        &json!({ "tipo": "version", "estado": "buscando" }),
+                    ),
+                ]
+            }
+            "descargar_version" => {
+                let url = self.t("zero_pagina_url");
+                self.nueva_pestana(Perfil::General, &url)
+            }
+            "favorito" => self.favorito_activa(),
+            "favorito_quitar" => self.favorito_quita(texto(m, "url")),
+            "importar_favoritos" => self.importa_favoritos(texto(m, "de")),
             "volver" => match origen {
                 Origen::Pestana(id) => self.volver(id),
                 _ => Vec::new(),
@@ -1504,6 +1635,7 @@ impl Sesion {
                     self.a_pestana(id, &self.msg_tema()),
                     self.a_pestana(id, &self.msg_textos()),
                     self.a_pestana(id, &self.msg_hoy()),
+                    self.a_pestana(id, &self.msg_favoritos()),
                 ]
                 .into_iter()
                 .flatten()
@@ -1537,6 +1669,11 @@ impl Sesion {
                 let mut o = vec![envia(Origen::Panel, &self.msg_ajustes())];
                 o.extend(self.a_paginas_propias(&self.msg_hoy()));
                 o
+            }
+            "rechazar_cookies" => {
+                self.prefs.cookies_sin_tocar = !valor.as_bool().unwrap_or(true);
+                self.guarda_prefs();
+                vec![envia(Origen::Panel, &self.msg_ajustes())]
             }
             "tema" => {
                 let v = valor.as_str().unwrap_or("");
@@ -2072,6 +2209,43 @@ impl Sesion {
     }
 
     // --- the form guard ------------------------------------------------------------------------
+
+    /// A web page's guard asks whether to deal with cookie notices: yes with the subscription on
+    /// and the setting on. The answer goes on the guard's own channel, like a form's.
+    fn cookies_pide(&self, id: u32, m: &Value) -> Vec<Orden> {
+        let ficha: String = texto(m, "zg").chars().take(64).collect();
+        let si = self.licencia.protege() && !self.prefs.cookies_sin_tocar;
+        vec![Orden::RespondeFormulario {
+            id,
+            json: json!({ "zg": ficha, "cookies": si }).to_string(),
+        }]
+    }
+
+    /// The guard dealt with the page's cookie notice: the shield says so. Only the managers the
+    /// guard knows, and only when it was told to act.
+    fn cookies_hecho(&mut self, id: u32, m: &Value) -> Vec<Orden> {
+        if !self.licencia.protege() || self.prefs.cookies_sin_tocar {
+            return Vec::new();
+        }
+        let gestor: String = texto(m, "gestor").chars().take(40).collect();
+        let accion = match texto(m, "accion") {
+            "rechazado" => "rechazado",
+            "escondido" => "escondido",
+            _ => return Vec::new(),
+        };
+        if gestor.is_empty() || !gestor.chars().all(|c| c.is_alphanumeric() || c == ' ') {
+            return Vec::new();
+        }
+        let Some(p) = self.pestana_mut(id) else {
+            return Vec::new();
+        };
+        p.escudo.cookies = Some((gestor, accion.to_string()));
+        if id == self.activa {
+            self.escudo_activa(false)
+        } else {
+            Vec::new()
+        }
+    }
 
     fn formulario(&mut self, id: u32, fuente: &str, m: &Value) -> Vec<Orden> {
         let Some(id_pagina) = numero(m, "id") else {

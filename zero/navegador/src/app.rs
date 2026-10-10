@@ -166,6 +166,8 @@ static COMPROBANDO: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBoo
 enum DeLicencia {
     Activada(Result<EstadoLicencia, Fallo>),
     Comprobada(EstadoLicencia),
+    /// The newest version in the public ledger, read when the person asked.
+    Version(Result<String, String>),
 }
 
 fn de_licencia(r: DeLicencia) {
@@ -186,6 +188,7 @@ fn recoge_licencia() {
         let o = match r {
             DeLicencia::Activada(r) => con_sesion(|s| s.licencia_activada(r)),
             DeLicencia::Comprobada(e) => con_sesion(|s| s.pon_licencia(e)),
+            DeLicencia::Version(r) => con_sesion(|s| s.version_encontrada(r)),
         };
         encola(o.unwrap_or_default());
     }
@@ -439,6 +442,21 @@ fn ejecuta(o: Orden) {
                     let r = lugar.activar(&clave, sesion::ahora_sistema());
                     de_licencia(DeLicencia::Activada(r));
                 });
+        }
+        Orden::BuscaVersion => {
+            let Some(lugar) = LUGAR.get().cloned() else {
+                de_licencia(DeLicencia::Version(Err("sin carpeta de datos".into())));
+                return;
+            };
+            let lanzado = std::thread::Builder::new()
+                .name("version".into())
+                .spawn(move || {
+                    let r = lugar.ultima_version(sesion::ahora_sistema());
+                    de_licencia(DeLicencia::Version(r));
+                });
+            if lanzado.is_err() {
+                de_licencia(DeLicencia::Version(Err("no se pudo empezar".into())));
+            }
         }
         Orden::ComprobarLicencia => {
             let Some(lugar) = LUGAR.get().cloned() else {

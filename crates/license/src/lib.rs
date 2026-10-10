@@ -739,6 +739,26 @@ fn status_con_reloj(ledger: &Ledger, secret: &str, now: i64) -> Result<(Status, 
     Ok((status, reloj))
 }
 
+/// A plain GET of a public text file (GUARDIANA ZERO reads the public ledger with it when the
+/// person asks whether there is a newer version): the status and the body.
+pub fn get_texto(url: &str) -> Result<(u16, String), Error> {
+    let response = ureq::get(url)
+        .config()
+        .timeout_global(Some(std::time::Duration::from_secs(20)))
+        .http_status_as_error(false)
+        .build()
+        .call()
+        .map_err(|e| Error::Network(e.to_string()))?;
+    let code = response.status().as_u16();
+    let text = response
+        .into_body()
+        .with_config()
+        .limit(4 * 1024 * 1024)
+        .read_to_string()
+        .map_err(|e| Error::Network(e.to_string()))?;
+    Ok((code, text))
+}
+
 fn post_json(url: &str, body: &serde_json::Value) -> Result<(u16, String), Error> {
     let response = ureq::post(url)
         .config()

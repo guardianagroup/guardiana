@@ -45,6 +45,12 @@ html, body { height: 100%; overflow: hidden; background: var(--marco); user-sele
 #vista-dir span { color: var(--gris); }
 #aviso-corte { flex: none; max-width: 42%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12.5px; color: var(--rojo); opacity: 0; transform: translateX(6px); transition: opacity .2s, transform .2s; }
 #aviso-corte.visto { opacity: 1; transform: none; }
+/* The star: keep this page in the favourites (it shows on the new tab). */
+#estrella { flex: none; width: 26px; height: 26px; margin-right: -6px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 13px; background: none; color: var(--gris); }
+#estrella:hover { color: var(--tinta); background: var(--hoja); }
+#estrella svg { width: 16px; height: 16px; }
+#estrella.puesta { color: var(--azul); }
+#estrella.puesta svg path { fill: currentColor; }
 
 /* The shield: how many companies were stopped on this page. It is the browser's pulse. */
 #b-escudo { height: 34px; padding: 0 12px 0 9px; border: 1px solid var(--linea); border-radius: 17px; background: var(--hoja); display: flex; align-items: center; gap: 7px; color: var(--verde); font-weight: 600; font-variant-numeric: tabular-nums; flex: none; }
@@ -86,6 +92,7 @@ html, body { height: 100%; overflow: hidden; background: var(--marco); user-sele
       <input id="campo-dir" spellcheck="false" data-t-ph="direccion_placeholder">
     </span>
     <span id="aviso-corte" role="status"></span>
+    <button type="button" id="estrella" class="oculto"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 2.8l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 8.1l5-.7z"/></svg></button>
   </form>
   <button id="b-parar" class="oculto" data-t-title="mandato_parar_titulo"><i></i><span data-t="mandato_parar"></span></button>
   <button id="b-licencia" class="oculto" data-t-title="licencia_boton_titulo"></button>

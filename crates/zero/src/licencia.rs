@@ -22,6 +22,33 @@ use std::path::{Path, PathBuf};
 use guardiana_core::{identity, Ledger, Purpose};
 use guardiana_license as lic;
 
+/// The public ledger, where every published version is written before its download exists.
+pub const REGISTRO_PUBLICO: &str =
+    "https://raw.githubusercontent.com/guardianagroup/guardiana/main/ledger.jsonl";
+const REGISTRO_HOST: &str = "raw.githubusercontent.com";
+
+/// The last GUARDIANA ZERO version in the public ledger's text (lines `"version":"zero-<v>"`).
+#[must_use]
+pub fn ultima_zero(texto: &str) -> Option<String> {
+    texto
+        .lines()
+        .filter_map(|l| serde_json::from_str::<serde_json::Value>(l.trim()).ok())
+        .filter_map(|v| {
+            v.get("version")
+                .and_then(serde_json::Value::as_str)
+                .and_then(|s| s.strip_prefix("zero-"))
+                .map(str::to_string)
+        })
+        .max_by(|a, b| compara_versiones(a, b))
+}
+
+/// `1.0.10` after `1.0.9`: compared number by number.
+#[must_use]
+pub fn compara_versiones(a: &str, b: &str) -> std::cmp::Ordering {
+    let partes = |s: &str| -> Vec<u64> { s.split('.').map(|x| x.parse().unwrap_or(0)).collect() };
+    partes(a).cmp(&partes(b))
+}
+
 /// The licence's own small ledger, inside the browser's data folder.
 pub const ARCHIVO: &str = "licencia.db";
 
@@ -177,8 +204,10 @@ pub struct Conexion {
     pub ms: i64,
     /// To whom.
     pub host: String,
-    /// Asked for by the person (an activation) or due (a periodic check).
+    /// Asked for by the person (an activation, a version check) or due (a periodic check).
     pub pedida: bool,
+    /// For the licence, or to see whether there is a newer version.
+    pub version: bool,
 }
 
 /// Where the licence lives, and the calls that read or change it. Cheap to clone: the shell keeps
@@ -241,6 +270,23 @@ impl Lugar {
             .map(|s| Estado::de_plan(&s.plan))
     }
 
+    /// The newest GUARDIANA ZERO in the public ledger, read once when the person asks. The
+    /// connection is written down like the licence's, as asked for by the person.
+    pub fn ultima_version(&self, ahora: i64) -> Result<String, String> {
+        let r = lic::get_texto(REGISTRO_PUBLICO);
+        if let Ok(mut l) = self.libro() {
+            let bytes = r
+                .as_ref()
+                .map_or(0, |(_, t)| i64::try_from(t.len()).unwrap_or(0));
+            let _ = l.record_outbound(ahora, Purpose::Version, REGISTRO_HOST, bytes, true);
+        }
+        let (code, texto) = r.map_err(|e| e.to_string())?;
+        if code != 200 {
+            return Err(format!("HTTP {code}"));
+        }
+        ultima_zero(&texto).ok_or_else(|| "el registro no tiene ninguna versión".to_string())
+    }
+
     /// The licence's connections, newest first (at most 20).
     #[must_use]
     pub fn conexiones(&self) -> Vec<Conexion> {
@@ -250,10 +296,11 @@ impl Lugar {
         l.outbound()
             .unwrap_or_default()
             .into_iter()
-            .filter(|o| o.purpose == Purpose::Licencia)
+            .filter(|o| matches!(o.purpose, Purpose::Licencia | Purpose::Version))
             .take(20)
             .map(|o| Conexion {
                 ms: o.ts,
+                version: o.purpose == Purpose::Version,
                 host: o.host,
                 pedida: o.initiated_by_user,
             })
@@ -270,6 +317,27 @@ impl Lugar {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+
+    #[test]
+    fn the_newest_zero_is_found_in_the_public_ledger() {
+        let texto = concat!(
+            r#"{"version":"1.0.9","files":[]}"#,
+            "\n",
+            r#"{"version":"zero-1.0.0","files":[]}"#,
+            "\n",
+            "una línea rota\n",
+            r#"{"version":"zero-1.0.10","files":[]}"#,
+            "\n",
+            r#"{"version":"zero-1.0.9","files":[]}"#,
+            "\n",
+        );
+        assert_eq!(ultima_zero(texto).as_deref(), Some("1.0.10"));
+        assert_eq!(ultima_zero(r#"{"version":"1.0.9"}"#), None);
+        assert!(compara_versiones("1.0.10", "1.0.9").is_gt());
+        assert!(compara_versiones("1.0.1", "1.0.1").is_eq());
+        assert!(compara_versiones("0.9.0", "1.0.0").is_lt());
+    }
+
     use super::*;
 
     const DIA: i64 = 86_400_000;

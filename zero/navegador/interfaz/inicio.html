@@ -19,6 +19,21 @@ body { background-image: linear-gradient(color-mix(in srgb, var(--tinta) 4%, tra
 main { max-width: 780px; margin: 0 auto; padding: 12vh 28px 64px; }
 #fecha { margin: 0 0 8px; font-size: 14px; font-weight: 500; color: var(--gris); }
 #saludo { font: 600 clamp(30px, 4vw, 42px)/1.15 var(--display); letter-spacing: -.02em; margin: 0 0 26px; }
+/* Favourites: the person's own pages, one click away. */
+.favs { margin-top: 22px; }
+.favs-rejilla { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; }
+.fav { position: relative; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 10px 4px 8px; border-radius: 12px; color: var(--tinta); text-decoration: none; cursor: pointer; }
+.fav:hover, .fav:focus-visible { background: var(--hoja); box-shadow: var(--sombra); outline: none; }
+.fav-ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: var(--hoja); border: 1px solid var(--linea); font: 600 16px/1 var(--display); color: var(--azul); overflow: hidden; }
+.fav-ic img { width: 22px; height: 22px; }
+.fav span { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; color: var(--gris); }
+.fav .quita { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 10px; background: var(--campo); color: var(--gris); font-size: 13px; line-height: 20px; opacity: 0; }
+.fav:hover .quita, .fav .quita:focus-visible { opacity: 1; }
+.fav .quita:hover { color: var(--rojo); }
+.favs-pie { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 6px 4px 0; font-size: 13px; color: var(--gris); }
+.favs-pie .enlace { font-size: 13px; }
+#favs-hecho { color: var(--verde); }
+@media (max-width: 640px) { .favs-rejilla { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 /* Today, live: the day's figures in one card that the program refreshes while it is open. */
 .hoy { margin-top: 30px; padding: 22px 24px 6px; border: 1px solid var(--linea); border-radius: 18px; background: var(--hoja); box-shadow: var(--sombra); }
 .hoy-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
@@ -82,6 +97,11 @@ a.hecho:hover span { color: var(--tinta); text-decoration: underline; text-under
     <input id="q" spellcheck="false" autofocus data-t-ph="buscar_ph_inicio">
     <select id="motor" data-t-title="buscador"></select>
   </form>
+  <section class="favs" id="favs" aria-labelledby="favs-t">
+    <h2 id="favs-t" class="oculto" data-t="favoritos"></h2>
+    <div class="favs-rejilla" id="favs-rejilla"></div>
+    <div class="favs-pie"><span id="favs-vacio" class="oculto" data-t="favoritos_vacio"></span><span id="favs-importar"></span><button class="enlace oculto" id="favs-todos"></button><span id="favs-hecho" role="status"></span></div>
+  </section>
   <section class="hoy" id="hoy">
     <div class="hoy-cab"><h2><i class="pulso"></i><span data-t="inicio_en_directo"></span></h2><a class="enlace" href="cortes.html" data-t="inicio_ver_todo"></a></div>
     <p id="frase"></p>

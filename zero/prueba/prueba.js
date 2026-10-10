@@ -38,6 +38,7 @@ function pagina(req, res) {
 <iframe src="http://googleads.g.doubleclick.net:${PUERTO}/pagead/ads" width="300" height="60"></iframe>
 <form id="f" action="/enviar" method="post"><label>Correo <input name="email" value="ana@correo.co"></label> <button id="b">Suscribirme</button></form>
 <p><a id="nueva" href="/otra" target="_blank">Abrir en otra ventana</a></p>
+<div id="onetrust-banner-sdk" style="position:fixed;bottom:0;left:0;right:0;padding:16px;background:#eee"><p>Usamos cookies</p><button id="onetrust-accept-btn-handler" onclick="fetch('/cookies-aceptadas')">Aceptar</button> <button id="onetrust-reject-all-handler" onclick="fetch('/cookies-rechazadas');this.parentNode.remove()">Rechazar todo</button></div>
 </body></html>`);
 }
 const servidor = http.createServer((req, res) => {
@@ -130,6 +131,11 @@ function pantalla(nombre) {
   comprueba(registro.filter((r) => r.host === 'sitio-prueba.test').every((r) => r.gpc === '1'), 'cada petición lleva Sec-GPC: 1');
   comprueba(await web.evaluate(() => navigator.globalPrivacyControl === true), 'navigator.globalPrivacyControl es true');
   comprueba(await web.evaluate(() => !(window.chrome && window.chrome.webview)), 'la página no ve el canal con el navegador');
+  comprueba(await hasta(async () => vio('sitio-prueba.test', '/cookies-rechazadas')), 'el aviso de cookies se rechaza solo («Rechazar todo»)');
+  comprueba(!vio('sitio-prueba.test', '/cookies-aceptadas'), 'y no se acepta nada');
+  // The star keeps the page in the favourites.
+  await barra.click('#estrella');
+  comprueba(await hasta(() => barra.evaluate(() => document.querySelector('#estrella').getAttribute('aria-pressed') === 'true')), 'la estrella guarda la web en favoritos');
   const n = Number(await barra.textContent('#b-escudo-n'));
   comprueba(n === 1, `el escudo cuenta empresas, no dominios: DoubleClick y Analytics son Google (${n})`);
   comprueba(await hasta(async () => (await barra.textContent('#aviso-corte')).includes('Google')), 'la barra dice a quién cortó');
@@ -179,6 +185,7 @@ function pantalla(nombre) {
   const nueva = await paginaQue(nav, (u) => u.endsWith('/inicio.html'));
   comprueba(await hasta(async () => (await nueva.getAttribute('#q', 'placeholder')) === 'Busca en la web o escribe una dirección'), 'la caja de búsqueda es nuestra');
   comprueba(await hasta(() => nueva.evaluate(() => (document.querySelector('#motor').selectedOptions[0] || {}).textContent === 'DuckDuckGo')), 'y lleva dentro el buscador, a la vista');
+  comprueba(await hasta(async () => (await nueva.locator('#favs-rejilla .fav').count()) === 1), 'la web guardada con la estrella sale en la pestaña nueva');
   let cortadasHoy = 0;
   await hasta(async () => { cortadasHoy = Number((await nueva.textContent('#h-cortadas')).replace(/\D/g, '')); return cortadasHoy >= 3; });
   comprueba(cortadasHoy >= 3, `la pestaña nueva cuenta las peticiones cortadas (${cortadasHoy})`);
@@ -236,6 +243,14 @@ function pantalla(nombre) {
   comprueba(await hasta(async () => (await barra.locator('.pestana').count()) === 2), '«Volver» cierra la lista que se abrió aparte');
   comprueba(await hasta(async () => (await barra.textContent('.pestana[aria-selected="true"] .titulo')) === tituloWeb), `y vuelve a la web en la que estabas (${tituloWeb})`);
 
+  // «Buscar actualización»: one read of the public ledger, when asked, and written down.
+  await barra.click('#b-menu');
+  await hasta(() => panel.evaluate(() => document.querySelector('#v-ajustes').classList.contains('vista-activa')));
+  await panel.click('#a-buscar-version');
+  comprueba(await hasta(async () => /última versión|versión nueva/.test(await panel.textContent('#a-version-res')), 30000), `«Buscar actualización» lee el registro público (${await panel.textContent('#a-version-res')})`);
+  await panel.click('#a-licencia-ver');
+  comprueba(await hasta(async () => (await panel.textContent('#l-conexiones')).includes('raw.githubusercontent.com')), 'y esa conexión queda anotada en «Suscripción»');
+
   // Closing writes everything down.
   try { execSync('taskkill /IM guardiana-zero.exe', { stdio: 'ignore' }); } catch (_) {}
   comprueba(await hasta(async () => salio !== null, 20000), 'cierra al pedírselo (sin forzar)');
@@ -266,6 +281,7 @@ function pantalla(nombre) {
   const panel2 = await paginaQue(nav2, (u) => u.endsWith('/panel.html'));
   comprueba(await hasta(async () => (await barra2.textContent('#b-licencia')) === 'Prueba terminada: sin protección'), `la barra dice que ya no protege (${await barra2.textContent('#b-licencia')})`);
   comprueba(await barra2.evaluate(() => document.querySelector('#b-escudo').classList.contains('oculto')), 'y el escudo, que no contaría nada, deja su sitio');
+  const rechazosAntes = registro.filter((r) => r.ruta === '/cookies-rechazadas').length;
   await barra2.fill('#campo-dir', `${SITIO}/prueba?utm_source=boletin&id=7`);
   await barra2.press('#campo-dir', 'Enter');
   const web2 = await paginaQue(nav2, (u) => u.startsWith(SITIO));
@@ -277,6 +293,7 @@ function pantalla(nombre) {
   // the ad frame, now arrives.
   comprueba(registro.some((r) => r.host === 'googleads.g.doubleclick.net'), 'pero GUARDIANA ZERO ya no corta: el marco de anuncios llega');
   comprueba(registro.some((r) => r.ruta.includes('utm_source=boletin')), 'ni se limpian las direcciones');
+  comprueba(registro.filter((r) => r.ruta === '/cookies-rechazadas').length === rechazosAntes, 'ni se tocan los avisos de cookies');
   await barra2.click('#b-mandato');
   comprueba(await hasta(() => panel2.evaluate(() => document.querySelector('#v-licencia').classList.contains('vista-activa'))), 'los mandatos llevan a «Suscripción»');
   comprueba(await hasta(async () => (await panel2.textContent('#l-detalle')).includes('La prueba terminó')), 'que explica qué dejó de hacer');

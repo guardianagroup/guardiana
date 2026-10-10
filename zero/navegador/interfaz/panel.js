@@ -64,6 +64,7 @@
     const hechos = [];
     if (m.parametros_quitados) hechos.push(tn('parametros_quitados', m.parametros_quitados, { n: n(m.parametros_quitados) }));
     if (m.datos_salvados) hechos.push(tn('datos_salvados', m.datos_salvados, { n: n(m.datos_salvados) }));
+    if (m.cookies) hechos.push(t(m.cookies.accion === 'rechazado' ? 'cookies_rechazado' : 'cookies_escondido', { gestor: m.cookies.gestor }));
     $('e-hechos').innerHTML = hechos.map((h) => `<span>${esc(h)}</span>`).join('');
   });
   $('e-recargar').addEventListener('click', () => { manda({ tipo: 'recargar' }); $('e-recarga').classList.add('oculto'); });
@@ -197,6 +198,10 @@
   // --- settings ---------------------------------------------------------------------------------
   en('ajustes', (m) => {
     $('a-proteccion').checked = !!m.cortar_seguimiento;
+    $('a-cookies').checked = m.rechazar_cookies !== false;
+    const imp = m.importar || [];
+    $('a-importar-caja').classList.toggle('oculto', !imp.length);
+    $('a-importar').innerHTML = imp.map((x) => `<button class="boton chico" data-de="${esc(x)}">${esc(x)}</button>`).join(' ');
     $('e-proteccion').checked = !!m.cortar_seguimiento;
     // Two groups: the engines that say they keep no record of who searches what, and the rest.
     const opcion = (b) => `<option value="${esc(b.id)}"${b.id === m.buscador ? ' selected' : ''}>${esc(b.nombre)}</option>`;
@@ -219,6 +224,23 @@
     $('a-motor').textContent = t('motor_web', { v: m.motor });
   });
   $('a-proteccion').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'cortar_seguimiento', valor: e.target.checked }));
+  // «Buscar actualización»: one read of the public ledger, only when pressed.
+  $('a-buscar-version').addEventListener('click', () => manda({ tipo: 'buscar_version' }));
+  $('a-descargar-version').addEventListener('click', () => manda({ tipo: 'descargar_version' }));
+  en('version', (m) => {
+    const r = $('a-version-res');
+    $('a-buscar-version').disabled = m.estado === 'buscando';
+    $('a-descargar-version').classList.toggle('oculto', m.estado !== 'nueva');
+    r.textContent = m.estado === 'buscando' ? t('version_buscando')
+      : m.estado === 'nueva' ? t('version_nueva', { v: m.version })
+        : m.estado === 'al_dia' ? t('version_al_dia', { v: m.version })
+          : t('version_error', { error: m.error || '' });
+  });
+  $('a-importar').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-de]');
+    if (b) manda({ tipo: 'importar_favoritos', de: b.dataset.de });
+  });
+  $('a-cookies').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'rechazar_cookies', valor: e.target.checked }));
   $('a-buscador').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'buscador', valor: e.target.value }));
   document.querySelector('.temas [data-tema="dia"]').innerHTML = Z.ICONO.sol;
   document.querySelector('.temas [data-tema="noche"]').innerHTML = Z.ICONO.luna;
@@ -300,7 +322,7 @@
     $('l-error').classList.toggle('oculto', !m.error);
     $('l-error').textContent = m.error || '';
     const con = m.conexiones || [];
-    $('l-conexiones').innerHTML = con.map((c) => `<li><time>${esc(fecha(c.ms))} ${esc(hora(c.ms))}</time><span><span class="mono">${esc(c.host)}</span> · ${esc(t(c.pedida ? 'licencia_conexion_pedida' : 'licencia_conexion_periodica'))}</span></li>`).join('');
+    $('l-conexiones').innerHTML = con.map((c) => `<li><time>${esc(fecha(c.ms))} ${esc(hora(c.ms))}</time><span><span class="mono">${esc(c.host)}</span> · ${esc(t(c.version ? 'conexion_version' : (c.pedida ? 'licencia_conexion_pedida' : 'licencia_conexion_periodica')))}</span></li>`).join('');
     $('l-conexiones-vacio').classList.toggle('oculto', con.length > 0);
     $('l-donde').textContent = m.donde_datos ? t('licencia_donde', { datos: m.donde_datos, ancla: m.donde_ancla }) : '';
     // Where the shield is, the same news; in the settings, one line.
@@ -308,6 +330,7 @@
     $('e-licencia-txt').textContent = terminada ? lineaLicencia(m) : '';
     $('e-proteccion').disabled = terminada;
     $('a-proteccion').disabled = terminada;
+    $('a-cookies').disabled = terminada;
     $('a-licencia').textContent = terminada ? t(m.estado === 'prueba_terminada' ? 'licencia_pastilla_terminada' : 'licencia_pastilla_sin_suscripcion') : lineaLicencia(m);
   }
   en('licencia', pintaLicencia);

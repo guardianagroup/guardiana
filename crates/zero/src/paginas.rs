@@ -91,7 +91,7 @@ pub fn guion_paginas() -> String {
     GUION.to_string()
 }
 
-const GUION: &str = r"(() => {
+const GUION: &str = r#"(() => {
   'use strict';
   // Global Privacy Control: the person does not want their data sold or shared.
   try {
@@ -135,6 +135,7 @@ const GUION: &str = r"(() => {
   escucha('message', (e) => {
     const m = e && e.data;
     if (!m || m.zg !== yo) return;
+    if (m.cookies !== undefined) { if (m.cookies === true) avisosDeCookies(); return; }
     const f = esperas.get(m.id);
     if (f) { esperas.delete(m.id); f(!!m.enviar); }
   });
@@ -160,6 +161,89 @@ const GUION: &str = r"(() => {
     manda({ tipo: 'zg_formulario', zg: yo, id, accion, valores: lista });
     return true;
   };
+  // Cookie notices of the consent managers most sites use: «reject all» is pressed when the
+  // notice has it, and the notice is hidden when it has not (then nothing was accepted either).
+  // Only these known managers, by their own markup: a page's other content is never touched.
+  // The browser says whether to (the setting, and only with the subscription on).
+  const GESTORES = [
+    ['OneTrust', '#onetrust-banner-sdk, #onetrust-pc-sdk, .onetrust-pc-dark-filter', '#onetrust-reject-all-handler, .ot-pc-refuse-all-handler'],
+    ['Cookiebot', '#CybotCookiebotDialog', '#CybotCookiebotDialogBodyButtonDecline, #CybotCookiebotDialogBodyLevelButtonLevelOptinDeclineAll'],
+    ['Didomi', '#didomi-host .didomi-popup-container, #didomi-host #didomi-notice', '#didomi-notice-disagree-button'],
+    ['Usercentrics', '#usercentrics-root, #usercentrics-cmp-ui', (r) => (r.shadowRoot || r).querySelector('[data-testid="uc-deny-all-button"], #deny')],
+    ['Quantcast', '.qc-cmp2-container', null],
+    ['Sourcepoint', 'div[id^="sp_message_container"]', null],
+    ['TrustArc', '#truste-consent-track, .truste_box_overlay, .truste_overlay', '#truste-consent-required'],
+    ['CookieYes', '.cky-consent-container, .cky-overlay, .cky-modal', '.cky-btn-reject'],
+    ['Osano', '.osano-cm-window', '.osano-cm-denyAll'],
+    ['Complianz', '#cmplz-cookiebanner-container, .cmplz-cookiebanner', '.cmplz-btn.cmplz-deny'],
+    ['iubenda', '#iubenda-cs-banner', '.iubenda-cs-reject-btn'],
+    ['Klaro', '.klaro .cookie-notice, .klaro .cookie-modal', '.klaro .cm-btn-decline'],
+    ['Axeptio', '#axeptio_overlay', '#axeptio_btn_dismiss'],
+    ['Google', '.fc-consent-root', '.fc-cta-do-not-consent'],
+    ['consentmanager', '#cmpbox, #cmpbox2', '.cmpboxbtnno'],
+    ['Borlabs', '#BorlabsCookieBox', 'a[data-cookie-refuse]'],
+    ['CookieFirst', '.cookiefirst-root', '[data-cookiefirst-action="reject"]'],
+    ['CookieScript', '#cookiescript_injected', '#cookiescript_reject'],
+    ['Cookie Notice', '#cookie-notice', '#cn-refuse-cookie'],
+    ['Moove', '#moove_gdpr_cookie_info_bar', '.moove-gdpr-infobar-reject-btn'],
+    ['tarteaucitron', '#tarteaucitronRoot', '#tarteaucitronAllDenied2'],
+  ];
+  const visible = (el) => { try { return !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden'); } catch (_) { return false; } };
+  let cookiesEnMarcha = false;
+  const avisosDeCookies = () => {
+    if (cookiesEnMarcha) return;
+    cookiesEnMarcha = true;
+    const hechos = new Set();
+    const escondidos = [];
+    const estilo = document.createElement('style');
+    const esconde = (sel) => {
+      escondidos.push(sel);
+      estilo.textContent = escondidos.join(',') + '{display:none!important}';
+      if (!estilo.isConnected) (document.head || document.documentElement).appendChild(estilo);
+      // A hidden notice must not leave the page frozen under it.
+      for (const el of [document.documentElement, document.body]) {
+        try { if (el && getComputedStyle(el).overflow === 'hidden') el.style.setProperty('overflow', 'auto', 'important'); } catch (_) {}
+      }
+      document.documentElement.classList.remove('sp-message-open');
+    };
+    const repasa = () => {
+      for (const [gestor, caja, boton] of GESTORES) {
+        if (hechos.has(gestor)) continue;
+        let c = null;
+        try { c = Array.from(document.querySelectorAll(caja)).find(visible) || null; } catch (_) {}
+        if (!c) continue;
+        let b = null;
+        try { b = typeof boton === 'function' ? boton(c) : (boton ? document.querySelector(boton) : null); } catch (_) {}
+        if (b && visible(b)) {
+          hechos.add(gestor);
+          try { b.click(); } catch (_) {}
+          manda({ tipo: 'zg_cookies', zg: yo, gestor, accion: 'rechazado' });
+        } else if (!boton || Date.now() - inicio > 1500) {
+          // No «reject» button (or it never showed up): hidden, and nothing accepted.
+          hechos.add(gestor);
+          esconde(caja);
+          manda({ tipo: 'zg_cookies', zg: yo, gestor, accion: 'escondido' });
+        }
+      }
+    };
+    const inicio = Date.now();
+    let pendiente = false;
+    const mira = new MutationObserver(() => {
+      if (pendiente) return;
+      pendiente = true;
+      setTimeout(() => { pendiente = false; repasa(); }, 250);
+    });
+    const empieza = () => {
+      repasa();
+      try { mira.observe(document.documentElement, { childList: true, subtree: true }); } catch (_) {}
+      setTimeout(repasa, 1600);
+      // Notices show up in the first seconds of a page; after that nobody is watched.
+      setTimeout(() => { mira.disconnect(); repasa(); }, 20000);
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', empieza, { once: true });
+    else empieza();
+  };
+  manda({ tipo: 'zg_cookies_pide', zg: yo });
   // On window and in the capture phase, registered before any of the page's own listeners.
   window.addEventListener('submit', (e) => {
     const form = e.target;
@@ -174,7 +258,7 @@ const GUION: &str = r"(() => {
       configurable: false, writable: false,
     });
   } catch (_) {}
-})();";
+})();"#;
 
 #[cfg(test)]
 mod tests {

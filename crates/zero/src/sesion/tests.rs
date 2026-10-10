@@ -1154,3 +1154,130 @@ fn day_or_night_is_kept_and_reaches_every_page_of_the_browser() {
     });
     assert_eq!(s2.msg_ajustes()["tema"], "noche");
 }
+
+#[test]
+fn cookie_notices_are_dealt_with_only_when_told_and_shown_in_the_shield() {
+    let (mut s, _, id) = con_pagina(true);
+    let web = "https://www.eltiempo.com/";
+    let pide = r#"{"tipo":"zg_cookies_pide","zg":"f1"}"#;
+    let respuesta = |o: &[Orden]| -> Value {
+        o.iter()
+            .find_map(|x| match x {
+                Orden::RespondeFormulario { json, .. } => serde_json::from_str(json).ok(),
+                _ => None,
+            })
+            .unwrap_or_default()
+    };
+    let o = s.mensaje(Origen::Pestana(id), web, pide);
+    let r = respuesta(&o);
+    assert_eq!(r["zg"], "f1");
+    assert!(s.protege());
+    assert_eq!(r["cookies"], true);
+    // What the guard did reaches the shield, with the manager's name.
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        web,
+        r#"{"tipo":"zg_cookies","zg":"f1","gestor":"OneTrust","accion":"rechazado"}"#,
+    );
+    if s.protege() {
+        let e = del_tipo(&o, Origen::Barra, "escudo").unwrap_or_default();
+        assert_eq!(e["cookies"]["gestor"], "OneTrust");
+        assert_eq!(e["cookies"]["accion"], "rechazado");
+    }
+    // Nonsense is ignored.
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        web,
+        r#"{"tipo":"zg_cookies","zg":"f1","gestor":"<img>","accion":"rechazado"}"#,
+    );
+    assert!(o.is_empty());
+    // Turned off in the settings: the guard is told no.
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"rechazar_cookies","valor":false}"#,
+    );
+    assert_eq!(s.msg_ajustes()["rechazar_cookies"], false);
+    let o = s.mensaje(Origen::Pestana(id), web, pide);
+    assert_eq!(respuesta(&o)["cookies"], false);
+    // Back on, but the trial is over: no.
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"rechazar_cookies","valor":true}"#,
+    );
+    let _ = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
+    let o = s.mensaje(Origen::Pestana(id), web, pide);
+    assert_eq!(respuesta(&o)["cookies"], false);
+}
+
+#[test]
+fn the_star_keeps_a_page_and_the_new_tab_shows_and_forgets_it() {
+    let (mut s, d, id) = con_pagina(true);
+    let estrella = |o: &[Orden]| {
+        del_tipo(o, Origen::Barra, "estado").unwrap_or_default()["activa"]["favorito"].clone()
+    };
+    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"favorito"}"#);
+    assert_eq!(estrella(&o), true);
+    let guardado: Value = serde_json::from_str(
+        &fs::read_to_string(d.join("datos").join("favoritos.json")).unwrap_or_default(),
+    )
+    .unwrap_or_default();
+    assert_eq!(guardado["lista"][0]["url"], "https://www.eltiempo.com/");
+    // On the new tab, with its × to forget it.
+    let _ = s.navegacion_empieza(id, INICIO, false);
+    let _ = s.pagina_nueva(id, INICIO);
+    let o = s.mensaje(Origen::Pestana(id), INICIO, r#"{"tipo":"listo"}"#);
+    let f = del_tipo(&o, Origen::Pestana(id), "favoritos").unwrap_or_default();
+    assert_eq!(f["lista"].as_array().map(Vec::len), Some(1));
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        INICIO,
+        r#"{"tipo":"favorito_quitar","url":"https://www.eltiempo.com/"}"#,
+    );
+    let f = del_tipo(&o, Origen::Pestana(id), "favoritos").unwrap_or_default();
+    assert_eq!(f["lista"].as_array().map(Vec::len), Some(0));
+    // A web page cannot touch them, and the star does nothing on the browser's own pages.
+    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"favorito"}"#);
+    assert!(o.is_empty());
+}
+
+#[test]
+fn update_check_runs_once_and_says_what_it_found() {
+    let (mut s, _, _) = abre();
+    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"buscar_version"}"#);
+    assert!(o.contains(&Orden::BuscaVersion));
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "version").unwrap_or_default()["estado"],
+        "buscando"
+    );
+    // Pressed again while it runs: nothing more goes out.
+    assert!(s
+        .mensaje(Origen::Panel, PANEL, r#"{"tipo":"buscar_version"}"#)
+        .is_empty());
+    let o = s.version_encontrada(Ok("9.9.9".into()));
+    let v = del_tipo(&o, Origen::Panel, "version").unwrap_or_default();
+    assert_eq!(
+        (v["estado"].as_str(), v["version"].as_str()),
+        (Some("nueva"), Some("9.9.9"))
+    );
+    let o = s.version_encontrada(Ok("0.1.0".into()));
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "version").unwrap_or_default()["estado"],
+        "al_dia"
+    );
+    let o = s.version_encontrada(Err("HTTP 503".into()));
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "version").unwrap_or_default()["error"],
+        "HTTP 503"
+    );
+    // A web page cannot ask for it.
+    let id = s.activa();
+    assert!(s
+        .mensaje(
+            Origen::Pestana(id),
+            "https://x.example/",
+            r#"{"tipo":"buscar_version"}"#
+        )
+        .is_empty());
+}

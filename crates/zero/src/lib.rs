@@ -12,6 +12,7 @@ pub mod destino;
 pub mod direccion;
 pub mod dominio;
 pub mod escudo;
+pub mod favoritos;
 pub mod fecha;
 pub mod libro;
 pub mod licencia;

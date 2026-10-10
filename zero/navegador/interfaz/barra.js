@@ -147,6 +147,7 @@
   en('textos', () => { if (licencia) pintaLicencia(licencia); });
 
   // --- what the program says ------------------------------------------------------------------
+  $('estrella').addEventListener('click', () => manda({ tipo: 'favorito' }));
   en('estado', (m) => {
     activa = m.activa ? m.activa.id : null;
     panel = m.panel || null;
@@ -162,6 +163,12 @@
     c.innerHTML = a.interna ? CANDADO.interno : (a.segura ? CANDADO.seguro : CANDADO.abierto);
     c.title = t(a.interna ? 'pagina_interna' : (a.segura ? 'conexion_segura' : 'conexion_no_segura'));
     pintaDireccion(a.url, a.interna);
+    const e = $('estrella');
+    e.classList.toggle('oculto', !!a.interna || !a.url);
+    e.classList.toggle('puesta', !!a.favorito);
+    e.title = t(a.favorito ? 'favorito_quitar' : 'favorito_guardar');
+    e.setAttribute('aria-label', e.title);
+    e.setAttribute('aria-pressed', String(!!a.favorito));
     for (const [id, v] of Object.entries(vistas)) $(id).classList.toggle('activo', panel === v);
     $('b-mandato').classList.toggle('activo', panel === 'mandato' || !!a.mandato);
     $('b-parar').classList.toggle('oculto', !a.mandato);

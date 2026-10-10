@@ -26,6 +26,7 @@ p { margin: 0 0 10px; }
 .sitio { font: 600 17px/1.25 var(--display); letter-spacing: -.01em; word-break: break-all; margin: 2px 0 8px; }
 .resumen { font-size: 14px; color: var(--tinta); margin-bottom: 14px; }
 .ajuste { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: var(--campo); }
+.ajuste + .ajuste { margin-top: 8px; }
 .ajuste label { font-weight: 500; display: block; }
 .ajuste .explica { margin: 3px 0 0; font-size: 12.5px; }
 .terceros { list-style: none; margin: 0; padding: 0; }
@@ -81,6 +82,7 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
 
 /* Settings ------------------------------------------------------------------------------------ */
 .linea-ajuste { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--linea); }
+.version-caja { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 6px; }
 .linea-ajuste select { border: 1px solid var(--linea); background: var(--campo); border-radius: 8px; padding: 5px 8px; }
 .temas { display: flex; padding: 3px; border-radius: 10px; background: var(--campo); border: 1px solid var(--linea); }
 .temas button { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 28px; padding: 0 9px; border: 0; border-radius: 7px; background: none; color: var(--gris); font-size: 12.5px; font-weight: 500; }
@@ -221,8 +223,13 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
     <input type="checkbox" class="interruptor" id="a-proteccion">
     <div><label for="a-proteccion" data-t="proteccion"></label><p class="explica" data-t="proteccion_explica"></p></div>
   </div>
+  <div class="ajuste">
+    <input type="checkbox" class="interruptor" id="a-cookies">
+    <div><label for="a-cookies" data-t="cookies_ajuste"></label><p class="explica" data-t="cookies_ajuste_explica"></p></div>
+  </div>
   <div class="linea-ajuste"><span class="que"><span data-t="licencia_titulo"></span><span class="explica" id="a-licencia"></span></span><button class="boton chico" id="a-licencia-ver" data-t="licencia_abrir"></button></div>
   <div class="linea-ajuste"><span data-t="buscador"></span><select id="a-buscador"></select></div>
+  <div class="linea-ajuste oculto" id="a-importar-caja"><span class="que"><span data-t="ajustes_favoritos"></span><span class="explica" data-t="ajustes_favoritos_explica"></span></span><span id="a-importar"></span></div>
   <div class="linea-ajuste"><span class="que"><span data-t="pestana_aislada"></span><span class="explica" data-t="pestana_aislada_explica"></span></span><button class="boton chico" id="a-aislada" data-t="nueva_pestana_aislada"></button></div>
   <div class="linea-ajuste"><span data-t="tema"></span><div class="temas" role="group"><button type="button" data-tema="dia" data-t-title="tema_dia"></button><button type="button" data-tema="noche" data-t-title="tema_noche"></button><button type="button" data-tema="" data-t="tema_windows"></button></div></div>
   <div class="linea-ajuste"><span data-t="idioma"></span><select id="a-idioma"><option value="">Windows</option><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option></select></div>
@@ -232,6 +239,8 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
   </div>
   <h2 data-t="acerca"></h2>
   <p class="pequeno" id="a-version"></p>
+  <div class="version-caja"><button class="boton chico" id="a-buscar-version" data-t="buscar_version"></button><span class="pequeno" id="a-version-res" role="status"></span><button class="boton chico principal oculto" id="a-descargar-version" data-t="version_descargar"></button></div>
+  <p class="pequeno explica" data-t="buscar_version_explica"></p>
   <p class="pequeno" id="a-motor"></p>
   <p class="pequeno" id="a-huella"></p>
   <p class="explica pequeno" data-t="sin_servidor"></p>
