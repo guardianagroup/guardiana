@@ -186,7 +186,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-core"
-version = "1.0.11"
+version = "1.0.12"
 dependencies = [
  "rusqlite",
  "serde",
@@ -196,7 +196,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-license"
-version = "1.0.11"
+version = "1.0.12"
 dependencies = [
  "getrandom 0.4.3",
  "guardiana-core",
@@ -208,7 +208,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-lists"
-version = "1.0.11"
+version = "1.0.12"
 dependencies = [
  "guardiana-core",
  "serde",
@@ -217,7 +217,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-zero"
-version = "1.0.11"
+version = "1.0.12"
 dependencies = [
  "base64",
  "guardiana-core",
