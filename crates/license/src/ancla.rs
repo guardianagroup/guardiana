@@ -18,9 +18,9 @@
 //! can read HKLM, and on Linux the file outlives `apt purge` (review of 5 Oct 2026, licence item
 //! 4). The trial mark itself is unchanged: the earlier of ledger and anchor still wins.
 //!
-//! **Nothing here is hidden.** The panel says where the mark is and what it holds, and
-//! `guardiana verify` prints it. A program that asks to be checked cannot leave marks it does not
-//! talk about. And every write says whether it happened: without administrator rights it does
+//! **Nothing here is hidden.** The panel's licence page says where the mark is and what it holds,
+//! and so does `guardiana licencia` (`guardiana verify` does not print it yet: review of 10 Oct
+//! 2026, trust 15). A program that asks to be checked cannot leave marks it does not talk about. And every write says whether it happened: without administrator rights it does
 //! not, and the interface must not claim otherwise (entry 24).
 //!
 //! With `GUARDIANA_DATA` set (test instances and development) the marks live inside that folder
@@ -68,6 +68,17 @@ pub struct Licencia {
     /// Days per billing period (30, 365, or 0 for a licence bought once).
     #[serde(default)]
     pub periodo: i64,
+    /// When the gateway said the key is no longer valid, Unix ms, if it did. With the two below,
+    /// what a new ledger needs so that deleting the whole data folder does not give an ended or
+    /// a turned-down licence a fresh grace (review of 10 Oct 2026, trust 11).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminada: Option<i64>,
+    /// When the gateway first turned the key down since its last good answer, Unix ms.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rechazada: Option<i64>,
+    /// When the first check that could not be done since the last good one was, Unix ms.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallida: Option<i64>,
 }
 
 /// Everything the anchor holds, read in one go.
@@ -444,6 +455,8 @@ mod tests {
             producto: "pdt_x".to_owned(),
             desde: 5,
             periodo: 30,
+            rechazada: Some(7),
+            ..Licencia::default()
         };
         assert!(escribir(1));
         assert!(escribir_visto(2));

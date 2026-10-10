@@ -57,6 +57,11 @@ pub const SETTING_LICENSE_REJECTED_AT: &str = "license_rejected_at";
 /// hour lives here and not in a timer, so a pass rebuilt every few minutes (a laptop changing
 /// networks) still checks (review of 8 Oct 2026).
 pub const SETTING_LICENSE_TRIED_AT: &str = "license_check_tried_at";
+/// Settings key: what the last check that could not be done got back (`HTTP 422
+/// VALIDATION_ERROR`, `HTTP 503`, the network error), cleared by a good answer. A 4xx whose code
+/// is not one of the gateway's words about the key is not a rejection, and is written down here
+/// so it can be seen (review of 10 Oct 2026, trust 7).
+pub const SETTING_LICENSE_LAST_FAILURE: &str = "license_check_last_failure";
 /// Settings key: "1" once this version has asked the gateway again about an end that 1.0.1
 /// stored, or about a 1.0.1 licence whose local mark no longer verifies (licence item 7).
 pub const SETTING_LICENSE_REVISADA: &str = "license_revisada_1_0_2";
@@ -102,7 +107,8 @@ pub const TEST_GATEWAY_ENV: &str = "GUARDIANA_GATEWAY_TEST";
 /// the anchor is a process (`reg`).
 const RELOJ_PASO_EXTRACTO_MS: i64 = 60 * 1000;
 const RELOJ_PASO_ANCLA_MS: i64 = HOUR_MS;
-/// How far past real time the remembered clock may move between two of this process's writes.
+/// How far the remembered clock may run past this process's anchor plus the time that really
+/// passed since it was taken (see `RELOJ_PROCESO`).
 const RELOJ_HOLGURA_MS: i64 = 5 * 60 * 1000;
 /// A first reading of a process this far ahead of the stored clock is held back (see
 /// `RELOJ_PENDIENTE`).
@@ -113,12 +119,31 @@ const RELOJ_CONFIRMA_MS: i64 = 5 * 60 * 1000;
 /// How far a later reading may stray from the held-back one plus the time that passed and still
 /// count as the same clock.
 const RELOJ_DESVIO_MS: i64 = 60 * 1000;
+/// 2026-09-01T00:00:00Z: no version of this program existed before it, so a clock that reads an
+/// earlier date is wrong whatever build this is.
+const PRIMERA_VERSION_MS: i64 = 1_788_220_800_000;
 
-/// The last clock reading this process remembered, and when, by the monotonic clock. A reading
-/// that runs ahead of the time that really passed in this process is not remembered beyond it:
-/// until 1.0.2 a date set a year ahead by mistake, for a minute, ended the trial for good
-/// (review of 5 Oct 2026, licence item 6). The first write of a process has nothing to compare
-/// with and is believed.
+/// The earliest a clock reading can be right: when this program was built (the reproducible
+/// build passes the commit's date as `SOURCE_DATE_EPOCH`), and never before the first version. A
+/// machine that starts the service before the network sets its clock (a new virtual machine, a
+/// dead clock battery) reads a date years back; the trial started there and ended the moment the
+/// clock was set right (review of 10 Oct 2026, trust 16).
+fn reloj_minimo() -> i64 {
+    option_env!("SOURCE_DATE_EPOCH")
+        .and_then(|s| s.trim().parse::<i64>().ok())
+        .map_or(PRIMERA_VERSION_MS, |s| {
+            s.saturating_mul(1000).max(PRIMERA_VERSION_MS)
+        })
+}
+
+/// This process's anchor: its first remembered clock reading, and when it was taken, by the
+/// monotonic clock. It never moves for the life of the process. A reading that runs ahead of the
+/// time that really passed since is not remembered beyond it: until 1.0.2 a date set a year ahead
+/// by mistake, for a minute, ended the trial for good (review of 5 Oct 2026, licence item 6).
+/// Up to 1.0.12 the anchor moved to every bounded value written, so the margin was added again at
+/// each write and an hour with the clock ahead left the remembered clock five hours ahead (review
+/// of 10 Oct 2026, trust 5). The first write of a process has nothing to compare with and is
+/// believed.
 static RELOJ_PROCESO: std::sync::Mutex<Option<(std::time::Instant, i64)>> =
     std::sync::Mutex::new(None);
 
@@ -280,6 +305,13 @@ pub struct Status {
     pub hogar_permitido: bool,
     /// Milliseconds this installation has been observing.
     pub observado_ms: i64,
+    /// While a key licence is still on: when the gateway itself turned the key down (one of its
+    /// own words about the key) since the last good answer. The panel says so instead of "no
+    /// connection", while the person can still fix the payment (review of 10 Oct 2026, trust 6).
+    pub rechazada_desde: Option<i64>,
+    /// While a key licence is still on: what the last check that could not be done got back, as
+    /// written down in `SETTING_LICENSE_LAST_FAILURE`.
+    pub ultimo_fallo: Option<String>,
 }
 
 fn mark(secret: &str, payload: &str) -> String {
@@ -403,7 +435,17 @@ fn observed_ms(ledger: &Ledger, now: i64) -> Result<i64, Error> {
 fn finish(ledger: &Ledger, plan: Plan, now: i64) -> Result<Status, Error> {
     let plus_activo = matches!(plan, Plan::Plus { .. } | Plan::Prueba { .. });
     let observado_ms = observed_ms(ledger, now)?;
+    let (rechazada_desde, ultimo_fallo) = if matches!(plan, Plan::Plus { .. }) {
+        (
+            setting_i64(ledger, SETTING_LICENSE_REJECTED_AT)?,
+            setting_text(ledger, SETTING_LICENSE_LAST_FAILURE)?,
+        )
+    } else {
+        (None, None)
+    };
     Ok(Status {
+        rechazada_desde,
+        ultimo_fallo,
         // There is one program and one plan: while the trial or the subscription is on it works,
         // and when neither is it stops watching and gives the system DNS back. It never keeps
         // resolving badly and it never leaves the machine without a resolver.
@@ -425,29 +467,23 @@ fn reloj(ledger: &Ledger, marcas: &ancla::Marcas, now: i64) -> Result<i64, Error
     let mut proceso = RELOJ_PROCESO
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    // A floor that time itself moves: the last reading this process remembered plus the time that
-    // really passed since, by the monotonic clock. With the date held back the system clock stood
+    // A floor that time itself moves: this process's anchor plus the time that really passed
+    // since, by the monotonic clock. With the date held back the system clock stood
     // below the remembered one, the licence clock stopped at it, and the trial never ended
     // (review of 5 Oct 2026, licence medium). Now it goes on counting while the program runs.
-    let monotono = proceso.map(|(cuando, antes)| {
-        antes.saturating_add(i64::try_from(cuando.elapsed().as_millis()).unwrap_or(i64::MAX))
+    let monotono = proceso.map(|(cuando, base)| {
+        base.saturating_add(i64::try_from(cuando.elapsed().as_millis()).unwrap_or(i64::MAX))
     });
     let reloj = [Some(now), visto, monotono]
         .into_iter()
         .flatten()
         .max()
         .unwrap_or(now);
-    // What may be remembered: the reading, but no further past the remembered clock than the
-    // time this process has really been running since it last moved it, plus a little.
+    // What may be remembered: the reading, but no further past this process's anchor than the
+    // time that really passed since it was taken, plus a little. Always against the same anchor,
+    // so the little is added once and not at every write.
     let recordable = match (*proceso, visto) {
-        (Some((cuando, antes)), Some(v)) => {
-            let pasado = i64::try_from(cuando.elapsed().as_millis()).unwrap_or(i64::MAX);
-            reloj.min(
-                v.max(antes)
-                    .saturating_add(pasado)
-                    .saturating_add(RELOJ_HOLGURA_MS),
-            )
-        }
+        (Some(_), Some(_)) => reloj.min(monotono.unwrap_or(reloj).saturating_add(RELOJ_HOLGURA_MS)),
         _ => reloj,
     };
     // The first reading of this process, well ahead of what is stored: held back until it proves
@@ -463,10 +499,8 @@ fn reloj(ledger: &Ledger, marcas: &ancla::Marcas, now: i64) -> Result<i64, Error
     }
     *pendiente = None;
     drop(pendiente);
-    let mut escrito = false;
     if en_extracto.is_none_or(|v| recordable >= v + RELOJ_PASO_EXTRACTO_MS) {
         ledger.set_setting(SETTING_CLOCK_SEEN, &recordable.to_string())?;
-        escrito = true;
     }
     if marcas
         .visto
@@ -474,9 +508,9 @@ fn reloj(ledger: &Ledger, marcas: &ancla::Marcas, now: i64) -> Result<i64, Error
     {
         // Best effort: without administrator rights the ledger's own copy still counts.
         ancla::escribir_visto(recordable);
-        escrito = true;
     }
-    if escrito || proceso.is_none() {
+    // The anchor is set once per process and never moved (see `RELOJ_PROCESO`).
+    if proceso.is_none() {
         *proceso = Some((std::time::Instant::now(), recordable));
     }
     Ok(reloj)
@@ -595,6 +629,10 @@ fn licencia_guardada(
                     .unwrap_or_default(),
                 desde: since,
                 periodo: period,
+                // How it stands with the gateway goes along, so a new ledger gets it back.
+                terminada: setting_i64(ledger, SETTING_LICENSE_ENDED_AT)?,
+                rechazada: setting_i64(ledger, SETTING_LICENSE_REJECTED_AT)?,
+                fallida: setting_i64(ledger, SETTING_LICENSE_CHECK_FAILED_AT)?,
             };
             if !copia.instancia.is_empty() && anclada != Some(&copia) {
                 ancla::escribir_licencia(&copia);
@@ -632,6 +670,18 @@ fn licencia_guardada(
     ledger.set_setting(SETTING_LICENSE_KEY_AT, &a.desde.to_string())?;
     ledger.set_setting(SETTING_LICENSE_PERIOD_DAYS, &a.periodo.to_string())?;
     ledger.set_setting(SETTING_LICENSE_CHECKED_AT, "")?;
+    // A whole data folder deleted takes the end, the rejection and the failed check with it: the
+    // anchor's copy brings them back, so that is no way to a fresh grace (review of 10 Oct 2026,
+    // trust 11). What the ledger still records stays, as above.
+    for (clave, valor) in [
+        (SETTING_LICENSE_ENDED_AT, a.terminada),
+        (SETTING_LICENSE_REJECTED_AT, a.rechazada),
+        (SETTING_LICENSE_CHECK_FAILED_AT, a.fallida),
+    ] {
+        if let (Some(v), None) = (valor, setting_i64(ledger, clave)?) {
+            ledger.set_setting(clave, &v.to_string())?;
+        }
+    }
     let period = periodo_guardado(ledger, &activacion)?;
     Ok(Some(Guardada {
         activation: activacion,
@@ -775,6 +825,18 @@ fn status_con_reloj(ledger: &Ledger, secret: &str, now: i64) -> Result<(Status, 
                 finish(ledger, Plan::PruebaAgotada { termino: ends }, reloj)
             }
         }
+        // A clock that reads a date before this program was built is wrong (see
+        // `reloj_minimo`): the trial runs, whole, but its start is not written down until the
+        // clock is right, so setting it right does not end it.
+        None if reloj < reloj_minimo() => finish(
+            ledger,
+            Plan::Prueba {
+                empieza: reloj,
+                termina: reloj + TRIAL_DAYS * DAY_MS,
+                dias_restantes: TRIAL_DAYS,
+            },
+            reloj,
+        ),
         None => {
             // There is no free plan to wait in: the seven days start the first time the program
             // runs, and the first run is this call. Writing it here and not in the engine means
@@ -864,6 +926,37 @@ fn es_palabra_de_la_pasarela(code: u16, body: &str) -> bool {
         .is_some_and(|v| v.get("message").is_some() || v.get("error").is_some())
 }
 
+/// The gateway's codes that speak about the key itself (docs.dodopayments.com/api-reference/
+/// error-codes): the only answers to a periodic check that count as the gateway turning the key
+/// down. Any other code — a field the API now requires, a renamed route — is a check that could
+/// not be done, written down to be seen. Until 1.0.12 any code in capitals counted, and a change
+/// in the gateway's API could have ended Founder licences within a week (review of 10 Oct 2026,
+/// trust 7).
+const CODIGOS_DE_LA_CLAVE: [&str; 4] = [
+    "INACTIVE_LICENSE_KEY",
+    "LICENSE_KEY_NOT_FOUND",
+    "LICENSE_KEY_EXPIRED",
+    "LICENSE_KEY_LIMIT_REACHED",
+];
+
+/// Whether a non-2xx answer is the gateway turning the key down: one of its codes about the key.
+fn rechaza_la_clave(code: u16, body: &str) -> bool {
+    codigo_de_la_pasarela(code, body).is_some_and(|c| CODIGOS_DE_LA_CLAVE.contains(&c.as_str()))
+}
+
+/// What a check that could not be done got back, in a few technical words for the record:
+/// `HTTP 422 VALIDATION_ERROR`, `HTTP 503`, or the network error.
+fn fallo_de(answer: &Result<(u16, String), Error>) -> String {
+    let texto = match answer {
+        Ok((code, body)) => match codigo_de_la_pasarela(*code, body) {
+            Some(c) => format!("HTTP {code} {c}"),
+            None => format!("HTTP {code}"),
+        },
+        Err(e) => e.to_string(),
+    };
+    texto.chars().take(200).collect()
+}
+
 /// The error a non-2xx answer becomes: the gateway's own reason, an inactive key, the activation
 /// limit, or a network problem for anything that is not the gateway talking.
 fn error_de_respuesta(code: u16, body: &str) -> Error {
@@ -950,6 +1043,7 @@ pub fn activate_with_key(
     ledger.set_setting(SETTING_LICENSE_ENDED_AT, "")?;
     // A new key says nothing about the old one's rejection (review of 5 Oct 2026).
     ledger.set_setting(SETTING_LICENSE_REJECTED_AT, "")?;
+    ledger.set_setting(SETTING_LICENSE_LAST_FAILURE, "")?;
     // `status` copies the new licence to the anchor.
     status(ledger, secret, now)
 }
@@ -998,6 +1092,7 @@ fn revalidate_stored_key(
     // The gateway says the key is good: a rejection it gave before is over (review of 5 Oct 2026:
     // it was kept, and a Founder licence that was refused once and then fixed ended anyway).
     ledger.set_setting(SETTING_LICENSE_REJECTED_AT, "")?;
+    ledger.set_setting(SETTING_LICENSE_LAST_FAILURE, "")?;
     status(ledger, secret, now).map(Some)
 }
 
@@ -1044,9 +1139,10 @@ fn aplicar_comprobacion(
     answer: Result<(u16, String), Error>,
     reloj: i64,
 ) -> Result<(), Error> {
-    // A 4xx in the gateway's own words is the gateway answering about the key; a 5xx, a proxy's
-    // 403, a timeout or no network is a check that could not be done.
-    let rechazada = matches!(&answer, Ok((code, text)) if es_palabra_de_la_pasarela(*code, text));
+    // A 4xx with one of the gateway's codes about the key is the gateway turning it down; any
+    // other code, a 5xx, a proxy's 403, a timeout or no network is a check that could not be done.
+    let rechazada = matches!(&answer, Ok((code, text)) if rechaza_la_clave(*code, text));
+    let fallo = fallo_de(&answer);
     let veredicto = match answer {
         Ok((code, text)) if (200..300).contains(&code) => {
             serde_json::from_str::<ValidationResponse>(&text)
@@ -1061,6 +1157,7 @@ fn aplicar_comprobacion(
             marcar_comprobada(ledger, reloj)?;
             ledger.set_setting(SETTING_LICENSE_CHECK_FAILED_AT, "")?;
             ledger.set_setting(SETTING_LICENSE_REJECTED_AT, "")?;
+            ledger.set_setting(SETTING_LICENSE_LAST_FAILURE, "")?;
         }
         Some(false) => {
             ledger.set_setting(SETTING_LICENSE_ENDED_AT, &reloj.to_string())?;
@@ -1069,6 +1166,7 @@ fn aplicar_comprobacion(
             if setting_i64(ledger, SETTING_LICENSE_CHECK_FAILED_AT)?.is_none() {
                 ledger.set_setting(SETTING_LICENSE_CHECK_FAILED_AT, &reloj.to_string())?;
             }
+            ledger.set_setting(SETTING_LICENSE_LAST_FAILURE, &fallo)?;
             if rechazada && setting_i64(ledger, SETTING_LICENSE_REJECTED_AT)?.is_none() {
                 ledger.set_setting(SETTING_LICENSE_REJECTED_AT, &reloj.to_string())?;
             }
@@ -1156,6 +1254,7 @@ fn aplicar_revision(
                     ledger.set_setting(SETTING_LICENSE_CHECK_FAILED_AT, "")?;
                     ledger.set_setting(SETTING_LICENSE_REJECTED_AT, "")?;
                     ledger.set_setting(SETTING_LICENSE_ENDED_AT, "")?;
+                    ledger.set_setting(SETTING_LICENSE_LAST_FAILURE, "")?;
                     revisada(ledger)?;
                     Ok(true)
                 }
@@ -1168,8 +1267,9 @@ fn aplicar_revision(
             }
         }
         // The gateway's own word about the key counts as the review done; a proxy's 403 does
-        // not (second pass, 8 Oct 2026).
-        Ok((code, text)) if es_palabra_de_la_pasarela(code, &text) => {
+        // not (second pass, 8 Oct 2026), nor a code that does not speak about the key (review of
+        // 10 Oct 2026, trust 7).
+        Ok((code, text)) if rechaza_la_clave(code, &text) => {
             revisada(ledger)?;
             Ok(false)
         }
@@ -1361,7 +1461,8 @@ mod tests {
     fn the_first_run_starts_the_trial_and_it_ends_seven_days_later() {
         let _a_solas = a_solas();
         let l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
-        let s = status(&l, "tok", 0).unwrap();
+        let t0 = reloj_minimo() + DAY_MS;
+        let s = status(&l, "tok", t0).unwrap();
         assert!(
             matches!(
                 s.plan,
@@ -1378,7 +1479,7 @@ mod tests {
         assert!(s.hogar_permitido);
 
         // Asking again the next day does not restart it.
-        let s = status(&l, "tok", DAY_MS).unwrap();
+        let s = status(&l, "tok", t0 + DAY_MS).unwrap();
         assert!(
             matches!(
                 s.plan,
@@ -1392,7 +1493,7 @@ mod tests {
         );
 
         // On the eighth day it is over and the program must stand down.
-        let s = status(&l, "tok", 7 * DAY_MS + 1).unwrap();
+        let s = status(&l, "tok", t0 + 7 * DAY_MS + 1).unwrap();
         assert!(matches!(s.plan, Plan::PruebaAgotada { .. }), "{:?}", s.plan);
         assert!(!s.plus_activo);
         assert!(!s.puede_funcionar);
@@ -1900,12 +2001,13 @@ mod tests {
         let _a_solas = a_solas();
         let l = ledger_observing();
         // La prueba corre desde la primera consulta al estado.
-        let s = status(&l, "tok", 0).unwrap();
+        let t0 = reloj_minimo() + DAY_MS;
+        let s = status(&l, "tok", t0).unwrap();
         assert!(s.plus_activo);
         assert!(s.puede_funcionar);
 
         // Se agota: el programa se aparta, pero nada se borra y el extracto sigue entero.
-        let fin = TRIAL_DAYS * DAY_MS;
+        let fin = t0 + TRIAL_DAYS * DAY_MS;
         let s = status(&l, "tok", fin + 1).unwrap();
         assert!(!s.plus_activo);
         assert!(!s.puede_funcionar);
@@ -2022,7 +2124,12 @@ mod tests {
         )
         .unwrap();
         l.set_setting(SETTING_LICENSE_KEY_AT, "0").unwrap();
-        let no_encontrada = || Ok((404, r#"{"message":"license key not found"}"#.to_owned()));
+        let no_encontrada = || {
+            Ok((
+                404,
+                r#"{"code":"LICENSE_KEY_NOT_FOUND","message":"license key not found"}"#.to_owned(),
+            ))
+        };
         // The gateway down for weeks, with 5xx: never cut.
         aplicar_comprobacion(&l, Ok((503, String::new())), 9 * DAY_MS).unwrap();
         assert!(status(&l, "tok", 60 * DAY_MS).unwrap().plus_activo);
@@ -2398,6 +2505,167 @@ mod tests {
         assert_eq!(
             setting_i64(&l, SETTING_LICENSE_CHECK_FAILED_AT).unwrap(),
             Some(11)
+        );
+    }
+
+    /// An hour of readings, one a minute, with the clock a year ahead: what is remembered stays
+    /// within the time that really passed plus the margin. The margin used to be added again at
+    /// every write, and an hour of that left the remembered clock five hours ahead, five days of
+    /// trial lost per day with the clock wrong (review of 10 Oct 2026, trust 5).
+    #[test]
+    fn un_rato_con_el_reloj_adelantado_no_adelanta_lo_recordado() {
+        let _a_solas = a_solas();
+        let l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        let t0 = 1_790_000_000_000;
+        let _ = status(&l, "", t0).unwrap();
+        for minuto in 1..=60 {
+            let _ = status(&l, "", t0 + 365 * DAY_MS + minuto * 60_000).unwrap();
+        }
+        // This test runs for milliseconds; a minute of slack covers a slow machine.
+        let tope = t0 + RELOJ_HOLGURA_MS + 60_000;
+        let visto = setting_i64(&l, SETTING_CLOCK_SEEN).unwrap().unwrap();
+        assert!(visto <= tope, "{} min ahead", (visto - t0) / 60_000);
+        assert!(ancla::leer_todo().visto.is_some_and(|v| v <= tope));
+        // The clock put right: the trial has its seven days.
+        let s = status(&l, "", t0 + HOUR_MS).unwrap();
+        assert!(
+            matches!(
+                s.plan,
+                Plan::Prueba {
+                    dias_restantes: 7,
+                    ..
+                }
+            ),
+            "{:?}",
+            s.plan
+        );
+    }
+
+    /// A first run with the clock years back (a new virtual machine, a dead clock battery) runs
+    /// the trial without writing its start: once the clock is right the seven days start then,
+    /// whole, instead of having ended the moment it was set (review of 10 Oct 2026, trust 16).
+    #[test]
+    fn con_el_reloj_de_antes_del_programa_la_prueba_no_empieza() {
+        let _a_solas = a_solas();
+        let l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        let hace_anos = 1_262_304_000_000; // 2010-01-01
+        let s = status(&l, "", hace_anos).unwrap();
+        assert!(s.puede_funcionar);
+        assert!(
+            matches!(
+                s.plan,
+                Plan::Prueba {
+                    dias_restantes: 7,
+                    ..
+                }
+            ),
+            "{:?}",
+            s.plan
+        );
+        assert_eq!(setting_i64(&l, SETTING_TRIAL_STARTED).unwrap(), None);
+        assert_eq!(ancla::leer(), None);
+        // The network sets the clock right: the trial starts now.
+        let bien = reloj_minimo() + DAY_MS;
+        let s = status(&l, "", bien).unwrap();
+        assert!(
+            matches!(
+                s.plan,
+                Plan::Prueba {
+                    empieza,
+                    dias_restantes: 7,
+                    ..
+                } if empieza == bien
+            ),
+            "{:?}",
+            s.plan
+        );
+        assert_eq!(setting_i64(&l, SETTING_TRIAL_STARTED).unwrap(), Some(bien));
+    }
+
+    /// Only the gateway's codes about the key turn it down. Another 4xx code (a changed API) is a
+    /// check that could not be done, written down, and never ends a Founder licence (review of
+    /// 10 Oct 2026, trust 7). While a rejection runs, the status says so and since when (trust 6).
+    #[test]
+    fn solo_los_codigos_de_la_clave_la_rechazan() {
+        let _a_solas = a_solas();
+        let l = Ledger::open_in_memory(Hash::of(b"x")).unwrap();
+        let activacion = r#"{"id":"inst_1","product":{"product_id":"pdt_0NnxfRzo4H78OnLGFOS2H"}}"#;
+        l.set_setting(SETTING_LICENSE_KEY, "FUNDADOR").unwrap();
+        l.set_setting(SETTING_LICENSE_ACTIVATION, activacion)
+            .unwrap();
+        l.set_setting(
+            SETTING_LICENSE_KEY_MARK,
+            &key_mark("tok", "FUNDADOR", activacion),
+        )
+        .unwrap();
+        l.set_setting(SETTING_LICENSE_KEY_AT, "0").unwrap();
+        let otro_codigo = || {
+            Ok((
+                422,
+                r#"{"code":"VALIDATION_ERROR","message":"missing field"}"#.to_owned(),
+            ))
+        };
+        aplicar_comprobacion(&l, otro_codigo(), 9 * DAY_MS).unwrap();
+        assert_eq!(setting_i64(&l, SETTING_LICENSE_REJECTED_AT).unwrap(), None);
+        let s = status(&l, "tok", 60 * DAY_MS).unwrap();
+        assert!(s.plus_activo, "{:?}", s.plan);
+        assert_eq!(s.rechazada_desde, None);
+        assert_eq!(s.ultimo_fallo.as_deref(), Some("HTTP 422 VALIDATION_ERROR"));
+        // The key's own code: a rejection, said with its date while the grace runs.
+        let inactiva = || {
+            Ok((
+                403,
+                r#"{"code":"INACTIVE_LICENSE_KEY","message":"License key is not active"}"#
+                    .to_owned(),
+            ))
+        };
+        aplicar_comprobacion(&l, inactiva(), 61 * DAY_MS).unwrap();
+        let s = status(&l, "tok", 62 * DAY_MS).unwrap();
+        assert!(s.plus_activo);
+        assert_eq!(s.rechazada_desde, Some(61 * DAY_MS));
+        assert!(!status(&l, "tok", 68 * DAY_MS).unwrap().puede_funcionar);
+        // A good answer clears all of it.
+        aplicar_comprobacion(&l, ok_200(r#"{"valid":true}"#), 69 * DAY_MS).unwrap();
+        let s = status(&l, "tok", 69 * DAY_MS).unwrap();
+        assert!(s.plus_activo);
+        assert_eq!((s.rechazada_desde, s.ultimo_fallo), (None, None));
+    }
+
+    /// Deleting the whole data folder does not give a turned-down or an ended licence a fresh
+    /// grace: the anchor's copy carries how it stands with the gateway (review of 10 Oct 2026,
+    /// trust 11).
+    #[test]
+    fn perder_la_carpeta_no_borra_el_rechazo_ni_el_fin() {
+        let _a_solas = a_solas();
+        let l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        store_key(&l, "tok", 5, "GUARDIANA Plus · mensual");
+        assert!(status(&l, "tok", 10).unwrap().plus_activo);
+        let inactiva = || {
+            Ok((
+                403,
+                r#"{"code":"INACTIVE_LICENSE_KEY","message":"License key is not active"}"#
+                    .to_owned(),
+            ))
+        };
+        aplicar_comprobacion(&l, inactiva(), 9 * DAY_MS).unwrap();
+        let _ = status(&l, "tok", 9 * DAY_MS).unwrap();
+        let copia = ancla::leer_todo().licencia.unwrap();
+        assert_eq!(copia.rechazada, Some(9 * DAY_MS));
+        assert_eq!(copia.fallida, Some(9 * DAY_MS));
+        // The data folder is gone: the rejection and its grace come back with the licence.
+        let nuevo = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        let s = status(&nuevo, "", 10 * DAY_MS).unwrap();
+        assert_eq!(s.rechazada_desde, Some(9 * DAY_MS), "{:?}", s.plan);
+        assert!(!status(&nuevo, "", 17 * DAY_MS).unwrap().puede_funcionar);
+        // An end too.
+        aplicar_comprobacion(&l, ok_200(r#"{"valid":false}"#), 20 * DAY_MS).unwrap();
+        let _ = status(&l, "tok", 20 * DAY_MS).unwrap();
+        let otro = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        let s = status(&otro, "", 21 * DAY_MS).unwrap();
+        assert!(
+            matches!(s.plan, Plan::PlusTerminado { ref motivo, termino } if motivo == "cancelada" && termino == 20 * DAY_MS),
+            "{:?}",
+            s.plan
         );
     }
 }
