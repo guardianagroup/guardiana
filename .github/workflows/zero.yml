@@ -76,6 +76,28 @@ jobs:
         run: |
           npm install --no-audit --no-fund --no-save playwright-core@1.47.2
           node prueba.js "$GITHUB_WORKSPACE/zero/navegador/target/release/guardiana-zero.exe" "$RUNNER_TEMP/e2e"
+      # The installer (build/wix/zero.wxs): per user, no administrator, shortcuts, opens at the
+      # end. Three MSIs, one per language, with WiX 5 as candidato.yml builds GUARDIANA's.
+      - name: installer (WiX 5, three languages)
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
+          $v = (Select-String -Path zero/navegador/Cargo.toml -Pattern '^version = "(.*)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+          New-Item -ItemType Directory -Force -Path msi | Out-Null
+          foreach ($idioma in 'es', 'en', 'pt') {
+            $sufijo = if ($idioma -eq 'es') { '' } else { "-$idioma" }
+            powershell -NoProfile -ExecutionPolicy Bypass -File build/msi-zero.ps1 -Exe zero/navegador/target/release/guardiana-zero.exe -Version $v -Idioma $idioma -Out "msi/guardiana-zero-$v-windows-x64$sufijo.msi"
+            if ($LASTEXITCODE -ne 0) { Write-Output "::error title=msi-zero.ps1 $idioma::the installer did not build"; exit 1 }
+          }
+      # And what a person gets from it, on this clean Windows: zero/prueba/instalador.ps1.
+      - name: installer end to end
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path zero/navegador/Cargo.toml -Pattern '^version = "(.*)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+          powershell -NoProfile -ExecutionPolicy Bypass -File zero/prueba/instalador.ps1 -Msi "msi/guardiana-zero-$v-windows-x64.msi" -Exe zero/navegador/target/release/guardiana-zero.exe -Version $v -Otros "msi/guardiana-zero-$v-windows-x64-en.msi","msi/guardiana-zero-$v-windows-x64-pt.msi"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Copy-Item -Recurse -Force "$env:RUNNER_TEMP/instalador" "$env:RUNNER_TEMP/e2e/instalador" -ErrorAction SilentlyContinue
       - name: package
         if: always()
         run: |
@@ -88,7 +110,10 @@ jobs:
           # be the one that gets signed (review of 9 Oct 2026). The test's screenshots always do.
           if [ -f "$exe" ] && [ "${{ job.status }}" = "success" ]; then
             cp "$exe" "dist/$nombre"
-            (cd dist && sha256sum "$nombre" > SHA256SUMS && echo "::notice title=sha256 $nombre::$(cut -d' ' -f1 SHA256SUMS)")
+            # The three installers travel with it, under the same SHA256SUMS: what gets signed
+            # is exactly what was built and tested here, installer included.
+            cp msi/guardiana-zero-"$v"-windows-x64*.msi dist/
+            (cd dist && sha256sum "$nombre" guardiana-zero-"$v"-windows-x64*.msi > SHA256SUMS && while read -r h n; do echo "::notice title=sha256 ${n#\*}::$h"; done < SHA256SUMS)
             echo "$GITHUB_SHA" > dist/COMMIT
           elif [ -f "$exe" ]; then
             echo "::warning title=sin navegador::la ejecución no pasó entera, así que el artefacto no lleva el .exe"

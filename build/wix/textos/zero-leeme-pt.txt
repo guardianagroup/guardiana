@@ -1,0 +1,41 @@
+﻿GUARDIANA ZERO para Windows
+===========================
+
+O GUARDIANA ZERO é um navegador próprio: enquanto você navega, vê na hora quais
+empresas cada página tenta chamar por trás e quais delas são barradas, com o
+país e o motivo. Tudo acontece neste PC. Sem conta, sem servidor nosso, zero
+telemetria.
+
+O que o instalador fez
+----------------------
+- Copiou o programa para AppData\Local\Programs\GUARDIANA ZERO, na sua pasta
+  de usuário. Não pediu senha de administrador.
+- Criou o atalho «GUARDIANA ZERO» na área de trabalho e no menu Iniciar.
+- Não mudou nada no Windows nem nos seus outros navegadores.
+
+Onde estão os seus dados
+------------------------
+Em AppData\Local\GUARDIANA ZERO: seus ajustes, seus favoritos, seus dados
+marcados, as cifras de cada dia e os recibos. Só neste PC. Continuam lá mesmo se
+você desinstalar; apague à mão se não quiser.
+
+Atualizar
+---------
+Baixe o instalador novo em guardianagroup.com/pt/zero.html e abra: ele substitui
+a versão anterior no lugar. Se o GUARDIANA ZERO estava aberto, fecha sozinho
+(salva tudo) e a versão nova abre ao terminar.
+
+Desinstalar
+-----------
+Configurações > Aplicativos > GUARDIANA ZERO > Desinstalar. Remove o programa e
+os atalhos; os seus dados ficam.
+
+Conferir o que você instalou
+----------------------------
+A impressão digital SHA-256 do instalador e do programa, e a assinatura, estão
+em guardianagroup.com/pt/zero.html e no registro público
+github.com/guardianagroup/guardiana/blob/main/ledger.jsonl, anotadas antes de
+publicar o download.
+
+Licença: GNU GPL 3.0 ou posterior. Código: github.com/guardianagroup/guardiana.
+Escreva para nós: hola@guardianagroup.com

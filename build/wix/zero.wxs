@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  GUARDIANA ZERO Windows installer, WiX v4/v5 schema. Built by build/msi-zero.ps1 on Windows:
+    wix build -arch x64 -culture es-ES -loc build/wix/loc-zero-es-ES.wxl \
+      -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext \
+      -d Version=<x.y.z> -d Exe=<guardiana-zero-<v>-windows-x64.exe> -d Welcome=<rtf> -d Readme=<txt> \
+      -d Icon=zero/navegador/recursos/guardiana-zero.ico -o dist/guardiana-zero-<v>-windows-x64.msi build/wix/zero.wxs
+
+  Why an installer at all (the owner, 10 Oct 2026: «tenemos que dárselo facilito al cliente para
+  que no se aburra y desista»): a bare .exe downloaded from the web carries Windows' «from the
+  internet» mark, and without a publisher certificate SmartScreen stops it on every double-click,
+  often behind other windows, so the person concludes the program does not open. The installer is
+  stopped once, at install; the program it leaves behind carries no mark and opens every time.
+
+  What it does, as a person: no administrator password (it installs for this user only, under
+  %LOCALAPPDATA%\Programs\GUARDIANA ZERO), a shortcut on the Desktop and in the Start menu, and
+  it opens GUARDIANA ZERO when it finishes. Installing a newer version over an older one replaces
+  it in place; if ZERO is open it is asked to close (the same WM_CLOSE as its own X, so it saves)
+  and the new one opens at the end. Uninstalling removes the program and the shortcuts; the
+  person's data (%LOCALAPPDATA%\GUARDIANA ZERO, settings, marked data, figures, receipts) stays:
+  it belongs to them.
+
+  UpgradeCode never changes between versions: it is what makes a newer installer replace the
+  older one instead of installing twice. It is not GUARDIANA's (the two programs live apart).
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <!-- Language neutral, like GUARDIANA's: one product whatever the language of the installer
+       (with one LCID each, Windows Installer saw three products; measured on 22 Sep 2026). -->
+  <Package Name="GUARDIANA ZERO"
+           Manufacturer="GUARDIANA GROUP"
+           Version="$(var.Version)"
+           UpgradeCode="7c2f0a4e-9b63-4d7a-8e21-5f3c6d1b9a08"
+           Language="0"
+           Codepage="1252"
+           Scope="perUser"
+           InstallerVersion="500"
+           Compressed="yes">
+
+    <SummaryInformation Description="!(loc.Descripcion)" Manufacturer="GUARDIANA GROUP" />
+
+    <!-- Two screens: what the installer does and does not, with «Install», then «Finish» with
+         «Open GUARDIANA ZERO» ticked. No folder choice, no options. -->
+    <ui:WixUI Id="WixUI_Minimal" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.Welcome)" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(sys.SOURCEFILEDIR)dialogo.bmp" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(sys.SOURCEFILEDIR)banner.bmp" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="!(loc.AbrirZero)" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <SetProperty Id="WixShellExecTarget" Value="[INSTALLFOLDER]GUARDIANA ZERO.exe" After="CostFinalize" Sequence="ui" />
+    <CustomAction Id="AbrirZero" DllEntry="WixShellExec" Impersonate="yes" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" />
+    <UI>
+      <!-- Also after an upgrade: the person double-clicked the new installer to get the new
+           version, and the old one was closed to make room; leaving them with nothing open would
+           be the «no se abre» of 10 Oct 2026 all over again. -->
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="AbrirZero" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT REMOVE" />
+    </UI>
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="!(loc.VersionMasNueva)" />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- «Programs and Features» / «Apps»: the icon, the site, no «Modify». -->
+    <Icon Id="zero.ico" SourceFile="$(var.Icon)" />
+    <Property Id="ARPPRODUCTICON" Value="zero.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://guardianagroup.com/zero.html" />
+    <Property Id="ARPHELPLINK" Value="https://guardianagroup.com/zero.html" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+    <!-- A running copy is asked to close before the files are replaced or removed: the same
+         message as its own X (it saves and leaves). Never killed: if it does not close in 30 s,
+         Windows Installer says so and nothing is half replaced. -->
+    <util:CloseApplication Id="CerrarZero" Target="GUARDIANA ZERO.exe" CloseMessage="yes" RebootPrompt="no" Timeout="30" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramasDir" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="GUARDIANA ZERO" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+    <StandardDirectory Id="DesktopFolder" />
+
+    <Feature Id="Main" Title="GUARDIANA ZERO" Level="1">
+      <ComponentRef Id="Exe" />
+      <ComponentRef Id="Readme" />
+      <ComponentRef Id="AccesoInicio" />
+      <ComponentRef Id="AccesoEscritorio" />
+    </Feature>
+
+    <!-- Per-user files live under the profile, so each component's key is a value under HKCU
+         (Windows Installer's rule for per-user packages, ICE38), not the file itself. -->
+    <Component Id="Exe" Directory="INSTALLFOLDER" Guid="a1d2e8c4-6f3b-4e0a-9c7d-2b5e8f1a3c60">
+      <File Id="ZeroExe" Name="GUARDIANA ZERO.exe" Source="$(var.Exe)" />
+      <RemoveFolder Id="QuitaCarpeta" On="uninstall" />
+      <RemoveFolder Id="QuitaProgramas" Directory="ProgramasDir" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\GUARDIANA GROUP\GUARDIANA ZERO" Name="carpeta" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+    </Component>
+
+    <Component Id="Readme" Directory="INSTALLFOLDER" Guid="b7e4f1a9-2c8d-4f6e-a3b0-9d1c7e5f2a84">
+      <File Id="Leeme" Name="!(loc.ArchivoLeeme)" Source="$(var.Readme)" />
+      <RegistryValue Root="HKCU" Key="Software\GUARDIANA GROUP\GUARDIANA ZERO" Name="leeme" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="AccesoInicio" Directory="ProgramMenuFolder" Guid="c3a9d7e2-5b1f-4c8a-b6e4-7f2d9a0c1e53">
+      <Shortcut Id="AccesoInicioZero"
+                Name="GUARDIANA ZERO"
+                Description="!(loc.AccesoDescripcion)"
+                Target="[INSTALLFOLDER]GUARDIANA ZERO.exe"
+                Icon="zero.ico"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\GUARDIANA GROUP\GUARDIANA ZERO" Name="inicio" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="AccesoEscritorio" Directory="DesktopFolder" Guid="d5c2b8f0-4e7a-4a19-9f3c-1e6b2d8a7c41">
+      <Shortcut Id="AccesoEscritorioZero"
+                Name="GUARDIANA ZERO"
+                Description="!(loc.AccesoDescripcion)"
+                Target="[INSTALLFOLDER]GUARDIANA ZERO.exe"
+                Icon="zero.ico"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\GUARDIANA GROUP\GUARDIANA ZERO" Name="escritorio" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+  </Package>
+</Wix>

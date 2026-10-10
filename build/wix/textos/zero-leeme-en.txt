@@ -1,0 +1,41 @@
+﻿GUARDIANA ZERO for Windows
+==========================
+
+GUARDIANA ZERO is a browser of its own: as you browse, you see at once which
+companies each page tries to call behind your back and which ones are cut off,
+with their country and the reason. Everything happens on this PC. No account,
+no server of ours, zero telemetry.
+
+What the installer did
+----------------------
+- It copied the program to AppData\Local\Programs\GUARDIANA ZERO, in your
+  user folder. It did not ask for an administrator password.
+- It added the “GUARDIANA ZERO” shortcut to the desktop and the Start menu.
+- It changed nothing in Windows or in your other browsers.
+
+Where your data is
+------------------
+In AppData\Local\GUARDIANA ZERO: your settings, your favourites, your marked
+data, each day's figures and the receipts. Only on this PC. They stay even if
+you uninstall; delete them by hand if you do not want them.
+
+Updating
+--------
+Download the new installer from guardianagroup.com/en/zero.html and open it: it
+replaces the previous version in place. If GUARDIANA ZERO was open, it closes
+by itself (saving everything) and the new version opens at the end.
+
+Uninstalling
+------------
+Settings > Apps > GUARDIANA ZERO > Uninstall. It removes the program and the
+shortcuts; your data stays.
+
+Checking what you installed
+---------------------------
+The SHA-256 hash of the installer and of the program, and their signature, are
+on guardianagroup.com/en/zero.html and in the public ledger
+github.com/guardianagroup/guardiana/blob/main/ledger.jsonl, written before the
+download was published.
+
+Licence: GNU GPL 3.0 or later. Code: github.com/guardianagroup/guardiana.
+Write to us: hola@guardianagroup.com

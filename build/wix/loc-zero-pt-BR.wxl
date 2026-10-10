@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Os textos do instalador do GUARDIANA ZERO em português (os da GUARDIANA estão em loc-pt-BR.wxl). -->
+<WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="pt-BR" Codepage="1252">
+  <String Id="Descripcion" Value="GUARDIANA ZERO: o navegador que mostra do que está protegendo você. Tudo acontece neste computador; sem conta e sem servidor." />
+  <String Id="AbrirZero" Value="Abrir o GUARDIANA ZERO" />
+  <String Id="AccesoDescripcion" Value="O navegador que mostra do que está protegendo você" />
+  <String Id="VersionMasNueva" Value="Já existe uma versão mais nova do GUARDIANA ZERO instalada." />
+  <String Id="ArchivoLeeme" Value="LEIAME.txt" />
+</WixLocalization>
