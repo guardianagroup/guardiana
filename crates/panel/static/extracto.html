@@ -32,10 +32,10 @@
 <h1 data-t="extracto_titulo"></h1>
 <p class="lead" data-t="extracto_lead"></p>
 <form id="filters" class="filters">
-  <label><span data-t="f_dispositivo"></span><select name="device_id" id="f-device"><option value=""></option></select></label>
-  <label><span data-t="f_categoria"></span><select name="category"><option value=""></option><option value="rastreador">rastreador</option><option value="publicidad">publicidad</option><option value="telemetria">telemetría</option><option value="esperado">normal</option><option value="desconocido">sin clasificar</option></select></label>
-  <label><span data-t="f_senal"></span><select name="signal"><option value=""></option><option value="baliza">baliza</option><option value="destino_nuevo">destino nuevo</option><option value="fuera_de_horas">fuera de horas</option><option value="evasion_dns">evasión de DNS</option><option value="volumen">volumen</option></select></label>
-  <label><span data-t="f_veredicto"></span><select name="verdict"><option value=""></option><option value="observado">observado</option><option value="respondido">respondido</option><option value="cortado">bloqueado</option></select></label>
+  <label><span data-t="f_dispositivo"></span><select name="device_id" id="f-device"><option value="" data-t="f_todas"></option></select></label>
+  <label><span data-t="f_categoria"></span><select name="category"><option value="" data-t="f_todas"></option><option value="rastreador">rastreador</option><option value="publicidad">publicidad</option><option value="telemetria">telemetría</option><option value="esperado">normal</option><option value="desconocido">sin clasificar</option></select></label>
+  <label><span data-t="f_senal"></span><select name="signal"><option value="" data-t="f_todas"></option><option value="baliza">baliza</option><option value="destino_nuevo">destino nuevo</option><option value="fuera_de_horas">fuera de horas</option><option value="evasion_dns">evasión de DNS</option><option value="volumen">volumen</option></select></label>
+  <label><span data-t="f_veredicto"></span><select name="verdict"><option value="" data-t="f_todas"></option><option value="observado">observado</option><option value="respondido">respondido</option><option value="cortado">bloqueado</option></select></label>
   <label><span data-t="f_limite"></span><input name="limit" type="number" min="1" max="5000" value="200"></label>
   <button type="submit" data-t="filtrar"></button>
 </form>
@@ -46,13 +46,13 @@
   <a id="export-csv" class="btn secondary" href="#" data-t="exportar_csv"></a>
   <a id="export-json" class="btn secondary" href="#" data-t="exportar_json"></a>
   <button id="export-pdf" type="button" class="secondary" data-t="exportar_pdf"></button>
-  <span id="export-pdf-msg" class="muted"></span>
+  <span id="export-pdf-msg" class="muted" role="status" aria-live="polite"></span>
 </p>
 <p class="muted" id="total"></p>
 <div class="card wrap"><table><thead><tr><th data-t="col_hora"></th><th data-t="col_nombre"></th><th data-t="col_empresa_n"></th><th data-t="col_categoria"></th><th data-t="col_pais"></th><th data-t="col_dispositivo"></th><th data-t="col_veredicto"></th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
 <h2 data-t="cadena_titulo"></h2>
 <p class="lead" data-t="cadena_lead"></p>
-<p><button id="check" class="secondary" data-t="cadena_boton"></button> <span id="check-result"></span></p>
+<p><button id="check" class="secondary" data-t="cadena_boton"></button> <span id="check-result" role="status" aria-live="polite"></span></p>
 <div id="huecos-card" class="card hidden"><h2 data-t="huecos_titulo"></h2><ul id="huecos" class="muted"></ul></div>
 <div class="card"><h2 data-t="cambios_titulo"></h2><p class="lead" data-t="cambios_lead"></p><ul id="cambios" class="muted"></ul></div>
 <p class="limit leyenda-colores" data-t-html="leyenda_colores"></p>

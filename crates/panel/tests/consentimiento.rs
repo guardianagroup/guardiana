@@ -224,3 +224,79 @@ async fn the_household_panel_never_lists_a_phone_that_did_not_share() {
     running.shutdown().await;
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// The AI page is detail too: which AI service a phone talked to is not shown when its owner did
+/// not share, and the page says how many devices keep their detail to themselves; a scope
+/// declared on that phone gives no counts read from names the panel may not see (review of
+/// 10 Oct 2026, panel 2 and 3).
+#[tokio::test]
+async fn the_ai_page_leaves_out_a_phone_that_did_not_share() {
+    let (dir, db, token_path) = prepare("ia");
+    {
+        let mut l = Ledger::open(&db, genesis()).unwrap();
+        let now = now_ms();
+        l.append(NewEvent::observed(
+            now - 1500,
+            CALLADO,
+            "10.0.0.2",
+            "api.openai.com",
+            "A",
+        ))
+        .unwrap();
+        l.append(NewEvent::observed(
+            now - 1400,
+            ABIERTO,
+            "10.0.0.3",
+            "api.anthropic.com",
+            "A",
+        ))
+        .unwrap();
+        l.set_setting(&format!("alcance:{CALLADO}"), "github.com")
+            .unwrap();
+    }
+    let running = start(Config {
+        listen: vec!["127.0.0.1:0".parse().unwrap()],
+        optional_listen: Vec::new(),
+        db_path: db,
+        genesis: genesis(),
+        token_path,
+        extra_hosts: Vec::new(),
+        info: RuntimeInfo::default(),
+    })
+    .await
+    .expect("the panel starts on a free loopback port");
+    let addr = running.addrs[0];
+    let token = running.token.clone();
+
+    let (status, body) = get(addr, Some(&token), "/api/ia").await;
+    assert_eq!(status, 200, "{body}");
+    let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v["ocultos"], 1, "{body}");
+    let servicios = v["servicios"].as_array().unwrap();
+    assert!(
+        servicios.iter().all(|s| s["device_id"] != CALLADO),
+        "{body}"
+    );
+    assert!(
+        servicios.iter().any(|s| s["device_id"] == ABIERTO
+            && s["servicio"].as_str().unwrap_or("").contains("Anthropic")),
+        "{body}"
+    );
+    assert!(
+        !body.contains("OpenAI") && !body.contains("api.openai.com"),
+        "{body}"
+    );
+    let alcance = v["alcances"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["device_id"] == CALLADO)
+        .expect("the silent phone's scope is listed");
+    assert_eq!(alcance["comparte"], false, "{body}");
+    assert_eq!(alcance["fuera_total"], 0, "{body}");
+    assert_eq!(alcance["fuera"].as_array().unwrap().len(), 0, "{body}");
+    assert!(!body.contains(NOMBRE_CALLADO), "{body}");
+
+    running.shutdown().await;
+    let _ = std::fs::remove_dir_all(&dir);
+}

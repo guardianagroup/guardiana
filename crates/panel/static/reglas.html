@@ -42,13 +42,13 @@
   <label><span data-t="f_accion"></span><select name="action"><option value="cortar" data-t="accion_cortar"></option><option value="permitir" data-t="accion_permitir"></option></select></label>
   <button type="submit" data-t="crear_regla"></button>
 </form>
-<p id="n-msg" class="muted"></p>
+<p id="n-msg" class="muted" role="status" aria-live="polite"></p>
 <h2 data-t="reglas_lista_titulo"></h2>
-<p><button id="undo-today" class="secondary" data-t="deshacer_hoy"></button> <span id="undo-msg" class="ok"></span></p>
+<p><button id="undo-today" class="secondary" data-t="deshacer_hoy"></button> <span id="undo-msg" class="ok" role="status" aria-live="polite"></span></p>
 <div class="card wrap"><table><thead><tr><th>#</th><th data-t="col_estado"></th><th data-t="col_alcance"></th><th data-t="col_tipo"></th><th data-t="col_patron"></th><th data-t="col_accion"></th><th data-t="col_quien"></th><th data-t="col_creada"></th><th></th></tr></thead><tbody id="r-rows"></tbody></table><p class="muted" id="r-ocultas"></p></div>
 <h2 data-t="modo_bloqueo_titulo"></h2>
 <p class="lead" data-t="modo_bloqueo_lead"></p>
-<p><label><input type="radio" name="modo" value="nxdomain"> <span data-t="modo_nxdomain"></span></label> &nbsp; <label><input type="radio" name="modo" value="zero"> <span data-t="modo_zero"></span></label> &nbsp; <button id="modo-guardar" class="secondary" data-t="guardar"></button> <span id="modo-msg" class="ok"></span></p>
+<p><label><input type="radio" name="modo" value="nxdomain"> <span data-t="modo_nxdomain"></span></label> &nbsp; <label><input type="radio" name="modo" value="zero"> <span data-t="modo_zero"></span></label> &nbsp; <button id="modo-guardar" class="secondary" data-t="guardar"></button> <span id="modo-msg" class="ok" role="status" aria-live="polite"></span></p>
 </main>
 <footer><span data-t="pie"></span></footer>
 <script src="/static/app.js"></script>

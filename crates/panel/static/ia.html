@@ -36,6 +36,7 @@
 <h2 data-t="ia_servicios_titulo"></h2>
 <p class="lead" data-t="ia_servicios_lead"></p>
 <div class="card wrap"><table><thead><tr><th data-t="ia_col_servicio"></th><th data-t="col_dispositivo"></th><th data-t="ia_col_nombres"></th><th data-t="col_consultas"></th><th data-t="col_ultima"></th></tr></thead><tbody id="ia-servicios"></tbody></table></div>
+<p id="ia-ocultos" class="muted hidden"></p>
 
 <h2 data-t="alcance_titulo"></h2>
 <p class="lead" data-t="alcance_lead"></p>
@@ -47,7 +48,7 @@
   <form id="alcance-form" class="filters">
     <label><span data-t="col_dispositivo"></span><select name="device_id" id="a-device"></select></label>
     <label><span data-t="alcance_campo"></span><textarea name="patrones" id="a-patrones" rows="5" class="mono wide" placeholder="api.anthropic.com&#10;github.com"></textarea></label>
-    <button type="submit" data-t="alcance_guardar"></button> <span id="a-msg" class="ok"></span>
+    <button type="submit" data-t="alcance_guardar"></button> <span id="a-msg" class="ok" role="status" aria-live="polite"></span>
   </form>
 </div>
 <p class="limit" data-t="alcance_limite"></p>

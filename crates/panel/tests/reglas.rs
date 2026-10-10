@@ -301,3 +301,66 @@ async fn a_device_page_cannot_lift_a_rule_the_panel_set_on_it() {
     assert_eq!(st, 200, "{body}");
     assert_eq!(body.trim(), "true");
 }
+
+/// One raw HTTP/1.1 request, as written; the status code.
+async fn raw(addr: SocketAddr, request: &str) -> u16 {
+    let mut s = TcpStream::connect(addr).await.unwrap();
+    s.write_all(request.as_bytes()).await.unwrap();
+    let mut out = Vec::new();
+    s.read_to_end(&mut out).await.unwrap();
+    String::from_utf8_lossy(&out)
+        .split_whitespace()
+        .nth(1)
+        .and_then(|c| c.parse().ok())
+        .expect("a status code")
+}
+
+/// The two checks in front of every route, the ones that stop adversaries B and C of the threat
+/// model: a request whose `Host` is not the panel's own (DNS rebinding) gets 421, and a change
+/// sent by a page of another site gets 403, also on a route a phone uses without a key. Until
+/// now only the helper functions were tested, never a request (review of 10 Oct 2026, panel 27).
+#[tokio::test]
+async fn a_foreign_host_or_a_foreign_origin_is_refused() {
+    let (db, token_path) = prepare("anfitrion");
+    let running = start(Config {
+        listen: vec!["127.0.0.1:0".parse().unwrap()],
+        optional_listen: Vec::new(),
+        db_path: db,
+        genesis: genesis(),
+        token_path,
+        extra_hosts: Vec::new(),
+        info: RuntimeInfo::default(),
+    })
+    .await
+    .expect("the panel starts");
+    let addr = running.addrs[0];
+    let token = running.token.clone();
+
+    // DNS rebinding: a name that is not ours, pointed at this address.
+    let peticion = |host: &str| {
+        format!("GET /api/textos HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n")
+    };
+    assert_eq!(raw(addr, &peticion("evil.example:7443")).await, 421);
+    assert_eq!(raw(addr, &peticion("evil.example")).await, 421);
+    // Even with the key: the Host check comes first.
+    let con_llave = format!(
+        "GET /api/extracto HTTP/1.1\r\nHost: evil.example\r\nX-Guardiana-Token: {token}\r\nConnection: close\r\n\r\n"
+    );
+    assert_eq!(raw(addr, &con_llave).await, 421);
+    assert_eq!(raw(addr, &peticion("127.0.0.1")).await, 200);
+
+    // A page of another site sending a change with no body (no preflight) to the panel's own
+    // address: refused before any handler, with or without a key.
+    let cambio = |origen: &str, llave: &str| {
+        format!(
+            "POST /api/mi-dispositivo/reglas/1/deshacer HTTP/1.1\r\nHost: 127.0.0.1\r\nOrigin: {origen}\r\nX-Guardiana-Token: {llave}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        )
+    };
+    assert_eq!(raw(addr, &cambio("http://evil.example", "")).await, 403);
+    assert_eq!(raw(addr, &cambio("http://evil.example", &token)).await, 403);
+    assert_eq!(raw(addr, &cambio("null", &token)).await, 403);
+    // The panel's own page passes that check (and then needs the key, from this computer).
+    assert_eq!(raw(addr, &cambio("http://127.0.0.1", "")).await, 401);
+    assert_eq!(raw(addr, &cambio("http://127.0.0.1", &token)).await, 200);
+    running.shutdown().await;
+}

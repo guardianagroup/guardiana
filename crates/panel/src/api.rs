@@ -525,10 +525,25 @@ pub(crate) async fn estado(
     // Applied by Guardiana (a backup exists) or pointed here by other means (the
     // system says 127.0.0.1 is the primary): either way this PC passes through it.
     let copia = with_ledger(&state, |l| l.setting(SETTING_BACKUP))?.is_some_and(|v| !v.is_empty());
-    let primario = if !copia || q.contains_key("detalle") {
-        tokio::task::spawn_blocking(guardiana_service::sysdns::guardian_is_primary)
+    // The Estado page asks afresh; the banner every page loads takes an answer up to thirty
+    // seconds old (see `AppState::primario`).
+    let reciente = state
+        .primario
+        .lock()
+        .ok()
+        .and_then(|g| *g)
+        .filter(|(cuando, _)| cuando.elapsed() < std::time::Duration::from_secs(30))
+        .map(|(_, p)| p);
+    let primario = if q.contains_key("detalle") || (!copia && reciente.is_none()) {
+        let p = tokio::task::spawn_blocking(guardiana_service::sysdns::guardian_is_primary)
             .await
-            .map_err(internal)?
+            .map_err(internal)?;
+        if let Ok(mut g) = state.primario.lock() {
+            *g = Some((std::time::Instant::now(), p));
+        }
+        p
+    } else if !copia {
+        reciente.flatten()
     } else {
         None
     };
@@ -793,6 +808,10 @@ pub(crate) struct IaServicio {
 pub(crate) struct AlcanceView {
     device_id: String,
     device_name: Option<String>,
+    /// Whether the device shares its detail with the home panel. When it does not, the names it
+    /// asked are not read here and the counts below are not figures: the page says so instead of
+    /// "nothing beyond the declared list" (review of 10 Oct 2026, panel 3).
+    comparte: bool,
     /// What the person declared this device may talk to, one per line.
     patrones: Vec<String>,
     /// Names seen in the last 24 h outside that list, most-queried first, at most twenty.
@@ -817,6 +836,10 @@ pub(crate) struct IaView {
     alcances: Vec<AlcanceView>,
     /// Devices with no declared scope yet, to offer it.
     sin_alcance: Vec<(String, Option<String>)>,
+    /// Devices that do not share their detail with the home panel: their AI services are left
+    /// out, and the page says how many devices that is (review of 10 Oct 2026, panel 2). All of
+    /// them, not only the ones that used an AI service, so the number says nothing about that.
+    ocultos: usize,
 }
 
 /// What the AI page shows: which artificial-intelligence services each device talks to, and
@@ -832,13 +855,17 @@ pub(crate) async fn ia(State(state): State<Arc<AppState>>, _s: Session) -> ApiRe
         let mut servicios: PorServicio = HashMap::new();
         let mut alcances = Vec::new();
         let mut sin_alcance = Vec::new();
+        // Which service a device talked to is its detail, not a total: a device that does not
+        // share it is left out here, as in the extract (review of 10 Oct 2026, panel 2).
+        let comparte = |d: &Device| d.id == SELF_DEVICE_ID || d.share_detail_with_home;
+        let ocultos = devices.iter().filter(|d| !comparte(d)).count();
         // The whole week, grouped in the database: no cap, so "last 7 days" is the last 7 days.
         let semana = l.names_grouped(now - 7 * 24 * guardiana_core::time::HOUR_MS, now + 1)?;
         for g in &semana {
             let Some(servicio) = guardiana_lists::ai_service_of(&g.qname) else {
                 continue;
             };
-            if !devices.iter().any(|d| d.id == g.device_id) {
+            if !devices.iter().any(|d| d.id == g.device_id && comparte(d)) {
                 continue;
             }
             let slot = servicios
@@ -864,6 +891,23 @@ pub(crate) async fn ia(State(state): State<Arc<AppState>>, _s: Session) -> ApiRe
                 .collect();
             if patrones.is_empty() {
                 sin_alcance.push((d.id.clone(), d.name.clone()));
+                continue;
+            }
+            let cortar = modo == "cortar" || pase_hasta.is_some_and(|t| now >= t);
+            if !comparte(d) {
+                // Its names are not read from here: no counts, and the page says why. Guard mode
+                // works all the same.
+                alcances.push(AlcanceView {
+                    device_id: d.id.clone(),
+                    device_name: d.name.clone(),
+                    comparte: false,
+                    patrones,
+                    fuera: Vec::new(),
+                    fuera_total: 0,
+                    dentro_total: 0,
+                    cortar,
+                    pase_hasta: pase_hasta.filter(|t| now < *t),
+                });
                 continue;
             }
             // Expected traffic (updates, time, resolvers, messaging) never counts as "beyond":
@@ -892,11 +936,12 @@ pub(crate) async fn ia(State(state): State<Arc<AppState>>, _s: Session) -> ApiRe
             alcances.push(AlcanceView {
                 device_id: d.id.clone(),
                 device_name: d.name.clone(),
+                comparte: true,
                 patrones,
                 fuera,
                 fuera_total,
                 dentro_total: dentro.len(),
-                cortar: modo == "cortar" || pase_hasta.is_some_and(|t| now >= t),
+                cortar,
                 pase_hasta: pase_hasta.filter(|t| now < *t),
             });
         }
@@ -923,6 +968,7 @@ pub(crate) async fn ia(State(state): State<Arc<AppState>>, _s: Session) -> ApiRe
             servicios,
             alcances,
             sin_alcance,
+            ocultos,
         })
     })?;
     Ok(Json(view))
@@ -1644,15 +1690,15 @@ const _: (Verdict, DecidedBy) = (Verdict::Observado, DecidedBy::Nadie);
 
 /// `/`: the radiography for the computer; the checker page when reached
 /// through `comprobar.guardiana.hogar` (brief §4).
-pub(crate) async fn root_page(headers: HeaderMap) -> Html<&'static str> {
+pub(crate) async fn root_page(headers: HeaderMap) -> Html<String> {
     let host = headers
         .get(header::HOST)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
     if host.starts_with(crate::CHECKER_HOST) {
-        Html(include_str!("../static/comprobador.html"))
+        crate::pagina(include_str!("../static/comprobador.html"))
     } else {
-        Html(include_str!("../static/index.html"))
+        crate::pagina(include_str!("../static/index.html"))
     }
 }
 
@@ -1713,7 +1759,11 @@ fn hogar_view(state: &AppState) -> Result<Hogar, Response> {
     let lan = guardiana_devices::local_lan_ipv4();
     let shown_ip = if on { ip } else { lan.map(|i| i.to_string()) };
     let parsed: Option<std::net::Ipv4Addr> = shown_ip.as_deref().and_then(|s| s.parse().ok());
-    let url = parsed.map(home::home_url);
+    // What the phone opens, by the QR or typed: its own page, which needs no key and carries the
+    // steps, the consent and whether it already goes through. The QR used to open /hogar, which
+    // needs the key, and the phone landed on "this tab has no session" (review of 10 Oct 2026,
+    // panel 1).
+    let url = parsed.map(|ip| format!("http://{ip}:{}/mi-dispositivo", crate::DEFAULT_PORT));
     Ok(Hogar {
         licencia: String::new(),
         encendido: on,
@@ -1825,6 +1875,11 @@ pub(crate) async fn hogar_desactivar(
 pub(crate) struct MiDispositivo {
     es_este_computador: bool,
     dispositivo: Option<Device>,
+    /// Hours this device has been observed, capped at 24, and whether that day is complete: the
+    /// page read them from the device record, which does not carry them, and printed «undefined
+    /// hours of 24» (found in the review of 10 Oct 2026).
+    horas_observadas: i64,
+    puede_cortar: bool,
     totales: Totales,
     eventos: Vec<EventView>,
     lectura: Lectura,
@@ -1882,8 +1937,11 @@ pub(crate) async fn mi_dispositivo(
     let names = HashMap::new();
     let mut eventos: Vec<EventView> = events.into_iter().map(|e| view(t, e, &names)).collect();
     eventos.reverse();
+    let observado = device.as_ref().map_or(0, |d| now - d.first_seen);
     Ok(Json(MiDispositivo {
         es_este_computador: id == SELF_DEVICE_ID,
+        horas_observadas: observed_hours(observado),
+        puede_cortar: observation_complete(observado),
         dispositivo: device,
         totales: totals.map_or_else(Totales::default, |t| Totales {
             consultas: t.queries,
@@ -2016,7 +2074,10 @@ struct InformeNovedad {
     nombre: String,
     empresa: String,
     categoria: String,
-    dispositivo: String,
+    /// The device, by id and by name apart, so the page names it the way every other page does
+    /// (review of 10 Oct 2026, panel 10).
+    device_id: String,
+    device_name: Option<String>,
     consultas: i64,
     visto: i64,
 }
@@ -2124,7 +2185,10 @@ pub(crate) async fn informe(
         texto_whatsapp.push(' ');
         texto_whatsapp.push_str(
             &t.panel_n("informe_corredores_texto", corredores.len() as i64)
-                .replace("{consultas}", &corredores_consultas.to_string()),
+                .replace(
+                    "{consultas}",
+                    &t.panel_n("informe_n_consultas", corredores_consultas),
+                ),
         );
     }
     Ok(Json(Informe {
@@ -2149,7 +2213,8 @@ pub(crate) async fn informe(
                 empresa: empresa_de(&n.qname).unwrap_or_default().to_owned(),
                 nombre: n.qname,
                 categoria: n.category,
-                dispositivo: n.name.unwrap_or(n.device_id),
+                device_id: n.device_id,
+                device_name: n.name,
                 consultas: n.queries,
                 visto: n.first_seen,
             })
@@ -2638,6 +2703,9 @@ pub(crate) struct LicenciaView {
     /// Where the copy of a paid licence lives (key, activation number, product), for the same
     /// reason the trial mark is named.
     marca_licencia: String,
+    /// Whether that copy is really there: it is written as best effort too, and the page said it
+    /// was kept without looking (review of 10 Oct 2026, panel 6).
+    marca_licencia_puesta: bool,
     clave_dev: bool,
     host_activacion: &'static str,
     /// Hours observed so far (the trial needs 24).
@@ -2650,8 +2718,17 @@ fn licencia_error(t: &Texts, e: &guardiana_license::Error) -> String {
         guardiana_license::Error::Malformed(_) => t.panel("licencia_err_formato").to_owned(),
         guardiana_license::Error::KeyInactive => t.panel("licencia_err_inactiva").to_owned(),
         guardiana_license::Error::ActivationLimit => t.panel("licencia_err_limite").to_owned(),
+        // The gateway's reason comes in English: the usual two are said in the panel's language
+        // (review of 10 Oct 2026, panel 23); anything else is quoted as it came.
         guardiana_license::Error::KeyRejected(why) => {
-            t.panel("licencia_err_clave").replace("{motivo}", why)
+            let w = why.to_ascii_lowercase();
+            if w.contains("not found") {
+                t.panel("licencia_err_no_existe").to_owned()
+            } else if w.contains("expired") {
+                t.panel("licencia_err_caducada").to_owned()
+            } else {
+                t.panel("licencia_err_clave").replace("{motivo}", why)
+            }
         }
         // Refused by the licence crate before anything leaves the machine (review of 1 Oct
         // 2026, entry 26); `licencia_clave` below already answers 400 for it.
@@ -2664,9 +2741,40 @@ fn licencia_error(t: &Texts, e: &guardiana_license::Error) -> String {
     }
 }
 
+/// A day as the person's language writes it (5/10/2026, 5 Oct 2026, 05/10/2026), on the
+/// person's own calendar: the licence's dates were the only ISO ones in the panel, next to the
+/// browser's own in the same page (review of 10 Oct 2026, panel 13). The shape and the names of
+/// the months live in the texts, like everything else the screen says.
+fn fecha_local(t: &Texts, ms: i64, zona: i64) -> String {
+    let iso = guardiana_core::time::local_day(ms, zona);
+    let mut partes = iso.split('-');
+    let (Some(ano), Some(mes), Some(dia)) = (partes.next(), partes.next(), partes.next()) else {
+        return iso;
+    };
+    let (Ok(m), Ok(d)) = (mes.parse::<usize>(), dia.parse::<usize>()) else {
+        return iso;
+    };
+    let nombre_mes = t
+        .panel("fecha_meses")
+        .split_whitespace()
+        .nth(m.wrapping_sub(1));
+    let nombre_dia = t
+        .panel("fecha_dias")
+        .split_whitespace()
+        .nth(d.wrapping_sub(1));
+    match (nombre_mes, nombre_dia) {
+        (Some(nm), Some(nd)) => t
+            .panel("fecha_formato")
+            .replace("{dia}", nd)
+            .replace("{mes}", nm)
+            .replace("{ano}", ano),
+        _ => iso,
+    }
+}
+
 fn licencia_texto(t: &Texts, s: &guardiana_license::Status, zona: i64) -> String {
     use guardiana_license::{Comprobacion, Plan};
-    let day = |ms: i64| guardiana_core::time::local_day(ms, zona);
+    let day = |ms: i64| fecha_local(t, ms, zona);
     match &s.plan {
         Plan::Prueba {
             termina,
@@ -2692,11 +2800,16 @@ fn licencia_texto(t: &Texts, s: &guardiana_license::Status, zona: i64) -> String
             comprobacion,
             ..
         } => {
+            // The holder only when it is known: «Titular: -.» said nothing (panel 23).
             let mut text = t
-                .panel("licencia_plus")
+                .panel(if titular.is_some() {
+                    "licencia_plus"
+                } else {
+                    "licencia_plus_sin_titular"
+                })
                 .replace("{origen}", t.panel("licencia_origen_clave"))
                 .replace("{fecha}", &day(*desde))
-                .replace("{titular}", titular.as_deref().unwrap_or("-"));
+                .replace("{titular}", titular.as_deref().unwrap_or_default());
             match (periodo_dias, proxima_comprobacion, comprobacion) {
                 // Una licencia comprada una vez no tiene periodo ni próxima comprobación, así
                 // que sin esta rama el panel se quedaba callado justo con quien más pagó. Se
@@ -2705,16 +2818,26 @@ fn licencia_texto(t: &Texts, s: &guardiana_license::Status, zona: i64) -> String
                 (Some(p), _, _) if *p == guardiana_license::DE_POR_VIDA => {
                     text.push(' ');
                     text.push_str(t.panel("licencia_de_por_vida"));
-                    // The gateway turned the key down: from when it stops, said with its date.
+                    // The gateway turned the key down: what it said, and from when it stops if it
+                    // keeps saying so. «It does not expire… The licence expires on…» read as a
+                    // contradiction (review of 10 Oct 2026, panel 23).
                     if let Some(c) = caduca_ms {
                         text.push(' ');
-                        text.push_str(&t.panel("licencia_caduca").replace("{fecha}", &day(*c)));
+                        text.push_str(
+                            &t.panel("licencia_de_por_vida_rechazada")
+                                .replace("{fecha}", &day(*c)),
+                        );
                     }
                 }
                 (Some(p), Some(next), Some(c)) => {
+                    // Turned down by the gateway is not «no connection»: while the grace runs the
+                    // person can still fix the payment (review of 10 Oct 2026, panel 5).
                     let key = match c {
                         Comprobacion::AlDia => "licencia_comprobacion_al_dia",
                         Comprobacion::Pendiente => "licencia_comprobacion_pendiente",
+                        Comprobacion::Fallida if s.rechazada_desde.is_some() => {
+                            "licencia_comprobacion_rechazada"
+                        }
                         Comprobacion::Fallida => "licencia_comprobacion_fallida",
                     };
                     text.push(' ');
@@ -2733,6 +2856,12 @@ fn licencia_texto(t: &Texts, s: &guardiana_license::Status, zona: i64) -> String
                             // was the date the check fell due, already past (licence item 2).
                             .replace("{limite}", &caduca_ms.map(day).unwrap_or_default()),
                     );
+                    // What the last attempt got back, when one could not be done: a number or a
+                    // code, for whoever has to look into it.
+                    if let (Comprobacion::Fallida, Some(f)) = (c, &s.ultimo_fallo) {
+                        text.push(' ');
+                        text.push_str(&t.panel("licencia_ultimo_fallo").replace("{motivo}", f));
+                    }
                 }
                 _ => {
                     if let Some(c) = caduca_ms {
@@ -2763,11 +2892,14 @@ fn licencia_view(t: &Texts, state: &AppState, zona: i64) -> Result<LicenciaView,
         })?;
         Ok((s, l.outbound()?))
     })?;
+    // One read of the anchor for both marks: on Windows each read is a process.
+    let marcas = en_hilo_aparte(guardiana_license::ancla::leer_todo);
     Ok(LicenciaView {
         texto: licencia_texto(t, &estado, zona),
         marca_prueba: guardiana_license::ancla::donde(),
-        marca_puesta: guardiana_license::ancla::leer().is_some(),
+        marca_puesta: marcas.prueba.is_some(),
         marca_licencia: guardiana_license::ancla::donde_licencia(),
+        marca_licencia_puesta: marcas.licencia.is_some(),
         clave_dev: guardiana_core::identity::public_key_is_dev(),
         host_activacion: guardiana_license::gateway_host(),
         horas_observadas: estado.observado_ms / guardiana_core::time::HOUR_MS,
@@ -2846,6 +2978,8 @@ mod tests {
             puede_funcionar,
             hogar_permitido: true,
             observado_ms: 0,
+            rechazada_desde: None,
+            ultimo_fallo: None,
         }
     }
 
@@ -2856,8 +2990,9 @@ mod tests {
         let t = guardiana_core::i18n::es();
         let fin = 1_760_000_000_000;
         let texto = licencia_texto(t, &estado(Plan::PruebaAgotada { termino: fin }, false), 0);
-        let dia = guardiana_core::time::rfc3339_utc(fin)[..10].to_owned();
+        let dia = fecha_local(t, fin, 0);
         assert!(texto.contains(&dia), "{texto}");
+        assert!(!dia.contains('-'), "{dia}");
     }
 
     /// Mientras la prueba corre, la pantalla dice cuántos días quedan: que se acabe no puede
@@ -2891,8 +3026,58 @@ mod tests {
             &estado(Plan::PruebaAgotada { termino: fin }, false),
             -300,
         );
-        assert!(bogota.contains("2026-10-04"), "{bogota}");
+        assert!(bogota.contains("4/10/2026"), "{bogota}");
         let madrid = licencia_texto(t, &estado(Plan::PruebaAgotada { termino: fin }, false), 120);
-        assert!(madrid.contains("2026-10-05"), "{madrid}");
+        assert!(madrid.contains("5/10/2026"), "{madrid}");
+    }
+
+    /// The licence's dates are written the way each language writes them, like the browser's
+    /// own in the same page (review of 10 Oct 2026, panel 13).
+    #[test]
+    fn la_fecha_va_en_la_forma_de_cada_idioma() {
+        let fin = 1_791_168_900_000; // 2026-10-05T02:55Z
+        assert_eq!(
+            fecha_local(guardiana_core::i18n::es(), fin, 120),
+            "5/10/2026"
+        );
+        assert_eq!(
+            fecha_local(guardiana_core::i18n::en(), fin, 120),
+            "5 Oct 2026"
+        );
+        assert_eq!(
+            fecha_local(guardiana_core::i18n::pt(), fin, 120),
+            "05/10/2026"
+        );
+    }
+
+    /// A key the gateway turned down is said as such while the grace runs, not as «no
+    /// connection»; and a check that could not be done says what came back (review of 10 Oct
+    /// 2026, panel 5 and trust 6 and 7).
+    #[test]
+    fn una_clave_rechazada_no_se_cuenta_como_sin_conexion() {
+        let t = guardiana_core::i18n::es();
+        let plan = |c| Plan::Plus {
+            origen: "clave".to_owned(),
+            desde: 0,
+            titular: None,
+            periodo_dias: Some(guardiana_license::MONTH_DAYS),
+            comprobada: Some(0),
+            proxima_comprobacion: Some(30 * guardiana_core::time::DAY_MS),
+            caduca_ms: Some(40 * guardiana_core::time::DAY_MS),
+            comprobacion: Some(c),
+        };
+        let mut s = estado(plan(guardiana_license::Comprobacion::Fallida), true);
+        s.ultimo_fallo = Some("HTTP 503".to_owned());
+        let sin_red = licencia_texto(t, &s, 0);
+        assert!(
+            sin_red.contains("No se pudo comprobar la clave"),
+            "{sin_red}"
+        );
+        assert!(sin_red.contains("HTTP 503"), "{sin_red}");
+        assert!(!sin_red.contains("Titular"), "{sin_red}");
+        s.rechazada_desde = Some(33 * guardiana_core::time::DAY_MS);
+        let rechazada = licencia_texto(t, &s, 0);
+        assert!(rechazada.contains("pasarela de pago dice"), "{rechazada}");
+        assert!(rechazada.contains("10/2/1970"), "{rechazada}");
     }
 }

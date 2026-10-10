@@ -35,7 +35,7 @@
   --cortado: #FF7A6E; --respondido: #8AA5FF;
   --nivel-verde: #3FD68A; --nivel-naranja: #F2B04A; --nivel-rojo: #FF6B5E;
 }
-:root[data-tema="noche"] input, :root[data-tema="noche"] select { color-scheme: dark; }
+:root[data-tema="noche"] input, :root[data-tema="noche"] select, :root[data-tema="noche"] textarea { color-scheme: dark; }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 var(--texto); -webkit-font-smoothing: antialiased; }
@@ -185,8 +185,14 @@ form.filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; marg
 /* Los tres botones de llevarse el extracto, en fila y siempre juntos. */
 p.exportar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 18px; }
 form.filters label { display: flex; flex-direction: column; gap: 4px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-input, select { font: 400 14px/1.4 var(--texto); padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--fg); }
-input:focus, select:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The declared scope is a textarea: without it here it came out white with black text at night
+   and without the rounded border (review of 10 Oct 2026, panel 24). */
+input, select, textarea { font: 400 14px/1.4 var(--texto); padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--fg); }
+input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* A finger needs more than a mouse: taller buttons on touch screens (panel 24). */
+@media (pointer: coarse) { button, .btn { padding-top: 11px; padding-bottom: 11px; } }
+/* Naming a device from its card, below its figures. */
+form.disp-nombre { margin: 12px 0 0; padding-top: 12px; border-top: 1px dashed var(--line); }
 
 .ok { color: var(--esperado); font-weight: 600; }
 .bad { color: var(--cortado); font-weight: 600; }

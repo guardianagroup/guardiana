@@ -4,7 +4,7 @@
 //! Security, as the brief states it: a random token per installation kept
 //! in a file only the user can read; the launcher opens
 //! `http://127.0.0.1:7443/?t=<token>` and the page keeps the token in
-//! memory, never as a cookie. Every request must carry a `Host` the panel
+//! its tab (`sessionStorage`, gone when the tab closes), never as a cookie. Every request must carry a `Host` the panel
 //! recognises (against DNS rebinding). Without the token there is no
 //! writing and no reading of the home panel. No third-party JavaScript, no
 //! external fonts, no cookies.
@@ -16,7 +16,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use axum::extract::Path as RutaUrl;
+use axum::extract::{Path as RutaUrl, RawQuery};
 use axum::http::{header, HeaderValue, StatusCode};
 use axum::middleware;
 use axum::response::{Html, IntoResponse, Response};
@@ -108,6 +108,10 @@ pub(crate) struct AppState {
     pub(crate) genesis: Hash,
     /// The one reader of the neighbour table (who is which phone), shared by every handler.
     pub(crate) vecinos: guardiana_devices::Resolver,
+    /// The last answer to "does this computer ask the guardian first?", and when. On Windows the
+    /// question is a PowerShell, and every page asked it on every load while the DNS was not
+    /// pointed yet (review of 10 Oct 2026, panel 15): it is asked again after thirty seconds.
+    pub(crate) primario: Mutex<Option<(std::time::Instant, Option<bool>)>>,
 }
 
 /// A running panel.
@@ -185,6 +189,49 @@ pub(crate) fn static_response(body: &'static str, content_type: &'static str) ->
     ([(header::CONTENT_TYPE, content_type)], body).into_response()
 }
 
+/// The panel's script and style sheet, as the pages ask for them.
+const APP_JS: &str = include_str!("../static/app.js");
+const STYLE_CSS: &str = include_str!("../static/style.css");
+
+/// A short tag of the script and the style sheet, so the pages ask for them by a name that
+/// changes when they do and the browser may keep them for a while. Until 1.0.12 every navigation
+/// fetched the 113 KB script and the style sheet again, which a phone on the Wi-Fi notices
+/// (review of 10 Oct 2026, panel 25). Only needs to be stable within one binary.
+pub(crate) fn version_estaticos() -> &'static str {
+    static TAG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    TAG.get_or_init(|| {
+        use std::hash::{Hash as _, Hasher as _};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        APP_JS.hash(&mut h);
+        STYLE_CSS.hash(&mut h);
+        format!("{:016x}", h.finish())
+    })
+}
+
+/// A page, with its script and style sheet named by their tag (see [`version_estaticos`]). The
+/// page itself is never stored, so it always names the current ones.
+pub(crate) fn pagina(html: &'static str) -> Html<String> {
+    let v = version_estaticos();
+    Html(
+        html.replace("/static/app.js\"", &format!("/static/app.js?v={v}\""))
+            .replace("/static/style.css\"", &format!("/static/style.css?v={v}\"")),
+    )
+}
+
+/// The script or the style sheet: kept for ten minutes when asked for by the current tag, never
+/// stored otherwise.
+fn estatico(body: &'static str, content_type: &'static str, query: Option<&str>) -> Response {
+    let mut res = static_response(body, content_type);
+    let v = version_estaticos();
+    if query.is_some_and(|q| q.split('&').any(|kv| kv.strip_prefix("v=") == Some(v))) {
+        res.headers_mut().insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=600"),
+        );
+    }
+    res
+}
+
 pub(crate) async fn add_security_headers(
     req: axum::extract::Request,
     next: middleware::Next,
@@ -206,8 +253,9 @@ pub(crate) async fn add_security_headers(
         header::REFERRER_POLICY,
         HeaderValue::from_static("no-referrer"),
     );
-    // The fonts say `immutable` for themselves; everything else is never stored (review of
-    // 8 Oct 2026: `insert` overwrote the fonts' header and 700 KB came down on every page).
+    // The fonts say `immutable` for themselves, and the script and the style sheet asked for by
+    // their tag keep ten minutes; everything else is never stored (review of 8 Oct 2026: `insert`
+    // overwrote the fonts' header and 700 KB came down on every page).
     h.entry(header::CACHE_CONTROL)
         .or_insert(HeaderValue::from_static("no-store"));
     res
@@ -233,24 +281,25 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         db_path: config.db_path,
         genesis: config.genesis,
         vecinos: guardiana_devices::Resolver::default(),
+        primario: Mutex::new(None),
     });
 
     let app = Router::new()
         .route("/", get(api::root_page))
         .route(
             "/licencia",
-            get(|| async { Html(include_str!("../static/licencia.html")) }),
+            get(|| async { pagina(include_str!("../static/licencia.html")) }),
         )
         .route("/api/licencia", get(api::licencia))
         .route("/api/licencia/activar-clave", post(api::licencia_clave))
         .route(
             "/verify",
-            get(|| async { Html(include_str!("../static/verify.html")) }),
+            get(|| async { pagina(include_str!("../static/verify.html")) }),
         )
         .route("/api/verify", get(api::verify))
         .route(
             "/reglas",
-            get(|| async { Html(include_str!("../static/reglas.html")) }),
+            get(|| async { pagina(include_str!("../static/reglas.html")) }),
         )
         .route("/api/reglas", get(api::reglas).post(api::nueva_regla))
         .route("/api/reglas/deshacer-hoy", post(api::deshacer_hoy))
@@ -266,39 +315,36 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         )
         .route(
             "/hogar",
-            get(|| async { Html(include_str!("../static/hogar.html")) }),
+            get(|| async { pagina(include_str!("../static/hogar.html")) }),
         )
         .route(
             "/mi-dispositivo",
-            get(|| async { Html(include_str!("../static/mi-dispositivo.html")) }),
+            get(|| async { pagina(include_str!("../static/mi-dispositivo.html")) }),
         )
         .route(
             "/extracto",
-            get(|| async { Html(include_str!("../static/extracto.html")) }),
+            get(|| async { pagina(include_str!("../static/extracto.html")) }),
         )
         .route(
             "/dispositivos",
-            get(|| async { Html(include_str!("../static/dispositivos.html")) }),
+            get(|| async { pagina(include_str!("../static/dispositivos.html")) }),
         )
         .route(
             "/sabe-de-ti",
-            get(|| async { Html(include_str!("../static/sabe-de-ti.html")) }),
+            get(|| async { pagina(include_str!("../static/sabe-de-ti.html")) }),
         )
         .route(
             "/estado",
-            get(|| async { Html(include_str!("../static/estado.html")) }),
+            get(|| async { pagina(include_str!("../static/estado.html")) }),
         )
         .route(
             "/ia",
-            get(|| async { Html(include_str!("../static/ia.html")) }),
+            get(|| async { pagina(include_str!("../static/ia.html")) }),
         )
         .route(
             "/static/style.css",
-            get(|| async {
-                static_response(
-                    include_str!("../static/style.css"),
-                    "text/css; charset=utf-8",
-                )
+            get(|RawQuery(q): RawQuery| async move {
+                estatico(STYLE_CSS, "text/css; charset=utf-8", q.as_deref())
             }),
         )
         // The site's own icon, so browsers stop asking for /favicon.ico (a 404 in the console).
@@ -317,47 +363,47 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         // parecía que el programa estaba roto (20 sep 2026).
         .route(
             "/licencia.html",
-            get(|| async { Html(include_str!("../static/licencia.html")) }),
+            get(|| async { pagina(include_str!("../static/licencia.html")) }),
         )
         .route(
             "/verify.html",
-            get(|| async { Html(include_str!("../static/verify.html")) }),
+            get(|| async { pagina(include_str!("../static/verify.html")) }),
         )
         .route(
             "/reglas.html",
-            get(|| async { Html(include_str!("../static/reglas.html")) }),
+            get(|| async { pagina(include_str!("../static/reglas.html")) }),
         )
         .route(
             "/hogar.html",
-            get(|| async { Html(include_str!("../static/hogar.html")) }),
+            get(|| async { pagina(include_str!("../static/hogar.html")) }),
         )
         .route(
             "/mi-dispositivo.html",
-            get(|| async { Html(include_str!("../static/mi-dispositivo.html")) }),
+            get(|| async { pagina(include_str!("../static/mi-dispositivo.html")) }),
         )
         .route(
             "/extracto.html",
-            get(|| async { Html(include_str!("../static/extracto.html")) }),
+            get(|| async { pagina(include_str!("../static/extracto.html")) }),
         )
         .route(
             "/dispositivos.html",
-            get(|| async { Html(include_str!("../static/dispositivos.html")) }),
+            get(|| async { pagina(include_str!("../static/dispositivos.html")) }),
         )
         .route(
             "/sabe-de-ti.html",
-            get(|| async { Html(include_str!("../static/sabe-de-ti.html")) }),
+            get(|| async { pagina(include_str!("../static/sabe-de-ti.html")) }),
         )
         .route(
             "/estado.html",
-            get(|| async { Html(include_str!("../static/estado.html")) }),
+            get(|| async { pagina(include_str!("../static/estado.html")) }),
         )
         .route(
             "/ia.html",
-            get(|| async { Html(include_str!("../static/ia.html")) }),
+            get(|| async { pagina(include_str!("../static/ia.html")) }),
         )
         .route(
             "/informe.html",
-            get(|| async { Html(include_str!("../static/informe.html")) }),
+            get(|| async { pagina(include_str!("../static/informe.html")) }),
         )
         .route("/static/fonts/{archivo}", get(fuente))
         .route(
@@ -371,10 +417,11 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         )
         .route(
             "/static/app.js",
-            get(|| async {
-                static_response(
-                    include_str!("../static/app.js"),
+            get(|RawQuery(q): RawQuery| async move {
+                estatico(
+                    APP_JS,
                     "application/javascript; charset=utf-8",
+                    q.as_deref(),
                 )
             }),
         )
@@ -398,7 +445,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/sabe-de-ti/borrar", post(api::borrar))
         .route(
             "/informe",
-            get(|| async { Html(include_str!("../static/informe.html")) }),
+            get(|| async { pagina(include_str!("../static/informe.html")) }),
         )
         .route("/api/informe", get(api::informe))
         .route("/api/hogar", get(api::hogar))
@@ -448,6 +495,40 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         stop,
         tasks,
     })
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod estaticos {
+    use super::*;
+
+    /// The pages name the script and the style sheet by their tag, and only a request with the
+    /// current tag may be kept by the browser (review of 10 Oct 2026, panel 25).
+    #[test]
+    fn the_pages_ask_for_the_current_script_and_only_that_one_is_kept() {
+        let v = version_estaticos();
+        let Html(pagina) = pagina(include_str!("../static/index.html"));
+        assert!(
+            pagina.contains(&format!("/static/app.js?v={v}\"")),
+            "{pagina}"
+        );
+        assert!(
+            pagina.contains(&format!("/static/style.css?v={v}\"")),
+            "{pagina}"
+        );
+        let guardado = |q: Option<&str>| {
+            estatico(APP_JS, "application/javascript", q)
+                .headers()
+                .get(header::CACHE_CONTROL)
+                .map(|h| h.to_str().unwrap_or_default().to_owned())
+        };
+        assert_eq!(
+            guardado(Some(&format!("v={v}"))).as_deref(),
+            Some("public, max-age=600")
+        );
+        assert_eq!(guardado(Some("v=otra")), None);
+        assert_eq!(guardado(None), None);
+    }
 }
 
 #[cfg(test)]

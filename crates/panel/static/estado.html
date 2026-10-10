@@ -35,11 +35,11 @@
   <p><span data-t="e_escucha"></span> <span class="mono" id="e-escucha"></span></p>
   <p><span data-t="e_upstream"></span> <span class="mono" id="e-upstream"></span></p>
   <p><span data-t="e_dns"></span> <span id="e-dns"></span></p>
-  <p><button id="e-dns-apply" class="hidden" data-t="e_dns_aplicar"></button><button id="e-dns-restore" class="secondary hidden" data-t="e_dns_restaurar"></button> <span id="e-dns-msg" class="muted"></span></p>
+  <p><button id="e-dns-apply" class="hidden" data-t="e_dns_aplicar"></button><button id="e-dns-restore" class="secondary hidden" data-t="e_dns_restaurar"></button> <span id="e-dns-msg" class="muted" role="status" aria-live="polite"></span></p>
 </div>
 <h2 data-t="e_listas"></h2>
 <div class="card wrap"><table><thead><tr><th data-t="col_lista"></th><th data-t="col_entradas"></th><th data-t="col_fecha"></th></tr></thead><tbody id="e-listas"></tbody></table></div>
-<p class="limit" data-t="estado_limite"></p>
+<p class="limit hidden" id="e-limite" data-t="estado_limite"></p>
 <div class="card"><h2 data-t="cambios_titulo"></h2><p class="lead" data-t="cambios_lead"></p><ul id="cambios" class="muted"></ul></div>
 </main>
 <footer><span data-t="pie"></span></footer>
