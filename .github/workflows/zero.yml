@@ -85,10 +85,18 @@ jobs:
           wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
           $v = (Select-String -Path zero/navegador/Cargo.toml -Pattern '^version = "(.*)"' | Select-Object -First 1).Matches[0].Groups[1].Value
           New-Item -ItemType Directory -Force -Path msi | Out-Null
+          $exe = (Resolve-Path zero/navegador/target/release/guardiana-zero.exe).Path
           foreach ($idioma in 'es', 'en', 'pt') {
             $sufijo = if ($idioma -eq 'es') { '' } else { "-$idioma" }
-            powershell -NoProfile -ExecutionPolicy Bypass -File build/msi-zero.ps1 -Exe zero/navegador/target/release/guardiana-zero.exe -Version $v -Idioma $idioma -Out "msi/guardiana-zero-$v-windows-x64$sufijo.msi"
-            if ($LASTEXITCODE -ne 0) { Write-Output "::error title=msi-zero.ps1 $idioma::the installer did not build"; exit 1 }
+            # The output goes into the annotation on failure: the run page and the public API
+            # carry the reason, not only the log (which only a signed-in browser can open).
+            $salida = & powershell -NoProfile -ExecutionPolicy Bypass -File build/msi-zero.ps1 -Exe $exe -Version $v -Idioma $idioma -Out "$PWD/msi/guardiana-zero-$v-windows-x64$sufijo.msi" 2>&1 | Out-String
+            Write-Output $salida
+            if ($LASTEXITCODE -ne 0) {
+              $corto = $salida.Substring([Math]::Max(0, $salida.Length - 3500))
+              Write-Output "::error title=msi-zero.ps1 $idioma::$($corto -replace "`r?`n", ' | ')"
+              exit 1
+            }
           }
       # And what a person gets from it, on this clean Windows: zero/prueba/instalador.ps1.
       - name: installer end to end
