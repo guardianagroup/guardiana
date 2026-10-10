@@ -127,19 +127,26 @@
   }
 
   // --- the subscription ---------------------------------------------------------------------------
-  // Said in the bar only when it matters: in the trial's last two days, and when the browser no
-  // longer protects (then the shield, which would count nothing, gives its place to it).
+  // Said in the bar only when it matters: in the trial's last two days, while the licence file
+  // cannot be read, and when the browser no longer protects (then the shield, which would count
+  // nothing, gives its place to it).
+  const PASTILLA_SIN = { prueba_terminada: 'licencia_pastilla_terminada', ilegible: 'licencia_pastilla_ilegible_fin' };
   let licencia = null;
   function pintaLicencia(m) {
     licencia = m;
     const b = $('b-licencia');
     const sin = m.protege === false;
     let texto = '';
-    if (sin) texto = t(m.estado === 'prueba_terminada' ? 'licencia_pastilla_terminada' : 'licencia_pastilla_sin_suscripcion');
+    if (sin) texto = t(PASTILLA_SIN[m.estado] || 'licencia_pastilla_sin_suscripcion');
+    else if (m.ilegible) texto = t('licencia_pastilla_ilegible');
     else if (m.estado === 'prueba' && m.dias <= 2) texto = tn('licencia_pastilla_dias', m.dias, { d: Z.n(m.dias) });
     b.textContent = texto;
     b.classList.toggle('oculto', !texto);
     b.classList.toggle('sin-proteccion', sin);
+    // While the file cannot be read, the whole sentence (with where it is) on hover.
+    const titulo = !sin && m.ilegible ? t('licencia_ilegible', { datos: m.donde_datos || '' }) : t('licencia_boton_titulo');
+    b.title = titulo;
+    b.setAttribute('aria-label', titulo);
     $('b-escudo').classList.toggle('oculto', sin);
   }
   $('b-licencia').addEventListener('click', () => manda({ tipo: 'panel', vista: panel === 'licencia' ? null : 'licencia' }));

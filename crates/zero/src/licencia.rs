@@ -16,6 +16,12 @@
 //! When neither the trial nor a subscription is on, the browser keeps opening pages, but it does
 //! nothing of its own: it cuts nothing, cleans no address, does not watch marked data and makes
 //! no mandates. It never locks the person out of their tabs (the owner's choice, same day).
+//!
+//! When the licence file cannot be read (locked, or a folder in its place), the browser keeps
+//! what it last knew for at most [`GRACIA_ILEGIBLE_MS`], counted from the start or from the last
+//! good reading, and the bar and the panel say so all along; after that it stops protecting until
+//! it can read the file again (review of 10 Oct 2026: an unreadable file must not turn the trial
+//! into a free browser for ever, nor be hidden).
 
 use std::path::{Path, PathBuf};
 
@@ -52,10 +58,15 @@ pub fn compara_versiones(a: &str, b: &str) -> std::cmp::Ordering {
 /// The licence's own small ledger, inside the browser's data folder.
 pub const ARCHIVO: &str = "licencia.db";
 
+/// How long the browser keeps protecting while it cannot read its licence file: one day, from
+/// the start or from the last good reading.
+pub const GRACIA_ILEGIBLE_MS: i64 = 24 * 60 * 60 * 1000;
+
 /// Where the subscription stands.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Estado {
-    /// Not read yet, or unreadable (a locked file): the browser works, and the next reading says.
+    /// Not read yet, or unreadable right now (a locked file, a folder in its place): the browser
+    /// works, for at most [`GRACIA_ILEGIBLE_MS`], and the next reading says.
     Desconocido,
     /// The seven free days are running.
     Prueba {
@@ -89,6 +100,12 @@ pub enum Estado {
         /// `cancelada`, `sin_comprobar` or `rechazada`.
         motivo: String,
     },
+    /// The licence file could not be read for [`GRACIA_ILEGIBLE_MS`]: no protection until a
+    /// reading works again.
+    Ilegible {
+        /// When protection stopped, Unix ms.
+        desde: i64,
+    },
 }
 
 impl Estado {
@@ -97,7 +114,9 @@ impl Estado {
     pub const fn protege(&self) -> bool {
         !matches!(
             self,
-            Self::PruebaTerminada { .. } | Self::SuscripcionTerminada { .. }
+            Self::PruebaTerminada { .. }
+                | Self::SuscripcionTerminada { .. }
+                | Self::Ilegible { .. }
         )
     }
 
@@ -144,6 +163,7 @@ impl Estado {
             Self::Suscrita { .. } => "suscrita",
             Self::PruebaTerminada { .. } => "prueba_terminada",
             Self::SuscripcionTerminada { .. } => "suscripcion_terminada",
+            Self::Ilegible { .. } => "ilegible",
         }
     }
 }
@@ -224,6 +244,16 @@ impl Lugar {
     #[must_use]
     pub fn nuevo(datos: &Path, ancla: PathBuf) -> Self {
         lic::ancla::usar_carpeta(Some(ancla.clone()));
+        Self {
+            db: datos.join(ARCHIVO),
+            ancla,
+        }
+    }
+
+    /// The same place without setting the process's mark folder, for tests that never read the
+    /// marks (one test at a time may own that folder).
+    #[cfg(test)]
+    pub(crate) fn sin_marca(datos: &Path, ancla: PathBuf) -> Self {
         Self {
             db: datos.join(ARCHIVO),
             ancla,
@@ -436,5 +466,28 @@ mod tests {
             "sin saber, el navegador funciona"
         );
         assert_eq!(Fallo::Limite.clave().0, "licencia_err_limite");
+    }
+
+    /// A folder where the licence file should be: nothing can be read (and nothing is sent), and
+    /// the state that follows a day of that does not protect.
+    #[test]
+    fn a_licence_file_that_cannot_be_read_gives_no_state() {
+        let base =
+            std::env::temp_dir().join(format!("zero-licencia-ilegible-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let datos = base.join("datos");
+        std::fs::create_dir_all(datos.join(ARCHIVO)).unwrap();
+        let lugar = Lugar::sin_marca(&datos, base.join("marca"));
+        let t0 = 1_791_000_000_000;
+        assert_eq!(lugar.estado(t0), None);
+        assert_eq!(lugar.comprobar(t0), None);
+        assert_eq!(lugar.activar("ABC-123", t0), Err(Fallo::Disco));
+        assert!(lugar.conexiones().is_empty());
+        let e = Estado::Ilegible {
+            desde: t0 + GRACIA_ILEGIBLE_MS,
+        };
+        assert!(!e.protege());
+        assert_eq!(e.nombre(), "ilegible");
+        let _ = std::fs::remove_dir_all(&base);
     }
 }

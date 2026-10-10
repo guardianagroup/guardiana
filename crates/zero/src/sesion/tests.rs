@@ -1293,6 +1293,97 @@ fn a_mandate_open_when_the_trial_ends_is_closed() {
     assert!(o.iter().any(|x| matches!(x, Orden::CierraPestana { .. })));
 }
 
+/// A licence file that cannot be read (here a folder in its place) neither turns the trial into
+/// a free browser for ever nor goes unsaid: the bar and the panel say it at once, the browser
+/// protects for a day from the start, or from the last good reading, and then stops until the
+/// file can be read again (review of 10 Oct 2026).
+#[test]
+fn an_unreadable_licence_protects_for_one_day_and_says_so() {
+    const DIA: u64 = 86_400_000;
+    static AHORA: AtomicU64 = AtomicU64::new(1_791_553_171_000);
+    fn reloj_movil() -> i64 {
+        i64::try_from(AHORA.load(Ordering::SeqCst)).unwrap_or(0)
+    }
+    let tracker = "https://stats.g.doubleclick.net/g/collect";
+    let d = carpeta();
+    let datos = d.join("datos");
+    fs::create_dir_all(datos.join(crate::licencia::ARCHIVO)).unwrap_or_default();
+    let (mut s, _) = Sesion::abre(Arranque {
+        datos: datos.clone(),
+        descargas: d.join("descargas"),
+        idioma_sistema: "es".into(),
+        version: "0.1.0".into(),
+        reloj: reloj_movil,
+    });
+    let o = s.pon_lugar_licencia(LugarLicencia::sin_marca(&datos, d.join("marca")));
+    for a in [Origen::Barra, Origen::Panel] {
+        let l = del_tipo(&o, a, "licencia").unwrap_or_default();
+        assert_eq!(l["estado"], "desconocido");
+        assert_eq!(l["ilegible"], true, "{a:?}");
+        assert_eq!(l["protege"], true);
+        assert!(l["donde_datos"]
+            .as_str()
+            .unwrap_or_default()
+            .ends_with(crate::licencia::ARCHIVO));
+    }
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"bienvenida","cortar":true}"#,
+    );
+    let id = s.activa();
+    let _ = abre_pagina(&mut s, id, "https://www.eltiempo.com/");
+    assert!(s.peticion(id, tracker, "GET", b"", 3).cortar);
+
+    // A minute short of the day: still protecting, nothing new to say.
+    AHORA.fetch_add(DIA - 60_000, Ordering::SeqCst);
+    let o = s.tic();
+    assert!(s.protege());
+    assert!(del_tipo(&o, Origen::Barra, "licencia").is_none());
+    // The day is over: no protection, and the bar and the panel say why.
+    AHORA.fetch_add(60_000, Ordering::SeqCst);
+    let o = s.tic();
+    assert!(!s.protege());
+    assert!(o.contains(&Orden::Seguimiento { estricto: false }));
+    let l = del_tipo(&o, Origen::Barra, "licencia").unwrap_or_default();
+    assert_eq!(l["estado"], "ilegible");
+    assert_eq!(l["protege"], false);
+    assert!(!s.peticion(id, tracker, "GET", b"", 3).cortar);
+    // The paid tools open the subscription view, without saying that a trial ended.
+    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"tachar","texto":"hola"}"#);
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "vista").unwrap_or_default()["vista"],
+        "licencia"
+    );
+    assert!(del_tipo(&o, Origen::Panel, "aviso").is_none());
+    // Read again (as the shell's check does): protection is back, and the notice goes.
+    let o = s.pon_licencia(EstadoLicencia::Prueba {
+        termina: reloj_movil() + 3 * 86_400_000,
+        dias: 3,
+    });
+    assert!(s.protege());
+    let l = del_tipo(&o, Origen::Barra, "licencia").unwrap_or_default();
+    assert_eq!(
+        (l["estado"].as_str(), l["ilegible"].as_bool()),
+        (Some("prueba"), Some(false))
+    );
+    assert!(s.peticion(id, tracker, "GET", b"", 3).cortar);
+    // Unreadable again: the day counts from that good reading.
+    AHORA.fetch_add(60_000, Ordering::SeqCst);
+    let o = s.tic();
+    let l = del_tipo(&o, Origen::Barra, "licencia").unwrap_or_default();
+    assert_eq!(
+        (l["estado"].as_str(), l["ilegible"].as_bool()),
+        (Some("prueba"), Some(true))
+    );
+    AHORA.fetch_add(DIA - 120_000, Ordering::SeqCst);
+    let _ = s.tic();
+    assert!(s.protege());
+    AHORA.fetch_add(60_000, Ordering::SeqCst);
+    let _ = s.tic();
+    assert!(!s.protege());
+}
+
 #[test]
 fn the_list_of_cuts_has_a_way_back_to_the_page_the_person_was_on() {
     let (mut s, _, web) = con_pagina(true);

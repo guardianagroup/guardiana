@@ -406,7 +406,8 @@ pub struct Sesion {
     trabajadores: bool,
     /// Cuts not yet written to the day's file.
     cortes_pend: Vec<Corte>,
-    /// The subscription. Unknown until the shell gives the place it lives in: the browser works.
+    /// The subscription. Unknown until the shell gives the place it lives in: the browser works
+    /// (for at most a day if the place cannot be read).
     licencia: EstadoLicencia,
     /// Where the subscription lives (`None` in tests that do not need it).
     lugar: Option<LugarLicencia>,
@@ -417,6 +418,11 @@ pub struct Sesion {
     /// When the state was last read from disk, and when the periodic check was last asked for.
     licencia_leida: i64,
     licencia_pedida: i64,
+    /// When the licence was last read well, or the session started: the day of grace for a file
+    /// that cannot be read counts from here.
+    licencia_ok: i64,
+    /// The last reading of the licence file failed (said in the bar and the panel).
+    licencia_ilegible: bool,
 }
 
 fn lee<T: DeserializeOwned + Default>(ruta: &Path) -> T {
@@ -586,10 +592,13 @@ impl Sesion {
             licencia_error: None,
             licencia_leida: 0,
             licencia_pedida: 0,
+            licencia_ok: 0,
+            licencia_ilegible: false,
         };
         s.dia_visto = s.hoy();
         s.poda_cortes();
         s.ultimo_guardado = (s.reloj)();
+        s.licencia_ok = s.ultimo_guardado;
         let o = s.nueva_pestana(Perfil::General, INICIO);
         (s, o)
     }
@@ -622,7 +631,8 @@ impl Sesion {
     }
 
     /// Whether the browser does its own work now: the trial or a subscription is on (or not known
-    /// yet). Without either it still opens pages, and does nothing else (decided 9 Oct 2026).
+    /// yet, for at most a day). Without either it still opens pages, and does nothing else
+    /// (decided 9 Oct 2026).
     #[must_use]
     pub const fn protege(&self) -> bool {
         self.licencia.protege()
@@ -634,13 +644,47 @@ impl Sesion {
         let estado = lugar.estado(ahora);
         self.lugar = Some(lugar);
         self.licencia_leida = ahora;
-        estado.map(|e| self.pon_licencia(e)).unwrap_or_default()
+        match estado {
+            Some(e) => self.pon_licencia(e),
+            None => self.licencia_sin_leer(ahora),
+        }
     }
 
-    /// The subscription's state, read again or after a check. When protection goes off, an
-    /// open mandate ends (its sites are no longer enforced) and the engine's own tracking
-    /// prevention goes back to its default.
+    /// The subscription's state, read again or after a check: the file was read well.
     pub fn pon_licencia(&mut self, e: EstadoLicencia) -> Vec<Orden> {
+        let volvio = std::mem::take(&mut self.licencia_ilegible);
+        self.licencia_ok = (self.reloj)();
+        let o = self.cambia_licencia(e);
+        if volvio && o.is_empty() {
+            // Same state as before the file stopped being readable: only the notice goes.
+            return self.avisa_licencia();
+        }
+        o
+    }
+
+    /// The licence file could not be read. For a day from the start, or from the last good
+    /// reading, the browser keeps what it knew and the bar and the panel say so; after that it
+    /// stops protecting until a reading works again.
+    fn licencia_sin_leer(&mut self, ahora: i64) -> Vec<Orden> {
+        let ya = std::mem::replace(&mut self.licencia_ilegible, true);
+        let fin = self.licencia_ok + crate::licencia::GRACIA_ILEGIBLE_MS;
+        if ahora >= fin {
+            if matches!(self.licencia, EstadoLicencia::Ilegible { .. }) {
+                return Vec::new();
+            }
+            return self.cambia_licencia(EstadoLicencia::Ilegible { desde: fin });
+        }
+        if ya {
+            Vec::new()
+        } else {
+            self.avisa_licencia()
+        }
+    }
+
+    /// A new state for the subscription. When protection goes off, an open mandate ends (its
+    /// sites are no longer enforced) and the engine's own tracking prevention goes back to its
+    /// default.
+    fn cambia_licencia(&mut self, e: EstadoLicencia) -> Vec<Orden> {
         if e == self.licencia {
             return Vec::new();
         }
@@ -693,9 +737,11 @@ impl Sesion {
             "ocupada": self.licencia_ocupada,
             "error": self.licencia_error,
             "comprar": self.t("licencia_comprar_url"),
+            "ilegible": self.licencia_ilegible,
         });
         match &self.licencia {
             EstadoLicencia::Desconocido => {}
+            EstadoLicencia::Ilegible { desde } => m["desde"] = json!(desde),
             EstadoLicencia::Prueba { termina, dias } => {
                 m["termina"] = json!(termina);
                 m["dias"] = json!(dias);
@@ -1455,7 +1501,10 @@ impl Sesion {
         );
         if de_pago && !self.licencia.protege() {
             let mut o = self.abre_panel("licencia");
-            o.push(self.aviso("licencia_hace_falta", &[]));
+            // An unreadable file is not an ended trial: the panel says what happened.
+            if !matches!(self.licencia, EstadoLicencia::Ilegible { .. }) {
+                o.push(self.aviso("licencia_hace_falta", &[]));
+            }
             return o;
         }
         match tipo {
@@ -3040,11 +3089,13 @@ impl Sesion {
         let mut o = Vec::new();
         // The subscription: read again every minute (the trial ends at a time of day, not at a
         // start), and the periodic check asked for every ten minutes; it connects only when due,
-        // and at most once an hour.
+        // and at most once an hour. A file that cannot be read gets a day, said on screen.
         if ahora - self.licencia_leida >= 60_000 {
             self.licencia_leida = ahora;
-            if let Some(e) = self.lugar.as_ref().and_then(|l| l.estado(ahora)) {
-                o.extend(self.pon_licencia(e));
+            match self.lugar.as_ref().map(|l| l.estado(ahora)) {
+                Some(Some(e)) => o.extend(self.pon_licencia(e)),
+                Some(None) => o.extend(self.licencia_sin_leer(ahora)),
+                None => {}
             }
         }
         if self.lugar.is_some() && ahora - self.licencia_pedida >= 600_000 {

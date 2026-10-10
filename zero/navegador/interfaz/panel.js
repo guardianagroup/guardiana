@@ -399,22 +399,32 @@
       case 'suscrita': return t('licencia_suscrita', { fecha: fecha(m.desde) });
       case 'prueba_terminada': return t('licencia_prueba_terminada', { fecha: fecha(m.desde) });
       case 'suscripcion_terminada': return t('licencia_terminada_' + (m.motivo || 'cancelada'), { fecha: fecha(m.desde) });
+      case 'ilegible': return t('licencia_ilegible_fin', { datos: m.donde_datos || '' });
       default: return '';
     }
+  }
+  // The short form, where there is room for one line only.
+  function pastillaLicencia(m) {
+    if (m.estado === 'prueba_terminada') return t('licencia_pastilla_terminada');
+    if (m.estado === 'ilegible') return t('licencia_pastilla_ilegible_fin');
+    return t('licencia_pastilla_sin_suscripcion');
   }
   function pintaLicencia(m) {
     lic = m;
     const terminada = m.protege === false;
     const suscrita = m.estado === 'suscrita';
+    // The licence file cannot be read right now: said first, above what was last known.
+    const sinLeer = !terminada && m.ilegible ? t('licencia_ilegible', { datos: m.donde_datos || '' }) : '';
     const caja = $('l-caja');
     caja.classList.toggle('sin-proteccion', terminada);
-    caja.classList.toggle('prueba', m.estado === 'prueba');
-    caja.classList.toggle('oculto', m.estado === 'desconocido');
+    caja.classList.toggle('prueba', m.estado === 'prueba' || !!sinLeer);
+    caja.classList.toggle('oculto', m.estado === 'desconocido' && !sinLeer);
     // The end-of-trial text says everything itself; the others get their detail below.
-    $('l-estado').textContent = terminada ? '' : lineaLicencia(m);
+    $('l-estado').textContent = terminada ? '' : (sinLeer || lineaLicencia(m));
     $('l-estado').classList.toggle('oculto', terminada);
     let detalle = '';
     if (terminada) detalle = lineaLicencia(m);
+    else if (sinLeer) detalle = lineaLicencia(m);
     else if (m.estado === 'prueba') detalle = t('licencia_al_terminar');
     else if (suscrita) {
       const partes = [];
@@ -442,7 +452,7 @@
     $('e-proteccion').disabled = terminada;
     $('a-proteccion').disabled = terminada;
     $('a-cookies').disabled = terminada;
-    $('a-licencia').textContent = terminada ? t(m.estado === 'prueba_terminada' ? 'licencia_pastilla_terminada' : 'licencia_pastilla_sin_suscripcion') : lineaLicencia(m);
+    $('a-licencia').textContent = terminada ? pastillaLicencia(m) : (m.ilegible ? t('licencia_pastilla_ilegible') : lineaLicencia(m));
   }
   en('licencia', pintaLicencia);
   $('l-comprar').addEventListener('click', () => manda({ tipo: 'licencia_comprar' }));

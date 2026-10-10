@@ -2,7 +2,7 @@
 // from the program (the browser's own log on this computer); nothing here talks to the network.
 'use strict';
 (() => {
-  const { manda, en, t, esc, $, n } = Z;
+  const { manda, en, t, tn, esc, $, n } = Z;
   const COLOR_CAT = { rastreador: 'rojo', publicidad: 'ambar', telemetria: 'ambar', esperado: 'verde', desconocido: '' };
   let periodo = 'hoy';
   let datos = null;
@@ -46,7 +46,7 @@
     const top = lista.slice(0, 12);
     const resto = lista.slice(12).reduce((a, x) => a + x.n, 0);
     const li = top.map((x) => `<li><span class="nombre">${esc(x.quien)}${x.pais ? `<small>${esc(nombrePais(x.pais))}</small>` : ''}</span><span class="n">${n(x.n)}</span><span class="barra"><i style="width:${Math.max(2, Math.round(100 * x.n / max))}%"></i></span></li>`);
-    if (resto) li.push(`<li><span class="nombre"><small>${esc(t('cortes_otras', { n: n(lista.length - 12) }))}</small></span><span class="n">${n(resto)}</span></li>`);
+    if (resto) li.push(`<li><span class="nombre"><small>${esc(tn('cortes_otras', lista.length - 12, { n: n(lista.length - 12) }))}</small></span><span class="n">${n(resto)}</span></li>`);
     return li.join('');
   }
   const simple = (lista, nombre) => lista.slice(0, 10).map((x) => `<li><span>${esc(nombre(x))}</span><span class="n">${n(x.n)}</span></li>`).join('');
@@ -95,7 +95,7 @@
     partes.push(`<p>${esc(c.motivo ? t('motivo_' + c.motivo) : '')} · ${esc(c.metodo)}</p>`);
     partes.push(`<p>${esc(c.aislada ? t('cortes_det_aislada') : t('cortes_det_web', { pagina: c.pagina }))}</p>`);
     if (c.mandato) partes.push(`<p>${esc(t('cortes_det_mandato'))}</p>`);
-    if (c.parametros) partes.push(`<p>${esc(t('cortes_det_parametros', { n: n(c.parametros) }))}</p>`);
+    if (c.parametros) partes.push(`<p>${esc(tn('cortes_det_parametros', c.parametros, { n: n(c.parametros) }))}</p>`);
     if (c.dato) partes.push(`<p>${esc(t('cortes_det_dato', { dato: t(c.dato).toLowerCase(), como: t('como_' + (c.como || 'tal_cual')) }))}</p>`);
     if (c.corredor) {
       partes.push(`<p>${esc(t('cortes_det_corredor', { empresa: c.corredor }))}</p>`);
