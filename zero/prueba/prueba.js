@@ -226,6 +226,7 @@ function pantalla(nombre) {
   // From the shield, too. Already on the list: it stays, no second copy.
   await barra.click('#b-escudo');
   await hasta(() => panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa')));
+  comprueba(await hasta(async () => /empresas? de fuera/.test(await panel.textContent('#e-dia-frase'))), `el escudo enseña también el día entero (${await panel.textContent('#e-dia-frase')})`);
   await panel.click('#e-ver-todo');
   await espera(1000);
   comprueba((await barra.locator('.pestana').count()) === 2, 'desde la lista, «ver todo» no abre otra copia');

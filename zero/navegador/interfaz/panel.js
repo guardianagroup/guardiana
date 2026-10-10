@@ -44,7 +44,23 @@
     return li;
   }
   let sitioEscudo = null;
+  // Today, across the whole browser, at the top of the shield: refreshed while it is open.
+  en('hoy', (m) => {
+    const h = m.hoy || {};
+    $('e-dia').classList.toggle('apagada', !m.cortando);
+    $('e-dia-frase').innerHTML = h.empresas
+      ? `${esc(tn('escudo_dia_frase', h.empresas, { empresas: n(h.empresas) }))} <b>${esc(tn('escudo_dia_cortadas', h.empresas_cortadas, { cortadas: n(h.empresas_cortadas) }))}</b>`
+      : esc(t('escudo_dia_cero'));
+    $('e-dia-barra').style.width = h.empresas ? `${Math.round((100 * (h.empresas_cortadas || 0)) / h.empresas)}%` : '0';
+    $('e-dia-cortadas').textContent = n(h.cortadas);
+    $('e-dia-datos').textContent = n(h.datos_salvados);
+    $('e-dia-parametros').textContent = n(h.parametros_quitados);
+    $('e-dia-corredores').textContent = n(h.corredores);
+  });
+  $('e-dia-ver').addEventListener('click', () => manda({ tipo: 'abrir_cortes' }));
   en('escudo', (m) => {
+    // On the browser's own pages there is no page to speak of: only the day.
+    $('e-pagina-cab').classList.toggle('oculto', !m.sitio);
     if (m.sitio !== sitioEscudo) { sitioEscudo = m.sitio; $('e-recarga').classList.add('oculto'); }
     $('e-sitio').textContent = m.sitio || '';
     const r = m.resumen || {};

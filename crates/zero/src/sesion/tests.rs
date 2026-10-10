@@ -1281,3 +1281,14 @@ fn update_check_runs_once_and_says_what_it_found() {
         )
         .is_empty());
 }
+
+#[test]
+fn the_shield_shows_the_whole_day_above_the_page() {
+    let (mut s, _, _) = con_pagina(true);
+    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":"escudo"}"#);
+    let hoy = del_tipo(&o, Origen::Panel, "hoy").unwrap_or_default();
+    assert!(
+        hoy["hoy"].is_object(),
+        "el panel recibe las cifras del día al abrir el escudo"
+    );
+}

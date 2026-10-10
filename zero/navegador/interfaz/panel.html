@@ -23,6 +23,25 @@ p { margin: 0 0 10px; }
 .fila-acciones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 
 /* Shield ------------------------------------------------------------------------------------- */
+/* Today, across the whole browser: the same figures as the new tab, one click from any page. */
+.dia { border: 1px solid var(--linea); border-radius: 14px; padding: 14px 16px 12px; margin: 0 0 18px; background: var(--hoja); }
+.dia-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 8px; }
+.dia-cab h2 { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 12.5px; font-weight: 600; color: var(--gris); }
+.dia-cab .enlace { font-size: 12.5px; }
+.dia-cab .enlace::after { content: ' →'; }
+.dia .pulso { width: 7px; height: 7px; border-radius: 50%; background: var(--verde); animation: late 2s infinite; }
+.dia.apagada .pulso { background: var(--ambar); animation: none; }
+@keyframes late { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--verde) 45%, transparent); } 50% { box-shadow: 0 0 0 5px transparent; } }
+@media (prefers-reduced-motion: reduce) { .dia .pulso { animation: none; } }
+.dia-frase { margin: 0 0 10px; font-size: 14px; line-height: 1.4; }
+.dia-frase b { font-weight: 600; color: var(--rojo); }
+.dia-barra { height: 6px; border-radius: 3px; background: var(--campo); overflow: hidden; }
+.dia-barra i { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--rojo); transition: width .6s ease; }
+.dia-cifras { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; }
+.dia-cifras div { font-size: 11px; line-height: 1.25; color: var(--gris); }
+.dia-cifras b { display: block; font: 600 17px/1.1 var(--display); color: var(--tinta); margin-bottom: 3px; font-variant-numeric: tabular-nums; }
+.dia-cifras .rojo b { color: var(--rojo); }
+.pagina-cab { margin: 0 0 4px; font-size: 12.5px; font-weight: 600; color: var(--gris); }
 .sitio { font: 600 17px/1.25 var(--display); letter-spacing: -.01em; word-break: break-all; margin: 2px 0 8px; }
 .resumen { font-size: 14px; color: var(--tinta); margin-bottom: 14px; }
 .ajuste { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: var(--campo); }
@@ -123,6 +142,18 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
 
 <section class="vista" id="v-escudo" data-titulo="escudo_titulo">
   <div class="tarjeta sin-proteccion oculto" id="e-licencia" style="margin:0 0 14px"><p class="pequeno" id="e-licencia-txt" style="margin:0"></p><div class="fila-acciones"><button class="boton principal chico" id="e-licencia-ver" data-t="licencia_ver"></button></div></div>
+  <section class="dia" id="e-dia">
+    <div class="dia-cab"><h2><i class="pulso"></i><span data-t="escudo_dia"></span></h2><button class="enlace" id="e-dia-ver" data-t="inicio_ver_todo"></button></div>
+    <p class="dia-frase" id="e-dia-frase"></p>
+    <div class="dia-barra"><i id="e-dia-barra"></i></div>
+    <div class="dia-cifras">
+      <div class="rojo"><b id="e-dia-cortadas">0</b><span data-t="inicio_peticiones"></span></div>
+      <div><b id="e-dia-datos">0</b><span data-t="escudo_dia_datos"></span></div>
+      <div><b id="e-dia-parametros">0</b><span data-t="escudo_dia_etiquetas"></span></div>
+      <div><b id="e-dia-corredores">0</b><span data-t="escudo_dia_corredores"></span></div>
+    </div>
+  </section>
+  <p class="pagina-cab" id="e-pagina-cab" data-t="escudo_esta_pagina"></p>
   <div class="sitio" id="e-sitio"></div>
   <p class="resumen" id="e-resumen"></p>
   <div class="ajuste">

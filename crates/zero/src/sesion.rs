@@ -652,7 +652,7 @@ impl Sesion {
                 estricto: self.seguimiento_estricto(),
             });
             o.extend(self.escudo_activa(true));
-            o.extend(self.a_paginas_propias(&self.msg_hoy()));
+            o.extend(self.hoy_a_todos());
         }
         o.extend(self.avisa_licencia());
         o
@@ -1178,6 +1178,16 @@ impl Sesion {
             .map(|_| envia(Origen::Pestana(id), v))
     }
 
+    /// Today's figures for the browser's own pages and for the side panel, whose shield shows
+    /// the whole day above the page's own (the owner, 10 Oct 2026: the summary one click away
+    /// from any web page, without opening a new tab).
+    fn hoy_a_todos(&self) -> Vec<Orden> {
+        let hoy = self.msg_hoy();
+        let mut o = self.a_paginas_propias(&hoy);
+        o.push(envia(Origen::Panel, &hoy));
+        o
+    }
+
     fn a_paginas_propias(&self, v: &Value) -> Vec<Orden> {
         self.pestanas
             .iter()
@@ -1309,7 +1319,10 @@ impl Sesion {
             envia(Origen::Panel, &json!({ "tipo": "vista", "vista": vista })),
         ];
         match vista {
-            "escudo" => o.extend(self.escudo_activa(true)),
+            "escudo" => {
+                o.extend(self.escudo_activa(true));
+                o.push(envia(Origen::Panel, &self.msg_hoy()));
+            }
             "mandato" => o.push(envia(Origen::Panel, &self.msg_mandato())),
             "datos" => {
                 o.push(envia(Origen::Panel, &self.msg_tinta()));
@@ -1570,7 +1583,7 @@ impl Sesion {
                 }];
                 o.extend(self.cierra_panel());
                 o.extend(self.escudo_activa(false));
-                o.extend(self.a_paginas_propias(&self.msg_hoy()));
+                o.extend(self.hoy_a_todos());
                 o
             }
             "borrar_todo" => self.borrar_todo(),
@@ -1610,6 +1623,7 @@ impl Sesion {
                     envia(Origen::Panel, &self.msg_tema()),
                     envia(Origen::Panel, &self.msg_textos()),
                     envia(Origen::Panel, &self.msg_ajustes()),
+                    envia(Origen::Panel, &self.msg_hoy()),
                     envia(Origen::Panel, &self.msg_acerca()),
                     envia(Origen::Panel, &self.msg_tinta()),
                     envia(Origen::Panel, &self.msg_libro()),
@@ -1657,7 +1671,7 @@ impl Sesion {
                     envia(Origen::Panel, &self.msg_ajustes()),
                 ];
                 o.extend(self.escudo_activa(false));
-                o.extend(self.a_paginas_propias(&self.msg_hoy()));
+                o.extend(self.hoy_a_todos());
                 o
             }
             "buscador" => {
@@ -1667,7 +1681,7 @@ impl Sesion {
                     self.guarda_prefs();
                 }
                 let mut o = vec![envia(Origen::Panel, &self.msg_ajustes())];
-                o.extend(self.a_paginas_propias(&self.msg_hoy()));
+                o.extend(self.hoy_a_todos());
                 o
             }
             "rechazar_cookies" => {
@@ -1727,7 +1741,7 @@ impl Sesion {
                 }
                 o.extend(self.escudo_activa(false));
                 o.extend(self.a_paginas_propias(&textos));
-                o.extend(self.a_paginas_propias(&self.msg_hoy()));
+                o.extend(self.hoy_a_todos());
                 o
             }
             _ => Vec::new(),
@@ -2918,7 +2932,7 @@ impl Sesion {
         if self.hoy_sucio && ahora - self.ultimo_hoy >= 1000 {
             self.hoy_sucio = false;
             self.ultimo_hoy = ahora;
-            o.extend(self.a_paginas_propias(&self.msg_hoy()));
+            o.extend(self.hoy_a_todos());
         }
         if ahora - self.ultimo_guardado >= 15_000 {
             self.ultimo_guardado = ahora;
