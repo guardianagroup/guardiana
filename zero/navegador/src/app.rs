@@ -1544,14 +1544,35 @@ pub fn arranca() {
         // The handle stays open for the life of the process: that is what marks it as running.
         let _mutex = CreateMutexW(None, true, nombre_mutex.p());
         if GetLastError() == ERROR_ALREADY_EXISTS {
-            if let Ok(otra) = FindWindowW(CLASE, PCWSTR::null()) {
-                if IsIconic(otra).as_bool() {
-                    let _ = ShowWindow(otra, SW_RESTORE);
+            // The first one may still be opening its window: give it a few seconds. A copy that
+            // runs with no window at all used to make every new start end in silence (the
+            // owner, 10 Oct 2026: «no se me abre el navegador»); now the person is told.
+            let mut otra = FindWindowW(CLASE, PCWSTR::null());
+            for _ in 0..20 {
+                if otra.is_ok() {
+                    break;
                 }
-                let _ = SetForegroundWindow(otra);
+                std::thread::sleep(std::time::Duration::from_millis(250));
+                otra = FindWindowW(CLASE, PCWSTR::null());
+            }
+            match otra {
+                Ok(otra) => {
+                    if IsIconic(otra).as_bool() {
+                        let _ = ShowWindow(otra, SW_RESTORE);
+                    }
+                    let _ = SetForegroundWindow(otra);
+                }
+                Err(_) => {
+                    registra("arranque", &"otra copia en marcha sin ventana");
+                    aviso(&textos, "error_ya_abierto_titulo", "error_ya_abierto");
+                }
             }
             return;
         }
+        registra(
+            "arranque",
+            &format!("GUARDIANA ZERO {}", env!("CARGO_PKG_VERSION")),
+        );
     }
 
     // The engine must be on the system (Windows 10 and 11 bring it; Windows Update keeps it).

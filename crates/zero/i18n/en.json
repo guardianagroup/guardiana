@@ -246,6 +246,8 @@
   "motor_falta": "GUARDIANA ZERO uses WebView2, the web engine Microsoft installs and updates with Windows. It is not on this computer. When you close this message, Microsoft’s page to install it opens; then open GUARDIANA ZERO again.",
   "error_arranque_titulo": "GUARDIANA ZERO could not open",
   "error_arranque": "Something failed while opening the window. Try again; if it happens again, the file registro.txt in GUARDIANA ZERO’s data folder says what failed.",
+  "error_ya_abierto_titulo": "GUARDIANA ZERO is already running",
+  "error_ya_abierto": "Another copy of GUARDIANA ZERO is running, but with no window. Close it in Task Manager (Ctrl+Shift+Esc, “guardiana-zero”) or restart the computer, and open it again.",
   "mandato_duracion": "How long the permission lasts",
   "mandato_min_15": "15 minutes",
   "mandato_min_30": "30 minutes",

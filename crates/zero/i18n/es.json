@@ -246,6 +246,8 @@
   "motor_falta": "GUARDIANA ZERO usa WebView2, el motor web que Microsoft instala y actualiza con Windows. En este equipo no está. Al cerrar este aviso se abre la página de Microsoft para instalarlo; después, vuelve a abrir GUARDIANA ZERO.",
   "error_arranque_titulo": "GUARDIANA ZERO no pudo abrirse",
   "error_arranque": "Algo falló al abrir la ventana. Vuelve a intentarlo; si se repite, el archivo registro.txt de la carpeta de datos de GUARDIANA ZERO dice qué falló.",
+  "error_ya_abierto_titulo": "GUARDIANA ZERO ya está en marcha",
+  "error_ya_abierto": "Hay otra copia de GUARDIANA ZERO abierta, pero sin ventana. Ciérrala en el Administrador de tareas (Ctrl+Mayús+Esc, «guardiana-zero») o reinicia el equipo, y vuelve a abrirlo.",
   "mandato_duracion": "Duración del permiso",
   "mandato_min_15": "15 minutos",
   "mandato_min_30": "30 minutos",

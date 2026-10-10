@@ -246,6 +246,8 @@
   "motor_falta": "O GUARDIANA ZERO usa o WebView2, o motor web que a Microsoft instala e atualiza com o Windows. Ele não está neste computador. Ao fechar este aviso, abre-se a página da Microsoft para instalá-lo; depois, abra de novo o GUARDIANA ZERO.",
   "error_arranque_titulo": "O GUARDIANA ZERO não conseguiu abrir",
   "error_arranque": "Algo falhou ao abrir a janela. Tente de novo; se acontecer outra vez, o arquivo registro.txt na pasta de dados do GUARDIANA ZERO diz o que falhou.",
+  "error_ya_abierto_titulo": "O GUARDIANA ZERO já está em execução",
+  "error_ya_abierto": "Há outra cópia do GUARDIANA ZERO aberta, mas sem janela. Feche-a no Gerenciador de Tarefas (Ctrl+Shift+Esc, «guardiana-zero») ou reinicie o computador, e abra de novo.",
   "mandato_duracion": "Duração da permissão",
   "mandato_min_15": "15 minutos",
   "mandato_min_30": "30 minutos",
