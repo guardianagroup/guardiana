@@ -141,6 +141,9 @@ pub struct Resumen {
     pub parametros_quitados: u32,
     /// Marked values cut on their way out.
     pub datos_salvados: u32,
+    /// Cookie notices answered «no» (or hidden without accepting anything).
+    #[serde(default)]
+    pub avisos_cookies: u32,
 }
 
 /// The days the browser was used, each with its totals: what the home page and «your month in
@@ -168,6 +171,9 @@ pub struct Dia {
     pub datos_salvados: u32,
     /// Pages opened.
     pub paginas: u32,
+    /// Cookie notices answered «no» (or hidden without accepting anything), one per page.
+    #[serde(default)]
+    pub avisos_cookies: u32,
     /// The sites the person had open (never in an isolated tab): how many webs the day had.
     /// Kept only for the last [`DIAS_WEBS`] days.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
@@ -328,6 +334,7 @@ impl Diario {
             r.cortadas += d.cortadas;
             r.parametros_quitados += d.parametros_quitados;
             r.datos_salvados += d.datos_salvados;
+            r.avisos_cookies += d.avisos_cookies;
         }
         r.terceros = sitios.len() as u32;
         r.empresas = empresas.len() as u32;

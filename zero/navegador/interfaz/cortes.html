@@ -29,6 +29,15 @@ h1 { font: 600 clamp(26px, 3.2vw, 38px)/1.1 var(--display); letter-spacing: -.02
 .cifra b { display: block; font: 600 34px/1 var(--display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .cifra.roja b { color: var(--rojo); }
 .cifra span { display: block; margin-top: 8px; font-size: 13px; color: var(--gris); }
+.cifras.segunda { border-top: 0; margin-top: -28px; }
+.t-resumen { display: none; }
+body.solo-resumen .t-resumen { display: inline; }
+body.solo-resumen .t-normal { display: none; }
+.cifras.segunda .cifra b { font-size: 26px; }
+.rastro-caja { margin-bottom: 14px; }
+.rastro-caja .explica { margin: -6px 0 8px; }
+.rastro-caja .rastro { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
+.rastro-caja .rastro li:nth-child(-n+2) { border-top: 0; }
 
 .resumen { display: grid; grid-template-columns: 1.3fr 1fr; gap: 14px; margin-bottom: 30px; }
 .caja { border: 1px solid var(--linea); border-radius: 14px; background: var(--hoja); padding: 16px 18px; }
@@ -75,7 +84,7 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
 .nota { margin-top: 22px; font-size: 12.5px; color: var(--gris); max-width: 72ch; }
 #aviso { position: fixed; left: 50%; bottom: 18px; transform: translate(-50%, 8px); padding: 10px 16px; border-radius: 10px; background: var(--tinta); color: var(--hoja); font-size: 13px; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
 #aviso.visto { opacity: 1; transform: translate(-50%, 0); }
-@media screen and (max-width: 860px) { .resumen { grid-template-columns: 1fr; } .caja.ancha { grid-row: auto; } .cifras { grid-template-columns: repeat(2, 1fr); } .det { grid-template-columns: 1fr; } }
+@media screen and (max-width: 860px) { .resumen { grid-template-columns: 1fr; } .rastro-caja .rastro { grid-template-columns: 1fr; } .rastro-caja .rastro li:nth-child(2) { border-top: 1px solid var(--linea); } .cifras.segunda { margin-top: -28px; } .caja.ancha { grid-row: auto; } .cifras { grid-template-columns: repeat(2, 1fr); } .det { grid-template-columns: 1fr; } }
 /* Narrow (the side panel open, a small window): each cut is a short card, nothing scrolls sideways. */
 @media screen and (max-width: 760px) {
   main { padding: 20px 16px 48px; }
@@ -111,6 +120,11 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
   body { background: #fff; }
   main { max-width: none; padding: 0; }
   .controles, .filtros, #aviso, .volver { display: none !important; }
+  /* «Resumen en PDF»: the same report without the list of every cut. */
+  body.solo-resumen .lista-cab, body.solo-resumen table, body.solo-resumen #recortada,
+  body.solo-resumen #vacio, body.solo-resumen #informe-filtro { display: none !important; }
+  .rastro-caja { break-inside: avoid; }
+  .rastro .pista i { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .informe { display: block; }
   tr.detalle { display: none !important; }
   tbody tr { break-inside: avoid; }
@@ -136,7 +150,7 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
     <div class="marca"><i></i><b data-t="app_nombre"></b><span data-t="lema"></span></div>
   </div>
   <div class="cabeza">
-    <h1 data-t="cortes_titulo"></h1>
+    <h1><span class="t-normal" data-t="cortes_titulo"></span><span class="t-resumen" data-t="cortes_titulo_resumen"></span></h1>
     <div class="controles">
       <div class="periodos" role="group">
         <button data-periodo="hoy" data-t="cortes_hoy" aria-pressed="true"></button>
@@ -144,7 +158,8 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
         <button data-periodo="mes" data-t="cortes_mes" aria-pressed="false"></button>
         <button data-periodo="31" data-t="cortes_31" data-t-title="cortes_31_titulo" aria-pressed="false"></button>
       </div>
-      <button class="boton" id="pdf" data-t="cortes_pdf"></button>
+      <button class="boton principal" id="pdf-resumen" data-t="cortes_pdf_resumen" data-t-title="cortes_pdf_resumen_titulo"></button>
+      <button class="boton" id="pdf" data-t="cortes_pdf" data-t-title="cortes_pdf_titulo"></button>
       <button class="boton" id="csv" data-t="cortes_csv"></button>
     </div>
   </div>
@@ -156,6 +171,17 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
     <div class="cifra"><b id="c-paises">0</b><span data-t="cortes_n_paises"></span></div>
     <div class="cifra"><b id="c-webs">0</b><span data-t="cortes_n_webs"></span></div>
   </div>
+  <div class="cifras segunda">
+    <div class="cifra"><b id="c-datos">0</b><span data-t="inicio_datos"></span></div>
+    <div class="cifra"><b id="c-etiquetas">0</b><span data-t="inicio_parametros"></span></div>
+    <div class="cifra"><b id="c-corredores">0</b><span data-t="inicio_corredores"></span></div>
+    <div class="cifra"><b id="c-cookies">0</b><span data-t="cortes_n_cookies"></span></div>
+  </div>
+  <section class="caja rastro-caja oculto" id="r-rastro-caja">
+    <h2 data-t="rastro_titulo"></h2>
+    <p class="explica pequeno" data-t="cortes_rastro_explica"></p>
+    <ol class="rastro" id="r-rastro"></ol>
+  </section>
   <div class="resumen" id="resumen">
     <section class="caja ancha"><h2 data-t="cortes_por_empresa"></h2><ul class="barras" id="r-empresas"></ul></section>
     <section class="caja"><h2 data-t="cortes_por_pais"></h2><ul class="lista-simple" id="r-paises"></ul></section>

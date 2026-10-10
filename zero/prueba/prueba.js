@@ -240,6 +240,15 @@ function pantalla(nombre) {
   comprueba(!!pdf && pdf.subarray(0, 5).toString() === '%PDF-' && pdf.length > 5000, `«Guardar PDF» deja el informe en Descargas (${pdf ? pdf.length : 0} bytes)`);
   const csv = await guardado('#csv', 'csv');
   comprueba(!!csv && csv.toString('utf8').includes('Google') && csv.toString('utf8').split('\n').filter(Boolean).length === total + 1, '«Exportar CSV» guarda cada corte en una fila');
+  // The summary: its own PDF, without the list; the list is back on screen afterwards.
+  await cortes.evaluate(() => { document.getElementById('aviso').textContent = ''; });
+  await cortes.click('#pdf-resumen');
+  await hasta(async () => (await cortes.textContent('#aviso')).includes('.pdf'), 30000);
+  const resumenes = fs.readdirSync(descargas).filter((x) => x.startsWith('guardiana-zero-resumen') && x.endsWith('.pdf'));
+  const resumen = resumenes.length ? fs.readFileSync(path.join(descargas, resumenes[0])) : null;
+  if (resumen) fs.copyFileSync(path.join(descargas, resumenes[0]), path.join(salida, 'resumen.pdf'));
+  comprueba(!!resumen && resumen.subarray(0, 5).toString() === '%PDF-' && resumen.length > 3000, `«Resumen en PDF» deja su propio informe en Descargas (${resumen ? resumen.length : 0} bytes)`);
+  comprueba(await cortes.evaluate(() => !document.body.classList.contains('solo-resumen')), 'y la lista vuelve a verse');
   // «Todo» is the whole log the browser keeps.
   await cortes.click('.periodos button[data-periodo="31"]');
   comprueba(await hasta(async () => (await cortes.textContent('.periodos button[data-periodo="31"]')) === 'Todo'), 'el periodo largo se llama «Todo»');

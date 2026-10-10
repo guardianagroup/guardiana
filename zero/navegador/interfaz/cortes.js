@@ -32,6 +32,11 @@
   // Back to the page the person was on: this list opens in its own tab, with nothing behind it.
   $('volver').addEventListener('click', () => manda({ tipo: 'volver' }));
   $('pdf').addEventListener('click', () => manda({ tipo: 'exportar_cortes', periodo, formato: 'pdf' }));
+  // The summary prints this same page without the list; the list comes back once it is saved.
+  $('pdf-resumen').addEventListener('click', () => {
+    document.body.classList.add('solo-resumen');
+    manda({ tipo: 'exportar_cortes', periodo, formato: 'resumen' });
+  });
   $('csv').addEventListener('click', () => manda({ tipo: 'exportar_cortes', periodo, formato: 'csv' }));
   $('f-motivo').addEventListener('change', pintaFilas);
   $('f-texto').addEventListener('input', pintaFilas);
@@ -52,6 +57,12 @@
     $('c-empresas').textContent = n(d.empresas.length);
     $('c-paises').textContent = n(d.paises.filter((x) => x.pais).length);
     $('c-webs').textContent = n(d.paginas.filter((x) => x.pagina).length);
+    const dia = d.dia || {};
+    $('c-datos').textContent = n(dia.datos_salvados);
+    $('c-etiquetas').textContent = n(dia.parametros_quitados);
+    $('c-corredores').textContent = n(dia.corredores);
+    $('c-cookies').textContent = n(dia.avisos_cookies);
+    $('r-rastro-caja').classList.toggle('oculto', !Z.rastro($('r-rastro'), d.rastro));
     $('r-empresas').innerHTML = barras(d.empresas);
     $('r-paises').innerHTML = simple(d.paises, (x) => nombrePais(x.pais));
     $('r-paginas').innerHTML = simple(d.paginas, (x) => x.pagina || t('pestana_aislada'));
@@ -127,6 +138,7 @@
   en('cortes', (m) => { datos = m; pinta(); });
   let avisoTimer = 0;
   en('guardado', (m) => {
+    document.body.classList.remove('solo-resumen');
     const a = $('aviso');
     a.textContent = m.texto || '';
     a.classList.add('visto');

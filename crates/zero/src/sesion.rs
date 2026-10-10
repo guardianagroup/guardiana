@@ -2198,6 +2198,8 @@ impl Sesion {
             "tipo": "cortes", "periodo": periodo, "desde": desde, "hasta": hasta,
             "total": total, "empresas": empresas, "paises": paises, "motivos": motivos,
             "tipos": tipos, "paginas": paginas, "lista": recientes,
+            "dia": self.diario.total(&desde, &hasta),
+            "rastro": self.diario.rastro(&desde, &hasta, 10),
             "recortada": total > cortes::MAX_LISTA,
         });
         self.a_pestana(id, &v).into_iter().collect()
@@ -2206,12 +2208,18 @@ impl Sesion {
     fn exporta_cortes(&mut self, id: u32, periodo: &str, formato: &str) -> Vec<Orden> {
         self.guarda_cortes();
         let (desde, hasta) = self.periodo(periodo);
-        let base = if desde == hasta {
-            format!("guardiana-zero-cortes-{hasta}")
+        // The summary is the same page printed without the list (the page hides it itself).
+        let que = if formato == "resumen" {
+            "resumen"
         } else {
-            format!("guardiana-zero-cortes-{desde}-a-{hasta}")
+            "cortes"
         };
-        if formato == "pdf" {
+        let base = if desde == hasta {
+            format!("guardiana-zero-{que}-{hasta}")
+        } else {
+            format!("guardiana-zero-{que}-{desde}-a-{hasta}")
+        };
+        if formato == "pdf" || formato == "resumen" {
             let ruta = self.nombre_libre(&base, "pdf");
             return vec![Orden::GuardaPdf { id, ruta }];
         }
@@ -2313,10 +2321,17 @@ impl Sesion {
         if gestor.is_empty() || !gestor.chars().all(|c| c.is_alphanumeric() || c == ' ') {
             return Vec::new();
         }
+        let hoy = self.hoy();
         let Some(p) = self.pestana_mut(id) else {
             return Vec::new();
         };
+        let primera = p.escudo.cookies.is_none();
         p.escudo.cookies = Some((gestor, accion.to_string()));
+        if primera {
+            self.diario.dias.entry(hoy).or_default().avisos_cookies += 1;
+            self.diario_sucio = true;
+            self.hoy_sucio = true;
+        }
         if id == self.activa {
             self.escudo_activa(false)
         } else {

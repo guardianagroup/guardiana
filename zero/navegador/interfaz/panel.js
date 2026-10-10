@@ -98,6 +98,37 @@
 
   // --- mandate ---------------------------------------------------------------------------------
   let sitioActual = '';
+  // Ideas to start from: they fill the task and the websites, and the person changes what they
+  // want. The websites are the same everywhere; the task is written in the person's language.
+  const IDEAS = {
+    vuelo: ['google.com', 'skyscanner.com', 'kayak.com'],
+    hotel: ['booking.com', 'airbnb.com', 'google.com'],
+    precios: ['amazon.com', 'ebay.com', 'google.com'],
+    investigar: ['wikipedia.org', 'google.com', 'britannica.com'],
+  };
+  // What the websites box will allow, as the person types: one chip per website.
+  const websDe = (texto) => [...new Set(texto.split(/[\s,;]+/).map((w) => w.trim().toLowerCase()
+    .replace(/^[a-z]+:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0]).filter((w) => /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(w)))];
+  function vistaWebs() {
+    const webs = websDe($('m-webs').value);
+    $('m-webs-vista').innerHTML = webs.length
+      ? `<span class="pequeno gris">${esc(t('mandato_podra'))}</span>` + webs.map((w) => `<span class="chip azul mono">${esc(w)}</span>`).join('')
+      : '';
+  }
+  $('m-webs').addEventListener('input', () => { vistaWebs(); $('m-error').classList.add('oculto'); });
+  document.querySelectorAll('#m-ideas .idea').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('#m-ideas .idea').forEach((x) => x.classList.toggle('elegida', x === b));
+    const idea = b.dataset.idea;
+    if (idea === 'esta') {
+      $('m-tarea').value = t('idea_esta_tarea', { sitio: sitioActual });
+      $('m-webs').value = sitioActual;
+    } else {
+      $('m-tarea').value = t('idea_' + idea + '_tarea');
+      $('m-webs').value = IDEAS[idea].join(', ');
+    }
+    vistaWebs();
+    $('m-tarea').focus();
+  }));
   $('m-empezar').addEventListener('click', () => {
     const webs = $('m-webs').value.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
     $('m-error').classList.toggle('oculto', webs.length > 0);
@@ -114,7 +145,10 @@
     $('m-nuevo').classList.toggle('oculto', estado !== 'ninguno');
     $('m-activo').classList.toggle('oculto', estado !== 'activo');
     $('m-recibo').classList.toggle('oculto', estado !== 'terminado');
-    if (estado === 'ninguno' && !$('m-webs').value && sitioActual) $('m-webs').value = sitioActual;
+    const esta = $('m-idea-esta');
+    esta.classList.toggle('oculto', !sitioActual);
+    esta.textContent = sitioActual ? t('idea_esta', { sitio: sitioActual }) : '';
+    vistaWebs();
     const md = m.mandato;
     const cuentas = m.cuentas ? t('mandato_cuentas', { visitas: n(m.cuentas.visitas), sitios: n(m.cuentas.sitios), cortes: n(m.cuentas.cortes), datos: n(m.cuentas.datos) }) : '';
     if (estado === 'activo' && md) {
@@ -124,6 +158,7 @@
       $('m-senuelo').textContent = md.senuelo;
       $('m-caduca').textContent = md.caduca ? t('mandato_termina', { hora: new Date(md.caduca).toLocaleTimeString(document.documentElement.lang, { hour: '2-digit', minute: '2-digit' }) }) : '';
       const pasos = (md.pasos || []).slice(-40).reverse();
+      $('m-pasos-vacio').classList.toggle('oculto', pasos.length > 0);
       $('m-pasos').innerHTML = pasos.map((p) => `<li><time>${esc(hora(p.ts))}</time><span class="que ${esc(p.que)}">${esc(t('mandato_paso_' + p.que))}</span><span class="mono">${esc(p.sitio)}</span>`
         + (p.que === 'cortado' && !md.permitidos.includes(p.sitio) ? `<button class="boton chico deja" data-sitio="${esc(p.sitio)}">${esc(t('mandato_anadir_corto'))}</button>` : '<span></span>') + '</li>').join('');
       $('m-pasos').querySelectorAll('button[data-sitio]').forEach((b) => {
@@ -143,8 +178,18 @@
   // --- redaction --------------------------------------------------------------------------------
   let tachado = null;
   $('t-tachar').addEventListener('click', () => manda({ tipo: 'tachar', texto: $('t-texto').value }));
+  // What the AI will receive appears as the person writes: no button to find first.
+  let tacharTimer = 0;
+  $('t-texto').addEventListener('input', () => {
+    clearTimeout(tacharTimer);
+    tacharTimer = setTimeout(() => manda({ tipo: 'tachar', texto: $('t-texto').value }), 350);
+  });
   en('tachado', (m) => {
     tachado = m;
+    const listo = !!(m.texto && m.texto.trim());
+    $('t-paso-2').classList.toggle('apagado', !listo);
+    $('t-pegar').disabled = !listo;
+    $('t-copiar').disabled = !listo;
     const hay = (m.sustituciones || []).length > 0;
     $('t-resultado').classList.toggle('oculto', !hay && !m.texto);
     $('t-nada').classList.toggle('oculto', hay || !m.texto);

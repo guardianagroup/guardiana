@@ -1034,6 +1034,14 @@ fn every_cut_can_be_examined_one_by_one_and_saved() {
     assert!(
         matches!(o.first(), Some(Orden::GuardaPdf { ruta, .. }) if ruta.extension().is_some_and(|e| e == "pdf"))
     );
+    // The summary: a PDF of its own name, the same page without the list.
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        CORTES,
+        r#"{"tipo":"exportar_cortes","periodo":"mes","formato":"resumen"}"#,
+    );
+    assert!(matches!(o.first(), Some(Orden::GuardaPdf { ruta, .. })
+        if ruta.file_name().is_some_and(|n| n.to_string_lossy().starts_with("guardiana-zero-resumen-"))));
     // A web page cannot ask for it.
     assert!(s
         .mensaje(
@@ -1336,6 +1344,13 @@ fn cookie_notices_are_dealt_with_only_when_told_and_shown_in_the_shield() {
         assert_eq!(e["cookies"]["gestor"], "OneTrust");
         assert_eq!(e["cookies"]["accion"], "rechazado");
     }
+    // Counted once per page in the day's figures, however often the guard reports it.
+    let _ = s.mensaje(
+        Origen::Pestana(id),
+        web,
+        r#"{"tipo":"zg_cookies","zg":"f1","gestor":"OneTrust","accion":"rechazado"}"#,
+    );
+    assert_eq!(s.msg_hoy()["hoy"]["avisos_cookies"], 1);
     // Nonsense is ignored.
     let o = s.mensaje(
         Origen::Pestana(id),
