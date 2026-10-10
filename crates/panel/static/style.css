@@ -50,7 +50,7 @@ header.top .brand-txt { display: flex; flex-direction: column; gap: 2px; line-he
 header.top .brand-txt small { font-family: var(--texto); font-weight: 500; font-size: 11px; letter-spacing: 0.01em; color: var(--muted); }
 header.top a.brand { color: inherit; text-decoration: none; }
 header.top a.brand:hover .brand-txt { text-decoration: underline; text-underline-offset: 3px; }
-header.top .brand::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); display: inline-block; }
+header.top .brand::before { content: ""; width:16px; height:16px; border-radius:50%; box-shadow:none; display:inline-block; flex:none; background:radial-gradient(circle closest-side,var(--accent) 0 34%,transparent 35% 69%,var(--fg) 70% 99%,transparent 100%); -webkit-mask:radial-gradient(circle closest-side,#000 0 45%,transparent 46%),conic-gradient(#000 0 42deg,transparent 42deg 78deg,#000 78deg); mask:radial-gradient(circle closest-side,#000 0 45%,transparent 46%),conic-gradient(#000 0 42deg,transparent 42deg 78deg,#000 78deg); }
 header.top nav { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 header.top nav a { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none; color: var(--muted); padding: 4px 0; border-bottom: 2px solid transparent; }
 header.top nav a:hover { color: var(--fg); }

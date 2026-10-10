@@ -24,7 +24,7 @@ html, body { height: 100%; overflow: hidden; background: var(--marco); user-sele
 #nueva { width: 30px; height: 30px; margin: 0 0 1px 4px; border: 0; border-radius: 8px; background: none; color: var(--gris); display: grid; place-items: center; }
 #nueva:hover { background: color-mix(in srgb, var(--hoja) 60%, transparent); color: var(--tinta); }
 .marca { margin-left: auto; align-self: center; display: flex; align-items: center; gap: 7px; font: 600 11.5px/1 var(--display); letter-spacing: .02em; color: var(--gris); padding-left: 16px; white-space: nowrap; }
-.marca i { width: 8px; height: 8px; border-radius: 50%; background: var(--azul); box-shadow: 0 0 0 3px var(--azul-suave); }
+.marca i { width:13px; height:13px; border-radius:50%; box-shadow:none; display:inline-block; flex:none; background:radial-gradient(circle closest-side,var(--azul) 0 34%,transparent 35% 69%,var(--tinta) 70% 99%,transparent 100%); -webkit-mask:radial-gradient(circle closest-side,#000 0 45%,transparent 46%),conic-gradient(#000 0 42deg,transparent 42deg 78deg,#000 78deg); mask:radial-gradient(circle closest-side,#000 0 45%,transparent 46%),conic-gradient(#000 0 42deg,transparent 42deg 78deg,#000 78deg); }
 
 #herramientas { position: relative; height: 46px; background: var(--hoja); display: flex; align-items: center; gap: 4px; padding: 0 10px; border-bottom: 1px solid var(--linea); }
 .icono { width: 34px; height: 34px; border: 0; border-radius: 9px; background: none; color: var(--tinta); display: grid; place-items: center; flex: none; }
