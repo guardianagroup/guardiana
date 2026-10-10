@@ -58,5 +58,18 @@ const Z = (() => {
     sol: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>',
     luna: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg>',
   };
-  return { manda, en, t, tn, esc, $, n, pintaTextos, recibe, oscuro, ICONO };
+  // «Who followed you from web to web»: one row per company, on how many of the person's webs it
+  // showed up, and whether it got through on any. Returns whether there was anyone.
+  function rastro(ul, r) {
+    const lista = (r && r.seguidores) || [];
+    const total = Math.max(1, Number((r && r.webs) || 0));
+    ul.innerHTML = lista.map((x) => {
+      const ancho = Math.min(100, Math.round((100 * x.webs) / total));
+      const estado = x.paso ? tn('rastro_paso', x.paso, { n: n(x.paso) }) : t('rastro_cortado');
+      return `<li><span class="quien">${esc(x.quien)}</span><span class="cuantas">${esc(t('rastro_webs', { webs: n(x.webs), total: n(r.webs) }))}</span>`
+        + `<span class="pista"><i style="width:${ancho}%"></i></span><span class="estado${x.paso ? ' paso' : ''}">${esc(estado)}</span></li>`;
+    }).join('');
+    return lista.length > 0;
+  }
+  return { manda, en, t, tn, esc, $, n, pintaTextos, recibe, oscuro, ICONO, rastro };
 })();

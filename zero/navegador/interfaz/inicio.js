@@ -132,6 +132,11 @@
     mes = m.mes || {};
     const nombreMes = new Date().toLocaleDateString(document.documentElement.lang, { month: 'long' });
     $('mes-frase').textContent = fraseMes(mes, nombreMes);
+    $('rastro-caja').classList.toggle('oculto', !Z.rastro($('rastro'), m.rastro_hoy));
+    const rm = m.rastro_mes || {};
+    const primero = (rm.seguidores || [])[0];
+    $('mes-rastro').classList.toggle('oculto', !primero);
+    if (primero) $('mes-rastro').textContent = t('mes_rastro', { quien: primero.quien, webs: n(primero.webs), total: n(rm.webs) });
     pintaMotores(m);
   });
 

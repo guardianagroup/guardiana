@@ -20,6 +20,11 @@ pub struct Ajustes {
     pub cortados: BTreeSet<String>,
     /// Sites the person let through by hand even if a list knows them (an «undo»).
     pub permitidos: BTreeSet<String>,
+    /// «Protección máxima» (the owner, 10 Oct 2026): on top of the above, also cut the
+    /// telemetry the lists know at other companies, and every ping or beacon to another company
+    /// (a request whose only job is to carry information out). Only with `cortar_seguimiento`.
+    #[serde(default)]
+    pub maxima: bool,
 }
 
 /// One request the engine is about to send.
@@ -54,6 +59,11 @@ pub enum Motivo {
     Tinta,
     /// The mandate's decoy leaving: proof that something tried to take data out.
     Senuelo,
+    /// Telemetry at another company (maximum protection).
+    Telemetria,
+    /// A ping or beacon to another company: it only carries information out (maximum
+    /// protection).
+    Baliza,
 }
 
 /// The answer for one request.
@@ -136,6 +146,8 @@ pub fn decide(
             "rastreador" => Some(Motivo::Rastreador),
             "publicidad" => Some(Motivo::Publicidad),
             _ if destino.corredor.is_some() => Some(Motivo::Corredor),
+            "telemetria" if ajustes.maxima => Some(Motivo::Telemetria),
+            _ if ajustes.maxima && p.recurso == Recurso::Aviso => Some(Motivo::Baliza),
             _ => None,
         };
         if let Some(m) = motivo {
@@ -241,5 +253,30 @@ mod tests {
             decide(&pet(&robo, b"", Recurso::Datos), &a, &f, Some(0), Some(&m)).motivo,
             Some(Motivo::Senuelo)
         );
+    }
+
+    #[test]
+    fn maximum_protection_also_cuts_telemetry_and_beacons_but_never_the_page() {
+        let mut a = Ajustes {
+            cortar_seguimiento: true,
+            ..Ajustes::default()
+        };
+        let baliza = pet("https://cdn.otra.io/ping", b"", Recurso::Aviso);
+        let script = pet("https://cdn.otra.io/app.js", b"", Recurso::Script);
+        assert!(!decide(&baliza, &a, &[], None, None).cortar);
+        a.maxima = true;
+        let d = decide(&baliza, &a, &[], None, None);
+        assert_eq!((d.cortar, d.motivo), (true, Some(Motivo::Baliza)));
+        // The same company's other requests still load: only what carries information out.
+        assert!(!decide(&script, &a, &[], None, None).cortar);
+        // The page's own beacons are the page's.
+        let propia = pet("https://www.eltiempo.com/ping", b"", Recurso::Aviso);
+        assert!(!decide(&propia, &a, &[], None, None).cortar);
+        // Unblocked by hand, it passes again; and without the cut on, nothing of this applies.
+        a.permitidos.insert("otra.io".into());
+        assert!(!decide(&baliza, &a, &[], None, None).cortar);
+        a.permitidos.clear();
+        a.cortar_seguimiento = false;
+        assert!(!decide(&baliza, &a, &[], None, None).cortar);
     }
 }

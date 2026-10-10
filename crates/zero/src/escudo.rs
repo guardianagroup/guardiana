@@ -168,12 +168,66 @@ pub struct Dia {
     pub datos_salvados: u32,
     /// Pages opened.
     pub paginas: u32,
+    /// The sites the person had open (never in an isolated tab): how many webs the day had.
+    /// Kept only for the last [`DIAS_WEBS`] days.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub webs: BTreeSet<String>,
+    /// The companies that tried to follow the person from site to site: on which of those webs
+    /// each one showed up as a tracker, advertiser or data broker, and on which it got through.
+    /// Kept only for the last [`DIAS_WEBS`] days.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub siguen: BTreeMap<String, Sigue>,
+}
+
+/// Where one company tried to follow the person on one day.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Sigue {
+    /// The sites of the pages it showed up on.
+    pub webs: BTreeSet<String>,
+    /// Those where at least one of its requests got through.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub paso: BTreeSet<String>,
+}
+
+/// Days for which the webs of each day are kept (the same as the list of cuts).
+pub const DIAS_WEBS: usize = 31;
+/// Webs kept per day, and companies per day: bounds, not expectations.
+const MAX_WEBS: usize = 5_000;
+const MAX_SIGUEN: usize = 2_000;
+
+/// One company that followed the person across sites, as the shield and the new tab show it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Seguidor {
+    /// The company.
+    pub quien: String,
+    /// On how many distinct webs it showed up.
+    pub webs: u32,
+    /// On how many of them something of it got through.
+    pub paso: u32,
+}
+
+/// Who followed the person across the most sites in a period.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Rastro {
+    /// Distinct webs the person had open.
+    pub webs: u32,
+    /// The companies that showed up on two webs or more, most webs first, at most `n`.
+    pub seguidores: Vec<Seguidor>,
+    /// How many companies showed up on two webs or more (the list may be shorter).
+    pub total: u32,
 }
 
 impl Diario {
-    /// Count one decided request on `dia`.
-    pub fn anota(&mut self, dia: &str, d: &Decision) {
+    /// Count one decided request on `dia`. `pagina` is the site of the page that made it, or
+    /// `None` in an isolated tab or on the browser's own pages (they are not webs of the day).
+    pub fn anota(&mut self, dia: &str, d: &Decision, pagina: Option<&str>) {
         let e = self.dias.entry(dia.to_string()).or_default();
+        let pagina = pagina.filter(|p| !p.is_empty());
+        if let Some(p) = pagina {
+            if e.webs.len() < MAX_WEBS && !e.webs.contains(p) {
+                e.webs.insert(p.to_string());
+            }
+        }
         if matches!(d.motivo, Some(Motivo::Tinta | Motivo::Senuelo)) {
             e.datos_salvados += 1;
         }
@@ -193,6 +247,66 @@ impl Diario {
         if d.cortar {
             e.cortadas += 1;
             e.cortados.insert(d.destino.sitio.clone());
+        }
+        let sigue = d.destino.sigue() || d.destino.corredor.is_some();
+        if let (true, Some(p)) = (sigue, pagina) {
+            let quien = d.destino.quien();
+            if e.siguen.len() < MAX_SIGUEN || e.siguen.contains_key(quien) {
+                let s = e.siguen.entry(quien.to_string()).or_default();
+                if s.webs.len() < MAX_WEBS {
+                    s.webs.insert(p.to_string());
+                    if !d.cortar {
+                        s.paso.insert(p.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    /// Forget which webs were open on the days before `desde` (`AAAA-MM-DD`): the totals stay,
+    /// the sites go, as the list of cuts does after [`DIAS_WEBS`] days.
+    pub fn olvida_webs(&mut self, desde: &str) -> bool {
+        let mut algo = false;
+        for (_, d) in self.dias.range_mut(..desde.to_string()) {
+            if !d.webs.is_empty() || !d.siguen.is_empty() {
+                d.webs.clear();
+                d.siguen.clear();
+                algo = true;
+            }
+        }
+        algo
+    }
+
+    /// Who followed the person across the most webs from `desde` to `hasta` (inclusive): the
+    /// companies seen on two webs or more, most webs first, at most `n` of them.
+    #[must_use]
+    pub fn rastro(&self, desde: &str, hasta: &str, n: usize) -> Rastro {
+        let mut webs = BTreeSet::new();
+        let mut por: BTreeMap<&str, (BTreeSet<&str>, BTreeSet<&str>)> = BTreeMap::new();
+        for (_, d) in self.dias.range(desde.to_string()..=hasta.to_string()) {
+            webs.extend(d.webs.iter().map(String::as_str));
+            for (q, s) in &d.siguen {
+                let e = por.entry(q.as_str()).or_default();
+                e.0.extend(s.webs.iter().map(String::as_str));
+                e.1.extend(s.paso.iter().map(String::as_str));
+            }
+        }
+        let mut seguidores: Vec<Seguidor> = por
+            .into_iter()
+            .filter(|(_, (w, _))| w.len() >= 2)
+            .map(|(q, (w, p))| Seguidor {
+                quien: q.to_string(),
+                webs: u32::try_from(w.len()).unwrap_or(u32::MAX),
+                paso: u32::try_from(p.len()).unwrap_or(u32::MAX),
+            })
+            .collect();
+        seguidores.sort_by(|a, b| b.webs.cmp(&a.webs).then_with(|| a.quien.cmp(&b.quien)));
+        let total = u32::try_from(seguidores.len()).unwrap_or(u32::MAX);
+        seguidores.truncate(n);
+        Rastro {
+            webs: u32::try_from(webs.len()).unwrap_or(u32::MAX),
+            seguidores,
+            total,
         }
     }
 
@@ -265,7 +379,7 @@ mod tests {
                 None,
             );
             p.anota(&d);
-            diario.anota("2026-10-09", &d);
+            diario.anota("2026-10-09", &d, Some("eltiempo.com"));
         }
         let r = p.resumen();
         assert_eq!(r.terceros, 3);
@@ -276,5 +390,93 @@ mod tests {
         let t = diario.total("2026-10-01", "2026-10-31");
         assert_eq!((t.terceros, t.cortadas), (3, 3));
         assert_eq!((t.empresas, t.empresas_cortadas), (2, 1));
+    }
+
+    #[test]
+    fn the_trail_counts_on_how_many_webs_each_company_showed_up() {
+        fn pide(diario: &mut Diario, dia: &str, pagina: Option<&str>, url: &str, a: &Ajustes) {
+            let d = decide(
+                &Peticion {
+                    url,
+                    cuerpo: b"",
+                    recurso: Recurso::Script,
+                    sitio_pagina: pagina.unwrap_or("aislada.example"),
+                },
+                a,
+                &[],
+                None,
+                None,
+            );
+            diario.anota(dia, &d, pagina);
+        }
+        let a = Ajustes {
+            cortar_seguimiento: true,
+            ..Ajustes::default()
+        };
+        let mut diario = Diario::default();
+        for web in ["eltiempo.com", "elpais.com", "semana.com"] {
+            pide(
+                &mut diario,
+                "2026-10-09",
+                Some(web),
+                "https://www.google-analytics.com/g/collect",
+                &a,
+            );
+        }
+        // A tracker seen on one web only is not following anyone from site to site.
+        pide(
+            &mut diario,
+            "2026-10-09",
+            Some("elpais.com"),
+            "https://stats.g.doubleclick.net/a",
+            &a,
+        );
+        pide(
+            &mut diario,
+            "2026-10-09",
+            Some("eltiempo.com"),
+            "https://cdn.otra.io/y.js",
+            &a,
+        );
+        // An isolated tab leaves no web behind.
+        pide(
+            &mut diario,
+            "2026-10-09",
+            None,
+            "https://www.google-analytics.com/g/collect",
+            &a,
+        );
+        // With cutting off, what gets through is told apart.
+        let sin = Ajustes::default();
+        pide(
+            &mut diario,
+            "2026-10-10",
+            Some("eltiempo.com"),
+            "https://www.google-analytics.com/g/collect",
+            &sin,
+        );
+        pide(
+            &mut diario,
+            "2026-10-10",
+            Some("bbc.com"),
+            "https://www.google-analytics.com/g/collect",
+            &a,
+        );
+        let r = diario.rastro("2026-10-09", "2026-10-09", 5);
+        assert_eq!(r.webs, 3);
+        assert_eq!(r.total, 1);
+        assert_eq!(r.seguidores[0].quien, "Google");
+        assert_eq!((r.seguidores[0].webs, r.seguidores[0].paso), (3, 0));
+        let r = diario.rastro("2026-10-09", "2026-10-10", 5);
+        assert_eq!(r.webs, 4);
+        assert_eq!((r.seguidores[0].webs, r.seguidores[0].paso), (4, 1));
+        // After the days the cuts are kept, the webs go and the totals stay.
+        assert!(diario.olvida_webs("2026-10-10"));
+        assert_eq!(
+            diario.rastro("2026-10-09", "2026-10-09", 5),
+            Rastro::default()
+        );
+        assert_eq!(diario.total("2026-10-09", "2026-10-09").cortadas, 5);
+        assert!(!diario.olvida_webs("2026-10-10"));
     }
 }

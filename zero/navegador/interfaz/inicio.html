@@ -50,6 +50,12 @@ main { max-width: 780px; margin: 0 auto; padding: 12vh 28px 64px; }
 #frase.cero { color: var(--gris); }
 .barra { height: 8px; border-radius: 4px; background: var(--campo); overflow: hidden; }
 .barra i { display: block; height: 100%; width: 0; border-radius: 4px; background: var(--rojo); transition: width .6s ease; }
+.hoy-rastro { margin: 0 -24px; padding: 14px 24px 12px; border-top: 1px solid var(--linea); }
+.hoy-rastro h3 { margin: 0 0 2px; font-size: 14px; font-weight: 600; }
+.hoy-rastro > p { margin: 0 0 8px; font-size: 12.5px; color: var(--gris); }
+.hoy-rastro .rastro { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); column-gap: 24px; }
+.hoy-rastro .rastro li:nth-child(-n+3) { border-top: 0; }
+.mes .mes-rastro { font-size: 13.5px; color: var(--gris); }
 .leyenda { display: flex; justify-content: space-between; gap: 12px; margin: 7px 0 0; font-size: 12px; color: var(--gris); }
 .cero ~ .barra, .cero ~ .leyenda { display: none; }
 form { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 20px; border-radius: 28px; background: var(--hoja); border: 1px solid var(--linea); box-shadow: var(--sombra); }
@@ -85,6 +91,7 @@ a.hecho:hover span { color: var(--tinta); text-decoration: underline; text-under
   #q { font-size: 15px; }
   .mes { grid-template-columns: 1fr; }
   .mes .boton { grid-row: auto; grid-column: 1; justify-self: start; }
+  .hoy-rastro .rastro li:nth-child(n+2) { border-top: 1px solid var(--linea); }
 }
 </style>
 </head>
@@ -115,6 +122,11 @@ a.hecho:hover span { color: var(--tinta); text-decoration: underline; text-under
     <div class="hecho"><b id="h-parametros">0</b><span data-t="inicio_parametros"></span></div>
     <div class="hecho"><b id="h-corredores">0</b><span data-t="inicio_corredores"></span></div>
   </div>
+  <div class="hoy-rastro oculto" id="rastro-caja">
+    <h3 data-t="rastro_titulo"></h3>
+    <p data-t="rastro_explica"></p>
+    <ol class="rastro" id="rastro"></ol>
+  </div>
   </section>
   <div id="apagado" class="oculto"><span data-t="proteccion_apagada"></span><button class="boton principal" id="encender" data-t="encender"></button></div>
   <div class="acciones">
@@ -125,6 +137,7 @@ a.hecho:hover span { color: var(--tinta); text-decoration: underline; text-under
   <div class="mes">
     <h2 data-t="inicio_mes"></h2>
     <p id="mes-frase"></p>
+    <p class="mes-rastro oculto" id="mes-rastro"></p>
     <button class="boton" id="mes-guardar" data-t="mes_guardar"></button>
     <small data-t="mes_nota"></small>
   </div>

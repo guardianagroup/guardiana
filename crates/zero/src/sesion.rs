@@ -292,6 +292,9 @@ struct Preferencias {
     cookies_sin_tocar: bool,
     /// Sites where the form guard does not ask (outside mandates).
     sin_preguntar: BTreeSet<String>,
+    /// The person closed the shield: it no longer opens by itself at start (the owner, 10 Oct
+    /// 2026: open from the start, live, until the person closes it).
+    escudo_cerrado: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -780,12 +783,14 @@ impl Sesion {
     }
 
     /// The cut log keeps today and the 30 days before it: the same span «Todo» shows.
-    fn poda_cortes(&self) {
+    /// The list of cuts and the webs of each day are kept 31 days; the day's totals stay.
+    fn poda_cortes(&mut self) {
         let dias = i64::try_from(cortes::DIAS).unwrap_or(31) - 1;
-        cortes::poda(
-            &self.datos.join("cortes"),
-            &fecha::dia_antes((self.reloj)(), self.zona, dias),
-        );
+        let desde = fecha::dia_antes((self.reloj)(), self.zona, dias);
+        cortes::poda(&self.datos.join("cortes"), &desde);
+        if self.diario.olvida_webs(&desde) {
+            self.diario_sucio = true;
+        }
     }
 
     fn guarda_prefs(&self) {
@@ -980,12 +985,19 @@ impl Sesion {
         if r.permitidos.contains(&t.sitio) {
             return ("pasa", Some("permitido"));
         }
-        let sigue =
-            matches!(t.categoria.as_str(), "rastreador" | "publicidad") || t.corredor.is_some();
-        if r.cortar_seguimiento && sigue {
+        if self.lo_corta_la_lista(t) {
             return ("cortado", Some("lista"));
         }
         ("pasa", None)
+    }
+
+    /// Whether the open lists cut this site with the person's settings (no rule of their own).
+    fn lo_corta_la_lista(&self, t: &Tercero) -> bool {
+        let r = &self.prefs.reglas;
+        let sigue = matches!(t.categoria.as_str(), "rastreador" | "publicidad")
+            || t.corredor.is_some()
+            || (r.maxima && t.categoria == "telemetria");
+        r.cortar_seguimiento && sigue
     }
 
     fn msg_escudo(&self, p: &Pestana) -> Value {
@@ -1008,6 +1020,7 @@ impl Sesion {
             "pestana": p.id,
             "sitio": if es_interna(&p.url) { "" } else { p.escudo.sitio.as_str() },
             "cortando": self.prefs.reglas.cortar_seguimiento && self.licencia.protege(),
+            "maxima": self.prefs.reglas.cortar_seguimiento && self.prefs.reglas.maxima,
             "protege": self.licencia.protege(),
             "resumen": p.escudo.resumen(),
             "terceros": terceros,
@@ -1168,6 +1181,8 @@ impl Sesion {
             "motores": lista_buscadores(),
             "hoy": self.diario.total(&hoy, &hoy),
             "mes": self.diario.total(&mes, &hoy),
+            "rastro_hoy": self.diario.rastro(&hoy, &hoy, 5),
+            "rastro_mes": self.diario.rastro(&mes, &hoy, 5),
         })
     }
 
@@ -1340,11 +1355,26 @@ impl Sesion {
         o
     }
 
+    /// Whether the shield stays open beside the pages: unless the person closed it, and only
+    /// while there is protection to show.
+    fn escudo_a_la_vista(&self) -> bool {
+        !self.prefs.escudo_cerrado && self.prefs.bienvenida && self.licencia.protege()
+    }
+
+    /// Done with a view (a question answered, settings closed): back to the shield while the
+    /// person keeps it open, else the panel closes.
     fn cierra_panel(&mut self) -> Vec<Orden> {
         if self.panel.as_deref() == Some("formulario") {
             self.preguntas.clear();
         }
+        if self.escudo_a_la_vista() && self.panel.as_deref() != Some("escudo") {
+            return self.abre_panel("escudo");
+        }
         self.panel = None;
+        self.cierra_del_todo()
+    }
+
+    fn cierra_del_todo(&self) -> Vec<Orden> {
         vec![
             Orden::Panel { abierto: false },
             self.estado(),
@@ -1474,7 +1504,20 @@ impl Sesion {
                 .map(|id| self.activar(id))
                 .unwrap_or_default(),
             "panel" => match m.get("vista").and_then(Value::as_str) {
-                Some(v) => self.abre_panel(v),
+                Some(v) => {
+                    if v == "escudo" && self.prefs.escudo_cerrado {
+                        self.prefs.escudo_cerrado = false;
+                        self.guarda_prefs();
+                    }
+                    self.abre_panel(v)
+                }
+                // The person closing the shield: it stays closed, now and at the next start.
+                None if self.panel.as_deref() == Some("escudo") => {
+                    self.prefs.escudo_cerrado = true;
+                    self.guarda_prefs();
+                    self.panel = None;
+                    self.cierra_del_todo()
+                }
                 None => self.cierra_panel(),
             },
             "ajuste" => self.ajuste(texto(m, "clave"), m.get("valor").unwrap_or(&Value::Null)),
@@ -1520,9 +1563,7 @@ impl Sesion {
                 }
                 vec![envia(Origen::Panel, &self.msg_ajustes())]
             }
-            "cortar_sitio" | "permitir_sitio" | "deshacer_sitio" => {
-                self.regla(tipo, texto(m, "sitio"))
-            }
+            "bloquear_sitio" | "desbloquear_sitio" => self.regla(tipo, texto(m, "sitio")),
             "tinta_anadir" => self.tinta_anadir(texto(m, "dato"), texto(m, "valor")),
             "tinta_quitar" => self.tinta_quitar(numero(m, "indice")),
             "carta" => self.carta(texto(m, "sitio"), texto(m, "ley")),
@@ -1615,6 +1656,8 @@ impl Sesion {
                 o.push(envia(Origen::Barra, &self.msg_licencia()));
                 if !self.prefs.bienvenida {
                     o.extend(self.abre_panel("bienvenida"));
+                } else if self.panel.is_none() && self.escudo_a_la_vista() {
+                    o.extend(self.abre_panel("escudo"));
                 }
                 o
             }
@@ -1660,8 +1703,23 @@ impl Sesion {
 
     fn ajuste(&mut self, clave: &str, valor: &Value) -> Vec<Orden> {
         match clave {
-            "cortar_seguimiento" => {
-                self.prefs.reglas.cortar_seguimiento = valor.as_bool().unwrap_or(false);
+            "cortar_seguimiento" | "maxima" => {
+                let si = valor.as_bool().unwrap_or(false);
+                let r = &mut self.prefs.reglas;
+                if clave == "maxima" {
+                    // Maximum protection is the cut, plus telemetry and beacons, plus cookie
+                    // notices answered «no»: everything the browser knows how to refuse.
+                    r.maxima = si;
+                    if si {
+                        r.cortar_seguimiento = true;
+                        self.prefs.cookies_sin_tocar = false;
+                    }
+                } else {
+                    r.cortar_seguimiento = si;
+                    if !si {
+                        r.maxima = false;
+                    }
+                }
                 self.prefs.bienvenida = true;
                 self.guarda_prefs();
                 let mut o = vec![
@@ -1753,18 +1811,23 @@ impl Sesion {
         if s.is_empty() || s.len() > 253 {
             return Vec::new();
         }
+        // Both ways, always: «Bloquear» and «Desbloquear» undo each other, and a site goes back
+        // to what the lists say for it rather than keeping a rule it no longer needs.
+        let lista = self
+            .pestanas
+            .iter()
+            .find_map(|p| p.escudo.terceros.get(&s))
+            .is_some_and(|t| self.lo_corta_la_lista(t));
         let r = &mut self.prefs.reglas;
-        match tipo {
-            "cortar_sitio" => {
-                r.permitidos.remove(&s);
+        if tipo == "bloquear_sitio" {
+            r.permitidos.remove(&s);
+            if !lista {
                 r.cortados.insert(s);
             }
-            "permitir_sitio" => {
-                r.cortados.remove(&s);
+        } else {
+            r.cortados.remove(&s);
+            if lista {
                 r.permitidos.insert(s);
-            }
-            _ => {
-                r.cortados.remove(&s);
             }
         }
         self.guarda_prefs();
@@ -2757,7 +2820,9 @@ impl Sesion {
         let p = &mut self.pestanas[i];
         p.escudo.anota(&d);
         let perfil = p.perfil;
-        self.diario.anota(&hoy, &d);
+        let web = (perfil != Perfil::Aislada && !es_interna(&p.url) && !p.escudo.sitio.is_empty())
+            .then(|| p.escudo.sitio.clone());
+        self.diario.anota(&hoy, &d, web.as_deref());
         if recurso == Recurso::Documento && !d.cortar {
             self.diario.dias.entry(hoy).or_default().paginas += 1;
         }

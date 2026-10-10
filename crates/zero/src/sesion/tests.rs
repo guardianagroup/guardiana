@@ -96,9 +96,63 @@ fn the_first_run_opens_a_new_tab_and_asks_the_question() {
         r#"{"tipo":"bienvenida","cortar":true}"#,
     );
     assert!(o.contains(&Orden::Seguimiento { estricto: true }));
+    // Answered, the panel turns into the shield, live, beside the page.
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "vista").unwrap_or_default()["vista"],
+        "escudo"
+    );
+    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"listo","vista":"barra"}"#);
+    assert!(del_tipo(&o, Origen::Panel, "vista").is_none_or(|v| v["vista"] != "bienvenida"));
+}
+
+#[test]
+fn the_shield_opens_by_itself_until_the_person_closes_it() {
+    let (mut s, _, _) = con_pagina(true);
+    let datos = s.datos.clone();
+    s.cierra();
+    // The next start: the shield is open as soon as the bar is there.
+    let (mut s, _) = Sesion::abre(Arranque {
+        datos: datos.clone(),
+        descargas: datos.join("descargas"),
+        idioma_sistema: "es-CO".into(),
+        version: "0.1.0".into(),
+        reloj,
+    });
+    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"listo","vista":"barra"}"#);
+    assert!(o.contains(&Orden::Panel { abierto: true }));
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "vista").unwrap_or_default()["vista"],
+        "escudo"
+    );
+    // Settings, closed: back to the shield, not to nothing.
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"panel","vista":"ajustes"}"#,
+    );
+    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"panel","vista":null}"#);
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "vista").unwrap_or_default()["vista"],
+        "escudo"
+    );
+    // The shield, closed: closed, and still closed at the next start.
+    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"panel","vista":null}"#);
     assert!(o.contains(&Orden::Panel { abierto: false }));
+    s.cierra();
+    let (mut s, _) = Sesion::abre(Arranque {
+        datos: datos.clone(),
+        descargas: datos.join("descargas"),
+        idioma_sistema: "es-CO".into(),
+        version: "0.1.0".into(),
+        reloj,
+    });
     let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"listo","vista":"barra"}"#);
     assert!(!o.contains(&Orden::Panel { abierto: true }));
+    // Opened again with the shield button: it opens by itself again from then on.
+    let _ = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":"escudo"}"#);
+    s.cierra();
+    let p: Preferencias = lee(&datos.join("preferencias.json"));
+    assert!(!p.escudo_cerrado);
 }
 
 #[test]
@@ -172,11 +226,11 @@ fn trackers_are_cut_and_the_shield_says_what_holds_now() {
     assert_eq!(fila["sitio"], "doubleclick.net");
     assert_eq!(fila["ahora"], "cortado");
     assert_eq!(fila["regla"], "lista");
-    // Let it through: the same row now says it passes, with its history kept.
+    // Unblock it: the same row now says it passes, with its history kept.
     let o = s.mensaje(
         Origen::Panel,
         PANEL,
-        r#"{"tipo":"permitir_sitio","sitio":"doubleclick.net"}"#,
+        r#"{"tipo":"desbloquear_sitio","sitio":"doubleclick.net"}"#,
     );
     let e = del_tipo(&o, Origen::Panel, "escudo").unwrap_or_default();
     assert_eq!(e["terceros"][0]["ahora"], "pasa");
@@ -196,6 +250,100 @@ fn trackers_are_cut_and_the_shield_says_what_holds_now() {
     let p: Preferencias = lee(&datos.join("preferencias.json"));
     assert!(p.reglas.permitidos.contains("doubleclick.net"));
     assert!(p.bienvenida);
+}
+
+#[test]
+fn block_and_unblock_undo_each_other_and_leave_no_stale_rule() {
+    let (mut s, _, id) = con_pagina(true);
+    let _ = s.peticion(id, "https://stats.g.doubleclick.net/a", "GET", b"", 3);
+    let _ = s.peticion(id, "https://cdn.otra.io/a.js", "GET", b"", 3);
+    let fila = |s: &mut Sesion, sitio: &str| {
+        let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":"escudo"}"#);
+        let e = del_tipo(&o, Origen::Panel, "escudo").unwrap_or_default();
+        let t = e["terceros"]
+            .as_array()
+            .and_then(|l| l.iter().find(|t| t["sitio"] == sitio).cloned())
+            .unwrap_or_default();
+        (
+            t["ahora"].as_str().unwrap_or("").to_string(),
+            t["regla"].clone(),
+        )
+    };
+    let manda = |s: &mut Sesion, tipo: &str, sitio: &str| {
+        let _ = s.mensaje(
+            Origen::Panel,
+            PANEL,
+            &json!({ "tipo": tipo, "sitio": sitio }).to_string(),
+        );
+    };
+    // A tracker: unblock, block again — back to the lists, no rule left.
+    manda(&mut s, "desbloquear_sitio", "doubleclick.net");
+    assert_eq!(
+        fila(&mut s, "doubleclick.net"),
+        ("pasa".into(), json!("permitido"))
+    );
+    manda(&mut s, "bloquear_sitio", "doubleclick.net");
+    assert_eq!(
+        fila(&mut s, "doubleclick.net"),
+        ("cortado".into(), json!("lista"))
+    );
+    // Any other site: block, unblock — back to passing, no rule left.
+    manda(&mut s, "bloquear_sitio", "otra.io");
+    assert_eq!(fila(&mut s, "otra.io"), ("cortado".into(), json!("tuya")));
+    manda(&mut s, "desbloquear_sitio", "otra.io");
+    assert_eq!(fila(&mut s, "otra.io"), ("pasa".into(), Value::Null));
+    assert!(s.prefs.reglas.cortados.is_empty() && s.prefs.reglas.permitidos.is_empty());
+}
+
+#[test]
+fn maximum_protection_turns_everything_on_and_goes_with_the_cut() {
+    let (mut s, _, id) = con_pagina(false);
+    s.prefs.cookies_sin_tocar = true;
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"maxima","valor":true}"#,
+    );
+    assert!(o.contains(&Orden::Seguimiento { estricto: true }));
+    assert!(s.prefs.reglas.cortar_seguimiento && s.prefs.reglas.maxima);
+    assert!(!s.prefs.cookies_sin_tocar);
+    let r = s.peticion(id, "https://cdn.otra.io/ping", "POST", b"x", 14);
+    assert!(r.cortar, "a beacon to another company is cut");
+    let e = del_tipo(&s.tic(), Origen::Barra, "escudo").unwrap_or_default();
+    assert_eq!(e["maxima"], true);
+    // Turning the cut off turns maximum off with it.
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"cortar_seguimiento","valor":false}"#,
+    );
+    assert!(!s.prefs.reglas.maxima);
+}
+
+#[test]
+fn the_day_says_who_followed_you_from_web_to_web() {
+    let (mut s, _, id) = con_pagina(true);
+    let _ = s.peticion(
+        id,
+        "https://www.google-analytics.com/g/collect",
+        "GET",
+        b"",
+        3,
+    );
+    assert!(!abre_pagina(&mut s, id, "https://elpais.com/").cortar);
+    let _ = s.peticion(
+        id,
+        "https://www.google-analytics.com/g/collect",
+        "GET",
+        b"",
+        3,
+    );
+    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":"escudo"}"#);
+    let hoy = del_tipo(&o, Origen::Panel, "hoy").unwrap_or_default();
+    assert_eq!(hoy["rastro_hoy"]["webs"], 2);
+    assert_eq!(hoy["rastro_hoy"]["seguidores"][0]["quien"], "Google");
+    assert_eq!(hoy["rastro_hoy"]["seguidores"][0]["webs"], 2);
+    assert_eq!(hoy["rastro_hoy"]["seguidores"][0]["paso"], 0);
 }
 
 #[test]
@@ -221,7 +369,7 @@ fn a_site_you_cut_shows_why_instead_of_the_page() {
     let _ = s.mensaje(
         Origen::Panel,
         PANEL,
-        r#"{"tipo":"cortar_sitio","sitio":"ejemplo.com"}"#,
+        r#"{"tipo":"bloquear_sitio","sitio":"ejemplo.com"}"#,
     );
     let r = abre_pagina(&mut s, id, "https://www.ejemplo.com/a");
     assert!(r.cortar);
@@ -802,8 +950,12 @@ fn questions_end_with_their_page_and_erasing_forgets_the_exceptions() {
     let q = del_tipo(&o, Origen::Panel, "pregunta_formulario").unwrap_or_default();
     assert_eq!(q["pestana"], "www.tienda.co");
     // The page leaves before the answer: nothing is approved for the next one.
+    // The panel goes back to the shield, which the person keeps open.
     let o = s.pagina_nueva(id, "https://www.tienda.co/otra");
-    assert!(o.contains(&Orden::Panel { abierto: false }));
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "vista").unwrap_or_default()["vista"],
+        "escudo"
+    );
     let o = s.mensaje(
         Origen::Panel,
         PANEL,

@@ -97,6 +97,7 @@ function pantalla(nombre) {
   pantalla('01-bienvenida.png');
   await panel.click('#b-si');
   comprueba(await hasta(() => barra.evaluate(() => !document.querySelector('#b-escudo').classList.contains('mirando'))), 'tras «Sí, cortarlos» el escudo corta');
+  comprueba(await hasta(() => panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa'))), 'y el escudo se queda abierto al lado, en directo');
   // The language can be chosen; the rest of the test reads Spanish.
   await barra.click('#b-menu');
   await hasta(() => panel.evaluate(() => document.querySelector('#v-ajustes').classList.contains('vista-activa')));
@@ -143,6 +144,24 @@ function pantalla(nombre) {
   comprueba(await hasta(async () => (await panel.locator('#e-cortados li').count()) >= 1), 'el panel lista lo cortado');
   const filas = await panel.locator('#e-cortados .quien').allTextContents();
   comprueba(filas.some((f) => f.includes('Google')), `el panel nombra a la empresa (${filas.join(', ')})`);
+  // Every button has its way back: «Desbloquear», then «Volver a bloquear».
+  const enCortados = () => panel.locator('#e-cortados li', { hasText: 'doubleclick.net' });
+  const enVistos = () => panel.locator('#e-vistos li', { hasText: 'doubleclick.net' });
+  comprueba((await enCortados().first().locator('button').textContent()) === 'Desbloquear', 'lo cortado ofrece «Desbloquear»');
+  await enCortados().first().locator('button').click();
+  comprueba(await hasta(async () => (await enVistos().count()) === 1 && (await enVistos().first().locator('button').textContent()) === 'Volver a bloquear'), 'desbloqueado, ofrece «Volver a bloquear» y dice que fue cosa tuya');
+  await enVistos().first().locator('button').click();
+  comprueba(await hasta(async () => (await enCortados().count()) === 1 && (await enVistos().count()) === 0), 'y vuelve a quedar cortado, como estaba');
+  // Maximum protection: a beacon to another company, which passed, no longer leaves.
+  const baliza = async (ruta) => { await web.evaluate(([p, r]) => navigator.sendBeacon(`http://collect.otra-empresa.io:${p}${r}`, 'x'), [PUERTO, ruta]); await espera(800); };
+  await baliza('/baliza-1');
+  comprueba(vio('collect.otra-empresa.io', '/baliza-1'), 'sin protección máxima, el aviso a otra empresa sale');
+  await panel.click('#e-maxima-activar');
+  comprueba(await hasta(() => panel.evaluate(() => !document.querySelector('#e-maxima-activa').classList.contains('oculto'))), '«Activar protección máxima» se enciende');
+  await baliza('/baliza-2');
+  comprueba(!vio('collect.otra-empresa.io', '/baliza-2'), 'con protección máxima, ese aviso ya no sale');
+  await panel.click('#e-maxima-quitar');
+  comprueba(await hasta(() => panel.evaluate(() => document.querySelector('#e-maxima-activa').classList.contains('oculto'))), 'y se puede volver a la normal');
   await espera(600);
   pantalla('02-escudo.png');
   await web.screenshot({ path: path.join(salida, 'web.png') }).catch(() => {});
@@ -186,6 +205,7 @@ function pantalla(nombre) {
   comprueba(await hasta(async () => (await nueva.getAttribute('#q', 'placeholder')) === 'Busca en la web o escribe una dirección'), 'la caja de búsqueda es nuestra');
   comprueba(await hasta(() => nueva.evaluate(() => (document.querySelector('#motor').selectedOptions[0] || {}).textContent === 'DuckDuckGo')), 'y lleva dentro el buscador, a la vista');
   comprueba(await hasta(async () => (await nueva.locator('#favs-rejilla .fav').count()) === 1), 'la web guardada con la estrella sale en la pestaña nueva');
+  comprueba((await nueva.textContent('.hoy-cab .enlace')) === 'Ver resumen', 'el enlace del día dice «Ver resumen»');
   let cortadasHoy = 0;
   await hasta(async () => { cortadasHoy = Number((await nueva.textContent('#h-cortadas')).replace(/\D/g, '')); return cortadasHoy >= 3; });
   comprueba(cortadasHoy >= 3, `la pestaña nueva cuenta las peticiones cortadas (${cortadasHoy})`);

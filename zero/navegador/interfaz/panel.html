@@ -41,6 +41,18 @@ p { margin: 0 0 10px; }
 .dia-cifras div { font-size: 11px; line-height: 1.25; color: var(--gris); }
 .dia-cifras b { display: block; font: 600 17px/1.1 var(--display); color: var(--tinta); margin-bottom: 3px; font-variant-numeric: tabular-nums; }
 .dia-cifras .rojo b { color: var(--rojo); }
+.dia-rastro { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--linea); }
+.dia-rastro h3 { margin: 0 0 2px; font-size: 13px; font-weight: 600; }
+.dia-rastro .explica { margin: 0 0 6px; }
+.maxima { margin: 10px 0 16px; padding: 12px 14px; border: 1px solid var(--linea); border-radius: 12px; background: var(--azul-suave); }
+.maxima-txt b { display: block; font-size: 13.5px; }
+.maxima-txt .explica { margin: 3px 0 10px; }
+.maxima .boton { width: 100%; }
+.maxima-activa { margin: 0; font-size: 13px; font-weight: 600; color: var(--verde); }
+.maxima-activa .enlace { font-weight: 400; margin-left: 6px; }
+.maxima.encendida { background: var(--verde-suave); }
+.maxima.encendida .boton { display: none; }
+.tercero .chip.tuya { background: var(--azul-suave); color: var(--azul); }
 .pagina-cab { margin: 0 0 4px; font-size: 12.5px; font-weight: 600; color: var(--gris); }
 .sitio { font: 600 17px/1.25 var(--display); letter-spacing: -.01em; word-break: break-all; margin: 2px 0 8px; }
 .resumen { font-size: 14px; color: var(--tinta); margin-bottom: 14px; }
@@ -152,6 +164,11 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
       <div><b id="e-dia-parametros">0</b><span data-t="escudo_dia_etiquetas"></span></div>
       <div><b id="e-dia-corredores">0</b><span data-t="escudo_dia_corredores"></span></div>
     </div>
+    <div class="dia-rastro oculto" id="e-rastro-caja">
+      <h3 data-t="rastro_titulo"></h3>
+      <p class="explica" data-t="rastro_explica"></p>
+      <ol class="rastro" id="e-rastro"></ol>
+    </div>
   </section>
   <p class="pagina-cab" id="e-pagina-cab" data-t="escudo_esta_pagina"></p>
   <div class="sitio" id="e-sitio"></div>
@@ -159,6 +176,11 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
   <div class="ajuste">
     <input type="checkbox" class="interruptor" id="e-proteccion">
     <div><label for="e-proteccion" data-t="proteccion"></label><p class="explica" data-t="proteccion_explica"></p></div>
+  </div>
+  <div class="maxima" id="e-maxima">
+    <div class="maxima-txt"><b id="e-maxima-titulo" data-t="maxima_titulo"></b><p class="explica" data-t="maxima_explica"></p></div>
+    <button class="boton principal" id="e-maxima-activar" data-t="maxima_activar"></button>
+    <p class="maxima-activa oculto" id="e-maxima-activa"><span data-t="maxima_activa"></span> <button class="enlace" id="e-maxima-quitar" data-t="maxima_quitar"></button></p>
   </div>
   <div id="e-cortados-caja"><h2><span data-t="escudo_cortados"></span><span class="cuenta" id="e-cortados-n"></span></h2><ul class="terceros" id="e-cortados"></ul></div>
   <div id="e-vistos-caja"><h2><span data-t="escudo_vistos"></span><span class="cuenta" id="e-vistos-n"></span></h2><ul class="terceros" id="e-vistos"></ul></div>

@@ -25,17 +25,20 @@
     const li = document.createElement('li');
     li.className = 'tercero' + (cortado ? ' cortado' : sigue ? ' sigue' : '');
     const paisTxt = x.pais ? `<small>${esc(pais(x.pais))}</small>` : '';
+    // Every button has its way back: «Desbloquear» on what is cut, «Bloquear» on what passes,
+    // «Volver a bloquear» on what the person unblocked; a chip says when the rule is theirs.
+    const [accion, clave] = cortado ? ['desbloquear_sitio', 'accion_desbloquear']
+      : x.regla === 'permitido' ? ['bloquear_sitio', 'accion_rebloquear'] : ['bloquear_sitio', 'accion_bloquear'];
+    const boton = `<button class="boton chico ${cortado ? 'deja' : 'corta'}" data-accion="${accion}" title="${esc(t(clave + '_titulo'))}">${esc(t(clave))}</button>`;
     const detalle = [
       `<span class="mono">${esc(x.sitio)}</span>`,
       `<span>${esc(x.cortadas > 0 ? t('escudo_cortadas_de', { c: n(x.cortadas), n: n(x.vistas) }) : tn('escudo_peticiones', x.vistas, { n: n(x.vistas) }))}</span>`,
       `<span class="chip ${COLOR_CAT[x.categoria] || ''}">${esc(t('cat_' + x.categoria))}</span>`,
+      x.regla === 'tuya' || x.regla === 'permitido' ? `<span class="chip tuya">${esc(t('regla_' + x.regla))}</span>` : '',
       x.corredor ? `<span class="chip rojo" title="${esc(x.corredor)}">${esc(t('corredor_etiqueta'))}</span>` : '',
       // The reason is printed only when the chips do not say it already.
-      x.cortadas > 0 && x.motivo && !['rastreador', 'publicidad', 'corredor'].includes(x.motivo) ? `<span class="motivo">${esc(t('motivo_' + x.motivo))}</span>` : '',
+      x.cortadas > 0 && x.motivo && !['rastreador', 'publicidad', 'corredor', 'corte_tuyo', 'telemetria'].includes(x.motivo) ? `<span class="motivo">${esc(t('motivo_' + x.motivo))}</span>` : '',
     ].join('');
-    const boton = cortado
-      ? `<button class="boton chico deja" data-accion="${x.regla === 'tuya' ? 'deshacer_sitio' : 'permitir_sitio'}" title="${esc(t('accion_permitir_titulo'))}">${esc(t('accion_permitir'))}</button>`
-      : `<button class="boton chico corta" data-accion="cortar_sitio" title="${esc(t('accion_cortar_titulo'))}">${esc(t('accion_cortar'))}</button>`;
     li.innerHTML = `<span class="quien">${esc(x.quien)}${paisTxt}</span>${boton}<span class="detalle">${detalle}</span>`;
     li.querySelector('button').addEventListener('click', (e) => {
       manda({ tipo: e.currentTarget.dataset.accion, sitio: x.sitio });
@@ -56,6 +59,7 @@
     $('e-dia-datos').textContent = n(h.datos_salvados);
     $('e-dia-parametros').textContent = n(h.parametros_quitados);
     $('e-dia-corredores').textContent = n(h.corredores);
+    $('e-rastro-caja').classList.toggle('oculto', !Z.rastro($('e-rastro'), { ...(m.rastro_hoy || {}), seguidores: ((m.rastro_hoy || {}).seguidores || []).slice(0, 3) }));
   });
   $('e-dia-ver').addEventListener('click', () => manda({ tipo: 'abrir_cortes' }));
   en('escudo', (m) => {
@@ -66,6 +70,9 @@
     const r = m.resumen || {};
     $('e-resumen').textContent = r.empresas ? `${tn('escudo_resumen', r.empresas, { empresas: n(r.empresas) })} ${tn('escudo_resumen_cortadas', r.cortadas, { cortadas: n(r.cortadas) })}` : '';
     $('e-proteccion').checked = !!m.cortando;
+    $('e-maxima').classList.toggle('encendida', !!m.maxima);
+    $('e-maxima').classList.toggle('oculto', !m.protege);
+    $('e-maxima-activa').classList.toggle('oculto', !m.maxima);
     const lista = (m.terceros || []).slice();
     lista.sort((a, b) => (b.cortadas - a.cortadas) || (b.vistas - a.vistas));
     const cortados = lista.filter((x) => x.ahora === 'cortado');
@@ -86,6 +93,8 @@
   $('e-recargar').addEventListener('click', () => { manda({ tipo: 'recargar' }); $('e-recarga').classList.add('oculto'); });
   $('e-ver-todo').addEventListener('click', () => manda({ tipo: 'abrir_cortes' }));
   $('e-proteccion').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'cortar_seguimiento', valor: e.target.checked }));
+  $('e-maxima-activar').addEventListener('click', () => { manda({ tipo: 'ajuste', clave: 'maxima', valor: true }); $('e-recarga').classList.remove('oculto'); });
+  $('e-maxima-quitar').addEventListener('click', () => manda({ tipo: 'ajuste', clave: 'maxima', valor: false }));
 
   // --- mandate ---------------------------------------------------------------------------------
   let sitioActual = '';
