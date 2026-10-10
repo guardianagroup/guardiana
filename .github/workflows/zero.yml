@@ -106,9 +106,10 @@ jobs:
       # And what a person gets from it, on this clean Windows: zero/prueba/instalador.ps1.
       - name: installer end to end
         shell: pwsh
+        timeout-minutes: 20
         run: |
           $v = (Select-String -Path zero/navegador/Cargo.toml -Pattern '^version = "(.*)"' | Select-Object -First 1).Matches[0].Groups[1].Value
-          powershell -NoProfile -ExecutionPolicy Bypass -File zero/prueba/instalador.ps1 -Msi "msi/guardiana-zero-$v-windows-x64.msi" -Viejo msi-prueba/viejo.msi -Exe zero/navegador/target/release/guardiana-zero.exe -Version $v -Otros "msi/guardiana-zero-$v-windows-x64-en.msi","msi/guardiana-zero-$v-windows-x64-pt.msi"
+          powershell -NoProfile -ExecutionPolicy Bypass -File zero/prueba/instalador.ps1 -Msi "msi/guardiana-zero-$v-windows-x64.msi" -Viejo msi-prueba/viejo.msi -Exe zero/navegador/target/release/guardiana-zero.exe -Version $v -Otros "msi/guardiana-zero-$v-windows-x64-en.msi;msi/guardiana-zero-$v-windows-x64-pt.msi"
           if ($LASTEXITCODE -ne 0) { exit 1 }
           Copy-Item -Recurse -Force "$env:RUNNER_TEMP/instalador" "$env:RUNNER_TEMP/e2e/instalador" -ErrorAction SilentlyContinue
       - name: package

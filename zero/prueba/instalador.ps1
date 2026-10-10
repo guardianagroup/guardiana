@@ -2,20 +2,23 @@
 # test): what a person gets after double-clicking it. Usage:
 #   powershell -NoProfile -File zero/prueba/instalador.ps1 -Msi dist/guardiana-zero-<v>-windows-x64.msi `
 #       -Viejo msi/prueba-viejo.msi -Exe zero/navegador/target/release/guardiana-zero.exe -Version <v> `
-#       [-Otros dist/...-en.msi,dist/...-pt.msi]
+#       [-Otros "dist/...-en.msi;dist/...-pt.msi"]
 # It checks, in this order: the package asks for no administrator rights; an older version
 # (-Viejo, the same program packaged as 1.0.0) installs and opens; the new installer, run while the
 # older one is OPEN, closes it the way its own X does (it saves and exits by itself, never killed)
 # and replaces it in place, with one entry in «Apps»; the new program is byte for byte the one
 # GitHub built, with its readme and its two shortcuts, and opens; the other two languages install
 # over it; uninstalling removes program and shortcuts and leaves the person's data. Every check
-# prints «OK» or «FALLO», and the run fails on any «FALLO».
+# prints «OK» or «FALLO», and the run fails on any «FALLO». Every wait has an end: a run that
+# hung once on a clean runner (10 Oct 2026, 50 minutes, no log) must fail with its reason instead.
 param(
     [Parameter(Mandatory = $true)][string]$Msi,
     [Parameter(Mandatory = $true)][string]$Viejo,
     [Parameter(Mandatory = $true)][string]$Exe,
     [Parameter(Mandatory = $true)][string]$Version,
-    [string[]]$Otros = @()
+    # One string, paths separated by «;»: «powershell -File» does not take arrays, and a list that
+    # arrives as one path would have msiexec show its help window, waiting for a click that never comes.
+    [string]$Otros = ''
 )
 $ErrorActionPreference = "Continue"
 $fallos = 0
@@ -23,21 +26,47 @@ $bien = 0
 function Comprueba([bool]$ok, [string]$que) {
     if ($ok) { $script:bien++; Write-Host "OK    $que" } else { $script:fallos++; Write-Host "FALLO $que"; Write-Host "::error title=instalador::$que" }
 }
-# Each argument quoted: runner paths have no spaces today, a person's may.
+# The end of an msiexec log, for the annotation when something fails: the run page shows it,
+# the log itself only a signed-in browser can open.
+function Cola([string]$log) {
+    $l = @(Get-Content $log -ErrorAction SilentlyContinue | Where-Object { $_ -match 'error|Return value 3|CloseApplication|in use|RestartManager|Product:' })
+    return (($l | Select-Object -Last 12) -join ' | ')
+}
+# Each argument quoted: runner paths have no spaces today, a person's may. Never «Start-Process
+# -Wait»: it waits for every process msiexec leaves behind, and has no end.
 function Msiexec([string[]]$argumentos, [string]$log) {
     $todos = @($argumentos | ForEach-Object { if ($_ -match '^/') { $_ } else { '"' + $_ + '"' } }) + @('/qn', '/norestart', '/l*v', ('"' + $log + '"'))
-    $p = Start-Process -FilePath msiexec.exe -ArgumentList $todos -Wait -PassThru
+    $p = Start-Process -FilePath msiexec.exe -ArgumentList $todos -PassThru
+    $null = $p.Handle  # without it, ExitCode reads empty once the process is gone
+    if (-not $p.WaitForExit(240000)) {
+        Comprueba $false "msiexec $($argumentos -join ' ') no terminó en 4 minutos: $(Ventanas)"
+        Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+        return -1
+    }
+    if ($p.ExitCode -ne 0) { Write-Host "::warning title=instalador::msiexec $($p.ExitCode): $(Cola $log)" }
     return $p.ExitCode
+}
+# What is open on screen that nobody can click on a runner: a message box from ZERO or msiexec.
+function Ventanas() {
+    $v = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { ($_.ProcessName -in @('GUARDIANA ZERO', 'msiexec')) -and $_.MainWindowTitle } | ForEach-Object { "$($_.ProcessName) $($_.Id): «$($_.MainWindowTitle)»" })
+    if ($v.Count -eq 0) { return 'ninguna ventana a la vista' }
+    return ($v -join '; ')
 }
 # Opens the installed program and waits for its own mark (en-marcha.txt: «<version> <pid>»).
 function Abre([string]$version) {
     Remove-Item -Force -ErrorAction SilentlyContinue $enMarcha
     $p = Start-Process -FilePath $instalado -PassThru
+    $null = $p.Handle
     for ($i = 0; $i -lt 60; $i++) {
         Start-Sleep -Milliseconds 500
         if ((Test-Path $enMarcha) -and ((Get-Content $enMarcha -ErrorAction SilentlyContinue) -match "^$([regex]::Escape($version)) $($p.Id)$")) { return $p }
     }
+    Write-Host "::warning title=instalador::no abrió en 30 s: $(Ventanas)"
     return $null
+}
+# The product GUARDIANA ZERO has in «Apps» right now (each language is its own product code).
+function Instalado() {
+    return (Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' | Where-Object { (Get-ItemProperty $_.PSPath).DisplayName -eq 'GUARDIANA ZERO' } | Select-Object -First 1).PSChildName
 }
 function Lee-Lnk([string]$ruta) {
     $sh = New-Object -ComObject WScript.Shell
@@ -87,7 +116,7 @@ $r = Msiexec @('/i', (Resolve-Path $Viejo).Path) (Join-Path $logs "instalar-viej
 Comprueba ($r -eq 0) "la versión vieja (1.0.0) se instala ($r)"
 $viejo = Abre $Version  # the same program inside, packaged as 1.0.0
 Comprueba ($null -ne $viejo) "la versión vieja abre"
-$codigoViejo = (Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' | Where-Object { (Get-ItemProperty $_.PSPath).DisplayName -eq 'GUARDIANA ZERO' } | Select-Object -First 1).PSChildName
+$codigoViejo = Instalado
 
 # 4. The new installer while the old one is open: it must be asked to close (WM_CLOSE: it saves
 #    and exits by itself) and be replaced in place, with no «file in use» and no reboot.
@@ -125,17 +154,25 @@ $nuevo = Abre $Version
 Comprueba ($null -ne $nuevo) "el programa nuevo abre (en-marcha.txt: $(Get-Content $enMarcha -ErrorAction SilentlyContinue))"
 $reg = Get-Content (Join-Path $datos "registro.txt") -ErrorAction SilentlyContinue
 Comprueba (($reg | Where-Object { $_ -match 'arranque: GUARDIANA ZERO ' + [regex]::Escape($Version) }).Count -ge 1) "y su registro anota el arranque de la $Version"
-if ($null -ne $nuevo) { $nuevo.CloseMainWindow() | Out-Null; $nuevo.WaitForExit(15000) | Out-Null }
+if ($null -ne $nuevo) {
+    $nuevo.CloseMainWindow() | Out-Null
+    Comprueba ($nuevo.WaitForExit(15000)) "y se cierra con su X"
+}
 
 # 6. The other languages install and uninstall too, with their own readme.
-foreach ($otro in $Otros) {
+foreach ($otro in @($Otros -split ';' | Where-Object { $_ })) {
     $nombre = Split-Path -Leaf $otro
+    if (-not (Test-Path $otro)) { Comprueba $false "no existe $otro"; continue }
     $leeme = if ($nombre -match '-pt\.msi$') { 'LEIAME.txt' } elseif ($nombre -match '-en\.msi$') { 'README.txt' } else { 'LEEME.txt' }
     $r = Msiexec @('/i', (Resolve-Path $otro).Path) (Join-Path $logs "instalar-$nombre.log")
     Comprueba (($r -eq 0) -and (Test-Path (Join-Path $carpeta $leeme))) "$nombre instala encima y deja $leeme ($r)"
+    Comprueba (@(Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' | Where-Object { (Get-ItemProperty $_.PSPath).DisplayName -eq 'GUARDIANA ZERO' }).Count -eq 1) "y sigue habiendo una sola entrada en «Aplicaciones»"
 }
 
 # 7. Uninstall: program and shortcuts go, the person's data stays.
+# The product installed now: after the other languages, it is the last one's, not the first's.
+$codigo = Instalado
+$arp = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$codigo"
 $r = Msiexec @('/x', $codigo) (Join-Path $logs "desinstalar.log")
 Comprueba ($r -eq 0) "msiexec /x termina con 0 ($r)"
 Comprueba (-not (Test-Path $instalado)) "quita el programa"
@@ -144,6 +181,11 @@ Comprueba (-not (Test-Path $inicio)) "y el acceso del menú Inicio"
 Comprueba (-not (Test-Path $escritorio)) "y el del escritorio"
 Comprueba (-not (Test-Path $arp)) "y la entrada de «Aplicaciones»"
 Comprueba ((Test-Path $marca) -and ((Get-Content $marca) -eq 'antes de instalar')) "pero los datos de la persona se quedan"
+
+# Nothing of ours may be left running: a runner waits for every process a step leaves behind.
+$quedan = @(Get-Process -Name 'GUARDIANA ZERO' -ErrorAction SilentlyContinue)
+Comprueba ($quedan.Count -eq 0) "no queda ningún GUARDIANA ZERO abierto ($(Ventanas))"
+$quedan | Stop-Process -Force -ErrorAction SilentlyContinue
 
 Write-Host "::notice title=instalador::$bien bien, $fallos fallos"
 if ($fallos -gt 0) { exit 1 }
