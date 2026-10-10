@@ -65,6 +65,12 @@ pub const BUSCADORES: &[Buscador] = &[
         privado: true,
     },
     Buscador {
+        id: "metager",
+        nombre: "MetaGer",
+        plantilla: "https://metager.org/meta/meta.ger3?eingabe={}",
+        privado: true,
+    },
+    Buscador {
         id: "google",
         nombre: "Google",
         plantilla: "https://www.google.com/search?q={}",
@@ -77,15 +83,45 @@ pub const BUSCADORES: &[Buscador] = &[
         privado: false,
     },
     Buscador {
-        id: "yahoo",
-        nombre: "Yahoo",
-        plantilla: "https://search.yahoo.com/search?p={}",
+        id: "chatgpt",
+        nombre: "ChatGPT",
+        plantilla: "https://chatgpt.com/?hints=search&q={}",
         privado: false,
     },
     Buscador {
         id: "perplexity",
         nombre: "Perplexity",
         plantilla: "https://www.perplexity.ai/search?q={}",
+        privado: false,
+    },
+    Buscador {
+        id: "yahoo",
+        nombre: "Yahoo",
+        plantilla: "https://search.yahoo.com/search?p={}",
+        privado: false,
+    },
+    Buscador {
+        id: "youtube",
+        nombre: "YouTube",
+        plantilla: "https://www.youtube.com/results?search_query={}",
+        privado: false,
+    },
+    Buscador {
+        id: "you",
+        nombre: "You.com",
+        plantilla: "https://you.com/search?q={}",
+        privado: false,
+    },
+    Buscador {
+        id: "ask",
+        nombre: "Ask",
+        plantilla: "https://www.ask.com/web?q={}",
+        privado: false,
+    },
+    Buscador {
+        id: "aol",
+        nombre: "AOL",
+        plantilla: "https://search.aol.com/aol/search?q={}",
         privado: false,
     },
     Buscador {
@@ -98,6 +134,18 @@ pub const BUSCADORES: &[Buscador] = &[
         id: "baidu",
         nombre: "Baidu",
         plantilla: "https://www.baidu.com/s?wd={}",
+        privado: false,
+    },
+    Buscador {
+        id: "naver",
+        nombre: "Naver",
+        plantilla: "https://search.naver.com/search.naver?query={}",
+        privado: false,
+    },
+    Buscador {
+        id: "seznam",
+        nombre: "Seznam",
+        plantilla: "https://search.seznam.cz/?q={}",
         privado: false,
     },
 ];
