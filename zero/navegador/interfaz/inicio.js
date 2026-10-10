@@ -23,9 +23,10 @@
     const sel = $('motor');
     if (!m.motores || sel.matches(':focus')) { if (m.motor_id) sel.value = m.motor_id; return; }
     const opcion = (b) => `<option value="${Z.esc(b.id)}"${b.id === m.motor_id ? ' selected' : ''}>${Z.esc(b.nombre)}</option>`;
-    const grupo = (clave, lista) => (lista.length ? `<optgroup label="${Z.esc(t(clave))}">${lista.map(opcion).join('')}</optgroup>` : '');
-    sel.innerHTML = grupo('buscador_privados', m.motores.filter((b) => b.privado))
-      + grupo('buscador_otros', m.motores.filter((b) => !b.privado));
+    // One plain list: the engines that say they keep no record of who searches what go first,
+    // with no heading (the owner, 10 Oct 2026: a heading repeating their claim is not ours to make).
+    sel.innerHTML = m.motores.filter((b) => b.privado).map(opcion).join('')
+      + m.motores.filter((b) => !b.privado).map(opcion).join('');
     sel.value = m.motor_id;
   }
 

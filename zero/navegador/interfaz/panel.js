@@ -280,12 +280,12 @@
     $('a-importar-caja').classList.toggle('oculto', !imp.length);
     $('a-importar').innerHTML = imp.map((x) => `<button class="boton chico" data-de="${esc(x)}">${esc(x)}</button>`).join(' ');
     $('e-proteccion').checked = !!m.cortar_seguimiento;
-    // Two groups: the engines that say they keep no record of who searches what, and the rest.
+    // One plain list, with no headings: the engines that say they keep no record of who searches
+    // what go first (the owner, 10 Oct 2026).
     const opcion = (b) => `<option value="${esc(b.id)}"${b.id === m.buscador ? ' selected' : ''}>${esc(b.nombre)}</option>`;
-    const grupo = (clave, lista) => (lista.length ? `<optgroup label="${esc(t(clave))}">${lista.map(opcion).join('')}</optgroup>` : '');
     const todos = m.buscadores || [];
-    $('a-buscador').innerHTML = grupo('buscador_privados', todos.filter((b) => b.privado))
-      + grupo('buscador_otros', todos.filter((b) => !b.privado));
+    $('a-buscador').innerHTML = todos.filter((b) => b.privado).map(opcion).join('')
+      + todos.filter((b) => !b.privado).map(opcion).join('');
     $('a-idioma').value = m.idioma || '';
     document.querySelectorAll('.temas button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tema === (m.tema || ''))));
     $('a-borrar-palabra').placeholder = t('borrar_confirma', { palabra: t('borrar_palabra') });
