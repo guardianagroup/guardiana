@@ -12,9 +12,11 @@ https://db-ip.com on the pages that show the results.
 Usage:
   python3 build/red-ip.py descargar 2026-10
       downloads both monthly files from download.db-ip.com and converts them.
-  python3 build/red-ip.py convertir PAIS.csv[.gz] RED.csv[.gz] --fecha 2026-10 [--muestra]
-      converts files already on disk. --muestra marks the result as a test sample: the panel
-      then says, on every page that shows it, that these are not real DB-IP data.
+  python3 build/red-ip.py convertir dbip-country-lite-2026-10.csv.gz dbip-asn-lite-2026-10.csv.gz
+      converts the two files already on disk (downloaded by hand from db-ip.com), gzipped or not.
+      The month is read from the file names; --fecha AAAA-MM says it when they were renamed.
+      --muestra marks the result as a test sample: the panel then says, on every page that shows
+      it, that these are not real DB-IP data.
 
 Output, in crates/lists/data/:
   ip-pais.bin   IP -> two-letter country, sorted ranges (format below)
@@ -204,6 +206,23 @@ def convertir_red(text):
     return bytes(out), info
 
 
+def fecha_de(path):
+    """`AAAA-MM` from a DB-IP file name (`dbip-country-lite-2026-10.csv.gz`), or None."""
+    import re
+    m = re.search(r'(\d{4})-(\d{2})\.csv(\.gz)?$', os.path.basename(path))
+    return f'{m.group(1)}-{m.group(2)}' if m else None
+
+
+def comprobar_origen(pais_path, red_path):
+    """Refuse the two files swapped: the country file has three columns, the ASN one four."""
+    for path, columnas, que in ((pais_path, 3, 'país'), (red_path, 4, 'red (ASN)')):
+        _, text = leer(path)
+        primera = next(filas(text), None)
+        if primera is None or len(primera) != columnas:
+            raise SystemExit(f'{path}: no parece el archivo de {que} de DB-IP '
+                             f'({columnas} columnas por fila; la primera tiene {len(primera or [])})')
+
+
 def escribir(pais_path, red_path, fecha, muestra, url_pais, url_red, salida):
     raw_p, text_p = leer(pais_path)
     raw_r, text_r = leer(red_path)
@@ -242,7 +261,7 @@ def main():
     c = sub.add_parser('convertir')
     c.add_argument('pais')
     c.add_argument('red')
-    c.add_argument('--fecha', required=True)
+    c.add_argument('--fecha', help='AAAA-MM; por defecto, el de los nombres de los archivos')
     c.add_argument('--muestra', action='store_true')
     c.add_argument('--salida', default=DATA)
     a = ap.parse_args()
@@ -258,8 +277,15 @@ def main():
             rutas.append((ruta, url))
         escribir(rutas[0][0], rutas[1][0], a.fecha, False, rutas[0][1], rutas[1][1], DATA)
     else:
-        escribir(a.pais, a.red, a.fecha, a.muestra, URL_PAIS.format(fecha=a.fecha),
-                 URL_RED.format(fecha=a.fecha), a.salida)
+        fechas = {f for f in (fecha_de(a.pais), fecha_de(a.red)) if f}
+        if len(fechas) > 1:
+            raise SystemExit(f'los dos archivos son de meses distintos: {sorted(fechas)}')
+        fecha = a.fecha or (fechas.pop() if fechas else None)
+        if not fecha or len(fecha) != 7 or fecha[4] != '-':
+            raise SystemExit('no se sabe de qué mes es la base: pásalo con --fecha AAAA-MM')
+        comprobar_origen(a.pais, a.red)
+        escribir(a.pais, a.red, fecha, a.muestra, URL_PAIS.format(fecha=fecha),
+                 URL_RED.format(fecha=fecha), a.salida)
 
 
 if __name__ == '__main__':
