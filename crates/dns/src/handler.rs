@@ -47,6 +47,17 @@ fn normalize(name: &Name) -> String {
     s
 }
 
+/// The first A or AAAA record of an answer, in the order the upstream gave them: after a CNAME
+/// chain, the address the device will actually connect to. Only this one address is kept of the
+/// whole answer (decision 203).
+fn first_address(answers: &[Record]) -> Option<std::net::IpAddr> {
+    answers.iter().find_map(|r| match &r.data {
+        RData::A(a) => Some(std::net::IpAddr::V4(a.0)),
+        RData::AAAA(a) => Some(std::net::IpAddr::V6(a.0)),
+        _ => None,
+    })
+}
+
 fn failed_info(request: &Request) -> ResponseInfo {
     let mut metadata = Metadata::response_from_request(&request.metadata);
     metadata.response_code = ResponseCode::ServFail;
@@ -169,16 +180,21 @@ impl<P: Policy> Handler<P> {
 
     async fn forward(&self, name: &Name, qtype: RecordType) -> (Answer, Outcome) {
         match self.upstream.lookup(name.clone(), qtype).await {
-            Ok(lookup) => (
-                Answer {
-                    code: ResponseCode::NoError,
-                    answers: lookup.answers().to_vec(),
-                    authorities: Vec::new(),
-                },
-                Outcome::Forwarded {
-                    rcode: ResponseCode::NoError,
-                },
-            ),
+            Ok(lookup) => {
+                let answers = lookup.answers().to_vec();
+                let server = first_address(&answers);
+                (
+                    Answer {
+                        code: ResponseCode::NoError,
+                        answers,
+                        authorities: Vec::new(),
+                    },
+                    Outcome::Forwarded {
+                        rcode: ResponseCode::NoError,
+                        server,
+                    },
+                )
+            }
             Err(NetError::Dns(DnsError::NoRecordsFound(NoRecords {
                 response_code,
                 authorities,
@@ -191,6 +207,7 @@ impl<P: Policy> Handler<P> {
                 },
                 Outcome::Forwarded {
                     rcode: response_code,
+                    server: None,
                 },
             ),
             Err(_) => (

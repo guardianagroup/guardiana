@@ -118,6 +118,13 @@ pub struct HashInput<'a> {
     /// it. It is hashed **only when it is there**: a row without it hashes exactly as it did
     /// before this field existed, and every ledger written until 20 September 2026 still verifies.
     pub process_json: &'a str,
+    /// First address of the forwarded answer, or empty (decision 203).
+    ///
+    /// Hashed **only when it is there**, after `process_json`, which is then hashed too, even
+    /// empty, so the two optional fields can never be read one for the other. A row without an
+    /// address hashes exactly as before this field existed (decision 203), and every older extract
+    /// still verifies.
+    pub answer_ip: &'a str,
 }
 
 /// Compute `sha256(prev_hash || fields)` for one ledger row.
@@ -146,10 +153,16 @@ pub fn chain_hash(prev: &Hash, input: &HashInput<'_>) -> Hash {
     }
     // Al final y solo si hay algo: así una fila sin programa da el mismo hash que antes de que
     // este campo existiera, y las cadenas ya escritas siguen comprobando.
-    if !input.process_json.is_empty() {
-        let len = u32::try_from(input.process_json.len()).unwrap_or(u32::MAX);
+    let mut opcionales: Vec<&str> = Vec::new();
+    if !input.answer_ip.is_empty() {
+        opcionales.extend([input.process_json, input.answer_ip]);
+    } else if !input.process_json.is_empty() {
+        opcionales.push(input.process_json);
+    }
+    for field in opcionales {
+        let len = u32::try_from(field.len()).unwrap_or(u32::MAX);
         h.update(len.to_be_bytes());
-        h.update(input.process_json.as_bytes());
+        h.update(field.as_bytes());
     }
     let digest = h.finalize();
     let mut out = [0u8; 32];
@@ -175,7 +188,32 @@ mod tests {
             decided_by: "nadie",
             rule_id: None,
             process_json: "",
+            answer_ip: "",
         }
+    }
+
+    #[test]
+    fn la_direccion_del_servidor_no_cambia_el_hash_de_las_filas_que_no_la_llevan() {
+        // Un extracto escrito antes de la decisión 203 tiene que seguir comprobando después de
+        // actualizar, con programa o sin él.
+        let anterior = Hash::of(b"ancla");
+        let sin = chain_hash(&anterior, &sample());
+        let mut con = sample();
+        con.answer_ip = "157.240.1.35";
+        assert_ne!(sin, chain_hash(&anterior, &con), "con dirección cambia");
+        let mut programa = sample();
+        programa.process_json = "{\"pid\":1}";
+        let solo_programa = chain_hash(&anterior, &programa);
+        // Los dos campos opcionales no se confunden: una dirección sin programa no da el hash
+        // de un programa que se llamara como la dirección.
+        let mut como_programa = sample();
+        como_programa.process_json = "157.240.1.35";
+        assert_ne!(
+            chain_hash(&anterior, &con),
+            chain_hash(&anterior, &como_programa)
+        );
+        programa.answer_ip = "2a03:2880::1";
+        assert_ne!(solo_programa, chain_hash(&anterior, &programa));
     }
 
     #[test]

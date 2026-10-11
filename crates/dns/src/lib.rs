@@ -165,6 +165,10 @@ pub enum Outcome {
     Forwarded {
         /// DNS response code sent back, e.g. `NoError` or `NXDomain`.
         rcode: hickory_proto::op::ResponseCode,
+        /// The first IPv4 or IPv6 address in the answer, when it carried one: where the device
+        /// was sent (decision 203). `None` for answers with no address (a name that does not
+        /// exist, a TXT, an HTTPS record without hints).
+        server: Option<std::net::IpAddr>,
     },
     /// Upstream did not answer; SERVFAIL was returned.
     UpstreamFailed,

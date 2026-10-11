@@ -289,6 +289,7 @@ fn filter_from(q: &HashMap<String, String>) -> Result<EventFilter, Response> {
         since: q.get("since").and_then(|s| s.parse().ok()),
         until: q.get("until").and_then(|s| s.parse().ok()),
         limit: q.get("limit").and_then(|s| s.parse().ok()),
+        answer_ips: None,
     })
 }
 

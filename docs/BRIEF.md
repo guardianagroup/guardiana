@@ -105,6 +105,7 @@ guardiana/
 - Comprobador: `comprobar.guardiana.hogar` → resuelve a la IP LAN del computador; el panel sirve en ese nombre una página "Este dispositivo ya pasa por Guardiana".
 - Evasión de DNS: lista de nombres de resolutores DoH/DoT conocidos; se anota como señal, no se corta salvo regla del usuario.
 - Nunca se anotan ni se muestran respuestas, solo consultas: nombre, tipo, dispositivo, hora, categoría, veredicto.
+  *(Cambiado por el responsable el 10 oct 2026, decisión 203: de la respuesta reenviada se guarda solo su primera dirección IP, para decir el país y la red del servidor con una base que va dentro del programa. Nada más de la respuesta.)*
 - Rendimiento objetivo: < 5 ms añadidos por consulta en caché, < 1 % CPU en reposo.
 
 ## 5 · Listas y clasificación

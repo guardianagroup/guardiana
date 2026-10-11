@@ -520,6 +520,14 @@ impl Policy for EnginePolicy {
         event.verdict = verdict;
         event.decided_by = decided_by;
         event.rule_id = rule_id;
+        // De la respuesta, solo su primera dirección: en qué país y en qué red está el servidor al
+        // que se mandó al aparato (decisión 203). Nada para lo cortado ni lo que contestó GUARDIANA.
+        if let Outcome::Forwarded {
+            server: Some(ip), ..
+        } = outcome
+        {
+            event.answer_ip = ip.to_string();
+        }
         // Solo para este equipo: de un teléfono en Modo Hogar se ve el nombre y nada más, y eso
         // lo dice cada pantalla. Si el sistema no lo dijo, el hueco se queda vacío.
         // Counted here, before the Windows queue takes the event: until 1.0.5 the count lived
@@ -2304,6 +2312,7 @@ mod aparte_tests {
         s.anota(Outcome::UpstreamFailed);
         s.anota(Outcome::Forwarded {
             rcode: dns::ResponseCode::NoError,
+            server: None,
         });
         s.anota(Outcome::Canary);
         assert_eq!(s.minuto(), (1, 2));

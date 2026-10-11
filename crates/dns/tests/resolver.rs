@@ -210,10 +210,13 @@ async fn forwards_and_serves_second_query_from_cache() {
     );
     assert_eq!(seen[0].0.qtype, RecordType::A);
     assert!(seen[0].0.ts > 0);
+    // The address the answer pointed to travels with the outcome, from the cache too
+    // (decision 203).
     assert_eq!(
         seen[1].1,
         Outcome::Forwarded {
-            rcode: ResponseCode::NoError
+            rcode: ResponseCode::NoError,
+            server: Some(std::net::IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4))),
         }
     );
 }
@@ -228,7 +231,8 @@ async fn nxdomain_from_upstream_passes_through() {
     assert_eq!(
         policy.seen()[0].1,
         Outcome::Forwarded {
-            rcode: ResponseCode::NXDomain
+            rcode: ResponseCode::NXDomain,
+            server: None,
         }
     );
 }

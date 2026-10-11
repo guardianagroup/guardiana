@@ -101,7 +101,10 @@ CREATE TABLE IF NOT EXISTS events (
     row_hash     BLOB    NOT NULL,
     -- El programa que pidió el nombre, cuando el sistema puede decirlo (Windows, este equipo).
     -- Vacío en todo lo demás, que es la mayoría: se guarda el nombre del programa, no lo que hace.
-    process_json TEXT    NOT NULL DEFAULT ''
+    process_json TEXT    NOT NULL DEFAULT '',
+    -- La primera dirección (IPv4 o IPv6) de la respuesta reenviada, o vacío (decisión 203). Es lo
+    -- único que se guarda de la respuesta: dice en qué país y en qué red está el servidor.
+    answer_ip    TEXT    NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
 CREATE INDEX IF NOT EXISTS events_device_ts ON events(device_id, ts);
@@ -154,7 +157,7 @@ CREATE TABLE IF NOT EXISTS daily_totals (
 
 const EVENT_COLUMNS: &str = "id, ts, device_id, client_ip, qname, qtype, category, list_source, \
                              signals_json, verdict, decided_by, rule_id, prev_hash, row_hash, \
-                             process_json";
+                             process_json, answer_ip";
 
 /// Handle to the ledger database.
 pub struct Ledger {
@@ -256,6 +259,10 @@ pub struct EventFilter {
     pub since: Option<i64>,
     /// Only `ts < until`.
     pub until: Option<i64>,
+    /// Only rows whose first answer address is one of these (the panel's filter by the server's
+    /// country, which turns a country into the addresses the extract holds for it). An empty
+    /// list matches no row.
+    pub answer_ips: Option<Vec<String>>,
     /// At most this many rows: the newest ones, returned oldest first.
     pub limit: Option<u32>,
 }
@@ -279,6 +286,7 @@ impl Ledger {
         ledger.ensure_changes_table()?;
         ledger.migrate_rules_confirmed()?;
         ledger.migrate_events_process()?;
+        ledger.migrate_events_answer_ip()?;
         match ledger.setting(KEY_GENESIS)? {
             None => {
                 ledger.set_setting(KEY_GENESIS, &genesis.to_hex())?;
@@ -428,12 +436,14 @@ impl Ledger {
                 decided_by: new.decided_by.as_str(),
                 rule_id: new.rule_id,
                 process_json: &process_json,
+                answer_ip: &new.answer_ip,
             },
         );
         tx.execute(
             "INSERT INTO events (ts, device_id, client_ip, qname, qtype, category, list_source, \
-             signals_json, verdict, decided_by, rule_id, prev_hash, row_hash, process_json) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+             signals_json, verdict, decided_by, rule_id, prev_hash, row_hash, process_json, \
+             answer_ip) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
             params![
                 new.ts,
                 new.device_id,
@@ -449,6 +459,7 @@ impl Ledger {
                 prev_hash.0.as_slice(),
                 row_hash.0.as_slice(),
                 process_json,
+                new.answer_ip,
             ],
         )?;
         let id = tx.last_insert_rowid();
@@ -490,6 +501,7 @@ impl Ledger {
             decided_by: new.decided_by,
             rule_id: new.rule_id,
             process: new.process,
+            answer_ip: new.answer_ip,
             prev_hash,
             row_hash,
         })
@@ -593,6 +605,12 @@ impl Ledger {
         if let Some(t) = filter.until {
             sql.push_str(" AND ts < ?");
             args.push(Box::new(t));
+        }
+        if let Some(ips) = &filter.answer_ips {
+            // One parameter whatever the number of addresses: a JSON array read by json_each,
+            // instead of one placeholder each, which SQLite caps.
+            sql.push_str(" AND answer_ip IN (SELECT value FROM json_each(?))");
+            args.push(Box::new(serde_json::to_string(ips)?));
         }
         // With a limit, the newest rows are wanted; they are still returned oldest first.
         match filter.limit {
@@ -869,6 +887,25 @@ impl Ledger {
         Ok(())
     }
 
+    /// Databases written before decision 203 lack `events.answer_ip`; add it once. Rows
+    /// written before keep an empty value, which the hash treats as "no address here", so an old
+    /// extract still verifies after the upgrade. Cheap on a big file: SQLite adds a column with a
+    /// constant default without rewriting the rows.
+    fn migrate_events_answer_ip(&self) -> Result<()> {
+        let has: bool = self
+            .conn
+            .prepare("PRAGMA table_info(events)")?
+            .query_map([], |r| r.get::<_, String>(1))?
+            .filter_map(std::result::Result::ok)
+            .any(|c| c == "answer_ip");
+        if !has {
+            self.conn.execute_batch(
+                "ALTER TABLE events ADD COLUMN answer_ip TEXT NOT NULL DEFAULT ''",
+            )?;
+        }
+        Ok(())
+    }
+
     /// Older databases lack `rules.confirmed`; add it once.
     fn migrate_rules_confirmed(&self) -> Result<()> {
         let has: bool = self
@@ -1096,6 +1133,7 @@ struct RawEvent {
     prev_hash: Hash,
     row_hash: Hash,
     process_json: String,
+    answer_ip: String,
 }
 
 impl RawEvent {
@@ -1113,6 +1151,7 @@ impl RawEvent {
             decided_by: &self.decided_by,
             rule_id: self.rule_id,
             process_json: &self.process_json,
+            answer_ip: &self.answer_ip,
         }
     }
 }
@@ -1135,6 +1174,7 @@ fn raw_from_row(row: &Row<'_>) -> Result<RawEvent> {
         prev_hash: Hash::from_bytes(&prev)?,
         row_hash: Hash::from_bytes(&cur)?,
         process_json: row.get(14).unwrap_or_default(),
+        answer_ip: row.get(15).unwrap_or_default(),
     })
 }
 
@@ -1165,6 +1205,7 @@ fn event_from_row(row: &Row<'_>) -> rusqlite::Result<Event> {
         } else {
             serde_json::from_str(&raw.process_json).map_err(|e| to_sql_err(Error::Json(e)))?
         },
+        answer_ip: raw.answer_ip,
         prev_hash: raw.prev_hash,
         row_hash: raw.row_hash,
     })
@@ -1511,6 +1552,75 @@ mod tests {
         assert_eq!(a.prev_hash, genesis());
         assert!(l.check().unwrap().is_ok());
         assert_eq!(l.setting(KEY_HEAD_COUNT).unwrap().as_deref(), Some("1"));
+    }
+
+    #[test]
+    fn an_extract_from_before_the_answer_address_gains_it_and_still_verifies() {
+        // A 1.0.12 file: the same table without `answer_ip`.
+        let (dir, db) = temp_db("answer-ip");
+        {
+            let mut l = Ledger::open(&db, genesis()).unwrap();
+            l.append(ev(1, "a.example")).unwrap();
+            l.append(ev(2, "b.example")).unwrap();
+            l.conn
+                .execute_batch("ALTER TABLE events DROP COLUMN answer_ip")
+                .unwrap();
+        }
+        let mut l = Ledger::open(&db, genesis()).unwrap();
+        assert!(
+            l.check().unwrap().is_ok(),
+            "old rows verify after the upgrade"
+        );
+        let mut con = ev(3, "c.example");
+        con.answer_ip = "2001:db8::7".to_owned();
+        let e = l.append(con).unwrap();
+        assert_eq!(e.answer_ip, "2001:db8::7");
+        l.append(ev(4, "d.example")).unwrap();
+        assert!(
+            l.check().unwrap().is_ok(),
+            "a row with its address verifies"
+        );
+        let todas = l.events(&EventFilter::default()).unwrap();
+        assert_eq!(todas[2].answer_ip, "2001:db8::7");
+        assert_eq!(todas[0].answer_ip, "");
+        // Changing the stored address is caught like any other field.
+        l.conn
+            .execute("UPDATE events SET answer_ip = '192.0.2.1' WHERE id = 3", [])
+            .unwrap();
+        let r = l.check().unwrap();
+        assert!(
+            matches!(r.first_fault, Some((3, ChainFault::AlteredRow { .. }))),
+            "{r:?}"
+        );
+        drop(l);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_extract_filters_by_answer_addresses() {
+        let mut l = Ledger::open_in_memory(genesis()).unwrap();
+        for (i, ip) in ["192.0.2.1", "192.0.2.2", "", "192.0.2.1"]
+            .iter()
+            .enumerate()
+        {
+            let mut e = ev(i64::try_from(i).unwrap(), "a.example");
+            e.answer_ip = (*ip).to_owned();
+            l.append(e).unwrap();
+        }
+        let solo = |ips: &[&str]| {
+            l.events(&EventFilter {
+                answer_ips: Some(ips.iter().map(|s| (*s).to_owned()).collect()),
+                ..EventFilter::default()
+            })
+            .unwrap()
+            .len()
+        };
+        assert_eq!(solo(&["192.0.2.1"]), 2);
+        assert_eq!(solo(&["192.0.2.1", "192.0.2.2"]), 3);
+        assert_eq!(solo(&[]), 0, "an empty list matches nothing");
+        let mut ips = l.answer_ips().unwrap();
+        ips.sort();
+        assert_eq!(ips, vec!["192.0.2.1", "192.0.2.2"]);
     }
 
     fn temp_db(tag: &str) -> (std::path::PathBuf, std::path::PathBuf) {

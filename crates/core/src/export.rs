@@ -10,7 +10,7 @@ use crate::time::rfc3339_utc;
 /// Column order of the CSV export.
 pub const CSV_HEADER: &str = "id,ts,ts_utc,device_id,client_ip,qname,qtype,category,list_source,\
                               signals,verdict,decided_by,rule_id,prev_hash,row_hash,\
-                              programa,programa_ruta,programa_sha256";
+                              programa,programa_ruta,programa_sha256,answer_ip";
 
 /// Write events as a JSON array, one object per event, hashes as hex.
 pub fn write_json<W: Write>(events: &[Event], mut w: W) -> Result<()> {
@@ -33,11 +33,41 @@ pub fn write_csv_for_spreadsheet<W: Write>(events: &[Event], sep: char, w: W) ->
     write_csv_with(events, sep, true, w)
 }
 
-fn write_csv_with<W: Write>(events: &[Event], sep: char, bom: bool, mut w: W) -> Result<()> {
+/// The spreadsheet CSV with more columns after the ledger's own: what the panel reads from the
+/// stored fields with the data bundled in the program (the server's country and network, the
+/// company's group; decision 203). They are not in the ledger and not in the hash, so they go
+/// last, after every column needed to recompute it, with their header from `extra_header`.
+pub fn write_csv_for_spreadsheet_with<W: Write>(
+    events: &[Event],
+    sep: char,
+    extra_header: &[&str],
+    extra: &dyn Fn(&Event) -> Vec<String>,
+    w: W,
+) -> Result<()> {
+    write_csv_inner(events, sep, true, extra_header, extra, w)
+}
+
+fn write_csv_with<W: Write>(events: &[Event], sep: char, bom: bool, w: W) -> Result<()> {
+    write_csv_inner(events, sep, bom, &[], &|_| Vec::new(), w)
+}
+
+fn write_csv_inner<W: Write>(
+    events: &[Event],
+    sep: char,
+    bom: bool,
+    extra_header: &[&str],
+    extra: &dyn Fn(&Event) -> Vec<String>,
+    mut w: W,
+) -> Result<()> {
     if bom {
         w.write_all("\u{feff}".as_bytes())?;
     }
-    writeln!(w, "{}", CSV_HEADER.replace(',', &sep.to_string()))?;
+    let mut header = CSV_HEADER.replace(',', &sep.to_string());
+    for h in extra_header {
+        header.push(sep);
+        header.push_str(&quote(h, sep, bom));
+    }
+    writeln!(w, "{header}")?;
     for e in events {
         let signals = e
             .signals
@@ -46,7 +76,7 @@ fn write_csv_with<W: Write>(events: &[Event], sep: char, bom: bool, mut w: W) ->
             .collect::<Vec<_>>()
             .join(" ");
         let rule = e.rule_id.map(|r| r.to_string()).unwrap_or_default();
-        let fields = [
+        let mut fields = vec![
             e.id.to_string(),
             e.ts.to_string(),
             rfc3339_utc(e.ts),
@@ -76,7 +106,11 @@ fn write_csv_with<W: Write>(events: &[Event], sep: char, bom: bool, mut w: W) ->
                 .as_ref()
                 .map(|p| p.sha256.clone())
                 .unwrap_or_default(),
+            // La primera dirección de la respuesta (decisión 203): entra en el hash cuando está,
+            // así que va en el CSV para poder recalcularlo.
+            e.answer_ip.clone(),
         ];
+        fields.extend(extra(e));
         let line = fields
             .iter()
             .map(|f| quote(f, sep, bom))
@@ -175,5 +209,45 @@ mod tests {
         assert!(row.starts_with("1,1,1970-01-01T00:00:00.001Z,self,127.0.0.1,a.example,A,"));
         assert!(row.contains(",volumen,observado,nadie,,"));
         assert!(lines.next().is_none());
+    }
+
+    #[test]
+    fn the_answer_address_is_exported_and_extra_columns_go_last() {
+        let mut l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        let mut e = NewEvent::observed(1, "self", "127.0.0.1", "a.example", "A");
+        e.answer_ip = "192.0.2.7".to_owned();
+        l.append(e).unwrap();
+        let events = l.events(&Default::default()).unwrap();
+        let mut plano = Vec::new();
+        write_csv(&events, &mut plano).unwrap();
+        let text = String::from_utf8(plano).unwrap();
+        assert!(
+            text.lines().nth(1).unwrap().ends_with(",192.0.2.7"),
+            "{text}"
+        );
+        let mut hoja = Vec::new();
+        write_csv_for_spreadsheet_with(
+            &events,
+            ';',
+            &["pais [fuente]", "red"],
+            &|ev| vec![format!("pais de {}", ev.answer_ip), "AS64500".to_owned()],
+            &mut hoja,
+        )
+        .unwrap();
+        let text = String::from_utf8(hoja[3..].to_vec()).unwrap();
+        let mut lines = text.lines();
+        assert!(lines
+            .next()
+            .unwrap()
+            .ends_with(";answer_ip;pais [fuente];red"));
+        assert!(lines
+            .next()
+            .unwrap()
+            .ends_with(";192.0.2.7;pais de 192.0.2.7;AS64500"));
+        // JSON carries it too, and reads back.
+        let mut json = Vec::new();
+        write_json(&events, &mut json).unwrap();
+        let back: Vec<Event> = serde_json::from_slice(&json).unwrap();
+        assert_eq!(back[0].answer_ip, "192.0.2.7");
     }
 }

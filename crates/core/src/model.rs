@@ -215,7 +215,10 @@ pub struct Proceso {
     pub firmado_por: String,
 }
 
-/// One stored query. Answers are never stored (brief §4).
+/// One stored query. Of the answer, only the first address is kept, and only when Guardiana
+/// forwarded the query and the answer carried one (decision 203): it is what says in which
+/// country, and on whose network, the server the device was sent to sits. Nothing else of the
+/// answer is stored.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Event {
     /// Row id, increasing in insertion order.
@@ -245,6 +248,11 @@ pub struct Event {
     /// The program that asked, when the system could say (Windows, this computer only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub process: Option<Proceso>,
+    /// First IPv4 or IPv6 address of the forwarded answer (`157.240.1.35`), empty when there was
+    /// none: cut, answered by Guardiana itself, no address in the answer, or written before
+    /// decision 203.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub answer_ip: String,
     /// Hash of the previous row (or the chain anchor).
     pub prev_hash: Hash,
     /// `sha256(prev_hash || fields)`.
@@ -278,6 +286,8 @@ pub struct NewEvent {
     pub rule_id: Option<i64>,
     /// The program that asked, when the system could say.
     pub process: Option<Proceso>,
+    /// First address of the forwarded answer, or empty (decision 203).
+    pub answer_ip: String,
 }
 
 impl NewEvent {
@@ -298,6 +308,7 @@ impl NewEvent {
             decided_by: DecidedBy::Nadie,
             rule_id: None,
             process: None,
+            answer_ip: String::new(),
         }
     }
 }
