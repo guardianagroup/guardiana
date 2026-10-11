@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>GUARDIANA · Haz que te borren</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="preload" href="/static/fonts/IBMPlexSans-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/Unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
+<script src="/static/arranque.js"></script>
+</head>
+<body data-page="borrado">
+<header class="top">
+  <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA<small data-t="lema"></small></span></a>
+  <nav>
+    <a href="/"  data-t="nav_radiografia">Radiografía</a>
+    <a href="/ia" data-t="nav_ia">Tu IA</a>
+    <a href="/extracto"  data-t="nav_extracto">Extracto</a>
+    <a href="/dispositivos"  data-t="nav_dispositivos">Dispositivos</a>
+    <a href="/sabe-de-ti" data-t="nav_sabe">Lo que GUARDIANA sabe de ti</a>
+    <a href="/borrado" aria-current="page" data-t="nav_borrado">Haz que te borren</a>
+    <a href="/reglas" data-t="nav_reglas">Reglas</a>
+    <a href="/informe" data-t="nav_informe">Informe semanal</a>
+    <a href="/hogar" data-t="nav_hogar">Modo Hogar</a>
+    <a href="/licencia" data-t="nav_licencia">Licencia</a>
+    <a href="/verify" data-t="nav_verify">Verificar</a>
+    <a href="/estado"  data-t="nav_estado">Estado</a>
+  </nav>
+</header>
+<main>
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<h1 data-t="borrado_titulo"></h1>
+<p class="lead" data-t="borrado_lead"></p>
+<p class="limit"><strong data-t="borrado_aviso_abogados"></strong> <span data-t="borrado_privado"></span></p>
+
+<h2 data-t="borrado_paso_pais"></h2>
+<p class="lead" data-t="borrado_pais_lead"></p>
+<form class="filters" id="b-pais-form">
+  <label><span data-t="borrado_campo_pais"></span><select id="b-pais"></select></label>
+</form>
+<div class="card" id="b-ley"></div>
+<div class="card hidden" id="b-drop">
+  <h3 data-t="borrado_drop_titulo"></h3>
+  <p data-t="borrado_drop_texto"></p>
+  <p><a class="btn" href="https://consumer.drop.privacy.ca.gov" target="_blank" rel="noopener noreferrer" data-t="borrado_drop_enlace"></a>
+     <a href="https://privacy.ca.gov/drop/" target="_blank" rel="noopener noreferrer" data-t="borrado_drop_mas"></a></p>
+</div>
+
+<h2 data-t="borrado_paso_empresa"></h2>
+<p class="lead" data-t="borrado_empresa_lead"></p>
+<div class="card wrap"><table><thead><tr><th data-t="borrado_col_empresa"></th><th data-t="borrado_col_visto"></th><th></th></tr></thead><tbody id="b-corredores"></tbody></table></div>
+<p id="b-callados" class="muted hidden"></p>
+
+<h2 data-t="borrado_paso_carta"></h2>
+<p class="lead" data-t="borrado_carta_lead"></p>
+<div class="card" id="b-carta-card">
+  <form class="filters" id="b-carta-form">
+    <label><span data-t="borrado_col_empresa"></span><select id="b-corredor"></select></label>
+    <label><span data-t="borrado_campo_idioma"></span><select id="b-idioma"><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option></select></label>
+    <label><span data-t="borrado_campo_nombre"></span><input id="b-nombre" type="text" autocomplete="off" spellcheck="false"></label>
+    <label><span data-t="borrado_campo_correo"></span><input id="b-correo" type="email" autocomplete="off" spellcheck="false"></label>
+    <label class="check"><span data-t="borrado_campo_evidencia"></span><input id="b-evidencia" type="checkbox" checked></label>
+  </form>
+  <p id="b-canal" class="muted"></p>
+  <p><strong id="b-asunto"></strong></p>
+  <textarea id="b-texto" class="mono wide" rows="22" readonly></textarea>
+  <p>
+    <button type="button" id="b-copiar" data-t="borrado_copiar"></button>
+    <a class="btn secondary" id="b-mailto" href="#" data-t="borrado_mailto"></a>
+    <button type="button" class="secondary" id="b-descargar" data-t="borrado_descargar"></button>
+    <a class="btn secondary hidden" id="b-formulario" href="#" target="_blank" rel="noopener noreferrer" data-t="borrado_formulario"></a>
+    <span id="b-msg" class="ok" role="status" aria-live="polite"></span>
+  </p>
+</div>
+
+<h2 data-t="borrado_paso_reloj"></h2>
+<p class="lead" data-t="borrado_reloj_lead"></p>
+<form class="filters" id="b-envio-form">
+  <label><span data-t="borrado_campo_enviada"></span><input id="b-enviada" type="date"></label>
+  <button type="submit" data-t="borrado_apuntar"></button> <span id="b-envio-msg" class="bad" role="status" aria-live="polite"></span>
+</form>
+<div id="b-envios"></div>
+<p class="limit" data-t="borrado_reloj_limite"></p>
+<p class="limit" data-t="borrado_aviso_abogados"></p>
+</main>
+<footer><span data-t="pie"></span></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

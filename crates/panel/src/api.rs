@@ -31,7 +31,7 @@ use crate::auth::{Lang, PorDireccion, Session, Zona};
 use crate::destinos::{self, FuenteView, ResumenDestinos, ServidorView};
 use crate::AppState;
 
-type ApiResult<T> = Result<Json<T>, Response>;
+pub(crate) type ApiResult<T> = Result<Json<T>, Response>;
 
 fn internal(e: impl std::fmt::Display) -> Response {
     (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
@@ -45,7 +45,7 @@ fn internal(e: impl std::fmt::Display) -> Response {
 /// tokio hands this worker's other tasks, the resolver's among them, to another thread first.
 /// Waiting for the lock counts as blocking too, so it is inside. A runtime with one thread (the
 /// tests) cannot do that and runs it as before.
-fn with_ledger<T>(
+pub(crate) fn with_ledger<T>(
     state: &AppState,
     f: impl FnOnce(&mut Ledger) -> guardiana_core::Result<T>,
 ) -> Result<T, Response> {

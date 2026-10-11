@@ -1,0 +1,270 @@
+# Guardiana — «Haz que te borren» (decisión 204): empresas conocidas que compran, venden o
+# reúnen datos personales, con el canal que ELLAS publican para pedir que te borren.
+#
+# Qué es y qué no es. Esta lista sirve para escribir una carta y para decir qué nombres de cada
+# empresa pidió la casa. Nunca dice que una empresa «tiene tus datos»: eso solo lo sabe ella, y
+# la carta es justamente la manera de preguntárselo. Las direcciones y los formularios son los que
+# la propia empresa publica; ninguno se ha inventado ni deducido. Si no se pudo comprobar un
+# correo, no hay correo: la carta se copia y se pega en su formulario.
+#
+# Fuentes, en este orden:
+#   1. La página de privacidad de la propia empresa, abierta el 11 de octubre de 2026.
+#   2. Para las inscritas en California, la página de derechos que ellas mismas declararon en el
+#      registro de corredores de datos de la CPPA (https://cppa.ca.gov/data_broker_registry/),
+#      según la copia del 8 de octubre de 2026 que ya usa crates/lists/data/corredores.txt.
+# Cada sección lleva sus `fuente` con la fecha en que se miró.
+#
+# FORMATO
+#   @id|Nombre|XX|tipo     id en minúsculas (lo usa el panel y el reloj); XX país ISO de la
+#                          sociedad que lleva ese servicio y contesta la carta (Equifax Ibérica es
+#                          ES aunque el grupo sea de EE. UU.), vacío si no se comprobó; tipo:
+#                          personas (buscador de personas), datos (corredor de datos),
+#                          publicidad, credito
+#   url URL                la página o el formulario oficial para pedir el borrado o la baja
+#   correo DIRECCION AMB   un correo publicado por la empresa para estos derechos; AMB son las
+#                          jurisdicciones (códigos del panel, separados por comas) para las que
+#                          la empresa lo da, o * para todas
+#   estado cerrado|incautado   la empresa cerró ese negocio, o la web ya no es suya (con fuente)
+#   fuente URL AAAA-MM-DD  de dónde sale lo de arriba y cuándo se miró
+#   dominio                un nombre (coincide con él y con sus subdominios)
+#   =Empresa               todos los nombres de esa sección de crates/lists/data/empresas.txt
+
+# ---------------------------------------------------------------- buscadores de personas (EE. UU.)
+
+@spokeo|Spokeo|US|personas
+url https://www.spokeo.com/optout
+correo CustomerCare@spokeo.com es,pt,ie,ue
+fuente https://www.spokeo.com/privacy-policy 2026-10-11
+# Su política dice que las peticiones del Espacio Económico Europeo y Suiza van a ese correo
+# (sección 8) y que responde en 30 días. Fuera de la UE, el formulario de la línea `url`.
+spokeo.com
+freepeopledirectory.com
+thatsthem.com
+peoplewin.com
+anywho.com
+family.me
+
+@whitepages|Whitepages|US|personas
+url https://www.whitepages.com/privacy
+fuente https://cppa.ca.gov/data_broker_registry/ 2026-10-08
+whitepages.com
+
+@beenverified|BeenVerified|US|personas
+url https://www.beenverified.com/svc/optout/search/comprehensive_optouts
+fuente https://cppa.ca.gov/data_broker_registry/ 2026-10-08
+beenverified.com
+peoplelooker.com
+numberguru.com
+ownerly.com
+neighborwho.com
+peoplesmart.com
+bumper.com
+freephonetracer.com
+emailfinder.com
+reversephone.com
+famfinder.com
+
+@intelius|Intelius|US|personas
+url https://www.intelius.com/privacy-center
+fuente https://cppa.ca.gov/data_broker_registry/ 2026-10-08
+intelius.com
+ussearch.com
+arrestrecordsearch.com
+criminalrecords.com
+peoplefinder.com
+peoplefind.com
+zabasearch.com
+addresses.com
+publicrecords.com
+peoplelookup.com
+
+@truthfinder|TruthFinder|US|personas
+url https://www.truthfinder.com/privacy-center/
+fuente https://cppa.ca.gov/data_broker_registry/ 2026-10-08
+truthfinder.com
+getfullreport.com
+backgroundchecks.us
+
+@instantcheckmate|Instant Checkmate|US|personas
+url https://www.instantcheckmate.com/privacy-center
+fuente https://cppa.ca.gov/data_broker_registry/ 2026-10-08
+instantcheckmate.com
+cellphonedirectory.com
+freepeople-search.com
+
+@peoplefinders|PeopleFinders|US|personas
+url https://www.peoplefinders.com/about/privacy
+fuente https://cppa.ca.gov/data_broker_registry/ 2026-10-08
+# Inscrita como «FindANeighborhood».
+peoplefinders.com
+findaneighborhood.com
+
+@mylife|MyLife|US|personas
+url https://www.mylife.com
+fuente https://cppa.ca.gov/data_broker_registry/ 2026-10-08
+# Inscrita como «Insightbridge LLC»; en el registro solo dio su portada.
+mylife.com
+
+@radaris|Radaris|US|personas
+estado incautado
+fuente https://radaris.com/control-privacy 2026-10-11
+# La portada dice hoy «This Domain Has Been Transferred by Court Order»: sentencia del 27 de
+# agosto de 2026 contra Radaris.com por la ley Daniel de Nueva Jersey; el dominio es de Atlas
+# Data Privacy Corporation y no ofrece formulario de borrado. No hay a quién escribir allí.
+radaris.com
+
+# ---------------------------------------------------------------- corredores de datos
+
+@acxiom|Acxiom|US|datos
+url https://www.acxiom.com/privacy/us/consumer-instructions/
+fuente https://www.acxiom.com/privacy/us/consumer-instructions/ 2026-10-11
+# Para EE. UU. da un portal de derechos, una baja y el teléfono 1-877-774-2094; ningún correo.
+acxiom.com
+acxiom-online.com
+
+@liveramp|LiveRamp|US|datos
+url https://liveramp.com/privacy/my-privacy-choices
+correo ukprivacy@liveramp.com gb
+fuente https://liveramp.com/privacy/service-privacy-policy 2026-10-11
+# En la UE remite a su portal de cada país (https://liveramp.fr/vos-donnees-personnelles-vos-droits/
+# para Francia y el resto); el correo de la línea de arriba es solo para el Reino Unido.
+=LiveRamp
+
+@epsilon|Epsilon|US|datos
+url https://legal.epsilon.com/dsr/
+fuente https://cppa.ca.gov/data_broker_registry/ 2026-10-08
+epsilon.com
+conversantmedia.com
+dotomi.com
+mediaplex.com
+fastclick.net
+
+@lotame|Lotame (Epsilon)|US|datos
+url https://legal.epsilon.com/dsr/
+fuente https://www.lotame.com/privacy/information-privacy-choices-services/ 2026-10-11
+fuente https://my.lotame.com/t/35hxvnl/lt-js-post-implementation-validation 2026-10-11
+# Su página de derechos manda al formulario de Epsilon; la baja del navegador está en
+# http://lotame-optout.com. crwdcntrl.net es el nombre al que llama su etiqueta (su propia
+# documentación: «bcp.crwdcntrl.net/6/data»).
+lotame.com
+crwdcntrl.net
+
+@oracle|Oracle Advertising (BlueKai)|US|datos
+estado cerrado
+fuente https://en.wikipedia.org/wiki/Oracle_Advertising 2026-10-11
+# Oracle dejó de dar servicio a sus productos de publicidad el 30 de septiembre de 2024.
+bluekai.com
+addthis.com
+moatads.com
+
+@bombora|Bombora|US|datos
+url https://preferences.bombora.com/
+correo dsars@bombora.com *
+fuente https://bombora.com/privacy-policy/ 2026-10-11
+bombora.com
+ml314.com
+
+@nielsen|Nielsen|US|datos
+url https://www.nielsen.com
+fuente https://cppa.ca.gov/data_broker_registry/ 2026-10-08
+# En el registro solo dio su portada.
+=Nielsen
+exelator.com
+
+@comscore|Comscore|US|datos
+url https://www.comscore.com/About/Privacy-Policy
+fuente https://cppa.ca.gov/data_broker_registry/ 2026-10-08
+=Comscore
+
+@infobel|Infobel||datos
+url https://dpo.infobel.com/
+fuente https://dpo.infobel.com/ 2026-10-11
+# Página «Contact DPO - Infobel» encontrada en su propio dominio; el 11 de octubre no se pudo
+# abrir desde aquí, así que no se copia ningún correo.
+infobel.com
+
+# ---------------------------------------------------------------- publicidad
+
+@criteo|Criteo|FR|publicidad
+url https://criteo.com/privacy/your-rights
+correo dpo@criteo.com *
+fuente https://criteo.com/privacy/your-rights 2026-10-11
+# Ese correo es el que da para el derecho de acceso; para el borrado pide «nuestro formulario de
+# contacto», cuyo enlace no llevaba a ninguna parte el 11 de octubre de 2026.
+=Criteo
+
+@taboola|Taboola|IL|publicidad
+url https://accessrequest.taboola.com/access
+fuente https://policies.taboola.com/privacy-policy/ 2026-10-11
+# Para las personas, su portal; dsr@taboola.com es para sus clientes, y dpo@taboola.com es la
+# vía para escalar (Brasil, Espacio Económico Europeo, Reino Unido) si el portal no responde.
+=Taboola
+
+@outbrain|Outbrain (Teads)|US|publicidad
+url https://www.outbrain.com/privacy/user-policy
+fuente https://cppa.ca.gov/data_broker_registry/ 2026-10-08
+=Outbrain
+
+@quantcast|Quantcast|US|publicidad
+url https://www.quantcast.com/opt-out/
+fuente https://legal.quantcast.com/ 2026-10-11
+=Quantcast
+
+# ---------------------------------------------------------------- crédito
+
+@experian_us|Experian (US)|US|credito
+url https://www.experian.com/privacy/us-consumer-data-privacy-policy
+fuente https://cppa.ca.gov/data_broker_registry/ 2026-10-08
+experian.com
+
+@equifax_us|Equifax (US)|US|credito
+url https://www.equifax.com/personal/my-privacy/
+fuente https://cppa.ca.gov/data_broker_registry/ 2026-10-08
+equifax.com
+theworknumber.com
+
+@transunion|TransUnion|US|credito
+url https://www.transunion.com
+fuente https://cppa.ca.gov/data_broker_registry/ 2026-10-08
+# En el registro solo dio su portada. agkn.com (Neustar) e iovation.com son de TransUnion.
+transunion.com
+agkn.com
+iovation.com
+iesnare.com
+
+@equifax_es|Equifax Ibérica (ASNEF)|ES|credito
+url https://www2.equifax.es/consumidores/eDerechos
+fuente https://soluciones.equifax.es/empresa/fichero-asnef/ 2026-10-11
+# Su web remite los derechos de los consumidores a ese portal; no publica un correo.
+equifax.es
+
+@experian_es|Experian Bureau de Crédito (Badexcug)|ES|credito
+url https://portaldelconsumidor.experian.es
+fuente https://www.experian.es/legal/salir-fichero 2026-10-11
+fuente https://www.experian.es/legal/salir-fichero/tratamiento-datos 2026-10-11
+# También por correo postal: Experian Bureau de Crédito, S.A., Apartado de Correos 1188, 28108
+# Alcobendas (Madrid). dpospain@experian.com es su delegado de protección de datos, y la propia
+# página dice que NO es el canal para ejercer derechos.
+experian.es
+
+@serasa|Serasa Experian|BR|credito
+url https://www.serasa.com.br/protecao-dados-pessoais/conheca-seus-direitos
+fuente https://www.serasaexperian.com.br/lgpd/ 2026-10-11
+serasa.com.br
+serasaexperian.com.br
+
+@boavista|Equifax BoaVista (SCPC)|BR|credito
+url https://www.boavistaservicos.com.br/protecao-de-dados/
+fuente https://www.boavistaservicos.com.br/protecao-de-dados/ 2026-10-11
+# Esa dirección lleva hoy a https://www.equifax.com.br/lgpd.
+boavistaservicos.com.br
+
+@datacredito|DataCrédito Experian|CO|credito
+url https://www.datacredito.com.co/habeas-data
+correo servicioalciudadano@experian.com co
+fuente https://www.datacredito.com.co/habeas-data 2026-10-11
+fuente https://www.datacredito.com.co/content/dam/marketing/latam/colombia/co/assets/Politica_tratamiento_datosa_y_videovigilancia_2042025.pdf 2026-10-11
+# Su política (sección 10.4) da ese correo para consultas y reclamos de los titulares. Una carta
+# en papel tiene que ir con la firma autenticada ante notario.
+datacredito.com.co
+midatacredito.com

@@ -268,3 +268,6 @@ ul.barras .barra > span{display:block;height:100%;background:var(--accent)}
 ul.barras .cifra{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
 @media (max-width:560px){ul.barras li{grid-template-columns:minmax(0,1fr) auto}ul.barras .barra{grid-column:1 / -1;grid-row:2}}
 .filters label, .filters select{max-width:100%}
+/* «Haz que te borren» (decision 204): a clock whose deadline has passed says so at a glance. */
+.card.reloj.vencido{border-left:4px solid var(--cortado)}
+#b-texto{min-height:18em;white-space:pre-wrap}

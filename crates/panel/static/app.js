@@ -963,7 +963,7 @@
     $('maxima-quitar').addEventListener('click', (e) => cambia(false, e.currentTarget));
     try { pinta(await api('/api/proteccion-maxima')); } catch (_) {}
   }
-  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo' };
+  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo', borrado: 'nav_borrado' };
   function applyTexts() {
     document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.getAttribute('data-t')); });
     document.querySelectorAll('[data-t-html]').forEach((el) => { el.innerHTML = t(el.getAttribute('data-t-html')); });
@@ -1768,6 +1768,148 @@
         } finally {
           b.disabled = false;
         }
+      });
+    },
+    // «Haz que te borren» (decision 204). The person's name and e-mail live in two inputs of this
+    // page and nowhere else: they are never sent to the panel's server, never stored, and the
+    // letter that comes back from /api/borrado/carta carries markers that are filled in here.
+    async borrado() {
+      let R = await api('/api/borrado');
+      let C = null;
+      const enlace = (url, texto) => `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(texto || url)}</a>`;
+      // The country: by the browser's region when one is said (es-CO → Colombia), otherwise by the
+      // panel's language. French Canada is Quebec. Always changeable, and never remembered.
+      const porDefecto = () => {
+        const partes = (navigator.language || '').split('-');
+        const idioma = (partes[0] || '').toLowerCase();
+        const region = (partes[1] || '').toUpperCase();
+        if (region === 'CA' && idioma === 'fr') return 'ca_qc';
+        const j = R.jurisdicciones.find((x) => x.regiones.includes(region));
+        if (j) return j.codigo;
+        return LANG === 'pt' ? 'br' : (LANG === 'en' ? 'us' : 'es');
+      };
+      const sel = $('b-pais');
+      sel.innerHTML = R.jurisdicciones.map((j) => `<option value="${esc(j.codigo)}">${esc(j.nombre)}</option>`).join('');
+      sel.value = porDefecto();
+      $('b-idioma').value = LANG;
+      const jur = () => R.jurisdicciones.find((j) => j.codigo === sel.value) || R.jurisdicciones[0];
+      const pintaLey = () => {
+        const j = jur();
+        const autoridad = j.autoridad
+          ? (j.autoridad_url ? enlace(j.autoridad_url, j.autoridad) : esc(j.autoridad))
+          : (j.autoridad_url ? enlace(j.autoridad_url, t('borrado_autoridad_lista')) : esc(t('borrado_autoridad_ninguna')));
+        $('b-ley').innerHTML = `<h3>${esc(j.nombre)}</h3>
+          ${j.derecho !== 'borrado' ? `<p class="bad">${esc(t('borrado_sin_derecho_' + j.derecho))}</p>` : ''}
+          <p><span class="muted">${esc(t('borrado_etq_ley'))}</span> ${esc(j.ley)}</p>
+          <p><span class="muted">${esc(t('borrado_etq_articulo'))}</span> ${esc(j.articulo)}</p>
+          <p><span class="muted">${esc(t('borrado_etq_plazo'))}</span> ${esc(j.plazo_texto)}</p>
+          <p>${esc(j.nota)}</p>
+          <p><span class="muted">${esc(t('borrado_etq_autoridad'))}</span> ${autoridad}</p>
+          <details><summary class="muted">${esc(t('borrado_etq_fuentes'))}</summary><ul class="mono small">${j.fuentes.map((u) => `<li>${enlace(u)}</li>`).join('')}</ul></details>`;
+        $('b-drop').classList.toggle('hidden', j.codigo !== 'us_ca');
+      };
+      const pintaCorredores = () => {
+        $('b-corredores').innerHTML = R.corredores.map((c) => {
+          const ev = c.evidencia;
+          const aparatos = c.aparatos.length
+            ? `<br><span class="muted">${esc(t('borrado_aparatos').replace('{lista}', c.aparatos.map((a) => nombreAparato(a[0], a[1])).join(', ')))}</span>` : '';
+          const nombres = ev.nombres.length
+            ? `<details><summary class="muted">${esc(t('borrado_ver_nombres'))}</summary><div class="wrap"><table><tbody>${ev.nombres.map((n) => `<tr><td class="mono">${esc(n.nombre)}</td><td>${num(n.consultas)}</td><td class="muted">${esc(new Date(n.primera).toLocaleDateString(LOC, DIA))} – ${esc(new Date(n.ultima).toLocaleDateString(LOC, DIA))}</td></tr>`).join('')}</tbody></table></div></details>` : '';
+          return `<tr><td><b>${esc(c.nombre)}</b>${c.pais ? ' <span class="muted">· ' + esc(c.pais) + '</span>' : ''}<br><span class="tag empresa">${esc(c.tipo_texto)}</span>${c.estado_texto ? `<br><span class="bad">${esc(c.estado_texto)}</span>` : ''}</td>
+            <td>${esc(c.frase)}${aparatos}${nombres}</td>
+            <td>${c.estado ? '' : `<button type="button" class="secondary b-elegir" data-id="${esc(c.id)}">${esc(t('borrado_elegir'))}</button>`}</td></tr>`;
+        }).join('');
+        $('b-callados').textContent = R.callados ? tn('borrado_callados', R.callados) : '';
+        $('b-callados').classList.toggle('hidden', !R.callados);
+        const elegible = R.corredores.filter((c) => !c.estado);
+        const cs = $('b-corredor');
+        const antes = cs.value;
+        cs.innerHTML = elegible.map((c) => `<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join('');
+        if (antes && elegible.some((c) => c.id === antes)) cs.value = antes;
+      };
+      // The letter with the two inputs filled in, here and only here.
+      const texto = () => {
+        if (!C) return '';
+        const nombre = $('b-nombre').value.trim() || C.hueco_nombre;
+        const correo = $('b-correo').value.trim() || C.hueco_correo;
+        return C.cuerpo.split('[[NOMBRE]]').join(nombre).split('[[CORREO]]').join(correo);
+      };
+      const pintaCarta = () => {
+        if (!C) return;
+        const cuerpo = texto();
+        $('b-asunto').textContent = C.asunto;
+        $('b-texto').value = cuerpo;
+        $('b-canal').textContent = C.para ? t('borrado_para').replace('{correo}', C.para) : t('borrado_sin_correo');
+        $('b-mailto').href = 'mailto:' + (C.para || '') + '?subject=' + encodeURIComponent(C.asunto) + '&body=' + encodeURIComponent(cuerpo);
+        $('b-formulario').classList.toggle('hidden', !C.url);
+        if (C.url) $('b-formulario').href = C.url;
+      };
+      const cargaCarta = async () => {
+        const id = $('b-corredor').value;
+        if (!id) return;
+        const q = new URLSearchParams({ corredor: id, jurisdiccion: sel.value, idioma: $('b-idioma').value, evidencia: $('b-evidencia').checked ? '1' : '0' });
+        C = await api('/api/borrado/carta?' + q.toString());
+        pintaCarta();
+      };
+      const pintaEnvios = (envios) => {
+        $('b-envios').innerHTML = envios.length ? envios.slice().reverse().map((e) => {
+          const autoridad = e.autoridad ? (e.autoridad_url ? enlace(e.autoridad_url, e.autoridad) : esc(e.autoridad)) : (e.autoridad_url ? enlace(e.autoridad_url) : '');
+          return `<div class="card reloj${e.vencido ? ' vencido' : ''}">
+            <h3>${esc(e.corredor_nombre)} · ${esc(e.jurisdiccion_nombre)}</h3>
+            <p class="muted">${esc(t('borrado_enviada').replace('{fecha}', e.enviada_texto))}</p>
+            <p><b>${esc(e.frase)}</b></p>
+            ${e.prorroga ? `<p class="muted">${esc(e.prorroga)}</p>` : ''}
+            ${e.notas.map((n) => `<p class="muted small">${esc(n)}</p>`).join('')}
+            ${e.vencido ? `<p><strong>${esc(t('borrado_reloj_queja_titulo'))}</strong><br>${esc(e.queja || '')}${autoridad ? '<br>' + autoridad : ''}</p>` : ''}
+            <p><button type="button" class="secondary b-quitar" data-id="${e.id}">${esc(t('borrado_quitar'))}</button></p></div>`;
+        }).join('') : `<p class="muted">${esc(t('borrado_reloj_vacio'))}</p>`;
+      };
+      pintaLey();
+      pintaCorredores();
+      pintaEnvios(R.envios);
+      $('b-enviada').value = R.hoy;
+      $('b-enviada').max = R.hoy;
+      await cargaCarta().catch((e) => { $('b-msg').textContent = String(e.message || e); });
+      sel.addEventListener('change', () => { pintaLey(); cargaCarta().catch(() => {}); });
+      ['b-corredor', 'b-idioma', 'b-evidencia'].forEach((id) => $(id).addEventListener('change', () => { cargaCarta().catch(() => {}); }));
+      ['b-nombre', 'b-correo'].forEach((id) => $(id).addEventListener('input', pintaCarta));
+      $('b-pais-form').addEventListener('submit', (e) => e.preventDefault());
+      $('b-carta-form').addEventListener('submit', (e) => e.preventDefault());
+      $('b-corredores').addEventListener('click', (e) => {
+        const b = e.target.closest('.b-elegir');
+        if (!b) return;
+        $('b-corredor').value = b.getAttribute('data-id');
+        cargaCarta().catch(() => {});
+        $('b-carta-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      const avisa = (k) => { $('b-msg').textContent = t(k); setTimeout(() => { $('b-msg').textContent = ''; }, 4000); };
+      $('b-copiar').addEventListener('click', async () => {
+        const area = $('b-texto');
+        try { await navigator.clipboard.writeText(texto()); avisa('borrado_copiado'); return; } catch (_) {}
+        // Home Mode serves the panel over plain http on the LAN, where the clipboard API is not
+        // offered: the old way still works there.
+        area.focus(); area.select();
+        try { document.execCommand('copy'); avisa('borrado_copiado'); } catch (_) {}
+      });
+      $('b-descargar').addEventListener('click', () => {
+        const blob = new Blob([C ? C.asunto + '\n\n' + texto() + '\n' : ''], { type: 'text/plain;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'carta-' + ($('b-corredor').value || 'guardiana') + '-' + R.hoy + '.txt';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      });
+      $('b-envio-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        $('b-envio-msg').textContent = '';
+        // Only the company, the country and the day: the name and the e-mail stay in the inputs.
+        const body = { corredor: $('b-corredor').value, jurisdiccion: sel.value, enviada: $('b-enviada').value };
+        try { pintaEnvios(await api('/api/borrado/envios', { method: 'POST', body })); } catch (err) { $('b-envio-msg').textContent = String(err.message || err); }
+      });
+      $('b-envios').addEventListener('click', async (e) => {
+        const b = e.target.closest('.b-quitar');
+        if (!b) return;
+        try { pintaEnvios(await api('/api/borrado/envios/' + encodeURIComponent(b.getAttribute('data-id')) + '/quitar', { method: 'POST' })); } catch (err) { $('b-envio-msg').textContent = String(err.message || err); }
       });
     },
     async comprobador() {},
