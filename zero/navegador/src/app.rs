@@ -999,8 +999,9 @@ fn prepara_pestana(id: u32, c: &ICoreWebView2Controller) -> windows::core::Resul
     }
     coloca();
     // The page script goes in before the first page; then the tab opens (or is handed to the
-    // page that asked for a new window).
-    let guion = con_sesion(|s| s.guion_paginas()).unwrap_or_default();
+    // page that asked for a new window). A mandate's tab gets its own (WebRTC and WebTransport
+    // off), and so do the windows its pages open, which are mandate tabs too.
+    let guion = con_sesion(|s| s.guion_pestana(id)).unwrap_or_default();
     let g = Ancho::de(&guion);
     let web2 = web.clone();
     let hecho = AddScriptToExecuteOnDocumentCreatedCompletedHandler::create(Box::new(
@@ -1199,9 +1200,11 @@ fn eventos_pestana(id: u32, web: &ICoreWebView2) -> windows::core::Result<()> {
                     let metodo = texto_de(|p| req.Method(p));
                     let mut contexto = COREWEBVIEW2_WEB_RESOURCE_CONTEXT::default();
                     args.ResourceContext(&mut contexto)?;
+                    // The body is read when marked data or the decoy might travel in it, or when
+                    // it goes to a known pixel, which puts there what it tells.
                     let cuerpo = if metodo != "GET"
                         && metodo != "HEAD"
-                        && con_sesion(|s| s.necesita_cuerpo(id)) == Some(true)
+                        && con_sesion(|s| s.necesita_cuerpo(id, &url)) == Some(true)
                     {
                         lee_cuerpo(&req)
                     } else {

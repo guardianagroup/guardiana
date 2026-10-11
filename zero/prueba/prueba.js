@@ -3,6 +3,7 @@
 // and what did not. Usage: node prueba.js <guardiana-zero.exe> <output folder>
 'use strict';
 const { spawn, execSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
@@ -75,7 +76,7 @@ function pantalla(nombre) {
 
 (async () => {
   await new Promise((r) => servidor.listen(PUERTO, '127.0.0.1', r));
-  const reglas = ['sitio-prueba.test', '*.doubleclick.net', 'www.google-analytics.com', 'collect.otra-empresa.io'].map((h) => `MAP ${h} 127.0.0.1`).join(',');
+  const reglas = ['sitio-prueba.test', '*.doubleclick.net', 'www.google-analytics.com', 'collect.otra-empresa.io', 'www.facebook.com', 'connect.facebook.net', 'www.google.com', 'analytics.tiktok.com'].map((h) => `MAP ${h} 127.0.0.1`).join(',');
   const proceso = spawn(exe, [], {
     env: { ...process.env, GUARDIANA_ZERO_DATOS: base, GUARDIANA_ZERO_DEPURA: '1', GUARDIANA_ZERO_ARGS: `--remote-debugging-port=9222 --host-resolver-rules="${reglas}"` },
     stdio: 'ignore',
@@ -206,6 +207,51 @@ function pantalla(nombre) {
   const nuevas = registro.slice(antes);
   comprueba(!nuevas.some((r) => r.host === 'collect.otra-empresa.io'), 'el correo marcado no llega a otra empresa');
   comprueba(nuevas.some((r) => r.host === 'sitio-prueba.test' && r.ruta === '/guardar'), 'a la propia web sí llega');
+
+  // «Los chivatos»: the shop's pixels try to tell Meta (by its path, www.facebook.com/tr) and
+  // TikTok (a POSTed JSON) about a purchase, with the marked email hashed the way they hash it.
+  // Nothing reaches them, and the shield says what they tried to tell.
+  const hash = crypto.createHash('sha256').update('ana@correo.co').digest('hex');
+  const antesChivatos = registro.length;
+  await web.evaluate(async ([p, h]) => {
+    const img = new Image();
+    img.src = `http://www.facebook.com:${p}/tr?id=1&ev=Purchase&cd[value]=89900&cd[currency]=COP&ud[em]=${h}&eid=pedido-7`;
+    // Without any data of the person: only its path says it is Meta's pixel.
+    const vista = new Image();
+    vista.src = `http://www.facebook.com:${p}/tr?id=1&ev=PageView&noscript=1`;
+    // Meta's pixel script, and a Google Ads conversion on www.google.com: both told by their
+    // path, on names that also serve other things.
+    const guion = document.createElement('script');
+    guion.src = `http://connect.facebook.net:${p}/en_US/fbevents.js`;
+    document.head.appendChild(guion);
+    const conversion = new Image();
+    conversion.src = `http://www.google.com:${p}/pagead/1p-conversion/123/?value=89900&currency_code=COP`;
+    try {
+      await fetch(`http://analytics.tiktok.com:${p}/api/v2/pixel`, {
+        method: 'POST',
+        body: JSON.stringify({ event: 'CompletePayment', event_id: 'pedido-7', properties: { value: 89900, currency: 'COP' }, context: { user: { email: h } } }),
+      });
+    } catch (_) {}
+  }, [PUERTO, hash]);
+  await espera(1200);
+  const chivatos = registro.slice(antesChivatos);
+  comprueba(!chivatos.some((r) => r.host === 'www.facebook.com'), 'el píxel de Meta (www.facebook.com/tr) no llega');
+  comprueba(!chivatos.some((r) => r.host === 'analytics.tiktok.com'), 'el píxel de TikTok no llega');
+  comprueba(!chivatos.some((r) => r.host === 'connect.facebook.net'), 'el guion del píxel de Meta (connect.facebook.net/…/fbevents.js) no llega');
+  comprueba(!chivatos.some((r) => r.host === 'www.google.com' && r.ruta.startsWith('/pagead/')), 'la conversión de Google Ads (www.google.com/pagead/1p-conversion) no llega');
+  await barra.click('#b-escudo');
+  await hasta(() => panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa')));
+  const textoChivatos = async () => panel.evaluate(() => document.querySelector('#e-chivatos').textContent);
+  comprueba(await hasta(async () => { const x = await textoChivatos(); return x.includes('A Meta') && x.includes('compra') && x.includes('89.900 COP'); }), `el escudo dice lo que la página intentó contarle a Meta: la compra y el importe (${await textoChivatos()})`);
+  comprueba((await textoChivatos()).includes('con tu correo cifrado'), 'y que llevaba tu correo cifrado');
+  comprueba(await panel.evaluate(() => [...document.querySelectorAll('#e-chivatos li')].every((l) => l.classList.contains('cortado'))), 'cada línea dice «cortado»');
+  comprueba((await panel.textContent('#e-chivatos-titulo')) === 'Lo que esta página intentó contar de ti', 'la sección se titula «Lo que esta página intentó contar de ti»');
+  const tarjeta = await panel.textContent('#e-tarjeta-frase');
+  comprueba(tarjeta.includes('intentó contarles a 2 empresas que compré, con mi correo cifrado'), `la tarjeta para compartir lo dice en una frase (${tarjeta})`);
+  comprueba(!/89|COP|ana@/.test(tarjeta), 'y no lleva importes ni el correo');
+  comprueba((await panel.locator('#e-cortados li', { hasText: 'facebook.com' }).count()) === 1, 'Meta sale entre lo cortado');
+  await espera(500);
+  pantalla('03b-chivatos.png');
 
   // A new tab and a new window.
   await barra.click('#nueva');

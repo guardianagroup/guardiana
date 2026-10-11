@@ -5,3 +5,7 @@
   7 oct 2026, SHA-256 2919eb9803c91a3f73a507cc6fedc934de005543c22c4016f72e3343de5dd6e7. Dice dónde
   termina el nombre de una organización en una dirección (`tracker.co.uk`, no `co.uk`). Viaja dentro
   del programa: nada se descarga. Una copia más nueva llega con una versión más nueva.
+- `pixeles.txt`: nuestra, abierta y corta. Los píxeles de rastreo que viven en un nombre que hace
+  también otras cosas (`www.facebook.com/tr`, `www.google.com/pagead/1p-conversion`), por su ruta, con
+  la empresa y lo que son. Se aplica, como las listas, solo a las peticiones hacia otra empresa
+  (revisión del 10 oct 2026, grave 1).

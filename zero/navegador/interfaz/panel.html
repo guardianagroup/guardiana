@@ -65,14 +65,28 @@ p { margin: 0 0 10px; }
 .tercero::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--gris-suave); }
 .tercero.cortado::before { background: var(--rojo); }
 .tercero.sigue::before { background: var(--ambar); }
+/* Partly cut: some of its requests are cut, others pass (its ads, not its reCAPTCHA). */
+.tercero.parcial::before { background: var(--ambar); }
 .tercero.recien { background: var(--azul-suave); border-radius: 8px; transition: background .4s; }
 .tercero .quien { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tercero .quien small { font-weight: 400; color: var(--gris); margin-left: 5px; font-size: 12px; }
 .tercero .detalle { grid-column: 1; font-size: 12.5px; color: var(--gris); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
 .tercero .detalle .motivo { color: var(--rojo); }
-.tercero .boton { grid-row: 1 / span 2; grid-column: 2; }
+.tercero .botones { grid-row: 1 / span 2; grid-column: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.tercero .nota-dato { flex-basis: 100%; color: var(--gris); font-size: 12px; }
 .vacio { padding: 18px 0; color: var(--gris); }
 .hechos { margin-top: 18px; display: grid; gap: 6px; font-size: 13px; color: var(--gris); }
+/* What the page's pixels tried to tell: one line each, its fate at the end. */
+.chivatos-lista { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.chivatos-lista li { position: relative; padding: 8px 0 8px 13px; border-bottom: 1px solid var(--linea); }
+.chivatos-lista li::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--rojo); }
+.chivatos-lista li.paso::before { background: var(--ambar); }
+.chivatos-lista .estado { margin-left: 6px; font-weight: 600; color: var(--rojo); white-space: nowrap; }
+.chivatos-lista li.paso .estado { color: var(--ambar); }
+.chivatos .explica { margin: 8px 0 0; }
+.compartir { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--linea); border-radius: 12px; }
+.compartir .frase { margin: 0 0 10px; font-weight: 600; }
+.compartir canvas { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--linea); }
 
 /* Mandate ------------------------------------------------------------------------------------- */
 .etiqueta { display: block; font-weight: 500; margin: 14px 0 6px; }
@@ -205,6 +219,18 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
   <div class="recarga oculto" id="e-recarga"><span data-t="escudo_recarga"></span><button class="boton chico" id="e-recargar" data-t="recargar"></button></div>
   <p class="vacio oculto" id="e-vacio" data-t="escudo_vacio"></p>
   <div class="hechos" id="e-hechos"></div>
+  <div class="chivatos oculto" id="e-chivatos-caja">
+    <h2 id="e-chivatos-titulo"></h2>
+    <ul class="chivatos-lista" id="e-chivatos"></ul>
+    <p class="explica pequeno" id="e-chivatos-nota"></p>
+    <div class="compartir oculto" id="e-tarjeta">
+      <p class="frase" id="e-tarjeta-frase"></p>
+      <canvas id="e-tarjeta-lienzo" width="1200" height="630"></canvas>
+      <div class="fila-acciones"><button class="boton chico principal" id="e-tarjeta-guardar" data-t="chivatos_guardar"></button><button class="boton chico" id="e-tarjeta-copiar" data-t="chivatos_copiar"></button></div>
+      <p class="explica pequeno" data-t="chivatos_tarjeta_nota" style="margin-top:8px"></p>
+      <p class="explica pequeno" id="e-tarjeta-guardada" role="status"></p>
+    </div>
+  </div>
   <p class="ver-todo"><button class="enlace" id="e-ver-todo" data-t="escudo_ver_todo"></button></p>
 </section>
 

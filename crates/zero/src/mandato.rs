@@ -79,7 +79,8 @@ pub struct Mandato {
     pub tarea: String,
     /// Sites the AI may use (registrable sites, `google.com`).
     pub permitidos: Vec<String>,
-    /// Strict: only those sites; delivery networks only for images, scripts, styles and fonts.
+    /// Strict: only those sites; delivery networks only for images, scripts, styles and fonts,
+    /// and never a customer's own name on them (`x.cloudfront.net`, a bucket).
     pub estricto: bool,
     /// A decoy for this mandate (see `tinta::senuelo`).
     pub senuelo: String,
@@ -161,7 +162,9 @@ impl Mandato {
             return true;
         }
         if self.estricto {
-            destino.reparto.is_some() && recurso.solo_trae()
+            // A distribution, a bucket or a repository on a shared service is somebody's:
+            // anyone can rent one and read what reaches it (review of 10 Oct 2026, grave 4).
+            destino.reparto.is_some() && !destino.de_cliente && recurso.solo_trae()
         } else {
             recurso.solo_trae() || destino.reparto.is_some()
         }
@@ -222,7 +225,7 @@ impl Mandato {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::destino::clasifica;
+    use crate::destino::{clasifica, clasifica_url};
 
     #[test]
     fn a_mandate_keeps_the_ai_inside_its_sites() {
@@ -239,9 +242,41 @@ mod tests {
         assert!(!m.permite(&clasifica("evil.example"), Recurso::Documento));
         assert!(!m.permite(&clasifica("evil.example"), Recurso::Datos));
         // A delivery network may bring an image, not take data out.
-        let cdn = clasifica("d1.cloudfront.net");
+        let cdn = clasifica("r1---sn-abc.gvt1.com");
         assert!(m.permite(&cdn, Recurso::Imagen));
+        let cdn = clasifica_url("https://cdn.jsdelivr.net/npm/vue@3/dist/vue.js");
+        assert!(m.permite(&cdn, Recurso::Script));
         assert!(!m.permite(&cdn, Recurso::Datos));
+    }
+
+    #[test]
+    fn a_strict_mandate_never_takes_a_rented_name_for_the_road() {
+        let m = Mandato::nuevo("1".into(), "", &["avianca.com".into()], "x".into(), 0);
+        assert!(m.estricto);
+        for u in [
+            "https://dattacker.cloudfront.net/p.gif?d=secreto",
+            "https://cdn.jsdelivr.net/gh/atacante/x@main/a.js?d=secreto",
+            "https://atacante.r2.cloudflarestorage.com/p.png?d=secreto",
+            "https://ninja.akamaized.net/p.png?d=secreto",
+            "https://raw.githubusercontent.com/atacante/x/main/a.js",
+            "https://storage.googleapis.com/atacante/p.png",
+        ] {
+            let d = clasifica_url(u);
+            assert!(!m.permite(&d, Recurso::Imagen), "{u}");
+            assert!(!m.permite(&d, Recurso::Script), "{u}");
+        }
+        // Named in the mandate, a rented name is allowed like any other site.
+        let m = Mandato::nuevo(
+            "2".into(),
+            "",
+            &["dattacker.cloudfront.net".into()],
+            "x".into(),
+            0,
+        );
+        assert!(m.permite(
+            &clasifica_url("https://dattacker.cloudfront.net/p.gif"),
+            Recurso::Imagen
+        ));
     }
 
     #[test]

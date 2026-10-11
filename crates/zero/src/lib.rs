@@ -5,6 +5,7 @@
 //! here opens a connection: the browser's only traffic is the pages the person asks for.
 
 pub mod cartas;
+pub mod chivatos;
 pub mod cortes;
 pub mod datos;
 pub mod decision;

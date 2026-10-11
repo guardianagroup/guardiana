@@ -1,0 +1,74 @@
+# GUARDIANA ZERO — píxeles conocidos por su dirección y su ruta (revisión del 10 oct 2026, grave 1).
+#
+# Las listas abiertas dicen qué es un nombre entero. Algunos rastreadores viven en un nombre que hace
+# además otras cosas: `www.facebook.com/tr` es el píxel de Meta, pero `www.facebook.com` es también
+# la web de Facebook; `www.google.com/pagead/1p-conversion` es una conversión de publicidad, pero
+# `www.google.com/recaptcha` es la casilla de «no soy un robot». Esta lista, corta y nuestra, nombra
+# solo esas rutas (y unos pocos nombres enteros que las listas no atribuyen a nadie), con la empresa
+# y lo que son. Solo se aplica a peticiones hacia otra empresa, igual que las listas, y «Desbloquear»
+# la deja pasar como cualquier otro corte.
+#
+# FORMATO: `nombre[/ruta] | empresa | país | categoría`
+# - nombre: exacto, o `*.sufijo` para cualquier nombre por debajo de ese sufijo (no el sufijo solo).
+# - ruta: opcional, por tramos; `*` vale por un tramo cualquiera. Casa con esa ruta y con todo lo que
+#   cuelga de ella (`/tr` casa con `/tr`, `/tr/` y `/tr/algo`, no con `/tracking`).
+# - país: el de la sede del grupo, como en `empresas.txt`; vacío si no se ha comprobado.
+# - categoría: `rastreador`, `publicidad` o `telemetria` (esta última solo se corta con la
+#   protección máxima).
+# Fuente: la documentación pública de cada píxel y las direcciones que piden sus propios guiones.
+
+# Meta: el píxel (GET y POST), su guion y su registro de conversiones para Privacy Sandbox.
+facebook.com/tr | Meta | US | rastreador
+*.facebook.com/tr | Meta | US | rastreador
+*.facebook.com/privacy_sandbox/pixel | Meta | US | rastreador
+connect.facebook.net/*/fbevents.js | Meta | US | rastreador
+connect.facebook.net/signals | Meta | US | rastreador
+
+# Google: todo `/pagead` (conversiones, listas de remarketing, los datos de formularios de las
+# conversiones «mejoradas»), en google.com y en sus dominios de país más usados aquí; y la medición
+# de conversiones de su etiqueta. El resto de esos nombres (la búsqueda, reCAPTCHA) no se toca.
+google.com/pagead | Google | US | publicidad
+*.google.com/pagead | Google | US | publicidad
+google.com.co/pagead | Google | US | publicidad
+*.google.com.co/pagead | Google | US | publicidad
+google.com.mx/pagead | Google | US | publicidad
+*.google.com.mx/pagead | Google | US | publicidad
+google.es/pagead | Google | US | publicidad
+*.google.es/pagead | Google | US | publicidad
+google.com.br/pagead | Google | US | publicidad
+*.google.com.br/pagead | Google | US | publicidad
+google.com.ar/pagead | Google | US | publicidad
+*.google.com.ar/pagead | Google | US | publicidad
+google.cl/pagead | Google | US | publicidad
+*.google.cl/pagead | Google | US | publicidad
+google.com.pe/pagead | Google | US | publicidad
+*.google.com.pe/pagead | Google | US | publicidad
+google.co.uk/pagead | Google | US | publicidad
+*.google.co.uk/pagead | Google | US | publicidad
+google.de/pagead | Google | US | publicidad
+*.google.de/pagead | Google | US | publicidad
+google.fr/pagead | Google | US | publicidad
+*.google.fr/pagead | Google | US | publicidad
+google.it/pagead | Google | US | publicidad
+*.google.it/pagead | Google | US | publicidad
+*.google.com/ccm/collect | Google | US | publicidad
+
+# X (antes Twitter).
+analytics.twitter.com/i/adsct | X | US | publicidad
+t.co/i/adsct | X | US | publicidad
+static.ads-twitter.com | X | US | publicidad
+
+# LinkedIn (de Microsoft): la «Insight Tag».
+snap.licdn.com | LinkedIn | US | rastreador
+px.ads.linkedin.com | LinkedIn | US | publicidad
+
+# Segment y Mixpanel: analítica de producto que sigue a cada persona.
+api.segment.io/v1 | Segment | US | rastreador
+cdn.segment.com | Segment | US | rastreador
+cdn.mxpnl.com | Mixpanel | US | rastreador
+api-js.mixpanel.com | Mixpanel | US | rastreador
+
+# Sentry: informes de errores de la web, con datos del equipo. Telemetría, no rastreo.
+*.ingest.sentry.io | Sentry | US | telemetria
+*.ingest.us.sentry.io | Sentry | US | telemetria
+*.ingest.de.sentry.io | Sentry | US | telemetria

@@ -24,7 +24,7 @@ use serde_json::{json, Value};
 use crate::cartas::{carta, Ley};
 use crate::cortes::{self, Corte, Lugar};
 use crate::datos::{clases, Clase};
-use crate::decision::{decide, Ajustes, Motivo, Peticion};
+use crate::decision::{decide_con, Ajustes, Motivo, Peticion};
 use crate::direccion::{a_direccion, buscador, codifica, BUSCADORES};
 use crate::dominio::{host_de, sitio};
 use crate::escudo::{self, Diario, Tercero};
@@ -325,7 +325,26 @@ struct Pestana {
     /// The tab the person was on when this one opened for them (the list of cuts opens in a tab
     /// of its own): its «Back» button returns there.
     vuelve: Option<u32>,
+    /// For a window a page opened (`ventana_nueva`): the web of the page that opened it, which
+    /// is where marked data would be leaving from until this tab shows a page of its own (empty
+    /// when it opened from none). Review of 10 Oct 2026, grave 6.
+    abridor: Option<String>,
+    /// Sendings the person approved in the form guard: those kinds of data may go to that site
+    /// from this tab for a few minutes (review of 10 Oct 2026, grave 5).
+    permisos: Vec<Permiso>,
 }
+
+/// A sending the person approved: `clases` of data to `sitio`, until `hasta`.
+#[derive(Debug, Clone)]
+struct Permiso {
+    sitio: String,
+    clases: Vec<Clase>,
+    hasta: i64,
+}
+
+/// How long an approved sending lets its data through to its site: the form, its redirects and
+/// the payment or sign-in page it leads to.
+const PERMISO_MS: i64 = 5 * 60_000;
 
 impl Pestana {
     fn nueva(id: u32, perfil: Perfil, url: &str) -> Self {
@@ -346,6 +365,8 @@ impl Pestana {
             lista: false,
             icono: String::new(),
             vuelve: None,
+            abridor: None,
+            permisos: Vec::new(),
         }
     }
 }
@@ -624,6 +645,17 @@ impl Sesion {
         paginas::guion_paginas()
     }
 
+    /// The script the pages of tab `id` get first: a mandate's tab gets also WebRTC and
+    /// WebTransport turned off (see [`paginas::guion_mandato`]).
+    #[must_use]
+    pub fn guion_pestana(&self, id: u32) -> String {
+        if self.perfil_de(id) == Some(Perfil::Mandato) {
+            paginas::guion_mandato()
+        } else {
+            paginas::guion_paginas()
+        }
+    }
+
     /// Whether the engine's tracking prevention should be strict.
     #[must_use]
     pub const fn seguimiento_estricto(&self) -> bool {
@@ -797,11 +829,14 @@ impl Sesion {
         self.panel.is_some()
     }
 
-    /// Whether requests of this tab need their body read (marked data or a mandate's decoy
-    /// might travel in it).
+    /// Whether a request of this tab to `url` needs its body read: marked data or a mandate's
+    /// decoy might travel in it, or it goes to a known pixel, which puts there what it tells
+    /// («Los chivatos»).
     #[must_use]
-    pub fn necesita_cuerpo(&self, id: u32) -> bool {
-        !self.tinta.is_empty() || self.perfil_de(id) == Some(Perfil::Mandato)
+    pub fn necesita_cuerpo(&self, id: u32, url: &str) -> bool {
+        !self.tinta.is_empty()
+            || self.perfil_de(id) == Some(Perfil::Mandato)
+            || crate::chivatos::interesa(url)
     }
 
     fn t(&self, clave: &str) -> String {
@@ -1028,45 +1063,25 @@ impl Sesion {
             .is_some_and(|p| p.perfil == Perfil::Aislada)
     }
 
-    /// Whether a site is cut now, and by which rule: what the shield's button must offer.
-    /// Without the trial or a subscription nothing is cut, and the shield says so.
-    fn estado_sitio(&self, t: &Tercero) -> (&'static str, Option<&'static str>) {
-        if !self.licencia.protege() {
-            return ("pasa", None);
-        }
-        let r = &self.prefs.reglas;
-        if r.cortados.contains(&t.sitio) {
-            return ("cortado", Some("tuya"));
-        }
-        if r.permitidos.contains(&t.sitio) {
-            return ("pasa", Some("permitido"));
-        }
-        if self.lo_corta_la_lista(t) {
-            return ("cortado", Some("lista"));
-        }
-        ("pasa", None)
-    }
-
-    /// Whether the open lists cut this site with the person's settings (no rule of their own).
-    fn lo_corta_la_lista(&self, t: &Tercero) -> bool {
-        let r = &self.prefs.reglas;
-        let sigue = matches!(t.categoria.as_str(), "rastreador" | "publicidad")
-            || t.corredor.is_some()
-            || (r.maxima && (t.categoria == "telemetria" || t.balizas > 0));
-        r.cortar_seguimiento && sigue
-    }
-
     fn msg_escudo(&self, p: &Pestana) -> Value {
+        // What holds now for each site, from what each of its requests was: cut, partly cut
+        // (some requests, or only those that carried your data, or only those outside the
+        // task), or passing; and by which rule, so its button offers the way back. Without the
+        // trial or a subscription nothing is cut, and the shield says so.
         let terceros: Vec<Value> = p
             .escudo
             .terceros
             .values()
             .map(|t| {
-                let (ahora, regla) = self.estado_sitio(t);
+                let e = t.estado(&self.prefs.reglas, self.licencia.protege());
                 let mut v = serde_json::to_value(t).unwrap_or(Value::Null);
                 if let Some(o) = v.as_object_mut() {
-                    o.insert("ahora".into(), json!(ahora));
-                    o.insert("regla".into(), json!(regla));
+                    o.insert("ahora".into(), json!(e.ahora));
+                    o.insert("regla".into(), json!(e.regla));
+                    o.insert("por".into(), json!(e.por.map(cortes::motivo_clave)));
+                    o.insert("fijo".into(), json!(t.fijo()));
+                    o.insert("deshace".into(), json!(e.deshace));
+                    o.insert("dato".into(), json!(e.dato));
                 }
                 v
             })
@@ -1083,6 +1098,12 @@ impl Sesion {
             "parametros_quitados": p.escudo.parametros_quitados,
             "datos_salvados": p.escudo.datos_salvados,
             "cookies": p.escudo.cookies.as_ref().map(|(g, a)| json!({ "gestor": g, "accion": a })),
+            "chivatos": p.escudo.chivatos,
+            "tarjeta": p.escudo.tarjeta().map(|t| json!({
+                "empresas": t.empresas,
+                "evento": t.evento.clave(),
+                "correo": t.correo,
+            })),
         })
     }
 
@@ -1622,7 +1643,9 @@ impl Sesion {
                 }
                 vec![envia(Origen::Panel, &self.msg_ajustes())]
             }
-            "bloquear_sitio" | "desbloquear_sitio" => self.regla(tipo, texto(m, "sitio")),
+            "bloquear_sitio" | "desbloquear_sitio" | "bloquear_todo" => {
+                self.regla(tipo, texto(m, "sitio"))
+            }
             "tinta_anadir" => self.tinta_anadir(texto(m, "dato"), texto(m, "valor")),
             "tinta_quitar" => self.tinta_quitar(numero(m, "indice")),
             "carta" => self.carta(texto(m, "sitio"), texto(m, "ley")),
@@ -1704,7 +1727,7 @@ impl Sesion {
                 o
             }
             "borrar_todo" => self.borrar_todo(),
-            "guardar_imagen" => self.guardar_imagen(origen, texto(m, "datos")),
+            "guardar_imagen" => self.guardar_imagen(origen, texto(m, "datos"), texto(m, "que")),
             _ => Vec::new(),
         }
     }
@@ -1904,32 +1927,30 @@ impl Sesion {
         // The site as the shields of every tab saw it (the lists cut it if they cut it in any of
         // them); if no tab shows it any more (the page moved on between the click and this
         // message), as the lists see it.
-        let vistos: Vec<Tercero> = self
+        // A site cut only in part by them (`google.com`: its ads, not its reCAPTCHA) goes back
+        // to that part with «Volver a bloquear», not to a rule for the whole site.
+        let mut vistos: Vec<Tercero> = self
             .pestanas
             .iter()
             .filter_map(|p| p.escudo.terceros.get(&s))
             .cloned()
             .collect();
-        let lista = if vistos.is_empty() {
-            let d = crate::destino::clasifica(&s);
-            self.lo_corta_la_lista(&Tercero {
-                quien: d.quien().to_string(),
-                sitio: s.clone(),
-                pais: None,
-                categoria: d.categoria.to_string(),
-                corredor: d.corredor.as_ref().map(|c| c.nombre.to_string()),
-                vistas: 0,
-                cortadas: 0,
-                motivo: None,
-                balizas: 0,
-            })
-        } else {
-            vistos.iter().any(|t| self.lo_corta_la_lista(t))
-        };
+        if vistos.is_empty() {
+            vistos.push(Tercero::de_sitio(&s));
+        }
+        let (todo, algo) = vistos
+            .iter()
+            .map(|t| t.sin_reglas(&self.prefs.reglas))
+            .fold((false, false), |(a, b), (c, d)| (a || c, b || d));
         let r = &mut self.prefs.reglas;
-        if tipo == "bloquear_sitio" {
+        if tipo == "bloquear_todo" {
+            // A site cut only in part, cut whole by the person: their rule, with «Desbloquear»
+            // on its row.
             r.permitidos.remove(&s);
-            if !lista {
+            r.cortados.insert(s);
+        } else if tipo == "bloquear_sitio" {
+            let volver = r.permitidos.remove(&s);
+            if !(if volver { algo } else { todo }) {
                 r.cortados.insert(s);
             }
         } else {
@@ -2122,11 +2143,18 @@ impl Sesion {
             "mandato": md,
             "cobertura": {
                 "observado": self.cobertura_vista(),
+                // Turned off in the pages of the task's tab: the request filter would not see
+                // them (review of 10 Oct 2026, grave 4).
+                // In the pages and their frames, by the page script: a worker, or an empty frame
+                // the page makes itself, may still reach them (said in `recibo_cobertura`).
+                "apagado": ["webrtc", "webtransport"],
+                "apagado_en": "paginas_y_marcos",
                 "no_observado": [
                     "otras_aplicaciones_del_equipo",
                     "lo_que_cada_servidor_hace_con_lo_recibido",
                     "otras_pestanas",
                     "conexiones_webrtc_entre_equipos",
+                    "conexiones_webtransport",
                     "anticipacion_dns_del_motor",
                     "cabeceras_de_las_peticiones",
                 ],
@@ -2436,7 +2464,7 @@ impl Sesion {
         };
         let primera = p.escudo.cookies.is_none();
         p.escudo.cookies = Some((gestor, accion.to_string()));
-        if primera {
+        if primera && p.perfil != Perfil::Aislada {
             self.diario.dias.entry(hoy).or_default().avisos_cookies += 1;
             self.diario_sucio = true;
             self.hoy_sucio = true;
@@ -2499,6 +2527,8 @@ impl Sesion {
             }
             if let Some(p) = self.pestana_mut(id) {
                 p.al_libro.insert(s.clone());
+                // Already approved for this site: the sending is not cut on its way.
+                Self::permite_envio(p, &s, &encontradas, ahora);
             }
             return vec![responde(true)];
         }
@@ -2532,6 +2562,68 @@ impl Sesion {
         o
     }
 
+    /// Let `clases` of the person's marked data go to `sitio` from tab `p` for
+    /// [`PERMISO_MS`]: what they approved in the form guard reaches where they sent it.
+    /// A second sending to the same site adds its kinds to what is still approved there.
+    fn permite_envio(p: &mut Pestana, sitio: &str, clases: &[Clase], ahora: i64) {
+        p.permisos.retain(|x| x.hasta > ahora);
+        if clases.is_empty() {
+            return;
+        }
+        if let Some(x) = p.permisos.iter_mut().find(|x| x.sitio == sitio) {
+            for c in clases {
+                if !x.clases.contains(c) {
+                    x.clases.push(*c);
+                }
+            }
+            x.hasta = ahora + PERMISO_MS;
+        } else if p.permisos.len() < 20 {
+            p.permisos.push(Permiso {
+                sitio: sitio.to_string(),
+                clases: clases.to_vec(),
+                hasta: ahora + PERMISO_MS,
+            });
+        }
+    }
+
+    /// The marked forms to look for in a request of tab `p` to `sitio_destino`, without those of
+    /// the data the person approved sending there a moment ago; `None` when nothing was approved
+    /// for it.
+    fn formas_sin_permiso(
+        &self,
+        p: &Pestana,
+        sitio_destino: &str,
+        formas: &[Forma],
+        ahora: i64,
+    ) -> Option<Vec<Forma>> {
+        if p.permisos.is_empty() {
+            return None;
+        }
+        let clases: Vec<Clase> = p
+            .permisos
+            .iter()
+            .filter(|x| x.hasta > ahora && x.sitio == sitio_destino)
+            .flat_map(|x| x.clases.iter().copied())
+            .collect();
+        if clases.is_empty() {
+            return None;
+        }
+        // The decoy has no kind of the person's: it is never approved.
+        Some(
+            formas
+                .iter()
+                .filter(|f| {
+                    !self
+                        .tinta
+                        .get(f.origen)
+                        .and_then(|m| clase_de(m.tipo))
+                        .is_some_and(|c| clases.contains(&c))
+                })
+                .cloned()
+                .collect(),
+        )
+    }
+
     fn formulario_respuesta(&mut self, n: u64, enviar: bool, recordar: bool) -> Vec<Orden> {
         let Some(q) = self.preguntas.remove(&n) else {
             return Vec::new();
@@ -2543,9 +2635,12 @@ impl Sesion {
                 self.libro.anota(&q.host, &q.clases, ahora);
                 self.guarda_libro();
             }
-            // Written once: the request that carries it is the same sending.
+            // Written once: the request that carries it is the same sending, and that sending is
+            // not cut for carrying what the person just agreed to send (review of 10 Oct 2026,
+            // grave 5: «Enviar» did not send when the form went to another site).
             if let Some(p) = self.pestana_mut(q.pestana) {
                 p.al_libro.insert(q.sitio.clone());
+                Self::permite_envio(p, &q.sitio, &q.clases, ahora);
             }
             if q.mandato {
                 if let Some(md) = self.mandato.as_mut() {
@@ -2609,7 +2704,9 @@ impl Sesion {
         o
     }
 
-    fn guardar_imagen(&self, origen: Origen, datos: &str) -> Vec<Orden> {
+    /// Save an image the browser's own page drew (the month in data, the card of what a page's
+    /// pixels tried to tell). Its name is the browser's, never the page's.
+    fn guardar_imagen(&self, origen: Origen, datos: &str, que: &str) -> Vec<Orden> {
         let Some(b64) = datos.strip_prefix("data:image/png;base64,") else {
             return Vec::new();
         };
@@ -2622,8 +2719,16 @@ impl Sesion {
         if !png.starts_with(b"\x89PNG\r\n\x1a\n") {
             return Vec::new();
         }
-        let mes: String = self.hoy().chars().take(7).collect();
-        let ruta = self.nombre_libre(&format!("guardiana-zero-{mes}"), "png");
+        let (base, que) = if que == "chivatos" {
+            (
+                format!("guardiana-zero-chivatos-{}", self.hoy()),
+                "chivatos",
+            )
+        } else {
+            let mes: String = self.hoy().chars().take(7).collect();
+            (format!("guardiana-zero-{mes}"), "mes")
+        };
+        let ruta = self.nombre_libre(&base, "png");
         let destino = match origen {
             Origen::Pestana(_) => origen,
             _ => Origen::Panel,
@@ -2633,12 +2738,12 @@ impl Sesion {
                 let ruta = ruta.display().to_string();
                 vec![envia(
                     destino,
-                    &json!({ "tipo": "guardado", "ruta": ruta, "texto": self.tf("guardado_en", &[("ruta", &ruta)]) }),
+                    &json!({ "tipo": "guardado", "que": que, "ruta": ruta, "texto": self.tf("guardado_en", &[("ruta", &ruta)]) }),
                 )]
             }
             Err(_) => vec![envia(
                 destino,
-                &json!({ "tipo": "guardado", "ruta": "", "texto": self.t("guardar_error") }),
+                &json!({ "tipo": "guardado", "que": que, "ruta": "", "texto": self.t("guardar_error") }),
             )],
         }
     }
@@ -2703,6 +2808,10 @@ impl Sesion {
             p.icono.clear();
         }
         let quitados = std::mem::take(&mut p.quitados);
+        if es_web {
+            // A window a page opened, now with a web of its own: data leaves from this one.
+            p.abridor = None;
+        }
         p.url = url.to_string();
         p.al_libro.clear();
         p.escudo = escudo::Pestana::nueva(&s);
@@ -2710,7 +2819,8 @@ impl Sesion {
         if !es_interna(url) {
             p.lista = false;
         }
-        if quitados > 0 {
+        // An isolated tab leaves nothing on disk: its figures live in its shield only.
+        if quitados > 0 && p.perfil != Perfil::Aislada {
             self.diario.dias.entry(hoy).or_default().parametros_quitados += quitados;
             self.diario_sucio = true;
             self.hoy_sucio = true;
@@ -2819,7 +2929,25 @@ impl Sesion {
             .iter()
             .position(|p| p.id == de)
             .map_or(self.pestanas.len(), |i| i + 1);
-        self.pestanas.insert(pos, Pestana::nueva(id, perfil, ""));
+        let ahora = (self.reloj)();
+        let mut nueva = Pestana::nueva(id, perfil, "");
+        // Until it shows a page of its own, what it sends leaves from the page that opened it;
+        // and what the person approved sending from that page goes on being approved here (a
+        // form with `target=_blank` posts in the new window).
+        if let Some(p) = self.pestana(de) {
+            nueva.abridor = Some(if es_interna(&p.url) {
+                String::new()
+            } else {
+                p.escudo.sitio.clone()
+            });
+            nueva.permisos = p
+                .permisos
+                .iter()
+                .filter(|x| x.hasta > ahora)
+                .cloned()
+                .collect();
+        }
+        self.pestanas.insert(pos, nueva);
         let mut o = vec![Orden::CreaPestana {
             id,
             perfil,
@@ -2895,6 +3023,14 @@ impl Sesion {
                 }),
             };
         }
+        // The address is read once, here, and its parts go to everything below.
+        let dir = url::Url::parse(url).ok();
+        let host = dir
+            .as_ref()
+            .and_then(url::Url::host_str)
+            .map(crate::dominio::normaliza_host)
+            .unwrap_or_default();
+        let destino = crate::destino::clasifica_en(&host, dir.as_ref().map_or("", url::Url::path));
         let d = {
             let p = &self.pestanas[i];
             let mut recurso = recurso_de_contexto(contexto);
@@ -2903,7 +3039,7 @@ impl Sesion {
                 recurso = Recurso::Marco;
             }
             let sitio_pagina = if recurso == Recurso::Documento {
-                host_de(url).map(|h| sitio(&h)).unwrap_or_default()
+                destino.sitio.clone()
             } else {
                 p.escudo.sitio.clone()
             };
@@ -2917,6 +3053,9 @@ impl Sesion {
             } else {
                 (&self.formas, None)
             };
+            // What the person approved sending to this site a moment ago goes there.
+            let sin_permiso = self.formas_sin_permiso(p, &destino.sitio, formas, ahora);
+            let formas: &[Forma] = sin_permiso.as_deref().unwrap_or(formas);
             let con_cuerpo = matches!(
                 metodo.to_ascii_uppercase().as_str(),
                 "POST" | "PUT" | "PATCH"
@@ -2928,20 +3067,37 @@ impl Sesion {
                 sitio_pagina: &sitio_pagina,
             };
             (
-                decide(&peticion, &self.prefs.reglas, formas, senuelo, mandato),
+                decide_con(
+                    &peticion,
+                    destino,
+                    &self.prefs.reglas,
+                    formas,
+                    senuelo,
+                    mandato,
+                ),
                 recurso,
             )
         };
         let (mut d, recurso) = d;
         if recurso == Recurso::Documento && !d.cortar && !d.hallazgos.is_empty() {
             // A page sending your marked data to another site by opening it (a link, a redirect,
-            // `location=`): cut, unless you typed that address yourself.
+            // `location=`, a new window): cut, unless you typed that address yourself (no rule
+            // of a site lets it through; «Enviar» in the form guard already let through what the
+            // person sent). The page it leaves from is the one shown, or, in a window a page just
+            // opened, that page; a new window from no web at all is cut too.
             let p = &self.pestanas[i];
             let escrita = p.escrita.as_deref() == Some(sin_fragmento(url));
-            if !escrita
-                && !p.escudo.sitio.is_empty()
-                && crate::destino::es_tercero(&d.destino.host, &p.escudo.sitio)
-            {
+            let desde = if p.escudo.sitio.is_empty() {
+                p.abridor.as_deref()
+            } else {
+                Some(p.escudo.sitio.as_str())
+            };
+            let fuera = match desde {
+                Some("") => true,
+                Some(w) => crate::destino::es_tercero_de(&d.destino, w),
+                None => false,
+            };
+            if !escrita && fuera {
                 d.cortar = true;
                 d.motivo = Some(Motivo::Tinta);
                 d.otro = true;
@@ -2949,11 +3105,25 @@ impl Sesion {
         }
         let p = &mut self.pestanas[i];
         p.escudo.anota(&d);
+        // What a page's pixel tried to tell («Los chivatos»): kept in the tab's shield, in
+        // memory, with whether it was cut.
+        let chivato = dir
+            .as_ref()
+            .and_then(|u| crate::chivatos::lee_en(u, &host, metodo, cuerpo, &self.formas))
+            .map(|c| (c.red, c.evento, p.escudo.chivato(c, d.cortar)));
         let perfil = p.perfil;
+        // An isolated tab writes nothing to disk, neither the day's figures nor the list of
+        // cuts (review of 10 Oct 2026, grave 7): its shield shows them while it is open.
+        let aislada = perfil == Perfil::Aislada;
         // The person's own webs of the day: not an isolated tab, and not the AI's mandate tab.
         let web = (perfil == Perfil::General && !es_interna(&p.url) && !p.escudo.sitio.is_empty())
             .then(|| p.escudo.sitio.clone());
-        self.diario.anota(&hoy, &d, web.as_deref());
+        if !aislada {
+            self.diario.anota(&hoy, &d, web.as_deref());
+            if let Some((red, evento, true)) = chivato {
+                self.diario.anota_chivato(&hoy, red, evento);
+            }
+        }
         // A day's list of cuts stops at `cortes::MAX_DIA` lines (a page calling endless names
         // must not fill the disk); the day's figures still count every one, and the list says
         // how many were left out.
@@ -2962,10 +3132,11 @@ impl Sesion {
             .dias
             .get(&hoy)
             .is_none_or(|e| e.cortadas as usize <= cortes::MAX_DIA);
-        if recurso == Recurso::Documento && !d.cortar {
+        if recurso == Recurso::Documento && !d.cortar && !aislada {
             self.diario.dias.entry(hoy).or_default().paginas += 1;
         }
-        if d.cortar && d.de_fuera() && cabe && self.cortes_pend.len() < 20_000 {
+        // A whole page cut (a site you cut, a step outside the task) is in the list too.
+        if d.cortar && d.anotable() && !aislada && cabe && self.cortes_pend.len() < 20_000 {
             let dato = d
                 .hallazgos
                 .first()
@@ -3037,14 +3208,19 @@ impl Sesion {
         self.diario_sucio = true;
         let nota = if self.depura {
             format!(
-                "{recurso:?} pagina={} tercero={} cortar={} motivo={:?}",
+                "{recurso:?} pagina={} tercero={} cortar={} motivo={:?}{}",
                 self.pestanas
                     .iter()
                     .find(|p| p.id == id)
                     .map_or("", |p| p.escudo.sitio.as_str()),
                 d.tercero,
                 d.cortar,
-                d.motivo
+                d.motivo,
+                chivato.map_or(String::new(), |(r, e, _)| format!(
+                    " chivato={}/{}",
+                    r.clave(),
+                    e.clave()
+                ))
             )
         } else {
             String::new()

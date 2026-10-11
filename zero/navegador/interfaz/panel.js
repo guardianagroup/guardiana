@@ -17,37 +17,49 @@
 
   // --- shield -------------------------------------------------------------------------------
   const COLOR_CAT = { rastreador: 'rojo', publicidad: 'ambar', telemetria: 'ambar', esperado: 'verde', desconocido: '' };
-  // One row per company: what holds now (cut or passing) decides the colour and the button;
-  // the counts below say what happened on this page.
+  // One row per company: what holds now (cut, partly cut, or passing) decides the colour and
+  // the button; the counts below say what happened on this page.
   function fila(x) {
-    const cortado = x.ahora === 'cortado';
-    const sigue = !cortado && (x.categoria === 'rastreador' || x.categoria === 'publicidad' || x.corredor);
+    const corta = x.ahora === 'cortado' || x.ahora === 'parcial';
+    const parcial = x.ahora === 'parcial';
+    const sigue = !corta && (x.categoria === 'rastreador' || x.categoria === 'publicidad' || x.corredor);
     const li = document.createElement('li');
-    li.className = 'tercero' + (cortado ? ' cortado' : sigue ? ' sigue' : '') + (movido && movido.sitio === x.sitio && Date.now() < movido.hasta ? ' recien' : '');
+    li.className = 'tercero' + (parcial ? ' parcial' : corta ? ' cortado' : sigue ? ' sigue' : '') + (movido && movido.sitio === x.sitio && Date.now() < movido.hasta ? ' recien' : '');
     li.dataset.sitio = x.sitio;
     const paisTxt = x.pais ? `<small>${esc(pais(x.pais))}</small>` : '';
-    // Every button has its way back: «Desbloquear» on what is cut, «Bloquear» on what passes,
-    // «Volver a bloquear» on what the person unblocked; a chip says when the rule is theirs.
-    const [accion, clave] = cortado ? ['desbloquear_sitio', 'accion_desbloquear']
-      : x.regla === 'permitido' ? ['bloquear_sitio', 'accion_rebloquear'] : ['bloquear_sitio', 'accion_bloquear'];
-    const boton = `<button class="boton chico ${cortado ? 'deja' : 'corta'}" data-accion="${accion}" title="${esc(t(clave + '_titulo'))}">${esc(t(clave))}</button>`;
+    // Every button has its way back: «Volver a bloquear» on what the person unblocked (even if
+    // something of it is still cut: their marked data never passes by a rule), «Desbloquear»
+    // on what a rule or the lists cut, «Bloquear» on what passes; a row cut only in part also
+    // offers «Bloquear todo». A chip says when the rule is theirs. What the task's limits cut,
+    // or a row cut only for carrying marked data, has no «Desbloquear»: it would do nothing.
+    const botones = [];
+    if (x.regla === 'permitido') botones.push(['bloquear_sitio', 'accion_rebloquear', 'corta']);
+    else if (corta) {
+      if (x.deshace) botones.push(['desbloquear_sitio', 'accion_desbloquear', 'deja']);
+      if (parcial) botones.push(['bloquear_todo', 'accion_bloquear_todo', 'corta']);
+    } else botones.push(['bloquear_sitio', 'accion_bloquear', 'corta']);
+    const boton = `<span class="botones">${(x.fijo ? [] : botones).map(([accion, clave, clase]) => `<button class="boton chico ${clase}" data-accion="${accion}" title="${esc(t(clave + '_titulo'))}">${esc(t(clave))}</button>`).join('')}</span>`;
+    // Why it is cut now: printed only when the chips do not say it already.
+    const por = corta ? (x.por || x.motivo) : null;
     const detalle = [
       `<span class="mono">${esc(x.sitio)}</span>`,
       `<span>${esc(x.cortadas > 0 ? t('escudo_cortadas_de', { c: n(x.cortadas), n: n(x.vistas) }) : tn('escudo_peticiones', x.vistas, { n: n(x.vistas) }))}</span>`,
+      parcial ? `<span class="chip ambar">${esc(t('escudo_parcial'))}</span>` : '',
       `<span class="chip ${COLOR_CAT[x.categoria] || ''}">${esc(t('cat_' + x.categoria))}</span>`,
       x.regla === 'tuya' || x.regla === 'permitido' ? `<span class="chip tuya">${esc(t('regla_' + x.regla))}</span>` : '',
       x.corredor ? `<span class="chip rojo" title="${esc(x.corredor)}">${esc(t('corredor_etiqueta'))}</span>` : '',
-      // The reason is printed only when the chips do not say it already.
-      x.cortadas > 0 && x.motivo && !['rastreador', 'publicidad', 'corredor', 'corte_tuyo', 'telemetria'].includes(x.motivo) ? `<span class="motivo">${esc(t('motivo_' + x.motivo))}</span>` : '',
+      por && !['rastreador', 'publicidad', 'corredor', 'corte_tuyo', 'telemetria'].includes(por) ? `<span class="motivo">${esc(t('motivo_' + por))}</span>` : '',
+      // Marked data is cut whatever the buttons say: how it goes out, said where it was cut.
+      x.dato ? `<span class="nota-dato">${esc(t('escudo_dato_cortado'))}</span>` : '',
     ].join('');
     li.innerHTML = `<span class="quien">${esc(x.quien)}${paisTxt}</span>${boton}<span class="detalle">${detalle}</span>`;
-    li.querySelector('button').addEventListener('click', (e) => {
+    li.querySelectorAll('button').forEach((b) => b.addEventListener('click', (e) => {
       // The row changes list (cut ↔ passing): remember it, to follow it there with its new
       // button in sight (owner's report of 10 Oct 2026: «Volver a bloquear» seemed gone).
       tocado = { sitio: x.sitio, antes: x.ahora + '|' + x.regla, hasta: Date.now() + 5000 };
       manda({ tipo: e.currentTarget.dataset.accion, sitio: x.sitio });
       $('e-recarga').classList.remove('oculto');
-    });
+    }));
     return li;
   }
   let tocado = null;
@@ -67,7 +79,8 @@
     if (!li) return;
     li.classList.add('recien');
     li.scrollIntoView({ block: 'nearest' });
-    li.querySelector('button').focus({ preventScroll: true });
+    const b = li.querySelector('button');
+    if (b) b.focus({ preventScroll: true });
     setTimeout(() => document.querySelectorAll('#v-escudo li.recien').forEach((l) => l.classList.remove('recien')), 2600);
   }
   let sitioEscudo = null;
@@ -99,18 +112,22 @@
     $('e-maxima-activa').classList.toggle('oculto', !m.maxima);
     const lista = (m.terceros || []).slice();
     lista.sort((a, b) => (b.cortadas - a.cortadas) || (b.vistas - a.vistas));
-    const cortados = lista.filter((x) => x.ahora === 'cortado');
-    const vistos = lista.filter((x) => x.ahora !== 'cortado');
+    // Partly cut rows are with the cut ones: something of theirs is being cut, and the way back
+    // is there.
+    const cortados = lista.filter((x) => x.ahora === 'cortado' || x.ahora === 'parcial');
+    const vistos = lista.filter((x) => x.ahora === 'pasa');
     const recienMovido = sigueFila(lista);
     // The rows are drawn again on every request the page makes: a button that had the focus
     // keeps it, on the same company's row.
     const activo = document.activeElement;
     const conFoco = activo && activo.closest && activo.closest('#v-escudo li.tercero') ? activo.closest('li.tercero').dataset.sitio : null;
+    const accionConFoco = conFoco && activo.dataset ? activo.dataset.accion : null;
     $('e-cortados').replaceChildren(...cortados.map(fila));
     $('e-vistos').replaceChildren(...vistos.map(fila));
     if (conFoco) {
       const li = [...document.querySelectorAll('#v-escudo li.tercero')].find((l) => l.dataset.sitio === conFoco);
-      if (li) li.querySelector('button').focus({ preventScroll: true });
+      const b = li && (li.querySelector(`button[data-accion="${accionConFoco}"]`) || li.querySelector('button'));
+      if (b) b.focus({ preventScroll: true });
     }
     $('e-cortados-n').textContent = n(cortados.length);
     $('e-vistos-n').textContent = n(vistos.length);
@@ -123,6 +140,90 @@
     if (m.datos_salvados) hechos.push(tn('datos_salvados', m.datos_salvados, { n: n(m.datos_salvados) }));
     if (m.cookies) hechos.push(t(m.cookies.accion === 'rechazado' ? 'cookies_rechazado' : 'cookies_escondido', { gestor: m.cookies.gestor }));
     $('e-hechos').innerHTML = hechos.map((h) => `<span>${esc(h)}</span>`).join('');
+    pintaChivatos(m);
+  });
+
+  // «Los chivatos»: what this page's pixels tried to tell an advertising network about the
+  // person, one line each, only what the request said; and, when something was cut, a card to
+  // share without amounts, products or email.
+  const lang = () => document.documentElement.lang || 'es';
+  // An amount as it travelled, written the person's way when it is a plain number.
+  function importe(v) {
+    const s = String(v);
+    if (!/^-?\d+(\.\d+)?$/.test(s)) return s;
+    const dec = (s.split('.')[1] || '').length;
+    return Number(s).toLocaleString(lang(), { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  }
+  function dato(tipo, d) {
+    if (!d) return '';
+    return t(`chivato_${tipo}_${d.tuyo ? 'tuyo' : 'otro'}${d.cifrado ? '' : '_claro'}`);
+  }
+  function lineaChivato(c) {
+    const red = t('chivato_red_' + c.red);
+    const que = c.evento === 'otro' ? t('chivato_ev_otro', { nombre: c.nombre }) : t('chivato_ev_' + c.evento);
+    const partes = [c.servidor ? t('chivato_a_servidor', { sitio: c.servidor, red, que }) : t('chivato_a', { red, que })];
+    if (c.importe) partes.push(importe(c.importe) + (c.moneda ? ' ' + c.moneda : ''));
+    const correo = dato('correo', c.correo);
+    if (correo) partes.push(correo);
+    const tel = dato('telefono', c.telefono);
+    if (tel) partes.push(tel);
+    if (c.veces > 1) partes.push(t('chivato_veces', { n: n(c.veces) }));
+    return partes.join(' · ');
+  }
+  let fraseTarjeta = '';
+  function fraseDe(m) {
+    const k = m.tarjeta;
+    if (!k || !m.sitio) return '';
+    return tn('chivatos_tarjeta', k.empresas, { web: m.sitio, n: n(k.empresas), que: t('chivatos_yo_' + k.evento), correo: k.correo ? t('chivatos_tarjeta_correo') : '' });
+  }
+  // The card as an image, the same look as «your month in data»: only the sentence.
+  async function dibujaTarjeta(frase) {
+    const c = $('e-tarjeta-lienzo');
+    const x = c.getContext('2d');
+    try { await document.fonts.ready; } catch (_) {}
+    if (frase !== fraseTarjeta) return;
+    x.clearRect(0, 0, 1200, 630);
+    x.fillStyle = '#F4F6FA'; x.fillRect(0, 0, 1200, 630);
+    x.strokeStyle = 'rgba(11,16,32,.05)';
+    for (let i = 0; i < 1200; i += 44) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 630); x.stroke(); }
+    for (let j = 0; j < 630; j += 44) { x.beginPath(); x.moveTo(0, j); x.lineTo(1200, j); x.stroke(); }
+    x.fillStyle = '#C0301A'; x.beginPath(); x.arc(84, 84, 9, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#0B1020'; x.font = '600 24px Unbounded'; x.fillText('GUARDIANA ZERO', 108, 93);
+    x.fillStyle = '#5B6275'; x.font = '500 22px Plex'; x.fillText(t('chivatos_titulo'), 72, 170);
+    x.fillStyle = '#0B1020'; x.font = '600 40px Unbounded';
+    let linea = ''; let y = 240;
+    for (const p of frase.split(' ')) {
+      const prueba = linea ? linea + ' ' + p : p;
+      if (x.measureText(prueba).width > 1056 && linea) { x.fillText(linea, 72, y); y += 54; linea = p; } else linea = prueba;
+    }
+    x.fillText(linea, 72, y);
+    x.fillStyle = '#5B6275'; x.font = '400 18px Plex'; x.fillText(t('lema'), 72, 540);
+    x.fillStyle = '#1F4BFF'; x.font = '500 20px PlexMono'; x.fillText('guardianagroup.com', 72, 570);
+  }
+  function pintaChivatos(m) {
+    const lista = m.chivatos || [];
+    $('e-chivatos-caja').classList.toggle('oculto', !lista.length);
+    const paso = lista.some((c) => !c.cortado);
+    $('e-chivatos-titulo').textContent = t(paso ? 'chivatos_titulo_paso' : 'chivatos_titulo');
+    $('e-chivatos-nota').textContent = t(paso ? 'chivatos_nota_paso' : 'chivatos_nota');
+    $('e-chivatos').innerHTML = lista.map((c) => `<li class="${c.cortado ? 'cortado' : 'paso'}" title="${esc(c.nombre)}"><span>${esc(lineaChivato(c))}</span><span class="estado">— ${esc(t(c.cortado ? 'chivato_cortado' : 'chivato_paso'))}</span></li>`).join('');
+    const frase = fraseDe(m);
+    $('e-tarjeta').classList.toggle('oculto', !frase);
+    if (frase !== fraseTarjeta) {
+      fraseTarjeta = frase;
+      $('e-tarjeta-frase').textContent = frase;
+      $('e-tarjeta-guardada').textContent = '';
+      if (frase) dibujaTarjeta(frase);
+    }
+  }
+  $('e-tarjeta-guardar').addEventListener('click', async () => {
+    if (!fraseTarjeta) return;
+    await dibujaTarjeta(fraseTarjeta);
+    manda({ tipo: 'guardar_imagen', que: 'chivatos', datos: $('e-tarjeta-lienzo').toDataURL('image/png') });
+  });
+  $('e-tarjeta-copiar').addEventListener('click', () => {
+    if (!fraseTarjeta) return;
+    navigator.clipboard.writeText(fraseTarjeta).then(() => { $('e-tarjeta-copiar').textContent = t('copiado'); setTimeout(() => { $('e-tarjeta-copiar').textContent = t('chivatos_copiar'); }, 1500); });
   });
   $('e-recargar').addEventListener('click', () => { manda({ tipo: 'recargar' }); $('e-recarga').classList.add('oculto'); });
   $('e-ver-todo').addEventListener('click', () => manda({ tipo: 'abrir_cortes' }));
@@ -214,7 +315,10 @@
       $('r-huella').textContent = m.huella ? t('recibo_huella', { huella: m.huella }) : '';
     }
   });
-  en('guardado', (m) => { $('r-ruta').textContent = m.texto || m.ruta || ''; });
+  en('guardado', (m) => {
+    if (m.que === 'chivatos') $('e-tarjeta-guardada').textContent = m.texto || m.ruta || '';
+    else $('r-ruta').textContent = m.texto || m.ruta || '';
+  });
 
   // --- redaction --------------------------------------------------------------------------------
   let tachado = null;

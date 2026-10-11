@@ -535,7 +535,7 @@ fn marked_data_never_reaches_a_third_party_and_the_book_says_who_got_it() {
     );
     let t = del_tipo(&o, Origen::Panel, "tinta").unwrap_or_default();
     assert_eq!(t["lista"][0]["visible"], "an•••@correo.co");
-    assert!(s.necesita_cuerpo(id));
+    assert!(s.necesita_cuerpo(id, "https://collect.otra-empresa.io/e"));
     let r = s.peticion(
         id,
         "https://collect.otra-empresa.io/e",
@@ -1713,4 +1713,681 @@ fn an_isolated_tab_writes_nothing_to_the_book() {
         s.libro.entradas.keys().collect::<Vec<_>>()
     );
     assert!(s.prefs.sin_preguntar.is_empty());
+}
+
+fn sha256_hex(s: &str) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(s.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// The shield's row of `sitio` as the panel gets it.
+fn fila_de(s: &mut Sesion, sitio: &str) -> Value {
+    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":"escudo"}"#);
+    let e = del_tipo(&o, Origen::Panel, "escudo").unwrap_or_default();
+    e["terceros"]
+        .as_array()
+        .and_then(|l| l.iter().find(|t| t["sitio"] == sitio).cloned())
+        .unwrap_or_default()
+}
+
+fn marca_correo(s: &mut Sesion) {
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"tinta_anadir","dato":"correo","valor":"ana@correo.co"}"#,
+    );
+}
+
+/// Review of 10 Oct 2026, grave 1: Meta's pixel lives on `www.facebook.com`, which the lists
+/// do not call a tracker by its name; its path does.
+#[test]
+fn meta_s_pixel_is_cut_and_its_row_says_the_lists_cut_it() {
+    let (mut s, _, id) = con_pagina(true);
+    let r = s.peticion(
+        id,
+        "https://www.facebook.com/tr?id=1&ev=Purchase&cd[value]=89900&cd[currency]=COP",
+        "GET",
+        b"",
+        3,
+    );
+    assert!(r.cortar);
+    assert!(
+        s.peticion(
+            id,
+            "https://www.facebook.com/tr/",
+            "POST",
+            b"id=1&ev=PageView",
+            8
+        )
+        .cortar
+    );
+    assert!(
+        s.peticion(
+            id,
+            "https://connect.facebook.net/en_US/fbevents.js",
+            "GET",
+            b"",
+            6
+        )
+        .cortar
+    );
+    assert!(
+        s.peticion(
+            id,
+            "https://www.google.com/pagead/1p-conversion/1/?value=1",
+            "GET",
+            b"",
+            3
+        )
+        .cortar
+    );
+    let f = fila_de(&mut s, "facebook.com");
+    assert_eq!(f["quien"], "Meta");
+    assert_eq!(
+        (f["ahora"].as_str(), f["regla"].as_str()),
+        (Some("cortado"), Some("lista"))
+    );
+    assert_eq!(f["categoria"], "rastreador");
+    // And who followed the person is now named too.
+    let hoy = s.msg_hoy();
+    assert!(hoy["hoy"]["empresas_cortadas"].as_u64().unwrap_or(0) >= 2);
+}
+
+/// Grave 2: a tracker served from a delivery network is a tracker, and shows up.
+#[test]
+fn a_tracker_on_a_delivery_network_is_cut_and_shown() {
+    let (mut s, _, id) = con_pagina(true);
+    let r = s.peticion(
+        id,
+        "https://d10lpsik1i8c69.cloudfront.net/w.js",
+        "GET",
+        b"",
+        6,
+    );
+    assert!(r.cortar);
+    let f = fila_de(&mut s, "d10lpsik1i8c69.cloudfront.net");
+    assert_eq!(f["ahora"], "cortado");
+    // The road carrying the page's own images is still not «a company from outside».
+    assert!(
+        !s.peticion(id, "https://d1abc.cloudfront.net/logo.png", "GET", b"", 3)
+            .cortar
+    );
+    assert!(fila_de(&mut s, "d1abc.cloudfront.net").is_null());
+}
+
+/// Grave 5: «Enviar» sends, to the site it was asked about and for a few minutes; and
+/// «Desbloquear» lets marked data through to a site, with «Volver a bloquear» as its way back.
+#[test]
+fn an_approved_sending_reaches_its_site_and_the_approval_ends() {
+    static AHORA: AtomicU64 = AtomicU64::new(1_791_553_171_000);
+    fn reloj_movil() -> i64 {
+        i64::try_from(AHORA.load(Ordering::SeqCst)).unwrap_or(0)
+    }
+    let d = carpeta();
+    let (mut s, _) = Sesion::abre(Arranque {
+        datos: d.join("datos"),
+        descargas: d.join("descargas"),
+        idioma_sistema: "es".into(),
+        version: "0.1.0".into(),
+        reloj: reloj_movil,
+    });
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"bienvenida","cortar":true}"#,
+    );
+    marca_correo(&mut s);
+    let id = s.activa();
+    let web = "https://www.tienda.co/pagar";
+    let _ = abre_pagina(&mut s, id, web);
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        web,
+        r#"{"tipo":"zg_formulario","zg":"f","id":1,"accion":"https://checkout.pagos-ejemplo.com/pay","valores":["ana@correo.co"]}"#,
+    );
+    let q = del_tipo(&o, Origen::Panel, "pregunta_formulario").unwrap_or_default();
+    assert_eq!(q["sitio"], "pagos-ejemplo.com");
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        &json!({ "tipo": "formulario_respuesta", "id": q["id"], "enviar": true, "recordar": false })
+            .to_string(),
+    );
+    // The form posts the page away to the payment site: it goes.
+    let pago = "https://checkout.pagos-ejemplo.com/pay";
+    let _ = s.navegacion_empieza(id, pago, false);
+    let r = s.peticion(id, pago, "POST", b"email=ana%40correo.co&total=1", 1);
+    assert!(!r.cortar, "«Enviar» must send");
+    // Its script sending the same to the same site, too; to anyone else, never.
+    assert!(
+        !s.peticion(
+            id,
+            "https://api.pagos-ejemplo.com/v1/intent",
+            "POST",
+            br#"{"email":"ana@correo.co"}"#,
+            8
+        )
+        .cortar
+    );
+    assert!(
+        s.peticion(
+            id,
+            "https://collect.otra-empresa.io/e",
+            "POST",
+            br#"{"email":"ana@correo.co"}"#,
+            8
+        )
+        .cortar
+    );
+    // Five minutes later, the approval is over.
+    AHORA.fetch_add(5 * 60_000 + 1, Ordering::SeqCst);
+    assert!(
+        s.peticion(
+            id,
+            "https://api.pagos-ejemplo.com/v1/intent",
+            "POST",
+            br#"{"email":"ana@correo.co"}"#,
+            8
+        )
+        .cortar
+    );
+}
+
+/// «Desbloquear» never lets marked data through (the owner, 10 Oct 2026): a row cut only for
+/// carrying it offers no «Desbloquear», and says that «Enviar» is how it goes.
+#[test]
+fn a_row_cut_for_your_data_offers_no_unblock_and_unblocking_never_sends_it() {
+    let (mut s, _, id) = con_pagina(false);
+    marca_correo(&mut s);
+    let envia_correo = |s: &mut Sesion| {
+        s.peticion(
+            id,
+            "https://collect.otra-empresa.io/e",
+            "POST",
+            br#"{"email":"ana@correo.co"}"#,
+            8,
+        )
+        .cortar
+    };
+    assert!(envia_correo(&mut s));
+    // The row says what holds: cut, for carrying your data (it said «pasa», review P5); and
+    // nothing a button of the shield does would send it.
+    let f = fila_de(&mut s, "otra-empresa.io");
+    assert_eq!(
+        (f["ahora"].as_str(), f["por"].as_str()),
+        (Some("cortado"), Some("tinta"))
+    );
+    assert_eq!(
+        (f["deshace"].as_bool(), f["dato"].as_bool()),
+        (Some(false), Some(true))
+    );
+    // Even an unblock sent anyway (an old panel) leaves the data cut.
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"desbloquear_sitio","sitio":"otra-empresa.io"}"#,
+    );
+    assert!(envia_correo(&mut s));
+    let f = fila_de(&mut s, "otra-empresa.io");
+    assert_eq!(
+        (f["ahora"].as_str(), f["regla"].as_str()),
+        (Some("cortado"), Some("permitido"))
+    );
+    assert!(!s.libro.entradas.contains_key("otra-empresa.io"));
+    // Its «Volver a bloquear» leaves it as it was, with no rule of the person's.
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"bloquear_sitio","sitio":"otra-empresa.io"}"#,
+    );
+    assert!(s.prefs.reglas.cortados.is_empty() && s.prefs.reglas.permitidos.is_empty());
+    assert_eq!(fila_de(&mut s, "otra-empresa.io")["ahora"], "cortado");
+    // A page sending your data away by opening another site is not let through by a rule
+    // either.
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"desbloquear_sitio","sitio":"tracker.example"}"#,
+    );
+    assert!(abre_pagina(&mut s, id, "https://tracker.example/r?e=ana%40correo.co").cortar);
+}
+
+/// The approval of «Enviar» goes on in the window the page opens for the sending (a form with
+/// `target=_blank`), and it never covers a mandate's decoy.
+#[test]
+fn an_approved_sending_carries_on_in_the_window_it_opens() {
+    let (mut s, _, id) = con_pagina(false);
+    marca_correo(&mut s);
+    let web = "https://www.tienda.co/pagar";
+    let _ = abre_pagina(&mut s, id, web);
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        web,
+        r#"{"tipo":"zg_formulario","zg":"f","id":1,"accion":"https://checkout.pagos-ejemplo.com/pay","valores":["ana@correo.co"]}"#,
+    );
+    let q = del_tipo(&o, Origen::Panel, "pregunta_formulario").unwrap_or_default();
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        &json!({ "tipo": "formulario_respuesta", "id": q["id"], "enviar": true, "recordar": false })
+            .to_string(),
+    );
+    let (n, _) = s.ventana_nueva(id).unwrap_or_default();
+    let pago = "https://checkout.pagos-ejemplo.com/pay";
+    let _ = s.navegacion_empieza(n, pago, false);
+    assert!(
+        !s.peticion(n, pago, "POST", b"email=ana%40correo.co", 1)
+            .cortar
+    );
+    // Anywhere else, still cut, from the new window too.
+    let fuga = "https://tracker.example/r?e=ana%40correo.co";
+    let (m, _) = s.ventana_nueva(id).unwrap_or_default();
+    let _ = s.navegacion_empieza(m, fuga, false);
+    assert!(s.peticion(m, fuga, "GET", b"", 1).cortar);
+    // Once the window shows a web of its own, that web is where data leaves from: from the new
+    // tab page after it, as from any tab.
+    let _ = s.pagina_nueva(m, "https://www.otra-web.co/");
+    let _ = s.navegacion_empieza(m, INICIO, false);
+    let _ = s.pagina_nueva(m, INICIO);
+    let _ = s.navegacion_empieza(m, fuga, false);
+    assert!(!s.peticion(m, fuga, "GET", b"", 1).cortar);
+}
+
+#[test]
+fn the_approval_never_covers_a_mandate_s_decoy() {
+    let (mut s, _, _) = con_pagina(false);
+    marca_correo(&mut s);
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"mandato_empezar","tarea":"","webs":["avianca.com"],"estricto":true}"#,
+    );
+    let Some(Orden::CreaPestana { id: m, .. }) = o.first().cloned() else {
+        unreachable!("{o:?}");
+    };
+    let senuelo = s
+        .mandato
+        .as_ref()
+        .map(|x| x.senuelo.clone())
+        .unwrap_or_default();
+    let web = "https://www.avianca.com/reservar";
+    let _ = abre_pagina(&mut s, m, web);
+    let o = s.mensaje(
+        Origen::Pestana(m),
+        web,
+        &json!({ "tipo": "zg_formulario", "zg": "f", "id": 1, "accion": "https://www.avianca.com/pago", "valores": [senuelo, "ana@correo.co"] })
+            .to_string(),
+    );
+    let q = del_tipo(&o, Origen::Panel, "pregunta_formulario").unwrap_or_default();
+    assert_eq!(q["mandato"], true);
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        &json!({ "tipo": "formulario_respuesta", "id": q["id"], "enviar": true, "recordar": false })
+            .to_string(),
+    );
+    // The person's own email was approved: it goes.
+    assert!(
+        !s.peticion(
+            m,
+            "https://www.avianca.com/api/pago",
+            "POST",
+            b"email=ana%40correo.co",
+            8
+        )
+        .cortar
+    );
+    // The decoy is nobody's: it is caught, approval or not, in the page and in a new window.
+    let robo = format!("{{\"email\":\"{senuelo}\"}}");
+    let r = s.peticion(
+        m,
+        "https://www.avianca.com/api/pago",
+        "POST",
+        robo.as_bytes(),
+        8,
+    );
+    assert!(r.cortar);
+    let (n, _) = s.ventana_nueva(m).unwrap_or_default();
+    let fuga = format!("https://www.avianca.com/p?e={senuelo}");
+    let _ = s.navegacion_empieza(n, &fuga, false);
+    assert!(s.peticion(n, &fuga, "GET", b"", 3).cortar);
+}
+
+/// Grave 6: a window a page opens leaves from that page.
+#[test]
+fn a_new_window_cannot_carry_marked_data_away_either() {
+    let (mut s, _, id) = con_pagina(false);
+    marca_correo(&mut s);
+    let _ = abre_pagina(&mut s, id, "https://www.tienda.co/");
+    let (n, _) = s.ventana_nueva(id).unwrap_or_default();
+    let fuga = "https://tracker.example/r?e=ana%40correo.co";
+    let _ = s.navegacion_empieza(n, fuga, false);
+    let r = s.peticion(n, fuga, "GET", b"", 1);
+    assert!(r.cortar);
+    assert!(r.pagina.unwrap_or_default().contains("tracker.example"));
+    // To the opener's own site it goes, as it would in the same tab.
+    let (m, _) = s.ventana_nueva(id).unwrap_or_default();
+    let propia = "https://www.tienda.co/cuenta?e=ana%40correo.co";
+    let _ = s.navegacion_empieza(m, propia, false);
+    assert!(!s.peticion(m, propia, "GET", b"", 1).cortar);
+    // A window from no web at all (the new tab page) is cut too.
+    let _ = s.tecla(u32::from('T'), true, false, false);
+    let t = s.activa();
+    let (w, _) = s.ventana_nueva(t).unwrap_or_default();
+    let _ = s.navegacion_empieza(w, fuga, false);
+    assert!(s.peticion(w, fuga, "GET", b"", 1).cortar);
+}
+
+/// Grave 7: an isolated tab leaves nothing on disk; its shield counts while it is open.
+#[test]
+fn an_isolated_tab_writes_no_figures_and_no_cuts_to_disk() {
+    let (mut s, d, _) = con_pagina(true);
+    let _ = s.tecla(u32::from('N'), true, true, false);
+    let id = s.activa();
+    assert!(s.es_aislada(id));
+    let _ = abre_pagina(&mut s, id, "https://secreto-medico.com/diagnostico");
+    let r = s.peticion(
+        id,
+        "https://stats.g.doubleclick.net/g/collect/secreto-medico.com/diagnostico",
+        "GET",
+        b"",
+        3,
+    );
+    assert!(r.cortar);
+    let _ = s.peticion(
+        id,
+        "https://www.facebook.com/tr?id=1&ev=ViewContent",
+        "GET",
+        b"",
+        3,
+    );
+    let e = del_tipo(&s.tic(), Origen::Barra, "escudo").unwrap_or_default();
+    assert_eq!(e["resumen"]["cortadas"], 2);
+    assert_eq!(e["chivatos"].as_array().map(Vec::len), Some(1));
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        &json!({ "tipo": "pestana_cerrar", "id": id }).to_string(),
+    );
+    s.cierra();
+    let diario = fs::read_to_string(d.join("datos").join("diario.json")).unwrap_or_default();
+    assert!(!diario.contains("doubleclick"), "{diario}");
+    assert!(!diario.contains("chivatos"), "{diario}");
+    assert_eq!(s.msg_hoy()["hoy"]["cortadas"], 0);
+    assert!(cortes::lee(&d.join("datos").join("cortes"), "2000-01-01", "2100-01-01").is_empty());
+}
+
+/// Media 8: a site partly cut says so, and its buttons go back to that part.
+#[test]
+fn a_site_cut_only_in_part_says_so_and_goes_back_to_that_part() {
+    let (mut s, _, id) = con_pagina(true);
+    assert!(
+        !s.peticion(id, "https://www.google.com/recaptcha/api.js", "GET", b"", 6)
+            .cortar
+    );
+    assert!(
+        s.peticion(id, "https://adservice.google.com/ddm/fls/z", "GET", b"", 3)
+            .cortar
+    );
+    let f = fila_de(&mut s, "google.com");
+    assert_eq!(
+        (f["ahora"].as_str(), f["regla"].as_str()),
+        (Some("parcial"), Some("lista"))
+    );
+    assert_eq!(f["categoria"], "publicidad");
+    let manda = |s: &mut Sesion, tipo: &str| {
+        let _ = s.mensaje(
+            Origen::Panel,
+            PANEL,
+            &json!({ "tipo": tipo, "sitio": "google.com" }).to_string(),
+        );
+    };
+    manda(&mut s, "desbloquear_sitio");
+    assert_eq!(fila_de(&mut s, "google.com")["ahora"], "pasa");
+    manda(&mut s, "bloquear_sitio");
+    assert_eq!(fila_de(&mut s, "google.com")["ahora"], "parcial");
+    assert!(s.prefs.reglas.cortados.is_empty() && s.prefs.reglas.permitidos.is_empty());
+    // Maximum protection: one beacon cut out of a site's requests is a part, not the site.
+    s.prefs.reglas.maxima = true;
+    let _ = s.peticion(id, "https://cdn.otra.io/a.js", "GET", b"", 6);
+    assert!(
+        s.peticion(id, "https://cdn.otra.io/ping", "POST", b"x", 14)
+            .cortar
+    );
+    assert_eq!(fila_de(&mut s, "otra.io")["ahora"], "parcial");
+    // «Bloquear todo» on a part-cut row: the whole site, by the person's rule, with its undo.
+    let f = fila_de(&mut s, "google.com");
+    assert_eq!(
+        (f["ahora"].as_str(), f["deshace"].as_bool()),
+        (Some("parcial"), Some(true))
+    );
+    manda(&mut s, "bloquear_todo");
+    let f = fila_de(&mut s, "google.com");
+    assert_eq!(
+        (f["ahora"].as_str(), f["regla"].as_str()),
+        (Some("cortado"), Some("tuya"))
+    );
+    assert!(
+        s.peticion(id, "https://www.google.com/recaptcha/api.js", "GET", b"", 6)
+            .cortar
+    );
+    manda(&mut s, "desbloquear_sitio");
+    assert_eq!(fila_de(&mut s, "google.com")["ahora"], "pasa");
+    assert!(
+        !s.peticion(id, "https://www.google.com/recaptcha/api.js", "GET", b"", 6)
+            .cortar
+    );
+}
+
+/// Media 8 in a mandate: what is outside the task is cut, and no button of the shield changes
+/// that (the task's own panel adds sites).
+#[test]
+fn outside_the_task_the_row_is_cut_and_fixed() {
+    let (mut s, _, _) = con_pagina(false);
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"mandato_empezar","tarea":"","webs":["avianca.com"],"estricto":true}"#,
+    );
+    let Some(Orden::CreaPestana { id: m, .. }) = o.first().cloned() else {
+        unreachable!("{o:?}");
+    };
+    let _ = abre_pagina(&mut s, m, "https://www.avianca.com/");
+    assert!(
+        s.peticion(m, "https://evil.example/p.png?d=1", "GET", b"", 3)
+            .cortar
+    );
+    let f = fila_de(&mut s, "evil.example");
+    assert_eq!(f["ahora"], "cortado");
+    assert_eq!(f["por"], "fuera_de_mandato");
+    assert_eq!(f["fijo"], true);
+    // The task's tab turns off what its filter would not see, and the receipt says so.
+    assert!(s.guion_pestana(m).contains("WebTransport"));
+    assert!(!s.guion_pestana(1).contains("WebTransport"));
+    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"mandato_terminar"}"#);
+    let fin = del_tipo(&o, Origen::Panel, "mandato").unwrap_or_default();
+    let contenido = fin["recibo"]["contenido"].as_str().unwrap_or_default();
+    assert!(
+        contenido.contains(r#""apagado":["webrtc","webtransport"]"#),
+        "{contenido}"
+    );
+    // Said where: in the pages and their frames, not everywhere.
+    assert!(
+        contenido.contains(r#""apagado_en":"paginas_y_marcos""#),
+        "{contenido}"
+    );
+}
+
+/// Media 10: a whole page cut is in «Lo que se cortó» and in today's figures.
+#[test]
+fn a_whole_page_cut_is_in_the_list_and_in_today() {
+    let (mut s, _, id) = con_pagina(false);
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"bloquear_sitio","sitio":"ejemplo.com"}"#,
+    );
+    assert!(abre_pagina(&mut s, id, "https://www.ejemplo.com/a").cortar);
+    // A request cut; not «a company from outside» that tried anything: you opened it.
+    let hoy = s.msg_hoy();
+    assert_eq!(hoy["hoy"]["cortadas"], 1);
+    assert_eq!(hoy["hoy"]["empresas"], 0);
+    assert_eq!(hoy["hoy"]["empresas_cortadas"], 0);
+    assert_eq!(hoy["mes"]["empresas"], 0);
+    let _ = s.navegacion_empieza(id, CORTES, false);
+    let _ = s.pagina_nueva(id, CORTES);
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        CORTES,
+        r#"{"tipo":"cortes","periodo":"hoy"}"#,
+    );
+    let c = del_tipo(&o, Origen::Pestana(id), "cortes").unwrap_or_default();
+    assert_eq!(c["total"], 1);
+    assert_eq!(c["lista"][0]["host"], "www.ejemplo.com");
+    assert_eq!(c["lista"][0]["recurso"], "documento");
+    assert_eq!(c["lista"][0]["motivo"], "corte_tuyo");
+    assert_eq!(c["sin_anotar"], 0);
+}
+
+/// «Los chivatos»: what the page's pixels tried to tell, per tab, deduplicated, with the card to
+/// share; the day keeps counts only.
+#[test]
+fn the_shield_says_what_the_pixels_tried_to_tell() {
+    let (mut s, d, id) = con_pagina(true);
+    let _ = abre_pagina(&mut s, id, "https://www.tienda.co/gracias");
+    // A pixel's body is read even without marked data.
+    assert!(s.necesita_cuerpo(id, "https://analytics.tiktok.com/api/v2/pixel"));
+    assert!(!s.necesita_cuerpo(id, "https://www.tienda.co/api"));
+    marca_correo(&mut s);
+    let em = sha256_hex("ana@correo.co");
+    let meta = format!(
+        "https://www.facebook.com/tr/?id=1&ev=Purchase&cd[value]=89900&cd[currency]=COP&ud[em]={em}&eid=ord-7"
+    );
+    assert!(s.peticion(id, &meta, "GET", b"", 3).cortar);
+    // The same event to a second pixel id of the same shop: one event.
+    assert!(
+        s.peticion(id, &meta.replace("id=1", "id=2"), "GET", b"", 3)
+            .cortar
+    );
+    let tiktok = format!(
+        r#"{{"event":"CompletePayment","event_id":"ord-7","properties":{{"value":89900,"currency":"COP"}},"context":{{"user":{{"email":"{em}"}}}}}}"#
+    );
+    assert!(
+        s.peticion(
+            id,
+            "https://analytics.tiktok.com/api/v2/pixel",
+            "POST",
+            tiktok.as_bytes(),
+            8
+        )
+        .cortar
+    );
+    let e = del_tipo(&s.tic(), Origen::Barra, "escudo").unwrap_or_default();
+    let lista = e["chivatos"].as_array().cloned().unwrap_or_default();
+    assert_eq!(lista.len(), 2, "{lista:?}");
+    let m = &lista[0];
+    assert_eq!(m["red"], "meta");
+    assert_eq!(m["evento"], "compra");
+    assert_eq!(m["nombre"], "Purchase");
+    assert_eq!(m["importe"], "89900");
+    assert_eq!(m["moneda"], "COP");
+    assert_eq!(m["correo"], json!({ "tuyo": true, "cifrado": true }));
+    assert_eq!(m["cortado"], true);
+    assert_eq!(m["veces"], 1);
+    assert!(m.get("id").is_none(), "the order id stays in memory");
+    assert_eq!(
+        e["tarjeta"],
+        json!({ "empresas": 2, "evento": "compra", "correo": true })
+    );
+    // The day counts them by network and event, in memory only: on disk it would say which days
+    // the person bought something.
+    let hoy = s.hoy();
+    let cuenta = |red: &str| s.diario.dias[&hoy].chivatos[red]["compra"];
+    assert_eq!((cuenta("meta"), cuenta("tiktok")), (1, 1));
+    s.cierra();
+    let diario = fs::read_to_string(d.join("datos").join("diario.json")).unwrap_or_default();
+    assert!(diario.contains("cortadas"), "{diario}");
+    assert!(
+        !diario.contains("chivatos") && !diario.contains("compra"),
+        "{diario}"
+    );
+    assert!(!diario.contains("89900") && !diario.contains("COP") && !diario.contains("ord-7"));
+    // What got through says so: with the cut off, it «passed».
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"cortar_seguimiento","valor":false}"#,
+    );
+    let _ = abre_pagina(&mut s, id, "https://www.tienda.co/");
+    let _ = s.peticion(
+        id,
+        "https://www.facebook.com/tr?id=1&ev=PageView",
+        "GET",
+        b"",
+        3,
+    );
+    let e = del_tipo(&s.tic(), Origen::Barra, "escudo").unwrap_or_default();
+    assert_eq!(e["chivatos"][0]["cortado"], false);
+    assert!(e["tarjeta"].is_null());
+}
+
+#[test]
+fn the_card_is_saved_as_a_png_of_its_own_name() {
+    let (mut s, _, d) = abre();
+    let png = base64::engine::general_purpose::STANDARD.encode(b"\x89PNG\r\n\x1a\nresto");
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        &json!({ "tipo": "guardar_imagen", "que": "chivatos", "datos": format!("data:image/png;base64,{png}") })
+            .to_string(),
+    );
+    let g = del_tipo(&o, Origen::Panel, "guardado").unwrap_or_default();
+    assert_eq!(g["que"], "chivatos");
+    let ruta = PathBuf::from(g["ruta"].as_str().unwrap_or_default());
+    assert_eq!(ruta.parent(), Some(d.join("descargas").as_path()));
+    assert_eq!(
+        ruta.file_name().and_then(|f| f.to_str()),
+        Some("guardiana-zero-chivatos-2026-10-09.png")
+    );
+}
+
+/// A second sending approved to the same site adds its data to what is approved there; it does
+/// not take back the first.
+#[test]
+fn two_approved_sendings_to_one_site_add_up() {
+    let (mut s, _, id) = con_pagina(false);
+    marca_correo(&mut s);
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"tinta_anadir","dato":"telefono","valor":"+57 300 123 4567"}"#,
+    );
+    let web = "https://www.tienda.co/pagar";
+    let _ = abre_pagina(&mut s, id, web);
+    for (n, valor) in [(1, "ana@correo.co"), (2, "3001234567")] {
+        let o = s.mensaje(
+            Origen::Pestana(id),
+            web,
+            &json!({ "tipo": "zg_formulario", "zg": "f", "id": n, "accion": "https://checkout.pagos-ejemplo.com/pay", "valores": [valor] })
+                .to_string(),
+        );
+        let q = del_tipo(&o, Origen::Panel, "pregunta_formulario").unwrap_or_default();
+        let _ = s.mensaje(
+            Origen::Panel,
+            PANEL,
+            &json!({ "tipo": "formulario_respuesta", "id": q["id"], "enviar": true, "recordar": false })
+                .to_string(),
+        );
+    }
+    let r = s.peticion(
+        id,
+        "https://api.pagos-ejemplo.com/v1/intent",
+        "POST",
+        br#"{"email":"ana@correo.co","tel":"3001234567"}"#,
+        8,
+    );
+    assert!(!r.cortar);
 }

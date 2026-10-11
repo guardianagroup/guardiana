@@ -4,7 +4,9 @@
 //!   cut, the decoy leaving), written in the person's language with no outside resource;
 //! - the script every page of a web tab gets before its own code runs: the Global Privacy
 //!   Control signal (`navigator.globalPrivacyControl`, sent as `Sec-GPC: 1` by the shell), and
-//!   the form guard that asks before personal data leaves in a form.
+//!   the form guard that asks before personal data leaves in a form;
+//! - in a mandate's tab, before that, WebRTC and WebTransport turned off: connections the
+//!   request filter does not see, which a page could use to take data outside the task.
 //!
 //! The script never reads anything the person has not typed into a form being sent, and what it
 //! reads goes only to the browser itself (never to a server): the browser decides, in the side
@@ -90,6 +92,44 @@ pub fn reabre(limpia: &str) -> String {
 pub fn guion_paginas() -> String {
     GUION.to_string()
 }
+
+/// The script of a mandate's tab: WebRTC and WebTransport turned off, then the same as every
+/// page. It runs in every frame it reaches; a frame made from the page's own code, which the
+/// engine may not give this script first, is cleaned when the page reaches into it
+/// (`contentWindow`, `contentDocument`). A page that still found a way would use a connection
+/// GUARDIANA ZERO does not see, and the receipt says so (review of 10 Oct 2026, grave 4).
+#[must_use]
+pub fn guion_mandato() -> String {
+    format!("{APAGA_CONEXIONES}\n{GUION}")
+}
+
+const APAGA_CONEXIONES: &str = r#"(() => {
+  'use strict';
+  const NOMBRES = ['RTCPeerConnection', 'webkitRTCPeerConnection', 'RTCDataChannel', 'RTCSessionDescription', 'RTCIceCandidate', 'RTCRtpSender', 'RTCRtpReceiver', 'RTCRtpTransceiver', 'WebTransport'];
+  const apaga = (w) => {
+    for (const k of NOMBRES) {
+      try { delete w[k]; } catch (_) {}
+      try { Object.defineProperty(w, k, { value: undefined, configurable: false, writable: false, enumerable: false }); } catch (_) {}
+    }
+  };
+  apaga(window);
+  for (const [C, k] of [[window.HTMLIFrameElement, 'contentWindow'], [window.HTMLIFrameElement, 'contentDocument'], [window.HTMLFrameElement, 'contentWindow'], [window.HTMLFrameElement, 'contentDocument'], [window.HTMLObjectElement, 'contentWindow'], [window.HTMLObjectElement, 'contentDocument']]) {
+    if (!C) continue;
+    const d = Object.getOwnPropertyDescriptor(C.prototype, k);
+    if (!d || !d.get) continue;
+    const leer = d.get;
+    try {
+      Object.defineProperty(C.prototype, k, {
+        configurable: false, enumerable: d.enumerable,
+        get: function () {
+          const r = leer.call(this);
+          try { const w = k === 'contentWindow' ? r : (r && r.defaultView); if (w) apaga(w); } catch (_) {}
+          return r;
+        },
+      });
+    } catch (_) {}
+  }
+})();"#;
 
 const GUION: &str = r#"(() => {
   'use strict';
@@ -297,6 +337,17 @@ mod tests {
         assert!(g.contains("globalPrivacyControl"));
         assert!(!g.contains("window.__"));
         assert!(g.contains("getRandomValues"));
+    }
+
+    #[test]
+    fn a_mandate_s_tab_turns_webrtc_and_webtransport_off_first() {
+        let g = guion_mandato();
+        let apaga = g.find("RTCPeerConnection").unwrap_or(usize::MAX);
+        assert!(g.contains("'WebTransport'"));
+        assert!(apaga < g.find("globalPrivacyControl").unwrap_or(0));
+        // Every other tab keeps them.
+        assert!(!guion_paginas().contains("RTCPeerConnection"));
+        assert!(!guion_paginas().contains("WebTransport"));
     }
 
     #[test]

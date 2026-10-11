@@ -6,7 +6,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::decision::{Decision, Motivo};
+use crate::chivatos::{Chivato, Evento, Red};
+use crate::decision::{Ajustes, Decision, Motivo};
 
 /// One company or site that a page tried to send you to or pull in, as the shield lists it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,10 +31,197 @@ pub struct Tercero {
     /// Why the last cut happened.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub motivo: Option<Motivo>,
-    /// Pings or beacons of it cut by maximum protection: then the lists' cut covers this site
-    /// too, and «Desbloquear» lets them through (review of 10 Oct 2026: they had no undo).
+    /// Cuts by reason.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub motivos: BTreeMap<Motivo, u32>,
+    /// What each request was, to tell what holds for the site now, whatever switch changes
+    /// (review of 10 Oct 2026, media 8). Each request counts once, in the first that applies:
+    /// cut for being outside the mandate or for carrying its decoy (no rule of the person's
+    /// undoes those)…
     #[serde(default, skip_serializing_if = "is_zero")]
-    pub balizas: u32,
+    pub fijos: u32,
+    /// …carrying a marked value of the person to it…
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub con_dato: u32,
+    /// …one the open lists cut with the protection on…
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub de_lista: u32,
+    /// …or one only maximum protection cuts (telemetry, pings and beacons).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub de_maxima: u32,
+    /// The lists' reason for the last request of it they know.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub motivo_lista: Option<Motivo>,
+}
+
+/// What holds now for one site of the shield.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Estado {
+    /// `cortado` (everything it asked for is cut now), `parcial` (part of it) or `pasa`.
+    pub ahora: &'static str,
+    /// The rule behind it: `tuya` (the person cut it), `permitido` (the person let it
+    /// through), `lista` (the open lists cut it), or none.
+    pub regla: Option<&'static str>,
+    /// Why it is cut, when it is.
+    pub por: Option<Motivo>,
+    /// «Desbloquear» would let through something that is cut now: the person's own cut, or
+    /// what the lists cut. Not marked data, nor what the task's limits cut.
+    pub deshace: bool,
+    /// Part of what is cut now carried the person's marked data: only «Enviar» in the form
+    /// guard sends it.
+    pub dato: bool,
+}
+
+impl Tercero {
+    /// A site seen through the lists alone, when no shield shows it any more: what its name
+    /// says, as one request.
+    #[must_use]
+    pub fn de_sitio(sitio: &str) -> Self {
+        let d = crate::destino::clasifica(sitio);
+        let lista = match d.categoria {
+            "rastreador" => Some(Motivo::Rastreador),
+            "publicidad" => Some(Motivo::Publicidad),
+            _ if d.corredor.is_some() => Some(Motivo::Corredor),
+            "telemetria" => Some(Motivo::Telemetria),
+            _ => None,
+        };
+        Self {
+            quien: d.quien().to_string(),
+            sitio: sitio.to_string(),
+            pais: None,
+            categoria: d.categoria.to_string(),
+            corredor: d.corredor.as_ref().map(|c| c.nombre.to_string()),
+            vistas: 1,
+            cortadas: 0,
+            motivo: None,
+            motivos: BTreeMap::new(),
+            fijos: 0,
+            con_dato: 0,
+            de_lista: u32::from(matches!(
+                lista,
+                Some(Motivo::Rastreador | Motivo::Publicidad | Motivo::Corredor)
+            )),
+            de_maxima: u32::from(lista == Some(Motivo::Telemetria)),
+            motivo_lista: lista,
+        }
+    }
+
+    /// How many of its requests would be cut now with these settings: (by the mandate's
+    /// limits, for carrying marked data, by the lists). With `reglas` false, leaving out the
+    /// person's own rules. «Desbloquear» only undoes what the lists cut: marked data never
+    /// goes to another company by a rule (the owner, 10 Oct 2026).
+    fn cortaria(&self, a: &Ajustes, reglas: bool) -> (u32, u32, u32) {
+        let permitido = reglas && a.permitidos.contains(&self.sitio);
+        let lista = if a.cortar_seguimiento && !permitido {
+            self.de_lista
+                .saturating_add(if a.maxima { self.de_maxima } else { 0 })
+        } else {
+            0
+        };
+        (self.fijos, self.con_dato, lista)
+    }
+
+    /// What the lists, the marked data and the mandate cut of it by themselves, without any
+    /// rule of the person's: `(all of it, some of it)`. «Bloquear» needs no rule of its own when
+    /// they already cut it all, and «Volver a bloquear» leaves it to them when they cut a part.
+    #[must_use]
+    pub fn sin_reglas(&self, a: &Ajustes) -> (bool, bool) {
+        let (f, d, l) = self.cortaria(a, false);
+        let n = f.saturating_add(d).saturating_add(l);
+        (self.vistas > 0 && n >= self.vistas, n > 0)
+    }
+
+    /// What holds now for the site with the person's settings (`protege` false: nothing is
+    /// cut, the trial or the subscription is over).
+    #[must_use]
+    pub fn estado(&self, a: &Ajustes, protege: bool) -> Estado {
+        if !protege {
+            return Estado {
+                ahora: "pasa",
+                regla: None,
+                por: None,
+                deshace: false,
+                dato: false,
+            };
+        }
+        if a.cortados.contains(&self.sitio) {
+            return Estado {
+                ahora: "cortado",
+                regla: Some("tuya"),
+                por: Some(Motivo::CorteTuyo),
+                deshace: true,
+                dato: self.con_dato > 0,
+            };
+        }
+        let permitido = a.permitidos.contains(&self.sitio);
+        let (f, d, l) = self.cortaria(a, true);
+        let n = f.saturating_add(d).saturating_add(l).min(self.vistas);
+        let ahora = if n == 0 {
+            "pasa"
+        } else if n >= self.vistas {
+            "cortado"
+        } else {
+            "parcial"
+        };
+        let por = if f > 0 {
+            Some(if self.motivos.contains_key(&Motivo::Senuelo) {
+                Motivo::Senuelo
+            } else {
+                Motivo::FueraDeMandato
+            })
+        } else if d > 0 {
+            Some(Motivo::Tinta)
+        } else if l > 0 {
+            self.motivo_lista
+        } else {
+            None
+        };
+        let regla = if permitido {
+            Some("permitido")
+        } else if l > 0 {
+            Some("lista")
+        } else {
+            None
+        };
+        Estado {
+            ahora,
+            regla,
+            por,
+            deshace: l > 0,
+            dato: d > 0,
+        }
+    }
+
+    /// Nothing the person's rules decide changes it: all of it was cut by the mandate's limits.
+    #[must_use]
+    pub const fn fijo(&self) -> bool {
+        self.vistas > 0 && self.fijos >= self.vistas
+    }
+}
+
+/// One thing a page's pixels tried to tell, as the shield lists it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChivatoVisto {
+    /// What it said.
+    #[serde(flatten)]
+    pub chivato: Chivato,
+    /// Every time it was sent, it was cut.
+    pub cortado: bool,
+    /// How many times it was sent (the same event, by its id, is one).
+    pub veces: u32,
+}
+
+/// What a shareable card says about the pixels of a page that were cut: `n` companies were told
+/// `evento` (and all of them with the person's hashed email, when `correo`), and every one of
+/// those attempts was cut. Nothing else: no amount, no product, no email.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct Tarjeta {
+    /// Companies.
+    pub empresas: u32,
+    /// The event, the one that says most among those cut.
+    pub evento: Evento,
+    /// All of them carried the person's own email, hashed.
+    pub correo: bool,
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -44,6 +232,8 @@ const fn is_zero(n: &u32) -> bool {
 /// Third parties kept per tab, sites per day: bounds against a page that calls endless names.
 const MAX_TERCEROS: usize = 2_000;
 const MAX_SITIOS_DIA: usize = 20_000;
+/// Pixel events kept per tab.
+const MAX_CHIVATOS: usize = 50;
 
 /// What the shield of one tab shows.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -59,6 +249,10 @@ pub struct Pestana {
     /// The page's cookie notice: its consent manager and what was done (`rechazado`, or
     /// `escondido` when it had no «reject all»).
     pub cookies: Option<(String, String)>,
+    /// What its pixels tried to tell (in memory only: amounts and products never reach the
+    /// disk).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub chivatos: Vec<ChivatoVisto>,
 }
 
 impl Pestana {
@@ -96,16 +290,123 @@ impl Pestana {
                 vistas: 0,
                 cortadas: 0,
                 motivo: None,
-                balizas: 0,
+                motivos: BTreeMap::new(),
+                fijos: 0,
+                con_dato: 0,
+                de_lista: 0,
+                de_maxima: 0,
+                motivo_lista: None,
             });
+        // One name of a site may say more than the first one did: `adservice.google.com` after
+        // `www.google.com`, the pixel after the like button.
+        if matches!(d.destino.categoria, "rastreador" | "publicidad")
+            && !matches!(e.categoria.as_str(), "rastreador" | "publicidad")
+        {
+            e.categoria = d.destino.categoria.to_string();
+        }
+        if e.quien == e.sitio && d.destino.quien() != d.destino.sitio {
+            e.quien = d.destino.quien().to_string();
+        }
         e.vistas += 1;
         if d.cortar {
             e.cortadas += 1;
             e.motivo = d.motivo;
-            if d.motivo == Some(Motivo::Baliza) {
-                e.balizas += 1;
+            if let Some(m) = d.motivo {
+                *e.motivos.entry(m).or_insert(0) += 1;
             }
         }
+        if d.lista.is_some() {
+            e.motivo_lista = d.lista;
+        }
+        if d.cortar && matches!(d.motivo, Some(Motivo::FueraDeMandato | Motivo::Senuelo)) {
+            e.fijos += 1;
+        } else if d.otro && !d.hallazgos.is_empty() {
+            e.con_dato += 1;
+        } else {
+            match d.lista {
+                Some(Motivo::Telemetria | Motivo::Baliza) => e.de_maxima += 1,
+                Some(_) => e.de_lista += 1,
+                None => {}
+            }
+        }
+    }
+
+    /// Keep what a page's pixel tried to tell. The same event sent again (by its id) is one;
+    /// without an id, the same thing again counts one more time. Returns whether it was new.
+    pub fn chivato(&mut self, c: Chivato, cortado: bool) -> bool {
+        let mismo = |x: &Chivato| {
+            x.red == c.red
+                && match (&x.id, &c.id) {
+                    (Some(a), Some(b)) => a == b,
+                    (None, None) => {
+                        x.evento == c.evento
+                            && x.nombre == c.nombre
+                            && x.importe == c.importe
+                            && x.moneda == c.moneda
+                    }
+                    _ => false,
+                }
+        };
+        if let Some(e) = self.chivatos.iter_mut().find(|e| mismo(&e.chivato)) {
+            if c.id.is_none() {
+                e.veces = e.veces.saturating_add(1);
+            }
+            // If it got through once, it got through.
+            e.cortado &= cortado;
+            // A copy may say what the first did not (the email in the second request).
+            if e.chivato.correo.is_none_or(|d| !d.tuyo) && c.correo.is_some() {
+                e.chivato.correo = c.correo;
+            }
+            if e.chivato.telefono.is_none_or(|d| !d.tuyo) && c.telefono.is_some() {
+                e.chivato.telefono = c.telefono;
+            }
+            return false;
+        }
+        if self.chivatos.len() >= MAX_CHIVATOS {
+            return false;
+        }
+        self.chivatos.push(ChivatoVisto {
+            chivato: c,
+            cortado,
+            veces: 1,
+        });
+        true
+    }
+
+    /// The card to share, when something the pixels tried to tell was cut: the event that says
+    /// most among those cut, told to how many companies, every attempt of theirs cut. A pixel
+    /// that says it was sent from another web (a beacon of the page before) is left out.
+    #[must_use]
+    pub fn tarjeta(&self) -> Option<Tarjeta> {
+        let de_aqui =
+            |c: &&ChivatoVisto| c.chivato.pagina.as_deref().is_none_or(|p| p == self.sitio);
+        let evento = self
+            .chivatos
+            .iter()
+            .filter(de_aqui)
+            .filter(|c| c.cortado)
+            .map(|c| c.chivato.evento)
+            .max_by_key(|e| e.peso())?;
+        let mut por: BTreeMap<&str, (bool, bool)> = BTreeMap::new();
+        for c in self
+            .chivatos
+            .iter()
+            .filter(de_aqui)
+            .filter(|c| c.chivato.evento == evento)
+        {
+            let e = por.entry(c.chivato.red.empresa()).or_insert((true, false));
+            e.0 &= c.cortado;
+            e.1 |= c.chivato.correo.is_some_and(|d| d.tuyo && d.cifrado);
+        }
+        let cortadas: Vec<bool> = por.values().filter(|(c, _)| *c).map(|(_, m)| *m).collect();
+        if cortadas.is_empty() {
+            return None;
+        }
+        Some(Tarjeta {
+            empresas: u32::try_from(cortadas.len()).unwrap_or(u32::MAX),
+            evento,
+            correo: cortadas.iter().all(|m| *m),
+        })
     }
 
     /// The numbers on the button and at the top of the panel.
@@ -203,6 +504,11 @@ pub struct Dia {
     /// Kept only for the last [`DIAS_WEBS`] days.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub siguen: BTreeMap<String, Sigue>,
+    /// What pages' pixels tried to tell, counted by network and event: never an amount, a
+    /// product or a site. In memory only: on disk it would say which days the person bought
+    /// something.
+    #[serde(skip)]
+    pub chivatos: BTreeMap<String, BTreeMap<String, u32>>,
 }
 
 /// Where one company tried to follow the person on one day.
@@ -258,8 +564,15 @@ impl Diario {
             e.datos_salvados += 1;
         }
         // Outside companies only: the page's own site, even when you cut a part of it, is not
-        // «a company from outside».
-        if !d.de_fuera() {
+        // «a company from outside». A whole page that was cut is in the day too, as it is in
+        // the list of cuts.
+        if !d.anotable() {
+            return;
+        }
+        // A whole page the person (or the AI, a step outside its task) opened and that was cut
+        // is a request cut, not «a company from outside» that tried anything.
+        if d.pagina && !d.de_fuera() {
+            e.cortadas += 1;
             return;
         }
         if e.terceros.len() < MAX_SITIOS_DIA {
@@ -276,7 +589,7 @@ impl Diario {
                 e.cortados.insert(d.destino.sitio.clone());
             }
         }
-        let sigue = d.destino.sigue() || d.destino.corredor.is_some();
+        let sigue = !d.pagina && (d.destino.sigue() || d.destino.corredor.is_some());
         if let (true, Some(p)) = (sigue, pagina) {
             let quien = d.destino.quien();
             if e.siguen.len() < MAX_SIGUEN || e.siguen.contains_key(quien) {
@@ -289,6 +602,19 @@ impl Diario {
                 }
             }
         }
+    }
+
+    /// Count one thing a page's pixel tried to tell, on `dia`: its network and event, nothing
+    /// more.
+    pub fn anota_chivato(&mut self, dia: &str, red: Red, evento: Evento) {
+        let e = self.dias.entry(dia.to_string()).or_default();
+        let n = e
+            .chivatos
+            .entry(red.clave().to_string())
+            .or_default()
+            .entry(evento.clave().to_string())
+            .or_insert(0);
+        *n = n.saturating_add(1);
     }
 
     /// Forget which webs were open on the days before `desde` (`AAAA-MM-DD`): the totals stay,
@@ -419,6 +745,65 @@ mod tests {
         let t = diario.total("2026-10-01", "2026-10-31");
         assert_eq!((t.terceros, t.cortadas), (3, 3));
         assert_eq!((t.empresas, t.empresas_cortadas), (2, 1));
+    }
+
+    #[test]
+    fn the_card_only_says_what_was_cut_for_every_company_it_names() {
+        use crate::chivatos::{Chivato, Dato, Evento, Red};
+        let c = |red: Red, evento: Evento, tuyo: bool| Chivato {
+            red,
+            evento,
+            nombre: String::new(),
+            importe: Some("1".into()),
+            moneda: None,
+            correo: Some(Dato {
+                tuyo,
+                cifrado: true,
+            }),
+            telefono: None,
+            id: None,
+            servidor: None,
+            pagina: None,
+        };
+        let mut p = Pestana::nueva("tienda.co");
+        assert!(p.chivato(c(Red::Meta, Evento::Compra, true), true));
+        // Google twice is one company.
+        assert!(p.chivato(c(Red::GoogleAds, Evento::Compra, true), true));
+        assert!(p.chivato(c(Red::GoogleAnalytics, Evento::Compra, true), true));
+        assert!(p.chivato(c(Red::Tiktok, Evento::VerPagina, false), true));
+        let t = p.tarjeta();
+        assert_eq!(
+            t,
+            Some(Tarjeta {
+                empresas: 2,
+                evento: Evento::Compra,
+                correo: true
+            })
+        );
+        // A company that got the purchase through is not «cut» on the card.
+        assert!(p.chivato(c(Red::Snap, Evento::Compra, false), false));
+        let t = p.tarjeta();
+        assert_eq!(t.map(|t| (t.empresas, t.correo)), Some((2, true)));
+        // The same again without an id is one more time, and if it got through once, it did.
+        assert!(!p.chivato(c(Red::Meta, Evento::Compra, true), false));
+        assert_eq!((p.chivatos[0].veces, p.chivatos[0].cortado), (2, false));
+        assert_eq!(p.tarjeta().map(|t| t.empresas), Some(1));
+        // And not everyone with the person's email: the card does not say «with my email».
+        let mut q = Pestana::nueva("tienda.co");
+        assert!(q.chivato(c(Red::Meta, Evento::Compra, true), true));
+        assert!(q.chivato(c(Red::Pinterest, Evento::Compra, false), true));
+        assert_eq!(q.tarjeta().map(|t| t.correo), Some(false));
+        assert_eq!(Pestana::nueva("x.co").tarjeta(), None);
+        // A beacon of the page before (its `dl` names another web) is not this page's story.
+        let mut r = Pestana::nueva("tienda.co");
+        let mut antes = c(Red::Meta, Evento::Compra, true);
+        antes.pagina = Some("otra-tienda.co".into());
+        assert!(r.chivato(antes, true));
+        assert_eq!(r.tarjeta(), None);
+        let mut aqui = c(Red::Tiktok, Evento::Compra, true);
+        aqui.pagina = Some("tienda.co".into());
+        assert!(r.chivato(aqui, true));
+        assert_eq!(r.tarjeta().map(|t| t.empresas), Some(1));
     }
 
     #[test]
