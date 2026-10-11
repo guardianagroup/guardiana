@@ -2333,6 +2333,99 @@ pub(crate) async fn reglas(State(state): State<Arc<AppState>>, _s: Session) -> A
     Ok(Json(list_rules(&state, None)?))
 }
 
+/// `created_by` of the rules «Protección máxima» sets (the owner, 10 Oct 2026: «activar seguridad
+/// máxima también podríamos ponerlo en radiografías»). Its own author, so turning it off undoes
+/// exactly those and never a rule the person made by hand.
+const CREADA_POR_MAXIMA: &str = "protección máxima";
+/// What it cuts for the whole home: whole categories the open lists know. `esperado` is never
+/// among them, and a category rule never cuts it anyway (brief §6, `rules::decide`).
+const CATEGORIAS_MAXIMA: [Category; 3] = [
+    Category::Rastreador,
+    Category::Publicidad,
+    Category::Telemetria,
+];
+
+/// «Protección máxima», as the panel shows it.
+#[derive(Serialize)]
+pub(crate) struct Maxima {
+    /// Its three rules are in force.
+    activa: bool,
+    /// The home has been observed for less than a day: the rules exist, but each device waits
+    /// its own 24 hours before a wide rule cuts anything there (`rules::decide`).
+    esperando: bool,
+}
+
+fn estado_maxima(state: &AppState) -> Result<Maxima, Response> {
+    let now = now_ms();
+    let rules = with_ledger(state, |l| l.rules())?;
+    let activa = CATEGORIAS_MAXIMA.iter().all(|c| {
+        rules.iter().any(|r| {
+            r.is_active(now)
+                && r.created_by == CREADA_POR_MAXIMA
+                && r.scope == Scope::Home
+                && r.match_kind == MatchKind::Category
+                && r.action == Action::Cortar
+                && r.pattern == c.as_str()
+        })
+    });
+    Ok(Maxima {
+        activa,
+        esperando: !observation_complete(observado_casa(state)?),
+    })
+}
+
+pub(crate) async fn maxima(State(state): State<Arc<AppState>>, _s: Session) -> ApiResult<Maxima> {
+    Ok(Json(estado_maxima(&state)?))
+}
+
+#[derive(Deserialize)]
+pub(crate) struct CambiaMaxima {
+    activa: bool,
+}
+
+/// On: one home-wide rule per category, made by «protección máxima» (only the ones missing).
+/// Off: undo the active rules it made, and only those. Undoing never deletes: the list of rules
+/// keeps them, with when they were undone. A name the person unblocked on its row stays
+/// unblocked: an exact name beats a category (`rules::decide`).
+pub(crate) async fn cambia_maxima(
+    State(state): State<Arc<AppState>>,
+    _s: Session,
+    Json(body): Json<CambiaMaxima>,
+) -> ApiResult<Maxima> {
+    let now = now_ms();
+    with_ledger(&state, |l| {
+        let suyas: Vec<Rule> = l
+            .rules()?
+            .into_iter()
+            .filter(|r| r.is_active(now) && r.created_by == CREADA_POR_MAXIMA)
+            .collect();
+        if body.activa {
+            for c in CATEGORIAS_MAXIMA {
+                if suyas.iter().any(|r| r.pattern == c.as_str()) {
+                    continue;
+                }
+                l.add_rule(NewRule {
+                    scope: Scope::Home,
+                    device_id: None,
+                    match_kind: MatchKind::Category,
+                    pattern: c.as_str().to_owned(),
+                    action: Action::Cortar,
+                    created_at: now,
+                    created_by: CREADA_POR_MAXIMA.to_owned(),
+                    expires_at: None,
+                    confirmed: false,
+                })?;
+            }
+        } else {
+            for r in &suyas {
+                l.undo_rule(r.id, now)?;
+            }
+        }
+        Ok(())
+    })?;
+    Ok(Json(estado_maxima(&state)?))
+}
+
 #[derive(Deserialize)]
 pub(crate) struct NuevaRegla {
     scope: String,

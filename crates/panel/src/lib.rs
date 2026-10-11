@@ -306,6 +306,10 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/reglas/{id}/deshacer", post(api::deshacer_regla))
         .route("/api/ajustes/bloqueo", post(api::modo_bloqueo))
         .route(
+            "/api/proteccion-maxima",
+            get(api::maxima).post(api::cambia_maxima),
+        )
+        .route(
             "/api/mi-dispositivo/reglas",
             get(api::mi_reglas).post(api::mi_nueva_regla),
         )

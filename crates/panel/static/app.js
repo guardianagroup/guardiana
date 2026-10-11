@@ -36,7 +36,7 @@
   // «1 reglas deshechas», «1 nombres distintos»), with {n} filled in.
   // Who made a rule, in words: the stored codes («usuario (panel)») were shown as they are, in
   // Spanish on every panel (review of 5 Oct 2026).
-  const creadaPor = (c) => (c === 'usuario (panel)' ? t('creada_panel') : c === 'usuario (dispositivo)' ? t('creada_dispositivo') : c);
+  const creadaPor = (c) => (c === 'usuario (panel)' ? t('creada_panel') : c === 'usuario (dispositivo)' ? t('creada_dispositivo') : c === 'protección máxima' ? t('creada_maxima') : c);
   const tn = (k, n) => t(n === 1 && T.panel && T.panel[k + '_uno'] ? k + '_uno' : k).replace('{n}', n);
 
   // ----- "Guardar en PDF" ----------------------------------------------------
@@ -894,6 +894,32 @@
     }).join('');
   }
 
+  // «Protección máxima» (the owner, 10 Oct 2026): one button for the whole home, off until the
+  // person turns it on, and «Volver a la normal» undoes exactly what it set (api::cambia_maxima).
+  // The same card on the X-ray and on Rules; `alCambiar` reloads the page's own list.
+  async function tarjetaMaxima(alCambiar) {
+    if (!$('maxima')) return;
+    const pinta = (m) => {
+      $('maxima').classList.remove('hidden');
+      $('maxima-activar').classList.toggle('hidden', m.activa);
+      $('maxima-activa').classList.toggle('hidden', !m.activa);
+      $('maxima-quitar').classList.toggle('hidden', !m.activa);
+      $('maxima-msg').className = 'muted';
+      $('maxima-msg').textContent = m.activa && m.esperando ? t('maxima_espera') : '';
+    };
+    const cambia = async (activa, b) => {
+      b.disabled = true;
+      try {
+        pinta(await api('/api/proteccion-maxima', { method: 'POST', body: { activa } }));
+        // The button pressed is gone: the focus goes to the one that undoes it.
+        $(activa ? 'maxima-quitar' : 'maxima-activar').focus();
+        if (alCambiar) await alCambiar();
+      } catch (err) { $('maxima-msg').className = 'bad'; $('maxima-msg').textContent = String(err.message || err); } finally { b.disabled = false; }
+    };
+    $('maxima-activar').addEventListener('click', (e) => cambia(true, e.currentTarget));
+    $('maxima-quitar').addEventListener('click', (e) => cambia(false, e.currentTarget));
+    try { pinta(await api('/api/proteccion-maxima')); } catch (_) {}
+  }
   const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo' };
   function applyTexts() {
     document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.getAttribute('data-t')); });
@@ -1192,9 +1218,11 @@
           $('modo-msg').textContent = t('guardado');
         } catch (err) { $('modo-msg').className = 'bad'; $('modo-msg').textContent = String(err.message || err); } finally { b.disabled = false; }
       });
+      await tarjetaMaxima(load);
       await load();
     },
     async radiografia() {
+      tarjetaMaxima();
       let last = null;
       savePdf('r-pdf', () => {
         const doc = pdfDocument('GUARDIANA · ' + t('radiografia_titulo'));

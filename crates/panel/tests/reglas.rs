@@ -364,3 +364,121 @@ async fn a_foreign_host_or_a_foreign_origin_is_refused() {
     assert_eq!(raw(addr, &cambio("http://127.0.0.1", &token)).await, 200);
     running.shutdown().await;
 }
+
+/// «Protección máxima»: off until turned on; on, three home-wide category rules of its own (the
+/// second «on» adds nothing); off, it undoes exactly those, never a rule the person made; and a
+/// home watched for less than a day says it does not cut anything yet.
+#[tokio::test]
+async fn maximum_protection_sets_and_undoes_only_its_own_rules() {
+    let (db, token_path) = prepare("maxima");
+    let running = start(Config {
+        listen: vec!["127.0.0.1:0".parse().unwrap()],
+        optional_listen: Vec::new(),
+        db_path: db.clone(),
+        genesis: genesis(),
+        token_path,
+        extra_hosts: Vec::new(),
+        info: RuntimeInfo::default(),
+    })
+    .await
+    .expect("the panel starts");
+    let addr = running.addrs[0];
+    let token = running.token.clone();
+    let suyas = || {
+        Ledger::open(&db, genesis())
+            .unwrap()
+            .rules()
+            .unwrap()
+            .into_iter()
+            .filter(|r| r.created_by == "protección máxima")
+            .collect::<Vec<_>>()
+    };
+
+    // A rule of the person's own, which «off» must leave alone.
+    let (st, _) = post(
+        addr,
+        &token,
+        "/api/reglas",
+        r#"{"scope":"home","match_kind":"category","pattern":"publicidad","action":"cortar"}"#,
+    )
+    .await;
+    assert_eq!(st, 200);
+
+    let (st, body) = post(addr, &token, "/api/proteccion-maxima", r#"{"activa":true}"#).await;
+    assert_eq!(st, 200, "{body}");
+    let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v["activa"], true, "{body}");
+    assert_eq!(v["esperando"], false, "observed for two days: {body}");
+    let mut categorias: Vec<String> = suyas().into_iter().map(|r| r.pattern).collect();
+    categorias.sort();
+    assert_eq!(categorias, ["publicidad", "rastreador", "telemetria"]);
+    assert!(suyas()
+        .iter()
+        .all(|r| r.scope == guardiana_core::Scope::Home
+            && r.match_kind == guardiana_core::MatchKind::Category
+            && r.action == guardiana_core::Action::Cortar));
+
+    // On twice: nothing more.
+    let (st, _) = post(addr, &token, "/api/proteccion-maxima", r#"{"activa":true}"#).await;
+    assert_eq!(st, 200);
+    assert_eq!(suyas().len(), 3);
+
+    // Off: its three undone, kept in the list; the person's own rule still active.
+    let (st, body) = post(
+        addr,
+        &token,
+        "/api/proteccion-maxima",
+        r#"{"activa":false}"#,
+    )
+    .await;
+    assert_eq!(st, 200, "{body}");
+    let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v["activa"], false, "{body}");
+    assert!(suyas().iter().all(|r| r.undone_at.is_some()));
+    let todas = Ledger::open(&db, genesis()).unwrap().rules().unwrap();
+    assert!(todas.iter().any(|r| r.created_by != "protección máxima"
+        && r.pattern == "publicidad"
+        && r.undone_at.is_none()));
+    running.shutdown().await;
+
+    // A home watched for an hour: the rules can exist, and the panel says they wait.
+    let dir = std::env::temp_dir().join(format!(
+        "guardiana-reglas-maxima-nueva-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let db = dir.join("ledger.db");
+    let mut l = Ledger::open(&db, genesis()).unwrap();
+    l.upsert_device(
+        SELF_DEVICE_ID,
+        None,
+        Some("127.0.0.1"),
+        now_ms() - DAY_MS / 24,
+    )
+    .unwrap();
+    drop(l);
+    let running = start(Config {
+        listen: vec!["127.0.0.1:0".parse().unwrap()],
+        optional_listen: Vec::new(),
+        db_path: db,
+        genesis: genesis(),
+        token_path: dir.join("panel.token"),
+        extra_hosts: Vec::new(),
+        info: RuntimeInfo::default(),
+    })
+    .await
+    .expect("the panel starts");
+    let (st, body) = post(
+        running.addrs[0],
+        &running.token,
+        "/api/proteccion-maxima",
+        r#"{"activa":true}"#,
+    )
+    .await;
+    assert_eq!(st, 200, "{body}");
+    let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v["activa"], true, "{body}");
+    assert_eq!(v["esperando"], true, "{body}");
+    running.shutdown().await;
+}
