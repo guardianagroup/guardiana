@@ -691,7 +691,7 @@
     "s_nombres": "service names seen",
     "s_ruta": "Database:",
     "s_retencion": "Retention:",
-    "s_no_respuestas": "Only queries are recorded: name, type, device, time, category and verdict; on Windows, for this computer’s own and when the system says so, also which program asked: its name, its path on disk (which may include your user name) and the file’s hash. Answers are never stored; only the country and network of the server that answered, to tell you where your data travels. Never the content.",
+    "s_no_respuestas": "Only queries are recorded: name, type, device, time, category and verdict; on Windows, for this computer’s own and when the system says so, also which program asked: its name, its path on disk (which may include your user name) and the file’s hash. Answers are never stored; only the country and network of the server that answered, to tell you where your data travels, and, when a name answers as another company’s tracker, the name of that tracker’s site. Never the content.",
     "retencion_ilimitada": "no limit: nothing is deleted, not even when you stop paying",
     "outbound_titulo": "What GUARDIANA has sent out",
     "outbound_lead": "Every connection the program made by itself: activating the licence and the subscription check (8 days after activating it and once per period). There is no other: the lists ship inside the program and new versions are installed by you. With whom, when and how many bytes.",

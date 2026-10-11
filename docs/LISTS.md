@@ -82,6 +82,12 @@ AdGuard DNS filter (GPL-3.0, ~176 000 dominios, mezcla publicidad y rastreo) y S
 
 Cualquiera puede proponer cambios a estas listas con un cambio en el repositorio.
 
+Y una lista de otros, para leer los nombres: `public_suffix_list.dat`, la Public Suffix List de Mozilla
+(MPL-2.0), en `crates/lists/data/` desde el 11 de octubre de 2026 (antes estaba en `crates/zero/data/`;
+la fecha, el commit y la huella están en `crates/zero/data/LEEME.md`). Dice dónde termina el sitio en
+un nombre (`tracker.co.uk`, no `co.uk`). La usan GUARDIANA ZERO y, desde la decisión 205, el resolutor,
+para saber si un alias de la respuesta es de otro sitio (un nombre disfrazado). No da ninguna categoría.
+
 ## Prioridad cuando varias listas coinciden
 
 Primero gana la entrada más específica: `www.ejemplo.com` antes que `ejemplo.com`.

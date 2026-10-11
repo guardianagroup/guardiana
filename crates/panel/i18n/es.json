@@ -691,7 +691,7 @@
     "s_nombres": "nombres de servicio vistos",
     "s_ruta": "Base de datos:",
     "s_retencion": "Retención:",
-    "s_no_respuestas": "Solo se anotan consultas: nombre, tipo, dispositivo, hora, categoría y veredicto; en Windows, para las de este equipo y cuando el sistema lo dice, también qué programa pidió cada una: su nombre, su ruta en el disco (que puede llevar el nombre de tu usuario) y la huella del archivo. Nunca se guardan las respuestas; solo el país y la red del servidor que respondió, para decirte a dónde viajan tus datos. Nunca el contenido.",
+    "s_no_respuestas": "Solo se anotan consultas: nombre, tipo, dispositivo, hora, categoría y veredicto; en Windows, para las de este equipo y cuando el sistema lo dice, también qué programa pidió cada una: su nombre, su ruta en el disco (que puede llevar el nombre de tu usuario) y la huella del archivo. Nunca se guardan las respuestas; solo el país y la red del servidor que respondió, para decirte a dónde viajan tus datos, y, cuando un nombre responde como el rastreador de otra empresa, el nombre del sitio de ese rastreador. Nunca el contenido.",
     "retencion_ilimitada": "sin límite: nada se borra, ni cuando dejes de pagar",
     "outbound_titulo": "Lo que GUARDIANA ha enviado fuera",
     "outbound_lead": "Cada conexión que el programa hizo por sí mismo: activar la licencia y la comprobación de la suscripción (a los 8 días de activarla y una vez por periodo). No hay ninguna otra: las listas van dentro del programa y las versiones nuevas las instalas tú. Con quién, cuándo y cuántos bytes.",
