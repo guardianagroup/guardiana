@@ -2741,3 +2741,189 @@ fn bodies_to_other_sites_are_read_for_their_size() {
     let _ = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
     assert!(!s.necesita_cuerpo(id, "https://collect.otra-empresa.io/e"));
 }
+
+/// Decision 206, approved by the owner: maximum protection also cuts the session recording
+/// services the lists do not already cut, says so on the page, and «Desbloquear» undoes it like
+/// the rest of maximum protection.
+#[test]
+fn maximum_protection_cuts_session_recording_and_can_be_undone() {
+    let (mut s, _, id) = con_pagina(true);
+    let candidatos = [
+        "https://edge.fullstory.com/s/fs.js",
+        "https://cdn.lr-ingest.io/LogRocket.min.js",
+        "https://cdn.mouseflow.com/projects/1.js",
+        "https://rec.smartlook.com/recorder.js",
+        "https://cdn.quantummetric.com/qscripts/quantum-x.js",
+        "https://mc.webvisor.org/watch",
+        "https://tools.luckyorange.com/core/lo.js",
+        "https://cdn.inspectlet.com/inspectlet.js",
+        "https://t.contentsquare.net/uxa/x.js",
+        "https://static.hotjar.com/c/hotjar-1.js",
+        "https://www.clarity.ms/tag/x",
+    ];
+    // Without maximum protection only what the lists already cut is cut.
+    let libres: Vec<&str> = candidatos
+        .iter()
+        .copied()
+        .filter(|u| !s.peticion(id, u, "GET", b"", 6).cortar)
+        .collect();
+    assert!(!libres.is_empty(), "the lists cut every service already");
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"maxima","valor":true}"#,
+    );
+    let _ = abre_pagina(&mut s, id, "https://www.eltiempo.com/");
+    for u in &libres {
+        assert!(s.peticion(id, u, "GET", b"", 6).cortar, "{u}");
+    }
+    let u = libres[0];
+    let servicio = crate::medidas::grabador(&host_de(u).unwrap_or_default()).unwrap_or("");
+    let l = medidas_de(&mut s);
+    assert!(
+        l.contains(&(
+            format!("cortado: grabación de sesiones ({servicio})"),
+            "cortado".to_string()
+        )),
+        "{l:?}"
+    );
+    // Its row offers the way back, and the way back works.
+    let sitio_u = sitio(&host_de(u).unwrap_or_default());
+    let fila = fila_de(&mut s, &sitio_u);
+    assert_eq!(fila["ahora"], "cortado");
+    assert_eq!(fila["deshace"], true);
+    assert_eq!(fila["por"], "grabacion");
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        &json!({ "tipo": "desbloquear_sitio", "sitio": sitio_u }).to_string(),
+    );
+    assert!(!s.peticion(id, u, "GET", b"", 6).cortar);
+    // Off again: back to the lists alone.
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        &json!({ "tipo": "bloquear_sitio", "sitio": sitio_u }).to_string(),
+    );
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"maxima","valor":false}"#,
+    );
+    for u in libres.iter().skip(1) {
+        assert!(!s.peticion(id, u, "GET", b"", 6).cortar, "{u}");
+    }
+}
+
+/// Decision 206: the page script learns, with the cookie answer, what maximum protection gives
+/// other companies' scripts on this page; nothing while it is off. One seed per site and run,
+/// another one in an isolated tab; the site's own names are listed so they are never touched.
+#[test]
+fn the_page_script_gets_a_seed_only_with_maximum_protection() {
+    let (mut s, _, id) = con_pagina(true);
+    let web = "https://www.eltiempo.com/";
+    let pide = r#"{"tipo":"zg_cookies_pide","zg":"f1"}"#;
+    let huella = |s: &mut Sesion, id: u32, web: &str| -> Value {
+        s.mensaje(Origen::Pestana(id), web, pide)
+            .iter()
+            .find_map(|x| match x {
+                Orden::RespondeFormulario { json, .. } => serde_json::from_str::<Value>(json).ok(),
+                _ => None,
+            })
+            .unwrap_or_default()["huella"]
+            .clone()
+    };
+    assert_eq!(huella(&mut s, id, web), Value::Null);
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"maxima","valor":true}"#,
+    );
+    let h = huella(&mut s, id, web);
+    assert_eq!(h["sitio"], "eltiempo.com");
+    assert!(h["semilla"].is_u64());
+    assert_eq!(h["propios"][0], "eltiempo.com");
+    // The same site, the same seed; another site, another.
+    assert_eq!(
+        huella(&mut s, id, "https://deportes.eltiempo.com/x")["semilla"],
+        h["semilla"]
+    );
+    let _ = abre_pagina(&mut s, id, "https://www.elpais.com/");
+    assert_ne!(
+        huella(&mut s, id, "https://www.elpais.com/")["semilla"],
+        h["semilla"]
+    );
+    // An isolated tab is not linked to the others.
+    let _ = s.tecla(u32::from('N'), true, true, false);
+    let aislada = s.activa();
+    let _ = abre_pagina(&mut s, aislada, web);
+    assert_ne!(huella(&mut s, aislada, web)["semilla"], h["semilla"]);
+    // A restart is another run: another secret.
+    let (mut s2, _, id2) = con_pagina(true);
+    let _ = s2.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"maxima","valor":true}"#,
+    );
+    assert_ne!(huella(&mut s2, id2, web)["semilla"], h["semilla"]);
+    // A company the person unblocked gets the real values.
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"desbloquear_sitio","sitio":"tracker.example"}"#,
+    );
+    let h = huella(&mut s, aislada, web);
+    assert!(h["propios"]
+        .as_array()
+        .is_some_and(|p| p.iter().any(|x| x == "tracker.example")));
+    // Off again, or without the trial: nothing.
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"maxima","valor":false}"#,
+    );
+    assert_eq!(huella(&mut s, aislada, web), Value::Null);
+}
+
+/// Decision 206: a frame's page script may report what it measured and ask for its seed, and
+/// nothing else; its reads count for the page the tab shows, by the script that asked or, with
+/// no address on the stack, by the frame's own address.
+#[test]
+fn frames_report_their_reads_and_get_their_answer_back() {
+    let (mut s, _, id) = con_pagina(true);
+    let marco = "https://ads.anuncios.example/frame.html";
+    let (r, o) = s.mensaje_de_marco(id, marco, r#"{"tipo":"zg_marco_pide","zg":"m1"}"#);
+    assert!(o.is_empty());
+    let r: Value = serde_json::from_str(&r.unwrap_or_default()).unwrap_or_default();
+    assert_eq!(
+        (r["zg"].clone(), r["huella"].clone()),
+        (json!("m1"), Value::Null)
+    );
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"maxima","valor":true}"#,
+    );
+    let (r, _) = s.mensaje_de_marco(id, marco, r#"{"tipo":"zg_marco_pide","zg":"m1"}"#);
+    let r: Value = serde_json::from_str(&r.unwrap_or_default()).unwrap_or_default();
+    // «The site itself» is the page the person opened, not the frame.
+    assert_eq!(r["huella"]["sitio"], "eltiempo.com");
+    let _ = s.mensaje_de_marco(
+        id,
+        marco,
+        r#"{"tipo":"zg_huella","zg":"m1","lista":[{"t":"canvas","u":["https://fp.tercero.example/a.js"],"r":true},{"t":"webgl","u":[],"r":true}]}"#,
+    );
+    assert_eq!(
+        medidas_de(&mut s)[0].0,
+        "2 scripts intentaron leer la huella de tu equipo; les dimos una distinta: anuncios.example (WebGL), tercero.example (canvas)"
+    );
+    // Nothing else a frame posts is read.
+    let (r, o) = s.mensaje_de_marco(
+        id,
+        marco,
+        r#"{"tipo":"zg_formulario","zg":"m1","id":1,"accion":"https://x.example/","valores":["a@b.co"]}"#,
+    );
+    assert!(r.is_none() && o.is_empty());
+    let (r, o) = s.mensaje_de_marco(id, marco, r#"{"tipo":"borrar_todo"}"#);
+    assert!(r.is_none() && o.is_empty());
+}

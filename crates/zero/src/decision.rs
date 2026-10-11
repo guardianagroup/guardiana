@@ -21,8 +21,9 @@ pub struct Ajustes {
     /// Sites the person let through by hand even if a list knows them (an «undo»).
     pub permitidos: BTreeSet<String>,
     /// «Protección máxima» (the owner, 10 Oct 2026): on top of the above, also cut the
-    /// telemetry the lists know at other companies, and every ping or beacon to another company
-    /// (a request whose only job is to carry information out). Only with `cortar_seguimiento`.
+    /// telemetry the lists know at other companies, every ping or beacon to another company
+    /// (a request whose only job is to carry information out), and the session recording
+    /// services of `data/grabacion.txt` (decision 206). Only with `cortar_seguimiento`.
     #[serde(default)]
     pub maxima: bool,
 }
@@ -64,6 +65,9 @@ pub enum Motivo {
     /// A ping or beacon to another company: it only carries information out (maximum
     /// protection).
     Baliza,
+    /// A session recording service (`data/grabacion.txt`): it can record what the person does
+    /// on the page (maximum protection, decision 206).
+    Grabacion,
 }
 
 /// The answer for one request.
@@ -157,6 +161,7 @@ pub fn decide_con(
             "rastreador" => Some(Motivo::Rastreador),
             "publicidad" => Some(Motivo::Publicidad),
             _ if destino.corredor.is_some() => Some(Motivo::Corredor),
+            _ if crate::medidas::grabador(&destino.host).is_some() => Some(Motivo::Grabacion),
             "telemetria" => Some(Motivo::Telemetria),
             _ if p.recurso == Recurso::Aviso => Some(Motivo::Baliza),
             _ => None,
@@ -197,7 +202,9 @@ pub fn decide_con(
     // A page the person opens is never cut by a list: only what it pulls in from others.
     if ajustes.cortar_seguimiento && !permitido {
         let motivo = match lista {
-            Some(Motivo::Telemetria | Motivo::Baliza) if !ajustes.maxima => None,
+            Some(Motivo::Telemetria | Motivo::Baliza | Motivo::Grabacion) if !ajustes.maxima => {
+                None
+            }
             m => m,
         };
         if let Some(m) = motivo {
@@ -518,5 +525,24 @@ mod tests {
         a.permitidos.clear();
         a.cortar_seguimiento = false;
         assert!(!decide(&baliza, &a, &[], None, None).cortar);
+        // Session recording (decision 206): only with maximum protection, unless the lists
+        // already call the name a tracker; undone like any other cut of the lists.
+        a.cortar_seguimiento = true;
+        a.maxima = false;
+        let grab = pet(
+            "https://cdn.lr-ingest.io/LogRocket.min.js",
+            b"",
+            Recurso::Script,
+        );
+        let antes = decide(&grab, &a, &[], None, None);
+        assert_ne!(antes.motivo, Some(Motivo::Grabacion));
+        a.maxima = true;
+        let d = decide(&grab, &a, &[], None, None);
+        assert!(d.cortar, "{d:?}");
+        if !antes.cortar {
+            assert_eq!(d.motivo, Some(Motivo::Grabacion));
+        }
+        a.permitidos.insert("lr-ingest.io".into());
+        assert!(!decide(&grab, &a, &[], None, None).cortar);
     }
 }

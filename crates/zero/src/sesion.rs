@@ -453,6 +453,9 @@ pub struct Sesion {
     /// What was measured since the browser opened, on the person's own webs (decision 206): in
     /// memory only.
     medidas: medidas::Total,
+    /// This run's secret for the different values maximum protection gives to other companies'
+    /// scripts (one seed per site and run, `medidas::semilla`). Never written anywhere.
+    secreto: [u8; 32],
 }
 
 fn lee<T: DeserializeOwned + Default>(ruta: &Path) -> T {
@@ -625,7 +628,9 @@ impl Sesion {
             licencia_ok: 0,
             licencia_ilegible: false,
             medidas: medidas::Total::default(),
+            secreto: [0; 32],
         };
+        azar(&mut s.secreto);
         s.dia_visto = s.hoy();
         s.poda_cortes();
         s.ultimo_guardado = (s.reloj)();
@@ -1504,10 +1509,10 @@ impl Sesion {
             Origen::Pestana(id) if !propia => {
                 return match tipo.as_str() {
                     "zg_formulario" => self.formulario(id, fuente, &m),
-                    "zg_cookies_pide" => self.cookies_pide(id, &m),
+                    "zg_cookies_pide" => self.cookies_pide(id, fuente, &m),
                     "zg_cookies" => self.cookies_hecho(id, &m),
-                    "zg_huella" => self.huella(id, fuente, &m),
-                    "zg_escribe" => self.escribe(id, fuente),
+                    "zg_huella" => self.huella(id, fuente, &m, false),
+                    "zg_escribe" => self.escribe(id, fuente, false),
                     _ => Vec::new(),
                 };
             }
@@ -2476,13 +2481,50 @@ impl Sesion {
 
     /// A web page's guard asks whether to deal with cookie notices: yes with the subscription on
     /// and the setting on. The answer goes on the guard's own channel, like a form's.
-    fn cookies_pide(&self, id: u32, m: &Value) -> Vec<Orden> {
+    /// The same answer carries what maximum protection gives other companies' scripts on this
+    /// page (decision 206), or `null`.
+    fn cookies_pide(&self, id: u32, fuente: &str, m: &Value) -> Vec<Orden> {
         let ficha: String = texto(m, "zg").chars().take(64).collect();
         let si = self.licencia.protege() && !self.prefs.cookies_sin_tocar;
         vec![Orden::RespondeFormulario {
             id,
-            json: json!({ "zg": ficha, "cookies": si }).to_string(),
+            json:
+                json!({ "zg": ficha, "cookies": si, "huella": self.proteccion_huella(id, fuente) })
+                    .to_string(),
         }]
+    }
+
+    /// What the page script of a page of tab `id` needs to give other companies' scripts a
+    /// different fingerprint, only with maximum protection on: the seed of this site in this
+    /// run (an isolated tab gets its own, so it cannot be linked to the others), the page's
+    /// site, and the names never touched (its same owner, and what the person unblocked).
+    /// `null` otherwise: nothing changes.
+    fn proteccion_huella(&self, id: u32, fuente: &str) -> Value {
+        let r = &self.prefs.reglas;
+        if !(self.licencia.protege() && r.cortar_seguimiento && r.maxima) {
+            return Value::Null;
+        }
+        let Some(p) = self.pestana(id) else {
+            return Value::Null;
+        };
+        let web = host_de(fuente).map(|h| sitio(&h)).unwrap_or_default();
+        if web.is_empty() || es_interna(fuente) {
+            return Value::Null;
+        }
+        let ambito = match p.perfil {
+            Perfil::General => format!("general|{web}"),
+            Perfil::Aislada => format!("aislada-{id}|{web}"),
+            Perfil::Mandato => format!("mandato|{web}"),
+        };
+        // A company the person unblocked gets the real values too: «Desbloquear» undoes this as
+        // it undoes the rest of maximum protection (from the next page on).
+        let mut propios = medidas::propios(&web);
+        propios.extend(r.permitidos.iter().take(400).cloned());
+        json!({
+            "semilla": medidas::semilla(&self.secreto, &ambito),
+            "sitio": web,
+            "propios": propios,
+        })
     }
 
     /// The guard dealt with the page's cookie notice: the shield says so. Only the managers the
@@ -2529,11 +2571,14 @@ impl Sesion {
     /// The page script saw reads that serve to recognise the computer (decision 206): which
     /// kind, and the web addresses on the call stack of whoever asked. Counted on the tab's
     /// shield and in the session's total; nothing changes on the page, nothing is answered.
-    fn huella(&mut self, id: u32, fuente: &str, m: &Value) -> Vec<Orden> {
+    ///
+    /// From a frame (`marco`, see [`Self::mensaje_de_marco`]) the reads belong to the page the tab
+    /// shows; with no web address on the stack, to the frame's own address.
+    fn huella(&mut self, id: u32, fuente: &str, m: &Value, marco: bool) -> Vec<Orden> {
         if !self.licencia.protege() {
             return Vec::new();
         }
-        let lista: Vec<(Tecnica, Vec<String>)> = m
+        let lista: Vec<(Tecnica, Vec<String>, bool)> = m
             .get("lista")
             .and_then(Value::as_array)
             .map(|a| {
@@ -2552,26 +2597,35 @@ impl Sesion {
                                     .collect()
                             })
                             .unwrap_or_default();
-                        Some((t, u))
+                        Some((t, u, x.get("r").and_then(Value::as_bool) == Some(true)))
                     })
                     .collect()
             })
             .unwrap_or_default();
-        let Some(p) = self.pestana_de_fuente(id, fuente) else {
+        let p = if marco {
+            self.pestana_mut(id)
+                .filter(|p| !p.escudo.sitio.is_empty() && !es_interna(&p.url))
+        } else {
+            self.pestana_de_fuente(id, fuente)
+        };
+        let Some(p) = p else {
             return Vec::new();
         };
         let web = p.escudo.sitio.clone();
         let propia = p.perfil == Perfil::General;
         let mut algo = false;
-        for (t, u) in &lista {
-            let u: Vec<&str> = u.iter().map(String::as_str).collect();
+        for (t, u, r) in &lista {
+            let mut u: Vec<&str> = u.iter().map(String::as_str).collect();
+            if marco && u.is_empty() {
+                u.push(fuente);
+            }
             let (autor, script) = medidas::autor(&u, &web);
-            algo |= p.escudo.medidas.huella(*t, autor, script);
+            algo |= p.escudo.medidas.huella(*t, autor, script, *r);
         }
         // The person's own webs only: not an isolated tab, not the AI's.
         if propia {
-            for (t, _) in &lista {
-                self.medidas.huella(&web, *t);
+            for (t, _, r) in &lista {
+                self.medidas.huella(&web, *t, *r);
             }
             self.hoy_sucio |= !lista.is_empty();
         }
@@ -2584,11 +2638,50 @@ impl Sesion {
     /// The person typed in a field of the page (the page script says it once per page, and
     /// nothing of what was typed): from now on, a request to a session recording service went
     /// «after you typed».
-    fn escribe(&mut self, id: u32, fuente: &str) -> Vec<Orden> {
-        if let Some(p) = self.pestana_de_fuente(id, fuente) {
+    fn escribe(&mut self, id: u32, fuente: &str, marco: bool) -> Vec<Orden> {
+        let p = if marco {
+            self.pestana_mut(id)
+                .filter(|p| !p.escudo.sitio.is_empty() && !es_interna(&p.url))
+        } else {
+            self.pestana_de_fuente(id, fuente)
+        };
+        if let Some(p) = p {
             let _ = p.escudo.medidas.escribe();
         }
         Vec::new()
+    }
+
+    /// A message from the page script inside a frame of tab `id` (an iframe the engine lets talk
+    /// to the browser, `CoreWebView2Frame`); `fuente` is the frame's address. A frame may only
+    /// report what it measured and ask what maximum protection gives it; the answer, when there
+    /// is one, goes back to that frame alone (the shell posts it there). Nothing else a frame
+    /// posts is read.
+    pub fn mensaje_de_marco(
+        &mut self,
+        id: u32,
+        fuente: &str,
+        json: &str,
+    ) -> (Option<String>, Vec<Orden>) {
+        let Ok(m) = serde_json::from_str::<Value>(json) else {
+            return (None, Vec::new());
+        };
+        match texto(&m, "tipo") {
+            "zg_marco_pide" => {
+                let ficha: String = texto(&m, "zg").chars().take(64).collect();
+                // The page's site, not the frame's: what is «the site itself» is the web the
+                // person opened.
+                let pagina = self
+                    .pestana(id)
+                    .filter(|p| !es_interna(&p.url))
+                    .map(|p| p.url.clone())
+                    .unwrap_or_default();
+                let r = json!({ "zg": ficha, "huella": self.proteccion_huella(id, &pagina) });
+                (Some(r.to_string()), Vec::new())
+            }
+            "zg_huella" => (None, self.huella(id, fuente, &m, true)),
+            "zg_escribe" => (None, self.escribe(id, fuente, true)),
+            _ => (None, Vec::new()),
+        }
     }
 
     fn formulario(&mut self, id: u32, fuente: &str, m: &Value) -> Vec<Orden> {
@@ -3240,6 +3333,7 @@ impl Sesion {
                 con_cuerpo,
                 bytes,
                 cortada: d.cortar,
+                por_grabacion: d.cortar && d.motivo == Some(Motivo::Grabacion),
             };
             let h = medidas::mira(&v);
             p.escudo.medidas.anota(&v, &h);

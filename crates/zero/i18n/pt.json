@@ -555,5 +555,14 @@
   "medida_nota_huella": "A impressão digital são leituras que servem para reconhecer o seu computador sem cookies: como ele desenha um texto, que placa de vídeo tem, como gera um som, que fontes tem. Alguns sites as fazem por outros motivos, como desenhar ou jogar. O ZERO não muda o que leem: só conta. Olha a página principal, não os quadros que ela tem dentro, e a origem sai da pilha de chamadas, que a própria página pode alterar.",
   "medida_nota_grabacion": "Um serviço de gravação de sessões pode guardar o que você faz na página (cliques, movimentos, o que digita) para ver depois. O ZERO vê para onde vão os pedidos, não o que levam: «depois que você digitou» não quer dizer que levou o que você digitou.",
   "medida_nota_cifrado": "O ZERO reconhece o nome do parâmetro e a forma do valor (um hash SHA-256 ou MD5); não guarda o valor nem sabe de quem é. Cifrado não quer dizer anônimo: o mesmo e-mail dá sempre o mesmo hash, e com ele é possível reconhecer você.",
-  "medida_nota_subida": "Conta o corpo dos pedidos (o que se envia além do endereço). Se o navegador não consegue lê-lo, o envio conta sem tamanho. O que vai no próprio endereço não é somado."
+  "medida_nota_subida": "Conta o corpo dos pedidos (o que se envia além do endereço). Se o navegador não consegue lê-lo, o envio conta sem tamanho. O que vai no próprio endereço não é somado.",
+  "motivo_grabacion": "gravação de sessões",
+  "medida_grabacion_maxima": "cortado: gravação de sessões ({servicio})",
+  "medida_grabacion_maxima_tras_escribir": " · tentou enviar dados a ele depois que você digitou em um campo",
+  "medida_huella_ruido": "{n} scripts tentaram ler a impressão digital do seu computador; demos a eles uma diferente: {lista}",
+  "medida_huella_ruido_uno": "1 script tentou ler a impressão digital do seu computador; demos a ele uma diferente: {lista}",
+  "medida_huella_ruido_autor": "; demos a ele uma diferente",
+  "medida_huella_ruido_parte": "; em {tecnicas} demos a ele uma diferente",
+  "medida_sesion_huella_ruido": "; em {m} demos uma diferente",
+  "medida_nota_ruido": "Com a proteção máxima, o ZERO dá aos scripts de outras empresas uma impressão digital diferente: o canvas e o áudio com uma mudança mínima, sempre a mesma neste site enquanto o ZERO estiver aberto, e uma placa de vídeo genérica. O próprio site e o mesmo dono nunca são tocados, nem um canvas pequeno ou sem texto. Só se diz «demos uma diferente» quando algo realmente mudou."
 }

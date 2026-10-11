@@ -555,5 +555,14 @@
   "medida_nota_huella": "La huella son lecturas que sirven para reconocer tu equipo sin cookies: cómo dibuja un texto, qué tarjeta gráfica tiene, cómo genera un sonido, qué fuentes tiene. Algunas webs las hacen por otros motivos, como dibujar o jugar. ZERO no cambia lo que leen: solo lo cuenta. Mira la página principal, no los marcos que lleva dentro, y el origen sale de la pila de llamadas, que la propia página puede alterar.",
   "medida_nota_grabacion": "Un servicio de grabación de sesiones puede guardar lo que haces en la página (clics, movimientos, lo que escribes) para verlo después. ZERO ve a quién van las peticiones, no qué llevan: «después de que escribieras» no quiere decir que se llevara lo que escribiste.",
   "medida_nota_cifrado": "ZERO reconoce el nombre del parámetro y la forma del valor (un código SHA-256 o MD5); no guarda el valor ni sabe de quién es. Cifrado no quiere decir anónimo: el mismo correo da siempre el mismo código, y con él se te puede reconocer.",
-  "medida_nota_subida": "Cuenta el cuerpo de las peticiones (lo que se envía aparte de la dirección). Si el navegador no deja leerlo, el envío cuenta sin tamaño. Lo que va en la propia dirección no se suma."
+  "medida_nota_subida": "Cuenta el cuerpo de las peticiones (lo que se envía aparte de la dirección). Si el navegador no deja leerlo, el envío cuenta sin tamaño. Lo que va en la propia dirección no se suma.",
+  "motivo_grabacion": "grabación de sesiones",
+  "medida_grabacion_maxima": "cortado: grabación de sesiones ({servicio})",
+  "medida_grabacion_maxima_tras_escribir": " · intentó enviarle datos después de que escribieras en un campo",
+  "medida_huella_ruido": "{n} scripts intentaron leer la huella de tu equipo; les dimos una distinta: {lista}",
+  "medida_huella_ruido_uno": "1 script intentó leer la huella de tu equipo; le dimos una distinta: {lista}",
+  "medida_huella_ruido_autor": "; le dimos una distinta",
+  "medida_huella_ruido_parte": "; en {tecnicas} le dimos una distinta",
+  "medida_sesion_huella_ruido": "; en {m} le dimos una distinta",
+  "medida_nota_ruido": "Con la protección máxima, a los scripts de otras empresas ZERO les da una huella distinta: el lienzo y el audio con un cambio mínimo, siempre el mismo en esta web mientras ZERO siga abierto, y una tarjeta gráfica genérica. A la propia web y a su mismo dueño nunca se les toca, ni a un lienzo pequeño o sin texto. Solo se dice «le dimos una distinta» cuando de verdad se cambió algo."
 }

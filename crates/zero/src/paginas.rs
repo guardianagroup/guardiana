@@ -5,7 +5,9 @@
 //! - the script every page of a web tab gets before its own code runs: the Global Privacy
 //!   Control signal (`navigator.globalPrivacyControl`, sent as `Sec-GPC: 1` by the shell), the
 //!   form guard that asks before personal data leaves in a form, and the measurement of reads
-//!   that serve to recognise the computer (decision 206: measured, never changed);
+//!   that serve to recognise the computer (decision 206), in the page and in its frames; with
+//!   maximum protection, other companies' scripts get a slightly different canvas and audio and a
+//!   generic graphics card, fixed for each site and run;
 //! - in a mandate's tab, before that, WebRTC and WebTransport turned off: connections the
 //!   request filter does not see, which a page could use to take data outside the task.
 //!
@@ -87,10 +89,12 @@ pub fn reabre(limpia: &str) -> String {
 }
 
 /// The script every document of a web tab runs first: Global Privacy Control, the hidden
-/// channel, the form guard and the measurement of reads for a fingerprint ([`crate::medidas`]).
-/// Nothing it defines can be found by the page by name: no global name, the channel to the
-/// browser is kept in a closure and the answers come back on it. The measured functions are
-/// wrapped (a page that compares them across frames can tell; decision 206 says so).
+/// channel, the form guard and the measurement of reads for a fingerprint ([`crate::medidas`]),
+/// with maximum protection's different values for other companies' scripts. In a frame only the
+/// measurement and the protection run, on the frame's own channel. Nothing it defines can be
+/// found by the page by name: no global name, the channel to the browser is kept in a closure
+/// and the answers come back on it. The measured functions are wrapped (a page that compares
+/// them across frames can tell; decision 206 says so).
 #[must_use]
 pub fn guion_paginas() -> String {
     GUION.to_string()
@@ -140,7 +144,10 @@ const GUION: &str = r#"(() => {
   try {
     Object.defineProperty(Navigator.prototype, 'globalPrivacyControl', { get: () => true, configurable: true, enumerable: true });
   } catch (_) {}
-  if (window.top !== window || location.origin === 'https://zero.guardiana') return;
+  if (location.origin === 'https://zero.guardiana') return;
+  // Frames get this script too (WebView2 runs it in «all future top level document and child
+  // frame navigations»): there it only measures, and protects, on the frame's own channel.
+  const marco = window.top !== window;
   const c = window.chrome;
   const host = c && c.webview;
   if (!host || typeof host.postMessage !== 'function') return;
@@ -149,41 +156,65 @@ const GUION: &str = r#"(() => {
   // Web pages do not need the channel to the browser: hidden for good, so a page can neither
   // talk to the browser nor use it to tell this browser apart.
   try { Object.defineProperty(c, 'webview', { value: undefined, configurable: false, writable: false }); } catch (_) {}
-  // The form guard. Built-ins are taken now, before the page can replace them.
-  const P = HTMLFormElement.prototype;
-  const elementos = Object.getOwnPropertyDescriptor(P, 'elements').get;
-  const accionDe = Object.getOwnPropertyDescriptor(P, 'action').get;
-  const enviarNativo = P.submit;
-  const pedirNativo = P.requestSubmit;
-  const de = (o, k) => { const d = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(o), k); return d && d.get ? d.get.call(o) : o[k]; };
   const ficha = new Uint32Array(4);
   crypto.getRandomValues(ficha);
   const yo = Array.from(ficha, (x) => x.toString(16)).join('');
-  // Measured, never changed (decision 206): reads that serve to recognise this computer without
-  // cookies (a canvas with text read back, the graphics card's names, audio rendered off screen,
-  // many fonts measured), and the first time the person types in a field. Each original is
-  // called as it was, with what it was given, and returns what it returned; the wrappers keep
-  // its name, its length and its native text. The browser gets the kind of read and the web
-  // addresses on the stack of whoever asked, never what was read or typed.
+  // What maximum protection gives other companies' scripts on this page (decision 206): `null`
+  // until the browser answers, `false` when it is off. Decided once per document, so a page
+  // never sees a value change under it.
+  let proteccion = null;
+  const pon = (h) => {
+    if (proteccion !== null) return;
+    proteccion = h && typeof h === 'object' && typeof h.semilla === 'number' && typeof h.sitio === 'string' && Array.isArray(h.propios)
+      ? { semilla: h.semilla >>> 0, sitio: h.sitio, propios: h.propios.filter((x) => typeof x === 'string').slice(0, 400) }
+      : false;
+  };
+  // Measured (decision 206): reads that serve to recognise this computer without cookies (a
+  // canvas with text read back, the graphics card's names, audio rendered off screen, many
+  // fonts measured), and the first time the person types in a field. The browser gets the kind
+  // of read and the web addresses on the stack of whoever asked, never what was read or typed.
+  // Each original is called as it was and returns what it returned, keeping its name, length and
+  // native text; only with maximum protection on, and only for a script of another company (by
+  // the stack; never the site itself, its same owner, or an unknown caller), the canvas and the
+  // audio come back with a tiny change fixed for this site and run, and the graphics card's
+  // names come back generic.
   try {
     const R = Reflect.apply;
     const Px = Proxy;
     const Err = Error;
+    const U = URL;
+    const mul = Math.imul;
     const ahora = Date.now;
+    const doc = window.document;
     const tarde = window.setTimeout.bind(window);
     const originales = new WeakMap();
     const aTexto = Function.prototype.toString;
     const finge = new Px(aTexto, { apply: (f, ese, a) => R(f, (typeof ese === 'function' && originales.get(ese)) || ese, a) });
     originales.set(finge, aTexto);
     Object.defineProperty(Function.prototype, 'toString', { value: finge });
+    // `antes` may hand back how to make the call instead (only ever with maximum protection);
+    // if that fails in any way, the original is called as it was.
     const envuelve = (o, k, antes) => {
       const d = o && Object.getOwnPropertyDescriptor(o, k);
       if (!d || typeof d.value !== 'function') return;
-      const p = new Px(d.value, { apply: function trampa(f, ese, a) { try { antes(ese, a, trampa); } catch (_) {} return R(f, ese, a); } });
+      const p = new Px(d.value, { apply: function trampa(f, ese, a) {
+        let x;
+        try { x = antes(ese, a, trampa); } catch (_) {}
+        if (typeof x === 'function') { try { return x(f, ese, a); } catch (_) {} }
+        return R(f, ese, a);
+      } });
       originales.set(p, d.value);
       Object.defineProperty(o, k, { value: p });
     };
+    const envuelveLector = (o, k, despues) => {
+      const d = o && Object.getOwnPropertyDescriptor(o, k);
+      if (!d || typeof d.get !== 'function') return;
+      const g = new Px(d.get, { apply: (f, ese, a) => { const r = R(f, ese, a); try { despues(ese, r); } catch (_) {} return r; } });
+      originales.set(g, d.get);
+      Object.defineProperty(o, k, { get: g });
+    };
     const lector = (o, k) => { const d = o && Object.getOwnPropertyDescriptor(o, k); return d && d.get; };
+    const escritor = (o, k) => { const d = o && Object.getOwnPropertyDescriptor(o, k); return d && d.set; };
     // The web addresses on the stack, closest first, without the trap's own frames (V8's
     // captureStackTrace starts below `desde`), their line numbers or their queries.
     const pila = (desde) => {
@@ -201,66 +232,216 @@ const GUION: &str = r#"(() => {
       } catch (_) {}
       return out;
     };
-    // Told in batches, each kind and script once per page, at most 100 per page; the stack is
-    // asked for on the first ten reads of a kind and then at most once a second.
+    // Whether the caller is another company's script: decided once per name and document, and
+    // «no» while the browser has not answered yet (so it stays the same all along).
+    const decididos = new Map();
+    const ajeno = (u) => {
+      if (proteccion === false || !u[0]) return false;
+      let h = '';
+      try { h = new U(u[0]).hostname.toLowerCase(); } catch (_) { return false; }
+      if (decididos.has(h)) return decididos.get(h);
+      const bajo = (s) => h === s || h.endsWith('.' + s);
+      const si = !!proteccion && !bajo(proteccion.sitio) && !proteccion.propios.some(bajo);
+      decididos.set(h, si);
+      return si;
+    };
+    // Told in batches, each kind, script and outcome once per page, at most 100 per page; the
+    // stack is asked for on the first ten reads of a kind and then at most once a second.
     const cola = [];
     const vistos = new Set();
     const ultimo = {};
     const veces = {};
     let dichos = 0;
     let enCamino = false;
-    const apunta = (t, desde) => {
+    const apunta = (t, desde, r, dada) => {
       if (dichos >= 100) return;
       const n = (veces[t] = (veces[t] || 0) + 1);
       const ya = ahora();
-      if (n > 10 && ya - (ultimo[t] || 0) < 1000) return;
+      if (!r && n > 10 && ya - (ultimo[t] || 0) < 1000) return;
       ultimo[t] = ya;
-      const u = pila(desde);
-      const k = t + ' ' + (u[0] || '');
+      const u = dada || pila(desde);
+      const k = t + ' ' + (u[0] || '') + (r ? ' r' : '');
       if (vistos.has(k)) return;
       vistos.add(k);
       dichos++;
-      cola.push({ t, u });
+      cola.push(r ? { t, u, r: true } : { t, u });
       if (enCamino) return;
       enCamino = true;
       tarde(() => { enCamino = false; const lista = cola.splice(0, cola.length); if (lista.length) manda({ tipo: 'zg_huella', zg: yo, lista }); }, 500);
     };
+    // A number mixed with the site's seed: the same input, the same output, all along.
+    const mezcla = (a, b) => {
+      let x = mul((a ^ b) >>> 0, 0x9E3779B1);
+      x ^= x >>> 15; x = mul(x, 0x85EBCA77); x ^= x >>> 13; x = mul(x, 0xC2B2AE35);
+      return (x ^ (x >>> 16)) >>> 0;
+    };
     const C2D = window.CanvasRenderingContext2D && CanvasRenderingContext2D.prototype;
     const HC = window.HTMLCanvasElement && HTMLCanvasElement.prototype;
+    const ID = window.ImageData && ImageData.prototype;
     const lienzoDe = lector(C2D, 'canvas');
     const anchoDe = lector(HC, 'width');
     const altoDe = lector(HC, 'height');
+    const anchoPon = escritor(HC, 'width');
+    const altoPon = escritor(HC, 'height');
     const fuenteDe = lector(C2D, 'font');
+    const datosDe = lector(ID, 'data');
+    const anchoImg = lector(ID, 'width');
+    const altoImg = lector(ID, 'height');
+    const crea = window.Document && Document.prototype.createElement;
+    const pideCtx = HC && HC.getContext;
+    const dibuja = C2D && C2D.drawImage;
+    const leeDatos = C2D && C2D.getImageData;
+    const ponDatos = C2D && C2D.putImageData;
     // Canvas: only one with text of ten different characters or more drawn on it, read back
     // whole or in a piece of at least 16 × 16 (after Englehardt and Narayanan, «Online
     // tracking: a 1-million-site measurement», 2016). Charts, photos and games rarely qualify.
     const conTexto = new WeakMap();
     const escrito = (ctx, a) => {
       if (typeof a[0] !== 'string') return;
-      const c = R(lienzoDe, ctx, []);
-      let e = conTexto.get(c);
+      const cv = R(lienzoDe, ctx, []);
+      let e = conTexto.get(cv);
       if (e === true) return;
-      if (!e) { e = new Set(); conTexto.set(c, e); }
+      if (!e) { e = new Set(); conTexto.set(cv, e); }
       for (const ch of a[0].slice(0, 64)) e.add(ch);
-      if (e.size >= 10) conTexto.set(c, true);
+      if (e.size >= 10) conTexto.set(cv, true);
     };
-    const leido = (c, w, h, desde) => { if (conTexto.get(c) === true && w >= 16 && h >= 16) apunta('canvas', desde); };
+    const cuenta = (cv, w, h) => conTexto.get(cv) === true && w >= 16 && h >= 16;
     const numero = (x) => (typeof x === 'number' ? Math.abs(x) : 0);
+    // Like Brave's «farbling»: about one opaque pixel in 32 gets the lowest bit of one colour
+    // flipped, chosen by the site's seed and the pixel's place in the canvas.
+    const ensucia = (d, x0, y0, ancho, alto, w) => {
+      let n = 0;
+      const s = proteccion.semilla;
+      for (let y = 0; y < alto; y++) {
+        for (let x = 0; x < ancho; x++) {
+          const k = (y * ancho + x) * 4;
+          if (d[k + 3] !== 255) continue;
+          const z = mezcla(s, (y0 + y) * w + (x0 + x));
+          if ((z & 31) !== 0) continue;
+          d[k + ((z >>> 5) % 3)] ^= 1;
+          n++;
+        }
+      }
+      return n;
+    };
+    // A copy of the canvas with the change, to read from instead (the page's canvas is never
+    // touched); `null` when nothing would change or it is too big.
+    const copia = (cv) => {
+      const w = R(anchoDe, cv, []);
+      const h = R(altoDe, cv, []);
+      if (w * h > 4000000) return null;
+      const t = R(crea, doc, ['canvas']);
+      R(anchoPon, t, [w]);
+      R(altoPon, t, [h]);
+      const x = R(pideCtx, t, ['2d']);
+      R(dibuja, x, [cv, 0, 0]);
+      const img = R(leeDatos, x, [0, 0, w, h]);
+      if (!ensucia(R(datosDe, img, []), 0, 0, w, h, w)) return null;
+      R(ponDatos, x, [img, 0, 0]);
+      return t;
+    };
     if (C2D && lienzoDe) {
       envuelve(C2D, 'fillText', escrito);
       envuelve(C2D, 'strokeText', escrito);
-      envuelve(C2D, 'getImageData', (ctx, a, desde) => leido(R(lienzoDe, ctx, []), numero(a[2]), numero(a[3]), desde));
+      envuelve(C2D, 'getImageData', (ctx, a, desde) => {
+        const cv = R(lienzoDe, ctx, []);
+        if (!cuenta(cv, numero(a[2]), numero(a[3]))) return undefined;
+        if (proteccion === false) { apunta('canvas', desde, false); return undefined; }
+        const u = pila(desde);
+        if (!ajeno(u) || !datosDe || !anchoImg || !altoImg) { apunta('canvas', desde, false, u); return undefined; }
+        return (f, ese, args) => {
+          const img = R(f, ese, args);
+          let n = 0;
+          try {
+            const sx = typeof args[0] === 'number' ? args[0] : 0;
+            const sy = typeof args[1] === 'number' ? args[1] : 0;
+            const x0 = Math.floor(args[2] < 0 ? sx + args[2] : sx);
+            const y0 = Math.floor(args[3] < 0 ? sy + args[3] : sy);
+            n = ensucia(R(datosDe, img, []), x0, y0, R(anchoImg, img, []), R(altoImg, img, []), R(anchoDe, cv, []));
+          } catch (_) {}
+          apunta('canvas', desde, n > 0, u);
+          return img;
+        };
+      });
     }
     if (HC && anchoDe && altoDe) {
-      for (const k of ['toDataURL', 'toBlob']) envuelve(HC, k, (c, a, desde) => leido(c, R(anchoDe, c, []), R(altoDe, c, []), desde));
+      for (const k of ['toDataURL', 'toBlob']) {
+        envuelve(HC, k, (cv, a, desde) => {
+          if (!cuenta(cv, R(anchoDe, cv, []), R(altoDe, cv, []))) return undefined;
+          if (proteccion === false) { apunta('canvas', desde, false); return undefined; }
+          const u = pila(desde);
+          let otra = null;
+          if (ajeno(u) && crea && anchoPon && altoPon && pideCtx && dibuja && leeDatos && ponDatos && datosDe) {
+            try { otra = copia(cv); } catch (_) { otra = null; }
+          }
+          apunta('canvas', desde, !!otra, u);
+          return otra ? (f, ese, args) => R(f, otra, args) : undefined;
+        });
+      }
     }
     // WebGL: the graphics card's own names (UNMASKED_VENDOR_WEBGL, UNMASKED_RENDERER_WEBGL).
     for (const G of [window.WebGLRenderingContext, window.WebGL2RenderingContext]) {
-      if (G) envuelve(G.prototype, 'getParameter', (ctx, a, desde) => { if (a[0] === 0x9245 || a[0] === 0x9246) apunta('webgl', desde); });
+      if (!G) continue;
+      envuelve(G.prototype, 'getParameter', (ctx, a, desde) => {
+        const p = a[0];
+        if (p !== 0x9245 && p !== 0x9246) return undefined;
+        if (proteccion === false) { apunta('webgl', desde, false); return undefined; }
+        const u = pila(desde);
+        if (!ajeno(u)) { apunta('webgl', desde, false, u); return undefined; }
+        return (f, ese, args) => {
+          const r = R(f, ese, args);
+          const otro = typeof r === 'string';
+          apunta('webgl', desde, otro, u);
+          return otro ? (p === 0x9245 ? 'Google Inc.' : 'ANGLE (Generic GPU)') : r;
+        };
+      });
     }
-    // Audio rendered off screen, never heard.
-    if (window.OfflineAudioContext) envuelve(OfflineAudioContext.prototype, 'startRendering', (x, a, desde) => apunta('audio', desde));
-    // Fonts: FUENTES = 20 different families measured on canvases of this page.
+    // Audio rendered off screen, never heard: with maximum protection, about one sample in 16
+    // of another company's render moves by a hundred-thousandth, fixed for this site and run.
+    const OAC = window.OfflineAudioContext;
+    const AB = window.AudioBuffer && AudioBuffer.prototype;
+    const canalDe = AB && AB.getChannelData;
+    const canalesDe = lector(AB, 'numberOfChannels');
+    const alLlegar = Promise.prototype.then;
+    const ajenos = new WeakSet();
+    const tocados = new WeakMap();
+    const ensuciaAudio = (buf) => {
+      if (tocados.has(buf)) return tocados.get(buf);
+      let n = 0;
+      const canales = R(canalesDe, buf, []);
+      for (let ch = 0; ch < canales; ch++) {
+        const d = R(canalDe, buf, [ch]);
+        const s = proteccion.semilla ^ mul(ch + 1, 0x27D4EB2D);
+        for (let i = 0; i < d.length; i++) {
+          if (d[i] === 0) continue;
+          const z = mezcla(s, i);
+          if ((z & 15) !== 0) continue;
+          d[i] *= (z & 16) ? 1.00001 : 0.99999;
+          n++;
+        }
+      }
+      tocados.set(buf, n);
+      return n;
+    };
+    if (OAC) {
+      envuelve(OAC.prototype, 'startRendering', (ctx, a, desde) => {
+        if (proteccion === false) { apunta('audio', desde, false); return undefined; }
+        const u = pila(desde);
+        if (!ajeno(u) || !canalDe || !canalesDe) { apunta('audio', desde, false, u); return undefined; }
+        ajenos.add(ctx);
+        return (f, ese, args) => R(alLlegar, R(f, ese, args), [(buf) => {
+          let n = 0;
+          try { n = ensuciaAudio(buf); } catch (_) {}
+          apunta('audio', desde, n > 0, u);
+          return buf;
+        }]);
+      });
+      // The same render handed over by its «complete» event.
+      const destinoDe = lector(window.Event && Event.prototype, 'target');
+      const OACE = window.OfflineAudioCompletionEvent && OfflineAudioCompletionEvent.prototype;
+      if (destinoDe) envuelveLector(OACE, 'renderedBuffer', (ev, buf) => { if (proteccion && buf && ajenos.has(R(destinoDe, ev, []))) ensuciaAudio(buf); });
+    }
+    // Fonts: FUENTES = 20 different families measured on canvases of this page (measured only).
     const FUENTES = 20;
     const familias = new Set();
     let ultimaFuente = null;
@@ -271,7 +452,7 @@ const GUION: &str = r#"(() => {
         if (f === ultimaFuente) return;
         ultimaFuente = f;
         familias.add(String(f).replace(/^.*?\d[\d.]*(?:px|pt|pc|em|rem|ex|ch|%|in|cm|mm|vw|vh)(?:\s*\/\s*\S+)?\s+/i, '').toLowerCase());
-        if (familias.size >= FUENTES) apunta('fuentes', desde);
+        if (familias.size >= FUENTES) apunta('fuentes', desde, false);
       });
     }
     // Typing: the first time the person types in a field of this page, and nothing of it.
@@ -282,6 +463,18 @@ const GUION: &str = r#"(() => {
       manda({ tipo: 'zg_escribe', zg: yo });
     }, true);
   } catch (_) {}
+  if (marco) {
+    escucha('message', (e) => { const m = e && e.data; if (m && m.zg === yo && m.huella !== undefined) pon(m.huella); });
+    manda({ tipo: 'zg_marco_pide', zg: yo });
+    return;
+  }
+  // The form guard. Built-ins are taken now, before the page can replace them.
+  const P = HTMLFormElement.prototype;
+  const elementos = Object.getOwnPropertyDescriptor(P, 'elements').get;
+  const accionDe = Object.getOwnPropertyDescriptor(P, 'action').get;
+  const enviarNativo = P.submit;
+  const pedirNativo = P.requestSubmit;
+  const de = (o, k) => { const d = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(o), k); return d && d.get ? d.get.call(o) : o[k]; };
   const esperas = new Map();
   const pasan = new WeakSet();
   let n = 0;
@@ -301,6 +494,7 @@ const GUION: &str = r#"(() => {
   escucha('message', (e) => {
     const m = e && e.data;
     if (!m || m.zg !== yo) return;
+    if (m.huella !== undefined) pon(m.huella);
     if (m.cookies !== undefined) { if (m.cookies === true) avisosDeCookies(); return; }
     const f = esperas.get(m.id);
     if (f) { esperas.delete(m.id); f(!!m.enviar); }
@@ -478,12 +672,17 @@ mod tests {
             assert!(g.contains(&format!("'{}'", t.clave())), "{t:?}");
         }
         assert!(g.contains("tipo: 'zg_huella'") && g.contains("tipo: 'zg_escribe'"));
-        // The originals are called with what they were given and their result is returned.
+        // The originals are called with what they were given and their result is returned,
+        // unless the browser said maximum protection is on (and then only for another company).
         assert!(g.contains("return R(f, ese, a);"));
-        // Only in the page itself, after the channel is hidden: the measurement comes after the
-        // frames have left.
-        let marcos = g.find("window.top !== window").unwrap_or(usize::MAX);
-        assert!(marcos < g.find("zg_huella").unwrap_or(0));
+        assert!(g.contains("if (proteccion === false || !u[0]) return false;"));
+        // Frames measure too, and leave before the form guard and the cookie notices, which are
+        // the page's alone; they ask on their own channel.
+        let marcos = g.find("if (marco) {").unwrap_or(usize::MAX);
+        assert!(g.find("zg_huella").unwrap_or(usize::MAX) < marcos);
+        assert!(marcos < g.find("HTMLFormElement.prototype").unwrap_or(0));
+        assert!(marcos < g.find("zg_cookies_pide").unwrap_or(0));
+        assert!(g.contains("tipo: 'zg_marco_pide'"));
         // Navigator's properties (plugins, hardwareConcurrency, deviceMemory) are not touched.
         for no in ["hardwareConcurrency", "deviceMemory", "'plugins'"] {
             assert!(!g.contains(no), "{no}");

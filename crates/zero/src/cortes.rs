@@ -287,6 +287,7 @@ pub const fn motivo_clave(m: Motivo) -> &'static str {
         Motivo::Senuelo => "senuelo",
         Motivo::Telemetria => "telemetria",
         Motivo::Baliza => "baliza",
+        Motivo::Grabacion => "grabacion",
     }
 }
 

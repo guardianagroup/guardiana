@@ -25,7 +25,7 @@ use serde::Serialize;
 
 use crate::chivatos::es_hash;
 use crate::destino::es_tercero;
-use crate::dominio::{normaliza_host, sitio};
+use crate::dominio::{bajo_sufijo_privado, normaliza_host, sitio};
 use crate::textos::{Idioma, Textos};
 
 const GRABACION: &str = include_str!("../data/grabacion.txt");
@@ -264,6 +264,8 @@ pub struct Vista<'a> {
     pub bytes: Option<u64>,
     /// It was cut: it never left.
     pub cortada: bool,
+    /// It was cut by maximum protection for being a session recording service.
+    pub por_grabacion: bool,
 }
 
 /// What one request was, of the things measured here.
@@ -340,6 +342,8 @@ impl Subida {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct Huella {
     tecnicas: BTreeSet<Tecnica>,
+    /// The kinds for which the script got a different value (maximum protection).
+    ruido: BTreeSet<Tecnica>,
     scripts: BTreeSet<String>,
 }
 
@@ -348,6 +352,8 @@ struct Huella {
 struct Grabacion {
     peticiones: u32,
     cortadas: u32,
+    /// Cut by maximum protection for being a recording service.
+    por_maxima: u32,
     tras_escribir: u32,
     tras_escribir_cortadas: u32,
 }
@@ -370,6 +376,9 @@ pub struct Linea {
     /// `cortado` (every attempt of it was cut), `paso` (something of it got through) or `""`
     /// (measured only: the reads happen inside the page, there is nothing to cut).
     pub estado: &'static str,
+    /// The sentence already says its fate («cortado: …»): the panel does not repeat it.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub dicho: bool,
 }
 
 /// What was measured on one page (a tab's shield; a new page starts it again).
@@ -388,14 +397,24 @@ impl Pagina {
         !std::mem::replace(&mut self.escribio, true)
     }
 
-    /// A read of kind `t` by `autor` (and its script, when known). Returns whether it says
-    /// something new (a new kind or a new script for that author).
-    pub fn huella(&mut self, t: Tecnica, autor: Autor, script: Option<String>) -> bool {
+    /// A read of kind `t` by `autor` (and its script, when known); `ruido`: the script got a
+    /// different value than the real one. Returns whether it says something new (a new kind,
+    /// a new script, or a kind newly given a different value).
+    pub fn huella(
+        &mut self,
+        t: Tecnica,
+        autor: Autor,
+        script: Option<String>,
+        ruido: bool,
+    ) -> bool {
         if self.huellas.len() >= MAX_AUTORES && !self.huellas.contains_key(&autor) {
             return false;
         }
         let h = self.huellas.entry(autor).or_default();
         let mut nuevo = h.tecnicas.insert(t);
+        if ruido {
+            nuevo |= h.ruido.insert(t);
+        }
         if let Some(s) = script {
             if h.scripts.len() < MAX_SCRIPTS && h.scripts.insert(s) {
                 nuevo = true;
@@ -411,6 +430,9 @@ impl Pagina {
             e.peticiones = e.peticiones.saturating_add(1);
             if v.cortada {
                 e.cortadas = e.cortadas.saturating_add(1);
+            }
+            if v.por_grabacion {
+                e.por_maxima = e.por_maxima.saturating_add(1);
             }
             if self.escribio {
                 e.tras_escribir = e.tras_escribir.saturating_add(1);
@@ -449,25 +471,63 @@ impl Pagina {
                 .values()
                 .map(|h| u64::try_from(h.scripts.len().max(1)).unwrap_or(u64::MAX))
                 .sum();
+            // «Le dimos una distinta» only where it really happened: for the whole sentence when
+            // every read of every script got a different value, else per script.
+            let todos = self.huellas.values().all(|h| h.ruido == h.tecnicas);
             let lista = self
                 .huellas
                 .iter()
-                .map(|(a, h)| format!("{} ({})", nombre_autor(a, t), tecnicas(&h.tecnicas, t)))
+                .map(|(a, h)| {
+                    let ruido = if todos || h.ruido.is_empty() {
+                        String::new()
+                    } else if h.ruido == h.tecnicas {
+                        t.t("medida_huella_ruido_autor")
+                    } else {
+                        t.tf(
+                            "medida_huella_ruido_parte",
+                            &[("tecnicas", &tecnicas(&h.ruido, t))],
+                        )
+                    };
+                    format!(
+                        "{} ({}{ruido})",
+                        nombre_autor(a, t),
+                        tecnicas(&h.tecnicas, t)
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join(", ");
             out.push(Linea {
                 clase: "huella",
                 texto: t.tn(
-                    "medida_huella",
+                    if todos {
+                        "medida_huella_ruido"
+                    } else {
+                        "medida_huella"
+                    },
                     scripts,
                     &[("n", &t.numero(scripts)), ("lista", &lista)],
                 ),
                 estado: "",
+                dicho: false,
             });
         }
         for (g, e) in &self.grabadores {
             // If something of it got through once, it got through.
             let paso = e.cortadas < e.peticiones;
+            if !paso && e.por_maxima > 0 {
+                // Maximum protection cut it for what it is (decision 206).
+                let mut texto = t.tf("medida_grabacion_maxima", &[("servicio", g)]);
+                if e.tras_escribir > 0 {
+                    texto.push_str(&t.t("medida_grabacion_maxima_tras_escribir"));
+                }
+                out.push(Linea {
+                    clase: "grabacion",
+                    texto,
+                    estado: "cortado",
+                    dicho: true,
+                });
+                continue;
+            }
             let mut texto = t.tf(
                 if paso {
                     "medida_grabacion"
@@ -485,6 +545,7 @@ impl Pagina {
                 clase: "grabacion",
                 texto,
                 estado: if paso { "paso" } else { "cortado" },
+                dicho: false,
             });
         }
         for (q, e) in &self.cifrados {
@@ -507,6 +568,7 @@ impl Pagina {
                     &[("empresa", q), ("que", &que)],
                 ),
                 estado: if paso { "paso" } else { "cortado" },
+                dicho: false,
             });
         }
         for (e, clave, estado) in [
@@ -519,6 +581,7 @@ impl Pagina {
                     clase: "subida",
                     texto: t.tn(clave, n, &[("n", &t.numero(n)), ("tam", &tamano_de(e, t))]),
                     estado,
+                    dicho: false,
                 });
             }
         }
@@ -531,6 +594,9 @@ impl Pagina {
         let mut out = Vec::new();
         if !self.huellas.is_empty() {
             out.push(t.t("medida_nota_huella"));
+        }
+        if self.huellas.values().any(|h| !h.ruido.is_empty()) {
+            out.push(t.t("medida_nota_ruido"));
         }
         if !self.grabadores.is_empty() {
             out.push(t.t("medida_nota_grabacion"));
@@ -550,6 +616,7 @@ impl Pagina {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Total {
     huella_webs: BTreeSet<String>,
+    huella_ruido: BTreeSet<String>,
     huella_tecnicas: BTreeSet<Tecnica>,
     grabacion: BTreeMap<&'static str, BTreeSet<String>>,
     cifrados: BTreeMap<String, BTreeSet<String>>,
@@ -557,11 +624,14 @@ pub struct Total {
 }
 
 impl Total {
-    /// A read of kind `t` on a page of `web`.
-    pub fn huella(&mut self, web: &str, t: Tecnica) {
+    /// A read of kind `t` on a page of `web`; `ruido`: the script got a different value.
+    pub fn huella(&mut self, web: &str, t: Tecnica, ruido: bool) {
         self.huella_tecnicas.insert(t);
         if !web.is_empty() && self.huella_webs.len() < MAX_WEBS {
             self.huella_webs.insert(web.to_string());
+            if ruido {
+                self.huella_ruido.insert(web.to_string());
+            }
         }
     }
 
@@ -590,17 +660,23 @@ impl Total {
         let mut out = Vec::new();
         if !self.huella_tecnicas.is_empty() {
             let n = u64::try_from(self.huella_webs.len()).unwrap_or(u64::MAX);
+            let mut texto = t.tn(
+                "medida_sesion_huella",
+                n,
+                &[
+                    ("n", &t.numero(n)),
+                    ("tecnicas", &tecnicas(&self.huella_tecnicas, t)),
+                ],
+            );
+            if !self.huella_ruido.is_empty() {
+                let m = u64::try_from(self.huella_ruido.len()).unwrap_or(u64::MAX);
+                texto.push_str(&t.tf("medida_sesion_huella_ruido", &[("m", &t.numero(m))]));
+            }
             out.push(Linea {
                 clase: "huella",
-                texto: t.tn(
-                    "medida_sesion_huella",
-                    n,
-                    &[
-                        ("n", &t.numero(n)),
-                        ("tecnicas", &tecnicas(&self.huella_tecnicas, t)),
-                    ],
-                ),
+                texto,
                 estado: "",
+                dicho: false,
             });
         }
         if !self.grabacion.is_empty() {
@@ -615,6 +691,7 @@ impl Total {
                     &[("n", &t.numero(n)), ("servicios", &servicios)],
                 ),
                 estado: "",
+                dicho: false,
             });
         }
         if !self.cifrados.is_empty() {
@@ -639,6 +716,7 @@ impl Total {
                     &[("n", &t.numero(n)), ("empresas", &lista_y(nombres, t))],
                 ),
                 estado: "",
+                dicho: false,
             });
         }
         let s = &self.subida;
@@ -654,10 +732,61 @@ impl Total {
                     ],
                 ),
                 estado: "",
+                dicho: false,
             });
         }
         out
     }
+}
+
+/// The seed of the different values a page of `ambito` gets (maximum protection): the same
+/// for every read of that site while the browser stays open, another for another site, another
+/// after a restart. An HMAC of the site under a secret of this run, which never leaves memory.
+#[must_use]
+pub fn semilla(secreto: &[u8], ambito: &str) -> u32 {
+    let k = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, secreto);
+    let t = ring::hmac::sign(&k, ambito.as_bytes());
+    let b = t.as_ref();
+    u32::from_le_bytes([b[0], b[1], b[2], b[3]])
+}
+
+static DUENOS: OnceLock<BTreeMap<&'static str, Vec<&'static str>>> = OnceLock::new();
+
+/// The names the page's own site counts as its own (its owner's other names, by the lists of
+/// owners), so the page script never gives them a different value: the page's site first, at
+/// most 400. The same rule as [`es_tercero`], which the shield uses.
+#[must_use]
+pub fn propios(sitio_pagina: &str) -> Vec<String> {
+    if sitio_pagina.is_empty() {
+        return Vec::new();
+    }
+    let mut out = vec![sitio_pagina.to_string()];
+    if bajo_sufijo_privado(sitio_pagina) {
+        return out;
+    }
+    let Some(dueno) = guardiana_lists::company_of(sitio_pagina) else {
+        return out;
+    };
+    let duenos = DUENOS.get_or_init(|| {
+        let mut m: BTreeMap<&'static str, Vec<&'static str>> = BTreeMap::new();
+        for (seccion, dominio) in guardiana_lists::parse_guardiana(guardiana_lists::EMPRESAS) {
+            if let Some(s) = seccion {
+                m.entry(s.split('|').next().unwrap_or(s))
+                    .or_default()
+                    .push(dominio);
+            }
+        }
+        m
+    });
+    for d in duenos.get(dueno).map(Vec::as_slice).unwrap_or_default() {
+        if out.len() >= 400 {
+            break;
+        }
+        if *d != sitio_pagina && !es_tercero(d, sitio_pagina) {
+            out.push((*d).to_string());
+        }
+    }
+    out
 }
 
 /// How an author is named.
@@ -748,6 +877,7 @@ mod tests {
             con_cuerpo: false,
             bytes: None,
             cortada,
+            por_grabacion: false,
         }
     }
 
@@ -783,11 +913,11 @@ mod tests {
         let mut p = Pagina::default();
         assert!(p.vacia());
         let (a, s) = autor(&["https://cdn.tracker.example/fp.js"], "tienda.co");
-        assert!(p.huella(Tecnica::Canvas, a.clone(), s.clone()));
-        assert!(p.huella(Tecnica::Webgl, a.clone(), s.clone()));
+        assert!(p.huella(Tecnica::Canvas, a.clone(), s.clone(), false));
+        assert!(p.huella(Tecnica::Webgl, a.clone(), s.clone(), false));
         // The same again says nothing new.
-        assert!(!p.huella(Tecnica::Webgl, a, s));
-        assert!(p.huella(Tecnica::Audio, Autor::Desconocido, None));
+        assert!(!p.huella(Tecnica::Webgl, a, s, false));
+        assert!(p.huella(Tecnica::Audio, Autor::Desconocido, None, false));
         let l = p.lineas(&t);
         assert_eq!(l.len(), 1);
         assert_eq!(
@@ -796,7 +926,7 @@ mod tests {
         );
         assert_eq!(l[0].estado, "");
         let mut q = Pagina::default();
-        assert!(q.huella(Tecnica::Fuentes, Autor::Propia, None));
+        assert!(q.huella(Tecnica::Fuentes, Autor::Propia, None, false));
         assert_eq!(
             q.lineas(&t)[0].texto,
             "1 script intentó leer la huella de tu equipo: esta misma web (fuentes)"
@@ -938,6 +1068,7 @@ mod tests {
             con_cuerpo: true,
             bytes,
             cortada,
+            por_grabacion: false,
         };
         for v in [
             cuerpo(Some(2048), false),
@@ -986,9 +1117,9 @@ mod tests {
         let t = Textos::de(Idioma::Es);
         let mut s = Total::default();
         assert!(s.lineas(&t).is_empty());
-        s.huella("tienda.co", Tecnica::Canvas);
-        s.huella("eltiempo.com", Tecnica::Webgl);
-        s.huella("tienda.co", Tecnica::Canvas);
+        s.huella("tienda.co", Tecnica::Canvas, false);
+        s.huella("eltiempo.com", Tecnica::Webgl, false);
+        s.huella("tienda.co", Tecnica::Canvas, false);
         let v = vista("www.clarity.ms", None, false);
         s.anota("tienda.co", &v, &mira(&v));
         let h = sha("x");
@@ -1019,6 +1150,15 @@ mod tests {
             let t = Textos::de(idioma);
             let mut claves = vec![
                 "medida_titulo",
+                "motivo_grabacion",
+                "medida_grabacion_maxima",
+                "medida_grabacion_maxima_tras_escribir",
+                "medida_huella_ruido",
+                "medida_huella_ruido_uno",
+                "medida_huella_ruido_autor",
+                "medida_huella_ruido_parte",
+                "medida_sesion_huella_ruido",
+                "medida_nota_ruido",
                 "medida_sesion_titulo",
                 "medida_huella",
                 "medida_huella_uno",
@@ -1080,6 +1220,87 @@ mod tests {
             }
             assert_eq!(Tecnica::de_clave("plugins"), None);
         }
+    }
+
+    #[test]
+    fn a_different_value_is_said_only_where_it_was_given() {
+        let t = Textos::de(Idioma::Es);
+        let fuera = Autor::Fuera("tracker.example".into());
+        let mut p = Pagina::default();
+        assert!(p.huella(Tecnica::Canvas, fuera.clone(), None, true));
+        assert!(p.huella(Tecnica::Webgl, fuera.clone(), None, true));
+        assert_eq!(
+            p.lineas(&t)[0].texto,
+            "1 script intentó leer la huella de tu equipo; le dimos una distinta: tracker.example (canvas, WebGL)"
+        );
+        assert!(p.notas(&t).iter().any(|n| n.contains("huella distinta")));
+        // The same read without a different value, later, does not take back what was given,
+        // but another script that got the real one is said apart.
+        assert!(p.huella(Tecnica::Audio, Autor::Propia, None, false));
+        assert_eq!(
+            p.lineas(&t)[0].texto,
+            "2 scripts intentaron leer la huella de tu equipo: tracker.example (canvas, WebGL; le dimos una distinta), esta misma web (audio)"
+        );
+        let mut q = Pagina::default();
+        assert!(q.huella(Tecnica::Canvas, fuera.clone(), None, true));
+        assert!(q.huella(Tecnica::Fuentes, fuera, None, false));
+        assert_eq!(
+            q.lineas(&t)[0].texto,
+            "1 script intentó leer la huella de tu equipo: tracker.example (canvas, fuentes; en canvas le dimos una distinta)"
+        );
+        // Without a different value nothing says so.
+        let mut r = Pagina::default();
+        assert!(r.huella(Tecnica::Canvas, Autor::Desconocido, None, false));
+        assert!(!r.lineas(&t)[0].texto.contains("distinta"));
+        assert!(!r.notas(&t).iter().any(|n| n.contains("huella distinta")));
+        let mut s = Total::default();
+        s.huella("tienda.co", Tecnica::Canvas, true);
+        s.huella("eltiempo.com", Tecnica::Canvas, false);
+        assert_eq!(
+            s.lineas(&t)[0].texto,
+            "En 2 webs, algún script intentó leer la huella de tu equipo (canvas); en 1 le dimos una distinta"
+        );
+    }
+
+    #[test]
+    fn maximum_protection_cutting_a_recording_service_says_it_plainly() {
+        let t = Textos::de(Idioma::Es);
+        let mut p = Pagina::default();
+        let mut v = vista("www.clarity.ms", None, true);
+        v.por_grabacion = true;
+        p.anota(&v, &mira(&v));
+        let l = &p.lineas(&t)[0];
+        assert_eq!(
+            l.texto,
+            "cortado: grabación de sesiones (Microsoft Clarity)"
+        );
+        assert_eq!((l.estado, l.dicho), ("cortado", true));
+        let _ = p.escribe();
+        p.anota(&v, &mira(&v));
+        assert_eq!(
+            p.lineas(&t)[0].texto,
+            "cortado: grabación de sesiones (Microsoft Clarity) · intentó enviarle datos después de que escribieras en un campo"
+        );
+    }
+
+    #[test]
+    fn the_seed_is_one_per_site_and_run_and_the_owner_s_names_are_its_own() {
+        let a = semilla(b"secreto-de-esta-vez", "general|tienda.co");
+        assert_eq!(a, semilla(b"secreto-de-esta-vez", "general|tienda.co"));
+        assert_ne!(a, semilla(b"secreto-de-esta-vez", "general|otra.co"));
+        assert_ne!(a, semilla(b"otro-arranque", "general|tienda.co"));
+        let g = propios("google.com");
+        assert_eq!(g.first().map(String::as_str), Some("google.com"));
+        assert!(g.iter().any(|d| d == "gstatic.com"), "{g:?}");
+        assert!(!g.iter().any(|d| d == "facebook.com"));
+        assert!(g.len() <= 400);
+        assert_eq!(
+            propios("tienda-sin-dueno.example"),
+            ["tienda-sin-dueno.example"]
+        );
+        assert!(propios("").is_empty());
+        // A rented name is nobody else's.
+        assert_eq!(propios("ana.github.io"), ["ana.github.io"]);
     }
 
     #[test]

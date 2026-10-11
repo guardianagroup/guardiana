@@ -86,6 +86,7 @@ impl Tercero {
             "rastreador" => Some(Motivo::Rastreador),
             "publicidad" => Some(Motivo::Publicidad),
             _ if d.corredor.is_some() => Some(Motivo::Corredor),
+            _ if crate::medidas::grabador(sitio).is_some() => Some(Motivo::Grabacion),
             "telemetria" => Some(Motivo::Telemetria),
             _ => None,
         };
@@ -106,7 +107,10 @@ impl Tercero {
                 lista,
                 Some(Motivo::Rastreador | Motivo::Publicidad | Motivo::Corredor)
             )),
-            de_maxima: u32::from(lista == Some(Motivo::Telemetria)),
+            de_maxima: u32::from(matches!(
+                lista,
+                Some(Motivo::Telemetria | Motivo::Grabacion)
+            )),
             motivo_lista: lista,
         }
     }
@@ -335,7 +339,7 @@ impl Pestana {
             e.con_dato += 1;
         } else {
             match d.lista {
-                Some(Motivo::Telemetria | Motivo::Baliza) => e.de_maxima += 1,
+                Some(Motivo::Telemetria | Motivo::Baliza | Motivo::Grabacion) => e.de_maxima += 1,
                 Some(_) => e.de_lista += 1,
                 None => {}
             }
