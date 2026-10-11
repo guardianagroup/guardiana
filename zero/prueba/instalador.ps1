@@ -69,22 +69,39 @@ function Abre([string]$version) {
     Anota "no abrió en 30 s: $(Ventanas)"
     return $null
 }
-# Windows Installer itself, not a guess about where it writes: the products of this family that
-# are installed now (each language is its own product code), and for whom (AssignmentType: 0 is
-# this user only, 1 is the whole machine).
-function Com($o, [string]$que, [object[]]$a) { return $o.GetType().InvokeMember($que, 'GetProperty', $null, $o, $a) }
+# Where Windows Installer registered the product, read from its own keys, not guessed: the
+# products of this family in «Apps» (both hives; each language is its own product code), and for
+# whom (a per-user product is under HKCU\Software\Microsoft\Installer\Products, a per-machine one
+# under HKLM\SOFTWARE\Classes\Installer\Products, both by the «packed» product code).
+$colmenas = @('HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall', 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall', 'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall')
 function Productos() {
-    $l = Com $wi 'RelatedProducts' @($familia)
-    $n = [int](Com $l 'Count' $null)
     $r = @()
-    for ($i = 0; $i -lt $n; $i++) { $r += [string](Com $l 'Item' @($i)) }
-    return , $r
+    foreach ($h in $colmenas) {
+        if (Test-Path $h) { $r += @(Get-ChildItem $h | Where-Object { (Get-ItemProperty $_.PSPath).DisplayName -eq 'GUARDIANA ZERO' } | ForEach-Object { $_.PSChildName }) }
+    }
+    return , @($r | Select-Object -Unique)
 }
 function Instalado() { $l = Productos; if ($l.Count -gt 0) { return $l[0] }; return $null }
-function ParaQuien([string]$c) { try { return [string](Com $wi 'ProductInfo' @($c, 'AssignmentType')) } catch { return '?' } }
+function Empaqueta([string]$g) {
+    $h = $g.Trim('{', '}').Replace('-', '').ToUpper()
+    if ($h.Length -ne 32) { return '' }
+    $p = ''
+    foreach ($tramo in @(@(0, 8), @(8, 4), @(12, 4))) {
+        $t = $h.Substring($tramo[0], $tramo[1]).ToCharArray(); [array]::Reverse($t); $p += -join $t
+    }
+    for ($i = 16; $i -lt 32; $i += 2) { $p += "$($h[$i + 1])$($h[$i])" }
+    return $p
+}
+function ParaQuien([string]$c) {
+    $e = Empaqueta $c
+    if (-not $e) { return '?' }
+    if (Test-Path "HKCU:\Software\Microsoft\Installer\Products\$e") { return 'usuario' }
+    if (Test-Path "HKLM:\SOFTWARE\Classes\Installer\Products\$e") { return 'equipo' }
+    return '?'
+}
 # The «Apps» entry, wherever Windows keeps it (the hive is noted, not assumed).
 function Entrada([string]$c) {
-    foreach ($h in @('HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall', 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall', 'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall')) {
+    foreach ($h in $colmenas) {
         if ($c -and (Test-Path "$h\$c")) { return "$h\$c" }
     }
     return $null
@@ -141,7 +158,7 @@ $viejo = Abre $Version  # the same program inside, packaged as 1.0.0
 Comprueba ($null -ne $viejo) "la versión vieja abre"
 $codigoViejo = Instalado
 Comprueba ($null -ne $codigoViejo) "Windows Installer la tiene instalada ($codigoViejo)"
-Comprueba ((ParaQuien $codigoViejo) -eq '0') "solo para este usuario (AssignmentType $(ParaQuien $codigoViejo))"
+Comprueba ((ParaQuien $codigoViejo) -eq 'usuario') "solo para este usuario ($(ParaQuien $codigoViejo))"
 Anota "la vieja: entrada de «Aplicaciones» en $(Entrada $codigoViejo)"
 
 # 4. The new installer while the old one is open: it must be asked to close (WM_CLOSE: it saves
@@ -162,7 +179,7 @@ if ($null -ne $viejo) {
 $productos = Productos
 Comprueba (($productos.Count -eq 1) -and ($productos[0] -eq $codigo)) "una sola GUARDIANA ZERO instalada, la nueva ($($productos -join ', '))"
 Comprueba ($codigoViejo -ne $codigo) "la vieja era otro producto de la misma familia ($codigoViejo)"
-Comprueba ((ParaQuien $codigo) -eq '0') "la nueva también, solo para este usuario (AssignmentType $(ParaQuien $codigo))"
+Comprueba ((ParaQuien $codigo) -eq 'usuario') "la nueva también, solo para este usuario ($(ParaQuien $codigo))"
 Comprueba (Test-Path $instalado) "deja GUARDIANA ZERO.exe en $carpeta"
 if (Test-Path $instalado) {
     Comprueba ((Get-FileHash -Algorithm SHA256 $instalado).Hash -eq $huella) "y es, byte a byte, el que compiló GitHub"
