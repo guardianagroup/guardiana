@@ -89,6 +89,11 @@ function pantalla(nombre) {
   const nav = await chromium.connectOverCDP('http://127.0.0.1:9222');
   const barra = await paginaQue(nav, (u) => u.endsWith('/barra.html'));
   const panel = await paginaQue(nav, (u) => u.endsWith('/panel.html'));
+  // A bar button opens its view, and the same button closes it again: open only what is not
+  // already open (the chivatos check leaves the shield open; clicking it again hid the panel).
+  const abreVista = async (id) => {
+    if (!(await barra.evaluate((i) => document.getElementById(i).classList.contains('activo'), id))) await barra.click('#' + id);
+  };
   const inicio = await paginaQue(nav, (u) => u.endsWith('/inicio.html'));
   comprueba(true, 'barra, panel y pestaña nueva cargados desde zero.guardiana');
   comprueba(await hasta(async () => ['Nueva pestaña', 'New tab', 'Nova aba'].includes(await barra.textContent('.pestana .titulo'))), 'la barra habla el idioma de Windows y nombra la pestaña');
@@ -239,7 +244,7 @@ function pantalla(nombre) {
   comprueba(!chivatos.some((r) => r.host === 'analytics.tiktok.com'), 'el píxel de TikTok no llega');
   comprueba(!chivatos.some((r) => r.host === 'connect.facebook.net'), 'el guion del píxel de Meta (connect.facebook.net/…/fbevents.js) no llega');
   comprueba(!chivatos.some((r) => r.host === 'www.google.com' && r.ruta.startsWith('/pagead/')), 'la conversión de Google Ads (www.google.com/pagead/1p-conversion) no llega');
-  await barra.click('#b-escudo');
+  await abreVista('b-escudo');
   await hasta(() => panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa')));
   const textoChivatos = async () => panel.evaluate(() => document.querySelector('#e-chivatos').textContent);
   comprueba(await hasta(async () => { const x = await textoChivatos(); return x.includes('A Meta') && x.includes('compra') && x.includes('89.900 COP'); }), `el escudo dice lo que la página intentó contarle a Meta: la compra y el importe (${await textoChivatos()})`);
@@ -320,7 +325,7 @@ function pantalla(nombre) {
   await cortes.click('.periodos button[data-periodo="31"]');
   comprueba(await hasta(async () => (await cortes.textContent('.periodos button[data-periodo="31"]')) === 'Todo'), 'el periodo largo se llama «Todo»');
   // From the shield, too. Already on the list: it stays, no second copy.
-  await barra.click('#b-escudo');
+  await abreVista('b-escudo');
   await hasta(() => panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa')));
   comprueba(await hasta(async () => /empresas? de fuera/.test(await panel.textContent('#e-dia-frase'))), `el escudo enseña también el día entero (${await panel.textContent('#e-dia-frase')})`);
   await panel.click('#e-ver-todo');
@@ -330,7 +335,7 @@ function pantalla(nombre) {
   await barra.click('.pestana[aria-selected="false"]');
   await espera(500);
   const tituloWeb = await barra.textContent('.pestana[aria-selected="true"] .titulo');
-  await barra.click('#b-escudo');
+  await abreVista('b-escudo');
   await hasta(() => panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa')));
   await panel.click('#e-ver-todo');
   comprueba(await hasta(async () => (await barra.locator('.pestana').count()) === 3), 'el escudo también lleva a la lista');
