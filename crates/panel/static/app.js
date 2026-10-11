@@ -843,17 +843,19 @@
   //  · when they come in and the person has scrolled into the table, the row at the top of the
   //    window stays exactly where it was: the new rows go in above it, out of sight.
   function tablaQuieta(tbody) {
-    const caja = tbody.closest('.card') || tbody.parentElement;
     const aviso = document.createElement('button');
     aviso.type = 'button';
     aviso.className = 'nuevas hidden';
     document.body.appendChild(aviso);
-    let encima = false, tocadaHasta = 0, mostrada = null, pendiente = null;
+    // Once the person touches the page (a click, a tap, the wheel, a key), the table stops
+    // moving for good: new rows wait behind the button, and the person scrolls by themselves
+    // (the owner, 10 Oct 2026: «cuando yo toco, ya deja de moverse… en todo momento»). Until
+    // then it is a live view that fills itself. Reloading the page makes it live again.
+    let quieta = false, mostrada = null, pendiente = null;
     const claves = (html) => [...String(html).matchAll(/data-k="([^"]*)"/g)].map((m) => m[1]);
-    const ocupada = () => {
-      const f = document.activeElement;
-      return encima || Date.now() < tocadaHasta || (f && f !== document.body && caja.contains(f) && f.matches(':focus-visible'));
-    };
+    const ocupada = () => quieta;
+    const para = (e) => { if (!aviso.contains(e.target)) quieta = true; };
+    for (const ev of ['pointerdown', 'wheel', 'touchstart', 'keydown']) window.addEventListener(ev, para, { capture: true, passive: true });
     function aplica(html) {
       const antes = tbody.getBoundingClientRect();
       let ancla = null;
@@ -876,11 +878,10 @@
     }
     // The browser's own scroll anchoring would correct the same jump a second time.
     document.documentElement.style.overflowAnchor = 'none';
-    caja.addEventListener('pointerenter', () => { encima = true; });
-    caja.addEventListener('pointerleave', () => { encima = false; if (pendiente !== null && !ocupada()) aplica(pendiente); });
-    caja.addEventListener('pointerdown', () => { tocadaHasta = Date.now() + 4000; });
+    // The button brings the new rows in once; the table stays still afterwards.
     aviso.addEventListener('click', () => { if (pendiente !== null) aplica(pendiente); });
     return {
+      get quieta() { return quieta; },
       pinta(html) {
         if (html === mostrada) { pendiente = null; aviso.classList.add('hidden'); return; }
         if (mostrada === null || !ocupada()) { aplica(html); return; }
@@ -1252,7 +1253,7 @@
         $('dns-card').classList.toggle('hidden', est.dns_aplicado || est.caducado);
         $('dns-apply').addEventListener('click', async () => {
           $('dns-msg').textContent = t('dns_aplicando'); $('dns-apply').disabled = true;
-          try { const r = await api('/api/dns/aplicar', { method: 'POST' }); $('dns-msg').textContent = r.mensaje; setTimeout(() => $('dns-card').classList.add('hidden'), 6000); }
+          try { const r = await api('/api/dns/aplicar', { method: 'POST' }); $('dns-msg').textContent = r.mensaje; $('dns-apply').classList.add('hidden'); }
           catch (err) { $('dns-msg').textContent = String(err.message || err); $('dns-apply').disabled = false; }
         });
       } catch (_) {}
@@ -1277,8 +1278,12 @@
         $('c-esperados').textContent = r.esperados;
         $('c-cortados').textContent = r.cortados;
         vivo.pinta(eventRows(r.eventos) || `<tr><td colspan="8" class="muted">${esc(t('sin_consultas_aun'))}</td></tr>`, r.eventos.length);
-        $('hueco').textContent = r.hueco ? t('hueco').replace('{desde}', when(r.hueco.desde)).replace('{hasta}', when(r.hueco.hasta)) : '';
-        $('hueco').classList.toggle('hidden', !r.hueco);
+        // A line that appears or goes would move everything below it: not once the person is
+        // using the page.
+        if (!vivo.quieta) {
+          $('hueco').textContent = r.hueco ? t('hueco').replace('{desde}', when(r.hueco.desde)).replace('{hasta}', when(r.hueco.hasta)) : '';
+          $('hueco').classList.toggle('hidden', !r.hueco);
+        }
       };
       await refresh();
       cadaTanto(refresh, 2000);
