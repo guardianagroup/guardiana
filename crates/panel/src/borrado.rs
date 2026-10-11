@@ -16,6 +16,9 @@
 //! The jurisdictions are data with their sources (see `docs/BORRADO.md`); every sentence that
 //! describes them lives in the three language files.
 
+// Handlers return a full HTTP `Response` as their error, as axum intends (same as `api.rs`).
+#![allow(clippy::result_large_err)]
+
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, OnceLock};
 
