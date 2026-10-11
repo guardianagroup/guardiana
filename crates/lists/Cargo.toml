@@ -13,6 +13,9 @@ publish = false
 guardiana-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# idna: the Public Suffix List's Unicode rules in the ASCII form names arrive in. Already in the
+# workspace (it came with GUARDIANA ZERO); it moved here with the list itself (decision 205).
+idna = { workspace = true }
 
 [lints]
 workspace = true

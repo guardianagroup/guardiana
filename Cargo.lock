@@ -504,6 +504,7 @@ name = "guardiana-lists"
 version = "1.0.14"
 dependencies = [
  "guardiana-core",
+ "idna",
  "serde",
  "serde_json",
 ]
@@ -557,7 +558,6 @@ dependencies = [
  "guardiana-core",
  "guardiana-license",
  "guardiana-lists",
- "idna",
  "ring",
  "serde",
  "serde_json",

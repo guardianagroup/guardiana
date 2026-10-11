@@ -10,6 +10,7 @@
 //! Precedence when several lists match (docs/LISTS.md):
 //! `esperado` > `telemetria` > `rastreador` > `publicidad`.
 
+pub mod dominio;
 mod parse;
 mod red;
 
@@ -629,6 +630,39 @@ impl Catalog {
         hit
     }
 
+    /// A name dressed as another (decision 205): when the answer for `qname` came through a chain
+    /// of aliases (CNAME, in the order the answer gave them) and one of those names belongs to
+    /// another site that the lists call a tracker, advertising or telemetry, the registrable site
+    /// of the last such name (`omtrdc.net`). `None` otherwise.
+    ///
+    /// Not a second opinion about the name: only what the lists already say about the alias, and
+    /// only when it is somebody else's. An alias inside the same site (`www.x.com` →
+    /// `x.com.cdn.x.com`), into a delivery network or a rented cloud server (the road, not the
+    /// destination), or into another name of the same company or group (`Google` → `Google`) is
+    /// not a disguise. A chain that goes on through a delivery network after the tracker still
+    /// names the tracker. Only a name is returned, never an address.
+    #[must_use]
+    pub fn cloaked_target(&self, qname: &str, chain: &[String]) -> Option<String> {
+        let sitio_pedido = dominio::sitio(qname);
+        let dueno_pedido = group_or_company_of(qname);
+        chain
+            .iter()
+            .rfind(|alias| {
+                let sitio = dominio::sitio(alias);
+                // A name, never an address: an alias that reads as one is not looked at.
+                alias.parse::<std::net::IpAddr>().is_err()
+                    && sitio != sitio_pedido
+                    && matches!(
+                        self.category(alias),
+                        Category::Rastreador | Category::Publicidad | Category::Telemetria
+                    )
+                    && delivery_of(alias).is_none()
+                    && hosting_of(alias).is_none()
+                    && (dueno_pedido.is_none() || dueno_pedido != group_or_company_of(alias))
+            })
+            .map(|alias| dominio::sitio(alias))
+    }
+
     /// Number of distinct domains known.
     #[must_use]
     pub fn len(&self) -> usize {
@@ -646,6 +680,53 @@ impl Catalog {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_name_that_answers_as_a_tracker_of_another_site_is_told_apart() {
+        let c = Catalog::bundled();
+        let cadena = |v: &[&str]| v.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+        // The classic: a sub-name of the shop that is Adobe's measurement under its skin.
+        assert_eq!(
+            c.cloaked_target(
+                "metricas.ejemplo.com",
+                &cadena(&["ejemplo.com.ssl.d1.sc.omtrdc.net"])
+            )
+            .as_deref(),
+            Some("omtrdc.net")
+        );
+        // A chain that goes on through a delivery network still names the tracker.
+        assert_eq!(
+            c.cloaked_target(
+                "metricas.ejemplo.com",
+                &cadena(&["ejemplo.sc.omtrdc.net", "e1.a.akamaiedge.net"])
+            )
+            .as_deref(),
+            Some("omtrdc.net")
+        );
+        // Into a delivery network alone, or inside its own site: not a disguise.
+        assert_eq!(
+            c.cloaked_target("www.ejemplo.com", &cadena(&["e1.a.akamaiedge.net"])),
+            None
+        );
+        assert_eq!(
+            c.cloaked_target("www.ejemplo.com", &cadena(&["ejemplo.com.cdn.ejemplo.com"])),
+            None
+        );
+        // No chain, nothing to say.
+        assert_eq!(c.cloaked_target("metricas.ejemplo.com", &[]), None);
+        // The same company under another of its own names is not somebody else.
+        assert_eq!(group_or_company_of("www.google.com"), Some("Alphabet"));
+        assert_eq!(c.category("x.doubleclick.net"), Category::Publicidad);
+        assert_eq!(
+            c.cloaked_target("www.google.com", &cadena(&["x.doubleclick.net"])),
+            None
+        );
+        // And a name the lists do not call a tracker is never one by being an alias.
+        assert_eq!(
+            c.cloaked_target("a.ejemplo.com", &cadena(&["b.otro-sitio.example"])),
+            None
+        );
+    }
 
     #[test]
     fn a_domain_is_asked_about_when_something_expected_is_under_it() {
