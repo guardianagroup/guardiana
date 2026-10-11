@@ -1205,7 +1205,7 @@
     "borrado_evidencia_nombres_uno": "1 name",
     "borrado_evidencia_cortadas": "GUARDIANA blocked {n} of those queries.",
     "borrado_evidencia_cortadas_uno": "GUARDIANA blocked 1 of those queries.",
-    "borrado_evidencia_nada": "Your home has not asked for any name of {empresa} in what the extract keeps. It may hold your data anyway: these companies buy it from others.",
+    "borrado_evidencia_nada": "Your home hasn't asked for any of its names in what the extract keeps.",
     "borrado_aparatos": "From: {lista}",
     "borrado_ver_nombres": "Show the names",
     "borrado_callados": "{n} devices don't share their detail with the panel: what they asked for doesn't count here.",
@@ -1397,6 +1397,9 @@
     "borrado_articulo_pe": "Article 20 of Law 29733",
     "borrado_plazo_pe": "10 business days from the day after filing, extendable only once by the same period (Articles 69.3 and 71 of the Regulation)",
     "borrado_nota_pe": "If they refuse in whole or in part, or don't answer, you can file a claim with the National Authority for Personal Data Protection (Article 24 of the Law).",
-    "borrado_queja_pe": "File a claim with the National Authority for Personal Data Protection."
+    "borrado_queja_pe": "File a claim with the National Authority for Personal Data Protection.",
+    "borrado_evidencia_frase_dia": "Your devices asked {n} times for {nombres} of {empresa}, on {desde}.",
+    "borrado_carta_evidencia_linea_dia": "- {nombre}: {n} times, on {desde}",
+    "borrado_carta_evidencia_linea_una": "- {nombre}: once, on {desde}"
   }
 }

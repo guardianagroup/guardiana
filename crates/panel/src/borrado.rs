@@ -840,11 +840,18 @@ pub(crate) fn carta(
                 .iter()
                 .take(12)
                 .map(|n| {
-                    t.panel("borrado_carta_evidencia_linea")
-                        .replace("{nombre}", &n.nombre)
-                        .replace("{n}", &n.consultas.to_string())
-                        .replace("{desde}", &fecha_texto(t, dia_de(n.primera, zona)))
-                        .replace("{hasta}", &fecha_texto(t, dia_de(n.ultima, zona)))
+                    let mismo_dia = dia_de(n.primera, zona) == dia_de(n.ultima, zona);
+                    t.panel(if n.consultas == 1 {
+                        "borrado_carta_evidencia_linea_una"
+                    } else if mismo_dia {
+                        "borrado_carta_evidencia_linea_dia"
+                    } else {
+                        "borrado_carta_evidencia_linea"
+                    })
+                    .replace("{nombre}", &n.nombre)
+                    .replace("{n}", &n.consultas.to_string())
+                    .replace("{desde}", &fecha_texto(t, dia_de(n.primera, zona)))
+                    .replace("{hasta}", &fecha_texto(t, dia_de(n.ultima, zona)))
                 })
                 .collect();
             t.panel("borrado_carta_evidencia")
@@ -1068,8 +1075,14 @@ fn jur_view(t: &Texts, j: &'static Jurisdiccion) -> JurView {
 fn frase_evidencia(t: &Texts, c: &Corredor, ev: &Evidencia, zona: i64) -> String {
     match (ev.primera, ev.ultima) {
         (Some(p), Some(u)) if ev.consultas > 0 => {
+            // One day only: «el 11/10/2026», not «entre el 11/10/2026 y el 11/10/2026».
+            let clave = if ev.consultas > 1 && dia_de(p, zona) == dia_de(u, zona) {
+                "borrado_evidencia_frase_dia"
+            } else {
+                "borrado_evidencia_frase"
+            };
             let mut s = t
-                .panel_n("borrado_evidencia_frase", ev.consultas)
+                .panel_n(clave, ev.consultas)
                 .replace(
                     "{nombres}",
                     &t.panel_n("borrado_evidencia_nombres", ev.nombres.len() as i64),
@@ -1474,6 +1487,12 @@ mod tests {
         let con = carta(i18n::es(), jurisdiccion("es").unwrap(), c, Some(ev), hoy, 0);
         assert!(con.cuerpo.contains("www.spokeo.com"), "{}", con.cuerpo);
         assert!(con.cuerpo.contains("1/10/2026"), "{}", con.cuerpo);
+        assert!(
+            con.cuerpo
+                .contains("- thatsthem.com: una vez, el 2/10/2026"),
+            "{}",
+            con.cuerpo
+        );
         let sin = carta(i18n::es(), jurisdiccion("es").unwrap(), c, None, hoy, 0);
         assert!(!sin.cuerpo.contains("www.spokeo.com"));
     }

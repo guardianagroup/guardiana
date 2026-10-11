@@ -1205,7 +1205,7 @@
     "borrado_evidencia_nombres_uno": "1 nome",
     "borrado_evidencia_cortadas": "A GUARDIANA bloqueou {n} dessas consultas.",
     "borrado_evidencia_cortadas_uno": "A GUARDIANA bloqueou 1 dessas consultas.",
-    "borrado_evidencia_nada": "A sua casa não consultou nenhum nome de {empresa} no que o extrato guarda. Ela pode ter os seus dados mesmo assim: essas empresas os compram de outras.",
+    "borrado_evidencia_nada": "A sua casa não consultou nenhum nome dela no que o extrato guarda.",
     "borrado_aparatos": "De: {lista}",
     "borrado_ver_nombres": "Ver os nomes",
     "borrado_callados": "{n} aparelhos não compartilham os detalhes com o painel: o que consultaram não conta aqui.",
@@ -1397,6 +1397,9 @@
     "borrado_articulo_pe": "no artigo 20 da Lei 29733",
     "borrado_plazo_pe": "10 dias úteis a partir do dia seguinte à apresentação, prorrogáveis uma só vez por igual prazo (artigos 69.3 e 71 do Regulamento)",
     "borrado_nota_pe": "Se recusarem no todo ou em parte, ou não responderem, você pode reclamar à Autoridade Nacional de Proteção de Dados Pessoais (artigo 24 da Lei).",
-    "borrado_queja_pe": "Apresente uma reclamação à Autoridade Nacional de Proteção de Dados Pessoais."
+    "borrado_queja_pe": "Apresente uma reclamação à Autoridade Nacional de Proteção de Dados Pessoais.",
+    "borrado_evidencia_frase_dia": "Os seus aparelhos consultaram {n} vezes {nombres} de {empresa}, em {desde}.",
+    "borrado_carta_evidencia_linea_dia": "- {nombre}: {n} vezes, em {desde}",
+    "borrado_carta_evidencia_linea_una": "- {nombre}: uma vez, em {desde}"
   }
 }

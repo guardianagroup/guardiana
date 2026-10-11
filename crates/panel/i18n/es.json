@@ -1205,7 +1205,7 @@
     "borrado_evidencia_nombres_uno": "1 nombre",
     "borrado_evidencia_cortadas": "GUARDIANA cortó {n} de esas consultas.",
     "borrado_evidencia_cortadas_uno": "GUARDIANA cortó 1 de esas consultas.",
-    "borrado_evidencia_nada": "Tu casa no ha preguntado por ningún nombre de {empresa} en lo que guarda el extracto. Puede tener tus datos igual: estas empresas los compran a otras.",
+    "borrado_evidencia_nada": "Tu casa no ha preguntado por ningún nombre suyo en lo que guarda el extracto.",
     "borrado_aparatos": "Desde: {lista}",
     "borrado_ver_nombres": "Ver los nombres",
     "borrado_callados": "{n} aparatos no comparten su detalle con el panel: lo que preguntaron no cuenta aquí.",
@@ -1397,6 +1397,9 @@
     "borrado_articulo_pe": "el artículo 20 de la Ley 29733",
     "borrado_plazo_pe": "10 días hábiles desde el día siguiente a la presentación, ampliables una sola vez por un plazo igual (artículos 69.3 y 71 del Reglamento)",
     "borrado_nota_pe": "Si te lo deniegan del todo o en parte, o no responden, puedes reclamar ante la Autoridad Nacional de Protección de Datos Personales (artículo 24 de la Ley).",
-    "borrado_queja_pe": "Presenta una reclamación ante la Autoridad Nacional de Protección de Datos Personales."
+    "borrado_queja_pe": "Presenta una reclamación ante la Autoridad Nacional de Protección de Datos Personales.",
+    "borrado_evidencia_frase_dia": "Tus aparatos preguntaron {n} veces por {nombres} de {empresa}, el {desde}.",
+    "borrado_carta_evidencia_linea_dia": "- {nombre}: {n} veces, el {desde}",
+    "borrado_carta_evidencia_linea_una": "- {nombre}: una vez, el {desde}"
   }
 }
