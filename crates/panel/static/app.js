@@ -607,22 +607,24 @@
     const texto = esHoy(ms)
       ? t('estado_a_las').replace('{hora}', d.toLocaleTimeString(LOC))
       : t('estado_el').replace('{fecha}', d.toLocaleDateString(LOC, DIA)).replace('{hora}', d.toLocaleTimeString(LOC));
-    return `<br><span class="muted small">${esc(texto)}</span>`;
+    // On the status itself, as its tooltip: a second line made the row taller after every
+    // click and pushed every row below it down (the owner, 10 Oct 2026: «no se puede mover»).
+    return texto;
   };
   function estadoCelda(ev) {
     if (levantado(ev)) {
-      return `<span class="verdict levantado">${esc(t('estado_desbloqueado'))}</span>${aLas(horaLevantado(ev))}`;
+      return `<span class="verdict levantado" title="${esc(aLas(horaLevantado(ev)))}">${esc(t('estado_desbloqueado'))}</span>`;
     }
     const corte = reglaDeCorte(ev);
     if (corte !== undefined) {
       // Blocked by a rule of this very name: blocked since that rule was made.
-      return `${verdict('cortado')}${aLas(HORAS_REGLA.get(corte)?.creada ?? null)}`;
+      return `<span title="${esc(aLas(HORAS_REGLA.get(corte)?.creada ?? null))}">${verdict('cortado')}</span>`;
     }
     // Blocked and unblocked after this query: unblocked, and when.
     const n = sinPunto(ev.qname);
     const des = Math.max(DESBLOQUEOS.get(claveCorte(ev.device_id, n)) ?? -1, DESBLOQUEOS.get(claveCorte('home', n)) ?? -1);
     if (ev.verdict !== 'cortado' && des >= Number(ev.ts)) {
-      return `<span class="verdict levantado">${esc(t('estado_desbloqueado'))}</span>${aLas(des)}`;
+      return `<span class="verdict levantado" title="${esc(aLas(des))}">${esc(t('estado_desbloqueado'))}</span>`;
     }
     return verdict(ev.verdict);
   }
@@ -803,7 +805,11 @@
       // The button turns into what can be done now and the status beside it says what holds
       // now, on this row and on every other row of the same name, in every table of the page.
       b.disabled = false;
+      // The button is drawn anew: the focus stays on this row's button, not on the page.
+      const fila = b.closest('tr');
       redibujaNombre(name);
+      const nuevo = fila && fila.querySelector('td.accion button');
+      if (nuevo) nuevo.focus({ preventScroll: true });
     });
   }
 
