@@ -7,7 +7,8 @@
 //! Three rules hold here and nowhere else:
 //! - A web page never receives a message from the browser: only the browser's own pages
 //!   (`https://zero.guardiana/…`) do, and the shell checks it again before posting.
-//! - From a web page the browser accepts one thing, the form guard's question; everything else a
+//! - From a web page the browser accepts only what its own page script sends on the hidden
+//!   channel (the form guard's question, the cookie notice, what it measured); everything else a
 //!   page could post is ignored.
 //! - Every figure is a count of requests decided here. Nothing is estimated.
 
@@ -33,6 +34,7 @@ use crate::fecha;
 use crate::libro::Libro;
 use crate::licencia::{Estado as EstadoLicencia, Fallo, Lugar as LugarLicencia};
 use crate::mandato::{Mandato, Recurso};
+use crate::medidas::{self, Tecnica};
 use crate::paginas;
 use crate::recibo::{self, Recibo};
 use crate::tachon::{self, Sustitucion};
@@ -448,6 +450,9 @@ pub struct Sesion {
     licencia_ok: i64,
     /// The last reading of the licence file failed (said in the bar and the panel).
     licencia_ilegible: bool,
+    /// What was measured since the browser opened, on the person's own webs (decision 206): in
+    /// memory only.
+    medidas: medidas::Total,
 }
 
 fn lee<T: DeserializeOwned + Default>(ruta: &Path) -> T {
@@ -619,6 +624,7 @@ impl Sesion {
             licencia_pedida: 0,
             licencia_ok: 0,
             licencia_ilegible: false,
+            medidas: medidas::Total::default(),
         };
         s.dia_visto = s.hoy();
         s.poda_cortes();
@@ -834,13 +840,25 @@ impl Sesion {
     }
 
     /// Whether a request of this tab to `url` needs its body read: marked data or a mandate's
-    /// decoy might travel in it, or it goes to a known pixel, which puts there what it tells
-    /// («Los chivatos»).
+    /// decoy might travel in it, it goes to a known pixel, which puts there what it tells
+    /// («Los chivatos»), or it goes to another site, whose body's size the shield says
+    /// (decision 206: only its length is kept).
     #[must_use]
     pub fn necesita_cuerpo(&self, id: u32, url: &str) -> bool {
         !self.tinta.is_empty()
             || self.perfil_de(id) == Some(Perfil::Mandato)
             || crate::chivatos::interesa(url)
+            || self.a_otro_sitio(id, url)
+    }
+
+    /// While protecting, a request of tab `id` to another site than the page's (or from a tab
+    /// with no web page yet): its body's size is measured.
+    fn a_otro_sitio(&self, id: u32, url: &str) -> bool {
+        self.licencia.protege()
+            && self.pestana(id).is_some_and(|p| {
+                host_de(url)
+                    .is_some_and(|h| p.escudo.sitio.is_empty() || sitio(&h) != p.escudo.sitio)
+            })
     }
 
     fn t(&self, clave: &str) -> String {
@@ -1105,6 +1123,10 @@ impl Sesion {
             "datos_salvados": p.escudo.datos_salvados,
             "cookies": p.escudo.cookies.as_ref().map(|(g, a)| json!({ "gestor": g, "accion": a })),
             "chivatos": p.escudo.chivatos,
+            "medidas": {
+                "lineas": p.escudo.medidas.lineas(&self.textos),
+                "notas": p.escudo.medidas.notas(&self.textos),
+            },
             "tarjeta": p.escudo.tarjeta().map(|t| json!({
                 "empresas": t.empresas,
                 "evento": t.evento.clave(),
@@ -1266,6 +1288,7 @@ impl Sesion {
             "mes": self.diario.total(&mes, &hoy),
             "rastro_hoy": self.diario.rastro(&hoy, &hoy, 5),
             "rastro_mes": self.diario.rastro(&mes, &hoy, 5),
+            "medidas_sesion": self.medidas.lineas(&self.textos),
         })
     }
 
@@ -1483,6 +1506,8 @@ impl Sesion {
                     "zg_formulario" => self.formulario(id, fuente, &m),
                     "zg_cookies_pide" => self.cookies_pide(id, &m),
                     "zg_cookies" => self.cookies_hecho(id, &m),
+                    "zg_huella" => self.huella(id, fuente, &m),
+                    "zg_escribe" => self.escribe(id, fuente),
                     _ => Vec::new(),
                 };
             }
@@ -2493,6 +2518,79 @@ impl Sesion {
         }
     }
 
+    /// The tab whose page posted from `fuente`, if that page is still the one it shows: a
+    /// message of the page before (it left while the message travelled) is not this page's.
+    fn pestana_de_fuente(&mut self, id: u32, fuente: &str) -> Option<&mut Pestana> {
+        let s = host_de(fuente).map(|h| sitio(&h)).unwrap_or_default();
+        self.pestana_mut(id)
+            .filter(|p| !s.is_empty() && p.escudo.sitio == s && !es_interna(&p.url))
+    }
+
+    /// The page script saw reads that serve to recognise the computer (decision 206): which
+    /// kind, and the web addresses on the call stack of whoever asked. Counted on the tab's
+    /// shield and in the session's total; nothing changes on the page, nothing is answered.
+    fn huella(&mut self, id: u32, fuente: &str, m: &Value) -> Vec<Orden> {
+        if !self.licencia.protege() {
+            return Vec::new();
+        }
+        let lista: Vec<(Tecnica, Vec<String>)> = m
+            .get("lista")
+            .and_then(Value::as_array)
+            .map(|a| {
+                a.iter()
+                    .take(50)
+                    .filter_map(|x| {
+                        let t = Tecnica::de_clave(texto(x, "t"))?;
+                        let u = x
+                            .get("u")
+                            .and_then(Value::as_array)
+                            .map(|u| {
+                                u.iter()
+                                    .filter_map(Value::as_str)
+                                    .take(4)
+                                    .map(|s| s.chars().take(500).collect())
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                        Some((t, u))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let Some(p) = self.pestana_de_fuente(id, fuente) else {
+            return Vec::new();
+        };
+        let web = p.escudo.sitio.clone();
+        let propia = p.perfil == Perfil::General;
+        let mut algo = false;
+        for (t, u) in &lista {
+            let u: Vec<&str> = u.iter().map(String::as_str).collect();
+            let (autor, script) = medidas::autor(&u, &web);
+            algo |= p.escudo.medidas.huella(*t, autor, script);
+        }
+        // The person's own webs only: not an isolated tab, not the AI's.
+        if propia {
+            for (t, _) in &lista {
+                self.medidas.huella(&web, *t);
+            }
+            self.hoy_sucio |= !lista.is_empty();
+        }
+        if algo {
+            self.sucios.insert(id);
+        }
+        Vec::new()
+    }
+
+    /// The person typed in a field of the page (the page script says it once per page, and
+    /// nothing of what was typed): from now on, a request to a session recording service went
+    /// «after you typed».
+    fn escribe(&mut self, id: u32, fuente: &str) -> Vec<Orden> {
+        if let Some(p) = self.pestana_de_fuente(id, fuente) {
+            let _ = p.escudo.medidas.escribe();
+        }
+        Vec::new()
+    }
+
     fn formulario(&mut self, id: u32, fuente: &str, m: &Value) -> Vec<Orden> {
         let Some(id_pagina) = numero(m, "id") else {
             return Vec::new();
@@ -2699,6 +2797,7 @@ impl Sesion {
         self.tinta.clear();
         self.libro = Libro::default();
         self.diario = Diario::default();
+        self.medidas = medidas::Total::default();
         self.mandato = None;
         self.terminado = None;
         self.recibo = None;
@@ -3049,6 +3148,15 @@ impl Sesion {
             .map(crate::dominio::normaliza_host)
             .unwrap_or_default();
         let destino = crate::destino::clasifica_en(&host, dir.as_ref().map_or("", url::Url::path));
+        // The size of its body, when the shell read it (`necesita_cuerpo`); otherwise not known,
+        // never guessed. An empty body read and a body the engine did not give look the same,
+        // so both count as not known.
+        let con_cuerpo = matches!(
+            metodo.to_ascii_uppercase().as_str(),
+            "POST" | "PUT" | "PATCH"
+        );
+        let bytes = (con_cuerpo && !cuerpo.is_empty() && self.necesita_cuerpo(id, url))
+            .then(|| u64::try_from(cuerpo.len()).unwrap_or(u64::MAX));
         let d = {
             let p = &self.pestanas[i];
             let mut recurso = recurso_de_contexto(contexto);
@@ -3123,6 +3231,20 @@ impl Sesion {
         }
         let p = &mut self.pestanas[i];
         p.escudo.anota(&d);
+        // What is measured of it, without changing what was decided (decision 206).
+        let medida = d.de_fuera().then(|| {
+            let v = medidas::Vista {
+                host: &host,
+                consulta: dir.as_ref().and_then(url::Url::query),
+                quien: d.destino.quien(),
+                con_cuerpo,
+                bytes,
+                cortada: d.cortar,
+            };
+            let h = medidas::mira(&v);
+            p.escudo.medidas.anota(&v, &h);
+            (v, h)
+        });
         // What a page's pixel tried to tell («Los chivatos»): kept in the tab's shield, in
         // memory, with whether it was cut.
         let chivato = dir
@@ -3141,6 +3263,10 @@ impl Sesion {
             if let Some((red, evento, true)) = chivato {
                 self.diario.anota_chivato(&hoy, red, evento);
             }
+        }
+        // The session's total: the person's own webs, as the day's trail.
+        if let (Some(w), Some((v, h))) = (web.as_deref(), medida.as_ref()) {
+            self.medidas.anota(w, v, h);
         }
         // A day's list of cuts stops at `cortes::MAX_DIA` lines (a page calling endless names
         // must not fill the disk); the day's figures still count every one, and the list says

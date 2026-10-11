@@ -258,6 +258,10 @@ pub struct Pestana {
     /// disk).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub chivatos: Vec<ChivatoVisto>,
+    /// What was measured on the page without cutting anything (decision 206): reads for a
+    /// fingerprint, session recording, hashed data in addresses, bodies sent. In memory only.
+    #[serde(skip)]
+    pub medidas: crate::medidas::Pagina,
 }
 
 impl Pestana {

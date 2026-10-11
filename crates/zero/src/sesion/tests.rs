@@ -2545,3 +2545,199 @@ fn rows_keep_the_order_they_first_showed_up_in() {
         carga
     );
 }
+
+/// The shield's measured lines for the active tab, as the panel gets them.
+fn medidas_de(s: &mut Sesion) -> Vec<(String, String)> {
+    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":"escudo"}"#);
+    let e = del_tipo(&o, Origen::Panel, "escudo").unwrap_or_default();
+    e["medidas"]["lineas"]
+        .as_array()
+        .map(|l| {
+            l.iter()
+                .map(|x| {
+                    (
+                        x["texto"].as_str().unwrap_or_default().to_string(),
+                        x["estado"].as_str().unwrap_or_default().to_string(),
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Decision 206: the page script's reports of reads for a fingerprint reach the shield, by the
+/// script that asked, and only for the page that sent them; nothing is cut or answered.
+#[test]
+fn reads_for_a_fingerprint_are_counted_by_the_script_that_asked() {
+    let (mut s, _, id) = con_pagina(true);
+    let web = "https://www.eltiempo.com/";
+    let huella =
+        |lista: Value| json!({ "tipo": "zg_huella", "zg": "f1", "lista": lista }).to_string();
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        web,
+        &huella(json!([
+            { "t": "canvas", "u": ["https://cdn.tracker.example/fp.js?k=1", "https://www.eltiempo.com/"] },
+            { "t": "webgl", "u": ["https://cdn.tracker.example/fp.js"] },
+            { "t": "plugins", "u": ["https://otra.example/x.js"] },
+            { "t": "audio", "u": [] },
+        ])),
+    );
+    // Nothing goes back to the page.
+    assert!(o.is_empty());
+    let l = medidas_de(&mut s);
+    assert_eq!(
+        l,
+        [(
+            "2 scripts intentaron leer la huella de tu equipo: tracker.example (canvas, WebGL), origen desconocido (audio)".to_string(),
+            String::new()
+        )]
+    );
+    // A message of a page this tab no longer shows, or of the browser's own pages, counts
+    // nothing.
+    let _ = s.mensaje(
+        Origen::Pestana(id),
+        "https://www.otro-sitio.example/",
+        &huella(json!([{ "t": "fuentes", "u": ["https://z.example/z.js"] }])),
+    );
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        &huella(json!([{ "t": "fuentes", "u": ["https://z.example/z.js"] }])),
+    );
+    assert_eq!(medidas_de(&mut s).len(), 1);
+    assert!(!medidas_de(&mut s)[0].0.contains("z.example"));
+    // The session's summary has it, by webs.
+    assert_eq!(
+        s.msg_hoy()["medidas_sesion"][0]["texto"],
+        "En 1 web, algún script intentó leer la huella de tu equipo (canvas, WebGL, audio)"
+    );
+    // A new page starts its own count; the session keeps it.
+    let _ = abre_pagina(&mut s, id, "https://www.elpais.com/");
+    assert!(medidas_de(&mut s).is_empty());
+    assert_eq!(
+        s.msg_hoy()["medidas_sesion"].as_array().map(Vec::len),
+        Some(1)
+    );
+    // Without the trial or a subscription, nothing is measured.
+    let _ = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
+    let _ = s.mensaje(
+        Origen::Pestana(id),
+        "https://www.elpais.com/",
+        &huella(json!([{ "t": "canvas", "u": [] }])),
+    );
+    assert!(s.pestana(id).is_some_and(|p| p.escudo.medidas.vacia()));
+}
+
+/// Decision 206: session recording services by their names, whether one got a request after the
+/// person typed, hashed data in addresses, and the size of what bodies carried; nothing of it
+/// changes what is cut.
+#[test]
+fn recording_hashed_addresses_and_bodies_are_measured_without_changing_any_cut() {
+    for cortar in [false, true] {
+        let (mut s, _, id) = con_pagina(cortar);
+        let web = "https://www.eltiempo.com/";
+        let r1 = s.peticion(id, "https://www.clarity.ms/tag/abc", "GET", b"", 6);
+        let _ = s.mensaje(
+            Origen::Pestana(id),
+            web,
+            r#"{"tipo":"zg_escribe","zg":"f1"}"#,
+        );
+        let r2 = s.peticion(id, "https://k.clarity.ms/collect", "POST", &[7u8; 3000], 8);
+        // The cut is the same as without measuring: the lists' word, nothing else.
+        assert_eq!(r1.cortar, r2.cortar);
+        assert_eq!(
+            r1.cortar, cortar,
+            "Clarity is cut only when cutting trackers"
+        );
+        let h = sha256_hex("ana@correo.co");
+        let pixel = format!("https://www.facebook.com/tr?id=1&ev=PageView&ud[em]={h}");
+        let _ = s.peticion(id, &pixel, "GET", b"", 3);
+        let _ = s.peticion(
+            id,
+            "https://collect.otra-empresa.io/e",
+            "POST",
+            &[1u8; 100],
+            8,
+        );
+        // A body to the page's own site is not «to other companies».
+        let _ = s.peticion(id, "https://www.eltiempo.com/api", "POST", &[1u8; 5000], 8);
+        let l = medidas_de(&mut s);
+        let textos: Vec<&str> = l.iter().map(|(t, _)| t.as_str()).collect();
+        if cortar {
+            assert!(textos.contains(&"Esta página intentó cargar un servicio de grabación de sesiones (Microsoft Clarity), e intentó enviarle datos después de que escribieras en un campo"), "{textos:?}");
+            assert!(textos.contains(&"Una petición a Meta intentó llevar en su dirección un correo en forma cifrada"), "{textos:?}");
+            assert!(
+                textos.contains(&"Salió 1 envío con datos hacia otras empresas: 100 B"),
+                "{textos:?}"
+            );
+            assert!(
+                textos.contains(&"Se cortó 1 envío con datos antes de salir: 2,9 KB"),
+                "{textos:?}"
+            );
+        } else {
+            assert!(textos.contains(&"Esta página carga un servicio de grabación de sesiones (Microsoft Clarity), y le envió datos después de que escribieras en un campo"), "{textos:?}");
+            assert!(
+                textos.contains(
+                    &"En la dirección de una petición a Meta iba un correo en forma cifrada"
+                ),
+                "{textos:?}"
+            );
+            assert!(
+                textos.contains(&"Salieron 2 envíos con datos hacia otras empresas: 3,0 KB"),
+                "{textos:?}"
+            );
+        }
+        // The value never reaches what is shown.
+        assert!(textos.iter().all(|t| !t.contains(&h[..16])));
+        let sesion: Vec<String> = s.msg_hoy()["medidas_sesion"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .map(|x| x["texto"].as_str().unwrap_or_default().to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert!(
+            sesion.contains(
+                &"En 1 web había un servicio de grabación de sesiones: Microsoft Clarity"
+                    .to_string()
+            ),
+            "{sesion:?}"
+        );
+        // «Borrar todo» forgets the session too.
+        let _ = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"borrar_todo"}"#);
+        assert_eq!(s.msg_hoy()["medidas_sesion"], json!([]));
+    }
+}
+
+/// Decision 206: an isolated tab shows what was measured on its own shield and leaves nothing
+/// in the session's summary.
+#[test]
+fn an_isolated_tab_is_measured_on_its_shield_only() {
+    let (mut s, _, _) = con_pagina(false);
+    let _ = s.tecla(u32::from('N'), true, true, false);
+    let id = s.activa();
+    assert!(s.es_aislada(id));
+    let web = "https://www.secreto.example/";
+    let _ = abre_pagina(&mut s, id, web);
+    let _ = s.peticion(id, "https://static.hotjar.com/c/hotjar-1.js", "GET", b"", 6);
+    let _ = s.mensaje(
+        Origen::Pestana(id),
+        web,
+        r#"{"tipo":"zg_huella","zg":"x","lista":[{"t":"canvas","u":["https://fp.example/a.js"]}]}"#,
+    );
+    assert_eq!(medidas_de(&mut s).len(), 2);
+    assert_eq!(s.msg_hoy()["medidas_sesion"], json!([]));
+}
+
+/// The shell reads the body of a request to another site while protecting (its size is
+/// measured), and not of one to the page's own site when nothing else needs it.
+#[test]
+fn bodies_to_other_sites_are_read_for_their_size() {
+    let (mut s, _, id) = con_pagina(true);
+    assert!(s.necesita_cuerpo(id, "https://collect.otra-empresa.io/e"));
+    assert!(!s.necesita_cuerpo(id, "https://www.eltiempo.com/api"));
+    let _ = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
+    assert!(!s.necesita_cuerpo(id, "https://collect.otra-empresa.io/e"));
+}
