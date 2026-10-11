@@ -258,6 +258,11 @@ body { transition: opacity .18s ease-out; }
    the percentages exactly. */
 .empresa-col .grupo{display:block;color:var(--muted);font-size:12.5px;line-height:1.35;margin-top:2px}
 .phrase.servidor{font-size:12.5px}
+/* Decision 205: a name dressed as another, and the weekly measurements. Same type, same rows. */
+.phrase.disfraz{color:var(--fg)}
+.phrase.disfraz b{font-family:var(--mono);font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;font-weight:500;margin-right:4px}
+table.medidas td{vertical-align:top;font-variant-numeric:tabular-nums}
+table.medidas .horas{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
 .fuente-red a{color:inherit}
 .card h3{font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:-0.01em;margin:18px 0 6px}
 ul.barras{list-style:none;padding:0;margin:8px 0 14px;max-width:46em}

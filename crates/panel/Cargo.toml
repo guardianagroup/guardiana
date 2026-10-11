@@ -23,6 +23,9 @@ qrcode = { workspace = true }
 guardiana-devices = { workspace = true }
 guardiana-verify = { workspace = true }
 guardiana-license = { workspace = true }
+# The weekly report's cadence (decision 205) folds and measures contacts exactly as the beacon
+# signal does, from the same functions, instead of a second copy of them here.
+guardiana-classify = { workspace = true }
 
 [lints]
 workspace = true

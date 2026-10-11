@@ -211,7 +211,7 @@
   // on the page (review of 10 Oct 2026, panel 10).
   const nombreAparato = (id, name, ip) => name || (id === 'self' ? t('este_computador') : t('dispositivo_nuevo') + ' · ' + (ip || String(id || '').replace(/^(mac|ip):/, '')));
   const deviceName = (ev) => nombreAparato(ev.device_id, ev.device_name);
-  const nameCell = (ev) => [ev.qname + (ev._n > 1 ? ' ×' + ev._n : '') + (ev.ia ? ' · ' + t('ia_prefijo') + ': ' + ev.ia : '')].concat((ev.frases || []).map((f) => '· ' + f)).concat(ev.servidor ? ['· ' + ev.servidor.frase] : []).join('\n');
+  const nameCell = (ev) => [ev.qname + (ev._n > 1 ? ' ×' + ev._n : '') + (ev.ia ? ' · ' + t('ia_prefijo') + ': ' + ev.ia : '')].concat((ev.frases || []).map((f) => '· ' + f)).concat(ev.disfraz ? ['· ' + t('disfraz_etiqueta') + ': ' + ev.disfraz.frase] : []).concat(ev.servidor ? ['· ' + ev.servidor.frase] : []).join('\n');
   // El PDF tiene que decir lo MISMO que la pantalla. Enseñaba `catName(ev.category)`, la
   // categoría en bruto, así que todo lo que en pantalla pone «entrega», «red local» o «de
   // Google» salía en el papel como «sin clasificar»; y el país no salía en absoluto (lo vio el
@@ -452,7 +452,11 @@
   const phrases = (ev) => (ev.oficio ? `<span class="phrase oficio">· ${esc(ev.oficio)}</span>` : '')
     + declara(ev)
     + (ev.frases || []).map((f) => `<span class="phrase">· ${esc(f)}</span>`).join('')
+    + disfrazFrase(ev)
     + servidorFrase(ev);
+  // Un nombre disfrazado (decisión 205): se presenta como la web, pero responde un rastreador de
+  // otra empresa. La frase viene hecha del servidor; la explicación larga, en el título.
+  const disfrazFrase = (ev) => (ev.disfraz ? `<span class="phrase disfraz" title="${esc(ev.disfraz.titulo)}">· <b>${esc(t('disfraz_etiqueta'))}</b> ${esc(ev.disfraz.frase)}</span>` : '');
   // A dónde mandó la respuesta al aparato (decisión 203): por qué red se sirve y en qué país está
   // el servidor según la base que va dentro del programa, o por qué no se dice (anycast, red
   // local). La dirección y la fuente van en el título, para quien quiera comprobarlas.
@@ -863,6 +867,7 @@
         last._n += 1;
         if (ev.qtype && !last._types.includes(ev.qtype)) last._types.push(ev.qtype);
         if (!last.servidor && ev.servidor) last.servidor = ev.servidor;
+        if (!last.disfraz && ev.disfraz) last.disfraz = ev.disfraz;
         last.ts = Math.max(last.ts, ev.ts);
         continue;
       }
@@ -1154,6 +1159,31 @@
         // The panel's CSP refuses style attributes; the width is set through the DOM instead.
         for (const b of document.querySelectorAll('ul.barras .barra > span[data-pct]')) b.style.width = b.dataset.pct + '%';
       }
+      // Las medidas de la decisión 205, hechas en el servidor con las filas que la casa puede
+      // leer: las noches, las empresas de cada día, cada cuánto llaman y los nombres disfrazados.
+      // La página no se refresca sola: nada se mueve mientras se lee.
+      const m = r.medidas;
+      for (const id of ['i-noche', 'i-empresas', 'i-cadencia', 'i-disfraz']) $(id).classList.toggle('hidden', !m);
+      const hhmm = (min) => String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
+      // Each day is named by its weekday, read at noon so the browser's own zone cannot slip it.
+      const diaCorto = (ms) => new Date(ms + 12 * 3600 * 1000).toLocaleDateString(LOC, { weekday: 'short', day: 'numeric' });
+      const nada = '<span class="muted">—</span>';
+      const mananas = (n) => n.mananas.map((x, i) => (x === null ? '' : diaCorto(m.dias[i]) + ' ' + hhmm(x))).filter(Boolean);
+      const empresaO = (e) => (e ? esc(e) : nada);
+      if (m) {
+        $('i-noche-frase').textContent = m.noche_total ? tn('noche_frase', m.noche_total) : '';
+        $('i-noche-rows').innerHTML = m.noche.map((n) => `<tr><td>${esc(nombreAparato(n.id, n.name))}</td><td>${num(n.consultas)}${n.cortadas ? ` <span class="muted">· ${esc(tn('noche_cortadas', n.cortadas))}</span>` : ''}</td><td>${num(n.noches)}</td><td>${n.empresas.length ? esc(n.empresas.join(', ')) : nada}</td><td class="horas">${mananas(n).map(esc).join('<br>') || nada}</td></tr>`).join('')
+          || `<tr><td colspan="5" class="muted">${esc(t('noche_ninguna'))}</td></tr>`;
+        $('i-empresas-cab').innerHTML = `<th>${esc(t('col_dispositivo'))}</th>` + m.dias.map((d) => `<th>${esc(diaCorto(d))}</th>`).join('');
+        $('i-empresas-hoy').textContent = m.empresas_hoy.length ? tn('empresas_hoy', m.empresas_hoy.length).replace('{grupos}', m.empresas_hoy.join(', ')) : '';
+        $('i-empresas-rows').innerHTML = m.empresas.map((e) => `<tr><td>${esc(nombreAparato(e.id, e.name))}</td>${e.por_dia.map((x, i) => `<td${i === e.por_dia.length - 1 && e.hoy.length ? ` title="${esc(e.hoy.join(', '))}"` : ''}>${x ? num(x) : nada}</td>`).join('')}</tr>`).join('')
+          || `<tr><td colspan="${m.dias.length + 1}" class="muted">${esc(t('empresas_ninguna'))}</td></tr>`;
+        $('i-cadencia-rows').innerHTML = m.cadencias.map((c) => `<tr><td class="mono">${esc(c.nombre)}</td><td>${empresaO(c.empresa)}</td><td>${num(c.contactos)}</td><td>${esc(c.frase)}</td></tr>`).join('')
+          || `<tr><td colspan="4" class="muted">${esc(t('cadencia_ninguna'))}</td></tr>`;
+        $('i-disfraz-total').textContent = m.disfrazados.length ? tn('disfraz_total', m.disfrazados.length).replace('{consultas}', tn('informe_n_consultas', m.disfrazados_consultas)) : '';
+        $('i-disfraz-rows').innerHTML = m.disfrazados.map((x) => `<tr><td><span class="mono">${esc(x.nombre)}</span><span class="phrase disfraz">· ${esc(x.frase)}</span></td><td>${empresaO(x.empresa)}</td><td>${num(x.consultas)}</td><td>${num(x.aparatos)}</td></tr>`).join('')
+          || `<tr><td colspan="4" class="muted">${esc(t('disfraz_ninguno'))}</td></tr>`;
+      }
       if (r.plus && !r.comparar_desde) {
         $('i-nuevos-rows').innerHTML = r.novedades.map((n2) => `<tr><td class="mono">${esc(n2.nombre)}</td><td>${esc(n2.empresa)}</td><td>${esc(catName(n2.categoria))}</td><td>${esc(nombreAparato(n2.device_id, n2.device_name))}</td><td>${num(n2.consultas)}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('informe_nuevos_ninguno'))}</td></tr>`;
       }
@@ -1215,6 +1245,37 @@
           if (d.grupos.length) doc.table([{ title: t('col_grupo'), w: 0.6 }, { title: '%', w: 0.15 }, { title: t('col_consultas'), w: 0.25 }], d.grupos.slice(0, 12).map((g) => [grupoDicho(g), g.pct + ' %', num(g.consultas)]), 8);
           // La fuente con su fecha, al pie del documento y de cada página.
           doc.gap(8).line(pieRed(d.fuente), 8, false, 0.45);
+        }
+        if (m) {
+          doc.seccion(t('noche_titulo'), t('noche_lead'));
+          if (m.noche.length) {
+            if (m.noche_total) doc.line(tn('noche_frase', m.noche_total), 10).gap(3);
+            doc.table([{ title: t('col_dispositivo'), w: 0.2 }, { title: t('noche_col_consultas'), w: 0.14 }, { title: t('noche_col_noches'), w: 0.1 }, { title: t('noche_col_empresas'), w: 0.24 }, { title: t('noche_col_mananas'), w: 0.32 }],
+              m.noche.map((n) => [nombreAparato(n.id, n.name), num(n.consultas) + (n.cortadas ? ' · ' + tn('noche_cortadas', n.cortadas) : ''), num(n.noches), n.empresas.join(', '), mananas(n).join('\n')]), 8);
+          } else {
+            doc.line(t('noche_ninguna'), 10);
+          }
+          doc.seccion(t('empresas_titulo'), t('empresas_lead'));
+          if (m.empresas_hoy.length) doc.line(tn('empresas_hoy', m.empresas_hoy.length).replace('{grupos}', m.empresas_hoy.join(', ')), 10).gap(3);
+          if (m.empresas.length) {
+            const w = 0.8 / m.dias.length;
+            doc.table([{ title: t('col_dispositivo'), w: 0.2 }].concat(m.dias.map((d) => ({ title: diaCorto(d), w }))), m.empresas.map((e) => [nombreAparato(e.id, e.name)].concat(e.por_dia.map((x) => num(x)))), 8);
+          } else {
+            doc.line(t('empresas_ninguna'), 10);
+          }
+          doc.seccion(t('cadencia_titulo'), t('cadencia_lead'));
+          if (m.cadencias.length) {
+            doc.table([{ title: t('col_nombre'), w: 0.34 }, { title: t('col_empresa_n'), w: 0.16 }, { title: t('col_contactos'), w: 0.12 }, { title: t('col_cadencia'), w: 0.38 }], m.cadencias.map((c) => [c.nombre, c.empresa || '', num(c.contactos), c.frase]), 8);
+          } else {
+            doc.line(t('cadencia_ninguna'), 10);
+          }
+          doc.seccion(t('disfraz_seccion'), t('disfraz_lead'));
+          if (m.disfrazados.length) {
+            doc.line(tn('disfraz_total', m.disfrazados.length).replace('{consultas}', tn('informe_n_consultas', m.disfrazados_consultas)), 10).gap(3);
+            doc.table([{ title: t('col_nombre'), w: 0.56 }, { title: t('col_empresa_n'), w: 0.2 }, { title: t('col_consultas'), w: 0.12 }, { title: t('col_aparatos_n'), w: 0.12 }], m.disfrazados.map((x) => [x.nombre + '\n' + x.frase, x.empresa || '', num(x.consultas), num(x.aparatos)]), 8);
+          } else {
+            doc.line(t('disfraz_ninguno'), 10);
+          }
         }
         if (r.plus) doc.seccion(t('informe_whatsapp_titulo')).line(r.texto_whatsapp, 10);
         return { name: pdfName('informe-semanal'), doc, pie2: d ? pieRed(d.fuente) : '' };

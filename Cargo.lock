@@ -515,6 +515,7 @@ version = "1.0.14"
 dependencies = [
  "axum",
  "getrandom 0.4.3",
+ "guardiana-classify",
  "guardiana-core",
  "guardiana-devices",
  "guardiana-license",

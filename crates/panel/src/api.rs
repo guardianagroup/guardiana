@@ -135,6 +135,31 @@ pub(crate) struct EventView {
     /// here, or older.
     #[serde(skip_serializing_if = "Option::is_none")]
     servidor: Option<ServidorView>,
+    /// A name dressed as another (decision 205): the tracker's site it answered as, who owns
+    /// that site, and the sentence. `None` for every other row.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    disfraz: Option<DisfrazView>,
+}
+
+/// A disguised name as a row shows it: «se presenta como metricas.ejemplo.com, pero responde
+/// Adobe (omtrdc.net)».
+#[derive(Serialize, Clone)]
+pub(crate) struct DisfrazView {
+    sitio: String,
+    empresa: Option<&'static str>,
+    frase: String,
+    /// The longer explanation, for the row's hover.
+    titulo: String,
+}
+
+fn disfraz_view(t: &Texts, qname: &str, sitio: Option<&str>) -> Option<DisfrazView> {
+    let sitio = sitio?;
+    Some(DisfrazView {
+        sitio: sitio.to_owned(),
+        empresa: empresa_de(sitio),
+        frase: crate::medidas::frase_disfraz(t, qname, sitio),
+        titulo: t.panel("disfraz_titulo").replace("{sitio}", sitio),
+    })
 }
 
 /// A registered data broker as the pages show it: who, from where, what it ticked in the
@@ -182,7 +207,7 @@ fn corredor_de(t: &Texts, qname: &str) -> Option<CorredorView> {
 
 /// Who owns the name: the company of `empresas.txt`, or, when that list does not know it, the
 /// registrant of `corredores.txt`. A registered broker's own name is as good an owner as any.
-fn empresa_de(qname: &str) -> Option<&'static str> {
+pub(crate) fn empresa_de(qname: &str) -> Option<&'static str> {
     guardiana_lists::company_of(qname)
         .or_else(|| guardiana_lists::data_broker_of(qname).map(|b| b.name))
 }
@@ -246,6 +271,7 @@ fn view(t: &Texts, e: Event, names: &HashMap<String, Option<String>>) -> EventVi
         corredor: corredor_de(t, &e.qname),
         grupo: guardiana_lists::group_of(&e.qname).filter(|_| alojado.is_none()),
         servidor: destinos::servidor_view(t, e.server.as_ref()),
+        disfraz: disfraz_view(t, &e.qname, e.cname_target.as_deref()),
         ciudad: guardiana_lists::city_of(&e.qname)
             .filter(|_| alojado.is_none())
             .map(str::to_owned),
@@ -2168,6 +2194,9 @@ pub(crate) struct Informe {
     /// Where the week's queries went: the servers' countries and the business groups behind the
     /// names (decision 203). Only with Plus, like the rest of the report.
     destinos: Option<ResumenDestinos>,
+    /// The measurements of decision 205: the nights, the companies per day, how often the
+    /// busiest trackers call and the disguised names. Only with Plus, like the rest.
+    medidas: Option<crate::medidas::Medidas>,
     texto_whatsapp: String,
 }
 
@@ -2251,12 +2280,13 @@ fn fila(d: &guardiana_core::DeviceWeek) -> InformeFila {
 
 pub(crate) async fn informe(
     Lang(t): Lang,
+    Zona(zona): Zona,
     State(state): State<Arc<AppState>>,
     _s: Session,
 ) -> ApiResult<Informe> {
     let ahora = now_ms();
     const SEMANA: i64 = 7 * 24 * 60 * 60 * 1000;
-    let (w, anterior, novedades, plus, comparar_desde, nombres, destinos) =
+    let (w, anterior, novedades, plus, comparar_desde, nombres, destinos, medidas) =
         with_ledger(&state, |l| {
             let plus = guardiana_license::status(l, &state.token, ahora)
                 .map(|s| s.plus_activo)
@@ -2292,6 +2322,23 @@ pub(crate) async fn informe(
             } else {
                 Vec::new()
             };
+            // The measurements of decision 205, over the same household rows, by whole local
+            // days of the person's own zone.
+            let medidas = if plus {
+                let (desde, hasta) = crate::medidas::ventana(ahora, zona);
+                let aparatos = names_of(&l.devices()?);
+                Some(crate::medidas::calcula(
+                    t,
+                    ahora,
+                    zona,
+                    &l.tracker_rows(desde, hasta)?,
+                    &l.names_by_local_day(desde, hasta, zona)?,
+                    &l.cloaked_names(desde, hasta)?,
+                    &aparatos,
+                ))
+            } else {
+                None
+            };
             Ok((
                 semana,
                 anterior,
@@ -2300,6 +2347,7 @@ pub(crate) async fn informe(
                 comparar_desde,
                 nombres,
                 destinos,
+                medidas,
             ))
         })?;
     if !plus {
@@ -2316,6 +2364,7 @@ pub(crate) async fn informe(
             corredores: Vec::new(),
             corredores_consultas: 0,
             destinos: None,
+            medidas: None,
             desde: w.since,
             hasta: w.until,
             dispositivos: Vec::new(),
@@ -2349,8 +2398,15 @@ pub(crate) async fn informe(
         texto_whatsapp.push(' ');
         texto_whatsapp.push_str(&frase);
     }
+    if let Some(m) = &medidas {
+        for frase in crate::medidas::frases_para_compartir(t, m) {
+            texto_whatsapp.push(' ');
+            texto_whatsapp.push_str(&frase);
+        }
+    }
     Ok(Json(Informe {
         destinos: Some(destinos),
+        medidas,
         plus: true,
         ejemplo: false,
         desde: w.since,

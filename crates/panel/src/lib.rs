@@ -13,6 +13,7 @@ mod api;
 mod auth;
 mod borrado;
 mod destinos;
+mod medidas;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
