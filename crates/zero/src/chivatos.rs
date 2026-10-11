@@ -434,7 +434,7 @@ fn de_base64(v: &str) -> Option<Vec<u8>> {
 
 /// Whether a value is a hash: SHA-256 in hex or in base64/base64url (what these networks ask
 /// for), or the hex of MD5 or SHA-1 (Criteo's email is an MD5).
-fn es_hash(v: &str) -> bool {
+pub(crate) fn es_hash(v: &str) -> bool {
     (matches!(v.len(), 32 | 40 | 64) && v.chars().all(|c| c.is_ascii_hexdigit()))
         || (matches!(v.len(), 43 | 44) && de_base64(v).is_some_and(|b| b.len() == 32))
 }

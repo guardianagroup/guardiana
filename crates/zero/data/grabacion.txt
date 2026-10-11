@@ -1,0 +1,81 @@
+# GUARDIANA ZERO — servicios de grabación de sesiones, por el nombre al que llaman (decisión 206).
+#
+# Estos servicios graban lo que la persona hace en una página (clics, movimientos, lo que escribe)
+# para verlo después como un vídeo. ZERO solo mira a qué nombre va cada petición: si va a uno de
+# estos, la página carga ese servicio. No mira qué lleva la petición. Solo se cuenta lo que va a
+# otra empresa (una petición hacia otra empresa, como en el escudo).
+#
+# FORMATO: `nombre | servicio`
+# - nombre: casa con ese nombre exacto y con cualquier nombre por debajo de él (`hotjar.com` casa
+#   con `static.hotjar.com`). Solo nombres que el propio servicio usa y que no comparte con otros
+#   productos: `c.bing.com`, que Clarity también usa, es de Bing y no entra; `mc.yandex.*` es el
+#   contador entero de Yandex Metrica, no solo su grabación (Webvisor), y tampoco entra.
+# - servicio: el nombre que se enseña, tal cual (es una marca: no se traduce).
+#
+# Fuentes (consultadas el 11 oct 2026): la lista de dominios que cada servicio pide permitir en la
+# Content Security Policy de una web, o su documentación de instalación; para Mouseflow y Quantum
+# Metric, que no publican una lista propia, la fuente que se cita:
+# - Hotjar: https://help.hotjar.com/hc/en-us/articles/36820026388881-Content-Security-Policies
+#   (*.hotjar.com, *.hotjar.io, wss://*.hotjar.com)
+# - Microsoft Clarity: https://learn.microsoft.com/en-us/clarity/setup-and-installation/clarity-csp
+#   (*.clarity.ms; www.clarity.ms y [a-z].clarity.ms)
+# - FullStory: https://help.fullstory.com/hc/en-us/articles/360020622854
+#   (edge.fullstory.com, rs.fullstory.com y sus versiones .eu1.)
+# - LogRocket: https://docs.logrocket.com/docs/troubleshooting-sessions (los trece de connect-src)
+# - Smartlook: https://help.smartlook.com/docs/content-security-policy-csp-smartlook
+#   (*.smartlook.com, *.smartlook.cloud)
+# - Mouseflow: https://www.consentstack.io/vendors/mouseflow (cdn.mouseflow.com/projects/…,
+#   o2.mouseflow.com; Mouseflow no publica una lista propia)
+# - Contentsquare: https://docs.contentsquare.com/en/web/content-security-policy/
+#   («*.contentsquare.net … covers … Session Replay»; *.contentsquare.com para enviar datos)
+# - Quantum Metric: https://www.rudderstack.com/docs/destinations/streaming-destinations/quantummetric/
+#   (cdn.quantummetric.com/qscripts/…) y https://www.netify.ai/resources/domains/quantummetric.com
+#   (los nombres <cliente>-app.quantummetric.com donde reciben)
+# - Yandex Metrica (Webvisor): https://yandex.com/support/metrica/pt/code/install-counter-csp
+#   (mc.webvisor.com, mc.webvisor.org)
+# - Lucky Orange: https://developers.luckyorange.com/libraries/browser/content-security-policy
+#   (*.luckyorange.com, wss://*.visitors.live)
+# - Inspectlet: https://docs.inspectlet.com/docs/using-inspectlet-with-a-content-security-policy-directive
+#   (*.inspectlet.com)
+
+hotjar.com | Hotjar
+hotjar.io | Hotjar
+
+clarity.ms | Microsoft Clarity
+
+edge.fullstory.com | FullStory
+rs.fullstory.com | FullStory
+edge.eu1.fullstory.com | FullStory
+rs.eu1.fullstory.com | FullStory
+
+logrocket.io | LogRocket
+logrocket.com | LogRocket
+lr-ingest.io | LogRocket
+lr-in.com | LogRocket
+lr-in-prod.com | LogRocket
+lr-ingest.com | LogRocket
+ingest-lr.com | LogRocket
+lr-intake.com | LogRocket
+intake-lr.com | LogRocket
+logr-ingest.com | LogRocket
+lrkt-in.com | LogRocket
+lgrckt-in.com | LogRocket
+logr-in.com | LogRocket
+
+smartlook.com | Smartlook
+smartlook.cloud | Smartlook
+
+mouseflow.com | Mouseflow
+
+contentsquare.net | Contentsquare
+contentsquare.com | Contentsquare
+
+quantummetric.com | Quantum Metric
+
+mc.webvisor.com | Yandex Metrica (Webvisor)
+mc.webvisor.org | Yandex Metrica (Webvisor)
+
+luckyorange.com | Lucky Orange
+visitors.live | Lucky Orange
+
+inspectlet.com | Inspectlet

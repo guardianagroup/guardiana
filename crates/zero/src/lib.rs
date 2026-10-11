@@ -19,6 +19,7 @@ pub mod libro;
 pub mod licencia;
 pub mod mandato;
 mod md5;
+pub mod medidas;
 pub mod paginas;
 pub mod recibo;
 pub mod sesion;

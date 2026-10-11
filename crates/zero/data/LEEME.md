@@ -10,3 +10,6 @@
   también otras cosas (`www.facebook.com/tr`, `www.google.com/pagead/1p-conversion`), por su ruta, con
   la empresa y lo que son. Se aplica, como las listas, solo a las peticiones hacia otra empresa
   (revisión del 10 oct 2026, grave 1).
+- `grabacion.txt`: nuestra, abierta y corta. Los nombres de once servicios de grabación de sesiones
+  (Hotjar, Microsoft Clarity, FullStory…), cada uno con la fuente de la que salen (su propia documentación cuando la publica).
+  Solo sirve para decir en el escudo que una página carga uno: no corta nada (decisión 206).
