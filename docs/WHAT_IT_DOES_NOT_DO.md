@@ -30,6 +30,12 @@ La regla: nunca «100 % seguro», nunca «invisible», nunca «protegido» sin o
   `metricas.tienda.com` pasa por un alias (CNAME) de otro sitio que las listas dan como rastreo,
   publicidad o telemetría, se anota el sitio de ese alias (`omtrdc.net`). Ni la cadena entera, ni
   ninguna dirección.
+- **No corta un nombre disfrazado antes de preguntar.** Si tienes cortada una categoría (o la
+  protección máxima encendida), un nombre que se presenta como parte de una web pero responde como
+  un rastreador de otra empresa también se corta (decisión 205, con el OK del responsable). Pero
+  eso solo se sabe cuando vuelve la respuesta: GUARDIANA **sí preguntó fuera** por ese nombre, como
+  por cualquier otro que no está en una lista; lo que no hace es dárselo al aparato, que no recibe
+  ninguna dirección. Quien responde a esa pregunta (el resolutor de la casa o el que había) la ve.
 - **No ve lo que esquiva el DNS.** Apps con IP fija, apps con su propio DNS cifrado (DoH/DoT), una
   VPN en el teléfono, iCloud Private Relay en Safari. Cuando lo detecta, lo anota como «tráfico
   fuera de vista»; no lo esconde ni lo cuenta como protegido.

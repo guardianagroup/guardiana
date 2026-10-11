@@ -101,6 +101,12 @@ propio, sin DNSSEC), y lo dice. El panel muestra cuál es; se cambia con `--upst
   porque es una decisión del usuario sobre una cosa que está viendo (decisión del 20 sep 2026); el
   panel pide confirmación mientras lleve menos de un día mirando. Nunca sin decisión del usuario, ni
   sin deshacer.
+- Un nombre disfrazado (un alias CNAME hacia el rastreador de otra empresa) se corta solo por una
+  regla de categoría que el usuario ya tiene, o por la protección máxima que encendió, con las mismas
+  24 h y con su desbloqueo ganando (decisión 205). Se decide **después** de la respuesta: la pregunta
+  ya salió hacia el resolutor de arriba, y lo que se protege es que el aparato no reciba la dirección
+  y no llegue a conectarse. Un atacante que controle ese resolutor puede quitar el alias de la
+  respuesta y el corte no ocurre; eso no empeora nada respecto a no tener esta función.
 
 ## 5 · Lo que este modelo no cubre
 
