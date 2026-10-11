@@ -102,9 +102,13 @@ CREATE TABLE IF NOT EXISTS events (
     -- El programa que pidió el nombre, cuando el sistema puede decirlo (Windows, este equipo).
     -- Vacío en todo lo demás, que es la mayoría: se guarda el nombre del programa, no lo que hace.
     process_json TEXT    NOT NULL DEFAULT '',
-    -- La primera dirección (IPv4 o IPv6) de la respuesta reenviada, o vacío (decisión 203). Es lo
-    -- único que se guarda de la respuesta: dice en qué país y en qué red está el servidor.
-    answer_ip    TEXT    NOT NULL DEFAULT ''
+    -- El servidor que respondió, según la base que va dentro del programa, mirado al responder
+    -- (decisión 203): tipo (0 nada, 1 público, 2 anycast, 3 red local), país ISO de dos letras,
+    -- número de red (ASN) y qué base lo dijo (server_bases). Nunca la dirección.
+    server_kind    INTEGER NOT NULL DEFAULT 0,
+    server_country TEXT    NOT NULL DEFAULT '',
+    server_asn     INTEGER NOT NULL DEFAULT 0,
+    server_base    INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
 CREATE INDEX IF NOT EXISTS events_device_ts ON events(device_id, ts);
@@ -145,6 +149,12 @@ CREATE TABLE IF NOT EXISTS seen_domains (
     first_seen INTEGER NOT NULL,
     PRIMARY KEY (device_id, qname)
 );
+-- Las bases de IP a país y red con que se miraron los servidores (`dbip-2026-10`), una fila por
+-- base: cada evento lleva el número, no el nombre (decisión 203).
+CREATE TABLE IF NOT EXISTS server_bases (
+    id   INTEGER PRIMARY KEY,
+    name TEXT    NOT NULL UNIQUE
+);
 CREATE TABLE IF NOT EXISTS daily_totals (
     day       TEXT    NOT NULL,
     device_id TEXT    NOT NULL,
@@ -157,7 +167,8 @@ CREATE TABLE IF NOT EXISTS daily_totals (
 
 const EVENT_COLUMNS: &str = "id, ts, device_id, client_ip, qname, qtype, category, list_source, \
                              signals_json, verdict, decided_by, rule_id, prev_hash, row_hash, \
-                             process_json, answer_ip";
+                             process_json, server_kind, server_country, server_asn, \
+                             (SELECT b.name FROM server_bases b WHERE b.id = events.server_base)";
 
 /// Handle to the ledger database.
 pub struct Ledger {
@@ -238,6 +249,19 @@ impl CheckReport {
     }
 }
 
+/// Where the server that answered a row falls, for the extract's filter (decision 203).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ServerFilter {
+    /// A public server the base put in this country (two letters).
+    Country(String),
+    /// A public server the base gave no country for.
+    NoCountry,
+    /// An anycast address.
+    Anycast,
+    /// A local or reserved address.
+    Local,
+}
+
 /// Filters for listing or exporting events. Every field is optional.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct EventFilter {
@@ -259,10 +283,9 @@ pub struct EventFilter {
     pub since: Option<i64>,
     /// Only `ts < until`.
     pub until: Option<i64>,
-    /// Only rows whose first answer address is one of these (the panel's filter by the server's
-    /// country, which turns a country into the addresses the extract holds for it). An empty
-    /// list matches no row.
-    pub answer_ips: Option<Vec<String>>,
+    /// Only rows whose server that answered falls here (the panel's filter by server country,
+    /// decision 203).
+    pub server: Option<ServerFilter>,
     /// At most this many rows: the newest ones, returned oldest first.
     pub limit: Option<u32>,
 }
@@ -286,7 +309,7 @@ impl Ledger {
         ledger.ensure_changes_table()?;
         ledger.migrate_rules_confirmed()?;
         ledger.migrate_events_process()?;
-        ledger.migrate_events_answer_ip()?;
+        ledger.migrate_events_server()?;
         match ledger.setting(KEY_GENESIS)? {
             None => {
                 ledger.set_setting(KEY_GENESIS, &genesis.to_hex())?;
@@ -417,6 +440,31 @@ impl Ledger {
             }
         };
         let signals_json = serde_json::to_string(&new.signals)?;
+        let server_text = new
+            .server
+            .as_ref()
+            .map(crate::model::ServerInfo::hash_text)
+            .unwrap_or_default();
+        let (server_kind, server_country, server_asn, server_base) = match &new.server {
+            Some(sv) => {
+                tx.execute(
+                    "INSERT OR IGNORE INTO server_bases(name) VALUES (?1)",
+                    [&sv.base],
+                )?;
+                let base: i64 = tx.query_row(
+                    "SELECT id FROM server_bases WHERE name = ?1",
+                    [&sv.base],
+                    |r| r.get(0),
+                )?;
+                (
+                    server_kind_code(sv.kind),
+                    sv.country.as_str(),
+                    i64::from(sv.asn),
+                    base,
+                )
+            }
+            None => (0, "", 0, 0),
+        };
         let process_json = match &new.process {
             Some(p) => serde_json::to_string(p)?,
             None => String::new(),
@@ -436,14 +484,14 @@ impl Ledger {
                 decided_by: new.decided_by.as_str(),
                 rule_id: new.rule_id,
                 process_json: &process_json,
-                answer_ip: &new.answer_ip,
+                server: &server_text,
             },
         );
         tx.execute(
             "INSERT INTO events (ts, device_id, client_ip, qname, qtype, category, list_source, \
              signals_json, verdict, decided_by, rule_id, prev_hash, row_hash, process_json, \
-             answer_ip) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+             server_kind, server_country, server_asn, server_base) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
             params![
                 new.ts,
                 new.device_id,
@@ -459,7 +507,10 @@ impl Ledger {
                 prev_hash.0.as_slice(),
                 row_hash.0.as_slice(),
                 process_json,
-                new.answer_ip,
+                server_kind,
+                server_country,
+                server_asn,
+                server_base,
             ],
         )?;
         let id = tx.last_insert_rowid();
@@ -501,7 +552,7 @@ impl Ledger {
             decided_by: new.decided_by,
             rule_id: new.rule_id,
             process: new.process,
-            answer_ip: new.answer_ip,
+            server: new.server,
             prev_hash,
             row_hash,
         })
@@ -606,11 +657,17 @@ impl Ledger {
             sql.push_str(" AND ts < ?");
             args.push(Box::new(t));
         }
-        if let Some(ips) = &filter.answer_ips {
-            // One parameter whatever the number of addresses: a JSON array read by json_each,
-            // instead of one placeholder each, which SQLite caps.
-            sql.push_str(" AND answer_ip IN (SELECT value FROM json_each(?))");
-            args.push(Box::new(serde_json::to_string(ips)?));
+        match &filter.server {
+            None => {}
+            Some(ServerFilter::Country(c)) => {
+                sql.push_str(" AND server_kind = 1 AND server_country = ?");
+                args.push(Box::new(c.clone()));
+            }
+            Some(ServerFilter::NoCountry) => {
+                sql.push_str(" AND server_kind = 1 AND server_country = ''")
+            }
+            Some(ServerFilter::Anycast) => sql.push_str(" AND server_kind = 2"),
+            Some(ServerFilter::Local) => sql.push_str(" AND server_kind = 3"),
         }
         // With a limit, the newest rows are wanted; they are still returned oldest first.
         match filter.limit {
@@ -737,6 +794,7 @@ impl Ledger {
         tx.execute_batch(
             "DELETE FROM events; DELETE FROM devices; DELETE FROM rules; DELETE FROM outbound; \
              DELETE FROM seen_domains; DELETE FROM daily_totals; DELETE FROM gaps; DELETE FROM changes; \
+             DELETE FROM server_bases; \
              DELETE FROM sqlite_sequence WHERE name IN ('events', 'rules', 'outbound', 'gaps', 'changes');",
         )?;
         tx.execute(
@@ -887,20 +945,37 @@ impl Ledger {
         Ok(())
     }
 
-    /// Databases written before decision 203 lack `events.answer_ip`; add it once. Rows
-    /// written before keep an empty value, which the hash treats as "no address here", so an old
+    /// Databases written before decision 203 lack the `events.server_*` columns; add them once.
+    /// Rows written before keep kind 0, which the hash treats as "no server here", so an old
     /// extract still verifies after the upgrade. Cheap on a big file: SQLite adds a column with a
     /// constant default without rewriting the rows.
-    fn migrate_events_answer_ip(&self) -> Result<()> {
-        let has: bool = self
+    ///
+    /// And a file written by the unreleased build of 10 Oct 2026 that kept the answer's address
+    /// in `events.answer_ip` loses it here, values first and then the column: no answer address
+    /// stays anywhere (the responsible, 11 Oct 2026). Those rows hashed the address, so their
+    /// links show as altered from then on, which is the truth about them.
+    fn migrate_events_server(&self) -> Result<()> {
+        let columnas: Vec<String> = self
             .conn
             .prepare("PRAGMA table_info(events)")?
             .query_map([], |r| r.get::<_, String>(1))?
             .filter_map(std::result::Result::ok)
-            .any(|c| c == "answer_ip");
-        if !has {
+            .collect();
+        for (columna, tipo) in [
+            ("server_kind", "INTEGER NOT NULL DEFAULT 0"),
+            ("server_country", "TEXT NOT NULL DEFAULT ''"),
+            ("server_asn", "INTEGER NOT NULL DEFAULT 0"),
+            ("server_base", "INTEGER NOT NULL DEFAULT 0"),
+        ] {
+            if !columnas.iter().any(|c| c == columna) {
+                self.conn
+                    .execute_batch(&format!("ALTER TABLE events ADD COLUMN {columna} {tipo}"))?;
+            }
+        }
+        if columnas.iter().any(|c| c == "answer_ip") {
             self.conn.execute_batch(
-                "ALTER TABLE events ADD COLUMN answer_ip TEXT NOT NULL DEFAULT ''",
+                "UPDATE events SET answer_ip = '' WHERE answer_ip != ''; \
+                 ALTER TABLE events DROP COLUMN answer_ip; VACUUM;",
             )?;
         }
         Ok(())
@@ -1133,7 +1208,8 @@ struct RawEvent {
     prev_hash: Hash,
     row_hash: Hash,
     process_json: String,
-    answer_ip: String,
+    server: Option<crate::model::ServerInfo>,
+    server_text: String,
 }
 
 impl RawEvent {
@@ -1151,12 +1227,42 @@ impl RawEvent {
             decided_by: &self.decided_by,
             rule_id: self.rule_id,
             process_json: &self.process_json,
-            answer_ip: &self.answer_ip,
+            server: &self.server_text,
         }
     }
 }
 
+/// The server columns of a row (decision 203). Kind 0 is "nothing here"; a row whose base number
+/// has no name any more reads with an empty base, and its hash says it was touched.
+fn server_from_row(row: &Row<'_>) -> Result<Option<crate::model::ServerInfo>> {
+    use crate::model::{ServerInfo, ServerKind};
+    let kind: i64 = row.get(15).unwrap_or(0);
+    let kind = match kind {
+        1 => ServerKind::Publico,
+        2 => ServerKind::Anycast,
+        3 => ServerKind::Local,
+        _ => return Ok(None),
+    };
+    let asn: i64 = row.get(17)?;
+    Ok(Some(ServerInfo {
+        kind,
+        country: row.get(16)?,
+        asn: u32::try_from(asn).unwrap_or(0),
+        base: row.get::<_, Option<String>>(18)?.unwrap_or_default(),
+    }))
+}
+
+/// The number a kind is stored as.
+fn server_kind_code(k: crate::model::ServerKind) -> i64 {
+    match k {
+        crate::model::ServerKind::Publico => 1,
+        crate::model::ServerKind::Anycast => 2,
+        crate::model::ServerKind::Local => 3,
+    }
+}
+
 fn raw_from_row(row: &Row<'_>) -> Result<RawEvent> {
+    let server = server_from_row(row)?;
     let prev: Vec<u8> = row.get(12)?;
     let cur: Vec<u8> = row.get(13)?;
     Ok(RawEvent {
@@ -1174,7 +1280,11 @@ fn raw_from_row(row: &Row<'_>) -> Result<RawEvent> {
         prev_hash: Hash::from_bytes(&prev)?,
         row_hash: Hash::from_bytes(&cur)?,
         process_json: row.get(14).unwrap_or_default(),
-        answer_ip: row.get(15).unwrap_or_default(),
+        server_text: server
+            .as_ref()
+            .map(crate::model::ServerInfo::hash_text)
+            .unwrap_or_default(),
+        server,
     })
 }
 
@@ -1205,7 +1315,7 @@ fn event_from_row(row: &Row<'_>) -> rusqlite::Result<Event> {
         } else {
             serde_json::from_str(&raw.process_json).map_err(|e| to_sql_err(Error::Json(e)))?
         },
-        answer_ip: raw.answer_ip,
+        server: raw.server,
         prev_hash: raw.prev_hash,
         row_hash: raw.row_hash,
     })
@@ -1554,16 +1664,30 @@ mod tests {
         assert_eq!(l.setting(KEY_HEAD_COUNT).unwrap().as_deref(), Some("1"));
     }
 
+    fn servidor(pais: &str, asn: u32) -> crate::model::ServerInfo {
+        crate::model::ServerInfo {
+            kind: crate::model::ServerKind::Publico,
+            country: pais.to_owned(),
+            asn,
+            base: "dbip-2026-10".to_owned(),
+        }
+    }
+
     #[test]
-    fn an_extract_from_before_the_answer_address_gains_it_and_still_verifies() {
-        // A 1.0.12 file: the same table without `answer_ip`.
-        let (dir, db) = temp_db("answer-ip");
+    fn an_extract_from_before_the_server_columns_gains_them_and_still_verifies() {
+        // A 1.0.13 file: the same table without the server columns.
+        let (dir, db) = temp_db("server-cols");
         {
             let mut l = Ledger::open(&db, genesis()).unwrap();
             l.append(ev(1, "a.example")).unwrap();
             l.append(ev(2, "b.example")).unwrap();
             l.conn
-                .execute_batch("ALTER TABLE events DROP COLUMN answer_ip")
+                .execute_batch(
+                    "ALTER TABLE events DROP COLUMN server_kind; \
+                     ALTER TABLE events DROP COLUMN server_country; \
+                     ALTER TABLE events DROP COLUMN server_asn; \
+                     ALTER TABLE events DROP COLUMN server_base;",
+                )
                 .unwrap();
         }
         let mut l = Ledger::open(&db, genesis()).unwrap();
@@ -1572,55 +1696,104 @@ mod tests {
             "old rows verify after the upgrade"
         );
         let mut con = ev(3, "c.example");
-        con.answer_ip = "2001:db8::7".to_owned();
+        con.server = Some(servidor("IE", 32_934));
         let e = l.append(con).unwrap();
-        assert_eq!(e.answer_ip, "2001:db8::7");
+        assert_eq!(e.server, Some(servidor("IE", 32_934)));
         l.append(ev(4, "d.example")).unwrap();
-        assert!(
-            l.check().unwrap().is_ok(),
-            "a row with its address verifies"
-        );
+        assert!(l.check().unwrap().is_ok(), "a row with its server verifies");
         let todas = l.events(&EventFilter::default()).unwrap();
-        assert_eq!(todas[2].answer_ip, "2001:db8::7");
-        assert_eq!(todas[0].answer_ip, "");
-        // Changing the stored address is caught like any other field.
+        assert_eq!(todas[2].server, Some(servidor("IE", 32_934)));
+        assert_eq!(todas[0].server, None);
+        // Changing the stored country, or the name of the base, is caught like any other field.
         l.conn
-            .execute("UPDATE events SET answer_ip = '192.0.2.1' WHERE id = 3", [])
+            .execute("UPDATE events SET server_country = 'FR' WHERE id = 3", [])
             .unwrap();
         let r = l.check().unwrap();
         assert!(
             matches!(r.first_fault, Some((3, ChainFault::AlteredRow { .. }))),
             "{r:?}"
         );
+        l.conn
+            .execute("UPDATE events SET server_country = 'IE' WHERE id = 3", [])
+            .unwrap();
+        assert!(l.check().unwrap().is_ok());
+        l.conn
+            .execute("UPDATE server_bases SET name = 'otra-base'", [])
+            .unwrap();
+        assert!(!l.check().unwrap().is_ok());
         drop(l);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
-    fn the_extract_filters_by_answer_addresses() {
-        let mut l = Ledger::open_in_memory(genesis()).unwrap();
-        for (i, ip) in ["192.0.2.1", "192.0.2.2", "", "192.0.2.1"]
-            .iter()
-            .enumerate()
+    fn a_file_that_kept_answer_addresses_loses_them_on_opening() {
+        // The unreleased build of 10 Oct 2026 kept the answer's address in `answer_ip`.
+        let (dir, db) = temp_db("answer-ip");
         {
+            let mut l = Ledger::open(&db, genesis()).unwrap();
+            l.append(ev(1, "a.example")).unwrap();
+            l.conn
+                .execute_batch(
+                    "ALTER TABLE events ADD COLUMN answer_ip TEXT NOT NULL DEFAULT ''; \
+                     UPDATE events SET answer_ip = '157.240.1.35';",
+                )
+                .unwrap();
+        }
+        let l = Ledger::open(&db, genesis()).unwrap();
+        let columnas: Vec<String> = l
+            .conn
+            .prepare("PRAGMA table_info(events)")
+            .unwrap()
+            .query_map([], |r| r.get::<_, String>(1))
+            .unwrap()
+            .map(|c| c.unwrap())
+            .collect();
+        assert!(!columnas.iter().any(|c| c == "answer_ip"), "{columnas:?}");
+        drop(l);
+        assert!(
+            !file_holds(&db, b"157.240.1.35"),
+            "the address is gone from the file"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_extract_filters_by_server_country() {
+        use crate::model::ServerKind;
+        let mut l = Ledger::open_in_memory(genesis()).unwrap();
+        let tipos = [
+            Some(servidor("IE", 32_934)),
+            Some(servidor("US", 15_169)),
+            None,
+            Some(servidor("IE", 32_934)),
+            Some(servidor("", 64_500)),
+            Some(crate::model::ServerInfo {
+                kind: ServerKind::Anycast,
+                country: String::new(),
+                asn: 13_335,
+                base: "dbip-2026-10".to_owned(),
+            }),
+        ];
+        for (i, sv) in tipos.into_iter().enumerate() {
             let mut e = ev(i64::try_from(i).unwrap(), "a.example");
-            e.answer_ip = (*ip).to_owned();
+            e.server = sv;
             l.append(e).unwrap();
         }
-        let solo = |ips: &[&str]| {
+        let solo = |f: ServerFilter| {
             l.events(&EventFilter {
-                answer_ips: Some(ips.iter().map(|s| (*s).to_owned()).collect()),
+                server: Some(f),
                 ..EventFilter::default()
             })
             .unwrap()
             .len()
         };
-        assert_eq!(solo(&["192.0.2.1"]), 2);
-        assert_eq!(solo(&["192.0.2.1", "192.0.2.2"]), 3);
-        assert_eq!(solo(&[]), 0, "an empty list matches nothing");
-        let mut ips = l.answer_ips().unwrap();
-        ips.sort();
-        assert_eq!(ips, vec!["192.0.2.1", "192.0.2.2"]);
+        assert_eq!(solo(ServerFilter::Country("IE".to_owned())), 2);
+        assert_eq!(solo(ServerFilter::Country("FR".to_owned())), 0);
+        assert_eq!(solo(ServerFilter::NoCountry), 1);
+        assert_eq!(solo(ServerFilter::Anycast), 1);
+        assert_eq!(solo(ServerFilter::Local), 0);
+        assert!(l.check().unwrap().is_ok());
+        assert_eq!(l.server_buckets().unwrap().len(), 4);
     }
 
     fn temp_db(tag: &str) -> (std::path::PathBuf, std::path::PathBuf) {

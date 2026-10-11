@@ -395,7 +395,66 @@ pub fn servidor_de(ip: IpAddr) -> Servidor {
     }
 }
 
-/// [`servidor_de`] for an address as the extract stores it; `None` when it is empty or not an
+/// The name the extract stores for the bundled base: `dbip-2026-10`, or `muestra-2026-10` while
+/// the tables are the hand-made test sample, so a row never passes for DB-IP's when it was not.
+#[must_use]
+pub fn base_de_red() -> String {
+    let f = fuente_red();
+    let fecha = if f.fecha.is_empty() {
+        "?"
+    } else {
+        f.fecha.as_str()
+    };
+    if f.muestra {
+        format!("muestra-{fecha}")
+    } else {
+        format!("dbip-{fecha}")
+    }
+}
+
+/// What the extract keeps about the server that answered (decision 203): kind, country,
+/// network and base, looked up now. The address goes no further than this call.
+#[must_use]
+pub fn server_info_de(ip: IpAddr) -> guardiana_core::ServerInfo {
+    let s = servidor_de(ip);
+    guardiana_core::ServerInfo {
+        kind: if s.local {
+            guardiana_core::ServerKind::Local
+        } else if s.anycast {
+            guardiana_core::ServerKind::Anycast
+        } else {
+            guardiana_core::ServerKind::Publico
+        },
+        country: s.pais.unwrap_or("").to_owned(),
+        asn: s.red.map_or(0, |r| r.asn),
+        base: base_de_red(),
+    }
+}
+
+/// The organisation name the bundled base gives a network, when it knows the number.
+#[must_use]
+pub fn nombre_de_red(asn: u32) -> Option<&'static str> {
+    let r = redes()?;
+    let n = r.asns.len() / 4;
+    let (mut lo, mut hi) = (0usize, n);
+    while lo < hi {
+        let mid = lo + (hi - lo) / 2;
+        let v = u32_en(r.asns, mid)?;
+        match v.cmp(&asn) {
+            std::cmp::Ordering::Less => lo = mid + 1,
+            std::cmp::Ordering::Greater => hi = mid,
+            std::cmp::Ordering::Equal => {
+                return r
+                    .red(mid + 1)
+                    .map(|x| x.nombre)
+                    .filter(|x| !x.trim().is_empty())
+            }
+        }
+    }
+    None
+}
+
+/// [`servidor_de`] for an address written as text (tests, tools); `None` when it is empty or not an
 /// address.
 #[must_use]
 pub fn servidor_de_texto(ip: &str) -> Option<Servidor> {
@@ -484,6 +543,31 @@ mod tests {
         assert!(s("2606:4700::6810:84e5").anycast);
         // Quad9, by prefix even with no network data.
         assert!(s("9.9.9.9").anycast);
+    }
+
+    #[test]
+    fn what_the_extract_keeps_has_no_address() {
+        let ip: IpAddr = "8.8.8.8".parse().unwrap();
+        let info = server_info_de(ip);
+        assert_eq!(info.kind, guardiana_core::ServerKind::Anycast);
+        assert_eq!(info.asn, 15169);
+        assert!(info.country.is_empty());
+        assert!(
+            !info.hash_text().contains("8.8.8.8"),
+            "{}",
+            info.hash_text()
+        );
+        assert!(info.base.ends_with(&fuente_red().fecha));
+        assert_eq!(
+            info.base.starts_with("muestra-"),
+            fuente_red().muestra,
+            "a sample never passes for DB-IP"
+        );
+        let local = server_info_de("192.168.1.1".parse().unwrap());
+        assert_eq!(local.kind, guardiana_core::ServerKind::Local);
+        assert_eq!(local.asn, 0);
+        assert!(nombre_de_red(15169).is_some());
+        assert_eq!(nombre_de_red(4_000_000_000), None);
     }
 
     #[test]

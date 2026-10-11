@@ -19,7 +19,7 @@ use guardiana_core::{
     write_csv_for_spreadsheet_with, write_json, Action, Category, DecidedBy, Device, Event,
     EventFilter, Ledger, MatchKind, NewRule, Rule, Scope, Signal, Verdict, SELF_DEVICE_ID,
 };
-use guardiana_core::{ChangeKind, ChangeWho};
+use guardiana_core::{ChangeKind, ChangeWho, ServerFilter, ServerKind};
 use guardiana_service::home::{
     self, SETTING_HOME_APARCADO, SETTING_HOME_IP, SETTING_HOME_MODE, SETTING_HOME_RED,
     SETTING_HOME_SINCE,
@@ -130,8 +130,9 @@ pub(crate) struct EventView {
     /// `Salesforce`) and that is public (decision 203). `None` when it is its own group.
     #[serde(skip_serializing_if = "Option::is_none")]
     grupo: Option<&'static str>,
-    /// The server the answer pointed to: its network and its country according to the bundled
-    /// base (decision 203). `None` for rows with no address: cut, answered here, or older.
+    /// The server that answered: its network and its country as the bundled base said when it
+    /// answered (decision 203); never its address. `None` for rows without one: cut, answered
+    /// here, or older.
     #[serde(skip_serializing_if = "Option::is_none")]
     servidor: Option<ServidorView>,
 }
@@ -244,7 +245,7 @@ fn view(t: &Texts, e: Event, names: &HashMap<String, Option<String>>) -> EventVi
         sector: guardiana_lists::sector_of(&e.qname).filter(|_| alojado.is_none()),
         corredor: corredor_de(t, &e.qname),
         grupo: guardiana_lists::group_of(&e.qname).filter(|_| alojado.is_none()),
-        servidor: destinos::servidor_view(t, &e.answer_ip),
+        servidor: destinos::servidor_view(t, e.server.as_ref()),
         ciudad: guardiana_lists::city_of(&e.qname)
             .filter(|_| alojado.is_none())
             .map(str::to_owned),
@@ -300,7 +301,7 @@ fn filter_from(q: &HashMap<String, String>) -> Result<EventFilter, Response> {
         since: q.get("since").and_then(|s| s.parse().ok()),
         until: q.get("until").and_then(|s| s.parse().ok()),
         limit: q.get("limit").and_then(|s| s.parse().ok()),
-        answer_ips: None,
+        server: None,
     })
 }
 
@@ -1443,16 +1444,15 @@ pub(crate) async fn extracto(
     // The page offers up to 5 000; a hand-typed limit above that would build a JSON of the
     // whole ledger in memory (review of 8 Oct 2026).
     filter.limit = Some(filter.limit.unwrap_or(200).min(5_000));
-    let (events, total, todos, devices, huecos, ips) = with_ledger(&state, |l| {
-        let ips = l.answer_ips()?;
-        filter.answer_ips = pais.as_deref().map(|p| ips_de(&ips, p));
+    filter.server = pais;
+    let (events, total, todos, devices, huecos, cubos) = with_ledger(&state, |l| {
         Ok((
             l.events(&filter)?,
             l.shared_event_count()?,
             l.event_count()?,
             l.devices()?,
             huecos(l, 0, 20)?,
-            ips,
+            l.server_buckets()?,
         ))
     })?;
     let names = names_of(&devices);
@@ -1463,44 +1463,27 @@ pub(crate) async fn extracto(
         ocultos: todos.saturating_sub(total),
         eventos,
         huecos,
-        paises_servidor: paises_para_filtro(t, &ips),
+        paises_servidor: paises_para_filtro(t, &cubos),
         fuente_red: destinos::fuente_view(),
     }))
 }
 
-/// The `pais` of a query string, checked: two capital letters, or one of the bucket words of
-/// `destinos`. Anything else is a 400, not a filter that silently matches nothing.
-fn pais_de_consulta(q: &HashMap<String, String>) -> Result<Option<String>, Response> {
+/// The `pais` of a query string as the extract's filter: two capital letters, or one of the
+/// bucket words of `destinos`. Anything else is a 400, not a filter that silently matches nothing.
+fn pais_de_consulta(q: &HashMap<String, String>) -> Result<Option<ServerFilter>, Response> {
     let Some(p) = q.get("pais").map(|p| p.trim()).filter(|p| !p.is_empty()) else {
         return Ok(None);
     };
-    let especial = [
-        destinos::CLAVE_ANYCAST,
-        destinos::CLAVE_LOCAL,
-        destinos::CLAVE_SIN_DATO,
-    ]
-    .contains(&p);
-    let codigo = p.len() == 2 && p.chars().all(|c| c.is_ascii_uppercase());
-    if especial || codigo {
-        Ok(Some(p.to_owned()))
-    } else {
-        Err((StatusCode::BAD_REQUEST, "pais").into_response())
-    }
+    destinos::filtro_de(p)
+        .map(Some)
+        .ok_or_else(|| (StatusCode::BAD_REQUEST, "pais").into_response())
 }
 
-/// The addresses among `ips` whose server falls in the country (or bucket) `clave`.
-fn ips_de(ips: &[String], clave: &str) -> Vec<String> {
-    ips.iter()
-        .filter(|ip| destinos::clave_pais(ip).as_deref() == Some(clave))
-        .cloned()
-        .collect()
-}
-
-/// Every country (or bucket) the stored addresses fall in, named, for the extract's filter.
-fn paises_para_filtro(t: &Texts, ips: &[String]) -> Vec<(String, String)> {
-    let mut claves: Vec<String> = ips
+/// Every country (or bucket) the stored servers fall in, named, for the extract's filter.
+fn paises_para_filtro(t: &Texts, cubos: &[(ServerKind, String)]) -> Vec<(String, String)> {
+    let mut claves: Vec<String> = cubos
         .iter()
-        .filter_map(|ip| destinos::clave_pais(ip))
+        .map(|(k, c)| destinos::clave_de(*k, c))
         .collect();
     claves.sort();
     claves.dedup();
@@ -1591,12 +1574,8 @@ pub(crate) async fn exportar(
     let mut filter = filter_from(&q)?;
     let pais = pais_de_consulta(&q)?;
     filter.limit = None;
-    let events = with_ledger(&state, |l| {
-        if let Some(p) = &pais {
-            filter.answer_ips = Some(ips_de(&l.answer_ips()?, p));
-        }
-        l.events(&filter)
-    })?;
+    filter.server = pais;
+    let events = with_ledger(&state, |l| l.events(&filter))?;
     let json = q.get("formato").is_some_and(|f| f == "json");
     let mut body = Vec::new();
     if json {
@@ -1609,32 +1588,27 @@ pub(crate) async fn exportar(
         } else {
             ';'
         };
-        // After the ledger's own columns, what the panel reads from them with the data bundled in
-        // the program: the server's country and network, and the company's group (decision 203).
-        // The source and its month go in the headers, so the file says where they come from.
+        // The ledger's own columns already carry the server that answered: kind, country, ASN
+        // and the base that said it, per row (decision 203). After them, what the panel reads
+        // from those with the lists in the program: the network's name and the company's group.
+        // The source goes in the header.
         let f = destinos::fuente_view();
         let fuente = if f.muestra {
             t.panel("csv_fuente_muestra").to_owned()
         } else {
-            format!("{} {}", f.fuente, f.fecha)
+            format!("empresas.txt, {} {}", f.fuente, f.fecha)
         };
         let cabeceras = [
-            format!("servidor_pais [{fuente}]"),
-            format!("servidor_asn [{fuente}]"),
             format!("servidor_red [{fuente}]"),
             "grupo [empresas.txt]".to_owned(),
         ];
         let refs: Vec<&str> = cabeceras.iter().map(String::as_str).collect();
         let extra = |e: &Event| -> Vec<String> {
-            let s = destinos::servidor_view(t, &e.answer_ip);
-            let pais = destinos::clave_pais(&e.answer_ip).unwrap_or_default();
             vec![
-                pais,
-                s.as_ref()
-                    .and_then(|s| s.asn)
-                    .map(|a| format!("AS{a}"))
+                e.server
+                    .as_ref()
+                    .and_then(|s| destinos::nombre_red(s.asn))
                     .unwrap_or_default(),
-                s.and_then(|s| s.red).unwrap_or_default(),
                 (guardiana_lists::hosting_of(&e.qname).is_none())
                     .then(|| guardiana_lists::group_or_company_of(&e.qname))
                     .flatten()

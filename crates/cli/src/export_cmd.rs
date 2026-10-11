@@ -24,7 +24,7 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
         since: opts.get("since").and_then(|s| s.parse().ok()),
         until: opts.get("until").and_then(|s| s.parse().ok()),
         limit: opts.get("limit").and_then(|s| s.parse().ok()),
-        answer_ips: None,
+        server: None,
     };
     let events = ledger.events(&filter)?;
     let json = match (opts.has("json"), opts.has("csv")) {

@@ -19,10 +19,12 @@ GUARDIANA se publica bajo GPL-3.0-or-later, compatible con redistribuir EasyPriv
 
 ## País y red del servidor (decisión 203)
 
-Desde el 10 de octubre de 2026 el extracto guarda, de cada respuesta reenviada, solo su primera
-dirección IP. El panel dice con ella **en qué país está el servidor y por qué red se sirve**, mirando
-dos tablas que van dentro del programa. **No se consulta ningún servicio de fuera por cada
-dirección**: eso le contaría a un tercero por dónde navega la casa.
+Desde el 11 de octubre de 2026, cuando GUARDIANA reenvía una consulta, mira la primera dirección de
+la respuesta en dos tablas que van dentro del programa y anota en el extracto **solo lo que dicen**:
+el país del servidor que respondió, su red (ASN), si es anycast o de la red local, y qué base lo dijo
+(`dbip-2026-10`). **La dirección no se guarda**, y **no se consulta ningún servicio de fuera**: eso
+le contaría a un tercero por dónde navega la casa. Una fila guarda el país que daba la base del
+programa que la escribió; si la base cambia, las filas viejas siguen diciendo qué base usaron.
 
 | Base | Qué da | Licencia | Atribución | Cómo entra |
 |---|---|---|---|---|
@@ -50,8 +52,8 @@ entrada los reenvía), ni el país de la empresa dueña del nombre (eso es `empr
 
 `anycast.txt` (nuestra) marca las redes y direcciones que su propio operador dice que son anycast
 (Cloudflare, Google Public DNS, Quad9), con la fuente al lado. Ahí una base de IP a país no sirve: la
-misma dirección contesta desde muchos países. El panel dice «red anycast: el servidor suele estar
-cerca de ti; no se sabe dónde acaban los datos», y no las cuenta en ningún país. Las direcciones
+misma dirección contesta desde muchos países. El panel dice «red de reparto: el servidor suele estar
+cerca de ti», y no las cuenta en ningún país. Las direcciones
 privadas, locales o reservadas no tienen país.
 
 ## Listas del brief que NO van en la 1.0, y por qué

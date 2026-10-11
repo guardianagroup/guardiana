@@ -56,7 +56,9 @@ fn prepare(tag: &str) -> (PathBuf, PathBuf, PathBuf) {
         for _ in 0..veces {
             ts += 10;
             let mut e = NewEvent::observed(ts, dev, "127.0.0.1", q, "A");
-            e.answer_ip = ip.to_owned();
+            // As the engine does when the answer arrives: the address is looked up and dropped.
+            e.server =
+                (!ip.is_empty()).then(|| guardiana_lists::server_info_de(ip.parse().unwrap()));
             e.verdict = v;
             l.append(e).unwrap();
         }
@@ -129,6 +131,9 @@ async fn the_panel_says_where_each_query_went_and_sums_the_week() {
     // Every row with an address carries its server; the cut ones carry none.
     let (status, body) = get(addr, &t, "/api/extracto").await;
     assert_eq!(status, 200, "{body}");
+    for ip in ["1.1.1.1", "157.240.1.35", "192.168.1.1"] {
+        assert!(!body.contains(ip), "no address in the extract: {ip}");
+    }
     let v: serde_json::Value = serde_json::from_str(&body).unwrap();
     let eventos = v["eventos"].as_array().unwrap();
     let cf = eventos
@@ -159,7 +164,7 @@ async fn the_panel_says_where_each_query_went_and_sums_the_week() {
             .unwrap();
         assert_eq!(
             fb["servidor"]["frase"],
-            "servido desde la red de Meta (AS32934) · servidor en Irlanda"
+            "servido desde la red de Meta (AS32934) · el servidor que respondió está en Irlanda"
         );
     }
     // The filter lists what the household's rows hold, and nothing of the silent phone.
@@ -199,16 +204,23 @@ async fn the_panel_says_where_each_query_went_and_sums_the_week() {
     let (status, _) = get(addr, &t, "/api/extracto?pais=irlanda").await;
     assert_eq!(status, 400);
 
-    // The spreadsheet CSV: the raw address the hash covers, then the derived columns with their
-    // source in the header.
+    // The spreadsheet CSV: the server columns the hash covers, then the network's name and the
+    // group with their source in the header. No address anywhere.
     let (status, csv) = get(addr, &t, "/api/extracto/exportar").await;
     assert_eq!(status, 200);
-    assert!(csv.contains(";answer_ip;servidor_pais ["), "{csv}");
-    assert!(csv.contains(";grupo [empresas.txt]"), "{csv}");
     assert!(
-        csv.contains(";1.1.1.1;anycast;AS13335;Cloudflare;"),
+        csv.contains(";servidor_tipo;servidor_pais;servidor_asn;servidor_base;servidor_red ["),
         "{csv}"
     );
+    assert!(csv.contains(";grupo [empresas.txt]"), "{csv}");
+    let base = guardiana_lists::base_de_red();
+    assert!(
+        csv.contains(&format!(";anycast;;13335;{base};Cloudflare;")),
+        "{csv}"
+    );
+    for ip in ["1.1.1.1", "157.240.1.35", "142.250.1.1", "192.168.1.1"] {
+        assert!(!csv.contains(ip), "no address in the CSV: {ip}");
+    }
     assert!(csv.contains("app.slack.com"), "{csv}");
     assert!(csv.contains(";Salesforce"), "{csv}");
     if muestra {
@@ -251,6 +263,16 @@ async fn the_panel_says_where_each_query_went_and_sums_the_week() {
     );
     // The sample is not something to send anybody: no countries in the shared text with it.
     assert_eq!(texto.contains("países"), !muestra, "{texto}");
+    // And the ledger file itself holds no answer address.
+    let mut datos = std::fs::read(dir.join("ledger.db")).unwrap();
+    datos.extend(std::fs::read(dir.join("ledger.db-wal")).unwrap_or_default());
+    for ip in [&b"157.240.1.35"[..], b"142.250.1.1", b"1.1.1.1"] {
+        assert!(
+            !datos.windows(ip.len()).any(|w| w == ip),
+            "{}",
+            String::from_utf8_lossy(ip)
+        );
+    }
     if muestra {
         // Ireland 6 and the United States 4 + 2 tie at 40 %: equal counts go by name.
         let paises = d["paises"].as_array().unwrap();

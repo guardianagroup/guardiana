@@ -1,51 +1,54 @@
-//! «A dónde viajan tus datos» (decision 203): the server behind each answer and the week's
-//! summary by country and by business group, worked out here, in Rust, from the rows of the
-//! extract and the data bundled in the program. Nothing is estimated and nothing is asked of
-//! anybody outside the house.
+//! «A dónde viajan tus datos» (decision 203): the server that answered each query and the
+//! week's summary by country and by business group, worked out here, in Rust, from the columns
+//! of the extract. The extract keeps only what the bundled base said about the server when it
+//! answered (kind, country, network, which base); never the address. Nothing is estimated and
+//! nothing is asked of anybody outside the house.
 //!
-//! The words matter as much as the figures. The country is the one the bundled base gives for
-//! the server's address («servidor en Irlanda, según DB-IP Lite de octubre de 2026»), never
-//! «where your data is»: a front server forwards what it receives, and an anycast address
-//! answers from wherever is nearest. Percentages are of queries, never of bytes, which
-//! GUARDIANA does not see.
+//! The words matter as much as the figures. It is the country of the **server that answered**,
+//! according to the base («el servidor que respondió está en Irlanda, según DB-IP Lite de
+//! octubre de 2026»), never «where your data is»: a front server forwards what it receives, and
+//! an anycast address answers from wherever is nearest. Percentages are of queries, never of
+//! bytes, which GUARDIANA does not see.
 
 use std::collections::HashMap;
 
 use guardiana_core::i18n::Texts;
-use guardiana_core::DestinationCount;
-use guardiana_lists::{FuenteRed, Servidor};
+use guardiana_core::{DestinationCount, ServerFilter, ServerInfo, ServerKind};
+use guardiana_lists::FuenteRed;
 use serde::Serialize;
 
 /// The server of one row, as the pages show it.
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ServidorView {
-    /// The address the answer pointed to, as stored.
-    pub(crate) ip: String,
-    /// Two-letter country the base gives, `None` when it gives none or the address is anycast
-    /// or local.
-    pub(crate) pais_codigo: Option<&'static str>,
+    /// Two-letter country the base gave, `None` when it gave none or the server is anycast or
+    /// local.
+    pub(crate) pais_codigo: Option<String>,
     /// That country by name, in the panel's language.
     pub(crate) pais: Option<String>,
     /// The network's autonomous system number.
     pub(crate) asn: Option<u32>,
     /// Who the network belongs to: the company of `empresas.txt` when its `AS` line says so,
-    /// otherwise the organisation name the base gives.
+    /// otherwise the organisation name the bundled base gives.
     pub(crate) red: Option<String>,
     /// Anycast by its operator's own word: no country is given.
     pub(crate) anycast: bool,
     /// A private, local or reserved address.
     pub(crate) local: bool,
-    /// The one line the row shows: «servido desde la red de Meta (AS32934) · servidor en Irlanda».
+    /// Which base said it, as stored (`dbip-2026-10`; `muestra-…` for the test sample).
+    pub(crate) base: String,
+    /// The one line the row shows: «servido desde la red de Meta (AS32934) · el servidor que
+    /// respondió está en Irlanda».
     pub(crate) frase: String,
 }
 
 /// The network's name as the panel says it.
-fn nombre_red(s: &Servidor) -> Option<(u32, String)> {
-    let r = s.red?;
-    let nombre = guardiana_lists::company_of_asn(r.asn)
-        .map(str::to_owned)
-        .or_else(|| (!r.nombre.trim().is_empty()).then(|| r.nombre.trim().to_owned()));
-    nombre.map(|n| (r.asn, n))
+pub(crate) fn nombre_red(asn: u32) -> Option<String> {
+    if asn == 0 {
+        return None;
+    }
+    guardiana_lists::company_of_asn(asn)
+        .or_else(|| guardiana_lists::nombre_de_red(asn))
+        .map(|n| n.trim().to_owned())
 }
 
 fn pais_nombre(t: &Texts, codigo: &str) -> String {
@@ -57,19 +60,23 @@ fn pais_nombre(t: &Texts, codigo: &str) -> String {
     }
 }
 
-/// The server of a stored answer address, or `None` when the row has none.
-pub(crate) fn servidor_view(t: &Texts, ip: &str) -> Option<ServidorView> {
-    let s = guardiana_lists::servidor_de_texto(ip)?;
-    let red = nombre_red(&s);
-    let pais = s.pais.map(|c| pais_nombre(t, c));
-    let tramo_red = red.as_ref().map(|(asn, n)| {
+/// The server of a row, as the pages show it, or `None` when the row has none.
+pub(crate) fn servidor_view(t: &Texts, s: Option<&ServerInfo>) -> Option<ServidorView> {
+    let s = s?;
+    let local = s.kind == ServerKind::Local;
+    let anycast = s.kind == ServerKind::Anycast;
+    let codigo =
+        (s.kind == ServerKind::Publico && !s.country.is_empty()).then(|| s.country.clone());
+    let pais = codigo.as_deref().map(|c| pais_nombre(t, c));
+    let red = nombre_red(s.asn);
+    let tramo_red = (s.asn != 0).then(|| {
         t.panel("servidor_red")
-            .replace("{red}", n)
-            .replace("{asn}", &asn.to_string())
+            .replace("{red}", red.as_deref().unwrap_or("?"))
+            .replace("{asn}", &s.asn.to_string())
     });
-    let tramo_pais = if s.local {
+    let tramo_pais = if local {
         Some(t.panel("servidor_local").to_owned())
-    } else if s.anycast {
+    } else if anycast {
         Some(t.panel("servidor_anycast").to_owned())
     } else {
         pais.as_ref()
@@ -82,13 +89,13 @@ pub(crate) fn servidor_view(t: &Texts, ip: &str) -> Option<ServidorView> {
         (None, None) => t.panel("servidor_sin_dato").to_owned(),
     };
     Some(ServidorView {
-        ip: ip.trim().to_owned(),
-        pais_codigo: s.pais,
+        pais_codigo: codigo,
         pais,
-        asn: red.as_ref().map(|(a, _)| *a),
-        red: red.map(|(_, n)| n),
-        anycast: s.anycast,
-        local: s.local,
+        asn: (s.asn != 0).then_some(s.asn),
+        red,
+        anycast,
+        local,
+        base: s.base.clone(),
         frase,
     })
 }
@@ -104,17 +111,28 @@ pub(crate) fn grupo_de(qname: &str) -> Option<&'static str> {
     guardiana_lists::group_or_company_of(qname)
 }
 
-/// The bucket a server address falls in for the country summary, and for the extract's filter:
-/// a two-letter country, or one of the words below.
-pub(crate) fn clave_pais(ip: &str) -> Option<String> {
-    let s = guardiana_lists::servidor_de_texto(ip)?;
-    Some(if s.local {
-        CLAVE_LOCAL.to_owned()
-    } else if s.anycast {
-        CLAVE_ANYCAST.to_owned()
-    } else {
-        s.pais
-            .map_or_else(|| CLAVE_SIN_DATO.to_owned(), str::to_owned)
+/// The bucket a server falls in for the country summary and for the extract's filter: a
+/// two-letter country, or one of the words below.
+pub(crate) fn clave_de(kind: ServerKind, country: &str) -> String {
+    match kind {
+        ServerKind::Local => CLAVE_LOCAL.to_owned(),
+        ServerKind::Anycast => CLAVE_ANYCAST.to_owned(),
+        ServerKind::Publico if country.is_empty() => CLAVE_SIN_DATO.to_owned(),
+        ServerKind::Publico => country.to_owned(),
+    }
+}
+
+/// The extract's filter for a bucket key, `None` when the key is neither two capital letters nor
+/// one of the words.
+pub(crate) fn filtro_de(clave: &str) -> Option<ServerFilter> {
+    Some(match clave {
+        CLAVE_ANYCAST => ServerFilter::Anycast,
+        CLAVE_LOCAL => ServerFilter::Local,
+        CLAVE_SIN_DATO => ServerFilter::NoCountry,
+        c if c.len() == 2 && c.chars().all(|x| x.is_ascii_uppercase()) => {
+            ServerFilter::Country(c.to_owned())
+        }
+        _ => return None,
     })
 }
 
@@ -223,9 +241,9 @@ pub(crate) fn resumen(t: &Texts, filas: &[DestinationCount]) -> ResumenDestinos 
             continue;
         }
         consultas += f.queries;
-        if let Some(clave) = clave_pais(&f.answer_ip) {
+        if let Some(kind) = f.kind {
             con_direccion += f.queries;
-            *por_clave.entry(clave).or_insert(0) += f.queries;
+            *por_clave.entry(clave_de(kind, &f.country)).or_insert(0) += f.queries;
         }
         if let Some(g) = grupo_de(&f.qname) {
             let e = por_grupo.entry(g).or_insert((0, Vec::new()));
@@ -360,7 +378,10 @@ mod tests {
             for _ in 0..veces {
                 ts += 1;
                 let mut e = NewEvent::observed(ts, SELF_DEVICE_ID, "127.0.0.1", q, "A");
-                e.answer_ip = ip.to_owned();
+                // What the engine does at the moment of the answer: look the address up, keep
+                // what the base said, drop the address.
+                e.server =
+                    (!ip.is_empty()).then(|| guardiana_lists::server_info_de(ip.parse().unwrap()));
                 e.verdict = v;
                 l.append(e).unwrap();
             }
@@ -423,22 +444,28 @@ mod tests {
     #[test]
     fn a_row_says_whose_network_and_which_country_or_why_not() {
         let t = i18n::es();
-        let v = servidor_view(t, "8.8.8.8").unwrap();
+        let de = |ip: &str| {
+            servidor_view(
+                t,
+                Some(&guardiana_lists::server_info_de(ip.parse().unwrap())),
+            )
+        };
+        let v = de("8.8.8.8").unwrap();
         assert!(v.anycast && v.pais.is_none());
         assert_eq!(v.red.as_deref(), Some("Google"));
-        assert!(v.frase.contains("anycast"), "{}", v.frase);
+        assert!(v.frase.contains(t.panel("servidor_anycast")), "{}", v.frase);
         assert!(v.frase.contains("AS15169"), "{}", v.frase);
-        let local = servidor_view(t, "192.168.1.1").unwrap();
+        let local = de("192.168.1.1").unwrap();
         assert!(local.local && local.pais.is_none() && local.red.is_none());
         assert_eq!(local.frase, t.panel("servidor_local"));
-        assert!(servidor_view(t, "").is_none());
+        assert!(servidor_view(t, None).is_none());
         if guardiana_lists::fuente_red().muestra {
-            let meta = servidor_view(t, "157.240.1.35").unwrap();
+            let meta = de("157.240.1.35").unwrap();
             assert_eq!(
                 meta.frase,
-                "servido desde la red de Meta (AS32934) · servidor en Irlanda"
+                "servido desde la red de Meta (AS32934) · el servidor que respondió está en Irlanda"
             );
-            let sin = servidor_view(t, "203.0.114.9").unwrap();
+            let sin = de("203.0.114.9").unwrap();
             assert_eq!(sin.frase, t.panel("servidor_sin_dato"));
         }
     }

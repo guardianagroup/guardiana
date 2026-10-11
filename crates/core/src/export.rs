@@ -10,7 +10,8 @@ use crate::time::rfc3339_utc;
 /// Column order of the CSV export.
 pub const CSV_HEADER: &str = "id,ts,ts_utc,device_id,client_ip,qname,qtype,category,list_source,\
                               signals,verdict,decided_by,rule_id,prev_hash,row_hash,\
-                              programa,programa_ruta,programa_sha256,answer_ip";
+                              programa,programa_ruta,programa_sha256,\
+                              servidor_tipo,servidor_pais,servidor_asn,servidor_base";
 
 /// Write events as a JSON array, one object per event, hashes as hex.
 pub fn write_json<W: Write>(events: &[Event], mut w: W) -> Result<()> {
@@ -106,9 +107,26 @@ fn write_csv_inner<W: Write>(
                 .as_ref()
                 .map(|p| p.sha256.clone())
                 .unwrap_or_default(),
-            // La primera dirección de la respuesta (decisión 203): entra en el hash cuando está,
-            // así que va en el CSV para poder recalcularlo.
-            e.answer_ip.clone(),
+            // El servidor que respondió según la base (decisión 203): tipo, país, red y qué base
+            // lo dijo. Entra en el hash cuando está, así que va en el CSV para poder recalcularlo.
+            // Nunca la dirección: no se guarda.
+            e.server
+                .as_ref()
+                .map(|s| s.kind.as_str().to_owned())
+                .unwrap_or_default(),
+            e.server
+                .as_ref()
+                .map(|s| s.country.clone())
+                .unwrap_or_default(),
+            e.server
+                .as_ref()
+                .filter(|s| s.asn != 0)
+                .map(|s| s.asn.to_string())
+                .unwrap_or_default(),
+            e.server
+                .as_ref()
+                .map(|s| s.base.clone())
+                .unwrap_or_default(),
         ];
         fields.extend(extra(e));
         let line = fields
@@ -212,25 +230,39 @@ mod tests {
     }
 
     #[test]
-    fn the_answer_address_is_exported_and_extra_columns_go_last() {
+    fn the_server_is_exported_and_extra_columns_go_last() {
+        use crate::model::{ServerInfo, ServerKind};
         let mut l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
         let mut e = NewEvent::observed(1, "self", "127.0.0.1", "a.example", "A");
-        e.answer_ip = "192.0.2.7".to_owned();
+        e.server = Some(ServerInfo {
+            kind: ServerKind::Publico,
+            country: "IE".to_owned(),
+            asn: 32_934,
+            base: "dbip-2026-10".to_owned(),
+        });
         l.append(e).unwrap();
         let events = l.events(&Default::default()).unwrap();
         let mut plano = Vec::new();
         write_csv(&events, &mut plano).unwrap();
         let text = String::from_utf8(plano).unwrap();
         assert!(
-            text.lines().nth(1).unwrap().ends_with(",192.0.2.7"),
+            text.lines()
+                .nth(1)
+                .unwrap()
+                .ends_with(",publico,IE,32934,dbip-2026-10"),
             "{text}"
         );
         let mut hoja = Vec::new();
         write_csv_for_spreadsheet_with(
             &events,
             ';',
-            &["pais [fuente]", "red"],
-            &|ev| vec![format!("pais de {}", ev.answer_ip), "AS64500".to_owned()],
+            &["red", "grupo"],
+            &|ev| {
+                vec![
+                    format!("red {}", ev.server.as_ref().unwrap().asn),
+                    "G".to_owned(),
+                ]
+            },
             &mut hoja,
         )
         .unwrap();
@@ -239,15 +271,15 @@ mod tests {
         assert!(lines
             .next()
             .unwrap()
-            .ends_with(";answer_ip;pais [fuente];red"));
+            .ends_with(";servidor_tipo;servidor_pais;servidor_asn;servidor_base;red;grupo"));
         assert!(lines
             .next()
             .unwrap()
-            .ends_with(";192.0.2.7;pais de 192.0.2.7;AS64500"));
+            .ends_with(";publico;IE;32934;dbip-2026-10;red 32934;G"));
         // JSON carries it too, and reads back.
         let mut json = Vec::new();
         write_json(&events, &mut json).unwrap();
         let back: Vec<Event> = serde_json::from_slice(&json).unwrap();
-        assert_eq!(back[0].answer_ip, "192.0.2.7");
+        assert_eq!(back[0].server, events[0].server);
     }
 }

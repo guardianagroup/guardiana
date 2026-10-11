@@ -215,10 +215,57 @@ pub struct Proceso {
     pub firmado_por: String,
 }
 
-/// One stored query. Of the answer, only the first address is kept, and only when Guardiana
-/// forwarded the query and the answer carried one (decision 203): it is what says in which
-/// country, and on whose network, the server the device was sent to sits. Nothing else of the
-/// answer is stored.
+str_enum! {
+    /// What kind of address the server that answered had (decision 203).
+    ServerKind {
+        /// A server on the internet: the base may give its country.
+        Publico => "publico",
+        /// An address its own operator calls anycast: no country is given.
+        Anycast => "anycast",
+        /// A private, local or reserved address: not on the internet, no country.
+        Local => "local",
+    }
+}
+
+/// What the bundled base said about the server that answered, at the moment of the query
+/// (decision 203). Never the address: only its country, its network and which base said so.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ServerInfo {
+    /// Public, anycast or local.
+    pub kind: ServerKind,
+    /// Two-letter country the base gave, empty when it gave none (always empty for anycast and
+    /// local).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub country: String,
+    /// Autonomous system number of the network, 0 when the base did not know it.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub asn: u32,
+    /// Which base said it, and of when (`dbip-2026-10`; `muestra-2026-10` for the test sample).
+    pub base: String,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_zero(n: &u32) -> bool {
+    *n == 0
+}
+
+impl ServerInfo {
+    /// The text that enters the row hash: `kind|country|asn|base`.
+    #[must_use]
+    pub fn hash_text(&self) -> String {
+        format!(
+            "{}|{}|{}|{}",
+            self.kind.as_str(),
+            self.country,
+            self.asn,
+            self.base
+        )
+    }
+}
+
+/// One stored query. Answers are never stored (brief §4). Of the server that answered, only what
+/// the base bundled in the program says about it is kept: its country and its network, read at the
+/// moment of the query (decision 203). The address itself is never written anywhere.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Event {
     /// Row id, increasing in insertion order.
@@ -248,11 +295,11 @@ pub struct Event {
     /// The program that asked, when the system could say (Windows, this computer only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub process: Option<Proceso>,
-    /// First IPv4 or IPv6 address of the forwarded answer (`157.240.1.35`), empty when there was
-    /// none: cut, answered by Guardiana itself, no address in the answer, or written before
-    /// decision 203.
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub answer_ip: String,
+    /// Country and network of the server that answered, looked up in the bundled base when the
+    /// query was answered (decision 203). `None` when there was no address: cut, answered by
+    /// Guardiana itself, no address in the answer, or written before decision 203.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server: Option<ServerInfo>,
     /// Hash of the previous row (or the chain anchor).
     pub prev_hash: Hash,
     /// `sha256(prev_hash || fields)`.
@@ -286,8 +333,8 @@ pub struct NewEvent {
     pub rule_id: Option<i64>,
     /// The program that asked, when the system could say.
     pub process: Option<Proceso>,
-    /// First address of the forwarded answer, or empty (decision 203).
-    pub answer_ip: String,
+    /// Country and network of the server that answered (decision 203).
+    pub server: Option<ServerInfo>,
 }
 
 impl NewEvent {
@@ -308,7 +355,7 @@ impl NewEvent {
             decided_by: DecidedBy::Nadie,
             rule_id: None,
             process: None,
-            answer_ip: String::new(),
+            server: None,
         }
     }
 }

@@ -39,11 +39,12 @@ pub use export::{
 pub use gaps::{Gap, GAP_THRESHOLD_MS, KEY_HEARTBEAT};
 pub use hash::{chain_hash, Hash, HashInput};
 pub use ledger::{
-    copia_junto_al_extracto, ChainFault, CheckReport, EventFilter, Ledger, COPIAS_EN_ARCHIVO,
+    copia_junto_al_extracto, ChainFault, CheckReport, EventFilter, Ledger, ServerFilter,
+    COPIAS_EN_ARCHIVO,
 };
 pub use model::{
     Action, Category, DecidedBy, Device, Event, MatchKind, NewEvent, NewRule, Outbound, Proceso,
-    Purpose, Rule, Scope, Signal, SignalKind, Verdict,
+    Purpose, Rule, Scope, ServerInfo, ServerKind, Signal, SignalKind, Verdict,
 };
 pub use report::{DestinationCount, DeviceWeek, NameCount, NameGroup, WeekSummary};
 pub use retention::{DailyTotal, PruneReport, Retention};

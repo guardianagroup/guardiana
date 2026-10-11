@@ -10,6 +10,7 @@ use serde::Serialize;
 
 use crate::error::Result;
 use crate::ledger::Ledger;
+use crate::model::ServerKind;
 use crate::time::{day_utc, DAY_MS};
 use crate::SELF_DEVICE_ID;
 
@@ -181,39 +182,49 @@ impl Ledger {
         rows.map(|r| r.map_err(crate::Error::from)).collect()
     }
 
-    /// The week's forwarded queries the household may read, by (name, first answer address),
-    /// most asked first (decision 203). Cut queries are not here: they never left the house.
-    /// The address is empty for rows without one (written before decision 203, or an answer with no
-    /// address), and those rows are still counted, so the panel can say out of how many.
+    /// The week's forwarded queries the household may read, by (name, kind and country of the
+    /// server that answered), most asked first (decision 203). Cut queries are not here: they
+    /// never left the house. Rows without a server (written before decision 203, or an answer
+    /// with no address) are still counted, so the panel can say out of how many.
     pub fn week_destinations(&self, until: i64) -> Result<Vec<DestinationCount>> {
         let since = until - 7 * DAY_MS;
         let mut stmt = self.conn.prepare(
-            "SELECT qname, answer_ip, COUNT(*) AS n FROM events \
+            "SELECT qname, server_kind, server_country, COUNT(*) AS n FROM events \
              WHERE ts >= ?1 AND ts < ?2 AND verdict = 'observado' \
                AND (device_id = ?3 OR device_id IN \
                     (SELECT id FROM devices WHERE share_detail_with_home != 0)) \
-             GROUP BY qname, answer_ip ORDER BY n DESC, qname ASC, answer_ip ASC",
+             GROUP BY qname, server_kind, server_country \
+             ORDER BY n DESC, qname ASC, server_kind ASC, server_country ASC",
         )?;
         let rows = stmt.query_map(params![since, until, SELF_DEVICE_ID], |r| {
             Ok(DestinationCount {
                 qname: r.get(0)?,
-                answer_ip: r.get(1)?,
-                queries: r.get(2)?,
+                kind: kind_of(r.get(1)?),
+                country: r.get(2)?,
+                queries: r.get(3)?,
             })
         })?;
         rows.map(|r| r.map_err(crate::Error::from)).collect()
     }
 
-    /// Every distinct answer address in the rows the household may read, for turning a
-    /// server's country into the addresses to filter the extract by.
-    pub fn answer_ips(&self) -> Result<Vec<String>> {
+    /// Every distinct (kind, country) of server in the rows the household may read, for the
+    /// extract's filter by server country.
+    pub fn server_buckets(&self) -> Result<Vec<(ServerKind, String)>> {
         let mut stmt = self.conn.prepare(
-            "SELECT DISTINCT answer_ip FROM events WHERE answer_ip != '' \
+            "SELECT DISTINCT server_kind, server_country FROM events WHERE server_kind != 0 \
                AND (device_id = ?1 OR device_id IN \
                     (SELECT id FROM devices WHERE share_detail_with_home != 0))",
         )?;
-        let rows = stmt.query_map(params![SELF_DEVICE_ID], |r| r.get::<_, String>(0))?;
-        rows.map(|r| r.map_err(crate::Error::from)).collect()
+        let rows = stmt.query_map(params![SELF_DEVICE_ID], |r| {
+            Ok((kind_of(r.get(0)?), r.get::<_, String>(1)?))
+        })?;
+        let mut out = Vec::new();
+        for r in rows {
+            if let (Some(k), c) = r? {
+                out.push((k, c));
+            }
+        }
+        Ok(out)
     }
 
     /// Every (device, name, program) asked for between `since` and `until`, with how many times
@@ -314,15 +325,27 @@ pub struct NameGroup {
     pub last_ts: i64,
 }
 
-/// A (name, first answer address) of the week and how many forwarded queries got it.
+/// A (name, server kind and country) of the week and how many forwarded queries got it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
 pub struct DestinationCount {
     /// Queried name.
     pub qname: String,
-    /// First address of the answer, or empty.
-    pub answer_ip: String,
-    /// Forwarded queries for that name that got that address.
+    /// What kind of server answered; `None` when the row has no server.
+    pub kind: Option<ServerKind>,
+    /// Its country, empty when the base gave none.
+    pub country: String,
+    /// Forwarded queries for that name that got such a server.
     pub queries: i64,
+}
+
+/// A stored server kind code as the kind; 0 (or anything unknown) is no server.
+fn kind_of(code: i64) -> Option<ServerKind> {
+    match code {
+        1 => Some(ServerKind::Publico),
+        2 => Some(ServerKind::Anycast),
+        3 => Some(ServerKind::Local),
+        _ => None,
+    }
 }
 
 /// A name and how many times it was asked for in a window.
@@ -404,37 +427,40 @@ mod tests {
         assert_eq!(w.devices[1].device_id, "self");
     }
 
-    /// The week's destinations: forwarded only, the household's rows only, by (name, address).
+    /// The week's destinations: forwarded only, the household's rows only, by (name, server).
     #[test]
     fn week_destinations_count_what_left_and_only_what_the_house_may_read() {
+        use crate::model::ServerInfo;
         let mut l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
         let now = 1_700_000_000_000i64;
         l.upsert_device("mac:callado", None, Some("10.0.0.9"), now - DAY_MS)
             .unwrap();
-        let mut add = |device: &str, name: &str, ip: &str, verdict: Verdict, ts: i64| {
+        let sv = |pais: &str| {
+            (!pais.is_empty()).then(|| ServerInfo {
+                kind: ServerKind::Publico,
+                country: pais.to_owned(),
+                asn: 64_500,
+                base: "dbip-2026-10".to_owned(),
+            })
+        };
+        let mut add = |device: &str, name: &str, pais: &str, verdict: Verdict, ts: i64| {
             let mut e = NewEvent::observed(ts, device, "127.0.0.1", name, "A");
-            e.answer_ip = ip.to_owned();
+            e.server = sv(pais);
             e.verdict = verdict;
             l.append(e).unwrap();
         };
+        add("self", "a.example", "IE", Verdict::Observado, now - HOUR_MS);
         add(
             "self",
             "a.example",
-            "192.0.2.1",
-            Verdict::Observado,
-            now - HOUR_MS,
-        );
-        add(
-            "self",
-            "a.example",
-            "192.0.2.1",
+            "IE",
             Verdict::Observado,
             now - 2 * HOUR_MS,
         );
         add(
             "self",
             "a.example",
-            "192.0.2.9",
+            "US",
             Verdict::Observado,
             now - 3 * HOUR_MS,
         );
@@ -443,28 +469,39 @@ mod tests {
         add(
             "mac:callado",
             "c.example",
-            "192.0.2.3",
+            "FR",
             Verdict::Observado,
             now - HOUR_MS,
         );
         add(
             "self",
             "viejo.example",
-            "192.0.2.4",
+            "DE",
             Verdict::Observado,
             now - 8 * DAY_MS,
         );
         let d = l.week_destinations(now).unwrap();
-        let tuplas: Vec<(&str, &str, i64)> = d
+        let tuplas: Vec<(&str, Option<ServerKind>, &str, i64)> = d
             .iter()
-            .map(|x| (x.qname.as_str(), x.answer_ip.as_str(), x.queries))
+            .map(|x| (x.qname.as_str(), x.kind, x.country.as_str(), x.queries))
             .collect();
+        let p = Some(ServerKind::Publico);
         assert_eq!(
             tuplas,
             vec![
-                ("a.example", "192.0.2.1", 2),
-                ("a.example", "192.0.2.9", 1),
-                ("b.example", "", 1),
+                ("a.example", p, "IE", 2),
+                ("a.example", p, "US", 1),
+                ("b.example", None, "", 1),
+            ]
+        );
+        let mut cubos = l.server_buckets().unwrap();
+        cubos.sort_by(|a, b| a.1.cmp(&b.1));
+        assert_eq!(
+            cubos,
+            vec![
+                (ServerKind::Publico, "DE".to_owned()),
+                (ServerKind::Publico, "IE".to_owned()),
+                (ServerKind::Publico, "US".to_owned()),
             ]
         );
     }

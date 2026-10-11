@@ -5,8 +5,8 @@
 # anuncia, y la red lleva cada consulta al más cercano. Una base de IP a país le pone un solo país
 # (suele ser el de la empresa), y ese país no dice dónde está el servidor que contestó, que suele
 # estar cerca de quien pregunta, ni dónde acaban los datos. Por eso, para estas direcciones el
-# panel no dice «servidor en Estados Unidos»: dice «red anycast: el servidor suele estar cerca de
-# ti; no se sabe dónde acaban los datos», y no las cuenta en ningún país.
+# panel no dice «el servidor que respondió está en Estados Unidos»: dice «red de reparto: el
+# servidor suele estar cerca de ti», y no las cuenta en ningún país.
 #
 # FORMATO: una entrada por línea. `AS<número>` marca una red entera (todo lo que la base de
 # IP a red dé con ese número); `<dirección>/<prefijo>` marca un bloque concreto, IPv4 o IPv6.

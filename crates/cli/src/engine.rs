@@ -520,13 +520,15 @@ impl Policy for EnginePolicy {
         event.verdict = verdict;
         event.decided_by = decided_by;
         event.rule_id = rule_id;
-        // De la respuesta, solo su primera dirección: en qué país y en qué red está el servidor al
-        // que se mandó al aparato (decisión 203). Nada para lo cortado ni lo que contestó GUARDIANA.
+        // De la respuesta no se guarda nada: con su primera dirección se mira aquí, en la base que
+        // va dentro del programa, el país y la red del servidor que respondió, y solo eso va al
+        // extracto (decisión 203, con el ok del responsable del 11 oct 2026). La dirección no
+        // pasa de esta línea. Nada para lo cortado ni para lo que contestó GUARDIANA.
         if let Outcome::Forwarded {
             server: Some(ip), ..
         } = outcome
         {
-            event.answer_ip = ip.to_string();
+            event.server = Some(guardiana_lists::server_info_de(ip));
         }
         // Solo para este equipo: de un teléfono en Modo Hogar se ve el nombre y nada más, y eso
         // lo dice cada pantalla. Si el sistema no lo dijo, el hueco se queda vacío.

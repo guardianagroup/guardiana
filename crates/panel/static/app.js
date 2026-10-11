@@ -456,7 +456,6 @@
   // A dónde mandó la respuesta al aparato (decisión 203): por qué red se sirve y en qué país está
   // el servidor según la base que va dentro del programa, o por qué no se dice (anycast, red
   // local). La dirección y la fuente van en el título, para quien quiera comprobarlas.
-  let FUENTE_RED = null;
   const fechaBase = (f) => {
     const [y, m] = String((f && f.fecha) || '').split('-').map(Number);
     return y && m ? new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString(LOC, { month: 'long', year: 'numeric', timeZone: 'UTC' }) : '';
@@ -465,14 +464,13 @@
   const servidorFrase = (ev) => {
     const s = ev.servidor;
     if (!s) return '';
-    const titulo = FUENTE_RED ? t('servidor_titulo').replace('{ip}', s.ip).replace('{fuente}', FUENTE_RED.fuente).replace('{fecha}', fechaBase(FUENTE_RED)) : s.ip;
+    const titulo = t('servidor_titulo').replace('{base}', s.base || '?');
     return `<span class="phrase servidor${s.anycast ? ' anycast' : ''}" title="${esc(titulo)}">· ${esc(s.frase)}</span>`;
   };
   // La línea de la fuente, debajo de cada tabla o tarjeta que enseña un país de servidor, con el
   // enlace que pide su licencia; y, si lo que va dentro es la muestra de pruebas, dicho delante.
   function pintaFuenteRed(id, f) {
     if (!f) return;
-    FUENTE_RED = f;
     const el = $(id);
     if (!el || el.dataset.hecho === f.fecha + f.muestra) return;
     el.dataset.hecho = f.fecha + f.muestra;

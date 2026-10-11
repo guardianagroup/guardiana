@@ -18,11 +18,12 @@ La regla: nunca «100 % seguro», nunca «invisible», nunca «protegido» sin o
   archivo, y un programa que lo lea y no siga el enlace no aparece en ningún sitio.
 - **No ve contenido.** Ni páginas, ni mensajes, ni qué se hizo en cada servicio.
 - **No ve cuántos bytes.** Solo que se preguntó por un nombre, cuándo y cuántas veces.
-- **No anota respuestas, salvo una dirección.** Solo consultas: nombre, tipo, dispositivo, hora,
-  categoría, veredicto. De la respuesta, desde la decisión 203 (10 de octubre de 2026), guarda solo su
-  primera dirección IP cuando GUARDIANA reenvió la consulta: es lo que dice en qué país y en qué red
-  está el servidor, según una base pública que va dentro del programa. Nada más de la respuesta, y
-  ninguna consulta fuera para averiguarlo.
+- **No anota respuestas.** Solo consultas: nombre, tipo, dispositivo, hora, categoría, veredicto.
+  Frase: «Nunca se guardan las respuestas; solo el país y la red del servidor que respondió, para
+  decirte a dónde viajan tus datos.» Desde la decisión 203 (11 de octubre de 2026), cuando GUARDIANA
+  reenvía una consulta mira la dirección del servidor que respondió en una base pública que va dentro
+  del programa y anota solo lo que esa base dice: su país, su red y qué base lo dijo. La dirección no
+  se guarda en ningún sitio, y no se pregunta a nadie de fuera.
 - **No ve lo que esquiva el DNS.** Apps con IP fija, apps con su propio DNS cifrado (DoH/DoT), una
   VPN en el teléfono, iCloud Private Relay en Safari. Cuando lo detecta, lo anota como «tráfico
   fuera de vista»; no lo esconde ni lo cuenta como protegido.

@@ -48,8 +48,8 @@ fn normalize(name: &Name) -> String {
 }
 
 /// The first A or AAAA record of an answer, in the order the upstream gave them: after a CNAME
-/// chain, the address the device will actually connect to. Only this one address is kept of the
-/// whole answer (decision 203).
+/// chain, the address the device will actually connect to. It travels to the policy only so the
+/// server's country and network can be looked up; it is not stored (decision 203).
 fn first_address(answers: &[Record]) -> Option<std::net::IpAddr> {
     answers.iter().find_map(|r| match &r.data {
         RData::A(a) => Some(std::net::IpAddr::V4(a.0)),
