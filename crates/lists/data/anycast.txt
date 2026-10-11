@@ -1,0 +1,36 @@
+# GUARDIANA — lista "anycast": redes y direcciones que se anuncian a la vez desde muchos sitios
+# del mundo (decisión 203). Mantenida por nosotros, abierta.
+#
+# Por qué existe. Una dirección anycast es la misma en todos los centros de datos de quien la
+# anuncia, y la red lleva cada consulta al más cercano. Una base de IP a país le pone un solo país
+# (suele ser el de la empresa), y ese país no dice dónde está el servidor que contestó, que suele
+# estar cerca de quien pregunta, ni dónde acaban los datos. Por eso, para estas direcciones el
+# panel no dice «servidor en Estados Unidos»: dice «red anycast: el servidor suele estar cerca de
+# ti; no se sabe dónde acaban los datos», y no las cuenta en ningún país.
+#
+# FORMATO: una entrada por línea. `AS<número>` marca una red entera (todo lo que la base de
+# IP a red dé con ese número); `<dirección>/<prefijo>` marca un bloque concreto, IPv4 o IPv6.
+# Solo entra lo que su propio operador dice que es anycast, y la fuente va al lado. Si no está
+# dicho, no se pone: una red de reparto con servidores propios en cada país (Akamai) no es
+# anycast, y su país sí dice dónde está el servidor que contestó.
+
+# Cloudflare: «Cloudflare operates a global anycast network» (sus notas en PeeringDB,
+# https://peeringdb.com/net/4224, consultado el 10 oct 2026). Es también 1.1.1.1.
+AS13335
+
+# Google Public DNS: «Anycast routing directs your queries to the closest Google Public DNS
+# server», en 8.8.8.8, 8.8.4.4 y las direcciones de 2001:4860:4860:: (su FAQ,
+# https://developers.google.com/speed/public-dns/faq, consultado el 10 oct 2026). Solo esas
+# direcciones: el resto de la red de Google (AS15169) no se marca entera.
+8.8.8.8/32
+8.8.4.4/32
+2001:4860:4860::8888/128
+2001:4860:4860::8844/128
+
+# Quad9: «The systems are "anycast" meaning that queries will automatically be routed to the
+# closest operational system», en 9.9.9.9, 149.112.112.112, 2620:fe::fe y 2620:fe::9
+# (https://quad9.net/service/, consultado el 10 oct 2026).
+9.9.9.9/32
+149.112.112.112/32
+2620:fe::fe/128
+2620:fe::9/128

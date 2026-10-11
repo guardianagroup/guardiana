@@ -17,6 +17,43 @@ Toda entrada coincide con el dominio y con sus subdominios.
 
 GUARDIANA se publica bajo GPL-3.0-or-later, compatible con redistribuir EasyPrivacy.
 
+## País y red del servidor (decisión 203)
+
+Desde el 10 de octubre de 2026 el extracto guarda, de cada respuesta reenviada, solo su primera
+dirección IP. El panel dice con ella **en qué país está el servidor y por qué red se sirve**, mirando
+dos tablas que van dentro del programa. **No se consulta ningún servicio de fuera por cada
+dirección**: eso le contaría a un tercero por dónde navega la casa.
+
+| Base | Qué da | Licencia | Atribución | Cómo entra |
+|---|---|---|---|---|
+| DB-IP «IP to Country Lite» | país (código ISO de dos letras) de cada rango de direcciones, IPv4 e IPv6 | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | «IP Geolocation by DB-IP», con enlace a https://db-ip.com en las páginas que enseñan el dato (lo piden ellos) | `build/red-ip.py descargar AAAA-MM` baja `https://download.db-ip.com/free/dbip-country-lite-AAAA-MM.csv.gz` y lo convierte en `ip-pais.bin` |
+| DB-IP «IP to ASN Lite» | red (sistema autónomo: número y organización) de cada rango | CC BY 4.0 | la misma | el mismo guion, `dbip-asn-lite-AAAA-MM.csv.gz` → `ip-red.bin` |
+
+`crates/lists/data/red-ip.json` dice de qué mes es la base, la huella SHA-256 de lo que se bajó y de
+lo que se generó, y cuántos rangos hay. El formato binario (rangos ordenados que se buscan por
+búsqueda binaria; IPv6 con detalle de /64) está escrito en la cabecera de `build/red-ip.py`. CC BY 4.0
+es compatible con distribuirla dentro de un programa GPL-3.0; la FSF la cuenta entre las licencias
+libres compatibles con la GPLv3. No es una dependencia de Rust, así que `deny.toml` no cambia.
+
+**Mientras `red-ip.json` diga `"muestra": true`**, lo que va en el programa es una muestra de pruebas
+escrita a mano (`build/red-ip-muestra/`), no datos de DB-IP: la red de desarrollo del 10 de octubre
+de 2026 no dejó bajar la base. El panel lo dice en cada sitio donde enseña un país o una red, y
+`build/publicar.py codigo --empujar` y `build/release.sh` se niegan a seguir.
+
+Otra base mirada y descartada: iptoasn.com (dominio público, PDDL, se actualiza cada hora). Su país
+va por rango sin decir de dónde sale, y para «dónde está el servidor» hace falta una base de
+geolocalización, que es lo que es DB-IP. Usar las dos tablas de DB-IP deja una sola fuente y una sola
+fecha que citar.
+
+Lo que el país **no** dice, y el panel no lo dice tampoco: dónde acaban los datos (un servidor de
+entrada los reenvía), ni el país de la empresa dueña del nombre (eso es `empresas.txt`).
+
+`anycast.txt` (nuestra) marca las redes y direcciones que su propio operador dice que son anycast
+(Cloudflare, Google Public DNS, Quad9), con la fuente al lado. Ahí una base de IP a país no sirve: la
+misma dirección contesta desde muchos países. El panel dice «red anycast: el servidor suele estar
+cerca de ti; no se sabe dónde acaban los datos», y no las cuenta en ningún país. Las direcciones
+privadas, locales o reservadas no tienen país.
+
 ## Listas del brief que NO van en la 1.0, y por qué
 
 | Lista | Licencia | Motivo |
@@ -35,7 +72,8 @@ AdGuard DNS filter (GPL-3.0, ~176 000 dominios, mezcla publicidad y rastreo) y S
 | `esperado.txt` | `esperado` | Actualizaciones de sistema (Windows, Apple, Debian, Ubuntu, Fedora, Arch, Flatpak, navegadores), certificados, comprobaciones de seguridad y de conexión del propio sistema, hora (NTP), mensajería y videollamada reconocidas, y el dominio propio de GUARDIANA (guardianagroup.com) con la pasarela de su licencia. Las secciones `@actualizaciones`, `@certificados`, `@seguridad`, `@hora`, `@mensajeria`, `@videollamada`, `@guardiana` deciden la frase de confirmación de la sección 6 del brief. |
 | `telemetria.txt` | `telemetria` | Destinos que los propios fabricantes documentan como telemetría o diagnóstico (Microsoft, Apple, Mozilla, Google, Canonical, NVIDIA, Dell). |
 | `evasion_dns.txt` | señal `evasion_dns` | Nombres de resolutores DoH/DoT conocidos. Consultarlos indica que un programa resuelve por su cuenta, fuera de la vista de GUARDIANA. Se anota; no se corta salvo regla del usuario. |
-| `empresas.txt` | etiqueta (no categoría) | Quién es dueño de cada nombre, con su país y su ciudad cuando están comprobados (decisión 61). |
+| `empresas.txt` | etiqueta (no categoría) | Quién es dueño de cada nombre, con su país y su ciudad cuando están comprobados (decisión 61), el grupo del que es filial o marca cuando lo es y está publicado (Slack → Salesforce; decisión 203, con la fuente encima de cada uno) y sus redes (`AS32934` en Meta), comprobadas en PeeringDB. |
+| `anycast.txt` | etiqueta del servidor | Redes y direcciones anycast según su propio operador, con la fuente (decisión 203). |
 | `ia.txt`, `entrega.txt` | etiqueta | El servicio de IA al que pertenece un nombre (decisión 62) y las redes de reparto que son carretera y no destino (decisión 148). |
 | `corredores.txt` | etiqueta «compra y venta de datos» | Las empresas inscritas en el registro público de corredores de datos de California (CPPA): su nombre, su país, lo que ellas mismas marcaron (ubicación exacta, menores, a quién vendieron) y la página que declararon para pedir que borren tus datos. Copia fechada del CSV del registro, con su huella en la cabecera, más los nombres de rastreo de cada inscrita comentados uno a uno (decisión 194). No cambia la categoría ni corta nada: dice qué es la dueña del nombre, y la persona decide. |
 | `sectores.txt` | etiqueta de sector | A qué se dedica una web conocida (deporte, noticias, banca, compras, red social, gobierno…): unas 560 webs grandes de Colombia, España, América Latina, Brasil, Portugal y Estados Unidos, comprobadas por su propia web. El panel lo dice en lugar de «sin clasificar» para la dirección principal de esa web; un subnombre que dice lo que es (`cdn.`, `login.`) sigue diciendo eso. No cambia la categoría ni corta nada (9 oct 2026). |

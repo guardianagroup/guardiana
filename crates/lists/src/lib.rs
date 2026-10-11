@@ -11,6 +11,7 @@
 //! `esperado` > `telemetria` > `rastreador` > `publicidad`.
 
 mod parse;
+mod red;
 
 use std::collections::HashMap;
 
@@ -18,6 +19,10 @@ use guardiana_core::Category;
 use serde::{Deserialize, Serialize};
 
 pub use parse::{parse_abp_domains, parse_guardiana, parse_hosts, Format};
+pub use red::{
+    es_local, fuente_red, servidor_de, servidor_de_texto, FuenteRed, Red, Servidor, ANYCAST,
+    IP_PAIS, IP_RED, RED_IP_JSON,
+};
 
 /// Bundled copy of EasyPrivacy, trimmed to domain rules by `build/fetch-lists.sh`.
 pub const EASYPRIVACY: &str = include_str!("../data/easyprivacy.txt");
@@ -275,6 +280,51 @@ pub fn city_of(qname: &str) -> Option<&'static str> {
     seccion_de(qname)
         .and_then(|s| s.split('|').nth(2))
         .filter(|c| !c.is_empty())
+}
+
+/// The group the owning company belongs to, when it is a company of another
+/// (`slack.com` → `Salesforce`), from the fourth field of its `empresas.txt` header, which carries
+/// its public source beside it. `None` when the company is its own group or nobody checked:
+/// a group that is not written is not guessed.
+#[must_use]
+pub fn group_of(qname: &str) -> Option<&'static str> {
+    seccion_de(qname)
+        .and_then(|s| s.split('|').nth(3))
+        .map(str::trim)
+        .filter(|g| !g.is_empty())
+}
+
+/// The group a name's queries add up to: the parent group when one is written, else the owning
+/// company itself. `None` for a name nobody in the list owns.
+#[must_use]
+pub fn group_or_company_of(qname: &str) -> Option<&'static str> {
+    group_of(qname).or_else(|| company_of(qname))
+}
+
+/// The company of `empresas.txt` that owns a network (autonomous system), from the `AS<number>`
+/// lines in its section (`AS32934` → `Meta`), each checked against PeeringDB. `None` for any
+/// network not written there: the base's own organisation name is shown instead.
+#[must_use]
+pub fn company_of_asn(asn: u32) -> Option<&'static str> {
+    static MAP: std::sync::OnceLock<HashMap<u32, &'static str>> = std::sync::OnceLock::new();
+    MAP.get_or_init(|| {
+        let mut map = HashMap::new();
+        let mut section: Option<&'static str> = None;
+        for line in EMPRESAS.lines() {
+            let line = line.split('#').next().unwrap_or("").trim();
+            if let Some(name) = line.strip_prefix('@') {
+                section = Some(name.split('|').next().unwrap_or(name).trim());
+            } else if let (Some(n), Some(c)) = (
+                line.strip_prefix("AS").and_then(|n| n.parse::<u32>().ok()),
+                section,
+            ) {
+                map.insert(n, c);
+            }
+        }
+        map
+    })
+    .get(&asn)
+    .copied()
 }
 
 fn seccion_de(qname: &str) -> Option<&'static str> {
@@ -678,6 +728,57 @@ mod tests {
         let v: Vec<&str> = suffixes("a.b.c.d").collect();
         assert_eq!(v, vec!["a.b.c.d", "b.c.d", "c.d"]);
         assert!(suffixes("localhost").next().is_none());
+    }
+}
+
+#[cfg(test)]
+mod group_tests {
+    use super::*;
+
+    #[test]
+    fn a_company_of_another_adds_up_to_its_group() {
+        assert_eq!(group_of("app.slack.com"), Some("Salesforce"));
+        assert_eq!(group_or_company_of("app.slack.com"), Some("Salesforce"));
+        assert_eq!(group_of("www.booking.com"), Some("Booking Holdings"));
+        assert_eq!(group_of("www.youtube.com"), Some("Alphabet"));
+        // A section with no country nor city still carries its group.
+        assert_eq!(group_of("cdn.iubenda.com"), Some("team.blue"));
+        assert_eq!(country_of("cdn.iubenda.com"), None);
+        // Its own group: no group written, the company stands for itself.
+        assert_eq!(group_of("www.instagram.com"), None);
+        assert_eq!(group_or_company_of("www.instagram.com"), Some("Meta"));
+        assert_eq!(group_or_company_of("nadie.example"), None);
+        // The fourth field does not move the other three.
+        assert_eq!(company_of("www.google.com"), Some("Google"));
+        assert_eq!(country_of("www.google.com"), Some("US"));
+        assert_eq!(city_of("www.google.com"), Some("Mountain View"));
+    }
+
+    #[test]
+    fn every_group_carries_its_source_and_every_network_its_company() {
+        let lineas: Vec<&str> = EMPRESAS.lines().collect();
+        for (i, l) in lineas.iter().enumerate() {
+            let cabecera = l.split('#').next().unwrap_or("").trim();
+            let Some(h) = cabecera.strip_prefix('@') else {
+                continue;
+            };
+            let grupo = h.split('|').nth(3).map(str::trim).filter(|g| !g.is_empty());
+            let fuente = i
+                .checked_sub(1)
+                .and_then(|j| lineas.get(j))
+                .is_some_and(|p| p.starts_with("# Grupo: ") && p.contains("http"));
+            assert_eq!(
+                grupo.is_some(),
+                fuente,
+                "{l}: un grupo lleva su fuente encima"
+            );
+        }
+        assert_eq!(company_of_asn(32934), Some("Meta"));
+        assert_eq!(company_of_asn(15169), Some("Google"));
+        assert_eq!(company_of_asn(13335), Some("Cloudflare"));
+        assert_eq!(company_of_asn(64_512), None);
+        // An `AS` line is not a domain: nothing is owned by the name «as32934».
+        assert_eq!(company_of("as32934"), None);
     }
 }
 

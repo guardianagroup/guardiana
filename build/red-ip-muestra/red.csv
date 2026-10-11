@@ -1,0 +1,14 @@
+1.1.1.0,1.1.1.255,13335,"Cloudflare, Inc."
+8.8.4.0,8.8.4.255,15169,Google LLC
+8.8.8.0,8.8.8.255,15169,Google LLC
+13.107.0.0,13.107.255.255,8075,Microsoft Corporation
+17.0.0.0,17.255.255.255,714,Apple Inc.
+31.13.24.0,31.13.127.255,32934,"Facebook, Inc."
+52.94.0.0,52.94.255.255,16509,"Amazon.com, Inc."
+142.250.0.0,142.251.255.255,15169,Google LLC
+157.240.0.0,157.240.255.255,32934,"Facebook, Inc."
+184.24.0.0,184.31.255.255,20940,Akamai International B.V.
+2001:4860::,2001:4860:ffff:ffff:ffff:ffff:ffff:ffff,15169,Google LLC
+2606:4700::,2606:4700:ffff:ffff:ffff:ffff:ffff:ffff,13335,"Cloudflare, Inc."
+2620:1ec::,2620:1ec:ffff:ffff:ffff:ffff:ffff:ffff,8075,Microsoft Corporation
+2a03:2880::,2a03:2880:ffff:ffff:ffff:ffff:ffff:ffff,32934,"Facebook, Inc."

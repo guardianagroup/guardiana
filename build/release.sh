@@ -55,6 +55,12 @@ if [ -n "$(git status --porcelain)" ]; then
     echo "release.sh: the working tree must be clean" >&2
     exit 1
 fi
+# The server country and network must come from DB-IP, not from the hand-made test sample
+# (decision 203).
+if grep -q '"muestra": true' crates/lists/data/red-ip.json; then
+    echo "release.sh: crates/lists/data/red-ip.json is the test sample; run: python3 build/red-ip.py descargar YYYY-MM" >&2
+    exit 1
+fi
 
 # 1. Reproducible build.
 #

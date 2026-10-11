@@ -37,3 +37,5 @@ OFL-*.txt -text
 *.jks binary
 *.exe binary
 *.wasm binary
+# The IP tables of crates/lists/data (decision 203): bytes, read by offset.
+*.bin binary

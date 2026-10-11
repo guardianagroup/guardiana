@@ -1,0 +1,12 @@
+MUESTRA DE PRUEBA, NO SON DATOS DE DB-IP.
+
+Dos archivos pequeños con el mismo formato CSV que DB-IP «IP to Country Lite» (inicio,fin,país) e
+«IP to ASN Lite» (inicio,fin,número de red,organización), escritos a mano el 10 de octubre de 2026
+para probar el conversor (build/red-ip.py), el formato binario y el cargador (crates/lists/src/red.rs)
+cuando la red de desarrollo no dejó bajar la base de verdad. Los números de red (AS) de Google,
+Meta, Microsoft, Amazon, Apple, Cloudflare y Akamai son los que esas empresas tienen en PeeringDB;
+los rangos y los países son de ejemplo y no salen de ninguna base.
+
+Mientras crates/lists/data/red-ip.json diga "muestra": true, el panel lo dice en cada página que
+enseña un país o una red, y build/publicar.py se niega a publicar.
+Para poner la base de verdad: python3 build/red-ip.py descargar AAAA-MM

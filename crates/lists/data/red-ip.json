@@ -1,0 +1,33 @@
+{
+  "fuente": "DB-IP Lite",
+  "fecha": "2026-10",
+  "licencia": "CC BY 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by/4.0/",
+  "atribucion": "IP Geolocation by DB-IP",
+  "web": "https://db-ip.com",
+  "muestra": true,
+  "pais": {
+    "url": "https://download.db-ip.com/free/dbip-country-lite-2026-10.csv.gz",
+    "archivo_origen": "pais.csv",
+    "sha256_origen": "86db997fe0965d664bfbd1783c8921c760c24d854dbcb6bb173565a176fe7dff",
+    "archivo": "ip-pais.bin",
+    "sha256": "da4677fc13b6f5ad1d898e73b2d5fc354f808a52185306253c375fcc98f80efe",
+    "registros_origen": 19,
+    "rangos_v4": 25,
+    "rangos_v6": 12,
+    "paises": 7,
+    "v6_por_debajo_de_64": 1
+  },
+  "red": {
+    "url": "https://download.db-ip.com/free/dbip-asn-lite-2026-10.csv.gz",
+    "archivo_origen": "red.csv",
+    "sha256_origen": "c35fd6ff527a61bc49e3d0bd8fd80705fd9f5d10fd65c34a0ccf0be180e0cdc0",
+    "archivo": "ip-red.bin",
+    "sha256": "4fb5f6b19112c28db4e1ead79da035bd75dc485e3acfd5b2d896ba74b26d0b34",
+    "registros_origen": 14,
+    "rangos_v4": 21,
+    "rangos_v6": 9,
+    "redes": 7,
+    "v6_por_debajo_de_64": 0
+  }
+}

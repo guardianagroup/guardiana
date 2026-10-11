@@ -135,6 +135,16 @@ def preparar_web(clon):
     return copiar(os.path.join(RAIZ, 'site'), clon, excluir=excluir)
 
 
+def red_ip_es_muestra():
+    """Whether the bundled IP data is the hand-made test sample (decision 203)."""
+    import json
+    try:
+        with open(os.path.join(RAIZ, 'crates', 'lists', 'data', 'red-ip.json'), encoding='utf-8') as f:
+            return bool(json.load(f).get('muestra', True))
+    except (OSError, ValueError):
+        return True
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('que', choices=sorted(DESTINOS))
@@ -148,6 +158,10 @@ def main():
         sys.exit('No está la llave %s en %s.' % (llave, SSH))
     if a.empujar and not a.mensaje:
         sys.exit('Para publicar hace falta --mensaje con el porqué.')
+    if a.que == 'codigo' and a.empujar and red_ip_es_muestra():
+        sys.exit('crates/lists/data/red-ip.json dice "muestra": true: el país y la red de los servidores '
+                 'saldrían de la muestra de pruebas, no de DB-IP (decisión 203). Antes: '
+                 'python3 build/red-ip.py descargar AAAA-MM')
     clon = a.clon or os.path.join(tempfile.gettempdir(), nombre)
     if os.path.exists(clon):
         shutil.rmtree(clon, onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))

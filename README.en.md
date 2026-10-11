@@ -84,7 +84,8 @@ Reproducible build in a digest-pinned container: `build/repro.sh` (see
 ## Licence
 
 GPL‑3.0‑or‑later. Third-party lists keep their own licence (EasyPrivacy: GPL‑3.0 / CC BY‑SA 3.0;
-Peter Lowe's list: free use with attribution). Details in `docs/LISTS.md`. The typefaces the
+Peter Lowe's list: free use with attribution; server country and network: DB-IP Lite, CC BY 4.0,
+“IP Geolocation by DB-IP”, https://db-ip.com). Details in `docs/LISTS.md`. The typefaces the
 panel serves from the machine itself (IBM Plex and Unbounded) travel with their OFL 1.1 licence
 next to them, in [`crates/panel/static/fonts`](crates/panel/static/fonts/LEEME.md).
 

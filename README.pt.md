@@ -80,7 +80,8 @@ Compilação reproduzível em um contêiner fixado por digest: `build/repro.sh` 
 ## Licença
 
 GPL‑3.0‑or‑later. As listas de terceiros mantêm a sua licença (EasyPrivacy: GPL‑3.0 / CC BY‑SA
-3.0; lista de Peter Lowe: uso livre com atribuição). Detalhe em `docs/LISTS.md`. As tipografias que o
+3.0; lista de Peter Lowe: uso livre com atribuição; país e rede dos servidores: DB-IP Lite,
+CC BY 4.0, «IP Geolocation by DB-IP», https://db-ip.com). Detalhe em `docs/LISTS.md`. As tipografias que o
 painel serve a partir do próprio computador (IBM Plex e Unbounded) vão com a sua licença OFL 1.1
 ao lado, em [`crates/panel/static/fonts`](crates/panel/static/fonts/LEEME.md).
 

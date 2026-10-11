@@ -9,6 +9,17 @@
 # Cualquiera de las dos se puede dejar vacía (`@Empresa`, `@Empresa|XX`) cuando no se ha podido
 # comprobar.
 #
+# EL GRUPO (`@Empresa|XX|Ciudad|Grupo`, cuarto campo, decisión 203): la empresa de la que esta es
+# filial o marca, cuando lo es y está publicado (Slack → Salesforce, Booking → Booking Holdings).
+# La fuente va en la línea `# Grupo:` de encima. Solo grupos empresariales que la poseen entera o
+# la controlan; un fondo de inversión que tenga una parte no es «el grupo». Si no está claro, no se
+# pone, y la empresa cuenta como su propio grupo. Los campos de en medio pueden ir vacíos
+# (`@iubenda|||team.blue`).
+#
+# LAS REDES (`AS<número>` dentro de una sección, decisión 203): los sistemas autónomos de internet
+# que son de esa empresa, comprobados en PeeringDB. Sirven para decir «red de Meta (AS32934)» en vez
+# del nombre que da la base de IP. No son dominios y no cuentan para nada más.
+#
 # EL PAÍS (`@Empresa|XX`, código ISO de dos letras): es el de la **sede del grupo**, no el de la
 # filial que firme una web concreta. Una multinacional tiene una sociedad en cada país y cualquiera
 # de ellas puede aparecer en un aviso legal; lo que le sirve a la persona que lee el panel es de
@@ -17,7 +28,9 @@
 # lado. Si no se ha podido comprobar, **se deja sin país**: se escribe `@Empresa` a secas y el
 # panel no enseña ninguno. Un país inventado es peor que un hueco.
 
-@Google|US|Mountain View
+# Grupo: Google LLC es filial de Alphabet Inc.: «Parent: Alphabet Inc.», https://en.wikipedia.org/wiki/Google (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@Google|US|Mountain View|Alphabet
+AS15169  # su red, según PeeringDB https://www.peeringdb.com/asn/15169 (Google LLC), consultado el 10 oct 2026
 google.com
 google.com.co
 google.es
@@ -52,6 +65,7 @@ nel.goog
 googlezip.net
 
 @Apple|US|Cupertino
+AS714  # su red, según PeeringDB https://www.peeringdb.com/net/3554 (Apple Inc.), consultado el 10 oct 2026
 apple.com
 icloud.com
 apple-dns.net
@@ -67,6 +81,7 @@ apple.news
 icloud-sandbox.com
 
 @Microsoft|US|Redmond
+AS8075  # su red, según PeeringDB https://www.peeringdb.com/net/694 (Microsoft Corporation), consultado el 10 oct 2026
 msftstatic.com
 microsoftpersonalcontent.com
 microsoft.com
@@ -106,6 +121,7 @@ cloud.microsoft
 githubassets.com
 
 @Amazon|US|Seattle
+AS16509  # su red, según PeeringDB https://peeringdb.com/net/1418 (Amazon.com, Inc.), consultado el 10 oct 2026
 amazon.com
 amazon.es
 amazonaws.com
@@ -127,6 +143,7 @@ on.aws
 amazon.dev
 
 @Meta|US|Menlo Park
+AS32934  # su red, según PeeringDB https://www.peeringdb.com/net/979 (Meta), consultado el 10 oct 2026
 facebook.com
 facebook.net
 fbcdn.net
@@ -235,6 +252,7 @@ nintendo.net
 nintendo.com
 
 @Cloudflare|US|San Francisco
+AS13335  # su red, según PeeringDB https://peeringdb.com/net/4224 (Cloudflare, Inc.), consultado el 10 oct 2026
 cloudflare.com
 cloudflare-dns.com
 one.one.one.one
@@ -242,6 +260,7 @@ cloudflareinsights.com
 cloudflare.net
 
 @Akamai|US|Cambridge (Massachusetts)
+AS20940  # su red, según PeeringDB https://www.peeringdb.com/net/2 (Akamai Technologies, Inc), consultado el 10 oct 2026
 akamai.net
 akamaiedge.net
 akadns.net
@@ -251,6 +270,7 @@ edgekey.net
 edgesuite.net
 
 @Fastly|US|San Francisco
+AS54113  # su red, según PeeringDB https://peeringdb.com/net/5520 (Fastly, Inc.), consultado el 10 oct 2026
 fastly.net
 fastlylb.net
 
@@ -305,7 +325,8 @@ pubmatic.com
 @Taboola|IL|Tel Aviv
 taboola.com
 
-@Outbrain|US|Nueva York
+# Grupo: Outbrain compró Teads y pasó a llamarse Teads Holding Co. el 9 jun 2025, https://investors.teads.com/news-releases/news-release-details/outbrain-completes-change-corporate-name-teads (consultada el 10 oct 2026)
+@Outbrain|US|Nueva York|Teads
 # Outbrain Inc., Nueva York. (Decía Israel por sus fundadores: la empresa es estadounidense.)
 outbrain.com
 outbrainimg.com
@@ -386,7 +407,8 @@ mercadolivre.com
 rappi.com
 rappi.com.co
 
-@Claro|MX|Ciudad de México
+# Grupo: «Parent: América Móvil», https://en.wikipedia.org/wiki/Claro_(telecommunications_company) (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@Claro|MX|Ciudad de México|América Móvil
 claro.com.co
 claro.com
 
@@ -396,17 +418,20 @@ movistar.es
 movistar.com
 telefonica.com
 
-@Tigo|LU|Luxemburgo
+# Grupo: la marca Tigo la opera Millicom International Cellular, https://en.wikipedia.org/wiki/Tigo (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@Tigo|LU|Luxemburgo|Millicom
 tigo.com.co
 tigoune.com.co
 
-@Bancolombia|CO|Medellín
+# Grupo: Grupo Cibest es la matriz de Bancolombia desde el 19 may 2025, https://www.noticiasrcn.com/economia/grupo-cibest-se-convierte-en-la-matriz-del-grupo-bancolombia-891716 (consultada el 10 oct 2026)
+@Bancolombia|CO|Medellín|Grupo Cibest
 bancolombia.com
 bancolombia.com.co
 nequi.com.co
 nequi.co
 
-@Davivienda|CO|Bogotá
+# Grupo: «Parent: Grupo Bolívar», https://en.wikipedia.org/wiki/Davivienda (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@Davivienda|CO|Bogotá|Grupo Bolívar
 davivienda.com
 
 @Contentsquare|FR|París
@@ -550,7 +575,8 @@ canva.com
 dropbox.com
 dropboxusercontent.com
 
-@Slack|US|San Francisco
+# Grupo: «Parent: Salesforce», https://en.wikipedia.org/wiki/Slack_Technologies (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@Slack|US|San Francisco|Salesforce
 slack.com
 slack-edge.com
 
@@ -571,7 +597,8 @@ steamcontent.com
 @Electronic Arts|US|Redwood City
 ea.com
 
-@Activision|US|Santa Mónica
+# Grupo: compra cerrada el 13 oct 2023: https://en.wikipedia.org/wiki/Acquisition_of_Activision_Blizzard_by_Microsoft (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@Activision|US|Santa Mónica|Microsoft
 activision.com
 callofduty.com
 
@@ -579,10 +606,12 @@ callofduty.com
 ubisoft.com
 ubi.com
 
-@Riot Games|US|Los Ángeles
+# Grupo: «Parent: Tencent (2011–present)», https://en.wikipedia.org/wiki/Riot_Games (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@Riot Games|US|Los Ángeles|Tencent
 riotgames.com
 
-@Supercell|FI|Helsinki
+# Grupo: la ficha da Tencent como matriz (81,4 % desde 2016), https://en.wikipedia.org/wiki/Supercell_(company) (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@Supercell|FI|Helsinki|Tencent
 supercell.com
 
 @AppLovin|US|Palo Alto
@@ -600,13 +629,16 @@ ironsrc.com
 ironsource.com
 supersonicads.com
 
-@Chartboost|GB|Londres  # la compró LoopMe (Londres) a Zynga en dic 2024
+# Grupo: LoopMe la compró a Zynga el 10 dic 2024: https://www.businesswire.com/news/home/20241210493233/en/ (consultada el 10 oct 2026)
+@Chartboost|GB|Londres|LoopMe  # la compró LoopMe (Londres) a Zynga en dic 2024
 chartboost.com
 
-@Vungle|US|Redwood City  # hoy Liftoff Mobile, de la fusión de Liftoff y Vungle en 2021
+# Grupo: fusión de Liftoff y Vungle en 2021, https://vungle.com/news/liftoff-and-vungle-join-forces-to-form-leading-independent-mobile-growth-platform/ (consultada el 10 oct 2026)
+@Vungle|US|Redwood City|Liftoff  # hoy Liftoff Mobile, de la fusión de Liftoff y Vungle en 2021
 vungle.com
 
-@AdColony|US|Austin  # de Digital Turbine desde 2021, 110 San Antonio St., Austin
+# Grupo: «Subsidiary of: Digital Turbine», https://www.theatdb.com/companies/adcolony (consultada el 10 oct 2026)
+@AdColony|US|Austin|Digital Turbine  # de Digital Turbine desde 2021, 110 San Antonio St., Austin
 adcolony.com
 
 @InMobi|IN|Bangalore
@@ -667,7 +699,8 @@ strava.com
 uber.com
 ubercdn.com
 
-@Booking|NL|Ámsterdam
+# Grupo: «a subsidiary of Booking Holdings», https://en.wikipedia.org/wiki/Booking.com (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@Booking|NL|Ámsterdam|Booking Holdings
 booking.com
 bstatic.com
 
@@ -701,11 +734,13 @@ amplitude.com
 @PostHog|US|San Francisco
 posthog.com
 
-@Segment|US|San Francisco
+# Grupo: Twilio compró Segment en 2020: https://support.twilio.com/hc/en-us/articles/360056928254 (consultada el 10 oct 2026)
+@Segment|US|San Francisco|Twilio
 segment.com
 segment.io
 
-@Adjust|DE|Berlín
+# Grupo: «Adjust, an AppLovin (NASDAQ: APP) company», https://www.adjust.com/company/media (consultada el 10 oct 2026)
+@Adjust|DE|Berlín|AppLovin
 adjust.com
 adjust.io
 
@@ -727,7 +762,8 @@ perimeterx.net
 px-cloud.net
 humansecurity.com
 
-@Temu|IE|Dublín  # PDD Holdings trasladó su sede principal a Dublín en 2023; registrada en Islas Caimán; el negocio nació en China
+# Grupo: «Parent: PDD Holdings», https://en.wikipedia.org/wiki/Temu (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@Temu|IE|Dublín|PDD Holdings  # PDD Holdings trasladó su sede principal a Dublín en 2023; registrada en Islas Caimán; el negocio nació en China
 # Sin país, y no por pereza: hay dos respuestas oficiales que se contradicen. PDD Holdings
 # declara ante la SEC que sus oficinas ejecutivas principales están en Dublín, y a la vez dijo
 # públicamente, en mayo de 2023, que «su sede estará siempre en Shanghái, China, y no cambiará».
@@ -767,7 +803,8 @@ smaato.com
 creativecdn.com
 rtbhouse.com
 
-@FreeWheel|US|Nueva York
+# Grupo: «a subsidiary of Comcast», https://wikitia.com/wiki/FreeWheel (consultada el 10 oct 2026)
+@FreeWheel|US|Nueva York|Comcast
 # Empresa de Comcast (corporate.comcast.com lista FreeWheel entre sus negocios). Publicidad de
 # televisión y vídeo; `user-sync` en el nombre es emparejar identificadores entre empresas.
 fwmrm.net
@@ -816,7 +853,8 @@ adventori.com
 # el 21 sep 2026 en su propio aviso legal).
 nexx360.io
 
-@Disqus|US|San Francisco
+# Grupo: «Parent: Zeta Global», https://en.wikipedia.org/wiki/Disqus (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@Disqus|US|San Francisco|Zeta Global
 disqus.com
 disquscdn.com
 
@@ -838,13 +876,15 @@ digicert.com
 @Sectigo|US|Scottsdale  # sede en Scottsdale (Arizona) desde 2023; los certificados los emite Sectigo Limited, del Reino Unido
 sectigo.com
 
-@GlobalSign|BE|Lovaina
+# Grupo: «Parent: GMO Internet», https://en.wikipedia.org/wiki/GlobalSign (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@GlobalSign|BE|Lovaina|GMO Internet
 globalsign.com
 
 @Entrust|US|Shakopee (Minnesota)
 entrust.net
 
-@IdenTrust|US|Salt Lake City  # parte de HID Global (grupo ASSA ABLOY)
+# Grupo: HID Global compró IdenTrust en 2014 y es de ASSA ABLOY, https://en.wikipedia.org/wiki/HID_Global (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@IdenTrust|US|Salt Lake City|ASSA ABLOY  # parte de HID Global (grupo ASSA ABLOY)
 identrust.com
 
 @GoDaddy|US|Tempe (Arizona)
@@ -950,7 +990,8 @@ hubspotlinks.com
 @Help Scout
 helpscout.net
 
-@iubenda
+# Grupo: «Parent: team.blue (since 2022)», https://en.wikipedia.org/wiki/Iubenda (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@iubenda|||team.blue
 iubenda.com
 
 @RudderStack
@@ -980,7 +1021,8 @@ servenobid.com
 @Next Millennium
 nextmillmedia.com
 
-@GfK
+# Grupo: «Parent: NIQ», https://en.wikipedia.org/wiki/GfK (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@GfK|||NIQ
 sensic.net
 
 @GUARDIANA
@@ -1095,7 +1137,8 @@ nba.com
 @NFL|US|Nueva York
 nfl.com
 
-@Unidad Editorial|ES|Madrid
+# Grupo: «Owner: RCS MediaGroup (96.48 %)», https://en.wikipedia.org/wiki/Unidad_Editorial (Wikipedia (en), ficha de la empresa, consultada el 10 oct 2026)
+@Unidad Editorial|ES|Madrid|RCS MediaGroup
 # Editora de Marca, El Mundo y Expansión.
 marca.com
 elmundo.es
