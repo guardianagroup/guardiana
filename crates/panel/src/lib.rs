@@ -11,6 +11,7 @@
 
 mod api;
 mod auth;
+mod destinos;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;

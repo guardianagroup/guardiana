@@ -253,3 +253,17 @@ html.cargando body { opacity: 0; animation: guardiana-aparece 0s 2s forwards; }
 body { transition: opacity .18s ease-out; }
 @keyframes guardiana-aparece { to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { body { transition: none; } }
+/* Decision 203: the group under the company, the server line under the name, and the bars of the
+   weekly report's countries and groups. Plain bars, no map: nothing to download, and a list says
+   the percentages exactly. */
+.empresa-col .grupo{display:block;color:var(--muted);font-size:12.5px;line-height:1.35;margin-top:2px}
+.phrase.servidor{font-size:12.5px}
+.fuente-red a{color:inherit}
+.card h3{font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:-0.01em;margin:18px 0 6px}
+ul.barras{list-style:none;padding:0;margin:8px 0 14px;max-width:46em}
+ul.barras li{display:grid;grid-template-columns:minmax(0,13em) minmax(60px,1fr) auto;gap:4px 12px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:14px}
+ul.barras li > a, ul.barras li > span:first-child{overflow-wrap:anywhere}
+ul.barras .barra{display:block;height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+ul.barras .barra > span{display:block;height:100%;background:var(--accent)}
+ul.barras .cifra{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+@media (max-width:560px){ul.barras li{grid-template-columns:minmax(0,1fr) auto}ul.barras .barra{grid-column:1 / -1;grid-row:2}}

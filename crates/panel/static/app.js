@@ -132,9 +132,16 @@
         });
         return doc;
       },
-      bytes(footer) {
+      // `footer2`, when given, is a second line just above the first, on every page: where the
+      // server countries of the document come from (decision 203).
+      bytes(footer, footer2) {
         const total = pages.length;
         pages.forEach((p, i) => {
+          if (footer2) {
+            for (const [k, l] of wrapText(winAnsi(footer2), 7, usable).slice(0, 2).entries()) {
+              p.push('0.45 g BT /F1 7 Tf ' + n(PDF_M) + ' ' + n(PDF_M - 4 + 8 * (1 - k)) + ' Td (' + pdfEscape(l) + ') Tj ET');
+            }
+          }
           const left = winAnsi(footer), right = winAnsi(t('pdf_pagina').replace('{n}', i + 1).replace('{m}', total));
           p.push('0.45 g BT /F1 8 Tf ' + n(PDF_M) + ' ' + n(PDF_M - 14) + ' Td (' + pdfEscape(left) + ') Tj ET');
           p.push('0.45 g BT /F1 8 Tf ' + n(PDF_W - PDF_M - textWidth(right, 8)) + ' ' + n(PDF_M - 14) + ' Td (' + pdfEscape(right) + ') Tj ET');
@@ -185,8 +192,8 @@
     const msg = $(id + '-msg');
     b.addEventListener('click', async () => {
       try {
-        const { name, doc } = build();
-        const outcome = await savePdfFile(name, doc.bytes(t('pdf_pie')));
+        const { name, doc, pie2 } = build();
+        const outcome = await savePdfFile(name, doc.bytes(t('pdf_pie'), pie2));
         if (msg) { msg.textContent = outcome === 'cancelado' ? '' : t('pdf_' + outcome).replace('{nombre}', name); setTimeout(() => { msg.textContent = ''; }, 8000); }
       } catch (e) { if (msg) msg.textContent = String(e.message || e); }
     });
@@ -204,7 +211,7 @@
   // on the page (review of 10 Oct 2026, panel 10).
   const nombreAparato = (id, name, ip) => name || (id === 'self' ? t('este_computador') : t('dispositivo_nuevo') + ' · ' + (ip || String(id || '').replace(/^(mac|ip):/, '')));
   const deviceName = (ev) => nombreAparato(ev.device_id, ev.device_name);
-  const nameCell = (ev) => [ev.qname + (ev._n > 1 ? ' ×' + ev._n : '') + (ev.ia ? ' · ' + t('ia_prefijo') + ': ' + ev.ia : '')].concat((ev.frases || []).map((f) => '· ' + f)).join('\n');
+  const nameCell = (ev) => [ev.qname + (ev._n > 1 ? ' ×' + ev._n : '') + (ev.ia ? ' · ' + t('ia_prefijo') + ': ' + ev.ia : '')].concat((ev.frases || []).map((f) => '· ' + f)).concat(ev.servidor ? ['· ' + ev.servidor.frase] : []).join('\n');
   // El PDF tiene que decir lo MISMO que la pantalla. Enseñaba `catName(ev.category)`, la
   // categoría en bruto, así que todo lo que en pantalla pone «entrega», «red local» o «de
   // Google» salía en el papel como «sin clasificar»; y el país no salía en absoluto (lo vio el
@@ -217,7 +224,7 @@
   const dondeCell = (ev) => [ev.pais || '', ev.ciudad || ''].filter(Boolean).join('\n');
   // En el papel, la etiqueta «compra y venta de datos» va debajo del nombre de la empresa, como
   // en la pantalla va a su lado.
-  const empresaTexto = (ev) => (ev.empresa || (ev.alojado ? t('alojado_en').replace('{nube}', ev.alojado) : '')) + (ev.corredor ? '\n' + t('corredor_etiqueta') : '');
+  const empresaTexto = (ev) => (ev.empresa || (ev.alojado ? t('alojado_en').replace('{nube}', ev.alojado) : '')) + (ev.grupo ? '\n' + t('grupo_de').replace('{grupo}', ev.grupo) : '') + (ev.corredor ? '\n' + t('corredor_etiqueta') : '');
   const eventCells = (ev, withDevice) => withDevice
     ? [clock(ev.ts), nameCell(ev), empresaTexto(ev), catTexto(ev), dondeCell(ev), deviceName(ev), verdictName(ev.verdict)]
     : [clock(ev.ts), nameCell(ev), empresaTexto(ev), catTexto(ev), dondeCell(ev), verdictName(ev.verdict)];
@@ -444,7 +451,37 @@
   // company, not about this query, and it is only printed where one is written.
   const phrases = (ev) => (ev.oficio ? `<span class="phrase oficio">· ${esc(ev.oficio)}</span>` : '')
     + declara(ev)
-    + (ev.frases || []).map((f) => `<span class="phrase">· ${esc(f)}</span>`).join('');
+    + (ev.frases || []).map((f) => `<span class="phrase">· ${esc(f)}</span>`).join('')
+    + servidorFrase(ev);
+  // A dónde mandó la respuesta al aparato (decisión 203): por qué red se sirve y en qué país está
+  // el servidor según la base que va dentro del programa, o por qué no se dice (anycast, red
+  // local). La dirección y la fuente van en el título, para quien quiera comprobarlas.
+  let FUENTE_RED = null;
+  const fechaBase = (f) => {
+    const [y, m] = String((f && f.fecha) || '').split('-').map(Number);
+    return y && m ? new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString(LOC, { month: 'long', year: 'numeric', timeZone: 'UTC' }) : '';
+  };
+  const textoFuenteRed = (f) => (f.muestra ? t('destinos_muestra') + ' ' : '') + t('destinos_fuente').replace('{fuente}', f.fuente).replace('{fecha}', fechaBase(f)).replace('{licencia}', f.licencia);
+  const servidorFrase = (ev) => {
+    const s = ev.servidor;
+    if (!s) return '';
+    const titulo = FUENTE_RED ? t('servidor_titulo').replace('{ip}', s.ip).replace('{fuente}', FUENTE_RED.fuente).replace('{fecha}', fechaBase(FUENTE_RED)) : s.ip;
+    return `<span class="phrase servidor${s.anycast ? ' anycast' : ''}" title="${esc(titulo)}">· ${esc(s.frase)}</span>`;
+  };
+  // La línea de la fuente, debajo de cada tabla o tarjeta que enseña un país de servidor, con el
+  // enlace que pide su licencia; y, si lo que va dentro es la muestra de pruebas, dicho delante.
+  function pintaFuenteRed(id, f) {
+    if (!f) return;
+    FUENTE_RED = f;
+    const el = $(id);
+    if (!el || el.dataset.hecho === f.fecha + f.muestra) return;
+    el.dataset.hecho = f.fecha + f.muestra;
+    el.classList.remove('hidden');
+    el.innerHTML = (f.muestra ? `<strong class="bad">${esc(t('destinos_muestra'))}</strong> ` : '')
+      + esc(t('destinos_fuente').replace('{fuente}', f.fuente).replace('{fecha}', fechaBase(f)).replace('{licencia}', f.licencia))
+      + ` <a href="${esc(f.web)}" target="_blank" rel="noopener noreferrer">${esc(f.atribucion)}</a>`;
+  }
+  const pieRed = (f) => (f ? textoFuenteRed(f) + ' ' + f.atribucion + ' (' + f.web + ')' : '');
   // Lo que la empresa marcó ella misma en el registro de corredores de datos (ubicación exacta,
   // menores, a quién vendió): una frase debajo del nombre, solo cuando marcó algo. Es su propia
   // declaración, copiada; no una conclusión de Guardiana (pedido del responsable, 6 oct 2026).
@@ -474,7 +511,7 @@
     : '');
   // A rented server on a cloud is whoever rents it: the cell says where it is hosted, not that
   // the cloud is the company (review of 9 Oct 2026).
-  const empresaCelda = (ev) => `<td class="empresa-col">${ev.empresa ? esc(ev.empresa) : ev.alojado ? `<span class="muted">${esc(t('alojado_en').replace('{nube}', ev.alojado))}</span>` : '<span class="muted">—</span>'}${corredorTag(ev)}</td>`;
+  const empresaCelda = (ev) => `<td class="empresa-col">${ev.empresa ? esc(ev.empresa) : ev.alojado ? `<span class="muted">${esc(t('alojado_en').replace('{nube}', ev.alojado))}</span>` : '<span class="muted">—</span>'}${corredorTag(ev)}${ev.grupo ? `<span class="grupo" title="${esc(t('grupo_titulo'))}">${esc(t('grupo_de').replace('{grupo}', ev.grupo))}</span>` : ''}</td>`;
   // Dónde acaba lo de este aparato, sumado: los países de las empresas dueñas de los nombres.
   const paisesDe = (l) => (l && l.paises && l.paises.length
     ? `<br><span class="phrase">${esc(t('lectura_paises'))} ` + l.paises.map((x) => `${esc(x[0])} <b>${x[1]}</b>`).join(' · ') + '</span>'
@@ -827,6 +864,7 @@
           && Math.abs(last.ts - ev.ts) <= 2000) {
         last._n += 1;
         if (ev.qtype && !last._types.includes(ev.qtype)) last._types.push(ev.qtype);
+        if (!last.servidor && ev.servidor) last.servidor = ev.servidor;
         last.ts = Math.max(last.ts, ev.ts);
         continue;
       }
@@ -1100,6 +1138,22 @@
         $('i-corredores-rows').innerHTML = r.corredores.map((c) => `<tr><td>${esc(c.nombre)}</td><td>${c.pais ? esc(c.pais) : '<span class="muted">—</span>'}</td><td>${num(c.consultas)}</td><td>${num(c.nombres)}</td><td>${c.declara.length ? esc(c.declara.join(', ')) : '<span class="muted">—</span>'}</td><td>${derechos(c)}</td></tr>`).join('')
           || `<tr><td colspan="6" class="muted">${esc(t('informe_corredores_ninguna'))}</td></tr>`;
       }
+      // A dónde viajan las consultas de la semana (decisión 203): el país del servidor según la
+      // base que va dentro del programa, y los grupos dueños de los nombres. Las cifras vienen
+      // hechas del servidor; aquí solo se dibujan. Cada país lleva al Extracto filtrado por él.
+      const d = r.destinos;
+      $('i-destinos').classList.toggle('hidden', !d);
+      const barra = (nombre, pct, consultas, enlace) => `<li>${enlace ? `<a href="${esc(enlace)}">${esc(nombre)}</a>` : `<span>${esc(nombre)}</span>`}<span class="barra" aria-hidden="true"><span style="width:${Math.max(0, Math.min(100, pct))}%"></span></span><span class="cifra"><b>${pct} %</b> <span class="muted">${esc(tn('informe_n_consultas', consultas))}</span></span></li>`;
+      const grupoDicho = (g) => g.nombre + (g.empresas.length ? ' (' + g.empresas.join(', ') + ')' : '');
+      if (d) {
+        pintaFuenteRed('fuente-red', d.fuente);
+        $('i-paises-frase').textContent = d.con_direccion ? tn('destinos_paises_frase', d.n_paises) : t('destinos_sin');
+        $('i-paises-lead').textContent = t('destinos_paises_lead').replace('{total}', num(d.consultas)).replace('{con}', num(d.con_direccion));
+        $('i-paises-lead').classList.toggle('hidden', !d.con_direccion);
+        $('i-paises').innerHTML = d.paises.map((p) => barra(p.nombre, p.pct, p.consultas, '/extracto?pais=' + encodeURIComponent(p.clave))).join('');
+        $('i-grupos-frase').textContent = d.top_n ? tn('destinos_grupos_frase', d.top_n).replace('{pct}', d.top_pct).replace('{total}', num(d.consultas)).replace('{grupos}', d.grupos.slice(0, d.top_n).map(grupoDicho).join(', ')) : '';
+        $('i-grupos').innerHTML = d.grupos.slice(0, 12).map((g) => barra(grupoDicho(g), g.pct, g.consultas)).join('');
+      }
       if (r.plus && !r.comparar_desde) {
         $('i-nuevos-rows').innerHTML = r.novedades.map((n2) => `<tr><td class="mono">${esc(n2.nombre)}</td><td>${esc(n2.empresa)}</td><td>${esc(catName(n2.categoria))}</td><td>${esc(nombreAparato(n2.device_id, n2.device_name))}</td><td>${num(n2.consultas)}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('informe_nuevos_ninguno'))}</td></tr>`;
       }
@@ -1147,8 +1201,23 @@
             doc.line(t('informe_corredores_ninguna'), 10);
           }
         }
+        if (d) {
+          doc.seccion(t('destinos_titulo'));
+          doc.line(t('destinos_paises_titulo'), 11, true).gap(2);
+          doc.line(d.con_direccion ? tn('destinos_paises_frase', d.n_paises) : t('destinos_sin'), 10);
+          if (d.con_direccion) {
+            doc.gap(2).line(t('destinos_paises_lead').replace('{total}', num(d.consultas)).replace('{con}', num(d.con_direccion)), 9, false, 0.45).gap(4);
+            doc.table([{ title: t('col_pais'), w: 0.6 }, { title: '%', w: 0.15 }, { title: t('col_consultas'), w: 0.25 }], d.paises.map((p) => [p.nombre, p.pct + ' %', num(p.consultas)]), 8);
+          }
+          doc.gap(8).line(t('destinos_grupos_titulo'), 11, true).gap(2);
+          if (d.top_n) doc.line(tn('destinos_grupos_frase', d.top_n).replace('{pct}', d.top_pct).replace('{total}', num(d.consultas)).replace('{grupos}', d.grupos.slice(0, d.top_n).map(grupoDicho).join(', ')), 10);
+          doc.gap(2).line(t('destinos_grupos_lead'), 9, false, 0.45).gap(4);
+          if (d.grupos.length) doc.table([{ title: t('col_grupo'), w: 0.6 }, { title: '%', w: 0.15 }, { title: t('col_consultas'), w: 0.25 }], d.grupos.slice(0, 12).map((g) => [grupoDicho(g), g.pct + ' %', num(g.consultas)]), 8);
+          // La fuente con su fecha, al pie del documento y de cada página.
+          doc.gap(8).line(pieRed(d.fuente), 8, false, 0.45);
+        }
         if (r.plus) doc.seccion(t('informe_whatsapp_titulo')).line(r.texto_whatsapp, 10);
-        return { name: pdfName('informe-semanal'), doc };
+        return { name: pdfName('informe-semanal'), doc, pie2: d ? pieRed(d.fuente) : '' };
       });
       $('i-copiar').addEventListener('click', async () => {
         try { await navigator.clipboard.writeText(r.texto_whatsapp); $('i-copiado').textContent = t('informe_copiado'); } catch (_) {}
@@ -1242,7 +1311,7 @@
         if (r.hueco) doc.line(t('hueco').replace('{desde}', when(r.hueco.desde)).replace('{hasta}', when(r.hueco.hasta)), 9, false, 0.4);
         doc.gap(6).table(eventCols(true), r.eventos.length ? foldEvents(r.eventos).map((ev) => eventCells(ev, true)) : [[ '', t('sin_consultas_aun'), '', '', '', '', '' ]]);
         pdfQuienHayDetras(doc, r.eventos);
-        return { name: pdfName('radiografia'), doc };
+        return { name: pdfName('radiografia'), doc, pie2: pieRed(r.fuente_red) };
       });
       await cargarCortados();
       // Until the system DNS points at Guardiana, this PC's own queries never arrive: say so and offer the change (brief §4).
@@ -1271,6 +1340,7 @@
       const refresh = async () => {
         const r = await api('/api/radiografia?segundos=60');
         last = r;
+        pintaFuenteRed('fuente-red', r.fuente_red);
         $('c-servicios').textContent = r.servicios;
         $('c-rastreadores').textContent = r.rastreadores;
         $('c-publicidad').textContent = r.publicidad;
@@ -1306,7 +1376,7 @@
         (r.huecos || []).forEach((h) => doc.line(t('hueco').replace('{desde}', when(h.desde)).replace('{hasta}', when(h.hasta)), 9, false, 0.4));
         doc.gap(6).table(eventCols(true), r.eventos.length ? foldEvents(r.eventos).map((ev) => eventCells(ev, true)) : [[ '', t('sin_resultados'), '', '', '', '', '' ]]);
         pdfQuienHayDetras(doc, r.eventos);
-        return { name: pdfName('extracto'), doc };
+        return { name: pdfName('extracto'), doc, pie2: pieRed(r.fuente_red) };
       });
       bindCutButtons($('rows'), '/api/reglas');
       const load = async () => {
@@ -1314,7 +1384,19 @@
         for (const [k, v] of [...q]) if (!v) q.delete(k);
         const r = await api('/api/extracto?' + q.toString());
         lastR = r;
-        lastFilters = [...q].filter(([k]) => k !== 'limit').map(([k, v]) => t('f_' + ({ device_id: 'dispositivo', category: 'categoria', signal: 'senal', verdict: 'veredicto' }[k] || k)) + ': ' + (k === 'device_id' ? ($('f-device').selectedOptions[0] || {}).textContent || v : k === 'category' ? catName(v) : k === 'verdict' ? verdictName(v) : v)).join(' · ');
+        pintaFuenteRed('fuente-red', r.fuente_red);
+        // The server countries the extract holds, for the filter; the one asked for in the
+        // address (a country pressed in the weekly report) is chosen (decision 203).
+        const selP = $('f-pais');
+        if (selP && !selP.dataset.lleno) {
+          selP.dataset.lleno = '1';
+          for (const [clave, nombre] of r.paises_servidor || []) {
+            const ya = [...selP.options].find((o) => o.value === clave);
+            if (ya) { ya.textContent = nombre; selP.appendChild(ya); continue; }
+            const o = document.createElement('option'); o.value = clave; o.textContent = nombre; selP.appendChild(o);
+          }
+        }
+        lastFilters = [...q].filter(([k]) => k !== 'limit').map(([k, v]) => t('f_' + ({ device_id: 'dispositivo', category: 'categoria', signal: 'senal', verdict: 'veredicto', pais: 'pais_servidor' }[k] || k)) + ': ' + (k === 'device_id' ? ($('f-device').selectedOptions[0] || {}).textContent || v : k === 'pais' ? ($('f-pais').selectedOptions[0] || {}).textContent || v : k === 'category' ? catName(v) : k === 'verdict' ? verdictName(v) : v)).join(' · ');
         $('rows').innerHTML = eventRows(r.eventos) || `<tr><td colspan="8" class="muted">${esc(t('sin_resultados'))}</td></tr>`;
         $('total').textContent = mostrandoTexto(r);
         $('huecos').innerHTML = (r.huecos || []).map((h) => `<li>${esc(t('hueco').replace('{desde}', when(h.desde)).replace('{hasta}', when(h.hasta)))}</li>`).join('');
@@ -1359,6 +1441,10 @@
       // A device that keeps its detail to itself says so here: choosing it shows no rows, and
       // that has a reason (review of 10 Oct 2026, panel 30).
       devs.forEach((d) => { const o = document.createElement('option'); o.value = d.id; o.textContent = nombreAparato(d.id, d.name, d.last_ip) + (d.detalle_visible ? '' : t('extracto_no_comparte')); sel.appendChild(o); });
+      // Arriving from a country of the weekly report: the filter starts on it. The option is put
+      // in before the first load, so the request carries it.
+      const pedido = new URLSearchParams(location.search).get('pais');
+      if (pedido && $('f-pais')) { const o = document.createElement('option'); o.value = pedido; o.textContent = pedido; $('f-pais').appendChild(o); $('f-pais').value = pedido; }
       await load();
     },
     async dispositivos() {
@@ -1762,6 +1848,7 @@
       // Lists by their name, not their id; GUARDIANA's own two have no download date because they
       // travel inside the program (review of 10 Oct 2026, panel 23).
       $('e-listas').innerHTML = r.listas.map((l) => `<tr><td>${esc((T.panel && T.panel['lista_' + l.id]) || l.id)}</td><td>${num(l.entries)}</td><td class="muted">${esc(l.fetched || t('lista_incluida'))}</td></tr>`).join('');
+      pintaFuenteRed('fuente-red', r.fuente_red);
     },
   };
 

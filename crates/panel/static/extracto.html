@@ -36,6 +36,7 @@
   <label><span data-t="f_categoria"></span><select name="category"><option value="" data-t="f_todas"></option><option value="rastreador">rastreador</option><option value="publicidad">publicidad</option><option value="telemetria">telemetría</option><option value="esperado">normal</option><option value="desconocido">sin clasificar</option></select></label>
   <label><span data-t="f_senal"></span><select name="signal"><option value="" data-t="f_todas"></option><option value="baliza">baliza</option><option value="destino_nuevo">destino nuevo</option><option value="fuera_de_horas">fuera de horas</option><option value="evasion_dns">evasión de DNS</option><option value="volumen">volumen</option></select></label>
   <label><span data-t="f_veredicto"></span><select name="verdict"><option value="" data-t="f_todas"></option><option value="observado">observado</option><option value="respondido">respondido</option><option value="cortado">bloqueado</option></select></label>
+  <label><span data-t="f_pais_servidor"></span><select name="pais" id="f-pais"><option value="" data-t="f_todas"></option></select></label>
   <label><span data-t="f_limite"></span><input name="limit" type="number" min="1" max="5000" value="200"></label>
   <button type="submit" data-t="filtrar"></button>
 </form>
@@ -50,6 +51,7 @@
 </p>
 <p class="muted" id="total"></p>
 <div class="card wrap"><table><thead><tr><th data-t="col_hora"></th><th data-t="col_nombre"></th><th data-t="col_empresa_n"></th><th data-t="col_categoria"></th><th data-t="col_pais"></th><th data-t="col_dispositivo"></th><th data-t="col_veredicto"></th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+<p class="limit fuente-red hidden" id="fuente-red"></p>
 <h2 data-t="cadena_titulo"></h2>
 <p class="lead" data-t="cadena_lead"></p>
 <p><button id="check" class="secondary" data-t="cadena_boton"></button> <span id="check-result" role="status" aria-live="polite"></span></p>

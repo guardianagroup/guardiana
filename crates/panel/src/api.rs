@@ -16,8 +16,8 @@ use guardiana_core::i18n::{self, Texts};
 use guardiana_core::rules::{observation_complete, observed_hours};
 use guardiana_core::time::now_ms;
 use guardiana_core::{
-    write_csv_for_spreadsheet, write_json, Action, Category, DecidedBy, Device, Event, EventFilter,
-    Ledger, MatchKind, NewRule, Rule, Scope, Signal, Verdict, SELF_DEVICE_ID,
+    write_csv_for_spreadsheet_with, write_json, Action, Category, DecidedBy, Device, Event,
+    EventFilter, Ledger, MatchKind, NewRule, Rule, Scope, Signal, Verdict, SELF_DEVICE_ID,
 };
 use guardiana_core::{ChangeKind, ChangeWho};
 use guardiana_service::home::{
@@ -28,6 +28,7 @@ use guardiana_service::sysdns::{SETTING_BACKUP, SETTING_BACKUP_APARCADA};
 use serde::{Deserialize, Serialize};
 
 use crate::auth::{Lang, PorDireccion, Session, Zona};
+use crate::destinos::{self, FuenteView, ResumenDestinos, ServidorView};
 use crate::AppState;
 
 type ApiResult<T> = Result<Json<T>, Response>;
@@ -125,6 +126,14 @@ pub(crate) struct EventView {
     /// that told the State of California it collects and sells personal data of people it has no
     /// relationship with. Copied from that public register; never a verdict about this query.
     corredor: Option<CorredorView>,
+    /// The group the owning company belongs to, when it is a company of another (`Slack` →
+    /// `Salesforce`) and that is public (decision 203). `None` when it is its own group.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    grupo: Option<&'static str>,
+    /// The server the answer pointed to: its network and its country according to the bundled
+    /// base (decision 203). `None` for rows with no address: cut, answered here, or older.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    servidor: Option<ServidorView>,
 }
 
 /// A registered data broker as the pages show it: who, from where, what it ticked in the
@@ -234,6 +243,8 @@ fn view(t: &Texts, e: Event, names: &HashMap<String, Option<String>>) -> EventVi
         alojado,
         sector: guardiana_lists::sector_of(&e.qname).filter(|_| alojado.is_none()),
         corredor: corredor_de(t, &e.qname),
+        grupo: guardiana_lists::group_of(&e.qname).filter(|_| alojado.is_none()),
+        servidor: destinos::servidor_view(t, &e.answer_ip),
         ciudad: guardiana_lists::city_of(&e.qname)
             .filter(|_| alojado.is_none())
             .map(str::to_owned),
@@ -497,6 +508,8 @@ pub(crate) struct Estado {
     /// 2026, serious 10).
     dns_cubre: Option<bool>,
     listas: Vec<ListaInfo>,
+    /// Source, licence and attribution of the IP tables, for the line under the lists.
+    fuente_red: FuenteView,
     panel_puerto: u16,
     /// Which system this is running on. The panel uses it to say, on a Mac, that Home Mode is
     /// not part of 1.0 there: the site says so and the program must not offer it silently.
@@ -524,6 +537,7 @@ struct ListaInfo {
 }
 
 pub(crate) async fn estado(
+    Lang(t): Lang,
     State(state): State<Arc<AppState>>,
     Query(q): Query<HashMap<String, String>>,
     _s: Session,
@@ -579,6 +593,26 @@ pub(crate) async fn estado(
         entries: guardiana_lists::parse_guardiana(guardiana_lists::ESPERADO).count() as u64,
         fetched: String::new(),
     });
+    // The two IP tables of decision 203: how many ranges, and the month of the base (or that it
+    // is the test sample, which the page says in words).
+    let red = guardiana_lists::fuente_red();
+    let red_ip: serde_json::Value =
+        serde_json::from_str(guardiana_lists::RED_IP_JSON).unwrap_or_default();
+    for (id, clave) in [("dbip-pais", "pais"), ("dbip-red", "red")] {
+        let rangos = ["rangos_v4", "rangos_v6"]
+            .iter()
+            .filter_map(|k| red_ip[clave][k].as_u64())
+            .sum();
+        listas.push(ListaInfo {
+            id: id.to_owned(),
+            entries: rangos,
+            fetched: if red.muestra {
+                t.panel("lista_muestra").to_owned()
+            } else {
+                red.fecha.clone()
+            },
+        });
+    }
     listas.push(ListaInfo {
         id: guardiana_lists::OWN_SOURCE_TELEMETRIA.to_owned(),
         entries: guardiana_lists::parse_guardiana(guardiana_lists::TELEMETRIA).count() as u64,
@@ -592,6 +626,7 @@ pub(crate) async fn estado(
         dns_aplicado,
         dns_cubre,
         listas,
+        fuente_red: destinos::fuente_view(),
         panel_puerto: crate::DEFAULT_PORT,
         so: if cfg!(target_os = "macos") {
             "macos"
@@ -625,6 +660,8 @@ pub(crate) struct Radiografia {
     eventos: Vec<EventView>,
     /// Latest period (last 7 days) in which the service was not watching.
     hueco: Option<HuecoView>,
+    /// Where the servers' countries and networks come from, for the line under the table.
+    fuente_red: FuenteView,
 }
 
 /// A gap in the watch, for the panel.
@@ -1138,6 +1175,7 @@ pub(crate) async fn radiografia(
     let mut eventos: Vec<EventView> = events.into_iter().map(|e| view(t, e, &names)).collect();
     eventos.reverse();
     Ok(Json(Radiografia {
+        fuente_red: destinos::fuente_view(),
         hueco,
         desde: since,
         hasta: until,
@@ -1382,6 +1420,11 @@ pub(crate) struct Extracto {
     eventos: Vec<EventView>,
     /// Periods in which the service was not watching, newest first.
     huecos: Vec<HuecoView>,
+    /// The server countries the rows the household may read point to, for the filter: (key,
+    /// name), by name, with anycast, local and no data last (decision 203).
+    paises_servidor: Vec<(String, String)>,
+    /// Where those countries come from.
+    fuente_red: FuenteView,
 }
 
 /// The household's extract. `?device_id=` of a device whose owner did not share its detail
@@ -1396,16 +1439,20 @@ pub(crate) async fn extracto(
     Query(q): Query<HashMap<String, String>>,
 ) -> ApiResult<Extracto> {
     let mut filter = filter_from(&q)?;
+    let pais = pais_de_consulta(&q)?;
     // The page offers up to 5 000; a hand-typed limit above that would build a JSON of the
     // whole ledger in memory (review of 8 Oct 2026).
     filter.limit = Some(filter.limit.unwrap_or(200).min(5_000));
-    let (events, total, todos, devices, huecos) = with_ledger(&state, |l| {
+    let (events, total, todos, devices, huecos, ips) = with_ledger(&state, |l| {
+        let ips = l.answer_ips()?;
+        filter.answer_ips = pais.as_deref().map(|p| ips_de(&ips, p));
         Ok((
             l.events(&filter)?,
             l.shared_event_count()?,
             l.event_count()?,
             l.devices()?,
             huecos(l, 0, 20)?,
+            ips,
         ))
     })?;
     let names = names_of(&devices);
@@ -1416,7 +1463,75 @@ pub(crate) async fn extracto(
         ocultos: todos.saturating_sub(total),
         eventos,
         huecos,
+        paises_servidor: paises_para_filtro(t, &ips),
+        fuente_red: destinos::fuente_view(),
     }))
+}
+
+/// The `pais` of a query string, checked: two capital letters, or one of the bucket words of
+/// `destinos`. Anything else is a 400, not a filter that silently matches nothing.
+fn pais_de_consulta(q: &HashMap<String, String>) -> Result<Option<String>, Response> {
+    let Some(p) = q.get("pais").map(|p| p.trim()).filter(|p| !p.is_empty()) else {
+        return Ok(None);
+    };
+    let especial = [
+        destinos::CLAVE_ANYCAST,
+        destinos::CLAVE_LOCAL,
+        destinos::CLAVE_SIN_DATO,
+    ]
+    .contains(&p);
+    let codigo = p.len() == 2 && p.chars().all(|c| c.is_ascii_uppercase());
+    if especial || codigo {
+        Ok(Some(p.to_owned()))
+    } else {
+        Err((StatusCode::BAD_REQUEST, "pais").into_response())
+    }
+}
+
+/// The addresses among `ips` whose server falls in the country (or bucket) `clave`.
+fn ips_de(ips: &[String], clave: &str) -> Vec<String> {
+    ips.iter()
+        .filter(|ip| destinos::clave_pais(ip).as_deref() == Some(clave))
+        .cloned()
+        .collect()
+}
+
+/// Every country (or bucket) the stored addresses fall in, named, for the extract's filter.
+fn paises_para_filtro(t: &Texts, ips: &[String]) -> Vec<(String, String)> {
+    let mut claves: Vec<String> = ips
+        .iter()
+        .filter_map(|ip| destinos::clave_pais(ip))
+        .collect();
+    claves.sort();
+    claves.dedup();
+    let especial = |k: &str| match k {
+        destinos::CLAVE_ANYCAST => Some("destinos_anycast"),
+        destinos::CLAVE_LOCAL => Some("destinos_local"),
+        destinos::CLAVE_SIN_DATO => Some("destinos_sin_dato"),
+        _ => None,
+    };
+    let mut paises: Vec<(String, String)> = claves
+        .iter()
+        .filter(|k| especial(k).is_none())
+        .map(|k| {
+            let n = t.pais(k);
+            (
+                k.clone(),
+                if n.is_empty() {
+                    k.clone()
+                } else {
+                    n.to_owned()
+                },
+            )
+        })
+        .collect();
+    paises.sort_by(|a, b| a.1.cmp(&b.1));
+    for k in &claves {
+        if let Some(texto) = especial(k) {
+            paises.push((k.clone(), t.panel(texto).to_owned()));
+        }
+    }
+    paises
 }
 
 #[derive(Serialize)]
@@ -1474,8 +1589,14 @@ pub(crate) async fn exportar(
     // share its detail is not in the file either, by the same `Ledger::events` the page uses
     // (review of 1 Oct 2026, entry 1).
     let mut filter = filter_from(&q)?;
+    let pais = pais_de_consulta(&q)?;
     filter.limit = None;
-    let events = with_ledger(&state, |l| l.events(&filter))?;
+    let events = with_ledger(&state, |l| {
+        if let Some(p) = &pais {
+            filter.answer_ips = Some(ips_de(&l.answer_ips()?, p));
+        }
+        l.events(&filter)
+    })?;
     let json = q.get("formato").is_some_and(|f| f == "json");
     let mut body = Vec::new();
     if json {
@@ -1488,7 +1609,40 @@ pub(crate) async fn exportar(
         } else {
             ';'
         };
-        write_csv_for_spreadsheet(&events, sep, &mut body).map_err(internal)?;
+        // After the ledger's own columns, what the panel reads from them with the data bundled in
+        // the program: the server's country and network, and the company's group (decision 203).
+        // The source and its month go in the headers, so the file says where they come from.
+        let f = destinos::fuente_view();
+        let fuente = if f.muestra {
+            t.panel("csv_fuente_muestra").to_owned()
+        } else {
+            format!("{} {}", f.fuente, f.fecha)
+        };
+        let cabeceras = [
+            format!("servidor_pais [{fuente}]"),
+            format!("servidor_asn [{fuente}]"),
+            format!("servidor_red [{fuente}]"),
+            "grupo [empresas.txt]".to_owned(),
+        ];
+        let refs: Vec<&str> = cabeceras.iter().map(String::as_str).collect();
+        let extra = |e: &Event| -> Vec<String> {
+            let s = destinos::servidor_view(t, &e.answer_ip);
+            let pais = destinos::clave_pais(&e.answer_ip).unwrap_or_default();
+            vec![
+                pais,
+                s.as_ref()
+                    .and_then(|s| s.asn)
+                    .map(|a| format!("AS{a}"))
+                    .unwrap_or_default(),
+                s.and_then(|s| s.red).unwrap_or_default(),
+                (guardiana_lists::hosting_of(&e.qname).is_none())
+                    .then(|| guardiana_lists::group_or_company_of(&e.qname))
+                    .flatten()
+                    .unwrap_or_default()
+                    .to_owned(),
+            ]
+        };
+        write_csv_for_spreadsheet_with(&events, sep, &refs, &extra, &mut body).map_err(internal)?;
     }
     let (ctype, name) = if json {
         ("application/json; charset=utf-8", "guardiana-extracto.json")
@@ -2037,6 +2191,9 @@ pub(crate) struct Informe {
     corredores: Vec<InformeCorredor>,
     /// Queries of the week that went to those registrants, all of them together.
     corredores_consultas: i64,
+    /// Where the week's queries went: the servers' countries and the business groups behind the
+    /// names (decision 203). Only with Plus, like the rest of the report.
+    destinos: Option<ResumenDestinos>,
     texto_whatsapp: String,
 }
 
@@ -2125,37 +2282,52 @@ pub(crate) async fn informe(
 ) -> ApiResult<Informe> {
     let ahora = now_ms();
     const SEMANA: i64 = 7 * 24 * 60 * 60 * 1000;
-    let (w, anterior, novedades, plus, comparar_desde, nombres) = with_ledger(&state, |l| {
-        let plus = guardiana_license::status(l, &state.token, ahora)
-            .map(|s| s.plus_activo)
-            .unwrap_or(false);
-        let semana = l.week_summary(ahora)?;
-        // Both comparisons need the previous week watched whole: since the first device was seen.
-        let mirando_desde = l.devices()?.iter().map(|d| d.first_seen).min();
-        let comparable = mirando_desde.is_some_and(|d| d <= ahora - 2 * SEMANA);
-        let comparar_desde = (!comparable).then(|| mirando_desde.unwrap_or(ahora) + 2 * SEMANA);
-        // Only asked for with Plus: without the memory Plus keeps, both answers are empty by
-        // construction and printing an empty one would read as "nothing changed". The week is
-        // figures per device, so every device is in it; the new destinations carry names, so a
-        // device whose owner did not share its detail is left out of them by the ledger itself
-        // (review of 1 Oct 2026, entry 1).
-        let (anterior, novedades) = if plus && comparable {
-            (
-                Some(l.week_summary(ahora - SEMANA)?),
-                l.new_destinations(ahora, 12)?,
-            )
-        } else {
-            (None, Vec::new())
-        };
-        // The week's names, for the registered data brokers among them: only with Plus, like
-        // the rest of the report, and the detail a device kept to itself is not in them.
-        let nombres = if plus {
-            l.week_names(ahora)?
-        } else {
-            Vec::new()
-        };
-        Ok((semana, anterior, novedades, plus, comparar_desde, nombres))
-    })?;
+    let (w, anterior, novedades, plus, comparar_desde, nombres, destinos) =
+        with_ledger(&state, |l| {
+            let plus = guardiana_license::status(l, &state.token, ahora)
+                .map(|s| s.plus_activo)
+                .unwrap_or(false);
+            let semana = l.week_summary(ahora)?;
+            // Both comparisons need the previous week watched whole: since the first device was seen.
+            let mirando_desde = l.devices()?.iter().map(|d| d.first_seen).min();
+            let comparable = mirando_desde.is_some_and(|d| d <= ahora - 2 * SEMANA);
+            let comparar_desde = (!comparable).then(|| mirando_desde.unwrap_or(ahora) + 2 * SEMANA);
+            // Only asked for with Plus: without the memory Plus keeps, both answers are empty by
+            // construction and printing an empty one would read as "nothing changed". The week is
+            // figures per device, so every device is in it; the new destinations carry names, so a
+            // device whose owner did not share its detail is left out of them by the ledger itself
+            // (review of 1 Oct 2026, entry 1).
+            let (anterior, novedades) = if plus && comparable {
+                (
+                    Some(l.week_summary(ahora - SEMANA)?),
+                    l.new_destinations(ahora, 12)?,
+                )
+            } else {
+                (None, Vec::new())
+            };
+            // The week's names, for the registered data brokers among them: only with Plus, like
+            // the rest of the report, and the detail a device kept to itself is not in them.
+            let nombres = if plus {
+                l.week_names(ahora)?
+            } else {
+                Vec::new()
+            };
+            // Where the week went, by server and by group: the same household rows, forwarded only.
+            let destinos = if plus {
+                l.week_destinations(ahora)?
+            } else {
+                Vec::new()
+            };
+            Ok((
+                semana,
+                anterior,
+                novedades,
+                plus,
+                comparar_desde,
+                nombres,
+                destinos,
+            ))
+        })?;
     if !plus {
         // There is no free plan any more: reaching this means the trial or the subscription is
         // over and Guardiana has stood down. It shows nothing rather than an invented example —
@@ -2169,6 +2341,7 @@ pub(crate) async fn informe(
             comparar_desde: None,
             corredores: Vec::new(),
             corredores_consultas: 0,
+            destinos: None,
             desde: w.since,
             hasta: w.until,
             dispositivos: Vec::new(),
@@ -2197,7 +2370,13 @@ pub(crate) async fn informe(
                 ),
         );
     }
+    let destinos = destinos::resumen(t, &destinos);
+    for frase in destinos::frases_para_compartir(t, &destinos) {
+        texto_whatsapp.push(' ');
+        texto_whatsapp.push_str(&frase);
+    }
     Ok(Json(Informe {
+        destinos: Some(destinos),
         plus: true,
         ejemplo: false,
         desde: w.since,
