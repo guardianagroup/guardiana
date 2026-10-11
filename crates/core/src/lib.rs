@@ -22,6 +22,7 @@ mod hash;
 pub mod i18n;
 pub mod identity;
 mod ledger;
+mod medidas;
 mod model;
 pub mod paths;
 mod report;
@@ -42,6 +43,7 @@ pub use ledger::{
     copia_junto_al_extracto, ChainFault, CheckReport, EventFilter, Ledger, ServerFilter,
     COPIAS_EN_ARCHIVO,
 };
+pub use medidas::{local_day_index, local_midnight, CloakedCount, NameDay, TrackerRow};
 pub use model::{
     Action, Category, DecidedBy, Device, Event, MatchKind, NewEvent, NewRule, Outbound, Proceso,
     Purpose, Rule, Scope, ServerInfo, ServerKind, Signal, SignalKind, Verdict,

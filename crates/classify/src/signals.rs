@@ -110,10 +110,7 @@ impl DeviceState {
         // milliseconds apart, not a new contact. Counted as separate samples they put a tiny
         // interval between every real one and the median collapsed to zero, so a beacon every
         // five minutes was never regular on Windows or macOS (review of 8 Oct 2026).
-        if times
-            .back()
-            .is_some_and(|&last| ts - last < SAME_CONTACT_MS)
-        {
+        if times.back().is_some_and(|&last| same_contact(last, ts)) {
             return None;
         }
         times.push_back(ts);
@@ -184,6 +181,36 @@ impl DeviceState {
     }
 }
 
+/// Whether a query at `ts` is the same contact as one at `previous`: one call asks the same name
+/// several ways at once (A, AAAA, HTTPS), a few milliseconds apart. The beacon signal and the
+/// weekly report's cadence (decision 205) fold them the same way.
+#[must_use]
+pub fn same_contact(previous: i64, ts: i64) -> bool {
+    ts - previous < SAME_CONTACT_MS
+}
+
+/// The intervals between successive contacts of one sorted series of query times, folded with
+/// [`same_contact`] first, sorted ascending.
+#[must_use]
+pub fn contact_intervals(times: &[i64]) -> Vec<i64> {
+    let mut contacts: Vec<i64> = Vec::with_capacity(times.len());
+    for &ts in times {
+        if !contacts.last().is_some_and(|&last| same_contact(last, ts)) {
+            contacts.push(ts);
+        }
+    }
+    let mut intervals: Vec<i64> = contacts.windows(2).map(|w| w[1] - w[0]).collect();
+    intervals.sort_unstable();
+    intervals
+}
+
+/// The median of intervals already sorted ascending (the upper one of an even count, as the
+/// beacon signal has always taken it), or `None` when there are none.
+#[must_use]
+pub fn median_of_sorted(intervals: &[i64]) -> Option<i64> {
+    intervals.get(intervals.len() / 2).copied()
+}
+
 /// Median interval in whole minutes when every interval is within tolerance
 /// of the median and the samples span at least the minimum.
 fn regular_period(times: &[i64], t: &Thresholds) -> Option<u32> {
@@ -196,7 +223,7 @@ fn regular_period(times: &[i64], t: &Thresholds) -> Option<u32> {
     }
     let mut intervals: Vec<i64> = times.windows(2).map(|w| w[1] - w[0]).collect();
     intervals.sort_unstable();
-    let median = intervals[intervals.len() / 2];
+    let median = median_of_sorted(&intervals)?;
     if median <= 0 {
         return None;
     }
@@ -224,6 +251,22 @@ mod tests {
         assert_eq!(regular_period(&[0, 20 * m, 45 * m, 65 * m], &t), None);
         // Too short a span.
         assert_eq!(regular_period(&[0, 5 * m, 10 * m, 15 * m], &t), None);
+    }
+
+    #[test]
+    fn contacts_fold_like_the_beacon_and_give_their_median() {
+        let m = 60_000;
+        // Every five minutes, each asked as A and AAAA a millisecond apart, and one long gap.
+        let mut times = Vec::new();
+        for i in [0, 5, 10, 15, 75] {
+            times.push(i * m);
+            times.push(i * m + 1);
+        }
+        let iv = contact_intervals(&times);
+        assert_eq!(iv, vec![5 * m, 5 * m, 5 * m, 60 * m]);
+        assert_eq!(median_of_sorted(&iv), Some(5 * m));
+        assert_eq!(median_of_sorted(&[]), None);
+        assert!(contact_intervals(&[7]).is_empty());
     }
 
     #[test]

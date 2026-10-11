@@ -15,7 +15,9 @@ use std::sync::Arc;
 use guardiana_core::{Category, Signal};
 use guardiana_lists::{Catalog, ExpectedKind};
 
-pub use signals::{DeviceState, HoursProfile, Thresholds};
+pub use signals::{
+    contact_intervals, median_of_sorted, same_contact, DeviceState, HoursProfile, Thresholds,
+};
 
 /// One query to classify.
 #[derive(Debug, Clone, PartialEq, Eq)]
