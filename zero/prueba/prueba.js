@@ -180,7 +180,7 @@ function pantalla(nombre) {
   await balizaVista.first().locator('button').click();
   comprueba(await hasta(async () => (await filaBaliza().count()) === 1), 'y «Volver a bloquear» lo deja cortado otra vez');
   await panel.click('#e-maxima-quitar');
-  comprueba(await hasta(() => panel.evaluate(() => document.querySelector('#e-maxima-activa').classList.contains('oculto'))), 'y se puede volver a la normal');
+  comprueba(await hasta(() => panel.evaluate(() => document.querySelector('#e-maxima-activa').classList.contains('oculto'))), 'y se puede desactivar');
   await espera(600);
   pantalla('02-escudo.png');
   await web.screenshot({ path: path.join(salida, 'web.png') }).catch(() => {});

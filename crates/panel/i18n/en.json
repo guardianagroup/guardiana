@@ -514,7 +514,7 @@
     "maxima_limite": "GUARDIANA blocks by name: when a company’s tracking uses the same name as its website, it cannot separate the two without breaking that website. GUARDIANA ZERO blocks that, because it sees the whole address.",
     "maxima_activar": "Turn on maximum protection",
     "maxima_activa": "Maximum protection is on.",
-    "maxima_quitar": "Back to normal",
+    "maxima_quitar": "Turn off maximum protection",
     "maxima_espera": "It does not block anything yet: GUARDIANA has been watching this home for less than 24 hours.",
     "proposito_licencia": "licence",
     "proposito_version": "version check",

@@ -66,7 +66,7 @@
   "maxima_explica": "On top of tracking, advertising and data brokers, it blocks other companies’ telemetry and every ping a page sends to another company only to carry information out, and it rejects cookie notices. If a website stops working properly, unblock that site right here.",
   "maxima_activar": "Turn on maximum protection",
   "maxima_activa": "Maximum protection is on.",
-  "maxima_quitar": "Back to normal",
+  "maxima_quitar": "Turn off maximum protection",
   "proteccion": "Block trackers, advertising and data brokers",
   "proteccion_explica": "Only what a page asks of other companies: those the open lists know as tracking or advertising, and those registered as data brokers. The page you open is never blocked.",
   "cookies_ajuste": "Reject cookie notices",

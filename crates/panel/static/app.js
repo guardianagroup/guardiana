@@ -895,7 +895,7 @@
   }
 
   // «Protección máxima» (the owner, 10 Oct 2026): one button for the whole home, off until the
-  // person turns it on, and «Volver a la normal» undoes exactly what it set (api::cambia_maxima).
+  // person turns it on, and «Desactivar protección máxima» undoes exactly what it set (api::cambia_maxima).
   // The same card on the X-ray and on Rules; `alCambiar` reloads the page's own list.
   async function tarjetaMaxima(alCambiar) {
     if (!$('maxima')) return;

@@ -514,7 +514,7 @@
     "maxima_limite": "GUARDIANA bloquea por nombre: cuando el rastreo de una empresa usa el mismo nombre que su web, no puede separarlos sin romper esa web. Eso lo corta GUARDIANA ZERO, que ve la dirección entera.",
     "maxima_activar": "Activar protección máxima",
     "maxima_activa": "Protección máxima activada.",
-    "maxima_quitar": "Volver a la normal",
+    "maxima_quitar": "Desactivar protección máxima",
     "maxima_espera": "Todavía no bloquea nada: GUARDIANA lleva menos de 24 horas mirando esta casa.",
     "proposito_licencia": "licencia",
     "proposito_version": "comprobar la versión",

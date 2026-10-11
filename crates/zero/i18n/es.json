@@ -66,7 +66,7 @@
   "maxima_explica": "Además de rastreo, publicidad y corredores de datos, corta la telemetría de otras empresas y cada aviso que una página manda a otra empresa solo para sacar información, y rechaza los avisos de cookies. Si alguna web deja de ir bien, desbloquea ese sitio aquí mismo.",
   "maxima_activar": "Activar protección máxima",
   "maxima_activa": "Protección máxima activada.",
-  "maxima_quitar": "Volver a la normal",
+  "maxima_quitar": "Desactivar protección máxima",
   "proteccion": "Cortar rastreadores, publicidad y corredores de datos",
   "proteccion_explica": "Solo lo que una página pide a otras empresas: las que las listas abiertas conocen como rastreo o publicidad y las inscritas como corredoras de datos. La página que abres nunca se corta.",
   "cookies_ajuste": "Rechazar los avisos de cookies",
