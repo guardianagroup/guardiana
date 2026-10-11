@@ -177,6 +177,10 @@
     $('e-dia-parametros').textContent = n(h.parametros_quitados);
     $('e-dia-corredores').textContent = n(h.corredores);
     $('e-rastro-caja').classList.toggle('oculto', !Z.rastro($('e-rastro'), { ...(m.rastro_hoy || {}), seguidores: ((m.rastro_hoy || {}).seguidores || []).slice(0, 3) }));
+    // Since the browser opened (decision 206): sentences the program wrote, in memory only.
+    const sesion = m.medidas_sesion || [];
+    $('e-sesion-caja').classList.toggle('oculto', !sesion.length);
+    $('e-sesion').innerHTML = sesion.map((l) => `<li>${esc(l.texto)}</li>`).join('');
   });
   $('e-dia-ver').addEventListener('click', () => manda({ tipo: 'abrir_cortes' }));
   en('escudo', (m) => {
@@ -197,7 +201,21 @@
     if (m.cookies) hechos.push(t(m.cookies.accion === 'rechazado' ? 'cookies_rechazado' : 'cookies_escondido', { gestor: m.cookies.gestor }));
     $('e-hechos').innerHTML = hechos.map((h) => `<span>${esc(h)}</span>`).join('');
     pintaChivatos(m);
+    pintaMedidas(m.medidas || {});
   });
+
+  // «Lo que ZERO midió en esta página» (decision 206): what was measured without cutting
+  // anything, in the program's own sentences; its fate only when there was one.
+  function pintaMedidas(md) {
+    const lineas = md.lineas || [];
+    $('e-medidas-caja').classList.toggle('oculto', !lineas.length);
+    $('e-medidas').innerHTML = lineas.map((l) => {
+      const clase = l.estado === 'cortado' ? 'cortado' : l.estado === 'paso' ? 'paso' : 'medido';
+      const fin = l.estado ? `<span class="estado">— ${esc(t(l.estado === 'cortado' ? 'chivato_cortado' : 'chivato_paso'))}</span>` : '';
+      return `<li class="${clase}" data-clase="${esc(l.clase)}"><span>${esc(l.texto)}</span>${fin}</li>`;
+    }).join('');
+    $('e-medidas-notas').innerHTML = (md.notas || []).map((x) => `<p class="explica pequeno">${esc(x)}</p>`).join('');
+  }
 
   // «Los chivatos»: what this page's pixels tried to tell an advertising network about the
   // person, one line each, only what the request said; and, when something was cut, a card to

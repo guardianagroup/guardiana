@@ -96,6 +96,13 @@ p { margin: 0 0 10px; }
 .chivatos-lista .estado { margin-left: 6px; font-weight: 600; color: var(--rojo); white-space: nowrap; }
 .chivatos-lista li.paso .estado { color: var(--ambar); }
 .chivatos .explica { margin: 8px 0 0; }
+/* What was measured without cutting (decision 206): a measured read has no fate, only a grey bar. */
+.chivatos-lista li.medido::before { background: var(--gris); }
+.medidas .explica { margin: 8px 0 0; }
+.dia-sesion { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--linea); }
+.dia-sesion h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
+.dia-sesion ul { list-style: none; margin: 0; padding: 0; font-size: 13px; display: grid; gap: 4px; }
+.dia-sesion .explica { margin: 6px 0 0; }
 .compartir { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--linea); border-radius: 12px; }
 .compartir .frase { margin: 0 0 10px; font-weight: 600; }
 .compartir canvas { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--linea); }
@@ -213,6 +220,11 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
       <p class="explica" data-t="rastro_explica"></p>
       <ol class="rastro" id="e-rastro"></ol>
     </div>
+    <div class="dia-sesion oculto" id="e-sesion-caja">
+      <h3 data-t="medida_sesion_titulo"></h3>
+      <ul id="e-sesion"></ul>
+      <p class="explica pequeno" data-t="medida_sesion_nota"></p>
+    </div>
   </section>
   <p class="pagina-cab" id="e-pagina-cab" data-t="escudo_esta_pagina"></p>
   <div class="sitio" id="e-sitio"></div>
@@ -241,6 +253,11 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
       <p class="explica pequeno" data-t="chivatos_tarjeta_nota" style="margin-top:8px"></p>
       <p class="explica pequeno" id="e-tarjeta-guardada" role="status"></p>
     </div>
+  </div>
+  <div class="medidas oculto" id="e-medidas-caja">
+    <h2 data-t="medida_titulo"></h2>
+    <ul class="chivatos-lista" id="e-medidas"></ul>
+    <div id="e-medidas-notas"></div>
   </div>
   <p class="ver-todo"><button class="enlace" id="e-ver-todo" data-t="escudo_ver_todo"></button></p>
 </section>

@@ -42,6 +42,16 @@ function pagina(req, res) {
 <div id="onetrust-banner-sdk" style="position:fixed;bottom:0;left:0;right:0;padding:16px;background:#eee"><p>Usamos cookies</p><button id="onetrust-accept-btn-handler" onclick="fetch('/cookies-aceptadas')">Aceptar</button> <button id="onetrust-reject-all-handler" onclick="fetch('/cookies-rechazadas');this.parentNode.remove()">Rechazar todo</button></div>
 </body></html>`);
 }
+// A script of another company that reads back a canvas with text on it, the way fingerprinting
+// scripts do (decision 206: measured, never changed). It reads twice: the same both times.
+const FP = `(function () {
+  var c = document.createElement('canvas'); c.width = 240; c.height = 60;
+  var x = c.getContext('2d'); x.textBaseline = 'top'; x.font = '14px Arial';
+  x.fillText('Cwm fjordbank glyphs vext quiz', 2, 2);
+  var a = c.toDataURL(); var b = c.toDataURL();
+  window.__zeroHuella = a.length; window.__zeroHuellaIgual = a === b;
+  window.__zeroNativo = Function.prototype.toString.call(HTMLCanvasElement.prototype.toDataURL);
+})();`;
 const servidor = http.createServer((req, res) => {
   let cuerpo = '';
   req.on('data', (c) => { cuerpo += c; });
@@ -49,6 +59,7 @@ const servidor = http.createServer((req, res) => {
     const host = String(req.headers.host || '').split(':')[0];
     registro.push({ t: Date.now(), host, metodo: req.method, ruta: req.url, gpc: req.headers['sec-gpc'] || '', cuerpo });
     if (host === 'sitio-prueba.test') return pagina(req, res);
+    if (host === 'scripts.medidor-prueba.io') { res.writeHead(200, { 'Content-Type': 'application/javascript' }); return res.end(FP); }
     res.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
     res.end('ok');
   });
@@ -76,7 +87,7 @@ function pantalla(nombre) {
 
 (async () => {
   await new Promise((r) => servidor.listen(PUERTO, '127.0.0.1', r));
-  const reglas = ['sitio-prueba.test', '*.doubleclick.net', 'www.google-analytics.com', 'collect.otra-empresa.io', 'www.facebook.com', 'connect.facebook.net', 'www.google.com', 'analytics.tiktok.com'].map((h) => `MAP ${h} 127.0.0.1`).join(',');
+  const reglas = ['sitio-prueba.test', '*.doubleclick.net', 'www.google-analytics.com', 'collect.otra-empresa.io', 'www.facebook.com', 'connect.facebook.net', 'www.google.com', 'analytics.tiktok.com', 'scripts.medidor-prueba.io', 'static.hotjar.com'].map((h) => `MAP ${h} 127.0.0.1`).join(',');
   const proceso = spawn(exe, [], {
     env: { ...process.env, GUARDIANA_ZERO_DATOS: base, GUARDIANA_ZERO_DEPURA: '1', GUARDIANA_ZERO_ARGS: `--remote-debugging-port=9222 --host-resolver-rules="${reglas}"` },
     stdio: 'ignore',
@@ -280,6 +291,25 @@ function pantalla(nombre) {
   comprueba(await panel.locator('#e-terceros li.cortado', { hasText: 'facebook.com' }).count() === 1, 'Meta sale cortada');
   await espera(500);
   pantalla('03b-chivatos.png');
+
+  // Decision 206: measured, never cut. A script of another company reads a canvas with text on
+  // it, and the page loads a session recording service (Hotjar, by its name).
+  await web.evaluate((p) => {
+    for (const src of [`http://scripts.medidor-prueba.io:${p}/fp.js`, `http://static.hotjar.com:${p}/c/hotjar-1.js`]) {
+      const s = document.createElement('script');
+      s.src = src;
+      document.head.appendChild(s);
+    }
+  }, PUERTO);
+  comprueba(await hasta(() => web.evaluate(() => typeof window.__zeroHuella === 'number')), 'el guion de otra empresa se ejecuta');
+  comprueba(await web.evaluate(() => window.__zeroHuella > 100 && window.__zeroHuellaIgual === true), 'y lee el lienzo como siempre: la medida no cambia lo que devuelve');
+  comprueba(await web.evaluate(() => window.__zeroNativo === 'function toDataURL() { [native code] }'), `y la función sigue pareciendo la original (${await web.evaluate(() => window.__zeroNativo)})`);
+  const textoMedidas = async () => panel.evaluate(() => document.querySelector('#e-medidas').textContent);
+  comprueba(await hasta(async () => { const x = await textoMedidas(); return x.includes('intentó leer la huella de tu equipo') && x.includes('medidor-prueba.io (canvas'); }), `el escudo dice qué guion intentó leer la huella (${await textoMedidas()})`);
+  comprueba((await textoMedidas()).includes('servicio de grabación de sesiones (Hotjar)'), 'y que la página carga (o intentó cargar) un servicio de grabación de sesiones');
+  comprueba(await hasta(async () => (await panel.textContent('#e-sesion')).includes('huella de tu equipo')), `el resumen «Desde que abriste ZERO» lo cuenta (${await panel.textContent('#e-sesion')})`);
+  await espera(500);
+  pantalla('03c-medidas.png');
 
   // A new tab and a new window.
   await barra.click('#nueva');

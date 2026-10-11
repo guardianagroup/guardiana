@@ -1031,7 +1031,7 @@ fn lee_cuerpo(req: &ICoreWebView2WebResourceRequest) -> Vec<u8> {
     let Ok(flujo) = (unsafe { req.Content() }) else {
         return Vec::new();
     };
-    let out = lee_flujo(&flujo, 2 * 1024 * 1024);
+    let out = lee_flujo(&flujo, guardiana_zero::medidas::MAX_CUERPO);
     // The engine reads the body again to send it: put it back at the start.
     let _ = unsafe { flujo.Seek(0, STREAM_SEEK_SET, None) };
     out
@@ -1200,8 +1200,9 @@ fn eventos_pestana(id: u32, web: &ICoreWebView2) -> windows::core::Result<()> {
                     let metodo = texto_de(|p| req.Method(p));
                     let mut contexto = COREWEBVIEW2_WEB_RESOURCE_CONTEXT::default();
                     args.ResourceContext(&mut contexto)?;
-                    // The body is read when marked data or the decoy might travel in it, or when
-                    // it goes to a known pixel, which puts there what it tells.
+                    // The body is read when marked data or the decoy might travel in it, when it
+                    // goes to a known pixel, which puts there what it tells, or when it goes to
+                    // another site, whose size the shield says (decision 206).
                     let cuerpo = if metodo != "GET"
                         && metodo != "HEAD"
                         && con_sesion(|s| s.necesita_cuerpo(id, &url)) == Some(true)
