@@ -1148,7 +1148,7 @@
     "destinos_paises_titulo": "Server country",
     "destinos_paises_frase": "The addresses your devices received this week point to servers in {n} countries.",
     "destinos_paises_frase_uno": "The addresses your devices received this week point to servers in 1 country.",
-    "destinos_paises_lead": "Of the {total} queries that left home, {con} came back with the server’s address; the percentages are of those. It is the country where the server that answered is, according to the base, not where the data ends up: a front server forwards what it receives. Press a country to see its queries in the Extract.",
+    "destinos_paises_lead": "Of the {total} queries that left home, {con} came back with the server’s address; the percentages are of those. It is the country where the server that answered is, according to the base, not where the data ends up: a front server forwards what it receives.",
     "destinos_grupos_titulo": "Business groups",
     "destinos_grupos_frase": "{pct} % of the {total} queries that left your home went to names of {n} groups: {grupos}.",
     "destinos_grupos_frase_uno": "{pct} % of the {total} queries that left your home went to names of 1 group: {grupos}.",
@@ -1165,6 +1165,8 @@
     "compartir_paises": "The addresses pointed to servers in {n} countries (according to {fuente}).",
     "compartir_paises_uno": "The addresses pointed to servers in 1 country (according to {fuente}).",
     "compartir_grupos": "{pct} % of the queries that left home went to names of {n} groups: {grupos}.",
-    "compartir_grupos_uno": "{pct} % of the queries that left home went to names of 1 group: {grupos}."
+    "compartir_grupos_uno": "{pct} % of the queries that left home went to names of 1 group: {grupos}.",
+    "filtro_anycast": "Anycast network (no country)",
+    "destinos_paises_pulsa": "Press a country to see its queries in the Extract."
   }
 }

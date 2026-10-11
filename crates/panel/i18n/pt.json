@@ -1148,7 +1148,7 @@
     "destinos_paises_titulo": "País do servidor",
     "destinos_paises_frase": "Os endereços que os seus aparelhos receberam esta semana apontam para servidores em {n} países.",
     "destinos_paises_frase_uno": "Os endereços que os seus aparelhos receberam esta semana apontam para servidores em 1 país.",
-    "destinos_paises_lead": "Das {total} consultas que saíram de casa, {con} voltaram com o endereço do servidor; as porcentagens são dessas. É o país onde está o servidor que respondeu, segundo a base, não onde os dados terminam: um servidor de entrada reenvia o que recebe. Toque em um país para ver as consultas dele no Extrato.",
+    "destinos_paises_lead": "Das {total} consultas que saíram de casa, {con} voltaram com o endereço do servidor; as porcentagens são dessas. É o país onde está o servidor que respondeu, segundo a base, não onde os dados terminam: um servidor de entrada reenvia o que recebe.",
     "destinos_grupos_titulo": "Grupos empresariais",
     "destinos_grupos_frase": "{pct} % das {total} consultas que saíram da sua casa foram para nomes de {n} grupos: {grupos}.",
     "destinos_grupos_frase_uno": "{pct} % das {total} consultas que saíram da sua casa foram para nomes de 1 grupo: {grupos}.",
@@ -1165,6 +1165,8 @@
     "compartir_paises": "Os endereços apontavam para servidores em {n} países (segundo {fuente}).",
     "compartir_paises_uno": "Os endereços apontavam para servidores em 1 país (segundo {fuente}).",
     "compartir_grupos": "{pct} % das consultas que saíram de casa foram para nomes de {n} grupos: {grupos}.",
-    "compartir_grupos_uno": "{pct} % das consultas que saíram de casa foram para nomes de 1 grupo: {grupos}."
+    "compartir_grupos_uno": "{pct} % das consultas que saíram de casa foram para nomes de 1 grupo: {grupos}.",
+    "filtro_anycast": "Rede anycast (sem país)",
+    "destinos_paises_pulsa": "Toque em um país para ver as consultas dele no Extrato."
   }
 }

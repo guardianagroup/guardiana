@@ -1143,16 +1143,18 @@
       // hechas del servidor; aquí solo se dibujan. Cada país lleva al Extracto filtrado por él.
       const d = r.destinos;
       $('i-destinos').classList.toggle('hidden', !d);
-      const barra = (nombre, pct, consultas, enlace) => `<li>${enlace ? `<a href="${esc(enlace)}">${esc(nombre)}</a>` : `<span>${esc(nombre)}</span>`}<span class="barra" aria-hidden="true"><span style="width:${Math.max(0, Math.min(100, pct))}%"></span></span><span class="cifra"><b>${pct} %</b> <span class="muted">${esc(tn('informe_n_consultas', consultas))}</span></span></li>`;
+      const barra = (nombre, pct, consultas, enlace) => `<li>${enlace ? `<a href="${esc(enlace)}">${esc(nombre)}</a>` : `<span>${esc(nombre)}</span>`}<span class="barra" aria-hidden="true"><span data-pct="${Math.max(0, Math.min(100, Number(pct) || 0))}"></span></span><span class="cifra"><b>${pct} %</b> <span class="muted">${esc(tn('informe_n_consultas', consultas))}</span></span></li>`;
       const grupoDicho = (g) => g.nombre + (g.empresas.length ? ' (' + g.empresas.join(', ') + ')' : '');
       if (d) {
         pintaFuenteRed('fuente-red', d.fuente);
         $('i-paises-frase').textContent = d.con_direccion ? tn('destinos_paises_frase', d.n_paises) : t('destinos_sin');
-        $('i-paises-lead').textContent = t('destinos_paises_lead').replace('{total}', num(d.consultas)).replace('{con}', num(d.con_direccion));
+        $('i-paises-lead').textContent = t('destinos_paises_lead').replace('{total}', num(d.consultas)).replace('{con}', num(d.con_direccion)) + ' ' + t('destinos_paises_pulsa');
         $('i-paises-lead').classList.toggle('hidden', !d.con_direccion);
         $('i-paises').innerHTML = d.paises.map((p) => barra(p.nombre, p.pct, p.consultas, '/extracto?pais=' + encodeURIComponent(p.clave))).join('');
         $('i-grupos-frase').textContent = d.top_n ? tn('destinos_grupos_frase', d.top_n).replace('{pct}', d.top_pct).replace('{total}', num(d.consultas)).replace('{grupos}', d.grupos.slice(0, d.top_n).map(grupoDicho).join(', ')) : '';
         $('i-grupos').innerHTML = d.grupos.slice(0, 12).map((g) => barra(grupoDicho(g), g.pct, g.consultas)).join('');
+        // The panel's CSP refuses style attributes; the width is set through the DOM instead.
+        for (const b of document.querySelectorAll('ul.barras .barra > span[data-pct]')) b.style.width = b.dataset.pct + '%';
       }
       if (r.plus && !r.comparar_desde) {
         $('i-nuevos-rows').innerHTML = r.novedades.map((n2) => `<tr><td class="mono">${esc(n2.nombre)}</td><td>${esc(n2.empresa)}</td><td>${esc(catName(n2.categoria))}</td><td>${esc(nombreAparato(n2.device_id, n2.device_name))}</td><td>${num(n2.consultas)}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('informe_nuevos_ninguno'))}</td></tr>`;

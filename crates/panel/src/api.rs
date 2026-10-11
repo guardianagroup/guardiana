@@ -1505,7 +1505,7 @@ fn paises_para_filtro(t: &Texts, ips: &[String]) -> Vec<(String, String)> {
     claves.sort();
     claves.dedup();
     let especial = |k: &str| match k {
-        destinos::CLAVE_ANYCAST => Some("destinos_anycast"),
+        destinos::CLAVE_ANYCAST => Some("filtro_anycast"),
         destinos::CLAVE_LOCAL => Some("destinos_local"),
         destinos::CLAVE_SIN_DATO => Some("destinos_sin_dato"),
         _ => None,
