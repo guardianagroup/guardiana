@@ -209,13 +209,15 @@ async fn the_panel_says_where_each_query_went_and_sums_the_week() {
     let (status, csv) = get(addr, &t, "/api/extracto/exportar").await;
     assert_eq!(status, 200);
     assert!(
-        csv.contains(";servidor_tipo;servidor_pais;servidor_asn;servidor_base;servidor_red ["),
+        csv.contains(
+            ";servidor_tipo;servidor_pais;servidor_asn;servidor_base;cname_destino;servidor_red ["
+        ),
         "{csv}"
     );
     assert!(csv.contains(";grupo [empresas.txt]"), "{csv}");
     let base = guardiana_lists::base_de_red();
     assert!(
-        csv.contains(&format!(";anycast;;13335;{base};Cloudflare;")),
+        csv.contains(&format!(";anycast;;13335;{base};;Cloudflare;")),
         "{csv}"
     );
     for ip in ["1.1.1.1", "157.240.1.35", "142.250.1.1", "192.168.1.1"] {

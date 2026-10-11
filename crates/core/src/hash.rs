@@ -3,7 +3,9 @@
 //!
 //! Fields are encoded unambiguously: each one as a 4-byte big-endian length
 //! followed by its UTF-8 bytes, in the fixed order documented on
-//! [`HashInput`]. Anyone can recompute a row with only this description,
+//! [`HashInput`]. The optional fields at the end (program, server, disguise) enter only when the
+//! last of them present is not empty, each bringing the ones before it. Anyone can recompute a
+//! row with only this description,
 //! which is what `guardiana ledger --check` and `docs/VERIFY.md` rely on.
 
 use std::fmt;
@@ -125,6 +127,12 @@ pub struct HashInput<'a> {
     /// empty, so the two optional fields can never be read one for the other. A row without it
     /// hashes exactly as before this field existed, and every older extract still verifies.
     pub server: &'a str,
+    /// The registrable site of the tracker the name answered as (decision 205), or empty.
+    ///
+    /// Same rule again: hashed **only when it is there**, after `process_json` and `server`,
+    /// which are then hashed too, even empty. A row without it hashes exactly as before this
+    /// field existed, so every older extract still verifies.
+    pub cname_target: &'a str,
 }
 
 /// Compute `sha256(prev_hash || fields)` for one ledger row.
@@ -153,8 +161,12 @@ pub fn chain_hash(prev: &Hash, input: &HashInput<'_>) -> Hash {
     }
     // Al final y solo si hay algo: así una fila sin programa da el mismo hash que antes de que
     // este campo existiera, y las cadenas ya escritas siguen comprobando.
+    // Each optional field brings the ones before it, even empty: the number of fields says which
+    // ones are there, and their length prefixes keep any of them from passing for another.
     let mut opcionales: Vec<&str> = Vec::new();
-    if !input.server.is_empty() {
+    if !input.cname_target.is_empty() {
+        opcionales.extend([input.process_json, input.server, input.cname_target]);
+    } else if !input.server.is_empty() {
         opcionales.extend([input.process_json, input.server]);
     } else if !input.process_json.is_empty() {
         opcionales.push(input.process_json);
@@ -189,7 +201,78 @@ mod tests {
             rule_id: None,
             process_json: "",
             server: "",
+            cname_target: "",
         }
+    }
+
+    /// Fixed vectors, computed apart from this code (Python, `hashlib`, the encoding described
+    /// at the top of this file): the three shapes a row could have before decision 205 hash to
+    /// exactly the bytes they hashed to then, and the new shape to what the description says.
+    #[test]
+    fn vectores_fijos_de_antes_y_de_ahora() {
+        let anterior = Hash::of(b"ancla");
+        let mut s = sample();
+        assert_eq!(
+            chain_hash(&anterior, &s).to_hex(),
+            "f7a3065227402680872802c968b7072e4dd9078d1907cd4d920f7f0e56431c4e"
+        );
+        s.process_json = "{\"pid\":1}";
+        assert_eq!(
+            chain_hash(&anterior, &s).to_hex(),
+            "7dfbe1429e141aa25272ab6104db5e838fcc530a94244e1046bf23f414ab9b0b"
+        );
+        let mut s = sample();
+        s.server = "publico|IE|32934|dbip-2026-10";
+        assert_eq!(
+            chain_hash(&anterior, &s).to_hex(),
+            "1d4b292862de1d02f326e0f9fa2c191441d7a1c8717eee099cd9444289ebc92b"
+        );
+        s.process_json = "{\"pid\":1}";
+        s.cname_target = "omtrdc.net";
+        assert_eq!(
+            chain_hash(&anterior, &s).to_hex(),
+            "ed933b76ac7998ddf78510e65b63d49e2d90418e11f8e2e5dd5f4a0b684068c6"
+        );
+    }
+
+    #[test]
+    fn el_disfraz_no_cambia_el_hash_de_las_filas_que_no_lo_llevan() {
+        // Decisión 205: un extracto escrito antes tiene que seguir comprobando, con programa,
+        // con servidor, con los dos o sin ninguno.
+        let anterior = Hash::of(b"ancla");
+        let mut formas = Vec::new();
+        for (programa, servidor) in [
+            ("", ""),
+            ("{\"pid\":1}", ""),
+            ("", "publico|IE|32934|dbip-2026-10"),
+            ("{\"pid\":1}", "publico|IE|32934|dbip-2026-10"),
+        ] {
+            let mut sin = sample();
+            sin.process_json = programa;
+            sin.server = servidor;
+            let antes = chain_hash(&anterior, &sin);
+            let mut vacio = sin;
+            vacio.cname_target = "";
+            assert_eq!(antes, chain_hash(&anterior, &vacio), "sin disfraz, igual");
+            let mut con = sin;
+            con.cname_target = "omtrdc.net";
+            let despues = chain_hash(&anterior, &con);
+            assert_ne!(antes, despues, "con disfraz cambia");
+            formas.push(antes);
+            formas.push(despues);
+        }
+        // Ninguna de las ocho formas da el hash de otra.
+        let distintas: std::collections::HashSet<_> = formas.iter().collect();
+        assert_eq!(distintas.len(), formas.len());
+        // El disfraz no se confunde con un servidor que se llamara igual.
+        let mut como_servidor = sample();
+        como_servidor.server = "omtrdc.net";
+        let mut como_disfraz = sample();
+        como_disfraz.cname_target = "omtrdc.net";
+        assert_ne!(
+            chain_hash(&anterior, &como_servidor),
+            chain_hash(&anterior, &como_disfraz)
+        );
     }
 
     #[test]

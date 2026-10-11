@@ -108,7 +108,10 @@ CREATE TABLE IF NOT EXISTS events (
     server_kind    INTEGER NOT NULL DEFAULT 0,
     server_country TEXT    NOT NULL DEFAULT '',
     server_asn     INTEGER NOT NULL DEFAULT 0,
-    server_base    INTEGER NOT NULL DEFAULT 0
+    server_base    INTEGER NOT NULL DEFAULT 0,
+    -- Un nombre disfrazado (decisión 205): el sitio del rastreador que respondía detrás de un
+    -- alias de otro sitio (`omtrdc.net`). Solo un nombre, nunca una dirección. Vacío casi siempre.
+    cname_target   TEXT    NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
 CREATE INDEX IF NOT EXISTS events_device_ts ON events(device_id, ts);
@@ -168,7 +171,8 @@ CREATE TABLE IF NOT EXISTS daily_totals (
 const EVENT_COLUMNS: &str = "id, ts, device_id, client_ip, qname, qtype, category, list_source, \
                              signals_json, verdict, decided_by, rule_id, prev_hash, row_hash, \
                              process_json, server_kind, server_country, server_asn, \
-                             (SELECT b.name FROM server_bases b WHERE b.id = events.server_base)";
+                             (SELECT b.name FROM server_bases b WHERE b.id = events.server_base), \
+                             cname_target";
 
 /// Handle to the ledger database.
 pub struct Ledger {
@@ -310,6 +314,7 @@ impl Ledger {
         ledger.migrate_rules_confirmed()?;
         ledger.migrate_events_process()?;
         ledger.migrate_events_server()?;
+        ledger.migrate_events_cname()?;
         match ledger.setting(KEY_GENESIS)? {
             None => {
                 ledger.set_setting(KEY_GENESIS, &genesis.to_hex())?;
@@ -485,13 +490,15 @@ impl Ledger {
                 rule_id: new.rule_id,
                 process_json: &process_json,
                 server: &server_text,
+                cname_target: new.cname_target.as_deref().unwrap_or(""),
             },
         );
         tx.execute(
             "INSERT INTO events (ts, device_id, client_ip, qname, qtype, category, list_source, \
              signals_json, verdict, decided_by, rule_id, prev_hash, row_hash, process_json, \
-             server_kind, server_country, server_asn, server_base) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+             server_kind, server_country, server_asn, server_base, cname_target) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, \
+             ?19)",
             params![
                 new.ts,
                 new.device_id,
@@ -511,6 +518,7 @@ impl Ledger {
                 server_country,
                 server_asn,
                 server_base,
+                new.cname_target.as_deref().unwrap_or(""),
             ],
         )?;
         let id = tx.last_insert_rowid();
@@ -553,6 +561,7 @@ impl Ledger {
             rule_id: new.rule_id,
             process: new.process,
             server: new.server,
+            cname_target: new.cname_target,
             prev_hash,
             row_hash,
         })
@@ -981,6 +990,25 @@ impl Ledger {
         Ok(())
     }
 
+    /// Databases written before decision 205 lack `events.cname_target`; add it once. Rows
+    /// written before keep it empty, which the hash treats as "no disguise here", so an old
+    /// extract still verifies after the upgrade, and SQLite adds the column without rewriting
+    /// the rows.
+    fn migrate_events_cname(&self) -> Result<()> {
+        let has: bool = self
+            .conn
+            .prepare("PRAGMA table_info(events)")?
+            .query_map([], |r| r.get::<_, String>(1))?
+            .filter_map(std::result::Result::ok)
+            .any(|c| c == "cname_target");
+        if !has {
+            self.conn.execute_batch(
+                "ALTER TABLE events ADD COLUMN cname_target TEXT NOT NULL DEFAULT ''",
+            )?;
+        }
+        Ok(())
+    }
+
     /// Older databases lack `rules.confirmed`; add it once.
     fn migrate_rules_confirmed(&self) -> Result<()> {
         let has: bool = self
@@ -1210,6 +1238,7 @@ struct RawEvent {
     process_json: String,
     server: Option<crate::model::ServerInfo>,
     server_text: String,
+    cname_target: String,
 }
 
 impl RawEvent {
@@ -1228,6 +1257,7 @@ impl RawEvent {
             rule_id: self.rule_id,
             process_json: &self.process_json,
             server: &self.server_text,
+            cname_target: &self.cname_target,
         }
     }
 }
@@ -1285,6 +1315,7 @@ fn raw_from_row(row: &Row<'_>) -> Result<RawEvent> {
             .map(crate::model::ServerInfo::hash_text)
             .unwrap_or_default(),
         server,
+        cname_target: row.get(19)?,
     })
 }
 
@@ -1316,6 +1347,7 @@ fn event_from_row(row: &Row<'_>) -> rusqlite::Result<Event> {
             serde_json::from_str(&raw.process_json).map_err(|e| to_sql_err(Error::Json(e)))?
         },
         server: raw.server,
+        cname_target: (!raw.cname_target.is_empty()).then_some(raw.cname_target),
         prev_hash: raw.prev_hash,
         row_hash: raw.row_hash,
     })
@@ -1671,6 +1703,86 @@ mod tests {
             asn,
             base: "dbip-2026-10".to_owned(),
         }
+    }
+
+    #[test]
+    fn an_extract_from_before_the_disguise_column_gains_it_and_mixed_rows_verify() {
+        // A 1.0.14 file (decision 203 already in it): rows with a program, with a server, with
+        // both and with neither, and no `cname_target` column yet.
+        let (dir, db) = temp_db("cname-col");
+        {
+            let mut l = Ledger::open(&db, genesis()).unwrap();
+            l.append(ev(1, "a.example")).unwrap();
+            let mut s = ev(2, "b.example");
+            s.server = Some(servidor("IE", 32_934));
+            l.append(s).unwrap();
+            let mut p = ev(3, "c.example");
+            p.process = Some(crate::model::Proceso {
+                pid: 7,
+                nombre: "x.exe".into(),
+                ruta: String::new(),
+                sha256: String::new(),
+                firmado_por: String::new(),
+            });
+            p.server = Some(servidor("US", 15_169));
+            l.append(p).unwrap();
+            l.conn
+                .execute_batch("ALTER TABLE events DROP COLUMN cname_target;")
+                .unwrap();
+        }
+        let mut l = Ledger::open(&db, genesis()).unwrap();
+        assert!(
+            l.check().unwrap().is_ok(),
+            "old rows verify after the upgrade"
+        );
+        // New rows, with and without the disguise, after the old ones.
+        let mut d = ev(4, "metricas.ejemplo.com");
+        d.server = Some(servidor("US", 15_224));
+        d.cname_target = Some("omtrdc.net".into());
+        let e = l.append(d).unwrap();
+        assert_eq!(e.cname_target.as_deref(), Some("omtrdc.net"));
+        let mut solo = ev(5, "m.ejemplo.com");
+        solo.cname_target = Some("omtrdc.net".into());
+        l.append(solo).unwrap();
+        l.append(ev(6, "e.example")).unwrap();
+        let r = l.check().unwrap();
+        assert!(r.is_ok(), "{r:?}");
+        assert_eq!(r.checked, 6);
+        let todas = l.events(&EventFilter::default()).unwrap();
+        assert_eq!(todas[0].cname_target, None);
+        assert_eq!(todas[3].cname_target.as_deref(), Some("omtrdc.net"));
+        // The disguise is covered by the hash: changing it, or giving one to an old row, shows.
+        l.conn
+            .execute(
+                "UPDATE events SET cname_target = 'otro.net' WHERE id = 4",
+                [],
+            )
+            .unwrap();
+        let r = l.check().unwrap();
+        assert!(
+            matches!(r.first_fault, Some((4, ChainFault::AlteredRow { .. }))),
+            "{r:?}"
+        );
+        l.conn
+            .execute(
+                "UPDATE events SET cname_target = 'omtrdc.net' WHERE id = 4",
+                [],
+            )
+            .unwrap();
+        assert!(l.check().unwrap().is_ok());
+        l.conn
+            .execute(
+                "UPDATE events SET cname_target = 'omtrdc.net' WHERE id = 2",
+                [],
+            )
+            .unwrap();
+        let r = l.check().unwrap();
+        assert!(
+            matches!(r.first_fault, Some((2, ChainFault::AlteredRow { .. }))),
+            "{r:?}"
+        );
+        drop(l);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

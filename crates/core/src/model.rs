@@ -300,6 +300,12 @@ pub struct Event {
     /// Guardiana itself, no address in the answer, or written before decision 203.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub server: Option<ServerInfo>,
+    /// A name dressed as another (decision 205): when the answer came through an alias that
+    /// belongs to another site the lists call a tracker, advertising or telemetry, that alias's
+    /// registrable site (`omtrdc.net`). Only a name, never an address. `None` for every other row
+    /// and for rows written before decision 205.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cname_target: Option<String>,
     /// Hash of the previous row (or the chain anchor).
     pub prev_hash: Hash,
     /// `sha256(prev_hash || fields)`.
@@ -335,6 +341,8 @@ pub struct NewEvent {
     pub process: Option<Proceso>,
     /// Country and network of the server that answered (decision 203).
     pub server: Option<ServerInfo>,
+    /// The registrable site of the tracker the name answered as, when it did (decision 205).
+    pub cname_target: Option<String>,
 }
 
 impl NewEvent {
@@ -356,6 +364,7 @@ impl NewEvent {
             rule_id: None,
             process: None,
             server: None,
+            cname_target: None,
         }
     }
 }

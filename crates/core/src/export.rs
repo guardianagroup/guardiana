@@ -11,7 +11,8 @@ use crate::time::rfc3339_utc;
 pub const CSV_HEADER: &str = "id,ts,ts_utc,device_id,client_ip,qname,qtype,category,list_source,\
                               signals,verdict,decided_by,rule_id,prev_hash,row_hash,\
                               programa,programa_ruta,programa_sha256,\
-                              servidor_tipo,servidor_pais,servidor_asn,servidor_base";
+                              servidor_tipo,servidor_pais,servidor_asn,servidor_base,\
+                              cname_destino";
 
 /// Write events as a JSON array, one object per event, hashes as hex.
 pub fn write_json<W: Write>(events: &[Event], mut w: W) -> Result<()> {
@@ -127,6 +128,9 @@ fn write_csv_inner<W: Write>(
                 .as_ref()
                 .map(|s| s.base.clone())
                 .unwrap_or_default(),
+            // Un nombre disfrazado (decisión 205): el sitio del rastreador que respondía detrás
+            // del alias. Entra en el hash cuando está; solo un nombre.
+            e.cname_target.clone().unwrap_or_default(),
         ];
         fields.extend(extra(e));
         let line = fields
@@ -240,6 +244,7 @@ mod tests {
             asn: 32_934,
             base: "dbip-2026-10".to_owned(),
         });
+        e.cname_target = Some("omtrdc.net".to_owned());
         l.append(e).unwrap();
         let events = l.events(&Default::default()).unwrap();
         let mut plano = Vec::new();
@@ -249,7 +254,7 @@ mod tests {
             text.lines()
                 .nth(1)
                 .unwrap()
-                .ends_with(",publico,IE,32934,dbip-2026-10"),
+                .ends_with(",publico,IE,32934,dbip-2026-10,omtrdc.net"),
             "{text}"
         );
         let mut hoja = Vec::new();
@@ -268,14 +273,13 @@ mod tests {
         .unwrap();
         let text = String::from_utf8(hoja[3..].to_vec()).unwrap();
         let mut lines = text.lines();
+        assert!(lines.next().unwrap().ends_with(
+            ";servidor_tipo;servidor_pais;servidor_asn;servidor_base;cname_destino;red;grupo"
+        ));
         assert!(lines
             .next()
             .unwrap()
-            .ends_with(";servidor_tipo;servidor_pais;servidor_asn;servidor_base;red;grupo"));
-        assert!(lines
-            .next()
-            .unwrap()
-            .ends_with(";publico;IE;32934;dbip-2026-10;red 32934;G"));
+            .ends_with(";publico;IE;32934;dbip-2026-10;omtrdc.net;red 32934;G"));
         // JSON carries it too, and reads back.
         let mut json = Vec::new();
         write_json(&events, &mut json).unwrap();
