@@ -147,7 +147,7 @@ struct Salud {
 }
 
 impl Salud {
-    fn anota(&self, outcome: Outcome) {
+    fn anota(&self, outcome: &Outcome) {
         use std::sync::atomic::Ordering::Relaxed;
         match outcome {
             Outcome::Forwarded { .. } => {
@@ -480,7 +480,7 @@ impl Policy for EnginePolicy {
     }
 
     fn record(&self, q: &Query, outcome: Outcome) {
-        self.salud.anota(outcome);
+        self.salud.anota(&outcome);
         let (verdict, mut decided_by, rule_id) = match outcome {
             Outcome::Refused => return,
             Outcome::Forwarded { .. } | Outcome::UpstreamFailed => {
@@ -529,6 +529,15 @@ impl Policy for EnginePolicy {
         } = outcome
         {
             event.server = Some(guardiana_lists::server_info_de(ip));
+        }
+        // Un nombre disfrazado (decisión 205): si la respuesta pasó por un alias de otro sitio que
+        // las listas llaman rastreador, publicidad o telemetría, se anota el sitio de ese alias, y
+        // nada más de la cadena. Solo se mira y se dice: lo que se corta sigue decidiéndose por el
+        // nombre pedido, como siempre.
+        if let Outcome::Forwarded { aliases, .. } = &outcome {
+            if !aliases.is_empty() {
+                event.cname_target = inner.classifier.catalog().cloaked_target(&q.name, aliases);
+            }
         }
         // Solo para este equipo: de un teléfono en Modo Hogar se ve el nombre y nada más, y eso
         // lo dice cada pantalla. Si el sistema no lo dijo, el hueco se queda vacío.
@@ -2310,13 +2319,14 @@ mod aparte_tests {
     #[test]
     fn the_health_counter_reads_and_resets() {
         let s = Salud::default();
-        s.anota(Outcome::UpstreamFailed);
-        s.anota(Outcome::UpstreamFailed);
-        s.anota(Outcome::Forwarded {
+        s.anota(&Outcome::UpstreamFailed);
+        s.anota(&Outcome::UpstreamFailed);
+        s.anota(&Outcome::Forwarded {
             rcode: dns::ResponseCode::NoError,
             server: None,
+            aliases: Vec::new(),
         });
-        s.anota(Outcome::Canary);
+        s.anota(&Outcome::Canary);
         assert_eq!(s.minuto(), (1, 2));
         assert_eq!(s.minuto(), (0, 0));
     }

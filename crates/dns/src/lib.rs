@@ -12,7 +12,9 @@
 //! - the checker `comprobar.guardiana.hogar` → the LAN IP of this computer.
 //!
 //! Only queries are ever handed to the policy: name, type, client and time.
-//! Answers are never handed out or stored (brief §4).
+//! Answers are never stored (brief §4): of an answer, the policy only gets its first address,
+//! to look up the server's country and network (decision 203), and the names of its aliases, to
+//! tell a name dressed as another (decision 205). Neither is kept as such.
 
 mod handler;
 pub mod probe;
@@ -46,6 +48,8 @@ pub fn is_self_check(name: &str) -> bool {
             .strip_suffix(SELF_CHECK_SUFFIX)
             .is_some_and(|head| head.ends_with('.'))
 }
+/// Longest alias chain handed to the policy; a longer one is cut there (decision 205).
+pub const MAX_ALIASES: usize = 8;
 /// TTL of blocked and built-in answers: short, so an undo takes effect fast.
 pub const BUILTIN_TTL: u32 = 30;
 
@@ -159,7 +163,7 @@ pub enum Decision {
 }
 
 /// What actually happened to a query.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Outcome {
     /// Forwarded (possibly served from cache) and answered with this code.
     Forwarded {
@@ -170,6 +174,11 @@ pub enum Outcome {
         /// (decision 203); the policy must not store it. `None` for answers with no address (a
         /// name that does not exist, a TXT, an HTTPS record without hints).
         server: Option<std::net::IpAddr>,
+        /// The aliases (CNAME targets) the answer went through from the name asked to its
+        /// address, in order, lowercase, without trailing dot, at most [`MAX_ALIASES`]. Empty for
+        /// an answer with no alias. Names only: the policy may look them up in the lists to tell a
+        /// name dressed as another (decision 205), and keep at most that name's site.
+        aliases: Vec<String>,
     },
     /// Upstream did not answer; SERVFAIL was returned.
     UpstreamFailed,

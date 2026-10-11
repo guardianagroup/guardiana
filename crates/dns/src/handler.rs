@@ -58,6 +58,28 @@ fn first_address(answers: &[Record]) -> Option<std::net::IpAddr> {
     })
 }
 
+/// The aliases an answer went through, following its CNAME records from the name asked: the
+/// chain the device was led along before its address (decision 205). At most
+/// [`crate::MAX_ALIASES`], and a loop stops the walk.
+fn alias_chain(asked: &Name, answers: &[Record]) -> Vec<String> {
+    let mut chain: Vec<String> = Vec::new();
+    let mut current = normalize(asked);
+    while chain.len() < crate::MAX_ALIASES {
+        let next = answers.iter().find_map(|r| match &r.data {
+            RData::CNAME(c) if normalize(&r.name) == current => Some(normalize(&c.0)),
+            _ => None,
+        });
+        match next {
+            Some(n) if n != current && !chain.contains(&n) => {
+                chain.push(n.clone());
+                current = n;
+            }
+            _ => break,
+        }
+    }
+    chain
+}
+
 fn failed_info(request: &Request) -> ResponseInfo {
     let mut metadata = Metadata::response_from_request(&request.metadata);
     metadata.response_code = ResponseCode::ServFail;
@@ -183,6 +205,7 @@ impl<P: Policy> Handler<P> {
             Ok(lookup) => {
                 let answers = lookup.answers().to_vec();
                 let server = first_address(&answers);
+                let aliases = alias_chain(name, &answers);
                 (
                     Answer {
                         code: ResponseCode::NoError,
@@ -192,6 +215,7 @@ impl<P: Policy> Handler<P> {
                     Outcome::Forwarded {
                         rcode: ResponseCode::NoError,
                         server,
+                        aliases,
                     },
                 )
             }
@@ -208,6 +232,7 @@ impl<P: Policy> Handler<P> {
                 Outcome::Forwarded {
                     rcode: response_code,
                     server: None,
+                    aliases: Vec::new(),
                 },
             ),
             Err(_) => (

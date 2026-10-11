@@ -12,7 +12,7 @@ use guardiana_dns::{
     CANARY_NAME, CHECKER_NAME, SELF_CHECK_SUFFIX,
 };
 use hickory_proto::op::{Message, MessageType, Metadata, OpCode, Query as DnsQuery, ResponseCode};
-use hickory_proto::rr::rdata::A;
+use hickory_proto::rr::rdata::{A, CNAME};
 use hickory_proto::rr::{Name, RData, Record};
 use hickory_resolver::net::runtime::Time;
 use hickory_server::server::{Request, RequestHandler, ResponseHandler, ResponseInfo, Server};
@@ -46,6 +46,16 @@ impl RequestHandler for Upstream {
                 300,
                 RData::A(A::from(Ipv4Addr::new(1, 2, 3, 4))),
             )]
+        } else if text == "metricas.tienda.test." && q.query_type() == RecordType::A {
+            // A name of the shop that is somebody else's under its skin: two aliases, then the
+            // address (decision 205).
+            let medio = Name::from_ascii("tienda.sc.medidor.test.").unwrap();
+            let fin = Name::from_ascii("e1.reparto.test.").unwrap();
+            vec![
+                Record::from_rdata(name.clone(), 300, RData::CNAME(CNAME(medio.clone()))),
+                Record::from_rdata(medio, 300, RData::CNAME(CNAME(fin.clone()))),
+                Record::from_rdata(fin, 300, RData::A(A::from(Ipv4Addr::new(5, 6, 7, 8)))),
+            ]
         } else if text == "muchas.test." && q.query_type() == RecordType::A {
             // Forty addresses: about 650 bytes, more than the 512 of plain DNS over UDP.
             (1..=40)
@@ -217,6 +227,29 @@ async fn forwards_and_serves_second_query_from_cache() {
         Outcome::Forwarded {
             rcode: ResponseCode::NoError,
             server: Some(std::net::IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4))),
+            aliases: Vec::new(),
+        }
+    );
+}
+
+/// The aliases an answer went through reach the policy in order, names only, as the device was
+/// led along them; the answer itself reaches the device whole (decision 205).
+#[tokio::test]
+async fn the_alias_chain_reaches_the_policy() {
+    let (up, _hits, _upstream) = fake_upstream().await;
+    let policy = Recorder::default();
+    let g = guardiana(up, policy.clone(), |_| {}).await;
+    let msg = ask_udp(g.udp_addrs[0], "metricas.tienda.test", RecordType::A).await;
+    assert_eq!(a_records(&msg), vec![Ipv4Addr::new(5, 6, 7, 8)]);
+    assert_eq!(
+        policy.seen()[0].1,
+        Outcome::Forwarded {
+            rcode: ResponseCode::NoError,
+            server: Some(std::net::IpAddr::V4(Ipv4Addr::new(5, 6, 7, 8))),
+            aliases: vec![
+                "tienda.sc.medidor.test".to_owned(),
+                "e1.reparto.test".to_owned()
+            ],
         }
     );
 }
@@ -233,6 +266,7 @@ async fn nxdomain_from_upstream_passes_through() {
         Outcome::Forwarded {
             rcode: ResponseCode::NXDomain,
             server: None,
+            aliases: Vec::new(),
         }
     );
 }
