@@ -322,7 +322,26 @@ impl<P: Policy> RequestHandler for Handler<P> {
                     self.blocked_answer(&name, qtype),
                     Outcome::Blocked { rule_id },
                 ),
-                Decision::Forward => self.forward(&name, qtype).await,
+                Decision::Forward => {
+                    let (answer, outcome) = self.forward(&name, qtype).await;
+                    // After the answer: a name that answered through aliases is asked about once
+                    // more (decision 205). Cut, the device gets the usual block answer and never
+                    // the one received; the resolver's own cache keeps that one for its TTL, and
+                    // every later query from the cache is decided again here.
+                    let cortar = match &outcome {
+                        Outcome::Forwarded { aliases, .. } if !aliases.is_empty() => {
+                            self.policy.after_answer(&query, aliases)
+                        }
+                        _ => Decision::Forward,
+                    };
+                    match cortar {
+                        Decision::Block { rule_id } => (
+                            self.blocked_answer(&name, qtype),
+                            Outcome::Blocked { rule_id },
+                        ),
+                        Decision::Forward => (answer, outcome),
+                    }
+                }
             }
         };
 

@@ -162,6 +162,31 @@ fn disfraz_view(t: &Texts, qname: &str, sitio: Option<&str>) -> Option<DisfrazVi
     })
 }
 
+/// Rows of disguised names that a rule cut after their answer say which decision of the person
+/// cut them (decision 205). The rules are read only when there is such a row.
+fn con_motivos(t: &Texts, state: &AppState, evs: &mut [EventView]) -> Result<(), Response> {
+    let hay = evs
+        .iter()
+        .any(|e| e.verdict == "cortado" && e.disfraz.is_some() && e.rule_id.is_some());
+    if !hay {
+        return Ok(());
+    }
+    let reglas: HashMap<i64, Rule> = with_ledger(state, |l| l.rules())?
+        .into_iter()
+        .map(|r| (r.id, r))
+        .collect();
+    for e in evs.iter_mut().filter(|e| e.verdict == "cortado") {
+        let (Some(d), Some(r)) = (e.disfraz.as_mut(), e.rule_id.and_then(|id| reglas.get(&id)))
+        else {
+            continue;
+        };
+        if r.match_kind == MatchKind::Category {
+            d.frase = crate::medidas::frase_disfraz_cortado(t, &e.qname, &d.sitio, r);
+        }
+    }
+    Ok(())
+}
+
 /// A registered data broker as the pages show it: who, from where, what it ticked in the
 /// register, and where it said people can ask for their data back.
 #[derive(Serialize, Clone)]
@@ -1200,6 +1225,7 @@ pub(crate) async fn radiografia(
     })?;
     let names = names_of(&devices);
     let mut eventos: Vec<EventView> = events.into_iter().map(|e| view(t, e, &names)).collect();
+    con_motivos(t, &state, &mut eventos)?;
     eventos.reverse();
     Ok(Json(Radiografia {
         fuente_red: destinos::fuente_view(),
@@ -1310,6 +1336,7 @@ pub(crate) async fn rafagas(
     // order the ledger hands them back is not part of its contract, and assuming it produced
     // one burst of 817 names with a negative duration.
     let mut evs: Vec<EventView> = events.into_iter().map(|e| view(t, e, &names)).collect();
+    con_motivos(t, &state, &mut evs)?;
     evs.sort_by_key(|e| e.ts);
 
     let mut por_aparato: HashMap<String, Vec<EventView>> = HashMap::new();
@@ -1377,6 +1404,7 @@ pub(crate) async fn recibo(
     })?;
     let names = names_of(&devices);
     let mut evs: Vec<EventView> = events.into_iter().map(|e| view(t, e, &names)).collect();
+    con_motivos(t, &state, &mut evs)?;
     evs.sort_by_key(|e| e.ts);
 
     let mut por_aparato: HashMap<String, Vec<EventView>> = HashMap::new();
@@ -1483,6 +1511,7 @@ pub(crate) async fn extracto(
     })?;
     let names = names_of(&devices);
     let mut eventos: Vec<EventView> = events.into_iter().map(|e| view(t, e, &names)).collect();
+    con_motivos(t, &state, &mut eventos)?;
     eventos.reverse();
     Ok(Json(Extracto {
         total,
@@ -2096,6 +2125,7 @@ pub(crate) async fn mi_dispositivo(
     })?;
     let names = HashMap::new();
     let mut eventos: Vec<EventView> = events.into_iter().map(|e| view(t, e, &names)).collect();
+    con_motivos(t, &state, &mut eventos)?;
     eventos.reverse();
     let observado = device.as_ref().map_or(0, |d| now - d.first_seen);
     Ok(Json(MiDispositivo {
@@ -2546,7 +2576,7 @@ pub(crate) async fn reglas(State(state): State<Arc<AppState>>, _s: Session) -> A
 /// `created_by` of the rules «Protección máxima» sets (the owner, 10 Oct 2026: «activar seguridad
 /// máxima también podríamos ponerlo en radiografías»). Its own author, so turning it off undoes
 /// exactly those and never a rule the person made by hand.
-const CREADA_POR_MAXIMA: &str = "protección máxima";
+pub(crate) const CREADA_POR_MAXIMA: &str = "protección máxima";
 /// What it cuts for the whole home: whole categories the open lists know. `esperado` is never
 /// among them, and a category rule never cuts it anyway (brief §6, `rules::decide`).
 const CATEGORIAS_MAXIMA: [Category; 3] = [

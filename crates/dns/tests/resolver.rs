@@ -100,6 +100,8 @@ async fn fake_upstream() -> (SocketAddr, Arc<AtomicUsize>, Server<Upstream>) {
 #[derive(Clone, Default)]
 struct Recorder {
     blocked: Arc<Mutex<Vec<String>>>,
+    /// Names cut after the answer when it came through an alias (decision 205).
+    blocked_after: Arc<Mutex<Vec<String>>>,
     seen: Arc<Mutex<Vec<(Query, Outcome)>>>,
 }
 
@@ -116,6 +118,13 @@ impl Policy for Recorder {
     fn decide(&self, query: &Query) -> Decision {
         if self.blocked.lock().unwrap().contains(&query.name) {
             Decision::Block { rule_id: Some(7) }
+        } else {
+            Decision::Forward
+        }
+    }
+    fn after_answer(&self, query: &Query, aliases: &[String]) -> Decision {
+        if !aliases.is_empty() && self.blocked_after.lock().unwrap().contains(&query.name) {
+            Decision::Block { rule_id: Some(9) }
         } else {
             Decision::Forward
         }
@@ -252,6 +261,45 @@ async fn the_alias_chain_reaches_the_policy() {
             ],
         }
     );
+}
+
+/// Cut after the answer (decision 205): the upstream was asked, the device gets the usual block
+/// answer and not one address of what came back; asked again, from the resolver's cache, the
+/// same. A name without aliases never reaches the question.
+#[tokio::test]
+async fn a_name_cut_after_its_answer_gets_the_block_answer_every_time() {
+    let (up, hits, _upstream) = fake_upstream().await;
+    let policy = Recorder::default();
+    policy
+        .blocked_after
+        .lock()
+        .unwrap()
+        .extend(["metricas.tienda.test".to_owned(), "a.test".to_owned()]);
+    let g = guardiana(up, policy.clone(), |_| {}).await;
+    for vez in 0..2 {
+        let msg = ask_udp(g.udp_addrs[0], "metricas.tienda.test", RecordType::A).await;
+        assert_eq!(
+            msg.metadata.response_code,
+            ResponseCode::NXDomain,
+            "vez {vez}"
+        );
+        assert!(
+            msg.answers.is_empty(),
+            "no alias nor address reaches the device"
+        );
+    }
+    assert_eq!(
+        hits.load(Ordering::SeqCst),
+        1,
+        "asked upstream once, then the cache"
+    );
+    let seen = policy.seen();
+    assert!(seen
+        .iter()
+        .all(|(_, o)| *o == Outcome::Blocked { rule_id: Some(9) }));
+    // `a.test` answers without an alias: it is never asked after the answer, and resolves.
+    let msg = ask_udp(g.udp_addrs[0], "a.test", RecordType::A).await;
+    assert_eq!(a_records(&msg), vec![Ipv4Addr::new(1, 2, 3, 4)]);
 }
 
 #[tokio::test]

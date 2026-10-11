@@ -134,6 +134,13 @@ struct Pending {
     classified: Classified,
     /// Cut because it fell outside the declared scope, not because of a rule.
     fuera_de_alcance: bool,
+    /// Cut after the answer as a name dressed as another (decision 205): the tracker's site it
+    /// answered as. The outcome then says `Blocked` and carries no aliases, so the site rides here.
+    disfraz_cortado: Option<String>,
+    /// When the device was first seen, as `decide` read it: the 24 hours of a category rule are
+    /// counted from here after the answer too. Kept here because a change of rules clears the
+    /// engine's own memory of it between `decide` and the answer.
+    first_seen: i64,
 }
 
 type PendingKey = (SocketAddr, String, String, i64);
@@ -367,6 +374,8 @@ impl EnginePolicy {
             ip: q.client.ip().to_string(),
             classified,
             fuera_de_alcance: false,
+            disfraz_cortado: None,
+            first_seen: q.ts,
         })
     }
 }
@@ -469,6 +478,8 @@ impl Policy for EnginePolicy {
                     ip,
                     classified,
                     fuera_de_alcance,
+                    disfraz_cortado: None,
+                    first_seen,
                 },
             );
             // Never let a lost `record` grow the map without bound.
@@ -477,6 +488,47 @@ impl Policy for EnginePolicy {
             }
         }
         decision
+    }
+
+    /// A name dressed as another (decision 205, with the owner's express OK of 11 Oct 2026): cut
+    /// after its answer when the tracker it answered as falls in a category the person already
+    /// cuts, by a rule of theirs or by «Protección máxima», with the same 24 hours of observation
+    /// and the same precedence as any category rule (`rules::decide_cloaked`). The upstream was
+    /// asked; the device gets the usual block answer instead of an address.
+    fn after_answer(&self, q: &Query, aliases: &[String]) -> Decision {
+        let Ok(mut inner) = self.inner.lock() else {
+            return Decision::Forward;
+        };
+        let Ok(mut pending) = self.pending.lock() else {
+            return Decision::Forward;
+        };
+        let Some(p) = pending.get_mut(&key_of(q)) else {
+            return Decision::Forward;
+        };
+        let Some((sitio, categoria)) = inner.classifier.catalog().cloaked(&q.name, aliases) else {
+            return Decision::Forward;
+        };
+        inner.refresh_rules();
+        let regla = rules::decide_cloaked(
+            &inner.rules.rules,
+            RuleInput {
+                device_id: &p.device_id,
+                name: &q.name,
+                category: categoria,
+                observed_ms: q.ts - p.first_seen,
+            },
+            p.classified.category,
+            q.ts,
+        );
+        match regla {
+            Some(r) => {
+                p.disfraz_cortado = Some(sitio);
+                Decision::Block {
+                    rule_id: Some(r.id),
+                }
+            }
+            None => Decision::Forward,
+        }
     }
 
     fn record(&self, q: &Query, outcome: Outcome) {
@@ -532,12 +584,15 @@ impl Policy for EnginePolicy {
         }
         // Un nombre disfrazado (decisión 205): si la respuesta pasó por un alias de otro sitio que
         // las listas llaman rastreador, publicidad o telemetría, se anota el sitio de ese alias, y
-        // nada más de la cadena. Solo se mira y se dice: lo que se corta sigue decidiéndose por el
-        // nombre pedido, como siempre.
+        // nada más de la cadena. Si se cortó por eso (después de la respuesta), el sitio viene de
+        // `after_answer`, porque el resultado ya no trae la cadena.
         if let Outcome::Forwarded { aliases, .. } = &outcome {
             if !aliases.is_empty() {
                 event.cname_target = inner.classifier.catalog().cloaked_target(&q.name, aliases);
             }
+        }
+        if verdict == Verdict::Cortado && p.disfraz_cortado.is_some() {
+            event.cname_target = p.disfraz_cortado;
         }
         // Solo para este equipo: de un teléfono en Modo Hogar se ve el nombre y nada más, y eso
         // lo dice cada pantalla. Si el sistema no lo dijo, el hueco se queda vacío.

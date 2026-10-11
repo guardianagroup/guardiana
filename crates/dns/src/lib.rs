@@ -200,6 +200,14 @@ pub enum Outcome {
 pub trait Policy: Send + Sync + 'static {
     /// Forward or block? Called before answering.
     fn decide(&self, query: &Query) -> Decision;
+    /// Called after the upstream answered a forwarded query through aliases (CNAME), with their
+    /// names in order, before anything is sent to the device. `Block` answers the device as
+    /// blocked instead of with the answer, and the outcome is `Blocked` (decision 205: a name
+    /// dressed as another, cut by what the person decided). The upstream was asked all the same;
+    /// the device only gets no address. The default forwards, as before this existed.
+    fn after_answer(&self, _query: &Query, _aliases: &[String]) -> Decision {
+        Decision::Forward
+    }
     /// Called after the answer was sent, with what happened.
     fn record(&self, query: &Query, outcome: Outcome);
 }
@@ -209,6 +217,9 @@ pub trait Policy: Send + Sync + 'static {
 impl<P: Policy> Policy for std::sync::Arc<P> {
     fn decide(&self, query: &Query) -> Decision {
         (**self).decide(query)
+    }
+    fn after_answer(&self, query: &Query, aliases: &[String]) -> Decision {
+        (**self).after_answer(query, aliases)
     }
     fn record(&self, query: &Query, outcome: Outcome) {
         (**self).record(query, outcome);

@@ -1452,9 +1452,9 @@
     "disfraz_etiqueta": "disguised",
     "disfraz_frase": "presents itself as {nombre}, but {empresa} answers ({sitio})",
     "disfraz_frase_sin_empresa": "presents itself as {nombre}, but {sitio} answers, which the open lists give as tracking",
-    "disfraz_titulo": "The answer to this name went through an alias (CNAME) of another site, {sitio}, that the open lists give as tracking, advertising or telemetry. GUARDIANA saw it in the answer and only wrote down that site's name. What is blocked is still decided by the name asked for.",
+    "disfraz_titulo": "The answer to this name went through an alias (CNAME) of another site, {sitio}, that the open lists give as tracking, advertising or telemetry. GUARDIANA saw it in the answer and only wrote down that site's name. If you block that site's category (with a rule of yours or with maximum protection), and the device has been watched for 24 hours, it is blocked too: GUARDIANA already asked outside, but the device gets no address. Unblocking this name wins.",
     "disfraz_seccion": "Disguised names",
-    "disfraz_lead": "Names that present themselves as part of a website, but whose answer goes through an alias (CNAME) of another company that the open lists give as tracking, advertising or telemetry: that is how a tracker slips in as if it were the website's own. GUARDIANA sees it in the answer and writes down only that alias's site. It does not change what is blocked.",
+    "disfraz_lead": "Names that present themselves as part of a website, but whose answer goes through an alias (CNAME) of another company that the open lists give as tracking, advertising or telemetry: that is how a tracker slips in as if it were the website's own. GUARDIANA sees it in the answer and writes down only that alias's site. If you block its category (with a rule of yours or with maximum protection), it is blocked like the rest of that category, once the answer has arrived.",
     "disfraz_total": "{n} disguised names got {consultas} in these 7 days.",
     "disfraz_total_uno": "1 disguised name got {consultas} in these 7 days.",
     "disfraz_ninguno": "No disguised names in these 7 days.",
@@ -1488,6 +1488,15 @@
     "compartir_noche": "Between 0:00 and 6:00 in these 7 days, the devices made {n} queries to tracking, advertising or telemetry.",
     "compartir_noche_uno": "Between 0:00 and 6:00 in these 7 days, the devices made 1 query to tracking, advertising or telemetry.",
     "compartir_disfrazados": "{n} names presented themselves as part of a website and answered as another company's tracking.",
-    "compartir_disfrazados_uno": "1 name presented itself as part of a website and answered as another company's tracking."
+    "compartir_disfrazados_uno": "1 name presented itself as part of a website and answered as another company's tracking.",
+    "disfraz_cortado": "blocked: it presented itself as {nombre}, but {empresa} answered ({sitio}), and {motivo}",
+    "disfraz_cortado_sin_empresa": "blocked: it presented itself as {nombre}, but {sitio} answered, which the open lists give as tracking, and {motivo}",
+    "disfraz_motivo_rastreador": "you block tracking",
+    "disfraz_motivo_publicidad": "you block advertising",
+    "disfraz_motivo_telemetria": "you block telemetry",
+    "disfraz_motivo_maxima": "you turned on maximum protection, which blocks {que}",
+    "disfraz_que_rastreador": "tracking",
+    "disfraz_que_publicidad": "advertising",
+    "disfraz_que_telemetria": "telemetry"
   }
 }

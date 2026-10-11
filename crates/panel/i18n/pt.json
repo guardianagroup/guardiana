@@ -1452,9 +1452,9 @@
     "disfraz_etiqueta": "disfarçado",
     "disfraz_frase": "se apresenta como {nombre}, mas quem responde é {empresa} ({sitio})",
     "disfraz_frase_sin_empresa": "se apresenta como {nombre}, mas quem responde é {sitio}, que as listas abertas dão como rastreamento",
-    "disfraz_titulo": "A resposta a este nome passou por um apelido (CNAME) de outro site, {sitio}, que as listas abertas dão como rastreamento, publicidade ou telemetria. O GUARDIANA viu isso na resposta e anotou só o nome desse site. O que é bloqueado continua sendo decidido pelo nome pedido.",
+    "disfraz_titulo": "A resposta a este nome passou por um apelido (CNAME) de outro site, {sitio}, que as listas abertas dão como rastreamento, publicidade ou telemetria. O GUARDIANA viu isso na resposta e anotou só o nome desse site. Se você bloqueia a categoria desse site (com uma regra sua ou com a proteção máxima), e o aparelho já foi observado por 24 horas, ele também é bloqueado: o GUARDIANA já perguntou lá fora, mas o aparelho não recebe nenhum endereço. Desbloquear este nome vence.",
     "disfraz_seccion": "Nomes disfarçados",
-    "disfraz_lead": "Nomes que se apresentam como parte de um site, mas cuja resposta passa por um apelido (CNAME) de outra empresa que as listas abertas dão como rastreamento, publicidade ou telemetria: é assim que um rastreador se infiltra como se fosse do próprio site. O GUARDIANA vê isso na resposta e anota só o site desse apelido. Não muda o que é bloqueado.",
+    "disfraz_lead": "Nomes que se apresentam como parte de um site, mas cuja resposta passa por um apelido (CNAME) de outra empresa que as listas abertas dão como rastreamento, publicidade ou telemetria: é assim que um rastreador se infiltra como se fosse do próprio site. O GUARDIANA vê isso na resposta e anota só o site desse apelido. Se você bloqueia a categoria dele (com uma regra sua ou com a proteção máxima), ele é bloqueado como o resto dessa categoria, depois que a resposta chega.",
     "disfraz_total": "{n} nomes disfarçados receberam {consultas} nestes 7 dias.",
     "disfraz_total_uno": "1 nome disfarçado recebeu {consultas} nestes 7 dias.",
     "disfraz_ninguno": "Nenhum nome disfarçado nestes 7 dias.",
@@ -1488,6 +1488,15 @@
     "compartir_noche": "Entre 0:00 e 6:00 destes 7 dias, os aparelhos fizeram {n} consultas a rastreamento, publicidade ou telemetria.",
     "compartir_noche_uno": "Entre 0:00 e 6:00 destes 7 dias, os aparelhos fizeram 1 consulta a rastreamento, publicidade ou telemetria.",
     "compartir_disfrazados": "{n} nomes se apresentavam como parte de um site e respondiam como rastreamento de outra empresa.",
-    "compartir_disfrazados_uno": "1 nome se apresentava como parte de um site e respondia como rastreamento de outra empresa."
+    "compartir_disfrazados_uno": "1 nome se apresentava como parte de um site e respondia como rastreamento de outra empresa.",
+    "disfraz_cortado": "bloqueado: se apresentava como {nombre}, mas quem respondia era {empresa} ({sitio}), e {motivo}",
+    "disfraz_cortado_sin_empresa": "bloqueado: se apresentava como {nombre}, mas quem respondia era {sitio}, que as listas abertas dão como rastreamento, e {motivo}",
+    "disfraz_motivo_rastreador": "você bloqueia o rastreamento",
+    "disfraz_motivo_publicidad": "você bloqueia a publicidade",
+    "disfraz_motivo_telemetria": "você bloqueia a telemetria",
+    "disfraz_motivo_maxima": "você ligou a proteção máxima, que bloqueia {que}",
+    "disfraz_que_rastreador": "o rastreamento",
+    "disfraz_que_publicidad": "a publicidade",
+    "disfraz_que_telemetria": "a telemetria"
   }
 }

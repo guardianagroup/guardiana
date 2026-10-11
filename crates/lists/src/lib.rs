@@ -643,6 +643,13 @@ impl Catalog {
     /// names the tracker. Only a name is returned, never an address.
     #[must_use]
     pub fn cloaked_target(&self, qname: &str, chain: &[String]) -> Option<String> {
+        self.cloaked(qname, chain).map(|(sitio, _)| sitio)
+    }
+
+    /// [`Catalog::cloaked_target`], with the category the lists give the alias it names: what a
+    /// category rule the person made, or «Protección máxima», would cut it by (decision 205).
+    #[must_use]
+    pub fn cloaked(&self, qname: &str, chain: &[String]) -> Option<(String, Category)> {
         let sitio_pedido = dominio::sitio(qname);
         let dueno_pedido = group_or_company_of(qname);
         chain
@@ -660,7 +667,7 @@ impl Catalog {
                     && hosting_of(alias).is_none()
                     && (dueno_pedido.is_none() || dueno_pedido != group_or_company_of(alias))
             })
-            .map(|alias| dominio::sitio(alias))
+            .map(|alias| (dominio::sitio(alias), self.category(alias)))
     }
 
     /// Number of distinct domains known.
@@ -712,6 +719,27 @@ mod tests {
             c.cloaked_target("www.ejemplo.com", &cadena(&["ejemplo.com.cdn.ejemplo.com"])),
             None
         );
+        // With the category the alias is listed under: what a category rule would cut it by.
+        assert_eq!(
+            c.cloaked(
+                "metricas.ejemplo.com",
+                &cadena(&["ejemplo.com.ssl.d1.sc.omtrdc.net"])
+            ),
+            Some(("omtrdc.net".to_owned(), Category::Rastreador))
+        );
+        // A tracker the lists name, but on a delivery network or a rented cloud server: the road,
+        // not a company behind the name, so neither a disguise nor anything to cut by.
+        for camino in [
+            "d10lpsik1i8c69.cloudfront.net",
+            "fs-client-logger.herokuapp.com",
+        ] {
+            assert_ne!(c.category(camino), Category::Desconocido, "{camino}");
+            assert!(
+                delivery_of(camino).is_some() || hosting_of(camino).is_some(),
+                "{camino}"
+            );
+            assert_eq!(c.cloaked("metricas.ejemplo.com", &cadena(&[camino])), None);
+        }
         // No chain, nothing to say.
         assert_eq!(c.cloaked_target("metricas.ejemplo.com", &[]), None);
         // The same company under another of its own names is not somebody else.

@@ -153,6 +153,34 @@ pub(crate) fn frase_disfraz(t: &Texts, nombre: &str, sitio: &str) -> String {
     }
 }
 
+/// The sentence of a disguised name the person's own rule cut after its answer (decision 205):
+/// «cortado: se presentaba como metricas.ejemplo.com, pero respondía Adobe (omtrdc.net), y tienes
+/// cortado el rastreo». The reason is the rule that did it, as it was made: by the person, or by
+/// «Protección máxima».
+pub(crate) fn frase_disfraz_cortado(
+    t: &Texts,
+    nombre: &str,
+    sitio: &str,
+    regla: &guardiana_core::Rule,
+) -> String {
+    let cat = regla.pattern.as_str();
+    let motivo = if regla.created_by == crate::api::CREADA_POR_MAXIMA {
+        t.panel("disfraz_motivo_maxima")
+            .replace("{que}", t.panel(&format!("disfraz_que_{cat}")))
+    } else {
+        t.panel(&format!("disfraz_motivo_{cat}")).to_owned()
+    };
+    let (clave, empresa) = match empresa_del_sitio(sitio) {
+        Some(e) => ("disfraz_cortado", e),
+        None => ("disfraz_cortado_sin_empresa", ""),
+    };
+    t.panel(clave)
+        .replace("{nombre}", nombre)
+        .replace("{empresa}", empresa)
+        .replace("{sitio}", sitio)
+        .replace("{motivo}", &motivo)
+}
+
 fn hora_local(ts: i64, zona_min: i64) -> (i64, i64) {
     let dia = local_day_index(ts, zona_min);
     (dia, (ts - local_midnight(dia, zona_min)) / 60_000)
@@ -542,6 +570,40 @@ mod tests {
         assert_eq!(fb.mediana_ms, None);
         assert_eq!(fb.frase, "3 contactos en estos 7 días");
         assert!(!m.cadencias.iter().any(|c| c.nombre == "viejo.tracker.test"));
+    }
+
+    #[test]
+    fn a_cut_disguise_says_which_decision_of_yours_cut_it() {
+        let t = i18n::es();
+        let mut regla = guardiana_core::Rule {
+            id: 1,
+            scope: guardiana_core::Scope::Home,
+            device_id: None,
+            match_kind: guardiana_core::MatchKind::Category,
+            pattern: "rastreador".into(),
+            action: guardiana_core::Action::Cortar,
+            created_at: 0,
+            created_by: "usuario (panel)".into(),
+            expires_at: None,
+            undone_at: None,
+            confirmed: false,
+        };
+        assert_eq!(
+            frase_disfraz_cortado(t, "metricas.ejemplo.com", "omtrdc.net", &regla),
+            "cortado: se presentaba como metricas.ejemplo.com, pero respondía Adobe (omtrdc.net), y tienes cortado el rastreo"
+        );
+        regla.created_by = crate::api::CREADA_POR_MAXIMA.into();
+        assert_eq!(
+            frase_disfraz_cortado(t, "metricas.ejemplo.com", "omtrdc.net", &regla),
+            "cortado: se presentaba como metricas.ejemplo.com, pero respondía Adobe (omtrdc.net), y tienes encendida la protección máxima, que corta el rastreo"
+        );
+        for l in [i18n::en(), i18n::pt()] {
+            let f = frase_disfraz_cortado(l, "m.x.com", "medidor.example", &regla);
+            assert!(
+                f.contains("m.x.com") && f.contains("medidor.example"),
+                "{f}"
+            );
+        }
     }
 
     #[test]

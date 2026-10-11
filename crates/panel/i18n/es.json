@@ -1452,9 +1452,9 @@
     "disfraz_etiqueta": "disfrazado",
     "disfraz_frase": "se presenta como {nombre}, pero responde {empresa} ({sitio})",
     "disfraz_frase_sin_empresa": "se presenta como {nombre}, pero responde {sitio}, que las listas abiertas dan como rastreo",
-    "disfraz_titulo": "La respuesta a este nombre pasó por un alias (CNAME) de otro sitio, {sitio}, que las listas abiertas dan como rastreo, publicidad o telemetría. GUARDIANA lo vio en la respuesta y solo anotó el nombre de ese sitio. Lo que se corta se sigue decidiendo por el nombre pedido.",
+    "disfraz_titulo": "La respuesta a este nombre pasó por un alias (CNAME) de otro sitio, {sitio}, que las listas abiertas dan como rastreo, publicidad o telemetría. GUARDIANA lo vio en la respuesta y solo anotó el nombre de ese sitio. Si tienes cortada la categoría de ese sitio (con una regla tuya o con la protección máxima), y el aparato lleva 24 horas mirado, también se corta: GUARDIANA ya preguntó fuera, pero el aparato no recibe ninguna dirección. Un desbloqueo de este nombre gana.",
     "disfraz_seccion": "Nombres disfrazados",
-    "disfraz_lead": "Nombres que se presentan como parte de una web, pero cuya respuesta pasa por un alias (CNAME) de otra empresa que las listas abiertas dan como rastreo, publicidad o telemetría: así se cuela un rastreador como si fuera de la propia web. GUARDIANA lo ve en la respuesta y anota solo el sitio de ese alias. No cambia lo que se corta.",
+    "disfraz_lead": "Nombres que se presentan como parte de una web, pero cuya respuesta pasa por un alias (CNAME) de otra empresa que las listas abiertas dan como rastreo, publicidad o telemetría: así se cuela un rastreador como si fuera de la propia web. GUARDIANA lo ve en la respuesta y anota solo el sitio de ese alias. Si tienes cortada su categoría (con una regla tuya o con la protección máxima), se corta igual que el resto de esa categoría, después de que llegue la respuesta.",
     "disfraz_total": "{n} nombres disfrazados recibieron {consultas} en estos 7 días.",
     "disfraz_total_uno": "1 nombre disfrazado recibió {consultas} en estos 7 días.",
     "disfraz_ninguno": "Ningún nombre disfrazado en estos 7 días.",
@@ -1488,6 +1488,15 @@
     "compartir_noche": "Entre las 0:00 y las 6:00 de estos 7 días, los aparatos hicieron {n} consultas a rastreadores, publicidad o telemetría.",
     "compartir_noche_uno": "Entre las 0:00 y las 6:00 de estos 7 días, los aparatos hicieron 1 consulta a rastreadores, publicidad o telemetría.",
     "compartir_disfrazados": "{n} nombres se presentaban como parte de una web y respondían como rastreo de otra empresa.",
-    "compartir_disfrazados_uno": "1 nombre se presentaba como parte de una web y respondía como rastreo de otra empresa."
+    "compartir_disfrazados_uno": "1 nombre se presentaba como parte de una web y respondía como rastreo de otra empresa.",
+    "disfraz_cortado": "cortado: se presentaba como {nombre}, pero respondía {empresa} ({sitio}), y {motivo}",
+    "disfraz_cortado_sin_empresa": "cortado: se presentaba como {nombre}, pero respondía {sitio}, que las listas abiertas dan como rastreo, y {motivo}",
+    "disfraz_motivo_rastreador": "tienes cortado el rastreo",
+    "disfraz_motivo_publicidad": "tienes cortada la publicidad",
+    "disfraz_motivo_telemetria": "tienes cortada la telemetría",
+    "disfraz_motivo_maxima": "tienes encendida la protección máxima, que corta {que}",
+    "disfraz_que_rastreador": "el rastreo",
+    "disfraz_que_publicidad": "la publicidad",
+    "disfraz_que_telemetria": "la telemetría"
   }
 }

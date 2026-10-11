@@ -166,6 +166,28 @@ fn prepare(tag: &str) -> (PathBuf, PathBuf, PathBuf) {
         &CADENA,
     ))
     .unwrap();
+    // Yesterday at 13:00, after the person cut tracking: the disguised name cut after its
+    // answer, as the engine writes it (decision 205): cut by that rule, with the site it answered
+    // as, and no server, because the device got no address.
+    let regla = l
+        .add_rule(guardiana_core::NewRule {
+            scope: guardiana_core::Scope::Home,
+            device_id: None,
+            match_kind: guardiana_core::MatchKind::Category,
+            pattern: "rastreador".into(),
+            action: guardiana_core::Action::Cortar,
+            created_at: ayer,
+            created_by: "usuario (panel)".into(),
+            expires_at: None,
+            confirmed: false,
+        })
+        .unwrap();
+    let mut cortado = consulta(SELF_DEVICE_ID, ayer + 13 * HOUR_MS, DISFRAZADO, &CADENA);
+    cortado.verdict = Verdict::Cortado;
+    cortado.decided_by = guardiana_core::DecidedBy::ReglaUsuario;
+    cortado.rule_id = Some(regla.id);
+    cortado.server = None;
+    l.append(cortado).unwrap();
     // Today, a little before now (and never before today's midnight): Alphabet.
     let hoy = (now - 120_000).max(local_midnight(local_day_index(now, 0), 0));
     l.append(consulta(SELF_DEVICE_ID, hoy, "www.youtube.com", &[]))
@@ -213,14 +235,26 @@ async fn the_report_measures_nights_companies_cadence_and_disguises() {
     assert_eq!(status, 200, "{body}");
     let v: serde_json::Value = serde_json::from_str(&body).unwrap();
     assert_eq!(v["ok"], true, "{body}");
-    assert_eq!(v["checked"], 2 + 26 + 1 + 1 + 1 + 1 + 1 + 6, "{body}");
+    assert_eq!(v["checked"], 2 + 26 + 1 + 1 + 1 + 1 + 1 + 1 + 6, "{body}");
 
     // The disguised name says who answers, in its row; nothing else does.
     let (status, body) = get(addr, &t, "/api/extracto").await;
     assert_eq!(status, 200, "{body}");
     let v: serde_json::Value = serde_json::from_str(&body).unwrap();
     let eventos = v["eventos"].as_array().unwrap();
-    let fila = eventos.iter().find(|e| e["qname"] == DISFRAZADO).unwrap();
+    let fila = eventos
+        .iter()
+        .find(|e| e["qname"] == DISFRAZADO && e["verdict"] == "observado")
+        .unwrap();
+    // The one cut after its answer says which decision of the person cut it.
+    let cortada = eventos
+        .iter()
+        .find(|e| e["qname"] == DISFRAZADO && e["verdict"] == "cortado")
+        .unwrap();
+    assert_eq!(
+        cortada["disfraz"]["frase"],
+        "cortado: se presentaba como metricas.tienda.example, pero respondía Adobe (omtrdc.net), y tienes cortado el rastreo"
+    );
     assert_eq!(
         fila["disfraz"]["frase"],
         "se presenta como metricas.tienda.example, pero responde Adobe (omtrdc.net)"
@@ -296,9 +330,9 @@ async fn the_report_measures_nights_companies_cadence_and_disguises() {
     let dis = m["disfrazados"].as_array().unwrap();
     assert_eq!(dis.len(), 1, "{dis:?}");
     assert_eq!(dis[0]["nombre"], DISFRAZADO);
-    assert_eq!(dis[0]["consultas"], 2);
+    assert_eq!(dis[0]["consultas"], 3, "the cut one too: it was asked");
     assert_eq!(dis[0]["aparatos"], 2);
-    assert_eq!(m["disfrazados_consultas"], 2);
+    assert_eq!(m["disfrazados_consultas"], 3);
 
     // The silent phone is nowhere in the measurements (its week is counted as figures in the
     // table above them, as it always was, and never by name).

@@ -156,6 +156,30 @@ pub fn decide<'r>(rules: &'r [Rule], input: RuleInput<'_>, now: i64) -> Option<&
     best.map(|(r, _)| r)
 }
 
+/// A name dressed as another (decision 205, cut with the owner's express OK of 11 Oct 2026):
+/// whether the person's own rules cut it by the category of the tracker that answered behind it.
+///
+/// `input` carries the name asked for, with `category` set to the category the lists give the
+/// alias it answered as. Only what the person already decided cuts: the deciding rule must be a
+/// **category** rule that cuts (one they made, or the three of «Protección máxima», which they
+/// turn on), with the same 24 hours of observation every category rule waits ([`decide`]
+/// applies it). Their own rules win: an allow for the name, exact or suffix, is more specific
+/// than a category and beats it. A name the lists call `esperado` (`own_category`) is never cut.
+/// Pure, like [`decide`]: the engine asks it after the answer arrived.
+#[must_use]
+pub fn decide_cloaked<'r>(
+    rules: &'r [Rule],
+    input: RuleInput<'_>,
+    own_category: Category,
+    now: i64,
+) -> Option<&'r Rule> {
+    if own_category == Category::Esperado || input.category == Category::Esperado {
+        return None;
+    }
+    decide(rules, input, now)
+        .filter(|r| r.action == Action::Cortar && r.match_kind == MatchKind::Category)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,6 +244,80 @@ mod tests {
             category,
             observed_ms: 2 * DAY,
         }
+    }
+
+    #[test]
+    fn a_disguised_name_is_cut_only_by_what_the_person_decided() {
+        let rastreo = rule(
+            1,
+            Scope::Home,
+            None,
+            MatchKind::Category,
+            "rastreador",
+            Action::Cortar,
+            false,
+        );
+        // `metricas.tienda.com` answers as a tracker (the alias's category).
+        let i = input("phone", "metricas.tienda.com", Category::Rastreador);
+        let propia = Category::Desconocido;
+        // A rule that cuts tracking, past the 24 hours: cut, and by that rule.
+        let reglas = vec![rastreo.clone()];
+        assert_eq!(
+            decide_cloaked(&reglas, i, propia, 10).map(|r| r.id),
+            Some(1)
+        );
+        // Before the 24 hours: not cut.
+        let mut pronto = i;
+        pronto.observed_ms = 23 * HOUR_MS;
+        assert!(decide_cloaked(&reglas, pronto, propia, 10).is_none());
+        // No rule for that category (only advertising is cut): not cut.
+        let publi = vec![rule(
+            2,
+            Scope::Home,
+            None,
+            MatchKind::Category,
+            "publicidad",
+            Action::Cortar,
+            false,
+        )];
+        assert!(decide_cloaked(&publi, i, propia, 10).is_none());
+        // The person allowed that name, exactly or with everything under the site: not cut.
+        for (kind, pattern) in [
+            (MatchKind::Domain, "metricas.tienda.com"),
+            (MatchKind::Suffix, "tienda.com"),
+        ] {
+            let mut r = reglas.clone();
+            r.push(rule(
+                3,
+                Scope::Device,
+                Some("phone"),
+                kind,
+                pattern,
+                Action::Permitir,
+                false,
+            ));
+            assert!(decide_cloaked(&r, i, propia, 10).is_none(), "{pattern}");
+        }
+        // The name itself is something the computer needs: never cut.
+        assert!(decide_cloaked(&reglas, i, Category::Esperado, 10).is_none());
+        // «Protección máxima»: its rules cut while on, and not once undone.
+        let mut maxima = rastreo.clone();
+        maxima.created_by = "protección máxima".into();
+        let mut on = vec![maxima];
+        assert_eq!(decide_cloaked(&on, i, propia, 10).map(|r| r.id), Some(1));
+        on[0].undone_at = Some(5);
+        assert!(decide_cloaked(&on, i, propia, 10).is_none());
+        // A rule that cuts the name itself already cut it before the answer: not this path.
+        let nombre = vec![rule(
+            4,
+            Scope::Device,
+            Some("phone"),
+            MatchKind::Domain,
+            "metricas.tienda.com",
+            Action::Cortar,
+            false,
+        )];
+        assert!(decide_cloaked(&nombre, i, propia, 10).is_none());
     }
 
     #[test]
