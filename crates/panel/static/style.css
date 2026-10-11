@@ -284,4 +284,7 @@ ul.b-lista li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:
 ul.b-lista li.hidden{display:none}
 p.b-acciones{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:6px}
 label.b-check{display:inline-flex;gap:8px;align-items:center;font-size:14px;cursor:pointer}
-#b-envio-form{margin-bottom:0}
+ul.b-lista li .b-pregunta{grid-column:1 / -1}
+.b-enviada{display:inline-flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:14px}
+.b-pregunta{border-top:1px dashed var(--line);margin-top:10px;padding-top:6px}
+.b-pregunta p{margin:6px 0}

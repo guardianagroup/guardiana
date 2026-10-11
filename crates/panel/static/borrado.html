@@ -42,22 +42,30 @@
 </ol>
 <p class="limit"><strong data-t="borrado_aviso_abogados"></strong> <span data-t="borrado_privado"></span></p>
 
-<h2 data-t="borrado_paso_pais"></h2>
-<p class="lead" data-t="borrado_pais_lead"></p>
-<form class="filters" id="b-pais-form">
-  <label><span data-t="borrado_campo_pais"></span><select id="b-pais"></select></label>
-</form>
-<p id="b-ley-corta" class="b-corta"></p>
-<details class="b-plegable" id="b-ley-det"><summary data-t="borrado_ver_ley"></summary><div class="card" id="b-ley"></div></details>
-<div class="card hidden" id="b-drop">
-  <h3 data-t="borrado_drop_titulo"></h3>
-  <p data-t="borrado_drop_texto"></p>
-  <p><a class="btn" href="https://consumer.drop.privacy.ca.gov" target="_blank" rel="noopener noreferrer" data-t="borrado_drop_enlace"></a>
-     <a href="https://privacy.ca.gov/drop/" target="_blank" rel="noopener noreferrer" data-t="borrado_drop_mas"></a></p>
+<h2 data-t="borrado_paso_datos"></h2>
+<div class="card" id="b-datos">
+  <form class="filters" id="b-datos-form">
+    <label><span data-t="borrado_campo_nombre"></span><input id="b-nombre" type="text" autocomplete="name" spellcheck="false"></label>
+    <label><span data-t="borrado_campo_correo"></span><input id="b-correo" type="email" autocomplete="email" spellcheck="false"></label>
+    <label><span data-t="borrado_campo_pais"></span><select id="b-pais"></select></label>
+    <label><span data-t="borrado_campo_idioma"></span><select id="b-idioma"><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option></select></label>
+  </form>
+  <p id="b-datos-msg" class="bad hidden" role="status" aria-live="polite"></p>
+  <p><label class="b-check"><input id="b-recordar" type="checkbox"> <span data-t="borrado_recordar"></span></label></p>
+  <p><label class="b-check"><input id="b-evidencia" type="checkbox" checked> <span data-t="borrado_campo_evidencia"></span></label></p>
+  <p id="b-qc" class="muted hidden" data-t="borrado_qc_frances"></p>
+  <p id="b-ley-corta" class="b-corta"></p>
+  <details class="b-plegable" id="b-ley-det"><summary data-t="borrado_ver_ley"></summary><div id="b-ley"></div></details>
 </div>
 
 <h2 data-t="borrado_paso_empresa"></h2>
 <p class="lead" id="b-empresa-lead"></p>
+<div class="card hidden" id="b-drop">
+  <h3 data-t="borrado_drop_titulo"></h3>
+  <p data-t="borrado_drop_texto"></p>
+  <p><a class="btn" href="https://consumer.drop.privacy.ca.gov" target="_blank" rel="noopener noreferrer" data-t="borrado_drop_enlace"></a></p>
+  <p class="muted"><a href="https://privacy.ca.gov/drop/" target="_blank" rel="noopener noreferrer" data-t="borrado_drop_mas"></a> · <span data-t="borrado_drop_debajo"></span></p>
+</div>
 <div id="b-vistas"></div>
 <p id="b-callados" class="muted hidden"></p>
 <details class="b-plegable" id="b-otras">
@@ -69,40 +77,26 @@
     <p id="b-lista-vacia" class="muted hidden" data-t="borrado_buscar_nada"></p>
   </div>
 </details>
-
-<h2 id="b-paso-carta" data-t="borrado_paso_carta"></h2>
-<p class="lead" data-t="borrado_carta_lead"></p>
-<div class="card" id="b-carta-card">
-  <form class="filters" id="b-carta-form">
-    <label><span data-t="borrado_col_empresa"></span><select id="b-corredor"></select></label>
-    <label><span data-t="borrado_campo_nombre"></span><input id="b-nombre" type="text" autocomplete="off" spellcheck="false"></label>
-    <label><span data-t="borrado_campo_correo"></span><input id="b-correo" type="email" autocomplete="off" spellcheck="false"></label>
-    <label><span data-t="borrado_campo_idioma"></span><select id="b-idioma"><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option></select></label>
-  </form>
-  <p><label class="b-check"><input id="b-evidencia" type="checkbox" checked> <span data-t="borrado_campo_evidencia"></span></label></p>
-  <p id="b-canal"></p>
-  <p><strong id="b-asunto"></strong></p>
-  <textarea id="b-texto" class="mono wide" rows="22" readonly data-t-label="borrado_paso_carta"></textarea>
-  <p class="b-acciones" id="b-acciones">
-    <a class="btn" id="b-mailto" href="#" data-t="borrado_mailto"></a>
-    <button type="button" id="b-copiar" data-t="borrado_copiar"></button>
-    <a class="btn secondary" id="b-formulario" href="#" target="_blank" rel="noopener noreferrer" data-t="borrado_formulario"></a>
-    <button type="button" class="secondary" id="b-descargar" data-t="borrado_descargar"></button>
-  </p>
-  <p id="b-pista" class="muted"></p>
-  <p id="b-msg" class="bad" role="status" aria-live="polite"></p>
-</div>
+<details class="b-plegable" id="b-ver-carta">
+  <summary data-t="borrado_ver_carta"></summary>
+  <div class="card" id="b-carta-card">
+    <form class="filters" id="b-carta-form">
+      <label><span data-t="borrado_col_empresa"></span><select id="b-corredor"></select></label>
+    </form>
+    <p id="b-canal" class="muted"></p>
+    <p><strong id="b-asunto"></strong></p>
+    <textarea id="b-texto" class="mono wide" rows="22" readonly data-t-label="borrado_ver_carta"></textarea>
+    <p class="b-acciones">
+      <button type="button" class="secondary" id="b-copiar" data-t="borrado_copiar"></button>
+      <button type="button" class="secondary" id="b-descargar" data-t="borrado_descargar"></button>
+    </p>
+    <p id="b-msg" class="bad" role="status" aria-live="polite"></p>
+  </div>
+</details>
 
 <h2 data-t="borrado_paso_reloj"></h2>
 <p class="lead" data-t="borrado_reloj_lead"></p>
-<div class="card">
-  <p id="b-reloj-que"></p>
-  <form class="filters" id="b-envio-form">
-    <label><span data-t="borrado_campo_enviada"></span><input id="b-enviada" type="date"></label>
-    <button type="submit" data-t="borrado_apuntar"></button>
-  </form>
-  <p id="b-envio-msg" class="bad" role="status" aria-live="polite"></p>
-</div>
+<p id="b-envio-msg" class="bad" role="status" aria-live="polite"></p>
 <div id="b-envios"></div>
 <p class="limit" data-t="borrado_reloj_limite"></p>
 <p class="limit" data-t="borrado_aviso_abogados"></p>

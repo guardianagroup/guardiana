@@ -110,7 +110,9 @@ async fn the_page_counts_right_writes_the_letter_and_keeps_no_name() {
         "borrado_paso1",
         "borrado_paso4",
         "borrado_ver_ley",
-        "borrado_mailto",
+        "borrado_paso_datos",
+        "borrado_recordar",
+        "borrado_ver_carta",
     ] {
         assert!(html.contains(paso), "{paso}");
     }
@@ -165,6 +167,17 @@ async fn the_page_counts_right_writes_the_letter_and_keeps_no_name() {
         es["corta"],
         "Plazo: 1 mes (+2 meses). Si no responden: AEPD."
     );
+    // The letter's language follows the place.
+    let idioma = |c: &str| {
+        jur.iter().find(|j| j["codigo"] == c).unwrap()["idioma"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    assert_eq!(idioma("es"), "es");
+    assert_eq!(idioma("us_ca"), "en");
+    assert_eq!(idioma("br"), "pt");
+    assert_eq!(idioma("ca_qc"), "en");
     assert_eq!(v["envios"].as_array().unwrap().len(), 0);
 
     // The letter: the article of the chosen law, in the chosen language, with the markers the

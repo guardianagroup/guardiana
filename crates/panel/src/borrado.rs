@@ -105,6 +105,9 @@ pub(crate) enum Derecho {
 pub(crate) struct Jurisdiccion {
     /// Panel code, lower case (`es`, `us_ca`).
     pub(crate) codigo: &'static str,
+    /// The language a letter there is written in by default (`es`, `en`, `pt`). Quebec gets
+    /// English: the panel has no French, and the page says so.
+    pub(crate) idioma: &'static str,
     /// Browser regions (`navigator.language`, `es-CO` → `CO`) that default to it.
     pub(crate) regiones: &'static [&'static str],
     pub(crate) derecho: Derecho,
@@ -129,6 +132,7 @@ const GDPR_PLAZO: &str = "https://www.legislation.gov.uk/eur/2016/679/article/12
 pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     Jurisdiccion {
         codigo: "es",
+        idioma: "es",
         regiones: &["ES"],
         derecho: Derecho::Borrado,
         plazo: meses(1),
@@ -147,6 +151,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "pt",
+        idioma: "pt",
         regiones: &["PT"],
         derecho: Derecho::Borrado,
         plazo: meses(1),
@@ -162,6 +167,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "ie",
+        idioma: "en",
         regiones: &["IE"],
         derecho: Derecho::Borrado,
         plazo: meses(1),
@@ -177,6 +183,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "ue",
+        idioma: "en",
         regiones: &[
             "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IT",
             "LV", "LT", "LU", "MT", "NL", "PL", "RO", "SK", "SI", "SE", "IS", "LI", "NO",
@@ -191,6 +198,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "gb",
+        idioma: "en",
         regiones: &["GB", "UK"],
         derecho: Derecho::Borrado,
         plazo: meses(1),
@@ -205,6 +213,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "us_ca",
+        idioma: "en",
         regiones: &[],
         derecho: Derecho::Borrado,
         plazo: dias(45),
@@ -221,6 +230,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "us_va",
+        idioma: "en",
         regiones: &[],
         derecho: Derecho::Borrado,
         plazo: dias(45),
@@ -232,6 +242,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "us_co",
+        idioma: "en",
         regiones: &[],
         derecho: Derecho::Borrado,
         plazo: dias(45),
@@ -246,6 +257,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "us_ct",
+        idioma: "en",
         regiones: &[],
         derecho: Derecho::Borrado,
         plazo: dias(45),
@@ -257,6 +269,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "us_ut",
+        idioma: "en",
         regiones: &[],
         derecho: Derecho::Borrado,
         plazo: dias(45),
@@ -271,6 +284,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "us_tx",
+        idioma: "en",
         regiones: &[],
         derecho: Derecho::Borrado,
         plazo: dias(45),
@@ -287,6 +301,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "us_or",
+        idioma: "en",
         regiones: &[],
         derecho: Derecho::Borrado,
         plazo: dias(45),
@@ -301,6 +316,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "us_otros",
+        idioma: "en",
         regiones: &[],
         derecho: Derecho::Borrado,
         plazo: dias(45),
@@ -312,6 +328,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "us",
+        idioma: "en",
         regiones: &["US"],
         derecho: Derecho::Ninguno,
         plazo: None,
@@ -323,6 +340,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "ca",
+        idioma: "en",
         regiones: &["CA"],
         derecho: Derecho::Limitado,
         plazo: dias(30),
@@ -338,6 +356,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "ca_qc",
+        idioma: "en",
         regiones: &[],
         derecho: Derecho::Limitado,
         plazo: dias(30),
@@ -352,6 +371,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "au",
+        idioma: "en",
         regiones: &["AU"],
         derecho: Derecho::Limitado,
         plazo: dias(30),
@@ -366,6 +386,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "nz",
+        idioma: "en",
         regiones: &["NZ"],
         derecho: Derecho::Limitado,
         plazo: habiles(20),
@@ -377,6 +398,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "br",
+        idioma: "pt",
         regiones: &["BR"],
         derecho: Derecho::Borrado,
         plazo: dias(15),
@@ -388,6 +410,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "mx",
+        idioma: "es",
         regiones: &["MX"],
         derecho: Derecho::Borrado,
         plazo: habiles(20),
@@ -399,6 +422,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "co",
+        idioma: "es",
         regiones: &["CO"],
         derecho: Derecho::Borrado,
         plazo: habiles(15),
@@ -410,6 +434,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "ar",
+        idioma: "es",
         regiones: &["AR"],
         derecho: Derecho::Borrado,
         plazo: habiles(5),
@@ -421,6 +446,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "cl",
+        idioma: "es",
         regiones: &["CL"],
         derecho: Derecho::Borrado,
         plazo: habiles(2),
@@ -435,6 +461,7 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
     },
     Jurisdiccion {
         codigo: "pe",
+        idioma: "es",
         regiones: &["PE"],
         derecho: Derecho::Borrado,
         plazo: habiles(10),
@@ -1003,6 +1030,7 @@ fn guardar_envios(l: &guardiana_core::Ledger, e: &[Envio]) -> guardiana_core::Re
 #[derive(Serialize)]
 pub(crate) struct JurView {
     codigo: &'static str,
+    idioma: &'static str,
     nombre: String,
     regiones: &'static [&'static str],
     derecho: Derecho,
@@ -1059,6 +1087,7 @@ pub(crate) struct Resumen {
 fn jur_view(t: &Texts, j: &'static Jurisdiccion) -> JurView {
     JurView {
         codigo: j.codigo,
+        idioma: j.idioma,
         nombre: texto_jur(t, "jur", j),
         regiones: j.regiones,
         derecho: j.derecho,
@@ -1380,6 +1409,22 @@ mod tests {
                     c.id
                 );
             }
+        }
+    }
+
+    /// The letter goes in the language of the place by default: what the company there reads.
+    #[test]
+    fn every_jurisdiction_writes_its_letter_in_its_own_language() {
+        for j in JURISDICCIONES {
+            let esperado = match j.codigo {
+                "es" | "mx" | "co" | "ar" | "cl" | "pe" => "es",
+                "pt" | "br" => "pt",
+                _ => "en",
+            };
+            assert_eq!(j.idioma, esperado, "{}", j.codigo);
+            // And the three files can write it.
+            let t = i18n::by_code(j.idioma);
+            assert_eq!(i18n::code_of(t), j.idioma);
         }
     }
 
