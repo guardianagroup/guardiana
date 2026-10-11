@@ -19,7 +19,6 @@ akamaized.net
 akadns.net
 edgekey.net
 edgesuite.net
-akstat.io
 
 @Cloudflare
 cloudflare.net

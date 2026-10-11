@@ -746,6 +746,17 @@ mod broker_tests {
     }
 
     #[test]
+    fn a_measurement_beacon_is_not_the_road() {
+        // akstat.io is Akamai's mPulse: it measures the visit and sends the figures back, it
+        // carries nobody's content (decision 201). It left entrega.txt on 10 Oct 2026.
+        assert_eq!(crate::delivery_of("c.akstat.io"), None);
+        assert_eq!(
+            crate::delivery_of("e673.dsce9.akamaiedge.net"),
+            Some("Akamai")
+        );
+    }
+
+    #[test]
     fn names_nobody_registered_are_none() {
         assert_eq!(data_broker_of("www.google.com"), None);
         assert_eq!(data_broker_of("graph.facebook.com"), None);
