@@ -268,6 +268,20 @@ ul.barras .barra > span{display:block;height:100%;background:var(--accent)}
 ul.barras .cifra{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
 @media (max-width:560px){ul.barras li{grid-template-columns:minmax(0,1fr) auto}ul.barras .barra{grid-column:1 / -1;grid-row:2}}
 .filters label, .filters select{max-width:100%}
-/* «Haz que te borren» (decision 204): a clock whose deadline has passed says so at a glance. */
+/* «Haz que te borren» (decision 204), built from the panel's own pieces: the four steps are the
+   counters, the companies are cards, the rest a dashed list like the receipt's, and a clock whose
+   deadline has passed has the red edge of an expired licence. */
 .card.reloj.vencido{border-left:4px solid var(--cortado)}
 #b-texto{min-height:18em;white-space:pre-wrap}
+ol.pasos{list-style:none;padding:0}
+ol.pasos .counter p{margin:6px 0 0;font-size:14px;line-height:1.45}
+p.b-corta{font-size:15px;font-weight:500;margin:0 0 4px}
+details.b-plegable > summary{cursor:pointer;color:var(--accent);font-size:14px;margin:6px 0 12px;max-width:100%}
+details.b-plegable > summary:hover{color:var(--accent-dark)}
+.card.b-vista .b-cab{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px 16px}
+.b-quien .tag{margin-left:4px}
+ul.b-lista li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px 14px}
+ul.b-lista li.hidden{display:none}
+p.b-acciones{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:6px}
+label.b-check{display:inline-flex;gap:8px;align-items:center;font-size:14px;cursor:pointer}
+#b-envio-form{margin-bottom:0}

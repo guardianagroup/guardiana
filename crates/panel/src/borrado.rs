@@ -1009,6 +1009,9 @@ pub(crate) struct JurView {
     ley: String,
     articulo: String,
     plazo_texto: String,
+    /// The one line shown before the law is unfolded: «Plazo: 45 días (+45 días). Si no
+    /// responden: CalPrivacy.»
+    corta: String,
     nota: String,
     plazo: Option<Plazo>,
     prorroga: Option<Plazo>,
@@ -1062,6 +1065,7 @@ fn jur_view(t: &Texts, j: &'static Jurisdiccion) -> JurView {
         ley: texto_jur(t, "ley", j),
         articulo: texto_jur(t, "articulo", j),
         plazo_texto: texto_jur(t, "plazo", j),
+        corta: linea_corta(t, j),
         nota: texto_jur(t, "nota", j),
         plazo: j.plazo,
         prorroga: j.prorroga,
@@ -1069,6 +1073,50 @@ fn jur_view(t: &Texts, j: &'static Jurisdiccion) -> JurView {
         autoridad: j.autoridad,
         autoridad_url: j.autoridad_url,
         fuentes: j.fuentes,
+    }
+}
+
+/// A deadline in words: «45 días», «1 mes», «20 días hábiles».
+fn plazo_en_palabras(t: &Texts, p: Plazo) -> String {
+    let k = match p.unidad {
+        Unidad::Dias => "borrado_unidad_dias",
+        Unidad::DiasHabiles => "borrado_unidad_habiles",
+        Unidad::Meses => "borrado_unidad_meses",
+    };
+    t.panel_n(k, i64::from(p.n))
+}
+
+/// The short name of an authority: what it calls itself in brackets (`(CalPrivacy)`, `(AEPD)`),
+/// or the whole name when it has none.
+fn sigla(autoridad: &str) -> &str {
+    autoridad
+        .strip_suffix(')')
+        .and_then(|a| a.rsplit_once('('))
+        .map_or(autoridad, |(_, s)| s)
+}
+
+/// The law in one line, for before the person unfolds the rest.
+pub(crate) fn linea_corta(t: &Texts, j: &Jurisdiccion) -> String {
+    let autoridad = j
+        .autoridad
+        .map_or_else(|| texto_jur(t, "autoridad", j), |a| sigla(a).to_owned());
+    match j.plazo {
+        Some(p) => {
+            let mut plazo = plazo_en_palabras(t, p);
+            if let Some(x) = j.prorroga {
+                plazo = format!("{plazo} (+{})", plazo_en_palabras(t, x));
+            }
+            t.panel(if j.referencia {
+                "borrado_corta_referencia"
+            } else {
+                "borrado_corta"
+            })
+            .replace("{plazo}", &plazo)
+            .replace("{autoridad}", &autoridad)
+        }
+        None => t
+            .panel("borrado_corta_sin_plazo")
+            .replace("{autoridad}", &autoridad),
     }
 }
 
@@ -1336,6 +1384,24 @@ mod tests {
     }
 
     #[test]
+    fn the_short_line_says_deadline_extension_and_authority() {
+        let l = |c: &str| linea_corta(i18n::es(), jurisdiccion(c).unwrap());
+        assert_eq!(
+            l("us_ca"),
+            "Plazo: 45 días (+45 días). Si no responden: CalPrivacy."
+        );
+        assert_eq!(l("es"), "Plazo: 1 mes (+2 meses). Si no responden: AEPD.");
+        assert!(l("co").starts_with("Plazo: 15 días hábiles (+8 días hábiles)."));
+        assert!(l("br").starts_with("Plazo de referencia: 15 días."));
+        assert!(l("us").starts_with("La ley no fija un plazo."));
+        let en = linea_corta(i18n::en(), jurisdiccion("gb").unwrap());
+        assert_eq!(
+            en,
+            "Deadline: 1 month (+2 months). If they don't answer: ICO."
+        );
+    }
+
+    #[test]
     fn names_match_by_domain_suffix_and_by_company() {
         let spokeo = corredor("spokeo").unwrap();
         assert!(spokeo.coincide("www.spokeo.com"));
@@ -1365,6 +1431,11 @@ mod tests {
                     let k = format!("borrado_{campo}_{}", j.codigo);
                     assert!(t.panel.contains_key(&k), "{lang}: falta {k}");
                 }
+                if j.autoridad.is_none() {
+                    let k = format!("borrado_autoridad_{}", j.codigo);
+                    assert!(t.panel.contains_key(&k), "{lang}: falta {k}");
+                }
+                assert!(!linea_corta(t, j).contains('{'), "{lang}/{}", j.codigo);
                 if j.referencia {
                     let k = format!("borrado_referencia_{}", j.codigo);
                     assert!(t.panel.contains_key(&k), "{lang}: falta {k}");

@@ -1774,7 +1774,7 @@
     // page and nowhere else: they are never sent to the panel's server, never stored, and the
     // letter that comes back from /api/borrado/carta carries markers that are filled in here.
     async borrado() {
-      let R = await api('/api/borrado');
+      const R = await api('/api/borrado');
       let C = null;
       const enlace = (url, texto) => `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(texto || url)}</a>`;
       // The country: by the browser's region when one is said (es-CO → Colombia), otherwise by the
@@ -1793,13 +1793,15 @@
       sel.value = porDefecto();
       $('b-idioma').value = LANG;
       const jur = () => R.jurisdicciones.find((j) => j.codigo === sel.value) || R.jurisdicciones[0];
+      const corredorDe = (id) => R.corredores.find((c) => c.id === id);
+      // Step 1: one line in view, the whole law one click away.
       const pintaLey = () => {
         const j = jur();
         const autoridad = j.autoridad
           ? (j.autoridad_url ? enlace(j.autoridad_url, j.autoridad) : esc(j.autoridad))
           : (j.autoridad_url ? enlace(j.autoridad_url, t('borrado_autoridad_lista')) : esc(t('borrado_autoridad_ninguna')));
+        $('b-ley-corta').innerHTML = (j.derecho !== 'borrado' ? `<span class="bad">${esc(t('borrado_sin_derecho_' + j.derecho))}</span><br>` : '') + esc(j.corta);
         $('b-ley').innerHTML = `<h3>${esc(j.nombre)}</h3>
-          ${j.derecho !== 'borrado' ? `<p class="bad">${esc(t('borrado_sin_derecho_' + j.derecho))}</p>` : ''}
           <p><span class="muted">${esc(t('borrado_etq_ley'))}</span> ${esc(j.ley)}</p>
           <p><span class="muted">${esc(t('borrado_etq_articulo'))}</span> ${esc(j.articulo)}</p>
           <p><span class="muted">${esc(t('borrado_etq_plazo'))}</span> ${esc(j.plazo_texto)}</p>
@@ -1808,26 +1810,45 @@
           <details><summary class="muted">${esc(t('borrado_etq_fuentes'))}</summary><ul class="mono small">${j.fuentes.map((u) => `<li>${enlace(u)}</li>`).join('')}</ul></details>`;
         $('b-drop').classList.toggle('hidden', j.codigo !== 'us_ca');
       };
-      const pintaCorredores = () => {
-        $('b-corredores').innerHTML = R.corredores.map((c) => {
-          const ev = c.evidencia;
-          const aparatos = c.aparatos.length
-            ? `<br><span class="muted">${esc(t('borrado_aparatos').replace('{lista}', c.aparatos.map((a) => nombreAparato(a[0], a[1])).join(', ')))}</span>` : '';
-          const nombres = ev.nombres.length
-            ? `<details><summary class="muted">${esc(t('borrado_ver_nombres'))}</summary><div class="wrap"><table><tbody>${ev.nombres.map((n) => `<tr><td class="mono">${esc(n.nombre)}</td><td>${num(n.consultas)}</td><td class="muted">${esc(new Date(n.primera).toLocaleDateString(LOC, DIA))} – ${esc(new Date(n.ultima).toLocaleDateString(LOC, DIA))}</td></tr>`).join('')}</tbody></table></div></details>` : '';
-          return `<tr><td><b>${esc(c.nombre)}</b>${c.pais ? ' <span class="muted">· ' + esc(c.pais) + '</span>' : ''}<br><span class="tag empresa">${esc(c.tipo_texto)}</span>${c.estado_texto ? `<br><span class="bad">${esc(c.estado_texto)}</span>` : ''}</td>
-            <td>${esc(c.frase)}${aparatos}${nombres}</td>
-            <td>${c.estado ? '' : `<button type="button" class="secondary b-elegir" data-id="${esc(c.id)}">${esc(t('borrado_elegir'))}</button>`}</td></tr>`;
-        }).join('');
-        $('b-callados').textContent = R.callados ? tn('borrado_callados', R.callados) : '';
-        $('b-callados').classList.toggle('hidden', !R.callados);
-        const elegible = R.corredores.filter((c) => !c.estado);
-        const cs = $('b-corredor');
-        const antes = cs.value;
-        cs.innerHTML = elegible.map((c) => `<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join('');
-        if (antes && elegible.some((c) => c.id === antes)) cs.value = antes;
-      };
-      // The letter with the two inputs filled in, here and only here.
+      // Step 2: the companies the house asked for, each with what it saw; every other one in a
+      // compact list behind one disclosure, with the «they may have your data anyway» said once.
+      const vistas = R.corredores.filter((c) => c.evidencia.consultas > 0);
+      const otras = R.corredores.filter((c) => c.evidencia.consultas === 0);
+      const botonCarta = (c, clase) => (c.estado ? `<span class="bad">${esc(c.estado_texto)}</span>`
+        : `<button type="button" class="${clase} b-elegir" data-id="${esc(c.id)}">${esc(t('borrado_elegir'))}</button>`);
+      const quien = (c) => `<b>${esc(c.nombre)}</b>${c.pais ? ' <span class="muted">· ' + esc(c.pais) + '</span>' : ''} <span class="tag empresa">${esc(c.tipo_texto)}</span>`;
+      $('b-vistas').innerHTML = vistas.length ? vistas.map((c) => {
+        const ev = c.evidencia;
+        const aparatos = c.aparatos.length
+          ? `<p class="muted">${esc(t('borrado_aparatos').replace('{lista}', c.aparatos.map((a) => nombreAparato(a[0], a[1])).join(', ')))}</p>` : '';
+        const nombres = `<details><summary class="muted">${esc(t('borrado_ver_nombres'))}</summary><div class="wrap"><table><tbody>${ev.nombres.map((n) => `<tr><td class="mono">${esc(n.nombre)}</td><td>${num(n.consultas)}</td><td class="muted">${esc(new Date(n.primera).toLocaleDateString(LOC, DIA))} – ${esc(new Date(n.ultima).toLocaleDateString(LOC, DIA))}</td></tr>`).join('')}</tbody></table></div></details>`;
+        return `<div class="card b-vista"><div class="b-cab"><div class="b-quien">${quien(c)}</div>${botonCarta(c, '')}</div>
+          <p>${esc(c.frase)}</p>${aparatos}${nombres}</div>`;
+      }).join('') : '';
+      // Nothing seen: the lead says so, instead of pointing at companies «at the top» that are not there.
+      $('b-empresa-lead').textContent = t(vistas.length ? 'borrado_empresa_lead' : 'borrado_ninguna_vista');
+      $('b-callados').textContent = R.callados ? tn('borrado_callados', R.callados) : '';
+      $('b-callados').classList.toggle('hidden', !R.callados);
+      $('b-otras-titulo').textContent = tn(vistas.length ? 'borrado_otras_titulo' : 'borrado_todas_titulo', otras.length);
+      $('b-otras').classList.toggle('hidden', !otras.length);
+      // With nothing seen, the list is the only way on: open it.
+      $('b-otras').open = !vistas.length;
+      $('b-lista').innerHTML = otras.map((c) => `<li data-nombre="${esc(c.nombre)}"><span class="b-quien">${quien(c)}</span>${botonCarta(c, 'secondary')}</li>`).join('');
+      const plano = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+      $('b-buscar').addEventListener('input', () => {
+        const q = plano($('b-buscar').value.trim());
+        let visibles = 0;
+        $('b-lista').querySelectorAll('li').forEach((li) => {
+          const si = !q || plano(li.getAttribute('data-nombre')).includes(q);
+          li.classList.toggle('hidden', !si);
+          if (si) visibles += 1;
+        });
+        $('b-lista-vacia').classList.toggle('hidden', visibles > 0);
+      });
+      $('b-buscar-form').addEventListener('submit', (e) => e.preventDefault());
+      const elegibles = R.corredores.filter((c) => !c.estado);
+      $('b-corredor').innerHTML = elegibles.map((c) => `<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join('');
+      // Step 3: the letter with the two inputs filled in, here and only here.
       const texto = () => {
         if (!C) return '';
         const nombre = $('b-nombre').value.trim() || C.hueco_nombre;
@@ -1839,18 +1860,35 @@
         const cuerpo = texto();
         $('b-asunto').textContent = C.asunto;
         $('b-texto').value = cuerpo;
-        $('b-canal').textContent = C.para ? t('borrado_para').replace('{correo}', C.para) : t('borrado_sin_correo');
         $('b-mailto').href = 'mailto:' + (C.para || '') + '?subject=' + encodeURIComponent(C.asunto) + '&body=' + encodeURIComponent(cuerpo);
-        $('b-formulario').classList.toggle('hidden', !C.url);
+      };
+      // Which buttons, and in which order, depends on how the company takes these letters: with
+      // an address, the mail client is the first thing to press; with only a form, copying is.
+      const pintaAcciones = () => {
+        if (!C) return;
+        const correo = !!C.para;
+        $('b-canal').textContent = correo ? t('borrado_para').replace('{correo}', C.para) : t('borrado_sin_correo');
+        $('b-mailto').classList.toggle('hidden', !correo);
+        $('b-copiar').classList.toggle('secondary', correo);
+        $('b-formulario').classList.toggle('hidden', correo || !C.url);
         if (C.url) $('b-formulario').href = C.url;
+        $('b-pista').textContent = correo ? t('borrado_pista_correo') : (C.url ? t('borrado_pista_formulario') : t('borrado_pista_sin_canal'));
+      };
+      const pintaQue = () => {
+        const c = corredorDe($('b-corredor').value);
+        $('b-reloj-que').textContent = c ? t('borrado_reloj_que').replace('{empresa}', c.nombre).replace('{pais}', jur().nombre) : '';
       };
       const cargaCarta = async () => {
+        pintaQue();
         const id = $('b-corredor').value;
         if (!id) return;
         const q = new URLSearchParams({ corredor: id, jurisdiccion: sel.value, idioma: $('b-idioma').value, evidencia: $('b-evidencia').checked ? '1' : '0' });
         C = await api('/api/borrado/carta?' + q.toString());
+        $('b-msg').textContent = '';
+        pintaAcciones();
         pintaCarta();
       };
+      // Step 4.
       const pintaEnvios = (envios) => {
         $('b-envios').innerHTML = envios.length ? envios.slice().reverse().map((e) => {
           const autoridad = e.autoridad ? (e.autoridad_url ? enlace(e.autoridad_url, e.autoridad) : esc(e.autoridad)) : (e.autoridad_url ? enlace(e.autoridad_url) : '');
@@ -1865,7 +1903,6 @@
         }).join('') : `<p class="muted">${esc(t('borrado_reloj_vacio'))}</p>`;
       };
       pintaLey();
-      pintaCorredores();
       pintaEnvios(R.envios);
       $('b-enviada').value = R.hoy;
       $('b-enviada').max = R.hoy;
@@ -1875,21 +1912,31 @@
       ['b-nombre', 'b-correo'].forEach((id) => $(id).addEventListener('input', pintaCarta));
       $('b-pais-form').addEventListener('submit', (e) => e.preventDefault());
       $('b-carta-form').addEventListener('submit', (e) => e.preventDefault());
-      $('b-corredores').addEventListener('click', (e) => {
+      // «Escribir la carta» takes the person to the letter, with that company chosen and the
+      // cursor in the first empty box.
+      document.querySelector('main').addEventListener('click', (e) => {
         const b = e.target.closest('.b-elegir');
         if (!b) return;
         $('b-corredor').value = b.getAttribute('data-id');
         cargaCarta().catch(() => {});
-        $('b-carta-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        $('b-paso-carta').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const vacio = !$('b-nombre').value.trim() ? $('b-nombre') : (!$('b-correo').value.trim() ? $('b-correo') : null);
+        if (vacio) vacio.focus({ preventScroll: true });
       });
-      const avisa = (k) => { $('b-msg').textContent = t(k); setTimeout(() => { $('b-msg').textContent = ''; }, 4000); };
       $('b-copiar').addEventListener('click', async () => {
-        const area = $('b-texto');
-        try { await navigator.clipboard.writeText(texto()); avisa('borrado_copiado'); return; } catch (_) {}
-        // Home Mode serves the panel over plain http on the LAN, where the clipboard API is not
-        // offered: the old way still works there.
-        area.focus(); area.select();
-        try { document.execCommand('copy'); avisa('borrado_copiado'); } catch (_) {}
+        const boton = $('b-copiar');
+        let hecho = false;
+        try { await navigator.clipboard.writeText(texto()); hecho = true; } catch (_) {}
+        if (!hecho) {
+          // Home Mode serves the panel over plain http on the LAN, where the clipboard API is not
+          // offered: the old way still works there.
+          const area = $('b-texto');
+          area.focus(); area.select();
+          try { hecho = document.execCommand('copy'); } catch (_) {}
+        }
+        if (!hecho) return;
+        boton.textContent = t('borrado_copiado');
+        setTimeout(() => { boton.textContent = t('borrado_copiar'); }, 2000);
       });
       $('b-descargar').addEventListener('click', () => {
         const blob = new Blob([C ? C.asunto + '\n\n' + texto() + '\n' : ''], { type: 'text/plain;charset=utf-8' });

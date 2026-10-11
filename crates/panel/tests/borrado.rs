@@ -106,6 +106,14 @@ async fn the_page_counts_right_writes_the_letter_and_keeps_no_name() {
     let (status, html) = pide(addr, &t, "GET", "/borrado", "").await;
     assert_eq!(status, 200);
     assert!(html.contains("data-page=\"borrado\""));
+    for paso in [
+        "borrado_paso1",
+        "borrado_paso4",
+        "borrado_ver_ley",
+        "borrado_mailto",
+    ] {
+        assert!(html.contains(paso), "{paso}");
+    }
     let (_, inicio) = pide(addr, &t, "GET", "/", "").await;
     assert!(inicio.contains("href=\"/borrado\""), "the nav links to it");
 
@@ -153,6 +161,10 @@ async fn the_page_counts_right_writes_the_letter_and_keeps_no_name() {
     assert!(jur.len() >= 20);
     let es = jur.iter().find(|j| j["codigo"] == "es").unwrap();
     assert!(es["articulo"].as_str().unwrap().contains("artículo 17"));
+    assert_eq!(
+        es["corta"],
+        "Plazo: 1 mes (+2 meses). Si no responden: AEPD."
+    );
     assert_eq!(v["envios"].as_array().unwrap().len(), 0);
 
     // The letter: the article of the chosen law, in the chosen language, with the markers the

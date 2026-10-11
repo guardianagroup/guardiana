@@ -32,6 +32,14 @@
 <div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
 <h1 data-t="borrado_titulo"></h1>
 <p class="lead" data-t="borrado_lead"></p>
+
+<h2 data-t="borrado_como_titulo"></h2>
+<ol class="counters pasos">
+  <li class="counter"><div class="n">1</div><p data-t="borrado_paso1"></p></li>
+  <li class="counter"><div class="n">2</div><p data-t="borrado_paso2"></p></li>
+  <li class="counter"><div class="n">3</div><p data-t="borrado_paso3"></p></li>
+  <li class="counter"><div class="n">4</div><p data-t="borrado_paso4"></p></li>
+</ol>
 <p class="limit"><strong data-t="borrado_aviso_abogados"></strong> <span data-t="borrado_privado"></span></p>
 
 <h2 data-t="borrado_paso_pais"></h2>
@@ -39,7 +47,8 @@
 <form class="filters" id="b-pais-form">
   <label><span data-t="borrado_campo_pais"></span><select id="b-pais"></select></label>
 </form>
-<div class="card" id="b-ley"></div>
+<p id="b-ley-corta" class="b-corta"></p>
+<details class="b-plegable" id="b-ley-det"><summary data-t="borrado_ver_ley"></summary><div class="card" id="b-ley"></div></details>
 <div class="card hidden" id="b-drop">
   <h3 data-t="borrado_drop_titulo"></h3>
   <p data-t="borrado_drop_texto"></p>
@@ -48,38 +57,52 @@
 </div>
 
 <h2 data-t="borrado_paso_empresa"></h2>
-<p class="lead" data-t="borrado_empresa_lead"></p>
-<div class="card wrap"><table><thead><tr><th data-t="borrado_col_empresa"></th><th data-t="borrado_col_visto"></th><th></th></tr></thead><tbody id="b-corredores"></tbody></table></div>
+<p class="lead" id="b-empresa-lead"></p>
+<div id="b-vistas"></div>
 <p id="b-callados" class="muted hidden"></p>
+<details class="b-plegable" id="b-otras">
+  <summary id="b-otras-titulo"></summary>
+  <div class="card">
+    <p class="muted" data-t="borrado_otras_explica"></p>
+    <form class="filters" id="b-buscar-form"><label><span data-t="borrado_buscar"></span><input id="b-buscar" type="search" autocomplete="off" spellcheck="false" data-t-label="borrado_buscar"></label></form>
+    <ul class="recibo b-lista" id="b-lista"></ul>
+    <p id="b-lista-vacia" class="muted hidden" data-t="borrado_buscar_nada"></p>
+  </div>
+</details>
 
-<h2 data-t="borrado_paso_carta"></h2>
+<h2 id="b-paso-carta" data-t="borrado_paso_carta"></h2>
 <p class="lead" data-t="borrado_carta_lead"></p>
 <div class="card" id="b-carta-card">
   <form class="filters" id="b-carta-form">
     <label><span data-t="borrado_col_empresa"></span><select id="b-corredor"></select></label>
-    <label><span data-t="borrado_campo_idioma"></span><select id="b-idioma"><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option></select></label>
     <label><span data-t="borrado_campo_nombre"></span><input id="b-nombre" type="text" autocomplete="off" spellcheck="false"></label>
     <label><span data-t="borrado_campo_correo"></span><input id="b-correo" type="email" autocomplete="off" spellcheck="false"></label>
-    <label class="check"><span data-t="borrado_campo_evidencia"></span><input id="b-evidencia" type="checkbox" checked></label>
+    <label><span data-t="borrado_campo_idioma"></span><select id="b-idioma"><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option></select></label>
   </form>
-  <p id="b-canal" class="muted"></p>
+  <p><label class="b-check"><input id="b-evidencia" type="checkbox" checked> <span data-t="borrado_campo_evidencia"></span></label></p>
+  <p id="b-canal"></p>
   <p><strong id="b-asunto"></strong></p>
-  <textarea id="b-texto" class="mono wide" rows="22" readonly></textarea>
-  <p>
+  <textarea id="b-texto" class="mono wide" rows="22" readonly data-t-label="borrado_paso_carta"></textarea>
+  <p class="b-acciones" id="b-acciones">
+    <a class="btn" id="b-mailto" href="#" data-t="borrado_mailto"></a>
     <button type="button" id="b-copiar" data-t="borrado_copiar"></button>
-    <a class="btn secondary" id="b-mailto" href="#" data-t="borrado_mailto"></a>
+    <a class="btn secondary" id="b-formulario" href="#" target="_blank" rel="noopener noreferrer" data-t="borrado_formulario"></a>
     <button type="button" class="secondary" id="b-descargar" data-t="borrado_descargar"></button>
-    <a class="btn secondary hidden" id="b-formulario" href="#" target="_blank" rel="noopener noreferrer" data-t="borrado_formulario"></a>
-    <span id="b-msg" class="ok" role="status" aria-live="polite"></span>
   </p>
+  <p id="b-pista" class="muted"></p>
+  <p id="b-msg" class="bad" role="status" aria-live="polite"></p>
 </div>
 
 <h2 data-t="borrado_paso_reloj"></h2>
 <p class="lead" data-t="borrado_reloj_lead"></p>
-<form class="filters" id="b-envio-form">
-  <label><span data-t="borrado_campo_enviada"></span><input id="b-enviada" type="date"></label>
-  <button type="submit" data-t="borrado_apuntar"></button> <span id="b-envio-msg" class="bad" role="status" aria-live="polite"></span>
-</form>
+<div class="card">
+  <p id="b-reloj-que"></p>
+  <form class="filters" id="b-envio-form">
+    <label><span data-t="borrado_campo_enviada"></span><input id="b-enviada" type="date"></label>
+    <button type="submit" data-t="borrado_apuntar"></button>
+  </form>
+  <p id="b-envio-msg" class="bad" role="status" aria-live="polite"></p>
+</div>
 <div id="b-envios"></div>
 <p class="limit" data-t="borrado_reloj_limite"></p>
 <p class="limit" data-t="borrado_aviso_abogados"></p>
