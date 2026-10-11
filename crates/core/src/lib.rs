@@ -46,7 +46,7 @@ pub use model::{
     Action, Category, DecidedBy, Device, Event, MatchKind, NewEvent, NewRule, Outbound, Proceso,
     Purpose, Rule, Scope, ServerInfo, ServerKind, Signal, SignalKind, Verdict,
 };
-pub use report::{DestinationCount, DeviceWeek, NameCount, NameGroup, WeekSummary};
+pub use report::{DestinationCount, DeviceWeek, NameCount, NameGroup, NameSpan, WeekSummary};
 pub use retention::{DailyTotal, PruneReport, Retention};
 pub use stats::{Counters, DeviceTotals, TableCounts};
 

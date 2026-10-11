@@ -182,6 +182,35 @@ impl Ledger {
         rows.map(|r| r.map_err(crate::Error::from)).collect()
     }
 
+    /// Every (name, device) the household may read in everything the extract still keeps in
+    /// detail, with how many times it was asked for, how many of those were cut, and the first
+    /// and last time (decision 204, «Haz que te borren»). The page that helps a person ask a data
+    /// broker to delete them shows which of the broker's names the house asked for, when, and from
+    /// which device. A device whose owner did not share its detail is left out entirely, as in
+    /// [`Ledger::events`]: that a phone asked for a people-search site is exactly the kind of
+    /// detail its owner kept to themselves.
+    pub fn name_device_spans(&self) -> Result<Vec<NameSpan>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT qname, device_id, COUNT(*), \
+                    SUM(CASE WHEN verdict = 'cortado' THEN 1 ELSE 0 END), MIN(ts), MAX(ts) \
+             FROM events \
+             WHERE device_id = ?1 OR device_id IN \
+                   (SELECT id FROM devices WHERE share_detail_with_home != 0) \
+             GROUP BY qname, device_id",
+        )?;
+        let rows = stmt.query_map(params![SELF_DEVICE_ID], |r| {
+            Ok(NameSpan {
+                qname: r.get(0)?,
+                device_id: r.get(1)?,
+                queries: r.get(2)?,
+                cut: r.get(3)?,
+                first_ts: r.get(4)?,
+                last_ts: r.get(5)?,
+            })
+        })?;
+        rows.map(|r| r.map_err(crate::Error::from)).collect()
+    }
+
     /// The week's forwarded queries the household may read, by (name, kind and country of the
     /// server that answered), most asked first (decision 203). Cut queries are not here: they
     /// never left the house. Rows without a server (written before decision 203, or an answer
@@ -321,6 +350,23 @@ pub struct NameGroup {
     pub process: Option<String>,
     /// Times it was asked for inside the window.
     pub queries: u64,
+    /// The last time, Unix ms.
+    pub last_ts: i64,
+}
+
+/// A (name, device) of the whole extract: how many times, how many cut, first and last time.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
+pub struct NameSpan {
+    /// The name asked for.
+    pub qname: String,
+    /// Which device asked.
+    pub device_id: String,
+    /// Times it was asked for.
+    pub queries: i64,
+    /// Of those, the ones GUARDIANA cut (they never left the house).
+    pub cut: i64,
+    /// The first time, Unix ms.
+    pub first_ts: i64,
     /// The last time, Unix ms.
     pub last_ts: i64,
 }
@@ -503,6 +549,51 @@ mod tests {
                 (ServerKind::Publico, "IE".to_owned()),
                 (ServerKind::Publico, "US".to_owned()),
             ]
+        );
+    }
+
+    /// Decision 204: per (name, device), counts, cuts and first/last time over the whole extract;
+    /// a device that shares is in, one that does not is out entirely.
+    #[test]
+    fn name_device_spans_count_everything_kept_and_leave_silent_devices_out() {
+        let mut l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        let t0 = 1_700_000_000_000i64;
+        l.upsert_device("mac:callado", None, Some("10.0.0.9"), t0)
+            .unwrap();
+        l.upsert_device("mac:comparte", None, Some("10.0.0.8"), t0)
+            .unwrap();
+        l.set_share_detail("mac:comparte", true).unwrap();
+        let mut add = |device: &str, name: &str, verdict: Verdict, ts: i64| {
+            let mut e = NewEvent::observed(ts, device, "127.0.0.1", name, "A");
+            e.verdict = verdict;
+            l.append(e).unwrap();
+        };
+        add("self", "a.spokeo.com", Verdict::Observado, t0 + 30 * DAY_MS);
+        add("self", "a.spokeo.com", Verdict::Cortado, t0 + DAY_MS);
+        add("self", "a.spokeo.com", Verdict::Observado, t0 + 2 * DAY_MS);
+        add("mac:comparte", "a.spokeo.com", Verdict::Observado, t0);
+        add(
+            "mac:callado",
+            "a.spokeo.com",
+            Verdict::Observado,
+            t0 - DAY_MS,
+        );
+        add("mac:callado", "secreto.example", Verdict::Observado, t0);
+        let mut s = l.name_device_spans().unwrap();
+        s.sort_by(|a, b| a.device_id.cmp(&b.device_id));
+        assert_eq!(s.len(), 2, "{s:?}");
+        assert!(s.iter().all(|x| x.device_id != "mac:callado"));
+        assert_eq!(
+            (s[0].device_id.as_str(), s[0].queries, s[0].cut),
+            ("mac:comparte", 1, 0)
+        );
+        assert_eq!(
+            (s[1].device_id.as_str(), s[1].queries, s[1].cut),
+            ("self", 3, 1)
+        );
+        assert_eq!(
+            (s[1].first_ts, s[1].last_ts),
+            (t0 + DAY_MS, t0 + 30 * DAY_MS)
         );
     }
 
