@@ -82,10 +82,10 @@ impl Red {
             Self::Tiktok => "TikTok",
             Self::Pinterest => "Pinterest",
             Self::Snap => "Snap",
-            Self::Linkedin => "LinkedIn",
+            // LinkedIn and Microsoft Advertising are one company, as the lists of owners say.
+            Self::Linkedin | Self::Microsoft => "Microsoft",
             Self::X => "X",
             Self::Criteo => "Criteo",
-            Self::Microsoft => "Microsoft",
         }
     }
 }

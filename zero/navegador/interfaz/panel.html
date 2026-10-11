@@ -52,7 +52,6 @@ p { margin: 0 0 10px; }
 .maxima-activa .enlace { font-weight: 400; margin-left: 6px; }
 .maxima.encendida { background: var(--verde-suave); }
 .maxima.encendida .boton { display: none; }
-.tercero .chip.tuya { background: var(--azul-suave); color: var(--azul); }
 .pagina-cab { margin: 0 0 4px; font-size: 12.5px; font-weight: 600; color: var(--gris); }
 .sitio { font: 600 17px/1.25 var(--display); letter-spacing: -.01em; word-break: break-all; margin: 2px 0 8px; }
 .resumen { font-size: 14px; color: var(--tinta); margin-bottom: 14px; }
@@ -61,19 +60,32 @@ p { margin: 0 0 10px; }
 .ajuste label { font-weight: 500; display: block; }
 .ajuste .explica { margin: 3px 0 0; font-size: 12.5px; }
 .terceros { list-style: none; margin: 0; padding: 0; }
-.tercero { position: relative; padding: 9px 0 9px 13px; border-bottom: 1px solid var(--linea); display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; }
+/* One list in a fixed order. Each row: its name, its site and counts, its chips, and a column of
+   two button places on the right, the same width and height whatever the words: nothing in it
+   moves when a button is pressed. */
+.lista-resumen { margin: 14px 0 6px; font-size: 13px; font-weight: 600; color: var(--tinta); }
+.tercero { position: relative; padding: 9px 0 9px 13px; border-bottom: 1px solid var(--linea); display: grid; grid-template-columns: minmax(0, 1fr) 8.75rem; grid-template-rows: auto auto auto; column-gap: 10px; row-gap: 3px; align-items: center; transition: background .3s; }
 .tercero::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--gris-suave); }
 .tercero.cortado::before { background: var(--rojo); }
 .tercero.sigue::before { background: var(--ambar); }
 /* Partly cut: some of its requests are cut, others pass (its ads, not its reCAPTCHA). */
 .tercero.parcial::before { background: var(--ambar); }
-.tercero.recien { background: var(--azul-suave); border-radius: 8px; transition: background .4s; }
-.tercero .quien { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tercero.recien { background: var(--azul-suave); }
+.tercero .chip.tuya { background: var(--azul-suave); color: var(--azul); }
+.tercero .quien { grid-column: 1; grid-row: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tercero .quien small { font-weight: 400; color: var(--gris); margin-left: 5px; font-size: 12px; }
-.tercero .detalle { grid-column: 1; font-size: 12.5px; color: var(--gris); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
-.tercero .detalle .motivo { color: var(--rojo); }
-.tercero .botones { grid-row: 1 / span 2; grid-column: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.tercero .nota-dato { flex-basis: 100%; color: var(--gris); font-size: 12px; }
+.tercero .linea { grid-column: 1; grid-row: 2; min-width: 0; display: flex; gap: 6px; white-space: nowrap; font-size: 12.5px; color: var(--gris); }
+.tercero .linea .mono { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tercero .linea .cuenta { flex: none; }
+.tercero .chips { grid-column: 1; grid-row: 3; min-width: 0; overflow: hidden; white-space: nowrap; font-size: 12.5px; color: var(--gris); }
+.tercero .chips > * { margin-right: 5px; }
+.tercero .chips .motivo { color: var(--rojo); }
+.tercero .botones { grid-column: 2; grid-row: 1 / span 3; align-self: center; display: grid; grid-template-rows: 26px 26px; row-gap: 4px; }
+.tercero .botones .boton { width: 100%; min-width: 0; height: 26px; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tercero .botones .boton.vacio { visibility: hidden; }
+.tercero .botones .boton[aria-busy="true"] { opacity: .55; cursor: progress; }
+.tercero.enviando .chip.estado { opacity: .55; }
+.tercero .nota-dato { grid-column: 1 / -1; grid-row: 4; color: var(--gris); font-size: 12px; }
 .vacio { padding: 18px 0; color: var(--gris); }
 .hechos { margin-top: 18px; display: grid; gap: 6px; font-size: 13px; color: var(--gris); }
 /* What the page's pixels tried to tell: one line each, its fate at the end. */
@@ -214,8 +226,7 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
     <button class="boton principal" id="e-maxima-activar" data-t="maxima_activar"></button>
     <p class="maxima-activa oculto" id="e-maxima-activa"><span data-t="maxima_activa"></span> <button class="enlace" id="e-maxima-quitar" data-t="maxima_quitar"></button></p>
   </div>
-  <div id="e-cortados-caja"><h2><span data-t="escudo_cortados"></span><span class="cuenta" id="e-cortados-n"></span></h2><ul class="terceros" id="e-cortados"></ul></div>
-  <div id="e-vistos-caja"><h2><span data-t="escudo_vistos"></span><span class="cuenta" id="e-vistos-n"></span></h2><ul class="terceros" id="e-vistos"></ul></div>
+  <div id="e-lista-caja" class="oculto"><p class="lista-resumen" id="e-lista-resumen" role="status"></p><ul class="terceros" id="e-terceros"></ul></div>
   <div class="recarga oculto" id="e-recarga"><span data-t="escudo_recarga"></span><button class="boton chico" id="e-recargar" data-t="recargar"></button></div>
   <p class="vacio oculto" id="e-vacio" data-t="escudo_vacio"></p>
   <div class="hechos" id="e-hechos"></div>

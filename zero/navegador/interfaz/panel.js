@@ -17,71 +17,151 @@
 
   // --- shield -------------------------------------------------------------------------------
   const COLOR_CAT = { rastreador: 'rojo', publicidad: 'ambar', telemetria: 'ambar', esperado: 'verde', desconocido: '' };
-  // One row per company: what holds now (cut, partly cut, or passing) decides the colour and
-  // the button; the counts below say what happened on this page.
-  function fila(x) {
-    const corta = x.ahora === 'cortado' || x.ahora === 'parcial';
-    const parcial = x.ahora === 'parcial';
-    const sigue = !corta && (x.categoria === 'rastreador' || x.categoria === 'publicidad' || x.corredor);
+  // One row per company, in the order it first showed up on this page, and it never moves: not
+  // when the person presses a button, not when requests arrive (the owner, 10 Oct 2026: rows
+  // jumping between lists lost the person's place). Each row is drawn once and then updated in
+  // place, so its buttons, its height and the focus stay where they are; only the colour bar,
+  // the chip and the button's words change. The order starts again only with a new page.
+  const filas = new Map();
+  let cargaFilas = null;
+  let pendiente = null;
+  function nuevaFila(sitio) {
     const li = document.createElement('li');
-    li.className = 'tercero' + (parcial ? ' parcial' : corta ? ' cortado' : sigue ? ' sigue' : '') + (movido && movido.sitio === x.sitio && Date.now() < movido.hasta ? ' recien' : '');
-    li.dataset.sitio = x.sitio;
-    const paisTxt = x.pais ? `<small>${esc(pais(x.pais))}</small>` : '';
+    li.className = 'tercero';
+    li.dataset.sitio = sitio;
+    li.innerHTML = '<span class="quien"></span><span class="botones"><button class="boton chico" type="button"></button><button class="boton chico" type="button"></button></span>'
+      + '<span class="linea"></span><span class="chips"></span><span class="nota-dato oculto"></span>';
+    li.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => pulsa(li, b)));
+    return li;
+  }
+  // The button answers at once (it waits, marked, until the program says what holds now), and
+  // the row is lit for a moment once it changed. The view is never scrolled.
+  function pulsa(li, b) {
+    if (b.classList.contains('vacio') || b.getAttribute('aria-busy') === 'true') return;
+    const x = filas.get(li.dataset.sitio);
+    if (!x) return;
+    pendiente = { sitio: x.datos.sitio, antes: clave(x.datos), hasta: Date.now() + 3000 };
+    b.setAttribute('aria-busy', 'true');
+    li.classList.add('enviando');
+    manda({ tipo: b.dataset.accion, sitio: x.datos.sitio });
+    $('e-recarga').classList.remove('oculto');
+    // If no answer changes it, the button is free again (never stuck waiting).
+    setTimeout(() => {
+      if (pendiente && pendiente.sitio === x.datos.sitio && Date.now() > pendiente.hasta) {
+        pendiente = null;
+        li.classList.remove('enviando');
+        li.querySelectorAll('button').forEach((y) => y.removeAttribute('aria-busy'));
+      }
+    }, 3100);
+  }
+  const clave = (x) => x.ahora + '|' + (x.regla || '');
+  function botonesDe(x, corta, parcial) {
     // Every button has its way back: «Volver a bloquear» on what the person unblocked (even if
     // something of it is still cut: their marked data never passes by a rule), «Desbloquear»
     // on what a rule or the lists cut, «Bloquear» on what passes; a row cut only in part also
-    // offers «Bloquear todo». A chip says when the rule is theirs. What the task's limits cut,
-    // or a row cut only for carrying marked data, has no «Desbloquear»: it would do nothing.
-    const botones = [];
-    if (x.regla === 'permitido') botones.push(['bloquear_sitio', 'accion_rebloquear', 'corta']);
+    // offers «Bloquear todo». What the task's limits cut, or a row cut only for carrying marked
+    // data, has no «Desbloquear»: it would do nothing.
+    const b = [];
+    if (x.fijo) return b;
+    if (x.regla === 'permitido') b.push(['bloquear_sitio', 'accion_rebloquear', 'corta']);
     else if (corta) {
-      if (x.deshace) botones.push(['desbloquear_sitio', 'accion_desbloquear', 'deja']);
-      if (parcial) botones.push(['bloquear_todo', 'accion_bloquear_todo', 'corta']);
-    } else botones.push(['bloquear_sitio', 'accion_bloquear', 'corta']);
-    const boton = `<span class="botones">${(x.fijo ? [] : botones).map(([accion, clave, clase]) => `<button class="boton chico ${clase}" data-accion="${accion}" title="${esc(t(clave + '_titulo'))}">${esc(t(clave))}</button>`).join('')}</span>`;
+      if (x.deshace) b.push(['desbloquear_sitio', 'accion_desbloquear', 'deja']);
+      if (parcial) b.push(['bloquear_todo', 'accion_bloquear_todo', 'corta']);
+    } else b.push(['bloquear_sitio', 'accion_bloquear', 'corta']);
+    return b;
+  }
+  function pintaFila(li, x) {
+    const corta = x.ahora === 'cortado' || x.ahora === 'parcial';
+    const parcial = x.ahora === 'parcial';
+    const sigue = !corta && (x.categoria === 'rastreador' || x.categoria === 'publicidad' || x.corredor);
+    for (const c of ['cortado', 'parcial', 'sigue']) li.classList.remove(c);
+    if (parcial) li.classList.add('parcial');
+    else if (corta) li.classList.add('cortado');
+    else if (sigue) li.classList.add('sigue');
+    li.querySelector('.quien').innerHTML = `${esc(x.quien)}${x.pais ? `<small>${esc(pais(x.pais))}</small>` : ''}`;
+    // The site may be shortened; its counts never are.
+    li.querySelector('.linea').innerHTML = `<span class="mono">${esc(x.sitio)}</span><span class="cuenta">${esc(x.cortadas > 0 ? t('escudo_cortadas_de', { c: n(x.cortadas), n: n(x.vistas) }) : tn('escudo_peticiones', x.vistas, { n: n(x.vistas) }))}</span>`;
+    // What holds now, in one chip: the person's rule when there is one, else cut, partly or not.
+    const [estado, color] = x.regla === 'tuya' || x.regla === 'permitido' ? [t('regla_' + x.regla), 'tuya']
+      : parcial ? [t('escudo_parcial'), 'ambar'] : corta ? [t('escudo_estado_cortado'), 'rojo'] : [t('escudo_estado_pasa'), ''];
     // Why it is cut now: printed only when the chips do not say it already.
     const por = corta ? (x.por || x.motivo) : null;
-    const detalle = [
-      `<span class="mono">${esc(x.sitio)}</span>`,
-      `<span>${esc(x.cortadas > 0 ? t('escudo_cortadas_de', { c: n(x.cortadas), n: n(x.vistas) }) : tn('escudo_peticiones', x.vistas, { n: n(x.vistas) }))}</span>`,
-      parcial ? `<span class="chip ambar">${esc(t('escudo_parcial'))}</span>` : '',
+    li.querySelector('.chips').innerHTML = [
+      `<span class="chip estado ${color}">${esc(estado)}</span>`,
       `<span class="chip ${COLOR_CAT[x.categoria] || ''}">${esc(t('cat_' + x.categoria))}</span>`,
-      x.regla === 'tuya' || x.regla === 'permitido' ? `<span class="chip tuya">${esc(t('regla_' + x.regla))}</span>` : '',
       x.corredor ? `<span class="chip rojo" title="${esc(x.corredor)}">${esc(t('corredor_etiqueta'))}</span>` : '',
       por && !['rastreador', 'publicidad', 'corredor', 'corte_tuyo', 'telemetria'].includes(por) ? `<span class="motivo">${esc(t('motivo_' + por))}</span>` : '',
-      // Marked data is cut whatever the buttons say: how it goes out, said where it was cut.
-      x.dato ? `<span class="nota-dato">${esc(t('escudo_dato_cortado'))}</span>` : '',
     ].join('');
-    li.innerHTML = `<span class="quien">${esc(x.quien)}${paisTxt}</span>${boton}<span class="detalle">${detalle}</span>`;
-    li.querySelectorAll('button').forEach((b) => b.addEventListener('click', (e) => {
-      // The row changes list (cut ↔ passing): remember it, to follow it there with its new
-      // button in sight (owner's report of 10 Oct 2026: «Volver a bloquear» seemed gone).
-      tocado = { sitio: x.sitio, antes: x.ahora + '|' + x.regla, hasta: Date.now() + 5000 };
-      manda({ tipo: e.currentTarget.dataset.accion, sitio: x.sitio });
-      $('e-recarga').classList.remove('oculto');
-    }));
-    return li;
+    // Marked data is cut whatever the buttons say: how it goes out, said where it was cut.
+    const nota = li.querySelector('.nota-dato');
+    nota.classList.toggle('oculto', !x.dato);
+    nota.textContent = x.dato ? t('escudo_dato_cortado') : '';
+    // Two places for buttons in every row, always: the column keeps its width and the row its
+    // height whatever the words, and the same button stays under the finger.
+    const lista = botonesDe(x, corta, parcial);
+    const huecos = [...li.querySelectorAll('.botones button')];
+    // Taken before anything changes: a button about to be hidden loses the focus at once.
+    const enFoco = huecos.indexOf(document.activeElement);
+    const cambio = pendiente && pendiente.sitio === x.sitio && (clave(x) !== pendiente.antes || Date.now() > pendiente.hasta);
+    huecos.forEach((b, i) => {
+      const d = lista[i];
+      b.classList.remove('corta', 'deja', 'vacio');
+      if (d) {
+        const [accion, k, clase] = d;
+        b.dataset.accion = accion;
+        b.textContent = t(k);
+        b.title = t(k + '_titulo');
+        b.classList.add(clase);
+        b.tabIndex = 0;
+        b.removeAttribute('aria-hidden');
+      } else {
+        b.dataset.accion = '';
+        b.textContent = '';
+        b.title = '';
+        b.classList.add('vacio');
+        b.tabIndex = -1;
+        b.setAttribute('aria-hidden', 'true');
+      }
+      if (cambio) b.removeAttribute('aria-busy');
+    });
+    if (cambio) {
+      pendiente = null;
+      li.classList.remove('enviando');
+      li.classList.add('recien');
+      setTimeout(() => li.classList.remove('recien'), 1200);
+    }
+    // A button that had the focus and is no longer there (the row's second one): the focus goes
+    // to the row's first, never away from the row.
+    if (enFoco > 0 && huecos[enFoco].classList.contains('vacio') && !huecos[0].classList.contains('vacio')) huecos[0].focus({ preventScroll: true });
   }
-  let tocado = null;
-  let movido = null;
-  // After a click, the first shield where that row changed: it is lit for a moment and brought
-  // into view, with the focus on its button.
-  function sigueFila(lista) {
-    if (!tocado || Date.now() > tocado.hasta) { tocado = null; return false; }
-    const x = lista.find((y) => y.sitio === tocado.sitio);
-    if (!x || x.ahora + '|' + x.regla === tocado.antes) return false;
-    movido = { sitio: x.sitio, hasta: Date.now() + 2500 };
-    tocado = null;
-    return true;
-  }
-  function enfocaMovido() {
-    const li = [...document.querySelectorAll('#v-escudo li.tercero')].find((l) => movido && l.dataset.sitio === movido.sitio);
-    if (!li) return;
-    li.classList.add('recien');
-    li.scrollIntoView({ block: 'nearest' });
-    const b = li.querySelector('button');
-    if (b) b.focus({ preventScroll: true });
-    setTimeout(() => document.querySelectorAll('#v-escudo li.recien').forEach((l) => l.classList.remove('recien')), 2600);
+  function pintaFilas(m) {
+    const lista = m.terceros || [];
+    const ul = $('e-terceros');
+    const carga = m.pestana + ':' + (m.carga || 0);
+    if (carga !== cargaFilas) {
+      cargaFilas = carga;
+      filas.clear();
+      pendiente = null;
+      ul.replaceChildren();
+    }
+    for (const x of lista) {
+      let f = filas.get(x.sitio);
+      if (!f) {
+        // New companies go at the end: nothing above them moves.
+        f = { li: nuevaFila(x.sitio) };
+        filas.set(x.sitio, f);
+        ul.appendChild(f.li);
+      }
+      f.datos = x;
+      pintaFila(f.li, x);
+    }
+    // Now: how many companies this page has, and to how many something is cut at this moment
+    // (a figure of now, said as such: it follows the buttons, unlike the counts of what happened).
+    const empresas = new Set(lista.map((x) => x.quien));
+    const cortadas = new Set(lista.filter((x) => x.ahora !== 'pasa').map((x) => x.quien));
+    $('e-lista-resumen').textContent = `${tn('escudo_lista_empresas', empresas.size, { n: n(empresas.size) })} · ${tn('escudo_lista_cortadas', cortadas.size, { n: n(cortadas.size) })}`;
+    $('e-lista-caja').classList.toggle('oculto', !lista.length);
+    $('e-vacio').classList.toggle('oculto', lista.length > 0);
   }
   let sitioEscudo = null;
   // Today, across the whole browser, at the top of the shield: refreshed while it is open.
@@ -110,31 +190,7 @@
     $('e-maxima').classList.toggle('encendida', !!m.maxima);
     $('e-maxima').classList.toggle('oculto', !m.protege);
     $('e-maxima-activa').classList.toggle('oculto', !m.maxima);
-    const lista = (m.terceros || []).slice();
-    lista.sort((a, b) => (b.cortadas - a.cortadas) || (b.vistas - a.vistas));
-    // Partly cut rows are with the cut ones: something of theirs is being cut, and the way back
-    // is there.
-    const cortados = lista.filter((x) => x.ahora === 'cortado' || x.ahora === 'parcial');
-    const vistos = lista.filter((x) => x.ahora === 'pasa');
-    const recienMovido = sigueFila(lista);
-    // The rows are drawn again on every request the page makes: a button that had the focus
-    // keeps it, on the same company's row.
-    const activo = document.activeElement;
-    const conFoco = activo && activo.closest && activo.closest('#v-escudo li.tercero') ? activo.closest('li.tercero').dataset.sitio : null;
-    const accionConFoco = conFoco && activo.dataset ? activo.dataset.accion : null;
-    $('e-cortados').replaceChildren(...cortados.map(fila));
-    $('e-vistos').replaceChildren(...vistos.map(fila));
-    if (conFoco) {
-      const li = [...document.querySelectorAll('#v-escudo li.tercero')].find((l) => l.dataset.sitio === conFoco);
-      const b = li && (li.querySelector(`button[data-accion="${accionConFoco}"]`) || li.querySelector('button'));
-      if (b) b.focus({ preventScroll: true });
-    }
-    $('e-cortados-n').textContent = n(cortados.length);
-    $('e-vistos-n').textContent = n(vistos.length);
-    $('e-cortados-caja').classList.toggle('oculto', !cortados.length);
-    $('e-vistos-caja').classList.toggle('oculto', !vistos.length);
-    if (recienMovido) enfocaMovido();
-    $('e-vacio').classList.toggle('oculto', lista.length > 0);
+    pintaFilas(m);
     const hechos = [];
     if (m.parametros_quitados) hechos.push(tn('parametros_quitados', m.parametros_quitados, { n: n(m.parametros_quitados) }));
     if (m.datos_salvados) hechos.push(tn('datos_salvados', m.datos_salvados, { n: n(m.datos_salvados) }));

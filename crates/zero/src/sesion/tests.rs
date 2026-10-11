@@ -2250,6 +2250,8 @@ fn a_whole_page_cut_is_in_the_list_and_in_today() {
     assert_eq!(c["lista"][0]["recurso"], "documento");
     assert_eq!(c["lista"][0]["motivo"], "corte_tuyo");
     assert_eq!(c["sin_anotar"], 0);
+    // In the list, not among the companies from outside: the same as «Hoy».
+    assert_eq!(c["empresas"], json!([]));
 }
 
 /// «Los chivatos»: what the page's pixels tried to tell, per tab, deduplicated, with the card to
@@ -2390,4 +2392,156 @@ fn two_approved_sendings_to_one_site_add_up() {
         8,
     );
     assert!(!r.cortar);
+}
+
+/// The figures of what happened, as every screen shows them: the shield's summary and each row's
+/// counts, the day and the month, and the list of cuts.
+fn historia(s: &mut Sesion, id: u32) -> Value {
+    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":"escudo"}"#);
+    let e = del_tipo(&o, Origen::Panel, "escudo").unwrap_or_default();
+    let filas: Vec<Value> = e["terceros"]
+        .as_array()
+        .map(|l| {
+            l.iter()
+                .map(|t| {
+                    json!([
+                        t["orden"],
+                        t["sitio"],
+                        t["quien"],
+                        t["vistas"],
+                        t["cortadas"],
+                        t["motivos"]
+                    ])
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    s.guarda_cortes();
+    let cortes = cortes::lee(&s.datos.join("cortes"), "2000-01-01", "2100-01-01").len();
+    let hoy = s.msg_hoy();
+    json!({
+        "pestana": id,
+        "resumen": e["resumen"],
+        "filas": filas,
+        "chivatos": e["chivatos"],
+        "datos_salvados": e["datos_salvados"],
+        "hoy": hoy["hoy"],
+        "mes": hoy["mes"],
+        "rastro": hoy["rastro_hoy"],
+        "cortes": cortes,
+    })
+}
+
+/// Pressing a button never adds or takes away anything that already happened (the owner, 10 Oct
+/// 2026: «que no estén sumando, restando… cuando uno le da a bloquear, desbloquear»): only what
+/// holds now and the rule change. Only the requests that come afterwards count.
+#[test]
+fn buttons_change_what_holds_now_never_the_figures_of_what_happened() {
+    let (mut s, _, id) = con_pagina(true);
+    for (url, contexto) in [
+        ("https://cdn.otra.io/a.js", 6),
+        ("https://www.google.com/recaptcha/api.js", 6),
+        ("https://adservice.google.com/ddm/fls/z", 3),
+        ("https://stats.g.doubleclick.net/g/collect", 3),
+        ("https://stats.g.doubleclick.net/g/collect", 3),
+        ("https://www.facebook.com/tr?id=1&ev=PageView", 3),
+    ] {
+        let _ = s.peticion(id, url, "GET", b"", contexto);
+    }
+    let antes = historia(&mut s, id);
+    assert_eq!(antes["hoy"]["cortadas"], 4);
+    let estado = |s: &mut Sesion| {
+        let f = fila_de(s, "google.com");
+        (
+            f["ahora"].as_str().unwrap_or("").to_string(),
+            f["regla"].as_str().map(str::to_string),
+        )
+    };
+    let pasos = [
+        ("desbloquear_sitio", "pasa", Some("permitido")),
+        ("bloquear_sitio", "parcial", Some("lista")),
+        ("bloquear_todo", "cortado", Some("tuya")),
+        ("desbloquear_sitio", "pasa", Some("permitido")),
+    ];
+    for (tipo, ahora, regla) in pasos {
+        for sitio in ["google.com", "doubleclick.net", "otra.io"] {
+            let _ = s.mensaje(
+                Origen::Panel,
+                PANEL,
+                &json!({ "tipo": tipo, "sitio": sitio }).to_string(),
+            );
+        }
+        assert_eq!(
+            estado(&mut s),
+            (ahora.to_string(), regla.map(str::to_string)),
+            "{tipo}"
+        );
+        assert_eq!(historia(&mut s, id), antes, "after {tipo}");
+    }
+    // What comes afterwards counts, as it is decided now: unblocked, it is seen and not cut.
+    let _ = s.peticion(id, "https://adservice.google.com/ddm/fls/z", "GET", b"", 3);
+    let despues = historia(&mut s, id);
+    assert_eq!(despues["hoy"]["cortadas"], 4);
+    assert_eq!(despues["resumen"]["cortadas"], antes["resumen"]["cortadas"]);
+    let google = |h: &Value| {
+        h["filas"]
+            .as_array()
+            .and_then(|l| l.iter().find(|f| f[1] == "google.com").cloned())
+            .unwrap_or_default()
+    };
+    assert_eq!(google(&despues)[3], 3);
+    assert_eq!(google(&despues)[4], google(&antes)[4]);
+}
+
+/// The rows keep the order in which each company first showed up on the page, whatever their
+/// counts or state; a new page starts its own order.
+#[test]
+fn rows_keep_the_order_they_first_showed_up_in() {
+    let (mut s, _, id) = con_pagina(true);
+    let orden = |s: &mut Sesion| -> Vec<String> {
+        let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":"escudo"}"#);
+        let e = del_tipo(&o, Origen::Panel, "escudo").unwrap_or_default();
+        e["terceros"]
+            .as_array()
+            .map(|l| {
+                l.iter()
+                    .map(|t| t["sitio"].as_str().unwrap_or("").to_string())
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let _ = s.peticion(id, "https://cdn.zeta.io/a.js", "GET", b"", 6);
+    let _ = s.peticion(id, "https://cdn.alfa.io/a.js", "GET", b"", 6);
+    for _ in 0..5 {
+        let _ = s.peticion(
+            id,
+            "https://stats.g.doubleclick.net/g/collect",
+            "GET",
+            b"",
+            3,
+        );
+    }
+    assert_eq!(orden(&mut s), ["zeta.io", "alfa.io", "doubleclick.net"]);
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"bloquear_sitio","sitio":"alfa.io"}"#,
+    );
+    let _ = s.peticion(id, "https://cdn.alfa.io/b.js", "GET", b"", 6);
+    let _ = s.peticion(id, "https://cdn.beta.io/a.js", "GET", b"", 6);
+    assert_eq!(
+        orden(&mut s),
+        ["zeta.io", "alfa.io", "doubleclick.net", "beta.io"]
+    );
+    // A new page, even the same site again, starts its own order (and the panel its rows).
+    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":"escudo"}"#);
+    let carga = del_tipo(&o, Origen::Panel, "escudo").unwrap_or_default()["carga"].clone();
+    let _ = abre_pagina(&mut s, id, "https://www.eltiempo.com/");
+    let _ = s.peticion(id, "https://cdn.beta.io/a.js", "GET", b"", 6);
+    assert_eq!(orden(&mut s), ["beta.io"]);
+    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":"escudo"}"#);
+    assert_ne!(
+        del_tipo(&o, Origen::Panel, "escudo").unwrap_or_default()["carga"],
+        carga
+    );
 }

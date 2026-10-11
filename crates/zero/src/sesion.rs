@@ -332,6 +332,9 @@ struct Pestana {
     /// Sendings the person approved in the form guard: those kinds of data may go to that site
     /// from this tab for a few minutes (review of 10 Oct 2026, grave 5).
     permisos: Vec<Permiso>,
+    /// Pages this tab has shown: tells the panel when its shield starts again (a reload of the
+    /// same site too), the only moment its rows are laid out anew.
+    carga: u32,
 }
 
 /// A sending the person approved: `clases` of data to `sitio`, until `hasta`.
@@ -367,6 +370,7 @@ impl Pestana {
             vuelve: None,
             abridor: None,
             permisos: Vec::new(),
+            carga: 0,
         }
     }
 }
@@ -1068,10 +1072,11 @@ impl Sesion {
         // (some requests, or only those that carried your data, or only those outside the
         // task), or passing; and by which rule, so its button offers the way back. Without the
         // trial or a subscription nothing is cut, and the shield says so.
-        let terceros: Vec<Value> = p
-            .escudo
-            .terceros
-            .values()
+        // In the order each one first showed up on this page: a row never moves.
+        let mut filas: Vec<&Tercero> = p.escudo.terceros.values().collect();
+        filas.sort_by_key(|t| t.orden);
+        let terceros: Vec<Value> = filas
+            .into_iter()
             .map(|t| {
                 let e = t.estado(&self.prefs.reglas, self.licencia.protege());
                 let mut v = serde_json::to_value(t).unwrap_or(Value::Null);
@@ -1089,6 +1094,7 @@ impl Sesion {
         json!({
             "tipo": "escudo",
             "pestana": p.id,
+            "carga": p.carga,
             "sitio": if es_interna(&p.url) { "" } else { p.escudo.sitio.as_str() },
             "cortando": self.prefs.reglas.cortar_seguimiento && self.licencia.protege(),
             "maxima": self.prefs.reglas.cortar_seguimiento && self.prefs.reglas.maxima,
@@ -2305,12 +2311,23 @@ impl Sesion {
                 .map(|(a, n)| json!({ k: a, "n": n }))
                 .collect()
         };
-        let empresas: Vec<Value> = cortes::cuenta(&lista, |c| c.quien.clone())
+        // Companies and countries are those from outside, as «Hoy» counts them: a whole page the
+        // person (or the AI, a step outside its task) opened and that was cut is a request cut,
+        // in the total and the list, not a company that tried anything.
+        let de_fuera: Vec<Corte> = lista
+            .iter()
+            .filter(|c| {
+                !(c.recurso == Recurso::Documento
+                    && matches!(c.motivo, Some(Motivo::CorteTuyo | Motivo::FueraDeMandato)))
+            })
+            .cloned()
+            .collect();
+        let empresas: Vec<Value> = cortes::cuenta(&de_fuera, |c| c.quien.clone())
             .into_iter()
             .map(|(q, n)| json!({ "quien": q, "pais": paises_de.get(q.as_str()), "n": n }))
             .collect();
         let paises = cuenta(
-            cortes::cuenta(&lista, |c| c.pais.clone().unwrap_or_default()),
+            cortes::cuenta(&de_fuera, |c| c.pais.clone().unwrap_or_default()),
             "pais",
         );
         let motivos = cuenta(
@@ -2815,6 +2832,7 @@ impl Sesion {
         p.url = url.to_string();
         p.al_libro.clear();
         p.escudo = escudo::Pestana::nueva(&s);
+        p.carga = p.carga.wrapping_add(1);
         p.escudo.parametros_quitados = quitados;
         if !es_interna(url) {
             p.lista = false;

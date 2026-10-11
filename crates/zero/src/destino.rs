@@ -233,7 +233,12 @@ pub fn clasifica_en(host: &str, ruta: &str) -> Destino {
         if !matches!(d.categoria, "rastreador" | "publicidad") {
             d.categoria = p.categoria;
         }
-        d.empresa = Some(p.empresa);
+        // The owner as the lists say it, when they know it: the same company is counted once
+        // whichever of its names a page calls (`snap.licdn.com` and `www.linkedin.com` are both
+        // Microsoft's). The pixel's own name only fills a gap.
+        if d.empresa.is_none() {
+            d.empresa = Some(p.empresa);
+        }
         if d.pais.is_none() {
             d.pais = p.pais;
         }
@@ -339,7 +344,8 @@ mod tests {
         );
         assert_eq!(
             px("https://snap.licdn.com/li.lms-analytics/insight.min.js"),
-            ("rastreador", "LinkedIn".into())
+            // LinkedIn is Microsoft's, as the lists of owners say: one company, counted once.
+            ("rastreador", "Microsoft".into())
         );
         assert_eq!(
             px("https://api.segment.io/v1/t"),

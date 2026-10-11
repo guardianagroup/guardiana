@@ -12,6 +12,10 @@ use crate::decision::{Ajustes, Decision, Motivo};
 /// One company or site that a page tried to send you to or pull in, as the shield lists it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Tercero {
+    /// Its place on the shield: the order in which it first showed up on this page. The rows
+    /// never move (the owner, 10 Oct 2026: «se mueven arriba, abajo… el cliente pierde cuál era»).
+    #[serde(default)]
+    pub orden: u32,
     /// The name people recognise (company, AI service, registered broker, or the site).
     pub quien: String,
     /// The registrable site.
@@ -86,6 +90,7 @@ impl Tercero {
             _ => None,
         };
         Self {
+            orden: 0,
             quien: d.quien().to_string(),
             sitio: sitio.to_string(),
             pais: None,
@@ -278,10 +283,12 @@ impl Pestana {
         if self.terceros.len() >= MAX_TERCEROS && !self.terceros.contains_key(&d.destino.sitio) {
             return;
         }
+        let orden = u32::try_from(self.terceros.len()).unwrap_or(u32::MAX);
         let e = self
             .terceros
             .entry(d.destino.sitio.clone())
             .or_insert_with(|| Tercero {
+                orden,
                 quien: d.destino.quien().to_string(),
                 sitio: d.destino.sitio.clone(),
                 pais: d.destino.pais.map(str::to_string),

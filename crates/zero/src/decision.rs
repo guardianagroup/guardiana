@@ -341,9 +341,9 @@ mod tests {
             ("https://static.ads-twitter.com/uwt.js", "X"),
             (
                 "https://snap.licdn.com/li.lms-analytics/insight.min.js",
-                "LinkedIn",
+                "Microsoft",
             ),
-            ("https://px.ads.linkedin.com/collect?pid=1", "LinkedIn"),
+            ("https://px.ads.linkedin.com/collect?pid=1", "Microsoft"),
             ("https://api.segment.io/v1/t", "Segment"),
             (
                 "https://cdn.segment.com/analytics.js/v1/k/analytics.min.js",

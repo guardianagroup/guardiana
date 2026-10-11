@@ -13,6 +13,8 @@
 # - ruta: opcional, por tramos; `*` vale por un tramo cualquiera. Casa con esa ruta y con todo lo que
 #   cuelga de ella (`/tr` casa con `/tr`, `/tr/` y `/tr/algo`, no con `/tracking`).
 # - país: el de la sede del grupo, como en `empresas.txt`; vacío si no se ha comprobado.
+# - empresa y país solo se usan cuando las listas no saben de quién es el nombre: así una misma
+#   empresa cuenta una vez, llame la página al nombre que llame.
 # - categoría: `rastreador`, `publicidad` o `telemetria` (esta última solo se corta con la
 #   protección máxima).
 # Fuente: la documentación pública de cada píxel y las direcciones que piden sus propios guiones.
@@ -59,8 +61,8 @@ t.co/i/adsct | X | US | publicidad
 static.ads-twitter.com | X | US | publicidad
 
 # LinkedIn (de Microsoft): la «Insight Tag».
-snap.licdn.com | LinkedIn | US | rastreador
-px.ads.linkedin.com | LinkedIn | US | publicidad
+snap.licdn.com | Microsoft | US | rastreador
+px.ads.linkedin.com | Microsoft | US | publicidad
 
 # Segment y Mixpanel: analítica de producto que sigue a cada persona.
 api.segment.io/v1 | Segment | US | rastreador

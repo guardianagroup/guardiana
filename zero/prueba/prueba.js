@@ -146,19 +146,48 @@ function pantalla(nombre) {
   const n = Number(await barra.textContent('#b-escudo-n'));
   comprueba(n === 1, `el escudo cuenta empresas, no dominios: DoubleClick y Analytics son Google (${n})`);
   comprueba(await hasta(async () => (await barra.textContent('#aviso-corte')).includes('Google')), 'la barra dice a quién cortó');
-  await barra.click('#b-escudo');
-  comprueba(await hasta(async () => (await panel.locator('#e-cortados li').count()) >= 1), 'el panel lista lo cortado');
+  await abreVista('b-escudo');
+  comprueba(await hasta(async () => (await panel.locator('#e-terceros li.cortado').count()) >= 1), 'el panel lista lo cortado');
   comprueba((await panel.textContent('#titulo')) === 'Conexiones con otras empresas', 'el escudo se titula «Conexiones con otras empresas»');
-  const filas = await panel.locator('#e-cortados .quien').allTextContents();
+  const filas = await panel.locator('#e-terceros .quien').allTextContents();
   comprueba(filas.some((f) => f.includes('Google')), `el panel nombra a la empresa (${filas.join(', ')})`);
-  // Every button has its way back: «Desbloquear», then «Volver a bloquear».
-  const enCortados = () => panel.locator('#e-cortados li', { hasText: 'doubleclick.net' });
-  const enVistos = () => panel.locator('#e-vistos li', { hasText: 'doubleclick.net' });
-  comprueba((await enCortados().first().locator('button').textContent()) === 'Desbloquear', 'lo cortado ofrece «Desbloquear»');
-  await enCortados().first().locator('button').click();
-  comprueba(await hasta(async () => (await enVistos().count()) === 1 && (await enVistos().first().locator('button').textContent()) === 'Volver a bloquear'), 'desbloqueado, ofrece «Volver a bloquear» y dice que fue cosa tuya');
-  await enVistos().first().locator('button').click();
-  comprueba(await hasta(async () => (await enCortados().count()) === 1 && (await enVistos().count()) === 0), 'y vuelve a quedar cortado, como estaba');
+  // The rows never move (the owner, 10 Oct 2026): one list, in the order each company first
+  // showed up. A button press changes the row's colour, chip and words, not its place, not the
+  // focus, and not any figure of what already happened.
+  const fila = (sitio) => panel.locator('#e-terceros li', { hasText: sitio });
+  const posicion = (sitio) => panel.evaluate((x) => [...document.querySelectorAll('#e-terceros li')].findIndex((l) => l.dataset.sitio === x), sitio);
+  const caja = (sitio) => panel.evaluate((x) => { const l = [...document.querySelectorAll('#e-terceros li')].find((y) => y.dataset.sitio === x); const r = l.getBoundingClientRect(); const b = l.querySelector('.botones').getBoundingClientRect(); return [Math.round(r.height), Math.round(b.left), Math.round(b.width)]; }, sitio);
+  const cifras = async () => JSON.stringify({
+    barra: await barra.textContent('#b-escudo-n'),
+    resumen: await panel.textContent('#e-resumen'),
+    filas: await panel.evaluate(() => [...document.querySelectorAll('#e-terceros li .linea')].map((l) => l.textContent)),
+    // «Hoy, en todo el navegador», at the top of the shield: the same figures as the new tab.
+    dia: await panel.evaluate(() => ['e-dia-frase', 'e-dia-cortadas', 'e-dia-datos', 'e-dia-parametros', 'e-dia-corredores'].map((k) => document.getElementById(k).textContent)),
+  });
+  const enfocado = () => panel.evaluate(() => { const b = document.activeElement; const l = b && b.closest && b.closest('#e-terceros li'); return l ? [l.dataset.sitio, b.textContent] : null; });
+  // A button press, and what must hold after it: the same place, height and button column,
+  // the focus on that row's button, the figures untouched; only the words change.
+  const pulsa = async (sitio, palabraAntes, palabraDespues, que) => {
+    const pos = await posicion(sitio);
+    const medidas = await caja(sitio);
+    await espera(1500);
+    const antes = await cifras();
+    const boton = fila(sitio).locator('.botones button', { hasText: palabraAntes });
+    comprueba((await boton.count()) === 1, `${que}: la fila ofrece «${palabraAntes}»`);
+    await boton.click();
+    comprueba(await hasta(async () => (await fila(sitio).locator('.botones button').first().textContent()) === palabraDespues), `${que}: el botón pasa a «${palabraDespues}» en su sitio`);
+    comprueba((await posicion(sitio)) === pos, `${que}: la fila sigue en la posición ${pos}`);
+    comprueba(JSON.stringify(await caja(sitio)) === JSON.stringify(medidas), `${que}: misma altura y misma columna de botones (${JSON.stringify(medidas)})`);
+    const foco = await enfocado();
+    comprueba(!!foco && foco[0] === sitio, `${que}: el foco sigue en un botón de esa fila (${foco})`);
+    await espera(1500);
+    const despues = await cifras();
+    comprueba(despues === antes, `${que}: las cifras del escudo, del día y de «Hoy» no cambian al pulsar${despues === antes ? '' : ` (${antes} → ${despues})`}`);
+  };
+  await pulsa('doubleclick.net', 'Desbloquear', 'Volver a bloquear', 'desbloquear');
+  comprueba(await fila('doubleclick.net').evaluate((l) => !l.classList.contains('cortado') && l.textContent.includes('desbloqueado por ti')), 'desbloqueado, la fila dice que fue cosa tuya');
+  await pulsa('doubleclick.net', 'Volver a bloquear', 'Desbloquear', 'volver a bloquear');
+  comprueba(await fila('doubleclick.net').evaluate((l) => l.classList.contains('cortado')), 'y vuelve a quedar cortado, como estaba');
   // Maximum protection: a beacon to another company, which passed, no longer leaves.
   const baliza = async (ruta) => { await web.evaluate(([p, r]) => navigator.sendBeacon(`http://collect.otra-empresa.io:${p}${r}`, 'x'), [PUERTO, ruta]); await espera(800); };
   await baliza('/baliza-1');
@@ -168,17 +197,11 @@ function pantalla(nombre) {
   await baliza('/baliza-2');
   comprueba(!vio('collect.otra-empresa.io', '/baliza-2'), 'con protección máxima, ese aviso ya no sale');
   // And it has its way back, like any other cut (review of 10 Oct 2026).
-  const filaBaliza = () => panel.locator('#e-cortados li', { hasText: 'otra-empresa.io' });
-  comprueba(await hasta(async () => (await filaBaliza().count()) === 1 && (await filaBaliza().first().locator('button').textContent()) === 'Desbloquear'), 'lo que corta la protección máxima sale como cortado, con «Desbloquear»');
-  await filaBaliza().first().locator('button').click();
-  await espera(300);
+  comprueba(await hasta(async () => (await fila('otra-empresa.io').count()) === 1 && (await fila('otra-empresa.io').evaluate((l) => l.classList.contains('cortado') || l.classList.contains('parcial')))), 'lo que corta la protección máxima sale como cortado, con «Desbloquear»');
+  await pulsa('otra-empresa.io', 'Desbloquear', 'Volver a bloquear', 'protección máxima, desbloquear');
   await baliza('/baliza-3');
   comprueba(vio('collect.otra-empresa.io', '/baliza-3'), 'desbloqueado, ese aviso vuelve a salir');
-  const balizaVista = panel.locator('#e-vistos li', { hasText: 'otra-empresa.io' });
-  comprueba(await hasta(async () => (await balizaVista.count()) === 1 && (await balizaVista.first().locator('button').textContent()) === 'Volver a bloquear'), 'con protección máxima, lo desbloqueado ofrece «Volver a bloquear» (informe del 10 oct 2026)');
-  comprueba(await panel.evaluate(() => { const b = document.activeElement; return !!b && !!b.closest('#e-vistos li') && b.textContent === 'Volver a bloquear'; }), 'y la fila se sigue: el foco queda en su botón «Volver a bloquear»');
-  await balizaVista.first().locator('button').click();
-  comprueba(await hasta(async () => (await filaBaliza().count()) === 1), 'y «Volver a bloquear» lo deja cortado otra vez');
+  await pulsa('otra-empresa.io', 'Volver a bloquear', 'Desbloquear', 'protección máxima, volver a bloquear');
   await panel.click('#e-maxima-quitar');
   comprueba(await hasta(() => panel.evaluate(() => document.querySelector('#e-maxima-activa').classList.contains('oculto'))), 'y se puede desactivar');
   await espera(600);
@@ -254,7 +277,7 @@ function pantalla(nombre) {
   const tarjeta = await panel.textContent('#e-tarjeta-frase');
   comprueba(tarjeta.includes('intentó contarles a 2 empresas que compré, con mi correo cifrado'), `la tarjeta para compartir lo dice en una frase (${tarjeta})`);
   comprueba(!/89|COP|ana@/.test(tarjeta), 'y no lleva importes ni el correo');
-  comprueba((await panel.locator('#e-cortados li', { hasText: 'facebook.com' }).count()) === 1, 'Meta sale entre lo cortado');
+  comprueba(await panel.locator('#e-terceros li.cortado', { hasText: 'facebook.com' }).count() === 1, 'Meta sale cortada');
   await espera(500);
   pantalla('03b-chivatos.png');
 
@@ -281,6 +304,8 @@ function pantalla(nombre) {
     return quieto;
   });
   comprueba(cortadasHoy >= 3, `la pestaña nueva cuenta las peticiones cortadas (${cortadasHoy})`);
+  const cortadasEscudo = Number((await panel.textContent('#e-dia-cortadas')).replace(/\D/g, ''));
+  comprueba(cortadasEscudo === cortadasHoy, `el día del escudo y la pestaña nueva dicen lo mismo (${cortadasEscudo} y ${cortadasHoy})`);
   await nueva.click('a.hecho.rojo');
   const cortes = await paginaQue(nav, (u) => u.endsWith('/cortes.html'));
   comprueba(await hasta(async () => (await cortes.locator('#filas tr.fila').count()) >= 3), '«peticiones cortadas» lleva a la lista, una a una');
