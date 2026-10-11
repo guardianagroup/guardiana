@@ -91,6 +91,65 @@ impl Textos {
             .unwrap_or_else(|| clave.to_string())
     }
 
+    /// Whether the language (or Spanish, its fallback) has a text for `clave`.
+    fn tiene(&self, clave: &str) -> bool {
+        let [es, en, pt] = mapas();
+        let m = match self.idioma {
+            Idioma::Es => es,
+            Idioma::En => en,
+            Idioma::Pt => pt,
+        };
+        m.contains_key(clave) || es.contains_key(clave)
+    }
+
+    /// The text for `clave` with every `{hueco}` filled.
+    #[must_use]
+    pub fn tf(&self, clave: &str, huecos: &[(&str, &str)]) -> String {
+        let mut s = self.t(clave);
+        for (k, v) in huecos {
+            s = s.replace(&format!("{{{k}}}"), v);
+        }
+        s
+    }
+
+    /// [`Self::tf`] with the count's own form, as the browser's pages do (`puente.js`):
+    /// `<clave>_uno` for one and `<clave>_cero` for none, when the texts have them («Se cortó 1
+    /// petición», never «Se cortaron 1 peticiones»).
+    #[must_use]
+    pub fn tn(&self, clave: &str, n: u64, huecos: &[(&str, &str)]) -> String {
+        let propia = match n {
+            1 => Some(format!("{clave}_uno")),
+            0 => Some(format!("{clave}_cero")),
+            _ => None,
+        };
+        match propia {
+            Some(k) if self.tiene(&k) => self.tf(&k, huecos),
+            _ => self.tf(clave, huecos),
+        }
+    }
+
+    /// A count written the person's way: `12.345` in Spanish and Portuguese, `12,345` in English
+    /// (four digits stay together in Spanish and Portuguese, as the pages write them).
+    #[must_use]
+    pub fn numero(&self, n: u64) -> String {
+        let s = n.to_string();
+        let (sep, desde) = match self.idioma {
+            Idioma::En => (',', 4),
+            Idioma::Es | Idioma::Pt => ('.', 5),
+        };
+        if s.len() < desde {
+            return s;
+        }
+        let mut out = String::with_capacity(s.len() + s.len() / 3);
+        for (i, c) in s.chars().enumerate() {
+            if i > 0 && (s.len() - i) % 3 == 0 {
+                out.push(sep);
+            }
+            out.push(c);
+        }
+        out
+    }
+
     /// Every text of the language, for the interface (sent once when it opens).
     #[must_use]
     pub fn todos(&self) -> &'static Mapa {
@@ -152,6 +211,30 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn counts_take_their_own_form_and_their_own_separators() {
+        let es = Textos::de(Idioma::Es);
+        assert_eq!(
+            es.tn("escudo_resumen_cortadas", 1, &[("cortadas", "1")]),
+            "Se cortó 1 petición."
+        );
+        assert_eq!(
+            es.tn("escudo_resumen_cortadas", 0, &[("cortadas", "0")]),
+            "No se cortó ninguna petición."
+        );
+        assert_eq!(
+            es.tn("escudo_resumen_cortadas", 7, &[("cortadas", "7")]),
+            "Se cortaron 7 peticiones."
+        );
+        // A text without a form for none takes the general one.
+        assert_eq!(es.tn("escudo_peticiones", 0, &[("n", "0")]), "0 peticiones");
+        assert_eq!(es.numero(1234), "1234");
+        assert_eq!(es.numero(12_345), "12.345");
+        assert_eq!(es.numero(1_234_567), "1.234.567");
+        assert_eq!(Textos::de(Idioma::En).numero(1234), "1,234");
+        assert_eq!(Textos::de(Idioma::Pt).numero(999), "999");
     }
 
     #[test]
