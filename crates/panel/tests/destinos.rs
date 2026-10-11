@@ -261,8 +261,11 @@ async fn the_panel_says_where_each_query_went_and_sums_the_week() {
         texto.contains("El 80 % de las consultas que salieron de casa fue a nombres de 3 grupos"),
         "{texto}"
     );
-    // The sample is not something to send anybody: no countries in the shared text with it.
-    assert_eq!(texto.contains("países"), !muestra, "{texto}");
+    // The sample is not something to send anybody: no countries in the shared text with it. With
+    // the real tables the sentence is there, in the singular when every server that answered sat
+    // in one country (the test's addresses all do) and in the plural otherwise.
+    let habla_de_paises = texto.contains("1 país (") || texto.contains("países");
+    assert_eq!(habla_de_paises, !muestra, "{texto}");
     // And the ledger file itself holds no answer address.
     let mut datos = std::fs::read(dir.join("ledger.db")).unwrap();
     datos.extend(std::fs::read(dir.join("ledger.db-wal")).unwrap_or_default());
