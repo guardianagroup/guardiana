@@ -24,8 +24,9 @@ use webview2_com::{
     ContainsFullScreenElementChangedEventHandler, ContentLoadingEventHandler,
     CoreWebView2EnvironmentOptions, CreateCoreWebView2ControllerCompletedHandler,
     CreateCoreWebView2EnvironmentCompletedHandler, DocumentTitleChangedEventHandler,
-    ExecuteScriptCompletedHandler, FaviconChangedEventHandler, GetFaviconCompletedHandler,
-    HistoryChangedEventHandler, NavigationCompletedEventHandler, NavigationStartingEventHandler,
+    ExecuteScriptCompletedHandler, FaviconChangedEventHandler, FrameCreatedEventHandler,
+    FrameWebMessageReceivedEventHandler, GetFaviconCompletedHandler, HistoryChangedEventHandler,
+    NavigationCompletedEventHandler, NavigationStartingEventHandler,
     NewWindowRequestedEventHandler, PrintToPdfCompletedHandler, ProcessFailedEventHandler,
     SourceChangedEventHandler, WebMessageReceivedEventHandler, WebResourceRequestedEventHandler,
 };
@@ -810,6 +811,56 @@ fn escucha_mensajes(web: &ICoreWebView2, origen: Origen) -> windows::core::Resul
     unsafe { web.add_WebMessageReceived(&h, &mut t) }
 }
 
+/// The page script inside the frames of a tab (decision 206). WebView2 runs it in child frames
+/// too, and a frame talks to the browser on its own channel (`CoreWebView2Frame`, for the frames
+/// directly inside the page). The session reads from it only what it measured and its question;
+/// the answer goes back to that frame alone. An engine without frames' channel: nothing here.
+fn escucha_marcos(web: &ICoreWebView2, id: u32) {
+    let Ok(w4) = web.cast::<ICoreWebView2_4>() else {
+        return;
+    };
+    let h = FrameCreatedEventHandler::create(Box::new(
+        move |_w, args: Option<ICoreWebView2FrameCreatedEventArgs>| {
+            let Some(args) = args else {
+                return Ok(());
+            };
+            let Ok(marco) = (unsafe { args.Frame() }) else {
+                return Ok(());
+            };
+            let Ok(marco) = marco.cast::<ICoreWebView2Frame2>() else {
+                return Ok(());
+            };
+            let destino = marco.clone();
+            let hm = FrameWebMessageReceivedEventHandler::create(Box::new(
+                move |_f, a: Option<ICoreWebView2WebMessageReceivedEventArgs>| {
+                    let Some(a) = a else {
+                        return Ok(());
+                    };
+                    let fuente = texto_de(|p| unsafe { a.Source(p) });
+                    let json = texto_de(|p| unsafe { a.WebMessageAsJson(p) });
+                    let (respuesta, o) = con_sesion(|s| s.mensaje_de_marco(id, &fuente, &json))
+                        .unwrap_or((None, Vec::new()));
+                    if let Some(r) = respuesta {
+                        let j = Ancho::de(&r);
+                        vale("respuesta al marco", unsafe {
+                            destino.PostWebMessageAsJson(j.p())
+                        });
+                    }
+                    encola(o);
+                    Ok(())
+                },
+            ));
+            let mut t = 0i64;
+            vale("mensajes del marco", unsafe {
+                marco.add_WebMessageReceived(&hm, &mut t)
+            });
+            Ok(())
+        },
+    ));
+    let mut t = 0i64;
+    vale("marcos", unsafe { w4.add_FrameCreated(&h, &mut t) });
+}
+
 fn pulsada(vk: i32) -> bool {
     unsafe { GetKeyState(vk) < 0 }
 }
@@ -977,6 +1028,7 @@ fn prepara_pestana(id: u32, c: &ICoreWebView2Controller) -> windows::core::Resul
     }
     eventos_pestana(id, &web)?;
     escucha_mensajes(&web, Origen::Pestana(id))?;
+    escucha_marcos(&web, id);
     escucha_teclas(c)?;
     let vista = Vista {
         controlador: c.clone(),

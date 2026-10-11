@@ -211,7 +211,7 @@
     $('e-medidas-caja').classList.toggle('oculto', !lineas.length);
     $('e-medidas').innerHTML = lineas.map((l) => {
       const clase = l.estado === 'cortado' ? 'cortado' : l.estado === 'paso' ? 'paso' : 'medido';
-      const fin = l.estado ? `<span class="estado">— ${esc(t(l.estado === 'cortado' ? 'chivato_cortado' : 'chivato_paso'))}</span>` : '';
+      const fin = l.estado && !l.dicho ? `<span class="estado">— ${esc(t(l.estado === 'cortado' ? 'chivato_cortado' : 'chivato_paso'))}</span>` : '';
       return `<li class="${clase}" data-clase="${esc(l.clase)}"><span>${esc(l.texto)}</span>${fin}</li>`;
     }).join('');
     $('e-medidas-notas').innerHTML = (md.notas || []).map((x) => `<p class="explica pequeno">${esc(x)}</p>`).join('');

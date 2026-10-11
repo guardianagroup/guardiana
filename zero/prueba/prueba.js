@@ -51,7 +51,15 @@ const FP = `(function () {
   var a = c.toDataURL(); var b = c.toDataURL();
   window.__zeroHuella = a.length; window.__zeroHuellaIgual = a === b;
   window.__zeroNativo = Function.prototype.toString.call(HTMLCanvasElement.prototype.toDataURL);
+  window.__zeroFpUrl = a;
 })();`;
+// A frame of another company that does the same from its own inline script.
+const MARCO = `<!doctype html><meta charset="utf-8"><script>
+  var c = document.createElement('canvas'); c.width = 240; c.height = 60;
+  var x = c.getContext('2d'); x.textBaseline = 'top'; x.font = '14px Arial';
+  x.fillText('Sphinx of black quartz, judge my vow', 2, 2);
+  c.toDataURL();
+</script><p>marco</p>`;
 const servidor = http.createServer((req, res) => {
   let cuerpo = '';
   req.on('data', (c) => { cuerpo += c; });
@@ -60,6 +68,7 @@ const servidor = http.createServer((req, res) => {
     registro.push({ t: Date.now(), host, metodo: req.method, ruta: req.url, gpc: req.headers['sec-gpc'] || '', cuerpo });
     if (host === 'sitio-prueba.test') return pagina(req, res);
     if (host === 'scripts.medidor-prueba.io') { res.writeHead(200, { 'Content-Type': 'application/javascript' }); return res.end(FP); }
+    if (host === 'marco-prueba.io') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(MARCO); }
     res.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
     res.end('ok');
   });
@@ -87,7 +96,7 @@ function pantalla(nombre) {
 
 (async () => {
   await new Promise((r) => servidor.listen(PUERTO, '127.0.0.1', r));
-  const reglas = ['sitio-prueba.test', '*.doubleclick.net', 'www.google-analytics.com', 'collect.otra-empresa.io', 'www.facebook.com', 'connect.facebook.net', 'www.google.com', 'analytics.tiktok.com', 'scripts.medidor-prueba.io', 'static.hotjar.com'].map((h) => `MAP ${h} 127.0.0.1`).join(',');
+  const reglas = ['sitio-prueba.test', '*.doubleclick.net', 'www.google-analytics.com', 'collect.otra-empresa.io', 'www.facebook.com', 'connect.facebook.net', 'www.google.com', 'analytics.tiktok.com', 'scripts.medidor-prueba.io', 'static.hotjar.com', 'marco-prueba.io'].map((h) => `MAP ${h} 127.0.0.1`).join(',');
   const proceso = spawn(exe, [], {
     env: { ...process.env, GUARDIANA_ZERO_DATOS: base, GUARDIANA_ZERO_DEPURA: '1', GUARDIANA_ZERO_ARGS: `--remote-debugging-port=9222 --host-resolver-rules="${reglas}"` },
     stdio: 'ignore',
@@ -310,6 +319,40 @@ function pantalla(nombre) {
   comprueba(await hasta(async () => (await panel.textContent('#e-sesion')).includes('huella de tu equipo')), `el resumen «Desde que abriste ZERO» lo cuenta (${await panel.textContent('#e-sesion')})`);
   await espera(500);
   pantalla('03c-medidas.png');
+
+  // Decision 206, approved: with maximum protection, another company's script gets a slightly
+  // different canvas (the same on every read), the page's own reads are untouched, and frames
+  // are measured too. Picked up by a page opened anew.
+  await panel.click('#e-maxima-activar');
+  await hasta(() => panel.evaluate(() => !document.querySelector('#e-maxima-activa').classList.contains('oculto')));
+  await barra.fill('#campo-dir', `${SITIO}/prueba?id=8`);
+  await barra.press('#campo-dir', 'Enter');
+  await hasta(() => web.evaluate(() => location.search === '?id=8'));
+  await web.waitForLoadState('load').catch(() => {});
+  await espera(800);
+  await web.evaluate((p) => {
+    const s = document.createElement('script');
+    s.src = `http://scripts.medidor-prueba.io:${p}/fp.js`;
+    document.head.appendChild(s);
+    const f = document.createElement('iframe');
+    f.src = `http://marco-prueba.io:${p}/marco.html`;
+    document.body.appendChild(f);
+  }, PUERTO);
+  comprueba(await hasta(() => web.evaluate(() => typeof window.__zeroFpUrl === 'string')), 'con protección máxima, el guion de otra empresa se ejecuta igual');
+  const propio = await web.evaluate(() => {
+    const c = document.createElement('canvas'); c.width = 240; c.height = 60;
+    const x = c.getContext('2d'); x.textBaseline = 'top'; x.font = '14px Arial';
+    x.fillText('Cwm fjordbank glyphs vext quiz', 2, 2);
+    return c.toDataURL();
+  });
+  const ajeno = await web.evaluate(() => window.__zeroFpUrl);
+  comprueba(ajeno !== propio && await web.evaluate(() => window.__zeroHuellaIgual === true), 'a otra empresa le da un lienzo distinto, y el mismo en cada lectura; la página lee el suyo');
+  comprueba(await hasta(async () => (await textoMedidas()).includes('le dimos una distinta')), `el escudo dice «le dimos una distinta» (${await textoMedidas()})`);
+  comprueba(await hasta(async () => (await textoMedidas()).includes('marco-prueba.io (canvas')), `y mide dentro de un marco de otra empresa (${await textoMedidas()})`);
+  await espera(500);
+  pantalla('03d-maxima-huella.png');
+  await panel.click('#e-maxima-quitar');
+  await hasta(() => panel.evaluate(() => document.querySelector('#e-maxima-activa').classList.contains('oculto')));
 
   // A new tab and a new window.
   await barra.click('#nueva');
