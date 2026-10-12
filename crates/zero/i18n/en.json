@@ -326,6 +326,8 @@
   "cortes_sin_identificar": "Unidentified · {pais} domain",
   "cortes_sin_identificar_explica": "We do not know yet which company is behind it. Its address ends with the letters of {pais}: that says where the name was registered, not that the company is from there.",
   "cortes_otras": "{n} more",
+  "cortes_ver_otras": "See the {n} other companies",
+  "cortes_ver_otras_uno": "See 1 more company",
   "cortes_otras_uno": "1 more",
   "cortes_col_hora": "Time",
   "cortes_col_pagina": "Website you were on",

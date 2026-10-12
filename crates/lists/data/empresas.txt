@@ -122,6 +122,7 @@ microsoft365.com
 cloud.microsoft
 githubassets.com
 clarity.ms  # «Clarity» de Microsoft en third-party-web (MIT), https://github.com/patrickhulce/third-party-web/blob/main/data/entities.js, consultada el 12 oct 2026
+bing.net  # https://www.whois.com/whois/bing.net (consultada el 12 oct 2026)
 
 @Amazon|US|Seattle
 AS16509  # su red, según PeeringDB https://peeringdb.com/net/1418 (Amazon.com, Inc.), consultado el 10 oct 2026
@@ -271,11 +272,13 @@ akamaihd.net
 akamaized.net
 edgekey.net
 edgesuite.net
+go-mpulse.net  # https://techdocs.akamai.com/mpulse/docs/move-mpulse-from-the-origin-to-the-edge (consultada el 12 oct 2026)
 
 @Fastly|US|San Francisco
 AS54113  # su red, según PeeringDB https://peeringdb.com/net/5520 (Fastly, Inc.), consultado el 10 oct 2026
 fastly.net
 fastlylb.net
+fastly-insights.com
 
 @Adobe|US|San José (California)
 adobe.com
@@ -287,6 +290,7 @@ adobe.io
 adobedtm.com
 everesttech.net
 2o7.net  # «Adobe Experience Cloud» de Adobe en third-party-web (MIT), https://github.com/patrickhulce/third-party-web/blob/main/data/entities.js, consultada el 12 oct 2026
+rum.hlx.page  # https://github.com/adobe/helix-rum-js (consultada el 12 oct 2026)
 
 @Oracle|US|Austin
 oracle.com
@@ -316,6 +320,7 @@ iponweb.com
 @The Trade Desk|US|Ventura (California)
 adsrvr.org
 uidapi.com  # https://unifiedid.com/docs/getting-started/gs-environments (consultada el 12 oct 2026)
+euid.eu  # https://euid.eu/docs/ref-info/uid-components (consultada el 12 oct 2026)
 
 @Magnite|US|Nueva York
 rubiconproject.com
@@ -323,6 +328,7 @@ magnite.com
 spotxchange.com  # SpotX, comprada por Magnite en 2021
 spotx.tv
 telaria.com  # Telaria, unida a Magnite en 2020
+springserve.com  # https://www.sec.gov/Archives/edgar/data/1595974/000159597426000007/mgni-20251231.htm (consultada el 12 oct 2026)
 
 @PubMatic|US|Redwood City
 pubmatic.com
@@ -371,6 +377,7 @@ ads-twitter.com  # https://help.x.com/en/business-and-advertising/conversion-tra
 snapchat.com
 sc-cdn.net
 snap.com
+sc-static.net  # https://www.consentstack.io/vendors/snap-pixel (consultada el 12 oct 2026)
 
 @Pinterest|US|San Francisco
 pinterest.com
@@ -468,6 +475,7 @@ comscore.com
 @Nielsen|US|Nueva York
 imrworldwide.com
 nielsen.com
+exelator.com  # https://www.nielsen.com/news-center/2015/nielsen-acquires-exelate/ (consultada el 12 oct 2026)
 
 @Quantcast|US|San Francisco
 quantserve.com
@@ -496,6 +504,7 @@ sharethrough.com
 
 @Datadog|US|Nueva York
 datadoghq.com
+browser-intake-datadoghq.com
 
 @Sentry|US|San Francisco
 sentry.io
@@ -857,6 +866,7 @@ didomi.io
 # Marfeel Solutions, S.L., Barcelona. Analítica y publicidad para periódicos.
 mrf.io
 marfeel.com
+newsroom.bi  # https://www.marfeel.com/docs/analytics/sdk-integrations/debug-marfeel-sdk-network-requests-and-tracking-parameters (consultada el 12 oct 2026)
 
 @Adventori|FR|París
 # ADventori SAS, 28 rue du Sentier, 75002 París, RCS de París 518 634 027 (comprobado el
@@ -905,6 +915,7 @@ identrust.com
 
 @GoDaddy|US|Tempe (Arizona)
 godaddy.com
+secureserver.net  # https://www.urlert.com/domains/secureserver.net (consultada el 12 oct 2026)
 
 @NTP Pool Project  # proyecto de voluntarios, sin empresa ni sede: por eso va sin país y sin ciudad
 # Sin país: es una red de voluntarios coordinada por una persona, sin sociedad ni fundación
@@ -987,6 +998,7 @@ reverso.net
 yandex.com
 yandex.ru
 yastatic.net
+webvisor.org  # https://yandex.ru/support/metrica/ru/code/install-counter-csp (consultada el 12 oct 2026)
 
 @HubSpot
 hubspot.com
@@ -1204,6 +1216,8 @@ crwdcntrl.net
 # Nota: Sovrn es la antigua Lijit Networks (Wikipedia y Evidon); ninguna fuente abierta cita textualmente el dominio lijit.com
 @Sovrn|US|Boulder (Colorado)
 lijit.com
+viglink.com  # https://www.sovrn.com/blog/sovrn-acquires-viglink/ (consultada el 12 oct 2026)
+sovrn.com  # https://www.sovrn.com/privacy-policy/privacy-policy/ (consultada el 12 oct 2026)
 
 # Sede: https://en.wikipedia.org/wiki/Media.net (consultada el 12 oct 2026)
 # media.net: https://www.media.net/privacy-policy/
@@ -1420,6 +1434,7 @@ tistory.com
 # seznam.cz: https://o-seznam.cz/en/contacts/
 @Seznam.cz|CZ|Praga
 seznam.cz
+imedia.cz  # https://blog.seznam.cz/2020/08/upravujeme-vydejovou-adresu-reklamy-pokud-vyuzivate-google-analytics-upravte-si-filtry/ (consultada el 12 oct 2026)
 
 # Sede: https://www.cbinsights.com/company/adotmob (consultada el 12 oct 2026)
 # adotmob.com: https://reports.exodus-privacy.eu.org/en/trackers/161
@@ -1469,6 +1484,8 @@ sberbank.ru
 # Nota: Unruly (Unruly Media) fue comprada en 2020 por Tremor International, hoy Nexxen; la política de Unruly es de Nexxen. Ninguna fuente abierta cita unrulymedia.com literalmente. Wikipedia pone sede en Nueva York; la política propia de Nexxen dice Tel Aviv
 @Nexxen|IL|Tel Aviv
 unrulymedia.com
+turn.com  # https://tostracker.app/document/turn-privacy/version/681649 (consultada el 12 oct 2026)
+tremorhub.com
 
 # sitewit.com: https://crunchbase.com/organization/sitewit
 # Nota: SiteWit opera hoy como Kliken (kliken.com) según Crunchbase; sede solo vista en Crunchbase (Tampa, Florida), no confirmada con fuente primaria
@@ -1512,6 +1529,7 @@ adhaven.com
 # Nota: Nordic Capital tomó la mayoría en 2020; fuente del dominio es de terceros (ConsentStack)
 @Siteimprove|DK|Copenhague
 siteimproveanalytics.com
+siteimproveanalytics.io  # https://help.siteimprove.com/support/solutions/articles/80001215625-how-to-configure-csp-rules-for-siteimprove-analytics (consultada el 12 oct 2026)
 
 # Sede: https://www.revcontent.com/privacy-policy (consultada el 12 oct 2026)
 # revcontent.com: https://www.revcontent.com/privacy-policy
@@ -1554,3 +1572,899 @@ thebase.in
 # Nota: servicio chino de estadísticas web; operador legal y ciudad no verificados (fuente secundaria)
 @51.LA|CN
 51.la
+
+# Sede: Gemius S.A., ul. Domaniewska 48, Varsovia, responsable del tratamiento en https://gemius.com/privacy-policy/cookie-policy/ (consultada el 12 oct 2026)
+# gemius.com, gemius.pl: la propia web y su política; la política enlaza www.gemius.pl como su mercado polaco.
+@Gemius|PL|Varsovia
+gemius.com
+gemius.pl
+
+# ---------------------------------------------------------------------------------------------
+# Ampliación del 12 oct 2026, segunda tanda: más empresas de
+# publicidad y rastreo más vistas en webs de todo el mundo que aún no estaban. Cada sede con su
+# fuente; donde no se pudo comprobar, va sin país o sin ciudad.
+
+# tiktokw.us: https://www.urlert.com/domains/tiktokw.us
+# Nota: Only a third-party listing (urlert: operator TikTok, parent ByteDance) ties the domain to TikTok; US operations moved to the TikTok USDS joint venture in 2026, so the operating entity, parent and HQ are not verified
+@TikTok
+tiktokw.us
+
+# Sede: https://www.datarequests.org/company/semasio/ (consultada el 12 oct 2026)
+# semasio.net: https://www.better.fyi/trackers/semasio.net
+# Nota: HQ from Semasio GmbH privacy contact (c/o WeWork, Hermannstraße 13, 20095 Hamburg) as quoted by datarequests.org from semasio.com/privacy; any current parent company not checked
+@Semasio|DE|Hamburgo
+semasio.net
+
+# Sede: https://vdx.tv/privacy (consultada el 12 oct 2026)
+# tribalfusion.com: https://vdx.tv/privacy
+# Nota: Exponential Interactive, Inc. now trades as VDX.tv; its privacy policy names the tribalfusion.com cookie domain and gives 2340 Powell St, Emeryville CA as its US address (it does not say 'headquarters')
+@VDX.tv|US|Emeryville (California)
+tribalfusion.com
+
+# Sede: https://cop.evidon.com/companies/simplifi (consultada el 12 oct 2026)
+# simpli.fi: https://cop.evidon.com/companies/simplifi
+# Nota: Evidon profile (Simpli.fi Holdings Inc., 128 East Exchange Ave, Fort Worth TX); private-equity ownership not verified
+@Simpli.fi|US|Fort Worth (Texas)
+simpli.fi
+
+# Sede: https://www.transunion.com/privacy/neustar (consultada el 12 oct 2026)
+# agkn.com: https://www.observepoint.com/cookies/ab-agkn-com/
+# Nota: Aggregate Knowledge -> Neustar -> TransUnion (2021). Aggregate Knowledge, LLC is listed as a Neustar subsidiary in TransUnion's Neustar notice. HQ city comes from the DPO address (555 West Adams St, Chicago)
+@TransUnion|US|Chicago
+agkn.com
+
+# Sede: https://www.sec.gov/Archives/edgar/data/1835830/000183583026000007/kvyo-20251231.htm (consultada el 12 oct 2026)
+# klaviyo.com: https://www.sec.gov/Archives/edgar/data/1835830/000183583026000007/kvyo-20251231.htm
+# Nota: ok (10-K FY2025: 125 Summer Street, Boston MA)
+@Klaviyo|US|Boston
+klaviyo.com
+
+# Sede: https://cop.evidon.com/companies/stackadapt (consultada el 12 oct 2026)
+# stackadapt.com: https://cop.evidon.com/companies/stackadapt
+# Nota: Address per Evidon profile (StackAdapt Inc., Roehampton Ave, Toronto)
+@StackAdapt|CA|Toronto
+stackadapt.com
+
+# Sede: https://cop.evidon.com/companies/gumgum (consultada el 12 oct 2026)
+# gumgum.com: https://cop.evidon.com/companies/gumgum
+# Nota: Address per Evidon profile (225 Santa Monica Blvd, Santa Monica CA)
+@GumGum|US|Santa Mónica (California)
+gumgum.com
+
+# crazyegg.com: https://www.crazyegg.com:443/privacy
+# Nota: The privacy policy names Crazy Egg, Inc. but gives no address, so the HQ is not verified
+@Crazy Egg
+crazyegg.com
+
+# Sede: https://cop.evidon.com/companies/viant (consultada el 12 oct 2026)
+# ipredictive.com: https://www.netify.ai/resources/domains/ipredictive.com
+# Nota: Domain is tied to Viant Adelphic only by Netify. HQ per Evidon (4 Park Plaza, Irvine). Evidon's 'owned by Meredith' is outdated, since Viant is now public and independent
+@Viant Technology|US|Irvine (California)
+ipredictive.com
+
+# Sede: https://www.sec.gov/Archives/edgar/data/1448056/000144805623000033/newr-20230331.htm (consultada el 12 oct 2026)
+# nr-data.net, newrelic.com: https://www.sec.gov/Archives/edgar/data/1448056/000144805623000033/newr-20230331.htm
+# Nota: HQ per the last 10-K (FY2023, 188 Spear St); the company went private in late 2023 (Francisco Partners/TPG, not verified here). nr-data.net is not named in the opened source
+@New Relic|US|San Francisco (California)
+nr-data.net
+newrelic.com
+
+# Sede: https://blockthrough.com/team/ (consultada el 12 oct 2026)
+# btloader.com: https://community.norton.com/t/is-btloader-on-my-network/226825
+# Nota: btloader.com is linked to the Blockthrough application only by a Norton forum and Netify. Blockthrough, Inc. is 'an eyeo group company' (acquired 2022; eyeo is based in Cologne)
+# Grupo: eyeo (fuente: https://blockthrough.com/team/, consultada el 12 oct 2026)
+@Blockthrough|CA|Toronto|eyeo
+btloader.com
+
+# Sede: https://ico.org.uk/ESDWebPages/Entry/ZB442756 (consultada el 12 oct 2026)
+# cookieyes.com: https://ico.org.uk/ESDWebPages/Entry/ZB442756
+# Nota: ICO register entry for Cookieyes Limited (3 Warren Yard, Wolverton Mill, Milton Keynes). The domain is matched by name only, and any parent company is not verified
+@CookieYes|GB|Milton Keynes
+cookieyes.com
+
+# sharethis.com: https://cop.evidon.com/companies/sharethis
+# Nota: Evidon lists ShareThis, Inc. with a London privacy address (10 John St), which may be an EU contact rather than the HQ (historically Palo Alto). HQ and ownership not verified
+@ShareThis
+sharethis.com
+
+# Sede: https://campaignlive.com/article/eyeota-acquired-dun-bradstreet/1732597 (consultada el 12 oct 2026)
+# eyeota.net: https://cop.evidon.com/companies/eyeota
+# Nota: Evidon lists eyeota.com (eyeota.net matched by brand) with a Hong Kong privacy address. Campaign calls Eyeota Singapore-based. D&B acquisition agreed Nov 2021; closing not shown in the opened source
+# Grupo: Dun & Bradstreet (fuente: https://campaignlive.com/article/eyeota-acquired-dun-bradstreet/1732597, consultada el 12 oct 2026)
+@Eyeota|SG|Singapur|Dun & Bradstreet
+eyeota.net
+
+# Sede: https://cop.evidon.com/companies/rich-audience (consultada el 12 oct 2026)
+# richaudience.com: https://cop.evidon.com/companies/rich-audience
+# Nota: Address per Evidon (Francesc Macià 54, Sabadell, Barcelona). Possible acquisition by a group (e.g. Azerion) not verified
+@Rich Audience|ES|Sabadell
+richaudience.com
+
+# Sede: https://cop.evidon.com/companies/sonobi-media (consultada el 12 oct 2026)
+# sonobi.com: https://cop.evidon.com/companies/sonobi-media
+# Nota: HQ only from the Evidon profile privacy contact (444 New England Ave, Winter Park FL); not confirmed by a primary source
+@Sonobi|US|Winter Park (Florida)
+sonobi.com
+
+# Sede: https://cop.evidon.com/companies/tealium (consultada el 12 oct 2026)
+# tiqcdn.com, tealiumiq.com: https://cop.evidon.com/companies/tealium
+# Nota: HQ per the Evidon privacy contact (11095 Torreyana Rd, San Diego). Neither domain is listed there: tealiumiq.com matches the brand (Tealium iQ), and tiqcdn.com is unverified
+@Tealium|US|San Diego (California)
+tiqcdn.com
+tealiumiq.com
+
+# Nota: Separate company from Tealium (video ad platform); not researched within the budget. HQ, ownership and source not verified
+@Aniview
+aniview.com
+
+# Sede: https://en.wikipedia.org/wiki/AccessiBe (consultada el 12 oct 2026)
+# Nota: HQ per the Wikipedia infobox (New York); the company was founded in Israel. acsbapp.com is attributed to accessiBe only by the dataset hint and its name; no opened source names it
+@accessiBe|US|Nueva York
+acsbapp.com
+
+# Sede: https://en.wikipedia.org/wiki/VK_(company) (consultada el 12 oct 2026)
+# mail.ru: https://en.wikipedia.org/wiki/VK_(company)
+# Nota: VK (formerly Mail.ru Group, renamed 2021) operates Mail.ru. Controlling stake held via MF Tekhnologii (Sogaz/Gazprombank), so grupo is left empty
+@VK|RU|Moscú
+mail.ru
+
+# Sede: https://cop.evidon.com/companies/audioeye (consultada el 12 oct 2026)
+# audioeye.com: https://cop.evidon.com/companies/audioeye
+# Nota: Address per Evidon (5210 E Williams Circle, Tucson)
+@AudioEye|US|Tucson (Arizona)
+audioeye.com
+
+# statcounter.com: https://cop.evidon.com/companies/statcounter
+# Nota: Evidon gives 'Guinness Enterprise Centre, Taylor's Lane' with no city or country (that centre is in Dublin, Ireland, but the opened source does not say so)
+@StatCounter
+statcounter.com
+
+# Sede: https://cop.evidon.com/companies/dstillery-formerly-media6degrees (consultada el 12 oct 2026)
+# media6degrees.com, dstillery.com: https://cop.evidon.com/companies/dstillery-formerly-media6degrees
+# Nota: Dstillery, Inc. (formerly Media6Degrees); address per Evidon (470 Park Ave S, New York)
+@Dstillery|US|Nueva York
+media6degrees.com
+dstillery.com
+
+# Sede: https://cop.evidon.com/companies/adingo (consultada el 12 oct 2026)
+# adingo.jp: https://cop.evidon.com/companies/adingo
+# Nota: Evidon: Fluct Corp (opt-out en cs.adingo.jp), filial de VOYAGE GROUP (hoy CARTA HOLDINGS, cambio de nombre no verificado con fuente abierta); dirección Shibuya First Place, Shibuya (Tokio)
+# Grupo: CARTA HOLDINGS (fuente: https://cop.evidon.com/companies/adingo, consultada el 12 oct 2026)
+@fluct|JP|Tokio|CARTA HOLDINGS
+adingo.jp
+
+# Nota: dominio no confirmado con fuente abierta (multiscreensite = hosting de Duda, sin cita); sede en conflicto: perfil de startuphub dice Palo Alto, la web de Duda solo lista oficinas en Tel Aviv, Louisville (CO), Reading y Florianópolis
+@Duda
+multiscreensite.com
+
+# Nota: dominio ml314.com no confirmado (la doc de Madison Logic cita ml-attr.com y madisonlogic.com); sede no verificada (conocida: Nueva York)
+@Madison Logic
+ml314.com
+
+# Sede: https://en.wikipedia.org/wiki/Rambler_(portal) (consultada el 12 oct 2026)
+# rambler.ru: https://en.wikipedia.org/wiki/Rambler_(portal)
+# Nota: Sber tomó el control total en 2020; sede Varshavskoe shosse 9, Moscú
+# Grupo: Sber (fuente: https://en.wikipedia.org/wiki/Rambler_(portal), consultada el 12 oct 2026)
+@Rambler&Co|RU|Moscú|Sber
+rambler.ru
+
+# Sede: https://www.sec.gov/Archives/edgar/data/1819928/000110465926020499/dv-20251231x10k.htm (consultada el 12 oct 2026)
+# doubleverify.com: https://www.sec.gov/Archives/edgar/data/1819928/000110465926020499/dv-20251231x10k.htm
+@DoubleVerify|US|Nueva York
+doubleverify.com
+
+# Sede: https://www.daily-tribune.com/online_features/press_releases/aditude-ranks-no-13-on-inc-magazine-s-2026-list-of-fastest-growing-companies-in/article_91e8ac45-6b7c-50ef-8477-3385575ec666.html (consultada el 12 oct 2026)
+# Nota: dominio aditude.cloud no confirmado (aditude.com no lo menciona); nota de prensa: sede oficial en Delaware, fechada en Nueva York; ciudad no confirmada
+@Aditude|US
+aditude.cloud
+
+# Sede: https://www.creditsafe.com/business-index/en-us/company/infolinks-inc-us30554386 (consultada el 12 oct 2026)
+# infolinks.com: https://www.creditsafe.com/business-index/en-us/company/infolinks-inc-us30554386
+# Nota: ciudad sin confirmar: Creditsafe da Palo Alto (California) para Infolinks Inc., no verificado con fuente propia (otras referencias la sitúan en Nueva York)
+@Infolinks|US
+infolinks.com
+
+# Sede: https://www.employbl.com/companies/Mediavine (consultada el 12 oct 2026)
+# Nota: sede solo de agregador (employbl: 160 W Camino Real, Boca Raton); falta fuente primaria
+@Mediavine|US|Boca Raton (Florida)
+mediavine.com
+
+# Sede: https://cop.evidon.com/companies/ad-river (consultada el 12 oct 2026)
+# adriver.ru: https://cop.evidon.com/companies/ad-river
+# Nota: Avito compró el grupo Internest (AdRiver + Soloway) en dic. 2024 (https://incrussia.ru/news/avito-zapustit-sobstvennuyu-reklamnuyu-set-dlya-etogo-kompaniya-priobrela-adriver-i-soloway/); dirección Kazarmenny per. 6 (Moscú)
+# Grupo: Avito (fuente: https://cop.evidon.com/companies/ad-river, consultada el 12 oct 2026)
+@AdRiver|RU|Moscú|Avito
+adriver.ru
+
+# daum.net: https://en.wikipedia.org/wiki/Kakao
+# Nota: Daum se escindió de Kakao en dic. 2025 bajo su filial AXZ; sede de AXZ no verificada (Kakao: Jeju, https://www.kakaocorp.com/ir/wayToCome?lang=en); hay informes de venta pendientes de confirmar
+# Grupo: Kakao (fuente: https://en.wikipedia.org/wiki/Kakao, consultada el 12 oct 2026)
+@Daum|KR||Kakao
+daum.net
+
+# Sede: https://bidtheatre.com/privacy-policy (consultada el 12 oct 2026)
+# bidtheatre.com: https://bidtheatre.com/privacy-policy
+# Nota: entidad legal 'Vitec BidTheatre AB', Urvädersgränd 5, Estocolmo; grupo deducido del nombre legal (Vitec)
+# Grupo: Vitec Software Group (fuente: https://bidtheatre.com/privacy-policy, consultada el 12 oct 2026)
+@BidTheatre|SE|Estocolmo|Vitec Software Group
+bidtheatre.com
+
+# Sede: https://en.wikipedia.org/wiki/Treasure_Data (consultada el 12 oct 2026)
+# treasuredata.com: https://en.wikipedia.org/wiki/Treasure_Data
+# Nota: independiente desde 2021 (escindida de Arm; SoftBank lideró una ronda posterior)
+@Treasure Data|US|Mountain View (California)
+treasuredata.com
+
+# Sede: https://oag.ca.gov/data-broker/registration/191320 (consultada el 12 oct 2026)
+# Nota: dominio pro-market.net no confirmado con fuente abierta; dirección Long Island City (Queens, Nueva York); matriz AlmondNet según https://www.offlist.me/broker-knowledge/datonics-com
+@Datonics|US|Nueva York
+pro-market.net
+
+# Sede: https://en.wikipedia.org/wiki/Naver_Corporation (consultada el 12 oct 2026)
+# naver.com: https://en.wikipedia.org/wiki/Naver_Corporation
+@Naver|KR|Seongnam
+naver.com
+
+# Nota: sin verificar (presupuesto agotado); conocida como filial japonesa de LY Corp en Tokio - confirmar
+@ValueCommerce
+valuecommerce.com
+
+# Nota: sin verificar (presupuesto agotado); sede no confirmada
+@Lucky Orange
+luckyorange.com
+
+# Sede: https://en.wikipedia.org/wiki/Trustpilot (consultada el 12 oct 2026)
+# trustpilot.com: https://en.wikipedia.org/wiki/Trustpilot
+# Nota: cotiza en Londres (LSE: TRST)
+@Trustpilot|DK|Copenhague
+trustpilot.com
+
+# Sede: https://usercentrics.com/imprint/ (consultada el 12 oct 2026)
+# usercentrics.eu: https://usercentrics.com/imprint/
+# Nota: el imprint enlaza account.usercentrics.eu; Usercentrics GmbH, Sendlinger Straße 7, Múnich
+@Usercentrics|DE|Múnich
+usercentrics.eu
+
+# adswizz.com: https://www.adswizz.com/careers/
+# Nota: filial de SiriusXM desde 2018 (vía Pandora) según theatdb; sede no verificada
+# Grupo: SiriusXM (fuente: https://www.adswizz.com/careers/, consultada el 12 oct 2026)
+@AdsWizz|||SiriusXM
+adswizz.com
+
+# Sede: https://en.wikipedia.org/wiki/Optimizely (consultada el 12 oct 2026)
+# optimizely.com: https://en.wikipedia.org/wiki/Optimizely
+# Nota: Episerver compró Optimizely en 2020 y adoptó su nombre; Wikipedia no da ciudad de sede
+@Optimizely|US
+optimizely.com
+
+# Nota: sin verificar: operador y sede desconocidos (presupuesto agotado)
+@Histats
+histats.com
+
+# Sede: https://www.consentstack.io/vendors/leadfeeder (consultada el 12 oct 2026)
+# lfeeder.com: https://guard.offseq.com/report/lfeeder.com
+# Nota: Dealfront volvió a llamarse Leadfeeder (help.leadfeeder.com); sede Helsinki solo de fuentes de terceros (offseq, consentstack)
+@Leadfeeder|FI|Helsinki
+lfeeder.com
+
+# Nota: sin verificar (presupuesto agotado); operador y sede no confirmados
+@JivoChat
+jivosite.com
+
+# Nota: sin verificar (presupuesto agotado); conocida como Leadinfo B.V. de Róterdam - confirmar
+@Leadinfo
+leadinfo.net
+
+# Sede: https://www.wikipedia.com/wiki/Wikia (consultada el 12 oct 2026)
+# wikia-services.com: https://www.netify.ai/resources/domains/wikia-services.com
+# Nota: Netify lo asocia a Fandom; propietario TPG desde 2018 según infobox
+@Fandom|US|San Francisco
+wikia-services.com
+
+# Sede: https://tapki.com/company/549046751 (consultada el 12 oct 2026)
+# tns-counter.ru: https://tapki.com/company/549046751
+# Nota: antes TNS Russia (ya no Kantar/WPP): VTsIOM compró el 80% en 2016 (https://medialandscapes.org/country/russia/organisations/audience-measurement-organisations); tapki lista tns-counter.ru como sitio relacionado de AO Mediaskop, Moscú
+# Grupo: VTsIOM (fuente: https://tapki.com/company/549046751, consultada el 12 oct 2026)
+@Mediascope|RU|Moscú|VTsIOM
+tns-counter.ru
+
+# Nota: sin verificar: ninguna fuente abierta vincula tsyndicate.com; TrafficStars fundada en Chipre (2014), sede actual no confirmada
+@TrafficStars
+tsyndicate.com
+
+# Sede: https://ar2024.mts.ru/en/additional-information/contacts-and-additional-information-about-mts/ (consultada el 12 oct 2026)
+# mts.ru: https://ar2024.mts.ru/en/additional-information/contacts-and-additional-information-about-mts/
+# Nota: Informe anual 2024 de MTS PJSC: sede en Moscú, web mts.ru; matriz (Sistema) no verificada
+@MTS|RU|Moscú
+mts.ru
+
+# Sede: https://www.clickcease.com/privacy.html (consultada el 12 oct 2026)
+# clickcease.com: https://www.clickcease.com/privacy.html
+# Nota: ClickCease es Cheq AI Technologies (2018) Ltd dba ClickCease; sede principal Tel Aviv-Yafo
+# Grupo: CHEQ (fuente: https://www.clickcease.com/privacy.html, consultada el 12 oct 2026)
+@ClickCease|IL|Tel Aviv|CHEQ
+clickcease.com
+
+# Sede: https://trustx.org/privacy (consultada el 12 oct 2026)
+# trustx.org: https://trustx.org/privacy
+# Nota: TrustX Digital Advertising Services, Inc. PBC, 530 Seventh Ave, Nueva York; matriz Symitri citada por ChatGPT no verificada
+@TrustX|US|Nueva York
+trustx.org
+
+# Sede: https://clicky.com/terms/privacy (consultada el 12 oct 2026)
+# getclicky.com: https://clicky.com/blog/getclicky-no-more
+# Nota: Clicky (antes getclicky.com) es de Roxr Software Ltd, Milwaukie, OR
+@Clicky|US|Milwaukie (Oregón)
+getclicky.com
+
+# Sede: https://www.userlocal.jp/company/access/ (consultada el 12 oct 2026)
+# nakanohito.jp: https://www.userlocal.jp/news/201206211/
+# Nota: nakanohito.jp es la herramienta de User Local, Inc. (sede en Minato, Tokio desde 2025)
+@User Local|JP|Tokio
+nakanohito.jp
+
+# Sede: https://www.fullstory.com/legal/reseller-pass-through-terms/ (consultada el 12 oct 2026)
+# fullstory.com: https://www.fullstory.com/legal/reseller-pass-through-terms/
+@Fullstory|US|Atlanta (Georgia)
+fullstory.com
+
+# Sede: https://www.shinystat.com/en/legal.html (consultada el 12 oct 2026)
+# shinystat.com: https://www.shinystat.com/en/legal.html
+# Nota: ShinyStat es servicio de Sevendata S.p.A., Corso di Porta Nuova 48, Milán
+# Grupo: Sevendata (fuente: https://www.shinystat.com/en/legal.html, consultada el 12 oct 2026)
+@ShinyStat|IT|Milán|Sevendata
+shinystat.com
+
+# Sede: https://www.weborama.com/privacy-fr (consultada el 12 oct 2026)
+# weborama.fr: https://weborama.fr
+# Nota: weborama.fr redirige a weborama.com; Weborama SAS, 36-40 rue Raspail, Levallois-Perret (área de París)
+@Weborama|FR|Levallois-Perret
+weborama.fr
+
+# Sede: https://wistia.com/privacy (consultada el 12 oct 2026)
+# wistia.com: https://wistia.com/privacy
+@Wistia|US|Cambridge (Massachusetts)
+wistia.com
+
+# Sede: https://www.pangleglobal.com/en/privacy/enduser-en (consultada el 12 oct 2026)
+# pangle-ads.com: https://ads.tiktok.com/resources/help/article/using-cookies-with-tiktok-pixel?lang=es
+# Nota: Ayuda de TikTok Ads cita la cookie _pangle en analytics.pangle-ads.com; Pangle lo opera Bytedance Pte. Ltd. (Singapur)
+# Grupo: ByteDance (fuente: https://www.pangleglobal.com/en/privacy/enduser-en, consultada el 12 oct 2026)
+@Pangle|SG|Singapur|ByteDance
+pangle-ads.com
+
+# Sede: https://www.amadeus-hospitality.com/ta-product-privacy-notice/ (consultada el 12 oct 2026)
+# travelaudience.com: https://travelaudience.com
+# Nota: travelaudience.com redirige a Amadeus Hospitality (Advertising Solutions); Travel Audience GmbH, Elsenstraße 106, Berlín, del grupo Amadeus
+# Grupo: Amadeus (fuente: https://www.amadeus-hospitality.com/ta-product-privacy-notice/, consultada el 12 oct 2026)
+@Travel Audience|DE|Berlín|Amadeus
+travelaudience.com
+
+# Sede: https://www.framer.com/legal/privacy-statement (consultada el 12 oct 2026)
+# framer.com: https://www.framer.com/legal/privacy-statement
+@Framer|NL|Ámsterdam
+framer.com
+
+# Sede: https://pepabo.com/en/company/overview/ (consultada el 12 oct 2026)
+# shop-pro.jp: https://shop-pro.jp/yomyom-colorme/about
+# Nota: shop-pro.jp es Color Me Shop (カラーミーショップ) de GMO Pepabo, Shibuya, Tokio; matriz GMO Internet Group no verificada
+@GMO Pepabo|JP|Tokio
+shop-pro.jp
+
+# Sede: https://www.wunderkind.co/privacy (consultada el 12 oct 2026)
+# bounceexchange.com, wknd.ai, bouncex.net, cdnwidget.com: https://www.bounceexchange.com
+# Nota: bounceexchange.com redirige a wunderkind.co; wknd.ai, bouncex.net y cdnwidget.com no verificados individualmente
+@Wunderkind|US|Nueva York
+bounceexchange.com
+wknd.ai
+bouncex.net
+cdnwidget.com
+
+# adthrive.com: https://raptive.com/newsroom/cafemedia-and-adthrive-are-now-raptive-a-new-kind-of-creator-company/
+# Nota: AdThrive (adthrive.com redirige a raptive.com) es hoy Raptive; sede no verificada (ChatGPT solo citó LinkedIn)
+@Raptive
+adthrive.com
+
+# Sede: https://www.skimlinks.com/privacy-policies/ (consultada el 12 oct 2026)
+# skimresources.com: https://skimresources.com
+# Nota: skimresources.com dice ser parte del sistema de Skimlinks; Skimbit Ltd, Londres; política cita a Taboola como su afiliada
+# Grupo: Taboola (fuente: https://www.skimlinks.com/privacy-policies/, consultada el 12 oct 2026)
+@Skimlinks|GB|Londres|Taboola
+skimresources.com
+
+# Sede: https://www.sec.gov/Archives/edgar/data/1982960/000149315226039058/form20-f.htm (consultada el 12 oct 2026)
+# brand-display.com: https://knorex.zendesk.com/hc/en-us/articles/360043885531-About-Ad-Tag
+# Nota: brand-display.com sirve las etiquetas de Knorex XPO; KNOREX Ltd. (Caimán) con oficinas principales en Singapur según 20-F
+@Knorex|SG|Singapur
+brand-display.com
+
+# Sede: https://www.privy.com/privacy (consultada el 12 oct 2026)
+# privy.com: https://www.privy.com/privacy
+# Nota: Privy Operations, LLC; dirección postal en Boston (PMB); matriz no verificada
+@Privy|US|Boston (Massachusetts)
+privy.com
+
+# Sede: https://www.adscore.com/contact (consultada el 12 oct 2026)
+# adsco.re: https://www.adscore.com/implementations
+# Nota: Adscore Technologies DMCC, Jumeirah Lake Towers, Dubái; su etiqueta carga //c.adsco.re
+@Adscore|AE|Dubái
+adsco.re
+
+# Sede: https://www.whatconverts.com/sales-tax/ (consultada el 12 oct 2026)
+# iconnode.com: https://www.whatconverts.com/help/docs/integrations/chat-integrations/track-livechat-chats/
+# Nota: Docs de WhatConverts usan process.iconnode.com; Icon Digital LLC dba WhatConverts, Charlotte, NC
+@WhatConverts|US|Charlotte (Carolina del Norte)
+iconnode.com
+
+# Sede: https://corp.logly.co.jp/company (consultada el 12 oct 2026)
+# juicer.cc: https://dmp.juicer.cc/
+# Nota: dmp.juicer.cc es el login de 'LOGLY Audience Analytics'; ログリー株式会社, Shibuya, Tokio
+@Logly|JP|Tokio
+juicer.cc
+
+# Sede: https://www.inmar.com/about/privacy-policy/owneriq (consultada el 12 oct 2026)
+# owneriq.net: https://www.inmar.com/about/privacy-policy/owneriq
+# Nota: Aviso de privacidad de ownerIQ (Inmar-OIQ, LLC, filial de Inmar); el dominio owneriq.net no aparece literalmente
+# Grupo: Inmar (fuente: https://www.inmar.com/about/privacy-policy/owneriq, consultada el 12 oct 2026)
+@OwnerIQ|US|Winston-Salem (Carolina del Norte)|Inmar
+owneriq.net
+
+# Sede: https://en.wikipedia.org/wiki/Amazon_(company) (consultada el 12 oct 2026)
+# paa-reporting-advertising.amazon: https://www.iana.org/domains/root/db/amazon.html
+# Nota: El TLD .amazon es exclusivo de Amazon Registry Services (Seattle) según IANA; Amazon tiene sedes en Seattle y Arlington (Virginia)
+# Grupo: Amazon (fuente: https://en.wikipedia.org/wiki/Amazon_(company), consultada el 12 oct 2026)
+@Amazon Ads|US|Seattle (Washington)|Amazon
+paa-reporting-advertising.amazon
+
+# Sede: https://www.awin.com/us/site-notice (consultada el 12 oct 2026)
+# Nota: Sede AWIN AG Berlín verificada; ninguna página abierta vincula dwin1.com con Awin (ChatGPT citó doc que no lo menciona); matriz Axel Springer no verificada
+@Awin|DE|Berlín
+dwin1.com
+
+# Sede: https://help.tumblr.com/knowledge-base/legal-guidelines/ (consultada el 12 oct 2026)
+# tumblr.com: https://www.tumblr.com/privacy/en
+# Nota: Tumblr, Inc., filial de Automattic; 'Tumblr is based in New York'
+# Grupo: Automattic (fuente: https://help.tumblr.com/knowledge-base/legal-guidelines/, consultada el 12 oct 2026)
+@Tumblr|US|Nueva York|Automattic
+tumblr.com
+
+# Sede: https://www.fluency.inc/news/fluency-named-to-inc-5000-fourth-consecutive-year (consultada el 12 oct 2026)
+# fluencyinc.co: https://www.fluency.inc/news/press-release-one-click-launch
+# Nota: Nota de prensa de Fluency remite a www.fluencyinc.co; empresa de Vermont (ranking Inc. 5000 Vermont) pero ciudad (Burlington según ChatGPT) no verificada
+@Fluency|US
+fluencyinc.co
+
+# Sede: https://www.triptease.com/en/privacy-policy (consultada el 12 oct 2026)
+# triptease.io: https://www.triptease.com/en/privacy-policy
+# Nota: La política cita *.triptease.io como web de Triptease; dirección en Londres
+@Triptease|GB|Londres
+triptease.io
+
+# Sede: https://www.pappers.fr/entreprise/applied-technologies-internet-403261258 (consultada el 12 oct 2026)
+# Nota: Registro francés: AT Internet, sede en Mérignac (Burdeos), dirigente Piano Software Inc.; vínculo xiti.com/aticdn.net no verificado (xiti.com no abrió; ChatGPT citó stackpatrol)
+# Grupo: Piano (fuente: https://www.pappers.fr/entreprise/applied-technologies-internet-403261258, consultada el 12 oct 2026)
+@AT Internet (Piano Analytics)|FR|Mérignac|Piano
+aticdn.net
+xiti.com
+
+# admaster.cc: https://www.admaster.cc/
+# Nota: La web admaster.cc es de 'AdMaster' (plataforma DSP); sin dirección ni sede publicada
+@AdMaster
+admaster.cc
+
+# Sede: https://6sense.com/privacy-policy/ (consultada el 12 oct 2026)
+# 6sc.co: https://support.6sense.com/docs/quick-start-guide-adobe-launch-via-configuration
+# Nota: Etiqueta 6sense usa j.6sc.co y b.6sc.co; 6Sense Insights, Inc., 201 3rd St, San Francisco
+@6sense|US|San Francisco
+6sc.co
+
+# Sede: https://www.adskeeper.com/terms-of-services/ (consultada el 12 oct 2026)
+# adskeeper.com: https://www.adskeeper.com/terms-of-services/
+# Nota: Operada por Hardware Solution Limited, domicilio registrado en Wan Chai, Hong Kong; los términos también citan una dirección en Tiflis (Georgia)
+@Adskeeper|HK|Hong Kong
+adskeeper.com
+
+# Sede: https://www.ninja.co.jp/trans/ (consultada el 12 oct 2026)
+# shinobi.jp: https://www.ninja.co.jp/trans/
+# Nota: Aviso legal de 忍者ツールズ株式会社 (Setagaya, Tokio) usa el correo hatena@shinobi.jp; shinobi.jp es '忍者ホームページ'
+@Ninja Tools (忍者ツールズ)|JP|Tokio
+shinobi.jp
+
+# mobilefuse.com: https://privacy.mobilefuse.com/policies
+# Nota: MobileFuse, LLC opera mobilefuse.com; sede no verificada (ChatGPT citó craft.co)
+@MobileFuse
+mobilefuse.com
+
+# Sede: https://www.optimonk.com/privacy-policy (consultada el 12 oct 2026)
+# optimonk.com: https://www.optimonk.com/privacy-policy
+# Nota: OptiMonk International Zrt., oficina principal en Debrecen
+@OptiMonk|HU|Debrecen
+optimonk.com
+
+# ay.delivery: https://ay.delivery/
+# Nota: ay.delivery muestra la página 'Assertive Yield'; sede no verificada (ChatGPT citó Creditsafe: La Haya)
+@Assertive Yield
+ay.delivery
+
+# abtasty.com: https://www.abtasty.com/privacy-policy/
+# Nota: abtasty.com redirige ya a wingify.com ('AB Tasty and VWO have united'); sede del grupo no verificada
+# Grupo: Wingify (fuente: https://www.abtasty.com/privacy-policy/, consultada el 12 oct 2026)
+@AB Tasty|||Wingify
+abtasty.com
+
+# Sede: https://www.qualtrics.com/privacy-statement/ (consultada el 12 oct 2026)
+# qualtrics.com: https://www.qualtrics.com/privacy-statement/
+# Nota: 'Co-headquartered in Provo, Utah and Seattle'; propietarios (Silver Lake) no verificados
+@Qualtrics|US|Provo (Utah)
+qualtrics.com
+
+# Sede: https://captifytechnologies.com/contact/ (consultada el 12 oct 2026)
+# cpx.to: https://captifytechnologies.com/data-subject-rights-request/
+# Nota: Captify Technologies Ltd: 'the Captify domain, which is .cpx.to'; Londres es la primera oficina listada (también NY, Manchester); matriz Verve no verificada
+@Captify|GB|Londres
+cpx.to
+
+# Sede: https://site.tray.com.br/aspectos-legais (consultada el 12 oct 2026)
+# tray.com.br: https://site.tray.com.br/aspectos-legais
+# Nota: Tray Tecnologia em Ecommerce Ltda, sede en Marília (São Paulo); matriz LWSA no verificada
+@Tray|BR|Marília
+tray.com.br
+
+# Sede: https://www.morisawa.co.jp/about/news/16213 (consultada el 12 oct 2026)
+# typesquare.com: https://www.morisawa.co.jp/about/news/16213
+# Nota: TypeSquare es el servicio de fuentes web de Morisawa (sede Osaka); se cierra progresivamente hasta 2027; el dominio no aparece literalmente
+@Morisawa|JP|Osaka
+typesquare.com
+
+# mparticle.com: https://www.rokt.com/products/rokt-mparticle
+# Nota: mParticle es ahora 'Rokt mParticle'; sede no verificada
+# Grupo: Rokt (fuente: https://www.rokt.com/products/rokt-mparticle, consultada el 12 oct 2026)
+@mParticle|||Rokt
+mparticle.com
+
+# Sede: https://en.wikipedia.org/wiki/Squarespace (consultada el 12 oct 2026)
+# squarespace.com: https://www.squarespace.com/about/company
+# Nota: Wikipedia: sede 225 Varick St, Nueva York; propietario Permira
+# Grupo: Permira (fuente: https://en.wikipedia.org/wiki/Squarespace, consultada el 12 oct 2026)
+@Squarespace|US|Nueva York|Permira
+squarespace.com
+
+# Sede: https://en.wikipedia.org/wiki/Parse.ly (consultada el 12 oct 2026)
+# parsely.com: https://www.parsely.com
+# Nota: parsely.com redirige a parse.ly; Parse.ly fue comprada por WPVIP (Automattic)
+# Grupo: Automattic (fuente: https://en.wikipedia.org/wiki/Parse.ly, consultada el 12 oct 2026)
+@Parse.ly|US|Nueva York|Automattic
+parsely.com
+
+# Sede: https://www.inspectlet.com/company (consultada el 12 oct 2026)
+# inspectlet.com: https://www.inspectlet.com/company
+# Nota: La página de empresa solo indica 'Santa Clara, CA'
+@Inspectlet|US|Santa Clara (California)
+inspectlet.com
+
+# Sede: https://www.madhive.com/legal/privacy-policy (consultada el 12 oct 2026)
+# mdhv.io: https://developer.madhive.com/docs/madhive-api/1/routes/v1/pixels/post
+# Nota: Los píxeles de la API de Madhive se sirven desde jelly.mdhv.io; MadHive, Inc., 225 Broadway, Nueva York
+@Madhive|US|Nueva York
+mdhv.io
+
+# Sede: https://vitals.app/legal/terms-of-use (consultada el 12 oct 2026)
+# vitals.co: https://vitals.app/legal/terms-of-use
+# Nota: APPSOLVE SRL (Vitals), sede en Bucarest, correo legal@vitals.co
+@Vitals|RO|Bucarest
+vitals.co
+
+# Sede: https://www.sojern.com/contact (consultada el 12 oct 2026)
+# sojern.com: https://www.sojern.com/contact
+# Nota: 'San Francisco HQ'; matriz RateGain citada por ChatGPT no verificada
+@Sojern|US|San Francisco
+sojern.com
+
+# Sede: https://www.heap.io/about (consultada el 12 oct 2026)
+# heapanalytics.com: https://www.heap.io/cookies
+# heap-api.com: https://docs.contentsquare.com/en/web/content-security-policy/
+# Nota: Heap Inc., miembro del grupo Contentsquare; heapanalytics.com es su plataforma
+# Grupo: Contentsquare (fuente: https://www.heap.io/about, consultada el 12 oct 2026)
+@Heap|US|San Francisco|Contentsquare
+heapanalytics.com
+heap-api.com
+
+# Sede: https://livedoor.co.jp/company.html (consultada el 12 oct 2026)
+# livedoor.jp: https://minkabu.co.jp/privacy-policy/
+# Nota: 株式会社ライブドア (livedoor News/Blog) es empresa del grupo MINKABU; sede Minato, Tokio; el dominio livedoor.jp no aparece literalmente
+# Grupo: MINKABU THE INFONOID (fuente: https://livedoor.co.jp/company.html, consultada el 12 oct 2026)
+@Livedoor|JP|Tokio|MINKABU THE INFONOID
+livedoor.jp
+
+# Sede: https://www.jotform.com/about/san-francisco/ (consultada el 12 oct 2026)
+# jotform.com: https://www.jotform.com/about/san-francisco/
+# Nota: 'Our headquarters office in San Francisco'
+@Jotform|US|San Francisco
+jotform.com
+
+# Sede: https://info.zotabox.com/about-us/ (consultada el 12 oct 2026)
+# zotabox.com: https://info.zotabox.com/about-us/
+# Nota: 'Zotabox is based in Hanoi, Vietnam'
+@Zotabox|VN|Hanói
+zotabox.com
+
+# Sede: https://en.wikipedia.org/wiki/Adobe_Inc. (consultada el 12 oct 2026)
+# marketo.net, marketo.com, mktoresp.com: https://www.marketo.com
+# Nota: marketo.com redirige a Adobe Marketo Engage; sede de Adobe; marketo.net y mktoresp.com no verificados individualmente
+# Grupo: Adobe (fuente: https://en.wikipedia.org/wiki/Adobe_Inc., consultada el 12 oct 2026)
+@Marketo|US|San José (California)|Adobe
+marketo.net
+marketo.com
+mktoresp.com
+
+# Sede: https://www.semcasting.com/contactus (consultada el 12 oct 2026)
+# rtactivate.com: https://knowledgebase.zetaglobal.com/pug/implementing-pixels
+# Nota: Guía de Zeta lista el píxel de Semcasting en bpi.rtactivate.com
+@Semcasting|US|North Andover (Massachusetts)
+rtactivate.com
+
+# Sede: https://sfbx.io/en/cgu/ (consultada el 12 oct 2026)
+# appconsent.io: https://sfbx.io/en/cgu/
+# Nota: AppConsent es la CMP de SFBX SAS, domicilio 14 Place Canteloup, Burdeos; el dominio appconsent.io no aparece literalmente
+@SFBX (AppConsent)|FR|Burdeos
+appconsent.io
+
+# Sede: https://www.italiaonline.it/corporate/contatti/ (consultada el 12 oct 2026)
+# iol.it: https://www.whois.com/whois/iol.it
+# Nota: WHOIS: registrante Italiaonline S.p.A.; sede legal en Assago (área de Milán); dirigida por Libero Acquisition S.à r.l.
+# Grupo: Libero Acquisition (fuente: https://www.italiaonline.it/corporate/contatti/, consultada el 12 oct 2026)
+@Italiaonline|IT|Assago|Libero Acquisition
+iol.it
+
+# mookie1.com: https://www.choreograph.com/global-privacy-policy/global-privacy-policy-english
+# Nota: Cookies id/ov en mookie1.com listadas en la política de Choreograph ('a WPP company'; antes Xaxis); entidades en Londres (EEE) y Nueva York (resto), sede global no clara
+# Grupo: WPP (fuente: https://www.choreograph.com/global-privacy-policy/global-privacy-policy-english, consultada el 12 oct 2026)
+@Choreograph|||WPP
+mookie1.com
+
+# Sede: https://www.shareaholic.com/contact (consultada el 12 oct 2026)
+# shareaholic.com: https://www.shareaholic.com/privacy/
+# Nota: Dirección postal de Shareaholic, Inc.: 45 Prospect St, Cambridge, MA
+@Shareaholic|US|Cambridge (Massachusetts)
+shareaholic.com
+
+# Sede: https://pusher.com/legal-archived/data-protection/ (consultada el 12 oct 2026)
+# pusher.com: https://pusher.com/legal-archived/data-protection/
+# Nota: Pusher Limited, domicilio registrado en Londres (c/o MessageBird UK); 'Pusher is now a Bird company'
+# Grupo: Bird (fuente: https://pusher.com/legal-archived/data-protection/, consultada el 12 oct 2026)
+@Pusher|GB|Londres|Bird
+pusher.com
+
+# Sede: https://admixer.com/contactus/ (consultada el 12 oct 2026)
+# admixer.net: https://admixer.com/contactus/
+# Nota: 'Headquaters Admixer EU GmbH, Essen'; contacto de prensa @admixer.net; oficinas en Kiev y otras
+@Admixer|DE|Essen
+admixer.net
+
+# Sede: https://www.demandbase.com/about-us/contact-us/ (consultada el 12 oct 2026)
+# demandbase.com: https://www.demandbase.com/about-us/contact-us/
+# Nota: San Francisco es la primera oficina listada (no rotulada como sede)
+@Demandbase|US|San Francisco
+demandbase.com
+
+# Sede: https://global.rakuten.com/corp/about/es/ (consultada el 12 oct 2026)
+# rakuten.co.jp: https://global.rakuten.com/corp/about/es/
+# Nota: Rakuten Group, Inc., oficina principal Crimson House, Setagaya, Tokio
+@Rakuten|JP|Tokio
+rakuten.co.jp
+
+# Sede: https://www.sec.gov/Archives/edgar/data/1793663/000119312526078150/d50865ds8.htm (consultada el 12 oct 2026)
+# vtex.com: https://www.vtex.com/en-us/about-us/
+# Nota: SEC S-8 2026: oficinas ejecutivas principales en Grand Cayman (domicilio legal); operaciones reales en Brasil/Reino Unido
+@VTEX|KY|Gran Caimán
+vtex.com
+
+# Sede: https://www.powr.io/about (consultada el 12 oct 2026)
+# powr.io: https://www.powr.io/about
+# Nota: 'Headquartered in San Francisco'; matriz Pender citada por ChatGPT no verificada
+@POWR|US|San Francisco
+powr.io
+
+# Sede: https://www.etracker.com/impressum/ (consultada el 12 oct 2026)
+# etracker.com: https://www.etracker.com/impressum/
+# Nota: Impressum: proveedor JustRelate Deutschland GmbH, Berlín
+# Grupo: JustRelate (fuente: https://www.etracker.com/impressum/, consultada el 12 oct 2026)
+@etracker|DE|Berlín|JustRelate
+etracker.com
+
+# attentivemobile.com: https://www.attentive.com/legal/privacy
+# Nota: Attentive Mobile Inc.; la política solo da un buzón postal en Hoboken (NJ), ChatGPT dice Nueva York; sede no confirmada; el dominio attentivemobile.com no aparece literalmente
+@Attentive|US
+attentivemobile.com
+
+# Sede: https://www.awin.com/us/site-notice (consultada el 12 oct 2026)
+# shareasale.com: https://www.awin.com/us/news-and-events/awin-news/shareasale-to-awin-upgrade
+# Nota: ShareASale se integra en Awin (nota de Awin Group); sede AWIN AG Berlín; se usa la sede del grupo
+# Grupo: Awin (fuente: https://www.awin.com/us/site-notice, consultada el 12 oct 2026)
+@ShareASale|DE|Berlín|Awin
+shareasale.com
+
+# Sede: https://cheq.ai/contact/ (consultada el 12 oct 2026)
+# ensighten.com: https://cheq.ai/ensighten/
+# Nota: 'Ensighten is now CHEQ Control & Compliance'; Tel Aviv es la primera oficina listada (también Nueva York, Tokio, Londres); cheq.ai cita ensighten.com como web propia
+@CHEQ (Ensighten)|IL|Tel Aviv
+ensighten.com
+
+# Sede: https://postscript.io/partners-terms-of-service (consultada el 12 oct 2026)
+# postscript.io: https://postscript.io/partners-terms-of-service
+# Nota: Stodge Inc. d/b/a Postscript; dirección legal (buzón) en Scottsdale, AZ
+@Postscript|US|Scottsdale (Arizona)
+postscript.io
+
+# Sede: https://rutube.ru/info/privacy/ (consultada el 12 oct 2026)
+# rutube.ru: https://rutube.ru/info/privacy/
+# Nota: Política de RUTUBE: ООО «Руформ», Moscú, grupo Gazprom-Media Holding
+# Grupo: Gazprom-Media (fuente: https://rutube.ru/info/privacy/, consultada el 12 oct 2026)
+@Rutube|RU|Moscú|Gazprom-Media
+rutube.ru
+
+# Sede: https://dotdigitalgroup.com/contact/ (consultada el 12 oct 2026)
+# trackedweb.net, trackedlink.net: https://marketing.help.dotdigital.com/en/articles/8198917-all-the-tracking-domains-we-use
+# Nota: Dotdigital lista trackedweb.net y trackedlink.net como sus dominios de seguimiento; Dotdigital Group PLC, No. 1 London Bridge
+@Dotdigital|GB|Londres
+trackedweb.net
+trackedlink.net
+
+# barion.com: https://www.barion.com/en/privacy-notice/
+# Nota: barion.com es la web de Barion; la página legal no cargó, sede (Budapest según ChatGPT) no verificada
+@Barion
+barion.com
+
+# Sede: https://freestar.com/privacy-policy/ (consultada el 12 oct 2026)
+# t13.io: https://freestar.com/glossary/
+# pub.network: https://freestar.com/glossary/
+# Nota: 's2s.t13.io is Freestar's main domain for our Prebid Server'; Publisher First, Inc. dba Freestar, Scottsdale, AZ
+@Freestar|US|Scottsdale (Arizona)
+t13.io
+pub.network
+
+# Sede: https://en.wikipedia.org/wiki/Microsoft (consultada el 12 oct 2026)
+# adnxs-simple.com: https://learn.microsoft.com/en-us/xandr/monetize/release-notes-20210428
+# Nota: Microsoft Advertising (antes Xandr) introdujo adnxs-simple.com en 2021 como dominio sin cookies
+# Grupo: Microsoft (fuente: https://en.wikipedia.org/wiki/Microsoft, consultada el 12 oct 2026)
+@Microsoft Advertising|US|Redmond (Washington)|Microsoft
+adnxs-simple.com
+
+# Sede: https://www.stroeer.de/impressum/ (consultada el 12 oct 2026)
+# adscale.de: https://adscale.de/
+# Nota: adscale.de redirige a la página de Ströer SSP (Ströer SSP GmbH); sede del grupo Ströer SE & Co. KGaA en Colonia; ciudad de la filial no verificada
+# Grupo: Ströer (fuente: https://www.stroeer.de/impressum/, consultada el 12 oct 2026)
+@Ströer SSP|DE|Colonia|Ströer
+adscale.de
+
+# Sede: https://corporate.walmart.com/news/2026/06/23/walmart-to-acquire-vibe-co-to-expand-access-to-connected-tv-advertising (consultada el 12 oct 2026)
+# vibe.co: https://www.vibe.co/legal/privacy-policy
+# Nota: Vibe Advertising Inc.; 'Vibe.co is now part of Walmart' (compra anunciada jun-2026); ciudad no confirmada (nota fechada en Bentonville y Nueva York)
+@Vibe.co|US
+vibe.co
+
+# Sede: https://www.ispot.tv/hub/agreements/privacy/ (consultada el 12 oct 2026)
+# ispot.tv: https://www.ispot.tv/hub/agreements/privacy/
+# Nota: 'Our place of business at 3180 139th Ave SE, Bellevue, WA'
+@iSpot.tv|US|Bellevue (Washington)
+ispot.tv
+
+# openfpcdn.io: https://github.com/fingerprintjs/cdn
+# Nota: openfpcdn.io es el CDN de los proyectos open source de FingerprintJS; sede (Chicago según ChatGPT, vía LEI) no verificada
+@Fingerprint
+openfpcdn.io
+
+# yotpo.com: https://www.yotpo.com/contact-us/
+# Nota: Yotpo lista oficinas en Tel Aviv (Ramat Gan), Nueva York, Londres y otras sin indicar sede; ChatGPT dice Nueva York
+@Yotpo
+yotpo.com
+
+# Sede: https://www.dealerinspire.com/partners/ (consultada el 12 oct 2026)
+# dealerinspire.com: https://www.dealerinspire.com/partners/
+# Nota: Dirección publicada en Naperville, IL; matriz Cars.com citada por ChatGPT no verificada
+@Dealer Inspire|US|Naperville (Illinois)
+dealerinspire.com
+
+# Sede: https://www.tradedoubler.com/contact (consultada el 12 oct 2026)
+# tradedoubler.com: https://www.tradedoubler.com/contact
+# Nota: Cotiza en Nasdaq Estocolmo y Estocolmo es la primera oficina listada; nuevo nombre de grupo NYORDA citado por ChatGPT no verificado
+@Tradedoubler|SE|Estocolmo
+tradedoubler.com
+
+# Sede: https://corporate.skroutz.gr/en/privacy-policy/ (consultada el 12 oct 2026)
+# skroutz.gr: https://corporate.skroutz.gr/en/privacy-policy/
+# Nota: Skroutz S.A., Nea Ionia (Atenas)
+@Skroutz|GR|Atenas
+skroutz.gr
+
+# Sede: https://wisepops.com/privacy-policy (consultada el 12 oct 2026)
+# wisepops.com: https://wisepops.com/privacy-policy
+# Nota: Wisepops SAS, 87 Boulevard Suchet, París
+@Wisepops|FR|París
+wisepops.com
+
+# replo.app: https://www.replo.app/privacy
+# Nota: Alchemy Technologies Incorporated d/b/a Replo; sede (San Francisco según ChatGPT) no verificada
+@Replo
+replo.app
+
+# Sede: https://company.nhncloud.com/about?lang=en (consultada el 12 oct 2026)
+# toast.com: https://company.nhncloud.com/about?lang=en
+# Nota: TOAST era la marca de nube de NHN (hoy NHN Cloud Corp., Pangyo, Seongnam); el dominio toast.com no aparece literalmente
+@NHN Cloud|KR|Seongnam
+toast.com
+
+# Sede: https://www.rewardful.com/terms (consultada el 12 oct 2026)
+# wdfl.co: https://developers.rewardful.com/javascript-api/overview
+# Nota: El script de Rewardful se carga desde r.wdfl.co; Rewardful Inc., Calgary (Alberta); matriz saas.group no verificada
+@Rewardful|CA|Calgary
+wdfl.co
+
+# Sede: https://www.exoclick.com/legal-notice/ (consultada el 12 oct 2026)
+# realsrv.com: https://docs.exoclick.com/publishers/vast/vast-wrapper
+# Nota: Docs de ExoClick usan syndication.realsrv.com; EXOCLICK, S.L., domicilio en Barcelona
+@ExoClick|ES|Barcelona
+realsrv.com
+
+# Sede: https://www.adnami.io/contact (consultada el 12 oct 2026)
+# adnami.io: https://www.adnami.io/contact
+# Nota: Dirección Skindergade 45, Copenhague; IVA DK38769359
+@Adnami|DK|Copenhague
+adnami.io
+
+# drift.com: https://www.salesloft.com/legal/drift/terms-of-service
+# Nota: drift.com operado por Drift.com, Inc.; sus términos se publican ahora en salesloft.com (© Salesloft, Inc.); sede no verificada
+# Grupo: Salesloft (fuente: https://www.salesloft.com/legal/drift/terms-of-service, consultada el 12 oct 2026)
+@Drift|||Salesloft
+drift.com
+
+# Sede: https://www.d2cmedia.ca/en/contact-us/ (consultada el 12 oct 2026)
+# d2cmedia.ca: https://www.d2cmedia.ca/en/contact-us/
+# Nota: Montreal es la primera oficina listada (también Edmonton); matriz Cars.com citada por ChatGPT no verificada
+@D2C Media|CA|Montreal
+d2cmedia.ca
+
+# Sede: https://impact.com/privacy-policy/ (consultada el 12 oct 2026)
+# impact.com: https://impact.com/privacy-policy/
+# Nota: Impact Tech, Inc. (antes Impact Radius), 223 E. De La Guerra St, Santa Bárbara
+@impact.com|US|Santa Bárbara (California)
+impact.com
+
+# aliyuncs.com: https://www.alibabacloud.com/help/en/management-console/configure-a-local-firewall-or-proxy-to-access-alibaba-cloud-services
+# Nota: Docs de Alibaba Cloud listan *.aliyuncs.com como sus endpoints; matriz Alibaba Group (Wikipedia); sede (Hangzhou según ChatGPT) no verificada
+# Grupo: Alibaba Group (fuente: https://www.alibabacloud.com/help/en/management-console/configure-a-local-firewall-or-proxy-to-access-alibaba-cloud-services, consultada el 12 oct 2026)
+@Alibaba Cloud|||Alibaba Group
+aliyuncs.com
+
+# Sede: https://fraudblocker.com/privacy (consultada el 12 oct 2026)
+# fraudblocker.com: https://fraudblocker.com/privacy
+# Nota: Web propia de Fraud Blocker; solo da un buzón postal (#1074) en Pasadena, CA, no confirmado como sede
+@Fraud Blocker|US
+fraudblocker.com
+
+# lrkt-in.com: https://docs.logrocket.com/docs/proxying-traffic-through-your-own-domain
+# Nota: Docs: 'requests to our domain (lrkt-in.com)'; sede (Boston según ChatGPT) no verificada
+@LogRocket
+lrkt-in.com
+
+# matterport.com: https://matterport.com/privacy-policy
+# Nota: La política de privacidad de matterport.com redirige ya al aviso global de CoStar; sede no verificada
+# Grupo: CoStar (fuente: https://matterport.com/privacy-policy, consultada el 12 oct 2026)
+@Matterport|||CoStar
+matterport.com
+
+# mailerlite.com: https://www.mailerlite.com/legal/terms-of-service
+# Nota: Dos entidades contratantes: MailerLite Limited (Dublín) y MailerLite, Inc. (San Francisco, buzón PMB); sede global no clara; matriz Vercom no verificada
+@MailerLite
+mailerlite.com
+
+# Sede: https://www.quantummetric.com/legal/privacy-policy (consultada el 12 oct 2026)
+# quantummetric.com: https://www.quantummetric.com/legal/privacy-policy
+# Nota: Quantum Metric, Inc., 16055 Old Forest Point, Monument, CO
+@Quantum Metric|US|Monument (Colorado)
+quantummetric.com
+
+# xg4ken.com: https://xg4ken.com/
+# Nota: xg4ken.com dice 'a domain registered under Kenshoo inc.'; ChatGPT dice que Kenshoo es hoy Skai; sede no verificada
+@Kenshoo
+xg4ken.com

@@ -9,6 +9,8 @@
   let abierta = -1;
   let pais = (c) => c || '';
   const MAX_BARRAS = 60;
+  // «Ver las N más»: the whole list, once pressed (the owner, 12 Oct 2026).
+  let todasLasEmpresas = false;
   // The reasons that mean «it carried your data»: the same ones the new tab counts.
   const DE_DATO = ['tinta', 'senuelo'];
   let filtroInicial = location.hash === '#dato' ? '@dato' : '';
@@ -54,10 +56,11 @@
   function barras(lista) {
     const max = Math.max(1, ...lista.map((x) => x.n));
     // As many as the box holds to the bottom (it scrolls inside); the rest, added up.
-    const top = lista.slice(0, MAX_BARRAS);
-    const resto = lista.slice(MAX_BARRAS).reduce((a, x) => a + x.n, 0);
+    const corte = todasLasEmpresas ? lista.length : MAX_BARRAS;
+    const top = lista.slice(0, corte);
+    const resto = lista.slice(corte).reduce((a, x) => a + x.n, 0);
     const li = top.map((x) => `<li><span class="nombre"><button class="enlace-empresa" data-empresa="${esc(x.quien)}">${esc(x.quien)}</button>${x.pais ? `<small>${esc(nombrePais(x.pais))}</small>` : ''}</span><span class="n">${n(x.n)}</span><span class="barra"><i style="width:${Math.max(2, Math.round(100 * x.n / max))}%"></i></span></li>`);
-    if (resto) li.push(`<li><span class="nombre"><small>${esc(tn('cortes_otras', lista.length - MAX_BARRAS, { n: n(lista.length - MAX_BARRAS) }))}</small></span><span class="n">${n(resto)}</span></li>`);
+    if (resto) li.push(`<li><span class="nombre"><button class="enlace" id="r-empresas-todas">${esc(tn('cortes_ver_otras', lista.length - corte, { n: n(lista.length - corte) }))}</button></span><span class="n">${n(resto)}</span></li>`);
     return li.join('');
   }
   const simple = (lista, nombre) => lista.slice(0, 10).map((x) => `<li><span>${esc(nombre(x))}</span><span class="n">${n(x.n)}</span></li>`).join('');
@@ -76,6 +79,8 @@
     $('c-emergentes').textContent = n(dia.emergentes || 0);
     $('r-rastro-caja').classList.toggle('oculto', !Z.rastro($('r-rastro'), d.rastro));
     $('r-empresas').innerHTML = barras(d.empresas);
+    const mas = $('r-empresas-todas');
+    if (mas) mas.addEventListener('click', () => { todasLasEmpresas = true; $('r-empresas').innerHTML = barras(d.empresas); sombraAbajo(); });
     sombraAbajo();
     $('r-paises').innerHTML = simple(d.paises, (x) => nombrePais(x.pais));
     $('r-paginas').innerHTML = simple(d.paginas, (x) => x.pagina || t('pestana_aislada'));

@@ -2127,6 +2127,1135 @@
    "filtraciones": [],
    "borrar": "https://contentsquare.com/privacy-center/data-subject-request-portal/",
    "slug": "contentsquare"
+  },
+  "ID5": {
+   "web": "https://id5.io/",
+   "fundada": 2017,
+   "que_hace": {
+    "es": "ID5 Technology Ltd, con sede en Londres, ofrece infraestructura de identidad para la publicidad digital: asigna un identificador propio (ID5 ID) para que editores y anunciantes reconozcan al mismo usuario sin depender de cookies de terceros.",
+    "en": "ID5 Technology Ltd, based in London, provides identity infrastructure for digital advertising: it assigns its own identifier (the ID5 ID) so publishers and advertisers can recognise the same user without relying on third-party cookies.",
+    "pt": "A ID5 Technology Ltd, com sede em Londres, oferece infraestrutura de identidade para publicidade digital: atribui um identificador próprio (ID5 ID) para que publishers e anunciantes reconheçam o mesmo usuário sem depender de cookies de terceiros."
+   },
+   "como_gana": {
+    "es": "Vende servicios de identidad (ID5 ID, grafo de identidad y grafo entre dispositivos) a editores, plataformas publicitarias y anunciantes.",
+    "en": "It sells identity services (the ID5 ID, an identity graph and a cross-device graph) to publishers, ad platforms and advertisers.",
+    "pt": "Vende serviços de identidade (ID5 ID, grafo de identidade e grafo entre dispositivos) para publishers, plataformas de anúncios e anunciantes."
+   },
+   "datos": {
+    "es": "Según su política, recoge IDs de cookies, IDs de ID5 e IDs publicitarios móviles (IDFA/AAID), dirección IP, datos del navegador y del dispositivo, páginas o apps visitadas con su hora, y correos electrónicos cifrados (hash) que suben sus clientes.",
+    "en": "According to its policy, it collects cookie IDs, ID5 IDs and mobile advertising IDs (IDFA/AAID), IP address, browser and device data, pages or apps visited with timestamps, and hashed email addresses uploaded by its clients.",
+    "pt": "Segundo sua política, coleta IDs de cookies, IDs da ID5 e IDs de publicidade móvel (IDFA/AAID), endereço IP, dados do navegador e do dispositivo, páginas ou apps visitados com horário, e e-mails com hash enviados por seus clientes."
+   },
+   "fuente_que_hace": "https://builtinlondon.uk/company/id5",
+   "fuente_datos": "https://id5.io/legal/trust/archive/platform-privacy-policy-20250905.html",
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://id5-sync.com/privacy",
+   "slug": "id5"
+  },
+  "33Across": {
+   "web": "https://www.33across.com/",
+   "fundada": 2008,
+   "que_hace": {
+    "es": "Empresa de tecnología publicitaria de Nueva York que ofrece datos, identidad (su solución Lexicon) y monetización programática a editores y anunciantes. En septiembre de 2026 se integró en WealthStage, una plataforma publicitaria para servicios financieros, como una división de esta.",
+    "en": "New York ad-tech company that provides data, identity (its Lexicon solution) and programmatic monetisation to publishers and advertisers. In September 2026 it became a division of WealthStage, an advertising platform for financial services.",
+    "pt": "Empresa de tecnologia de publicidade de Nova York que oferece dados, identidade (sua solução Lexicon) e monetização programática para publishers e anunciantes. Em setembro de 2026 passou a ser uma divisão da WealthStage, uma plataforma de publicidade para serviços financeiros."
+   },
+   "como_gana": {
+    "es": "Gana dinero sirviendo publicidad y vendiendo segmentos de audiencia y servicios de monetización a editores y anunciantes.",
+    "en": "It makes money by serving advertising and selling audience segments and monetisation services to publishers and advertisers.",
+    "pt": "Ganha dinheiro veiculando publicidade e vendendo segmentos de audiência e serviços de monetização para publishers e anunciantes."
+   },
+   "datos": {
+    "es": "Según su política, a través de los sitios de sus clientes recoge dirección IP, navegador y sistema operativo, URLs visitadas, IDs de dispositivo y publicitarios móviles, correos electrónicos cifrados (hash) y datos de comportamiento como clics y contenido compartido, con cookies y también sin ellas.",
+    "en": "According to its policy, through its clients' websites it collects IP address, browser and operating system, URLs visited, device and mobile advertising IDs, hashed email addresses and behavioural data such as clicks and shares, using cookies and also cookieless methods.",
+    "pt": "Segundo sua política, por meio dos sites de seus clientes coleta endereço IP, navegador e sistema operacional, URLs visitadas, IDs de dispositivo e de publicidade móvel, e-mails com hash e dados de comportamento como cliques e compartilhamentos, com cookies e também sem eles."
+   },
+   "fuente_que_hace": "https://www.cmswire.com/the-wire/33across-rebrands-as-wealthstage-launching-new-digital-advertising-platform-built-for-finan/",
+   "fuente_datos": "https://www.33across.co.uk/privacy-policy",
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://www.33across.co.uk/user-data-portal/",
+   "slug": "33across"
+  },
+  "LiveIntent": {
+   "web": "https://www.liveintent.com/",
+   "fundada": 2009,
+   "que_hace": {
+    "es": "Empresa de publicidad de Nueva York basada en el correo electrónico: pone anuncios dentro de newsletters y ofrece audiencias y un grafo de identidad construido con correos cifrados (hash). Desde octubre de 2024 pertenece a Zeta Global (NYSE: ZETA).",
+    "en": "New York email-based advertising company: it places ads inside newsletters and offers audiences and an identity graph built from hashed email addresses. Since October 2024 it has been owned by Zeta Global (NYSE: ZETA).",
+    "pt": "Empresa de publicidade de Nova York baseada em e-mail: coloca anúncios dentro de newsletters e oferece audiências e um grafo de identidade construído com e-mails com hash. Desde outubro de 2024 pertence à Zeta Global (NYSE: ZETA)."
+   },
+   "como_gana": {
+    "es": "Vende publicidad segmentada, audiencias y datos de identidad a anunciantes, y servicios de monetización a más de 2.000 editores.",
+    "en": "It sells targeted advertising, audiences and identity data to advertisers, and monetisation services to more than 2,000 publishers.",
+    "pt": "Vende publicidade segmentada, audiências e dados de identidade para anunciantes, e serviços de monetização para mais de 2.000 publishers."
+   },
+   "datos": {
+    "es": "Según su política, recoge correos electrónicos (a veces cifrados con hash), IDs de cookies y publicitarios móviles, IP, dispositivo y navegador, ubicación aproximada, aperturas y clics en correos, visitas a webs, compras tras ver un anuncio e intereses inferidos, incluidos algunos sensibles (salud, religión, LGBTQ+) para crear audiencias; también vende o comparte datos con clientes y socios.",
+    "en": "According to its policy, it collects email addresses (sometimes hashed), cookie and mobile advertising IDs, IP, device and browser data, approximate location, email opens and clicks, website visits, purchases after an ad view and inferred interests, including some sensitive ones (health, religion, LGBTQ+) to build audiences; it also sells or shares data with clients and partners.",
+    "pt": "Segundo sua política, coleta e-mails (às vezes com hash), IDs de cookies e de publicidade móvel, IP, dados de dispositivo e navegador, localização aproximada, aberturas e cliques em e-mails, visitas a sites, compras após ver um anúncio e interesses inferidos, incluindo alguns sensíveis (saúde, religião, LGBTQ+) para criar audiências; também vende ou compartilha dados com clientes e parceiros."
+   },
+   "fuente_que_hace": "https://www.businesswire.com/news/home/20241008799629/en/Zeta-Global-to-Acquire-LiveIntent-in-a-Highly-Accretive-Transaction/",
+   "fuente_datos": "https://liveintent.com/services-privacy-policy/",
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://privacy.liveintent.com",
+   "slug": "liveintent"
+  },
+  "HubSpot": {
+   "web": "https://www.hubspot.com/",
+   "fundada": 2006,
+   "bolsa": "NYSE: HUBS",
+   "que_hace": {
+    "es": "Empresa de Cambridge (Massachusetts) que vende una plataforma de software de CRM, marketing, ventas y atención al cliente, sobre todo a empresas medianas de 2 a 2.000 empleados. Su código de seguimiento se instala en las webs de sus clientes.",
+    "en": "Cambridge, Massachusetts company that sells a CRM, marketing, sales and customer-service software platform, mainly to mid-sized companies with 2 to 2,000 employees. Its tracking code runs on its customers' websites.",
+    "pt": "Empresa de Cambridge (Massachusetts) que vende uma plataforma de software de CRM, marketing, vendas e atendimento ao cliente, principalmente para empresas médias de 2 a 2.000 funcionários. Seu código de rastreamento é instalado nos sites de seus clientes."
+   },
+   "como_gana": {
+    "es": "Casi todos sus ingresos vienen de suscripciones a su software; además cobra por servicios profesionales.",
+    "en": "Almost all its revenue comes from subscriptions to its software; it also charges for professional services.",
+    "pt": "Quase toda a sua receita vem de assinaturas do seu software; também cobra por serviços profissionais."
+   },
+   "datos": {
+    "es": "Según su política, recoge datos de contacto y de cuenta, IP, navegador, sistema operativo y páginas de referencia, uso del producto, y usa cookies, píxeles y su código de seguimiento; también reúne datos profesionales de fuentes públicas y de terceros para un conjunto de datos comercial. Los datos que sus clientes guardan en el CRM los trata por encargo de ellos.",
+    "en": "According to its policy, it collects contact and account details, IP address, browser, operating system and referring pages, product usage, and uses cookies, pixels and its tracking code; it also gathers professional data from public and third-party sources for a commercial dataset. Data its customers store in the CRM is processed on their behalf.",
+    "pt": "Segundo sua política, coleta dados de contato e de conta, IP, navegador, sistema operacional e páginas de referência, uso do produto, e usa cookies, pixels e seu código de rastreamento; também reúne dados profissionais de fontes públicas e de terceiros para um conjunto de dados comercial. Os dados que seus clientes guardam no CRM são tratados em nome deles."
+   },
+   "fuente_que_hace": "https://www.sec.gov/Archives/edgar/data/1404655/000119312526046646/hubs-20251231.htm",
+   "fuente_datos": "https://legal.hubspot.com/privacy-policy",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 3131266000,
+     "moneda": "USD",
+     "fuente": "https://www.businesswire.com/news/home/20260211469584/en/HubSpot-Reports-Strong-Q4-and-Full-Year-2025-Results"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2025,
+     "valor": 45911000,
+     "moneda": "USD",
+     "fuente": "https://www.businesswire.com/news/home/20260211469584/en/HubSpot-Reports-Strong-Q4-and-Full-Year-2025-Results"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 8882,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1404655/000119312526046646/hubs-20251231.htm"
+    }
+   ],
+   "sanciones": [],
+   "filtraciones": [
+    {
+     "fecha": "2024-07",
+     "que": {
+      "es": "Atacantes accedieron sin autorización a menos de 50 cuentas de clientes de HubSpot (cifra preliminar); la empresa lo detectó el 22 de junio y lo comunicó el 5 de julio de 2024. No se informó qué datos se vieron expuestos.",
+      "en": "Attackers gained unauthorised access to fewer than 50 HubSpot customer accounts (preliminary figure); the company detected it on 22 June and disclosed it on 5 July 2024. It did not say what data was exposed.",
+      "pt": "Atacantes obtiveram acesso não autorizado a menos de 50 contas de clientes da HubSpot (número preliminar); a empresa detectou em 22 de junho e divulgou em 5 de julho de 2024. Não informou quais dados foram expostos."
+     },
+     "fuente": "https://www.techcentral.ie/hubspot-reports-nearly-50-customer-accounts-compromised/"
+    },
+    {
+     "fecha": "2022-03",
+     "que": {
+      "es": "Un atacante robó por ingeniería social las credenciales de un empleado y exportó datos de contactos y usuarios de un pequeño número de cuentas de clientes, en un ataque dirigido a empresas de criptomonedas.",
+      "en": "An attacker used social engineering to steal an employee's credentials and exported contact and user data from a small number of customer accounts, in an attack aimed at cryptocurrency companies.",
+      "pt": "Um atacante usou engenharia social para roubar as credenciais de um funcionário e exportou dados de contatos e usuários de um pequeno número de contas de clientes, em um ataque direcionado a empresas de criptomoedas."
+     },
+     "fuente": "https://hubspot.com/en-us/march-2022-security-incident"
+    }
+   ],
+   "borrar": "https://preferences.hubspot.com/privacy",
+   "slug": "hubspot"
+  },
+  "Sovrn": {
+   "web": "https://www.sovrn.com/",
+   "fundada": 2014,
+   "que_hace": {
+    "es": "Sovrn Holdings, de Boulder (Colorado), ofrece a editores web tecnología de publicidad programática, herramientas de enlaces de afiliados y comercio (Sovrn Commerce, antes VigLink) y analítica. Nació en 2014 del negocio de Lijit Networks.",
+    "en": "Sovrn Holdings, based in Boulder, Colorado, provides web publishers with programmatic advertising technology, affiliate-link and commerce tools (Sovrn Commerce, formerly VigLink) and analytics. It was created in 2014 from the Lijit Networks business.",
+    "pt": "A Sovrn Holdings, de Boulder (Colorado), oferece a publishers da web tecnologia de publicidade programática, ferramentas de links de afiliados e comércio (Sovrn Commerce, antiga VigLink) e análise. Surgiu em 2014 a partir do negócio da Lijit Networks."
+   },
+   "como_gana": {
+    "es": "Gana dinero con la venta de espacios publicitarios de editores en subastas programáticas y con comisiones de afiliados por compras hechas desde sus enlaces.",
+    "en": "It makes money from selling publishers' ad space in programmatic auctions and from affiliate commissions on purchases made through its links.",
+    "pt": "Ganha dinheiro com a venda de espaços publicitários de publishers em leilões programáticos e com comissões de afiliados sobre compras feitas por seus links."
+   },
+   "datos": {
+    "es": "Según su política, recoge IP, IDs de cookies y publicitarios móviles, correos cifrados (hash), actividad de navegación y búsqueda en sitios no relacionados, uso de apps, ubicación precisa si se permite, datos del dispositivo y vínculos entre navegadores y dispositivos, además de datos de terceros; declara haber vendido información personal en los 12 meses previos.",
+    "en": "According to its policy, it collects IP address, cookie and mobile advertising IDs, hashed emails, browsing and search activity across unrelated sites, app usage, precise location if allowed, device data and links between browsers and devices, plus third-party data; it states it sold personal information in the preceding 12 months.",
+    "pt": "Segundo sua política, coleta IP, IDs de cookies e de publicidade móvel, e-mails com hash, atividade de navegação e busca em sites não relacionados, uso de apps, localização precisa se permitida, dados do dispositivo e vínculos entre navegadores e dispositivos, além de dados de terceiros; declara ter vendido informações pessoais nos 12 meses anteriores."
+   },
+   "fuente_que_hace": "https://www.vcaonline.com/news/2022072603/sovrn-raises-36-million-in-series-c-funding-fueled-by-consistent-revenue-growth/",
+   "fuente_datos": "https://tostracker.app/document/sovrn-privacy",
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://www.sovrn.com/your-data/",
+   "slug": "sovrn"
+  },
+  "Media.net": {
+   "web": "https://www.media.net/",
+   "fundada": 2010,
+   "que_hace": {
+    "es": "Red de publicidad contextual: tecnología que elige y muestra anuncios en sitios web según el contenido de la página o de la búsqueda, e intermedia entre anunciantes y editores. Desde 2016 pertenece al consorcio chino Miteno Communication Technology (Shuzhi.AI).",
+    "en": "Contextual advertising network: technology that selects and shows ads on websites based on the content of the page or search, and brokers between advertisers and publishers. Since 2016 it has been owned by the Chinese consortium Miteno Communication Technology (Shuzhi.AI).",
+    "pt": "Rede de publicidade contextual: tecnologia que escolhe e exibe anúncios em sites de acordo com o conteúdo da página ou da busca, e faz a intermediação entre anunciantes e editores. Desde 2016 pertence ao consórcio chinês Miteno Communication Technology (Shuzhi.AI)."
+   },
+   "como_gana": {
+    "es": "Gana dinero intermediando la venta de espacios publicitarios entre anunciantes y sitios web.",
+    "en": "It makes money by brokering the sale of ad space between advertisers and websites.",
+    "pt": "Ganha dinheiro intermediando a venda de espaços publicitários entre anunciantes e sites."
+   },
+   "datos": {
+    "es": "Según su política, recoge IP, identificadores de cookies y de publicidad móvil, datos del dispositivo, ubicación aproximada, páginas vistas y clics, y datos comprados a terceros (intereses, demografía, emails cifrados con hash) para segmentar anuncios.",
+    "en": "Per its policy, it collects IP addresses, cookie and mobile advertising IDs, device data, approximate location, pages viewed and clicks, and licensed third-party data (interests, demographics, hashed emails) to target ads.",
+    "pt": "Segundo sua política, coleta IP, identificadores de cookies e de publicidade móvel, dados do dispositivo, localização aproximada, páginas vistas e cliques, e dados licenciados de terceiros (interesses, dados demográficos, e-mails com hash) para segmentar anúncios."
+   },
+   "fuente_que_hace": "https://en.wikipedia.org/wiki/Media.net",
+   "fuente_datos": "https://www.media.net/privacy-policy/",
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://www.media.net/preferences",
+   "slug": "media-net"
+  },
+  "Adform": {
+   "web": "https://site.adform.com/",
+   "fundada": 2002,
+   "que_hace": {
+    "es": "Empresa danesa de tecnología publicitaria (Adform A/S) que ofrece una plataforma para que anunciantes, agencias y editores compren y vendan publicidad digital y automaticen sus campañas.",
+    "en": "Danish ad tech company (Adform A/S) that provides a platform for advertisers, agencies and publishers to buy and sell digital advertising and automate their campaigns.",
+    "pt": "Empresa dinamarquesa de tecnologia de publicidade (Adform A/S) que oferece uma plataforma para anunciantes, agências e editores comprarem e venderem publicidade digital e automatizarem suas campanhas."
+   },
+   "como_gana": {
+    "es": "Cobra a anunciantes, agencias y editores por el uso de su plataforma de compra, venta y servicio de anuncios.",
+    "en": "It charges advertisers, agencies and publishers for using its platform to buy, sell and serve ads.",
+    "pt": "Cobra de anunciantes, agências e editores pelo uso de sua plataforma de compra, venda e veiculação de anúncios."
+   },
+   "datos": {
+    "es": "Asigna identificadores únicos de cookie a cada navegador para rastrear y segmentar anuncios entre sitios; su exclusión (opt-out) deja de usar esos datos para segmentar, pero no los borra.",
+    "en": "It assigns unique cookie identifiers to each browser to track and target ads across sites; its opt-out stops using that data for targeting but is not described as deleting it.",
+    "pt": "Atribui identificadores únicos de cookie a cada navegador para rastrear e segmentar anúncios entre sites; sua exclusão (opt-out) deixa de usar esses dados para segmentação, mas não os apaga."
+   },
+   "fuente_que_hace": "https://site.adform.com/media/zwkpcmh5/adform-annual-report-2025.pdf",
+   "fuente_datos": "https://site.adform.com/privacy-center/platform-privacy/opt-out/",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 103370000,
+     "moneda": "EUR",
+     "fuente": "https://site.adform.com/media/zwkpcmh5/adform-annual-report-2025.pdf"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2025,
+     "valor": 7841000,
+     "moneda": "EUR",
+     "fuente": "https://site.adform.com/media/zwkpcmh5/adform-annual-report-2025.pdf"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 731,
+     "fuente": "https://site.adform.com/media/zwkpcmh5/adform-annual-report-2025.pdf"
+    }
+   ],
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://site.adform.com/privacy-center/platform-privacy/opt-out/",
+   "slug": "adform"
+  },
+  "Tapad": {
+   "web": "https://www.tapad.com/",
+   "fundada": 2010,
+   "que_hace": {
+    "es": "Empresa de resolución de identidad digital: su \"grafo\" estima qué dispositivos (móvil, ordenador, TV conectada) pertenecen a la misma persona para que las marcas le muestren anuncios en todos ellos. Es propiedad de Experian desde 2020.",
+    "en": "Digital identity resolution company: its \"Graph\" estimates which devices (phone, computer, connected TV) belong to the same person so brands can reach them with ads across all of them. Owned by Experian since 2020.",
+    "pt": "Empresa de resolução de identidade digital: seu \"grafo\" estima quais dispositivos (celular, computador, TV conectada) pertencem à mesma pessoa para que marcas a alcancem com anúncios em todos eles. Pertence à Experian desde 2020."
+   },
+   "como_gana": {
+    "es": "Vende a anunciantes y socios el acceso a su grafo de dispositivos para publicidad segmentada, medición y modelado de audiencias.",
+    "en": "It sells advertisers and partners access to its device graph for targeted advertising, measurement and audience modelling.",
+    "pt": "Vende a anunciantes e parceiros acesso ao seu grafo de dispositivos para publicidade segmentada, mensuração e modelagem de audiências."
+   },
+   "datos": {
+    "es": "Según su política, procesa cookies, identificadores de publicidad móvil, emails cifrados con hash, IP, agente de usuario, IDs de TV conectada, URLs con hash y ubicación a nivel de código postal para enlazar dispositivos.",
+    "en": "Per its policy, it processes cookies, mobile advertising IDs, hashed emails, IP address, user agent, connected-TV IDs, hashed URLs and postal-code-level location to link devices.",
+    "pt": "Segundo sua política, processa cookies, identificadores de publicidade móvel, e-mails com hash, IP, user agent, IDs de TV conectada, URLs com hash e localização em nível de CEP para vincular dispositivos."
+   },
+   "fuente_que_hace": "https://www.experianplc.com/media/news/2020/experian-acquires-tapad/",
+   "fuente_datos": "https://tapad.com/privacy-policy",
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://crportal.tapad.com",
+   "slug": "tapad"
+  },
+  "TripleLift": {
+   "web": "https://triplelift.com/",
+   "fundada": 2012,
+   "que_hace": {
+    "es": "Plataforma de tecnología publicitaria con sede en Nueva York que vende el espacio publicitario de sitios web y apps a anunciantes mediante subastas automatizadas. Vista Equity Partners compró la mayoría en 2021.",
+    "en": "New York-based ad tech platform that sells websites' and apps' ad space to advertisers through automated auctions. Vista Equity Partners acquired a majority stake in 2021.",
+    "pt": "Plataforma de tecnologia de publicidade sediada em Nova York que vende o espaço publicitário de sites e apps a anunciantes por meio de leilões automatizados. A Vista Equity Partners comprou o controle em 2021."
+   },
+   "como_gana": {
+    "es": "Gana dinero intermediando la venta de anuncios entre editores y compradores de publicidad.",
+    "en": "It makes money by brokering ad sales between publishers and ad buyers.",
+    "pt": "Ganha dinheiro intermediando a venda de anúncios entre editores e compradores de publicidade."
+   },
+   "datos": {
+    "es": "Según su aviso de privacidad, recoge cookies, IDs de publicidad, emails o teléfonos cifrados con hash, IP, páginas vistas, búsquedas, vídeos y clics, intereses y datos demográficos inferidos, y ubicación precisa cuando los socios la comparten.",
+    "en": "Per its privacy notice, it collects cookies, advertising IDs, hashed emails or phone numbers, IP address, pages viewed, searches, videos and clicks, inferred interests and demographics, and precise location when partners share it.",
+    "pt": "Segundo seu aviso de privacidade, coleta cookies, IDs de publicidade, e-mails ou telefones com hash, IP, páginas vistas, buscas, vídeos e cliques, interesses e dados demográficos inferidos, e localização precisa quando parceiros a compartilham."
+   },
+   "fuente_que_hace": "https://triplelift.com/press/triplelift-acquired-by-vista-equity-partners/",
+   "fuente_datos": "https://triplelift.com/?p=37574",
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://triplelift.com/consumer-opt-out/",
+   "slug": "triplelift"
+  },
+  "Pinterest": {
+   "web": "https://www.pinterest.com/",
+   "fundada": 2009,
+   "bolsa": "NYSE: PINS",
+   "que_hace": {
+    "es": "Red social visual donde las personas buscan y guardan ideas (imágenes y vídeos en tableros); vende publicidad a marcas y comercios.",
+    "en": "Visual discovery social network where people find and save ideas (images and videos on boards); it sells advertising to brands and retailers.",
+    "pt": "Rede social visual onde as pessoas encontram e salvam ideias (imagens e vídeos em pastas); vende publicidade a marcas e varejistas."
+   },
+   "como_gana": {
+    "es": "Casi todos sus ingresos proceden de la venta de anuncios a terceros.",
+    "en": "Substantially all of its revenue comes from third-party advertising.",
+    "pt": "Praticamente toda a sua receita vem da venda de anúncios a terceiros."
+   },
+   "datos": {
+    "es": "Según su política, recoge datos de la cuenta, pines, búsquedas y clics, datos del dispositivo y cookies, ubicación aproximada por IP, y datos de visitas y compras en webs de anunciantes (Pinterest Tag); los usa para segmentar anuncios y comparte IDs de cookie, IP y emails con hash con socios publicitarios.",
+    "en": "Per its policy, it collects account data, Pins, searches and clicks, device data and cookies, approximate location from IP, and data on visits and purchases on advertisers' sites (Pinterest Tag); it uses them to target ads and shares cookie IDs, IP addresses and hashed emails with ad partners.",
+    "pt": "Segundo sua política, coleta dados da conta, Pins, buscas e cliques, dados do dispositivo e cookies, localização aproximada por IP, e dados de visitas e compras em sites de anunciantes (Pinterest Tag); usa-os para segmentar anúncios e compartilha IDs de cookie, IP e e-mails com hash com parceiros de publicidade."
+   },
+   "fuente_que_hace": "https://www.sec.gov/Archives/edgar/data/1506293/000150629326000021/pins-20251231.htm",
+   "fuente_datos": "https://policy.pinterest.com/en/privacy-policy",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 4221767000,
+     "moneda": "USD",
+     "fuente": "https://www.businesswire.com/news/home/20260212059914/en/Pinterest-Announces-Fourth-Quarter-and-Full-Year-2025-Results-Delivers-14-Revenue-Growth-and-Record-Users"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2025,
+     "valor": 416855000,
+     "moneda": "USD",
+     "fuente": "https://www.businesswire.com/news/home/20260212059914/en/Pinterest-Announces-Fourth-Quarter-and-Full-Year-2025-Results-Delivers-14-Revenue-Growth-and-Record-Users"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 5265,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1506293/000150629326000021/pins-20251231.htm"
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2025-03",
+     "autoridad": "Tribunal de distrito Taganski de Moscú",
+     "pais": "RU",
+     "importe": 12000000,
+     "moneda": "RUB",
+     "motivo": {
+      "es": "Multa por negarse por segunda vez a almacenar en Rusia los datos personales de usuarios rusos (ley de localización de datos).",
+      "en": "Fine for refusing for a second time to store Russian users' personal data in Russia (data localization law).",
+      "pt": "Multa por se recusar pela segunda vez a armazenar na Rússia os dados pessoais de usuários russos (lei de localização de dados)."
+     },
+     "fuente": "https://3dnews.ru/1119289/sud-oshtrafoval-zoom-pinterest-i-twitch-na-millioni-rubley-za-otkaz-lokalizovat-dannie-rossiyan/amp"
+    },
+    {
+     "fecha": "2022-06-28",
+     "autoridad": "Juzgado de paz del distrito Taganka de Moscú",
+     "pais": "RU",
+     "importe": 2000000,
+     "moneda": "RUB",
+     "motivo": {
+      "es": "Multa por no cumplir la ley que obliga a almacenar en Rusia los datos de usuarios rusos.",
+      "en": "Fine for failing to comply with the law requiring Russian users' data to be stored in Russia.",
+      "pt": "Multa por não cumprir a lei que obriga a armazenar na Rússia os dados de usuários russos."
+     },
+     "fuente": "https://rferl.org/a/russia-fines-airbnb-ups-twitch-pinterest/31919972.html"
+    }
+   ],
+   "filtraciones": [],
+   "borrar": "https://help.pinterest.com/en/article/deactivate-or-close-your-account",
+   "slug": "pinterest"
+  },
+  "Snap": {
+   "web": "https://www.snap.com/",
+   "fundada": 2011,
+   "bolsa": "NYSE: SNAP",
+   "que_hace": {
+    "es": "Snap Inc. es la empresa estadounidense dueña de Snapchat, una app de mensajería con fotos y vídeos, historias y mapas, y de las gafas Spectacles. Ofrece la app gratis a usuarios y vende publicidad a anunciantes.",
+    "en": "Snap Inc. is the US company that owns Snapchat, a messaging app for photos and videos, stories and maps, and the Spectacles glasses. It offers the app free to users and sells advertising to advertisers.",
+    "pt": "A Snap Inc. é a empresa norte-americana dona do Snapchat, um app de mensagens com fotos e vídeos, stories e mapas, e dos óculos Spectacles. Oferece o app de graça aos usuários e vende publicidade a anunciantes."
+   },
+   "como_gana": {
+    "es": "La mayor parte de sus ingresos viene de la publicidad en Snapchat, a lo que suma suscripciones como Snapchat+.",
+    "en": "Most of its revenue comes from advertising on Snapchat, plus subscriptions such as Snapchat+.",
+    "pt": "A maior parte da receita vem da publicidade no Snapchat, somada a assinaturas como o Snapchat+."
+   },
+   "datos": {
+    "es": "Según su política de privacidad, recoge datos de la cuenta (nombre, usuario, correo, teléfono, fecha de nacimiento), uso de la app, contenido y sus metadatos, datos del dispositivo e identificadores publicitarios, ubicación por IP o GPS si se permite, contactos si se da permiso, cookies y datos de anunciantes y terceros. Usa intereses deducidos de esos datos para personalizar y medir anuncios.",
+    "en": "According to its privacy policy, it collects account data (name, username, email, phone, birthday), app usage, content and its metadata, device data and advertising identifiers, location by IP or GPS if allowed, contacts if permitted, cookies, and data from advertisers and third parties. It uses interests inferred from this data to personalise and measure ads.",
+    "pt": "Segundo sua política de privacidade, coleta dados da conta (nome, usuário, e-mail, telefone, data de nascimento), uso do app, conteúdo e seus metadados, dados do dispositivo e identificadores de publicidade, localização por IP ou GPS se permitido, contatos se autorizado, cookies e dados de anunciantes e terceiros. Usa interesses deduzidos desses dados para personalizar e medir anúncios."
+   },
+   "fuente_que_hace": "https://www.sec.gov/Archives/edgar/data/1564408/000156440826000013/snap-20251231.htm",
+   "fuente_datos": "https://values.snap.com/privacy/privacy-policy",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 5931447000,
+     "moneda": "USD",
+     "fuente": "https://investor.snap.com/news/news-details/2026/Snap-Inc--Announces-Fourth-Quarter-and-Full-Year-2025-Financial-Results/"
+    },
+    {
+     "clave": "perdidas",
+     "anio": 2025,
+     "valor": 460489000,
+     "moneda": "USD",
+     "fuente": "https://investor.snap.com/news/news-details/2026/Snap-Inc--Announces-Fourth-Quarter-and-Full-Year-2025-Financial-Results/"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 5261,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1564408/000156440826000013/snap-20251231.htm"
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2014-12",
+     "autoridad": "FTC",
+     "pais": "US",
+     "motivo": {
+      "es": "Acuerdo con la FTC por engañar a los usuarios: los mensajes no desaparecían como se prometía, se recogían contactos y ubicación sin aviso ni consentimiento, y una mala seguridad permitió filtrar 4,6 millones de usuarios y teléfonos. Sin multa; obliga a un programa de privacidad con auditorías independientes durante 20 años.",
+      "en": "Settlement with the FTC for deceiving users: messages did not disappear as promised, contacts and location were collected without notice or consent, and weak security allowed 4.6 million usernames and phone numbers to leak. No fine; requires a privacy programme with independent audits for 20 years.",
+      "pt": "Acordo com a FTC por enganar os usuários: as mensagens não desapareciam como prometido, contatos e localização eram coletados sem aviso nem consentimento, e falhas de segurança permitiram vazar 4,6 milhões de usuários e telefones. Sem multa; exige um programa de privacidade com auditorias independentes por 20 anos."
+     },
+     "estado": {
+      "es": "Acuerdo anunciado el 8 de mayo de 2014; orden definitiva en diciembre de 2014, vigente 20 años.",
+      "en": "Settlement announced on 8 May 2014; final order in December 2014, in force for 20 years.",
+      "pt": "Acordo anunciado em 8 de maio de 2014; ordem definitiva em dezembro de 2014, válida por 20 anos."
+     },
+     "fuente": "https://www.ftc.gov/node/44428"
+    }
+   ],
+   "filtraciones": [
+    {
+     "fecha": "2013-12",
+     "afectados": 4600000,
+     "que": {
+      "es": "Un grupo publicó nombres de usuario y números de teléfono (con los dos últimos dígitos ocultos) obtenidos aprovechando un fallo en la función de buscar amigos. Snap dijo que no se accedió a los mensajes.",
+      "en": "A group published usernames and phone numbers (last two digits hidden) obtained through a flaw in the Find Friends feature. Snap said message content was not accessed.",
+      "pt": "Um grupo publicou nomes de usuário e números de telefone (com os dois últimos dígitos ocultos) obtidos por uma falha no recurso de encontrar amigos. A Snap disse que o conteúdo das mensagens não foi acessado."
+     },
+     "fuente": "https://www.channel4.com/news/snapchat-hacking-twitter-facebook-phone-numbers"
+    }
+   ],
+   "borrar": "https://help.snapchat.com/hc/articles/7012328360596",
+   "slug": "snap"
+  },
+  "Comscore": {
+   "web": "https://www.comscore.com/",
+   "fundada": 1999,
+   "bolsa": "NASDAQ: SCOR",
+   "que_hace": {
+    "es": "Comscore es una empresa estadounidense que mide audiencias de contenidos y publicidad en televisión, web, móvil, TV conectada y cines. Vende esos datos y análisis a medios, anunciantes y agencias.",
+    "en": "Comscore is a US company that measures content and advertising audiences across TV, web, mobile, connected TV and cinemas. It sells this data and analysis to media owners, advertisers and agencies.",
+    "pt": "A Comscore é uma empresa norte-americana que mede audiências de conteúdo e publicidade em TV, web, celular, TV conectada e cinemas. Vende esses dados e análises a veículos de mídia, anunciantes e agências."
+   },
+   "como_gana": {
+    "es": "Gana dinero con suscripciones a sus datos de audiencia, productos de medición y activación de campañas, e investigaciones a medida.",
+    "en": "It earns money from subscriptions to its audience data, campaign measurement and activation products, and custom research.",
+    "pt": "Ganha dinheiro com assinaturas de seus dados de audiência, produtos de medição e ativação de campanhas e pesquisas sob encomenda."
+   },
+   "datos": {
+    "es": "Según su política de privacidad, sus etiquetas (ScorecardResearch) recogen identificadores de cookie y dispositivo, IP, ubicación deducida de la IP, historial de navegación, navegador y sistema operativo, y deducen características y preferencias, que pueden incluir categorías sensibles. Además mide a miembros de paneles que instalan su software.",
+    "en": "According to its privacy policy, its tags (ScorecardResearch) collect cookie and device IDs, IP address, IP-based location, browsing history, browser and operating system, and infer characteristics and preferences, which may include sensitive categories. It also measures panel members who install its software.",
+    "pt": "Segundo sua política de privacidade, suas tags (ScorecardResearch) coletam identificadores de cookie e dispositivo, IP, localização deduzida do IP, histórico de navegação, navegador e sistema operacional, e deduzem características e preferências, que podem incluir categorias sensíveis. Também mede membros de painéis que instalam seu software."
+   },
+   "fuente_que_hace": "https://www.sec.gov/Archives/edgar/data/1158172/000115817226000009/scor-20251231.htm",
+   "fuente_datos": "https://comscore.com/About/Privacy-Policy",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 357469000,
+     "moneda": "USD",
+     "fuente": "https://ir.comscore.com/node/34416/html"
+    },
+    {
+     "clave": "perdidas",
+     "anio": 2025,
+     "valor": 10004000,
+     "moneda": "USD",
+     "fuente": "https://ir.comscore.com/node/34416/html"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2026,
+     "valor": 1200,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1158172/000115817226000009/scor-20251231.htm"
+    }
+   ],
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://www.comscore.com/About/General-Data-Protection-Regulation-GDPR/Data-Subject-Rights",
+   "slug": "comscore"
+  },
+  "Nielsen": {
+   "web": "https://www.nielsen.com/",
+   "fundada": 1923,
+   "que_hace": {
+    "es": "Nielsen es una empresa estadounidense de medición de audiencias, conocida por los índices de audiencia de televisión, que también mide audiencias digitales y de audio. Es privada desde 2022, propiedad de un consorcio liderado por Elliott (Evergreen Coast Capital) y Brookfield; no es la misma empresa que NielsenIQ.",
+    "en": "Nielsen is a US audience measurement company, known for TV ratings, that also measures digital and audio audiences. It has been private since 2022, owned by a consortium led by Elliott (Evergreen Coast Capital) and Brookfield; it is not the same company as NielsenIQ.",
+    "pt": "A Nielsen é uma empresa norte-americana de medição de audiência, conhecida pelos índices de audiência de TV, que também mede audiências digitais e de áudio. É privada desde 2022, controlada por um consórcio liderado pela Elliott (Evergreen Coast Capital) e pela Brookfield; não é a mesma empresa que a NielsenIQ."
+   },
+   "como_gana": {
+    "es": "Vende datos y análisis de audiencia a cadenas de TV, plataformas, anunciantes y agencias, que los usan para fijar precios y planificar publicidad.",
+    "en": "It sells audience data and analytics to TV networks, platforms, advertisers and agencies, which use them to price and plan advertising.",
+    "pt": "Vende dados e análises de audiência a emissoras de TV, plataformas, anunciantes e agências, que os usam para precificar e planejar publicidade."
+   },
+   "datos": {
+    "es": "Según la política de su panel digital, su software de medición recoge identificadores del dispositivo, IP, apps usadas y tiempo en ellas, sitios web visitados, ubicación por GPS o wifi si está activada y lo que se ve en la TV, junto con datos demográficos y de contacto de los panelistas. En webs y apps de terceros también mide visitas mediante cookies e identificadores.",
+    "en": "According to its digital panel policy, its metering software collects device identifiers, IP address, apps used and time spent, websites visited, GPS or Wi-Fi location when enabled, and what is watched on TV, along with panelists' demographic and contact data. On third-party sites and apps it also measures visits through cookies and identifiers.",
+    "pt": "Segundo a política do seu painel digital, o software de medição coleta identificadores do dispositivo, IP, apps usados e tempo de uso, sites visitados, localização por GPS ou Wi-Fi quando ativada e o que é assistido na TV, além de dados demográficos e de contato dos panelistas. Em sites e apps de terceiros também mede visitas por meio de cookies e identificadores."
+   },
+   "fuente_que_hace": "https://en.wikipedia.org/wiki/Nielsen_Holdings",
+   "fuente_datos": "https://digitalpanel.nielsen.com/ui/US/en/privacypolicyen.html",
+   "cifras": [
+    {
+     "clave": "empleados",
+     "anio": 2021,
+     "valor": 15000,
+     "fuente": "https://en.wikipedia.org/wiki/Nielsen_Holdings"
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2013-09-20",
+     "autoridad": "FTC",
+     "pais": "US",
+     "motivo": {
+      "es": "Acuerdo con la FTC (competencia) para poder comprar Arbitron por unos 1.260 millones USD: la FTC consideró que la compra podía reducir la competencia en la medición de audiencias multiplataforma. Nielsen tuvo que vender y licenciar activos de Arbitron a un comprador aprobado. Sin multa.",
+      "en": "Settlement with the FTC (antitrust) to allow its purchase of Arbitron for about USD 1.26 billion: the FTC found the deal could reduce competition in cross-platform audience measurement. Nielsen had to sell and license Arbitron assets to an approved buyer. No fine.",
+      "pt": "Acordo com a FTC (concorrência) para poder comprar a Arbitron por cerca de US$ 1,26 bilhão: a FTC considerou que a compra podia reduzir a concorrência na medição de audiência multiplataforma. A Nielsen teve de vender e licenciar ativos da Arbitron a um comprador aprovado. Sem multa."
+     },
+     "fuente": "https://www.ftc.gov/node/45991"
+    }
+   ],
+   "filtraciones": [],
+   "borrar": "http://server-us.imrworldwide.com/cgi-bin/o?oo=total&tu=https://sites.nielsen.com/legal/policy/en/cookie-policy/",
+   "slug": "nielsen"
+  },
+  "Integral Ad Science": {
+   "web": "https://integralads.com/",
+   "fundada": 2009,
+   "que_hace": {
+    "es": "Integral Ad Science (IAS) es una empresa estadounidense de verificación y medición publicitaria: comprueba que los anuncios digitales los vean personas reales, en sitios adecuados, para anunciantes y editores. Fue fundada en 2009 como AdSafe Media y desde diciembre de 2025 es propiedad del fondo Novacap.",
+    "en": "Integral Ad Science (IAS) is a US ad verification and measurement company: it checks that digital ads are seen by real people in suitable environments, for advertisers and publishers. It was founded in 2009 as AdSafe Media and has been owned by the fund Novacap since December 2025.",
+    "pt": "A Integral Ad Science (IAS) é uma empresa norte-americana de verificação e medição de publicidade: confere se os anúncios digitais são vistos por pessoas reais, em ambientes adequados, para anunciantes e publishers. Foi fundada em 2009 como AdSafe Media e desde dezembro de 2025 pertence ao fundo Novacap."
+   },
+   "como_gana": {
+    "es": "Cobra a anunciantes y editores una tarifa por cada mil anuncios que analiza, en buena parte a través de plataformas de compra de publicidad (DSP).",
+    "en": "It charges advertisers and publishers a fee per thousand ads it analyses, largely through ad-buying platforms (DSPs).",
+    "pt": "Cobra de anunciantes e publishers uma tarifa por mil anúncios analisados, em grande parte por meio de plataformas de compra de mídia (DSPs)."
+   },
+   "datos": {
+    "es": "Su política de privacidad del sitio web indica que recoge IP, identificador del dispositivo, navegador, sistema operativo, datos de registro y cookies de los visitantes; los datos que su tecnología de medición recoge al analizar anuncios se rigen por una política aparte que no pudimos revisar.",
+    "en": "Its website privacy policy says it collects visitors' IP address, device identifier, browser, operating system, log data and cookies; data its measurement technology collects when analysing ads is covered by a separate policy we could not review.",
+    "pt": "Sua política de privacidade do site diz que coleta IP, identificador do dispositivo, navegador, sistema operacional, dados de registro e cookies dos visitantes; os dados que sua tecnologia de medição coleta ao analisar anúncios seguem uma política à parte que não pudemos revisar."
+   },
+   "fuente_que_hace": "https://www.sec.gov/Archives/edgar/data/1842718/000184271825000023/ias-20241231.htm",
+   "fuente_datos": "https://integralads.com/privacy-policy/",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2024,
+     "valor": 530101000,
+     "moneda": "USD",
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1842718/000184271825000022/q424earningsrelease.htm"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2024,
+     "valor": 37795000,
+     "moneda": "USD",
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1842718/000184271825000022/q424earningsrelease.htm"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2024,
+     "valor": 902,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1842718/000184271825000023/ias-20241231.htm"
+    }
+   ],
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://integralads.com/privacy-policy/",
+   "slug": "integral-ad-science"
+  },
+  "Teads": {
+   "web": "https://www.teads.com/",
+   "bolsa": "NASDAQ: TEAD",
+   "que_hace": {
+    "es": "Teads es una plataforma publicitaria que vende espacios de anuncios en webs, apps y TV conectada a anunciantes. La empresa cotizada Teads Holding Co. es la antigua Outbrain, que compró Teads en febrero de 2025 y adoptó su nombre.",
+    "en": "Teads is an advertising platform that sells ad space on websites, apps and connected TV to advertisers. The listed company Teads Holding Co. is the former Outbrain, which bought Teads in February 2025 and took its name.",
+    "pt": "A Teads é uma plataforma de publicidade que vende espaços de anúncio em sites, apps e TV conectada a anunciantes. A empresa listada Teads Holding Co. é a antiga Outbrain, que comprou a Teads em fevereiro de 2025 e adotou seu nome."
+   },
+   "como_gana": {
+    "es": "Gana dinero cuando los anunciantes compran, a través de su plataforma, espacios publicitarios de medios y editores asociados.",
+    "en": "It earns money when advertisers buy ad space from partner media owners and publishers through its platform.",
+    "pt": "Ganha dinheiro quando anunciantes compram, por meio da sua plataforma, espaços publicitários de veículos e publishers parceiros."
+   },
+   "datos": {
+    "es": "Según su política de privacidad, recoge identificadores de cookie, publicitarios de móvil y de TV conectada, IP, ubicación aproximada, páginas y apps visitadas, clics y tiempo de visualización de anuncios, y datos del dispositivo; une dispositivos en un perfil de hogar y deduce intereses para personalizar anuncios.",
+    "en": "According to its privacy policy, it collects cookie, mobile and connected-TV advertising IDs, IP address, approximate location, pages and apps visited, clicks and ad viewing time, and device data; it links devices into a household profile and infers interests to personalise ads.",
+    "pt": "Segundo sua política de privacidade, coleta identificadores de cookie, de publicidade de celular e de TV conectada, IP, localização aproximada, páginas e apps visitados, cliques e tempo de visualização de anúncios e dados do dispositivo; une dispositivos em um perfil de domicílio e deduz interesses para personalizar anúncios."
+   },
+   "fuente_que_hace": "https://www.sec.gov/Archives/edgar/data/1454938/000145493826000015/tead-20251231.htm",
+   "fuente_datos": "https://privacy-policy.teads.com/",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 1300461000,
+     "moneda": "USD",
+     "fuente": "https://www.stocktitan.net/news/TEAD/teads-holding-co-announces-fourth-quarter-and-full-year-2025-t891vk37a4ol.html"
+    },
+    {
+     "clave": "perdidas",
+     "anio": 2025,
+     "valor": 517070000,
+     "moneda": "USD",
+     "fuente": "https://www.stocktitan.net/news/TEAD/teads-holding-co-announces-fourth-quarter-and-full-year-2025-t891vk37a4ol.html"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2026,
+     "valor": 1700,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1454938/000145493826000015/tead-20251231.htm"
+    }
+   ],
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://user-privacy.teads.tv/viewer-data-deletion",
+   "slug": "teads"
+  },
+  "MGID": {
+   "web": "https://www.mgid.com/",
+   "fundada": 2008,
+   "que_hace": {
+    "es": "MGID es una red de publicidad nativa con sede en Santa Monica (EE. UU.): coloca widgets de anuncios y recomendaciones de contenido en sitios web de editores.",
+    "en": "MGID is a native advertising network based in Santa Monica (US): it places ad and content-recommendation widgets on publishers' websites.",
+    "pt": "A MGID é uma rede de publicidade nativa sediada em Santa Monica (EUA): coloca widgets de anúncios e recomendações de conteúdo em sites de editores."
+   },
+   "como_gana": {
+    "es": "Cobra a los anunciantes por mostrar sus anuncios en sitios de editores, con los que comparte ingresos.",
+    "en": "It charges advertisers to show their ads on publishers' sites, sharing revenue with those publishers.",
+    "pt": "Cobra dos anunciantes para exibir anúncios em sites de editores, com os quais divide a receita."
+   },
+   "datos": {
+    "es": "Según su aviso de privacidad, usa cookies e identificadores propios, la IP, el navegador y el dispositivo, la ubicación (ciudad, país, código postal) y la navegación reciente por los sitios de sus clientes para dirigir anuncios; comparte datos con socios programáticos, anunciantes y editores.",
+    "en": "Per its privacy notice, it uses its own cookies and IDs, IP address, browser and device details, location (city, country, zip code) and recent browsing across its customers' sites to target ads; it shares data with programmatic partners, advertisers and publishers.",
+    "pt": "Segundo seu aviso de privacidade, usa cookies e identificadores próprios, IP, navegador e dispositivo, localização (cidade, país, CEP) e a navegação recente nos sites de seus clientes para direcionar anúncios; compartilha dados com parceiros programáticos, anunciantes e editores."
+   },
+   "fuente_que_hace": "https://mgid.com/about",
+   "fuente_datos": "https://www.mgid.com/services/privacy-policy",
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://www.mgid.com/services/privacy-policy",
+   "slug": "mgid"
+  },
+  "Reddit": {
+   "web": "https://www.reddit.com/",
+   "fundada": 2005,
+   "bolsa": "NYSE: RDDT",
+   "que_hace": {
+    "es": "Reddit es una red social de comunidades (subreddits) donde los usuarios publican, comentan y votan contenido; vende publicidad a anunciantes y licencia sus datos.",
+    "en": "Reddit is a social network of communities (subreddits) where users post, comment and vote on content; it sells advertising and licenses its data.",
+    "pt": "O Reddit é uma rede social de comunidades (subreddits) onde usuários publicam, comentam e votam em conteúdo; vende publicidade e licencia seus dados."
+   },
+   "como_gana": {
+    "es": "En 2025 cerca del 94% de sus ingresos vino de la publicidad; el resto incluye la licencia de contenido.",
+    "en": "In 2025 about 94% of its revenue came from advertising; the rest includes content licensing.",
+    "pt": "Em 2025 cerca de 94% da receita veio de publicidade; o restante inclui licenciamento de conteúdo."
+   },
+   "datos": {
+    "es": "Según su política de privacidad, recoge datos de la cuenta, publicaciones y mensajes privados, votos y suscripciones, IP, dispositivo, páginas vistas y búsquedas, ubicación aproximada e intereses inferidos (edad, género); recibe datos de socios publicitarios que puede vincular con un email cifrado.",
+    "en": "Per its privacy policy, it collects account data, posts and private messages, votes and subscriptions, IP address, device data, pages viewed and searches, approximate location and inferred traits (age, gender); it receives data from ad partners that it may match using a hashed email.",
+    "pt": "Segundo sua política de privacidade, coleta dados da conta, publicações e mensagens privadas, votos e inscrições, IP, dispositivo, páginas vistas e buscas, localização aproximada e características inferidas (idade, gênero); recebe dados de parceiros de anúncios que pode vincular por e-mail com hash."
+   },
+   "fuente_que_hace": "https://www.sec.gov/Archives/edgar/data/1713445/000171344526000022/rddt-20251231.htm",
+   "fuente_datos": "https://www.reddit.com/policies/privacy-policy",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 2202506000,
+     "moneda": "USD",
+     "fuente": "https://www.businesswire.com/news/home/20260205441801/en/Reddit-Reports-Fourth-Quarter-and-Full-Year-2025-Results-Announces-%241-Billion-Share-Repurchase-Program"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2025,
+     "valor": 529721000,
+     "moneda": "USD",
+     "fuente": "https://www.businesswire.com/news/home/20260205441801/en/Reddit-Reports-Fourth-Quarter-and-Full-Year-2025-Results-Announces-%241-Billion-Share-Repurchase-Program"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 2555,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1713445/000171344526000022/rddt-20251231.htm"
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2026-02-24",
+     "autoridad": "ICO",
+     "pais": "GB",
+     "importe": 14470000,
+     "moneda": "GBP",
+     "motivo": {
+      "es": "Uso ilícito de datos de menores: no verificaba la edad de forma robusta, por lo que trataba datos de menores de 13 años sin base legal, y no evaluó los riesgos para niños hasta enero de 2025.",
+      "en": "Unlawful use of children's data: it had no robust age checks, so it processed data of under-13s without a lawful basis, and did not assess risks to children until January 2025.",
+      "pt": "Uso ilícito de dados de crianças: não verificava a idade de forma robusta, tratando dados de menores de 13 anos sem base legal, e só avaliou os riscos para crianças em janeiro de 2025."
+     },
+     "estado": {
+      "es": "Reddit anunció que la recurrirá.",
+      "en": "Reddit said it intends to appeal.",
+      "pt": "O Reddit anunciou que vai recorrer."
+     },
+     "fuente": "https://www.scl.org/ico-fines-reddit-14-47-million-for-childrens-privacy-failures/"
+    }
+   ],
+   "filtraciones": [
+    {
+     "fecha": "2023-02",
+     "que": {
+      "es": "Tras robar credenciales de un empleado por phishing, atacantes accedieron a documentos internos, código fuente, datos de contacto de cientos de empleados actuales y antiguos e información de anunciantes; Reddit dijo no tener pruebas de acceso a datos de usuarios.",
+      "en": "After phishing an employee's credentials, attackers accessed internal documents, source code, contact details of hundreds of current and former employees and some advertiser information; Reddit said it had no evidence user data was taken.",
+      "pt": "Após roubar credenciais de um funcionário por phishing, atacantes acessaram documentos internos, código-fonte, contatos de centenas de funcionários atuais e antigos e informações de anunciantes; o Reddit disse não ter provas de acesso a dados de usuários."
+     },
+     "fuente": "https://techcrunch.com/2023/02/10/reddit-says-hackers-accessed-internal-data-following-employee-phishing-attack/amp"
+    },
+    {
+     "fecha": "2018-08",
+     "que": {
+      "es": "Un atacante accedió a una copia de seguridad de 2007 con nombres de usuario, contraseñas cifradas (hash con sal), emails y contenido, incluidos algunos mensajes privados, y a registros de emails de junio de 2018 que vinculaban usuarios con su email.",
+      "en": "An attacker accessed a 2007 backup with usernames, salted hashed passwords, emails and content including some private messages, plus June 2018 email-digest logs linking usernames to email addresses.",
+      "pt": "Um invasor acessou um backup de 2007 com nomes de usuário, senhas com hash e sal, e-mails e conteúdo, incluindo algumas mensagens privadas, além de registros de e-mails de junho de 2018 que ligavam usuários a seus e-mails."
+     },
+     "fuente": "https://www.bleepingcomputer.com/news/security/reddit-announces-security-breach-after-hackers-bypassed-staffs-2fa/?mid=1"
+    }
+   ],
+   "slug": "reddit"
+  },
+  "Opera": {
+   "web": "https://www.opera.com/",
+   "fundada": 1995,
+   "bolsa": "NASDAQ: OPRA",
+   "que_hace": {
+    "es": "Opera, con sede en Oslo (Noruega), desarrolla navegadores web para móvil y ordenador, además de Opera News, portales de juegos, una plataforma de anuncios (Opera Ads) y la billetera MiniPay; está controlada en un 68% por la china Kunlun.",
+    "en": "Opera, based in Oslo (Norway), makes mobile and desktop web browsers, plus Opera News, gaming portals, an ad platform (Opera Ads) and the MiniPay wallet; China's Kunlun owns about 68% of it.",
+    "pt": "A Opera, sediada em Oslo (Noruega), desenvolve navegadores para celular e computador, além do Opera News, portais de jogos, uma plataforma de anúncios (Opera Ads) e a carteira MiniPay; a chinesa Kunlun controla cerca de 68%."
+   },
+   "como_gana": {
+    "es": "Gana sobre todo con la distribución de búsquedas (acuerdos con buscadores) y la publicidad que muestra a sus usuarios.",
+    "en": "It earns mainly from search distribution deals with search engines and from advertising shown to its users.",
+    "pt": "Ganha principalmente com acordos de distribuição de busca e com a publicidade exibida a seus usuários."
+   },
+   "datos": {
+    "es": "Según su declaración de privacidad, recoge estadísticas de uso ligadas a un ID de instalación, la IP y la ubicación general para noticias y anuncios personalizados; comparte con socios publicitarios un perfil con un ID cifrado, la ubicación general y categorías de intereses.",
+    "en": "Per its privacy statement, it collects usage statistics tied to an installation ID, IP address and general location for personalized news and ads; it shares with ad partners a profile with a hashed ID, general location and broad interest categories.",
+    "pt": "Segundo sua declaração de privacidade, coleta estatísticas de uso ligadas a um ID de instalação, IP e localização geral para notícias e anúncios personalizados; compartilha com parceiros de anúncios um perfil com ID com hash, localização geral e categorias de interesse."
+   },
+   "fuente_que_hace": "https://investor.opera.com/static-files/75f6e636-cfb9-4d76-a034-9219a8f1c930",
+   "fuente_datos": "https://www.opera.com/privacy",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 614825000,
+     "moneda": "USD",
+     "fuente": "https://opera.gcs-web.com/news-releases/news-release-details/opera-reports-fourth-quarter-and-full-year-2025-results-ahead"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2025,
+     "valor": 108282000,
+     "moneda": "USD",
+     "fuente": "https://opera.gcs-web.com/news-releases/news-release-details/opera-reports-fourth-quarter-and-full-year-2025-results-ahead"
+    }
+   ],
+   "sanciones": [],
+   "filtraciones": [
+    {
+     "fecha": "2016-08",
+     "afectados": 1700000,
+     "que": {
+      "es": "Ataque a los servidores de Opera Sync: los nombres de usuario y contraseñas (cifradas con hash y sal) de cuentas de sincronización pudieron quedar expuestos; Opera obligó a cambiar la contraseña.",
+      "en": "Attack on Opera Sync servers: usernames and salted hashed passwords of sync accounts may have been exposed; Opera forced a password reset.",
+      "pt": "Ataque aos servidores do Opera Sync: nomes de usuário e senhas (com hash e sal) de contas de sincronização podem ter sido expostos; a Opera forçou a troca de senha."
+     },
+     "fuente": "https://www.darkreading.com/cyberattacks-data-breaches/opera-forces-password-reset-for-1-7-million-users-after-server-breach"
+    }
+   ],
+   "borrar": "https://security.opera.com/privacy-inquiry",
+   "slug": "opera"
+  },
+  "Improve Digital": {
+   "web": "https://www.improvedigital.com/",
+   "fundada": 2007,
+   "que_hace": {
+    "es": "Improve Digital es la plataforma publicitaria del lado de la oferta (SSP) del grupo neerlandés Azerion: ayuda a webs y apps a vender su espacio publicitario en subastas automáticas a compradores de anuncios.",
+    "en": "Improve Digital is the supply-side ad platform (SSP) of Dutch group Azerion: it helps websites and apps sell their ad space in automated auctions to ad buyers.",
+    "pt": "A Improve Digital é a plataforma de anúncios do lado da oferta (SSP) do grupo holandês Azerion: ajuda sites e apps a vender espaço publicitário em leilões automáticos para compradores de anúncios."
+   },
+   "como_gana": {
+    "es": "Cobra una parte del dinero de los anuncios que vende en nombre de editores y apps.",
+    "en": "It takes a share of the ad money it sells on behalf of publishers and apps.",
+    "pt": "Fica com uma parte do valor dos anúncios que vende em nome de editores e apps."
+   },
+   "datos": {
+    "es": "Según su política de privacidad, recoge IDs de cookies y de publicidad móvil, IP, datos del dispositivo y navegador, ubicación (precisa si la app la comparte), páginas visitadas y segmentos de intereses, y los envía a unos 70 compradores de anuncios para que pujen.",
+    "en": "Per its privacy policy, it collects cookie and mobile ad IDs, IP address, device and browser data, location (precise if the app shares it), pages visited and interest segments, and sends them to about 70 ad buyers so they can bid.",
+    "pt": "Segundo sua política de privacidade, coleta IDs de cookies e de publicidade móvel, IP, dados do dispositivo e navegador, localização (precisa se o app compartilhar), páginas visitadas e segmentos de interesse, e os envia a cerca de 70 compradores de anúncios para darem lances."
+   },
+   "fuente_que_hace": "https://improvedigital.com/platform-privacy-policy",
+   "fuente_datos": "https://improvedigital.com/platform-privacy-policy",
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://myads.360yield.com/",
+   "slug": "improve-digital"
+  },
+  "InMobi": {
+   "web": "https://www.inmobi.com/",
+   "fundada": 2007,
+   "que_hace": {
+    "es": "InMobi, con sede en Bengaluru (India), es una plataforma de publicidad móvil que sirve anuncios dentro de apps y ofrece herramientas de anuncios y gestión de consentimiento a anunciantes y editores.",
+    "en": "InMobi, based in Bengaluru (India), is a mobile advertising platform that serves ads inside apps and sells advertising and consent-management tools to advertisers and publishers.",
+    "pt": "A InMobi, sediada em Bengaluru (Índia), é uma plataforma de publicidade móvel que exibe anúncios dentro de apps e oferece ferramentas de anúncios e gestão de consentimento a anunciantes e editores."
+   },
+   "como_gana": {
+    "es": "Cobra a los anunciantes por los anuncios que coloca en apps móviles.",
+    "en": "It charges advertisers for the ads it places in mobile apps.",
+    "pt": "Cobra dos anunciantes pelos anúncios que coloca em apps móveis."
+   },
+   "datos": {
+    "es": "Según su política de privacidad, recoge IDs de publicidad (IDFA, AAID), IP, ubicación por GPS o wifi, datos del dispositivo, actividad en apps y anuncios y emails cifrados, y crea perfiles de intereses que comparte con anunciantes, editores y socios de datos.",
+    "en": "Per its privacy policy, it collects ad IDs (IDFA, AAID), IP address, GPS or Wi-Fi location, device data, app and ad activity and hashed emails, and builds interest profiles shared with advertisers, publishers and data partners.",
+    "pt": "Segundo sua política de privacidade, coleta IDs de publicidade (IDFA, AAID), IP, localização por GPS ou Wi-Fi, dados do dispositivo, atividade em apps e anúncios e e-mails com hash, e cria perfis de interesse compartilhados com anunciantes, editores e parceiros de dados."
+   },
+   "fuente_que_hace": "https://inc42.com/company/inmobi/",
+   "fuente_datos": "https://www.inmobi.cn/privacy-policy-for-eea/",
+   "sanciones": [
+    {
+     "fecha": "2016-06-22",
+     "autoridad": "FTC",
+     "pais": "US",
+     "importe": 950000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con la FTC: rastreó la ubicación de cientos de millones de usuarios aunque no lo autorizaran y recogió la ubicación de niños en apps infantiles sin permiso de los padres (ley COPPA). Multa civil de 4 millones, reducida a 950.000 por su situación financiera.",
+      "en": "FTC settlement: it tracked the location of hundreds of millions of users regardless of their permissions and collected children's location in child-directed apps without parental consent (COPPA). $4 million civil penalty, suspended to $950,000 based on its finances.",
+      "pt": "Acordo com a FTC: rastreou a localização de centenas de milhões de usuários sem a devida permissão e coletou a localização de crianças em apps infantis sem consentimento dos pais (COPPA). Multa civil de US$ 4 milhões, reduzida a US$ 950 mil por sua situação financeira."
+     },
+     "fuente": "https://www.ftc.gov/node/44937"
+    }
+   ],
+   "filtraciones": [],
+   "borrar": "https://www.inmobi.com/page/opt-out/",
+   "slug": "inmobi"
+  },
+  "Cloudflare": {
+   "web": "https://www.cloudflare.com/",
+   "fundada": 2009,
+   "bolsa": "NYSE: NET",
+   "que_hace": {
+    "es": "Cloudflare opera una red global que ofrece a empresas y organizaciones servicios de entrega de contenido, seguridad (protección contra ataques DDoS, cortafuegos), DNS y conectividad para sus sitios web, aplicaciones, redes y empleados.",
+    "en": "Cloudflare runs a global network that sells companies and organisations content delivery, security (DDoS protection, firewall), DNS and connectivity services for their websites, applications, networks and employees.",
+    "pt": "A Cloudflare opera uma rede global que oferece a empresas e organizações serviços de entrega de conteúdo, segurança (proteção contra ataques DDoS, firewall), DNS e conectividade para seus sites, aplicativos, redes e funcionários."
+   },
+   "como_gana": {
+    "es": "Cobra a sus clientes suscripciones a sus servicios de red y seguridad; también ofrece planes gratuitos.",
+    "en": "It charges customers subscriptions for its network and security services; it also offers free plans.",
+    "pt": "Cobra dos clientes assinaturas dos seus serviços de rede e segurança; também oferece planos gratuitos."
+   },
+   "datos": {
+    "es": "Según su política de privacidad, procesa las direcciones IP y los datos de tráfico de las personas que visitan los sitios de sus clientes (como encargado del tratamiento para esos clientes) y recoge datos de contacto, de facturación, registros de actividad y cookies de sus clientes y de los visitantes de su propia web.",
+    "en": "According to its privacy policy, it processes the IP addresses and traffic data of people visiting its customers' sites (as a processor for those customers) and collects contact, billing, activity-log and cookie data about its customers and visitors to its own website.",
+    "pt": "Segundo sua política de privacidade, processa os endereços IP e os dados de tráfego das pessoas que visitam os sites dos seus clientes (como operadora para esses clientes) e coleta dados de contato, de cobrança, registros de atividade e cookies dos seus clientes e dos visitantes do seu próprio site."
+   },
+   "fuente_que_hace": "https://www.businesswire.com/news/home/20260210624682/en/Cloudflare-Announces-Fourth-Quarter-and-Fiscal-Year-2025-Financial-Results/",
+   "fuente_datos": "https://www.cloudflare.com/privacypolicy",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 2167937000,
+     "moneda": "USD",
+     "fuente": "https://www.businesswire.com/news/home/20260210624682/en/Cloudflare-Announces-Fourth-Quarter-and-Fiscal-Year-2025-Financial-Results/"
+    },
+    {
+     "clave": "perdidas",
+     "anio": 2025,
+     "valor": 102267000,
+     "moneda": "USD",
+     "fuente": "https://www.businesswire.com/news/home/20260210624682/en/Cloudflare-Announces-Fourth-Quarter-and-Fiscal-Year-2025-Financial-Results/"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 5156,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1477333/000147733326000016/cloud-20251231.htm"
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2025-12-29",
+     "autoridad": "AGCOM (Autorità per le Garanzie nelle Comunicazioni)",
+     "pais": "IT",
+     "importe": 14000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Multa por no cumplir las obligaciones del sistema italiano antipiratería \"Piracy Shield\" (registro y bloqueo de sitios, incluido en su DNS 1.1.1.1).",
+      "en": "Fine for not complying with the obligations of Italy's \"Piracy Shield\" anti-piracy system (registering and blocking sites, including on its 1.1.1.1 DNS).",
+      "pt": "Multa por não cumprir as obrigações do sistema antipirataria italiano \"Piracy Shield\" (cadastro e bloqueio de sites, inclusive no seu DNS 1.1.1.1)."
+     },
+     "estado": {
+      "es": "Recurrida por Cloudflare en marzo de 2026.",
+      "en": "Appealed by Cloudflare in March 2026.",
+      "pt": "Contestada pela Cloudflare em março de 2026."
+     },
+     "fuente": "https://blog.cloudflare.com/standing-up-for-the-open-internet/"
+    }
+   ],
+   "filtraciones": [
+    {
+     "fecha": "2017-02",
+     "que": {
+      "es": "Un error en su analizador HTML (\"Cloudbleed\") hizo que entre septiembre de 2016 y el 18 de febrero de 2017 se filtraran fragmentos de memoria con datos de visitantes de sitios de clientes, como cookies, tokens de autenticación, claves de API y datos de formularios que podían contener contraseñas; parte quedó en la caché de buscadores.",
+      "en": "A bug in its HTML parser (\"Cloudbleed\") leaked memory fragments with data from visitors to customer sites between September 2016 and 18 February 2017, such as cookies, authentication tokens, API keys and form data that could include passwords; some was cached by search engines.",
+      "pt": "Um erro no seu analisador HTML (\"Cloudbleed\") vazou fragmentos de memória com dados de visitantes de sites de clientes entre setembro de 2016 e 18 de fevereiro de 2017, como cookies, tokens de autenticação, chaves de API e dados de formulários que podiam conter senhas; parte ficou no cache de buscadores."
+     },
+     "fuente": "https://blog.cloudflare.com/incident-report-on-memory-leak-caused-by-cloudflare-parser-bug/"
+    }
+   ],
+   "borrar": "mailto:sar@cloudflare.com",
+   "slug": "cloudflare"
+  },
+  "Automattic": {
+   "web": "https://automattic.com/",
+   "fundada": 2005,
+   "que_hace": {
+    "es": "Automattic, fundada por Matt Mullenweg, es la empresa detrás de WordPress.com, WooCommerce, Jetpack, Tumblr, Gravatar, Day One y Pocket Casts: herramientas para crear y alojar sitios web, tiendas en línea y blogs.",
+    "en": "Automattic, founded by Matt Mullenweg, is the company behind WordPress.com, WooCommerce, Jetpack, Tumblr, Gravatar, Day One and Pocket Casts: tools for building and hosting websites, online shops and blogs.",
+    "pt": "A Automattic, fundada por Matt Mullenweg, é a empresa por trás do WordPress.com, WooCommerce, Jetpack, Tumblr, Gravatar, Day One e Pocket Casts: ferramentas para criar e hospedar sites, lojas online e blogs."
+   },
+   "como_gana": {
+    "es": "Vende planes de pago de alojamiento web y servicios asociados (WordPress.com, Jetpack, extensiones de WooCommerce) y suscripciones a sus aplicaciones.",
+    "en": "It sells paid hosting plans and related services (WordPress.com, Jetpack, WooCommerce extensions) and subscriptions to its apps.",
+    "pt": "Vende planos pagos de hospedagem e serviços associados (WordPress.com, Jetpack, extensões do WooCommerce) e assinaturas dos seus aplicativos."
+   },
+   "datos": {
+    "es": "Según su aviso de privacidad para visitantes de los sitios de sus usuarios, recoge dirección IP, navegador, identificadores de dispositivo, sitio de procedencia, ubicación aproximada y datos que el visitante introduce (comentarios, correo, pedidos), y usa cookies y píxeles para seguir el uso del sitio y mostrar anuncios dirigidos donde hay publicidad.",
+    "en": "According to its privacy notice for visitors to its users' sites, it collects IP address, browser, device identifiers, referring site, approximate location and data the visitor enters (comments, email, orders), and uses cookies and pixels to track site use and show targeted ads where ads are enabled.",
+    "pt": "Segundo seu aviso de privacidade para visitantes dos sites dos seus usuários, coleta endereço IP, navegador, identificadores de dispositivo, site de origem, localização aproximada e dados que o visitante insere (comentários, e-mail, pedidos), e usa cookies e pixels para rastrear o uso do site e exibir anúncios direcionados onde há publicidade."
+   },
+   "fuente_que_hace": "https://en.wikipedia.org/wiki/Automattic",
+   "fuente_datos": "https://automattic.com/privacy-notice",
+   "cifras": [
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 1479,
+     "fuente": "https://en.wikipedia.org/wiki/Automattic"
+    }
+   ],
+   "sanciones": [],
+   "filtraciones": [
+    {
+     "fecha": "2021-12",
+     "afectados": 114000000,
+     "que": {
+      "es": "Gravatar (propiedad de Automattic): se extrajeron masivamente 167 millones de registros de perfiles con nombres, nombres de usuario y hashes MD5 de correos; 114 millones de hashes se descifraron y se difundieron con las direcciones de correo.",
+      "en": "Gravatar (owned by Automattic): 167 million profile records with names, usernames and MD5 hashes of email addresses were scraped; 114 million hashes were cracked and circulated with the email addresses.",
+      "pt": "Gravatar (da Automattic): foram extraídos em massa 167 milhões de registros de perfis com nomes, nomes de usuário e hashes MD5 de e-mails; 114 milhões de hashes foram decifrados e divulgados com os endereços de e-mail."
+     },
+     "fuente": "https://haveibeenpwned.com/breach/gravatar"
+    }
+   ],
+   "slug": "automattic"
+  },
+  "Shopify": {
+   "web": "https://www.shopify.com/",
+   "fundada": 2006,
+   "bolsa": "NASDAQ: SHOP; TSX: SHOP",
+   "que_hace": {
+    "es": "Shopify, con sede en Ottawa (Canadá), ofrece a comercios una plataforma para crear tiendas en línea y vender en internet, en redes sociales y en tienda física, con pagos, envíos y la app de compras Shop.",
+    "en": "Shopify, based in Ottawa (Canada), gives merchants a platform to build online stores and sell on the web, on social media and in person, with payments, shipping and the Shop shopping app.",
+    "pt": "A Shopify, com sede em Ottawa (Canadá), oferece a comerciantes uma plataforma para criar lojas online e vender na internet, nas redes sociais e em loja física, com pagamentos, envios e o app de compras Shop."
+   },
+   "como_gana": {
+    "es": "Cobra a los comercios suscripciones mensuales y comisiones por los pagos y otros servicios que procesan con ella.",
+    "en": "It charges merchants monthly subscriptions and fees on the payments and other services they process through it.",
+    "pt": "Cobra dos comerciantes assinaturas mensais e taxas sobre os pagamentos e outros serviços que processam por meio dela."
+   },
+   "datos": {
+    "es": "Según su política para consumidores, recibe nombre, dirección, correo, datos de pago, IP, identificadores de dispositivo y cookies, y la actividad en las tiendas que usan Shopify (productos vistos, carrito, compras, búsquedas); con la app Shop también puede leer correos de pedidos de bandejas conectadas.",
+    "en": "According to its consumer privacy policy, it receives name, address, email, payment details, IP, device identifiers and cookie IDs, and activity on stores that use Shopify (products viewed, cart, purchases, searches); with the Shop app it can also read order emails from connected inboxes.",
+    "pt": "Segundo sua política para consumidores, recebe nome, endereço, e-mail, dados de pagamento, IP, identificadores de dispositivo e cookies, e a atividade nas lojas que usam a Shopify (produtos vistos, carrinho, compras, buscas); com o app Shop também pode ler e-mails de pedidos de caixas conectadas."
+   },
+   "fuente_que_hace": "https://en.wikipedia.org/wiki/Shopify",
+   "fuente_datos": "https://www.shopify.com/legal/privacy/consumers",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 11556000000,
+     "moneda": "USD",
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1594805/000159480526000006/exhibit991pressreleaseq420.htm"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2025,
+     "valor": 1231000000,
+     "moneda": "USD",
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1594805/000159480526000006/exhibit991pressreleaseq420.htm"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 7600,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1594805/000159480526000007/shop-20251231.htm"
+    }
+   ],
+   "sanciones": [],
+   "filtraciones": [
+    {
+     "fecha": "2020-09",
+     "que": {
+      "es": "Dos empleados de su equipo de soporte accedieron sin autorización a registros de transacciones de clientes de menos de 200 comercios: nombres, correos, direcciones postales y detalles de pedidos (no números completos de tarjeta).",
+      "en": "Two members of its support team accessed, without authorisation, customer transaction records of fewer than 200 merchants: names, emails, postal addresses and order details (not full card numbers).",
+      "pt": "Dois funcionários da equipe de suporte acessaram sem autorização registros de transações de clientes de menos de 200 comerciantes: nomes, e-mails, endereços postais e detalhes de pedidos (não números completos de cartão)."
+     },
+     "fuente": "https://sootoday.com/national-business/shopify-says-it-notified-privacy-commissioner-of-breach-involving-rogue-staff-2737481"
+    }
+   ],
+   "borrar": "https://privacy.shopify.com/en",
+   "slug": "shopify"
+  },
+  "Salesforce": {
+   "web": "https://www.salesforce.com/",
+   "fundada": 1999,
+   "bolsa": "NYSE: CRM",
+   "que_hace": {
+    "es": "Salesforce vende a empresas software en la nube para gestionar clientes (CRM): ventas, atención al cliente, marketing, comercio electrónico, datos e inteligencia artificial; también es dueña de Slack, Tableau y MuleSoft.",
+    "en": "Salesforce sells businesses cloud software for customer relationship management (CRM): sales, customer service, marketing, e-commerce, data and AI; it also owns Slack, Tableau and MuleSoft.",
+    "pt": "A Salesforce vende a empresas software em nuvem para gestão de clientes (CRM): vendas, atendimento, marketing, comércio eletrônico, dados e inteligência artificial; também é dona do Slack, Tableau e MuleSoft."
+   },
+   "como_gana": {
+    "es": "Cobra a las empresas suscripciones y servicios de soporte por su software en la nube, además de servicios profesionales.",
+    "en": "It charges businesses subscriptions and support fees for its cloud software, plus professional services.",
+    "pt": "Cobra das empresas assinaturas e suporte pelo seu software em nuvem, além de serviços profissionais."
+   },
+   "datos": {
+    "es": "Según su declaración de privacidad, recoge datos de dispositivo y uso de los visitantes de sus webs y correos (IP, navegador, páginas vistas) mediante cookies y píxeles, también para publicidad personalizada, y compra a terceros datos de contacto profesional (cargo, correo, teléfono, perfiles sociales) para marketing. Los datos que sus clientes guardan en Salesforce se rigen por la política de cada cliente.",
+    "en": "According to its privacy statement, it collects device and usage data from visitors to its websites and emails (IP, browser, pages viewed) via cookies and pixels, including for personalised advertising, and obtains business contact data (job title, email, phone, social profiles) from third-party providers for marketing. Data its customers store in Salesforce is governed by each customer's policy.",
+    "pt": "Segundo sua declaração de privacidade, coleta dados de dispositivo e uso dos visitantes dos seus sites e e-mails (IP, navegador, páginas vistas) por cookies e pixels, inclusive para publicidade personalizada, e obtém de terceiros dados de contato profissional (cargo, e-mail, telefone, perfis sociais) para marketing. Os dados que seus clientes guardam na Salesforce seguem a política de cada cliente."
+   },
+   "fuente_que_hace": "https://www.sec.gov/Archives/edgar/data/1108524/000110852426000060/crm-20260131.htm",
+   "fuente_datos": "https://www.salesforce.com/company/privacy/",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2026,
+     "valor": 41525000000,
+     "moneda": "USD",
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1108524/000110852426000056/crm-q4fy26xexhibit991.htm"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2026,
+     "valor": 7457000000,
+     "moneda": "USD",
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1108524/000110852426000056/crm-q4fy26xexhibit991.htm"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2026,
+     "valor": 83334,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1108524/000110852426000060/crm-20260131.htm"
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2021-06",
+     "autoridad": "Kartellgericht (tribunal de competencia de Austria)",
+     "pais": "AT",
+     "importe": 100000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Multa de competencia por ejecutar la compra de Tableau Software antes de obtener la autorización de concentración.",
+      "en": "Competition fine for completing its acquisition of Tableau Software before obtaining merger clearance.",
+      "pt": "Multa concorrencial por concluir a compra da Tableau Software antes de obter a aprovação da operação."
+     },
+     "fuente": "https://www.mlex.com/mlex/amp/articles/2206168"
+    }
+   ],
+   "filtraciones": [
+    {
+     "fecha": "2025-10",
+     "que": {
+      "es": "Un grupo de extorsión robó datos de instancias de Salesforce de cientos de empresas clientes usando tokens OAuth robados de la aplicación de terceros Salesloft Drift; Salesforce dijo que no había indicios de que su plataforma estuviera comprometida y se negó a pagar. Las cifras de registros afectados no están verificadas.",
+      "en": "An extortion group stole data from the Salesforce instances of hundreds of customer companies using stolen OAuth tokens from the third-party app Salesloft Drift; Salesforce said there was no indication its platform was compromised and refused to pay. Record counts are unverified.",
+      "pt": "Um grupo de extorsão roubou dados das instâncias Salesforce de centenas de empresas clientes usando tokens OAuth roubados do aplicativo de terceiros Salesloft Drift; a Salesforce disse não haver indícios de que sua plataforma foi comprometida e se recusou a pagar. Os números de registros não foram verificados."
+     },
+     "fuente": "https://www.bankinfosecurity.net/salesforce-rebuffs-shinyhunters-extortionists-ransom-demand-a-29689"
+    }
+   ],
+   "borrar": "https://www.salesforce.com/form/other/privacy-request/?d=pb",
+   "slug": "salesforce"
+  },
+  "Gemius": {
+   "web": "https://gemius.com/",
+   "fundada": 1999,
+   "que_hace": {
+    "es": "Gemius (Gemius S.A., con sede en Varsovia, Polonia) es una empresa de investigación y tecnología que mide audiencias digitales y multimedia para anunciantes, editores, agencias de medios y comités de la industria en Europa Central y del Este.",
+    "en": "Gemius (Gemius S.A., based in Warsaw, Poland) is a research and technology company that measures digital and cross-media audiences for marketers, publishers, media agencies and industry committees in Central and Eastern Europe.",
+    "pt": "A Gemius (Gemius S.A., com sede em Varsóvia, Polônia) é uma empresa de pesquisa e tecnologia que mede audiências digitais e multimídia para anunciantes, editores, agências de mídia e comitês do setor na Europa Central e Oriental."
+   },
+   "como_gana": {
+    "es": "Vende datos y estudios de medición de audiencias y de eficacia publicitaria a editores, anunciantes, agencias y comités de medición.",
+    "en": "It sells audience-measurement and advertising-effectiveness data and research to publishers, advertisers, agencies and measurement committees.",
+    "pt": "Vende dados e estudos de medição de audiência e de eficácia publicitária a editores, anunciantes, agências e comitês de medição."
+   },
+   "datos": {
+    "es": "Según su política de cookies, coloca cookies a través de los sitios de sus clientes, asocia cada cookie con la dirección IP y la hora de actividad, mide impresiones y clics en anuncios y, con consentimiento, usa el historial de navegación para segmentar publicidad.",
+    "en": "According to its cookie policy, it sets cookies through its clients' websites, links each cookie to the IP address and time of activity, measures ad impressions and clicks and, with consent, uses browsing history for ad targeting.",
+    "pt": "Segundo sua política de cookies, instala cookies por meio dos sites dos seus clientes, associa cada cookie ao endereço IP e ao horário de atividade, mede impressões e cliques em anúncios e, com consentimento, usa o histórico de navegação para segmentar publicidade."
+   },
+   "fuente_que_hace": "https://gemius.com/about-us",
+   "fuente_datos": "https://gemius.com/privacy-policy/cookie-policy/",
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "http://privacypolicy.gemius.com/",
+   "slug": "gemius"
   }
  }
 }

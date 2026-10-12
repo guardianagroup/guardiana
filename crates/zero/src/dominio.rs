@@ -31,10 +31,11 @@ mod tests {
 
 /// Two-letter endings sold to anyone for their look (`.io`, `.co`, `.tv`, `.me`…): they say
 /// nothing about a country.
-const TERMINACIONES_DE_ADORNO: [&str; 42] = [
-    "ac", "ad", "ag", "ai", "am", "as", "bz", "cc", "cd", "cf", "cm", "co", "cx", "dj", "eu", "fm",
-    "ga", "gd", "gg", "gl", "gq", "gs", "im", "io", "je", "la", "ly", "me", "ml", "ms", "mu", "nu",
-    "pw", "sc", "sh", "so", "st", "su", "tk", "to", "tv", "ws",
+const TERMINACIONES_DE_ADORNO: [&str; 50] = [
+    "ac", "ad", "ag", "ai", "am", "as", "bi", "bz", "cc", "cd", "cf", "cm", "co", "cx", "dj", "eu",
+    "ki", "lc", "nr", "sx", "tc", "tl", "vc", "vg", "fm", "ga", "gd", "gg", "gl", "gq", "gs", "im",
+    "io", "je", "la", "ly", "me", "ml", "ms", "mu", "nu", "pw", "sc", "sh", "so", "st", "su", "tk",
+    "to", "tv", "ws",
 ];
 
 /// The country of a site's two-letter ending (`seznam.cz` → `CZ`, `bbc.co.uk` → `GB`), as an
@@ -68,6 +69,8 @@ mod pruebas_del_pais {
         assert_eq!(pais_del_dominio("bbc.co.uk").as_deref(), Some("GB"));
         assert_eq!(pais_del_dominio("gemius.pl").as_deref(), Some("PL"));
         assert_eq!(pais_del_dominio("ad.gt").as_deref(), Some("GT"));
+        // «.bi» is sold as «business intelligence» (newsroom.bi is Deep.BI, from Poland).
+        assert!(pais_del_dominio("newsroom.bi").is_none());
         for no in ["criteo.com", "x.io", "t.co", "a.tv", "y.eu", "cz", ""] {
             assert!(pais_del_dominio(no).is_none(), "{no}");
         }

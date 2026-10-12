@@ -326,6 +326,8 @@
   "cortes_sin_identificar": "Não identificada · domínio de {pais}",
   "cortes_sin_identificar_explica": "Ainda não sabemos qual empresa está por trás. O endereço termina com as letras de {pais}: isso diz onde o nome foi registrado, não prova que a empresa seja de lá.",
   "cortes_otras": "mais {n}",
+  "cortes_ver_otras": "Ver as outras {n} empresas",
+  "cortes_ver_otras_uno": "Ver mais 1 empresa",
   "cortes_otras_uno": "mais 1",
   "cortes_col_hora": "Hora",
   "cortes_col_pagina": "Site onde você estava",
