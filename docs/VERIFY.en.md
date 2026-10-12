@@ -12,7 +12,7 @@ There are three independent checks, from cheapest to strongest:
 | **SHA‑256** against `ledger.jsonl` | the file is the one listed in this repo | ✔ | ✔ | ✔ |
 | **minisign** signature | the file was signed by the GUARDIANA release key, which never touches CI | ✔ | ✔ | ✔ |
 | **Rekor** (Sigstore transparency log) | the ledger line existed on that date and was not rewritten | ✔ | ✔ | ✔ |
-| OS code signature | the OS vendor's chain of trust | — (none on Linux) | ✔ Authenticode, certificate issued to GUARDIANA GROUP by Certum | ✘ not notarized (see below) |
+| OS code signature | the OS vendor's chain of trust | — (none on Linux) | ✘ not yet: no Authenticode certificate (see below) | ✘ not notarized (see below) |
 | Reproducible build | the Linux binary comes bit‑for‑bit from the public commit | ✔ `build/repro.sh` | — | — |
 
 ## The release key
@@ -55,9 +55,9 @@ Get-FileHash .\guardiana-1.0.15-windows-x64.msi -Algorithm SHA256
 Compare with the line for that version in [`ledger.jsonl`](../ledger.jsonl):
 
 - `sha256_unsigned`: hash of the binary as it comes out of the build.
-- `sha256_signed`: hash of the same binary after the Windows Authenticode signature is added
-  (the signature lives inside the file, so the hash changes). On Linux and macOS both are equal;
-  what you download is the `sha256_signed` value.
+- `sha256_signed`: hash of the binary after an operating-system code signature is added (it
+  lives inside the file, so the hash would change). Today no file carries one, so both values are
+  equal for every file, Windows included.
 
 ### 2. minisign
 
@@ -66,19 +66,17 @@ minisign -Vm guardiana-1.0.15-linux-x86_64 -P RWS+xz+N6DvnuDlJCAIOUEku8PLZ9pP1cU
 ```
 
 `rsign` (`cargo install rsign2`) reads the same format: `rsign verify -P <key> <file>`.
-The `.minisig` is downloaded next to each file. **On Windows the minisign signature covers the
-unsigned binary** (`sha256_unsigned`), because the Authenticode signature is added afterwards; to
-check it, strip the Authenticode signature first (`osslsigncode remove-signature`) or simply verify
-the Authenticode chain, which is what Windows itself does.
+The `.minisig` is downloaded next to each file and covers the file exactly as you download it, on
+every platform.
 
-### 3. Windows Authenticode
+### 3. Windows — honest note
 
-```powershell
-Get-AuthenticodeSignature .\guardiana-1.0.15-windows-x64.msi | Format-List
-```
-
-`Status` must be `Valid` and the signer's subject must be **GUARDIANA GROUP**, with a chain to
-Certum. The same certificate signs the `.exe`, every `.msi` (es/en/pt) and GUARDIANA ZERO.
+The Windows installers are **not Authenticode-signed yet**: a code-signing certificate is a yearly
+cost we have not paid so far. Windows SmartScreen will therefore say *Unknown publisher* and may
+show "Windows protected your PC" the first time (*More info → Run anyway*). We never ask you to
+turn off your antivirus. What stands behind the file instead is the same as on Linux and macOS:
+its SHA‑256 and minisign signature, published in this repo and in Rekor before the download
+exists. If we add a certificate, this section and the ledger (`sha256_signed`) will say so.
 
 ### 4. macOS — honest note
 
@@ -120,6 +118,5 @@ Installers and the ZERO browser are built on GitHub's runners and are checked by
 ## What this does *not* prove
 
 - That the code is free of bugs. It proves that what you run is what we published, nothing more.
-- That the Windows certificate cannot be stolen. If it were, the minisign key (offline, separate)
-  and the Rekor log are what would reveal a rogue build: a file signed with Authenticode but
-  absent from the ledger is not ours.
+- That a signing key can never be stolen. The minisign key is kept offline, apart from CI; if a
+  file ever appeared that is not in the ledger and not in Rekor, it is not ours.
