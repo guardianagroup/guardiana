@@ -8,6 +8,7 @@
   let datos = null;
   let abierta = -1;
   let pais = (c) => c || '';
+  const MAX_BARRAS = 60;
   // The reasons that mean «it carried your data»: the same ones the new tab counts.
   const DE_DATO = ['tinta', 'senuelo'];
   let filtroInicial = location.hash === '#dato' ? '@dato' : '';
@@ -42,12 +43,21 @@
   $('f-motivo').addEventListener('change', pintaFilas);
   $('f-texto').addEventListener('input', pintaFilas);
 
+  // When the companies do not fit, the bottom fades until the list is scrolled to its end.
+  function sombraAbajo() {
+    const ul = $('r-empresas');
+    ul.classList.toggle('desborda', ul.scrollHeight > ul.clientHeight + 2);
+    ul.classList.toggle('al-final', ul.scrollTop + ul.clientHeight >= ul.scrollHeight - 2);
+  }
+  $('r-empresas').addEventListener('scroll', sombraAbajo, { passive: true });
+  window.addEventListener('resize', sombraAbajo);
   function barras(lista) {
     const max = Math.max(1, ...lista.map((x) => x.n));
-    const top = lista.slice(0, 12);
-    const resto = lista.slice(12).reduce((a, x) => a + x.n, 0);
+    // As many as the box holds to the bottom (it scrolls inside); the rest, added up.
+    const top = lista.slice(0, MAX_BARRAS);
+    const resto = lista.slice(MAX_BARRAS).reduce((a, x) => a + x.n, 0);
     const li = top.map((x) => `<li><span class="nombre"><button class="enlace-empresa" data-empresa="${esc(x.quien)}">${esc(x.quien)}</button>${x.pais ? `<small>${esc(nombrePais(x.pais))}</small>` : ''}</span><span class="n">${n(x.n)}</span><span class="barra"><i style="width:${Math.max(2, Math.round(100 * x.n / max))}%"></i></span></li>`);
-    if (resto) li.push(`<li><span class="nombre"><small>${esc(tn('cortes_otras', lista.length - 12, { n: n(lista.length - 12) }))}</small></span><span class="n">${n(resto)}</span></li>`);
+    if (resto) li.push(`<li><span class="nombre"><small>${esc(tn('cortes_otras', lista.length - MAX_BARRAS, { n: n(lista.length - MAX_BARRAS) }))}</small></span><span class="n">${n(resto)}</span></li>`);
     return li.join('');
   }
   const simple = (lista, nombre) => lista.slice(0, 10).map((x) => `<li><span>${esc(nombre(x))}</span><span class="n">${n(x.n)}</span></li>`).join('');
@@ -66,6 +76,7 @@
     $('c-emergentes').textContent = n(dia.emergentes || 0);
     $('r-rastro-caja').classList.toggle('oculto', !Z.rastro($('r-rastro'), d.rastro));
     $('r-empresas').innerHTML = barras(d.empresas);
+    sombraAbajo();
     $('r-paises').innerHTML = simple(d.paises, (x) => nombrePais(x.pais));
     $('r-paginas').innerHTML = simple(d.paginas, (x) => x.pagina || t('pestana_aislada'));
     $('r-motivos').innerHTML = d.motivos.map((x) => `<span class="chip rojo">${esc(t('motivo_' + x.motivo))}<b>${n(x.n)}</b></span>`).join('');

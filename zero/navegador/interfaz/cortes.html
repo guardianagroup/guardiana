@@ -43,7 +43,13 @@ h1 { font: 600 clamp(26px, 3.2vw, 38px)/1.1 var(--display); letter-spacing: -.02
 .resumen { display: grid; grid-template-columns: 1.3fr 1fr; gap: 14px; margin-bottom: 30px; }
 .caja { border: 1px solid var(--linea); border-radius: 14px; background: var(--hoja); padding: 16px 18px; }
 .caja h2 { font-size: 13px; font-weight: 600; margin: 0 0 12px; color: var(--gris); }
-.caja.ancha { grid-row: span 3; }
+.caja.ancha { grid-row: span 3; display: flex; flex-direction: column; min-height: 340px; }
+/* «Por empresa» fills its whole box, as tall as the three beside it (the owner, 12 Oct 2026):
+   the list does not set the box's height, it scrolls inside it when it is longer. */
+.barras-marco { position: relative; flex: 1; min-height: 0; }
+.barras-marco .barras { position: absolute; inset: 0; overflow-y: auto; padding-right: 8px; align-content: start; }
+.barras-marco .barras.desborda { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 34px), transparent); }
+.barras-marco .barras.desborda.al-final { -webkit-mask-image: none; mask-image: none; }
 .barras { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
 .barras li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; align-items: baseline; }
 .barras .nombre { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -85,7 +91,7 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
 .nota { margin-top: 22px; font-size: 12.5px; color: var(--gris); max-width: 72ch; }
 #aviso { position: fixed; left: 50%; bottom: 18px; transform: translate(-50%, 8px); padding: 10px 16px; border-radius: 10px; background: var(--tinta); color: var(--hoja); font-size: 13px; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; }
 #aviso.visto { opacity: 1; transform: translate(-50%, 0); }
-@media screen and (max-width: 860px) { .resumen { grid-template-columns: 1fr; } .rastro-caja .rastro { grid-template-columns: 1fr; } .rastro-caja .rastro li:nth-child(2) { border-top: 1px solid var(--linea); } .cifras.segunda { margin-top: -28px; } .caja.ancha { grid-row: auto; } .cifras { grid-template-columns: repeat(2, 1fr); } .det { grid-template-columns: 1fr; } }
+@media screen and (max-width: 860px) { .resumen { grid-template-columns: 1fr; } .rastro-caja .rastro { grid-template-columns: 1fr; } .rastro-caja .rastro li:nth-child(2) { border-top: 1px solid var(--linea); } .cifras.segunda { margin-top: -28px; } .caja.ancha { grid-row: auto; } .cifras { grid-template-columns: repeat(2, 1fr); } .det { grid-template-columns: 1fr; } .caja.ancha { min-height: 420px; } }
 /* Narrow (the side panel open, a small window): each cut is a short card, nothing scrolls sideways. */
 @media screen and (max-width: 760px) {
   main { padding: 20px 16px 48px; }
@@ -127,6 +133,8 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
   body.solo-resumen .lista-cab, body.solo-resumen table, body.solo-resumen #recortada,
   body.solo-resumen #vacio, body.solo-resumen #informe-filtro { display: none !important; }
   .rastro-caja { break-inside: avoid; }
+  .barras-marco .barras { position: static; overflow: visible; padding-right: 0; -webkit-mask-image: none !important; mask-image: none !important; }
+  .caja.ancha { min-height: 0; }
   .rastro .pista i { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .informe { display: block; }
   tr.detalle { display: none !important; }
@@ -187,7 +195,7 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
     <ol class="rastro" id="r-rastro"></ol>
   </section>
   <div class="resumen" id="resumen">
-    <section class="caja ancha"><h2 data-t="cortes_por_empresa"></h2><ul class="barras" id="r-empresas"></ul></section>
+    <section class="caja ancha"><h2 data-t="cortes_por_empresa"></h2><div class="barras-marco"><ul class="barras" id="r-empresas"></ul></div></section>
     <section class="caja"><h2 data-t="cortes_por_pais"></h2><ul class="lista-simple" id="r-paises"></ul></section>
     <section class="caja"><h2 data-t="cortes_por_motivo"></h2><div class="fichas" id="r-motivos"></div><h2 style="margin-top:16px" data-t="cortes_por_tipo"></h2><div class="fichas" id="r-tipos"></div></section>
     <section class="caja"><h2 data-t="cortes_por_pagina"></h2><ul class="lista-simple" id="r-paginas"></ul></section>
