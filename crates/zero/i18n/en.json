@@ -607,6 +607,7 @@
   "ficha_cifra_empleados": "Employees ({anio})",
   "ficha_sanciones": "Fines and sanctions",
   "ficha_total_sanciones": "In total: {total}",
+  "ficha_anulada": "annulled",
   "ficha_sin_sanciones": "We found no published fines or sanctions when we checked it on {fecha}.",
   "ficha_filtraciones": "Data breaches and hacks",
   "ficha_afectados": "{n} people affected",

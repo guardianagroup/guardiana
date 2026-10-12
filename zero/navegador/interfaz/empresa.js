@@ -83,7 +83,7 @@
         s.push(`<section><h2>${esc(t('ficha_dinero'))}</h2><div class="cifras-dinero">${cajas.join('')}</div></section>`);
       }
       const sanciones = Array.isArray(f.sanciones) ? f.sanciones : [];
-      s.push(`<section><h2>${esc(t('ficha_sanciones'))}</h2>${sanciones.length ? totales(sanciones) + `<ul class="lista">${sanciones.map((x) => `<li><div class="linea1"><span>${esc(x.autoridad || '')}${x.pais ? ` · ${esc(pais(x.pais))}` : ''} · ${esc(fecha(x.fecha))}</span><span class="importe">${x.importe ? esc(dinero(x.importe, x.moneda)) : ''}</span></div><div class="linea2">${esc(L(x.motivo))}${x.estado ? ` ${esc(L(x.estado))}` : ''}${cita(x.fuente)}</div></li>`).join('')}</ul>` : `<p class="vacia">${esc(t('ficha_sin_sanciones', { fecha: fecha(d.revisada) }))}</p>`}</section>`);
+      s.push(`<section><h2>${esc(t('ficha_sanciones'))}</h2>${sanciones.length ? totales(sanciones) + `<ul class="lista">${sanciones.map((x) => `<li><div class="linea1"><span>${esc(x.autoridad || '')}${x.pais ? ` · ${esc(pais(x.pais))}` : ''} · ${esc(fecha(x.fecha))}</span><span class="importe">${importe(x)}</span></div><div class="linea2">${esc(L(x.motivo))}${x.estado ? ` ${esc(L(x.estado))}` : ''}${cita(x.fuente)}</div></li>`).join('')}</ul>` : `<p class="vacia">${esc(t('ficha_sin_sanciones', { fecha: fecha(d.revisada) }))}</p>`}</section>`);
       const filtraciones = Array.isArray(f.filtraciones) ? f.filtraciones : [];
       s.push(`<section><h2>${esc(t('ficha_filtraciones'))}</h2>${filtraciones.length ? `<ul class="lista">${filtraciones.map((x) => `<li class="ambar"><div class="linea1"><span>${esc(fecha(x.fecha))}</span><span>${x.afectados ? esc(tn('ficha_afectados', x.afectados, { n: n(x.afectados) })) : ''}</span></div><div class="linea2">${esc(L(x.que))}${cita(x.fuente)}</div></li>`).join('')}</ul>` : `<p class="vacia">${esc(t('ficha_sin_filtraciones', { fecha: fecha(d.revisada) }))}</p>`}</section>`);
       if (f.web) s.push(`<section><h2>${esc(t('ficha_web'))}</h2><p>${enlace(f.web)}</p></section>`);
@@ -103,11 +103,21 @@
     $('nota').textContent = f && d.revisada ? t('ficha_nota', { fecha: fecha(d.revisada) }) : t('ficha_nota_sin');
   }
 
-  // The fines added up, by currency (never converted: a rate would be a figure of ours).
+  // A fine as imposed; cut on appeal, the amount that stands beside it; annulled, said so.
+  function importe(x) {
+    if (!x.importe) return '';
+    const puesta = esc(dinero(x.importe, x.moneda));
+    if (x.vigente === false) return `<s>${puesta}</s> ${esc(t('ficha_anulada'))}`;
+    if (x.importe_final) return `<s>${puesta}</s> ${esc(dinero(x.importe_final, x.moneda))}`;
+    return puesta;
+  }
+  // The fines that stand, added up by currency (never converted: a rate would be a figure of
+  // ours); an annulled one does not count, a reduced one counts as reduced.
   function totales(lista) {
     const suma = new Map();
     for (const x of lista) {
-      const v = Number(x.importe);
+      if (x.vigente === false) continue;
+      const v = Number(x.importe_final || x.importe);
       if (!Number.isFinite(v) || !v || !x.moneda) continue;
       suma.set(x.moneda, (suma.get(x.moneda) || 0) + v);
     }

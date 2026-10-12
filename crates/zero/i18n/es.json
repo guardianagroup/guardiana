@@ -607,6 +607,7 @@
   "ficha_cifra_empleados": "Empleados ({anio})",
   "ficha_sanciones": "Multas y sanciones",
   "ficha_total_sanciones": "En total: {total}",
+  "ficha_anulada": "anulada",
   "ficha_sin_sanciones": "No encontramos multas ni sanciones publicadas al revisarla el {fecha}.",
   "ficha_filtraciones": "Filtraciones y hackeos de datos",
   "ficha_afectados": "{n} personas afectadas",

@@ -1,4 +1,833 @@
 {
-  "actualizado": "",
-  "empresas": {}
+ "actualizado": "2026-10-12",
+ "empresas": {
+  "Google": {
+   "web": "https://about.google/",
+   "fundada": 1998,
+   "bolsa": "NASDAQ: GOOGL (Alphabet Inc.)",
+   "que_hace": {
+    "es": "Google, filial de Alphabet Inc., ofrece a las personas el buscador Google, YouTube, Android, Chrome, Gmail y otros servicios, y vende publicidad y servicios en la nube (Google Cloud) a empresas.",
+    "en": "Google, a subsidiary of Alphabet Inc., offers people Google Search, YouTube, Android, Chrome, Gmail and other services, and sells advertising and cloud services (Google Cloud) to businesses.",
+    "pt": "O Google, subsidiária da Alphabet Inc., oferece às pessoas a busca Google, o YouTube, o Android, o Chrome, o Gmail e outros serviços, e vende publicidade e serviços de nuvem (Google Cloud) para empresas."
+   },
+   "como_gana": {
+    "es": "La mayor parte de sus ingresos viene de la publicidad en el buscador, YouTube y sitios asociados; el resto, de Google Cloud, suscripciones, plataformas y dispositivos.",
+    "en": "Most of its revenue comes from advertising on Search, YouTube and partner sites; the rest comes from Google Cloud, subscriptions, platforms and devices.",
+    "pt": "A maior parte da receita vem de publicidade na busca, no YouTube e em sites parceiros; o restante vem do Google Cloud, de assinaturas, plataformas e dispositivos."
+   },
+   "datos": {
+    "es": "Según su política de privacidad, recoge lo que creas o proporcionas (datos de la cuenta, correos, fotos, documentos), datos de tus apps, navegadores y dispositivos, tu actividad (búsquedas, vídeos vistos, compras) y tu ubicación (GPS, IP, señales cercanas). Los usa, entre otras cosas, para personalizar contenido y mostrar anuncios personalizados.",
+    "en": "According to its privacy policy, it collects what you create or provide (account details, emails, photos, documents), information about your apps, browsers and devices, your activity (searches, videos watched, purchases) and your location (GPS, IP address, nearby signals). It uses this, among other things, to personalise content and show personalised ads.",
+    "pt": "Segundo sua política de privacidade, coleta o que você cria ou fornece (dados da conta, e-mails, fotos, documentos), informações sobre seus apps, navegadores e dispositivos, sua atividade (pesquisas, vídeos assistidos, compras) e sua localização (GPS, IP, sinais próximos). Usa esses dados, entre outras coisas, para personalizar conteúdo e exibir anúncios personalizados."
+   },
+   "fuente_que_hace": "https://s206.q4cdn.com/479360582/files/doc_financials/2025/q4/2025q4-alphabet-earnings-release.pdf",
+   "fuente_datos": "https://policies.google.com/privacy",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 402836000000,
+     "moneda": "USD",
+     "fuente": "https://s206.q4cdn.com/479360582/files/doc_financials/2025/q4/2025q4-alphabet-earnings-release.pdf"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2025,
+     "valor": 132170000000,
+     "moneda": "USD",
+     "fuente": "https://s206.q4cdn.com/479360582/files/doc_financials/2025/q4/2025q4-alphabet-earnings-release.pdf"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 190820,
+     "fuente": "https://s206.q4cdn.com/479360582/files/doc_financials/2025/q4/2025q4-alphabet-earnings-release.pdf"
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2026-07-23",
+     "autoridad": "Comisión Europea",
+     "pais": "EU",
+     "importe": 890000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Ley de Mercados Digitales (DMA): favorecer sus propios resultados de compras, hoteles, transporte y deportes en el buscador (460 millones) e impedir que los desarrolladores dirijan a los usuarios a ofertas fuera de Google Play (430 millones).",
+      "en": "Digital Markets Act (DMA): favouring its own shopping, hotel, transport and sports results in Search (460 million) and restricting developers from steering users to offers outside Google Play (430 million).",
+      "pt": "Lei dos Mercados Digitais (DMA): favorecer seus próprios resultados de compras, hotéis, transporte e esportes na busca (460 milhões) e impedir que desenvolvedores direcionem usuários a ofertas fora do Google Play (430 milhões)."
+     },
+     "fuente": "https://europa.eu/newsroom/ecpc-failover/pdf/ip-26-1670_en.pdf"
+    },
+    {
+     "fecha": "2025-09-05",
+     "autoridad": "Comisión Europea",
+     "pais": "EU",
+     "importe": 2950000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Competencia: abuso de posición dominante en tecnología publicitaria, favoreciendo su propia plataforma de anuncios AdX desde al menos 2014.",
+      "en": "Antitrust: abuse of a dominant position in advertising technology by favouring its own AdX ad exchange since at least 2014.",
+      "pt": "Concorrência: abuso de posição dominante em tecnologia de publicidade, favorecendo sua própria plataforma de anúncios AdX desde pelo menos 2014."
+     },
+     "fuente": "https://www.belganewsagency.eu/commission-fines-google-295bn-euros-for-abusive-practices-in-advertising-tech"
+    },
+    {
+     "fecha": "2025-09-01",
+     "autoridad": "CNIL",
+     "pais": "FR",
+     "importe": 325000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Mostrar anuncios con forma de correo entre los emails de Gmail sin consentimiento previo, y consentimiento no válido a las cookies publicitarias al crear una cuenta Google (Google LLC 200 millones, Google Ireland 125 millones).",
+      "en": "Showing email-like ads between Gmail messages without prior consent, and invalid consent to advertising cookies when creating a Google account (Google LLC 200 million, Google Ireland 125 million).",
+      "pt": "Exibir anúncios em formato de e-mail entre as mensagens do Gmail sem consentimento prévio, e consentimento inválido para cookies de publicidade ao criar uma conta Google (Google LLC 200 milhões, Google Ireland 125 milhões)."
+     },
+     "fuente": "https://cnil.fr/fr/publicites-inserees-entre-les-courriels-et-cookies-la-cnil-sanctionne-google-dune-amende-de-325"
+    },
+    {
+     "fecha": "2025-05-09",
+     "autoridad": "Fiscal General de Texas",
+     "pais": "US",
+     "importe": 1375000000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con el fiscal general de Texas por rastrear la ubicación, recoger datos de búsquedas en modo incógnito y capturar datos biométricos (voz y geometría facial) sin consentimiento.",
+      "en": "Settlement with the Texas Attorney General over tracking location, collecting data from incognito searches and capturing biometric data (voiceprints and facial geometry) without consent.",
+      "pt": "Acordo com o procurador-geral do Texas por rastrear localização, coletar dados de pesquisas em modo anônimo e capturar dados biométricos (voz e geometria facial) sem consentimento."
+     },
+     "fuente": "https://texasattorneygeneral.gov/news/releases/attorney-general-ken-paxton-secures-historic-1375-billion-settlement-google-related-texans-data"
+    },
+    {
+     "fecha": "2022-11-14",
+     "autoridad": "Fiscales generales de 40 estados",
+     "pais": "US",
+     "importe": 391500000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con 40 estados por seguir recogiendo datos de ubicación cuando los usuarios creían haber desactivado el rastreo en su cuenta.",
+      "en": "Settlement with 40 states over continuing to collect location data after users believed they had turned off location tracking in their account settings.",
+      "pt": "Acordo com 40 estados por continuar coletando dados de localização depois que os usuários acreditavam ter desativado o rastreamento na conta."
+     },
+     "fuente": "https://www.cnbc.com/2022/11/14/google-settles-with-40-states-over-location-tracking-practices.html"
+    },
+    {
+     "fecha": "2022-10",
+     "autoridad": "Fiscal General de Arizona",
+     "pais": "US",
+     "importe": 85000000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con Arizona en una demanda por sus prácticas de rastreo de ubicación.",
+      "en": "Settlement with Arizona in a lawsuit over its location-tracking practices.",
+      "pt": "Acordo com o Arizona em um processo sobre suas práticas de rastreamento de localização."
+     },
+     "fuente": "https://www.cnbc.com/2022/11/14/google-settles-with-40-states-over-location-tracking-practices.html"
+    },
+    {
+     "fecha": "2022",
+     "autoridad": "AEPD",
+     "pais": "ES",
+     "importe": 10000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Transferir datos al proyecto Lumen sin base legal y dificultar el ejercicio del derecho de supresión.",
+      "en": "Transferring data to the Lumen Project without a legal basis and making it hard to exercise the right to erasure.",
+      "pt": "Transferir dados para o projeto Lumen sem base legal e dificultar o exercício do direito de exclusão."
+     },
+     "fuente": "https://termly.io/resources/articles/google-gdpr-fine"
+    },
+    {
+     "fecha": "2021-12-31",
+     "autoridad": "CNIL",
+     "pais": "FR",
+     "importe": 150000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Hacer más difícil rechazar las cookies que aceptarlas, incluido en YouTube (Google LLC 90 millones, Google Ireland 60 millones).",
+      "en": "Making it harder to refuse cookies than to accept them, including on YouTube (Google LLC 90 million, Google Ireland 60 million).",
+      "pt": "Tornar mais difícil recusar cookies do que aceitá-los, inclusive no YouTube (Google LLC 90 milhões, Google Ireland 60 milhões)."
+     },
+     "fuente": "https://next.ink/brief-article/214-millions-deuros-damendes-cnil-en-2021/"
+    },
+    {
+     "fecha": "2020-12",
+     "autoridad": "CNIL",
+     "pais": "FR",
+     "importe": 100000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Colocar cookies publicitarias sin consentimiento previo, sin informar a los usuarios y con un mecanismo de rechazo defectuoso.",
+      "en": "Placing advertising cookies without prior consent, without informing users and with a partly defective refusal mechanism.",
+      "pt": "Instalar cookies de publicidade sem consentimento prévio, sem informar os usuários e com um mecanismo de recusa defeituoso."
+     },
+     "estado": {
+      "es": "Confirmada por el Conseil d'État en enero de 2022.",
+      "en": "Upheld by the Conseil d'État in January 2022.",
+      "pt": "Confirmada pelo Conseil d'État em janeiro de 2022."
+     },
+     "fuente": "https://siecledigital.fr/2022/01/31/le-conseil-detat-confirme-lamende-de-la-cnil-prononcee-en-2020-envers-google/"
+    },
+    {
+     "fecha": "2020",
+     "autoridad": "IMY (Autoridad sueca de protección de datos)",
+     "pais": "SE",
+     "importe": 75000000,
+     "moneda": "SEK",
+     "motivo": {
+      "es": "Fallos en la aplicación del derecho al olvido, que permitían a los sitios web volver a publicar contenido retirado de los resultados de búsqueda.",
+      "en": "Failures in applying the right to be forgotten, allowing website owners to republish content delisted from search results.",
+      "pt": "Falhas na aplicação do direito ao esquecimento, que permitiam a sites republicar conteúdo removido dos resultados de busca."
+     },
+     "estado": {
+      "es": "Recurrida por Google.",
+      "en": "Appealed by Google.",
+      "pt": "Contestada pelo Google."
+     },
+     "fuente": "https://termly.io/resources/articles/google-gdpr-fine"
+    },
+    {
+     "fecha": "2019-09-04",
+     "autoridad": "FTC y Fiscal General de Nueva York",
+     "pais": "US",
+     "importe": 170000000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo: YouTube recogió identificadores (cookies) de espectadores de canales infantiles sin consentimiento de los padres para mostrar anuncios dirigidos (ley COPPA). 136 millones a la FTC y 34 millones a Nueva York.",
+      "en": "Settlement: YouTube collected identifiers (cookies) from viewers of child-directed channels without parental consent to serve targeted ads (COPPA). 136 million to the FTC and 34 million to New York.",
+      "pt": "Acordo: o YouTube coletou identificadores (cookies) de espectadores de canais infantis sem consentimento dos pais para exibir anúncios direcionados (lei COPPA). 136 milhões para a FTC e 34 milhões para Nova York."
+     },
+     "fuente": "https://www.ftc.gov/news-events/news/press-releases/2019/09/google-youtube-will-pay-record-170-million-alleged-violations-childrens-privacy-law"
+    },
+    {
+     "fecha": "2019-03-20",
+     "autoridad": "Comisión Europea",
+     "pais": "EU",
+     "importe": 1490000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Competencia: cláusulas en los contratos de AdSense para búsquedas que impedían a los sitios web mostrar anuncios de rivales.",
+      "en": "Antitrust: clauses in AdSense for Search contracts that blocked websites from showing rivals' ads.",
+      "pt": "Concorrência: cláusulas nos contratos do AdSense para pesquisa que impediam sites de exibir anúncios de concorrentes."
+     },
+     "estado": {
+      "es": "Anulada por el Tribunal General de la UE en septiembre de 2024.",
+      "en": "Annulled by the EU General Court in September 2024.",
+      "pt": "Anulada pelo Tribunal Geral da UE em setembro de 2024."
+     },
+     "fuente": "https://www.techrepublic.com/article/news-google-setback-appeal-eu-fine/",
+     "vigente": false
+    },
+    {
+     "fecha": "2019-01-21",
+     "autoridad": "CNIL",
+     "pais": "FR",
+     "importe": 50000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "RGPD: falta de transparencia y de una base legal válida para personalizar anuncios, tras denuncias de NOYB y La Quadrature du Net.",
+      "en": "GDPR: lack of transparency and of a valid legal basis for ad personalisation, following complaints by NOYB and La Quadrature du Net.",
+      "pt": "RGPD: falta de transparência e de base legal válida para personalizar anúncios, após denúncias da NOYB e da La Quadrature du Net."
+     },
+     "fuente": "https://paperjam.lu/article/news-google-condamne-a-50-millions-deuros-par-la-cnil"
+    },
+    {
+     "fecha": "2018-07-18",
+     "autoridad": "Comisión Europea",
+     "pais": "EU",
+     "importe": 4340000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Competencia: restricciones ilegales a fabricantes de dispositivos Android y operadores móviles para reforzar su dominio en las búsquedas.",
+      "en": "Antitrust: illegal restrictions on Android device makers and mobile network operators to cement its dominance in search.",
+      "pt": "Concorrência: restrições ilegais a fabricantes de dispositivos Android e operadoras móveis para reforçar seu domínio nas buscas."
+     },
+     "estado": {
+      "es": "Reducida a 4.125 millones de euros por el Tribunal General en 2022; el Tribunal de Justicia de la UE desestimó el recurso de Google en 2026.",
+      "en": "Reduced to EUR 4.125 billion by the General Court in 2022; the EU Court of Justice dismissed Google's appeal in 2026.",
+      "pt": "Reduzida para 4,125 bilhões de euros pelo Tribunal Geral em 2022; o Tribunal de Justiça da UE rejeitou o recurso do Google em 2026."
+     },
+     "fuente": "https://ec.europa.eu/newsroom/comp/items/631884",
+     "importe_final": 4125000000
+    },
+    {
+     "fecha": "2017-06-27",
+     "autoridad": "Comisión Europea",
+     "pais": "EU",
+     "importe": 2420000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Competencia: favorecer su comparador de precios (Google Shopping) en los resultados de búsqueda.",
+      "en": "Antitrust: favouring its own comparison shopping service (Google Shopping) in search results.",
+      "pt": "Concorrência: favorecer seu comparador de preços (Google Shopping) nos resultados de busca."
+     },
+     "estado": {
+      "es": "Confirmada de forma definitiva por el Tribunal de Justicia de la UE en septiembre de 2024.",
+      "en": "Upheld on final appeal by the EU Court of Justice in September 2024.",
+      "pt": "Confirmada em definitivo pelo Tribunal de Justiça da UE em setembro de 2024."
+     },
+     "fuente": "https://www.techrepublic.com/article/news-google-setback-appeal-eu-fine/"
+    },
+    {
+     "fecha": "2012-08-09",
+     "autoridad": "FTC",
+     "pais": "US",
+     "importe": 22500000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Sanción civil acordada con la FTC por eludir el bloqueo de cookies de Safari para rastrear a usuarios a los que había dicho que estaban protegidos.",
+      "en": "Civil penalty agreed with the FTC for circumventing Safari's cookie blocking to track users it had told were protected.",
+      "pt": "Multa civil acordada com a FTC por contornar o bloqueio de cookies do Safari para rastrear usuários aos quais havia dito que estavam protegidos."
+     },
+     "fuente": "https://guptadeepak.com/tech-fines/violation/google-us-safari-2012/"
+    }
+   ],
+   "filtraciones": [
+    {
+     "fecha": "2018-12-10",
+     "afectados": 52500000,
+     "que": {
+      "es": "Un fallo en una API de Google+ permitió a apps ver datos de perfil que los usuarios no habían hecho públicos, como nombre, email, ocupación y edad.",
+      "en": "A bug in a Google+ API let apps see profile data users had not made public, such as name, email address, occupation and age.",
+      "pt": "Uma falha em uma API do Google+ permitiu que apps vissem dados de perfil que os usuários não tinham tornado públicos, como nome, e-mail, ocupação e idade."
+     },
+     "fuente": "https://blog.google/technology/safety-security/expediting-changes-google-plus/"
+    }
+   ],
+   "borrar": "https://myaccount.google.com/delete-services-or-account",
+   "slug": "google"
+  },
+  "Meta": {
+   "web": "https://www.meta.com/",
+   "bolsa": "NASDAQ: META",
+   "que_hace": {
+    "es": "Meta Platforms opera las apps Facebook, Instagram, Messenger y WhatsApp, usadas por personas y empresas, y desarrolla dispositivos de realidad virtual y aumentada (Reality Labs).",
+    "en": "Meta Platforms runs the Facebook, Instagram, Messenger and WhatsApp apps, used by people and businesses, and develops virtual and augmented reality devices (Reality Labs).",
+    "pt": "A Meta Platforms opera os apps Facebook, Instagram, Messenger e WhatsApp, usados por pessoas e empresas, e desenvolve dispositivos de realidade virtual e aumentada (Reality Labs)."
+   },
+   "como_gana": {
+    "es": "Casi todos sus ingresos vienen de la publicidad: 196.175 de 200.966 millones de dólares en 2025.",
+    "en": "Almost all of its revenue comes from advertising: USD 196,175 million of 200,966 million in 2025.",
+    "pt": "Quase toda a receita vem de publicidade: 196.175 de 200.966 milhões de dólares em 2025."
+   },
+   "datos": {
+    "es": "Su política de privacidad cubre Facebook, Instagram, Messenger y otros productos. Según la autoridad irlandesa (DPC), usa los datos de sus usuarios para publicidad personalizada, y según Texas aplicó durante más de una década reconocimiento facial a las fotos subidas a Facebook.",
+    "en": "Its privacy policy covers Facebook, Instagram, Messenger and other products. According to the Irish regulator (DPC) it uses users' data for personalised advertising, and according to Texas it ran facial recognition on photos uploaded to Facebook for more than a decade.",
+    "pt": "Sua política de privacidade cobre Facebook, Instagram, Messenger e outros produtos. Segundo a autoridade irlandesa (DPC), usa os dados dos usuários para publicidade personalizada e, segundo o Texas, aplicou por mais de uma década reconhecimento facial às fotos enviadas ao Facebook."
+   },
+   "fuente_que_hace": "https://s21.q4cdn.com/399680738/files/doc_financials/2025/q4/Meta-12-31-2025-Exhibit-99-1-FINAL.pdf",
+   "fuente_datos": "https://www.facebook.com/privacy/policy/",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 200966000000,
+     "moneda": "USD",
+     "fuente": "https://s21.q4cdn.com/399680738/files/doc_financials/2025/q4/Meta-12-31-2025-Exhibit-99-1-FINAL.pdf"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2025,
+     "valor": 60458000000,
+     "moneda": "USD",
+     "fuente": "https://s21.q4cdn.com/399680738/files/doc_financials/2025/q4/Meta-12-31-2025-Exhibit-99-1-FINAL.pdf"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 78865,
+     "fuente": "https://s21.q4cdn.com/399680738/files/doc_financials/2025/q4/Meta-12-31-2025-Exhibit-99-1-FINAL.pdf"
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2025-04",
+     "autoridad": "Comisión Europea",
+     "pais": "EU",
+     "importe": 200000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Ley de Mercados Digitales (DMA): su modelo de 'pagar o consentir' no ofrecía una opción equivalente con menos datos personales ni permitía consentir libremente la combinación de datos.",
+      "en": "Digital Markets Act (DMA): its 'consent or pay' model offered no equivalent option using less personal data and did not let users freely consent to combining their data.",
+      "pt": "Lei dos Mercados Digitais (DMA): seu modelo de 'pagar ou consentir' não oferecia uma opção equivalente com menos dados pessoais nem permitia consentir livremente com a combinação de dados."
+     },
+     "fuente": "https://scl.org/?p=18463"
+    },
+    {
+     "fecha": "2024-12-17",
+     "autoridad": "DPC (Irlanda)",
+     "pais": "IE",
+     "importe": 251000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "RGPD: notificación incompleta y falta de protección de datos desde el diseño y por defecto en relación con la brecha de 2018 que afectó a unos 29 millones de cuentas de Facebook.",
+      "en": "GDPR: incomplete breach notification and lack of data protection by design and by default related to the 2018 breach affecting about 29 million Facebook accounts.",
+      "pt": "RGPD: notificação incompleta e falta de proteção de dados desde a concepção e por padrão, ligadas à violação de 2018 que afetou cerca de 29 milhões de contas do Facebook."
+     },
+     "fuente": "https://dataprotection.ie/news-media/press-releases/irish-data-protection-commission-fines-meta-eu251-million"
+    },
+    {
+     "fecha": "2024-11",
+     "autoridad": "Comisión Europea",
+     "pais": "EU",
+     "importe": 797720000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Competencia: vincular Facebook Marketplace a la red social Facebook e imponer condiciones injustas a otros servicios de anuncios clasificados.",
+      "en": "Antitrust: tying Facebook Marketplace to the Facebook social network and imposing unfair trading conditions on other online classified ads services.",
+      "pt": "Concorrência: vincular o Facebook Marketplace à rede social Facebook e impor condições injustas a outros serviços de anúncios classificados."
+     },
+     "fuente": "https://www.jurist.org/news/2024/11/eu-fines-meta-european-commission-to-collect-e797m-over-facebook-marketplaces-anti-competitive-advertisement-model"
+    },
+    {
+     "fecha": "2024-09-27",
+     "autoridad": "DPC (Irlanda)",
+     "pais": "IE",
+     "importe": 91000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "RGPD: guardar contraseñas de usuarios en texto plano, sin cifrar, en sus sistemas internos, y no notificar ni documentar la brecha.",
+      "en": "GDPR: storing user passwords in plaintext, without encryption, on internal systems, and failing to notify and document the breach.",
+      "pt": "RGPD: armazenar senhas de usuários em texto simples, sem criptografia, em sistemas internos, e não notificar nem documentar a violação."
+     },
+     "fuente": "https://www.dataprotection.ie/en/news-media/press-releases/DPC-announces-91-million-fine-of-Meta"
+    },
+    {
+     "fecha": "2024-07-30",
+     "autoridad": "Fiscal General de Texas",
+     "pais": "US",
+     "importe": 1400000000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con el fiscal general de Texas por aplicar reconocimiento facial a fotos subidas a Facebook y captar datos biométricos sin informar ni pedir consentimiento (ley CUBI). Se paga en cinco años.",
+      "en": "Settlement with the Texas Attorney General over running facial recognition on photos uploaded to Facebook and capturing biometric data without notice or consent (CUBI Act). Paid over five years.",
+      "pt": "Acordo com o procurador-geral do Texas por aplicar reconhecimento facial a fotos enviadas ao Facebook e captar dados biométricos sem informar nem pedir consentimento (lei CUBI). Pago em cinco anos."
+     },
+     "fuente": "https://www.texasattorneygeneral.gov/news/releases/attorney-general-ken-paxton-secures-14-billion-settlement-meta-over-its-unauthorized-capture"
+    },
+    {
+     "fecha": "2023-05-22",
+     "autoridad": "DPC (Irlanda)",
+     "pais": "IE",
+     "importe": 1200000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "RGPD: transferir datos personales de usuarios europeos de Facebook a Estados Unidos sin cumplir las normas de transferencias internacionales.",
+      "en": "GDPR: transferring EU Facebook users' personal data to the United States in breach of international transfer rules.",
+      "pt": "RGPD: transferir dados pessoais de usuários europeus do Facebook para os Estados Unidos em violação das regras de transferência internacional."
+     },
+     "fuente": "https://techcrunch.com/2024/08/10/the-10-largest-gdpr-fines-on-big-tech"
+    },
+    {
+     "fecha": "2023-01-19",
+     "autoridad": "DPC (Irlanda)",
+     "pais": "IE",
+     "importe": 5500000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "RGPD: infracciones de WhatsApp Ireland relacionadas con la base legal y la transparencia del tratamiento de datos en su servicio.",
+      "en": "GDPR: breaches by WhatsApp Ireland relating to the legal basis and transparency of data processing in its service.",
+      "pt": "RGPD: infrações do WhatsApp Ireland relacionadas à base legal e à transparência do tratamento de dados em seu serviço."
+     },
+     "fuente": "https://www.dataprotection.ie/en/news-media/?page=15"
+    },
+    {
+     "fecha": "2023-01-04",
+     "autoridad": "DPC (Irlanda)",
+     "pais": "IE",
+     "importe": 390000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "RGPD: usar el contrato como base legal no válida para tratar datos con fines de publicidad personalizada en Facebook e Instagram, y falta de transparencia.",
+      "en": "GDPR: relying on contract as an invalid legal basis to process data for personalised advertising on Facebook and Instagram, and lack of transparency.",
+      "pt": "RGPD: usar o contrato como base legal inválida para tratar dados para publicidade personalizada no Facebook e no Instagram, e falta de transparência."
+     },
+     "fuente": "https://techcrunch.com/2024/08/10/the-10-largest-gdpr-fines-on-big-tech"
+    },
+    {
+     "fecha": "2022-11-28",
+     "autoridad": "DPC (Irlanda)",
+     "pais": "IE",
+     "importe": 265000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "RGPD: fallos de protección de datos desde el diseño y por defecto que permitieron extraer y publicar en internet datos de unos 530 millones de usuarios de Facebook.",
+      "en": "GDPR: data protection by design and by default failures that allowed data of about 530 million Facebook users to be scraped and posted online.",
+      "pt": "RGPD: falhas de proteção de dados desde a concepção e por padrão que permitiram extrair e publicar na internet dados de cerca de 530 milhões de usuários do Facebook."
+     },
+     "fuente": "https://www.privacylaws.com/news/ireland-dpa-fines-meta-265-million/"
+    },
+    {
+     "fecha": "2022-09-02",
+     "autoridad": "DPC (Irlanda)",
+     "pais": "IE",
+     "importe": 405000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "RGPD: tratamiento de datos de menores en Instagram (configuración de perfiles y cuentas de niños).",
+      "en": "GDPR: handling of children's data on Instagram (profile and account settings for children).",
+      "pt": "RGPD: tratamento de dados de menores no Instagram (configurações de perfis e contas de crianças)."
+     },
+     "fuente": "https://www.thejakartapost.com/world/2022/09/06/irish-data-watchdog-fines-instagram-405-million-euros-"
+    },
+    {
+     "fecha": "2022-03",
+     "autoridad": "DPC (Irlanda)",
+     "pais": "IE",
+     "importe": 17000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "RGPD: no poder demostrar las medidas de seguridad aplicadas en doce brechas de datos notificadas en 2018.",
+      "en": "GDPR: failing to demonstrate the security measures used in twelve data breaches notified in 2018.",
+      "pt": "RGPD: não conseguir demonstrar as medidas de segurança aplicadas em doze violações de dados notificadas em 2018."
+     },
+     "fuente": "https://scl.org/?p=5263"
+    },
+    {
+     "fecha": "2021-12-31",
+     "autoridad": "CNIL",
+     "pais": "FR",
+     "importe": 60000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Hacer más difícil rechazar las cookies que aceptarlas en Facebook.",
+      "en": "Making it harder to refuse cookies than to accept them on Facebook.",
+      "pt": "Tornar mais difícil recusar cookies do que aceitá-los no Facebook."
+     },
+     "fuente": "https://next.ink/brief-article/214-millions-deuros-damendes-cnil-en-2021/"
+    },
+    {
+     "fecha": "2021-09",
+     "autoridad": "DPC (Irlanda)",
+     "pais": "IE",
+     "importe": 225000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "RGPD: WhatsApp no explicaba con claridad a los usuarios cómo trataba sus datos (falta de transparencia).",
+      "en": "GDPR: WhatsApp did not make clear to users how their data was processed (transparency failures).",
+      "pt": "RGPD: o WhatsApp não explicava com clareza aos usuários como tratava seus dados (falta de transparência)."
+     },
+     "fuente": "https://techcrunch.com/2024/08/10/the-10-largest-gdpr-fines-on-big-tech"
+    },
+    {
+     "fecha": "2019-07-24",
+     "autoridad": "FTC",
+     "pais": "US",
+     "importe": 5000000000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con la FTC por incumplir una orden de 2012 engañando a los usuarios sobre su control de la privacidad, entre otras cosas compartiendo datos de amigos con desarrolladores de apps; incluye nuevas restricciones.",
+      "en": "Settlement with the FTC for violating a 2012 order by deceiving users about their privacy controls, including sharing friends' data with app developers; includes new restrictions.",
+      "pt": "Acordo com a FTC por descumprir uma ordem de 2012 enganando os usuários sobre o controle da privacidade, inclusive compartilhando dados de amigos com desenvolvedores de apps; inclui novas restrições."
+     },
+     "fuente": "https://www.infodocket.com/2019/07/24/ftc-imposes-5-billion-penalty-and-new-privacy-restrictions-on-facebook/"
+    }
+   ],
+   "filtraciones": [
+    {
+     "fecha": "2018-09",
+     "afectados": 29000000,
+     "que": {
+      "es": "Atacantes explotaron un fallo que generaba tokens de acceso a perfiles de Facebook: nombre, email, teléfono, ubicación, lugar de trabajo, fecha de nacimiento, religión, género, publicaciones y grupos.",
+      "en": "Attackers exploited a bug that generated access tokens to Facebook profiles: name, email, phone number, location, workplace, date of birth, religion, gender, timeline posts and groups.",
+      "pt": "Invasores exploraram uma falha que gerava tokens de acesso a perfis do Facebook: nome, e-mail, telefone, localização, local de trabalho, data de nascimento, religião, gênero, publicações e grupos."
+     },
+     "fuente": "https://dataprotection.ie/news-media/press-releases/irish-data-protection-commission-fines-meta-eu251-million"
+    },
+    {
+     "fecha": "2018-04",
+     "afectados": 87000000,
+     "que": {
+      "es": "Facebook reveló que datos de hasta 87 millones de personas se compartieron de forma indebida con Cambridge Analytica a través de una app de un investigador.",
+      "en": "Facebook disclosed that data on up to 87 million people was improperly shared with Cambridge Analytica through a researcher's app.",
+      "pt": "O Facebook revelou que dados de até 87 milhões de pessoas foram compartilhados indevidamente com a Cambridge Analytica por meio de um app de um pesquisador."
+     },
+     "fuente": "https://www.cbsnews.com/amp/news/facebook-data-cambridge-analytica-received-data-of-nearly-87-million-people"
+    }
+   ],
+   "slug": "meta"
+  },
+  "Microsoft": {
+   "web": "https://www.microsoft.com/",
+   "bolsa": "NASDAQ: MSFT",
+   "que_hace": {
+    "es": "Microsoft vende software y servicios en la nube a personas, empresas y gobiernos, como Windows, Microsoft 365, Azure, Xbox y el buscador Bing; también es dueña de la red profesional LinkedIn.",
+    "en": "Microsoft sells software and cloud services to people, businesses and governments, such as Windows, Microsoft 365, Azure, Xbox and the Bing search engine; it also owns the professional network LinkedIn.",
+    "pt": "A Microsoft vende software e serviços de nuvem para pessoas, empresas e governos, como Windows, Microsoft 365, Azure, Xbox e o buscador Bing; também é dona da rede profissional LinkedIn."
+   },
+   "como_gana": {
+    "es": "En el año fiscal 2026 sus ingresos se repartieron entre productividad y procesos de negocio (139.996 M USD), nube inteligente (137.791 M USD) y computación personal (54.052 M USD).",
+    "en": "In fiscal year 2026 its revenue was split between Productivity and Business Processes (USD 139,996 million), Intelligent Cloud (USD 137,791 million) and More Personal Computing (USD 54,052 million).",
+    "pt": "No ano fiscal de 2026 a receita se dividiu entre produtividade e processos de negócio (139.996 milhões de dólares), nuvem inteligente (137.791 milhões) e computação pessoal (54.052 milhões)."
+   },
+   "datos": {
+    "es": "Según los reguladores, Bing colocaba cookies publicitarias sin consentimiento, Xbox recogía datos personales de menores al crear cuentas y LinkedIn usaba datos de sus miembros para publicidad comportamental.",
+    "en": "According to regulators, Bing placed advertising cookies without consent, Xbox collected personal data from children at sign-up, and LinkedIn used members' data for behavioural advertising.",
+    "pt": "Segundo os reguladores, o Bing instalava cookies de publicidade sem consentimento, o Xbox coletava dados pessoais de crianças ao criar contas e o LinkedIn usava dados de seus membros para publicidade comportamental."
+   },
+   "fuente_que_hace": "https://www.sec.gov/Archives/edgar/data/0000789019/000119312526323632/msft-ex99_1.htm",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2026,
+     "valor": 331839000000,
+     "moneda": "USD",
+     "fuente": "https://www.sec.gov/Archives/edgar/data/0000789019/000119312526323632/msft-ex99_1.htm"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2026,
+     "valor": 133749000000,
+     "moneda": "USD",
+     "fuente": "https://www.sec.gov/Archives/edgar/data/0000789019/000119312526323632/msft-ex99_1.htm"
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2024-10-24",
+     "autoridad": "DPC (Irlanda)",
+     "pais": "IE",
+     "importe": 310000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "RGPD (LinkedIn, filial de Microsoft): tratar datos de los miembros para publicidad comportamental sin base legal válida y sin suficiente transparencia.",
+      "en": "GDPR (LinkedIn, a Microsoft subsidiary): processing members' data for behavioural advertising without a valid legal basis and without sufficient transparency.",
+      "pt": "RGPD (LinkedIn, subsidiária da Microsoft): tratar dados dos membros para publicidade comportamental sem base legal válida e sem transparência suficiente."
+     },
+     "fuente": "https://dataprotection.ie/en/news-media/press-releases?page=3"
+    },
+    {
+     "fecha": "2023-06-05",
+     "autoridad": "FTC",
+     "pais": "US",
+     "importe": 20000000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con la FTC: Xbox recogió datos personales de menores sin avisar ni pedir consentimiento a los padres y los conservó durante años (ley COPPA).",
+      "en": "Settlement with the FTC: Xbox collected personal data from children without notifying or getting consent from parents and kept it for years (COPPA).",
+      "pt": "Acordo com a FTC: o Xbox coletou dados pessoais de crianças sem avisar nem pedir consentimento aos pais e os guardou por anos (lei COPPA)."
+     },
+     "fuente": "https://www.ftc.gov/node/81119"
+    },
+    {
+     "fecha": "2022-12",
+     "autoridad": "CNIL",
+     "pais": "FR",
+     "importe": 60000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Colocar cookies publicitarias en bing.com sin consentimiento previo y sin un mecanismo para rechazarlas tan fácil como aceptarlas (Microsoft Ireland Operations).",
+      "en": "Placing advertising cookies on bing.com without prior consent and without a way to refuse them as easily as accepting them (Microsoft Ireland Operations).",
+      "pt": "Instalar cookies de publicidade no bing.com sem consentimento prévio e sem um mecanismo para recusá-los tão fácil quanto aceitá-los (Microsoft Ireland Operations)."
+     },
+     "fuente": "https://thehackernews.com/2022/12/france-fines-microsoft-60-million-for.html"
+    },
+    {
+     "fecha": "2013-03-06",
+     "autoridad": "Comisión Europea",
+     "pais": "EU",
+     "importe": 561000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Competencia: incumplir su compromiso de mostrar una pantalla de elección de navegador; unos 15,3 millones de usuarios de Windows 7 SP1 no la vieron.",
+      "en": "Antitrust: breaking its commitment to show a browser choice screen; about 15.3 million Windows 7 SP1 users did not see it.",
+      "pt": "Concorrência: descumprir o compromisso de exibir uma tela de escolha de navegador; cerca de 15,3 milhões de usuários do Windows 7 SP1 não a viram."
+     },
+     "fuente": "https://www.jonesday.com/en/insights/2013/03/antitrust-alert--european-commission-fines-microsoft-561-million-for-breach-of-commitments"
+    },
+    {
+     "fecha": "2008-02-27",
+     "autoridad": "Comisión Europea",
+     "pais": "EU",
+     "importe": 899000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Competencia: no cumplir la decisión de 2004, cobrando precios no razonables por la información de interoperabilidad.",
+      "en": "Antitrust: failing to comply with the 2004 decision by charging unreasonable prices for interoperability information.",
+      "pt": "Concorrência: descumprir a decisão de 2004, cobrando preços não razoáveis pelas informações de interoperabilidade."
+     },
+     "estado": {
+      "es": "Reducida a 860 millones de euros por el Tribunal General de la UE en junio de 2012.",
+      "en": "Reduced to EUR 860 million by the EU General Court in June 2012.",
+      "pt": "Reduzida para 860 milhões de euros pelo Tribunal Geral da UE em junho de 2012."
+     },
+     "fuente": "https://www.jonesday.com/en/insights/2013/03/antitrust-alert--european-commission-fines-microsoft-561-million-for-breach-of-commitments",
+     "importe_final": 860000000
+    },
+    {
+     "fecha": "2006-07",
+     "autoridad": "Comisión Europea",
+     "pais": "EU",
+     "importe": 280500000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Competencia: no cumplir la decisión de marzo de 2004.",
+      "en": "Antitrust: failing to comply with the March 2004 decision.",
+      "pt": "Concorrência: descumprir a decisão de março de 2004."
+     },
+     "fuente": "https://cms.law/en/gbr/legal-updates/european-commission-fines-microsoft-889million"
+    },
+    {
+     "fecha": "2004-03",
+     "autoridad": "Comisión Europea",
+     "pais": "EU",
+     "importe": 497000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Competencia: abuso de posición dominante, incluida la vinculación de Windows Media Player a Windows y no facilitar información de interoperabilidad.",
+      "en": "Antitrust: abuse of a dominant position, including bundling Windows Media Player with Windows and failing to supply interoperability information.",
+      "pt": "Concorrência: abuso de posição dominante, incluindo vincular o Windows Media Player ao Windows e não fornecer informações de interoperabilidade."
+     },
+     "estado": {
+      "es": "Confirmada por el Tribunal de Primera Instancia de la UE en septiembre de 2007.",
+      "en": "Upheld by the EU Court of First Instance in September 2007.",
+      "pt": "Confirmada pelo Tribunal de Primeira Instância da UE em setembro de 2007."
+     },
+     "fuente": "https://cms.law/en/gbr/legal-updates/european-commission-fines-microsoft-889million"
+    }
+   ],
+   "filtraciones": [
+    {
+     "fecha": "2020-01",
+     "afectados": null,
+     "que": {
+      "es": "Una base de datos de soporte mal configurada expuso unos 250 millones de registros de atención al cliente de 14 años; algunos tenían emails, ubicaciones y direcciones IP sin anonimizar.",
+      "en": "A misconfigured support database exposed about 250 million customer service records spanning 14 years; some contained unredacted email addresses, locations and IP addresses.",
+      "pt": "Um banco de dados de suporte mal configurado expôs cerca de 250 milhões de registros de atendimento ao cliente de 14 anos; alguns tinham e-mails, localizações e endereços IP sem anonimização."
+     },
+     "fuente": "https://www.geekwire.com/2020/microsoft-exposed-250m-customer-service-records-due-misconfiguration-internal-database/"
+    }
+   ],
+   "slug": "microsoft"
+  },
+  "Amazon": {
+   "web": "https://www.aboutamazon.com/",
+   "bolsa": "NASDAQ: AMZN",
+   "que_hace": {
+    "es": "Amazon vende productos en su tienda online y en tiendas físicas, ofrece servicios a vendedores externos, publicidad y suscripciones como Prime, fabrica dispositivos como Alexa y Ring, y vende servicios en la nube (AWS) a empresas.",
+    "en": "Amazon sells products in its online and physical stores, offers services to third-party sellers, advertising and subscriptions such as Prime, makes devices such as Alexa and Ring, and sells cloud services (AWS) to businesses.",
+    "pt": "A Amazon vende produtos em sua loja online e em lojas físicas, oferece serviços a vendedores terceiros, publicidade e assinaturas como o Prime, fabrica dispositivos como Alexa e Ring, e vende serviços de nuvem (AWS) para empresas."
+   },
+   "como_gana": {
+    "es": "La mayor parte de sus ventas viene del comercio en Norteamérica (426.305 M USD en 2025) e internacional (161.894 M USD); AWS aportó 128.725 M USD.",
+    "en": "Most of its sales come from retail in North America (USD 426,305 million in 2025) and internationally (USD 161,894 million); AWS brought in USD 128,725 million.",
+    "pt": "A maior parte das vendas vem do varejo na América do Norte (426.305 milhões de dólares em 2025) e internacional (161.894 milhões); a AWS gerou 128.725 milhões."
+   },
+   "datos": {
+    "es": "Según los reguladores, Amazon usa datos personales de sus clientes para publicidad dirigida, colocaba cookies publicitarias en amazon.fr sin consentimiento, y Alexa conservaba grabaciones de voz y datos de ubicación de niños.",
+    "en": "According to regulators, Amazon uses customers' personal data for targeted advertising, placed advertising cookies on amazon.fr without consent, and Alexa kept children's voice recordings and location data.",
+    "pt": "Segundo os reguladores, a Amazon usa dados pessoais dos clientes para publicidade direcionada, instalava cookies de publicidade no amazon.fr sem consentimento, e a Alexa guardava gravações de voz e dados de localização de crianças."
+   },
+   "fuente_que_hace": "https://www.businesswire.com/news/home/20260204777163/en/Amazon.com-Announces-Fourth-Quarter-Results",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 716924000000,
+     "moneda": "USD",
+     "fuente": "https://www.businesswire.com/news/home/20260204777163/en/Amazon.com-Announces-Fourth-Quarter-Results"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2025,
+     "valor": 77670000000,
+     "moneda": "USD",
+     "fuente": "https://www.businesswire.com/news/home/20260204777163/en/Amazon.com-Announces-Fourth-Quarter-Results"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 1576000,
+     "fuente": "https://www.businesswire.com/news/home/20260204777163/en/Amazon.com-Announces-Fourth-Quarter-Results"
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2025-09-25",
+     "autoridad": "FTC",
+     "pais": "US",
+     "importe": 2500000000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con la FTC por inscribir a clientes en Prime con diseños engañosos y dificultar la cancelación: 1.000 millones de multa civil y 1.500 millones en reembolsos.",
+      "en": "Settlement with the FTC over enrolling customers in Prime through deceptive designs and making cancellation hard: USD 1 billion civil penalty and USD 1.5 billion in refunds.",
+      "pt": "Acordo com a FTC por inscrever clientes no Prime com designs enganosos e dificultar o cancelamento: 1 bilhão de dólares de multa civil e 1,5 bilhão em reembolsos."
+     },
+     "fuente": "https://guptadeepak.com/tech-fines/violation/amazon-us-prime-darkpatterns-2025/"
+    },
+    {
+     "fecha": "2023-05-31",
+     "autoridad": "FTC",
+     "pais": "US",
+     "importe": 25000000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Sanción civil acordada con la FTC: Alexa conservó durante años grabaciones de voz y datos de ubicación de niños y no los borraba del todo cuando los padres lo pedían (ley COPPA).",
+      "en": "Civil penalty agreed with the FTC: Alexa kept children's voice recordings and location data for years and did not fully delete them when parents asked (COPPA).",
+      "pt": "Multa civil acordada com a FTC: a Alexa guardou por anos gravações de voz e dados de localização de crianças e não os apagava totalmente quando os pais pediam (lei COPPA)."
+     },
+     "fuente": "https://www.wtoc.com/2023/05/31/ftc-charges-amazon-with-privacy-violations-over-alexa-ring-cameras/"
+    },
+    {
+     "fecha": "2023-05-31",
+     "autoridad": "FTC",
+     "pais": "US",
+     "importe": 5800000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con la FTC (Ring, filial de Amazon): empleados y contratistas podían ver vídeos privados de clientes y su seguridad deficiente permitió a hackers tomar cuentas. Importe destinado a reembolsos.",
+      "en": "Settlement with the FTC (Ring, an Amazon subsidiary): employees and contractors could access customers' private videos and lax security let hackers take over accounts. Amount goes to customer refunds.",
+      "pt": "Acordo com a FTC (Ring, subsidiária da Amazon): funcionários e terceirizados podiam ver vídeos privados de clientes e a segurança fraca permitiu que hackers assumissem contas. Valor destinado a reembolsos."
+     },
+     "fuente": "https://www.wtoc.com/2023/05/31/ftc-charges-amazon-with-privacy-violations-over-alexa-ring-cameras/"
+    },
+    {
+     "fecha": "2022",
+     "autoridad": "AEPD",
+     "pais": "ES",
+     "importe": 2000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "RGPD (Amazon Road Transport Spain): exigir certificados de antecedentes penales a conductores autónomos sin base legal.",
+      "en": "GDPR (Amazon Road Transport Spain): requiring self-employed drivers to provide criminal record certificates without a legal basis.",
+      "pt": "RGPD (Amazon Road Transport Spain): exigir certidões de antecedentes criminais de motoristas autônomos sem base legal."
+     },
+     "fuente": "https://termly.io/resources/articles/google-gdpr-fine"
+    },
+    {
+     "fecha": "2021-07-15",
+     "autoridad": "CNPD (Luxemburgo)",
+     "pais": "LU",
+     "importe": 746000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "RGPD (Amazon Europe Core): tratar datos personales para publicidad dirigida sin base legal válida, falta de transparencia y fallos en los derechos de acceso, rectificación y oposición.",
+      "en": "GDPR (Amazon Europe Core): processing personal data for targeted advertising without a valid legal basis, lack of transparency and failures on access, rectification and objection rights.",
+      "pt": "RGPD (Amazon Europe Core): tratar dados pessoais para publicidade direcionada sem base legal válida, falta de transparência e falhas nos direitos de acesso, retificação e oposição."
+     },
+     "estado": {
+      "es": "El tribunal administrativo la confirmó en marzo de 2025; la Cour administrative la anuló el 12-03-2026, confirmó la mayoría de las infracciones y devolvió el caso a la CNPD para decidir una nueva sanción.",
+      "en": "Upheld by the Administrative Tribunal in March 2025; annulled by the Administrative Court on 2026-03-12, which confirmed most breaches and sent the case back to the CNPD to decide a new sanction.",
+      "pt": "Confirmada pelo tribunal administrativo em março de 2025; anulada pela Cour administrative em 12-03-2026, que confirmou a maioria das infrações e devolveu o caso à CNPD para decidir nova sanção."
+     },
+     "fuente": "https://paperjam.lu/article/amende-de-746-millions-la-decision-de-la-cnpd-contre-amazon-annulee",
+     "vigente": false
+    },
+    {
+     "fecha": "2020-12",
+     "autoridad": "CNIL",
+     "pais": "FR",
+     "importe": 35000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Colocar cookies publicitarias en los dispositivos de los visitantes de amazon.fr sin consentimiento previo ni información adecuada.",
+      "en": "Placing advertising cookies on amazon.fr visitors' devices without prior consent or adequate information.",
+      "pt": "Instalar cookies de publicidade nos dispositivos dos visitantes do amazon.fr sem consentimento prévio nem informação adequada."
+     },
+     "fuente": "https://guptadeepak.com/tech-fines/violation/amazon-france-cookies-2020/"
+    }
+   ],
+   "filtraciones": [],
+   "slug": "amazon"
+  }
+ }
 }
