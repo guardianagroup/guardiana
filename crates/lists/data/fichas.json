@@ -828,6 +828,1305 @@
    ],
    "filtraciones": [],
    "slug": "amazon"
+  },
+  "ByteDance": {
+   "web": "https://www.bytedance.com/",
+   "fundada": 2012,
+   "que_hace": {
+    "es": "Empresa tecnológica china con sede en Pekín, dueña de TikTok y de su versión china Douyin, además de CapCut, Lemon8, la app de noticias Toutiao y la herramienta de trabajo Lark/Feishu. En Estados Unidos, desde enero de 2026 TikTok lo gestiona una empresa conjunta (TikTok USDS Joint Venture) en la que ByteDance tiene el 19,9 %.",
+    "en": "Chinese technology company based in Beijing that owns TikTok and its Chinese version Douyin, plus CapCut, Lemon8, the Toutiao news app and the Lark/Feishu workplace tool. In the United States, since January 2026 TikTok has been run by a joint venture (TikTok USDS Joint Venture) in which ByteDance holds 19.9%.",
+    "pt": "Empresa de tecnologia chinesa com sede em Pequim, dona do TikTok e da sua versão chinesa Douyin, além do CapCut, Lemon8, do app de notícias Toutiao e da ferramenta de trabalho Lark/Feishu. Nos Estados Unidos, desde janeiro de 2026 o TikTok é operado por uma joint venture (TikTok USDS Joint Venture) na qual a ByteDance tem 19,9%."
+   },
+   "como_gana": {
+    "es": "Gana dinero con la publicidad en sus aplicaciones y con el comercio electrónico y los servicios de pago dentro de ellas.",
+    "en": "It makes money from advertising in its apps and from e-commerce and paid services inside them.",
+    "pt": "Ganha dinheiro com publicidade em seus aplicativos e com comércio eletrônico e serviços pagos dentro deles."
+   },
+   "datos": {
+    "es": "Según la política de privacidad de TikTok, recoge datos de la cuenta, el contenido que creas o envías (incluidos mensajes), datos del dispositivo y de la red, ubicación aproximada (precisa si la activas), actividad de uso y cookies, y datos de anunciantes y socios; además infiere edad, género e intereses. Los usa para personalizar el feed y para mostrar y medir publicidad.",
+    "en": "According to TikTok's privacy policy, it collects account details, content you create or send (including messages), device and network data, approximate location (precise if you enable it), usage activity and cookies, and data from advertisers and partners; it also infers age, gender and interests. It uses this to personalise the feed and to show and measure ads.",
+    "pt": "Segundo a política de privacidade do TikTok, coleta dados da conta, o conteúdo que você cria ou envia (incluindo mensagens), dados do dispositivo e da rede, localização aproximada (precisa se você ativar), atividade de uso e cookies, e dados de anunciantes e parceiros; também infere idade, gênero e interesses. Usa isso para personalizar o feed e para exibir e medir anúncios."
+   },
+   "fuente_que_hace": "https://en.wikipedia.org/wiki/ByteDance",
+   "fuente_datos": "https://www.tiktok.com/legal/privacy-policy",
+   "cifras": [
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 120000,
+     "fuente": "https://en.wikipedia.org/wiki/ByteDance"
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2025-05-02",
+     "autoridad": "Data Protection Commission (DPC)",
+     "pais": "IE",
+     "importe": 530000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Transferir datos de usuarios europeos de TikTok a China sin garantizar una protección equivalente a la de la UE (485 M€) y no informar con claridad de esas transferencias (45 M€). Multa a TikTok Technology Limited.",
+      "en": "Transferring European TikTok users' data to China without ensuring protection equivalent to the EU's (€485M) and not clearly informing users about those transfers (€45M). Fine on TikTok Technology Limited.",
+      "pt": "Transferir dados de usuários europeus do TikTok para a China sem garantir proteção equivalente à da UE (485 M€) e não informar com clareza sobre essas transferências (45 M€). Multa à TikTok Technology Limited."
+     },
+     "fuente": "https://dataprotection.ie/en/news-media/latest-news/irish-data-protection-commission-fines-tiktok-eu530-million-and-orders-corrective-measures-following"
+    },
+    {
+     "fecha": "2024-03",
+     "autoridad": "AGCM (Autorità Garante della Concorrenza e del Mercato)",
+     "pais": "IT",
+     "importe": 10000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Protección del consumidor: controles insuficientes sobre contenidos que pueden poner en riesgo a menores y personas vulnerables, como el reto de la «cicatriz francesa». Multa a tres sociedades del grupo TikTok.",
+      "en": "Consumer protection: inadequate controls over content that may endanger minors and vulnerable people, such as the 'French scar' challenge. Fine on three TikTok group companies.",
+      "pt": "Proteção do consumidor: controles insuficientes sobre conteúdos que podem pôr em risco menores e pessoas vulneráveis, como o desafio da \"cicatriz francesa\". Multa a três empresas do grupo TikTok."
+     },
+     "fuente": "https://ansa.it/amp/english/news/general_news/2024/03/14/antitrust-fines-tiktok-10m-over-protection-of-minors_2f3b420a-8295-4ed0-9afd-81c1b7c585fb.html"
+    },
+    {
+     "fecha": "2023-09-01",
+     "autoridad": "Data Protection Commission (DPC)",
+     "pais": "IE",
+     "importe": 345000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Tratamiento de datos de menores: cuentas públicas por defecto y otros fallos de protección y transparencia con usuarios menores de edad (julio–diciembre de 2020).",
+      "en": "Processing of children's data: accounts set to public by default and other protection and transparency failures towards child users (July–December 2020).",
+      "pt": "Tratamento de dados de menores: contas públicas por padrão e outras falhas de proteção e transparência com usuários menores de idade (julho–dezembro de 2020)."
+     },
+     "fuente": "https://pandectes.io/blog/child-data-protection-in-the-spotlight-tiktoks-e345-million-fine/"
+    },
+    {
+     "fecha": "2023-04",
+     "autoridad": "Information Commissioner's Office (ICO)",
+     "pais": "GB",
+     "importe": 12700000,
+     "moneda": "GBP",
+     "motivo": {
+      "es": "Permitir que unos 1,4 millones de niños menores de 13 años usaran TikTok sin consentimiento de sus padres y no hacer lo suficiente para detectarlos y retirarlos.",
+      "en": "Allowing about 1.4 million children under 13 to use TikTok without parental consent and not doing enough to detect and remove them.",
+      "pt": "Permitir que cerca de 1,4 milhão de crianças menores de 13 anos usassem o TikTok sem consentimento dos pais e não fazer o suficiente para detectá-las e removê-las."
+     },
+     "fuente": "https://www.freevacy.com/news/ico/ico-fines-tiktok-ps127m-over-childrens-data-protection-violations/3550"
+    },
+    {
+     "fecha": "2022-12-29",
+     "autoridad": "CNIL",
+     "pais": "FR",
+     "importe": 5000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Cookies: en tiktok.com rechazarlas no era tan fácil como aceptarlas y no se informaba bien de su finalidad.",
+      "en": "Cookies: on tiktok.com refusing them was not as easy as accepting them, and users were not properly informed of their purposes.",
+      "pt": "Cookies: no tiktok.com recusá-los não era tão fácil quanto aceitá-los e os usuários não eram bem informados sobre suas finalidades."
+     },
+     "fuente": "https://securityaffairs.com/posts/cnil-fined-tiktok"
+    },
+    {
+     "fecha": "2021-07",
+     "autoridad": "Autoriteit Persoonsgegevens (AP)",
+     "pais": "NL",
+     "importe": 750000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "No ofrecer en neerlandés la información de privacidad a usuarios de los Países Bajos, incluidos los menores.",
+      "en": "Not providing privacy information in Dutch to users in the Netherlands, including children.",
+      "pt": "Não oferecer em neerlandês as informações de privacidade a usuários dos Países Baixos, incluindo menores."
+     },
+     "fuente": "https://www.pearlcohen.com/dutch-privacy-regulator-imposes-a-e750000-fine-on-tiktok/"
+    },
+    {
+     "fecha": "2019-02-27",
+     "autoridad": "Federal Trade Commission (FTC)",
+     "pais": "US",
+     "importe": 5700000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con la FTC: Musical.ly (hoy TikTok) recogió nombres, correos y otros datos de menores de 13 años sin consentimiento de los padres, infringiendo la ley COPPA.",
+      "en": "Settlement with the FTC: Musical.ly (now TikTok) collected names, emails and other data from children under 13 without parental consent, violating COPPA.",
+      "pt": "Acordo com a FTC: o Musical.ly (hoje TikTok) coletou nomes, e-mails e outros dados de menores de 13 anos sem consentimento dos pais, violando a lei COPPA."
+     },
+     "fuente": "https://ftc.gov/news-events/news/press-releases/2019/02/video-social-networking-app-musically-agrees-settle-ftc-allegations-it-violated-childrens-privacy"
+    }
+   ],
+   "filtraciones": [
+    {
+     "fecha": "2022-12",
+     "que": {
+      "es": "ByteDance reconoció que empleados suyos accedieron sin autorización a datos de usuarios de TikTok, incluidas direcciones IP, de dos periodistas para buscar filtraciones internas. Despidió a cuatro empleados.",
+      "en": "ByteDance admitted that some of its employees improperly accessed TikTok user data, including IP addresses, of two journalists while hunting for internal leaks. Four employees were fired.",
+      "pt": "A ByteDance admitiu que funcionários acessaram sem autorização dados de usuários do TikTok, incluindo endereços IP, de dois jornalistas para investigar vazamentos internos. Quatro funcionários foram demitidos."
+     },
+     "fuente": "https://us.cnn.com/2022/12/22/tech/tiktok-bytedance-journalist-data"
+    }
+   ],
+   "borrar": "https://www.tiktok.com/legal/report/privacy",
+   "slug": "bytedance"
+  },
+  "X": {
+   "web": "https://x.com/",
+   "fundada": 2006,
+   "que_hace": {
+    "es": "Red social, antes llamada Twitter, para publicar y leer mensajes cortos, fotos y vídeos. La opera X Corp., que en marzo de 2025 pasó a manos de xAI; SpaceX compró xAI en febrero de 2026. Todas son empresas de Elon Musk.",
+    "en": "Social network, formerly Twitter, for posting and reading short messages, photos and videos. It is run by X Corp., which was acquired by xAI in March 2025; SpaceX acquired xAI in February 2026. All are Elon Musk companies.",
+    "pt": "Rede social, antes chamada Twitter, para publicar e ler mensagens curtas, fotos e vídeos. É operada pela X Corp., que passou para a xAI em março de 2025; a SpaceX comprou a xAI em fevereiro de 2026. Todas são empresas de Elon Musk."
+   },
+   "como_gana": {
+    "es": "Gana dinero sobre todo con publicidad dirigida y también con suscripciones de pago, como la marca azul de verificación.",
+    "en": "It makes money mainly from targeted advertising, and also from paid subscriptions such as the blue verification checkmark.",
+    "pt": "Ganha dinheiro principalmente com publicidade direcionada e também com assinaturas pagas, como o selo azul de verificação."
+   },
+   "datos": {
+    "es": "Según X, guarda datos de la cuenta (usuario, correo, teléfono, fecha de nacimiento), publicaciones, historial de inicio de sesión, ubicaciones, dispositivos y navegadores, contactos importados de la agenda, e intereses, edad y género inferidos por X y sus socios. Los usa, entre otras cosas, para publicidad personalizada.",
+    "en": "According to X, it keeps account data (username, email, phone, birth date), posts, login history, locations, devices and browsers, imported address-book contacts, and interests, age and gender inferred by X and its partners. It uses them, among other things, for personalised advertising.",
+    "pt": "Segundo o X, guarda dados da conta (usuário, e-mail, telefone, data de nascimento), publicações, histórico de login, localizações, dispositivos e navegadores, contatos importados da agenda, e interesses, idade e gênero inferidos pelo X e seus parceiros. Usa esses dados, entre outras coisas, para publicidade personalizada."
+   },
+   "fuente_que_hace": "https://en.wikipedia.org/wiki/X_(social_network)",
+   "fuente_datos": "https://help.x.com/en/managing-your-account/accessing-your-x-data",
+   "sanciones": [
+    {
+     "fecha": "2025-12-05",
+     "autoridad": "Comisión Europea",
+     "pais": "EU",
+     "importe": 120000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Ley de Servicios Digitales (DSA): la marca azul de pago engaña a los usuarios y los expone a estafas, el repositorio de anuncios no es transparente y X impide a investigadores acceder a datos públicos.",
+      "en": "Digital Services Act (DSA): the paid blue checkmark deceives users and exposes them to scams, the ad repository is not transparent, and X blocks researchers from accessing public data.",
+      "pt": "Lei de Serviços Digitais (DSA): o selo azul pago engana os usuários e os expõe a golpes, o repositório de anúncios não é transparente e o X impede pesquisadores de acessar dados públicos."
+     },
+     "fuente": "https://eucrim.eu/news/eu-fines-x-120-million-in-first-dsa-non-compliance-decision/"
+    },
+    {
+     "fecha": "2022-05-25",
+     "autoridad": "Federal Trade Commission (FTC) y Departamento de Justicia",
+     "pais": "US",
+     "importe": 150000000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con la FTC: usó los teléfonos y correos que los usuarios dieron por seguridad (como la verificación en dos pasos) para dirigirles publicidad, incumpliendo una orden de la FTC. Afectó a más de 140 millones de usuarios.",
+      "en": "Settlement with the FTC: it used phone numbers and emails that users provided for security (such as two-factor authentication) to target ads, violating an FTC order. It affected more than 140 million users.",
+      "pt": "Acordo com a FTC: usou telefones e e-mails que os usuários forneceram por segurança (como a verificação em duas etapas) para direcionar publicidade, violando uma ordem da FTC. Afetou mais de 140 milhões de usuários."
+     },
+     "fuente": "https://www.malwarebytes.com/blog/news/2022/05/twitter-fined-150m-for-using-2fa-phone-numbers-for-marketing"
+    },
+    {
+     "fecha": "2020-12-09",
+     "autoridad": "Data Protection Commission (DPC)",
+     "pais": "IE",
+     "importe": 450000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "No notificar a tiempo ni documentar bien una brecha de datos: un fallo en Twitter para Android hacía públicos los tuits protegidos de algunos usuarios.",
+      "en": "Failing to notify on time and to properly document a data breach: a bug in Twitter for Android made some users' protected tweets public.",
+      "pt": "Não notificar a tempo nem documentar bem uma violação de dados: uma falha no Twitter para Android tornava públicos os tuítes protegidos de alguns usuários."
+     },
+     "estado": {
+      "es": "Confirmada por el Tribunal de Circuito de Dublín el 18-10-2021.",
+      "en": "Confirmed by the Dublin Circuit Court on 18 October 2021.",
+      "pt": "Confirmada pelo Tribunal de Circuito de Dublin em 18/10/2021."
+     },
+     "fuente": "https://dataprotection.ie/en/news-media/press-releases/confirmation-fine-twitter-international-company"
+    },
+    {
+     "fecha": "2010-06-24",
+     "autoridad": "Federal Trade Commission (FTC)",
+     "pais": "US",
+     "motivo": {
+      "es": "Acuerdo con la FTC, sin multa, por fallos de seguridad que expusieron cuentas: le prohíbe engañar sobre cómo protege la información privada y le exige auditorías de seguridad independientes.",
+      "en": "Settlement with the FTC, without a fine, over security failures that exposed accounts: it bars Twitter from misleading users about how it protects private information and requires independent security audits.",
+      "pt": "Acordo com a FTC, sem multa, por falhas de segurança que expuseram contas: proíbe enganar sobre como protege informações privadas e exige auditorias de segurança independentes."
+     },
+     "fuente": "https://en.wikipedia.org/wiki/X_(social_network)"
+    }
+   ],
+   "filtraciones": [
+    {
+     "fecha": "2023-01",
+     "que": {
+      "es": "Se publicó en un foro de ciberdelincuentes una lista de más de 200 millones de correos electrónicos vinculados a cuentas, obtenida aprovechando un fallo de la API de Twitter activo entre junio de 2021 y enero de 2022.",
+      "en": "A list of more than 200 million email addresses linked to accounts was posted on a cybercrime forum, compiled by exploiting a Twitter API bug that was active from June 2021 to January 2022.",
+      "pt": "Uma lista de mais de 200 milhões de e-mails vinculados a contas foi publicada em um fórum de cibercriminosos, obtida explorando uma falha da API do Twitter ativa entre junho de 2021 e janeiro de 2022."
+     },
+     "fuente": "https://dashlane.com/blog/twitters-200-million-user-email-leak"
+    },
+    {
+     "fecha": "2022-08",
+     "afectados": 5400000,
+     "que": {
+      "es": "Twitter reconoció un fallo de su API que permitía saber qué cuenta correspondía a un correo o teléfono. Con él se recopilaron datos de 5,4 millones de cuentas (correos y teléfonos privados), luego difundidos en un foro.",
+      "en": "Twitter disclosed an API bug that revealed which account belonged to an email or phone number. It was used to compile data on 5.4 million accounts (private emails and phone numbers), later shared on a forum.",
+      "pt": "O Twitter reconheceu uma falha na API que permitia descobrir a conta associada a um e-mail ou telefone. Com ela foram reunidos dados de 5,4 milhões de contas (e-mails e telefones privados), depois divulgados em um fórum."
+     },
+     "fuente": "https://www.engadget.com/twitter-data-for-54-million-users-leaked-online-095040426.html"
+    },
+    {
+     "fecha": "2020-07-15",
+     "afectados": 130,
+     "que": {
+      "es": "Atacantes engañaron a empleados para entrar en una herramienta interna y tomaron el control de 130 cuentas de alto perfil para publicar una estafa con bitcoin.",
+      "en": "Attackers tricked employees to get into an internal admin tool and took over 130 high-profile accounts to post a bitcoin scam.",
+      "pt": "Atacantes enganaram funcionários para acessar uma ferramenta interna e assumiram o controle de 130 contas de alto perfil para publicar um golpe com bitcoin."
+     },
+     "fuente": "https://en.wikipedia.org/wiki/X_(social_network)"
+    },
+    {
+     "fecha": "2019-01",
+     "que": {
+      "es": "Un fallo en Twitter para Android hacía públicos los tuits protegidos de usuarios que cambiaban su correo; según la prensa, afectó a unos 90.000 usuarios de la UE/EEE.",
+      "en": "A bug in Twitter for Android made protected tweets public for users who changed their email address; press reports put the number at about 90,000 EU/EEA users.",
+      "pt": "Uma falha no Twitter para Android tornava públicos os tuítes protegidos de usuários que mudavam o e-mail; segundo a imprensa, afetou cerca de 90 mil usuários da UE/EEE."
+     },
+     "fuente": "https://www.mccannfitzgerald.com/knowledge/data-privacy-and-cyber-risk/twitter-fined-by-the-data-protection-commission-for-gdpr-violations"
+    }
+   ],
+   "borrar": "https://help.x.com/forms/privacy",
+   "slug": "x"
+  },
+  "Yandex": {
+   "web": "https://yandex.ru/",
+   "fundada": 1997,
+   "bolsa": "MOEX: YDEX",
+   "que_hace": {
+    "es": "Empresa tecnológica rusa con buscador, mapas, nube, streaming, compras en línea, reparto de comida y taxi. Desde julio de 2024 pertenece a inversores rusos, tras la venta del negocio por su antigua matriz neerlandesa (hoy Nebius Group).",
+    "en": "Russian technology company offering search, maps, cloud, streaming, online shopping, food delivery and ride-hailing. Since July 2024 it has been owned by Russian investors, after its former Dutch parent (now Nebius Group) sold the business.",
+    "pt": "Empresa de tecnologia russa com buscador, mapas, nuvem, streaming, compras on-line, entrega de comida e transporte por aplicativo. Desde julho de 2024 pertence a investidores russos, após a venda do negócio pela antiga controladora holandesa (hoje Nebius Group)."
+   },
+   "como_gana": {
+    "es": "Gana dinero con la publicidad en su buscador y servicios, con comisiones de taxi, reparto y comercio electrónico, y con suscripciones.",
+    "en": "It makes money from advertising on its search engine and services, from ride-hailing, delivery and e-commerce fees, and from subscriptions.",
+    "pt": "Ganha dinheiro com publicidade no buscador e em seus serviços, com comissões de transporte, entrega e comércio eletrônico, e com assinaturas."
+   },
+   "datos": {
+    "es": "Según su política de privacidad, recoge nombre, teléfono, dirección y edad, datos del dispositivo y del navegador, IP, cookies, historial de búsquedas y compras, ubicación y datos de pago. Los usa para prestar sus servicios y personalizar anuncios y ofertas.",
+    "en": "According to its privacy policy, it collects name, phone, address and age, device and browser data, IP address, cookies, search and purchase history, location and payment data. It uses them to provide its services and to personalise ads and offers.",
+    "pt": "Segundo sua política de privacidade, coleta nome, telefone, endereço e idade, dados do dispositivo e do navegador, IP, cookies, histórico de buscas e compras, localização e dados de pagamento. Usa esses dados para prestar seus serviços e personalizar anúncios e ofertas."
+   },
+   "fuente_que_hace": "https://en.wikipedia.org/wiki/Yandex",
+   "fuente_datos": "https://yandex.com/legal/confidential/",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 1441100000000,
+     "moneda": "RUB",
+     "fuente": "https://yastatic.net/s3/ir-docs/docs/2025/q4/fc756ee95baa6fa171ee77ac733d52be/4Q25_YDEX_Press_Release_ENG_short_6ee9.pdf"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2025,
+     "valor": 79600000000,
+     "moneda": "RUB",
+     "fuente": "https://yastatic.net/s3/ir-docs/docs/2025/q4/fc756ee95baa6fa171ee77ac733d52be/4Q25_YDEX_Press_Release_ENG_short_6ee9.pdf"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 95024,
+     "fuente": "https://yastatic.net/s3/ir-docs/docs/2025/q4/fc756ee95baa6fa171ee77ac733d52be/4Q25_YDEX_Press_Release_ENG_short_6ee9.pdf"
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2023-06",
+     "autoridad": "Tribunal de Moscú",
+     "pais": "RU",
+     "importe": 2000000,
+     "moneda": "RUB",
+     "motivo": {
+      "es": "Negarse varias veces a entregar información de usuarios al FSB (servicio de seguridad ruso), como exige la ley rusa.",
+      "en": "Repeatedly refusing to hand user information to the FSB (Russian security service), as Russian law requires.",
+      "pt": "Recusar-se várias vezes a entregar informações de usuários ao FSB (serviço de segurança russo), como exige a lei russa."
+     },
+     "fuente": "https://en.wikipedia.org/wiki/Yandex"
+    },
+    {
+     "fecha": "2022-08",
+     "autoridad": "Juzgado de paz n.º 101 de Zamoskvorechye (Moscú), a instancia de Roskomnadzor",
+     "pais": "RU",
+     "importe": 60000,
+     "moneda": "RUB",
+     "motivo": {
+      "es": "Filtración de datos personales de repartidores de Yandex Eda (más de 700 registros).",
+      "en": "Leak of personal data of Yandex Eda couriers (more than 700 records).",
+      "pt": "Vazamento de dados pessoais de entregadores do Yandex Eda (mais de 700 registros)."
+     },
+     "fuente": "https://www.anti-malware.ru/news/2022-08-03-118537/39261"
+    },
+    {
+     "fecha": "2022-04",
+     "autoridad": "Juzgado de paz de Moscú",
+     "pais": "RU",
+     "importe": 60000,
+     "moneda": "RUB",
+     "motivo": {
+      "es": "Filtración masiva de datos de clientes de Yandex Eda en marzo de 2022.",
+      "en": "Mass leak of Yandex Eda customer data in March 2022.",
+      "pt": "Vazamento em massa de dados de clientes do Yandex Eda em março de 2022."
+     },
+     "fuente": "https://zona.media/news/2022/04/21/food"
+    }
+   ],
+   "filtraciones": [
+    {
+     "fecha": "2022-03-01",
+     "que": {
+      "es": "Yandex Eda (reparto de comida) informó de una filtración causada por un empleado: nombres, teléfonos, direcciones de entrega y detalles de pedidos de junio de 2021 a febrero de 2022. Según el servicio DLBI, incluía 6.882.230 teléfonos únicos de Rusia y Kazajistán.",
+      "en": "Yandex Eda (food delivery) reported a leak caused by an employee: names, phone numbers, delivery addresses and order details from June 2021 to February 2022. According to the DLBI service, it included 6,882,230 unique phone numbers from Russia and Kazakhstan.",
+      "pt": "O Yandex Eda (entrega de comida) informou um vazamento causado por um funcionário: nomes, telefones, endereços de entrega e detalhes de pedidos de junho de 2021 a fevereiro de 2022. Segundo o serviço DLBI, incluía 6.882.230 telefones únicos da Rússia e do Cazaquistão."
+     },
+     "fuente": "https://habr.com/ru/post/657237"
+    },
+    {
+     "fecha": "2021-02-12",
+     "afectados": 4887,
+     "que": {
+      "es": "Un administrador de sistemas de Yandex vendía acceso no autorizado a buzones de correo de usuarios; 4.887 buzones quedaron comprometidos.",
+      "en": "A Yandex system administrator was selling unauthorised access to users' mailboxes; 4,887 mailboxes were compromised.",
+      "pt": "Um administrador de sistemas da Yandex vendia acesso não autorizado a caixas de e-mail de usuários; 4.887 caixas foram comprometidas."
+     },
+     "fuente": "https://yandex.com/company/press_center/press_releases/2021/2021-12-02"
+    }
+   ],
+   "borrar": "https://passport.yandex.ru/profile",
+   "slug": "yandex"
+  },
+  "Criteo": {
+   "web": "https://www.criteo.com/",
+   "fundada": 2005,
+   "bolsa": "NASDAQ: CRTO",
+   "que_hace": {
+    "es": "Empresa francesa de publicidad digital que muestra anuncios personalizados según la navegación de cada persona en webs y apps, y ofrece a tiendas en línea una plataforma para vender publicidad en sus propios sitios (retail media).",
+    "en": "French digital advertising company that shows personalised ads based on each person's browsing across websites and apps, and offers online retailers a platform to sell advertising on their own sites (retail media).",
+    "pt": "Empresa francesa de publicidade digital que exibe anúncios personalizados conforme a navegação de cada pessoa em sites e apps, e oferece a lojas on-line uma plataforma para vender publicidade em seus próprios sites (retail media)."
+   },
+   "como_gana": {
+    "es": "Cobra a anunciantes y comercios por los anuncios que muestra y por el uso de sus plataformas publicitarias.",
+    "en": "It charges advertisers and retailers for the ads it shows and for using its advertising platforms.",
+    "pt": "Cobra de anunciantes e varejistas pelos anúncios que exibe e pelo uso de suas plataformas de publicidade."
+   },
+   "datos": {
+    "es": "Según Criteo, usa cookies e identificadores para reconocer tu navegador o dispositivo y vincularlo con los datos que tiene, y puede combinar correos electrónicos cifrados (hash) con otros identificadores para mostrar anuncios a medida.",
+    "en": "According to Criteo, it uses cookies and identifiers to recognise your browser or device and link it to the data it holds, and it may combine hashed email addresses with other identifiers to show tailored ads.",
+    "pt": "Segundo a Criteo, usa cookies e identificadores para reconhecer seu navegador ou dispositivo e vinculá-lo aos dados que possui, e pode combinar e-mails criptografados (hash) com outros identificadores para exibir anúncios personalizados."
+   },
+   "fuente_que_hace": "https://en.wikipedia.org/wiki/Criteo",
+   "fuente_datos": "https://www.criteo.com/privacy/disable-criteo-%20services-on-internet-browsers/",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 1944901000,
+     "moneda": "USD",
+     "fuente": "https://criteo.investorroom.com/2026-02-11-CRITEO-REPORTS-FOURTH-QUARTER-2025-RESULTS"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2025,
+     "valor": 149379000,
+     "moneda": "USD",
+     "fuente": "https://criteo.investorroom.com/2026-02-11-CRITEO-REPORTS-FOURTH-QUARTER-2025-RESULTS"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 3649,
+     "fuente": "https://criteo.investorroom.com/2026-02-11-CRITEO-REPORTS-FOURTH-QUARTER-2025-RESULTS"
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2023-06-15",
+     "autoridad": "CNIL",
+     "pais": "FR",
+     "importe": 40000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "No comprobar que las personas habían dado su consentimiento para el uso de sus datos con fines publicitarios, además de fallos en la información a los usuarios y en la atención de sus derechos de acceso, retirada del consentimiento y supresión.",
+      "en": "Failing to verify that people had consented to the use of their data for advertising, plus failures in informing users and in handling their rights of access, consent withdrawal and erasure.",
+      "pt": "Não verificar se as pessoas tinham consentido o uso de seus dados para fins publicitários, além de falhas na informação aos usuários e no atendimento de seus direitos de acesso, retirada do consentimento e exclusão."
+     },
+     "estado": {
+      "es": "Recurrida; el Conseil d'État rechazó el recurso de Criteo el 4-3-2026.",
+      "en": "Appealed; the Conseil d'État rejected Criteo's appeal on 4 March 2026.",
+      "pt": "Recorrida; o Conseil d'État rejeitou o recurso da Criteo em 4/3/2026."
+     },
+     "fuente": "https://www.conseil-etat.fr/fr/arianeweb/CE/decision/2026-03-04/482872"
+    }
+   ],
+   "filtraciones": [],
+   "borrar": "https://www.criteo.com/privacy/disable-criteo-%20services-on-internet-browsers/",
+   "slug": "criteo"
+  },
+  "Seznam.cz": {
+   "web": "https://www.seznam.cz/",
+   "fundada": 1996,
+   "que_hace": {
+    "es": "Buscador y portal web checo fundado por Ivo Lukačovič, que también ofrece correo electrónico, noticias (Seznam Zprávy) y televisión (Televize Seznam), entre otros servicios.",
+    "en": "Czech search engine and web portal founded by Ivo Lukačovič, which also offers email, news (Seznam Zprávy) and television (Televize Seznam), among other services.",
+    "pt": "Buscador e portal web tcheco fundado por Ivo Lukačovič, que também oferece e-mail, notícias (Seznam Zprávy) e televisão (Televize Seznam), entre outros serviços."
+   },
+   "como_gana": {
+    "es": "Gana dinero vendiendo publicidad en sus webs y servicios.",
+    "en": "It makes money by selling advertising on its websites and services.",
+    "pt": "Ganha dinheiro vendendo publicidade em seus sites e serviços."
+   },
+   "datos": {
+    "es": "Según su política de privacidad, recoge los datos que das al registrarte o en formularios, cookies, datos del dispositivo e IP, e información de webs y servicios de terceros que usan sus servicios publicitarios. Los usa para personalizar contenidos y anuncios, medir audiencias, seguridad y marketing directo.",
+    "en": "According to its privacy policy, it collects data you give when registering or in forms, cookies, device data and IP address, and information from third-party websites and services that use its advertising services. It uses them to personalise content and ads, measure audiences, for security and for direct marketing.",
+    "pt": "Segundo sua política de privacidade, coleta os dados que você fornece ao se cadastrar ou em formulários, cookies, dados do dispositivo e IP, e informações de sites e serviços de terceiros que usam seus serviços de publicidade. Usa esses dados para personalizar conteúdos e anúncios, medir audiência, segurança e marketing direto."
+   },
+   "fuente_que_hace": "https://www.lupa.cz/aktuality/seznam-udelal-zisk-1-3-miliardy-vyplatil-peknou-dividendu-a-prestehoval-se-z-kypru-mimo-eu/",
+   "fuente_datos": "https://o-seznam.cz/pravni-informace/ochrana-udaju/",
+   "cifras": [
+    {
+     "clave": "beneficio",
+     "anio": 2024,
+     "valor": 1270000000,
+     "moneda": "CZK",
+     "fuente": "https://www.lupa.cz/aktuality/seznam-udelal-zisk-1-3-miliardy-vyplatil-peknou-dividendu-a-prestehoval-se-z-kypru-mimo-eu/"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2024,
+     "valor": 1722,
+     "fuente": "https://www.lupa.cz/aktuality/seznam-udelal-zisk-1-3-miliardy-vyplatil-peknou-dividendu-a-prestehoval-se-z-kypru-mimo-eu/"
+    }
+   ],
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://o-seznam.cz/pravni-informace/ochrana-udaju/kontakt/",
+   "slug": "seznam-cz"
+  },
+  "Adobe": {
+   "web": "https://www.adobe.com/",
+   "fundada": 1982,
+   "bolsa": "NASDAQ: ADBE",
+   "que_hace": {
+    "es": "Adobe vende software de creación (Photoshop, Illustrator, Acrobat) por suscripción en Creative Cloud, y software de marketing digital y analítica (Adobe Experience Cloud) a profesionales y empresas de todo el mundo.",
+    "en": "Adobe sells creative software (Photoshop, Illustrator, Acrobat) by subscription through Creative Cloud, and digital marketing and analytics software (Adobe Experience Cloud) to professionals and businesses worldwide.",
+    "pt": "A Adobe vende software de criação (Photoshop, Illustrator, Acrobat) por assinatura no Creative Cloud e software de marketing digital e análise (Adobe Experience Cloud) para profissionais e empresas do mundo todo."
+   },
+   "como_gana": {
+    "es": "Casi todo su dinero viene de suscripciones: 22.904 de sus 23.769 millones de dólares de ingresos en el año fiscal 2025.",
+    "en": "Almost all of its money comes from subscriptions: $22,904 million of its $23,769 million revenue in fiscal 2025.",
+    "pt": "Quase toda a sua receita vem de assinaturas: US$ 22.904 milhões dos US$ 23.769 milhões faturados no ano fiscal de 2025."
+   },
+   "datos": {
+    "es": "Según su política de privacidad, recoge datos de cuenta y pago, datos de uso y del dispositivo (como la dirección IP y el navegador), el contenido que subes, datos de cookies e información de socios y corredores de datos, y los usa también para marketing y publicidad. Los datos que sus clientes empresariales recogen con Adobe Experience Cloud los trata por encargo de esos clientes.",
+    "en": "According to its privacy policy, it collects account and payment details, usage and device data (such as IP address and browser), content you upload, cookie data, and information from partners and data brokers, and uses it also for marketing and advertising. Data that its business customers collect through Adobe Experience Cloud is processed on those customers' behalf.",
+    "pt": "Segundo sua política de privacidade, coleta dados de conta e pagamento, dados de uso e do dispositivo (como endereço IP e navegador), o conteúdo que você envia, dados de cookies e informações de parceiros e corretores de dados, e os usa também para marketing e publicidade. Os dados que seus clientes empresariais coletam com o Adobe Experience Cloud são tratados em nome desses clientes."
+   },
+   "fuente_que_hace": "https://en.wikipedia.org/wiki/Adobe_Inc.",
+   "fuente_datos": "https://www.adobe.com/privacy/policy",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 23769000000,
+     "moneda": "USD",
+     "fuente": "https://www.sec.gov/Archives/edgar/data/796343/000079634325000135/adbeex991q425.htm"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2025,
+     "valor": 7130000000,
+     "moneda": "USD",
+     "fuente": "https://www.sec.gov/Archives/edgar/data/796343/000079634325000135/adbeex991q425.htm"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 31360,
+     "fuente": "https://en.wikipedia.org/wiki/Adobe_Inc."
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2026-03-13",
+     "autoridad": "U.S. Department of Justice (DOJ)",
+     "pais": "US",
+     "importe": 75000000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con el Departamento de Justicia de EE. UU. por ocultar en letra pequeña una penalización por cancelación anticipada y dificultar la baja de las suscripciones (ley ROSCA). Incluye 75 millones de dólares de multa civil y otros 75 millones en servicios gratuitos para clientes.",
+      "en": "Settlement with the U.S. Department of Justice over hiding an early termination fee in fine print and making subscriptions hard to cancel (ROSCA). It includes a $75 million civil penalty plus $75 million in free services for customers.",
+      "pt": "Acordo com o Departamento de Justiça dos EUA por esconder em letras miúdas uma multa por cancelamento antecipado e dificultar o cancelamento das assinaturas (lei ROSCA). Inclui multa civil de US$ 75 milhões e mais US$ 75 milhões em serviços gratuitos para clientes."
+     },
+     "estado": {
+      "es": "Orden propuesta en marzo de 2026; en esa fecha faltaba la aprobación del tribunal.",
+      "en": "Proposed order filed in March 2026; court approval was still pending at that date.",
+      "pt": "Ordem proposta em março de 2026; nessa data ainda faltava a aprovação do tribunal."
+     },
+     "fuente": "https://www.justice.gov/opa/pr/adobe-agrees-150-million-settlement-and-injunction-resolve-alleged-violations-restore-online"
+    },
+    {
+     "fecha": "2016-11-10",
+     "autoridad": "15 U.S. state attorneys general (led by Connecticut)",
+     "pais": "US",
+     "importe": 1000000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con los fiscales generales de 15 estados por la filtración de 2013, que expuso números de tarjeta cifrados, fechas de caducidad, nombres, direcciones y teléfonos de clientes (unos 552.000 residentes de esos estados).",
+      "en": "Settlement with 15 state attorneys general over the 2013 breach, which exposed customers' encrypted card numbers, expiration dates, names, addresses and phone numbers (about 552,000 residents of those states).",
+      "pt": "Acordo com os procuradores-gerais de 15 estados pelo vazamento de 2013, que expôs números de cartão criptografados, datas de validade, nomes, endereços e telefones de clientes (cerca de 552.000 moradores desses estados)."
+     },
+     "fuente": "https://portal.ct.gov/AG/Press-Releases-Archived/2016-Press-Releases/AG-Jepsen-Adobe-Reach-Agreement-Resolving-ConnecticutLed-Multistate-Investigation-into-Unauthorized"
+    }
+   ],
+   "filtraciones": [
+    {
+     "fecha": "2019-10",
+     "afectados": 7500000,
+     "que": {
+      "es": "Una base de datos Elasticsearch sin protección expuso unos 7,5 millones de registros de clientes de Creative Cloud: correos, fechas de alta, productos comprados, estado de suscripción y de pago, ID de miembro y país. No incluía contraseñas ni datos de tarjetas.",
+      "en": "An unprotected Elasticsearch database exposed about 7.5 million Creative Cloud customer records: email addresses, account creation dates, products purchased, subscription and payment status, member IDs and country. It did not include passwords or card data.",
+      "pt": "Um banco de dados Elasticsearch sem proteção expôs cerca de 7,5 milhões de registros de clientes do Creative Cloud: e-mails, datas de criação da conta, produtos comprados, status de assinatura e de pagamento, ID de membro e país. Não incluía senhas nem dados de cartão."
+     },
+     "fuente": "https://www.theregister.com/2019/10/25/adobe_user_data_exposed"
+    },
+    {
+     "fecha": "2013-10",
+     "afectados": 38000000,
+     "que": {
+      "es": "Robo de nombres de usuario, contraseñas y datos de tarjetas de pago de clientes, además de código fuente de Acrobat, Reader, Photoshop y ColdFusion.",
+      "en": "Theft of customers' usernames, passwords and payment card data, plus source code for Acrobat, Reader, Photoshop and ColdFusion.",
+      "pt": "Roubo de nomes de usuário, senhas e dados de cartões de pagamento de clientes, além do código-fonte do Acrobat, Reader, Photoshop e ColdFusion."
+     },
+     "fuente": "https://krebsonsecurity.com/2016/11/adobe-fined-1m-in-multistate-suit-over-2013-breach-no-jail-for-spamhaus-attacker/"
+    }
+   ],
+   "borrar": "https://www.adobe.com/privacy/opt-out.html",
+   "slug": "adobe"
+  },
+  "Oracle": {
+   "web": "https://www.oracle.com/",
+   "fundada": 1977,
+   "bolsa": "NYSE: ORCL",
+   "que_hace": {
+    "es": "Oracle vende a empresas software de bases de datos, aplicaciones de gestión (ERP, recursos humanos, clientes, cadena de suministro), infraestructura en la nube y hardware; también es dueña de Java y de Oracle Health (antes Cerner). Tuvo un negocio de publicidad y datos (Oracle Advertising) que cerró el 30 de septiembre de 2024.",
+    "en": "Oracle sells businesses database software, enterprise applications (ERP, HR, customer experience, supply chain), cloud infrastructure and hardware; it also owns Java and Oracle Health (formerly Cerner). It ran an advertising and data business (Oracle Advertising) that it shut down on September 30, 2024.",
+    "pt": "A Oracle vende para empresas software de banco de dados, aplicativos de gestão (ERP, RH, clientes, cadeia de suprimentos), infraestrutura em nuvem e hardware; também é dona do Java e da Oracle Health (antiga Cerner). Teve um negócio de publicidade e dados (Oracle Advertising), encerrado em 30 de setembro de 2024."
+   },
+   "como_gana": {
+    "es": "En el año fiscal 2026, 33.989 millones de dólares vinieron de la nube y 24.541 millones de software (licencias y soporte); el resto, de servicios y hardware.",
+    "en": "In fiscal 2026, $33,989 million came from cloud and $24,541 million from software (licenses and support); the rest came from services and hardware.",
+    "pt": "No ano fiscal de 2026, US$ 33.989 milhões vieram da nuvem e US$ 24.541 milhões de software (licenças e suporte); o restante, de serviços e hardware."
+   },
+   "datos": {
+    "es": "Su política general de privacidad cubre los datos que recoge en sus sitios web, apps, redes sociales, eventos y actividades de venta y marketing. Oracle dejó de ofrecer Oracle Advertising el 30 de septiembre de 2024 y su herramienta de exclusión publicitaria ya no existe.",
+    "en": "Its general privacy policy covers data it collects through its websites, apps, social media pages, events and sales and marketing activities. Oracle stopped providing Oracle Advertising on September 30, 2024, and its advertising opt-out tool is no longer available.",
+    "pt": "Sua política geral de privacidade cobre os dados que coleta em seus sites, apps, redes sociais, eventos e atividades de vendas e marketing. A Oracle deixou de oferecer o Oracle Advertising em 30 de setembro de 2024, e sua ferramenta de exclusão de publicidade não existe mais."
+   },
+   "fuente_que_hace": "https://en.wikipedia.org/wiki/Oracle_Corporation",
+   "fuente_datos": "https://www.oracle.com/si/legal/privacy/",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2026,
+     "valor": 67357000000,
+     "moneda": "USD",
+     "fuente": "https://www.sec.gov/Archives/edgar/data/0001341439/000119312526265848/orcl-ex99_1.htm"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2026,
+     "valor": 17087000000,
+     "moneda": "USD",
+     "fuente": "https://www.sec.gov/Archives/edgar/data/0001341439/000119312526265848/orcl-ex99_1.htm"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2026,
+     "valor": 141000,
+     "fuente": "https://en.wikipedia.org/wiki/Oracle_Corporation"
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2015-12-21",
+     "autoridad": "FTC",
+     "pais": "US",
+     "motivo": {
+      "es": "Acuerdo con la FTC por engañar a los consumidores sobre la seguridad de las actualizaciones de Java SE, que no eliminaban las versiones antiguas vulnerables. Sin multa: Oracle debía avisar a los usuarios de las versiones antiguas y ofrecerles desinstalarlas.",
+      "en": "Settlement with the FTC over deceiving consumers about the security of Java SE updates, which did not remove older vulnerable versions. No fine: Oracle had to warn users about old versions and offer to uninstall them.",
+      "pt": "Acordo com a FTC por enganar os consumidores sobre a segurança das atualizações do Java SE, que não removiam as versões antigas vulneráveis. Sem multa: a Oracle teve de avisar os usuários sobre as versões antigas e oferecer a desinstalação."
+     },
+     "fuente": "https://ftc.gov/news-events/press-releases/2015/12/oracle-agrees-settle-ftc-charges-it-deceived-consumers-about-java"
+    }
+   ],
+   "filtraciones": [
+    {
+     "fecha": "2025-04",
+     "que": {
+      "es": "Un atacante entró en servidores antiguos de Oracle Cloud Classic (Gen 1) y robó datos de su sistema de identidades: nombres de usuario, correos y contraseñas cifradas (hash). Dijo tener 6 millones de registros; Oracle lo negó en público, pero según Bloomberg lo confirmó en privado a algunos clientes.",
+      "en": "An attacker broke into legacy Oracle Cloud Classic (Gen 1) servers and stole identity system data: usernames, emails and hashed passwords. The attacker claimed 6 million records; Oracle denied it publicly but, according to Bloomberg, confirmed it privately to some customers.",
+      "pt": "Um invasor entrou em servidores antigos do Oracle Cloud Classic (Gen 1) e roubou dados do sistema de identidades: nomes de usuário, e-mails e senhas criptografadas (hash). Ele disse ter 6 milhões de registros; a Oracle negou publicamente, mas, segundo a Bloomberg, confirmou em privado a alguns clientes."
+     },
+     "fuente": "https://bleepingcomputer.com/news/security/oracle-privately-confirms-cloud-breach-to-customers"
+    },
+    {
+     "fecha": "2025-03",
+     "que": {
+      "es": "Robo de datos de pacientes de historias clínicas electrónicas guardadas en servidores antiguos de Cerner (Oracle Health); Oracle lo notificó a hospitales de EE. UU. afectados.",
+      "en": "Theft of patient data from electronic health records stored on legacy Cerner (Oracle Health) servers; Oracle notified affected U.S. hospitals.",
+      "pt": "Roubo de dados de pacientes de prontuários eletrônicos guardados em servidores antigos da Cerner (Oracle Health); a Oracle notificou hospitais dos EUA afetados."
+     },
+     "fuente": "https://bleepingcomputer.com/news/security/oracle-health-breach-compromises-patient-data-at-us-hospitals"
+    }
+   ],
+   "borrar": "https://www.oracle.com/si/legal/privacy/privacy-choices/",
+   "slug": "oracle"
+  },
+  "Yahoo": {
+   "web": "https://www.yahoo.com/",
+   "fundada": 1994,
+   "que_hace": {
+    "es": "Yahoo es un portal web con buscador, correo (Yahoo Mail), noticias, finanzas y deportes, y vende publicidad (Yahoo Native, Yahoo Ad Tech). Pertenece en un 90 % a Apollo Global Management y en un 10 % a Verizon.",
+    "en": "Yahoo is a web portal with search, email (Yahoo Mail), news, finance and sports, and it sells advertising (Yahoo Native, Yahoo Ad Tech). It is 90% owned by Apollo Global Management and 10% by Verizon.",
+    "pt": "O Yahoo é um portal web com buscador, e-mail (Yahoo Mail), notícias, finanças e esportes, e vende publicidade (Yahoo Native, Yahoo Ad Tech). Pertence 90% à Apollo Global Management e 10% à Verizon."
+   },
+   "como_gana": {
+    "es": "Gana dinero con publicidad, incluida la publicidad dirigida en sus servicios y su plataforma publicitaria Yahoo Ad Tech.",
+    "en": "It makes money from advertising, including targeted ads on its services and its Yahoo Ad Tech advertising platform.",
+    "pt": "Ganha dinheiro com publicidade, incluindo anúncios direcionados em seus serviços e sua plataforma publicitária Yahoo Ad Tech."
+   },
+   "datos": {
+    "es": "Según su política de privacidad, recoge datos de la cuenta, del dispositivo (como la IP y las cookies), de ubicación, el contenido que publicas o envías (incluidos correos) y datos de socios y terceros. Los usa, entre otras cosas, para mostrar publicidad dirigida según tu actividad, tus intereses inferidos y tu ubicación.",
+    "en": "According to its privacy policy, it collects account data, device data (such as IP address and cookies), location, content you post or send (including emails) and data from partners and third parties. Among other uses, it serves targeted ads based on your activity, inferred interests and location.",
+    "pt": "Segundo sua política de privacidade, coleta dados da conta, do dispositivo (como IP e cookies), de localização, o conteúdo que você publica ou envia (incluindo e-mails) e dados de parceiros e terceiros. Entre outros usos, exibe anúncios direcionados com base na sua atividade, interesses inferidos e localização."
+   },
+   "fuente_que_hace": "https://en.wikipedia.org/wiki/Yahoo",
+   "fuente_datos": "https://legal.yahoo.com/us/en/yahoo/privacy/index.html",
+   "sanciones": [
+    {
+     "fecha": "2023-12-29",
+     "autoridad": "CNIL",
+     "pais": "FR",
+     "importe": 10000000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Multa a Yahoo EMEA por colocar unas 20 cookies publicitarias sin consentimiento en yahoo.com y por avisar a los usuarios de Yahoo Mail de que perderían el acceso si retiraban su consentimiento, lo que impedía retirarlo libremente.",
+      "en": "Fine on Yahoo EMEA for placing about 20 advertising cookies without consent on yahoo.com and for telling Yahoo Mail users they would lose access if they withdrew consent, which meant consent could not be freely withdrawn.",
+      "pt": "Multa à Yahoo EMEA por instalar cerca de 20 cookies publicitários sem consentimento no yahoo.com e por avisar aos usuários do Yahoo Mail que perderiam o acesso se retirassem o consentimento, o que impedia retirá-lo livremente."
+     },
+     "estado": {
+      "es": "Recurrida; el Consejo de Estado de Francia rechazó el recurso y confirmó la multa en octubre de 2025.",
+      "en": "Appealed; France's Council of State rejected the appeal and upheld the fine in October 2025.",
+      "pt": "Recorrida; o Conselho de Estado da França rejeitou o recurso e confirmou a multa em outubro de 2025."
+     },
+     "fuente": "https://www.privacylaws.com/news/france-s-dpa-fines-yahoo-10-million-for-cookie-breaches/"
+    },
+    {
+     "fecha": "2018-12-04",
+     "autoridad": "New York State Attorney General",
+     "pais": "US",
+     "importe": 4950000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con la fiscal general de Nueva York por violar la ley de privacidad infantil COPPA: sus sistemas publicitarios (de AOL) mostraban anuncios que recogían datos mediante cookies y ubicación en sitios dirigidos a menores de 13 años. La sancionada fue Oath Inc., entonces matriz de Yahoo y AOL y hoy Yahoo Inc.",
+      "en": "Settlement with the New York Attorney General for violating the COPPA children's privacy law: its (AOL) ad systems served ads that collected data through cookies and location on sites aimed at children under 13. The company was Oath Inc., then the parent of Yahoo and AOL and now Yahoo Inc.",
+      "pt": "Acordo com a procuradora-geral de Nova York por violar a lei de privacidade infantil COPPA: seus sistemas de anúncios (da AOL) exibiam anúncios que coletavam dados por cookies e localização em sites voltados a menores de 13 anos. A empresa punida foi a Oath Inc., então controladora do Yahoo e da AOL e hoje Yahoo Inc."
+     },
+     "fuente": "https://www.engadget.com/2018-12-04-oath-settlement-over-childrens-privacy.html"
+    },
+    {
+     "fecha": "2018-06-12",
+     "autoridad": "ICO",
+     "pais": "GB",
+     "importe": 250000,
+     "moneda": "GBP",
+     "motivo": {
+      "es": "Multa a Yahoo! UK Services Ltd por no proteger los datos de 515.121 cuentas del Reino Unido afectadas por el ataque de noviembre de 2014.",
+      "en": "Fine on Yahoo! UK Services Ltd for failing to protect the data of 515,121 UK accounts affected by the November 2014 attack.",
+      "pt": "Multa à Yahoo! UK Services Ltd por não proteger os dados de 515.121 contas do Reino Unido afetadas pelo ataque de novembro de 2014."
+     },
+     "fuente": "https://www.businessinsurance.com/article/20180612/NEWS06/912321957/Britain-fines-Yahoo-UK-Services-250,000-pounds-for-2014-hack"
+    },
+    {
+     "fecha": "2018-04-24",
+     "autoridad": "SEC",
+     "pais": "US",
+     "importe": 35000000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con la SEC: Altaba Inc. (la antigua Yahoo! Inc.) pagó por no informar a los inversores durante dos años del robo de datos de cuentas de diciembre de 2014 (nombres de usuario, correos, teléfonos, fechas de nacimiento, contraseñas cifradas y preguntas de seguridad).",
+      "en": "Settlement with the SEC: Altaba Inc. (formerly Yahoo! Inc.) paid for failing to tell investors for two years about the December 2014 theft of account data (usernames, emails, phone numbers, birthdates, encrypted passwords and security questions).",
+      "pt": "Acordo com a SEC: a Altaba Inc. (antiga Yahoo! Inc.) pagou por não informar os investidores, durante dois anos, sobre o roubo de dados de contas de dezembro de 2014 (nomes de usuário, e-mails, telefones, datas de nascimento, senhas criptografadas e perguntas de segurança)."
+     },
+     "fuente": "https://www.sec.gov/news/press-release/2018-71"
+    }
+   ],
+   "filtraciones": [
+    {
+     "fecha": "2017-10",
+     "afectados": 3000000000,
+     "que": {
+      "es": "Yahoo confirmó que el robo de 2013 afectó a sus 3.000 millones de cuentas (antes había dicho más de 1.000 millones): nombres, correos, teléfonos, fechas de nacimiento y preguntas de seguridad. Según Yahoo, no afectó a datos bancarios ni de tarjetas.",
+      "en": "Yahoo confirmed that the 2013 theft affected all 3 billion of its accounts (it had earlier said over 1 billion): names, emails, phone numbers, birthdates and security questions. Yahoo said bank and card data were not affected.",
+      "pt": "O Yahoo confirmou que o roubo de 2013 afetou todas as suas 3 bilhões de contas (antes falava em mais de 1 bilhão): nomes, e-mails, telefones, datas de nascimento e perguntas de segurança. Segundo o Yahoo, dados bancários e de cartões não foram afetados."
+     },
+     "fuente": "https://abc30.com/yahoo-breach-hacked-data-new/2484860/"
+    },
+    {
+     "fecha": "2016-09",
+     "afectados": 500000000,
+     "que": {
+      "es": "Yahoo reveló el robo de datos de 500 millones de cuentas, ocurrido en 2014.",
+      "en": "Yahoo disclosed the theft of data from 500 million accounts, which took place in 2014.",
+      "pt": "O Yahoo revelou o roubo de dados de 500 milhões de contas, ocorrido em 2014."
+     },
+     "fuente": "https://abc30.com/yahoo-breach-hacked-data-new/2484860/"
+    }
+   ],
+   "borrar": "https://legal.yahoo.com/us/en/yahoo/privacy/dashboard/index.html",
+   "slug": "yahoo"
+  },
+  "Magnite": {
+   "web": "https://www.magnite.com/",
+   "fundada": 2007,
+   "bolsa": "NASDAQ: MGNI",
+   "que_hace": {
+    "es": "Magnite ofrece tecnología para automatizar la compraventa de publicidad digital: ayuda a editores, canales de TV conectada (CTV) y otros medios a vender sus espacios publicitarios a anunciantes, agencias y plataformas de compra (DSP). Nació en 2020 de la fusión de Rubicon Project y Telaria.",
+    "en": "Magnite provides technology to automate the buying and selling of digital advertising: it helps publishers, connected TV (CTV) channels and other media sell their ad space to advertisers, agencies and demand-side platforms (DSPs). It was formed in 2020 by the merger of Rubicon Project and Telaria.",
+    "pt": "A Magnite oferece tecnologia para automatizar a compra e venda de publicidade digital: ajuda editores, canais de TV conectada (CTV) e outras mídias a vender seus espaços publicitários a anunciantes, agências e plataformas de compra (DSP). Surgiu em 2020 da fusão da Rubicon Project com a Telaria."
+   },
+   "como_gana": {
+    "es": "En general cobra un porcentaje del gasto publicitario que pasa por su plataforma, además de tarifas fijas por algunos servicios, como el servidor de anuncios.",
+    "en": "It generally charges a percentage of the ad spend that runs through its platform, plus fixed fees for some services such as ad serving.",
+    "pt": "Em geral cobra uma porcentagem do gasto publicitário que passa por sua plataforma, além de tarifas fixas por alguns serviços, como o servidor de anúncios."
+   },
+   "datos": {
+    "es": "Según su política de cookies de la plataforma, recoge mediante cookies, píxeles y SDK la dirección IP y otros identificadores del dispositivo, identificadores publicitarios móviles (IDFA, Google Advertising ID), actividad de navegación y en apps, y correos electrónicos convertidos en hash. Los usa para publicidad, analítica y medición, incluido seguir y segmentar los intereses de los usuarios de los sitios de sus clientes.",
+    "en": "According to its platform cookie policy, it collects through cookies, pixels and SDKs the IP address and other device identifiers, mobile advertising IDs (IDFA, Google Advertising ID), browsing and app activity, and hashed email addresses. It uses them for advertising, analytics and measurement, including tracking and targeting the interests of users of its clients' sites.",
+    "pt": "Segundo sua política de cookies da plataforma, coleta por meio de cookies, pixels e SDKs o endereço IP e outros identificadores do dispositivo, identificadores de publicidade móvel (IDFA, Google Advertising ID), atividade de navegação e em apps, e e-mails convertidos em hash. Usa esses dados para publicidade, análise e medição, incluindo rastrear e segmentar os interesses dos usuários dos sites de seus clientes."
+   },
+   "fuente_que_hace": "https://www.sec.gov/Archives/edgar/data/1595974/000159597426000007/mgni-20251231.htm",
+   "fuente_datos": "https://magnite.com/legal/platform-cookie-policy",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 713953000,
+     "moneda": "USD",
+     "fuente": "https://investor.magnite.com/node/16431"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2025,
+     "valor": 144613000,
+     "moneda": "USD",
+     "fuente": "https://investor.magnite.com/node/16431"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 971,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1595974/000159597426000007/mgni-20251231.htm"
+    }
+   ],
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://magnite.com/legal/user-choice-portal",
+   "slug": "magnite"
+  },
+  "PubMatic": {
+   "web": "https://pubmatic.com/",
+   "fundada": 2006,
+   "bolsa": "NASDAQ: PUBM",
+   "que_hace": {
+    "es": "PubMatic vende software de publicidad programática para el lado de la oferta: conecta a editores de sitios web, apps y video con compradores de anuncios, proveedores de datos y redes de comercio, mediante subastas automáticas en tiempo real.",
+    "en": "PubMatic sells sell-side programmatic advertising software: it connects publishers of websites, apps and video with ad buyers, data providers and commerce media networks through automated real-time auctions.",
+    "pt": "A PubMatic vende software de publicidade programática do lado da oferta: conecta editores de sites, apps e vídeo a compradores de anúncios, provedores de dados e redes de commerce media por meio de leilões automáticos em tempo real."
+   },
+   "como_gana": {
+    "es": "Cobra comisiones a los editores, en general un porcentaje del valor de las impresiones publicitarias que monetizan con su plataforma.",
+    "en": "It charges fees to publishers, generally a percentage of the value of the ad impressions they monetize on its platform.",
+    "pt": "Cobra taxas dos editores, em geral uma porcentagem do valor das impressões publicitárias que eles monetizam em sua plataforma."
+   },
+   "datos": {
+    "es": "Según su política de privacidad de la plataforma, recoge datos seudónimos de quienes ven anuncios: identificadores de navegador y dispositivo, dirección IP, ubicación, historial de navegación y de interacción con anuncios, y datos de socios. Los usa para mostrar y personalizar anuncios, limitar cuántas veces se ve un anuncio, medir campañas y prevenir fraude.",
+    "en": "According to its platform privacy policy, it collects pseudonymous data about people who see ads: browser and device identifiers, IP address, location, browsing and ad-interaction history, and data from partners. It uses this to serve and personalize ads, cap how often an ad is shown, measure campaigns and prevent fraud.",
+    "pt": "Segundo sua política de privacidade da plataforma, coleta dados pseudônimos de quem vê anúncios: identificadores de navegador e dispositivo, endereço IP, localização, histórico de navegação e de interação com anúncios, e dados de parceiros. Usa esses dados para exibir e personalizar anúncios, limitar quantas vezes um anúncio aparece, medir campanhas e prevenir fraudes."
+   },
+   "fuente_que_hace": "https://www.sec.gov/Archives/edgar/data/1422930/000142293026000010/pubm-20251231.htm",
+   "fuente_datos": "https://pubmatic.com/legal/privacy-policy/",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 282926000,
+     "moneda": "USD",
+     "fuente": "https://investors.pubmatic.com/news-releases/news-release-details/pubmatic-announces-fourth-quarter-and-fiscal-year-ended-2025"
+    },
+    {
+     "clave": "perdidas",
+     "anio": 2025,
+     "valor": 14462000,
+     "moneda": "USD",
+     "fuente": "https://investors.pubmatic.com/news-releases/news-release-details/pubmatic-announces-fourth-quarter-and-fiscal-year-ended-2025"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 1030,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1422930/000142293026000010/pubm-20251231.htm"
+    }
+   ],
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://pubmatic.com/legal/opt-out/",
+   "slug": "pubmatic"
+  },
+  "The Trade Desk": {
+   "web": "https://www.thetradedesk.com/",
+   "fundada": 2009,
+   "bolsa": "NASDAQ: TTD",
+   "que_hace": {
+    "es": "Plataforma de compra de publicidad digital (DSP) que permite a anunciantes y agencias planificar, comprar y medir anuncios en webs, apps, audio, televisores conectados y video.",
+    "en": "A demand-side platform (DSP) that lets advertisers and agencies plan, buy and measure digital ads across websites, apps, audio, connected TV and video.",
+    "pt": "Plataforma de compra de publicidade digital (DSP) que permite a anunciantes e agências planejar, comprar e medir anúncios em sites, apps, áudio, TVs conectadas e vídeo."
+   },
+   "como_gana": {
+    "es": "Cobra a sus clientes una tarifa de plataforma proporcional a lo que gastan en anuncios, más tarifas por datos y servicios adicionales.",
+    "en": "It charges clients a platform fee based on a share of their ad spend, plus fees for data and value-added services.",
+    "pt": "Cobra dos clientes uma taxa de plataforma proporcional ao que gastam em anúncios, além de taxas por dados e serviços adicionais."
+   },
+   "datos": {
+    "es": "Usa identificadores seudónimos (cookies como TDID, IDs publicitarios del móvil, correos y teléfonos cifrados con hash vía UID2/EUID), dirección IP y ubicación, datos del dispositivo, historial de navegación y de apps visto en las subastas de anuncios, contenido visto en TV conectada e intereses inferidos o aportados por clientes y socios.",
+    "en": "It uses pseudonymous identifiers (cookies such as TDID, mobile advertising IDs, hashed emails and phone numbers via UID2/EUID), IP address and location, device data, browsing and app history seen in ad auctions, content watched on connected TV, and interests inferred or supplied by clients and partners.",
+    "pt": "Usa identificadores pseudônimos (cookies como TDID, IDs de publicidade do celular, e-mails e telefones com hash via UID2/EUID), endereço IP e localização, dados do dispositivo, histórico de navegação e de apps visto nos leilões de anúncios, conteúdo assistido em TV conectada e interesses inferidos ou fornecidos por clientes e parceiros."
+   },
+   "fuente_que_hace": "https://www.sec.gov/Archives/edgar/data/1671933/000167193326000014/ttd-20251231.htm",
+   "fuente_datos": "https://www.thetradedesk.com/legal/privacy",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 2896284000,
+     "moneda": "USD",
+     "fuente": "https://www.businesswire.com/news/home/20260225420796/en/The-Trade-Desk-Reports-Fourth-Quarter-and-Fiscal-Year-2025-Financial-Results"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2025,
+     "valor": 443304000,
+     "moneda": "USD",
+     "fuente": "https://www.businesswire.com/news/home/20260225420796/en/The-Trade-Desk-Reports-Fourth-Quarter-and-Fiscal-Year-2025-Financial-Results"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 3843,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1671933/000167193326000014/ttd-20251231.htm"
+    }
+   ],
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://adsrvr.org/",
+   "slug": "the-trade-desk"
+  },
+  "LiveRamp": {
+   "web": "https://liveramp.com/",
+   "fundada": 2011,
+   "bolsa": "NYSE: RAMP",
+   "que_hace": {
+    "es": "Empresa de software de 'colaboración de datos' que ayuda a anunciantes y medios a unificar, conectar y activar datos de clientes para publicidad, incluido el paso de datos offline a entornos online. En mayo de 2026 acordó su venta a Publicis Groupe por 38,50 dólares por acción (operación pendiente de cierre en agosto de 2026).",
+    "en": "A data collaboration software company that helps marketers and media owners unify, connect and activate customer data for advertising, including moving offline data online. In May 2026 it agreed to be acquired by Publicis Groupe for $38.50 per share (deal still pending as of August 2026).",
+    "pt": "Empresa de software de 'colaboração de dados' que ajuda anunciantes e veículos de mídia a unificar, conectar e ativar dados de clientes para publicidade, incluindo levar dados offline para o ambiente online. Em maio de 2026 acordou sua venda à Publicis Groupe por US$ 38,50 por ação (operação pendente em agosto de 2026)."
+   },
+   "como_gana": {
+    "es": "Cerca del 76 % de sus ingresos son suscripciones a su plataforma, cobradas sobre todo según el volumen de datos; el resto viene de su mercado de datos (comisión sobre las ventas de proveedores de datos) y de tarifas por uso.",
+    "en": "About 76% of revenue comes from platform subscriptions, priced mainly on data volume; the rest comes from its data marketplace (a revenue share on data sellers' sales) and usage-based fees.",
+    "pt": "Cerca de 76% da receita vem de assinaturas da plataforma, cobradas principalmente pelo volume de dados; o restante vem do seu marketplace de dados (participação nas vendas de fornecedores de dados) e de taxas por uso."
+   },
+   "datos": {
+    "es": "Sus servicios facilitan publicidad dirigida a navegadores, dispositivos y direcciones de correo usando cookies, identificadores móviles y direcciones IP; declara que usa datos sensibles como números de seguro social y de licencia de conducir para resolución de identidad (vincular datos de una misma persona).",
+    "en": "Its services facilitate targeted advertising to browsers, devices and email addresses using cookies, mobile identifiers and IP addresses; it states that it uses sensitive data such as Social Security and driver's license numbers for identity resolution (linking data about the same person).",
+    "pt": "Seus serviços facilitam publicidade direcionada a navegadores, dispositivos e endereços de e-mail usando cookies, identificadores móveis e endereços IP; declara que usa dados sensíveis como números de Social Security e de carteira de motorista para resolução de identidade (vincular dados de uma mesma pessoa)."
+   },
+   "fuente_que_hace": "https://www.sec.gov/Archives/edgar/data/0000733269/000073326926000025/ramp-20260331.htm",
+   "fuente_datos": "https://liveramp.com/your-rights/",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2026,
+     "valor": 812940000,
+     "moneda": "USD",
+     "fuente": "https://investors.liveramp.com/news-releases/news-release-details/liveramp-announces-fourth-quarter-and-fiscal-year-2026-results"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2026,
+     "valor": 145952000,
+     "moneda": "USD",
+     "fuente": "https://investors.liveramp.com/news-releases/news-release-details/liveramp-announces-fourth-quarter-and-fiscal-year-2026-results"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2026,
+     "valor": 1300,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/0000733269/000073326926000025/ramp-20260331.htm"
+    }
+   ],
+   "sanciones": [],
+   "filtraciones": [
+    {
+     "fecha": "2003",
+     "que": {
+      "es": "Entre enero y julio de 2003 el dueño de una empresa proveedora (Snipermail) robó de Acxiom Corporation —la empresa que en 2018 pasó a llamarse LiveRamp Holdings— más de mil millones de registros de sus clientes con nombres, direcciones postales y de correo y teléfonos; fue condenado en 2006.",
+      "en": "Between January and July 2003 the owner of a vendor company (Snipermail) stole more than one billion client records from Acxiom Corporation (the company renamed LiveRamp Holdings in 2018), including names, postal and email addresses and phone numbers; he was sentenced in 2006.",
+      "pt": "Entre janeiro e julho de 2003 o dono de uma empresa fornecedora (Snipermail) roubou da Acxiom Corporation — empresa que em 2018 passou a se chamar LiveRamp Holdings — mais de um bilhão de registros de clientes com nomes, endereços postais e de e-mail e telefones; ele foi condenado em 2006."
+     },
+     "fuente": "https://www.justice.gov/archive/criminal/cybercrime/press-releases/2006/levineSent.htm"
+    }
+   ],
+   "borrar": "https://liveramp.com/your-rights/",
+   "slug": "liveramp"
+  },
+  "Epsilon": {
+   "web": "https://www.epsilon.com/",
+   "fundada": 1969,
+   "que_hace": {
+    "es": "Empresa de marketing basado en datos, propiedad de Publicis Groupe desde 2019, que ayuda a marcas a incorporar, enriquecer y activar sus datos de clientes para publicidad y marketing. Incluye Conversant (antes ValueClick) y Lotame, cuya compra anunció Publicis en marzo de 2025.",
+    "en": "A data-driven marketing company owned by Publicis Groupe since 2019 that helps brands onboard, enrich and activate customer data for advertising and marketing. It includes Conversant (formerly ValueClick) and Lotame, whose purchase Publicis announced in March 2025.",
+    "pt": "Empresa de marketing orientado por dados, controlada pela Publicis Groupe desde 2019, que ajuda marcas a integrar, enriquecer e ativar dados de clientes para publicidade e marketing. Inclui a Conversant (antiga ValueClick) e a Lotame, cuja compra a Publicis anunciou em março de 2025."
+   },
+   "como_gana": {
+    "es": "Cobra a empresas por servicios de datos de consumidores, identidad y ejecución de campañas de marketing y publicidad dirigida.",
+    "en": "It charges businesses for consumer data, identity services and running marketing and targeted-advertising campaigns.",
+    "pt": "Cobra de empresas por serviços de dados de consumidores, identidade e execução de campanhas de marketing e publicidade direcionada."
+   },
+   "datos": {
+    "es": "Según su página para consumidores, recopila nombres y direcciones postales, categorías de compra del hogar (dónde compra y qué tipo de productos), datos demográficos, intereses y respuestas a encuestas, obtenidos sobre todo de empresas clientes; agrupa a los hogares en segmentos para predecir qué podrían comprar.",
+    "en": "According to its consumer page, it collects names and postal addresses, household purchase categories (where a household shops and what it buys), demographics, interests and survey answers, mostly supplied by client companies; it groups households into segments to predict what they may buy.",
+    "pt": "Segundo sua página para consumidores, coleta nomes e endereços postais, categorias de compra do domicílio (onde compra e que tipo de produto), dados demográficos, interesses e respostas a pesquisas, obtidos principalmente de empresas clientes; agrupa os domicílios em segmentos para prever o que podem comprar."
+   },
+   "fuente_que_hace": "https://www.epsilon.com/us/about-us/pressroom/publicis-groupe-finalizes-the-acquisition-of-epsilon",
+   "fuente_datos": "https://legal.epsilon.com/us/consumer-information",
+   "sanciones": [
+    {
+     "fecha": "2021-01-19",
+     "autoridad": "U.S. Department of Justice",
+     "pais": "US",
+     "importe": 150000000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo de enjuiciamiento diferido por conspiración para cometer fraude postal y electrónico: entre 2008 y 2017 su unidad Direct to Consumer vendió datos de más de 30 millones de consumidores a esquemas fraudulentos de sorteos y astrología que afectaban sobre todo a personas mayores y vulnerables. De ese importe, 127,5 millones se destinaron a compensar a las víctimas.",
+      "en": "Deferred prosecution agreement for conspiracy to commit mail and wire fraud: from 2008 to 2017 its Direct to Consumer unit sold data on more than 30 million consumers to fraudulent sweepstakes and astrology schemes that mainly hurt elderly and vulnerable people. Of the total, $127.5 million went to compensate victims.",
+      "pt": "Acordo de suspensão do processo criminal (deferred prosecution agreement) por conspiração para fraude postal e eletrônica: entre 2008 e 2017 sua unidade Direct to Consumer vendeu dados de mais de 30 milhões de consumidores a esquemas fraudulentos de sorteios e astrologia que atingiam sobretudo idosos e pessoas vulneráveis. Desse total, US$ 127,5 milhões foram destinados a indenizar vítimas."
+     },
+     "estado": {
+      "es": "Aceptado por la empresa.",
+      "en": "Accepted by the company.",
+      "pt": "Aceito pela empresa."
+     },
+     "fuente": "https://www.justice.gov/archives/opa/pr/marketing-company-agrees-pay-150-million-facilitating-elder-fraud-schemes"
+    },
+    {
+     "fecha": "2008-03-17",
+     "autoridad": "FTC",
+     "pais": "US",
+     "importe": 2900000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con la FTC de ValueClick (que en 2014 pasó a llamarse Conversant y se integró en Epsilon): multa civil por correos y anuncios engañosos que prometían regalos 'gratis' (ley CAN-SPAM). La FTC también la acusó de afirmar falsamente que protegía y cifraba los datos de sus clientes y le impuso un programa de seguridad de 20 años.",
+      "en": "Settlement with the FTC by ValueClick (renamed Conversant in 2014 and folded into Epsilon): civil penalty for deceptive emails and ads promising 'free' gifts (CAN-SPAM Act). The FTC also charged it with falsely claiming to secure and encrypt customer data and required a 20-year security program.",
+      "pt": "Acordo com a FTC da ValueClick (renomeada Conversant em 2014 e incorporada à Epsilon): multa civil por e-mails e anúncios enganosos que prometiam brindes 'grátis' (lei CAN-SPAM). A FTC também a acusou de afirmar falsamente que protegia e criptografava dados de clientes e exigiu um programa de segurança de 20 anos."
+     },
+     "fuente": "https://www.ftc.gov/news-events/news/press-releases/2008/03/valueclick-pay-29-million-settle-ftc-charges"
+    }
+   ],
+   "filtraciones": [
+    {
+     "fecha": "2011-04",
+     "que": {
+      "es": "Un acceso no autorizado a su sistema de correo electrónico, ocurrido el 30 de marzo de 2011, expuso nombres y direcciones de correo de clientes de empresas que usaban sus servicios de email marketing; la empresa dijo que no se expusieron otros datos personales.",
+      "en": "Unauthorized access to its email system on 30 March 2011 exposed names and email addresses of customers of companies using its email marketing services; the company said no other personal data was exposed.",
+      "pt": "Um acesso não autorizado ao seu sistema de e-mail, em 30 de março de 2011, expôs nomes e endereços de e-mail de clientes de empresas que usavam seus serviços de e-mail marketing; a empresa disse que nenhum outro dado pessoal foi exposto."
+     },
+     "fuente": "https://www.hunton.com/privacy-and-cybersecurity-law-blog/email-marketing-service-providers-data-breach-likely-to-affect-millions"
+    }
+   ],
+   "borrar": "https://legal.epsilon.com/dsr",
+   "slug": "epsilon"
+  },
+  "Quantcast": {
+   "web": "https://www.quantcast.com/",
+   "fundada": 2006,
+   "que_hace": {
+    "es": "Empresa tecnológica estadounidense de publicidad, medición y análisis de audiencias; ofrece a empresas herramientas para comprar publicidad dirigida (Quantcast Advertise) y medir audiencias de sitios web (Quantcast Measure).",
+    "en": "A US technology company focused on advertising, audience insights and measurement; it offers businesses tools to buy targeted ads (Quantcast Advertise) and measure website audiences (Quantcast Measure).",
+    "pt": "Empresa de tecnologia dos EUA voltada a publicidade, análise e medição de audiências; oferece a empresas ferramentas para comprar publicidade direcionada (Quantcast Advertise) e medir audiências de sites (Quantcast Measure)."
+   },
+   "como_gana": {
+    "es": "Sus ingresos provienen de los servicios de publicidad dirigida y de medición de audiencias que vende a empresas.",
+    "en": "Its revenue comes from the targeted-advertising and audience-measurement services it sells to businesses.",
+    "pt": "Sua receita vem dos serviços de publicidade direcionada e de medição de audiência que vende a empresas."
+   },
+   "datos": {
+    "es": "Recoge con etiquetas, píxeles y SDK identificadores seudónimos (cookies, IDs de dispositivo, direcciones IP, correos cifrados con hash), ubicación aproximada (como código postal), comportamiento de navegación y datos de subastas de anuncios, además de segmentos de audiencia de clientes y terceros e inferencias; dice no recoger intencionadamente nombres, teléfonos ni ubicación precisa.",
+    "en": "Through tags, pixels and SDKs it collects pseudonymous identifiers (cookies, device IDs, IP addresses, hashed emails), approximate location (such as zip code), browsing behaviour and ad-auction data, plus audience segments from clients and third parties and inferences; it says it does not intentionally collect names, phone numbers or precise location.",
+    "pt": "Coleta por tags, pixels e SDKs identificadores pseudônimos (cookies, IDs de dispositivo, endereços IP, e-mails com hash), localização aproximada (como CEP), comportamento de navegação e dados de leilões de anúncios, além de segmentos de audiência de clientes e terceiros e inferências; diz não coletar intencionalmente nomes, telefones nem localização precisa."
+   },
+   "fuente_que_hace": "https://en.wikipedia.org/wiki/Quantcast",
+   "fuente_datos": "https://help.quantcast.com/docs/faq-data-collection-and-use",
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://www.quantcast.com/privacy-choices/",
+   "slug": "quantcast"
+  },
+  "Taboola": {
+   "web": "https://www.taboola.com/",
+   "fundada": 2007,
+   "bolsa": "NASDAQ: TBLA",
+   "que_hace": {
+    "es": "Plataforma de publicidad que muestra anuncios y recomendaciones de contenido en webs y apps de medios, conectando a anunciantes con esos lectores; también tiene la app Taboola News y el buscador de respuestas con IA DeeperDive.",
+    "en": "An advertising platform that places ads and content recommendations on publisher websites and apps, connecting advertisers with their readers; it also runs the Taboola News app and the DeeperDive AI answer engine.",
+    "pt": "Plataforma de publicidade que exibe anúncios e recomendações de conteúdo em sites e apps de veículos de mídia, conectando anunciantes a esses leitores; também tem o app Taboola News e o mecanismo de respostas com IA DeeperDive."
+   },
+   "como_gana": {
+    "es": "Cobra a los anunciantes cuando las personas hacen clic, compran o, a veces, ven sus anuncios en sitios asociados, y comparte parte de esos ingresos con esos sitios.",
+    "en": "Advertisers pay it when people click, buy or, in some cases, view their ads on partner sites, and it shares part of that revenue with those sites.",
+    "pt": "Cobra dos anunciantes quando as pessoas clicam, compram ou, em alguns casos, veem seus anúncios em sites parceiros, e repassa parte dessa receita a esses sites."
+   },
+   "datos": {
+    "es": "Recoge datos seudónimos de quienes visitan los sitios asociados: IDs de cookies, direcciones IP, IDs publicitarios del móvil, historial de navegación dentro de su red y a veces correos cifrados con hash, más datos del dispositivo y ubicación general (ciudad/estado); los usa para personalizar anuncios, reconocer dispositivos y crear segmentos de datos para sus clientes.",
+    "en": "It collects pseudonymous data on visitors to partner sites: cookie IDs, IP addresses, mobile advertising IDs, browsing history within its network and sometimes hashed emails, plus device data and general location (city/state); it uses them to personalise ads, recognise devices across sessions and build data segments for its clients.",
+    "pt": "Coleta dados pseudônimos de quem visita os sites parceiros: IDs de cookies, endereços IP, IDs de publicidade do celular, histórico de navegação dentro da sua rede e às vezes e-mails com hash, além de dados do dispositivo e localização geral (cidade/estado); usa-os para personalizar anúncios, reconhecer dispositivos e criar segmentos de dados para seus clientes."
+   },
+   "fuente_que_hace": "https://www.sec.gov/Archives/edgar/data/1840502/000184050226000004/tbla-20251231.htm",
+   "fuente_datos": "https://policies.taboola.com/",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 1912040000,
+     "moneda": "USD",
+     "fuente": "https://investors.taboola.com/news-releases/news-release-details/taboola-reports-strong-fourth-quarter-full-year-2025-financial"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2025,
+     "valor": 42284000,
+     "moneda": "USD",
+     "fuente": "https://investors.taboola.com/news-releases/news-release-details/taboola-reports-strong-fourth-quarter-full-year-2025-financial"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2025,
+     "valor": 2000,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1840502/000184050226000004/tbla-20251231.htm"
+    }
+   ],
+   "sanciones": [
+    {
+     "fecha": "2023-08",
+     "autoridad": "DGCCRF",
+     "pais": "FR",
+     "importe": 650000,
+     "moneda": "EUR",
+     "motivo": {
+      "es": "Multa transaccional acordada con la Fiscalía de París por prácticas comerciales engañosas: entre enero de 2018 y octubre de 2020 difundió en medios franceses anuncios con apariencia editorial que exageraban efectos de productos, desacreditaban enfoques médicos y promovían tratamientos que requieren diagnóstico médico.",
+      "en": "Settlement fine agreed with the Paris prosecutor for deceptive commercial practices: between January 2018 and October 2020 it ran ads on French news sites that looked like editorial content, made unsupported product claims, discredited medical approaches and promoted treatments that require a medical diagnosis.",
+      "pt": "Multa por transação acordada com a Promotoria de Paris por práticas comerciais enganosas: entre janeiro de 2018 e outubro de 2020 veiculou em sites de notícias franceses anúncios com aparência editorial que exageravam efeitos de produtos, desacreditavam abordagens médicas e promoviam tratamentos que exigem diagnóstico médico."
+     },
+     "estado": {
+      "es": "Aceptada por Taboola France y Taboola Europe.",
+      "en": "Accepted by Taboola France and Taboola Europe.",
+      "pt": "Aceita pela Taboola France e pela Taboola Europe."
+     },
+     "fuente": "https://www.frenchweb.fr/la-dgccrf-sanctionne-la-regie-publicitaire-taboola-dune-amende-de-650-000-euros/444803"
+    }
+   ],
+   "filtraciones": [],
+   "borrar": "https://accessrequest.taboola.com/access",
+   "slug": "taboola"
+  },
+  "Outbrain": {
+   "web": "https://www.outbrain.com/",
+   "fundada": 2006,
+   "bolsa": "NASDAQ: TEAD",
+   "que_hace": {
+    "es": "Outbrain es una plataforma de publicidad que coloca anuncios y recomendaciones de contenido en sitios de noticias, apps y TV conectada, para anunciantes y medios. En 2025 compró Teads y su empresa matriz pasó a llamarse Teads Holding Co. (antes Outbrain Inc.).",
+    "en": "Outbrain is an advertising platform that places ads and content recommendations on news sites, apps and connected TV, for advertisers and media owners. In 2025 it bought Teads and its parent company was renamed Teads Holding Co. (formerly Outbrain Inc.).",
+    "pt": "Outbrain é uma plataforma de publicidade que coloca anúncios e recomendações de conteúdo em sites de notícias, apps e TV conectada, para anunciantes e veículos de mídia. Em 2025 comprou a Teads e sua empresa controladora passou a se chamar Teads Holding Co. (antes Outbrain Inc.)."
+   },
+   "como_gana": {
+    "es": "Cobra a los anunciantes por los anuncios que muestra en los espacios de los medios asociados; en 2025 el 93 % de sus ingresos vino directamente de anunciantes.",
+    "en": "It charges advertisers for the ads it shows on partner media owners' inventory; in 2025, 93% of its revenue came directly from advertisers.",
+    "pt": "Cobra dos anunciantes pelos anúncios que exibe nos espaços dos veículos parceiros; em 2025, 93% da sua receita veio diretamente de anunciantes."
+   },
+   "datos": {
+    "es": "Usa una cookie o el ID publicitario del móvil para asignarte un identificador y registra las páginas que visitas, tu navegador y dispositivo y una ubicación aproximada a partir de tu IP. Con eso crea categorías de intereses para elegir qué anuncios y contenidos mostrarte.",
+    "en": "It uses a cookie or your phone's advertising ID to assign you an identifier and records the pages you visit, your browser and device, and an approximate location from your IP address. It uses this to build interest categories that decide which ads and content you see.",
+    "pt": "Usa um cookie ou o ID de publicidade do celular para atribuir a você um identificador e registra as páginas que você visita, seu navegador e dispositivo e uma localização aproximada a partir do seu IP. Com isso cria categorias de interesses para escolher quais anúncios e conteúdos mostrar."
+   },
+   "fuente_que_hace": "https://www.sec.gov/Archives/edgar/data/1454938/000145493826000015/tead-20251231.htm",
+   "fuente_datos": "https://www.outbrain.com/privacy/",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2025,
+     "valor": 1300461000,
+     "moneda": "USD",
+     "fuente": "https://www.stocktitan.net/news/TEAD/teads-holding-co-announces-fourth-quarter-and-full-year-2025-t891vk37a4ol.html"
+    },
+    {
+     "clave": "perdidas",
+     "anio": 2025,
+     "valor": 517070000,
+     "moneda": "USD",
+     "fuente": "https://www.stocktitan.net/news/TEAD/teads-holding-co-announces-fourth-quarter-and-full-year-2025-t891vk37a4ol.html"
+    },
+    {
+     "clave": "empleados",
+     "anio": 2026,
+     "valor": 1700,
+     "fuente": "https://www.sec.gov/Archives/edgar/data/1454938/000145493826000015/tead-20251231.htm"
+    }
+   ],
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://www.outbrain.com/privacy/",
+   "slug": "outbrain"
+  },
+  "Equativ": {
+   "web": "https://equativ.com/",
+   "fundada": 2001,
+   "que_hace": {
+    "es": "Empresa francesa de tecnología publicitaria (antes Smart AdServer) que ofrece a medios y anunciantes plataformas para vender y comprar publicidad automatizada en web, apps y TV conectada. En 2024 se fusionó con Sharethrough; su accionista mayoritario es el fondo Bridgepoint.",
+    "en": "French ad tech company (formerly Smart AdServer) that gives media owners and advertisers platforms to sell and buy automated advertising on the web, apps and connected TV. In 2024 it merged with Sharethrough; its majority shareholder is the investment firm Bridgepoint.",
+    "pt": "Empresa francesa de tecnologia publicitária (antes Smart AdServer) que oferece a veículos e anunciantes plataformas para vender e comprar publicidade automatizada na web, em apps e na TV conectada. Em 2024 se fundiu com a Sharethrough; seu acionista majoritário é o fundo Bridgepoint."
+   },
+   "como_gana": {
+    "es": "Sus ingresos vienen de la publicidad que medios y anunciantes venden y compran a través de su plataforma.",
+    "en": "Its revenue comes from the advertising that media owners and advertisers sell and buy through its platform.",
+    "pt": "Sua receita vem da publicidade que veículos e anunciantes vendem e compram pela sua plataforma."
+   },
+   "datos": {
+    "es": "Recoge tu IP, IDs de cookies (incluido el Equativ ID) e IDs publicitarios del móvil, datos del navegador y del dispositivo, la ubicación del dispositivo (precisa en algunos casos) y las páginas y apps que usas, para elegir y medir anuncios. Guarda las cookies hasta 13 meses.",
+    "en": "It collects your IP address, cookie IDs (including the Equativ ID) and mobile advertising IDs, browser and device data, the device's location (precise in some cases) and the pages and apps you use, to select and measure ads. It keeps cookies for up to 13 months.",
+    "pt": "Coleta seu IP, IDs de cookies (incluindo o Equativ ID) e IDs de publicidade do celular, dados do navegador e do dispositivo, a localização do dispositivo (precisa em alguns casos) e as páginas e apps que você usa, para escolher e medir anúncios. Guarda os cookies por até 13 meses."
+   },
+   "fuente_que_hace": "https://www.businesswire.com/news/home/20240613777498/en",
+   "fuente_datos": "https://privacy.equativ.com/?p=767",
+   "cifras": [
+    {
+     "clave": "ingresos",
+     "anio": 2024,
+     "valor": 371000000,
+     "moneda": "EUR",
+     "fuente": "https://www.xerfi.com/etudes-par-entreprise/equativ_487613481"
+    },
+    {
+     "clave": "beneficio",
+     "anio": 2024,
+     "valor": 2400000,
+     "moneda": "EUR",
+     "fuente": "https://www.xerfi.com/etudes-par-entreprise/equativ_487613481"
+    }
+   ],
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://sync.smartadserver.com/optout",
+   "slug": "equativ"
+  },
+  "OpenX": {
+   "web": "https://www.openx.com/",
+   "fundada": 2008,
+   "que_hace": {
+    "es": "Empresa estadounidense (Pasadena, California) que opera una plataforma del lado de la oferta (SSP): ayuda a medios y apps a vender sus espacios publicitarios a anunciantes mediante subastas automáticas en TV conectada, apps y web.",
+    "en": "US company (Pasadena, California) that runs a supply-side platform (SSP): it helps media owners and apps sell their ad space to advertisers through automated auctions on connected TV, apps and the web.",
+    "pt": "Empresa americana (Pasadena, Califórnia) que opera uma plataforma do lado da oferta (SSP): ajuda veículos e apps a vender seus espaços publicitários a anunciantes por meio de leilões automáticos em TV conectada, apps e web."
+   },
+   "como_gana": {
+    "es": "Sus ingresos vienen de la publicidad que se compra y vende a través de su plataforma de subastas.",
+    "en": "Its revenue comes from the advertising bought and sold through its auction platform.",
+    "pt": "Sua receita vem da publicidade comprada e vendida pela sua plataforma de leilões."
+   },
+   "datos": {
+    "es": "Recoge tu IP, ID de cookie, ID publicitario del móvil o de la TV conectada y correo o teléfono cifrados (hash), además de historial de navegación y de compras, intereses deducidos, ubicación aproximada y datos del dispositivo, para mostrar anuncios basados en intereses.",
+    "en": "It collects your IP address, cookie ID, mobile or connected-TV advertising ID and hashed email or phone number, plus browsing and purchase history, inferred interests, approximate location and device data, to show interest-based ads.",
+    "pt": "Coleta seu IP, ID de cookie, ID de publicidade do celular ou da TV conectada e e-mail ou telefone criptografados (hash), além de histórico de navegação e de compras, interesses inferidos, localização aproximada e dados do dispositivo, para exibir anúncios baseados em interesses."
+   },
+   "fuente_que_hace": "https://en.wikipedia.org/wiki/OpenX_Technologies",
+   "fuente_datos": "https://www.openx.com/privacy-center/openx-ad-exchange-privacy-policy/",
+   "sanciones": [
+    {
+     "fecha": "2021-12-15",
+     "autoridad": "FTC",
+     "pais": "US",
+     "importe": 7500000,
+     "moneda": "USD",
+     "motivo": {
+      "es": "Acuerdo con la FTC por recoger datos personales de menores de 13 años sin permiso de los padres (ley COPPA) y por recoger la ubicación de usuarios que habían pedido no ser rastreados.",
+      "en": "Settlement with the FTC over collecting personal information from children under 13 without parental consent (COPPA) and collecting location data from users who had opted out of tracking.",
+      "pt": "Acordo com a FTC por coletar dados pessoais de menores de 13 anos sem consentimento dos pais (lei COPPA) e por coletar a localização de usuários que haviam pedido para não ser rastreados."
+     },
+     "estado": {
+      "es": "Multa civil de 7,5 millones de USD, de los que se suspendieron 5,5 millones por la situación financiera de OpenX; pagó 2 millones.",
+      "en": "Civil penalty of USD 7.5 million, of which 5.5 million was suspended due to OpenX's financial condition; it paid 2 million.",
+      "pt": "Multa civil de US$ 7,5 milhões, dos quais 5,5 milhões foram suspensos pela situação financeira da OpenX; pagou 2 milhões."
+     },
+     "fuente": "https://hunton.com/privacy-and-information-security-law/ftc-announces-2-million-settlement-with-ad-exchange-over-alleged-coppa-violations",
+     "importe_final": 2000000
+    }
+   ],
+   "filtraciones": [],
+   "borrar": "https://www.openx.com/privacy-center/browser-opt-out-portal/",
+   "slug": "openx"
+  },
+  "Index Exchange": {
+   "web": "https://www.indexexchange.com/",
+   "fundada": 2003,
+   "que_hace": {
+    "es": "Empresa canadiense (Toronto) que opera un mercado global de publicidad: organiza subastas en tiempo real para vender a los compradores los espacios publicitarios de sitios web, apps y TV en streaming de los medios. Nació en 2015 a partir de Casale Media.",
+    "en": "Canadian company (Toronto) that runs a global advertising marketplace: it holds real-time auctions to sell media owners' ad space on websites, apps and streaming TV to buyers. It grew out of Casale Media in 2015.",
+    "pt": "Empresa canadense (Toronto) que opera um mercado global de publicidade: realiza leilões em tempo real para vender aos compradores os espaços publicitários de sites, apps e TV por streaming dos veículos. Surgiu em 2015 a partir da Casale Media."
+   },
+   "como_gana": {
+    "es": "Sus ingresos vienen de la publicidad que se vende a través de su mercado de subastas.",
+    "en": "Its revenue comes from the advertising sold through its auction marketplace.",
+    "pt": "Sua receita vem da publicidade vendida pelo seu mercado de leilões."
+   },
+   "datos": {
+    "es": "Recibe IDs de cookies e IDs publicitarios del móvil y de la smart TV, tu IP, datos del navegador y del dispositivo, una ubicación generalmente aproximada (los medios pueden enviar una más precisa) e intereses o datos demográficos que aportan los medios.",
+    "en": "It receives cookie IDs and mobile and smart-TV advertising IDs, your IP address, browser and device data, a usually approximate location (publishers may send a more precise one) and interests or demographics supplied by publishers.",
+    "pt": "Recebe IDs de cookies e IDs de publicidade do celular e da smart TV, seu IP, dados do navegador e do dispositivo, uma localização geralmente aproximada (os veículos podem enviar uma mais precisa) e interesses ou dados demográficos fornecidos pelos veículos."
+   },
+   "fuente_que_hace": "https://www.indexexchange.com/privacy/exchange-platform-privacy-policy/",
+   "fuente_datos": "https://www.indexexchange.com/privacy/exchange-platform-privacy-policy/",
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://www.indexexchange.com/privacy/user-privacy-rights-form/",
+   "slug": "index-exchange"
+  },
+  "Contentsquare": {
+   "web": "https://contentsquare.com/",
+   "fundada": 2012,
+   "que_hace": {
+    "es": "Empresa francesa que vende a otras empresas software de análisis para ver cómo los visitantes usan sus sitios web y apps (clics, desplazamientos, grabaciones de sesión) y mejorarlos. Es dueña de Hotjar y Heap.",
+    "en": "French company that sells businesses analytics software to see how visitors use their websites and apps (clicks, scrolling, session recordings) and improve them. It owns Hotjar and Heap.",
+    "pt": "Empresa francesa que vende a outras empresas software de análise para ver como os visitantes usam seus sites e apps (cliques, rolagem, gravações de sessão) e melhorá-los. É dona da Hotjar e da Heap."
+   },
+   "como_gana": {
+    "es": "Vende a empresas el acceso a su plataforma de software en la nube (SaaS).",
+    "en": "It sells businesses access to its cloud software platform (SaaS).",
+    "pt": "Vende a empresas o acesso à sua plataforma de software na nuvem (SaaS)."
+   },
+   "datos": {
+    "es": "En los sitios de sus clientes registra tu IP, IDs de usuario y de cookies, páginas vistas, navegador y dispositivo, movimientos del ratón o del dedo, desplazamientos y clics (incluida la grabación de sesión) y tu país; puede captar teclas pulsadas si el cliente lo activa. Lo hace como encargado del tratamiento por cuenta de cada cliente.",
+    "en": "On its clients' sites it records your IP address, user and cookie IDs, pages viewed, browser and device, mouse or touch movements, scrolling and clicks (including session replay) and your country; it may capture keypresses if the client enables it. It does this as a processor on behalf of each client.",
+    "pt": "Nos sites dos seus clientes registra seu IP, IDs de usuário e de cookies, páginas vistas, navegador e dispositivo, movimentos do mouse ou do dedo, rolagem e cliques (incluindo gravação de sessão) e seu país; pode capturar teclas digitadas se o cliente ativar. Faz isso como operador de dados em nome de cada cliente."
+   },
+   "fuente_que_hace": "https://en.wikipedia.org/wiki/Contentsquare",
+   "fuente_datos": "https://contentsquare.com/privacy-center/services-privacy-policy/",
+   "sanciones": [],
+   "filtraciones": [],
+   "borrar": "https://contentsquare.com/privacy-center/data-subject-request-portal/",
+   "slug": "contentsquare"
   }
  }
 }

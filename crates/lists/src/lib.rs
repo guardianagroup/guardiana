@@ -948,6 +948,39 @@ mod group_tests {
     }
 
     #[test]
+    fn every_profile_is_of_a_listed_company_and_every_fact_has_its_source() {
+        let v: serde_json::Value = serde_json::from_str(FICHAS).unwrap_or_default();
+        let empresas = v["empresas"].as_object().cloned().unwrap_or_default();
+        let fuente = |x: &serde_json::Value| x.as_str().is_some_and(|u| u.starts_with("https://"));
+        for (nombre, f) in &empresas {
+            assert!(
+                company_record(nombre).is_some(),
+                "{nombre}: no está en empresas.txt"
+            );
+            for lista in ["cifras", "sanciones", "filtraciones"] {
+                for x in f[lista].as_array().cloned().unwrap_or_default() {
+                    assert!(fuente(&x["fuente"]), "{nombre} {lista}: sin fuente: {x}");
+                }
+            }
+            for x in f["sanciones"].as_array().cloned().unwrap_or_default() {
+                let fecha = x["fecha"].as_str().unwrap_or("");
+                assert!(
+                    fecha.len() >= 4 && fecha[..4].bytes().all(|b| b.is_ascii_digit()),
+                    "{nombre}: fecha {fecha}"
+                );
+                assert!(
+                    x["motivo"]["es"].is_string()
+                        && x["motivo"]["en"].is_string()
+                        && x["motivo"]["pt"].is_string(),
+                    "{nombre}: motivo en los tres idiomas"
+                );
+            }
+        }
+        assert!(profile_of("Criteo").is_some());
+        assert!(profile_of("nadie").is_none());
+    }
+
+    #[test]
     fn every_group_carries_its_source_and_every_network_its_company() {
         let lineas: Vec<&str> = EMPRESAS.lines().collect();
         for (i, l) in lineas.iter().enumerate() {
