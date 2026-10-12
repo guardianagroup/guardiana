@@ -63,6 +63,8 @@ nest.com
 fitbit.com
 nel.goog
 googlezip.net
+2mdn.net  # «Google/Doubleclick Ads» de Google en third-party-web (MIT), https://github.com/patrickhulce/third-party-web/blob/main/data/entities.js, consultada el 12 oct 2026
+googleoptimize.com  # «Google Optimize» de Google en third-party-web (MIT), https://github.com/patrickhulce/third-party-web/blob/main/data/entities.js, consultada el 12 oct 2026
 
 @Apple|US|Cupertino
 AS714  # su red, según PeeringDB https://www.peeringdb.com/net/3554 (Apple Inc.), consultado el 10 oct 2026
@@ -119,6 +121,7 @@ sfx.ms
 microsoft365.com
 cloud.microsoft
 githubassets.com
+clarity.ms  # «Clarity» de Microsoft en third-party-web (MIT), https://github.com/patrickhulce/third-party-web/blob/main/data/entities.js, consultada el 12 oct 2026
 
 @Amazon|US|Seattle
 AS16509  # su red, según PeeringDB https://peeringdb.com/net/1418 (Amazon.com, Inc.), consultado el 10 oct 2026
@@ -283,6 +286,7 @@ typekit.net
 adobe.io
 adobedtm.com
 everesttech.net
+2o7.net  # «Adobe Experience Cloud» de Adobe en third-party-web (MIT), https://github.com/patrickhulce/third-party-web/blob/main/data/entities.js, consultada el 12 oct 2026
 
 @Oracle|US|Austin
 oracle.com
@@ -311,6 +315,7 @@ iponweb.com
 
 @The Trade Desk|US|Ventura (California)
 adsrvr.org
+uidapi.com  # https://unifiedid.com/docs/getting-started/gs-environments (consultada el 12 oct 2026)
 
 @Magnite|US|Nueva York
 rubiconproject.com
@@ -360,6 +365,7 @@ twimg.com
 t.co
 grok.com
 x.ai
+ads-twitter.com  # https://help.x.com/en/business-and-advertising/conversion-tracking-for-websites (consultada el 12 oct 2026)
 
 @Snap|US|Santa Mónica
 snapchat.com
@@ -444,6 +450,8 @@ hotjar.com
 @Piano|US|Filadelfia
 piano.io
 tinypass.com
+cxense.com  # https://tostracker.app/document/cxense-privacy (consultada el 12 oct 2026)
+npttech.com  # «piano» de Piano en third-party-web (MIT), https://github.com/patrickhulce/third-party-web/blob/main/data/entities.js, consultada el 12 oct 2026
 
 @Permutive|GB|Londres
 permutive.com
@@ -464,6 +472,7 @@ nielsen.com
 @Quantcast|US|San Francisco
 quantserve.com
 quantcount.com
+ntv.io  # «Quantcast» de Quantcast en third-party-web (MIT), https://github.com/patrickhulce/third-party-web/blob/main/data/entities.js, consultada el 12 oct 2026
 
 @LiveRamp|US|San Francisco
 rlcdn.com
@@ -477,6 +486,7 @@ privacymanager.io
 @ID5|GB|Londres
 # ID5 TECHNOLOGY LIMITED, Londres, Companies House 10735438. (Decía Francia: estaba mal.)
 id5-sync.com
+eu-1-id5-sync.com  # https://urlscan.io/result/0198146c-c116-71bc-ac04-756fccbd4959 (consultada el 12 oct 2026)
 
 @Equativ|FR|París
 smartadserver.com
@@ -499,6 +509,7 @@ sendgrid.net
 @Braze|US|Nueva York
 braze.com
 appboy.com
+appboycdn.com  # «Braze» de Braze en third-party-web (MIT), https://github.com/patrickhulce/third-party-web/blob/main/data/entities.js, consultada el 12 oct 2026
 
 @OneSignal|US|San Mateo
 onesignal.com
@@ -558,15 +569,18 @@ operacdn.com
 wordpress.com
 wp.com
 gravatar.com
+pubmine.com  # «WordAds» de Automattic en third-party-web (MIT), https://github.com/patrickhulce/third-party-web/blob/main/data/entities.js, consultada el 12 oct 2026
 
 @Wix|IL|Tel Aviv
 wix.com
 wixstatic.com
 parastorage.com
+wixapps.net  # «Wix» de Wix en third-party-web (MIT), https://github.com/patrickhulce/third-party-web/blob/main/data/entities.js, consultada el 12 oct 2026
 
 @Shopify|CA|Ottawa
 shopify.com
 shopifycdn.com
+shopifysvc.com  # «Shopify» de Shopify en third-party-web (MIT), https://github.com/patrickhulce/third-party-web/blob/main/data/entities.js, consultada el 12 oct 2026
 
 @Canva|AU|Sídney
 canva.com
@@ -643,6 +657,7 @@ adcolony.com
 
 @InMobi|IN|Bangalore
 inmobi.com
+inmobi-choice.io  # https://www.urlert.com/domains/inmobi-choice.io (consultada el 12 oct 2026)
 
 @Gen Digital|US|Tempe (Arizona)
 avast.com
@@ -857,6 +872,7 @@ nexx360.io
 @Disqus|US|San Francisco|Zeta Global
 disqus.com
 disquscdn.com
+disq.us  # «disq.us» de Disqus en third-party-web (MIT), https://github.com/patrickhulce/third-party-web/blob/main/data/entities.js, consultada el 12 oct 2026
 
 # --- Quién hay detrás de lo que sale como «normal» -------------------------------------------
 # Las comprobaciones de certificados, la hora y las actualizaciones del sistema aparecían con un
@@ -1148,3 +1164,393 @@ expansion.com
 eltiempo.com
 portafolio.co
 futbolred.com
+
+# ---------------------------------------------------------------------------------------------
+# Ampliación del 12 oct 2026 (el dueño: «que a nadie le salga desconocido»): las empresas de
+# publicidad y rastreo más vistas en webs de todo el mundo que aún no estaban. Cada sede con su
+# fuente; donde no se pudo comprobar, va sin país o sin ciudad.
+
+# dotomi.com, fastclick.net: https://legal.epsilon.com/eu/cookie-list
+# Nota: Conversant fue absorbida por Epsilon (la política UE de Epsilon dice 'Epsilon, formerly also known as Conversant'; https://legal.epsilon.com/eu/privacy-policy/). La lista de cookies de Epsilon incluye dotomi.com y fastclick.net. No se pudo confirmar con fuente abierta la sede propia de Epsilon (lími
+# Grupo: Publicis Groupe (fuente: https://legal.epsilon.com/eu/cookie-list, consultada el 12 oct 2026)
+@Epsilon|||Publicis Groupe
+dotomi.com
+fastclick.net
+
+# Sede: https://www.datarequests.org/company/33across/ (consultada el 12 oct 2026)
+# 33across.com: https://www.33across.co.uk/privacy-policy
+# tynt.com: https://www.consentstack.io/vendors/33across
+# Nota: Dirección postal de 33Across, Inc. en 229 West 28th St, Nueva York según datarequests.org (no página propia); Wikipedia indica sede 'Remote' y menciona Sunnyvale sin cita. Sin matriz conocida
+@33Across|US|Nueva York
+33across.com
+tynt.com
+
+# Sede: https://liveintent.com/services-privacy-policy/ (consultada el 12 oct 2026)
+# liadm.com: https://docs.prebid.org/dev-docs/modules/userid-submodules/liveintent.html
+# Nota: La pista IPONWEB es errónea: liadm.com es el colector de LiveIntent (rp.liadm.com). Zeta Global completó la compra de LiveIntent en oct. 2024 (https://www.nasdaq.com/press-release/zeta-global-completes-acquisition-liveintent-2024-10-21)
+# Grupo: Zeta Global (fuente: https://liveintent.com/services-privacy-policy/, consultada el 12 oct 2026)
+@LiveIntent|US|Nueva York|Zeta Global
+liadm.com
+
+# Sede: https://www.lotame.com/?p=16947 (consultada el 12 oct 2026)
+# crwdcntrl.net: https://my.lotame.com/t/83hxvnt
+# Nota: Publicis compró Lotame (anunciado 6-mar-2025, cerrado 2-abr-2025) y la integró en Epsilon; según redact.dev Lotame Solutions se fusionó en Epsilon Data Management LLC en oct. 2025. Dirección de Lotame: 8890 McGaw Road, Columbia, MD
+# Grupo: Publicis Groupe (fuente: https://www.lotame.com/?p=16947, consultada el 12 oct 2026)
+@Lotame|US|Columbia (Maryland)|Publicis Groupe
+crwdcntrl.net
+
+# Sede: https://en.wikipedia.org/wiki/Sovrn_Holdings (consultada el 12 oct 2026)
+# lijit.com: https://cop.evidon.com/companies/sovrn-formerly-lijit-networks
+# Nota: Sovrn es la antigua Lijit Networks (Wikipedia y Evidon); ninguna fuente abierta cita textualmente el dominio lijit.com
+@Sovrn|US|Boulder (Colorado)
+lijit.com
+
+# Sede: https://en.wikipedia.org/wiki/Media.net (consultada el 12 oct 2026)
+# media.net: https://www.media.net/privacy-policy/
+# Nota: Entidad legal Media.Net Advertising FZ-LLC (Aurora Tower, Dubai Media City) según su política de privacidad; Wikipedia da Dubái como sede global y Nueva York como sede (EE. UU.). Comprada en 2016 por un consorcio chino liderado por Miteno (Shuzhi.AI) según Wikipedia
+# Grupo: Miteno Communication Technology (fuente: https://en.wikipedia.org/wiki/Media.net, consultada el 12 oct 2026)
+@Media.net|AE|Dubái|Miteno Communication Technology
+media.net
+
+# Sede: https://site.adform.com/media/89191/privacy-policy-version-until-30092021.pdf (consultada el 12 oct 2026)
+# adform.net: https://www.consentstack.io/vendors/adform
+# Nota: Adform A/S, Silkegade 3B, Copenhague (también Wikipedia). Fuente de dominio es un agregador (ConsentStack); no se pudo abrir la página de cookies propia de Adform
+@Adform|DK|Copenhague
+adform.net
+
+# Sede: https://www.experianplc.com/media/news/2020/experian-acquires-tapad/ (consultada el 12 oct 2026)
+# tapad.com: https://en.wikipedia.org/wiki/Tapad
+# Nota: Experian completó la compra de Tapad a Telenor en nov. 2020; Tapad tiene sede en Nueva York
+# Grupo: Experian (fuente: https://www.experianplc.com/media/news/2020/experian-acquires-tapad/, consultada el 12 oct 2026)
+@Tapad|US|Nueva York|Experian
+tapad.com
+
+# Sede: https://improvedigital.com/platform-privacy-policy (consultada el 12 oct 2026)
+# 360yield.com: https://improvedigital.com/platform-privacy-policy
+# Nota: Improve Digital opera hoy como Azerion Technology B.V. ('Improve Digital by Azerion'), Boeing Avenue 30, Schiphol-Rijk (junto a Ámsterdam); la política lo da como dirección, no lo llama sede
+# Grupo: Azerion (fuente: https://improvedigital.com/platform-privacy-policy, consultada el 12 oct 2026)
+@Improve Digital|NL|Schiphol-Rijk|Azerion
+360yield.com
+
+# yieldmo.com: https://www.consentstack.io/vendors/yieldmo
+# Nota: Dominio confirmado solo por agregador (ConsentStack); sede no verificada (límite de búsquedas agotado)
+@Yieldmo
+yieldmo.com
+
+# Sede: https://www.businesswire.com/news/home/20250528884555/en/MGID-Partners-with-Digiseg-to-Enhance-Privacy-First-Audience-Targeting-Across-Global-Markets (consultada el 12 oct 2026)
+# mgid.com: https://cop.evidon.com/companies/mgid
+# Nota: ok (boilerplate de nota de prensa de mayo de 2025: 'Headquartered in Santa Monica'; Evidon lista la dirección de contacto de privacidad en Nueva York)
+@MGID|US|Santa Mónica (California)
+mgid.com
+
+# Sede: https://pulsepoint.com/legal/platform-privacy-policy (consultada el 12 oct 2026)
+# contextweb.com: https://pulsepoint.com/legal/platform-privacy-policy
+# Nota: ContextWeb es el nombre antiguo de PulsePoint; su política dice 'Our cookie domain is contextweb.com' y que es filial de WebMD Health Corp., dentro de Internet Brands
+# Grupo: WebMD Health Corp. (Internet Brands) (fuente: https://pulsepoint.com/legal/platform-privacy-policy, consultada el 12 oct 2026)
+@PulsePoint|US|Newark (Nueva Jersey)|WebMD Health Corp. (Internet Brands)
+contextweb.com
+
+# Sede: https://ico.org.uk/ESDWebPages/Entry/ZA926133 (consultada el 12 oct 2026)
+# onaudience.com: https://oag.ca.gov/node/546407
+# Nota: Domicilio registrado de OnAudience Ltd en Londres (registro ICO); empresa de origen polaco; la pertenencia a Cloud Technologies S.A. (Varsovia) solo consta en agregadores (theatdb, bouncewatch)
+@OnAudience|GB|Londres
+onaudience.com
+
+# Sede: https://deepintent.com/platformprivacypolicy (consultada el 12 oct 2026)
+# deepintent.com: https://deepintent.com/platformprivacypolicy
+@DeepIntent|US|Nueva York
+deepintent.com
+
+# Sede: https://en.wikipedia.org/wiki/Infillion (consultada el 12 oct 2026)
+# mathtag.com: https://webcf.waybackmachine.org/web/20180703064121/https://pixel.mathtag.com
+# Nota: MediaMath (Nueva York) quebró en 2023 e Infillion compró sus activos (sept. 2023); mediamath.com redirige a infillion.com; Wikipedia da como sede de Infillion Los Ángeles y Nueva York
+# Grupo: Infillion (fuente: https://en.wikipedia.org/wiki/Infillion, consultada el 12 oct 2026)
+@MediaMath|US|Nueva York|Infillion
+mathtag.com
+
+# Sede: https://trademarks.justia.com/862/24/adman-86224782.html (consultada el 12 oct 2026)
+# admanmedia.com: https://www.preqin.com/data/profile/asset/adman-interactive/73426
+# Nota: Titular de la marca ADMAN MEDIA: ADMAN INTERACTIVE, S.L. (sociedad española); Preqin y Craft dicen Barcelona, pero no hay fuente primaria; propiedad actual no verificada
+@AdMan Media|ES
+admanmedia.com
+
+# Sede: https://www.llrpartners.com/connatix-and-jw-player-merge-to-create-the-industrys-largest-video-technology-and-monetization-platform/ (consultada el 12 oct 2026)
+# connatix.com: https://www.llrpartners.com/connatix-and-jw-player-merge-to-create-the-industrys-largest-video-technology-and-monetization-platform/
+# Nota: Connatix se fusionó con JW Player en oct. 2024 y forman JWP Connatix (sede en Nueva York); la nota enlaza connatix.com; empresa respaldada por capital privado
+@JWP Connatix|US|Nueva York
+connatix.com
+
+# a-mx.com: https://www.netify.ai/resources/domains/a-mx.com
+# Nota: Netify asocia a-mx.com y a-mx.net con AdaptMX (bidder 'amx'/AMX RTB); CB Insights y vcbacked indican Boston (EE. UU.), sin fuente primaria
+@AdaptMX
+a-mx.com
+
+# Sede: https://en.wikipedia.org/wiki/Integral_Ad_Science (consultada el 12 oct 2026)
+# adsafeprotected.com: https://www.netify.ai/resources/applications/adsafeprotected
+# Nota: Novacap completó la compra el 23-dic-2025 (integralads.com/news/ias-priorities-in-2026/); fuente de dominio es Netify (agregador), coincide con URLert
+@Integral Ad Science|US|Nueva York
+adsafeprotected.com
+
+# Sede: https://www.kargo.com/privacy (consultada el 12 oct 2026)
+# kargo.com: https://www.kargo.com/privacy
+# Nota: Kargo Global, LLC, 826 Broadway, Nueva York (dirección legal de su política; Built In confirma sede)
+@Kargo|US|Nueva York
+kargo.com
+
+# Sede: https://www.localogy.com/2023/03/simpli-fi-acquires-contextual-ad-platform-bidtellect/ (consultada el 12 oct 2026)
+# bttrack.com: https://www.consentstack.io/vendors/bidtellect
+# Nota: Simpli.fi (Fort Worth) compró Bidtellect en 2023; antes tenía sede en Delray Beach (Florida), no confirmado si sigue siendo su sede hoy
+# Grupo: Simpli.fi (fuente: https://www.localogy.com/2023/03/simpli-fi-acquires-contextual-ad-platform-bidtellect/, consultada el 12 oct 2026)
+@Bidtellect|US||Simpli.fi
+bttrack.com
+
+# Sede: https://www.cbinsights.com/company/kueez (consultada el 12 oct 2026)
+# kueezrtb.com: https://www.urlert.com/domains/kueezrtb.com
+# Nota: Solo agregadores (URLert, CB Insights con dirección Haarba'a St 17, Built In); KueezRTB es su SSP; sin fuente primaria
+@Kueez|IL|Tel Aviv
+kueezrtb.com
+
+# Sede: https://www.sec.gov/Archives/edgar/data/0001338940/000117891325001021/zk2532820.htm (consultada el 12 oct 2026)
+# undertone.com: https://datarequests.org/company/undertone
+# Nota: Undertone (Intercept Interactive) es filial de Perion y la marca pasó a 'Perion' con Perion One (2025); 20-F FY2024: 2 Leonardo Da Vinci St, Tel Aviv
+@Perion|IL|Tel Aviv
+undertone.com
+
+# Sede: https://www.datarequests.org/company/adition/ (consultada el 12 oct 2026)
+# adition.com: https://cop.evidon.com/companies/adition-technologies-ag
+# Nota: Oststraße 55, 40211 Düsseldorf; forma jurídica AG/GmbH según la fuente; matriz Virtual Minds (Friburgo) según virtualminds.com
+# Grupo: Virtual Minds (fuente: https://www.datarequests.org/company/adition/, consultada el 12 oct 2026)
+@ADITION technologies|DE|Düsseldorf|Virtual Minds
+adition.com
+
+# Sede: https://cop.evidon.com/companies/callrail (consultada el 12 oct 2026)
+# callrail.com: https://cop.evidon.com/companies/callrail
+# Nota: Fuente única: directorio Evidon/Ghostery (100 Peachtree St NW, Atlanta); no se abrió la página propia de CallRail
+@CallRail|US|Atlanta (Georgia)
+callrail.com
+
+# Sede: https://metricool.com/fr/mentions-legales/ (consultada el 12 oct 2026)
+# metricool.com: https://metricool.com/fr/mentions-legales/
+# Nota: El aviso legal da METRICOOL SOFTWARE, S.L. (NIF B87527115), C/ Téllez 12, 28007 Madrid. Es el domicilio social.
+@Metricool|ES|Madrid
+metricool.com
+
+# Sede: https://www.nexttv.com/news/beachfront-staffs-moves-hq-new-york-172244 (consultada el 12 oct 2026)
+# bfmio.com: https://github.com/prebid/Prebid.js/blob/master/modules/beachfrontBidAdapter.js
+# Nota: Incierto: Seedtag absorbió Beachfront en 2024 (https://www.theatdb.com/companies/beachfront) y beachfront.com ya redirige a seedtag.com. El traslado de la sede a Nueva York es de 2018 y puede no seguir vigente. Seedtag tiene sede en Madrid (dato no verificado con fuente primaria).
+# Grupo: Seedtag (fuente: https://www.nexttv.com/news/beachfront-staffs-moves-hq-new-york-172244, consultada el 12 oct 2026)
+@Beachfront|US|Nueva York|Seedtag
+bfmio.com
+
+# Sede: https://www.so-netmedia.jp/assets/uploads/2023/07/information-20230704.pdf (consultada el 12 oct 2026)
+# ladsp.com: https://github.com/prebid/Prebid.js/blob/master/modules/logicadBidAdapter.js
+# Nota: El hint F@N Communications es incorrecto. ladsp.com es el DSP Logicad de SMN Corporation (antes So-net Media Networks), con sede en Shinagawa (Tokio). Se mencionan lazos con el grupo Sony, pero el control accionarial no está verificado.
+@SMN|JP|Tokio
+ladsp.com
+
+# iqm.com: https://github.com/prebid/Prebid.js/blob/master/modules/iqmBidAdapter.md
+# Nota: Adaptador Prebid de iQM mantenido por hbteam@iqm.com. Sede sin verificar porque se agotó el presupuesto de búsqueda.
+@IQM
+iqm.com
+
+# Sede: https://en.globes.co.il/en/article-1001386029 (consultada el 12 oct 2026)
+# cootlogix.com: https://github.com/prebid/Prebid.js/blob/master/modules/vidazooBidAdapter.js
+# Nota: El adaptador Prebid de Vidazoo usa cootlogix.com como dominio base (mantenedor dev@vidazoo.com) y DDG Tracker Radar lo asigna a Vidazoo Ltd. Perion compró Vidazoo en octubre de 2021. Sede de Tel Aviv según la prensa de 2021.
+# Grupo: Perion (fuente: https://en.globes.co.il/en/article-1001386029, consultada el 12 oct 2026)
+@Vidazoo|IL|Tel Aviv|Perion
+cootlogix.com
+
+# e-planning.net: https://github.com/prebid/Prebid.js/blob/master/modules/eplanningBidAdapter.md
+# Nota: DDG Tracker Radar da como razón social Teroa S.A. Sede sin verificar porque se agotó el presupuesto de búsqueda (Ghostery indica AR).
+@e-planning
+e-planning.net
+
+# Sede: https://inpublishing.co.uk/suppliers/s/limelight-inc (consultada el 12 oct 2026)
+# ortb.net: https://github.com/prebid/Prebid.js/blob/master/modules/limelightDigitalBidAdapter.md
+# Nota: Exchange white-label de Limelight Inc. (antes Project Limelight): los clientes usan subdominios exchange-*.ortb.net y el mantenedor es project-limelight.com. Se fundó en Londres en 2018 (napierb2b.com); el directorio da como dirección 61 Bridge Street, Kington HR5 3DJ (Reino Unido), probablemente el
+@Limelight|GB
+ortb.net
+
+# Sede: https://getintent.com/en/getintent-about-company/ (consultada el 12 oct 2026)
+# adhigh.net: https://github.com/prebid/Prebid.js/blob/master/modules/getintentBidAdapter.js
+# Nota: El adaptador Prebid usa px.adhigh.net (mantenedor getintent.com). La página About solo lista la oficina de Moscú (Olimpiyskiy Prospekt 14).
+@GetIntent|RU|Moscú
+adhigh.net
+
+# Sede: https://www.adstanding.com/wp-content/uploads/2026/01/Press-release-Adstanding-Appointment-Luc-Quetel.pdf (consultada el 12 oct 2026)
+# adstanding.com: https://www.adstanding.com/wp-content/uploads/2026/01/Press-release-Adstanding-Appointment-Luc-Quetel.pdf
+# Nota: DSP/SSP de DOOH escindida de Atedra en 2022. Su nota de prensa de 2026 la presenta como privada y con base en Montreal.
+@Adstanding|CA|Montreal
+adstanding.com
+
+# connectad.io: https://github.com/prebid/Prebid.js/blob/master/modules/connectadBidAdapter.js
+# Nota: Sede sin verificar: Ghostery indica AT, sin confirmar con fuente primaria.
+@ConnectAd
+connectad.io
+
+# rkdms.com: https://github.com/prebid/Prebid.js/blob/master/modules/merkleIdSystem.js
+# Nota: El módulo Merkle ID de Prebid usa prebid.sv.rkdms.com. Ghostery TrackerDB asigna Merkle a la organización Dentsu. Sede sin verificar.
+# Grupo: dentsu (fuente: https://github.com/prebid/Prebid.js/blob/master/modules/merkleIdSystem.js, consultada el 12 oct 2026)
+@Merkle|||dentsu
+rkdms.com
+
+# idsequoia.ai: https://github.com/prebid/Prebid.js/blob/master/modules/panxoRtdProvider.js
+# Nota: El módulo RTD de Panxo carga https://api.idsequoia.ai/rtd.js (mantenedor prebid@panxo.ai); Sequoia ID es la capa de señales de Panxo. Sede sin verificar: vcbacked.co (agregador) indica Nueva York.
+@Panxo
+idsequoia.ai
+
+# Sede: https://www.e-recht24.de/dsg/13357-nitropack.html (consultada el 12 oct 2026)
+# getnitropack.com: https://developers.wpengine.com/docs/nitropack
+# Nota: Vínculo del dominio indirecto: 'getnitropack' es la cuenta oficial de NitroPack en X/Facebook (web actual nitropack.io); WP Engine la compró en julio de 2024 (https://wpengine.com/blog/wp-engine-acquires-nitropack/); sede NitroPack Ltd. en Sofía según e-recht24
+# Grupo: WP Engine (fuente: https://www.e-recht24.de/dsg/13357-nitropack.html, consultada el 12 oct 2026)
+@NitroPack|BG|Sofía|WP Engine
+getnitropack.com
+
+# Sede: https://www.sec.gov/Archives/edgar/data/1891027/000189102726000019/mntn-20251231.htm (consultada el 12 oct 2026)
+# mountain.com: https://www.sec.gov/Archives/edgar/data/1891027/000189102726000019/mntn-20251231.htm
+@MNTN|US|Austin (Texas)
+mountain.com
+
+# Sede: https://en.wikipedia.org/wiki/Kakao (consultada el 12 oct 2026)
+# tistory.com: https://en.wikipedia.com/wiki/Tistory
+@Kakao|KR|Jeju
+tistory.com
+
+# Sede: https://o-seznam.cz/en/contacts/ (consultada el 12 oct 2026)
+# seznam.cz: https://o-seznam.cz/en/contacts/
+@Seznam.cz|CZ|Praga
+seznam.cz
+
+# Sede: https://www.cbinsights.com/company/adotmob (consultada el 12 oct 2026)
+# adotmob.com: https://reports.exodus-privacy.eu.org/en/trackers/161
+# Nota: Antes Adotmob (ahora we-are-adot.com); sede solo según Exodus (fundada en París) y CB Insights, sin página legal propia; CB Insights la da como activa con accionista corporativo minoritario
+@Adot|FR|París
+adotmob.com
+
+# Sede: https://lei.bloomberg.com/leis/view/335800KZIHL753NBYP66 (consultada el 12 oct 2026)
+# visualwebsiteoptimizer.com: https://www.drupal.org/node/1292320
+# Nota: Everstone tiene la mayoría desde 2025 (https://www.businesswire.com/news/home/20250124810184/en/Everstone-Capital-Acquires-Majority-Stake-in-Wingify-Strengthens-Its-Tech-Investment-Portfolio); en 2026 se fusionó con AB Tasty y la marca corporativa pasa a 'Wingify' (vwo.com/imprint redirige a wingify
+@Wingify|IN|Delhi
+visualwebsiteoptimizer.com
+
+# Sede: https://www.builtinnyc.com/company/confiant (consultada el 12 oct 2026)
+# confiant-integrations.net: https://www.netify.ai/resources/applications/confiant
+# Nota: Sede solo según el perfil de BuiltIn NYC (106 West 32nd St) y theatdb; la empresa trabaja en remoto y no hallé dirección en una página legal propia
+@Confiant|US|Nueva York
+confiant-integrations.net
+
+# Sede: https://findit.org.tw/en/Startup/YWo3OE96a21vVCtJMlU5M0xhcFdvUT09/Basic (consultada el 12 oct 2026)
+# aralego.com: https://docs.prebid.org/dev-docs/bidders/ucfunnel.html
+# Nota: vínculo indirecto: la doc de Prebid del bidder ucfunnel usa cdn.aralego.net (no .com); país deducido del registro taiwanés FINDIT (UCFUNNEL CO., LTD); ciudad no verificada
+@ucfunnel|TW
+aralego.com
+
+# Sede: https://mouseflow.com/about-us/ (consultada el 12 oct 2026)
+# mouseflow.com: https://mouseflow.com/about-us/
+# Nota: ok (Mouseflow ApS, Flaesketorvet 68, Copenhague; segunda base en Austin, Texas)
+@Mouseflow|DK|Copenhague
+mouseflow.com
+
+# Sede: https://www.cisco.com/site/us/en/about/corporate-development/acquisitions/smartlook/index.html (consultada el 12 oct 2026)
+# smartlook.com: https://smartlook.com/
+# Nota: Cisco la compró en 2023 (integrada en Splunk); producto en cierre: fin de venta 31/05/2026, plataforma se apaga 30/09/2027
+# Grupo: Cisco (fuente: https://www.cisco.com/site/us/en/about/corporate-development/acquisitions/smartlook/index.html, consultada el 12 oct 2026)
+@Smartlook|CZ|Brno|Cisco
+smartlook.com
+
+# Sede: https://en.wikipedia.org/wiki/Sberbank (consultada el 12 oct 2026)
+# sberbank.ru: https://en.wikipedia.org/wiki/Sberbank
+# Nota: controlado por el Estado ruso (Fondo Nacional de Bienestar, 50%+1 de los votos)
+@Sber|RU|Moscú
+sberbank.ru
+
+# Sede: https://nexxen.com/privacy-policy (consultada el 12 oct 2026)
+# unrulymedia.com: https://tostracker.app/document/unruly-privacy
+# Nota: Unruly (Unruly Media) fue comprada en 2020 por Tremor International, hoy Nexxen; la política de Unruly es de Nexxen. Ninguna fuente abierta cita unrulymedia.com literalmente. Wikipedia pone sede en Nueva York; la política propia de Nexxen dice Tel Aviv
+@Nexxen|IL|Tel Aviv
+unrulymedia.com
+
+# sitewit.com: https://crunchbase.com/organization/sitewit
+# Nota: SiteWit opera hoy como Kliken (kliken.com) según Crunchbase; sede solo vista en Crunchbase (Tampa, Florida), no confirmada con fuente primaria
+@Kliken
+sitewit.com
+
+# Sede: https://innovid.com/privacy-policy (consultada el 12 oct 2026)
+# flashtalking.com: https://innovid.com/privacy-policy
+# Nota: Flashtalking, Inc. se fusionó con Innovid en 2025 bajo Mediaocean y la marca unificada es Innovid; flashtalking.com sigue cubierto por la política de Innovid (120 Broadway, Nueva York)
+# Grupo: Mediaocean (fuente: https://innovid.com/privacy-policy, consultada el 12 oct 2026)
+@Flashtalking|US|Nueva York|Mediaocean
+flashtalking.com
+
+# sumome.com, sumo.com: https://techcrunch.com/2015/05/27/sumome-is-an-app-store-for-tools-to-grow-your-online-traffic
+# Nota: en 2015 SumoMe/Sumo era producto de AppSumo (Noah Kagan); propietario y sede actuales no verificados (posible venta o cambio de marca)
+@Sumo
+sumome.com
+sumo.com
+
+# Sede: https://tostracker.app/document/bunnycdn (consultada el 12 oct 2026)
+# b-cdn.net: https://www.urlert.com/domains/gamkeys.b-cdn.net
+# Nota: CDN genérico (BunnyWay d.o.o.), no del mismo dueño que Sumo; fuente del dominio es de terceros (URLert)
+@Bunny.net|SI|Liubliana
+b-cdn.net
+
+# Sede: https://en.wikipedia.org/wiki/Yardi_Systems (consultada el 12 oct 2026)
+# rentcafe.com: https://en.wikipedia.org/wiki/Yardi_Systems
+# Nota: RentCafe es un producto de Yardi (lanzado en 2011), sin sede propia
+# Grupo: Yardi Systems (fuente: https://en.wikipedia.org/wiki/Yardi_Systems, consultada el 12 oct 2026)
+@RentCafe|US|Santa Bárbara (California)|Yardi Systems
+rentcafe.com
+
+# adhaven.com: https://techcrunch.com/2010/11/02/4info-makes-a-real-play-for-display-adhaven-platform-reaches-63-million
+# Nota: AdHaven era la plataforma de anuncios de 4INFO; Cadent compró 4INFO en enero de 2020 (https://www.mediavillage.com/article/cadent-acquires-4info-expands-cross-screen-tv-capabilities/); sede y uso actual del dominio no verificados
+# Grupo: Cadent (fuente: https://techcrunch.com/2010/11/02/4info-makes-a-real-play-for-display-adhaven-platform-reaches-63-million, consultada el 12 oct 2026)
+@4INFO|||Cadent
+adhaven.com
+
+# Sede: https://en.wikipedia.org/wiki/Siteimprove (consultada el 12 oct 2026)
+# siteimproveanalytics.com: https://consentstack.io/vendors/siteimprove
+# Nota: Nordic Capital tomó la mayoría en 2020; fuente del dominio es de terceros (ConsentStack)
+@Siteimprove|DK|Copenhague
+siteimproveanalytics.com
+
+# Sede: https://www.revcontent.com/privacy-policy (consultada el 12 oct 2026)
+# revcontent.com: https://www.revcontent.com/privacy-policy
+# Nota: ok (RevContent, LLC, 1680 Fruitville Road, Sarasota)
+@Revcontent|US|Sarasota (Florida)
+revcontent.com
+
+# amung.us: https://techcrunch.com/?p=8647
+# Nota: contador de visitas en tiempo real; operador legal y sede no verificados (URLert dice 'Amung.us, Inc.', fuente secundaria)
+@whos.amung.us
+amung.us
+
+# Sede: https://www.globenewswire.com/news-release/2016/10/06/1078331/0/en/iPerceptions-Acquires-Datacratic-s-Ad-Tech-Business.html (consultada el 12 oct 2026)
+# iperceptions.com: https://www.globenewswire.com/news-release/2016/10/06/1078331/0/en/iPerceptions-Acquires-Datacratic-s-Ad-Tech-Business.html
+# Nota: Astute, Inc. la compró en 2020 (https://www.businesswire.com/news/home/20200717005326/en); no se verificó si Astute sigue siendo su dueño ni si la sede sigue en Montreal
+# Grupo: Astute (fuente: https://www.globenewswire.com/news-release/2016/10/06/1078331/0/en/iPerceptions-Acquires-Datacratic-s-Ad-Tech-Business.html, consultada el 12 oct 2026)
+@iPerceptions|CA|Montreal|Astute
+iperceptions.com
+
+# Sede: https://en.wikipedia.org/wiki/Aptoide (consultada el 12 oct 2026)
+# aptoide.com: https://en.wikipedia.org/wiki/Aptoide
+# Nota: ok (Aptoide S.A.)
+@Aptoide|PT|Lisboa
+aptoide.com
+
+# Sede: https://realreviews.io/reviews/prom.ua (consultada el 12 oct 2026)
+# prom.ua: https://realreviews.io/reviews/prom.ua
+# Nota: entidad UAPROM LLC, filial de EVO Group; fuente de terceros, falta confirmar en el aviso legal de prom.ua
+@Prom.ua|UA|Kiev
+prom.ua
+
+# Sede: https://uk.finance.yahoo.com/quote/4477.T/profile?p=4477.T (consultada el 12 oct 2026)
+# thebase.in: https://stockcrew.co.jp/journal/base-own-domain
+# Nota: BASE, Inc. (TSE 4477); thebase.in es dominio de la plataforma de tiendas BASE (cname.thebase.in), según un blog de terceros
+@BASE|JP|Tokio
+thebase.in
+
+# Sede: https://the-web-radar.com/technologies/51-la (consultada el 12 oct 2026)
+# 51.la: https://the-web-radar.com/technologies/51-la
+# Nota: servicio chino de estadísticas web; operador legal y ciudad no verificados (fuente secundaria)
+@51.LA|CN
+51.la
