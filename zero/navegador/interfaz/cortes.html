@@ -30,6 +30,7 @@ h1 { font: 600 clamp(26px, 3.2vw, 38px)/1.1 var(--display); letter-spacing: -.02
 .cifra.roja b { color: var(--rojo); }
 .cifra span { display: block; margin-top: 8px; font-size: 13px; color: var(--gris); }
 .cifras.segunda { border-top: 0; margin-top: -28px; }
+.cifras.segunda { grid-template-columns: repeat(5, 1fr); }
 .t-resumen { display: none; }
 .explica { color: var(--gris); }
 .pequeno { font-size: 12.5px; }
@@ -178,6 +179,7 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
     <div class="cifra"><b id="c-etiquetas">0</b><span data-t="inicio_parametros"></span></div>
     <div class="cifra"><b id="c-corredores">0</b><span data-t="inicio_corredores"></span></div>
     <div class="cifra"><b id="c-cookies">0</b><span data-t="cortes_n_cookies"></span></div>
+    <div class="cifra"><b id="c-emergentes">0</b><span data-t="cortes_n_emergentes"></span></div>
   </div>
   <section class="caja rastro-caja oculto" id="r-rastro-caja">
     <h2 data-t="rastro_titulo"></h2>

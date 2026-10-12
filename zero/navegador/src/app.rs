@@ -22,13 +22,14 @@ use webview2_com::{
     take_pwstr, AcceleratorKeyPressedEventHandler,
     AddScriptToExecuteOnDocumentCreatedCompletedHandler, ClearBrowsingDataCompletedHandler,
     ContainsFullScreenElementChangedEventHandler, ContentLoadingEventHandler,
-    CoreWebView2EnvironmentOptions, CreateCoreWebView2ControllerCompletedHandler,
-    CreateCoreWebView2EnvironmentCompletedHandler, DocumentTitleChangedEventHandler,
-    ExecuteScriptCompletedHandler, FaviconChangedEventHandler, FrameCreatedEventHandler,
-    FrameWebMessageReceivedEventHandler, GetFaviconCompletedHandler, HistoryChangedEventHandler,
-    NavigationCompletedEventHandler, NavigationStartingEventHandler,
-    NewWindowRequestedEventHandler, PrintToPdfCompletedHandler, ProcessFailedEventHandler,
-    SourceChangedEventHandler, WebMessageReceivedEventHandler, WebResourceRequestedEventHandler,
+    ContextMenuRequestedEventHandler, CoreWebView2EnvironmentOptions,
+    CreateCoreWebView2ControllerCompletedHandler, CreateCoreWebView2EnvironmentCompletedHandler,
+    DocumentTitleChangedEventHandler, ExecuteScriptCompletedHandler, FaviconChangedEventHandler,
+    FrameCreatedEventHandler, FrameWebMessageReceivedEventHandler, GetFaviconCompletedHandler,
+    HistoryChangedEventHandler, NavigationCompletedEventHandler, NavigationStartingEventHandler,
+    NewWindowRequestedEventHandler, PermissionRequestedEventHandler, PrintToPdfCompletedHandler,
+    ProcessFailedEventHandler, SourceChangedEventHandler, WebMessageReceivedEventHandler,
+    WebResourceRequestedEventHandler,
 };
 use windows::core::{w, Interface, BOOL, PCWSTR, PWSTR};
 use windows::Win32::Foundation::{
@@ -765,8 +766,12 @@ fn ajustes_comunes(web: &ICoreWebView2, propia: bool) -> windows::core::Result<(
             s4.SetIsGeneralAutofillEnabled(false)?;
         }
         if propia {
-            // The bar and the panel are the browser, not pages: no zoom, no menu, no reload keys.
-            s.SetAreDefaultContextMenusEnabled(false)?;
+            // The bar and the panel are the browser, not pages: no zoom, no reload keys, and a
+            // menu with only what editing text needs (the owner, 12 Oct 2026: cut, copy and
+            // paste in the address bar). Without that menu, none at all.
+            if menu_de_texto(web).is_err() {
+                s.SetAreDefaultContextMenusEnabled(false)?;
+            }
             s.SetAreDevToolsEnabled(std::env::var_os("GUARDIANA_ZERO_ARGS").is_some())?;
             s.SetIsZoomControlEnabled(false)?;
             s.SetIsStatusBarEnabled(false)?;
@@ -782,6 +787,75 @@ fn ajustes_comunes(web: &ICoreWebView2, propia: bool) -> windows::core::Result<(
         }
     }
     Ok(())
+}
+
+/// What the menu of the bar and the panel keeps: editing text and copying what is selected.
+const MENU_DE_TEXTO: [&str; 8] = [
+    "undo",
+    "redo",
+    "cut",
+    "copy",
+    "paste",
+    "pasteAndMatchStyle",
+    "selectAll",
+    "emoji",
+];
+
+/// The right-click (or long-press) menu of the bar and the panel: only [`MENU_DE_TEXTO`], with
+/// no separator at its ends or two together; off a field and with nothing selected, no menu.
+fn menu_de_texto(web: &ICoreWebView2) -> windows::core::Result<()> {
+    let w11 = web.cast::<ICoreWebView2_11>()?;
+    let h = ContextMenuRequestedEventHandler::create(Box::new(
+        |_w, args: Option<ICoreWebView2ContextMenuRequestedEventArgs>| {
+            let Some(args) = args else {
+                return Ok(());
+            };
+            unsafe {
+                let lista = args.MenuItems()?;
+                let separador = |i: u32| -> windows::core::Result<bool> {
+                    let mut k = COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND::default();
+                    lista.GetValueAtIndex(i)?.Kind(&mut k)?;
+                    Ok(k == COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_SEPARATOR)
+                };
+                let cuantos = || -> windows::core::Result<u32> {
+                    let mut n = 0u32;
+                    lista.Count(&mut n)?;
+                    Ok(n)
+                };
+                // From the end, so the places still to read do not move.
+                let mut i = cuantos()?;
+                while i > 0 {
+                    i -= 1;
+                    let item = lista.GetValueAtIndex(i)?;
+                    let nombre = texto_de(|p| item.Name(p));
+                    if !separador(i)? && !MENU_DE_TEXTO.contains(&nombre.as_str()) {
+                        lista.RemoveValueAtIndex(i)?;
+                    }
+                }
+                let mut i = 0u32;
+                let mut tras_separador = true;
+                while i < cuantos()? {
+                    let sep = separador(i)?;
+                    if sep && tras_separador {
+                        lista.RemoveValueAtIndex(i)?;
+                        continue;
+                    }
+                    tras_separador = sep;
+                    i += 1;
+                }
+                let n = cuantos()?;
+                if n > 0 && separador(n - 1)? {
+                    lista.RemoveValueAtIndex(n - 1)?;
+                }
+                if cuantos()? == 0 {
+                    args.SetHandled(true)?;
+                }
+            }
+            Ok(())
+        },
+    ));
+    let mut t = 0i64;
+    unsafe { w11.add_ContextMenuRequested(&h, &mut t) }
 }
 
 fn mapea_interfaz(web: &ICoreWebView2, acceso: COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND) {
@@ -1222,14 +1296,42 @@ fn eventos_pestana(id: u32, web: &ICoreWebView2) -> windows::core::Result<()> {
                         args.SetHandled(true)?;
                         return Ok(());
                     }
+                    // Where it goes (empty or `about:blank` when the page fills it in later): a
+                    // pop-up to an advertising or tracking company is not opened.
+                    let destino = texto_de(|p| args.Uri(p));
                     let aplazado = args.GetDeferral()?;
-                    let Some((nueva, o)) = con_sesion(|s| s.ventana_nueva(id)).flatten() else {
+                    let Some((nueva, o)) = con_sesion(|s| s.ventana_nueva(id, &destino)).flatten()
+                    else {
                         args.SetHandled(true)?;
                         aplazado.Complete()?;
                         return Ok(());
                     };
                     con_vistas(|v| v.ventanas.insert(nueva, (args.clone(), aplazado)));
                     encola(o);
+                    Ok(())
+                },
+            )),
+            &mut t,
+        )?;
+        // A page asking to show notifications as it loads, without a click: answered «no»
+        // without a prompt. Asked after a click, the engine asks the person as always.
+        web.add_PermissionRequested(
+            &PermissionRequestedEventHandler::create(Box::new(
+                move |_w, args: Option<ICoreWebView2PermissionRequestedEventArgs>| {
+                    let Some(args) = args else {
+                        return Ok(());
+                    };
+                    let mut tipo = COREWEBVIEW2_PERMISSION_KIND::default();
+                    args.PermissionKind(&mut tipo)?;
+                    if tipo == COREWEBVIEW2_PERMISSION_KIND_NOTIFICATIONS {
+                        let mut persona = BOOL::default();
+                        let _ = args.IsUserInitiated(&mut persona);
+                        if con_sesion(|s| s.pide_notificaciones(id, persona.as_bool()))
+                            == Some(true)
+                        {
+                            args.SetState(COREWEBVIEW2_PERMISSION_STATE_DENY)?;
+                        }
+                    }
                     Ok(())
                 },
             )),

@@ -163,6 +163,12 @@ const GUION: &str = r#"(() => {
   // until the browser answers, `false` when it is off. Decided once per document, so a page
   // never sees a value change under it.
   let proteccion = null;
+  // Pop-ups dealt with (the setting, and only with the subscription on): `false` until the
+  // browser answers. The person's last press (a click, a tap, Enter), to tell a window they
+  // asked for from one the page opens on its own.
+  let emergentes = false;
+  let gesto = null;
+  let envuelveFuera = null;
   const pon = (h) => {
     if (proteccion !== null) return;
     proteccion = h && typeof h === 'object' && typeof h.semilla === 'number' && typeof h.sitio === 'string' && Array.isArray(h.propios)
@@ -192,8 +198,8 @@ const GUION: &str = r#"(() => {
     const finge = new Px(aTexto, { apply: (f, ese, a) => R(f, (typeof ese === 'function' && originales.get(ese)) || ese, a) });
     originales.set(finge, aTexto);
     Object.defineProperty(Function.prototype, 'toString', { value: finge });
-    // `antes` may hand back how to make the call instead (only ever with maximum protection);
-    // if that fails in any way, the original is called as it was.
+    // `antes` may hand back how to make the call instead (only ever with maximum protection, or
+    // a pop-up not opened); if that fails in any way, the original is called as it was.
     const envuelve = (o, k, antes) => {
       const d = o && Object.getOwnPropertyDescriptor(o, k);
       if (!d || typeof d.value !== 'function') return;
@@ -206,6 +212,7 @@ const GUION: &str = r#"(() => {
       originales.set(p, d.value);
       Object.defineProperty(o, k, { value: p });
     };
+    envuelveFuera = envuelve;
     const envuelveLector = (o, k, despues) => {
       const d = o && Object.getOwnPropertyDescriptor(o, k);
       if (!d || typeof d.get !== 'function') return;
@@ -463,8 +470,138 @@ const GUION: &str = r#"(() => {
       manda({ tipo: 'zg_escribe', zg: yo });
     }, true);
   } catch (_) {}
+  // Pop-ups (the owner, 12 Oct 2026: «quitar el máximo posible»). A window the page opens after
+  // a click anywhere on it (on text, a picture, an invisible layer over a video) is not opened:
+  // a pop-under. One the person asked for opens: a click on a link, a button or anything the
+  // page shows as clickable, unless the page swapped that link's address for another site's.
+  // The browser then judges every window that opens by the company it goes to; a link the
+  // person clicked is theirs, so it is told which.
+  try {
+    const R2 = Reflect.apply;
+    const U2 = URL;
+    const ya = Date.now;
+    const vista = window.getComputedStyle.bind(window);
+    const real = (e) => {
+      try { for (const x of e.composedPath()) if (x && x.nodeType === 1) return x; } catch (_) {}
+      return e.target && e.target.nodeType === 1 ? e.target : null;
+    };
+    const anota = (e) => { if (e.isTrusted) gesto = { t: ya(), el: real(e) }; };
+    for (const tipo of ['pointerdown', 'mousedown', 'touchstart', 'click']) window.addEventListener(tipo, anota, true);
+    window.addEventListener('keydown', (e) => {
+      if (e.isTrusted && (e.key === 'Enter' || e.key === ' ')) gesto = { t: ya(), el: real(e) };
+    }, true);
+    const arriba = (x) => x.parentElement || (x.parentNode && x.parentNode.host) || null;
+    const base = (h) => {
+      const p = String(h || '').toLowerCase().replace(/\.$/, '').split('.');
+      const n = p.length;
+      if (n <= 2) return p.join('.');
+      return p[n - 1].length === 2 && /^(co|com|org|net|gov|gob|edu|ac|or|ne|go|mil|nom|ltd|plc)$/.test(p[n - 2]) ? p.slice(-3).join('.') : p.slice(-2).join('.');
+    };
+    const sitioDe = (u) => {
+      try { const x = new U2(u, location.href); return /^https?:$/.test(x.protocol) ? base(x.hostname) : ''; } catch (_) { return ''; }
+    };
+    const absoluta = (u) => { try { return new U2(u, location.href).href; } catch (_) { return ''; } };
+    const SEMANTICOS = /^(A|AREA|BUTTON|INPUT|SELECT|TEXTAREA|LABEL|SUMMARY|OPTION|DETAILS)$/;
+    const ROLES = /^(button|link|menuitem|menuitemcheckbox|menuitemradio|tab|option|checkbox|switch|radio|treeitem)$/;
+    // What the person pressed, when it is something meant to be pressed. A layer that only
+    // looks clickable and covers half the window is there to catch clicks, not a button.
+    const pulsable = (el, soloSemantico) => {
+      const total = innerWidth * innerHeight;
+      let declarado = null;
+      for (let x = el, i = 0; x && x.nodeType === 1 && i < 30; x = arriba(x), i++) {
+        if (x === document.body || x === document.documentElement) break;
+        if (SEMANTICOS.test(x.tagName)) return x;
+        const r = x.getAttribute('role');
+        if (r && ROLES.test(r)) return x;
+        if (soloSemantico) continue;
+        if (x.hasAttribute('onclick')) return x;
+        let c = '';
+        try { c = vista(x).cursor; } catch (_) {}
+        if (c === 'pointer') declarado = x;
+        else if (declarado) break;
+      }
+      if (!declarado) return null;
+      try {
+        if (vista(document.body).cursor === 'pointer') return null;
+        const b = declarado.getBoundingClientRect();
+        if (total > 0 && b.width * b.height > total * 0.5) return null;
+      } catch (_) {}
+      return declarado;
+    };
+    const enlaceDe = (el) => (el && (el.tagName === 'A' || el.tagName === 'AREA') ? el : null);
+    // Whether a window to `url` the page asks for now opens.
+    const abre = (url) => {
+      if (!emergentes) return true;
+      const g = gesto;
+      if (!g || !g.el || ya() - g.t > 5000) return false;
+      const destino = sitioDe(url);
+      if (destino && destino === base(location.hostname)) return true;
+      // A listener on the whole page (window, document, body) runs for a click anywhere: from
+      // there only a real link or button counts as the person asking.
+      const ev = window.event;
+      const ct = ev && ev.currentTarget;
+      const global = !!ct && (ct === window || ct === document || ct === document.documentElement || ct === document.body);
+      const el = pulsable(g.el, global);
+      if (!el) return false;
+      const a = enlaceDe(el);
+      const href = a ? a.getAttribute('href') || '' : '';
+      if (a && href && href !== '#' && !/^\s*javascript:/i.test(href)) {
+        const s = sitioDe(a.href);
+        if (s && s !== destino) return false;
+      }
+      return true;
+    };
+    const informa = (url) => { try { manda({ tipo: 'zg_emergente', zg: yo, url: absoluta(url).slice(0, 4000) }); } catch (_) {} };
+    const nuevaVentana = (a) => {
+      const t = String(a.getAttribute('target') || '').toLowerCase();
+      return !!t && t !== '_self' && t !== '_top' && t !== '_parent';
+    };
+    const envuelve2 = envuelveFuera || ((o, k, antes) => {
+      const d = o && Object.getOwnPropertyDescriptor(o, k);
+      if (!d || typeof d.value !== 'function') return;
+      Object.defineProperty(o, k, { value: new Proxy(d.value, { apply: (f, ese, a) => {
+        let x;
+        try { x = antes(ese, a); } catch (_) {}
+        if (typeof x === 'function') { try { return x(f, ese, a); } catch (_) {} }
+        return R2(f, ese, a);
+      } }) });
+    });
+    envuelve2(window, 'open', (ese, a) => {
+      const u = a && a.length && a[0] != null ? String(a[0]) : '';
+      if (abre(u)) return;
+      informa(u);
+      return () => null;
+    });
+    // A link the page makes and «clicks» from its code opens a window the same way.
+    envuelve2(HTMLElement.prototype, 'click', (el) => {
+      if (!emergentes || !el || !(el.tagName === 'A' || el.tagName === 'AREA') || !nuevaVentana(el)) return;
+      const u = el.href;
+      if (abre(u)) return;
+      informa(u);
+      return () => undefined;
+    });
+    // A link the person clicks to open in a new window (or with the wheel, or Ctrl): theirs.
+    const suyo = (e) => {
+      if (!emergentes || !e.isTrusted) return;
+      let a = null;
+      for (let x = real(e), i = 0; x && x.nodeType === 1 && i < 30; x = arriba(x), i++) {
+        if (x.tagName === 'A' || x.tagName === 'AREA') { a = x; break; }
+      }
+      if (!a) return;
+      if (!(nuevaVentana(a) || e.button === 1 || e.ctrlKey || e.metaKey || e.shiftKey)) return;
+      const u = a.href;
+      if (typeof u === 'string' && /^https?:/i.test(u)) manda({ tipo: 'zg_enlace', zg: yo, url: u.slice(0, 8000) });
+    };
+    window.addEventListener('click', suyo, true);
+    window.addEventListener('auxclick', suyo, true);
+  } catch (_) {}
   if (marco) {
-    escucha('message', (e) => { const m = e && e.data; if (m && m.zg === yo && m.huella !== undefined) pon(m.huella); });
+    escucha('message', (e) => {
+      const m = e && e.data;
+      if (!m || m.zg !== yo) return;
+      if (m.emergentes !== undefined) emergentes = m.emergentes === true;
+      if (m.huella !== undefined) pon(m.huella);
+    });
     manda({ tipo: 'zg_marco_pide', zg: yo });
     return;
   }
@@ -495,6 +632,7 @@ const GUION: &str = r#"(() => {
     const m = e && e.data;
     if (!m || m.zg !== yo) return;
     if (m.huella !== undefined) pon(m.huella);
+    if (m.emergentes !== undefined) { emergentes = m.emergentes === true; if (emergentes) ventanasDeLaPagina(); }
     if (m.cookies !== undefined) { if (m.cookies === true) avisosDeCookies(); return; }
     const f = esperas.get(m.id);
     if (f) { esperas.delete(m.id); f(!!m.enviar); }
@@ -547,6 +685,14 @@ const GUION: &str = r#"(() => {
     ['Cookie Notice', '#cookie-notice', '#cn-refuse-cookie'],
     ['Moove', '#moove_gdpr_cookie_info_bar', '.moove-gdpr-infobar-reject-btn'],
     ['tarteaucitron', '#tarteaucitronRoot', '#tarteaucitronAllDenied2'],
+    ['HubSpot', '#hs-eu-cookie-confirmation', '#hs-eu-decline-button'],
+    ['CookieHub', '.ch2-container', '.ch2-deny-all-btn'],
+    ['Shopify', '#shopify-pc__banner', '#shopify-pc__banner__btn-decline'],
+    ['Cookie Law Info', '#cookie-law-info-bar', '#cookie_action_close_header_reject'],
+    ['Cookie Consent', '.cc-window.cc-banner, .cc-window.cc-floating', '.cc-window .cc-deny'],
+    ['CookieConsent', '#cc-main .cm, #cc--main #cm', '#cc-main .cm__btn[data-role="necessary"], #c-s-bn'],
+    ['Evidon', '#_evidon_banner', '#_evidon-decline-button'],
+    ['Civic', '#ccc-notify, #ccc-module', '#ccc-notify-reject, #ccc-reject-settings'],
   ];
   const visible = (el) => { try { return !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden'); } catch (_) { return false; } };
   let cookiesEnMarcha = false;
@@ -602,6 +748,104 @@ const GUION: &str = r#"(() => {
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', empieza, { once: true });
     else empieza();
+  };
+  // The page's own pop-ups (the owner, 12 Oct 2026): a box that shows up over the page without
+  // the person asking (no press in the moment before) and asks for an email, to subscribe, to
+  // turn notifications on or to get an app. Its close button is pressed («×», «No, gracias»,
+  // «Ahora no»), or it is hidden. Never a box with a password field, a video, a search, an age
+  // check, a «subscribe to keep reading» wall or a cookie notice (those have their own rule), and
+  // never the bar across the top of the page (the site's header).
+  const PIDE = /(newsletter|bolet[ií]n|suscr[ií]b|subscrib|inscreva|assine (a |nossa )?newsletter|notificaci|notification|notifica[cç][aã]o|notifica[cç][oõ]es|descuento|discount|desconto|cup[oó]n|coupon|cupom|ofertas? exclusiv|exclusive offer|descarga (la|nuestra) app|get (the|our) app|baixe (o|nosso) app|download (the|our) app|abrir en la app|open in (the )?app|abrir no app|\bunete\b|únete|join (our|the) (list|community|newsletter)|junte-se)/i;
+  const NO_TOCAR = /(seguir leyendo|sigue leyendo|to continue reading|keep reading|continuar lendo|continue lendo|ya eres suscriptor|already a subscriber|já é assinante|inicia sesión para|sign in to continue|faça login para|mayor de (18|edad)|over 18|18 or older|maior de (18|idade)|confirm your age|confirma tu edad|confirme sua idade|cookie)/i;
+  const CERRAR = /^(×|✕|✖|╳|x|cerrar|close|fechar|no,? gracias|no,? thanks|não,? obrigad[oa]|ahora no|not now|agora não|más tarde|maybe later|later|mais tarde|no me interesa|not interested|não tenho interesse|bloquear|block|no permitir|don'?t allow|não permitir|cancelar|cancel|omitir|skip|pular|continuar sin|continue without)$/i;
+  let ventanasEnMarcha = false;
+  const ventanasDeLaPagina = () => {
+    if (ventanasEnMarcha) return;
+    ventanasEnMarcha = true;
+    const vistas = new WeakSet();
+    const vista = window.getComputedStyle.bind(window);
+    const arriba = (x) => x.parentElement || (x.parentNode && x.parentNode.host) || null;
+    const fija = (el) => {
+      let caja = null;
+      for (let x = el, i = 0; x && x.nodeType === 1 && i < 40; x = arriba(x), i++) {
+        if (x === document.body || x === document.documentElement) break;
+        try { if (vista(x).position === 'fixed') caja = x; } catch (_) { break; }
+      }
+      return caja;
+    };
+    const boton = (caja) => {
+      let lista = [];
+      try { lista = caja.querySelectorAll('button, a, [role="button"], [aria-label], [title], span, div, svg'); } catch (_) {}
+      for (const c of lista) {
+        if (!visible(c)) continue;
+        const etiqueta = String(c.getAttribute('aria-label') || c.getAttribute('title') || '').trim();
+        const hoja = c.childElementCount === 0 || c.tagName === 'BUTTON' || c.tagName === 'A';
+        const txt = hoja ? String(c.textContent || '').trim() : '';
+        const cl = c.className;
+        const nombre = `${typeof cl === 'string' ? cl : (cl && cl.baseVal) || ''} ${c.id || ''}`;
+        if ((etiqueta && CERRAR.test(etiqueta)) || (txt && txt.length <= 30 && CERRAR.test(txt)) || /(^|[-_\s])(close|cerrar|dismiss|fechar)([-_\s]|$)/i.test(nombre)) {
+          const b = (c.closest && c.closest('button, a, [role="button"]')) || c;
+          // A link that goes somewhere is not a close button.
+          const href = b.tagName === 'A' ? String(b.getAttribute('href') || '') : '';
+          if (href && href !== '#' && !/^\s*javascript:/i.test(href)) continue;
+          return b;
+        }
+      }
+      return null;
+    };
+    const suelta = () => {
+      for (const el of [document.documentElement, document.body]) {
+        try { if (el && vista(el).overflow === 'hidden') el.style.setProperty('overflow', 'auto', 'important'); } catch (_) {}
+      }
+    };
+    const esconde = (caja) => {
+      try { caja.style.setProperty('display', 'none', 'important'); } catch (_) {}
+      // The dark layer some leave behind on its own, empty and over the whole page.
+      try {
+        const resto = fija(document.elementFromPoint(innerWidth / 2, innerHeight / 2));
+        if (resto && resto !== caja && !String(resto.innerText || '').trim() && !resto.querySelector('video, iframe, img, canvas')) {
+          const b = resto.getBoundingClientRect();
+          if (b.width * b.height >= innerWidth * innerHeight * 0.5) resto.style.setProperty('display', 'none', 'important');
+        }
+      } catch (_) {}
+      suelta();
+    };
+    const juzga = (caja) => {
+      if (vistas.has(caja)) return;
+      vistas.add(caja);
+      // Shown right after the person pressed something: theirs (a menu, a gallery, a form).
+      if (gesto && Date.now() - gesto.t < 2500) return;
+      let b;
+      try { b = caja.getBoundingClientRect(); } catch (_) { return; }
+      const total = innerWidth * innerHeight;
+      const area = b.width * b.height;
+      if (!total || area < total * 0.02) return;
+      const grande = area >= total * 0.5;
+      if (!grande && b.width >= innerWidth * 0.9 && b.top <= 2) return;
+      try { if (caja.querySelector('input[type="password"], input[type="search"], video')) return; } catch (_) { return; }
+      const texto = String(caja.innerText || '').slice(0, 3000);
+      if (!texto.trim() || NO_TOCAR.test(texto)) return;
+      let correo = false;
+      try { correo = !!caja.querySelector('input[type="email"], input[name*="mail" i], input[placeholder*="mail" i], input[placeholder*="correo" i]'); } catch (_) {}
+      if (!(PIDE.test(texto) || (correo && texto.length < 1500))) return;
+      try { if (!grande && caja.querySelectorAll('a[href]').length > 8) return; } catch (_) { return; }
+      const x = boton(caja);
+      if (x) { try { x.click(); } catch (_) {} }
+      setTimeout(() => { if (visible(caja)) esconde(caja); else suelta(); }, x ? 600 : 0);
+      manda({ tipo: 'zg_molesta', zg: yo });
+    };
+    const repasa = () => {
+      if (document.hidden || !document.body) return;
+      const w = innerWidth;
+      const h = innerHeight;
+      for (const [x, y] of [[w / 2, h / 2], [w / 2, 40], [w / 2, h - 40], [w - 60, h - 60], [60, h - 60]]) {
+        let el = null;
+        try { el = document.elementFromPoint(x, y); } catch (_) {}
+        const caja = el && fija(el);
+        if (caja) juzga(caja);
+      }
+    };
+    setInterval(repasa, 1000);
   };
   manda({ tipo: 'zg_cookies_pide', zg: yo });
   // On window and in the capture phase, registered before any of the page's own listeners.

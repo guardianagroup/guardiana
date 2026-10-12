@@ -66,10 +66,19 @@ const Z = (() => {
     ul.innerHTML = lista.map((x) => {
       const ancho = Math.min(100, Math.round((100 * x.webs) / total));
       const estado = x.paso ? tn('rastro_paso', x.paso, { n: n(x.paso) }) : t('rastro_cortado');
-      return `<li><span class="quien">${esc(x.quien)}</span><span class="cuantas">${esc(t('rastro_webs', { webs: n(x.webs), total: n(r.webs) }))}</span>`
+      return `<li><button class="quien enlace-empresa" data-empresa="${esc(x.quien)}">${esc(x.quien)}</button><span class="cuantas">${esc(t('rastro_webs', { webs: n(x.webs), total: n(r.webs) }))}</span>`
         + `<span class="pista"><i style="width:${ancho}%"></i></span><span class="estado${x.paso ? ' paso' : ''}">${esc(estado)}</span></li>`;
     }).join('');
     return lista.length > 0;
   }
+  // A company's name anywhere on these pages opens its profile (the owner, 12 Oct 2026). In the
+  // capture phase, so the row around the name does not open or close as well.
+  document.addEventListener('click', (e) => {
+    const b = e.target && e.target.closest ? e.target.closest('[data-empresa]') : null;
+    if (!b) return;
+    e.preventDefault();
+    e.stopPropagation();
+    manda({ tipo: 'abrir_ficha', empresa: b.dataset.empresa });
+  }, true);
   return { manda, en, t, tn, esc, $, n, pintaTextos, recibe, oscuro, ICONO, rastro };
 })();

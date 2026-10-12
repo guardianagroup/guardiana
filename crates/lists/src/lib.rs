@@ -328,6 +328,90 @@ pub fn company_of_asn(asn: u32) -> Option<&'static str> {
     .copied()
 }
 
+/// What `empresas.txt` says of one company, found by its name as the lists show it
+/// (`Criteo`): its country, city and group when written, and the names it owns.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CompanyRecord {
+    /// The name, as written in its header.
+    pub name: &'static str,
+    /// Two-letter ISO code of its seat, when written.
+    pub country: Option<&'static str>,
+    /// Its seat's city, when written.
+    pub city: Option<&'static str>,
+    /// The group it belongs to, when written.
+    pub group: Option<&'static str>,
+    /// The domains of its section (not its networks).
+    pub domains: Vec<&'static str>,
+}
+
+/// The company of `empresas.txt` called `name` (a group's own section counts too). `None` when
+/// no section has that name.
+#[must_use]
+pub fn company_record(name: &str) -> Option<CompanyRecord> {
+    let name = name.trim();
+    if name.is_empty() {
+        return None;
+    }
+    let mut out: Option<CompanyRecord> = None;
+    for line in EMPRESAS.lines() {
+        let line = line.split('#').next().unwrap_or("").trim();
+        if let Some(header) = line.strip_prefix('@') {
+            if out.is_some() {
+                break;
+            }
+            let mut f = header.split('|').map(str::trim);
+            let n = f.next().unwrap_or("");
+            if n == name {
+                let country = f.next().filter(|p| p.len() == 2);
+                let city = f.next().filter(|c| !c.is_empty());
+                let group = f.next().filter(|g| !g.is_empty());
+                out = Some(CompanyRecord {
+                    name: n,
+                    country,
+                    city,
+                    group,
+                    domains: Vec::new(),
+                });
+            }
+        } else if let Some(r) = out.as_mut() {
+            if !line.is_empty() && !line.starts_with("AS") {
+                r.domains.push(line);
+            }
+        }
+    }
+    out
+}
+
+/// Profiles of the companies people meet most (`data/fichas.json`): what each does, its
+/// figures, fines and data breaches, every fact with its public source and date. Read as it
+/// is; the browser shows what is there and nothing else.
+pub const FICHAS: &str = include_str!("../data/fichas.json");
+
+/// The profile of the company called `name`, if `fichas.json` has one.
+#[must_use]
+pub fn profile_of(name: &str) -> Option<&'static serde_json::Value> {
+    static MAP: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
+    MAP.get_or_init(|| serde_json::from_str(FICHAS).unwrap_or(serde_json::Value::Null))
+        .get("empresas")
+        .and_then(|e| e.get(name.trim()))
+}
+
+/// The date `fichas.json` was last checked (`AAAA-MM-DD`), empty when it never was.
+#[must_use]
+pub fn profiles_checked() -> &'static str {
+    static FECHA: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    FECHA.get_or_init(|| {
+        serde_json::from_str::<serde_json::Value>(FICHAS)
+            .ok()
+            .and_then(|v| {
+                v.get("actualizado")
+                    .and_then(|x| x.as_str())
+                    .map(String::from)
+            })
+            .unwrap_or_default()
+    })
+}
+
 fn seccion_de(qname: &str) -> Option<&'static str> {
     let map = COMPANIES.get_or_init(|| {
         parse_guardiana(EMPRESAS)

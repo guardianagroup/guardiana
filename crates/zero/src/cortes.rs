@@ -296,6 +296,7 @@ pub const fn motivo_clave(m: Motivo) -> &'static str {
 pub const fn recurso_clave(r: Recurso) -> &'static str {
     match r {
         Recurso::Documento => "documento",
+        Recurso::Ventana => "ventana",
         Recurso::Marco => "marco",
         Recurso::Script => "script",
         Recurso::Imagen => "imagen",

@@ -258,6 +258,17 @@ pub struct Pestana {
     /// The page's cookie notice: its consent manager and what was done (`rechazado`, or
     /// `escondido` when it had no «reject all»).
     pub cookies: Option<(String, String)>,
+    /// Windows this page asked to open that were not opened: towards an advertising or
+    /// tracking company, or opened by a click anywhere on the page (a pop-under).
+    #[serde(default)]
+    pub emergentes: u32,
+    /// The address of the last of them, for «Open it» in the shield. In memory only.
+    #[serde(skip)]
+    pub emergente: Option<String>,
+    /// The page's own pop-ups closed (a newsletter box, «allow notifications», «get the app»),
+    /// and the browser's notification prompts it asked for without a click.
+    #[serde(default)]
+    pub molestas: u32,
     /// What its pixels tried to tell (in memory only: amounts and products never reach the
     /// disk).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -480,6 +491,9 @@ pub struct Resumen {
     /// Cookie notices answered «no» (or hidden without accepting anything).
     #[serde(default)]
     pub avisos_cookies: u32,
+    /// Pop-up windows not opened and a page's own pop-ups closed.
+    #[serde(default)]
+    pub emergentes: u32,
 }
 
 /// The days the browser was used, each with its totals: what the home page and «your month in
@@ -510,6 +524,9 @@ pub struct Dia {
     /// Cookie notices answered «no» (or hidden without accepting anything), one per page.
     #[serde(default)]
     pub avisos_cookies: u32,
+    /// Pop-up windows not opened and a page's own pop-ups closed.
+    #[serde(default)]
+    pub emergentes: u32,
     /// The sites the person had open (never in an isolated tab): how many webs the day had.
     /// Kept only for the last [`DIAS_WEBS`] days.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
@@ -698,6 +715,7 @@ impl Diario {
             r.parametros_quitados += d.parametros_quitados;
             r.datos_salvados += d.datos_salvados;
             r.avisos_cookies += d.avisos_cookies;
+            r.emergentes += d.emergentes;
         }
         r.terceros = sitios.len() as u32;
         r.empresas = empresas.len() as u32;

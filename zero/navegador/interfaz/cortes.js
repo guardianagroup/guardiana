@@ -13,7 +13,8 @@
   let filtroInicial = location.hash === '#dato' ? '@dato' : '';
 
   const lang = () => document.documentElement.lang || 'es';
-  const nombrePais = (c) => (c ? pais(c) : t('cortes_desconocido'));
+  // `~CZ`: a company the lists do not know, on a site ending in that country's letters.
+  const nombrePais = (c) => (!c ? t('cortes_desconocido') : c[0] === '~' ? t('cortes_sin_identificar', { pais: pais(c.slice(1)) }) : pais(c));
   function hora(ts) {
     const d = new Date(ts);
     const h = d.toLocaleTimeString(lang(), { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -45,7 +46,7 @@
     const max = Math.max(1, ...lista.map((x) => x.n));
     const top = lista.slice(0, 12);
     const resto = lista.slice(12).reduce((a, x) => a + x.n, 0);
-    const li = top.map((x) => `<li><span class="nombre">${esc(x.quien)}${x.pais ? `<small>${esc(nombrePais(x.pais))}</small>` : ''}</span><span class="n">${n(x.n)}</span><span class="barra"><i style="width:${Math.max(2, Math.round(100 * x.n / max))}%"></i></span></li>`);
+    const li = top.map((x) => `<li><span class="nombre"><button class="enlace-empresa" data-empresa="${esc(x.quien)}">${esc(x.quien)}</button>${x.pais ? `<small>${esc(nombrePais(x.pais))}</small>` : ''}</span><span class="n">${n(x.n)}</span><span class="barra"><i style="width:${Math.max(2, Math.round(100 * x.n / max))}%"></i></span></li>`);
     if (resto) li.push(`<li><span class="nombre"><small>${esc(tn('cortes_otras', lista.length - 12, { n: n(lista.length - 12) }))}</small></span><span class="n">${n(resto)}</span></li>`);
     return li.join('');
   }
@@ -55,13 +56,14 @@
     const d = datos;
     $('c-total').textContent = n(d.total);
     $('c-empresas').textContent = n(d.empresas.length);
-    $('c-paises').textContent = n(d.paises.filter((x) => x.pais).length);
+    $('c-paises').textContent = n(d.paises.filter((x) => x.pais && x.pais[0] !== '~').length);
     $('c-webs').textContent = n(d.paginas.filter((x) => x.pagina).length);
     const dia = d.dia || {};
     $('c-datos').textContent = n(dia.datos_salvados);
     $('c-etiquetas').textContent = n(dia.parametros_quitados);
     $('c-corredores').textContent = n(dia.corredores);
     $('c-cookies').textContent = n(dia.avisos_cookies);
+    $('c-emergentes').textContent = n(dia.emergentes || 0);
     $('r-rastro-caja').classList.toggle('oculto', !Z.rastro($('r-rastro'), d.rastro));
     $('r-empresas').innerHTML = barras(d.empresas);
     $('r-paises').innerHTML = simple(d.paises, (x) => nombrePais(x.pais));
@@ -89,7 +91,8 @@
 
   function detalle(c) {
     const partes = [];
-    partes.push(`<p><b>${esc(c.quien)}</b> · ${esc(nombrePais(c.pais))}</p>`);
+    partes.push(`<p><button class="enlace-empresa" data-empresa="${esc(c.quien)}"><b>${esc(c.quien)}</b></button> · ${esc(nombrePais(c.pais))} · <button class="enlace" data-empresa="${esc(c.quien)}">${esc(t('ficha_ver'))}</button></p>`);
+    if (c.pais && c.pais[0] === '~') partes.push(`<p>${esc(t('cortes_sin_identificar_explica', { pais: pais(c.pais.slice(1)) }))}</p>`);
     partes.push(`<p>${esc(t('cortes_det_destino'))}: <span class="mono">${esc(c.host)}${esc(c.ruta)}</span></p>`);
     partes.push(`<p>${esc(t('recurso_' + c.recurso + '_explica'))}</p>`);
     partes.push(`<p>${esc(c.motivo ? t('motivo_' + c.motivo) : '')} · ${esc(c.metodo)}</p>`);
@@ -115,7 +118,7 @@
     for (const [c, i] of lista) {
       filas.push(`<tr class="fila" data-i="${i}" aria-expanded="${abierta === i}">`
         + `<td class="hora">${esc(hora(c.ts))}</td>`
-        + `<td class="quien"><b>${esc(c.quien)}</b><small>${esc(nombrePais(c.pais))}</small></td>`
+        + `<td class="quien"><button class="enlace-empresa" data-empresa="${esc(c.quien)}"><b>${esc(c.quien)}</b></button><small>${esc(nombrePais(c.pais))}</small></td>`
         + `<td class="destino">${esc(c.host)}<span>${esc(c.ruta)}</span></td>`
         + `<td class="que"><span class="chip ${COLOR_CAT[c.categoria] || ''}">${esc(t('cat_' + c.categoria))}</span>${c.corredor ? ` <span class="chip rojo">${esc(t('corredor_etiqueta'))}</span>` : ''}</td>`
         + `<td class="tipo">${esc(t('recurso_' + c.recurso))}</td>`

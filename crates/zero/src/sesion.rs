@@ -54,6 +54,8 @@ pub const BARRA: &str = "https://zero.guardiana/barra.html";
 pub const PANEL: &str = "https://zero.guardiana/panel.html";
 /// «Lo que se cortó», one by one.
 pub const CORTES: &str = "https://zero.guardiana/cortes.html";
+/// A company's profile (`?e=<its name>`).
+pub const EMPRESA: &str = "https://zero.guardiana/empresa.html";
 
 /// Whether an address is one of the browser's own pages.
 #[must_use]
@@ -292,6 +294,9 @@ struct Preferencias {
     /// Leave cookie notices as they come (the person turned «reject cookie notices» off; it is
     /// on unless they do).
     cookies_sin_tocar: bool,
+    /// Leave pop-ups as they come (the person turned «remove pop-ups» off; it is on unless
+    /// they do).
+    emergentes_sin_tocar: bool,
     /// Sites where the form guard does not ask (outside mandates).
     sin_preguntar: BTreeSet<String>,
     /// The person closed the shield: it no longer opens by itself at start (the owner, 10 Oct
@@ -334,6 +339,12 @@ struct Pestana {
     /// Sendings the person approved in the form guard: those kinds of data may go to that site
     /// from this tab for a few minutes (review of 10 Oct 2026, grave 5).
     permisos: Vec<Permiso>,
+    /// The last link the person clicked to open in a new window, and when: that window is
+    /// theirs, whatever company it goes to (an affiliate link, a shortener).
+    enlace: Option<(String, i64)>,
+    /// A window a page opened with no address yet (`about:blank`, filled in by its code): its
+    /// first page is judged as that page's window, not as a page the person opens.
+    juzga_primera: bool,
     /// Pages this tab has shown: tells the panel when its shield starts again (a reload of the
     /// same site too), the only moment its rows are laid out anew.
     carga: u32,
@@ -350,6 +361,15 @@ struct Permiso {
 /// How long an approved sending lets its data through to its site: the form, its redirects and
 /// the payment or sign-in page it leads to.
 const PERMISO_MS: i64 = 5 * 60_000;
+
+/// How long after the person clicks a link its new window is still theirs.
+const ENLACE_MS: i64 = 5_000;
+
+/// Not an engine context: a new window a page asked for, judged before it opens.
+pub const CONTEXTO_VENTANA: i32 = -1;
+
+/// The most pop-ups one page counts (a page posting endless reports must not run the figures up).
+const MAX_EMERGENTES: u32 = 99;
 
 impl Pestana {
     fn nueva(id: u32, perfil: Perfil, url: &str) -> Self {
@@ -372,6 +392,8 @@ impl Pestana {
             vuelve: None,
             abridor: None,
             permisos: Vec::new(),
+            enlace: None,
+            juzga_primera: false,
             carga: 0,
         }
     }
@@ -547,6 +569,7 @@ const fn clase_de(tipo: Tipo) -> Option<Clase> {
 pub const fn recurso_de_contexto(contexto: i32) -> Recurso {
     match contexto {
         1 => Recurso::Documento,
+        CONTEXTO_VENTANA => Recurso::Ventana,
         2 => Recurso::Estilo,
         3 => Recurso::Imagen,
         4 | 9 => Recurso::Media,
@@ -1127,6 +1150,9 @@ impl Sesion {
             "parametros_quitados": p.escudo.parametros_quitados,
             "datos_salvados": p.escudo.datos_salvados,
             "cookies": p.escudo.cookies.as_ref().map(|(g, a)| json!({ "gestor": g, "accion": a })),
+            "emergentes": p.escudo.emergentes,
+            "emergente": p.escudo.emergente.as_deref().and_then(host_de).map(|h| sitio(&h)),
+            "molestas": p.escudo.molestas,
             "chivatos": p.escudo.chivatos,
             "medidas": {
                 "lineas": p.escudo.medidas.lineas(&self.textos),
@@ -1197,6 +1223,7 @@ impl Sesion {
             "idioma": self.prefs.idioma,
             "tema": self.prefs.tema,
             "rechazar_cookies": !self.prefs.cookies_sin_tocar,
+            "quitar_emergentes": !self.prefs.emergentes_sin_tocar,
             "importar": favoritos::otros_navegadores().into_iter().map(|(n, _)| n).collect::<Vec<_>>(),
             "sin_preguntar": self.prefs.sin_preguntar,
             "huella_clave": self.huella_clave(),
@@ -1364,6 +1391,105 @@ impl Sesion {
         o
     }
 
+    /// A company's profile, in a tab of its own that «Back» leaves for the tab it came from
+    /// (the owner, 12 Oct 2026: touch Criteo and see everything about it).
+    fn abre_ficha(&mut self, empresa: &str) -> Vec<Orden> {
+        let empresa = empresa.trim();
+        if empresa.is_empty() || empresa.chars().count() > 120 {
+            return Vec::new();
+        }
+        let de = self.activa;
+        let url = format!("{EMPRESA}?e={}", codifica(empresa));
+        let o = self.nueva_pestana(Perfil::General, &url);
+        let nueva = self.activa;
+        let vuelve = self.pestana(de).map(|q| q.id);
+        if let Some(p) = self.pestana_mut(nueva) {
+            p.vuelve = vuelve;
+        }
+        o
+    }
+
+    /// What the profile page of `empresa` shows: what the lists say of it, its profile when
+    /// there is one, and what it tried with this person in the last 31 days (from the list of
+    /// cuts, kept on this computer).
+    fn ficha(&mut self, id: u32, empresa: &str) -> Vec<Orden> {
+        let empresa: String = empresa.trim().chars().take(120).collect();
+        if empresa.is_empty() {
+            return Vec::new();
+        }
+        self.guarda_cortes();
+        let ahora = (self.reloj)();
+        let hasta = self.hoy();
+        let desde = fecha::dia_antes(ahora, self.zona, 30);
+        let lista = cortes::lee(&self.datos.join("cortes"), &desde, &hasta);
+        let suyos: Vec<&Corte> = lista.iter().filter(|c| c.quien == empresa).collect();
+        let webs: BTreeSet<&str> = suyos
+            .iter()
+            .filter(|c| !c.aislada && !c.pagina.is_empty())
+            .map(|c| c.pagina.as_str())
+            .collect();
+        let sitios: BTreeSet<&str> = suyos.iter().map(|c| c.sitio.as_str()).collect();
+        let registro = guardiana_lists::company_record(&empresa);
+        // A name the lists do not know is the site itself: its ending says only where the name
+        // was registered.
+        let pais = registro
+            .as_ref()
+            .and_then(|r| r.country.map(String::from))
+            .or_else(|| crate::dominio::pais_del_dominio(&empresa).map(|p| format!("~{p}")));
+        let corredor = registro
+            .as_ref()
+            .and_then(|r| {
+                r.domains
+                    .iter()
+                    .find_map(|d| guardiana_lists::data_broker_of(d))
+            })
+            .or_else(|| guardiana_lists::data_broker_of(&empresa));
+        let v = json!({
+            "tipo": "ficha",
+            "empresa": empresa,
+            "conocida": registro.is_some(),
+            "pais": pais,
+            "ciudad": registro.as_ref().and_then(|r| r.city),
+            "grupo": registro.as_ref().and_then(|r| r.group),
+            "dominios": registro.as_ref().map(|r| r.domains.iter().take(40).collect::<Vec<_>>()),
+            "n_dominios": registro.as_ref().map_or(0, |r| r.domains.len()),
+            "corredor": corredor.map(|b| json!({ "nombre": b.name, "url": b.rights_url })),
+            "ficha": guardiana_lists::profile_of(&empresa),
+            "revisada": guardiana_lists::profiles_checked(),
+            "contigo": {
+                "desde": desde,
+                "hasta": hasta,
+                "cortes": suyos.len(),
+                "webs": webs.len(),
+                "sitios": sitios.into_iter().take(12).collect::<Vec<_>>(),
+                "ejemplos": webs.into_iter().take(8).collect::<Vec<_>>(),
+            },
+        });
+        self.a_pestana(id, &v).into_iter().collect()
+    }
+
+    /// «Descargar» on a company's profile: the page as a PDF in the person's Downloads.
+    fn ficha_pdf(&mut self, id: u32, empresa: &str) -> Vec<Orden> {
+        if !self.pestana(id).is_some_and(|p| p.url.starts_with(EMPRESA)) {
+            return Vec::new();
+        }
+        let nombre: String = empresa
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-')
+            .take(60)
+            .collect::<String>()
+            .trim()
+            .replace(' ', "-")
+            .to_lowercase();
+        let base = if nombre.is_empty() {
+            "guardiana-zero-empresa".to_string()
+        } else {
+            format!("guardiana-zero-{nombre}")
+        };
+        let ruta = self.nombre_libre(&base, "pdf");
+        vec![Orden::GuardaPdf { id, ruta }]
+    }
+
     /// «Back» on the browser's own pages: the page before, if there is one; otherwise the tab
     /// it was opened from (this one closes); otherwise the new tab page.
     fn volver(&mut self, id: u32) -> Vec<Orden> {
@@ -1511,6 +1637,9 @@ impl Sesion {
                     "zg_formulario" => self.formulario(id, fuente, &m),
                     "zg_cookies_pide" => self.cookies_pide(id, fuente, &m),
                     "zg_cookies" => self.cookies_hecho(id, &m),
+                    "zg_enlace" => self.enlace(id, &m),
+                    "zg_emergente" => self.emergente(id, &m),
+                    "zg_molesta" => self.molesta(id),
                     "zg_huella" => self.huella(id, fuente, &m, false),
                     "zg_escribe" => self.escribe(id, fuente, false),
                     _ => Vec::new(),
@@ -1526,6 +1655,9 @@ impl Sesion {
                         | "guardar_imagen"
                         | "cortes"
                         | "exportar_cortes"
+                        | "abrir_ficha"
+                        | "ficha"
+                        | "ficha_pdf"
                         | "volver"
                         | "favorito_quitar"
                         | "importar_favoritos"
@@ -1648,6 +1780,16 @@ impl Sesion {
                 _ => Vec::new(),
             },
             "abrir_cortes" => self.abre_cortes(),
+            "abrir_ficha" => self.abre_ficha(texto(m, "empresa")),
+            "ficha" => match origen {
+                Origen::Pestana(id) => self.ficha(id, texto(m, "empresa")),
+                _ => Vec::new(),
+            },
+            "ficha_pdf" => match origen {
+                Origen::Pestana(id) => self.ficha_pdf(id, texto(m, "empresa")),
+                _ => Vec::new(),
+            },
+            "abre_emergente" => self.abre_emergente(),
             "buscar_version" => {
                 if self.buscando_version {
                     return Vec::new();
@@ -1848,6 +1990,7 @@ impl Sesion {
                     if si {
                         r.cortar_seguimiento = true;
                         self.prefs.cookies_sin_tocar = false;
+                        self.prefs.emergentes_sin_tocar = false;
                     }
                 } else {
                     r.cortar_seguimiento = si;
@@ -1882,6 +2025,17 @@ impl Sesion {
                 // Maximum protection includes refusing cookie notices: leaving them as they come
                 // is no longer maximum, and the shield must not say it is.
                 if self.prefs.cookies_sin_tocar {
+                    self.prefs.reglas.maxima = false;
+                }
+                self.guarda_prefs();
+                let mut o = vec![envia(Origen::Panel, &self.msg_ajustes())];
+                o.extend(self.escudo_activa(false));
+                o
+            }
+            "quitar_emergentes" => {
+                self.prefs.emergentes_sin_tocar = !valor.as_bool().unwrap_or(true);
+                // Maximum protection removes pop-ups too: leaving them is no longer maximum.
+                if self.prefs.emergentes_sin_tocar {
                     self.prefs.reglas.maxima = false;
                 }
                 self.guarda_prefs();
@@ -2356,10 +2510,16 @@ impl Sesion {
             .into_iter()
             .map(|(q, n)| json!({ "quien": q, "pais": paises_de.get(q.as_str()), "n": n }))
             .collect();
-        let paises = cuenta(
-            cortes::cuenta(&de_fuera, |c| c.pais.clone().unwrap_or_default()),
-            "pais",
-        );
+        // A company the lists do not know: the country of its site's ending, marked `~` so the
+        // page says it is only that («Sin identificar · dominio de Chequia»).
+        let pais_o_dominio = |c: &Corte| {
+            c.pais.clone().unwrap_or_else(|| {
+                crate::dominio::pais_del_dominio(&c.sitio)
+                    .map(|p| format!("~{p}"))
+                    .unwrap_or_default()
+            })
+        };
+        let paises = cuenta(cortes::cuenta(&de_fuera, pais_o_dominio), "pais");
         let motivos = cuenta(
             cortes::cuenta(&lista, |c| {
                 c.motivo
@@ -2374,7 +2534,23 @@ impl Sesion {
             "recurso",
         );
         let paginas = cuenta(cortes::cuenta(&lista, |c| c.pagina.clone()), "pagina");
-        let recientes: Vec<&Corte> = lista.iter().rev().take(cortes::MAX_LISTA).collect();
+        let recientes: Vec<Value> = lista
+            .iter()
+            .rev()
+            .take(cortes::MAX_LISTA)
+            .map(|c| {
+                let mut v = serde_json::to_value(c).unwrap_or(Value::Null);
+                if c.pais.is_none() {
+                    if let Some(o) = v.as_object_mut() {
+                        o.insert(
+                            "pais".into(),
+                            json!(Some(pais_o_dominio(c)).filter(|p| !p.is_empty())),
+                        );
+                    }
+                }
+                v
+            })
+            .collect();
         let dia = self.diario.total(&desde, &hasta);
         let sin_anotar = (dia.cortadas as usize).saturating_sub(total);
         let v = json!({
@@ -2488,9 +2664,13 @@ impl Sesion {
         let si = self.licencia.protege() && !self.prefs.cookies_sin_tocar;
         vec![Orden::RespondeFormulario {
             id,
-            json:
-                json!({ "zg": ficha, "cookies": si, "huella": self.proteccion_huella(id, fuente) })
-                    .to_string(),
+            json: json!({
+                "zg": ficha,
+                "cookies": si,
+                "emergentes": self.emergentes_activas(),
+                "huella": self.proteccion_huella(id, fuente),
+            })
+            .to_string(),
         }]
     }
 
@@ -2558,6 +2738,115 @@ impl Sesion {
         } else {
             Vec::new()
         }
+    }
+
+    /// The page script saw the person click a link that opens in a new window (or open one with
+    /// the wheel or Ctrl): that window is theirs (`ventana_nueva`).
+    fn enlace(&mut self, id: u32, m: &Value) -> Vec<Orden> {
+        let url = texto(m, "url");
+        if !(url.starts_with("http://") || url.starts_with("https://")) || url.len() > 8000 {
+            return Vec::new();
+        }
+        let ahora = (self.reloj)();
+        if let Some(p) = self.pestana_mut(id) {
+            p.enlace = Some((url.to_string(), ahora));
+        }
+        Vec::new()
+    }
+
+    /// The page script did not open a window the page asked for after a click anywhere on it
+    /// (a pop-under). The shield says so and offers to open it.
+    fn emergente(&mut self, id: u32, m: &Value) -> Vec<Orden> {
+        if !self.emergentes_activas() {
+            return Vec::new();
+        }
+        let url = texto(m, "url");
+        let web = (url.starts_with("http://") || url.starts_with("https://")) && url.len() <= 4000;
+        let hoy = self.hoy();
+        let Some(p) = self.pestana_mut(id) else {
+            return Vec::new();
+        };
+        if p.escudo.emergentes >= MAX_EMERGENTES {
+            return Vec::new();
+        }
+        p.escudo.emergentes += 1;
+        if web {
+            p.escudo.emergente = Some(url.to_string());
+        }
+        if p.perfil != Perfil::Aislada {
+            self.diario.dias.entry(hoy).or_default().emergentes += 1;
+            self.diario_sucio = true;
+            self.hoy_sucio = true;
+        }
+        self.sucios.insert(id);
+        Vec::new()
+    }
+
+    /// The page script closed one of the page's own pop-ups (a newsletter box, «allow
+    /// notifications», «get the app»).
+    fn molesta(&mut self, id: u32) -> Vec<Orden> {
+        if !self.emergentes_activas() {
+            return Vec::new();
+        }
+        let hoy = self.hoy();
+        let Some(p) = self.pestana_mut(id) else {
+            return Vec::new();
+        };
+        if p.escudo.molestas >= MAX_EMERGENTES {
+            return Vec::new();
+        }
+        p.escudo.molestas += 1;
+        if p.perfil != Perfil::Aislada {
+            self.diario.dias.entry(hoy).or_default().emergentes += 1;
+            self.diario_sucio = true;
+            self.hoy_sucio = true;
+        }
+        self.sucios.insert(id);
+        Vec::new()
+    }
+
+    /// A page of tab `id` asks to show notifications. Asked without a click (the page asking as
+    /// it loads), it is answered «no» without a prompt, and the shield counts it; asked after a
+    /// click (a «turn on notifications» button), the engine asks the person. Returns whether to
+    /// refuse it.
+    pub fn pide_notificaciones(&mut self, id: u32, con_clic: bool) -> bool {
+        if con_clic || !self.emergentes_activas() {
+            return false;
+        }
+        self.molesta(id);
+        true
+    }
+
+    /// «Open it» in the shield: the last window the page of the active tab was not let open,
+    /// now opened because the person asked, as a tab of the same session.
+    fn abre_emergente(&mut self) -> Vec<Orden> {
+        let de = self.activa;
+        let Some(url) = self.pestana_mut(de).and_then(|p| p.escudo.emergente.take()) else {
+            return Vec::new();
+        };
+        let Some(perfil) = self.perfil_de(de) else {
+            return Vec::new();
+        };
+        let id = self.siguiente;
+        self.siguiente += 1;
+        let pos = self
+            .pestanas
+            .iter()
+            .position(|p| p.id == de)
+            .map_or(self.pestanas.len(), |i| i + 1);
+        let mut nueva = Pestana::nueva(id, perfil, "");
+        if let Some(p) = self.pestana(de) {
+            nueva.abridor = Some(p.escudo.sitio.clone());
+        }
+        self.pestanas.insert(pos, nueva);
+        let mut o = vec![Orden::CreaPestana {
+            id,
+            perfil,
+            url: Some(url),
+            de: Some(de),
+        }];
+        o.extend(self.activar(id));
+        o
     }
 
     /// The tab whose page posted from `fuente`, if that page is still the one it shows: a
@@ -2675,9 +2964,15 @@ impl Sesion {
                     .filter(|p| !es_interna(&p.url))
                     .map(|p| p.url.clone())
                     .unwrap_or_default();
-                let r = json!({ "zg": ficha, "huella": self.proteccion_huella(id, &pagina) });
+                let r = json!({
+                    "zg": ficha,
+                    "huella": self.proteccion_huella(id, &pagina),
+                    "emergentes": self.emergentes_activas(),
+                });
                 (Some(r.to_string()), Vec::new())
             }
+            "zg_enlace" => (None, self.enlace(id, &m)),
+            "zg_emergente" => (None, self.emergente(id, &m)),
             "zg_huella" => (None, self.huella(id, fuente, &m, true)),
             "zg_escribe" => (None, self.escribe(id, fuente, true)),
             _ => (None, Vec::new()),
@@ -3020,6 +3315,7 @@ impl Sesion {
         if es_web {
             // A window a page opened, now with a web of its own: data leaves from this one.
             p.abridor = None;
+            p.juzga_primera = false;
         }
         p.url = url.to_string();
         p.al_libro.clear();
@@ -3127,11 +3423,25 @@ impl Sesion {
         }
     }
 
-    /// A tab asks for a new window (a link with `target=_blank`, a sign-in popup). It becomes a
-    /// tab in the same session as the one that asked.
-    pub fn ventana_nueva(&mut self, de: u32) -> Option<(u32, Vec<Orden>)> {
+    /// A tab asks for a new window (a link with `target=_blank`, a sign-in popup) to `url` (empty
+    /// or `about:blank` when the page fills it in later). It becomes a tab in the same session as
+    /// the one that asked, unless it is a pop-up to cut (`ventana_cortada`): then `None`.
+    pub fn ventana_nueva(&mut self, de: u32, url: &str) -> Option<(u32, Vec<Orden>)> {
         // A window from a tab the session does not know (closing) is not opened.
         let perfil = self.perfil_de(de)?;
+        let web = url.starts_with("http://") || url.starts_with("https://");
+        let ahora = (self.reloj)();
+        // The window of a link the person just clicked is theirs, whatever company it goes to.
+        let suya = web
+            && self
+                .pestana_mut(de)
+                .and_then(|p| p.enlace.take())
+                .is_some_and(|(u, t)| {
+                    sin_fragmento(&u) == sin_fragmento(url) && (0..ENLACE_MS).contains(&(ahora - t))
+                });
+        if web && !suya && self.ventana_cortada(de, url) {
+            return None;
+        }
         let id = self.siguiente;
         self.siguiente += 1;
         let pos = self
@@ -3139,8 +3449,8 @@ impl Sesion {
             .iter()
             .position(|p| p.id == de)
             .map_or(self.pestanas.len(), |i| i + 1);
-        let ahora = (self.reloj)();
         let mut nueva = Pestana::nueva(id, perfil, "");
+        nueva.juzga_primera = !web && self.emergentes_activas();
         // Until it shows a page of its own, what it sends leaves from the page that opened it;
         // and what the person approved sending from that page goes on being approved here (a
         // form with `target=_blank` posts in the new window).
@@ -3166,6 +3476,109 @@ impl Sesion {
         }];
         o.extend(self.activar(id));
         Some((id, o))
+    }
+
+    /// Whether pop-ups are dealt with: the subscription on and «remove pop-ups» on.
+    fn emergentes_activas(&self) -> bool {
+        self.licencia.protege() && !self.prefs.emergentes_sin_tocar
+    }
+
+    /// A window tab `de` asks to open to `url`, judged before it opens like something its page
+    /// brings from another company: one to an advertising or tracking company, or to a site the
+    /// person cut, is not opened (the person's own rules and «Desbloquear» decide as for the
+    /// rest). It goes into the list of cuts, and the shield offers to open it anyway.
+    fn ventana_cortada(&mut self, de: u32, url: &str) -> bool {
+        if !self.emergentes_activas() {
+            return false;
+        }
+        let Some(i) = self.pestanas.iter().position(|p| p.id == de) else {
+            return false;
+        };
+        // A link on the browser's own pages (a source of a company's profile) is the person's.
+        if es_interna(&self.pestanas[i].url) {
+            return false;
+        }
+        let dir = url::Url::parse(url).ok();
+        let host = dir
+            .as_ref()
+            .and_then(url::Url::host_str)
+            .map(crate::dominio::normaliza_host)
+            .unwrap_or_default();
+        if host.is_empty() {
+            return false;
+        }
+        let destino = crate::destino::clasifica_en(&host, dir.as_ref().map_or("", url::Url::path));
+        if !self
+            .decision_en(i, url, destino, "GET", &[], Recurso::Ventana)
+            .cortar
+        {
+            return false;
+        }
+        // Written down as every cut is (the list, the day, the shield's rows).
+        if !self.peticion(de, url, "GET", &[], CONTEXTO_VENTANA).cortar {
+            return false;
+        }
+        if let Some(p) = self.pestana_mut(de) {
+            if p.escudo.emergentes < MAX_EMERGENTES {
+                p.escudo.emergentes += 1;
+            }
+            p.escudo.emergente = Some(url.chars().take(4000).collect());
+        }
+        // The shield shows it on its next beat.
+        self.sucios.insert(de);
+        true
+    }
+
+    /// What to do with one request of tab `pestanas[i]`, as `recurso`.
+    fn decision_en(
+        &self,
+        i: usize,
+        url: &str,
+        destino: crate::destino::Destino,
+        metodo: &str,
+        cuerpo: &[u8],
+        recurso: Recurso,
+    ) -> crate::decision::Decision {
+        let ahora = (self.reloj)();
+        let p = &self.pestanas[i];
+        let sitio_pagina = match recurso {
+            Recurso::Documento => destino.sitio.clone(),
+            // A window is its page's: in a window with no page of its own yet, the page that
+            // opened it.
+            Recurso::Ventana if p.escudo.sitio.is_empty() => p.abridor.clone().unwrap_or_default(),
+            _ => p.escudo.sitio.clone(),
+        };
+        let mandato = if p.perfil == Perfil::Mandato {
+            self.mandato.as_ref()
+        } else {
+            None
+        };
+        let (formas, senuelo) = if mandato.is_some() {
+            (&self.formas_mandato, Some(self.tinta.len()))
+        } else {
+            (&self.formas, None)
+        };
+        // What the person approved sending to this site a moment ago goes there.
+        let sin_permiso = self.formas_sin_permiso(p, &destino.sitio, formas, ahora);
+        let formas: &[Forma] = sin_permiso.as_deref().unwrap_or(formas);
+        let con_cuerpo = matches!(
+            metodo.to_ascii_uppercase().as_str(),
+            "POST" | "PUT" | "PATCH"
+        );
+        let peticion = Peticion {
+            url,
+            cuerpo: if con_cuerpo { cuerpo } else { &[] },
+            recurso,
+            sitio_pagina: &sitio_pagina,
+        };
+        decide_con(
+            &peticion,
+            destino,
+            &self.prefs.reglas,
+            formas,
+            senuelo,
+            mandato,
+        )
     }
 
     /// One request about to leave a tab. `contexto` is the engine's resource context.
@@ -3250,54 +3663,26 @@ impl Sesion {
         );
         let bytes = (con_cuerpo && !cuerpo.is_empty() && self.necesita_cuerpo(id, url))
             .then(|| u64::try_from(cuerpo.len()).unwrap_or(u64::MAX));
-        let d = {
+        let recurso = {
             let p = &self.pestanas[i];
-            let mut recurso = recurso_de_contexto(contexto);
-            if recurso == Recurso::Documento && p.navegando.as_deref() != Some(sin_fragmento(url)) {
+            let mut r = recurso_de_contexto(contexto);
+            if r == Recurso::Documento && p.navegando.as_deref() != Some(sin_fragmento(url)) {
                 // Only the tab's own navigation is «the page»; any other document is a frame.
-                recurso = Recurso::Marco;
+                r = Recurso::Marco;
             }
-            let sitio_pagina = if recurso == Recurso::Documento {
-                destino.sitio.clone()
-            } else {
-                p.escudo.sitio.clone()
-            };
-            let mandato = if p.perfil == Perfil::Mandato {
-                self.mandato.as_ref()
-            } else {
-                None
-            };
-            let (formas, senuelo) = if mandato.is_some() {
-                (&self.formas_mandato, Some(self.tinta.len()))
-            } else {
-                (&self.formas, None)
-            };
-            // What the person approved sending to this site a moment ago goes there.
-            let sin_permiso = self.formas_sin_permiso(p, &destino.sitio, formas, ahora);
-            let formas: &[Forma] = sin_permiso.as_deref().unwrap_or(formas);
-            let con_cuerpo = matches!(
-                metodo.to_ascii_uppercase().as_str(),
-                "POST" | "PUT" | "PATCH"
-            );
-            let peticion = Peticion {
-                url,
-                cuerpo: if con_cuerpo { cuerpo } else { &[] },
-                recurso,
-                sitio_pagina: &sitio_pagina,
-            };
-            (
-                decide_con(
-                    &peticion,
-                    destino,
-                    &self.prefs.reglas,
-                    formas,
-                    senuelo,
-                    mandato,
-                ),
-                recurso,
-            )
+            // A window a page opened with no address of its own, going to its first page: judged
+            // as that page's window (`ventana_cortada`), not as a page the person opens.
+            if r == Recurso::Documento
+                && p.juzga_primera
+                && p.escudo.sitio.is_empty()
+                && p.abridor.as_deref().is_some_and(|w| !w.is_empty())
+                && self.emergentes_activas()
+            {
+                r = Recurso::Ventana;
+            }
+            r
         };
-        let (mut d, recurso) = d;
+        let mut d = self.decision_en(i, url, destino, metodo, cuerpo, recurso);
         if recurso == Recurso::Documento && !d.cortar && !d.hallazgos.is_empty() {
             // A page sending your marked data to another site by opening it (a link, a redirect,
             // `location=`, a new window): cut, unless you typed that address yourself (no rule
@@ -3356,6 +3741,9 @@ impl Sesion {
             self.diario.anota(&hoy, &d, web.as_deref());
             if let Some((red, evento, true)) = chivato {
                 self.diario.anota_chivato(&hoy, red, evento);
+            }
+            if d.cortar && recurso == Recurso::Ventana {
+                self.diario.dias.entry(hoy.clone()).or_default().emergentes += 1;
             }
         }
         // The session's total: the person's own webs, as the day's trail.
@@ -3469,27 +3857,37 @@ impl Sesion {
                 ..Respuesta::default()
             };
         }
-        let pagina = (recurso == Recurso::Documento).then(|| {
-            let s = d.destino.sitio.as_str();
-            let razon = match d.motivo {
-                Some(Motivo::FueraDeMandato) => self.tf("pagina_cortada_mandato", &[("sitio", s)]),
-                Some(Motivo::CorteTuyo) => self.tf("pagina_cortada_tuya", &[("sitio", s)]),
-                Some(Motivo::Senuelo) => self.t("pagina_cortada_senuelo"),
-                Some(Motivo::Tinta) => {
-                    let dato = d
-                        .hallazgos
-                        .first()
-                        .and_then(|h| self.tinta.get(h.origen))
-                        .and_then(|m| clase_de(m.tipo))
-                        .map(|c| self.t(c.clave()).to_lowercase())
-                        .unwrap_or_default();
-                    self.tf("pagina_cortada_tinta", &[("dato", &dato), ("sitio", s)])
-                }
-                Some(m) => self.t(&format!("motivo_{}", cortes::motivo_clave(m))),
-                None => String::new(),
-            };
-            paginas::pagina_cortada(&self.textos, &razon, url, &self.prefs.tema)
-        });
+        // A window cut once it was open (its page filled it in later) shows why, as a page does.
+        let pagina = (recurso == Recurso::Documento
+            || (recurso == Recurso::Ventana && contexto == 1))
+            .then(|| {
+                let s = d.destino.sitio.as_str();
+                let razon = match d.motivo {
+                    Some(Motivo::Publicidad | Motivo::Rastreador)
+                        if recurso == Recurso::Ventana =>
+                    {
+                        self.tf("pagina_cortada_ventana", &[("sitio", s)])
+                    }
+                    Some(Motivo::FueraDeMandato) => {
+                        self.tf("pagina_cortada_mandato", &[("sitio", s)])
+                    }
+                    Some(Motivo::CorteTuyo) => self.tf("pagina_cortada_tuya", &[("sitio", s)]),
+                    Some(Motivo::Senuelo) => self.t("pagina_cortada_senuelo"),
+                    Some(Motivo::Tinta) => {
+                        let dato = d
+                            .hallazgos
+                            .first()
+                            .and_then(|h| self.tinta.get(h.origen))
+                            .and_then(|m| clase_de(m.tipo))
+                            .map(|c| self.t(c.clave()).to_lowercase())
+                            .unwrap_or_default();
+                        self.tf("pagina_cortada_tinta", &[("dato", &dato), ("sitio", s)])
+                    }
+                    Some(m) => self.t(&format!("motivo_{}", cortes::motivo_clave(m))),
+                    None => String::new(),
+                };
+                paginas::pagina_cortada(&self.textos, &razon, url, &self.prefs.tema)
+            });
         Respuesta {
             cortar: true,
             pagina,

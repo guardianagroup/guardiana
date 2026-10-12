@@ -89,7 +89,15 @@
       b.classList.remove('late'); void b.offsetWidth; b.classList.add('late');
     }
     cortesPrevios = mirando ? -1 : (r.empresas_cortadas || 0);
+    // A pop-up just not opened on this page: said beside the address.
+    const clave = `${m.pestana}:${m.carga}`;
+    const e = m.emergentes || 0;
+    if (clave === emergentesDe && e > emergentesPrevios) aviso(t('emergente_aviso'));
+    emergentesDe = clave;
+    emergentesPrevios = e;
   }
+  let emergentesDe = '';
+  let emergentesPrevios = 0;
 
   // --- the guard line ----------------------------------------------------------------------------
   const lienzo = $('guardia');

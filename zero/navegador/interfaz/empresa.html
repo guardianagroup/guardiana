@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title data-t="ficha_titulo">Ficha de empresa</title>
+<link rel="stylesheet" href="comun.css">
+<style>
+html, body { min-height: 100%; background: var(--hoja); }
+main { max-width: 920px; margin: 0 auto; padding: 26px 28px 64px; }
+.arriba { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.marca { display: flex; align-items: center; gap: 9px; color: var(--gris); }
+.marca i { width:16px; height:16px; display:inline-block; flex:none; background:radial-gradient(circle closest-side,var(--azul) 0 42%,var(--tinta) 42%); -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M160.59 69.13 A68 68 0 1 1 130.87 39.41' fill='none' stroke='%23000' stroke-width='30'/%3E%3Ccircle cx='100' cy='100' r='31' fill='%23000'/%3E%3C/svg%3E") center/contain no-repeat; mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M160.59 69.13 A68 68 0 1 1 130.87 39.41' fill='none' stroke='%23000' stroke-width='30'/%3E%3Ccircle cx='100' cy='100' r='31' fill='%23000'/%3E%3C/svg%3E") center/contain no-repeat; }
+.marca b { font: 600 12px/1 var(--display); letter-spacing: .03em; color: var(--tinta); }
+.marca span { font-size: 12.5px; }
+.cabeza { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin: 30px 0 8px; }
+h1 { font: 600 clamp(28px, 3.6vw, 44px)/1.05 var(--display); letter-spacing: -.02em; margin: 0; word-break: break-word; }
+.sub { color: var(--gris); margin: 6px 0 0; font-size: 14px; }
+.sub b { color: var(--tinta); font-weight: 600; }
+.controles { display: flex; gap: 10px; flex-wrap: wrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.contigo { margin: 26px 0 8px; border-top: 2px solid var(--tinta); border-bottom: 1px solid var(--linea); display: grid; grid-template-columns: repeat(2, 1fr); }
+.cifra { padding: 16px 16px 16px 0; }
+.cifra b { display: block; font: 600 34px/1 var(--display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.cifra.roja b { color: var(--rojo); }
+.cifra span { display: block; margin-top: 8px; font-size: 13px; color: var(--gris); }
+.contigo-webs { color: var(--gris); font-size: 13px; margin: 8px 0 0; }
+section { margin-top: 28px; }
+h2 { font: 600 19px/1.2 var(--display); margin: 0 0 10px; }
+section p { margin: 0 0 8px; line-height: 1.55; max-width: 74ch; }
+.cifras-dinero { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.dinero { border: 1px solid var(--linea); border-radius: 12px; padding: 12px 14px; }
+.dinero b { display: block; font: 600 22px/1.15 var(--display); font-variant-numeric: tabular-nums; }
+.dinero span { display: block; color: var(--gris); font-size: 12.5px; margin-top: 4px; }
+.lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.lista li { border: 1px solid var(--linea); border-left: 4px solid var(--rojo); border-radius: 10px; padding: 11px 14px; }
+.lista li.ambar { border-left-color: var(--ambar); }
+.lista .linea1 { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-weight: 600; }
+.lista .importe { color: var(--rojo); font-variant-numeric: tabular-nums; }
+.lista .linea2 { color: var(--gris); font-size: 13.5px; margin-top: 4px; line-height: 1.5; }
+.total { margin: 0 0 10px; font-weight: 600; }
+.fuente { font-size: 12px; color: var(--gris); }
+.fuente a, .fuentes a, .enlace-ext { color: var(--azul); word-break: break-all; }
+.fuentes { font-size: 12.5px; color: var(--gris); padding-left: 20px; }
+.fuentes li { margin: 3px 0; }
+.dominios { font-family: var(--mono); font-size: 12px; color: var(--gris); line-height: 1.7; }
+.vacia { border: 1px dashed var(--linea); border-radius: 12px; padding: 14px 16px; color: var(--gris); }
+.nota { margin-top: 30px; font-size: 12.5px; color: var(--gris); max-width: 74ch; }
+#aviso { position: fixed; left: 50%; bottom: 18px; transform: translate(-50%, 8px); padding: 10px 16px; border-radius: 10px; background: var(--tinta); color: var(--hoja); font-size: 13px; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; max-width: 90vw; }
+#aviso.visto { opacity: 1; transform: translate(-50%, 0); }
+@media screen and (max-width: 640px) { main { padding: 20px 16px 48px; } .contigo { grid-template-columns: 1fr 1fr; } }
+@media print {
+  :root, :root[data-tema], :root:not([data-tema="dia"]) {
+    color-scheme: light; --marco: #E8ECF4; --hoja: #fff; --campo: #F3F5F9; --tinta: #0B1020; --gris: #4A5163;
+    --gris-suave: #8A91A3; --linea: #D9DEE8; --azul: #1F4BFF; --azul-suave: #E6ECFF; --verde: #0E8F6E;
+    --verde-suave: #E2F4EE; --rojo: #B3261E; --rojo-suave: #FBE7E3; --ambar: #9A5B00; --ambar-suave: #FBF0DC;
+    --sombra: none;
+  }
+  body { background: #fff; }
+  main { max-width: none; padding: 0; }
+  .controles, #aviso, .volver { display: none !important; }
+  .lista li, .dinero { break-inside: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  h2 { break-after: avoid; }
+}
+@page { margin: 14mm 12mm; }
+</style>
+</head>
+<body>
+<main>
+  <div class="arriba">
+    <button class="boton volver" id="volver" data-t="cortes_volver" data-t-title="cortes_volver_titulo"></button>
+    <div class="marca"><i></i><b data-t="app_nombre"></b><span data-t="ficha_titulo"></span></div>
+  </div>
+  <div class="cabeza">
+    <div>
+      <h1 id="nombre"></h1>
+      <p class="sub" id="sede"></p>
+    </div>
+    <div class="controles">
+      <button class="boton principal" id="compartir" data-t="ficha_compartir"></button>
+      <button class="boton" id="pdf" data-t="ficha_pdf"></button>
+    </div>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div class="contigo">
+    <div class="cifra roja"><b id="c-cortes">0</b><span data-t="ficha_contigo_cortes"></span></div>
+    <div class="cifra"><b id="c-webs">0</b><span data-t="ficha_contigo_webs"></span></div>
+  </div>
+  <p class="contigo-webs" id="contigo-webs"></p>
+  <div id="cuerpo"></div>
+  <section id="s-dominios" class="oculto">
+    <h2 data-t="ficha_dominios"></h2>
+    <p class="dominios" id="dominios"></p>
+  </section>
+  <section id="s-fuentes" class="oculto">
+    <h2 data-t="ficha_fuentes"></h2>
+    <ol class="fuentes" id="fuentes"></ol>
+  </section>
+  <p class="nota" id="nota"></p>
+</main>
+<div id="aviso" role="status" aria-live="polite"></div>
+<script src="puente.js"></script>
+<script src="empresa.js"></script>
+</body>
+</html>

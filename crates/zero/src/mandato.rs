@@ -14,6 +14,9 @@ use crate::dominio::sitio;
 pub enum Recurso {
     /// The page itself (top-level navigation).
     Documento,
+    /// A new window a page asks to open (ZERO's own kind, not the engine's): judged before it
+    /// opens like something the page brings from another company.
+    Ventana,
     /// A frame inside the page.
     Marco,
     /// A script.

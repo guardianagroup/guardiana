@@ -774,7 +774,7 @@ fn keys_tabs_and_new_windows() {
         .unwrap_or_default();
     assert!(matches!(o.first(), Some(Orden::CreaPestana { id: 2, .. })));
     assert!(o.contains(&Orden::Foco { a: Origen::Barra }));
-    let (n, o) = s.ventana_nueva(2).unwrap_or_default();
+    let (n, o) = s.ventana_nueva(2, "").unwrap_or_default();
     assert_eq!(n, 3);
     assert!(o.contains(&Orden::CreaPestana {
         id: 3,
@@ -807,7 +807,7 @@ fn keys_tabs_and_new_windows() {
             ..
         })
     ));
-    let (_, o) = s.ventana_nueva(2).unwrap_or_default();
+    let (_, o) = s.ventana_nueva(2, "").unwrap_or_default();
     assert!(matches!(
         o.first(),
         Some(Orden::CreaPestana {
@@ -1975,7 +1975,7 @@ fn an_approved_sending_carries_on_in_the_window_it_opens() {
         &json!({ "tipo": "formulario_respuesta", "id": q["id"], "enviar": true, "recordar": false })
             .to_string(),
     );
-    let (n, _) = s.ventana_nueva(id).unwrap_or_default();
+    let (n, _) = s.ventana_nueva(id, "").unwrap_or_default();
     let pago = "https://checkout.pagos-ejemplo.com/pay";
     let _ = s.navegacion_empieza(n, pago, false);
     assert!(
@@ -1984,7 +1984,7 @@ fn an_approved_sending_carries_on_in_the_window_it_opens() {
     );
     // Anywhere else, still cut, from the new window too.
     let fuga = "https://tracker.example/r?e=ana%40correo.co";
-    let (m, _) = s.ventana_nueva(id).unwrap_or_default();
+    let (m, _) = s.ventana_nueva(id, "").unwrap_or_default();
     let _ = s.navegacion_empieza(m, fuga, false);
     assert!(s.peticion(m, fuga, "GET", b"", 1).cortar);
     // Once the window shows a web of its own, that web is where data leaves from: from the new
@@ -2050,7 +2050,7 @@ fn the_approval_never_covers_a_mandate_s_decoy() {
         8,
     );
     assert!(r.cortar);
-    let (n, _) = s.ventana_nueva(m).unwrap_or_default();
+    let (n, _) = s.ventana_nueva(m, "").unwrap_or_default();
     let fuga = format!("https://www.avianca.com/p?e={senuelo}");
     let _ = s.navegacion_empieza(n, &fuga, false);
     assert!(s.peticion(n, &fuga, "GET", b"", 3).cortar);
@@ -2062,21 +2062,21 @@ fn a_new_window_cannot_carry_marked_data_away_either() {
     let (mut s, _, id) = con_pagina(false);
     marca_correo(&mut s);
     let _ = abre_pagina(&mut s, id, "https://www.tienda.co/");
-    let (n, _) = s.ventana_nueva(id).unwrap_or_default();
+    let (n, _) = s.ventana_nueva(id, "").unwrap_or_default();
     let fuga = "https://tracker.example/r?e=ana%40correo.co";
     let _ = s.navegacion_empieza(n, fuga, false);
     let r = s.peticion(n, fuga, "GET", b"", 1);
     assert!(r.cortar);
     assert!(r.pagina.unwrap_or_default().contains("tracker.example"));
     // To the opener's own site it goes, as it would in the same tab.
-    let (m, _) = s.ventana_nueva(id).unwrap_or_default();
+    let (m, _) = s.ventana_nueva(id, "").unwrap_or_default();
     let propia = "https://www.tienda.co/cuenta?e=ana%40correo.co";
     let _ = s.navegacion_empieza(m, propia, false);
     assert!(!s.peticion(m, propia, "GET", b"", 1).cortar);
     // A window from no web at all (the new tab page) is cut too.
     let _ = s.tecla(u32::from('T'), true, false, false);
     let t = s.activa();
-    let (w, _) = s.ventana_nueva(t).unwrap_or_default();
+    let (w, _) = s.ventana_nueva(t, "").unwrap_or_default();
     let _ = s.navegacion_empieza(w, fuga, false);
     assert!(s.peticion(w, fuga, "GET", b"", 1).cortar);
 }
@@ -2926,4 +2926,213 @@ fn frames_report_their_reads_and_get_their_answer_back() {
     assert!(r.is_none() && o.is_empty());
     let (r, o) = s.mensaje_de_marco(id, marco, r#"{"tipo":"borrar_todo"}"#);
     assert!(r.is_none() && o.is_empty());
+}
+
+#[test]
+fn a_pop_up_to_an_advertising_company_is_not_opened_unless_the_person_clicked_its_link() {
+    let (mut s, _, id) = con_pagina(true);
+    let web = "https://www.eltiempo.com/";
+    let anuncio = "https://ad.doubleclick.net/ddm/clk/1;2;3";
+    assert!(s.ventana_nueva(id, anuncio).is_none());
+    assert_eq!(s.pestana(id).map(|p| p.escudo.emergentes), Some(1));
+    // In the list of cuts, as a window of the page that asked for it.
+    assert!(s.cortes_pend.iter().any(|c| c.sitio == "doubleclick.net"
+        && c.recurso == Recurso::Ventana
+        && c.pagina == "eltiempo.com"));
+    // «Open it» in the shield opens it anyway, as a tab of the same session.
+    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"abre_emergente"}"#);
+    assert!(o.iter().any(|x| matches!(
+        x,
+        Orden::CreaPestana { url: Some(u), de: Some(d), .. } if u == anuncio && *d == id
+    )));
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        &json!({ "tipo": "pestana_activar", "id": id }).to_string(),
+    );
+    // An ordinary site opens.
+    assert!(s.ventana_nueva(id, "https://www.wikipedia.org/").is_some());
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        &json!({ "tipo": "pestana_activar", "id": id }).to_string(),
+    );
+    // A link the person clicked opens, whatever company it goes to (an affiliate link), once.
+    let _ = s.mensaje(
+        Origen::Pestana(id),
+        web,
+        &json!({ "tipo": "zg_enlace", "zg": "f", "url": anuncio }).to_string(),
+    );
+    assert!(s.ventana_nueva(id, anuncio).is_some());
+    assert!(s.ventana_nueva(id, anuncio).is_none());
+}
+
+#[test]
+fn a_blank_pop_up_its_page_fills_with_an_ad_says_why_instead() {
+    let (mut s, _, id) = con_pagina(true);
+    let (n, _) = s.ventana_nueva(id, "about:blank").unwrap_or_default();
+    let anuncio = "https://ad.doubleclick.net/ddm/clk/1";
+    let _ = s.navegacion_empieza(n, anuncio, false);
+    let r = s.peticion(n, anuncio, "GET", b"", 1);
+    assert!(r.cortar);
+    assert!(r.pagina.is_some_and(|p| p.contains("doubleclick.net")));
+    // A blank window going to an ordinary site shows it.
+    let (m, _) = s.ventana_nueva(id, "").unwrap_or_default();
+    let otra = "https://www.wikipedia.org/";
+    let _ = s.navegacion_empieza(m, otra, false);
+    assert!(!s.peticion(m, otra, "GET", b"", 1).cortar);
+    // A page the person opens in a tab is never cut by a list.
+    let _ = s.navegacion_empieza(id, anuncio, false);
+    assert!(!s.peticion(id, anuncio, "GET", b"", 1).cortar);
+}
+
+#[test]
+fn the_shield_counts_the_pop_ups_the_page_script_dealt_with() {
+    let (mut s, _, id) = con_pagina(true);
+    let web = "https://www.eltiempo.com/";
+    let _ = s.mensaje(
+        Origen::Pestana(id),
+        web,
+        r#"{"tipo":"zg_emergente","zg":"f","url":"https://pop.example/x"}"#,
+    );
+    let _ = s.mensaje(
+        Origen::Pestana(id),
+        web,
+        r#"{"tipo":"zg_molesta","zg":"f"}"#,
+    );
+    // A page asking for notifications as it loads gets «no» without a prompt; after a click, the
+    // person is asked.
+    assert!(s.pide_notificaciones(id, false));
+    assert!(!s.pide_notificaciones(id, true));
+    let e = s.pestana(id).map(|p| s.msg_escudo(p)).unwrap_or_default();
+    assert_eq!(e["emergentes"], 1);
+    assert_eq!(e["emergente"], "pop.example");
+    assert_eq!(e["molestas"], 2);
+    assert_eq!(s.msg_hoy()["hoy"]["emergentes"], 3);
+    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"abre_emergente"}"#);
+    assert!(o.iter().any(|x| matches!(
+        x,
+        Orden::CreaPestana { url: Some(u), .. } if u == "https://pop.example/x"
+    )));
+    // Only web addresses are kept to open.
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        &json!({ "tipo": "pestana_activar", "id": id }).to_string(),
+    );
+    let _ = s.mensaje(
+        Origen::Pestana(id),
+        web,
+        r#"{"tipo":"zg_emergente","zg":"f","url":"javascript:alert(1)"}"#,
+    );
+    let e = s.pestana(id).map(|p| s.msg_escudo(p)).unwrap_or_default();
+    assert_eq!(e["emergentes"], 2);
+    assert!(e["emergente"].is_null());
+}
+
+#[test]
+fn with_pop_ups_left_alone_windows_open_as_before() {
+    let (mut s, _, id) = con_pagina(true);
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"quitar_emergentes","valor":false}"#,
+    );
+    let web = "https://www.eltiempo.com/";
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        web,
+        r#"{"tipo":"zg_cookies_pide","zg":"f1"}"#,
+    );
+    let r = o.iter().find_map(|x| match x {
+        Orden::RespondeFormulario { json, .. } => serde_json::from_str::<Value>(json).ok(),
+        _ => None,
+    });
+    assert_eq!(r.unwrap_or_default()["emergentes"], false);
+    assert!(!s.pide_notificaciones(id, false));
+    let _ = s.mensaje(
+        Origen::Pestana(id),
+        web,
+        r#"{"tipo":"zg_molesta","zg":"f"}"#,
+    );
+    assert_eq!(s.pestana(id).map(|p| p.escudo.molestas), Some(0));
+    assert!(s
+        .ventana_nueva(id, "https://ad.doubleclick.net/x")
+        .is_some());
+    // Maximum protection turns it back on.
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"maxima","valor":true}"#,
+    );
+    assert!(!s.prefs.emergentes_sin_tocar);
+}
+
+#[test]
+fn a_company_s_profile_opens_in_its_own_tab_with_what_it_tried() {
+    let (mut s, _, id) = con_pagina(true);
+    let web = "https://www.eltiempo.com/";
+    let _ = s.peticion(
+        id,
+        "https://static.criteo.net/js/ld/publishertag.js",
+        "GET",
+        b"",
+        6,
+    );
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"abrir_ficha","empresa":"Criteo"}"#,
+    );
+    let n = o
+        .iter()
+        .find_map(|x| match x {
+            Orden::CreaPestana {
+                id, url: Some(u), ..
+            } if u == &format!("{EMPRESA}?e=Criteo") => Some(*id),
+            _ => None,
+        })
+        .unwrap_or_default();
+    assert!(n > 0, "no tab for the profile");
+    let _ = s.navegacion_empieza(n, &format!("{EMPRESA}?e=Criteo"), false);
+    let _ = s.pagina_nueva(n, &format!("{EMPRESA}?e=Criteo"));
+    let o = s.mensaje(
+        Origen::Pestana(n),
+        &format!("{EMPRESA}?e=Criteo"),
+        r#"{"tipo":"ficha","empresa":"Criteo"}"#,
+    );
+    let f = del_tipo(&o, Origen::Pestana(n), "ficha").unwrap_or_default();
+    assert_eq!(f["empresa"], "Criteo");
+    assert_eq!(f["pais"], "FR");
+    assert_eq!(f["contigo"]["cortes"], 1);
+    assert_eq!(f["contigo"]["webs"], 1);
+    assert!(f["dominios"]
+        .as_array()
+        .is_some_and(|d| d.iter().any(|x| x == "criteo.net")));
+    // An unknown name is the site itself: only the country of its ending, said as that.
+    let o = s.mensaje(
+        Origen::Pestana(n),
+        &format!("{EMPRESA}?e=Criteo"),
+        r#"{"tipo":"ficha","empresa":"r2b2.cz"}"#,
+    );
+    let f = del_tipo(&o, Origen::Pestana(n), "ficha").unwrap_or_default();
+    assert_eq!(f["pais"], "~CZ");
+    assert_eq!(f["conocida"], false);
+    // The PDF goes to Downloads, named after the company; a web page cannot ask for it.
+    let o = s.mensaje(
+        Origen::Pestana(n),
+        &format!("{EMPRESA}?e=Criteo"),
+        r#"{"tipo":"ficha_pdf","empresa":"Criteo"}"#,
+    );
+    assert!(o.iter().any(|x| matches!(
+        x,
+        Orden::GuardaPdf { ruta, .. } if ruta.ends_with("guardiana-zero-criteo.pdf")
+    )));
+    assert!(s
+        .mensaje(
+            Origen::Pestana(id),
+            web,
+            r#"{"tipo":"ficha_pdf","empresa":"Criteo"}"#
+        )
+        .is_empty());
 }

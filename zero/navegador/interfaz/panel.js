@@ -78,7 +78,7 @@
     if (parcial) li.classList.add('parcial');
     else if (corta) li.classList.add('cortado');
     else if (sigue) li.classList.add('sigue');
-    li.querySelector('.quien').innerHTML = `${esc(x.quien)}${x.pais ? `<small>${esc(pais(x.pais))}</small>` : ''}`;
+    li.querySelector('.quien').innerHTML = `<button class="enlace-empresa" data-empresa="${esc(x.quien)}" title="${esc(t('ficha_ver'))}">${esc(x.quien)}</button>${x.pais ? `<small>${esc(pais(x.pais))}</small>` : ''}`;
     // The site may be shortened; its counts never are.
     li.querySelector('.linea').innerHTML = `<span class="mono">${esc(x.sitio)}</span><span class="cuenta">${esc(x.cortadas > 0 ? t('escudo_cortadas_de', { c: n(x.cortadas), n: n(x.vistas) }) : tn('escudo_peticiones', x.vistas, { n: n(x.vistas) }))}</span>`;
     // What holds now, in one chip: the person's rule when there is one, else cut, partly or not.
@@ -183,6 +183,9 @@
     $('e-sesion').innerHTML = sesion.map((l) => `<li>${esc(l.texto)}</li>`).join('');
   });
   $('e-dia-ver').addEventListener('click', () => manda({ tipo: 'abrir_cortes' }));
+  $('e-hechos').addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'e-emergente-abrir') manda({ tipo: 'abre_emergente' });
+  });
   en('escudo', (m) => {
     // On the browser's own pages there is no page to speak of: only the day.
     $('e-pagina-cab').classList.toggle('oculto', !m.sitio);
@@ -199,7 +202,14 @@
     if (m.parametros_quitados) hechos.push(tn('parametros_quitados', m.parametros_quitados, { n: n(m.parametros_quitados) }));
     if (m.datos_salvados) hechos.push(tn('datos_salvados', m.datos_salvados, { n: n(m.datos_salvados) }));
     if (m.cookies) hechos.push(t(m.cookies.accion === 'rechazado' ? 'cookies_rechazado' : 'cookies_escondido', { gestor: m.cookies.gestor }));
-    $('e-hechos').innerHTML = hechos.map((h) => `<span>${esc(h)}</span>`).join('');
+    if (m.molestas) hechos.push(tn('molestas_cerradas', m.molestas, { n: n(m.molestas) }));
+    let html = hechos.map((h) => `<span>${esc(h)}</span>`).join('');
+    // Pop-ups not opened: the last one can still be opened, if the person wanted it.
+    if (m.emergentes) {
+      const abrir = m.emergente ? ` <button class="enlace" id="e-emergente-abrir">${esc(t('emergente_abrir', { sitio: m.emergente }))}</button>` : '';
+      html += `<span>${esc(tn('emergentes_no_abiertas', m.emergentes, { n: n(m.emergentes) }))}${abrir}</span>`;
+    }
+    $('e-hechos').innerHTML = html;
     pintaChivatos(m);
     pintaMedidas(m.medidas || {});
   });
@@ -450,7 +460,7 @@
       const d = document.createElement('div');
       d.className = 'entrada';
       const datos = (e.clases || []).map((c) => t('dato_' + c)).join(', ');
-      d.innerHTML = `<div class="cab"><b>${esc(e.empresa || e.sitio)}</b>${e.empresa ? `<span class="mono gris">${esc(e.sitio)}</span>` : ''}${e.pais ? `<span class="gris pequeno">${esc(pais(e.pais))}</span>` : ''}${e.corredor ? `<span class="chip rojo">${esc(t('corredor_etiqueta'))}</span>` : ''}</div>`
+      d.innerHTML = `<div class="cab"><button class="enlace-empresa" data-empresa="${esc(e.empresa || e.sitio)}"><b>${esc(e.empresa || e.sitio)}</b></button>${e.empresa ? `<span class="mono gris">${esc(e.sitio)}</span>` : ''}${e.pais ? `<span class="gris pequeno">${esc(pais(e.pais))}</span>` : ''}${e.corredor ? `<span class="chip rojo">${esc(t('corredor_etiqueta'))}</span>` : ''}</div>`
         + `<div class="datos">${esc(t('libro_fila', { datos, veces: n(e.veces), fecha: fecha(e.ultima) }))}</div>`
         + `<button class="boton chico">${esc(t('libro_carta'))}</button><div class="carta oculto"></div>`;
       const caja = d.querySelector('.carta');
@@ -488,6 +498,7 @@
   en('ajustes', (m) => {
     $('a-proteccion').checked = !!m.cortar_seguimiento;
     $('a-cookies').checked = m.rechazar_cookies !== false;
+    $('a-emergentes').checked = m.quitar_emergentes !== false;
     const imp = m.importar || [];
     $('a-importar-caja').classList.toggle('oculto', !imp.length);
     $('a-importar').innerHTML = imp.map((x) => `<button class="boton chico" data-de="${esc(x)}">${esc(x)}</button>`).join(' ');
@@ -530,6 +541,7 @@
     if (b) manda({ tipo: 'importar_favoritos', de: b.dataset.de });
   });
   $('a-cookies').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'rechazar_cookies', valor: e.target.checked }));
+  $('a-emergentes').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'quitar_emergentes', valor: e.target.checked }));
   $('a-buscador').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'buscador', valor: e.target.value }));
   document.querySelector('.temas [data-tema="dia"]').innerHTML = Z.ICONO.sol;
   document.querySelector('.temas [data-tema="noche"]').innerHTML = Z.ICONO.luna;
@@ -630,6 +642,7 @@
     $('e-proteccion').disabled = terminada;
     $('a-proteccion').disabled = terminada;
     $('a-cookies').disabled = terminada;
+    $('a-emergentes').disabled = terminada;
     $('a-licencia').textContent = terminada ? pastillaLicencia(m) : (m.ilegible ? t('licencia_pastilla_ilegible') : lineaLicencia(m));
   }
   en('licencia', pintaLicencia);
