@@ -31,7 +31,7 @@ mod tests {
 
 /// Two-letter endings sold to anyone for their look (`.io`, `.co`, `.tv`, `.me`…): they say
 /// nothing about a country.
-const TERMINACIONES_DE_ADORNO: [&str; 50] = [
+const TERMINACIONES_DE_ADORNO: [&str; 51] = [
     "ac", "ad", "ag", "ai", "am", "as", "bi", "bz", "cc", "cd", "cf", "cm", "co", "cx", "dj", "eu",
     "ki", "lc", "nr", "sx", "tc", "tl", "vc", "vg", "fm", "ga", "gd", "gg", "gl", "gq", "gs", "im",
     "io", "je", "la", "ly", "me", "ml", "ms", "mu", "nu", "pw", "sc", "sh", "so", "st", "su", "tk",
