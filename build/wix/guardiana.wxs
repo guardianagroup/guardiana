@@ -28,8 +28,8 @@
        the English one over the Spanish left both registered (measured, 22 sep 2026). Neutral
        also replaces the LCID 10 of 15 sep 2026, which said "Español" of a program that speaks
        three languages and picks by the system's own. -->
-  <Package Name="Guardiana"
-           Manufacturer="Guardiana"
+  <Package Name="GUARDIANA"
+           Manufacturer="GUARDIANA GROUP"
            Version="$(var.Version)"
            UpgradeCode="0d4fae13-1842-4b29-a2e6-1939a9564b47"
            Language="$(var.Lang)"
@@ -38,7 +38,7 @@
            InstallerVersion="500"
            Compressed="yes">
 
-    <SummaryInformation Description="!(loc.Descripcion)" Manufacturer="Guardiana" />
+    <SummaryInformation Description="!(loc.Descripcion)" Manufacturer="GUARDIANA GROUP" />
 
     <!-- Two screens only: what the installer does and does not (build/wix/textos/bienvenida-XX.rtf)
          with "Install", then "Finish" with "Open Guardiana" ticked, which opens the panel in the
@@ -48,9 +48,12 @@
          Spanish installer (22 Sep 2026). -->
     <ui:WixUI Id="WixUI_Minimal" />
     <WixVariable Id="WixUILicenseRtf" Value="$(var.Welcome)" />
-    <!-- The brand instead of WiX's red sample artwork (1.0.1): the grid, the dot and the name of
-         the site, on the left of the first and last screens (493x312) and on the right of the
-         top band of the others (493x58), where WiX leaves room free of text. -->
+    <!-- The brand instead of WiX's red sample artwork (1.0.1), redrawn in 1.0.18 (the owner:
+         «no se ve la palabra… no se ven simétricos»): a navy side with the white symbol and the
+         name centred under it on the first and last screens (493x312), and the same, small, on
+         the right of the top band of the others (493x58), where WiX leaves room free of text.
+         build/wix/imagenes.py draws them. The package name is the brand, in capitals, as
+         Windows shows it in every screen and in «Aplicaciones instaladas». -->
     <WixVariable Id="WixUIDialogBmp" Value="$(sys.SOURCEFILEDIR)dialogo.bmp" />
     <WixVariable Id="WixUIBannerBmp" Value="$(sys.SOURCEFILEDIR)banner.bmp" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="!(loc.AbrirPanel)" />
