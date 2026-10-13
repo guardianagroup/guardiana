@@ -1116,7 +1116,8 @@ minutemedia-prebid.com
 @Viously|FR|Tourcoing|Sparteo
 viously.com
 
-@SundaySky
+# Sede: https://sundaysky.com/contact-us/ (oficinas: «New York 82 Nassau St. … New York, NY 10038», Tel Aviv y Tokio; la política la firma «SundaySky Parent, Inc.») (consultada el 13 oct 2026)
+@SundaySky|US|Nueva York
 sundaysky.com
 
 # Sede: https://impactify.io/terms/ («IMPACTIFY S.à r.l., 53 Allée Scheffer L-2520 Luxembourg») (consultada el 13 oct 2026)
@@ -1798,8 +1799,9 @@ adingo.jp
 @Duda|US|Louisville (Colorado)
 multiscreensite.com
 
-# Nota: dominio ml314.com no confirmado (la doc de Madison Logic cita ml-attr.com y madisonlogic.com); sede no verificada (conocida: Nueva York)
-@Madison Logic
+# Nota: dominio ml314.com no confirmado (la doc de Madison Logic cita ml-attr.com y madisonlogic.com); sede comprobada abajo
+# Sede: https://www.madisonlogic.com/contact/ («Madison Logic NY - HQ … 780 3rd Avenue, 20FL, New York, NY, 10017») (consultada el 13 oct 2026)
+@Madison Logic|US|Nueva York
 ml314.com
 
 # Sede: https://en.wikipedia.org/wiki/Rambler_(portal) (consultada el 12 oct 2026)
@@ -2144,8 +2146,9 @@ adskeeper.com
 shinobi.jp
 
 # mobilefuse.com: https://privacy.mobilefuse.com/policies
-# Nota: MobileFuse, LLC opera mobilefuse.com; sede no verificada (ChatGPT citó craft.co)
-@MobileFuse
+# Nota: MobileFuse, LLC opera mobilefuse.com; sede comprobada abajo
+# Sede: https://privacy.mobilefuse.com/policies («MobileFuse, LLC Attn: Compliance Team PO Box 37 Stirling, NJ 07980 USA»; es un apartado postal) (consultada el 13 oct 2026)
+@MobileFuse|US|Stirling (Nueva Jersey)
 mobilefuse.com
 
 # Sede: https://www.optimonk.com/privacy-policy (consultada el 12 oct 2026)
@@ -2155,8 +2158,9 @@ mobilefuse.com
 optimonk.com
 
 # ay.delivery: https://ay.delivery/
-# Nota: ay.delivery muestra la página 'Assertive Yield'; sede no verificada (ChatGPT citó Creditsafe: La Haya)
-@Assertive Yield
+# Nota: ay.delivery muestra la página 'Assertive Yield'; sede comprobada abajo
+# Sede: https://www.assertiveyield.com/about-us/ («Assertive Yield was born in the vibrant city of The Hague, Netherlands») (consultada el 13 oct 2026)
+@Assertive Yield|NL|La Haya
 ay.delivery
 
 # abtasty.com: https://www.abtasty.com/privacy-policy/
