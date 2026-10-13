@@ -3348,7 +3348,7 @@ fn a_cut_says_what_code_was_on_the_page_and_what_it_carried() {
     assert!(!ruta.is_empty(), "{g}");
     let archivo = std::fs::read_to_string(&ruta).unwrap_or_default();
     assert!(archivo.contains("_ga = GA1.1.secreto"), "{archivo}");
-    assert_eq!(s.ids_de("Google").is_empty(), false);
+    assert!(!s.ids_de("Google").is_empty());
     assert_eq!(fila["cookies_n"], 2);
     assert!(fila["cookies_lleva"]
         .to_string()
