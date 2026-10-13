@@ -62,6 +62,14 @@ section p { margin: 0 0 8px; line-height: 1.55; max-width: 74ch; }
   .lista li, .dinero { break-inside: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   h2 { break-after: avoid; }
 }
+.carta-controles { margin: 10px 0; align-items: center; }
+.carta-controles select { border: 1px solid var(--linea); background: var(--hoja); border-radius: 9px; padding: 8px 10px; }
+pre.carta { display: none; }
+@media print {
+  /* «Descargar la carta en PDF»: only the letter, ready to attach. */
+  body.solo-carta main > *:not(#cuerpo), body.solo-carta #cuerpo > *:not(:has(#carta)), body.solo-carta #cuerpo section:has(#carta) > *:not(#carta) { display: none !important; }
+  body.solo-carta pre.carta { display: block; white-space: pre-wrap; font: 12pt/1.55 var(--texto, Georgia, serif); color: #000; margin: 0; }
+}
 @page { margin: 14mm 12mm; }
 </style>
 </head>

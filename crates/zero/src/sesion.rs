@@ -1469,7 +1469,7 @@ impl Sesion {
     }
 
     /// «Descargar» on a company's profile: the page as a PDF in the person's Downloads.
-    fn ficha_pdf(&mut self, id: u32, empresa: &str) -> Vec<Orden> {
+    fn ficha_pdf(&mut self, id: u32, empresa: &str, carta: bool) -> Vec<Orden> {
         if !self.pestana(id).is_some_and(|p| p.url.starts_with(EMPRESA)) {
             return Vec::new();
         }
@@ -1485,6 +1485,11 @@ impl Sesion {
             "guardiana-zero-empresa".to_string()
         } else {
             format!("guardiana-zero-{nombre}")
+        };
+        let base = if carta {
+            base.replace("guardiana-zero-", "carta-borrado-")
+        } else {
+            base
         };
         let ruta = self.nombre_libre(&base, "pdf");
         vec![Orden::GuardaPdf { id, ruta }]
@@ -1658,6 +1663,8 @@ impl Sesion {
                         | "abrir_ficha"
                         | "ficha"
                         | "ficha_pdf"
+                        | "carta_ficha"
+                        | "abrir_correo"
                         | "volver"
                         | "favorito_quitar"
                         | "importar_favoritos"
@@ -1786,7 +1793,13 @@ impl Sesion {
                 _ => Vec::new(),
             },
             "ficha_pdf" => match origen {
-                Origen::Pestana(id) => self.ficha_pdf(id, texto(m, "empresa")),
+                Origen::Pestana(id) => {
+                    self.ficha_pdf(id, texto(m, "empresa"), texto(m, "que") == "carta")
+                }
+                _ => Vec::new(),
+            },
+            "carta_ficha" => match origen {
+                Origen::Pestana(id) => self.carta_ficha(id, texto(m, "empresa"), texto(m, "ley")),
                 _ => Vec::new(),
             },
             "abre_emergente" => self.abre_emergente(),
@@ -2188,6 +2201,78 @@ impl Sesion {
             }
         }
         vec![envia(Origen::Panel, &self.msg_tinta())]
+    }
+
+    /// «Descargar la carta» on a company's profile: the deletion letter to that company, under the
+    /// law the person picked, with their name and email when marked. The page shows it and saves it
+    /// as a PDF to attach to an email (the owner, 12 Oct 2026: «que solamente lo adjunten»).
+    fn carta_ficha(&self, id: u32, empresa: &str, ley: &str) -> Vec<Orden> {
+        let empresa: String = empresa.trim().chars().take(120).collect();
+        if empresa.is_empty() {
+            return Vec::new();
+        }
+        let registro = guardiana_lists::company_record(&empresa);
+        let dominios: Vec<String> = registro
+            .as_ref()
+            .map(|r| r.domains.iter().map(|d| (*d).to_string()).collect())
+            .unwrap_or_else(|| vec![empresa.clone()]);
+        let sitio = dominios.first().cloned().unwrap_or_else(|| empresa.clone());
+        // What the book saw it receive, from any of its names.
+        let mut clases: Vec<Clase> = Vec::new();
+        for d in &dominios {
+            if let Some(e) = self.libro.entradas.get(d) {
+                for c in &e.clases {
+                    if !clases.contains(c) {
+                        clases.push(*c);
+                    }
+                }
+            }
+        }
+        let corredor = dominios
+            .iter()
+            .find_map(|d| guardiana_lists::data_broker_of(d))
+            .map(|b| (b.name.to_string(), b.rights_url.map(str::to_string)));
+        let entrada = crate::libro::Entrada {
+            sitio,
+            empresa: registro.as_ref().map(|r| r.name.to_string()),
+            pais: registro
+                .as_ref()
+                .and_then(|r| r.country.map(str::to_string)),
+            corredor,
+            clases,
+            primera: 0,
+            ultima: 0,
+            veces: 0,
+            carta: None,
+        };
+        let ley = match ley {
+            "co" => Ley::Co,
+            "ue" => Ley::Ue,
+            "ca" => Ley::Ca,
+            "br" => Ley::Br,
+            _ => Ley::Otro,
+        };
+        let primero = |t: Tipo| {
+            self.tinta
+                .iter()
+                .find(|m| m.tipo == t)
+                .map(|m| m.valor.clone())
+                .unwrap_or_default()
+        };
+        let c = carta(
+            &self.textos,
+            ley,
+            &entrada,
+            &primero(Tipo::Nombre),
+            &primero(Tipo::Correo),
+            &self.hoy(),
+        );
+        self.a_pestana(
+            id,
+            &json!({ "tipo": "carta_ficha", "empresa": empresa, "asunto": c.asunto, "cuerpo": c.cuerpo }),
+        )
+        .into_iter()
+        .collect()
     }
 
     fn carta(&self, s: &str, ley: &str) -> Vec<Orden> {

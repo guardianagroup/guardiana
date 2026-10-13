@@ -74,6 +74,11 @@
     if (f) {
       if (f.que_hace) s.push(`<section><h2>${esc(t('ficha_que_hace'))}</h2><p>${esc(L(f.que_hace))}</p>${f.como_gana ? `<p>${esc(L(f.como_gana))}</p>` : ''}${f.fuente_que_hace ? `<p>${cita(f.fuente_que_hace)}</p>` : ''}</section>`);
       if (f.datos) s.push(`<section><h2>${esc(t('ficha_datos'))}</h2><p>${esc(L(f.datos))}${cita(f.fuente_datos)}</p></section>`);
+      // How it turns your data into money, with an example; where it is incorporated; what it
+      // does with taxes; what competition authorities found (the owner, 12 Oct 2026).
+      for (const [k, titulo] of [['como_usa_datos', 'ficha_como_usa'], ['sociedad', 'ficha_sociedad'], ['fiscal', 'ficha_fiscal'], ['monopolio', 'ficha_monopolio']]) {
+        if (f[k]) s.push(`<section><h2>${esc(t(titulo))}</h2><p>${esc(L(f[k]))}${cita(f['fuente_' + k])}</p></section>`);
+      }
       const cifras = Array.isArray(f.cifras) ? f.cifras : [];
       if (cifras.length) {
         const cajas = cifras.map((x) => {
@@ -92,7 +97,15 @@
     }
     // How to ask it to delete your data: its own page, or the one it gave the registry.
     const borrar = (f && f.borrar) || (d.corredor && d.corredor.url) || '';
-    if (web(borrar)) s.push(`<section><h2>${esc(t('ficha_borrar'))}</h2><p>${esc(t('ficha_borrar_explica'))}</p><p>${enlace(borrar, t('cortes_det_corredor_url'))}</p></section>`);
+    // The letter, ready: pick the law, download it as a PDF to attach, or open it in your mail.
+    const leyes = ['ue', 'co', 'ca', 'br', 'otro'];
+    s.push(`<section><h2>${esc(t('ficha_borrar'))}</h2>`
+      + (web(borrar) ? `<p>${esc(t('ficha_borrar_explica'))}</p><p>${enlace(borrar, t('cortes_det_corredor_url'))}</p>` : '')
+      + `<p>${esc(t('ficha_carta_explica'))}</p>`
+      + `<div class="controles carta-controles"><select id="carta-ley">${leyes.map((l) => `<option value="${l}"${l === leyPorDefecto() ? ' selected' : ''}>${esc(t('carta_ley_' + l))}</option>`).join('')}</select>`
+      + `<button class="boton principal" id="carta-pdf">${esc(t('ficha_carta_pdf'))}</button>`
+      + `<button class="boton" id="carta-correo">${esc(t('ficha_carta_correo'))}</button></div>`
+      + `<pre class="carta" id="carta"></pre></section>`);
     $('cuerpo').innerHTML = s.join('');
 
     const dom = d.dominios || [];
@@ -169,7 +182,39 @@
   $('pdf').addEventListener('click', () => manda({ tipo: 'ficha_pdf', empresa }));
   $('volver').addEventListener('click', () => manda({ tipo: 'volver' }));
   en('ficha', (m) => { if (m.empresa === empresa.trim()) { datos = m; pinta(); } });
-  en('guardado', (m) => aviso(m.texto || ''));
+  en('guardado', (m) => { document.body.classList.remove('solo-carta'); aviso(m.texto || ''); });
+  // The law that most likely applies, from the browser's language (the person can change it).
+  function leyPorDefecto() {
+    const l = (navigator.language || '').toLowerCase();
+    if (l.endsWith('-co')) return 'co';
+    if (l.startsWith('pt')) return 'br';
+    if (l === 'en-us') return 'ca';
+    if (/^(es|fr|de|it|nl|pl|cs|pt-pt|sv|da|fi|el|ro|hu|sk|sl|hr|bg|lt|lv|et|ga|mt)/.test(l)) return 'ue';
+    return lang() === 'es' ? 'ue' : 'otro';
+  }
+  let cartaLista = null;
+  function pideCarta(despues) {
+    cartaLista = despues;
+    manda({ tipo: 'carta_ficha', empresa, ley: $('carta-ley').value });
+  }
+  en('carta_ficha', (m) => {
+    if (m.empresa !== empresa.trim()) return;
+    $('carta').textContent = `${m.asunto}\n\n${m.cuerpo}`;
+    const f = cartaLista;
+    cartaLista = null;
+    if (f) f(m);
+  });
+  document.addEventListener('click', (e) => {
+    const id = e.target && e.target.id;
+    if (id === 'carta-pdf') {
+      pideCarta(() => {
+        document.body.classList.add('solo-carta');
+        manda({ tipo: 'ficha_pdf', empresa, que: 'carta' });
+      });
+    } else if (id === 'carta-correo') {
+      pideCarta((m) => manda({ tipo: 'abrir_correo', asunto: m.asunto, cuerpo: m.cuerpo }));
+    }
+  });
   en('textos', () => {
     try { const dn = new Intl.DisplayNames([lang()], { type: 'region' }); pais = (c) => { try { return dn.of(c); } catch (_) { return c; } }; } catch (_) {}
     if (datos) pinta(); else manda({ tipo: 'ficha', empresa });

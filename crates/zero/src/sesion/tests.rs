@@ -3136,3 +3136,35 @@ fn a_company_s_profile_opens_in_its_own_tab_with_what_it_tried() {
         )
         .is_empty());
 }
+
+#[test]
+fn a_profile_hands_over_the_deletion_letter_for_its_company() {
+    let (mut s, _, _) = con_pagina(true);
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"abrir_ficha","empresa":"Criteo"}"#,
+    );
+    let n = s.activa();
+    let url = format!("{EMPRESA}?e=Criteo");
+    let _ = s.navegacion_empieza(n, &url, false);
+    let _ = s.pagina_nueva(n, &url);
+    let o = s.mensaje(
+        Origen::Pestana(n),
+        &url,
+        r#"{"tipo":"carta_ficha","empresa":"Criteo","ley":"ue"}"#,
+    );
+    let c = del_tipo(&o, Origen::Pestana(n), "carta_ficha").unwrap_or_default();
+    let cuerpo = c["cuerpo"].as_str().unwrap_or("");
+    assert!(cuerpo.contains("Criteo") && cuerpo.contains("17"));
+    assert!(!cuerpo.contains("()"));
+    let o = s.mensaje(
+        Origen::Pestana(n),
+        &url,
+        r#"{"tipo":"ficha_pdf","empresa":"Criteo","que":"carta"}"#,
+    );
+    assert!(o.iter().any(|x| matches!(
+        x,
+        Orden::GuardaPdf { ruta, .. } if ruta.ends_with("carta-borrado-criteo.pdf")
+    )));
+}

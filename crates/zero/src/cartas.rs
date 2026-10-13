@@ -70,6 +70,12 @@ pub fn carta(
         .map(|c| t.t(c.clave()))
         .collect::<Vec<_>>()
         .join(", ");
+    // A letter from a company's profile has no marked data behind it: what any tracker keeps.
+    let datos = if datos.is_empty() {
+        t.t("carta_datos_generico")
+    } else {
+        datos
+    };
     let quien = entrada
         .empresa
         .clone()
