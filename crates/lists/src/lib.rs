@@ -385,7 +385,8 @@ pub fn company_record(name: &str) -> Option<CompanyRecord> {
 
 /// Profiles of the companies people meet most (`data/fichas.json`): what each does, its
 /// figures, fines and data breaches, every fact with its public source and date. Read as it
-/// is; the browser shows what is there and nothing else.
+/// is; the browser shows what is there and nothing else. A figure that is not the company's own
+/// but its group's (Alphabet's results on Google's profile) names whose it is in `de`.
 pub const FICHAS: &str = include_str!("../data/fichas.json");
 
 /// The profile of the company called `name`, if `fichas.json` has one.
@@ -965,6 +966,14 @@ mod group_tests {
                     assert!(fuente(&x["fuente"]), "{nombre} {lista}: sin fuente: {x}");
                 }
             }
+            // A figure of the group, not of the company itself, names whose it is (`de`).
+            for x in f["cifras"].as_array().cloned().unwrap_or_default() {
+                assert!(
+                    x.get("de")
+                        .is_none_or(|d| d.as_str().is_some_and(|s| !s.trim().is_empty())),
+                    "{nombre} cifras: «de» sin nombre: {x}"
+                );
+            }
             for x in f["sanciones"].as_array().cloned().unwrap_or_default() {
                 let fecha = x["fecha"].as_str().unwrap_or("");
                 assert!(
@@ -981,6 +990,11 @@ mod group_tests {
         }
         assert!(profile_of("Criteo").is_some());
         assert!(profile_of("nadie").is_none());
+        // Alphabet's results are not Google's alone (review of 13 Oct 2026).
+        let google = profile_of("Google").and_then(|f| f["cifras"].as_array());
+        assert!(
+            google.is_some_and(|c| !c.is_empty() && c.iter().all(|x| x["de"] == "Alphabet Inc."))
+        );
     }
 
     #[test]

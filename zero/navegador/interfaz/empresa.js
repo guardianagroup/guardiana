@@ -82,14 +82,20 @@
       }
       const cifras = Array.isArray(f.cifras) ? f.cifras : [];
       if (cifras.length) {
+        // Whose figures they are: a group's results (Alphabet's, on Google's profile) say so in
+        // the heading when all of them are the group's, and beside each one when they mix.
+        const de = (x) => (typeof x.de === 'string' ? x.de.trim() : '');
+        const todasDe = new Set(cifras.map(de)).size === 1 ? de(cifras[0]) : '';
         const cajas = cifras.map((x) => {
           const valor = x.moneda ? dinero(x.valor, x.moneda) : (Number(x.valor) || 0).toLocaleString(lang(), { useGrouping: 'always' });
-          return `<div class="dinero"><b>${esc(valor)}</b><span>${esc(t('ficha_cifra_' + x.clave, { anio: String(x.anio || '') }))}${cita(x.fuente)}</span></div>`;
+          const suya = !todasDe && de(x) ? ` · ${t('ficha_cifra_de', { entidad: de(x) })}` : '';
+          return `<div class="dinero"><b>${esc(valor)}</b><span>${esc(t('ficha_cifra_' + x.clave, { anio: String(x.anio || '') }) + suya)}${cita(x.fuente)}</span></div>`;
         });
-        s.push(`<section><h2>${esc(t('ficha_dinero'))}</h2><div class="cifras-dinero">${cajas.join('')}</div></section>`);
+        s.push(`<section><h2>${esc(todasDe ? t('ficha_dinero_de', { entidad: todasDe }) : t('ficha_dinero'))}</h2><div class="cifras-dinero">${cajas.join('')}</div></section>`);
       }
+      // An old fine is what an authority decided then, not proof of what the company does now.
       const sanciones = Array.isArray(f.sanciones) ? f.sanciones : [];
-      s.push(`<section><h2>${esc(t('ficha_sanciones'))}</h2>${sanciones.length ? totales(sanciones) + `<ul class="lista">${sanciones.map((x) => `<li><div class="linea1"><span>${esc(x.autoridad || '')}${x.pais ? ` · ${esc(pais(x.pais))}` : ''} · ${esc(fecha(x.fecha))}</span><span class="importe">${importe(x)}</span></div><div class="linea2">${esc(L(x.motivo))}${x.estado ? ` ${esc(L(x.estado))}` : ''}${cita(x.fuente)}</div></li>`).join('')}</ul>` : `<p class="vacia">${esc(t('ficha_sin_sanciones', { fecha: fecha(d.revisada) }))}</p>`}</section>`);
+      s.push(`<section><h2>${esc(t('ficha_sanciones'))}</h2>${sanciones.length ? `<p class="sanciones-nota">${esc(t('ficha_sanciones_nota'))}</p>` + totales(sanciones) + `<ul class="lista">${sanciones.map((x) => `<li><div class="linea1"><span>${esc(x.autoridad || '')}${x.pais ? ` · ${esc(pais(x.pais))}` : ''} · ${esc(fecha(x.fecha))}</span><span class="importe">${importe(x)}</span></div><div class="linea2">${esc(L(x.motivo))}${x.estado ? ` ${esc(L(x.estado))}` : ''}${cita(x.fuente)}</div></li>`).join('')}</ul>` : `<p class="vacia">${esc(t('ficha_sin_sanciones', { fecha: fecha(d.revisada) }))}</p>`}</section>`);
       const filtraciones = Array.isArray(f.filtraciones) ? f.filtraciones : [];
       s.push(`<section><h2>${esc(t('ficha_filtraciones'))}</h2>${filtraciones.length ? `<ul class="lista">${filtraciones.map((x) => `<li class="ambar"><div class="linea1"><span>${esc(fecha(x.fecha))}</span><span>${x.afectados ? esc(tn('ficha_afectados', x.afectados, { n: n(x.afectados) })) : ''}</span></div><div class="linea2">${esc(L(x.que))}${cita(x.fuente)}</div></li>`).join('')}</ul>` : `<p class="vacia">${esc(t('ficha_sin_filtraciones', { fecha: fecha(d.revisada) }))}</p>`}</section>`);
       if (f.web) s.push(`<section><h2>${esc(t('ficha_web'))}</h2><p>${enlace(f.web)}</p></section>`);
