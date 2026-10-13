@@ -233,7 +233,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-zero-navegador"
-version = "1.0.10"
+version = "1.0.11"
 dependencies = [
  "guardiana-zero",
  "serde_json",
