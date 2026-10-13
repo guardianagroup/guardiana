@@ -61,19 +61,28 @@ const LISTAS: &[(&[u8], Lista)] = &[
 /// The lists are stored encoded (`data/filtros/LEEME.md`): the malware lists carry real
 /// malware addresses, and an antivirus that sees them in a program takes it for one (Microsoft
 /// Defender did, with ZERO 1.0.15, on 13 Oct 2026). Antivirus products keep their own
-/// databases the same way. This undoes it: XOR with a fixed xorshift64 sequence.
+/// databases the same way. Each byte is swapped for another by a fixed permutation (Fisher-Yates
+/// driven by xorshift64), so plain strings disappear but the files still compress; this undoes
+/// it.
 #[must_use]
 pub fn descodifica(b: &[u8]) -> String {
+    let mut t: [u8; 256] = [0; 256];
+    for (i, v) in t.iter_mut().enumerate() {
+        *v = u8::try_from(i).unwrap_or(0);
+    }
     let mut x: u64 = 0x9E37_79B9_7F4A_7C15;
-    let out: Vec<u8> = b
-        .iter()
-        .map(|c| {
-            x ^= x << 13;
-            x ^= x >> 7;
-            x ^= x << 17;
-            c ^ (x & 0xFF) as u8
-        })
-        .collect();
+    for i in (1..256_usize).rev() {
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        let j = usize::try_from(x % (i as u64 + 1)).unwrap_or(0);
+        t.swap(i, j);
+    }
+    let mut inversa: [u8; 256] = [0; 256];
+    for (i, v) in t.iter().enumerate() {
+        inversa[*v as usize] = u8::try_from(i).unwrap_or(0);
+    }
+    let out: Vec<u8> = b.iter().map(|c| inversa[*c as usize]).collect();
     String::from_utf8_lossy(&out).into_owned()
 }
 

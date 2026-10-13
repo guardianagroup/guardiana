@@ -1,8 +1,9 @@
 # Listas de reglas de ZERO (codificadas)
 
 Estos archivos son EasyList, EasyPrivacy, las listas de uBlock Origin, URLhaus y las reglas
-cosméticas, tal como dice `docs/LISTS.md`, **codificados** con una secuencia fija (XOR con un
-xorshift64 de semilla `0x9E3779B97F4A7C15`, ver `crates/zero/src/filtros.rs`).
+cosméticas, tal como dice `docs/LISTS.md`, **codificados**: cada byte se cambia por otro con una permutación fija (Fisher-Yates con un
+xorshift64 de semilla `0x9E3779B97F4A7C15`, ver `crates/zero/src/filtros.rs`), que quita las
+cadenas legibles y deja que el instalador las comprima igual.
 
 No es para esconderlos: el código que los descodifica está aquí al lado y es público. Es porque
 las listas de malware llevan escritas direcciones de malware real, y un antivirus que ve esas

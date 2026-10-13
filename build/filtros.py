@@ -16,20 +16,32 @@ SEMILLA = 0x9E3779B97F4A7C15
 DATOS = pathlib.Path(__file__).resolve().parent.parent / 'crates/zero/data/filtros'
 
 
-def secuencia(n):
+def tabla():
+    """A fixed permutation of the 256 byte values (Fisher-Yates driven by xorshift64): each
+    byte is swapped for another, so plain strings disappear but the files still compress."""
     x = SEMILLA
-    out = bytearray(n)
     m = 0xFFFFFFFFFFFFFFFF
-    for i in range(n):
+    t = list(range(256))
+    for i in range(255, 0, -1):
         x ^= (x << 13) & m
         x ^= x >> 7
         x ^= (x << 17) & m
-        out[i] = x & 0xFF
-    return out
+        j = x % (i + 1)
+        t[i], t[j] = t[j], t[i]
+    return t
 
 
 def codifica(b):
-    return bytes(a ^ c for a, c in zip(b, secuencia(len(b))))
+    t = tabla()
+    return bytes(t[c] for c in b)
+
+
+def descodifica(b):
+    t = tabla()
+    inv = [0] * 256
+    for i, v in enumerate(t):
+        inv[v] = i
+    return bytes(inv[c] for c in b)
 
 
 RED = [
@@ -73,7 +85,7 @@ def renueva(ua):
 
 if __name__ == '__main__':
     if len(sys.argv) == 3 and sys.argv[1] == '--leer':
-        sys.stdout.write(codifica(pathlib.Path(sys.argv[2]).read_bytes()).decode())
+        sys.stdout.write(descodifica(pathlib.Path(sys.argv[2]).read_bytes()).decode())
     elif len(sys.argv) == 3 and sys.argv[1] == '--renovar':
         renueva(sys.argv[2])
     else:
