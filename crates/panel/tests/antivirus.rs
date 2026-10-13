@@ -229,12 +229,16 @@ async fn the_antivirus_page_shows_what_each_antivirus_asked_and_every_official_r
     assert_eq!(td["destinos"][0]["destino"], "wdcp.microsoft.com");
     assert!(v["trafico_horas"].as_i64().unwrap() >= 1);
 
-    // The detect button: on Linux there is no Security Center, said plainly, not crashing.
+    // The detect button answers on every system. Outside Windows there is no Security Center,
+    // said plainly; on Windows it lists what Windows lists (the CI machine has Defender).
     let (status, body) = get(addr, &t, "/api/antivirus/detectar").await;
     assert_eq!(status, 200, "{body}");
     let d: serde_json::Value = serde_json::from_str(&body).unwrap();
-    assert_eq!(d["aviso"], "no_windows");
-    assert!(d["detectados"].as_array().unwrap().is_empty());
+    assert!(d["detectados"].is_array(), "{body}");
+    if cfg!(not(windows)) {
+        assert_eq!(d["aviso"], "no_windows");
+        assert!(d["detectados"].as_array().unwrap().is_empty());
+    }
 
     if let Some(seg) = std::env::var("GUARDIANA_VISTA_SEG")
         .ok()
