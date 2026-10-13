@@ -20,6 +20,9 @@
 //! content), and anything it sends without asking the system for a name (its own resolver, or a
 //! fixed address).
 
+// The handler answers with the same error type as the rest of the API (see api.rs).
+#![allow(clippy::result_large_err)]
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
