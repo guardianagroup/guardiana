@@ -239,6 +239,13 @@ pub fn lee(host: &str, nombre: &str) -> Option<Lectura> {
             "aip" => return l("campo_ip_anonima", GOOGLE),
             "uip" => return l("campo_ip", GOOGLE),
             "geoid" => return l("campo_lugar", GOOGLE),
+            "cu" | "tr" | "ti" | "ep.currency" | "epn.value" | "ep.transaction_id" => {
+                return l("campo_compra", GOOGLE)
+            }
+            "ep.search_term" => return l("campo_busqueda", GOOGLE),
+            n if n.starts_with("pr") && n[2..].starts_with(|c: char| c.is_ascii_digit()) => {
+                return l("campo_compra", GOOGLE)
+            }
             _ => {}
         }
     }
@@ -255,6 +262,16 @@ pub fn lee(host: &str, nombre: &str) -> Option<Lectura> {
             "ud[ph]" => return l("campo_telefono_cifrado", META),
             "ud[fn]" | "ud[ln]" | "ud[ge]" | "ud[db]" | "ud[ct]" | "ud[st]" | "ud[zp]"
             | "ud[country]" | "ud[external_id]" => return l("campo_persona_cifrada", META),
+            "cd[value]"
+            | "cd[currency]"
+            | "cd[content_ids]"
+            | "cd[content_name]"
+            | "cd[content_type]"
+            | "cd[content_category]"
+            | "cd[num_items]"
+            | "cd[contents]"
+            | "cd[order_id]" => return l("campo_compra", META),
+            "cd[search_string]" => return l("campo_busqueda", META),
             "ts" | "it" => return l("campo_hora", META),
             "v" | "r" | "if" | "o" | "coo" | "ec" | "tm" | "es" | "eid" => {
                 return l("campo_tecnico", META)
@@ -300,6 +317,198 @@ pub fn lee(host: &str, nombre: &str) -> Option<Lectura> {
         | "format" | "cachebuster" => l("campo_tecnico", None),
         _ => None,
     }
+}
+
+/// The meanings whose values may be shown to the person, on their own screen, while ZERO is
+/// open: what a request says about what happened («a purchase of 89,900 COP»), never who you
+/// are. Identifiers, sessions, e-mails, phones, names, addresses, IPs and cookies are only ever
+/// named, never shown (the owner, 13 Oct 2026: «necesito saber qué hay ahí dentro»).
+const SE_MUESTRAN: &[&str] = &[
+    "campo_evento",
+    "campo_compra",
+    "campo_busqueda",
+    "campo_pagina",
+    "campo_referente",
+    "campo_titulo",
+    "campo_pantalla",
+    "campo_idioma",
+    "campo_lugar",
+    "campo_cuenta",
+];
+
+/// How many values a cut shows at most, and how long each.
+pub const MAX_VISTOS: usize = 12;
+const MAX_VALOR: usize = 80;
+
+/// One value shown: what it means (an interface key), the field's name and what it said.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Visto {
+    /// The interface text of its meaning (`campo_compra`…).
+    pub clave: &'static str,
+    /// The field's name as it travelled (`cd[value]`).
+    pub nombre: String,
+    /// What it said, cleaned and cut short.
+    pub valor: String,
+}
+
+/// What a request said, for the meanings of [`SE_MUESTRAN`] only: read from its address and
+/// its body in memory, to be shown and forgotten. Nothing here is written anywhere. A value
+/// that looks like a person's data whatever its name (an e-mail, a long hash, a token) is
+/// left out.
+#[must_use]
+pub fn muestra(host: &str, url: &str, cuerpo: &[u8]) -> Vec<Visto> {
+    let mut out: Vec<Visto> = Vec::new();
+    let mut mete = |nombre: &str, valor: &str| {
+        if out.len() >= MAX_VISTOS {
+            return;
+        }
+        let nombre = nombre.trim().to_ascii_lowercase();
+        let Some(l) = lee(host, &nombre) else { return };
+        if !SE_MUESTRAN.contains(&l.clave) {
+            return;
+        }
+        let Some(valor) = limpia(l.clave, valor) else {
+            return;
+        };
+        if out.iter().any(|v| v.nombre == nombre) {
+            return;
+        }
+        out.push(Visto {
+            clave: l.clave,
+            nombre,
+            valor,
+        });
+    };
+    if let Ok(u) = url::Url::parse(url) {
+        for (k, v) in u.query_pairs() {
+            mete(&k, &v);
+        }
+    }
+    if let Ok(texto) = std::str::from_utf8(cuerpo) {
+        let texto = texto.trim_start();
+        if texto.starts_with('{') || texto.starts_with('[') {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(texto) {
+                valores_json(&v, "", 0, &mut mete);
+            }
+        } else if texto.contains('=') && !texto.starts_with('<') {
+            for linea in texto.lines().take(50) {
+                for par in linea.split('&').take(200) {
+                    if let Some((k, v)) = par.split_once('=') {
+                        mete(&percent_decode(k), &percent_decode(v));
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+fn valores_json(
+    v: &serde_json::Value,
+    prefijo: &str,
+    nivel: u8,
+    mete: &mut impl FnMut(&str, &str),
+) {
+    match v {
+        serde_json::Value::Object(m) => {
+            for (k, hijo) in m {
+                let nombre = if prefijo.is_empty() {
+                    k.clone()
+                } else {
+                    format!("{prefijo}.{k}")
+                };
+                match hijo {
+                    serde_json::Value::String(s) => mete(&nombre, s),
+                    serde_json::Value::Number(n) => mete(&nombre, &n.to_string()),
+                    serde_json::Value::Array(a) => {
+                        // A list of products: their names or codes, and how many.
+                        let cosas: Vec<String> = a
+                            .iter()
+                            .take(5)
+                            .filter_map(|e| match e {
+                                serde_json::Value::Object(o) => {
+                                    ["item_name", "name", "title", "item_id", "sku", "id"]
+                                        .iter()
+                                        .find_map(|c| o.get(*c))
+                                        .map(|x| {
+                                            x.as_str().map_or_else(|| x.to_string(), str::to_string)
+                                        })
+                                }
+                                serde_json::Value::String(s) => Some(s.clone()),
+                                serde_json::Value::Number(n) => Some(n.to_string()),
+                                _ => None,
+                            })
+                            .collect();
+                        if !cosas.is_empty() {
+                            let mas = a.len().saturating_sub(cosas.len());
+                            let mut s = cosas.join(", ");
+                            if mas > 0 {
+                                s.push_str(&format!(" (+{mas})"));
+                            }
+                            mete(&nombre, &s);
+                        }
+                        if nivel < 1 {
+                            if let Some(primero) = a.first() {
+                                valores_json(primero, prefijo, nivel + 1, mete);
+                            }
+                        }
+                    }
+                    serde_json::Value::Object(_) if nivel < 1 => {
+                        valores_json(hijo, &nombre, nivel + 1, mete);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        serde_json::Value::Array(a) => {
+            if let Some(primero) = a.first() {
+                valores_json(primero, prefijo, nivel, mete);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// A value fit to be shown: trimmed, one line, short; an address loses its query and
+/// fragment (where tokens and e-mails travel); `None` when empty or when it looks like a
+/// person's data or a secret.
+fn limpia(clave: &str, valor: &str) -> Option<String> {
+    let mut v: String = valor
+        .chars()
+        .filter(|c| !c.is_control())
+        .collect::<String>()
+        .trim()
+        .to_string();
+    if matches!(clave, "campo_pagina" | "campo_referente") {
+        if let Ok(u) = url::Url::parse(&v) {
+            v = format!("{}{}", u.host_str().unwrap_or(""), u.path());
+        } else if let Some((sin, _)) = v.split_once(['?', '#']) {
+            v = sin.to_string();
+        }
+    }
+    if v.is_empty() || parece_personal(&v) {
+        return None;
+    }
+    if v.chars().count() > MAX_VALOR {
+        v = v.chars().take(MAX_VALOR).collect::<String>() + "…";
+    }
+    Some(v)
+}
+
+/// An e-mail, a long hash or a token: never shown, whatever the field is called.
+fn parece_personal(v: &str) -> bool {
+    if v.contains('@') && v.contains('.') {
+        return true;
+    }
+    let sin_espacios = !v.contains(' ');
+    let hex = v.len() >= 32 && v.chars().all(|c| c.is_ascii_hexdigit());
+    let token = sin_espacios
+        && v.len() >= 40
+        && v.chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '=' | '+' | '/'))
+        && v.chars().any(|c| c.is_ascii_digit())
+        && !v.contains('/');
+    hex || token
 }
 
 /// What a cut carried, as the distinct meanings of its names (each once, in a fixed order),
@@ -363,6 +572,39 @@ mod tests {
         let (que, _) = resumen("collect.otra-empresa.io", &nombres_cuerpo(j));
         let claves: Vec<&str> = que.iter().map(|l| l.clave).collect();
         assert!(claves.contains(&"campo_correo") && claves.contains(&"campo_compra"));
+    }
+
+    #[test]
+    fn what_a_request_said_is_shown_but_never_who_you_are() {
+        let url = "https://www.facebook.com/tr?id=123456&ev=Purchase&cd[value]=89900&cd[currency]=COP&cd[content_ids]=SKU-7&ud[em]=85fcc737579f8be786746e857cf0f9679aa20ecc5acb9638991e6b12b9f40caa&fbp=fb.1.2.3&dl=https%3A%2F%2Ftienda.co%2Fpago%3Ftoken%3Dabc%26email%3Dana%40x.co";
+        let v = muestra("www.facebook.com", url, b"");
+        let par = |n: &str| v.iter().find(|x| x.nombre == n).map(|x| x.valor.as_str());
+        assert_eq!(par("ev"), Some("Purchase"));
+        assert_eq!(par("cd[value]"), Some("89900"));
+        assert_eq!(par("cd[currency]"), Some("COP"));
+        assert_eq!(par("cd[content_ids]"), Some("SKU-7"));
+        assert_eq!(par("id"), Some("123456"));
+        // The page, without its query: no token, no e-mail.
+        assert_eq!(par("dl"), Some("tienda.co/pago"));
+        // Who you are is never shown.
+        assert!(par("ud[em]").is_none() && par("fbp").is_none());
+        assert!(!v
+            .iter()
+            .any(|x| x.valor.contains('@') || x.valor.contains("85fcc7")));
+        // A body: the event, its value and the products; never the e-mail inside it.
+        let j = br#"{"event":"purchase","value":9,"currency":"EUR","items":[{"item_name":"Zapatos","price":9},{"item_name":"Medias"}],"user":{"email":"ana@secreto.co"}}"#;
+        let v = muestra("collect.otra.io", "https://collect.otra.io/e", j);
+        let par = |n: &str| v.iter().find(|x| x.nombre == n).map(|x| x.valor.clone());
+        assert_eq!(par("event").as_deref(), Some("purchase"));
+        assert_eq!(par("items").as_deref(), Some("Zapatos, Medias"));
+        assert_eq!(par("currency").as_deref(), Some("EUR"));
+        assert!(!v.iter().any(|x| x.valor.contains("secreto")));
+        // A field named like a search but carrying an e-mail is not shown.
+        assert!(muestra("x.io", "https://x.io/?q=ana%40mail.com", b"").is_empty());
+        assert_eq!(
+            muestra("x.io", "https://x.io/?q=zapatos+rojos", b"")[0].valor,
+            "zapatos rojos"
+        );
     }
 
     #[test]

@@ -108,6 +108,36 @@
     pintaFilas();
   }
 
+  // An event's name in plain words when it is a known one («Purchase» → «una compra»).
+  function evento(v) {
+    const k = 'evento_' + String(v).toLowerCase().replace(/[^a-z]/g, '');
+    const s = t(k);
+    return s === k ? v : `${s} (${v})`;
+  }
+  // One line for the whole request: the event, then the amount and its currency, then the rest.
+  function titular(dice) {
+    const de = (que) => dice.filter((v) => v.que === que);
+    const ev = de('campo_evento')[0];
+    const compra = de('campo_compra');
+    const importe = compra.find((v) => /value|revenue|total|price|tr$|pr$|epn/.test(v.campo) && /^[0-9.,]+$/.test(v.valor));
+    const moneda = compra.find((v) => /currency|^cu$/.test(v.campo));
+    const productos = compra.filter((v) => v !== importe && v !== moneda && !/order|transaction|^ti$/.test(v.campo));
+    const partes = [];
+    if (ev) {
+      const k = 'evento_' + String(ev.valor).toLowerCase().replace(/[^a-z]/g, '');
+      partes.push((t(k) === k ? ev.valor : t(k)).toUpperCase());
+    }
+    if (importe) {
+      const num = Number(importe.valor.replace(',', '.'));
+      const cifra = Number.isFinite(num) ? num.toLocaleString(lang()) : importe.valor;
+      partes.push(cifra + (moneda ? ' ' + moneda.valor : ''));
+    }
+    productos.slice(0, 2).forEach((v) => partes.push(v.valor));
+    de('campo_busqueda').slice(0, 1).forEach((v) => partes.push('«' + v.valor + '»'));
+    if (!partes.length) dice.slice(0, 3).forEach((v) => partes.push(v.valor));
+    return partes.join(' · ');
+  }
+
   function detalle(c) {
     const partes = [];
     partes.push(`<p><button class="enlace-empresa" data-empresa="${esc(c.quien)}"><b>${esc(c.quien)}</b></button> · ${esc(nombrePais(c.pais))} · <button class="enlace" data-empresa="${esc(c.quien)}">${esc(t('ficha_ver'))}</button></p>`);
@@ -125,6 +155,12 @@
       if (c.tras_envio) pasos.push(`<span class="paso">${esc(t('cortes_cadena_envio'))}</span>`);
       pasos.push(`<span class="paso cortado">${esc(t('cortes_cadena_peticion', { empresa: c.quien }))}</span>`);
       partes.push(`<p class="cadena">${pasos.join(' <span class="flecha">→</span> ')}</p><p class="gris pequeno">${esc(t(c.codigo && c.codigo.length ? 'cortes_cadena_nota' : 'cortes_cadena_nota_sin'))}</p>`);
+    }
+    // What it said, in plain words, while ZERO is open: kept in memory only (never on disk),
+    // and only what tells what happened, never who you are.
+    if (c.dice && c.dice.length) {
+      const filas = c.dice.map((v) => `<li><span class="que">${esc(t(v.que + '_corto'))}</span> <span class="valor">${esc(v.que === 'campo_evento' ? evento(v.valor) : v.valor)}</span> <span class="gris mono">${esc(v.campo)}</span></li>`).join('');
+      partes.push(`<div class="dice"><p><b>${esc(t('cortes_dice_titulo', { empresa: c.quien }))}</b></p><p class="titular">${esc(titular(c.dice))}</p><ul>${filas}</ul><p class="gris pequeno">${esc(t('cortes_dice_nota'))}</p></div>`);
     }
     if (c.parametros) partes.push(`<p>${esc(tn('cortes_det_parametros', c.parametros, { n: n(c.parametros) }))}</p>`);
     // What it carried, by the names of its fields: the page, an identifier, the screen…

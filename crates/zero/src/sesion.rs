@@ -358,6 +358,8 @@ struct Permiso {
     hasta: i64,
 }
 
+/// How many cuts keep what they said in memory (see `vistos`).
+const MAX_VISTOS_MEMORIA: usize = 3000;
 /// How long an approved sending lets its data through to its site: the form, its redirects and
 /// the payment or sign-in page it leads to.
 const PERMISO_MS: i64 = 5 * 60_000;
@@ -455,6 +457,9 @@ pub struct Sesion {
     trabajadores: bool,
     /// Cuts not yet written to the day's file.
     cortes_pend: Vec<Corte>,
+    /// What the last cuts said (`campos::muestra`), by (time, host, path): only in memory,
+    /// to be shown on the person's screen while ZERO is open, never written anywhere.
+    vistos: std::collections::VecDeque<(i64, String, String, Vec<crate::campos::Visto>)>,
     /// The subscription. Unknown until the shell gives the place it lives in: the browser works
     /// (for at most a day if the place cannot be read).
     licencia: EstadoLicencia,
@@ -657,6 +662,7 @@ impl Sesion {
             depura: false,
             trabajadores: false,
             cortes_pend: Vec::new(),
+            vistos: std::collections::VecDeque::new(),
             licencia: EstadoLicencia::Desconocido,
             lugar: None,
             licencia_ocupada: false,
@@ -2739,6 +2745,21 @@ impl Sesion {
                         o.insert("cookies_sin_leer".into(), json!(sin_leer));
                         o.remove("cookies");
                     }
+                    // What it said, while ZERO is open: kept in memory only, never on disk.
+                    if let Some((_, _, _, visto)) = self
+                        .vistos
+                        .iter()
+                        .rev()
+                        .find(|(ts, h, r, _)| *ts == c.ts && *h == c.host && *r == c.ruta)
+                    {
+                        o.insert(
+                            "dice".into(),
+                            json!(visto
+                                .iter()
+                                .map(|v| json!({ "que": v.clave, "campo": v.nombre, "valor": v.valor }))
+                                .collect::<Vec<_>>()),
+                        );
+                    }
                     if !c.campos.is_empty() || !c.campos_cuerpo.is_empty() {
                         let todos: Vec<String> =
                             c.campos.iter().chain(&c.campos_cuerpo).cloned().collect();
@@ -4089,7 +4110,16 @@ impl Sesion {
                     .ultimo_envio
                     .is_some_and(|t| ahora.saturating_sub(t) <= 5_000),
             };
-            self.cortes_pend.push(Corte::de(&lugar, &d));
+            let corte = Corte::de(&lugar, &d);
+            let visto = crate::campos::muestra(&corte.host, url, cuerpo);
+            if !visto.is_empty() {
+                if self.vistos.len() >= MAX_VISTOS_MEMORIA {
+                    self.vistos.pop_front();
+                }
+                self.vistos
+                    .push_back((corte.ts, corte.host.clone(), corte.ruta.clone(), visto));
+            }
+            self.cortes_pend.push(corte);
         }
         if d.de_fuera() {
             if self.pulsos.len() < 2000 {

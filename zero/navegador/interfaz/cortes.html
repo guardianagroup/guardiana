@@ -91,6 +91,12 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
 .det { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 26px; font-size: 13px; }
 .det p { margin: 0; }
 .det .mono { word-break: break-all; }
+.det .dice { grid-column: 1 / -1; border: 1px solid var(--linea); border-left: 4px solid var(--rojo); border-radius: 10px; padding: 10px 14px; background: var(--hoja); }
+.det .dice .titular { font-size: 15px; font-weight: 700; margin: 4px 0 6px; overflow-wrap: anywhere; }
+.det .dice ul { margin: 0 0 6px; padding-left: 18px; }
+.det .dice li { margin: 2px 0; overflow-wrap: anywhere; }
+.det .dice .que { color: var(--gris); }
+.det .dice .valor { font-weight: 600; }
 .det a { color: var(--azul); font-weight: 600; }
 .vacio { padding: 28px 0; color: var(--gris); }
 .nota { margin-top: 22px; font-size: 12.5px; color: var(--gris); max-width: 72ch; }
