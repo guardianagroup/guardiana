@@ -330,7 +330,7 @@
   "cortes_nota": "Este registro fica só neste computador, por 31 dias, e «Apagar tudo» o elimina. Não guarda endereços completos: só o site onde você estava e o destino sem os parâmetros.",
   "cortes_informe": "Relatório do GUARDIANA ZERO, gerado em {fecha}. Período: {desde} – {hasta}.",
   "cortes_informe_filtro": "Só {n} linhas: {filtro}. Os números acima contam todo o período.",
-  "cortes_desconocido": "País desconhecido",
+  "cortes_desconocido": "Dono não identificado",
   "cortes_sin_identificar": "Não identificada · domínio de {pais}",
   "cortes_sin_identificar_explica": "Ainda não sabemos qual empresa está por trás. O endereço termina com as letras de {pais}: isso diz onde o nome foi registrado, não prova que a empresa seja de lá.",
   "cortes_otras": "mais {n}",
@@ -545,7 +545,7 @@
   "medida_huella": "{n} scripts tentaram ler a impressão digital do seu computador: {lista}",
   "medida_huella_uno": "1 script tentou ler a impressão digital do seu computador: {lista}",
   "medida_autor_propia": "este mesmo site",
-  "medida_autor_desconocido": "origem desconhecida",
+  "medida_autor_desconocido": "origem não determinada",
   "medida_tecnica_canvas": "canvas",
   "medida_tecnica_webgl": "WebGL",
   "medida_tecnica_audio": "áudio",
@@ -720,5 +720,8 @@
   "auditoria_despues_cero": "Depois: nenhuma",
   "recibo_privacidad_nota": "Cada pedido desta lista foi cortado pelo GUARDIANA ZERO antes de sair do navegador. «campos» são os nomes do que levava, nunca os valores; «lleva» é o significado, segundo a documentação da empresa ou o nome habitual do campo. Este recibo não vê outros aplicativos do computador, nem as abas isoladas, nem o que os servidores de cada site enviam por conta própria, nem o que cada empresa faz com o que recebe. A assinatura prova que o recibo não foi alterado depois que este navegador o escreveu.",
   "recibo_privacidad_guardado": "Recibo assinado salvo em {ruta}. Confira em guardianagroup.com/verificar; a impressão digital da chave deste computador é {huella}.",
-  "cortes_recibo": "Recibo assinado"
+  "cortes_recibo": "Recibo assinado",
+  "cortes_sin_dueno": "Dono não identificado",
+  "cortes_sin_sede": "Sede não publicada",
+  "cortes_sin_pais_nota": "«Sede não publicada»: a empresa não diz, em nenhuma fonte que pudemos conferir, onde fica a sede. «Dono não identificado»: um nome que nenhuma lista ou registro liga a uma empresa, e o site que o usa não diz de quem é. Pôr um país aí seria inventá-lo."
 }

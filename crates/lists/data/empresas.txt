@@ -973,7 +973,8 @@ nextroll.com
 @TradingView|US|Nueva York
 tradingview.com
 
-@Dodo Payments
+# País: https://dodopayments.com/legal/dpa («8, The Green, STE A Dover, County of Kent, Delaware 19901, United States»: domicilio legal en Delaware, no una oficina; sin ciudad) (consultada el 13 oct 2026)
+@Dodo Payments|US|
 dodopayments.com
 dodopayments.tech
 
@@ -993,7 +994,8 @@ crates.io
 @Y Combinator|US|Mountain View (California)
 ycombinator.com
 
-@Product Hunt
+# Sede: https://www.producthunt.com/legal («720 York St #116, San Francisco, CA, 94110»); se separó de AngelList, que la había comprado en 2016 (consultada el 13 oct 2026)
+@Product Hunt|US|San Francisco
 producthunt.com
 
 # Sede: política de privacidad de hCaptcha, leída en una instancia servida bajo hcaptcha.uth.edu/privacy («Intuition Machines, Inc., 1065 SW 8th St #704, Miami FL 33130»; Impressum: «a Delaware US Corporation (#6393793)»); hcaptcha.com/llms.txt confirma que la matriz es Intuition Machines, Inc. (consultada el 13 oct 2026)
@@ -1066,7 +1068,8 @@ seedtag.com
 @AdKernel|US|Woodcliff Lake (Nueva Jersey)
 adkernel.com
 
-@NoBid
+# Sede: https://www.nobid.io/privacy-policy/ («NoBid … 4813 West Haven Rd. West Haven, UT 84401, USA») (consultada el 13 oct 2026)
+@NoBid|US|West Haven (Utah)
 nobid.io
 servenobid.com
 
@@ -1103,7 +1106,8 @@ pbstck.com
 @vdo.ai
 vdo.ai
 
-@Minute Media
+# País: https://www.minutegroup.com/company/contact (la marca es hoy «Minute»; su primera oficina, «625 Broadway, New York»; también Londres y otras, sin marcar sede) y https://en.wikipedia.org/wiki/Minute_Media («based in the United States») (consultada el 13 oct 2026)
+@Minute Media|US|
 minutemedia.com
 minutemedia-prebid.com
 
@@ -1115,7 +1119,8 @@ viously.com
 @SundaySky
 sundaysky.com
 
-@Impactify
+# Sede: https://impactify.io/terms/ («IMPACTIFY S.à r.l., 53 Allée Scheffer L-2520 Luxembourg») (consultada el 13 oct 2026)
+@Impactify|LU|Luxemburgo
 impactify.io
 impactify.media
 
@@ -1128,11 +1133,13 @@ optidigital.com
 @Airwallex|SG|Singapur
 airwallex.com
 
-@OpenWeb
+# Sede: https://www.openweb.com/legal-and-privacy/privacy/ («OpenWeb is headquartered in Israel»; «OpenWeb Ltd. … Yigal Alon 94, Tel Aviv») (consultada el 13 oct 2026)
+@OpenWeb|IL|Tel Aviv
 openweb.com
 openwebmp.com
 
-@Forter
+# Sede: https://www.forter.com/privacy-policy/ («Forter Ltd: Derech Menachem Begin 156 Tel Aviv, Israel»; Forter, Inc. es la filial de EE. UU.) (consultada el 13 oct 2026)
+@Forter|IL|Tel Aviv
 forter.com
 
 # --- Clubes, ligas y medios grandes (petición del responsable, 9 oct 2026: la web del Real
@@ -1219,8 +1226,9 @@ futbolred.com
 
 # dotomi.com, fastclick.net: https://legal.epsilon.com/eu/cookie-list
 # Nota: Conversant fue absorbida por Epsilon (la política UE de Epsilon dice 'Epsilon, formerly also known as Conversant'; https://legal.epsilon.com/eu/privacy-policy/). La lista de cookies de Epsilon incluye dotomi.com y fastclick.net. No se pudo confirmar con fuente abierta la sede propia de Epsilon (lími
+# Sede del grupo: https://www.publicisgroupe.com/en/legal-mentions («PUBLICIS GROUPE SA … 133, Avenue des Champs-Elysées 75008 PARIS») (consultada el 13 oct 2026)
 # Grupo: Publicis Groupe (fuente: https://legal.epsilon.com/eu/cookie-list, consultada el 12 oct 2026)
-@Epsilon|||Publicis Groupe
+@Epsilon|FR|París|Publicis Groupe
 dotomi.com
 fastclick.net
 
@@ -1284,7 +1292,8 @@ tapad.com
 
 # yieldmo.com: https://www.consentstack.io/vendors/yieldmo
 # Nota: Dominio confirmado solo por agregador (ConsentStack); sede no verificada (límite de búsquedas agotado)
-@Yieldmo
+# Sede: https://yieldmo.com/privacy-policy/ («Yieldmo, Inc. … 1 Tara Boulevard, Suite 200 – Nashua, NH 03062») (consultada el 13 oct 2026)
+@Yieldmo|US|Nashua (New Hampshire)
 yieldmo.com
 
 # Sede: https://www.businesswire.com/news/home/20250528884555/en/MGID-Partners-with-Digiseg-to-Enhance-Privacy-First-Audience-Targeting-Across-Global-Markets (consultada el 12 oct 2026)
@@ -1333,7 +1342,8 @@ connatix.com
 
 # a-mx.com: https://www.netify.ai/resources/domains/a-mx.com
 # Nota: Netify asocia a-mx.com y a-mx.net con AdaptMX (bidder 'amx'/AMX RTB); CB Insights y vcbacked indican Boston (EE. UU.), sin fuente primaria
-@AdaptMX
+# Sede: https://adaptmx.com/privacy-policy/ («68 Harrison Ave Ste 605, PMB 25666, Boston, MA», un buzón); que a-mx.com sea suyo sigue sin fuente propia (consultada el 13 oct 2026)
+@AdaptMX|US|Boston
 a-mx.com
 
 # Sede: https://en.wikipedia.org/wiki/Integral_Ad_Science (consultada el 12 oct 2026)
@@ -1401,7 +1411,8 @@ ladsp.com
 
 # iqm.com: https://github.com/prebid/Prebid.js/blob/master/modules/iqmBidAdapter.md
 # Nota: Adaptador Prebid de iQM mantenido por hbteam@iqm.com. Sede sin verificar porque se agotó el presupuesto de búsqueda.
-@IQM
+# Sede: https://iqm.com/contact/ («HEAD OFFICE … Port Washington, New York … 191 Main St., #591») (consultada el 13 oct 2026)
+@IQM|US|Port Washington (Nueva York)
 iqm.com
 
 # Sede: https://en.globes.co.il/en/article-1001386029 (consultada el 12 oct 2026)
@@ -1436,13 +1447,15 @@ adstanding.com
 
 # connectad.io: https://github.com/prebid/Prebid.js/blob/master/modules/connectadBidAdapter.js
 # Nota: Sede sin verificar: Ghostery indica AT, sin confirmar con fuente primaria.
-@ConnectAd
+# Sede: https://connectad.io/contact («REGISTERED OFFICE ConnectAd Demand GmbH Niederhofstrasse 37 1120 Vienna Austria») (consultada el 13 oct 2026)
+@ConnectAd|AT|Viena
 connectad.io
 
 # rkdms.com: https://github.com/prebid/Prebid.js/blob/master/modules/merkleIdSystem.js
 # Nota: El módulo Merkle ID de Prebid usa prebid.sv.rkdms.com. Ghostery TrackerDB asigna Merkle a la organización Dentsu. Sede sin verificar.
+# Sede del grupo: https://www.group.dentsu.com/en/about-us/data-location.html (Dentsu Group Inc., «1-8-1, Higashi-Shimbashi, Minato-ku, Tokyo») (consultada el 13 oct 2026)
 # Grupo: dentsu (fuente: https://github.com/prebid/Prebid.js/blob/master/modules/merkleIdSystem.js, consultada el 12 oct 2026)
-@Merkle|||dentsu
+@Merkle|JP|Tokio|dentsu
 rkdms.com
 
 # idsequoia.ai: https://github.com/prebid/Prebid.js/blob/master/modules/panxoRtdProvider.js
@@ -1526,7 +1539,8 @@ tremorhub.com
 
 # sitewit.com: https://crunchbase.com/organization/sitewit
 # Nota: SiteWit opera hoy como Kliken (kliken.com) según Crunchbase; sede solo vista en Crunchbase (Tampa, Florida), no confirmada con fuente primaria
-@Kliken
+# Sede: https://www.kliken.com/privacy.html («Sitewit Corp (d/b/a Kliken) 4830 W. Kennedy Blvd. Tampa, FL 33609 United States») (consultada el 13 oct 2026)
+@Kliken|US|Tampa (Florida)
 sitewit.com
 
 # Sede: https://innovid.com/privacy-policy (consultada el 12 oct 2026)
@@ -1538,7 +1552,8 @@ flashtalking.com
 
 # sumome.com, sumo.com: https://techcrunch.com/2015/05/27/sumome-is-an-app-store-for-tools-to-grow-your-online-traffic
 # Nota: en 2015 SumoMe/Sumo era producto de AppSumo (Noah Kagan); propietario y sede actuales no verificados (posible venta o cambio de marca)
-@Sumo
+# Sede: https://sendfox.com/tos («Sumo Group Inc., a Delaware corporation»; la familia AppSumo, «1305 E 6th street unit 3 Austin, TX 78702») (consultada el 13 oct 2026)
+@Sumo|US|Austin (Texas)
 sumome.com
 sumo.com
 
@@ -1577,7 +1592,8 @@ revcontent.com
 
 # amung.us: https://techcrunch.com/?p=8647
 # Nota: contador de visitas en tiempo real; operador legal y sede no verificados (URLert dice 'Amung.us, Inc.', fuente secundaria)
-@whos.amung.us
+# Sede: https://whos.amung.us/legal/terms/ («This Web Site/Company is based in Calgary, Alberta, Canada») (consultada el 13 oct 2026)
+@whos.amung.us|CA|Calgary
 amung.us
 
 # Sede: https://www.globenewswire.com/news-release/2016/10/06/1078331/0/en/iPerceptions-Acquires-Datacratic-s-Ad-Tech-Business.html (consultada el 12 oct 2026)
@@ -1889,7 +1905,8 @@ optimizely.com
 episerver.net  # https://www.netify.ai/resources/domains/episerver.net (consultada el 12 oct 2026)
 
 # Nota: sin verificar: operador y sede desconocidos (presupuesto agotado)
-@Histats
+# País: https://www.histats.com/ (pie: «wisecode srl unipersonale», forma de sociedad italiana; la dirección está en una ventana de su política que no se pudo leer, por eso sin ciudad) (consultada el 13 oct 2026)
+@Histats|IT|
 histats.com
 
 # Sede: https://www.consentstack.io/vendors/leadfeeder (consultada el 12 oct 2026)
@@ -1921,7 +1938,8 @@ wikia-services.com
 tns-counter.ru
 
 # Nota: sin verificar: ninguna fuente abierta vincula tsyndicate.com; TrafficStars fundada en Chipre (2014), sede actual no confirmada
-@TrafficStars
+# Sede: https://trafficstars.com/policies/terms-and-conditions.html («Traffic Stars Ltd … registered office at 124 Arch. Makariou III, 3021, Limassol, Cyprus») (consultada el 13 oct 2026)
+@TrafficStars|CY|Limasol
 tsyndicate.com
 
 # Sede: https://ar2024.mts.ru/en/additional-information/contacts-and-additional-information-about-mts/ (consultada el 12 oct 2026)
@@ -2014,7 +2032,8 @@ cdnwidget.com
 
 # adthrive.com: https://raptive.com/newsroom/cafemedia-and-adthrive-are-now-raptive-a-new-kind-of-creator-company/
 # Nota: AdThrive (adthrive.com redirige a raptive.com) es hoy Raptive; sede no verificada (ChatGPT solo citó LinkedIn)
-@Raptive
+# Sede: https://raptive.com/raptive-service-agreement/ («CMI Marketing, Inc dba Raptive … 1411 Broadway, Fl 32, New York») (consultada el 13 oct 2026)
+@Raptive|US|Nueva York
 adthrive.com
 
 # Sede: https://www.skimlinks.com/privacy-policies/ (consultada el 12 oct 2026)
@@ -2142,8 +2161,9 @@ ay.delivery
 
 # abtasty.com: https://www.abtasty.com/privacy-policy/
 # Nota: abtasty.com redirige ya a wingify.com ('AB Tasty and VWO have united'); sede del grupo no verificada
+# Sede del grupo: https://wingify.com/careers/privacy-statement/ («Wingify Software Private Limited … Pitampura, New Delhi – 110034, India») (consultada el 13 oct 2026)
 # Grupo: Wingify (fuente: https://www.abtasty.com/privacy-policy/, consultada el 12 oct 2026)
-@AB Tasty|||Wingify
+@AB Tasty|IN|Nueva Delhi|Wingify
 abtasty.com
 
 # Sede: https://www.qualtrics.com/privacy-statement/ (consultada el 12 oct 2026)
@@ -2172,8 +2192,9 @@ typesquare.com
 
 # mparticle.com: https://www.rokt.com/products/rokt-mparticle
 # Nota: mParticle es ahora 'Rokt mParticle'; sede no verificada
+# Sede del grupo: https://www.sec.gov/Archives/edgar/data/2079926/000207992625000001/xslFormDX08/primary_doc.xml (SEC, formulario D de Rokt Inc.: «175 VARICK ST, FL 10», Nueva York) (consultada el 13 oct 2026)
 # Grupo: Rokt (fuente: https://www.rokt.com/products/rokt-mparticle, consultada el 12 oct 2026)
-@mParticle|||Rokt
+@mParticle|US|Nueva York|Rokt
 mparticle.com
 
 # Sede: https://en.wikipedia.org/wiki/Squarespace (consultada el 12 oct 2026)
@@ -2272,8 +2293,9 @@ iol.it
 
 # mookie1.com: https://www.choreograph.com/global-privacy-policy/global-privacy-policy-english
 # Nota: Cookies id/ov en mookie1.com listadas en la política de Choreograph ('a WPP company'; antes Xaxis); entidades en Londres (EEE) y Nueva York (resto), sede global no clara
+# Sede del grupo: https://en.wikipedia.org/wiki/WPP_plc (Wikipedia (en), ficha: «Headquarters London, England, UK») (consultada el 13 oct 2026)
 # Grupo: WPP (fuente: https://www.choreograph.com/global-privacy-policy/global-privacy-policy-english, consultada el 12 oct 2026)
-@Choreograph|||WPP
+@Choreograph|GB|Londres|WPP
 mookie1.com
 
 # Sede: https://www.shareaholic.com/contact (consultada el 12 oct 2026)
@@ -2313,6 +2335,7 @@ rakuten.com  # https://lechameau.com/static/cms/media/Services-Privacy-Policy-En
 # Nota: SEC S-8 2026: oficinas ejecutivas principales en Grand Cayman (domicilio legal); operaciones reales en Brasil/Reino Unido
 @VTEX|KY|Gran Caimán
 vtex.com
+myvtex.com  # https://developers.vtex.com/docs/guides/vtex-io-documentation-workspace («https://{workspace}--{account}.myvtex.com») (consultada el 13 oct 2026)
 
 # Sede: https://www.powr.io/about (consultada el 12 oct 2026)
 # powr.io: https://www.powr.io/about
@@ -2522,7 +2545,9 @@ matterport.com
 
 # mailerlite.com: https://www.mailerlite.com/legal/terms-of-service
 # Nota: Dos entidades contratantes: MailerLite Limited (Dublín) y MailerLite, Inc. (San Francisco, buzón PMB); sede global no clara; matriz Vercom no verificada
-@MailerLite
+# País del grupo: https://www.mediapost.com/publications/article/374822/vercom-completes-mailerlite-acquisition.html (Vercom, «Polish firm», completó la compra de MailerLite, 15 jun 2022); ciudad del grupo sin comprobar (consultada el 13 oct 2026)
+# Grupo: Vercom (fuente: https://www.mediapost.com/publications/article/374822/vercom-completes-mailerlite-acquisition.html, consultada el 13 oct 2026)
+@MailerLite|PL||Vercom
 mailerlite.com
 
 # Sede: https://www.quantummetric.com/legal/privacy-policy (consultada el 12 oct 2026)
@@ -2837,7 +2862,8 @@ sail-horizon.com
 
 # rum-ingress-coralogix.com: https://npmjs.com/package/@coralogix/browser
 # Nota: El SDK RUM de Coralogix se sirve desde cdn.rum-ingress-coralogix.com; la política de privacidad nombra Coralogix Ltd. y Coralogix Inc. sin dirección, sede no confirmada
-@Coralogix
+# Sede: https://coralogix.com/terms-conditions/ («Coralogix Ltd., a company incorporated under the laws of Israel, having its principal place of business at 21 Aba Hilel St., Ramat Gan») (consultada el 13 oct 2026)
+@Coralogix|IL|Ramat Gan
 rum-ingress-coralogix.com
 
 # Sede: https://smartyads.com/privacy-policy (consultada el 12 oct 2026)

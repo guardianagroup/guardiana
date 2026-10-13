@@ -922,7 +922,7 @@ mod tests {
         assert_eq!(l.len(), 1);
         assert_eq!(
             l[0].texto,
-            "2 scripts intentaron leer la huella de tu equipo: tracker.example (canvas, WebGL), origen desconocido (audio)"
+            "2 scripts intentaron leer la huella de tu equipo: tracker.example (canvas, WebGL), origen sin determinar (audio)"
         );
         assert_eq!(l[0].estado, "");
         let mut q = Pagina::default();

@@ -330,7 +330,7 @@
   "cortes_nota": "This log stays only on this computer, for 31 days, and “Delete everything” erases it. It keeps no full addresses: only the website you were on and the destination without its parameters.",
   "cortes_informe": "GUARDIANA ZERO report, generated on {fecha}. Period: {desde} – {hasta}.",
   "cortes_informe_filtro": "Only {n} rows: {filtro}. The figures above count the whole period.",
-  "cortes_desconocido": "Unknown country",
+  "cortes_desconocido": "Owner not identified",
   "cortes_sin_identificar": "Unidentified · {pais} domain",
   "cortes_sin_identificar_explica": "We do not know yet which company is behind it. Its address ends with the letters of {pais}: that says where the name was registered, not that the company is from there.",
   "cortes_otras": "{n} more",
@@ -545,7 +545,7 @@
   "medida_huella": "{n} scripts tried to read your computer's fingerprint: {lista}",
   "medida_huella_uno": "1 script tried to read your computer's fingerprint: {lista}",
   "medida_autor_propia": "this same website",
-  "medida_autor_desconocido": "unknown origin",
+  "medida_autor_desconocido": "origin not determined",
   "medida_tecnica_canvas": "canvas",
   "medida_tecnica_webgl": "WebGL",
   "medida_tecnica_audio": "audio",
@@ -720,5 +720,8 @@
   "auditoria_despues_cero": "After: none",
   "recibo_privacidad_nota": "Every request in this list was cut by GUARDIANA ZERO before it left the browser. «campos» are the names of what it carried, never their values; «lleva» is their meaning, as the company documents it or by the usual name of the field. This receipt does not see other applications on the computer, isolated tabs, what each website's servers send on their own, or what each company does with what it gets. The signature proves the receipt was not changed after this browser wrote it.",
   "recibo_privacidad_guardado": "Signed receipt saved to {ruta}. Check it at guardianagroup.com/verificar; this computer's key fingerprint is {huella}.",
-  "cortes_recibo": "Signed receipt"
+  "cortes_recibo": "Signed receipt",
+  "cortes_sin_dueno": "Owner not identified",
+  "cortes_sin_sede": "Seat not published",
+  "cortes_sin_pais_nota": "«Seat not published»: the company does not say, in any source we could check, where its seat is. «Owner not identified»: a name no list or registry ties to a company, and the website using it does not say whose it is. Putting a country there would be inventing it."
 }

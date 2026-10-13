@@ -2678,11 +2678,21 @@ impl Sesion {
             .collect();
         // A company the lists do not know: the country of its site's ending, marked `~` so the
         // page says it is only that («Sin identificar · dominio de Chequia»).
+        // With no country and no telling ending, never «unknown» (the owner, 13 Oct 2026): a
+        // company whose seat no source gives (`!sede`), or a name no list or registry ties to
+        // any company (`!dueno`). The page says which, and why.
         let pais_o_dominio = |c: &Corte| {
             c.pais.clone().unwrap_or_else(|| {
-                crate::dominio::pais_del_dominio(&c.sitio)
-                    .map(|p| format!("~{p}"))
-                    .unwrap_or_default()
+                crate::dominio::pais_del_dominio(&c.sitio).map_or_else(
+                    || {
+                        if c.quien == c.sitio {
+                            "!dueno".to_string()
+                        } else {
+                            "!sede".to_string()
+                        }
+                    },
+                    |p| format!("~{p}"),
+                )
             })
         };
         let paises = cuenta(cortes::cuenta(&de_fuera, pais_o_dominio), "pais");

@@ -2670,7 +2670,7 @@ fn reads_for_a_fingerprint_are_counted_by_the_script_that_asked() {
     assert_eq!(
         l,
         [(
-            "2 scripts intentaron leer la huella de tu equipo: tracker.example (canvas, WebGL), origen desconocido (audio)".to_string(),
+            "2 scripts intentaron leer la huella de tu equipo: tracker.example (canvas, WebGL), origen sin determinar (audio)".to_string(),
             String::new()
         )]
     );

@@ -17,7 +17,7 @@
 
   const lang = () => document.documentElement.lang || 'es';
   // `~CZ`: a company the lists do not know, on a site ending in that country's letters.
-  const nombrePais = (c) => (!c ? t('cortes_desconocido') : c[0] === '~' ? t('cortes_sin_identificar', { pais: pais(c.slice(1)) }) : pais(c));
+  const nombrePais = (c) => (!c || c === '!dueno' ? t('cortes_sin_dueno') : c === '!sede' ? t('cortes_sin_sede') : c[0] === '~' ? t('cortes_sin_identificar', { pais: pais(c.slice(1)) }) : pais(c));
   function hora(ts) {
     const d = new Date(ts);
     const h = d.toLocaleTimeString(lang(), { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -71,7 +71,7 @@
     const d = datos;
     $('c-total').textContent = n(d.total);
     $('c-empresas').textContent = n(d.empresas.length);
-    $('c-paises').textContent = n(d.paises.filter((x) => x.pais && x.pais[0] !== '~').length);
+    $('c-paises').textContent = n(d.paises.filter((x) => x.pais && x.pais[0] !== '~' && x.pais[0] !== '!').length);
     $('c-webs').textContent = n(d.paginas.filter((x) => x.pagina).length);
     const dia = d.dia || {};
     $('c-datos').textContent = n(dia.datos_salvados);
@@ -85,6 +85,7 @@
     if (mas) mas.addEventListener('click', () => { todasLasEmpresas = true; $('r-empresas').innerHTML = barras(d.empresas); sombraAbajo(); });
     sombraAbajo();
     $('r-paises').innerHTML = simple(d.paises, (x) => nombrePais(x.pais));
+    $('r-paises-nota').classList.toggle('oculto', !d.paises.slice(0, 10).some((x) => !x.pais || x.pais[0] === '!'));
     $('r-paginas').innerHTML = simple(d.paginas, (x) => x.pagina || t('pestana_aislada'));
     $('r-motivos').innerHTML = d.motivos.map((x) => `<span class="chip rojo">${esc(t('motivo_' + x.motivo))}<b>${n(x.n)}</b></span>`).join('');
     $('r-tipos').innerHTML = d.tipos.map((x) => `<span class="chip">${esc(t('recurso_' + x.recurso))}<b>${n(x.n)}</b></span>`).join('');
