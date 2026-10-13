@@ -277,9 +277,26 @@ pub struct Pestana {
     /// fingerprint, session recording, hashed data in addresses, bodies sent. In memory only.
     #[serde(skip)]
     pub medidas: crate::medidas::Pagina,
+    /// The outside companies whose code (scripts) the page has loaded so far, in order, each
+    /// once: what was running on the page before each later request. Only what the engine
+    /// loaded (cut scripts never ran). In memory only; at most 20.
+    #[serde(skip)]
+    pub codigo: Vec<String>,
+    /// When the person last approved a form sending on this page (ms since the epoch): a cut
+    /// right after it happened «al enviar un formulario». In memory only.
+    #[serde(skip)]
+    pub ultimo_envio: Option<i64>,
 }
 
 impl Pestana {
+    /// A script of an outside company ran on the page: it is written down, once, so a later
+    /// request can say what code was on the page before it.
+    pub fn anota_codigo(&mut self, quien: &str) {
+        if self.codigo.len() < 20 && !self.codigo.iter().any(|q| q == quien) {
+            self.codigo.push(quien.to_string());
+        }
+    }
+
     /// A clean shield for a page of `sitio` (on every top-level navigation).
     #[must_use]
     pub fn nueva(sitio: &str) -> Self {

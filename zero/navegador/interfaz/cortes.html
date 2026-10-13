@@ -83,6 +83,10 @@ td.destino span { color: var(--gris); }
 td.motivo { color: var(--rojo); white-space: nowrap; }
 td.pagina { color: var(--gris); white-space: nowrap; }
 tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); padding: 12px 14px 14px; }
+.cadena { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 2px; }
+.cadena .paso { border: 1px solid var(--linea); border-radius: 999px; padding: 3px 10px; font-size: 13px; background: var(--hoja); }
+.cadena .paso.cortado { border-color: var(--rojo); color: var(--rojo); }
+.cadena .flecha { color: var(--gris); }
 .det { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 26px; font-size: 13px; }
 .det p { margin: 0; }
 .det .mono { word-break: break-all; }

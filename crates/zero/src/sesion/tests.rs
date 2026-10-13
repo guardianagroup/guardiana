@@ -3205,3 +3205,55 @@ fn a_profile_hands_over_the_deletion_letter_for_its_company() {
         Orden::GuardaPdf { ruta, .. } if ruta.ends_with("carta-borrado-criteo.pdf")
     )));
 }
+
+#[test]
+fn a_cut_says_what_code_was_on_the_page_and_what_it_carried() {
+    let (mut s, _, id) = con_pagina(true);
+    let _ = abre_pagina(&mut s, id, "https://www.eltiempo.com/");
+    // A script of an outside company that is not in the lists runs on the page…
+    let r = s.peticion(id, "https://js.stripe.com/v3/", "GET", b"", 6);
+    assert!(!r.cortar);
+    // …and then a tracker is cut: its line says what code was running, what the address
+    // carried (names only) and which cookies went with it (names only).
+    let r = s.peticion_con(
+        id,
+        "https://www.google-analytics.com/g/collect?v=2&tid=G-1&cid=55.66&dl=https%3A%2F%2Feltiempo.com%2Fx&sr=1920x1080",
+        "POST",
+        br#"{"client_id":"55.66","events":[{"name":"page_view","params":{"page_title":"Secreto"}}]}"#,
+        "_ga=GA1.1.secreto; _gid=GA1.2.secreto",
+        9,
+    );
+    assert!(r.cortar);
+    let n = id;
+    let _ = s.navegacion_empieza(n, CORTES, false);
+    let _ = s.pagina_nueva(n, CORTES);
+    let o = s.mensaje(
+        Origen::Pestana(n),
+        CORTES,
+        r#"{"tipo":"cortes","periodo":"hoy"}"#,
+    );
+    let c = del_tipo(&o, Origen::Pestana(n), "cortes").unwrap_or_default();
+    let fila = c["lista"]
+        .as_array()
+        .and_then(|l| l.iter().find(|x| x["host"] == "www.google-analytics.com"))
+        .cloned()
+        .unwrap_or_default();
+    let texto = fila.to_string();
+    assert!(
+        !texto.contains("secreto") && !texto.contains("Secreto"),
+        "{texto}"
+    );
+    assert_eq!(fila["cookies_n"], 2);
+    assert!(fila["cookies_lleva"]
+        .to_string()
+        .contains("cookie_google_analytics"));
+    assert!(fila["en_cuerpo"] == true, "{texto}");
+    let lleva = fila["lleva"].to_string();
+    assert!(
+        lleva.contains("campo_pagina")
+            && lleva.contains("campo_id")
+            && lleva.contains("campo_pantalla"),
+        "{lleva}"
+    );
+    assert_eq!(fila["codigo"], json!(["Stripe"]), "{texto}");
+}

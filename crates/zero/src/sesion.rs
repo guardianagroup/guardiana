@@ -3321,6 +3321,7 @@ impl Sesion {
             // grave 5: «Enviar» did not send when the form went to another site).
             if let Some(p) = self.pestana_mut(q.pestana) {
                 p.al_libro.insert(q.sitio.clone());
+                p.escudo.ultimo_envio = Some(ahora);
                 Self::permite_envio(p, &q.sitio, &q.clases, ahora);
             }
             if q.mandato {
@@ -3901,6 +3902,10 @@ impl Sesion {
         }
         let p = &mut self.pestanas[i];
         p.escudo.anota(&d);
+        // Code of another company that will run on the page: later requests say it was there.
+        if recurso == Recurso::Script && d.de_fuera() && !d.cortar {
+            p.escudo.anota_codigo(d.destino.quien());
+        }
         // What is measured of it, without changing what was decided (decision 206).
         let medida = d.de_fuera().then(|| {
             let v = medidas::Vista {
@@ -3973,6 +3978,11 @@ impl Sesion {
                 dato,
                 aislada: p.perfil == Perfil::Aislada,
                 mandato: p.perfil == Perfil::Mandato,
+                codigo: &p.escudo.codigo,
+                tras_envio: p
+                    .escudo
+                    .ultimo_envio
+                    .is_some_and(|t| ahora.saturating_sub(t) <= 5_000),
             };
             self.cortes_pend.push(Corte::de(&lugar, &d));
         }

@@ -702,5 +702,10 @@
   "campo_direccion": "seu endereço postal",
   "campo_persona": "dados pessoais (idade, sexo, data de nascimento…)",
   "campo_compra": "o que você compra ou vê (produtos, valores)",
-  "campo_busqueda": "o que você pesquisou"
+  "campo_busqueda": "o que você pesquisou",
+  "cortes_cadena_codigo": "código de {empresas} na página",
+  "cortes_cadena_envio": "você enviou um formulário",
+  "cortes_cadena_peticion": "pedido a {empresa} (cortado)",
+  "cortes_cadena_nota": "A cadeia como o navegador a vê: o site que você abriu já tinha carregado código dessas empresas quando este pedido saiu. O motor não diz qual script o disparou.",
+  "cortes_cadena_nota_sin": "O pedido saiu da própria página, sem código de outras empresas carregado antes."
 }

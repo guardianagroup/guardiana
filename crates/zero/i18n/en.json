@@ -702,5 +702,10 @@
   "campo_direccion": "your postal address",
   "campo_persona": "personal details (age, gender, date of birth…)",
   "campo_compra": "what you buy or look at (products, amounts)",
-  "campo_busqueda": "what you searched for"
+  "campo_busqueda": "what you searched for",
+  "cortes_cadena_codigo": "code from {empresas} on the page",
+  "cortes_cadena_envio": "you sent a form",
+  "cortes_cadena_peticion": "request to {empresa} (cut)",
+  "cortes_cadena_nota": "The chain as the browser sees it: the site you opened had already loaded code from those companies when this request left. The engine does not say which script fired it.",
+  "cortes_cadena_nota_sin": "The request came from the page itself, with no other company’s code loaded before it."
 }

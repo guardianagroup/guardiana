@@ -83,6 +83,15 @@ pub struct Corte {
     /// It happened in a mandate's tab.
     #[serde(default)]
     pub mandato: bool,
+    /// The outside companies whose code the page had loaded before this request, in order:
+    /// the chain «page → their code → this request» as far as the browser can see it. The
+    /// engine does not say which script made a request, so this is what was running, not who
+    /// fired it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub codigo: Vec<String>,
+    /// It happened within seconds of the person sending a form on the page.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub tras_envio: bool,
 }
 
 /// Where and how a cut happened (what the decision itself does not know).
@@ -108,6 +117,10 @@ pub struct Lugar<'a> {
     pub aislada: bool,
     /// In a mandate's tab.
     pub mandato: bool,
+    /// The outside companies whose code the page had loaded so far.
+    pub codigo: &'a [String],
+    /// Within seconds of a form the person sent.
+    pub tras_envio: bool,
 }
 
 impl Corte {
@@ -146,6 +159,8 @@ impl Corte {
             como: d.hallazgos.first().map(|h| h.como.to_string()),
             aislada: l.aislada,
             mandato: l.mandato,
+            codigo: l.codigo.to_vec(),
+            tras_envio: l.tras_envio,
         }
     }
 }
@@ -392,8 +407,11 @@ mod tests {
             dato: None,
             aislada: false,
             mandato: false,
+            codigo: &["Google".to_string()],
+            tras_envio: false,
         };
         let c = Corte::de(&l, &d);
+        assert_eq!(c.codigo, vec!["Google"]);
         assert_eq!(c.ruta, "/g/collect");
         assert_eq!(c.parametros, 2);
         assert_eq!(c.campos.len(), 2);

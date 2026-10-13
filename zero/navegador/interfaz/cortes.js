@@ -115,6 +115,15 @@
     partes.push(`<p>${esc(c.motivo ? t('motivo_' + c.motivo) : '')} · ${esc(c.metodo)}</p>`);
     partes.push(`<p>${esc(c.aislada ? t('cortes_det_aislada') : t('cortes_det_web', { pagina: c.pagina }))}</p>`);
     if (c.mandato) partes.push(`<p>${esc(t('cortes_det_mandato'))}</p>`);
+    // The chain, as far as the browser sees it: the page → the outside code it had loaded →
+    // this request. Who fired it the engine does not say, so it is what was running.
+    if (!c.aislada && c.pagina) {
+      const pasos = [`<span class="paso">${esc(c.pagina)}</span>`];
+      if (c.codigo && c.codigo.length) pasos.push(`<span class="paso">${esc(t('cortes_cadena_codigo', { empresas: c.codigo.join(', ') }))}</span>`);
+      if (c.tras_envio) pasos.push(`<span class="paso">${esc(t('cortes_cadena_envio'))}</span>`);
+      pasos.push(`<span class="paso cortado">${esc(t('cortes_cadena_peticion', { empresa: c.quien }))}</span>`);
+      partes.push(`<p class="cadena">${pasos.join(' <span class="flecha">→</span> ')}</p><p class="gris pequeno">${esc(t(c.codigo && c.codigo.length ? 'cortes_cadena_nota' : 'cortes_cadena_nota_sin'))}</p>`);
+    }
     if (c.parametros) partes.push(`<p>${esc(tn('cortes_det_parametros', c.parametros, { n: n(c.parametros) }))}</p>`);
     // What it carried, by the names of its fields: the page, an identifier, the screen…
     if (c.lleva && c.lleva.length) {

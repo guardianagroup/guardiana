@@ -306,17 +306,24 @@ pub fn lee(host: &str, nombre: &str) -> Option<Lectura> {
 /// and how many names stay unread.
 #[must_use]
 pub fn resumen(host: &str, campos: &[String]) -> (Vec<Lectura>, usize) {
-    let mut vistos = BTreeSet::new();
+    let mut vistos: Vec<Lectura> = Vec::new();
     let mut sin = 0;
     for c in campos {
         match lee(host, c) {
-            Some(l) => {
-                vistos.insert(l);
-            }
+            Some(l) => match vistos.iter_mut().find(|v| v.clave == l.clave) {
+                // One meaning once; a documented reading beats a conventional one.
+                Some(v) => {
+                    if v.fuente.is_none() {
+                        v.fuente = l.fuente;
+                    }
+                }
+                None => vistos.push(l),
+            },
             None => sin += 1,
         }
     }
-    (vistos.into_iter().collect(), sin)
+    vistos.sort();
+    (vistos, sin)
 }
 
 #[cfg(test)]
