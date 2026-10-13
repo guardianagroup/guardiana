@@ -116,6 +116,12 @@
     partes.push(`<p>${esc(c.aislada ? t('cortes_det_aislada') : t('cortes_det_web', { pagina: c.pagina }))}</p>`);
     if (c.mandato) partes.push(`<p>${esc(t('cortes_det_mandato'))}</p>`);
     if (c.parametros) partes.push(`<p>${esc(tn('cortes_det_parametros', c.parametros, { n: n(c.parametros) }))}</p>`);
+    // What it carried, by the names of its fields: the page, an identifier, the screen…
+    if (c.lleva && c.lleva.length) {
+      const que = c.lleva.map((l) => t(l.que)).join(', ');
+      const fuentes = [...new Set(c.lleva.map((l) => l.fuente).filter(Boolean))].map((f) => t(f)).join(', ');
+      partes.push(`<p>${esc(t('cortes_det_lleva', { que }))}${c.sin_leer ? ' ' + esc(tn('cortes_det_sin_leer', c.sin_leer, { n: n(c.sin_leer) })) : ''}${fuentes ? ` <span class="gris">${esc(t('cortes_det_lleva_fuente', { fuentes }))}</span>` : ''}</p>`);
+    }
     if (c.dato) partes.push(`<p>${esc(t('cortes_det_dato', { dato: t(c.dato).toLowerCase(), como: t('como_' + (c.como || 'tal_cual')) }))}</p>`);
     if (c.corredor) {
       partes.push(`<p>${esc(t('cortes_det_corredor', { empresa: c.corredor }))}</p>`);

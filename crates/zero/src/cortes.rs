@@ -38,6 +38,10 @@ pub struct Corte {
     pub ruta: String,
     /// How many query parameters it carried (their values are not kept).
     pub parametros: u32,
+    /// Their names, each once, at most [`crate::campos::MAX_CAMPOS`]: what the request
+    /// carried can be read from them (`dl` is the page, `sr` the screen). Never the values.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub campos: Vec<String>,
     /// The registrable site of the destination.
     pub sitio: String,
     /// The company behind it, or the site when unknown.
@@ -115,6 +119,7 @@ impl Corte {
             host: d.destino.host.clone(),
             ruta,
             parametros,
+            campos: crate::campos::nombres(l.url),
             sitio: d.destino.sitio.clone(),
             quien: d.destino.quien().to_string(),
             pais: d.destino.pais.map(str::to_string),
@@ -338,6 +343,10 @@ pub const fn recurso_clave(r: Recurso) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn linea_de(c: &Corte) -> String {
+        serde_json::to_string(c).unwrap_or_default()
+    }
     use crate::decision::{decide, Ajustes, Peticion};
 
     #[test]
@@ -346,7 +355,7 @@ mod tests {
             cortar_seguimiento: true,
             ..Ajustes::default()
         };
-        let url = "https://stats.g.doubleclick.net/g/collect?cid=123&uid=ana%40correo.co";
+        let url = "https://stats.g.doubleclick.net/g/collect?cid=123secreto&uid=ana%40correo.co";
         let d = decide(
             &Peticion {
                 url,
@@ -372,6 +381,11 @@ mod tests {
         let c = Corte::de(&l, &d);
         assert_eq!(c.ruta, "/g/collect");
         assert_eq!(c.parametros, 2);
+        assert_eq!(c.campos.len(), 2);
+        assert!(
+            !linea_de(&c).contains("secreto"),
+            "values are never written"
+        );
         assert_eq!(c.quien, "Google");
         assert_eq!(c.metodo, "GET");
         let linea = serde_json::to_string(&c).unwrap_or_default();

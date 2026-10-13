@@ -2686,12 +2686,27 @@ impl Sesion {
             .take(if sin_lista { 0 } else { cortes::MAX_LISTA })
             .map(|c| {
                 let mut v = serde_json::to_value(c).unwrap_or(Value::Null);
-                if c.pais.is_none() {
-                    if let Some(o) = v.as_object_mut() {
+                if let Some(o) = v.as_object_mut() {
+                    if c.pais.is_none() {
                         o.insert(
                             "pais".into(),
                             json!(Some(pais_o_dominio(c)).filter(|p| !p.is_empty())),
                         );
+                    }
+                    // What it carried, read from the names of its fields (never the values):
+                    // the page, an identifier, the screen size…, and how many names stay
+                    // unread. The names themselves do not travel to the page.
+                    if !c.campos.is_empty() {
+                        let (lleva, sin_leer) = crate::campos::resumen(&c.host, &c.campos);
+                        o.insert(
+                            "lleva".into(),
+                            json!(lleva
+                                .iter()
+                                .map(|l| json!({ "que": l.clave, "fuente": l.fuente }))
+                                .collect::<Vec<_>>()),
+                        );
+                        o.insert("sin_leer".into(), json!(sin_leer));
+                        o.remove("campos");
                     }
                 }
                 v
