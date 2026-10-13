@@ -43,6 +43,7 @@
     manda({ tipo: 'exportar_cortes', periodo, formato: 'resumen' });
   });
   $('csv').addEventListener('click', () => manda({ tipo: 'exportar_cortes', periodo, formato: 'csv' }));
+  $('recibo').addEventListener('click', () => manda({ tipo: 'exportar_cortes', periodo, formato: 'recibo' }));
   $('f-motivo').addEventListener('change', pintaFilas);
   $('f-texto').addEventListener('input', pintaFilas);
 

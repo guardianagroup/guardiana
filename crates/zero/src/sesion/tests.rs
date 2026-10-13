@@ -1151,6 +1151,40 @@ fn every_cut_can_be_examined_one_by_one_and_saved() {
     );
     assert!(matches!(o.first(), Some(Orden::GuardaPdf { ruta, .. })
         if ruta.file_name().is_some_and(|n| n.to_string_lossy().starts_with("guardiana-zero-resumen-"))));
+    // The signed privacy receipt: every cut, its field names (never the values), checkable.
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        CORTES,
+        r#"{"tipo":"exportar_cortes","periodo":"hoy","formato":"recibo"}"#,
+    );
+    let g = del_tipo(&o, Origen::Pestana(id), "guardado").unwrap_or_default();
+    let ruta = PathBuf::from(g["ruta"].as_str().unwrap_or_default());
+    assert!(ruta
+        .file_name()
+        .is_some_and(|n| n.to_string_lossy().starts_with("guardiana-zero-recibo-")));
+    let r: crate::recibo::Recibo = serde_json::from_slice(&fs::read(&ruta).unwrap_or_default())
+        .unwrap_or_else(|_| crate::recibo::Recibo {
+            algoritmo: String::new(),
+            contenido: String::new(),
+            clave: String::new(),
+            firma: String::new(),
+        });
+    assert_eq!(crate::recibo::comprueba(&r), Ok(()));
+    let c: Value = serde_json::from_str(&r.contenido).unwrap_or_default();
+    assert_eq!(c["tipo"], "recibo_de_privacidad");
+    assert_eq!(c["cortes"].as_array().map(Vec::len), Some(2));
+    assert_eq!(c["cortes"][0]["estado"], "cortada_antes_de_salir");
+    assert!(c["cortes"][0]["campos"]
+        .as_array()
+        .is_some_and(|a| a.iter().any(|x| x == "cid")));
+    assert!(
+        !r.contenido.contains("cid=9"),
+        "values never reach the receipt"
+    );
+    assert!(g["texto"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("guardianagroup.com/verificar"));
     // A web page cannot ask for it.
     assert!(s
         .mensaje(

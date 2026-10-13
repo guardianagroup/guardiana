@@ -497,6 +497,11 @@ fn escribe(ruta: &Path, contenido: &[u8]) -> io::Result<()> {
     fs::rename(&tmp, ruta)
 }
 
+/// The same, saying whether it was written (a file the person asked for).
+fn escribe_json_ok<T: Serialize>(ruta: &Path, v: &T) -> bool {
+    serde_json::to_vec_pretty(v).is_ok_and(|b| escribe(ruta, &b).is_ok())
+}
+
 fn escribe_json<T: Serialize>(ruta: &Path, v: &T) {
     if let Ok(b) = serde_json::to_vec(v) {
         // Losing one save is better than stopping the browser; the next one retries.
@@ -2777,6 +2782,9 @@ impl Sesion {
             return vec![Orden::GuardaPdf { id, ruta }];
         }
         let lista = cortes::lee(&self.datos.join("cortes"), &desde, &hasta);
+        if formato == "recibo" {
+            return self.recibo_cortes(id, &desde, &hasta, &lista);
+        }
         let columnas: Vec<String> = [
             "cortes_col_hora",
             "cortes_col_pagina",
@@ -2805,6 +2813,78 @@ impl Sesion {
                 json!({ "tipo": "guardado", "ruta": r, "texto": self.tf("guardado_en", &[("ruta", &r)]) })
             }
             Err(_) => json!({ "tipo": "guardado", "ruta": "", "texto": self.t("guardar_error") }),
+        };
+        self.a_pestana(id, &v).into_iter().collect()
+    }
+
+    /// The privacy receipt (ChatGPT's review of 13 Oct 2026, «recibo de privacidad
+    /// verificable»): every cut of the period with when, where, to whom, how, why, and what it
+    /// carried read from the names of its fields, signed with this browser's receipt key, so
+    /// anyone can check on guardianagroup.com/verificar that nothing was changed after. It says
+    /// what ZERO observes and what it cannot: a cut request never left; what the page's servers
+    /// send on their own is not seen.
+    fn recibo_cortes(&mut self, id: u32, desde: &str, hasta: &str, lista: &[Corte]) -> Vec<Orden> {
+        let filas: Vec<Value> = lista
+            .iter()
+            .map(|c| {
+                let (lleva, sin_leer) = crate::campos::resumen(&c.host, &c.campos);
+                json!({
+                    "hora": fecha::hora_local(c.ts, self.zona),
+                    "ts": c.ts,
+                    "pagina": c.pagina,
+                    "destino": c.host,
+                    "ruta": c.ruta,
+                    "empresa": c.quien,
+                    "pais": c.pais,
+                    "categoria": c.categoria,
+                    "corredor": c.corredor,
+                    "metodo": c.metodo,
+                    "recurso": cortes::recurso_clave(c.recurso),
+                    "motivo": c.motivo.map(cortes::motivo_clave),
+                    "dato": c.dato,
+                    "campos": c.campos,
+                    "lleva": lleva.iter().map(|l| l.clave).collect::<Vec<_>>(),
+                    "sin_leer": sin_leer,
+                    "estado": "cortada_antes_de_salir",
+                })
+            })
+            .collect();
+        let contenido = json!({
+            "programa": "GUARDIANA ZERO",
+            "tipo": "recibo_de_privacidad",
+            "version": self.version,
+            "generado": (self.reloj)(),
+            "desde": desde,
+            "hasta": hasta,
+            "cortes": filas,
+            "cobertura": {
+                "observado": self.cobertura_vista(),
+                "no_observado": [
+                    "otras_aplicaciones_del_equipo",
+                    "pestanas_aisladas",
+                    "lo_que_los_servidores_de_cada_web_envian_por_su_cuenta",
+                    "lo_que_cada_empresa_hace_con_lo_recibido",
+                    "valores_de_los_campos",
+                ],
+                "nota": self.t("recibo_privacidad_nota"),
+            },
+        })
+        .to_string();
+        let base = if desde == hasta {
+            format!("guardiana-zero-recibo-{hasta}")
+        } else {
+            format!("guardiana-zero-recibo-{desde}-a-{hasta}")
+        };
+        let ruta = self.nombre_libre(&base, "json");
+        let firmado = self
+            .clave_recibos()
+            .and_then(|k| recibo::firma(&k, contenido).ok());
+        let v = match firmado.map(|r| escribe_json_ok(&ruta, &r)) {
+            Some(true) => {
+                let r = ruta.display().to_string();
+                json!({ "tipo": "guardado", "ruta": r, "texto": self.tf("recibo_privacidad_guardado", &[("ruta", &r), ("huella", &self.huella_clave())]) })
+            }
+            _ => json!({ "tipo": "guardado", "ruta": "", "texto": self.t("guardar_error") }),
         };
         self.a_pestana(id, &v).into_iter().collect()
     }

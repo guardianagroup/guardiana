@@ -717,5 +717,8 @@
   "auditoria_y_mas": "and {n} more",
   "auditoria_nota": "These are the page's attempts, cut by ZERO or not, to companies the open lists class as tracking, advertising or data brokers. Asking for them before your answer does not by itself prove a breach: it depends on what they are used for.",
   "auditoria_antes_cero": "Before the notice was answered, the page did not try to reach any tracking or advertising company",
-  "auditoria_despues_cero": "After: none"
+  "auditoria_despues_cero": "After: none",
+  "recibo_privacidad_nota": "Every request in this list was cut by GUARDIANA ZERO before it left the browser. «campos» are the names of what it carried, never their values; «lleva» is their meaning, as the company documents it or by the usual name of the field. This receipt does not see other applications on the computer, isolated tabs, what each website's servers send on their own, or what each company does with what it gets. The signature proves the receipt was not changed after this browser wrote it.",
+  "recibo_privacidad_guardado": "Signed receipt saved to {ruta}. Check it at guardianagroup.com/verificar; this computer's key fingerprint is {huella}.",
+  "cortes_recibo": "Signed receipt"
 }

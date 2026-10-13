@@ -717,5 +717,8 @@
   "auditoria_y_mas": "y {n} más",
   "auditoria_nota": "Son intentos de la página, cortados o no por ZERO, de empresas que las listas abiertas clasifican como rastreo, publicidad o corredoras de datos. Pedirlas antes de tu respuesta no prueba por sí solo una infracción: depende de para qué se usen.",
   "auditoria_antes_cero": "Antes de que se respondiera al aviso, la página no intentó contactar con ninguna empresa de rastreo o publicidad",
-  "auditoria_despues_cero": "Después: ninguna"
+  "auditoria_despues_cero": "Después: ninguna",
+  "recibo_privacidad_nota": "Cada petición de esta lista la cortó GUARDIANA ZERO antes de que saliera del navegador. «campos» son los nombres de lo que llevaba, nunca sus valores; «lleva» es su significado, según la documentación de la empresa o el nombre habitual del campo. Este recibo no ve otras aplicaciones del equipo, ni las pestañas aisladas, ni lo que los servidores de cada web envían por su cuenta, ni lo que cada empresa hace con lo que recibe. La firma prueba que el recibo no se cambió después de que este navegador lo escribiera.",
+  "recibo_privacidad_guardado": "Recibo firmado guardado en {ruta}. Compruébalo en guardianagroup.com/verificar; la huella de la clave de este equipo es {huella}.",
+  "cortes_recibo": "Recibo firmado"
 }
