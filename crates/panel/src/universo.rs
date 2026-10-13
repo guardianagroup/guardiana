@@ -101,6 +101,10 @@ struct Destino {
     pais: String,
     /// The network that announces the address (`Amazon.com, Inc.`), or the company of the name.
     red: String,
+    /// The company the name belongs to (`Microsoft`), from GUARDIANA's open list; empty when the
+    /// list does not know it. Not the same as the network: a server on Amazon's network does not
+    /// mean Amazon uses what is sent (13 Oct 2026).
+    empresa: String,
     asn: u32,
     /// The way most of its bytes went (`tcp`/`udp` and the port at the other end).
     proto: String,
@@ -337,7 +341,11 @@ pub(crate) async fn universo(
             .unwrap_or((0, 0, Category::Desconocido, 0));
         let (documentado, uso) = documentado(&prog, tipo, &destino);
         con_trafico.insert((prog.clone(), destino.clone()));
+        let empresa = guardiana_lists::company_of(&destino)
+            .unwrap_or("")
+            .to_owned();
         destinos.push(Destino {
+            empresa,
             regla: regla_de(&rules, &destino, categoria, now),
             programa: prog,
             destino,
@@ -386,6 +394,7 @@ pub(crate) async fn universo(
             destino: nombre.clone(),
             pais,
             red: empresa.unwrap_or("").to_owned(),
+            empresa: empresa.unwrap_or("").to_owned(),
             asn: 0,
             proto: String::new(),
             puerto: 0,

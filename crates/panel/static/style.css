@@ -425,6 +425,19 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 /* The tab's key on a keyboard, before its name. */
 .universo .pestanas .tecla { opacity: .6; margin-right: 7px; }
 
+/* Map or globe, and «Todo · Datos · Antivirus»: small segmented switches (13 Oct 2026). */
+.universo .seg { display: inline-flex; border: 1px solid var(--hud-line); border-radius: 6px; overflow: hidden; }
+
+.universo .seg[hidden] { display: none; }
+
+.universo .seg button { appearance: none; background: transparent; color: var(--hud-muted); border: 0; border-right: 1px solid var(--hud-line); padding: 5px 10px; font: 500 12px 'IBM Plex Mono', ui-monospace, monospace; cursor: pointer; }
+
+.universo .seg button:last-child { border-right: 0; }
+
+.universo .seg button:hover { color: var(--hud-fg); }
+
+.universo .seg button[aria-pressed="true"] { color: var(--hud-fg); background: rgba(63,224,197,.16); box-shadow: inset 0 -2px 0 var(--shield); }
+
 /* Without the Fullscreen API (an iPhone), «Pantalla completa» leaves the picture alone with the bar. */
 .universo .stage.full .hud { display: none; }
 
@@ -618,14 +631,14 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 
 .universo .controles { margin-left: 0; }
 
-/* A phone: the title may wrap; the five tabs keep one line (without their keys, and sliding
-   sideways on a narrower screen still); the deck below keeps what reads at a glance, so the
-   picture gets the room. The side panel «Datos en vivo» still has everything. */
+/* A phone: the title may wrap; the two tabs and the two switches share the rows (the tabs
+   without their keys); the deck below keeps what reads at a glance, so the picture gets the
+   room. The side panel «Datos en vivo» still has everything. */
 .universo .barra { padding: 8px 10px; gap: 6px 10px; }
 
 .universo .marca { white-space: normal; flex-wrap: wrap; gap: 6px 10px; font-size: 12px; }
 
-.universo .pestanas { flex: 1 1 100%; min-width: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.universo .pestanas { flex: 0 0 auto; min-width: 0; flex-wrap: nowrap; }
 
 .universo .pestanas::-webkit-scrollbar { display: none; }
 
@@ -633,7 +646,7 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 
 .universo .pestanas .tecla { display: none; }
 
-.universo .pestanas button, .universo .controles .btn-hud { padding: 5px 8px; font-size: 12px; }
+.universo .pestanas button, .universo .controles .btn-hud, .universo .seg button { padding: 5px 8px; font-size: 12px; }
 
 .universo .hud > div:nth-child(3), .universo .hud > div:nth-child(5) { display: none; }
 

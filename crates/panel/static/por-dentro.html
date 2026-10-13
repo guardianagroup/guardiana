@@ -15,12 +15,15 @@
 <section class="stage" id="stage" aria-label="GUARDIANA por dentro">
   <div class="barra">
     <div class="marca"><a href="/" data-t="pd_volver">← Panel</a> <span data-t="pd_titulo">GUARDIANA por dentro</span> <span class="chip-modo corte" id="chip-modo" role="status" hidden></span></div>
-    <div class="pestanas" role="group">
-      <button type="button" data-vista="globo" aria-pressed="true"><span class="tecla" aria-hidden="true">1</span><span data-t="pd_vista_globo">Globo</span></button>
-      <button type="button" data-vista="mapa" aria-pressed="false"><span class="tecla" aria-hidden="true">2</span><span data-t="pd_vista_mapa">Mapa</span></button>
-      <button type="button" data-vista="nebulosa" aria-pressed="false"><span class="tecla" aria-hidden="true">3</span><span data-t="pd_vista_nebulosa">Nebulosa</span></button>
-      <button type="button" data-vista="dentro" aria-pressed="false"><span class="tecla" aria-hidden="true">4</span><span data-t="pd_vista_dentro">El ordenador</span></button>
-      <button type="button" data-vista="radar" aria-pressed="false"><span class="tecla" aria-hidden="true">5</span><span data-t="pd_vista_radar">Radar</span></button>
+    <div class="pestanas" role="group" data-t-label="pd_vistas">
+      <button type="button" data-vista="destinos" aria-pressed="true"><span class="tecla" aria-hidden="true">1</span><span data-t="pd_vista_destinos">Destinos</span></button>
+      <button type="button" data-vista="programas" aria-pressed="false"><span class="tecla" aria-hidden="true">2</span><span data-t="pd_vista_programas">Programas</span></button>
+    </div>
+    <div class="seg" id="proy" role="group" data-t-label="pd_proy">
+      <button type="button" data-proy="mapa" aria-pressed="true" data-t="pd_proy_mapa">Mapa</button><button type="button" data-proy="globo" aria-pressed="false" data-t="pd_proy_globo">Globo</button>
+    </div>
+    <div class="seg" id="filtro" role="group" data-t-label="pd_filtro">
+      <button type="button" data-filtro="todo" aria-pressed="true" data-t="pd_filtro_todo">Todo</button><button type="button" data-filtro="datos" aria-pressed="false" data-t="pd_filtro_datos">Datos</button><button type="button" data-filtro="av" aria-pressed="false" data-t="pd_filtro_av">Antivirus</button>
     </div>
     <div class="controles">
       <span class="lugar-yo" title=""><span data-t="pd_tu_pais">Tu ordenador está en</span> <b id="yo"></b></span>

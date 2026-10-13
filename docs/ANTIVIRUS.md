@@ -106,10 +106,18 @@ Una página aparte (`/por-dentro`), con un botón bien visible en la portada del
 antivirus»: lo que el antivirus, el navegador y los programas que más se mueven envían y reciben, en
 directo, sobre la Tierra.
 
-- **Cinco vistas**: el globo (la primera), el mapa (el mismo globo desenrollado), la nebulosa, el
-  ordenador por dentro y el radar. Globo y mapa están hechos en WebGL2 escrito aquí, con imágenes de
-  la NASA servidas por el propio panel y la luz del sol de ese momento (donde es de noche se ven las
-  luces de las ciudades). Sin internet y sin código de terceros.
+- **Dos vistas** (desde la 1.0.23; la 1.0.22 tenía cinco): **Destinos**, dónde está cada servidor
+  sobre la Tierra (el mapa por defecto, el globo como opción), y **Programas**, cuánto envía cada
+  programa y adónde, por la puerta de GUARDIANA. La nebulosa y el radar se quitaron: pedían
+  explicación y ayudaban poco a decidir. Un interruptor **Todo · Datos · Antivirus** separa en el
+  dibujo lo que envía el antivirus de lo que envían el navegador y los demás programas. Globo y mapa
+  están hechos en WebGL2 escrito aquí, con imágenes de la NASA servidas por el propio panel y la luz
+  del sol de ese momento; un equipo sin WebGL2 ve el mismo mundo plano, dibujado en 2D. Sin internet
+  y sin código de terceros.
+- **Tres datos distintos**: la empresa del nombre (de la lista abierta de GUARDIANA), la empresa de la
+  red donde está el servidor y su país. Que un servidor esté en la red de Amazon no quiere decir que
+  Amazon use lo que se envía, y la página lo dice. Los intentos parados se cuentan, no se miden en
+  bytes: se dibujan como líneas discontinuas, nunca en la escala de los datos.
 - **Datos** (`/api/por-dentro`, cada 5 segundos): por programa y destino, los bytes, paquetes,
   protocolo y puerto que contó Windows; el país y la red del servidor (con su AS); si el fabricante
   documenta el nombre (solo antivirus); cuántas veces lo pidió y cuántas lo paró GUARDIANA. Nunca la

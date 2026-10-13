@@ -82,7 +82,7 @@
     // minutes», whatever the rhythm of the data (Windows is read every 10 s).
     const CUBO_MS = 10000, N_CUBOS = 30, CADA_MEDIDA = 10;
     const st = {
-      vista: 'globo', yo: paisDelEquipo(), W: 0, Wc: 0, H: 0, dpr: 1, t0: performance.now(),
+      vista: 'destinos', proy: 'mapa', filtro: 'todo', yo: paisDelEquipo(), W: 0, Wc: 0, H: 0, dpr: 1, t0: performance.now(),
       arrastre: null, dRot: 0, dTilt: 0, part: [], estallidos: [], hover: null, raton: null, dianas: [],
       serie: new Array(N_CUBOS).fill(0), serieP: {}, cuboT0: Date.now(), eventos: [], ahora: [0, 0, 0], intervalo: 5,
       datos: null, abierto: Date.now(), primeraCarga: true, ultimoGesto: performance.now(),
@@ -96,27 +96,29 @@
       st.cuboT0 = n === N_CUBOS ? Date.now() : st.cuboT0 + n * CUBO_MS;
     };
 
-    // ---------- Stars and nebulae (fixed, made once) ----------
+    // ---------- Stars (fixed, made once) ----------
     let semilla = 7;
     const azar = () => { semilla = (semilla * 16807) % 2147483647; return semilla / 2147483647; };
     const gauss = () => { let u = 0, v = 0; while (!u) u = azar(); while (!v) v = azar(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
     const estrellas = Array.from({ length: 320 }, () => ({ x: azar(), y: azar(), r: azar() * 1.2 + 0.2, f: azar() * 6.28 }));
-    const nubeDe = {};
     let paisesUsados = [];
     const tono = (c) => { let h = 0; for (const ch of c) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
 
+    // «Todo · Datos · Antivirus» (13 Oct 2026): the drawing shows everything, or only what the
+    // browser and the other programs send, or only what the antivirus sends — the same split as
+    // the two telemetries of «Datos en vivo».
+    const enFiltro = (p) => st.filtro === 'todo' || (st.filtro === 'av') === (!!p && p.tipo === 'antivirus');
     // What is drawn: the destinations that move most (and every one that is cut), so a busy
     // computer stays readable. The side panel lists them all.
     const MAX_DIBUJO = 60;
     let VISIBLES = [];
     const recalcula = () => {
-      const orden = DEST.filter(dibujable).sort((a, b) => (b.sub + b.baj) - (a.sub + a.baj) || b.bloq - a.bloq);
+      const orden = DEST.filter((d) => dibujable(d) && enFiltro(prod(d.p))).sort((a, b) => (b.sub + b.baj) - (a.sub + a.baj) || b.bloq - a.bloq);
       const cortados = orden.filter((d) => bloqueado(d) || d.bloq).slice(0, 20);
       const resto = orden.filter((d) => !cortados.includes(d)).slice(0, MAX_DIBUJO - cortados.length);
       VISIBLES = resto.concat(cortados);
       VISIBLES.forEach((d, i) => { d.i = i; });
       paisesUsados = [...new Set(VISIBLES.map((d) => d.pais))];
-      paisesUsados.forEach((c) => { if (!nubeDe[c]) nubeDe[c] = Array.from({ length: 260 }, () => ({ x: gauss() * 0.55, y: gauss() * 0.4, r: azar() * 1.3 + 0.3, a: azar() * 0.6 + 0.15 })); });
       PROD.forEach((p, k) => { if (!st.serieP[p.id]) st.serieP[p.id] = new Array(N_CUBOS).fill(0); p.k = k; });
     };
     const nuevoProducto = (p) => {
@@ -179,7 +181,7 @@
         const esNuevo = !d;
         if (!d) { d = { k, p: x.programa, ruta: [], tg: 0.3, x: 0, y: 0, vis: true, ema: 0, bloq: x.paradas }; porClave.set(k, d); DEST.push(d); }
         const antes = d.bloq || 0;
-        Object.assign(d, { host: nombreDe(x), destino: x.destino, pais: x.pais, red: x.red, asn: x.asn, proto: x.proto, puerto: x.puerto, vias: x.vias, sub: x.enviados, baj: x.recibidos, paq: x.paquetes, noche: x.noche, primera: x.primera, ultima: x.ultima, doc: x.documentado, uso: x.uso, consultas: x.consultas, bloq: x.paradas, regla: x.regla ?? null, cortado: x.regla !== null && x.regla !== undefined, sede: x.sede });
+        Object.assign(d, { host: nombreDe(x), destino: x.destino, pais: x.pais, red: x.red, asn: x.asn, proto: x.proto, puerto: x.puerto, vias: x.vias, sub: x.enviados, baj: x.recibidos, paq: x.paquetes, noche: x.noche, primera: x.primera, ultima: x.ultima, doc: x.documentado, uso: x.uso, consultas: x.consultas, bloq: x.paradas, regla: x.regla ?? null, cortado: x.regla !== null && x.regla !== undefined, sede: x.sede, empresa: x.empresa || '' });
         d.ancho = !d.cortado && d.sede && d.bloq > 0;
         if (!st.primeraCarga && esNuevo) {
           d.visto = Date.now();
@@ -197,7 +199,7 @@
         if (prev) { de = f.enviados - prev.e; dr = f.recibidos - prev.r; dp = f.paquetes - prev.p; } else if (st.primeraCarga && f.minuto < r.ahora - 70000) {
           // Opening the page: the latest minutes go to the log at once, without particles.
           const d0 = porClave.get([f.programa, f.destino, f.pais, f.red].join('|'));
-          if (d0 && f.enviados > 0) st.eventos.push({ h: hora(f.minuto), prog: prod(d0.p).nombre, host: d0.host, que: `${bytes(f.enviados)} ↑ · ${bytes(f.recibidos)} ↓ · ${f.pais || '—'} · ${f.red || '—'}`, cls: 'o' });
+          if (d0 && f.enviados > 0) st.eventos.push({ h: hora(f.minuto), prog: prod(d0.p).nombre, host: d0.host, que: `${bytes(f.enviados)} ↑ · ${bytes(f.recibidos)} ↓ · ${f.pais || '—'} · ${f.red || '—'}`, cls: 'o', av: prod(d0.p).tipo === 'antivirus' });
           return;
         } else { de = f.enviados; dr = f.recibidos; dp = f.paquetes; }
         if (de <= 0 && dr <= 0) return;
@@ -255,7 +257,8 @@
       }, retraso || 0);
     };
     const evento = (prog, host, que, cls) => {
-      st.eventos.unshift({ h: hora(Date.now()), prog, host, que, cls });
+      const pp = PROD.find((x) => x.nombre === prog);
+      st.eventos.unshift({ h: hora(Date.now()), prog, host, que, cls, av: !!pp && pp.tipo === 'antivirus' });
       if (st.eventos.length > 40) st.eventos.length = 40;
     };
 
@@ -282,77 +285,6 @@
     // Each watched program inside the ring, turning slowly.
     const posProductos = (c, r) => { const ps = prodsVisibles(); return ps.map((p, k) => { const a = tiempo() * (reducido ? 0.03 : 0.12) + k * 2 * Math.PI / Math.max(1, ps.length); return { p, x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r }; }); };
     const posDe = (prods, d, c) => prods.find((q) => q.p.id === d.p) || { x: c.x, y: c.y };
-
-    // --- Nebula ---
-    const layoutNebulosa = () => {
-      const c = { x: st.W / 2, y: st.H / 2 }, R0 = Math.min(st.W, st.H) * 0.16;
-      const prods = posProductos(c, R0 * 0.48);
-      const ax = st.W < 700 ? st.W * 0.3 : Math.min(st.W * 0.36, st.W / 2 - 150), ay = st.H * 0.33;
-      const cent = {};
-      paisesUsados.forEach((pc, k) => { const a = -Math.PI / 2 + (k + 0.5) * (2 * Math.PI / paisesUsados.length); cent[pc] = { x: c.x + Math.cos(a) * ax, y: c.y + Math.sin(a) * ay, a }; });
-      const porPais = {};
-      VISIBLES.forEach((d) => { (porPais[d.pais] = porPais[d.pais] || []).push(d); });
-      VISIBLES.forEach((d) => {
-        const grupo = porPais[d.pais], k = grupo.indexOf(d), n = grupo.length, ce = cent[d.pais];
-        const paso = Math.min(22, (st.H * 0.3) / Math.max(1, n));
-        d.x = ce.x + (k % 2 ? 10 : -10) * (n > 1 ? 1 : 0); d.y = ce.y + (k - (n - 1) / 2) * paso;
-        const pr = posDe(prods, d, c);
-        const ang = Math.atan2(d.y - c.y, d.x - c.x);
-        const g = { x: c.x + Math.cos(ang) * R0, y: c.y + Math.sin(ang) * R0 };
-        const c1 = { x: (pr.x + g.x) / 2 + Math.sin(ang) * R0 * 0.25, y: (pr.y + g.y) / 2 - Math.cos(ang) * R0 * 0.25 };
-        const s = lado(d) || 0.4;
-        const c2 = { x: g.x + Math.cos(ang) * R0 * 0.9 + Math.sin(ang) * 40 * s, y: g.y + Math.sin(ang) * R0 * 0.9 - Math.cos(ang) * 40 * s };
-        d.ruta = tramo((u) => bez2(pr, c1, g, u), 14).concat(tramo((u) => bez2(g, c2, d, u), N - 14).slice(1));
-        d.tg = 14 / N; d.vis = true;
-      });
-      return { c, R0, prods, cent, porPais };
-    };
-
-    // --- The computer, inside ---
-    const layoutDentro = () => {
-      const W = st.W, H = st.H, top = 70, bot = H - 48;
-      const col = { prod: W * 0.1, puerta: W * 0.36, red: W * 0.5, inet: W * 0.66, dest: W * 0.8 };
-      const caja = { x: W * 0.035, y: 30, w: W * 0.515, h: H - 66 };
-      const ps = prodsVisibles();
-      const prods = ps.map((p, k) => ({ p, x: col.prod, y: top + (bot - top) * (k + 1) / (ps.length + 1) }));
-      const filas = Math.max(6, Math.min(24, Math.floor((bot - top) / 22)));
-      const orden = VISIBLES.slice().sort((a, b) => (b.sub + b.baj) - (a.sub + a.baj)).slice(0, filas).sort((a, b) => a.pais.localeCompare(b.pais) || a.p.localeCompare(b.p));
-      VISIBLES.forEach((d) => { d.vis = false; d.ruta = []; });
-      const fila = (k) => top + 8 + (bot - top - 16) * (orden.length === 1 ? 0.5 : k / (orden.length - 1));
-      const nic = { x: col.red, y: H / 2 };
-      orden.forEach((d, k) => {
-        const y = fila(k), pr = posDe(prods, d, { x: col.prod, y });
-        d.x = col.dest; d.y = y; d.puerta = { x: col.puerta, y };
-        const pts = [pr, { x: col.puerta, y }, nic, { x: col.inet, y: H / 2 + (y - H / 2) * 0.45 }, { x: col.dest, y }];
-        const ruta = [];
-        for (let i = 0; i < pts.length - 1; i++) {
-          const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
-          for (let s = i ? 1 : 0; s <= 7; s++) { const u = s / 7, u2 = u * u, u3 = u2 * u;
-            ruta.push({ x: 0.5 * (2 * p1.x + (-p0.x + p2.x) * u + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * u2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * u3),
-                        y: 0.5 * (2 * p1.y + (-p0.y + p2.y) * u + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * u2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * u3) }); }
-        }
-        d.ruta = ruta; d.tg = 7 / (ruta.length - 1); d.vis = true;
-      });
-      return { caja, col, prods, nic, orden };
-    };
-
-    // --- Radar (Grok's idea) ---
-    const layoutRadar = () => {
-      const c = { x: st.W / 2, y: st.H / 2 }, Rr = Math.min(st.W, st.H) * 0.42, R0 = Rr * 0.16;
-      const prods = posProductos(c, R0 * 0.5);
-      const mx = Math.max(1, ...VISIBLES.map((d) => d.sub));
-      VISIBLES.forEach((d) => {
-        const ce = centros[d.pais], grupo = VISIBLES.filter((x) => x.pais === d.pais), k = grupo.indexOf(d);
-        const ang = Math.PI + (ce.lon + 180) / 360 * Math.PI * 2 + (k - (grupo.length - 1) / 2) * 0.06;
-        const frac = Math.sqrt(d.sub / mx);
-        const dist = R0 * 1.25 + (Rr - R0 * 1.25) * (1 - 0.9 * frac);
-        d.ang = ang; d.x = c.x + Math.cos(ang) * dist; d.y = c.y + Math.sin(ang) * dist;
-        const pr = posDe(prods, d, c), g = { x: c.x + Math.cos(ang) * R0, y: c.y + Math.sin(ang) * R0 };
-        d.ruta = tramo((u) => ({ x: pr.x + (g.x - pr.x) * u, y: pr.y + (g.y - pr.y) * u }), 8).concat(tramo((u) => ({ x: g.x + (d.x - g.x) * u, y: g.y + (d.y - g.y) * u }), N - 8).slice(1));
-        d.tg = 8 / N; d.vis = true;
-      });
-      return { c, Rr, R0, prods };
-    };
 
     // =====================================================================================
     // The Earth in WebGL2 (globe and map are the same mesh: the map is the globe unrolled).
@@ -695,7 +627,7 @@
         if (!d0.cima.v) return;
         const todas = [...new Set(ds.map((d) => d.red).filter((r) => r && r[0] !== '@'))], redes = todas.slice(0, 3).join(' · ') + (todas.length > 3 ? ` +${todas.length - 3}` : '');
         const corta = ds.every(bloqueado);
-        rotulo(d0.cima.x + 6, d0.cima.y - 2, `${nombrePais(c)} — ${redes}`, corta ? '#ff8d99' : '#f3e3c8', puestos);
+        rotulo(d0.cima.x + 6, d0.cima.y - 2, redes ? t('pd_rotulo_pais').replace('{pais}', nombrePais(c)).replace('{redes}', redes) : nombrePais(c), corta ? '#ff8d99' : '#f3e3c8', puestos);
       });
     };
     const rotulo = (x, y, txt, col, puestos) => {
@@ -723,14 +655,69 @@
       if (Math.abs(px) > Math.PI || Math.abs(py) > Math.PI / 2) return null;
       return [px / RAD, py / RAD];
     };
-    const paisBajo = (x, y) => { const ll = lonLatBajo(x, y); return ll ? paisEn(ll[0], ll[1]) : null; };
+    const paisBajo = (x, y) => { const ll = T.ok ? lonLatBajo(x, y) : lonLatPlano(x, y); return ll ? paisEn(ll[0], ll[1]) : null; };
+
+    // --- Destinos without WebGL: the same world, flat, drawn with the 2D canvas ---
+    // The land is the Natural Earth grid above, one dot per 1.5° cell, made once per size.
+    const PLANO = { lat0: 83, lat1: -58, cache: null, clave: '' };
+    const escalaPlano = () => {
+      const s = Math.max(0.5, Math.min(st.W / 360, (st.H - 70) / (PLANO.lat0 - PLANO.lat1)));
+      return { s, ox: (st.W - 360 * s) / 2, oy: Math.max(8, (st.H - (PLANO.lat0 - PLANO.lat1) * s) / 2 - 12) };
+    };
+    const aPlano = (lon, lat) => { const e = escalaPlano(); return { x: e.ox + (lon + 180) * e.s, y: e.oy + (PLANO.lat0 - lat) * e.s, v: true }; };
+    const lonLatPlano = (x, y) => { const e = escalaPlano(), lon = (x - e.ox) / e.s - 180, lat = PLANO.lat0 - (y - e.oy) / e.s; return lon < -180 || lon > 180 || lat > PLANO.lat0 || lat < PLANO.lat1 ? null : [lon, lat]; };
+    const tierraPlana = () => {
+      const clave = [st.W, st.H, st.dpr].join('x');
+      if (PLANO.cache && PLANO.clave === clave) return PLANO.cache;
+      const c = document.createElement('canvas'); c.width = Math.round(st.W * st.dpr); c.height = Math.round(st.H * st.dpr);
+      const g = c.getContext('2d'); g.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);
+      const e = escalaPlano(), tam = Math.max(1, e.s * G.paso * 0.62);
+      g.fillStyle = 'rgba(120,160,200,.34)';
+      for (let i = 0; i < G.nlat; i++) {
+        const lat = G.lat0 - i * G.paso; if (lat > PLANO.lat0 || lat < PLANO.lat1) continue;
+        for (let j = 0; j < G.nlon; j++) if (celdas[i * G.nlon + j]) { const q = aPlano(G.lon0 + j * G.paso, lat); g.fillRect(q.x - tam / 2, q.y - tam / 2, tam, tam); }
+      }
+      PLANO.cache = c; PLANO.clave = clave; return c;
+    };
+    const layoutPlano = () => {
+      const yo = st.lugar, cen = aPlano(yo.lon, yo.lat), R0 = 18;
+      const prods = posProductos(cen, 8);
+      VISIBLES.forEach((d) => {
+        const ce = centros[d.pais], grupo = VISIBLES.filter((x) => x.pais === d.pais), k = grupo.indexOf(d);
+        const ga = k * 2.399963, rr = grupo.length > 1 ? 1.4 * Math.sqrt(k + 0.5) : 0;
+        const b = aPlano(ce.lon + Math.cos(ga) * rr, ce.lat + Math.sin(ga) * rr);
+        const dx = b.x - cen.x, dy = b.y - cen.y, dist = Math.hypot(dx, dy) || 1;
+        const g = { x: cen.x + dx / dist * R0, y: cen.y + dy / dist * R0 };
+        const c1 = { x: (g.x + b.x) / 2, y: (g.y + b.y) / 2 - Math.min(120, dist * 0.28) - lado(d) * 10 };
+        const pr = posDe(prods, d, cen);
+        d.ruta = tramo((u) => ({ x: pr.x + (g.x - pr.x) * u, y: pr.y + (g.y - pr.y) * u }), 5).concat(tramo((u) => bez2(g, c1, b, u), N - 5).slice(1));
+        d.tg = 5 / N; d.x = b.x; d.y = b.y; d.vis = true;
+      });
+      return { cen, R0, prods };
+    };
+    const dibujaPlano = (dt) => {
+      cx.drawImage(tierraPlana(), 0, 0, st.W, st.H);
+      const L = layoutPlano();
+      tentaculos();
+      escudo(L.cen, L.R0);
+      st.dianas.push({ x: L.cen.x, y: L.cen.y, r: 10, tipo: 'yo' });
+      L.prods.forEach(nodoProducto);
+      particulas(dt);
+      VISIBLES.forEach((d) => nodoDestino(d, false));
+      const puestos = [];
+      rotulo(L.cen.x + 12, L.cen.y - 14, t('pd_tu_ordenador').toUpperCase() + ' · ' + nombrePais(st.yo).toUpperCase(), '#3fe0c5', puestos);
+      if (st.W >= 700) paisesUsados.forEach((c) => {
+        const ds = VISIBLES.filter((d) => d.pais === c), d0 = ds[0];
+        const todas = [...new Set(ds.map((d) => d.red).filter((r) => r && r[0] !== '@'))], redes = todas.slice(0, 2).join(' · ') + (todas.length > 2 ? ` +${todas.length - 2}` : '');
+        rotulo(d0.x + 8, d0.y - 6, redes ? t('pd_rotulo_pais').replace('{pais}', nombrePais(c)).replace('{redes}', redes) : nombrePais(c), ds.every(bloqueado) ? '#ff8d99' : '#f3e3c8', puestos);
+      });
+    };
 
 
     // ---------- Drawing ----------
-    const enTierra = () => (st.vista === 'globo' || st.vista === 'mapa') && T.ok;
-    const nebulosaGL = () => st.vista === 'nebulosa' && T.ok && !!PN;
+    const enTierra = () => st.vista === 'destinos' && T.ok;
     const fondo = () => {
-      if (enTierra() || nebulosaGL()) { cx.clearRect(0, 0, st.Wc, st.H); return; }
+      if (enTierra()) { cx.clearRect(0, 0, st.Wc, st.H); return; }
       cx.fillStyle = '#04070d'; cx.fillRect(0, 0, st.Wc, st.H);
       const tt = tiempo();
       estrellas.forEach((e) => { const a = 0.25 + 0.25 * Math.sin(tt * 0.8 + e.f); cx.fillStyle = `rgba(190,215,240,${reducido ? 0.35 : a})`; cx.fillRect(e.x * st.W, e.y * st.H, e.r, e.r); });
@@ -837,440 +824,9 @@
     // Labels only for the ones that move most (and the cut ones): the rest on hover.
     const conNombre = (d) => st.W >= 700 && (bloqueado(d) || VISIBLES.indexOf(d) < 22);
 
-    const dibujaNebulosa = (dt) => {
-      const L = layoutNebulosa();
-      Object.entries(L.cent).forEach(([c, ce]) => {
-        const h = tono(c), escala = Math.min(st.W, st.H) * 0.11;
-        nubeDe[c].forEach((s) => { cx.fillStyle = `hsla(${h},75%,72%,${s.a * 0.8})`; cx.fillRect(ce.x + s.x * escala, ce.y + s.y * escala, s.r, s.r); });
-        cx.font = '600 11px "IBM Plex Mono", monospace'; cx.fillStyle = `hsla(${h},70%,78%,.9)`; cx.textAlign = 'center';
-        const n = (L.porPais[c] || []).length, alto = Math.min(n * 11, st.H * 0.15), ly = ce.y + (Math.sin(ce.a) > 0 ? alto + 22 : -alto - 14);
-        cx.fillText(nombrePais(c).toUpperCase(), ce.x, ly); cx.textAlign = 'left';
-      });
-      tentaculos();
-      escudo(L.c, L.R0);
-      ordenador(L.c, Math.max(18, L.R0 * 0.32));
-      st.dianas.push({ x: L.c.x, y: L.c.y, r: L.R0 * 0.3, tipo: 'yo' });
-      L.prods.forEach(nodoProducto);
-      particulas(dt);
-      VISIBLES.forEach((d) => nodoDestino(d, conNombre(d), d.x < L.c.x ? 'izq' : 'der'));
-    };
-    const dibujaDentro = (dt) => {
-      const L = layoutDentro();
-      const k = L.caja;
-      cx.strokeStyle = 'rgba(118,144,168,.35)'; cx.lineWidth = 1; cx.setLineDash([6, 5]); cx.strokeRect(k.x, k.y, k.w, k.h); cx.setLineDash([]);
-      cx.font = '500 11px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(160,185,210,.85)';
-      cx.fillText(t('pd_tu_ordenador').toUpperCase(), k.x + 10, k.y + 16);
-      cx.fillText(t('pd_internet').toUpperCase(), L.col.inet - 30, 46);
-      cx.fillText(t('pd_pais_red').toUpperCase(), L.col.dest - 6, 46);
-      const tt = tiempo();
-      const gm = cx.createLinearGradient(L.col.puerta - 14, 0, L.col.puerta + 14, 0);
-      gm.addColorStop(0, 'rgba(63,224,197,0)'); gm.addColorStop(0.5, `rgba(63,224,197,${0.2 + 0.06 * Math.sin(tt * 2)})`); gm.addColorStop(1, 'rgba(63,224,197,0)');
-      cx.fillStyle = gm; cx.fillRect(L.col.puerta - 14, k.y + 26, 28, k.h - 34);
-      cx.fillStyle = '#3fe0c5'; cx.textAlign = 'center'; cx.fillText('GUARDIANA', L.col.puerta, k.y + 16);
-      cx.fillText(t('pd_tarjeta_red').toUpperCase(), L.nic.x, L.nic.y - 26); cx.textAlign = 'left';
-      cx.strokeStyle = 'rgba(160,185,210,.7)'; cx.strokeRect(L.nic.x - 16, L.nic.y - 14, 32, 28);
-      tentaculos();
-      L.orden.forEach((d) => {
-        if (bloqueado(d)) puerta(d.puerta, 0); else { cx.fillStyle = '#3fe0c5'; cx.fillRect(d.puerta.x - 1, d.puerta.y - 7, 2, 4); cx.fillRect(d.puerta.x - 1, d.puerta.y + 3, 2, 4); }
-      });
-      L.prods.forEach((q) => { nodoProducto(q); cx.font = '600 12px "IBM Plex Sans", sans-serif'; cx.fillStyle = '#d3e6f3'; cx.fillText(q.p.nombre, q.x - 34, q.y - 18); cx.font = '10.5px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(160,185,210,.8)'; cx.fillText((q.p.procesos[0] || ''), q.x - 34, q.y + 24); });
-      particulas(dt);
-      L.orden.forEach((d) => {
-        nodoDestino(d, false);
-        cx.font = '500 10.5px "IBM Plex Mono", monospace'; cx.fillStyle = bloqueado(d) ? '#ff8d99' : '#f3e3c8';
-        const txt = `${nombrePais(d.pais)} · ${d.red && d.red[0] !== '@' ? d.red : d.host}`; cx.fillText(txt.length > 30 ? txt.slice(0, 29) + '…' : txt, d.x + 10, d.y + 3.5);
-      });
-    };
-    const dibujaRadar = (dt) => {
-      const L = layoutRadar(), tt = tiempo(), barrido = (tt * (reducido ? 0.3 : 0.9)) % (Math.PI * 2);
-      cx.strokeStyle = 'rgba(63,224,197,.16)'; cx.lineWidth = 1;
-      for (let k = 1; k <= 4; k++) { cx.beginPath(); cx.arc(L.c.x, L.c.y, L.Rr * k / 4, 0, 7); cx.stroke(); }
-      for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; cx.beginPath(); cx.moveTo(L.c.x, L.c.y); cx.lineTo(L.c.x + Math.cos(a) * L.Rr, L.c.y + Math.sin(a) * L.Rr); cx.stroke(); }
-      for (let k = 0; k < 24; k++) { const a0 = barrido - k * 0.03; cx.fillStyle = `rgba(63,224,197,${0.12 * (1 - k / 24)})`; cx.beginPath(); cx.moveTo(L.c.x, L.c.y); cx.arc(L.c.x, L.c.y, L.Rr, a0 - 0.03, a0); cx.closePath(); cx.fill(); }
-      cx.strokeStyle = 'rgba(63,224,197,.8)'; cx.beginPath(); cx.moveTo(L.c.x, L.c.y); cx.lineTo(L.c.x + Math.cos(barrido) * L.Rr, L.c.y + Math.sin(barrido) * L.Rr); cx.stroke();
-      cx.font = '500 10px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(160,185,210,.7)'; cx.textAlign = 'center';
-      [[t('pd_america'), -100], [t('pd_europa'), 10], [t('pd_asia'), 110]].forEach(([n, lon]) => { const a = Math.PI + (lon + 180) / 360 * Math.PI * 2; cx.fillText(n.toUpperCase(), L.c.x + Math.cos(a) * (L.Rr + 14), L.c.y + Math.sin(a) * (L.Rr + 14)); });
-      cx.fillText(t('pd_radar_centro'), L.c.x, L.c.y + L.Rr + 30); cx.textAlign = 'left';
-      tentaculos();
-      escudo(L.c, L.R0); ordenador(L.c, Math.max(14, L.R0 * 0.32));
-      st.dianas.push({ x: L.c.x, y: L.c.y, r: L.R0 * 0.3, tipo: 'yo' });
-      L.prods.forEach(nodoProducto);
-      particulas(dt);
-      VISIBLES.forEach((d) => {
-        const delta = ((barrido - ((d.ang % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) + Math.PI * 4) % (Math.PI * 2);
-        if (delta < 0.6) { cx.strokeStyle = bloqueado(d) ? `rgba(255,107,122,${0.8 - delta})` : `rgba(255,181,71,${0.8 - delta})`; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(d.x, d.y, 6 + delta * 22, 0, 7); cx.stroke(); }
-        nodoDestino(d, conNombre(d) && delta < 2.2, d.x < L.c.x ? 'izq' : 'der');
-      });
-    };
-
-
-    // =====================================================================================
-    // Second pass on three views (the owner, 13 Oct 2026: «el radar, nebulosa y ordenador
-    // necesito más calidad profesional»), worked out with Grok from the best references there
-    // are: the nebula as thousands of points in WebGL, one turning galaxy per country, with
-    // depth; the radar as a real one, with phosphor persistence, a true logarithmic scale of
-    // bytes, bearings and air-traffic-control tags; the computer as a Sankey diagram whose
-    // bands are as wide as the bytes, through GUARDIANA's gate.
-    // =====================================================================================
-
-    // ---------- 1. Nebula: WebGL2 points, one galaxy per country ----------
-    const VS_NEB = `#version 300 es
-    in vec3 aCentro; in vec3 aOff; in vec4 aColor; in vec2 aTam;
-    uniform mat4 uPV; uniform float uT, uPx; uniform float uAct[24];
-    out vec4 vColor;
-    void main() {
-      float r = length(aOff.xy);
-      float ang = uT * (0.025 + 0.2 / (0.45 + r));
-      float c = cos(ang), s = sin(ang);
-      vec3 o = vec3(aOff.x * c - aOff.y * s, aOff.x * s + aOff.y * c, aOff.z);
-      o += 0.04 * vec3(sin(uT * 0.7 + aTam.y * 13.0), cos(uT * 0.6 + aTam.y * 7.0), sin(uT * 0.5 + aTam.y * 5.0));
-      float act = uAct[int(aColor.a + 0.5)];
-      vec4 p = uPV * vec4(aCentro + o, 1.0);
-      gl_Position = p;
-      gl_PointSize = clamp(aTam.x * uPx / p.w * (1.0 + act * 0.5), 1.0, 26.0);
-      vColor = vec4(aColor.rgb * (0.75 + act * 0.9), 0.7 + 0.3 * sin(uT * 1.6 + aTam.y * 40.0));
-    }`;
-    const FS_NEB = `#version 300 es
-    precision mediump float;
-    in vec4 vColor; out vec4 o;
-    void main() {
-      vec2 q = gl_PointCoord * 2.0 - 1.0; float d = dot(q, q);
-      if (d > 1.0) discard;
-      float a = exp(-d * 4.2) * vColor.a;
-      o = vec4(vColor.rgb * a, a);
-    }`;
-    let PN = null, vaoN = null, bufN = null, nPuntos = 0, firmaNeb = '';
-    if (T.ok) {
-      try {
-        PN = programa(VS_NEB, FS_NEB);
-        vaoN = gl.createVertexArray(); bufN = gl.createBuffer();
-        gl.bindVertexArray(vaoN); gl.bindBuffer(gl.ARRAY_BUFFER, bufN);
-        const paso = 12 * 4;
-        [['aCentro', 3, 0], ['aOff', 3, 12], ['aColor', 4, 24], ['aTam', 2, 40]].forEach(([n, k, o]) => { const l = gl.getAttribLocation(PN.p, n); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, k, gl.FLOAT, false, paso, o); });
-        gl.bindVertexArray(null);
-      } catch (e) { console.error(e); PN = null; }
-    }
-    const hsl = (h, s, l) => { s /= 100; l /= 100; const k = (n) => (n + h / 30) % 12, a = s * Math.min(l, 1 - l), f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))); return [f(0), f(8), f(4)]; };
-    const NEB = { rx: 10.5, ry: 6.2, centros: {}, ordenPaises: [] };
-    // Countries west to east around the ring: the Americas on the left, Europe on top, Asia right.
-    const centroNeb = (k, n) => { const a = Math.PI - (k + 0.5) * (2 * Math.PI / Math.max(1, n)); return [Math.cos(a) * NEB.rx, Math.sin(a) * NEB.ry, 2.2 * Math.sin(2 * a)]; };
-    const construyeNebulosa = () => {
-      // A tall screen (a phone) gets a tall ring, so the galaxies are not drawn tiny.
-      const vertical = st.W < st.H * 0.9;
-      NEB.rx = vertical ? 6.4 : 10.5; NEB.ry = vertical ? 9.6 : 6.2;
-      const orden = paisesUsados.slice().sort((a, b) => centros[a].lon - centros[b].lon);
-      const totPais = {}; VISIBLES.forEach((d) => { totPais[d.pais] = (totPais[d.pais] || 0) + d.sub + d.baj + d.bloq * 2000; });
-      const total = Math.max(1, Object.values(totPais).reduce((a, b) => a + b, 0));
-      const firma = (vertical ? 'v' : 'h') + orden.join(',') + '|' + orden.map((c) => Math.round(Math.sqrt((totPais[c] || 0) / total) * 6)).join('');
-      NEB.ordenPaises = orden;
-      orden.forEach((c, k) => { NEB.centros[c] = centroNeb(k, orden.length); });
-      if (!PN || firma === firmaNeb) return;
-      firmaNeb = firma;
-      const datos = [];
-      const punto3 = (cen, off, col, grupo, tam) => { datos.push(cen[0], cen[1], cen[2], off[0], off[1], off[2], col[0], col[1], col[2], grupo, tam, azar()); };
-      orden.forEach((c, k) => {
-        const cen = NEB.centros[c], h = tono(c), m = Math.round(600 + 2600 * Math.sqrt((totPais[c] || 0) / total)), brazos = 2 + (k % 2), giro = azar() * 6.28, inclina = 0.35 + azar() * 0.4;
-        for (let i = 0; i < m; i++) {
-          const r = Math.min(3.4, -Math.log(1 - azar() * 0.985) * 0.72), brazo = i % brazos;
-          const th = r * 2.3 + brazo * 2 * Math.PI / brazos + gauss() * 0.3 + giro;
-          let x = Math.cos(th) * r, y = Math.sin(th) * r, z = gauss() * 0.14 * (1 - r / 3);
-          const y2 = y * Math.cos(inclina) - z * Math.sin(inclina), z2 = y * Math.sin(inclina) + z * Math.cos(inclina); y = y2; z = z2;
-          const blanco = r < 0.25 && azar() < 0.5, col = blanco ? [1, 0.95, 0.9] : hsl((h + gauss() * 14 + 360) % 360, 70 + azar() * 20, 55 + azar() * 28);
-          punto3(cen, [x, y * 0.8, z], col, k % 21, 0.05 + Math.pow(azar(), 3) * 0.12);
-        }
-      });
-      // The computer: a hot core, and GUARDIANA's ring around it (a dashed torus of light).
-      for (let i = 0; i < 700; i++) { const r = Math.abs(gauss()) * 0.32; const th = azar() * 6.28; punto3([0, 0, 0], [Math.cos(th) * r, Math.sin(th) * r, gauss() * 0.15], azar() < 0.5 ? [1, 0.55, 0.62] : [1, 0.9, 0.92], 22, 0.03 + azar() * 0.06); }
-      for (let i = 0; i < 1800; i++) { const th = azar() * 6.28; if ((th % (2 * Math.PI / 28)) > (2 * Math.PI / 28) * 0.72) continue; const r = 2.05 + gauss() * 0.04; punto3([0, 0, 0], [Math.cos(th) * r, Math.sin(th) * r, gauss() * 0.04], [0.25, 0.88, 0.77], 21, 0.025 + azar() * 0.03); }
-      // Dust between them.
-      for (let i = 0; i < 2600; i++) punto3([0, 0, 0], [gauss() * 7, gauss() * 4.2, gauss() * 4], [0.55, 0.65, 0.85], 23, 0.012 + azar() * 0.02);
-      nPuntos = datos.length / 12;
-      gl.bindBuffer(gl.ARRAY_BUFFER, bufN); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(datos), gl.STATIC_DRAW);
-    };
-    const NC = { PV: null, C: [0, 0, 20], tanH: Math.tan(20 * RAD) };
-    const camaraNeb = () => {
-      const W = st.Wc, H = st.H, asp = W / H, aspU = st.W / H, tt = tiempo();
-      // Room for each galaxy (up to 3.4 across) and the title under it; the whole ring a little
-      // up, clear of the legend and the help at the bottom.
-      const D = Math.max((NEB.ry + 5.2) / NC.tanH, (NEB.rx + 4.2) / (NC.tanH * aspU)) * 1.02 / T.zoom;
-      const px = 2 * D * NC.tanH / H, despl = ((W - st.W) / 2) * px, subir = 28 * px;
-      const rx = st.raton ? (st.raton.x / W - 0.5) : 0, ry = st.raton ? (st.raton.y / H - 0.5) : 0;
-      NEB.yaw += ((reducido ? 0 : 0.2 * Math.sin(tt * 0.045)) + rx * 0.16 + st.dRot - NEB.yaw) * 0.04;
-      NEB.pitch += ((reducido ? 0 : 0.07 * Math.sin(tt * 0.031)) + ry * 0.1 + st.dTilt * 0.5 - NEB.pitch) * 0.04;
-      const t0 = 1 / NC.tanH, n = 0.5, f = 120, P = new Float32Array(16); P[0] = t0 / asp; P[5] = t0; P[10] = (f + n) / (n - f); P[11] = -1; P[14] = 2 * f * n / (n - f);
-      NC.PV = mul(P, mul(trasl(-despl, subir, -D), mul(rotX(NEB.pitch), rotY(NEB.yaw))));
-      NC.D = D;
-    };
-    NEB.yaw = 0; NEB.pitch = 0;
-    const aPantallaNeb = (q) => { const c = aplica(NC.PV, q); return { x: (c[0] / c[3] + 1) / 2 * st.Wc, y: (1 - c[1] / c[3]) / 2 * st.H, v: c[3] > 0.1, w: c[3] }; };
-    const actividad = new Float32Array(24);
-    const pintaNebulosaGL = () => {
-      const W = Math.round(st.Wc * st.dpr), H = Math.round(st.H * st.dpr);
-      if (glc.width !== W || glc.height !== H) { glc.width = W; glc.height = H; }
-      gl.viewport(0, 0, W, H);
-      gl.disable(gl.DEPTH_TEST); gl.useProgram(PF.p); gl.bindVertexArray(vaoF);
-      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex.cielo); gl.uniform1i(PF.u.uCielo, 0);
-      gl.uniform2f(PF.u.uRes, W, H); gl.uniform1f(PF.u.uDesp, -NEB.yaw * 0.06); gl.uniform1f(PF.u.uHalo, 0); gl.uniform2f(PF.u.uCentro, 0, 0); gl.uniform1f(PF.u.uRadio, 1); gl.uniform2f(PF.u.uSolP, 1, 0);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      if (!PN || !nPuntos) return;
-      // How alive each galaxy is right now: what its destinations sent in the last beats.
-      const porPais = {}; let todo = 0;
-      VISIBLES.forEach((d) => { porPais[d.pais] = (porPais[d.pais] || 0) + (d.ema || 0); todo += d.ema || 0; });
-      NEB.ordenPaises.forEach((c, k) => { const v = Math.min(1, Math.sqrt((porPais[c] || 0) / 40000)); actividad[k % 21] += (v - actividad[k % 21]) * 0.08; });
-      actividad[22] += (Math.min(1, Math.sqrt(todo / 80000)) - actividad[22]) * 0.08; actividad[21] = 0.35 + 0.25 * Math.sin(tiempo() * 1.4); actividad[23] = 0;
-      gl.useProgram(PN.p); gl.bindVertexArray(vaoN);
-      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
-      gl.uniformMatrix4fv(PN.u.uPV, false, NC.PV); gl.uniform1f(PN.u.uT, reducido ? 0 : tiempo()); gl.uniform1f(PN.u.uPx, H / (2 * NC.tanH));
-      gl.uniform1fv(PN.u['uAct[0]'], actividad);
-      gl.drawArrays(gl.POINTS, 0, nPuntos);
-      gl.disable(gl.BLEND); gl.bindVertexArray(null);
-    };
-    // Routes and labels of the nebula, drawn over the points with the same camera.
-    const layoutNebulosaPro = () => {
-      const tt = tiempo(), cen = aPantallaNeb([0, 0, 0]);
-      const ps = prodsVisibles();
-      const prods = ps.map((p, k) => { const a = tt * (reducido ? 0.03 : 0.12) + k * 2 * Math.PI / Math.max(1, ps.length); const q = aPantallaNeb([Math.cos(a) * 1.0, Math.sin(a) * 1.0, 0]); return { p, x: q.x, y: q.y, w3: [Math.cos(a), Math.sin(a), 0] }; });
-      const porPais = {};
-      VISIBLES.forEach((d) => { (porPais[d.pais] = porPais[d.pais] || []).push(d); });
-      Object.values(porPais).forEach((g) => g.sort((a, b) => (b.sub + b.baj) - (a.sub + a.baj)));
-      VISIBLES.forEach((d) => {
-        const g = porPais[d.pais], j = g.indexOf(d), c3 = NEB.centros[d.pais] || [0, 0, 0];
-        const ga = j * 2.399963, rr = 0.8 + 0.42 * Math.sqrt(j);
-        const p3 = [c3[0] + Math.cos(ga) * rr, c3[1] + Math.sin(ga) * rr * 0.6, c3[2] + 0.3 * Math.sin(j * 1.7)];
-        d.p3 = p3;
-        const dir = Math.atan2(c3[1], c3[0]), gate3 = [Math.cos(dir) * 2.05, Math.sin(dir) * 2.05, 0];
-        const lad = lado(d) || 0.3, ctrl3 = [c3[0] * 0.5 - Math.sin(dir) * 1.1 * lad, c3[1] * 0.5 + Math.cos(dir) * 1.1 * lad, c3[2] * 0.5];
-        const pr = prods.find((q) => q.p.id === d.p), from3 = pr ? pr.w3 : [0, 0, 0];
-        const ruta = [];
-        for (let i = 0; i <= 6; i++) { const u = i / 6; ruta.push(aPantallaNeb([from3[0] + (gate3[0] - from3[0]) * u, from3[1] + (gate3[1] - from3[1]) * u, 0])); }
-        for (let i = 1; i <= N - 6; i++) { const u = i / (N - 6), a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, c = u * u; ruta.push(aPantallaNeb([a * gate3[0] + b * ctrl3[0] + c * p3[0], a * gate3[1] + b * ctrl3[1] + c * p3[1], a * gate3[2] + b * ctrl3[2] + c * p3[2]])); }
-        d.ruta = ruta; d.tg = 6 / N;
-        const fin = ruta[ruta.length - 1]; d.x = fin.x; d.y = fin.y; d.vis = fin.v;
-      });
-      return { cen, prods, porPais };
-    };
-    const dibujaNebulosaPro = (dt) => {
-      const L = layoutNebulosaPro();
-      const tt = tiempo();
-      // GUARDIANA's ring, crisp over its points.
-      const anillo = []; for (let i = 0; i <= 96; i++) { const a = i / 96 * Math.PI * 2; anillo.push(aPantallaNeb([Math.cos(a) * 2.05, Math.sin(a) * 2.05, 0])); }
-      cx.globalCompositeOperation = 'lighter';
-      trazoPuntos(anillo, 'rgba(63,224,197,.55)', 1.2, [10, 6], -tt * 16);
-      // Filaments: a fine thread per destination, a faint wide veil per country (they bundle).
-      VISIBLES.forEach((d) => {
-        if (!d.ruta.length) return;
-        const bl = bloqueado(d), col = bl ? '#ff6b7a' : prod(d.p).color, vivo = Math.min(1, (d.ema || 0) / 20000);
-        if (bl) { trazo(d.ruta, 0, d.tg, 'rgba(255,107,122,.65)', 1.2); trazo(d.ruta, d.tg, 1, 'rgba(160,175,200,.12)', 1, [2, 6]); return; }
-        trazo(d.ruta, 0, 1, col + '10', 6);
-        trazo(d.ruta, 0, 1, col + Math.round(60 + 120 * vivo).toString(16).padStart(2, '0'), 0.9);
-      });
-      cx.globalCompositeOperation = 'source-over';
-      ordenador(L.cen, 15);
-      st.dianas.push({ x: L.cen.x, y: L.cen.y, r: 16, tipo: 'yo' });
-      L.prods.forEach(nodoProducto);
-      particulas(dt);
-      VISIBLES.forEach((d) => { if (d.vis) nodoDestino(d, false); });
-      // Country titles under each galaxy, with what moved.
-      const puestos = [];
-      NEB.ordenPaises.forEach((c) => {
-        const g = L.porPais[c] || [], q = aPantallaNeb(NEB.centros[c]);
-        if (!q.v) return;
-        st.dianas.push({ x: q.x, y: q.y, r: 26, tipo: 'pais', ref: c });
-        const sub = g.reduce((a, d) => a + d.sub, 0), h = tono(c), c3 = NEB.centros[c];
-        cx.textAlign = 'center';
-        cx.font = '500 11px "Unbounded", "IBM Plex Sans", sans-serif'; cx.fillStyle = `hsla(${h},75%,80%,.95)`;
-        const y0 = aPantallaNeb([c3[0], c3[1] - 2.6, c3[2]]).y + 12;
-        cx.fillText(nombrePais(c).toUpperCase(), q.x, y0);
-        cx.font = '10px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(170,190,210,.8)';
-        cx.fillText(`${tn('pd_nombres', g.length)} · ${bytes(sub)}`, q.x, y0 + 14);
-        cx.textAlign = 'left';
-        puestos.push({ x: q.x - 60, y: y0 - 12, w: 120, h: 30 });
-      });
-      // Callouts with leader lines for the ones that move most (and every one stopped).
-      if (st.W >= 700) {
-        const marcados = VISIBLES.filter((d) => d.vis && (bloqueado(d) || VISIBLES.indexOf(d) < 18)).slice(0, 24);
-        marcados.forEach((d) => {
-          const derecha = d.x >= L.cen.x;
-          const txt = d.host.length > 30 ? d.host.slice(0, 29) + '…' : d.host;
-          const sub = bloqueado(d) ? tn('pd_parados', d.bloq) : `${d.pais} · ${d.red && d.red[0] !== '@' ? d.red.slice(0, 16) : '—'} · ${bytes(d.sub)}`;
-          cx.font = '500 10.5px "IBM Plex Mono", monospace';
-          const w = Math.max(cx.measureText(txt).width, cx.measureText(sub).width) + 14, h = 30;
-          // Beside its point; if the place is taken, a little above or below; else no callout. Never
-          // over the legend at the bottom.
-          const bx = Math.max(4, Math.min(st.W - w - 4, derecha ? d.x + 26 : d.x - 26 - w));
-          const libre = (y) => y >= 6 && y + h <= st.H - 78 && !puestos.some((b) => bx < b.x + b.w && bx + w > b.x && y < b.y + b.h && y + h > b.y);
-          const by = [0, 1, -1, 2, -2, 3, -3].map((k) => d.y - h / 2 + k * (h + 3)).find(libre);
-          if (by === undefined) return;
-          puestos.push({ x: bx, y: by, w, h });
-          const bl = bloqueado(d), col = bl ? '#ff6b7a' : d.doc === false ? '#ffd166' : 'rgba(255,181,71,.8)';
-          cx.strokeStyle = 'rgba(170,190,210,.45)'; cx.lineWidth = 1;
-          const ex = derecha ? bx : bx + w;
-          cx.beginPath(); cx.moveTo(d.x, d.y); cx.lineTo(ex + (derecha ? -8 : 8), by + h / 2); cx.lineTo(ex, by + h / 2); cx.stroke();
-          cx.fillStyle = 'rgba(4,10,20,.8)'; cx.fillRect(bx, by, w, h);
-          cx.strokeStyle = col; cx.setLineDash(d.doc === false && !bl ? [3, 2] : []); cx.strokeRect(bx + 0.5, by + 0.5, w - 1, h - 1); cx.setLineDash([]);
-          cx.fillStyle = bl ? '#ff8d99' : '#f3e3c8'; cx.fillText(txt, bx + 7, by + 12);
-          cx.font = '10px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(160,185,210,.85)'; cx.fillText(sub, bx + 7, by + 24);
-        });
-      }
-    };
-
-    // ---------- 2. Radar: phosphor, a true scale of bytes, bearings, tags ----------
-    let fosforo = null, barridoAntes = 0, radarAntes = 0;
-    const capaFosforo = () => {
-      if (!fosforo || fosforo.width !== cv.width || fosforo.height !== cv.height) { fosforo = document.createElement('canvas'); fosforo.width = cv.width; fosforo.height = cv.height; }
-      const f = fosforo.getContext('2d'); f.setTransform(st.dpr, 0, 0, st.dpr, 0, 0); return f;
-    };
-    let rayas = null;
-    const patronRayas = () => { if (rayas) return rayas; const c = document.createElement('canvas'); c.width = 4; c.height = 3; const g = c.getContext('2d'); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, 0, 4, 1); rayas = cx.createPattern(c, 'repeat'); return rayas; };
-    const PERIODO = 7;
-    const layoutRadarPro = () => {
-      // Room around the scope for its bearings and regions, and for the legend under it. A narrow
-      // screen: the scope as large as it fits under its readout, without the region arcs.
-      const estrecho = st.W < 700;
-      const Rr = estrecho ? Math.max(60, Math.min(st.W / 2 - 34, st.H / 2 - 77)) : Math.max(80, Math.min(st.W * 0.4, st.H / 2 - 72)), R0 = Rr * 0.12;
-      const c = { x: st.W / 2, y: estrecho ? 72 + Rr : st.H / 2 + 4 };
-      // The scale follows the data: the busiest contact near the inner ring, the quietest near the
-      // edge, at least three powers of ten between them.
-      const vals = VISIBLES.map((d) => d.sub).filter((v) => v > 0);
-      const hi = Math.log10(Math.max(1000, ...vals, 1)) + 0.25, lo = Math.min(hi - 3, Math.log10(Math.max(10, Math.min(...vals, 1e12))) - 0.25);
-      const lmax = hi, lmin = Math.max(1, lo);
-      const radio = (b) => { const l = Math.log10(Math.max(1, b)); const f = Math.min(1, Math.max(0, (lmax - l) / (lmax - lmin))); return R0 * 1.6 + (Rr * 0.93 - R0 * 1.6) * f; };
-      const prods = posProductos(c, R0 * 0.55);
-      VISIBLES.forEach((d) => {
-        const ce = centros[d.pais], grupo = VISIBLES.filter((x) => x.pais === d.pais), k = grupo.indexOf(d);
-        const rumbo = ((ce.lon % 360) + 360) % 360 + (k - (grupo.length - 1) / 2) * Math.min(2.4, 20 / grupo.length);
-        const ang = (rumbo - 90) * RAD, dist = d.sub ? radio(d.sub) : Rr * 0.97;
-        d.ang = ang; d.rumbo = (rumbo + 360) % 360; d.x = c.x + Math.cos(ang) * dist; d.y = c.y + Math.sin(ang) * dist;
-        const pr = posDe(prods, d, c), g = { x: c.x + Math.cos(ang) * R0, y: c.y + Math.sin(ang) * R0 };
-        d.ruta = tramo((u) => ({ x: pr.x + (g.x - pr.x) * u, y: pr.y + (g.y - pr.y) * u }), 8).concat(tramo((u) => ({ x: g.x + (d.x - g.x) * u, y: g.y + (d.y - g.y) * u }), N - 8).slice(1));
-        d.tg = 8 / N; d.vis = true;
-      });
-      return { c, Rr, R0, prods, lmin, lmax, radio, estrecho };
-    };
-    // A line of facts split at its « · » so each piece fits the width.
-    const partir = (texto, ancho) => {
-      const out = []; let linea = '';
-      texto.split(' · ').forEach((p) => { const prueba = linea ? linea + ' · ' + p : p; if (linea && cx.measureText(prueba).width > ancho) { out.push(linea); linea = p; } else linea = prueba; });
-      if (linea) out.push(linea);
-      return out;
-    };
-    const etiquetaBytes = (l) => bytes(Math.pow(10, l)).replace('.0 ', ' ');
-    const dibujaRadarPro = (dt) => {
-      const L = layoutRadarPro(), tt = tiempo(), { c, Rr, R0 } = L;
-      const barrido = ((tt % PERIODO) / PERIODO) * Math.PI * 2 - Math.PI / 2;
-      // The scope's glass: a dark teal disc with a vignette.
-      const fondoG = cx.createRadialGradient(c.x, c.y, Rr * 0.05, c.x, c.y, Rr * 1.15);
-      fondoG.addColorStop(0, 'rgba(10,40,44,.55)'); fondoG.addColorStop(0.7, 'rgba(5,20,26,.5)'); fondoG.addColorStop(1, 'rgba(4,7,13,0)');
-      cx.fillStyle = fondoG; cx.beginPath(); cx.arc(c.x, c.y, Rr * 1.15, 0, 7); cx.fill();
-      // Range rings: one per power of ten of bytes, labelled; nearer the centre, more data.
-      cx.lineWidth = 1; cx.font = '10px "IBM Plex Mono", monospace'; cx.textAlign = 'left';
-      for (let l = Math.ceil(L.lmin); l <= Math.floor(L.lmax); l++) {
-        const r = L.radio(Math.pow(10, l));
-        cx.strokeStyle = 'rgba(63,224,197,.16)'; cx.beginPath(); cx.arc(c.x, c.y, r, 0, 7); cx.stroke();
-        const a = 135 * RAD - Math.PI / 2; cx.fillStyle = 'rgba(63,224,197,.55)'; cx.fillText(etiquetaBytes(l), c.x + Math.cos(a) * r + 4, c.y + Math.sin(a) * r - 3);
-      }
-      cx.strokeStyle = 'rgba(63,224,197,.35)'; cx.beginPath(); cx.arc(c.x, c.y, Rr, 0, 7); cx.stroke();
-      cx.strokeStyle = 'rgba(63,224,197,.08)'; cx.beginPath(); cx.moveTo(c.x - Rr, c.y); cx.lineTo(c.x + Rr, c.y); cx.moveTo(c.x, c.y - Rr); cx.lineTo(c.x, c.y + Rr); cx.stroke();
-      // Bearings: a tick every 5°, a number every 30° (000 = the Greenwich meridian, up).
-      for (let g = 0; g < 360; g += 5) {
-        const a = (g - 90) * RAD, largo = g % 30 === 0 ? 10 : g % 10 === 0 ? 6 : 3;
-        cx.strokeStyle = g % 30 === 0 ? 'rgba(63,224,197,.7)' : 'rgba(63,224,197,.35)';
-        cx.beginPath(); cx.moveTo(c.x + Math.cos(a) * Rr, c.y + Math.sin(a) * Rr); cx.lineTo(c.x + Math.cos(a) * (Rr + largo), c.y + Math.sin(a) * (Rr + largo)); cx.stroke();
-        if (g % 30 === 0) { cx.fillStyle = 'rgba(63,224,197,.75)'; cx.textAlign = 'center'; cx.fillText(String(g).padStart(3, '0'), c.x + Math.cos(a) * (Rr + 22), c.y + Math.sin(a) * (Rr + 22) + 3.5); }
-      }
-      // Regions as arcs outside the bearings (by longitude: west on the left, east on the right).
-      const cajasRegion = [];
-      if (!L.estrecho) [[t('pd_america'), 190, 330], [t('pd_europa') + ' · ' + t('pd_africa'), 335, 55], [t('pd_asia') + ' · ' + t('pd_oceania'), 60, 185]].forEach(([n, a0, a1]) => {
-        const g0 = (a0 - 90) * RAD, g1 = ((a1 < a0 ? a1 + 360 : a1) - 90) * RAD, rr = Rr + 38;
-        cx.strokeStyle = 'rgba(63,224,197,.35)'; cx.beginPath(); cx.arc(c.x, c.y, rr, g0, g1); cx.stroke();
-        const gm = (g0 + g1) / 2; cx.fillStyle = 'rgba(170,200,215,.8)'; cx.font = '500 10px "IBM Plex Mono", monospace';
-        const lx = c.x + Math.cos(gm) * (rr + 12), ly = c.y + Math.sin(gm) * (rr + 12) + 3, lw = cx.measureText(n.toUpperCase()).width;
-        cx.textAlign = 'center'; cx.fillText(n.toUpperCase(), lx, ly);
-        cajasRegion.push({ x: lx - lw / 2 - 4, y: ly - 11, w: lw + 8, h: 15 });
-      });
-      cx.textAlign = 'left';
-      // Phosphor: what the sweep lights stays and fades (half-life 1.4 s of real time, whatever the
-      // frame rate), like a real scope. The swept sector is filled whole, so a slow frame leaves
-      // no gaps.
-      const ahora = performance.now();
-      const real = Math.min(2, (ahora - (radarAntes || ahora)) / 1000); radarAntes = ahora;
-      const f = capaFosforo();
-      f.globalCompositeOperation = 'destination-out'; f.fillStyle = `rgba(0,0,0,${1 - Math.pow(0.5, real / 1.4)})`; f.fillRect(0, 0, st.Wc, st.H);
-      f.globalCompositeOperation = 'lighter';
-      const norm = (x) => ((x % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-      const paso = norm(barrido - barridoAntes), seguido = paso > 0 && paso < 1;
-      if (seguido) { f.fillStyle = 'rgba(63,224,197,.07)'; f.beginPath(); f.moveTo(c.x, c.y); f.arc(c.x, c.y, Rr, barrido - paso, barrido); f.closePath(); f.fill(); }
-      const cruza = (a) => seguido && norm(a - (barrido - paso)) <= paso;
-      VISIBLES.forEach((d) => {
-        if (!cruza(d.ang)) return;
-        d.eco = ahora;
-        const bl = bloqueado(d), col = bl ? '255,107,122' : d.doc === false ? '255,209,102' : '120,255,225';
-        const r = 3 + Math.min(7, Math.log10(1 + d.sub) * 0.9);
-        const gr = f.createRadialGradient(d.x, d.y, 0, d.x, d.y, r * 2.6); gr.addColorStop(0, `rgba(${col},.95)`); gr.addColorStop(0.35, `rgba(${col},.45)`); gr.addColorStop(1, `rgba(${col},0)`);
-        f.fillStyle = gr; f.beginPath(); f.arc(d.x, d.y, r * 2.6, 0, 7); f.fill();
-      });
-      barridoAntes = barrido;
-      cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0); cx.globalCompositeOperation = 'lighter'; cx.drawImage(fosforo, 0, 0); cx.restore();
-      cx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);
-      // The beam itself, sharp, with a short glow behind it, drawn fresh each frame.
-      cx.globalCompositeOperation = 'lighter';
-      for (let k = 0; k < 14; k++) { const a0 = barrido - k * 0.02; cx.fillStyle = `rgba(63,224,197,${0.06 * (1 - k / 14)})`; cx.beginPath(); cx.moveTo(c.x, c.y); cx.arc(c.x, c.y, Rr, a0 - 0.021, a0); cx.closePath(); cx.fill(); }
-      cx.strokeStyle = 'rgba(140,255,230,.9)'; cx.lineWidth = 1.4; cx.beginPath(); cx.moveTo(c.x, c.y); cx.lineTo(c.x + Math.cos(barrido) * Rr, c.y + Math.sin(barrido) * Rr); cx.stroke();
-      cx.globalCompositeOperation = 'source-over';
-      // The routes, faint, and the data moving along them.
-      cx.globalCompositeOperation = 'lighter';
-      VISIBLES.forEach((d) => { const bl = bloqueado(d); trazo(d.ruta, 0, bl ? d.tg : 1, bl ? 'rgba(255,107,122,.3)' : prod(d.p).color + '12', 0.8); });
-      cx.globalCompositeOperation = 'source-over';
-      escudo(c, R0); ordenador(c, Math.max(13, R0 * 0.3));
-      st.dianas.push({ x: c.x, y: c.y, r: R0 * 0.35, tipo: 'yo' });
-      L.prods.forEach(nodoProducto);
-      particulas(dt);
-      VISIBLES.forEach((d) => st.dianas.push({ x: d.x, y: d.y, r: 12, tipo: 'dest', ref: d }));
-      // Air-traffic-control tags for the busiest contacts and the stopped ones: they light up as
-      // the sweep passes and dim after.
-      if (st.W >= 700) {
-        const puestos = [{ x: c.x - R0, y: c.y - R0, w: 2 * R0, h: 2 * R0 }, ...cajasRegion];
-        VISIBLES.filter((d) => bloqueado(d) || VISIBLES.indexOf(d) < 10).slice(0, 14).forEach((d) => {
-          const brillo2 = 0.45 + 0.55 * Math.exp(-((ahora - (d.eco || 0)) / 1000) / 2.2);
-          const prog = (prod(d.p).nombre || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase();
-          const l1 = `${prog} ${(d.destino || d.host).toUpperCase().slice(0, 26)}`;
-          const l2 = `${String(Math.round(d.rumbo)).padStart(3, '0')}° · ${d.pais} · ${(d.red && d.red[0] !== '@' ? d.red : '—').toUpperCase().slice(0, 14)}${d.asn ? ' AS' + d.asn : ''}`;
-          const l3 = bloqueado(d) ? tn('pd_parados', d.bloq).toUpperCase() : `↑ ${bytes(d.ema || 0)}/S · ${bytes(d.sub)}`;
-          cx.font = '500 10px "IBM Plex Mono", monospace';
-          const w = Math.max(cx.measureText(l1).width, cx.measureText(l2).width, cx.measureText(l3).width) + 10, h = 40;
-          // Outwards from the centre; if the place is taken, a little along the ring; else no tag.
-          const ux = Math.cos(d.ang), uy = Math.sin(d.ang), dcha = ux >= 0;
-          const choca = (x0, y0) => puestos.some((b) => x0 < b.x + b.w && x0 + w > b.x && y0 < b.y + b.h && y0 + h > b.y) || x0 < 4 || x0 + w > st.W - 4 || y0 < 50 || y0 + h > st.H - 30;
-          let bx = 0, by = 0, ok = false;
-          for (const [dist, tang] of [[22, 0], [22, 26], [22, -26], [44, 0], [44, 34], [44, -34], [66, 0]]) {
-            const ax = d.x + ux * dist - uy * tang, ay = d.y + uy * dist + ux * tang;
-            bx = dcha ? ax : ax - w; by = ay - h / 2;
-            if (!choca(bx, by)) { ok = true; break; }
-          }
-          if (!ok) return;
-          puestos.push({ x: bx, y: by, w, h });
-          const col = bloqueado(d) ? `rgba(255,141,153,${brillo2})` : `rgba(140,255,225,${brillo2})`;
-          cx.strokeStyle = col; cx.lineWidth = 1; cx.beginPath(); cx.moveTo(d.x, d.y); cx.lineTo(dcha ? bx : bx + w, by + h / 2); cx.stroke();
-          cx.fillStyle = `rgba(4,14,18,${0.55 + 0.25 * brillo2})`; cx.fillRect(bx, by, w, h);
-          cx.fillStyle = col; cx.fillText(l1, bx + 5, by + 11); cx.fillStyle = `rgba(170,200,215,${brillo2})`; cx.fillText(l2, bx + 5, by + 23); cx.fillStyle = col; cx.fillText(l3, bx + 5, by + 35);
-        });
-      }
-      // The glass: fine scan lines and a vignette, very light.
-      cx.save(); cx.beginPath(); cx.arc(c.x, c.y, Rr, 0, 7); cx.clip();
-      cx.fillStyle = patronRayas(); cx.globalAlpha = 0.5; cx.fillRect(c.x - Rr, c.y - Rr, Rr * 2, Rr * 2); cx.globalAlpha = 1;
-      const vi = cx.createRadialGradient(c.x, c.y, Rr * 0.6, c.x, c.y, Rr); vi.addColorStop(0, 'rgba(0,0,0,0)'); vi.addColorStop(1, 'rgba(0,0,0,.35)'); cx.fillStyle = vi; cx.fillRect(c.x - Rr, c.y - Rr, Rr * 2, Rr * 2);
-      cx.restore();
-      // The scope's own readout.
-      cx.font = '500 10.5px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(140,255,225,.75)'; cx.textAlign = 'center';
-      // The scope's readout: centred on top of a narrow screen, in the top right corner otherwise
-      // (the top left is the live telemetry's).
-      const lectura = partir(t('pd_radar_lectura').replace('{n}', VISIBLES.length).replace('{p}', VISIBLES.filter(bloqueado).length).replace('{s}', PERIODO).toUpperCase(), L.estrecho ? st.W - 24 : st.W / 2 - 90);
-      if (!L.estrecho) cx.textAlign = 'right';
-      lectura.forEach((l, i) => cx.fillText(l, L.estrecho ? c.x : st.W - 14, (L.estrecho ? 16 : 22) + i * 13));
-      cx.textAlign = 'left';
-    };
-
-    // ---------- 3. The computer: a Sankey diagram through GUARDIANA's gate ----------
+    // ---------- Programas: a Sankey diagram through GUARDIANA's gate ----------
+    // (13 Oct 2026: of the five views only two stay, Programas and Destinos; the nebula and the
+    // radar asked for an explanation and helped little to decide — the plan of the three AIs.)
     const banda = (x0, a0, b0, x1, a1, b1) => { const xm = (x0 + x1) / 2; cx.beginPath(); cx.moveTo(x0, a0); cx.bezierCurveTo(xm, a0, xm, a1, x1, a1); cx.lineTo(x1, b1); cx.bezierCurveTo(xm, b1, xm, b0, x0, b0); cx.closePath(); };
     const curvaCentro = (x0, y0, x1, y1, n) => { const out = [], xm = (x0 + x1) / 2; for (let i = 0; i <= n; i++) { const u = i / n, a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c2 = 3 * (1 - u) * u * u, d2 = u ** 3; out.push({ x: a * x0 + b * xm + c2 * xm + d2 * x1, y: a * y0 + b * y0 + c2 * y1 + d2 * y1 }); } return out; };
     // A label cut to the width it has, with an ellipsis.
@@ -1299,7 +855,9 @@
       const nodosPais = [...new Set(pasan.map(paisDe))].sort((a, b) => (a === OTROS) - (b === OTROS) || (totP[b] || 0) - (totP[a] || 0));
       const nodosRed = col.red === null ? [] : [...new Set(pasan.map(redDe))].sort((a, b) => (a === OTROS) - (b === OTROS) || (totR[b] || 0) - (totR[a] || 0));
       const total = Math.max(1, pasan.reduce((a, d) => a + d.sub, 0));
-      const parPx = (d) => Math.min(10, 2 + 1.6 * Math.log2(1 + d.bloq));
+      // A stopped attempt is counted, not measured in bytes (nothing left): each stopped flow is
+      // the same thin dashed line, never a band on the bytes' scale (ChatGPT's review, 13 Oct 2026).
+      const parPx = () => 4;
       const stopTot = paran.reduce((a, d) => a + parPx(d), 0);
       const gap = estrecho ? 7 : 10, nMax = Math.max(ps.length, nodosPais.length, nodosRed.length);
       const k = Math.max(0.000001, (alto - gap * (nMax - 1) - stopTot) / total * 0.92);
@@ -1368,6 +926,7 @@
       cx.globalCompositeOperation = 'lighter';
       L.bandas.forEach((b) => {
         const resaltada = hov && hov.ref === b.d;
+        if (b.tipo === 'para') { cx.globalCompositeOperation = 'source-over'; trazo(b.d.ruta, 0, 1, resaltada ? 'rgba(255,107,122,.95)' : 'rgba(255,107,122,.6)', 1.4, [4, 3]); cx.globalCompositeOperation = 'lighter'; return; }
         b.tramos.forEach(([x0, y0, x1, y1, h], i) => {
           const hh = Math.max(1, h);
           const g = cx.createLinearGradient(x0, 0, x1, 0);
@@ -1388,7 +947,7 @@
       cx.fillText(t('pd_puerta_pasa').replace('{x}', bytes(L.total)), L.col.puerta, yT + 14);
       cx.fillStyle = 'rgba(255,141,153,.9)'; cx.fillText(tn('pd_parados', parados.reduce((a, d) => a + d.bloq, 0)), L.col.puerta, yT + 26);
       cx.textAlign = 'left';
-      L.bandas.filter((b) => b.tipo === 'para').forEach((b) => { const [, , x1, y1, h] = b.tramos[0]; cx.fillStyle = '#ff6b7a'; cx.fillRect(x1 - 1, y1, 4, Math.max(2, h)); });
+      L.bandas.filter((b) => b.tipo === 'para').forEach((b) => { const [, , x1, y1, h] = b.tramos[0], ym = y1 + h / 2; cx.strokeStyle = '#ff6b7a'; cx.lineWidth = 1.6; cx.beginPath(); cx.moveTo(x1 - 3, ym - 3); cx.lineTo(x1 + 3, ym + 3); cx.moveTo(x1 + 3, ym - 3); cx.lineTo(x1 - 3, ym + 3); cx.stroke(); });
       // Nodes and their labels, each cut to the room it has.
       Object.values(L.nodoProg).forEach((n) => {
         cx.fillStyle = n.p.color; cx.fillRect(n.x, n.y, L.nodoW, n.h);
@@ -1425,12 +984,14 @@
     const sparkline = () => {
       const { g, w, h } = prepara($('spark'));
       if (w < 20 || h < 20) return;
-      const mx = Math.max(1, ...st.serie);
+      const ps = prodsVisibles(), suma = new Array(N_CUBOS).fill(0);
+      ps.forEach((p) => (st.serieP[p.id] || []).forEach((v, i) => { suma[i] += v; }));
+      const mx = Math.max(1, ...suma);
       g.strokeStyle = 'rgba(118,144,168,.18)'; g.lineWidth = 1;
       for (let k = 1; k < 4; k++) { g.beginPath(); g.moveTo(0, h * k / 4); g.lineTo(w, h * k / 4); g.stroke(); }
       const n = st.serie.length, X = (i) => i / (n - 1) * w, Y = (v) => h - 3 - v / mx * (h - 9);
       let base = new Array(n).fill(0);
-      prodsVisibles().forEach((p) => {
+      ps.forEach((p) => {
         const serie = st.serieP[p.id] || [], tope = base.map((b, i) => b + (serie[i] || 0));
         g.beginPath(); tope.forEach((v, i) => (i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v))));
         for (let i = n - 1; i >= 0; i--) g.lineTo(X(i), Y(base[i]));
@@ -1449,14 +1010,16 @@
       g.fillStyle = '#d3e6f3'; g.font = '600 17px "IBM Plex Mono", monospace'; g.textAlign = 'center'; g.fillText(f === null ? '—' : Math.round(f * 100) + '%', c.x, c.y - 6);
     };
     const pintaHud = () => {
-      $('registro').innerHTML = st.eventos.slice(0, 9).map((e) => `<li><span class="t">${esc(e.h)}</span> ${esc(e.prog)} → ${esc(e.host)} <span class="${e.cls}">${esc(e.que)}</span></li>`).join('') || `<li class="t">${esc(t('pd_registro_vacio'))}</li>`;
-      $('hud-min').textContent = bytes(st.serie.reduce((a, b) => a + b, 0));
-      const pp = {}; DEST.forEach((d) => { if (d.pais && d.pais[0] !== '@' && !d.sede) pp[d.pais] = (pp[d.pais] || 0) + d.sub; });
+      // The deck follows «Todo · Datos · Antivirus», like the drawing.
+      const mios = PROD.filter(enFiltro), ids = new Set(mios.map((p) => p.id)), DF = DEST.filter((d) => ids.has(d.p));
+      $('registro').innerHTML = st.eventos.filter((e) => st.filtro === 'todo' || (st.filtro === 'av') === !!e.av).slice(0, 9).map((e) => `<li><span class="t">${esc(e.h)}</span> ${esc(e.prog)} → ${esc(e.host)} <span class="${e.cls}">${esc(e.que)}</span></li>`).join('') || `<li class="t">${esc(t('pd_registro_vacio'))}</li>`;
+      $('hud-min').textContent = bytes(mios.reduce((a, p) => a + (st.serieP[p.id] || []).reduce((x, y) => x + y, 0), 0));
+      const pp = {}; DF.forEach((d) => { if (d.pais && d.pais[0] !== '@' && !d.sede) pp[d.pais] = (pp[d.pais] || 0) + d.sub; });
       const top = Object.entries(pp).filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 5), mx = Math.max(1, ...top.map((x) => x[1]));
       $('barras').innerHTML = top.map(([c, v]) => `<div><span>${esc(nombrePais(c))}</span><s data-w="${Math.max(2, v / mx * 100)}"></s><span>${esc(bytes(v))}</span></div>`).join('') || `<div class="t">—</div>`;
       estilos($('barras'));
-      $('hud-cortes').textContent = num(DEST.filter((d) => d.cortado).length + PROD.filter((p) => p.cortado).length);
-      $('hud-bloqueos').textContent = tn('pd_intentos', DEST.reduce((a, d) => a + d.bloq, 0));
+      $('hud-cortes').textContent = num(DF.filter((d) => d.cortado).length + mios.filter((p) => p.cortado).length);
+      $('hud-bloqueos').textContent = tn('pd_intentos', DF.reduce((a, d) => a + d.bloq, 0));
       const av = DEST.filter((d) => d.doc !== null && d.doc !== undefined), tot = av.reduce((a, d) => a + d.sub, 0), doc = av.filter((d) => d.doc).reduce((a, d) => a + d.sub, 0);
       sparkline(); indicador(tot ? doc / tot : null);
       $('hud-doc').textContent = tot ? t('pd_doc_explica').replace('{n}', pct(doc, tot)).replace('{m}', 100 - pct(doc, tot)) : t('pd_doc_nada');
@@ -1596,7 +1159,7 @@
     };
     const telemetria = () => {
       const el = $('telemetria');
-      el.hidden = st.vista === 'dentro' || datosAbierto || st.Wc < 700;
+      el.hidden = st.vista === 'programas' || datosAbierto || st.Wc < 700;
       if (!el.hidden) el.innerHTML = htmlDirecto();
     };
 
@@ -1605,7 +1168,7 @@
       let mejor = null, dm = Infinity;
       st.dianas.forEach((d) => { const dd = Math.hypot(d.x - x, d.y - y); if (dd < d.r && dd < dm) { dm = dd; mejor = d; } });
       if (mejor) return mejor;
-      if (enTierra()) { const c = paisBajo(x, y); return c ? { tipo: 'pais', ref: c } : null; }
+      if (st.vista === 'destinos') { const c = paisBajo(x, y); return c ? { tipo: 'pais', ref: c } : null; }
       return null;
     };
     const usoTexto = (d) => (d.doc === null || d.doc === undefined ? '' : d.uso ? `<div>${esc(t('pd_para_que'))} <b>${esc(t('av_uso_' + d.uso))}</b></div>` : `<div class="nodoc">${esc(t('pd_no_documenta'))}</div>`);
@@ -1617,7 +1180,9 @@
         const donde = d.sede ? t('pd_sede').replace('{pais}', nombrePais(d.pais)).replace('{empresa}', d.red || '—') : t('pd_servidor').replace('{pais}', d.pais ? nombrePais(d.pais) : '—').replace('{red}', d.red || '—');
         const accion = !d.destino ? t('pd_sin_nombre_no_corta') : d.ancho ? t('pd_ancho_dejar') : d.cortado ? t('pd_clic_dejar') : t('pd_clic_cortar');
         return `<div class="mono">${esc(d.host)}</div><div>${esc(p.nombre)} · <span class="mono">${esc(p.procesos.join(' · '))}</span></div>${usoTexto(d)}
+          ${d.empresa && !d.sede ? `<div>${esc(t('pd_nombre_de').replace('{empresa}', d.empresa))}</div>` : ''}
           <div>${esc(donde)}${d.asn ? ` <span class="mono">AS${d.asn}</span>` : ''}</div>
+          ${d.red && !d.sede && d.red[0] !== '@' && d.red !== d.empresa ? `<div class="t">${esc(t('pd_red_no_es'))}</div>` : ''}
           ${d.proto ? `<div>${esc((d.vias && d.vias.length ? d.vias : [d.proto + '/' + d.puerto]).join(' · '))}${d.puerto === 443 ? ' ' + esc(t('pd_cifrado_corto')) : d.puerto === 80 ? ' ' + esc(t('pd_sin_cifrar_corto')) : ''} · ${esc(tn('pd_paquetes_n', d.paq))}</div>` : ''}
           <div>${esc(t('pd_enviado'))} <b>${esc(bytes(d.sub))}</b> · ${esc(t('pd_recibido'))} ${esc(bytes(d.baj))}${d.consultas ? ' · ' + esc(tn('pd_consultas', d.consultas)) : ''}${d.bloq ? ' · ' + esc(tn('pd_parados', d.bloq)) : ''}</div>
           <div class="t">${d.primera ? esc(t('pd_primera').replace('{t}', hace(Date.now() - d.primera))) : ''}${dia === null ? '' : ' · ' + esc(t(dia ? 'pd_alli_dia' : 'pd_alli_noche'))}</div>${estado}
@@ -1634,7 +1199,7 @@
       if (hh.tipo === 'red') {
         const r = hh.ref, ds = DEST.filter((d) => d.red === r && !d.sede), asn = (ds.find((d) => d.asn) || {}).asn;
         const paises = [...new Set(ds.map((d) => d.pais).filter((x) => x && x[0] !== '@'))].map(nombrePais).join(', ');
-        return `<b>${esc(r)}</b>${asn ? ` <span class="mono">AS${asn}</span>` : ''}<div>${esc(t('pd_red_paises'))} <b>${esc(paises || '—')}</b></div>
+        return `<b>${esc(r)}</b>${asn ? ` <span class="mono">AS${asn}</span>` : ''}<div>${esc(t('pd_red_paises'))} <b>${esc(paises || '—')}</b></div><div class="t">${esc(t('pd_red_no_es'))}</div>
           <div>${esc(t('pd_enviado'))} <b>${esc(bytes(ds.reduce((a, d) => a + d.sub, 0)))}</b> · ${esc(t('pd_recibido'))} ${esc(bytes(ds.reduce((a, d) => a + d.baj, 0)))}</div>
           <div class="mono arriba4">${ds.slice(0, 10).map((d) => '· ' + esc(d.host)).join('<br>')}${ds.length > 10 ? '<br>…' : ''}</div>`;
       }
@@ -1653,7 +1218,7 @@
     };
     const actualizaTip = () => {
       const { x, y } = st.raton, hh = queHay(x, y);
-      cv.style.cursor = hh && (hh.tipo === 'dest' || hh.tipo === 'prod') ? 'pointer' : st.vista === 'globo' || nebulosaGL() ? 'grab' : 'crosshair';
+      cv.style.cursor = hh && (hh.tipo === 'dest' || hh.tipo === 'prod') ? 'pointer' : enGlobo() ? 'grab' : 'crosshair';
       if (!hh) { tip.hidden = true; st.hover = null; return; }
       const html = textoTip(hh);
       if (tip.innerHTML !== html) { tip.innerHTML = html; estilos(tip); }
@@ -1724,9 +1289,9 @@
       const r = cv.getBoundingClientRect(); st.raton = { x: e.clientX - r.left, y: e.clientY - r.top };
       if (st.arrastre) { st.dRot += (e.clientX - st.arrastre.x) * 0.006; st.dTilt -= (e.clientY - st.arrastre.y) * 0.004; st.arrastre = { x: e.clientX, y: e.clientY, mov: true }; }
     });
-    cv.addEventListener('wheel', (e) => { if (!enTierra() && !nebulosaGL()) return; e.preventDefault(); T.zoom = Math.max(0.7, Math.min(3.2, T.zoom * Math.exp(-e.deltaY * 0.0012))); }, { passive: false });
+    cv.addEventListener('wheel', (e) => { if (!enTierra()) return; e.preventDefault(); T.zoom = Math.max(0.7, Math.min(3.2, T.zoom * Math.exp(-e.deltaY * 0.0012))); }, { passive: false });
     cv.addEventListener('pointerleave', () => { st.raton = null; tip.hidden = true; });
-    cv.addEventListener('pointerdown', (e) => { if (st.vista === 'globo' || nebulosaGL()) { st.arrastre = { x: e.clientX, y: e.clientY, mov: false }; cv.setPointerCapture(e.pointerId); } });
+    cv.addEventListener('pointerdown', (e) => { if (enGlobo()) { st.arrastre = { x: e.clientX, y: e.clientY, mov: false }; cv.setPointerCapture(e.pointerId); } });
     cv.addEventListener('pointerup', (e) => {
       const movido = st.arrastre && st.arrastre.mov; st.arrastre = null;
       if (movido) return;
@@ -1736,30 +1301,42 @@
       if (hh.tipo === 'dest') corteNombre(hh.ref);
       if (hh.tipo === 'prod') corteProducto(hh.ref);
     });
-    const AYUDA = { globo: 'pd_ayuda_globo', mapa: 'pd_ayuda_mapa', nebulosa: 'pd_ayuda_nebulosa', dentro: 'pd_ayuda_dentro', radar: 'pd_ayuda_radar' };
-    const VISTAS = ['globo', 'mapa', 'nebulosa', 'dentro', 'radar'];
-    const ponVista = (v) => {
-      const antesT = st.vista === 'globo' || st.vista === 'mapa', ahoraT = v === 'globo' || v === 'mapa';
-      if (!(antesT && ahoraT)) { st.part = []; st.estallidos = []; }
-      st.vista = v;
-      document.querySelectorAll('.pestanas button').forEach((b) => {
-        b.setAttribute('aria-pressed', String(b.dataset.vista === v));
-        // On a phone the tabs slide sideways: the chosen one comes into sight.
-        const fila = b.parentElement;
-        if (b.dataset.vista === v && fila.scrollWidth > fila.clientWidth) fila.scrollLeft = Math.max(0, b.offsetLeft - fila.offsetLeft - (fila.clientWidth - b.offsetWidth) / 2);
-      });
-      $('ayuda-vista').textContent = t(AYUDA[v]) + ((v === 'globo' || v === 'mapa') && !T.ok ? ' ' + t('pd_sin_webgl') : '');
+    // Two views (13 Oct 2026): Destinos, where each server is on the Earth (the flat map by
+    // default, the globe as an option), and Programas, how much each program sends and where to.
+    const enGlobo = () => st.vista === 'destinos' && st.proy === 'globo' && T.ok;
+    const ayuda = () => t(st.vista === 'programas' ? 'pd_ayuda_programas' : !T.ok ? 'pd_ayuda_plano' : st.proy === 'globo' ? 'pd_ayuda_globo' : 'pd_ayuda_mapa');
+    const VISTAS = ['destinos', 'programas'];
+    const muestraAyuda = () => {
+      $('ayuda-vista').textContent = ayuda();
       // The help says what to do and then gets out of the way.
-      $('ayuda-vista').classList.remove('oculta'); clearTimeout(ponVista.ayuda); ponVista.ayuda = setTimeout(() => $('ayuda-vista').classList.add('oculta'), 12000);
-      try { localStorage.setItem('guardiana_pd_vista', v); } catch (_) {}
+      $('ayuda-vista').classList.remove('oculta'); clearTimeout(muestraAyuda.t); muestraAyuda.t = setTimeout(() => $('ayuda-vista').classList.add('oculta'), 12000);
+    };
+    const pulsado = (sel, attr, v) => document.querySelectorAll(sel).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset[attr] === v)));
+    const guarda = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
+    const ponVista = (v) => {
+      if (v !== st.vista) { st.part = []; st.estallidos = []; }
+      st.vista = v;
+      pulsado('.pestanas button', 'vista', v);
+      $('proy').hidden = v !== 'destinos' || !T.ok;
+      muestraAyuda();
+      guarda('guardiana_pd_vista', v);
+    };
+    const ponProy = (v) => { st.proy = v; pulsado('#proy button', 'proy', v); if (st.vista === 'destinos') muestraAyuda(); guarda('guardiana_pd_proy', v); };
+    const ponFiltro = (v) => {
+      st.filtro = v; pulsado('#filtro button', 'filtro', v);
+      recalcula(); st.part = st.part.filter((q) => VISIBLES.includes(q.d));
+      pintaHud(); guarda('guardiana_pd_filtro', v);
     };
     document.querySelectorAll('.pestanas button').forEach((b) => b.addEventListener('click', () => ponVista(b.dataset.vista)));
+    document.querySelectorAll('#proy button').forEach((b) => b.addEventListener('click', () => ponProy(b.dataset.proy)));
+    document.querySelectorAll('#filtro button').forEach((b) => b.addEventListener('click', () => ponFiltro(b.dataset.filtro)));
     const pantalla = (on) => { stage.classList.toggle('full', on); $('pantalla').textContent = t(on ? 'pd_cerrar' : 'pd_pantalla_completa'); requestAnimationFrame(ajusta); };
     $('pantalla').addEventListener('click', () => { if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; } if (stage.requestFullscreen) stage.requestFullscreen().catch(() => pantalla(!stage.classList.contains('full'))); else pantalla(!stage.classList.contains('full')); });
     document.addEventListener('fullscreenchange', () => { $('pantalla').textContent = t(document.fullscreenElement ? 'pd_cerrar' : 'pd_pantalla_completa'); requestAnimationFrame(ajusta); });
     document.addEventListener('keydown', (e) => {
-      if (/select|input|textarea/i.test(document.activeElement.tagName)) return;
-      if (['1', '2', '3', '4', '5'].includes(e.key)) ponVista(VISTAS[+e.key - 1]);
+      if (/select|input|textarea/i.test(document.activeElement.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === '1' || e.key === '2') ponVista(VISTAS[+e.key - 1]);
+      else if ((e.key === 'm' || e.key === 'g') && st.vista === 'destinos' && T.ok) ponProy(e.key === 'g' ? 'globo' : 'mapa');
     });
     // Where the computer is: said, not chosen.
     $('yo').textContent = nombrePais(st.yo) + (st.lugar.ciudad ? ' · ' + st.lugar.ciudad : '');
@@ -1781,26 +1358,28 @@
         lienzo.classList.toggle('con-datos', st.W !== st.Wc);
         fondo();
         if (enTierra()) {
-          const obj = st.vista === 'mapa' ? 1 : 0;
+          const obj = st.proy === 'globo' ? 0 : 1;
           if (obj !== T.mObj) { T.tw = { desde: T.m, t0: ahora }; T.mObj = obj; }
           if (T.tw) { const u = Math.min(1, (ahora - T.tw.t0) / 2200), e = u * u * (3 - 2 * u); T.m = T.tw.desde + (T.mObj - T.tw.desde) * e; if (u >= 1) T.tw = null; }
           glc.style.visibility = 'visible';
           camara(); pintaTierra(); dibujaTierra(dt);
-        } else if (nebulosaGL()) {
-          glc.style.visibility = 'visible';
-          construyeNebulosa(); camaraNeb(); pintaNebulosaGL(); dibujaNebulosaPro(dt);
         } else {
           glc.style.visibility = 'hidden';
-          ({ nebulosa: dibujaNebulosa, dentro: dibujaSankey, radar: dibujaRadarPro, globo: dibujaNebulosa, mapa: dibujaNebulosa })[st.vista](dt);
+          (st.vista === 'programas' ? dibujaSankey : dibujaPlano)(dt);
         }
         if (st.raton) actualizaTip();
       } catch (e) { if (!bucle.dicho) { bucle.dicho = true; console.error(e); } }
     };
 
     // ---------- Start ----------
-    let vistaGuardada = 'globo';
-    try { const v = localStorage.getItem('guardiana_pd_vista'); if (VISTAS.includes(v)) vistaGuardada = v; } catch (_) {}
-    ponVista(vistaGuardada);
+    // What the person chose last time; the five views of 1.0.22 map onto the two that stay.
+    const leido = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
+    const vAntes = leido('guardiana_pd_vista');
+    if (leido('guardiana_pd_proy') !== 'globo' && vAntes !== 'globo') { T.m = 1; T.mObj = 1; }
+    ponProy(leido('guardiana_pd_proy') === 'globo' || vAntes === 'globo' ? 'globo' : 'mapa');
+    const f0 = leido('guardiana_pd_filtro');
+    st.filtro = ['todo', 'datos', 'av'].includes(f0) ? f0 : 'todo'; pulsado('#filtro button', 'filtro', st.filtro);
+    ponVista(vAntes === 'programas' || vAntes === 'dentro' ? 'programas' : 'destinos');
     ajusta();
     let datosGuardado = null;
     try { datosGuardado = localStorage.getItem('guardiana_pd_datos'); } catch (_) {}
