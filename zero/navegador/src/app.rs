@@ -1833,6 +1833,7 @@ pub fn arranca() {
     });
     let mut s = s;
     s.pon_depuracion(DEPURA.with(|d| *d));
+    s.pon_resolutor(Some(guardiana_zero::servidor::del_sistema));
     // The subscription: seven days of the browser's own, kept in its data folder and, a second
     // time, in a folder outside it (Roaming), so emptying one does not start the week again.
     let ancla = std::env::var_os("GUARDIANA_ZERO_DATOS")

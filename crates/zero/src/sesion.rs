@@ -463,6 +463,9 @@ pub struct Sesion {
     /// What the last cuts said (`campos::muestra`), by (time, host, path): only in memory,
     /// to be shown on the person's screen while ZERO is open, never written anywhere.
     vistos: std::collections::VecDeque<Vistos>,
+    /// Where the servers of names nobody owns are (`servidor`): off until the shell gives the
+    /// system's resolver, so tests never touch the network.
+    servidores: crate::servidor::Servidores,
     /// The subscription. Unknown until the shell gives the place it lives in: the browser works
     /// (for at most a day if the place cannot be read).
     licencia: EstadoLicencia,
@@ -678,6 +681,7 @@ impl Sesion {
             trabajadores: false,
             cortes_pend: Vec::new(),
             vistos: std::collections::VecDeque::new(),
+            servidores: crate::servidor::Servidores::con(None),
             licencia: EstadoLicencia::Desconocido,
             lugar: None,
             licencia_ocupada: false,
@@ -728,6 +732,12 @@ impl Sesion {
         } else {
             paginas::guion_paginas()
         }
+    }
+
+    /// How names are resolved to place the servers of names nobody owns (the shell gives the
+    /// system's resolver; tests give a fixed answer or none).
+    pub fn pon_resolutor(&mut self, r: Option<crate::servidor::Resuelve>) {
+        self.servidores = crate::servidor::Servidores::con(r);
     }
 
     /// Whether the engine's tracking prevention should be strict.
@@ -2813,15 +2823,20 @@ impl Sesion {
         // With no country and no telling ending, never «unknown» (the owner, 13 Oct 2026): a
         // company whose seat no source gives (`!sede`), or a name no list or registry ties to
         // any company (`!dueno`). The page says which, and why.
+        // Then, for a name nobody owns or a company with no published seat, where its server
+        // is (`@XX`, or `!anycast` for a server in many countries at once), looked up on its own
+        // thread while the page waits.
+        let servidores = self.servidores.clone();
         let pais_o_dominio = |c: &Corte| {
             c.pais.clone().unwrap_or_else(|| {
                 crate::dominio::pais_del_dominio(&c.sitio).map_or_else(
-                    || {
-                        if c.quien == c.sitio {
-                            "!dueno".to_string()
-                        } else {
-                            "!sede".to_string()
+                    || match servidores.mira(&c.host) {
+                        Some(Some(i)) if i.pais.is_some() => {
+                            format!("@{}", i.pais.unwrap_or_default())
                         }
+                        Some(Some(i)) if i.anycast => "!anycast".to_string(),
+                        _ if c.quien == c.sitio => "!dueno".to_string(),
+                        _ => "!sede".to_string(),
                     },
                     |p| format!("~{p}"),
                 )
@@ -2854,6 +2869,12 @@ impl Sesion {
                             "pais".into(),
                             json!(Some(pais_o_dominio(c)).filter(|p| !p.is_empty())),
                         );
+                        if let Some(Some(i)) = servidores.mira(&c.host) {
+                            o.insert(
+                                "servidor".into(),
+                                json!({ "pais": i.pais, "red": i.red, "anycast": i.anycast }),
+                            );
+                        }
                     }
                     // What it carried, read from the names of its fields (never the values):
                     // the page, an identifier, the screen size…, and how many names stay
@@ -2909,6 +2930,7 @@ impl Sesion {
             "dia": dia,
             "sin_anotar": sin_anotar,
             "rastro": self.diario.rastro(&desde, &hasta, 10),
+            "pendientes": self.servidores.pendientes(),
             "recortada": total > cortes::MAX_LISTA,
         });
         self.a_pestana(id, &v).into_iter().collect()

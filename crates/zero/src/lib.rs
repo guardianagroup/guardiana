@@ -24,6 +24,7 @@ mod md5;
 pub mod medidas;
 pub mod paginas;
 pub mod recibo;
+pub mod servidor;
 pub mod sesion;
 pub mod tachon;
 pub mod textos;

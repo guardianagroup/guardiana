@@ -3363,3 +3363,45 @@ fn a_cut_says_what_code_was_on_the_page_and_what_it_carried() {
     );
     assert_eq!(fila["codigo"], json!(["Stripe"]), "{texto}");
 }
+
+#[test]
+fn a_name_nobody_owns_gets_its_servers_country() {
+    fn fijo(_: &str) -> Option<std::net::IpAddr> {
+        "185.15.59.224".parse().ok()
+    }
+    let (mut s, _, id) = con_pagina(true);
+    s.pon_resolutor(Some(fijo));
+    let _ = abre_pagina(&mut s, id, "https://www.eltiempo.com/");
+    let r = s.peticion(
+        id,
+        "https://zzqx-nadie-lo-conoce.com/ads/banners/1.gif",
+        "GET",
+        b"",
+        3,
+    );
+    assert!(r.cortar);
+    let n = id;
+    let _ = s.navegacion_empieza(n, CORTES, false);
+    let _ = s.pagina_nueva(n, CORTES);
+    let mut pais = String::new();
+    for _ in 0..200 {
+        let o = s.mensaje(
+            Origen::Pestana(n),
+            CORTES,
+            r#"{"tipo":"cortes","periodo":"hoy"}"#,
+        );
+        let c = del_tipo(&o, Origen::Pestana(n), "cortes").unwrap_or_default();
+        let fila = c["lista"]
+            .as_array()
+            .and_then(|l| l.iter().find(|x| x["host"] == "zzqx-nadie-lo-conoce.com"))
+            .cloned()
+            .unwrap_or_default();
+        pais = fila["pais"].as_str().unwrap_or("").to_string();
+        if pais.starts_with('@') || pais == "!anycast" {
+            assert!(fila["servidor"].is_object(), "{fila}");
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    assert!(pais.starts_with('@') || pais == "!anycast", "{pais}");
+}

@@ -17,7 +17,7 @@
 
   const lang = () => document.documentElement.lang || 'es';
   // `~CZ`: a company the lists do not know, on a site ending in that country's letters.
-  const nombrePais = (c) => (!c || c === '!dueno' ? t('cortes_sin_dueno') : c === '!sede' ? t('cortes_sin_sede') : c[0] === '~' ? t('cortes_sin_identificar', { pais: pais(c.slice(1)) }) : pais(c));
+  const nombrePais = (c) => (!c || c === '!dueno' ? t('cortes_sin_dueno') : c === '!sede' ? t('cortes_sin_sede') : c === '!anycast' ? t('cortes_servidor_anycast') : c[0] === '~' ? t('cortes_sin_identificar', { pais: pais(c.slice(1)) }) : c[0] === '@' ? t('cortes_servidor_en', { pais: pais(c.slice(1)) }) : pais(c));
   function hora(ts) {
     const d = new Date(ts);
     const h = d.toLocaleTimeString(lang(), { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -85,7 +85,7 @@
     if (mas) mas.addEventListener('click', () => { todasLasEmpresas = true; $('r-empresas').innerHTML = barras(d.empresas); sombraAbajo(); });
     sombraAbajo();
     $('r-paises').innerHTML = simple(d.paises, (x) => nombrePais(x.pais));
-    $('r-paises-nota').classList.toggle('oculto', !d.paises.slice(0, 10).some((x) => !x.pais || x.pais[0] === '!'));
+    $('r-paises-nota').classList.toggle('oculto', !d.paises.slice(0, 10).some((x) => !x.pais || x.pais[0] === '!' || x.pais[0] === '@'));
     $('r-paginas').innerHTML = simple(d.paginas, (x) => x.pagina || t('pestana_aislada'));
     $('r-motivos').innerHTML = d.motivos.map((x) => `<span class="chip rojo">${esc(t('motivo_' + x.motivo))}<b>${n(x.n)}</b></span>`).join('');
     $('r-tipos').innerHTML = d.tipos.map((x) => `<span class="chip">${esc(t('recurso_' + x.recurso))}<b>${n(x.n)}</b></span>`).join('');
@@ -177,6 +177,7 @@
     const partes = [];
     partes.push(`<p><button class="enlace-empresa" data-empresa="${esc(c.quien)}"><b>${esc(c.quien)}</b></button> · ${esc(nombrePais(c.pais))} · <button class="enlace" data-empresa="${esc(c.quien)}">${esc(t('ficha_ver'))}</button></p>`);
     if (c.pais && c.pais[0] === '~') partes.push(`<p>${esc(t('cortes_sin_identificar_explica', { pais: pais(c.pais.slice(1)) }))}</p>`);
+    if (c.servidor) partes.push(`<p>${esc(c.servidor.anycast ? t('cortes_servidor_anycast_explica', { red: c.servidor.red || '' }) : t(c.servidor.red ? 'cortes_servidor_explica' : 'cortes_servidor_explica_sin_red', { pais: pais(c.servidor.pais || ''), red: c.servidor.red || '' }))}</p>`);
     partes.push(`<p>${esc(t('cortes_det_destino'))}: <span class="mono">${esc(c.host)}${esc(c.ruta)}</span></p>`);
     partes.push(`<p>${esc(t('recurso_' + c.recurso + '_explica'))}</p>`);
     partes.push(`<p>${esc(c.motivo ? t('motivo_' + c.motivo) : '')} · ${esc(c.metodo)}</p>`);
@@ -279,7 +280,12 @@
     }));
   }
 
-  en('cortes', (m) => { datos = m; pinta(); });
+  let reintentos = 0;
+  en('cortes', (m) => {
+    datos = m; pinta();
+    // The servers of names nobody owns are looked up meanwhile: ask again until they are in.
+    if (m.pendientes > 0 && reintentos < 10) { reintentos += 1; setTimeout(pide, 2000); } else if (!m.pendientes) reintentos = 0;
+  });
   let avisoTimer = 0;
   en('guardado', (m) => {
     document.body.classList.remove('solo-resumen');

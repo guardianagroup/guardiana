@@ -121,7 +121,7 @@
   const MAX_BARRAS = 60;
   let pais = (c) => c || '';
   const lang = () => document.documentElement.lang || 'es';
-  const nombrePais = (c) => (!c || c === '!dueno' ? t('cortes_sin_dueno') : c === '!sede' ? t('cortes_sin_sede') : c[0] === '~' ? t('cortes_sin_identificar', { pais: pais(c.slice(1)) }) : pais(c));
+  const nombrePais = (c) => (!c || c === '!dueno' ? t('cortes_sin_dueno') : c === '!sede' ? t('cortes_sin_sede') : c === '!anycast' ? t('cortes_servidor_anycast') : c[0] === '~' ? t('cortes_sin_identificar', { pais: pais(c.slice(1)) }) : c[0] === '@' ? t('cortes_servidor_en', { pais: pais(c.slice(1)) }) : pais(c));
   function pideResumen() {
     pedido = Date.now();
     manda({ tipo: 'cortes', periodo, sin_lista: true });
@@ -177,7 +177,7 @@
     if (mas) mas.addEventListener('click', () => { todasLasEmpresas = true; pintaResumen(); });
     sombraAbajo();
     $('r-paises').innerHTML = simple(d.paises, (x) => nombrePais(x.pais));
-    $('r-paises-nota').classList.toggle('oculto', !d.paises.slice(0, 10).some((x) => !x.pais || x.pais[0] === '!'));
+    $('r-paises-nota').classList.toggle('oculto', !d.paises.slice(0, 10).some((x) => !x.pais || x.pais[0] === '!' || x.pais[0] === '@'));
     $('r-paginas').innerHTML = simple(d.paginas, (x) => x.pagina || t('pestana_aislada'));
     $('r-motivos').innerHTML = d.motivos.map((x) => `<span class="chip rojo">${Z.esc(t('motivo_' + x.motivo))}<b>${n(x.n)}</b></span>`).join('');
     $('r-tipos').innerHTML = d.tipos.map((x) => `<span class="chip">${Z.esc(t('recurso_' + x.recurso))}<b>${n(x.n)}</b></span>`).join('');
@@ -196,7 +196,11 @@
         : t('cortes_vacio');
     }
   }
-  en('cortes', (m) => { resumen = m; pintaResumen(); });
+  let reintentos = 0;
+  en('cortes', (m) => {
+    resumen = m; pintaResumen();
+    if (m.pendientes > 0 && reintentos < 10) { reintentos += 1; setTimeout(() => manda({ tipo: 'cortes', periodo, sin_lista: true }), 2000); } else if (!m.pendientes) reintentos = 0;
+  });
   en('textos', () => {
     try { const dn = new Intl.DisplayNames([lang()], { type: 'region' }); pais = (c) => { try { return dn.of(c); } catch (_) { return c; } }; } catch (_) {}
     $('hoy-titulo').textContent = t(periodo === 'hoy' ? 'inicio_en_directo' : 'inicio_resumen');
