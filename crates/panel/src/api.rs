@@ -95,6 +95,13 @@ pub(crate) struct EventView {
     /// La ciudad de la sede de la empresa dueña del nombre, cuando está comprobada. Va debajo
     /// del país: «Estados Unidos» sitúa bajo qué leyes está; «Menlo Park» lo hace concreto.
     ciudad: Option<String>,
+    /// For a name no company of the lists owns: the country of its two-letter ending
+    /// (`tracker.seznam.cz` → Chequia), in the panel's language. It says where the name was
+    /// registered, not where a company is, and the page says so; `None` for `.com`, for endings
+    /// sold for their look (`.io`, `.tv`) and for every name with an owner (the owner, 12 Oct
+    /// 2026: «que a nadie le salga desconocido»).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pais_dominio: Option<String>,
     /// The artificial-intelligence service the name belongs to (decision 62), or `None`.
     ia: Option<&'static str>,
     /// The delivery network that serves the name (decision 148), or `None`. Used to say
@@ -300,6 +307,7 @@ fn view(t: &Texts, e: Event, names: &HashMap<String, Option<String>>) -> EventVi
         ciudad: guardiana_lists::city_of(&e.qname)
             .filter(|_| alojado.is_none())
             .map(str::to_owned),
+        pais_dominio: pais_dominio_de(t, &e.qname, alojado.is_some()),
         ia: guardiana_lists::ai_service_of(&e.qname),
         entrega: guardiana_lists::delivery_of(&e.qname),
         local: guardiana_lists::is_local_name(&e.qname),
@@ -317,6 +325,20 @@ fn view(t: &Texts, e: Event, names: &HashMap<String, Option<String>>) -> EventVi
         rule_id: e.rule_id,
         device_id: e.device_id,
     }
+}
+
+/// See [`EventView::pais_dominio`].
+pub(crate) fn pais_dominio_de(t: &Texts, qname: &str, alojado: bool) -> Option<String> {
+    if alojado
+        || empresa_de(qname).is_some()
+        || guardiana_lists::is_local_name(qname)
+        || guardiana_lists::delivery_of(qname).is_some()
+    {
+        return None;
+    }
+    guardiana_lists::dominio::pais_del_dominio(qname)
+        .map(|c| t.pais(&c).to_owned())
+        .filter(|n| !n.is_empty())
 }
 
 fn names_of(devices: &[Device]) -> HashMap<String, Option<String>> {

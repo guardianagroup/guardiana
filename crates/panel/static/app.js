@@ -221,7 +221,7 @@
     : [{ title: t('col_hora'), w: 0.12 }, { title: t('col_nombre'), w: 0.33 }, { title: t('col_empresa_n'), w: 0.17 }, { title: t('col_categoria'), w: 0.15 }, { title: t('col_pais'), w: 0.13 }, { title: t('col_veredicto'), w: 0.10 }];
   // En el papel no hay dos líneas por celda: la ciudad va en la misma, debajo, como en la
   // pantalla, porque la columna de país se lee de arriba abajo.
-  const dondeCell = (ev) => [ev.pais || '', ev.ciudad || ''].filter(Boolean).join('\n');
+  const dondeCell = (ev) => [ev.pais || (ev.pais_dominio ? t('pais_dominio_texto').replace('{pais}', ev.pais_dominio) : ''), ev.ciudad || ''].filter(Boolean).join('\n');
   // En el papel, la etiqueta «compra y venta de datos» va debajo del nombre de la empresa, como
   // en la pantalla va a su lado.
   const empresaTexto = (ev) => (ev.empresa || (ev.alojado ? t('alojado_en').replace('{nube}', ev.alojado) : '')) + (ev.grupo ? '\n' + t('grupo_de').replace('{grupo}', ev.grupo) : '') + (ev.corredor ? '\n' + t('corredor_etiqueta') : '');
@@ -297,6 +297,9 @@
   // «Mostrando 1 de 1 eventos» read wrong: the noun follows the total (panel 22).
   const mostrandoTexto = (r) => t(r.total === 1 ? 'mostrando_uno' : 'mostrando').replace('{n}', Number(r.eventos.length).toLocaleString(LOC)).replace('{total}', Number(r.total).toLocaleString(LOC)) + ocultosTexto(r.ocultos);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // A company's name opens its profile (the owner, 12 Oct 2026: touch it and see everything about
+  // it). Same tab: the session lives in this tab, and «Volver» comes back here.
+  const empresaLink = (nombre) => (nombre ? `<a class="enlace-empresa" href="/empresa?e=${encodeURIComponent(nombre)}" title="${esc(t('ficha_ver_titulo').replace('{empresa}', nombre))}">${esc(nombre)}</a>` : '');
   // Dates follow the panel's language, not the computer's: someone reading the panel in English
   // on a Spanish machine was getting «18/9/2026», and in English that reads as the 9th of a month
   // that does not exist here. English gets a named month so the two can never be swapped.
@@ -498,7 +501,7 @@
   // El país dice bajo qué leyes está la empresa; la ciudad, debajo y en gris, lo hace concreto:
   // «Estados Unidos» son muchos sitios, «Menlo Park» es uno (pedido del responsable, 21 sep 2026).
   const paisCelda = (ev) => `<td class="pais"${ev.pais ? ` title="${esc(t('pais_titulo'))}"` : ''}>`
-    + (ev.pais ? esc(ev.pais) : '<span class="muted">—</span>')
+    + (ev.pais ? esc(ev.pais) : ev.pais_dominio ? `<span class="muted" title="${esc(t('pais_dominio_titulo').replace('{pais}', ev.pais_dominio))}">${esc(t('pais_dominio_texto').replace('{pais}', ev.pais_dominio))}</span>` : '<span class="muted">—</span>')
     + (ev.ciudad ? `<span class="ciudad">${esc(ev.ciudad)}</span>` : '') + '</td>';
   // El servicio de IA sigue pegado al nombre —es el nombre dicho de otra manera—, pero la
   // EMPRESA pasa a su propia columna, al lado de la categoría y el país: así la tabla dice
@@ -513,7 +516,7 @@
     : '');
   // A rented server on a cloud is whoever rents it: the cell says where it is hosted, not that
   // the cloud is the company (review of 9 Oct 2026).
-  const empresaCelda = (ev) => `<td class="empresa-col">${ev.empresa ? esc(ev.empresa) : ev.alojado ? `<span class="muted">${esc(t('alojado_en').replace('{nube}', ev.alojado))}</span>` : '<span class="muted">—</span>'}${corredorTag(ev)}${ev.grupo ? `<span class="grupo" title="${esc(t('grupo_titulo'))}">${esc(t('grupo_de').replace('{grupo}', ev.grupo))}</span>` : ''}</td>`;
+  const empresaCelda = (ev) => `<td class="empresa-col">${ev.empresa ? empresaLink(ev.empresa) : ev.alojado ? `<span class="muted">${esc(t('alojado_en').replace('{nube}', ev.alojado))}</span>` : '<span class="muted">—</span>'}${corredorTag(ev)}${ev.grupo ? `<span class="grupo" title="${esc(t('grupo_titulo'))}">${esc(t('grupo_de').split('{grupo}')[0])}${empresaLink(ev.grupo)}${esc(t('grupo_de').split('{grupo}').slice(1).join(''))}</span>` : ''}</td>`;
   // Dónde acaba lo de este aparato, sumado: los países de las empresas dueñas de los nombres.
   const paisesDe = (l) => (l && l.paises && l.paises.length
     ? `<br><span class="phrase">${esc(t('lectura_paises'))} ` + l.paises.map((x) => `${esc(x[0])} <b>${x[1]}</b>`).join(' · ') + '</span>'
@@ -968,7 +971,7 @@
     $('maxima-quitar').addEventListener('click', (e) => cambia(false, e.currentTarget));
     try { pinta(await api('/api/proteccion-maxima')); } catch (_) {}
   }
-  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo', borrado: 'nav_borrado' };
+  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo', borrado: 'nav_borrado', empresa: 'ficha_titulo' };
   function applyTexts() {
     document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.getAttribute('data-t')); });
     document.querySelectorAll('[data-t-html]').forEach((el) => { el.innerHTML = t(el.getAttribute('data-t-html')); });
@@ -1169,7 +1172,7 @@
       const diaCorto = (ms) => new Date(ms + 12 * 3600 * 1000).toLocaleDateString(LOC, { weekday: 'short', day: 'numeric' });
       const nada = '<span class="muted">—</span>';
       const mananas = (n) => n.mananas.map((x, i) => (x === null ? '' : diaCorto(m.dias[i]) + ' ' + hhmm(x))).filter(Boolean);
-      const empresaO = (e) => (e ? esc(e) : nada);
+      const empresaO = (e) => (e ? empresaLink(e) : nada);
       if (m) {
         $('i-noche-frase').textContent = m.noche_total ? tn('noche_frase', m.noche_total) : '';
         $('i-noche-rows').innerHTML = m.noche.map((n) => `<tr><td>${esc(nombreAparato(n.id, n.name))}</td><td>${num(n.consultas)}${n.cortadas ? ` <span class="muted">· ${esc(tn('noche_cortadas', n.cortadas))}</span>` : ''}</td><td>${num(n.noches)}</td><td>${n.empresas.length ? esc(n.empresas.join(', ')) : nada}</td><td class="horas">${mananas(n).map(esc).join('<br>') || nada}</td></tr>`).join('')
@@ -1185,7 +1188,7 @@
           || `<tr><td colspan="4" class="muted">${esc(t('disfraz_ninguno'))}</td></tr>`;
       }
       if (r.plus && !r.comparar_desde) {
-        $('i-nuevos-rows').innerHTML = r.novedades.map((n2) => `<tr><td class="mono">${esc(n2.nombre)}</td><td>${esc(n2.empresa)}</td><td>${esc(catName(n2.categoria))}</td><td>${esc(nombreAparato(n2.device_id, n2.device_name))}</td><td>${num(n2.consultas)}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('informe_nuevos_ninguno'))}</td></tr>`;
+        $('i-nuevos-rows').innerHTML = r.novedades.map((n2) => `<tr><td class="mono">${esc(n2.nombre)}</td><td>${empresaLink(n2.empresa)}</td><td>${esc(catName(n2.categoria))}</td><td>${esc(nombreAparato(n2.device_id, n2.device_name))}</td><td>${num(n2.consultas)}</td></tr>`).join('') || `<tr><td colspan="5" class="muted">${esc(t('informe_nuevos_ninguno'))}</td></tr>`;
       }
       savePdf('i-pdf', () => {
         const doc = pdfDocument('GUARDIANA · ' + t('nav_informe'));
@@ -1831,6 +1834,304 @@
         }
       });
     },
+    // A company's profile (the owner, 12 Oct 2026: «que quede todo perfecto, igual que GUARDIANA
+    // ZERO»): what the lists say of it, its checked profile with every fact's public source, what
+    // the devices of this house asked of it according to the extract, and the letter that asks it
+    // to delete the person's data, as a PDF to attach or written in the person's own mail.
+    async empresa() {
+      const pedida = new URLSearchParams(location.search).get('e') || '';
+      $('f-volver').addEventListener('click', (e) => { if (history.length > 1) { e.preventDefault(); history.back(); } });
+      let d;
+      try {
+        d = await api('/api/empresa?' + new URLSearchParams({ e: pedida }).toString());
+      } catch (err) {
+        if (!/sesi/.test(String(err.message))) $('f-no').classList.remove('hidden');
+        return;
+      }
+      const f = d.ficha || null;
+      const fx = (k, o) => Object.entries(o || {}).reduce((s, [a, b]) => s.split('{' + a + '}').join(String(b)), t(k));
+      const fn = (k, n, o) => fx(n === 1 && T.panel && T.panel[k + '_uno'] ? k + '_uno' : k, Object.assign({ n: num(n) }, o));
+      const L = (o) => (o && typeof o === 'object' ? o[LANG] || o.es || o.en || o.pt || '' : String(o || ''));
+      const web = (u) => typeof u === 'string' && /^https:\/\//.test(u);
+      const enlace = (u, texto) => (web(u) ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(texto || u)}</a>` : '');
+      let nombrePais = (c) => c || '';
+      try { const dn = new Intl.DisplayNames([LOC], { type: 'region' }); nombrePais = (c) => { try { return dn.of(c) || c; } catch (_) { return c; } }; } catch (_) {}
+      // Money as people say it: «1.930 millones de USD». Never converted: a rate would be ours.
+      const dinero = (valor, moneda) => {
+        const v = Number(valor);
+        if (!Number.isFinite(v)) return '';
+        const m = String(moneda || '').toUpperCase().slice(0, 3);
+        if (Math.abs(v) >= 1e6) return fx('ficha_millones', { n: (v / 1e6).toLocaleString(LOC, { maximumFractionDigits: Math.abs(v) >= 1e10 ? 0 : 1, useGrouping: 'always' }), moneda: m });
+        try { return v.toLocaleString(LOC, { style: 'currency', currency: m, maximumFractionDigits: 0 }); } catch (_) { return num(v) + ' ' + m; }
+      };
+      const fecha = (x) => {
+        const s = String(x || '');
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T12:00:00').toLocaleDateString(LOC, { day: 'numeric', month: 'long', year: 'numeric' });
+        if (/^\d{4}-\d{2}$/.test(s)) return new Date(s + '-15T12:00:00').toLocaleDateString(LOC, { month: 'long', year: 'numeric' });
+        return s;
+      };
+      const dia = (ms) => new Date(ms).toLocaleDateString(LOC, DIA);
+      // A fine as imposed; cut on appeal, the amount that stands; annulled, said so.
+      const importe = (x) => {
+        if (!x.importe) return { puesta: '', queda: '' };
+        const puesta = dinero(x.importe, x.moneda);
+        if (x.vigente === false) return { puesta, queda: t('ficha_anulada') };
+        if (x.importe_final) return { puesta, queda: dinero(x.importe_final, x.moneda) };
+        return { puesta: '', queda: puesta };
+      };
+      // The fines that stand, added up by currency; an annulled one does not count.
+      const totales = (lista) => {
+        const suma = new Map();
+        for (const x of lista) {
+          if (x.vigente === false) continue;
+          const v = Number(x.importe_final || x.importe);
+          if (!Number.isFinite(v) || !v || !x.moneda) continue;
+          suma.set(x.moneda, (suma.get(x.moneda) || 0) + v);
+        }
+        return suma.size ? fx('ficha_total_sanciones', { total: Array.from(suma, ([m, v]) => dinero(v, m)).join(' + ') }) : '';
+      };
+
+      // What the page says, once, for the screen and for the PDF: every source numbered in the
+      // order it is first cited.
+      const fuentes = [];
+      const cita = (u) => { if (!web(u)) return 0; let i = fuentes.indexOf(u); if (i < 0) { fuentes.push(u); i = fuentes.length - 1; } return i + 1; };
+      const sede = [d.ciudad, d.pais_por_dominio ? fx('pais_dominio_texto', { pais: d.pais }) : d.pais].filter(Boolean).join(', ');
+      const sanciones = f && Array.isArray(f.sanciones) ? f.sanciones : [];
+      const filtraciones = f && Array.isArray(f.filtraciones) ? f.filtraciones : [];
+      const bloques = [];
+      if (f) {
+        if (f.que_hace) bloques.push({ titulo: t('ficha_que_hace'), textos: [[L(f.que_hace), 0], [L(f.como_gana), cita(f.fuente_que_hace)]].filter((x) => x[0]) });
+        if (f.datos) bloques.push({ titulo: t('ficha_datos'), textos: [[L(f.datos), cita(f.fuente_datos)]] });
+        for (const [k, titulo] of [['como_usa_datos', 'ficha_como_usa'], ['sociedad', 'ficha_sociedad'], ['fiscal', 'ficha_fiscal'], ['monopolio', 'ficha_monopolio']]) {
+          if (f[k]) bloques.push({ titulo: t(titulo), textos: [[L(f[k]), cita(f['fuente_' + k])]] });
+        }
+        const cifras = Array.isArray(f.cifras) ? f.cifras : [];
+        if (cifras.length) {
+          bloques.push({ titulo: t('ficha_dinero'), cifras: cifras.map((x) => ({ valor: x.moneda ? dinero(x.valor, x.moneda) : Number(x.valor || 0).toLocaleString(LOC, { useGrouping: 'always' }), que: fx('ficha_cifra_' + x.clave, { anio: String(x.anio || '') }), n: cita(x.fuente) })) });
+        }
+        bloques.push({ titulo: t('ficha_sanciones'), total: totales(sanciones), vacio: fx('ficha_sin_sanciones', { fecha: fecha(d.revisada) }),
+          filas: sanciones.map((x) => Object.assign({ cab: [x.autoridad || '', x.pais ? nombrePais(x.pais) : '', fecha(x.fecha)].filter(Boolean).join(' · '), texto: [L(x.motivo), L(x.estado)].filter(Boolean).join(' '), n: cita(x.fuente), roja: true }, importe(x))) });
+        bloques.push({ titulo: t('ficha_filtraciones'), vacio: fx('ficha_sin_filtraciones', { fecha: fecha(d.revisada) }),
+          filas: filtraciones.map((x) => ({ cab: fecha(x.fecha), queda: x.afectados ? fn('ficha_afectados', Number(x.afectados)) : '', puesta: '', texto: L(x.que), n: cita(x.fuente) })) });
+        if (web(f.web)) bloques.push({ titulo: t('ficha_web'), enlace: f.web });
+      } else {
+        bloques.push({ titulo: '', textos: [[fx(d.conocida ? 'ficha_pendiente' : 'ficha_pendiente_desconocida', { empresa: d.empresa }), 0]], vaga: true });
+      }
+      const borrarPagina = (f && web(f.borrar) && f.borrar) || (d.corredor && web(d.corredor.url) && d.corredor.url) || '';
+      cita(borrarPagina);
+
+      // ----- the screen -----
+      document.title = d.empresa + ' · GUARDIANA';
+      $('f-nombre').textContent = d.empresa;
+      const partes = [];
+      if (d.pais_por_dominio) partes.push(`<b>${esc(sede)}</b>`);
+      else if (sede) partes.push(`${esc(t('ficha_sede'))}: <b>${esc(sede)}</b>`);
+      if (d.grupo) partes.push(`${esc(t('ficha_grupo'))}: ${d.grupo_conocido ? empresaLink(d.grupo) : `<b>${esc(d.grupo)}</b>`}`);
+      if (f && f.fundada) partes.push(`${esc(t('ficha_fundada'))}: <b>${esc(String(f.fundada))}</b>`);
+      if (f && f.bolsa) partes.push(`${esc(t('ficha_bolsa'))}: <b>${esc(f.bolsa)}</b>`);
+      if (!d.conocida && !d.pais_por_dominio) partes.push(esc(t('ficha_no_identificada')));
+      $('f-sede').innerHTML = partes.join(' · ');
+      if (d.pais_por_dominio) $('f-sede').title = fx('pais_dominio_titulo', { pais: d.pais });
+      const chips = [];
+      if (d.corredor) chips.push(`<span class="tag corredor-chip" title="${esc(fx('ficha_corredor_titulo', { nombre: d.corredor.nombre }))}">${esc(t('corredor_etiqueta'))}</span>`);
+      if (sanciones.length) chips.push(`<span class="tag rastreador">${esc(fn('ficha_n_sanciones', sanciones.length))}</span>`);
+      if (filtraciones.length) chips.push(`<span class="tag publicidad">${esc(fn('ficha_n_filtraciones', filtraciones.length))}</span>`);
+      $('f-chips').innerHTML = chips.join(' ');
+      $('f-oficio').textContent = (!f || !f.que_hace) && d.oficio ? d.oficio : '';
+      $('f-oficio').classList.toggle('hidden', !$('f-oficio').textContent);
+
+      const c = d.casa;
+      $('f-consultas').textContent = num(c.consultas);
+      $('f-cortadas').textContent = num(c.cortadas);
+      $('f-aparatos').textContent = num(c.aparatos.length);
+      const aparatos = c.aparatos.map((a) => nombreAparato(a[0], a[1])).join(', ');
+      const callados = c.callados ? ' ' + fn('ficha_casa_callados', c.callados) : '';
+      $('f-casa-texto').textContent = (c.consultas
+        ? fx('ficha_casa_periodo', { desde: dia(c.primera), hasta: dia(c.ultima), aparatos })
+        : t('ficha_casa_nada')) + callados;
+      $('f-nombres-det').classList.toggle('hidden', !c.nombres.length);
+      $('f-nombres-titulo').textContent = fn('ficha_casa_ver_nombres', c.n_nombres);
+      $('f-nombres').innerHTML = c.nombres.map((x) => `<tr><td class="mono">${esc(x.nombre)}</td><td>${esc(fn('ficha_casa_n_consultas', x.consultas))}${x.cortadas ? ` <span class="muted">· ${esc(fn('ficha_casa_n_cortadas', x.cortadas))}</span>` : ''}</td><td class="muted">${esc(dia(x.primera))} – ${esc(dia(x.ultima))}</td></tr>`).join('')
+        + (c.n_nombres > c.nombres.length ? `<tr><td colspan="3" class="muted">${esc(fx('ficha_y_mas', { n: num(c.n_nombres - c.nombres.length) }))}</td></tr>` : '');
+
+      const sup = (n) => (n ? ` <sup class="f-cita"><a href="${esc(fuentes[n - 1])}" target="_blank" rel="noopener noreferrer">[${n}]</a></sup>` : '');
+      $('f-cuerpo').innerHTML = bloques.map((b) => {
+        let h = b.titulo ? `<h2>${esc(b.titulo)}</h2>` : '';
+        if (b.textos) h += b.textos.map(([x, n]) => `<p${b.vaga ? ' class="f-vacia"' : ''}>${esc(x)}${sup(n)}</p>`).join('');
+        if (b.cifras) h += `<div class="counters f-dinero">${b.cifras.map((x) => `<div class="counter"><div class="n">${esc(x.valor)}</div><div class="l">${esc(x.que)}${sup(x.n)}</div></div>`).join('')}</div>`;
+        if (b.filas) {
+          h += b.filas.length
+            ? (b.total ? `<p class="f-total">${esc(b.total)}</p>` : '') + `<ul class="f-lista">${b.filas.map((x) => `<li class="${x.roja ? 'roja' : 'ambar'}"><div class="f-l1"><span>${esc(x.cab)}</span><span class="f-importe">${x.puesta ? `<s>${esc(x.puesta)}</s> ` : ''}${esc(x.queda)}</span></div><div class="f-l2">${esc(x.texto)}${sup(x.n)}</div></li>`).join('')}</ul>`
+            : `<p class="f-vacia">${esc(b.vacio)}</p>`;
+        }
+        if (b.enlace) h += `<p>${enlace(b.enlace)}</p>`;
+        return `<section class="f-seccion">${h}</section>`;
+      }).join('');
+      if (borrarPagina) {
+        $('f-borrar-pagina').innerHTML = `${esc(t('ficha_borrar_explica'))} ${enlace(borrarPagina, t('ficha_borrar_enlace'))}`;
+        $('f-borrar-pagina').classList.remove('hidden');
+      }
+      $('f-s-dominios').classList.toggle('hidden', !d.dominios.length);
+      $('f-dominios').textContent = d.dominios.join(' · ') + (d.n_dominios > d.dominios.length ? ' · ' + fx('ficha_y_mas', { n: num(d.n_dominios - d.dominios.length) }) : '');
+      const pintaFuentes = () => {
+        $('f-s-fuentes').classList.toggle('hidden', !fuentes.length);
+        $('f-fuentes').innerHTML = fuentes.map((u) => `<li>${enlace(u)}</li>`).join('');
+      };
+      pintaFuentes();
+      $('f-nota').textContent = f && d.revisada ? fx('ficha_nota', { fecha: fecha(d.revisada) }) : t('ficha_nota_sin');
+      $('f-todo').classList.remove('hidden');
+
+      // ----- the profile as a PDF -----
+      const slug = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'empresa';
+      savePdf('f-pdf', () => {
+        const doc = pdfDocument(d.empresa + ' · ' + t('ficha_titulo'));
+        pdfHead(doc, t('ficha_titulo'));
+        doc.line(d.empresa, 20, true).gap(4);
+        if (sede || d.grupo) doc.line([sede ? t('ficha_sede') + ': ' + sede : '', d.grupo ? t('ficha_grupo') + ': ' + d.grupo : '', f && f.fundada ? t('ficha_fundada') + ': ' + f.fundada : '', f && f.bolsa ? t('ficha_bolsa') + ': ' + f.bolsa : ''].filter(Boolean).join(' · '), 10, false, 0.3);
+        const etiquetas = [d.corredor ? t('corredor_etiqueta') : '', sanciones.length ? fn('ficha_n_sanciones', sanciones.length) : '', filtraciones.length ? fn('ficha_n_filtraciones', filtraciones.length) : ''].filter(Boolean);
+        if (etiquetas.length) doc.gap(4).line(etiquetas.join(' · '), 10, true);
+        if ((!f || !f.que_hace) && d.oficio) doc.gap(6).line(d.oficio, 10);
+        doc.seccion(t('ficha_casa_titulo'));
+        doc.line(fx('ficha_casa_resumen_pdf', { consultas: num(c.consultas), cortadas: num(c.cortadas), aparatos: num(c.aparatos.length) }), 10, true);
+        doc.gap(2).line($('f-casa-texto').textContent, 9, false, 0.35);
+        const n = (k) => (k ? ' [' + k + ']' : '');
+        for (const b of bloques) {
+          if (b.titulo) doc.seccion(b.titulo);
+          if (b.textos) for (const [x, k] of b.textos) doc.line(x + n(k), 10).gap(3);
+          if (b.cifras) doc.table([{ title: t('ficha_pdf_concepto'), w: 0.6 }, { title: t('ficha_pdf_cifra'), w: 0.4 }], b.cifras.map((x) => [x.que + n(x.n), x.valor]), 9);
+          if (b.filas) {
+            if (!b.filas.length) doc.line(b.vacio, 10, false, 0.35);
+            else {
+              if (b.total) doc.line(b.total, 10, true).gap(4);
+              doc.table([{ title: t('ficha_pdf_cuando'), w: 0.3 }, { title: t('ficha_pdf_importe'), w: 0.18 }, { title: t('ficha_pdf_que'), w: 0.52 }],
+                b.filas.map((x) => [x.cab, (x.puesta ? x.puesta + ' -> ' : '') + x.queda, x.texto + n(x.n)]), 8);
+            }
+          }
+          if (b.enlace) doc.line(b.enlace, 10);
+        }
+        if (borrarPagina) doc.seccion(t('ficha_borrar')).line(t('ficha_borrar_explica') + ' ' + borrarPagina, 10);
+        if (d.dominios.length) doc.seccion(t('ficha_dominios')).line($('f-dominios').textContent, 8, false, 0.3);
+        if (fuentes.length) { doc.seccion(t('ficha_fuentes')); fuentes.forEach((u, i) => doc.line((i + 1) + '. ' + u, 8, false, 0.3)); }
+        doc.gap(10).line($('f-nota').textContent, 8, false, 0.45);
+        return { name: 'guardiana-' + slug(d.empresa) + '.pdf', doc };
+      });
+
+      // ----- share: a few lines anyone can read, and the public page when there is one -----
+      const enlacePublico = () => {
+        const s = f && typeof f.slug === 'string' && /^[a-z0-9-]+$/.test(f.slug) ? f.slug : '';
+        const pre = LANG === 'es' ? '' : LANG + '/';
+        return s ? `https://guardianagroup.com/${pre}empresas/${s}.html` : 'https://guardianagroup.com/' + (LANG === 'es' ? '' : LANG + '/');
+      };
+      const copia = async (s) => {
+        try { await navigator.clipboard.writeText(s); return true; } catch (_) {}
+        const area = document.createElement('textarea');
+        area.value = s; area.setAttribute('readonly', ''); area.style.position = 'fixed'; area.style.left = '-9999px';
+        document.body.appendChild(area); area.select();
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (_) {}
+        area.remove();
+        return ok;
+      };
+      $('f-compartir').addEventListener('click', async () => {
+        const lineas = [d.empresa + (sede ? ` (${sede})` : '')];
+        if (f && f.que_hace) lineas.push(L(f.que_hace));
+        for (const x of sanciones.slice(0, 3)) lineas.push('• ' + [x.autoridad, fecha(x.fecha), x.importe ? dinero(x.importe, x.moneda) : ''].filter(Boolean).join(' · ') + ': ' + L(x.motivo));
+        for (const x of filtraciones.slice(0, 2)) lineas.push('• ' + fecha(x.fecha) + ': ' + L(x.que));
+        if (c.consultas) lineas.push(fx('ficha_compartir_casa', { n: num(c.consultas), c: num(c.cortadas) }));
+        const texto = lineas.join('\n');
+        const url = enlacePublico();
+        if (navigator.share) {
+          try { await navigator.share({ title: d.empresa, text: texto, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+        }
+        $('f-pdf-msg').textContent = t((await copia(texto + '\n' + url)) ? 'ficha_copiado' : 'ficha_no_copiado');
+        setTimeout(() => { $('f-pdf-msg').textContent = ''; }, 6000);
+      });
+
+      // ----- the letter -----
+      const R = await api('/api/borrado');
+      const RECUERDO = 'guardiana_borrado_datos';
+      const MAILTO_MAX = 2000;
+      const sel = $('f-pais');
+      sel.innerHTML = R.jurisdicciones.map((j) => `<option value="${esc(j.codigo)}">${esc(j.nombre)}</option>`).join('');
+      const partesIdioma = (navigator.language || '').split('-');
+      const region = (partesIdioma[1] || '').toUpperCase();
+      const jPorDefecto = (region === 'CA' && (partesIdioma[0] || '').toLowerCase() === 'fr') ? 'ca_qc'
+        : ((R.jurisdicciones.find((x) => x.regiones.includes(region)) || {}).codigo || (LANG === 'pt' ? 'br' : (LANG === 'en' ? 'us' : 'es')));
+      sel.value = jPorDefecto;
+      const jur = () => R.jurisdicciones.find((j) => j.codigo === sel.value) || R.jurisdicciones[0];
+      let guardado = null;
+      try { guardado = JSON.parse(localStorage.getItem(RECUERDO) || 'null'); } catch (_) {}
+      if (guardado && typeof guardado === 'object') { $('f-cnombre').value = String(guardado.nombre || ''); $('f-ccorreo').value = String(guardado.correo || ''); }
+      // Kept in this browser only when the person already asked for it on «Haz que te borren».
+      const recuerda = () => { if (!guardado) return; try { localStorage.setItem(RECUERDO, JSON.stringify({ nombre: $('f-cnombre').value, correo: $('f-ccorreo').value })); } catch (_) {} };
+      let C = null;
+      const pide = (evidencia) => api('/api/borrado/carta?' + new URLSearchParams({ empresa: d.empresa, jurisdiccion: sel.value, idioma: jur().idioma, evidencia: evidencia ? '1' : '0' }).toString());
+      const rellena = (cuerpo, carta) => cuerpo.split('[[NOMBRE]]').join($('f-cnombre').value.trim() || carta.hueco_nombre).split('[[CORREO]]').join($('f-ccorreo').value.trim() || carta.hueco_correo);
+      const pinta = () => {
+        if (!C) return;
+        const j = jur();
+        $('f-ley').innerHTML = (j.derecho !== 'borrado' ? `<span class="bad">${esc(t('borrado_sin_derecho_' + j.derecho))}</span><br>` : '') + esc(j.corta);
+        $('f-asunto').textContent = C.asunto;
+        $('f-texto').value = rellena(C.cuerpo, C);
+        $('f-canal').innerHTML = C.para ? esc(t('borrado_para').replace('{correo}', C.para))
+          : C.url ? `${esc(t('ficha_carta_formulario'))} ${enlace(C.url)}` : esc(t('ficha_carta_sin_correo'));
+      };
+      const carga = async () => { C = await pide($('f-evidencia').checked); pinta(); };
+      if (d.borrado) {
+        $('f-en-borrado').innerHTML = `${esc(t('ficha_carta_en_borrado'))} <a href="/borrado">${esc(t('nav_borrado'))}</a>`;
+        $('f-en-borrado').classList.remove('hidden');
+      }
+      const avisa = (k, o) => { $('f-carta-msg').textContent = fx(k, o); setTimeout(() => { $('f-carta-msg').textContent = ''; }, 8000); };
+      const faltan = () => {
+        const vacio = !$('f-cnombre').value.trim() ? $('f-cnombre') : (!$('f-ccorreo').value.trim() ? $('f-ccorreo') : null);
+        if (!vacio) return false;
+        avisa('borrado_faltan_datos');
+        vacio.focus();
+        return true;
+      };
+      $('f-carta-pdf').addEventListener('click', async () => {
+        if (faltan()) return;
+        try {
+          await carga();
+          const doc = pdfDocument(C.asunto);
+          if (C.para) doc.line(t('ficha_carta_pdf_para').replace('{correo}', C.para), 9, false, 0.4).gap(10);
+          doc.line(C.asunto, 12, true).gap(12);
+          for (const l of rellena(C.cuerpo, C).split('\n')) { if (l.trim()) doc.line(l, 10.5); else doc.gap(7); }
+          const name = 'carta-borrado-' + slug(d.empresa) + '.pdf';
+          const r = await savePdfFile(name, doc.bytes(''));
+          if (r !== 'cancelado') avisa('pdf_' + r, { nombre: name });
+        } catch (err) { $('f-carta-msg').textContent = String(err.message || err); }
+      });
+      $('f-carta-correo').addEventListener('click', async () => {
+        if (faltan()) return;
+        try {
+          await carga();
+          const para = C.para || '';
+          const mailto = (asunto, cuerpo) => 'mailto:' + para + '?subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo);
+          let url = mailto(C.asunto, rellena(C.cuerpo, C));
+          let pista = para ? 'borrado_pista_correo' : 'ficha_carta_pista_sin_para';
+          if (url.length > MAILTO_MAX && $('f-evidencia').checked) {
+            const sin = await pide(false);
+            url = mailto(sin.asunto, rellena(sin.cuerpo, sin));
+          }
+          if (url.length > MAILTO_MAX) {
+            await copia(rellena(C.cuerpo, C));
+            url = mailto(C.asunto, t('borrado_mailto_pega'));
+            pista = 'borrado_pista_pegar_correo';
+          }
+          location.href = url;
+          avisa(pista);
+        } catch (err) { $('f-carta-msg').textContent = String(err.message || err); }
+      });
+      $('f-carta-copiar').addEventListener('click', async () => {
+        try { await carga(); avisa((await copia(C.asunto + '\n\n' + rellena(C.cuerpo, C))) ? 'borrado_copiado' : 'ficha_no_copiado'); } catch (err) { $('f-carta-msg').textContent = String(err.message || err); }
+      });
+      sel.addEventListener('change', () => { carga().catch(() => {}); });
+      $('f-evidencia').addEventListener('change', () => { carga().catch(() => {}); });
+      ['f-cnombre', 'f-ccorreo'].forEach((id) => $(id).addEventListener('input', () => { pinta(); recuerda(); }));
+      $('f-carta-form').addEventListener('submit', (e) => e.preventDefault());
+      await carga().catch((e) => { $('f-carta-msg').textContent = String(e.message || e); });
+    },
     // «Haz que te borren» (decision 204). One button per company sends the letter as far as a
     // browser may without GUARDIANA sending anything: the person's own mail client opens with the
     // letter written, or the company's form opens with the letter on the clipboard. The name and
@@ -2102,13 +2403,19 @@
         boton.textContent = t('borrado_copiado');
         setTimeout(() => { boton.textContent = t('borrado_copiar'); }, 2000);
       });
-      $('b-descargar').addEventListener('click', () => {
-        const blob = new Blob([C ? C.asunto + '\n\n' + texto() + '\n' : ''], { type: 'text/plain;charset=utf-8' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'carta-' + ($('b-corredor').value || 'guardiana') + '-' + R.hoy + '.txt';
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      // The letter as a PDF, ready to attach to an e-mail (the owner, 12 Oct 2026: «que
+      // solamente lo adjunten»); until 1.0.16 it was a .txt.
+      $('b-descargar').addEventListener('click', async () => {
+        if (!C) return;
+        const doc = pdfDocument(C.asunto);
+        if (C.para) doc.line(t('ficha_carta_pdf_para').replace('{correo}', C.para), 9, false, 0.4).gap(10);
+        doc.line(C.asunto, 12, true).gap(12);
+        for (const l of texto().split('\n')) { if (l.trim()) doc.line(l, 10.5); else doc.gap(7); }
+        const name = 'carta-borrado-' + ($('b-corredor').value || 'guardiana') + '-' + R.hoy + '.pdf';
+        try {
+          const r = await savePdfFile(name, doc.bytes(''));
+          if (r !== 'cancelado') { $('b-msg').textContent = t('pdf_' + r).replace('{nombre}', name); setTimeout(() => { $('b-msg').textContent = ''; }, 8000); }
+        } catch (err) { $('b-msg').textContent = String(err.message || err); }
       });
       $('b-envios').addEventListener('click', async (e) => {
         const b = e.target.closest('.b-quitar');

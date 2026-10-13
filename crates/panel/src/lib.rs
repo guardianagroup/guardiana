@@ -13,6 +13,7 @@ mod api;
 mod auth;
 mod borrado;
 mod destinos;
+mod empresa;
 mod medidas;
 
 use std::net::SocketAddr;
@@ -352,6 +353,15 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             "/borrado.html",
             get(|| async { pagina(include_str!("../static/borrado.html")) }),
         )
+        .route(
+            "/empresa",
+            get(|| async { pagina(include_str!("../static/empresa.html")) }),
+        )
+        .route(
+            "/empresa.html",
+            get(|| async { pagina(include_str!("../static/empresa.html")) }),
+        )
+        .route("/api/empresa", get(empresa::ficha))
         .route("/api/borrado", get(borrado::resumen))
         .route("/api/borrado/carta", get(borrado::carta_api))
         .route("/api/borrado/envios", post(borrado::nuevo_envio))
@@ -577,6 +587,7 @@ mod textos {
             include_str!("../static/ia.html"),
             include_str!("../static/comprobador.html"),
             include_str!("../static/borrado.html"),
+            include_str!("../static/empresa.html"),
         ];
         const SCRIPTS: &[&str] = &[include_str!("../static/app.js")];
         // The keys asked for with a literal: `data-t="x"` in the pages, `t('x')` in the scripts.

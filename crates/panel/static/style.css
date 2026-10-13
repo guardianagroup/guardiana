@@ -293,3 +293,38 @@ ul.b-lista li .b-pregunta{grid-column:1 / -1}
 .b-enviada{display:inline-flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:14px}
 .b-pregunta{border-top:1px dashed var(--line);margin-top:10px;padding-top:6px}
 .b-pregunta p{margin:6px 0}
+
+/* A company's profile (1.0.16, the same «ficha» as GUARDIANA ZERO): the name big, the house's
+   figures as counters, fines in red and breaches in amber, every fact with its numbered source. */
+a.enlace-empresa { color: inherit; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+a.enlace-empresa:hover { color: var(--accent); text-decoration-color: currentColor; }
+.ficha .f-arriba { display: flex; gap: 14px; align-items: baseline; margin: 6px 0 0; font-size: 13.5px; }
+.ficha .f-cabeza { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 14px 24px; margin-top: 18px; }
+.ficha h1 { font-family: var(--display); font-weight: 600; font-size: clamp(28px, 3.6vw, 42px); line-height: 1.08; letter-spacing: -0.02em; margin: 0; overflow-wrap: anywhere; }
+.ficha .f-sub { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+.ficha .f-sub b { color: var(--fg); font-weight: 600; }
+.ficha .f-controles { margin: 0; }
+.ficha .f-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; }
+.ficha .f-chips:empty { display: none; }
+.ficha .tag.corredor-chip { color: var(--rastreador); }
+.ficha .f-casa .f-cortadas { color: var(--cortado); }
+.ficha .f-seccion { margin-top: 28px; }
+.ficha .f-seccion h2 { margin-bottom: 10px; }
+.ficha .f-seccion p { max-width: 76ch; }
+.ficha .f-dinero .n { font-size: 22px; }
+.ficha .f-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ficha .f-lista li { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--rastreador); border-radius: 10px; padding: 11px 14px; }
+.ficha .f-lista li.ambar { border-left-color: var(--publicidad); }
+.ficha .f-l1 { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 14px; font-weight: 600; }
+.ficha .f-importe { color: var(--rastreador); font-variant-numeric: tabular-nums; }
+.ficha .f-lista li.ambar .f-importe { color: var(--publicidad); }
+.ficha .f-importe s { color: var(--muted); font-weight: 400; }
+.ficha .f-l2 { color: var(--muted); font-size: 13.5px; margin-top: 4px; line-height: 1.5; }
+.ficha .f-total { font-weight: 600; margin: 0 0 10px; }
+.ficha .f-vacia { border: 1px dashed var(--line); border-radius: 12px; padding: 12px 16px; color: var(--muted); }
+.ficha .f-cita { font-size: 11px; }
+.ficha .f-cita a { text-decoration: none; }
+.ficha .f-dominios { font-family: var(--mono); font-size: 12px; color: var(--muted); line-height: 1.7; overflow-wrap: anywhere; }
+.ficha .f-fuentes { font-size: 12.5px; color: var(--muted); padding-left: 22px; }
+.ficha .f-fuentes li { margin: 3px 0; overflow-wrap: anywhere; }
+.ficha #f-casa-texto { max-width: 76ch; }

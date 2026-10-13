@@ -1262,7 +1262,12 @@ pub(crate) async fn resumen(
 
 #[derive(Deserialize)]
 pub(crate) struct CartaQuery {
-    corredor: String,
+    /// A company of the deletion list, by its id.
+    #[serde(default)]
+    corredor: Option<String>,
+    /// Or any company of the lists, by its name, or a site (from its profile page).
+    #[serde(default)]
+    empresa: Option<String>,
     jurisdiccion: String,
     /// `es`, `en` or `pt`: the letter's language, which need not be the panel's.
     #[serde(default)]
@@ -1284,19 +1289,24 @@ pub(crate) async fn carta_api(
     Query(q): Query<CartaQuery>,
 ) -> ApiResult<Carta> {
     let j = jurisdiccion(&q.jurisdiccion).ok_or_else(|| no_encontrado("jurisdiction"))?;
-    let c = corredor(&q.corredor).ok_or_else(|| no_encontrado("company"))?;
+    let c = match (&q.corredor, &q.empresa) {
+        (Some(id), _) => corredor(id).cloned(),
+        (None, Some(e)) => crate::empresa::destinatario(e),
+        (None, None) => None,
+    }
+    .ok_or_else(|| no_encontrado("company"))?;
     let t = q.idioma.as_deref().map_or(t_panel, i18n::by_code);
     let ev = if q.evidencia.as_deref() == Some("0") {
         None
     } else {
         let spans = with_ledger(&state, |l| l.name_device_spans())?;
-        let mut evs = evidencias(&spans, std::slice::from_ref(c));
+        let mut evs = evidencias(&spans, std::slice::from_ref(&c));
         evs.remove(&c.id)
     };
     Ok(Json(carta(
         t,
         j,
-        c,
+        &c,
         ev.as_ref(),
         dia_de(now_ms(), zona),
         zona,

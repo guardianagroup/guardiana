@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>GUARDIANA · Ficha de empresa</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="preload" href="/static/fonts/IBMPlexSans-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/Unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
+<script src="/static/arranque.js"></script>
+</head>
+<body data-page="empresa">
+<header class="top">
+  <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA<small data-t="lema"></small></span></a>
+  <nav>
+    <a href="/"  data-t="nav_radiografia">Radiografía</a>
+    <a href="/ia" data-t="nav_ia">Tu IA</a>
+    <a href="/extracto"  data-t="nav_extracto">Extracto</a>
+    <a href="/dispositivos"  data-t="nav_dispositivos">Dispositivos</a>
+    <a href="/sabe-de-ti" data-t="nav_sabe">Lo que GUARDIANA sabe de ti</a>
+    <a href="/borrado" data-t="nav_borrado">Haz que te borren</a>
+    <a href="/reglas" data-t="nav_reglas">Reglas</a>
+    <a href="/informe" data-t="nav_informe">Informe semanal</a>
+    <a href="/hogar" data-t="nav_hogar">Modo Hogar</a>
+    <a href="/licencia" data-t="nav_licencia">Licencia</a>
+    <a href="/verify" data-t="nav_verify">Verificar</a>
+    <a href="/estado"  data-t="nav_estado">Estado</a>
+  </nav>
+</header>
+<main class="ficha">
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<p class="f-arriba"><a href="/" id="f-volver" data-t="ficha_volver">← Volver</a> <span class="muted" data-t="ficha_titulo"></span></p>
+<div id="f-no" class="card hidden"><strong data-t="ficha_no_titulo"></strong> <span data-t="ficha_no_texto"></span></div>
+<div id="f-todo" class="hidden">
+  <div class="f-cabeza">
+    <div>
+      <h1 id="f-nombre"></h1>
+      <p class="f-sub" id="f-sede"></p>
+    </div>
+    <p class="b-acciones f-controles">
+      <button type="button" id="f-compartir" data-t="ficha_compartir"></button>
+      <button type="button" class="secondary" id="f-pdf" data-t="ficha_pdf"></button>
+    </p>
+  </div>
+  <p id="f-pdf-msg" class="muted" role="status" aria-live="polite"></p>
+  <p class="f-chips" id="f-chips"></p>
+  <p class="lead" id="f-oficio"></p>
+
+  <h2 data-t="ficha_casa_titulo"></h2>
+  <div class="counters f-casa">
+    <div class="counter"><div class="n" id="f-consultas">0</div><div class="l" data-t="ficha_casa_consultas"></div></div>
+    <div class="counter"><div class="n f-cortadas" id="f-cortadas">0</div><div class="l" data-t="ficha_casa_cortadas"></div></div>
+    <div class="counter"><div class="n" id="f-aparatos">0</div><div class="l" data-t="ficha_casa_aparatos"></div></div>
+  </div>
+  <p class="muted" id="f-casa-texto"></p>
+  <details class="b-plegable hidden" id="f-nombres-det"><summary id="f-nombres-titulo"></summary>
+    <div class="wrap"><table><tbody id="f-nombres"></tbody></table></div>
+  </details>
+
+  <div id="f-cuerpo"></div>
+
+  <section class="f-seccion" id="f-borrar">
+    <h2 data-t="ficha_borrar"></h2>
+    <p id="f-borrar-pagina" class="hidden"></p>
+    <p data-t="ficha_carta_explica"></p>
+    <div class="card">
+      <form class="filters" id="f-carta-form">
+        <label><span data-t="borrado_campo_pais"></span><select id="f-pais"></select></label>
+        <label><span data-t="borrado_campo_nombre"></span><input id="f-cnombre" type="text" autocomplete="name" spellcheck="false"></label>
+        <label><span data-t="borrado_campo_correo"></span><input id="f-ccorreo" type="email" autocomplete="email" spellcheck="false"></label>
+      </form>
+      <p><label class="b-check"><input id="f-evidencia" type="checkbox" checked> <span data-t="borrado_campo_evidencia"></span></label></p>
+      <p id="f-ley" class="b-corta"></p>
+      <p id="f-canal" class="muted"></p>
+      <p class="b-acciones">
+        <button type="button" id="f-carta-pdf" data-t="ficha_carta_pdf"></button>
+        <button type="button" class="secondary" id="f-carta-correo" data-t="ficha_carta_correo"></button>
+        <button type="button" class="secondary" id="f-carta-copiar" data-t="borrado_copiar"></button>
+      </p>
+      <p id="f-carta-msg" class="muted" role="status" aria-live="polite"></p>
+      <details class="b-plegable"><summary data-t="borrado_ver_carta"></summary>
+        <p><strong id="f-asunto"></strong></p>
+        <textarea id="f-texto" class="mono wide" rows="18" readonly data-t-label="borrado_ver_carta"></textarea>
+      </details>
+      <p id="f-en-borrado" class="muted hidden"></p>
+    </div>
+  </section>
+
+  <section class="f-seccion hidden" id="f-s-dominios">
+    <h2 data-t="ficha_dominios"></h2>
+    <p class="f-dominios" id="f-dominios"></p>
+  </section>
+  <section class="f-seccion hidden" id="f-s-fuentes">
+    <h2 data-t="ficha_fuentes"></h2>
+    <ol class="f-fuentes" id="f-fuentes"></ol>
+  </section>
+  <p class="limit" id="f-nota"></p>
+</div>
+</main>
+<footer><span data-t="pie"></span></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>
