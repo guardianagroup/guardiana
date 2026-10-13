@@ -50,6 +50,163 @@ pub fn nombres(url: &str) -> Vec<String> {
     out
 }
 
+/// The names of the fields of a request's body, never their values: the keys of a JSON
+/// object (one level down too, as `user.email`), or the names of a form (`a=1&b=2`). Anything
+/// else (a file, text, a binary) gives nothing. At most [`MAX_CAMPOS`], each once.
+#[must_use]
+pub fn nombres_cuerpo(cuerpo: &[u8]) -> Vec<String> {
+    let Ok(texto) = std::str::from_utf8(cuerpo) else {
+        return Vec::new();
+    };
+    let texto = texto.trim_start();
+    let mut vistos = BTreeSet::new();
+    let mut out = Vec::new();
+    let mut mete = |k: String| {
+        let k: String = k
+            .trim()
+            .to_ascii_lowercase()
+            .chars()
+            .take(MAX_LARGO)
+            .collect();
+        if !k.is_empty() && out.len() < MAX_CAMPOS && vistos.insert(k.clone()) {
+            out.push(k);
+        }
+    };
+    if texto.starts_with('{') || texto.starts_with('[') {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(texto) {
+            claves_json(&v, "", 0, &mut mete);
+        }
+        return out;
+    }
+    if texto.starts_with('<') || texto.contains('\0') {
+        return Vec::new();
+    }
+    // A form: `name=value&other=value`, or one `name=value` line.
+    if texto.contains('=') {
+        for par in texto.split('&').take(200) {
+            if let Some((k, _)) = par.split_once('=') {
+                mete(percent_decode(k));
+            }
+        }
+    }
+    out
+}
+
+fn claves_json(v: &serde_json::Value, prefijo: &str, nivel: u8, mete: &mut impl FnMut(String)) {
+    match v {
+        serde_json::Value::Object(m) => {
+            for (k, hijo) in m {
+                let nombre = if prefijo.is_empty() {
+                    k.clone()
+                } else {
+                    format!("{prefijo}.{k}")
+                };
+                mete(nombre.clone());
+                if nivel < 1 {
+                    claves_json(hijo, &nombre, nivel + 1, mete);
+                }
+            }
+        }
+        serde_json::Value::Array(a) => {
+            // A list of events: the keys of the first one say what each carries.
+            if let Some(primero) = a.first() {
+                claves_json(primero, prefijo, nivel, mete);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let Ok(h) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(h);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(if b[i] == b'+' { b' ' } else { b[i] });
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// The names of the cookies a request carries (its `Cookie` header), never their values.
+#[must_use]
+pub fn nombres_cookies(cabecera: &str) -> Vec<String> {
+    let mut vistos = BTreeSet::new();
+    let mut out = Vec::new();
+    for par in cabecera.split(';') {
+        let k = par.split('=').next().unwrap_or("").trim();
+        let k: String = k.chars().take(MAX_LARGO).collect();
+        if k.is_empty() || !vistos.insert(k.clone()) {
+            continue;
+        }
+        out.push(k);
+        if out.len() >= MAX_CAMPOS {
+            break;
+        }
+    }
+    out
+}
+
+/// What a cookie is, by its name, when the trade documents it. The cookies a tracker reads
+/// back are how it knows you from one site to the next.
+#[must_use]
+pub fn lee_cookie(nombre: &str) -> Option<Lectura> {
+    let l = |clave: &'static str, fuente: Option<&'static str>| Some(Lectura { clave, fuente });
+    match nombre {
+        "_ga" | "_gid" | "_gat" | "_gcl_au" | "_gcl_aw" | "__utma" | "__utmb" | "__utmc"
+        | "__utmz" => l("cookie_google_analytics", GOOGLE),
+        "IDE" | "DSID" | "__gads" | "__gpi" | "test_cookie" | "NID" | "ANID" | "1P_JAR" => {
+            l("cookie_google_ads", GOOGLE)
+        }
+        "_fbp" | "_fbc" | "fr" | "datr" | "sb" | "c_user" | "xs" => l("cookie_meta", META),
+        "_tt_enable_cookie" | "_ttp" | "ttwid" => l("cookie_tiktok", None),
+        "_hjid" | "_hjSessionUser_" | "_hjSession_" | "_hjFirstSeen" => l("cookie_hotjar", None),
+        "_pin_unauth" | "_pinterest_ct_ua" => l("cookie_pinterest", None),
+        "li_sugr" | "bcookie" | "lidc" | "UserMatchHistory" | "AnalyticsSyncHistory" => {
+            l("cookie_linkedin", None)
+        }
+        "uuid2" | "anj" | "sess" | "usersync" | "icu" => l("cookie_appnexus", None),
+        "tuuid" | "tuuid_lu" | "c" | "ssi" => l("cookie_adtech", None),
+        "_uetsid" | "_uetvid" | "MUID" | "MR" => l("cookie_microsoft_ads", None),
+        "criteo_write_test" | "uid" | "cto_bundle" | "cto_bidid" => l("cookie_criteo", None),
+        "sessionid" | "session_id" | "PHPSESSID" | "JSESSIONID" | "ASP.NET_SessionId"
+        | "connect.sid" | "_session_id" => l("cookie_sesion", None),
+        "euconsent-v2" | "eupubconsent-v2" | "OptanonConsent" | "CookieConsent"
+        | "cookieyes-consent" | "didomi_token" | "usprivacy" => l("cookie_consentimiento", None),
+        _ => {
+            let n = nombre.to_ascii_lowercase();
+            if n.contains("uuid") || n.contains("_id") || n.ends_with("id") && n.len() <= 12 {
+                l("cookie_id", None)
+            } else {
+                None
+            }
+        }
+    }
+}
+
+/// What a request's cookies say, each meaning once, and how many names stay unread.
+#[must_use]
+pub fn resumen_cookies(cookies: &[String]) -> (Vec<Lectura>, usize) {
+    let mut vistos = BTreeSet::new();
+    let mut sin = 0;
+    for c in cookies {
+        match lee_cookie(c) {
+            Some(l) => {
+                vistos.insert(l);
+            }
+            None => sin += 1,
+        }
+    }
+    (vistos.into_iter().collect(), sin)
+}
+
 const GOOGLE: Option<&str> = Some("fuente_google_analytics");
 const META: Option<&str> = Some("fuente_meta_pixel");
 
@@ -122,7 +279,20 @@ pub fn lee(host: &str, nombre: &str) -> Option<Lectura> {
         "ua" | "user_agent" | "useragent" | "browser" => l("campo_navegador", None),
         "ts" | "t" | "time" | "timestamp" | "tz" | "tzo" => l("campo_hora", None),
         "ev" | "event" | "e" | "ea" | "action" => l("campo_evento", None),
-        "email" | "em" | "mail" | "e_mail" => l("campo_correo", None),
+        "email" | "em" | "mail" | "e_mail" | "user.email" | "email_address" | "user_email"
+        | "customer.email" | "hashed_email" | "em_hash" | "email_sha256" => l("campo_correo", None),
+        "name" | "first_name" | "last_name" | "firstname" | "lastname" | "full_name"
+        | "user.name" | "customer.name" | "fn" | "ln" => l("campo_nombre", None),
+        "address" | "street" | "address1" | "zip" | "zipcode" | "postal_code" | "postcode"
+        | "ct" | "st" | "zp" | "user.address" => l("campo_direccion", None),
+        "birthday" | "birthdate" | "dob" | "date_of_birth" | "db" | "age" | "gender" | "ge"
+        | "sex" => l("campo_persona", None),
+        "items" | "products" | "product_id" | "sku" | "content_ids" | "contents" | "cart"
+        | "line_items" | "order_id" | "transaction_id" | "value" | "currency" | "price"
+        | "total" | "revenue" => l("campo_compra", None),
+        "query" | "q" | "search" | "search_term" | "keyword" | "keywords" => {
+            l("campo_busqueda", None)
+        }
         "phone" | "ph" | "tel" => l("campo_telefono", None),
         "ip" | "ipaddress" | "ip_address" => l("campo_ip", None),
         "lat" | "lon" | "lng" | "geo" | "country" | "city" => l("campo_lugar", None),
@@ -164,6 +334,28 @@ mod tests {
             nombres(&format!("https://a.example/?{muchos}")).len(),
             MAX_CAMPOS
         );
+    }
+
+    #[test]
+    fn body_keys_and_cookie_names_are_read_without_values() {
+        let j = br#"{"event":"purchase","user":{"email":"ana@secreto.co","name":"Ana"},"items":[{"sku":"X1","price":9}],"value":9}"#;
+        let n = nombres_cuerpo(j);
+        assert!(n.contains(&"user.email".into()) && n.contains(&"items".into()));
+        assert!(!n.iter().any(|k| k.contains("secreto") || k.contains("Ana")));
+        let f = nombres_cuerpo(b"email=ana%40secreto.co&phone=123&gdpr_consent=abc");
+        assert_eq!(f, vec!["email", "phone", "gdpr_consent"]);
+        assert!(nombres_cuerpo(b"\x89PNG\0binary").is_empty());
+        assert!(nombres_cuerpo(b"just some text").is_empty());
+        let c = nombres_cookies("_ga=GA1.2.3; _fbp=fb.1.2; PHPSESSID=abc; weird=1");
+        assert_eq!(c, vec!["_ga", "_fbp", "PHPSESSID", "weird"]);
+        let (que, sin) = resumen_cookies(&c);
+        let claves: Vec<&str> = que.iter().map(|l| l.clave).collect();
+        assert!(claves.contains(&"cookie_google_analytics") && claves.contains(&"cookie_meta"));
+        assert!(claves.contains(&"cookie_sesion"));
+        assert_eq!(sin, 1);
+        let (que, _) = resumen("collect.otra-empresa.io", &nombres_cuerpo(j));
+        let claves: Vec<&str> = que.iter().map(|l| l.clave).collect();
+        assert!(claves.contains(&"campo_correo") && claves.contains(&"campo_compra"));
     }
 
     #[test]

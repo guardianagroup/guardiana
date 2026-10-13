@@ -120,7 +120,12 @@
     if (c.lleva && c.lleva.length) {
       const que = c.lleva.map((l) => t(l.que)).join(', ');
       const fuentes = [...new Set(c.lleva.map((l) => l.fuente).filter(Boolean))].map((f) => t(f)).join(', ');
-      partes.push(`<p>${esc(t('cortes_det_lleva', { que }))}${c.sin_leer ? ' ' + esc(tn('cortes_det_sin_leer', c.sin_leer, { n: n(c.sin_leer) })) : ''}${fuentes ? ` <span class="gris">${esc(t('cortes_det_lleva_fuente', { fuentes }))}</span>` : ''}</p>`);
+      partes.push(`<p>${esc(t(c.en_cuerpo ? 'cortes_det_lleva_cuerpo' : 'cortes_det_lleva', { que }))}${c.sin_leer ? ' ' + esc(tn('cortes_det_sin_leer', c.sin_leer, { n: n(c.sin_leer) })) : ''}${fuentes ? ` <span class="gris">${esc(t('cortes_det_lleva_fuente', { fuentes }))}</span>` : ''}</p>`);
+    }
+    // The cookies it carried: how the destination knows you from one site to the next.
+    if (c.cookies_n) {
+      const que = (c.cookies_lleva || []).map((l) => t(l.que)).join(', ');
+      partes.push(`<p>${esc(tn('cortes_det_cookies', c.cookies_n, { n: n(c.cookies_n) }))}${que ? ' ' + esc(t('cortes_det_cookies_que', { que })) : ''}${c.cookies_sin_leer && que ? ' ' + esc(tn('cortes_det_sin_leer', c.cookies_sin_leer, { n: n(c.cookies_sin_leer) })) : ''} <span class="gris">${esc(t('cortes_det_cookies_nota'))}</span></p>`);
     }
     if (c.dato) partes.push(`<p>${esc(t('cortes_det_dato', { dato: t(c.dato).toLowerCase(), como: t('como_' + (c.como || 'tal_cual')) }))}</p>`);
     if (c.corredor) {

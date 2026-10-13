@@ -2696,8 +2696,23 @@ impl Sesion {
                     // What it carried, read from the names of its fields (never the values):
                     // the page, an identifier, the screen size…, and how many names stay
                     // unread. The names themselves do not travel to the page.
-                    if !c.campos.is_empty() {
-                        let (lleva, sin_leer) = crate::campos::resumen(&c.host, &c.campos);
+                    if !c.cookies.is_empty() {
+                        let (lleva, sin_leer) = crate::campos::resumen_cookies(&c.cookies);
+                        o.insert(
+                            "cookies_lleva".into(),
+                            json!(lleva
+                                .iter()
+                                .map(|l| json!({ "que": l.clave, "fuente": l.fuente }))
+                                .collect::<Vec<_>>()),
+                        );
+                        o.insert("cookies_n".into(), json!(c.cookies.len()));
+                        o.insert("cookies_sin_leer".into(), json!(sin_leer));
+                        o.remove("cookies");
+                    }
+                    if !c.campos.is_empty() || !c.campos_cuerpo.is_empty() {
+                        let todos: Vec<String> =
+                            c.campos.iter().chain(&c.campos_cuerpo).cloned().collect();
+                        let (lleva, sin_leer) = crate::campos::resumen(&c.host, &todos);
                         o.insert(
                             "lleva".into(),
                             json!(lleva
@@ -2706,7 +2721,9 @@ impl Sesion {
                                 .collect::<Vec<_>>()),
                         );
                         o.insert("sin_leer".into(), json!(sin_leer));
+                        o.insert("en_cuerpo".into(), json!(!c.campos_cuerpo.is_empty()));
                         o.remove("campos");
+                        o.remove("campos_cuerpo");
                     }
                 }
                 v
@@ -3751,6 +3768,20 @@ impl Sesion {
         cuerpo: &[u8],
         contexto: i32,
     ) -> Respuesta {
+        self.peticion_con(id, url, metodo, cuerpo, "", contexto)
+    }
+
+    /// The same, with the request's `Cookie` header: a cut writes down the names of the
+    /// cookies it carried (never the values), which say how the destination knows you.
+    pub fn peticion_con(
+        &mut self,
+        id: u32,
+        url: &str,
+        metodo: &str,
+        cuerpo: &[u8],
+        cookies: &str,
+        contexto: i32,
+    ) -> Respuesta {
         let web = ["http://", "https://", "ws://", "wss://"]
             .iter()
             .any(|e| url.starts_with(e));
@@ -3936,6 +3967,8 @@ impl Sesion {
                 pagina: &p.escudo.sitio,
                 url,
                 metodo,
+                cuerpo,
+                cookies,
                 recurso,
                 dato,
                 aislada: p.perfil == Perfil::Aislada,

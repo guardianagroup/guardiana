@@ -1376,7 +1376,20 @@ fn eventos_pestana(id: u32, web: &ICoreWebView2) -> windows::core::Result<()> {
                     };
                     // If the session cannot answer, nothing leaves (it never happens; if it did, the
                     // safe side is the cut).
-                    let r = con_sesion(|s| s.peticion(id, &url, &metodo, &cuerpo, contexto.0))
+                    // The names of its cookies go with it (never their values): a cut says how
+                    // the destination knows you from one site to the next.
+                    let cookies = req
+                        .Headers()
+                        .ok()
+                        .filter(|h| {
+                            let mut hay = BOOL::default();
+                            h.Contains(w!("Cookie"), &mut hay).is_ok() && hay.as_bool()
+                        })
+                        .map(|h| texto_de(|p| h.GetHeader(w!("Cookie"), p)))
+                        .unwrap_or_default();
+                    let r = con_sesion(|s| {
+                        s.peticion_con(id, &url, &metodo, &cuerpo, &cookies, contexto.0)
+                    })
                         .unwrap_or(sesion::Respuesta {
                             cortar: true,
                             pagina: None,

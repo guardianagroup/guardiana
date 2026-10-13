@@ -42,6 +42,13 @@ pub struct Corte {
     /// carried can be read from them (`dl` is the page, `sr` the screen). Never the values.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub campos: Vec<String>,
+    /// The names of the fields of its body (a JSON's keys, a form's names), never the values.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub campos_cuerpo: Vec<String>,
+    /// The names of the cookies it carried, never their values: how the destination knows you
+    /// from one site to the next.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cookies: Vec<String>,
     /// The registrable site of the destination.
     pub sitio: String,
     /// The company behind it, or the site when unknown.
@@ -89,6 +96,10 @@ pub struct Lugar<'a> {
     pub url: &'a str,
     /// GET, POST…
     pub metodo: &'a str,
+    /// What it sends (empty when the engine did not hand it over).
+    pub cuerpo: &'a [u8],
+    /// Its `Cookie` header (empty when none).
+    pub cookies: &'a str,
     /// What kind of request.
     pub recurso: Recurso,
     /// The kind of marked data found (`dato_correo`…), if any.
@@ -120,6 +131,8 @@ impl Corte {
             ruta,
             parametros,
             campos: crate::campos::nombres(l.url),
+            campos_cuerpo: crate::campos::nombres_cuerpo(l.cuerpo),
+            cookies: crate::campos::nombres_cookies(l.cookies),
             sitio: d.destino.sitio.clone(),
             quien: d.destino.quien().to_string(),
             pais: d.destino.pais.map(str::to_string),
@@ -373,6 +386,8 @@ mod tests {
             pagina: "eltiempo.com",
             url,
             metodo: "get",
+            cuerpo: b"",
+            cookies: "_ga=GA1.secreto; _fbp=fb.secreto",
             recurso: Recurso::Imagen,
             dato: None,
             aislada: false,
@@ -382,6 +397,7 @@ mod tests {
         assert_eq!(c.ruta, "/g/collect");
         assert_eq!(c.parametros, 2);
         assert_eq!(c.campos.len(), 2);
+        assert_eq!(c.cookies, vec!["_ga", "_fbp"]);
         assert!(
             !linea_de(&c).contains("secreto"),
             "values are never written"
