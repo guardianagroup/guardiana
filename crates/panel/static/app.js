@@ -2136,9 +2136,14 @@
         }
         const cifras = Array.isArray(f.cifras) ? f.cifras : [];
         if (cifras.length) {
-          bloques.push({ titulo: t('ficha_dinero'), cifras: cifras.map((x) => ({ valor: x.moneda ? dinero(x.valor, x.moneda) : Number(x.valor || 0).toLocaleString(LOC, { useGrouping: 'always' }), que: fx('ficha_cifra_' + x.clave, { anio: String(x.anio || '') }), n: cita(x.fuente) })) });
+          // Whose figures they are: a group's results (Alphabet's, on Google's profile) say so in
+          // the heading when all of them are the group's, and beside each one when they mix.
+          const de = (x) => (typeof x.de === 'string' ? x.de.trim() : '');
+          const todasDe = new Set(cifras.map(de)).size === 1 ? de(cifras[0]) : '';
+          bloques.push({ titulo: todasDe ? fx('ficha_dinero_de', { entidad: todasDe }) : t('ficha_dinero'), cifras: cifras.map((x) => ({ valor: x.moneda ? dinero(x.valor, x.moneda) : Number(x.valor || 0).toLocaleString(LOC, { useGrouping: 'always' }), que: fx('ficha_cifra_' + x.clave, { anio: String(x.anio || '') }) + (!todasDe && de(x) ? ' · ' + fx('ficha_cifra_de', { entidad: de(x) }) : ''), n: cita(x.fuente) })) });
         }
-        bloques.push({ titulo: t('ficha_sanciones'), total: totales(sanciones), vacio: fx('ficha_sin_sanciones', { fecha: fecha(d.revisada) }),
+        // An old fine is what an authority decided then, not proof of what the company does now.
+        bloques.push({ titulo: t('ficha_sanciones'), nota: t('ficha_sanciones_nota'), total: totales(sanciones), vacio: fx('ficha_sin_sanciones', { fecha: fecha(d.revisada) }),
           filas: sanciones.map((x) => Object.assign({ cab: [x.autoridad || '', x.pais ? nombrePais(x.pais) : '', fecha(x.fecha)].filter(Boolean).join(' · '), texto: [L(x.motivo), L(x.estado)].filter(Boolean).join(' '), n: cita(x.fuente), roja: true }, importe(x))) });
         bloques.push({ titulo: t('ficha_filtraciones'), vacio: fx('ficha_sin_filtraciones', { fecha: fecha(d.revisada) }),
           filas: filtraciones.map((x) => ({ cab: fecha(x.fecha), queda: x.afectados ? fn('ficha_afectados', Number(x.afectados)) : '', puesta: '', texto: L(x.que), n: cita(x.fuente) })) });
@@ -2190,7 +2195,7 @@
         if (b.cifras) h += `<div class="counters f-dinero">${b.cifras.map((x) => `<div class="counter"><div class="n">${esc(x.valor)}</div><div class="l">${esc(x.que)}${sup(x.n)}</div></div>`).join('')}</div>`;
         if (b.filas) {
           h += b.filas.length
-            ? (b.total ? `<p class="f-total">${esc(b.total)}</p>` : '') + `<ul class="f-lista">${b.filas.map((x) => `<li class="${x.roja ? 'roja' : 'ambar'}"><div class="f-l1"><span>${esc(x.cab)}</span><span class="f-importe">${x.puesta ? `<s>${esc(x.puesta)}</s> ` : ''}${esc(x.queda)}</span></div><div class="f-l2">${esc(x.texto)}${sup(x.n)}</div></li>`).join('')}</ul>`
+            ? (b.nota ? `<p class="muted">${esc(b.nota)}</p>` : '') + (b.total ? `<p class="f-total">${esc(b.total)}</p>` : '') + `<ul class="f-lista">${b.filas.map((x) => `<li class="${x.roja ? 'roja' : 'ambar'}"><div class="f-l1"><span>${esc(x.cab)}</span><span class="f-importe">${x.puesta ? `<s>${esc(x.puesta)}</s> ` : ''}${esc(x.queda)}</span></div><div class="f-l2">${esc(x.texto)}${sup(x.n)}</div></li>`).join('')}</ul>`
             : `<p class="f-vacia">${esc(b.vacio)}</p>`;
         }
         if (b.enlace) h += `<p>${enlace(b.enlace)}</p>`;
@@ -2231,6 +2236,7 @@
           if (b.filas) {
             if (!b.filas.length) doc.line(b.vacio, 10, false, 0.35);
             else {
+              if (b.nota) doc.line(b.nota, 9, false, 0.35).gap(4);
               if (b.total) doc.line(b.total, 10, true).gap(4);
               doc.table([{ title: t('ficha_pdf_cuando'), w: 0.3 }, { title: t('ficha_pdf_importe'), w: 0.18 }, { title: t('ficha_pdf_que'), w: 0.52 }],
                 b.filas.map((x) => [x.cab, (x.puesta ? x.puesta + ' -> ' : '') + x.queda, x.texto + n(x.n)]), 8);

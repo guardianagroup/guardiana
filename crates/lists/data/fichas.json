@@ -28,6 +28,7 @@
      "anio": 2025,
      "valor": 402836000000,
      "moneda": "USD",
+     "de": "Alphabet Inc.",
      "fuente": "https://s206.q4cdn.com/479360582/files/doc_financials/2025/q4/2025q4-alphabet-earnings-release.pdf"
     },
     {
@@ -35,12 +36,14 @@
      "anio": 2025,
      "valor": 132170000000,
      "moneda": "USD",
+     "de": "Alphabet Inc.",
      "fuente": "https://s206.q4cdn.com/479360582/files/doc_financials/2025/q4/2025q4-alphabet-earnings-release.pdf"
     },
     {
      "clave": "empleados",
      "anio": 2025,
      "valor": 190820,
+     "de": "Alphabet Inc.",
      "fuente": "https://s206.q4cdn.com/479360582/files/doc_financials/2025/q4/2025q4-alphabet-earnings-release.pdf"
     }
    ],
@@ -2347,6 +2350,7 @@
      "anio": 2025,
      "valor": 1300461000,
      "moneda": "USD",
+     "de": "Teads Holding Co.",
      "fuente": "https://www.stocktitan.net/news/TEAD/teads-holding-co-announces-fourth-quarter-and-full-year-2025-t891vk37a4ol.html"
     },
     {
@@ -2354,12 +2358,14 @@
      "anio": 2025,
      "valor": 517070000,
      "moneda": "USD",
+     "de": "Teads Holding Co.",
      "fuente": "https://www.stocktitan.net/news/TEAD/teads-holding-co-announces-fourth-quarter-and-full-year-2025-t891vk37a4ol.html"
     },
     {
      "clave": "empleados",
      "anio": 2026,
      "valor": 1700,
+     "de": "Teads Holding Co.",
      "fuente": "https://www.sec.gov/Archives/edgar/data/1454938/000145493826000015/tead-20251231.htm"
     }
    ],
