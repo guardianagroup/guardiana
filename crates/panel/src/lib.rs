@@ -161,10 +161,6 @@ pub fn panel_url(addr: SocketAddr, token: &str) -> String {
     format!("http://{addr}/?t={token}")
 }
 
-/// The site's own typefaces, carried inside the binary. The panel never asks the internet for
-/// anything (brief, section 6), so looking like guardianagroup.com cannot mean fetching a font
-/// from a CDN: the six files travel with the program. Latin subset only, which is all Spanish,
-/// English and Portuguese need.
 /// The Earth's pictures for «GUARDIANA por dentro»: NASA Blue Marble (day), its city lights at
 /// night and the water mask made from the day picture. Public domain; served from the panel so the
 /// globe works with no internet (brief §8).
@@ -185,6 +181,10 @@ async fn tierra(RutaUrl(archivo): RutaUrl<String>) -> Response {
         .into_response()
 }
 
+/// The site's own typefaces, carried inside the binary. The panel never asks the internet for
+/// anything (brief, section 6), so looking like guardianagroup.com cannot mean fetching a font
+/// from a CDN: the six files travel with the program. Latin subset only, which is all Spanish,
+/// English and Portuguese need.
 async fn fuente(RutaUrl(archivo): RutaUrl<String>) -> Response {
     let cuerpo: &'static [u8] = match archivo.as_str() {
         "IBMPlexSans-400-latin.woff2" => {

@@ -271,7 +271,7 @@ pub(crate) async fn universo(
         };
         a.ultima = a.ultima.max(f.minuto);
         a.asn = a.asn.max(f.asn);
-        *a.vias.entry((f.proto.clone(), f.puerto)).or_insert(0) += f.enviados + f.recibidos;
+        *a.vias.entry((f.proto.clone(), f.puerto)).or_default() += f.enviados + f.recibidos;
     }
 
     // The DNS side: how many times each program asked for each name, and how many were cut.
@@ -314,7 +314,8 @@ pub(crate) async fn universo(
     let vale = |id: &str, tipo: &str| tipo != "programa" || quedan.iter().any(|q| q == id);
 
     let mut destinos: Vec<Destino> = Vec::new();
-    let mut con_trafico: std::collections::HashSet<(String, String)> = Default::default();
+    let mut con_trafico: std::collections::HashSet<(String, String)> =
+        std::collections::HashSet::new();
     for ((prog, destino, pais, red), a) in por_destino {
         let tipo = progs.get(&prog).map_or("programa", |p| p.tipo);
         if !vale(&prog, tipo) {
@@ -409,7 +410,10 @@ pub(crate) async fn universo(
         .filter(|f| f.minuto >= now - RECIENTES_MIN * 60_000)
         .filter_map(|f| {
             let (id, tipo) = programa_de(&f.programa);
-            vale(&id, tipo).then(|| Reciente {
+            if !vale(&id, tipo) {
+                return None;
+            }
+            Some(Reciente {
                 minuto: f.minuto,
                 programa: id,
                 destino: f.destino.clone(),
