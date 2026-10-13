@@ -1777,7 +1777,7 @@ impl Sesion {
             },
             "ajuste" => self.ajuste(texto(m, "clave"), m.get("valor").unwrap_or(&Value::Null)),
             "cortes" => match origen {
-                Origen::Pestana(id) => self.cortes(id, texto(m, "periodo")),
+                Origen::Pestana(id) => self.cortes(id, texto(m, "periodo"), si(m, "sin_lista")),
                 _ => Vec::new(),
             },
             "exportar_cortes" => match origen {
@@ -2564,7 +2564,10 @@ impl Sesion {
 
     /// «Lo que se cortó» for a period: every cut, newest first, and the counts that summarise
     /// them (all of them, even when the list is cut short).
-    fn cortes(&mut self, id: u32, periodo: &str) -> Vec<Orden> {
+    ///
+    /// `sin_lista`: only the counts, for the new tab's summary (the owner, 12 Oct 2026: the
+    /// summary on the first screen); the list of every cut stays on its own page.
+    fn cortes(&mut self, id: u32, periodo: &str, sin_lista: bool) -> Vec<Orden> {
         self.guarda_cortes();
         let (desde, hasta) = self.periodo(periodo);
         let lista = cortes::lee(&self.datos.join("cortes"), &desde, &hasta);
@@ -2622,7 +2625,7 @@ impl Sesion {
         let recientes: Vec<Value> = lista
             .iter()
             .rev()
-            .take(cortes::MAX_LISTA)
+            .take(if sin_lista { 0 } else { cortes::MAX_LISTA })
             .map(|c| {
                 let mut v = serde_json::to_value(c).unwrap_or(Value::Null);
                 if c.pais.is_none() {

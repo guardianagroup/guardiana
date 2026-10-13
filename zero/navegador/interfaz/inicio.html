@@ -16,7 +16,7 @@ body { background-image: linear-gradient(color-mix(in srgb, var(--tinta) 4%, tra
 #tema:hover { color: var(--tinta); border-color: var(--gris-suave); }
 #tema svg { width: 18px; height: 18px; }
 .marca span { font-size: 12.5px; }
-main { max-width: 780px; margin: 0 auto; padding: 12vh 28px 64px; }
+main { max-width: 860px; margin: 0 auto; padding: 12vh 28px 64px; }
 #fecha { margin: 0 0 8px; font-size: 14px; font-weight: 500; color: var(--gris); }
 #saludo { font: 600 clamp(30px, 4vw, 42px)/1.15 var(--display); letter-spacing: -.02em; margin: 0 0 26px; }
 /* Favourites: the person's own pages, one click away. */
@@ -42,6 +42,7 @@ main { max-width: 780px; margin: 0 auto; padding: 12vh 28px 64px; }
 .hoy-cab .enlace::after { content: ' →'; }
 .pulso { width: 8px; height: 8px; border-radius: 50%; background: var(--verde); animation: late 2s infinite; }
 .apagada .pulso { background: var(--ambar); animation: none; }
+.pasado .pulso { display: none; }
 @keyframes late { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--verde) 45%, transparent); } 50% { box-shadow: 0 0 0 6px transparent; } }
 @media (prefers-reduced-motion: reduce) { .pulso { animation: none; } }
 #frase { margin: 0 0 14px; font-size: 17px; line-height: 1.45; font-variant-numeric: tabular-nums; }
@@ -58,6 +59,40 @@ main { max-width: 780px; margin: 0 auto; padding: 12vh 28px 64px; }
 .mes .mes-rastro { font-size: 13.5px; color: var(--gris); }
 .leyenda { display: flex; justify-content: space-between; gap: 12px; margin: 7px 0 0; font-size: 12px; color: var(--gris); }
 .cero ~ .barra, .cero ~ .leyenda { display: none; }
+/* The period, chosen in the card's own header: today is live; the others are the summary. */
+.periodos { display: flex; padding: 3px; border-radius: 12px; background: var(--campo); border: 1px solid var(--linea); }
+.periodos button { border: 0; background: none; padding: 5px 11px; border-radius: 9px; color: var(--gris); font-weight: 500; font-size: 13px; }
+.periodos button[aria-pressed="true"] { background: var(--hoja); color: var(--tinta); box-shadow: var(--sombra); }
+#periodo-frase { margin: 0 0 6px; font-size: 15px; color: var(--gris); }
+.hechos.segunda { grid-template-columns: repeat(5, 1fr); margin-top: 0; }
+.hechos.segunda .hecho b { font-size: 20px; }
+.hoy .resumen { display: grid; grid-template-columns: 1.25fr 1fr; gap: 12px; margin: 4px -8px 14px; }
+.hoy .resumen.oculto { display: none; }
+.caja { border: 1px solid var(--linea); border-radius: 14px; background: var(--hoja); padding: 14px 16px; min-width: 0; }
+.caja h3 { font-size: 13px; font-weight: 600; margin: 0 0 10px; color: var(--gris); }
+.caja h3.segundo { margin-top: 14px; }
+.caja.ancha { grid-row: span 3; display: flex; flex-direction: column; min-height: 320px; }
+.barras-marco { position: relative; flex: 1; min-height: 0; }
+.barras-marco .barras { position: absolute; inset: 0; overflow-y: auto; padding-right: 8px; align-content: start; }
+.barras-marco .barras.desborda { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 34px), transparent); }
+.barras-marco .barras.desborda.al-final { -webkit-mask-image: none; mask-image: none; }
+.barras { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.barras li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; align-items: baseline; }
+.barras .nombre { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.barras .nombre small { font-weight: 400; color: var(--gris); margin-left: 6px; font-size: 12px; }
+.barras .n { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 14px; }
+.barras .barra { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--campo); overflow: hidden; }
+.barras .barra i { display: block; height: 100%; border-radius: 3px; background: var(--rojo); }
+.lista-simple { list-style: none; margin: 0; padding: 0; }
+.lista-simple li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--linea); font-size: 13.5px; }
+.lista-simple li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lista-simple li:last-child { border-bottom: 0; }
+.lista-simple .n { font-variant-numeric: tabular-nums; font-weight: 600; }
+.fichas { display: flex; flex-wrap: wrap; gap: 6px; }
+.fichas .chip { font-size: 12.5px; padding: 6px 9px; }
+.fichas .chip b { margin-left: 6px; color: inherit; }
+.hoy-pie { margin: 0 -24px; padding: 12px 24px 14px; border-top: 1px solid var(--linea); font-size: 13.5px; }
+.hoy-pie .enlace::after { content: ' →'; }
 form { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 20px; border-radius: 28px; background: var(--hoja); border: 1px solid var(--linea); box-shadow: var(--sombra); }
 form:focus-within { border-color: var(--azul); box-shadow: 0 0 0 4px var(--azul-suave), var(--sombra); }
 form svg { width: 20px; height: 20px; color: var(--gris); flex: none; }
@@ -84,6 +119,12 @@ a.hecho:hover span { color: var(--tinta); text-decoration: underline; text-under
 .mes .boton { grid-row: 1 / span 2; grid-column: 2; }
 .mes small { grid-column: 1 / -1; color: var(--gris); font-size: 12px; }
 #guardada { margin-top: 10px; font-size: 12.5px; color: var(--verde); }
+@media (max-width: 760px) {
+  .hoy .resumen { grid-template-columns: 1fr; margin: 4px 0 14px; }
+  .caja.ancha { grid-row: auto; min-height: 360px; }
+  .hechos.segunda { grid-template-columns: repeat(3, 1fr); }
+  .hoy-cab { flex-wrap: wrap; }
+}
 @media (max-width: 640px) {
   .hechos { grid-template-columns: repeat(2, 1fr); }
   .marca span { display: none; }
@@ -112,21 +153,48 @@ a.hecho:hover span { color: var(--tinta); text-decoration: underline; text-under
     <div class="favs-pie"><span id="favs-vacio" class="oculto" data-t="favoritos_vacio"></span><span id="favs-importar"></span><button class="enlace oculto" id="favs-todos"></button><span id="favs-hecho" role="status"></span></div>
   </section>
   <section class="hoy" id="hoy">
-    <div class="hoy-cab"><h2><i class="pulso"></i><span data-t="inicio_en_directo"></span></h2><a class="enlace" href="cortes.html" data-t="inicio_ver_todo"></a></div>
-    <p id="frase"></p>
-    <div class="barra"><i id="barra"></i></div>
-    <div class="leyenda"><span id="l-cortadas"></span><span id="l-intentaron"></span></div>
+    <div class="hoy-cab">
+      <h2><i class="pulso"></i><span id="hoy-titulo" data-t="inicio_en_directo"></span></h2>
+      <div class="periodos" role="group">
+        <button data-periodo="hoy" data-t="cortes_hoy" aria-pressed="true"></button>
+        <button data-periodo="7" data-t="cortes_7" aria-pressed="false"></button>
+        <button data-periodo="mes" data-t="cortes_mes" aria-pressed="false"></button>
+        <button data-periodo="31" data-t="cortes_31" data-t-title="cortes_31_titulo" aria-pressed="false"></button>
+      </div>
+    </div>
+    <div id="solo-hoy">
+      <p id="frase"></p>
+      <div class="barra"><i id="barra"></i></div>
+      <div class="leyenda"><span id="l-cortadas"></span><span id="l-intentaron"></span></div>
+    </div>
+    <p id="periodo-frase" class="oculto"></p>
   <div class="hechos">
     <a class="hecho rojo" href="cortes.html"><b id="h-cortadas">0</b><span data-t="inicio_peticiones"></span></a>
     <a class="hecho" href="cortes.html#dato"><b id="h-datos">0</b><span data-t="inicio_datos"></span></a>
     <div class="hecho"><b id="h-parametros">0</b><span data-t="inicio_parametros"></span></div>
     <div class="hecho"><b id="h-corredores">0</b><span data-t="inicio_corredores"></span></div>
   </div>
+  <!-- The summary, right here (the owner, 12 Oct 2026: «que aparezca directo en pantalla»):
+       the same figures and boxes as «Lo que se cortó», for the period chosen above. -->
+  <div class="hechos segunda">
+    <div class="hecho"><b id="r-n-empresas">0</b><span data-t="cortes_n_empresas"></span></div>
+    <div class="hecho"><b id="r-n-paises">0</b><span data-t="cortes_n_paises"></span></div>
+    <div class="hecho"><b id="r-n-webs">0</b><span data-t="cortes_n_webs"></span></div>
+    <div class="hecho"><b id="r-n-cookies">0</b><span data-t="cortes_n_cookies"></span></div>
+    <div class="hecho"><b id="r-n-emergentes">0</b><span data-t="cortes_n_emergentes"></span></div>
+  </div>
   <div class="hoy-rastro oculto" id="rastro-caja">
     <h3 data-t="rastro_titulo"></h3>
     <p data-t="rastro_explica"></p>
     <ol class="rastro" id="rastro"></ol>
   </div>
+  <div class="resumen oculto" id="resumen">
+    <section class="caja ancha"><h3 data-t="cortes_por_empresa"></h3><div class="barras-marco"><ul class="barras" id="r-empresas"></ul></div></section>
+    <section class="caja"><h3 data-t="cortes_por_pais"></h3><ul class="lista-simple" id="r-paises"></ul></section>
+    <section class="caja"><h3 data-t="cortes_por_motivo"></h3><div class="fichas" id="r-motivos"></div><h3 class="segundo" data-t="cortes_por_tipo"></h3><div class="fichas" id="r-tipos"></div></section>
+    <section class="caja"><h3 data-t="cortes_por_pagina"></h3><ul class="lista-simple" id="r-paginas"></ul></section>
+  </div>
+  <p class="hoy-pie"><a class="enlace" href="cortes.html" id="ver-lista" data-t="inicio_ver_todo"></a></p>
   </section>
   <div id="apagado" class="oculto"><span data-t="proteccion_apagada"></span><button class="boton principal" id="encender" data-t="encender"></button></div>
   <div class="acciones">

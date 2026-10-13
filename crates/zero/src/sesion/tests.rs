@@ -1113,6 +1113,16 @@ fn every_cut_can_be_examined_one_by_one_and_saved() {
     assert_eq!(c["lista"][0]["pagina"], "eltiempo.com");
     assert_eq!(c["lista"][0]["ruta"], "/g/collect");
     assert!(!c.to_string().contains("cid=9"));
+    // The new tab's summary: the same counts, without the list of every cut.
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        CORTES,
+        r#"{"tipo":"cortes","periodo":"hoy","sin_lista":true}"#,
+    );
+    let r = del_tipo(&o, Origen::Pestana(id), "cortes").unwrap_or_default();
+    assert_eq!(r["total"], 2);
+    assert_eq!(r["empresas"], c["empresas"]);
+    assert_eq!(r["lista"].as_array().map(Vec::len), Some(0));
     // Saved as CSV in Downloads, and as PDF by the engine.
     let o = s.mensaje(
         Origen::Pestana(id),

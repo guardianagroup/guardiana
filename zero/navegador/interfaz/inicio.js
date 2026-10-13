@@ -109,7 +109,102 @@
     requestAnimationFrame(paso);
   }
 
+  // The summary of «Lo que se cortó», right here, for the period chosen in the card's header (the
+  // owner, 12 Oct 2026: «que aparezca directo en pantalla … en una sale todo»). Today stays live;
+  // the list of every cut, one by one, is still one click away.
+  let periodo = 'hoy';
+  let ultimoHoy = null;
+  let resumen = null;
+  let pedido = 0;
+  let pendiente = 0;
+  let todasLasEmpresas = false;
+  const MAX_BARRAS = 60;
+  let pais = (c) => c || '';
+  const lang = () => document.documentElement.lang || 'es';
+  const nombrePais = (c) => (!c ? t('cortes_desconocido') : c[0] === '~' ? t('cortes_sin_identificar', { pais: pais(c.slice(1)) }) : pais(c));
+  function pideResumen() {
+    pedido = Date.now();
+    manda({ tipo: 'cortes', periodo, sin_lista: true });
+  }
+  // Today changes as the pages work: asked again at most every five seconds.
+  function pideLuego() {
+    if (pendiente) return;
+    pendiente = setTimeout(() => { pendiente = 0; pideResumen(); }, Math.max(0, 5000 - (Date.now() - pedido)));
+  }
+  document.querySelectorAll('.periodos button').forEach((b) => b.addEventListener('click', () => {
+    if (periodo === b.dataset.periodo) return;
+    periodo = b.dataset.periodo;
+    document.querySelectorAll('.periodos button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    const esHoy = periodo === 'hoy';
+    $('hoy').classList.toggle('pasado', !esHoy);
+    $('hoy-titulo').textContent = t(esHoy ? 'inicio_en_directo' : 'inicio_resumen');
+    $('solo-hoy').classList.toggle('oculto', !esHoy);
+    $('periodo-frase').classList.toggle('oculto', esHoy);
+    todasLasEmpresas = false;
+    if (esHoy && ultimoHoy) pintaHoy(ultimoHoy);
+    pideResumen();
+  }));
+  function sombraAbajo() {
+    const ul = $('r-empresas');
+    ul.classList.toggle('desborda', ul.scrollHeight > ul.clientHeight + 2);
+    ul.classList.toggle('al-final', ul.scrollTop + ul.clientHeight >= ul.scrollHeight - 2);
+  }
+  $('r-empresas').addEventListener('scroll', sombraAbajo, { passive: true });
+  window.addEventListener('resize', sombraAbajo);
+  function barras(lista) {
+    const max = Math.max(1, ...lista.map((x) => x.n));
+    const corte = todasLasEmpresas ? lista.length : MAX_BARRAS;
+    const resto = lista.slice(corte).reduce((a, x) => a + x.n, 0);
+    const li = lista.slice(0, corte).map((x) => `<li><span class="nombre"><button class="enlace-empresa" data-empresa="${Z.esc(x.quien)}">${Z.esc(x.quien)}</button>${x.pais ? `<small>${Z.esc(nombrePais(x.pais))}</small>` : ''}</span><span class="n">${n(x.n)}</span><span class="barra"><i style="width:${Math.max(2, Math.round(100 * x.n / max))}%"></i></span></li>`);
+    if (resto) li.push(`<li><span class="nombre"><button class="enlace" id="r-empresas-todas">${Z.esc(tn('cortes_ver_otras', lista.length - corte, { n: n(lista.length - corte) }))}</button></span><span class="n">${n(resto)}</span></li>`);
+    return li.join('');
+  }
+  const simple = (lista, nombre) => lista.slice(0, 10).map((x) => `<li><span title="${Z.esc(nombre(x))}">${Z.esc(nombre(x))}</span><span class="n">${n(x.n)}</span></li>`).join('');
+  function pintaResumen() {
+    const d = resumen;
+    if (!d || d.periodo !== periodo) return;
+    const dia = d.dia || {};
+    $('r-n-empresas').textContent = n(d.empresas.length);
+    $('r-n-paises').textContent = n(d.paises.filter((x) => x.pais && x.pais[0] !== '~').length);
+    $('r-n-webs').textContent = n(d.paginas.filter((x) => x.pagina).length);
+    $('r-n-cookies').textContent = n(dia.avisos_cookies);
+    $('r-n-emergentes').textContent = n(dia.emergentes || 0);
+    $('resumen').classList.toggle('oculto', !d.total);
+    $('r-empresas').innerHTML = barras(d.empresas);
+    const mas = $('r-empresas-todas');
+    if (mas) mas.addEventListener('click', () => { todasLasEmpresas = true; pintaResumen(); });
+    sombraAbajo();
+    $('r-paises').innerHTML = simple(d.paises, (x) => nombrePais(x.pais));
+    $('r-paginas').innerHTML = simple(d.paginas, (x) => x.pagina || t('pestana_aislada'));
+    $('r-motivos').innerHTML = d.motivos.map((x) => `<span class="chip rojo">${Z.esc(t('motivo_' + x.motivo))}<b>${n(x.n)}</b></span>`).join('');
+    $('r-tipos').innerHTML = d.tipos.map((x) => `<span class="chip">${Z.esc(t('recurso_' + x.recurso))}<b>${n(x.n)}</b></span>`).join('');
+    if (periodo !== 'hoy') {
+      // Another period: the four figures and the trail are that period's.
+      $('h-cortadas').textContent = n(dia.cortadas || d.total);
+      $('h-datos').textContent = n(dia.datos_salvados);
+      $('h-parametros').textContent = n(dia.parametros_quitados);
+      $('h-corredores').textContent = n(dia.corredores);
+      $('rastro-caja').classList.toggle('oculto', !Z.rastro($('rastro'), d.rastro));
+      const f = (x) => new Date(x + 'T12:00:00').toLocaleDateString(lang(), { day: 'numeric', month: 'long' });
+      $('periodo-frase').textContent = d.total
+        ? t('inicio_periodo_frase', { desde: f(d.desde), hasta: f(d.hasta), cortadas: n(dia.cortadas || d.total), empresas: n(d.empresas.length) })
+        : t('cortes_vacio');
+    }
+  }
+  en('cortes', (m) => { resumen = m; pintaResumen(); });
+  en('textos', () => {
+    try { const dn = new Intl.DisplayNames([lang()], { type: 'region' }); pais = (c) => { try { return dn.of(c); } catch (_) { return c; } }; } catch (_) {}
+    $('hoy-titulo').textContent = t(periodo === 'hoy' ? 'inicio_en_directo' : 'inicio_resumen');
+    if (resumen) pintaResumen(); else pideResumen();
+  });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pideResumen(); });
+
   en('hoy', (m) => {
+    ultimoHoy = m;
+    pintaHoy(m);
+    if (periodo === 'hoy') pideLuego();
+  });
+  function pintaHoy(m) {
     const h = m.hoy || {};
     const frase = $('frase');
     if (h.empresas) {
@@ -124,22 +219,24 @@
     }
     // Live while protecting; amber, not green, when the cuts are off.
     $('hoy').classList.toggle('apagada', !m.cortando);
-    cifra($('h-cortadas'), h.cortadas);
-    cifra($('h-datos'), h.datos_salvados);
-    cifra($('h-parametros'), h.parametros_quitados);
-    cifra($('h-corredores'), h.corredores);
-    primeraVez = false;
+    if (periodo === 'hoy') {
+      cifra($('h-cortadas'), h.cortadas);
+      cifra($('h-datos'), h.datos_salvados);
+      cifra($('h-parametros'), h.parametros_quitados);
+      cifra($('h-corredores'), h.corredores);
+      primeraVez = false;
+      $('rastro-caja').classList.toggle('oculto', !Z.rastro($('rastro'), m.rastro_hoy));
+    }
     $('apagado').classList.toggle('oculto', !!m.cortando);
     mes = m.mes || {};
     const nombreMes = new Date().toLocaleDateString(document.documentElement.lang, { month: 'long' });
     $('mes-frase').textContent = fraseMes(mes, nombreMes);
-    $('rastro-caja').classList.toggle('oculto', !Z.rastro($('rastro'), m.rastro_hoy));
     const rm = m.rastro_mes || {};
     const primero = (rm.seguidores || [])[0];
     $('mes-rastro').classList.toggle('oculto', !primero);
     if (primero) $('mes-rastro').textContent = t('mes_rastro', { quien: primero.quien, webs: n(primero.webs), total: n(rm.webs) });
     pintaMotores(m);
-  });
+  }
 
   // «Your month in data» as an image: only the month's figures, never a website or the history.
   $('mes-guardar').addEventListener('click', async () => {
