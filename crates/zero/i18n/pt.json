@@ -707,5 +707,15 @@
   "cortes_cadena_envio": "você enviou um formulário",
   "cortes_cadena_peticion": "pedido a {empresa} (cortado)",
   "cortes_cadena_nota": "A cadeia como o navegador a vê: o site que você abriu já tinha carregado código dessas empresas quando este pedido saiu. O motor não diz qual script o disparou.",
-  "cortes_cadena_nota_sin": "O pedido saiu da própria página, sem código de outras empresas carregado antes."
+  "cortes_cadena_nota_sin": "O pedido saiu da própria página, sem código de outras empresas carregado antes.",
+  "gpc_enviada": "Disse a este site que não venda nem compartilhe seus dados (sinal GPC)",
+  "auditoria_titulo": "O aviso de cookies, antes e depois",
+  "auditoria_antes": "Antes de o aviso ser respondido, a página já tentou contatar {n} empresas de rastreamento ou publicidade ({peticiones} pedidos)",
+  "auditoria_antes_uno": "Antes de o aviso ser respondido, a página já tentou contatar 1 empresa de rastreamento ou publicidade ({peticiones} pedidos)",
+  "auditoria_despues": "Depois: {n} empresas ({peticiones} pedidos)",
+  "auditoria_despues_uno": "Depois: 1 empresa ({peticiones} pedidos)",
+  "auditoria_y_mas": "e mais {n}",
+  "auditoria_nota": "São tentativas da página, cortadas ou não pelo ZERO, de empresas que as listas abertas classificam como rastreamento, publicidade ou corretoras de dados. Pedi-las antes da sua resposta não prova por si só uma infração: depende de para que são usadas.",
+  "auditoria_antes_cero": "Antes de o aviso ser respondido, a página não tentou contatar nenhuma empresa de rastreamento ou publicidade",
+  "auditoria_despues_cero": "Depois: nenhuma"
 }

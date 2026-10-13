@@ -1160,6 +1160,21 @@ impl Sesion {
             "parametros_quitados": p.escudo.parametros_quitados,
             "datos_salvados": p.escudo.datos_salvados,
             "cookies": p.escudo.cookies.as_ref().map(|(g, a)| json!({ "gestor": g, "accion": a })),
+            // The consent audit: only once the notice was answered, so «before» is closed.
+            "auditoria": p.escudo.cookies.as_ref().map(|_| {
+                let lado = |m: &BTreeMap<String, u32>| {
+                    let mut v: Vec<(&String, &u32)> = m.iter().collect();
+                    v.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+                    json!({
+                        "empresas": v.len(),
+                        "peticiones": m.values().sum::<u32>(),
+                        "nombres": v.iter().take(8).map(|(q, _)| q.as_str()).collect::<Vec<_>>(),
+                    })
+                };
+                json!({ "antes": lado(&p.escudo.antes_aviso), "despues": lado(&p.escudo.tras_aviso) })
+            }),
+            // Global Privacy Control goes on every request that leaves (app.rs): the page got it.
+            "gpc": !es_interna(&p.url) && !p.escudo.sitio.is_empty(),
             "emergentes": p.escudo.emergentes,
             "emergente": p.escudo.emergente.as_deref().and_then(host_de).map(|h| sitio(&h)),
             "molestas": p.escudo.molestas,

@@ -286,7 +286,19 @@ pub struct Pestana {
     /// right after it happened «al enviar un formulario». In memory only.
     #[serde(skip)]
     pub ultimo_envio: Option<i64>,
+    /// The consent audit (ChatGPT's review of 13 Oct 2026, adopted by the owner): the tracking,
+    /// advertising and broker companies this page tried to reach before its cookie notice was
+    /// answered, with how many requests each, and after it. Attempts, cut or not: what the page
+    /// asked for. In memory only; at most [`MAX_AUDITORIA`] companies each.
+    #[serde(skip)]
+    pub antes_aviso: BTreeMap<String, u32>,
+    /// The same, once the notice was answered.
+    #[serde(skip)]
+    pub tras_aviso: BTreeMap<String, u32>,
 }
+
+/// Companies kept on each side of the consent audit.
+pub const MAX_AUDITORIA: usize = 200;
 
 impl Pestana {
     /// A script of an outside company ran on the page: it is written down, once, so a later
@@ -310,6 +322,19 @@ impl Pestana {
     pub fn anota(&mut self, d: &Decision) {
         if matches!(d.motivo, Some(Motivo::Tinta | Motivo::Senuelo)) {
             self.datos_salvados += 1;
+        }
+        // The consent audit: what the lists call tracking, advertising or a registered broker,
+        // on the side of the cookie notice it happened.
+        if d.de_fuera() && (d.destino.sigue() || d.destino.corredor.is_some()) {
+            let lado = if self.cookies.is_none() {
+                &mut self.antes_aviso
+            } else {
+                &mut self.tras_aviso
+            };
+            let quien = d.destino.quien();
+            if lado.len() < MAX_AUDITORIA || lado.contains_key(quien) {
+                *lado.entry(quien.to_string()).or_insert(0) += 1;
+            }
         }
         // Outside companies only: the page's own site, even when you cut a part of it, is not
         // «a company from outside».

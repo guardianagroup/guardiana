@@ -203,6 +203,7 @@
     if (m.datos_salvados) hechos.push(tn('datos_salvados', m.datos_salvados, { n: n(m.datos_salvados) }));
     if (m.cookies) hechos.push(t(m.cookies.accion === 'rechazado' ? 'cookies_rechazado' : 'cookies_escondido', { gestor: m.cookies.gestor }));
     if (m.molestas) hechos.push(tn('molestas_cerradas', m.molestas, { n: n(m.molestas) }));
+    if (m.gpc && m.protege) hechos.push(t('gpc_enviada'));
     let html = hechos.map((h) => `<span>${esc(h)}</span>`).join('');
     // Pop-ups not opened: the last one can still be opened, if the person wanted it.
     if (m.emergentes) {
@@ -211,6 +212,7 @@
     }
     $('e-hechos').innerHTML = html;
     pintaChivatos(m);
+    pintaAuditoria(m.auditoria);
     pintaMedidas(m.medidas || {});
   });
 
@@ -283,6 +285,18 @@
     x.fillText(linea, 72, y);
     x.fillStyle = '#5B6275'; x.font = '400 18px Plex'; x.fillText(t('lema'), 72, 540);
     x.fillStyle = '#1F4BFF'; x.font = '500 20px PlexMono'; x.fillText('guardianagroup.com', 72, 570);
+  }
+  // The consent audit: which tracking or advertising companies the page asked for before its
+  // cookie notice was answered, and after. Only once it was answered.
+  function pintaAuditoria(a) {
+    const caja = $('e-auditoria-caja');
+    if (!a || (!a.antes.empresas && !a.despues.empresas)) { caja.classList.add('oculto'); return; }
+    caja.classList.remove('oculto');
+    const fila = (clave, x) => {
+      const nombres = x.nombres.join(', ') + (x.empresas > x.nombres.length ? ` ${t('auditoria_y_mas', { n: n(x.empresas - x.nombres.length) })}` : '');
+      return `<li><b>${esc(tn(clave, x.empresas, { n: n(x.empresas), peticiones: n(x.peticiones) }))}</b>${x.empresas ? `<br><span class="gris">${esc(nombres)}</span>` : ''}</li>`;
+    };
+    $('e-auditoria').innerHTML = fila('auditoria_antes', a.antes) + fila('auditoria_despues', a.despues);
   }
   function pintaChivatos(m) {
     const lista = m.chivatos || [];

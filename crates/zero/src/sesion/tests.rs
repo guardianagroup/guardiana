@@ -1533,6 +1533,28 @@ fn cookie_notices_are_dealt_with_only_when_told_and_shown_in_the_shield() {
     assert_eq!(r["zg"], "f1");
     assert!(s.protege());
     assert_eq!(r["cookies"], true);
+    // The consent audit: two tracking companies before the notice is answered…
+    let _ = s.peticion(
+        id,
+        "https://www.google-analytics.com/g/collect?v=2",
+        "GET",
+        b"",
+        4,
+    );
+    let _ = s.peticion(
+        id,
+        "https://connect.facebook.net/en_US/fbevents.js",
+        "GET",
+        b"",
+        7,
+    );
+    let _ = s.peticion(
+        id,
+        "https://www.google-analytics.com/g/collect?v=2",
+        "GET",
+        b"",
+        4,
+    );
     // What the guard did reaches the shield, with the manager's name.
     let o = s.mensaje(
         Origen::Pestana(id),
@@ -1543,7 +1565,22 @@ fn cookie_notices_are_dealt_with_only_when_told_and_shown_in_the_shield() {
         let e = del_tipo(&o, Origen::Barra, "escudo").unwrap_or_default();
         assert_eq!(e["cookies"]["gestor"], "OneTrust");
         assert_eq!(e["cookies"]["accion"], "rechazado");
+        assert_eq!(e["auditoria"]["antes"]["empresas"], 2, "{e}");
+        assert_eq!(e["auditoria"]["antes"]["peticiones"], 3, "{e}");
+        assert_eq!(e["auditoria"]["despues"]["empresas"], 0, "{e}");
+        assert_eq!(e["gpc"], true);
     }
+    // …and one after it.
+    let _ = s.peticion(
+        id,
+        "https://static.criteo.net/js/ld/publishertag.js",
+        "GET",
+        b"",
+        7,
+    );
+    let e = s.pestana(id).map(|p| s.msg_escudo(p)).unwrap_or_default();
+    assert_eq!(e["auditoria"]["despues"]["empresas"], 1, "{e}");
+    assert_eq!(e["auditoria"]["despues"]["nombres"][0], "Criteo", "{e}");
     // Counted once per page in the day's figures, however often the guard reports it.
     let _ = s.mensaje(
         Origen::Pestana(id),

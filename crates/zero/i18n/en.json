@@ -707,5 +707,15 @@
   "cortes_cadena_envio": "you sent a form",
   "cortes_cadena_peticion": "request to {empresa} (cut)",
   "cortes_cadena_nota": "The chain as the browser sees it: the site you opened had already loaded code from those companies when this request left. The engine does not say which script fired it.",
-  "cortes_cadena_nota_sin": "The request came from the page itself, with no other company’s code loaded before it."
+  "cortes_cadena_nota_sin": "The request came from the page itself, with no other company’s code loaded before it.",
+  "gpc_enviada": "Told this website not to sell or share your data (GPC signal)",
+  "auditoria_titulo": "The cookie notice, before and after",
+  "auditoria_antes": "Before the notice was answered, the page had already tried to reach {n} tracking or advertising companies ({peticiones} requests)",
+  "auditoria_antes_uno": "Before the notice was answered, the page had already tried to reach 1 tracking or advertising company ({peticiones} requests)",
+  "auditoria_despues": "After: {n} companies ({peticiones} requests)",
+  "auditoria_despues_uno": "After: 1 company ({peticiones} requests)",
+  "auditoria_y_mas": "and {n} more",
+  "auditoria_nota": "These are the page's attempts, cut by ZERO or not, to companies the open lists class as tracking, advertising or data brokers. Asking for them before your answer does not by itself prove a breach: it depends on what they are used for.",
+  "auditoria_antes_cero": "Before the notice was answered, the page did not try to reach any tracking or advertising company",
+  "auditoria_despues_cero": "After: none"
 }
