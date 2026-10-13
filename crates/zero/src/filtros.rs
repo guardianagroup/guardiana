@@ -11,7 +11,8 @@
 //! network rules and are not here.
 //!
 //! The lists are copies taken on the day of each release, written to `data/filtros/` without
-//! comments or cosmetic rules; their source, licence and date are at the top of each file.
+//! comments or cosmetic rules, encoded (see [`descodifica`]); their source, licence and date are
+//! at the top of each one (`build/filtros.py --leer` prints it in clear).
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -29,30 +30,52 @@ pub enum Lista {
     Peligro,
 }
 
-const LISTAS: &[(&str, Lista)] = &[
+const LISTAS: &[(&[u8], Lista)] = &[
     (
-        include_str!("../data/filtros/easylist.txt"),
+        include_bytes!("../data/filtros/easylist.bin"),
         Lista::Anuncios,
     ),
     (
-        include_str!("../data/filtros/easyprivacy.txt"),
+        include_bytes!("../data/filtros/easyprivacy.bin"),
         Lista::Rastreo,
     ),
-    (include_str!("../data/filtros/ubo.txt"), Lista::Anuncios),
+    (include_bytes!("../data/filtros/ubo.bin"), Lista::Anuncios),
     (
-        include_str!("../data/filtros/ubo-privacy.txt"),
+        include_bytes!("../data/filtros/ubo-privacy.bin"),
         Lista::Rastreo,
     ),
     (
-        include_str!("../data/filtros/ubo-badware.txt"),
+        include_bytes!("../data/filtros/ubo-badware.bin"),
         Lista::Peligro,
     ),
     (
-        include_str!("../data/filtros/ubo-unbreak.txt"),
+        include_bytes!("../data/filtros/ubo-unbreak.bin"),
         Lista::Anuncios,
     ),
-    (include_str!("../data/filtros/urlhaus.txt"), Lista::Peligro),
+    (
+        include_bytes!("../data/filtros/urlhaus.bin"),
+        Lista::Peligro,
+    ),
 ];
+
+/// The lists are stored encoded (`data/filtros/LEEME.md`): the malware lists carry real
+/// malware addresses, and an antivirus that sees them in a program takes it for one (Microsoft
+/// Defender did, with ZERO 1.0.15, on 13 Oct 2026). Antivirus products keep their own
+/// databases the same way. This undoes it: XOR with a fixed xorshift64 sequence.
+#[must_use]
+pub fn descodifica(b: &[u8]) -> String {
+    let mut x: u64 = 0x9E37_79B9_7F4A_7C15;
+    let out: Vec<u8> = b
+        .iter()
+        .map(|c| {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            c ^ (x & 0xFF) as u8
+        })
+        .collect();
+    String::from_utf8_lossy(&out).into_owned()
+}
 
 // Request types, as bits.
 const T_SCRIPT: u16 = 1;
@@ -680,12 +703,17 @@ fn rango_host(url: &str) -> (usize, usize) {
 #[must_use]
 pub fn motor() -> &'static Motor {
     static M: OnceLock<Motor> = OnceLock::new();
-    M.get_or_init(|| Motor::de(LISTAS))
+    M.get_or_init(|| {
+        let textos: Vec<(String, Lista)> =
+            LISTAS.iter().map(|(b, l)| (descodifica(b), *l)).collect();
+        let refs: Vec<(&str, Lista)> = textos.iter().map(|(t, l)| (t.as_str(), *l)).collect();
+        Motor::de(&refs)
+    })
 }
 
 // ----- hiding what the lists know as adverts on the page (cosmetic rules) -----------------
 
-const COSMETICOS: &str = include_str!("../data/filtros/cosmeticos.txt");
+const COSMETICOS: &[u8] = include_bytes!("../data/filtros/cosmeticos.bin");
 
 /// The hiding rules of EasyList and uBlock filters: CSS selectors of advert boxes, for every
 /// site (generic) or for some sites, with their exceptions. Like Brave, ZERO hides them so the
@@ -808,7 +836,7 @@ impl Cosmetica {
 #[must_use]
 pub fn cosmetica() -> &'static Cosmetica {
     static C: OnceLock<Cosmetica> = OnceLock::new();
-    C.get_or_init(|| Cosmetica::de(COSMETICOS))
+    C.get_or_init(|| Cosmetica::de(&descodifica(COSMETICOS)))
 }
 
 /// The script that hides a page's advert boxes: it keeps the selectors this engine accepts

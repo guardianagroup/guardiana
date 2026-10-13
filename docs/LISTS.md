@@ -60,7 +60,7 @@ privadas, locales o reservadas no tienen país.
 
 ZERO, el navegador, aplica además las mismas reglas de red que usan Brave y uBlock Origin, y oculta
 los huecos de anuncio con sus reglas cosméticas (el responsable, 13 oct 2026: «al nivel de Brave o
-más»). Van dentro del programa, en `crates/zero/data/filtros/`, copiadas el día de cada versión desde
+más»). Van dentro del programa, en `crates/zero/data/filtros/` (codificadas: las listas de malware llevan direcciones de malware real y Microsoft Defender tomó ZERO por una el 13 oct 2026; `build/filtros.py --leer` las muestra en claro), copiadas el día de cada versión desde
 [uBlockOrigin/uAssets](https://github.com/uBlockOrigin/uAssets) (que trae también EasyList y URLhaus)
 sin comentarios ni reglas que no sean de red; cada archivo dice en su cabecera de dónde sale, el
 commit y la licencia. ZERO no las descarga nunca. Solo se aplican con «Cortar rastreadores» activado.
