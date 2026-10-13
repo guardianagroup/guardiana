@@ -780,6 +780,17 @@ pub(crate) fn queja_de(t: &'static Texts, e: &Expediente, j: &Jurisdiccion, hoy:
         || t.panel("exp_queja_autoridad_generica").to_owned(),
         str::to_owned,
     );
+    // Where the law gives no deadline in days, the complaint says how long it has been instead
+    // of an empty date.
+    let vencimiento = match (vence, enviada) {
+        (Some(v), _) => t
+            .panel("exp_queja_vence")
+            .replace("{vence}", &fecha_texto(t, v)),
+        (None, Some(d)) => t
+            .panel("exp_queja_sin_dias")
+            .replace("{dias}", &(hoy - d).max(0).to_string()),
+        (None, None) => String::new(),
+    };
     let que_paso = match e.resultado {
         Some(r) if r != Resultado::SinRespuesta => t
             .panel("exp_queja_respondio")
@@ -805,10 +816,7 @@ pub(crate) fn queja_de(t: &'static Texts, e: &Expediente, j: &Jurisdiccion, hoy:
             "{enviada}",
             &enviada.map(|d| fecha_texto(t, d)).unwrap_or_default(),
         )
-        .replace(
-            "{vence}",
-            &vence.map(|d| fecha_texto(t, d)).unwrap_or_default(),
-        )
+        .replace("{vencimiento}", &vencimiento)
         .replace("{que_paso}", &que_paso)
         .replace("{fecha}", &fecha_texto(t, hoy))
         .replace("{nombre}", MARCA_NOMBRE)

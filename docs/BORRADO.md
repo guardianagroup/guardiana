@@ -132,6 +132,38 @@ Notas:
 - **Perú**: el «procedimiento trilateral de tutela» no se comprobó y no se nombra; el panel dice
   «reclamación ante la Autoridad».
 
+## Asia y Oriente Medio (1.0.19)
+
+Comprobado el 13 oct 2026 leyendo el texto oficial (o la traducción oficial al inglés) de cada
+ley. La carta va en **inglés** en todos: el panel no está en esos idiomas, y la página lo dice.
+
+| Código | Lugar | Ley y artículo citado (borrado · acceso) | Plazo borrado | Plazo acceso | Derecho | Autoridad | Fuentes |
+|---|---|---|---|---|---|---|---|
+| `tr` | Turquía | Ley 6698 (KVKK) art. 11.1.e · art. 11.1.a-b | 30 días (art. 13) | igual | borrado | KVKK https://www.kvkk.gov.tr/ (solo tras pedir a la empresa: 30 días desde su respuesta o 60 desde la solicitud, art. 14) | https://www.kvkk.gov.tr/Icerik/6649/Personal-Data-Protection-Law |
+| `jp` | Japón | APPI arts. 33 y 35 · art. 33 | «sin demora»; el reloj cuenta **2 semanas de referencia** (art. 39: esperar antes de demandar) | igual | limitado (art. 35: fuera del fin, obtenidos mal, ya no necesarios, riesgo para tus derechos) | PPC https://www.ppc.go.jp/en/ | https://www.japaneselawtranslation.go.jp/en/laws/view/4241 |
+| `kr` | Corea del Sur | PIPA art. 36 · art. 35 | 10 días (Decreto art. 43.3) | 10 días (Decreto art. 41.4) | borrado | PIPC https://www.pipc.go.kr/eng | https://elaw.klri.re.kr/eng_service/lawView.do?hseq=62389&lang=ENG · Decreto: hseq=63755 |
+| `cn` | China continental | PIPL art. 47 · art. 45 | **sin días** («a tiempo») | sin días | borrado (con condiciones del art. 47) | CAC https://www.cac.gov.cn; o demanda judicial si se niegan (art. 50) | http://www.npc.gov.cn/c2/c30834/202108/t20210820_313088.html |
+| `hk` | Hong Kong | PDPO ss. 18, 22 y 26 · s. 18 | 40 días (ss. 19 y 23) | igual | limitado (s. 26 es un deber de la empresa, no un derecho a pedir) | PCPD https://www.pcpd.org.hk | https://www.elegislation.gov.hk/hk/cap486!en |
+| `tw` | Taiwán | PDPA art. 11 · art. 10 | 30 + 30 días (art. 13) | 15 + 15 días (art. 13) | borrado | el organismo que supervisa el sector de la empresa (sin enlace) | https://law.moj.gov.tw/ENG/LawClass/LawAll.aspx?pcode=I0050021 |
+| `sg` | Singapur | PDPA ss. 16, 21 y 25 · s. 21 | 30 días de **referencia** (Reglamento 2021, reg. 5: avisar si tardan más) | igual | limitado (sin derecho de borrado) | PDPC https://www.pdpc.gov.sg | https://sso.agc.gov.sg/Act/PDPA2012 · https://sso.agc.gov.sg/SL/PDPA2012-S63-2021?WholeDoc=1 |
+| `th` | Tailandia | PDPA B.E. 2562 s. 33 · s. 30 | **sin días** | 30 días (s. 30) | borrado | Office of the PDPC https://www.pdpc.or.th (s. 73; comité de expertos, s. 33) | https://www.mdes.go.th/uploads/tinymce/source/%E0%B8%AA%E0%B8%84%E0%B8%AA/Personal%20Data%20Protection%20Act%202019.pdf |
+| `my` | Malasia | Ley 709 ss. 10, 30, 34 y 38 · s. 30 | 21 días (ss. 31 y 35) | 21 + 14 días (s. 31) | limitado | Comisionado (JPDP) https://www.pdp.gov.my (s. 104) | Reimpresión oficial 2026: https://lom.agc.gov.my/ilims/upload/portal/akta/outputaktap/3301061_BI/Act%20709%20(Reprint%202026).pdf |
+| `ph` | Filipinas | RA 10173 s. 16(e) · s. 16(c) | 15 días naturales de **referencia** (Reglas de procedimiento de la NPC 2021, regla II s. 2: sin respuesta en 15 días se puede reclamar) | igual | borrado (bloqueo, retirada o destrucción, con condiciones) | NPC https://privacy.gov.ph | https://privacy.gov.ph/data-privacy-act/ · https://privacy.gov.ph/wp-content/uploads/2024/03/2021-Rules-of-Procedure-of-the-NPC-As-Amended.pdf |
+| `id` | Indonesia | UU 27/2022 arts. 8 y 43 · arts. 7 y 32 | **sin días** (art. 45: avisar del borrado) | 3 × 24 horas (art. 32.2) | borrado | la agencia que designe el Presidente (art. 58), sin enlace; conflicto: arbitraje o tribunales (art. 64) | https://peraturan.bpk.go.id/Details/229798/uu-no-27-tahun-2022 |
+| `sa` | Arabia Saudí | PDPL art. 4.5 · art. 4.2 | 30 + 30 días (Reglamento de aplicación art. 3.1.a) | igual | borrado (cuando ya no hace falta, salvo art. 18) | SDAIA https://sdaia.gov.sa (art. 34) | https://sdaia.gov.sa/en/SDAIA/about/Documents/PersonalDataProtectionLaw.pdf · https://sdaia.gov.sa/en/SDAIA/about/Documents/ImplementingRegulationPersonalDataProtectionLaw.pdf |
+
+Notas:
+- **Los que no entran todavía**: India (los derechos de acceso y borrado de la DPDP Act 2023 y su
+  Reglamento de 2025, con 90 días para responder, se aplican desde mayo de 2027; hoy no hay una ley
+  que la carta pueda citar), Vietnam, Emiratos e Israel (no se pudo leer el texto oficial esta
+  noche). Prefiero un hueco a un dato inventado.
+- **Taiwán**: el plazo de 15 + 15 días para el acceso y 30 + 30 para el borrado están en el art. 13
+  de la ley; la autoridad sectorial depende de la empresa, así que no se enlaza ninguna.
+- **Japón y Filipinas**: la ley no fija días; el reloj cuenta un plazo de **referencia** que la
+  propia ley o su autoridad usa para el paso siguiente (demanda o queja), y lo dice.
+- Cuando el plazo es «sin días», la queja ya no deja una fecha vacía: dice cuántos días pasaron
+  desde el envío.
+
 ## Derecho de acceso (Expedientes, 1.0.17)
 
 Desde la 1.0.17 la carta puede pedir **acceso** («qué datos tienen de mí») además de borrado. El artículo citado está en `borrado_articulo_acceso_<código>` y, cuando el plazo de acceso es distinto del de borrado, en `borrado_plazo_acceso_<código>`. Mismo criterio que arriba: un plazo que no se comprobó no se cuenta.
