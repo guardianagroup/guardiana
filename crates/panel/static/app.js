@@ -1833,6 +1833,20 @@
             : `<p class="muted">${esc(t(d.aviso === 'no_windows' ? 'av_detectar_no_windows' : 'av_detectar_ninguno'))}</p>`;
         } catch (err) { $('av-detectar-msg').textContent = String(err.message || err); } finally { e.target.disabled = false; }
       });
+      // El mercado del antivirus: cifras de fuentes oficiales o reconocidas, con su enlace.
+      const mercado = [
+        { n: 1, fuente: 'Gartner / F‑Secure', url: 'https://investors.f-secure.com/investors/as_an_investment/market' },
+        { n: 2, fuente: 'Gen Digital (año fiscal 2025)', url: 'https://newsroom.gendigital.com/2025-05-06-Gen-Delivers-Record-Q4-and-Full-Year-Fiscal-2025-Results' },
+        { n: 3, fuente: 'Kaspersky (2024)', url: 'https://www.kaspersky.com/about/press-releases/kaspersky-reports-2024-financial-results-with-record-revenue' },
+        { n: 4, fuente: 'FTC (2024)', url: 'https://www.ftc.gov/news-events/news/press-releases/2024/06/ftc-finalizes-order-avast-banning-it-selling-or-licensing-web-browsing-data-advertising-requiring-it' },
+        { n: 5, fuente: 'Microsoft', url: 'https://learn.microsoft.com/en-us/defender-endpoint/microsoft-defender-antivirus-windows' },
+        { n: 6, fuente: 'CMA (2021)', url: 'https://www.gov.uk/cma-cases/anti-virus-software' },
+      ];
+      $('av-mercado').innerHTML = mercado.map((m) => `<div class="card av-dato">
+        <div class="av-dato-cifra">${esc(t('av_mercado_cifra_' + m.n))}</div>
+        <p>${esc(t('av_mercado_' + m.n))}</p>
+        <p class="muted">${esc(t('av_mercado_fuente'))}: <a href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">${esc(m.fuente)}</a></p>
+      </div>`).join('');
       paint(await api('/api/antivirus'));
       cadaTanto(async () => paint(await api('/api/antivirus')), 10000);
     },

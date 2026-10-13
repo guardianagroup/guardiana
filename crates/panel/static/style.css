@@ -355,3 +355,8 @@ a.enlace-empresa:hover { color: var(--accent); text-decoration-color: currentCol
 #av-vivo tr{animation:av-entra .5s ease}
 @keyframes av-entra{from{background:rgba(31,95,174,.12)}to{background:transparent}}
 @media (prefers-reduced-motion: reduce){.av-latido{animation:none}#av-vivo tr{animation:none}}
+
+/* El negocio del antivirus en el mundo (1.0.22). */
+.av-mercado{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}
+.av-dato{margin:0}
+.av-dato-cifra{font-family:'Unbounded',system-ui,sans-serif;font-size:1.7rem;line-height:1.1;color:var(--azul);margin-bottom:6px}

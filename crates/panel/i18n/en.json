@@ -1893,6 +1893,22 @@
     "av_vivo_resumen": "in the last 20 minutes: {sube} sent · {baja} received",
     "av_vivo_vacio": "Waiting for your antivirus to do something… When it sends or receives, it will appear here at once.",
     "av_col_producto": "Antivirus",
-    "av_export": "Download everything (CSV)"
+    "av_export": "Download everything (CSV)",
+    "av_mercado_titulo": "The antivirus business worldwide",
+    "av_mercado_lead": "Many people do not know how much money the antivirus business moves or where it comes from. These figures are from official or recognised sources; each has its link.",
+    "av_mercado_cifra_1": "$9.7 billion",
+    "av_mercado_1": "That is the size Gartner forecasts for the worldwide consumer security market in 2028, growing about 4 % a year.",
+    "av_mercado_cifra_2": "$3.935 billion",
+    "av_mercado_2": "Gen Digital —owner of Norton, Avast, AVG and Avira— earned this in its fiscal year 2025, with 40.4 million paying customers. One company holds four of the best-known antivirus brands.",
+    "av_mercado_cifra_3": "$822 million",
+    "av_mercado_3": "Kaspersky earned this in 2024, its all-time record, despite being banned on US government computers.",
+    "av_mercado_cifra_4": "100 million",
+    "av_mercado_4": "users had their browsing history collected by Avast antivirus and sold, through its Jumpshot subsidiary, to more than 100 companies. The FTC banned it and made it pay $16.5 million.",
+    "av_mercado_cifra_5": "Built in",
+    "av_mercado_5": "Microsoft Defender comes free inside Windows 10 and 11, so it is on almost every Windows computer in the world and is the most-used antivirus. The exact split against paid ones is not reliably published.",
+    "av_mercado_cifra_6": "Renewals",
+    "av_mercado_6": "Most of that money comes from subscriptions that renew by themselves. That is why in 2021 the UK authority made Norton and McAfee ease cancellation and refund those who did not want to renew.",
+    "av_mercado_limite": "The figures change every year and companies report in different currencies and calendars; take them as the order of magnitude of the business, not as today’s exact number.",
+    "av_mercado_fuente": "Source"
   }
 }
