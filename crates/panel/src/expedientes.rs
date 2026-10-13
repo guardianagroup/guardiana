@@ -996,6 +996,9 @@ mod tests {
             "under the right",
             "de mis datos de mis datos",
             "reconhecido em",
+            "vencía el .",
+            "ended on .",
+            "vencia em .",
         ];
         for (name, t) in [("es", i18n::es()), ("en", i18n::en()), ("pt", i18n::pt())] {
             for j in borrado::JURISDICCIONES {
