@@ -85,12 +85,16 @@ GUARDIANA nunca pide apagar el antivirus. Vigilarlo no es quitarlo.
 - **El negocio del antivirus**: cifras globales con su fuente; donde no hay cifra fiable, se dice.
 - **Vigilar, sí o no** (`/api/antivirus/vigilar`): apagado, GUARDIANA deja de medir y de guardar lo
   que envían los antivirus. No deshace ningún corte y las consultas de nombres siguen anotándose.
-- **Cortar** (`/api/antivirus/cortar`) un antivirus, o todos con **Protección máxima**
-  (`/api/antivirus/maxima`): filtros de verdad en el cortafuegos de Windows (WFP, modo usuario, sin
+- **Cortar** (`/api/antivirus/cortar`) un antivirus, o todos con **Cortar todo lo que envía el
+  antivirus** (`/api/antivirus/maxima`; hasta el 13 oct 2026 se llamaba «Protección máxima del
+  antivirus», un nombre engañoso: con el corte, el antivirus protege menos). Va plegado en
+  «Controles avanzados»; puesto, una línea fuera del pliegue lo recuerda, y en «Por dentro» lo dice
+  la barra de arriba. Filtros de verdad en el cortafuegos de Windows (WFP, modo usuario, sin
   controlador propio) sobre los ejecutables vistos esa semana. La sesión es dinámica: si GUARDIANA
-  se detiene o se cae, Windows quita todo solo. No se finge nada: el corte es un bloqueo, no un
-  «éxito» falso. Un clic para ponerlo (con aviso previo de que sin actualizaciones ni análisis en
-  la nube protege menos) y uno para quitarlo.
+  se detiene o se cae, Windows quita todo solo, y GUARDIANA lo vuelve a poner al arrancar hasta que
+  la persona lo quite. No se finge nada: el corte es un bloqueo, no un «éxito» falso. Un clic para
+  ponerlo (con aviso previo de que sin actualizaciones ni análisis en la nube protege menos) y uno
+  para quitarlo.
 
 Descartado a propósito: engañar al antivirus con un éxito falso (necesitaría un controlador del
 núcleo y no es posible del todo) y descifrar lo que envía (exigiría un certificado en medio de
@@ -118,7 +122,10 @@ directo, sobre la Tierra.
 - **Tu país** sale de la zona horaria y del idioma del equipo; no se pregunta nada fuera.
 - **Horas abierta**: 30 imágenes por segundo, 20 tras dos minutos sin tocar nada, y se para cuando la
   pestaña no se ve.
-- Si aún no hay medidas (equipo recién instalado, o fuera de Windows), ofrece una **demostración**
-  con datos de ejemplo, marcada en pantalla.
+- **Solo medidas, nunca datos de ejemplo.** Sin medidas, lo dice con palabras: sin sesión;
+  «Midiendo» mientras llegan las primeras (y, si pasado medio minuto no llega nada, que aún no ha
+  llegado ninguna); la vigilancia del antivirus apagada, con el enlace a «Tu antivirus» para
+  encenderla; o, fuera de Windows (`mide_bytes: false`), que ese sistema no mide los datos de cada
+  programa y qué sí ve.
 
 Las fuentes de las imágenes y del mapa están en `crates/panel/static/tierra/LEEME.md`.

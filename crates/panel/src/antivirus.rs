@@ -194,7 +194,8 @@ pub(crate) struct Vista {
     cortados: Vec<String>,
     /// GUARDIANA is counting what the antivirus sends and receives (the person can turn it off).
     vigilando: bool,
-    /// «Protección máxima» of the antivirus is on: every product this computer has seen is cut.
+    /// «Cortar todo lo que envía el antivirus» is on (until 13 Oct 2026 «Protección máxima del
+    /// antivirus»): every product this computer has seen is cut.
     maxima: bool,
     /// The last 24 hours of all the antivirus on this computer, together.
     resumen: Resumen,
@@ -746,8 +747,9 @@ pub(crate) struct ActivaBody {
     activa: bool,
 }
 
-/// `/api/antivirus/maxima`: «Protección máxima» of the antivirus (1.0.22): cut every product this
-/// computer has seen, or let them all through again. One click each way, like the home's.
+/// `/api/antivirus/maxima`: «Cortar todo lo que envía el antivirus» (1.0.22; «Protección máxima
+/// del antivirus» until 13 Oct 2026, a name that hid that the antivirus then protects less): cut
+/// every product this computer has seen, or let them all through again. One click each way.
 pub(crate) async fn maxima(
     State(state): State<Arc<AppState>>,
     _s: Session,

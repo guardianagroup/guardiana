@@ -65,8 +65,12 @@ pub(crate) struct Universo {
     cortar_disponible: bool,
     /// GUARDIANA is counting what the antivirus sends.
     vigilando: bool,
-    /// «Protección máxima» of the antivirus is on.
+    /// «Cortar todo lo que envía el antivirus» is on (called «Protección máxima del antivirus»
+    /// until 13 Oct 2026; the field keeps its name).
     maxima: bool,
+    /// This system measures the bytes of each program (Windows' network channel, 1.0.22).
+    /// Elsewhere nothing will ever arrive, and the page says so instead of waiting.
+    mide_bytes: bool,
     ventana_h: i64,
     ahora: i64,
 }
@@ -471,6 +475,7 @@ pub(crate) async fn universo(
         cortar_disponible: state.cortes.disponible(),
         vigilando,
         maxima,
+        mide_bytes: cfg!(windows),
         ventana_h: VENTANA_H,
         ahora: now,
     }))

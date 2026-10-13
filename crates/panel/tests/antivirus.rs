@@ -297,8 +297,9 @@ async fn the_antivirus_page_shows_what_each_antivirus_asked_and_every_official_r
     let v3: serde_json::Value = serde_json::from_str(&body).unwrap();
     assert_eq!(v3["vigilando"], true);
 
-    // «Protección máxima»: letting everything through always works; cutting everything needs a
-    // product with a path seen (this test ledger has none) and, off Windows, says so.
+    // «Cortar todo lo que envía el antivirus» (until 13 Oct 2026 «Protección máxima del
+    // antivirus»): letting everything through always works; cutting everything needs a product
+    // with a path seen (this test ledger has none) and, off Windows, says so.
     let (status, body) = post(addr, &t, "/api/antivirus/maxima", r#"{"activa":false}"#).await;
     assert_eq!(status, 200, "{body}");
     let (status, _) = post(addr, &t, "/api/antivirus/maxima", r#"{"activa":true}"#).await;
@@ -346,6 +347,10 @@ async fn the_antivirus_page_shows_what_each_antivirus_asked_and_every_official_r
     let (status, body) = get(addr, &t, "/api/por-dentro").await;
     assert_eq!(status, 200, "{body}");
     let u: serde_json::Value = serde_json::from_str(&body).unwrap();
+    // Whether this system measures the bytes of each program: only Windows does, and elsewhere
+    // the page says so instead of waiting for measurements that never come.
+    assert_eq!(u["mide_bytes"], cfg!(windows), "{body}");
+    assert_eq!(u["maxima"], false, "{body}");
     let progs = u["programas"].as_array().unwrap();
     assert!(
         progs.iter().any(|p| p["id"] == "Microsoft Defender"

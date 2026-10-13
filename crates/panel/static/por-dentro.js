@@ -6,8 +6,8 @@
 // No third-party code (brief §8), and nothing from the internet: WebGL2 written here, the Earth's
 // pictures (NASA, public domain) served by the panel itself, the world's countries from Natural
 // Earth (public domain) in a 1.5° grid below. The light on the globe is the sun's of this very
-// moment, computed here. Every figure is a measurement of this computer (`/api/por-dentro`); when
-// there is none yet, the page offers a demonstration, labelled as such on screen.
+// moment, computed here. Every figure is a measurement of this computer (`/api/por-dentro`) and
+// nothing else is ever drawn: when there is no measurement, the page says why, in words.
 (() => {
   'use strict';
   // ---------- The world: Natural Earth 110 m (public domain) in a 1.5° grid ----------
@@ -79,13 +79,13 @@
     const bloqueado = (d) => d.cortado || (prod(d.p) && prod(d.p).cortado) || !!d.ancho;
     const dibujable = (d) => !!centros[d.pais];
     // What the person's computer sent, in 10-second buckets: 30 of them are the deck's «last five
-    // minutes», whatever the rhythm of the data (Windows is read every 10 s; the demo beats faster).
+    // minutes», whatever the rhythm of the data (Windows is read every 10 s).
     const CUBO_MS = 10000, N_CUBOS = 30, CADA_MEDIDA = 10;
     const st = {
       vista: 'globo', yo: paisDelEquipo(), W: 0, Wc: 0, H: 0, dpr: 1, t0: performance.now(),
       arrastre: null, dRot: 0, dTilt: 0, part: [], estallidos: [], hover: null, raton: null, dianas: [],
       serie: new Array(N_CUBOS).fill(0), serieP: {}, cuboT0: Date.now(), eventos: [], ahora: [0, 0, 0], intervalo: 5,
-      demo: false, sinSesion: false, datos: null, abierto: Date.now(), primeraCarga: true, ultimoGesto: performance.now(),
+      datos: null, abierto: Date.now(), primeraCarga: true, ultimoGesto: performance.now(),
     };
 
     st.lugar = lugarDe(st.yo);
@@ -127,54 +127,44 @@
     const claveDe = (d) => [d.programa, d.destino, d.pais, d.red].join('|');
     const nombreDe = (d) => d.destino || (d.red && d.red[0] !== '@' ? t('pd_sin_nombre_red').replace('{red}', d.red) : t('pd_sin_nombre'));
 
-    // ---------- Demonstration (no measurements yet, or no session) ----------
-    const DEMO_PROD = [
-      { id: t('pd_demo_av_a'), tipo: 'antivirus', procesos: ['avservicio.exe'], firma: 'Ejemplo A S. L.', cortable: true },
-      { id: t('pd_demo_av_b'), tipo: 'antivirus', procesos: ['bguardia.exe'], firma: 'Ejemplo B Inc.', cortable: true },
-      { id: t('pd_demo_nav'), tipo: 'navegador', procesos: ['navegador.exe'], firma: 'Ejemplo N Ltd.', cortable: false },
-    ];
-    const DEMO_DEST = [
-      [0, 'nube.antivirus-a.example', 'US', 'Microsoft', 8075, true, 'nube', 5], [0, 'actualiza.antivirus-a.example', 'NL', 'Akamai', 20940, true, 'actualizaciones', 3],
-      [0, 'telemetria.antivirus-a.example', 'IE', 'Microsoft', 8075, true, 'telemetria', 2], [0, 'licencia.antivirus-a.example', 'DE', 'Amazon', 16509, true, 'licencia', 1],
-      [0, 'mapas.antivirus-a.example', 'BR', 'Google', 15169, false, null, 1], [1, 'api.antivirus-b.example', 'US', 'Amazon', 16509, false, null, 3],
-      [1, 'muestras.antivirus-b.example', 'CA', 'OVH', 16276, true, 'muestras', 2], [1, 'anuncios.publicidad.example', 'US', 'Google', 15169, false, null, 2, 'cortado'],
-      [1, 'cdn.antivirus-b.example', 'SG', 'Cloudflare', 13335, true, 'actualizaciones', 1], [1, '', 'JP', '', 0, false, null, 1],
-      [2, 'periodico.example', 'ES', 'Cloudflare', 13335, null, null, 3], [2, 'rastreo.anuncios.example', 'US', 'Google', 15169, null, null, 3, 'cortado'],
-      [2, 'pixel.redsocial.example', 'IE', 'Meta', 32934, null, null, 2, 'cortado'], [2, 'video.example', 'US', 'Akamai', 20940, null, null, 2],
-    ];
-    const DEMO_NUEVOS = [[1, 'informes.antivirus-b.example', 'PL', 'OVH', 16276, false, null, 1, null, 40], [0, 'reputacion.antivirus-a.example', 'FR', 'Microsoft', 8075, true, 'nube', 2, null, 95], [2, 'fotos.example', 'BR', 'Amazon', 16509, null, null, 1, null, 150]];
-    const demoDestino = ([pi, host, pais, red, asn, doc, uso, peso, estado]) => {
-      const p = PROD[pi];
-      return { k: [p.id, host, pais, red].join('|'), p: p.id, host: host || t('pd_sin_nombre'), destino: host, pais, red, asn, proto: /video|periodico|rastreo|pixel|fotos|cdn/.test(host) && red !== 'Akamai' ? 'udp' : 'tcp', puerto: /actualiza/.test(host) ? 80 : 443, vias: [], sub: 0, baj: 0, paq: 0, noche: 0, primera: Date.now() - 3600e3, ultima: Date.now(), doc, uso, consultas: 0, bloq: 0, regla: estado === 'cortado' ? -1 : null, cortado: estado === 'cortado', sede: false, peso, ruta: [], tg: 0.3, x: 0, y: 0, vis: true, ema: 0 };
+    // ---------- Nothing to draw: said in words, never filled with anything invented ----------
+    // The page only draws measurements (the owner, 13 Oct 2026: no example data anywhere). Each
+    // empty case says what is happening: no session (the panel's own «sin sesión» card, which
+    // app.js shows), the first measurements on their way, nothing arriving after a while, an error
+    // reading them, or a system that does not measure the bytes of each program.
+    const ESPERA_MS = 30000;
+    const VACIOS = {
+      error: () => ({ titulo: t('pd_vacio_titulo'), texto: t('pd_error_lectura') }),
+      midiendo: () => ({ titulo: t('pd_midiendo_titulo'), texto: t('pd_midiendo'), midiendo: true }),
+      espera: () => ({ titulo: t('pd_vacio_titulo'), texto: t('pd_vacio') }),
+      sin_bytes: () => ({ titulo: t('pd_sin_bytes_titulo'), texto: t('pd_sin_bytes'), enlace: true }),
     };
-    const empiezaDemo = () => {
-      st.demo = true; PROD.length = 0; DEST.length = 0; porClave.clear();
-      DEMO_PROD.forEach(nuevoProducto);
-      DEMO_DEST.forEach((x) => { const d = demoDestino(x); DEST.push(d); porClave.set(d.k, d); });
-      st.demoT0 = Date.now(); recalcula();
-      $('chip-modo').textContent = t('pd_chip_demo'); $('chip-modo').hidden = false;
-      $('vacio').hidden = true;
-      pintaHud(); pintaDatos();
-    };
-    // One beat of the demonstration: what a computer like this one would measure in a second.
-    const latidoDemo = () => {
-      const seg = (Date.now() - st.demoT0) / 1000;
-      DEMO_NUEVOS.filter((n) => !n.hecho && seg >= n[9]).forEach((n) => { n.hecho = true; const d = demoDestino(n); d.primera = Date.now(); DEST.push(d); porClave.set(d.k, d); recalcula(); evento(prod(d.p).nombre, d.host, t('pd_ev_nuevo').replace('{pais}', d.pais).replace('{red}', d.red), 'n'); avisa(t('pd_aviso_nuevo').replace('{prog}', prod(d.p).nombre).replace('{nombre}', d.host).replace('{pais}', nombrePais(d.pais))); });
-      const rec = [];
-      DEST.forEach((d) => { if (azar() > d.peso / 6.5) return; if (bloqueado(d)) { rec.push({ d, env: 0, recb: 0, paq: 0, parada: 1 }); return; } const s = Math.round(Math.pow(azar(), 2) * 38000 * d.peso + 300), b = Math.round(azar() * 9000 * d.peso + 200); rec.push({ d, env: s, recb: b, paq: Math.round(s / 1200 + b / 1400) + 2, parada: 0 }); });
-      aplicaDeltas(rec, 0.9);
+    let vacioAhora = null;
+    const vacio = (cual) => {
+      if (cual === vacioAhora) return;
+      vacioAhora = cual;
+      $('vacio').hidden = !cual;
+      if (!cual) return;
+      const v = VACIOS[cual]();
+      $('vacio-titulo').textContent = v.titulo;
+      $('vacio-titulo').classList.toggle('midiendo', !!v.midiendo);
+      $('vacio-texto').textContent = v.texto;
+      $('vacio-enlace').hidden = !v.enlace;
     };
 
     // ---------- Measurements: the panel's answer, and what changed since the last one ----------
     const filasVistas = new Map();
-    let ultimaCarga = 0;
+    let ultimaCarga = 0, primeraLectura = 0;
     const cargar = async () => {
-      if (st.demo) return;
       let r;
       try { r = await api('/api/por-dentro'); } catch (e) {
-        if (st.primeraCarga) { st.primeraCarga = false; ofrecerDemo(String(e && e.message || '').includes('sesión') ? t('pd_vacio_sin_sesion') : t('pd_vacio')); }
+        // Without anything measured yet, the reason is said; with a picture already drawn, it
+        // stays as it was and the next reading tries again. Without a session, the «sin sesión»
+        // card says it already, and once is enough.
+        if (!st.datos) vacio(String(e && e.message || '').includes('sesión') ? null : 'error');
         return;
       }
+      if (!primeraLectura) primeraLectura = Date.now();
       const ahora = performance.now(), intervalo = ultimaCarga ? Math.max(1, (ahora - ultimaCarga) / 1000) : 5;
       ultimaCarga = ahora; st.intervalo = intervalo; st.datos = r;
       r.programas.forEach((p) => {
@@ -216,28 +206,27 @@
       });
       for (const [k, v] of filasVistas) if (v.m < r.ahora - 5 * 60000) filasVistas.delete(k);
       recalcula();
-      aplicaDeltas(rec, Math.max(intervalo, CADA_MEDIDA), false);
+      aplicaDeltas(rec, Math.max(intervalo, CADA_MEDIDA));
       st.primeraCarga = false;
-      $('vacio').hidden = DEST.length > 0;
-      if (!DEST.length) ofrecerDemo(t('pd_vacio'));
-      $('vigilancia-off').hidden = r.vigilando !== false;
+      // Off Windows the bytes of each program are not measured: nothing will come, and that is
+      // what the page says, instead of «midiendo» for ever.
+      vacio(DEST.length ? null : r.mide_bytes === false ? 'sin_bytes' : Date.now() - primeraLectura < ESPERA_MS ? 'midiendo' : 'espera');
+      $('vigilancia-off').hidden = !(r.vigilando === false && r.mide_bytes !== false);
       pintaHud();
     };
     // What arrived in this beat becomes particles along each route, spread over the beat so the
-    // flow looks continuous, and lines in the log.
-    const aplicaDeltas = (rec, segundos, suma = true) => {
+    // flow looks continuous, and lines in the log. The totals are the panel's, not added here.
+    const aplicaDeltas = (rec, segundos) => {
       let env = 0, recb = 0, paq = 0;
       const porProd = {}, grupo = { datos: [0, 0], av: [0, 0] };
       DEST.forEach((d) => { d.ema = (d.ema || 0) * 0.7; });
       rec.forEach(({ d, env: e, recb: b, paq: q, parada }) => {
         const p = prod(d.p);
         if (parada) {
-          if (suma) d.bloq += parada;
           for (let k = 0; k < Math.min(3, parada); k++) nuevo(d, 'out', true, 2000, azar() * segundos * 900);
           evento(p.nombre, d.host, t('pd_ev_parado'), 'c');
           return;
         }
-        if (suma) { d.sub += e; d.baj += b; d.paq += q; p.sub += e; p.baj += b; if (new Date().getHours() < 6) d.noche += e; }
         env += e; recb += b; paq += q; porProd[d.p] = (porProd[d.p] || 0) + e;
         const g = grupo[p.tipo === 'antivirus' ? 'av' : 'datos']; g[0] += e; g[1] += b;
         d.ema += e / segundos * 0.3; d.ult = performance.now();
@@ -268,11 +257,6 @@
     const evento = (prog, host, que, cls) => {
       st.eventos.unshift({ h: hora(Date.now()), prog, host, que, cls });
       if (st.eventos.length > 40) st.eventos.length = 40;
-    };
-    const ofrecerDemo = (texto) => {
-      if (st.demo) return;
-      $('vacio-texto').textContent = texto;
-      $('vacio').hidden = false;
     };
 
     // ---------- Size ----------
@@ -1476,9 +1460,20 @@
       const av = DEST.filter((d) => d.doc !== null && d.doc !== undefined), tot = av.reduce((a, d) => a + d.sub, 0), doc = av.filter((d) => d.doc).reduce((a, d) => a + d.sub, 0);
       sparkline(); indicador(tot ? doc / tot : null);
       $('hud-doc').textContent = tot ? t('pd_doc_explica').replace('{n}', pct(doc, tot)).replace('{m}', 100 - pct(doc, tot)) : t('pd_doc_nada');
-      const corte = PROD.filter((p) => p.cortable);
-      $('maxima').setAttribute('aria-pressed', String(corte.length > 0 && corte.every((p) => p.cortado)));
-      $('maxima').hidden = !corte.length;
+      pintaCorte();
+    };
+    // «Cortar todo lo que envía el antivirus» (until 13 Oct 2026 «Protección máxima», a name that
+    // hid that the antivirus then gets no updates): a small button in the antivirus's telemetry,
+    // not in the top bar; while it is on, the bar's chip says so, so nobody forgets it.
+    const pintaCorte = () => {
+      const todo = !!(st.datos && st.datos.maxima), hay = PROD.some((p) => p.cortable);
+      const chip = $('chip-modo');
+      chip.hidden = !todo;
+      if (todo && chip.textContent !== t('pd_chip_corte')) { chip.textContent = t('pd_chip_corte'); chip.title = t('av_max_activa'); }
+      const b = $('corte-av-btn'), texto = todo ? t('av_max_quitar') : t('av_max_activar');
+      $('corte-av').hidden = !(todo || hay);
+      if (b.textContent !== texto) b.textContent = texto;
+      b.classList.toggle('quitar', todo);
     };
 
     // ---------- «Datos en vivo» ----------
@@ -1539,9 +1534,12 @@
       if (!datosAbierto) return;
       const ahoraMs = performance.now();
       const tot = DEST.reduce((a, d) => a + d.sub, 0), baj = DEST.reduce((a, d) => a + d.baj, 0), paq = DEST.reduce((a, d) => a + d.paq, 0);
-      let h = `<h4>${esc(t('pd_en_directo'))}${st.demo ? ` <span class="chip">${esc(t('pd_chip_demo'))}</span>` : ''}</h4><div>${htmlDirecto()}</div>`;
+      // Live figures first, then the cut's button, then the rest. The button lives outside what is
+      // rewritten every second, so a click or the keyboard's focus on it is never lost.
+      $('datos-vivo').innerHTML = `<h4>${esc(t('pd_en_directo'))}</h4><div>${htmlDirecto()}</div>`;
+      pintaCorte();
       // Programs.
-      h += `<h4>${esc(t('pd_programas'))} <span class="s">${PROD.length}</span></h4>`;
+      let h = `<h4>${esc(t('pd_programas'))} <span class="s">${PROD.length}</span></h4>`;
       PROD.forEach((p) => {
         const ds = DEST.filter((d) => d.p === p.id), act = ds.filter((d) => d.ult && ahoraMs - d.ult < 15000 && !bloqueado(d)).length;
         const avs = ds.filter((d) => d.doc !== null && d.doc !== undefined), su = avs.reduce((a, d) => a + d.sub, 0), doc = avs.filter((d) => d.doc).reduce((a, d) => a + d.sub, 0);
@@ -1578,7 +1576,7 @@
       const p443 = DEST.filter((d) => d.puerto === 443).reduce((a, d) => a + d.sub, 0), p80 = DEST.filter((d) => d.puerto === 80).reduce((a, d) => a + d.sub, 0);
       h += `<h4>${esc(t('pd_como_viaja'))}</h4>
         <div class="barrita gruesa"><i data-w="${pct(tcp, tot)}" data-bg="var(--in)"></i><i data-w="${pct(udp, tot)}" data-bg="#a98bff"></i></div>
-        <div>TCP ${pct(tcp, tot)} % · UDP/QUIC ${pct(udp, tot)} %</div>
+        <div>TCP ${pct(tcp, tot)} % · UDP ${pct(udp, tot)} %</div>
         <div>${esc(t('pd_puerto_443'))} <b>${pct(p443, tot)} %</b> · ${esc(t('pd_puerto_80'))} <b class="${p80 ? 'c' : ''}">${pct(p80, tot)} %</b></div>
         <div>${esc(t('pd_paquetes').replace('{s}', num(Math.round(st.ahora[2]))).replace('{n}', num(paq)))}</div>
         <div class="t">${esc(t('pd_cifrado'))}</div>`;
@@ -1589,11 +1587,11 @@
       h += `<div class="t">${esc(t('pd_centro_pais'))}</div>`;
       // The window.
       const noche = DEST.reduce((a, d) => a + d.noche, 0);
-      h += `<h4>${esc(st.demo ? t('pd_sesion_demo') : t('pd_ventana').replace('{h}', st.datos ? st.datos.ventana_h : 24))}</h4>
+      h += `<h4>${esc(t('pd_ventana').replace('{h}', st.datos ? st.datos.ventana_h : 24))}</h4>
         <div><span class="o">↑ ${esc(bytes(tot))}</span> · <span class="i">↓ ${esc(bytes(baj))}</span> · ${esc(t('pd_madrugada').replace('{x}', bytes(noche)))}</div>
         <div>${esc(t('pd_abierto').replace('{t}', hace(Date.now() - st.abierto)))} · <span class="c">${esc(tn('pd_intentos', DEST.reduce((a, d) => a + d.bloq, 0)))}</span></div>`;
       if (st.datos && st.datos.programas_omitidos) h += `<div class="t">${esc(tn('pd_programas_omitidos', st.datos.programas_omitidos))}</div>`;
-      panelDatos.innerHTML = h;
+      $('datos-resto').innerHTML = h;
       estilos(panelDatos);
     };
     const telemetria = () => {
@@ -1679,7 +1677,6 @@
     const corteNombre = async (d) => {
       if (!d.destino) { avisa(t('pd_sin_nombre_no_corta')); return; }
       if (d.ancho) { avisa(t('pd_ancho_dejar')); return; }
-      if (st.demo) { d.cortado = !d.cortado; avisa((d.cortado ? t('pd_hecho_cortar') : t('pd_hecho_dejar')).replace('{nombre}', d.host) + ' ' + t('pd_demo_simulacion')); pintaHud(); return; }
       try {
         if (d.regla !== null && d.regla !== undefined && d.regla >= 0) {
           await api(`/api/reglas/${d.regla}/deshacer`, { method: 'POST' });
@@ -1703,21 +1700,21 @@
     const corteProducto = async (p) => {
       if (!p.cortable) { avisa(t('pd_no_cortable')); return; }
       const hacer = async () => {
-        if (st.demo) { p.cortado = !p.cortado; avisa((p.cortado ? t('pd_hecho_cortar_prog') : t('pd_hecho_dejar_prog')).replace('{prog}', p.nombre) + ' ' + t('pd_demo_simulacion')); pintaHud(); return; }
         try { await api('/api/antivirus/cortar', { method: 'POST', body: { producto: p.id, cortar: !p.cortado } }); avisa((!p.cortado ? t('pd_hecho_cortar_prog') : t('pd_hecho_dejar_prog')).replace('{prog}', p.nombre)); await cargar(); } catch (e) { avisa(String(e && e.message || e)); }
       };
       if (p.cortado) { hacer(); return; }
-      if (!st.demo && st.datos && !st.datos.cortar_disponible) { avisa(t('av_cortar_no_disponible')); return; }
+      if (st.datos && !st.datos.cortar_disponible) { avisa(t('av_cortar_no_disponible')); return; }
       avisa(t('pd_aviso_cortar_prog').replace('{prog}', p.nombre), [{ texto: t('pd_cortar_igual'), peligro: true, hacer }, { texto: t('pd_cancelar'), hacer: () => {} }]);
     };
-    $('maxima').addEventListener('click', () => {
-      const cortables = PROD.filter((p) => p.cortable), activa = cortables.length > 0 && cortables.every((p) => p.cortado);
+    // The same steps the top bar's «Protección máxima» took until 13 Oct 2026: a warning to
+    // confirm before cutting (the antivirus then gets no updates), and one click to take it off.
+    $('corte-av-btn').addEventListener('click', () => {
+      const activa = !!(st.datos && st.datos.maxima);
       const hacer = async () => {
-        if (st.demo) { cortables.forEach((p) => { p.cortado = !activa; }); avisa(t(activa ? 'pd_maxima_off' : 'pd_maxima_on') + ' ' + t('pd_demo_simulacion')); pintaHud(); return; }
-        try { await api('/api/antivirus/maxima', { method: 'POST', body: { activa: !activa } }); avisa(t(activa ? 'pd_maxima_off' : 'pd_maxima_on')); await cargar(); } catch (e) { avisa(String(e && e.message || e)); }
+        try { await api('/api/antivirus/maxima', { method: 'POST', body: { activa: !activa } }); avisa(activa ? t('pd_maxima_off') : t('pd_maxima_on')); await cargar(); } catch (e) { avisa(String(e && e.message || e)); }
       };
       if (activa) { hacer(); return; }
-      if (!st.demo && st.datos && !st.datos.cortar_disponible) { avisa(t('av_cortar_no_disponible')); return; }
+      if (st.datos && !st.datos.cortar_disponible) { avisa(t('av_cortar_no_disponible')); return; }
       avisa(t('av_max_aviso'), [{ texto: t('av_max_confirmar'), peligro: true, hacer }, { texto: t('pd_cancelar'), hacer: () => {} }]);
     });
 
@@ -1764,12 +1761,11 @@
       if (/select|input|textarea/i.test(document.activeElement.tagName)) return;
       if (['1', '2', '3', '4', '5'].includes(e.key)) ponVista(VISTAS[+e.key - 1]);
     });
-    $('demo').addEventListener('click', () => empiezaDemo());
     // Where the computer is: said, not chosen.
     $('yo').textContent = nombrePais(st.yo) + (st.lugar.ciudad ? ' · ' + st.lugar.ciudad : '');
 
     // ---------- The loop ----------
-    let antes = performance.now(), ultimaTele = 0, ultimoDemo = 0;
+    let antes = performance.now(), ultimaTele = 0;
     const bucle = (ahora) => {
       requestAnimationFrame(bucle);
       // To keep it open for hours: 30 frames a second, 20 after two quiet minutes, 60 while dragging.
@@ -1777,11 +1773,12 @@
       if (!st.arrastre && ahora - antes < (quieto ? 48 : 31)) return;
       const dt = Math.min(0.06, (ahora - antes) / 1000); antes = ahora;
       try {
-        if (st.demo && ahora - ultimoDemo > 900) { ultimoDemo = ahora; latidoDemo(); }
         if (ahora - ultimaTele > 1000) { ultimaTele = ahora; telemetria(); pintaDatos(); }
         cx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);
         st.dianas = [];
         st.W = datosAbierto && st.Wc > 700 ? Math.max(320, st.Wc - panelDatos.offsetWidth - 20) : st.Wc;
+        // The notices on the picture are centred on what is drawn, not under the side panel.
+        lienzo.classList.toggle('con-datos', st.W !== st.Wc);
         fondo();
         if (enTierra()) {
           const obj = st.vista === 'mapa' ? 1 : 0;
@@ -1808,9 +1805,8 @@
     let datosGuardado = null;
     try { datosGuardado = localStorage.getItem('guardiana_pd_datos'); } catch (_) {}
     ponDatos(datosGuardado === null ? st.Wc >= 1000 : datosGuardado === '1');
-    // The website shows the same universe with example data only (`demo`); the panel, the person's.
-    if (ctx.demo) empiezaDemo();
-    else { await cargar(); ctx.cadaTanto(cargar, 5000); }
+    await cargar();
+    ctx.cadaTanto(cargar, 5000);
     requestAnimationFrame(bucle);
   }
 })();

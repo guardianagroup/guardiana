@@ -45,11 +45,16 @@
   <div id="av-detectados" class="muted"></div>
   <hr>
   <p class="vigilante"><label><input type="checkbox" id="av-vigilar"> <b data-t="av_vigilar"></b></label><br><span id="av-vigilar-txt" class="muted"></span></p>
-  <h3 data-t="av_max_titulo"></h3>
-  <p class="muted" data-t="av_max_lead"></p>
-  <p id="av-max-estado"></p>
-  <p id="av-max-confirma" class="hidden"><span class="bad" data-t="av_max_aviso"></span><br><button id="av-max-si" data-t="av_max_confirmar"></button> <button id="av-max-no" class="secondary" data-t="av_max_cancelar"></button></p>
-  <p><button id="av-max-activar" data-t="av_max_activar"></button> <button id="av-max-quitar" class="secondary hidden" data-t="av_max_quitar"></button> <span id="av-detectar-msg" class="muted" role="status" aria-live="polite"></span></p>
+  <p id="av-max-fuera" class="bad hidden" role="status"></p>
+  <details class="b-plegable av-avanzado" id="av-avanzado">
+    <summary data-t="av_avanzado"></summary>
+    <h3 data-t="av_max_titulo"></h3>
+    <p class="muted" data-t="av_max_lead"></p>
+    <p id="av-max-estado" class="hidden"></p>
+    <p id="av-max-confirma" class="hidden"><span class="bad" data-t="av_max_aviso"></span><br><button id="av-max-si" data-t="av_max_confirmar"></button> <button id="av-max-no" class="secondary" data-t="av_max_cancelar"></button></p>
+    <p><button id="av-max-activar" data-t="av_max_activar"></button> <button id="av-max-quitar" class="secondary hidden" data-t="av_max_quitar"></button></p>
+  </details>
+  <p id="av-detectar-msg" class="muted" role="status" aria-live="polite"></p>
 </div>
 
 <h2 data-t="av_vivo_titulo"></h2>

@@ -14,7 +14,7 @@
 <div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
 <section class="stage" id="stage" aria-label="GUARDIANA por dentro">
   <div class="barra">
-    <div class="marca"><a href="/" data-t="pd_volver">← Panel</a> <span data-t="pd_titulo">GUARDIANA por dentro</span> <span class="chip-modo" id="chip-modo" hidden></span></div>
+    <div class="marca"><a href="/" data-t="pd_volver">← Panel</a> <span data-t="pd_titulo">GUARDIANA por dentro</span> <span class="chip-modo corte" id="chip-modo" role="status" hidden></span></div>
     <div class="pestanas" role="group">
       <button type="button" data-vista="globo" aria-pressed="true"><span class="tecla" aria-hidden="true">1</span><span data-t="pd_vista_globo">Globo</span></button>
       <button type="button" data-vista="mapa" aria-pressed="false"><span class="tecla" aria-hidden="true">2</span><span data-t="pd_vista_mapa">Mapa</span></button>
@@ -25,7 +25,6 @@
     <div class="controles">
       <span class="lugar-yo" title=""><span data-t="pd_tu_pais">Tu ordenador está en</span> <b id="yo"></b></span>
       <button type="button" class="btn-hud" id="btn-datos" aria-pressed="true" aria-controls="datos" data-t="pd_btn_datos">Datos en vivo</button>
-      <button type="button" class="btn-hud peligro" id="maxima" aria-pressed="false" data-t="pd_btn_maxima">Protección máxima</button>
       <button type="button" class="btn-hud" id="pantalla" data-t="pd_pantalla_completa">Pantalla completa</button>
     </div>
   </div>
@@ -33,8 +32,8 @@
     <canvas id="gl"></canvas>
     <canvas id="cv"></canvas>
     <div class="telemetria" id="telemetria" hidden></div>
-    <aside class="datos" id="datos"></aside>
-    <div class="vigilancia-off" id="vigilancia-off" hidden data-t="pd_vigilancia_off"></div>
+    <aside class="datos" id="datos"><div id="datos-vivo"></div><p class="corte-av" id="corte-av" hidden><button type="button" class="btn-hud" id="corte-av-btn"></button></p><div id="datos-resto"></div></aside>
+    <div class="vigilancia-off" id="vigilancia-off" hidden><span data-t="pd_vigilancia_off"></span> <a href="/antivirus" data-t="pd_vigilancia_enciende"></a></div>
     <div class="leyenda" aria-hidden="true">
       <span><i class="ley-o"></i><span data-t="pd_ley_sale"></span></span>
       <span><i class="ley-i"></i><span data-t="pd_ley_entra"></span></span>
@@ -42,7 +41,7 @@
       <span><i class="ley-n"></i><span data-t="pd_ley_nodoc"></span></span>
     </div>
     <div class="ayuda-vista" id="ayuda-vista"></div>
-    <div class="vacio" id="vacio" hidden><h2 data-t="pd_vacio_titulo"></h2><p id="vacio-texto"></p><button type="button" class="btn-hud" id="demo" data-t="pd_demo_boton"></button></div>
+    <div class="vacio" id="vacio" hidden role="status" aria-live="polite"><h2 id="vacio-titulo"></h2><p id="vacio-texto"></p><p id="vacio-enlace" hidden><a href="/" data-t="pd_ver_radiografia"></a></p></div>
     <div class="tip" id="tip" hidden></div>
     <div class="aviso" id="aviso" hidden role="status" aria-live="polite"></div>
   </div>

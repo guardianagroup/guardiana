@@ -1808,11 +1808,14 @@
         <div class="wrap"><table><tbody>${p.destinos.map((x) => filaTrafico(x, (x.destino || x.red || t('av_sin_nombre')) + (x.destino && x.pais && x.pais[0] !== '@' ? ' · ' + paisTrafico(x.pais) : ''))).join('')}</tbody></table></div>
       </div>`;
       const reloj = (ms) => { try { return new Date(ms).toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+      // «Controles avanzados» se abre solo una vez, al abrir la página, si hay un corte puesto.
+      let avanzadoVisto = false;
       // El panel en directo: cada minuto reciente de un antivirus hablando, lo nuevo arriba.
       const filaViva = (v) => `<tr><td class="muted">${esc(reloj(v.minuto))}</td><td><span class="tag ia">${esc(v.producto)}</span></td><td class="mono">${esc(v.destino || v.red || t('av_sin_nombre'))}</td><td>${esc(v.pais && v.pais[0] !== '@' ? paisTrafico(v.pais) : paisTrafico(v.red))}</td><td><b>${esc(bytes(v.subidos))}</b></td><td>${esc(bytes(v.bajados))}</td></tr>`;
       const paint = (r) => {
         corte = { disponible: !!r.cortar_disponible, cortados: r.cortados || [] };
-        // El resumen de 24 h, siempre arriba, y los dos mandos: vigilar y protección máxima.
+        // El resumen de 24 h, siempre arriba, y los dos mandos: vigilar y, plegado en «Controles
+        // avanzados», cortar todo lo que envía el antivirus.
         const m = r.resumen || {};
         $('av-resumen').innerHTML = (m.productos && m.productos.length)
           ? `<p class="av-cifras"><b>${esc(bytes(m.subidos))}</b> ${esc(t('av_resumen_enviado'))} · <b>${esc(bytes(m.bajados))}</b> ${esc(t('av_resumen_recibido'))} · ${esc(tn('av_resumen_paises', m.paises))} · ${esc(tn('av_resumen_destinos', m.destinos))}</p>`
@@ -1822,11 +1825,18 @@
         if (!r.vigilando) $('av-resumen').innerHTML += `<p class="bad">${esc(t('av_resumen_pausado'))}</p>`;
         $('av-vigilar').checked = !!r.vigilando;
         $('av-vigilar-txt').textContent = t(r.vigilando ? 'av_vigilar_on' : 'av_vigilar_off');
+        // «Cortar todo lo que envía el antivirus» (hasta el 13 oct 2026 «Protección máxima del
+        // antivirus», un nombre que callaba que así el antivirus protege menos) vive plegado en
+        // «Controles avanzados». Puesto, una línea fuera del pliegue lo dice siempre, y al abrir la
+        // página el pliegue se abre solo: nadie tiene que buscar cómo quitarlo.
         const hayCorte = !!r.maxima;
-        $('av-max-estado').textContent = !corte.disponible ? t('av_cortar_no_disponible') : hayCorte ? t('av_max_activa') : '';
-        $('av-max-estado').className = hayCorte ? 'bad' : 'muted';
+        $('av-max-fuera').textContent = hayCorte ? t('av_max_activa') : '';
+        $('av-max-fuera').classList.toggle('hidden', !hayCorte);
+        $('av-max-estado').textContent = corte.disponible ? '' : t('av_cortar_no_disponible');
+        $('av-max-estado').className = corte.disponible ? 'hidden' : 'muted';
         $('av-max-activar').classList.toggle('hidden', hayCorte || !corte.disponible);
         $('av-max-quitar').classList.toggle('hidden', !corte.cortados.length);
+        if (!avanzadoVisto) { avanzadoVisto = true; if (hayCorte || corte.cortados.length) $('av-avanzado').open = true; }
         $('av-vistos').innerHTML = r.vistos.length ? r.vistos.map(visto).join('')
           : `<div class="card"><p class="muted">${esc(t('av_ninguno').replace('{dias}', r.dias))}</p></div>`;
         $('av-ocultos').textContent = r.ocultos ? tn('av_ocultos', r.ocultos) : '';
@@ -1893,7 +1903,8 @@
           paint(await api('/api/antivirus'));
         } catch (err) { c.checked = !c.checked; $('av-detectar-msg').textContent = String(err.message || err); } finally { c.disabled = false; }
       });
-      // Protección máxima: pide confirmación una vez (lleva un aviso), y se quita de un clic.
+      // Cortar todo lo que envía el antivirus: pide confirmación una vez (lleva un aviso), y se
+      // quita de un clic.
       const maximaSet = async (activa) => {
         $('av-max-confirma').classList.add('hidden');
         try {
@@ -1901,6 +1912,8 @@
           corte.cortados = x.cortados || [];
           $('av-detectar-msg').textContent = '';
           paint(await api('/api/antivirus'));
+          // El botón pulsado desaparece: el foco va al que lo deshace.
+          $(activa ? 'av-max-quitar' : 'av-max-activar').focus();
         } catch (err) { $('av-detectar-msg').textContent = String(err.message || err); }
       };
       $('av-max-activar').addEventListener('click', () => { $('av-max-confirma').classList.remove('hidden'); $('av-max-si').focus(); });

@@ -362,6 +362,13 @@ a.enlace-empresa:hover { color: var(--accent); text-decoration-color: currentCol
 .av-dato-cifra{font-family:'Unbounded',system-ui,sans-serif;font-size:1.7rem;line-height:1.1;color:var(--azul);margin-bottom:6px}
 .av-cifras { font-size: 1.15rem; margin: .4rem 0; }
 .av-resumen hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
+/* «Cortar todo lo que envía el antivirus» lives folded under «Controles avanzados»: it makes the
+   antivirus protect less. While it is on, one line outside the fold says so. */
+#av-max-fuera { margin: 12px 0 0; }
+details.av-avanzado { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 2px; }
+details.av-avanzado > summary { margin: 10px 0 4px; }
+details.av-avanzado h3 { margin: 10px 0 4px; font-size: 15px; }
+details.av-avanzado p { margin: 8px 0; }
 
 /* «GUARDIANA por dentro» (1.0.22): the way in, well in sight on the start page and on «Tu
    antivirus» (the owner, 13 Oct 2026: «quiero que esté bien visible en la portada»). */
@@ -385,7 +392,12 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 
 .universo { --hud: #08101b; --hud-line: #172638; --hud-fg: #d3e6f3; --hud-muted: #7690a8; --shield: #3fe0c5; --out: #ffb547; --in: #6fb6ff; --cut: #ff6b7a; --undoc: #ffd166; }
 
-.universo #no-session { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 60; max-width: 560px; }
+/* «Sin sesión», the panel's own card, said in the middle of the picture and readable on the dark. */
+.universo #no-session { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 60; width: max-content; max-width: min(560px, calc(100vw - 32px)); margin: 0; background: rgba(6,12,22,.95); border-color: #172638; color: #d3e6f3; text-align: center; }
+
+.universo #no-session strong { display: block; margin-bottom: 6px; font: 500 17px 'Unbounded', system-ui, sans-serif; }
+
+.universo #no-session span { color: #7690a8; font-size: 14px; }
 
 .universo .stage { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr); background: #04070d; color: var(--hud-fg); font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 
@@ -399,7 +411,8 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 
 .universo .chip-modo { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; border: 1px solid var(--undoc); color: var(--undoc); border-radius: 4px; padding: 1px 6px; }
 
-.universo .chip-modo.off { border-color: var(--cut); color: var(--cut); }
+/* «Antivirus: todo cortado»: while the cut is on, the bar says so, in the colour of what is cut. */
+.universo .chip-modo.corte { border-color: var(--cut); color: var(--cut); }
 
 .universo .pestanas { display: flex; gap: 4px; flex-wrap: wrap; }
 
@@ -498,13 +511,13 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 
 .universo .tip .t { color: var(--hud-muted); }
 
-.universo .aviso { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 5; background: rgba(6,12,22,.96); border: 1px solid var(--hud-line); color: var(--hud-fg); border-radius: 8px; padding: 9px 14px; font: 12.5px/1.5 'IBM Plex Sans', system-ui, sans-serif; max-width: min(620px, 92%); text-align: center; }
+.universo .aviso { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 5; background: rgba(6,12,22,.96); border: 1px solid var(--hud-line); color: var(--hud-fg); border-radius: 8px; padding: 9px 14px; font: 12.5px/1.5 'IBM Plex Sans', system-ui, sans-serif; width: max-content; max-width: min(620px, 92%); text-align: center; }
 
 .universo .aviso.pide { border-color: var(--cut); }
 
 .universo .aviso-botones { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
 
-.universo .vacio { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4; max-width: min(520px, 90%); background: rgba(6,12,22,.92); border: 1px solid var(--hud-line); border-radius: 12px; padding: 18px 20px; text-align: center; }
+.universo .vacio { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4; width: max-content; max-width: min(520px, 90%); background: rgba(6,12,22,.92); border: 1px solid var(--hud-line); border-radius: 12px; padding: 18px 20px; text-align: center; }
 
 .universo .vacio h2 { font: 500 17px 'Unbounded', system-ui, sans-serif; margin: 0 0 8px; color: var(--hud-fg); }
 
@@ -512,7 +525,36 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 
 .universo .vacio .btn-hud { border-color: var(--shield); color: var(--shield); padding: 8px 14px; }
 
-.universo .vigilancia-off { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 3; font: 500 11px 'IBM Plex Mono', ui-monospace, monospace; color: var(--cut); border: 1px solid var(--cut); border-radius: 6px; padding: 3px 8px; background: rgba(6,12,22,.85); max-width: 90%; text-align: center; }
+.universo .vigilancia-off { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 3; font: 500 11px/1.5 'IBM Plex Mono', ui-monospace, monospace; color: var(--cut); border: 1px solid var(--cut); border-radius: 6px; padding: 3px 8px; background: rgba(6,12,22,.85); width: max-content; max-width: min(560px, 90%); text-align: center; }
+
+.universo .vigilancia-off a, .universo .vacio a { color: var(--shield); text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+
+/* «Midiendo…»: three dots that come and go, and nothing that could pass for a measurement. */
+.universo .vacio h2.midiendo::after { content: '...'; display: inline-block; vertical-align: bottom; overflow: hidden; width: 0; animation: pd-puntos 1.6s steps(4, jump-none) infinite; }
+
+@keyframes pd-puntos { to { width: 1.05em; } }
+
+@media (prefers-reduced-motion: reduce) { .universo .vacio h2.midiendo::after { animation: none; width: auto; } }
+
+/* With «Datos en vivo» open beside the picture, the notices are centred on the picture. */
+.universo .lienzo.con-datos .vacio, .universo .lienzo.con-datos .vigilancia-off, .universo .lienzo.con-datos .aviso { left: calc(50% - 175px); }
+
+.universo .lienzo.con-datos .aviso { max-width: min(620px, calc(100% - 380px)); }
+
+.universo .lienzo.con-datos .vacio { max-width: min(520px, calc(100% - 380px)); }
+
+.universo .lienzo.con-datos .vigilancia-off { max-width: min(560px, calc(100% - 380px)); }
+
+/* The cut's button, small and second to the figures, at the foot of the antivirus's telemetry. */
+.universo .datos .corte-av { margin: 8px 0 0; }
+
+.universo .datos .corte-av button { font-size: 11px; padding: 4px 8px; color: var(--hud-muted); border-color: var(--hud-line); white-space: normal; text-align: left; text-transform: none; letter-spacing: 0; box-shadow: none; }
+
+.universo .datos .corte-av button:hover { color: var(--cut); border-color: var(--cut); }
+
+.universo .datos .corte-av button.quitar { color: var(--shield); border-color: var(--shield); }
+
+.universo .datos #datos-resto > h4:first-child { margin-top: 12px; }
 
 .universo .hud { display: grid; grid-template-columns: 2fr 1fr 1fr 0.8fr 0.8fr; border-top: 1px solid var(--hud-line); background: var(--hud); }
 
@@ -570,6 +612,9 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 @media (max-width: 700px) {
 
 .universo .datos { left: 8px; right: 8px; width: auto; }
+
+/* On a phone «Datos en vivo» covers the picture; what is said on the picture waits behind it. */
+.universo .datos:not([hidden]) ~ .vacio, .universo .datos:not([hidden]) ~ .vigilancia-off { display: none; }
 
 .universo .controles { margin-left: 0; }
 
