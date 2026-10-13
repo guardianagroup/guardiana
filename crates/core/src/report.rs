@@ -285,6 +285,53 @@ impl Ledger {
         rows.map(|r| r.map_err(crate::Error::from)).collect()
     }
 
+    /// What each program asked for in a window, per (device, name, program, signer): how many
+    /// times, how many of them between midnight and six in the person's own day (`offset_min`
+    /// minutes east of UTC), how many were cut, the last time and the name's category.
+    ///
+    /// Only rows where the system said which program asked. Made for «GUARDIANA vigila a tu
+    /// antivirus» (13 Oct 2026), where the signer matters: a process called like an antivirus
+    /// and signed by somebody else is not that antivirus.
+    pub fn program_names(
+        &self,
+        since: i64,
+        until: i64,
+        offset_min: i64,
+    ) -> Result<Vec<ProgramName>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT device_id, qname, json_extract(process_json, '$.nombre') AS programa, \
+                    COALESCE(json_extract(process_json, '$.firmado_por'), '') AS firma, \
+                    COUNT(*), MAX(ts), \
+                    SUM(CASE WHEN ((ts + ?3) % 86400000) < 21600000 THEN 1 ELSE 0 END), \
+                    SUM(CASE WHEN verdict = 'cortado' THEN 1 ELSE 0 END), \
+                    MAX(category) \
+             FROM events WHERE ts >= ?1 AND ts < ?2 AND process_json != '' \
+             GROUP BY device_id, qname, programa, firma",
+        )?;
+        let n = |v: i64| u64::try_from(v).unwrap_or(0);
+        let rows = stmt.query_map(params![since, until, offset_min * 60_000], |r| {
+            Ok(ProgramName {
+                device_id: r.get(0)?,
+                qname: r.get(1)?,
+                program: r.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                signer: r.get(3)?,
+                queries: n(r.get(4)?),
+                last_ts: r.get(5)?,
+                night: n(r.get(6)?),
+                cut: n(r.get(7)?),
+                // A name keeps its category; when a list update changed it inside the window,
+                // the highest of the two by name, which puts telemetry and trackers first.
+                category: r
+                    .get::<_, String>(8)?
+                    .parse()
+                    .unwrap_or(crate::Category::Desconocido),
+            })
+        })?;
+        rows.map(|r| r.map_err(crate::Error::from))
+            .filter(|r| !matches!(r, Ok(p) if p.program.is_empty()))
+            .collect()
+    }
+
     /// Destinations the house had never asked for before the seven days ending at `until`.
     ///
     /// `seen_domains` remembers when each (device, name) pair first appeared and survives
@@ -352,6 +399,29 @@ pub struct NameGroup {
     pub queries: u64,
     /// The last time, Unix ms.
     pub last_ts: i64,
+}
+
+/// What one program asked for in a window: see [`Ledger::program_names`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ProgramName {
+    /// Which device asked.
+    pub device_id: String,
+    /// The name asked for.
+    pub qname: String,
+    /// The program's file name, as the system gave it.
+    pub program: String,
+    /// Who signs the program, as the system reported it; empty when unsigned or not checked.
+    pub signer: String,
+    /// Times it was asked for inside the window.
+    pub queries: u64,
+    /// Of those, between midnight and six in the person's day.
+    pub night: u64,
+    /// Of those, cut.
+    pub cut: u64,
+    /// The last time, Unix ms.
+    pub last_ts: i64,
+    /// The name's category.
+    pub category: crate::Category,
 }
 
 /// A (name, device) of the whole extract: how many times, how many cut, first and last time.
@@ -428,6 +498,53 @@ mod tests {
     use crate::model::{Category, NewEvent, Verdict};
     use crate::retention::Retention;
     use crate::time::HOUR_MS;
+
+    #[test]
+    fn what_each_program_asked_with_its_signer_its_nights_and_its_cuts() {
+        let mut l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        let dia = 20 * DAY_MS;
+        let prog = |nombre: &str, firma: &str| crate::model::Proceso {
+            pid: 1,
+            nombre: nombre.into(),
+            ruta: String::new(),
+            sha256: String::new(),
+            firmado_por: firma.into(),
+        };
+        // Two in the person's night (UTC-5: 07:00 UTC is 02:00 there), one cut; one in the day.
+        for (h, cortar) in [(7, false), (8, true), (15, false)] {
+            let mut e =
+                NewEvent::observed(dia + h * HOUR_MS, "self", "127.0.0.1", "t.av.example", "A");
+            e.category = Category::Telemetria;
+            e.process = Some(prog("AvSvc.exe", "Av s.r.o."));
+            if cortar {
+                e.verdict = Verdict::Cortado;
+            }
+            l.append(e).unwrap();
+        }
+        // The same name from a process with the same file name and another signer: its own row.
+        let mut otro =
+            NewEvent::observed(dia + 15 * HOUR_MS, "self", "127.0.0.1", "t.av.example", "A");
+        otro.process = Some(prog("AvSvc.exe", ""));
+        l.append(otro).unwrap();
+        // No program: left out.
+        l.append(NewEvent::observed(
+            dia + 16 * HOUR_MS,
+            "self",
+            "127.0.0.1",
+            "x.example",
+            "A",
+        ))
+        .unwrap();
+        let mut r = l.program_names(dia, dia + DAY_MS, -300).unwrap();
+        r.sort_by(|a, b| b.signer.cmp(&a.signer));
+        assert_eq!(r.len(), 2);
+        assert_eq!(r[0].signer, "Av s.r.o.");
+        assert_eq!((r[0].queries, r[0].night, r[0].cut), (3, 2, 1));
+        assert_eq!(r[0].category, Category::Telemetria);
+        assert_eq!(r[0].last_ts, dia + 15 * HOUR_MS);
+        assert_eq!(r[1].signer, "");
+        assert_eq!(r[1].queries, 1);
+    }
 
     #[test]
     fn week_combines_detail_and_rolled_up_days() {

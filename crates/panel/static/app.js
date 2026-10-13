@@ -999,7 +999,7 @@
     $('maxima-quitar').addEventListener('click', (e) => cambia(false, e.currentTarget));
     try { pinta(await api('/api/proteccion-maxima')); } catch (_) {}
   }
-  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo', borrado: 'nav_borrado', empresa: 'ficha_titulo', expedientes: 'nav_expedientes' };
+  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', antivirus: 'nav_antivirus', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo', borrado: 'nav_borrado', empresa: 'ficha_titulo', expedientes: 'nav_expedientes' };
   function applyTexts() {
     document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.getAttribute('data-t')); });
     document.querySelectorAll('[data-t-html]').forEach((el) => { el.innerHTML = t(el.getAttribute('data-t-html')); });
@@ -1736,6 +1736,51 @@
       });
       await load();
       cadaTanto(load, 5000);
+    },
+    async antivirus() {
+      let pais = (c) => c;
+      try { const dn = new Intl.DisplayNames([LOC], { type: 'region' }); pais = (c) => { try { return dn.of(c) || c; } catch (_) { return c; } }; } catch (_) {}
+      const catNombre = (k) => (T.categorias && T.categorias[k]) || k;
+      const enlace = (url, txt) => `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(txt)}</a>`;
+      // Lo que el fabricante dice de un nombre, con su página; o que no lo dice, y de quién es
+      // el nombre cuando las listas lo saben. Un nombre sin documentar es una pregunta, no una
+      // acusación: así se escribe.
+      const queEs = (d) => (d.uso
+        ? `<span class="tag av-doc">${esc(t('av_uso_' + d.uso))}</span> ${enlace(d.fuente, t('av_fuente_fabricante'))}`
+        : `<span class="tag av-nodoc">${esc(t('av_no_documentado'))}</span>`
+          + (d.empresa ? ` <span class="muted">${esc(t('av_nombre_de').replace('{empresa}', d.empresa))}</span>` : '')
+          + (d.categoria !== 'desconocido' && d.categoria !== 'esperado' ? ` <span class="tag ${esc(d.categoria)}">${esc(catNombre(d.categoria))}</span>` : ''));
+      const firma = (p) => `<span class="tag app">${esc(p.nombre)} ×${num(p.consultas)}</span> <span class="muted">${esc(p.firma ? t('av_firmado_por').replace('{firma}', p.firma) : t('av_sin_firma'))}</span>`;
+      const visto = (v) => `<div class="card">
+        <h3>${esc(v.producto)} <span class="muted">· ${esc(v.empresa)} (${esc(pais(v.pais))}) · ${esc(nombreAparato(v.device_id, v.device_name))}</span></h3>
+        <p>${v.programas.map(firma).join('<br>')}</p>
+        <p><b>${esc(tn('av_consultas', v.consultas))}</b> · ${esc(tn('av_nombres', v.destinos_total))} · ${esc(tn('av_nocturnas', v.nocturnas))}${v.cortadas ? ' · ' + esc(tn('av_cortadas', v.cortadas)) : ''} · <span class="muted">${esc(t('col_ultima'))}: ${when(v.ultima)}</span></p>
+        <p>${esc(tn('av_documentados', v.documentados))} · <b>${esc(tn('av_no_documentados', v.no_documentados))}</b></p>
+        <div class="wrap"><table><thead><tr><th>${esc(t('av_col_nombre'))}</th><th>${esc(t('av_col_que_es'))}</th><th>${esc(t('col_consultas'))}</th><th>${esc(t('av_col_noche'))}</th><th>${esc(t('col_ultima'))}</th></tr></thead><tbody>
+        ${v.destinos.map((d) => `<tr><td class="mono">${esc(d.qname)}</td><td>${queEs(d)}</td><td>${num(d.consultas)}${d.cortadas ? ` <span class="muted">(${esc(tn('av_cortadas', d.cortadas))})</span>` : ''}</td><td>${num(d.nocturnas)}</td><td class="muted">${when(d.ultima)}</td></tr>`).join('')}
+        </tbody></table></div>
+        ${v.destinos_total > v.destinos.length ? `<p class="muted">${esc(t('av_mas').replace('{n}', num(v.destinos_total - v.destinos.length)))}</p>` : ''}
+      </div>`;
+      // El importe viaja como «16500000 USD» y se escribe en la moneda y el idioma de quien lo lee.
+      const importe = (x) => { const [n, m] = String(x).split(' '); try { return new Intl.NumberFormat(LOC, { style: 'currency', currency: m, maximumFractionDigits: 0 }).format(Number(n)); } catch (_) { return x; } };
+      const fecha = (d) => { try { return new Date(d + 'T12:00:00').toLocaleDateString(LOC, { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return d; } };
+      const sancion = (s) => `<li><b>${esc(fecha(s.fecha))}</b> · ${esc(s.autoridad)} (${esc(pais(s.pais))}) · <span class="tag av-${esc(s.tipo)}">${esc(t('av_tipo_' + s.tipo))}</span>${s.importe ? ' · <b>' + esc(importe(s.importe)) + '</b>' : ''}<br>${esc(t('av_sancion_' + s.clave))} ${enlace(s.fuente, t('av_fuente_oficial'))}</li>`;
+      const ficha = (f) => `<div class="card">
+        <h3>${esc(f.producto)} <span class="muted">· ${esc(f.empresa)} (${esc(pais(f.pais))})</span></h3>
+        <p class="muted mono">${f.programas.map(esc).join(' · ')}</p>
+        ${f.sanciones.length ? `<ul>${f.sanciones.map(sancion).join('')}</ul>` : `<p class="muted">${esc(t('av_sin_sanciones'))}</p>`}
+      </div>`;
+      const paint = (r) => {
+        $('av-vistos').innerHTML = r.vistos.length ? r.vistos.map(visto).join('')
+          : `<div class="card"><p class="muted">${esc(t('av_ninguno').replace('{dias}', r.dias))}</p></div>`;
+        $('av-ocultos').textContent = r.ocultos ? tn('av_ocultos', r.ocultos) : '';
+        $('av-ocultos').classList.toggle('hidden', !r.ocultos);
+        // Primero los que tienen decisiones oficiales, luego el resto, cada grupo por nombre.
+        const cat = r.catalogo.slice().sort((a, b) => (b.sanciones.length > 0) - (a.sanciones.length > 0) || a.producto.localeCompare(b.producto));
+        $('av-catalogo').innerHTML = cat.map(ficha).join('');
+      };
+      paint(await api('/api/antivirus'));
+      cadaTanto(async () => paint(await api('/api/antivirus')), 30000);
     },
     async ia() {
       const paint = (r) => {

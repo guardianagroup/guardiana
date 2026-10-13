@@ -1,0 +1,256 @@
+# Guardiana — lista «antivirus»: qué procesos de Windows son de cada antivirus, qué nombres
+# documenta su propio fabricante y para qué, y las decisiones oficiales de autoridades sobre él.
+# Mantenida por nosotros, abierta. «GUARDIANA vigila a tu antivirus» (13 oct 2026).
+#
+# Formato:
+#   @Producto
+#   empresa: quién está detrás hoy
+#   pais: código de dos letras de su sede
+#   programa: nombre de archivo del proceso en Windows (uno por línea; un proceso, un producto)
+#   dominio: nombre | uso | página del fabricante que lo dice
+#            uso ∈ actualizaciones, nube, muestras, licencia, telemetria, publicidad, otros
+#   sancion: AAAA-MM-DD | autoridad (su nombre propio) | país (dos letras) | importe («16500000 USD») o - |
+#            tipo (multa, orden, sentencia, prohibicion, advertencia, compromiso) | clave | página oficial
+#            la clave es el texto en palabras llanas (av_sancion_<clave> en el panel)
+#
+# Reglas: solo lo que el fabricante publica (un dominio que no documenta no se añade aquí; el
+# panel lo enseña como «no documentado»); solo decisiones de autoridades con su resolución o
+# nota oficial publicada; una decisión recurrida o anulada en parte se dice en su texto.
+# Un dominio coincide consigo mismo y con sus subdominios.
+
+# Procesos: https://learn.microsoft.com/en-us/defender-endpoint/microsoft-defender-antivirus-windows
+@Microsoft Defender
+empresa: Microsoft Corporation
+pais: US
+programa: MsMpEng.exe
+programa: MpDefenderCoreService.exe
+programa: NisSrv.exe
+programa: MpCmdRun.exe
+programa: ConfigSecurityPolicy.exe
+dominio: wdcp.microsoft.com | nube | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: wdcpalt.microsoft.com | nube | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: wd.microsoft.com | nube | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: update.microsoft.com | actualizaciones | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: delivery.mp.microsoft.com | actualizaciones | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: windowsupdate.com | actualizaciones | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: download.microsoft.com | actualizaciones | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: go.microsoft.com | actualizaciones | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: definitionupdates.microsoft.com | actualizaciones | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: ussus1eastprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: ussus2eastprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: ussus3eastprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: ussus4eastprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: wsus1eastprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: wsus2eastprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: ussus1westprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: ussus2westprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: ussus3westprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: ussus4westprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: wsus1westprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: wsus2westprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: usseu1northprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: wseu1northprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: usseu1westprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: wseu1westprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: ussuk1southprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: wsuk1southprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: ussuk1westprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: wsuk1westprod.blob.core.windows.net | muestras | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: crl.microsoft.com | otros | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: vortex-win.data.microsoft.com | telemetria | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: settings-win.data.microsoft.com | telemetria | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+
+# Procesos: https://support.avast.com/en-us/article/windows-process-dump
+# afwServ.exe (cortafuegos) es común a Avast y AVG: no se atribuye a ninguno de los dos.
+# Avast solo publica dominios generales (*.avast.com, *.avcdn.net) sin decir para qué es cada uno: van como «otros».
+@Avast
+empresa: Gen Digital Inc.
+pais: US
+programa: AvastSvc.exe
+programa: AvastUI.exe
+dominio: avast.com | otros | https://businesshelp.avast.com/Content/Products/AfB_Management_Consoles/DeviceManagement/FirewallRequirements.htm
+dominio: avcdn.net | otros | https://businesshelp.avast.com/Content/Products/AfB_Management_Consoles/DeviceManagement/FirewallRequirements.htm
+sancion: 2024-06-27 | FTC | US | 16500000 USD | orden | ftc_avast | https://www.ftc.gov/news-events/news/press-releases/2024/06/ftc-finalizes-order-avast-banning-it-selling-or-licensing-web-browsing-data-advertising-requiring-it
+sancion: 2024-04-15 | ÚOOÚ | CZ | 351000000 CZK | multa | uoou_avast | https://uoou.gov.cz/en/news/business-communication/czech-dpa-imposed-fine-of-351-million-czk-for-gdpr-infringement
+sancion: 2025-09-30 | Městský soud v Praze | CZ | - | sentencia | msp_avast | https://msp.gov.cz/documents/d/mestsky-soud-v-praze/tiskova-zprava-k-rozsudku-ze-dne-30-9-2025-sp-zn-5-a-56-2024
+
+# Procesos: https://support.avg.com (artículo de volcado de procesos de Windows).
+# Sus dominios publicados son generales y de la edición Business: no se ponen.
+@AVG
+empresa: Gen Digital Inc.
+pais: US
+programa: AVGSvc.exe
+programa: AVGUI.exe
+sancion: 2024-06-27 | FTC | US | 16500000 USD | orden | ftc_avg | https://www.ftc.gov/news-events/news/press-releases/2024/06/ftc-finalizes-order-avast-banning-it-selling-or-licensing-web-browsing-data-advertising-requiring-it
+
+# Procesos: aviso NLOKSA1515 (https://www.gendigital.com/us/en/contact-us/security-advisories/) e
+# investigación de Gen Digital (https://www.gendigital.com/blog/insights/research/meh-2-2). Sin lista oficial de dominios.
+@Avira
+empresa: Gen Digital Inc.
+pais: US
+programa: avguard.exe
+programa: Endpointprotection.exe
+
+# Proceso: https://www.gendigital.com/blog/insights/research/meh-2-2 (2020). nis.exe y ns.exe, también
+# citados ahí, se dejan fuera: son nombres demasiado cortos para atribuirlos sin dudas. Sin lista oficial de dominios.
+@Norton
+empresa: Gen Digital Inc.
+pais: US
+programa: NortonSecurity.exe
+sancion: 2021-06-14 | CMA | GB | - | compromiso | cma_norton | https://www.gov.uk/cma-cases/anti-virus-software
+
+# Procesos: McAfee Labs, 2018 (https://www.mcafee.com/blogs/other-blogs/mcafee-labs/political-figures-differ-online-names-of-trump-obama-merkel-attached-to-ransomware-campaigns/).
+# Sin lista oficial de dominios del producto doméstico.
+@McAfee
+empresa: McAfee, LLC
+pais: US
+programa: mcshield.exe
+programa: VsTskMgr.exe
+sancion: 2021-05-25 | CMA | GB | - | compromiso | cma_mcafee | https://www.gov.uk/cma-cases/anti-virus-software
+
+# Procesos: https://support.kaspersky.com/es/kes-for-windows/14.0/318302. Dominios: lista de Kaspersky Endpoint Security 12.7.
+# KSN agrupa nube, muestras y estadísticas sin separarlas por nombre: van como «nube».
+@Kaspersky
+empresa: AO Kaspersky Lab
+pais: RU
+programa: avp.exe
+programa: avpui.exe
+programa: avpsus.exe
+dominio: upd.kaspersky.com | actualizaciones | https://support.kaspersky.com/kes-for-windows/12.7/202507
+dominio: cm.k.kaspersky-labs.com | actualizaciones | https://support.kaspersky.com/kes-for-windows/12.7/202507
+dominio: downloads.kaspersky-labs.com | actualizaciones | https://support.kaspersky.com/kes-for-windows/12.7/202507
+dominio: ksn.kaspersky-labs.com | nube | https://support.kaspersky.com/kes-for-windows/12.7/202507
+dominio: ksn-file-geo.kaspersky-labs.com | nube | https://support.kaspersky.com/kes-for-windows/12.7/202507
+dominio: ksn-verdict-geo.kaspersky-labs.com | nube | https://support.kaspersky.com/kes-for-windows/12.7/202507
+dominio: ksn-a-stat-geo.kaspersky-labs.com | nube | https://support.kaspersky.com/kes-for-windows/12.7/202507
+dominio: ds.kaspersky.com | nube | https://support.kaspersky.com/kes-for-windows/12.7/202507
+dominio: activation-v2.kaspersky.com | licencia | https://support.kaspersky.com/kes-for-windows/12.7/202507
+dominio: click.kaspersky.com | otros | https://support.kaspersky.com/kes-for-windows/12.7/202507
+dominio: redirect.kaspersky.com | otros | https://support.kaspersky.com/kes-for-windows/12.7/202507
+sancion: 2024-06-20 | BIS | US | - | prohibicion | bis_kaspersky | https://www.bis.gov/press-release/commerce-department-prohibits-russian-kaspersky-software-u.s.-customers
+sancion: 2023-10-30 | Treasury Board of Canada | CA | - | prohibicion | canada_kaspersky | https://www.canada.ca/en/treasury-board-secretariat/news/2023/10/minister-anand-announces-a-ban-on-the-use-of-wechat-and-kaspersky-suite-of-applications-on-government-mobile-devices.html
+sancion: 2022-03-15 | BSI | DE | - | advertencia | bsi_kaspersky | https://bsi.bund.de/EN/Themen/Unternehmen-und-Organisationen/Cyber-Sicherheitslage/Technische-Sicherheitshinweise-und-Warnungen/Warnungen-nach-Par-7/FAQ-Kaspersky/faq_node.html
+sancion: 2017-09-13 | DHS | US | - | prohibicion | dhs_kaspersky | https://dhs.gov/news/2017/09/13/dhs-statement-issuance-binding-operational-directive-17-01
+
+# Procesos: https://help.eset.com/ees/12/en-US/how_apply_policy.html y https://help.eset.com/efsw/12.0/cs-CZ/idh_config_diagnostics.html
+# tsmNN.eset.com sirve a la vez para muestras y estadísticas anónimas, según ESET.
+@ESET
+empresa: ESET, spol. s r.o.
+pais: SK
+programa: ekrn.exe
+programa: egui.exe
+dominio: um01.eset.com | actualizaciones | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: um02.eset.com | actualizaciones | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: repository.eset.com | actualizaciones | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: avcloud.e5.sk | nube | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: dnsj.e5.sk | nube | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: livegrid.eset.systems | nube | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: tsm09.eset.com | muestras | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: tsm10.eset.com | muestras | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: tsm11.eset.com | muestras | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: tsm12.eset.com | muestras | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: tsm13.eset.com | muestras | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: tsm14.eset.com | muestras | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: tsm15.eset.com | muestras | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: tsm16.eset.com | muestras | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: tsm17.eset.com | muestras | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: tsm18.eset.com | muestras | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: gallup.eset.com | telemetria | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: trace.eset.com | telemetria | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: ipm.eset.com | mensajes | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: banner.eset.com | mensajes | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+dominio: edf.eset.com | licencia | https://support.eset.com/en/kb332-ports-and-addresses-required-to-use-your-eset-product-with-a-third-party-firewall
+
+# Proceso: https://www.bitdefender.com/consumer/support/answer/87461/. Sin lista oficial de dominios del producto doméstico.
+# Pendiente: la multa de la ANSPDCP de abril de 2025 (10.000 EUR, por un servicio de análisis de correo, no por el antivirus)
+# se añadirá cuando tengamos el enlace a la nota oficial; hoy solo la hemos visto en prensa.
+@Bitdefender
+empresa: Bitdefender SRL
+pais: RO
+programa: bdservicehost.exe
+
+# Procesos: https://www.bitdefender.com/business/support/en/77209-157497-install-security-agents---standard-procedure.html
+@Bitdefender GravityZone
+empresa: Bitdefender SRL
+pais: RO
+programa: epsecurityservice.exe
+programa: epconsole.exe
+programa: epag.exe
+programa: epintegrationservice.exe
+programa: epprotectedservice.exe
+programa: bdredline.exe
+dominio: upgrade.bitdefender.com | actualizaciones | https://www.bitdefender.com/business/support/en/77209-1603894-gravityzone-cloud-instance-1.html
+dominio: update-cloud.2d585.cdn.bitdefender.net | actualizaciones | https://www.bitdefender.com/business/support/en/77209-1603894-gravityzone-cloud-instance-1.html
+dominio: nimbus.bitdefender.net | nube | https://www.bitdefender.com/business/support/en/77209-1603894-gravityzone-cloud-instance-1.html
+dominio: sandbox-portal-eu.gravityzone.bitdefender.com | nube | https://www.bitdefender.com/business/support/en/77209-1603894-gravityzone-cloud-instance-1.html
+
+@Malwarebytes
+empresa: Malwarebytes Inc.
+pais: US
+programa: Malwarebytes.exe
+programa: mbamservice.exe
+programa: MBVpnTunnelService.exe
+dominio: www.malwarebytes.com | otros | https://help.malwarebytes.com/hc/en-us/articles/31589222734875-Allow-Malwarebytes-through-your-firewall
+dominio: cleo.mb-internal.com | licencia | https://help.malwarebytes.com/hc/en-us/articles/31589222734875-Allow-Malwarebytes-through-your-firewall
+dominio: links.malwarebytes.com | licencia | https://help.malwarebytes.com/hc/en-us/articles/31589222734875-Allow-Malwarebytes-through-your-firewall
+dominio: iris.mwbsys.com | mensajes | https://help.malwarebytes.com/hc/en-us/articles/31589222734875-Allow-Malwarebytes-through-your-firewall
+dominio: my-device.malwarebytes.com | licencia | https://help.malwarebytes.com/hc/en-us/articles/31589222734875-Allow-Malwarebytes-through-your-firewall
+dominio: cdn.mwbsys.com | actualizaciones | https://help.malwarebytes.com/hc/en-us/articles/31589222734875-Allow-Malwarebytes-through-your-firewall
+dominio: sirius.mwbsys.com | actualizaciones | https://help.malwarebytes.com/hc/en-us/articles/31589222734875-Allow-Malwarebytes-through-your-firewall
+dominio: keystone.mwbsys.com | licencia | https://help.malwarebytes.com/hc/en-us/articles/31589222734875-Allow-Malwarebytes-through-your-firewall
+dominio: telemetry.malwarebytes.com | telemetria | https://help.malwarebytes.com/hc/en-us/articles/31589222734875-Allow-Malwarebytes-through-your-firewall
+dominio: hubble.mb-cosmos.com | nube | https://help.malwarebytes.com/hc/en-us/articles/31589222734875-Allow-Malwarebytes-through-your-firewall
+
+# Procesos: https://www.watchguard.com/help/docs/help-center/en-US/Content/en-US/Endpoint-Security/troubleshooting/collect-process-dump-PSAN.html
+# Dominios: los de WatchGuard EDR, Prime, 360 y Elite; Panda Dome doméstico no publica los suyos.
+@Panda / WatchGuard
+empresa: WatchGuard Technologies, Inc.
+pais: US
+programa: PSANHost.exe
+programa: PSUAService.exe
+dominio: corporate.updates.pandasecurity.com | actualizaciones | https://www.watchguard.com/help/docs/help-center/en-US/Content/en-US/WG-Cloud/wg-cloud_urls.html
+dominio: repository.pandasecurity.com | actualizaciones | https://www.watchguard.com/help/docs/help-center/en-US/Content/en-US/WG-Cloud/wg-cloud_urls.html
+dominio: cpp-repository.pandasecurity.com | actualizaciones | https://www.watchguard.com/help/docs/help-center/en-US/Content/en-US/WG-Cloud/wg-cloud_urls.html
+dominio: wes-cpp-kw.pandasecurity.com | actualizaciones | https://www.watchguard.com/help/docs/help-center/en-US/Content/en-US/WG-Cloud/wg-cloud_urls.html
+dominio: wes-cpp-fusm.pandasecurity.com | muestras | https://www.watchguard.com/help/docs/help-center/en-US/Content/en-US/WG-Cloud/wg-cloud_urls.html
+dominio: wes-cpp-fusmb.pandasecurity.com | muestras | https://www.watchguard.com/help/docs/help-center/en-US/Content/en-US/WG-Cloud/wg-cloud_urls.html
+dominio: iwes-ext.pandasecurity.com | nube | https://www.watchguard.com/help/docs/help-center/en-US/Content/en-US/WG-Cloud/wg-cloud_urls.html
+dominio: wes-cpp-fulg.pandasecurity.com | telemetria | https://www.watchguard.com/help/docs/help-center/en-US/Content/en-US/WG-Cloud/wg-cloud_urls.html
+dominio: wes-cpp-fuelg.pandasecurity.com | telemetria | https://www.watchguard.com/help/docs/help-center/en-US/Content/en-US/WG-Cloud/wg-cloud_urls.html
+dominio: wes-cpp-fuo.pandasecurity.com | telemetria | https://www.watchguard.com/help/docs/help-center/en-US/Content/en-US/WG-Cloud/wg-cloud_urls.html
+
+# Procesos: https://success.trendmicro.com/ja-JP/solution/KA-0010044. Es la edición de empresa; la doméstica no publica lista.
+@Trend Micro Apex One
+empresa: Trend Micro Incorporated
+pais: JP
+programa: Ntrtscan.exe
+programa: TmListen.exe
+programa: TmCCSF.exe
+programa: TMBMSRV.exe
+programa: TmPfw.exe
+programa: EndpointBasecamp.exe
+dominio: osce14-p.activeupdate.trendmicro.com | actualizaciones | https://success.trendmicro.com/en-US/solution/KA-0004968
+dominio: ctapi.trendmicro.com | nube | https://success.trendmicro.com/en-US/solution/KA-0004968
+dominio: sandbox-threatconnect.trendmicro.com | nube | https://success.trendmicro.com/en-US/solution/KA-0004968
+dominio: asm01-nabu-prod.aot.trendmicro.com | telemetria | https://success.trendmicro.com/en-US/solution/KA-0004968
+dominio: api-nabu.aot.trendmicro.com | telemetria | https://success.trendmicro.com/en-US/solution/KA-0004968
+
+# Procesos: https://docs.taegis.secureworks.com/sophos_agent/sophos_tech_details/. Dominios: Sophos Central; Sophos no dice para qué es
+# cada uno, salvo las muestras y el análisis en la nube.
+@Sophos
+empresa: Sophos Ltd
+pais: GB
+programa: SEDService.exe
+programa: SophosFS.exe
+programa: SophosLiveQueryService.exe
+programa: SophosHealth.exe
+programa: mcsagent.exe
+programa: mcsclient.exe
+programa: SSPService.exe
+programa: hmpalert.exe
+dominio: samples.sophosxl.net | muestras | https://support.sophos.com/support/s/article/KBA-000002701
+dominio: analysis.sophos.com | nube | https://docs.sophos.com/central/customer/help/en-us/PeopleAndDevices/ProtectDevices/DomainsPorts/index.html
+dominio: sophosupd.com | otros | https://docs.sophos.com/central/customer/help/en-us/PeopleAndDevices/ProtectDevices/DomainsPorts/index.html
+dominio: sophosupd.net | otros | https://docs.sophos.com/central/customer/help/en-us/PeopleAndDevices/ProtectDevices/DomainsPorts/index.html
+dominio: sophosxl.net | otros | https://docs.sophos.com/central/customer/help/en-us/PeopleAndDevices/ProtectDevices/DomainsPorts/index.html
+dominio: sdu-feedback.sophos.com | otros | https://docs.sophos.com/central/customer/help/en-us/PeopleAndDevices/ProtectDevices/DomainsPorts/index.html

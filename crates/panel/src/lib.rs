@@ -9,6 +9,7 @@
 //! writing and no reading of the home panel. No third-party JavaScript, no
 //! external fonts, no cookies.
 
+mod antivirus;
 mod api;
 mod auth;
 mod borrado;
@@ -391,6 +392,10 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             get(|| async { pagina(include_str!("../static/ia.html")) }),
         )
         .route(
+            "/antivirus",
+            get(|| async { pagina(include_str!("../static/antivirus.html")) }),
+        )
+        .route(
             "/static/style.css",
             get(|RawQuery(q): RawQuery| async move {
                 estatico(STYLE_CSS, "text/css; charset=utf-8", q.as_deref())
@@ -451,6 +456,10 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             get(|| async { pagina(include_str!("../static/ia.html")) }),
         )
         .route(
+            "/antivirus.html",
+            get(|| async { pagina(include_str!("../static/antivirus.html")) }),
+        )
+        .route(
             "/informe.html",
             get(|| async { pagina(include_str!("../static/informe.html")) }),
         )
@@ -478,6 +487,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/estado", get(api::estado))
         .route("/api/cambios", get(api::cambios))
         .route("/api/ia", get(api::ia))
+        .route("/api/antivirus", get(antivirus::vista))
         .route("/api/ia/alcance", post(api::alcance))
         .route("/api/ia/alcance/anadir", post(api::alcance_anadir))
         .route("/api/dns/aplicar", post(api::dns_aplicar))
@@ -602,6 +612,7 @@ mod textos {
             include_str!("../static/estado.html"),
             include_str!("../static/verify.html"),
             include_str!("../static/ia.html"),
+            include_str!("../static/antivirus.html"),
             include_str!("../static/comprobador.html"),
             include_str!("../static/borrado.html"),
             include_str!("../static/empresa.html"),

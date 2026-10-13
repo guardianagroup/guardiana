@@ -10,6 +10,7 @@
 //! Precedence when several lists match (docs/LISTS.md):
 //! `esperado` > `telemetria` > `rastreador` > `publicidad`.
 
+pub mod antivirus;
 pub mod dominio;
 mod parse;
 mod red;
