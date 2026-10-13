@@ -720,8 +720,10 @@
   "auditoria_despues_cero": "After: none",
   "recibo_privacidad_nota": "Every request in this list was cut by GUARDIANA ZERO before it left the browser. «campos» are the names of what it carried, never their values; «lleva» is their meaning, as the company documents it or by the usual name of the field. This receipt does not see other applications on the computer, isolated tabs, what each website's servers send on their own, or what each company does with what it gets. The signature proves the receipt was not changed after this browser wrote it.",
   "recibo_privacidad_guardado": "Signed receipt saved to {ruta}. Check it at guardianagroup.com/verificar; this computer's key fingerprint is {huella}.",
-  "cortes_recibo": "Signed receipt",
+  "cortes_recibo": "Signed receipt (proof)",
   "cortes_sin_dueno": "Owner not identified",
   "cortes_sin_sede": "Seat not published",
-  "cortes_sin_pais_nota": "«Seat not published»: the company does not say, in any source we could check, where its seat is. «Owner not identified»: a name no list or registry ties to a company, and the website using it does not say whose it is. Putting a country there would be inventing it."
+  "cortes_sin_pais_nota": "«Seat not published»: the company does not say, in any source we could check, where its seat is. «Owner not identified»: a name no list or registry ties to a company, and the website using it does not say whose it is. Putting a country there would be inventing it.",
+  "cortes_recibo_titulo": "Saves a file with everything that was cut, sealed so nobody can change it without it showing",
+  "cortes_recibo_explica": "«Signed receipt (proof)» saves to your Downloads a file with every request ZERO cut in this period: the time, the page, the company, its country and what it carried. ZERO seals it with a key that only exists in this browser, like the wax seal on an envelope: if anyone changes a single letter, the seal no longer fits. It works as proof for a lawyer, an authority or a journalist, and anyone can check it at guardianagroup.com/verificar without installing anything."
 }

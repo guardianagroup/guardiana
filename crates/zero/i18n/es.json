@@ -720,8 +720,10 @@
   "auditoria_despues_cero": "Después: ninguna",
   "recibo_privacidad_nota": "Cada petición de esta lista la cortó GUARDIANA ZERO antes de que saliera del navegador. «campos» son los nombres de lo que llevaba, nunca sus valores; «lleva» es su significado, según la documentación de la empresa o el nombre habitual del campo. Este recibo no ve otras aplicaciones del equipo, ni las pestañas aisladas, ni lo que los servidores de cada web envían por su cuenta, ni lo que cada empresa hace con lo que recibe. La firma prueba que el recibo no se cambió después de que este navegador lo escribiera.",
   "recibo_privacidad_guardado": "Recibo firmado guardado en {ruta}. Compruébalo en guardianagroup.com/verificar; la huella de la clave de este equipo es {huella}.",
-  "cortes_recibo": "Recibo firmado",
+  "cortes_recibo": "Recibo firmado (prueba)",
   "cortes_sin_dueno": "Dueño sin identificar",
   "cortes_sin_sede": "Sede sin publicar",
-  "cortes_sin_pais_nota": "«Sede sin publicar»: la empresa no dice en ninguna fuente que hayamos podido comprobar dónde tiene su sede. «Dueño sin identificar»: un nombre que ninguna lista ni registro relaciona con una empresa, y la web que lo usa no dice de quién es. Poner un país ahí sería inventarlo."
+  "cortes_sin_pais_nota": "«Sede sin publicar»: la empresa no dice en ninguna fuente que hayamos podido comprobar dónde tiene su sede. «Dueño sin identificar»: un nombre que ninguna lista ni registro relaciona con una empresa, y la web que lo usa no dice de quién es. Poner un país ahí sería inventarlo.",
+  "cortes_recibo_titulo": "Guarda un archivo con todo lo que se cortó, sellado para que nadie pueda cambiarlo sin que se note",
+  "cortes_recibo_explica": "«Recibo firmado (prueba)» guarda en tus Descargas un archivo con cada petición que ZERO cortó en este periodo: la hora, la página, la empresa, su país y qué llevaba. ZERO lo sella con una clave que solo existe en este navegador, como el lacre de un sobre: si alguien cambia una sola letra, el sello deja de cuadrar. Sirve como prueba ante un abogado, una autoridad o un periodista, y cualquiera puede comprobarlo en guardianagroup.com/verificar sin instalar nada."
 }

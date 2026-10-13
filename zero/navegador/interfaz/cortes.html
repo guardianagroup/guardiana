@@ -22,6 +22,7 @@ h1 { font: 600 clamp(26px, 3.2vw, 38px)/1.1 var(--display); letter-spacing: -.02
 .periodos button { border: 0; background: none; padding: 6px 12px; border-radius: 9px; color: var(--gris); font-weight: 500; }
 .periodos button[aria-pressed="true"] { background: var(--hoja); color: var(--tinta); box-shadow: var(--sombra); }
 .informe { display: none; color: var(--gris); font-size: 12px; margin: -8px 0 16px; }
+.recibo-explica { color: var(--gris); font-size: 13px; line-height: 1.5; margin: -6px 0 16px; max-width: 900px; }
 
 /* The figures of the period: the same numbers the new tab shows. */
 .cifras { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 2px solid var(--tinta); border-bottom: 1px solid var(--linea); margin-bottom: 28px; }
@@ -141,6 +142,7 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
   .caja.ancha { min-height: 0; }
   .rastro .pista i { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .informe { display: block; }
+  .recibo-explica { display: none; }
   tr.detalle { display: none !important; }
   tbody tr { break-inside: avoid; }
   .caja { break-inside: avoid; }
@@ -176,9 +178,10 @@ tr.detalle td { background: color-mix(in srgb, var(--campo) 55%, transparent); p
       <button class="boton principal" id="pdf-resumen" data-t="cortes_pdf_resumen" data-t-title="cortes_pdf_resumen_titulo"></button>
       <button class="boton" id="pdf" data-t="cortes_pdf" data-t-title="cortes_pdf_titulo"></button>
       <button class="boton" id="csv" data-t="cortes_csv"></button>
-      <button class="boton" id="recibo" data-t="cortes_recibo"></button>
+      <button class="boton" id="recibo" data-t="cortes_recibo" data-t-title="cortes_recibo_titulo"></button>
     </div>
   </div>
+  <p class="recibo-explica" data-t="cortes_recibo_explica"></p>
   <p class="informe" id="informe"></p>
   <p class="informe" id="informe-filtro"></p>
   <div class="cifras">

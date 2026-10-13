@@ -720,8 +720,10 @@
   "auditoria_despues_cero": "Depois: nenhuma",
   "recibo_privacidad_nota": "Cada pedido desta lista foi cortado pelo GUARDIANA ZERO antes de sair do navegador. «campos» são os nomes do que levava, nunca os valores; «lleva» é o significado, segundo a documentação da empresa ou o nome habitual do campo. Este recibo não vê outros aplicativos do computador, nem as abas isoladas, nem o que os servidores de cada site enviam por conta própria, nem o que cada empresa faz com o que recebe. A assinatura prova que o recibo não foi alterado depois que este navegador o escreveu.",
   "recibo_privacidad_guardado": "Recibo assinado salvo em {ruta}. Confira em guardianagroup.com/verificar; a impressão digital da chave deste computador é {huella}.",
-  "cortes_recibo": "Recibo assinado",
+  "cortes_recibo": "Recibo assinado (prova)",
   "cortes_sin_dueno": "Dono não identificado",
   "cortes_sin_sede": "Sede não publicada",
-  "cortes_sin_pais_nota": "«Sede não publicada»: a empresa não diz, em nenhuma fonte que pudemos conferir, onde fica a sede. «Dono não identificado»: um nome que nenhuma lista ou registro liga a uma empresa, e o site que o usa não diz de quem é. Pôr um país aí seria inventá-lo."
+  "cortes_sin_pais_nota": "«Sede não publicada»: a empresa não diz, em nenhuma fonte que pudemos conferir, onde fica a sede. «Dono não identificado»: um nome que nenhuma lista ou registro liga a uma empresa, e o site que o usa não diz de quem é. Pôr um país aí seria inventá-lo.",
+  "cortes_recibo_titulo": "Salva um arquivo com tudo o que foi cortado, selado para que ninguém possa alterá-lo sem que se note",
+  "cortes_recibo_explica": "«Recibo assinado (prova)» salva nos seus Downloads um arquivo com cada pedido que o ZERO cortou neste período: a hora, a página, a empresa, o país dela e o que levava. O ZERO o sela com uma chave que só existe neste navegador, como o lacre de um envelope: se alguém mudar uma única letra, o selo deixa de bater. Serve como prova diante de um advogado, uma autoridade ou um jornalista, e qualquer pessoa pode conferir em guardianagroup.com/verificar sem instalar nada."
 }
