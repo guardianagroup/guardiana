@@ -468,12 +468,30 @@
         caja.classList.toggle('oculto');
         if (!caja.classList.contains('oculto') && !caja.dataset.listo) {
           caja.dataset.listo = '1';
-          caja.innerHTML = `<label class="etiqueta">${esc(t('ley'))}</label><select class="campo">${LEYES.map((l) => `<option value="${l}">${esc(t('ley_' + l))}</option>`).join('')}</select>`
+          caja.innerHTML = `<label class="etiqueta">${esc(t('carta_tu_nombre'))}</label><input class="campo nombre" type="text" autocomplete="name" spellcheck="false">`
+            + `<label class="etiqueta">${esc(t('carta_tu_correo'))}</label><input class="campo correo-tuyo" type="email" autocomplete="email" spellcheck="false">`
+            + `<label class="etiqueta"><input type="checkbox" class="recordar"> ${esc(t('carta_recordar'))}</label>`
+            + `<label class="etiqueta">${esc(t('ley'))}</label><select class="campo">${LEYES.map((l) => `<option value="${l}">${esc(t('ley_' + l))}</option>`).join('')}</select>`
             + `<label class="etiqueta">${esc(t('libro_carta'))}</label><input class="campo asunto" readonly><textarea class="campo" readonly style="margin-top:6px"></textarea>`
             + `<div class="fila-acciones"><button class="boton principal copiar">${esc(t('carta_copiar'))}</button><button class="boton correo">${esc(t('carta_correo'))}</button></div><p class="explica pequeno" style="margin-top:8px">${esc(t('carta_nota'))}</p>`;
           const sel = caja.querySelector('select');
-          const pide = () => manda({ tipo: 'carta', sitio: e.sitio, ley: sel.value });
+          const nombre = caja.querySelector('.nombre'), correo = caja.querySelector('.correo-tuyo'), recordar = caja.querySelector('.recordar');
+          try {
+            const g = JSON.parse(localStorage.getItem('guardiana_carta_datos') || 'null');
+            if (g && typeof g === 'object') { nombre.value = String(g.nombre || ''); correo.value = String(g.correo || ''); recordar.checked = true; }
+          } catch (_) {}
+          // The letter is made with what is typed; kept in this browser only when asked.
+          const pide = () => {
+            try {
+              if (recordar.checked) localStorage.setItem('guardiana_carta_datos', JSON.stringify({ nombre: nombre.value.trim(), correo: correo.value.trim() }));
+              else localStorage.removeItem('guardiana_carta_datos');
+            } catch (_) {}
+            manda({ tipo: 'carta', sitio: e.sitio, ley: sel.value, nombre: nombre.value.trim(), correo: correo.value.trim() });
+          };
           sel.addEventListener('change', pide);
+          nombre.addEventListener('change', pide);
+          correo.addEventListener('change', pide);
+          recordar.addEventListener('change', pide);
           caja.querySelector('.copiar').addEventListener('click', () => {
             navigator.clipboard.writeText(caja.querySelector('.asunto').value + '\n\n' + caja.querySelector('textarea').value);
             manda({ tipo: 'carta_hecha', sitio: e.sitio });

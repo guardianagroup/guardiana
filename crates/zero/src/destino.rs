@@ -214,11 +214,15 @@ pub fn clasifica_en(host: &str, ruta: &str) -> Destino {
         url_derechos: b.rights_url,
     });
     let privado = bajo_sufijo_privado(&host);
+    // A name the company list does not place but the broker registry does (ad.turn.com is
+    // Nexxen's) takes the broker's country: the same answer the registry gives.
+    let pais =
+        guardiana_lists::country_of(&host).or_else(|| corredor.as_ref().and_then(|c| c.pais));
     let mut d = Destino {
         sitio: sitio(&host),
         categoria,
         empresa: guardiana_lists::company_of(&host),
-        pais: guardiana_lists::country_of(&host),
+        pais,
         corredor,
         ia: guardiana_lists::ai_service_of(&host),
         reparto: guardiana_lists::delivery_of(&host),

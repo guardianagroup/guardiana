@@ -648,5 +648,8 @@
   "ficha_nota_sin": "O que ela fez com você vem da lista de cortes deste computador e não é enviado a lugar nenhum.",
   "ficha_copiado": "Copiado. Cole no WhatsApp, num e-mail ou onde quiser.",
   "ficha_no_copiado": "Não foi possível copiar.",
-  "ficha_compartir_contigo": "O GUARDIANA ZERO cortou {n} tentativas dela em {webs} sites meus em um mês."
+  "ficha_compartir_contigo": "O GUARDIANA ZERO cortou {n} tentativas dela em {webs} sites meus em um mês.",
+  "carta_tu_nombre": "Seu nome completo",
+  "carta_tu_correo": "Seu e-mail",
+  "carta_recordar": "Lembrar neste navegador"
 }

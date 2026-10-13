@@ -648,5 +648,8 @@
   "ficha_nota_sin": "Lo que hizo contigo sale de la lista de cortes de este ordenador y no se envía a ningún sitio.",
   "ficha_copiado": "Copiado. Pégalo en WhatsApp, en un correo o donde quieras.",
   "ficha_no_copiado": "No se pudo copiar.",
-  "ficha_compartir_contigo": "A mí, GUARDIANA ZERO le cortó {n} intentos en {webs} webs en un mes."
+  "ficha_compartir_contigo": "A mí, GUARDIANA ZERO le cortó {n} intentos en {webs} webs en un mes.",
+  "carta_tu_nombre": "Tu nombre y apellidos",
+  "carta_tu_correo": "Tu correo",
+  "carta_recordar": "Recordarlos en este navegador"
 }

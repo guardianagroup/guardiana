@@ -648,5 +648,8 @@
   "ficha_nota_sin": "What it did with you comes from the list of cuts on this computer and is not sent anywhere.",
   "ficha_copiado": "Copied. Paste it in WhatsApp, an email or anywhere you like.",
   "ficha_no_copiado": "Could not copy.",
-  "ficha_compartir_contigo": "GUARDIANA ZERO blocked {n} of its attempts on {webs} of my websites in a month."
+  "ficha_compartir_contigo": "GUARDIANA ZERO blocked {n} of its attempts on {webs} of my websites in a month.",
+  "carta_tu_nombre": "Your full name",
+  "carta_tu_correo": "Your e-mail",
+  "carta_recordar": "Remember them in this browser"
 }

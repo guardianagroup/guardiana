@@ -103,11 +103,17 @@
     s.push(`<section><h2>${esc(t('ficha_borrar'))}</h2>`
       + (web(borrar) ? `<p>${esc(t('ficha_borrar_explica'))}</p><p>${enlace(borrar, t('cortes_det_corredor_url'))}</p>` : '')
       + `<p>${esc(t('ficha_carta_explica'))}</p>`
+      // Who signs: typed here, so the letter goes out complete. Kept in this browser only if
+      // the person ticks it; never sent anywhere (the owner, 12 Oct 2026).
+      + `<div class="controles carta-datos"><input class="campo" id="carta-nombre" type="text" autocomplete="name" spellcheck="false" placeholder="${esc(t('carta_tu_nombre'))}" aria-label="${esc(t('carta_tu_nombre'))}">`
+      + `<input class="campo" id="carta-correo-tuyo" type="email" autocomplete="email" spellcheck="false" placeholder="${esc(t('carta_tu_correo'))}" aria-label="${esc(t('carta_tu_correo'))}">`
+      + `<label class="recordar"><input type="checkbox" id="carta-recordar"> ${esc(t('carta_recordar'))}</label></div>`
       + `<div class="controles carta-controles"><select id="carta-ley">${leyes.map((l) => `<option value="${l}"${l === (leyElegida || leyPorDefecto()) ? ' selected' : ''}>${esc(t('carta_ley_' + l))}</option>`).join('')}</select>`
       + `<button class="boton principal" id="carta-pdf">${esc(t('ficha_carta_pdf'))}</button>`
       + `<button class="boton" id="carta-correo">${esc(t('ficha_carta_correo'))}</button></div>`
       + `<pre class="carta" id="carta"></pre></section>`);
     $('cuerpo').innerHTML = s.join('');
+    cargaDatos();
 
     const dom = d.dominios || [];
     $('s-dominios').classList.toggle('oculto', !dom.length);
@@ -200,9 +206,34 @@
   }
   let leyElegida = '';
   let cartaLista = null;
+  const RECUERDO = 'guardiana_carta_datos';
+  function cargaDatos() {
+    if (!$('carta-nombre')) return;
+    try {
+      const g = JSON.parse(localStorage.getItem(RECUERDO) || 'null');
+      if (g && typeof g === 'object') { $('carta-nombre').value = String(g.nombre || ''); $('carta-correo-tuyo').value = String(g.correo || ''); $('carta-recordar').checked = true; }
+    } catch (_) {}
+  }
+  function guardaDatos() {
+    try {
+      if ($('carta-recordar').checked) localStorage.setItem(RECUERDO, JSON.stringify({ nombre: $('carta-nombre').value.trim(), correo: $('carta-correo-tuyo').value.trim() }));
+      else localStorage.removeItem(RECUERDO);
+    } catch (_) {}
+  }
+  // The letter needs who signs it: the boxes are asked for before anything is made.
+  function faltanDatos() {
+    const falta = ['carta-nombre', 'carta-correo-tuyo'].find((id) => !$(id).value.trim());
+    if (!falta) return false;
+    $(falta).focus();
+    $(falta).classList.add('falta');
+    setTimeout(() => $(falta) && $(falta).classList.remove('falta'), 2500);
+    return true;
+  }
   function pideCarta(despues) {
+    if (faltanDatos()) return;
+    guardaDatos();
     cartaLista = despues;
-    manda({ tipo: 'carta_ficha', empresa, ley: $('carta-ley').value });
+    manda({ tipo: 'carta_ficha', empresa, ley: $('carta-ley').value, nombre: $('carta-nombre').value.trim(), correo: $('carta-correo-tuyo').value.trim() });
   }
   en('carta_ficha', (m) => {
     if (m.empresa !== empresa.trim()) return;

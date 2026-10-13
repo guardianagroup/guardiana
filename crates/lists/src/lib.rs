@@ -934,9 +934,11 @@ mod group_tests {
         assert_eq!(group_or_company_of("app.slack.com"), Some("Salesforce"));
         assert_eq!(group_of("www.booking.com"), Some("Booking Holdings"));
         assert_eq!(group_of("www.youtube.com"), Some("Alphabet"));
-        // A section with no country nor city still carries its group.
         assert_eq!(group_of("cdn.iubenda.com"), Some("team.blue"));
-        assert_eq!(country_of("cdn.iubenda.com"), None);
+        assert_eq!(country_of("cdn.iubenda.com"), Some("IT"));
+        // A section with no country nor city still carries its group.
+        assert_eq!(group_of("jssdks.mparticle.com"), Some("Rokt"));
+        assert_eq!(country_of("jssdks.mparticle.com"), None);
         // Its own group: no group written, the company stands for itself.
         assert_eq!(group_of("www.instagram.com"), None);
         assert_eq!(group_or_company_of("www.instagram.com"), Some("Meta"));

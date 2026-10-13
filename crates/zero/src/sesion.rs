@@ -504,6 +504,16 @@ fn escribe_json<T: Serialize>(ruta: &Path, v: &T) {
     }
 }
 
+/// What the page sent, trimmed, or what the program would use otherwise.
+fn dicho(valor: &str, si_no: impl FnOnce() -> String) -> String {
+    let v = valor.trim();
+    if v.is_empty() {
+        si_no()
+    } else {
+        v.to_string()
+    }
+}
+
 fn texto<'a>(m: &'a Value, k: &str) -> &'a str {
     m.get(k).and_then(Value::as_str).unwrap_or("")
 }
@@ -1799,7 +1809,13 @@ impl Sesion {
                 _ => Vec::new(),
             },
             "carta_ficha" => match origen {
-                Origen::Pestana(id) => self.carta_ficha(id, texto(m, "empresa"), texto(m, "ley")),
+                Origen::Pestana(id) => self.carta_ficha(
+                    id,
+                    texto(m, "empresa"),
+                    texto(m, "ley"),
+                    texto(m, "nombre"),
+                    texto(m, "correo"),
+                ),
                 _ => Vec::new(),
             },
             "abre_emergente" => self.abre_emergente(),
@@ -1839,7 +1855,12 @@ impl Sesion {
             }
             "tinta_anadir" => self.tinta_anadir(texto(m, "dato"), texto(m, "valor")),
             "tinta_quitar" => self.tinta_quitar(numero(m, "indice")),
-            "carta" => self.carta(texto(m, "sitio"), texto(m, "ley")),
+            "carta" => self.carta(
+                texto(m, "sitio"),
+                texto(m, "ley"),
+                texto(m, "nombre"),
+                texto(m, "correo"),
+            ),
             "carta_hecha" => {
                 let ahora = (self.reloj)();
                 if let Some(e) = self.libro.entradas.get_mut(texto(m, "sitio")) {
@@ -2206,7 +2227,14 @@ impl Sesion {
     /// «Descargar la carta» on a company's profile: the deletion letter to that company, under the
     /// law the person picked, with their name and email when marked. The page shows it and saves it
     /// as a PDF to attach to an email (the owner, 12 Oct 2026: «que solamente lo adjunten»).
-    fn carta_ficha(&self, id: u32, empresa: &str, ley: &str) -> Vec<Orden> {
+    fn carta_ficha(
+        &self,
+        id: u32,
+        empresa: &str,
+        ley: &str,
+        nombre: &str,
+        correo: &str,
+    ) -> Vec<Orden> {
         let empresa: String = empresa.trim().chars().take(120).collect();
         if empresa.is_empty() {
             return Vec::new();
@@ -2290,8 +2318,8 @@ impl Sesion {
             &self.textos,
             ley,
             &entrada,
-            &primero(Tipo::Nombre),
-            &primero(Tipo::Correo),
+            &dicho(nombre, || primero(Tipo::Nombre)),
+            &dicho(correo, || primero(Tipo::Correo)),
             &self.hoy(),
         );
         self.a_pestana(
@@ -2302,7 +2330,10 @@ impl Sesion {
         .collect()
     }
 
-    fn carta(&self, s: &str, ley: &str) -> Vec<Orden> {
+    /// The letter for a site of the book. The name and the e-mail come from the page's boxes
+    /// (the owner, 12 Oct 2026: «que la persona ponga el nombre y el email… y ya quede la carta
+    /// descargada con el nombre y todo»); when they are empty, from the marked data, if any.
+    fn carta(&self, s: &str, ley: &str, nombre: &str, correo: &str) -> Vec<Orden> {
         let Some(e) = self.libro.entradas.get(s) else {
             return Vec::new();
         };
@@ -2324,8 +2355,8 @@ impl Sesion {
             &self.textos,
             ley,
             e,
-            &primero(Tipo::Nombre),
-            &primero(Tipo::Correo),
+            &dicho(nombre, || primero(Tipo::Nombre)),
+            &dicho(correo, || primero(Tipo::Correo)),
             &self.hoy(),
         );
         vec![envia(

@@ -182,11 +182,36 @@ pub fn lee(carpeta: &Path, desde: &str, hasta: &str) -> Vec<Corte> {
             out.extend(
                 texto
                     .lines()
-                    .filter_map(|l| serde_json::from_str::<Corte>(l).ok()),
+                    .filter_map(|l| serde_json::from_str::<Corte>(l).ok())
+                    .map(actualiza),
             );
         }
     }
     out
+}
+
+/// A cut as the lists know it today. A cut is written once, with what the lists said that day;
+/// when the lists learn a company or its country later (the owner, 13 Oct 2026: 287 «país
+/// desconocido» on a screen, most of them names the lists already knew), the old lines must
+/// not keep saying nobody. Only the gaps are filled: what was written stays.
+fn actualiza(mut c: Corte) -> Corte {
+    if c.pais.is_some() && c.quien != c.sitio {
+        return c;
+    }
+    let d = crate::destino::clasifica(&c.host);
+    if c.quien == c.sitio && d.quien() != d.sitio {
+        c.quien = d.quien().to_string();
+    }
+    if c.pais.is_none() {
+        c.pais = d.pais.map(str::to_string);
+    }
+    if c.corredor.is_none() {
+        if let Some(b) = &d.corredor {
+            c.corredor = Some(b.nombre.to_string());
+            c.corredor_url = b.url_derechos.map(str::to_string);
+        }
+    }
+    c
 }
 
 /// Keep only the last [`DIAS`] days: every day file dated before `desde` (`YYYY-MM-DD`, the

@@ -3168,6 +3168,23 @@ fn a_profile_hands_over_the_deletion_letter_for_its_company() {
     let cuerpo = c["cuerpo"].as_str().unwrap_or("");
     assert!(cuerpo.contains("Criteo") && cuerpo.contains("17"));
     assert!(!cuerpo.contains("()"));
+    // Nothing typed and nothing marked: the letter leaves the gap to fill.
+    assert!(cuerpo.contains(&s.textos.t("carta_hueco")), "{cuerpo}");
+    // Typed on the page, the name and the e-mail go in the letter (the owner, 12 Oct 2026),
+    // and nowhere else: the session keeps no copy.
+    let o = s.mensaje(
+        Origen::Pestana(n),
+        &url,
+        r#"{"tipo":"carta_ficha","empresa":"Criteo","ley":"ue","nombre":" Zuleima Quintanilla ","correo":"zuleima@secreto.example"}"#,
+    );
+    let c = del_tipo(&o, Origen::Pestana(n), "carta_ficha").unwrap_or_default();
+    let cuerpo = c["cuerpo"].as_str().unwrap_or("");
+    assert!(
+        cuerpo.contains("Zuleima Quintanilla") && cuerpo.contains("zuleima@secreto.example"),
+        "{cuerpo}"
+    );
+    assert!(!cuerpo.contains(&s.textos.t("carta_hueco")), "{cuerpo}");
+    assert!(s.tinta.is_empty(), "the letter's name is not marked data");
     // With nothing seen of it here, the letter names the company's own website, not the first
     // address of its list (review of 12 Oct 2026: Microsoft's named «msftstatic.com»).
     let o = s.mensaje(
