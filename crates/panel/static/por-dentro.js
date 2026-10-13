@@ -207,7 +207,7 @@
     // flow looks continuous, and lines in the log.
     const aplicaDeltas = (rec, segundos, suma = true) => {
       let env = 0, recb = 0, paq = 0;
-      const porProd = {};
+      const porProd = {}, grupo = { datos: [0, 0], av: [0, 0] };
       DEST.forEach((d) => { d.ema = (d.ema || 0) * 0.7; });
       rec.forEach(({ d, env: e, recb: b, paq: q, parada }) => {
         const p = prod(d.p);
@@ -219,6 +219,7 @@
         }
         if (suma) { d.sub += e; d.baj += b; d.paq += q; p.sub += e; p.baj += b; if (new Date().getHours() < 6) d.noche += e; }
         env += e; recb += b; paq += q; porProd[d.p] = (porProd[d.p] || 0) + e;
+        const g = grupo[p.tipo === 'antivirus' ? 'av' : 'datos']; g[0] += e; g[1] += b;
         d.ema += e / segundos * 0.3; d.ult = performance.now();
         const n = Math.min(4, 1 + Math.floor(Math.log10(1 + e / 3000)));
         for (let k = 0; k < n; k++) nuevo(d, 'out', false, e, azar() * segundos * 900);
@@ -228,6 +229,7 @@
       st.serie.push(env); st.serie.shift();
       Object.keys(st.serieP).forEach((k) => { st.serieP[k].push(porProd[k] || 0); st.serieP[k].shift(); });
       st.ahora = [env / segundos, recb / segundos, paq / segundos];
+      st.ahoraG = { datos: grupo.datos.map((x) => x / segundos), av: grupo.av.map((x) => x / segundos) };
       pintaHud();
     };
     const nuevo = (d, dir, bloq, tam, retraso) => {
@@ -1455,20 +1457,52 @@
     let datosAbierto = true;
     const ponDatos = (on) => { datosAbierto = on; panelDatos.hidden = !on; $('btn-datos').setAttribute('aria-pressed', String(on)); try { localStorage.setItem('guardiana_pd_datos', on ? '1' : '0'); } catch (_) {} pintaDatos(); };
     $('btn-datos').addEventListener('click', () => ponDatos(!datosAbierto));
+    // Two telemetries, apart (the owner, 13 Oct 2026): the data of the browser and the other
+    // programs, and the antivirus's own, so what the person does is never mixed with what the
+    // antivirus does.
+    const esAV = (p) => !!p && p.tipo === 'antivirus';
+    const resumenGrupo = (es) => {
+      const ds = DEST.filter((d) => es(prod(d.p))), ps = PROD.filter(es), ahoraMs = performance.now();
+      const conDatos = ds.filter((d) => d.sub && !d.sede);
+      return {
+        ds, ps,
+        activas: ds.filter((d) => d.ult && ahoraMs - d.ult < 15000 && !bloqueado(d)).length,
+        tot: conDatos.reduce((a, d) => a + d.sub, 0),
+        fuera: conDatos.filter((d) => d.pais && d.pais !== st.yo && d.pais[0] !== '@').reduce((a, d) => a + d.sub, 0),
+        paises: new Set(conDatos.map((d) => d.pais).filter((x) => x && x[0] !== '@')).size,
+        empresas: new Set(conDatos.map((d) => d.red).filter((r) => r && r[0] !== '@')).size,
+        cortes: ds.filter((d) => d.cortado).length + ps.filter((p) => p.cortado).length,
+        intentos: ds.reduce((a, d) => a + d.bloq, 0),
+        noche: ds.reduce((a, d) => a + (d.noche || 0), 0),
+      };
+    };
+    const lineasGrupo = (G, ahora) => `${esc(t('pd_ahora'))} <span class="o">↑ ${esc(bytes(ahora[0]))}/s</span> · <span class="i">↓ ${esc(bytes(ahora[1]))}/s</span><br>
+        ${esc(tn('pd_conexiones', G.activas))} · ${esc(tn('pd_paises', G.paises))} · ${esc(tn('pd_empresas', G.empresas))}<br>
+        <span class="t">${esc(t('pd_salio').replace('{n}', pct(G.fuera, G.tot)).replace('{pais}', nombrePais(st.yo)))}</span>`;
     const htmlDirecto = () => {
       const yo = centros[st.yo], dia = esDeDia(yo.lon, yo.lat);
       const [slon, slat] = T.solLL, sobre = paisEn(slon, slat);
-      const ahoraMs = performance.now(), activas = DEST.filter((d) => d.ult && ahoraMs - d.ult < 15000 && !bloqueado(d)).length;
-      const [su, ba] = st.ahora;
-      const conDatos = DEST.filter((d) => d.sub && !d.sede);
-      const tot = conDatos.reduce((a, d) => a + d.sub, 0), fuera = conDatos.filter((d) => d.pais && d.pais !== st.yo && d.pais[0] !== '@').reduce((a, d) => a + d.sub, 0);
-      const cortes = DEST.filter((d) => d.cortado).length + PROD.filter((p) => p.cortado).length;
-      return `<b>● ${esc(t('pd_en_directo').toUpperCase())}</b> <span class="t">· ${esc(hora(Date.now()))}</span><br>
-        ${esc(t(dia ? 'pd_es_de_dia' : 'pd_es_de_noche').replace('{pais}', nombrePais(st.yo)))} <span class="t">· ${esc(t('pd_sol_sobre').replace('{lugar}', sobre ? nombrePais(sobre) : t('pd_oceano')))} (${slat.toFixed(1)}°, ${slon.toFixed(1)}°)</span><br>
-        ${esc(t('pd_ahora'))} <span class="o">↑ ${esc(bytes(su))}/s</span> · <span class="i">↓ ${esc(bytes(ba))}/s</span><br>
-        ${esc(tn('pd_conexiones', activas))} · ${esc(tn('pd_paises', new Set(conDatos.map((d) => d.pais).filter((p) => p && p[0] !== '@')).size))} · ${esc(tn('pd_empresas', new Set(conDatos.map((d) => d.red).filter((r) => r && r[0] !== '@')).size))}<br>
-        <span class="t">${esc(t('pd_salio').replace('{n}', pct(fuera, tot)).replace('{pais}', nombrePais(st.yo)))}</span><br>
-        <span class="c">${esc(tn('pd_puertas', cortes))} · ${esc(tn('pd_intentos', DEST.reduce((a, d) => a + d.bloq, 0)))}</span>`;
+      const ahoraG = st.ahoraG || { datos: [0, 0], av: [0, 0] };
+      const D = resumenGrupo((p) => !esAV(p)), A = resumenGrupo(esAV);
+      let h = `<b>● ${esc(t('pd_en_directo').toUpperCase())}</b> <span class="t">· ${esc(hora(Date.now()))}</span><br>
+        ${esc(t(dia ? 'pd_es_de_dia' : 'pd_es_de_noche').replace('{pais}', nombrePais(st.yo)))} <span class="t">· ${esc(t('pd_sol_sobre').replace('{lugar}', sobre ? nombrePais(sobre) : t('pd_oceano')))} (${slat.toFixed(1)}°, ${slon.toFixed(1)}°)</span>`;
+      // The data: the browser and the other programs.
+      h += `<div class="tele"><b class="s">${esc(t('pd_tele_datos').toUpperCase())}</b> <span class="t">· ${esc(t('pd_tele_datos_sub'))}</span><br>
+        ${lineasGrupo(D, ahoraG.datos)}<br>
+        <span class="c">${esc(tn('pd_puertas', D.cortes))} · ${esc(tn('pd_intentos', D.intentos))}</span></div>`;
+      // The antivirus, on its own.
+      h += `<div class="tele"><b class="s">${esc(t('pd_tele_av').toUpperCase())}</b> <span class="t">· ${esc(t('pd_tele_av_sub'))}</span><br>`;
+      if (st.datos && st.datos.vigilando === false) h += `<span class="c">${esc(t('pd_vigilancia_off_corto'))}</span>`;
+      else if (!A.ps.length) h += `<span class="t">${esc(t('pd_sin_antivirus'))}</span>`;
+      else {
+        const avs = A.ds.filter((d) => d.doc !== null && d.doc !== undefined), su = avs.reduce((a, d) => a + d.sub, 0), doc = avs.filter((d) => d.doc).reduce((a, d) => a + d.sub, 0);
+        const enteros = A.ps.filter((p) => p.cortado).map((p) => p.nombre);
+        h += `${lineasGrupo(A, ahoraG.av)}<br>
+          ${esc(t('pd_documentado').replace('{n}', su ? pct(doc, su) : '—'))} · ${esc(tn('pd_sin_documentar', A.ds.filter((d) => d.doc === false).length))}<br>
+          <span class="t">${esc(t('pd_noche_av').replace('{x}', bytes(A.noche)))}</span><br>
+          <span class="c">${enteros.length ? esc(t('pd_av_cortado').replace('{n}', enteros.join(', '))) + ' · ' : ''}${esc(tn('pd_puertas', A.cortes))} · ${esc(tn('pd_intentos', A.intentos))}</span>`;
+      }
+      return h + '</div>';
     };
     const tipoTexto = (p) => t('pd_tipo_' + p.tipo);
     const pintaDatos = () => {
@@ -1476,7 +1510,6 @@
       const ahoraMs = performance.now();
       const tot = DEST.reduce((a, d) => a + d.sub, 0), baj = DEST.reduce((a, d) => a + d.baj, 0), paq = DEST.reduce((a, d) => a + d.paq, 0);
       let h = `<h4>${esc(t('pd_en_directo'))}${st.demo ? ` <span class="chip">${esc(t('pd_chip_demo'))}</span>` : ''}</h4><div>${htmlDirecto()}</div>`;
-      if (st.datos && st.datos.vigilando === false) h += `<p class="c">${esc(t('pd_vigilancia_off'))}</p>`;
       // Programs.
       h += `<h4>${esc(t('pd_programas'))} <span class="s">${PROD.length}</span></h4>`;
       PROD.forEach((p) => {

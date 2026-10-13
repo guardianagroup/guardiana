@@ -2109,6 +2109,14 @@
     "pd_otros_paises": "Otros países",
     "pd_otras_redes": "Otras redes",
     "pd_red_desconocida": "Red sin identificar",
-    "pd_red_paises": "Servidores en:"
+    "pd_red_paises": "Servidores en:",
+    "pd_tele_datos": "Telemetría de datos",
+    "pd_tele_datos_sub": "navegador y demás programas",
+    "pd_tele_av": "Telemetría del antivirus",
+    "pd_tele_av_sub": "solo el antivirus",
+    "pd_sin_antivirus": "En esta ventana no se ha visto tráfico de ningún antivirus conocido.",
+    "pd_vigilancia_off_corto": "Vigilancia apagada: lo que envía el antivirus no se mide (se enciende en «Tu antivirus»).",
+    "pd_noche_av": "De noche (00:00–06:00): ↑ {x}",
+    "pd_av_cortado": "Cortado del todo: {n}"
   }
 }

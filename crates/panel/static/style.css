@@ -445,6 +445,11 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 
 .universo .telemetria b, .universo .datos b.s, .universo .datos .s { color: var(--shield); font-weight: 500; }
 
+/* The data's telemetry and the antivirus's, one under the other and apart. */
+.universo .tele { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--hud-line); }
+
+.universo .tele > b.s { letter-spacing: .06em; font-size: 10.5px; }
+
 .universo .telemetria .o, .universo .datos .o { color: var(--out); }
 
 .universo .telemetria .i, .universo .datos .i { color: var(--in); }

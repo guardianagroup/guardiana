@@ -2109,6 +2109,14 @@
     "pd_otros_paises": "Outros países",
     "pd_otras_redes": "Outras redes",
     "pd_red_desconocida": "Rede não identificada",
-    "pd_red_paises": "Servidores em:"
+    "pd_red_paises": "Servidores em:",
+    "pd_tele_datos": "Telemetria de dados",
+    "pd_tele_datos_sub": "navegador e demais programas",
+    "pd_tele_av": "Telemetria do antivírus",
+    "pd_tele_av_sub": "só o antivírus",
+    "pd_sin_antivirus": "Nesta janela não se viu tráfego de nenhum antivírus conhecido.",
+    "pd_vigilancia_off_corto": "Vigilância desligada: o que o antivírus envia não é medido (liga-se em «Seu antivírus»).",
+    "pd_noche_av": "À noite (00:00–06:00): ↑ {x}",
+    "pd_av_cortado": "Cortado por inteiro: {n}"
   }
 }

@@ -2109,6 +2109,14 @@
     "pd_otros_paises": "Other countries",
     "pd_otras_redes": "Other networks",
     "pd_red_desconocida": "Unidentified network",
-    "pd_red_paises": "Servers in:"
+    "pd_red_paises": "Servers in:",
+    "pd_tele_datos": "Data telemetry",
+    "pd_tele_datos_sub": "browser and other programs",
+    "pd_tele_av": "Antivirus telemetry",
+    "pd_tele_av_sub": "the antivirus only",
+    "pd_sin_antivirus": "No traffic from any known antivirus in this window.",
+    "pd_vigilancia_off_corto": "Watching is off: what the antivirus sends is not measured (turn it on in «Your antivirus»).",
+    "pd_noche_av": "At night (00:00–06:00): ↑ {x}",
+    "pd_av_cortado": "Cut off entirely: {n}"
   }
 }
