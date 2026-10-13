@@ -365,7 +365,9 @@ function pantalla(nombre) {
   comprueba(await hasta(async () => (await nueva.getAttribute('#q', 'placeholder')) === 'Busca en la web o escribe una dirección'), 'la caja de búsqueda es nuestra');
   comprueba(await hasta(() => nueva.evaluate(() => (document.querySelector('#motor').selectedOptions[0] || {}).textContent === 'DuckDuckGo')), 'y lleva dentro el buscador, a la vista');
   comprueba(await hasta(async () => (await nueva.locator('#favs-rejilla .fav').count()) === 1), 'la web guardada con la estrella sale en la pestaña nueva');
-  comprueba((await nueva.textContent('.hoy-cab .enlace')) === 'Ver resumen', 'el enlace del día dice «Ver resumen»');
+  // The summary is on the first screen (12 Oct 2026): the companies cut today, with no click.
+  comprueba(await hasta(async () => (await nueva.locator('#r-empresas li').count()) >= 1), 'el resumen sale directamente en la pestaña nueva, con las empresas');
+  comprueba((await nueva.textContent('#ver-lista')) === 'Ver la lista completa, una por una', 'y la lista completa queda a un clic');
   // The figure counts up when it first appears: read it once it has stopped moving.
   let cortadasHoy = 0;
   let anterior = -1;
