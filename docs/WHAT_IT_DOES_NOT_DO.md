@@ -11,13 +11,17 @@ La regla: nunca «100 % seguro», nunca «invisible», nunca «protegido» sin o
   GUARDIANA sí puede decir qué programa pidió cada nombre: se lo cuenta el propio Windows por su
   canal de sucesos, y lo que guarda es el nombre del programa, su ruta y su huella. En Modo Hogar,
   para teléfonos y televisores, sigue sin poder saberse: «En Modo Hogar, GUARDIANA ve nombres de
-  servicios, no qué app los pidió.» Y en ningún caso corta por programa: eso es 2.0.
+  servicios, no qué app los pidió.» Corta por programa solo en un caso: desde la 1.0.22, todo lo
+  que sale de un antivirus, en el cortafuegos de Windows (WFP) y de forma reversible.
 - **No mira archivos, ni siquiera los suyos.** Los «archivos trampa» (decisión 184) no son
   vigilancia del sistema de archivos: el cebo es un nombre único escrito dentro del archivo, y lo
   único que GUARDIANA ve —como siempre— es si alguien pregunta por ese nombre. Nunca abre el
   archivo, y un programa que lo lea y no siga el enlace no aparece en ningún sitio.
 - **No ve contenido.** Ni páginas, ni mensajes, ni qué se hizo en cada servicio.
-- **No ve cuántos bytes.** Solo que se preguntó por un nombre, cuándo y cuántas veces.
+- **Los bytes, solo en Windows.** Desde la 1.0.22, en Windows, anota cuántos datos envía y recibe
+  cada programa con cada destino, por minuto (bytes, paquetes, protocolo y puerto), nunca el
+  contenido. En Linux, en Mac y en Modo Hogar sigue sin ver cuántos bytes: solo que se preguntó por
+  un nombre, cuándo y cuántas veces.
 - **No anota respuestas.** Solo consultas: nombre, tipo, dispositivo, hora, categoría, veredicto.
   Frase: «Nunca se guardan las respuestas; solo el país y la red del servidor que respondió, para
   decirte a dónde viajan tus datos[, y, cuando un nombre responde como el rastreador de otra empresa,

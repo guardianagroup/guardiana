@@ -111,7 +111,8 @@ propio, sin DNSSEC), y lo dice. El panel muestra cuál es; se cambia con `--upst
 ## 5 · Lo que este modelo no cubre
 
 Ver `docs/WHAT_IT_DOES_NOT_DO.md`. En resumen: apps que esquivan el DNS, tráfico fuera de la Wi‑Fi
-de casa, qué app pidió cada nombre en teléfonos, bytes y contenido, y cualquier atacante con
+de casa, qué app pidió cada nombre en teléfonos, el contenido (y los bytes fuera de Windows), y
+cualquier atacante con
 privilegios en el computador.
 
 Revisión de seguridad con hallazgos y estado: `docs/SEGURIDAD.md`.
