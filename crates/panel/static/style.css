@@ -387,7 +387,7 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 
 .universo #no-session { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 60; max-width: 560px; }
 
-.universo .stage { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr auto; background: #04070d; color: var(--hud-fg); font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.universo .stage { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr); background: #04070d; color: var(--hud-fg); font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 
 .universo .barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 14px; border-bottom: 1px solid var(--hud-line); background: rgba(8,16,27,.9); position: relative; z-index: 3; }
 
@@ -408,6 +408,12 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 .universo .btn-hud { color: var(--hud-fg); font-size: 12px; }
 
 .universo .pestanas button[aria-pressed="true"] { color: #04070d; background: var(--shield); border-color: var(--shield); }
+
+/* The tab's key on a keyboard, before its name. */
+.universo .pestanas .tecla { opacity: .6; margin-right: 7px; }
+
+/* Without the Fullscreen API (an iPhone), «Pantalla completa» leaves the picture alone with the bar. */
+.universo .stage.full .hud { display: none; }
 
 .universo .btn-hud.peligro { border-color: var(--cut); color: var(--cut); }
 
@@ -559,9 +565,34 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 
 .universo .controles { margin-left: 0; }
 
-.universo .hud > div:nth-child(5) { display: none; }
+/* A phone: the title may wrap; the five tabs keep one line (without their keys, and sliding
+   sideways on a narrower screen still); the deck below keeps what reads at a glance, so the
+   picture gets the room. The side panel «Datos en vivo» still has everything. */
+.universo .barra { padding: 8px 10px; gap: 6px 10px; }
 
-.universo .registro { height: 52px; }
+.universo .marca { white-space: normal; flex-wrap: wrap; gap: 6px 10px; font-size: 12px; }
+
+.universo .pestanas { flex: 1 1 100%; min-width: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+
+.universo .pestanas::-webkit-scrollbar { display: none; }
+
+.universo .pestanas button { flex: 0 0 auto; }
+
+.universo .pestanas .tecla { display: none; }
+
+.universo .pestanas button, .universo .controles .btn-hud { padding: 5px 8px; font-size: 12px; }
+
+.universo .hud > div:nth-child(3), .universo .hud > div:nth-child(5) { display: none; }
+
+.universo .hud > div { padding: 8px 10px; }
+
+.universo .registro { height: 36px; }
+
+.universo .hud canvas { height: 40px; }
+
+.universo .leyenda { left: 10px; bottom: 6px; gap: 0 10px; font-size: 10px; }
+
+.universo .ayuda-vista { left: 10px; right: 10px; bottom: 60px; font-size: 11.5px; }
  }
 
 .universo .leyenda i.ley-o { background: var(--out); } .universo .leyenda i.ley-i { background: var(--in); } .universo .leyenda i.ley-c { background: var(--cut); } .universo .leyenda i.ley-n { background: var(--undoc); }

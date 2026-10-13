@@ -941,10 +941,13 @@
     // Countries west to east around the ring: the Americas on the left, Europe on top, Asia right.
     const centroNeb = (k, n) => { const a = Math.PI - (k + 0.5) * (2 * Math.PI / Math.max(1, n)); return [Math.cos(a) * NEB.rx, Math.sin(a) * NEB.ry, 2.2 * Math.sin(2 * a)]; };
     const construyeNebulosa = () => {
+      // A tall screen (a phone) gets a tall ring, so the galaxies are not drawn tiny.
+      const vertical = st.W < st.H * 0.9;
+      NEB.rx = vertical ? 6.4 : 10.5; NEB.ry = vertical ? 9.6 : 6.2;
       const orden = paisesUsados.slice().sort((a, b) => centros[a].lon - centros[b].lon);
       const totPais = {}; VISIBLES.forEach((d) => { totPais[d.pais] = (totPais[d.pais] || 0) + d.sub + d.baj + d.bloq * 2000; });
       const total = Math.max(1, Object.values(totPais).reduce((a, b) => a + b, 0));
-      const firma = orden.join(',') + '|' + orden.map((c) => Math.round(Math.sqrt((totPais[c] || 0) / total) * 6)).join('');
+      const firma = (vertical ? 'v' : 'h') + orden.join(',') + '|' + orden.map((c) => Math.round(Math.sqrt((totPais[c] || 0) / total) * 6)).join('');
       NEB.ordenPaises = orden;
       orden.forEach((c, k) => { NEB.centros[c] = centroNeb(k, orden.length); });
       if (!PN || firma === firmaNeb) return;
@@ -973,13 +976,15 @@
     const NC = { PV: null, C: [0, 0, 20], tanH: Math.tan(20 * RAD) };
     const camaraNeb = () => {
       const W = st.Wc, H = st.H, asp = W / H, aspU = st.W / H, tt = tiempo();
-      const D = Math.max((NEB.ry + 3.2) / NC.tanH, (NEB.rx + 4.2) / (NC.tanH * aspU)) * 1.02 / T.zoom;
-      const despl = ((W - st.W) / 2) * (2 * D * NC.tanH / H);
+      // Room for each galaxy (up to 3.4 across) and the title under it; the whole ring a little
+      // up, clear of the legend and the help at the bottom.
+      const D = Math.max((NEB.ry + 5.2) / NC.tanH, (NEB.rx + 4.2) / (NC.tanH * aspU)) * 1.02 / T.zoom;
+      const px = 2 * D * NC.tanH / H, despl = ((W - st.W) / 2) * px, subir = 28 * px;
       const rx = st.raton ? (st.raton.x / W - 0.5) : 0, ry = st.raton ? (st.raton.y / H - 0.5) : 0;
       NEB.yaw += ((reducido ? 0 : 0.2 * Math.sin(tt * 0.045)) + rx * 0.16 + st.dRot - NEB.yaw) * 0.04;
       NEB.pitch += ((reducido ? 0 : 0.07 * Math.sin(tt * 0.031)) + ry * 0.1 + st.dTilt * 0.5 - NEB.pitch) * 0.04;
       const t0 = 1 / NC.tanH, n = 0.5, f = 120, P = new Float32Array(16); P[0] = t0 / asp; P[5] = t0; P[10] = (f + n) / (n - f); P[11] = -1; P[14] = 2 * f * n / (n - f);
-      NC.PV = mul(P, mul(trasl(-despl, 0, -D), mul(rotX(NEB.pitch), rotY(NEB.yaw))));
+      NC.PV = mul(P, mul(trasl(-despl, subir, -D), mul(rotX(NEB.pitch), rotY(NEB.yaw))));
       NC.D = D;
     };
     NEB.yaw = 0; NEB.pitch = 0;
@@ -1076,9 +1081,12 @@
           const sub = bloqueado(d) ? tn('pd_parados', d.bloq) : `${d.pais} · ${d.red && d.red[0] !== '@' ? d.red.slice(0, 16) : '—'} · ${bytes(d.sub)}`;
           cx.font = '500 10.5px "IBM Plex Mono", monospace';
           const w = Math.max(cx.measureText(txt).width, cx.measureText(sub).width) + 14, h = 30;
-          let bx = derecha ? d.x + 26 : d.x - 26 - w, by = d.y - h / 2;
-          let n = 0; while (n++ < 14 && puestos.some((b) => bx < b.x + b.w && bx + w > b.x && by < b.y + b.h && by + h > b.y)) by += h + 3;
-          bx = Math.max(4, Math.min(st.W - w - 4, bx));
+          // Beside its point; if the place is taken, a little above or below; else no callout. Never
+          // over the legend at the bottom.
+          const bx = Math.max(4, Math.min(st.W - w - 4, derecha ? d.x + 26 : d.x - 26 - w));
+          const libre = (y) => y >= 6 && y + h <= st.H - 78 && !puestos.some((b) => bx < b.x + b.w && bx + w > b.x && y < b.y + b.h && y + h > b.y);
+          const by = [0, 1, -1, 2, -2, 3, -3].map((k) => d.y - h / 2 + k * (h + 3)).find(libre);
+          if (by === undefined) return;
           puestos.push({ x: bx, y: by, w, h });
           const bl = bloqueado(d), col = bl ? '#ff6b7a' : d.doc === false ? '#ffd166' : 'rgba(255,181,71,.8)';
           cx.strokeStyle = 'rgba(170,190,210,.45)'; cx.lineWidth = 1;
@@ -1093,7 +1101,7 @@
     };
 
     // ---------- 2. Radar: phosphor, a true scale of bytes, bearings, tags ----------
-    let fosforo = null, barridoAntes = 0;
+    let fosforo = null, barridoAntes = 0, radarAntes = 0;
     const capaFosforo = () => {
       if (!fosforo || fosforo.width !== cv.width || fosforo.height !== cv.height) { fosforo = document.createElement('canvas'); fosforo.width = cv.width; fosforo.height = cv.height; }
       const f = fosforo.getContext('2d'); f.setTransform(st.dpr, 0, 0, st.dpr, 0, 0); return f;
@@ -1102,7 +1110,11 @@
     const patronRayas = () => { if (rayas) return rayas; const c = document.createElement('canvas'); c.width = 4; c.height = 3; const g = c.getContext('2d'); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, 0, 4, 1); rayas = cx.createPattern(c, 'repeat'); return rayas; };
     const PERIODO = 7;
     const layoutRadarPro = () => {
-      const c = { x: st.W / 2, y: st.H / 2 + 8 }, Rr = Math.min(st.W * 0.4, st.H * 0.4), R0 = Rr * 0.12;
+      // Room around the scope for its bearings and regions, and for the legend under it. A narrow
+      // screen: the scope as large as it fits under its readout, without the region arcs.
+      const estrecho = st.W < 700;
+      const Rr = estrecho ? Math.max(60, Math.min(st.W / 2 - 34, st.H / 2 - 77)) : Math.max(80, Math.min(st.W * 0.4, st.H / 2 - 72)), R0 = Rr * 0.12;
+      const c = { x: st.W / 2, y: estrecho ? 72 + Rr : st.H / 2 + 4 };
       // The scale follows the data: the busiest contact near the inner ring, the quietest near the
       // edge, at least three powers of ten between them.
       const vals = VISIBLES.map((d) => d.sub).filter((v) => v > 0);
@@ -1119,7 +1131,14 @@
         d.ruta = tramo((u) => ({ x: pr.x + (g.x - pr.x) * u, y: pr.y + (g.y - pr.y) * u }), 8).concat(tramo((u) => ({ x: g.x + (d.x - g.x) * u, y: g.y + (d.y - g.y) * u }), N - 8).slice(1));
         d.tg = 8 / N; d.vis = true;
       });
-      return { c, Rr, R0, prods, lmin, lmax, radio };
+      return { c, Rr, R0, prods, lmin, lmax, radio, estrecho };
+    };
+    // A line of facts split at its « · » so each piece fits the width.
+    const partir = (texto, ancho) => {
+      const out = []; let linea = '';
+      texto.split(' · ').forEach((p) => { const prueba = linea ? linea + ' · ' + p : p; if (linea && cx.measureText(prueba).width > ancho) { out.push(linea); linea = p; } else linea = prueba; });
+      if (linea) out.push(linea);
+      return out;
     };
     const etiquetaBytes = (l) => bytes(Math.pow(10, l)).replace('.0 ', ' ');
     const dibujaRadarPro = (dt) => {
@@ -1146,21 +1165,28 @@
         if (g % 30 === 0) { cx.fillStyle = 'rgba(63,224,197,.75)'; cx.textAlign = 'center'; cx.fillText(String(g).padStart(3, '0'), c.x + Math.cos(a) * (Rr + 22), c.y + Math.sin(a) * (Rr + 22) + 3.5); }
       }
       // Regions as arcs outside the bearings (by longitude: west on the left, east on the right).
-      [[t('pd_america'), 190, 330], [t('pd_europa') + ' · ' + t('pd_africa'), 335, 55], [t('pd_asia') + ' · ' + t('pd_oceania'), 60, 185]].forEach(([n, a0, a1]) => {
+      const cajasRegion = [];
+      if (!L.estrecho) [[t('pd_america'), 190, 330], [t('pd_europa') + ' · ' + t('pd_africa'), 335, 55], [t('pd_asia') + ' · ' + t('pd_oceania'), 60, 185]].forEach(([n, a0, a1]) => {
         const g0 = (a0 - 90) * RAD, g1 = ((a1 < a0 ? a1 + 360 : a1) - 90) * RAD, rr = Rr + 38;
         cx.strokeStyle = 'rgba(63,224,197,.35)'; cx.beginPath(); cx.arc(c.x, c.y, rr, g0, g1); cx.stroke();
         const gm = (g0 + g1) / 2; cx.fillStyle = 'rgba(170,200,215,.8)'; cx.font = '500 10px "IBM Plex Mono", monospace';
-        cx.fillText(n.toUpperCase(), c.x + Math.cos(gm) * (rr + 12), c.y + Math.sin(gm) * (rr + 12) + 3);
+        const lx = c.x + Math.cos(gm) * (rr + 12), ly = c.y + Math.sin(gm) * (rr + 12) + 3, lw = cx.measureText(n.toUpperCase()).width;
+        cx.textAlign = 'center'; cx.fillText(n.toUpperCase(), lx, ly);
+        cajasRegion.push({ x: lx - lw / 2 - 4, y: ly - 11, w: lw + 8, h: 15 });
       });
       cx.textAlign = 'left';
-      // Phosphor: what the sweep lights stays and fades (half-life 1.4 s), like a real scope.
-      const f = capaFosforo();
-      f.globalCompositeOperation = 'destination-out'; f.fillStyle = `rgba(0,0,0,${1 - Math.pow(0.5, dt / 1.4)})`; f.fillRect(0, 0, st.Wc, st.H);
-      f.globalCompositeOperation = 'lighter';
-      for (let k = 0; k < 18; k++) { const a0 = barrido - k * 0.022; f.fillStyle = `rgba(63,224,197,${0.05 * (1 - k / 18)})`; f.beginPath(); f.moveTo(c.x, c.y); f.arc(c.x, c.y, Rr, a0 - 0.024, a0); f.closePath(); f.fill(); }
-      f.strokeStyle = 'rgba(120,255,225,.85)'; f.lineWidth = 1.4; f.beginPath(); f.moveTo(c.x, c.y); f.lineTo(c.x + Math.cos(barrido) * Rr, c.y + Math.sin(barrido) * Rr); f.stroke();
+      // Phosphor: what the sweep lights stays and fades (half-life 1.4 s of real time, whatever the
+      // frame rate), like a real scope. The swept sector is filled whole, so a slow frame leaves
+      // no gaps.
       const ahora = performance.now();
-      const cruza = (a) => { const n = (x) => ((x % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2); const d0 = n(barridoAntes), d1 = n(barrido), x = n(a); return d0 <= d1 ? x > d0 && x <= d1 : x > d0 || x <= d1; };
+      const real = Math.min(2, (ahora - (radarAntes || ahora)) / 1000); radarAntes = ahora;
+      const f = capaFosforo();
+      f.globalCompositeOperation = 'destination-out'; f.fillStyle = `rgba(0,0,0,${1 - Math.pow(0.5, real / 1.4)})`; f.fillRect(0, 0, st.Wc, st.H);
+      f.globalCompositeOperation = 'lighter';
+      const norm = (x) => ((x % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const paso = norm(barrido - barridoAntes), seguido = paso > 0 && paso < 1;
+      if (seguido) { f.fillStyle = 'rgba(63,224,197,.07)'; f.beginPath(); f.moveTo(c.x, c.y); f.arc(c.x, c.y, Rr, barrido - paso, barrido); f.closePath(); f.fill(); }
+      const cruza = (a) => seguido && norm(a - (barrido - paso)) <= paso;
       VISIBLES.forEach((d) => {
         if (!cruza(d.ang)) return;
         d.eco = ahora;
@@ -1172,6 +1198,11 @@
       barridoAntes = barrido;
       cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0); cx.globalCompositeOperation = 'lighter'; cx.drawImage(fosforo, 0, 0); cx.restore();
       cx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);
+      // The beam itself, sharp, with a short glow behind it, drawn fresh each frame.
+      cx.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < 14; k++) { const a0 = barrido - k * 0.02; cx.fillStyle = `rgba(63,224,197,${0.06 * (1 - k / 14)})`; cx.beginPath(); cx.moveTo(c.x, c.y); cx.arc(c.x, c.y, Rr, a0 - 0.021, a0); cx.closePath(); cx.fill(); }
+      cx.strokeStyle = 'rgba(140,255,230,.9)'; cx.lineWidth = 1.4; cx.beginPath(); cx.moveTo(c.x, c.y); cx.lineTo(c.x + Math.cos(barrido) * Rr, c.y + Math.sin(barrido) * Rr); cx.stroke();
+      cx.globalCompositeOperation = 'source-over';
       // The routes, faint, and the data moving along them.
       cx.globalCompositeOperation = 'lighter';
       VISIBLES.forEach((d) => { const bl = bloqueado(d); trazo(d.ruta, 0, bl ? d.tg : 1, bl ? 'rgba(255,107,122,.3)' : prod(d.p).color + '12', 0.8); });
@@ -1184,7 +1215,7 @@
       // Air-traffic-control tags for the busiest contacts and the stopped ones: they light up as
       // the sweep passes and dim after.
       if (st.W >= 700) {
-        const puestos = [{ x: c.x - R0, y: c.y - R0, w: 2 * R0, h: 2 * R0 }];
+        const puestos = [{ x: c.x - R0, y: c.y - R0, w: 2 * R0, h: 2 * R0 }, ...cajasRegion];
         VISIBLES.filter((d) => bloqueado(d) || VISIBLES.indexOf(d) < 10).slice(0, 14).forEach((d) => {
           const brillo2 = 0.45 + 0.55 * Math.exp(-((ahora - (d.eco || 0)) / 1000) / 2.2);
           const prog = (prod(d.p).nombre || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase();
@@ -1217,42 +1248,70 @@
       cx.restore();
       // The scope's own readout.
       cx.font = '500 10.5px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(140,255,225,.75)'; cx.textAlign = 'center';
-      cx.fillText(t('pd_radar_lectura').replace('{n}', VISIBLES.length).replace('{p}', VISIBLES.filter(bloqueado).length).replace('{s}', PERIODO).toUpperCase(), c.x, Math.max(62, c.y - Rr - 58));
+      // The scope's readout: centred on top of a narrow screen, in the top right corner otherwise
+      // (the top left is the live telemetry's).
+      const lectura = partir(t('pd_radar_lectura').replace('{n}', VISIBLES.length).replace('{p}', VISIBLES.filter(bloqueado).length).replace('{s}', PERIODO).toUpperCase(), L.estrecho ? st.W - 24 : st.W / 2 - 90);
+      if (!L.estrecho) cx.textAlign = 'right';
+      lectura.forEach((l, i) => cx.fillText(l, L.estrecho ? c.x : st.W - 14, (L.estrecho ? 16 : 22) + i * 13));
       cx.textAlign = 'left';
     };
 
     // ---------- 3. The computer: a Sankey diagram through GUARDIANA's gate ----------
     const banda = (x0, a0, b0, x1, a1, b1) => { const xm = (x0 + x1) / 2; cx.beginPath(); cx.moveTo(x0, a0); cx.bezierCurveTo(xm, a0, xm, a1, x1, a1); cx.lineTo(x1, b1); cx.bezierCurveTo(xm, b1, xm, b0, x0, b0); cx.closePath(); };
     const curvaCentro = (x0, y0, x1, y1, n) => { const out = [], xm = (x0 + x1) / 2; for (let i = 0; i <= n; i++) { const u = i / n, a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c2 = 3 * (1 - u) * u * u, d2 = u ** 3; out.push({ x: a * x0 + b * xm + c2 * xm + d2 * x1, y: a * y0 + b * y0 + c2 * y1 + d2 * y1 }); } return out; };
+    // A label cut to the width it has, with an ellipsis.
+    const corta = (txt, ancho) => { if (cx.measureText(txt).width <= ancho) return txt; let r = txt; while (r.length > 1 && cx.measureText(r + '…').width > ancho) r = r.slice(0, -1); return r + '…'; };
     const layoutSankey = () => {
-      const W = st.W, H = st.H, top = 86, bot = H - 60, alto = bot - top, nodoW = 10;
-      const col = { prog: Math.max(150, W * 0.14), puerta: W * 0.38, pais: W * 0.62, red: W * 0.84 };
-      const pasan = VISIBLES.filter((d) => !bloqueado(d) && d.sub > 0), paran = VISIBLES.filter((d) => bloqueado(d));
+      const W = st.W, H = st.H, estrecho = W < 700, nodoW = estrecho ? 8 : 10;
+      // Room on top for the column titles and the gate's figures; under it, for the legend.
+      const top = estrecho ? 64 : 86, bot = H - (estrecho ? 70 : 72), alto = Math.max(60, bot - top);
       const ps = prodsVisibles();
+      // A narrow screen keeps three columns (programs, gate, country of the server); the network's
+      // company is in each band's tip and in «Datos en vivo».
+      let col;
+      if (estrecho) {
+        cx.font = '600 11px "IBM Plex Sans", sans-serif';
+        const izq = Math.min(W * 0.3, Math.max(48, ...ps.map((p) => cx.measureText(p.nombre).width))) + 12;
+        const pais = W - Math.min(W * 0.3, 100) - nodoW - 6;
+        col = { prog: izq, puerta: izq + nodoW + (pais - izq - nodoW) * 0.45, pais, red: null };
+      } else col = { prog: Math.max(150, W * 0.14), puerta: W * 0.38, pais: W * 0.62, red: W * 0.84 };
+      const pasan = VISIBLES.filter((d) => !bloqueado(d) && d.sub > 0), paran = VISIBLES.filter((d) => bloqueado(d));
       // Countries and networks beyond the busiest go together, so it stays readable.
       const totP = {}, totR = {};
       pasan.forEach((d) => { totP[d.pais] = (totP[d.pais] || 0) + d.sub; const r = d.red && d.red[0] !== '@' ? d.red : '—'; totR[r] = (totR[r] || 0) + d.sub; });
       const paises = Object.keys(totP).sort((a, b) => totP[b] - totP[a]), redes = Object.keys(totR).sort((a, b) => totR[b] - totR[a]);
-      const OTROS = '…', paisDe = (d) => (paises.indexOf(d.pais) < 11 ? d.pais : OTROS), redDe = (d) => { const r = d.red && d.red[0] !== '@' ? d.red : '—'; return redes.indexOf(r) < 13 ? r : OTROS; };
+      const maxPaises = estrecho ? 7 : 11;
+      const OTROS = '…', paisDe = (d) => (paises.indexOf(d.pais) < maxPaises ? d.pais : OTROS), redDe = (d) => { const r = d.red && d.red[0] !== '@' ? d.red : '—'; return redes.indexOf(r) < 13 ? r : OTROS; };
       const nodosPais = [...new Set(pasan.map(paisDe))].sort((a, b) => (a === OTROS) - (b === OTROS) || (totP[b] || 0) - (totP[a] || 0));
-      const nodosRed = [...new Set(pasan.map(redDe))].sort((a, b) => (a === OTROS) - (b === OTROS) || (totR[b] || 0) - (totR[a] || 0));
+      const nodosRed = col.red === null ? [] : [...new Set(pasan.map(redDe))].sort((a, b) => (a === OTROS) - (b === OTROS) || (totR[b] || 0) - (totR[a] || 0));
       const total = Math.max(1, pasan.reduce((a, d) => a + d.sub, 0));
       const parPx = (d) => Math.min(10, 2 + 1.6 * Math.log2(1 + d.bloq));
       const stopTot = paran.reduce((a, d) => a + parPx(d), 0);
-      const gap = 10, nMax = Math.max(ps.length, nodosPais.length, nodosRed.length);
+      const gap = estrecho ? 7 : 10, nMax = Math.max(ps.length, nodosPais.length, nodosRed.length);
       const k = Math.max(0.000001, (alto - gap * (nMax - 1) - stopTot) / total * 0.92);
       const alturaDe = (v) => Math.max(2, v * k);
-      // Programs: what passes, then what was stopped, stacked.
+      // Programs: what passes, then what was stopped, stacked. Each keeps room for its label: two
+      // lines (name and bytes), or only the name when a phone has no room for more.
       const nodoProg = {}; let y = top;
-      ps.forEach((p) => { const v = pasan.filter((d) => d.p === p.id).reduce((a, d) => a + d.sub, 0), st2 = paran.filter((d) => d.p === p.id).reduce((a, d) => a + parPx(d), 0); const h = (v ? alturaDe(v) : 0) + st2 || 6; nodoProg[p.id] = { p, x: col.prog, y, h, v, cur: y }; y += h + gap; });
-      const colocar = (lista, tot, x) => { const out = {}; const usado = lista.reduce((a, n) => a + alturaDe(tot[n] || 0), 0) + gap * (lista.length - 1); let y2 = top + Math.max(0, (alto - usado) / 2); lista.forEach((n) => { const h = alturaDe(tot[n] || 0); out[n] = { n, x, y: y2, h, cur: y2, curIn: y2 }; y2 += h + gap; }); return out; };
+      ps.forEach((p) => {
+        const v = pasan.filter((d) => d.p === p.id).reduce((a, d) => a + d.sub, 0), st2 = paran.filter((d) => d.p === p.id).reduce((a, d) => a + parPx(d), 0);
+        const h = (v ? alturaDe(v) : 0) + st2 || 6, lineas = !estrecho || h + gap >= 28 ? 2 : 1;
+        nodoProg[p.id] = { p, x: col.prog, y, h, v, cur: y, lineas }; y += Math.max(h + gap, lineas === 2 ? 30 : 15);
+      });
+      // Countries and networks, centred, each with room for its one-line label.
+      const colocar = (lista, tot, x) => {
+        const out = {}, alt = (n) => alturaDe(tot[n] || 0), paso = (n) => Math.max(alt(n) + gap, 14);
+        const usado = lista.reduce((a, n) => a + paso(n), 0) - gap;
+        let y2 = top + Math.max(0, (alto - usado) / 2);
+        lista.forEach((n) => { const h = alt(n); out[n] = { n, x, y: y2, h, cur: y2, curIn: y2 }; y2 += paso(n); });
+        return out;
+      };
       const tP = {}; pasan.forEach((d) => { const n = paisDe(d); tP[n] = (tP[n] || 0) + d.sub; });
       const tR = {}; pasan.forEach((d) => { const n = redDe(d); tR[n] = (tR[n] || 0) + d.sub; });
-      const nodoPais = colocar(nodosPais, tP, col.pais), nodoRed = colocar(nodosRed, tR, col.red);
+      const nodoPais = colocar(nodosPais, tP, col.pais), nodoRed = col.red === null ? {} : colocar(nodosRed, tR, col.red);
       // The gate: everything that leaves the programs arrives here; what passes goes on.
-      const puertaY = top, puertaH = Math.max(40, alto);
       let yPuerta = top + Math.max(0, (alto - (total * k + stopTot + gap * Math.max(0, ps.length - 1))) / 2);
-      const bandas = [];
+      const bandas = [], mid = (y0, hh) => y0 + hh / 2;
       VISIBLES.forEach((d) => { d.vis = false; d.ruta = []; });
       ps.forEach((p) => {
         const np = nodoProg[p.id];
@@ -1260,11 +1319,15 @@
         const mias = pasan.filter((d) => d.p === p.id).sort((a, b) => nodosPais.indexOf(paisDe(a)) - nodosPais.indexOf(paisDe(b)) || nodosRed.indexOf(redDe(a)) - nodosRed.indexOf(redDe(b)));
         mias.forEach((d) => {
           const h = d.sub * k, a0 = np.cur, g0 = yPuerta; np.cur += h; yPuerta += h;
-          const npais = nodoPais[paisDe(d)], nred = nodoRed[redDe(d)];
-          const c0 = npais.curIn; npais.curIn += h; const r0 = nred.curIn; nred.curIn += h; const s0 = npais.cur; npais.cur += h;
-          bandas.push({ tipo: 'pasa', d, col: p.color, tramos: [[col.prog + nodoW, a0, col.puerta - 3, g0, h], [col.puerta + 3, g0, col.pais, c0, h], [col.pais + nodoW, s0, col.red, r0, h]] });
-          const mid = (y0, hh) => y0 + hh / 2;
-          d.ruta = curvaCentro(col.prog + nodoW, mid(a0, h), col.puerta, mid(g0, h), 12).concat(curvaCentro(col.puerta, mid(g0, h), col.pais, mid(c0, h), 18).slice(1)).concat(curvaCentro(col.pais + nodoW, mid(s0, h), col.red, mid(r0, h), 18).slice(1));
+          const npais = nodoPais[paisDe(d)], c0 = npais.curIn; npais.curIn += h;
+          const tramos = [[col.prog + nodoW, a0, col.puerta - 3, g0, h], [col.puerta + 3, g0, col.pais, c0, h]];
+          d.ruta = curvaCentro(col.prog + nodoW, mid(a0, h), col.puerta, mid(g0, h), 12).concat(curvaCentro(col.puerta, mid(g0, h), col.pais, mid(c0, h), 18).slice(1));
+          if (col.red !== null) {
+            const nred = nodoRed[redDe(d)], r0 = nred.curIn, s0 = npais.cur; nred.curIn += h; npais.cur += h;
+            tramos.push([col.pais + nodoW, s0, col.red, r0, h]);
+            d.ruta = d.ruta.concat(curvaCentro(col.pais + nodoW, mid(s0, h), col.red, mid(r0, h), 18).slice(1));
+          }
+          bandas.push({ tipo: 'pasa', d, col: p.color, tramos });
           d.tg = 12 / (d.ruta.length - 1); d.vis = true; const fin = d.ruta[d.ruta.length - 1]; d.x = fin.x; d.y = fin.y;
         });
         // Stopped flows end at the gate.
@@ -1275,13 +1338,17 @@
         });
         yPuerta += gap;
       });
-      return { col, nodoW, nodoProg, nodoPais, nodoRed, bandas, puertaY, puertaH, top, bot, total, OTROS };
+      return { col, nodoW, nodoProg, nodoPais, nodoRed, bandas, top, bot, total, OTROS, estrecho };
     };
     const dibujaSankey = (dt) => {
-      const L = layoutSankey(), tt = tiempo(), hov = st.hover;
-      // Column titles.
+      const L = layoutSankey(), tt = tiempo(), hov = st.hover, W = st.W;
+      // Column titles (on a phone: programs over their names, the country at the right edge).
+      const yT = L.estrecho ? 20 : 46;
       cx.font = '500 10.5px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(160,185,210,.75)';
-      [[t('pd_col_programas'), L.col.prog, 'left'], ['GUARDIANA', L.col.puerta, 'center'], [t('pd_col_pais'), L.col.pais, 'left'], [t('pd_col_red'), L.col.red, 'left']].forEach(([n, x, al]) => { cx.textAlign = al; cx.fillText(n.toUpperCase(), x, 46); });
+      (L.estrecho
+        ? [[t('pd_col_programas'), L.col.prog + L.nodoW, 'right'], ['GUARDIANA', L.col.puerta, 'center'], [t('pd_col_pais'), W - 6, 'right']]
+        : [[t('pd_col_programas'), L.col.prog, 'left'], ['GUARDIANA', L.col.puerta, 'center'], [t('pd_col_pais'), L.col.pais, 'left'], [t('pd_col_red'), L.col.red, 'left']]
+      ).forEach(([n, x, al]) => { cx.textAlign = al; cx.fillText(n.toUpperCase(), x, yT); });
       cx.textAlign = 'left';
       // Bands: a gradient from the program's colour to the country's.
       cx.globalCompositeOperation = 'lighter';
@@ -1304,31 +1371,32 @@
       cx.fillStyle = '#3fe0c5'; cx.fillRect(L.col.puerta - 1.5, L.top - 6, 3, L.bot - L.top + 12);
       const parados = VISIBLES.filter(bloqueado);
       cx.font = '10px "IBM Plex Mono", monospace'; cx.textAlign = 'center'; cx.fillStyle = 'rgba(140,255,225,.85)';
-      cx.fillText(t('pd_puerta_pasa').replace('{x}', bytes(L.total)), L.col.puerta, 60);
-      cx.fillStyle = 'rgba(255,141,153,.9)'; cx.fillText(tn('pd_parados', parados.reduce((a, d) => a + d.bloq, 0)), L.col.puerta, 72);
+      cx.fillText(t('pd_puerta_pasa').replace('{x}', bytes(L.total)), L.col.puerta, yT + 14);
+      cx.fillStyle = 'rgba(255,141,153,.9)'; cx.fillText(tn('pd_parados', parados.reduce((a, d) => a + d.bloq, 0)), L.col.puerta, yT + 26);
       cx.textAlign = 'left';
       L.bandas.filter((b) => b.tipo === 'para').forEach((b) => { const [, , x1, y1, h] = b.tramos[0]; cx.fillStyle = '#ff6b7a'; cx.fillRect(x1 - 1, y1, 4, Math.max(2, h)); });
-      // Nodes and their labels.
+      // Nodes and their labels, each cut to the room it has.
       Object.values(L.nodoProg).forEach((n) => {
         cx.fillStyle = n.p.color; cx.fillRect(n.x, n.y, L.nodoW, n.h);
         st.dianas.push({ x: n.x + L.nodoW / 2, y: n.y + n.h / 2, r: Math.max(12, n.h / 2), tipo: 'prod', ref: n.p });
-        cx.textAlign = 'right'; cx.font = '600 12px "IBM Plex Sans", sans-serif'; cx.fillStyle = '#e3eef6'; cx.fillText(n.p.nombre, n.x - 8, n.y + Math.min(n.h, 28) / 2 + 1);
-        cx.font = '10px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(160,185,210,.85)'; cx.fillText(`↑ ${bytes(n.p.sub)}`, n.x - 8, n.y + Math.min(n.h, 28) / 2 + 14); cx.textAlign = 'left';
+        const yl = n.y + Math.min(n.h, n.lineas === 2 ? 28 : 12) / 2 + (n.lineas === 2 ? 1 : 4);
+        cx.textAlign = 'right'; cx.font = `600 ${L.estrecho ? 11 : 12}px "IBM Plex Sans", sans-serif`; cx.fillStyle = '#e3eef6'; cx.fillText(corta(n.p.nombre, n.x - 12), n.x - 8, yl);
+        if (n.lineas === 2) { cx.font = '10px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(160,185,210,.85)'; cx.fillText(`↑ ${bytes(n.p.sub)}`, n.x - 8, yl + 13); }
+        cx.textAlign = 'left';
       });
+      const etiqueta = (n, txt) => { cx.font = '500 11px "IBM Plex Sans", sans-serif'; cx.fillStyle = '#e3eef6'; cx.fillText(corta(txt, W - (n.x + L.nodoW + 6) - 4), n.x + L.nodoW + 6, n.y + Math.min(n.h, 26) / 2 + 4); };
       Object.values(L.nodoPais).forEach((n) => {
         cx.fillStyle = n.n === L.OTROS ? '#55657a' : `hsl(${tono(n.n)},70%,62%)`; cx.fillRect(n.x, n.y, L.nodoW, n.h);
         if (n.n !== L.OTROS) st.dianas.push({ x: n.x + L.nodoW / 2, y: n.y + n.h / 2, r: Math.max(12, n.h / 2), tipo: 'pais', ref: n.n });
-        cx.font = '500 11px "IBM Plex Sans", sans-serif'; cx.fillStyle = '#e3eef6';
-        cx.fillText(n.n === L.OTROS ? t('pd_otros_paises') : nombrePais(n.n), n.x + L.nodoW + 6, n.y + Math.min(n.h, 26) / 2 + 2);
+        etiqueta(n, n.n === L.OTROS ? t('pd_otros_paises') : nombrePais(n.n));
       });
       Object.values(L.nodoRed).forEach((n) => {
         cx.fillStyle = n.n === L.OTROS ? '#55657a' : '#6fb6ff'; cx.fillRect(n.x, n.y, L.nodoW, n.h);
         if (n.n !== L.OTROS && n.n !== '—') st.dianas.push({ x: n.x + L.nodoW / 2, y: n.y + n.h / 2, r: Math.max(12, n.h / 2), tipo: 'red', ref: n.n });
-        const txt = n.n === L.OTROS ? t('pd_otras_redes') : n.n === '—' ? t('pd_red_desconocida') : n.n;
-        cx.font = '500 11px "IBM Plex Sans", sans-serif'; cx.fillStyle = '#e3eef6'; cx.fillText(txt.length > 24 ? txt.slice(0, 23) + '…' : txt, n.x + L.nodoW + 6, n.y + Math.min(n.h, 26) / 2 + 2);
+        etiqueta(n, n.n === L.OTROS ? t('pd_otras_redes') : n.n === '—' ? t('pd_red_desconocida') : n.n);
       });
       particulas(dt);
-      VISIBLES.forEach((d) => { if (d.vis && d.ruta.length) st.dianas.push({ x: d.ruta[Math.round(d.ruta.length * 0.75)].x, y: d.ruta[Math.round(d.ruta.length * 0.75)].y, r: 8, tipo: 'dest', ref: d }); });
+      VISIBLES.forEach((d) => { if (d.vis && d.ruta.length) { const q = d.ruta[Math.min(d.ruta.length - 1, Math.round(d.ruta.length * 0.75))]; st.dianas.push({ x: q.x, y: q.y, r: 8, tipo: 'dest', ref: d }); } });
     };
 
     // The page's security policy allows no inline styles (style-src 'self'): widths and colours
@@ -1613,7 +1681,12 @@
       const antesT = st.vista === 'globo' || st.vista === 'mapa', ahoraT = v === 'globo' || v === 'mapa';
       if (!(antesT && ahoraT)) { st.part = []; st.estallidos = []; }
       st.vista = v;
-      document.querySelectorAll('.pestanas button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.vista === v)));
+      document.querySelectorAll('.pestanas button').forEach((b) => {
+        b.setAttribute('aria-pressed', String(b.dataset.vista === v));
+        // On a phone the tabs slide sideways: the chosen one comes into sight.
+        const fila = b.parentElement;
+        if (b.dataset.vista === v && fila.scrollWidth > fila.clientWidth) fila.scrollLeft = Math.max(0, b.offsetLeft - fila.offsetLeft - (fila.clientWidth - b.offsetWidth) / 2);
+      });
       $('ayuda-vista').textContent = t(AYUDA[v]) + ((v === 'globo' || v === 'mapa') && !T.ok ? ' ' + t('pd_sin_webgl') : '');
       // The help says what to do and then gets out of the way.
       $('ayuda-vista').classList.remove('oculta'); clearTimeout(ponVista.ayuda); ponVista.ayuda = setTimeout(() => $('ayuda-vista').classList.add('oculta'), 12000);

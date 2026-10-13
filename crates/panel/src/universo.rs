@@ -9,6 +9,9 @@
 //! is never stored nor sent (decision 203). A name stopped before it left has no server: it is
 //! placed at its company's seat, and the answer says so.
 
+// The handler answers with the same error type as the rest of the API (see api.rs).
+#![allow(clippy::result_large_err)]
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
