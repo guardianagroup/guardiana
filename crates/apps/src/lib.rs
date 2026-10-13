@@ -52,6 +52,7 @@ pub const VENTANA_MS: i64 = 2_000;
 /// measurement from this project, so the bound is generous and still bounded.
 pub const MAXIMO: usize = 2_048;
 
+pub mod cortafuegos;
 #[cfg(windows)]
 mod firmas;
 #[cfg(windows)]
