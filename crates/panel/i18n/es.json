@@ -2078,7 +2078,6 @@
     "pd_clic_cortar_prog": "Clic: cortar todo lo que envía",
     "pd_clic_dejar_prog": "Clic: dejarlo pasar de nuevo",
     "pd_no_cortable": "Solo un antivirus se puede cortar entero (un navegador o un programa dejaría de funcionar); sus destinos sí se cortan uno a uno.",
-    "pd_pais_origen": "Tu país sale de la zona horaria y el idioma de este equipo; no se pregunta nada fuera. Puedes cambiarlo arriba.",
     "pd_vigila_n": "GUARDIANA vigila {n} programas aquí dentro.",
     "pd_vigila_n_uno": "GUARDIANA vigila 1 programa aquí dentro.",
     "pd_aqui_tu": "Aquí está tu ordenador.",
@@ -2121,11 +2120,7 @@
     "pd_doc_explica": "{n} de cada 100 bytes que envía van a servicios que su fabricante explica en su web; {m}, a sitios que no explica.",
     "pd_doc_nada": "Tu antivirus aún no ha enviado nada a un nombre conocido en esta ventana.",
     "pd_doc_matiz": "Explicado no quiere decir inofensivo (la telemetría también se explica); sin explicar no quiere decir malo.",
-    "pd_colocar": "Colocar mi ordenador",
-    "pd_colocar_ayuda": "Pulsa en el globo o en el mapa justo donde está tu ordenador. Ese punto se guarda solo en este navegador.",
-    "pd_colocado": "Listo: tu ordenador está colocado en {pais}, en el punto que marcaste. Los datos salen y entran desde ahí.",
-    "pd_lugar_mano": "Colocado por ti en el mapa (el punto se guarda solo en este navegador).",
-    "pd_lugar_zona": "Situado en {ciudad} por la zona horaria de este ordenador. Para ponerlo en su sitio exacto, «Colocar mi ordenador».",
-    "pd_lugar_pais": "En el centro del país elegido. Para ponerlo en su sitio exacto, «Colocar mi ordenador»."
+    "pd_lugar_zona": "Situado en {ciudad} por la zona horaria del sistema. Se detecta solo y no se puede cambiar a mano.",
+    "pd_lugar_pais": "En el centro del país: la zona horaria del sistema no nombra una ciudad. Se detecta solo y no se puede cambiar a mano."
   }
 }

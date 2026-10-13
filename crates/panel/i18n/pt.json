@@ -2078,7 +2078,6 @@
     "pd_clic_cortar_prog": "Clique: cortar tudo o que envia",
     "pd_clic_dejar_prog": "Clique: deixá-lo passar de novo",
     "pd_no_cortable": "Só um antivírus pode ser cortado inteiro (um navegador ou um programa pararia de funcionar); seus destinos podem ser cortados um a um.",
-    "pd_pais_origen": "Seu país vem do fuso horário e do idioma deste computador; nada é perguntado fora. Você pode mudá-lo acima.",
     "pd_vigila_n": "A GUARDIANA vigia {n} programas aqui dentro.",
     "pd_vigila_n_uno": "A GUARDIANA vigia 1 programa aqui dentro.",
     "pd_aqui_tu": "Seu computador está aqui.",
@@ -2121,11 +2120,7 @@
     "pd_doc_explica": "{n} de cada 100 bytes que envia vão para serviços que o fabricante explica no site; {m}, para lugares que não explica.",
     "pd_doc_nada": "Seu antivírus ainda não enviou nada a um nome conhecido nesta janela.",
     "pd_doc_matiz": "Explicado não quer dizer inofensivo (a telemetria também é explicada); sem explicação não quer dizer ruim.",
-    "pd_colocar": "Posicionar meu computador",
-    "pd_colocar_ayuda": "Clique no globo ou no mapa exatamente onde está o seu computador. Esse ponto fica guardado só neste navegador.",
-    "pd_colocado": "Pronto: seu computador está em {pais}, no ponto que você marcou. Os dados saem e chegam a partir daí.",
-    "pd_lugar_mano": "Posicionado por você no mapa (o ponto fica só neste navegador).",
-    "pd_lugar_zona": "Situado em {ciudad} pelo fuso horário deste computador. Para colocá-lo no lugar exato, «Posicionar meu computador».",
-    "pd_lugar_pais": "No centro do país escolhido. Para colocá-lo no lugar exato, «Posicionar meu computador»."
+    "pd_lugar_zona": "Situado em {ciudad} pelo fuso horário do sistema. É detectado sozinho e não pode ser mudado à mão.",
+    "pd_lugar_pais": "No centro do país: o fuso horário do sistema não indica uma cidade. É detectado sozinho e não pode ser mudado à mão."
   }
 }

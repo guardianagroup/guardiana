@@ -2078,7 +2078,6 @@
     "pd_clic_cortar_prog": "Click: cut everything it sends",
     "pd_clic_dejar_prog": "Click: let it through again",
     "pd_no_cortable": "Only an antivirus can be cut as a whole (a browser or a program would stop working); their destinations can be cut one by one.",
-    "pd_pais_origen": "Your country comes from this computer's time zone and language; nothing is asked outside. You can change it above.",
     "pd_vigila_n": "GUARDIANA watches {n} programs in here.",
     "pd_vigila_n_uno": "GUARDIANA watches 1 program in here.",
     "pd_aqui_tu": "Your computer is here.",
@@ -2121,11 +2120,7 @@
     "pd_doc_explica": "{n} of every 100 bytes it sends go to services its maker explains on its website; {m}, to places it does not explain.",
     "pd_doc_nada": "Your antivirus has not sent anything to a known name in this window yet.",
     "pd_doc_matiz": "Explained does not mean harmless (telemetry is explained too); unexplained does not mean bad.",
-    "pd_colocar": "Place my computer",
-    "pd_colocar_ayuda": "Click on the globe or the map right where your computer is. That point is kept in this browser only.",
-    "pd_colocado": "Done: your computer is placed in {pais}, at the point you marked. The data leaves and arrives from there.",
-    "pd_lugar_mano": "Placed by you on the map (the point is kept in this browser only).",
-    "pd_lugar_zona": "Placed in {ciudad} by this computer’s time zone. To put it exactly where it is, «Place my computer».",
-    "pd_lugar_pais": "In the centre of the chosen country. To put it exactly where it is, «Place my computer»."
+    "pd_lugar_zona": "Placed in {ciudad} by the system’s time zone. It is detected automatically and cannot be changed by hand.",
+    "pd_lugar_pais": "In the centre of the country: the system’s time zone names no city. It is detected automatically and cannot be changed by hand."
   }
 }

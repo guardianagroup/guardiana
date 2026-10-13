@@ -425,10 +425,6 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 
 .universo .controles { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
-.universo .controles label { font: 12px 'IBM Plex Mono', ui-monospace, monospace; color: var(--hud-muted); display: flex; gap: 6px; align-items: center; }
-
-.universo .controles select { background: var(--hud); color: var(--hud-fg); border: 1px solid var(--hud-line); border-radius: 6px; padding: 4px 6px; font: 12px 'IBM Plex Mono', ui-monospace, monospace; max-width: 170px; }
-
 .universo .lienzo { position: relative; min-height: 0; }
 
 .universo .lienzo canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
@@ -554,8 +550,10 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 
 .universo .pequeno { font: 11px/1.4 'IBM Plex Mono', ui-monospace, monospace; color: var(--hud-muted); }
 
-/* While the person places the computer on the map, the pointer says so. */
-.universo .lienzo canvas.colocando { cursor: cell; }
+/* Where the computer is: detected from the system, said and not chosen. */
+.universo .lugar-yo { font: 12px 'IBM Plex Mono', ui-monospace, monospace; color: var(--hud-muted); white-space: nowrap; }
+
+.universo .lugar-yo b { color: var(--hud-fg); font-weight: 500; }
 
 .universo .hud #hud-doc { font-size: 10.5px; line-height: 1.35; }
 @media (max-width: 900px) {
