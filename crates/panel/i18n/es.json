@@ -1562,7 +1562,6 @@
     "ficha_casa_n_consultas_uno": "1 consulta",
     "ficha_casa_n_cortadas": "{n} cortadas",
     "ficha_casa_n_cortadas_uno": "1 cortada",
-    "ficha_casa_resumen_pdf": "{consultas} consultas a sus direcciones · {cortadas} cortadas por GUARDIANA · {aparatos} aparatos",
     "ficha_borrar_enlace": "Abrir su página",
     "ficha_carta_explica": "También puedes enviarle tú mismo una carta pidiendo que borre tus datos. Elige el lugar cuya ley te protege, escribe tu nombre y tu correo, y descárgala en PDF para adjuntarla a un correo, o ábrela directamente en tu correo. Tu nombre y tu correo no salen de este equipo.",
     "ficha_carta_formulario": "No conocemos un correo suyo para estas cartas; tiene esta página para pedirlo:",
@@ -1579,6 +1578,17 @@
     "ficha_pdf_importe": "Importe",
     "ficha_pdf_que": "Qué pasó",
     "pais_dominio_texto": "Sin identificar · dominio de {pais}",
-    "pais_dominio_titulo": "Ninguna empresa de nuestras listas es dueña de este nombre. {pais} es el país de su terminación: dice dónde se registró el nombre, no necesariamente dónde está quien lo usa."
+    "pais_dominio_titulo": "Ninguna empresa de nuestras listas es dueña de este nombre. {pais} es el país de su terminación: dice dónde se registró el nombre, no necesariamente dónde está quien lo usa.",
+    "ficha_millon": "1 millón de {moneda}",
+    "ficha_casa_periodo_dia": "El {dia}, según el extracto de este equipo. La consultaron: {aparatos}.",
+    "ficha_pdf_consultas": "{n} consultas a sus direcciones",
+    "ficha_pdf_consultas_uno": "1 consulta a sus direcciones",
+    "ficha_pdf_cortadas": "{n} cortadas por GUARDIANA",
+    "ficha_pdf_cortadas_uno": "1 cortada por GUARDIANA",
+    "ficha_pdf_aparatos": "{n} aparatos",
+    "ficha_pdf_aparatos_uno": "1 aparato",
+    "ficha_compartir_casa_uno": "En mi casa, sus direcciones recibieron 1 consulta y GUARDIANA cortó {c}.",
+    "ficha_carta_pdf_no": "El PDF no puede escribir estas letras de tu nombre o tu correo: {letras}. Usa «Abrir en mi correo» o «Copiar la carta»: ahí salen tal cual.",
+    "ficha_carta_pdf_cambia": "En el PDF tu nombre sale como «{nombre}», sin algunos acentos, porque el PDF solo escribe letras latinas básicas. Si lo prefieres exacto, usa «Abrir en mi correo»."
   }
 }

@@ -1562,7 +1562,6 @@
     "ficha_casa_n_consultas_uno": "1 query",
     "ficha_casa_n_cortadas": "{n} cut",
     "ficha_casa_n_cortadas_uno": "1 cut",
-    "ficha_casa_resumen_pdf": "{consultas} queries for its addresses · {cortadas} cut by GUARDIANA · {aparatos} devices",
     "ficha_borrar_enlace": "Open its page",
     "ficha_carta_explica": "You can also send the company a letter yourself asking it to delete your data. Pick the place whose law protects you, write your name and email, and download it as a PDF to attach to an email, or open it straight in your mail. Your name and email never leave this computer.",
     "ficha_carta_formulario": "We know no email of theirs for these letters; they have this page to ask:",
@@ -1579,6 +1578,17 @@
     "ficha_pdf_importe": "Amount",
     "ficha_pdf_que": "What happened",
     "pais_dominio_texto": "Unidentified · {pais} domain",
-    "pais_dominio_titulo": "No company in our lists owns this name. {pais} is the country of its ending: it says where the name was registered, not necessarily where whoever uses it is."
+    "pais_dominio_titulo": "No company in our lists owns this name. {pais} is the country of its ending: it says where the name was registered, not necessarily where whoever uses it is.",
+    "ficha_millon": "1 million {moneda}",
+    "ficha_casa_periodo_dia": "On {dia}, according to this computer’s statement. Asked by: {aparatos}.",
+    "ficha_pdf_consultas": "{n} queries for its addresses",
+    "ficha_pdf_consultas_uno": "1 query for its addresses",
+    "ficha_pdf_cortadas": "{n} cut by GUARDIANA",
+    "ficha_pdf_cortadas_uno": "1 cut by GUARDIANA",
+    "ficha_pdf_aparatos": "{n} devices",
+    "ficha_pdf_aparatos_uno": "1 device",
+    "ficha_compartir_casa_uno": "In my home, its addresses got 1 query and GUARDIANA cut {c}.",
+    "ficha_carta_pdf_no": "The PDF cannot write these letters of your name or email: {letras}. Use “Open in my email” or “Copy the letter”: they come out as they are there.",
+    "ficha_carta_pdf_cambia": "In the PDF your name appears as “{nombre}”, without some accents, because the PDF writes only basic Latin letters. To keep it exact, use “Open in my email”."
   }
 }

@@ -3168,6 +3168,16 @@ fn a_profile_hands_over_the_deletion_letter_for_its_company() {
     let cuerpo = c["cuerpo"].as_str().unwrap_or("");
     assert!(cuerpo.contains("Criteo") && cuerpo.contains("17"));
     assert!(!cuerpo.contains("()"));
+    // With nothing seen of it here, the letter names the company's own website, not the first
+    // address of its list (review of 12 Oct 2026: Microsoft's named «msftstatic.com»).
+    let o = s.mensaje(
+        Origen::Pestana(n),
+        &url,
+        r#"{"tipo":"carta_ficha","empresa":"Microsoft","ley":"ue"}"#,
+    );
+    let m = del_tipo(&o, Origen::Pestana(n), "carta_ficha").unwrap_or_default();
+    let asunto = m["asunto"].as_str().unwrap_or("");
+    assert!(asunto.contains("(microsoft.com)"), "{asunto}");
     let o = s.mensaje(
         Origen::Pestana(n),
         &url,

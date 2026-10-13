@@ -8,6 +8,9 @@
 //! Nothing here talks to the network: the profiles travel inside the program, the evidence is
 //! the extract on this computer, and the sources open only when the person clicks them.
 
+// Handlers return a full HTTP `Response` as their error, as axum intends (as in api.rs).
+#![allow(clippy::result_large_err)]
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -21,7 +24,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::api::{with_ledger, ApiResult};
 use crate::auth::{Lang, Session};
-use crate::borrado::{corredores, evidencias, Corredor, NombreVisto};
+use crate::borrado::{
+    corredores, evidencias, jur_view, Corredor, JurView, NombreVisto, JURISDICCIONES,
+};
 use crate::AppState;
 
 /// The longest company name the page may ask for. The longest in the lists is under 60.
@@ -68,11 +73,19 @@ pub(crate) fn destinatario(empresa: &str) -> Option<Corredor> {
     if registro.is_none() && sitio.is_none() {
         return None;
     }
-    let url = guardiana_lists::profile_of(&empresa)
+    let borrar = guardiana_lists::profile_of(&empresa)
         .and_then(|f| f.get("borrar"))
         .and_then(|u| u.as_str())
-        .filter(|u| u.starts_with("https://"))
-        .map(str::to_owned);
+        .unwrap_or_default();
+    let url = borrar.starts_with("https://").then(|| borrar.to_owned());
+    // A profile may give the company's own address for these requests (`mailto:`): the letter
+    // goes there, under every law (review of 12 Oct 2026: Cloudflare's was ignored).
+    let correos = borrar
+        .strip_prefix("mailto:")
+        .map(|c| c.split('?').next().unwrap_or_default().trim())
+        .filter(|c| c.contains('@') && !c.contains([' ', ',', ';', '<', '>']))
+        .map(|c| vec![(c.to_owned(), vec!["*".to_owned()])])
+        .unwrap_or_default();
     Some(Corredor {
         id: format!("empresa:{empresa}"),
         nombre: registro
@@ -81,6 +94,7 @@ pub(crate) fn destinatario(empresa: &str) -> Option<Corredor> {
         pais: registro.as_ref().and_then(|r| r.country.map(str::to_owned)),
         tipo: "publicidad".to_owned(),
         url,
+        correos,
         dominios: if registro.is_some() {
             Vec::new()
         } else {
@@ -146,6 +160,9 @@ pub(crate) struct FichaView {
     ficha: Option<&'static serde_json::Value>,
     revisada: &'static str,
     casa: EnCasa,
+    /// The places whose law the letter can cite, as «Haz que te borren» lists them: the page
+    /// needs only this of that page's summary, which reads the whole statement again.
+    jurisdicciones: Vec<JurView>,
 }
 
 fn no_encontrado() -> Response {
@@ -229,7 +246,10 @@ fn vista(
     };
     let (codigo, por_dominio) = match registro.and_then(|r| r.country) {
         Some(c) => (Some(c.to_owned()), false),
-        None if registro.is_none() => (guardiana_lists::dominio::pais_del_dominio(empresa), true),
+        None if registro.is_none() => (
+            sitio_pedido(empresa).and_then(|s| guardiana_lists::dominio::pais_del_dominio(&s)),
+            true,
+        ),
         None => (None, false),
     };
     let pais = codigo
@@ -264,6 +284,7 @@ fn vista(
         ficha: perfil,
         revisada: guardiana_lists::profiles_checked(),
         casa,
+        jurisdicciones: JURISDICCIONES.iter().map(|j| jur_view(t, j)).collect(),
     }
 }
 
@@ -346,6 +367,7 @@ mod tests {
         assert!(!v.conocida);
         assert!(v.pais_por_dominio);
         assert_eq!(v.pais_codigo.as_deref(), Some("CZ"));
+        assert!(!v.jurisdicciones.is_empty());
         assert_eq!(v.casa.consultas, 2);
         assert!(v.borrado.is_none());
         // A name that is neither a company nor a site has no profile at all.
@@ -372,6 +394,11 @@ mod tests {
             .and_then(|u| u.as_str());
         if de_la_lista("Criteo").is_none() {
             assert_eq!(criteo.url.as_deref(), borrar);
+        }
+        // An address given as `mailto:` in the profile is where the letter goes.
+        if de_la_lista("Cloudflare").is_none() {
+            let cf = destinatario("Cloudflare").unwrap();
+            assert_eq!(cf.correo_para("es"), Some("sar@cloudflare.com"));
         }
     }
 }

@@ -20,6 +20,7 @@
     const v = Number(valor);
     if (!Number.isFinite(v)) return '';
     const m = String(moneda || '').toUpperCase().slice(0, 3);
+    if (Math.abs(v) === 1e6) return t('ficha_millon', { moneda: m });
     if (Math.abs(v) >= 1e6) {
       const millones = (v / 1e6).toLocaleString(lang(), { maximumFractionDigits: Math.abs(v) >= 1e10 ? 0 : 1, useGrouping: 'always' });
       return t('ficha_millones', { n: millones, moneda: m });
@@ -102,7 +103,7 @@
     s.push(`<section><h2>${esc(t('ficha_borrar'))}</h2>`
       + (web(borrar) ? `<p>${esc(t('ficha_borrar_explica'))}</p><p>${enlace(borrar, t('cortes_det_corredor_url'))}</p>` : '')
       + `<p>${esc(t('ficha_carta_explica'))}</p>`
-      + `<div class="controles carta-controles"><select id="carta-ley">${leyes.map((l) => `<option value="${l}"${l === leyPorDefecto() ? ' selected' : ''}>${esc(t('carta_ley_' + l))}</option>`).join('')}</select>`
+      + `<div class="controles carta-controles"><select id="carta-ley">${leyes.map((l) => `<option value="${l}"${l === (leyElegida || leyPorDefecto()) ? ' selected' : ''}>${esc(t('carta_ley_' + l))}</option>`).join('')}</select>`
       + `<button class="boton principal" id="carta-pdf">${esc(t('ficha_carta_pdf'))}</button>`
       + `<button class="boton" id="carta-correo">${esc(t('ficha_carta_correo'))}</button></div>`
       + `<pre class="carta" id="carta"></pre></section>`);
@@ -179,19 +180,25 @@
       aviso(t('ficha_copiado'));
     } catch (_) { aviso(t('ficha_no_copiado')); }
   });
-  $('pdf').addEventListener('click', () => manda({ tipo: 'ficha_pdf', empresa }));
+  $('pdf').addEventListener('click', () => { document.body.classList.remove('solo-carta'); manda({ tipo: 'ficha_pdf', empresa }); });
+  // The chosen law survives a repaint (a change of language re-renders the page).
+  document.addEventListener('change', (e) => { if (e.target && e.target.id === 'carta-ley') leyElegida = e.target.value; });
   $('volver').addEventListener('click', () => manda({ tipo: 'volver' }));
   en('ficha', (m) => { if (m.empresa === empresa.trim()) { datos = m; pinta(); } });
   en('guardado', (m) => { document.body.classList.remove('solo-carta'); aviso(m.texto || ''); });
-  // The law that most likely applies, from the browser's language (the person can change it).
+  // The law that most likely applies, from the region of the browser's language, never from the
+  // language alone: Spanish is also Mexico and Argentina, Portuguese also Portugal (review of
+  // 12 Oct 2026). California only when chosen; the person can always change it.
+  const UE_REGIONES = ['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'IS', 'LI', 'NO'];
   function leyPorDefecto() {
-    const l = (navigator.language || '').toLowerCase();
-    if (l.endsWith('-co')) return 'co';
-    if (l.startsWith('pt')) return 'br';
-    if (l === 'en-us') return 'ca';
-    if (/^(es|fr|de|it|nl|pl|cs|pt-pt|sv|da|fi|el|ro|hu|sk|sl|hr|bg|lt|lv|et|ga|mt)/.test(l)) return 'ue';
-    return lang() === 'es' ? 'ue' : 'otro';
+    const partes = (navigator.language || '').split('-');
+    const region = (partes.find((x, i) => i > 0 && /^[A-Za-z]{2}$/.test(x)) || '').toUpperCase();
+    if (region === 'CO') return 'co';
+    if (region === 'BR') return 'br';
+    if (UE_REGIONES.includes(region)) return 'ue';
+    return 'otro';
   }
+  let leyElegida = '';
   let cartaLista = null;
   function pideCarta(despues) {
     cartaLista = despues;
@@ -210,6 +217,8 @@
       pideCarta(() => {
         document.body.classList.add('solo-carta');
         manda({ tipo: 'ficha_pdf', empresa, que: 'carta' });
+        // If the program never answers, the page does not stay letter-only.
+        setTimeout(() => document.body.classList.remove('solo-carta'), 15000);
       });
     } else if (id === 'carta-correo') {
       pideCarta((m) => manda({ tipo: 'abrir_correo', asunto: m.asunto, cuerpo: m.cuerpo }));

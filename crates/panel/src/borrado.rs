@@ -1030,7 +1030,7 @@ fn guardar_envios(l: &guardiana_core::Ledger, e: &[Envio]) -> guardiana_core::Re
 
 // ----- the page's API -----------------------------------------------------------------------
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub(crate) struct JurView {
     codigo: &'static str,
     idioma: &'static str,
@@ -1087,7 +1087,7 @@ pub(crate) struct Resumen {
     hoy: String,
 }
 
-fn jur_view(t: &Texts, j: &'static Jurisdiccion) -> JurView {
+pub(crate) fn jur_view(t: &Texts, j: &'static Jurisdiccion) -> JurView {
     JurView {
         codigo: j.codigo,
         idioma: j.idioma,

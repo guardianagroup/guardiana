@@ -54,17 +54,45 @@
   // Unicode code points that WinAnsi keeps in the 0x80-0x9F slots, plus spaces and hyphens
   // that toLocaleString() produces in some locales.
   const WINANSI = { 0x20AC: 0x80, 0x201A: 0x82, 0x0192: 0x83, 0x201E: 0x84, 0x2026: 0x85, 0x2020: 0x86, 0x2021: 0x87, 0x02C6: 0x88, 0x2030: 0x89, 0x0160: 0x8A, 0x2039: 0x8B, 0x0152: 0x8C, 0x017D: 0x8E, 0x2018: 0x91, 0x2019: 0x92, 0x201C: 0x93, 0x201D: 0x94, 0x2022: 0x95, 0x2013: 0x96, 0x2014: 0x97, 0x02DC: 0x98, 0x2122: 0x99, 0x0161: 0x9A, 0x203A: 0x9B, 0x0153: 0x9C, 0x017E: 0x9E, 0x0178: 0x9F, 0xA0: 0x20, 0x2009: 0x20, 0x202F: 0x20, 0x2010: 0x2D, 0x2011: 0x2D, 0x2212: 0x2D };
+  // What WinAnsi cannot hold is written the nearest way it can: the letter without its accent
+  // (ř → r, ș → s), a few letters by hand (ł → l), Cyrillic in Latin letters, arrows and signs in
+  // ASCII. Until 1.0.16 all of it became «?», and a Czech or Polish name came out of the deletion
+  // letter as «Dvo?ák» (review of 12 Oct 2026). What still has no form (Chinese, emoji) stays «?»;
+  // `faltaEnPdf()` says so before a letter is made.
+  const A_MANO = { 'ł': 'l', 'Ł': 'L', 'đ': 'd', 'Đ': 'D', 'ı': 'i', 'ħ': 'h', 'Ħ': 'H', 'ŧ': 't', 'Ŧ': 'T', 'ŋ': 'n', 'ĸ': 'k', 'ſ': 's', '→': '->', '←': '<-', '↑': '^', '↓': 'v', '≥': '>=', '≤': '<=', '≠': '!=', '≈': '~', '′': "'", '″': '"', '‐': '-', '−': '-' };
+  const CIRILICO = 'a,b,v,g,d,e,zh,z,i,y,k,l,m,n,o,p,r,s,t,u,f,kh,ts,ch,sh,shch,,y,,e,yu,ya'.split(',');
+  function aWinAnsi(ch) {
+    const cp = ch.codePointAt(0);
+    if (cp < 128 || (cp >= 160 && cp < 256) || WINANSI[cp]) return ch;
+    if (A_MANO[ch] !== undefined) return A_MANO[ch];
+    if (cp >= 0x410 && cp <= 0x44F) {
+      const i = (cp - 0x410) % 32;
+      const l = CIRILICO[i];
+      return cp < 0x430 && l ? l.charAt(0).toUpperCase() + l.slice(1) : l;
+    }
+    if (cp === 0x401) return 'Yo';
+    if (cp === 0x451) return 'yo';
+    const sin = ch.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (sin && [...sin].every((c) => { const p = c.codePointAt(0); return p < 128 || (p >= 160 && p < 256) || WINANSI[p]; })) return sin;
+    return '?';
+  }
   // Text as a "binary string": one character per byte, ready for a PDF string.
   function winAnsi(s) {
     let out = '';
-    for (const ch of String(s ?? '')) {
-      const cp = ch.codePointAt(0);
-      let b = cp < 128 || (cp >= 160 && cp < 256) ? cp : (WINANSI[cp] || 63);
-      if (b < 32 && b !== 10) b = 32;
-      out += String.fromCharCode(b);
+    for (const ch0 of String(s ?? '')) {
+      for (const ch of aWinAnsi(ch0)) {
+        const cp = ch.codePointAt(0);
+        let b = cp < 128 || (cp >= 160 && cp < 256) ? cp : (WINANSI[cp] || 63);
+        if (b < 32 && b !== 10) b = 32;
+        out += String.fromCharCode(b);
+      }
     }
     return out;
   }
+  // The characters of `s` the PDF cannot write in any form, and whether it changes any.
+  const faltaEnPdf = (s) => [...String(s ?? '')].filter((c) => c !== '?' && aWinAnsi(c) === '?');
+  const cambiaEnPdf = (s) => [...String(s ?? '')].some((c) => aWinAnsi(c) !== c);
+  const winAnsiLegible = (s) => [...String(s ?? '')].map(aWinAnsi).join('');
   const textWidth = (bin, size) => { let w = 0; for (let i = 0; i < bin.length; i++) w += HELV[bin.charCodeAt(i) - 32] || 556; return w * size / 1000; };
   const pdfEscape = (bin) => bin.replace(/[\\()]/g, (c) => '\\' + c);
   // Greedy wrap by words; a word wider than the column (a long domain name) is cut by characters.
@@ -1861,6 +1889,7 @@
         const v = Number(valor);
         if (!Number.isFinite(v)) return '';
         const m = String(moneda || '').toUpperCase().slice(0, 3);
+        if (Math.abs(v) === 1e6) return fx('ficha_millon', { moneda: m });
         if (Math.abs(v) >= 1e6) return fx('ficha_millones', { n: (v / 1e6).toLocaleString(LOC, { maximumFractionDigits: Math.abs(v) >= 1e10 ? 0 : 1, useGrouping: 'always' }), moneda: m });
         try { return v.toLocaleString(LOC, { style: 'currency', currency: m, maximumFractionDigits: 0 }); } catch (_) { return num(v) + ' ' + m; }
       };
@@ -1947,7 +1976,7 @@
       const aparatos = c.aparatos.map((a) => nombreAparato(a[0], a[1])).join(', ');
       const callados = c.callados ? ' ' + fn('ficha_casa_callados', c.callados) : '';
       $('f-casa-texto').textContent = (c.consultas
-        ? fx('ficha_casa_periodo', { desde: dia(c.primera), hasta: dia(c.ultima), aparatos })
+        ? (dia(c.primera) === dia(c.ultima) ? fx('ficha_casa_periodo_dia', { dia: dia(c.primera), aparatos }) : fx('ficha_casa_periodo', { desde: dia(c.primera), hasta: dia(c.ultima), aparatos }))
         : t('ficha_casa_nada')) + callados;
       $('f-nombres-det').classList.toggle('hidden', !c.nombres.length);
       $('f-nombres-titulo').textContent = fn('ficha_casa_ver_nombres', c.n_nombres);
@@ -1992,7 +2021,7 @@
         if (etiquetas.length) doc.gap(4).line(etiquetas.join(' · '), 10, true);
         if ((!f || !f.que_hace) && d.oficio) doc.gap(6).line(d.oficio, 10);
         doc.seccion(t('ficha_casa_titulo'));
-        doc.line(fx('ficha_casa_resumen_pdf', { consultas: num(c.consultas), cortadas: num(c.cortadas), aparatos: num(c.aparatos.length) }), 10, true);
+        doc.line([fn('ficha_pdf_consultas', c.consultas), fn('ficha_pdf_cortadas', c.cortadas), fn('ficha_pdf_aparatos', c.aparatos.length)].join(' · '), 10, true);
         doc.gap(2).line($('f-casa-texto').textContent, 9, false, 0.35);
         const n = (k) => (k ? ' [' + k + ']' : '');
         for (const b of bloques) {
@@ -2037,7 +2066,7 @@
         if (f && f.que_hace) lineas.push(L(f.que_hace));
         for (const x of sanciones.slice(0, 3)) lineas.push('• ' + [x.autoridad, fecha(x.fecha), x.importe ? dinero(x.importe, x.moneda) : ''].filter(Boolean).join(' · ') + ': ' + L(x.motivo));
         for (const x of filtraciones.slice(0, 2)) lineas.push('• ' + fecha(x.fecha) + ': ' + L(x.que));
-        if (c.consultas) lineas.push(fx('ficha_compartir_casa', { n: num(c.consultas), c: num(c.cortadas) }));
+        if (c.consultas) lineas.push(fn('ficha_compartir_casa', c.consultas, { c: num(c.cortadas) }));
         const texto = lineas.join('\n');
         const url = enlacePublico();
         if (navigator.share) {
@@ -2048,7 +2077,10 @@
       });
 
       // ----- the letter -----
-      const R = await api('/api/borrado');
+      // The places come with the profile: «Haz que te borren»'s summary would read the whole
+      // statement again only for this list (review of 12 Oct 2026).
+      const R = { jurisdicciones: d.jurisdicciones || [] };
+      if (!R.jurisdicciones.length) { $('f-borrar').classList.add('hidden'); return; }
       const RECUERDO = 'guardiana_borrado_datos';
       const MAILTO_MAX = 2000;
       const sel = $('f-pais');
@@ -2065,7 +2097,13 @@
       // Kept in this browser only when the person already asked for it on «Haz que te borren».
       const recuerda = () => { if (!guardado) return; try { localStorage.setItem(RECUERDO, JSON.stringify({ nombre: $('f-cnombre').value, correo: $('f-ccorreo').value })); } catch (_) {} };
       let C = null;
-      const pide = (evidencia) => api('/api/borrado/carta?' + new URLSearchParams({ empresa: d.empresa, jurisdiccion: sel.value, idioma: jur().idioma, evidencia: evidencia ? '1' : '0' }).toString());
+      // One request per law and choice of evidence: each one reads the statement.
+      const cartas = new Map();
+      const pide = (evidencia) => {
+        const k = sel.value + '|' + (evidencia ? 1 : 0);
+        if (!cartas.has(k)) cartas.set(k, api('/api/borrado/carta?' + new URLSearchParams({ empresa: d.empresa, jurisdiccion: sel.value, idioma: jur().idioma, evidencia: evidencia ? '1' : '0' }).toString()).catch((e) => { cartas.delete(k); throw e; }));
+        return cartas.get(k);
+      };
       const rellena = (cuerpo, carta) => cuerpo.split('[[NOMBRE]]').join($('f-cnombre').value.trim() || carta.hueco_nombre).split('[[CORREO]]').join($('f-ccorreo').value.trim() || carta.hueco_correo);
       const pinta = () => {
         if (!C) return;
@@ -2091,6 +2129,11 @@
       };
       $('f-carta-pdf').addEventListener('click', async () => {
         if (faltan()) return;
+        // The PDF writes Latin letters only: a name it cannot write at all goes by mail or copy;
+        // one it writes without its accents is said (review of 12 Oct 2026).
+        const quien = $('f-cnombre').value.trim() + ' ' + $('f-ccorreo').value.trim();
+        const faltan2 = faltaEnPdf(quien);
+        if (faltan2.length) { avisa('ficha_carta_pdf_no', { letras: faltan2.join(' ') }); return; }
         try {
           await carga();
           const doc = pdfDocument(C.asunto);
@@ -2099,7 +2142,10 @@
           for (const l of rellena(C.cuerpo, C).split('\n')) { if (l.trim()) doc.line(l, 10.5); else doc.gap(7); }
           const name = 'carta-borrado-' + slug(d.empresa) + '.pdf';
           const r = await savePdfFile(name, doc.bytes(''));
-          if (r !== 'cancelado') avisa('pdf_' + r, { nombre: name });
+          if (r !== 'cancelado') {
+            avisa('pdf_' + r, { nombre: name });
+            if (cambiaEnPdf(quien)) setTimeout(() => avisa('ficha_carta_pdf_cambia', { nombre: winAnsiLegible($('f-cnombre').value.trim()) }), 50);
+          }
         } catch (err) { $('f-carta-msg').textContent = String(err.message || err); }
       });
       $('f-carta-correo').addEventListener('click', async () => {
@@ -2113,6 +2159,7 @@
           if (url.length > MAILTO_MAX && $('f-evidencia').checked) {
             const sin = await pide(false);
             url = mailto(sin.asunto, rellena(sin.cuerpo, sin));
+            pista = pista + '|borrado_pista_sin_evidencia';
           }
           if (url.length > MAILTO_MAX) {
             await copia(rellena(C.cuerpo, C));
@@ -2120,7 +2167,7 @@
             pista = 'borrado_pista_pegar_correo';
           }
           location.href = url;
-          avisa(pista);
+          $('f-carta-msg').textContent = pista.split('|').map((k) => t(k)).join(' ');
         } catch (err) { $('f-carta-msg').textContent = String(err.message || err); }
       });
       $('f-carta-copiar').addEventListener('click', async () => {

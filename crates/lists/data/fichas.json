@@ -192,9 +192,9 @@
      "importe": 170000000,
      "moneda": "USD",
      "motivo": {
-      "es": "Acuerdo: YouTube recogió identificadores (cookies) de espectadores de canales infantiles sin consentimiento de los padres para mostrar anuncios dirigidos (ley COPPA). 136 millones a la FTC y 34 millones a Nueva York.",
-      "en": "Settlement: YouTube collected identifiers (cookies) from viewers of child-directed channels without parental consent to serve targeted ads (COPPA). 136 million to the FTC and 34 million to New York.",
-      "pt": "Acordo: o YouTube coletou identificadores (cookies) de espectadores de canais infantis sem consentimento dos pais para exibir anúncios direcionados (lei COPPA). 136 milhões para a FTC e 34 milhões para Nova York."
+      "es": "Acuerdo: YouTube recogió identificadores (cookies) de espectadores de canales infantiles sin consentimiento de los padres para mostrar anuncios dirigidos (ley COPPA). 136 millones a la FTC y 34 millones a Nueva York. Son acusaciones de la FTC cerradas con un acuerdo.",
+      "en": "Settlement: YouTube collected identifiers (cookies) from viewers of child-directed channels without parental consent to serve targeted ads (COPPA). 136 million to the FTC and 34 million to New York. These are the FTC's allegations, resolved by settlement.",
+      "pt": "Acordo: o YouTube coletou identificadores (cookies) de espectadores de canais infantis sem consentimento dos pais para exibir anúncios direcionados (lei COPPA). 136 milhões para a FTC e 34 milhões para Nova York. São acusações da FTC encerradas por acordo."
      },
      "fuente": "https://www.ftc.gov/news-events/news/press-releases/2019/09/google-youtube-will-pay-record-170-million-alleged-violations-childrens-privacy-law"
     },
@@ -274,9 +274,9 @@
      "importe": 22500000,
      "moneda": "USD",
      "motivo": {
-      "es": "Sanción civil acordada con la FTC por eludir el bloqueo de cookies de Safari para rastrear a usuarios a los que había dicho que estaban protegidos.",
-      "en": "Civil penalty agreed with the FTC for circumventing Safari's cookie blocking to track users it had told were protected.",
-      "pt": "Multa civil acordada com a FTC por contornar o bloqueio de cookies do Safari para rastrear usuários aos quais havia dito que estavam protegidos."
+      "es": "Sanción civil acordada con la FTC por eludir el bloqueo de cookies de Safari para rastrear a usuarios a los que había dicho que estaban protegidos. Son acusaciones de la FTC cerradas con un acuerdo.",
+      "en": "Civil penalty agreed with the FTC for circumventing Safari's cookie blocking to track users it had told were protected. These are the FTC's allegations, resolved by settlement.",
+      "pt": "Multa civil acordada com a FTC por contornar o bloqueio de cookies do Safari para rastrear usuários aos quais havia dito que estavam protegidos. São acusações da FTC encerradas por acordo."
      },
      "fuente": "https://guptadeepak.com/tech-fines/violation/google-us-safari-2012/"
     }
@@ -539,9 +539,9 @@
      "importe": 5000000000,
      "moneda": "USD",
      "motivo": {
-      "es": "Acuerdo con la FTC por incumplir una orden de 2012 engañando a los usuarios sobre su control de la privacidad, entre otras cosas compartiendo datos de amigos con desarrolladores de apps; incluye nuevas restricciones.",
-      "en": "Settlement with the FTC for violating a 2012 order by deceiving users about their privacy controls, including sharing friends' data with app developers; includes new restrictions.",
-      "pt": "Acordo com a FTC por descumprir uma ordem de 2012 enganando os usuários sobre o controle da privacidade, inclusive compartilhando dados de amigos com desenvolvedores de apps; inclui novas restrições."
+      "es": "Acuerdo con la FTC por incumplir una orden de 2012 engañando a los usuarios sobre su control de la privacidad, entre otras cosas compartiendo datos de amigos con desarrolladores de apps; incluye nuevas restricciones. Son acusaciones de la FTC cerradas con un acuerdo.",
+      "en": "Settlement with the FTC for violating a 2012 order by deceiving users about their privacy controls, including sharing friends' data with app developers; includes new restrictions. These are the FTC's allegations, resolved by settlement.",
+      "pt": "Acordo com a FTC por descumprir uma ordem de 2012 enganando os usuários sobre o controle da privacidade, inclusive compartilhando dados de amigos com desenvolvedores de apps; inclui novas restrições. São acusações da FTC encerradas por acordo."
      },
      "fuente": "https://www.infodocket.com/2019/07/24/ftc-imposes-5-billion-penalty-and-new-privacy-restrictions-on-facebook/"
     }
@@ -650,9 +650,9 @@
      "importe": 20000000,
      "moneda": "USD",
      "motivo": {
-      "es": "Acuerdo con la FTC: Xbox recogió datos personales de menores sin avisar ni pedir consentimiento a los padres y los conservó durante años (ley COPPA).",
-      "en": "Settlement with the FTC: Xbox collected personal data from children without notifying or getting consent from parents and kept it for years (COPPA).",
-      "pt": "Acordo com a FTC: o Xbox coletou dados pessoais de crianças sem avisar nem pedir consentimento aos pais e os guardou por anos (lei COPPA)."
+      "es": "Acuerdo con la FTC: Xbox recogió datos personales de menores sin avisar ni pedir consentimiento a los padres y los conservó durante años (ley COPPA). Son acusaciones de la FTC cerradas con un acuerdo.",
+      "en": "Settlement with the FTC: Xbox collected personal data from children without notifying or getting consent from parents and kept it for years (COPPA). These are the FTC's allegations, resolved by settlement.",
+      "pt": "Acordo com a FTC: o Xbox coletou dados pessoais de crianças sem avisar nem pedir consentimento aos pais e os guardou por anos (lei COPPA). São acusações da FTC encerradas por acordo."
      },
      "fuente": "https://www.ftc.gov/node/81119"
     },
@@ -817,14 +817,14 @@
      "fecha": "2025-09-25",
      "autoridad": "FTC",
      "pais": "US",
-     "importe": 2500000000,
+     "importe": 1000000000,
      "moneda": "USD",
      "motivo": {
-      "es": "Acuerdo con la FTC por inscribir a clientes en Prime con diseños engañosos y dificultar la cancelación: 1.000 millones de multa civil y 1.500 millones en reembolsos.",
-      "en": "Settlement with the FTC over enrolling customers in Prime through deceptive designs and making cancellation hard: USD 1 billion civil penalty and USD 1.5 billion in refunds.",
-      "pt": "Acordo com a FTC por inscrever clientes no Prime com designs enganosos e dificultar o cancelamento: 1 bilhão de dólares de multa civil e 1,5 bilhão em reembolsos."
+      "es": "Acuerdo con la FTC, que la acusaba de inscribir a clientes en Prime con diseños engañosos y dificultar la cancelación: 1.000 millones de dólares de multa civil, y además 1.500 millones en reembolsos a clientes (no cuentan como multa). Amazon no admitió haber hecho nada ilegal.",
+      "en": "Settlement with the FTC, which accused it of enrolling customers in Prime through deceptive designs and making cancellation hard: USD 1 billion civil penalty, plus USD 1.5 billion in customer refunds (not counted as a fine). Amazon did not admit wrongdoing.",
+      "pt": "Acordo com a FTC, que a acusava de inscrever clientes no Prime com designs enganosos e dificultar o cancelamento: 1 bilhão de dólares de multa civil, além de 1,5 bilhão em reembolsos a clientes (não contam como multa). A Amazon não admitiu irregularidades."
      },
-     "fuente": "https://guptadeepak.com/tech-fines/violation/amazon-us-prime-darkpatterns-2025/"
+     "fuente": "https://krdo.com/news/2025/09/25/amazon-to-pay-historic-2-5-billion-settlement-for-allegedly-tricking-customers-into-signing-up-for-prime/"
     },
     {
      "fecha": "2023-05-31",
@@ -833,9 +833,9 @@
      "importe": 25000000,
      "moneda": "USD",
      "motivo": {
-      "es": "Sanción civil acordada con la FTC: Alexa conservó durante años grabaciones de voz y datos de ubicación de niños y no los borraba del todo cuando los padres lo pedían (ley COPPA).",
-      "en": "Civil penalty agreed with the FTC: Alexa kept children's voice recordings and location data for years and did not fully delete them when parents asked (COPPA).",
-      "pt": "Multa civil acordada com a FTC: a Alexa guardou por anos gravações de voz e dados de localização de crianças e não os apagava totalmente quando os pais pediam (lei COPPA)."
+      "es": "Sanción civil acordada con la FTC: Alexa conservó durante años grabaciones de voz y datos de ubicación de niños y no los borraba del todo cuando los padres lo pedían (ley COPPA). Son acusaciones de la FTC cerradas con un acuerdo.",
+      "en": "Civil penalty agreed with the FTC: Alexa kept children's voice recordings and location data for years and did not fully delete them when parents asked (COPPA). These are the FTC's allegations, resolved by settlement.",
+      "pt": "Multa civil acordada com a FTC: a Alexa guardou por anos gravações de voz e dados de localização de crianças e não os apagava totalmente quando os pais pediam (lei COPPA). São acusações da FTC encerradas por acordo."
      },
      "fuente": "https://www.wtoc.com/2023/05/31/ftc-charges-amazon-with-privacy-violations-over-alexa-ring-cameras/"
     },
@@ -843,12 +843,10 @@
      "fecha": "2023-05-31",
      "autoridad": "FTC",
      "pais": "US",
-     "importe": 5800000,
-     "moneda": "USD",
      "motivo": {
-      "es": "Acuerdo con la FTC (Ring, filial de Amazon): empleados y contratistas podían ver vídeos privados de clientes y su seguridad deficiente permitió a hackers tomar cuentas. Importe destinado a reembolsos.",
-      "en": "Settlement with the FTC (Ring, an Amazon subsidiary): employees and contractors could access customers' private videos and lax security let hackers take over accounts. Amount goes to customer refunds.",
-      "pt": "Acordo com a FTC (Ring, subsidiária da Amazon): funcionários e terceirizados podiam ver vídeos privados de clientes e a segurança fraca permitiu que hackers assumissem contas. Valor destinado a reembolsos."
+      "es": "Acuerdo con la FTC (Ring, filial de Amazon), que la acusaba de que empleados y contratistas podían ver vídeos privados de clientes y de que su seguridad deficiente permitió a hackers tomar cuentas. Ring pagaría 5,8 millones de dólares destinados a reembolsos a clientes, no una multa.",
+      "en": "Settlement with the FTC (Ring, an Amazon subsidiary), which accused it of letting employees and contractors access customers' private videos and of lax security that let hackers take over accounts. Ring would pay USD 5.8 million for customer refunds, not a fine.",
+      "pt": "Acordo com a FTC (Ring, subsidiária da Amazon), que a acusava de permitir que funcionários e terceirizados vissem vídeos privados de clientes e de ter segurança fraca que permitiu a hackers assumir contas. A Ring pagaria 5,8 milhões de dólares destinados a reembolsos a clientes, não uma multa."
      },
      "fuente": "https://www.wtoc.com/2023/05/31/ftc-charges-amazon-with-privacy-violations-over-alexa-ring-cameras/"
     },
@@ -1039,9 +1037,9 @@
      "importe": 5700000,
      "moneda": "USD",
      "motivo": {
-      "es": "Acuerdo con la FTC: Musical.ly (hoy TikTok) recogió nombres, correos y otros datos de menores de 13 años sin consentimiento de los padres, infringiendo la ley COPPA.",
-      "en": "Settlement with the FTC: Musical.ly (now TikTok) collected names, emails and other data from children under 13 without parental consent, violating COPPA.",
-      "pt": "Acordo com a FTC: o Musical.ly (hoje TikTok) coletou nomes, e-mails e outros dados de menores de 13 anos sem consentimento dos pais, violando a lei COPPA."
+      "es": "Acuerdo con la FTC: Musical.ly (hoy TikTok) recogió nombres, correos y otros datos de menores de 13 años sin consentimiento de los padres, infringiendo la ley COPPA. Son acusaciones de la FTC cerradas con un acuerdo.",
+      "en": "Settlement with the FTC: Musical.ly (now TikTok) collected names, emails and other data from children under 13 without parental consent, violating COPPA. These are the FTC's allegations, resolved by settlement.",
+      "pt": "Acordo com a FTC: o Musical.ly (hoje TikTok) coletou nomes, e-mails e outros dados de menores de 13 anos sem consentimento dos pais, violando a lei COPPA. São acusações da FTC encerradas por acordo."
      },
      "fuente": "https://ftc.gov/news-events/news/press-releases/2019/02/video-social-networking-app-musically-agrees-settle-ftc-allegations-it-violated-childrens-privacy"
     }
@@ -1125,9 +1123,9 @@
      "importe": 150000000,
      "moneda": "USD",
      "motivo": {
-      "es": "Acuerdo con la FTC: usó los teléfonos y correos que los usuarios dieron por seguridad (como la verificación en dos pasos) para dirigirles publicidad, incumpliendo una orden de la FTC. Afectó a más de 140 millones de usuarios.",
-      "en": "Settlement with the FTC: it used phone numbers and emails that users provided for security (such as two-factor authentication) to target ads, violating an FTC order. It affected more than 140 million users.",
-      "pt": "Acordo com a FTC: usou telefones e e-mails que os usuários forneceram por segurança (como a verificação em duas etapas) para direcionar publicidade, violando uma ordem da FTC. Afetou mais de 140 milhões de usuários."
+      "es": "Acuerdo con la FTC: usó los teléfonos y correos que los usuarios dieron por seguridad (como la verificación en dos pasos) para dirigirles publicidad, incumpliendo una orden de la FTC. Afectó a más de 140 millones de usuarios. Son acusaciones de la FTC cerradas con un acuerdo.",
+      "en": "Settlement with the FTC: it used phone numbers and emails that users provided for security (such as two-factor authentication) to target ads, violating an FTC order. It affected more than 140 million users. These are the FTC's allegations, resolved by settlement.",
+      "pt": "Acordo com a FTC: usou telefones e e-mails que os usuários forneceram por segurança (como a verificação em duas etapas) para direcionar publicidade, violando uma ordem da FTC. Afetou mais de 140 milhões de usuários. São acusações da FTC encerradas por acordo."
      },
      "fuente": "https://www.malwarebytes.com/blog/news/2022/05/twitter-fined-150m-for-using-2fa-phone-numbers-for-marketing"
     },
@@ -1154,9 +1152,9 @@
      "autoridad": "Federal Trade Commission (FTC)",
      "pais": "US",
      "motivo": {
-      "es": "Acuerdo con la FTC, sin multa, por fallos de seguridad que expusieron cuentas: le prohíbe engañar sobre cómo protege la información privada y le exige auditorías de seguridad independientes.",
-      "en": "Settlement with the FTC, without a fine, over security failures that exposed accounts: it bars Twitter from misleading users about how it protects private information and requires independent security audits.",
-      "pt": "Acordo com a FTC, sem multa, por falhas de segurança que expuseram contas: proíbe enganar sobre como protege informações privadas e exige auditorias de segurança independentes."
+      "es": "Acuerdo con la FTC, sin multa, por fallos de seguridad que expusieron cuentas: le prohíbe engañar sobre cómo protege la información privada y le exige auditorías de seguridad independientes. Son acusaciones de la FTC cerradas con un acuerdo.",
+      "en": "Settlement with the FTC, without a fine, over security failures that exposed accounts: it bars Twitter from misleading users about how it protects private information and requires independent security audits. These are the FTC's allegations, resolved by settlement.",
+      "pt": "Acordo com a FTC, sem multa, por falhas de segurança que expuseram contas: proíbe enganar sobre como protege informações privadas e exige auditorias de segurança independentes. São acusações da FTC encerradas por acordo."
      },
      "fuente": "https://en.wikipedia.org/wiki/X_(social_network)"
     }
@@ -1342,9 +1340,9 @@
    },
    "fuente_sociedad": "https://oborot.ru/news/yandeks-polnostyu-otdelilsya-ot-yandex-n-v-teper-est-mkpao-yandeks-i-nebius-group-i218035.html",
    "fiscal": {
-    "es": "Entre 2007 y 2024 la sociedad holding de Yandex estuvo constituida en los Países Bajos (Yandex N.V.), que salió a bolsa en Nasdaq en 2011. Tras la escisión de 2024, la nueva matriz rusa quedó registrada en el distrito administrativo especial de la isla Oktyabrsky (Kaliningrado). No se encontró ninguna resolución fiscal, caso judicial tributario ni declaración de tipo impositivo efectivo.",
-    "en": "From 2007 to 2024 Yandex's holding company was incorporated in the Netherlands (Yandex N.V.), which listed on Nasdaq in 2011. After the 2024 split, the new Russian parent was registered in the special administrative district on Oktyabrsky Island (Kaliningrad). No tax ruling, tax court case or effective-tax-rate statement was found.",
-    "pt": "De 2007 a 2024 a holding da Yandex foi constituída nos Países Baixos (Yandex N.V.), listada na Nasdaq em 2011. Após a cisão de 2024, a nova controladora russa foi registrada no distrito administrativo especial da ilha Oktyabrsky (Kaliningrado). Não foi encontrada nenhuma decisão fiscal, processo tributário ou declaração de alíquota efetiva."
+    "es": "Entre 2007 y 2024 la sociedad holding de Yandex estuvo constituida en los Países Bajos (Yandex N.V.), que salió a bolsa en Nasdaq en 2011. Tras la venta de su negocio ruso en 2024, la nueva matriz rusa quedó registrada en el distrito administrativo especial de la isla Oktyabrsky (Kaliningrado).",
+    "en": "From 2007 to 2024 Yandex's holding company was incorporated in the Netherlands (Yandex N.V.), which listed on Nasdaq in 2011. After the 2024 sale of its Russian business, the new Russian parent was registered in the special administrative district on Oktyabrsky Island (Kaliningrad).",
+    "pt": "De 2007 a 2024 a holding da Yandex foi constituída nos Países Baixos (Yandex N.V.), listada na Nasdaq em 2011. Após a venda do seu negócio russo em 2024, a nova controladora russa foi registrada no distrito administrativo especial da ilha Oktyabrsky (Kaliningrado)."
    },
    "fuente_fiscal": "https://en.wikipedia.org/wiki/Yandex",
    "monopolio": {
@@ -1659,9 +1657,9 @@
      "autoridad": "FTC",
      "pais": "US",
      "motivo": {
-      "es": "Acuerdo con la FTC por engañar a los consumidores sobre la seguridad de las actualizaciones de Java SE, que no eliminaban las versiones antiguas vulnerables. Sin multa: Oracle debía avisar a los usuarios de las versiones antiguas y ofrecerles desinstalarlas.",
-      "en": "Settlement with the FTC over deceiving consumers about the security of Java SE updates, which did not remove older vulnerable versions. No fine: Oracle had to warn users about old versions and offer to uninstall them.",
-      "pt": "Acordo com a FTC por enganar os consumidores sobre a segurança das atualizações do Java SE, que não removiam as versões antigas vulneráveis. Sem multa: a Oracle teve de avisar os usuários sobre as versões antigas e oferecer a desinstalação."
+      "es": "Acuerdo con la FTC por engañar a los consumidores sobre la seguridad de las actualizaciones de Java SE, que no eliminaban las versiones antiguas vulnerables. Sin multa: Oracle debía avisar a los usuarios de las versiones antiguas y ofrecerles desinstalarlas. Son acusaciones de la FTC cerradas con un acuerdo.",
+      "en": "Settlement with the FTC over deceiving consumers about the security of Java SE updates, which did not remove older vulnerable versions. No fine: Oracle had to warn users about old versions and offer to uninstall them. These are the FTC's allegations, resolved by settlement.",
+      "pt": "Acordo com a FTC por enganar os consumidores sobre a segurança das atualizações do Java SE, que não removiam as versões antigas vulneráveis. Sem multa: a Oracle teve de avisar os usuários sobre as versões antigas e oferecer a desinstalação. São acusações da FTC encerradas por acordo."
      },
      "fuente": "https://ftc.gov/news-events/press-releases/2015/12/oracle-agrees-settle-ftc-charges-it-deceived-consumers-about-java"
     }
@@ -1895,9 +1893,9 @@
    },
    "fuente_sociedad": "https://www.sec.gov/Archives/edgar/data/1595974/000159597426000007/mgni-20251231.htm",
    "fiscal": {
-    "es": "Su anexo de filiales del 10-K de 2024 enumera 27 sociedades sin indicar jurisdicción, entre ellas Magnite Netherlands B.V., Magnite Singapore Pte Ltd., Magnite SARL, Magnite Ltd, Magnite Holdings Pty Ltd, Telaria SDN. BHD., SpotX Limited y varias sociedades Rubicon Project. Su 10-K de 2025 advierte de que el uso de sus pérdidas fiscales acumuladas y créditos fiscales puede estar sujeto a limitaciones. No se encontró ninguna declaración documentada sobre uso de jurisdicciones de baja tributación ni litigios fiscales.",
-    "en": "Its FY2024 10-K subsidiaries exhibit lists 27 entities without stating jurisdictions, including Magnite Netherlands B.V., Magnite Singapore Pte Ltd., Magnite SARL, Magnite Ltd, Magnite Holdings Pty Ltd, Telaria SDN. BHD., SpotX Limited and several Rubicon Project entities. Its FY2025 10-K warns that the use of its net operating losses and tax credit carryforwards may be subject to limitations. No documented statement on use of low-tax jurisdictions or tax litigation was found.",
-    "pt": "Seu anexo de subsidiárias do 10-K de 2024 lista 27 sociedades sem indicar jurisdição, entre elas Magnite Netherlands B.V., Magnite Singapore Pte Ltd., Magnite SARL, Magnite Ltd, Magnite Holdings Pty Ltd, Telaria SDN. BHD., SpotX Limited e várias sociedades Rubicon Project. Seu 10-K de 2025 adverte que o uso de seus prejuízos fiscais acumulados e créditos fiscais pode estar sujeito a limitações. Não foi encontrada nenhuma declaração documentada sobre uso de jurisdições de baixa tributação ou litígios fiscais."
+    "es": "Su anexo de filiales del 10-K de 2024 enumera 27 sociedades sin indicar jurisdicción, entre ellas Magnite Netherlands B.V., Magnite Singapore Pte Ltd., Magnite SARL, Magnite Ltd, Magnite Holdings Pty Ltd, Telaria SDN. BHD., SpotX Limited y varias sociedades Rubicon Project. Su 10-K de 2025 advierte de que el uso de sus pérdidas fiscales acumuladas y créditos fiscales puede estar sujeto a limitaciones.",
+    "en": "Its FY2024 10-K subsidiaries exhibit lists 27 entities without stating jurisdictions, including Magnite Netherlands B.V., Magnite Singapore Pte Ltd., Magnite SARL, Magnite Ltd, Magnite Holdings Pty Ltd, Telaria SDN. BHD., SpotX Limited and several Rubicon Project entities. Its FY2025 10-K warns that the use of its net operating losses and tax credit carryforwards may be subject to limitations.",
+    "pt": "Seu anexo de subsidiárias do 10-K de 2024 lista 27 sociedades sem indicar jurisdição, entre elas Magnite Netherlands B.V., Magnite Singapore Pte Ltd., Magnite SARL, Magnite Ltd, Magnite Holdings Pty Ltd, Telaria SDN. BHD., SpotX Limited e várias sociedades Rubicon Project. Seu 10-K de 2025 adverte que o uso de seus prejuízos fiscais acumulados e créditos fiscais pode estar sujeito a limitações."
    },
    "fuente_fiscal": "https://www.sec.gov/Archives/edgar/data/1595974/000159597425000008/exhibit211-listofsubsidiar.htm",
    "monopolio": {
@@ -1967,9 +1965,9 @@
    },
    "fuente_sociedad": "https://www.sec.gov/Archives/edgar/data/1422930/000142293026000010/pubm-20251231.htm",
    "fiscal": {
-    "es": "Su anexo de filiales del 10-K de 2025 enumera ocho sociedades: PubMatic India Private Limited (India), PubMatic GmbH (Alemania), PubMatic Limited (Reino Unido), PubMatic Software (Shanghai) Limited (China), PubMatic KK (Japón), PubMatic Pte Ltd (Singapur), PubMatic US, Inc. (Delaware) y PubMatic Ireland Limited (Irlanda). No se encontró ninguna declaración documentada sobre el tipo impositivo efectivo, acuerdos fiscales ni litigios tributarios.",
-    "en": "Its FY2025 10-K subsidiaries exhibit lists eight entities: PubMatic India Private Limited (India), PubMatic GmbH (Germany), PubMatic Limited (United Kingdom), PubMatic Software (Shanghai) Limited (China), PubMatic KK (Japan), PubMatic Pte Ltd (Singapore), PubMatic US, Inc. (Delaware) and PubMatic Ireland Limited (Ireland). No documented statement on effective tax rate, tax rulings or tax litigation was found.",
-    "pt": "Seu anexo de subsidiárias do 10-K de 2025 lista oito sociedades: PubMatic India Private Limited (Índia), PubMatic GmbH (Alemanha), PubMatic Limited (Reino Unido), PubMatic Software (Shanghai) Limited (China), PubMatic KK (Japão), PubMatic Pte Ltd (Singapura), PubMatic US, Inc. (Delaware) e PubMatic Ireland Limited (Irlanda). Não foi encontrada nenhuma declaração documentada sobre alíquota efetiva, acordos fiscais ou litígios tributários."
+    "es": "Su anexo de filiales del 10-K de 2025 enumera ocho sociedades: PubMatic India Private Limited (India), PubMatic GmbH (Alemania), PubMatic Limited (Reino Unido), PubMatic Software (Shanghai) Limited (China), PubMatic KK (Japón), PubMatic Pte Ltd (Singapur), PubMatic US, Inc. (Delaware) y PubMatic Ireland Limited (Irlanda).",
+    "en": "Its FY2025 10-K subsidiaries exhibit lists eight entities: PubMatic India Private Limited (India), PubMatic GmbH (Germany), PubMatic Limited (United Kingdom), PubMatic Software (Shanghai) Limited (China), PubMatic KK (Japan), PubMatic Pte Ltd (Singapore), PubMatic US, Inc. (Delaware) and PubMatic Ireland Limited (Ireland).",
+    "pt": "Seu anexo de subsidiárias do 10-K de 2025 lista oito sociedades: PubMatic India Private Limited (Índia), PubMatic GmbH (Alemanha), PubMatic Limited (Reino Unido), PubMatic Software (Shanghai) Limited (China), PubMatic KK (Japão), PubMatic Pte Ltd (Singapura), PubMatic US, Inc. (Delaware) e PubMatic Ireland Limited (Irlanda)."
    },
    "fuente_fiscal": "https://www.sec.gov/Archives/edgar/data/1422930/000142293026000010/q42025exhibit211.htm",
    "monopolio": {
@@ -2109,15 +2107,15 @@
    "borrar": "https://liveramp.com/your-rights/",
    "slug": "liveramp",
    "sociedad": {
-    "es": "LiveRamp Holdings, Inc. es una sociedad de Delaware con sede en 225 Bush Street, San Francisco, California, cotizada en NYSE (RAMP). Es la antigua Acxiom Corporation (fundada en 1969 en Conway, Arkansas), que compró LiveRamp en 2014, vendió su negocio de marketing a IPG y adoptó el nombre LiveRamp en octubre de 2018. En mayo de 2026 Publicis Groupe acordó adquirirla; el cierre, previsto antes de fin de 2026, está sujeto a aprobaciones regulatorias y de los accionistas.",
-    "en": "LiveRamp Holdings, Inc. is a Delaware corporation headquartered at 225 Bush Street, San Francisco, California, listed on the NYSE (RAMP). It is the former Acxiom Corporation (founded in 1969 in Conway, Arkansas), which bought LiveRamp in 2014, sold its marketing business to IPG and took the LiveRamp name in October 2018. In May 2026 Publicis Groupe agreed to acquire it; closing, expected before year-end 2026, is subject to regulatory and shareholder approvals.",
-    "pt": "A LiveRamp Holdings, Inc. é uma sociedade de Delaware com sede em 225 Bush Street, San Francisco, Califórnia, listada na NYSE (RAMP). É a antiga Acxiom Corporation (fundada em 1969 em Conway, Arkansas), que comprou a LiveRamp em 2014, vendeu seu negócio de marketing para a IPG e adotou o nome LiveRamp em outubro de 2018. Em maio de 2026 a Publicis Groupe acordou adquiri-la; o fechamento, previsto antes do fim de 2026, está sujeito a aprovações regulatórias e dos acionistas."
+    "es": "LiveRamp Holdings, Inc. es una sociedad de Delaware con sede en 225 Bush Street, San Francisco, California, cotizada en NYSE (RAMP). En mayo de 2026 Publicis Groupe acordó adquirirla por unos 2.200 millones de dólares; los accionistas lo aprobaron el 17 de agosto de 2026 y el cierre, previsto antes de fin de 2026, depende de aprobaciones regulatorias.",
+    "en": "LiveRamp Holdings, Inc. is a Delaware corporation headquartered at 225 Bush Street, San Francisco, California, listed on the NYSE (RAMP). In May 2026 Publicis Groupe agreed to acquire it for about USD 2.2 billion; shareholders approved it on 17 August 2026 and closing, expected before the end of 2026, depends on regulatory approvals.",
+    "pt": "A LiveRamp Holdings, Inc. é uma sociedade de Delaware com sede em 225 Bush Street, San Francisco, Califórnia, listada na NYSE (RAMP). Em maio de 2026 o Publicis Groupe concordou em adquiri-la por cerca de 2,2 bilhões de dólares; os acionistas aprovaram em 17 de agosto de 2026 e o fechamento, previsto para antes do fim de 2026, depende de aprovações regulatórias."
    },
-   "fuente_sociedad": "https://www.sec.gov/Archives/edgar/data/733269/000073326924000018/ramp-20240331.htm",
+   "fuente_sociedad": "https://www.adweek.com/media/liveramp-shareholders-approve-22b-publicis-deal-but-reject-execs-826m-payday/",
    "fiscal": {
-    "es": "Su anexo de filiales del 10-K del ejercicio 2024 enumera cinco filiales en Delaware (LiveRamp, Inc., Data Plus Math Corporation, DataFleets, Ltd., Diablo.ai, Inc. y Habu, Inc) y filiales internacionales en India, Australia, Francia, Reino Unido, China, Japón, Países Bajos (LiveRamp Netherlands B.V.), Nueva Zelanda, Singapur (LiveRamp PTE. Ltd.), Italia, Brasil y España. No se encontró ninguna declaración documentada sobre uso de jurisdicciones de baja tributación, acuerdos fiscales ni litigios tributarios.",
-    "en": "Its FY2024 10-K subsidiaries exhibit lists five Delaware subsidiaries (LiveRamp, Inc., Data Plus Math Corporation, DataFleets, Ltd., Diablo.ai, Inc. and Habu, Inc) and international subsidiaries in India, Australia, France, the UK, China, Japan, the Netherlands (LiveRamp Netherlands B.V.), New Zealand, Singapore (LiveRamp PTE. Ltd.), Italy, Brazil and Spain. No documented statement about use of low-tax jurisdictions, tax rulings or tax litigation was found.",
-    "pt": "Seu anexo de subsidiárias do 10-K do exercício 2024 lista cinco subsidiárias em Delaware (LiveRamp, Inc., Data Plus Math Corporation, DataFleets, Ltd., Diablo.ai, Inc. e Habu, Inc) e subsidiárias internacionais na Índia, Austrália, França, Reino Unido, China, Japão, Países Baixos (LiveRamp Netherlands B.V.), Nova Zelândia, Singapura (LiveRamp PTE. Ltd.), Itália, Brasil e Espanha. Não foi encontrada nenhuma declaração documentada sobre uso de jurisdições de baixa tributação, acordos fiscais ou litígios tributários."
+    "es": "Su anexo de filiales del 10-K del ejercicio 2024 enumera cinco filiales en Delaware (LiveRamp, Inc., Data Plus Math Corporation, DataFleets, Ltd., Diablo.ai, Inc. y Habu, Inc) y filiales internacionales en India, Australia, Francia, Reino Unido, China, Japón, Países Bajos (LiveRamp Netherlands B.V.), Nueva Zelanda, Singapur (LiveRamp PTE. Ltd.), Italia, Brasil y España.",
+    "en": "Its FY2024 10-K subsidiaries exhibit lists five Delaware subsidiaries (LiveRamp, Inc., Data Plus Math Corporation, DataFleets, Ltd., Diablo.ai, Inc. and Habu, Inc) and international subsidiaries in India, Australia, France, the UK, China, Japan, the Netherlands (LiveRamp Netherlands B.V.), New Zealand, Singapore (LiveRamp PTE. Ltd.), Italy, Brazil and Spain.",
+    "pt": "Seu anexo de subsidiárias do 10-K do exercício 2024 lista cinco subsidiárias em Delaware (LiveRamp, Inc., Data Plus Math Corporation, DataFleets, Ltd., Diablo.ai, Inc. e Habu, Inc) e subsidiárias internacionais na Índia, Austrália, França, Reino Unido, China, Japão, Países Baixos (LiveRamp Netherlands B.V.), Nova Zelândia, Singapura (LiveRamp PTE. Ltd.), Itália, Brasil e Espanha."
    },
    "fuente_fiscal": "https://www.sec.gov/Archives/edgar/data/733269/000073326924000018/a2024q4ex21subsidiaries.htm",
    "como_usa_datos": {
@@ -2173,9 +2171,9 @@
      "importe": 2900000,
      "moneda": "USD",
      "motivo": {
-      "es": "Acuerdo con la FTC de ValueClick (que en 2014 pasó a llamarse Conversant y se integró en Epsilon): multa civil por correos y anuncios engañosos que prometían regalos 'gratis' (ley CAN-SPAM). La FTC también la acusó de afirmar falsamente que protegía y cifraba los datos de sus clientes y le impuso un programa de seguridad de 20 años.",
-      "en": "Settlement with the FTC by ValueClick (renamed Conversant in 2014 and folded into Epsilon): civil penalty for deceptive emails and ads promising 'free' gifts (CAN-SPAM Act). The FTC also charged it with falsely claiming to secure and encrypt customer data and required a 20-year security program.",
-      "pt": "Acordo com a FTC da ValueClick (renomeada Conversant em 2014 e incorporada à Epsilon): multa civil por e-mails e anúncios enganosos que prometiam brindes 'grátis' (lei CAN-SPAM). A FTC também a acusou de afirmar falsamente que protegia e criptografava dados de clientes e exigiu um programa de segurança de 20 anos."
+      "es": "Acuerdo con la FTC de ValueClick (que en 2014 pasó a llamarse Conversant y se integró en Epsilon): multa civil por correos y anuncios engañosos que prometían regalos 'gratis' (ley CAN-SPAM). La FTC también la acusó de afirmar falsamente que protegía y cifraba los datos de sus clientes y le impuso un programa de seguridad de 20 años. Son acusaciones de la FTC cerradas con un acuerdo.",
+      "en": "Settlement with the FTC by ValueClick (renamed Conversant in 2014 and folded into Epsilon): civil penalty for deceptive emails and ads promising 'free' gifts (CAN-SPAM Act). The FTC also charged it with falsely claiming to secure and encrypt customer data and required a 20-year security program. These are the FTC's allegations, resolved by settlement.",
+      "pt": "Acordo com a FTC da ValueClick (renomeada Conversant em 2014 e incorporada à Epsilon): multa civil por e-mails e anúncios enganosos que prometiam brindes 'grátis' (lei CAN-SPAM). A FTC também a acusou de afirmar falsamente que protegia e criptografava dados de clientes e exigiu um programa de segurança de 20 anos. São acusações da FTC encerradas por acordo."
      },
      "fuente": "https://www.ftc.gov/news-events/news/press-releases/2008/03/valueclick-pay-29-million-settle-ftc-charges"
     }
@@ -2376,9 +2374,9 @@
    },
    "fuente_sociedad": "https://www.sec.gov/Archives/edgar/data/1454938/000145493826000015/tead-20251231.htm",
    "fiscal": {
-    "es": "Su anexo de filiales del 10-K de 2025 enumera 64 sociedades, entre ellas dos en Luxemburgo (Teads SARL y Teads MENA SARL), dos en Países Bajos (Outbrain Netherlands B.V. y Teads NL BV), tres en Suiza (OT Swiss Financing GmbH, Teads Schweiz GmbH y video intelligence AG), además de Outbrain Israel Ltd., Teads Middle East FZ-LLC (EAU) y filiales en Singapur, Hong Kong y otros países. La propia TEADS adquirida era una sociedad luxemburguesa. No se encontró ninguna declaración sobre tipo impositivo efectivo ni litigios fiscales.",
-    "en": "Its FY2025 10-K subsidiaries exhibit lists 64 entities, including two in Luxembourg (Teads SARL and Teads MENA SARL), two in the Netherlands (Outbrain Netherlands B.V. and Teads NL BV), three in Switzerland (OT Swiss Financing GmbH, Teads Schweiz GmbH and video intelligence AG), plus Outbrain Israel Ltd., Teads Middle East FZ-LLC (UAE) and subsidiaries in Singapore, Hong Kong and other countries. The acquired TEADS itself was a Luxembourg company. No statement on effective tax rate or tax litigation was found.",
-    "pt": "Seu anexo de subsidiárias do 10-K de 2025 lista 64 sociedades, entre elas duas em Luxemburgo (Teads SARL e Teads MENA SARL), duas nos Países Baixos (Outbrain Netherlands B.V. e Teads NL BV), três na Suíça (OT Swiss Financing GmbH, Teads Schweiz GmbH e video intelligence AG), além da Outbrain Israel Ltd., Teads Middle East FZ-LLC (EAU) e subsidiárias em Singapura, Hong Kong e outros países. A própria TEADS adquirida era uma sociedade luxemburguesa. Não foi encontrada nenhuma declaração sobre alíquota efetiva ou litígios fiscais."
+    "es": "Su anexo de filiales del 10-K de 2025 enumera 64 sociedades, entre ellas dos en Luxemburgo (Teads SARL y Teads MENA SARL), dos en Países Bajos (Outbrain Netherlands B.V. y Teads NL BV), tres en Suiza (OT Swiss Financing GmbH, Teads Schweiz GmbH y video intelligence AG), además de Outbrain Israel Ltd., Teads Middle East FZ-LLC (EAU) y filiales en Singapur, Hong Kong y otros países.",
+    "en": "Its FY2025 10-K subsidiaries exhibit lists 64 entities, including two in Luxembourg (Teads SARL and Teads MENA SARL), two in the Netherlands (Outbrain Netherlands B.V. and Teads NL BV), three in Switzerland (OT Swiss Financing GmbH, Teads Schweiz GmbH and video intelligence AG), plus Outbrain Israel Ltd., Teads Middle East FZ-LLC (UAE) and subsidiaries in Singapore, Hong Kong and other countries.",
+    "pt": "Seu anexo de subsidiárias do 10-K de 2025 lista 64 sociedades, entre elas duas em Luxemburgo (Teads SARL e Teads MENA SARL), duas nos Países Baixos (Outbrain Netherlands B.V. e Teads NL BV), três na Suíça (OT Swiss Financing GmbH, Teads Schweiz GmbH e video intelligence AG), além da Outbrain Israel Ltd., Teads Middle East FZ-LLC (EAU) e subsidiárias em Singapura, Hong Kong e outros países."
    },
    "fuente_fiscal": "https://www.sec.gov/Archives/edgar/data/1454938/000145493826000015/exhibit211-202510xk.htm",
    "monopolio": {
@@ -2463,9 +2461,9 @@
      "importe": 7500000,
      "moneda": "USD",
      "motivo": {
-      "es": "Acuerdo con la FTC por recoger datos personales de menores de 13 años sin permiso de los padres (ley COPPA) y por recoger la ubicación de usuarios que habían pedido no ser rastreados.",
-      "en": "Settlement with the FTC over collecting personal information from children under 13 without parental consent (COPPA) and collecting location data from users who had opted out of tracking.",
-      "pt": "Acordo com a FTC por coletar dados pessoais de menores de 13 anos sem consentimento dos pais (lei COPPA) e por coletar a localização de usuários que haviam pedido para não ser rastreados."
+      "es": "Acuerdo con la FTC por recoger datos personales de menores de 13 años sin permiso de los padres (ley COPPA) y por recoger la ubicación de usuarios que habían pedido no ser rastreados. Son acusaciones de la FTC cerradas con un acuerdo.",
+      "en": "Settlement with the FTC over collecting personal information from children under 13 without parental consent (COPPA) and collecting location data from users who had opted out of tracking. These are the FTC's allegations, resolved by settlement.",
+      "pt": "Acordo com a FTC por coletar dados pessoais de menores de 13 anos sem consentimento dos pais (lei COPPA) e por coletar a localização de usuários que haviam pedido para não ser rastreados. São acusações da FTC encerradas por acordo."
      },
      "estado": {
       "es": "Multa civil de 7,5 millones de USD, de los que se suspendieron 5,5 millones por la situación financiera de OpenX; pagó 2 millones.",
@@ -2651,13 +2649,14 @@
    "sanciones": [],
    "filtraciones": [
     {
-     "fecha": "2024-07",
+     "fecha": "2024-06",
      "que": {
-      "es": "Atacantes accedieron sin autorización a menos de 50 cuentas de clientes de HubSpot (cifra preliminar); la empresa lo detectó el 22 de junio y lo comunicó el 5 de julio de 2024. No se informó qué datos se vieron expuestos.",
-      "en": "Attackers gained unauthorised access to fewer than 50 HubSpot customer accounts (preliminary figure); the company detected it on 22 June and disclosed it on 5 July 2024. It did not say what data was exposed.",
-      "pt": "Atacantes obtiveram acesso não autorizado a menos de 50 contas de clientes da HubSpot (número preliminar); a empresa detectou em 22 de junho e divulgou em 5 de julho de 2024. Não informou quais dados foram expostos."
+      "es": "Atacantes accedieron sin autorización a cuentas de clientes de HubSpot; la empresa lo detectó el 22 de junio de 2024, lo comunicó el 28 de junio y el 12 de julio rebajó la cifra a menos de 30 portales de clientes. No se informó qué datos se vieron expuestos.",
+      "en": "Attackers gained unauthorised access to HubSpot customer accounts; the company detected it on 22 June 2024, disclosed it on 28 June and on 12 July revised the figure to fewer than 30 customer portals. It did not say what data was exposed.",
+      "pt": "Atacantes obtiveram acesso não autorizado a contas de clientes da HubSpot; a empresa detectou em 22 de junho de 2024, divulgou em 28 de junho e em 12 de julho reduziu o número para menos de 30 portais de clientes. Não informou quais dados foram expostos."
      },
-     "fuente": "https://www.techcentral.ie/hubspot-reports-nearly-50-customer-accounts-compromised/"
+     "fuente": "https://ir.hubspot.com/news-releases/news-release-details/hubspots-statement-regarding-june-22-2024-security-incident",
+     "afectados": null
     },
     {
      "fecha": "2022-03",
@@ -2900,9 +2899,9 @@
    },
    "fuente_sociedad": "https://www.sec.gov/Archives/edgar/data/1506293/000150629325000022/pins-20241231.htm",
    "fiscal": {
-    "es": "El anexo de filiales de su 10-K de 2025 nombra una sola sociedad: Pinterest Europe Limited, constituida en Irlanda; el anexo indica que omite las filiales que, consideradas en conjunto, no serían significativas. No se encontró ninguna declaración documentada sobre el tipo impositivo efectivo, acuerdos fiscales ni litigios tributarios.",
-    "en": "The subsidiaries exhibit of its FY2025 10-K names a single entity: Pinterest Europe Limited, incorporated in Ireland; the exhibit states that it omits subsidiaries which, considered in the aggregate, would not be significant. No documented statement on effective tax rate, tax rulings or tax litigation was found.",
-    "pt": "O anexo de subsidiárias do seu 10-K de 2025 nomeia uma única sociedade: Pinterest Europe Limited, constituída na Irlanda; o anexo indica que omite as subsidiárias que, consideradas em conjunto, não seriam significativas. Não foi encontrada nenhuma declaração documentada sobre alíquota efetiva, acordos fiscais ou litígios tributários."
+    "es": "El anexo de filiales de su 10-K de 2025 nombra una sola sociedad: Pinterest Europe Limited, constituida en Irlanda; el anexo indica que omite las filiales que, consideradas en conjunto, no serían significativas.",
+    "en": "The subsidiaries exhibit of its FY2025 10-K names a single entity: Pinterest Europe Limited, incorporated in Ireland; the exhibit states that it omits subsidiaries which, considered in the aggregate, would not be significant.",
+    "pt": "O anexo de subsidiárias do seu 10-K de 2025 nomeia uma única sociedade: Pinterest Europe Limited, constituída na Irlanda; o anexo indica que omite as subsidiárias que, consideradas em conjunto, não seriam significativas."
    },
    "fuente_fiscal": "https://www.sec.gov/Archives/edgar/data/1506293/000150629326000021/pins-ex211x20251231.htm",
    "como_usa_datos": {
@@ -2961,9 +2960,9 @@
      "autoridad": "FTC",
      "pais": "US",
      "motivo": {
-      "es": "Acuerdo con la FTC por engañar a los usuarios: los mensajes no desaparecían como se prometía, se recogían contactos y ubicación sin aviso ni consentimiento, y una mala seguridad permitió filtrar 4,6 millones de usuarios y teléfonos. Sin multa; obliga a un programa de privacidad con auditorías independientes durante 20 años.",
-      "en": "Settlement with the FTC for deceiving users: messages did not disappear as promised, contacts and location were collected without notice or consent, and weak security allowed 4.6 million usernames and phone numbers to leak. No fine; requires a privacy programme with independent audits for 20 years.",
-      "pt": "Acordo com a FTC por enganar os usuários: as mensagens não desapareciam como prometido, contatos e localização eram coletados sem aviso nem consentimento, e falhas de segurança permitiram vazar 4,6 milhões de usuários e telefones. Sem multa; exige um programa de privacidade com auditorias independentes por 20 anos."
+      "es": "Acuerdo con la FTC por engañar a los usuarios: los mensajes no desaparecían como se prometía, se recogían contactos y ubicación sin aviso ni consentimiento, y una mala seguridad permitió filtrar 4,6 millones de usuarios y teléfonos. Sin multa; obliga a un programa de privacidad con auditorías independientes durante 20 años. Son acusaciones de la FTC cerradas con un acuerdo.",
+      "en": "Settlement with the FTC for deceiving users: messages did not disappear as promised, contacts and location were collected without notice or consent, and weak security allowed 4.6 million usernames and phone numbers to leak. No fine; requires a privacy programme with independent audits for 20 years. These are the FTC's allegations, resolved by settlement.",
+      "pt": "Acordo com a FTC por enganar os usuários: as mensagens não desapareciam como prometido, contatos e localização eram coletados sem aviso nem consentimento, e falhas de segurança permitiram vazar 4,6 milhões de usuários e telefones. Sem multa; exige um programa de privacidade com auditorias independentes por 20 anos. São acusações da FTC encerradas por acordo."
      },
      "estado": {
       "es": "Acuerdo anunciado el 8 de mayo de 2014; orden definitiva en diciembre de 2014, vigente 20 años.",
@@ -2994,9 +2993,9 @@
    },
    "fuente_sociedad": "https://www.sec.gov/Archives/edgar/data/1564408/000156440826000013/snap-20251231.htm",
    "fiscal": {
-    "es": "Su anexo de filiales del 10-K de 2022 enumera nueve sociedades: Snap LLC (Nevada), Snap Group Limited, Snap International I Limited y Snap International II Limited (Reino Unido), Snap Intermediate Inc. (Delaware), Snap Group SAS (Francia), Snap Aus Pty Ltd (Australia), Snap ULC (Canadá) y Snap Camera GmbH (Alemania); no figuran filiales en Irlanda, Luxemburgo, Países Bajos ni Caimán. No se encontró ninguna declaración documentada sobre el tipo impositivo efectivo, acuerdos fiscales ni litigios tributarios.",
-    "en": "Its FY2022 10-K subsidiaries exhibit lists nine entities: Snap LLC (Nevada), Snap Group Limited, Snap International I Limited and Snap International II Limited (United Kingdom), Snap Intermediate Inc. (Delaware), Snap Group SAS (France), Snap Aus Pty Ltd (Australia), Snap ULC (Canada) and Snap Camera GmbH (Germany); no subsidiaries in Ireland, Luxembourg, the Netherlands or the Cayman Islands are listed. No documented statement on effective tax rate, tax rulings or tax litigation was found.",
-    "pt": "Seu anexo de subsidiárias do 10-K de 2022 lista nove sociedades: Snap LLC (Nevada), Snap Group Limited, Snap International I Limited e Snap International II Limited (Reino Unido), Snap Intermediate Inc. (Delaware), Snap Group SAS (França), Snap Aus Pty Ltd (Austrália), Snap ULC (Canadá) e Snap Camera GmbH (Alemanha); não constam subsidiárias na Irlanda, Luxemburgo, Países Baixos ou Cayman. Não foi encontrada nenhuma declaração documentada sobre alíquota efetiva, acordos fiscais ou litígios tributários."
+    "es": "Su anexo de filiales del 10-K de 2022 enumera nueve sociedades: Snap LLC (Nevada), Snap Group Limited, Snap International I Limited y Snap International II Limited (Reino Unido), Snap Intermediate Inc. (Delaware), Snap Group SAS (Francia), Snap Aus Pty Ltd (Australia), Snap ULC (Canadá) y Snap Camera GmbH (Alemania); no figuran filiales en Irlanda, Luxemburgo, Países Bajos ni Caimán.",
+    "en": "Its FY2022 10-K subsidiaries exhibit lists nine entities: Snap LLC (Nevada), Snap Group Limited, Snap International I Limited and Snap International II Limited (United Kingdom), Snap Intermediate Inc. (Delaware), Snap Group SAS (France), Snap Aus Pty Ltd (Australia), Snap ULC (Canada) and Snap Camera GmbH (Germany); no subsidiaries in Ireland, Luxembourg, the Netherlands or the Cayman Islands are listed.",
+    "pt": "Seu anexo de subsidiárias do 10-K de 2022 lista nove sociedades: Snap LLC (Nevada), Snap Group Limited, Snap International I Limited e Snap International II Limited (Reino Unido), Snap Intermediate Inc. (Delaware), Snap Group SAS (França), Snap Aus Pty Ltd (Austrália), Snap ULC (Canadá) e Snap Camera GmbH (Alemanha); não constam subsidiárias na Irlanda, Luxemburgo, Países Baixos ou Cayman."
    },
    "fuente_fiscal": "https://www.sec.gov/Archives/edgar/data/1564408/000156440823000013/snap-20221231xexx211.htm",
    "como_usa_datos": {
@@ -3088,9 +3087,9 @@
      "autoridad": "FTC",
      "pais": "US",
      "motivo": {
-      "es": "Acuerdo con la FTC (competencia) para poder comprar Arbitron por unos 1.260 millones USD: la FTC consideró que la compra podía reducir la competencia en la medición de audiencias multiplataforma. Nielsen tuvo que vender y licenciar activos de Arbitron a un comprador aprobado. Sin multa.",
-      "en": "Settlement with the FTC (antitrust) to allow its purchase of Arbitron for about USD 1.26 billion: the FTC found the deal could reduce competition in cross-platform audience measurement. Nielsen had to sell and license Arbitron assets to an approved buyer. No fine.",
-      "pt": "Acordo com a FTC (concorrência) para poder comprar a Arbitron por cerca de US$ 1,26 bilhão: a FTC considerou que a compra podia reduzir a concorrência na medição de audiência multiplataforma. A Nielsen teve de vender e licenciar ativos da Arbitron a um comprador aprovado. Sem multa."
+      "es": "Acuerdo con la FTC (competencia) para poder comprar Arbitron por unos 1.260 millones USD: la FTC consideró que la compra podía reducir la competencia en la medición de audiencias multiplataforma. Nielsen tuvo que vender y licenciar activos de Arbitron a un comprador aprobado. Sin multa. Son acusaciones de la FTC cerradas con un acuerdo.",
+      "en": "Settlement with the FTC (antitrust) to allow its purchase of Arbitron for about USD 1.26 billion: the FTC found the deal could reduce competition in cross-platform audience measurement. Nielsen had to sell and license Arbitron assets to an approved buyer. No fine. These are the FTC's allegations, resolved by settlement.",
+      "pt": "Acordo com a FTC (concorrência) para poder comprar a Arbitron por cerca de US$ 1,26 bilhão: a FTC considerou que a compra podia reduzir a concorrência na medição de audiência multiplataforma. A Nielsen teve de vender e licenciar ativos da Arbitron a um comprador aprovado. Sem multa. São acusações da FTC encerradas por acordo."
      },
      "fuente": "https://www.ftc.gov/node/45991"
     }
@@ -3409,9 +3408,9 @@
      "importe": 950000,
      "moneda": "USD",
      "motivo": {
-      "es": "Acuerdo con la FTC: rastreó la ubicación de cientos de millones de usuarios aunque no lo autorizaran y recogió la ubicación de niños en apps infantiles sin permiso de los padres (ley COPPA). Multa civil de 4 millones, reducida a 950.000 por su situación financiera.",
-      "en": "FTC settlement: it tracked the location of hundreds of millions of users regardless of their permissions and collected children's location in child-directed apps without parental consent (COPPA). $4 million civil penalty, suspended to $950,000 based on its finances.",
-      "pt": "Acordo com a FTC: rastreou a localização de centenas de milhões de usuários sem a devida permissão e coletou a localização de crianças em apps infantis sem consentimento dos pais (COPPA). Multa civil de US$ 4 milhões, reduzida a US$ 950 mil por sua situação financeira."
+      "es": "Acuerdo con la FTC: rastreó la ubicación de cientos de millones de usuarios aunque no lo autorizaran y recogió la ubicación de niños en apps infantiles sin permiso de los padres (ley COPPA). Multa civil de 4 millones, reducida a 950.000 por su situación financiera. Son acusaciones de la FTC cerradas con un acuerdo.",
+      "en": "FTC settlement: it tracked the location of hundreds of millions of users regardless of their permissions and collected children's location in child-directed apps without parental consent (COPPA). $4 million civil penalty, suspended to $950,000 based on its finances. These are the FTC's allegations, resolved by settlement.",
+      "pt": "Acordo com a FTC: rastreou a localização de centenas de milhões de usuários sem a devida permissão e coletou a localização de crianças em apps infantis sem consentimento dos pais (COPPA). Multa civil de US$ 4 milhões, reduzida a US$ 950 mil por sua situação financeira. São acusações da FTC encerradas por acordo."
      },
      "fuente": "https://www.ftc.gov/node/44937"
     }
@@ -3658,13 +3657,13 @@
    ],
    "filtraciones": [
     {
-     "fecha": "2025-10",
+     "fecha": "2025-08",
      "que": {
-      "es": "Un grupo de extorsión robó datos de instancias de Salesforce de cientos de empresas clientes usando tokens OAuth robados de la aplicación de terceros Salesloft Drift; Salesforce dijo que no había indicios de que su plataforma estuviera comprometida y se negó a pagar. Las cifras de registros afectados no están verificadas.",
-      "en": "An extortion group stole data from the Salesforce instances of hundreds of customer companies using stolen OAuth tokens from the third-party app Salesloft Drift; Salesforce said there was no indication its platform was compromised and refused to pay. Record counts are unverified.",
-      "pt": "Um grupo de extorsão roubou dados das instâncias Salesforce de centenas de empresas clientes usando tokens OAuth roubados do aplicativo de terceiros Salesloft Drift; a Salesforce disse não haver indícios de que sua plataforma foi comprometida e se recusou a pagar. Os números de registros não foram verificados."
+      "es": "Entre el 8 y el 18 de agosto de 2025, atacantes usaron tokens OAuth robados de la aplicación de terceros Salesloft Drift para sacar datos de instancias de Salesforce de cientos de empresas clientes. En octubre, un grupo que se atribuye el robo intentó extorsionar y Salesforce se negó a pagar; Salesforce dijo que no había indicios de que su plataforma estuviera comprometida. Las cifras de registros afectados no están verificadas.",
+      "en": "Between 8 and 18 August 2025, attackers used stolen OAuth tokens from the third-party app Salesloft Drift to take data from the Salesforce instances of hundreds of customer companies. In October, a group claiming the theft tried extortion and Salesforce refused to pay; Salesforce said there was no indication its platform was compromised. Record counts are unverified.",
+      "pt": "Entre 8 e 18 de agosto de 2025, atacantes usaram tokens OAuth roubados do aplicativo de terceiros Salesloft Drift para tirar dados das instâncias Salesforce de centenas de empresas clientes. Em outubro, um grupo que reivindica o roubo tentou extorsão e a Salesforce se recusou a pagar; a Salesforce disse não haver indícios de que sua plataforma tenha sido comprometida. Os números de registros afetados não estão verificados."
      },
-     "fuente": "https://www.bankinfosecurity.net/salesforce-rebuffs-shinyhunters-extortionists-ransom-demand-a-29689"
+     "fuente": "https://www.bleepingcomputer.com/news/security/salesloft-breached-to-steal-oauth-tokens-for-salesforce-data-theft-attacks/"
     }
    ],
    "borrar": "https://www.salesforce.com/form/other/privacy-request/?d=pb",

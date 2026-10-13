@@ -134,6 +134,8 @@
   document.querySelectorAll('.periodos button').forEach((b) => b.addEventListener('click', () => {
     if (periodo === b.dataset.periodo) return;
     periodo = b.dataset.periodo;
+    clearTimeout(pendiente);
+    pendiente = 0;
     document.querySelectorAll('.periodos button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     const esHoy = periodo === 'hoy';
     $('hoy').classList.toggle('pasado', !esHoy);
@@ -186,8 +188,10 @@
       $('h-corredores').textContent = n(dia.corredores);
       $('rastro-caja').classList.toggle('oculto', !Z.rastro($('rastro'), d.rastro));
       const f = (x) => new Date(x + 'T12:00:00').toLocaleDateString(lang(), { day: 'numeric', month: 'long' });
+      const cortadas = dia.cortadas || d.total;
+      const rango = d.desde === d.hasta ? t('inicio_periodo_el', { dia: f(d.desde) }) : t('inicio_periodo_del', { desde: f(d.desde), hasta: f(d.hasta) });
       $('periodo-frase').textContent = d.total
-        ? t('inicio_periodo_frase', { desde: f(d.desde), hasta: f(d.hasta), cortadas: n(dia.cortadas || d.total), empresas: n(d.empresas.length) })
+        ? `${rango}: ${tn('inicio_periodo_cortadas', cortadas, { n: n(cortadas) })} ${tn('inicio_periodo_empresas', d.empresas.length, { n: n(d.empresas.length) })}.`
         : t('cortes_vacio');
     }
   }
@@ -202,7 +206,8 @@
   en('hoy', (m) => {
     ultimoHoy = m;
     pintaHoy(m);
-    if (periodo === 'hoy') pideLuego();
+    // A tab nobody is looking at does not ask: it catches up when it is shown again.
+    if (periodo === 'hoy' && document.visibilityState === 'visible') pideLuego();
   });
   function pintaHoy(m) {
     const h = m.hoy || {};

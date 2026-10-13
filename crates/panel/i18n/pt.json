@@ -1562,7 +1562,6 @@
     "ficha_casa_n_consultas_uno": "1 consulta",
     "ficha_casa_n_cortadas": "{n} cortadas",
     "ficha_casa_n_cortadas_uno": "1 cortada",
-    "ficha_casa_resumen_pdf": "{consultas} consultas aos seus endereços · {cortadas} cortadas pela GUARDIANA · {aparatos} aparelhos",
     "ficha_borrar_enlace": "Abrir a página",
     "ficha_carta_explica": "Você também pode enviar à empresa uma carta pedindo que apague seus dados. Escolha o lugar cuja lei te protege, escreva seu nome e seu e-mail, e baixe em PDF para anexar a um e-mail, ou abra direto no seu e-mail. Seu nome e seu e-mail não saem deste computador.",
     "ficha_carta_formulario": "Não conhecemos um e-mail deles para estas cartas; eles têm esta página para pedir:",
@@ -1579,6 +1578,17 @@
     "ficha_pdf_importe": "Valor",
     "ficha_pdf_que": "O que aconteceu",
     "pais_dominio_texto": "Não identificada · domínio de {pais}",
-    "pais_dominio_titulo": "Nenhuma empresa das nossas listas é dona deste nome. {pais} é o país da sua terminação: diz onde o nome foi registrado, não necessariamente onde está quem o usa."
+    "pais_dominio_titulo": "Nenhuma empresa das nossas listas é dona deste nome. {pais} é o país da sua terminação: diz onde o nome foi registrado, não necessariamente onde está quem o usa.",
+    "ficha_millon": "1 milhão de {moneda}",
+    "ficha_casa_periodo_dia": "Em {dia}, segundo o extrato deste computador. Consultaram: {aparatos}.",
+    "ficha_pdf_consultas": "{n} consultas aos seus endereços",
+    "ficha_pdf_consultas_uno": "1 consulta aos seus endereços",
+    "ficha_pdf_cortadas": "{n} cortadas pela GUARDIANA",
+    "ficha_pdf_cortadas_uno": "1 cortada pela GUARDIANA",
+    "ficha_pdf_aparatos": "{n} aparelhos",
+    "ficha_pdf_aparatos_uno": "1 aparelho",
+    "ficha_compartir_casa_uno": "Na minha casa, seus endereços receberam 1 consulta e a GUARDIANA cortou {c}.",
+    "ficha_carta_pdf_no": "O PDF não consegue escrever estas letras do seu nome ou e-mail: {letras}. Use «Abrir no meu e-mail» ou «Copiar a carta»: lá elas saem como são.",
+    "ficha_carta_pdf_cambia": "No PDF seu nome aparece como «{nombre}», sem alguns acentos, porque o PDF só escreve letras latinas básicas. Para mantê-lo exato, use «Abrir no meu e-mail»."
   }
 }

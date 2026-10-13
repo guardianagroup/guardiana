@@ -1330,6 +1330,15 @@ fn eventos_pestana(id: u32, web: &ICoreWebView2) -> windows::core::Result<()> {
                             == Some(true)
                         {
                             args.SetState(COREWEBVIEW2_PERMISSION_STATE_DENY)?;
+                            // This «no» is for this time only: by default WebView2 keeps the
+                            // answer in the profile, and the site could never ask again, not
+                            // even when the person wants its notifications (review of 12 Oct
+                            // 2026). Older engines without the interface keep the old behaviour.
+                            if let Ok(a3) =
+                                args.cast::<ICoreWebView2PermissionRequestedEventArgs3>()
+                            {
+                                let _ = a3.SetSavesInProfile(false);
+                            }
                         }
                     }
                     Ok(())

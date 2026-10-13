@@ -31,6 +31,7 @@
     periodo = b.dataset.periodo;
     document.querySelectorAll('.periodos button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     abierta = -1;
+    todasLasEmpresas = false;
     pide();
   }));
   // Back to the page the person was on: this list opens in its own tab, with nothing behind it.

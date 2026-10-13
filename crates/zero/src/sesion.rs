@@ -2216,7 +2216,34 @@ impl Sesion {
             .as_ref()
             .map(|r| r.domains.iter().map(|d| (*d).to_string()).collect())
             .unwrap_or_else(|| vec![empresa.clone()]);
-        let sitio = dominios.first().cloned().unwrap_or_else(|| empresa.clone());
+        // The site the letter names: one where this person met the company (its book, then its
+        // cuts of the last 31 days), else the company's own website, never just the first address
+        // of its list (review of 12 Oct 2026: Microsoft's letter named «msftstatic.com»).
+        let visto_en_libro = dominios
+            .iter()
+            .find(|d| self.libro.entradas.contains_key(d.as_str()))
+            .cloned();
+        let visto_en_cortes = || {
+            let ahora = (self.reloj)();
+            let desde = fecha::dia_antes(ahora, self.zona, 30);
+            cortes::lee(&self.datos.join("cortes"), &desde, &self.hoy())
+                .into_iter()
+                .rev()
+                .find(|c| c.quien == empresa)
+                .map(|c| c.sitio)
+        };
+        let su_web = || {
+            guardiana_lists::profile_of(&empresa)
+                .and_then(|f| f.get("web"))
+                .and_then(|w| w.as_str())
+                .and_then(crate::dominio::host_de)
+                .map(|h| h.trim_start_matches("www.").to_string())
+        };
+        let sitio = visto_en_libro
+            .or_else(visto_en_cortes)
+            .or_else(su_web)
+            .or_else(|| dominios.first().cloned())
+            .unwrap_or_else(|| empresa.clone());
         // What the book saw it receive, from any of its names.
         let mut clases: Vec<Clase> = Vec::new();
         for d in &dominios {
