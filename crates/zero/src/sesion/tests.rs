@@ -3309,11 +3309,46 @@ fn a_cut_says_what_code_was_on_the_page_and_what_it_carried() {
         .and_then(|l| l.iter().find(|x| x["host"] == "www.google-analytics.com"))
         .cloned()
         .unwrap_or_default();
-    let texto = fila.to_string();
+    // What it carried reaches the person's screen («dice»), from memory…
+    let dice = fila["dice"].to_string();
+    assert!(
+        dice.contains("GA1.1.secreto") && dice.contains("55.66"),
+        "{dice}"
+    );
+    assert!(fila["dice"]
+        .as_array()
+        .is_some_and(|l| l.iter().any(|v| v["id"] == true)));
+    // …while the rest of the line keeps only names, and the disk never sees a value.
+    let mut sin_dice = fila.clone();
+    if let Some(o) = sin_dice.as_object_mut() {
+        o.remove("dice");
+    }
+    let texto = sin_dice.to_string();
     assert!(
         !texto.contains("secreto") && !texto.contains("Secreto"),
         "{texto}"
     );
+    s.guarda_cortes();
+    for e in std::fs::read_dir(s.datos.join("cortes"))
+        .into_iter()
+        .flatten()
+        .flatten()
+    {
+        let en_disco = std::fs::read_to_string(e.path()).unwrap_or_default();
+        assert!(!en_disco.contains("secreto") && !en_disco.contains("55.66"));
+    }
+    // The person can save it, and a letter names the identifiers.
+    let o = s.mensaje(
+        Origen::Pestana(n),
+        CORTES,
+        &json!({ "tipo": "descargar_dice", "ts": fila["ts"], "host": fila["host"], "ruta": fila["ruta"] }).to_string(),
+    );
+    let g = del_tipo(&o, Origen::Pestana(n), "guardado").unwrap_or_default();
+    let ruta = g["ruta"].as_str().unwrap_or("").to_string();
+    assert!(!ruta.is_empty(), "{g}");
+    let archivo = std::fs::read_to_string(&ruta).unwrap_or_default();
+    assert!(archivo.contains("_ga = GA1.1.secreto"), "{archivo}");
+    assert_eq!(s.ids_de("Google").is_empty(), false);
     assert_eq!(fila["cookies_n"], 2);
     assert!(fila["cookies_lleva"]
         .to_string()

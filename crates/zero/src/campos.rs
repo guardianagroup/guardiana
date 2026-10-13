@@ -319,85 +319,142 @@ pub fn lee(host: &str, nombre: &str) -> Option<Lectura> {
     }
 }
 
-/// The meanings whose values may be shown to the person, on their own screen, while ZERO is
-/// open: what a request says about what happened («a purchase of 89,900 COP»), never who you
-/// are. Identifiers, sessions, e-mails, phones, names, addresses, IPs and cookies are only ever
-/// named, never shown (the owner, 13 Oct 2026: «necesito saber qué hay ahí dentro»).
-const SE_MUESTRAN: &[&str] = &[
-    "campo_evento",
-    "campo_compra",
-    "campo_busqueda",
-    "campo_pagina",
-    "campo_referente",
-    "campo_titulo",
-    "campo_pantalla",
-    "campo_idioma",
-    "campo_lugar",
-    "campo_cuenta",
-];
-
 /// How many values a cut shows at most, and how long each.
-pub const MAX_VISTOS: usize = 12;
-const MAX_VALOR: usize = 80;
+pub const MAX_VISTOS: usize = 60;
+const MAX_VALOR: usize = 200;
 
-/// One value shown: what it means (an interface key), the field's name and what it said.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Visto {
-    /// The interface text of its meaning (`campo_compra`…).
-    pub clave: &'static str,
-    /// The field's name as it travelled (`cd[value]`).
-    pub nombre: String,
-    /// What it said, cleaned and cut short.
-    pub valor: String,
+/// Where a value travelled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Origen {
+    /// In the address (`?ev=Purchase`).
+    Direccion,
+    /// In what was sent (a form, a JSON).
+    Envio,
+    /// In a cookie.
+    Cookie,
 }
 
-/// What a request said, for the meanings of [`SE_MUESTRAN`] only: read from its address and
-/// its body in memory, to be shown and forgotten. Nothing here is written anywhere. A value
-/// that looks like a person's data whatever its name (an e-mail, a long hash, a token) is
-/// left out.
+impl Origen {
+    /// Its interface key (`origen_direccion`…).
+    #[must_use]
+    pub const fn clave(self) -> &'static str {
+        match self {
+            Self::Direccion => "origen_direccion",
+            Self::Envio => "origen_envio",
+            Self::Cookie => "origen_cookie",
+        }
+    }
+}
+
+/// One value, as the request carried it: what it means when known, the field's name, and the
+/// value itself.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Visto {
+    /// The interface text of its meaning (`campo_compra`, `cookie_meta`…), when known.
+    pub clave: Option<&'static str>,
+    /// The field's name as it travelled (`cd[value]`, `_fbp`).
+    pub nombre: String,
+    /// What it carried, cleaned of control characters and cut at [`MAX_VALOR`].
+    pub valor: String,
+    /// Where it travelled.
+    pub origen: Origen,
+}
+
+impl Visto {
+    /// An identifier the destination knows the person by: what a deletion letter can name so
+    /// the company finds the data (an ID, a hashed e-mail or phone, a tracking cookie).
+    #[must_use]
+    pub fn identifica(&self) -> bool {
+        matches!(
+            self.clave,
+            Some(
+                "campo_id"
+                    | "campo_correo_cifrado"
+                    | "campo_telefono_cifrado"
+                    | "campo_persona_cifrada"
+                    | "cookie_id"
+                    | "cookie_google_analytics"
+                    | "cookie_google_ads"
+                    | "cookie_meta"
+                    | "cookie_tiktok"
+                    | "cookie_hotjar"
+                    | "cookie_pinterest"
+                    | "cookie_linkedin"
+                    | "cookie_appnexus"
+                    | "cookie_adtech"
+                    | "cookie_microsoft_ads"
+                    | "cookie_criteo"
+            )
+        )
+    }
+}
+
+/// Everything a request carried, as the person's own browser had it before it was cut: read in
+/// memory, to be shown on the person's screen (and saved only if the person saves it), never
+/// written by ZERO, never sent (the owner, 13 Oct 2026: «que el cliente lo vea, todos los datos,
+/// tal y como lo podemos descifrar; nosotros no lo guardamos ni lo vemos»). Only secrets are
+/// left out: passwords, keys, tokens and session cookies give access to the person's accounts
+/// and are no use to ask a company to delete anything.
 #[must_use]
-pub fn muestra(host: &str, url: &str, cuerpo: &[u8]) -> Vec<Visto> {
+pub fn muestra(host: &str, url: &str, cuerpo: &[u8], cookies: &str) -> Vec<Visto> {
     let mut out: Vec<Visto> = Vec::new();
-    let mut mete = |nombre: &str, valor: &str| {
+    let mut mete = |nombre: &str, valor: &str, origen: Origen| {
         if out.len() >= MAX_VISTOS {
             return;
         }
-        let nombre = nombre.trim().to_ascii_lowercase();
-        let Some(l) = lee(host, &nombre) else { return };
-        if !SE_MUESTRAN.contains(&l.clave) {
+        let nombre: String = nombre.trim().chars().take(MAX_LARGO).collect();
+        let bajo = nombre.to_ascii_lowercase();
+        if nombre.is_empty() || es_secreto(&bajo) {
             return;
         }
-        let Some(valor) = limpia(l.clave, valor) else {
+        let clave = if origen == Origen::Cookie {
+            lee_cookie(&nombre).map(|l| l.clave)
+        } else {
+            lee(host, &bajo).map(|l| l.clave)
+        };
+        if clave == Some("cookie_sesion") {
+            return;
+        }
+        let Some(valor) = limpia(clave, valor) else {
             return;
         };
-        if out.iter().any(|v| v.nombre == nombre) {
+        if out
+            .iter()
+            .any(|v| v.nombre == nombre && v.origen == origen && v.valor == valor)
+        {
             return;
         }
         out.push(Visto {
-            clave: l.clave,
+            clave,
             nombre,
             valor,
+            origen,
         });
     };
     if let Ok(u) = url::Url::parse(url) {
         for (k, v) in u.query_pairs() {
-            mete(&k, &v);
+            mete(&k, &v, Origen::Direccion);
         }
     }
     if let Ok(texto) = std::str::from_utf8(cuerpo) {
         let texto = texto.trim_start();
         if texto.starts_with('{') || texto.starts_with('[') {
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(texto) {
-                valores_json(&v, "", 0, &mut mete);
+                valores_json(&v, "", 0, &mut |n, v| mete(n, v, Origen::Envio));
             }
         } else if texto.contains('=') && !texto.starts_with('<') {
             for linea in texto.lines().take(50) {
                 for par in linea.split('&').take(200) {
                     if let Some((k, v)) = par.split_once('=') {
-                        mete(&percent_decode(k), &percent_decode(v));
+                        mete(&percent_decode(k), &percent_decode(v), Origen::Envio);
                     }
                 }
             }
+        }
+    }
+    for par in cookies.split(';') {
+        if let Some((k, v)) = par.split_once('=') {
+            mete(k, v, Origen::Cookie);
         }
     }
     out
@@ -420,6 +477,7 @@ fn valores_json(
                 match hijo {
                     serde_json::Value::String(s) => mete(&nombre, s),
                     serde_json::Value::Number(n) => mete(&nombre, &n.to_string()),
+                    serde_json::Value::Bool(b) => mete(&nombre, if *b { "true" } else { "false" }),
                     serde_json::Value::Array(a) => {
                         // A list of products: their names or codes, and how many.
                         let cosas: Vec<String> = a
@@ -449,11 +507,11 @@ fn valores_json(
                         }
                         if nivel < 1 {
                             if let Some(primero) = a.first() {
-                                valores_json(primero, prefijo, nivel + 1, mete);
+                                valores_json(primero, &nombre, nivel + 1, mete);
                             }
                         }
                     }
-                    serde_json::Value::Object(_) if nivel < 1 => {
+                    serde_json::Value::Object(_) if nivel < 2 => {
                         valores_json(hijo, &nombre, nivel + 1, mete);
                     }
                     _ => {}
@@ -469,24 +527,23 @@ fn valores_json(
     }
 }
 
-/// A value fit to be shown: trimmed, one line, short; an address loses its query and
-/// fragment (where tokens and e-mails travel); `None` when empty or when it looks like a
-/// person's data or a secret.
-fn limpia(clave: &str, valor: &str) -> Option<String> {
+/// A value fit to be shown: one line, at most [`MAX_VALOR`] characters; an address loses its
+/// query and fragment (where sign-in tokens travel); `None` when empty or a token.
+fn limpia(clave: Option<&str>, valor: &str) -> Option<String> {
     let mut v: String = valor
         .chars()
         .filter(|c| !c.is_control())
         .collect::<String>()
         .trim()
         .to_string();
-    if matches!(clave, "campo_pagina" | "campo_referente") {
+    if matches!(clave, Some("campo_pagina" | "campo_referente")) {
         if let Ok(u) = url::Url::parse(&v) {
             v = format!("{}{}", u.host_str().unwrap_or(""), u.path());
         } else if let Some((sin, _)) = v.split_once(['?', '#']) {
             v = sin.to_string();
         }
     }
-    if v.is_empty() || parece_personal(&v) {
+    if v.is_empty() || es_token(&v) {
         return None;
     }
     if v.chars().count() > MAX_VALOR {
@@ -495,20 +552,36 @@ fn limpia(clave: &str, valor: &str) -> Option<String> {
     Some(v)
 }
 
-/// An e-mail, a long hash or a token: never shown, whatever the field is called.
-fn parece_personal(v: &str) -> bool {
-    if v.contains('@') && v.contains('.') {
-        return true;
-    }
-    let sin_espacios = !v.contains(' ');
-    let hex = v.len() >= 32 && v.chars().all(|c| c.is_ascii_hexdigit());
-    let token = sin_espacios
-        && v.len() >= 40
-        && v.chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '=' | '+' | '/'))
-        && v.chars().any(|c| c.is_ascii_digit())
-        && !v.contains('/');
-    hex || token
+/// A field that holds a secret, by its name: never shown.
+fn es_secreto(nombre: &str) -> bool {
+    const PARTES: &[&str] = &[
+        "pass",
+        "pwd",
+        "token",
+        "auth",
+        "secret",
+        "apikey",
+        "api_key",
+        "csrf",
+        "xsrf",
+        "otp",
+        "cvv",
+        "cvc",
+        "card",
+        "iban",
+        "ssn",
+        "bearer",
+        "credential",
+        "login",
+        "sess",
+    ];
+    PARTES.iter().any(|p| nombre.contains(p))
+        || matches!(nombre, "pin" | "sig" | "signature" | "key")
+}
+
+/// A sign-in token by its shape (a JWT): never shown, whatever the field is called.
+fn es_token(v: &str) -> bool {
+    v.starts_with("eyJ") && v.matches('.').count() >= 2 && !v.contains(' ')
 }
 
 /// What a cut carried, as the distinct meanings of its names (each once, in a fixed order),
@@ -575,36 +648,43 @@ mod tests {
     }
 
     #[test]
-    fn what_a_request_said_is_shown_but_never_who_you_are() {
-        let url = "https://www.facebook.com/tr?id=123456&ev=Purchase&cd[value]=89900&cd[currency]=COP&cd[content_ids]=SKU-7&ud[em]=85fcc737579f8be786746e857cf0f9679aa20ecc5acb9638991e6b12b9f40caa&fbp=fb.1.2.3&dl=https%3A%2F%2Ftienda.co%2Fpago%3Ftoken%3Dabc%26email%3Dana%40x.co";
-        let v = muestra("www.facebook.com", url, b"");
+    fn everything_a_request_carried_is_shown_but_secrets() {
+        let url = "https://www.facebook.com/tr?id=123456&ev=Purchase&cd[value]=89900&cd[currency]=COP&cd[content_ids]=SKU-7&ud[em]=85fcc737579f8be786746e857cf0f9679aa20ecc5acb9638991e6b12b9f40caa&fbp=fb.1.2.3&dl=https%3A%2F%2Ftienda.co%2Fpago%3Ftoken%3Dabc&access_token=SECRETO";
+        let v = muestra(
+            "www.facebook.com",
+            url,
+            b"",
+            "_fbp=fb.1.99.88; PHPSESSID=abc123; auth_token=xyz; datr=AbCdEf",
+        );
         let par = |n: &str| v.iter().find(|x| x.nombre == n).map(|x| x.valor.as_str());
         assert_eq!(par("ev"), Some("Purchase"));
         assert_eq!(par("cd[value]"), Some("89900"));
         assert_eq!(par("cd[currency]"), Some("COP"));
-        assert_eq!(par("cd[content_ids]"), Some("SKU-7"));
         assert_eq!(par("id"), Some("123456"));
-        // The page, without its query: no token, no e-mail.
+        // Who you are for them: shown, so a letter can name it.
+        assert!(par("ud[em]").is_some_and(|h| h.starts_with("85fcc7")));
+        assert_eq!(par("fbp"), Some("fb.1.2.3"));
+        assert_eq!(par("_fbp"), Some("fb.1.99.88"));
+        assert_eq!(par("datr"), Some("AbCdEf"));
+        assert!(v.iter().filter(|x| x.identifica()).count() >= 4);
+        // The page, without the query where tokens travel.
         assert_eq!(par("dl"), Some("tienda.co/pago"));
-        // Who you are is never shown.
-        assert!(par("ud[em]").is_none() && par("fbp").is_none());
+        // Secrets never: tokens, sessions.
+        assert!(par("access_token").is_none() && par("PHPSESSID").is_none());
+        assert!(par("auth_token").is_none());
         assert!(!v
             .iter()
-            .any(|x| x.valor.contains('@') || x.valor.contains("85fcc7")));
-        // A body: the event, its value and the products; never the e-mail inside it.
-        let j = br#"{"event":"purchase","value":9,"currency":"EUR","items":[{"item_name":"Zapatos","price":9},{"item_name":"Medias"}],"user":{"email":"ana@secreto.co"}}"#;
-        let v = muestra("collect.otra.io", "https://collect.otra.io/e", j);
+            .any(|x| x.valor.contains("SECRETO") || x.valor == "abc123"));
+        // A body, with nested objects and products.
+        let j = br#"{"event":"purchase","value":9,"currency":"EUR","items":[{"item_name":"Zapatos","price":9},{"item_name":"Medias"}],"user":{"email":"ana@mail.co","password":"x"}}"#;
+        let v = muestra("collect.otra.io", "https://collect.otra.io/e", j, "");
         let par = |n: &str| v.iter().find(|x| x.nombre == n).map(|x| x.valor.clone());
-        assert_eq!(par("event").as_deref(), Some("purchase"));
         assert_eq!(par("items").as_deref(), Some("Zapatos, Medias"));
-        assert_eq!(par("currency").as_deref(), Some("EUR"));
-        assert!(!v.iter().any(|x| x.valor.contains("secreto")));
-        // A field named like a search but carrying an e-mail is not shown.
-        assert!(muestra("x.io", "https://x.io/?q=ana%40mail.com", b"").is_empty());
-        assert_eq!(
-            muestra("x.io", "https://x.io/?q=zapatos+rojos", b"")[0].valor,
-            "zapatos rojos"
-        );
+        assert_eq!(par("user.email").as_deref(), Some("ana@mail.co"));
+        assert!(par("user.password").is_none());
+        assert!(v.iter().all(|x| x.origen == Origen::Envio));
+        // A JWT is a token, whatever its field.
+        assert!(muestra("x.io", "https://x.io/?q=eyJhbGciOi.eyJzdWIi.c2ln", b"", "").is_empty());
     }
 
     #[test]

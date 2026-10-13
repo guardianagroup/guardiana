@@ -159,8 +159,15 @@
     // What it said, in plain words, while ZERO is open: kept in memory only (never on disk),
     // and only what tells what happened, never who you are.
     if (c.dice && c.dice.length) {
-      const filas = c.dice.map((v) => `<li><span class="que">${esc(t(v.que + '_corto'))}</span> <span class="valor">${esc(v.que === 'campo_evento' ? evento(v.valor) : v.valor)}</span> <span class="gris mono">${esc(v.campo)}</span></li>`).join('');
-      partes.push(`<div class="dice"><p><b>${esc(t('cortes_dice_titulo', { empresa: c.quien }))}</b></p><p class="titular">${esc(titular(c.dice))}</p><ul>${filas}</ul><p class="gris pequeno">${esc(t('cortes_dice_nota'))}</p></div>`);
+      const fila = (v) => `<tr class="${v.id ? 'es-id' : ''}"><td class="mono">${esc(v.campo)}</td><td>${esc(v.que ? t(v.que) : '')}${v.id ? ` <span class="marca-id">${esc(t('cortes_dice_es_id'))}</span>` : ''}</td><td class="valor mono">${esc(v.que === 'campo_evento' ? evento(v.valor) : v.valor)}</td><td class="gris">${esc(t(v.origen))}</td></tr>`;
+      const ids = c.dice.filter((v) => v.id);
+      partes.push(`<div class="dice"><p><b>${esc(t('cortes_dice_titulo', { empresa: c.quien }))}</b></p>`
+        + `<p class="titular">${esc(titular(c.dice))}</p>`
+        + `<p class="gris">${esc(t('cortes_dice_todo', { n: n(c.dice.length) }))}</p>`
+        + `<div class="tabla-dice"><table><tbody>${c.dice.map(fila).join('')}</tbody></table></div>`
+        + (ids.length ? `<p>${esc(t('cortes_dice_ids', { empresa: c.quien }))}</p>` : '')
+        + `<p class="botones-dice"><button class="dice-descargar" data-ts="${esc(c.ts)}" data-host="${esc(c.host)}" data-ruta="${esc(c.ruta)}">${esc(t('cortes_dice_descargar'))}</button> <button class="dice-carta" data-empresa="${esc(c.quien)}">${esc(t('cortes_dice_carta', { empresa: c.quien }))}</button></p>`
+        + `<p class="gris pequeno">${esc(t('cortes_dice_nota'))}</p></div>`);
     }
     if (c.parametros) partes.push(`<p>${esc(tn('cortes_det_parametros', c.parametros, { n: n(c.parametros) }))}</p>`);
     // What it carried, by the names of its fields: the page, an identifier, the screen…
@@ -208,6 +215,14 @@
     const vacio = $('vacio');
     vacio.classList.toggle('oculto', lista.length > 0);
     vacio.textContent = datos.total ? t('cortes_sin_coincidencias') : t('cortes_vacio');
+    $('filas').querySelectorAll('.dice-descargar').forEach((bt) => bt.addEventListener('click', (e) => {
+      e.stopPropagation();
+      manda({ tipo: 'descargar_dice', ts: Number(bt.dataset.ts), host: bt.dataset.host, ruta: bt.dataset.ruta });
+    }));
+    $('filas').querySelectorAll('.dice-carta').forEach((bt) => bt.addEventListener('click', (e) => {
+      e.stopPropagation();
+      manda({ tipo: 'abrir_ficha', empresa: bt.dataset.empresa });
+    }));
     $('filas').querySelectorAll('tr.fila').forEach((tr) => tr.addEventListener('click', () => {
       const i = Number(tr.dataset.i);
       abierta = abierta === i ? -1 : i;

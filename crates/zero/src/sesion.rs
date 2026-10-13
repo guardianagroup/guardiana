@@ -360,6 +360,9 @@ struct Permiso {
 
 /// How many cuts keep what they said in memory (see `vistos`).
 const MAX_VISTOS_MEMORIA: usize = 3000;
+
+/// What one cut carried, in memory only: (time, host, path, company, the values).
+type Vistos = (i64, String, String, String, Vec<crate::campos::Visto>);
 /// How long an approved sending lets its data through to its site: the form, its redirects and
 /// the payment or sign-in page it leads to.
 const PERMISO_MS: i64 = 5 * 60_000;
@@ -459,7 +462,7 @@ pub struct Sesion {
     cortes_pend: Vec<Corte>,
     /// What the last cuts said (`campos::muestra`), by (time, host, path): only in memory,
     /// to be shown on the person's screen while ZERO is open, never written anywhere.
-    vistos: std::collections::VecDeque<(i64, String, String, Vec<crate::campos::Visto>)>,
+    vistos: std::collections::VecDeque<Vistos>,
     /// The subscription. Unknown until the shell gives the place it lives in: the browser works
     /// (for at most a day if the place cannot be read).
     licencia: EstadoLicencia,
@@ -515,6 +518,18 @@ fn escribe_json<T: Serialize>(ruta: &Path, v: &T) {
 }
 
 /// What the page sent, trimmed, or what the program would use otherwise.
+/// What a cut carried, for the page: each value with its meaning, where it travelled and
+/// whether it is an identifier a deletion letter can name.
+fn dice_json(visto: &[crate::campos::Visto]) -> Value {
+    json!(visto
+        .iter()
+        .map(|v| json!({
+            "que": v.clave, "campo": v.nombre, "valor": v.valor,
+            "origen": v.origen.clave(), "id": v.identifica(),
+        }))
+        .collect::<Vec<_>>())
+}
+
 fn dicho(valor: &str, si_no: impl FnOnce() -> String) -> String {
     let v = valor.trim();
     if v.is_empty() {
@@ -1700,6 +1715,7 @@ impl Sesion {
                         | "ficha"
                         | "ficha_pdf"
                         | "carta_ficha"
+                        | "descargar_dice"
                         | "abrir_correo"
                         | "volver"
                         | "favorito_quitar"
@@ -1832,6 +1848,15 @@ impl Sesion {
                 Origen::Pestana(id) => {
                     self.ficha_pdf(id, texto(m, "empresa"), texto(m, "que") == "carta")
                 }
+                _ => Vec::new(),
+            },
+            "descargar_dice" => match origen {
+                Origen::Pestana(id) => self.descargar_dice(
+                    id,
+                    m.get("ts").and_then(Value::as_i64).unwrap_or(0),
+                    texto(m, "host"),
+                    texto(m, "ruta"),
+                ),
                 _ => Vec::new(),
             },
             "carta_ficha" => match origen {
@@ -2253,6 +2278,99 @@ impl Sesion {
     /// «Descargar la carta» on a company's profile: the deletion letter to that company, under the
     /// law the person picked, with their name and email when marked. The page shows it and saves it
     /// as a PDF to attach to an email (the owner, 12 Oct 2026: «que solamente lo adjunten»).
+    /// The identifiers a company received from this browser while ZERO is open, each once
+    /// («_fbp = fb.1.99.88»), at most 20.
+    fn ids_de(&self, empresa: &str) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for (_, _, _, quien, visto) in self.vistos.iter().rev() {
+            if quien != empresa {
+                continue;
+            }
+            for v in visto.iter().filter(|v| v.identifica()) {
+                let s = format!("{} = {}", v.nombre, v.valor);
+                if !out.contains(&s) && out.len() < 20 {
+                    out.push(s);
+                }
+            }
+        }
+        out
+    }
+
+    /// Save, at the person's request, what one cut carried: a text file in Downloads. ZERO
+    /// itself never writes it anywhere else.
+    fn descargar_dice(&self, id: u32, ts: i64, host: &str, ruta: &str) -> Vec<Orden> {
+        let Some((_, _, _, quien, visto)) = self
+            .vistos
+            .iter()
+            .rev()
+            .find(|(t, h, r, _, _)| *t == ts && h == host && r == ruta)
+        else {
+            return self
+                .a_pestana(
+                    id,
+                    &json!({ "tipo": "guardado", "ruta": "", "texto": self.t("dice_ya_no") }),
+                )
+                .into_iter()
+                .collect();
+        };
+        let mut s = self.tf(
+            "dice_archivo_cabecera",
+            &[
+                ("empresa", quien),
+                ("destino", &format!("{host}{ruta}")),
+                ("fecha", &fecha::dia(ts, self.zona)),
+            ],
+        );
+        s.push_str("\n\n");
+        for v in visto {
+            let que = v.clave.map(|k| self.t(k)).unwrap_or_default();
+            s.push_str(&format!(
+                "{} = {}{}\n",
+                v.nombre,
+                v.valor,
+                if que.is_empty() {
+                    String::new()
+                } else {
+                    format!("    ({que})")
+                }
+            ));
+        }
+        let ids: Vec<&crate::campos::Visto> = visto.iter().filter(|v| v.identifica()).collect();
+        if !ids.is_empty() {
+            s.push('\n');
+            s.push_str(&self.t("dice_archivo_ids"));
+            s.push('\n');
+            for v in ids {
+                s.push_str(&format!("{} = {}\n", v.nombre, v.valor));
+            }
+        }
+        let limpio: String = quien
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() {
+                    c.to_ascii_lowercase()
+                } else {
+                    '-'
+                }
+            })
+            .collect();
+        let ruta_f = self.nombre_libre(
+            &format!(
+                "guardiana-zero-datos-{limpio}-{}",
+                fecha::dia(ts, self.zona)
+            ),
+            "txt",
+        );
+        let v = match escribe(&ruta_f, s.as_bytes()) {
+            Ok(()) => {
+                let r = ruta_f.display().to_string();
+                json!({ "tipo": "guardado", "ruta": r, "texto": self.tf("guardado_en", &[("ruta", &r)]) })
+            }
+            Err(_) => json!({ "tipo": "guardado", "ruta": "", "texto": self.t("guardar_error") }),
+        };
+        self.a_pestana(id, &v).into_iter().collect()
+    }
+
     fn carta_ficha(
         &self,
         id: u32,
@@ -2340,7 +2458,7 @@ impl Sesion {
                 .map(|m| m.valor.clone())
                 .unwrap_or_default()
         };
-        let c = carta(
+        let mut c = carta(
             &self.textos,
             ley,
             &entrada,
@@ -2348,9 +2466,17 @@ impl Sesion {
             &dicho(correo, || primero(Tipo::Correo)),
             &self.hoy(),
         );
+        // The identifiers this company received from this browser while ZERO was open: with
+        // them it can find the data (only in memory; the letter is the person's to send).
+        let ids = self.ids_de(&empresa);
+        if !ids.is_empty() {
+            c.cuerpo.push_str("\n\n");
+            c.cuerpo
+                .push_str(&self.tf("carta_ids", &[("ids", &ids.join("\n"))]));
+        }
         self.a_pestana(
             id,
-            &json!({ "tipo": "carta_ficha", "empresa": empresa, "asunto": c.asunto, "cuerpo": c.cuerpo }),
+            &json!({ "tipo": "carta_ficha", "empresa": empresa, "asunto": c.asunto, "cuerpo": c.cuerpo, "ids": ids.len() }),
         )
         .into_iter()
         .collect()
@@ -2746,19 +2872,13 @@ impl Sesion {
                         o.remove("cookies");
                     }
                     // What it said, while ZERO is open: kept in memory only, never on disk.
-                    if let Some((_, _, _, visto)) = self
+                    if let Some((_, _, _, _, visto)) = self
                         .vistos
                         .iter()
                         .rev()
-                        .find(|(ts, h, r, _)| *ts == c.ts && *h == c.host && *r == c.ruta)
+                        .find(|(ts, h, r, _, _)| *ts == c.ts && *h == c.host && *r == c.ruta)
                     {
-                        o.insert(
-                            "dice".into(),
-                            json!(visto
-                                .iter()
-                                .map(|v| json!({ "que": v.clave, "campo": v.nombre, "valor": v.valor }))
-                                .collect::<Vec<_>>()),
-                        );
+                        o.insert("dice".into(), dice_json(visto));
                     }
                     if !c.campos.is_empty() || !c.campos_cuerpo.is_empty() {
                         let todos: Vec<String> =
@@ -4111,13 +4231,18 @@ impl Sesion {
                     .is_some_and(|t| ahora.saturating_sub(t) <= 5_000),
             };
             let corte = Corte::de(&lugar, &d);
-            let visto = crate::campos::muestra(&corte.host, url, cuerpo);
+            let visto = crate::campos::muestra(&corte.host, url, cuerpo, cookies);
             if !visto.is_empty() {
                 if self.vistos.len() >= MAX_VISTOS_MEMORIA {
                     self.vistos.pop_front();
                 }
-                self.vistos
-                    .push_back((corte.ts, corte.host.clone(), corte.ruta.clone(), visto));
+                self.vistos.push_back((
+                    corte.ts,
+                    corte.host.clone(),
+                    corte.ruta.clone(),
+                    corte.quien.clone(),
+                    visto,
+                ));
             }
             self.cortes_pend.push(corte);
         }
