@@ -114,6 +114,11 @@ directo, sobre la Tierra.
   están hechos en WebGL2 escrito aquí, con imágenes de la NASA servidas por el propio panel y la luz
   del sol de ese momento; un equipo sin WebGL2 ve el mismo mundo plano, dibujado en 2D. Sin internet
   y sin código de terceros.
+- **Retrato** (1.0.23): «Grabar 5 minutos» guarda lo que mide la página, de 10 en 10 segundos, y lo
+  entrega como PDF (con el modo en que estaba GUARDIANA: normal, protección máxima, antivirus
+  cortado), como CSV y como JSON para reproducirlo. Antes de salir se limpia: sin usuario, rutas,
+  direcciones IP, horas exactas ni nombres privados (estos se marcan «oculto por privacidad»). Se
+  hace en el navegador del panel y no sale del equipo hasta que la persona lo comparte.
 - **Tres datos distintos**: la empresa del nombre (de la lista abierta de GUARDIANA), la empresa de la
   red donde está el servidor y su país. Que un servidor esté en la red de Amazon no quiere decir que
   Amazon use lo que se envía, y la página lo dice. Los intentos parados se cuentan, no se miden en

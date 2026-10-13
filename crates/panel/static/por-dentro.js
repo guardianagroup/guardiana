@@ -219,6 +219,7 @@
     // What arrived in this beat becomes particles along each route, spread over the beat so the
     // flow looks continuous, and lines in the log. The totals are the panel's, not added here.
     const aplicaDeltas = (rec, segundos) => {
+      graba(rec);
       let env = 0, recb = 0, paq = 0;
       const porProd = {}, grupo = { datos: [0, 0], av: [0, 0] };
       DEST.forEach((d) => { d.ema = (d.ema || 0) * 0.7; });
@@ -1282,6 +1283,143 @@
       if (st.datos && !st.datos.cortar_disponible) { avisa(t('av_cortar_no_disponible')); return; }
       avisa(t('av_max_aviso'), [{ texto: t('av_max_confirmar'), peligro: true, hacer }, { texto: t('pd_cancelar'), hacer: () => {} }]);
     });
+
+    // ---------- «Retrato»: five real minutes of this computer, kept by the person (13 Oct 2026) ----------
+    // The owner wants every picture real, on the website too: a recording made here from the same
+    // measurements, cleaned before it leaves (no user, no paths, no addresses, no clock times, no
+    // private names: those are marked «oculto por privacidad», never replaced), as a PDF that says
+    // the mode GUARDIANA was in, and as data (CSV, and JSON to replay it).
+    const GRABA_MS = 5 * 60000;
+    const grab = { on: false, t0: 0, filas: [], modo: null, dur: 0, fecha: '', zona: '' };
+    const privado = (h) => !!h && (!h.includes('.') || /\.(local|lan|home|internal|localdomain|arpa|intranet|corp)$/i.test(h) || /^[\d.:]+$/.test(h) || /^\[/.test(h));
+    const graba = (rec) => {
+      if (!grab.on) return;
+      const s = Math.round((performance.now() - grab.t0) / 1000);
+      rec.forEach(({ d, env: e, recb: b, parada }) => {
+        const p = prod(d.p), oculto = privado(d.destino);
+        grab.filas.push({ s, programa: p.nombre, tipo: p.tipo, destino: oculto ? '' : (d.destino || ''), oculto, pais: d.pais || '', red: d.red && d.red[0] !== '@' ? d.red : '', empresa: d.empresa || '', enviados: e || 0, recibidos: b || 0, parados: parada || 0, documentado: d.doc === undefined ? null : d.doc });
+      });
+    };
+    const modoAhora = async () => {
+      let pm = null;
+      try { pm = !!(await api('/api/proteccion-maxima')).activa; } catch (_) {}
+      return { proteccion_maxima: pm, antivirus_cortado: !!(st.datos && st.datos.maxima) };
+    };
+    const mmss = (sg) => `${Math.floor(sg / 60)}:${String(Math.round(sg % 60)).padStart(2, '0')}`;
+    const btnGrabar = $('grabar');
+    let relojGrab = 0;
+    const pintaGrabar = () => {
+      if (!grab.on) { btnGrabar.textContent = t('pd_grabar'); btnGrabar.setAttribute('aria-pressed', 'false'); return; }
+      const sg = (performance.now() - grab.t0) / 1000;
+      btnGrabar.textContent = t('pd_grabando').replace('{t}', mmss(sg)).replace('{total}', mmss(GRABA_MS / 1000));
+      btnGrabar.setAttribute('aria-pressed', 'true');
+      if (sg * 1000 >= GRABA_MS) paraGrabacion();
+    };
+    const empiezaGrabacion = async () => {
+      grab.filas = []; grab.t0 = performance.now(); grab.on = true;
+      const d = new Date();
+      grab.fecha = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      try { grab.zona = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (_) { grab.zona = ''; }
+      grab.modo = await modoAhora();
+      $('retrato').hidden = true;
+      clearInterval(relojGrab); relojGrab = setInterval(pintaGrabar, 1000); pintaGrabar();
+      avisa(t('pd_grabacion_empieza'));
+    };
+    const paraGrabacion = async () => {
+      if (!grab.on) return;
+      grab.on = false; grab.dur = Math.round((performance.now() - grab.t0) / 1000);
+      clearInterval(relojGrab); pintaGrabar();
+      const fin = await modoAhora();
+      // The mode is said as it was during the whole recording: if it changed, both are said.
+      grab.modo = { inicio: grab.modo, fin };
+      muestraRetrato();
+    };
+    btnGrabar.addEventListener('click', () => (grab.on ? paraGrabacion() : empiezaGrabacion()));
+    // What the recording adds up to: the same sums the PDF and the panel show.
+    const resumen = () => {
+      const f = grab.filas, suma = (arr, k) => arr.reduce((a, x) => a + x[k], 0);
+      const por = (clave) => { const m = new Map(); f.forEach((x) => { const k = x[clave] || '—'; const o = m.get(k) || { k, env: 0, rec: 0, dest: new Set(), parados: 0, tipo: x.tipo }; o.env += x.enviados; o.rec += x.recibidos; o.parados += x.parados; o.dest.add(x.destino || (x.oculto ? '·' : '')); m.set(k, o); }); return [...m.values()].sort((a, b) => b.env - a.env); };
+      const dests = new Map();
+      f.forEach((x) => { const k = [x.programa, x.destino, x.pais, x.red].join('|'); const o = dests.get(k) || { ...x, enviados: 0, recibidos: 0, parados: 0 }; o.enviados += x.enviados; o.recibidos += x.recibidos; o.parados += x.parados; dests.set(k, o); });
+      const av = f.filter((x) => x.tipo === 'antivirus');
+      return {
+        env: suma(f, 'enviados'), rec: suma(f, 'recibidos'), parados: suma(f, 'parados'),
+        programas: por('programa'), paises: por('pais').filter((x) => x.k !== '—' && x.k[0] !== '@'), redes: por('red').filter((x) => x.k !== '—'),
+        destinos: [...dests.values()].sort((a, b) => b.enviados - a.enviados || b.parados - a.parados),
+        envAv: suma(av, 'enviados'), ocultos: new Set(f.filter((x) => x.oculto).map((x) => x.programa + '|' + x.pais + '|' + x.red)).size,
+      };
+    };
+    const textoModo = (m) => {
+      const uno = (x) => [x.proteccion_maxima === null ? t('pd_modo_pm_nose') : t(x.proteccion_maxima ? 'pd_modo_pm_si' : 'pd_modo_pm_no'), t(x.antivirus_cortado ? 'pd_modo_av_si' : 'pd_modo_av_no')];
+      const a = uno(m.inicio), b = uno(m.fin);
+      const normal = !m.inicio.proteccion_maxima && !m.inicio.antivirus_cortado && !m.fin.proteccion_maxima && !m.fin.antivirus_cortado;
+      const cambio = a.join('|') !== b.join('|');
+      return { titulo: t(normal ? 'pd_modo_normal' : 'pd_modo_reforzado'), lineas: cambio ? [t('pd_modo_al_empezar') + ' ' + a.join(' · '), t('pd_modo_al_acabar') + ' ' + b.join(' · ')] : a };
+    };
+    const muestraRetrato = () => {
+      const r = resumen(), m = textoModo(grab.modo);
+      $('retrato-t').textContent = t('pd_retrato_titulo').replace('{t}', mmss(grab.dur));
+      $('retrato-txt').textContent = grab.filas.length
+        ? t('pd_retrato_resumen').replace('{env}', bytes(r.env)).replace('{rec}', bytes(r.rec)).replace('{p}', tn('pd_retrato_n_prog', r.programas.length)).replace('{d}', tn('pd_retrato_n_dest', r.destinos.length)).replace('{paises}', tn('pd_paises', r.paises.length))
+        : t('pd_retrato_vacio');
+      $('retrato-modo').textContent = m.titulo + ' ' + m.lineas.join(' · ');
+      ['retrato-pdf', 'retrato-csv', 'retrato-json'].forEach((id) => { $(id).disabled = !grab.filas.length; });
+      $('retrato').hidden = false;
+      $('retrato-pdf').focus();
+    };
+    const baja = (nombre, tipo, contenido) => {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([contenido], { type: tipo })); a.download = nombre;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    };
+    const nombreArchivo = (que, ext) => `guardiana-${que}-${grab.fecha}.${ext}`;
+    const COLS = ['segundo', 'programa', 'tipo', 'destino', 'oculto_por_privacidad', 'pais_servidor', 'red', 'empresa_del_nombre', 'enviados', 'recibidos', 'parados', 'documentado_por_el_fabricante'];
+    $('retrato-csv').addEventListener('click', () => {
+      const q = (v) => { const x = v === null || v === undefined ? '' : String(v); return /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
+      const filas = grab.filas.map((x) => [x.s, x.programa, x.tipo, x.destino, x.oculto ? 'si' : '', x.pais, x.red, x.empresa, x.enviados, x.recibidos, x.parados, x.documentado === null ? '' : x.documentado ? 'si' : 'no'].map(q).join(','));
+      baja(nombreArchivo('grabacion', 'csv'), 'text/csv;charset=utf-8', '\ufeff' + [COLS.join(',')].concat(filas).join('\r\n') + '\r\n');
+    });
+    $('retrato-json').addEventListener('click', () => {
+      baja(nombreArchivo('grabacion', 'json'), 'application/json', JSON.stringify({
+        formato: 'guardiana-grabacion/1', fecha: grab.fecha, zona_horaria: grab.zona, duracion_s: grab.dur, cada_s: CADA_MEDIDA,
+        modo: grab.modo, quitado: ['usuario', 'rutas', 'direcciones IP', 'horas exactas', 'nombres privados'],
+        columnas: COLS, filas: grab.filas.map((x) => [x.s, x.programa, x.tipo, x.destino, x.oculto, x.pais, x.red, x.empresa, x.enviados, x.recibidos, x.parados, x.documentado]),
+      }, null, 1));
+    });
+    $('retrato-pdf').addEventListener('click', async () => {
+      if (!ctx.pdf) return;
+      const r = resumen(), m = textoModo(grab.modo), doc = ctx.pdf.pdfDocument(t('pd_retrato_pdf_titulo'));
+      const may = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+      const fechaLarga = (() => { try { return new Date(grab.fecha + 'T12:00:00').toLocaleDateString(LOC, { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return grab.fecha; } })();
+      doc.line('GUARDIANA · ' + t('pd_retrato_titulo').replace('{t}', mmss(grab.dur)), 16, true).gap(3)
+        .line(t('pd_retrato_pdf_sub').replace('{fecha}', fechaLarga).replace('{zona}', grab.zona || '—'), 9, false, 0.45).regla().gap(10);
+      doc.seccion(t('pd_retrato_modo'), m.titulo); m.lineas.forEach((l) => doc.line('· ' + l, 10));
+      doc.seccion(t('pd_retrato_cifras'));
+      doc.table([{ title: t('pd_retrato_que'), w: 0.6 }, { title: t('pd_retrato_cuanto'), w: 0.4 }], [
+        [t('pd_enviado'), bytes(r.env)], [may(t('pd_recibido')), bytes(r.rec)], [t('pd_retrato_de_antivirus'), bytes(r.envAv)],
+        [t('pd_col_programas'), String(r.programas.length)], [t('pd_retrato_destinos'), String(r.destinos.length)],
+        [t('pd_col_pais'), String(r.paises.length)], [t('pd_col_red'), String(r.redes.length)], [t('pd_retrato_parados'), String(r.parados)],
+      ]);
+      doc.seccion(t('pd_col_programas'));
+      doc.table([{ title: t('pd_col_programas'), w: 0.4 }, { title: t('pd_retrato_tipo'), w: 0.18 }, { title: t('pd_enviado'), w: 0.21 }, { title: may(t('pd_recibido')), w: 0.21 }],
+        r.programas.map((x) => [x.k, t('pd_tipo_' + x.tipo), bytes(x.env), bytes(x.rec)]));
+      if (r.paises.length) {
+        doc.seccion(t('pd_col_pais'));
+        doc.table([{ title: t('pd_col_pais'), w: 0.6 }, { title: t('pd_enviado'), w: 0.4 }], r.paises.map((x) => [nombrePais(x.k), bytes(x.env)]));
+      }
+      if (r.redes.length) {
+        doc.seccion(t('pd_col_red'), t('pd_red_no_es'));
+        doc.table([{ title: t('pd_col_red'), w: 0.6 }, { title: t('pd_enviado'), w: 0.4 }], r.redes.map((x) => [x.k, bytes(x.env)]));
+      }
+      doc.seccion(t('pd_retrato_destinos'), r.destinos.length > 40 ? t('pd_retrato_los_40') : '');
+      doc.table([{ title: t('pd_retrato_destino'), w: 0.36 }, { title: t('pd_col_programas'), w: 0.2 }, { title: t('pd_col_pais'), w: 0.14 }, { title: t('pd_col_red'), w: 0.17 }, { title: t('pd_enviado'), w: 0.13 }],
+        r.destinos.slice(0, 40).map((x) => [x.oculto ? t('pd_oculto_privacidad') : (x.destino || t('pd_sin_nombre')), x.programa, x.pais && x.pais[0] !== '@' ? nombrePais(x.pais) : '—', x.red || '—', x.parados && !x.enviados ? tn('pd_parados', x.parados) : bytes(x.enviados)]));
+      doc.seccion(t('pd_retrato_como'));
+      doc.line(t('pd_retrato_como_1'), 9, false, 0.3).gap(4).line(t('pd_retrato_como_2'), 9, false, 0.3);
+      const nombre = nombreArchivo('retrato', 'pdf');
+      const res = await ctx.pdf.savePdfFile(nombre, doc.bytes(t('pd_retrato_pie')));
+      if (res !== 'cancelado') avisa(t('pd_retrato_guardado').replace('{nombre}', nombre));
+    });
+    $('retrato-cerrar').addEventListener('click', () => { $('retrato').hidden = true; });
 
     // ---------- Pointer and keys ----------
     ['pointermove', 'pointerdown', 'wheel', 'keydown'].forEach((ev) => window.addEventListener(ev, () => { st.ultimoGesto = performance.now(); }, { passive: true }));

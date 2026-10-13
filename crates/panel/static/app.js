@@ -1741,7 +1741,7 @@
     // the page loads before this one; here it gets the session, the texts and the language.
     async 'por-dentro'() {
       if (!window.GuardianaUniverso) return;
-      await window.GuardianaUniverso.iniciar({ api, t, tn, esc, LOC, LANG, cadaTanto });
+      await window.GuardianaUniverso.iniciar({ api, t, tn, esc, LOC, LANG, cadaTanto, pdf: { pdfDocument, savePdfFile } });
     },
     async antivirus() {
       let pais = (c) => c;

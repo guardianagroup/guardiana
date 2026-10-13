@@ -27,6 +27,7 @@
     </div>
     <div class="controles">
       <span class="lugar-yo" title=""><span data-t="pd_tu_pais">Tu ordenador está en</span> <b id="yo"></b></span>
+      <button type="button" class="btn-hud graba" id="grabar" aria-pressed="false" data-t="pd_grabar">● Grabar 5 minutos</button>
       <button type="button" class="btn-hud" id="btn-datos" aria-pressed="true" aria-controls="datos" data-t="pd_btn_datos">Datos en vivo</button>
       <button type="button" class="btn-hud" id="pantalla" data-t="pd_pantalla_completa">Pantalla completa</button>
     </div>
@@ -45,6 +46,7 @@
     </div>
     <div class="ayuda-vista" id="ayuda-vista"></div>
     <div class="vacio" id="vacio" hidden role="status" aria-live="polite"><h2 id="vacio-titulo"></h2><p id="vacio-texto"></p><p id="vacio-enlace" hidden><a href="/" data-t="pd_ver_radiografia"></a></p></div>
+    <div class="retrato" id="retrato" hidden role="dialog" aria-labelledby="retrato-t"><h2 id="retrato-t"></h2><p id="retrato-txt"></p><p class="pequeno" id="retrato-modo"></p><div class="aviso-botones"><button type="button" class="btn-hud" id="retrato-pdf" data-t="pd_retrato_pdf"></button><button type="button" class="btn-hud" id="retrato-csv" data-t="pd_retrato_csv"></button><button type="button" class="btn-hud" id="retrato-json" data-t="pd_retrato_json"></button><button type="button" class="btn-hud" id="retrato-cerrar" data-t="pd_retrato_cerrar"></button></div></div>
     <div class="tip" id="tip" hidden></div>
     <div class="aviso" id="aviso" hidden role="status" aria-live="polite"></div>
   </div>

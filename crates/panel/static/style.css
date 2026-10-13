@@ -676,3 +676,13 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 .av-terminos li { margin-bottom: 8px; line-height: 1.5; }
 .av-terminos .tag { margin-right: 4px; color: var(--muted, #586477); }
 .av-terminos p { margin: 6px 0; overflow-wrap: anywhere; }
+
+/* «Retrato»: five real minutes, kept by the person (13 Oct 2026). */
+.universo .btn-hud.graba[aria-pressed="true"] { border-color: var(--cut); color: var(--cut); }
+.universo .retrato { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 6; width: min(520px, calc(100% - 24px)); background: rgba(6,12,22,.97); border: 1px solid var(--shield); border-radius: 12px; padding: 18px 20px; font: 13px/1.55 'IBM Plex Sans', system-ui, sans-serif; color: var(--hud-fg); text-align: center; }
+.universo .retrato[hidden] { display: none; }
+.universo .retrato h2 { margin: 0 0 8px; font: 500 16px 'Unbounded', system-ui, sans-serif; }
+.universo .retrato p { margin: 0 0 8px; }
+.universo .retrato .pequeno { color: var(--hud-muted); font-size: 12px; }
+.universo .retrato .aviso-botones { flex-wrap: wrap; }
+.universo .retrato button:disabled { opacity: .45; cursor: default; }
