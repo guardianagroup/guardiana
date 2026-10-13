@@ -14,6 +14,8 @@ on:
       - 'crates/lists/**'
       - 'crates/core/**'
       - 'crates/license/**'
+      - 'build/wix/**'
+      - 'build/msi-zero.ps1'
       - '.github/workflows/zero.yml'
   workflow_dispatch:
     inputs:
