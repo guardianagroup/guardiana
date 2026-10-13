@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>GUARDIANA · Expedientes</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="preload" href="/static/fonts/IBMPlexSans-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/Unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
+<script src="/static/arranque.js"></script>
+</head>
+<body data-page="expedientes">
+<header class="top">
+  <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA<small data-t="lema"></small></span></a>
+  <nav>
+    <a href="/"  data-t="nav_radiografia">Radiografía</a>
+    <a href="/ia" data-t="nav_ia">Tu IA</a>
+    <a href="/extracto"  data-t="nav_extracto">Extracto</a>
+    <a href="/dispositivos"  data-t="nav_dispositivos">Dispositivos</a>
+    <a href="/sabe-de-ti" data-t="nav_sabe">Lo que GUARDIANA sabe de ti</a>
+    <a href="/borrado" data-t="nav_borrado">Haz que te borren</a>
+    <a href="/expedientes" aria-current="page" data-t="nav_expedientes">Expedientes</a>
+    <a href="/reglas" data-t="nav_reglas">Reglas</a>
+    <a href="/informe" data-t="nav_informe">Informe semanal</a>
+    <a href="/hogar" data-t="nav_hogar">Modo Hogar</a>
+    <a href="/licencia" data-t="nav_licencia">Licencia</a>
+    <a href="/verify" data-t="nav_verify">Verificar</a>
+    <a href="/estado"  data-t="nav_estado">Estado</a>
+  </nav>
+</header>
+<main class="expedientes">
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<h1 data-t="exp_titulo"></h1>
+<p class="lead" data-t="exp_lead"></p>
+
+<div class="counters">
+  <div class="counter"><div class="n" id="x-abiertos">0</div><div class="l" data-t="exp_n_abiertos"></div></div>
+  <div class="counter"><div class="n x-rojo" id="x-vencidos">0</div><div class="l" data-t="exp_n_vencidos"></div></div>
+  <div class="counter"><div class="n" id="x-resueltos">0</div><div class="l" data-t="exp_n_resueltos"></div></div>
+</div>
+
+<h2 data-t="exp_nuevo_titulo"></h2>
+<p class="muted" data-t="exp_nuevo_lead"></p>
+<div class="card">
+  <form class="filters" id="x-nuevo">
+    <label class="x-ancho"><span data-t="exp_campo_empresa"></span><input id="x-empresa" type="text" list="x-empresas" autocomplete="off" spellcheck="false" data-t-label="exp_campo_empresa"></label>
+    <datalist id="x-empresas"></datalist>
+    <label><span data-t="exp_campo_tipo"></span><select id="x-tipo"><option value="borrado" data-t="exp_tipo_borrado"></option><option value="acceso" data-t="exp_tipo_acceso"></option></select></label>
+    <label><span data-t="borrado_campo_pais"></span><select id="x-pais"></select></label>
+    <label><span data-t="exp_campo_estado"></span><select id="x-estado"><option value="preparada" data-t="exp_estado_preparada"></option><option value="enviada" data-t="exp_estado_enviada"></option></select></label>
+    <label id="x-fecha-l" class="hidden"><span data-t="exp_campo_fecha"></span><input id="x-fecha" type="date"></label>
+    <button type="submit" data-t="exp_abrir"></button>
+  </form>
+  <p id="x-ley" class="b-corta"></p>
+  <p id="x-msg" class="bad" role="status" aria-live="polite"></p>
+</div>
+
+<details class="b-plegable" id="x-datos-det">
+  <summary data-t="exp_datos_titulo"></summary>
+  <div class="card">
+    <form class="filters" id="x-datos">
+      <label><span data-t="borrado_campo_nombre"></span><input id="x-nombre" type="text" autocomplete="name" spellcheck="false"></label>
+      <label><span data-t="borrado_campo_correo"></span><input id="x-correo" type="email" autocomplete="email" spellcheck="false"></label>
+    </form>
+    <p class="muted" data-t="borrado_privado"></p>
+  </div>
+</details>
+
+<p class="x-filtros" role="group">
+  <button type="button" class="secondary" data-filtro="todos" aria-pressed="true" data-t="exp_filtro_todos"></button>
+  <button type="button" class="secondary" data-filtro="abiertos" aria-pressed="false" data-t="exp_filtro_abiertos"></button>
+  <button type="button" class="secondary" data-filtro="vencidos" aria-pressed="false" data-t="exp_filtro_vencidos"></button>
+  <button type="button" class="secondary" data-filtro="cerrados" aria-pressed="false" data-t="exp_filtro_cerrados"></button>
+</p>
+<div id="x-lista"></div>
+<p id="x-vacio" class="muted hidden" data-t="exp_vacio"></p>
+<p class="limit" data-t="borrado_aviso_abogados"></p>
+</main>
+<footer><span data-t="pie"></span></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

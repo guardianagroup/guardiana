@@ -598,6 +598,10 @@ pub(crate) struct Estado {
     /// While stood down: Home Mode was on, so the router still sends the house here and a relay
     /// passes their queries on without looking. The panel says so, and asks for the router back.
     hogar_aparcado: bool,
+    /// Case files sent and past their deadline, and due within a few days: every page warns
+    /// about them, as about the trial (1.0.17).
+    exp_vencidos: usize,
+    exp_pronto: usize,
     /// Days left of the trial while it runs, so every page can count down honestly instead of
     /// letting the day arrive as a surprise. `None` with a subscription.
     prueba_dias: Option<i64>,
@@ -612,6 +616,7 @@ struct ListaInfo {
 
 pub(crate) async fn estado(
     Lang(t): Lang,
+    Zona(zona): Zona,
     State(state): State<Arc<AppState>>,
     Query(q): Query<HashMap<String, String>>,
     _s: Session,
@@ -692,7 +697,12 @@ pub(crate) async fn estado(
         entries: guardiana_lists::parse_guardiana(guardiana_lists::TELEMETRIA).count() as u64,
         fetched: String::new(),
     });
+    let (exp_vencidos, exp_pronto) = with_ledger(&state, |l| {
+        crate::expedientes::avisos(l, crate::borrado::dia_de(now_ms(), zona))
+    })?;
     Ok(Json(Estado {
+        exp_vencidos,
+        exp_pronto,
         version: state.info.version.clone(),
         clave_dev: state.info.dev_key,
         escucha: state.info.listen_dns.clone(),

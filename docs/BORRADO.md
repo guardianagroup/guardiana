@@ -132,6 +132,30 @@ Notas:
 - **Perú**: el «procedimiento trilateral de tutela» no se comprobó y no se nombra; el panel dice
   «reclamación ante la Autoridad».
 
+## Derecho de acceso (Expedientes, 1.0.17)
+
+Desde la 1.0.17 la carta puede pedir **acceso** («qué datos tienen de mí») además de borrado. El artículo citado está en `borrado_articulo_acceso_<código>` y, cuando el plazo de acceso es distinto del de borrado, en `borrado_plazo_acceso_<código>`. Mismo criterio que arriba: un plazo que no se comprobó no se cuenta.
+
+| Código | Lo que se cita para el acceso | Plazo que cuenta el reloj | Fuente |
+|---|---|---|---|
+| `es`, `pt`, `ie`, `ue` | RGPD art. 15 (España: y LOPDGDD art. 13) | 1 mes + 2 (RGPD art. 12.3), igual que el borrado | RGPD (arriba) |
+| `gb` | UK GDPR art. 15 | igual que el borrado | ICO (arriba) |
+| `us_ca` | Civil Code §1798.110 (derecho a saber) | 45 + 45 días (§1798.130), igual | §1798.130 (arriba) |
+| `us_va` … `us_or`, `us_otros` | el derecho de acceso de cada ley, sin número de sección | 45 + 45 días, igual | las mismas leyes (arriba) |
+| `us` | ninguna ley federal; es una petición | sin plazo | — |
+| `ca` | PIPEDA, principio 4.9 | 30 días (art. 8(3)), igual | arriba |
+| `ca_qc` | Ley P-39.1 art. 27 | 30 días (art. 32), igual | arriba |
+| `au` | APP 12 | 30 días de referencia, igual | arriba |
+| `nz` | IPP 6 | 20 días hábiles, igual | arriba |
+| `br` | LGPD art. 18, II | **15 días fijados por la ley** (art. 19, II): aquí no es referencia | https://www.legjur.com/legislacao/art/LEI_00137092018-19 (comprobado 12 oct 2026) |
+| `mx` | el derecho de acceso de la LFPDPPP | 20 días hábiles (art. 31), igual | arriba |
+| `co` | Ley 1581 art. 8 lit. a) y art. 14 (consultas) | **10 días hábiles + 5** (art. 14) | https://leyes.co/se_dictan_disposiciones_generales_para_la_proteccion_de_datos_personales/14.htm (comprobado 12 oct 2026) |
+| `ar` | Ley 25.326 art. 14 | **10 días corridos** (art. 14.2) | https://leyes-ar.com/ley_de_proteccion_de_los_datos_personales/14.htm (comprobado 12 oct 2026) |
+| `cl` | Ley 19.628 art. 12 | 2 días hábiles (art. 16), igual | arriba |
+| `pe` | Ley 29733 art. 19 | **sin contar**: no se comprobó el plazo del Reglamento para el acceso | — |
+
+Pendiente, como el resto: que un abogado revise esta tabla.
+
 ## Las empresas (`crates/panel/data/borrado-corredores.txt`)
 
 30 empresas, cada una con su `fuente` y la fecha en que se miró. Dos clases de fuente:

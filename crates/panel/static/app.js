@@ -999,7 +999,7 @@
     $('maxima-quitar').addEventListener('click', (e) => cambia(false, e.currentTarget));
     try { pinta(await api('/api/proteccion-maxima')); } catch (_) {}
   }
-  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo', borrado: 'nav_borrado', empresa: 'ficha_titulo' };
+  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo', borrado: 'nav_borrado', empresa: 'ficha_titulo', expedientes: 'nav_expedientes' };
   function applyTexts() {
     document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.getAttribute('data-t')); });
     document.querySelectorAll('[data-t-html]').forEach((el) => { el.innerHTML = t(el.getAttribute('data-t-html')); });
@@ -2100,15 +2100,15 @@
       // One request per law and choice of evidence: each one reads the statement.
       const cartas = new Map();
       const pide = (evidencia) => {
-        const k = sel.value + '|' + (evidencia ? 1 : 0);
-        if (!cartas.has(k)) cartas.set(k, api('/api/borrado/carta?' + new URLSearchParams({ empresa: d.empresa, jurisdiccion: sel.value, idioma: jur().idioma, evidencia: evidencia ? '1' : '0' }).toString()).catch((e) => { cartas.delete(k); throw e; }));
+        const k = sel.value + '|' + $('f-tipo').value + '|' + (evidencia ? 1 : 0);
+        if (!cartas.has(k)) cartas.set(k, api('/api/borrado/carta?' + new URLSearchParams({ empresa: d.empresa, jurisdiccion: sel.value, idioma: jur().idioma, evidencia: evidencia ? '1' : '0', tipo: $('f-tipo').value }).toString()).catch((e) => { cartas.delete(k); throw e; }));
         return cartas.get(k);
       };
       const rellena = (cuerpo, carta) => cuerpo.split('[[NOMBRE]]').join($('f-cnombre').value.trim() || carta.hueco_nombre).split('[[CORREO]]').join($('f-ccorreo').value.trim() || carta.hueco_correo);
       const pinta = () => {
         if (!C) return;
         const j = jur();
-        $('f-ley').innerHTML = (j.derecho !== 'borrado' ? `<span class="bad">${esc(t('borrado_sin_derecho_' + j.derecho))}</span><br>` : '') + esc(j.corta);
+        $('f-ley').innerHTML = (j.derecho !== 'borrado' ? `<span class="bad">${esc(t('borrado_sin_derecho_' + j.derecho))}</span><br>` : '') + esc($('f-tipo').value === 'acceso' ? j.corta_acceso : j.corta);
         $('f-asunto').textContent = C.asunto;
         $('f-texto').value = rellena(C.cuerpo, C);
         $('f-canal').innerHTML = C.para ? esc(t('borrado_para').replace('{correo}', C.para))
@@ -2174,10 +2174,222 @@
         try { await carga(); avisa((await copia(C.asunto + '\n\n' + rellena(C.cuerpo, C))) ? 'borrado_copiado' : 'ficha_no_copiado'); } catch (err) { $('f-carta-msg').textContent = String(err.message || err); }
       });
       sel.addEventListener('change', () => { carga().catch(() => {}); });
+      $('f-tipo').addEventListener('change', () => { carga().catch(() => {}); });
       $('f-evidencia').addEventListener('change', () => { carga().catch(() => {}); });
+      // The request becomes a case file, prepared: its clock starts when the person says it went.
+      $('f-expediente').addEventListener('click', async () => {
+        try {
+          const cuerpo = { jurisdiccion: sel.value, tipo: $('f-tipo').value, estado: 'preparada' };
+          if (d.borrado) cuerpo.corredor = d.borrado; else cuerpo.empresa = d.empresa;
+          await api('/api/expedientes', { method: 'POST', body: cuerpo });
+          $('f-carta-msg').innerHTML = `${esc(t('exp_abierto_ok'))} <a href="/expedientes">${esc(t('exp_aviso_ver'))}</a>`;
+        } catch (err) { $('f-carta-msg').textContent = String(err.message || err); }
+      });
       ['f-cnombre', 'f-ccorreo'].forEach((id) => $(id).addEventListener('input', () => { pinta(); recuerda(); }));
       $('f-carta-form').addEventListener('submit', (e) => e.preventDefault());
       await carga().catch((e) => { $('f-carta-msg').textContent = String(e.message || e); });
+    },
+    // «Expedientes» (the owner, 12 Oct 2026): every request made to a company, with its legal
+    // deadline, the answer and, once overdue, the complaint to the authority. Only the company,
+    // the place, the kind, the dates, a result and a note are kept; the name and the e-mail live
+    // in this page's inputs (and in this browser only if «Haz que te borren» was told to remember).
+    async expedientes() {
+      let R = await api('/api/expedientes');
+      const RECUERDO = 'guardiana_borrado_datos';
+      const MAILTO_MAX = 2000;
+      const fx = (k, o) => Object.entries(o || {}).reduce((s, [a, b]) => s.split('{' + a + '}').join(String(b)), t(k));
+      const enlace = (url, texto) => (/^https:\/\//.test(String(url || '')) ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(texto || url)}</a>` : '');
+      let filtro = 'todos';
+      // The place: from the browser's region, as on «Haz que te borren».
+      const sel = $('x-pais');
+      sel.innerHTML = R.jurisdicciones.map((j) => `<option value="${esc(j.codigo)}">${esc(j.nombre)}</option>`).join('');
+      const partes = (navigator.language || '').split('-');
+      const region = (partes[1] || '').toUpperCase();
+      sel.value = (region === 'CA' && (partes[0] || '').toLowerCase() === 'fr') ? 'ca_qc'
+        : ((R.jurisdicciones.find((x) => x.regiones.includes(region)) || {}).codigo || (LANG === 'pt' ? 'br' : (LANG === 'en' ? 'us' : 'es')));
+      const jur = (c) => R.jurisdicciones.find((j) => j.codigo === c) || R.jurisdicciones[0];
+      const pintaLey = () => {
+        const j = jur(sel.value);
+        $('x-ley').innerHTML = (j.derecho !== 'borrado' ? `<span class="bad">${esc(t('borrado_sin_derecho_' + j.derecho))}</span><br>` : '') + esc($('x-tipo').value === 'acceso' ? j.corta_acceso : j.corta);
+      };
+      // The companies to pick from: those the house asked for, then those of «Haz que te borren».
+      const opciones = [];
+      const vistos = new Set();
+      for (const e of R.vistas.concat(R.corredores)) { if (!vistos.has(e.empresa)) { vistos.add(e.empresa); opciones.push(e); } }
+      $('x-empresas').innerHTML = opciones.map((e) => `<option value="${esc(e.empresa)}">${e.consultas ? esc(tn('ficha_casa_n_consultas', e.consultas).replace(String(e.consultas), num(e.consultas))) : ''}</option>`).join('');
+      $('x-fecha').max = R.hoy;
+      $('x-fecha').value = R.hoy;
+      $('x-estado').addEventListener('change', () => $('x-fecha-l').classList.toggle('hidden', $('x-estado').value !== 'enviada'));
+      sel.addEventListener('change', pintaLey);
+      $('x-tipo').addEventListener('change', pintaLey);
+      pintaLey();
+      // The person's details, for the letters: as on «Haz que te borren».
+      try {
+        const g = JSON.parse(localStorage.getItem(RECUERDO) || 'null');
+        if (g && typeof g === 'object') { $('x-nombre').value = String(g.nombre || ''); $('x-correo').value = String(g.correo || ''); }
+      } catch (_) {}
+      const recuerda = () => { try { if (localStorage.getItem(RECUERDO)) localStorage.setItem(RECUERDO, JSON.stringify({ nombre: $('x-nombre').value, correo: $('x-correo').value })); } catch (_) {} };
+      ['x-nombre', 'x-correo'].forEach((id) => $(id).addEventListener('input', recuerda));
+      $('x-datos').addEventListener('submit', (e) => e.preventDefault());
+      const rellena = (c) => c.cuerpo.split('[[NOMBRE]]').join($('x-nombre').value.trim() || c.hueco_nombre).split('[[CORREO]]').join($('x-correo').value.trim() || c.hueco_correo);
+      const faltan = () => {
+        if ($('x-nombre').value.trim() && $('x-correo').value.trim()) return false;
+        $('x-datos-det').open = true;
+        ($('x-nombre').value.trim() ? $('x-correo') : $('x-nombre')).focus();
+        return true;
+      };
+      const copia = async (s) => {
+        try { await navigator.clipboard.writeText(s); return true; } catch (_) {}
+        const area = document.createElement('textarea');
+        area.value = s; area.setAttribute('readonly', ''); area.style.position = 'fixed'; area.style.left = '-9999px';
+        document.body.appendChild(area); area.select();
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (_) {}
+        area.remove();
+        return ok;
+      };
+      const slug = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50) || 'empresa';
+
+      const abiertos = () => R.expedientes.filter((e) => e.estado === 'enviada').length;
+      const pintaCifras = () => {
+        $('x-abiertos').textContent = num(abiertos());
+        $('x-vencidos').textContent = num(R.expedientes.filter((e) => e.vencido).length);
+        $('x-resueltos').textContent = num(R.expedientes.filter((e) => e.estado === 'respondida' || e.estado === 'cerrada').length);
+      };
+      const pasa = (e) => filtro === 'todos' || (filtro === 'abiertos' && (e.estado === 'enviada' || e.estado === 'preparada'))
+        || (filtro === 'vencidos' && e.vencido) || (filtro === 'cerrados' && (e.estado === 'respondida' || e.estado === 'cerrada'));
+      const fechas = (e) => [fx('exp_creada', { fecha: e.creada_texto }), e.enviada_texto ? fx('exp_enviada_el', { fecha: e.enviada_texto }) : '', e.cerrada_texto ? fx('exp_cerrada_el', { fecha: e.cerrada_texto }) : ''].filter(Boolean).join(' · ');
+      const botones = (e) => {
+        const b = [];
+        if (e.estado === 'preparada') b.push(`<button type="button" data-accion="enviada" data-id="${e.id}">${esc(t('exp_ya_envie'))}</button>`);
+        if (e.estado === 'enviada') b.push(`<button type="button" data-accion="respondida" data-id="${e.id}">${esc(t('exp_respondieron'))}</button>`);
+        if (e.estado !== 'cerrada') b.push(`<button type="button" class="secondary" data-accion="cerrada" data-id="${e.id}">${esc(t('exp_cerrar'))}</button>`);
+        else b.push(`<button type="button" class="secondary" data-accion="reabrir" data-id="${e.id}">${esc(t('exp_reabrir'))}</button>`);
+        b.push(`<button type="button" class="secondary" data-accion="quitar" data-id="${e.id}">${esc(t('exp_quitar'))}</button>`);
+        return b.join(' ');
+      };
+      const pinta = () => {
+        pintaCifras();
+        const lista = R.expedientes.filter(pasa);
+        $('x-vacio').classList.toggle('hidden', R.expedientes.length > 0);
+        $('x-lista').innerHTML = lista.map((e) => `<div class="card x-exp${e.vencido ? ' vencido' : e.aviso ? ' pronto' : ''}" data-id="${e.id}">
+          <div class="b-cab"><div><b>${empresaLink(e.empresa)}</b> <span class="tag empresa">${esc(e.tipo_texto)}</span> <span class="tag x-estado ${esc(e.estado)}">${esc(e.estado_texto)}</span>
+            <div class="muted small">${esc(e.jurisdiccion_nombre)} · ${esc(fechas(e))}</div></div>
+            <div class="b-acciones">${botones(e)}</div></div>
+          <p><b>${esc(e.frase)}</b>${e.resultado_texto ? ` <span class="muted">· ${esc(e.resultado_texto)}</span>` : ''}</p>
+          ${e.prorroga ? `<p class="muted">${esc(e.prorroga)}</p>` : ''}
+          ${e.notas_plazo.map((n) => `<p class="muted small">${esc(n)}</p>`).join('')}
+          <div class="x-paso hidden" data-id="${e.id}"></div>
+          ${e.vencido ? `<div class="x-queja"><h3>${esc(t('exp_queja'))}</h3><p>${esc(t('exp_queja_explica'))}</p>
+            ${e.queja ? `<p class="muted">${esc(e.queja)}</p>` : ''}
+            ${e.autoridad || e.autoridad_url ? `<p>${esc(t('exp_queja_donde'))}: ${e.autoridad_url ? enlace(e.autoridad_url, e.autoridad || e.autoridad_url) : esc(e.autoridad)}</p>` : ''}
+            <p class="b-acciones"><button type="button" data-doc="queja" data-que="pdf" data-id="${e.id}">${esc(t('ficha_carta_pdf'))}</button>
+              <button type="button" class="secondary" data-doc="queja" data-que="correo" data-id="${e.id}">${esc(t('ficha_carta_correo'))}</button>
+              <button type="button" class="secondary" data-doc="queja" data-que="copiar" data-id="${e.id}">${esc(t('borrado_copiar'))}</button></p></div>` : ''}
+          <details class="b-plegable"><summary>${esc(t('exp_carta'))}</summary>
+            <p class="muted">${esc(t('exp_carta_explica'))}</p>
+            ${e.url ? `<p>${enlace(e.url, t('exp_pagina_empresa'))}</p>` : ''}
+            <p class="b-acciones"><button type="button" data-doc="carta" data-que="pdf" data-id="${e.id}">${esc(t('ficha_carta_pdf'))}</button>
+              <button type="button" class="secondary" data-doc="carta" data-que="correo" data-id="${e.id}">${esc(t('ficha_carta_correo'))}</button>
+              <button type="button" class="secondary" data-doc="carta" data-que="copiar" data-id="${e.id}">${esc(t('borrado_copiar'))}</button></p></details>
+          <details class="b-plegable"><summary>${esc(t('exp_notas'))}</summary>
+            <textarea class="wide x-notas" rows="3" maxlength="600" data-id="${e.id}" placeholder="${esc(t('exp_notas_ph'))}">${esc(e.notas)}</textarea>
+            <p class="b-acciones"><button type="button" class="secondary" data-accion="notas" data-id="${e.id}">${esc(t('exp_guardar_notas'))}</button></p></details>
+          <p class="x-msg muted" role="status" aria-live="polite" data-id="${e.id}"></p>
+        </div>`).join('');
+      };
+      const msg = (id, texto) => { const m = document.querySelector(`.x-msg[data-id="${id}"]`); if (m) { m.textContent = texto; setTimeout(() => { m.textContent = ''; }, 8000); } };
+      const cambia = async (id, cuerpo) => { R.expedientes = await api('/api/expedientes/' + id, { method: 'POST', body: cuerpo }); pinta(); };
+      // A step asks for its day (today by default) and, for an answer, what they answered.
+      const pidePaso = (id, accion) => {
+        const caja = document.querySelector(`.x-paso[data-id="${id}"]`);
+        document.querySelectorAll('.x-paso').forEach((c) => { if (c !== caja) { c.classList.add('hidden'); c.innerHTML = ''; } });
+        const resultados = accion === 'respondida' || accion === 'cerrada'
+          ? `<label><span>${esc(t('exp_resultado_campo'))}</span><select class="x-res"><option value=""></option>${R.resultados.map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('')}</select></label>` : '';
+        caja.innerHTML = `<form class="filters x-paso-form" data-id="${id}" data-accion="${accion}">
+          <label><span>${esc(t(accion === 'enviada' ? 'exp_campo_fecha' : 'exp_fecha_otro'))}</span><input type="date" class="x-dia" value="${esc(R.hoy)}" max="${esc(R.hoy)}"></label>
+          ${resultados}
+          <button type="submit">${esc(t('exp_confirmar'))}</button> <button type="button" class="secondary x-cancela">${esc(t('exp_cancelar'))}</button></form>`;
+        caja.classList.remove('hidden');
+      };
+      const doc = async (id, que, como) => {
+        const e = R.expedientes.find((x) => String(x.id) === String(id));
+        if (!e || faltan()) return;
+        const j = jur(e.jurisdiccion);
+        const pide = (ev) => api(`/api/expedientes/${id}/${que}?` + new URLSearchParams({ idioma: j.idioma, evidencia: ev ? '1' : '0' }).toString());
+        let C = await pide(true);
+        const texto = rellena(C);
+        if (como === 'pdf') {
+          const quien = $('x-nombre').value.trim() + ' ' + $('x-correo').value.trim();
+          const no = faltaEnPdf(quien);
+          if (no.length) { msg(id, fx('ficha_carta_pdf_no', { letras: no.join(' ') })); return; }
+          const d = pdfDocument(C.asunto);
+          if (C.para) d.line(t('ficha_carta_pdf_para').replace('{correo}', C.para), 9, false, 0.4).gap(10);
+          d.line(C.asunto, 12, true).gap(12);
+          for (const l of texto.split('\n')) { if (l.trim()) d.line(l, 10.5); else d.gap(7); }
+          const name = (que === 'queja' ? 'queja-' : 'carta-') + slug(e.empresa) + '.pdf';
+          const r = await savePdfFile(name, d.bytes(''));
+          if (r !== 'cancelado') msg(id, t('pdf_' + r).replace('{nombre}', name) + (cambiaEnPdf(quien) ? ' ' + fx('ficha_carta_pdf_cambia', { nombre: winAnsiLegible($('x-nombre').value.trim()) }) : ''));
+        } else if (como === 'correo') {
+          const mailto = (a, b) => 'mailto:' + (C.para || '') + '?subject=' + encodeURIComponent(a) + '&body=' + encodeURIComponent(b);
+          let url = mailto(C.asunto, texto);
+          const pistas = [C.para ? 'borrado_pista_correo' : 'ficha_carta_pista_sin_para'];
+          if (url.length > MAILTO_MAX && que === 'carta') { C = await pide(false); url = mailto(C.asunto, rellena(C)); pistas.push('borrado_pista_sin_evidencia'); }
+          if (url.length > MAILTO_MAX) { await copia(rellena(C)); url = mailto(C.asunto, t('borrado_mailto_pega')); pistas.splice(0, pistas.length, 'borrado_pista_pegar_correo'); }
+          location.href = url;
+          msg(id, pistas.map((k) => t(k)).join(' '));
+        } else {
+          msg(id, t((await copia(C.asunto + '\n\n' + texto)) ? 'borrado_copiado' : 'ficha_no_copiado'));
+        }
+      };
+      const lista = $('x-lista');
+      lista.addEventListener('click', async (ev) => {
+        const b = ev.target.closest('button');
+        if (!b) return;
+        const id = b.dataset.id;
+        try {
+          if (b.classList.contains('x-cancela')) { const c = b.closest('.x-paso'); c.classList.add('hidden'); c.innerHTML = ''; return; }
+          if (b.dataset.doc) { await doc(id, b.dataset.doc, b.dataset.que); return; }
+          const a = b.dataset.accion;
+          if (a === 'enviada' || a === 'respondida' || a === 'cerrada') pidePaso(id, a);
+          else if (a === 'reabrir') await cambia(id, { estado: 'enviada' });
+          else if (a === 'notas') { await cambia(id, { notas: document.querySelector(`.x-notas[data-id="${id}"]`).value }); msg(id, t('exp_guardado')); }
+          else if (a === 'quitar') { if (b.dataset.seguro) { R.expedientes = await api('/api/expedientes/' + id + '/quitar', { method: 'POST' }); pinta(); } else { b.dataset.seguro = '1'; b.textContent = t('exp_quitar_seguro'); b.classList.add('danger'); } }
+        } catch (err) { msg(id, String(err.message || err)); }
+      });
+      lista.addEventListener('submit', async (ev) => {
+        const f = ev.target.closest('.x-paso-form');
+        if (!f) return;
+        ev.preventDefault();
+        const cuerpo = { estado: f.dataset.accion, fecha: f.querySelector('.x-dia').value };
+        const r = f.querySelector('.x-res');
+        if (r && r.value) cuerpo.resultado = r.value;
+        try { await cambia(f.dataset.id, cuerpo); } catch (err) { msg(f.dataset.id, String(err.message || err)); }
+      });
+      document.querySelectorAll('.x-filtros button').forEach((b) => b.addEventListener('click', () => {
+        filtro = b.dataset.filtro;
+        document.querySelectorAll('.x-filtros button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        pinta();
+      }));
+      $('x-nuevo').addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        $('x-msg').textContent = '';
+        const nombre = $('x-empresa').value.trim();
+        if (!nombre) { $('x-empresa').focus(); return; }
+        const conocida = opciones.find((o) => o.empresa.toLowerCase() === nombre.toLowerCase());
+        const cuerpo = { jurisdiccion: sel.value, tipo: $('x-tipo').value, estado: $('x-estado').value };
+        if (conocida && conocida.corredor) cuerpo.corredor = conocida.corredor; else cuerpo.empresa = conocida ? conocida.empresa : nombre;
+        if (cuerpo.estado === 'enviada') cuerpo.fecha = $('x-fecha').value;
+        try {
+          R.expedientes = await api('/api/expedientes', { method: 'POST', body: cuerpo });
+          $('x-empresa').value = '';
+          pinta();
+        } catch (err) { $('x-msg').textContent = /unknown company/.test(String(err.message)) ? t('exp_empresa_desconocida') : String(err.message || err); }
+      });
+      // From a profile or another page: /expedientes?e=Criteo fills the company in.
+      const pedida = new URLSearchParams(location.search).get('e');
+      if (pedida) $('x-empresa').value = pedida;
+      pinta();
     },
     // «Haz que te borren» (decision 204). One button per company sends the letter as far as a
     // browser may without GUARDIANA sending anything: the person's own mail client opens with the
@@ -2572,9 +2784,23 @@
   // honesta mientras dura la prueba. Que la prueba se acabe no puede ser una sorpresa, y que el
   // programa haya dejado de mirar tiene que verse en la página en la que estés, no solo en la de
   // la licencia.
+  // Overdue case files, on every page but their own: as visible as the trial (1.0.17).
+  function franjaExpedientes(e) {
+    if (document.body.getAttribute('data-page') === 'expedientes') return;
+    if (!e.exp_vencidos && !e.exp_pronto) return;
+    const caja = document.createElement('div');
+    caja.className = 'card franja-exp';
+    const partes = [];
+    if (e.exp_vencidos) partes.push(`<strong>${esc(tn('exp_aviso_vencidos', e.exp_vencidos))}</strong>`);
+    if (e.exp_pronto) partes.push(`<span>${esc(tn('exp_aviso_pronto', e.exp_pronto))}</span>`);
+    caja.innerHTML = partes.join(' · ') + ` <a href="/expedientes">${esc(t('exp_aviso_ver'))}</a>`;
+    const m = document.querySelector('main');
+    if (m) m.insertBefore(caja, m.firstChild);
+  }
   async function franjaLicencia() {
     let e;
     try { e = await estadoBase(); } catch (_) { return; }
+    franjaExpedientes(e);
     if (!e.caducado && !(e.prueba_dias !== null && e.prueba_dias !== undefined)) return;
     const caja = document.createElement('div');
     caja.className = 'card ' + (e.caducado ? 'caducado' : 'prueba');

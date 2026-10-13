@@ -239,6 +239,13 @@ impl Texts {
         Self::get(&self.panel, key)
     }
 
+    /// Whether a panel text exists, for a text that is optional (a wording that only some
+    /// places need) and must not fall back to its own key.
+    #[must_use]
+    pub fn panel_has(&self, key: &str) -> bool {
+        self.panel.contains_key(key)
+    }
+
     /// A CLI text that counts: `key_uno` when there is one thing and that text exists, `key`
     /// otherwise, with `{n}` replaced. Until 1.0.2 the program said «1 reglas deshechas» or
     /// «quedan 1 días» (review of 5 Oct 2026).

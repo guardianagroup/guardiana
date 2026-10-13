@@ -303,15 +303,28 @@ async fn the_page_counts_right_writes_the_letter_and_keeps_no_name() {
 
     running.shutdown().await;
 
-    // What was kept: the company, the law and the day, in the settings. Nothing else, and no
+    // What was kept: since 1.0.17 the clock is a case file of «Expedientes»: the company, the
+    // law, the kind of request, its status and the days, in the settings. Nothing else, and no
     // trace of the name or the address anywhere in the database files.
     let l = Ledger::open(&db, genesis()).unwrap();
-    let guardado = l.setting("borrado_envios").unwrap().unwrap();
+    let guardado = l.setting("expedientes").unwrap().unwrap();
     let v: serde_json::Value = serde_json::from_str(&guardado).unwrap();
     let uno = v.as_array().unwrap()[0].as_object().unwrap();
     let mut campos: Vec<&str> = uno.keys().map(String::as_str).collect();
     campos.sort_unstable();
-    assert_eq!(campos, vec!["corredor", "enviada", "id", "jurisdiccion"]);
+    assert_eq!(
+        campos,
+        vec![
+            "corredor",
+            "creada",
+            "empresa",
+            "enviada",
+            "estado",
+            "id",
+            "jurisdiccion",
+            "tipo"
+        ]
+    );
     drop(l);
     for entrada in std::fs::read_dir(&dir).unwrap() {
         let p = entrada.unwrap().path();

@@ -41,8 +41,6 @@ pub(crate) const MARCA_NOMBRE: &str = "[[NOMBRE]]";
 pub(crate) const MARCA_CORREO: &str = "[[CORREO]]";
 /// The setting that keeps the clock: a JSON list of [`Envio`].
 pub(crate) const SETTING_ENVIOS: &str = "borrado_envios";
-/// At most this many letters on the clock: a list nobody can read is no clock.
-const MAX_ENVIOS: usize = 200;
 
 // ----- jurisdictions ------------------------------------------------------------------------
 
@@ -87,6 +85,25 @@ const fn meses(n: u32) -> Option<Plazo> {
     })
 }
 
+/// What a letter asks for: that the company delete the person's data, or that it say what data
+/// it holds (the right of access, which every law here gives in some form).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum Tipo {
+    #[default]
+    Borrado,
+    Acceso,
+}
+
+impl Tipo {
+    pub(crate) fn clave(self) -> &'static str {
+        match self {
+            Tipo::Borrado => "borrado",
+            Tipo::Acceso => "acceso",
+        }
+    }
+}
+
 /// What the law of a place gives the person.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -118,6 +135,11 @@ pub(crate) struct Jurisdiccion {
     pub(crate) plazo: Option<Plazo>,
     /// The extension the law allows, when it does (added after the deadline).
     pub(crate) prorroga: Option<Plazo>,
+    /// The deadline to answer a request of access (what data it holds), when the law fixes one
+    /// and it was checked; `None` when it is not known, and the clock says so. Written for every
+    /// place, even where it is the same as for deletion, so the table is explicit.
+    pub(crate) plazo_acceso: Option<Plazo>,
+    pub(crate) prorroga_acceso: Option<Plazo>,
     /// The deadline is a reference, not fixed by the law (Brazil, Australia, other US states):
     /// the clock still counts it, and says so.
     pub(crate) referencia: bool,
@@ -140,6 +162,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: meses(1),
         prorroga: meses(2),
+        plazo_acceso: meses(1),
+        prorroga_acceso: meses(2),
         referencia: false,
         autoridad: Some("Agencia Española de Protección de Datos (AEPD)"),
         autoridad_url: Some(
@@ -159,6 +183,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: meses(1),
         prorroga: meses(2),
+        plazo_acceso: meses(1),
+        prorroga_acceso: meses(2),
         referencia: false,
         autoridad: Some("Comissão Nacional de Proteção de Dados (CNPD)"),
         autoridad_url: Some("https://www.cnpd.pt"),
@@ -175,6 +201,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: meses(1),
         prorroga: meses(2),
+        plazo_acceso: meses(1),
+        prorroga_acceso: meses(2),
         referencia: false,
         autoridad: Some("Data Protection Commission (DPC)"),
         autoridad_url: Some("https://forms.dataprotection.ie/contact"),
@@ -194,6 +222,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: meses(1),
         prorroga: meses(2),
+        plazo_acceso: meses(1),
+        prorroga_acceso: meses(2),
         referencia: false,
         autoridad: None,
         autoridad_url: Some("https://www.edpb.europa.eu/about-edpb/about-edpb/members_en"),
@@ -206,6 +236,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: meses(1),
         prorroga: meses(2),
+        plazo_acceso: meses(1),
+        prorroga_acceso: meses(2),
         referencia: false,
         autoridad: Some("Information Commissioner's Office (ICO)"),
         autoridad_url: Some("https://ico.org.uk/make-a-complaint/"),
@@ -221,6 +253,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: dias(45),
         prorroga: dias(45),
+        plazo_acceso: dias(45),
+        prorroga_acceso: dias(45),
         referencia: false,
         autoridad: Some("California Privacy Protection Agency (CalPrivacy)"),
         autoridad_url: Some("https://privacy.ca.gov/submit-a-complaint/"),
@@ -238,6 +272,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: dias(45),
         prorroga: dias(45),
+        plazo_acceso: dias(45),
+        prorroga_acceso: dias(45),
         referencia: false,
         autoridad: Some("Virginia Attorney General"),
         autoridad_url: Some("https://www.oag.state.va.us"),
@@ -250,6 +286,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: dias(45),
         prorroga: dias(45),
+        plazo_acceso: dias(45),
+        prorroga_acceso: dias(45),
         referencia: false,
         autoridad: Some("Colorado Attorney General"),
         autoridad_url: Some("https://complaints.coag.gov/s/data-privacy"),
@@ -265,6 +303,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: dias(45),
         prorroga: dias(45),
+        plazo_acceso: dias(45),
+        prorroga_acceso: dias(45),
         referencia: false,
         autoridad: Some("Connecticut Attorney General"),
         autoridad_url: Some("https://portal.ct.gov/ag/common/complaint-form-landing-page"),
@@ -277,6 +317,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: dias(45),
         prorroga: dias(45),
+        plazo_acceso: dias(45),
+        prorroga_acceso: dias(45),
         referencia: false,
         autoridad: Some("Utah Division of Consumer Protection"),
         autoridad_url: Some("https://dcp.utah.gov"),
@@ -292,6 +334,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: dias(45),
         prorroga: dias(45),
+        plazo_acceso: dias(45),
+        prorroga_acceso: dias(45),
         referencia: false,
         autoridad: Some("Texas Attorney General"),
         autoridad_url: Some(
@@ -309,6 +353,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: dias(45),
         prorroga: dias(45),
+        plazo_acceso: dias(45),
+        prorroga_acceso: dias(45),
         referencia: false,
         autoridad: Some("Oregon Department of Justice"),
         autoridad_url: Some("https://doj.state.or.us/consumer-protection/id-theft-data-breaches"),
@@ -324,6 +370,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: dias(45),
         prorroga: dias(45),
+        plazo_acceso: dias(45),
+        prorroga_acceso: dias(45),
         referencia: true,
         autoridad: None,
         autoridad_url: None,
@@ -336,6 +384,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Ninguno,
         plazo: None,
         prorroga: None,
+        plazo_acceso: None,
+        prorroga_acceso: None,
         referencia: false,
         autoridad: None,
         autoridad_url: None,
@@ -348,6 +398,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Limitado,
         plazo: dias(30),
         prorroga: dias(30),
+        plazo_acceso: dias(30),
+        prorroga_acceso: dias(30),
         referencia: false,
         autoridad: Some("Office of the Privacy Commissioner of Canada (OPC)"),
         autoridad_url: Some("https://www.priv.gc.ca/en/report-a-concern/file-a-formal-privacy-complaint/file-a-complaint-about-a-business"),
@@ -364,6 +416,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Limitado,
         plazo: dias(30),
         prorroga: None,
+        plazo_acceso: dias(30),
+        prorroga_acceso: None,
         referencia: false,
         autoridad: Some("Commission d'accès à l'information du Québec (CAI)"),
         autoridad_url: Some("https://www.cai.gouv.qc.ca"),
@@ -379,6 +433,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Limitado,
         plazo: dias(30),
         prorroga: None,
+        plazo_acceso: dias(30),
+        prorroga_acceso: None,
         referencia: true,
         autoridad: Some("Office of the Australian Information Commissioner (OAIC)"),
         autoridad_url: Some("https://www.oaic.gov.au"),
@@ -394,6 +450,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Limitado,
         plazo: habiles(20),
         prorroga: None,
+        plazo_acceso: habiles(20),
+        prorroga_acceso: None,
         referencia: false,
         autoridad: Some("Office of the Privacy Commissioner (OPC)"),
         autoridad_url: Some("https://www.privacy.org.nz"),
@@ -406,6 +464,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: dias(15),
         prorroga: None,
+        plazo_acceso: dias(15),
+        prorroga_acceso: None,
         referencia: true,
         autoridad: Some("Autoridade Nacional de Proteção de Dados (ANPD)"),
         autoridad_url: Some("https://www.gov.br/pt-br/servicos/abrir-requerimento-relacionado-a-lgpd"),
@@ -418,6 +478,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: habiles(20),
         prorroga: habiles(20),
+        plazo_acceso: habiles(20),
+        prorroga_acceso: habiles(20),
         referencia: false,
         autoridad: Some("Secretaría Anticorrupción y Buen Gobierno"),
         autoridad_url: Some("https://www.anticorrupcionybg.gob.mx"),
@@ -430,6 +492,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: habiles(15),
         prorroga: habiles(8),
+        plazo_acceso: habiles(10),
+        prorroga_acceso: habiles(5),
         referencia: false,
         autoridad: Some("Superintendencia de Industria y Comercio (SIC)"),
         autoridad_url: Some("https://www.sic.gov.co"),
@@ -442,6 +506,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: habiles(5),
         prorroga: None,
+        plazo_acceso: dias(10),
+        prorroga_acceso: None,
         referencia: false,
         autoridad: Some("Agencia de Acceso a la Información Pública (AAIP)"),
         autoridad_url: Some("https://www.argentina.gob.ar/aaip"),
@@ -454,6 +520,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: habiles(2),
         prorroga: None,
+        plazo_acceso: habiles(2),
+        prorroga_acceso: None,
         referencia: false,
         autoridad: None,
         autoridad_url: None,
@@ -469,6 +537,8 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
         derecho: Derecho::Borrado,
         plazo: habiles(10),
         prorroga: habiles(10),
+        plazo_acceso: None,
+        prorroga_acceso: None,
         referencia: false,
         autoridad: Some("Autoridad Nacional de Protección de Datos Personales (ANPD)"),
         autoridad_url: Some("https://www.gob.pe/anpd"),
@@ -485,9 +555,38 @@ pub(crate) fn jurisdiccion(codigo: &str) -> Option<&'static Jurisdiccion> {
 }
 
 /// A panel text of a jurisdiction, `borrado_<campo>_<código>`, owned.
-fn texto_jur(t: &Texts, campo: &str, j: &Jurisdiccion) -> String {
+pub(crate) fn texto_jur(t: &Texts, campo: &str, j: &Jurisdiccion) -> String {
     let k = format!("borrado_{campo}_{}", j.codigo);
     t.panel(&k).to_owned()
+}
+
+/// The text of a field for a request type: `borrado_<campo>_acceso_<código>` for access when
+/// it is written, else the deletion one (the same deadline, worded once).
+pub(crate) fn texto_jur_tipo(t: &Texts, campo: &str, j: &Jurisdiccion, tipo: Tipo) -> String {
+    if tipo == Tipo::Acceso {
+        let k = format!("borrado_{campo}_acceso_{}", j.codigo);
+        if t.panel_has(&k) {
+            return t.panel(&k).to_owned();
+        }
+    }
+    texto_jur(t, campo, j)
+}
+
+impl Jurisdiccion {
+    /// Whether the deadline counted for a request type is only a reference. Brazil's LGPD has no
+    /// deadline in days for deletion, but fixes 15 days for the full statement of access
+    /// (article 19, II; checked on 12 Oct 2026).
+    pub(crate) fn es_referencia(&self, tipo: Tipo) -> bool {
+        self.referencia && !(tipo == Tipo::Acceso && self.codigo == "br")
+    }
+
+    /// The deadline and the extension for a request type.
+    pub(crate) fn plazos(&self, tipo: Tipo) -> (Option<Plazo>, Option<Plazo>) {
+        match tipo {
+            Tipo::Borrado => (self.plazo, self.prorroga),
+            Tipo::Acceso => (self.plazo_acceso, self.prorroga_acceso),
+        }
+    }
 }
 
 // ----- the companies ------------------------------------------------------------------------
@@ -801,7 +900,7 @@ pub(crate) fn sumar(desde: i64, p: Plazo) -> i64 {
 }
 
 /// A day number as the panel writes dates in this language.
-fn fecha_texto(t: &Texts, z: i64) -> String {
+pub(crate) fn fecha_texto(t: &Texts, z: i64) -> String {
     let (y, m, d) = civil_desde_dias(z);
     let mes = t
         .panel("fecha_meses")
@@ -824,7 +923,7 @@ fn fecha_texto(t: &Texts, z: i64) -> String {
 }
 
 /// The person's day, as a day number, from a time and their offset.
-fn dia_de(ms: i64, zona_min: i64) -> i64 {
+pub(crate) fn dia_de(ms: i64, zona_min: i64) -> i64 {
     (ms + zona_min * 60_000).div_euclid(guardiana_core::time::DAY_MS)
 }
 
@@ -847,8 +946,9 @@ pub(crate) struct Carta {
     pub(crate) hueco_correo: String,
 }
 
-/// Puts the letter together, in the language of `t`. `hoy` is a day number; `zona` the person's
-/// offset in minutes, for the days of the evidence.
+/// Puts the deletion letter together, in the language of `t`. `hoy` is a day number; `zona` the
+/// person's offset in minutes, for the days of the evidence.
+#[cfg(test)]
 pub(crate) fn carta(
     t: &'static Texts,
     j: &Jurisdiccion,
@@ -857,10 +957,28 @@ pub(crate) fn carta(
     hoy: i64,
     zona: i64,
 ) -> Carta {
-    let (k_asunto, k_cuerpo) = match j.derecho {
-        Derecho::Borrado => ("borrado_asunto_borrado", "borrado_carta_borrado"),
-        Derecho::Limitado => ("borrado_asunto_limitado", "borrado_carta_limitado"),
-        Derecho::Ninguno => ("borrado_asunto_ninguno", "borrado_carta_ninguno"),
+    carta_de(t, j, c, ev, hoy, zona, Tipo::Borrado)
+}
+
+/// The same, for either request: deletion, or access (what data the company holds), which
+/// every law here gives; where there is no law, it is a request and says so.
+pub(crate) fn carta_de(
+    t: &'static Texts,
+    j: &Jurisdiccion,
+    c: &Corredor,
+    ev: Option<&Evidencia>,
+    hoy: i64,
+    zona: i64,
+    tipo: Tipo,
+) -> Carta {
+    let (k_asunto, k_cuerpo) = match (tipo, j.derecho) {
+        (Tipo::Acceso, Derecho::Ninguno) => {
+            ("borrado_asunto_acceso", "borrado_carta_acceso_ninguno")
+        }
+        (Tipo::Acceso, _) => ("borrado_asunto_acceso", "borrado_carta_acceso"),
+        (Tipo::Borrado, Derecho::Borrado) => ("borrado_asunto_borrado", "borrado_carta_borrado"),
+        (Tipo::Borrado, Derecho::Limitado) => ("borrado_asunto_limitado", "borrado_carta_limitado"),
+        (Tipo::Borrado, Derecho::Ninguno) => ("borrado_asunto_ninguno", "borrado_carta_ninguno"),
     };
     let evidencia = match ev.filter(|e| e.consultas > 0) {
         None => String::new(),
@@ -892,8 +1010,8 @@ pub(crate) fn carta(
         .panel(k_cuerpo)
         .replace("{empresa}", &c.nombre)
         .replace("{ley}", &texto_jur(t, "ley", j))
-        .replace("{articulo}", &texto_jur(t, "articulo", j))
-        .replace("{plazo}", &texto_jur(t, "plazo", j))
+        .replace("{articulo}", &texto_jur_tipo(t, "articulo", j, tipo))
+        .replace("{plazo}", &texto_jur_tipo(t, "plazo", j, tipo))
         .replace("{evidencia}", &evidencia)
         .replace("{fecha}", &fecha_texto(t, hoy))
         .replace("{nombre}", MARCA_NOMBRE)
@@ -1014,18 +1132,22 @@ pub(crate) fn envio_view(t: &Texts, e: &Envio, hoy: i64) -> EnvioView {
     }
 }
 
-/// The clocks kept in the settings; an unreadable value is an empty list, not an error page.
+/// The clocks this page shows: since 1.0.17 they are the files of «Expedientes» that were sent
+/// asking for deletion and are still waiting (the `borrado_envios` setting became those files,
+/// once). Answered or closed files live on that page.
 fn leer_envios(l: &guardiana_core::Ledger) -> guardiana_core::Result<Vec<Envio>> {
-    Ok(l.setting(SETTING_ENVIOS)?
-        .and_then(|v| serde_json::from_str(&v).ok())
-        .unwrap_or_default())
-}
-
-fn guardar_envios(l: &guardiana_core::Ledger, e: &[Envio]) -> guardiana_core::Result<()> {
-    l.set_setting(
-        SETTING_ENVIOS,
-        &serde_json::to_string(e).unwrap_or_else(|_| "[]".to_owned()),
-    )
+    Ok(crate::expedientes::leer(l)?
+        .iter()
+        .filter(|e| e.tipo == Tipo::Borrado && e.estado == crate::expedientes::Estado::Enviada)
+        .filter_map(|e| {
+            Some(Envio {
+                id: e.id,
+                corredor: e.corredor.clone()?,
+                jurisdiccion: e.jurisdiccion.clone(),
+                enviada: e.enviada.clone()?,
+            })
+        })
+        .collect())
 }
 
 // ----- the page's API -----------------------------------------------------------------------
@@ -1043,6 +1165,8 @@ pub(crate) struct JurView {
     /// The one line shown before the law is unfolded: «Plazo: 45 días (+45 días). Si no
     /// responden: CalPrivacy.»
     corta: String,
+    /// The same line for an access request, with its own deadline where the law fixes one.
+    corta_acceso: String,
     nota: String,
     plazo: Option<Plazo>,
     prorroga: Option<Plazo>,
@@ -1097,7 +1221,8 @@ pub(crate) fn jur_view(t: &Texts, j: &'static Jurisdiccion) -> JurView {
         ley: texto_jur(t, "ley", j),
         articulo: texto_jur(t, "articulo", j),
         plazo_texto: texto_jur(t, "plazo", j),
-        corta: linea_corta(t, j),
+        corta: linea_corta(t, j, Tipo::Borrado),
+        corta_acceso: linea_corta(t, j, Tipo::Acceso),
         nota: texto_jur(t, "nota", j),
         plazo: j.plazo,
         prorroga: j.prorroga,
@@ -1128,17 +1253,18 @@ fn sigla(autoridad: &str) -> &str {
 }
 
 /// The law in one line, for before the person unfolds the rest.
-pub(crate) fn linea_corta(t: &Texts, j: &Jurisdiccion) -> String {
+pub(crate) fn linea_corta(t: &Texts, j: &Jurisdiccion, tipo: Tipo) -> String {
     let autoridad = j
         .autoridad
         .map_or_else(|| texto_jur(t, "autoridad", j), |a| sigla(a).to_owned());
-    match j.plazo {
+    let (plazo, prorroga) = j.plazos(tipo);
+    match plazo {
         Some(p) => {
             let mut plazo = plazo_en_palabras(t, p);
-            if let Some(x) = j.prorroga {
+            if let Some(x) = prorroga {
                 plazo = format!("{plazo} (+{})", plazo_en_palabras(t, x));
             }
-            t.panel(if j.referencia {
+            t.panel(if j.es_referencia(tipo) {
                 "borrado_corta_referencia"
             } else {
                 "borrado_corta"
@@ -1275,6 +1401,9 @@ pub(crate) struct CartaQuery {
     /// `0` leaves the house's evidence out of the letter.
     #[serde(default)]
     evidencia: Option<String>,
+    /// `acceso` asks what data the company holds instead of asking it to delete them.
+    #[serde(default)]
+    tipo: Tipo,
 }
 
 fn no_encontrado(que: &str) -> Response {
@@ -1303,13 +1432,14 @@ pub(crate) async fn carta_api(
         let mut evs = evidencias(&spans, std::slice::from_ref(&c));
         evs.remove(&c.id)
     };
-    Ok(Json(carta(
+    Ok(Json(carta_de(
         t,
         j,
         &c,
         ev.as_ref(),
         dia_de(now_ms(), zona),
         zona,
+        q.tipo,
     )))
 }
 
@@ -1337,19 +1467,8 @@ pub(crate) async fn nuevo_envio(
         return Err(malo("date out of range"));
     }
     let lista = with_ledger(&state, |l| {
-        let mut lista = leer_envios(l)?;
-        if lista.len() >= MAX_ENVIOS {
-            lista.remove(0);
-        }
-        let id = lista.iter().map(|e| e.id).max().unwrap_or(0) + 1;
-        lista.push(Envio {
-            id,
-            corredor: body.corredor.clone(),
-            jurisdiccion: body.jurisdiccion.clone(),
-            enviada: fecha_iso(dia),
-        });
-        guardar_envios(l, &lista)?;
-        Ok(lista)
+        crate::expedientes::abrir_enviado(l, &body.corredor, &body.jurisdiccion, fecha_iso(dia))?;
+        leer_envios(l)
     })?;
     Ok(Json(lista.iter().map(|e| envio_view(t, e, hoy)).collect()))
 }
@@ -1362,10 +1481,8 @@ pub(crate) async fn quitar_envio(
     Path(id): Path<u32>,
 ) -> ApiResult<Vec<EnvioView>> {
     let lista = with_ledger(&state, |l| {
-        let mut lista = leer_envios(l)?;
-        lista.retain(|e| e.id != id);
-        guardar_envios(l, &lista)?;
-        Ok(lista)
+        crate::expedientes::quitar_de(l, id)?;
+        leer_envios(l)
     })?;
     let hoy = dia_de(now_ms(), zona);
     Ok(Json(lista.iter().map(|e| envio_view(t, e, hoy)).collect()))
@@ -1443,7 +1560,7 @@ mod tests {
 
     #[test]
     fn the_short_line_says_deadline_extension_and_authority() {
-        let l = |c: &str| linea_corta(i18n::es(), jurisdiccion(c).unwrap());
+        let l = |c: &str| linea_corta(i18n::es(), jurisdiccion(c).unwrap(), Tipo::Borrado);
         assert_eq!(
             l("us_ca"),
             "Plazo: 45 días (+45 días). Si no responden: CalPrivacy."
@@ -1452,7 +1569,20 @@ mod tests {
         assert!(l("co").starts_with("Plazo: 15 días hábiles (+8 días hábiles)."));
         assert!(l("br").starts_with("Plazo de referencia: 15 días."));
         assert!(l("us").starts_with("La ley no fija un plazo."));
-        let en = linea_corta(i18n::en(), jurisdiccion("gb").unwrap());
+        let a = |c: &str| linea_corta(i18n::es(), jurisdiccion(c).unwrap(), Tipo::Acceso);
+        assert!(
+            a("co").starts_with("Plazo: 10 días hábiles (+5 días hábiles)."),
+            "{}",
+            a("co")
+        );
+        assert!(a("ar").starts_with("Plazo: 10 días."), "{}", a("ar"));
+        assert!(
+            a("br").starts_with("Plazo: 15 días."),
+            "not a reference for access: {}",
+            a("br")
+        );
+        assert_eq!(a("es"), l("es"));
+        let en = linea_corta(i18n::en(), jurisdiccion("gb").unwrap(), Tipo::Borrado);
         assert_eq!(
             en,
             "Deadline: 1 month (+2 months). If they don't answer: ICO."
@@ -1493,7 +1623,13 @@ mod tests {
                     let k = format!("borrado_autoridad_{}", j.codigo);
                     assert!(t.panel.contains_key(&k), "{lang}: falta {k}");
                 }
-                assert!(!linea_corta(t, j).contains('{'), "{lang}/{}", j.codigo);
+                for tipo in [Tipo::Borrado, Tipo::Acceso] {
+                    assert!(
+                        !linea_corta(t, j, tipo).contains('{'),
+                        "{lang}/{}",
+                        j.codigo
+                    );
+                }
                 if j.referencia {
                     let k = format!("borrado_referencia_{}", j.codigo);
                     assert!(t.panel.contains_key(&k), "{lang}: falta {k}");

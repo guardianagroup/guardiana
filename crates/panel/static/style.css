@@ -328,3 +328,22 @@ a.enlace-empresa:hover { color: var(--accent); text-decoration-color: currentCol
 .ficha .f-fuentes { font-size: 12.5px; color: var(--muted); padding-left: 22px; }
 .ficha .f-fuentes li { margin: 3px 0; overflow-wrap: anywhere; }
 .ficha #f-casa-texto { max-width: 76ch; }
+
+/* «Expedientes» (1.0.17): one card per request; overdue in red, due soon in amber. */
+.expedientes .x-rojo { color: var(--cortado); }
+.expedientes .x-filtros { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 6px; }
+.expedientes .x-filtros button[aria-pressed="true"] { border-color: var(--fg); background: var(--card); }
+.expedientes .x-ancho { flex: 1 1 260px; }
+.expedientes .x-ancho input { width: 100%; }
+.card.x-exp { border-left: 4px solid var(--line); }
+.card.x-exp.pronto { border-left-color: var(--publicidad); }
+.card.x-exp.vencido { border-left-color: var(--cortado); }
+.card.x-exp .b-cab { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 10px 16px; }
+.card.x-exp .b-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+.tag.x-estado.enviada { color: var(--accent); }
+.tag.x-estado.respondida { color: var(--esperado); }
+.tag.x-estado.cerrada { color: var(--muted); }
+.x-queja { border: 1px solid var(--cortado); border-radius: 10px; padding: 12px 14px; margin: 10px 0; }
+.x-queja h3 { margin-top: 0; color: var(--cortado); }
+.x-paso { margin: 8px 0; }
+.franja-exp { border-left: 4px solid var(--cortado); }

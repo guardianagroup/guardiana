@@ -14,6 +14,7 @@ mod auth;
 mod borrado;
 mod destinos;
 mod empresa;
+mod expedientes;
 mod medidas;
 
 use std::net::SocketAddr;
@@ -362,6 +363,22 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             get(|| async { pagina(include_str!("../static/empresa.html")) }),
         )
         .route("/api/empresa", get(empresa::ficha))
+        .route(
+            "/expedientes",
+            get(|| async { pagina(include_str!("../static/expedientes.html")) }),
+        )
+        .route(
+            "/expedientes.html",
+            get(|| async { pagina(include_str!("../static/expedientes.html")) }),
+        )
+        .route(
+            "/api/expedientes",
+            get(expedientes::resumen).post(expedientes::nuevo),
+        )
+        .route("/api/expedientes/{id}", post(expedientes::cambiar))
+        .route("/api/expedientes/{id}/quitar", post(expedientes::quitar))
+        .route("/api/expedientes/{id}/carta", get(expedientes::carta))
+        .route("/api/expedientes/{id}/queja", get(expedientes::queja))
         .route("/api/borrado", get(borrado::resumen))
         .route("/api/borrado/carta", get(borrado::carta_api))
         .route("/api/borrado/envios", post(borrado::nuevo_envio))
@@ -588,6 +605,7 @@ mod textos {
             include_str!("../static/comprobador.html"),
             include_str!("../static/borrado.html"),
             include_str!("../static/empresa.html"),
+            include_str!("../static/expedientes.html"),
         ];
         const SCRIPTS: &[&str] = &[include_str!("../static/app.js")];
         // The keys asked for with a literal: `data-t="x"` in the pages, `t('x')` in the scripts.

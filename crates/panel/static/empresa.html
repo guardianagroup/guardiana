@@ -20,6 +20,7 @@
     <a href="/dispositivos"  data-t="nav_dispositivos">Dispositivos</a>
     <a href="/sabe-de-ti" data-t="nav_sabe">Lo que GUARDIANA sabe de ti</a>
     <a href="/borrado" data-t="nav_borrado">Haz que te borren</a>
+    <a href="/expedientes" data-t="nav_expedientes">Expedientes</a>
     <a href="/reglas" data-t="nav_reglas">Reglas</a>
     <a href="/informe" data-t="nav_informe">Informe semanal</a>
     <a href="/hogar" data-t="nav_hogar">Modo Hogar</a>
@@ -66,6 +67,7 @@
     <p data-t="ficha_carta_explica"></p>
     <div class="card">
       <form class="filters" id="f-carta-form">
+        <label><span data-t="exp_campo_tipo"></span><select id="f-tipo"><option value="borrado" data-t="exp_tipo_borrado"></option><option value="acceso" data-t="exp_tipo_acceso"></option></select></label>
         <label><span data-t="borrado_campo_pais"></span><select id="f-pais"></select></label>
         <label><span data-t="borrado_campo_nombre"></span><input id="f-cnombre" type="text" autocomplete="name" spellcheck="false"></label>
         <label><span data-t="borrado_campo_correo"></span><input id="f-ccorreo" type="email" autocomplete="email" spellcheck="false"></label>
@@ -77,6 +79,7 @@
         <button type="button" id="f-carta-pdf" data-t="ficha_carta_pdf"></button>
         <button type="button" class="secondary" id="f-carta-correo" data-t="ficha_carta_correo"></button>
         <button type="button" class="secondary" id="f-carta-copiar" data-t="borrado_copiar"></button>
+        <button type="button" class="secondary" id="f-expediente" data-t="exp_abrir_desde_ficha"></button>
       </p>
       <p id="f-carta-msg" class="muted" role="status" aria-live="polite"></p>
       <details class="b-plegable"><summary data-t="borrado_ver_carta"></summary>
