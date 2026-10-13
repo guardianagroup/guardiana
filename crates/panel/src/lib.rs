@@ -488,6 +488,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/cambios", get(api::cambios))
         .route("/api/ia", get(api::ia))
         .route("/api/antivirus", get(antivirus::vista))
+        .route("/api/antivirus/detectar", get(antivirus::detectar))
         .route("/api/ia/alcance", post(api::alcance))
         .route("/api/ia/alcance/anadir", post(api::alcance_anadir))
         .route("/api/dns/aplicar", post(api::dns_aplicar))

@@ -1770,17 +1770,49 @@
         <p class="muted mono">${f.programas.map(esc).join(' · ')}</p>
         ${f.sanciones.length ? `<ul>${f.sanciones.map(sancion).join('')}</ul>` : `<p class="muted">${esc(t('av_sin_sanciones'))}</p>`}
       </div>`;
+      // Bytes en la unidad de quien lee, sin inventar precisión: lo que la pila dio por enviado.
+      const bytes = (n) => {
+        n = Number(n || 0);
+        const u = ['B', 'kB', 'MB', 'GB', 'TB'];
+        let i = 0;
+        while (n >= 1000 && i < u.length - 1) { n /= 1000; i += 1; }
+        return (i === 0 ? n : n.toFixed(n < 10 ? 1 : 0)) + ' ' + u[i];
+      };
+      // Un país es «XX», o una marca (@local, @anycast) que se dice en palabras.
+      const paisTrafico = (c) => (!c ? t('av_pais_desconocido') : c === '@local' ? t('av_local') : c === '@anycast' ? t('av_anycast') : pais(c));
+      const filaTrafico = (d, etiqueta) => `<tr><td>${esc(etiqueta)}</td><td><b>${esc(bytes(d.subidos))}</b> ${esc(t('av_sube'))}</td><td>${esc(bytes(d.bajados))} ${esc(t('av_baja'))}</td></tr>`;
+      const bloqueTrafico = (p) => `<div class="card">
+        <h3>${esc(p.producto)}</h3>
+        <p><b>${esc(bytes(p.subidos))}</b> ${esc(t('av_subidos_total'))} · ${esc(bytes(p.bajados))} ${esc(t('av_bajados_total'))}${p.subidos_noche ? ' · ' + esc(t('av_de_noche_trafico').replace('{x}', bytes(p.subidos_noche))) : ''}</p>
+        <h4 data-t="av_por_pais">${esc(t('av_por_pais'))}</h4>
+        <div class="wrap"><table><tbody>${p.paises.map((x) => filaTrafico(x, paisTrafico(x.pais))).join('')}</tbody></table></div>
+        <h4 data-t="av_por_destino">${esc(t('av_por_destino'))}</h4>
+        <div class="wrap"><table><tbody>${p.destinos.map((x) => filaTrafico(x, (x.destino || x.red || t('av_sin_nombre')) + (x.destino && x.pais && x.pais[0] !== '@' ? ' · ' + paisTrafico(x.pais) : ''))).join('')}</tbody></table></div>
+      </div>`;
       const paint = (r) => {
         $('av-vistos').innerHTML = r.vistos.length ? r.vistos.map(visto).join('')
           : `<div class="card"><p class="muted">${esc(t('av_ninguno').replace('{dias}', r.dias))}</p></div>`;
         $('av-ocultos').textContent = r.ocultos ? tn('av_ocultos', r.ocultos) : '';
         $('av-ocultos').classList.toggle('hidden', !r.ocultos);
+        $('av-trafico-lead').textContent = r.trafico_horas ? t('av_trafico_lead').replace('{h}', r.trafico_horas) : t('av_trafico_vacio');
+        $('av-trafico').innerHTML = r.trafico.length ? r.trafico.map(bloqueTrafico).join('') : '';
         // Primero los que tienen decisiones oficiales, luego el resto, cada grupo por nombre.
         const cat = r.catalogo.slice().sort((a, b) => (b.sanciones.length > 0) - (a.sanciones.length > 0) || a.producto.localeCompare(b.producto));
         $('av-catalogo').innerHTML = cat.map(ficha).join('');
       };
+      const detectado = (d) => `<p>${d.activo ? '🟢' : '⚪'} <b>${esc(d.nombre)}</b> · ${esc(d.activo ? t('av_activo') : t('av_inactivo'))} · ${esc(d.al_dia ? t('av_al_dia') : t('av_desactualizado'))}${d.conocido ? '' : ` <span class="muted">${esc(t('av_no_en_lista'))}</span>`}</p>`;
+      $('av-detectar').addEventListener('click', async (e) => {
+        e.target.disabled = true;
+        $('av-detectar-msg').textContent = t('av_detectando');
+        try {
+          const d = await api('/api/antivirus/detectar');
+          $('av-detectar-msg').textContent = '';
+          $('av-detectados').innerHTML = d.detectados.length ? d.detectados.map(detectado).join('')
+            : `<p class="muted">${esc(t(d.aviso === 'no_windows' ? 'av_detectar_no_windows' : 'av_detectar_ninguno'))}</p>`;
+        } catch (err) { $('av-detectar-msg').textContent = String(err.message || err); } finally { e.target.disabled = false; }
+      });
       paint(await api('/api/antivirus'));
-      cadaTanto(async () => paint(await api('/api/antivirus')), 30000);
+      cadaTanto(async () => paint(await api('/api/antivirus')), 10000);
     },
     async ia() {
       const paint = (r) => {

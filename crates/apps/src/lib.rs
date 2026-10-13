@@ -53,6 +53,12 @@ pub const VENTANA_MS: i64 = 2_000;
 pub const MAXIMO: usize = 2_048;
 
 #[cfg(windows)]
+mod firmas;
+#[cfg(windows)]
+mod red;
+#[cfg(windows)]
+mod seguridad;
+#[cfg(windows)]
 mod ventanas;
 
 /// Listens to what the system says about who asked for each name.
@@ -99,6 +105,125 @@ impl Observador {
     }
 }
 
+/// What one program sent to and received from one address since the last take (1.0.21).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Medida {
+    /// The program, with its path, its fingerprint and who signs it when known. `pid` is 0:
+    /// the totals are per program, not per process.
+    pub proceso: Proceso,
+    /// The address at the other end. Kept in memory only: the service writes its country and
+    /// network, never the address (decision 203).
+    pub ip: std::net::IpAddr,
+    /// The port at the other end.
+    pub puerto: u16,
+    /// `tcp` or `udp`.
+    pub proto: &'static str,
+    /// Bytes sent there.
+    pub enviados: u64,
+    /// Bytes received from there.
+    pub recibidos: u64,
+    /// Packets either way.
+    pub paquetes: u64,
+}
+
+/// Listens to what the system says about every packet each program sends or receives, and adds
+/// it up per program and address (1.0.21, «vigila a tu antivirus»). Counts, never contents.
+pub struct Red {
+    #[cfg(windows)]
+    interno: red::Sesion,
+}
+
+impl Red {
+    /// Starts listening.
+    ///
+    /// # Errors
+    /// [`Error::NoSoportado`] outside Windows; [`Error::Sistema`] when the trace cannot start.
+    pub fn arrancar() -> Result<Self, Error> {
+        #[cfg(windows)]
+        {
+            Ok(Self {
+                interno: red::Sesion::arrancar()?,
+            })
+        }
+        #[cfg(not(windows))]
+        {
+            Err(Error::NoSoportado)
+        }
+    }
+
+    /// The totals since the last call.
+    #[must_use]
+    pub fn toma(&self) -> Vec<Medida> {
+        #[cfg(windows)]
+        {
+            self.interno.toma()
+        }
+        #[cfg(not(windows))]
+        {
+            Vec::new()
+        }
+    }
+}
+
+/// The network channel, raw, for a few seconds: event number, process id, size and the two
+/// ends as read. `guardiana apps --red`, to check on the machine.
+///
+/// # Errors
+/// [`Error::NoSoportado`] outside Windows; [`Error::Sistema`] if the session cannot open.
+pub fn diagnostico_red(segundos: u64) -> Result<Vec<(u16, u32, u32, String)>, Error> {
+    #[cfg(windows)]
+    {
+        red::diagnostico(segundos)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = segundos;
+        Err(Error::NoSoportado)
+    }
+}
+
+/// An antivirus as Windows Security Center lists it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct AntivirusInstalado {
+    /// Its name as the product registered it.
+    pub nombre: String,
+    /// The program Windows says it is (`pathToSignedProductExe`), may be empty.
+    pub ruta: String,
+    /// The raw `productState` the product reported.
+    pub estado: u32,
+    /// Whether real-time protection is on, as far as `productState` says.
+    pub activo: bool,
+    /// Whether its signatures are up to date, as far as `productState` says.
+    pub al_dia: bool,
+}
+
+/// What Windows Security Center says is installed (1.0.21). Read-only, asked on demand.
+///
+/// # Errors
+/// [`Error::NoSoportado`] outside Windows; [`Error::Sistema`] when Windows did not answer.
+pub fn antivirus_instalados() -> Result<Vec<AntivirusInstalado>, Error> {
+    #[cfg(windows)]
+    {
+        seguridad::instalados()
+    }
+    #[cfg(not(windows))]
+    {
+        Err(Error::NoSoportado)
+    }
+}
+
+/// Reads a `productState`: (real-time protection on, signatures up to date).
+///
+/// The value is not documented by Microsoft; this is the reading every tool uses, and the page
+/// says it is Windows' word, not ours: the second byte says on (`0x10`) or snoozed/off, and the
+/// third, whether the signatures are up to date (`0x00`) or not (`0x10`).
+#[must_use]
+pub const fn lee_estado(estado: u32) -> (bool, bool) {
+    let proteccion = (estado >> 8) & 0xFF;
+    let firmas = estado & 0xFF;
+    (proteccion & 0x10 != 0, firmas == 0)
+}
+
 /// Lo que el canal de sucesos está contando, tal cual, durante unos segundos.
 ///
 /// Es la comprobación que pide el brief (§12.3): antes de fiarse de un número de suceso hay que
@@ -124,6 +249,15 @@ pub fn diagnostico(segundos: u64) -> Result<Vec<(u16, String, u32)>, Error> {
 #[allow(clippy::expect_used)]
 mod pruebas {
     use super::{Error, Observador};
+
+    #[test]
+    fn el_estado_de_un_antivirus_se_lee_como_lo_lee_todo_el_mundo() {
+        // Defender on and up to date (397568 = 0x061100), off (393472 = 0x060100), outdated
+        // (397584 = 0x061110).
+        assert_eq!(super::lee_estado(397_568), (true, true));
+        assert_eq!(super::lee_estado(393_472), (false, true));
+        assert_eq!(super::lee_estado(397_584), (true, false));
+    }
 
     #[test]
     fn fuera_de_windows_lo_dice_y_no_rompe_nada() {

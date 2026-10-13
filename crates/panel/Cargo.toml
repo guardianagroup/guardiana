@@ -13,6 +13,7 @@ build = "build.rs"
 [dependencies]
 guardiana-core = { workspace = true }
 guardiana-lists = { workspace = true }
+guardiana-apps = { workspace = true }
 guardiana-service = { workspace = true }
 axum = { workspace = true }
 tokio = { workspace = true }

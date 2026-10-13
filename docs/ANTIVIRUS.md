@@ -55,4 +55,22 @@ la documentación de cada fabricante).
 - Una consulta DNS no prueba qué datos viajaron. Por eso la pantalla dice lo que documenta el
   fabricante y lo que no, y nunca «te espía».
 
+## Analizar y medir en tiempo real (1.0.21)
+
+Dos cosas más, en este ordenador:
+
+- **Analizar mi antivirus**: un botón pregunta a Windows (Centro de seguridad,
+  `root/SecurityCenter2`) qué antivirus hay instalado y si está activo y al día. Solo lectura, sin
+  elevación. En Windows Server o fuera de Windows no hay Centro de seguridad y se dice así.
+- **Qué envía y recibe, por país**: GUARDIANA cuenta, por cada proceso del antivirus, los bytes
+  que salen y entran por cada destino, y los agrupa por país del servidor y por destino. La
+  medida viene del canal de red de Windows (`Microsoft-Windows-Kernel-Network`, GUID
+  `7dd42a49-5329-4832-8dfd-43d979153a88`), usando el PID que lleva el propio suceso. El destino es
+  el nombre que el programa pidió para esa dirección (cuando GUARDIANA vio la pregunta); la
+  dirección en sí nunca se guarda (decisión 203). Las medidas siguen la retención del detalle (24
+  h en el plan gratis) y no están en la cadena de hashes: son medidas, no sucesos.
+
+Lo que «enviado» significa es lo que la pila dio por enviado, no una prueba de que el servidor lo
+recibiera ni de qué contenía. Eso último no se puede saber sin descifrar, y GUARDIANA no descifra.
+
 GUARDIANA nunca pide apagar el antivirus. Vigilarlo no es quitarlo.

@@ -17,6 +17,7 @@ use ferrisetw::EventRecord;
 use sha2::{Digest, Sha256};
 
 use super::{Error, Proceso, MAXIMO, VENTANA_MS};
+use crate::firmas::Firmas;
 
 /// `Microsoft-Windows-DNS-Client`: por aquí pasa toda consulta que resuelve Windows.
 const PROVEEDOR: &str = "1c95126e-7eea-49a9-a3fe-a378b03ddb4d";
@@ -75,9 +76,10 @@ impl Sesion {
     pub(crate) fn arrancar() -> Result<Self, Error> {
         let datos: Arc<Mutex<Compartido>> = Arc::default();
         let para_callback = Arc::clone(&datos);
+        let firmas = Firmas::arrancar();
         let proveedor = Provider::by_guid(PROVEEDOR)
             .add_callback(move |registro: &EventRecord, esquemas: &SchemaLocator| {
-                anotar(&para_callback, registro, esquemas);
+                anotar(&para_callback, &firmas, registro, esquemas);
             })
             .build();
         cerrar_la_que_quedo(SESION);
@@ -135,7 +137,12 @@ fn limpiar(d: &mut Compartido, ahora: i64) {
 }
 
 /// Lo que hace el callback de la sesión con cada suceso.
-fn anotar(datos: &Arc<Mutex<Compartido>>, registro: &EventRecord, esquemas: &SchemaLocator) {
+fn anotar(
+    datos: &Arc<Mutex<Compartido>>,
+    firmas: &Firmas,
+    registro: &EventRecord,
+    esquemas: &SchemaLocator,
+) {
     if registro.event_id() != EVENTO_CONSULTA {
         return;
     }
@@ -176,6 +183,7 @@ fn anotar(datos: &Arc<Mutex<Compartido>>, registro: &EventRecord, esquemas: &Sch
             }
         }
     };
+    let firmado_por = firmas.de(&ruta);
     d.cola.push_back(Oida {
         ts: ahora,
         qname,
@@ -184,14 +192,14 @@ fn anotar(datos: &Arc<Mutex<Compartido>>, registro: &EventRecord, esquemas: &Sch
             nombre,
             ruta,
             sha256,
-            firmado_por: String::new(),
+            firmado_por,
         },
     });
 }
 
 /// SHA-256 del archivo del programa. Si no se puede leer, se devuelve vacío y se dice así en la
 /// pantalla: mejor un hueco que un número inventado.
-fn huella_de(ruta: &str) -> String {
+pub(crate) fn huella_de(ruta: &str) -> String {
     let Ok(datos) = std::fs::read(ruta) else {
         return String::new();
     };
@@ -212,7 +220,7 @@ fn huella_de(ruta: &str) -> String {
 /// permiso más pequeño que existe para esto (`PROCESS_QUERY_LIMITED_INFORMATION`, que solo deja
 /// leer la ruta), el asa se cierra siempre, y el buffer se pasa con su longitud y se corta por lo
 /// que Windows dice que escribió. Si algo falla, se devuelve vacío: un hueco, nunca una invención.
-fn programa_de(pid: u32) -> (String, String) {
+pub(crate) fn programa_de(pid: u32) -> (String, String) {
     use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::System::Threading::{
         OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,

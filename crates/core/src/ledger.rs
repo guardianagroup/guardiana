@@ -311,6 +311,7 @@ impl Ledger {
         let ledger = Self { conn };
         ledger.ensure_gaps_table()?;
         ledger.ensure_changes_table()?;
+        ledger.ensure_trafico_table()?;
         ledger.migrate_rules_confirmed()?;
         ledger.migrate_events_process()?;
         ledger.migrate_events_server()?;

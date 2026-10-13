@@ -30,6 +30,7 @@ mod retention;
 pub mod rules;
 mod stats;
 pub mod time;
+mod trafico;
 pub mod trampas;
 
 pub use changes::{Change, ChangeKind, ChangeWho};
@@ -53,6 +54,7 @@ pub use report::{
 };
 pub use retention::{DailyTotal, PruneReport, Retention};
 pub use stats::{Counters, DeviceTotals, TableCounts};
+pub use trafico::{minuto_de, Trafico};
 
 /// Identifier of the computer running Guardiana in the `devices` table (brief §3).
 pub const SELF_DEVICE_ID: &str = "self";

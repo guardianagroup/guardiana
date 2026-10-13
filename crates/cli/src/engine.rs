@@ -246,11 +246,67 @@ struct EnginePolicy {
     /// cola, en el mismo orden en que llegó, y se escribe cuando ya se puede decir quién fue.
     /// Lo que no espera es la respuesta al programa, que sale igual de rápido que siempre.
     cola_apps: Arc<Mutex<VecDeque<guardiana_core::NewEvent>>>,
+    /// Address → the name this computer asked to reach it, and when (1.0.21). In memory only, a
+    /// bounded few thousand: it is how the traffic of a program gets the name of where it went
+    /// instead of a bare address, which is never written (decision 203).
+    nombres_ip: Arc<Mutex<HashMap<IpAddr, (String, i64)>>>,
 }
+
+/// The most addresses remembered with their name.
+const MAX_NOMBRES_IP: usize = 20_000;
+/// How long an address keeps the name it was asked for.
+const VIGENCIA_NOMBRE_IP_MS: i64 = 6 * 60 * 60 * 1_000;
 
 /// Cuánto espera una consulta de este equipo antes de anotarse, para darle tiempo a Windows a
 /// decir quién la pidió. Un poco más que el segundo del temporizador de sucesos.
 const ESPERA_APPS_MS: i64 = 1_300;
+
+/// How often the traffic totals are written, in seconds: the antivirus page is live within this.
+const TRAFICO_CADA_S: u64 = 10;
+
+/// The rows a take of traffic becomes: the address turns into the name this computer asked to
+/// reach it (when it did, within a few hours), and into its country and network. Never the
+/// address itself.
+fn filas_de_trafico(
+    medidas: &[guardiana_apps::Medida],
+    nombres: &Mutex<HashMap<IpAddr, (String, i64)>>,
+    ahora: i64,
+) -> Vec<guardiana_core::Trafico> {
+    let nombres = nombres.lock().map(|m| m.clone()).unwrap_or_default();
+    medidas
+        .iter()
+        .map(|m| {
+            let s = guardiana_lists::servidor_de(m.ip);
+            let destino = nombres
+                .get(&m.ip)
+                .filter(|(_, ts)| ahora - ts < VIGENCIA_NOMBRE_IP_MS)
+                .map(|(n, _)| n.clone())
+                .unwrap_or_default();
+            guardiana_core::Trafico {
+                minuto: ahora,
+                programa: m.proceso.nombre.clone(),
+                firma: m.proceso.firmado_por.clone(),
+                destino,
+                pais: s.pais.unwrap_or_default().to_owned(),
+                // A local or anycast address has no country by design: said with a mark the
+                // page translates, so it is never shown as «unknown».
+                red: if s.local {
+                    "@local".to_owned()
+                } else if s.anycast && s.red.is_none() {
+                    "@anycast".to_owned()
+                } else {
+                    s.red.map(|r| r.nombre.to_owned()).unwrap_or_default()
+                },
+                asn: s.red.map_or(0, |r| r.asn),
+                proto: m.proto.to_owned(),
+                puerto: m.puerto,
+                enviados: m.enviados,
+                recibidos: m.recibidos,
+                paquetes: m.paquetes,
+            }
+        })
+        .collect()
+}
 
 /// The rules as the resolver matches them. A rule saved before 1.0.2 may hold what was typed
 /// (`https://x.com/…`, `*.x.com`) and never match a query: it is read as the name a query carries
@@ -581,6 +637,21 @@ impl Policy for EnginePolicy {
         } = outcome
         {
             event.server = Some(guardiana_lists::server_info_de(ip));
+            if p.device_id == guardiana_core::SELF_DEVICE_ID {
+                if let Ok(mut m) = self.nombres_ip.lock() {
+                    if m.len() >= MAX_NOMBRES_IP {
+                        let corte = q.ts - VIGENCIA_NOMBRE_IP_MS;
+                        m.retain(|_, (_, ts)| *ts >= corte);
+                        if m.len() >= MAX_NOMBRES_IP {
+                            m.clear();
+                        }
+                    }
+                    m.insert(
+                        ip,
+                        (q.name.trim_end_matches('.').to_ascii_lowercase(), q.ts),
+                    );
+                }
+            }
         }
         // Un nombre disfrazado (decisión 205): si la respuesta pasó por un alias de otro sitio que
         // las listas llaman rastreador, publicidad o telemetría, se anota el sitio de ese alias, y
@@ -1625,6 +1696,7 @@ async fn run_once<F: Future<Output = ()>>(
             }
         },
         cola_apps: Arc::default(),
+        nombres_ip: Arc::default(),
     });
     let policy_al_cerrar = Arc::clone(&policy);
 
@@ -1722,6 +1794,44 @@ async fn run_once<F: Future<Output = ()>>(
     // Una copia del asa de la cola para poder vaciarla al cerrar, cuando la política ya se la ha
     // llevado el resolutor.
     let policy_cola = Arc::clone(&policy.cola_apps);
+    // What each program sends and receives (1.0.21, «vigila a tu antivirus»): every few seconds
+    // the totals Windows gave since the last time, per program and destination, written per
+    // minute with the name it had asked for that address, its country and its network. The
+    // address itself stays here, in memory (decision 203). Outside Windows there is no such
+    // channel and this does nothing.
+    let contador = match guardiana_apps::Red::arrancar() {
+        Ok(red) => {
+            let nombres = Arc::clone(&policy.nombres_ip);
+            let db = cfg.db.clone();
+            Some(tokio::spawn(async move {
+                let mut cada = tokio::time::interval(Duration::from_secs(TRAFICO_CADA_S));
+                let mut conexion: Option<Ledger> = None;
+                loop {
+                    cada.tick().await;
+                    let medidas = red.toma();
+                    if medidas.is_empty() {
+                        continue;
+                    }
+                    let filas = filas_de_trafico(&medidas, &nombres, now_ms());
+                    if conexion.is_none() {
+                        conexion = Ledger::open(&db, identity::genesis()).ok();
+                    }
+                    if let Some(l) = conexion.as_mut() {
+                        if let Err(e) = l.suma_trafico(&filas) {
+                            eprintln!("guardiana: {e}");
+                        }
+                    }
+                }
+            }))
+        }
+        Err(guardiana_apps::Error::NoSoportado) => None,
+        Err(e) => {
+            // Said and carried on: counting traffic is an extra.
+            eprintln!("guardiana: {e}");
+            None
+        }
+    };
+
     let vaciador = policy.apps.as_ref().map(|obs| {
         let obs = Arc::clone(obs);
         let cola = Arc::clone(&policy.cola_apps);
@@ -2091,6 +2201,10 @@ async fn run_once<F: Future<Output = ()>>(
     let _ = running.wait().await;
     // Lo que quedara esperando a saber su programa se anota igual, sin él: al cerrar, una consulta
     // sin anotar sería una consulta perdida, y eso sí que no.
+    if let Some(c) = contador {
+        c.abort();
+        let _ = c.await;
+    }
     if let Some(v) = vaciador {
         v.abort();
         // Gone before the queue is emptied here, so no row is written twice or half.

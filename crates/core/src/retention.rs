@@ -40,6 +40,8 @@ pub struct PruneReport {
     pub events_pruned: u64,
     /// Rows of `daily_totals` deleted.
     pub totals_pruned: u64,
+    /// Minutes of traffic measurements deleted with the detail.
+    pub trafico_pruned: u64,
 }
 
 /// One day's totals for a device, as kept after detail is pruned.
@@ -101,6 +103,13 @@ impl Ledger {
                     params![deleted as i64, KEY_PRUNED],
                 )?;
             }
+        }
+
+        // The traffic measurements follow the detail: what a program sent is detail too.
+        if let Some(keep) = policy.detail_ms {
+            let cutoff = crate::trafico::minuto_de(now - keep);
+            report.trafico_pruned =
+                tx.execute("DELETE FROM trafico WHERE minuto < ?1", [cutoff])? as u64;
         }
 
         if let Some(keep) = policy.totals_ms {

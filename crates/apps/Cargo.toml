@@ -11,6 +11,8 @@ publish = false
 
 [dependencies]
 guardiana-core = { path = "../core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 # Solo en Windows, y solo para leer:
 # - ferrisetw: envoltorio seguro del consumidor de ETW, que es el canal por el que el propio

@@ -138,6 +138,22 @@ async fn the_antivirus_page_shows_what_each_antivirus_asked_and_every_official_r
             4,
             Category::Esperado,
         );
+        // What Defender's process sent and received, measured (1.0.21): 3 MB up to the US.
+        l.suma_trafico(&[guardiana_core::Trafico {
+            minuto: now - 30 * 60_000,
+            programa: "MsMpEng.exe".into(),
+            firma: "Microsoft Windows Publisher".into(),
+            destino: "wdcp.microsoft.com".into(),
+            pais: "US".into(),
+            red: "Microsoft Corporation".into(),
+            asn: 8075,
+            proto: "tcp".into(),
+            puerto: 443,
+            enviados: 3_000_000,
+            recibidos: 120_000,
+            paquetes: 2_100,
+        }])
+        .unwrap();
     }
     let running = start(Config {
         listen: vec!["127.0.0.1:0".parse().unwrap()],
@@ -199,6 +215,26 @@ async fn the_antivirus_page_shows_what_each_antivirus_asked_and_every_official_r
             .unwrap()
             .starts_with("https://www.ftc.gov/")));
     assert_eq!(v["ocultos"], 1);
+
+    // The traffic: Defender sent 3 MB to the US, and it is grouped by country and destination.
+    let trafico = v["trafico"].as_array().unwrap();
+    let td = trafico
+        .iter()
+        .find(|x| x["producto"] == "Microsoft Defender")
+        .unwrap();
+    assert_eq!(td["subidos"], 3_000_000);
+    assert_eq!(td["bajados"], 120_000);
+    assert_eq!(td["paises"][0]["pais"], "US");
+    assert_eq!(td["paises"][0]["subidos"], 3_000_000);
+    assert_eq!(td["destinos"][0]["destino"], "wdcp.microsoft.com");
+    assert!(v["trafico_horas"].as_i64().unwrap() >= 1);
+
+    // The detect button: on Linux there is no Security Center, said plainly, not crashing.
+    let (status, body) = get(addr, &t, "/api/antivirus/detectar").await;
+    assert_eq!(status, 200, "{body}");
+    let d: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(d["aviso"], "no_windows");
+    assert!(d["detectados"].as_array().unwrap().is_empty());
 
     if let Some(seg) = std::env::var("GUARDIANA_VISTA_SEG")
         .ok()

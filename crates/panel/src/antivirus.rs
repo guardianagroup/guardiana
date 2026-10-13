@@ -47,9 +47,52 @@ pub(crate) struct Vista {
     ocultos: usize,
     /// Every product the list knows, with its official record.
     catalogo: Vec<Ficha>,
+    /// What each antivirus on this computer sent and received, by country and destination
+    /// (1.0.21). Only this computer: the traffic channel sees no other device.
+    trafico: Vec<TraficoProducto>,
+    /// How many hours of traffic there are (the plan's detail): the page says it.
+    trafico_horas: i64,
     /// The window, in days.
     dias: i64,
 }
+
+/// What one antivirus product sent and received in the window, measured on this computer.
+#[derive(Serialize)]
+struct TraficoProducto {
+    producto: &'static str,
+    /// Bytes its processes sent out, in all.
+    subidos: u64,
+    /// Bytes they received.
+    bajados: u64,
+    /// By country of the server, most bytes first.
+    paises: Vec<PaisTrafico>,
+    /// By destination (the name it asked, or its network when it asked none), most bytes first.
+    destinos: Vec<DestinoTrafico>,
+    /// Of the bytes sent, how many between midnight and six.
+    subidos_noche: u64,
+}
+
+#[derive(Serialize)]
+struct PaisTrafico {
+    /// Two-letter country, or a mark (`@local`, `@anycast`) the page translates.
+    pais: String,
+    subidos: u64,
+    bajados: u64,
+}
+
+#[derive(Serialize)]
+struct DestinoTrafico {
+    /// The name the program asked for the address, or empty when it asked none GUARDIANA saw.
+    destino: String,
+    /// The network that announces the address (`Amazon.com, Inc.`), or a mark.
+    red: String,
+    pais: String,
+    subidos: u64,
+    bajados: u64,
+}
+
+/// How many of a product's rows are listed per country and per destination.
+const MAX_TRAFICO: usize = 50;
 
 #[derive(Serialize)]
 struct Visto {
@@ -255,6 +298,89 @@ fn calcula(
     vistos
 }
 
+/// The night, in a program's traffic minute, by the person's own clock.
+fn es_noche(minuto: i64, zona: i64) -> bool {
+    let local = (minuto + zona * 60_000).rem_euclid(24 * 3_600_000);
+    local < 6 * 3_600_000
+}
+
+/// Group the traffic measurements of this computer by antivirus product (1.0.21).
+fn calcula_trafico(filas: &[guardiana_core::Trafico], zona: i64) -> Vec<TraficoProducto> {
+    struct Acc {
+        subidos: u64,
+        bajados: u64,
+        noche: u64,
+        por_pais: HashMap<String, (u64, u64)>,
+        por_destino: HashMap<(String, String, String), (u64, u64)>,
+    }
+    let mut por: HashMap<&'static str, Acc> = HashMap::new();
+    for f in filas {
+        let Some(av) = antivirus::antivirus_de_programa(&f.programa) else {
+            continue;
+        };
+        let a = por.entry(av.nombre).or_insert_with(|| Acc {
+            subidos: 0,
+            bajados: 0,
+            noche: 0,
+            por_pais: HashMap::new(),
+            por_destino: HashMap::new(),
+        });
+        a.subidos += f.enviados;
+        a.bajados += f.recibidos;
+        if es_noche(f.minuto, zona) {
+            a.noche += f.enviados;
+        }
+        let pais = if f.pais.is_empty() {
+            f.red.clone() // may be @local / @anycast; else empty
+        } else {
+            f.pais.clone()
+        };
+        let p = a.por_pais.entry(pais.clone()).or_insert((0, 0));
+        p.0 += f.enviados;
+        p.1 += f.recibidos;
+        let d = a
+            .por_destino
+            .entry((f.destino.clone(), f.red.clone(), pais))
+            .or_insert((0, 0));
+        d.0 += f.enviados;
+        d.1 += f.recibidos;
+    }
+    fn corta<K>(mut v: Vec<(K, (u64, u64))>) -> Vec<(K, (u64, u64))> {
+        v.sort_by_key(|x| std::cmp::Reverse(x.1 .0 + x.1 .1));
+        v.truncate(MAX_TRAFICO);
+        v
+    }
+    let mut out: Vec<TraficoProducto> = por
+        .into_iter()
+        .map(|(producto, a)| TraficoProducto {
+            producto,
+            subidos: a.subidos,
+            bajados: a.bajados,
+            subidos_noche: a.noche,
+            paises: corta(a.por_pais.into_iter().collect())
+                .into_iter()
+                .map(|(pais, (s, b))| PaisTrafico {
+                    pais,
+                    subidos: s,
+                    bajados: b,
+                })
+                .collect(),
+            destinos: corta(a.por_destino.into_iter().collect())
+                .into_iter()
+                .map(|((destino, red, pais), (s, b))| DestinoTrafico {
+                    destino,
+                    red,
+                    pais,
+                    subidos: s,
+                    bajados: b,
+                })
+                .collect(),
+        })
+        .collect();
+    out.sort_by_key(|p| std::cmp::Reverse(p.subidos + p.bajados));
+    out
+}
+
 /// `/api/antivirus`: what each antivirus asked for this week, and every product's official record.
 pub(crate) async fn vista(
     Zona(zona): Zona,
@@ -263,12 +389,19 @@ pub(crate) async fn vista(
 ) -> ApiResult<Vista> {
     const DIAS: i64 = 7;
     let now = now_ms();
-    let (filas, devices) = with_ledger(&state, |l| {
+    let (filas, devices, trafico) = with_ledger(&state, |l| {
         Ok((
             l.program_names(now - DIAS * 24 * HOUR_MS, now + 1, zona)?,
             l.devices()?,
+            l.trafico(now - DIAS * 24 * HOUR_MS, now + 1, &[])?,
         ))
     })?;
+    let trafico_horas = trafico
+        .iter()
+        .map(|f| f.minuto)
+        .min()
+        .map_or(0, |m| (now - m) / HOUR_MS + 1);
+    let trafico = calcula_trafico(&trafico, zona);
     let comparten: Vec<&str> = devices
         .iter()
         .filter(|d| d.id == SELF_DEVICE_ID || d.share_detail_with_home)
@@ -285,8 +418,55 @@ pub(crate) async fn vista(
         vistos,
         ocultos: devices.len() - comparten.len(),
         catalogo: antivirus::antivirus().iter().map(ficha).collect(),
+        trafico,
+        trafico_horas,
         dias: DIAS,
     }))
+}
+
+/// `/api/antivirus/detectar`: which antivirus Windows Security Center lists as installed, and
+/// whether each is on and up to date (1.0.21, the «Analizar mi antivirus» button). Read-only.
+pub(crate) async fn detectar(_s: Session) -> ApiResult<DeteccionView> {
+    let (lista, aviso) = match guardiana_apps::antivirus_instalados() {
+        Ok(l) => (l, None),
+        Err(guardiana_apps::Error::NoSoportado) => (Vec::new(), Some("no_windows".to_owned())),
+        Err(e) => (Vec::new(), Some(e.to_string())),
+    };
+    // Say which of the detected products GUARDIANA's list knows (so the page can link to it).
+    let conocido = |n: &str| {
+        antivirus::antivirus().iter().any(|a| {
+            n.to_ascii_lowercase()
+                .contains(&a.nombre.to_ascii_lowercase())
+        })
+    };
+    let detectados: Vec<Detectado> = lista
+        .into_iter()
+        .map(|a| Detectado {
+            conocido: conocido(&a.nombre),
+            nombre: a.nombre,
+            ruta: a.ruta,
+            activo: a.activo,
+            al_dia: a.al_dia,
+        })
+        .collect();
+    Ok(axum::Json(DeteccionView { detectados, aviso }))
+}
+
+#[derive(Serialize)]
+pub(crate) struct DeteccionView {
+    detectados: Vec<Detectado>,
+    /// Why nothing was detected, when that is the reason rather than «none installed».
+    aviso: Option<String>,
+}
+
+#[derive(Serialize)]
+struct Detectado {
+    nombre: String,
+    ruta: String,
+    activo: bool,
+    al_dia: bool,
+    /// Whether GUARDIANA's list has this product (then the page offers its record).
+    conocido: bool,
 }
 
 #[cfg(test)]
