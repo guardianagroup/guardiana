@@ -88,7 +88,15 @@
       datos: null, abierto: Date.now(), primeraCarga: true, ultimoGesto: performance.now(),
     };
 
-    st.lugar = lugarDe(st.yo);
+    // A replay on the website (13 Oct 2026) draws the recorded computer where it was, by the time
+    // zone the recording carries, never where the person watching is.
+    if (ctx.zona && ZONAS[ctx.zona] && centros[ZONAS[ctx.zona][0]]) {
+      const z = ZONAS[ctx.zona];
+      st.yo = z[0];
+      st.lugar = { lon: z[2], lat: z[1], fuente: 'zona', ciudad: ctx.zona.split('/').pop().replace(/_/g, ' ') };
+    } else st.lugar = lugarDe(st.yo);
+    // In a replay nothing can be cut: it would show a result that never happened.
+    const soloMirar = !!ctx.reproduccion;
     const avanzaCubos = () => {
       const n = Math.min(N_CUBOS, Math.floor((Date.now() - st.cuboT0) / CUBO_MS));
       if (n <= 0) return;
@@ -199,7 +207,7 @@
         if (prev) { de = f.enviados - prev.e; dr = f.recibidos - prev.r; dp = f.paquetes - prev.p; } else if (st.primeraCarga && f.minuto < r.ahora - 70000) {
           // Opening the page: the latest minutes go to the log at once, without particles.
           const d0 = porClave.get([f.programa, f.destino, f.pais, f.red].join('|'));
-          if (d0 && f.enviados > 0) st.eventos.push({ h: hora(f.minuto), prog: prod(d0.p).nombre, host: d0.host, que: `${bytes(f.enviados)} ↑ · ${bytes(f.recibidos)} ↓ · ${f.pais || '—'} · ${f.red || '—'}`, cls: 'o', av: prod(d0.p).tipo === 'antivirus' });
+          if (d0 && f.enviados > 0) st.eventos.push({ h: ctx.reloj ? ctx.reloj() : hora(f.minuto), prog: prod(d0.p).nombre, host: d0.host, que: `${bytes(f.enviados)} ↑ · ${bytes(f.recibidos)} ↓ · ${f.pais || '—'} · ${f.red || '—'}`, cls: 'o', av: prod(d0.p).tipo === 'antivirus' });
           return;
         } else { de = f.enviados; dr = f.recibidos; dp = f.paquetes; }
         if (de <= 0 && dr <= 0) return;
@@ -259,7 +267,7 @@
     };
     const evento = (prog, host, que, cls) => {
       const pp = PROD.find((x) => x.nombre === prog);
-      st.eventos.unshift({ h: hora(Date.now()), prog, host, que, cls, av: !!pp && pp.tipo === 'antivirus' });
+      st.eventos.unshift({ h: ctx.reloj ? ctx.reloj() : hora(Date.now()), prog, host, que, cls, av: !!pp && pp.tipo === 'antivirus' });
       if (st.eventos.length > 40) st.eventos.length = 40;
     };
 
@@ -1035,7 +1043,7 @@
       chip.hidden = !todo;
       if (todo && chip.textContent !== t('pd_chip_corte')) { chip.textContent = t('pd_chip_corte'); chip.title = t('av_max_activa'); }
       const b = $('corte-av-btn'), texto = todo ? t('av_max_quitar') : t('av_max_activar');
-      $('corte-av').hidden = !(todo || hay);
+      $('corte-av').hidden = soloMirar || !(todo || hay);
       if (b.textContent !== texto) b.textContent = texto;
       b.classList.toggle('quitar', todo);
     };
@@ -1241,6 +1249,7 @@
       if (!botones) temporizadorAviso = setTimeout(() => { a.hidden = true; }, 5200);
     };
     const corteNombre = async (d) => {
+      if (soloMirar) { avisa(t('pd_repro_no_corta')); return; }
       if (!d.destino) { avisa(t('pd_sin_nombre_no_corta')); return; }
       if (d.ancho) { avisa(t('pd_ancho_dejar')); return; }
       try {
@@ -1264,6 +1273,7 @@
       } catch (e) { avisa(String(e && e.message || e)); }
     };
     const corteProducto = async (p) => {
+      if (soloMirar) { avisa(t('pd_repro_no_corta')); return; }
       if (!p.cortable) { avisa(t('pd_no_cortable')); return; }
       const hacer = async () => {
         try { await api('/api/antivirus/cortar', { method: 'POST', body: { producto: p.id, cortar: !p.cortado } }); avisa((!p.cortado ? t('pd_hecho_cortar_prog') : t('pd_hecho_dejar_prog')).replace('{prog}', p.nombre)); await cargar(); } catch (e) { avisa(String(e && e.message || e)); }
@@ -1307,6 +1317,7 @@
     };
     const mmss = (sg) => `${Math.floor(sg / 60)}:${String(Math.round(sg % 60)).padStart(2, '0')}`;
     const btnGrabar = $('grabar');
+    if (soloMirar) btnGrabar.hidden = true;
     let relojGrab = 0;
     const pintaGrabar = () => {
       if (!grab.on) { btnGrabar.textContent = t('pd_grabar'); btnGrabar.setAttribute('aria-pressed', 'false'); return; }

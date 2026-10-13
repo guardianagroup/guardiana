@@ -2018,6 +2018,7 @@
     "pd_retrato_como_2": "Antes de guardarlo se quitó lo que no debe salir: usuario, rutas, direcciones IP, horas exactas y nombres privados (estos se marcan «oculto por privacidad», nunca se cambian por otros). El país es el del servidor y la red, la de la empresa que la opera: no quiere decir que esa empresa use lo que se envía.",
     "pd_retrato_pie": "GUARDIANA · retrato hecho en este ordenador",
     "pd_retrato_guardado": "Guardado: {nombre}",
+    "pd_repro_no_corta": "Esto es una reproducción de una medición real: aquí no se corta nada. En tu ordenador, GUARDIANA lo corta de verdad.",
     "pd_cerrar": "Cerrar",
     "pd_ley_sale": "sale de tu ordenador",
     "pd_ley_entra": "entra",
