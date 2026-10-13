@@ -17,6 +17,7 @@ mod destinos;
 mod empresa;
 mod expedientes;
 mod medidas;
+mod universo;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -164,6 +165,26 @@ pub fn panel_url(addr: SocketAddr, token: &str) -> String {
 /// anything (brief, section 6), so looking like guardianagroup.com cannot mean fetching a font
 /// from a CDN: the six files travel with the program. Latin subset only, which is all Spanish,
 /// English and Portuguese need.
+/// The Earth's pictures for «GUARDIANA por dentro»: NASA Blue Marble (day), its city lights at
+/// night and the water mask made from the day picture. Public domain; served from the panel so the
+/// globe works with no internet (brief §8).
+async fn tierra(RutaUrl(archivo): RutaUrl<String>) -> Response {
+    let (cuerpo, tipo): (&'static [u8], &'static str) = match archivo.as_str() {
+        "dia.jpg" => (include_bytes!("../static/tierra/dia.jpg"), "image/jpeg"),
+        "luces.jpg" => (include_bytes!("../static/tierra/luces.jpg"), "image/jpeg"),
+        "agua.png" => (include_bytes!("../static/tierra/agua.png"), "image/png"),
+        _ => return StatusCode::NOT_FOUND.into_response(),
+    };
+    (
+        [
+            (header::CONTENT_TYPE, tipo),
+            (header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        cuerpo,
+    )
+        .into_response()
+}
+
 async fn fuente(RutaUrl(archivo): RutaUrl<String>) -> Response {
     let cuerpo: &'static [u8] = match archivo.as_str() {
         "IBMPlexSans-400-latin.woff2" => {
@@ -201,6 +222,8 @@ pub(crate) fn static_response(body: &'static str, content_type: &'static str) ->
 /// The panel's script and style sheet, as the pages ask for them.
 const APP_JS: &str = include_str!("../static/app.js");
 const STYLE_CSS: &str = include_str!("../static/style.css");
+/// «GUARDIANA por dentro» (1.0.22): its own script, so the other pages do not carry its weight.
+const POR_DENTRO_JS: &str = include_str!("../static/por-dentro.js");
 
 /// A short tag of the script and the style sheet, so the pages ask for them by a name that
 /// changes when they do and the browser may keep them for a while. Until 1.0.12 every navigation
@@ -213,6 +236,7 @@ pub(crate) fn version_estaticos() -> &'static str {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         APP_JS.hash(&mut h);
         STYLE_CSS.hash(&mut h);
+        POR_DENTRO_JS.hash(&mut h);
         format!("{:016x}", h.finish())
     })
 }
@@ -223,7 +247,11 @@ pub(crate) fn pagina(html: &'static str) -> Html<String> {
     let v = version_estaticos();
     Html(
         html.replace("/static/app.js\"", &format!("/static/app.js?v={v}\""))
-            .replace("/static/style.css\"", &format!("/static/style.css?v={v}\"")),
+            .replace("/static/style.css\"", &format!("/static/style.css?v={v}\""))
+            .replace(
+                "/static/por-dentro.js\"",
+                &format!("/static/por-dentro.js?v={v}\""),
+            ),
     )
 }
 
@@ -470,6 +498,25 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             get(|| async { pagina(include_str!("../static/informe.html")) }),
         )
         .route("/static/fonts/{archivo}", get(fuente))
+        .route("/static/tierra/{archivo}", get(tierra))
+        .route(
+            "/static/por-dentro.js",
+            get(|RawQuery(q): RawQuery| async move {
+                estatico(
+                    POR_DENTRO_JS,
+                    "application/javascript; charset=utf-8",
+                    q.as_deref(),
+                )
+            }),
+        )
+        .route(
+            "/por-dentro",
+            get(|| async { pagina(include_str!("../static/por-dentro.html")) }),
+        )
+        .route(
+            "/por-dentro.html",
+            get(|| async { pagina(include_str!("../static/por-dentro.html")) }),
+        )
         .route(
             "/static/arranque.js",
             get(|| async {
@@ -499,6 +546,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/antivirus/cortar", post(antivirus::cortar))
         .route("/api/antivirus/maxima", post(antivirus::maxima))
         .route("/api/antivirus/vigilar", post(antivirus::vigilar))
+        .route("/api/por-dentro", get(universo::universo))
         .route("/api/ia/alcance", post(api::alcance))
         .route("/api/ia/alcance/anadir", post(api::alcance_anadir))
         .route("/api/dns/aplicar", post(api::dns_aplicar))
@@ -628,8 +676,12 @@ mod textos {
             include_str!("../static/borrado.html"),
             include_str!("../static/empresa.html"),
             include_str!("../static/expedientes.html"),
+            include_str!("../static/por-dentro.html"),
         ];
-        const SCRIPTS: &[&str] = &[include_str!("../static/app.js")];
+        const SCRIPTS: &[&str] = &[
+            include_str!("../static/app.js"),
+            include_str!("../static/por-dentro.js"),
+        ];
         // The keys asked for with a literal: `data-t="x"` in the pages, `t('x')` in the scripts.
         // The ones built at run time (`t('cambio_' + x)`) cannot be read here and are covered by
         // the tests of whatever produces them.

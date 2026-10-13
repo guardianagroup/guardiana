@@ -362,3 +362,210 @@ a.enlace-empresa:hover { color: var(--accent); text-decoration-color: currentCol
 .av-dato-cifra{font-family:'Unbounded',system-ui,sans-serif;font-size:1.7rem;line-height:1.1;color:var(--azul);margin-bottom:6px}
 .av-cifras { font-size: 1.15rem; margin: .4rem 0; }
 .av-resumen hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
+
+/* «GUARDIANA por dentro» (1.0.22): the way in, well in sight on the start page and on «Tu
+   antivirus» (the owner, 13 Oct 2026: «quiero que esté bien visible en la portada»). */
+.por-dentro-cta { display: flex; align-items: center; gap: 16px; margin: 14px 0 18px; padding: 16px 18px; border-radius: 14px; text-decoration: none; color: #e8f4fb; background: radial-gradient(120% 140% at 0% 0%, #12304a 0%, #0a1726 45%, #04070d 100%); border: 1px solid #1d3550; box-shadow: 0 10px 30px rgba(4,7,13,.25); transition: transform .15s ease, box-shadow .15s ease; }
+.por-dentro-cta:hover, .por-dentro-cta:focus-visible { transform: translateY(-1px); box-shadow: 0 14px 36px rgba(4,7,13,.35), 0 0 0 1px #3fe0c5 inset; }
+.por-dentro-cta .cta-globo { position: relative; flex: none; width: 58px; height: 58px; border-radius: 50%; background: radial-gradient(circle at 34% 32%, #9be3ff 0%, #2f86c0 30%, #0f3d63 58%, #04121f 80%); box-shadow: 0 0 22px rgba(63,224,197,.4), inset -10px -8px 16px rgba(0,0,0,.65); }
+.por-dentro-cta .cta-globo::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; border: 1px dashed rgba(63,224,197,.85); animation: cta-gira 14s linear infinite; }
+.por-dentro-cta .cta-texto { display: grid; gap: 4px; min-width: 0; }
+.por-dentro-cta strong { font-family: 'Unbounded', 'Segoe UI', system-ui, sans-serif; font-weight: 500; font-size: 1.05rem; line-height: 1.3; color: #ffffff; }
+.por-dentro-cta .cta-texto > span { color: #a9c4d8; font-size: .92rem; }
+.por-dentro-cta .cta-flecha { margin-left: auto; font-size: 1.4rem; color: #3fe0c5; }
+@keyframes cta-gira { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .por-dentro-cta .cta-globo::after { animation: none; } }
+nav a.nav-destacado { color: #0b8a7c; font-weight: 600; }
+:root[data-tema="noche"] nav a.nav-destacado { color: #3fe0c5; }
+
+/* «GUARDIANA por dentro» (1.0.22): everything under body.universo, so no other page changes. */
+/* «GUARDIANA por dentro»: the universe takes the whole window and is dark on purpose, in the day
+   theme too. The panel's own pages keep their light and night themes. */
+body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden; }
+
+.universo { --hud: #08101b; --hud-line: #172638; --hud-fg: #d3e6f3; --hud-muted: #7690a8; --shield: #3fe0c5; --out: #ffb547; --in: #6fb6ff; --cut: #ff6b7a; --undoc: #ffd166; }
+
+.universo #no-session { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 60; max-width: 560px; }
+
+.universo .stage { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr auto; background: #04070d; color: var(--hud-fg); font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+.universo .barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 14px; border-bottom: 1px solid var(--hud-line); background: rgba(8,16,27,.9); position: relative; z-index: 3; }
+
+.universo .marca { font-family: 'Unbounded', 'Segoe UI', system-ui, sans-serif; font-size: 13px; letter-spacing: .04em; display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+
+.universo .marca a { color: var(--hud-muted); text-decoration: none; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; border: 1px solid var(--hud-line); border-radius: 6px; padding: 4px 8px; }
+
+.universo .marca a:hover { color: var(--hud-fg); }
+
+.universo .chip-modo { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; border: 1px solid var(--undoc); color: var(--undoc); border-radius: 4px; padding: 1px 6px; }
+
+.universo .chip-modo.off { border-color: var(--cut); color: var(--cut); }
+
+.universo .pestanas { display: flex; gap: 4px; flex-wrap: wrap; }
+
+.universo .pestanas button, .universo .btn-hud { appearance: none; background: transparent; color: var(--hud-muted); border: 1px solid var(--hud-line); border-radius: 6px; padding: 5px 10px; font: 500 12.5px 'IBM Plex Mono', ui-monospace, monospace; cursor: pointer; }
+
+.universo .btn-hud { color: var(--hud-fg); font-size: 12px; }
+
+.universo .pestanas button[aria-pressed="true"] { color: #04070d; background: var(--shield); border-color: var(--shield); }
+
+.universo .btn-hud.peligro { border-color: var(--cut); color: var(--cut); }
+
+.universo .btn-hud.peligro[aria-pressed="true"] { background: var(--cut); color: #04070d; }
+
+.universo .btn-hud[aria-pressed="true"]:not(.peligro) { border-color: var(--shield); color: var(--shield); }
+
+.universo .stage button:focus-visible, .universo .stage select:focus-visible, .universo .marca a:focus-visible { outline: 2px solid var(--shield); outline-offset: 2px; }
+
+.universo .controles { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.universo .controles label { font: 12px 'IBM Plex Mono', ui-monospace, monospace; color: var(--hud-muted); display: flex; gap: 6px; align-items: center; }
+
+.universo .controles select { background: var(--hud); color: var(--hud-fg); border: 1px solid var(--hud-line); border-radius: 6px; padding: 4px 6px; font: 12px 'IBM Plex Mono', ui-monospace, monospace; max-width: 170px; }
+
+.universo .lienzo { position: relative; min-height: 0; }
+
+.universo .lienzo canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
+
+.universo .lienzo #gl { pointer-events: none; visibility: hidden; }
+
+.universo .leyenda { position: absolute; left: 14px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 2px 14px; font: 11px/1.6 'IBM Plex Mono', ui-monospace, monospace; color: var(--hud-muted); pointer-events: none; z-index: 2; }
+
+.universo .leyenda i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+
+.universo .ayuda-vista { position: absolute; left: 14px; bottom: 30px; max-width: 460px; font: 12px/1.5 'IBM Plex Sans', system-ui, sans-serif; color: var(--hud-muted); pointer-events: none; z-index: 2; }
+
+.universo .telemetria { position: absolute; left: 14px; top: 12px; z-index: 2; pointer-events: none; font: 11px/1.65 'IBM Plex Mono', ui-monospace, monospace; color: var(--hud-fg); background: rgba(4,10,20,.58); border: 1px solid var(--hud-line); border-radius: 8px; padding: 8px 11px; max-width: min(360px, 70%); }
+
+.universo .telemetria b, .universo .datos b.s, .universo .datos .s { color: var(--shield); font-weight: 500; }
+
+.universo .telemetria .o, .universo .datos .o { color: var(--out); }
+
+.universo .telemetria .i, .universo .datos .i { color: var(--in); }
+
+.universo .telemetria .c, .universo .datos .c { color: var(--cut); }
+
+.universo .telemetria .t, .universo .datos .t { color: var(--hud-muted); }
+
+.universo .datos { position: absolute; right: 10px; top: 10px; bottom: 46px; width: 330px; z-index: 2; overflow-y: auto; overscroll-behavior: contain; background: rgba(4,10,20,.7); border: 1px solid var(--hud-line); border-radius: 10px; padding: 10px 12px 14px; font: 11.5px/1.5 'IBM Plex Mono', ui-monospace, monospace; color: var(--hud-fg); scrollbar-width: thin; scrollbar-color: var(--hud-line) transparent; }
+
+.universo .datos[hidden], .universo .telemetria[hidden] { display: none; }
+
+.universo .datos h4 { margin: 12px 0 6px; font: 500 10.5px 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--hud-muted); display: flex; justify-content: space-between; gap: 6px; }
+
+.universo .datos h4:first-child { margin-top: 0; }
+
+.universo .datos p { margin: 6px 0; }
+
+.universo .datos .prod { border-left: 3px solid var(--c); padding: 4px 0 6px 8px; margin-bottom: 8px; }
+
+.universo .datos .prod b { font-weight: 600; }
+
+.universo .datos .fila { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: baseline; }
+
+.universo .datos .fila > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.universo .datos .barrita { height: 4px; border-radius: 2px; background: rgba(118,144,168,.2); margin: 2px 0 5px; overflow: hidden; display: flex; }
+
+.universo .datos .barrita i { display: block; height: 100%; }
+
+.universo .datos .chip { display: inline-block; border: 1px solid var(--shield); color: var(--shield); border-radius: 3px; padding: 0 4px; font-size: 9.5px; letter-spacing: .06em; margin-left: 4px; }
+
+.universo .datos .chip.c { border-color: var(--cut); color: var(--cut); }
+
+.universo .datos .leyenda-j { display: flex; flex-wrap: wrap; gap: 2px 10px; }
+
+.universo .datos .leyenda-j i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
+
+.universo .tip { position: absolute; z-index: 4; pointer-events: none; background: rgba(6,12,22,.95); border: 1px solid var(--hud-line); border-radius: 8px; padding: 10px 12px; font: 12.5px/1.5 'IBM Plex Sans', system-ui, sans-serif; color: var(--hud-fg); max-width: 320px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+
+.universo .tip .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+
+.universo .tip .estado { display: inline-block; margin-top: 4px; font: 500 11px 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: .05em; text-transform: uppercase; }
+
+.universo .tip .pasa { color: var(--shield); }
+
+.universo .tip .corta { color: var(--cut); }
+
+.universo .tip .nodoc { color: var(--undoc); }
+
+.universo .tip .t { color: var(--hud-muted); }
+
+.universo .aviso { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 5; background: rgba(6,12,22,.96); border: 1px solid var(--hud-line); color: var(--hud-fg); border-radius: 8px; padding: 9px 14px; font: 12.5px/1.5 'IBM Plex Sans', system-ui, sans-serif; max-width: min(620px, 92%); text-align: center; }
+
+.universo .aviso.pide { border-color: var(--cut); }
+
+.universo .aviso-botones { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
+
+.universo .vacio { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4; max-width: min(520px, 90%); background: rgba(6,12,22,.92); border: 1px solid var(--hud-line); border-radius: 12px; padding: 18px 20px; text-align: center; }
+
+.universo .vacio h2 { font: 500 17px 'Unbounded', system-ui, sans-serif; margin: 0 0 8px; color: var(--hud-fg); }
+
+.universo .vacio p { margin: 0 0 12px; color: var(--hud-muted); font-size: 14px; }
+
+.universo .vacio .btn-hud { border-color: var(--shield); color: var(--shield); padding: 8px 14px; }
+
+.universo .vigilancia-off { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 3; font: 500 11px 'IBM Plex Mono', ui-monospace, monospace; color: var(--cut); border: 1px solid var(--cut); border-radius: 6px; padding: 3px 8px; background: rgba(6,12,22,.85); max-width: 90%; text-align: center; }
+
+.universo .hud { display: grid; grid-template-columns: 2fr 1fr 1fr 0.8fr 0.8fr; border-top: 1px solid var(--hud-line); background: var(--hud); }
+
+.universo .hud > div { padding: 10px 12px; border-right: 1px solid var(--hud-line); min-width: 0; display: grid; align-content: start; gap: 6px; }
+
+.universo .hud > div:last-child { border-right: 0; }
+
+.universo .hud h3 { margin: 0; font: 500 10.5px 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--hud-muted); display: flex; justify-content: space-between; gap: 8px; }
+
+.universo .hud h3 span { color: var(--shield); }
+
+.universo .registro { list-style: none; margin: 0; padding: 0; font: 11px/1.55 'IBM Plex Mono', ui-monospace, monospace; color: var(--hud-fg); height: 86px; overflow: hidden; }
+
+.universo .registro li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.universo .registro .t { color: var(--hud-muted); }
+
+.universo .registro .c { color: var(--cut); }
+
+.universo .registro .o { color: var(--out); }
+
+.universo .registro .n { color: var(--shield); }
+
+.universo .hud canvas { width: 100%; height: 70px; display: block; }
+
+.universo .barras { display: grid; gap: 5px; font: 11px 'IBM Plex Mono', ui-monospace, monospace; }
+
+.universo .barras div { display: grid; grid-template-columns: 82px 1fr auto; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
+
+.universo .barras div span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.universo .barras s { display: block; height: 6px; border-radius: 3px; background: var(--out); text-decoration: none; }
+
+.universo .grande { font: 600 24px 'IBM Plex Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+.universo .pequeno { font: 11px/1.4 'IBM Plex Mono', ui-monospace, monospace; color: var(--hud-muted); }
+@media (max-width: 900px) {
+
+.universo .hud { grid-template-columns: 1fr 1fr; }
+
+.universo .hud > div { border-bottom: 1px solid var(--hud-line); }
+
+.universo .hud > div:first-child { grid-column: 1 / -1; }
+
+.universo .ayuda-vista { display: none; }
+
+}
+@media (max-width: 700px) {
+
+.universo .datos { left: 8px; right: 8px; width: auto; }
+
+.universo .controles { margin-left: 0; }
+
+.universo .hud > div:nth-child(5) { display: none; }
+
+.universo .registro { height: 52px; }
+ }
+
+.universo .leyenda i.ley-o { background: var(--out); } .universo .leyenda i.ley-i { background: var(--in); } .universo .leyenda i.ley-c { background: var(--cut); } .universo .leyenda i.ley-n { background: var(--undoc); }
+.universo .hud h3 .h3-titulo { color: inherit; }
+.universo .datos .barrita.gruesa { height: 8px; }
+.universo .tip .arriba4 { margin-top: 4px; }
+.universo .barra button, .universo .vacio button, .universo .aviso button { text-transform: none; letter-spacing: 0; box-shadow: none; }

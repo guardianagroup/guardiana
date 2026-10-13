@@ -1737,6 +1737,12 @@
       await load();
       cadaTanto(load, 5000);
     },
+    // «GUARDIANA por dentro» (1.0.22): the universe lives in its own script (por-dentro.js), which
+    // the page loads before this one; here it gets the session, the texts and the language.
+    async 'por-dentro'() {
+      if (!window.GuardianaUniverso) return;
+      await window.GuardianaUniverso.iniciar({ api, t, tn, esc, LOC, LANG, cadaTanto });
+    },
     async antivirus() {
       let pais = (c) => c;
       try { const dn = new Intl.DisplayNames([LOC], { type: 'region' }); pais = (c) => { try { return dn.of(c) || c; } catch (_) { return c; } }; } catch (_) {}

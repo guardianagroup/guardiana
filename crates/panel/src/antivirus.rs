@@ -102,7 +102,9 @@ impl CortesAntivirus {
 
     /// Every known product with the executable paths this computer has seen of it in the last
     /// week; products with none are left out (there is nothing to cut).
-    fn rutas_por_producto(ledger: &guardiana_core::Ledger) -> Vec<(&'static str, Vec<String>)> {
+    pub(crate) fn rutas_por_producto(
+        ledger: &guardiana_core::Ledger,
+    ) -> Vec<(&'static str, Vec<String>)> {
         let desde = now_ms() - 7 * 24 * HOUR_MS;
         let vistos = ledger.program_paths(desde).unwrap_or_default();
         antivirus::antivirus()
@@ -480,7 +482,7 @@ fn calcula(
 }
 
 /// The night, in a program's traffic minute, by the person's own clock.
-fn es_noche(minuto: i64, zona: i64) -> bool {
+pub(crate) fn es_noche(minuto: i64, zona: i64) -> bool {
     let local = (minuto + zona * 60_000).rem_euclid(24 * 3_600_000);
     local < 6 * 3_600_000
 }

@@ -95,3 +95,30 @@ GUARDIANA nunca pide apagar el antivirus. Vigilarlo no es quitarlo.
 Descartado a propósito: engañar al antivirus con un éxito falso (necesitaría un controlador del
 núcleo y no es posible del todo) y descifrar lo que envía (exigiría un certificado en medio de
 todas tus conexiones, y GUARDIANA no hace eso).
+
+## GUARDIANA por dentro (1.0.22)
+
+Una página aparte (`/por-dentro`), con un botón bien visible en la portada del panel y en «Tu
+antivirus»: lo que el antivirus, el navegador y los programas que más se mueven envían y reciben, en
+directo, sobre la Tierra.
+
+- **Cinco vistas**: el globo (la primera), el mapa (el mismo globo desenrollado), la nebulosa, el
+  ordenador por dentro y el radar. Globo y mapa están hechos en WebGL2 escrito aquí, con imágenes de
+  la NASA servidas por el propio panel y la luz del sol de ese momento (donde es de noche se ven las
+  luces de las ciudades). Sin internet y sin código de terceros.
+- **Datos** (`/api/por-dentro`, cada 5 segundos): por programa y destino, los bytes, paquetes,
+  protocolo y puerto que contó Windows; el país y la red del servidor (con su AS); si el fabricante
+  documenta el nombre (solo antivirus); cuántas veces lo pidió y cuántas lo paró GUARDIANA. Nunca la
+  dirección del servidor (decisión 203). Un nombre parado antes de salir no tiene servidor: se pone en
+  la sede de su empresa y se dice así.
+- **Programas**: los antivirus de la lista, los navegadores conocidos (Chrome, Edge, Firefox, Brave,
+  Opera, Vivaldi, GUARDIANA ZERO…) y los ocho programas que más se mueven. Solo un antivirus se puede
+  cortar entero (un navegador dejaría de funcionar); los nombres se cortan uno a uno con una regla de
+  este ordenador, que se deshace con otro clic.
+- **Tu país** sale de la zona horaria y del idioma del equipo; no se pregunta nada fuera.
+- **Horas abierta**: 30 imágenes por segundo, 20 tras dos minutos sin tocar nada, y se para cuando la
+  pestaña no se ve.
+- Si aún no hay medidas (equipo recién instalado, o fuera de Windows), ofrece una **demostración**
+  con datos de ejemplo, marcada en pantalla.
+
+Las fuentes de las imágenes y del mapa están en `crates/panel/static/tierra/LEEME.md`.

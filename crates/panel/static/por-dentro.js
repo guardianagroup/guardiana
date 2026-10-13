@@ -1,0 +1,1226 @@
+// GUARDIANA por dentro (1.0.22). The owner asked for a view where you see «cómo trabaja GUARDIANA
+// dentro del ordenador»: the antivirus, the browser and the programs that talk most, their data
+// going out to countries and companies, what GUARDIANA lets pass and what it stops, live, «un
+// espectáculo visual» someone can keep open for hours. Designed with Grok's help (12–13 Oct 2026).
+//
+// No third-party code (brief §8), and nothing from the internet: WebGL2 written here, the Earth's
+// pictures (NASA, public domain) served by the panel itself, the world's countries from Natural
+// Earth (public domain) in a 1.5° grid below. The light on the globe is the sun's of this very
+// moment, computed here. Every figure is a measurement of this computer (`/api/por-dentro`); when
+// there is none yet, the page offers a demonstration, labelled as such on screen.
+(() => {
+  'use strict';
+  // ---------- The world: Natural Earth 110 m (public domain) in a 1.5° grid ----------
+  const P = `FJ 11.6 -16.4 | TZ 34.8 -6.3 | EH -12.1 24.3 | CA -101.6 57.7 | US -99.1 39.5 | KZ 67.3 48.2 | UZ 63.2 41.7 | PG 144.3 -6.6 | ID 114 -0.3 | AR -65.1 -35.2 | CL -71.7 -37.3 | CD 23.6 -2.8 | SO 45.7 4.8 | KE 37.8 0.6 | SD 29.9 16 | TD 18.6 15.3 | HT -73.6 18.6 | DO -70.5 18.9 | RU 124.6 61.2 | BS -77.9 24.5 | FK -59.4 -51.7 | NO 13.4 62.9 | GL -41.5 74.8 | TF 69.5 -49.3 | TL 126 -8.8 | ZA 25.1 -29 | LS 28.2 -29.6 | MX -102.6 23.9 | UY -56 -32.8 | BR -53.1 -10.8 | BO -64.6 -16.7 | PE -74.4 -9.2 | CO -73.1 3.9 | PA -80.1 8.5 | CR -84.2 10 | NI -85 12.8 | HN -86.6 14.8 | SV -88.9 13.7 | GT -90.4 15.7 | BZ -88.7 17.2 | VE -66.2 7.2 | GY -59 4.8 | SR -55.9 4.1 | FR 2.3 46.6 | EC -78.4 -1.5 | PR -66.5 18.2 | JM -77.3 18.1 | CU -79 21.6 | ZW 29.8 -18.9 | BW 23.8 -22.1 | NA 17.2 -22.1 | SN -14.5 14.4 | ML -3.5 17.3 | MR -10.3 20.2 | BJ 2.3 9.6 | NE 9.3 17.3 | NG 8 9.5 | CM 12.6 5.7 | TG 1 8.4 | GH -1.2 7.9 | CI -5.6 7.6 | GN -11.1 10.4 | GW -15.1 12 | LR -9.4 6.4 | SL -11.8 8.5 | BF -1.8 12.3 | CF 20.4 6.5 | CG 15.1 -0.8 | GA 11.7 -0.6 | GQ 10.4 1.6 | ZM 27.7 -13.4 | MW 34.2 -13.2 | MZ 35.5 -17.2 | SZ 31.4 -26.5 | AO 17.5 -12.3 | BI 29.9 -3.4 | IL 34.8 31.5 | LB 35.9 33.9 | MG 46.7 -19.4 | PS 35.3 31.9 | GM -15.4 13.5 | TN 9.5 34.2 | DZ 2.6 28.2 | JO 36.8 31.2 | AE 54.2 23.9 | QA 51.2 25.3 | KW 47.6 29.3 | IQ 43.8 33 | OM 56.1 20.6 | VU 166.9 -15.2 | KH 104.9 12.7 | TH 101 15 | LA 103.7 18.4 | MM 96.5 21 | VN 105.8 20 | KP 127.2 40.1 | KR 127.8 36.4 | MN 102.9 46.8 | IN 79.6 22.9 | BD 90.3 23.8 | BT 90.5 27.4 | NP 84 28.2 | PK 69.4 30 | AF 66.1 33.9 | TJ 71 38.6 | KG 74.6 41.5 | TM 59.3 39.1 | IR 54.3 32.5 | SY 38.5 35 | AM 45 40.2 | SE 16.6 62.8 | BY 28 53.5 | UA 31.2 49.1 | PL 19.3 52.1 | AT 14.1 47.6 | HU 19.4 47.2 | MD 28.4 47.2 | RO 24.9 45.9 | LT 23.9 55.3 | LV 24.8 56.8 | EE 25.8 58.6 | DE 10.3 51.1 | BG 25.2 42.8 | GR 22.6 39.3 | TR 35.4 39 | AL 20 41.1 | HR 17.5 43.7 | CH 8.1 46.8 | LU 6 49.8 | BE 4.6 50.7 | NL 5.5 52.3 | PT -8.1 39.6 | ES -3.6 40.3 | IE -8 53.2 | NC 165.5 -21.3 | SB 159.1 -7.9 | NZ 170.5 -44 | AU 134.4 -25.6 | LK 80.7 7.7 | CN 103.9 36.6 | TW 121 23.7 | IT 12.2 43.5 | DK 9.3 56.2 | GB -2.7 53.9 | IS -18.8 65.1 | AZ 47.7 40.3 | GE 43.5 42.2 | PH 121.5 15.8 | MY 114.7 3.5 | BN 114.9 4.7 | SI 14.9 46.1 | FI 26.2 64.5 | SK 19.5 48.7 | CZ 15.3 49.8 | ER 38.7 15.4 | JP 136.9 36 | PY -58.4 -23.2 | YE 47.5 15.9 | SA 44.5 24.1 | AQ 31.2 -77.3 | CY 33.6 35.3 | CY 33 34.9 | MA -8.4 29.9 | EG 29.8 26.5 | LY 18 27 | ET 39.6 8.7 | DJ 42.5 11.8 | SO 46.2 9.8 | UG 32.4 1.3 | RW 29.9 -2 | BA 17.8 44.2 | MK 21.7 41.6 | RS 20.8 44.2 | ME 19.3 42.8 | XK 20.9 42.6 | TT -61.3 10.4 | SS 30.2 7.3`;
+  const R = `0 94 23 9 0 196 4 17 0 2 23 27 0 3 23 3 0 185 4 6 0 3 4 8 0 2 23 33 0 24 22 6 0 13 19 2 0 28 19 5 0 99 4 1 0 4 4 3 0 1 4 2 0 1 4 4 0 1 4 7 0 4 23 34 0 21 22 5 0 54 19 3 0 90 4 2 0 19 4 6 0 7 23 33 0 22 22 3 0 56 19 2 0 92 4 4 0 1 4 2 0 3 4 3 0 3 4 2 0 4 4 1 0 15 23 27 0 52 19 4 0 19 19 14 0 16 19 4 0 61 4 3 0 42 23 24 0 51 19 2 0 19 19 15 0 84 4 4 0 1 4 3 0 1 4 1 0 1 4 2 0 2 4 3 0 1 4 2 0 2 4 6 0 17 23 22 0 50 19 2 0 9 19 2 0 6 19 32 0 7 19 2 0 27 19 6 0 7 5 1 0 22 4 1 0 3 4 8 0 6 4 2 0 2 4 12 0 61 19 19 0 3 19 3 0 7 19 3 0 1 19 37 0 2 19 13 0 30 5 15 0 6 4 4 0 2 4 1 0 3 4 11 0 1 4 1 0 1 4 2 0 5 4 1 0 4 4 7 0 9 23 20 0 29 22 4 152 2 22 2 19 1 0 18 19 1 0 4 19 3 0 1 19 57 0 7 19 5 0 4 19 6 0 1 5 17 4 18 0 4 4 2 0 4 4 2 0 1 4 4 0 2 4 2 0 6 4 4 0 58 19 6 0 7 19 3 0 2 19 3 0 2 19 1 0 8 19 1 0 3 19 1 0 73 19 1 0 2 19 2 0 4 5 14 4 39 0 6 4 8 0 54 19 7 0 7 19 3 0 18 19 1 0 71 19 3 0 2 19 3 0 1 5 17 4 36 0 1 4 1 0 4 4 7 0 2 4 1 0 55 19 7 0 3 19 4 0 106 5 13 4 34 0 2 4 2 0 1 4 2 0 5 4 5 0 9 23 7 0 13 145 2 0 18 22 2 111 5 0 2 152 5 19 99 0 11 5 16 4 32 0 6 4 1 0 3 4 3 0 3 4 2 0 11 23 5 0 32 22 4 111 4 0 2 152 7 19 88 0 1 19 8 0 12 5 11 0 1 5 4 4 31 0 11 4 6 0 15 23 2 0 32 22 5 111 4 0 2 152 5 19 85 0 5 19 5 0 18 5 5 0 10 5 1 4 1 5 1 4 27 0 11 4 6 0 2 4 2 0 46 22 4 111 4 0 4 121 3 19 77 0 2 19 1 0 2 19 2 0 4 19 2 0 26 5 3 0 13 4 27 0 11 4 10 0 37 144 1 0 11 111 3 0 5 120 1 121 1 19 75 0 12 19 3 0 25 5 1 0 18 5 1 4 29 0 7 4 10 0 37 144 2 0 7 143 2 0 1 111 3 0 3 120 1 119 2 120 2 19 73 0 12 19 5 0 21 5 1 0 22 4 32 0 2 4 15 0 33 144 1 0 1 144 2 0 7 122 1 0 4 114 1 0 1 19 2 119 2 112 4 19 23 6 3 19 43 0 14 19 4 0 43 4 1 0 2 4 31 0 2 4 16 0 31 134 2 0 1 144 3 0 3 131 2 122 5 114 6 112 6 19 19 6 11 19 29 140 2 19 12 0 9 19 3 0 48 4 31 0 1 4 15 0 35 144 4 0 2 131 1 122 6 114 6 113 2 112 2 113 3 19 17 6 13 19 27 140 4 19 11 0 9 19 1 0 50 4 41 0 2 4 2 0 36 144 2 0 3 44 2 130 1 122 4 154 4 114 4 113 9 19 7 6 24 19 4 98 3 19 2 98 4 19 1 98 1 19 9 140 5 19 9 0 1 19 1 0 60 4 2 5 19 4 17 0 1 4 2 0 4 4 3 0 33 44 1 0 1 44 6 122 4 154 1 115 1 153 4 113 11 19 5 6 27 140 1 98 18 140 10 19 6 0 64 5 26 4 11 5 1 4 2 0 7 4 1 0 33 44 6 128 2 115 5 116 4 118 3 117 2 113 5 19 7 6 23 140 1 6 1 140 3 98 20 140 9 19 4 0 64 5 27 4 9 5 2 4 5 0 39 44 6 142 4 151 1 127 3 173 1 118 5 113 1 0 2 19 1 0 2 19 7 0 3 6 20 140 5 98 17 140 12 19 3 0 65 5 28 4 4 5 5 0 2 4 1 0 42 44 6 142 3 0 2 127 1 171 2 173 2 118 4 0 7 19 5 0 3 6 3 7 4 6 13 140 10 98 10 140 13 19 4 0 3 156 2 0 61 5 28 4 2 5 6 0 41 133 7 44 1 0 5 142 2 0 3 174 1 175 1 173 1 123 4 0 9 147 1 19 3 0 3 6 2 7 7 6 5 106 4 140 11 98 9 140 14 19 1 0 5 156 3 0 61 5 35 0 42 132 2 133 5 0 8 142 2 0 2 126 1 172 1 124 3 125 1 0 2 125 4 0 2 125 2 147 2 146 2 0 3 107 4 7 4 6 2 7 1 106 5 140 32 96 2 0 71 5 34 0 43 132 1 133 5 0 10 142 1 0 2 126 1 124 1 0 3 125 12 110 1 146 2 0 3 107 6 7 4 106 3 140 31 0 1 140 1 0 1 96 2 0 8 156 2 0 63 5 32 0 44 132 1 133 5 0 10 142 1 0 3 124 2 0 2 125 12 108 3 0 3 107 8 7 2 105 1 104 1 105 2 140 29 0 4 96 2 97 1 0 7 156 1 0 65 5 30 0 47 133 3 0 3 83 1 0 1 83 2 82 1 0 11 125 6 109 4 88 2 108 10 107 3 104 6 103 2 140 30 0 3 97 2 0 5 156 3 0 65 5 30 0 47 163 2 0 1 83 7 82 1 0 9 124 2 0 4 161 1 0 1 109 4 88 3 108 10 104 7 103 4 140 28 0 4 97 2 0 2 156 6 0 67 5 27 0 47 163 4 83 6 82 2 0 17 109 2 88 4 108 10 104 7 103 2 99 4 140 27 0 8 156 3 0 71 28 2 5 22 0 48 163 5 83 7 82 1 165 3 0 3 165 2 0 8 80 1 84 2 88 6 108 9 104 5 103 4 99 2 140 29 0 6 156 1 0 75 28 1 0 1 28 5 5 16 0 48 163 3 83 9 82 1 165 5 0 1 165 4 164 6 77 1 84 1 159 3 88 4 108 9 104 3 103 5 99 4 140 28 0 82 28 1 0 1 28 8 5 4 0 2 5 1 0 5 5 1 0 47 163 2 83 12 165 10 164 6 159 7 88 1 87 1 0 2 108 7 103 8 99 5 102 2 140 25 0 82 28 2 0 1 28 8 5 1 0 10 5 1 0 45 163 3 83 12 165 11 164 5 0 2 159 9 0 2 108 7 103 5 99 8 102 4 101 2 99 4 140 16 0 84 28 1 0 1 28 7 5 1 0 10 5 2 0 1 20 1 0 41 163 2 3 2 54 1 83 11 165 11 164 6 0 1 159 9 0 4 89 1 108 3 103 6 99 16 94 3 140 14 0 85 28 1 0 2 28 7 0 55 163 2 54 4 53 1 83 10 165 10 164 6 0 2 159 9 0 2 85 1 89 1 0 7 103 2 99 12 100 3 99 1 94 2 140 14 0 90 28 6 0 54 163 2 54 5 53 2 83 10 56 1 165 1 16 1 165 6 164 7 0 2 159 9 85 2 89 2 0 7 99 13 100 3 94 4 140 12 0 2 141 1 0 89 28 5 0 12 48 1 0 41 163 1 3 1 54 5 53 4 83 6 56 4 16 3 165 4 15 8 0 1 159 11 89 3 0 6 99 13 0 2 100 1 94 5 140 1 95 4 140 3 0 95 28 5 0 5 28 2 0 6 48 3 0 38 54 7 53 5 83 3 56 7 16 4 165 2 15 8 0 2 159 10 89 2 0 10 99 9 0 4 94 4 92 1 93 3 95 1 0 100 28 5 0 3 28 3 0 10 18 2 0 35 54 7 53 7 56 7 16 6 15 9 0 2 159 6 158 2 89 3 0 11 99 7 0 7 94 2 92 2 93 3 95 1 0 1 140 2 0 99 28 6 39 2 0 48 54 7 53 7 56 7 16 6 15 9 155 1 0 2 159 1 158 2 159 1 158 3 89 2 0 12 99 6 0 8 94 2 92 5 93 1 0 9 148 2 0 93 28 1 0 2 28 1 39 2 37 3 0 45 52 2 54 5 53 6 56 7 16 7 15 8 155 2 0 2 158 7 0 14 99 5 0 9 94 1 0 1 94 1 92 4 93 2 0 8 148 1 0 98 39 1 38 1 37 2 36 2 0 44 52 3 53 7 66 1 56 9 16 6 15 9 166 3 155 1 0 1 158 4 0 17 99 3 0 12 94 1 92 3 91 1 93 1 91 1 95 1 0 7 148 1 0 101 36 2 0 45 52 3 53 5 66 4 56 2 57 6 58 1 16 5 15 9 166 4 155 1 158 1 0 20 99 3 0 13 92 2 91 4 95 1 0 9 148 1 0 100 36 1 0 7 33 1 0 1 41 1 0 36 62 4 53 2 66 5 55 1 57 7 58 1 16 5 15 8 166 5 167 1 0 3 168 1 13 1 0 17 99 2 0 16 91 2 95 1 0 9 148 1 0 1 148 1 0 100 35 1 0 5 33 1 41 1 0 1 41 6 0 32 62 1 65 1 62 1 61 4 60 2 59 1 55 1 57 7 16 5 67 2 15 1 177 1 15 2 177 3 166 6 168 4 13 1 0 17 99 2 0 17 95 1 0 114 34 1 0 2 33 4 41 8 0 31 65 2 64 1 61 4 60 2 59 1 55 1 57 6 58 2 16 2 67 4 177 6 166 9 168 1 13 1 0 20 139 1 0 11 92 2 0 15 148 2 0 104 33 5 41 6 42 2 0 31 64 2 61 4 60 2 59 1 55 1 57 6 58 2 67 7 177 6 166 8 13 2 0 20 139 1 0 13 92 1 0 15 148 1 0 104 33 7 41 4 42 3 43 2 44 1 0 29 64 1 61 3 60 2 0 3 57 3 58 4 67 8 177 5 14 1 166 6 13 2 0 32 9 1 0 2 149 2 0 8 149 2 0 110 33 6 41 2 30 3 42 1 43 3 44 1 30 1 0 40 58 4 67 2 12 8 177 2 169 1 14 2 166 2 14 1 13 4 0 32 9 2 0 1 149 2 0 7 149 1 9 1 0 110 33 7 41 3 30 2 42 2 43 1 30 1 44 1 30 1 0 40 70 2 69 1 58 2 68 1 12 9 169 2 14 4 13 4 0 34 9 2 0 1 149 1 0 5 149 3 9 2 0 108 45 1 33 6 30 13 0 39 69 3 68 3 12 8 169 3 14 4 13 2 0 37 9 3 0 4 9 6 0 1 9 3 0 2 9 1 0 100 45 4 33 4 30 15 0 37 69 4 68 2 12 8 169 3 14 4 13 1 0 39 9 2 0 4 9 5 0 7 9 1 0 2 9 1 0 97 45 3 32 2 33 3 30 16 0 36 69 2 68 3 12 8 170 2 2 3 14 3 0 40 9 3 0 3 9 5 0 1 9 2 0 8 9 1 0 1 9 2 0 93 32 1 45 1 32 5 30 21 0 33 69 1 68 3 12 9 2 5 14 2 0 41 9 3 0 5 9 1 0 4 9 1 0 2 9 1 0 4 9 5 8 2 0 90 32 5 30 25 0 32 12 12 2 6 0 43 9 2 0 21 9 2 8 3 0 89 32 5 30 26 0 31 75 3 12 9 2 6 0 44 9 2 0 2 9 1 0 14 9 1 0 2 9 2 8 4 0 6 136 1 0 82 32 4 30 26 0 32 75 6 12 5 2 6 0 48 9 3 0 15 9 2 8 2 0 1 8 2 0 7 136 1 0 81 32 4 30 24 0 33 75 6 12 4 71 3 72 1 2 4 0 55 9 1 0 15 8 2 0 88 32 6 31 2 30 19 0 34 75 7 71 1 12 2 71 3 72 1 2 3 73 1 0 162 32 5 31 4 30 17 0 34 75 7 71 3 12 1 71 2 72 1 73 4 0 60 138 4 0 4 138 1 0 93 32 5 31 6 30 14 0 34 75 7 71 6 73 1 72 2 73 3 0 5 79 1 0 51 138 1 0 1 138 5 0 3 138 2 0 94 32 4 31 6 30 14 0 34 75 7 71 5 73 3 72 1 73 3 0 4 79 3 0 49 138 8 0 3 138 3 0 95 32 2 31 7 30 13 0 34 51 1 75 6 71 3 49 4 73 3 0 4 79 4 0 49 138 11 0 1 138 3 0 96 11 1 31 8 30 12 0 34 51 6 50 3 49 5 73 2 0 5 79 4 0 48 138 17 0 95 11 1 31 5 157 2 30 12 0 36 51 5 50 4 49 4 73 1 0 7 79 2 0 47 138 20 0 10 135 1 0 83 11 2 31 3 157 3 30 12 0 36 51 5 50 5 49 2 73 3 0 5 79 3 0 45 138 23 0 10 135 1 0 82 11 2 10 4 157 4 30 8 0 39 51 3 50 5 26 3 73 3 0 5 79 3 0 44 138 25 0 92 11 1 10 7 157 3 30 4 0 42 51 3 50 4 26 4 73 2 0 6 79 2 0 45 138 26 0 91 11 1 10 7 157 3 30 4 0 42 51 3 26 1 50 1 26 6 73 1 0 54 138 26 0 91 11 1 10 9 30 5 0 42 51 3 26 9 0 54 138 26 0 90 11 1 10 9 30 5 0 44 26 7 27 2 26 1 0 56 138 25 0 90 11 1 10 8 29 2 30 3 0 46 26 8 0 57 138 25 0 90 11 1 10 8 29 3 30 1 0 47 26 7 0 58 138 8 0 4 138 13 0 90 11 1 10 8 29 3 0 48 26 5 0 60 138 6 0 7 138 1 0 1 138 9 0 91 11 1 10 9 0 130 138 8 0 15 137 1 0 75 11 2 10 9 0 131 138 7 0 16 137 1 0 74 11 2 10 8 0 133 138 2 0 1 138 1 0 18 137 3 0 72 11 1 10 7 0 157 137 2 0 73 11 1 10 5 0 140 138 2 0 17 137 1 0 74 11 1 10 5 0 140 138 2 0 15 137 2 0 74 11 2 10 4 0 156 137 2 0 76 11 2 10 3 0 156 137 3 0 76 11 2 10 4 0 234 11 2 10 3 0 235 11 1 10 3 0 236 11 2 10 2 0 5 21 2 0 230 11 3 10 1 0 237 11 2 10 3 0 255 0 148`;
+  const G = { nlat: 94, nlon: 240, paso: 1.5, lat0: 83.25, lon0: -179.25 };
+  const RAD = Math.PI / 180;
+  const listaPaises = P.trim().split(' | ').map((s) => { const [c, lon, lat] = s.trim().split(' '); return { c, lon: +lon, lat: +lat }; });
+  const centros = {};
+  listaPaises.forEach((p) => { if (!centros[p.c]) centros[p.c] = p; });
+  // Countries too small for the 110 m map (no land cell): their centre only.
+  [['SG', 103.8, 1.35], ['HK', 114.2, 22.3], ['BH', 50.55, 26.07], ['MT', 14.4, 35.9], ['MU', 57.55, -20.25], ['AD', 1.6, 42.5], ['MC', 7.42, 43.74], ['LI', 9.55, 47.16], ['SM', 12.46, 43.94], ['BB', -59.55, 13.17], ['MV', 73.5, 4.2], ['GI', -5.35, 36.14], ['MO', 113.55, 22.17], ['BM', -64.75, 32.3], ['KY', -81.25, 19.3], ['IM', -4.5, 54.2], ['JE', -2.13, 49.21], ['GG', -2.58, 49.45], ['VG', -64.6, 18.42], ['SC', 55.45, -4.6], ['AG', -61.8, 17.07], ['LC', -60.98, 13.9], ['GD', -61.68, 12.1], ['KN', -62.75, 17.33], ['VC', -61.2, 13.25], ['DM', -61.35, 15.42], ['CW', -68.95, 12.17], ['AW', -69.97, 12.52], ['ST', 6.6, 0.3], ['CV', -23.6, 15.1], ['KM', 43.3, -11.7], ['TO', -175.2, -21.2], ['WS', -172.1, -13.75], ['KI', 173.0, 1.4], ['MH', 171.2, 7.1], ['FM', 158.2, 6.9], ['PW', 134.5, 7.5], ['TV', 179.2, -8.5], ['NR', 166.93, -0.53]]
+    .forEach(([c, lon, lat]) => { if (!centros[c]) { centros[c] = { c, lon, lat }; listaPaises.push({ c, lon, lat }); } });
+  const celdas = new Uint8Array(G.nlat * G.nlon);
+  { const n = R.trim().split(/\s+/).map(Number); let k = 0; for (let i = 0; i < n.length; i += 2) { celdas.fill(n[i], k, k + n[i + 1]); k += n[i + 1]; } }
+  const paisEn = (lon, lat) => {
+    const i = Math.round((G.lat0 - lat) / G.paso), j = Math.round((lon - G.lon0) / G.paso);
+    if (i < 0 || i >= G.nlat) return null;
+    const v = celdas[i * G.nlon + (((j % G.nlon) + G.nlon) % G.nlon)];
+    return v ? listaPaises[v - 1].c : null;
+  };
+  // Where the computer is, without asking anyone: its time zone first (a Spanish browser in
+  // Bogotá says «es»), then the region of its languages. The person can change it, and the choice
+  // stays in this browser.
+  const ZONAS = { 'America/Bogota': 'CO', 'Europe/Madrid': 'ES', 'Atlantic/Canary': 'ES', 'America/Mexico_City': 'MX', 'America/Monterrey': 'MX', 'America/Cancun': 'MX', 'America/Tijuana': 'MX', 'America/Lima': 'PE', 'America/Santiago': 'CL', 'America/Argentina/Buenos_Aires': 'AR', 'America/Buenos_Aires': 'AR', 'America/Sao_Paulo': 'BR', 'America/Caracas': 'VE', 'America/Guayaquil': 'EC', 'America/Montevideo': 'UY', 'America/Asuncion': 'PY', 'America/La_Paz': 'BO', 'America/Panama': 'PA', 'America/Costa_Rica': 'CR', 'America/Guatemala': 'GT', 'America/El_Salvador': 'SV', 'America/Tegucigalpa': 'HN', 'America/Managua': 'NI', 'America/Santo_Domingo': 'DO', 'America/Havana': 'CU', 'America/Puerto_Rico': 'PR', 'Europe/Lisbon': 'PT', 'Europe/London': 'GB', 'Europe/Paris': 'FR', 'Europe/Berlin': 'DE', 'Europe/Rome': 'IT', 'Europe/Amsterdam': 'NL', 'Europe/Brussels': 'BE', 'Europe/Dublin': 'IE', 'Europe/Zurich': 'CH', 'Europe/Vienna': 'AT', 'Europe/Warsaw': 'PL', 'America/New_York': 'US', 'America/Chicago': 'US', 'America/Denver': 'US', 'America/Los_Angeles': 'US', 'America/Phoenix': 'US', 'America/Toronto': 'CA', 'America/Vancouver': 'CA' };
+  const paisDelEquipo = () => {
+    try { const g = localStorage.getItem('guardiana_pais'); if (g && centros[g]) return g; } catch (_) {}
+    try { const z = Intl.DateTimeFormat().resolvedOptions().timeZone; if (ZONAS[z]) return ZONAS[z]; } catch (_) {}
+    try { const r = (navigator.languages || [navigator.language]).map((l) => (String(l).split('-')[1] || '').toUpperCase()).find((x) => centros[x]); if (r) return r; } catch (_) {}
+    return 'US';
+  };
+  const UE = new Set(['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE']);
+
+  window.GuardianaUniverso = { iniciar };
+
+  async function iniciar(ctx) {
+    const { api, esc, LOC } = ctx;
+    const t = ctx.t, tn = ctx.tn;
+    const $ = (id) => document.getElementById(id);
+    const cv = $('cv'), cx = cv.getContext('2d');
+    const stage = $('stage'), lienzo = $('lienzo'), tip = $('tip');
+    let nombrePais = (c) => c;
+    try { const dn = new Intl.DisplayNames([LOC], { type: 'region' }); nombrePais = (c) => { try { return dn.of(c) || c; } catch (_) { return c; } }; } catch (_) {}
+    const bytes = (n) => { const u = ['B', 'kB', 'MB', 'GB', 'TB']; let i = 0; n = Number(n || 0); while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; } return (i ? n.toFixed(n < 10 ? 1 : 0) : Math.round(n)) + ' ' + u[i]; };
+    const num = (n) => Number(n || 0).toLocaleString(LOC);
+    const pct = (a, b) => (b ? Math.round(a / b * 100) : 0);
+    const hora = (ms) => new Date(ms).toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const hace = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? t('pd_hace_s').replace('{n}', s) : s < 3600 ? t('pd_hace_min').replace('{n}', Math.floor(s / 60)) : t('pd_hace_h').replace('{n}', Math.floor(s / 3600)).replace('{m}', String(Math.floor(s % 3600 / 60)).padStart(2, '0')); };
+    const reducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // ---------- Model: programs and destinations ----------
+    // A destination is (program, name, country, network): the name the program asked for that
+    // server, where the server is, and whose network it is. `sub`/`baj` add up the window.
+    const PROD = [], DEST = [];
+    const porClave = new Map();
+    const COLORES = { antivirus: ['#8fdcff', '#cfa8ff', '#7fb2ff', '#b6c8ff'], navegador: ['#9df2c8', '#c6f68d', '#7ff0e0'], programa: ['#ffd1a6', '#f5b0d0', '#d4c4ff', '#a6e3e9', '#f3e08a', '#ffb3a6', '#c9d6ea', '#b7f0a8'] };
+    const prod = (id) => PROD.find((p) => p.id === id) || PROD[0];
+    // Stopped: a rule of this name, the whole program cut, or a wide rule (a category) that stopped
+    // every lookup of a name that never left.
+    const bloqueado = (d) => d.cortado || (prod(d.p) && prod(d.p).cortado) || !!d.ancho;
+    const dibujable = (d) => !!centros[d.pais];
+    const st = {
+      vista: 'globo', yo: paisDelEquipo(), W: 0, Wc: 0, H: 0, dpr: 1, t0: performance.now(),
+      arrastre: null, dRot: 0, dTilt: 0, part: [], estallidos: [], hover: null, raton: null, dianas: [],
+      serie: new Array(60).fill(0), serieP: {}, eventos: [], ahora: [0, 0, 0], intervalo: 5,
+      demo: false, sinSesion: false, datos: null, abierto: Date.now(), primeraCarga: true, ultimoGesto: performance.now(),
+    };
+
+    // ---------- Stars and nebulae (fixed, made once) ----------
+    let semilla = 7;
+    const azar = () => { semilla = (semilla * 16807) % 2147483647; return semilla / 2147483647; };
+    const gauss = () => { let u = 0, v = 0; while (!u) u = azar(); while (!v) v = azar(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+    const estrellas = Array.from({ length: 320 }, () => ({ x: azar(), y: azar(), r: azar() * 1.2 + 0.2, f: azar() * 6.28 }));
+    const nubeDe = {};
+    let paisesUsados = [];
+    const tono = (c) => { let h = 0; for (const ch of c) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
+
+    // What is drawn: the destinations that move most (and every one that is cut), so a busy
+    // computer stays readable. The side panel lists them all.
+    const MAX_DIBUJO = 60;
+    let VISIBLES = [];
+    const recalcula = () => {
+      const orden = DEST.filter(dibujable).sort((a, b) => (b.sub + b.baj) - (a.sub + a.baj) || b.bloq - a.bloq);
+      const cortados = orden.filter((d) => bloqueado(d) || d.bloq).slice(0, 20);
+      const resto = orden.filter((d) => !cortados.includes(d)).slice(0, MAX_DIBUJO - cortados.length);
+      VISIBLES = resto.concat(cortados);
+      VISIBLES.forEach((d, i) => { d.i = i; });
+      paisesUsados = [...new Set(VISIBLES.map((d) => d.pais))];
+      paisesUsados.forEach((c) => { if (!nubeDe[c]) nubeDe[c] = Array.from({ length: 260 }, () => ({ x: gauss() * 0.55, y: gauss() * 0.4, r: azar() * 1.3 + 0.3, a: azar() * 0.6 + 0.15 })); });
+      PROD.forEach((p, k) => { if (!st.serieP[p.id]) st.serieP[p.id] = new Array(60).fill(0); p.k = k; });
+    };
+    const nuevoProducto = (p) => {
+      const tipo = p.tipo || 'programa', usados = PROD.filter((x) => x.tipo === tipo).length, pal = COLORES[tipo] || COLORES.programa;
+      const o = { id: p.id, nombre: p.id, tipo, procesos: p.procesos || [], firma: p.firma || '', cortable: !!p.cortable, cortado: !!p.cortado, color: pal[usados % pal.length], sub: p.enviados || 0, baj: p.recibidos || 0 };
+      PROD.push(o); return o;
+    };
+    const claveDe = (d) => [d.programa, d.destino, d.pais, d.red].join('|');
+    const nombreDe = (d) => d.destino || (d.red && d.red[0] !== '@' ? t('pd_sin_nombre_red').replace('{red}', d.red) : t('pd_sin_nombre'));
+
+    // ---------- Demonstration (no measurements yet, or no session) ----------
+    const DEMO_PROD = [
+      { id: t('pd_demo_av_a'), tipo: 'antivirus', procesos: ['avservicio.exe'], firma: 'Ejemplo A S. L.', cortable: true },
+      { id: t('pd_demo_av_b'), tipo: 'antivirus', procesos: ['bguardia.exe'], firma: 'Ejemplo B Inc.', cortable: true },
+      { id: t('pd_demo_nav'), tipo: 'navegador', procesos: ['navegador.exe'], firma: 'Ejemplo N Ltd.', cortable: false },
+    ];
+    const DEMO_DEST = [
+      [0, 'nube.antivirus-a.example', 'US', 'Microsoft', 8075, true, 'nube', 5], [0, 'actualiza.antivirus-a.example', 'NL', 'Akamai', 20940, true, 'actualizaciones', 3],
+      [0, 'telemetria.antivirus-a.example', 'IE', 'Microsoft', 8075, true, 'telemetria', 2], [0, 'licencia.antivirus-a.example', 'DE', 'Amazon', 16509, true, 'licencia', 1],
+      [0, 'mapas.antivirus-a.example', 'BR', 'Google', 15169, false, null, 1], [1, 'api.antivirus-b.example', 'US', 'Amazon', 16509, false, null, 3],
+      [1, 'muestras.antivirus-b.example', 'CA', 'OVH', 16276, true, 'muestras', 2], [1, 'anuncios.publicidad.example', 'US', 'Google', 15169, false, null, 2, 'cortado'],
+      [1, 'cdn.antivirus-b.example', 'SG', 'Cloudflare', 13335, true, 'actualizaciones', 1], [1, '', 'JP', '', 0, false, null, 1],
+      [2, 'periodico.example', 'ES', 'Cloudflare', 13335, null, null, 3], [2, 'rastreo.anuncios.example', 'US', 'Google', 15169, null, null, 3, 'cortado'],
+      [2, 'pixel.redsocial.example', 'IE', 'Meta', 32934, null, null, 2, 'cortado'], [2, 'video.example', 'US', 'Akamai', 20940, null, null, 2],
+    ];
+    const DEMO_NUEVOS = [[1, 'informes.antivirus-b.example', 'PL', 'OVH', 16276, false, null, 1, null, 40], [0, 'reputacion.antivirus-a.example', 'FR', 'Microsoft', 8075, true, 'nube', 2, null, 95], [2, 'fotos.example', 'BR', 'Amazon', 16509, null, null, 1, null, 150]];
+    const demoDestino = ([pi, host, pais, red, asn, doc, uso, peso, estado]) => {
+      const p = PROD[pi];
+      return { k: [p.id, host, pais, red].join('|'), p: p.id, host: host || t('pd_sin_nombre'), destino: host, pais, red, asn, proto: /video|periodico|rastreo|pixel|fotos|cdn/.test(host) && red !== 'Akamai' ? 'udp' : 'tcp', puerto: /actualiza/.test(host) ? 80 : 443, vias: [], sub: 0, baj: 0, paq: 0, noche: 0, primera: Date.now() - 3600e3, ultima: Date.now(), doc, uso, consultas: 0, bloq: 0, regla: estado === 'cortado' ? -1 : null, cortado: estado === 'cortado', sede: false, peso, ruta: [], tg: 0.3, x: 0, y: 0, vis: true, ema: 0 };
+    };
+    const empiezaDemo = () => {
+      st.demo = true; PROD.length = 0; DEST.length = 0; porClave.clear();
+      DEMO_PROD.forEach(nuevoProducto);
+      DEMO_DEST.forEach((x) => { const d = demoDestino(x); DEST.push(d); porClave.set(d.k, d); });
+      st.demoT0 = Date.now(); recalcula();
+      $('chip-modo').textContent = t('pd_chip_demo'); $('chip-modo').hidden = false;
+      $('vacio').hidden = true;
+      pintaHud(); pintaDatos();
+    };
+    // One beat of the demonstration: what a computer like this one would measure in a second.
+    const latidoDemo = () => {
+      const seg = (Date.now() - st.demoT0) / 1000;
+      DEMO_NUEVOS.filter((n) => !n.hecho && seg >= n[9]).forEach((n) => { n.hecho = true; const d = demoDestino(n); d.primera = Date.now(); DEST.push(d); porClave.set(d.k, d); recalcula(); evento(prod(d.p).nombre, d.host, t('pd_ev_nuevo').replace('{pais}', d.pais).replace('{red}', d.red), 'n'); avisa(t('pd_aviso_nuevo').replace('{prog}', prod(d.p).nombre).replace('{nombre}', d.host).replace('{pais}', nombrePais(d.pais))); });
+      const rec = [];
+      DEST.forEach((d) => { if (azar() > d.peso / 6.5) return; if (bloqueado(d)) { rec.push({ d, env: 0, recb: 0, paq: 0, parada: 1 }); return; } const s = Math.round(Math.pow(azar(), 2) * 38000 * d.peso + 300), b = Math.round(azar() * 9000 * d.peso + 200); rec.push({ d, env: s, recb: b, paq: Math.round(s / 1200 + b / 1400) + 2, parada: 0 }); });
+      aplicaDeltas(rec, 0.9);
+    };
+
+    // ---------- Measurements: the panel's answer, and what changed since the last one ----------
+    const filasVistas = new Map();
+    let ultimaCarga = 0;
+    const cargar = async () => {
+      if (st.demo) return;
+      let r;
+      try { r = await api('/api/por-dentro'); } catch (e) {
+        if (st.primeraCarga) { st.primeraCarga = false; ofrecerDemo(String(e && e.message || '').includes('sesión') ? t('pd_vacio_sin_sesion') : t('pd_vacio')); }
+        return;
+      }
+      const ahora = performance.now(), intervalo = ultimaCarga ? Math.max(1, (ahora - ultimaCarga) / 1000) : 5;
+      ultimaCarga = ahora; st.intervalo = intervalo; st.datos = r;
+      r.programas.forEach((p) => {
+        let o = PROD.find((x) => x.id === p.id);
+        if (!o) o = nuevoProducto(p);
+        Object.assign(o, { tipo: p.tipo, procesos: p.procesos, firma: p.firma, cortable: p.cortable, cortado: p.cortado, sub: p.enviados, baj: p.recibidos });
+      });
+      const rec = [], vistos = new Set();
+      r.destinos.forEach((x) => {
+        const k = claveDe(x); vistos.add(k);
+        let d = porClave.get(k);
+        const esNuevo = !d;
+        if (!d) { d = { k, p: x.programa, ruta: [], tg: 0.3, x: 0, y: 0, vis: true, ema: 0, bloq: x.paradas }; porClave.set(k, d); DEST.push(d); }
+        const antes = d.bloq || 0;
+        Object.assign(d, { host: nombreDe(x), destino: x.destino, pais: x.pais, red: x.red, asn: x.asn, proto: x.proto, puerto: x.puerto, vias: x.vias, sub: x.enviados, baj: x.recibidos, paq: x.paquetes, noche: x.noche, primera: x.primera, ultima: x.ultima, doc: x.documentado, uso: x.uso, consultas: x.consultas, bloq: x.paradas, regla: x.regla ?? null, cortado: x.regla !== null && x.regla !== undefined, sede: x.sede });
+        d.ancho = !d.cortado && d.sede && d.bloq > 0;
+        if (!st.primeraCarga && esNuevo) {
+          d.visto = Date.now();
+          evento(prod(d.p).nombre, d.host, t('pd_ev_nuevo').replace('{pais}', d.pais || '—').replace('{red}', d.red || '—'), 'n');
+          if (prod(d.p).tipo === 'antivirus') avisa(t('pd_aviso_nuevo').replace('{prog}', prod(d.p).nombre).replace('{nombre}', d.host).replace('{pais}', d.pais ? nombrePais(d.pais) : '—'));
+        }
+        if (!st.primeraCarga && x.paradas > antes) rec.push({ d, env: 0, recb: 0, paq: 0, parada: x.paradas - antes });
+      });
+      for (let i = DEST.length - 1; i >= 0; i--) if (!vistos.has(DEST[i].k)) { porClave.delete(DEST[i].k); DEST.splice(i, 1); }
+      r.recientes.forEach((f) => {
+        const kf = [f.minuto, f.programa, f.destino, f.pais, f.red, f.proto, f.puerto].join('|');
+        const prev = filasVistas.get(kf);
+        filasVistas.set(kf, { e: f.enviados, r: f.recibidos, p: f.paquetes, m: f.minuto });
+        let de, dr, dp;
+        if (prev) { de = f.enviados - prev.e; dr = f.recibidos - prev.r; dp = f.paquetes - prev.p; } else if (st.primeraCarga && f.minuto < r.ahora - 70000) {
+          // Opening the page: the latest minutes go to the log at once, without particles.
+          const d0 = porClave.get([f.programa, f.destino, f.pais, f.red].join('|'));
+          if (d0 && f.enviados > 0) st.eventos.push({ h: hora(f.minuto), prog: prod(d0.p).nombre, host: d0.host, que: `${bytes(f.enviados)} ↑ · ${bytes(f.recibidos)} ↓ · ${f.pais || '—'} · ${f.red || '—'}`, cls: 'o' });
+          return;
+        } else { de = f.enviados; dr = f.recibidos; dp = f.paquetes; }
+        if (de <= 0 && dr <= 0) return;
+        const d = porClave.get([f.programa, f.destino, f.pais, f.red].join('|'));
+        if (d) rec.push({ d, env: Math.max(0, de), recb: Math.max(0, dr), paq: Math.max(0, dp), parada: 0 });
+      });
+      for (const [k, v] of filasVistas) if (v.m < r.ahora - 5 * 60000) filasVistas.delete(k);
+      recalcula();
+      aplicaDeltas(rec, intervalo, false);
+      st.primeraCarga = false;
+      $('vacio').hidden = DEST.length > 0;
+      if (!DEST.length) ofrecerDemo(t('pd_vacio'));
+      $('vigilancia-off').hidden = r.vigilando !== false;
+      pintaHud();
+    };
+    // What arrived in this beat becomes particles along each route, spread over the beat so the
+    // flow looks continuous, and lines in the log.
+    const aplicaDeltas = (rec, segundos, suma = true) => {
+      let env = 0, recb = 0, paq = 0;
+      const porProd = {};
+      DEST.forEach((d) => { d.ema = (d.ema || 0) * 0.7; });
+      rec.forEach(({ d, env: e, recb: b, paq: q, parada }) => {
+        const p = prod(d.p);
+        if (parada) {
+          if (suma) d.bloq += parada;
+          for (let k = 0; k < Math.min(3, parada); k++) nuevo(d, 'out', true, 2000, azar() * segundos * 900);
+          evento(p.nombre, d.host, t('pd_ev_parado'), 'c');
+          return;
+        }
+        if (suma) { d.sub += e; d.baj += b; d.paq += q; p.sub += e; p.baj += b; if (new Date().getHours() < 6) d.noche += e; }
+        env += e; recb += b; paq += q; porProd[d.p] = (porProd[d.p] || 0) + e;
+        d.ema += e / segundos * 0.3; d.ult = performance.now();
+        const n = Math.min(4, 1 + Math.floor(Math.log10(1 + e / 3000)));
+        for (let k = 0; k < n; k++) nuevo(d, 'out', false, e, azar() * segundos * 900);
+        if (b > 2000) nuevo(d, 'in', false, b, 300 + azar() * segundos * 800);
+        evento(p.nombre, d.host, `${bytes(e)} ↑ · ${bytes(b)} ↓ · ${d.pais || '—'} · ${d.red || '—'}${d.asn ? ' AS' + d.asn : ''}${d.proto ? ' · ' + d.proto + '/' + d.puerto : ''}`, 'o');
+      });
+      st.serie.push(env); st.serie.shift();
+      Object.keys(st.serieP).forEach((k) => { st.serieP[k].push(porProd[k] || 0); st.serieP[k].shift(); });
+      st.ahora = [env / segundos, recb / segundos, paq / segundos];
+      pintaHud();
+    };
+    const nuevo = (d, dir, bloq, tam, retraso) => {
+      setTimeout(() => {
+        if (st.part.length > 280 || !VISIBLES.includes(d)) return;
+        st.part.push({ d, dir, bloq, t: dir === 'out' ? 0 : 1, v: (reducido ? 0.16 : 0.34) + azar() * 0.16, r: Math.min(3.2, 1.1 + Math.log10(1 + tam) * 0.42) });
+      }, retraso || 0);
+    };
+    const evento = (prog, host, que, cls) => {
+      st.eventos.unshift({ h: hora(Date.now()), prog, host, que, cls });
+      if (st.eventos.length > 40) st.eventos.length = 40;
+    };
+    const ofrecerDemo = (texto) => {
+      if (st.demo) return;
+      $('vacio-texto').textContent = texto;
+      $('vacio').hidden = false;
+    };
+
+    // ---------- Size ----------
+    let fondoListo = false;
+    const ajusta = () => {
+      const r = lienzo.getBoundingClientRect();
+      st.dpr = Math.min(window.devicePixelRatio || 1, 2);
+      st.Wc = Math.max(1, r.width); st.W = st.Wc; st.H = Math.max(1, r.height);
+      cv.width = Math.round(st.Wc * st.dpr); cv.height = Math.round(st.H * st.dpr);
+      fondoListo = false;
+    };
+    new ResizeObserver(ajusta).observe(lienzo);
+
+    // ---------- Geometry ----------
+    const bez2 = (a, c, b, u) => ({ x: (1 - u) * (1 - u) * a.x + 2 * (1 - u) * u * c.x + u * u * b.x, y: (1 - u) * (1 - u) * a.y + 2 * (1 - u) * u * c.y + u * u * b.y });
+    const N = 48;
+    // A route is a list of sampled points; `tg` is the fraction where it crosses GUARDIANA's gate.
+    const tramo = (seg, n) => { const out = []; for (let i = 0; i <= n; i++) out.push(seg(i / n)); return out; };
+    const punto = (ruta, u) => { if (!ruta.length) return { x: 0, y: 0, v: false }; const f = Math.max(0, Math.min(1, u)) * (ruta.length - 1); const i = Math.floor(f); const a = ruta[i], b = ruta[Math.min(i + 1, ruta.length - 1)]; const k = f - i; return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, v: a.v !== false && b.v !== false }; };
+    const tiempo = () => (performance.now() - st.t0) / 1000;
+    const prodsVisibles = () => PROD.filter((p) => VISIBLES.some((d) => d.p === p.id));
+    const lado = (d) => { const p = prod(d.p); return ((p ? p.k : 0) % 3) - 1; };
+    // Each watched program inside the ring, turning slowly.
+    const posProductos = (c, r) => { const ps = prodsVisibles(); return ps.map((p, k) => { const a = tiempo() * (reducido ? 0.03 : 0.12) + k * 2 * Math.PI / Math.max(1, ps.length); return { p, x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r }; }); };
+    const posDe = (prods, d, c) => prods.find((q) => q.p.id === d.p) || { x: c.x, y: c.y };
+
+    // --- Nebula ---
+    const layoutNebulosa = () => {
+      const c = { x: st.W / 2, y: st.H / 2 }, R0 = Math.min(st.W, st.H) * 0.16;
+      const prods = posProductos(c, R0 * 0.48);
+      const ax = st.W < 700 ? st.W * 0.3 : Math.min(st.W * 0.36, st.W / 2 - 150), ay = st.H * 0.33;
+      const cent = {};
+      paisesUsados.forEach((pc, k) => { const a = -Math.PI / 2 + (k + 0.5) * (2 * Math.PI / paisesUsados.length); cent[pc] = { x: c.x + Math.cos(a) * ax, y: c.y + Math.sin(a) * ay, a }; });
+      const porPais = {};
+      VISIBLES.forEach((d) => { (porPais[d.pais] = porPais[d.pais] || []).push(d); });
+      VISIBLES.forEach((d) => {
+        const grupo = porPais[d.pais], k = grupo.indexOf(d), n = grupo.length, ce = cent[d.pais];
+        const paso = Math.min(22, (st.H * 0.3) / Math.max(1, n));
+        d.x = ce.x + (k % 2 ? 10 : -10) * (n > 1 ? 1 : 0); d.y = ce.y + (k - (n - 1) / 2) * paso;
+        const pr = posDe(prods, d, c);
+        const ang = Math.atan2(d.y - c.y, d.x - c.x);
+        const g = { x: c.x + Math.cos(ang) * R0, y: c.y + Math.sin(ang) * R0 };
+        const c1 = { x: (pr.x + g.x) / 2 + Math.sin(ang) * R0 * 0.25, y: (pr.y + g.y) / 2 - Math.cos(ang) * R0 * 0.25 };
+        const s = lado(d) || 0.4;
+        const c2 = { x: g.x + Math.cos(ang) * R0 * 0.9 + Math.sin(ang) * 40 * s, y: g.y + Math.sin(ang) * R0 * 0.9 - Math.cos(ang) * 40 * s };
+        d.ruta = tramo((u) => bez2(pr, c1, g, u), 14).concat(tramo((u) => bez2(g, c2, d, u), N - 14).slice(1));
+        d.tg = 14 / N; d.vis = true;
+      });
+      return { c, R0, prods, cent, porPais };
+    };
+
+    // --- The computer, inside ---
+    const layoutDentro = () => {
+      const W = st.W, H = st.H, top = 70, bot = H - 48;
+      const col = { prod: W * 0.1, puerta: W * 0.36, red: W * 0.5, inet: W * 0.66, dest: W * 0.8 };
+      const caja = { x: W * 0.035, y: 30, w: W * 0.515, h: H - 66 };
+      const ps = prodsVisibles();
+      const prods = ps.map((p, k) => ({ p, x: col.prod, y: top + (bot - top) * (k + 1) / (ps.length + 1) }));
+      const filas = Math.max(6, Math.min(24, Math.floor((bot - top) / 22)));
+      const orden = VISIBLES.slice().sort((a, b) => (b.sub + b.baj) - (a.sub + a.baj)).slice(0, filas).sort((a, b) => a.pais.localeCompare(b.pais) || a.p.localeCompare(b.p));
+      VISIBLES.forEach((d) => { d.vis = false; d.ruta = []; });
+      const fila = (k) => top + 8 + (bot - top - 16) * (orden.length === 1 ? 0.5 : k / (orden.length - 1));
+      const nic = { x: col.red, y: H / 2 };
+      orden.forEach((d, k) => {
+        const y = fila(k), pr = posDe(prods, d, { x: col.prod, y });
+        d.x = col.dest; d.y = y; d.puerta = { x: col.puerta, y };
+        const pts = [pr, { x: col.puerta, y }, nic, { x: col.inet, y: H / 2 + (y - H / 2) * 0.45 }, { x: col.dest, y }];
+        const ruta = [];
+        for (let i = 0; i < pts.length - 1; i++) {
+          const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+          for (let s = i ? 1 : 0; s <= 7; s++) { const u = s / 7, u2 = u * u, u3 = u2 * u;
+            ruta.push({ x: 0.5 * (2 * p1.x + (-p0.x + p2.x) * u + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * u2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * u3),
+                        y: 0.5 * (2 * p1.y + (-p0.y + p2.y) * u + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * u2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * u3) }); }
+        }
+        d.ruta = ruta; d.tg = 7 / (ruta.length - 1); d.vis = true;
+      });
+      return { caja, col, prods, nic, orden };
+    };
+
+    // --- Radar (Grok's idea) ---
+    const layoutRadar = () => {
+      const c = { x: st.W / 2, y: st.H / 2 }, Rr = Math.min(st.W, st.H) * 0.42, R0 = Rr * 0.16;
+      const prods = posProductos(c, R0 * 0.5);
+      const mx = Math.max(1, ...VISIBLES.map((d) => d.sub));
+      VISIBLES.forEach((d) => {
+        const ce = centros[d.pais], grupo = VISIBLES.filter((x) => x.pais === d.pais), k = grupo.indexOf(d);
+        const ang = Math.PI + (ce.lon + 180) / 360 * Math.PI * 2 + (k - (grupo.length - 1) / 2) * 0.06;
+        const frac = Math.sqrt(d.sub / mx);
+        const dist = R0 * 1.25 + (Rr - R0 * 1.25) * (1 - 0.9 * frac);
+        d.ang = ang; d.x = c.x + Math.cos(ang) * dist; d.y = c.y + Math.sin(ang) * dist;
+        const pr = posDe(prods, d, c), g = { x: c.x + Math.cos(ang) * R0, y: c.y + Math.sin(ang) * R0 };
+        d.ruta = tramo((u) => ({ x: pr.x + (g.x - pr.x) * u, y: pr.y + (g.y - pr.y) * u }), 8).concat(tramo((u) => ({ x: g.x + (d.x - g.x) * u, y: g.y + (d.y - g.y) * u }), N - 8).slice(1));
+        d.tg = 8 / N; d.vis = true;
+      });
+      return { c, Rr, R0, prods };
+    };
+
+    // =====================================================================================
+    // The Earth in WebGL2 (globe and map are the same mesh: the map is the globe unrolled).
+    // Texturas de la NASA (Blue Marble de día, luces de ciudades de noche) y la luz del sol
+    // de este mismo momento: donde ahora es de noche, en la pantalla también lo es.
+    // =====================================================================================
+    const glc = $('gl');
+    const T = { ok: false, m: 0, mObj: 0, zoom: 1, px: 0, py: 0, sol: [0, 0, 1], solLL: [0, 0], tanH: Math.tan(15 * RAD), M: null, PV: null, C: [0, 0, 5], asp: 1 };
+    const gl = glc.getContext('webgl2', { antialias: true, alpha: false, powerPreference: 'low-power' });
+
+    // --- matrices (columna a columna, como las quiere WebGL) ---
+    const mul = (a, b) => { const o = new Float32Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; };
+    const persp = (asp) => { const t = 1 / T.tanH, n = 0.1, f = 60, o = new Float32Array(16); o[0] = t / asp; o[5] = t; o[10] = (f + n) / (n - f); o[11] = -1; o[14] = 2 * f * n / (n - f); return o; };
+    const trasl = (x, y, z) => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
+    const rotX = (t) => { const c = Math.cos(t), s = Math.sin(t); return new Float32Array([1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1]); };
+    const rotY = (t) => { const c = Math.cos(t), s = Math.sin(t); return new Float32Array([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]); };
+    const aplica = (m, v) => [m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12], m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13], m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14], m[3] * v[0] + m[7] * v[1] + m[11] * v[2] + m[15]];
+
+    // --- el sol de ahora: punto subsolar (declinación y ecuación del tiempo) ---
+    const solAhora = () => {
+      const d = new Date(), ini = Date.UTC(d.getUTCFullYear(), 0, 0), N = (d - ini) / 86400000;
+      const h = d.getUTCHours() + d.getUTCMinutes() / 60 + d.getUTCSeconds() / 3600;
+      const dec = -23.44 * Math.cos(2 * Math.PI / 365 * (N + 10));
+      const B = 2 * Math.PI * (N - 81) / 364, eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
+      let lon = -15 * (h - 12 + eot / 60); lon = ((lon + 540) % 360) - 180;
+      T.solLL = [lon, dec];
+      const cl = Math.cos(dec * RAD);
+      T.sol = [cl * Math.sin(lon * RAD), Math.sin(dec * RAD), cl * Math.cos(lon * RAD)];
+    };
+    solAhora(); setInterval(solAhora, 30000);
+    const esDeDia = (lon, lat) => { const cl = Math.cos(lat * RAD); return cl * Math.sin(lon * RAD) * T.sol[0] + Math.sin(lat * RAD) * T.sol[1] + cl * Math.cos(lon * RAD) * T.sol[2] > 0; };
+
+    // --- shaders ---
+    const VS_TIERRA = `#version 300 es
+    in vec2 aLL;
+    uniform mat4 uPV, uM; uniform float uMorph;
+    out vec2 vUv; out vec3 vN; out vec3 vW;
+    void main() {
+      float lon = aLL.x, lat = aLL.y;
+      vec3 s = vec3(cos(lat) * sin(lon), sin(lat), cos(lat) * cos(lon));
+      vec3 p = mix(s, vec3(lon, lat, 0.0), uMorph);
+      vec4 w = uM * vec4(p, 1.0);
+      vN = s; vW = w.xyz;
+      vUv = vec2(lon / 6.2831853 + 0.5, 0.5 - lat / 3.1415927);
+      gl_Position = uPV * w;
+    }`;
+    const FS_TIERRA = `#version 300 es
+    precision highp float;
+    uniform sampler2D uDia, uLuces, uAgua;
+    uniform vec3 uSol, uCam; uniform mat3 uM3; uniform float uMorph;
+    in vec2 vUv; in vec3 vN; in vec3 vW;
+    out vec4 o;
+    vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
+    void main() {
+      vec3 n = normalize(vN);
+      float mu = dot(n, uSol);
+      vec3 dia = pow(texture(uDia, vUv).rgb, vec3(2.2));
+      float luz = texture(uLuces, vUv).r;
+      float agua = texture(uAgua, vUv).r;
+      float lado = smoothstep(-0.08, 0.22, mu);
+      // Luz del sol (Lambert) con un mínimo para que la noche no sea un agujero negro.
+      vec3 col = dia * (max(mu, 0.0) * 1.25 + 0.018);
+      // Crepúsculo: banda cálida a lo largo del terminador.
+      col += dia * vec3(1.0, 0.45, 0.2) * 0.35 * exp(-pow((mu - 0.03) * 10.0, 2.0));
+      // Luces de las ciudades, solo donde es de noche.
+      float noche = 1.0 - smoothstep(-0.20, 0.05, mu);
+      col += vec3(1.0, 0.70, 0.38) * pow(luz, 1.25) * 2.4 * noche;
+      vec3 nw = normalize(uM3 * n);
+      vec3 V = normalize(uCam - vW);
+      vec3 Lw = normalize(uM3 * uSol);
+      float g = 1.0 - uMorph;
+      // Brillo del sol en el océano (solo en el agua y solo en el globo).
+      vec3 H = normalize(Lw + V);
+      float nh = max(dot(nw, H), 0.0);
+      float spec = (pow(nh, 900.0) * 0.32 + pow(nh, 90.0) * 0.05 + pow(nh, 12.0) * 0.012) * agua * lado * g;
+      col += vec3(1.0, 0.86, 0.66) * spec;
+      col += vec3(0.02, 0.06, 0.13) * agua * lado * 0.6;
+      // Atmósfera vista de canto (Fresnel), azul de día, apagada de noche.
+      float fres = pow(1.0 - max(dot(nw, V), 0.0), 2.6) * g;
+      vec3 atm = vec3(0.28, 0.55, 1.0) * fres * (0.08 + 0.92 * smoothstep(-0.3, 0.45, mu));
+      col = col * (1.0 - fres * 0.35) + atm * 0.85;
+      // En el mapa plano, un leve sombreado hacia el terminador mantiene el relieve del día.
+      col = aces(col * 1.3);
+      o = vec4(pow(col, vec3(1.0 / 2.2)), 1.0);
+    }`;
+    const VS_PANTALLA = `#version 300 es
+    in vec2 aP; out vec2 vP;
+    void main() { vP = aP; gl_Position = vec4(aP, 0.0, 1.0); }`;
+    const FS_FONDO = `#version 300 es
+    precision highp float;
+    uniform sampler2D uCielo; uniform vec2 uRes; uniform float uDesp;
+    uniform vec2 uCentro; uniform float uRadio, uHalo; uniform vec2 uSolP;
+    in vec2 vP; out vec4 o;
+    void main() {
+      vec2 uv = vec2(gl_FragCoord.x / uRes.y * 0.275 + uDesp, gl_FragCoord.y / uRes.y * 0.55 + 0.22);
+      vec3 c = texture(uCielo, uv).rgb;
+      // Halo de la atmósfera alrededor del globo, más intenso del lado del sol.
+      vec2 d = gl_FragCoord.xy - uCentro;
+      float r = length(d) / uRadio;
+      if (r > 1.0) {
+        float lado = 0.25 + 0.75 * smoothstep(-0.7, 0.8, dot(normalize(d), uSolP));
+        float h = exp(-(r - 1.0) * 14.0) * 0.9 + exp(-(r - 1.0) * 3.5) * 0.18;
+        c += vec3(0.30, 0.58, 1.0) * h * lado * uHalo;
+      }
+      o = vec4(c, 1.0);
+    }`;
+    const compila = (tipo, src) => { const s = gl.createShader(tipo); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+    const programa = (vs, fs) => { const p = gl.createProgram(); gl.attachShader(p, compila(gl.VERTEX_SHADER, vs)); gl.attachShader(p, compila(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p)); const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); for (let i = 0; i < n; i++) { const a = gl.getActiveUniform(p, i); u[a.name] = gl.getUniformLocation(p, a.name); } return { p, u }; };
+
+    // Cielo: estrellas y una Vía Láctea tenue, generadas una vez.
+    const cielo = () => {
+      const c = document.createElement('canvas'); c.width = 2048; c.height = 1024; const g = c.getContext('2d');
+      g.fillStyle = '#02040a'; g.fillRect(0, 0, 2048, 1024);
+      // Cada mancha y cada estrella se pinta también una vuelta a izquierda y derecha: el cielo encaja sin costura.
+      for (let i = 0; i < 1400; i++) { const x = azar() * 2048, y = 512 + gauss() * 120 + Math.sin(x / 2048 * Math.PI * 2) * 140; const r = 30 + azar() * 90;
+        for (const dx of [-2048, 0, 2048]) { const gr = g.createRadialGradient(x + dx, y, 0, x + dx, y, r); gr.addColorStop(0, 'rgba(120,140,190,0.035)'); gr.addColorStop(1, 'rgba(120,140,190,0)'); g.fillStyle = gr; g.fillRect(x + dx - r, y - r, 2 * r, 2 * r); } }
+      for (let i = 0; i < 5200; i++) { const x = azar() * 2048, y = azar() < 0.45 ? 512 + gauss() * 150 + Math.sin(x / 2048 * Math.PI * 2) * 140 : azar() * 1024; const b = Math.pow(azar(), 6); const t = azar(); g.fillStyle = `rgba(${200 + 55 * t | 0},${210 + 30 * t | 0},${255 - 40 * (1 - t) | 0},${0.25 + b * 0.75})`; const s = 0.6 + b * 1.6; g.fillRect(x, y, s, s); }
+      return c;
+    };
+    const textura = (fuente, mip) => {
+      const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+      if (fuente) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, fuente);
+      else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([8, 20, 40, 255]));
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      if (fuente && mip) { gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); const an = gl.getExtension('EXT_texture_filter_anisotropic'); if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT))); }
+      else gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      return t;
+    };
+    let PT, PF, vaoT, vaoF, nIdx, tex = {};
+    if (gl) {
+      try {
+        PT = programa(VS_TIERRA, FS_TIERRA); PF = programa(VS_PANTALLA, FS_FONDO);
+        // Malla: 360 × 180 pasos de longitud y latitud.
+        const NL = 360, NA = 180, v = new Float32Array((NL + 1) * (NA + 1) * 2); let k = 0;
+        for (let j = 0; j <= NA; j++) for (let i = 0; i <= NL; i++) { v[k++] = -Math.PI + 2 * Math.PI * i / NL; v[k++] = Math.PI / 2 - Math.PI * j / NA; }
+        const ix = new Uint32Array(NL * NA * 6); k = 0;
+        for (let j = 0; j < NA; j++) for (let i = 0; i < NL; i++) { const a = j * (NL + 1) + i, b = a + NL + 1; ix.set([a, b, a + 1, a + 1, b, b + 1], k); k += 6; }
+        nIdx = ix.length;
+        vaoT = gl.createVertexArray(); gl.bindVertexArray(vaoT);
+        gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, v, gl.STATIC_DRAW);
+        const la = gl.getAttribLocation(PT.p, 'aLL'); gl.enableVertexAttribArray(la); gl.vertexAttribPointer(la, 2, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ix, gl.STATIC_DRAW);
+        vaoF = gl.createVertexArray(); gl.bindVertexArray(vaoF);
+        gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+        const lp = gl.getAttribLocation(PF.p, 'aP'); gl.enableVertexAttribArray(lp); gl.vertexAttribPointer(lp, 2, gl.FLOAT, false, 0, 0);
+        gl.bindVertexArray(null);
+        tex = { dia: textura(null), luces: textura(null), agua: textura(null), cielo: textura(cielo(), true) };
+        const carga = (clave, url) => { const im = new Image(); im.onload = () => { gl.deleteTexture(tex[clave]); tex[clave] = textura(im, true); }; im.src = url; };
+        carga('dia', '/static/tierra/dia.jpg'); carga('luces', '/static/tierra/luces.jpg'); carga('agua', '/static/tierra/agua.png');
+        T.ok = true;
+      } catch (e) { console.error(e); T.ok = false; }
+    }
+
+    // Cámara y modelo de este cuadro. m = 0 globo, 1 mapa.
+    const camara = () => {
+      const W = st.Wc, H = st.H, asp = W / H, aspU = st.W / H; T.asp = asp;
+      const yo = centros[st.yo];
+      const osc = reducido ? 0 : Math.sin(tiempo() * 0.05) * 0.35;
+      const rot = -yo.lon * RAD + osc + st.dRot, tilt = Math.max(-1.25, Math.min(1.25, yo.lat * RAD * 0.8 + st.dTilt));
+      const g = 1 - T.m;
+      const dGlobo = 1 / Math.sin(Math.atan(0.84 * T.tanH * Math.min(1, aspU)));
+      const dMapa = Math.max((Math.PI / 2) / (T.tanH * 0.94), Math.PI / (T.tanH * aspU * 0.985));
+      const dist = (dGlobo * g + dMapa * T.m) / T.zoom;
+      // Con el panel de datos abierto, el mundo se centra en el espacio que queda libre.
+      const desplaza = ((W - st.W) / 2) * (2 * dist * T.tanH / H);
+      const px = T.px * T.m + desplaza, py = T.py * T.m;
+      T.M = mul(rotX(tilt * g), rotY(rot * g));
+      T.PV = mul(persp(asp), trasl(-px, -py, -dist));
+      T.C = [px, py, dist]; T.dist = dist; T.rot = rot * g; T.tilt = tilt * g;
+    };
+    // Un punto local (marco de la Tierra) a pantalla, y si se ve (no está detrás del globo).
+    const aPantalla = (q) => {
+      const w = aplica(T.M, q), c = aplica(T.PV, [w[0], w[1], w[2]]);
+      const x = (c[0] / c[3] + 1) / 2 * st.Wc, y = (1 - c[1] / c[3]) / 2 * st.H;
+      let v = c[3] > 0;
+      if (v && T.m < 0.5) {
+        const C = T.C, D = [w[0] - C[0], w[1] - C[1], w[2] - C[2]], L = Math.hypot(D[0], D[1], D[2]);
+        D[0] /= L; D[1] /= L; D[2] /= L;
+        const b = C[0] * D[0] + C[1] * D[1] + C[2] * D[2], cc = C[0] * C[0] + C[1] * C[1] + C[2] * C[2] - 1, disc = b * b - cc;
+        if (disc > 0) { const t1 = -b - Math.sqrt(disc); if (t1 > 0 && t1 < L - 0.012) v = false; }
+      }
+      return { x, y, v, w };
+    };
+    // Un lugar de la Tierra a una altura (fracción del radio), mezclando globo y mapa.
+    const lugar = (lon, lat, alt = 0, alza = 0) => {
+      const l = lon * RAD, a = lat * RAD, cl = Math.cos(a), h = 1 + alt;
+      const s = [cl * Math.sin(l) * h, Math.sin(a) * h, cl * Math.cos(l) * h], p = [l, a + alza, alt * 0.35];
+      const m = T.m; return [s[0] + (p[0] - s[0]) * m, s[1] + (p[1] - s[1]) * m, s[2] + (p[2] - s[2]) * m];
+    };
+    const pintaTierra = () => {
+      if (!T.ok) return false;
+      const W = Math.round(st.Wc * st.dpr), H = Math.round(st.H * st.dpr);
+      if (glc.width !== W || glc.height !== H) { glc.width = W; glc.height = H; }
+      gl.viewport(0, 0, W, H);
+      // Fondo y halo.
+      const o = aPantalla([0, 0, 0]);
+      const rpx = Math.tan(Math.asin(1 / T.dist)) / T.tanH * (st.H / 2);
+      const Lw = aplica(T.M, T.sol), ls = Math.hypot(Lw[0], Lw[1]) || 1;
+      gl.disable(gl.DEPTH_TEST); gl.useProgram(PF.p); gl.bindVertexArray(vaoF);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex.cielo); gl.uniform1i(PF.u.uCielo, 0);
+      gl.uniform2f(PF.u.uRes, W, H); gl.uniform1f(PF.u.uDesp, -T.rot * 0.04);
+      gl.uniform2f(PF.u.uCentro, o.x * st.dpr, H - o.y * st.dpr); gl.uniform1f(PF.u.uRadio, rpx * st.dpr);
+      gl.uniform1f(PF.u.uHalo, Math.max(0, 1 - T.m * 1.6)); gl.uniform2f(PF.u.uSolP, Lw[0] / ls, Lw[1] / ls);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      // La Tierra.
+      gl.enable(gl.DEPTH_TEST); gl.clear(gl.DEPTH_BUFFER_BIT);
+      gl.useProgram(PT.p); gl.bindVertexArray(vaoT);
+      gl.uniformMatrix4fv(PT.u.uPV, false, T.PV); gl.uniformMatrix4fv(PT.u.uM, false, T.M);
+      gl.uniformMatrix3fv(PT.u.uM3, false, new Float32Array([T.M[0], T.M[1], T.M[2], T.M[4], T.M[5], T.M[6], T.M[8], T.M[9], T.M[10]]));
+      gl.uniform1f(PT.u.uMorph, T.m); gl.uniform3fv(PT.u.uSol, T.sol); gl.uniform3fv(PT.u.uCam, T.C);
+      [['uDia', tex.dia], ['uLuces', tex.luces], ['uAgua', tex.agua]].forEach(([n, t], i) => { gl.activeTexture(gl.TEXTURE1 + i); gl.bindTexture(gl.TEXTURE_2D, t); gl.uniform1i(PT.u[n], 1 + i); });
+      gl.drawElements(gl.TRIANGLES, nIdx, gl.UNSIGNED_INT, 0);
+      gl.bindVertexArray(null);
+      return true;
+    };
+
+    // Brillos ya dibujados (uno por color), para que las partículas parezcan luz y no puntos.
+    const brillos = {};
+    const brillo = (col) => {
+      if (brillos[col]) return brillos[col];
+      const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+      const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gr.addColorStop(0, 'rgba(255,255,255,.95)'); gr.addColorStop(0.07, col); gr.addColorStop(0.3, col + '66'); gr.addColorStop(1, col + '00');
+      g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return (brillos[col] = c);
+    };
+
+    // --- Globo y mapa: rutas, columnas de luz, escudo y rótulos sobre la Tierra ---
+    const layoutTierra = () => {
+      camara();
+      const yo = centros[st.yo], cen = aPantalla(lugar(yo.lon, yo.lat, 0.002));
+      const R0 = 26;
+      const prods = posProductos(cen, 11);
+      const mx = Math.max(1, ...VISIBLES.map((d) => d.sub));
+      VISIBLES.forEach((d) => {
+        const ce = centros[d.pais], grupo = VISIBLES.filter((x) => x.pais === d.pais), k = grupo.indexOf(d);
+        // Several servers in one country: a small spiral around its centre, never a long row.
+        const ga = k * 2.399963, rr = grupo.length > 1 ? 1.1 * Math.sqrt(k + 0.5) : 0;
+        const lon1 = ce.lon + Math.cos(ga) * rr / Math.max(0.35, Math.cos(ce.lat * RAD)), lat1 = ce.lat + Math.sin(ga) * rr;
+        d.lon = lon1; d.lat = lat1;
+        const a = [Math.cos(yo.lat * RAD) * Math.sin(yo.lon * RAD), Math.sin(yo.lat * RAD), Math.cos(yo.lat * RAD) * Math.cos(yo.lon * RAD)];
+        const b = [Math.cos(lat1 * RAD) * Math.sin(lon1 * RAD), Math.sin(lat1 * RAD), Math.cos(lat1 * RAD) * Math.cos(lon1 * RAD)];
+        const om = Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))) || 1e-6;
+        const alt = 0.05 + 0.3 * om / Math.PI + lado(d) * 0.03;
+        const dl = Math.hypot(lon1 - yo.lon, lat1 - yo.lat) * RAD, alzaMax = 0.12 + 0.22 * dl / Math.PI + lado(d) * 0.05;
+        const arco = [];
+        for (let i = 0; i <= N; i++) {
+          const t = i / N, s1 = Math.sin((1 - t) * om) / Math.sin(om), s2 = Math.sin(t * om) / Math.sin(om), h = 1 + alt * Math.sin(Math.PI * t);
+          const sx = (a[0] * s1 + b[0] * s2) * h, sy = (a[1] * s1 + b[1] * s2) * h, sz = (a[2] * s1 + b[2] * s2) * h;
+          const pl = [(yo.lon + (lon1 - yo.lon) * t) * RAD, (yo.lat + (lat1 - yo.lat) * t) * RAD + alzaMax * Math.sin(Math.PI * t), 0.02];
+          const m = T.m;
+          arco.push(aPantalla([sx + (pl[0] - sx) * m, sy + (pl[1] - sy) * m, sz + (pl[2] - sz) * m]));
+        }
+        const pr = posDe(prods, d, cen);
+        let ig = arco.findIndex((q) => Math.hypot(q.x - cen.x, q.y - cen.y) > R0);
+        if (ig < 1) ig = 1;
+        const gte = arco[ig];
+        d.ruta = tramo((t) => ({ x: pr.x + (gte.x - pr.x) * t, y: pr.y + (gte.y - pr.y) * t, v: cen.v }), 5).concat(arco.slice(ig + 1));
+        d.tg = 5 / (d.ruta.length - 1);
+        const fin = d.ruta[d.ruta.length - 1];
+        d.x = fin.x; d.y = fin.y; d.vis = fin.v;
+        // Columna de luz en el destino: altura según lo enviado (raíz, con techo).
+        const hb = 0.025 + 0.11 * Math.sqrt(d.sub / mx);
+        d.base = aPantalla(lugar(lon1, lat1, 0.002)); d.cima = aPantalla(lugar(lon1, lat1, hb, hb * 0.9));
+      });
+      return { cen, R0, prods, yo };
+    };
+    // Un círculo pequeño sobre la superficie (radio en grados), ya en pantalla.
+    const circuloSuelo = (lon, lat, rg, n = 40) => {
+      const out = [], a0 = lat * RAD, l0 = lon * RAD, r = rg * RAD;
+      for (let i = 0; i <= n; i++) {
+        const th = i / n * Math.PI * 2;
+        const la = Math.asin(Math.sin(a0) * Math.cos(r) + Math.cos(a0) * Math.sin(r) * Math.cos(th));
+        const lo = l0 + Math.atan2(Math.sin(th) * Math.sin(r) * Math.cos(a0), Math.cos(r) - Math.sin(a0) * Math.sin(la));
+        out.push(aPantalla(lugar(lo / RAD, la / RAD, 0.003)));
+      }
+      return out;
+    };
+    const trazoPuntos = (pts, col, ancho, guion, desp) => {
+      cx.strokeStyle = col; cx.lineWidth = ancho; cx.setLineDash(guion || []); cx.lineDashOffset = desp || 0;
+      cx.beginPath(); let ab = false; pts.forEach((q) => { if (!q.v) { ab = false; return; } if (!ab) { cx.moveTo(q.x, q.y); ab = true; } else cx.lineTo(q.x, q.y); }); cx.stroke(); cx.setLineDash([]); cx.lineDashOffset = 0;
+    };
+    const dibujaTierra = (dt) => {
+      const L = layoutTierra(), tt = tiempo();
+      cx.globalCompositeOperation = 'lighter';
+      // Arcos: un velo ancho y un hilo fino, más vivo en el centro del recorrido.
+      VISIBLES.forEach((d) => {
+        const bl = bloqueado(d), col = bl ? '#ff6b7a' : prod(d.p).color, n = d.ruta.length - 1;
+        if (bl) {
+          trazo(d.ruta, 0, d.tg, 'rgba(255,107,122,.7)', 1.3);
+          trazo(d.ruta, d.tg, 1, 'rgba(160,175,200,.16)', 1, [2, 6]);
+          return;
+        }
+        for (let s = 0; s < 6; s++) {
+          const a0 = s / 6, a1 = (s + 1) / 6, mid = 1 - Math.abs((a0 + a1) / 2 - 0.5) * 1.4;
+          trazo(d.ruta, a0, Math.min(1, a1 + 1 / n), col + Math.round(18 + 22 * mid).toString(16).padStart(2, '0'), 5);
+          trazo(d.ruta, a0, Math.min(1, a1 + 1 / n), col + Math.round(110 + 120 * mid).toString(16).padStart(2, '0'), 1.1);
+        }
+      });
+      // Columnas de luz en los servidores.
+      VISIBLES.forEach((d) => {
+        if (!d.base.v) return;
+        const bl = bloqueado(d), col = bl ? '255,107,122' : d.doc ? '255,181,71' : '255,209,102';
+        const gr = cx.createLinearGradient(d.base.x, d.base.y, d.cima.x, d.cima.y);
+        gr.addColorStop(0, `rgba(${col},.95)`); gr.addColorStop(1, `rgba(${col},0)`);
+        cx.strokeStyle = gr; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(d.base.x, d.base.y); cx.lineTo(d.cima.x, d.cima.y); cx.stroke();
+        cx.lineWidth = 7; cx.globalAlpha = 0.25; cx.stroke(); cx.globalAlpha = 1;
+        const pulso = (tt * 0.6 + d.i * 0.13) % 1;
+        trazoPuntos(circuloSuelo(d.lon, d.lat, 0.6 + pulso * 2.2, 28), `rgba(${col},${0.55 * (1 - pulso)})`, 1.2);
+        cx.drawImage(brillo(bl ? '#ff6b7a' : '#ffb547'), d.base.x - 9, d.base.y - 9, 18, 18);
+        st.dianas.push({ x: d.base.x, y: d.base.y, r: 14, tipo: 'dest', ref: d });
+      });
+      // El escudo de GUARDIANA sobre tu ordenador.
+      if (L.cen.v) {
+        [2.2, 3.6, 5.2].forEach((r, k) => trazoPuntos(circuloSuelo(L.yo.lon, L.yo.lat, r + (k === 2 ? Math.sin(tt * 1.6) * 0.3 : 0), 64), `rgba(63,224,197,${[0.9, 0.55, 0.3][k]})`, k ? 1 : 1.6, k === 1 ? [6, 5] : null, k === 1 ? -tt * 14 : 0));
+        const cima = aPantalla(lugar(L.yo.lon, L.yo.lat, 0.07, 0.06));
+        const gr = cx.createLinearGradient(L.cen.x, L.cen.y, cima.x, cima.y); gr.addColorStop(0, 'rgba(63,224,197,.9)'); gr.addColorStop(1, 'rgba(63,224,197,0)');
+        cx.strokeStyle = gr; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(L.cen.x, L.cen.y); cx.lineTo(cima.x, cima.y); cx.stroke();
+        cx.drawImage(brillo('#3fe0c5'), L.cen.x - 16, L.cen.y - 16, 32, 32);
+        st.dianas.push({ x: L.cen.x, y: L.cen.y, r: 10, tipo: 'yo' });
+        L.prods.forEach((q) => { cx.drawImage(brillo(q.p.color), q.x - 8, q.y - 8, 16, 16); st.dianas.push({ x: q.x, y: q.y, r: 9, tipo: 'prod', ref: q.p }); });
+        cx.globalCompositeOperation = 'source-over';
+        rotulo(cima.x + 8, cima.y - 4, t('pd_tu_ordenador').toUpperCase() + ' · ' + nombrePais(st.yo).toUpperCase(), '#3fe0c5');
+        cx.globalCompositeOperation = 'lighter';
+      }
+      particulas(dt);
+      cx.globalCompositeOperation = 'source-over';
+      // Rótulos: país y empresas dueñas de las redes, junto a las columnas, sin pisarse.
+      const puestos = [];
+      // La velocidad de los tres flujos más vivos, sobre lo alto de su arco.
+      if (st.W >= 700) VISIBLES.filter((d) => !bloqueado(d) && d.ema > 800).sort((a, b) => b.ema - a.ema).slice(0, 3).forEach((d) => {
+        const cima = d.ruta[Math.round(d.ruta.length * 0.55)];
+        if (!cima || !cima.v) return;
+        rotulo(cima.x + 6, cima.y - 6, `↑ ${bytes(d.ema)}/s · ${d.host.split('.')[0]}`, prod(d.p).color, puestos);
+      });
+      // En el móvil, sin rótulos: se ve el mundo y se toca para saber más.
+      if (st.W >= 700) paisesUsados.forEach((c) => {
+        const ds = VISIBLES.filter((d) => d.pais === c), d0 = ds.reduce((a, d) => (d.cima.y < a.cima.y ? d : a), ds[0]);
+        if (!d0.cima.v) return;
+        const todas = [...new Set(ds.map((d) => d.red).filter((r) => r && r[0] !== '@'))], redes = todas.slice(0, 3).join(' · ') + (todas.length > 3 ? ` +${todas.length - 3}` : '');
+        const corta = ds.every(bloqueado);
+        rotulo(d0.cima.x + 6, d0.cima.y - 2, `${nombrePais(c)} — ${redes}`, corta ? '#ff8d99' : '#f3e3c8', puestos);
+      });
+    };
+    const rotulo = (x, y, txt, col, puestos) => {
+      cx.font = '500 10.5px "IBM Plex Mono", monospace';
+      const w = cx.measureText(txt).width + 12, h = 17;
+      let bx = Math.min(st.W - w - 6, Math.max(6, x)), by = y - h + 4;
+      if (puestos) { let n = 0; while (n++ < 12 && puestos.some((b) => bx < b.x + b.w && bx + w > b.x && by < b.y + b.h && by + h > b.y)) by += h + 2; puestos.push({ x: bx, y: by, w, h }); }
+      cx.fillStyle = 'rgba(4,10,20,.72)'; cx.fillRect(bx, by, w, h);
+      cx.fillStyle = col; cx.fillRect(bx, by, 2, h);
+      cx.fillStyle = col; cx.textBaseline = 'middle'; cx.fillText(txt, bx + 7, by + h / 2 + 0.5); cx.textBaseline = 'alphabetic';
+    };
+    // Qué país hay bajo el ratón en el globo o en el mapa (rayo desde la cámara).
+    const paisBajo = (x, y) => {
+      if (!T.M || (T.m > 0.2 && T.m < 0.8)) return null;
+      const nx = (2 * x / st.Wc - 1) * T.tanH * T.asp, ny = (1 - 2 * y / st.H) * T.tanH, l = Math.hypot(nx, ny, 1);
+      const D = [nx / l, ny / l, -1 / l], C = T.C;
+      if (T.m < 0.5) {
+        const b = C[0] * D[0] + C[1] * D[1] + C[2] * D[2], cc = C[0] ** 2 + C[1] ** 2 + C[2] ** 2 - 1, disc = b * b - cc;
+        if (disc < 0) return null;
+        const t = -b - Math.sqrt(disc), w = [C[0] + D[0] * t, C[1] + D[1] * t, C[2] + D[2] * t], M = T.M;
+        const q = [M[0] * w[0] + M[1] * w[1] + M[2] * w[2], M[4] * w[0] + M[5] * w[1] + M[6] * w[2], M[8] * w[0] + M[9] * w[1] + M[10] * w[2]];
+        return paisEn(Math.atan2(q[0], q[2]) / RAD, Math.asin(Math.max(-1, Math.min(1, q[1]))) / RAD);
+      }
+      const t = -C[2] / D[2], px = C[0] + D[0] * t, py = C[1] + D[1] * t;
+      if (Math.abs(px) > Math.PI || Math.abs(py) > Math.PI / 2) return null;
+      return paisEn(px / RAD, py / RAD);
+    };
+
+
+    // ---------- Drawing ----------
+    const enTierra = () => (st.vista === 'globo' || st.vista === 'mapa') && T.ok;
+    const fondo = () => {
+      if (enTierra()) { cx.clearRect(0, 0, st.Wc, st.H); return; }
+      cx.fillStyle = '#04070d'; cx.fillRect(0, 0, st.Wc, st.H);
+      const tt = tiempo();
+      estrellas.forEach((e) => { const a = 0.25 + 0.25 * Math.sin(tt * 0.8 + e.f); cx.fillStyle = `rgba(190,215,240,${reducido ? 0.35 : a})`; cx.fillRect(e.x * st.W, e.y * st.H, e.r, e.r); });
+    };
+    const trazo = (ruta, desde, hasta, color, ancho, guion) => {
+      if (!ruta.length) return;
+      const n = ruta.length - 1, i0 = Math.round(desde * n), i1 = Math.round(hasta * n);
+      cx.strokeStyle = color; cx.lineWidth = ancho; cx.setLineDash(guion || []);
+      cx.beginPath(); let abierto = false;
+      for (let i = i0; i <= i1; i++) { const q = ruta[i]; if (q.v === false) { abierto = false; continue; } if (!abierto) { cx.moveTo(q.x, q.y); abierto = true; } else cx.lineTo(q.x, q.y); }
+      cx.stroke(); cx.setLineDash([]);
+    };
+    const escudo = (c, r) => {
+      const tt = tiempo(), cerrado = PROD.some((p) => p.cortado) || DEST.some((d) => d.cortado);
+      const g = cx.createRadialGradient(c.x, c.y, r * 0.2, c.x, c.y, r * 1.6);
+      g.addColorStop(0, 'rgba(63,224,197,.10)'); g.addColorStop(0.62, 'rgba(63,224,197,.05)'); g.addColorStop(1, 'rgba(63,224,197,0)');
+      cx.fillStyle = g; cx.beginPath(); cx.arc(c.x, c.y, r * 1.6, 0, 7); cx.fill();
+      cx.strokeStyle = 'rgba(63,224,197,.85)'; cx.lineWidth = 1.6;
+      cx.setLineDash([r * 0.18, r * 0.06]); cx.lineDashOffset = -tt * 12;
+      cx.beginPath(); cx.arc(c.x, c.y, r, 0, 7); cx.stroke(); cx.setLineDash([]); cx.lineDashOffset = 0;
+      cx.strokeStyle = `rgba(63,224,197,${0.18 + 0.12 * Math.sin(tt * 2)})`; cx.lineWidth = 6; cx.beginPath(); cx.arc(c.x, c.y, r + 5, 0, 7); cx.stroke();
+      if (cerrado) { cx.strokeStyle = 'rgba(255,107,122,.25)'; cx.lineWidth = 1; cx.beginPath(); cx.arc(c.x, c.y, r + 11, 0, 7); cx.stroke(); }
+    };
+    const ordenador = (c, s) => {
+      const g = cx.createRadialGradient(c.x, c.y, 0, c.x, c.y, s * 2.4);
+      g.addColorStop(0, 'rgba(255,120,140,.55)'); g.addColorStop(0.35, 'rgba(255,90,120,.15)'); g.addColorStop(1, 'rgba(255,90,120,0)');
+      cx.fillStyle = g; cx.beginPath(); cx.arc(c.x, c.y, s * 2.4, 0, 7); cx.fill();
+      cx.strokeStyle = '#ffd9df'; cx.lineWidth = 1.4; cx.strokeRect(c.x - s * 0.7, c.y - s * 0.5, s * 1.4, s * 0.9);
+      cx.beginPath(); cx.moveTo(c.x - s * 0.3, c.y + s * 0.62); cx.lineTo(c.x + s * 0.3, c.y + s * 0.62); cx.moveTo(c.x, c.y + s * 0.4); cx.lineTo(c.x, c.y + s * 0.62); cx.stroke();
+      cx.fillStyle = '#ff6f86'; cx.beginPath(); cx.arc(c.x, c.y - s * 0.05, s * 0.16, 0, 7); cx.fill();
+    };
+    const nodoProducto = (q) => {
+      const p = q.p;
+      cx.fillStyle = p.color; cx.beginPath(); cx.arc(q.x, q.y, 5.5, 0, 7); cx.fill();
+      cx.strokeStyle = p.cortado ? '#ff6b7a' : 'rgba(255,255,255,.6)'; cx.lineWidth = p.cortado ? 2 : 1; cx.beginPath(); cx.arc(q.x, q.y, 9, 0, 7); cx.stroke();
+      st.dianas.push({ x: q.x, y: q.y, r: 12, tipo: 'prod', ref: p });
+    };
+    // The colour of a destination: cut, documented by the maker, not documented, or not an
+    // antivirus (the question does not apply).
+    const colorDe = (d) => (bloqueado(d) ? '#ff6b7a' : d.doc === false ? '#ffd166' : '#ffb547');
+    const etiqueta = (d, x, y, alinea) => {
+      const txt = d.host.length > 30 ? d.host.slice(0, 29) + '…' : d.host;
+      cx.font = '500 10.5px "IBM Plex Mono", monospace';
+      const w = cx.measureText(txt).width + 12, h = 17;
+      const bx = alinea === 'izq' ? x - w - 10 : x + 10, by = y - h / 2;
+      const bl = bloqueado(d);
+      cx.fillStyle = 'rgba(6,12,22,.82)'; cx.fillRect(bx, by, w, h);
+      cx.strokeStyle = bl ? '#ff6b7a' : d.doc === false ? '#ffd166' : 'rgba(255,181,71,.7)'; cx.lineWidth = 1;
+      cx.setLineDash(d.doc === false && !bl ? [3, 2] : []); cx.strokeRect(bx + 0.5, by + 0.5, w - 1, h - 1); cx.setLineDash([]);
+      cx.fillStyle = bl ? '#ff8d99' : '#f3e3c8'; cx.textBaseline = 'middle'; cx.fillText(txt, bx + 6, y + 0.5); cx.textBaseline = 'alphabetic';
+    };
+    const nodoDestino = (d, conEtiqueta, alinea) => {
+      if (!d.vis) return;
+      const tam = 3 + Math.min(6, Math.log10(1 + d.sub) * 0.9);
+      cx.drawImage(brillo(colorDe(d)), d.x - tam * 1.6, d.y - tam * 1.6, tam * 3.2, tam * 3.2);
+      cx.fillStyle = colorDe(d); cx.fillRect(d.x - tam / 2, d.y - tam / 2, tam, tam);
+      if (conEtiqueta) etiqueta(d, d.x, d.y, alinea);
+      st.dianas.push({ x: d.x, y: d.y, r: 14, tipo: 'dest', ref: d });
+    };
+    const puerta = (q, roto) => {
+      cx.save(); cx.translate(q.x, q.y); cx.rotate(roto || 0);
+      cx.fillStyle = '#ff6b7a'; cx.fillRect(-2, -9, 4, 18);
+      cx.restore();
+    };
+    const tentaculos = () => {
+      VISIBLES.forEach((d) => {
+        if (!d.ruta.length) return;
+        const bl = bloqueado(d), base = prod(d.p).color;
+        if (bl) {
+          trazo(d.ruta, 0, d.tg, 'rgba(255,107,122,.7)', 1.3);
+          trazo(d.ruta, d.tg, 1, 'rgba(160,175,200,.16)', 1, [2, 6]);
+          const g = punto(d.ruta, d.tg), h = punto(d.ruta, d.tg + 0.01);
+          if (g.v) puerta(g, Math.atan2(h.y - g.y, h.x - g.x));
+        } else {
+          trazo(d.ruta, 0, 1, base + '55', 1.1);
+          trazo(d.ruta, 0, 1, base + '14', 4);
+        }
+      });
+    };
+    const particulas = (dt) => {
+      st.part = st.part.filter((q) => {
+        q.t += (q.dir === 'out' ? 1 : -1) * q.v * dt;
+        const d = q.d;
+        if (!d.ruta.length || !d.vis) return false;
+        if (q.bloq && q.t >= d.tg) { const g = punto(d.ruta, d.tg); st.estallidos.push({ x: g.x, y: g.y, a: 0, v: g.v }); return false; }
+        if (q.t > 1 || q.t < 0) return false;
+        const p = punto(d.ruta, q.t);
+        if (!p.v) return true;
+        const col = q.bloq ? '#ff6b7a' : q.dir === 'out' ? '#ffb547' : '#6fb6ff';
+        // A trail: a few steps back along the route, fainter each time.
+        const atras = q.dir === 'out' ? -1 : 1, prev = cx.globalCompositeOperation;
+        cx.globalCompositeOperation = 'lighter';
+        for (let k = 7; k >= 1; k--) { const pk = punto(d.ruta, q.t + atras * k * 0.009); if (!pk.v) continue; const s = q.r * (1.9 - k * 0.18); cx.globalAlpha = 0.22 * (1 - k / 8); cx.drawImage(brillo(col), pk.x - s, pk.y - s, 2 * s, 2 * s); }
+        cx.globalAlpha = 0.8; const s = q.r * 2.3; cx.drawImage(brillo(col), p.x - s, p.y - s, 2 * s, 2 * s); cx.globalAlpha = 1;
+        cx.globalCompositeOperation = prev;
+        return true;
+      });
+      st.estallidos = st.estallidos.filter((e) => {
+        e.a += dt * 1.6; if (e.a > 1) return false; if (!e.v) return true;
+        cx.strokeStyle = `rgba(255,107,122,${0.6 * (1 - e.a)})`; cx.lineWidth = 1.2; cx.beginPath(); cx.arc(e.x, e.y, 3 + e.a * 9, 0, 7); cx.stroke();
+        return true;
+      });
+    };
+    // Labels only for the ones that move most (and the cut ones): the rest on hover.
+    const conNombre = (d) => st.W >= 700 && (bloqueado(d) || VISIBLES.indexOf(d) < 22);
+
+    const dibujaNebulosa = (dt) => {
+      const L = layoutNebulosa();
+      Object.entries(L.cent).forEach(([c, ce]) => {
+        const h = tono(c), escala = Math.min(st.W, st.H) * 0.11;
+        nubeDe[c].forEach((s) => { cx.fillStyle = `hsla(${h},75%,72%,${s.a * 0.8})`; cx.fillRect(ce.x + s.x * escala, ce.y + s.y * escala, s.r, s.r); });
+        cx.font = '600 11px "IBM Plex Mono", monospace'; cx.fillStyle = `hsla(${h},70%,78%,.9)`; cx.textAlign = 'center';
+        const n = (L.porPais[c] || []).length, alto = Math.min(n * 11, st.H * 0.15), ly = ce.y + (Math.sin(ce.a) > 0 ? alto + 22 : -alto - 14);
+        cx.fillText(nombrePais(c).toUpperCase(), ce.x, ly); cx.textAlign = 'left';
+      });
+      tentaculos();
+      escudo(L.c, L.R0);
+      ordenador(L.c, Math.max(18, L.R0 * 0.32));
+      st.dianas.push({ x: L.c.x, y: L.c.y, r: L.R0 * 0.3, tipo: 'yo' });
+      L.prods.forEach(nodoProducto);
+      particulas(dt);
+      VISIBLES.forEach((d) => nodoDestino(d, conNombre(d), d.x < L.c.x ? 'izq' : 'der'));
+    };
+    const dibujaDentro = (dt) => {
+      const L = layoutDentro();
+      const k = L.caja;
+      cx.strokeStyle = 'rgba(118,144,168,.35)'; cx.lineWidth = 1; cx.setLineDash([6, 5]); cx.strokeRect(k.x, k.y, k.w, k.h); cx.setLineDash([]);
+      cx.font = '500 11px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(160,185,210,.85)';
+      cx.fillText(t('pd_tu_ordenador').toUpperCase(), k.x + 10, k.y + 16);
+      cx.fillText(t('pd_internet').toUpperCase(), L.col.inet - 30, 46);
+      cx.fillText(t('pd_pais_red').toUpperCase(), L.col.dest - 6, 46);
+      const tt = tiempo();
+      const gm = cx.createLinearGradient(L.col.puerta - 14, 0, L.col.puerta + 14, 0);
+      gm.addColorStop(0, 'rgba(63,224,197,0)'); gm.addColorStop(0.5, `rgba(63,224,197,${0.2 + 0.06 * Math.sin(tt * 2)})`); gm.addColorStop(1, 'rgba(63,224,197,0)');
+      cx.fillStyle = gm; cx.fillRect(L.col.puerta - 14, k.y + 26, 28, k.h - 34);
+      cx.fillStyle = '#3fe0c5'; cx.textAlign = 'center'; cx.fillText('GUARDIANA', L.col.puerta, k.y + 16);
+      cx.fillText(t('pd_tarjeta_red').toUpperCase(), L.nic.x, L.nic.y - 26); cx.textAlign = 'left';
+      cx.strokeStyle = 'rgba(160,185,210,.7)'; cx.strokeRect(L.nic.x - 16, L.nic.y - 14, 32, 28);
+      tentaculos();
+      L.orden.forEach((d) => {
+        if (bloqueado(d)) puerta(d.puerta, 0); else { cx.fillStyle = '#3fe0c5'; cx.fillRect(d.puerta.x - 1, d.puerta.y - 7, 2, 4); cx.fillRect(d.puerta.x - 1, d.puerta.y + 3, 2, 4); }
+      });
+      L.prods.forEach((q) => { nodoProducto(q); cx.font = '600 12px "IBM Plex Sans", sans-serif'; cx.fillStyle = '#d3e6f3'; cx.fillText(q.p.nombre, q.x - 34, q.y - 18); cx.font = '10.5px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(160,185,210,.8)'; cx.fillText((q.p.procesos[0] || ''), q.x - 34, q.y + 24); });
+      particulas(dt);
+      L.orden.forEach((d) => {
+        nodoDestino(d, false);
+        cx.font = '500 10.5px "IBM Plex Mono", monospace'; cx.fillStyle = bloqueado(d) ? '#ff8d99' : '#f3e3c8';
+        const txt = `${nombrePais(d.pais)} · ${d.red && d.red[0] !== '@' ? d.red : d.host}`; cx.fillText(txt.length > 30 ? txt.slice(0, 29) + '…' : txt, d.x + 10, d.y + 3.5);
+      });
+    };
+    const dibujaRadar = (dt) => {
+      const L = layoutRadar(), tt = tiempo(), barrido = (tt * (reducido ? 0.3 : 0.9)) % (Math.PI * 2);
+      cx.strokeStyle = 'rgba(63,224,197,.16)'; cx.lineWidth = 1;
+      for (let k = 1; k <= 4; k++) { cx.beginPath(); cx.arc(L.c.x, L.c.y, L.Rr * k / 4, 0, 7); cx.stroke(); }
+      for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; cx.beginPath(); cx.moveTo(L.c.x, L.c.y); cx.lineTo(L.c.x + Math.cos(a) * L.Rr, L.c.y + Math.sin(a) * L.Rr); cx.stroke(); }
+      for (let k = 0; k < 24; k++) { const a0 = barrido - k * 0.03; cx.fillStyle = `rgba(63,224,197,${0.12 * (1 - k / 24)})`; cx.beginPath(); cx.moveTo(L.c.x, L.c.y); cx.arc(L.c.x, L.c.y, L.Rr, a0 - 0.03, a0); cx.closePath(); cx.fill(); }
+      cx.strokeStyle = 'rgba(63,224,197,.8)'; cx.beginPath(); cx.moveTo(L.c.x, L.c.y); cx.lineTo(L.c.x + Math.cos(barrido) * L.Rr, L.c.y + Math.sin(barrido) * L.Rr); cx.stroke();
+      cx.font = '500 10px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(160,185,210,.7)'; cx.textAlign = 'center';
+      [[t('pd_america'), -100], [t('pd_europa'), 10], [t('pd_asia'), 110]].forEach(([n, lon]) => { const a = Math.PI + (lon + 180) / 360 * Math.PI * 2; cx.fillText(n.toUpperCase(), L.c.x + Math.cos(a) * (L.Rr + 14), L.c.y + Math.sin(a) * (L.Rr + 14)); });
+      cx.fillText(t('pd_radar_centro'), L.c.x, L.c.y + L.Rr + 30); cx.textAlign = 'left';
+      tentaculos();
+      escudo(L.c, L.R0); ordenador(L.c, Math.max(14, L.R0 * 0.32));
+      st.dianas.push({ x: L.c.x, y: L.c.y, r: L.R0 * 0.3, tipo: 'yo' });
+      L.prods.forEach(nodoProducto);
+      particulas(dt);
+      VISIBLES.forEach((d) => {
+        const delta = ((barrido - ((d.ang % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) + Math.PI * 4) % (Math.PI * 2);
+        if (delta < 0.6) { cx.strokeStyle = bloqueado(d) ? `rgba(255,107,122,${0.8 - delta})` : `rgba(255,181,71,${0.8 - delta})`; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(d.x, d.y, 6 + delta * 22, 0, 7); cx.stroke(); }
+        nodoDestino(d, conNombre(d) && delta < 2.2, d.x < L.c.x ? 'izq' : 'der');
+      });
+    };
+
+    // The page's security policy allows no inline styles (style-src 'self'): widths and colours
+    // travel as data-* and are set through the style object, which the policy allows.
+    const estilos = (raiz) => {
+      raiz.querySelectorAll('[data-w]').forEach((e) => { e.style.width = e.dataset.w + '%'; });
+      raiz.querySelectorAll('[data-bg]').forEach((e) => { e.style.background = e.dataset.bg; });
+      raiz.querySelectorAll('[data-c]').forEach((e) => { e.style.setProperty('--c', e.dataset.c); });
+    };
+    // ---------- The bottom deck ----------
+    const prepara = (c) => { const r = c.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2); c.width = Math.max(1, r.width * d); c.height = Math.max(1, r.height * d); const g = c.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0); return { g, w: r.width, h: r.height }; };
+    const sparkline = () => {
+      const { g, w, h } = prepara($('spark'));
+      if (w < 20 || h < 20) return;
+      const mx = Math.max(1, ...st.serie);
+      g.strokeStyle = 'rgba(118,144,168,.18)'; g.lineWidth = 1;
+      for (let k = 1; k < 4; k++) { g.beginPath(); g.moveTo(0, h * k / 4); g.lineTo(w, h * k / 4); g.stroke(); }
+      const n = st.serie.length, X = (i) => i / (n - 1) * w, Y = (v) => h - 3 - v / mx * (h - 9);
+      let base = new Array(n).fill(0);
+      prodsVisibles().forEach((p) => {
+        const serie = st.serieP[p.id] || [], tope = base.map((b, i) => b + (serie[i] || 0));
+        g.beginPath(); tope.forEach((v, i) => (i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v))));
+        for (let i = n - 1; i >= 0; i--) g.lineTo(X(i), Y(base[i]));
+        g.closePath(); g.fillStyle = p.color + '55'; g.fill();
+        g.beginPath(); tope.forEach((v, i) => (i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v)))); g.strokeStyle = p.color; g.lineWidth = 1.1; g.stroke();
+        base = tope;
+      });
+    };
+    const indicador = (f) => {
+      const { g, w, h } = prepara($('indicador'));
+      if (w < 40 || h < 30) return;
+      const r = Math.min(w / 2 - 6, h - 10), c = { x: w / 2, y: h - 4 };
+      g.lineWidth = 7; g.lineCap = 'round';
+      g.strokeStyle = 'rgba(118,144,168,.22)'; g.beginPath(); g.arc(c.x, c.y, r, Math.PI, 2 * Math.PI); g.stroke();
+      if (f !== null) { g.strokeStyle = '#3fe0c5'; g.beginPath(); g.arc(c.x, c.y, r, Math.PI, Math.PI + Math.PI * f); g.stroke(); }
+      g.fillStyle = '#d3e6f3'; g.font = '600 17px "IBM Plex Mono", monospace'; g.textAlign = 'center'; g.fillText(f === null ? '—' : Math.round(f * 100) + '%', c.x, c.y - 6);
+    };
+    const pintaHud = () => {
+      $('registro').innerHTML = st.eventos.slice(0, 9).map((e) => `<li><span class="t">${esc(e.h)}</span> ${esc(e.prog)} → ${esc(e.host)} <span class="${e.cls}">${esc(e.que)}</span></li>`).join('') || `<li class="t">${esc(t('pd_registro_vacio'))}</li>`;
+      $('hud-min').textContent = bytes(st.serie.reduce((a, b) => a + b, 0));
+      const pp = {}; DEST.forEach((d) => { if (d.pais && d.pais[0] !== '@' && !d.sede) pp[d.pais] = (pp[d.pais] || 0) + d.sub; });
+      const top = Object.entries(pp).filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 5), mx = Math.max(1, ...top.map((x) => x[1]));
+      $('barras').innerHTML = top.map(([c, v]) => `<div><span>${esc(nombrePais(c))}</span><s data-w="${Math.max(2, v / mx * 100)}"></s><span>${esc(bytes(v))}</span></div>`).join('') || `<div class="t">—</div>`;
+      estilos($('barras'));
+      $('hud-cortes').textContent = num(DEST.filter((d) => d.cortado).length + PROD.filter((p) => p.cortado).length);
+      $('hud-bloqueos').textContent = tn('pd_intentos', DEST.reduce((a, d) => a + d.bloq, 0));
+      const av = DEST.filter((d) => d.doc !== null && d.doc !== undefined), tot = av.reduce((a, d) => a + d.sub, 0), doc = av.filter((d) => d.doc).reduce((a, d) => a + d.sub, 0);
+      sparkline(); indicador(tot ? doc / tot : null);
+      const corte = PROD.filter((p) => p.cortable);
+      $('maxima').setAttribute('aria-pressed', String(corte.length > 0 && corte.every((p) => p.cortado)));
+      $('maxima').hidden = !corte.length;
+    };
+
+    // ---------- «Datos en vivo» ----------
+    const panelDatos = $('datos');
+    let datosAbierto = true;
+    const ponDatos = (on) => { datosAbierto = on; panelDatos.hidden = !on; $('btn-datos').setAttribute('aria-pressed', String(on)); try { localStorage.setItem('guardiana_pd_datos', on ? '1' : '0'); } catch (_) {} pintaDatos(); };
+    $('btn-datos').addEventListener('click', () => ponDatos(!datosAbierto));
+    const htmlDirecto = () => {
+      const yo = centros[st.yo], dia = esDeDia(yo.lon, yo.lat);
+      const [slon, slat] = T.solLL, sobre = paisEn(slon, slat);
+      const ahoraMs = performance.now(), activas = DEST.filter((d) => d.ult && ahoraMs - d.ult < 15000 && !bloqueado(d)).length;
+      const [su, ba] = st.ahora;
+      const conDatos = DEST.filter((d) => d.sub && !d.sede);
+      const tot = conDatos.reduce((a, d) => a + d.sub, 0), fuera = conDatos.filter((d) => d.pais && d.pais !== st.yo && d.pais[0] !== '@').reduce((a, d) => a + d.sub, 0);
+      const cortes = DEST.filter((d) => d.cortado).length + PROD.filter((p) => p.cortado).length;
+      return `<b>● ${esc(t('pd_en_directo').toUpperCase())}</b> <span class="t">· ${esc(hora(Date.now()))}</span><br>
+        ${esc(t(dia ? 'pd_es_de_dia' : 'pd_es_de_noche').replace('{pais}', nombrePais(st.yo)))} <span class="t">· ${esc(t('pd_sol_sobre').replace('{lugar}', sobre ? nombrePais(sobre) : t('pd_oceano')))} (${slat.toFixed(1)}°, ${slon.toFixed(1)}°)</span><br>
+        ${esc(t('pd_ahora'))} <span class="o">↑ ${esc(bytes(su))}/s</span> · <span class="i">↓ ${esc(bytes(ba))}/s</span><br>
+        ${esc(tn('pd_conexiones', activas))} · ${esc(tn('pd_paises', new Set(conDatos.map((d) => d.pais).filter((p) => p && p[0] !== '@')).size))} · ${esc(tn('pd_empresas', new Set(conDatos.map((d) => d.red).filter((r) => r && r[0] !== '@')).size))}<br>
+        <span class="t">${esc(t('pd_salio').replace('{n}', pct(fuera, tot)).replace('{pais}', nombrePais(st.yo)))}</span><br>
+        <span class="c">${esc(tn('pd_puertas', cortes))} · ${esc(tn('pd_intentos', DEST.reduce((a, d) => a + d.bloq, 0)))}</span>`;
+    };
+    const tipoTexto = (p) => t('pd_tipo_' + p.tipo);
+    const pintaDatos = () => {
+      if (!datosAbierto) return;
+      const ahoraMs = performance.now();
+      const tot = DEST.reduce((a, d) => a + d.sub, 0), baj = DEST.reduce((a, d) => a + d.baj, 0), paq = DEST.reduce((a, d) => a + d.paq, 0);
+      let h = `<h4>${esc(t('pd_en_directo'))}${st.demo ? ` <span class="chip">${esc(t('pd_chip_demo'))}</span>` : ''}</h4><div>${htmlDirecto()}</div>`;
+      if (st.datos && st.datos.vigilando === false) h += `<p class="c">${esc(t('pd_vigilancia_off'))}</p>`;
+      // Programs.
+      h += `<h4>${esc(t('pd_programas'))} <span class="s">${PROD.length}</span></h4>`;
+      PROD.forEach((p) => {
+        const ds = DEST.filter((d) => d.p === p.id), act = ds.filter((d) => d.ult && ahoraMs - d.ult < 15000 && !bloqueado(d)).length;
+        const avs = ds.filter((d) => d.doc !== null && d.doc !== undefined), su = avs.reduce((a, d) => a + d.sub, 0), doc = avs.filter((d) => d.doc).reduce((a, d) => a + d.sub, 0);
+        const chip = p.cortado ? `<span class="chip c">${esc(t('pd_chip_cortado'))}</span>` : `<span class="chip">${esc(t('pd_chip_pasa'))}</span>`;
+        h += `<div class="prod" data-c="${p.color}"><div class="fila"><span><b>${esc(p.nombre)}</b> <span class="t">${esc(tipoTexto(p))}</span></span>${chip}</div>
+          <div class="t">${esc(p.procesos.join(' · '))} · ${esc(p.firma ? t('pd_firmado').replace('{firma}', p.firma) : t('pd_sin_firma'))}</div>
+          <div><span class="o">↑ ${esc(bytes(p.sub))}</span> · <span class="i">↓ ${esc(bytes(p.baj))}</span> · ${esc(tn('pd_conexiones', act))} · ${esc(tn('pd_paises', new Set(ds.map((d) => d.pais).filter((x) => x && x[0] !== '@')).size))}</div>`
+          + (p.tipo === 'antivirus' ? `<div class="barrita"><i data-w="${pct(doc, su)}" data-bg="var(--shield)"></i><i data-w="${su ? 100 - pct(doc, su) : 0}" data-bg="var(--undoc)"></i></div>
+          <div class="t">${esc(t('pd_documentado').replace('{n}', su ? pct(doc, su) : '—'))} · ${esc(tn('pd_sin_documentar', ds.filter((d) => d.doc === false).length))}</div>` : '')
+          + `</div>`;
+      });
+      // Destinations.
+      const top = DEST.slice().sort((a, b) => (b.sub + b.baj) - (a.sub + a.baj) || b.bloq - a.bloq).slice(0, 30), mx = Math.max(1, ...top.map((d) => d.sub));
+      h += `<h4>${esc(t('pd_destinos'))} <span class="s">${num(DEST.length)}</span></h4>`;
+      top.forEach((d) => {
+        const nuevo = d.visto && Date.now() - d.visto < 180000, bl = bloqueado(d);
+        h += `<div class="fila"><span title="${esc(d.host)}">${esc(d.host)}${nuevo ? ` <span class="chip">${esc(t('pd_chip_nuevo'))}</span>` : ''}</span><span class="${bl ? 'c' : 'o'}">${bl || (!d.sub && d.bloq) ? esc(tn('pd_parados', d.bloq)) : esc(bytes(d.sub))}</span></div>
+          <div class="barrita"><i data-w="${bl ? 100 : Math.max(2, d.sub / mx * 100)}" data-bg="${bl ? 'rgba(255,107,122,.5)' : prod(d.p).color}"></i></div>`;
+      });
+      if (st.datos && st.datos.destinos_omitidos) h += `<div class="t">${esc(tn('pd_omitidos', st.datos.destinos_omitidos))}</div>`;
+      // Companies that own the networks.
+      const redes = {}; DEST.filter((d) => !d.sede && d.red && d.red[0] !== '@').forEach((d) => { const k = d.red; redes[k] = redes[k] || { b: 0, asn: d.asn, n: 0 }; redes[k].b += d.sub + d.baj; redes[k].n++; });
+      const rr = Object.entries(redes).sort((a, b) => b[1].b - a[1].b).slice(0, 15), mr = Math.max(1, ...rr.map((x) => x[1].b));
+      h += `<h4>${esc(t('pd_empresas_redes'))} <span class="s">${num(Object.keys(redes).length)}</span></h4>`;
+      rr.forEach(([n, r]) => { h += `<div class="fila"><span>${esc(n)} <span class="t">${r.asn ? 'AS' + r.asn : ''} · ${esc(tn('pd_nombres', r.n))}</span></span><span>${esc(bytes(r.b))}</span></div><div class="barrita"><i data-w="${Math.max(2, r.b / mr * 100)}" data-bg="var(--in)"></i></div>`; });
+      // Where the servers are.
+      const j = { yo: 0, ue: 0, us: 0, otros: 0, sin: 0 };
+      DEST.filter((d) => !d.sede).forEach((d) => { j[!d.pais || d.pais[0] === '@' ? 'sin' : d.pais === st.yo ? 'yo' : UE.has(d.pais) ? 'ue' : d.pais === 'US' ? 'us' : 'otros'] += d.sub; });
+      h += `<h4>${esc(t('pd_donde'))}</h4>
+        <div class="barrita gruesa"><i data-w="${pct(j.us, tot)}" data-bg="var(--out)"></i><i data-w="${pct(j.ue, tot)}" data-bg="var(--in)"></i><i data-w="${pct(j.otros, tot)}" data-bg="#a98bff"></i><i data-w="${pct(j.yo, tot)}" data-bg="var(--shield)"></i><i data-w="${pct(j.sin, tot)}" data-bg="#55657a"></i></div>
+        <div class="leyenda-j"><span><i data-bg="var(--out)"></i>${esc(t('pd_eeuu'))} ${pct(j.us, tot)} %</span><span><i data-bg="var(--in)"></i>${esc(t('pd_ue'))} ${pct(j.ue, tot)} %</span><span><i data-bg="#a98bff"></i>${esc(t('pd_otros'))} ${pct(j.otros, tot)} %</span><span><i data-bg="var(--shield)"></i>${esc(nombrePais(st.yo))} ${pct(j.yo, tot)} %</span>${j.sin ? `<span><i data-bg="#55657a"></i>${esc(t('pd_sin_pais'))} ${pct(j.sin, tot)} %</span>` : ''}</div>`;
+      // How it travels.
+      const tcp = DEST.filter((d) => d.proto === 'tcp').reduce((a, d) => a + d.sub, 0), udp = DEST.filter((d) => d.proto === 'udp').reduce((a, d) => a + d.sub, 0);
+      const p443 = DEST.filter((d) => d.puerto === 443).reduce((a, d) => a + d.sub, 0), p80 = DEST.filter((d) => d.puerto === 80).reduce((a, d) => a + d.sub, 0);
+      h += `<h4>${esc(t('pd_como_viaja'))}</h4>
+        <div class="barrita gruesa"><i data-w="${pct(tcp, tot)}" data-bg="var(--in)"></i><i data-w="${pct(udp, tot)}" data-bg="#a98bff"></i></div>
+        <div>TCP ${pct(tcp, tot)} % · UDP/QUIC ${pct(udp, tot)} %</div>
+        <div>${esc(t('pd_puerto_443'))} <b>${pct(p443, tot)} %</b> · ${esc(t('pd_puerto_80'))} <b class="${p80 ? 'c' : ''}">${pct(p80, tot)} %</b></div>
+        <div>${esc(t('pd_paquetes').replace('{s}', num(Math.round(st.ahora[2]))).replace('{n}', num(paq)))}</div>
+        <div class="t">${esc(t('pd_cifrado'))}</div>`;
+      // The world now (the real sun).
+      const [slon, slat] = T.solLL, sobre = paisEn(slon, slat);
+      h += `<h4>${esc(t('pd_mundo'))}</h4><div>${esc(t('pd_sol_sobre').replace('{lugar}', sobre ? nombrePais(sobre) : t('pd_oceano')))} <span class="t">(${slat.toFixed(1)}°, ${slon.toFixed(1)}°)</span></div>`;
+      [st.yo, ...paisesUsados.filter((c) => c !== st.yo).slice(0, 16)].forEach((c) => { const ce = centros[c]; if (!ce) return; const dia = esDeDia(ce.lon, ce.lat); h += `<div class="fila"><span>${dia ? '☀' : '☾'} ${esc(nombrePais(c))}${c === st.yo ? ` <span class="t">(${esc(t('pd_tu'))})</span>` : ''}</span><span class="t">${esc(t(dia ? 'pd_de_dia' : 'pd_de_noche'))}</span></div>`; });
+      h += `<div class="t">${esc(t('pd_centro_pais'))}</div>`;
+      // The window.
+      const noche = DEST.reduce((a, d) => a + d.noche, 0);
+      h += `<h4>${esc(st.demo ? t('pd_sesion_demo') : t('pd_ventana').replace('{h}', st.datos ? st.datos.ventana_h : 24))}</h4>
+        <div><span class="o">↑ ${esc(bytes(tot))}</span> · <span class="i">↓ ${esc(bytes(baj))}</span> · ${esc(t('pd_madrugada').replace('{x}', bytes(noche)))}</div>
+        <div>${esc(t('pd_abierto').replace('{t}', hace(Date.now() - st.abierto)))} · <span class="c">${esc(tn('pd_intentos', DEST.reduce((a, d) => a + d.bloq, 0)))}</span></div>`;
+      if (st.datos && st.datos.programas_omitidos) h += `<div class="t">${esc(tn('pd_programas_omitidos', st.datos.programas_omitidos))}</div>`;
+      panelDatos.innerHTML = h;
+      estilos(panelDatos);
+    };
+    const telemetria = () => {
+      const el = $('telemetria');
+      el.hidden = st.vista === 'dentro' || datosAbierto || st.Wc < 700;
+      if (!el.hidden) el.innerHTML = htmlDirecto();
+    };
+
+    // ---------- What is under the pointer ----------
+    const queHay = (x, y) => {
+      let mejor = null, dm = Infinity;
+      st.dianas.forEach((d) => { const dd = Math.hypot(d.x - x, d.y - y); if (dd < d.r && dd < dm) { dm = dd; mejor = d; } });
+      if (mejor) return mejor;
+      if (enTierra()) { const c = paisBajo(x, y); return c ? { tipo: 'pais', ref: c } : null; }
+      return null;
+    };
+    const usoTexto = (d) => (d.doc === null || d.doc === undefined ? '' : d.uso ? `<div>${esc(t('pd_para_que'))} <b>${esc(t('av_uso_' + d.uso))}</b></div>` : `<div class="nodoc">${esc(t('pd_no_documenta'))}</div>`);
+    const textoTip = (hh) => {
+      if (hh.tipo === 'dest') {
+        const d = hh.ref, p = prod(d.p), bl = bloqueado(d);
+        const estado = bl ? `<span class="estado corta">${esc(d.cortado ? t('pd_cortado_nombre') : d.ancho ? t('pd_cortado_ancho') : t('pd_cortado_programa').replace('{prog}', p.nombre))}</span>` : `<span class="estado pasa">${esc(t('pd_pasa'))}</span>`;
+        const dia = centros[d.pais] ? esDeDia(centros[d.pais].lon, centros[d.pais].lat) : null;
+        const donde = d.sede ? t('pd_sede').replace('{pais}', nombrePais(d.pais)).replace('{empresa}', d.red || '—') : t('pd_servidor').replace('{pais}', d.pais ? nombrePais(d.pais) : '—').replace('{red}', d.red || '—');
+        const accion = !d.destino ? t('pd_sin_nombre_no_corta') : d.ancho ? t('pd_ancho_dejar') : d.cortado ? t('pd_clic_dejar') : t('pd_clic_cortar');
+        return `<div class="mono">${esc(d.host)}</div><div>${esc(p.nombre)} · <span class="mono">${esc(p.procesos.join(' · '))}</span></div>${usoTexto(d)}
+          <div>${esc(donde)}${d.asn ? ` <span class="mono">AS${d.asn}</span>` : ''}</div>
+          ${d.proto ? `<div>${esc((d.vias && d.vias.length ? d.vias : [d.proto + '/' + d.puerto]).join(' · '))}${d.puerto === 443 ? ' ' + esc(t('pd_cifrado_corto')) : d.puerto === 80 ? ' ' + esc(t('pd_sin_cifrar_corto')) : ''} · ${esc(tn('pd_paquetes_n', d.paq))}</div>` : ''}
+          <div>${esc(t('pd_enviado'))} <b>${esc(bytes(d.sub))}</b> · ${esc(t('pd_recibido'))} ${esc(bytes(d.baj))}${d.consultas ? ' · ' + esc(tn('pd_consultas', d.consultas)) : ''}${d.bloq ? ' · ' + esc(tn('pd_parados', d.bloq)) : ''}</div>
+          <div class="t">${d.primera ? esc(t('pd_primera').replace('{t}', hace(Date.now() - d.primera))) : ''}${dia === null ? '' : ' · ' + esc(t(dia ? 'pd_alli_dia' : 'pd_alli_noche'))}</div>${estado}
+          <div class="t">${esc(accion)}</div>`;
+      }
+      if (hh.tipo === 'prod') {
+        const p = hh.ref, ds = DEST.filter((d) => d.p === p.id);
+        return `<b>${esc(p.nombre)}</b> · <span class="t">${esc(tipoTexto(p))}</span><div class="mono">${esc(p.procesos.join(' · '))}</div>
+          <div>${esc(tn('pd_destinos_en', ds.length).replace('{p}', new Set(ds.map((d) => d.pais).filter((x) => x && x[0] !== '@')).size))}</div>
+          <div>${esc(t('pd_enviado'))} <b>${esc(bytes(p.sub))}</b> · ${esc(t('pd_recibido'))} ${esc(bytes(p.baj))}</div>
+          ${p.cortado ? `<span class="estado corta">${esc(t('pd_prog_cortado'))}</span>` : `<span class="estado pasa">${esc(t('pd_prog_pasa'))}</span>`}
+          <div class="t">${esc(p.cortable ? (p.cortado ? t('pd_clic_dejar_prog') : t('pd_clic_cortar_prog')) : t('pd_no_cortable'))}</div>`;
+      }
+      if (hh.tipo === 'yo') { const ce = centros[st.yo]; return `<b>${esc(t('pd_tu_ordenador'))}</b> · ${esc(nombrePais(st.yo))} · ${esc(t(esDeDia(ce.lon, ce.lat) ? 'pd_de_dia' : 'pd_de_noche'))}<div class="t">${esc(t('pd_pais_origen'))}</div><div>${esc(tn('pd_vigila_n', PROD.length))}</div>`; }
+      if (hh.tipo === 'pais') {
+        const c = hh.ref, ds = DEST.filter((d) => d.pais === c), ce = centros[c], dia = ce ? esDeDia(ce.lon, ce.lat) : null;
+        const cab = `<b>${esc(nombrePais(c))}</b>${dia === null ? '' : ` <span class="t">· ${esc(t(dia ? 'pd_de_dia' : 'pd_de_noche'))}</span>`}`;
+        if (c === st.yo && !ds.length) return `${cab}<div>${esc(t('pd_aqui_tu'))}</div>`;
+        if (!ds.length) return `${cab}<div class="t">${esc(t('pd_pais_nada'))}</div>`;
+        const redes = [...new Set(ds.map((d) => d.red).filter((r) => r && r[0] !== '@'))].join(', ');
+        return `${cab}<div>${esc(t('pd_redes_aqui'))} <b>${esc(redes || '—')}</b></div>
+          <div>${esc(t('pd_enviado'))} <b>${esc(bytes(ds.reduce((a, d) => a + d.sub, 0)))}</b> · ${esc(t('pd_recibido'))} ${esc(bytes(ds.reduce((a, d) => a + d.baj, 0)))}</div>
+          <div class="mono arriba4">${ds.slice(0, 12).map((d) => (bloqueado(d) ? '✕ ' : '· ') + esc(d.host)).join('<br>')}${ds.length > 12 ? '<br>…' : ''}</div>`;
+      }
+      return '';
+    };
+    const actualizaTip = () => {
+      const { x, y } = st.raton, hh = queHay(x, y);
+      cv.style.cursor = hh && (hh.tipo === 'dest' || hh.tipo === 'prod') ? 'pointer' : st.vista === 'globo' ? 'grab' : 'crosshair';
+      if (!hh) { tip.hidden = true; st.hover = null; return; }
+      const html = textoTip(hh);
+      if (tip.innerHTML !== html) { tip.innerHTML = html; estilos(tip); }
+      tip.hidden = false;
+      const tw = tip.offsetWidth, th = tip.offsetHeight;
+      tip.style.left = Math.min(st.Wc - tw - 8, x + 16) + 'px';
+      tip.style.top = Math.min(st.H - th - 8, Math.max(8, y + 14)) + 'px';
+      st.hover = hh;
+    };
+
+    // ---------- Acting from the globe: cut or let through, always reversible ----------
+    let temporizadorAviso = 0;
+    const avisa = (txt, botones) => {
+      const a = $('aviso');
+      a.innerHTML = `<div>${esc(txt)}</div>` + (botones ? `<div class="aviso-botones">${botones.map((b, i) => `<button type="button" class="btn-hud${b.peligro ? ' peligro' : ''}" data-i="${i}">${esc(b.texto)}</button>`).join('')}</div>` : '');
+      a.hidden = false; a.classList.toggle('pide', !!botones);
+      a.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { a.hidden = true; botones[+b.dataset.i].hacer(); }));
+      clearTimeout(temporizadorAviso);
+      if (!botones) temporizadorAviso = setTimeout(() => { a.hidden = true; }, 5200);
+    };
+    const corteNombre = async (d) => {
+      if (!d.destino) { avisa(t('pd_sin_nombre_no_corta')); return; }
+      if (d.ancho) { avisa(t('pd_ancho_dejar')); return; }
+      if (st.demo) { d.cortado = !d.cortado; avisa((d.cortado ? t('pd_hecho_cortar') : t('pd_hecho_dejar')).replace('{nombre}', d.host) + ' ' + t('pd_demo_simulacion')); pintaHud(); return; }
+      try {
+        if (d.regla !== null && d.regla !== undefined && d.regla >= 0) {
+          await api(`/api/reglas/${d.regla}/deshacer`, { method: 'POST' });
+          avisa(t('pd_hecho_dejar').replace('{nombre}', d.host));
+        } else {
+          const cuerpo = { scope: 'device', device_id: 'self', match_kind: 'domain', pattern: d.destino, action: 'cortar' };
+          let r = await api('/api/reglas', { method: 'POST', body: cuerpo });
+          if (r.necesita === 'confirmar') {
+            avisa(r.mensaje || t('pd_confirmar'), [
+              { texto: t('pd_cortar_igual'), peligro: true, hacer: async () => { const r2 = await api('/api/reglas', { method: 'POST', body: Object.assign({}, cuerpo, { confirmed: true }) }); if (r2.creada) avisa(t('pd_hecho_cortar').replace('{nombre}', d.host) + ' ' + t('pd_dns_tarda')); await cargar(); } },
+              { texto: t('pd_cancelar'), hacer: () => {} },
+            ]);
+            return;
+          }
+          if (r.mensaje && !r.creada) { avisa(r.mensaje); return; }
+          avisa(t('pd_hecho_cortar').replace('{nombre}', d.host) + ' ' + t('pd_dns_tarda'));
+        }
+        await cargar();
+      } catch (e) { avisa(String(e && e.message || e)); }
+    };
+    const corteProducto = async (p) => {
+      if (!p.cortable) { avisa(t('pd_no_cortable')); return; }
+      const hacer = async () => {
+        if (st.demo) { p.cortado = !p.cortado; avisa((p.cortado ? t('pd_hecho_cortar_prog') : t('pd_hecho_dejar_prog')).replace('{prog}', p.nombre) + ' ' + t('pd_demo_simulacion')); pintaHud(); return; }
+        try { await api('/api/antivirus/cortar', { method: 'POST', body: { producto: p.id, cortar: !p.cortado } }); avisa((!p.cortado ? t('pd_hecho_cortar_prog') : t('pd_hecho_dejar_prog')).replace('{prog}', p.nombre)); await cargar(); } catch (e) { avisa(String(e && e.message || e)); }
+      };
+      if (p.cortado) { hacer(); return; }
+      if (!st.demo && st.datos && !st.datos.cortar_disponible) { avisa(t('av_cortar_no_disponible')); return; }
+      avisa(t('pd_aviso_cortar_prog').replace('{prog}', p.nombre), [{ texto: t('pd_cortar_igual'), peligro: true, hacer }, { texto: t('pd_cancelar'), hacer: () => {} }]);
+    };
+    $('maxima').addEventListener('click', () => {
+      const cortables = PROD.filter((p) => p.cortable), activa = cortables.length > 0 && cortables.every((p) => p.cortado);
+      const hacer = async () => {
+        if (st.demo) { cortables.forEach((p) => { p.cortado = !activa; }); avisa(t(activa ? 'pd_maxima_off' : 'pd_maxima_on') + ' ' + t('pd_demo_simulacion')); pintaHud(); return; }
+        try { await api('/api/antivirus/maxima', { method: 'POST', body: { activa: !activa } }); avisa(t(activa ? 'pd_maxima_off' : 'pd_maxima_on')); await cargar(); } catch (e) { avisa(String(e && e.message || e)); }
+      };
+      if (activa) { hacer(); return; }
+      if (!st.demo && st.datos && !st.datos.cortar_disponible) { avisa(t('av_cortar_no_disponible')); return; }
+      avisa(t('av_max_aviso'), [{ texto: t('av_max_confirmar'), peligro: true, hacer }, { texto: t('pd_cancelar'), hacer: () => {} }]);
+    });
+
+    // ---------- Pointer and keys ----------
+    ['pointermove', 'pointerdown', 'wheel', 'keydown'].forEach((ev) => window.addEventListener(ev, () => { st.ultimoGesto = performance.now(); }, { passive: true }));
+    cv.addEventListener('pointermove', (e) => {
+      const r = cv.getBoundingClientRect(); st.raton = { x: e.clientX - r.left, y: e.clientY - r.top };
+      if (st.arrastre) { st.dRot += (e.clientX - st.arrastre.x) * 0.006; st.dTilt -= (e.clientY - st.arrastre.y) * 0.004; st.arrastre = { x: e.clientX, y: e.clientY, mov: true }; }
+    });
+    cv.addEventListener('wheel', (e) => { if (!enTierra()) return; e.preventDefault(); T.zoom = Math.max(0.7, Math.min(3.2, T.zoom * Math.exp(-e.deltaY * 0.0012))); }, { passive: false });
+    cv.addEventListener('pointerleave', () => { st.raton = null; tip.hidden = true; });
+    cv.addEventListener('pointerdown', (e) => { if (st.vista === 'globo') { st.arrastre = { x: e.clientX, y: e.clientY, mov: false }; cv.setPointerCapture(e.pointerId); } });
+    cv.addEventListener('pointerup', (e) => {
+      const movido = st.arrastre && st.arrastre.mov; st.arrastre = null;
+      if (movido) return;
+      const r = cv.getBoundingClientRect(), hh = queHay(e.clientX - r.left, e.clientY - r.top);
+      if (!hh) return;
+      if (hh.tipo === 'dest') corteNombre(hh.ref);
+      if (hh.tipo === 'prod') corteProducto(hh.ref);
+    });
+    const AYUDA = { globo: 'pd_ayuda_globo', mapa: 'pd_ayuda_mapa', nebulosa: 'pd_ayuda_nebulosa', dentro: 'pd_ayuda_dentro', radar: 'pd_ayuda_radar' };
+    const VISTAS = ['globo', 'mapa', 'nebulosa', 'dentro', 'radar'];
+    const ponVista = (v) => {
+      const antesT = st.vista === 'globo' || st.vista === 'mapa', ahoraT = v === 'globo' || v === 'mapa';
+      if (!(antesT && ahoraT)) { st.part = []; st.estallidos = []; }
+      st.vista = v;
+      document.querySelectorAll('.pestanas button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.vista === v)));
+      $('ayuda-vista').textContent = t(AYUDA[v]) + ((v === 'globo' || v === 'mapa') && !T.ok ? ' ' + t('pd_sin_webgl') : '');
+      try { localStorage.setItem('guardiana_pd_vista', v); } catch (_) {}
+    };
+    document.querySelectorAll('.pestanas button').forEach((b) => b.addEventListener('click', () => ponVista(b.dataset.vista)));
+    const pantalla = (on) => { stage.classList.toggle('full', on); $('pantalla').textContent = t(on ? 'pd_cerrar' : 'pd_pantalla_completa'); requestAnimationFrame(ajusta); };
+    $('pantalla').addEventListener('click', () => { if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; } if (stage.requestFullscreen) stage.requestFullscreen().catch(() => pantalla(!stage.classList.contains('full'))); else pantalla(!stage.classList.contains('full')); });
+    document.addEventListener('fullscreenchange', () => { $('pantalla').textContent = t(document.fullscreenElement ? 'pd_cerrar' : 'pd_pantalla_completa'); requestAnimationFrame(ajusta); });
+    document.addEventListener('keydown', (e) => {
+      if (/select|input|textarea/i.test(document.activeElement.tagName)) return;
+      if (['1', '2', '3', '4', '5'].includes(e.key)) ponVista(VISTAS[+e.key - 1]);
+    });
+    $('demo').addEventListener('click', () => empiezaDemo());
+    // Country selector, by name in the reader's language.
+    { const sel = $('yo'), vistos = new Set();
+      listaPaises.filter((p) => p.c !== 'AQ' && !vistos.has(p.c) && vistos.add(p.c)).map((p) => [p.c, nombrePais(p.c)]).sort((a, b) => a[1].localeCompare(b[1], LOC))
+        .forEach(([c, n]) => { const o = document.createElement('option'); o.value = c; o.textContent = n; sel.appendChild(o); });
+      sel.value = st.yo;
+      sel.addEventListener('change', () => { st.yo = sel.value; try { localStorage.setItem('guardiana_pais', st.yo); } catch (_) {} pintaDatos(); }); }
+
+    // ---------- The loop ----------
+    let antes = performance.now(), ultimaTele = 0, ultimoDemo = 0;
+    const bucle = (ahora) => {
+      requestAnimationFrame(bucle);
+      // To keep it open for hours: 30 frames a second, 20 after two quiet minutes, 60 while dragging.
+      const quieto = ahora - st.ultimoGesto > 120000;
+      if (!st.arrastre && ahora - antes < (quieto ? 48 : 31)) return;
+      const dt = Math.min(0.06, (ahora - antes) / 1000); antes = ahora;
+      try {
+        if (st.demo && ahora - ultimoDemo > 900) { ultimoDemo = ahora; latidoDemo(); }
+        if (ahora - ultimaTele > 1000) { ultimaTele = ahora; telemetria(); pintaDatos(); }
+        cx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);
+        st.dianas = [];
+        st.W = datosAbierto && st.Wc > 700 ? Math.max(320, st.Wc - panelDatos.offsetWidth - 20) : st.Wc;
+        fondo();
+        if (enTierra()) {
+          const obj = st.vista === 'mapa' ? 1 : 0;
+          if (obj !== T.mObj) { T.tw = { desde: T.m, t0: ahora }; T.mObj = obj; }
+          if (T.tw) { const u = Math.min(1, (ahora - T.tw.t0) / 2200), e = u * u * (3 - 2 * u); T.m = T.tw.desde + (T.mObj - T.tw.desde) * e; if (u >= 1) T.tw = null; }
+          glc.style.visibility = 'visible';
+          camara(); pintaTierra(); dibujaTierra(dt);
+        } else {
+          glc.style.visibility = 'hidden';
+          ({ nebulosa: dibujaNebulosa, dentro: dibujaDentro, radar: dibujaRadar, globo: dibujaNebulosa, mapa: dibujaNebulosa })[st.vista](dt);
+        }
+        if (st.raton) actualizaTip();
+      } catch (e) { if (!bucle.dicho) { bucle.dicho = true; console.error(e); } }
+    };
+
+    // ---------- Start ----------
+    let vistaGuardada = 'globo';
+    try { const v = localStorage.getItem('guardiana_pd_vista'); if (VISTAS.includes(v)) vistaGuardada = v; } catch (_) {}
+    ponVista(vistaGuardada);
+    ajusta();
+    let datosGuardado = null;
+    try { datosGuardado = localStorage.getItem('guardiana_pd_datos'); } catch (_) {}
+    ponDatos(datosGuardado === null ? st.Wc >= 1000 : datosGuardado === '1');
+    await cargar();
+    ctx.cadaTanto(cargar, 5000);
+    requestAnimationFrame(bucle);
+  }
+})();

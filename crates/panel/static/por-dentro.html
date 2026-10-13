@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<title>GUARDIANA · Por dentro</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="preload" href="/static/fonts/IBMPlexMono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/tierra/dia.jpg" as="image">
+<script src="/static/arranque.js"></script>
+</head>
+<body data-page="por-dentro" class="universo">
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<section class="stage" id="stage" aria-label="GUARDIANA por dentro">
+  <div class="barra">
+    <div class="marca"><a href="/" data-t="pd_volver">← Panel</a> <span data-t="pd_titulo">GUARDIANA por dentro</span> <span class="chip-modo" id="chip-modo" hidden></span></div>
+    <div class="pestanas" role="group">
+      <button type="button" data-vista="globo" aria-pressed="true" data-t="pd_vista_globo">1 Globo</button>
+      <button type="button" data-vista="mapa" aria-pressed="false" data-t="pd_vista_mapa">2 Mapa</button>
+      <button type="button" data-vista="nebulosa" aria-pressed="false" data-t="pd_vista_nebulosa">3 Nebulosa</button>
+      <button type="button" data-vista="dentro" aria-pressed="false" data-t="pd_vista_dentro">4 El ordenador</button>
+      <button type="button" data-vista="radar" aria-pressed="false" data-t="pd_vista_radar">5 Radar</button>
+    </div>
+    <div class="controles">
+      <label for="yo"><span data-t="pd_tu_pais">Tu ordenador está en</span> <select id="yo"></select></label>
+      <button type="button" class="btn-hud" id="btn-datos" aria-pressed="true" aria-controls="datos" data-t="pd_btn_datos">Datos en vivo</button>
+      <button type="button" class="btn-hud peligro" id="maxima" aria-pressed="false" data-t="pd_btn_maxima">Protección máxima</button>
+      <button type="button" class="btn-hud" id="pantalla" data-t="pd_pantalla_completa">Pantalla completa</button>
+    </div>
+  </div>
+  <div class="lienzo" id="lienzo">
+    <canvas id="gl"></canvas>
+    <canvas id="cv"></canvas>
+    <div class="telemetria" id="telemetria" hidden></div>
+    <aside class="datos" id="datos"></aside>
+    <div class="vigilancia-off" id="vigilancia-off" hidden data-t="pd_vigilancia_off"></div>
+    <div class="leyenda" aria-hidden="true">
+      <span><i class="ley-o"></i><span data-t="pd_ley_sale"></span></span>
+      <span><i class="ley-i"></i><span data-t="pd_ley_entra"></span></span>
+      <span><i class="ley-c"></i><span data-t="pd_ley_cortado"></span></span>
+      <span><i class="ley-n"></i><span data-t="pd_ley_nodoc"></span></span>
+    </div>
+    <div class="ayuda-vista" id="ayuda-vista"></div>
+    <div class="vacio" id="vacio" hidden><h2 data-t="pd_vacio_titulo"></h2><p id="vacio-texto"></p><button type="button" class="btn-hud" id="demo" data-t="pd_demo_boton"></button></div>
+    <div class="tip" id="tip" hidden></div>
+    <div class="aviso" id="aviso" hidden role="status" aria-live="polite"></div>
+  </div>
+  <div class="hud">
+    <div><h3><span data-t="pd_hud_registro" class="h3-titulo"></span> <span data-t="pd_hud_vivo"></span></h3><ul class="registro" id="registro"></ul></div>
+    <div><h3><span data-t="pd_hud_enviado" class="h3-titulo"></span> <span id="hud-min"></span></h3><canvas id="spark"></canvas></div>
+    <div><h3 data-t="pd_hud_paises"></h3><div class="barras" id="barras"></div></div>
+    <div><h3 data-t="pd_hud_puertas"></h3><div class="grande" id="hud-cortes">0</div><div class="pequeno" id="hud-bloqueos"></div></div>
+    <div><h3 data-t="pd_hud_documenta"></h3><canvas id="indicador"></canvas></div>
+  </div>
+</section>
+<script src="/static/por-dentro.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -342,6 +342,85 @@ async fn the_antivirus_page_shows_what_each_antivirus_asked_and_every_official_r
         assert!(v2["cortados"].as_array().unwrap().is_empty());
     }
 
+    // «GUARDIANA por dentro» (1.0.22): the same measurements, for the live globe.
+    let (status, body) = get(addr, &t, "/api/por-dentro").await;
+    assert_eq!(status, 200, "{body}");
+    let u: serde_json::Value = serde_json::from_str(&body).unwrap();
+    let progs = u["programas"].as_array().unwrap();
+    assert!(
+        progs.iter().any(|p| p["id"] == "Microsoft Defender"
+            && p["tipo"] == "antivirus"
+            && p["cortable"] == true),
+        "{body}"
+    );
+    // A browser is watched too, and it is never cut whole (it would stop working).
+    assert!(
+        progs
+            .iter()
+            .any(|p| p["id"] == "Chrome" && p["tipo"] == "navegador" && p["cortable"] == false),
+        "{body}"
+    );
+    // The antivirus comes first.
+    assert_eq!(progs[0]["tipo"], "antivirus");
+    let dest = u["destinos"].as_array().unwrap();
+    let wdcp = dest
+        .iter()
+        .find(|d| d["destino"] == "wdcp.microsoft.com" && d["programa"] == "Microsoft Defender")
+        .unwrap();
+    assert_eq!(wdcp["enviados"], 3_000_000);
+    assert_eq!(wdcp["recibidos"], 120_000);
+    assert_eq!(wdcp["paquetes"], 2_100);
+    assert_eq!(wdcp["pais"], "US");
+    assert_eq!(wdcp["red"], "Microsoft Corporation");
+    assert_eq!(wdcp["asn"], 8075);
+    assert_eq!(wdcp["proto"], "tcp");
+    assert_eq!(wdcp["puerto"], 443);
+    assert_eq!(wdcp["vias"][0], "tcp/443");
+    assert_eq!(wdcp["consultas"], 12);
+    assert_eq!(wdcp["sede"], false);
+    assert!(wdcp["documentado"].is_boolean(), "{wdcp}");
+    // Never the server's address (decision 203).
+    assert!(!body.contains("\"ip\""), "{body}");
+    // A name stopped before it left has no server: it is placed at its company's seat, and says
+    // so; for a browser, «documented by the maker» does not apply.
+    let ads = dest
+        .iter()
+        .find(|d| d["destino"] == "googleads.g.doubleclick.net" && d["programa"] == "Chrome")
+        .unwrap();
+    assert_eq!(ads["sede"], true);
+    assert_eq!(ads["paradas"], 7);
+    assert_eq!(ads["enviados"], 0);
+    assert!(ads["documentado"].is_null());
+    // The latest minutes, row by row, for the live particles.
+    assert!(u["recientes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|r| r["destino"] == "vortex-win.data.microsoft.com" && r["enviados"] == 44_000));
+    assert_eq!(u["ventana_h"], 24);
+    // The page, its own script and the Earth's pictures come from the panel itself (no internet).
+    let (status, page) = get(addr, &t, "/por-dentro").await;
+    assert_eq!(status, 200);
+    assert!(page.contains("data-page=\"por-dentro\""));
+    assert!(
+        page.contains("/static/por-dentro.js?v="),
+        "the script is asked for by its tag"
+    );
+    let (status, script) = get(addr, &t, "/static/por-dentro.js").await;
+    assert_eq!(status, 200);
+    assert!(script.contains("GuardianaUniverso"));
+    for imagen in ["dia.jpg", "luces.jpg", "agua.png"] {
+        let (status, _) = get(addr, &t, &format!("/static/tierra/{imagen}")).await;
+        assert_eq!(status, 200, "{imagen}");
+    }
+    let (status, _) = get(addr, &t, "/static/tierra/otra.jpg").await;
+    assert_eq!(status, 404);
+    // The way in is on the start page and on «Tu antivirus».
+    for pagina in ["/", "/antivirus"] {
+        let (_, html) = get(addr, &t, pagina).await;
+        assert!(html.contains("href=\"/por-dentro\""), "{pagina}");
+    }
+
     if let Some(seg) = std::env::var("GUARDIANA_VISTA_SEG")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
