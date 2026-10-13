@@ -360,3 +360,5 @@ a.enlace-empresa:hover { color: var(--accent); text-decoration-color: currentCol
 .av-mercado{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}
 .av-dato{margin:0}
 .av-dato-cifra{font-family:'Unbounded',system-ui,sans-serif;font-size:1.7rem;line-height:1.1;color:var(--azul);margin-bottom:6px}
+.av-cifras { font-size: 1.15rem; margin: .4rem 0; }
+.av-resumen hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }

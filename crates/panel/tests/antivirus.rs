@@ -15,6 +15,25 @@ use guardiana_panel::{start, Config, RuntimeInfo};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
+async fn post(addr: SocketAddr, token: &str, path: &str, body: &str) -> (u16, String) {
+    let mut s = TcpStream::connect(addr).await.unwrap();
+    let req = format!(
+        "POST {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\nX-Guardiana-Token: {token}\r\nX-Guardiana-Lang: es\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+        body.len()
+    );
+    s.write_all(req.as_bytes()).await.unwrap();
+    let mut raw = Vec::new();
+    s.read_to_end(&mut raw).await.unwrap();
+    let text = String::from_utf8_lossy(&raw).into_owned();
+    let (head, body) = text.split_once("\r\n\r\n").expect("a complete response");
+    let status: u16 = head
+        .split_whitespace()
+        .nth(1)
+        .and_then(|c| c.parse().ok())
+        .expect("a status code");
+    (status, body.to_owned())
+}
+
 async fn get(addr: SocketAddr, token: &str, path: &str) -> (u16, String) {
     let mut s = TcpStream::connect(addr).await.unwrap();
     let req = format!(
@@ -257,7 +276,36 @@ async fn the_antivirus_page_shows_what_each_antivirus_asked_and_every_official_r
     assert!(csv.contains("Microsoft Defender;MsMpEng.exe"));
     assert!(csv.contains("wdcp.microsoft.com"));
 
-    // The detect button answers on every system. Outside Windows there is no Security Center,
+    // The 24-hour summary on top: Defender's 3 MB to the US, one country, watching on by default.
+    let r24 = &v["resumen"];
+    assert_eq!(r24["subidos"], 3_044_000);
+    assert_eq!(r24["bajados"], 123_000);
+    assert_eq!(r24["paises"], 1);
+    assert_eq!(r24["productos"][0], "Microsoft Defender");
+    assert_eq!(v["vigilando"], true);
+    assert_eq!(v["maxima"], false);
+
+    // Watching can be turned off and on; it is remembered and reported.
+    let (status, body) = post(addr, &t, "/api/antivirus/vigilar", r#"{"activa":false}"#).await;
+    assert_eq!(status, 200, "{body}");
+    let (_, body) = get(addr, &t, "/api/antivirus").await;
+    let v3: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v3["vigilando"], false);
+    let (status, _) = post(addr, &t, "/api/antivirus/vigilar", r#"{"activa":true}"#).await;
+    assert_eq!(status, 200);
+    let (_, body) = get(addr, &t, "/api/antivirus").await;
+    let v3: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v3["vigilando"], true);
+
+    // «Protección máxima»: letting everything through always works; cutting everything needs a
+    // product with a path seen (this test ledger has none) and, off Windows, says so.
+    let (status, body) = post(addr, &t, "/api/antivirus/maxima", r#"{"activa":false}"#).await;
+    assert_eq!(status, 200, "{body}");
+    let (status, _) = post(addr, &t, "/api/antivirus/maxima", r#"{"activa":true}"#).await;
+    assert_eq!(status, 409);
+
+    // The installed antivirus are asked of Windows by the page itself, with no button.
+    // The detect endpoint answers on every system. Outside Windows there is no Security Center,
     // said plainly; on Windows it lists what Windows lists (the CI machine has Defender).
     let (status, body) = get(addr, &t, "/api/antivirus/detectar").await;
     assert_eq!(status, 200, "{body}");
@@ -266,6 +314,32 @@ async fn the_antivirus_page_shows_what_each_antivirus_asked_and_every_official_r
     if cfg!(not(windows)) {
         assert_eq!(d["aviso"], "no_windows");
         assert!(d["detectados"].as_array().unwrap().is_empty());
+    }
+
+    // The clean cut: an unknown product is refused; off Windows (or not as the system) cutting
+    // is unavailable, said so, and nothing is recorded as cut.
+    let (status, _) = post(
+        addr,
+        &t,
+        "/api/antivirus/cortar",
+        r#"{"producto":"Nadie","cortar":true}"#,
+    )
+    .await;
+    assert_eq!(status, 400);
+    if cfg!(not(windows)) {
+        assert_eq!(v["cortar_disponible"], false);
+        let (status, body) = post(
+            addr,
+            &t,
+            "/api/antivirus/cortar",
+            r#"{"producto":"Microsoft Defender","cortar":true}"#,
+        )
+        .await;
+        assert_eq!(status, 503, "{body}");
+        assert!(body.contains("Windows"), "{body}");
+        let (_, body) = get(addr, &t, "/api/antivirus").await;
+        let v2: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert!(v2["cortados"].as_array().unwrap().is_empty());
     }
 
     if let Some(seg) = std::env::var("GUARDIANA_VISTA_SEG")

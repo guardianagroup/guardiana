@@ -54,7 +54,7 @@ pub use report::{
 };
 pub use retention::{DailyTotal, PruneReport, Retention};
 pub use stats::{Counters, DeviceTotals, TableCounts};
-pub use trafico::{minuto_de, Trafico};
+pub use trafico::{minuto_de, Trafico, AJUSTE_VIGILAR_ANTIVIRUS};
 
 /// Identifier of the computer running Guardiana in the `devices` table (brief §3).
 pub const SELF_DEVICE_ID: &str = "self";

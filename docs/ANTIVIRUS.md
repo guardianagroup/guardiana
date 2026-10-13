@@ -59,9 +59,10 @@ la documentación de cada fabricante).
 
 Dos cosas más, en este ordenador:
 
-- **Analizar mi antivirus**: un botón pregunta a Windows (Centro de seguridad,
-  `root/SecurityCenter2`) qué antivirus hay instalado y si está activo y al día. Solo lectura, sin
-  elevación. En Windows Server o fuera de Windows no hay Centro de seguridad y se dice así.
+- **Qué antivirus hay**: la página pregunta a Windows (Centro de seguridad,
+  `root/SecurityCenter2`) qué antivirus hay instalado y si está activo y al día, al abrirse y cada
+  dos minutos; en 1.0.22 ya no hay botón. Solo lectura, sin elevación. En Windows Server o fuera
+  de Windows no hay Centro de seguridad y se dice así.
 - **Qué envía y recibe, por país**: GUARDIANA cuenta, por cada proceso del antivirus, los bytes
   que salen y entran por cada destino, y los agrupa por país del servidor y por destino. La
   medida viene del canal de red de Windows (`Microsoft-Windows-Kernel-Network`, GUID
@@ -74,3 +75,23 @@ Lo que «enviado» significa es lo que la pila dio por enviado, no una prueba de
 recibiera ni de qué contenía. Eso último no se puede saber sin descifrar, y GUARDIANA no descifra.
 
 GUARDIANA nunca pide apagar el antivirus. Vigilarlo no es quitarlo.
+
+## Todo dentro (1.0.22)
+
+- **Resumen de las últimas 24 horas**, siempre arriba y en directo: bytes enviados y recibidos por
+  todos los antivirus, países, destinos distintos, lo enviado de madrugada y quiénes han hablado.
+- **En directo**: lo último de los últimos 20 minutos, minuto a minuto, lo nuevo arriba.
+- **Exportar** todo el tráfico a CSV (hora local, producto, programa, destino, país, red, bytes).
+- **El negocio del antivirus**: cifras globales con su fuente; donde no hay cifra fiable, se dice.
+- **Vigilar, sí o no** (`/api/antivirus/vigilar`): apagado, GUARDIANA deja de medir y de guardar lo
+  que envían los antivirus. No deshace ningún corte y las consultas de nombres siguen anotándose.
+- **Cortar** (`/api/antivirus/cortar`) un antivirus, o todos con **Protección máxima**
+  (`/api/antivirus/maxima`): filtros de verdad en el cortafuegos de Windows (WFP, modo usuario, sin
+  controlador propio) sobre los ejecutables vistos esa semana. La sesión es dinámica: si GUARDIANA
+  se detiene o se cae, Windows quita todo solo. No se finge nada: el corte es un bloqueo, no un
+  «éxito» falso. Un clic para ponerlo (con aviso previo de que sin actualizaciones ni análisis en
+  la nube protege menos) y uno para quitarlo.
+
+Descartado a propósito: engañar al antivirus con un éxito falso (necesitaría un controlador del
+núcleo y no es posible del todo) y descifrar lo que envía (exigiría un certificado en medio de
+todas tus conexiones, y GUARDIANA no hace eso).

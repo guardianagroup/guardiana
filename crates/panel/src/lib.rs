@@ -118,6 +118,9 @@ pub(crate) struct AppState {
     /// question is a PowerShell, and every page asked it on every load while the DNS was not
     /// pointed yet (review of 10 Oct 2026, panel 15): it is asked again after thirty seconds.
     pub(crate) primario: Mutex<Option<(std::time::Instant, Option<bool>)>>,
+    /// The clean cut of what an antivirus sends out (1.0.22), with its one long-lived firewall
+    /// session. Unavailable (and said so) off Windows or when not running as the system.
+    pub(crate) cortes: antivirus::CortesAntivirus,
 }
 
 /// A running panel.
@@ -271,6 +274,8 @@ pub(crate) async fn add_security_headers(
 pub async fn start(config: Config) -> Result<Running, Error> {
     let token = load_or_create_token(&config.token_path).map_err(Error::Token)?;
     let ledger = Ledger::open(&config.db_path, config.genesis).map_err(Error::Ledger)?;
+    // Open the firewall once and re-apply whatever the person had chosen to cut.
+    let cortes = antivirus::CortesAntivirus::nuevo(&ledger);
     let mut allowed_hosts = vec![
         "127.0.0.1".to_owned(),
         "localhost".to_owned(),
@@ -288,6 +293,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         genesis: config.genesis,
         vecinos: guardiana_devices::Resolver::default(),
         primario: Mutex::new(None),
+        cortes,
     });
 
     let app = Router::new()
@@ -490,6 +496,9 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/antivirus", get(antivirus::vista))
         .route("/api/antivirus/detectar", get(antivirus::detectar))
         .route("/api/antivirus/export", get(antivirus::export))
+        .route("/api/antivirus/cortar", post(antivirus::cortar))
+        .route("/api/antivirus/maxima", post(antivirus::maxima))
+        .route("/api/antivirus/vigilar", post(antivirus::vigilar))
         .route("/api/ia/alcance", post(api::alcance))
         .route("/api/ia/alcance/anadir", post(api::alcance_anadir))
         .route("/api/dns/aplicar", post(api::dns_aplicar))

@@ -285,6 +285,24 @@ impl Ledger {
         rows.map(|r| r.map_err(crate::Error::from)).collect()
     }
 
+    /// The distinct programs seen on this computer in a window, with their full path, newest
+    /// first (1.0.22). For cutting a program's outgoing traffic, which needs the file's path, not
+    /// just its name. Only rows that carry a path.
+    pub fn program_paths(&self, since: i64) -> Result<Vec<(String, String)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT json_extract(process_json, '$.nombre') AS nombre, \
+                    json_extract(process_json, '$.ruta') AS ruta, MAX(ts) AS t \
+             FROM events \
+             WHERE device_id = ?2 AND ts >= ?1 AND process_json != '' \
+               AND json_extract(process_json, '$.ruta') != '' \
+             GROUP BY nombre, ruta ORDER BY t DESC",
+        )?;
+        let rows = stmt.query_map(params![since, crate::SELF_DEVICE_ID], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+        })?;
+        rows.map(|r| r.map_err(crate::Error::from)).collect()
+    }
+
     /// What each program asked for in a window, per (device, name, program, signer): how many
     /// times, how many of them between midnight and six in the person's own day (`offset_min`
     /// minutes east of UTC), how many were cut, the last time and the name's category.
@@ -498,6 +516,35 @@ mod tests {
     use crate::model::{Category, NewEvent, Verdict};
     use crate::retention::Retention;
     use crate::time::HOUR_MS;
+
+    #[test]
+    fn the_paths_of_the_programs_this_computer_saw_newest_first() {
+        let mut l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        let prog = |nombre: &str, ruta: &str| crate::model::Proceso {
+            pid: 1,
+            nombre: nombre.into(),
+            ruta: ruta.into(),
+            sha256: String::new(),
+            firmado_por: String::new(),
+        };
+        let mut a = NewEvent::observed(1_000, "self", "127.0.0.1", "a.example", "A");
+        a.process = Some(prog("AvSvc.exe", r"C:\Av\AvSvc.exe"));
+        l.append(a).unwrap();
+        let mut b = NewEvent::observed(2_000, "self", "127.0.0.1", "b.example", "A");
+        b.process = Some(prog("Ui.exe", r"C:\Av\Ui.exe"));
+        l.append(b).unwrap();
+        // No path: left out. Another device: left out.
+        let mut c = NewEvent::observed(3_000, "self", "127.0.0.1", "c.example", "A");
+        c.process = Some(prog("x.exe", ""));
+        l.append(c).unwrap();
+        let mut d = NewEvent::observed(4_000, "mac:otro", "10.0.0.2", "d.example", "A");
+        d.process = Some(prog("Otro.exe", r"C:\Otro.exe"));
+        l.append(d).unwrap();
+        let r = l.program_paths(0).unwrap();
+        assert_eq!(r.len(), 2);
+        assert_eq!(r[0].0, "Ui.exe");
+        assert_eq!(r[1].1, r"C:\Av\AvSvc.exe");
+    }
 
     #[test]
     fn what_each_program_asked_with_its_signer_its_nights_and_its_cuts() {

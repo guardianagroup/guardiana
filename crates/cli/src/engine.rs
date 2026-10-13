@@ -1817,6 +1817,22 @@ async fn run_once<F: Future<Output = ()>>(
                         conexion = Ledger::open(&db, identity::genesis()).ok();
                     }
                     if let Some(l) = conexion.as_mut() {
+                        // «Que GUARDIANA lo mire» apagado (1.0.22): lo que miden los antivirus
+                        // se tira, no se guarda. La lectura de cada vez es la que manda, no una copia.
+                        let filas: Vec<_> = if l.vigilando_antivirus() {
+                            filas
+                        } else {
+                            filas
+                                .into_iter()
+                                .filter(|f| {
+                                    guardiana_lists::antivirus::antivirus_de_programa(&f.programa)
+                                        .is_none()
+                                })
+                                .collect()
+                        };
+                        if filas.is_empty() {
+                            continue;
+                        }
                         if let Err(e) = l.suma_trafico(&filas) {
                             eprintln!("guardiana: {e}");
                         }

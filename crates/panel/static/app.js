@@ -1751,8 +1751,20 @@
           + (d.empresa ? ` <span class="muted">${esc(t('av_nombre_de').replace('{empresa}', d.empresa))}</span>` : '')
           + (d.categoria !== 'desconocido' && d.categoria !== 'esperado' ? ` <span class="tag ${esc(d.categoria)}">${esc(catNombre(d.categoria))}</span>` : ''));
       const firma = (p) => `<span class="tag app">${esc(p.nombre)} ×${num(p.consultas)}</span> <span class="muted">${esc(p.firma ? t('av_firmado_por').replace('{firma}', p.firma) : t('av_sin_firma'))}</span>`;
+      // El corte limpio (1.0.22): solo en este equipo, siempre decisión de la persona, siempre
+      // reversible. Si no está disponible, se dice por qué en vez de esconder el botón.
+      let corte = { disponible: false, cortados: [] };
+      const controlCorte = (v) => {
+        if (v.device_id !== 'self') return '';
+        const on = corte.cortados.includes(v.producto);
+        if (!corte.disponible) return `<p class="limit">${esc(t('av_cortar_no_disponible'))}</p>`;
+        return `<p class="vigilante"><label><input type="checkbox" class="av-cortar" data-producto="${esc(v.producto)}"${on ? ' checked' : ''}> <b>${esc(t('av_cortar'))}</b></label>
+          <br><span class="${on ? 'bad' : 'muted'}">${esc(t(on ? 'av_cortar_on' : 'av_cortar_off'))}</span>
+          <br><span class="muted">${esc(t('av_cortar_aviso'))}</span></p>`;
+      };
       const visto = (v) => `<div class="card">
         <h3>${esc(v.producto)} <span class="muted">· ${esc(v.empresa)} (${esc(pais(v.pais))}) · ${esc(nombreAparato(v.device_id, v.device_name))}</span></h3>
+        ${controlCorte(v)}
         <p>${v.programas.map(firma).join('<br>')}</p>
         <p><b>${esc(tn('av_consultas', v.consultas))}</b> · ${esc(tn('av_nombres', v.destinos_total))} · ${esc(tn('av_nocturnas', v.nocturnas))}${v.cortadas ? ' · ' + esc(tn('av_cortadas', v.cortadas)) : ''} · <span class="muted">${esc(t('col_ultima'))}: ${when(v.ultima)}</span></p>
         <p>${esc(tn('av_documentados', v.documentados))} · <b>${esc(tn('av_no_documentados', v.no_documentados))}</b></p>
@@ -1793,6 +1805,22 @@
       // El panel en directo: cada minuto reciente de un antivirus hablando, lo nuevo arriba.
       const filaViva = (v) => `<tr><td class="muted">${esc(reloj(v.minuto))}</td><td><span class="tag ia">${esc(v.producto)}</span></td><td class="mono">${esc(v.destino || v.red || t('av_sin_nombre'))}</td><td>${esc(v.pais && v.pais[0] !== '@' ? paisTrafico(v.pais) : paisTrafico(v.red))}</td><td><b>${esc(bytes(v.subidos))}</b></td><td>${esc(bytes(v.bajados))}</td></tr>`;
       const paint = (r) => {
+        corte = { disponible: !!r.cortar_disponible, cortados: r.cortados || [] };
+        // El resumen de 24 h, siempre arriba, y los dos mandos: vigilar y protección máxima.
+        const m = r.resumen || {};
+        $('av-resumen').innerHTML = (m.productos && m.productos.length)
+          ? `<p class="av-cifras"><b>${esc(bytes(m.subidos))}</b> ${esc(t('av_resumen_enviado'))} · <b>${esc(bytes(m.bajados))}</b> ${esc(t('av_resumen_recibido'))} · ${esc(tn('av_resumen_paises', m.paises))} · ${esc(tn('av_resumen_destinos', m.destinos))}</p>`
+            + (m.subidos_noche ? `<p class="muted">${esc(t('av_resumen_noche').replace('{x}', bytes(m.subidos_noche)))}</p>` : '')
+            + `<p class="muted">${esc(t('av_resumen_productos').replace('{p}', m.productos.join(', ')))}</p>`
+          : `<p class="muted">${esc(t('av_resumen_nada'))}</p>`;
+        if (!r.vigilando) $('av-resumen').innerHTML += `<p class="bad">${esc(t('av_resumen_pausado'))}</p>`;
+        $('av-vigilar').checked = !!r.vigilando;
+        $('av-vigilar-txt').textContent = t(r.vigilando ? 'av_vigilar_on' : 'av_vigilar_off');
+        const hayCorte = !!r.maxima;
+        $('av-max-estado').textContent = !corte.disponible ? t('av_cortar_no_disponible') : hayCorte ? t('av_max_activa') : '';
+        $('av-max-estado').className = hayCorte ? 'bad' : 'muted';
+        $('av-max-activar').classList.toggle('hidden', hayCorte || !corte.disponible);
+        $('av-max-quitar').classList.toggle('hidden', !corte.cortados.length);
         $('av-vistos').innerHTML = r.vistos.length ? r.vistos.map(visto).join('')
           : `<div class="card"><p class="muted">${esc(t('av_ninguno').replace('{dias}', r.dias))}</p></div>`;
         $('av-ocultos').textContent = r.ocultos ? tn('av_ocultos', r.ocultos) : '';
@@ -1811,6 +1839,21 @@
         const cat = r.catalogo.slice().sort((a, b) => (b.sanciones.length > 0) - (a.sanciones.length > 0) || a.producto.localeCompare(b.producto));
         $('av-catalogo').innerHTML = cat.map(ficha).join('');
       };
+      // Cortar / dejar pasar: la casilla manda la decisión; si Windows no deja, vuelve atrás y
+      // se dice por qué.
+      $('av-vistos').addEventListener('change', async (e) => {
+        const c = e.target.closest('input.av-cortar');
+        if (!c) return;
+        c.disabled = true;
+        try {
+          const x = await api('/api/antivirus/cortar', { method: 'POST', body: { producto: c.dataset.producto, cortar: c.checked } });
+          corte.cortados = x.cortados || [];
+          paint(await api('/api/antivirus'));
+        } catch (err) {
+          c.checked = !c.checked;
+          $('av-detectar-msg').textContent = String(err.message || err);
+        } finally { c.disabled = false; }
+      });
       // Exportar: se pide con el token en la cabecera (nunca en la dirección) y se descarga.
       $('av-export').addEventListener('click', async (e) => {
         e.preventDefault();
@@ -1822,17 +1865,42 @@
           document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000);
         } catch (err) { $('av-detectar-msg').textContent = String(err.message || err); }
       });
-      const detectado = (d) => `<p>${d.activo ? '🟢' : '⚪'} <b>${esc(d.nombre)}</b> · ${esc(d.activo ? t('av_activo') : t('av_inactivo'))} · ${esc(d.al_dia ? t('av_al_dia') : t('av_desactualizado'))}${d.conocido ? '' : ` <span class="muted">${esc(t('av_no_en_lista'))}</span>`}</p>`;
-      $('av-detectar').addEventListener('click', async (e) => {
-        e.target.disabled = true;
-        $('av-detectar-msg').textContent = t('av_detectando');
+      // Qué antivirus hay en el equipo, preguntado a Windows al abrir y cada pocos minutos: sin
+      // botón, porque es información que siempre debe estar a la vista.
+      const detectado = (d) => `<span>${d.activo ? '🟢' : '⚪'} <b>${esc(d.nombre)}</b> · ${esc(d.activo ? t('av_activo') : t('av_inactivo'))} · ${esc(d.al_dia ? t('av_al_dia') : t('av_desactualizado'))}${d.conocido ? '' : ` ${esc(t('av_no_en_lista'))}`}</span>`;
+      const detecta = async () => {
         try {
           const d = await api('/api/antivirus/detectar');
-          $('av-detectar-msg').textContent = '';
-          $('av-detectados').innerHTML = d.detectados.length ? d.detectados.map(detectado).join('')
-            : `<p class="muted">${esc(t(d.aviso === 'no_windows' ? 'av_detectar_no_windows' : 'av_detectar_ninguno'))}</p>`;
-        } catch (err) { $('av-detectar-msg').textContent = String(err.message || err); } finally { e.target.disabled = false; }
+          $('av-detectados').innerHTML = d.detectados.length
+            ? `<p>${esc(t('av_instalados'))}<br>${d.detectados.map(detectado).join('<br>')}</p>`
+            : `<p>${esc(t(d.aviso === 'no_windows' ? 'av_detectar_no_windows' : 'av_detectar_ninguno'))}</p>`;
+        } catch (_) { /* si Windows no contesta, la línea queda como estaba */ }
+      };
+      detecta();
+      cadaTanto(detecta, 120000);
+      // Vigilar a mi antivirus: apagado, GUARDIANA deja de medir; no deshace ningún corte.
+      $('av-vigilar').addEventListener('change', async (e) => {
+        const c = e.target;
+        c.disabled = true;
+        try {
+          await api('/api/antivirus/vigilar', { method: 'POST', body: { activa: c.checked } });
+          paint(await api('/api/antivirus'));
+        } catch (err) { c.checked = !c.checked; $('av-detectar-msg').textContent = String(err.message || err); } finally { c.disabled = false; }
       });
+      // Protección máxima: pide confirmación una vez (lleva un aviso), y se quita de un clic.
+      const maximaSet = async (activa) => {
+        $('av-max-confirma').classList.add('hidden');
+        try {
+          const x = await api('/api/antivirus/maxima', { method: 'POST', body: { activa } });
+          corte.cortados = x.cortados || [];
+          $('av-detectar-msg').textContent = '';
+          paint(await api('/api/antivirus'));
+        } catch (err) { $('av-detectar-msg').textContent = String(err.message || err); }
+      };
+      $('av-max-activar').addEventListener('click', () => { $('av-max-confirma').classList.remove('hidden'); $('av-max-si').focus(); });
+      $('av-max-no').addEventListener('click', () => { $('av-max-confirma').classList.add('hidden'); $('av-max-activar').focus(); });
+      $('av-max-si').addEventListener('click', () => maximaSet(true));
+      $('av-max-quitar').addEventListener('click', () => maximaSet(false));
       // El mercado del antivirus: cifras de fuentes oficiales o reconocidas, con su enlace.
       const mercado = [
         { n: 1, fuente: 'Gartner / F‑Secure', url: 'https://investors.f-secure.com/investors/as_an_investment/market' },

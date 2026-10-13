@@ -53,6 +53,7 @@ pub const VENTANA_MS: i64 = 2_000;
 pub const MAXIMO: usize = 2_048;
 
 pub mod cortafuegos;
+pub use cortafuegos::{Cortafuegos, Destino, ErrorCorte};
 #[cfg(windows)]
 mod firmas;
 #[cfg(windows)]

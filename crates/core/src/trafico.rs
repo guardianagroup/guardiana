@@ -157,6 +157,22 @@ impl Ledger {
     }
 }
 
+/// The setting that says whether GUARDIANA counts what the antivirus sends and receives (1.0.22).
+/// Absent means yes: watching is the default; turning it off is the person's choice.
+pub const AJUSTE_VIGILAR_ANTIVIRUS: &str = "antivirus_vigilar";
+
+impl Ledger {
+    /// Whether the antivirus traffic is being watched.
+    pub fn vigilando_antivirus(&self) -> bool {
+        !matches!(self.setting(AJUSTE_VIGILAR_ANTIVIRUS), Ok(Some(v)) if v == "0")
+    }
+
+    /// Turn the watching on or off.
+    pub fn vigila_antivirus(&self, si: bool) -> Result<()> {
+        self.set_setting(AJUSTE_VIGILAR_ANTIVIRUS, if si { "1" } else { "0" })
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -207,5 +223,15 @@ mod tests {
             .unwrap();
         assert_eq!(r.trafico_pruned, 2);
         assert_eq!(l.trafico(0, i64::MAX, &[]).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn watching_the_antivirus_is_on_until_the_person_turns_it_off() {
+        let l = Ledger::open_in_memory(Hash::of(b"t")).unwrap();
+        assert!(l.vigilando_antivirus());
+        l.vigila_antivirus(false).unwrap();
+        assert!(!l.vigilando_antivirus());
+        l.vigila_antivirus(true).unwrap();
+        assert!(l.vigilando_antivirus());
     }
 }

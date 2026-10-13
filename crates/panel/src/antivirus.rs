@@ -38,6 +38,136 @@ use crate::api::{with_ledger, ApiResult};
 use crate::auth::{Session, Zona};
 use crate::AppState;
 
+/// Settings key: the antivirus products whose outgoing traffic the person has chosen to cut.
+const CLAVE_CORTES: &str = "antivirus_cortes";
+
+/// Manages the clean cut of what an antivirus sends out (1.0.22). It holds the one long-lived
+/// firewall session (dynamic: the cuts vanish if GUARDIANA stops) and, per product, the ids of
+/// the filters in place. The wanted set is kept in the ledger, so a restart re-applies it.
+pub(crate) struct CortesAntivirus {
+    cortafuegos: Option<guardiana_apps::Cortafuegos>,
+    /// Product name → the filter ids blocking its executables.
+    puesto: std::sync::Mutex<HashMap<String, Vec<u64>>>,
+}
+
+impl CortesAntivirus {
+    /// Opens the firewall (when on Windows and running as the system) and re-applies whatever the
+    /// person had chosen to cut. Never fails the panel: if the firewall cannot open, cutting is
+    /// simply unavailable and every attempt says so.
+    pub(crate) fn nuevo(ledger: &guardiana_core::Ledger) -> Self {
+        let cortafuegos = guardiana_apps::Cortafuegos::abrir().ok();
+        let yo = Self {
+            cortafuegos,
+            puesto: std::sync::Mutex::new(HashMap::new()),
+        };
+        if yo.cortafuegos.is_some() {
+            for prod in yo.querados(ledger) {
+                let rutas = Self::rutas_de(ledger, &prod);
+                let _ = yo.aplica_rutas(&prod, true, &rutas);
+            }
+        }
+        yo
+    }
+
+    /// The products the person asked to cut, from the ledger.
+    fn querados(&self, ledger: &guardiana_core::Ledger) -> Vec<String> {
+        ledger
+            .setting(CLAVE_CORTES)
+            .ok()
+            .flatten()
+            .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
+            .unwrap_or_default()
+    }
+
+    /// The full paths of a product's running executables, from what this computer has seen in the
+    /// last week. Matching is by the product's documented process file names.
+    fn rutas_de(ledger: &guardiana_core::Ledger, producto: &str) -> Vec<String> {
+        let nombres: Vec<String> = antivirus::antivirus()
+            .iter()
+            .find(|a| a.nombre == producto)
+            .map(|a| a.programas.iter().map(|p| p.to_ascii_lowercase()).collect())
+            .unwrap_or_default();
+        let desde = now_ms() - 7 * 24 * HOUR_MS;
+        let mut rutas: Vec<String> = ledger
+            .program_paths(desde)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|(nombre, _)| nombres.contains(&nombre.to_ascii_lowercase()))
+            .map(|(_, ruta)| ruta)
+            .collect();
+        rutas.sort();
+        rutas.dedup();
+        rutas
+    }
+
+    /// Every known product with the executable paths this computer has seen of it in the last
+    /// week; products with none are left out (there is nothing to cut).
+    fn rutas_por_producto(ledger: &guardiana_core::Ledger) -> Vec<(&'static str, Vec<String>)> {
+        let desde = now_ms() - 7 * 24 * HOUR_MS;
+        let vistos = ledger.program_paths(desde).unwrap_or_default();
+        antivirus::antivirus()
+            .iter()
+            .filter_map(|a| {
+                let mut rutas: Vec<String> = vistos
+                    .iter()
+                    .filter(|(n, _)| a.programas.iter().any(|p| p.eq_ignore_ascii_case(n)))
+                    .map(|(_, r)| r.clone())
+                    .collect();
+                rutas.sort();
+                rutas.dedup();
+                (!rutas.is_empty()).then_some((a.nombre, rutas))
+            })
+            .collect()
+    }
+
+    /// Put the cut on (`cortar`) or take it off, over these executable paths. Returns the number
+    /// of filters now in place for the product.
+    fn aplica_rutas(
+        &self,
+        producto: &str,
+        cortar: bool,
+        rutas: &[String],
+    ) -> Result<usize, guardiana_apps::ErrorCorte> {
+        let Some(cf) = self.cortafuegos.as_ref() else {
+            return Err(guardiana_apps::ErrorCorte::NoSoportado);
+        };
+        // Always take off what was there, so re-applying after an update tracks new paths.
+        if let Some(previos) = self.puesto.lock().ok().and_then(|mut m| m.remove(producto)) {
+            cf.quitar(&previos)?;
+        }
+        if !cortar {
+            return Ok(0);
+        }
+        let mut ids = Vec::new();
+        for ruta in rutas {
+            ids.extend(cf.cortar(ruta, &guardiana_apps::Destino::default())?);
+        }
+        let n = ids.len();
+        if let Ok(mut m) = self.puesto.lock() {
+            m.insert(producto.to_owned(), ids);
+        }
+        Ok(n)
+    }
+
+    /// Which products are cut right now (have filters in place).
+    pub(crate) fn cortados(&self) -> Vec<String> {
+        self.puesto
+            .lock()
+            .map(|m| {
+                m.iter()
+                    .filter(|(_, v)| !v.is_empty())
+                    .map(|(k, _)| k.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Whether cutting is available at all on this machine.
+    pub(crate) fn disponible(&self) -> bool {
+        self.cortafuegos.is_some()
+    }
+}
+
 /// How many names of one product are listed; the totals count all of them.
 const MAX_DESTINOS: usize = 300;
 
@@ -56,8 +186,34 @@ pub(crate) struct Vista {
     trafico_horas: i64,
     /// The latest minutes of antivirus traffic, newest first, for the live panel (1.0.22).
     vivo: Vec<VivoFila>,
+    /// Whether cutting an antivirus's outgoing traffic is available here (Windows, as the system).
+    cortar_disponible: bool,
+    /// The products whose outgoing traffic is cut right now.
+    cortados: Vec<String>,
+    /// GUARDIANA is counting what the antivirus sends and receives (the person can turn it off).
+    vigilando: bool,
+    /// «Protección máxima» of the antivirus is on: every product this computer has seen is cut.
+    maxima: bool,
+    /// The last 24 hours of all the antivirus on this computer, together.
+    resumen: Resumen,
     /// The window, in days.
     dias: i64,
+}
+
+/// The last 24 hours of the antivirus on this computer, always on top of the page (1.0.22).
+#[derive(Serialize, Default)]
+struct Resumen {
+    /// Bytes they sent out and received.
+    subidos: u64,
+    bajados: u64,
+    /// Of the bytes sent, how many between midnight and six.
+    subidos_noche: u64,
+    /// How many different countries they talked to (real ones; marks are not countries).
+    paises: usize,
+    /// How many different destinations (a name, or a network when no name was seen).
+    destinos: usize,
+    /// The products that talked in these 24 hours, most bytes first.
+    productos: Vec<&'static str>,
 }
 
 /// One line of the live panel: a minute of an antivirus talking to a destination (1.0.22).
@@ -406,6 +562,33 @@ fn calcula_trafico(filas: &[guardiana_core::Trafico], zona: i64) -> Vec<TraficoP
     out
 }
 
+/// The totals of all the products together: bytes, countries, destinations.
+fn resume(por_producto: &[TraficoProducto]) -> Resumen {
+    let mut paises = std::collections::HashSet::new();
+    let mut destinos = std::collections::HashSet::new();
+    let mut r = Resumen::default();
+    for p in por_producto {
+        r.subidos += p.subidos;
+        r.bajados += p.bajados;
+        r.subidos_noche += p.subidos_noche;
+        for x in &p.paises {
+            if !x.pais.is_empty() && !x.pais.starts_with('@') {
+                paises.insert(x.pais.clone());
+            }
+        }
+        for d in &p.destinos {
+            destinos.insert((d.destino.clone(), d.red.clone()));
+        }
+    }
+    r.paises = paises.len();
+    r.destinos = destinos.len();
+    // `por_producto` is not sorted yet at this point; order here by bytes.
+    let mut orden: Vec<&TraficoProducto> = por_producto.iter().collect();
+    orden.sort_by_key(|p| std::cmp::Reverse(p.subidos + p.bajados));
+    r.productos = orden.iter().map(|p| p.producto).collect();
+    r
+}
+
 /// `/api/antivirus`: what each antivirus asked for this week, and every product's official record.
 pub(crate) async fn vista(
     Zona(zona): Zona,
@@ -414,19 +597,32 @@ pub(crate) async fn vista(
 ) -> ApiResult<Vista> {
     const DIAS: i64 = 7;
     let now = now_ms();
-    let (filas, devices, trafico, recientes) = with_ledger(&state, |l| {
+    let (filas, devices, trafico, recientes, vigilando, con_ruta) = with_ledger(&state, |l| {
         Ok((
             l.program_names(now - DIAS * 24 * HOUR_MS, now + 1, zona)?,
             l.devices()?,
             l.trafico(now - DIAS * 24 * HOUR_MS, now + 1, &[])?,
             l.trafico(now - VIVO_MINUTOS * 60_000, now + 1, &[])?,
+            l.vigilando_antivirus(),
+            CortesAntivirus::rutas_por_producto(l)
+                .into_iter()
+                .map(|(p, _)| p)
+                .collect::<Vec<_>>(),
         ))
     })?;
+    let cortados = state.cortes.cortados();
+    let maxima = !con_ruta.is_empty() && con_ruta.iter().all(|p| cortados.iter().any(|c| c == p));
     let trafico_horas = trafico
         .iter()
         .map(|f| f.minuto)
         .min()
         .map_or(0, |m| (now - m) / HOUR_MS + 1);
+    let ultimas_24h: Vec<guardiana_core::Trafico> = trafico
+        .iter()
+        .filter(|f| f.minuto >= now - 24 * HOUR_MS)
+        .cloned()
+        .collect();
+    let resumen = resume(&calcula_trafico(&ultimas_24h, zona));
     let trafico = calcula_trafico(&trafico, zona);
     // The live feed: the latest minutes, newest first, only of a known antivirus.
     let mut vivo: Vec<VivoFila> = recientes
@@ -465,8 +661,130 @@ pub(crate) async fn vista(
         trafico,
         trafico_horas,
         vivo,
+        cortar_disponible: state.cortes.disponible(),
+        cortados,
+        vigilando,
+        maxima,
+        resumen,
         dias: DIAS,
     }))
+}
+
+#[derive(serde::Deserialize)]
+pub(crate) struct CortarBody {
+    /// The product to cut or let through.
+    producto: String,
+    /// true to cut everything it sends, false to let it through again.
+    cortar: bool,
+}
+
+#[derive(Serialize)]
+pub(crate) struct CortarView {
+    /// How many filters are in place for the product now (0 when let through).
+    filtros: usize,
+    /// All the products cut right now.
+    cortados: Vec<String>,
+}
+
+/// Cut or let through one product, and record the wanted set so a restart re-applies it.
+fn pon_corte(
+    state: &Arc<AppState>,
+    producto: &str,
+    cortar: bool,
+    rutas: &[String],
+) -> Result<usize, axum::response::Response> {
+    // Change the firewall (outside the ledger lock): its error is its own.
+    let filtros = state
+        .cortes
+        .aplica_rutas(producto, cortar, rutas)
+        .map_err(|e| {
+            (axum::http::StatusCode::SERVICE_UNAVAILABLE, e.to_string()).into_response()
+        })?;
+    with_ledger(state, |l| {
+        let mut set = l
+            .setting(CLAVE_CORTES)?
+            .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
+            .unwrap_or_default();
+        set.retain(|p| p != producto);
+        if cortar {
+            set.push(producto.to_owned());
+        }
+        l.set_setting(
+            CLAVE_CORTES,
+            &serde_json::to_string(&set).unwrap_or_else(|_| "[]".to_owned()),
+        )
+    })?;
+    Ok(filtros)
+}
+
+/// `/api/antivirus/cortar`: cut (or let through) everything an antivirus sends out (1.0.22).
+/// Always the person's explicit choice; always reversible.
+pub(crate) async fn cortar(
+    State(state): State<Arc<AppState>>,
+    _s: Session,
+    axum::Json(body): axum::Json<CortarBody>,
+) -> ApiResult<CortarView> {
+    if !antivirus::antivirus()
+        .iter()
+        .any(|a| a.nombre == body.producto)
+    {
+        return Err((axum::http::StatusCode::BAD_REQUEST, "unknown product").into_response());
+    }
+    // The executable paths of the product, from what this computer has seen (needs the ledger).
+    let rutas = with_ledger(&state, |l| Ok(CortesAntivirus::rutas_de(l, &body.producto)))?;
+    let filtros = pon_corte(&state, &body.producto, body.cortar, &rutas)?;
+    Ok(axum::Json(CortarView {
+        filtros,
+        cortados: state.cortes.cortados(),
+    }))
+}
+
+#[derive(serde::Deserialize)]
+pub(crate) struct ActivaBody {
+    activa: bool,
+}
+
+/// `/api/antivirus/maxima`: «Protección máxima» of the antivirus (1.0.22): cut every product this
+/// computer has seen, or let them all through again. One click each way, like the home's.
+pub(crate) async fn maxima(
+    State(state): State<Arc<AppState>>,
+    _s: Session,
+    axum::Json(body): axum::Json<ActivaBody>,
+) -> ApiResult<CortarView> {
+    let todos = with_ledger(&state, |l| Ok(CortesAntivirus::rutas_por_producto(l)))?;
+    let mut filtros = 0;
+    if body.activa {
+        if todos.is_empty() {
+            return Err((
+                axum::http::StatusCode::CONFLICT,
+                "no antivirus seen on this computer yet",
+            )
+                .into_response());
+        }
+        for (producto, rutas) in &todos {
+            filtros += pon_corte(&state, producto, true, rutas)?;
+        }
+    } else {
+        // Let through everything that is cut, seen or not (it may no longer be listed).
+        for producto in state.cortes.cortados() {
+            pon_corte(&state, &producto, false, &[])?;
+        }
+    }
+    Ok(axum::Json(CortarView {
+        filtros,
+        cortados: state.cortes.cortados(),
+    }))
+}
+
+/// `/api/antivirus/vigilar`: GUARDIANA counts what the antivirus sends and receives, or stops
+/// counting (1.0.22). It never undoes a cut: that is the person's other choice.
+pub(crate) async fn vigilar(
+    State(state): State<Arc<AppState>>,
+    _s: Session,
+    axum::Json(body): axum::Json<ActivaBody>,
+) -> ApiResult<serde_json::Value> {
+    with_ledger(&state, |l| l.vigila_antivirus(body.activa))?;
+    Ok(axum::Json(serde_json::json!({ "vigilando": body.activa })))
 }
 
 /// A plain local date-time `YYYY-MM-DD HH:MM` from a Unix-ms minute, for the CSV.
