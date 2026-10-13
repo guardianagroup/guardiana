@@ -44,7 +44,7 @@
          «Open GUARDIANA ZERO» ticked. No folder choice, no options. -->
     <ui:WixUI Id="WixUI_Minimal" />
     <WixVariable Id="WixUILicenseRtf" Value="$(var.Welcome)" />
-    <WixVariable Id="WixUIDialogBmp" Value="$(sys.SOURCEFILEDIR)dialogo-zero.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.Dialogo)" />
     <WixVariable Id="WixUIBannerBmp" Value="$(sys.SOURCEFILEDIR)banner-zero.bmp" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="!(loc.AbrirZero)" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />

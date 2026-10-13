@@ -26,7 +26,9 @@ $readme = Join-Path $here "wix\textos\zero-leeme-$Idioma.txt"
 $welcome = Join-Path $here "wix\textos\zero-bienvenida-$Idioma.rtf"
 $loc = Join-Path $here "wix\loc-zero-$cultura.wxl"
 $icon = Join-Path (Split-Path -Parent $here) "zero\navegador\recursos\guardiana-zero.ico"
-foreach ($f in @($readme, $welcome, $loc, $icon, $wxs)) { if (-not (Test-Path $f)) { throw "Falta $f" } }
+# The side picture carries the phrase of the profiles in the installer's language (1.0.18).
+$dialogo = Join-Path $here "wix\dialogo-zero-$Idioma.bmp"
+foreach ($f in @($readme, $welcome, $loc, $icon, $wxs, $dialogo)) { if (-not (Test-Path $f)) { throw "Falta $f" } }
 # The exe must carry a version resource: without one, Windows Installer compares timestamps
 # instead of versions and can silently keep the old binary on an upgrade (DECISIONES #93).
 if (-not (Test-Path $Exe)) { throw "No existe $Exe" }
@@ -39,6 +41,6 @@ $outDir = Split-Path -Parent $Out
 if ($outDir -and -not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir | Out-Null }
 if ($Wix -like "*.dll") { $cmd = "dotnet"; $pre = @($Wix) } else { $cmd = $Wix; $pre = @() }
 Write-Host "idioma del instalador: $Idioma ($cultura)"
-& $cmd @pre build -arch x64 -culture $cultura -loc $loc -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d "Version=$Version" -d "Exe=$Exe" -d "Readme=$readme" -d "Welcome=$welcome" -d "Icon=$icon" -o $Out $wxs
+& $cmd @pre build -arch x64 -culture $cultura -loc $loc -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d "Version=$Version" -d "Exe=$Exe" -d "Readme=$readme" -d "Welcome=$welcome" -d "Dialogo=$dialogo" -d "Icon=$icon" -o $Out $wxs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Get-FileHash -Algorithm SHA256 $Out | Format-List

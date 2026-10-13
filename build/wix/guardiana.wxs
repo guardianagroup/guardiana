@@ -54,7 +54,7 @@
          the right of the top band of the others (493x58), where WiX leaves room free of text.
          build/wix/imagenes.py draws them. The package name is the brand, in capitals, as
          Windows shows it in every screen and in «Aplicaciones instaladas». -->
-    <WixVariable Id="WixUIDialogBmp" Value="$(sys.SOURCEFILEDIR)dialogo.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.Dialogo)" />
     <WixVariable Id="WixUIBannerBmp" Value="$(sys.SOURCEFILEDIR)banner.bmp" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="!(loc.AbrirPanel)" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
