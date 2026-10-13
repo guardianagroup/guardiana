@@ -569,3 +569,5 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 .universo .datos .barrita.gruesa { height: 8px; }
 .universo .tip .arriba4 { margin-top: 4px; }
 .universo .barra button, .universo .vacio button, .universo .aviso button { text-transform: none; letter-spacing: 0; box-shadow: none; }
+.universo .ayuda-vista { transition: opacity .8s ease; }
+.universo .ayuda-vista.oculta { opacity: 0; }

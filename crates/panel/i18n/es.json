@@ -1971,9 +1971,9 @@
     "pd_vigilancia_off": "La vigilancia del antivirus está apagada: lo que envía no se está midiendo (se enciende en «Tu antivirus»).",
     "pd_ayuda_globo": "La luz del sol es la de este momento. Arrastra para girar, rueda para acercar. Las columnas son los servidores: más altas, más datos.",
     "pd_ayuda_mapa": "El mismo mundo, desenrollado. La sombra es la noche de ahora mismo. Rueda del ratón: acercar.",
-    "pd_ayuda_nebulosa": "Tu ordenador en el centro; el anillo es GUARDIANA. Pasa el ratón por un punto; con un clic lo cortas o lo dejas pasar.",
-    "pd_ayuda_dentro": "De izquierda a derecha: el programa, la puerta de GUARDIANA, la tarjeta de red, internet y el país del servidor.",
-    "pd_ayuda_radar": "El ángulo es la región del servidor; cuanto más cerca del centro, más datos le ha enviado tu equipo.",
+    "pd_ayuda_nebulosa": "Una galaxia por país: más grande cuantos más datos van y vienen, y late con lo que tu ordenador le envía en cada momento. En el centro, tu ordenador dentro del anillo de GUARDIANA. Arrastra para mirar de lado, rueda para acercar.",
+    "pd_ayuda_dentro": "Cada banda es tan ancha como los datos que salen por ella: de cada programa, por la puerta de GUARDIANA, al país del servidor y a la empresa de su red. Lo parado termina en la puerta; su grosor cuenta los intentos parados, porque no salió nada.",
+    "pd_ayuda_radar": "Un radar de verdad: el rumbo es la longitud del país del servidor (000 = Greenwich) y los anillos, una escala real de bytes enviados; cuanto más cerca del centro, más datos. Los ecos se encienden al pasar el barrido.",
     "pd_sin_webgl": "(Este navegador no permite WebGL2: se muestra la nebulosa.)",
     "pd_tu_ordenador": "Tu ordenador",
     "pd_internet": "Internet",
@@ -2098,6 +2098,17 @@
     "pd_boton_portada": "Ver cómo trabaja GUARDIANA en tu ordenador",
     "pd_portada_texto": "En directo, sobre el globo: lo que tu antivirus, tu navegador y tus programas envían a cada país y a cada empresa, y lo que GUARDIANA corta.",
     "pd_cortado_ancho": "Parado: una regla general de GUARDIANA (por categoría) no deja salir este nombre",
-    "pd_ancho_dejar": "Lo para una regla general; para dejarlo pasar, usa «Desbloquear» en su fila de la Radiografía."
+    "pd_ancho_dejar": "Lo para una regla general; para dejarlo pasar, usa «Desbloquear» en su fila de la Radiografía.",
+    "pd_africa": "África",
+    "pd_oceania": "Oceanía",
+    "pd_radar_lectura": "Radar · escala logarítmica de bytes · {n} contactos · {p} parados · barrido cada {s} s",
+    "pd_col_programas": "Programas",
+    "pd_col_pais": "País del servidor",
+    "pd_col_red": "Empresa de la red",
+    "pd_puerta_pasa": "pasa {x}",
+    "pd_otros_paises": "Otros países",
+    "pd_otras_redes": "Otras redes",
+    "pd_red_desconocida": "Red sin identificar",
+    "pd_red_paises": "Servidores en:"
   }
 }

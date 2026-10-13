@@ -489,7 +489,8 @@
         gl.bindVertexArray(null);
         tex = { dia: textura(null), luces: textura(null), agua: textura(null), cielo: textura(cielo(), true) };
         const carga = (clave, url) => { const im = new Image(); im.onload = () => { gl.deleteTexture(tex[clave]); tex[clave] = textura(im, true); }; im.src = url; };
-        carga('dia', '/static/tierra/dia.jpg'); carga('luces', '/static/tierra/luces.jpg'); carga('agua', '/static/tierra/agua.png');
+        const ruta = ctx.tierra || '/static/tierra/';
+          carga('dia', ruta + 'dia.jpg'); carga('luces', ruta + 'luces.jpg'); carga('agua', ruta + 'agua.png');
         T.ok = true;
       } catch (e) { console.error(e); T.ok = false; }
     }
@@ -713,8 +714,9 @@
 
     // ---------- Drawing ----------
     const enTierra = () => (st.vista === 'globo' || st.vista === 'mapa') && T.ok;
+    const nebulosaGL = () => st.vista === 'nebulosa' && T.ok && !!PN;
     const fondo = () => {
-      if (enTierra()) { cx.clearRect(0, 0, st.Wc, st.H); return; }
+      if (enTierra() || nebulosaGL()) { cx.clearRect(0, 0, st.Wc, st.H); return; }
       cx.fillStyle = '#04070d'; cx.fillRect(0, 0, st.Wc, st.H);
       const tt = tiempo();
       estrellas.forEach((e) => { const a = 0.25 + 0.25 * Math.sin(tt * 0.8 + e.f); cx.fillStyle = `rgba(190,215,240,${reducido ? 0.35 : a})`; cx.fillRect(e.x * st.W, e.y * st.H, e.r, e.r); });
@@ -885,6 +887,448 @@
         if (delta < 0.6) { cx.strokeStyle = bloqueado(d) ? `rgba(255,107,122,${0.8 - delta})` : `rgba(255,181,71,${0.8 - delta})`; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(d.x, d.y, 6 + delta * 22, 0, 7); cx.stroke(); }
         nodoDestino(d, conNombre(d) && delta < 2.2, d.x < L.c.x ? 'izq' : 'der');
       });
+    };
+
+
+    // =====================================================================================
+    // Second pass on three views (the owner, 13 Oct 2026: «el radar, nebulosa y ordenador
+    // necesito más calidad profesional»), worked out with Grok from the best references there
+    // are: the nebula as thousands of points in WebGL, one turning galaxy per country, with
+    // depth; the radar as a real one, with phosphor persistence, a true logarithmic scale of
+    // bytes, bearings and air-traffic-control tags; the computer as a Sankey diagram whose
+    // bands are as wide as the bytes, through GUARDIANA's gate.
+    // =====================================================================================
+
+    // ---------- 1. Nebula: WebGL2 points, one galaxy per country ----------
+    const VS_NEB = `#version 300 es
+    in vec3 aCentro; in vec3 aOff; in vec4 aColor; in vec2 aTam;
+    uniform mat4 uPV; uniform float uT, uPx; uniform float uAct[24];
+    out vec4 vColor;
+    void main() {
+      float r = length(aOff.xy);
+      float ang = uT * (0.025 + 0.2 / (0.45 + r));
+      float c = cos(ang), s = sin(ang);
+      vec3 o = vec3(aOff.x * c - aOff.y * s, aOff.x * s + aOff.y * c, aOff.z);
+      o += 0.04 * vec3(sin(uT * 0.7 + aTam.y * 13.0), cos(uT * 0.6 + aTam.y * 7.0), sin(uT * 0.5 + aTam.y * 5.0));
+      float act = uAct[int(aColor.a + 0.5)];
+      vec4 p = uPV * vec4(aCentro + o, 1.0);
+      gl_Position = p;
+      gl_PointSize = clamp(aTam.x * uPx / p.w * (1.0 + act * 0.5), 1.0, 26.0);
+      vColor = vec4(aColor.rgb * (0.75 + act * 0.9), 0.7 + 0.3 * sin(uT * 1.6 + aTam.y * 40.0));
+    }`;
+    const FS_NEB = `#version 300 es
+    precision mediump float;
+    in vec4 vColor; out vec4 o;
+    void main() {
+      vec2 q = gl_PointCoord * 2.0 - 1.0; float d = dot(q, q);
+      if (d > 1.0) discard;
+      float a = exp(-d * 4.2) * vColor.a;
+      o = vec4(vColor.rgb * a, a);
+    }`;
+    let PN = null, vaoN = null, bufN = null, nPuntos = 0, firmaNeb = '';
+    if (T.ok) {
+      try {
+        PN = programa(VS_NEB, FS_NEB);
+        vaoN = gl.createVertexArray(); bufN = gl.createBuffer();
+        gl.bindVertexArray(vaoN); gl.bindBuffer(gl.ARRAY_BUFFER, bufN);
+        const paso = 12 * 4;
+        [['aCentro', 3, 0], ['aOff', 3, 12], ['aColor', 4, 24], ['aTam', 2, 40]].forEach(([n, k, o]) => { const l = gl.getAttribLocation(PN.p, n); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, k, gl.FLOAT, false, paso, o); });
+        gl.bindVertexArray(null);
+      } catch (e) { console.error(e); PN = null; }
+    }
+    const hsl = (h, s, l) => { s /= 100; l /= 100; const k = (n) => (n + h / 30) % 12, a = s * Math.min(l, 1 - l), f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))); return [f(0), f(8), f(4)]; };
+    const NEB = { rx: 10.5, ry: 6.2, centros: {}, ordenPaises: [] };
+    // Countries west to east around the ring: the Americas on the left, Europe on top, Asia right.
+    const centroNeb = (k, n) => { const a = Math.PI - (k + 0.5) * (2 * Math.PI / Math.max(1, n)); return [Math.cos(a) * NEB.rx, Math.sin(a) * NEB.ry, 2.2 * Math.sin(2 * a)]; };
+    const construyeNebulosa = () => {
+      const orden = paisesUsados.slice().sort((a, b) => centros[a].lon - centros[b].lon);
+      const totPais = {}; VISIBLES.forEach((d) => { totPais[d.pais] = (totPais[d.pais] || 0) + d.sub + d.baj + d.bloq * 2000; });
+      const total = Math.max(1, Object.values(totPais).reduce((a, b) => a + b, 0));
+      const firma = orden.join(',') + '|' + orden.map((c) => Math.round(Math.sqrt((totPais[c] || 0) / total) * 6)).join('');
+      NEB.ordenPaises = orden;
+      orden.forEach((c, k) => { NEB.centros[c] = centroNeb(k, orden.length); });
+      if (!PN || firma === firmaNeb) return;
+      firmaNeb = firma;
+      const datos = [];
+      const punto3 = (cen, off, col, grupo, tam) => { datos.push(cen[0], cen[1], cen[2], off[0], off[1], off[2], col[0], col[1], col[2], grupo, tam, azar()); };
+      orden.forEach((c, k) => {
+        const cen = NEB.centros[c], h = tono(c), m = Math.round(600 + 2600 * Math.sqrt((totPais[c] || 0) / total)), brazos = 2 + (k % 2), giro = azar() * 6.28, inclina = 0.35 + azar() * 0.4;
+        for (let i = 0; i < m; i++) {
+          const r = Math.min(3.4, -Math.log(1 - azar() * 0.985) * 0.72), brazo = i % brazos;
+          const th = r * 2.3 + brazo * 2 * Math.PI / brazos + gauss() * 0.3 + giro;
+          let x = Math.cos(th) * r, y = Math.sin(th) * r, z = gauss() * 0.14 * (1 - r / 3);
+          const y2 = y * Math.cos(inclina) - z * Math.sin(inclina), z2 = y * Math.sin(inclina) + z * Math.cos(inclina); y = y2; z = z2;
+          const blanco = r < 0.25 && azar() < 0.5, col = blanco ? [1, 0.95, 0.9] : hsl((h + gauss() * 14 + 360) % 360, 70 + azar() * 20, 55 + azar() * 28);
+          punto3(cen, [x, y * 0.8, z], col, k % 21, 0.05 + Math.pow(azar(), 3) * 0.12);
+        }
+      });
+      // The computer: a hot core, and GUARDIANA's ring around it (a dashed torus of light).
+      for (let i = 0; i < 700; i++) { const r = Math.abs(gauss()) * 0.32; const th = azar() * 6.28; punto3([0, 0, 0], [Math.cos(th) * r, Math.sin(th) * r, gauss() * 0.15], azar() < 0.5 ? [1, 0.55, 0.62] : [1, 0.9, 0.92], 22, 0.03 + azar() * 0.06); }
+      for (let i = 0; i < 1800; i++) { const th = azar() * 6.28; if ((th % (2 * Math.PI / 28)) > (2 * Math.PI / 28) * 0.72) continue; const r = 2.05 + gauss() * 0.04; punto3([0, 0, 0], [Math.cos(th) * r, Math.sin(th) * r, gauss() * 0.04], [0.25, 0.88, 0.77], 21, 0.025 + azar() * 0.03); }
+      // Dust between them.
+      for (let i = 0; i < 2600; i++) punto3([0, 0, 0], [gauss() * 7, gauss() * 4.2, gauss() * 4], [0.55, 0.65, 0.85], 23, 0.012 + azar() * 0.02);
+      nPuntos = datos.length / 12;
+      gl.bindBuffer(gl.ARRAY_BUFFER, bufN); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(datos), gl.STATIC_DRAW);
+    };
+    const NC = { PV: null, C: [0, 0, 20], tanH: Math.tan(20 * RAD) };
+    const camaraNeb = () => {
+      const W = st.Wc, H = st.H, asp = W / H, aspU = st.W / H, tt = tiempo();
+      const D = Math.max((NEB.ry + 3.2) / NC.tanH, (NEB.rx + 4.2) / (NC.tanH * aspU)) * 1.02 / T.zoom;
+      const despl = ((W - st.W) / 2) * (2 * D * NC.tanH / H);
+      const rx = st.raton ? (st.raton.x / W - 0.5) : 0, ry = st.raton ? (st.raton.y / H - 0.5) : 0;
+      NEB.yaw += ((reducido ? 0 : 0.2 * Math.sin(tt * 0.045)) + rx * 0.16 + st.dRot - NEB.yaw) * 0.04;
+      NEB.pitch += ((reducido ? 0 : 0.07 * Math.sin(tt * 0.031)) + ry * 0.1 + st.dTilt * 0.5 - NEB.pitch) * 0.04;
+      const t0 = 1 / NC.tanH, n = 0.5, f = 120, P = new Float32Array(16); P[0] = t0 / asp; P[5] = t0; P[10] = (f + n) / (n - f); P[11] = -1; P[14] = 2 * f * n / (n - f);
+      NC.PV = mul(P, mul(trasl(-despl, 0, -D), mul(rotX(NEB.pitch), rotY(NEB.yaw))));
+      NC.D = D;
+    };
+    NEB.yaw = 0; NEB.pitch = 0;
+    const aPantallaNeb = (q) => { const c = aplica(NC.PV, q); return { x: (c[0] / c[3] + 1) / 2 * st.Wc, y: (1 - c[1] / c[3]) / 2 * st.H, v: c[3] > 0.1, w: c[3] }; };
+    const actividad = new Float32Array(24);
+    const pintaNebulosaGL = () => {
+      const W = Math.round(st.Wc * st.dpr), H = Math.round(st.H * st.dpr);
+      if (glc.width !== W || glc.height !== H) { glc.width = W; glc.height = H; }
+      gl.viewport(0, 0, W, H);
+      gl.disable(gl.DEPTH_TEST); gl.useProgram(PF.p); gl.bindVertexArray(vaoF);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex.cielo); gl.uniform1i(PF.u.uCielo, 0);
+      gl.uniform2f(PF.u.uRes, W, H); gl.uniform1f(PF.u.uDesp, -NEB.yaw * 0.06); gl.uniform1f(PF.u.uHalo, 0); gl.uniform2f(PF.u.uCentro, 0, 0); gl.uniform1f(PF.u.uRadio, 1); gl.uniform2f(PF.u.uSolP, 1, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      if (!PN || !nPuntos) return;
+      // How alive each galaxy is right now: what its destinations sent in the last beats.
+      const porPais = {}; let todo = 0;
+      VISIBLES.forEach((d) => { porPais[d.pais] = (porPais[d.pais] || 0) + (d.ema || 0); todo += d.ema || 0; });
+      NEB.ordenPaises.forEach((c, k) => { const v = Math.min(1, Math.sqrt((porPais[c] || 0) / 40000)); actividad[k % 21] += (v - actividad[k % 21]) * 0.08; });
+      actividad[22] += (Math.min(1, Math.sqrt(todo / 80000)) - actividad[22]) * 0.08; actividad[21] = 0.35 + 0.25 * Math.sin(tiempo() * 1.4); actividad[23] = 0;
+      gl.useProgram(PN.p); gl.bindVertexArray(vaoN);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+      gl.uniformMatrix4fv(PN.u.uPV, false, NC.PV); gl.uniform1f(PN.u.uT, reducido ? 0 : tiempo()); gl.uniform1f(PN.u.uPx, H / (2 * NC.tanH));
+      gl.uniform1fv(PN.u['uAct[0]'], actividad);
+      gl.drawArrays(gl.POINTS, 0, nPuntos);
+      gl.disable(gl.BLEND); gl.bindVertexArray(null);
+    };
+    // Routes and labels of the nebula, drawn over the points with the same camera.
+    const layoutNebulosaPro = () => {
+      const tt = tiempo(), cen = aPantallaNeb([0, 0, 0]);
+      const ps = prodsVisibles();
+      const prods = ps.map((p, k) => { const a = tt * (reducido ? 0.03 : 0.12) + k * 2 * Math.PI / Math.max(1, ps.length); const q = aPantallaNeb([Math.cos(a) * 1.0, Math.sin(a) * 1.0, 0]); return { p, x: q.x, y: q.y, w3: [Math.cos(a), Math.sin(a), 0] }; });
+      const porPais = {};
+      VISIBLES.forEach((d) => { (porPais[d.pais] = porPais[d.pais] || []).push(d); });
+      Object.values(porPais).forEach((g) => g.sort((a, b) => (b.sub + b.baj) - (a.sub + a.baj)));
+      VISIBLES.forEach((d) => {
+        const g = porPais[d.pais], j = g.indexOf(d), c3 = NEB.centros[d.pais] || [0, 0, 0];
+        const ga = j * 2.399963, rr = 0.8 + 0.42 * Math.sqrt(j);
+        const p3 = [c3[0] + Math.cos(ga) * rr, c3[1] + Math.sin(ga) * rr * 0.6, c3[2] + 0.3 * Math.sin(j * 1.7)];
+        d.p3 = p3;
+        const dir = Math.atan2(c3[1], c3[0]), gate3 = [Math.cos(dir) * 2.05, Math.sin(dir) * 2.05, 0];
+        const lad = lado(d) || 0.3, ctrl3 = [c3[0] * 0.5 - Math.sin(dir) * 1.1 * lad, c3[1] * 0.5 + Math.cos(dir) * 1.1 * lad, c3[2] * 0.5];
+        const pr = prods.find((q) => q.p.id === d.p), from3 = pr ? pr.w3 : [0, 0, 0];
+        const ruta = [];
+        for (let i = 0; i <= 6; i++) { const u = i / 6; ruta.push(aPantallaNeb([from3[0] + (gate3[0] - from3[0]) * u, from3[1] + (gate3[1] - from3[1]) * u, 0])); }
+        for (let i = 1; i <= N - 6; i++) { const u = i / (N - 6), a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, c = u * u; ruta.push(aPantallaNeb([a * gate3[0] + b * ctrl3[0] + c * p3[0], a * gate3[1] + b * ctrl3[1] + c * p3[1], a * gate3[2] + b * ctrl3[2] + c * p3[2]])); }
+        d.ruta = ruta; d.tg = 6 / N;
+        const fin = ruta[ruta.length - 1]; d.x = fin.x; d.y = fin.y; d.vis = fin.v;
+      });
+      return { cen, prods, porPais };
+    };
+    const dibujaNebulosaPro = (dt) => {
+      const L = layoutNebulosaPro();
+      const tt = tiempo();
+      // GUARDIANA's ring, crisp over its points.
+      const anillo = []; for (let i = 0; i <= 96; i++) { const a = i / 96 * Math.PI * 2; anillo.push(aPantallaNeb([Math.cos(a) * 2.05, Math.sin(a) * 2.05, 0])); }
+      cx.globalCompositeOperation = 'lighter';
+      trazoPuntos(anillo, 'rgba(63,224,197,.55)', 1.2, [10, 6], -tt * 16);
+      // Filaments: a fine thread per destination, a faint wide veil per country (they bundle).
+      VISIBLES.forEach((d) => {
+        if (!d.ruta.length) return;
+        const bl = bloqueado(d), col = bl ? '#ff6b7a' : prod(d.p).color, vivo = Math.min(1, (d.ema || 0) / 20000);
+        if (bl) { trazo(d.ruta, 0, d.tg, 'rgba(255,107,122,.65)', 1.2); trazo(d.ruta, d.tg, 1, 'rgba(160,175,200,.12)', 1, [2, 6]); return; }
+        trazo(d.ruta, 0, 1, col + '10', 6);
+        trazo(d.ruta, 0, 1, col + Math.round(60 + 120 * vivo).toString(16).padStart(2, '0'), 0.9);
+      });
+      cx.globalCompositeOperation = 'source-over';
+      ordenador(L.cen, 15);
+      st.dianas.push({ x: L.cen.x, y: L.cen.y, r: 16, tipo: 'yo' });
+      L.prods.forEach(nodoProducto);
+      particulas(dt);
+      VISIBLES.forEach((d) => { if (d.vis) nodoDestino(d, false); });
+      // Country titles under each galaxy, with what moved.
+      const puestos = [];
+      NEB.ordenPaises.forEach((c) => {
+        const g = L.porPais[c] || [], q = aPantallaNeb(NEB.centros[c]);
+        if (!q.v) return;
+        st.dianas.push({ x: q.x, y: q.y, r: 26, tipo: 'pais', ref: c });
+        const sub = g.reduce((a, d) => a + d.sub, 0), h = tono(c), c3 = NEB.centros[c];
+        cx.textAlign = 'center';
+        cx.font = '500 11px "Unbounded", "IBM Plex Sans", sans-serif'; cx.fillStyle = `hsla(${h},75%,80%,.95)`;
+        const y0 = aPantallaNeb([c3[0], c3[1] - 2.6, c3[2]]).y + 12;
+        cx.fillText(nombrePais(c).toUpperCase(), q.x, y0);
+        cx.font = '10px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(170,190,210,.8)';
+        cx.fillText(`${tn('pd_nombres', g.length)} · ${bytes(sub)}`, q.x, y0 + 14);
+        cx.textAlign = 'left';
+        puestos.push({ x: q.x - 60, y: y0 - 12, w: 120, h: 30 });
+      });
+      // Callouts with leader lines for the ones that move most (and every one stopped).
+      if (st.W >= 700) {
+        const marcados = VISIBLES.filter((d) => d.vis && (bloqueado(d) || VISIBLES.indexOf(d) < 18)).slice(0, 24);
+        marcados.forEach((d) => {
+          const derecha = d.x >= L.cen.x;
+          const txt = d.host.length > 30 ? d.host.slice(0, 29) + '…' : d.host;
+          const sub = bloqueado(d) ? tn('pd_parados', d.bloq) : `${d.pais} · ${d.red && d.red[0] !== '@' ? d.red.slice(0, 16) : '—'} · ${bytes(d.sub)}`;
+          cx.font = '500 10.5px "IBM Plex Mono", monospace';
+          const w = Math.max(cx.measureText(txt).width, cx.measureText(sub).width) + 14, h = 30;
+          let bx = derecha ? d.x + 26 : d.x - 26 - w, by = d.y - h / 2;
+          let n = 0; while (n++ < 14 && puestos.some((b) => bx < b.x + b.w && bx + w > b.x && by < b.y + b.h && by + h > b.y)) by += h + 3;
+          bx = Math.max(4, Math.min(st.W - w - 4, bx));
+          puestos.push({ x: bx, y: by, w, h });
+          const bl = bloqueado(d), col = bl ? '#ff6b7a' : d.doc === false ? '#ffd166' : 'rgba(255,181,71,.8)';
+          cx.strokeStyle = 'rgba(170,190,210,.45)'; cx.lineWidth = 1;
+          const ex = derecha ? bx : bx + w;
+          cx.beginPath(); cx.moveTo(d.x, d.y); cx.lineTo(ex + (derecha ? -8 : 8), by + h / 2); cx.lineTo(ex, by + h / 2); cx.stroke();
+          cx.fillStyle = 'rgba(4,10,20,.8)'; cx.fillRect(bx, by, w, h);
+          cx.strokeStyle = col; cx.setLineDash(d.doc === false && !bl ? [3, 2] : []); cx.strokeRect(bx + 0.5, by + 0.5, w - 1, h - 1); cx.setLineDash([]);
+          cx.fillStyle = bl ? '#ff8d99' : '#f3e3c8'; cx.fillText(txt, bx + 7, by + 12);
+          cx.font = '10px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(160,185,210,.85)'; cx.fillText(sub, bx + 7, by + 24);
+        });
+      }
+    };
+
+    // ---------- 2. Radar: phosphor, a true scale of bytes, bearings, tags ----------
+    let fosforo = null, barridoAntes = 0;
+    const capaFosforo = () => {
+      if (!fosforo || fosforo.width !== cv.width || fosforo.height !== cv.height) { fosforo = document.createElement('canvas'); fosforo.width = cv.width; fosforo.height = cv.height; }
+      const f = fosforo.getContext('2d'); f.setTransform(st.dpr, 0, 0, st.dpr, 0, 0); return f;
+    };
+    let rayas = null;
+    const patronRayas = () => { if (rayas) return rayas; const c = document.createElement('canvas'); c.width = 4; c.height = 3; const g = c.getContext('2d'); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, 0, 4, 1); rayas = cx.createPattern(c, 'repeat'); return rayas; };
+    const PERIODO = 7;
+    const layoutRadarPro = () => {
+      const c = { x: st.W / 2, y: st.H / 2 + 8 }, Rr = Math.min(st.W * 0.4, st.H * 0.4), R0 = Rr * 0.12;
+      // The scale follows the data: the busiest contact near the inner ring, the quietest near the
+      // edge, at least three powers of ten between them.
+      const vals = VISIBLES.map((d) => d.sub).filter((v) => v > 0);
+      const hi = Math.log10(Math.max(1000, ...vals, 1)) + 0.25, lo = Math.min(hi - 3, Math.log10(Math.max(10, Math.min(...vals, 1e12))) - 0.25);
+      const lmax = hi, lmin = Math.max(1, lo);
+      const radio = (b) => { const l = Math.log10(Math.max(1, b)); const f = Math.min(1, Math.max(0, (lmax - l) / (lmax - lmin))); return R0 * 1.6 + (Rr * 0.93 - R0 * 1.6) * f; };
+      const prods = posProductos(c, R0 * 0.55);
+      VISIBLES.forEach((d) => {
+        const ce = centros[d.pais], grupo = VISIBLES.filter((x) => x.pais === d.pais), k = grupo.indexOf(d);
+        const rumbo = ((ce.lon % 360) + 360) % 360 + (k - (grupo.length - 1) / 2) * Math.min(2.4, 20 / grupo.length);
+        const ang = (rumbo - 90) * RAD, dist = d.sub ? radio(d.sub) : Rr * 0.97;
+        d.ang = ang; d.rumbo = (rumbo + 360) % 360; d.x = c.x + Math.cos(ang) * dist; d.y = c.y + Math.sin(ang) * dist;
+        const pr = posDe(prods, d, c), g = { x: c.x + Math.cos(ang) * R0, y: c.y + Math.sin(ang) * R0 };
+        d.ruta = tramo((u) => ({ x: pr.x + (g.x - pr.x) * u, y: pr.y + (g.y - pr.y) * u }), 8).concat(tramo((u) => ({ x: g.x + (d.x - g.x) * u, y: g.y + (d.y - g.y) * u }), N - 8).slice(1));
+        d.tg = 8 / N; d.vis = true;
+      });
+      return { c, Rr, R0, prods, lmin, lmax, radio };
+    };
+    const etiquetaBytes = (l) => bytes(Math.pow(10, l)).replace('.0 ', ' ');
+    const dibujaRadarPro = (dt) => {
+      const L = layoutRadarPro(), tt = tiempo(), { c, Rr, R0 } = L;
+      const barrido = ((tt % PERIODO) / PERIODO) * Math.PI * 2 - Math.PI / 2;
+      // The scope's glass: a dark teal disc with a vignette.
+      const fondoG = cx.createRadialGradient(c.x, c.y, Rr * 0.05, c.x, c.y, Rr * 1.15);
+      fondoG.addColorStop(0, 'rgba(10,40,44,.55)'); fondoG.addColorStop(0.7, 'rgba(5,20,26,.5)'); fondoG.addColorStop(1, 'rgba(4,7,13,0)');
+      cx.fillStyle = fondoG; cx.beginPath(); cx.arc(c.x, c.y, Rr * 1.15, 0, 7); cx.fill();
+      // Range rings: one per power of ten of bytes, labelled; nearer the centre, more data.
+      cx.lineWidth = 1; cx.font = '10px "IBM Plex Mono", monospace'; cx.textAlign = 'left';
+      for (let l = Math.ceil(L.lmin); l <= Math.floor(L.lmax); l++) {
+        const r = L.radio(Math.pow(10, l));
+        cx.strokeStyle = 'rgba(63,224,197,.16)'; cx.beginPath(); cx.arc(c.x, c.y, r, 0, 7); cx.stroke();
+        const a = 135 * RAD - Math.PI / 2; cx.fillStyle = 'rgba(63,224,197,.55)'; cx.fillText(etiquetaBytes(l), c.x + Math.cos(a) * r + 4, c.y + Math.sin(a) * r - 3);
+      }
+      cx.strokeStyle = 'rgba(63,224,197,.35)'; cx.beginPath(); cx.arc(c.x, c.y, Rr, 0, 7); cx.stroke();
+      cx.strokeStyle = 'rgba(63,224,197,.08)'; cx.beginPath(); cx.moveTo(c.x - Rr, c.y); cx.lineTo(c.x + Rr, c.y); cx.moveTo(c.x, c.y - Rr); cx.lineTo(c.x, c.y + Rr); cx.stroke();
+      // Bearings: a tick every 5°, a number every 30° (000 = the Greenwich meridian, up).
+      for (let g = 0; g < 360; g += 5) {
+        const a = (g - 90) * RAD, largo = g % 30 === 0 ? 10 : g % 10 === 0 ? 6 : 3;
+        cx.strokeStyle = g % 30 === 0 ? 'rgba(63,224,197,.7)' : 'rgba(63,224,197,.35)';
+        cx.beginPath(); cx.moveTo(c.x + Math.cos(a) * Rr, c.y + Math.sin(a) * Rr); cx.lineTo(c.x + Math.cos(a) * (Rr + largo), c.y + Math.sin(a) * (Rr + largo)); cx.stroke();
+        if (g % 30 === 0) { cx.fillStyle = 'rgba(63,224,197,.75)'; cx.textAlign = 'center'; cx.fillText(String(g).padStart(3, '0'), c.x + Math.cos(a) * (Rr + 22), c.y + Math.sin(a) * (Rr + 22) + 3.5); }
+      }
+      // Regions as arcs outside the bearings (by longitude: west on the left, east on the right).
+      [[t('pd_america'), 190, 330], [t('pd_europa') + ' · ' + t('pd_africa'), 335, 55], [t('pd_asia') + ' · ' + t('pd_oceania'), 60, 185]].forEach(([n, a0, a1]) => {
+        const g0 = (a0 - 90) * RAD, g1 = ((a1 < a0 ? a1 + 360 : a1) - 90) * RAD, rr = Rr + 38;
+        cx.strokeStyle = 'rgba(63,224,197,.35)'; cx.beginPath(); cx.arc(c.x, c.y, rr, g0, g1); cx.stroke();
+        const gm = (g0 + g1) / 2; cx.fillStyle = 'rgba(170,200,215,.8)'; cx.font = '500 10px "IBM Plex Mono", monospace';
+        cx.fillText(n.toUpperCase(), c.x + Math.cos(gm) * (rr + 12), c.y + Math.sin(gm) * (rr + 12) + 3);
+      });
+      cx.textAlign = 'left';
+      // Phosphor: what the sweep lights stays and fades (half-life 1.4 s), like a real scope.
+      const f = capaFosforo();
+      f.globalCompositeOperation = 'destination-out'; f.fillStyle = `rgba(0,0,0,${1 - Math.pow(0.5, dt / 1.4)})`; f.fillRect(0, 0, st.Wc, st.H);
+      f.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < 18; k++) { const a0 = barrido - k * 0.022; f.fillStyle = `rgba(63,224,197,${0.05 * (1 - k / 18)})`; f.beginPath(); f.moveTo(c.x, c.y); f.arc(c.x, c.y, Rr, a0 - 0.024, a0); f.closePath(); f.fill(); }
+      f.strokeStyle = 'rgba(120,255,225,.85)'; f.lineWidth = 1.4; f.beginPath(); f.moveTo(c.x, c.y); f.lineTo(c.x + Math.cos(barrido) * Rr, c.y + Math.sin(barrido) * Rr); f.stroke();
+      const ahora = performance.now();
+      const cruza = (a) => { const n = (x) => ((x % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2); const d0 = n(barridoAntes), d1 = n(barrido), x = n(a); return d0 <= d1 ? x > d0 && x <= d1 : x > d0 || x <= d1; };
+      VISIBLES.forEach((d) => {
+        if (!cruza(d.ang)) return;
+        d.eco = ahora;
+        const bl = bloqueado(d), col = bl ? '255,107,122' : d.doc === false ? '255,209,102' : '120,255,225';
+        const r = 3 + Math.min(7, Math.log10(1 + d.sub) * 0.9);
+        const gr = f.createRadialGradient(d.x, d.y, 0, d.x, d.y, r * 2.6); gr.addColorStop(0, `rgba(${col},.95)`); gr.addColorStop(0.35, `rgba(${col},.45)`); gr.addColorStop(1, `rgba(${col},0)`);
+        f.fillStyle = gr; f.beginPath(); f.arc(d.x, d.y, r * 2.6, 0, 7); f.fill();
+      });
+      barridoAntes = barrido;
+      cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0); cx.globalCompositeOperation = 'lighter'; cx.drawImage(fosforo, 0, 0); cx.restore();
+      cx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);
+      // The routes, faint, and the data moving along them.
+      cx.globalCompositeOperation = 'lighter';
+      VISIBLES.forEach((d) => { const bl = bloqueado(d); trazo(d.ruta, 0, bl ? d.tg : 1, bl ? 'rgba(255,107,122,.3)' : prod(d.p).color + '12', 0.8); });
+      cx.globalCompositeOperation = 'source-over';
+      escudo(c, R0); ordenador(c, Math.max(13, R0 * 0.3));
+      st.dianas.push({ x: c.x, y: c.y, r: R0 * 0.35, tipo: 'yo' });
+      L.prods.forEach(nodoProducto);
+      particulas(dt);
+      VISIBLES.forEach((d) => st.dianas.push({ x: d.x, y: d.y, r: 12, tipo: 'dest', ref: d }));
+      // Air-traffic-control tags for the busiest contacts and the stopped ones: they light up as
+      // the sweep passes and dim after.
+      if (st.W >= 700) {
+        const puestos = [{ x: c.x - R0, y: c.y - R0, w: 2 * R0, h: 2 * R0 }];
+        VISIBLES.filter((d) => bloqueado(d) || VISIBLES.indexOf(d) < 10).slice(0, 14).forEach((d) => {
+          const brillo2 = 0.45 + 0.55 * Math.exp(-((ahora - (d.eco || 0)) / 1000) / 2.2);
+          const prog = (prod(d.p).nombre || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase();
+          const l1 = `${prog} ${(d.destino || d.host).toUpperCase().slice(0, 26)}`;
+          const l2 = `${String(Math.round(d.rumbo)).padStart(3, '0')}° · ${d.pais} · ${(d.red && d.red[0] !== '@' ? d.red : '—').toUpperCase().slice(0, 14)}${d.asn ? ' AS' + d.asn : ''}`;
+          const l3 = bloqueado(d) ? tn('pd_parados', d.bloq).toUpperCase() : `↑ ${bytes(d.ema || 0)}/S · ${bytes(d.sub)}`;
+          cx.font = '500 10px "IBM Plex Mono", monospace';
+          const w = Math.max(cx.measureText(l1).width, cx.measureText(l2).width, cx.measureText(l3).width) + 10, h = 40;
+          // Outwards from the centre; if the place is taken, a little along the ring; else no tag.
+          const ux = Math.cos(d.ang), uy = Math.sin(d.ang), dcha = ux >= 0;
+          const choca = (x0, y0) => puestos.some((b) => x0 < b.x + b.w && x0 + w > b.x && y0 < b.y + b.h && y0 + h > b.y) || x0 < 4 || x0 + w > st.W - 4 || y0 < 50 || y0 + h > st.H - 30;
+          let bx = 0, by = 0, ok = false;
+          for (const [dist, tang] of [[22, 0], [22, 26], [22, -26], [44, 0], [44, 34], [44, -34], [66, 0]]) {
+            const ax = d.x + ux * dist - uy * tang, ay = d.y + uy * dist + ux * tang;
+            bx = dcha ? ax : ax - w; by = ay - h / 2;
+            if (!choca(bx, by)) { ok = true; break; }
+          }
+          if (!ok) return;
+          puestos.push({ x: bx, y: by, w, h });
+          const col = bloqueado(d) ? `rgba(255,141,153,${brillo2})` : `rgba(140,255,225,${brillo2})`;
+          cx.strokeStyle = col; cx.lineWidth = 1; cx.beginPath(); cx.moveTo(d.x, d.y); cx.lineTo(dcha ? bx : bx + w, by + h / 2); cx.stroke();
+          cx.fillStyle = `rgba(4,14,18,${0.55 + 0.25 * brillo2})`; cx.fillRect(bx, by, w, h);
+          cx.fillStyle = col; cx.fillText(l1, bx + 5, by + 11); cx.fillStyle = `rgba(170,200,215,${brillo2})`; cx.fillText(l2, bx + 5, by + 23); cx.fillStyle = col; cx.fillText(l3, bx + 5, by + 35);
+        });
+      }
+      // The glass: fine scan lines and a vignette, very light.
+      cx.save(); cx.beginPath(); cx.arc(c.x, c.y, Rr, 0, 7); cx.clip();
+      cx.fillStyle = patronRayas(); cx.globalAlpha = 0.5; cx.fillRect(c.x - Rr, c.y - Rr, Rr * 2, Rr * 2); cx.globalAlpha = 1;
+      const vi = cx.createRadialGradient(c.x, c.y, Rr * 0.6, c.x, c.y, Rr); vi.addColorStop(0, 'rgba(0,0,0,0)'); vi.addColorStop(1, 'rgba(0,0,0,.35)'); cx.fillStyle = vi; cx.fillRect(c.x - Rr, c.y - Rr, Rr * 2, Rr * 2);
+      cx.restore();
+      // The scope's own readout.
+      cx.font = '500 10.5px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(140,255,225,.75)'; cx.textAlign = 'center';
+      cx.fillText(t('pd_radar_lectura').replace('{n}', VISIBLES.length).replace('{p}', VISIBLES.filter(bloqueado).length).replace('{s}', PERIODO).toUpperCase(), c.x, Math.max(62, c.y - Rr - 58));
+      cx.textAlign = 'left';
+    };
+
+    // ---------- 3. The computer: a Sankey diagram through GUARDIANA's gate ----------
+    const banda = (x0, a0, b0, x1, a1, b1) => { const xm = (x0 + x1) / 2; cx.beginPath(); cx.moveTo(x0, a0); cx.bezierCurveTo(xm, a0, xm, a1, x1, a1); cx.lineTo(x1, b1); cx.bezierCurveTo(xm, b1, xm, b0, x0, b0); cx.closePath(); };
+    const curvaCentro = (x0, y0, x1, y1, n) => { const out = [], xm = (x0 + x1) / 2; for (let i = 0; i <= n; i++) { const u = i / n, a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c2 = 3 * (1 - u) * u * u, d2 = u ** 3; out.push({ x: a * x0 + b * xm + c2 * xm + d2 * x1, y: a * y0 + b * y0 + c2 * y1 + d2 * y1 }); } return out; };
+    const layoutSankey = () => {
+      const W = st.W, H = st.H, top = 86, bot = H - 60, alto = bot - top, nodoW = 10;
+      const col = { prog: Math.max(150, W * 0.14), puerta: W * 0.38, pais: W * 0.62, red: W * 0.84 };
+      const pasan = VISIBLES.filter((d) => !bloqueado(d) && d.sub > 0), paran = VISIBLES.filter((d) => bloqueado(d));
+      const ps = prodsVisibles();
+      // Countries and networks beyond the busiest go together, so it stays readable.
+      const totP = {}, totR = {};
+      pasan.forEach((d) => { totP[d.pais] = (totP[d.pais] || 0) + d.sub; const r = d.red && d.red[0] !== '@' ? d.red : '—'; totR[r] = (totR[r] || 0) + d.sub; });
+      const paises = Object.keys(totP).sort((a, b) => totP[b] - totP[a]), redes = Object.keys(totR).sort((a, b) => totR[b] - totR[a]);
+      const OTROS = '…', paisDe = (d) => (paises.indexOf(d.pais) < 11 ? d.pais : OTROS), redDe = (d) => { const r = d.red && d.red[0] !== '@' ? d.red : '—'; return redes.indexOf(r) < 13 ? r : OTROS; };
+      const nodosPais = [...new Set(pasan.map(paisDe))].sort((a, b) => (a === OTROS) - (b === OTROS) || (totP[b] || 0) - (totP[a] || 0));
+      const nodosRed = [...new Set(pasan.map(redDe))].sort((a, b) => (a === OTROS) - (b === OTROS) || (totR[b] || 0) - (totR[a] || 0));
+      const total = Math.max(1, pasan.reduce((a, d) => a + d.sub, 0));
+      const parPx = (d) => Math.min(10, 2 + 1.6 * Math.log2(1 + d.bloq));
+      const stopTot = paran.reduce((a, d) => a + parPx(d), 0);
+      const gap = 10, nMax = Math.max(ps.length, nodosPais.length, nodosRed.length);
+      const k = Math.max(0.000001, (alto - gap * (nMax - 1) - stopTot) / total * 0.92);
+      const alturaDe = (v) => Math.max(2, v * k);
+      // Programs: what passes, then what was stopped, stacked.
+      const nodoProg = {}; let y = top;
+      ps.forEach((p) => { const v = pasan.filter((d) => d.p === p.id).reduce((a, d) => a + d.sub, 0), st2 = paran.filter((d) => d.p === p.id).reduce((a, d) => a + parPx(d), 0); const h = (v ? alturaDe(v) : 0) + st2 || 6; nodoProg[p.id] = { p, x: col.prog, y, h, v, cur: y }; y += h + gap; });
+      const colocar = (lista, tot, x) => { const out = {}; const usado = lista.reduce((a, n) => a + alturaDe(tot[n] || 0), 0) + gap * (lista.length - 1); let y2 = top + Math.max(0, (alto - usado) / 2); lista.forEach((n) => { const h = alturaDe(tot[n] || 0); out[n] = { n, x, y: y2, h, cur: y2, curIn: y2 }; y2 += h + gap; }); return out; };
+      const tP = {}; pasan.forEach((d) => { const n = paisDe(d); tP[n] = (tP[n] || 0) + d.sub; });
+      const tR = {}; pasan.forEach((d) => { const n = redDe(d); tR[n] = (tR[n] || 0) + d.sub; });
+      const nodoPais = colocar(nodosPais, tP, col.pais), nodoRed = colocar(nodosRed, tR, col.red);
+      // The gate: everything that leaves the programs arrives here; what passes goes on.
+      const puertaY = top, puertaH = Math.max(40, alto);
+      let yPuerta = top + Math.max(0, (alto - (total * k + stopTot + gap * Math.max(0, ps.length - 1))) / 2);
+      const bandas = [];
+      VISIBLES.forEach((d) => { d.vis = false; d.ruta = []; });
+      ps.forEach((p) => {
+        const np = nodoProg[p.id];
+        // Passing flows of this program, grouped by country (fewer crossings).
+        const mias = pasan.filter((d) => d.p === p.id).sort((a, b) => nodosPais.indexOf(paisDe(a)) - nodosPais.indexOf(paisDe(b)) || nodosRed.indexOf(redDe(a)) - nodosRed.indexOf(redDe(b)));
+        mias.forEach((d) => {
+          const h = d.sub * k, a0 = np.cur, g0 = yPuerta; np.cur += h; yPuerta += h;
+          const npais = nodoPais[paisDe(d)], nred = nodoRed[redDe(d)];
+          const c0 = npais.curIn; npais.curIn += h; const r0 = nred.curIn; nred.curIn += h; const s0 = npais.cur; npais.cur += h;
+          bandas.push({ tipo: 'pasa', d, col: p.color, tramos: [[col.prog + nodoW, a0, col.puerta - 3, g0, h], [col.puerta + 3, g0, col.pais, c0, h], [col.pais + nodoW, s0, col.red, r0, h]] });
+          const mid = (y0, hh) => y0 + hh / 2;
+          d.ruta = curvaCentro(col.prog + nodoW, mid(a0, h), col.puerta, mid(g0, h), 12).concat(curvaCentro(col.puerta, mid(g0, h), col.pais, mid(c0, h), 18).slice(1)).concat(curvaCentro(col.pais + nodoW, mid(s0, h), col.red, mid(r0, h), 18).slice(1));
+          d.tg = 12 / (d.ruta.length - 1); d.vis = true; const fin = d.ruta[d.ruta.length - 1]; d.x = fin.x; d.y = fin.y;
+        });
+        // Stopped flows end at the gate.
+        paran.filter((d) => d.p === p.id).forEach((d) => {
+          const h = parPx(d), a0 = np.cur, g0 = yPuerta; np.cur += h; yPuerta += h;
+          bandas.push({ tipo: 'para', d, col: '#ff6b7a', tramos: [[col.prog + nodoW, a0, col.puerta - 3, g0, h]] });
+          d.ruta = curvaCentro(col.prog + nodoW, a0 + h / 2, col.puerta - 2, g0 + h / 2, 20); d.tg = 0.98; d.vis = true; d.x = col.puerta - 2; d.y = g0 + h / 2;
+        });
+        yPuerta += gap;
+      });
+      return { col, nodoW, nodoProg, nodoPais, nodoRed, bandas, puertaY, puertaH, top, bot, total, OTROS };
+    };
+    const dibujaSankey = (dt) => {
+      const L = layoutSankey(), tt = tiempo(), hov = st.hover;
+      // Column titles.
+      cx.font = '500 10.5px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(160,185,210,.75)';
+      [[t('pd_col_programas'), L.col.prog, 'left'], ['GUARDIANA', L.col.puerta, 'center'], [t('pd_col_pais'), L.col.pais, 'left'], [t('pd_col_red'), L.col.red, 'left']].forEach(([n, x, al]) => { cx.textAlign = al; cx.fillText(n.toUpperCase(), x, 46); });
+      cx.textAlign = 'left';
+      // Bands: a gradient from the program's colour to the country's.
+      cx.globalCompositeOperation = 'lighter';
+      L.bandas.forEach((b) => {
+        const resaltada = hov && hov.ref === b.d;
+        b.tramos.forEach(([x0, y0, x1, y1, h], i) => {
+          const hh = Math.max(1, h);
+          const g = cx.createLinearGradient(x0, 0, x1, 0);
+          const c1 = b.tipo === 'para' ? '#ff6b7a' : i < 2 ? b.col : `hsl(${tono(b.d.pais)},70%,62%)`, c2 = b.tipo === 'para' ? '#ff6b7a' : i === 0 ? b.col : `hsl(${tono(b.d.pais)},70%,62%)`;
+          const al = resaltada ? 'aa' : b.tipo === 'para' ? '55' : '38';
+          g.addColorStop(0, (c1.startsWith('#') ? c1 + al : c1.replace('hsl', 'hsla').replace(')', `,${parseInt(al, 16) / 255})`))); g.addColorStop(1, (c2.startsWith('#') ? c2 + al : c2.replace('hsl', 'hsla').replace(')', `,${parseInt(al, 16) / 255})`)));
+          cx.fillStyle = g; banda(x0, y0, y0 + hh, x1, y1, y1 + hh); cx.fill();
+        });
+      });
+      cx.globalCompositeOperation = 'source-over';
+      // GUARDIANA's gate: a column of light, with what it let through and what it stopped.
+      const pg = cx.createLinearGradient(L.col.puerta - 16, 0, L.col.puerta + 16, 0);
+      pg.addColorStop(0, 'rgba(63,224,197,0)'); pg.addColorStop(0.5, `rgba(63,224,197,${0.28 + 0.08 * Math.sin(tt * 2)})`); pg.addColorStop(1, 'rgba(63,224,197,0)');
+      cx.fillStyle = pg; cx.fillRect(L.col.puerta - 16, L.top - 6, 32, L.bot - L.top + 12);
+      cx.fillStyle = '#3fe0c5'; cx.fillRect(L.col.puerta - 1.5, L.top - 6, 3, L.bot - L.top + 12);
+      const parados = VISIBLES.filter(bloqueado);
+      cx.font = '10px "IBM Plex Mono", monospace'; cx.textAlign = 'center'; cx.fillStyle = 'rgba(140,255,225,.85)';
+      cx.fillText(t('pd_puerta_pasa').replace('{x}', bytes(L.total)), L.col.puerta, 60);
+      cx.fillStyle = 'rgba(255,141,153,.9)'; cx.fillText(tn('pd_parados', parados.reduce((a, d) => a + d.bloq, 0)), L.col.puerta, 72);
+      cx.textAlign = 'left';
+      L.bandas.filter((b) => b.tipo === 'para').forEach((b) => { const [, , x1, y1, h] = b.tramos[0]; cx.fillStyle = '#ff6b7a'; cx.fillRect(x1 - 1, y1, 4, Math.max(2, h)); });
+      // Nodes and their labels.
+      Object.values(L.nodoProg).forEach((n) => {
+        cx.fillStyle = n.p.color; cx.fillRect(n.x, n.y, L.nodoW, n.h);
+        st.dianas.push({ x: n.x + L.nodoW / 2, y: n.y + n.h / 2, r: Math.max(12, n.h / 2), tipo: 'prod', ref: n.p });
+        cx.textAlign = 'right'; cx.font = '600 12px "IBM Plex Sans", sans-serif'; cx.fillStyle = '#e3eef6'; cx.fillText(n.p.nombre, n.x - 8, n.y + Math.min(n.h, 28) / 2 + 1);
+        cx.font = '10px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(160,185,210,.85)'; cx.fillText(`↑ ${bytes(n.p.sub)}`, n.x - 8, n.y + Math.min(n.h, 28) / 2 + 14); cx.textAlign = 'left';
+      });
+      Object.values(L.nodoPais).forEach((n) => {
+        cx.fillStyle = n.n === L.OTROS ? '#55657a' : `hsl(${tono(n.n)},70%,62%)`; cx.fillRect(n.x, n.y, L.nodoW, n.h);
+        if (n.n !== L.OTROS) st.dianas.push({ x: n.x + L.nodoW / 2, y: n.y + n.h / 2, r: Math.max(12, n.h / 2), tipo: 'pais', ref: n.n });
+        cx.font = '500 11px "IBM Plex Sans", sans-serif'; cx.fillStyle = '#e3eef6';
+        cx.fillText(n.n === L.OTROS ? t('pd_otros_paises') : nombrePais(n.n), n.x + L.nodoW + 6, n.y + Math.min(n.h, 26) / 2 + 2);
+      });
+      Object.values(L.nodoRed).forEach((n) => {
+        cx.fillStyle = n.n === L.OTROS ? '#55657a' : '#6fb6ff'; cx.fillRect(n.x, n.y, L.nodoW, n.h);
+        if (n.n !== L.OTROS && n.n !== '—') st.dianas.push({ x: n.x + L.nodoW / 2, y: n.y + n.h / 2, r: Math.max(12, n.h / 2), tipo: 'red', ref: n.n });
+        const txt = n.n === L.OTROS ? t('pd_otras_redes') : n.n === '—' ? t('pd_red_desconocida') : n.n;
+        cx.font = '500 11px "IBM Plex Sans", sans-serif'; cx.fillStyle = '#e3eef6'; cx.fillText(txt.length > 24 ? txt.slice(0, 23) + '…' : txt, n.x + L.nodoW + 6, n.y + Math.min(n.h, 26) / 2 + 2);
+      });
+      particulas(dt);
+      VISIBLES.forEach((d) => { if (d.vis && d.ruta.length) st.dianas.push({ x: d.ruta[Math.round(d.ruta.length * 0.75)].x, y: d.ruta[Math.round(d.ruta.length * 0.75)].y, r: 8, tipo: 'dest', ref: d }); });
     };
 
     // The page's security policy allows no inline styles (style-src 'self'): widths and colours
@@ -1058,6 +1502,13 @@
           ${p.cortado ? `<span class="estado corta">${esc(t('pd_prog_cortado'))}</span>` : `<span class="estado pasa">${esc(t('pd_prog_pasa'))}</span>`}
           <div class="t">${esc(p.cortable ? (p.cortado ? t('pd_clic_dejar_prog') : t('pd_clic_cortar_prog')) : t('pd_no_cortable'))}</div>`;
       }
+      if (hh.tipo === 'red') {
+        const r = hh.ref, ds = DEST.filter((d) => d.red === r && !d.sede), asn = (ds.find((d) => d.asn) || {}).asn;
+        const paises = [...new Set(ds.map((d) => d.pais).filter((x) => x && x[0] !== '@'))].map(nombrePais).join(', ');
+        return `<b>${esc(r)}</b>${asn ? ` <span class="mono">AS${asn}</span>` : ''}<div>${esc(t('pd_red_paises'))} <b>${esc(paises || '—')}</b></div>
+          <div>${esc(t('pd_enviado'))} <b>${esc(bytes(ds.reduce((a, d) => a + d.sub, 0)))}</b> · ${esc(t('pd_recibido'))} ${esc(bytes(ds.reduce((a, d) => a + d.baj, 0)))}</div>
+          <div class="mono arriba4">${ds.slice(0, 10).map((d) => '· ' + esc(d.host)).join('<br>')}${ds.length > 10 ? '<br>…' : ''}</div>`;
+      }
       if (hh.tipo === 'yo') { const ce = centros[st.yo]; return `<b>${esc(t('pd_tu_ordenador'))}</b> · ${esc(nombrePais(st.yo))} · ${esc(t(esDeDia(ce.lon, ce.lat) ? 'pd_de_dia' : 'pd_de_noche'))}<div class="t">${esc(t('pd_pais_origen'))}</div><div>${esc(tn('pd_vigila_n', PROD.length))}</div>`; }
       if (hh.tipo === 'pais') {
         const c = hh.ref, ds = DEST.filter((d) => d.pais === c), ce = centros[c], dia = ce ? esDeDia(ce.lon, ce.lat) : null;
@@ -1073,7 +1524,7 @@
     };
     const actualizaTip = () => {
       const { x, y } = st.raton, hh = queHay(x, y);
-      cv.style.cursor = hh && (hh.tipo === 'dest' || hh.tipo === 'prod') ? 'pointer' : st.vista === 'globo' ? 'grab' : 'crosshair';
+      cv.style.cursor = hh && (hh.tipo === 'dest' || hh.tipo === 'prod') ? 'pointer' : st.vista === 'globo' || nebulosaGL() ? 'grab' : 'crosshair';
       if (!hh) { tip.hidden = true; st.hover = null; return; }
       const html = textoTip(hh);
       if (tip.innerHTML !== html) { tip.innerHTML = html; estilos(tip); }
@@ -1145,9 +1596,9 @@
       const r = cv.getBoundingClientRect(); st.raton = { x: e.clientX - r.left, y: e.clientY - r.top };
       if (st.arrastre) { st.dRot += (e.clientX - st.arrastre.x) * 0.006; st.dTilt -= (e.clientY - st.arrastre.y) * 0.004; st.arrastre = { x: e.clientX, y: e.clientY, mov: true }; }
     });
-    cv.addEventListener('wheel', (e) => { if (!enTierra()) return; e.preventDefault(); T.zoom = Math.max(0.7, Math.min(3.2, T.zoom * Math.exp(-e.deltaY * 0.0012))); }, { passive: false });
+    cv.addEventListener('wheel', (e) => { if (!enTierra() && !nebulosaGL()) return; e.preventDefault(); T.zoom = Math.max(0.7, Math.min(3.2, T.zoom * Math.exp(-e.deltaY * 0.0012))); }, { passive: false });
     cv.addEventListener('pointerleave', () => { st.raton = null; tip.hidden = true; });
-    cv.addEventListener('pointerdown', (e) => { if (st.vista === 'globo') { st.arrastre = { x: e.clientX, y: e.clientY, mov: false }; cv.setPointerCapture(e.pointerId); } });
+    cv.addEventListener('pointerdown', (e) => { if (st.vista === 'globo' || nebulosaGL()) { st.arrastre = { x: e.clientX, y: e.clientY, mov: false }; cv.setPointerCapture(e.pointerId); } });
     cv.addEventListener('pointerup', (e) => {
       const movido = st.arrastre && st.arrastre.mov; st.arrastre = null;
       if (movido) return;
@@ -1164,6 +1615,8 @@
       st.vista = v;
       document.querySelectorAll('.pestanas button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.vista === v)));
       $('ayuda-vista').textContent = t(AYUDA[v]) + ((v === 'globo' || v === 'mapa') && !T.ok ? ' ' + t('pd_sin_webgl') : '');
+      // The help says what to do and then gets out of the way.
+      $('ayuda-vista').classList.remove('oculta'); clearTimeout(ponVista.ayuda); ponVista.ayuda = setTimeout(() => $('ayuda-vista').classList.add('oculta'), 12000);
       try { localStorage.setItem('guardiana_pd_vista', v); } catch (_) {}
     };
     document.querySelectorAll('.pestanas button').forEach((b) => b.addEventListener('click', () => ponVista(b.dataset.vista)));
@@ -1203,9 +1656,12 @@
           if (T.tw) { const u = Math.min(1, (ahora - T.tw.t0) / 2200), e = u * u * (3 - 2 * u); T.m = T.tw.desde + (T.mObj - T.tw.desde) * e; if (u >= 1) T.tw = null; }
           glc.style.visibility = 'visible';
           camara(); pintaTierra(); dibujaTierra(dt);
+        } else if (nebulosaGL()) {
+          glc.style.visibility = 'visible';
+          construyeNebulosa(); camaraNeb(); pintaNebulosaGL(); dibujaNebulosaPro(dt);
         } else {
           glc.style.visibility = 'hidden';
-          ({ nebulosa: dibujaNebulosa, dentro: dibujaDentro, radar: dibujaRadar, globo: dibujaNebulosa, mapa: dibujaNebulosa })[st.vista](dt);
+          ({ nebulosa: dibujaNebulosa, dentro: dibujaSankey, radar: dibujaRadarPro, globo: dibujaNebulosa, mapa: dibujaNebulosa })[st.vista](dt);
         }
         if (st.raton) actualizaTip();
       } catch (e) { if (!bucle.dicho) { bucle.dicho = true; console.error(e); } }
@@ -1219,8 +1675,9 @@
     let datosGuardado = null;
     try { datosGuardado = localStorage.getItem('guardiana_pd_datos'); } catch (_) {}
     ponDatos(datosGuardado === null ? st.Wc >= 1000 : datosGuardado === '1');
-    await cargar();
-    ctx.cadaTanto(cargar, 5000);
+    // The website shows the same universe with example data only (`demo`); the panel, the person's.
+    if (ctx.demo) empiezaDemo();
+    else { await cargar(); ctx.cadaTanto(cargar, 5000); }
     requestAnimationFrame(bucle);
   }
 })();

@@ -1971,9 +1971,9 @@
     "pd_vigilancia_off": "Watching the antivirus is off: what it sends is not being measured (turn it on in «Your antivirus»).",
     "pd_ayuda_globo": "The sunlight is this moment's. Drag to turn, scroll to zoom. The columns are the servers: taller, more data.",
     "pd_ayuda_mapa": "The same world, unrolled. The shadow is tonight, right now. Scroll: zoom.",
-    "pd_ayuda_nebulosa": "Your computer in the centre; the ring is GUARDIANA. Hover over a point; one click cuts it or lets it through.",
-    "pd_ayuda_dentro": "From left to right: the program, GUARDIANA's door, the network card, the internet and the server's country.",
-    "pd_ayuda_radar": "The angle is the server's region; the closer to the centre, the more data your computer sent it.",
+    "pd_ayuda_nebulosa": "One galaxy per country: bigger the more data goes back and forth, and pulsing with what your computer is sending it at each moment. In the centre, your computer inside GUARDIANA’s ring. Drag to look from the side, scroll to zoom.",
+    "pd_ayuda_dentro": "Each band is as wide as the data going out through it: from each program, through GUARDIANA’s gate, to the server’s country and its network’s company. What is stopped ends at the gate; its width counts the stopped attempts, since nothing left.",
+    "pd_ayuda_radar": "A real radar: the bearing is the longitude of the server’s country (000 = Greenwich) and the rings a true scale of bytes sent; the closer to the centre, the more data. Echoes light up as the sweep passes.",
     "pd_sin_webgl": "(This browser does not allow WebGL2: the nebula is shown instead.)",
     "pd_tu_ordenador": "Your computer",
     "pd_internet": "Internet",
@@ -2098,6 +2098,17 @@
     "pd_boton_portada": "See how GUARDIANA works inside your computer",
     "pd_portada_texto": "Live, on the globe: what your antivirus, your browser and your programs send to each country and each company, and what GUARDIANA cuts.",
     "pd_cortado_ancho": "Stopped: a general GUARDIANA rule (by category) does not let this name out",
-    "pd_ancho_dejar": "A general rule stops it; to let it through, use «Unblock» on its row in the Radiography."
+    "pd_ancho_dejar": "A general rule stops it; to let it through, use «Unblock» on its row in the Radiography.",
+    "pd_africa": "Africa",
+    "pd_oceania": "Oceania",
+    "pd_radar_lectura": "Radar · logarithmic scale of bytes · {n} contacts · {p} stopped · sweep every {s} s",
+    "pd_col_programas": "Programs",
+    "pd_col_pais": "Server country",
+    "pd_col_red": "Network company",
+    "pd_puerta_pasa": "{x} passes",
+    "pd_otros_paises": "Other countries",
+    "pd_otras_redes": "Other networks",
+    "pd_red_desconocida": "Unidentified network",
+    "pd_red_paises": "Servers in:"
   }
 }
