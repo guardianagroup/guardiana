@@ -108,6 +108,41 @@
     pintaFilas();
   }
 
+  // Fields a site sends «disguised» (SHA-256), as Meta, Google and TikTok ask: the e-mail, the
+  // phone, names. The page can say whether one is the person's own by doing the same with what
+  // the person types, here, without it going anywhere.
+  const CIFRADOS = ['campo_correo_cifrado', 'campo_telefono_cifrado', 'campo_persona_cifrada'];
+  async function sha256(s) {
+    const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+    return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+  }
+  // The ways the trade writes a value before disguising it: trimmed and lower case; a phone
+  // with digits only.
+  function formas(dato) {
+    const d = String(dato || '').trim();
+    const f = new Set([d, d.toLowerCase()]);
+    const digitos = d.replace(/[^0-9]/g, '');
+    if (digitos.length >= 7) { f.add(digitos); f.add('+' + digitos); }
+    return [...f].filter(Boolean);
+  }
+  async function compruebaHash(caja, c, dato, auto) {
+    const salida = caja.querySelector('.resultado-hash');
+    const hashes = c.dice.filter((v) => CIFRADOS.includes(v.que)).map((v) => [v, String(v.valor).toLowerCase()]);
+    for (const f of formas(dato)) {
+      const h = await sha256(f);
+      const hit = hashes.find(([, x]) => x === h);
+      if (hit) {
+        // The row shows the person's own value, with the code under it.
+        caja.closest('.dice').querySelectorAll('td.valor').forEach((td) => {
+          if (td.textContent.trim().toLowerCase() === hit[1]) td.innerHTML = `${esc(f)}<br><span class="gris">${esc(hit[1])}</span>`;
+        });
+        salida.innerHTML = `<b class="rojo">${esc(t('cortes_dice_hash_si', { dato: f, campo: hit[0].campo, empresa: c.quien }))}</b>`;
+        return true;
+      }
+    }
+    if (!auto) salida.textContent = t('cortes_dice_hash_no', { dato: String(dato).trim() });
+    return false;
+  }
   // An event's name in plain words when it is a known one («Purchase» → «una compra»).
   function evento(v) {
     const k = 'evento_' + String(v).toLowerCase().replace(/[^a-z]/g, '');
@@ -166,6 +201,7 @@
         + `<p class="gris">${esc(t('cortes_dice_todo', { n: n(c.dice.length) }))}</p>`
         + `<div class="tabla-dice"><table><tbody>${c.dice.map(fila).join('')}</tbody></table></div>`
         + (ids.length ? `<p>${esc(t('cortes_dice_ids', { empresa: c.quien }))}</p>` : '')
+        + (c.dice.some((v) => CIFRADOS.includes(v.que)) ? `<div class="descifra"><p>${esc(t('cortes_dice_hash_explica', { empresa: c.quien }))}</p><p><input class="tu-dato" type="text" autocomplete="off" placeholder="${esc(t('cortes_dice_hash_ph'))}"> <button class="dice-comprueba">${esc(t('cortes_dice_hash_boton'))}</button></p><p class="resultado-hash" aria-live="polite"></p></div>` : '')
         + `<p class="botones-dice"><button class="dice-descargar" data-ts="${esc(c.ts)}" data-host="${esc(c.host)}" data-ruta="${esc(c.ruta)}">${esc(t('cortes_dice_descargar'))}</button> <button class="dice-carta" data-empresa="${esc(c.quien)}">${esc(t('cortes_dice_carta', { empresa: c.quien }))}</button></p>`
         + `<p class="gris pequeno">${esc(t('cortes_dice_nota'))}</p></div>`);
     }
@@ -219,6 +255,19 @@
       e.stopPropagation();
       manda({ tipo: 'descargar_dice', ts: Number(bt.dataset.ts), host: bt.dataset.host, ruta: bt.dataset.ruta });
     }));
+    $('filas').querySelectorAll('.descifra').forEach((caja) => {
+      const c = datos.lista[abierta];
+      if (!c) return;
+      caja.addEventListener('click', (e) => e.stopPropagation());
+      const caja_input = caja.querySelector('.tu-dato');
+      caja.querySelector('.dice-comprueba').addEventListener('click', () => compruebaHash(caja, c, caja_input.value, false));
+      caja_input.addEventListener('keydown', (e) => { if (e.key === 'Enter') compruebaHash(caja, c, caja_input.value, false); });
+      // The e-mail the person saved for letters, if any, is tried at once.
+      try {
+        const g = JSON.parse(localStorage.getItem('guardiana_carta_datos') || 'null');
+        if (g && g.correo) compruebaHash(caja, c, g.correo, true);
+      } catch (_) {}
+    });
     $('filas').querySelectorAll('.dice-carta').forEach((bt) => bt.addEventListener('click', (e) => {
       e.stopPropagation();
       manda({ tipo: 'abrir_ficha', empresa: bt.dataset.empresa });
