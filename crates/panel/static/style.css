@@ -553,6 +553,11 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 .universo .grande { font: 600 24px 'IBM Plex Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
 
 .universo .pequeno { font: 11px/1.4 'IBM Plex Mono', ui-monospace, monospace; color: var(--hud-muted); }
+
+/* While the person places the computer on the map, the pointer says so. */
+.universo .lienzo canvas.colocando { cursor: cell; }
+
+.universo .hud #hud-doc { font-size: 10.5px; line-height: 1.35; }
 @media (max-width: 900px) {
 
 .universo .hud { grid-template-columns: 1fr 1fr; }

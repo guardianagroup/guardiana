@@ -24,6 +24,7 @@
     </div>
     <div class="controles">
       <label for="yo"><span data-t="pd_tu_pais">Tu ordenador está en</span> <select id="yo"></select></label>
+      <button type="button" class="btn-hud" id="colocar" aria-pressed="false" data-t="pd_colocar">Colocar mi ordenador</button>
       <button type="button" class="btn-hud" id="btn-datos" aria-pressed="true" aria-controls="datos" data-t="pd_btn_datos">Datos en vivo</button>
       <button type="button" class="btn-hud peligro" id="maxima" aria-pressed="false" data-t="pd_btn_maxima">Protección máxima</button>
       <button type="button" class="btn-hud" id="pantalla" data-t="pd_pantalla_completa">Pantalla completa</button>
@@ -51,7 +52,7 @@
     <div><h3><span data-t="pd_hud_enviado" class="h3-titulo"></span> <span id="hud-min"></span></h3><canvas id="spark"></canvas></div>
     <div><h3 data-t="pd_hud_paises"></h3><div class="barras" id="barras"></div></div>
     <div><h3 data-t="pd_hud_puertas"></h3><div class="grande" id="hud-cortes">0</div><div class="pequeno" id="hud-bloqueos"></div></div>
-    <div><h3 data-t="pd_hud_documenta"></h3><canvas id="indicador"></canvas></div>
+    <div><h3 data-t="pd_hud_documenta"></h3><canvas id="indicador"></canvas><div class="pequeno" id="hud-doc"></div></div>
   </div>
 </section>
 <script src="/static/por-dentro.js"></script>
