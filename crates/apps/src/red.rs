@@ -181,11 +181,15 @@ fn anotar(datos: &Arc<Mutex<Compartido>>, registro: &EventRecord, esquemas: &Sch
     e.2 += 1;
 }
 
+/// One raw network event seen by the diagnostic: event number, process id, size, and the two
+/// ends as text.
+type FilaDiag = (u16, u32, u32, String);
+
 /// Hears the channel for a few seconds and returns what came, raw: event number, process id,
 /// size, the address and port read as the far end. To check on the machine what the
 /// documentation promises (`guardiana apps --red`).
-pub(crate) fn diagnostico(segundos: u64) -> Result<Vec<(u16, u32, u32, String)>, Error> {
-    let vistos: Arc<Mutex<Vec<(u16, u32, u32, String)>>> = Arc::default();
+pub(crate) fn diagnostico(segundos: u64) -> Result<Vec<FilaDiag>, Error> {
+    let vistos: Arc<Mutex<Vec<FilaDiag>>> = Arc::default();
     let para_callback = Arc::clone(&vistos);
     let proveedor = Provider::by_guid(PROVEEDOR)
         .any(PALABRAS)
