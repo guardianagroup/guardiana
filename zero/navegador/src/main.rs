@@ -16,6 +16,12 @@ mod app;
 mod interfaz;
 
 fn main() {
+    // The rule lists (EasyList, EasyPrivacy, uBlock Origin, URLhaus) are compiled while the
+    // window opens, so the first page does not wait for them.
+    std::thread::spawn(|| {
+        let _ = guardiana_zero::filtros::motor();
+        let _ = guardiana_zero::filtros::cosmetica();
+    });
     #[cfg(windows)]
     app::arranca();
     #[cfg(not(windows))]

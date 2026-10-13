@@ -68,6 +68,23 @@ pub enum Motivo {
     /// A session recording service (`data/grabacion.txt`): it can record what the person does
     /// on the page (maximum protection, decision 206).
     Grabacion,
+    /// Advertising by the rules of EasyList and uBlock Origin (`filtros`).
+    ListaAnuncios,
+    /// Tracking by the rules of EasyPrivacy and uBlock Origin's privacy list (`filtros`).
+    ListaRastreo,
+    /// Malware, scams or phishing by uBlock Origin's badware list and URLhaus (`filtros`).
+    Peligro,
+}
+
+impl Motivo {
+    /// It comes from the rule lists every blocker uses, not from ZERO's lists by company.
+    #[must_use]
+    pub const fn de_filtros(self) -> bool {
+        matches!(
+            self,
+            Self::ListaAnuncios | Self::ListaRastreo | Self::Peligro
+        )
+    }
 }
 
 /// The answer for one request.
@@ -110,7 +127,8 @@ impl Decision {
     /// the mandate), which otherwise vanished from both (review of 10 Oct 2026, media 10).
     #[must_use]
     pub const fn anotable(&self) -> bool {
-        self.de_fuera() || (self.cortar && self.pagina)
+        self.de_fuera()
+            || (self.cortar && (self.pagina || matches!(self.motivo, Some(m) if m.de_filtros())))
     }
 }
 
@@ -169,6 +187,22 @@ pub fn decide_con(
     } else {
         None
     };
+    // Then the rules of EasyList, EasyPrivacy, uBlock Origin and URLhaus, by the address
+    // itself: an advert path on the page's own site too, as Brave and uBlock do. Never the
+    // page the person opens.
+    let lista = lista.or_else(|| {
+        if p.recurso == Recurso::Documento {
+            return None;
+        }
+        let otro_sitio = !destino.sitio.is_empty() && destino.sitio != p.sitio_pagina;
+        crate::filtros::motor()
+            .bloquea(p.url, p.recurso, otro_sitio, p.sitio_pagina)
+            .map(|l| match l {
+                crate::filtros::Lista::Anuncios => Motivo::ListaAnuncios,
+                crate::filtros::Lista::Rastreo => Motivo::ListaRastreo,
+                crate::filtros::Lista::Peligro => Motivo::Peligro,
+            })
+    });
     let pagina = p.recurso == Recurso::Documento;
     let corta = |motivo: Motivo, destino: Destino, hallazgos: Vec<Hallazgo>| Decision {
         cortar: true,
@@ -420,14 +454,16 @@ mod tests {
             corta(&a, sentry, b"{}", Recurso::Datos),
             (true, Some(Motivo::Telemetria), "Sentry".into())
         );
-        // On Facebook itself, its own pixel is the page's own business.
+        // On Facebook itself its own pixel is not a company from outside, but EasyPrivacy cuts
+        // it there too, as uBlock Origin and Brave do (13 Oct 2026).
         let propia = Peticion {
             url: "https://www.facebook.com/tr?id=1&ev=PageView",
             cuerpo: b"",
             recurso: Recurso::Imagen,
             sitio_pagina: "facebook.com",
         };
-        assert!(!decide(&propia, &a, &[], None, None).cortar);
+        let d = decide(&propia, &a, &[], None, None);
+        assert!(!d.tercero && d.cortar && d.motivo.is_some_and(Motivo::de_filtros));
         // And «Desbloquear» lets it through like any cut of the lists.
         a.permitidos.insert("facebook.com".into());
         assert!(!corta(&a, "https://www.facebook.com/tr?id=1", b"", Recurso::Imagen).0);

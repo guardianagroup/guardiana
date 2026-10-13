@@ -3763,6 +3763,17 @@ impl Sesion {
         if antes != self.preguntas.len() && self.panel.as_deref() == Some("formulario") {
             o.extend(self.cierra_panel());
         }
+        // The boxes the cut adverts leave empty are hidden too, as Brave does: the hiding
+        // rules of EasyList and uBlock filters for this host, while the protection is on.
+        if es_web && self.prefs.reglas.cortar_seguimiento && self.licencia.protege() {
+            if let Some(script) = host_de(url).and_then(|h| crate::filtros::guion_ocultar(&h)) {
+                o.push(Orden::Ejecuta {
+                    id,
+                    script,
+                    etiqueta: None,
+                });
+            }
+        }
         self.sucios.insert(id);
         if id == self.activa {
             o.push(self.estado());
@@ -4327,9 +4338,13 @@ impl Sesion {
             .then(|| {
                 let s = d.destino.sitio.as_str();
                 let razon = match d.motivo {
-                    Some(Motivo::Publicidad | Motivo::Rastreador)
-                        if recurso == Recurso::Ventana =>
-                    {
+                    Some(
+                        Motivo::Publicidad
+                        | Motivo::Rastreador
+                        | Motivo::ListaAnuncios
+                        | Motivo::ListaRastreo
+                        | Motivo::Peligro,
+                    ) if recurso == Recurso::Ventana => {
                         self.tf("pagina_cortada_ventana", &[("sitio", s)])
                     }
                     Some(Motivo::FueraDeMandato) => {

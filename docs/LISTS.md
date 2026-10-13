@@ -56,6 +56,29 @@ misma dirección contesta desde muchos países. El panel dice «red de reparto: 
 cerca de ti», y no las cuenta en ningún país. Las direcciones
 privadas, locales o reservadas no tienen país.
 
+## Reglas de bloqueo de GUARDIANA ZERO (desde ZERO 1.0.15)
+
+ZERO, el navegador, aplica además las mismas reglas de red que usan Brave y uBlock Origin, y oculta
+los huecos de anuncio con sus reglas cosméticas (el responsable, 13 oct 2026: «al nivel de Brave o
+más»). Van dentro del programa, en `crates/zero/data/filtros/`, copiadas el día de cada versión desde
+[uBlockOrigin/uAssets](https://github.com/uBlockOrigin/uAssets) (que trae también EasyList y URLhaus)
+sin comentarios ni reglas que no sean de red; cada archivo dice en su cabecera de dónde sale, el
+commit y la licencia. ZERO no las descarga nunca. Solo se aplican con «Cortar rastreadores» activado.
+
+| Lista | Motivo en ZERO | Licencia | Atribución |
+|---|---|---|---|
+| EasyList | `lista_anuncios` | GPL-3.0-or-later / CC BY-SA 3.0 | The EasyList authors, https://easylist.to |
+| EasyPrivacy | `lista_rastreo` | GPL-3.0-or-later / CC BY-SA 3.0 | The EasyList authors, https://easylist.to |
+| uBlock filters, Privacy, Unbreak | `lista_anuncios` / `lista_rastreo` | GPL-3.0 | uBlock Origin, https://github.com/uBlockOrigin/uAssets |
+| uBlock filters – Badware risks | `peligro` | GPL-3.0 | uBlock Origin |
+| Online Malicious URL Blocklist (URLhaus) | `peligro` | CC0 / MIT | malware-filter, https://gitlab.com/malware-filter/urlhaus-filter, datos de https://urlhaus.abuse.ch |
+| Reglas cosméticas de EasyList y uBlock filters (`cosmeticos.txt`) | ocultan huecos | las de cada lista | las de cada lista |
+
+El motor (`crates/zero/src/filtros.rs`) entiende la sintaxis de Adblock Plus con las extensiones de
+uBlock que importan para la red (`||`, `|`, `^`, `*`, `@@`, tipos, `third-party`, `domain=`, `to=`,
+`important`, `badfilter`, `popup`). Una regla con una opción que no entiende (o una expresión
+regular) se deja fuera en vez de adivinarla. Nunca se bloquea la página que la persona abre.
+
 ## Listas del brief que NO van en la 1.0, y por qué
 
 | Lista | Licencia | Motivo |
