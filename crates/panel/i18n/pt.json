@@ -1886,6 +1886,13 @@
     "av_sin_nombre": "(endereço sem nome)",
     "av_pais_desconocido": "país desconhecido",
     "av_anycast": "rede mundial (anycast)",
-    "av_local": "rede local"
+    "av_local": "rede local",
+    "av_vivo_titulo": "Ao vivo",
+    "av_vivo_lead": "O que o seu antivírus está enviando e recebendo agora mesmo, minuto a minuto. O mais recente em cima.",
+    "av_vivo_directo": "Ao vivo",
+    "av_vivo_resumen": "nos últimos 20 minutos: {sube} enviados · {baja} recebidos",
+    "av_vivo_vacio": "Aguardando atividade do seu antivírus… Quando enviar ou receber algo, aparecerá aqui na hora.",
+    "av_col_producto": "Antivírus",
+    "av_export": "Baixar tudo (CSV)"
   }
 }

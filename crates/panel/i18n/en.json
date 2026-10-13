@@ -1886,6 +1886,13 @@
     "av_sin_nombre": "(address with no name)",
     "av_pais_desconocido": "unknown country",
     "av_anycast": "worldwide network (anycast)",
-    "av_local": "local network"
+    "av_local": "local network",
+    "av_vivo_titulo": "Live",
+    "av_vivo_lead": "What your antivirus is sending and receiving right now, minute by minute. The newest at the top.",
+    "av_vivo_directo": "Live",
+    "av_vivo_resumen": "in the last 20 minutes: {sube} sent · {baja} received",
+    "av_vivo_vacio": "Waiting for your antivirus to do something… When it sends or receives, it will appear here at once.",
+    "av_col_producto": "Antivirus",
+    "av_export": "Download everything (CSV)"
   }
 }

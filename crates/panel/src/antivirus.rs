@@ -27,6 +27,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::extract::State;
+use axum::http::header;
+use axum::response::IntoResponse;
 use guardiana_core::time::{now_ms, HOUR_MS};
 use guardiana_core::{Category, SELF_DEVICE_ID};
 use guardiana_lists::antivirus::{self, Antivirus};
@@ -52,9 +54,32 @@ pub(crate) struct Vista {
     trafico: Vec<TraficoProducto>,
     /// How many hours of traffic there are (the plan's detail): the page says it.
     trafico_horas: i64,
+    /// The latest minutes of antivirus traffic, newest first, for the live panel (1.0.22).
+    vivo: Vec<VivoFila>,
     /// The window, in days.
     dias: i64,
 }
+
+/// One line of the live panel: a minute of an antivirus talking to a destination (1.0.22).
+#[derive(Serialize)]
+struct VivoFila {
+    /// Start of the minute, Unix ms.
+    minuto: i64,
+    producto: &'static str,
+    programa: String,
+    /// The name asked for the address, or empty.
+    destino: String,
+    /// The network, or a mark (`@local`, `@anycast`).
+    red: String,
+    pais: String,
+    subidos: u64,
+    bajados: u64,
+}
+
+/// How many minutes of the live feed are returned.
+const VIVO_MINUTOS: i64 = 20;
+/// The most rows of the live feed.
+const VIVO_MAX: usize = 120;
 
 /// What one antivirus product sent and received in the window, measured on this computer.
 #[derive(Serialize)]
@@ -389,11 +414,12 @@ pub(crate) async fn vista(
 ) -> ApiResult<Vista> {
     const DIAS: i64 = 7;
     let now = now_ms();
-    let (filas, devices, trafico) = with_ledger(&state, |l| {
+    let (filas, devices, trafico, recientes) = with_ledger(&state, |l| {
         Ok((
             l.program_names(now - DIAS * 24 * HOUR_MS, now + 1, zona)?,
             l.devices()?,
             l.trafico(now - DIAS * 24 * HOUR_MS, now + 1, &[])?,
+            l.trafico(now - VIVO_MINUTOS * 60_000, now + 1, &[])?,
         ))
     })?;
     let trafico_horas = trafico
@@ -402,6 +428,24 @@ pub(crate) async fn vista(
         .min()
         .map_or(0, |m| (now - m) / HOUR_MS + 1);
     let trafico = calcula_trafico(&trafico, zona);
+    // The live feed: the latest minutes, newest first, only of a known antivirus.
+    let mut vivo: Vec<VivoFila> = recientes
+        .into_iter()
+        .filter_map(|f| {
+            antivirus::antivirus_de_programa(&f.programa).map(|av| VivoFila {
+                minuto: f.minuto,
+                producto: av.nombre,
+                programa: f.programa,
+                destino: f.destino,
+                red: f.red,
+                pais: f.pais,
+                subidos: f.enviados,
+                bajados: f.recibidos,
+            })
+        })
+        .collect();
+    vivo.sort_by_key(|v| std::cmp::Reverse((v.minuto, v.subidos + v.bajados)));
+    vivo.truncate(VIVO_MAX);
     let comparten: Vec<&str> = devices
         .iter()
         .filter(|d| d.id == SELF_DEVICE_ID || d.share_detail_with_home)
@@ -420,8 +464,93 @@ pub(crate) async fn vista(
         catalogo: antivirus::antivirus().iter().map(ficha).collect(),
         trafico,
         trafico_horas,
+        vivo,
         dias: DIAS,
     }))
+}
+
+/// A plain local date-time `YYYY-MM-DD HH:MM` from a Unix-ms minute, for the CSV.
+fn fecha_hora_local(ms: i64, zona_min: i64) -> String {
+    let t = ms.div_euclid(1000) + zona_min * 60;
+    let (dias, seg) = (t.div_euclid(86_400), t.rem_euclid(86_400));
+    // Civil date from a day number (Howard Hinnant's algorithm), days since 1970-01-01.
+    let z = dias + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    format!(
+        "{y:04}-{m:02}-{d:02} {:02}:{:02}",
+        seg.div_euclid(3600),
+        (seg.rem_euclid(3600)).div_euclid(60)
+    )
+}
+
+/// `/api/antivirus/export`: all the antivirus traffic there is, as a CSV the person can keep or
+/// show (1.0.22). One row per minute, program and destination; the address is never in it.
+pub(crate) async fn export(
+    Zona(zona): Zona,
+    State(state): State<Arc<AppState>>,
+    _s: Session,
+) -> Result<axum::response::Response, axum::response::Response> {
+    use std::fmt::Write as _;
+    let now = now_ms();
+    let filas = with_ledger(&state, |l| l.trafico(0, now + 1, &[]))?;
+    let mut csv = String::new();
+    writeln!(
+        csv,
+        "minuto;fecha_hora;producto;programa;firma;destino;pais;red;asn;protocolo;puerto;bytes_enviados;bytes_recibidos;de_noche"
+    )
+    .ok();
+    let celda = |s: &str| {
+        if s.contains([';', '"', '\n']) {
+            format!("\"{}\"", s.replace('"', "\"\""))
+        } else {
+            s.to_owned()
+        }
+    };
+    for f in &filas {
+        let Some(av) = antivirus::antivirus_de_programa(&f.programa) else {
+            continue;
+        };
+        let resto = (f.minuto + zona * 60_000).rem_euclid(86_400_000);
+        let noche = resto < 6 * 3_600_000;
+        let fecha = fecha_hora_local(f.minuto, zona);
+        let _ = writeln!(
+            csv,
+            "{};{};{};{};{};{};{};{};{};{};{};{};{};{}",
+            f.minuto,
+            celda(&fecha),
+            celda(av.nombre),
+            celda(&f.programa),
+            celda(&f.firma),
+            celda(&f.destino),
+            celda(&f.pais),
+            celda(&f.red),
+            f.asn,
+            celda(&f.proto),
+            f.puerto,
+            f.enviados,
+            f.recibidos,
+            if noche { "sí" } else { "no" },
+        );
+    }
+    Ok((
+        [
+            (header::CONTENT_TYPE, "text/csv; charset=utf-8".to_owned()),
+            (
+                header::CONTENT_DISPOSITION,
+                "attachment; filename=\"guardiana-antivirus-trafico.csv\"".to_owned(),
+            ),
+        ],
+        csv,
+    )
+        .into_response())
 }
 
 /// `/api/antivirus/detectar`: which antivirus Windows Security Center lists as installed, and
@@ -487,6 +616,19 @@ mod tests {
             last_ts: 1_000 + i64::try_from(n).unwrap(),
             category: cat,
         }
+    }
+
+    #[test]
+    fn the_csv_date_is_the_persons_local_day_and_minute() {
+        // 1791900000000 ms = 2026-10-13 14:00 UTC; in UTC-5 it is 09:00 the same day.
+        assert_eq!(
+            super::fecha_hora_local(1_791_900_000_000, 0),
+            "2026-10-13 14:00"
+        );
+        assert_eq!(
+            super::fecha_hora_local(1_791_900_000_000, -300),
+            "2026-10-13 09:00"
+        );
     }
 
     #[test]

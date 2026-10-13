@@ -347,3 +347,11 @@ a.enlace-empresa:hover { color: var(--accent); text-decoration-color: currentCol
 .x-queja h3 { margin-top: 0; color: var(--cortado); }
 .x-paso { margin: 8px 0; }
 .franja-exp { border-left: 4px solid var(--cortado); }
+
+/* Panel de telemetría en directo del antivirus (1.0.22). */
+.av-vivo-cab{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:.95rem}
+.av-latido{display:inline-block;width:10px;height:10px;border-radius:50%;background:#d33;box-shadow:0 0 0 0 rgba(221,51,51,.6);animation:av-latir 1.6s infinite}
+@keyframes av-latir{0%{box-shadow:0 0 0 0 rgba(221,51,51,.6)}70%{box-shadow:0 0 0 8px rgba(221,51,51,0)}100%{box-shadow:0 0 0 0 rgba(221,51,51,0)}}
+#av-vivo tr{animation:av-entra .5s ease}
+@keyframes av-entra{from{background:rgba(31,95,174,.12)}to{background:transparent}}
+@media (prefers-reduced-motion: reduce){.av-latido{animation:none}#av-vivo tr{animation:none}}

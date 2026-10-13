@@ -1789,17 +1789,39 @@
         <h4 data-t="av_por_destino">${esc(t('av_por_destino'))}</h4>
         <div class="wrap"><table><tbody>${p.destinos.map((x) => filaTrafico(x, (x.destino || x.red || t('av_sin_nombre')) + (x.destino && x.pais && x.pais[0] !== '@' ? ' · ' + paisTrafico(x.pais) : ''))).join('')}</tbody></table></div>
       </div>`;
+      const reloj = (ms) => { try { return new Date(ms).toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+      // El panel en directo: cada minuto reciente de un antivirus hablando, lo nuevo arriba.
+      const filaViva = (v) => `<tr><td class="muted">${esc(reloj(v.minuto))}</td><td><span class="tag ia">${esc(v.producto)}</span></td><td class="mono">${esc(v.destino || v.red || t('av_sin_nombre'))}</td><td>${esc(v.pais && v.pais[0] !== '@' ? paisTrafico(v.pais) : paisTrafico(v.red))}</td><td><b>${esc(bytes(v.subidos))}</b></td><td>${esc(bytes(v.bajados))}</td></tr>`;
       const paint = (r) => {
         $('av-vistos').innerHTML = r.vistos.length ? r.vistos.map(visto).join('')
           : `<div class="card"><p class="muted">${esc(t('av_ninguno').replace('{dias}', r.dias))}</p></div>`;
         $('av-ocultos').textContent = r.ocultos ? tn('av_ocultos', r.ocultos) : '';
         $('av-ocultos').classList.toggle('hidden', !r.ocultos);
+        // Panel en directo.
+        const vivo = r.vivo || [];
+        $('av-vivo').innerHTML = vivo.map(filaViva).join('');
+        $('av-vivo-vacio').classList.toggle('hidden', vivo.length > 0);
+        const sube = vivo.reduce((s, v) => s + Number(v.subidos || 0), 0);
+        const baja = vivo.reduce((s, v) => s + Number(v.bajados || 0), 0);
+        $('av-vivo-resumen').textContent = vivo.length ? t('av_vivo_resumen').replace('{sube}', bytes(sube)).replace('{baja}', bytes(baja)) : '';
         $('av-trafico-lead').textContent = r.trafico_horas ? t('av_trafico_lead').replace('{h}', r.trafico_horas) : t('av_trafico_vacio');
         $('av-trafico').innerHTML = r.trafico.length ? r.trafico.map(bloqueTrafico).join('') : '';
+        $('av-export').classList.toggle('hidden', !r.trafico.length);
         // Primero los que tienen decisiones oficiales, luego el resto, cada grupo por nombre.
         const cat = r.catalogo.slice().sort((a, b) => (b.sanciones.length > 0) - (a.sanciones.length > 0) || a.producto.localeCompare(b.producto));
         $('av-catalogo').innerHTML = cat.map(ficha).join('');
       };
+      // Exportar: se pide con el token en la cabecera (nunca en la dirección) y se descarga.
+      $('av-export').addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+          const r = await fetch('/api/antivirus/export', { headers: { 'X-Guardiana-Token': token, 'X-Guardiana-Tz': String(-new Date().getTimezoneOffset()) } });
+          if (!r.ok) throw new Error(await r.text());
+          const blob = await r.blob();
+          const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'guardiana-antivirus-trafico.csv';
+          document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+        } catch (err) { $('av-detectar-msg').textContent = String(err.message || err); }
+      });
       const detectado = (d) => `<p>${d.activo ? '🟢' : '⚪'} <b>${esc(d.nombre)}</b> · ${esc(d.activo ? t('av_activo') : t('av_inactivo'))} · ${esc(d.al_dia ? t('av_al_dia') : t('av_desactualizado'))}${d.conocido ? '' : ` <span class="muted">${esc(t('av_no_en_lista'))}</span>`}</p>`;
       $('av-detectar').addEventListener('click', async (e) => {
         e.target.disabled = true;

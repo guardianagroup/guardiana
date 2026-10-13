@@ -154,6 +154,22 @@ async fn the_antivirus_page_shows_what_each_antivirus_asked_and_every_official_r
             paquetes: 2_100,
         }])
         .unwrap();
+        // One recent minute too, so the live panel has something to show.
+        l.suma_trafico(&[guardiana_core::Trafico {
+            minuto: now - 2 * 60_000,
+            programa: "MsMpEng.exe".into(),
+            firma: "Microsoft Windows Publisher".into(),
+            destino: "vortex-win.data.microsoft.com".into(),
+            pais: "US".into(),
+            red: "Microsoft Corporation".into(),
+            asn: 8075,
+            proto: "tcp".into(),
+            puerto: 443,
+            enviados: 44_000,
+            recibidos: 3_000,
+            paquetes: 40,
+        }])
+        .unwrap();
     }
     let running = start(Config {
         listen: vec!["127.0.0.1:0".parse().unwrap()],
@@ -222,12 +238,24 @@ async fn the_antivirus_page_shows_what_each_antivirus_asked_and_every_official_r
         .iter()
         .find(|x| x["producto"] == "Microsoft Defender")
         .unwrap();
-    assert_eq!(td["subidos"], 3_000_000);
-    assert_eq!(td["bajados"], 120_000);
+    assert_eq!(td["subidos"], 3_044_000);
+    assert_eq!(td["bajados"], 123_000);
     assert_eq!(td["paises"][0]["pais"], "US");
-    assert_eq!(td["paises"][0]["subidos"], 3_000_000);
+    assert_eq!(td["paises"][0]["subidos"], 3_044_000);
     assert_eq!(td["destinos"][0]["destino"], "wdcp.microsoft.com");
     assert!(v["trafico_horas"].as_i64().unwrap() >= 1);
+    // The live panel shows the recent minute, newest first, only for antivirus.
+    let vivo = v["vivo"].as_array().unwrap();
+    assert!(!vivo.is_empty());
+    assert_eq!(vivo[0]["destino"], "vortex-win.data.microsoft.com");
+    assert_eq!(vivo[0]["producto"], "Microsoft Defender");
+
+    // Export: a CSV with the header and Defender's rows, never an address.
+    let (status, csv) = get(addr, &t, "/api/antivirus/export").await;
+    assert_eq!(status, 200);
+    assert!(csv.starts_with("minuto;fecha_hora;producto;"));
+    assert!(csv.contains("Microsoft Defender;MsMpEng.exe"));
+    assert!(csv.contains("wdcp.microsoft.com"));
 
     // The detect button answers on every system. Outside Windows there is no Security Center,
     // said plainly; on Windows it lists what Windows lists (the CI machine has Defender).
