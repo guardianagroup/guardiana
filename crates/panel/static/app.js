@@ -1783,9 +1783,18 @@
       const importe = (x) => { const [n, m] = String(x).split(' '); try { return new Intl.NumberFormat(LOC, { style: 'currency', currency: m, maximumFractionDigits: 0 }).format(Number(n)); } catch (_) { return x; } };
       const fecha = (d) => { try { return new Date(d + 'T12:00:00').toLocaleDateString(LOC, { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return d; } };
       const sancion = (s) => `<li><b>${esc(fecha(s.fecha))}</b> · ${esc(s.autoridad)} (${esc(pais(s.pais))}) · <span class="tag av-${esc(s.tipo)}">${esc(t('av_tipo_' + s.tipo))}</span>${s.importe ? ' · <b>' + esc(importe(s.importe)) + '</b>' : ''}<br>${esc(t('av_sancion_' + s.clave))} ${enlace(s.fuente, t('av_fuente_oficial'))}</li>`;
+      // Lo que dicen sus propios documentos (13 oct 2026): resumido en palabras llanas, cada punto
+      // con el enlace a la página del fabricante que lo dice. Un resumen, no asesoría legal.
+      const L3 = (o) => (o ? o[LANG] || o.es || '' : '');
+      const terminos = (x) => (!x ? '' : `<details class="av-terminos"><summary><b>${esc(t('av_terminos_titulo'))}</b> <span class="muted">· ${esc(t('av_terminos_revisado').replace('{f}', fecha(x.revisado)))}</span></summary>
+        <ul>${x.puntos.map((p) => `<li><span class="tag">${esc(t('av_tema_' + p.tema))}</span> ${esc(L3(p))} ${enlace(p.fuente, t('av_terminos_fuente'))}</li>`).join('')}</ul>
+        ${x.como_limitar ? `<p><b>${esc(t('av_terminos_limitar'))}</b> ${esc(L3(x.como_limitar))} ${enlace(x.como_limitar.fuente, t('av_terminos_fuente'))}</p>` : ''}
+        <p class="muted">${esc(t('av_terminos_leidos'))} ${x.documentos.map((d) => enlace(d.url, d.titulo + (d.actualizado ? ' (' + d.actualizado + ')' : ''))).join(' · ')}</p>
+        <p class="muted">${esc(t('av_terminos_nota'))}</p></details>`);
       const ficha = (f) => `<div class="card">
         <h3>${esc(f.producto)} <span class="muted">· ${esc(f.empresa)} (${esc(pais(f.pais))})</span></h3>
         <p class="muted mono">${f.programas.map(esc).join(' · ')}</p>
+        ${terminos(f.terminos)}
         ${f.sanciones.length ? `<ul>${f.sanciones.map(sancion).join('')}</ul>` : `<p class="muted">${esc(t('av_sin_sanciones'))}</p>`}
       </div>`;
       // Bytes en la unidad de quien lee, sin inventar precisión: lo que la pila dio por enviado.

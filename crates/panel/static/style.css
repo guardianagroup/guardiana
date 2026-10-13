@@ -668,3 +668,11 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 .universo .barra button, .universo .vacio button, .universo .aviso button { text-transform: none; letter-spacing: 0; box-shadow: none; }
 .universo .ayuda-vista { transition: opacity .8s ease; }
 .universo .ayuda-vista.oculta { opacity: 0; }
+
+/* «Lo que dicen sus términos» in each antivirus card (13 Oct 2026). */
+.av-terminos { margin: 10px 0 12px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.av-terminos summary { cursor: pointer; }
+.av-terminos ul { margin: 10px 0 8px; padding-left: 18px; }
+.av-terminos li { margin-bottom: 8px; line-height: 1.5; }
+.av-terminos .tag { margin-right: 4px; color: var(--muted, #586477); }
+.av-terminos p { margin: 6px 0; overflow-wrap: anywhere; }

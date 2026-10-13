@@ -214,10 +214,172 @@ pub fn uso_documentado(av: &Antivirus, qname: &str) -> Option<DominioAv> {
         .copied()
 }
 
+/// What each antivirus's own documents say (privacy policy, product notice, licence), in plain
+/// words and checked sentence by sentence against the maker's page on the day of `revisado`
+/// (`antivirus-terminos.json`, 13 Oct 2026). A summary with its sources, not legal advice.
+pub const TERMINOS: &str = include_str!("../data/antivirus-terminos.json");
+
+/// A text in the three languages of the panel.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct Texto3 {
+    /// Spanish, the master text.
+    pub es: String,
+    /// English.
+    pub en: String,
+    /// Portuguese.
+    pub pt: String,
+}
+
+/// One official document that was read.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct DocumentoAv {
+    /// Its title, as the maker gives it.
+    pub titulo: String,
+    /// Where it is.
+    pub url: String,
+    /// Its own «last updated», as written (`2026-03-06`, `2026-09`), or empty when it has none.
+    pub actualizado: String,
+}
+
+/// One point of the summary, with the page that says it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct PuntoAv {
+    /// What it is about, one of [`TEMAS`].
+    pub tema: String,
+    /// What it says, in plain words.
+    #[serde(flatten)]
+    pub texto: Texto3,
+    /// The maker's page where it is written.
+    pub fuente: String,
+}
+
+/// The documented way to limit what is collected or shared.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct ComoLimitar {
+    /// What to do, in plain words.
+    #[serde(flatten)]
+    pub texto: Texto3,
+    /// The maker's page that says so.
+    pub fuente: String,
+}
+
+/// What one antivirus's documents say.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct TerminosAv {
+    /// The product, as `antivirus.txt` names it.
+    pub producto: String,
+    /// The day it was checked, `YYYY-MM-DD`.
+    pub revisado: String,
+    /// The documents read.
+    pub documentos: Vec<DocumentoAv>,
+    /// The points, most important first.
+    pub puntos: Vec<PuntoAv>,
+    /// How to limit it, when the maker documents a way.
+    #[serde(default)]
+    pub como_limitar: Option<ComoLimitar>,
+}
+
+#[derive(serde::Deserialize)]
+struct ArchivoTerminos {
+    antivirus: Vec<TerminosAv>,
+}
+
+/// What a point can be about. The order is the order the page shows them in.
+pub const TEMAS: &[&str] = &[
+    "datos",
+    "venta",
+    "compartir",
+    "marketing",
+    "conservacion",
+    "transferencias",
+    "cambios",
+    "renovacion",
+    "responsabilidad",
+    "arbitraje",
+];
+
+/// What every antivirus's documents say, in the list's order.
+///
+/// # Panics
+/// Never in a build that passed its tests: the file is checked by them.
+#[must_use]
+#[allow(clippy::expect_used)]
+pub fn terminos() -> &'static [TerminosAv] {
+    static L: OnceLock<Vec<TerminosAv>> = OnceLock::new();
+    L.get_or_init(|| {
+        serde_json::from_str::<ArchivoTerminos>(TERMINOS)
+            .expect("antivirus-terminos.json is checked by its tests")
+            .antivirus
+    })
+}
+
+/// What one product's documents say, by its name in the list.
+#[must_use]
+pub fn terminos_de(producto: &str) -> Option<&'static TerminosAv> {
+    terminos().iter().find(|t| t.producto == producto)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_summary_of_terms_is_complete_and_has_its_sources() {
+        let nombres: Vec<&str> = antivirus().iter().map(|a| a.nombre).collect();
+        let t = terminos();
+        assert!(t.len() >= 10, "{}", t.len());
+        let fuente = |u: &str| u.starts_with("https://") && !u.contains(' ');
+        for a in t {
+            assert!(
+                nombres.contains(&a.producto.as_str()),
+                "{} is not in antivirus.txt",
+                a.producto
+            );
+            assert_eq!(a.revisado.len(), 10, "{}", a.producto);
+            assert!(!a.documentos.is_empty(), "{} read no document", a.producto);
+            for d in &a.documentos {
+                assert!(
+                    fuente(&d.url) && !d.titulo.is_empty(),
+                    "{}: {}",
+                    a.producto,
+                    d.url
+                );
+            }
+            assert!(
+                !a.puntos.is_empty() && a.puntos.len() <= 6,
+                "{}",
+                a.producto
+            );
+            for p in &a.puntos {
+                assert!(
+                    TEMAS.contains(&p.tema.as_str()),
+                    "{}: {}",
+                    a.producto,
+                    p.tema
+                );
+                assert!(fuente(&p.fuente), "{}: {}", a.producto, p.fuente);
+                for x in [&p.texto.es, &p.texto.en, &p.texto.pt] {
+                    assert!(!x.trim().is_empty(), "{}: empty text", a.producto);
+                }
+                // Plain words, short: a sentence a person reads at once.
+                assert!(
+                    p.texto.es.split_whitespace().count() <= 40,
+                    "{}: {}",
+                    a.producto,
+                    p.texto.es
+                );
+            }
+            if let Some(c) = &a.como_limitar {
+                assert!(
+                    fuente(&c.fuente) && !c.texto.es.is_empty(),
+                    "{}",
+                    a.producto
+                );
+            }
+        }
+        assert!(terminos_de("Avast").is_some());
+    }
 
     #[test]
     fn the_list_reads_and_every_entry_has_its_source() {

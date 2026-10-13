@@ -1,0 +1,995 @@
+{
+ "_leeme": "Lo que dicen los documentos oficiales de cada antivirus (política de privacidad, aviso de productos, contrato de licencia), resumido en palabras llanas por GUARDIANA y comprobado frase a frase en el documento del propio fabricante el día de «revisado». Cada punto lleva el enlace a su fuente. Es un resumen, no asesoría legal: manda el texto oficial. Si un dato está mal, escribe a hola@guardianagroup.com y se corrige con su fecha.",
+ "actualizado": "2026-10-13",
+ "antivirus": [
+  {
+   "producto": "Microsoft Defender",
+   "revisado": "2026-10-13",
+   "documentos": [
+    {
+     "titulo": "Microsoft Privacy Statement",
+     "url": "https://www.microsoft.com/en-us/privacy/privacystatement",
+     "actualizado": "2026-09"
+    },
+    {
+     "titulo": "Virus and Threat Protection in the Windows Security App",
+     "url": "https://support.microsoft.com/en-US/Windows/Security/Threat-Malware-Protection/virus-and-threat-protection-in-the-windows-security-app",
+     "actualizado": "2026-06-24"
+    },
+    {
+     "titulo": "Términos de licencia del software de Microsoft – Sistema operativo Windows",
+     "url": "https://www.microsoft.com/content/dam/microsoft/usetm/documents/windows/11/oem-(pre-installed)/Useterms_OEM_Windows_11_Spanish.pdf",
+     "actualizado": "2024-04"
+    },
+    {
+     "titulo": "Cloud protection and sample submission at Microsoft Defender Antivirus",
+     "url": "https://learn.microsoft.com/en-us/defender-endpoint/cloud-protection-microsoft-antivirus-sample-submission",
+     "actualizado": "2025-10-20"
+    }
+   ],
+   "puntos": [
+    {
+     "tema": "datos",
+     "es": "Con la protección en la nube activada, Microsoft Defender puede enviar automáticamente archivos sospechosos a Microsoft para comprobar si son una amenaza.",
+     "en": "With cloud-delivered protection turned on, Microsoft Defender can automatically send suspicious files to Microsoft to check whether they are a threat.",
+     "pt": "Com a proteção na nuvem ativada, o Microsoft Defender pode enviar automaticamente arquivos suspeitos à Microsoft para verificar se são uma ameaça.",
+     "fuente": "https://support.microsoft.com/en-US/Windows/Security/Threat-Malware-Protection/virus-and-threat-protection-in-the-windows-security-app"
+    },
+    {
+     "tema": "compartir",
+     "es": "Al aceptar la licencia de Windows y usar el software, el usuario acepta que Microsoft pueda reunir, usar y divulgar información según su Declaración de Privacidad.",
+     "en": "By accepting the Windows licence and using the software, the user agrees that Microsoft may collect, use and disclose information as described in its Privacy Statement.",
+     "pt": "Ao aceitar a licença do Windows e usar o software, o usuário concorda que a Microsoft pode coletar, usar e divulgar informações conforme sua Declaração de Privacidade.",
+     "fuente": "https://www.microsoft.com/content/dam/microsoft/usetm/documents/windows/11/oem-(pre-installed)/Useterms_OEM_Windows_11_Spanish.pdf"
+    },
+    {
+     "tema": "conservacion",
+     "es": "Microsoft conserva los datos personales durante el tiempo necesario para prestar los productos y servicios que el usuario utiliza.",
+     "en": "Microsoft keeps personal data for as long as necessary to provide the products and services the user uses.",
+     "pt": "A Microsoft mantém os dados pessoais pelo tempo necessário para fornecer os produtos e serviços que o usuário utiliza.",
+     "fuente": "https://www.microsoft.com/en-us/privacy/privacystatement"
+    },
+    {
+     "tema": "cambios",
+     "es": "Según la licencia de Windows, al aceptar el contrato o usar el software, el usuario acepta recibir actualizaciones automáticas sin notificación adicional.",
+     "en": "Under the Windows licence, by accepting the agreement or using the software, the user agrees to receive automatic updates without additional notice.",
+     "pt": "Segundo a licença do Windows, ao aceitar o contrato ou usar o software, o usuário concorda em receber atualizações automáticas sem notificação adicional.",
+     "fuente": "https://www.microsoft.com/content/dam/microsoft/usetm/documents/windows/11/oem-(pre-installed)/Useterms_OEM_Windows_11_Spanish.pdf"
+    },
+    {
+     "tema": "responsabilidad",
+     "es": "La licencia de Windows limita lo que el usuario puede recuperar por daños al importe que pagó por el software, o hasta 50 USD si lo obtuvo gratis.",
+     "en": "The Windows licence limits what the user can recover in damages to the amount paid for the software, or up to USD 50 if it was obtained free.",
+     "pt": "A licença do Windows limita o que o usuário pode recuperar por danos ao valor pago pelo software, ou até 50 USD se foi obtido gratuitamente.",
+     "fuente": "https://www.microsoft.com/content/dam/microsoft/usetm/documents/windows/11/oem-(pre-installed)/Useterms_OEM_Windows_11_Spanish.pdf"
+    },
+    {
+     "tema": "transferencias",
+     "es": "Microsoft indica que mantiene grandes centros de datos en países como Australia, Austria, Brasil, Canadá, Finlandia, Francia, Alemania y Estados Unidos, entre otros.",
+     "en": "Microsoft says it maintains major data centres in countries such as Australia, Austria, Brazil, Canada, Finland, France, Germany and the United States, among others.",
+     "pt": "A Microsoft indica que mantém grandes centros de dados em países como Austrália, Áustria, Brasil, Canadá, Finlândia, França, Alemanha e Estados Unidos, entre outros.",
+     "fuente": "https://www.microsoft.com/en-us/privacy/privacystatement#mainstorageandprocessingpersonaldatamodule"
+    }
+   ],
+   "como_limitar": {
+    "es": "En la app Seguridad de Windows, en Protección antivirus y contra amenazas > Administrar la configuración, se puede ajustar el envío de muestras de archivos a Microsoft.",
+    "en": "In the Windows Security app, under Virus & threat protection > Manage settings, you can adjust the sending of sample files to Microsoft.",
+    "pt": "No app Segurança do Windows, em Proteção contra vírus e ameaças > Gerenciar configurações, é possível ajustar o envio de amostras de arquivos à Microsoft.",
+    "fuente": "https://support.microsoft.com/en-US/Windows/Security/Threat-Malware-Protection/virus-and-threat-protection-in-the-windows-security-app"
+   }
+  },
+  {
+   "producto": "Avast",
+   "revisado": "2026-10-13",
+   "documentos": [
+    {
+     "titulo": "Privacy Center",
+     "url": "https://avast.com/privacy-policy",
+     "actualizado": ""
+    },
+    {
+     "titulo": "Gen General Privacy Notice",
+     "url": "https://privacy.gendigital.com/en/",
+     "actualizado": "2026-03-06"
+    },
+    {
+     "titulo": "Product Privacy Notice",
+     "url": "https://www.avast.com/en-us/products-policy",
+     "actualizado": "2026-07-23"
+    },
+    {
+     "titulo": "End User License Agreement, Version 1.16",
+     "url": "https://www.avast.com/eula",
+     "actualizado": "2026-01-23"
+    }
+   ],
+   "puntos": [
+    {
+     "tema": "datos",
+     "es": "Según su aviso de privacidad de productos, el antivirus de escritorio de Avast trata muestras de archivos, URL y sus referentes, identificadores del dispositivo y las aplicaciones presentes en el equipo.",
+     "en": "According to its product privacy notice, Avast's desktop antivirus processes file samples, URLs and their referrers, device identifiers and the applications present on the computer.",
+     "pt": "Segundo seu aviso de privacidade de produtos, o antivírus de desktop da Avast trata amostras de arquivos, URLs e seus referenciadores, identificadores do dispositivo e os aplicativos presentes no computador.",
+     "fuente": "https://www.avast.com/en-us/products-policy"
+    },
+    {
+     "tema": "venta",
+     "es": "El aviso general de privacidad de Gen Digital, que se aplica a Avast, afirma que no vende los datos personales de los usuarios a terceros.",
+     "en": "Gen Digital's General Privacy Notice, which applies to Avast, states that it does not sell users' personal data to third parties.",
+     "pt": "O aviso geral de privacidade da Gen Digital, que se aplica à Avast, afirma que não vende os dados pessoais dos usuários a terceiros.",
+     "fuente": "https://privacy.gendigital.com/en/#heading-008c683854514679997d498cda5ab9f1"
+    },
+    {
+     "tema": "compartir",
+     "es": "El aviso general de privacidad de Gen Digital, aplicable a Avast, permite compartir datos personales con terceros con fines publicitarios cuando la ley aplicable lo permita.",
+     "en": "Gen Digital's General Privacy Notice, which applies to Avast, allows personal data to be shared with third parties for advertising purposes where applicable law permits.",
+     "pt": "O aviso geral de privacidade da Gen Digital, aplicável à Avast, permite compartilhar dados pessoais com terceiros para fins publicitários quando a lei aplicável permitir.",
+     "fuente": "https://privacy.gendigital.com/en/#heading-008c683854514679997d498cda5ab9f1"
+    },
+    {
+     "tema": "marketing",
+     "es": "Los datos sobre las aplicaciones del dispositivo también se usan para «mejora de producto y negocio», incluido estimar oportunidades de mercado, y se conservan hasta 36 meses.",
+     "en": "Data about the applications on the device is also used for \"product and business improvement\", including estimating market opportunity, and is kept for up to 36 months.",
+     "pt": "Os dados sobre os aplicativos do dispositivo também são usados para «melhoria de produto e negócio», incluindo estimar oportunidades de mercado, e são mantidos por até 36 meses.",
+     "fuente": "https://www.avast.com/en-us/products-policy"
+    },
+    {
+     "tema": "renovacion",
+     "es": "La suscripción se renueva automáticamente y el distribuidor puede intentar cobrar el siguiente periodo hasta 35 días antes de la fecha de renovación.",
+     "en": "The subscription renews automatically and the distributor may attempt to charge for the next period up to 35 days before the renewal date.",
+     "pt": "A assinatura é renovada automaticamente e o distribuidor pode tentar cobrar o próximo período até 35 dias antes da data de renovação.",
+     "fuente": "https://www.avast.com/eula"
+    },
+    {
+     "tema": "arbitraje",
+     "es": "El contrato de licencia prevé arbitraje vinculante para las disputas y el usuario se compromete a no presentarlas como demanda colectiva, con algunas excepciones.",
+     "en": "The licence agreement provides for binding arbitration of disputes, and the user agrees not to bring them as a class action, with some exceptions.",
+     "pt": "O contrato de licença prevê arbitragem vinculante para as disputas e o usuário se compromete a não apresentá-las como ação coletiva, com algumas exceções.",
+     "fuente": "https://www.avast.com/eula#arbitration-agreement"
+    }
+   ],
+   "como_limitar": {
+    "es": "El aviso general de Gen Digital indica que se puede usar la configuración de la cuenta o del producto para gestionar la privacidad.",
+    "en": "Gen Digital's General Privacy Notice says you can use the settings in your account or product to manage privacy.",
+    "pt": "O aviso geral da Gen Digital indica que é possível usar as configurações da conta ou do produto para gerenciar a privacidade.",
+    "fuente": "https://privacy.gendigital.com/en/#heading-2e250b5921244b348eab4b193a40f4c1"
+   }
+  },
+  {
+   "producto": "AVG",
+   "revisado": "2026-10-13",
+   "documentos": [
+    {
+     "titulo": "General Privacy Notice",
+     "url": "https://avg.com/en-us/privacy",
+     "actualizado": ""
+    },
+    {
+     "titulo": "Gen General Privacy Notice",
+     "url": "https://privacy.gendigital.com/en/",
+     "actualizado": "2026-03-06"
+    },
+    {
+     "titulo": "Products Policy / Product Privacy Notice",
+     "url": "https://www.avg.com/en-us/products-policy",
+     "actualizado": "2026-08-26"
+    },
+    {
+     "titulo": "End User License Agreement, Version 1.15",
+     "url": "https://www.avg.com/en-us/eula",
+     "actualizado": "2026-01-23"
+    }
+   ],
+   "puntos": [
+    {
+     "tema": "datos",
+     "es": "Según su aviso de privacidad de productos, el antivirus de escritorio de AVG trata muestras de archivos, URL y sus referentes, identificadores del dispositivo y las aplicaciones presentes en el equipo.",
+     "en": "According to its product privacy notice, AVG's desktop antivirus processes file samples, URLs and their referrers, device identifiers and the applications present on the computer.",
+     "pt": "Segundo seu aviso de privacidade de produtos, o antivírus de desktop da AVG trata amostras de arquivos, URLs e seus referenciadores, identificadores do dispositivo e os aplicativos presentes no computador.",
+     "fuente": "https://www.avg.com/en-us/products-policy"
+    },
+    {
+     "tema": "venta",
+     "es": "El aviso general de privacidad de Gen Digital, que se aplica a AVG, afirma que no vende los datos personales de los usuarios a terceros.",
+     "en": "Gen Digital's General Privacy Notice, which applies to AVG, states that it does not sell users' personal data to third parties.",
+     "pt": "O aviso geral de privacidade da Gen Digital, que se aplica à AVG, afirma que não vende os dados pessoais dos usuários a terceiros.",
+     "fuente": "https://privacy.gendigital.com/en/#heading-008c683854514679997d498cda5ab9f1"
+    },
+    {
+     "tema": "compartir",
+     "es": "El aviso general de privacidad de Gen Digital, aplicable a AVG, permite compartir datos personales con terceros con fines publicitarios cuando la ley aplicable lo permita.",
+     "en": "Gen Digital's General Privacy Notice, which applies to AVG, allows personal data to be shared with third parties for advertising purposes where applicable law permits.",
+     "pt": "O aviso geral de privacidade da Gen Digital, aplicável à AVG, permite compartilhar dados pessoais com terceiros para fins publicitários quando a lei aplicável permitir.",
+     "fuente": "https://privacy.gendigital.com/en/#heading-008c683854514679997d498cda5ab9f1"
+    },
+    {
+     "tema": "marketing",
+     "es": "Los datos sobre las aplicaciones del dispositivo también se usan para «mejora de producto y negocio», incluido estimar oportunidades de mercado, y se conservan hasta 36 meses.",
+     "en": "Data about the applications on the device is also used for \"product and business improvement\", including estimating market opportunity, and is kept for up to 36 months.",
+     "pt": "Os dados sobre os aplicativos do dispositivo também são usados para «melhoria de produto e negócio», incluindo estimar oportunidades de mercado, e são mantidos por até 36 meses.",
+     "fuente": "https://www.avg.com/en-us/products-policy"
+    },
+    {
+     "tema": "renovacion",
+     "es": "La suscripción se renueva automáticamente y el distribuidor puede intentar cobrar el siguiente periodo hasta 35 días antes de la fecha de renovación.",
+     "en": "The subscription renews automatically and the distributor may attempt to charge for the next period up to 35 days before the renewal date.",
+     "pt": "A assinatura é renovada automaticamente e o distribuidor pode tentar cobrar o próximo período até 35 dias antes da data de renovação.",
+     "fuente": "https://www.avg.com/en-us/eula"
+    },
+    {
+     "tema": "arbitraje",
+     "es": "El contrato de licencia prevé arbitraje vinculante para las disputas y el usuario se compromete a no presentarlas como demanda colectiva, con algunas excepciones.",
+     "en": "The licence agreement provides for binding arbitration of disputes, and the user agrees not to bring them as a class action, with some exceptions.",
+     "pt": "O contrato de licença prevê arbitragem vinculante para as disputas e o usuário se compromete a não apresentá-las como ação coletiva, com algumas exceções.",
+     "fuente": "https://www.avg.com/en-us/eula#arbitration-agreement"
+    }
+   ],
+   "como_limitar": {
+    "es": "El aviso general de Gen Digital indica que se puede usar la configuración de la cuenta o del producto para gestionar la privacidad.",
+    "en": "Gen Digital's General Privacy Notice says you can use the settings in your account or product to manage privacy.",
+    "pt": "O aviso geral da Gen Digital indica que é possível usar as configurações da conta ou do produto para gerenciar a privacidade.",
+    "fuente": "https://privacy.gendigital.com/en/#heading-2e250b5921244b348eab4b193a40f4c1"
+   }
+  },
+  {
+   "producto": "Avira",
+   "revisado": "2026-10-13",
+   "documentos": [
+    {
+     "titulo": "Avira Privacy Policy – Homepage",
+     "url": "https://www.avira.com/en/privacy-policy/homepage",
+     "actualizado": ""
+    },
+    {
+     "titulo": "Gen General Privacy Notice",
+     "url": "https://privacy.gendigital.com/en/",
+     "actualizado": "2026-03-06"
+    },
+    {
+     "titulo": "Avira Privacy Policy – Product / Account",
+     "url": "https://www.avira.com/en/privacy-policy/product",
+     "actualizado": ""
+    },
+    {
+     "titulo": "Avira Products End User License Agreement and Terms of Use",
+     "url": "https://www.avira.com/en/end-user-license-agreement-terms-of-use",
+     "actualizado": ""
+    },
+    {
+     "titulo": "Avira License & Services Agreement",
+     "url": "https://www.avira.com/en/avira-license-services-agreement",
+     "actualizado": ""
+    }
+   ],
+   "puntos": [
+    {
+     "tema": "datos",
+     "es": "Según su aviso de productos, Avira Security (incluida la versión para Windows) puede tratar identificadores del dispositivo, dirección MAC, datos de geolocalización y las URL o sitios web visitados.",
+     "en": "According to its product notice, Avira Security (including the Windows version) may process device identifiers, MAC address, geolocation data and the URLs or websites visited.",
+     "pt": "Segundo seu aviso de produtos, o Avira Security (incluindo a versão para Windows) pode tratar identificadores do dispositivo, endereço MAC, dados de geolocalização e as URLs ou sites visitados.",
+     "fuente": "https://www.avira.com/en/privacy-policy/product#Avira-Security-Products"
+    },
+    {
+     "tema": "datos",
+     "es": "El contrato de licencia advierte que el usuario quizá no pueda excluirse de parte de esta recogida de datos salvo desinstalando el producto.",
+     "en": "The licence agreement warns that the user may not be able to opt out of some of this data collection other than by uninstalling the product.",
+     "pt": "O contrato de licença adverte que o usuário talvez não possa recusar parte dessa coleta de dados, a não ser desinstalando o produto.",
+     "fuente": "https://www.avira.com/en/end-user-license-agreement-terms-of-use"
+    },
+    {
+     "tema": "venta",
+     "es": "El aviso general de privacidad de Gen Digital, que se aplica a Avira, afirma que no vende los datos personales de los usuarios a terceros.",
+     "en": "Gen Digital's General Privacy Notice, which applies to Avira, states that it does not sell users' personal data to third parties.",
+     "pt": "O aviso geral de privacidade da Gen Digital, que se aplica à Avira, afirma que não vende os dados pessoais dos usuários a terceiros.",
+     "fuente": "https://privacy.gendigital.com/en/#heading-008c683854514679997d498cda5ab9f1"
+    },
+    {
+     "tema": "compartir",
+     "es": "El aviso general de privacidad de Gen Digital, aplicable a Avira, permite compartir datos personales con terceros con fines publicitarios cuando la ley aplicable lo permita.",
+     "en": "Gen Digital's General Privacy Notice, which applies to Avira, allows personal data to be shared with third parties for advertising purposes where applicable law permits.",
+     "pt": "O aviso geral de privacidade da Gen Digital, aplicável à Avira, permite compartilhar dados pessoais com terceiros para fins publicitários quando a lei aplicável permitir.",
+     "fuente": "https://privacy.gendigital.com/en/#heading-008c683854514679997d498cda5ab9f1"
+    },
+    {
+     "tema": "marketing",
+     "es": "Los datos del producto, como versión, idioma, fecha de instalación y volcados de errores, se usan para prestar el servicio y para entender su uso y mejorar el producto.",
+     "en": "Product data, such as version, language, installation date and crash dumps, is used to provide the service and to understand usage and improve the product.",
+     "pt": "Os dados do produto, como versão, idioma, data de instalação e despejos de falhas, são usados para prestar o serviço e para entender o uso e melhorar o produto.",
+     "fuente": "https://www.avira.com/en/privacy-policy/product#Avira-Security-Products"
+    },
+    {
+     "tema": "renovacion",
+     "es": "Según el aviso de precios publicado con el contrato de licencia, los pagos de renovación anual se cobran hasta 35 días antes de la renovación.",
+     "en": "According to the pricing notice published with the licence agreement, annual renewal payments are charged up to 35 days before renewal.",
+     "pt": "Segundo o aviso de preços publicado com o contrato de licença, os pagamentos de renovação anual são cobrados até 35 dias antes da renovação.",
+     "fuente": "https://www.avira.com/en/end-user-license-agreement-terms-of-use"
+    }
+   ],
+   "como_limitar": {
+    "es": "El aviso general de Gen Digital indica que se puede usar la configuración de la cuenta o del producto para gestionar la privacidad.",
+    "en": "Gen Digital's General Privacy Notice says you can use the settings in your account or product to manage privacy.",
+    "pt": "O aviso geral da Gen Digital indica que é possível usar as configurações da conta ou do produto para gerenciar a privacidade.",
+    "fuente": "https://privacy.gendigital.com/en/#heading-2e250b5921244b348eab4b193a40f4c1"
+   }
+  },
+  {
+   "producto": "Norton",
+   "revisado": "2026-10-13",
+   "documentos": [
+    {
+     "titulo": "Products Privacy Notice",
+     "url": "https://us.norton.com/privacy/products-privacy-notice",
+     "actualizado": "2026-09-25"
+    },
+    {
+     "titulo": "General Privacy Notice",
+     "url": "https://privacy.gendigital.com/en/",
+     "actualizado": "2026-03-06"
+    },
+    {
+     "titulo": "License and Services Agreement",
+     "url": "https://us.norton.com/legal/lsa",
+     "actualizado": ""
+    }
+   ],
+   "puntos": [
+    {
+     "tema": "datos",
+     "es": "Según el aviso de productos, Norton 360 y Norton AntiVirus para escritorio pueden tratar las URL visitadas y metadatos de archivos, incluidas sus rutas, y conservarlos 36 meses.",
+     "en": "According to the product notice, Norton 360 and Norton AntiVirus for desktop may process URLs visited and file metadata, including file paths, and keep them for 36 months.",
+     "pt": "Segundo o aviso de produtos, o Norton 360 e o Norton AntiVirus para desktop podem tratar as URLs visitadas e metadados de arquivos, incluindo seus caminhos, e mantê-los por 36 meses.",
+     "fuente": "https://us.norton.com/privacy/products-privacy-notice#norton-security-products"
+    },
+    {
+     "tema": "datos",
+     "es": "También pueden tratar otro software de seguridad y las aplicaciones en ejecución en el dispositivo, y la ubicación aproximada derivada de la dirección IP, que se conserva 50 meses.",
+     "en": "They may also process other security software and apps running on the device, and the approximate location derived from the IP address, which is kept for 50 months.",
+     "pt": "Também podem tratar outros softwares de segurança e os aplicativos em execução no dispositivo, e a localização aproximada derivada do endereço IP, mantida por 50 meses.",
+     "fuente": "https://us.norton.com/privacy/products-privacy-notice#norton-security-products"
+    },
+    {
+     "tema": "venta",
+     "es": "El aviso general de privacidad de Gen Digital, que se aplica a Norton, afirma que no vende los datos personales de los usuarios a terceros.",
+     "en": "Gen Digital's General Privacy Notice, which applies to Norton, states that it does not sell users' personal data to third parties.",
+     "pt": "O aviso geral de privacidade da Gen Digital, que se aplica à Norton, afirma que não vende os dados pessoais dos usuários a terceiros.",
+     "fuente": "https://privacy.gendigital.com/en/#heading-008c683854514679997d498cda5ab9f1"
+    },
+    {
+     "tema": "compartir",
+     "es": "El aviso general de privacidad de Gen Digital, aplicable a Norton, permite compartir datos personales con terceros con fines publicitarios cuando la ley aplicable lo permita.",
+     "en": "Gen Digital's General Privacy Notice, which applies to Norton, allows personal data to be shared with third parties for advertising purposes where applicable law permits.",
+     "pt": "O aviso geral de privacidade da Gen Digital, aplicável à Norton, permite compartilhar dados pessoais com terceiros para fins publicitários quando a lei aplicável permitir.",
+     "fuente": "https://privacy.gendigital.com/en/#heading-008c683854514679997d498cda5ab9f1"
+    },
+    {
+     "tema": "cambios",
+     "es": "El contrato de licencia y servicios dice que Norton puede cambiar o actualizar el contrato sin necesidad de avisar, y que seguir usando el producto implica aceptar los cambios.",
+     "en": "The License and Services Agreement says Norton can change or update the agreement without any need to give notice, and continued use means accepting the changes.",
+     "pt": "O contrato de licença e serviços diz que a Norton pode alterar ou atualizar o contrato sem necessidade de aviso, e que continuar usando o produto implica aceitar as mudanças.",
+     "fuente": "https://us.norton.com/legal/lsa"
+    },
+    {
+     "tema": "renovacion",
+     "es": "Las suscripciones se renuevan automáticamente; Norton avisa por correo y puede cobrar hasta 35 días antes del vencimiento, al precio vigente en la renovación, que puede ser distinto.",
+     "en": "Subscriptions renew automatically; Norton emails in advance and may charge up to 35 days before expiry, at the price in effect at renewal, which may differ.",
+     "pt": "As assinaturas são renovadas automaticamente; a Norton avisa por e-mail e pode cobrar até 35 dias antes do vencimento, pelo preço vigente na renovação, que pode ser diferente.",
+     "fuente": "https://us.norton.com/legal/lsa"
+    }
+   ],
+   "como_limitar": {
+    "es": "El aviso general de Gen Digital indica que se puede usar la configuración de la cuenta o del producto para gestionar la privacidad.",
+    "en": "Gen Digital's General Privacy Notice says you can use the settings in your account or product to manage privacy.",
+    "pt": "O aviso geral da Gen Digital indica que é possível usar as configurações da conta ou do produto para gerenciar a privacidade.",
+    "fuente": "https://privacy.gendigital.com/en/#heading-2e250b5921244b348eab4b193a40f4c1"
+   }
+  },
+  {
+   "producto": "McAfee",
+   "revisado": "2026-10-13",
+   "documentos": [
+    {
+     "titulo": "McAfee Privacy Notice",
+     "url": "https://www.mcafee.com/en-us/consumer-support/policy/legal.html#privacycontent",
+     "actualizado": "2026-01"
+    }
+   ],
+   "puntos": [
+    {
+     "tema": "datos",
+     "es": "El aviso de privacidad indica que los servicios de McAfee pueden recoger del dispositivo y la red el ID del dispositivo, telemetría, la dirección IP y los dominios web visitados.",
+     "en": "The privacy notice says McAfee's services may collect from the device and network the device ID, telemetry, the IP address and the web domains visited.",
+     "pt": "O aviso de privacidade indica que os serviços da McAfee podem coletar do dispositivo e da rede o ID do dispositivo, telemetria, o endereço IP e os domínios web visitados.",
+     "fuente": "https://www.mcafee.com/en-us/consumer-support/policy/legal.html#sectiond"
+    },
+    {
+     "tema": "datos",
+     "es": "Si se usa WebAdvisor, McAfee puede analizar, recoger y almacenar información sobre la navegación web, incluidas URL, búsquedas, datos de tráfico y metadatos de archivos descargados.",
+     "en": "If WebAdvisor is used, McAfee may scan, collect and store information about web browsing, including URLs, searches, traffic data and metadata of downloaded files.",
+     "pt": "Se o WebAdvisor for usado, a McAfee pode analisar, coletar e armazenar informações sobre a navegação web, incluindo URLs, pesquisas, dados de tráfego e metadados de arquivos baixados.",
+     "fuente": "https://www.mcafee.com/en-us/consumer-support/policy/legal.html#sectiond"
+    },
+    {
+     "tema": "venta",
+     "es": "A efectos de las leyes estatales de EE. UU. sobre privacidad, McAfee afirma que no «vende» información personal.",
+     "en": "For the purposes of US state privacy laws, McAfee states that it does not \"sell\" personal information.",
+     "pt": "Para fins das leis estaduais de privacidade dos EUA, a McAfee afirma que não «vende» informações pessoais.",
+     "fuente": "https://www.mcafee.com/en-us/consumer-support/policy/legal.html#ccpa"
+    },
+    {
+     "tema": "compartir",
+     "es": "McAfee puede compartir información con socios publicitarios externos para promocionar sus servicios, por ejemplo mediante publicidad dirigida.",
+     "en": "McAfee may share information with third-party advertising partners to promote its services, for example through targeted advertising.",
+     "pt": "A McAfee pode compartilhar informações com parceiros publicitários externos para promover seus serviços, por exemplo por meio de publicidade direcionada.",
+     "fuente": "https://www.mcafee.com/en-us/consumer-support/policy/legal.html#ccpa"
+    },
+    {
+     "tema": "marketing",
+     "es": "McAfee indica que en algunos casos usa inteligencia artificial y que esas funciones usan la información recogida para mejorar los servicios.",
+     "en": "McAfee says that in some cases it uses artificial intelligence and that these features use the information collected to improve the services.",
+     "pt": "A McAfee indica que em alguns casos usa inteligência artificial e que essas funções usam as informações coletadas para melhorar os serviços.",
+     "fuente": "https://www.mcafee.com/en-us/consumer-support/policy/legal.html#how"
+    },
+    {
+     "tema": "cambios",
+     "es": "McAfee puede revisar su aviso de privacidad cuando lo considere, a su exclusiva discreción; los cambios importantes los notificará según exija la ley aplicable.",
+     "en": "McAfee may revise its privacy notice from time to time at its sole discretion; it will notify material changes as required by applicable law.",
+     "pt": "A McAfee pode revisar seu aviso de privacidade quando considerar, a seu exclusivo critério; notificará mudanças relevantes conforme exigir a lei aplicável.",
+     "fuente": "https://www.mcafee.com/en-us/consumer-support/policy/legal.html#scope"
+    }
+   ],
+   "como_limitar": {
+    "es": "McAfee indica que se puede excluir de la publicidad dirigida rellenando su formulario de solicitud individual de datos (Individual Data Request Form).",
+    "en": "McAfee says you can opt out of targeted advertising by completing its Individual Data Request Form.",
+    "pt": "A McAfee indica que é possível recusar a publicidade direcionada preenchendo seu formulário de solicitação individual de dados (Individual Data Request Form).",
+    "fuente": "https://www.mcafee.com/en-us/consumer-support/policy/legal.html#rights"
+   }
+  },
+  {
+   "producto": "Kaspersky",
+   "revisado": "2026-10-13",
+   "documentos": [
+    {
+     "titulo": "Kaspersky – Products and Services Privacy Policy",
+     "url": "https://www.kaspersky.com/products-and-services-privacy-policy",
+     "actualizado": "2022-02-28"
+    },
+    {
+     "titulo": "Data provision under the End User License Agreement",
+     "url": "https://support.kaspersky.com/us/kaspersky-for-windows/21.16/144976",
+     "actualizado": "2023-12-26"
+    },
+    {
+     "titulo": "Data provision to Kaspersky Security Network",
+     "url": "https://support.kaspersky.com/us/kaspersky-for-windows/21.16/144977",
+     "actualizado": "2023-12-26"
+    }
+   ],
+   "puntos": [
+    {
+     "tema": "datos",
+     "es": "La política de privacidad de productos indica que las URL visitadas pueden enviarse a Kaspersky para comprobar si son maliciosas.",
+     "en": "The products privacy policy says URLs visited can be sent to Kaspersky to check whether they are malicious.",
+     "pt": "A política de privacidade de produtos indica que as URLs visitadas podem ser enviadas à Kaspersky para verificar se são maliciosas.",
+     "fuente": "https://www.kaspersky.com/products-and-services-privacy-policy"
+    },
+    {
+     "tema": "datos",
+     "es": "Si se detecta en el equipo un archivo desconocido con comportamiento sospechoso, puede enviarse automáticamente para analizarlo con tecnologías de aprendizaje automático y, en casos raros, por un analista.",
+     "en": "If an unknown file with suspicious behaviour is detected on the device, it can be sent automatically for analysis by machine-learning technologies and, in rare cases, by an analyst.",
+     "pt": "Se um arquivo desconhecido com comportamento suspeito for detectado no dispositivo, ele pode ser enviado automaticamente para análise por tecnologias de aprendizado de máquina e, em casos raros, por um analista.",
+     "fuente": "https://www.kaspersky.com/products-and-services-privacy-policy"
+    },
+    {
+     "tema": "compartir",
+     "es": "Kaspersky puede compartir información con proveedores que le prestan servicios, entre ellos empresas de analítica web, procesamiento de datos y publicidad.",
+     "en": "Kaspersky may share information with vendors that provide services to it, including web analytics, data processing and advertising companies.",
+     "pt": "A Kaspersky pode compartilhar informações com fornecedores que lhe prestam serviços, entre eles empresas de análise web, processamento de dados e publicidade.",
+     "fuente": "https://www.kaspersky.com/products-and-services-privacy-policy"
+    },
+    {
+     "tema": "marketing",
+     "es": "Uno de los fines declarados del tratamiento de datos es ofrecer a los usuarios información y ofertas personalizadas de Kaspersky.",
+     "en": "One of the stated purposes of data processing is to provide users with personalised information and offers from Kaspersky.",
+     "pt": "Uma das finalidades declaradas do tratamento de dados é oferecer aos usuários informações e ofertas personalizadas da Kaspersky.",
+     "fuente": "https://www.kaspersky.com/products-and-services-privacy-policy"
+    },
+    {
+     "tema": "cambios",
+     "es": "La política puede cambiar y la versión revisada entra en vigor en cuanto se publica en el sitio web de Kaspersky.",
+     "en": "The policy may change, and the revised version takes effect as soon as it is posted on Kaspersky's website.",
+     "pt": "A política pode mudar, e a versão revisada entra em vigor assim que é publicada no site da Kaspersky.",
+     "fuente": "https://www.kaspersky.com/products-and-services-privacy-policy"
+    },
+    {
+     "tema": "transferencias",
+     "es": "Según la política, los datos de usuarios de la Unión Europea se procesan en servidores ubicados en la UE y en Rusia.",
+     "en": "According to the policy, data from users in the European Union is processed on servers located in the EU and in Russia.",
+     "pt": "Segundo a política, os dados de usuários da União Europeia são processados em servidores localizados na UE e na Rússia.",
+     "fuente": "https://www.kaspersky.com/products-and-services-privacy-policy"
+    }
+   ],
+   "como_limitar": {
+    "es": "La política indica que el usuario puede decidir en la configuración del producto, marcando la casilla correspondiente, si aporta los datos de Kaspersky Security Network o de marketing, y revertirlo cuando quiera.",
+    "en": "The policy says users can decide in the product settings, by checking the corresponding box, whether to provide Kaspersky Security Network or marketing data, and reverse this whenever they choose.",
+    "pt": "A política indica que o usuário pode decidir nas configurações do produto, marcando a caixa correspondente, se fornece os dados da Kaspersky Security Network ou de marketing, e reverter isso quando quiser.",
+    "fuente": "https://www.kaspersky.com/products-and-services-privacy-policy"
+   }
+  },
+  {
+   "producto": "ESET",
+   "revisado": "2026-10-13",
+   "documentos": [
+    {
+     "titulo": "Privacy Policy | ESET NOD32 Antivirus 19",
+     "url": "https://help.eset.com/eav/19/en-US/privacy_policy.html",
+     "actualizado": ""
+    },
+    {
+     "titulo": "End User License Agreement | ESET NOD32 Antivirus 19",
+     "url": "https://help.eset.com/eav/19/en-US/eula.html",
+     "actualizado": "2021-10-19"
+    }
+   ],
+   "puntos": [
+    {
+     "tema": "datos",
+     "es": "Si el usuario activa LiveGrid Feedback al instalar, el programa envía a ESET muestras de objetos sospechosos, como archivos, URL, paquetes IP y tramas Ethernet, con información sobre la instalación y el equipo.",
+     "en": "If the user enables LiveGrid Feedback during installation, the software sends ESET samples of suspicious objects, such as files, URLs, IP packets and Ethernet frames, with information about the installation and the computer.",
+     "pt": "Se o usuário ativar o LiveGrid Feedback na instalação, o programa envia à ESET amostras de objetos suspeitos, como arquivos, URLs, pacotes IP e quadros Ethernet, com informações sobre a instalação e o computador.",
+     "fuente": "https://help.eset.com/eav/19/en-US/eula.html"
+    },
+    {
+     "tema": "datos",
+     "es": "ESET advierte que esa información puede contener datos personales del usuario final o de otros usuarios, obtenidos de forma aleatoria o accidental.",
+     "en": "ESET warns that this information may contain personal data about the end user or other users, obtained randomly or accidentally.",
+     "pt": "A ESET adverte que essas informações podem conter dados pessoais do usuário final ou de outros usuários, obtidos de forma aleatória ou acidental.",
+     "fuente": "https://help.eset.com/eav/19/en-US/eula.html"
+    },
+    {
+     "tema": "compartir",
+     "es": "ESET afirma que no comparte datos con terceros, pero puede transferir datos de licencia, facturación y soporte a sus filiales o socios, y usa servicios de terceros de computación en la nube.",
+     "en": "ESET states that it does not share data with third parties, but it may transfer licensing, billing and support data to its affiliates or partners, and it uses third-party cloud computing services.",
+     "pt": "A ESET afirma que não compartilha dados com terceiros, mas pode transferir dados de licença, faturamento e suporte para suas afiliadas ou parceiros, e usa serviços de terceiros de computação em nuvem.",
+     "fuente": "https://help.eset.com/eav/19/en-US/privacy_policy.html"
+    },
+    {
+     "tema": "marketing",
+     "es": "ESET indica que la ley reconoce el marketing como interés legítimo y que usa los datos de licencia para enviar, entre otros, mensajes de marketing; el usuario puede oponerse sin dar razones.",
+     "en": "ESET states that the law recognises marketing as a legitimate interest and that it uses licence data to send, among other things, marketing messages; users can object without giving reasons.",
+     "pt": "A ESET indica que a lei reconhece o marketing como interesse legítimo e que usa os dados da licença para enviar, entre outras, mensagens de marketing; o usuário pode se opor sem dar motivos.",
+     "fuente": "https://help.eset.com/eav/19/en-US/privacy_policy.html"
+    },
+    {
+     "tema": "conservacion",
+     "es": "ESET guarda hasta 4 años los datos de actualizaciones y otras estadísticas, y 10 años los datos de facturación por obligación legal.",
+     "en": "ESET keeps update and other statistics data for up to 4 years, and billing data for 10 years because it is legally required to.",
+     "pt": "A ESET guarda por até 4 anos os dados de atualizações e outras estatísticas, e por 10 anos os dados de faturamento, por obrigação legal.",
+     "fuente": "https://help.eset.com/eav/19/en-US/privacy_policy.html"
+    },
+    {
+     "tema": "responsabilidad",
+     "es": "Cuando la ley no permite excluirla del todo, la responsabilidad de ESET, sus empleados, licenciantes o filiales se limita a la suma que el usuario pagó por la licencia.",
+     "en": "Where the law does not allow it to be fully excluded, the liability of ESET, its employees, licensors or affiliates is limited to the amount the user paid for the licence.",
+     "pt": "Quando a lei não permite excluí-la totalmente, a responsabilidade da ESET, de seus funcionários, licenciadores ou afiliadas limita-se ao valor que o usuário pagou pela licença.",
+     "fuente": "https://help.eset.com/eav/19/en-US/eula.html"
+    }
+   ],
+   "como_limitar": {
+    "es": "Según el contrato, las funciones LiveGrid que envían datos a ESET (Reputación, activa por defecto, y Feedback) se pueden desactivar en cualquier momento.",
+    "en": "According to the licence agreement, the LiveGrid functions that send data to ESET (Reputation, on by default, and Feedback) can be turned off at any time.",
+    "pt": "Segundo o contrato, as funções LiveGrid que enviam dados à ESET (Reputação, ativa por padrão, e Feedback) podem ser desativadas a qualquer momento.",
+    "fuente": "https://help.eset.com/eav/19/en-US/eula.html"
+   }
+  },
+  {
+   "producto": "Bitdefender",
+   "revisado": "2026-10-13",
+   "documentos": [
+    {
+     "titulo": "Privacy Policy for Bitdefender Home User Solutions, Version 10.4",
+     "url": "https://www.bitdefender.com/site/view/legal-privacy-policy-for-home-users-solutions",
+     "actualizado": "2026-08-18"
+    },
+    {
+     "titulo": "Subscription Agreement and Terms of services for Home User Solutions",
+     "url": "https://www.bitdefender.com/site/view/subscription-agreement-and-terms-of-services-for-home-user-solutions.html",
+     "actualizado": "2026-08-28"
+    }
+   ],
+   "puntos": [
+    {
+     "tema": "datos",
+     "es": "Bitdefender indica que trata datos técnicos del dispositivo, como la dirección IP o MAC, y datos seudonimizados que identifican el dispositivo, el usuario, archivos, carpetas, aplicaciones o URL.",
+     "en": "Bitdefender states that it processes technical data from the device, such as the IP or MAC address, and pseudonymised data identifying the device, the user, files, folders, apps or URLs.",
+     "pt": "A Bitdefender indica que trata dados técnicos do dispositivo, como o endereço IP ou MAC, e dados pseudonimizados que identificam o dispositivo, o usuário, arquivos, pastas, aplicativos ou URLs.",
+     "fuente": "https://www.bitdefender.com/site/view/legal-privacy-policy-for-home-users-solutions"
+    },
+    {
+     "tema": "compartir",
+     "es": "Bitdefender dice que no vende datos y que, en principio, no revela datos personales a terceros, pero usa otras empresas para tratarlos, como proveedores de alojamiento, soporte, comercio electrónico y marketing.",
+     "en": "Bitdefender says it does not sell data and, in principle, does not disclose personal data to third parties, but it uses other companies to process it, such as hosting, support, e-commerce and marketing providers.",
+     "pt": "A Bitdefender diz que não vende dados e que, em princípio, não revela dados pessoais a terceiros, mas usa outras empresas para tratá-los, como fornecedores de hospedagem, suporte, comércio eletrônico e marketing.",
+     "fuente": "https://www.bitdefender.com/site/view/legal-privacy-policy-for-home-users-solutions"
+    },
+    {
+     "tema": "marketing",
+     "es": "Entre los fines declarados están el análisis estadístico, los estudios de mercado y el marketing propio; los datos técnicos también pueden usarse con fines estadísticos y para mejorar sus productos.",
+     "en": "Its stated purposes include statistical analysis, market studies and its own marketing; technical data may also be used for statistical purposes and to improve its products.",
+     "pt": "Entre as finalidades declaradas estão a análise estatística, os estudos de mercado e o marketing próprio; os dados técnicos também podem ser usados para fins estatísticos e para melhorar seus produtos.",
+     "fuente": "https://www.bitdefender.com/site/view/legal-privacy-policy-for-home-users-solutions"
+    },
+    {
+     "tema": "conservacion",
+     "es": "Bitdefender indica que guarda los datos técnicos por periodos limitados y que no necesitará los datos técnicos maliciosos más de 10 años desde su recogida.",
+     "en": "Bitdefender states that it keeps technical data for limited periods and will not need malicious technical data for more than 10 years after collection.",
+     "pt": "A Bitdefender indica que guarda os dados técnicos por períodos limitados e que não precisará dos dados técnicos maliciosos por mais de 10 anos após a coleta.",
+     "fuente": "https://www.bitdefender.com/site/view/legal-privacy-policy-for-home-users-solutions"
+    },
+    {
+     "tema": "renovacion",
+     "es": "Las suscripciones se renuevan automáticamente por periodos iguales al inicial, salvo que el usuario cancele desde Bitdefender Central antes de la siguiente fecha de cobro; los precios pueden cambiar con aviso previo.",
+     "en": "Subscriptions renew automatically for periods equal to the initial term unless the user cancels in Bitdefender Central before the next billing date; prices may change with prior notice.",
+     "pt": "As assinaturas são renovadas automaticamente por períodos iguais ao inicial, salvo se o usuário cancelar no Bitdefender Central antes da próxima data de cobrança; os preços podem mudar com aviso prévio.",
+     "fuente": "https://www.bitdefender.com/site/view/subscription-agreement-and-terms-of-services-for-home-user-solutions.html"
+    },
+    {
+     "tema": "arbitraje",
+     "es": "El aviso inicial del contrato indica que este contiene cláusulas que obligan a resolver las disputas mediante arbitraje, en lugar de un juicio con jurado u otros procesos judiciales.",
+     "en": "The agreement's opening notice states that it contains provisions requiring disputes to be resolved through arbitration rather than a jury trial or other court proceedings.",
+     "pt": "O aviso inicial do contrato indica que ele contém cláusulas que obrigam a resolver as disputas por arbitragem, em vez de julgamento com júri ou outros processos judiciais.",
+     "fuente": "https://www.bitdefender.com/site/view/subscription-agreement-and-terms-of-services-for-home-user-solutions.html"
+    }
+   ],
+   "como_limitar": {
+    "es": "La política no describe un ajuste para limitar el envío de datos técnicos; para ejercer derechos como la oposición, indica enviar una solicitud escrita, y su delegado de protección de datos atiende en dpo@bitdefender.com.",
+    "en": "The policy does not describe a setting to limit technical data; to exercise rights such as objecting, it says to send a written request, and its data protection officer can be reached at dpo@bitdefender.com.",
+    "pt": "A política não descreve um ajuste para limitar o envio de dados técnicos; para exercer direitos como a oposição, indica enviar uma solicitação por escrito, e seu encarregado de proteção de dados atende em dpo@bitdefender.com.",
+    "fuente": "https://www.bitdefender.com/site/view/legal-privacy-policy-for-home-users-solutions"
+   }
+  },
+  {
+   "producto": "Bitdefender GravityZone",
+   "revisado": "2026-10-13",
+   "documentos": [
+    {
+     "titulo": "Privacy Policy for Bitdefender Business Solutions, Version 5.2",
+     "url": "https://www.bitdefender.com/site/view/legal-privacy-policy-for-bitdefender-business-solutions.html",
+     "actualizado": "2026-07-29"
+    },
+    {
+     "titulo": "Master Service Agreement for Bitdefender Business Solutions and Services",
+     "url": "https://www.bitdefender.com/site/view/eula-business-solutions.html",
+     "actualizado": ""
+    }
+   ],
+   "puntos": [
+    {
+     "tema": "datos",
+     "es": "Según los módulos activados, Bitdefender recoge información técnica de los equipos, incluidos archivos sospechosos y URL de webs visitadas que considere posiblemente fraudulentas, que pueden contener datos personales.",
+     "en": "Depending on the modules enabled, Bitdefender collects technical information from endpoints, including suspicious files and URLs of visited websites it deems potentially fraudulent, which may contain personal data.",
+     "pt": "Conforme os módulos ativados, a Bitdefender coleta informações técnicas dos equipamentos, incluindo arquivos suspeitos e URLs de sites visitados que considere possivelmente fraudulentos, que podem conter dados pessoais.",
+     "fuente": "https://www.bitdefender.com/site/view/eula-business-solutions.html"
+    },
+    {
+     "tema": "datos",
+     "es": "Bitdefender anonimiza los datos técnicos que puedan ser personales, excepto direcciones IP y MAC, nombres de equipo, líneas de comandos, nombres de archivo, URL y similares.",
+     "en": "Bitdefender anonymises technical data that may be personal, except IP and MAC addresses, computer names, command lines, file names, URLs and the like.",
+     "pt": "A Bitdefender anonimiza os dados técnicos que possam ser pessoais, exceto endereços IP e MAC, nomes de computador, linhas de comando, nomes de arquivo, URLs e similares.",
+     "fuente": "https://www.bitdefender.com/site/view/eula-business-solutions.html"
+    },
+    {
+     "tema": "compartir",
+     "es": "Bitdefender puede revelar datos limitados a sus filiales, usar proveedores de servicios o tecnología como subcontratistas y revelar datos personales a autoridades competentes que los soliciten.",
+     "en": "Bitdefender may disclose limited data to its affiliates, use service or technology providers as subcontractors, and disclose personal data to competent authorities upon request.",
+     "pt": "A Bitdefender pode revelar dados limitados às suas afiliadas, usar fornecedores de serviços ou tecnologia como subcontratados e revelar dados pessoais às autoridades competentes que os solicitem.",
+     "fuente": "https://www.bitdefender.com/site/view/legal-privacy-policy-for-bitdefender-business-solutions.html"
+    },
+    {
+     "tema": "marketing",
+     "es": "El contrato permite usar la información técnica recogida para mejorar los productos y prestar servicios relacionados; la política de privacidad añade que puede usarse con fines estadísticos.",
+     "en": "The agreement allows the collected technical information to be used to improve the products and provide related services; the privacy policy adds that it may be used for statistical purposes.",
+     "pt": "O contrato permite usar as informações técnicas coletadas para melhorar os produtos e prestar serviços relacionados; a política de privacidade acrescenta que podem ser usadas para fins estatísticos.",
+     "fuente": "https://www.bitdefender.com/site/view/eula-business-solutions.html"
+    },
+    {
+     "tema": "conservacion",
+     "es": "Bitdefender indica que no necesitará los datos técnicos más de 10 años desde su recogida; los datos de uso de la consola se guardan como máximo 12 meses.",
+     "en": "Bitdefender states that it will not need technical data for more than 10 years after collection; console usage data is kept for at most 12 months.",
+     "pt": "A Bitdefender indica que não precisará dos dados técnicos por mais de 10 anos após a coleta; os dados de uso do console são guardados por no máximo 12 meses.",
+     "fuente": "https://www.bitdefender.com/site/view/legal-privacy-policy-for-bitdefender-business-solutions.html"
+    },
+    {
+     "tema": "cambios",
+     "es": "Bitdefender puede revisar los términos del contrato en cualquier momento y cambiar funciones de forma unilateral; para los cambios de funciones, su única obligación declarada es notificarlos.",
+     "en": "Bitdefender may revise the agreement's terms at any time and change features unilaterally; for feature changes, its only stated obligation is to give notice.",
+     "pt": "A Bitdefender pode revisar os termos do contrato a qualquer momento e alterar funções de forma unilateral; para mudanças de funções, sua única obrigação declarada é notificá-las.",
+     "fuente": "https://www.bitdefender.com/site/view/eula-business-solutions.html"
+    }
+   ],
+   "como_limitar": {
+    "es": "La política indica que los consentimientos pueden retirarse en cualquier momento con las herramientas de preferencias de las comunicaciones o de la interfaz de los productos, y que los derechos se ejercen escribiendo a dpo@bitdefender.com.",
+    "en": "The policy states that consent can be withdrawn at any time using the preference tools in communications or in the product interfaces, and that rights are exercised by writing to dpo@bitdefender.com.",
+    "pt": "A política indica que os consentimentos podem ser retirados a qualquer momento com as ferramentas de preferências das comunicações ou da interface dos produtos, e que os direitos são exercidos escrevendo para dpo@bitdefender.com.",
+    "fuente": "https://www.bitdefender.com/site/view/legal-privacy-policy-for-bitdefender-business-solutions.html"
+   }
+  },
+  {
+   "producto": "Malwarebytes",
+   "revisado": "2026-10-13",
+   "documentos": [
+    {
+     "titulo": "Malwarebytes Privacy Policy",
+     "url": "https://malwarebytes.com/legal/privacy-policy",
+     "actualizado": "2026-08-26"
+    },
+    {
+     "titulo": "Malwarebytes Software License Agreement",
+     "url": "https://www.malwarebytes.com/eula",
+     "actualizado": ""
+    }
+   ],
+   "puntos": [
+    {
+     "tema": "datos",
+     "es": "Malwarebytes recoge el sistema operativo, el idioma y datos del Centro de seguridad de Windows, incluida la configuración de seguridad y los programas instalados o en uso, y cómo se usa el software.",
+     "en": "Malwarebytes collects the operating system, language and Windows Security Center data, including security settings and programs installed or in use, and how the software is used.",
+     "pt": "A Malwarebytes coleta o sistema operacional, o idioma e dados da Central de Segurança do Windows, incluindo configurações de segurança e programas instalados ou em uso, e como o software é usado.",
+     "fuente": "https://malwarebytes.com/legal/privacy-policy"
+    },
+    {
+     "tema": "datos",
+     "es": "A partir de la dirección IP deduce la ubicación aproximada (continente, país, ciudad y coordenadas), aunque dice no guardar la IP, y asigna a cada equipo un identificador creado al instalar.",
+     "en": "It infers approximate location (continent, country, city and coordinates) from the IP address, though it says it does not store the IP, and assigns each computer an identifier created at installation.",
+     "pt": "A partir do endereço IP, deduz a localização aproximada (continente, país, cidade e coordenadas), embora diga não guardar o IP, e atribui a cada computador um identificador criado na instalação.",
+     "fuente": "https://malwarebytes.com/legal/privacy-policy"
+    },
+    {
+     "tema": "datos",
+     "es": "Recoge los archivos detectados como malware, programas potencialmente no deseados o sospechosos; las estadísticas de amenazas incluyen muestras de detección.",
+     "en": "It collects files detected as malware, potentially unwanted programs or suspicious; threat statistics include detection samples.",
+     "pt": "Coleta os arquivos detectados como malware, programas potencialmente indesejados ou suspeitos; as estatísticas de ameaças incluem amostras de detecção.",
+     "fuente": "https://malwarebytes.com/legal/privacy-policy"
+    },
+    {
+     "tema": "compartir",
+     "es": "Al aceptar el contrato, el usuario acepta que Malwarebytes comparta con terceros datos sobre software malicioso, exploits u otras amenazas.",
+     "en": "By accepting the agreement, the user agrees that Malwarebytes may share data about malicious software, exploits or other threats with third parties.",
+     "pt": "Ao aceitar o contrato, o usuário concorda que a Malwarebytes compartilhe com terceiros dados sobre software malicioso, exploits ou outras ameaças.",
+     "fuente": "https://www.malwarebytes.com/eula"
+    },
+    {
+     "tema": "marketing",
+     "es": "Usa la información personal para mejorar sus productos, incluida la investigación de malware, y para promocionar productos nuevos y existentes; dice que no vende datos personales a cambio de dinero.",
+     "en": "It uses personal information to improve its products, including malware research, and to market new and existing products; it says it does not sell personal data for money.",
+     "pt": "Usa as informações pessoais para melhorar seus produtos, incluindo pesquisa de malware, e para promover produtos novos e existentes; diz que não vende dados pessoais em troca de dinheiro.",
+     "fuente": "https://malwarebytes.com/legal/privacy-policy"
+    },
+    {
+     "tema": "renovacion",
+     "es": "La suscripción doméstica se renueva automáticamente salvo que el usuario desactive la renovación automática en su portal MyAccount.",
+     "en": "The home subscription renews automatically unless the user turns off auto-renewal in their MyAccount portal.",
+     "pt": "A assinatura doméstica é renovada automaticamente, salvo se o usuário desativar a renovação automática no portal MyAccount.",
+     "fuente": "https://www.malwarebytes.com/eula"
+    }
+   ],
+   "como_limitar": {
+    "es": "La política indica que en algunos productos de Malwarebytes se puede desactivar en los ajustes la recogida de estadísticas de uso y de amenazas.",
+    "en": "The policy states that in some Malwarebytes products the collection of usage and threat statistics can be turned off in the settings.",
+    "pt": "A política indica que, em alguns produtos da Malwarebytes, a coleta de estatísticas de uso e de ameaças pode ser desativada nas configurações.",
+    "fuente": "https://malwarebytes.com/legal/privacy-policy"
+   }
+  },
+  {
+   "producto": "Panda / WatchGuard",
+   "revisado": "2026-10-13",
+   "documentos": [
+    {
+     "titulo": "Legal notice – Panda Security, section 10. PRIVACY POLICY",
+     "url": "https://pandasecurity.com/homeusers/media/legal-notice",
+     "actualizado": "2024-01-29"
+    },
+    {
+     "titulo": "END-USER LICENSE AGREEMENT – Panda consumer products for Windows",
+     "url": "https://www.pandasecurity.com/rfiles/resources/eula/EULA_Consumer_products_for_Windows_EN.pdf",
+     "actualizado": "2020"
+    },
+    {
+     "titulo": "Privacy Policy | WatchGuard Technologies",
+     "url": "https://www.watchguard.com/wgrd-trust-center/privacy-policy",
+     "actualizado": "2025-10-30"
+    }
+   ],
+   "puntos": [
+    {
+     "tema": "datos",
+     "es": "En algunos productos, Panda puede recoger información técnica, incluidos archivos sospechosos; además, el programa envía la IP y el nombre del equipo para controlar licencias y detectar incidencias.",
+     "en": "In some products, Panda may collect technical information, including suspicious files; the software also sends the computer's IP address and name to monitor licences and detect incidents.",
+     "pt": "Em alguns produtos, a Panda pode coletar informações técnicas, incluindo arquivos suspeitos; além disso, o programa envia o IP e o nome do computador para controlar licenças e detectar incidentes.",
+     "fuente": "https://www.pandasecurity.com/rfiles/resources/eula/EULA_Consumer_products_for_Windows_EN.pdf"
+    },
+    {
+     "tema": "datos",
+     "es": "La política de Panda incluye la recogida automática, al usar sus webs, correos o productos, de datos como IP, identificadores, URL o dominios visitados e información sobre aplicaciones instaladas.",
+     "en": "Panda's policy includes automatic collection, when using its websites, emails or products, of data such as IP address, identifiers, URLs or domains visited and information on installed apps.",
+     "pt": "A política da Panda inclui a coleta automática, ao usar seus sites, e-mails ou produtos, de dados como IP, identificadores, URLs ou domínios visitados e informações sobre aplicativos instalados.",
+     "fuente": "https://www.pandasecurity.com/en/homeusers/media/legal-notice/#e10"
+    },
+    {
+     "tema": "compartir",
+     "es": "Panda dice que no comparte datos personales con terceros salvo en los casos que enumera, entre ellos con empresas del grupo WatchGuard, revendedores y distribuidores autorizados y proveedores contratados.",
+     "en": "Panda says it does not share personal data with third parties except in the cases it lists, including WatchGuard group companies, authorised resellers and distributors, and contracted vendors.",
+     "pt": "A Panda diz que não compartilha dados pessoais com terceiros, exceto nos casos que enumera, entre eles empresas do grupo WatchGuard, revendedores e distribuidores autorizados e fornecedores contratados.",
+     "fuente": "https://www.pandasecurity.com/en/homeusers/media/legal-notice/#e10"
+    },
+    {
+     "tema": "marketing",
+     "es": "Panda usa los datos que recoge para enviar comunicaciones promocionales, incluidas recomendaciones de productos.",
+     "en": "Panda uses the data it collects to send promotional communications, including product recommendations.",
+     "pt": "A Panda usa os dados que coleta para enviar comunicações promocionais, incluindo recomendações de produtos.",
+     "fuente": "https://www.pandasecurity.com/en/homeusers/media/legal-notice/#e10"
+    },
+    {
+     "tema": "conservacion",
+     "es": "Panda indica que puede conservar los datos personales el tiempo necesario para los fines para los que se recogieron o para otros fines esenciales.",
+     "en": "Panda states that it may keep personal data for as long as necessary for the purposes for which it was collected or for other essential purposes.",
+     "pt": "A Panda indica que pode guardar os dados pessoais pelo tempo necessário para as finalidades da coleta ou para outras finalidades essenciais.",
+     "fuente": "https://www.pandasecurity.com/en/homeusers/media/legal-notice/#e10"
+    },
+    {
+     "tema": "responsabilidad",
+     "es": "El contrato de licencia para Windows establece que Panda no responderá en ningún caso por daños superiores al precio que el usuario pagó por el programa.",
+     "en": "The Windows licence agreement states that Panda will under no circumstances be liable for damages greater than the fee the user paid for the program.",
+     "pt": "O contrato de licença para Windows estabelece que a Panda não responderá em nenhum caso por danos superiores ao valor que o usuário pagou pelo programa.",
+     "fuente": "https://www.pandasecurity.com/rfiles/resources/eula/EULA_Consumer_products_for_Windows_EN.pdf"
+    }
+   ],
+   "como_limitar": {
+    "es": "Para dejar de recibir correos promocionales, Panda indica seguir las instrucciones de esos correos; para otras solicitudes de privacidad ofrece la dirección panda.dpo@watchguard.com.",
+    "en": "To stop receiving promotional emails, Panda says to follow the instructions in those emails; for other privacy requests it gives the address panda.dpo@watchguard.com.",
+    "pt": "Para deixar de receber e-mails promocionais, a Panda indica seguir as instruções desses e-mails; para outras solicitações de privacidade, oferece o endereço panda.dpo@watchguard.com.",
+    "fuente": "https://www.pandasecurity.com/en/homeusers/media/legal-notice/#e10"
+   }
+  },
+  {
+   "producto": "Trend Micro Apex One",
+   "revisado": "2026-10-13",
+   "documentos": [
+    {
+     "titulo": "Trend Micro Apex One as a Service Data Collection Notice",
+     "url": "https://success.trendmicro.com/en-US/solution/KA-0008657",
+     "actualizado": ""
+    },
+    {
+     "titulo": "Trend Micro Global Privacy Notice",
+     "url": "https://www.trendmicro.com/content/dam/trendmicro/global/en/core/docs/trust-center/notice/en-english-global-privacy-notice.pdf",
+     "actualizado": "2025-06-27"
+    },
+    {
+     "titulo": "TrendAI Apex One as a Service Data Privacy, Security, and Compliance",
+     "url": "https://docs.trendmicro.com/en-us/enterprise/apex-central-saas/ApexOneDataPrivacySecurityCompliance",
+     "actualizado": ""
+    }
+   ],
+   "puntos": [
+    {
+     "tema": "datos",
+     "es": "Al instalar el agente de Apex One se recogen el nombre del equipo, el usuario conectado, la IP, la dirección MAC y un identificador; la nota indica no instalarlo si no se acepta.",
+     "en": "Installing the Apex One agent collects the computer name, logged-on user, IP address, MAC address and an identifier; the notice says not to install it if you do not accept this.",
+     "pt": "Ao instalar o agente do Apex One, são coletados o nome do computador, o usuário conectado, o IP, o endereço MAC e um identificador; a nota indica não instalá-lo se não aceitar.",
+     "fuente": "https://success.trendmicro.com/en-US/solution/KA-0008657"
+    },
+    {
+     "tema": "datos",
+     "es": "Con Smart Feedback, Apex One comparte información de amenazas con la Smart Protection Network de Trend Micro, incluidos correo electrónico, nombre y ruta de archivos, nombre del equipo, ejecutables sospechosos y URL.",
+     "en": "With Smart Feedback, Apex One shares threat information with Trend Micro's Smart Protection Network, including email address, file name and path, host name, suspicious executables and URLs.",
+     "pt": "Com o Smart Feedback, o Apex One compartilha informações de ameaças com a Smart Protection Network da Trend Micro, incluindo e-mail, nome e caminho de arquivos, nome do computador, executáveis suspeitos e URLs.",
+     "fuente": "https://success.trendmicro.com/en-US/solution/KA-0008657"
+    },
+    {
+     "tema": "datos",
+     "es": "La reputación web, que evalúa los dominios visitados por los equipos, recoge la URL, el SHA1 del proceso que hizo la petición, la IP, el nombre del equipo y el usuario conectado.",
+     "en": "Web reputation, which rates the domains visited by endpoints, collects the URL, the SHA1 of the process that made the request, the IP address, the computer name and the logged-on user.",
+     "pt": "A reputação web, que avalia os domínios visitados pelos computadores, coleta a URL, o SHA1 do processo que fez a solicitação, o IP, o nome do computador e o usuário conectado.",
+     "fuente": "https://success.trendmicro.com/en-US/solution/KA-0008657"
+    },
+    {
+     "tema": "compartir",
+     "es": "La política global permite compartir datos personales con empresas afiliadas, distribuidores, patrocinadores de eventos, proveedores, mercados en línea o socios, y atender solicitudes de autoridades públicas.",
+     "en": "The global notice allows personal data to be shared with affiliated companies, distributors, event sponsors, vendors, marketplace providers or partners, and in response to requests from public authorities.",
+     "pt": "A política global permite compartilhar dados pessoais com empresas afiliadas, distribuidores, patrocinadores de eventos, fornecedores, marketplaces ou parceiros, e atender solicitações de autoridades públicas.",
+     "fuente": "https://www.trendmicro.com/content/dam/trendmicro/global/en/core/docs/trust-center/notice/en-english-global-privacy-notice.pdf"
+    },
+    {
+     "tema": "marketing",
+     "es": "Trend Micro usa los datos de sus clientes para contactarles sobre renovaciones, problemas técnicos e información de nuevos productos; dice que no vende datos personales a cambio de dinero.",
+     "en": "Trend Micro uses customer data to contact customers about renewals, technical issues and new product information; it says it does not sell personal data for money.",
+     "pt": "A Trend Micro usa os dados de seus clientes para contatá-los sobre renovações, problemas técnicos e informações de novos produtos; diz que não vende dados pessoais em troca de dinheiro.",
+     "fuente": "https://www.trendmicro.com/content/dam/trendmicro/global/en/core/docs/trust-center/notice/en-english-global-privacy-notice.pdf"
+    },
+    {
+     "tema": "conservacion",
+     "es": "Trend Micro puede conservar indefinidamente datos agregados o desidentificados, o en la medida en que lo permita la ley aplicable.",
+     "en": "Trend Micro may keep aggregated or de-identified data indefinitely, or to the extent allowed by applicable law.",
+     "pt": "A Trend Micro pode guardar indefinidamente dados agregados ou desidentificados, ou na medida permitida pela lei aplicável.",
+     "fuente": "https://www.trendmicro.com/content/dam/trendmicro/global/en/core/docs/trust-center/notice/en-english-global-privacy-notice.pdf"
+    }
+   ],
+   "como_limitar": {
+    "es": "Según la nota de recogida de datos, Smart Feedback depende de la opción de consola «Enable Trend Micro Smart Feedback (recommended)», y otras funciones tienen sus propias opciones de activación.",
+    "en": "According to the data collection notice, Smart Feedback depends on the console option \"Enable Trend Micro Smart Feedback (recommended)\", and other features have their own enable settings.",
+    "pt": "Segundo a nota de coleta de dados, o Smart Feedback depende da opção de console «Enable Trend Micro Smart Feedback (recommended)», e outras funções têm suas próprias opções de ativação.",
+    "fuente": "https://success.trendmicro.com/en-US/solution/KA-0008657"
+   }
+  },
+  {
+   "producto": "Sophos",
+   "revisado": "2026-10-13",
+   "documentos": [
+    {
+     "titulo": "Sophos Home and Sophos Home Premium (consumer products) – product privacy information",
+     "url": "https://www.sophos.com/en-us/legal/sophos-home-premium-consumer-products",
+     "actualizado": "2022-09"
+    },
+    {
+     "titulo": "Sophos Group Privacy Notice",
+     "url": "https://www.sophos.com/en-us/legal/sophos-group-privacy-notice",
+     "actualizado": "2026-07-01"
+    },
+    {
+     "titulo": "Sophos Consumer Terms of Service",
+     "url": "https://home.sophos.com/en-us/eula",
+     "actualizado": "2022-01-15"
+    }
+   ],
+   "puntos": [
+    {
+     "tema": "datos",
+     "es": "Sophos Home envía información al instalarse, desinstalarse y de forma periódica, que puede incluir IP, correo, nombre de usuario, dirección MAC, URL, ID del dispositivo y rutas y nombres de archivo.",
+     "en": "Sophos Home sends information on installation, uninstallation and at regular intervals, which may include IP address, email, username, MAC address, URL, device ID and file paths and names.",
+     "pt": "O Sophos Home envia informações na instalação, na desinstalação e periodicamente, que podem incluir IP, e-mail, nome de usuário, endereço MAC, URL, ID do dispositivo e caminhos e nomes de arquivos.",
+     "fuente": "https://www.sophos.com/en-us/legal/sophos-home-premium-consumer-products"
+    },
+    {
+     "tema": "compartir",
+     "es": "La política general de Sophos indica que comparte un subconjunto de sus datos de inteligencia de amenazas con miembros seleccionados del sector de la seguridad informática, para investigar spam y amenazas.",
+     "en": "Sophos's group privacy notice states that it shares a subset of its threat intelligence data with selected members of the IT security industry for anti-spam and security threat research.",
+     "pt": "A política geral da Sophos indica que compartilha um subconjunto de seus dados de inteligência de ameaças com membros selecionados do setor de segurança da informação, para pesquisar spam e ameaças.",
+     "fuente": "https://www.sophos.com/en-us/legal/sophos-group-privacy-notice#section-tab4"
+    },
+    {
+     "tema": "marketing",
+     "es": "Sophos puede usar los datos de Sophos Home para prestar el producto, análisis de tendencias, estadísticas, informes, detección de spam y amenazas, y desarrollo de nuevos productos.",
+     "en": "Sophos may use Sophos Home data to provide the product and for trend analysis, statistics, reporting, spam and threat detection, and new product development.",
+     "pt": "A Sophos pode usar os dados do Sophos Home para fornecer o produto, análise de tendências, estatísticas, relatórios, detecção de spam e ameaças, e desenvolvimento de novos produtos.",
+     "fuente": "https://www.sophos.com/en-us/legal/sophos-home-premium-consumer-products"
+    },
+    {
+     "tema": "renovacion",
+     "es": "La suscripción se renueva automáticamente (según la ley aplicable); puede cancelarse antes del fin del periodo de facturación, pero los pagos no son reembolsables salvo las excepciones previstas.",
+     "en": "The subscription renews automatically (subject to applicable law); it can be cancelled before the end of the billing period, but payments are non-refundable except for the stated exceptions.",
+     "pt": "A assinatura é renovada automaticamente (conforme a lei aplicável); pode ser cancelada antes do fim do período de cobrança, mas os pagamentos não são reembolsáveis, salvo as exceções previstas.",
+     "fuente": "https://home.sophos.com/en-us/eula"
+    },
+    {
+     "tema": "cambios",
+     "es": "Sophos se reserva el derecho de modificar estos términos a su entera discreción; los cambios rigen al publicarse en su web o al notificarse por otros medios.",
+     "en": "Sophos reserves the right to modify these terms at its sole discretion; changes take effect when posted on its website or when notified by other means.",
+     "pt": "A Sophos reserva-se o direito de modificar estes termos a seu exclusivo critério; as mudanças valem quando publicadas em seu site ou notificadas por outros meios.",
+     "fuente": "https://home.sophos.com/en-us/eula"
+    },
+    {
+     "tema": "transferencias",
+     "es": "Los portales de Sophos Home se alojan en EE. UU., y el uso del producto puede requerir transferir datos desde el país del usuario a Estados Unidos y Canadá.",
+     "en": "Sophos Home portals are hosted in the USA, and using the product may require data to be transferred from the user's country to the United States and Canada.",
+     "pt": "Os portais do Sophos Home são hospedados nos EUA, e o uso do produto pode exigir a transferência de dados do país do usuário para os Estados Unidos e o Canadá.",
+     "fuente": "https://www.sophos.com/en-us/legal/sophos-home-premium-consumer-products"
+    }
+   ],
+   "como_limitar": {
+    "es": "Sophos indica que normalmente se puede dejar de recibir marketing con el enlace «unsubscribe» u «opt-out» de sus correos; no documenta un ajuste para desactivar la telemetría de Sophos Home.",
+    "en": "Sophos states that marketing can usually be stopped with the \"unsubscribe\" or \"opt-out\" link in its emails; it does not document a setting to turn off Sophos Home telemetry.",
+    "pt": "A Sophos indica que normalmente é possível deixar de receber marketing pelo link «unsubscribe» ou «opt-out» de seus e-mails; não documenta um ajuste para desativar a telemetria do Sophos Home.",
+    "fuente": "https://www.sophos.com/en-us/legal/sophos-group-privacy-notice"
+   }
+  }
+ ]
+}

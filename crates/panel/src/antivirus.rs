@@ -331,6 +331,8 @@ struct Ficha {
     /// How many names the maker documents.
     dominios: usize,
     sanciones: Vec<Sancion>,
+    /// What its own documents say, in plain words and with their sources (13 Oct 2026).
+    terminos: Option<&'static antivirus::TerminosAv>,
 }
 
 #[derive(Serialize)]
@@ -351,6 +353,7 @@ fn ficha(a: &Antivirus) -> Ficha {
         pais: a.pais,
         programas: a.programas.clone(),
         dominios: a.dominios.len(),
+        terminos: antivirus::terminos_de(a.nombre),
         sanciones: a
             .sanciones
             .iter()
