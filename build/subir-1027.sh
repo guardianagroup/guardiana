@@ -13,7 +13,7 @@ for d in "$SRC/build/out" "$SRC/dist/1.0.27"; do
 done
 echo "2. Archivos:"
 ls -1 "$PAQ"
-python3 - "$PAQ" << 'PY'
+python - "$PAQ" << 'PY'
 import hashlib, sys
 from pathlib import Path
 paq = Path(sys.argv[1])
@@ -54,7 +54,7 @@ fi
 rm -rf "$WEB/descargas/1.0.27"
 mkdir -p "$WEB/descargas/1.0.27"
 cp -f "$PAQ"/* "$WEB/descargas/1.0.27/"
-python3 - "$WEB" "$PAQ" << 'PY'
+python - "$WEB" "$PAQ" << 'PY'
 import re, sys
 from pathlib import Path
 web, paq = Path(sys.argv[1]), Path(sys.argv[2])
