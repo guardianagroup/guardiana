@@ -265,8 +265,23 @@ fn s(v: &Value) -> String {
     }
 }
 
+/// A list from PowerShell. Windows PowerShell can turn a list of one into the thing itself on
+/// its way to JSON (Grok's review, 13 Oct 2026): a lone object is read as a list of one.
+/// Like [`arr`], but `None` when Windows did not answer (missing, null or the word `error`).
+fn lista_de(v: &Value) -> Option<&[Value]> {
+    match v {
+        Value::Null => None,
+        Value::String(x) if x == "error" => None,
+        otro => Some(arr(otro)),
+    }
+}
+
 fn arr(v: &Value) -> &[Value] {
-    v.as_array().map_or(&[], Vec::as_slice)
+    match v {
+        Value::Array(a) => a.as_slice(),
+        Value::Object(_) | Value::String(_) => std::slice::from_ref(v),
+        _ => &[],
+    }
 }
 
 /// The key of each remembered item, by kind.
@@ -599,7 +614,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
     }
 
     let sis = &d["sistema"];
-    if let Some(perfiles) = sis["cortafuegos"].as_array() {
+    if let Some(perfiles) = lista_de(&sis["cortafuegos"]) {
         let apagados: Vec<Item> = perfiles
             .iter()
             .filter(|p| p["activo"].as_bool() != Some(true))
@@ -643,7 +658,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
         _ => nd("tpm"),
     });
     let unidad = s(&sis["unidad"]).to_uppercase();
-    if let Some(vols) = sis["cifrado"].as_array() {
+    if let Some(vols) = lista_de(&sis["cifrado"]) {
         let sistema = vols
             .iter()
             .find(|v| s(&v["unidad"]).to_uppercase() == unidad);
@@ -663,7 +678,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
 
     // ---- Acceso
     let ac = &d["acceso"];
-    if let Some(cuentas) = ac["cuentas"].as_array() {
+    if let Some(cuentas) = lista_de(&ac["cuentas"]) {
         let mut aviso = false;
         let lista: Vec<Item> = cuentas
             .iter()
@@ -769,7 +784,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
             check("autologon", "info", "rv_autologon")
         });
     }
-    if let Some(puertos) = ac["puertos"].as_array() {
+    if let Some(puertos) = lista_de(&ac["puertos"]) {
         const DE_WINDOWS: &[&str] = &[
             "system",
             "svchost",
@@ -812,7 +827,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
                 .items(lista)
         });
     }
-    if let Some(carpetas) = ac["carpetas"].as_array() {
+    if let Some(carpetas) = lista_de(&ac["carpetas"]) {
         let raiz = carpetas.iter().any(|c| {
             let r = s(&c["ruta"]);
             r.len() <= 3 && r.ends_with(":\\")
@@ -839,7 +854,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
                       nombre: &dyn Fn(&Value) -> String,
                       filas: &Value|
      -> Check {
-        let Some(filas) = filas.as_array() else {
+        let Some(filas) = lista_de(filas) else {
             return nd(id);
         };
         let lista: Vec<Item> = filas
@@ -908,7 +923,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
 
     // ---- Por dónde sale tu internet
     let sa = &d["salida"];
-    if let Some(dns) = sa["dns"].as_array() {
+    if let Some(dns) = lista_de(&sa["dns"]) {
         let mut tipos: Vec<String> = Vec::new();
         for i in dns {
             for ip in arr(&i["servidores"]) {
@@ -945,7 +960,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
         let mut probados = 0;
         for p in arr(&sa["prueba_dns"]) {
             let ok_de = |v: &Value, buenas: &[&str]| -> Option<bool> {
-                let l = v.as_array()?;
+                let l = lista_de(v)?;
                 Some(!l.is_empty() && l.iter().all(|x| buenas.contains(&s(x).as_str())))
             };
             let g = ok_de(&p["google"], &["8.8.8.8", "8.8.4.4"]);
@@ -956,7 +971,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
             if g == Some(false) || c == Some(false) {
                 falsea = true;
             }
-            if p["inexistente"].as_array().is_some_and(|l| !l.is_empty()) {
+            if lista_de(&p["inexistente"]).is_some_and(|l| !l.is_empty()) {
                 redirige = true;
             }
         }
@@ -1026,7 +1041,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
     } else {
         check("vpn", "info", "rv_vpn_si").items(vpn)
     });
-    if let Some(h) = sa["hosts"].as_array() {
+    if let Some(h) = lista_de(&sa["hosts"]) {
         let mut redir = false;
         let lista: Vec<Item> = h
             .iter()
@@ -1120,7 +1135,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
             });
         }
     }
-    if let Some(p) = sa["perfiles"].as_array() {
+    if let Some(p) = lista_de(&sa["perfiles"]) {
         if p.iter().any(|x| s(&x["categoria"]) == "Private") {
             salida.push(check("perfil_red", "info", "rv_perfil_privada"));
         } else if !p.is_empty() {
@@ -1226,7 +1241,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
                 .items(de_fabrica)
         });
     }
-    if let Some(usb) = pr["usb"].as_array() {
+    if let Some(usb) = lista_de(&pr["usb"]) {
         let lista: Vec<Item> = usb
             .iter()
             .map(|u| item(s(&u["nombre"]), "", Vec::new()))
@@ -1237,7 +1252,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
                 .items(lista),
         );
     }
-    if let Some(bt) = pr["bluetooth"].as_array() {
+    if let Some(bt) = lista_de(&pr["bluetooth"]) {
         if !bt.is_empty() {
             let lista: Vec<Item> = bt.iter().map(|b| item(s(b), "", Vec::new())).collect();
             privacidad.push(
@@ -1257,7 +1272,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
     }
 
     // ---- Lo que tu antivirus anotó (Microsoft Defender)
-    if let Some(ev) = d["defender_sucesos"]["sucesos"].as_array() {
+    if let Some(ev) = lista_de(&d["defender_sucesos"]["sucesos"]) {
         let cuenta = |ids: &[i64]| {
             ev.iter()
                 .filter(|e| ids.contains(&e["id"].as_i64().unwrap_or(0)))
