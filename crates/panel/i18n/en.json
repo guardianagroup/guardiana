@@ -2242,6 +2242,14 @@
     "pd_op_oracle": "Oracle Cloud",
     "pd_op_do": "DigitalOcean",
     "pd_op_linode": "Akamai (Linode)",
-    "pd_op_vultr": "Vultr"
+    "pd_op_vultr": "Vultr",
+    "pd_precisar": "◎ Pinpoint",
+    "pd_precisar_que": "Asks this computer where it is (your browser will ask for permission) and rounds it to the city, about 10 km. It stays in this browser: GUARDIANA sends it to no one.",
+    "pd_precisar_pide": "Your browser will ask for permission to use this computer's location. To work it out, the browser may rely on Microsoft's or Google's location service; GUARDIANA only receives the point, rounds it to about 10 km and sends it to no one.",
+    "pd_precisar_hecho": "Done: your computer is in {lugar}.",
+    "pd_precisar_denegado": "Location permission was not given: GUARDIANA keeps using the system's time zone. You can allow it from the padlock in the address bar.",
+    "pd_precisar_fallo": "This computer could not say where it is (no location service or no answer). The system's time zone is still used.",
+    "pd_precisar_no": "This browser does not offer the computer's location.",
+    "pd_lugar_equipo": "Place measured by this computer, rounded to about 10 km."
   }
 }

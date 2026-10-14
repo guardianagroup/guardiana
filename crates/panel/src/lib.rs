@@ -169,6 +169,12 @@ async fn tierra(RutaUrl(archivo): RutaUrl<String>) -> Response {
         "dia.jpg" => (include_bytes!("../static/tierra/dia.jpg"), "image/jpeg"),
         "luces.jpg" => (include_bytes!("../static/tierra/luces.jpg"), "image/jpeg"),
         "agua.png" => (include_bytes!("../static/tierra/agua.png"), "image/png"),
+        // Every city of 15 000 people or more (GeoNames, CC BY 4.0), to name the one nearest to
+        // where the computer says it is (1.0.24). Asked only when the person presses the button.
+        "ciudades.tsv" => (
+            include_bytes!("../static/tierra/ciudades.tsv"),
+            "text/tab-separated-values; charset=utf-8",
+        ),
         _ => return StatusCode::NOT_FOUND.into_response(),
     };
     (

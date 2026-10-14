@@ -1200,7 +1200,7 @@
           <div>${esc(t('pd_enviado'))} <b>${esc(bytes(ds.reduce((a, d) => a + d.sub, 0)))}</b> · ${esc(t('pd_recibido'))} ${esc(bytes(ds.reduce((a, d) => a + d.baj, 0)))}</div>
           <div class="mono arriba4">${ds.slice(0, 10).map((d) => '· ' + esc(d.host)).join('<br>')}${ds.length > 10 ? '<br>…' : ''}</div>`;
       }
-      if (hh.tipo === 'yo') { const ce = st.lugar, por = ce.fuente === 'zona' ? t('pd_lugar_zona').replace('{ciudad}', ce.ciudad) : t('pd_lugar_pais'); return `<b>${esc(t('pd_tu_ordenador'))}</b> · ${esc(nombrePais(st.yo))} · ${esc(t(esDeDia(ce.lon, ce.lat) ? 'pd_de_dia' : 'pd_de_noche'))}<div class="t">${esc(por)}</div><div>${esc(tn('pd_vigila_n', PROD.length))}</div>`; }
+      if (hh.tipo === 'yo') { const ce = st.lugar, por = ce.fuente === 'equipo' ? t('pd_lugar_equipo') : ce.fuente === 'zona' ? t('pd_lugar_zona').replace('{ciudad}', ce.ciudad) : t('pd_lugar_pais'); return `<b>${esc(t('pd_tu_ordenador'))}</b> · ${esc(nombrePais(st.yo))} · ${esc(t(esDeDia(ce.lon, ce.lat) ? 'pd_de_dia' : 'pd_de_noche'))}<div class="t">${esc(por)}</div><div>${esc(tn('pd_vigila_n', PROD.length))}</div>`; }
       if (hh.tipo === 'pais') {
         const c = hh.ref, ds = DEST.filter((d) => d.pais === c), ce = centros[c], dia = ce ? esDeDia(ce.lon, ce.lat) : null;
         const cab = `<b>${esc(nombrePais(c))}</b>${dia === null ? '' : ` <span class="t">· ${esc(t(dia ? 'pd_de_dia' : 'pd_de_noche'))}</span>`}`;
@@ -1650,8 +1650,62 @@
       else if (e.key === '0') zoomInicio();
       else if (e.key === 'Escape') cierraDetalle();
     });
-    // Where the computer is: said, not chosen.
-    $('yo').textContent = nombrePais(st.yo) + (st.lugar.ciudad ? ' · ' + st.lugar.ciudad : '');
+    // Where the computer is: said, not chosen (the owner: nobody types a place to fake it). The
+    // time zone only knows one city per zone (all of Colombia reads «Bogotá»), so since 1.0.24 the
+    // person can ask the computer itself: the browser's location, with its own permission prompt,
+    // rounded to 0.1° (about 10 km) and named by the nearest city of GeoNames, which travels with
+    // the panel. It stays in this browser; GUARDIANA sends it nowhere.
+    const pintaYo = () => { $('yo').textContent = nombrePais(st.yo) + (st.lugar.ciudad ? ' · ' + st.lugar.ciudad : ''); };
+    pintaYo();
+    let CIUDADES = null;
+    const ciudades = async () => {
+      if (CIUDADES) return CIUDADES;
+      const r = await fetch((ctx.tierra || '/static/tierra/') + 'ciudades.tsv');
+      if (!r.ok) throw new Error(String(r.status));
+      CIUDADES = (await r.text()).split('\n').filter((l) => l && l[0] !== '#').map((l) => { const [n, cc, adm, la, lo] = l.split('\t'); return { n, cc, adm, la: +la, lo: +lo }; });
+      return CIUDADES;
+    };
+    const cercana = (lista, lat, lon) => {
+      let mejor = null, dm = Infinity;
+      const cl = Math.cos(lat * RAD);
+      for (const c of lista) { const dx = (c.lo - lon) * cl, dy = c.la - lat, d = dx * dx + dy * dy; if (d < dm) { dm = d; mejor = c; } }
+      return mejor ? { c: mejor, km: Math.sqrt(dm) * 111 } : null;
+    };
+    const ponLugarEquipo = (g, guardar) => {
+      st.lugar = { lon: g.lon, lat: g.lat, fuente: 'equipo', ciudad: g.ciudad };
+      if (g.cc && centros[g.cc]) st.yo = g.cc;
+      pintaYo();
+      if (guardar) { try { localStorage.setItem('guardiana_pd_lugar', JSON.stringify(Object.assign({ cuando: Date.now() }, g))); } catch (_) {} }
+    };
+    const precisar = (callado) => {
+      if (!navigator.geolocation) { if (!callado) avisa(t('pd_precisar_no')); return; }
+      if (!callado) avisa(t('pd_precisar_pide'));
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = Math.round(pos.coords.latitude * 10) / 10, lon = Math.round(pos.coords.longitude * 10) / 10;
+        let g = { lat, lon, ciudad: '', cc: '' };
+        try {
+          const m = cercana(await ciudades(), lat, lon);
+          if (m && m.km < 60) g = { lat, lon, ciudad: m.c.n + (m.c.adm ? ', ' + m.c.adm : ''), cc: m.c.cc };
+          else g.cc = paisEn(lon, lat) || '';
+        } catch (_) { g.cc = paisEn(lon, lat) || ''; }
+        ponLugarEquipo(g, true);
+        if (!callado) avisa(t('pd_precisar_hecho').replace('{lugar}', g.ciudad || nombrePais(g.cc || st.yo)));
+      }, (err) => {
+        if (!callado) avisa(t(err && err.code === 1 ? 'pd_precisar_denegado' : 'pd_precisar_fallo'));
+      }, { enableHighAccuracy: false, timeout: 20000, maximumAge: 30 * 60000 });
+    };
+    if (soloMirar) $('precisar').hidden = true;
+    else {
+      $('precisar').title = t('pd_precisar_que');
+      $('precisar').addEventListener('click', () => precisar(false));
+      // What this browser measured before (within 30 days) is used at once; if the permission is
+      // still granted, it is measured again quietly, so a laptop that travelled follows.
+      try {
+        const g = JSON.parse(localStorage.getItem('guardiana_pd_lugar') || 'null');
+        if (g && Date.now() - g.cuando < 30 * 86400000 && Number.isFinite(g.lat) && Number.isFinite(g.lon)) ponLugarEquipo(g, false);
+      } catch (_) {}
+      try { navigator.permissions.query({ name: 'geolocation' }).then((p) => { if (p.state === 'granted') precisar(true); }).catch(() => {}); } catch (_) {}
+    }
 
     // ---------- The loop ----------
     let antes = performance.now(), ultimaTele = 0;

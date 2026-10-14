@@ -2242,6 +2242,14 @@
     "pd_op_oracle": "Oracle Cloud",
     "pd_op_do": "DigitalOcean",
     "pd_op_linode": "Akamai (Linode)",
-    "pd_op_vultr": "Vultr"
+    "pd_op_vultr": "Vultr",
+    "pd_precisar": "◎ Precisar",
+    "pd_precisar_que": "Pregunta a este equipo dónde está (tu navegador te pedirá permiso) y lo redondea a la ciudad, unos 10 km. Se queda en este navegador: GUARDIANA no lo envía a nadie.",
+    "pd_precisar_pide": "Tu navegador te pedirá permiso para usar la ubicación de este equipo. Para calcularla, el navegador puede apoyarse en el servicio de ubicación de Microsoft o de Google; GUARDIANA solo recibe el punto, lo redondea a unos 10 km y no lo envía a nadie.",
+    "pd_precisar_hecho": "Listo: tu ordenador está en {lugar}.",
+    "pd_precisar_denegado": "No diste permiso para la ubicación: GUARDIANA sigue usando la zona horaria del sistema. Puedes darlo desde el candado de la barra de direcciones.",
+    "pd_precisar_fallo": "Este equipo no ha podido decir dónde está (sin servicio de ubicación o sin respuesta). Se sigue usando la zona horaria del sistema.",
+    "pd_precisar_no": "Este navegador no ofrece la ubicación del equipo.",
+    "pd_lugar_equipo": "Lugar medido por este equipo, redondeado a unos 10 km."
   }
 }

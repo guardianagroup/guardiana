@@ -2242,6 +2242,14 @@
     "pd_op_oracle": "Oracle Cloud",
     "pd_op_do": "DigitalOcean",
     "pd_op_linode": "Akamai (Linode)",
-    "pd_op_vultr": "Vultr"
+    "pd_op_vultr": "Vultr",
+    "pd_precisar": "◎ Precisar",
+    "pd_precisar_que": "Pergunta a este computador onde ele está (o navegador vai pedir permissão) e arredonda para a cidade, uns 10 km. Fica neste navegador: a GUARDIANA não envia para ninguém.",
+    "pd_precisar_pide": "O navegador vai pedir permissão para usar a localização deste computador. Para calculá-la, o navegador pode usar o serviço de localização da Microsoft ou do Google; a GUARDIANA só recebe o ponto, arredonda para uns 10 km e não o envia a ninguém.",
+    "pd_precisar_hecho": "Pronto: seu computador está em {lugar}.",
+    "pd_precisar_denegado": "A permissão de localização não foi dada: a GUARDIANA continua usando o fuso horário do sistema. Você pode permitir pelo cadeado da barra de endereços.",
+    "pd_precisar_fallo": "Este computador não conseguiu dizer onde está (sem serviço de localização ou sem resposta). Continua sendo usado o fuso horário do sistema.",
+    "pd_precisar_no": "Este navegador não oferece a localização do computador.",
+    "pd_lugar_equipo": "Lugar medido por este computador, arredondado a uns 10 km."
   }
 }
