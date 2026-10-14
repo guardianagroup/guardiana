@@ -212,18 +212,16 @@ html,body{{height:100%;margin:0}}
 body{{background:#F4F6FA;color:#0B1020;font-family:"IBM Plex Sans","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}}
 main{{max-width:520px;padding:32px 24px}}
 .logo{{width:112px;height:112px;margin:0 auto 22px;display:block}}
-.anillo{{transform-origin:50% 50%;animation:latido 1.8s ease-in-out infinite}}
-@keyframes latido{{0%,100%{{opacity:.55;transform:scale(.96)}}50%{{opacity:1;transform:scale(1)}}}}
 h1{{font-family:"Unbounded","IBM Plex Sans","Segoe UI",system-ui,sans-serif;font-weight:700;letter-spacing:.18em;font-size:22px;margin:0 0 14px}}
 p{{font-size:16px;line-height:1.5;color:#5B6275;margin:0 0 10px}}
-.barra{{height:3px;width:220px;margin:22px auto 0;background:#D9DEE8;border-radius:3px;overflow:hidden}}
-.barra i{{display:block;height:100%;width:40%;background:#1F4BFF;border-radius:3px;animation:va 1.6s ease-in-out infinite}}
-@keyframes va{{0%{{transform:translateX(-120%)}}100%{{transform:translateX(320%)}}}}
+.barra{{height:2px;width:160px;margin:22px auto 0;background:#D9DEE8;border-radius:2px;overflow:hidden}}
+.barra i{{display:block;height:100%;width:35%;background:#1F4BFF;border-radius:2px;animation:va 2.4s ease-in-out infinite}}
+@keyframes va{{0%{{transform:translateX(-120%)}}100%{{transform:translateX(340%)}}}}
 #tarda{{display:none;color:#5B6275;font-size:14px;margin-top:18px}}
 a{{color:#1F4BFF}}
 </style></head>
 <body><main>
-<svg class="logo" viewBox="0 0 200 200" aria-hidden="true"><rect x="8" y="8" width="184" height="184" rx="40" fill="#0B1220" stroke="#17324A" stroke-width="2"/><g class="anillo"><circle cx="100" cy="100" r="42" fill="none" stroke="#62E6FF" stroke-width="12"/><circle cx="100" cy="100" r="14" fill="#62E6FF"/></g></svg>
+<svg class="logo" viewBox="0 0 200 200" aria-hidden="true"><rect x="8" y="8" width="184" height="184" rx="40" fill="#0B1220" stroke="#17324A" stroke-width="2"/><g><circle cx="100" cy="100" r="42" fill="none" stroke="#62E6FF" stroke-width="12"/><circle cx="100" cy="100" r="14" fill="#62E6FF"/></g></svg>
 <h1>GUARDIANA</h1>
 <p>{texto}</p>
 <div class="barra"><i></i></div>

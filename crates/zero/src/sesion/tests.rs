@@ -114,7 +114,8 @@ fn guardiana_is_one_fixed_tab_and_web_addresses_leave_it_in_place() {
     assert!(o
         .iter()
         .any(|x| matches!(x, Orden::CreaPestana { url: Some(u), .. } if u == &url)));
-    assert_eq!(s.pestanas.len(), 2);
+    // The start page is not opened underneath: one tab, the panel.
+    assert_eq!(s.pestanas.len(), 1);
     assert!(s.pestanas[0].fija);
     let id = s.pestanas[0].id;
     assert_eq!(s.activa, id);
@@ -127,20 +128,20 @@ fn guardiana_is_one_fixed_tab_and_web_addresses_leave_it_in_place() {
     assert!(!o
         .iter()
         .any(|x| matches!(x, Orden::CierraPestana { id: cerrado } if *cerrado == id)));
-    assert_eq!(s.pestanas.len(), 2);
+    assert_eq!(s.pestanas.len(), 1);
 
     let _ = s.mensaje(
         Origen::Barra,
         BARRA,
         r#"{"tipo":"navegar","texto":"example.com"}"#,
     );
-    assert_eq!(s.pestanas.len(), 3);
+    assert_eq!(s.pestanas.len(), 2);
     assert!(s.pestanas[0].fija);
     assert_eq!(s.pestanas[0].url, url);
 
     let _ = s.abre_guardiana(&format!("http://127.0.0.1:7443/?t={}", "b".repeat(64)));
     assert_eq!(s.pestanas.iter().filter(|p| p.fija).count(), 1);
-    assert_eq!(s.pestanas.len(), 3);
+    assert_eq!(s.pestanas.len(), 2);
 }
 
 #[test]
