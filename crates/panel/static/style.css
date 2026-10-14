@@ -821,3 +821,23 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 }
 /* The rule that stretches the picture's canvases does not apply to the explorer's small graphs. */
 .universo .lienzo .ex-5m canvas { position: static; inset: auto; width: 120px; height: 28px; cursor: inherit; }
+/* «Revisión del ordenador» (1.0.24) */
+.rv-cabeza{display:flex;flex-direction:column;gap:10px}
+.rv-semaforo{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:15px}
+.rv-semaforo b{font-family:var(--display);font-size:20px;margin-right:4px}
+.rv-botones{display:flex;flex-wrap:wrap;gap:8px}
+.rv-grupo h2{font-family:var(--display);font-size:17px;margin:26px 0 6px}
+.rv-check{border-left:4px solid var(--line)}
+.rv-check.ok{border-left-color:var(--nivel-verde)}
+.rv-check.aviso{border-left-color:var(--nivel-naranja)}
+.rv-check.alerta{border-left-color:var(--nivel-rojo)}
+.rv-check.info{border-left-color:var(--accent)}
+.rv-check .rv-t{display:flex;align-items:baseline;gap:10px;font-weight:600}
+.rv-punto{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none;background:var(--desconocido)}
+.rv-punto.ok{background:var(--nivel-verde)}.rv-punto.aviso{background:var(--nivel-naranja)}.rv-punto.alerta{background:var(--nivel-rojo)}.rv-punto.info{background:var(--accent)}
+.rv-check details{margin-top:8px}
+.rv-check ul{margin:6px 0 0;padding-left:18px;max-height:340px;overflow:auto}
+.rv-check li{margin:3px 0;overflow-wrap:anywhere}
+.rv-check li .muted{font-size:12px}
+.rv-marca{display:inline-block;font-size:11px;padding:1px 6px;border-radius:8px;border:1px solid var(--line);margin-left:6px;color:var(--muted)}
+.rv-marca.fuerte{border-color:var(--nivel-naranja);color:var(--nivel-naranja)}

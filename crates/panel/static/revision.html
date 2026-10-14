@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>GUARDIANA · Revisión del ordenador</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="preload" href="/static/fonts/IBMPlexSans-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/Unbounded-latin.woff2" as="font" type="font/woff2" crossorigin>
+<script src="/static/arranque.js"></script>
+</head>
+<body data-page="revision">
+<header class="top">
+  <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA<small data-t="lema"></small></span></a>
+  <nav>
+    <a href="/por-dentro" class="nav-destacado" data-t="nav_por_dentro">Por dentro</a>
+    <a href="/revision" class="nav-destacado" aria-current="page" data-t="nav_revision">Revisión</a>
+    <a href="/"  data-t="nav_radiografia">Radiografía</a>
+    <a href="/ia" data-t="nav_ia">Tu IA</a>
+    <a href="/antivirus" data-t="nav_antivirus">Tu antivirus</a>
+    <a href="/extracto"  data-t="nav_extracto">Extracto</a>
+    <a href="/dispositivos"  data-t="nav_dispositivos">Dispositivos</a>
+    <a href="/sabe-de-ti"  data-t="nav_sabe">Lo que GUARDIANA sabe de ti</a>
+    <a href="/borrado" data-t="nav_borrado">Haz que te borren</a>
+    <a href="/expedientes" data-t="nav_expedientes">Expedientes</a>
+    <a href="/reglas" data-t="nav_reglas">Reglas</a>
+    <a href="/informe" data-t="nav_informe">Informe semanal</a>
+    <a href="/hogar" data-t="nav_hogar">Modo Hogar</a>
+    <a href="/licencia" data-t="nav_licencia">Licencia</a>
+    <a href="/verify" data-t="nav_verify">Verificar</a>
+    <a href="/estado" data-t="nav_estado">Estado</a>
+  </nav>
+</header>
+<main>
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<h1 data-t="rv_titulo">Revisión del ordenador</h1>
+<p class="muted" data-t="rv_intro"></p>
+<div class="card rv-cabeza">
+  <div id="rv-semaforo" class="rv-semaforo"></div>
+  <div id="rv-cuando" class="muted"></div>
+  <div class="rv-botones">
+    <button type="button" id="rv-ahora" data-t="rv_ahora">Revisar ahora</button>
+    <button type="button" id="rv-pdf" class="secundario" data-t="rv_pdf">Guardar PDF</button>
+    <button type="button" id="rv-json" class="secundario" data-t="rv_json">Exportar datos</button>
+    <button type="button" id="rv-compartir" class="secundario" data-t="rv_compartir">Compartir</button>
+  </div>
+  <div id="rv-msg" class="muted"></div>
+</div>
+<div id="rv-equipo" class="muted"></div>
+<div id="rv-grupos"></div>
+<p class="muted" data-t="rv_pie"></p>
+</main>
+<script src="/static/revision.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -61,6 +61,8 @@ mod firmas;
 #[cfg(windows)]
 mod red;
 #[cfg(windows)]
+mod revision;
+#[cfg(windows)]
 mod seguridad;
 #[cfg(windows)]
 mod ventanas;
@@ -303,5 +305,63 @@ pub fn actividad(nombres: &[String]) -> Vec<Actividad> {
     {
         let _ = nombres;
         Vec::new()
+    }
+}
+
+/// «Revisión del ordenador» (1.0.24): everything Windows says about this computer's protection,
+/// access, startup, internet way out and privacy, as one JSON (see `revision.ps1`). Read-only.
+/// Takes tens of seconds; call it off the async runtime. Windows only.
+///
+/// # Errors
+/// [`Error::NoSoportado`] off Windows; [`Error::Sistema`] if PowerShell could not run, took
+/// longer than `limite` or answered something that is not JSON.
+pub fn revision_del_equipo(limite: std::time::Duration) -> Result<serde_json::Value, Error> {
+    #[cfg(windows)]
+    {
+        revision::revisar(limite)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = limite;
+        Err(Error::NoSoportado)
+    }
+}
+
+/// The review's script, so its size and its read-only promise can be checked everywhere.
+pub const REVISION_PS1: &str = include_str!("revision.ps1");
+
+#[cfg(test)]
+mod revision_script {
+    /// Nothing in the script can change the computer: no setter verbs, no deletions, no
+    /// downloads. ASCII only, so standard input carries it the same in any console code page.
+    #[test]
+    fn the_review_script_only_reads() {
+        let s = super::REVISION_PS1;
+        assert!(s.is_ascii());
+        let l = s.to_ascii_lowercase();
+        for prohibido in [
+            "set-",
+            "remove-",
+            "new-item",
+            "new-itemproperty",
+            "stop-",
+            "start-",
+            "restart-",
+            "disable-",
+            "enable-",
+            "invoke-webrequest",
+            "invoke-restmethod",
+            "downloadstring",
+            "out-file",
+            "set-content",
+            "add-content",
+            "reg add",
+            "reg delete",
+            "invoke-expression",
+            "iex ",
+            "-encodedcommand",
+        ] {
+            assert!(!l.contains(prohibido), "{prohibido}");
+        }
     }
 }

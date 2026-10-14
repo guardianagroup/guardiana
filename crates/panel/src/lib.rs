@@ -17,6 +17,7 @@ mod destinos;
 mod empresa;
 mod expedientes;
 mod medidas;
+mod revision;
 mod universo;
 
 use std::net::SocketAddr;
@@ -122,6 +123,8 @@ pub(crate) struct AppState {
     /// The clean cut of what an antivirus sends out (1.0.22), with its one long-lived firewall
     /// session. Unavailable (and said so) off Windows or when not running as the system.
     pub(crate) cortes: antivirus::CortesAntivirus,
+    /// «Revisión del ordenador» (1.0.24): the last review, in memory.
+    pub(crate) revision: revision::Revisor,
 }
 
 /// A running panel.
@@ -230,6 +233,8 @@ const APP_JS: &str = include_str!("../static/app.js");
 const STYLE_CSS: &str = include_str!("../static/style.css");
 /// «GUARDIANA por dentro» (1.0.22): its own script, so the other pages do not carry its weight.
 const POR_DENTRO_JS: &str = include_str!("../static/por-dentro.js");
+/// «Revisión del ordenador» (1.0.24): its own script too.
+const REVISION_JS: &str = include_str!("../static/revision.js");
 
 /// A short tag of the script and the style sheet, so the pages ask for them by a name that
 /// changes when they do and the browser may keep them for a while. Until 1.0.12 every navigation
@@ -243,6 +248,7 @@ pub(crate) fn version_estaticos() -> &'static str {
         APP_JS.hash(&mut h);
         STYLE_CSS.hash(&mut h);
         POR_DENTRO_JS.hash(&mut h);
+        REVISION_JS.hash(&mut h);
         format!("{:016x}", h.finish())
     })
 }
@@ -257,6 +263,10 @@ pub(crate) fn pagina(html: &'static str) -> Html<String> {
             .replace(
                 "/static/por-dentro.js\"",
                 &format!("/static/por-dentro.js?v={v}\""),
+            )
+            .replace(
+                "/static/revision.js\"",
+                &format!("/static/revision.js?v={v}\""),
             ),
     )
 }
@@ -328,7 +338,9 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         vecinos: guardiana_devices::Resolver::default(),
         primario: Mutex::new(None),
         cortes,
+        revision: revision::Revisor::default(),
     });
+    revision::vigilar(Arc::clone(&state));
 
     let app = Router::new()
         .route("/", get(api::root_page))
@@ -516,6 +528,24 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             }),
         )
         .route(
+            "/static/revision.js",
+            get(|RawQuery(q): RawQuery| async move {
+                estatico(
+                    REVISION_JS,
+                    "application/javascript; charset=utf-8",
+                    q.as_deref(),
+                )
+            }),
+        )
+        .route(
+            "/revision",
+            get(|| async { pagina(include_str!("../static/revision.html")) }),
+        )
+        .route(
+            "/revision.html",
+            get(|| async { pagina(include_str!("../static/revision.html")) }),
+        )
+        .route(
             "/por-dentro",
             get(|| async { pagina(include_str!("../static/por-dentro.html")) }),
         )
@@ -553,6 +583,8 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/antivirus/maxima", post(antivirus::maxima))
         .route("/api/antivirus/vigilar", post(antivirus::vigilar))
         .route("/api/por-dentro", get(universo::universo))
+        .route("/api/revision", get(revision::ver))
+        .route("/api/revision/ahora", post(revision::ahora))
         .route("/api/ia/alcance", post(api::alcance))
         .route("/api/ia/alcance/anadir", post(api::alcance_anadir))
         .route("/api/dns/aplicar", post(api::dns_aplicar))
@@ -683,10 +715,12 @@ mod textos {
             include_str!("../static/empresa.html"),
             include_str!("../static/expedientes.html"),
             include_str!("../static/por-dentro.html"),
+            include_str!("../static/revision.html"),
         ];
         const SCRIPTS: &[&str] = &[
             include_str!("../static/app.js"),
             include_str!("../static/por-dentro.js"),
+            include_str!("../static/revision.js"),
         ];
         // The keys asked for with a literal: `data-t="x"` in the pages, `t('x')` in the scripts.
         // The ones built at run time (`t('cambio_' + x)`) cannot be read here and are covered by
