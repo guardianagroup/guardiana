@@ -2231,6 +2231,17 @@
     "pd_ex_red": "{red} network",
     "pd_ex_ver_todos": "See all {n} destinations",
     "pd_ex_nada": "No program has sent anything yet in this window.",
-    "pd_ex_nada_busca": "Nothing matches your search."
+    "pd_ex_nada_busca": "Nothing matches your search.",
+    "pd_lugar_titulo": "Data centre:",
+    "pd_lugar_region": "It is region {region} of {op}, according to the address list the operator itself publishes. Where the data is kept afterwards inside the company cannot be seen from your computer.",
+    "pd_lugar_geofeed": "It is the city {op} declares for that address in its public list (geofeed). Where the data is kept afterwards cannot be seen from your computer.",
+    "pd_servidor_en": "Server in {lugar} ({pais}) · {red} network",
+    "pd_op_aws": "Amazon Web Services",
+    "pd_op_gcp": "Google Cloud",
+    "pd_op_azure": "Microsoft Azure",
+    "pd_op_oracle": "Oracle Cloud",
+    "pd_op_do": "DigitalOcean",
+    "pd_op_linode": "Akamai (Linode)",
+    "pd_op_vultr": "Vultr"
   }
 }

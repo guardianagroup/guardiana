@@ -71,6 +71,10 @@ pub struct Trafico {
     pub recibidos: u64,
     /// Packets either way.
     pub paquetes: u64,
+    /// The place the address's own operator publishes for it (`aws:us-east-1`), looked up when
+    /// it was measured (1.0.24); empty when the operator publishes none. Like the country, it is
+    /// about the address and replaces it: the address is still never written.
+    pub lugar: String,
 }
 
 /// Minute of a Unix ms timestamp.
@@ -82,6 +86,17 @@ pub const fn minuto_de(ts: i64) -> i64 {
 impl Ledger {
     pub(crate) fn ensure_trafico_table(&self) -> Result<()> {
         self.conn.execute_batch(TRAFICO_SCHEMA)?;
+        // 1.0.24: the place its operator publishes. Not part of the key: a row of the same
+        // destination keeps the last place seen.
+        let tiene: bool = self.conn.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('trafico') WHERE name = 'lugar'",
+            [],
+            |r| r.get::<_, i64>(0),
+        )? > 0;
+        if !tiene {
+            self.conn
+                .execute_batch("ALTER TABLE trafico ADD COLUMN lugar TEXT NOT NULL DEFAULT ''")?;
+        }
         Ok(())
     }
 
@@ -91,12 +106,14 @@ impl Ledger {
         {
             let mut st = tx.prepare_cached(
                 "INSERT INTO trafico (minuto, programa, firma, destino, pais, red, asn, proto, \
-                                      puerto, enviados, recibidos, paquetes) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) \
+                                      puerto, enviados, recibidos, paquetes, lugar) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13) \
                  ON CONFLICT (minuto, programa, firma, destino, pais, red, asn, proto, puerto) \
                  DO UPDATE SET enviados = enviados + excluded.enviados, \
                                recibidos = recibidos + excluded.recibidos, \
-                               paquetes = paquetes + excluded.paquetes",
+                               paquetes = paquetes + excluded.paquetes, \
+                               lugar = CASE WHEN excluded.lugar <> '' THEN excluded.lugar \
+                                            ELSE lugar END",
             )?;
             let n = |v: u64| i64::try_from(v).unwrap_or(i64::MAX);
             for f in filas {
@@ -113,6 +130,7 @@ impl Ledger {
                     n(f.enviados),
                     n(f.recibidos),
                     n(f.paquetes),
+                    f.lugar,
                 ])?;
             }
         }
@@ -125,7 +143,7 @@ impl Ledger {
     pub fn trafico(&self, since: i64, until: i64, programas: &[&str]) -> Result<Vec<Trafico>> {
         let mut st = self.conn.prepare(
             "SELECT minuto, programa, firma, destino, pais, red, asn, proto, puerto, enviados, \
-                    recibidos, paquetes \
+                    recibidos, paquetes, lugar \
              FROM trafico WHERE minuto >= ?1 AND minuto < ?2 ORDER BY minuto ASC",
         )?;
         let quiere: Vec<String> = programas.iter().map(|p| p.to_ascii_lowercase()).collect();
@@ -144,6 +162,7 @@ impl Ledger {
                 enviados: n(r.get(9)?),
                 recibidos: n(r.get(10)?),
                 paquetes: n(r.get(11)?),
+                lugar: r.get(12)?,
             })
         })?;
         let mut out = Vec::new();
@@ -193,6 +212,7 @@ mod tests {
             enviados: env,
             recibidos: 10,
             paquetes: 2,
+            lugar: String::new(),
         }
     }
 
@@ -223,6 +243,20 @@ mod tests {
             .unwrap();
         assert_eq!(r.trafico_pruned, 2);
         assert_eq!(l.trafico(0, i64::MAX, &[]).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_row_keeps_the_last_place_its_operator_published() {
+        let mut l = Ledger::open_in_memory(Hash::of(b"t")).unwrap();
+        let m = 2_000 * 60_000;
+        let mut a = fila(m, "AvSvc.exe", "t.av.example", 1);
+        a.lugar = "aws:us-east-1".into();
+        l.suma_trafico(&[a]).unwrap();
+        l.suma_trafico(&[fila(m + 1, "AvSvc.exe", "t.av.example", 1)])
+            .unwrap();
+        let f = l.trafico(m, m + 60_000, &[]).unwrap();
+        assert_eq!(f.len(), 1);
+        assert_eq!(f[0].lugar, "aws:us-east-1");
     }
 
     #[test]

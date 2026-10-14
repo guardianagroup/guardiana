@@ -1,0 +1,148 @@
+{
+  "hecho": "2026-10-14T00:54:21Z",
+  "fuentes": {
+    "aws": {
+      "url": "https://ip-ranges.amazonaws.com/ip-ranges.json",
+      "archivo": "aws.json",
+      "sha256": "91b080d5ff99a526f1057cc884aa6a34ba5331955f596dfcc79662a14fb37b78",
+      "bytes": 2717361,
+      "licencia": "publicado por Amazon Web Services para que sus clientes configuren cortafuegos"
+    },
+    "gcp": {
+      "url": "https://www.gstatic.com/ipranges/cloud.json",
+      "archivo": "gcp.json",
+      "sha256": "6e03a8b265421225609e7b5a2094683897470eda17a1d02858e50ae917b46e1c",
+      "bytes": 115265,
+      "licencia": "publicado por Google Cloud para que sus clientes configuren cortafuegos"
+    },
+    "oracle": {
+      "url": "https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json",
+      "archivo": "oracle.json",
+      "sha256": "59e5ba5e92e38f911ce377f1d71c6eaa89ffcf53f9eb4ccd667d9ffca81ead7d",
+      "bytes": 234112,
+      "licencia": "publicado por Oracle Cloud Infrastructure"
+    },
+    "do": {
+      "url": "https://digitalocean.com/geo/google.csv",
+      "archivo": "do.csv",
+      "sha256": "259d82de286d2af92abb8bcb50d473b5f5b193659d58b27289aa85f1c5a3086e",
+      "bytes": 53123,
+      "licencia": "geofeed RFC 8805 publicado por DigitalOcean"
+    },
+    "linode": {
+      "url": "https://geoip.linode.com/",
+      "archivo": "linode.csv",
+      "sha256": "254dc4433d26b1beef6afc9e832680110ef66db2ba8863f18e675a19e3d33187",
+      "bytes": 192744,
+      "licencia": "geofeed RFC 8805 publicado por Akamai (Linode)"
+    },
+    "vultr": {
+      "url": "https://geofeed.constant.com/?text",
+      "archivo": "vultr.csv",
+      "sha256": "56a803ba6b1edc5823b1887851b969afd91d1d1f6eb31a8d7063292acc0ff23a",
+      "bytes": 8076,
+      "licencia": "geofeed RFC 8805 publicado por Vultr (Constant)"
+    },
+    "ciudades": {
+      "url": "https://download.geonames.org/export/dump/cities15000.zip",
+      "archivo": "cities15000.zip",
+      "sha256": "19de48da195cd1ef7f636c2293bb8b6d1591addf23b45cd94d5684de5f261aed",
+      "bytes": 3361377,
+      "licencia": "GeoNames, CC BY 4.0 (https://www.geonames.org)"
+    },
+    "admin1": {
+      "url": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+      "archivo": "admin1CodesASCII.txt",
+      "sha256": "1da92a6323a5fec3176f3f743bf4cf4040fd56a876da55e46fbca23c863aa60a",
+      "bytes": 151583,
+      "licencia": "GeoNames, CC BY 4.0 (https://www.geonames.org)"
+    },
+    "azure": {
+      "url": "https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_20261005.json",
+      "pagina": "https://www.microsoft.com/en-us/download/details.aspx?id=56519",
+      "archivo": "azure.json",
+      "sha256": "fed834a26c3847f6c66715c924259d9d6f437078b32decf0b5337e6414f96c98",
+      "bytes": 4330497,
+      "licencia": "publicado por Microsoft (Azure IP Ranges and Service Tags – Public Cloud)"
+    }
+  },
+  "prefijos": {
+    "aws": 17572,
+    "gcp": 1127,
+    "azure": 15031,
+    "oracle": 1107,
+    "do": 1229,
+    "linode": 5110,
+    "vultr": 0
+  },
+  "lugares": 222,
+  "rangos_v4": 16553,
+  "rangos_v6": 8229,
+  "ciudades": 34162,
+  "sin_sitio": {
+    "linode:ciudades sin encontrar en GeoNames": 395,
+    "aws:us-south-1": 149,
+    "azure:malaysiasouth": 135,
+    "aws:me-west-1": 120,
+    "aws:sa-west-1": 117,
+    "azure:switzerlandw": 106,
+    "azure:germanyn": 105,
+    "azure:brazilse": 102,
+    "azure:taiwannorth": 97,
+    "azure:norwayw": 93,
+    "azure:chilec": 91,
+    "azure:austriaeast": 86,
+    "azure:swedensouth": 86,
+    "azure:usstagee": 85,
+    "azure:taiwannorthwest": 85,
+    "azure:usstagec": 82,
+    "azure:denmarkeast": 76,
+    "azure:belgiumcentral": 65,
+    "azure:eastus3": 64,
+    "azure:indiasouthcentral": 57,
+    "azure:israelnorthwest": 56,
+    "azure:jioindiawest": 52,
+    "azure:jioindiacentral": 46,
+    "azure:southcentralus2": 42,
+    "azure:southeastus5": 42,
+    "azure:southeastus3": 41,
+    "azure:southwestus": 41,
+    "azure:southeastus": 39,
+    "azure:northeastus5": 37,
+    "gcp:us-central2": 14,
+    "oracle:us-dallas-1": 13,
+    "oracle:af-casablanca-1": 12,
+    "oracle:ap-batam-1": 12,
+    "gcp:us-east7": 10,
+    "azure:northeurope2": 10,
+    "oracle:eu-madrid-3": 10,
+    "oracle:eu-dublin-3": 10,
+    "oracle:ap-singapore-2": 10,
+    "oracle:ap-delhi-1": 10,
+    "oracle:us-abilene-1": 10,
+    "oracle:ap-kulai-1": 10,
+    "oracle:us-sanantonio-1": 9,
+    "oracle:us-lenexa-1": 9,
+    "oracle:us-desmoines-1": 9,
+    "oracle:us-shawnee-1": 9,
+    "oracle:us-boardman-1": 9,
+    "oracle:us-quincy-1": 9,
+    "oracle:sa-riodejaneiro-2": 9,
+    "oracle:us-saltlake-2": 8,
+    "oracle:eu-jovanovac-1": 7,
+    "gcp:asia-southeast3": 6,
+    "gcp:us-west8": 6,
+    "gcp:europe-west15": 5,
+    "do:ciudades sin encontrar en GeoNames": 5,
+    "azure:brazilne": 4
+  },
+  "ciudades_sin_encontrar": [
+    "do:Sandston|US",
+    "linode:Cedar Knolls|US"
+  ],
+  "sha256": {
+    "nube-ip.bin": "d645817f76cc311014342ab2e367ea429b1c16dbc2c4b2e7cac0d79bf6e73ccb",
+    "lugares.json": "4b916725695700f0513beb411b3e7faa87c453b911c3f6743c538672da703c03",
+    "ciudades.tsv": "7a97b6ece84729db8bd69306a754376b07f66eb14f856852e4d1ffb8607c2051"
+  }
+}

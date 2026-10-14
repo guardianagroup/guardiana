@@ -24,6 +24,87 @@ pub const IP_RED: &[u8] = include_bytes!("../data/ip-red.bin");
 pub const RED_IP_JSON: &str = include_str!("../data/red-ip.json");
 /// Networks and addresses their own operator calls anycast, each with its source.
 pub const ANYCAST: &str = include_str!("../data/anycast.txt");
+/// IP → the place its own operator publishes for it: a cloud region (Amazon, Google Cloud,
+/// Azure, Oracle) or the city of a geofeed (DigitalOcean, Akamai/Linode, Vultr). `build/geo.py`.
+pub const NUBE_IP: &[u8] = include_bytes!("../data/nube-ip.bin");
+/// The places `NUBE_IP` points to (`build/geo.py`).
+pub const LUGARES_JSON: &str = include_str!("../data/lugares.json");
+/// What those two are: sources, dates, licences, hashes (`build/geo.py`).
+pub const GEO_JSON: &str = include_str!("../data/geo.json");
+
+/// A place an operator publishes for its addresses (owner, 13 Oct 2026: «saber la ciudad o el
+/// estado a dónde van… lo máximo que podáis de precisión»). Not a guess from a geolocation base:
+/// the region of a cloud as the cloud names it, or the city its geofeed declares.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Lugar {
+    /// `aws`, `gcp`, `azure`, `oracle`, `do`, `linode`, `vultr`.
+    pub proveedor: String,
+    /// The region's code (`us-east-1`) or, for a geofeed, `ciudad|país`.
+    pub region: String,
+    /// The place in words (`Virginia del Norte (Ashburn)`, `Frankfurt am Main, Hesse`).
+    pub ciudad: String,
+    /// Two-letter country.
+    pub pais: String,
+    /// Latitude of that city, rounded to 0.1° (regions) or as GeoNames gives it (geofeeds).
+    pub lat: f64,
+    /// Longitude, likewise.
+    pub lon: f64,
+    /// `región del operador` or `geofeed del operador`.
+    pub fuente: String,
+}
+
+impl Lugar {
+    /// The stable key a measurement keeps: `aws:us-east-1`.
+    #[must_use]
+    pub fn clave(&self) -> String {
+        format!("{}:{}", self.proveedor, self.region)
+    }
+}
+
+fn lugares() -> &'static [Lugar] {
+    static L: OnceLock<Vec<Lugar>> = OnceLock::new();
+    L.get_or_init(|| serde_json::from_str(LUGARES_JSON).unwrap_or_default())
+}
+
+fn tabla_nube() -> Option<&'static Tabla> {
+    static T: OnceLock<Option<Tabla>> = OnceLock::new();
+    T.get_or_init(|| {
+        let mut l = Lector {
+            datos: NUBE_IP,
+            pos: 0,
+        };
+        if l.bytes(8)? != b"GNUBE001" {
+            return None;
+        }
+        l.rangos(2)
+    })
+    .as_ref()
+}
+
+/// The place the operator of this address publishes for it, when it does.
+#[must_use]
+pub fn lugar_de(ip: IpAddr) -> Option<&'static Lugar> {
+    let ip = normal(ip);
+    if es_local(ip) {
+        return None;
+    }
+    let i = tabla_nube()?.buscar(ip);
+    lugares().get(i.checked_sub(1)?)
+}
+
+/// The place a measurement kept, by its key (`aws:us-east-1`).
+#[must_use]
+pub fn lugar_por_clave(clave: &str) -> Option<&'static Lugar> {
+    static M: OnceLock<std::collections::HashMap<String, usize>> = OnceLock::new();
+    let m = M.get_or_init(|| {
+        lugares()
+            .iter()
+            .enumerate()
+            .map(|(i, l)| (l.clave(), i))
+            .collect()
+    });
+    lugares().get(*m.get(clave)?)
+}
 
 /// A network (autonomous system): its number and the organisation name the base gives it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

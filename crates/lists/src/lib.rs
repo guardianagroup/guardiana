@@ -22,8 +22,9 @@ use serde::{Deserialize, Serialize};
 
 pub use parse::{parse_abp_domains, parse_guardiana, parse_hosts, Format};
 pub use red::{
-    base_de_red, es_local, fuente_red, nombre_de_red, server_info_de, servidor_de,
-    servidor_de_texto, FuenteRed, Red, Servidor, ANYCAST, IP_PAIS, IP_RED, RED_IP_JSON,
+    base_de_red, es_local, fuente_red, lugar_de, lugar_por_clave, nombre_de_red, server_info_de,
+    servidor_de, servidor_de_texto, FuenteRed, Lugar, Red, Servidor, ANYCAST, GEO_JSON, IP_PAIS,
+    IP_RED, LUGARES_JSON, NUBE_IP, RED_IP_JSON,
 };
 
 /// Bundled copy of EasyPrivacy, trimmed to domain rules by `build/fetch-lists.sh`.

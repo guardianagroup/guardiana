@@ -128,6 +128,42 @@ struct Destino {
     regla: Option<i64>,
     /// True when nothing left: the name was stopped, so `pais` is its company's seat.
     sede: bool,
+    /// Where the server is, to the region or the city, when its own operator publishes it
+    /// (1.0.24); `None` when only the country is known.
+    lugar: Option<LugarServidor>,
+}
+
+/// The place an operator publishes for its servers, as the page draws and tells it.
+#[derive(Serialize)]
+struct LugarServidor {
+    /// `Virginia del Norte (Ashburn)`.
+    ciudad: String,
+    pais: String,
+    lat: f64,
+    lon: f64,
+    /// `aws`, `gcp`, `azure`, `oracle`, `do`, `linode`, `vultr`.
+    operador: String,
+    /// The region's code (`us-east-1`), empty for a geofeed's city.
+    region: String,
+    /// `region` (a cloud region) or `geofeed` (a city the operator declares).
+    fuente: &'static str,
+}
+
+fn lugar_servidor(lugares: &HashMap<String, u64>) -> Option<LugarServidor> {
+    let (clave, _) = lugares
+        .iter()
+        .max_by(|a, b| a.1.cmp(b.1).then(b.0.cmp(a.0)))?;
+    let l = guardiana_lists::lugar_por_clave(clave)?;
+    let geofeed = l.region.contains('|');
+    Some(LugarServidor {
+        ciudad: l.ciudad.clone(),
+        pais: l.pais.clone(),
+        lat: l.lat,
+        lon: l.lon,
+        operador: l.proveedor.clone(),
+        region: if geofeed { String::new() } else { l.region.clone() },
+        fuente: if geofeed { "geofeed" } else { "region" },
+    })
 }
 
 #[derive(Serialize)]
@@ -202,6 +238,8 @@ struct Acc {
     ultima: i64,
     asn: u32,
     vias: HashMap<(String, u16), u64>,
+    /// Bytes per place its operator published (`aws:us-east-1`).
+    lugares: HashMap<String, u64>,
 }
 
 /// `/api/por-dentro`: the live universe of this computer.
@@ -283,6 +321,9 @@ pub(crate) async fn universo(
         a.ultima = a.ultima.max(f.minuto);
         a.asn = a.asn.max(f.asn);
         *a.vias.entry((f.proto.clone(), f.puerto)).or_default() += f.enviados + f.recibidos;
+        if !f.lugar.is_empty() {
+            *a.lugares.entry(f.lugar.clone()).or_default() += f.enviados + f.recibidos + 1;
+        }
     }
 
     // The DNS side: how many times each program asked for each name, and how many were cut.
@@ -345,6 +386,7 @@ pub(crate) async fn universo(
             .unwrap_or("")
             .to_owned();
         destinos.push(Destino {
+            lugar: lugar_servidor(&a.lugares),
             empresa,
             regla: regla_de(&rules, &destino, categoria, now),
             programa: prog,
@@ -410,6 +452,7 @@ pub(crate) async fn universo(
             consultas: *consultas,
             paradas: *paradas,
             sede: true,
+            lugar: None,
         });
     }
     destinos.sort_by(|a, b| {

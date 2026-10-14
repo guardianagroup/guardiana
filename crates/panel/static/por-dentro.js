@@ -77,7 +77,18 @@
     // Stopped: a rule of this name, the whole program cut, or a wide rule (a category) that stopped
     // every lookup of a name that never left.
     const bloqueado = (d) => d.cortado || (prod(d.p) && prod(d.p).cortado) || !!d.ancho;
-    const dibujable = (d) => !!centros[d.pais];
+    const dibujable = (d) => !!(d.lugar || centros[d.pais]);
+    // Where a destination is drawn (1.0.24): at the region or city its operator publishes, when it
+    // does (exact), or around its country's centre (only the country is known), a small spiral
+    // apart from the others in the same spot so each one can be seen and clicked.
+    const sitio = (d) => {
+      const clave = d.lugar ? `${d.lugar.lat},${d.lugar.lon}` : d.pais;
+      const grupo = VISIBLES.filter((x) => (x.lugar ? `${x.lugar.lat},${x.lugar.lon}` : x.pais) === clave), k = Math.max(0, grupo.indexOf(d));
+      const base = d.lugar ? { lon: d.lugar.lon, lat: d.lugar.lat } : centros[d.pais], paso = d.lugar ? 0.18 : 1.1;
+      const ga = k * 2.399963, rr = grupo.length > 1 ? paso * Math.sqrt(k + 0.5) : 0;
+      d.d = d.lugar ? 'exacto' : 'pais';
+      return { lon: base.lon + Math.cos(ga) * rr / Math.max(0.35, Math.cos(base.lat * RAD)), lat: base.lat + Math.sin(ga) * rr };
+    };
     // What the person's computer sent, in 10-second buckets: 30 of them are the deck's «last five
     // minutes», whatever the rhythm of the data (Windows is read every 10 s).
     const CUBO_MS = 10000, N_CUBOS = 30, CADA_MEDIDA = 10;
@@ -189,7 +200,7 @@
         const esNuevo = !d;
         if (!d) { d = { k, p: x.programa, ruta: [], tg: 0.3, x: 0, y: 0, vis: true, ema: 0, bloq: x.paradas }; porClave.set(k, d); DEST.push(d); }
         const antes = d.bloq || 0;
-        Object.assign(d, { host: nombreDe(x), destino: x.destino, pais: x.pais, red: x.red, asn: x.asn, proto: x.proto, puerto: x.puerto, vias: x.vias, sub: x.enviados, baj: x.recibidos, paq: x.paquetes, noche: x.noche, primera: x.primera, ultima: x.ultima, doc: x.documentado, uso: x.uso, consultas: x.consultas, bloq: x.paradas, regla: x.regla ?? null, cortado: x.regla !== null && x.regla !== undefined, sede: x.sede, empresa: x.empresa || '' });
+        Object.assign(d, { host: nombreDe(x), destino: x.destino, pais: x.pais, red: x.red, asn: x.asn, proto: x.proto, puerto: x.puerto, vias: x.vias, sub: x.enviados, baj: x.recibidos, paq: x.paquetes, noche: x.noche, primera: x.primera, ultima: x.ultima, doc: x.documentado, uso: x.uso, consultas: x.consultas, bloq: x.paradas, regla: x.regla ?? null, cortado: x.regla !== null && x.regla !== undefined, sede: x.sede, empresa: x.empresa || '', lugar: x.lugar || null });
         d.ancho = !d.cortado && d.sede && d.bloq > 0;
         if (!st.primeraCarga && esNuevo) {
           d.visto = Date.now();
@@ -540,10 +551,7 @@
       const prods = posProductos(cen, 11);
       const mx = Math.max(1, ...VISIBLES.map((d) => d.sub));
       VISIBLES.forEach((d) => {
-        const ce = centros[d.pais], grupo = VISIBLES.filter((x) => x.pais === d.pais), k = grupo.indexOf(d);
-        // Several servers in one country: a small spiral around its centre, never a long row.
-        const ga = k * 2.399963, rr = grupo.length > 1 ? 1.1 * Math.sqrt(k + 0.5) : 0;
-        const lon1 = ce.lon + Math.cos(ga) * rr / Math.max(0.35, Math.cos(ce.lat * RAD)), lat1 = ce.lat + Math.sin(ga) * rr;
+        const { lon: lon1, lat: lat1 } = sitio(d);
         d.lon = lon1; d.lat = lat1;
         const a = [Math.cos(yo.lat * RAD) * Math.sin(yo.lon * RAD), Math.sin(yo.lat * RAD), Math.cos(yo.lat * RAD) * Math.cos(yo.lon * RAD)];
         const b = [Math.cos(lat1 * RAD) * Math.sin(lon1 * RAD), Math.sin(lat1 * RAD), Math.cos(lat1 * RAD) * Math.cos(lon1 * RAD)];
@@ -709,9 +717,7 @@
       const yo = st.lugar, cen = aPlano(yo.lon, yo.lat), R0 = 18;
       const prods = posProductos(cen, 8);
       VISIBLES.forEach((d) => {
-        const ce = centros[d.pais], grupo = VISIBLES.filter((x) => x.pais === d.pais), k = grupo.indexOf(d);
-        const ga = k * 2.399963, rr = grupo.length > 1 ? 1.4 * Math.sqrt(k + 0.5) : 0;
-        d.lon = ce.lon + Math.cos(ga) * rr; d.lat = ce.lat + Math.sin(ga) * rr;
+        const q0 = sitio(d); d.lon = q0.lon; d.lat = q0.lat;
         const b = aPlano(d.lon, d.lat);
         const dx = b.x - cen.x, dy = b.y - cen.y, dist = Math.hypot(dx, dy) || 1;
         const g = { x: cen.x + dx / dist * R0, y: cen.y + dy / dist * R0 };
@@ -1171,7 +1177,7 @@
         const d = hh.ref, p = prod(d.p), bl = bloqueado(d);
         const estado = bl ? `<span class="estado corta">${esc(d.cortado ? t('pd_cortado_nombre') : d.ancho ? t('pd_cortado_ancho') : t('pd_cortado_programa').replace('{prog}', p.nombre))}</span>` : `<span class="estado pasa">${esc(t('pd_pasa'))}</span>`;
         const dia = centros[d.pais] ? esDeDia(centros[d.pais].lon, centros[d.pais].lat) : null;
-        const donde = d.sede ? t('pd_sede').replace('{pais}', nombrePais(d.pais)).replace('{empresa}', d.red || '—') : t('pd_servidor').replace('{pais}', d.pais ? nombrePais(d.pais) : '—').replace('{red}', d.red || '—');
+        const donde = d.lugar ? t('pd_servidor_en').replace('{lugar}', d.lugar.ciudad).replace('{pais}', nombrePais(d.lugar.pais)).replace('{red}', d.red || '—') : d.sede ? t('pd_sede').replace('{pais}', nombrePais(d.pais)).replace('{empresa}', d.red || '—') : t('pd_servidor').replace('{pais}', d.pais ? nombrePais(d.pais) : '—').replace('{red}', d.red || '—');
         return `<div class="mono">${esc(d.host)}</div><div>${esc(p.nombre)} · <span class="mono">${esc(p.procesos.join(' · '))}</span></div>${usoTexto(d)}
           ${d.empresa && !d.sede ? `<div>${esc(t('pd_nombre_de').replace('{empresa}', d.empresa))}</div>` : ''}
           <div>${esc(donde)}${d.asn ? ` <span class="mono">AS${d.asn}</span>` : ''}</div>
@@ -1235,7 +1241,8 @@
       let h = `<div class="cuerpo">${textoTip(hh)}</div>`, acciones = '', enlaces = [];
       if (hh.tipo === 'dest') {
         const d = hh.ref, p = prod(d.p);
-        if (!d.sede) h += `<p class="t">${esc(t('pd_pos_pais').replace('{pais}', d.pais ? nombrePais(d.pais) : '—'))}</p>`;
+        if (d.lugar) h += `<p><b>${esc(t('pd_lugar_titulo'))}</b> ${esc(d.lugar.ciudad)} · ${esc(nombrePais(d.lugar.pais))}</p><p class="t">${esc(t(d.lugar.fuente === 'region' ? 'pd_lugar_region' : 'pd_lugar_geofeed').replace('{op}', t('pd_op_' + d.lugar.operador)).replace('{region}', d.lugar.region))}</p>`;
+        else if (!d.sede) h += `<p class="t">${esc(t('pd_pos_pais').replace('{pais}', d.pais ? nombrePais(d.pais) : '—'))}</p>`;
         if (!soloMirar) acciones += !d.destino ? `<p class="t">${esc(t('pd_sin_nombre_no_corta'))}</p>` : d.ancho ? `<p class="t">${esc(t('pd_ancho_dejar'))}</p>` : `<button type="button" class="btn-hud${d.cortado ? '' : ' peligro'}" data-cortar="dest">${esc(t(d.cortado ? 'pd_btn_dejar' : 'pd_btn_cortar'))}</button>`;
         acciones += cerca(d.lon, d.lat);
         if (d.empresa) enlaces.push(enlace('/empresa?e=' + encodeURIComponent(d.empresa), t('pd_ver_empresa').replace('{empresa}', d.empresa)));

@@ -1,0 +1,2000 @@
+[
+{
+"proveedor": "aws",
+"region": "eu-west-1",
+"ciudad": "Dublín",
+"pais": "IE",
+"lat": 53.3,
+"lon": -6.3,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ap-northeast-2",
+"ciudad": "Seúl",
+"pais": "KR",
+"lat": 37.6,
+"lon": 127.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ap-east-2",
+"ciudad": "Taipéi",
+"pais": "TW",
+"lat": 25.0,
+"lon": 121.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "eu-central-1",
+"ciudad": "Fráncfort",
+"pais": "DE",
+"lat": 50.1,
+"lon": 8.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "us-east-1",
+"ciudad": "Virginia del Norte (Ashburn)",
+"pais": "US",
+"lat": 39.0,
+"lon": -77.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "eu-west-3",
+"ciudad": "París",
+"pais": "FR",
+"lat": 48.9,
+"lon": 2.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "il-central-1",
+"ciudad": "Tel Aviv",
+"pais": "IL",
+"lat": 32.1,
+"lon": 34.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "eu-west-2",
+"ciudad": "Londres",
+"pais": "GB",
+"lat": 51.5,
+"lon": -0.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "us-west-1",
+"ciudad": "California del Norte (San José)",
+"pais": "US",
+"lat": 37.3,
+"lon": -121.9,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "us-west-2",
+"ciudad": "Oregón (Boardman)",
+"pais": "US",
+"lat": 45.8,
+"lon": -119.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ap-southeast-2",
+"ciudad": "Sídney",
+"pais": "AU",
+"lat": -33.9,
+"lon": 151.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "eu-south-1",
+"ciudad": "Milán",
+"pais": "IT",
+"lat": 45.5,
+"lon": 9.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "us-east-2",
+"ciudad": "Ohio (Columbus)",
+"pais": "US",
+"lat": 40.0,
+"lon": -83.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ap-south-1",
+"ciudad": "Bombay",
+"pais": "IN",
+"lat": 19.1,
+"lon": 72.9,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "sa-east-1",
+"ciudad": "São Paulo",
+"pais": "BR",
+"lat": -23.5,
+"lon": -46.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "mx-central-1",
+"ciudad": "Querétaro",
+"pais": "MX",
+"lat": 20.6,
+"lon": -100.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ap-southeast-1",
+"ciudad": "Singapur",
+"pais": "SG",
+"lat": 1.3,
+"lon": 103.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ap-east-1",
+"ciudad": "Hong Kong",
+"pais": "HK",
+"lat": 22.3,
+"lon": 114.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ap-southeast-6",
+"ciudad": "Nueva Zelanda (Auckland)",
+"pais": "NZ",
+"lat": -36.8,
+"lon": 174.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ap-southeast-7",
+"ciudad": "Tailandia (Bangkok)",
+"pais": "TH",
+"lat": 13.8,
+"lon": 100.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ap-northeast-1",
+"ciudad": "Tokio",
+"pais": "JP",
+"lat": 35.7,
+"lon": 139.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "me-central-1",
+"ciudad": "Emiratos Árabes Unidos",
+"pais": "AE",
+"lat": 25.2,
+"lon": 55.3,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ap-southeast-5",
+"ciudad": "Malasia (Kuala Lumpur)",
+"pais": "MY",
+"lat": 3.1,
+"lon": 101.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ca-central-1",
+"ciudad": "Montreal",
+"pais": "CA",
+"lat": 45.5,
+"lon": -73.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "cn-north-1",
+"ciudad": "Pekín",
+"pais": "CN",
+"lat": 39.9,
+"lon": 116.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ap-southeast-3",
+"ciudad": "Yakarta",
+"pais": "ID",
+"lat": -6.2,
+"lon": 106.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ap-northeast-3",
+"ciudad": "Osaka",
+"pais": "JP",
+"lat": 34.7,
+"lon": 135.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "us-gov-east-1",
+"ciudad": "Ohio (GovCloud)",
+"pais": "US",
+"lat": 40.0,
+"lon": -83.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "us-gov-west-1",
+"ciudad": "Oregón (GovCloud)",
+"pais": "US",
+"lat": 45.8,
+"lon": -119.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "cn-northwest-1",
+"ciudad": "Ningxia (Zhongwei)",
+"pais": "CN",
+"lat": 37.5,
+"lon": 105.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "me-south-1",
+"ciudad": "Baréin",
+"pais": "BH",
+"lat": 26.1,
+"lon": 50.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "af-south-1",
+"ciudad": "Ciudad del Cabo",
+"pais": "ZA",
+"lat": -33.9,
+"lon": 18.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ca-west-1",
+"ciudad": "Calgary",
+"pais": "CA",
+"lat": 51.0,
+"lon": -114.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "eu-north-1",
+"ciudad": "Estocolmo",
+"pais": "SE",
+"lat": 59.3,
+"lon": 18.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "eu-south-2",
+"ciudad": "Aragón (Zaragoza)",
+"pais": "ES",
+"lat": 41.6,
+"lon": -0.9,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "eu-central-2",
+"ciudad": "Zúrich",
+"pais": "CH",
+"lat": 47.4,
+"lon": 8.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ap-southeast-4",
+"ciudad": "Melbourne",
+"pais": "AU",
+"lat": -37.8,
+"lon": 145.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "ap-south-2",
+"ciudad": "Hyderabad",
+"pais": "IN",
+"lat": 17.4,
+"lon": 78.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "aws",
+"region": "eusc-de-east-1",
+"ciudad": "Brandeburgo (nube soberana europea)",
+"pais": "DE",
+"lat": 52.4,
+"lon": 13.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "africa-south1",
+"ciudad": "Johannesburgo",
+"pais": "ZA",
+"lat": -26.2,
+"lon": 28.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "asia-east1",
+"ciudad": "Changhua, Taiwán",
+"pais": "TW",
+"lat": 24.1,
+"lon": 120.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "asia-east2",
+"ciudad": "Hong Kong",
+"pais": "HK",
+"lat": 22.3,
+"lon": 114.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "asia-northeast1",
+"ciudad": "Tokio",
+"pais": "JP",
+"lat": 35.7,
+"lon": 139.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "asia-northeast2",
+"ciudad": "Osaka",
+"pais": "JP",
+"lat": 34.7,
+"lon": 135.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "asia-northeast3",
+"ciudad": "Seúl",
+"pais": "KR",
+"lat": 37.6,
+"lon": 127.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "asia-south1",
+"ciudad": "Bombay",
+"pais": "IN",
+"lat": 19.1,
+"lon": 72.9,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "asia-south2",
+"ciudad": "Delhi",
+"pais": "IN",
+"lat": 28.6,
+"lon": 77.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "asia-southeast1",
+"ciudad": "Jurong West, Singapur",
+"pais": "SG",
+"lat": 1.3,
+"lon": 103.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "asia-southeast2",
+"ciudad": "Yakarta",
+"pais": "ID",
+"lat": -6.2,
+"lon": 106.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "australia-southeast1",
+"ciudad": "Sídney",
+"pais": "AU",
+"lat": -33.9,
+"lon": 151.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "australia-southeast2",
+"ciudad": "Melbourne",
+"pais": "AU",
+"lat": -37.8,
+"lon": 145.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "europe-central2",
+"ciudad": "Varsovia",
+"pais": "PL",
+"lat": 52.2,
+"lon": 21.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "europe-north1",
+"ciudad": "Hamina, Finlandia",
+"pais": "FI",
+"lat": 60.6,
+"lon": 27.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "europe-north2",
+"ciudad": "Estocolmo",
+"pais": "SE",
+"lat": 59.3,
+"lon": 18.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "europe-southwest1",
+"ciudad": "Madrid",
+"pais": "ES",
+"lat": 40.4,
+"lon": -3.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "europe-west1",
+"ciudad": "St. Ghislain, Bélgica",
+"pais": "BE",
+"lat": 50.5,
+"lon": 3.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "europe-west10",
+"ciudad": "Berlín",
+"pais": "DE",
+"lat": 52.5,
+"lon": 13.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "europe-west12",
+"ciudad": "Turín",
+"pais": "IT",
+"lat": 45.1,
+"lon": 7.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "europe-west2",
+"ciudad": "Londres",
+"pais": "GB",
+"lat": 51.5,
+"lon": -0.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "europe-west3",
+"ciudad": "Fráncfort",
+"pais": "DE",
+"lat": 50.1,
+"lon": 8.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "europe-west4",
+"ciudad": "Eemshaven, Países Bajos",
+"pais": "NL",
+"lat": 53.4,
+"lon": 6.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "europe-west6",
+"ciudad": "Zúrich",
+"pais": "CH",
+"lat": 47.4,
+"lon": 8.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "europe-west8",
+"ciudad": "Milán",
+"pais": "IT",
+"lat": 45.5,
+"lon": 9.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "europe-west9",
+"ciudad": "París",
+"pais": "FR",
+"lat": 48.9,
+"lon": 2.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "me-central1",
+"ciudad": "Doha",
+"pais": "QA",
+"lat": 25.3,
+"lon": 51.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "me-central2",
+"ciudad": "Dammam",
+"pais": "SA",
+"lat": 26.4,
+"lon": 50.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "me-west1",
+"ciudad": "Tel Aviv",
+"pais": "IL",
+"lat": 32.1,
+"lon": 34.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "northamerica-northeast1",
+"ciudad": "Montreal",
+"pais": "CA",
+"lat": 45.5,
+"lon": -73.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "northamerica-northeast2",
+"ciudad": "Toronto",
+"pais": "CA",
+"lat": 43.7,
+"lon": -79.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "northamerica-south1",
+"ciudad": "Querétaro",
+"pais": "MX",
+"lat": 20.6,
+"lon": -100.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "southamerica-east1",
+"ciudad": "Osasco (São Paulo)",
+"pais": "BR",
+"lat": -23.5,
+"lon": -46.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "southamerica-west1",
+"ciudad": "Santiago de Chile",
+"pais": "CL",
+"lat": -33.4,
+"lon": -70.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "us-central1",
+"ciudad": "Council Bluffs, Iowa",
+"pais": "US",
+"lat": 41.3,
+"lon": -95.9,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "us-east1",
+"ciudad": "Moncks Corner, Carolina del Sur",
+"pais": "US",
+"lat": 33.2,
+"lon": -80.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "us-east4",
+"ciudad": "Ashburn, Virginia",
+"pais": "US",
+"lat": 39.0,
+"lon": -77.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "us-east5",
+"ciudad": "Columbus, Ohio",
+"pais": "US",
+"lat": 40.0,
+"lon": -83.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "us-south1",
+"ciudad": "Dallas, Texas",
+"pais": "US",
+"lat": 32.8,
+"lon": -96.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "us-west1",
+"ciudad": "The Dalles, Oregón",
+"pais": "US",
+"lat": 45.6,
+"lon": -121.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "us-west2",
+"ciudad": "Los Ángeles",
+"pais": "US",
+"lat": 34.1,
+"lon": -118.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "us-west3",
+"ciudad": "Salt Lake City",
+"pais": "US",
+"lat": 40.8,
+"lon": -111.9,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
+"region": "us-west4",
+"ciudad": "Las Vegas",
+"pais": "US",
+"lat": 36.2,
+"lon": -115.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "australiacentral2",
+"ciudad": "Canberra",
+"pais": "AU",
+"lat": -35.3,
+"lon": 149.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "australiacentral",
+"ciudad": "Canberra",
+"pais": "AU",
+"lat": -35.3,
+"lon": 149.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "australiaeast",
+"ciudad": "Nueva Gales del Sur (Sídney)",
+"pais": "AU",
+"lat": -33.9,
+"lon": 151.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "australiasoutheast",
+"ciudad": "Victoria (Melbourne)",
+"pais": "AU",
+"lat": -37.8,
+"lon": 145.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "brazilsouth",
+"ciudad": "São Paulo",
+"pais": "BR",
+"lat": -23.5,
+"lon": -46.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "canadacentral",
+"ciudad": "Toronto",
+"pais": "CA",
+"lat": 43.7,
+"lon": -79.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "canadaeast",
+"ciudad": "Quebec",
+"pais": "CA",
+"lat": 46.8,
+"lon": -71.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "centralindia",
+"ciudad": "Pune",
+"pais": "IN",
+"lat": 18.5,
+"lon": 73.9,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "centraluseuap",
+"ciudad": "Iowa (Des Moines)",
+"pais": "US",
+"lat": 41.6,
+"lon": -93.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "centralus",
+"ciudad": "Iowa (Des Moines)",
+"pais": "US",
+"lat": 41.6,
+"lon": -93.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "eastasia",
+"ciudad": "Hong Kong",
+"pais": "HK",
+"lat": 22.3,
+"lon": 114.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "eastus2euap",
+"ciudad": "Virginia",
+"pais": "US",
+"lat": 36.7,
+"lon": -78.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "eastus2",
+"ciudad": "Virginia",
+"pais": "US",
+"lat": 36.7,
+"lon": -78.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "eastus",
+"ciudad": "Virginia",
+"pais": "US",
+"lat": 36.7,
+"lon": -78.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "centralfrance",
+"ciudad": "París",
+"pais": "FR",
+"lat": 48.9,
+"lon": 2.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "southfrance",
+"ciudad": "Marsella",
+"pais": "FR",
+"lat": 43.3,
+"lon": 5.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "germanywc",
+"ciudad": "Fráncfort",
+"pais": "DE",
+"lat": 50.1,
+"lon": 8.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "indonesiacentral",
+"ciudad": "Yakarta",
+"pais": "ID",
+"lat": -6.2,
+"lon": 106.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "israelcentral",
+"ciudad": "Israel",
+"pais": "IL",
+"lat": 32.1,
+"lon": 34.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "italynorth",
+"ciudad": "Milán",
+"pais": "IT",
+"lat": 45.5,
+"lon": 9.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "japaneast",
+"ciudad": "Tokio, Saitama",
+"pais": "JP",
+"lat": 35.7,
+"lon": 139.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "japanwest",
+"ciudad": "Osaka",
+"pais": "JP",
+"lat": 34.7,
+"lon": 135.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "koreacentral",
+"ciudad": "Seúl",
+"pais": "KR",
+"lat": 37.6,
+"lon": 127.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "koreasouth",
+"ciudad": "Busan",
+"pais": "KR",
+"lat": 35.2,
+"lon": 129.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "malaysiawest",
+"ciudad": "Kuala Lumpur",
+"pais": "MY",
+"lat": 3.1,
+"lon": 101.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "mexicocentral",
+"ciudad": "Querétaro",
+"pais": "MX",
+"lat": 20.6,
+"lon": -100.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "newzealandnorth",
+"ciudad": "Auckland",
+"pais": "NZ",
+"lat": -36.8,
+"lon": 174.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "northcentralus",
+"ciudad": "Illinois (Chicago)",
+"pais": "US",
+"lat": 41.9,
+"lon": -87.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "northeurope",
+"ciudad": "Irlanda (Dublín)",
+"pais": "IE",
+"lat": 53.3,
+"lon": -6.3,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "norwaye",
+"ciudad": "Oslo",
+"pais": "NO",
+"lat": 59.9,
+"lon": 10.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "polandcentral",
+"ciudad": "Varsovia",
+"pais": "PL",
+"lat": 52.2,
+"lon": 21.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "qatarcentral",
+"ciudad": "Doha",
+"pais": "QA",
+"lat": 25.3,
+"lon": 51.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "southafricanorth",
+"ciudad": "Johannesburgo",
+"pais": "ZA",
+"lat": -26.2,
+"lon": 28.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "southafricawest",
+"ciudad": "Ciudad del Cabo",
+"pais": "ZA",
+"lat": -33.9,
+"lon": 18.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "southcentralus",
+"ciudad": "Texas (San Antonio)",
+"pais": "US",
+"lat": 29.4,
+"lon": -98.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "southindia",
+"ciudad": "Chennai",
+"pais": "IN",
+"lat": 13.1,
+"lon": 80.3,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "southeastasia",
+"ciudad": "Singapur",
+"pais": "SG",
+"lat": 1.3,
+"lon": 103.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "spaincentral",
+"ciudad": "Madrid",
+"pais": "ES",
+"lat": 40.4,
+"lon": -3.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "swedencentral",
+"ciudad": "Gävle",
+"pais": "SE",
+"lat": 60.7,
+"lon": 17.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "switzerlandn",
+"ciudad": "Zúrich",
+"pais": "CH",
+"lat": 47.4,
+"lon": 8.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "uaecentral",
+"ciudad": "Abu Dabi",
+"pais": "AE",
+"lat": 24.5,
+"lon": 54.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "uaenorth",
+"ciudad": "Dubái",
+"pais": "AE",
+"lat": 25.2,
+"lon": 55.3,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "uksouth",
+"ciudad": "Londres",
+"pais": "GB",
+"lat": 51.5,
+"lon": -0.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "ukwest",
+"ciudad": "Cardiff",
+"pais": "GB",
+"lat": 51.5,
+"lon": -3.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "westcentralus",
+"ciudad": "Wyoming (Cheyenne)",
+"pais": "US",
+"lat": 41.1,
+"lon": -104.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "westeurope",
+"ciudad": "Países Bajos (Ámsterdam)",
+"pais": "NL",
+"lat": 52.4,
+"lon": 4.9,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "westindia",
+"ciudad": "Bombay",
+"pais": "IN",
+"lat": 19.1,
+"lon": 72.9,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "westus2",
+"ciudad": "Washington (Quincy)",
+"pais": "US",
+"lat": 47.2,
+"lon": -119.9,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "westus3",
+"ciudad": "Arizona (Phoenix)",
+"pais": "US",
+"lat": 33.4,
+"lon": -112.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "westus",
+"ciudad": "California",
+"pais": "US",
+"lat": 37.8,
+"lon": -122.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "mx-monterrey-1",
+"ciudad": "Monterrey",
+"pais": "MX",
+"lat": 25.7,
+"lon": -100.3,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "ca-toronto-1",
+"ciudad": "Toronto",
+"pais": "CA",
+"lat": 43.7,
+"lon": -79.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "eu-madrid-1",
+"ciudad": "Madrid",
+"pais": "ES",
+"lat": 40.4,
+"lon": -3.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "me-abudhabi-1",
+"ciudad": "Abu Dabi",
+"pais": "AE",
+"lat": 24.5,
+"lon": 54.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "ap-seoul-1",
+"ciudad": "Seúl",
+"pais": "KR",
+"lat": 37.6,
+"lon": 127.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "ap-osaka-1",
+"ciudad": "Osaka",
+"pais": "JP",
+"lat": 34.7,
+"lon": 135.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "sa-saopaulo-1",
+"ciudad": "São Paulo",
+"pais": "BR",
+"lat": -23.5,
+"lon": -46.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "us-chicago-1",
+"ciudad": "Chicago",
+"pais": "US",
+"lat": 41.9,
+"lon": -87.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "us-sanjose-1",
+"ciudad": "San José, California",
+"pais": "US",
+"lat": 37.3,
+"lon": -121.9,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "ap-hyderabad-1",
+"ciudad": "Hyderabad",
+"pais": "IN",
+"lat": 17.4,
+"lon": 78.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "ca-montreal-1",
+"ciudad": "Montreal",
+"pais": "CA",
+"lat": 45.5,
+"lon": -73.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "me-jeddah-1",
+"ciudad": "Yeda",
+"pais": "SA",
+"lat": 21.5,
+"lon": 39.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "eu-stockholm-1",
+"ciudad": "Estocolmo",
+"pais": "SE",
+"lat": 59.3,
+"lon": 18.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "eu-marseille-1",
+"ciudad": "Marsella",
+"pais": "FR",
+"lat": 43.3,
+"lon": 5.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "eu-milan-1",
+"ciudad": "Milán",
+"pais": "IT",
+"lat": 45.5,
+"lon": 9.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "uk-london-1",
+"ciudad": "Londres",
+"pais": "GB",
+"lat": 51.5,
+"lon": -0.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "eu-frankfurt-1",
+"ciudad": "Fráncfort",
+"pais": "DE",
+"lat": 50.1,
+"lon": 8.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "ap-mumbai-1",
+"ciudad": "Bombay",
+"pais": "IN",
+"lat": 19.1,
+"lon": 72.9,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "il-jerusalem-1",
+"ciudad": "Jerusalén",
+"pais": "IL",
+"lat": 31.8,
+"lon": 35.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "me-riyadh-1",
+"ciudad": "Riad",
+"pais": "SA",
+"lat": 24.7,
+"lon": 46.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "af-johannesburg-1",
+"ciudad": "Johannesburgo",
+"pais": "ZA",
+"lat": -26.2,
+"lon": 28.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "eu-amsterdam-1",
+"ciudad": "Ámsterdam",
+"pais": "NL",
+"lat": 52.4,
+"lon": 4.9,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "me-dubai-1",
+"ciudad": "Dubái",
+"pais": "AE",
+"lat": 25.2,
+"lon": 55.3,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "uk-cardiff-1",
+"ciudad": "Newport (Gales)",
+"pais": "GB",
+"lat": 51.6,
+"lon": -3.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "eu-paris-1",
+"ciudad": "París",
+"pais": "FR",
+"lat": 48.9,
+"lon": 2.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "us-ashburn-1",
+"ciudad": "Ashburn, Virginia",
+"pais": "US",
+"lat": 39.0,
+"lon": -77.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "sa-santiago-1",
+"ciudad": "Santiago de Chile",
+"pais": "CL",
+"lat": -33.4,
+"lon": -70.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "ap-sydney-1",
+"ciudad": "Sídney",
+"pais": "AU",
+"lat": -33.9,
+"lon": 151.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "us-phoenix-1",
+"ciudad": "Phoenix, Arizona",
+"pais": "US",
+"lat": 33.4,
+"lon": -112.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "ap-singapore-1",
+"ciudad": "Singapur",
+"pais": "SG",
+"lat": 1.3,
+"lon": 103.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "ap-chuncheon-1",
+"ciudad": "Chuncheon",
+"pais": "KR",
+"lat": 37.9,
+"lon": 127.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "ap-melbourne-1",
+"ciudad": "Melbourne",
+"pais": "AU",
+"lat": -37.8,
+"lon": 145.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "ap-tokyo-1",
+"ciudad": "Tokio",
+"pais": "JP",
+"lat": 35.7,
+"lon": 139.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "eu-zurich-1",
+"ciudad": "Zúrich",
+"pais": "CH",
+"lat": 47.4,
+"lon": 8.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "sa-vinhedo-1",
+"ciudad": "Vinhedo",
+"pais": "BR",
+"lat": -23.0,
+"lon": -47.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "mx-queretaro-1",
+"ciudad": "Querétaro",
+"pais": "MX",
+"lat": 20.6,
+"lon": -100.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "sa-valparaiso-1",
+"ciudad": "Valparaíso",
+"pais": "CL",
+"lat": -33.0,
+"lon": -71.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "sa-bogota-1",
+"ciudad": "Bogotá",
+"pais": "CO",
+"lat": 4.7,
+"lon": -74.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "do",
+"region": "Amsterdam|NL",
+"ciudad": "Amsterdam, North Holland",
+"pais": "NL",
+"lat": 52.37,
+"lon": 4.89,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "do",
+"region": "North Bergen|US",
+"ciudad": "North Bergen, New Jersey",
+"pais": "US",
+"lat": 40.8,
+"lon": -74.01,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "do",
+"region": "Santa Clara|US",
+"ciudad": "Santa Clara, California",
+"pais": "US",
+"lat": 37.35,
+"lon": -121.96,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "do",
+"region": "San Francisco|US",
+"ciudad": "San Francisco, California",
+"pais": "US",
+"lat": 37.77,
+"lon": -122.42,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "do",
+"region": "Clifton|US",
+"ciudad": "Clifton, New Jersey",
+"pais": "US",
+"lat": 40.86,
+"lon": -74.16,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "do",
+"region": "Secaucus|US",
+"ciudad": "Secaucus, New Jersey",
+"pais": "US",
+"lat": 40.79,
+"lon": -74.06,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "do",
+"region": "London|GB",
+"ciudad": "London, England",
+"pais": "GB",
+"lat": 51.51,
+"lon": -0.13,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "do",
+"region": "Frankfurt am Main|DE",
+"ciudad": "Frankfurt am Main, Hesse",
+"pais": "DE",
+"lat": 50.12,
+"lon": 8.68,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "do",
+"region": "Bengaluru|IN",
+"ciudad": "Bengaluru, Karnataka",
+"pais": "IN",
+"lat": 12.97,
+"lon": 77.59,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "do",
+"region": "Singapore|SG",
+"ciudad": "Singapore",
+"pais": "SG",
+"lat": 1.29,
+"lon": 103.85,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "do",
+"region": "Toronto|CA",
+"ciudad": "Toronto, Ontario",
+"pais": "CA",
+"lat": 43.71,
+"lon": -79.4,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "do",
+"region": "Douglasville|US",
+"ciudad": "Douglasville, Georgia",
+"pais": "US",
+"lat": 33.75,
+"lon": -84.75,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "do",
+"region": "Sydney|AU",
+"ciudad": "Sydney, New South Wales",
+"pais": "AU",
+"lat": -33.87,
+"lon": 151.21,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "do",
+"region": "Kansas City|US",
+"ciudad": "Kansas City, Missouri",
+"pais": "US",
+"lat": 39.1,
+"lon": -94.58,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "do",
+"region": "Memphis|US",
+"ciudad": "Memphis, Tennessee",
+"pais": "US",
+"lat": 35.15,
+"lon": -90.05,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Richardson|US",
+"ciudad": "Richardson, Texas",
+"pais": "US",
+"lat": 32.95,
+"lon": -96.73,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Fremont|US",
+"ciudad": "Fremont, California",
+"pais": "US",
+"lat": 37.55,
+"lon": -121.99,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Atlanta|US",
+"ciudad": "Atlanta, Georgia",
+"pais": "US",
+"lat": 33.75,
+"lon": -84.39,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "London|GB",
+"ciudad": "London, England",
+"pais": "GB",
+"lat": 51.51,
+"lon": -0.13,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Singapore|SG",
+"ciudad": "Singapore",
+"pais": "SG",
+"lat": 1.29,
+"lon": 103.85,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Frankfurt am Main|DE",
+"ciudad": "Frankfurt am Main, Hesse",
+"pais": "DE",
+"lat": 50.12,
+"lon": 8.68,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Tokyo|JP",
+"ciudad": "Tokyo, Tokyo",
+"pais": "JP",
+"lat": 35.69,
+"lon": 139.69,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Mumbai|IN",
+"ciudad": "Mumbai, Maharashtra",
+"pais": "IN",
+"lat": 19.07,
+"lon": 72.88,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Toronto|CA",
+"ciudad": "Toronto, Ontario",
+"pais": "CA",
+"lat": 43.71,
+"lon": -79.4,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Sydney|AU",
+"ciudad": "Sydney, New South Wales",
+"pais": "AU",
+"lat": -33.87,
+"lon": 151.21,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Ashburn|US",
+"ciudad": "Ashburn, Virginia",
+"pais": "US",
+"lat": 39.04,
+"lon": -77.49,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Chicago|US",
+"ciudad": "Chicago, Illinois",
+"pais": "US",
+"lat": 41.85,
+"lon": -87.65,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Paris|FR",
+"ciudad": "Paris, Île-de-France",
+"pais": "FR",
+"lat": 48.85,
+"lon": 2.35,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Tukwila|US",
+"ciudad": "Tukwila, Washington",
+"pais": "US",
+"lat": 47.47,
+"lon": -122.26,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "São Paulo|BR",
+"ciudad": "São Paulo, São Paulo",
+"pais": "BR",
+"lat": -23.55,
+"lon": -46.64,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Amsterdam|NL",
+"ciudad": "Amsterdam, North Holland",
+"pais": "NL",
+"lat": 52.37,
+"lon": 4.89,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Stockholm|SE",
+"ciudad": "Stockholm, Stockholm",
+"pais": "SE",
+"lat": 59.33,
+"lon": 18.07,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Madrid|ES",
+"ciudad": "Madrid, Madrid",
+"pais": "ES",
+"lat": 40.42,
+"lon": -3.7,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Chennai|IN",
+"ciudad": "Chennai, Tamil Nadu",
+"pais": "IN",
+"lat": 13.09,
+"lon": 80.28,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Osaka|JP",
+"ciudad": "Osaka, Osaka",
+"pais": "JP",
+"lat": 34.69,
+"lon": 135.5,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Milan|IT",
+"ciudad": "Milan, Lombardy",
+"pais": "IT",
+"lat": 45.46,
+"lon": 9.19,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Miami|US",
+"ciudad": "Miami, Florida",
+"pais": "US",
+"lat": 25.77,
+"lon": -80.19,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Jakarta|ID",
+"ciudad": "Jakarta, Jakarta",
+"pais": "ID",
+"lat": -6.21,
+"lon": 106.85,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Los Angeles|US",
+"ciudad": "Los Angeles, California",
+"pais": "US",
+"lat": 34.05,
+"lon": -118.24,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Auckland|NZ",
+"ciudad": "Auckland, Auckland",
+"pais": "NZ",
+"lat": -36.85,
+"lon": 174.76,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Denver|US",
+"ciudad": "Denver, Colorado",
+"pais": "US",
+"lat": 39.74,
+"lon": -104.98,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Hamburg|DE",
+"ciudad": "Hamburg, Hamburg",
+"pais": "DE",
+"lat": 53.55,
+"lon": 9.99,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Johannesburg|ZA",
+"ciudad": "Johannesburg, Gauteng",
+"pais": "ZA",
+"lat": -26.2,
+"lon": 28.04,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Kuala Lumpur|MY",
+"ciudad": "Kuala Lumpur, Kuala Lumpur",
+"pais": "MY",
+"lat": 3.14,
+"lon": 101.69,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Santiago de Querétaro|MX",
+"ciudad": "Santiago de Querétaro, Querétaro",
+"pais": "MX",
+"lat": 20.59,
+"lon": -100.39,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Houston|US",
+"ciudad": "Houston, Texas",
+"pais": "US",
+"lat": 29.76,
+"lon": -95.36,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Santiago|CL",
+"ciudad": "Santiago, Santiago Metropolitan",
+"pais": "CL",
+"lat": -33.46,
+"lon": -70.65,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Melbourne|AU",
+"ciudad": "Melbourne, Victoria",
+"pais": "AU",
+"lat": -37.81,
+"lon": 144.96,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Berlin|DE",
+"ciudad": "Berlin, State of Berlin",
+"pais": "DE",
+"lat": 52.52,
+"lon": 13.41,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Oslo|NO",
+"ciudad": "Oslo, Oslo",
+"pais": "NO",
+"lat": 59.91,
+"lon": 10.75,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Reno|US",
+"ciudad": "Reno, Nevada",
+"pais": "US",
+"lat": 39.53,
+"lon": -119.81,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Bogotá|CO",
+"ciudad": "Bogotá, Bogota D.C.",
+"pais": "CO",
+"lat": 4.61,
+"lon": -74.08,
+"fuente": "geofeed del operador"
+},
+{
+"proveedor": "linode",
+"region": "Marseille|FR",
+"ciudad": "Marseille, Provence-Alpes-Côte d'Azur",
+"pais": "FR",
+"lat": 43.3,
+"lon": 5.38,
+"fuente": "geofeed del operador"
+}
+]
