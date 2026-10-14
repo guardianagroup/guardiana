@@ -6,6 +6,7 @@ What this installer will do
 - Copy the program to “Program Files\Guardiana”.
 - Register the “Guardiana” service, which starts with Windows.
 - Add the “Guardiana” shortcut, which opens the panel in your browser, to the Start menu and the desktop, and the “Guardiana (menu)” shortcut to the Start menu.
+- Also install GUARDIANA ZERO, the browser that sees the full address of every request, in “Program Files\Guardiana\ZERO”, with its shortcut in the Start menu and on the desktop. It uses Microsoft Edge WebView2, which already comes with Windows. It is part of the same program and the same licence; if you do not want it, ignore it or install with ZERO=0.
 - Make GUARDIANA this PC's DNS, over IPv6 too, so it starts watching from the first minute. It first keeps an exact copy of your setting; if the service stops, the PC gets its previous DNS back, and uninstalling leaves it exactly as it was.
 
 What it will NOT do

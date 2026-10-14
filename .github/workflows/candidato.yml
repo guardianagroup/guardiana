@@ -69,6 +69,24 @@ jobs:
         with:
           name: candidato-linux
           path: paquetes
+      # GUARDIANA ZERO, the browser, goes inside the same installer since 1.0.25 (the owner:
+      # «uno solo»). It is built here, on Windows, as zero.yml builds it: WebView2 makes it a
+      # Windows program, so it is not part of the reproducible Linux-hosted build, and the
+      # installer's hash (in the public ledger) covers it.
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: zero/navegador
+      - name: GUARDIANA ZERO
+        shell: bash
+        working-directory: zero/navegador
+        run: |
+          cargo build --release --locked
+          mkdir -p "$GITHUB_WORKSPACE/zero-exe"
+          cp target/release/guardiana-zero.exe "$GITHUB_WORKSPACE/zero-exe/GUARDIANA ZERO.exe"
+          echo "::notice title=GUARDIANA ZERO.exe (dentro de los MSI)::$(sha256sum "$GITHUB_WORKSPACE/zero-exe/GUARDIANA ZERO.exe" | cut -d' ' -f1)"
       - name: WiX 5 y los tres MSI
         shell: pwsh
         run: |
@@ -80,7 +98,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path msi | Out-Null
           foreach ($idioma in @("es", "en", "pt")) {
             $sufijo = if ($idioma -eq "es") { "" } else { "-$idioma" }
-            $salida = & powershell -NoProfile -ExecutionPolicy Bypass -File build/msi.ps1 -Exe $exe -Version $version -Idioma $idioma -Out "msi/guardiana-$version-windows-x64$sufijo.msi" 2>&1 | Out-String
+            $salida = & powershell -NoProfile -ExecutionPolicy Bypass -File build/msi.ps1 -Exe $exe -Version $version -Idioma $idioma -ZeroExe "zero-exe/GUARDIANA ZERO.exe" -Out "msi/guardiana-$version-windows-x64$sufijo.msi" 2>&1 | Out-String
             Write-Output $salida
             if ($LASTEXITCODE -ne 0) { Write-Output "::error title=msi.ps1 $idioma::$($salida -replace "`r?`n", ' | ')"; exit 1 }
           }

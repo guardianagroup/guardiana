@@ -67,7 +67,9 @@
     <MediaTemplate EmbedCab="yes" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="Guardiana" />
+      <Directory Id="INSTALLFOLDER" Name="Guardiana">
+        <Directory Id="ZERODIR" Name="ZERO" />
+      </Directory>
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="MenuDir" Name="Guardiana" />
@@ -140,6 +142,45 @@
                 WorkingDirectory="INSTALLFOLDER" />
       <RegistryValue Root="HKCU" Key="Software\Guardiana" Name="desktop" Type="integer" Value="1" KeyPath="yes" />
     </Component>
+
+<?ifdef ZeroExe ?>
+    <!-- One program (the owner, 13 Oct 2026: «instalando solo uno ya lo tiene todo»): the browser
+         GUARDIANA ZERO travels inside GUARDIANA's installer, installed by default under
+         Program Files\Guardiana\ZERO with its shortcuts. Same version, same licence. It uses
+         Microsoft Edge WebView2, which Windows 10 and 11 already carry, so it adds about 10 MB.
+         `msiexec /i ... ZERO=0` installs GUARDIANA alone. Its data stays per user in
+         %LOCALAPPDATA%\GUARDIANA ZERO, the same folder the separate ZERO installer used, so a
+         person who had it keeps everything. A running ZERO is asked to close (its own X) before
+         its file is replaced or removed. -->
+    <Property Id="ZERO" Value="1" Secure="yes" />
+    <util:CloseApplication Id="CerrarZero" Target="GUARDIANA ZERO.exe" CloseMessage="yes" RebootPrompt="no" Timeout="30" />
+    <Icon Id="zero.ico" SourceFile="$(var.ZeroIcon)" />
+    <Feature Id="Zero" Title="GUARDIANA ZERO" Level="1">
+      <Level Value="0" Condition="ZERO=&quot;0&quot;" />
+      <ComponentRef Id="ZeroExe" />
+      <ComponentRef Id="ZeroMenu" />
+      <ComponentRef Id="ZeroEscritorio" />
+    </Feature>
+    <Component Id="ZeroExe" Directory="ZERODIR" Guid="5e0c7a31-8d24-4f6b-b9a2-3c1d7e8f4a95">
+      <File Id="ZeroExeFile" Name="GUARDIANA ZERO.exe" Source="$(var.ZeroExe)" KeyPath="yes" />
+    </Component>
+    <Component Id="ZeroMenu" Directory="MenuDir" Guid="8b3f1d62-4a7c-4e95-a0d8-6f2c9b1e7d34">
+      <Shortcut Id="ZeroMenuShortcut"
+                Name="GUARDIANA ZERO"
+                Target="[ZERODIR]GUARDIANA ZERO.exe"
+                Icon="zero.ico"
+                WorkingDirectory="ZERODIR" />
+      <RegistryValue Root="HKCU" Key="Software\Guardiana" Name="zero" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+    <Component Id="ZeroEscritorio" Directory="DesktopFolder" Guid="c4a8e2f7-1b6d-4c3e-8f50-9d7a2e6b1c83">
+      <Shortcut Id="ZeroDesktopShortcut"
+                Name="GUARDIANA ZERO"
+                Target="[ZERODIR]GUARDIANA ZERO.exe"
+                Icon="zero.ico"
+                WorkingDirectory="ZERODIR" />
+      <RegistryValue Root="HKCU" Key="Software\Guardiana" Name="zeroescritorio" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+<?endif ?>
 
     <!-- Uninstall only: after the service is stopped and before it is deleted.
          Not on upgrade (UPGRADINGPRODUCTCODE) and not on repair (REINSTALL): a

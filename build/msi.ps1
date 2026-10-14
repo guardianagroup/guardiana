@@ -18,6 +18,9 @@ param(
     [Parameter(Mandatory = $true)][string]$Out,
     [ValidateSet("es", "en", "pt")][string]$Idioma = "es",
     [string]$Wix = "wix",
+    # GUARDIANA ZERO, the browser, inside the same installer (1.0.25): the path to
+    # «GUARDIANA ZERO.exe» built from zero/navegador. Without it the MSI carries GUARDIANA alone.
+    [string]$ZeroExe = "",
     [string]$CertSha1 = "",
     [string]$SignTool = "",
     [string]$TimestampUrl = "http://time.certum.pl"
@@ -56,7 +59,17 @@ if ($Wix -like "*.dll") { $cmd = "dotnet"; $pre = @($Wix) } else { $cmd = $Wix; 
 # The UI and Util extensions (WixUI_Minimal, WixShellExec) come from NuGet once:
 #   dotnet wix.dll extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
 Write-Host "idioma del instalador: $Idioma ($cultura, LCID $lcid)"
-& $cmd @pre build -arch x64 -culture $cultura -loc $loc -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d "Version=$Version" -d "Lang=$lcid" -d "Exe=$Exe" -d "Readme=$readme" -d "Welcome=$welcome" -d "Dialogo=$dialogo" -d "Icon=$icon" -o $Out $wxs
+$conZero = @()
+if ($ZeroExe) {
+    if (-not (Test-Path $ZeroExe)) { throw "No existe $ZeroExe" }
+    $zfv = (Get-Item $ZeroExe).VersionInfo.FileVersion
+    if ([string]::IsNullOrWhiteSpace($zfv)) { throw "$ZeroExe no tiene FileVersion" }
+    Write-Host "GUARDIANA ZERO.exe FileVersion = $zfv"
+    $zicon = Join-Path (Split-Path -Parent $here) "zero\navegador\recursos\guardiana-zero.ico"
+    if (-not (Test-Path $zicon)) { throw "Falta $zicon" }
+    $conZero = @("-d", "ZeroExe=$ZeroExe", "-d", "ZeroIcon=$zicon")
+}
+& $cmd @pre build -arch x64 -culture $cultura -loc $loc -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d "Version=$Version" -d "Lang=$lcid" -d "Exe=$Exe" -d "Readme=$readme" -d "Welcome=$welcome" -d "Dialogo=$dialogo" -d "Icon=$icon" @conZero -o $Out $wxs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 # Code signing of the MSI itself (decision 66): the installer is what the person double-clicks, so
 # it must carry the certificate too, not only guardiana.exe. Pass -CertSha1 with the thumbprint of

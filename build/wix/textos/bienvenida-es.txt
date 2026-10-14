@@ -6,6 +6,7 @@ Qué va a hacer este instalador
 - Copiar el programa a «Archivos de programa\Guardiana».
 - Registrar el servicio «Guardiana», que arranca solo con Windows.
 - Crear en el menú Inicio y en el escritorio el acceso «Guardiana», que abre el panel en tu navegador, y en el menú Inicio el acceso «Guardiana (menú)».
+- Instalar también GUARDIANA ZERO, el navegador que ve la dirección entera de cada petición, en «Archivos de programa\Guardiana\ZERO», con su acceso en el menú Inicio y en el escritorio. Usa Microsoft Edge WebView2, que ya viene con Windows. Es parte del mismo programa y de la misma licencia; si no lo quieres, ignóralo o instala con ZERO=0.
 - Poner a GUARDIANA como DNS de este PC, también por IPv6, para que empiece a mirar desde el primer minuto. Antes guarda una copia exacta de tu ajuste; si el servicio se para, el PC recupera su DNS de antes, y al desinstalar queda tal como estaba.
 
 Qué NO va a hacer

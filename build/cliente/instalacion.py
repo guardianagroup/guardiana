@@ -430,6 +430,10 @@ def tarde(tipo, paquete, version):
         ok("versión", out.strip())
     else:
         mal("versión", f"esperaba {version}, dice «{out.strip()}»")
+    # One program since 1.0.25: the MSI brings the browser GUARDIANA ZERO with it.
+    if tipo == "msi":
+        zero = r"C:\Program Files\Guardiana\ZERO\GUARDIANA ZERO.exe"
+        (ok if os.path.exists(zero) else mal)("GUARDIANA ZERO viene incluido", zero)
 
     # 2. The panel, and its key.
     if esperar(lambda: panel("/", con_llave=False)[0] == 200, 30):
@@ -581,6 +585,9 @@ def tarde(tipo, paquete, version):
     (ok if servicio() == "absent" else mal)("el servicio desaparece", servicio())
     (ok if not binario() or tipo == "msi" and not os.path.exists(r"C:\Program Files\Guardiana\guardiana.exe") else mal)(
         "el programa desaparece", str(binario()))
+    if tipo == "msi":
+        zero = r"C:\Program Files\Guardiana\ZERO\GUARDIANA ZERO.exe"
+        (ok if not os.path.exists(zero) else mal)("GUARDIANA ZERO desaparece con él", zero)
     despues = dns_actual()
     if despues == antes:
         ok("el DNS queda exactamente como estaba", str(despues))
