@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Prepara los tres zip de la CI y comprueba cada archivo en binario.
-# En Windows, sha256sum a secas abre en modo texto y las huellas no cuadran.
+# Prepara los tres zip de la CI en Git Bash (Windows).
+# Extrae con PowerShell porque el tar de Git Bash no entiende .zip.
+# Comprueba cada archivo en binario. Si la carpeta queda vacía, para.
+# Si el repo local no tiene el commit de la 1.0.27, no intenta firmar.
 echo "1. Empiezo"
 DL=""
 for d in "$HOME/Downloads" "$HOME/Descargas" "/c/Users/franc/Downloads" "/c/Users/franc/Descargas"; do
@@ -9,8 +11,12 @@ done
 echo "2. Carpeta: ${DL:-NO}"
 if [ -z "$DL" ]; then echo "PARA: no hay carpeta de descargas"; exit 1; fi
 
+# Prefiere el zip sin " (1)" si existen los dos.
 uno() {
   local f
+  for f in "$DL"/$1.zip "$DL"/$1.ZIP; do
+    if [ -f "$f" ]; then echo "$f"; return 0; fi
+  done
   for f in "$DL"/$1*.zip "$DL"/$1*.ZIP; do
     if [ -f "$f" ]; then echo "$f"; return 0; fi
   done
@@ -31,13 +37,18 @@ fi
 ROOT="$DL/guardiana-1.0.27"
 rm -rf "$ROOT"
 mkdir -p "$ROOT/linux" "$ROOT/mac" "$ROOT/msi" "$ROOT/firmar"
-echo "4. Descomprimiendo"
-tar -xf "$L" -C "$ROOT/linux"
-tar -xf "$M" -C "$ROOT/mac"
-tar -xf "$W" -C "$ROOT/msi"
+echo "4. Descomprimiendo con PowerShell"
+ps() { powershell.exe -NoProfile -Command "Expand-Archive -LiteralPath '$1' -DestinationPath '$2' -Force"; }
+ps "$L" "$ROOT/linux" || { echo "PARA: no pude abrir el zip de linux"; exit 1; }
+ps "$M" "$ROOT/mac"   || { echo "PARA: no pude abrir el zip de mac"; exit 1; }
+ps "$W" "$ROOT/msi"   || { echo "PARA: no pude abrir el zip de msi"; exit 1; }
 find "$ROOT/linux" "$ROOT/mac" "$ROOT/msi" -type f -name 'guardiana*' ! -name '*.minisig' -exec cp {} "$ROOT/firmar/" \;
 echo "5. Archivos:"
-ls -1 "$ROOT/firmar"
+ls -1 "$ROOT/firmar" || true
+if [ -z "$(ls -A "$ROOT/firmar" 2>/dev/null)" ]; then
+  echo "PARA: la carpeta quedó vacía. Los zip no se abrieron."
+  exit 1
+fi
 
 huella() {
   if command -v openssl >/dev/null 2>&1; then
@@ -58,9 +69,9 @@ esperada() {
     guardiana-1.0.27-windows-x64-en.msi) echo bdfb22b1b3f0c131871fc0889f3fc4149317dae1113edc688b718b1cd1e907ac ;;
     *)
       local sums line name hash
-      for sums in $(find "$ROOT/linux" "$ROOT/mac" -name SHA256SUMS); do
+      for sums in $(find "$ROOT/linux" "$ROOT/mac" -name SHA256SUMS 2>/dev/null); do
         while IFS= read -r line || [ -n "$line" ]; do
-          line=${line%$'\r'}
+          line=${line%$''}
           hash=${line%% *}
           name=${line##* }
           name=${name#\*}
@@ -74,8 +85,10 @@ esperada() {
 echo "6. Comprobando uno por uno"
 mal=0
 lista=""
+n=0
 for f in "$ROOT/firmar"/guardiana*; do
   [ -f "$f" ] || continue
+  n=$((n+1))
   base=$(basename "$f")
   tengo=$(huella "$f")
   quiero=$(esperada "$base")
@@ -93,8 +106,8 @@ for f in "$ROOT/firmar"/guardiana*; do
     mal=1
   fi
 done
-if [ "$mal" != 0 ]; then
-  echo "7. HUELLAS MAL. Copia las lineas MAL."
+if [ "$n" -eq 0 ] || [ "$mal" != 0 ]; then
+  echo "7. HUELLAS MAL o carpeta vacía. No firmo."
   exit 1
 fi
 
@@ -121,20 +134,27 @@ do
 done
 if [ -z "$REPO" ]; then
   echo "8. No encuentro la carpeta del proyecto."
-  echo "Abre Git Bash en esa carpeta y pega esta unica linea:"
+  echo "Cuando la tengas, en ella pega:"
   echo "build/release.sh --paquetes \"$ROOT/firmar\""
   exit 0
 fi
 echo "8. Repo: $REPO"
 cd "$REPO"
+# El repo de Documents no tiene origin. No intentamos checkout si el commit no está.
+if ! git cat-file -e 7e1c56542be529a130dbc113a8a957d571e80edb^{commit} 2>/dev/null; then
+  echo "El repo local no tiene el commit de la 1.0.27 y no puedo bajarlo."
+  echo "Los archivos ya están listos en:"
+  echo "  $ROOT/firmar"
+  echo "Cuando tengas un clon bueno de guardianagroup/guardiana en el commit 7e1c565, pega:"
+  echo "build/release.sh --paquetes \"$ROOT/firmar\""
+  exit 0
+fi
 if [ -n "$(git status --porcelain)" ]; then
   echo "Hay cambios sin guardar. No firmo."
   git status --short
   exit 0
 fi
-git cat-file -e 7e1c56542be529a130dbc113a8a957d571e80edb^{commit} 2>/dev/null || git fetch origin
 git checkout 7e1c56542be529a130dbc113a8a957d571e80edb
 echo "9. Pide la contrasena de minisign.key"
 bash build/release.sh --paquetes "$ROOT/firmar"
-git push origin HEAD:main
-echo "10. FIRMADO"
+echo "10. Hecho. Si salió bien, escribe listo."
