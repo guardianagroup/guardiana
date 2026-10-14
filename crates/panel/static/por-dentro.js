@@ -93,7 +93,7 @@
     // minutes», whatever the rhythm of the data (Windows is read every 10 s).
     const CUBO_MS = 10000, N_CUBOS = 30, CADA_MEDIDA = 10;
     const st = {
-      vista: 'destinos', proy: 'mapa', filtro: 'todo', yo: paisDelEquipo(), W: 0, Wc: 0, H: 0, dpr: 1, t0: performance.now(),
+      vista: 'destinos', proy: 'globo', filtro: 'todo', yo: paisDelEquipo(), W: 0, Wc: 0, H: 0, dpr: 1, t0: performance.now(),
       dRot: 0, dTilt: 0, part: [], estallidos: [], hover: null, raton: null, dianas: [],
       serie: new Array(N_CUBOS).fill(0), serieP: {}, cuboT0: Date.now(), eventos: [], ahora: [0, 0, 0], intervalo: 5,
       datos: null, abierto: Date.now(), primeraCarga: true, ultimoGesto: performance.now(), tocado: false, vuelo: null, inercia: null, interactuando: false,
@@ -599,12 +599,12 @@
       VISIBLES.forEach((d) => {
         const bl = bloqueado(d), col = bl ? '#ff6b7a' : prod(d.p).color;
         if (bl) {
-          trazo(d.ruta, 0, d.tg, 'rgba(255,107,122,.7)', 1.3);
-          trazo(d.ruta, d.tg, 1, 'rgba(160,175,200,.16)', 1, [2, 6]);
+          trazo(d.ruta, 0, d.tg, 'rgba(255,107,122,.75)', 0.7);
+          trazo(d.ruta, d.tg, 1, 'rgba(160,175,200,.22)', 0.45, [1.2, 3.2]);
           return;
         }
-        trazo(d.ruta, 0, 1, col + '28', 2.2);
-        trazo(d.ruta, 0, 1, col + 'd0', 1.05);
+        trazo(d.ruta, 0, 1, col + '24', 1.05);
+        trazo(d.ruta, 0, 1, col + 'c8', 0.45);
       });
       // Solo el punto donde llega el dato. El nombre sale al pasar el cursor, no escrito encima.
       VISIBLES.forEach((d) => {
@@ -723,6 +723,7 @@
     const trazo = (ruta, desde, hasta, color, ancho, guion) => {
       if (!ruta.length) return;
       const n = ruta.length - 1, i0 = Math.round(desde * n), i1 = Math.round(hasta * n);
+      cx.lineCap = 'round'; cx.lineJoin = 'round';
       cx.strokeStyle = color; cx.lineWidth = ancho; cx.setLineDash(guion || []);
       cx.beginPath(); let abierto = false;
       for (let i = i0; i <= i1; i++) { const q = ruta[i]; if (q.v === false) { abierto = false; continue; } if (!abierto) { cx.moveTo(q.x, q.y); abierto = true; } else cx.lineTo(q.x, q.y); }
@@ -785,13 +786,13 @@
         if (!d.ruta.length) return;
         const bl = bloqueado(d), base = prod(d.p).color;
         if (bl) {
-          trazo(d.ruta, 0, d.tg, 'rgba(255,107,122,.7)', 1.3);
-          trazo(d.ruta, d.tg, 1, 'rgba(160,175,200,.16)', 1, [2, 6]);
+          trazo(d.ruta, 0, d.tg, 'rgba(255,107,122,.75)', 0.7);
+          trazo(d.ruta, d.tg, 1, 'rgba(160,175,200,.22)', 0.45, [1.2, 3.2]);
           const g = punto(d.ruta, d.tg), h = punto(d.ruta, d.tg + 0.01);
           if (g.v) puerta(g, Math.atan2(h.y - g.y, h.x - g.x));
         } else {
-          trazo(d.ruta, 0, 1, base + '55', 1.1);
-          trazo(d.ruta, 0, 1, base + '14', 4);
+          trazo(d.ruta, 0, 1, base + '22', 1.05);
+          trazo(d.ruta, 0, 1, base + 'c0', 0.45);
         }
       });
     };
@@ -1593,7 +1594,6 @@
       if (v !== st.vista) { st.part = []; st.estallidos = []; }
       st.vista = v;
       pulsado('.pestanas button', 'vista', v);
-      $('proy').hidden = v !== 'destinos' || !T.ok;
       $('zoom').hidden = v !== 'destinos';
       expl.hidden = v !== 'programas'; stage.dataset.vista = v; pintaExplorador();
       muestraAyuda();
@@ -1614,7 +1614,6 @@
     document.addEventListener('keydown', (e) => {
       if (/select|input|textarea/i.test(document.activeElement.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === '1' || e.key === '2') ponVista(VISTAS[+e.key - 1]);
-      else if ((e.key === 'm' || e.key === 'g') && st.vista === 'destinos' && T.ok) ponProy(e.key === 'g' ? 'globo' : 'mapa');
       else if (e.key === '+' || e.key === '=') zoomBoton(1.6);
       else if (e.key === '-') zoomBoton(1 / 1.6);
       else if (e.key === '0') zoomInicio();
@@ -1760,8 +1759,7 @@
     // What the person chose last time; the five views of 1.0.22 map onto the two that stay.
     const leido = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
     const vAntes = leido('guardiana_pd_vista');
-    if (leido('guardiana_pd_proy') !== 'globo' && vAntes !== 'globo') { T.m = 1; T.mObj = 1; }
-    ponProy(leido('guardiana_pd_proy') === 'globo' || vAntes === 'globo' ? 'globo' : 'mapa');
+    ponProy('globo');
     const f0 = leido('guardiana_pd_filtro');
     st.filtro = ['todo', 'datos', 'av'].includes(f0) ? f0 : 'todo'; pulsado('#filtro button', 'filtro', st.filtro);
     ponVista(vAntes === 'programas' || vAntes === 'dentro' ? 'programas' : 'destinos');
