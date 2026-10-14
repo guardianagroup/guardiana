@@ -28,6 +28,7 @@
     <div class="controles">
       <span class="lugar-yo" title=""><span data-t="pd_tu_pais">Tu ordenador está en</span> <b id="yo"></b></span>
       <button type="button" class="btn-hud" id="precisar" data-t="pd_precisar">◎ Precisar</button>
+      <button type="button" class="btn-hud" id="corregir-lugar" data-t="pd_corregir">Corregir ciudad</button>
       <span class="en-vivo" role="status"><i aria-hidden="true"></i><span data-t="pd_en_vivo">En vivo</span></span>
       <button type="button" class="btn-hud graba" id="grabar" aria-pressed="false" data-t="pd_grabar">● Guardar 5 minutos de medidas</button>
       <button type="button" class="btn-hud" id="pantalla" data-t="pd_pantalla_completa">Pantalla completa</button>
@@ -59,6 +60,14 @@
     <div class="retrato" id="retrato" hidden role="dialog" aria-labelledby="retrato-t"><h2 id="retrato-t"></h2><p id="retrato-txt"></p><p class="pequeno" id="retrato-modo"></p><div class="aviso-botones"><button type="button" class="btn-hud" id="retrato-pdf" data-t="pd_retrato_pdf"></button><button type="button" class="btn-hud" id="retrato-csv" data-t="pd_retrato_csv"></button><button type="button" class="btn-hud" id="retrato-json" data-t="pd_retrato_json"></button><button type="button" class="btn-hud" id="retrato-cerrar" data-t="pd_retrato_cerrar"></button></div></div>
     <div class="tip" id="tip" hidden></div>
     <div class="aviso" id="aviso" hidden role="status" aria-live="polite"></div>
+    <div class="ubicacion" id="ubicacion" hidden role="dialog" aria-modal="true" aria-labelledby="ubicacion-t">
+      <h2 id="ubicacion-t" data-t="pd_corregir_titulo">Confirma tu ciudad</h2>
+      <p data-t="pd_corregir_texto">Si el servicio de ubicación se equivoca, busca tu ciudad. La elección queda solo en este navegador.</p>
+      <label for="ubicacion-busca" data-t="pd_corregir_etiqueta">Ciudad o región</label>
+      <input id="ubicacion-busca" type="search" autocomplete="off" spellcheck="false" data-t-placeholder="pd_corregir_placeholder">
+      <div class="ubicacion-resultados" id="ubicacion-resultados" role="listbox"></div>
+      <div class="aviso-botones"><button type="button" class="btn-hud" id="ubicacion-cerrar" data-t="pd_corregir_cancelar">Cancelar</button></div>
+    </div>
   </div>
   <div class="hud">
     <div><h3><span data-t="pd_hud_registro" class="h3-titulo"></span> <span data-t="pd_hud_vivo"></span></h3><ul class="registro" id="registro"></ul></div>

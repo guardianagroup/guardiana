@@ -106,6 +106,44 @@ fn the_first_run_opens_a_new_tab_and_asks_the_question() {
 }
 
 #[test]
+fn guardiana_is_one_fixed_tab_and_web_addresses_leave_it_in_place() {
+    let (mut s, _, _) = abre();
+    assert!(s.abre_guardiana("https://example.com/").is_empty());
+    let url = format!("http://127.0.0.1:7443/?t={}", "a".repeat(64));
+    let o = s.abre_guardiana(&url);
+    assert!(o
+        .iter()
+        .any(|x| matches!(x, Orden::CreaPestana { url: Some(u), .. } if u == &url)));
+    assert_eq!(s.pestanas.len(), 2);
+    assert!(s.pestanas[0].fija);
+    let id = s.pestanas[0].id;
+    assert_eq!(s.activa, id);
+
+    let o = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        &json!({ "tipo": "pestana_cerrar", "id": id }).to_string(),
+    );
+    assert!(!o
+        .iter()
+        .any(|x| matches!(x, Orden::CierraPestana { id: cerrado } if *cerrado == id)));
+    assert_eq!(s.pestanas.len(), 2);
+
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"navegar","texto":"example.com"}"#,
+    );
+    assert_eq!(s.pestanas.len(), 3);
+    assert!(s.pestanas[0].fija);
+    assert_eq!(s.pestanas[0].url, url);
+
+    let _ = s.abre_guardiana(&format!("http://127.0.0.1:7443/?t={}", "b".repeat(64)));
+    assert_eq!(s.pestanas.iter().filter(|p| p.fija).count(), 1);
+    assert_eq!(s.pestanas.len(), 3);
+}
+
+#[test]
 fn the_shield_opens_by_itself_until_the_person_closes_it() {
     let (mut s, _, _) = con_pagina(true);
     let datos = s.datos.clone();

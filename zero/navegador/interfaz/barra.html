@@ -17,6 +17,8 @@ html, body { height: 100%; overflow: hidden; background: var(--marco); user-sele
 .pestana.cargando .punto { background: none; border: 2px solid var(--azul); border-right-color: transparent; width: 10px; height: 10px; animation: gira .8s linear infinite; }
 .pestana.mandato .punto { border-radius: 2px; background: var(--azul); }
 .pestana.aislada .punto { background: none; border: 1.5px dashed var(--gris); }
+.pestana.fija { flex: 0 1 210px; }
+.pestana.fija .titulo { font-weight: 650; }
 @keyframes gira { to { transform: rotate(360deg); } }
 .pestana .cerrar { flex: none; width: 20px; height: 20px; border: 0; border-radius: 6px; background: none; color: var(--gris); display: grid; place-items: center; opacity: 0; }
 .pestana:hover .cerrar, .pestana[aria-selected="true"] .cerrar { opacity: 1; }

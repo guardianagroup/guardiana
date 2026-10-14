@@ -96,7 +96,7 @@
       vista: 'destinos', proy: 'mapa', filtro: 'todo', yo: paisDelEquipo(), W: 0, Wc: 0, H: 0, dpr: 1, t0: performance.now(),
       dRot: 0, dTilt: 0, part: [], estallidos: [], hover: null, raton: null, dianas: [],
       serie: new Array(N_CUBOS).fill(0), serieP: {}, cuboT0: Date.now(), eventos: [], ahora: [0, 0, 0], intervalo: 5,
-      datos: null, abierto: Date.now(), primeraCarga: true, ultimoGesto: performance.now(), tocado: false, vuelo: null,
+      datos: null, abierto: Date.now(), primeraCarga: true, ultimoGesto: performance.now(), tocado: false, vuelo: null, inercia: null, interactuando: false,
     };
 
     // A replay on the website (13 Oct 2026) draws the recorded computer where it was, by the time
@@ -310,7 +310,7 @@
     // =====================================================================================
     const glc = $('gl');
     const T = { ok: false, m: 0, mObj: 0, zoomG: 1, zoomM: 1, px: 0, py: 0, dist: 5, sol: [0, 0, 1], solLL: [0, 0], tanH: Math.tan(15 * RAD), M: null, PV: null, C: [0, 0, 5], asp: 1 };
-    const gl = glc.getContext('webgl2', { antialias: true, alpha: false, powerPreference: 'low-power' });
+    const gl = glc.getContext('webgl2', { antialias: true, alpha: false, powerPreference: 'default' });
 
     // --- matrices (columna a columna, como las quiere WebGL) ---
     const mul = (a, b) => { const o = new Float32Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; };
@@ -670,7 +670,7 @@
     const rotuloLugar = (d) => d.lugar && d.lugar.ciudad
       ? [d.lugar.ciudad, d.lugar.region].filter(Boolean).join(' · ')
       : d.host;
-    const rotuloYo = () => [nombrePais(st.yo), st.lugar && st.lugar.ciudad].filter(Boolean).join(' · ');
+    const rotuloYo = () => [nombrePais(st.yo), st.lugar && st.lugar.fuente !== 'zona' && st.lugar.ciudad].filter(Boolean).join(' · ');
     // How many screen pixels one degree of the Earth takes now, at the centre of the view.
     const pxPorGrado = () => (!T.ok ? escalaPlano().s : T.m < 0.5 ? st.H / (2 * Math.max(0.05, T.dist - 1) * T.tanH) * RAD : st.H / (2 * T.dist * T.tanH) * RAD);
     // Qué país hay bajo el ratón en el globo o en el mapa (rayo desde la cámara).
@@ -1212,7 +1212,7 @@
           <div>${esc(t('pd_enviado'))} <b>${esc(bytes(ds.reduce((a, d) => a + d.sub, 0)))}</b> · ${esc(t('pd_recibido'))} ${esc(bytes(ds.reduce((a, d) => a + d.baj, 0)))}</div>
           <div class="mono arriba4">${ds.slice(0, 10).map((d) => '· ' + esc(d.host)).join('<br>')}${ds.length > 10 ? '<br>…' : ''}</div>`;
       }
-      if (hh.tipo === 'yo') { const ce = st.lugar, por = ce.fuente === 'equipo' ? t('pd_lugar_equipo') : ce.fuente === 'zona' ? t('pd_lugar_zona').replace('{ciudad}', ce.ciudad) : t('pd_lugar_pais'); return `<b>${esc(t('pd_tu_ordenador'))}</b> · ${esc(rotuloYo())} · ${esc(t(esDeDia(ce.lon, ce.lat) ? 'pd_de_dia' : 'pd_de_noche'))}<div class="t">${esc(por)}</div><div>${esc(tn('pd_vigila_n', PROD.length))}</div>`; }
+      if (hh.tipo === 'yo') { const ce = st.lugar, por = ce.fuente === 'equipo' ? t('pd_lugar_equipo').replace('{precision}', ce.precision < 1000 ? Math.max(1, Math.round(ce.precision)) + ' m' : Math.max(1, Math.round(ce.precision / 1000)) + ' km') : ce.fuente === 'manual' ? t('pd_lugar_manual') : ce.fuente === 'zona' ? t('pd_lugar_zona') : t('pd_lugar_pais'); return `<b>${esc(t('pd_tu_ordenador'))}</b> · ${esc(rotuloYo())} · ${esc(t(esDeDia(ce.lon, ce.lat) ? 'pd_de_dia' : 'pd_de_noche'))}<div class="t">${esc(por)}</div><div>${esc(tn('pd_vigila_n', PROD.length))}</div>`; }
       if (hh.tipo === 'pais') {
         const c = hh.ref, ds = DEST.filter((d) => d.pais === c), ce = centros[c], dia = ce ? esDeDia(ce.lon, ce.lat) : null;
         const cab = `<b>${esc(nombrePais(c))}</b>${dia === null ? '' : ` <span class="t">· ${esc(t(dia ? 'pd_de_dia' : 'pd_de_noche'))}</span>`}`;
@@ -1504,15 +1504,15 @@
     $('retrato-cerrar').addEventListener('click', () => { $('retrato').hidden = true; });
 
     // ---------- Pointer, wheel and keys ---------------------------------------------------------
-    // The view stays centred and cannot be dragged. Wheel, buttons and pinch only change scale;
-    // a click opens a destination backed by measurements and never cuts anything by itself.
+    // The flat map stays centred. The 3D globe can be turned; wheel, buttons and pinch change scale.
+    // A click opens a destination backed by measurements and never cuts anything by itself.
     const ZOOM = { globo: [0.75, 7], mapa: [0.85, 10], plano: [1, 10] };
     const lim = (v, [a, b]) => Math.max(a, Math.min(b, v));
     ['pointermove', 'pointerdown', 'wheel', 'keydown'].forEach((ev) => window.addEventListener(ev, () => { st.ultimoGesto = performance.now(); }, { passive: true }));
     const enPlano = () => st.vista === 'destinos' && !T.ok;
     const zoomable = () => st.vista === 'destinos';
     // The first touch stops the globe's own sway where it is, without a jump.
-    const toca = () => { if (st.tocado) return; st.dRot += T.osc || 0; st.tocado = true; st.vuelo = null; };
+    const toca = () => { if (!st.tocado) { st.dRot += T.osc || 0; st.tocado = true; } st.vuelo = null; st.inercia = null; };
     // Zoom by a factor f around the screen point (x, y): what is under it stays under it.
     const zoomEn = (f, x, y) => {
       if (!zoomable()) return;
@@ -1561,16 +1561,30 @@
     };
     // Two fingers: the distance between them is the zoom.
     const dedos = new Map();
-    let pellizco = null;
+    let pellizco = null, arrastre = null;
     cv.addEventListener('pointermove', (e) => {
       const r = cv.getBoundingClientRect(); st.raton = { x: e.clientX - r.left, y: e.clientY - r.top };
       if (dedos.has(e.pointerId)) dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (dedos.size === 2 && pellizco) {
+        st.interactuando = true; st.inercia = null;
         const [a, b] = [...dedos.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
         if (pellizco.d > 0 && d > 0) zoomBoton(d / pellizco.d);
         pellizco.d = d; return;
       }
-      // The world view is fixed. Pointer movement only updates hover; dragging never pans it.
+      if (arrastre && arrastre.id === e.pointerId && enGlobo()) {
+        const dx = e.clientX - arrastre.x, dy = e.clientY - arrastre.y;
+        arrastre.total += Math.hypot(dx, dy);
+        if (arrastre.total > 3) {
+          toca(); st.interactuando = true;
+          const sensibilidad = 2 * Math.PI / Math.max(420, Math.min(st.W || 800, st.H || 600));
+          const dt = Math.max(8, Math.min(80, e.timeStamp - arrastre.t));
+          st.dRot += dx * sensibilidad; st.dTilt = Math.max(-1.4, Math.min(1.4, st.dTilt + dy * sensibilidad * 0.82));
+          arrastre.vr = dx * sensibilidad * 1000 / dt; arrastre.vt = dy * sensibilidad * 0.82 * 1000 / dt;
+          arrastre.t = e.timeStamp;
+          arrastre.x = e.clientX; arrastre.y = e.clientY; arrastre.movido = true;
+          cv.classList.add('arrastrando'); tip.hidden = true;
+        }
+      }
     });
     cv.addEventListener('wheel', (e) => {
       if (!zoomable()) return; e.preventDefault();
@@ -1581,18 +1595,22 @@
     cv.addEventListener('pointerleave', () => { st.raton = null; tip.hidden = true; });
     cv.addEventListener('pointerdown', (e) => {
       dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (dedos.size === 2) { const [a, b] = [...dedos.values()]; pellizco = { d: Math.hypot(a.x - b.x, a.y - b.y) }; return; }
-      // Keep the pointer for a click and for two-finger zoom, without starting a drag.
+      if (dedos.size === 2) { arrastre = null; st.inercia = null; st.interactuando = true; cv.classList.remove('arrastrando'); const [a, b] = [...dedos.values()]; pellizco = { d: Math.hypot(a.x - b.x, a.y - b.y) }; return; }
+      if (enGlobo() && e.button === 0) { st.inercia = null; arrastre = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, total: 0, vr: 0, vt: 0, movido: false }; try { cv.setPointerCapture(e.pointerId); } catch (_) {} }
     });
-    const suelta = (e) => { dedos.delete(e.pointerId); if (dedos.size < 2) pellizco = null; };
-    cv.addEventListener('pointercancel', (e) => { suelta(e); });
+    const suelta = (e) => { dedos.delete(e.pointerId); if (dedos.size < 2) pellizco = null; st.interactuando = dedos.size > 0; cv.classList.remove('arrastrando'); try { if (cv.hasPointerCapture(e.pointerId)) cv.releasePointerCapture(e.pointerId); } catch (_) {} };
+    cv.addEventListener('pointercancel', (e) => { if (arrastre && arrastre.id === e.pointerId) arrastre = null; suelta(e); });
     cv.addEventListener('pointerup', (e) => {
+      const movido = !!(arrastre && arrastre.id === e.pointerId && arrastre.movido);
+      if (movido && !reducido && dedos.size < 2) st.inercia = { vr: arrastre.vr, vt: arrastre.vt };
+      if (arrastre && arrastre.id === e.pointerId) arrastre = null;
       suelta(e);
-      if (dedos.size) return;
+      if (dedos.size || movido) return;
       const r = cv.getBoundingClientRect();
       const hh = queHay(e.clientX - r.left, e.clientY - r.top);
       if (hh) abreDetalle(hh); else cierraDetalle();
     });
+    cv.addEventListener('lostpointercapture', (e) => { if (arrastre && arrastre.id === e.pointerId) arrastre = null; suelta(e); });
     $('zoom-mas').addEventListener('click', () => zoomBoton(1.6));
     $('zoom-menos').addEventListener('click', () => zoomBoton(1 / 1.6));
     $('zoom-0').addEventListener('click', zoomInicio);
@@ -1618,7 +1636,7 @@
       muestraAyuda();
       guarda('guardiana_pd_vista', v);
     };
-    const ponProy = (v) => { st.proy = v; pulsado('#proy button', 'proy', v); if (st.vista === 'destinos') muestraAyuda(); guarda('guardiana_pd_proy', v); };
+    const ponProy = (v) => { st.proy = v; stage.dataset.proy = v; pulsado('#proy button', 'proy', v); if (st.vista === 'destinos') muestraAyuda(); guarda('guardiana_pd_proy', v); };
     const ponFiltro = (v) => {
       st.filtro = v; pulsado('#filtro button', 'filtro', v);
       recalcula(); st.part = st.part.filter((q) => VISIBLES.includes(q.d));
@@ -1639,12 +1657,16 @@
       else if (e.key === '0') zoomInicio();
       else if (e.key === 'Escape') cierraDetalle();
     });
-    // Where the computer is: said, not chosen (the owner: nobody types a place to fake it). The
-    // time zone only knows one city per zone (all of Colombia reads «Bogotá»), so since 1.0.24 the
-    // person can ask the computer itself: the browser's location, with its own permission prompt,
-    // rounded to 0.01° (about 1 km) and named by the nearest city of GeoNames, which travels with
-    // the panel. It stays in this browser; GUARDIANA sends it nowhere.
-    const pintaYo = () => { $('yo').textContent = nombrePais(st.yo) + (st.lugar.ciudad ? ' · ' + st.lugar.ciudad : ''); };
+    // The time zone is only a visual starting reference: it never proves a city. A requested
+    // measurement takes several fresh samples and keeps the best one. The person can also confirm
+    // a city when Windows, Microsoft or Google returns an imprecise or stale point. Everything
+    // stays in this browser and GUARDIANA sends it nowhere.
+    const etiquetaYo = document.querySelector('.lugar-yo [data-t="pd_tu_pais"]');
+    const pintaYo = () => {
+      const aproximada = st.lugar.fuente === 'zona' || st.lugar.fuente === 'pais';
+      etiquetaYo.textContent = t(aproximada ? 'pd_ubicacion_referencia' : 'pd_tu_pais');
+      $('yo').textContent = nombrePais(st.yo) + (st.lugar.ciudad && !aproximada ? ' · ' + st.lugar.ciudad : '');
+    };
     pintaYo();
     let CIUDADES = null;
     const ciudades = async () => {
@@ -1661,28 +1683,60 @@
       return mejor ? { c: mejor, km: Math.sqrt(dm) * 111 } : null;
     };
     const ponLugarEquipo = (g, guardar) => {
-      st.lugar = { lon: g.lon, lat: g.lat, fuente: 'equipo', ciudad: g.ciudad };
+      st.lugar = { lon: g.lon, lat: g.lat, fuente: g.fuente || 'equipo', ciudad: g.ciudad, precision: g.precision };
       if (g.cc && centros[g.cc]) st.yo = g.cc;
       pintaYo();
       if (guardar) { try { localStorage.setItem('guardiana_pd_lugar', JSON.stringify(Object.assign({ cuando: Date.now() }, g))); } catch (_) {} }
     };
+    const procesaPosicion = async (pos, callado) => {
+      const precision = Number.isFinite(pos.coords.accuracy) ? Math.max(0, pos.coords.accuracy) : Infinity;
+      const lat = Math.round(pos.coords.latitude * 100) / 100, lon = Math.round(pos.coords.longitude * 100) / 100;
+      let g = { lat, lon, ciudad: '', cc: '', precision, fuente: 'equipo' };
+      try {
+        const m = cercana(await ciudades(), lat, lon);
+        if (m && m.km < 35 && precision <= 25000) g = { lat, lon, ciudad: m.c.n + (m.c.adm ? ', ' + m.c.adm : ''), cc: m.c.cc, precision, fuente: 'equipo' };
+        else g.cc = paisEn(lon, lat) || '';
+      } catch (_) { g.cc = paisEn(lon, lat) || ''; }
+      if (precision > 25000) {
+        if (!callado) avisa(t('pd_precisar_impreciso').replace('{km}', String(Math.max(1, Math.round(precision / 1000)))), [{ texto: t('pd_corregir'), hacer: abreUbicacion }]);
+        return;
+      }
+      ponLugarEquipo(g, true);
+      if (!callado) avisa(t('pd_precisar_hecho').replace('{lugar}', g.ciudad || nombrePais(g.cc || st.yo)).replace('{precision}', precision < 1000 ? Math.max(1, Math.round(precision)) + ' m' : Math.max(1, Math.round(precision / 1000)) + ' km'));
+    };
+    let medicion = null;
     const precisar = (callado) => {
       if (!navigator.geolocation) { if (!callado) avisa(t('pd_precisar_no')); return; }
       if (!callado) avisa(t('pd_precisar_pide'));
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        const lat = Math.round(pos.coords.latitude * 100) / 100, lon = Math.round(pos.coords.longitude * 100) / 100;
-        let g = { lat, lon, ciudad: '', cc: '' };
-        try {
-          const m = cercana(await ciudades(), lat, lon);
-          if (m && m.km < 35) g = { lat, lon, ciudad: m.c.n + (m.c.adm ? ', ' + m.c.adm : ''), cc: m.c.cc };
-          else g.cc = paisEn(lon, lat) || '';
-        } catch (_) { g.cc = paisEn(lon, lat) || ''; }
-        ponLugarEquipo(g, true);
-        if (!callado) avisa(t('pd_precisar_hecho').replace('{lugar}', g.ciudad || nombrePais(g.cc || st.yo)));
-      }, (err) => {
-        if (!callado) avisa(t(err && err.code === 1 ? 'pd_precisar_denegado' : 'pd_precisar_fallo'));
-      }, { enableHighAccuracy: true, timeout: 25000, maximumAge: 5 * 60000 });
+      if (medicion !== null) navigator.geolocation.clearWatch(medicion);
+      let mejor = null, terminado = false;
+      const acaba = (err) => {
+        if (terminado) return; terminado = true;
+        if (medicion !== null) navigator.geolocation.clearWatch(medicion); medicion = null; clearTimeout(acaba.reloj);
+        if (mejor) procesaPosicion(mejor, callado);
+        else if (!callado) avisa(t(err && err.code === 1 ? 'pd_precisar_denegado' : 'pd_precisar_fallo'), [{ texto: t('pd_corregir'), hacer: abreUbicacion }]);
+      };
+      medicion = navigator.geolocation.watchPosition((pos) => {
+        if (!mejor || (Number.isFinite(pos.coords.accuracy) && pos.coords.accuracy < mejor.coords.accuracy)) mejor = pos;
+        if (mejor && mejor.coords.accuracy <= 100) acaba();
+      }, acaba, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+      acaba.reloj = setTimeout(() => acaba(), 15000);
     };
+    const modalUbicacion = $('ubicacion'), buscaUbicacion = $('ubicacion-busca'), resultadosUbicacion = $('ubicacion-resultados');
+    buscaUbicacion.placeholder = t('pd_corregir_placeholder');
+    const cierraUbicacion = () => { modalUbicacion.hidden = true; resultadosUbicacion.innerHTML = ''; };
+    const eligeCiudad = (c) => {
+      ponLugarEquipo({ lat: Math.round(c.la * 100) / 100, lon: Math.round(c.lo * 100) / 100, ciudad: c.n + (c.adm ? ', ' + c.adm : ''), cc: c.cc, fuente: 'manual', precision: null }, true);
+      cierraUbicacion(); avisa(t('pd_corregir_hecho').replace('{lugar}', st.lugar.ciudad + ', ' + nombrePais(st.yo)));
+    };
+    const pintaCiudades = async () => {
+      const q = buscaUbicacion.value.trim().toLocaleLowerCase(LOC); resultadosUbicacion.innerHTML = '';
+      if (q.length < 2) return;
+      const lista = (await ciudades()).filter((c) => (c.n + ' ' + c.adm + ' ' + nombrePais(c.cc)).toLocaleLowerCase(LOC).includes(q)).slice(0, 8);
+      lista.forEach((c) => { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'option'); b.innerHTML = `${esc(c.n)}${c.adm ? ` · ${esc(c.adm)}` : ''}<small>${esc(nombrePais(c.cc))}</small>`; b.addEventListener('click', () => eligeCiudad(c)); resultadosUbicacion.appendChild(b); });
+      if (!lista.length) resultadosUbicacion.innerHTML = `<p>${esc(t('pd_corregir_sin_resultados'))}</p>`;
+    };
+    function abreUbicacion() { modalUbicacion.hidden = false; buscaUbicacion.value = ''; resultadosUbicacion.innerHTML = ''; setTimeout(() => buscaUbicacion.focus(), 0); }
     if (soloMirar) $('precisar').hidden = true;
     else {
       $('precisar').title = t('pd_precisar_que');
@@ -1691,21 +1745,33 @@
       // still granted, it is measured again quietly, so a laptop that travelled follows.
       try {
         const g = JSON.parse(localStorage.getItem('guardiana_pd_lugar') || 'null');
-        if (g && Date.now() - g.cuando < 30 * 86400000 && Number.isFinite(g.lat) && Number.isFinite(g.lon)) ponLugarEquipo(g, false);
+        if (g && Date.now() - g.cuando < 30 * 86400000 && Number.isFinite(g.lat) && Number.isFinite(g.lon) && (g.fuente === 'manual' || Number.isFinite(g.precision))) ponLugarEquipo(g, false);
       } catch (_) {}
       try { navigator.permissions.query({ name: 'geolocation' }).then((p) => { if (p.state === 'granted') precisar(true); }).catch(() => {}); } catch (_) {}
     }
+    if (soloMirar) $('corregir-lugar').hidden = true;
+    else $('corregir-lugar').addEventListener('click', abreUbicacion);
+    buscaUbicacion.addEventListener('input', pintaCiudades);
+    $('ubicacion-cerrar').addEventListener('click', cierraUbicacion);
 
     // ---------- The loop ----------
-    let antes = performance.now(), ultimaTele = 0;
+    let antes = performance.now(), ultimaTele = 0, escenaVisible = true;
+    if ('IntersectionObserver' in window) new IntersectionObserver((e) => { escenaVisible = !!(e[0] && e[0].isIntersecting); }, { threshold: 0.01 }).observe(stage);
     const bucle = (ahora) => {
       requestAnimationFrame(bucle);
+      if (document.hidden || !escenaVisible) { antes = ahora; return; }
       // To keep it open for hours: 30 frames a second, 20 after two quiet minutes and 60 during
       // the short guided flight opened by «View close up».
       const quieto = ahora - st.ultimoGesto > 120000;
-      if (!st.vuelo && ahora - antes < (quieto ? 48 : 31)) return;
+      const activo = !!(st.vuelo || st.inercia || st.interactuando || arrastre || pellizco);
+      if (ahora - antes < (activo ? 16 : quieto ? 48 : 31)) return;
       const dt = Math.min(0.06, (ahora - antes) / 1000); antes = ahora;
       try {
+        if (st.inercia && !reducido) {
+          st.dRot += st.inercia.vr * dt; st.dTilt = Math.max(-1.4, Math.min(1.4, st.dTilt + st.inercia.vt * dt));
+          const freno = Math.exp(-4.5 * dt); st.inercia.vr *= freno; st.inercia.vt *= freno;
+          if (Math.hypot(st.inercia.vr, st.inercia.vt) < 0.004) st.inercia = null;
+        }
         if (ahora - ultimaTele > 1000) { ultimaTele = ahora; telemetria(); pintaDatos(); }
         cx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);
         st.dianas = [];

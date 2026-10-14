@@ -197,8 +197,18 @@ Seccion 'salida' {
 }
 
 Seccion 'certificados' {
-  $auth = @{}; Get-ChildItem Cert:\LocalMachine\AuthRoot | ForEach-Object { $auth[$_.Thumbprint] = 1 }
-  $todos = @(Get-ChildItem Cert:\LocalMachine\Root)
+  # The Cert: PowerShell drive is absent in some service/non-interactive sessions. .NET opens
+  # the same Windows stores directly and works there too.
+  $authStore = [Security.Cryptography.X509Certificates.X509Store]::new('AuthRoot', 'LocalMachine')
+  $rootStore = [Security.Cryptography.X509Certificates.X509Store]::new('Root', 'LocalMachine')
+  try {
+    $authStore.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
+    $rootStore.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
+    $auth = @{}; @($authStore.Certificates) | ForEach-Object { $auth[$_.Thumbprint] = 1 }
+    $todos = @($rootStore.Certificates)
+  } finally {
+    $authStore.Close(); $rootStore.Close()
+  }
   $maq = @{}; $todos | ForEach-Object { $maq[$_.Thumbprint] = 1 }
   $fuera = @($todos | Where-Object { -not $auth.ContainsKey($_.Thumbprint) } | ForEach-Object {
     [ordered]@{ huella = [string]$_.Thumbprint; nombre = $_.GetNameInfo([Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false); emisor = $_.GetNameInfo([Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $true); desde = (Ms $_.NotBefore); hasta = (Ms $_.NotAfter) } })

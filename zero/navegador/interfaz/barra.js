@@ -20,19 +20,19 @@
     const nueva = $('nueva');
     for (const p of lista) {
       const el = document.createElement('div');
-      el.className = 'pestana' + (p.cargando ? ' cargando' : '') + (p.mandato ? ' mandato' : '') + (p.aislada ? ' aislada' : '');
+      el.className = 'pestana' + (p.cargando ? ' cargando' : '') + (p.mandato ? ' mandato' : '') + (p.aislada ? ' aislada' : '') + (p.fija ? ' fija' : '');
       el.setAttribute('role', 'tab');
       el.setAttribute('aria-selected', p.activa ? 'true' : 'false');
       el.dataset.id = p.id;
       el.title = p.titulo || p.url || '';
       const icono = p.icono && !p.cargando && /^data:image\/png;base64,/.test(p.icono) ? `<img class="icono" alt="" src="${esc(p.icono)}">` : '<i class="punto"></i>';
       el.innerHTML = `${icono}<span class="titulo">${esc(p.titulo || t('pestana_nueva'))}</span>`
-        + `<button class="cerrar" aria-label="${esc(t('cerrar_pestana'))}" title="${esc(t('cerrar_pestana'))}"><svg viewBox="0 0 12 12" width="10" height="10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></button>`;
+        + (p.fija ? '' : `<button class="cerrar" aria-label="${esc(t('cerrar_pestana'))}" title="${esc(t('cerrar_pestana'))}"><svg viewBox="0 0 12 12" width="10" height="10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></button>`);
       el.addEventListener('mousedown', (e) => {
-        if (e.button === 1) { e.preventDefault(); manda({ tipo: 'pestana_cerrar', id: p.id }); return; }
+        if (e.button === 1 && !p.fija) { e.preventDefault(); manda({ tipo: 'pestana_cerrar', id: p.id }); return; }
         if (!e.target.closest('.cerrar')) manda({ tipo: 'pestana_activar', id: p.id });
       });
-      el.querySelector('.cerrar').addEventListener('click', () => manda({ tipo: 'pestana_cerrar', id: p.id }));
+      el.querySelector('.cerrar')?.addEventListener('click', () => manda({ tipo: 'pestana_cerrar', id: p.id }));
       cont.insertBefore(el, nueva);
     }
   }

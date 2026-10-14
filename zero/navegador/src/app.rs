@@ -46,6 +46,7 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::System::Com::{
     CoInitializeEx, CoTaskMemFree, COINIT_APARTMENTTHREADED, STREAM_SEEK_SET,
 };
+use windows::Win32::System::DataExchange::COPYDATASTRUCT;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
 use windows::Win32::System::Threading::{CreateMutexW, WaitForSingleObject};
@@ -65,8 +66,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     HWND_TOP, ICON_BIG, ICON_SMALL, IDC_ARROW, LR_DEFAULTCOLOR, MB_ICONWARNING, MB_OK, MINMAXINFO,
     MSG, SIZE_MINIMIZED, SPI_GETWORKAREA, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOOWNERZORDER,
     SWP_NOZORDER, SW_RESTORE, SW_SHOW, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
-    WINDOW_EX_STYLE, WM_APP, WM_CLOSE, WM_DESTROY, WM_DPICHANGED, WM_GETMINMAXINFO, WM_MOVE,
-    WM_MOVING, WM_SETFOCUS, WM_SETICON, WM_SIZE, WM_TIMER, WNDCLASSEXW, WS_OVERLAPPEDWINDOW,
+    WINDOW_EX_STYLE, WM_APP, WM_CLOSE, WM_COPYDATA, WM_DESTROY, WM_DPICHANGED, WM_GETMINMAXINFO,
+    WM_MOVE, WM_MOVING, WM_SETFOCUS, WM_SETICON, WM_SIZE, WM_TIMER, WNDCLASSEXW,
+    WS_OVERLAPPEDWINDOW,
 };
 
 /// Height of the bar (tabs 38 + tools 46), in CSS pixels; see `interfaz/barra.html`.
@@ -1568,6 +1570,24 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
             drena();
             LRESULT(0)
         }
+        WM_COPYDATA => {
+            let copia = lp.0 as *const COPYDATASTRUCT;
+            if copia.is_null() {
+                return LRESULT(0);
+            }
+            let copia = unsafe { &*copia };
+            if copia.cbData < 2 || copia.lpData.is_null() || copia.cbData > 16_384 {
+                return LRESULT(0);
+            }
+            let chars = unsafe {
+                std::slice::from_raw_parts(copia.lpData.cast::<u16>(), copia.cbData as usize / 2)
+            };
+            let fin = chars.iter().position(|c| *c == 0).unwrap_or(chars.len());
+            let url = String::from_utf16_lossy(&chars[..fin]);
+            encola(con_sesion(|s| s.abre_guardiana(&url)).unwrap_or_default());
+            drena();
+            LRESULT(1)
+        }
         WM_SETFOCUS => {
             let activa = con_vistas(|v| v.activa).unwrap_or(0);
             if let Some(v) = vista_de(Origen::Pestana(activa)) {
@@ -1716,6 +1736,14 @@ pub fn arranca() {
     REGISTRO.with(|r| *r.borrow_mut() = Some(datos.join("registro.txt")));
     let idioma = idioma_sistema();
     let textos = Textos::de(Idioma::de_etiqueta(&idioma));
+    let abrir_guardiana = {
+        let mut args = std::env::args();
+        let _ = args.next();
+        match (args.next().as_deref(), args.next()) {
+            (Some("--abrir-guardiana"), Some(url)) => Some(url),
+            _ => None,
+        }
+    };
 
     // One window: a second start of the same version brings the first one forward; a newer
     // version closes the older one (it saves as on its own X) and takes its place, so updating
@@ -1751,6 +1779,20 @@ pub fn arranca() {
             let mia = version_de(env!("CARGO_PKG_VERSION")).unwrap_or_default();
             // Up to 1.0.4 nothing wrote the mark: no mark means an older copy.
             if suya.is_some_and(|v| v >= mia) {
+                if let Some(url) = abrir_guardiana.as_deref() {
+                    let ancho = Ancho::de(url);
+                    let copia = COPYDATASTRUCT {
+                        dwData: 1,
+                        cbData: u32::try_from(ancho.0.len() * 2).unwrap_or_default(),
+                        lpData: ancho.0.as_ptr().cast_mut().cast::<c_void>(),
+                    };
+                    let _ = SendMessageW(
+                        otra,
+                        WM_COPYDATA,
+                        Some(WPARAM(0)),
+                        Some(LPARAM((&copia as *const COPYDATASTRUCT) as isize)),
+                    );
+                }
                 if IsIconic(otra).as_bool() {
                     let _ = ShowWindow(otra, SW_RESTORE);
                 }
@@ -1846,6 +1888,9 @@ pub fn arranca() {
     let lugar = LugarLicencia::nuevo(&datos, ancla);
     let _ = LUGAR.set(lugar.clone());
     let mut iniciales = iniciales;
+    if let Some(url) = abrir_guardiana.as_deref() {
+        iniciales.extend(s.abre_guardiana(url));
+    }
     iniciales.extend(s.pon_lugar_licencia(lugar));
     let estricto = s.seguimiento_estricto();
     let tema_elegido = s.tema_oscuro();

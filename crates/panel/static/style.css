@@ -455,6 +455,9 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 
 .universo .lienzo canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
 
+.universo .stage[data-vista="destinos"][data-proy="globo"] #cv { cursor: grab; }
+.universo .stage[data-vista="destinos"][data-proy="globo"] #cv.arrastrando { cursor: grabbing; }
+
 .universo .lienzo #gl { pointer-events: none; visibility: hidden; }
 
 .universo .leyenda { position: absolute; left: 14px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 2px 14px; font: 11px/1.6 'IBM Plex Mono', ui-monospace, monospace; color: var(--hud-muted); pointer-events: none; z-index: 2; }
@@ -529,6 +532,18 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 .universo .aviso.pide { border-color: var(--cut); }
 
 .universo .aviso-botones { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
+
+.universo .ubicacion { position: absolute; z-index: 8; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100% - 28px)); max-height: min(620px, calc(100% - 28px)); overflow: auto; padding: 20px; border: 1px solid var(--hud-line); border-radius: 12px; background: rgba(6,12,22,.98); box-shadow: 0 22px 70px rgba(0,0,0,.7); }
+.universo .ubicacion[hidden] { display: none; }
+.universo .ubicacion h2 { margin: 0 0 8px; font: 500 18px/1.3 'Unbounded', system-ui, sans-serif; color: var(--hud-fg); }
+.universo .ubicacion p, .universo .ubicacion label { color: var(--hud-muted); font-size: 13px; line-height: 1.5; }
+.universo .ubicacion label { display: block; margin: 14px 0 5px; }
+.universo .ubicacion input { box-sizing: border-box; width: 100%; padding: 10px 11px; border: 1px solid var(--hud-line); border-radius: 7px; background: #091421; color: var(--hud-fg); font: 14px 'IBM Plex Sans', system-ui, sans-serif; }
+.universo .ubicacion input:focus { outline: 2px solid var(--shield); outline-offset: 2px; }
+.universo .ubicacion-resultados { display: grid; gap: 4px; margin-top: 8px; }
+.universo .ubicacion-resultados button { appearance: none; width: 100%; padding: 9px 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--hud-fg); text-align: left; cursor: pointer; }
+.universo .ubicacion-resultados button:hover, .universo .ubicacion-resultados button:focus-visible { border-color: var(--shield); background: rgba(63,224,197,.1); outline: 0; }
+.universo .ubicacion-resultados small { display: block; margin-top: 2px; color: var(--hud-muted); }
 
 .universo .vacio { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4; width: max-content; max-width: min(520px, 90%); background: rgba(6,12,22,.92); border: 1px solid var(--hud-line); border-radius: 12px; padding: 18px 20px; text-align: center; }
 
@@ -862,3 +877,6 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 .rv-botones .rv-mapa{display:inline-flex;align-items:center;text-decoration:none}
 @media(max-width:700px){.rv-escena{grid-template-columns:1fr;padding:16px}.rv-orbe{width:120px;height:120px}.rv-pasos{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.rv-escena.trabajando .rv-orbe,.rv-escena.trabajando .rv-orbe::before,.rv-escena.trabajando .rv-orbe::after,.rv-paso.revisando>i,.rv-progreso-barra i{animation:none}}
+.rv-conclusion{margin-top:22px;border-left:4px solid var(--azul,#1f4bff)}
+.rv-conclusion h2{margin-top:0}
+.rv-conclusion p{font-size:1.05rem;line-height:1.65;margin-bottom:0}

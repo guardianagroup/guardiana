@@ -139,6 +139,10 @@ fn url_de_archivo(ruta: &std::path::Path) -> String {
 fn abrir_espera(ruta: &std::path::Path) {
     let destino = url_de_archivo(ruta);
     #[cfg(windows)]
+    if abrir_en_guardiana_zero(&destino) {
+        return;
+    }
+    #[cfg(windows)]
     if let Some(partes) = navegador_por_defecto() {
         let exe = &partes[0];
         let args: Vec<String> = partes[1..]
@@ -157,6 +161,33 @@ fn abrir_espera(ruta: &std::path::Path) {
         }
     }
     crate::engine::open_in_browser(&destino);
+}
+
+/// Open an address in the browser that is installed with Guardiana. A second invocation is
+/// delivered to its existing window, so the customer always sees one program and one taskbar
+/// button. Development and installs without ZERO keep the normal browser fallback.
+#[cfg(windows)]
+fn abrir_en_guardiana_zero(url: &str) -> bool {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let Some(exe) = std::env::current_exe()
+        .ok()
+        .and_then(|p| {
+            p.parent()
+                .map(|p| p.join("ZERO").join("GUARDIANA ZERO.exe"))
+        })
+        .filter(|p| p.is_file())
+    else {
+        return false;
+    };
+    std::process::Command::new(exe)
+        .args(["--abrir-guardiana", url])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .is_ok()
 }
 
 /// The page the browser shows while the service comes up: the logo, one sentence, and a
@@ -297,6 +328,11 @@ pub fn run(_opts: &Opts) -> Result<(), Box<dyn Error>> {
         }
     }
     println!("{}", t.cli("panel.abriendo").replace("{url}", &url));
+    #[cfg(windows)]
+    if abrir_en_guardiana_zero(&url) {
+        soltar_consola();
+        return Ok(());
+    }
     crate::engine::open_in_browser(&url);
     #[cfg(windows)]
     soltar_consola();

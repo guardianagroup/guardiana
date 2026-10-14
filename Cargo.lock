@@ -417,7 +417,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-apps"
-version = "1.0.26"
+version = "1.0.27"
 dependencies = [
  "ferrisetw",
  "guardiana-core",
@@ -429,7 +429,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-classify"
-version = "1.0.26"
+version = "1.0.27"
 dependencies = [
  "guardiana-core",
  "guardiana-lists",
@@ -439,7 +439,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-cli"
-version = "1.0.26"
+version = "1.0.27"
 dependencies = [
  "getrandom 0.4.3",
  "guardiana-apps",
@@ -461,7 +461,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-core"
-version = "1.0.26"
+version = "1.0.27"
 dependencies = [
  "rusqlite",
  "serde",
@@ -471,14 +471,14 @@ dependencies = [
 
 [[package]]
 name = "guardiana-devices"
-version = "1.0.26"
+version = "1.0.27"
 dependencies = [
  "guardiana-core",
 ]
 
 [[package]]
 name = "guardiana-dns"
-version = "1.0.26"
+version = "1.0.27"
 dependencies = [
  "async-trait",
  "guardiana-core",
@@ -491,7 +491,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-license"
-version = "1.0.26"
+version = "1.0.27"
 dependencies = [
  "getrandom 0.4.3",
  "guardiana-core",
@@ -503,7 +503,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-lists"
-version = "1.0.26"
+version = "1.0.27"
 dependencies = [
  "guardiana-core",
  "idna",
@@ -513,7 +513,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-panel"
-version = "1.0.26"
+version = "1.0.27"
 dependencies = [
  "axum",
  "getrandom 0.4.3",
@@ -533,7 +533,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-service"
-version = "1.0.26"
+version = "1.0.27"
 dependencies = [
  "guardiana-core",
  "serde",
@@ -543,7 +543,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-verify"
-version = "1.0.26"
+version = "1.0.27"
 dependencies = [
  "guardiana-core",
  "guardiana-lists",
@@ -556,7 +556,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-zero"
-version = "1.0.26"
+version = "1.0.27"
 dependencies = [
  "base64",
  "guardiana-core",

@@ -15,6 +15,11 @@
     const fecha = (ms) => (ms ? new Date(ms).toLocaleString(LOC, { dateStyle: 'medium', timeStyle: 'short' }) : '');
     const rellena = (k, datos) => Object.entries(datos || {}).reduce((s, [a, b]) => s.split('{' + a + '}').join(b), t(k));
     const frase = (c) => rellena(c.frase, c.datos);
+    const conclusion = (r) => {
+      const s = r.resumen || {};
+      const clave = s.alerta ? 'rv_conclusion_alerta' : s.aviso ? 'rv_conclusion_aviso' : 'rv_conclusion_ok';
+      return rellena(clave, { alerta: s.alerta || 0, aviso: s.aviso || 0, ok: s.ok || 0, info: s.info || 0 });
+    };
     const marca = (m) => `<span class="rv-marca${FUERTES.has(m) ? ' fuerte' : ''}">${esc(t('rv_marca_' + m))}</span>`;
     let empezo = 0, reloj = null;
     const ordenEstado = { alerta: 4, aviso: 3, info: 2, nd: 2, ok: 1 };
@@ -52,6 +57,7 @@
       $('rv-cuando').textContent = r.corriendo ? t('rv_revisando') : r.cuando ? t('rv_cuando').replace('{fecha}', fecha(r.cuando)) + (r.desde ? ' · ' + t('rv_desde').replace('{fecha}', fecha(r.desde)) : '') : t('rv_aun_no');
       $('rv-msg').textContent = r.error ? t('rv_error').replace('{e}', r.error === 'no_windows' ? t('rv_no_windows') : r.error) : '';
       $('rv-ahora').disabled = !!r.corriendo;
+      $('rv-ahora').textContent = t(r.corriendo ? 'rv_boton_revisando' : 'rv_ahora');
       const e = r.equipo;
       $('rv-equipo').textContent = e && e.sistema ? [e.fabricante, e.modelo, e.sistema + (e.display ? ' ' + e.display : ''), e.compilacion ? 'build ' + e.compilacion + (e.ubr ? '.' + e.ubr : '') : ''].filter(Boolean).join(' · ') : '';
       $('rv-grupos').innerHTML = r.grupos.map((g) => `<section class="rv-grupo"><h2>${esc(t('rv_g_' + g.id))}</h2>${g.checks.map((c) => {
@@ -59,6 +65,8 @@
           `<li>${esc(i.t || '—')}${i.marcas.map(marca).join('')}${i.d || i.cuando ? `<div class="muted">${esc([i.d, i.cuando ? fecha(i.cuando) : ''].filter(Boolean).join(' · '))}</div>` : ''}</li>`).join('')}</ul></details>` : '';
         return `<div class="card rv-check ${c.estado}"><div class="rv-t"><span class="rv-punto ${c.estado}"></span>${esc(t('rv_t_' + c.id))}</div><div>${esc(frase(c))}</div>${lista}</div>`;
       }).join('')}</section>`).join('');
+      $('rv-conclusion').hidden = !!r.corriendo || !r.cuando;
+      $('rv-conclusion-texto').textContent = r.corriendo || !r.cuando ? '' : conclusion(r);
     };
 
     const carga = async () => { const r = await api('/api/revision'); pinta(r); return r; };
@@ -67,7 +75,7 @@
     const sigue = (r) => { clearTimeout(espera); espera = setTimeout(async () => { try { sigue(await carga()); } catch (_) {} }, r && r.corriendo ? 4000 : 300000); };
     sigue(await carga());
     $('rv-ahora').addEventListener('click', async () => {
-      $('rv-ahora').disabled = true; empezo = Date.now(); progreso(true);
+      $('rv-ahora').disabled = true; $('rv-ahora').textContent = t('rv_boton_revisando'); empezo = Date.now(); progreso(true);
       try { const r = await api('/api/revision/ahora', { method: 'POST' }); pinta(r); sigue(r); }
       catch (e) { progreso(false); $('rv-ahora').disabled = false; $('rv-msg').textContent = String(e.message || e); }
     });
@@ -78,6 +86,7 @@
       const r = ultimo; if (!r) return '';
       const l = [t('rv_titulo') + ' · ' + fecha(r.cuando), $('rv-equipo').textContent, ''];
       r.grupos.forEach((g) => { l.push('== ' + t('rv_g_' + g.id)); g.checks.forEach((c) => { l.push(`[${t('rv_resumen_' + (c.estado === 'nd' ? 'info' : c.estado)).trim()}] ${t('rv_t_' + c.id)}: ${frase(c)}`); c.lista.forEach((i) => l.push('   · ' + i.t + (i.marcas.length ? ' (' + i.marcas.map((m) => t('rv_marca_' + m)).join(', ') + ')' : ''))); }); l.push(''); });
+      l.push('== ' + t('rv_conclusion_titulo'), conclusion(r), '');
       return l.join('\n');
     };
     $('rv-json').addEventListener('click', () => {
@@ -107,6 +116,7 @@
           doc.gap(5);
         });
       });
+      doc.seccion(t('rv_conclusion_titulo')).line(conclusion(r), 10, false, 0.45);
       doc.gap(8).line(t('rv_pie'), 8, false, 0.45);
       const res = await ctx.pdf.savePdfFile(nombre('pdf'), doc.bytes(t('rv_pdf_pie')));
       $('rv-msg').textContent = res === 'cancelado' ? '' : t('rv_pdf_hecho');

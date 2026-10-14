@@ -308,6 +308,8 @@ struct Preferencias {
 struct Pestana {
     id: u32,
     perfil: Perfil,
+    /// Guardiana's own local control panel: always present and never reused for web browsing.
+    fija: bool,
     url: String,
     titulo: String,
     cargando: bool,
@@ -381,6 +383,7 @@ impl Pestana {
         Self {
             id,
             perfil,
+            fija: false,
             url: url.to_string(),
             titulo: String::new(),
             cargando: false,
@@ -624,6 +627,15 @@ pub const fn recurso_de_contexto(contexto: i32) -> Recurso {
 /// pings for link auditing, and WebRTC never revealing the local network address.
 pub const ARGUMENTOS_MOTOR: &str = "--disable-background-networking --disable-domain-reliability --disable-component-update --disable-sync --no-pings --force-webrtc-ip-handling-policy=default_public_interface_only";
 
+fn es_panel_guardiana(url: &str) -> bool {
+    url.starts_with("http://127.0.0.1:7443/")
+}
+
+fn es_enlace_panel_guardiana(url: &str) -> bool {
+    url.strip_prefix("http://127.0.0.1:7443/?t=")
+        .is_some_and(|token| token.len() == 64 && token.bytes().all(|b| b.is_ascii_hexdigit()))
+}
+
 impl Sesion {
     /// Open the session: read what was kept and open the first tab.
     #[must_use]
@@ -700,6 +712,34 @@ impl Sesion {
         s.licencia_ok = s.ultimo_guardado;
         let o = s.nueva_pestana(Perfil::General, INICIO);
         (s, o)
+    }
+
+    /// Open Guardiana's local panel inside this same window. The launcher only hands us the
+    /// loopback panel (or its local wait page), never an arbitrary external address.
+    pub fn abre_guardiana(&mut self, url: &str) -> Vec<Orden> {
+        let url = url.trim();
+        let espera_local = url.starts_with("file:///")
+            && url.ends_with("/guardiana-arrancando.html")
+            && !url.contains("../");
+        if url.len() > 8_192 || !(es_enlace_panel_guardiana(url) || espera_local) {
+            return Vec::new();
+        }
+        if let Some(id) = self.pestanas.iter().find(|p| p.fija).map(|p| p.id) {
+            return vec![Orden::Navega {
+                id,
+                url: url.to_owned(),
+            }]
+            .into_iter()
+            .chain(self.activar(id))
+            .collect();
+        }
+        let mut ordenes = self.nueva_pestana(Perfil::General, url);
+        if let Some(mut panel) = self.pestanas.pop() {
+            panel.fija = true;
+            self.pestanas.insert(0, panel);
+            ordenes.push(self.estado());
+        }
+        ordenes
     }
 
     /// The engine's version, once the shell knows it.
@@ -1119,6 +1159,7 @@ impl Sesion {
                     "cargando": p.cargando,
                     "aislada": p.perfil == Perfil::Aislada,
                     "mandato": p.perfil == Perfil::Mandato,
+                    "fija": p.fija,
                     "icono": if es_interna(&p.url) { "" } else { p.icono.as_str() },
                 })
             })
@@ -1596,6 +1637,9 @@ impl Sesion {
         let Some(i) = self.pestanas.iter().position(|p| p.id == id) else {
             return Vec::new();
         };
+        if self.pestanas[i].fija {
+            return self.activar(id);
+        }
         let p = self.pestanas.remove(i);
         self.preguntas.retain(|_, q| q.pestana != id);
         let mut o = vec![Orden::CierraPestana { id }];
@@ -1796,6 +1840,9 @@ impl Sesion {
                     _ => activa,
                 };
                 let url = a_direccion(texto(m, "texto"), buscador(&self.prefs.buscador));
+                if self.pestana(id).is_some_and(|p| p.fija) && !es_panel_guardiana(&url) {
+                    return self.nueva_pestana(Perfil::General, &url);
+                }
                 if let Some(p) = self.pestana_mut(id) {
                     p.escrita = Some(sin_fragmento(&url).to_string());
                 }
