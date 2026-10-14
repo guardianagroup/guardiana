@@ -131,7 +131,7 @@ def ciudades(d):
             c = linea.split('\t')
             # geonameid, name, asciiname, alternatenames, lat, lon, fclass, fcode, cc, cc2, admin1, ..., population
             nombre, lat, lon, cc, adm, pob = c[1], float(c[4]), float(c[5]), c[8], c[10], int(c[14] or 0)
-            out.append((nombre, cc, a1.get(f'{cc}.{adm}', ''), round(lat, 2), round(lon, 2), pob, c[2]))
+            out.append((nombre, cc, a1.get(f'{cc}.{adm}', ''), round(lat, 2), round(lon, 2), pob, c[2], c[3]))
     return out
 
 
@@ -214,8 +214,9 @@ def convertir(d):
     # Geofeeds: the operator declares the city of each block; GeoNames gives its coordinates.
     tabla = ciudades(d)
     porNombre = {}
-    for (nombre, cc, adm, lat, lon, pob, ascii_) in tabla:
-        for k in {norm(nombre), norm(ascii_)}:
+    for (nombre, cc, adm, lat, lon, pob, ascii_, otros) in tabla:
+        # Also by its other names (Frankfurt for «Frankfurt am Main», Bangalore for «Bengaluru»).
+        for k in {norm(nombre), norm(ascii_), *(norm(x) for x in otros.split(',') if x and x.isascii())}:
             porNombre.setdefault((k, cc), []).append((pob, nombre, adm, lat, lon))
     muestras = []
     for p, archivo in (('do', 'do.csv'), ('linode', 'linode.csv'), ('vultr', 'vultr.csv')):
@@ -229,10 +230,10 @@ def convertir(d):
             cand = porNombre.get((norm(ciudad), cc)) or porNombre.get((norm(re.sub(r'\s*\(.*\)$', '', ciudad)), cc))
             if not ciudad or not cand:
                 sin += 1
-                if len(muestras) < 25:
+                if len(muestras) < 200 and f'{p}:{ciudad}|{cc}' not in muestras:
                     muestras.append(f'{p}:{ciudad}|{cc}')
                 continue
-            pob, nombre, adm, lat, lon = max(cand)
+            pob, nombre, adm, lat, lon = max(cand)  # the biggest city of that name in that country
             try:
                 anota(pref, lugar(p, f'{nombre}|{cc}', nombre + (f', {adm}' if adm else ''), cc, lat, lon, 'geofeed del operador'))
                 n += 1
@@ -269,7 +270,7 @@ def convertir(d):
     os.makedirs(TIERRA, exist_ok=True)
     with open(os.path.join(TIERRA, 'ciudades.tsv'), 'w', encoding='utf-8', newline='\n') as f:
         f.write('# GeoNames cities15000, CC BY 4.0, https://www.geonames.org — nombre, país, división, lat, lon\n')
-        for (nombre, cc, adm, lat, lon, pob, _a) in sorted(tabla, key=lambda x: -x[5]):
+        for (nombre, cc, adm, lat, lon, pob, _a, _o) in sorted(tabla, key=lambda x: -x[5]):
             f.write(f'{nombre}\t{cc}\t{adm}\t{lat}\t{lon}\n')
 
     desc = json.load(open(ruta('descargas.json'))) if os.path.exists(ruta('descargas.json')) else {}
@@ -281,6 +282,7 @@ def convertir(d):
         'rangos_v4': len(t4), 'rangos_v6': len(t6),
         'ciudades': len(tabla),
         'sin_sitio': dict(sorted(sin_sitio.items(), key=lambda x: -x[1])),
+        'ciudades_sin_encontrar': muestras,
         'sha256': {
             'nube-ip.bin': sha256(bytes(out)),
             'lugares.json': sha256(open(os.path.join(DATA, 'lugares.json'), 'rb').read()),
