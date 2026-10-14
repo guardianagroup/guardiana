@@ -597,30 +597,23 @@
       cx.globalCompositeOperation = 'lighter';
       // Arcos: un velo ancho y un hilo fino, más vivo en el centro del recorrido.
       VISIBLES.forEach((d) => {
-        const bl = bloqueado(d), col = bl ? '#ff6b7a' : prod(d.p).color, n = d.ruta.length - 1;
+        const bl = bloqueado(d), col = bl ? '#ff6b7a' : prod(d.p).color;
         if (bl) {
           trazo(d.ruta, 0, d.tg, 'rgba(255,107,122,.7)', 1.3);
           trazo(d.ruta, d.tg, 1, 'rgba(160,175,200,.16)', 1, [2, 6]);
           return;
         }
-        for (let s = 0; s < 6; s++) {
-          const a0 = s / 6, a1 = (s + 1) / 6, mid = 1 - Math.abs((a0 + a1) / 2 - 0.5) * 1.4;
-          trazo(d.ruta, a0, Math.min(1, a1 + 1 / n), col + Math.round(18 + 22 * mid).toString(16).padStart(2, '0'), 5);
-          trazo(d.ruta, a0, Math.min(1, a1 + 1 / n), col + Math.round(110 + 120 * mid).toString(16).padStart(2, '0'), 1.1);
-        }
+        trazo(d.ruta, 0, 1, col + '28', 2.2);
+        trazo(d.ruta, 0, 1, col + 'd0', 1.05);
       });
-      // Columnas de luz en los servidores.
+      // Solo el punto donde llega el dato. El nombre sale al pasar el cursor, no escrito encima.
       VISIBLES.forEach((d) => {
         if (!d.base.v) return;
-        const bl = bloqueado(d), col = bl ? '255,107,122' : d.doc ? '255,181,71' : '255,209,102';
-        const gr = cx.createLinearGradient(d.base.x, d.base.y, d.cima.x, d.cima.y);
-        gr.addColorStop(0, `rgba(${col},.95)`); gr.addColorStop(1, `rgba(${col},0)`);
-        cx.strokeStyle = gr; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(d.base.x, d.base.y); cx.lineTo(d.cima.x, d.cima.y); cx.stroke();
-        cx.lineWidth = 7; cx.globalAlpha = 0.25; cx.stroke(); cx.globalAlpha = 1;
-        const pulso = (tt * 0.6 + d.i * 0.13) % 1;
-        trazoPuntos(circuloSuelo(d.lon, d.lat, 0.6 + pulso * 2.2, 28), `rgba(${col},${0.55 * (1 - pulso)})`, 1.2);
-        cx.drawImage(brillo(bl ? '#ff6b7a' : '#ffb547'), d.base.x - 9, d.base.y - 9, 18, 18);
-        st.dianas.push({ x: d.base.x, y: d.base.y, r: 14, tipo: 'dest', ref: d });
+        const bl = bloqueado(d);
+        const sobre = st.hover && st.hover.tipo === 'dest' && st.hover.ref === d;
+        const r = sobre ? 13 : 6.5;
+        cx.drawImage(brillo(bl ? '#ff6b7a' : '#ffb547'), d.base.x - r, d.base.y - r, r * 2, r * 2);
+        st.dianas.push({ x: d.base.x, y: d.base.y, r: 18, tipo: 'dest', ref: d });
       });
       // El escudo de GUARDIANA sobre tu ordenador.
       if (L.cen.v) {
@@ -629,32 +622,11 @@
         const gr = cx.createLinearGradient(L.cen.x, L.cen.y, cima.x, cima.y); gr.addColorStop(0, 'rgba(63,224,197,.9)'); gr.addColorStop(1, 'rgba(63,224,197,0)');
         cx.strokeStyle = gr; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(L.cen.x, L.cen.y); cx.lineTo(cima.x, cima.y); cx.stroke();
         cx.drawImage(brillo('#3fe0c5'), L.cen.x - 16, L.cen.y - 16, 32, 32);
-        st.dianas.push({ x: L.cen.x, y: L.cen.y, r: 10, tipo: 'yo' });
-        L.prods.forEach((q) => { cx.drawImage(brillo(q.p.color), q.x - 8, q.y - 8, 16, 16); st.dianas.push({ x: q.x, y: q.y, r: 9, tipo: 'prod', ref: q.p }); });
-        cx.globalCompositeOperation = 'source-over';
-        rotulo(cima.x + 8, cima.y - 4, t('pd_tu_ordenador').toUpperCase() + ' · ' + rotuloYo().toUpperCase(), '#3fe0c5');
-        cx.globalCompositeOperation = 'lighter';
+        st.dianas.push({ x: L.cen.x, y: L.cen.y, r: 16, tipo: 'yo' });
+        L.prods.forEach((q) => { cx.drawImage(brillo(q.p.color), q.x - 7, q.y - 7, 14, 14); st.dianas.push({ x: q.x, y: q.y, r: 12, tipo: 'prod', ref: q.p }); });
       }
       particulas(dt);
       cx.globalCompositeOperation = 'source-over';
-      // Rótulos: país y empresas dueñas de las redes, junto a las columnas, sin pisarse.
-      const puestos = [];
-      // La velocidad de los tres flujos más vivos, sobre lo alto de su arco.
-      if (st.W >= 700) VISIBLES.filter((d) => !bloqueado(d) && d.ema > 800).sort((a, b) => b.ema - a.ema).slice(0, 3).forEach((d) => {
-        const cima = d.ruta[Math.round(d.ruta.length * 0.55)];
-        if (!cima || !cima.v) return;
-        rotulo(cima.x + 6, cima.y - 6, `↑ ${bytes(d.ema)}/s · ${d.host.split('.')[0]}`, prod(d.p).color, puestos);
-      });
-      // Close enough (zoom), every destination says its name next to its point.
-      if (pxPorGrado() > 16) { VISIBLES.forEach((d) => { if (d.base.v && d.base.x > -20 && d.base.x < st.W && d.base.y > 10 && d.base.y < st.H) rotulo(d.base.x + 9, d.base.y + 5, rotuloLugar(d), bloqueado(d) ? '#ff8d99' : '#d6e6f2', puestos); }); return; }
-      // En el móvil, sin rótulos: se ve el mundo y se toca para saber más.
-      if (st.W >= 700) paisesUsados.forEach((c) => {
-        const ds = VISIBLES.filter((d) => d.pais === c), d0 = ds.reduce((a, d) => (d.cima.y < a.cima.y ? d : a), ds[0]);
-        if (!d0.cima.v) return;
-        const todas = [...new Set(ds.map((d) => d.red).filter((r) => r && r[0] !== '@'))], redes = todas.slice(0, 3).join(' · ') + (todas.length > 3 ? ` +${todas.length - 3}` : '');
-        const corta = ds.every(bloqueado);
-        rotulo(d0.cima.x + 6, d0.cima.y - 2, redes ? t('pd_rotulo_pais').replace('{pais}', nombrePais(c)).replace('{redes}', redes) : nombrePais(c), corta ? '#ff8d99' : '#f3e3c8', puestos);
-      });
     };
     const rotulo = (x, y, txt, col, puestos) => {
       cx.font = '500 10.5px "IBM Plex Mono", monospace';
@@ -737,14 +709,6 @@
       L.prods.forEach(nodoProducto);
       particulas(dt);
       VISIBLES.forEach((d) => nodoDestino(d, false));
-      const puestos = [];
-      rotulo(L.cen.x + 12, L.cen.y - 14, t('pd_tu_ordenador').toUpperCase() + ' · ' + rotuloYo().toUpperCase(), '#3fe0c5', puestos);
-      if (pxPorGrado() > 16) { VISIBLES.forEach((d) => { if (d.x > -20 && d.x < st.W && d.y > 10 && d.y < st.H) rotulo(d.x + 9, d.y + 5, rotuloLugar(d), bloqueado(d) ? '#ff8d99' : '#d6e6f2', puestos); }); return; }
-      if (st.W >= 700) paisesUsados.forEach((c) => {
-        const ds = VISIBLES.filter((d) => d.pais === c), d0 = ds[0];
-        const todas = [...new Set(ds.map((d) => d.red).filter((r) => r && r[0] !== '@'))], redes = todas.slice(0, 2).join(' · ') + (todas.length > 2 ? ` +${todas.length - 2}` : '');
-        rotulo(d0.x + 8, d0.y - 6, redes ? t('pd_rotulo_pais').replace('{pais}', nombrePais(c)).replace('{redes}', redes) : nombrePais(c), ds.every(bloqueado) ? '#ff8d99' : '#f3e3c8', puestos);
-      });
     };
 
 
@@ -855,8 +819,7 @@
         return true;
       });
     };
-    // Labels only for the ones that move most (and the cut ones): the rest on hover.
-    const conNombre = (d) => st.W >= 700 && (bloqueado(d) || VISIBLES.indexOf(d) < 22);
+    // Los nombres no se pintan en el mapa: la ficha sale al pasar el cursor por el punto.
 
     // ---------- Programas: the activity explorer (13 Oct 2026) ----------
     // The owner found the Sankey hard to read; Grok and ChatGPT, asked as a design agency, both
@@ -1764,7 +1727,7 @@
       // the short guided flight opened by «View close up».
       const quieto = ahora - st.ultimoGesto > 120000;
       const activo = !!(st.vuelo || st.inercia || st.interactuando || arrastre || pellizco);
-      if (ahora - antes < (activo ? 16 : quieto ? 48 : 31)) return;
+      if (ahora - antes < (activo || st.raton ? 16 : quieto ? 40 : 20)) return;
       const dt = Math.min(0.06, (ahora - antes) / 1000); antes = ahora;
       try {
         if (st.inercia && !reducido) {
