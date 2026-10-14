@@ -724,6 +724,23 @@ impl Sesion {
         if url.len() > 8_192 || !(es_enlace_panel_guardiana(url) || espera_local) {
             return Vec::new();
         }
+        // The program is opening: the start page has not been shown yet. Point that one tab at
+        // the panel instead of opening a second one on top of it. Two pages, one after the
+        // other, was the screen being hit several times (the owner, 14 Oct 2026).
+        if self.pestanas.len() == 1 && self.pestanas[0].url == INICIO {
+            let id = self.pestanas[0].id;
+            let perfil = self.pestanas[0].perfil;
+            self.pestanas[0].url = url.to_owned();
+            self.pestanas[0].fija = true;
+            let mut o = vec![Orden::CreaPestana {
+                id,
+                perfil,
+                url: Some(url.to_owned()),
+                de: None,
+            }];
+            o.extend(self.activar(id));
+            return o;
+        }
         if let Some(id) = self.pestanas.iter().find(|p| p.fija).map(|p| p.id) {
             return vec![Orden::Navega {
                 id,

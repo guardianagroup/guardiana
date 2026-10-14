@@ -12,7 +12,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::ffi::c_void;
 use std::io::Write as _;
-use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use guardiana_zero::licencia::{Estado as EstadoLicencia, Fallo, Lugar as LugarLicencia};
 use guardiana_zero::sesion::{self, Arranque, Orden, Origen, Perfil, Sesion};
@@ -81,6 +81,9 @@ const CLASE: PCWSTR = w!("GuardianaZeroVentana");
 const WM_ORDENES: u32 = WM_APP + 1;
 /// The session's clock (batches, figures, saves).
 const TIC: usize = 1;
+/// Shown once, when a page has loaded: not empty, then white, then the page.
+static VENTANA_LISTA: AtomicBool = AtomicBool::new(false);
+static TICS_SIN_PAGINA: AtomicU32 = AtomicU32::new(0);
 
 /// A string the way Win32 wants it: UTF-16, ending in zero, alive while it is used.
 struct Ancho(Vec<u16>);
@@ -208,6 +211,18 @@ fn con_vistas<R>(f: impl FnOnce(&mut Vistas) -> R) -> Option<R> {
 
 fn hwnd() -> HWND {
     con_vistas(|v| v.hwnd).unwrap_or(HWND(std::ptr::null_mut()))
+}
+
+/// One appearance. Called when the first page has loaded, or after a few seconds if it has not.
+fn muestra_ventana() {
+    if VENTANA_LISTA.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let h = hwnd();
+    unsafe {
+        let _ = ShowWindow(h, SW_SHOW);
+        let _ = SetForegroundWindow(h);
+    }
 }
 
 /// A line in the browser's own log (`datos/registro.txt`): what failed, for whoever has to look.
@@ -1240,6 +1255,10 @@ fn eventos_pestana(id: u32, web: &ICoreWebView2) -> windows::core::Result<()> {
                             con_sesion(|s| s.historial(id, a.as_bool(), b.as_bool()))
                                 .unwrap_or_default(),
                         );
+                        let url = texto_de(|p| w.Source(p));
+                        if !(url.is_empty() || url.starts_with("about:")) {
+                            muestra_ventana();
+                        }
                     }
                     encola(o);
                     Ok(())
@@ -1564,6 +1583,12 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
             recoge_licencia();
             encola(con_sesion(Sesion::tic).unwrap_or_default());
             drena();
+            // A page that never arrives still has to appear: three seconds, then the window.
+            if !VENTANA_LISTA.load(Ordering::Relaxed)
+                && TICS_SIN_PAGINA.fetch_add(1, Ordering::Relaxed) >= 15
+            {
+                muestra_ventana();
+            }
             LRESULT(0)
         }
         WM_ORDENES => {
@@ -1889,7 +1914,10 @@ pub fn arranca() {
     let _ = LUGAR.set(lugar.clone());
     let mut iniciales = iniciales;
     if let Some(url) = abrir_guardiana.as_deref() {
-        iniciales.extend(s.abre_guardiana(url));
+        let o = s.abre_guardiana(url);
+        if !o.is_empty() {
+            iniciales = o;
+        }
     }
     iniciales.extend(s.pon_lugar_licencia(lugar));
     let estricto = s.seguimiento_estricto();
@@ -1932,7 +1960,6 @@ pub fn arranca() {
         return;
     }
     unsafe {
-        let _ = ShowWindow(h, SW_SHOW);
         SetTimer(Some(h), TIC, 200, None);
         let mut msg = MSG::default();
         while GetMessageW(&mut msg, None, 0, 0).0 > 0 {
