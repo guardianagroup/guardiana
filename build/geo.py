@@ -217,6 +217,7 @@ def convertir(d):
     for (nombre, cc, adm, lat, lon, pob, ascii_) in tabla:
         for k in {norm(nombre), norm(ascii_)}:
             porNombre.setdefault((k, cc), []).append((pob, nombre, adm, lat, lon))
+    muestras = []
     for p, archivo in (('do', 'do.csv'), ('linode', 'linode.csv'), ('vultr', 'vultr.csv')):
         if not os.path.exists(ruta(archivo)):
             continue
@@ -225,9 +226,11 @@ def convertir(d):
             if not fila or fila[0].startswith('#') or len(fila) < 4:
                 continue
             pref, cc, _reg, ciudad = fila[0].strip(), fila[1].strip().upper(), fila[2].strip(), fila[3].strip()
-            cand = porNombre.get((norm(ciudad), cc))
+            cand = porNombre.get((norm(ciudad), cc)) or porNombre.get((norm(re.sub(r'\s*\(.*\)$', '', ciudad)), cc))
             if not ciudad or not cand:
                 sin += 1
+                if len(muestras) < 25:
+                    muestras.append(f'{p}:{ciudad}|{cc}')
                 continue
             pob, nombre, adm, lat, lon = max(cand)
             try:
@@ -286,6 +289,8 @@ def convertir(d):
     }
     json.dump(meta, open(os.path.join(DATA, 'geo.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
     print(json.dumps({k: meta[k] for k in ('prefijos', 'lugares', 'rangos_v4', 'rangos_v6', 'ciudades')}, ensure_ascii=False))
+    for m in muestras:
+        print(f'::notice title=ciudad sin encontrar::{m}')
     for k, v in list(meta['sin_sitio'].items())[:60]:
         print(f'::notice title=sin sitio::{k} ({v})')
 

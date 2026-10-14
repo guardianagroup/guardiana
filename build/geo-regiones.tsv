@@ -179,3 +179,10 @@ oracle	ap-seoul-1	Seúl	KR	37.6	127.0
 oracle	ap-chuncheon-1	Chuncheon	KR	37.9	127.7
 oracle	ap-sydney-1	Sídney	AU	-33.9	151.2
 oracle	ap-melbourne-1	Melbourne	AU	-37.8	145.0
+aws	eusc-de-east-1	Brandeburgo (nube soberana europea)	DE	52.4	13.1
+aws	ap-east-2	Taipéi	TW	25.0	121.5
+azure	switzerlandn	Zúrich	CH	47.4	8.5
+azure	germanywc	Fráncfort	DE	50.1	8.7
+azure	centralfrance	París	FR	48.9	2.4
+azure	centraluseuap	Iowa (Des Moines)	US	41.6	-93.6
+azure	eastus2euap	Virginia	US	36.7	-78.4
