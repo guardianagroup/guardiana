@@ -89,6 +89,102 @@ struct Programa {
     cortado: bool,
     enviados: u64,
     recibidos: u64,
+    /// What it does inside the computer now, as Windows counts it (1.0.24, antivirus only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    actividad: Option<ActividadAv>,
+}
+
+/// An antivirus inside the computer: processor, memory and input/output, measured each time the
+/// page asks (every 5 s), as rates between two takes. Nothing estimated: until there are two
+/// takes, the rates are absent and the page says it is measuring.
+#[derive(Serialize, Clone, Default)]
+struct ActividadAv {
+    /// Its processes running now.
+    procesos: u32,
+    /// Share of the whole computer's processor in the last interval, 0–100.
+    cpu: Option<f64>,
+    /// Memory it holds in RAM now, bytes.
+    memoria: u64,
+    /// Bytes per second it read and wrote in the last interval.
+    lee: Option<u64>,
+    escribe: Option<u64>,
+    /// The last five minutes, one value per take: processor % and bytes/s read + written.
+    serie_cpu: Vec<f64>,
+    serie_es: Vec<u64>,
+}
+
+/// The takes of each antivirus product: (time ms, cpu ms, read, written).
+type Tomas = HashMap<String, std::collections::VecDeque<(i64, u64, u64, u64)>>;
+
+fn actividad_antivirus(now: i64) -> HashMap<String, ActividadAv> {
+    static TOMAS: std::sync::Mutex<Option<Tomas>> = std::sync::Mutex::new(None);
+    let nombres: Vec<String> = antivirus::antivirus()
+        .iter()
+        .flat_map(|a| a.programas.iter().map(|p| (*p).to_owned()))
+        .collect();
+    let mut por_av: HashMap<String, (u32, u64, u64, u64, u64)> = HashMap::new();
+    for a in guardiana_apps::actividad(&nombres) {
+        if let Some(av) = antivirus::antivirus_de_programa(&a.nombre) {
+            let e = por_av.entry(av.nombre.to_owned()).or_default();
+            e.0 += a.procesos;
+            e.1 += a.cpu_ms;
+            e.2 += a.leido;
+            e.3 += a.escrito;
+            e.4 += a.memoria;
+        }
+    }
+    let cpus = std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
+    let Ok(mut g) = TOMAS.lock() else {
+        return HashMap::new();
+    };
+    let tomas = g.get_or_insert_with(HashMap::new);
+    tomas.retain(|k, _| por_av.contains_key(k));
+    let mut out = HashMap::new();
+    for (av, (procesos, cpu_ms, lee, escribe, memoria)) in por_av {
+        let t = tomas.entry(av.clone()).or_default();
+        t.push_back((now, cpu_ms, lee, escribe));
+        while t.len() > 61 || t.front().is_some_and(|x| now - x.0 > 6 * 60_000) {
+            t.pop_front();
+        }
+        // Rates between consecutive takes; a counter that went back (a process restarted) gives
+        // no rate for that step rather than a wrong one.
+        let pasos: Vec<(f64, Option<u64>, Option<u64>)> = t
+            .iter()
+            .zip(t.iter().skip(1))
+            .filter_map(|(a, b)| {
+                let dt = b.0 - a.0;
+                if dt <= 0 {
+                    return None;
+                }
+                let dt_f = dt as f64;
+                let cpu = b.1.checked_sub(a.1).map_or(0.0, |d| {
+                    (d as f64 / (dt_f * cpus as f64) * 100.0).min(100.0)
+                });
+                let por_s = |x: u64, y: u64| {
+                    y.checked_sub(x)
+                        .map(|d| d * 1000 / u64::try_from(dt).unwrap_or(1).max(1))
+                };
+                Some((cpu, por_s(a.2, b.2), por_s(a.3, b.3)))
+            })
+            .collect();
+        let ultimo = pasos.last().copied();
+        out.insert(
+            av,
+            ActividadAv {
+                procesos,
+                cpu: ultimo.map(|u| (u.0 * 10.0).round() / 10.0),
+                memoria,
+                lee: ultimo.and_then(|u| u.1),
+                escribe: ultimo.and_then(|u| u.2),
+                serie_cpu: pasos.iter().map(|p| (p.0 * 10.0).round() / 10.0).collect(),
+                serie_es: pasos
+                    .iter()
+                    .map(|p| p.1.unwrap_or(0) + p.2.unwrap_or(0))
+                    .collect(),
+            },
+        );
+    }
+    out
 }
 
 #[derive(Serialize)]
@@ -161,7 +257,11 @@ fn lugar_servidor(lugares: &HashMap<String, u64>) -> Option<LugarServidor> {
         lat: l.lat,
         lon: l.lon,
         operador: l.proveedor.clone(),
-        region: if geofeed { String::new() } else { l.region.clone() },
+        region: if geofeed {
+            String::new()
+        } else {
+            l.region.clone()
+        },
         fuente: if geofeed { "geofeed" } else { "region" },
     })
 }
@@ -491,10 +591,27 @@ pub(crate) async fn universo(
         })
         .collect();
 
+    // An antivirus that is running is shown even when it sent nothing in the window: what it does
+    // inside the computer is measured too (1.0.24).
+    let mut actividad = actividad_antivirus(now);
+    for av in actividad.keys() {
+        progs.entry(av.clone()).or_insert_with(|| ProgAcc {
+            tipo: "antivirus",
+            procesos: antivirus::antivirus()
+                .iter()
+                .find(|a| a.nombre == av)
+                .map(|a| a.programas.iter().map(|p| (*p).to_owned()).collect())
+                .unwrap_or_default(),
+            firma: String::new(),
+            enviados: 0,
+            recibidos: 0,
+        });
+    }
     let mut programas: Vec<Programa> = progs
         .into_iter()
         .filter(|(id, p)| vale(id, p.tipo))
         .map(|(id, p)| Programa {
+            actividad: actividad.remove(&id),
             cortable: p.tipo == "antivirus",
             cortado: cortados.iter().any(|c| c == &id),
             id,

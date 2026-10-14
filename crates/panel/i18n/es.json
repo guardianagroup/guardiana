@@ -2250,6 +2250,16 @@
     "pd_precisar_denegado": "No diste permiso para la ubicación: GUARDIANA sigue usando la zona horaria del sistema. Puedes darlo desde el candado de la barra de direcciones.",
     "pd_precisar_fallo": "Este equipo no ha podido decir dónde está (sin servicio de ubicación o sin respuesta). Se sigue usando la zona horaria del sistema.",
     "pd_precisar_no": "Este navegador no ofrece la ubicación del equipo.",
-    "pd_lugar_equipo": "Lugar medido por este equipo, redondeado a unos 10 km."
+    "pd_lugar_equipo": "Lugar medido por este equipo, redondeado a unos 10 km.",
+    "pd_av_dentro": "{prog}, dentro del ordenador",
+    "pd_av_dentro_midiendo": "Midiendo: la primera cifra llega en la siguiente lectura (5 segundos).",
+    "pd_av_cpu": "Procesador",
+    "pd_av_memoria": "memoria",
+    "pd_av_lee": "Lee",
+    "pd_av_escribe": "escribe",
+    "pd_av_procesos": "{n} procesos",
+    "pd_av_procesos_uno": "1 proceso",
+    "pd_av_es": "Lee y escribe",
+    "pd_av_dentro_nota": "Contadores de Windows (los mismos del Administrador de tareas), de 5 en 5 segundos mientras esta página está abierta. «Lee y escribe» es todo lo que pide el programa, a archivos y a otros dispositivos: no dice qué archivos. Un antivirus tiene que leer para protegerte."
   }
 }

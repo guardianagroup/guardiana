@@ -2250,6 +2250,16 @@
     "pd_precisar_denegado": "A permissão de localização não foi dada: a GUARDIANA continua usando o fuso horário do sistema. Você pode permitir pelo cadeado da barra de endereços.",
     "pd_precisar_fallo": "Este computador não conseguiu dizer onde está (sem serviço de localização ou sem resposta). Continua sendo usado o fuso horário do sistema.",
     "pd_precisar_no": "Este navegador não oferece a localização do computador.",
-    "pd_lugar_equipo": "Lugar medido por este computador, arredondado a uns 10 km."
+    "pd_lugar_equipo": "Lugar medido por este computador, arredondado a uns 10 km.",
+    "pd_av_dentro": "{prog}, dentro do computador",
+    "pd_av_dentro_midiendo": "Medindo: o primeiro número chega na próxima leitura (5 segundos).",
+    "pd_av_cpu": "Processador",
+    "pd_av_memoria": "memória",
+    "pd_av_lee": "Lê",
+    "pd_av_escribe": "escreve",
+    "pd_av_procesos": "{n} processos",
+    "pd_av_procesos_uno": "1 processo",
+    "pd_av_es": "Lê e escreve",
+    "pd_av_dentro_nota": "Contadores do Windows (os mesmos do Gerenciador de Tarefas), de 5 em 5 segundos enquanto esta página está aberta. «Lê e escreve» é tudo o que o programa pede, a arquivos e a outros dispositivos: não diz quais arquivos. Um antivírus precisa ler para proteger você."
   }
 }

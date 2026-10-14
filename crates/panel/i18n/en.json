@@ -2250,6 +2250,16 @@
     "pd_precisar_denegado": "Location permission was not given: GUARDIANA keeps using the system's time zone. You can allow it from the padlock in the address bar.",
     "pd_precisar_fallo": "This computer could not say where it is (no location service or no answer). The system's time zone is still used.",
     "pd_precisar_no": "This browser does not offer the computer's location.",
-    "pd_lugar_equipo": "Place measured by this computer, rounded to about 10 km."
+    "pd_lugar_equipo": "Place measured by this computer, rounded to about 10 km.",
+    "pd_av_dentro": "{prog}, inside the computer",
+    "pd_av_dentro_midiendo": "Measuring: the first figure arrives with the next reading (5 seconds).",
+    "pd_av_cpu": "Processor",
+    "pd_av_memoria": "memory",
+    "pd_av_lee": "Reads",
+    "pd_av_escribe": "writes",
+    "pd_av_procesos": "{n} processes",
+    "pd_av_procesos_uno": "1 process",
+    "pd_av_es": "Reads and writes",
+    "pd_av_dentro_nota": "Windows counters (the same as Task Manager), every 5 seconds while this page is open. «Reads and writes» is everything the program asks for, to files and other devices: it does not say which files. An antivirus has to read to protect you."
   }
 }

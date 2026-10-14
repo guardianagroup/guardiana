@@ -55,6 +55,8 @@ pub const MAXIMO: usize = 2_048;
 pub mod cortafuegos;
 pub use cortafuegos::{Cortafuegos, Destino, ErrorCorte};
 #[cfg(windows)]
+mod actividad;
+#[cfg(windows)]
 mod firmas;
 #[cfg(windows)]
 mod red;
@@ -268,5 +270,38 @@ mod pruebas {
             .expect("debería no estar disponible");
         assert!(matches!(e, Error::NoSoportado));
         assert!(e.to_string().contains("solo Windows"));
+    }
+}
+
+/// What one program did inside the computer, summed over its processes, as Windows counts it
+/// (1.0.24). Counters since each process started: the panel turns two takes into rates.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Actividad {
+    /// The program's file name as Windows lists it (`MsMpEng.exe`).
+    pub nombre: String,
+    /// How many of its processes are running now.
+    pub procesos: u32,
+    /// Processor time used, kernel and user, in milliseconds.
+    pub cpu_ms: u64,
+    /// Bytes it read (files and other devices: everything the process asked for).
+    pub leido: u64,
+    /// Bytes it wrote, likewise.
+    pub escrito: u64,
+    /// Memory it holds in RAM now (working set), in bytes.
+    pub memoria: u64,
+}
+
+/// The counters of the programs with these file names that are running now. Windows only;
+/// elsewhere, nothing (and the page says this system does not measure it).
+#[must_use]
+pub fn actividad(nombres: &[String]) -> Vec<Actividad> {
+    #[cfg(windows)]
+    {
+        actividad::actividad(nombres)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = nombres;
+        Vec::new()
     }
 }

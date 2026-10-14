@@ -191,7 +191,7 @@
       r.programas.forEach((p) => {
         let o = PROD.find((x) => x.id === p.id);
         if (!o) o = nuevoProducto(p);
-        Object.assign(o, { tipo: p.tipo, procesos: p.procesos, firma: p.firma, cortable: p.cortable, cortado: p.cortado, sub: p.enviados, baj: p.recibidos });
+        Object.assign(o, { tipo: p.tipo, procesos: p.procesos, firma: p.firma, cortable: p.cortable, cortado: p.cortado, sub: p.enviados, baj: p.recibidos, act: p.actividad || null });
       });
       const rec = [], vistos = new Set();
       r.destinos.forEach((x) => {
@@ -888,7 +888,7 @@
       const abierto = abiertoExpl === p.id;
       const top = ds.filter((d) => d.sub > 0).slice(0, 2);
       const resto = ds.length - top.length;
-      const tipo = esc(tipoTexto(p)) + (p.firma ? ' · ' + esc(t('pd_firmado').replace('{firma}', p.firma)) : '');
+      const tipo = esc(tipoTexto(p)) + (p.act && p.act.cpu !== null && p.act.cpu !== undefined ? ' · ' + esc(t('pd_av_cpu')) + ' ' + esc(pct1(p.act.cpu)) + ' · ' + esc(bytes(p.act.memoria)) : '') + (p.firma ? ' · ' + esc(t('pd_firmado').replace('{firma}', p.firma)) : '');
       let h = `<div class="ex-prog${abierto ? ' abierto' : ''}${p.cortado ? ' cortado' : ''}" data-c="${p.color}">
         <button type="button" class="ex-fila" data-expl="${esc(p.id)}" aria-expanded="${abierto}">
           <span class="ex-nombre"><span class="pto${activo ? ' vivo' : ''}" aria-hidden="true"></span><span><b>${esc(p.nombre)}</b><span class="t">${tipo}</span></span></span>
@@ -1042,8 +1042,20 @@
     // The antivirus, in full (the owner, 13 Oct 2026: «la telemetría de él todo el tiempo me gustaría
     // tenerla revisada… se ve muy pobre»): what for, by its maker's own documentation; where to;
     // the last five minutes; when it last spoke; its lookups by day and by night. All measured here.
+    // Inside the computer (1.0.24): processor, memory and reads/writes, as Windows counts them.
+    const pct1 = (x) => (x === null || x === undefined ? '—' : `${x.toLocaleString(LOC, { maximumFractionDigits: 1 })} %`);
+    const htmlDentroAV = (p) => {
+      const a = p.act; if (!a) return '';
+      const midiendo = a.cpu === null || a.cpu === undefined;
+      let h = `<div class="sub-av">${esc(t('pd_av_dentro').replace('{prog}', p.nombre))}</div>`;
+      h += midiendo ? `<div class="t">${esc(t('pd_av_dentro_midiendo'))}</div>` : `<div>${esc(t('pd_av_cpu'))} <b>${esc(pct1(a.cpu))}</b> · ${esc(t('pd_av_memoria'))} <b>${esc(bytes(a.memoria))}</b></div><div>${esc(t('pd_av_lee'))} <span class="i">${esc(bytes(a.lee || 0))}/s</span> · ${esc(t('pd_av_escribe'))} <span class="o">${esc(bytes(a.escribe || 0))}/s</span> · ${esc(tn('pd_av_procesos', a.procesos))}</div>`;
+      const bc = bloques(a.serie_cpu || []), be = bloques(a.serie_es || []);
+      if (bc) h += `<div class="fila"><span class="t">${esc(t('pd_av_cpu'))}</span><span class="bloques">${esc(bc)}</span></div>`;
+      if (be) h += `<div class="fila"><span class="t">${esc(t('pd_av_es'))}</span><span class="bloques">${esc(be)}</span></div>`;
+      return h + `<div class="t">${esc(t('pd_av_dentro_nota'))}</div>`;
+    };
     const htmlAV = (A) => {
-      let h = '';
+      let h = A.ps.map(htmlDentroAV).join('');
       const porUso = {};
       A.ds.forEach((d) => { const k = d.doc === false ? 'sin' : d.doc ? d.uso || 'otros' : null; if (!k) return; const u = porUso[k] || (porUso[k] = [0, 0]); u[0] += d.sub; u[1] += d.baj; });
       const usos = Object.entries(porUso).sort((a, b) => b[1][0] + b[1][1] - (a[1][0] + a[1][1]));
