@@ -90,15 +90,16 @@ Seccion 'sistema' {
     if ($t.Count) { $o.tpm = [ordered]@{ activo = [bool]$t[0].IsEnabled_InitialValue; version = ([string]$t[0].SpecVersion -split ',')[0].Trim() } } else { $o.tpm = 'ninguno' }
   } catch {}
   try { $o.cifrado = @(Get-CimInstance -Namespace root/cimv2/security/microsoftvolumeencryption -ClassName Win32_EncryptableVolume | ForEach-Object { [ordered]@{ unidad = [string]$_.DriveLetter; proteccion = [int]$_.ProtectionStatus } }) } catch {}
-  $o.integridad_memoria = ((Prop 'HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity' 'Enabled') -eq 1)
+  try { $dg = Get-CimInstance -Namespace root/Microsoft/Windows/DeviceGuard -ClassName Win32_DeviceGuard; $o.integridad_memoria = (@($dg.SecurityServicesRunning) -contains 2) } catch {}
   $o
 }
 
 Seccion 'acceso' {
   $o = [ordered]@{ cuentas = $null; rdp = $null; rdp_nla = $null; asistencia = $null; autologon = $false; autologon_clave = $false; fallidos_7d = $null; rdp_entradas_30d = $null; creadas_30d = $null; puertos = $null; carpetas = $null }
-  $adm = @()
-  try { $adm = @(Get-LocalGroupMember -SID 'S-1-5-32-544' | ForEach-Object { ([string]$_.Name -split '\\')[-1] }) } catch {}
-  try { $o.cuentas = @(Get-LocalUser | ForEach-Object { [ordered]@{ nombre = [string]$_.Name; sid = [string]$_.SID; activa = [bool]$_.Enabled; admin = ($adm -contains [string]$_.Name); ultima = (Ms $_.LastLogon); sin_clave = (-not $_.PasswordRequired); origen = [string]$_.PrincipalSource } }) } catch {}
+  $adm = $null
+  try { $adm = @(Get-LocalGroupMember -SID 'S-1-5-32-544' | ForEach-Object { [string]$_.SID }) } catch {}
+  try { $o.cuentas = @(Get-LocalUser | ForEach-Object { $es = $null; if ($null -ne $adm) { $es = ($adm -contains [string]$_.SID) }
+    [ordered]@{ nombre = [string]$_.Name; sid = [string]$_.SID; activa = [bool]$_.Enabled; admin = $es; ultima = (Ms $_.LastLogon); clave_opcional = (-not $_.PasswordRequired); origen = [string]$_.PrincipalSource } }) } catch {}
   $ts = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server'
   $d = Prop $ts 'fDenyTSConnections'; if ($null -ne $d) { $o.rdp = ($d -eq 0) }
   $n = Prop "$ts\WinStations\RDP-Tcp" 'UserAuthentication'; if ($null -ne $n) { $o.rdp_nla = ($n -eq 1) }
@@ -133,14 +134,19 @@ Seccion 'arranque' {
   } catch {}
   try {
     $o.tareas = @(Get-ScheduledTask | Where-Object { $_.TaskPath -notlike '\Microsoft\*' } | ForEach-Object {
-      $a = @($_.Actions | Where-Object { $_.Execute }) | Select-Object -First 1
-      $r = $null; $args2 = $null; if ($a) { $r = RutaDe ('"' + ([string]$a.Execute).Trim('"') + '"'); $args2 = Corta $a.Arguments }
-      $f = Firma $r
+      $acs = @($_.Actions | Where-Object { $_.Execute })
+      $r = $null; $args2 = $null; $f = Firma $null
+      foreach ($a in $acs) {
+        $ra = RutaDe ('"' + ([string]$a.Execute).Trim('"') + '"'); $fa = Firma $ra
+        if ($null -eq $r -or -not $fa.existe -or ($fa.estado -ne 'Valid' -and $f.estado -eq 'Valid')) { $r = $ra; $f = $fa; $args2 = Corta $a.Arguments }
+      }
       $dis = @($_.Triggers | ForEach-Object { ([string]$_.CimClass.CimClassName) -replace '^MSFT_Task', '' -replace 'Trigger$', '' })
       [ordered]@{ nombre = [string]$_.TaskName; carpeta = [string]$_.TaskPath; estado = [string]$_.State; autor = [string]$_.Author; ruta = $r; args = $args2; disparadores = $dis; oculta = [bool]$_.Settings.Hidden; existe = $f.existe; firma = $f.estado; firmante = $f.firmante } })
   } catch {}
   try {
-    $o.servicios = @(Get-CimInstance Win32_Service | ForEach-Object { $r = RutaDe $_.PathName; $f = Firma $r
+    $o.servicios = @(Get-CimInstance Win32_Service | ForEach-Object { $r = RutaDe $_.PathName
+      if ($r -match '(?i)\\svchost\.exe$') { $dll = Prop "HKLM:\SYSTEM\CurrentControlSet\Services\$($_.Name)\Parameters" 'ServiceDll'; if ($dll) { $r = [Environment]::ExpandEnvironmentVariables([string]$dll) } }
+      $f = Firma $r
       if (-not (EsDeMicrosoft $f)) { [ordered]@{ nombre = [string]$_.Name; visible = [string]$_.DisplayName; estado = [string]$_.State; inicio = [string]$_.StartMode; ruta = $r; existe = $f.existe; firma = $f.estado; firmante = $f.firmante } } })
   } catch {}
   try {
@@ -160,7 +166,7 @@ Seccion 'salida' {
       $s = $_; $p = [ordered]@{ servidor = $s; google = $null; cloudflare = $null; inexistente = $null }
       try { $p.google = @(Resolve-DnsName -Name 'dns.google' -Type A -Server $s -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction Stop | Where-Object { $_.IPAddress } | ForEach-Object { [string]$_.IPAddress }) } catch { $p.google = 'error' }
       try { $p.cloudflare = @(Resolve-DnsName -Name 'one.one.one.one' -Type A -Server $s -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction Stop | Where-Object { $_.IPAddress } | ForEach-Object { [string]$_.IPAddress }) } catch { $p.cloudflare = 'error' }
-      try { $p.inexistente = @(Resolve-DnsName -Name $falso -Type A -Server $s -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction Stop | Where-Object { $_.IPAddress } | ForEach-Object { [string]$_.IPAddress }) } catch { if ([string]$_.FullyQualifiedErrorId -like 'DNS_ERROR_RCODE_NAME_ERROR*' -or $_.Exception.Message -match '9003') { $p.inexistente = @() } else { $p.inexistente = 'error' } }
+      try { $p.inexistente = @(Resolve-DnsName -Name $falso -Type A -Server $s -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction Stop | Where-Object { $_.IPAddress } | ForEach-Object { [string]$_.IPAddress }) } catch { if ([string]$_.FullyQualifiedErrorId -like 'DNS_ERROR_RCODE_NAME_ERROR*') { $p.inexistente = @() } else { $p.inexistente = 'error' } }
       $p })
   } catch {}
   try { $o.adaptadores = @(Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | ForEach-Object { [ordered]@{ nombre = [string]$_.Name; desc = [string]$_.InterfaceDescription; virtual = [bool]$_.Virtual } }) } catch {}
@@ -170,7 +176,7 @@ Seccion 'salida' {
     $en = Prop $is 'ProxyEnable'; $sv = Prop $is 'ProxyServer'; $pac = Prop $is 'AutoConfigURL'
     if ($en -eq 1 -or $pac) { $o.proxy += [ordered]@{ sid = $sid; servidor = $(if ($en -eq 1) { [string]$sv } else { $null }); pac = [string]$pac } }
   }
-  try { $b = Prop 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\Connections' 'WinHttpSettings'; if ($b -and $b.Length -ge 16) { $n = [BitConverter]::ToInt32($b, 12); if ($n -gt 0 -and (16 + $n) -le $b.Length) { $o.proxy_sistema = [Text.Encoding]::ASCII.GetString($b, 16, $n) } } } catch {}
+  try { $b = Prop 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\Connections' 'WinHttpSettings'; if ($b -and $b.Length -ge 16) { $n = [BitConverter]::ToInt32($b, 12); if ($n -gt 0 -and (16 + $n) -le $b.Length) { $px = [Text.Encoding]::ASCII.GetString($b, 16, $n); if ($px -match '^[\w\.\-:;=\[\]/<>]+$') { $o.proxy_sistema = $px } } } } catch {}
   try {
     $o.hosts = @(Get-Content -LiteralPath "$env:SystemRoot\System32\drivers\etc\hosts" -ErrorAction Stop | ForEach-Object { ($_ -split '#')[0].Trim() } | Where-Object { $_ } | ForEach-Object { $p = $_ -split '\s+'; if ($p.Count -ge 2) { [ordered]@{ direccion = $p[0]; nombres = @($p[1..($p.Count - 1)]) } } })
   } catch {}

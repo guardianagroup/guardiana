@@ -524,10 +524,9 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
         _ if u["politica_sin_auto"].as_bool() == Some(true) || s(&u["servicio"]) == "Disabled" => {
             check("actualizaciones", "alerta", "rv_actualizaciones_apagadas")
         }
-        Some(n) if n > 60 => {
-            check("actualizaciones", "alerta", "rv_actualizaciones_viejas").con("n", n)
-        }
-        Some(n) if n > 30 => {
+        // Days since the last install say activity, not that nothing is pending (ChatGPT's
+        // review): never red for that alone.
+        Some(n) if n > 45 => {
             check("actualizaciones", "aviso", "rv_actualizaciones_viejas").con("n", n)
         }
         _ if u["pausada_hasta"].as_i64().is_some_and(|t| t > now) => {
@@ -539,7 +538,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
         _ if u["reinicio_pendiente"].as_bool() == Some(true) => {
             check("actualizaciones", "aviso", "rv_actualizaciones_reinicio")
         }
-        Some(n) => check("actualizaciones", "ok", "rv_actualizaciones_ok").con("n", n),
+        Some(n) => check("actualizaciones", "info", "rv_actualizaciones_ok").con("n", n),
         None => nd("actualizaciones"),
     });
 
@@ -598,8 +597,14 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
                 .to_lowercase()
                 .contains("passive");
         if activo {
-            let n = m.get("firmas_dias").and_then(Value::as_i64).unwrap_or(0);
-            proteccion.push(if n > 14 {
+            let firmas = m
+                .get("firmas_dias")
+                .and_then(Value::as_i64)
+                .filter(|&n| n < 100_000);
+            let n = firmas.unwrap_or(0);
+            proteccion.push(if firmas.is_none() {
+                nd("defender")
+            } else if n > 14 {
                 check("defender", "alerta", "rv_defender_firmas").con("n", n)
             } else if n > 7 {
                 check("defender", "aviso", "rv_defender_firmas").con("n", n)
@@ -628,12 +633,10 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
     } else {
         proteccion.push(nd("cortafuegos"));
     }
-    if sis.is_object() && sis["error"].is_null() {
-        proteccion.push(if sis["uac"].as_i64() == Some(0) {
-            check("uac", "alerta", "rv_uac_apagado")
-        } else {
-            check("uac", "ok", "rv_uac_ok")
-        });
+    match sis["uac"].as_i64() {
+        Some(0) => proteccion.push(check("uac", "alerta", "rv_uac_apagado")),
+        Some(_) => proteccion.push(check("uac", "ok", "rv_uac_ok")),
+        None => proteccion.push(nd("uac")),
     }
     match sis["smb1"].as_bool() {
         Some(true) => proteccion.push(check("smb1", "aviso", "rv_smb1_activo")),
@@ -664,16 +667,16 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
             .find(|v| s(&v["unidad"]).to_uppercase() == unidad);
         proteccion.push(match sistema.and_then(|v| v["proteccion"].as_i64()) {
             Some(1) => check("cifrado", "ok", "rv_cifrado_ok").con("unidad", &unidad),
-            Some(_) => check("cifrado", "aviso", "rv_cifrado_no").con("unidad", &unidad),
-            None => check("cifrado", "info", "rv_cifrado_nd"),
+            Some(0) => check("cifrado", "aviso", "rv_cifrado_no").con("unidad", &unidad),
+            _ => check("cifrado", "info", "rv_cifrado_nd"),
         });
     } else {
         proteccion.push(check("cifrado", "info", "rv_cifrado_nd"));
     }
-    if sis["integridad_memoria"].as_bool() == Some(true) {
-        proteccion.push(check("integridad_memoria", "ok", "rv_integridad_ok"));
-    } else if sis.is_object() {
-        proteccion.push(check("integridad_memoria", "info", "rv_integridad_no"));
+    match sis["integridad_memoria"].as_bool() {
+        Some(true) => proteccion.push(check("integridad_memoria", "ok", "rv_integridad_ok")),
+        Some(false) => proteccion.push(check("integridad_memoria", "info", "rv_integridad_no")),
+        None => {}
     }
 
     // ---- Acceso
@@ -688,9 +691,9 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
                 if c["admin"].as_bool() == Some(true) {
                     m.push("admin");
                 }
-                if c["sin_clave"].as_bool() == Some(true) {
-                    m.push("sin_clave");
-                    aviso = true;
+                // «Password not required» is allowed, not proven empty (ChatGPT's review).
+                if c["clave_opcional"].as_bool() == Some(true) {
+                    m.push("clave_opcional");
                 }
                 if s(&c["sid"]).ends_with("-501") {
                     m.push("invitado");
@@ -772,7 +775,15 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
             .items(remotos)
     });
     match ac["fallidos_7d"].as_i64() {
-        Some(n) if n > 500 => acceso.push(check("fallidos", "alerta", "rv_fallidos").con("n", n)),
+        // The script reads at most 5 000 events: at the cap, «5000+».
+        Some(n) if n > 500 => acceso.push(check("fallidos", "alerta", "rv_fallidos").con(
+            "n",
+            if n >= 5000 {
+                "5000+".to_owned()
+            } else {
+                n.to_string()
+            },
+        )),
         Some(n) if n > 30 => acceso.push(check("fallidos", "aviso", "rv_fallidos").con("n", n)),
         Some(n) => acceso.push(check("fallidos", "ok", "rv_fallidos_ok").con("n", n)),
         None => acceso.push(nd("fallidos")),
@@ -976,7 +987,9 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
             }
         }
         salida.push(if falsea {
-            check("dns", "alerta", "rv_dns_falsea").items(lista)
+            // Different answers can be a provider's filter as well as a diversion (ChatGPT's
+            // review): something to look at, not a proven forgery.
+            check("dns", "aviso", "rv_dns_falsea").items(lista)
         } else if redirige {
             check("dns", "aviso", "rv_dns_redirige").items(lista)
         } else if probados > 0 {
@@ -1110,10 +1123,17 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
             }
             lista.push(item(s(&c["huella"]), "", m));
         }
+        // Outside Microsoft's automatic program says neither who added it nor when (ChatGPT's
+        // review): the list is to know; what appears after the first review is to look at.
+        let nuevos = lista.iter().filter(|i| i.marcas.contains(&"nuevo")).count();
         salida.push(if lista.is_empty() {
             check("certificados", "ok", "rv_certificados_ok").con("n", s(&ce["total"]))
+        } else if nuevos > 0 {
+            check("certificados", "aviso", "rv_certificados_nuevo")
+                .con("n", nuevos)
+                .items(lista)
         } else {
-            check("certificados", "aviso", "rv_certificados_hay")
+            check("certificados", "info", "rv_certificados_hay")
                 .con("n", lista.len())
                 .items(lista)
         });
@@ -1308,7 +1328,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
         );
         if cuenta(&[5001]) > 0 {
             antivirus.push(
-                check("tiempo_real_apagado", "alerta", "rv_tiempo_real_apagado")
+                check("tiempo_real_apagado", "aviso", "rv_tiempo_real_apagado")
                     .con("n", cuenta(&[5001])),
             );
         }
@@ -1393,6 +1413,7 @@ pub(crate) const FRASES: &[&str] = &[
     "rv_hosts_bloquea",
     "rv_certificados_ok",
     "rv_certificados_hay",
+    "rv_certificados_nuevo",
     "rv_wifi_ok",
     "rv_wifi_viejo",
     "rv_wifi_nd",
@@ -1484,7 +1505,7 @@ pub(crate) const MARCAS: &[&str] = &[
     "apagado",
     "sin_actualizar",
     "admin",
-    "sin_clave",
+    "clave_opcional",
     "invitado",
     "servicio",
     "delicado",
@@ -1524,14 +1545,14 @@ mod tests {
                 .unwrap()
                 .clone()
         };
-        assert_eq!(c("actualizaciones").estado, "ok");
+        assert_eq!(c("actualizaciones").estado, "info");
         assert_eq!(c("antivirus").estado, "ok");
         assert_eq!(c("cortafuegos").estado, "alerta");
         assert_eq!(c("escritorio_remoto").estado, "ok");
         assert_eq!(c("acceso_remoto").estado, "aviso");
         assert_eq!(c("acceso_remoto").lista[0].t, "AnyDesk");
         assert_eq!(c("dns").estado, "aviso", "{:?}", c("dns"));
-        assert_eq!(c("certificados").estado, "aviso");
+        assert_eq!(c("certificados").estado, "info");
         assert_eq!(c("certificados").lista.len(), 1, "{:?}", c("certificados"));
         assert_eq!(c("camara").estado, "info");
         assert!(c("camara").lista[0].marcas.contains(&"en_uso"));

@@ -15,7 +15,14 @@ pub(crate) fn revisar(limite: std::time::Duration) -> Result<serde_json::Value, 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
     let raiz = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_owned());
-    let exe = format!("{raiz}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
+    // A 32-bit GUARDIANA on a 64-bit Windows would get the 32-bit PowerShell, which has no
+    // local-accounts module (ChatGPT's review): «Sysnative» is the real System32 from there.
+    let carpeta = if std::env::var_os("PROCESSOR_ARCHITEW6432").is_some() {
+        "Sysnative"
+    } else {
+        "System32"
+    };
+    let exe = format!("{raiz}\\{carpeta}\\WindowsPowerShell\\v1.0\\powershell.exe");
     let mut hijo = Command::new(exe)
         .args([
             "-NoProfile",
