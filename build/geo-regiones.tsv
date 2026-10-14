@@ -189,3 +189,35 @@ azure	eastus2euap	Virginia	US	36.7	-78.4
 azure	southfrance	Marsella	FR	43.3	5.4
 azure	norwaye	Oslo	NO	59.9	10.8
 aws	ap-southeast-6	Nueva Zelanda (Auckland)	NZ	-36.8	174.8
+azure	switzerlandw	Ginebra	CH	46.2	6.1
+azure	germanyn	Berlín	DE	52.5	13.4
+azure	brazilse	Río de Janeiro	BR	-22.9	-43.2
+azure	chilec	Santiago de Chile	CL	-33.4	-70.7
+azure	norwayw	Stavanger	NO	59.0	5.7
+azure	taiwannorth	Taipéi	TW	25.0	121.5
+azure	austriaeast	Viena	AT	48.2	16.4
+azure	swedensouth	Malmö	SE	55.6	13.0
+azure	denmarkeast	Copenhague	DK	55.7	12.6
+azure	belgiumcentral	Bruselas	BE	50.8	4.4
+azure	jioindiawest	Jamnagar	IN	22.5	70.1
+azure	jioindiacentral	Nagpur	IN	21.1	79.1
+azure	indiasouthcentral	Hyderabad	IN	17.4	78.5
+oracle	us-dallas-1	Dallas, Texas	US	32.8	-96.8
+oracle	us-abilene-1	Abilene, Texas	US	32.4	-99.7
+oracle	us-sanantonio-1	San Antonio, Texas	US	29.4	-98.5
+oracle	us-lenexa-1	Lenexa, Kansas	US	39.0	-94.7
+oracle	us-shawnee-1	Shawnee, Kansas	US	39.0	-94.7
+oracle	us-desmoines-1	Des Moines, Iowa	US	41.6	-93.6
+oracle	us-boardman-1	Boardman, Oregón	US	45.8	-119.7
+oracle	us-quincy-1	Quincy, Washington	US	47.2	-119.9
+oracle	us-saltlake-2	Salt Lake City	US	40.8	-111.9
+oracle	sa-riodejaneiro-2	Río de Janeiro	BR	-22.9	-43.2
+oracle	af-casablanca-1	Casablanca	MA	33.6	-7.6
+oracle	ap-batam-1	Batam	ID	1.1	104.0
+oracle	ap-singapore-2	Singapur	SG	1.3	103.8
+oracle	ap-delhi-1	Delhi	IN	28.6	77.2
+oracle	ap-kulai-1	Kulai (Johor)	MY	1.7	103.6
+oracle	eu-madrid-3	Madrid	ES	40.4	-3.7
+oracle	eu-dublin-3	Dublín	IE	53.3	-6.3
+oracle	eu-jovanovac-1	Jovanovac (Kragujevac)	RS	44.0	20.9
+gcp	asia-southeast3	Bangkok	TH	13.8	100.5
