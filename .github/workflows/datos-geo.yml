@@ -1,0 +1,39 @@
+# Where servers are, to the city when their operator says so (build/geo.py, 14 Oct 2026). Runs on
+# a branch named datos-*: downloads the clouds' published address lists, the geofeeds and GeoNames,
+# converts them and leaves the result as an artifact, to be reviewed and committed by a person.
+# It never commits anything and holds no keys.
+name: datos-geo
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['datos-*']
+
+permissions:
+  contents: read
+
+jobs:
+  geo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: descargar
+        run: python3 build/geo.py descargar --dir fuentes-geo
+      - name: convertir
+        run: python3 build/geo.py convertir --dir fuentes-geo
+      - name: huellas
+        run: |
+          set -euo pipefail
+          sha256sum crates/lists/data/nube-ip.bin crates/lists/data/lugares.json crates/lists/data/geo.json crates/panel/static/tierra/ciudades.tsv | while read -r h n; do echo "::notice title=${n##*/}::$h"; done
+          ls -la crates/lists/data/nube-ip.bin crates/lists/data/lugares.json crates/panel/static/tierra/ciudades.tsv
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: datos-geo
+          path: |
+            crates/lists/data/nube-ip.bin
+            crates/lists/data/lugares.json
+            crates/lists/data/geo.json
+            crates/panel/static/tierra/ciudades.tsv
+            fuentes-geo/descargas.json
+          retention-days: 7

@@ -1,0 +1,181 @@
+# Where each cloud region is, as its own operator names it (owner, 13 Oct 2026: «saber la ciudad
+# o el estado a dónde van… lo máximo que podáis de precisión»). One line per region:
+#   proveedor <TAB> región <TAB> ciudad o zona que el operador da <TAB> país <TAB> lat <TAB> lon
+# The place is the one in the region's public name (AWS «US East (N. Virginia)», Google
+# «us-east4: Ashburn, Virginia», Azure «East US: Virginia», Oracle «US East (Ashburn)»); the
+# coordinates are those of that city or, when only a state or area is named, of its usual data
+# centre city, rounded to 0.1°. Sources:
+#   AWS     https://docs.aws.amazon.com/global-infrastructure/latest/regions/aws-regions.html
+#   Google  https://cloud.google.com/compute/docs/regions-zones
+#   Azure   https://learn.microsoft.com/azure/reliability/regions-list
+#   Oracle  https://docs.oracle.com/iaas/Content/General/Concepts/regions.htm
+# A region missing here is not placed: build/geo.py lists it and the point stays in its country.
+aws	us-east-1	Virginia del Norte (Ashburn)	US	39.0	-77.5
+aws	us-east-2	Ohio (Columbus)	US	40.0	-83.0
+aws	us-west-1	California del Norte (San José)	US	37.3	-121.9
+aws	us-west-2	Oregón (Boardman)	US	45.8	-119.7
+aws	ca-central-1	Montreal	CA	45.5	-73.6
+aws	ca-west-1	Calgary	CA	51.0	-114.1
+aws	mx-central-1	Querétaro	MX	20.6	-100.4
+aws	sa-east-1	São Paulo	BR	-23.5	-46.6
+aws	eu-west-1	Dublín	IE	53.3	-6.3
+aws	eu-west-2	Londres	GB	51.5	-0.1
+aws	eu-west-3	París	FR	48.9	2.4
+aws	eu-central-1	Fráncfort	DE	50.1	8.7
+aws	eu-central-2	Zúrich	CH	47.4	8.5
+aws	eu-north-1	Estocolmo	SE	59.3	18.1
+aws	eu-south-1	Milán	IT	45.5	9.2
+aws	eu-south-2	Aragón (Zaragoza)	ES	41.6	-0.9
+aws	il-central-1	Tel Aviv	IL	32.1	34.8
+aws	me-south-1	Baréin	BH	26.1	50.6
+aws	me-central-1	Emiratos Árabes Unidos	AE	25.2	55.3
+aws	af-south-1	Ciudad del Cabo	ZA	-33.9	18.4
+aws	ap-east-1	Hong Kong	HK	22.3	114.2
+aws	ap-south-1	Bombay	IN	19.1	72.9
+aws	ap-south-2	Hyderabad	IN	17.4	78.5
+aws	ap-southeast-1	Singapur	SG	1.3	103.8
+aws	ap-southeast-2	Sídney	AU	-33.9	151.2
+aws	ap-southeast-3	Yakarta	ID	-6.2	106.8
+aws	ap-southeast-4	Melbourne	AU	-37.8	145.0
+aws	ap-southeast-5	Malasia (Kuala Lumpur)	MY	3.1	101.7
+aws	ap-southeast-7	Tailandia (Bangkok)	TH	13.8	100.5
+aws	ap-northeast-1	Tokio	JP	35.7	139.7
+aws	ap-northeast-2	Seúl	KR	37.6	127.0
+aws	ap-northeast-3	Osaka	JP	34.7	135.5
+aws	us-gov-east-1	Ohio (GovCloud)	US	40.0	-83.0
+aws	us-gov-west-1	Oregón (GovCloud)	US	45.8	-119.7
+aws	cn-north-1	Pekín	CN	39.9	116.4
+aws	cn-northwest-1	Ningxia (Zhongwei)	CN	37.5	105.2
+gcp	us-central1	Council Bluffs, Iowa	US	41.3	-95.9
+gcp	us-east1	Moncks Corner, Carolina del Sur	US	33.2	-80.0
+gcp	us-east4	Ashburn, Virginia	US	39.0	-77.5
+gcp	us-east5	Columbus, Ohio	US	40.0	-83.0
+gcp	us-south1	Dallas, Texas	US	32.8	-96.8
+gcp	us-west1	The Dalles, Oregón	US	45.6	-121.2
+gcp	us-west2	Los Ángeles	US	34.1	-118.2
+gcp	us-west3	Salt Lake City	US	40.8	-111.9
+gcp	us-west4	Las Vegas	US	36.2	-115.1
+gcp	northamerica-northeast1	Montreal	CA	45.5	-73.6
+gcp	northamerica-northeast2	Toronto	CA	43.7	-79.4
+gcp	northamerica-south1	Querétaro	MX	20.6	-100.4
+gcp	southamerica-east1	Osasco (São Paulo)	BR	-23.5	-46.8
+gcp	southamerica-west1	Santiago de Chile	CL	-33.4	-70.7
+gcp	europe-west1	St. Ghislain, Bélgica	BE	50.5	3.8
+gcp	europe-west2	Londres	GB	51.5	-0.1
+gcp	europe-west3	Fráncfort	DE	50.1	8.7
+gcp	europe-west4	Eemshaven, Países Bajos	NL	53.4	6.8
+gcp	europe-west6	Zúrich	CH	47.4	8.5
+gcp	europe-west8	Milán	IT	45.5	9.2
+gcp	europe-west9	París	FR	48.9	2.4
+gcp	europe-west10	Berlín	DE	52.5	13.4
+gcp	europe-west12	Turín	IT	45.1	7.7
+gcp	europe-southwest1	Madrid	ES	40.4	-3.7
+gcp	europe-north1	Hamina, Finlandia	FI	60.6	27.2
+gcp	europe-north2	Estocolmo	SE	59.3	18.1
+gcp	europe-central2	Varsovia	PL	52.2	21.0
+gcp	me-central1	Doha	QA	25.3	51.5
+gcp	me-central2	Dammam	SA	26.4	50.1
+gcp	me-west1	Tel Aviv	IL	32.1	34.8
+gcp	africa-south1	Johannesburgo	ZA	-26.2	28.0
+gcp	asia-east1	Changhua, Taiwán	TW	24.1	120.5
+gcp	asia-east2	Hong Kong	HK	22.3	114.2
+gcp	asia-northeast1	Tokio	JP	35.7	139.7
+gcp	asia-northeast2	Osaka	JP	34.7	135.5
+gcp	asia-northeast3	Seúl	KR	37.6	127.0
+gcp	asia-south1	Bombay	IN	19.1	72.9
+gcp	asia-south2	Delhi	IN	28.6	77.2
+gcp	asia-southeast1	Jurong West, Singapur	SG	1.3	103.7
+gcp	asia-southeast2	Yakarta	ID	-6.2	106.8
+gcp	australia-southeast1	Sídney	AU	-33.9	151.2
+gcp	australia-southeast2	Melbourne	AU	-37.8	145.0
+azure	eastus	Virginia	US	36.7	-78.4
+azure	eastus2	Virginia	US	36.7	-78.4
+azure	centralus	Iowa (Des Moines)	US	41.6	-93.6
+azure	northcentralus	Illinois (Chicago)	US	41.9	-87.6
+azure	southcentralus	Texas (San Antonio)	US	29.4	-98.5
+azure	westcentralus	Wyoming (Cheyenne)	US	41.1	-104.8
+azure	westus	California	US	37.8	-122.4
+azure	westus2	Washington (Quincy)	US	47.2	-119.9
+azure	westus3	Arizona (Phoenix)	US	33.4	-112.1
+azure	canadacentral	Toronto	CA	43.7	-79.4
+azure	canadaeast	Quebec	CA	46.8	-71.2
+azure	mexicocentral	Querétaro	MX	20.6	-100.4
+azure	brazilsouth	São Paulo	BR	-23.5	-46.6
+azure	brazilsoutheast	Río de Janeiro	BR	-22.9	-43.2
+azure	chilecentral	Santiago de Chile	CL	-33.4	-70.7
+azure	northeurope	Irlanda (Dublín)	IE	53.3	-6.3
+azure	westeurope	Países Bajos (Ámsterdam)	NL	52.4	4.9
+azure	uksouth	Londres	GB	51.5	-0.1
+azure	ukwest	Cardiff	GB	51.5	-3.2
+azure	francecentral	París	FR	48.9	2.4
+azure	francesouth	Marsella	FR	43.3	5.4
+azure	germanywestcentral	Fráncfort	DE	50.1	8.7
+azure	germanynorth	Berlín	DE	52.5	13.4
+azure	switzerlandnorth	Zúrich	CH	47.4	8.5
+azure	switzerlandwest	Ginebra	CH	46.2	6.1
+azure	norwayeast	Oslo	NO	59.9	10.8
+azure	norwaywest	Stavanger	NO	59.0	5.7
+azure	swedencentral	Gävle	SE	60.7	17.1
+azure	polandcentral	Varsovia	PL	52.2	21.0
+azure	italynorth	Milán	IT	45.5	9.2
+azure	spaincentral	Madrid	ES	40.4	-3.7
+azure	israelcentral	Israel	IL	32.1	34.8
+azure	qatarcentral	Doha	QA	25.3	51.5
+azure	uaenorth	Dubái	AE	25.2	55.3
+azure	uaecentral	Abu Dabi	AE	24.5	54.4
+azure	southafricanorth	Johannesburgo	ZA	-26.2	28.0
+azure	southafricawest	Ciudad del Cabo	ZA	-33.9	18.4
+azure	centralindia	Pune	IN	18.5	73.9
+azure	southindia	Chennai	IN	13.1	80.3
+azure	westindia	Bombay	IN	19.1	72.9
+azure	eastasia	Hong Kong	HK	22.3	114.2
+azure	southeastasia	Singapur	SG	1.3	103.8
+azure	japaneast	Tokio, Saitama	JP	35.7	139.7
+azure	japanwest	Osaka	JP	34.7	135.5
+azure	koreacentral	Seúl	KR	37.6	127.0
+azure	koreasouth	Busan	KR	35.2	129.1
+azure	australiaeast	Nueva Gales del Sur (Sídney)	AU	-33.9	151.2
+azure	australiasoutheast	Victoria (Melbourne)	AU	-37.8	145.0
+azure	australiacentral	Canberra	AU	-35.3	149.1
+azure	australiacentral2	Canberra	AU	-35.3	149.1
+azure	newzealandnorth	Auckland	NZ	-36.8	174.8
+azure	indonesiacentral	Yakarta	ID	-6.2	106.8
+azure	malaysiawest	Kuala Lumpur	MY	3.1	101.7
+oracle	us-ashburn-1	Ashburn, Virginia	US	39.0	-77.5
+oracle	us-phoenix-1	Phoenix, Arizona	US	33.4	-112.1
+oracle	us-sanjose-1	San José, California	US	37.3	-121.9
+oracle	us-chicago-1	Chicago	US	41.9	-87.6
+oracle	ca-toronto-1	Toronto	CA	43.7	-79.4
+oracle	ca-montreal-1	Montreal	CA	45.5	-73.6
+oracle	mx-queretaro-1	Querétaro	MX	20.6	-100.4
+oracle	mx-monterrey-1	Monterrey	MX	25.7	-100.3
+oracle	sa-saopaulo-1	São Paulo	BR	-23.5	-46.6
+oracle	sa-vinhedo-1	Vinhedo	BR	-23.0	-47.0
+oracle	sa-santiago-1	Santiago de Chile	CL	-33.4	-70.7
+oracle	sa-valparaiso-1	Valparaíso	CL	-33.0	-71.6
+oracle	sa-bogota-1	Bogotá	CO	4.7	-74.1
+oracle	eu-frankfurt-1	Fráncfort	DE	50.1	8.7
+oracle	eu-amsterdam-1	Ámsterdam	NL	52.4	4.9
+oracle	eu-zurich-1	Zúrich	CH	47.4	8.5
+oracle	eu-madrid-1	Madrid	ES	40.4	-3.7
+oracle	eu-marseille-1	Marsella	FR	43.3	5.4
+oracle	eu-paris-1	París	FR	48.9	2.4
+oracle	eu-milan-1	Milán	IT	45.5	9.2
+oracle	eu-stockholm-1	Estocolmo	SE	59.3	18.1
+oracle	uk-london-1	Londres	GB	51.5	-0.1
+oracle	uk-cardiff-1	Newport (Gales)	GB	51.6	-3.0
+oracle	il-jerusalem-1	Jerusalén	IL	31.8	35.2
+oracle	me-dubai-1	Dubái	AE	25.2	55.3
+oracle	me-abudhabi-1	Abu Dabi	AE	24.5	54.4
+oracle	me-jeddah-1	Yeda	SA	21.5	39.2
+oracle	me-riyadh-1	Riad	SA	24.7	46.7
+oracle	af-johannesburg-1	Johannesburgo	ZA	-26.2	28.0
+oracle	ap-mumbai-1	Bombay	IN	19.1	72.9
+oracle	ap-hyderabad-1	Hyderabad	IN	17.4	78.5
+oracle	ap-singapore-1	Singapur	SG	1.3	103.8
+oracle	ap-tokyo-1	Tokio	JP	35.7	139.7
+oracle	ap-osaka-1	Osaka	JP	34.7	135.5
+oracle	ap-seoul-1	Seúl	KR	37.6	127.0
+oracle	ap-chuncheon-1	Chuncheon	KR	37.9	127.7
+oracle	ap-sydney-1	Sídney	AU	-33.9	151.2
+oracle	ap-melbourne-1	Melbourne	AU	-37.8	145.0
