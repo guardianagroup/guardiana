@@ -6,6 +6,7 @@
   'use strict';
   window.GuardianaRevision = { iniciar };
   const FUERTES = new Set(['nuevo', 'sin_firma', 'firma_mala', 'no_existe', 'sin_clave', 'invitado', 'delicado', 'redirigido', 'apagado', 'sin_actualizar', 'en_uso', 'detectada', 'actuo']);
+  const GRUPOS = ['proteccion', 'acceso', 'arranque', 'salida', 'privacidad', 'antivirus'];
 
   async function iniciar(ctx) {
     const { api, t, esc, LOC } = ctx;
@@ -15,10 +16,35 @@
     const rellena = (k, datos) => Object.entries(datos || {}).reduce((s, [a, b]) => s.split('{' + a + '}').join(b), t(k));
     const frase = (c) => rellena(c.frase, c.datos);
     const marca = (m) => `<span class="rv-marca${FUERTES.has(m) ? ' fuerte' : ''}">${esc(t('rv_marca_' + m))}</span>`;
+    let empezo = 0, reloj = null;
+    const ordenEstado = { alerta: 4, aviso: 3, info: 2, nd: 2, ok: 1 };
+    const progreso = (activo) => {
+      $('rv-progreso').hidden = !activo;
+      $('rv-escena').setAttribute('aria-busy', activo ? 'true' : 'false');
+      clearInterval(reloj); reloj = null;
+      if (!activo) { empezo = 0; return; }
+      if (!empezo) empezo = Date.now();
+      const actualiza = () => { $('rv-tiempo').textContent = t('rv_progreso_tiempo').replace('{n}', Math.max(1, Math.round((Date.now() - empezo) / 1000))); };
+      actualiza(); reloj = setInterval(actualiza, 1000);
+    };
+    const pintaEscena = (r) => {
+      const recibidos = Array.isArray(r.grupos) ? r.grupos : [];
+      const grupos = recibidos.length ? recibidos : GRUPOS.map((id) => ({ id, checks: [] }));
+      $('rv-escena').classList.toggle('trabajando', !!r.corriendo);
+      $('rv-pasos').innerHTML = grupos.map((g) => {
+        const checks = Array.isArray(g.checks) ? g.checks : [];
+        const peor = checks.reduce((a, c) => (ordenEstado[c.estado] || 0) > (ordenEstado[a] || 0) ? c.estado : a, 'ok');
+        const estado = r.corriendo ? 'revisando' : (peor === 'nd' ? 'info' : peor);
+        const detalle = r.corriendo ? t('rv_paso_revisando') : t('rv_paso_comprobaciones').replace('{n}', checks.length);
+        return `<div class="rv-paso ${estado}"><i aria-hidden="true"></i><span><b>${esc(t('rv_g_' + g.id))}</b><small>${esc(detalle)}</small></span></div>`;
+      }).join('');
+      progreso(!!r.corriendo);
+    };
 
     const pinta = (r) => {
       ultimo = r;
       if (!r.disponible) { $('rv-semaforo').textContent = t('rv_no_windows'); $('rv-ahora').disabled = true; return; }
+      pintaEscena(r);
       const s = r.resumen;
       $('rv-semaforo').innerHTML = [['alerta', s.alerta], ['aviso', s.aviso], ['ok', s.ok], ['info', s.info]]
         .map(([k, n]) => `<span><span class="rv-punto ${k}"></span> <b>${n}</b>${esc(t('rv_resumen_' + k))}</span>`).join('')
@@ -40,7 +66,11 @@
     let espera = null;
     const sigue = (r) => { clearTimeout(espera); espera = setTimeout(async () => { try { sigue(await carga()); } catch (_) {} }, r && r.corriendo ? 4000 : 300000); };
     sigue(await carga());
-    $('rv-ahora').addEventListener('click', async () => { $('rv-ahora').disabled = true; try { const r = await api('/api/revision/ahora', { method: 'POST' }); pinta(r); sigue(r); } catch (e) { $('rv-msg').textContent = String(e.message || e); } });
+    $('rv-ahora').addEventListener('click', async () => {
+      $('rv-ahora').disabled = true; empezo = Date.now(); progreso(true);
+      try { const r = await api('/api/revision/ahora', { method: 'POST' }); pinta(r); sigue(r); }
+      catch (e) { progreso(false); $('rv-ahora').disabled = false; $('rv-msg').textContent = String(e.message || e); }
+    });
 
     // ---- Keep it and share it
     const nombre = (ext) => `guardiana-revision-${new Date().toISOString().slice(0, 10)}.${ext}`;

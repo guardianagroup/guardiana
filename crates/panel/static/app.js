@@ -118,8 +118,17 @@
     const pages = []; let ops = []; let y = 0;
     const usable = PDF_W - 2 * PDF_M;
     const n = (v) => v.toFixed(2);
-    const newPage = () => { ops = []; pages.push(ops); y = PDF_H - PDF_ARRIBA; };
-    const text = (x, yy, bin, size, bold, gray) => { ops.push(n(gray || 0) + ' g BT /' + (bold ? 'F2' : 'F1') + ' ' + n(size) + ' Tf ' + n(x) + ' ' + n(yy) + ' Td (' + pdfEscape(bin) + ') Tj ET'); };
+    const ink = (color) => Array.isArray(color) ? color.map(n).join(' ') + ' rg' : n(color || 0) + ' g';
+    const text = (x, yy, bin, size, bold, color) => { ops.push(ink(color) + ' BT /' + (bold ? 'F2' : 'F1') + ' ' + n(size) + ' Tf ' + n(x) + ' ' + n(yy) + ' Td (' + pdfEscape(bin) + ') Tj ET'); };
+    const rect = (x, yy, w, h, color) => ops.push(ink(color) + ' ' + n(x) + ' ' + n(yy) + ' ' + n(w) + ' ' + n(h) + ' re f');
+    const newPage = () => {
+      ops = []; pages.push(ops);
+      rect(0, PDF_H - 38, PDF_W, 38, [0.043, 0.063, 0.125]);
+      rect(0, PDF_H - 41, PDF_W, 3, [0.122, 0.294, 1]);
+      text(PDF_M, PDF_H - 24, winAnsi('GUARDIANA'), 10, true, [1, 1, 1]);
+      text(PDF_W - PDF_M - textWidth(winAnsi('PRIVACIDAD Y SEGURIDAD'), 7), PDF_H - 23, winAnsi('PRIVACIDAD Y SEGURIDAD'), 7, false, [0.76, 0.81, 1]);
+      y = PDF_H - PDF_ARRIBA;
+    };
     const need = (h) => { if (y - h < PDF_M + 18) newPage(); };
     newPage();
     const doc = {
@@ -129,9 +138,14 @@
         return doc;
       },
       gap(h = 8) { y -= h; return doc; },
-      // La raya fina que separa el encabezado del contenido, igual que en el panel.
-      // Un título de sección: el mismo aire en los cuatro PDF del panel.
-      seccion(titulo, lead) { doc.gap(18).juntos(46).line(titulo, 12, true); if (lead) doc.gap(2).line(lead, 9, false, 0.45); doc.gap(8); return doc; },
+      // A clear section band makes long reports navigable on screen and on paper.
+      seccion(titulo, lead) {
+        doc.gap(18); need(lead ? 58 : 38);
+        y -= 30; rect(PDF_M, y, usable, 26, [0.95, 0.965, 1]); rect(PDF_M, y, 4, 26, [0.122, 0.294, 1]);
+        text(PDF_M + 12, y + 8, winAnsi(titulo), 11, true, [0.043, 0.063, 0.125]);
+        if (lead) { y -= 4; doc.line(lead, 9, false, 0.38); }
+        doc.gap(8); return doc;
+      },
       regla() { need(12); y -= 7; ops.push('0.78 G 0.6 w ' + n(PDF_M) + ' ' + n(y) + ' m ' + n(PDF_M + usable) + ' ' + n(y) + ' l S'); return doc; },
       // Pide sitio para lo que viene: sin esto, el nombre de una empresa se quedaba al final de
       // una página y la frase que explica qué vende se iba a la siguiente.
@@ -144,19 +158,20 @@
           const cellLines = cells.map((c, i) => wrapText(winAnsi(c), size, widths[i] - 2 * pad));
           return { cellLines, bold, h: Math.max(1, ...cellLines.map((l) => l.length)) * lh + 2 * pad };
         };
-        const draw = (row, shade) => {
-          if (shade) ops.push('0.92 g ' + n(PDF_M) + ' ' + n(y - row.h) + ' ' + n(usable) + ' ' + n(row.h) + ' re f');
+        const draw = (row, kind) => {
+          if (kind === 'header') rect(PDF_M, y - row.h, usable, row.h, [0.043, 0.063, 0.125]);
+          else if (kind === 'stripe') rect(PDF_M, y - row.h, usable, row.h, [0.965, 0.972, 0.988]);
           let x = PDF_M;
-          row.cellLines.forEach((lines, i) => { lines.forEach((l, k) => text(x + pad, y - pad - lh * (k + 1) + size * 0.3, l, size, row.bold, 0)); x += widths[i]; });
+          row.cellLines.forEach((lines, i) => { lines.forEach((l, k) => text(x + pad, y - pad - lh * (k + 1) + size * 0.3, l, size, row.bold, kind === 'header' ? [1, 1, 1] : [0.043, 0.063, 0.125])); x += widths[i]; });
           y -= row.h;
-          ops.push('0.75 G 0.4 w ' + n(PDF_M) + ' ' + n(y) + ' m ' + n(PDF_M + usable) + ' ' + n(y) + ' l S');
+          ops.push('0.82 G 0.35 w ' + n(PDF_M) + ' ' + n(y) + ' m ' + n(PDF_M + usable) + ' ' + n(y) + ' l S');
         };
         const header = layout(cols.map((c) => c.title), true);
-        need(header.h + lh); draw(header, true);
-        rows.forEach((r) => {
+        need(header.h + lh); draw(header, 'header');
+        rows.forEach((r, index) => {
           const row = layout(r.cells || r, !!r.bold);
-          if (y - row.h < PDF_M + 18) { newPage(); draw(header, true); }
-          draw(row, false);
+          if (y - row.h < PDF_M + 18) { newPage(); draw(header, 'header'); }
+          draw(row, index % 2 ? 'stripe' : 'row');
         });
         return doc;
       },
@@ -165,6 +180,7 @@
       bytes(footer, footer2) {
         const total = pages.length;
         pages.forEach((p, i) => {
+          p.push('0.78 G 0.5 w ' + n(PDF_M) + ' ' + n(PDF_M + 14) + ' m ' + n(PDF_W - PDF_M) + ' ' + n(PDF_M + 14) + ' l S');
           if (footer2) {
             for (const [k, l] of wrapText(winAnsi(footer2), 7, usable).slice(0, 2).entries()) {
               p.push('0.45 g BT /F1 7 Tf ' + n(PDF_M) + ' ' + n(PDF_M - 4 + 8 * (1 - k)) + ' Td (' + pdfEscape(l) + ') Tj ET');

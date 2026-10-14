@@ -94,7 +94,7 @@
     const CUBO_MS = 10000, N_CUBOS = 30, CADA_MEDIDA = 10;
     const st = {
       vista: 'destinos', proy: 'mapa', filtro: 'todo', yo: paisDelEquipo(), W: 0, Wc: 0, H: 0, dpr: 1, t0: performance.now(),
-      arrastre: null, dRot: 0, dTilt: 0, part: [], estallidos: [], hover: null, raton: null, dianas: [],
+      dRot: 0, dTilt: 0, part: [], estallidos: [], hover: null, raton: null, dianas: [],
       serie: new Array(N_CUBOS).fill(0), serieP: {}, cuboT0: Date.now(), eventos: [], ahora: [0, 0, 0], intervalo: 5,
       datos: null, abierto: Date.now(), primeraCarga: true, ultimoGesto: performance.now(), tocado: false, vuelo: null,
     };
@@ -127,15 +127,12 @@
     // browser and the other programs send, or only what the antivirus sends — the same split as
     // the two telemetries of «Datos en vivo».
     const enFiltro = (p) => st.filtro === 'todo' || (st.filtro === 'av') === (!!p && p.tipo === 'antivirus');
-    // What is drawn: the destinations that move most (and every one that is cut), so a busy
-    // computer stays readable. The side panel lists them all.
-    const MAX_DIBUJO = 60;
+    // Every measured destination is drawn. A busy computer may have hundreds, but hiding the
+    // quiet ones would make a newly opened page or program disappear from the map.
     let VISIBLES = [];
     const recalcula = () => {
       const orden = DEST.filter((d) => dibujable(d) && enFiltro(prod(d.p))).sort((a, b) => (b.sub + b.baj) - (a.sub + a.baj) || b.bloq - a.bloq);
-      const cortados = orden.filter((d) => bloqueado(d) || d.bloq).slice(0, 20);
-      const resto = orden.filter((d) => !cortados.includes(d)).slice(0, MAX_DIBUJO - cortados.length);
-      VISIBLES = resto.concat(cortados);
+      VISIBLES = orden;
       VISIBLES.forEach((d, i) => { d.i = i; });
       paisesUsados = [...new Set(VISIBLES.map((d) => d.pais))];
       PROD.forEach((p, k) => { if (!st.serieP[p.id]) st.serieP[p.id] = new Array(N_CUBOS).fill(0); p.k = k; });
@@ -635,7 +632,7 @@
         st.dianas.push({ x: L.cen.x, y: L.cen.y, r: 10, tipo: 'yo' });
         L.prods.forEach((q) => { cx.drawImage(brillo(q.p.color), q.x - 8, q.y - 8, 16, 16); st.dianas.push({ x: q.x, y: q.y, r: 9, tipo: 'prod', ref: q.p }); });
         cx.globalCompositeOperation = 'source-over';
-        rotulo(cima.x + 8, cima.y - 4, t('pd_tu_ordenador').toUpperCase() + ' · ' + nombrePais(st.yo).toUpperCase(), '#3fe0c5');
+        rotulo(cima.x + 8, cima.y - 4, t('pd_tu_ordenador').toUpperCase() + ' · ' + rotuloYo().toUpperCase(), '#3fe0c5');
         cx.globalCompositeOperation = 'lighter';
       }
       particulas(dt);
@@ -649,7 +646,7 @@
         rotulo(cima.x + 6, cima.y - 6, `↑ ${bytes(d.ema)}/s · ${d.host.split('.')[0]}`, prod(d.p).color, puestos);
       });
       // Close enough (zoom), every destination says its name next to its point.
-      if (pxPorGrado() > 16) { VISIBLES.forEach((d) => { if (d.base.v && d.base.x > -20 && d.base.x < st.W && d.base.y > 10 && d.base.y < st.H) rotulo(d.base.x + 9, d.base.y + 5, d.host, bloqueado(d) ? '#ff8d99' : '#d6e6f2', puestos); }); return; }
+      if (pxPorGrado() > 16) { VISIBLES.forEach((d) => { if (d.base.v && d.base.x > -20 && d.base.x < st.W && d.base.y > 10 && d.base.y < st.H) rotulo(d.base.x + 9, d.base.y + 5, rotuloLugar(d), bloqueado(d) ? '#ff8d99' : '#d6e6f2', puestos); }); return; }
       // En el móvil, sin rótulos: se ve el mundo y se toca para saber más.
       if (st.W >= 700) paisesUsados.forEach((c) => {
         const ds = VISIBLES.filter((d) => d.pais === c), d0 = ds.reduce((a, d) => (d.cima.y < a.cima.y ? d : a), ds[0]);
@@ -668,6 +665,12 @@
       cx.fillStyle = col; cx.fillRect(bx, by, 2, h);
       cx.fillStyle = col; cx.textBaseline = 'middle'; cx.fillText(txt, bx + 7, by + h / 2 + 0.5); cx.textBaseline = 'alphabetic';
     };
+    // Up close, name the measured place. Keep the host as a fallback: the map never invents a
+    // city or state when the operator did not publish one.
+    const rotuloLugar = (d) => d.lugar && d.lugar.ciudad
+      ? [d.lugar.ciudad, d.lugar.region].filter(Boolean).join(' · ')
+      : d.host;
+    const rotuloYo = () => [nombrePais(st.yo), st.lugar && st.lugar.ciudad].filter(Boolean).join(' · ');
     // How many screen pixels one degree of the Earth takes now, at the centre of the view.
     const pxPorGrado = () => (!T.ok ? escalaPlano().s : T.m < 0.5 ? st.H / (2 * Math.max(0.05, T.dist - 1) * T.tanH) * RAD : st.H / (2 * T.dist * T.tanH) * RAD);
     // Qué país hay bajo el ratón en el globo o en el mapa (rayo desde la cámara).
@@ -686,8 +689,6 @@
       if (Math.abs(px) > Math.PI || Math.abs(py) > Math.PI / 2) return null;
       return [px / RAD, py / RAD];
     };
-    const paisBajo = (x, y) => { const ll = T.ok ? lonLatBajo(x, y) : lonLatPlano(x, y); return ll ? paisEn(ll[0], ll[1]) : null; };
-
     // --- Destinos without WebGL: the same world, flat, drawn with the 2D canvas ---
     // The land is the Natural Earth grid above, one dot per 1.5° cell, made once per size.
     // z, px, py: the zoom and the pan of the flat map (13 Oct 2026), in screen pixels.
@@ -698,7 +699,6 @@
       return { s, ox: b.ox + PLANO.px, oy: b.oy + PLANO.py };
     };
     const aPlano = (lon, lat) => { const e = escalaPlano(); return { x: e.ox + (lon + 180) * e.s, y: e.oy + (PLANO.lat0 - lat) * e.s, v: true }; };
-    const lonLatPlano = (x, y) => { const e = escalaPlano(), lon = (x - e.ox) / e.s - 180, lat = PLANO.lat0 - (y - e.oy) / e.s; return lon < -180 || lon > 180 || lat > PLANO.lat0 || lat < PLANO.lat1 ? null : [lon, lat]; };
     const tierraPlana = () => {
       const clave = [st.W, st.H, st.dpr, PLANO.z, Math.round(PLANO.px), Math.round(PLANO.py)].join('x');
       if (PLANO.cache && PLANO.clave === clave) return PLANO.cache;
@@ -738,8 +738,8 @@
       particulas(dt);
       VISIBLES.forEach((d) => nodoDestino(d, false));
       const puestos = [];
-      rotulo(L.cen.x + 12, L.cen.y - 14, t('pd_tu_ordenador').toUpperCase() + ' · ' + nombrePais(st.yo).toUpperCase(), '#3fe0c5', puestos);
-      if (pxPorGrado() > 16) { VISIBLES.forEach((d) => { if (d.x > -20 && d.x < st.W && d.y > 10 && d.y < st.H) rotulo(d.x + 9, d.y + 5, d.host, bloqueado(d) ? '#ff8d99' : '#d6e6f2', puestos); }); return; }
+      rotulo(L.cen.x + 12, L.cen.y - 14, t('pd_tu_ordenador').toUpperCase() + ' · ' + rotuloYo().toUpperCase(), '#3fe0c5', puestos);
+      if (pxPorGrado() > 16) { VISIBLES.forEach((d) => { if (d.x > -20 && d.x < st.W && d.y > 10 && d.y < st.H) rotulo(d.x + 9, d.y + 5, rotuloLugar(d), bloqueado(d) ? '#ff8d99' : '#d6e6f2', puestos); }); return; }
       if (st.W >= 700) paisesUsados.forEach((c) => {
         const ds = VISIBLES.filter((d) => d.pais === c), d0 = ds[0];
         const todas = [...new Set(ds.map((d) => d.red).filter((r) => r && r[0] !== '@'))], redes = todas.slice(0, 2).join(' · ') + (todas.length > 2 ? ` +${todas.length - 2}` : '');
@@ -1179,9 +1179,9 @@
     const queHay = (x, y) => {
       let mejor = null, dm = Infinity;
       st.dianas.forEach((d) => { const dd = Math.hypot(d.x - x, d.y - y); if (dd < d.r && dd < dm) { dm = dd; mejor = d; } });
-      if (mejor) return mejor;
-      if (st.vista === 'destinos') { const c = paisBajo(x, y); return c ? { tipo: 'pais', ref: c } : null; }
-      return null;
+      // The map itself is context, not a control. Hover only reacts to a point backed by real
+      // measurements; empty countries and oceans stay still.
+      return mejor;
     };
     const usoTexto = (d) => (d.doc === null || d.doc === undefined ? '' : d.uso ? `<div>${esc(t('pd_para_que'))} <b>${esc(t('av_uso_' + d.uso))}</b></div>` : `<div class="nodoc">${esc(t('pd_no_documenta'))}</div>`);
     const textoTip = (hh) => {
@@ -1212,7 +1212,7 @@
           <div>${esc(t('pd_enviado'))} <b>${esc(bytes(ds.reduce((a, d) => a + d.sub, 0)))}</b> · ${esc(t('pd_recibido'))} ${esc(bytes(ds.reduce((a, d) => a + d.baj, 0)))}</div>
           <div class="mono arriba4">${ds.slice(0, 10).map((d) => '· ' + esc(d.host)).join('<br>')}${ds.length > 10 ? '<br>…' : ''}</div>`;
       }
-      if (hh.tipo === 'yo') { const ce = st.lugar, por = ce.fuente === 'equipo' ? t('pd_lugar_equipo') : ce.fuente === 'zona' ? t('pd_lugar_zona').replace('{ciudad}', ce.ciudad) : t('pd_lugar_pais'); return `<b>${esc(t('pd_tu_ordenador'))}</b> · ${esc(nombrePais(st.yo))} · ${esc(t(esDeDia(ce.lon, ce.lat) ? 'pd_de_dia' : 'pd_de_noche'))}<div class="t">${esc(por)}</div><div>${esc(tn('pd_vigila_n', PROD.length))}</div>`; }
+      if (hh.tipo === 'yo') { const ce = st.lugar, por = ce.fuente === 'equipo' ? t('pd_lugar_equipo') : ce.fuente === 'zona' ? t('pd_lugar_zona').replace('{ciudad}', ce.ciudad) : t('pd_lugar_pais'); return `<b>${esc(t('pd_tu_ordenador'))}</b> · ${esc(rotuloYo())} · ${esc(t(esDeDia(ce.lon, ce.lat) ? 'pd_de_dia' : 'pd_de_noche'))}<div class="t">${esc(por)}</div><div>${esc(tn('pd_vigila_n', PROD.length))}</div>`; }
       if (hh.tipo === 'pais') {
         const c = hh.ref, ds = DEST.filter((d) => d.pais === c), ce = centros[c], dia = ce ? esDeDia(ce.lon, ce.lat) : null;
         const cab = `<b>${esc(nombrePais(c))}</b>${dia === null ? '' : ` <span class="t">· ${esc(t(dia ? 'pd_de_dia' : 'pd_de_noche'))}</span>`}`;
@@ -1227,7 +1227,7 @@
     };
     const actualizaTip = () => {
       const { x, y } = st.raton, hh = queHay(x, y);
-      cv.style.cursor = hh ? 'pointer' : st.arrastre && st.arrastre.mov ? 'grabbing' : zoomable() ? 'grab' : 'default';
+      cv.style.cursor = hh ? 'pointer' : 'default';
       if (!hh) { tip.hidden = true; st.hover = null; return; }
       const html = textoTip(hh) + `<div class="t clic">${esc(t('pd_clic_info'))}</div>`;
       if (tip.innerHTML !== html) { tip.innerHTML = html; estilos(tip); }
@@ -1503,11 +1503,9 @@
     });
     $('retrato-cerrar').addEventListener('click', () => { $('retrato').hidden = true; });
 
-    // ---------- Pointer, wheel and keys: like Google Earth (the owner, 13 Oct 2026) ----------
-    // Dragging takes the Earth in hand: the point under the finger follows it, left is left and up
-    // is up, on the globe and on the map. The wheel, the + and − buttons and a pinch zoom in and
-    // out, up to a limit (ZOOM) where the pictures of the NASA still read. A click (a press that
-    // did not move) opens what is under it; it never cuts by itself.
+    // ---------- Pointer, wheel and keys ---------------------------------------------------------
+    // The view stays centred and cannot be dragged. Wheel, buttons and pinch only change scale;
+    // a click opens a destination backed by measurements and never cuts anything by itself.
     const ZOOM = { globo: [0.75, 7], mapa: [0.85, 10], plano: [1, 10] };
     const lim = (v, [a, b]) => Math.max(a, Math.min(b, v));
     ['pointermove', 'pointerdown', 'wheel', 'keydown'].forEach((ev) => window.addEventListener(ev, () => { st.ultimoGesto = performance.now(); }, { passive: true }));
@@ -1515,21 +1513,6 @@
     const zoomable = () => st.vista === 'destinos';
     // The first touch stops the globe's own sway where it is, without a jump.
     const toca = () => { if (st.tocado) return; st.dRot += T.osc || 0; st.tocado = true; st.vuelo = null; };
-    const mueve = (dx, dy) => {
-      toca();
-      if (enPlano()) { PLANO.px += dx; PLANO.py += dy; return; }
-      if (T.m < 0.5) {
-        // Radians of the surface under one pixel at the centre of the view.
-        const k = Math.max(0.0004, (T.dist - 1) * 2 * T.tanH / st.H);
-        st.dRot += dx * k / Math.max(0.35, Math.cos(T.tiltSin || 0));
-        const base = st.lugar.lat * RAD * 0.8;
-        st.dTilt = Math.max(-1.4 - base, Math.min(1.4 - base, st.dTilt + dy * k));
-      } else {
-        const u = 2 * T.dist * T.tanH / st.H;
-        T.px = Math.max(-Math.PI, Math.min(Math.PI, T.px - dx * u));
-        T.py = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, T.py + dy * u));
-      }
-    };
     // Zoom by a factor f around the screen point (x, y): what is under it stays under it.
     const zoomEn = (f, x, y) => {
       if (!zoomable()) return;
@@ -1584,34 +1567,28 @@
       if (dedos.has(e.pointerId)) dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (dedos.size === 2 && pellizco) {
         const [a, b] = [...dedos.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
-        if (pellizco.d > 0 && d > 0) zoomEn(d / pellizco.d, (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top);
-        pellizco.d = d; if (st.arrastre) st.arrastre.mov = true; return;
+        if (pellizco.d > 0 && d > 0) zoomBoton(d / pellizco.d);
+        pellizco.d = d; return;
       }
-      const a = st.arrastre; if (!a) return;
-      const dx = e.clientX - a.x, dy = e.clientY - a.y;
-      if (!a.mov && Math.hypot(e.clientX - a.x0, e.clientY - a.y0) < 5) return;
-      a.mov = true; a.x = e.clientX; a.y = e.clientY;
-      if (zoomable()) mueve(dx, dy);
+      // The world view is fixed. Pointer movement only updates hover; dragging never pans it.
     });
     cv.addEventListener('wheel', (e) => {
       if (!zoomable()) return; e.preventDefault();
-      const r = cv.getBoundingClientRect(), dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
-      zoomEn(Math.exp(-Math.max(-200, Math.min(200, dy)) * 0.0022), e.clientX - r.left, e.clientY - r.top);
+      const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+      zoomBoton(Math.exp(-Math.max(-200, Math.min(200, dy)) * 0.0022));
     }, { passive: false });
-    cv.addEventListener('dblclick', (e) => { const r = cv.getBoundingClientRect(); zoomEn(2, e.clientX - r.left, e.clientY - r.top); });
+    cv.addEventListener('dblclick', () => zoomBoton(2));
     cv.addEventListener('pointerleave', () => { st.raton = null; tip.hidden = true; });
     cv.addEventListener('pointerdown', (e) => {
       dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (dedos.size === 2) { const [a, b] = [...dedos.values()]; pellizco = { d: Math.hypot(a.x - b.x, a.y - b.y) }; return; }
-      st.arrastre = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, mov: false };
-      try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+      // Keep the pointer for a click and for two-finger zoom, without starting a drag.
     });
     const suelta = (e) => { dedos.delete(e.pointerId); if (dedos.size < 2) pellizco = null; };
-    cv.addEventListener('pointercancel', (e) => { suelta(e); st.arrastre = null; });
+    cv.addEventListener('pointercancel', (e) => { suelta(e); });
     cv.addEventListener('pointerup', (e) => {
       suelta(e);
-      const movido = st.arrastre && st.arrastre.mov; st.arrastre = null;
-      if (movido || dedos.size) return;
+      if (dedos.size) return;
       const r = cv.getBoundingClientRect();
       const hh = queHay(e.clientX - r.left, e.clientY - r.top);
       if (hh) abreDetalle(hh); else cierraDetalle();
@@ -1665,7 +1642,7 @@
     // Where the computer is: said, not chosen (the owner: nobody types a place to fake it). The
     // time zone only knows one city per zone (all of Colombia reads «Bogotá»), so since 1.0.24 the
     // person can ask the computer itself: the browser's location, with its own permission prompt,
-    // rounded to 0.1° (about 10 km) and named by the nearest city of GeoNames, which travels with
+    // rounded to 0.01° (about 1 km) and named by the nearest city of GeoNames, which travels with
     // the panel. It stays in this browser; GUARDIANA sends it nowhere.
     const pintaYo = () => { $('yo').textContent = nombrePais(st.yo) + (st.lugar.ciudad ? ' · ' + st.lugar.ciudad : ''); };
     pintaYo();
@@ -1693,18 +1670,18 @@
       if (!navigator.geolocation) { if (!callado) avisa(t('pd_precisar_no')); return; }
       if (!callado) avisa(t('pd_precisar_pide'));
       navigator.geolocation.getCurrentPosition(async (pos) => {
-        const lat = Math.round(pos.coords.latitude * 10) / 10, lon = Math.round(pos.coords.longitude * 10) / 10;
+        const lat = Math.round(pos.coords.latitude * 100) / 100, lon = Math.round(pos.coords.longitude * 100) / 100;
         let g = { lat, lon, ciudad: '', cc: '' };
         try {
           const m = cercana(await ciudades(), lat, lon);
-          if (m && m.km < 60) g = { lat, lon, ciudad: m.c.n + (m.c.adm ? ', ' + m.c.adm : ''), cc: m.c.cc };
+          if (m && m.km < 35) g = { lat, lon, ciudad: m.c.n + (m.c.adm ? ', ' + m.c.adm : ''), cc: m.c.cc };
           else g.cc = paisEn(lon, lat) || '';
         } catch (_) { g.cc = paisEn(lon, lat) || ''; }
         ponLugarEquipo(g, true);
         if (!callado) avisa(t('pd_precisar_hecho').replace('{lugar}', g.ciudad || nombrePais(g.cc || st.yo)));
       }, (err) => {
         if (!callado) avisa(t(err && err.code === 1 ? 'pd_precisar_denegado' : 'pd_precisar_fallo'));
-      }, { enableHighAccuracy: false, timeout: 20000, maximumAge: 30 * 60000 });
+      }, { enableHighAccuracy: true, timeout: 25000, maximumAge: 5 * 60000 });
     };
     if (soloMirar) $('precisar').hidden = true;
     else {
@@ -1723,9 +1700,10 @@
     let antes = performance.now(), ultimaTele = 0;
     const bucle = (ahora) => {
       requestAnimationFrame(bucle);
-      // To keep it open for hours: 30 frames a second, 20 after two quiet minutes, 60 while dragging.
+      // To keep it open for hours: 30 frames a second, 20 after two quiet minutes and 60 during
+      // the short guided flight opened by «View close up».
       const quieto = ahora - st.ultimoGesto > 120000;
-      if (!st.arrastre && !st.vuelo && ahora - antes < (quieto ? 48 : 31)) return;
+      if (!st.vuelo && ahora - antes < (quieto ? 48 : 31)) return;
       const dt = Math.min(0.06, (ahora - antes) / 1000); antes = ahora;
       try {
         if (ahora - ultimaTele > 1000) { ultimaTele = ahora; telemetria(); pintaDatos(); }

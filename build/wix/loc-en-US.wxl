@@ -4,6 +4,7 @@
 <WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="en-US" Codepage="1252">
   <String Id="Descripcion" Value="GUARDIANA: see who your AI talks to. Everything happens on this computer; no account, no server." />
   <String Id="AbrirPanel" Value="Open the GUARDIANA panel" />
+  <String Id="AbrirZero" Value="Open the GUARDIANA ZERO browser" />
   <String Id="VersionMasNueva" Value="A newer version of GUARDIANA is already installed." />
   <String Id="ServicioDescripcion" Value="GUARDIANA: see who your AI and every device at home talk to. Everything happens on this computer; no account, no server." />
   <String Id="AccesoMenu" Value="Guardiana (menu)" />

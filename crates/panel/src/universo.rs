@@ -31,9 +31,9 @@ const VENTANA_H: i64 = 24;
 /// The latest minutes, row by row, for the live particles and the log.
 const RECIENTES_MIN: i64 = 3;
 /// The most destinations sent; the totals count all of them.
-const MAX_DESTINOS: usize = 400;
+const MAX_DESTINOS: usize = 800;
 /// Besides the antivirus and the browsers, how many other programs (the ones that move most).
-const MAX_OTROS: usize = 8;
+const MAX_OTROS: usize = 128;
 
 /// Browsers by their process file name (lowercase), with the name people know.
 const NAVEGADORES: &[(&str, &str)] = &[
