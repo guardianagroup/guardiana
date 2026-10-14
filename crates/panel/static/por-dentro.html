@@ -27,8 +27,8 @@
     </div>
     <div class="controles">
       <span class="lugar-yo" title=""><span data-t="pd_tu_pais">Tu ordenador está en</span> <b id="yo"></b></span>
-      <button type="button" class="btn-hud graba" id="grabar" aria-pressed="false" data-t="pd_grabar">● Grabar 5 minutos</button>
-      <button type="button" class="btn-hud" id="btn-datos" aria-pressed="true" aria-controls="datos" data-t="pd_btn_datos">Datos en vivo</button>
+      <span class="en-vivo" role="status"><i aria-hidden="true"></i><span data-t="pd_en_vivo">En vivo</span></span>
+      <button type="button" class="btn-hud graba" id="grabar" aria-pressed="false" data-t="pd_grabar">● Guardar 5 minutos de medidas</button>
       <button type="button" class="btn-hud" id="pantalla" data-t="pd_pantalla_completa">Pantalla completa</button>
     </div>
   </div>
@@ -36,7 +36,16 @@
     <canvas id="gl"></canvas>
     <canvas id="cv"></canvas>
     <div class="telemetria" id="telemetria" hidden></div>
-    <aside class="datos" id="datos"><div id="datos-vivo"></div><p class="corte-av" id="corte-av" hidden><button type="button" class="btn-hud" id="corte-av-btn"></button></p><div id="datos-resto"></div></aside>
+    <aside class="datos" id="datos"><button type="button" class="cerrar-datos" id="cerrar-datos" data-t-label="pd_ocultar_cifras" aria-controls="datos">×</button><div id="datos-vivo"></div><p class="corte-av" id="corte-av" hidden><button type="button" class="btn-hud" id="corte-av-btn"></button></p><div id="datos-resto"></div></aside>
+    <button type="button" class="abrir-datos" id="btn-datos" aria-controls="datos" hidden data-t="pd_ver_cifras">‹ Cifras</button>
+    <div class="zoom" id="zoom" role="group" data-t-label="pd_zoom"><button type="button" id="zoom-mas" data-t-label="pd_zoom_mas">+</button><button type="button" id="zoom-menos" data-t-label="pd_zoom_menos">−</button><button type="button" id="zoom-0" data-t-label="pd_zoom_inicio">⌂</button></div>
+    <div class="detalle" id="detalle" hidden role="dialog" aria-modal="false" data-t-label="pd_detalle"><button type="button" class="cerrar-datos" id="detalle-cerrar" data-t-label="pd_cerrar">×</button><div id="detalle-cuerpo"></div></div>
+    <section class="explorador" id="explorador" hidden aria-labelledby="expl-t">
+      <div class="ex-cab"><div><h2 id="expl-t" data-t="pd_ex_titulo">Actividad por programa</h2><p class="t" data-t="pd_ex_sub"></p></div><div class="ex-ind"><span id="expl-mayor"></span><span id="expl-ultima" class="t"></span></div></div>
+      <div class="ex-herr"><label><span data-t="pd_ex_ordenar"></span> <select id="expl-orden"><option value="enviado" data-t="pd_ex_ord_env"></option><option value="recibido" data-t="pd_ex_ord_rec"></option><option value="ahora" data-t="pd_ex_ord_ahora"></option><option value="nombre" data-t="pd_ex_ord_nombre"></option></select></label><input type="search" id="expl-busca" autocomplete="off" spellcheck="false" data-t-label="pd_ex_buscar"></div>
+      <div class="ex-cols t" aria-hidden="true"><span data-t="pd_ex_col_prog"></span><span data-t="pd_ex_col_destinos"></span><span data-t="pd_ex_col_env"></span><span data-t="pd_ex_col_rec"></span><span data-t="pd_ex_col_cortes"></span><span data-t="pd_ex_col_5min"></span><span></span></div>
+      <div id="expl-filas"></div>
+    </section>
     <div class="vigilancia-off" id="vigilancia-off" hidden><span data-t="pd_vigilancia_off"></span> <a href="/antivirus" data-t="pd_vigilancia_enciende"></a></div>
     <div class="leyenda" aria-hidden="true">
       <span><i class="ley-o"></i><span data-t="pd_ley_sale"></span></span>
@@ -55,7 +64,7 @@
     <div><h3><span data-t="pd_hud_enviado" class="h3-titulo"></span> <span id="hud-min"></span></h3><canvas id="spark"></canvas></div>
     <div><h3 data-t="pd_hud_paises"></h3><div class="barras" id="barras"></div></div>
     <div><h3 data-t="pd_hud_puertas"></h3><div class="grande" id="hud-cortes">0</div><div class="pequeno" id="hud-bloqueos"></div></div>
-    <div><h3 data-t="pd_hud_documenta"></h3><canvas id="indicador"></canvas><div class="pequeno" id="hud-doc"></div></div>
+    <div><h3 data-t="pd_hud_top"></h3><ol class="top-ahora" id="hud-top"></ol></div>
   </div>
 </section>
 <script src="/static/por-dentro.js"></script>

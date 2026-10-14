@@ -85,7 +85,7 @@
       vista: 'destinos', proy: 'mapa', filtro: 'todo', yo: paisDelEquipo(), W: 0, Wc: 0, H: 0, dpr: 1, t0: performance.now(),
       arrastre: null, dRot: 0, dTilt: 0, part: [], estallidos: [], hover: null, raton: null, dianas: [],
       serie: new Array(N_CUBOS).fill(0), serieP: {}, cuboT0: Date.now(), eventos: [], ahora: [0, 0, 0], intervalo: 5,
-      datos: null, abierto: Date.now(), primeraCarga: true, ultimoGesto: performance.now(),
+      datos: null, abierto: Date.now(), primeraCarga: true, ultimoGesto: performance.now(), tocado: false, vuelo: null,
     };
 
     // A replay on the website (13 Oct 2026) draws the recorded computer where it was, by the time
@@ -301,7 +301,7 @@
     // de este mismo momento: donde ahora es de noche, en la pantalla también lo es.
     // =====================================================================================
     const glc = $('gl');
-    const T = { ok: false, m: 0, mObj: 0, zoom: 1, px: 0, py: 0, sol: [0, 0, 1], solLL: [0, 0], tanH: Math.tan(15 * RAD), M: null, PV: null, C: [0, 0, 5], asp: 1 };
+    const T = { ok: false, m: 0, mObj: 0, zoomG: 1, zoomM: 1, px: 0, py: 0, dist: 5, sol: [0, 0, 1], solLL: [0, 0], tanH: Math.tan(15 * RAD), M: null, PV: null, C: [0, 0, 5], asp: 1 };
     const gl = glc.getContext('webgl2', { antialias: true, alpha: false, powerPreference: 'low-power' });
 
     // --- matrices (columna a columna, como las quiere WebGL) ---
@@ -354,13 +354,17 @@
       float luz = texture(uLuces, vUv).r;
       float agua = texture(uAgua, vUv).r;
       float lado = smoothstep(-0.08, 0.22, mu);
-      // Luz del sol (Lambert) con un mínimo para que la noche no sea un agujero negro.
-      vec3 col = dia * (max(mu, 0.0) * 1.25 + 0.018);
+      // Luz del sol con una noche suave (the owner, 13 Oct 2026: «se ve muy oscuro… que se vea el
+      // día y la noche, pero más suave»): the night side keeps its land and seas, a little bluer,
+      // and the day side gets the full sun. The line between them is soft, as dusk is.
+      float diaF = smoothstep(-0.14, 0.24, mu);
+      vec3 noct = dia * vec3(0.30, 0.36, 0.50);
+      vec3 col = mix(noct, dia * (0.62 + 0.68 * max(mu, 0.0)), diaF);
       // Crepúsculo: banda cálida a lo largo del terminador.
-      col += dia * vec3(1.0, 0.45, 0.2) * 0.35 * exp(-pow((mu - 0.03) * 10.0, 2.0));
+      col += dia * vec3(1.0, 0.45, 0.2) * 0.22 * exp(-pow((mu - 0.03) * 10.0, 2.0));
       // Luces de las ciudades, solo donde es de noche.
       float noche = 1.0 - smoothstep(-0.20, 0.05, mu);
-      col += vec3(1.0, 0.70, 0.38) * pow(luz, 1.25) * 2.4 * noche;
+      col += vec3(1.0, 0.70, 0.38) * pow(luz, 1.25) * 1.5 * noche;
       vec3 nw = normalize(uM3 * n);
       vec3 V = normalize(uCam - vW);
       vec3 Lw = normalize(uM3 * uSol);
@@ -453,18 +457,24 @@
     const camara = () => {
       const W = st.Wc, H = st.H, asp = W / H, aspU = st.W / H; T.asp = asp;
       const yo = st.lugar;
-      const osc = reducido ? 0 : Math.sin(tiempo() * 0.05) * 0.35;
-      const rot = -yo.lon * RAD + osc + st.dRot, tilt = Math.max(-1.25, Math.min(1.25, yo.lat * RAD * 0.8 + st.dTilt));
+      // The globe sways a little by itself until the person takes it in hand (13 Oct 2026).
+      const osc = reducido || st.tocado ? 0 : Math.sin(tiempo() * 0.05) * 0.35;
+      T.osc = osc;
+      const rot = -yo.lon * RAD + osc + st.dRot, tilt = Math.max(-1.4, Math.min(1.4, yo.lat * RAD * 0.8 + st.dTilt));
       const g = 1 - T.m;
       const dGlobo = 1 / Math.sin(Math.atan(0.84 * T.tanH * Math.min(1, aspU)));
       const dMapa = Math.max((Math.PI / 2) / (T.tanH * 0.94), Math.PI / (T.tanH * aspU * 0.985));
-      const dist = (dGlobo * g + dMapa * T.m) / T.zoom;
+      // Zoom (the owner, 13 Oct 2026: «que se pueda hacer zoom… hasta un punto máximo»): on the
+      // globe it brings the camera closer to the surface (the height above it shrinks), on the map
+      // it narrows the view; each has its own limits (ZOOM).
+      T.dGlobo = dGlobo; T.dMapa = dMapa;
+      const dist = (1 + (dGlobo - 1) / T.zoomG) * g + (dMapa / T.zoomM) * T.m;
       // Con el panel de datos abierto, el mundo se centra en el espacio que queda libre.
       const desplaza = ((W - st.W) / 2) * (2 * dist * T.tanH / H);
       const px = T.px * T.m + desplaza, py = T.py * T.m;
       T.M = mul(rotX(tilt * g), rotY(rot * g));
       T.PV = mul(persp(asp), trasl(-px, -py, -dist));
-      T.C = [px, py, dist]; T.dist = dist; T.rot = rot * g; T.tilt = tilt * g;
+      T.C = [px, py, dist]; T.dist = dist; T.rot = rot * g; T.tilt = tilt * g; T.tiltSin = tilt;
     };
     // Un punto local (marco de la Tierra) a pantalla, y si se ve (no está detrás del globo).
     const aPantalla = (q) => {
@@ -557,7 +567,7 @@
         const fin = d.ruta[d.ruta.length - 1];
         d.x = fin.x; d.y = fin.y; d.vis = fin.v;
         // Columna de luz en el destino: altura según lo enviado (raíz, con techo).
-        const hb = 0.025 + 0.11 * Math.sqrt(d.sub / mx);
+        const hb = (0.025 + 0.11 * Math.sqrt(d.sub / mx)) / Math.pow(Math.max(1, T.m < 0.5 ? T.zoomG : T.zoomM), 0.85);
         d.base = aPantalla(lugar(lon1, lat1, 0.002)); d.cima = aPantalla(lugar(lon1, lat1, hb, hb * 0.9));
       });
       return { cen, R0, prods, yo };
@@ -630,6 +640,8 @@
         if (!cima || !cima.v) return;
         rotulo(cima.x + 6, cima.y - 6, `↑ ${bytes(d.ema)}/s · ${d.host.split('.')[0]}`, prod(d.p).color, puestos);
       });
+      // Close enough (zoom), every destination says its name next to its point.
+      if (pxPorGrado() > 16) { VISIBLES.forEach((d) => { if (d.base.v && d.base.x > -20 && d.base.x < st.W && d.base.y > 10 && d.base.y < st.H) rotulo(d.base.x + 9, d.base.y + 5, d.host, bloqueado(d) ? '#ff8d99' : '#d6e6f2', puestos); }); return; }
       // En el móvil, sin rótulos: se ve el mundo y se toca para saber más.
       if (st.W >= 700) paisesUsados.forEach((c) => {
         const ds = VISIBLES.filter((d) => d.pais === c), d0 = ds.reduce((a, d) => (d.cima.y < a.cima.y ? d : a), ds[0]);
@@ -648,6 +660,8 @@
       cx.fillStyle = col; cx.fillRect(bx, by, 2, h);
       cx.fillStyle = col; cx.textBaseline = 'middle'; cx.fillText(txt, bx + 7, by + h / 2 + 0.5); cx.textBaseline = 'alphabetic';
     };
+    // How many screen pixels one degree of the Earth takes now, at the centre of the view.
+    const pxPorGrado = () => (!T.ok ? escalaPlano().s : T.m < 0.5 ? st.H / (2 * Math.max(0.05, T.dist - 1) * T.tanH) * RAD : st.H / (2 * T.dist * T.tanH) * RAD);
     // Qué país hay bajo el ratón en el globo o en el mapa (rayo desde la cámara).
     const lonLatBajo = (x, y) => {
       if (!T.M || (T.m > 0.2 && T.m < 0.8)) return null;
@@ -668,15 +682,17 @@
 
     // --- Destinos without WebGL: the same world, flat, drawn with the 2D canvas ---
     // The land is the Natural Earth grid above, one dot per 1.5° cell, made once per size.
-    const PLANO = { lat0: 83, lat1: -58, cache: null, clave: '' };
+    // z, px, py: the zoom and the pan of the flat map (13 Oct 2026), in screen pixels.
+    const PLANO = { lat0: 83, lat1: -58, cache: null, clave: '', z: 1, px: 0, py: 0 };
+    const basePlano = (s) => ({ ox: (st.W - 360 * s) / 2, oy: Math.max(8, (st.H - (PLANO.lat0 - PLANO.lat1) * s) / 2 - 12) });
     const escalaPlano = () => {
-      const s = Math.max(0.5, Math.min(st.W / 360, (st.H - 70) / (PLANO.lat0 - PLANO.lat1)));
-      return { s, ox: (st.W - 360 * s) / 2, oy: Math.max(8, (st.H - (PLANO.lat0 - PLANO.lat1) * s) / 2 - 12) };
+      const s = Math.max(0.5, Math.min(st.W / 360, (st.H - 70) / (PLANO.lat0 - PLANO.lat1))) * PLANO.z, b = basePlano(s);
+      return { s, ox: b.ox + PLANO.px, oy: b.oy + PLANO.py };
     };
     const aPlano = (lon, lat) => { const e = escalaPlano(); return { x: e.ox + (lon + 180) * e.s, y: e.oy + (PLANO.lat0 - lat) * e.s, v: true }; };
     const lonLatPlano = (x, y) => { const e = escalaPlano(), lon = (x - e.ox) / e.s - 180, lat = PLANO.lat0 - (y - e.oy) / e.s; return lon < -180 || lon > 180 || lat > PLANO.lat0 || lat < PLANO.lat1 ? null : [lon, lat]; };
     const tierraPlana = () => {
-      const clave = [st.W, st.H, st.dpr].join('x');
+      const clave = [st.W, st.H, st.dpr, PLANO.z, Math.round(PLANO.px), Math.round(PLANO.py)].join('x');
       if (PLANO.cache && PLANO.clave === clave) return PLANO.cache;
       const c = document.createElement('canvas'); c.width = Math.round(st.W * st.dpr); c.height = Math.round(st.H * st.dpr);
       const g = c.getContext('2d'); g.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);
@@ -684,7 +700,8 @@
       g.fillStyle = 'rgba(120,160,200,.34)';
       for (let i = 0; i < G.nlat; i++) {
         const lat = G.lat0 - i * G.paso; if (lat > PLANO.lat0 || lat < PLANO.lat1) continue;
-        for (let j = 0; j < G.nlon; j++) if (celdas[i * G.nlon + j]) { const q = aPlano(G.lon0 + j * G.paso, lat); g.fillRect(q.x - tam / 2, q.y - tam / 2, tam, tam); }
+        const y = aPlano(0, lat).y; if (y < -tam || y > st.H + tam) continue;
+        for (let j = 0; j < G.nlon; j++) if (celdas[i * G.nlon + j]) { const q = aPlano(G.lon0 + j * G.paso, lat); if (q.x > -tam && q.x < st.W + tam) g.fillRect(q.x - tam / 2, q.y - tam / 2, tam, tam); }
       }
       PLANO.cache = c; PLANO.clave = clave; return c;
     };
@@ -694,7 +711,8 @@
       VISIBLES.forEach((d) => {
         const ce = centros[d.pais], grupo = VISIBLES.filter((x) => x.pais === d.pais), k = grupo.indexOf(d);
         const ga = k * 2.399963, rr = grupo.length > 1 ? 1.4 * Math.sqrt(k + 0.5) : 0;
-        const b = aPlano(ce.lon + Math.cos(ga) * rr, ce.lat + Math.sin(ga) * rr);
+        d.lon = ce.lon + Math.cos(ga) * rr; d.lat = ce.lat + Math.sin(ga) * rr;
+        const b = aPlano(d.lon, d.lat);
         const dx = b.x - cen.x, dy = b.y - cen.y, dist = Math.hypot(dx, dy) || 1;
         const g = { x: cen.x + dx / dist * R0, y: cen.y + dy / dist * R0 };
         const c1 = { x: (g.x + b.x) / 2, y: (g.y + b.y) / 2 - Math.min(120, dist * 0.28) - lado(d) * 10 };
@@ -715,6 +733,7 @@
       VISIBLES.forEach((d) => nodoDestino(d, false));
       const puestos = [];
       rotulo(L.cen.x + 12, L.cen.y - 14, t('pd_tu_ordenador').toUpperCase() + ' · ' + nombrePais(st.yo).toUpperCase(), '#3fe0c5', puestos);
+      if (pxPorGrado() > 16) { VISIBLES.forEach((d) => { if (d.x > -20 && d.x < st.W && d.y > 10 && d.y < st.H) rotulo(d.x + 9, d.y + 5, d.host, bloqueado(d) ? '#ff8d99' : '#d6e6f2', puestos); }); return; }
       if (st.W >= 700) paisesUsados.forEach((c) => {
         const ds = VISIBLES.filter((d) => d.pais === c), d0 = ds[0];
         const todas = [...new Set(ds.map((d) => d.red).filter((r) => r && r[0] !== '@'))], redes = todas.slice(0, 2).join(' · ') + (todas.length > 2 ? ` +${todas.length - 2}` : '');
@@ -833,153 +852,92 @@
     // Labels only for the ones that move most (and the cut ones): the rest on hover.
     const conNombre = (d) => st.W >= 700 && (bloqueado(d) || VISIBLES.indexOf(d) < 22);
 
-    // ---------- Programas: a Sankey diagram through GUARDIANA's gate ----------
-    // (13 Oct 2026: of the five views only two stay, Programas and Destinos; the nebula and the
-    // radar asked for an explanation and helped little to decide — the plan of the three AIs.)
-    const banda = (x0, a0, b0, x1, a1, b1) => { const xm = (x0 + x1) / 2; cx.beginPath(); cx.moveTo(x0, a0); cx.bezierCurveTo(xm, a0, xm, a1, x1, a1); cx.lineTo(x1, b1); cx.bezierCurveTo(xm, b1, xm, b0, x0, b0); cx.closePath(); };
-    const curvaCentro = (x0, y0, x1, y1, n) => { const out = [], xm = (x0 + x1) / 2; for (let i = 0; i <= n; i++) { const u = i / n, a = (1 - u) ** 3, b = 3 * (1 - u) ** 2 * u, c2 = 3 * (1 - u) * u * u, d2 = u ** 3; out.push({ x: a * x0 + b * xm + c2 * xm + d2 * x1, y: a * y0 + b * y0 + c2 * y1 + d2 * y1 }); } return out; };
-    // A label cut to the width it has, with an ellipsis.
-    const corta = (txt, ancho) => { if (cx.measureText(txt).width <= ancho) return txt; let r = txt; while (r.length > 1 && cx.measureText(r + '…').width > ancho) r = r.slice(0, -1); return r + '…'; };
-    const layoutSankey = () => {
-      const W = st.W, H = st.H, estrecho = W < 700, nodoW = estrecho ? 8 : 10;
-      // Room on top for the column titles and the gate's figures; under it, for the legend.
-      const top = estrecho ? 64 : 86, bot = H - (estrecho ? 70 : 72), alto = Math.max(60, bot - top);
-      const ps = prodsVisibles();
-      // A narrow screen keeps three columns (programs, gate, country of the server); the network's
-      // company is in each band's tip and in «Datos en vivo».
-      let col;
-      if (estrecho) {
-        cx.font = '600 11px "IBM Plex Sans", sans-serif';
-        const izq = Math.min(W * 0.3, Math.max(48, ...ps.map((p) => cx.measureText(p.nombre).width))) + 12;
-        const pais = W - Math.min(W * 0.3, 100) - nodoW - 6;
-        col = { prog: izq, puerta: izq + nodoW + (pais - izq - nodoW) * 0.45, pais, red: null };
-      } else col = { prog: Math.max(150, W * 0.14), puerta: W * 0.38, pais: W * 0.62, red: W * 0.84 };
-      const pasan = VISIBLES.filter((d) => !bloqueado(d) && d.sub > 0), paran = VISIBLES.filter((d) => bloqueado(d));
-      // Countries and networks beyond the busiest go together, so it stays readable.
-      const totP = {}, totR = {};
-      pasan.forEach((d) => { totP[d.pais] = (totP[d.pais] || 0) + d.sub; const r = d.red && d.red[0] !== '@' ? d.red : '—'; totR[r] = (totR[r] || 0) + d.sub; });
-      const paises = Object.keys(totP).sort((a, b) => totP[b] - totP[a]), redes = Object.keys(totR).sort((a, b) => totR[b] - totR[a]);
-      const maxPaises = estrecho ? 7 : 11;
-      const OTROS = '…', paisDe = (d) => (paises.indexOf(d.pais) < maxPaises ? d.pais : OTROS), redDe = (d) => { const r = d.red && d.red[0] !== '@' ? d.red : '—'; return redes.indexOf(r) < 13 ? r : OTROS; };
-      const nodosPais = [...new Set(pasan.map(paisDe))].sort((a, b) => (a === OTROS) - (b === OTROS) || (totP[b] || 0) - (totP[a] || 0));
-      const nodosRed = col.red === null ? [] : [...new Set(pasan.map(redDe))].sort((a, b) => (a === OTROS) - (b === OTROS) || (totR[b] || 0) - (totR[a] || 0));
-      const total = Math.max(1, pasan.reduce((a, d) => a + d.sub, 0));
-      // A stopped attempt is counted, not measured in bytes (nothing left): each stopped flow is
-      // the same thin dashed line, never a band on the bytes' scale (ChatGPT's review, 13 Oct 2026).
-      const parPx = () => 4;
-      const stopTot = paran.reduce((a, d) => a + parPx(d), 0);
-      const gap = estrecho ? 7 : 10, nMax = Math.max(ps.length, nodosPais.length, nodosRed.length);
-      const k = Math.max(0.000001, (alto - gap * (nMax - 1) - stopTot) / total * 0.92);
-      const alturaDe = (v) => Math.max(2, v * k);
-      // Programs: what passes, then what was stopped, stacked. Each keeps room for its label: two
-      // lines (name and bytes), or only the name when a phone has no room for more.
-      const nodoProg = {}; let y = top;
-      ps.forEach((p) => {
-        const v = pasan.filter((d) => d.p === p.id).reduce((a, d) => a + d.sub, 0), st2 = paran.filter((d) => d.p === p.id).reduce((a, d) => a + parPx(d), 0);
-        const h = (v ? alturaDe(v) : 0) + st2 || 6, lineas = !estrecho || h + gap >= 28 ? 2 : 1;
-        nodoProg[p.id] = { p, x: col.prog, y, h, v, cur: y, lineas }; y += Math.max(h + gap, lineas === 2 ? 30 : 15);
-      });
-      // Countries and networks, centred, each with room for its one-line label.
-      const colocar = (lista, tot, x) => {
-        const out = {}, alt = (n) => alturaDe(tot[n] || 0), paso = (n) => Math.max(alt(n) + gap, 14);
-        const usado = lista.reduce((a, n) => a + paso(n), 0) - gap;
-        let y2 = top + Math.max(0, (alto - usado) / 2);
-        lista.forEach((n) => { const h = alt(n); out[n] = { n, x, y: y2, h, cur: y2, curIn: y2 }; y2 += paso(n); });
-        return out;
-      };
-      const tP = {}; pasan.forEach((d) => { const n = paisDe(d); tP[n] = (tP[n] || 0) + d.sub; });
-      const tR = {}; pasan.forEach((d) => { const n = redDe(d); tR[n] = (tR[n] || 0) + d.sub; });
-      const nodoPais = colocar(nodosPais, tP, col.pais), nodoRed = col.red === null ? {} : colocar(nodosRed, tR, col.red);
-      // The gate: everything that leaves the programs arrives here; what passes goes on.
-      let yPuerta = top + Math.max(0, (alto - (total * k + stopTot + gap * Math.max(0, ps.length - 1))) / 2);
-      const bandas = [], mid = (y0, hh) => y0 + hh / 2;
-      VISIBLES.forEach((d) => { d.vis = false; d.ruta = []; });
-      ps.forEach((p) => {
-        const np = nodoProg[p.id];
-        // Passing flows of this program, grouped by country (fewer crossings).
-        const mias = pasan.filter((d) => d.p === p.id).sort((a, b) => nodosPais.indexOf(paisDe(a)) - nodosPais.indexOf(paisDe(b)) || nodosRed.indexOf(redDe(a)) - nodosRed.indexOf(redDe(b)));
-        mias.forEach((d) => {
-          const h = d.sub * k, a0 = np.cur, g0 = yPuerta; np.cur += h; yPuerta += h;
-          const npais = nodoPais[paisDe(d)], c0 = npais.curIn; npais.curIn += h;
-          const tramos = [[col.prog + nodoW, a0, col.puerta - 3, g0, h], [col.puerta + 3, g0, col.pais, c0, h]];
-          d.ruta = curvaCentro(col.prog + nodoW, mid(a0, h), col.puerta, mid(g0, h), 12).concat(curvaCentro(col.puerta, mid(g0, h), col.pais, mid(c0, h), 18).slice(1));
-          if (col.red !== null) {
-            const nred = nodoRed[redDe(d)], r0 = nred.curIn, s0 = npais.cur; nred.curIn += h; npais.cur += h;
-            tramos.push([col.pais + nodoW, s0, col.red, r0, h]);
-            d.ruta = d.ruta.concat(curvaCentro(col.pais + nodoW, mid(s0, h), col.red, mid(r0, h), 18).slice(1));
-          }
-          bandas.push({ tipo: 'pasa', d, col: p.color, tramos });
-          d.tg = 12 / (d.ruta.length - 1); d.vis = true; const fin = d.ruta[d.ruta.length - 1]; d.x = fin.x; d.y = fin.y;
-        });
-        // Stopped flows end at the gate.
-        paran.filter((d) => d.p === p.id).forEach((d) => {
-          const h = parPx(d), a0 = np.cur, g0 = yPuerta; np.cur += h; yPuerta += h;
-          bandas.push({ tipo: 'para', d, col: '#ff6b7a', tramos: [[col.prog + nodoW, a0, col.puerta - 3, g0, h]] });
-          d.ruta = curvaCentro(col.prog + nodoW, a0 + h / 2, col.puerta - 2, g0 + h / 2, 20); d.tg = 0.98; d.vis = true; d.x = col.puerta - 2; d.y = g0 + h / 2;
-        });
-        yPuerta += gap;
-      });
-      return { col, nodoW, nodoProg, nodoPais, nodoRed, bandas, top, bot, total, OTROS, estrecho };
+    // ---------- Programas: the activity explorer (13 Oct 2026) ----------
+    // The owner found the Sankey hard to read; Grok and ChatGPT, asked as a design agency, both
+    // said the same: the question is «which program sends, where to, and what is cut», and that is
+    // read best as a list. One row per program (antivirus first, in a section of their own), its
+    // two main destinations, what it sent and received, what was stopped and its last five minutes;
+    // a click unfolds every destination, and a click on one opens its card. HTML, not canvas: it
+    // is text the person reads, selects and reaches with the keyboard.
+    const expl = $('explorador'), filasExpl = $('expl-filas');
+    let ordenExpl = 'enviado', buscaExpl = '', abiertoExpl = null, verTodosExpl = false;
+    const coincide = (txt) => !buscaExpl || String(txt || '').toLowerCase().includes(buscaExpl);
+    const filaDestExpl = (d) => {
+      const bl = bloqueado(d), nuevo = d.visto && Date.now() - d.visto < 180000;
+      const chips = (bl ? `<span class="chip c">${esc(d.cortado ? t('pd_chip_cortado') : t('pd_chip_parado'))}</span>` : '') + (d.doc === false ? `<span class="chip nd">${esc(t('pd_chip_nodoc'))}</span>` : '') + (nuevo ? `<span class="chip">${esc(t('pd_chip_nuevo'))}</span>` : '');
+      return `<div class="ex-dest enlace-fila" data-dest="${esc(d.k)}" tabindex="0" role="button">
+        <span class="ex-host"><span class="mono">${esc(d.host)}</span>${d.red && d.red[0] !== '@' ? `<span class="t">${esc(t('pd_ex_red').replace('{red}', d.red))}${d.asn ? ' · AS' + d.asn : ''}</span>` : ''}</span>
+        <span>${esc(d.empresa || '—')}</span>
+        <span>${esc(d.pais && d.pais[0] !== '@' ? nombrePais(d.pais) : '—')}</span>
+        <span class="num o">${d.sub ? '↑ ' + esc(bytes(d.sub)) : '—'}</span>
+        <span class="num i">${d.baj ? '↓ ' + esc(bytes(d.baj)) : '—'}</span>
+        <span class="ex-chips">${d.bloq ? `<span class="c">${esc(tn('pd_parados', d.bloq))}</span> ` : ''}${chips}</span>
+      </div>`;
     };
-    const dibujaSankey = (dt) => {
-      const L = layoutSankey(), tt = tiempo(), hov = st.hover, W = st.W;
-      // Column titles (on a phone: programs over their names, the country at the right edge).
-      const yT = L.estrecho ? 20 : 46;
-      cx.font = '500 10.5px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(160,185,210,.75)';
-      (L.estrecho
-        ? [[t('pd_col_programas'), L.col.prog + L.nodoW, 'right'], ['GUARDIANA', L.col.puerta, 'center'], [t('pd_col_pais'), W - 6, 'right']]
-        : [[t('pd_col_programas'), L.col.prog, 'left'], ['GUARDIANA', L.col.puerta, 'center'], [t('pd_col_pais'), L.col.pais, 'left'], [t('pd_col_red'), L.col.red, 'left']]
-      ).forEach(([n, x, al]) => { cx.textAlign = al; cx.fillText(n.toUpperCase(), x, yT); });
-      cx.textAlign = 'left';
-      // Bands: a gradient from the program's colour to the country's.
-      cx.globalCompositeOperation = 'lighter';
-      L.bandas.forEach((b) => {
-        const resaltada = hov && hov.ref === b.d;
-        if (b.tipo === 'para') { cx.globalCompositeOperation = 'source-over'; trazo(b.d.ruta, 0, 1, resaltada ? 'rgba(255,107,122,.95)' : 'rgba(255,107,122,.6)', 1.4, [4, 3]); cx.globalCompositeOperation = 'lighter'; return; }
-        b.tramos.forEach(([x0, y0, x1, y1, h], i) => {
-          const hh = Math.max(1, h);
-          const g = cx.createLinearGradient(x0, 0, x1, 0);
-          const c1 = b.tipo === 'para' ? '#ff6b7a' : i < 2 ? b.col : `hsl(${tono(b.d.pais)},70%,62%)`, c2 = b.tipo === 'para' ? '#ff6b7a' : i === 0 ? b.col : `hsl(${tono(b.d.pais)},70%,62%)`;
-          const al = resaltada ? 'aa' : b.tipo === 'para' ? '55' : '38';
-          g.addColorStop(0, (c1.startsWith('#') ? c1 + al : c1.replace('hsl', 'hsla').replace(')', `,${parseInt(al, 16) / 255})`))); g.addColorStop(1, (c2.startsWith('#') ? c2 + al : c2.replace('hsl', 'hsla').replace(')', `,${parseInt(al, 16) / 255})`)));
-          cx.fillStyle = g; banda(x0, y0, y0 + hh, x1, y1, y1 + hh); cx.fill();
-        });
-      });
-      cx.globalCompositeOperation = 'source-over';
-      // GUARDIANA's gate: a column of light, with what it let through and what it stopped.
-      const pg = cx.createLinearGradient(L.col.puerta - 16, 0, L.col.puerta + 16, 0);
-      pg.addColorStop(0, 'rgba(63,224,197,0)'); pg.addColorStop(0.5, `rgba(63,224,197,${0.28 + 0.08 * Math.sin(tt * 2)})`); pg.addColorStop(1, 'rgba(63,224,197,0)');
-      cx.fillStyle = pg; cx.fillRect(L.col.puerta - 16, L.top - 6, 32, L.bot - L.top + 12);
-      cx.fillStyle = '#3fe0c5'; cx.fillRect(L.col.puerta - 1.5, L.top - 6, 3, L.bot - L.top + 12);
-      const parados = VISIBLES.filter(bloqueado);
-      cx.font = '10px "IBM Plex Mono", monospace'; cx.textAlign = 'center'; cx.fillStyle = 'rgba(140,255,225,.85)';
-      cx.fillText(t('pd_puerta_pasa').replace('{x}', bytes(L.total)), L.col.puerta, yT + 14);
-      cx.fillStyle = 'rgba(255,141,153,.9)'; cx.fillText(tn('pd_parados', parados.reduce((a, d) => a + d.bloq, 0)), L.col.puerta, yT + 26);
-      cx.textAlign = 'left';
-      L.bandas.filter((b) => b.tipo === 'para').forEach((b) => { const [, , x1, y1, h] = b.tramos[0], ym = y1 + h / 2; cx.strokeStyle = '#ff6b7a'; cx.lineWidth = 1.6; cx.beginPath(); cx.moveTo(x1 - 3, ym - 3); cx.lineTo(x1 + 3, ym + 3); cx.moveTo(x1 + 3, ym - 3); cx.lineTo(x1 - 3, ym + 3); cx.stroke(); });
-      // Nodes and their labels, each cut to the room it has.
-      Object.values(L.nodoProg).forEach((n) => {
-        cx.fillStyle = n.p.color; cx.fillRect(n.x, n.y, L.nodoW, n.h);
-        st.dianas.push({ x: n.x + L.nodoW / 2, y: n.y + n.h / 2, r: Math.max(12, n.h / 2), tipo: 'prod', ref: n.p });
-        const yl = n.y + Math.min(n.h, n.lineas === 2 ? 28 : 12) / 2 + (n.lineas === 2 ? 1 : 4);
-        cx.textAlign = 'right'; cx.font = `600 ${L.estrecho ? 11 : 12}px "IBM Plex Sans", sans-serif`; cx.fillStyle = '#e3eef6'; cx.fillText(corta(n.p.nombre, n.x - 12), n.x - 8, yl);
-        if (n.lineas === 2) { cx.font = '10px "IBM Plex Mono", monospace'; cx.fillStyle = 'rgba(160,185,210,.85)'; cx.fillText(`↑ ${bytes(n.p.sub)}`, n.x - 8, yl + 13); }
-        cx.textAlign = 'left';
-      });
-      const etiqueta = (n, txt) => { cx.font = '500 11px "IBM Plex Sans", sans-serif'; cx.fillStyle = '#e3eef6'; cx.fillText(corta(txt, W - (n.x + L.nodoW + 6) - 4), n.x + L.nodoW + 6, n.y + Math.min(n.h, 26) / 2 + 4); };
-      Object.values(L.nodoPais).forEach((n) => {
-        cx.fillStyle = n.n === L.OTROS ? '#55657a' : `hsl(${tono(n.n)},70%,62%)`; cx.fillRect(n.x, n.y, L.nodoW, n.h);
-        if (n.n !== L.OTROS) st.dianas.push({ x: n.x + L.nodoW / 2, y: n.y + n.h / 2, r: Math.max(12, n.h / 2), tipo: 'pais', ref: n.n });
-        etiqueta(n, n.n === L.OTROS ? t('pd_otros_paises') : nombrePais(n.n));
-      });
-      Object.values(L.nodoRed).forEach((n) => {
-        cx.fillStyle = n.n === L.OTROS ? '#55657a' : '#6fb6ff'; cx.fillRect(n.x, n.y, L.nodoW, n.h);
-        if (n.n !== L.OTROS && n.n !== '—') st.dianas.push({ x: n.x + L.nodoW / 2, y: n.y + n.h / 2, r: Math.max(12, n.h / 2), tipo: 'red', ref: n.n });
-        etiqueta(n, n.n === L.OTROS ? t('pd_otras_redes') : n.n === '—' ? t('pd_red_desconocida') : n.n);
-      });
-      particulas(dt);
-      VISIBLES.forEach((d) => { if (d.vis && d.ruta.length) { const q = d.ruta[Math.min(d.ruta.length - 1, Math.round(d.ruta.length * 0.75))]; st.dianas.push({ x: q.x, y: q.y, r: 8, tipo: 'dest', ref: d }); } });
+    const filaProgExpl = (p, mx) => {
+      const ds = DEST.filter((d) => d.p === p.id).sort((a, b) => b.sub - a.sub || b.bloq - a.bloq);
+      const vis = buscaExpl && !coincide(p.nombre) && !p.procesos.some(coincide) ? ds.filter((d) => coincide(d.host) || coincide(d.empresa) || coincide(d.red)) : ds;
+      const parados = ds.reduce((a, d) => a + (d.bloq || 0), 0), nodoc = ds.filter((d) => d.doc === false).length;
+      const activo = ds.some((d) => d.ult && performance.now() - d.ult < 15000 && !bloqueado(d));
+      const abierto = abiertoExpl === p.id;
+      const top = ds.filter((d) => d.sub > 0).slice(0, 2);
+      const resto = ds.length - top.length;
+      const tipo = esc(tipoTexto(p)) + (p.firma ? ' · ' + esc(t('pd_firmado').replace('{firma}', p.firma)) : '');
+      let h = `<div class="ex-prog${abierto ? ' abierto' : ''}${p.cortado ? ' cortado' : ''}" data-c="${p.color}">
+        <button type="button" class="ex-fila" data-expl="${esc(p.id)}" aria-expanded="${abierto}">
+          <span class="ex-nombre"><span class="pto${activo ? ' vivo' : ''}" aria-hidden="true"></span><span><b>${esc(p.nombre)}</b><span class="t">${tipo}</span></span></span>
+          <span class="ex-destinos">${top.map((d) => `<span class="mono">${esc(d.host)}</span>`).join('')}${resto > 0 ? `<span class="t">${esc(tn('pd_y_mas', resto))}</span>` : ''}${!ds.length ? `<span class="t">${esc(t('pd_ex_sin_destinos'))}</span>` : ''}</span>
+          <span class="ex-env"><span class="num o">${esc(bytes(p.sub))}</span><span class="barra-env"><i data-w="${Math.max(p.sub ? 2 : 0, p.sub / mx * 100)}"></i></span></span>
+          <span class="num i">${esc(bytes(p.baj))}</span>
+          <span class="ex-cortes">${p.cortado ? `<span class="chip c">${esc(t('pd_chip_cortado'))}</span>` : parados ? `<span class="c">${esc(tn('pd_parados', parados))}</span>` : '<span class="t">—</span>'}${nodoc ? `<span class="nd">${esc(tn('pd_ex_nodoc', nodoc))}</span>` : ''}</span>
+          <span class="ex-5m"><canvas data-serie="${esc(p.id)}"></canvas></span>
+          <span class="ex-flecha" aria-hidden="true">›</span>
+        </button>`;
+      if (abierto) {
+        const lista = verTodosExpl ? vis : vis.slice(0, 6);
+        h += `<div class="ex-tabla"><div class="ex-cab-dest t"><span>${esc(t('pd_ex_col_nombre'))}</span><span>${esc(t('pd_ex_col_empresa'))}</span><span>${esc(t('pd_ex_col_pais'))}</span><span>${esc(t('pd_ex_col_env'))}</span><span>${esc(t('pd_ex_col_rec'))}</span><span>${esc(t('pd_ex_col_estado'))}</span></div>
+          ${lista.map(filaDestExpl).join('') || `<p class="t">${esc(t('pd_ex_sin_destinos'))}</p>`}
+          ${vis.length > lista.length ? `<button type="button" class="btn-hud ex-todos" data-todos="1">${esc(t('pd_ex_ver_todos').replace('{n}', vis.length))}</button>` : ''}
+          <div class="ex-acciones">${!soloMirar && p.cortable ? `<button type="button" class="btn-hud${p.cortado ? '' : ' peligro'}" data-cortar-prog="${esc(p.id)}">${esc(t(p.cortado ? 'pd_btn_dejar_prog' : 'pd_btn_cortar_prog'))}</button>` : ''}${p.tipo === 'antivirus' && !soloMirar ? `<a href="/antivirus">${esc(t('pd_ver_antivirus'))} →</a>` : ''}</div>
+        </div>`;
+      }
+      return h + '</div>';
     };
+    const ordenaExpl = (ps) => ps.sort(ordenExpl === 'recibido' ? (a, b) => b.baj - a.baj : ordenExpl === 'ahora' ? (a, b) => (st.serieP[b.id] || []).reduce((x, y) => x + y, 0) - (st.serieP[a.id] || []).reduce((x, y) => x + y, 0) : ordenExpl === 'nombre' ? (a, b) => a.nombre.localeCompare(b.nombre, LOC) : (a, b) => b.sub - a.sub);
+    const pintaExplorador = () => {
+      if (st.vista !== 'programas') return;
+      const ps = PROD.filter(enFiltro).filter((p) => !buscaExpl || coincide(p.nombre) || p.procesos.some(coincide) || DEST.some((d) => d.p === p.id && (coincide(d.host) || coincide(d.empresa) || coincide(d.red))));
+      const mx = Math.max(1, ...ps.map((p) => p.sub));
+      const av = ordenaExpl(ps.filter(esAV)), otros = ordenaExpl(ps.filter((p) => !esAV(p)));
+      const seccion = (titulo, lista) => (lista.length ? `<div class="ex-seccion">${esc(titulo)} <span>${lista.length}</span></div>` + lista.map((p) => filaProgExpl(p, mx)).join('') : '');
+      let h = seccion(t('pd_ex_sec_av'), av) + seccion(t('pd_ex_sec_otros'), otros);
+      if (!h) h = `<p class="ex-vacio t">${esc(buscaExpl ? t('pd_ex_nada_busca') : t('pd_ex_nada'))}</p>`;
+      if (filasExpl.innerHTML !== h) { filasExpl.innerHTML = h; estilos(filasExpl); }
+      // The heading: who sent most, and when the last measurement came.
+      const mayor = PROD.filter(enFiltro).sort((a, b) => b.sub - a.sub)[0];
+      $('expl-mayor').textContent = mayor && mayor.sub ? t('pd_ex_mayor').replace('{prog}', mayor.nombre).replace('{x}', bytes(mayor.sub)) : '';
+      $('expl-ultima').textContent = ultimaCarga ? t('pd_ex_ultima').replace('{h}', ctx.reloj ? ctx.reloj() : hora(Date.now() - (performance.now() - ultimaCarga))) : '';
+      // Five minutes per program: 30 bars, one per 10 seconds, all on the same scale.
+      const todas = PROD.map((p) => Math.max(0, ...(st.serieP[p.id] || [0]))), techo = Math.max(1, ...todas);
+      filasExpl.querySelectorAll('canvas[data-serie]').forEach((c) => {
+        const p = PROD.find((x) => x.id === c.dataset.serie); if (!p) return;
+        const { g, w, h: hh } = prepara(c); if (w < 20) return;
+        const serie = st.serieP[p.id] || [], n = serie.length || 1, bw = w / n;
+        g.fillStyle = 'rgba(118,144,168,.16)'; g.fillRect(0, hh - 1, w, 1);
+        g.fillStyle = p.cortado ? '#ff6b7a' : '#3fe0c5';
+        serie.forEach((v, i) => { if (v > 0) { const a = Math.max(2, Math.sqrt(v / techo) * (hh - 2)); g.fillRect(i * bw + 0.5, hh - 1 - a, Math.max(1, bw - 1.5), a); } });
+      });
+    };
+    $('expl-busca').placeholder = t('pd_ex_buscar');
+    $('expl-orden').addEventListener('change', (e) => { ordenExpl = e.target.value; pintaExplorador(); });
+    $('expl-busca').addEventListener('input', (e) => { buscaExpl = e.target.value.trim().toLowerCase(); verTodosExpl = !!buscaExpl; pintaExplorador(); });
+    filasExpl.addEventListener('click', (e) => {
+      const f = e.target.closest('[data-expl]');
+      if (f) { abiertoExpl = abiertoExpl === f.dataset.expl ? null : f.dataset.expl; verTodosExpl = !!buscaExpl; pintaExplorador(); return; }
+      if (e.target.closest('[data-todos]')) { verTodosExpl = true; pintaExplorador(); return; }
+      const c = e.target.closest('[data-cortar-prog]');
+      if (c) { const p = PROD.find((x) => x.id === c.dataset.cortarProg); if (p) corteProducto(p); }
+    });
 
     // The page's security policy allows no inline styles (style-src 'self'): widths and colours
     // travel as data-* and are set through the style object, which the policy allows.
@@ -1009,15 +967,6 @@
         base = tope;
       });
     };
-    const indicador = (f) => {
-      const { g, w, h } = prepara($('indicador'));
-      if (w < 40 || h < 30) return;
-      const r = Math.min(w / 2 - 6, h - 10), c = { x: w / 2, y: h - 4 };
-      g.lineWidth = 7; g.lineCap = 'round';
-      g.strokeStyle = 'rgba(118,144,168,.22)'; g.beginPath(); g.arc(c.x, c.y, r, Math.PI, 2 * Math.PI); g.stroke();
-      if (f !== null) { g.strokeStyle = '#3fe0c5'; g.beginPath(); g.arc(c.x, c.y, r, Math.PI, Math.PI + Math.PI * f); g.stroke(); }
-      g.fillStyle = '#d3e6f3'; g.font = '600 17px "IBM Plex Mono", monospace'; g.textAlign = 'center'; g.fillText(f === null ? '—' : Math.round(f * 100) + '%', c.x, c.y - 6);
-    };
     const pintaHud = () => {
       // The deck follows «Todo · Datos · Antivirus», like the drawing.
       const mios = PROD.filter(enFiltro), ids = new Set(mios.map((p) => p.id)), DF = DEST.filter((d) => ids.has(d.p));
@@ -1025,14 +974,16 @@
       $('hud-min').textContent = bytes(mios.reduce((a, p) => a + (st.serieP[p.id] || []).reduce((x, y) => x + y, 0), 0));
       const pp = {}; DF.forEach((d) => { if (d.pais && d.pais[0] !== '@' && !d.sede) pp[d.pais] = (pp[d.pais] || 0) + d.sub; });
       const top = Object.entries(pp).filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 5), mx = Math.max(1, ...top.map((x) => x[1]));
-      $('barras').innerHTML = top.map(([c, v]) => `<div><span>${esc(nombrePais(c))}</span><s data-w="${Math.max(2, v / mx * 100)}"></s><span>${esc(bytes(v))}</span></div>`).join('') || `<div class="t">—</div>`;
+      $('barras').innerHTML = top.map(([c, v]) => `<div class="enlace-fila" data-pais="${esc(c)}" tabindex="0" role="button"><span>${esc(nombrePais(c))}</span><s data-w="${Math.max(2, v / mx * 100)}"></s><span>${esc(bytes(v))}</span></div>`).join('') || `<div class="t">—</div>`;
       estilos($('barras'));
       $('hud-cortes').textContent = num(DF.filter((d) => d.cortado).length + mios.filter((p) => p.cortado).length);
       $('hud-bloqueos').textContent = tn('pd_intentos', DF.reduce((a, d) => a + d.bloq, 0));
-      const av = DEST.filter((d) => d.doc !== null && d.doc !== undefined), tot = av.reduce((a, d) => a + d.sub, 0), doc = av.filter((d) => d.doc).reduce((a, d) => a + d.sub, 0);
-      sparkline(); indicador(tot ? doc / tot : null);
-      $('hud-doc').textContent = tot ? t('pd_doc_explica').replace('{n}', pct(doc, tot)).replace('{m}', 100 - pct(doc, tot)) : t('pd_doc_nada');
-      pintaCorte();
+      sparkline();
+      // «Lo que más envía ahora» (13 Oct 2026, in place of a needle that hardly ever moved): the
+      // three destinations with most sent in the last minutes, each one a click away from its card.
+      const vivos = DF.filter((d) => d.ema > 0 && !bloqueado(d)).sort((a, b) => b.ema - a.ema).slice(0, 3);
+      $('hud-top').innerHTML = vivos.map((d) => `<li class="enlace-fila" data-dest="${esc(d.k)}" tabindex="0" role="button"><span>${esc(d.host)}</span><span class="o">${esc(bytes(d.ema))}/s</span></li>`).join('') || `<li class="t">${esc(t('pd_top_nada'))}</li>`;
+      pintaCorte(); pintaDetalle(); pintaExplorador();
     };
     // «Cortar todo lo que envía el antivirus» (until 13 Oct 2026 «Protección máxima», a name that
     // hid that the antivirus then gets no updates): a small button in the antivirus's telemetry,
@@ -1051,8 +1002,12 @@
     // ---------- «Datos en vivo» ----------
     const panelDatos = $('datos');
     let datosAbierto = true;
-    const ponDatos = (on) => { datosAbierto = on; panelDatos.hidden = !on; $('btn-datos').setAttribute('aria-pressed', String(on)); try { localStorage.setItem('guardiana_pd_datos', on ? '1' : '0'); } catch (_) {} pintaDatos(); };
-    $('btn-datos').addEventListener('click', () => ponDatos(!datosAbierto));
+    // Everything on this page is live; the side panel of figures closes with its × and comes back
+    // with the small «‹ Cifras» tab on the edge (the owner, 13 Oct 2026: the «Datos en vivo» button
+    // did not say what it did; «● En vivo» is now a fixed sign in the bar).
+    const ponDatos = (on) => { datosAbierto = on; panelDatos.hidden = !on; $('btn-datos').hidden = on; $('btn-datos').setAttribute('aria-expanded', String(on)); try { localStorage.setItem('guardiana_pd_datos', on ? '1' : '0'); } catch (_) {} pintaDatos(); };
+    $('btn-datos').addEventListener('click', () => ponDatos(true));
+    $('cerrar-datos').addEventListener('click', () => ponDatos(false));
     // Two telemetries, apart (the owner, 13 Oct 2026): the data of the browser and the other
     // programs, and the antivirus's own, so what the person does is never mixed with what the
     // antivirus does.
@@ -1075,7 +1030,36 @@
     const lineasGrupo = (G, ahora) => `${esc(t('pd_ahora'))} <span class="o">↑ ${esc(bytes(ahora[0]))}/s</span> · <span class="i">↓ ${esc(bytes(ahora[1]))}/s</span><br>
         ${esc(tn('pd_conexiones', G.activas))} · ${esc(tn('pd_paises', G.paises))} · ${esc(tn('pd_empresas', G.empresas))}<br>
         <span class="t">${esc(t('pd_salio').replace('{n}', pct(G.fuera, G.tot)).replace('{pais}', nombrePais(st.yo)))}</span>`;
-    const htmlDirecto = () => {
+    // Five minutes in eight heights of a block, one per 10 seconds: the shape of the activity,
+    // in text, so it lives inside the panel that is rewritten every second.
+    const bloques = (serie) => { const mx = Math.max(...serie); return mx > 0 ? serie.map((v) => (v > 0 ? '▁▂▃▄▅▆▇█'[Math.min(7, Math.ceil(v / mx * 8) - 1)] : '·')).join('') : ''; };
+    // The antivirus, in full (the owner, 13 Oct 2026: «la telemetría de él todo el tiempo me gustaría
+    // tenerla revisada… se ve muy pobre»): what for, by its maker's own documentation; where to;
+    // the last five minutes; when it last spoke; its lookups by day and by night. All measured here.
+    const htmlAV = (A) => {
+      let h = '';
+      const porUso = {};
+      A.ds.forEach((d) => { const k = d.doc === false ? 'sin' : d.doc ? d.uso || 'otros' : null; if (!k) return; const u = porUso[k] || (porUso[k] = [0, 0]); u[0] += d.sub; u[1] += d.baj; });
+      const usos = Object.entries(porUso).sort((a, b) => b[1][0] + b[1][1] - (a[1][0] + a[1][1]));
+      if (usos.length) {
+        h += `<div class="sub-av">${esc(t('pd_av_para_que'))}</div>`;
+        usos.forEach(([k, [e, r]]) => { h += `<div class="fila"><span class="${k === 'sin' ? 'nd' : ''}">${esc(k === 'sin' ? t('pd_av_sin_doc') : t('av_uso_' + k))}</span><span><span class="o">↑ ${esc(bytes(e))}</span> <span class="i">↓ ${esc(bytes(r))}</span></span></div>`; });
+      }
+      const top = A.ds.filter((d) => d.sub + d.baj + d.bloq > 0).sort((a, b) => b.sub + b.baj - (a.sub + a.baj)).slice(0, 6);
+      if (top.length) {
+        h += `<div class="sub-av">${esc(t('pd_av_adonde'))}</div>`;
+        top.forEach((d) => { h += `<div class="fila enlace-fila" data-dest="${esc(d.k)}" tabindex="0" role="button"><span>${d.doc === false ? '<span class="nd">●</span> ' : ''}${esc(d.host)} <span class="t">${esc(d.pais || '—')}</span></span><span class="${bloqueado(d) ? 'c' : 'o'}">${bloqueado(d) ? esc(tn('pd_parados', d.bloq)) : '↑ ' + esc(bytes(d.sub))}</span></div>`; });
+      }
+      const serie = new Array(N_CUBOS).fill(0); A.ps.forEach((p) => (st.serieP[p.id] || []).forEach((v, i) => { serie[i] += v; }));
+      const b = bloques(serie);
+      h += `<div class="sub-av">${esc(t('pd_av_5min'))}</div><div class="bloques">${b ? esc(b) : `<span class="t">${esc(t('pd_av_5min_nada'))}</span>`}</div>`;
+      const ultima = Math.max(0, ...A.ds.map((d) => d.ultima || 0)), consultas = A.ds.reduce((a, d) => a + (d.consultas || 0), 0);
+      h += `<div>${ultima ? esc(t('pd_av_ultima').replace('{t}', hace(Date.now() - ultima))) : ''}${consultas ? (ultima ? ' · ' : '') + esc(tn('pd_consultas', consultas)) : ''}</div>`;
+      A.ps.forEach((p) => { h += `<div class="t">${esc(p.nombre)}: ${esc(p.procesos.join(' · '))} · ${esc(p.firma ? t('pd_firmado').replace('{firma}', p.firma) : t('pd_sin_firma'))}</div>`; });
+      if (A.ps.some((p) => /defender/i.test(p.nombre))) h += `<div class="t">${esc(t('pd_av_defender_wu'))}</div>`;
+      return h;
+    };
+    const htmlDirecto = (completo) => {
       const yo = st.lugar, dia = esDeDia(yo.lon, yo.lat);
       const [slon, slat] = T.solLL, sobre = paisEn(slon, slat);
       const ahoraG = st.ahoraG || { datos: [0, 0], av: [0, 0] };
@@ -1098,6 +1082,7 @@
           <span class="t">${esc(t('pd_doc_matiz'))}</span><br>
           <span class="t">${esc(t('pd_noche_av').replace('{x}', bytes(A.noche)))}</span><br>
           <span class="c">${enteros.length ? esc(t('pd_av_cortado').replace('{n}', enteros.join(', '))) + ' · ' : ''}${esc(tn('pd_puertas', A.cortes))} · ${esc(tn('pd_intentos', A.intentos))}</span>`;
+        if (completo) h += htmlAV(A);
       }
       return h + '</div>';
     };
@@ -1108,7 +1093,7 @@
       const tot = DEST.reduce((a, d) => a + d.sub, 0), baj = DEST.reduce((a, d) => a + d.baj, 0), paq = DEST.reduce((a, d) => a + d.paq, 0);
       // Live figures first, then the cut's button, then the rest. The button lives outside what is
       // rewritten every second, so a click or the keyboard's focus on it is never lost.
-      $('datos-vivo').innerHTML = `<h4>${esc(t('pd_en_directo'))}</h4><div>${htmlDirecto()}</div>`;
+      $('datos-vivo').innerHTML = `<h4>${esc(t('pd_en_directo'))}</h4><div>${htmlDirecto(true)}</div>`;
       pintaCorte();
       // Programs.
       let h = `<h4>${esc(t('pd_programas'))} <span class="s">${PROD.length}</span></h4>`;
@@ -1116,7 +1101,7 @@
         const ds = DEST.filter((d) => d.p === p.id), act = ds.filter((d) => d.ult && ahoraMs - d.ult < 15000 && !bloqueado(d)).length;
         const avs = ds.filter((d) => d.doc !== null && d.doc !== undefined), su = avs.reduce((a, d) => a + d.sub, 0), doc = avs.filter((d) => d.doc).reduce((a, d) => a + d.sub, 0);
         const chip = p.cortado ? `<span class="chip c">${esc(t('pd_chip_cortado'))}</span>` : `<span class="chip">${esc(t('pd_chip_pasa'))}</span>`;
-        h += `<div class="prod" data-c="${p.color}"><div class="fila"><span><b>${esc(p.nombre)}</b> <span class="t">${esc(tipoTexto(p))}</span></span>${chip}</div>
+        h += `<div class="prod enlace-fila" data-c="${p.color}" data-prod="${esc(p.id)}" tabindex="0" role="button"><div class="fila"><span><b>${esc(p.nombre)}</b> <span class="t">${esc(tipoTexto(p))}</span></span>${chip}</div>
           <div class="t">${esc(p.procesos.join(' · '))} · ${esc(p.firma ? t('pd_firmado').replace('{firma}', p.firma) : t('pd_sin_firma'))}</div>
           <div><span class="o">↑ ${esc(bytes(p.sub))}</span> · <span class="i">↓ ${esc(bytes(p.baj))}</span> · ${esc(tn('pd_conexiones', act))} · ${esc(tn('pd_paises', new Set(ds.map((d) => d.pais).filter((x) => x && x[0] !== '@')).size))}</div>`
           + (p.tipo === 'antivirus' ? `<div class="barrita"><i data-w="${pct(doc, su)}" data-bg="var(--shield)"></i><i data-w="${su ? 100 - pct(doc, su) : 0}" data-bg="var(--undoc)"></i></div>
@@ -1128,7 +1113,7 @@
       h += `<h4>${esc(t('pd_destinos'))} <span class="s">${num(DEST.length)}</span></h4>`;
       top.forEach((d) => {
         const nuevo = d.visto && Date.now() - d.visto < 180000, bl = bloqueado(d);
-        h += `<div class="fila"><span title="${esc(d.host)}">${esc(d.host)}${nuevo ? ` <span class="chip">${esc(t('pd_chip_nuevo'))}</span>` : ''}</span><span class="${bl ? 'c' : 'o'}">${bl || (!d.sub && d.bloq) ? esc(tn('pd_parados', d.bloq)) : esc(bytes(d.sub))}</span></div>
+        h += `<div class="fila enlace-fila" data-dest="${esc(d.k)}" tabindex="0" role="button"><span title="${esc(d.host)}">${esc(d.host)}${nuevo ? ` <span class="chip">${esc(t('pd_chip_nuevo'))}</span>` : ''}</span><span class="${bl ? 'c' : 'o'}">${bl || (!d.sub && d.bloq) ? esc(tn('pd_parados', d.bloq)) : esc(bytes(d.sub))}</span></div>
           <div class="barrita"><i data-w="${bl ? 100 : Math.max(2, d.sub / mx * 100)}" data-bg="${bl ? 'rgba(255,107,122,.5)' : prod(d.p).color}"></i></div>`;
       });
       if (st.datos && st.datos.destinos_omitidos) h += `<div class="t">${esc(tn('pd_omitidos', st.datos.destinos_omitidos))}</div>`;
@@ -1136,7 +1121,7 @@
       const redes = {}; DEST.filter((d) => !d.sede && d.red && d.red[0] !== '@').forEach((d) => { const k = d.red; redes[k] = redes[k] || { b: 0, asn: d.asn, n: 0 }; redes[k].b += d.sub + d.baj; redes[k].n++; });
       const rr = Object.entries(redes).sort((a, b) => b[1].b - a[1].b).slice(0, 15), mr = Math.max(1, ...rr.map((x) => x[1].b));
       h += `<h4>${esc(t('pd_empresas_redes'))} <span class="s">${num(Object.keys(redes).length)}</span></h4>`;
-      rr.forEach(([n, r]) => { h += `<div class="fila"><span>${esc(n)} <span class="t">${r.asn ? 'AS' + r.asn : ''} · ${esc(tn('pd_nombres', r.n))}</span></span><span>${esc(bytes(r.b))}</span></div><div class="barrita"><i data-w="${Math.max(2, r.b / mr * 100)}" data-bg="var(--in)"></i></div>`; });
+      rr.forEach(([n, r]) => { h += `<div class="fila enlace-fila" data-red="${esc(n)}" tabindex="0" role="button"><span>${esc(n)} <span class="t">${r.asn ? 'AS' + r.asn : ''} · ${esc(tn('pd_nombres', r.n))}</span></span><span>${esc(bytes(r.b))}</span></div><div class="barrita"><i data-w="${Math.max(2, r.b / mr * 100)}" data-bg="var(--in)"></i></div>`; });
       // Where the servers are.
       const j = { yo: 0, ue: 0, us: 0, otros: 0, sin: 0 };
       DEST.filter((d) => !d.sede).forEach((d) => { j[!d.pais || d.pais[0] === '@' ? 'sin' : d.pais === st.yo ? 'yo' : UE.has(d.pais) ? 'ue' : d.pais === 'US' ? 'us' : 'otros'] += d.sub; });
@@ -1187,23 +1172,20 @@
         const estado = bl ? `<span class="estado corta">${esc(d.cortado ? t('pd_cortado_nombre') : d.ancho ? t('pd_cortado_ancho') : t('pd_cortado_programa').replace('{prog}', p.nombre))}</span>` : `<span class="estado pasa">${esc(t('pd_pasa'))}</span>`;
         const dia = centros[d.pais] ? esDeDia(centros[d.pais].lon, centros[d.pais].lat) : null;
         const donde = d.sede ? t('pd_sede').replace('{pais}', nombrePais(d.pais)).replace('{empresa}', d.red || '—') : t('pd_servidor').replace('{pais}', d.pais ? nombrePais(d.pais) : '—').replace('{red}', d.red || '—');
-        const accion = !d.destino ? t('pd_sin_nombre_no_corta') : d.ancho ? t('pd_ancho_dejar') : d.cortado ? t('pd_clic_dejar') : t('pd_clic_cortar');
         return `<div class="mono">${esc(d.host)}</div><div>${esc(p.nombre)} · <span class="mono">${esc(p.procesos.join(' · '))}</span></div>${usoTexto(d)}
           ${d.empresa && !d.sede ? `<div>${esc(t('pd_nombre_de').replace('{empresa}', d.empresa))}</div>` : ''}
           <div>${esc(donde)}${d.asn ? ` <span class="mono">AS${d.asn}</span>` : ''}</div>
           ${d.red && !d.sede && d.red[0] !== '@' && d.red !== d.empresa ? `<div class="t">${esc(t('pd_red_no_es'))}</div>` : ''}
           ${d.proto ? `<div>${esc((d.vias && d.vias.length ? d.vias : [d.proto + '/' + d.puerto]).join(' · '))}${d.puerto === 443 ? ' ' + esc(t('pd_cifrado_corto')) : d.puerto === 80 ? ' ' + esc(t('pd_sin_cifrar_corto')) : ''} · ${esc(tn('pd_paquetes_n', d.paq))}</div>` : ''}
           <div>${esc(t('pd_enviado'))} <b>${esc(bytes(d.sub))}</b> · ${esc(t('pd_recibido'))} ${esc(bytes(d.baj))}${d.consultas ? ' · ' + esc(tn('pd_consultas', d.consultas)) : ''}${d.bloq ? ' · ' + esc(tn('pd_parados', d.bloq)) : ''}</div>
-          <div class="t">${d.primera ? esc(t('pd_primera').replace('{t}', hace(Date.now() - d.primera))) : ''}${dia === null ? '' : ' · ' + esc(t(dia ? 'pd_alli_dia' : 'pd_alli_noche'))}</div>${estado}
-          <div class="t">${esc(accion)}</div>`;
+          <div class="t">${d.primera ? esc(t('pd_primera').replace('{t}', hace(Date.now() - d.primera))) : ''}${dia === null ? '' : ' · ' + esc(t(dia ? 'pd_alli_dia' : 'pd_alli_noche'))}</div>${estado}`;
       }
       if (hh.tipo === 'prod') {
         const p = hh.ref, ds = DEST.filter((d) => d.p === p.id);
         return `<b>${esc(p.nombre)}</b> · <span class="t">${esc(tipoTexto(p))}</span><div class="mono">${esc(p.procesos.join(' · '))}</div>
           <div>${esc(tn('pd_destinos_en', ds.length).replace('{p}', new Set(ds.map((d) => d.pais).filter((x) => x && x[0] !== '@')).size))}</div>
           <div>${esc(t('pd_enviado'))} <b>${esc(bytes(p.sub))}</b> · ${esc(t('pd_recibido'))} ${esc(bytes(p.baj))}</div>
-          ${p.cortado ? `<span class="estado corta">${esc(t('pd_prog_cortado'))}</span>` : `<span class="estado pasa">${esc(t('pd_prog_pasa'))}</span>`}
-          <div class="t">${esc(p.cortable ? (p.cortado ? t('pd_clic_dejar_prog') : t('pd_clic_cortar_prog')) : t('pd_no_cortable'))}</div>`;
+          ${p.cortado ? `<span class="estado corta">${esc(t('pd_prog_cortado'))}</span>` : `<span class="estado pasa">${esc(t('pd_prog_pasa'))}</span>`}`;
       }
       if (hh.tipo === 'red') {
         const r = hh.ref, ds = DEST.filter((d) => d.red === r && !d.sede), asn = (ds.find((d) => d.asn) || {}).asn;
@@ -1227,9 +1209,9 @@
     };
     const actualizaTip = () => {
       const { x, y } = st.raton, hh = queHay(x, y);
-      cv.style.cursor = hh && (hh.tipo === 'dest' || hh.tipo === 'prod') ? 'pointer' : enGlobo() ? 'grab' : 'crosshair';
+      cv.style.cursor = hh ? 'pointer' : st.arrastre && st.arrastre.mov ? 'grabbing' : zoomable() ? 'grab' : 'default';
       if (!hh) { tip.hidden = true; st.hover = null; return; }
-      const html = textoTip(hh);
+      const html = textoTip(hh) + `<div class="t clic">${esc(t('pd_clic_info'))}</div>`;
       if (tip.innerHTML !== html) { tip.innerHTML = html; estilos(tip); }
       tip.hidden = false;
       const tw = tip.offsetWidth, th = tip.offsetHeight;
@@ -1237,6 +1219,75 @@
       tip.style.top = Math.min(st.H - th - 8, Math.max(8, y + 14)) + 'px';
       st.hover = hh;
     };
+
+    // ---------- A click opens what is under it (the owner, 13 Oct 2026: «cuando clique, que me
+    // dé información… haciendo clics y enlaces») ----------
+    // The card says everything the panel knows of it, links to the pages that say more (the
+    // company's profile, the country in the extract, the antivirus's page) and holds the one
+    // button that cuts or lets through. Nothing is cut by a click on the picture any more.
+    const detalle = $('detalle'), cuerpoDet = $('detalle-cuerpo');
+    let abierto = null;
+    const enlace = (href, txt) => (soloMirar ? '' : `<a href="${esc(href)}">${esc(txt)} →</a>`);
+    const botonDest = (d) => `<button type="button" class="fila-det" data-dest="${esc(d.k)}"><span>${bloqueado(d) ? '✕ ' : ''}${esc(d.host)}</span><span class="${bloqueado(d) ? 'c' : 'o'}">${bloqueado(d) ? esc(tn('pd_parados', d.bloq)) : '↑ ' + esc(bytes(d.sub))}</span></button>`;
+    const listaDest = (ds) => { const o = ds.slice().sort((a, b) => b.sub - a.sub || b.bloq - a.bloq); return o.length ? `<div class="lista-det">${o.slice(0, 12).map(botonDest).join('')}${o.length > 12 ? `<div class="t">${esc(tn('pd_y_mas', o.length - 12))}</div>` : ''}</div>` : ''; };
+    const cerca = (lon, lat) => (st.vista === 'destinos' && lon !== undefined ? `<button type="button" class="btn-hud" data-cerca="${lon},${lat}">${esc(t('pd_ver_cerca'))}</button>` : '');
+    const htmlDetalle = (hh) => {
+      let h = `<div class="cuerpo">${textoTip(hh)}</div>`, acciones = '', enlaces = [];
+      if (hh.tipo === 'dest') {
+        const d = hh.ref, p = prod(d.p);
+        if (!d.sede) h += `<p class="t">${esc(t('pd_pos_pais').replace('{pais}', d.pais ? nombrePais(d.pais) : '—'))}</p>`;
+        if (!soloMirar) acciones += !d.destino ? `<p class="t">${esc(t('pd_sin_nombre_no_corta'))}</p>` : d.ancho ? `<p class="t">${esc(t('pd_ancho_dejar'))}</p>` : `<button type="button" class="btn-hud${d.cortado ? '' : ' peligro'}" data-cortar="dest">${esc(t(d.cortado ? 'pd_btn_dejar' : 'pd_btn_cortar'))}</button>`;
+        acciones += cerca(d.lon, d.lat);
+        if (d.empresa) enlaces.push(enlace('/empresa?e=' + encodeURIComponent(d.empresa), t('pd_ver_empresa').replace('{empresa}', d.empresa)));
+        if (d.red && d.red[0] !== '@' && d.red !== d.empresa) enlaces.push(enlace('/empresa?e=' + encodeURIComponent(d.red), t('pd_ver_red').replace('{red}', d.red)));
+        if (d.pais && d.pais[0] !== '@') enlaces.push(enlace('/extracto?pais=' + encodeURIComponent(d.pais), t('pd_ver_pais_extracto').replace('{pais}', nombrePais(d.pais))));
+        if (p.tipo === 'antivirus') enlaces.push(enlace('/antivirus', t('pd_ver_antivirus')));
+      } else if (hh.tipo === 'prod') {
+        const p = hh.ref;
+        if (!soloMirar) acciones += p.cortable ? `<button type="button" class="btn-hud${p.cortado ? '' : ' peligro'}" data-cortar="prod">${esc(t(p.cortado ? 'pd_btn_dejar_prog' : 'pd_btn_cortar_prog'))}</button>` : `<p class="t">${esc(t('pd_no_cortable'))}</p>`;
+        h += `<h4>${esc(t('pd_det_destinos'))}</h4>` + listaDest(DEST.filter((d) => d.p === p.id));
+        if (p.tipo === 'antivirus') enlaces.push(enlace('/antivirus', t('pd_ver_antivirus')));
+      } else if (hh.tipo === 'pais') {
+        const c = hh.ref, ce = centros[c];
+        h = `<div class="cuerpo">${textoTip(hh).replace(/<div class="mono arriba4">[\s\S]*$/, '')}</div><h4>${esc(t('pd_det_destinos'))}</h4>` + listaDest(DEST.filter((d) => d.pais === c));
+        if (ce) acciones += cerca(ce.lon, ce.lat);
+        enlaces.push(enlace('/extracto?pais=' + encodeURIComponent(c), t('pd_ver_pais_extracto').replace('{pais}', nombrePais(c))));
+      } else if (hh.tipo === 'red') {
+        const r = hh.ref;
+        h = `<div class="cuerpo">${textoTip(hh).replace(/<div class="mono arriba4">[\s\S]*$/, '')}</div><h4>${esc(t('pd_det_destinos'))}</h4>` + listaDest(DEST.filter((d) => d.red === r && !d.sede));
+        enlaces.push(enlace('/empresa?e=' + encodeURIComponent(r), t('pd_ver_red').replace('{red}', r)));
+      } else if (hh.tipo === 'yo') acciones += cerca(st.lugar.lon, st.lugar.lat);
+      enlaces = enlaces.filter(Boolean);
+      return h + (acciones ? `<div class="acciones-det">${acciones}</div>` : '') + (enlaces.length ? `<div class="enlaces-det">${enlaces.join('')}</div>` : '');
+    };
+    const pintaDetalle = () => {
+      if (!abierto) return;
+      // A destination that is no longer measured keeps its last card; one that still is, its fresh figures.
+      if (abierto.tipo === 'dest' && porClave.get(abierto.ref.k)) abierto.ref = porClave.get(abierto.ref.k);
+      if (abierto.tipo === 'prod') abierto.ref = PROD.find((p) => p.id === abierto.ref.id) || abierto.ref;
+      const html = htmlDetalle(abierto);
+      if (cuerpoDet.innerHTML !== html) { cuerpoDet.innerHTML = html; estilos(cuerpoDet); }
+    };
+    const abreDetalle = (hh) => { abierto = hh; tip.hidden = true; detalle.hidden = false; pintaDetalle(); detalle.scrollTop = 0; };
+    const cierraDetalle = () => { abierto = null; detalle.hidden = true; };
+    $('detalle-cerrar').addEventListener('click', cierraDetalle);
+    detalle.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.dest) { const d = porClave.get(b.dataset.dest); if (d) abreDetalle({ tipo: 'dest', ref: d }); return; }
+      if (b.dataset.cerca) { const [lon, lat] = b.dataset.cerca.split(',').map(Number); vuela(lon, lat); return; }
+      if (b.dataset.cortar === 'dest' && abierto && abierto.tipo === 'dest') corteNombre(abierto.ref);
+      if (b.dataset.cortar === 'prod' && abierto && abierto.tipo === 'prod') corteProducto(abierto.ref);
+    });
+    // The side panel and the deck open the same card.
+    const abreDesde = (e) => {
+      const el = e.target.closest('[data-dest],[data-prod],[data-red],[data-pais]'); if (!el || el.closest('#detalle')) return;
+      if (el.dataset.dest) { const d = porClave.get(el.dataset.dest); if (d) abreDetalle({ tipo: 'dest', ref: d }); }
+      else if (el.dataset.prod) { const p = PROD.find((x) => x.id === el.dataset.prod); if (p) abreDetalle({ tipo: 'prod', ref: p }); }
+      else if (el.dataset.red) abreDetalle({ tipo: 'red', ref: el.dataset.red });
+      else if (el.dataset.pais) abreDetalle({ tipo: 'pais', ref: el.dataset.pais });
+    };
+    stage.addEventListener('click', abreDesde);
+    stage.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-dest],[data-prod],[data-red],[data-pais]') && e.target.tagName !== 'BUTTON') { e.preventDefault(); abreDesde(e); } });
 
     // ---------- Acting from the globe: cut or let through, always reversible ----------
     let temporizadorAviso = 0;
@@ -1318,6 +1369,7 @@
     const mmss = (sg) => `${Math.floor(sg / 60)}:${String(Math.round(sg % 60)).padStart(2, '0')}`;
     const btnGrabar = $('grabar');
     if (soloMirar) btnGrabar.hidden = true;
+    btnGrabar.title = t('pd_grabar_que');
     let relojGrab = 0;
     const pintaGrabar = () => {
       if (!grab.on) { btnGrabar.textContent = t('pd_grabar'); btnGrabar.setAttribute('aria-pressed', 'false'); return; }
@@ -1432,24 +1484,122 @@
     });
     $('retrato-cerrar').addEventListener('click', () => { $('retrato').hidden = true; });
 
-    // ---------- Pointer and keys ----------
+    // ---------- Pointer, wheel and keys: like Google Earth (the owner, 13 Oct 2026) ----------
+    // Dragging takes the Earth in hand: the point under the finger follows it, left is left and up
+    // is up, on the globe and on the map. The wheel, the + and − buttons and a pinch zoom in and
+    // out, up to a limit (ZOOM) where the pictures of the NASA still read. A click (a press that
+    // did not move) opens what is under it; it never cuts by itself.
+    const ZOOM = { globo: [0.75, 7], mapa: [0.85, 10], plano: [1, 10] };
+    const lim = (v, [a, b]) => Math.max(a, Math.min(b, v));
     ['pointermove', 'pointerdown', 'wheel', 'keydown'].forEach((ev) => window.addEventListener(ev, () => { st.ultimoGesto = performance.now(); }, { passive: true }));
+    const enPlano = () => st.vista === 'destinos' && !T.ok;
+    const zoomable = () => st.vista === 'destinos';
+    // The first touch stops the globe's own sway where it is, without a jump.
+    const toca = () => { if (st.tocado) return; st.dRot += T.osc || 0; st.tocado = true; st.vuelo = null; };
+    const mueve = (dx, dy) => {
+      toca();
+      if (enPlano()) { PLANO.px += dx; PLANO.py += dy; return; }
+      if (T.m < 0.5) {
+        // Radians of the surface under one pixel at the centre of the view.
+        const k = Math.max(0.0004, (T.dist - 1) * 2 * T.tanH / st.H);
+        st.dRot += dx * k / Math.max(0.35, Math.cos(T.tiltSin || 0));
+        const base = st.lugar.lat * RAD * 0.8;
+        st.dTilt = Math.max(-1.4 - base, Math.min(1.4 - base, st.dTilt + dy * k));
+      } else {
+        const u = 2 * T.dist * T.tanH / st.H;
+        T.px = Math.max(-Math.PI, Math.min(Math.PI, T.px - dx * u));
+        T.py = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, T.py + dy * u));
+      }
+    };
+    // Zoom by a factor f around the screen point (x, y): what is under it stays under it.
+    const zoomEn = (f, x, y) => {
+      if (!zoomable()) return;
+      toca();
+      if (enPlano()) {
+        const e0 = escalaPlano(), z = lim(PLANO.z * f, ZOOM.plano); if (z === PLANO.z) return;
+        const r = z / PLANO.z; PLANO.z = z;
+        const s1 = e0.s * r, b = basePlano(s1);
+        PLANO.px = x - (x - e0.ox) * r - b.ox; PLANO.py = y - (y - e0.oy) * r - b.oy;
+        return;
+      }
+      if (T.m < 0.5) {
+        const antes = lonLatBajo(x, y);
+        T.zoomG = lim(T.zoomG * f, ZOOM.globo);
+        // Turn the globe so the place under the pointer stays there (twice: the second step
+        // corrects what the first left near the edges).
+        for (let k = 0; antes && k < 2; k++) {
+          camara(); const ahora = lonLatBajo(x, y); if (!ahora) break;
+          let dl = ahora[0] - antes[0]; if (dl > 180) dl -= 360; if (dl < -180) dl += 360;
+          st.dRot += dl * RAD; st.dTilt += (antes[1] - ahora[1]) * RAD;
+        }
+      } else {
+        const d0 = T.dist; T.zoomM = lim(T.zoomM * f, ZOOM.mapa); camara();
+        const c = ((st.Wc - st.W) / 2) * (2 * T.tanH / st.H), nx = (2 * x / st.Wc - 1) * T.tanH * T.asp, ny = (1 - 2 * y / st.H) * T.tanH;
+        T.px += (c + nx) * (d0 - T.dist); T.py += ny * (d0 - T.dist);
+        T.px = Math.max(-Math.PI, Math.min(Math.PI, T.px)); T.py = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, T.py));
+      }
+    };
+    const centroVista = () => ({ x: st.W / 2, y: st.H / 2 });
+    const zoomBoton = (f) => { const c = centroVista(); zoomEn(f, c.x, c.y); };
+    const zoomInicio = () => { st.dRot = 0; st.dTilt = 0; T.zoomG = 1; T.zoomM = 1; T.px = 0; T.py = 0; PLANO.z = 1; PLANO.px = 0; PLANO.py = 0; st.vuelo = null; };
+    // «Ver de cerca»: fly to a place and zoom in on it.
+    const vuela = (lon, lat) => {
+      toca();
+      if (enPlano()) { const z = Math.max(PLANO.z, 5); PLANO.z = z; const e = escalaPlano(), q = aPlano(lon, lat); PLANO.px += st.W / 2 - q.x; PLANO.py += st.H / 2 - q.y; return; }
+      const yo = st.lugar;
+      const dos = 2 * Math.PI, dif = ((((-(lon - yo.lon) * RAD - st.dRot) + Math.PI) % dos) + dos) % dos - Math.PI;
+      st.vuelo = { t0: performance.now(), de: { r: st.dRot, ti: st.dTilt, zg: T.zoomG, zm: T.zoomM, px: T.px, py: T.py },
+        a: { r: st.dRot + dif, ti: (lat - yo.lat * 0.8) * RAD, zg: Math.max(T.zoomG, 4), zm: Math.max(T.zoomM, 7), px: lon * RAD, py: lat * RAD } };
+    };
+    const avanzaVuelo = (ahora) => {
+      const v = st.vuelo; if (!v) return;
+      const u = Math.min(1, (ahora - v.t0) / 1400), e = u * u * (3 - 2 * u), m = (a, b) => a + (b - a) * e;
+      st.dRot = m(v.de.r, v.a.r); st.dTilt = m(v.de.ti, v.a.ti); T.zoomG = Math.exp(m(Math.log(v.de.zg), Math.log(v.a.zg))); T.zoomM = Math.exp(m(Math.log(v.de.zm), Math.log(v.a.zm))); T.px = m(v.de.px, v.a.px); T.py = m(v.de.py, v.a.py);
+      if (u >= 1) st.vuelo = null;
+    };
+    // Two fingers: the distance between them is the zoom.
+    const dedos = new Map();
+    let pellizco = null;
     cv.addEventListener('pointermove', (e) => {
       const r = cv.getBoundingClientRect(); st.raton = { x: e.clientX - r.left, y: e.clientY - r.top };
-      if (st.arrastre) { st.dRot += (e.clientX - st.arrastre.x) * 0.006; st.dTilt -= (e.clientY - st.arrastre.y) * 0.004; st.arrastre = { x: e.clientX, y: e.clientY, mov: true }; }
+      if (dedos.has(e.pointerId)) dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (dedos.size === 2 && pellizco) {
+        const [a, b] = [...dedos.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (pellizco.d > 0 && d > 0) zoomEn(d / pellizco.d, (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top);
+        pellizco.d = d; if (st.arrastre) st.arrastre.mov = true; return;
+      }
+      const a = st.arrastre; if (!a) return;
+      const dx = e.clientX - a.x, dy = e.clientY - a.y;
+      if (!a.mov && Math.hypot(e.clientX - a.x0, e.clientY - a.y0) < 5) return;
+      a.mov = true; a.x = e.clientX; a.y = e.clientY;
+      if (zoomable()) mueve(dx, dy);
     });
-    cv.addEventListener('wheel', (e) => { if (!enTierra()) return; e.preventDefault(); T.zoom = Math.max(0.7, Math.min(3.2, T.zoom * Math.exp(-e.deltaY * 0.0012))); }, { passive: false });
+    cv.addEventListener('wheel', (e) => {
+      if (!zoomable()) return; e.preventDefault();
+      const r = cv.getBoundingClientRect(), dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+      zoomEn(Math.exp(-Math.max(-200, Math.min(200, dy)) * 0.0022), e.clientX - r.left, e.clientY - r.top);
+    }, { passive: false });
+    cv.addEventListener('dblclick', (e) => { const r = cv.getBoundingClientRect(); zoomEn(2, e.clientX - r.left, e.clientY - r.top); });
     cv.addEventListener('pointerleave', () => { st.raton = null; tip.hidden = true; });
-    cv.addEventListener('pointerdown', (e) => { if (enGlobo()) { st.arrastre = { x: e.clientX, y: e.clientY, mov: false }; cv.setPointerCapture(e.pointerId); } });
+    cv.addEventListener('pointerdown', (e) => {
+      dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (dedos.size === 2) { const [a, b] = [...dedos.values()]; pellizco = { d: Math.hypot(a.x - b.x, a.y - b.y) }; return; }
+      st.arrastre = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, mov: false };
+      try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    const suelta = (e) => { dedos.delete(e.pointerId); if (dedos.size < 2) pellizco = null; };
+    cv.addEventListener('pointercancel', (e) => { suelta(e); st.arrastre = null; });
     cv.addEventListener('pointerup', (e) => {
+      suelta(e);
       const movido = st.arrastre && st.arrastre.mov; st.arrastre = null;
-      if (movido) return;
+      if (movido || dedos.size) return;
       const r = cv.getBoundingClientRect();
       const hh = queHay(e.clientX - r.left, e.clientY - r.top);
-      if (!hh) return;
-      if (hh.tipo === 'dest') corteNombre(hh.ref);
-      if (hh.tipo === 'prod') corteProducto(hh.ref);
+      if (hh) abreDetalle(hh); else cierraDetalle();
     });
+    $('zoom-mas').addEventListener('click', () => zoomBoton(1.6));
+    $('zoom-menos').addEventListener('click', () => zoomBoton(1 / 1.6));
+    $('zoom-0').addEventListener('click', zoomInicio);
     // Two views (13 Oct 2026): Destinos, where each server is on the Earth (the flat map by
     // default, the globe as an option), and Programas, how much each program sends and where to.
     const enGlobo = () => st.vista === 'destinos' && st.proy === 'globo' && T.ok;
@@ -1467,6 +1617,8 @@
       st.vista = v;
       pulsado('.pestanas button', 'vista', v);
       $('proy').hidden = v !== 'destinos' || !T.ok;
+      $('zoom').hidden = v !== 'destinos';
+      expl.hidden = v !== 'programas'; stage.dataset.vista = v; pintaExplorador();
       muestraAyuda();
       guarda('guardiana_pd_vista', v);
     };
@@ -1486,6 +1638,10 @@
       if (/select|input|textarea/i.test(document.activeElement.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === '1' || e.key === '2') ponVista(VISTAS[+e.key - 1]);
       else if ((e.key === 'm' || e.key === 'g') && st.vista === 'destinos' && T.ok) ponProy(e.key === 'g' ? 'globo' : 'mapa');
+      else if (e.key === '+' || e.key === '=') zoomBoton(1.6);
+      else if (e.key === '-') zoomBoton(1 / 1.6);
+      else if (e.key === '0') zoomInicio();
+      else if (e.key === 'Escape') cierraDetalle();
     });
     // Where the computer is: said, not chosen.
     $('yo').textContent = nombrePais(st.yo) + (st.lugar.ciudad ? ' · ' + st.lugar.ciudad : '');
@@ -1496,7 +1652,7 @@
       requestAnimationFrame(bucle);
       // To keep it open for hours: 30 frames a second, 20 after two quiet minutes, 60 while dragging.
       const quieto = ahora - st.ultimoGesto > 120000;
-      if (!st.arrastre && ahora - antes < (quieto ? 48 : 31)) return;
+      if (!st.arrastre && !st.vuelo && ahora - antes < (quieto ? 48 : 31)) return;
       const dt = Math.min(0.06, (ahora - antes) / 1000); antes = ahora;
       try {
         if (ahora - ultimaTele > 1000) { ultimaTele = ahora; telemetria(); pintaDatos(); }
@@ -1511,10 +1667,10 @@
           if (obj !== T.mObj) { T.tw = { desde: T.m, t0: ahora }; T.mObj = obj; }
           if (T.tw) { const u = Math.min(1, (ahora - T.tw.t0) / 2200), e = u * u * (3 - 2 * u); T.m = T.tw.desde + (T.mObj - T.tw.desde) * e; if (u >= 1) T.tw = null; }
           glc.style.visibility = 'visible';
-          camara(); pintaTierra(); dibujaTierra(dt);
+          avanzaVuelo(ahora); camara(); pintaTierra(); dibujaTierra(dt);
         } else {
           glc.style.visibility = 'hidden';
-          (st.vista === 'programas' ? dibujaSankey : dibujaPlano)(dt);
+          if (st.vista !== 'programas') dibujaPlano(dt);
         }
         if (st.raton) actualizaTip();
       } catch (e) { if (!bucle.dicho) { bucle.dicho = true; console.error(e); } }

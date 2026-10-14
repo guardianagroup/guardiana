@@ -686,3 +686,138 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 .universo .retrato .pequeno { color: var(--hud-muted); font-size: 12px; }
 .universo .retrato .aviso-botones { flex-wrap: wrap; }
 .universo .retrato button:disabled { opacity: .45; cursor: default; }
+/* Everything on «Por dentro» is live: a fixed sign in the bar instead of a button (13 Oct 2026). */
+.universo .en-vivo { display: inline-flex; align-items: center; gap: 6px; font: 500 11px 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--shield); }
+.universo .en-vivo i { width: 8px; height: 8px; border-radius: 50%; background: var(--shield); box-shadow: 0 0 8px var(--shield); animation: pd-vivo 2s ease-in-out infinite; }
+@keyframes pd-vivo { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .universo .en-vivo i { animation: none; } }
+/* The side panel closes with its ×, and the tab on the edge brings it back. */
+.universo .datos { padding-top: 26px; }
+.universo .cerrar-datos { position: absolute; right: 6px; top: 4px; appearance: none; background: transparent; border: 0; color: var(--hud-muted); font: 400 20px/1 'IBM Plex Sans', system-ui, sans-serif; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; }
+.universo .cerrar-datos:hover { color: var(--hud-fg); background: rgba(118,144,168,.14); }
+.universo .abrir-datos { position: absolute; right: 0; top: 14px; z-index: 3; appearance: none; background: rgba(4,10,20,.85); border: 1px solid var(--hud-line); border-right: 0; border-radius: 8px 0 0 8px; color: var(--hud-fg); padding: 7px 10px; font: 500 11.5px 'IBM Plex Mono', ui-monospace, monospace; cursor: pointer; }
+.universo .abrir-datos[hidden] { display: none; }
+.universo .abrir-datos:hover { color: var(--shield); }
+/* Zoom: + − and back to the start, like a map application. */
+.universo .zoom { position: absolute; right: 14px; bottom: 16px; z-index: 3; display: grid; border: 1px solid var(--hud-line); border-radius: 8px; overflow: hidden; background: rgba(4,10,20,.85); }
+.universo .zoom[hidden] { display: none; }
+.universo .zoom button { appearance: none; background: transparent; border: 0; border-bottom: 1px solid var(--hud-line); color: var(--hud-fg); width: 36px; height: 34px; font: 500 18px/1 'IBM Plex Mono', ui-monospace, monospace; cursor: pointer; }
+.universo .zoom button:last-child { border-bottom: 0; font-size: 15px; }
+.universo .zoom button:hover { background: rgba(63,224,197,.16); color: var(--shield); }
+.universo .lienzo.con-datos .zoom { right: 352px; }
+/* The card a click opens: what the panel knows, links to say more, and the one button that cuts. */
+.universo .detalle { position: absolute; left: 14px; top: 12px; z-index: 6; width: min(360px, calc(100% - 28px)); max-height: calc(100% - 70px); overflow-y: auto; overscroll-behavior: contain; background: rgba(6,12,22,.97); border: 1px solid var(--shield); border-radius: 10px; padding: 14px 14px 12px; font: 12.5px/1.55 'IBM Plex Sans', system-ui, sans-serif; color: var(--hud-fg); box-shadow: 0 12px 40px rgba(0,0,0,.55); scrollbar-width: thin; scrollbar-color: var(--hud-line) transparent; }
+.universo .detalle[hidden] { display: none; }
+.universo .detalle .cuerpo { padding-right: 22px; }
+.universo .detalle .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+.universo .detalle .t { color: var(--hud-muted); }
+.universo .detalle .estado { display: inline-block; margin-top: 4px; font: 500 11px 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: .05em; text-transform: uppercase; }
+.universo .detalle .pasa { color: var(--shield); } .universo .detalle .corta, .universo .detalle .c { color: var(--cut); } .universo .detalle .nodoc { color: var(--undoc); } .universo .detalle .o { color: var(--out); }
+.universo .detalle p { margin: 8px 0 0; font-size: 12px; }
+.universo .detalle h4 { margin: 12px 0 6px; font: 500 10.5px 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--hud-muted); }
+.universo .detalle .acciones-det { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.universo .detalle .acciones-det p { margin: 0; }
+.universo .detalle .enlaces-det { display: grid; gap: 4px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--hud-line); }
+.universo .detalle .enlaces-det a { color: var(--shield); text-decoration: none; font-size: 12.5px; }
+.universo .detalle .enlaces-det a:hover { text-decoration: underline; text-underline-offset: 2px; }
+.universo .detalle .lista-det { display: grid; gap: 2px; }
+.universo .fila-det { appearance: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; width: 100%; text-align: left; background: transparent; border: 0; border-radius: 4px; padding: 3px 6px; color: var(--hud-fg); font: 11.5px/1.45 'IBM Plex Mono', ui-monospace, monospace; cursor: pointer; }
+.universo .fila-det span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.universo .fila-det:hover, .universo .fila-det:focus-visible { background: rgba(63,224,197,.12); }
+/* Rows of the side panel and the deck open the same card. */
+.universo .enlace-fila { cursor: pointer; border-radius: 4px; }
+.universo .enlace-fila:hover, .universo .enlace-fila:focus-visible { background: rgba(63,224,197,.10); outline: none; }
+.universo .tip .clic { margin-top: 6px; font-size: 11px; }
+/* The antivirus, in full. */
+.universo .datos .sub-av { margin: 9px 0 3px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--hud-muted); }
+.universo .datos .nd { color: var(--undoc); }
+.universo .datos .bloques { font-size: 13px; letter-spacing: 1px; color: var(--shield); white-space: nowrap; overflow: hidden; }
+/* «Lo que más envía ahora», in the deck. */
+.universo .top-ahora { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font: 11px/1.45 'IBM Plex Mono', ui-monospace, monospace; }
+.universo .top-ahora li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding: 1px 4px; }
+.universo .top-ahora li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.universo .top-ahora .o { color: var(--out); }
+.universo .top-ahora .t { color: var(--hud-muted); }
+@media (max-width: 700px) {
+.universo .lienzo.con-datos .zoom { right: 14px; }
+.universo .zoom { bottom: 60px; }
+.universo .detalle { max-height: calc(100% - 24px); }
+}
+/* «Programas»: the activity explorer (13 Oct 2026), designed with Grok and ChatGPT. One row per
+   program, antivirus first; a click unfolds its destinations; colour only says state. */
+.universo .explorador { position: absolute; inset: 0; z-index: 2; overflow-y: auto; overscroll-behavior: contain; padding: 18px 24px 24px; background: #04070d; color: #e9f2f7; font: 13px/1.45 'IBM Plex Sans', system-ui, sans-serif; scrollbar-width: thin; scrollbar-color: var(--hud-line) transparent; }
+.universo .explorador[hidden] { display: none; }
+.universo .lienzo.con-datos .explorador { right: 350px; }
+.universo .stage[data-vista="programas"] .leyenda, .universo .stage[data-vista="programas"] .ayuda-vista { display: none; }
+.universo .explorador .t { color: #92a6b7; }
+.universo .explorador .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; }
+.universo .explorador .o { color: var(--shield); } .universo .explorador .i { color: #80add6; } .universo .explorador .c { color: var(--cut); } .universo .explorador .nd { color: var(--out); }
+.universo .explorador .num { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 12.5px; white-space: nowrap; }
+.universo .ex-cab { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.universo .ex-cab h2 { margin: 0; font: 600 22px/1.2 'IBM Plex Sans', system-ui, sans-serif; color: #e9f2f7; }
+.universo .ex-cab p { margin: 4px 0 0; font-size: 12px; }
+.universo .ex-ind { display: grid; justify-items: end; gap: 2px; font: 12px 'IBM Plex Mono', ui-monospace, monospace; }
+.universo .ex-herr { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin: 16px 0 10px; font-size: 12px; color: #92a6b7; }
+.universo .ex-herr select, .universo .ex-herr input { background: #0b111b; color: #e9f2f7; border: 1px solid #1f2b3b; border-radius: 6px; padding: 6px 9px; font: 12.5px 'IBM Plex Sans', system-ui, sans-serif; }
+.universo .ex-herr input { flex: 1 1 220px; max-width: 360px; }
+.universo .ex-herr select:focus-visible, .universo .ex-herr input:focus-visible { outline: 2px solid var(--shield); outline-offset: 1px; }
+.universo .ex-cols, .universo .ex-fila { display: grid; grid-template-columns: minmax(170px, 1.7fr) minmax(150px, 2fr) 120px 96px minmax(90px, .9fr) 128px 22px; gap: 14px; align-items: center; }
+.universo .ex-cols { padding: 0 12px 6px; font: 500 10.5px 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; border-bottom: 1px solid #1f2b3b; }
+.universo .ex-seccion { margin: 16px 0 6px; padding: 0 12px; font: 600 11px 'IBM Plex Sans', system-ui, sans-serif; letter-spacing: .8px; text-transform: uppercase; color: #92a6b7; }
+.universo .ex-seccion span { color: #e9f2f7; margin-left: 4px; }
+.universo .ex-prog { background: #0b111b; border: 1px solid #1f2b3b; border-radius: 8px; margin-bottom: 6px; overflow: hidden; }
+.universo .ex-prog.cortado { border-color: rgba(255,107,122,.55); }
+.universo .ex-fila { appearance: none; width: 100%; min-height: 64px; padding: 10px 12px; background: transparent; border: 0; border-left: 2px solid transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.universo .ex-fila:hover, .universo .ex-prog.abierto > .ex-fila { background: #101c29; border-left-color: var(--shield); }
+.universo .ex-fila:focus-visible { outline: 2px solid var(--shield); outline-offset: -2px; }
+.universo .ex-nombre { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
+.universo .ex-nombre > span:last-child { display: grid; min-width: 0; }
+.universo .ex-nombre b { font-size: 14px; font-weight: 600; color: #e9f2f7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.universo .ex-nombre .t { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.universo .ex-nombre .pto { flex: 0 0 auto; width: 9px; height: 9px; margin-top: 5px; border-radius: 50%; background: var(--c); opacity: .55; }
+.universo .ex-nombre .pto.vivo { opacity: 1; box-shadow: 0 0 0 3px rgba(63,224,197,.18); }
+.universo .ex-destinos { display: grid; gap: 1px; min-width: 0; }
+.universo .ex-destinos > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.universo .ex-destinos .t { font-size: 11px; }
+.universo .ex-env { display: grid; gap: 5px; }
+.universo .barra-env { height: 4px; border-radius: 2px; background: rgba(118,144,168,.16); overflow: hidden; }
+.universo .barra-env i { display: block; height: 100%; background: var(--shield); border-radius: 2px; }
+.universo .ex-cortes { display: grid; gap: 2px; font: 11.5px 'IBM Plex Mono', ui-monospace, monospace; }
+.universo .ex-5m canvas { width: 120px; height: 28px; display: block; }
+.universo .ex-flecha { color: #92a6b7; font-size: 18px; transition: transform .16s ease; justify-self: end; }
+.universo .ex-prog.abierto .ex-flecha { transform: rotate(90deg); color: var(--shield); }
+.universo .explorador .chip { display: inline-block; border: 1px solid var(--shield); color: var(--shield); border-radius: 3px; padding: 0 5px; font: 500 9.5px 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; margin-right: 4px; }
+.universo .explorador .chip.c { border-color: var(--cut); color: var(--cut); } .universo .explorador .chip.nd { border-color: var(--out); color: var(--out); }
+.universo .ex-tabla { padding: 4px 12px 12px 34px; border-top: 1px solid #1f2b3b; }
+.universo .ex-cab-dest, .universo .ex-dest { display: grid; grid-template-columns: minmax(180px, 2.4fr) minmax(90px, 1fr) minmax(80px, .8fr) 92px 92px minmax(110px, 1fr); gap: 12px; align-items: baseline; padding: 6px 6px; }
+.universo .ex-cab-dest { font: 500 10px 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.universo .ex-dest { border-top: 1px solid rgba(31,43,59,.6); font-size: 12px; }
+.universo .ex-host { display: grid; min-width: 0; }
+.universo .ex-host .mono { overflow-wrap: anywhere; }
+.universo .ex-host .t { font-size: 11px; }
+.universo .ex-chips { font: 11px 'IBM Plex Mono', ui-monospace, monospace; }
+.universo .ex-todos { margin-top: 8px; }
+.universo .ex-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 12px; }
+.universo .ex-acciones a { color: var(--shield); text-decoration: none; font-size: 12.5px; }
+.universo .ex-acciones a:hover { text-decoration: underline; }
+.universo .ex-vacio { padding: 24px 12px; }
+@media (max-width: 1100px) {
+.universo .ex-cols, .universo .ex-fila { grid-template-columns: minmax(150px, 1.6fr) minmax(130px, 1.6fr) 110px 90px 22px; }
+.universo .ex-cols > :nth-child(5), .universo .ex-cols > :nth-child(6), .universo .ex-fila > .ex-cortes, .universo .ex-fila > .ex-5m { display: none; }
+}
+@media (max-width: 700px) {
+.universo .explorador { padding: 12px 10px 18px; }
+.universo .lienzo.con-datos .explorador { right: 0; }
+.universo .ex-cab h2 { font-size: 18px; }
+.universo .ex-ind { justify-items: start; }
+.universo .ex-cols { display: none; }
+.universo .ex-fila { grid-template-columns: minmax(0, 1fr) auto 18px; gap: 10px; min-height: 56px; }
+.universo .ex-fila > .ex-destinos, .universo .ex-fila > .num.i { display: none; }
+.universo .ex-tabla { padding: 4px 8px 10px; }
+.universo .ex-cab-dest { display: none; }
+.universo .ex-dest { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; }
+.universo .ex-dest > :nth-child(2), .universo .ex-dest > :nth-child(3), .universo .ex-dest > .num.i { display: none; }
+.universo .ex-dest > .ex-chips { grid-column: 1 / -1; }
+}
+/* The rule that stretches the picture's canvases does not apply to the explorer's small graphs. */
+.universo .lienzo .ex-5m canvas { position: static; inset: auto; width: 120px; height: 28px; cursor: inherit; }

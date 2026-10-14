@@ -108,13 +108,20 @@ directo, sobre la Tierra.
 
 - **Dos vistas** (desde la 1.0.23; la 1.0.22 tenía cinco): **Destinos**, dónde está cada servidor
   sobre la Tierra (el mapa por defecto, el globo como opción), y **Programas**, cuánto envía cada
-  programa y adónde, por la puerta de GUARDIANA. La nebulosa y el radar se quitaron: pedían
+  programa y adónde. Desde la 1.0.24 Programas es un explorador en filas (antivirus primero; a
+  dónde envía más, lo enviado y recibido, lo parado y sus últimos cinco minutos; un clic despliega
+  todos sus destinos), diseñado con Grok y ChatGPT: el diagrama de bandas no se entendía.
+- **Como un mapa de verdad** (1.0.24): arrastrar mueve la Tierra como en Google Earth (el punto
+  bajo el ratón lo sigue), la rueda, + − o dos dedos acercan hasta un límite, y de cerca cada punto
+  lleva su nombre. Un clic abre una ficha con todo lo que sabe el panel, enlaces a la empresa, al
+  país en el extracto y a «Tu antivirus», y el único botón que corta: un clic sobre el dibujo ya no
+  corta nada por sí mismo. La noche es suave: se ven tierra y mar, con las luces de las ciudades. La nebulosa y el radar se quitaron: pedían
   explicación y ayudaban poco a decidir. Un interruptor **Todo · Datos · Antivirus** separa en el
   dibujo lo que envía el antivirus de lo que envían el navegador y los demás programas. Globo y mapa
   están hechos en WebGL2 escrito aquí, con imágenes de la NASA servidas por el propio panel y la luz
   del sol de ese momento; un equipo sin WebGL2 ve el mismo mundo plano, dibujado en 2D. Sin internet
   y sin código de terceros.
-- **Retrato** (1.0.23): «Grabar 5 minutos» guarda lo que mide la página, de 10 en 10 segundos, y lo
+- **Retrato** (1.0.23): «Guardar 5 minutos de medidas» (antes «Grabar 5 minutos»: no graba vídeo) guarda lo que mide la página, de 10 en 10 segundos, y lo
   entrega como PDF (con el modo en que estaba GUARDIANA: normal, protección máxima, antivirus
   cortado), como CSV y como JSON para reproducirlo. Antes de salir se limpia: sin usuario, rutas,
   direcciones IP, horas exactas ni nombres privados (estos se marcan «oculto por privacidad»). Se
