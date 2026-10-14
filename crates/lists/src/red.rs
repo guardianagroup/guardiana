@@ -703,3 +703,26 @@ mod tests {
         assert_eq!(s("ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffe").pais, None);
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod lugar_tests {
+    use super::*;
+
+    #[test]
+    fn the_places_operators_publish_are_bundled_and_found_by_key() {
+        let l = lugar_por_clave("aws:us-east-1").unwrap();
+        assert_eq!(l.pais, "US");
+        assert!(l.ciudad.contains("Virginia"));
+        assert!(lugar_por_clave("gcp:europe-west1").is_some());
+        assert!(lugar_por_clave("azure:northeurope").is_some());
+        assert!(lugar_por_clave("").is_none());
+        // Every place has a country and coordinates on the Earth.
+        for l in lugares() {
+            assert_eq!(l.pais.len(), 2, "{l:?}");
+            assert!(l.lat.abs() <= 90.0 && l.lon.abs() <= 180.0, "{l:?}");
+        }
+        // A private address has no place.
+        assert!(lugar_de("192.168.1.1".parse().unwrap()).is_none());
+    }
+}

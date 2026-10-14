@@ -442,6 +442,15 @@
 },
 {
 "proveedor": "gcp",
+"region": "asia-southeast3",
+"ciudad": "Bangkok",
+"pais": "TH",
+"lat": 13.8,
+"lon": 100.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "gcp",
 "region": "australia-southeast1",
 "ciudad": "Sídney",
 "pais": "AU",
@@ -766,11 +775,38 @@
 },
 {
 "proveedor": "azure",
+"region": "austriaeast",
+"ciudad": "Viena",
+"pais": "AT",
+"lat": 48.2,
+"lon": 16.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "belgiumcentral",
+"ciudad": "Bruselas",
+"pais": "BE",
+"lat": 50.8,
+"lon": 4.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
 "region": "brazilsouth",
 "ciudad": "São Paulo",
 "pais": "BR",
 "lat": -23.5,
 "lon": -46.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "brazilse",
+"ciudad": "Río de Janeiro",
+"pais": "BR",
+"lat": -22.9,
+"lon": -43.2,
 "fuente": "región del operador"
 },
 {
@@ -816,6 +852,24 @@
 "pais": "US",
 "lat": 41.6,
 "lon": -93.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "chilec",
+"ciudad": "Santiago de Chile",
+"pais": "CL",
+"lat": -33.4,
+"lon": -70.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "denmarkeast",
+"ciudad": "Copenhague",
+"pais": "DK",
+"lat": 55.7,
+"lon": 12.6,
 "fuente": "región del operador"
 },
 {
@@ -874,11 +928,29 @@
 },
 {
 "proveedor": "azure",
+"region": "germanyn",
+"ciudad": "Berlín",
+"pais": "DE",
+"lat": 52.5,
+"lon": 13.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
 "region": "germanywc",
 "ciudad": "Fráncfort",
 "pais": "DE",
 "lat": 50.1,
 "lon": 8.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "indiasouthcentral",
+"ciudad": "Hyderabad",
+"pais": "IN",
+"lat": 17.4,
+"lon": 78.5,
 "fuente": "región del operador"
 },
 {
@@ -924,6 +996,24 @@
 "pais": "JP",
 "lat": 34.7,
 "lon": 135.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "jioindiacentral",
+"ciudad": "Nagpur",
+"pais": "IN",
+"lat": 21.1,
+"lon": 79.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "jioindiawest",
+"ciudad": "Jamnagar",
+"pais": "IN",
+"lat": 22.5,
+"lon": 70.1,
 "fuente": "región del operador"
 },
 {
@@ -996,6 +1086,15 @@
 "pais": "NO",
 "lat": 59.9,
 "lon": 10.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "norwayw",
+"ciudad": "Stavanger",
+"pais": "NO",
+"lat": 59.0,
+"lon": 5.7,
 "fuente": "región del operador"
 },
 {
@@ -1081,11 +1180,38 @@
 },
 {
 "proveedor": "azure",
+"region": "swedensouth",
+"ciudad": "Malmö",
+"pais": "SE",
+"lat": 55.6,
+"lon": 13.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
 "region": "switzerlandn",
 "ciudad": "Zúrich",
 "pais": "CH",
 "lat": 47.4,
 "lon": 8.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "switzerlandw",
+"ciudad": "Ginebra",
+"pais": "CH",
+"lat": 46.2,
+"lon": 6.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "azure",
+"region": "taiwannorth",
+"ciudad": "Taipéi",
+"pais": "TW",
+"lat": 25.0,
+"lon": 121.5,
 "fuente": "región del operador"
 },
 {
@@ -1216,6 +1342,15 @@
 },
 {
 "proveedor": "oracle",
+"region": "af-casablanca-1",
+"ciudad": "Casablanca",
+"pais": "MA",
+"lat": 33.6,
+"lon": -7.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
 "region": "ap-seoul-1",
 "ciudad": "Seúl",
 "pais": "KR",
@@ -1329,6 +1464,15 @@
 "pais": "DE",
 "lat": 50.1,
 "lon": 8.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "eu-madrid-3",
+"ciudad": "Madrid",
+"pais": "ES",
+"lat": 40.4,
+"lon": -3.7,
 "fuente": "región del operador"
 },
 {
@@ -1459,6 +1603,15 @@
 },
 {
 "proveedor": "oracle",
+"region": "ap-batam-1",
+"ciudad": "Batam",
+"pais": "ID",
+"lat": 1.1,
+"lon": 104.0,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
 "region": "ap-melbourne-1",
 "ciudad": "Melbourne",
 "pais": "AU",
@@ -1495,11 +1648,38 @@
 },
 {
 "proveedor": "oracle",
+"region": "eu-dublin-3",
+"ciudad": "Dublín",
+"pais": "IE",
+"lat": 53.3,
+"lon": -6.3,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "us-dallas-1",
+"ciudad": "Dallas, Texas",
+"pais": "US",
+"lat": 32.8,
+"lon": -96.8,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
 "region": "mx-queretaro-1",
 "ciudad": "Querétaro",
 "pais": "MX",
 "lat": 20.6,
 "lon": -100.4,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "ap-singapore-2",
+"ciudad": "Singapur",
+"pais": "SG",
+"lat": 1.3,
+"lon": 103.8,
 "fuente": "región del operador"
 },
 {
@@ -1513,11 +1693,119 @@
 },
 {
 "proveedor": "oracle",
+"region": "us-sanantonio-1",
+"ciudad": "San Antonio, Texas",
+"pais": "US",
+"lat": 29.4,
+"lon": -98.5,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
 "region": "sa-bogota-1",
 "ciudad": "Bogotá",
 "pais": "CO",
 "lat": 4.7,
 "lon": -74.1,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "us-saltlake-2",
+"ciudad": "Salt Lake City",
+"pais": "US",
+"lat": 40.8,
+"lon": -111.9,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "us-lenexa-1",
+"ciudad": "Lenexa, Kansas",
+"pais": "US",
+"lat": 39.0,
+"lon": -94.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "ap-delhi-1",
+"ciudad": "Delhi",
+"pais": "IN",
+"lat": 28.6,
+"lon": 77.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "us-desmoines-1",
+"ciudad": "Des Moines, Iowa",
+"pais": "US",
+"lat": 41.6,
+"lon": -93.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "us-abilene-1",
+"ciudad": "Abilene, Texas",
+"pais": "US",
+"lat": 32.4,
+"lon": -99.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "ap-kulai-1",
+"ciudad": "Kulai (Johor)",
+"pais": "MY",
+"lat": 1.7,
+"lon": 103.6,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "us-shawnee-1",
+"ciudad": "Shawnee, Kansas",
+"pais": "US",
+"lat": 39.0,
+"lon": -94.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "us-boardman-1",
+"ciudad": "Boardman, Oregón",
+"pais": "US",
+"lat": 45.8,
+"lon": -119.7,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "us-quincy-1",
+"ciudad": "Quincy, Washington",
+"pais": "US",
+"lat": 47.2,
+"lon": -119.9,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "sa-riodejaneiro-2",
+"ciudad": "Río de Janeiro",
+"pais": "BR",
+"lat": -22.9,
+"lon": -43.2,
+"fuente": "región del operador"
+},
+{
+"proveedor": "oracle",
+"region": "eu-jovanovac-1",
+"ciudad": "Jovanovac (Kragujevac)",
+"pais": "RS",
+"lat": 44.0,
+"lon": 20.9,
 "fuente": "región del operador"
 },
 {
