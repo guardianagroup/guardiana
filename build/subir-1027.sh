@@ -13,37 +13,26 @@ for d in "$SRC/build/out" "$SRC/dist/1.0.27"; do
 done
 echo "2. Archivos:"
 ls -1 "$PAQ"
-python - "$PAQ" << 'PY'
-import hashlib, sys
-from pathlib import Path
-paq = Path(sys.argv[1])
-want = {
-"guardiana-1.0.27-linux-x86_64": "54431dfe33ac921200bd4080bfc227c6223f568bf6a7533cd857f7970cc0ded3",
-"guardiana-1.0.27-windows-x86_64.exe": "22c901703c5c137fe115eeb956cb9d28476b515cc1e5bf8b77745dcad61fc5b8",
-"guardiana-1.0.27-windows-x64.msi": "e1fe0960c1187adcb5ea07a90336cf0d98bcd13b509410022efecba3bba79110",
-"guardiana-1.0.27-windows-x64-en.msi": "bdfb22b1b3f0c131871fc0889f3fc4149317dae1113edc688b718b1cd1e907ac",
-"guardiana-1.0.27-windows-x64-pt.msi": "493c26ea8f95e1a30276d7c35f728b3c4c1928d28d031446b4456d4a6f1518f9",
-"guardiana_1.0.27_amd64.deb": "1b2fd0bf1bff9ad3ca3c04840b35510b2f7f76f6845a42535737352443e3165d",
-"guardiana-1.0.27-linux-x86_64.tar.gz": "1360734347ad9f5de546336feac2729fac4a9483c269aee7851d36e49cebb133",
-"guardiana-1.0.27-macos.app.zip": "3e961ae28601a2b680b3eb09b974cd6895ab33062e12e934bc5ba8f4a02c15e8",
+
+huella() { openssl dgst -sha256 "$1" | awk '{print tolower($NF)}'; }
+ok=1
+comprobar() {
+  local f="$PAQ/$1" tengo
+  if [ ! -f "$f" ] || [ ! -f "$f.minisig" ]; then echo "   FALTA $1"; ok=0; return; fi
+  tengo=$(huella "$f")
+  if [ "$tengo" = "$2" ]; then echo "   OK    $1"; else echo "   MAL   $1"; echo "         $tengo"; ok=0; fi
 }
-bad = 0
-for name, exp in want.items():
-    f, s = paq / name, paq / (name + ".minisig")
-    if not f.is_file() or not s.is_file():
-        print("   FALTA", name if not f.is_file() else name + ".minisig")
-        bad = 1
-        continue
-    h = hashlib.sha256(f.read_bytes()).hexdigest()
-    if h != exp:
-        print("   MAL  ", name)
-        bad = 1
-    else:
-        print("   OK   ", name)
-if bad:
-    sys.exit("PARA: no subo archivos que no coinciden con la firma.")
-print("3. HUELLAS OK")
-PY
+comprobar guardiana-1.0.27-linux-x86_64 54431dfe33ac921200bd4080bfc227c6223f568bf6a7533cd857f7970cc0ded3
+comprobar guardiana-1.0.27-windows-x86_64.exe 22c901703c5c137fe115eeb956cb9d28476b515cc1e5bf8b77745dcad61fc5b8
+comprobar guardiana-1.0.27-windows-x64.msi e1fe0960c1187adcb5ea07a90336cf0d98bcd13b509410022efecba3bba79110
+comprobar guardiana-1.0.27-windows-x64-en.msi bdfb22b1b3f0c131871fc0889f3fc4149317dae1113edc688b718b1cd1e907ac
+comprobar guardiana-1.0.27-windows-x64-pt.msi 493c26ea8f95e1a30276d7c35f728b3c4c1928d28d031446b4456d4a6f1518f9
+comprobar guardiana_1.0.27_amd64.deb 1b2fd0bf1bff9ad3ca3c04840b35510b2f7f76f6845a42535737352443e3165d
+comprobar guardiana-1.0.27-linux-x86_64.tar.gz 1360734347ad9f5de546336feac2729fac4a9483c269aee7851d36e49cebb133
+comprobar guardiana-1.0.27-macos.app.zip 3e961ae28601a2b680b3eb09b974cd6895ab33062e12e934bc5ba8f4a02c15e8
+[ "$ok" = 1 ] || { echo "PARA: no subo archivos que no coinciden con la firma."; exit 1; }
+echo "3. HUELLAS OK"
+
 if [ ! -d "$WEB/.git" ]; then
   echo "4. Bajando la web (tarda, son archivos grandes)"
   git clone --depth 1 https://github.com/guardianagroup/guardianagroup.com.git "$WEB"
@@ -54,7 +43,8 @@ fi
 rm -rf "$WEB/descargas/1.0.27"
 mkdir -p "$WEB/descargas/1.0.27"
 cp -f "$PAQ"/* "$WEB/descargas/1.0.27/"
-python - "$WEB" "$PAQ" << 'PY'
+
+cat > "$PAQ/paginas.py" << 'ENDPY'
 import re, sys
 from pathlib import Path
 web, paq = Path(sys.argv[1]), Path(sys.argv[2])
@@ -73,7 +63,7 @@ hashes = {
 }
 old_rekor = "108e9186e8c5677a2e50d18aeac9a2c8af21b7c140fa4e542e80fedd0dedad50b3b0d78a31fa17a2"
 new_rekor = "108e9186e8c5677ab553c663014824a5594930ce89d60463e5b61ef651a3a89c49abdc4c0d6cc689"
-sizes = {p.name: p.stat().st_size for p in paq.iterdir() if p.is_file() and not p.name.endswith(".minisig")}
+sizes = {p.name: p.stat().st_size for p in paq.iterdir() if p.is_file() and not p.name.endswith(".minisig") and p.suffix != ".py"}
 pat = re.compile(r"(\d+[\.,]\d+)\s*MB")
 def mb(n, comma):
     s = f"{n/1048576:.1f}"
@@ -94,7 +84,7 @@ for rel in pages:
                 break
             window = text[i:i+500]
             m = pat.search(window)
-            if m and "MB" in window[m.start():m.end()]:
+            if m:
                 comma = "," in m.group(1)
                 nuevo = mb(nbytes, comma)
                 text = text[:i+m.start()] + nuevo + text[i+m.end():]
@@ -106,7 +96,21 @@ for rel in pages:
     path.write_text(text, encoding="utf-8", newline="\n")
     print("   pagina", rel)
 print("5. Paginas actualizadas")
-PY
+ENDPY
+
+if python -c "import sys; print(sys.executable)"; then
+  PY=python
+elif py -3 -c "import sys; print(sys.executable)"; then
+  PY="py -3"
+else
+  echo "PARA: no encuentro Python. Copia estas dos lineas:"
+  echo "   type python"
+  echo "   py -3 -c \"import sys; print(sys.executable)\""
+  exit 1
+fi
+# shellcheck disable=SC2086
+$PY "$PAQ/paginas.py" "$WEB" "$PAQ"
+
 cd "$WEB"
 git config user.email "francistierraplana@icloud.com"
 git config user.name "guardianagroup"
