@@ -11,6 +11,9 @@
 //! Addresses: the DNS test and the hosts file carry addresses; they stay in memory for the page
 //! and are never written (decision 203). What is written to disk is only the list of names seen.
 
+// The handlers answer with axum's `Response` as their error, like the rest of the panel.
+#![allow(clippy::result_large_err)]
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
