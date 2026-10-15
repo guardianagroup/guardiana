@@ -18,5 +18,9 @@ getrandom = { workspace = true }
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
 
+# Keychain Services. Only the local wrapping key lives here, never the message.
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = { version = "=3.7.0", features = ["OSX_10_15"] }
+
 [lints]
 workspace = true
