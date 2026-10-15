@@ -56,19 +56,14 @@ pub struct Pausa {
 }
 
 /// Running or stopped.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "estado", rename_all = "snake_case")]
 pub enum Sesion {
     /// Messages, files and media flow.
+    #[default]
     EnMarcha,
     /// Nothing leaves this computer; the conversation is kept where it was.
     Pausada(Pausa),
-}
-
-impl Default for Sesion {
-    fn default() -> Self {
-        Self::EnMarcha
-    }
 }
 
 /// How often the cause is checked while stopped.
