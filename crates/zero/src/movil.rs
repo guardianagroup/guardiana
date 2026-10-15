@@ -468,13 +468,14 @@ mod tests {
         let conecta = |ruta: String| {
             let huella = huella.clone();
             async move {
+                let con_puntos = huella
+                    .as_bytes()
+                    .chunks(2)
+                    .map(|c| std::str::from_utf8(c).unwrap())
+                    .collect::<Vec<_>>()
+                    .join(":");
                 let digest = wtransport::tls::Sha256Digest::from_str_fmt(
-                    &huella
-                        .as_bytes()
-                        .chunks(2)
-                        .map(|c| std::str::from_utf8(c).unwrap())
-                        .collect::<Vec<_>>()
-                        .join(":"),
+                    con_puntos,
                     Sha256DigestFmt::DottedHex,
                 )
                 .unwrap();
