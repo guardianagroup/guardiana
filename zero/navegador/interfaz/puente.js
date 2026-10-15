@@ -23,6 +23,8 @@ const Z = (() => {
     if (m.tipo === 'tema') document.documentElement.dataset.tema = m.tema || '';
     (oyentes[m.tipo] || []).forEach((f) => f(m));
   };
+  // The pages follow Windows' day or night until the person chooses (diseno.css, data-sigue).
+  document.documentElement.dataset.sigue = '';
   if (host) host.addEventListener('message', (e) => recibe(e.data));
   // A text with its {holes} filled; the key itself if the text is missing (never silent).
   const t = (k, v) => {
