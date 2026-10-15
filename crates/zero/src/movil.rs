@@ -513,7 +513,7 @@ mod tests {
         for _ in 0..100 {
             // The client's endpoint lives on this runtime: give it time to drive the QUIC
             // connection (acks, keep-alives) while the computer's thread reads.
-            rt.block_on(tokio::time::sleep(Duration::from_millis(50)));
+            rt.block_on(async { tokio::time::sleep(Duration::from_millis(50)).await });
             visto.extend(m.recoge());
             if visto
                 .iter()
