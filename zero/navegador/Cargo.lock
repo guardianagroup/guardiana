@@ -444,7 +444,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-core"
-version = "1.0.27"
+version = "1.0.31"
 dependencies = [
  "rusqlite",
  "serde",
@@ -454,7 +454,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-license"
-version = "1.0.27"
+version = "1.0.31"
 dependencies = [
  "getrandom 0.4.3",
  "guardiana-core",
@@ -466,7 +466,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-lists"
-version = "1.0.27"
+version = "1.0.31"
 dependencies = [
  "flate2",
  "guardiana-core",
@@ -477,7 +477,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-secure"
-version = "1.0.27"
+version = "1.0.31"
 dependencies = [
  "base64 0.23.1",
  "chacha20poly1305",
@@ -491,7 +491,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-zero"
-version = "1.0.27"
+version = "1.0.31"
 dependencies = [
  "base64 0.23.1",
  "guardiana-core",
