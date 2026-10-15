@@ -13,6 +13,7 @@ members = [
     "crates/verify",
     "crates/cli",
     "crates/zero",
+    "crates/secure",
 ]
 
 [workspace.package]
@@ -42,6 +43,7 @@ guardiana-license = { path = "crates/license" }
 guardiana-verify = { path = "crates/verify" }
 guardiana-cli = { path = "crates/cli" }
 guardiana-zero = { path = "crates/zero" }
+guardiana-secure = { path = "crates/secure" }
 
 # --- third-party, each justified (brief §2) ---
 # --- GUARDIANA ZERO, the browser (decision 197). All four were already in the tree through
@@ -88,6 +90,11 @@ ureq = { version = "3", default-features = false, features = ["rustls", "platfor
 minisign-verify = "0.2"
 # QR code for the Home Mode page (brief §7). Rendered as SVG text, no image crate.
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+# Olm double ratchet for GUARDIANA SECURE (plan of 14 Oct 2026). Apache-2.0.
+# Only guardiana-secure may depend on it. The DNS service must not.
+# SessionConfig::version_1 is the Olm that Matrix deploys. Version 2 is experimental
+# and is not enabled.
+vodozemac = "0.10"
 
 [workspace.lints.rust]
 # Brief §2: `unsafe` is forbidden unless justified in a comment.

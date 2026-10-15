@@ -1,0 +1,16 @@
+[package]
+name = "guardiana-secure"
+description = "GUARDIANA SECURE: an Olm conversation between two identities. No network, no DNS service."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+vodozemac = { workspace = true }
+
+[lints]
+workspace = true
