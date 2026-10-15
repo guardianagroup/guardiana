@@ -208,6 +208,24 @@ pub struct AntivirusInstalado {
 ///
 /// # Errors
 /// [`Error::NoSoportado`] outside Windows; [`Error::Sistema`] when Windows did not answer.
+pub use vpn::Vpn;
+
+/// The VPNs this computer's traffic is leaving through right now, as Windows lists them
+/// (15 Oct 2026). Elsewhere, nothing is known.
+///
+/// # Errors
+/// [`Error::NoSoportado`] off Windows; [`Error::Sistema`] if Windows did not answer.
+pub fn vpn_activas() -> Result<Vec<Vpn>, Error> {
+    #[cfg(windows)]
+    {
+        vpn::activas()
+    }
+    #[cfg(not(windows))]
+    {
+        Err(Error::NoSoportado)
+    }
+}
+
 pub fn antivirus_instalados() -> Result<Vec<AntivirusInstalado>, Error> {
     #[cfg(windows)]
     {
