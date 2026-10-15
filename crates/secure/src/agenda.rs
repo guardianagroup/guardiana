@@ -47,6 +47,16 @@ pub struct Contacto {
 }
 
 impl Contacto {
+    /// The pinned device, if the entry is verified and its keys decode: what a conversation is
+    /// opened with when the same keys come back.
+    pub fn verified(&self) -> Option<Verified> {
+        if self.estado != Estado::Verificado {
+            return None;
+        }
+        let (curve, signing) = self.claves()?;
+        Some(Verified::new(curve, signing))
+    }
+
     /// The keys, decoded. A corrupt entry yields `None` and is treated as not verified.
     fn claves(&self) -> Option<(Curve25519PublicKey, Ed25519PublicKey)> {
         Some((

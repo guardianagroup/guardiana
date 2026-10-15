@@ -18,6 +18,12 @@
 use vodozemac::olm::{Account, OlmMessage, Session, SessionConfig, SessionCreationError};
 use vodozemac::{Curve25519PublicKey, Ed25519PublicKey};
 
+/// The key types the product needs by name, so no other crate depends on vodozemac.
+pub mod claves {
+    pub use vodozemac::sas::Mac;
+    pub use vodozemac::{Curve25519PublicKey, Ed25519PublicKey, Ed25519Signature};
+}
+
 pub mod agenda;
 pub mod archivo;
 pub mod carry;

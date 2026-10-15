@@ -267,7 +267,7 @@ pub fn ahora_sistema() -> i64 {
         .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
 }
 
-fn azar(buf: &mut [u8]) {
+pub(crate) fn azar(buf: &mut [u8]) {
     use ring::rand::SecureRandom as _;
     if ring::rand::SystemRandom::new().fill(buf).is_err() {
         // Without the system's randomness the ids are still unique within a run.
@@ -426,6 +426,8 @@ struct Pregunta {
 pub struct Sesion {
     datos: PathBuf,
     descargas: PathBuf,
+    /// GUARDIANA SECURE, opened with the session (15 Oct 2026).
+    secure: crate::secure::Secure,
     version: String,
     motor: String,
     idioma_sistema: String,
@@ -656,9 +658,11 @@ impl Sesion {
         } else {
             Idioma::de_etiqueta(&prefs.idioma)
         };
+        let secure = crate::secure::Secure::abre(&a.datos, &a.descargas);
         let mut s = Self {
             datos: a.datos,
             descargas: a.descargas,
+            secure,
             version: a.version,
             motor: String::new(),
             idioma_sistema: a.idioma_sistema,
@@ -1179,12 +1183,79 @@ impl Sesion {
         host_de(&p.url).unwrap_or_else(|| p.url.clone())
     }
 
-    /// The SECURE monitor as the page draws it: what `guardiana_secure::monitor::Monitor`
-    /// knows, nothing more. No conversation yet, so it is the empty screen.
-    fn msg_monitor_secure(&self) -> Value {
-        let monitor = guardiana_secure::monitor::Monitor::new();
-        let valor = serde_json::from_str::<Value>(&monitor.to_json()).unwrap_or(Value::Null);
-        json!({ "tipo": "monitor", "monitor": valor })
+    /// The SECURE tab, if open.
+    fn pestana_secure(&self) -> Option<u32> {
+        self.pestanas
+            .iter()
+            .find(|p| p.url.starts_with(SECURE))
+            .map(|p| p.id)
+    }
+
+    /// Every tick: let the network in, and redraw the tab when something changed.
+    fn secure_tic(&mut self) -> Vec<Orden> {
+        self.secure.tic();
+        let mut o = Vec::new();
+        if self.secure.cambiado() {
+            if let Some(id) = self.pestana_secure() {
+                o.extend(self.a_pestana(id, &self.secure.estado_json()));
+                while let Some(a) = self.secure.avisos.pop_front() {
+                    o.extend(self.a_pestana(
+                        id,
+                        &json!({ "tipo": "secure_aviso", "clave": a["clave"], "texto": a["texto"] }),
+                    ));
+                }
+            }
+        }
+        o
+    }
+
+    /// What the Comunicaciones page asks for.
+    fn secure_accion(&mut self, origen: Origen, m: &Value) -> Vec<Orden> {
+        let Origen::Pestana(id) = origen else {
+            return Vec::new();
+        };
+        if !self.pestana(id).is_some_and(|p| p.url.starts_with(SECURE)) {
+            return Vec::new();
+        }
+        let accion = texto(m, "accion");
+        let r: Result<(), String> = match accion {
+            "escuchar" => self
+                .secure
+                .escuchar(u16::try_from(m["puerto"].as_u64().unwrap_or(0)).unwrap_or(0))
+                .map(|_| ()),
+            "conectar" => self.secure.conectar(texto(m, "direccion")),
+            "cerrar" => {
+                self.secure.cerrar("la persona cerró");
+                Ok(())
+            }
+            "sas" => {
+                self.secure
+                    .sas_persona(m["iguales"].as_bool().unwrap_or(false), texto(m, "nombre"));
+                Ok(())
+            }
+            "texto" => {
+                self.secure.texto(texto(m, "texto"));
+                Ok(())
+            }
+            "archivo_empieza" => self.secure.archivo_empieza(texto(m, "nombre")),
+            "archivo_trozo" => self
+                .secure
+                .archivo_trozo(texto(m, "b64"), m["ultimo"].as_bool().unwrap_or(false)),
+            "reanudar" => {
+                self.secure.reanudar_a_mano();
+                Ok(())
+            }
+            _ => Ok(()),
+        };
+        let mut o = Vec::new();
+        if let Err(e) = r {
+            o.extend(self.a_pestana(
+                id,
+                &json!({ "tipo": "secure_aviso", "clave": "sec_error", "texto": e }),
+            ));
+        }
+        o.extend(self.a_pestana(id, &self.secure.estado_json()));
+        o
     }
 
     fn msg_estado(&self) -> Value {
@@ -1885,6 +1956,7 @@ impl Sesion {
                 self.nueva_pestana(Perfil::General, &url)
             }
             "listo" => self.listo(origen, m),
+            "secure" => self.secure_accion(origen, m),
             "navegar" => {
                 let id = match origen {
                     Origen::Pestana(id) => id,
@@ -2170,7 +2242,7 @@ impl Sesion {
                 // The SECURE tab draws its monitor from the first second (15 Oct 2026). Until a
                 // conversation exists every field is null and the page shows «—».
                 if m.get("vista").and_then(Value::as_str) == Some("secure") {
-                    o.extend(self.a_pestana(id, &self.msg_monitor_secure()));
+                    o.extend(self.a_pestana(id, &self.secure.estado_json()));
                 }
                 o
             }
@@ -4504,6 +4576,7 @@ impl Sesion {
     pub fn tic(&mut self) -> Vec<Orden> {
         let ahora = (self.reloj)();
         let mut o = Vec::new();
+        o.extend(self.secure_tic());
         // The subscription: read again every minute (the trial ends at a time of day, not at a
         // start), and the periodic check asked for every ten minutes; it connects only when due,
         // and at most once an hour. A file that cannot be read gets a day, said on screen.
