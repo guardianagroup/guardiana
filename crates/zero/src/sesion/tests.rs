@@ -120,18 +120,18 @@ fn the_three_product_tabs_open_together_and_the_panel_stays_in_front() {
     )));
     assert!(o.iter().any(|x| matches!(
         x,
-        Orden::CreaPestana { url: Some(u), .. } if u == crate::sesion::COMUNICACIONES
+        Orden::CreaPestana { url: Some(u), .. } if u == crate::sesion::SECURE
     )));
     assert_eq!(s.pestanas.len(), 3);
     assert!(s.pestanas.iter().all(|p| p.fija));
     assert_eq!(s.pestanas[0].url, url);
     assert_eq!(s.pestanas[1].url, crate::sesion::INICIO);
-    assert_eq!(s.pestanas[2].url, crate::sesion::COMUNICACIONES);
+    assert_eq!(s.pestanas[2].url, crate::sesion::SECURE);
     assert_eq!(s.activa, s.pestanas[0].id);
     let e = del_tipo(&o, Origen::Barra, "estado").unwrap_or_default();
     assert_eq!(e["pestanas"][0]["titulo"], "GUARDIANA");
     assert_eq!(e["pestanas"][1]["titulo"], "GUARDIANA ZERO");
-    assert_eq!(e["pestanas"][2]["titulo"], "GUARDIANA Comunicaciones");
+    assert_eq!(e["pestanas"][2]["titulo"], "GUARDIANA SECURE");
 
     let id = s.pestanas[0].id;
     let o = s.mensaje(
