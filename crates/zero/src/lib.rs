@@ -25,6 +25,7 @@ pub mod medidas;
 pub mod paginas;
 pub mod puerta;
 pub mod recibo;
+pub mod rele;
 pub mod secure;
 pub mod servidor;
 pub mod sesion;

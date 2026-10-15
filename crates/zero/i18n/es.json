@@ -955,5 +955,10 @@
   "sec_c_abriendo": "Abriendo la puerta en tu router…",
   "sec_c_puerta_abierta": "Puerta abierta. Esperando.",
   "sec_c_sin_puerta": "Tu router no ha dejado abrir la puerta ({e}). En tu misma red te pueden llamar al puerto {p}; desde fuera, mejor que espere la otra persona y tú llamas con su código.",
-  "sec_c_direccion_v2": "Código (GS-…) o dirección:puerto"
+  "sec_c_direccion_v2": "Código (GS-…) o dirección:puerto",
+  "sec_c_rele_texto": "Tu router no ha dejado abrir una puerta, así que GUARDIANA usa su relé ciego: un servidor que solo junta las dos conexiones y pasa bytes que ya van cifrados; no puede leer nada ni guarda direcciones. Dale este código a la otra persona. Caduca al cerrar.",
+  "sec_c_rele_listo": "Sin puerta en el router. Esperando en el relé ciego.",
+  "sec_c_rele_buscando": "Sin puerta en el router. Conectando con el relé ciego…",
+  "sec_e_buscando": "Buscando a la otra persona en el relé ciego…",
+  "sec_rele_fallo": "No se pudo usar el relé: {e}"
 }

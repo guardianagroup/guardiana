@@ -955,5 +955,10 @@
   "sec_c_abriendo": "Opening the door in your router…",
   "sec_c_puerta_abierta": "Door open. Waiting.",
   "sec_c_sin_puerta": "Your router did not let the door open ({e}). On your own network they can call you at port {p}; from outside, better let the other person wait and you call with their code.",
-  "sec_c_direccion_v2": "Code (GS-…) or address:port"
+  "sec_c_direccion_v2": "Code (GS-…) or address:port",
+  "sec_c_rele_texto": "Your router would not open a door, so GUARDIANA uses its blind relay: a server that only joins the two connections and passes bytes that are already encrypted; it can read nothing and keeps no addresses. Give this code to the other person. It expires when you close.",
+  "sec_c_rele_listo": "No door in the router. Waiting at the blind relay.",
+  "sec_c_rele_buscando": "No door in the router. Connecting to the blind relay…",
+  "sec_e_buscando": "Looking for the other person at the blind relay…",
+  "sec_rele_fallo": "The relay could not be used: {e}"
 }
