@@ -1162,8 +1162,10 @@ impl Sesion {
         if p.fija && (es_panel_guardiana(&p.url) || p.url.contains("guardiana-arrancando.html")) {
             return self.t("pestana_guardiana");
         }
+        // The three product tabs carry the names the owner asked for (15 Oct 2026: «radiografías,
+        // navegador ZERO, comunicaciones», so the person understands at a glance).
         if p.fija && (p.url == INICIO || p.url.is_empty()) {
-            return self.t("app_nombre");
+            return self.t("pestana_zero");
         }
         if p.url.starts_with(SECURE) {
             return self.t("pestana_secure");
