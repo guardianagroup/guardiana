@@ -2500,6 +2500,8 @@
     "pd_ht_estado": "Status",
     "pd_ht_cortado": "Cut",
     "pd_ht_documentado": "Explained by the maker",
-    "pd_ht_sin_documentar": "Not explained"
+    "pd_ht_sin_documentar": "Not explained",
+    "pd_ht_buscar": "Search program, destination, company, country, network…",
+    "pd_ht_paises": "Countries"
   }
 }

@@ -1033,13 +1033,28 @@
     };
     // The technical table and its downloads: exactly the rows on screen, nothing more. The file is
     // made here and never leaves the computer unless the person sends it.
-    const filasTabla = (DF) => DF.filter((d) => !d.sede).sort((a, b) => (b.sub + b.baj) - (a.sub + a.baj));
+    let ordenTabla = { k: 'sub', desc: true }, buscaTabla = '';
+    const valorOrden = (d, k) => k === 'programa' ? prod(d.p).nombre : k === 'destino' ? d.host : k === 'pais' ? (d.pais ? nombrePais(d.pais) : '') : k === 'ciudad' ? (d.lugar && d.lugar.ciudad) || '' : k === 'proto' ? (d.proto || '') + (d.puerto || '') : k === 'estado' ? (d.cortado ? 2 : d.bloq > 0 ? 1 : 0) : d[k];
+    const filasTabla = (DF) => {
+      const q = buscaTabla.trim().toLocaleLowerCase(LOC);
+      let f = DF.filter((d) => !d.sede);
+      if (q) f = f.filter((d) => [prod(d.p).nombre, d.host, d.destino, d.empresa, d.pais && nombrePais(d.pais), d.lugar && d.lugar.ciudad, d.red, d.asn && 'AS' + d.asn, d.proto, d.puerto].filter(Boolean).join(' ').toLocaleLowerCase(LOC).includes(q));
+      const { k, desc } = ordenTabla;
+      return f.sort((a, b) => { const x = valorOrden(a, k), y = valorOrden(b, k); const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x ?? '').localeCompare(String(y ?? ''), LOC); return (desc ? -c : c) || (b.sub + b.baj) - (a.sub + a.baj); });
+    };
+    $('ht-busca').addEventListener('input', () => { buscaTabla = $('ht-busca').value; pintaHud(); });
+    document.querySelectorAll('table.ht th[data-orden]').forEach((th) => {
+      const elige = () => { const k = th.dataset.orden; ordenTabla = ordenTabla.k === k ? { k, desc: !ordenTabla.desc } : { k, desc: !['programa', 'destino', 'empresa', 'pais', 'ciudad', 'red', 'proto'].includes(k) }; document.querySelectorAll('table.ht th[data-orden]').forEach((x) => x.removeAttribute('aria-sort')); th.setAttribute('aria-sort', ordenTabla.desc ? 'descending' : 'ascending'); pintaHud(); };
+      th.addEventListener('click', elige); th.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); elige(); } });
+    });
     const fechaCorta = (ms) => ms ? new Date(ms).toLocaleString(LOC, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
     const pintaTabla = (DF, amplio) => {
       $('hud-tabla').hidden = !amplio;
       if (!amplio) return;
-      const filas = filasTabla(DF).slice(0, 300);
-      $('ht-cuantos').textContent = num(filasTabla(DF).length);
+      const todas = filasTabla(DF), filas = todas.slice(0, 300);
+      $('ht-cuantos').textContent = num(todas.length);
+      const paises = new Set(todas.map((d) => d.pais).filter((p) => p && p[0] !== '@'));
+      $('ht-kpi').innerHTML = [[bytes(todas.reduce((a, d) => a + d.sub, 0)), t('pd_ht_sube'), 'o'], [bytes(todas.reduce((a, d) => a + d.baj, 0)), t('pd_ht_baja'), 'i'], [num(todas.length), t('pd_ht_titulo').split(' ·')[0], ''], [num(paises.size), t('pd_ht_paises'), ''], [num(todas.reduce((a, d) => a + d.bloq, 0)), t('pd_ht_cortes'), 'c']].map(([v, l, c]) => `<div><b class="${c}">${esc(v)}</b><span>${esc(l)}</span></div>`).join('');
       $('ht-filas').innerHTML = filas.map((d) => {
         const estado = d.cortado ? `<span class="chip-ht c">${esc(t('pd_ht_cortado'))}</span>` : d.bloq > 0 ? `<span class="chip-ht o">${esc(tn('pd_intentos', d.bloq))}</span>` : d.doc === true ? `<span class="chip-ht t">${esc(t('pd_ht_documentado'))}</span>` : d.doc === false ? `<span class="chip-ht" style="color:var(--undoc)">${esc(t('pd_ht_sin_documentar'))}</span>` : '';
         return `<tr class="enlace-fila" data-dest="${esc(d.k)}" tabindex="0" role="button"><td>${esc(prod(d.p).nombre)}</td><td title="${esc(d.destino || d.host)}">${esc(d.host)}</td><td>${esc(d.empresa || '—')}</td><td>${esc(d.pais ? nombrePais(d.pais) : '—')}</td><td>${esc(d.lugar && d.lugar.ciudad ? d.lugar.ciudad : '—')}</td><td title="AS${esc(d.asn || '')}">${esc(d.red || '—')}${d.asn ? ` <span class="t">AS${esc(d.asn)}</span>` : ''}</td><td>${esc((d.proto || '') + (d.puerto ? '/' + d.puerto : ''))}</td><td class="n o">${esc(bytes(d.sub))}</td><td class="n i">${esc(bytes(d.baj))}</td><td class="n">${esc(num(d.paq))}</td><td class="n">${esc(num(d.consultas))}</td><td class="n${d.bloq ? ' c' : ''}">${esc(num(d.bloq))}</td><td class="t">${esc(fechaCorta(d.primera))}</td><td class="t">${esc(fechaCorta(d.ultima))}</td><td>${estado}</td></tr>`;

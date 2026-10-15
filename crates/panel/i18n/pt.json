@@ -2500,6 +2500,8 @@
     "pd_ht_estado": "Estado",
     "pd_ht_cortado": "Cortado",
     "pd_ht_documentado": "Explicado pelo fabricante",
-    "pd_ht_sin_documentar": "Sem explicar"
+    "pd_ht_sin_documentar": "Sem explicar",
+    "pd_ht_buscar": "Procurar programa, destino, empresa, país, rede…",
+    "pd_ht_paises": "Países"
   }
 }

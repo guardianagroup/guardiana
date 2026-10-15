@@ -1020,6 +1020,7 @@
     document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.getAttribute('data-t')); });
     document.querySelectorAll('[data-t-html]').forEach((el) => { el.innerHTML = t(el.getAttribute('data-t-html')); });
     document.querySelectorAll('[data-t-title]').forEach((el) => { el.title = t(el.getAttribute('data-t-title')); });
+    document.querySelectorAll('[data-t-placeholder]').forEach((el) => { el.placeholder = t(el.getAttribute('data-t-placeholder')); });
     // A name for what a screen reader cannot read by itself: the share card, the QR code.
     document.querySelectorAll('[data-t-label]').forEach((el) => { el.setAttribute('aria-label', t(el.getAttribute('data-t-label'))); });
     // Filter options and fixed headers carry stored values (Spanish keys); their labels follow the language.
