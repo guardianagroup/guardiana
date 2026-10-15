@@ -35,7 +35,8 @@ env:
 jobs:
   # The lock, when asked (15 Oct 2026: guardiana-secure joined crates/zero and nobody can run
   # cargo against crates.io from where the branches are written). Only on a branch, never on
-  # main; the commit is signed by nothing and carries only zero/navegador/Cargo.lock.
+  # main; the commit is signed by nothing and carries only zero/navegador/Cargo.lock. A push by
+  # the CI's own token starts no workflow (GitHub's rule): the next human push checks it.
   lock:
     name: update the lock
     if: ${{ github.event.inputs.lock == 'actualizar' && github.ref != 'refs/heads/main' }}
