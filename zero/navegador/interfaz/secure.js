@@ -151,10 +151,13 @@
     $('c-huella').textContent = E.huella || RAYA;
     // Waiting: the door in the router gives a GS code; no door, the blind relay gives a GR one.
     const codigo = E.codigo || E.rele_codigo;
-    if (f === 'escuchando') { $('c-puerto').hidden = false; $('c-puerto').textContent = E.codigo ? t('sec_c_puerta_abierta') : E.rele_codigo ? t('sec_c_rele_listo') : E.puerta_error ? (E.rele_error ? t('sec_c_puerto', { p: E.puerto }) : t('sec_c_rele_buscando')) : t('sec_c_abriendo'); } else $('c-puerto').hidden = true;
+    // While the code is being prepared, one line; once it is on screen, the code box says it all.
+    if (f === 'escuchando' && !codigo) { $('c-puerto').hidden = false; $('c-puerto').textContent = E.puerta_error && E.rele_error ? t('sec_c_puerto', { p: E.puerto }) : t('sec_c_preparando'); } else $('c-puerto').hidden = true;
+    $('c-escuchar').hidden = f === 'escuchando';
     $('c-codigo-caja').hidden = !(f === 'escuchando' && codigo);
     if (codigo) $('c-codigo').textContent = codigo;
-    $('c-codigo-texto').textContent = t(E.rele_codigo && !E.codigo ? 'sec_c_rele_texto' : 'sec_c_codigo_texto');
+    $('c-codigo-texto').textContent = t('sec_c_listo');
+    $('c-via').textContent = E.codigo ? t('sec_c_via_puerta') : E.rele_codigo ? t('sec_c_via_rele') : '';
     $('c-puerta-error').hidden = !(f === 'escuchando' && E.puerta_error && !codigo && E.rele_error);
     if (E.puerta_error) $('c-puerta-error').textContent = t('sec_c_sin_puerta', { p: E.puerto, e: E.puerta_error }) + (E.rele_error ? ' ' + t('sec_rele_fallo', { e: E.rele_error }) : '');
     $('c-espera-texto').textContent = t(f === 'saludando' ? 'sec_e_saludando' : f === 'abriendo' ? 'sec_e_abriendo' : f === 'buscando' ? 'sec_e_buscando' : 'sec_e_esperando');
@@ -186,6 +189,10 @@
   const avisos = [];
   function aviso(txt) { avisos.push(txt); const ol = $('c-mensajes'); const li = document.createElement('li'); li.className = 'aviso-li'; li.textContent = txt; ol.appendChild(li); ol.scrollTop = ol.scrollHeight; }
   $('c-escuchar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'escuchar', puerto: 0 }));
+  // Sending the code: WhatsApp (a tab with the message ready) or mail; the person picks who.
+  const invitacion = () => t('sec_c_mensaje_invitacion', { c: $('c-codigo').textContent });
+  $('c-whatsapp').addEventListener('click', () => manda({ tipo: 'navegar', texto: 'https://wa.me/?text=' + encodeURIComponent(invitacion()) }));
+  $('c-correo').addEventListener('click', () => manda({ tipo: 'abrir_correo', asunto: t('sec_c_asunto_invitacion'), cuerpo: invitacion() }));
   $('c-copiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('c-codigo').textContent); $('c-copiar').textContent = t('sec_c_copiado'); setTimeout(() => { $('c-copiar').textContent = t('sec_c_copiar'); }, 1500); } catch (_) {} });
   $('c-conectar').addEventListener('click', () => { const d = $('c-direccion').value.trim(); if (d) manda({ tipo: 'secure', accion: 'conectar', direccion: d }); });
   $('c-direccion').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('c-conectar').click(); });
