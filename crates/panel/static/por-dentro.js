@@ -1028,8 +1028,37 @@
       // three destinations with most sent in the last minutes, each one a click away from its card.
       const vivos = DF.filter((d) => d.ema > 0 && !bloqueado(d)).sort((a, b) => b.ema - a.ema).slice(0, amplio ? 30 : (window.innerWidth >= 1700 ? 6 : 3));
       $('hud-top').innerHTML = vivos.map((d) => `<li class="enlace-fila" data-dest="${esc(d.k)}" tabindex="0" role="button"><span>${esc(d.host)}</span><span class="o">${esc(bytes(d.ema))}/s</span></li>`).join('') || `<li class="t">${esc(t('pd_top_nada'))}</li>`;
+      pintaTabla(DF, amplio);
       pintaCorte(); pintaDetalle(); pintaExplorador();
     };
+    // The technical table and its downloads: exactly the rows on screen, nothing more. The file is
+    // made here and never leaves the computer unless the person sends it.
+    const filasTabla = (DF) => DF.filter((d) => !d.sede).sort((a, b) => (b.sub + b.baj) - (a.sub + a.baj));
+    const fechaCorta = (ms) => ms ? new Date(ms).toLocaleString(LOC, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+    const pintaTabla = (DF, amplio) => {
+      $('hud-tabla').hidden = !amplio;
+      if (!amplio) return;
+      const filas = filasTabla(DF).slice(0, 300);
+      $('ht-cuantos').textContent = num(filasTabla(DF).length);
+      $('ht-filas').innerHTML = filas.map((d) => {
+        const estado = d.cortado ? `<span class="chip-ht c">${esc(t('pd_ht_cortado'))}</span>` : d.bloq > 0 ? `<span class="chip-ht o">${esc(tn('pd_intentos', d.bloq))}</span>` : d.doc === true ? `<span class="chip-ht t">${esc(t('pd_ht_documentado'))}</span>` : d.doc === false ? `<span class="chip-ht" style="color:var(--undoc)">${esc(t('pd_ht_sin_documentar'))}</span>` : '';
+        return `<tr class="enlace-fila" data-dest="${esc(d.k)}" tabindex="0" role="button"><td>${esc(prod(d.p).nombre)}</td><td title="${esc(d.destino || d.host)}">${esc(d.host)}</td><td>${esc(d.empresa || '—')}</td><td>${esc(d.pais ? nombrePais(d.pais) : '—')}</td><td>${esc(d.lugar && d.lugar.ciudad ? d.lugar.ciudad : '—')}</td><td title="AS${esc(d.asn || '')}">${esc(d.red || '—')}${d.asn ? ` <span class="t">AS${esc(d.asn)}</span>` : ''}</td><td>${esc((d.proto || '') + (d.puerto ? '/' + d.puerto : ''))}</td><td class="n o">${esc(bytes(d.sub))}</td><td class="n i">${esc(bytes(d.baj))}</td><td class="n">${esc(num(d.paq))}</td><td class="n">${esc(num(d.consultas))}</td><td class="n${d.bloq ? ' c' : ''}">${esc(num(d.bloq))}</td><td class="t">${esc(fechaCorta(d.primera))}</td><td class="t">${esc(fechaCorta(d.ultima))}</td><td>${estado}</td></tr>`;
+      }).join('') || `<tr><td colspan="15" class="t">${esc(t('pd_registro_vacio'))}</td></tr>`;
+    };
+    const descarga = (nombre, tipo, texto) => {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([texto], { type: tipo })); a.download = nombre; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    };
+    const selloArchivo = () => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; };
+    const filasExport = () => {
+      const mios = PROD.filter(enFiltro), ids = new Set(mios.map((p) => p.id));
+      return filasTabla(DEST.filter((d) => ids.has(d.p))).map((d) => ({ programa: prod(d.p).nombre, destino: d.destino || d.host, nombre: d.host, empresa: d.empresa || '', pais: d.pais || '', ciudad: d.lugar && d.lugar.ciudad ? d.lugar.ciudad : '', red: d.red || '', asn: d.asn || 0, protocolo: d.proto || '', puerto: d.puerto || 0, enviados_bytes: d.sub, recibidos_bytes: d.baj, paquetes: d.paq, consultas: d.consultas, cortes: d.bloq, cortado: !!d.cortado, documentado: d.doc === true ? 'si' : d.doc === false ? 'no' : '', uso: d.uso || '', primera: d.primera ? new Date(d.primera).toISOString() : '', ultima: d.ultima ? new Date(d.ultima).toISOString() : '' }));
+    };
+    $('ht-json').addEventListener('click', () => descarga(`guardiana-por-dentro-${selloArchivo()}.json`, 'application/json', JSON.stringify({ programa: 'GUARDIANA', pagina: 'por-dentro', ventana_h: st.datos && st.datos.ventana_h, generado: new Date().toISOString(), filtro: st.filtro, destinos: filasExport(), sucesos: st.eventos.map((e) => ({ hora: e.h, programa: e.prog, destino: e.host, que: e.que })) }, null, 2)));
+    $('ht-csv').addEventListener('click', () => {
+      const filas = filasExport(); if (!filas.length) return;
+      const cab = Object.keys(filas[0]); const q = (v) => { const s = String(v ?? ''); return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+      descarga(`guardiana-por-dentro-${selloArchivo()}.csv`, 'text/csv;charset=utf-8', '\ufeff' + cab.join(',') + '\n' + filas.map((f) => cab.map((k) => q(f[k])).join(',')).join('\n') + '\n');
+    });
     // «Cortar todo lo que envía el antivirus» (until 13 Oct 2026 «Protección máxima», a name that
     // hid that the antivirus then gets no updates): a small button in the antivirus's telemetry,
     // not in the top bar; while it is on, the bar's chip says so, so nobody forgets it.

@@ -609,6 +609,24 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 .universo .hud.amplio .grande { font-size: 34px; }
 .universo .hud.amplio .top-ahora { gap: 5px; }
 .universo .hud.amplio .top-ahora li { padding: 3px 4px; border-bottom: 1px solid var(--hud-line); }
+/* Open, the band first shows the technical table of every destination (the owner, 15 Oct 2026:
+   «datos reales e interesantes para el cliente que quiere saber muchos datos técnicos y
+   descargar»), with CSV and JSON of exactly what is on screen; the five panels sit under it. */
+.universo .hud.amplio { grid-template-rows: minmax(0, 1.25fr) minmax(0, 1fr); }
+.universo .hud-tabla { grid-column: 1 / -1; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 0; padding: 0 !important; border-bottom: 1px solid var(--hud-line); }
+.universo .hud-tabla[hidden] { display: none; }
+.universo .ht-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px 8px; border-bottom: 1px solid var(--hud-line); position: static !important; }
+.universo .ht-acciones { display: flex; gap: 8px; }
+.universo .ht-scroll { overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--hud-line) transparent; }
+.universo table.ht { width: 100%; border-collapse: collapse; font: 11.5px/1.4 'IBM Plex Mono', ui-monospace, monospace; color: var(--hud-fg); background: transparent; font-variant-numeric: tabular-nums; }
+.universo table.ht th { position: sticky; top: 0; z-index: 1; background: var(--hud); color: var(--hud-muted); font-weight: 500; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--hud-line); white-space: nowrap; }
+.universo table.ht td { padding: 5px 10px; border-bottom: 1px solid color-mix(in srgb, var(--hud-line) 60%, transparent); white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
+.universo table.ht th.n, .universo table.ht td.n { text-align: right; }
+.universo table.ht tr.enlace-fila { cursor: pointer; }
+.universo table.ht tr.enlace-fila:hover td { background: color-mix(in srgb, var(--shield) 8%, transparent); }
+.universo table.ht td.o { color: var(--out); } .universo table.ht td.i { color: var(--in); } .universo table.ht td.c { color: var(--cut); } .universo table.ht td.t { color: var(--hud-muted); }
+.universo table.ht .chip-ht { display: inline-block; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; border: 1px solid currentColor; border-radius: 4px; padding: 0 5px; }
+@media (min-width: 1700px) { .universo table.ht { font-size: 13px; } .universo table.ht th { font-size: 11.5px; } }
 /* A big monitor (a friend's, 15 Oct 2026) gets a taller band and larger type from the start. */
 @media (min-width: 1700px) {
   .universo .hud > div { padding: 14px 18px; gap: 8px; }

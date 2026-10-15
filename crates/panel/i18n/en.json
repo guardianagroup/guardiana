@@ -2479,6 +2479,27 @@
     "rv_certificados_nuevo": "{n} new root certificates since the first check-up. With one, a program can read your encrypted traffic: if you do not know where they come from, check it.",
     "pd_lugar_zona_aviso": "Your computer is placed by its time zone, in {lugar}. If that is not your city, correct it or measure with GPS or Wi-Fi: it stays in this browser only.",
     "pd_hud_desplegar": "See all the data",
-    "pd_hud_recoger": "Collapse"
+    "pd_hud_recoger": "Collapse",
+    "pd_ht_titulo": "Destinations · all the data",
+    "pd_ht_csv": "Download CSV",
+    "pd_ht_json": "Download JSON",
+    "pd_ht_programa": "Program",
+    "pd_ht_destino": "Destination",
+    "pd_ht_empresa": "Company",
+    "pd_ht_pais": "Server country",
+    "pd_ht_ciudad": "City",
+    "pd_ht_red": "Network (AS)",
+    "pd_ht_proto": "Proto/port",
+    "pd_ht_sube": "Sent",
+    "pd_ht_baja": "Received",
+    "pd_ht_paquetes": "Packets",
+    "pd_ht_consultas": "Queries",
+    "pd_ht_cortes": "Cuts",
+    "pd_ht_primera": "First seen",
+    "pd_ht_ultima": "Last seen",
+    "pd_ht_estado": "Status",
+    "pd_ht_cortado": "Cut",
+    "pd_ht_documentado": "Explained by the maker",
+    "pd_ht_sin_documentar": "Not explained"
   }
 }

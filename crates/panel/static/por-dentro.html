@@ -69,6 +69,12 @@
   </div>
   <div class="hud" id="hud">
     <button type="button" class="hud-asa" id="hud-asa" aria-expanded="false" aria-controls="hud" data-t-title="pd_hud_desplegar"><i aria-hidden="true"></i><span data-t="pd_hud_desplegar"></span></button>
+    <div class="hud-tabla" id="hud-tabla" hidden>
+      <div class="ht-cab"><h3><span data-t="pd_ht_titulo" class="h3-titulo"></span> <span id="ht-cuantos"></span></h3><div class="ht-acciones"><button type="button" class="btn-hud" id="ht-csv" data-t="pd_ht_csv"></button><button type="button" class="btn-hud" id="ht-json" data-t="pd_ht_json"></button></div></div>
+      <div class="ht-scroll"><table class="ht"><thead><tr>
+        <th data-t="pd_ht_programa"></th><th data-t="pd_ht_destino"></th><th data-t="pd_ht_empresa"></th><th data-t="pd_ht_pais"></th><th data-t="pd_ht_ciudad"></th><th data-t="pd_ht_red"></th><th data-t="pd_ht_proto"></th><th class="n" data-t="pd_ht_sube"></th><th class="n" data-t="pd_ht_baja"></th><th class="n" data-t="pd_ht_paquetes"></th><th class="n" data-t="pd_ht_consultas"></th><th class="n" data-t="pd_ht_cortes"></th><th data-t="pd_ht_primera"></th><th data-t="pd_ht_ultima"></th><th data-t="pd_ht_estado"></th>
+      </tr></thead><tbody id="ht-filas"></tbody></table></div>
+    </div>
     <div><h3><span data-t="pd_hud_registro" class="h3-titulo"></span> <span data-t="pd_hud_vivo"></span></h3><ul class="registro" id="registro"></ul></div>
     <div><h3><span data-t="pd_hud_enviado" class="h3-titulo"></span> <span id="hud-min"></span></h3><canvas id="spark"></canvas></div>
     <div><h3 data-t="pd_hud_paises"></h3><div class="barras" id="barras"></div></div>

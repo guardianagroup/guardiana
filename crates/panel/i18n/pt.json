@@ -2479,6 +2479,27 @@
     "rv_certificados_nuevo": "{n} certificados raiz novos desde a primeira revisão. Com um assim, um programa pode ler seu tráfego criptografado: se não sabe de onde vêm, verifique.",
     "pd_lugar_zona_aviso": "O seu computador está colocado pelo fuso horário, em {lugar}. Se não é a sua cidade, corrija ou meça com GPS ou Wi-Fi: fica só neste navegador.",
     "pd_hud_desplegar": "Ver todos os dados",
-    "pd_hud_recoger": "Recolher"
+    "pd_hud_recoger": "Recolher",
+    "pd_ht_titulo": "Destinos · todos os dados",
+    "pd_ht_csv": "Baixar CSV",
+    "pd_ht_json": "Baixar JSON",
+    "pd_ht_programa": "Programa",
+    "pd_ht_destino": "Destino",
+    "pd_ht_empresa": "Empresa",
+    "pd_ht_pais": "País do servidor",
+    "pd_ht_ciudad": "Cidade",
+    "pd_ht_red": "Rede (AS)",
+    "pd_ht_proto": "Proto/porta",
+    "pd_ht_sube": "Enviado",
+    "pd_ht_baja": "Recebido",
+    "pd_ht_paquetes": "Pacotes",
+    "pd_ht_consultas": "Consultas",
+    "pd_ht_cortes": "Cortes",
+    "pd_ht_primera": "Primeira vez",
+    "pd_ht_ultima": "Última vez",
+    "pd_ht_estado": "Estado",
+    "pd_ht_cortado": "Cortado",
+    "pd_ht_documentado": "Explicado pelo fabricante",
+    "pd_ht_sin_documentar": "Sem explicar"
   }
 }
