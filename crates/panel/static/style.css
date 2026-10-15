@@ -839,6 +839,8 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 /* «Revisión del ordenador» (1.0.24) */
 .rv-cabeza{display:flex;flex-direction:column;gap:10px}
 .rv-semaforo{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:15px}
+.rv-semaforo span[title]{cursor:help}
+.rv-check summary{cursor:pointer}
 .rv-semaforo b{font-family:var(--display);font-size:20px;margin-right:4px}
 .rv-botones{display:flex;flex-wrap:wrap;gap:8px}
 .rv-grupo h2{font-family:var(--display);font-size:17px;margin:26px 0 6px}

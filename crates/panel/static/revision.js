@@ -41,7 +41,8 @@
         const peor = checks.reduce((a, c) => (ordenEstado[c.estado] || 0) > (ordenEstado[a] || 0) ? c.estado : a, 'ok');
         const estado = r.corriendo ? 'revisando' : (peor === 'nd' ? 'info' : peor);
         const detalle = r.corriendo ? t('rv_paso_revisando') : t('rv_paso_comprobaciones').replace('{n}', checks.length);
-        return `<div class="rv-paso ${estado}"><i aria-hidden="true"></i><span><b>${esc(t('rv_g_' + g.id))}</b><small>${esc(detalle)}</small></span></div>`;
+        const nombre = t('rv_g_' + g.id);
+        return `<div class="rv-paso ${estado}" title="${esc(nombre + ' · ' + detalle)}"><i aria-hidden="true"></i><span><b>${esc(nombre)}</b><small>${esc(detalle)}</small></span></div>`;
       }).join('');
       progreso(!!r.corriendo);
     };
@@ -51,9 +52,16 @@
       if (!r.disponible) { $('rv-semaforo').textContent = t('rv_no_windows'); $('rv-ahora').disabled = true; return; }
       pintaEscena(r);
       const s = r.resumen;
+      const deEstado = (k) => (r.grupos || []).flatMap((g) => (g.checks || []).filter((c) => (c.estado === 'nd' ? 'info' : c.estado) === k));
+      const pista = (cs) => {
+        if (!cs.length) return '';
+        const nombres = cs.slice(0, 8).map((c) => t('rv_t_' + c.id));
+        return nombres.join(' · ') + (cs.length > nombres.length ? ' · +' + (cs.length - nombres.length) : '');
+      };
+      const conPista = (html, texto) => texto ? html.replace('<span>', `<span title="${esc(texto)}">`) : html;
       $('rv-semaforo').innerHTML = [['alerta', s.alerta], ['aviso', s.aviso], ['ok', s.ok], ['info', s.info]]
-        .map(([k, n]) => `<span><span class="rv-punto ${k}"></span> <b>${n}</b>${esc(t('rv_resumen_' + k))}</span>`).join('')
-        + (s.nuevos ? `<span><b>${s.nuevos}</b>${esc(t('rv_resumen_nuevos'))}</span>` : '');
+        .map(([k, n]) => conPista(`<span><span class="rv-punto ${k}"></span> <b>${n}</b>${esc(t('rv_resumen_' + k))}</span>`, pista(deEstado(k)))).join('')
+        + (s.nuevos ? conPista(`<span><b>${s.nuevos}</b>${esc(t('rv_resumen_nuevos'))}</span>`, pista((r.grupos || []).flatMap((g) => (g.checks || []).filter((c) => (c.lista || []).some((i) => i.marcas.includes('nuevo')))))) : '');
       $('rv-cuando').textContent = r.corriendo ? t('rv_revisando') : r.cuando ? t('rv_cuando').replace('{fecha}', fecha(r.cuando)) + (r.desde ? ' · ' + t('rv_desde').replace('{fecha}', fecha(r.desde)) : '') : t('rv_aun_no');
       $('rv-msg').textContent = r.error ? t('rv_error').replace('{e}', r.error === 'no_windows' ? t('rv_no_windows') : r.error) : '';
       $('rv-ahora').disabled = !!r.corriendo;
@@ -61,8 +69,13 @@
       const e = r.equipo;
       $('rv-equipo').textContent = e && e.sistema ? [e.fabricante, e.modelo, e.sistema + (e.display ? ' ' + e.display : ''), e.compilacion ? 'build ' + e.compilacion + (e.ubr ? '.' + e.ubr : '') : ''].filter(Boolean).join(' · ') : '';
       $('rv-grupos').innerHTML = r.grupos.map((g) => `<section class="rv-grupo"><h2>${esc(t('rv_g_' + g.id))}</h2>${g.checks.map((c) => {
-        const lista = c.lista.length ? `<details${c.lista.some((i) => i.marcas.includes('nuevo')) ? ' open' : ''}><summary>${esc(t('rv_ver_lista').replace('{n}', c.lista.length))}</summary><ul>${c.lista.map((i) =>
-          `<li>${esc(i.t || '—')}${i.marcas.map(marca).join('')}${i.d || i.cuando ? `<div class="muted">${esc([i.d, i.cuando ? fecha(i.cuando) : ''].filter(Boolean).join(' · '))}</div>` : ''}</li>`).join('')}</ul></details>` : '';
+        const fila = (i) => {
+          const texto = [i.t, i.d, i.marcas.map((m) => t('rv_marca_' + m)).join(', '), i.cuando ? fecha(i.cuando) : ''].filter(Boolean).join(' · ');
+          return `<li title="${esc(texto)}">${esc(i.t || '—')}${i.marcas.map(marca).join('')}${i.d || i.cuando ? `<div class="muted">${esc([i.d, i.cuando ? fecha(i.cuando) : ''].filter(Boolean).join(' · '))}</div>` : ''}</li>`;
+        };
+        const lista = !c.lista.length ? '' : c.lista.length <= 2
+          ? `<ul>${c.lista.map(fila).join('')}</ul>`
+          : `<details${c.lista.some((i) => i.marcas.includes('nuevo')) ? ' open' : ''}><summary title="${esc(c.lista.slice(0, 8).map((i) => i.t || '—').join(' · '))}">${esc(t('rv_ver_lista').replace('{n}', c.lista.length))}</summary><ul>${c.lista.map(fila).join('')}</ul></details>`;
         return `<div class="card rv-check ${c.estado}"><div class="rv-t"><span class="rv-punto ${c.estado}"></span>${esc(t('rv_t_' + c.id))}</div><div>${esc(frase(c))}</div>${lista}</div>`;
       }).join('')}</section>`).join('');
       $('rv-conclusion').hidden = !!r.corriendo || !r.cuando;
