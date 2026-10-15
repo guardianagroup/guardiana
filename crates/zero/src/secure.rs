@@ -23,7 +23,7 @@ use std::time::Duration;
 
 use base64::Engine as _;
 use guardiana_secure::agenda::{self, Agenda};
-use guardiana_secure::archivo::{self, Llave, Recepcion, Trozos};
+use guardiana_secure::archivo::{Llave, Recepcion, Trozos};
 use guardiana_secure::claves::{Curve25519PublicKey, Ed25519Signature, Mac};
 use guardiana_secure::monitor::{Identidad, Monitor, Nivel};
 use guardiana_secure::pausa::Sesion as EstadoSesion;
@@ -163,6 +163,15 @@ pub struct Secure {
     /// Lines for the page's event list, drained by the session.
     pub avisos: VecDeque<Value>,
     cambio: bool,
+}
+
+impl std::fmt::Debug for Secure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Secure")
+            .field("fase", &self.fase)
+            .field("contacto", &self.nombre_contacto)
+            .finish()
+    }
 }
 
 fn ahora_s() -> u64 {
@@ -955,11 +964,11 @@ mod tests {
         assert!(!b.mensajes.last().unwrap().1);
 
         // A file in three pieces, the last one short.
-        let plano: Vec<u8> = (0..(archivo::BLOQUE * 2 + 321))
+        let plano: Vec<u8> = (0..(guardiana_secure::archivo::BLOQUE * 2 + 321))
             .map(|i| (i % 211) as u8)
             .collect();
         a.archivo_empieza("informe.pdf").unwrap();
-        let trozos: Vec<&[u8]> = plano.chunks(archivo::BLOQUE).collect();
+        let trozos: Vec<&[u8]> = plano.chunks(guardiana_secure::archivo::BLOQUE).collect();
         for (i, t) in trozos.iter().enumerate() {
             a.archivo_trozo(&B64.encode(t), i + 1 == trozos.len())
                 .unwrap();
