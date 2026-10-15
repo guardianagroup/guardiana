@@ -1929,6 +1929,9 @@ impl Sesion {
                         | "volver"
                         | "favorito_quitar"
                         | "importar_favoritos"
+                        // Comunicaciones: its own page's buttons (15 Oct 2026; the page's
+                        // actions were missing here, so the buttons did nothing in 1.0.31).
+                        | "secure"
                 ) || (tipo == "ajuste"
                     && ((texto(&m, "clave") == "cortar_seguimiento" && si(&m, "valor"))
                         || matches!(texto(&m, "clave"), "buscador" | "tema")));
