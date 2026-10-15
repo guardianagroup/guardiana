@@ -18,7 +18,6 @@ use std::io::{Read as _, Write as _};
 use std::net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs as _};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use base64::Engine as _;
@@ -50,22 +49,37 @@ pub enum Entrante {
     Cerrado(String),
 }
 
-/// One link to the other computer: a writer half for us, a reader thread for what comes.
+/// One link to the other computer: a writer thread for us (so a slow link never stalls the
+/// window), a reader thread for what comes.
 struct Enlace {
-    escritor: Arc<Mutex<TcpStream>>,
+    cola: Sender<Vec<u8>>,
 }
 
 impl Enlace {
+    fn new(mut s: TcpStream) -> Self {
+        let (cola, rx) = mpsc::channel::<Vec<u8>>();
+        std::thread::spawn(move || {
+            while let Ok(cuerpo) = rx.recv() {
+                if s.write_all(&(cuerpo.len() as u32).to_be_bytes())
+                    .and_then(|()| s.write_all(&cuerpo))
+                    .and_then(|()| s.flush())
+                    .is_err()
+                {
+                    return;
+                }
+            }
+        });
+        Self { cola }
+    }
+
     fn manda(&self, v: &Value) -> Result<(), String> {
         let cuerpo = serde_json::to_vec(v).map_err(|e| e.to_string())?;
         if cuerpo.len() > MAX_FRAME {
             return Err("trama demasiado grande".to_owned());
         }
-        let mut w = self.escritor.lock().map_err(|_| "enlace".to_owned())?;
-        w.write_all(&(cuerpo.len() as u32).to_be_bytes())
-            .and_then(|()| w.write_all(&cuerpo))
-            .and_then(|()| w.flush())
-            .map_err(|e| e.to_string())
+        self.cola
+            .send(cuerpo)
+            .map_err(|_| "enlace cerrado".to_owned())
     }
 }
 
@@ -329,9 +343,7 @@ impl Secure {
             }
         };
         std::thread::spawn(move || lee_tramas(lector, tx));
-        self.enlace = Some(Enlace {
-            escritor: Arc::new(Mutex::new(s)),
-        });
+        self.enlace = Some(Enlace::new(s));
         self.rx = Some(rx);
         self.fase = Fase::Saludando;
         self.cambio = true;
