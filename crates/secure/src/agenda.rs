@@ -33,6 +33,7 @@ pub enum Estado {
 /// One verified person: the name this computer's owner gave them, and their keys.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Contacto {
+    /// The name this computer's owner gave the person. Not checked against anything.
     pub nombre: String,
     /// Curve25519 key, base64: the one messages are encrypted to.
     pub curve: String,
@@ -40,6 +41,7 @@ pub struct Contacto {
     pub signing: String,
     /// Unix seconds of the short-code check that pinned these keys.
     pub verificado_en: u64,
+    /// Whether the name may be talked to right now.
     #[serde(flatten)]
     pub estado: Estado,
 }
@@ -184,7 +186,9 @@ pub fn huella(a: Ed25519PublicKey, b: Ed25519PublicKey) -> String {
         .chunks(4)
         .chain(extra.chunks(4).take(4))
         .map(|c| {
-            let n = u32::from_be_bytes([c[0], c[1], c[2], c[3]]);
+            let n = c
+                .iter()
+                .fold(0u32, |acc, &b| acc.wrapping_shl(8) | u32::from(b));
             format!("{:05}", n % 100_000)
         })
         .collect();
@@ -197,7 +201,16 @@ pub fn huella_corta(k: Ed25519PublicKey) -> String {
     if b.len() <= 12 {
         return b;
     }
-    format!("{}…{}", &b[..4], &b[b.len() - 4..])
+    let inicio: String = b.chars().take(4).collect();
+    let fin: String = b
+        .chars()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    format!("{inicio}…{fin}")
 }
 
 #[cfg(test)]

@@ -29,13 +29,16 @@ pub enum Nivel {
 pub struct Suceso {
     /// Unix seconds.
     pub cuando: u64,
+    /// How sure the entry is.
     pub nivel: Nivel,
+    /// What happened, in the person's language, naming the program when one was seen.
     pub texto: String,
 }
 
 /// Who this computer is talking to, as verified.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Identidad {
+    /// The name the owner gave the contact.
     pub nombre: String,
     /// The safety number both people compared ([`crate::agenda::huella`]).
     pub huella: String,
@@ -54,7 +57,9 @@ pub struct Identidad {
 pub struct Cifrado {
     /// Always Olm (double ratchet) in this version; printed so the person sees it.
     pub algoritmo: &'static str,
+    /// Messages encrypted here since the session opened.
     pub enviados: u64,
+    /// Messages opened here since the session opened.
     pub recibidos: u64,
     /// Unix seconds of the last message either way.
     pub ultimo: Option<u64>,
@@ -65,23 +70,36 @@ pub struct Cifrado {
 /// The connection, once there is one. Never an address.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct Transporte {
+    /// `true`: the two computers talk directly; `false`: through a relay that sees only ciphertext.
     pub directo: Option<bool>,
+    /// Whether the DTLS fingerprint matched the one signed inside the session.
     pub dtls_verificado: Option<bool>,
+    /// Round trip, milliseconds.
     pub latencia_ms: Option<u32>,
+    /// Packets lost, percent.
     pub perdida_pct: Option<f32>,
+    /// Jitter, milliseconds.
     pub jitter_ms: Option<u32>,
+    /// Audio bitrate, kilobits per second.
     pub kbps_audio: Option<u32>,
+    /// Video bitrate, kilobits per second.
     pub kbps_video: Option<u32>,
+    /// Audio codec name (Opus).
     pub codec_audio: Option<String>,
+    /// Video codec name (AV1, VP9…).
     pub codec_video: Option<String>,
+    /// Video size, as `1920×1080`.
     pub resolucion: Option<String>,
 }
 
 /// The whole screen, as one value the page can draw every second.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct Monitor {
+    /// The verified contact of the open conversation, if any.
     pub identidad: Option<Identidad>,
+    /// The cipher at work.
     pub cifrado: Cifrado,
+    /// The connection, once there is one.
     pub transporte: Transporte,
     /// What other programs were seen doing during the session, newest last.
     pub vigilancia: Vec<Suceso>,
