@@ -7,6 +7,9 @@
   window.GuardianaRevision = { iniciar };
   const FUERTES = new Set(['nuevo', 'sin_firma', 'firma_mala', 'no_existe', 'sin_clave', 'invitado', 'delicado', 'redirigido', 'apagado', 'sin_actualizar', 'en_uso', 'detectada', 'actuo']);
   const GRUPOS = ['proteccion', 'acceso', 'arranque', 'salida', 'privacidad', 'antivirus'];
+  // Which sections of revision.ps1 feed each group (the script's own order).
+  const SECCIONES = { proteccion: ['equipo', 'actualizaciones', 'defensa', 'sistema'], acceso: ['acceso'], arranque: ['arranque'], salida: ['salida', 'certificados'], privacidad: ['privacidad', 'programas'], antivirus: ['defender_sucesos'] };
+  const TOTAL_SECCIONES = 11;
 
   async function iniciar(ctx) {
     const { api, t, esc, LOC } = ctx;
@@ -39,12 +42,34 @@
       $('rv-pasos').innerHTML = grupos.map((g) => {
         const checks = Array.isArray(g.checks) ? g.checks : [];
         const peor = checks.reduce((a, c) => (ordenEstado[c.estado] || 0) > (ordenEstado[a] || 0) ? c.estado : a, 'ok');
-        const estado = r.corriendo ? 'revisando' : (peor === 'nd' ? 'info' : peor);
-        const detalle = r.corriendo ? t('rv_paso_revisando') : t('rv_paso_comprobaciones').replace('{n}', checks.length);
+        // While it runs, each group follows the script's own sections (1.0.31): done, now, waiting.
+        const v = r.vivo, secs = SECCIONES[g.id] || [];
+        const hechas = v ? secs.filter((x) => v.hechas.some((h) => h[0] === x)) : [];
+        const ahora = v && secs.includes(v.seccion) && hechas.length < secs.length;
+        const listo = v && secs.length && hechas.length === secs.length;
+        const ms = v ? v.hechas.filter((h) => secs.includes(h[0])).reduce((a, h) => a + h[1], 0) : 0;
+        const estado = r.corriendo ? (listo ? 'listo' : ahora ? 'revisando' : v ? 'espera' : 'revisando') : (peor === 'nd' ? 'info' : peor);
+        const detalle = r.corriendo ? (listo ? t('rv_paso_listo').replace('{s}', (ms / 1000).toLocaleString(LOC, { maximumFractionDigits: 1 })) : ahora ? t('rv_paso_revisando') : v ? t('rv_paso_espera') : t('rv_paso_revisando')) : t('rv_paso_comprobaciones').replace('{n}', checks.length);
         const nombre = t('rv_g_' + g.id);
         return `<div class="rv-paso ${estado}" title="${esc(nombre + ' · ' + detalle)}"><i aria-hidden="true"></i><span><b>${esc(nombre)}</b><small>${esc(detalle)}</small></span></div>`;
       }).join('');
       progreso(!!r.corriendo);
+      pintaVivo(r);
+    };
+    // The live feed: the script's real steps, newest at the bottom (1.0.31). Nothing invented.
+    const lineaVivo = ([tipo, texto]) => {
+      if (tipo === 'seccion') return t('rv_vivo_seccion').replace('{x}', t('rv_vivo_s_' + texto));
+      if (tipo === 'firma') return t('rv_vivo_firma').replace('{x}', texto);
+      if (tipo === 'dns') return t('rv_vivo_dns').replace('{x}', texto);
+      if (tipo === 'cuenta') { const [k, n] = texto.split('\t'); return t('rv_vivo_cuenta_' + k).replace('{n}', n); }
+      return texto;
+    };
+    const pintaVivo = (r) => {
+      const v = r.corriendo ? r.vivo : null;
+      $('rv-vivo').hidden = !v;
+      if (!v) return;
+      $('rv-vivo-cifras').textContent = t('rv_vivo_cifras').replace('{s}', v.hechas.length).replace('{t}', TOTAL_SECCIONES).replace('{f}', v.firmas);
+      $('rv-vivo-lista').innerHTML = v.pasos.map((p, i) => `<li class="${esc(p[0])}${i === v.pasos.length - 1 ? ' ultimo' : ''}">${esc(lineaVivo(p))}</li>`).join('');
     };
 
     const pinta = (r) => {
@@ -85,7 +110,7 @@
     const carga = async () => { const r = await api('/api/revision'); pinta(r); return r; };
     // While Windows is answering (tens of seconds), ask again every 4 s; then every 5 minutes.
     let espera = null;
-    const sigue = (r) => { clearTimeout(espera); espera = setTimeout(async () => { try { sigue(await carga()); } catch (_) {} }, r && r.corriendo ? 4000 : 300000); };
+    const sigue = (r) => { clearTimeout(espera); espera = setTimeout(async () => { try { sigue(await carga()); } catch (_) {} }, r && r.corriendo ? 1500 : 300000); };
     sigue(await carga());
     $('rv-ahora').addEventListener('click', async () => {
       $('rv-ahora').disabled = true; $('rv-ahora').textContent = t('rv_boton_revisando'); empezo = Date.now(); progreso(true);

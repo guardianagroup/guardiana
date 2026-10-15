@@ -39,7 +39,16 @@ jobs:
       - name: fmt
         run: cargo fmt --all --check
       - name: build
-        run: cargo build --workspace --locked
+        # Errors also as annotations, from cargo's own JSON (15 Oct 2026: the grep on the text
+        # output caught nothing when a build failed and the log needs a sign-in). Non-compiler
+        # failures (a lock out of date, a build script) go in one annotation from the text.
+        shell: bash
+        run: |
+          r=0
+          cargo build --workspace --locked --message-format=json > "$RUNNER_TEMP/build.json" 2> "$RUNNER_TEMP/build.err" || r=$?
+          node zero/prueba/anotaciones.js "$RUNNER_TEMP/build.json"
+          if [ "$r" != "0" ]; then grep -v "^ *Compiling\|^ *Downloaded\|^ *Downloading\|^ *Updating\|^ *Locking\|^ *Finished\|^ *Blocking" "$RUNNER_TEMP/build.err" | head -40 | sed -e 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}' | sed 's/^/::error title=build::/'; echo; fi
+          exit $r
       - name: clippy
         # Lints also as annotations, like the tests below: they can be read from the run page and
         # the public API without signing in, the log cannot (13 Oct 2026: a newer stable clippy

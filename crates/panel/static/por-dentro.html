@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
 <title>GUARDIANA · Por dentro</title>
+<link rel="stylesheet" href="/static/diseno.css">
 <link rel="stylesheet" href="/static/style.css">
 <link rel="preload" href="/static/fonts/IBMPlexMono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/static/tierra/dia.jpg" as="image">
@@ -26,6 +27,7 @@
       <span class="lugar-yo" title=""><span data-t="pd_tu_pais">Tu ordenador está en</span> <b id="yo"></b></span>
       <button type="button" class="btn-hud" id="precisar" data-t="pd_precisar">◎ Precisar</button>
       <button type="button" class="btn-hud" id="corregir-lugar" data-t="pd_corregir">Corregir ciudad</button>
+      <span class="chip-vpn" id="vpn" hidden role="status"></span>
       <span class="en-vivo" role="status"><i aria-hidden="true"></i><span data-t="pd_en_vivo">En vivo</span></span>
       <button type="button" class="btn-hud graba" id="grabar" aria-pressed="false" data-t="pd_grabar">● Guardar 5 minutos de medidas</button>
       <button type="button" class="btn-hud" id="pantalla" data-t="pd_pantalla_completa">Pantalla completa</button>
@@ -66,7 +68,14 @@
       <div class="aviso-botones"><button type="button" class="btn-hud" id="ubicacion-cerrar" data-t="pd_corregir_cancelar">Cancelar</button></div>
     </div>
   </div>
-  <div class="hud">
+  <div class="hud" id="hud">
+    <button type="button" class="hud-asa" id="hud-asa" aria-expanded="false" aria-controls="hud" data-t-title="pd_hud_desplegar"><i aria-hidden="true"></i><span data-t="pd_hud_desplegar"></span></button>
+    <div class="hud-tabla" id="hud-tabla" hidden>
+      <div class="ht-cab"><h3><span data-t="pd_ht_titulo" class="h3-titulo"></span> <span id="ht-cuantos"></span></h3><div class="ht-kpi" id="ht-kpi"></div><div class="ht-acciones"><input type="search" id="ht-busca" class="ht-busca" autocomplete="off" spellcheck="false" data-t-placeholder="pd_ht_buscar"><button type="button" class="btn-hud" id="ht-csv" data-t="pd_ht_csv"></button><button type="button" class="btn-hud" id="ht-json" data-t="pd_ht_json"></button></div></div>
+      <div class="ht-scroll"><table class="ht"><thead><tr>
+        <th data-t="pd_ht_programa" data-orden="programa" tabindex="0" role="button"></th><th data-t="pd_ht_destino" data-orden="destino" tabindex="0" role="button"></th><th data-t="pd_ht_empresa" data-orden="empresa" tabindex="0" role="button"></th><th data-t="pd_ht_pais" data-orden="pais" tabindex="0" role="button"></th><th data-t="pd_ht_ciudad" data-orden="ciudad" tabindex="0" role="button"></th><th data-t="pd_ht_red" data-orden="red" tabindex="0" role="button"></th><th data-t="pd_ht_proto" data-orden="proto" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_sube" data-orden="sub" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_baja" data-orden="baj" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_paquetes" data-orden="paq" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_consultas" data-orden="consultas" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_cortes" data-orden="bloq" tabindex="0" role="button"></th><th data-t="pd_ht_primera" data-orden="primera" tabindex="0" role="button"></th><th data-t="pd_ht_ultima" data-orden="ultima" tabindex="0" role="button"></th><th data-t="pd_ht_estado" data-orden="estado" tabindex="0" role="button"></th>
+      </tr></thead><tbody id="ht-filas"></tbody></table></div>
+    </div>
     <div><h3><span data-t="pd_hud_registro" class="h3-titulo"></span> <span data-t="pd_hud_vivo"></span></h3><ul class="registro" id="registro"></ul></div>
     <div><h3><span data-t="pd_hud_enviado" class="h3-titulo"></span> <span id="hud-min"></span></h3><canvas id="spark"></canvas></div>
     <div><h3 data-t="pd_hud_paises"></h3><div class="barras" id="barras"></div></div>

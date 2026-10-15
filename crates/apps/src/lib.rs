@@ -66,6 +66,7 @@ mod revision;
 mod seguridad;
 #[cfg(windows)]
 mod ventanas;
+mod vpn;
 
 /// Listens to what the system says about who asked for each name.
 pub struct Observador {
@@ -207,6 +208,24 @@ pub struct AntivirusInstalado {
 ///
 /// # Errors
 /// [`Error::NoSoportado`] outside Windows; [`Error::Sistema`] when Windows did not answer.
+pub use vpn::Vpn;
+
+/// The VPNs this computer's traffic is leaving through right now, as Windows lists them
+/// (15 Oct 2026). Elsewhere, nothing is known.
+///
+/// # Errors
+/// [`Error::NoSoportado`] off Windows; [`Error::Sistema`] if Windows did not answer.
+pub fn vpn_activas() -> Result<Vec<Vpn>, Error> {
+    #[cfg(windows)]
+    {
+        vpn::activas()
+    }
+    #[cfg(not(windows))]
+    {
+        Err(Error::NoSoportado)
+    }
+}
+
 pub fn antivirus_instalados() -> Result<Vec<AntivirusInstalado>, Error> {
     #[cfg(windows)]
     {
@@ -316,13 +335,30 @@ pub fn actividad(nombres: &[String]) -> Vec<Actividad> {
 /// [`Error::NoSoportado`] off Windows; [`Error::Sistema`] if PowerShell could not run, took
 /// longer than `limite` or answered something that is not JSON.
 pub fn revision_del_equipo(limite: std::time::Duration) -> Result<serde_json::Value, Error> {
+    revision_del_equipo_en_vivo(limite, Box::new(|_, _| {}))
+}
+
+/// Who hears each live step of the review: `(kind, text)`.
+pub type AvisoRevision = Box<dyn Fn(&str, &str) + Send>;
+
+/// The same review, telling `avisa` each step as it happens: `seccion` (a section starts),
+/// `hecho` (a section ended, with its milliseconds), `firma` (the file whose signature is being
+/// read), `dns` (the name being asked) and `cuenta` (how many items a list had). 1.0.31: the
+/// page shows them live, so nobody thinks the button does nothing.
+///
+/// # Errors
+/// As [`revision_del_equipo`].
+pub fn revision_del_equipo_en_vivo(
+    limite: std::time::Duration,
+    avisa: AvisoRevision,
+) -> Result<serde_json::Value, Error> {
     #[cfg(windows)]
     {
-        revision::revisar(limite)
+        revision::revisar(limite, avisa)
     }
     #[cfg(not(windows))]
     {
-        let _ = limite;
+        let _ = (limite, avisa);
         Err(Error::NoSoportado)
     }
 }

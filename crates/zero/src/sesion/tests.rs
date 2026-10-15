@@ -129,9 +129,10 @@ fn the_three_product_tabs_open_together_and_the_panel_stays_in_front() {
     assert_eq!(s.pestanas[2].url, crate::sesion::SECURE);
     assert_eq!(s.activa, s.pestanas[0].id);
     let e = del_tipo(&o, Origen::Barra, "estado").unwrap_or_default();
-    assert_eq!(e["pestanas"][0]["titulo"], "GUARDIANA");
-    assert_eq!(e["pestanas"][1]["titulo"], "GUARDIANA ZERO");
-    assert_eq!(e["pestanas"][2]["titulo"], "GUARDIANA SECURE");
+    // The names the owner asked for (15 Oct 2026), so the person knows each tab at a glance.
+    assert_eq!(e["pestanas"][0]["titulo"], "Radiografías");
+    assert_eq!(e["pestanas"][1]["titulo"], "Navegador ZERO");
+    assert_eq!(e["pestanas"][2]["titulo"], "Comunicaciones");
 
     let id = s.pestanas[0].id;
     let o = s.mensaje(
