@@ -27,6 +27,12 @@ main > .tarjeta { margin-top: 14px; }
 .c-fila { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .c-fila .campo { flex: 1; min-width: 180px; }
 .c-puerto { font: 500 13px var(--mono); color: var(--ok); }
+.c-codigo { margin-top: 12px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--line)); background: color-mix(in srgb, var(--ok) 5%, var(--card)); border-radius: var(--r-tarjeta); display: grid; grid-template-columns: auto 1fr auto; gap: 6px 12px; align-items: center; }
+.c-codigo[hidden] { display: none; }
+.c-codigo b { font: 600 22px/1.2 var(--mono); letter-spacing: .06em; color: var(--fg); user-select: all; }
+.c-codigo .t { grid-column: 1 / -1; margin: 0; font-size: 12.5px; }
+.c-puerta-error { margin-top: 10px; color: var(--aviso); }
+.c-puerta-error[hidden] { display: none; }
 .c-huella { margin: 14px 0 0; font-size: 12.5px; color: var(--muted); }
 .c-huella code { font-family: var(--mono); color: var(--fg); }
 .numeros { display: flex; gap: 14px; margin: 12px 0 16px; }
@@ -146,11 +152,13 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
         <h2 data-t="sec_c_recibir"></h2>
         <p class="t" data-t="sec_c_recibir_texto"></p>
         <div class="c-fila"><button type="button" class="boton principal" id="c-escuchar" data-t="sec_c_escuchar"></button><span class="c-puerto" id="c-puerto" hidden></span></div>
+        <div class="c-codigo" id="c-codigo-caja" hidden><span class="rotulo" data-t="sec_c_codigo_rotulo"></span><b id="c-codigo"></b><button type="button" class="boton chico" id="c-copiar" data-t="sec_c_copiar"></button><p class="t" data-t="sec_c_codigo_texto"></p></div>
+        <p class="t c-puerta-error" id="c-puerta-error" hidden></p>
       </div>
       <div>
         <h2 data-t="sec_c_llamar"></h2>
         <p class="t" data-t="sec_c_llamar_texto"></p>
-        <div class="c-fila"><input class="campo" id="c-direccion" data-t-ph="sec_c_direccion" spellcheck="false" autocomplete="off"><button type="button" class="boton principal" id="c-conectar" data-t="sec_c_conectar"></button></div>
+        <div class="c-fila"><input class="campo" id="c-direccion" data-t-ph="sec_c_direccion_v2" spellcheck="false" autocomplete="off"><button type="button" class="boton principal" id="c-conectar" data-t="sec_c_conectar"></button></div>
       </div>
     </div>
     <p class="c-huella"><span data-t="sec_c_tu_huella"></span> <code id="c-huella"></code></p>

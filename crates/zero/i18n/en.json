@@ -888,11 +888,11 @@
   "cortes_recibo_explica": "«Signed receipt (proof)» saves to your Downloads a file with every request ZERO cut in this period: the time, the page, the company, its country and what it carried. ZERO seals it with a key that only exists in this browser, like the wax seal on an envelope: if anyone changes a single letter, the seal no longer fits. It works as proof for a lawyer, an authority or a journalist, and anyone can check it at guardianagroup.com/verificar without installing anything.",
   "sec_frase_v1": "Messages and files encrypted end to end between two computers. No server: the two talk directly. First of all, both compare a few numbers.",
   "sec_c_recibir": "Receive a conversation",
-  "sec_c_recibir_texto": "This computer waits for the other one to call. Give the other person your address and the port shown.",
+  "sec_c_recibir_texto": "This computer waits for the other one to call. GUARDIANA opens the door in your router by itself and gives you a code so they can call you.",
   "sec_c_escuchar": "Wait for a call",
   "sec_c_puerto": "Waiting on port {p}",
   "sec_c_llamar": "Call another computer",
-  "sec_c_llamar_texto": "Type the other computer's address and port (same network, or a port opened on its router). The address is used and not kept.",
+  "sec_c_llamar_texto": "Paste the code the other person gave you (or their address:port if you are on the same network). It is not kept.",
   "sec_c_direccion": "address:port",
   "sec_c_conectar": "Connect",
   "sec_c_tu_huella": "Your key:",
@@ -947,5 +947,13 @@
   "sec_r_duracion": "Duration",
   "sec_r_mensajes": "Messages",
   "sec_r_archivos": "Files",
-  "sec_r_vistas": "Things seen"
+  "sec_r_vistas": "Things seen",
+  "sec_c_codigo_rotulo": "Your code",
+  "sec_c_copiar": "Copy",
+  "sec_c_copiado": "Copied",
+  "sec_c_codigo_texto": "Give this code to the other person (by phone, by message). With it they can call you from anywhere. It expires when you close.",
+  "sec_c_abriendo": "Opening the door in your router…",
+  "sec_c_puerta_abierta": "Door open. Waiting.",
+  "sec_c_sin_puerta": "Your router did not let the door open ({e}). On your own network they can call you at port {p}; from outside, better let the other person wait and you call with their code.",
+  "sec_c_direccion_v2": "Code (GS-…) or address:port"
 }
