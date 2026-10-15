@@ -7,7 +7,8 @@
   const { manda, en, t, esc, $, n } = Z;
   const RAYA = '—';
   const hora = (s) => (s ? new Date(s * 1000).toLocaleTimeString(document.documentElement.lang || 'es', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : RAYA);
-  const fecha = (s) => (s ? new Date(s * 1000).toLocaleString(document.documentElement.lang || 'es') : RAYA);
+  const fecha = (s) => (s ? new Date(s * 1000).toLocaleDateString(document.documentElement.lang || 'es', { day: 'numeric', month: 'short', year: 'numeric' }) : RAYA);
+  const fechaHora = (s) => (s ? new Date(s * 1000).toLocaleString(document.documentElement.lang || 'es') : RAYA);
   const sino = (v) => (v === true ? t('sec_si') : v === false ? t('sec_no') : RAYA);
   const num = (v, unidad) => (v === null || v === undefined ? RAYA : n(v) + (unidad || ''));
   const NIVEL = { info: 'sec_nivel_info', observada: 'sec_nivel_observada', inusual: 'sec_nivel_inusual', no_verificable: 'sec_nivel_no_verificable' };
@@ -20,20 +21,56 @@
     vacio.hidden = xs.length > 0;
   };
 
+  // The one state on top, from the same facts the details show. Rules agreed on 15 Oct 2026
+  // with Grok and ChatGPT: green only when verified, encrypted, direct (or an accepted relay),
+  // loss under 3 % and nothing observed; amber when something was seen, the relay is in use or
+  // loss is 3-8 %; red when the identity is not verified, a key changed or loss stays over 8 %.
+  function estadoGlobal(m) {
+    const id = m.identidad, tr = m.transporte || {}, vistos = m.vigilancia || [];
+    if (!id) return 'sin';
+    if (id.estado === 'clave_cambiada') return 'pausada';
+    const perdida = typeof tr.perdida_pct === 'number' ? tr.perdida_pct : 0;
+    if (perdida > 8 || vistos.some((s) => s.nivel === 'inusual')) return 'pausada';
+    if (vistos.length > 0 || tr.directo === false || perdida >= 3) return 'revisar';
+    return 'protegida';
+  }
+  const linea = (el, clase, texto) => { el.className = clase; el.textContent = texto; };
+  function pintaGlobal(m) {
+    const g = estadoGlobal(m), id = m.identidad, tr = m.transporte || {}, vistos = m.vigilancia || [];
+    const caja = $('g');
+    caja.classList.remove('protegida', 'revisar', 'pausada', 'sin');
+    caja.classList.add(g);
+    $('g-palabra').textContent = t('sec_g_' + g);
+    $('g-frase').textContent = t('sec_g_' + g + '_frase');
+    const chip = $('m-estado-chip');
+    chip.textContent = g === 'sin' ? t('sec_sin_sesion') : t('sec_g_' + g);
+    chip.className = 'chip' + (g === 'protegida' ? ' ok' : g === 'revisar' ? ' aviso' : g === 'pausada' ? ' alerta' : '');
+    if (!id) {
+      linea($('g-cifrado'), '', t('sec_l_cifrado_no'));
+      linea($('g-identidad'), '', t('sec_l_sin_verificar'));
+      linea($('g-conexion'), '', t('sec_l_sin_conexion'));
+      linea($('g-visto'), '', t('sec_l_nada'));
+    } else {
+      linea($('g-cifrado'), 'ok', t('sec_l_cifrado'));
+      if (id.estado === 'clave_cambiada') linea($('g-identidad'), 'alerta', t('sec_l_clave_cambiada', { n: id.nombre }));
+      else linea($('g-identidad'), 'ok', t('sec_l_verificado', { n: id.nombre, f: fecha(id.verificado_en) }));
+      if (tr.directo === true) linea($('g-conexion'), typeof tr.perdida_pct === 'number' && tr.perdida_pct >= 3 ? 'aviso' : 'ok', typeof tr.perdida_pct === 'number' && tr.perdida_pct >= 3 ? t('sec_l_perdida', { p: n(tr.perdida_pct) }) : t('sec_l_directa'));
+      else if (tr.directo === false) linea($('g-conexion'), 'aviso', t('sec_l_rele'));
+      else linea($('g-conexion'), '', t('sec_l_sin_conexion'));
+      if (vistos.length === 0) linea($('g-visto'), 'ok', t('sec_l_nada'));
+      else linea($('g-visto'), vistos.some((s) => s.nivel === 'inusual') ? 'alerta' : 'aviso', vistos.length === 1 ? t('sec_l_visto_uno', { t: vistos[0].texto }) : t('sec_l_visto', { n: n(vistos.length), t: vistos[vistos.length - 1].texto }));
+    }
+    const abierto = $('g-mas').getAttribute('aria-expanded') === 'true';
+    $('g-mas').textContent = t(abierto ? 'sec_ocultar_detalles' : 'sec_ver_detalles');
+  }
+
   function pinta(m) {
+    pintaGlobal(m);
     const id = m.identidad;
     $('m-latido').classList.toggle('vivo', !!id);
-    const chip = $('m-estado-chip');
-    if (!id) {
-      chip.textContent = t('sec_sin_sesion'); chip.className = 'chip';
-    } else if (id.estado === 'clave_cambiada') {
-      chip.textContent = t('sec_estado_cambiada'); chip.className = 'chip alerta';
-    } else {
-      chip.textContent = t('sec_estado_verificado'); chip.className = 'chip ok';
-    }
     $('m-nombre').textContent = id ? id.nombre : RAYA;
     $('m-estado').textContent = id ? t(id.estado === 'clave_cambiada' ? 'sec_estado_cambiada' : 'sec_estado_verificado') : RAYA;
-    $('m-verificado').textContent = id ? fecha(id.verificado_en) : RAYA;
+    $('m-verificado').textContent = id ? fechaHora(id.verificado_en) : RAYA;
     $('m-huella').textContent = id ? id.huella : RAYA;
     $('m-propia').textContent = id ? id.propia : RAYA;
     $('m-otra').textContent = id ? id.contacto : RAYA;
@@ -58,6 +95,15 @@
     lista($('m-historico'), $('m-historico-vacio'), m.historico);
   }
 
+  // The numbers only when asked for. The choice is remembered on this computer only.
+  $('g-mas').addEventListener('click', () => {
+    const abierto = $('g-mas').getAttribute('aria-expanded') !== 'true';
+    $('g-mas').setAttribute('aria-expanded', String(abierto));
+    $('detalles').hidden = !abierto;
+    $('g-mas').textContent = t(abierto ? 'sec_ocultar_detalles' : 'sec_ver_detalles');
+    try { localStorage.setItem('secure-detalles', abierto ? '1' : ''); } catch (_) {}
+  });
+  try { if (localStorage.getItem('secure-detalles') === '1') { $('g-mas').setAttribute('aria-expanded', 'true'); $('detalles').hidden = false; } } catch (_) {}
   let ultimo = {};
   en('monitor', (m) => { ultimo = m.monitor || {}; pinta(ultimo); });
   // The texts arrive after the page: draw again so «—» and the chips speak the person's language.

@@ -24,8 +24,35 @@ h1 { font: 600 clamp(28px, 3.6vw, 38px)/1.1 var(--display); letter-spacing: -.02
 .tres p { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--muted); }
 @media (max-width: 680px) { .tres { grid-template-columns: 1fr; } }
 
+/* The one state on top: a colour, a word, a sentence, four plain lines. The numbers live
+   below, folded, so a lawyer or a doctor reads the top and only opens the rest if they want. */
+.estado-g { display: grid; gap: 10px; padding: 18px 18px 16px; border-width: 1px; transition: border-color .3s, background-color .3s; }
+.estado-g .fila { display: flex; align-items: center; gap: 12px; }
+.estado-g .punto { width: 14px; height: 14px; border-radius: 50%; flex: none; background: var(--muted-2); transition: background-color .3s; }
+.estado-g .palabra { font: 600 22px/1.1 var(--display); letter-spacing: -.01em; }
+.estado-g .frase-g { margin: 0; font-size: 15px; color: var(--fg); }
+.estado-g ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 7px; }
+.estado-g li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; color: var(--muted); }
+.estado-g li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; margin-top: 7px; flex: none; background: var(--line); }
+.estado-g li.ok { color: var(--fg); } .estado-g li.ok::before { background: var(--ok); }
+.estado-g li.aviso { color: var(--fg); } .estado-g li.aviso::before { background: var(--aviso); }
+.estado-g li.alerta { color: var(--alerta); } .estado-g li.alerta::before { background: var(--alerta); }
+.estado-g.protegida { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); background: color-mix(in srgb, var(--ok) 5%, var(--card)); }
+.estado-g.protegida .punto { background: var(--ok); animation: late-g 4s ease-in-out infinite; }
+.estado-g.protegida .palabra { color: var(--ok); }
+.estado-g.revisar { border-color: color-mix(in srgb, var(--aviso) 55%, var(--line)); background: color-mix(in srgb, var(--aviso) 6%, var(--card)); }
+.estado-g.revisar .punto { background: var(--aviso); } .estado-g.revisar .palabra { color: var(--aviso); }
+.estado-g.pausada { border-color: var(--alerta); background: color-mix(in srgb, var(--alerta) 6%, var(--card)); }
+.estado-g.pausada .punto { background: var(--alerta); } .estado-g.pausada .palabra { color: var(--alerta); }
+@keyframes late-g { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 45%, transparent); } 50% { box-shadow: 0 0 0 7px transparent; } }
+@media (prefers-reduced-motion: reduce) { .estado-g .punto { animation: none !important; } }
+.estado-g .nota-g { margin: 2px 0 0; font-size: 11.5px; color: var(--muted); }
+.estado-g .mas { justify-self: start; margin-top: 2px; }
+.detalles[hidden] { display: none; }
+
 /* The monitor: one card, sections with a mono caption, two-column rows of label and value. */
-aside.monitor { position: sticky; top: var(--e5); align-self: start; display: grid; gap: var(--e3); }
+aside.monitor { position: sticky; top: var(--e5); align-self: start; display: grid; gap: var(--e3); max-height: calc(100vh - 2 * var(--e5)); overflow: auto; }
+.detalles { display: grid; gap: var(--e3); }
 .monitor .tarjeta { padding: 14px 16px; }
 .monitor .cabecera { display: flex; align-items: center; gap: 10px; }
 .monitor .cabecera .rotulo { flex: 1; }
@@ -64,6 +91,19 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
 </main>
 
 <aside class="monitor" aria-live="polite">
+  <section class="tarjeta estado-g" id="g">
+    <div class="fila"><i class="punto"></i><span class="palabra" id="g-palabra">—</span></div>
+    <p class="frase-g" id="g-frase"></p>
+    <ul>
+      <li id="g-cifrado"></li>
+      <li id="g-identidad"></li>
+      <li id="g-conexion"></li>
+      <li id="g-visto"></li>
+    </ul>
+    <p class="nota-g" data-t="sec_g_nota"></p>
+    <button type="button" class="boton chico mas" id="g-mas" aria-expanded="false" aria-controls="detalles"></button>
+  </section>
+  <div class="detalles" id="detalles" hidden>
   <section class="tarjeta">
     <div class="cabecera"><span class="rotulo" data-t="sec_monitor"></span><i class="latido" id="m-latido"></i></div>
     <p class="frase-m" data-t="sec_monitor_frase"></p>
@@ -118,6 +158,7 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
     <ol id="m-historico"></ol>
     <p class="vacio" id="m-historico-vacio" data-t="sec_historico_vacio"></p>
   </section>
+  </div>
 </aside>
 </div>
 <script src="puente.js"></script>
