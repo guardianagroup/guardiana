@@ -90,7 +90,6 @@
     $('p-prueba').textContent = t('sec_p_prueba');
     $('p-terminar').textContent = t('sec_p_terminar');
   }
-  $('p-reanudar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'reanudar' }));
   $('p-verificar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'verificar' }));
   $('p-prueba').addEventListener('click', () => manda({ tipo: 'secure', accion: 'prueba' }));
   $('p-terminar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'terminar' }));
@@ -139,6 +138,68 @@
     try { localStorage.setItem('secure-detalles', abierto ? '1' : ''); } catch (_) {}
   });
   try { if (localStorage.getItem('secure-detalles') === '1') { $('g-mas').setAttribute('aria-expanded', 'true'); $('detalles').hidden = false; } } catch (_) {}
+  // ---------- The conversation itself (15 Oct 2026) ----------
+  let E = { fase: 'sola' };
+  const fasePinta = () => {
+    const f = E.fase;
+    $('c-conexion').hidden = !(f === 'sola' || f === 'escuchando');
+    $('c-comparar').hidden = f !== 'comparando' || !E.numeros;
+    $('c-espera').hidden = !(f === 'saludando' || f === 'abriendo' || (f === 'comparando' && !E.numeros));
+    $('c-chat').hidden = f !== 'lista';
+    $('c-huella').textContent = E.huella || RAYA;
+    if (f === 'escuchando') { $('c-puerto').hidden = false; $('c-puerto').textContent = t('sec_c_puerto', { p: E.puerto }); } else $('c-puerto').hidden = true;
+    $('c-espera-texto').textContent = t(f === 'saludando' ? 'sec_e_saludando' : f === 'abriendo' ? 'sec_e_abriendo' : 'sec_e_esperando');
+    if (E.numeros) $('c-numeros').innerHTML = E.numeros.map((x) => `<b>${esc(String(x).padStart(4, '0'))}</b>`).join('');
+    if (E.contacto && !$('c-nombre').value) $('c-nombre').value = E.contacto;
+    $('c-con').textContent = E.contacto ? t('sec_m_con', { n: E.contacto }) : '';
+    const ol = $('c-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 30;
+    ol.innerHTML = (E.mensajes || []).map((m) => `<li class="${m.mio ? 'mio' : ''}">${esc(m.texto)}<time>${esc(hora(m.t))}</time></li>`).join('');
+    if (abajo) ol.scrollTop = ol.scrollHeight;
+  };
+  en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); fasePinta(); });
+  en('secure_aviso', (m) => { const txt = t(m.clave) + (m.texto ? ' ' + m.texto : ''); aviso(txt); });
+  const avisos = [];
+  function aviso(txt) { avisos.push(txt); const ol = $('c-mensajes'); const li = document.createElement('li'); li.className = 'aviso-li'; li.textContent = txt; ol.appendChild(li); ol.scrollTop = ol.scrollHeight; }
+  $('c-escuchar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'escuchar', puerto: 0 }));
+  $('c-conectar').addEventListener('click', () => { const d = $('c-direccion').value.trim(); if (d) manda({ tipo: 'secure', accion: 'conectar', direccion: d }); });
+  $('c-direccion').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('c-conectar').click(); });
+  $('c-sas-si').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sas', iguales: true, nombre: $('c-nombre').value.trim() }));
+  $('c-sas-no').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sas', iguales: false, nombre: '' }));
+  $('c-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'cerrar' }));
+  $('c-form').addEventListener('submit', (e) => { e.preventDefault(); const x = $('c-texto').value.trim(); if (!x) return; manda({ tipo: 'secure', accion: 'texto', texto: x }); $('c-texto').value = ''; });
+  // Files: read here in 64 KB pieces and handed to the program one by one, so a big file never
+  // sits in memory; the program encrypts each piece and sends it, and the key goes inside Olm.
+  const TROZO = 64 * 1024;
+  let cola = [], enviando = false;
+  const b64De = (buf) => { let s = ''; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+  const enviaSiguiente = async () => {
+    if (enviando || !cola.length) return;
+    enviando = true;
+    const f = cola.shift();
+    manda({ tipo: 'secure', accion: 'archivo_empieza', nombre: f.name });
+    $('c-progreso').hidden = false;
+    const total = Math.max(1, Math.ceil(f.size / TROZO));
+    for (let i = 0; i < total; i++) {
+      const trozo = await f.slice(i * TROZO, (i + 1) * TROZO).arrayBuffer();
+      const ultimo = i + 1 === total && trozo.byteLength < TROZO;
+      manda({ tipo: 'secure', accion: 'archivo_trozo', b64: b64De(trozo), ultimo });
+      if (i + 1 === total && !ultimo) manda({ tipo: 'secure', accion: 'archivo_trozo', b64: '', ultimo: true });
+      $('c-progreso-texto').textContent = t('sec_f_enviando', { n: f.name, p: Math.round((i + 1) / total * 100) });
+      $('c-progreso-barra').style.width = Math.round((i + 1) / total * 100) + '%';
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    setTimeout(() => { if (!cola.length) $('c-progreso').hidden = true; }, 1500);
+    enviando = false;
+    enviaSiguiente();
+  };
+  const encola = (files) => { for (const f of files) cola.push(f); enviaSiguiente(); };
+  $('c-archivo').addEventListener('change', () => { encola($('c-archivo').files); $('c-archivo').value = ''; });
+  const zona = $('c-zona');
+  ['dragenter', 'dragover'].forEach((ev) => zona.addEventListener(ev, (e) => { e.preventDefault(); zona.classList.add('sobre'); }));
+  ['dragleave', 'drop'].forEach((ev) => zona.addEventListener(ev, (e) => { e.preventDefault(); zona.classList.remove('sobre'); }));
+  zona.addEventListener('drop', (e) => { if (e.dataTransfer && e.dataTransfer.files.length) encola(e.dataTransfer.files); });
+  $('p-reanudar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'reanudar' }));
+
   let ultimo = {};
   en('monitor', (m) => { ultimo = m.monitor || {}; pinta(ultimo); });
   // The texts arrive after the page: draw again so «—» and the chips speak the person's language.

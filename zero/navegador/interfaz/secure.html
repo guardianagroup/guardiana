@@ -19,6 +19,32 @@ header.top .chip { margin-left: auto; }
 h1 { font: 600 clamp(28px, 3.6vw, 38px)/1.1 var(--display); letter-spacing: -.02em; margin: 0 0 12px; }
 .frase { margin: 0 0 var(--e5); max-width: 38em; font-size: 16px; line-height: 1.5; color: var(--muted); }
 .tres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+/* The conversation: connect, compare the numbers, talk. One card at a time. */
+main > .tarjeta { margin-top: 14px; }
+.conexion .c-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.conexion h2, .comparar h2, .chat h2 { margin: 0 0 6px; font: 600 15px/1.3 var(--display); }
+.t { color: var(--muted); font-size: 13.5px; line-height: 1.45; margin: 0 0 10px; }
+.c-fila { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.c-fila .campo { flex: 1; min-width: 180px; }
+.c-puerto { font: 500 13px var(--mono); color: var(--ok); }
+.c-huella { margin: 14px 0 0; font-size: 12.5px; color: var(--muted); }
+.c-huella code { font-family: var(--mono); color: var(--fg); }
+.numeros { display: flex; gap: 14px; margin: 12px 0 16px; }
+.numeros b { font: 600 clamp(28px, 4vw, 40px)/1 var(--display); letter-spacing: .02em; padding: 12px 18px; border: 1px solid var(--line); border-radius: var(--r-tarjeta); background: var(--card); font-variant-numeric: tabular-nums; }
+.c-nombre { display: grid; gap: 4px; margin: 0 0 12px; font-size: 13px; color: var(--muted); max-width: 320px; }
+.chat-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mensajes { list-style: none; margin: 10px 0; padding: 12px; min-height: 220px; max-height: 50vh; overflow: auto; display: grid; gap: 6px; align-content: start; background: var(--campo); border-radius: var(--r-tarjeta); }
+.mensajes li { max-width: 72%; padding: 8px 12px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.mensajes li.mio { justify-self: end; background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.mensajes li time { display: block; font: 10.5px var(--mono); opacity: .7; margin-top: 2px; }
+.zona-archivo { border: 1px dashed var(--line); border-radius: var(--r-tarjeta); padding: 10px 14px; font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+.zona-archivo.sobre { border-color: var(--accent); background: var(--accent-suave); }
+.c-progreso { display: grid; gap: 4px; font: 12px var(--mono); color: var(--muted); margin: 0 0 8px; }
+.c-progreso i { display: block; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.c-progreso b { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+.escribir { display: flex; gap: 8px; }
+.escribir .campo { flex: 1; }
+@media (max-width: 680px) { .conexion .c-dos { grid-template-columns: 1fr; } .mensajes li { max-width: 92%; } }
 .tres article.tarjeta { box-shadow: var(--sombra); }
 .tres h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
 .tres p { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--muted); }
@@ -96,12 +122,41 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
 <div class="secure">
 <main>
   <h1 data-t="sec_titulo">SECURE</h1>
-  <p class="frase" data-t="sec_frase">Mensajes, archivos y llamadas privadas entre ordenadores. En desarrollo, con cifrado de extremo a extremo. Aún no envía nada.</p>
-  <div class="tres">
-    <article class="tarjeta"><h2 data-t="sec_mensajes">Mensajes</h2><p data-t="sec_mensajes_vacio">Entre dos ordenadores. Aún no hay ninguno.</p></article>
-    <article class="tarjeta"><h2 data-t="sec_docs">Documentos</h2><p data-t="sec_docs_vacio">Archivos entre dos ordenadores. Aún no hay ninguno.</p></article>
-    <article class="tarjeta"><h2 data-t="sec_voz">Voz</h2><p data-t="sec_voz_vacio">Llamada entre dos ordenadores. Aún no hay ninguna.</p></article>
-  </div>
+  <p class="frase" data-t="sec_frase_v1"></p>
+
+  <section class="tarjeta conexion" id="c-conexion">
+    <div class="c-dos">
+      <div>
+        <h2 data-t="sec_c_recibir"></h2>
+        <p class="t" data-t="sec_c_recibir_texto"></p>
+        <div class="c-fila"><button type="button" class="boton principal" id="c-escuchar" data-t="sec_c_escuchar"></button><span class="c-puerto" id="c-puerto" hidden></span></div>
+      </div>
+      <div>
+        <h2 data-t="sec_c_llamar"></h2>
+        <p class="t" data-t="sec_c_llamar_texto"></p>
+        <div class="c-fila"><input class="campo" id="c-direccion" data-t-ph="sec_c_direccion" spellcheck="false" autocomplete="off"><button type="button" class="boton principal" id="c-conectar" data-t="sec_c_conectar"></button></div>
+      </div>
+    </div>
+    <p class="c-huella"><span data-t="sec_c_tu_huella"></span> <code id="c-huella"></code></p>
+  </section>
+
+  <section class="tarjeta comparar" id="c-comparar" hidden>
+    <h2 data-t="sec_s_titulo"></h2>
+    <p class="t" data-t="sec_s_texto"></p>
+    <div class="numeros" id="c-numeros"></div>
+    <label class="c-nombre"><span data-t="sec_s_nombre"></span><input class="campo" id="c-nombre" data-t-ph="sec_s_nombre_ph" autocomplete="off"></label>
+    <div class="c-fila"><button type="button" class="boton deja" id="c-sas-si" data-t="sec_s_iguales"></button><button type="button" class="boton corta" id="c-sas-no" data-t="sec_s_distintos"></button></div>
+  </section>
+
+  <section class="tarjeta espera" id="c-espera" hidden><p class="t" id="c-espera-texto"></p></section>
+
+  <section class="tarjeta chat" id="c-chat" hidden>
+    <div class="chat-cab"><h2 id="c-con"></h2><button type="button" class="boton chico" id="c-cerrar" data-t="sec_c_cerrar"></button></div>
+    <ol class="mensajes" id="c-mensajes"></ol>
+    <div class="zona-archivo" id="c-zona"><span data-t="sec_f_arrastra"></span> <label class="enlace" for="c-archivo" data-t="sec_f_elige"></label><input type="file" id="c-archivo" hidden multiple></div>
+    <div class="c-progreso" id="c-progreso" hidden><span id="c-progreso-texto"></span><i><b id="c-progreso-barra"></b></i></div>
+    <form class="escribir" id="c-form"><input class="campo" id="c-texto" data-t-ph="sec_m_escribe" autocomplete="off" maxlength="8000"><button type="submit" class="boton principal" data-t="sec_m_enviar"></button></form>
+  </section>
 </main>
 
 <aside class="monitor" aria-live="polite">
