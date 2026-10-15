@@ -16,8 +16,11 @@ use crate::Error;
 
 /// Bytes of plaintext per block.
 pub const BLOQUE: usize = 64 * 1024;
-/// The largest file this version carries: 4 GiB.
-pub const MAX_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+/// The largest file this version carries: 1 TiB. Francisco, 15 Oct 2026: «el envío de archivos
+/// grandes hay que incluirlo, lo máximo posible». Nothing here holds the whole file: the
+/// streaming pair ([`Cifrador`], [`Descifrador`]) works one block at a time, so the limit is
+/// the disk, not the memory.
+pub const MAX_BYTES: u64 = 1024 * 1024 * 1024 * 1024;
 const DOMINIO: &[u8] = b"GUARDIANA_SECURE_ARCHIVO_V1";
 
 /// What the sender tells the receiver inside Olm, before any block: enough to open the blocks
@@ -143,6 +146,161 @@ pub fn descifrar(llave: &Llave, bloques: &[Bloque]) -> Result<Vec<u8>, Error> {
     Ok(plano)
 }
 
+/// Encrypt a file of any size block by block: read from `origen`, write each block's bytes
+/// (16-byte length prefix, big-endian, then the block) to `destino`. Nothing is held beyond one
+/// block. Returns the key for Olm once the whole file has gone through.
+pub struct Cifrador {
+    clave: [u8; 32],
+    prefijo: [u8; 16],
+    cipher: XChaCha20Poly1305,
+    hash: Sha256,
+    bytes: u64,
+    bloques: u64,
+}
+
+impl Cifrador {
+    /// Fresh key and nonce prefix for one file.
+    pub fn new() -> Result<Self, Error> {
+        let mut clave = [0u8; 32];
+        let mut prefijo = [0u8; 16];
+        getrandom::fill(&mut clave).map_err(|_| Error::CannotOpen)?;
+        getrandom::fill(&mut prefijo).map_err(|_| Error::CannotOpen)?;
+        Ok(Self {
+            clave,
+            prefijo,
+            cipher: XChaCha20Poly1305::new((&clave).into()),
+            hash: Sha256::new(),
+            bytes: 0,
+            bloques: 0,
+        })
+    }
+
+    /// Stream the whole file. The block count is not known until the end, so blocks are bound
+    /// to their number only; the key (sent after) carries the count and the hash, and the
+    /// receiver refuses a file whose count or hash differ.
+    pub fn cifra<R: std::io::Read, W: std::io::Write>(
+        mut self,
+        mut origen: R,
+        mut destino: W,
+    ) -> Result<Llave, Error> {
+        let mut buf = vec![0u8; BLOQUE];
+        let mut primero = true;
+        loop {
+            let n = lee_lleno(&mut origen, &mut buf)?;
+            if n == 0 && !primero {
+                break;
+            }
+            primero = false;
+            let trozo = &buf[..n];
+            self.hash.update(trozo);
+            self.bytes += n as u64;
+            if self.bytes > MAX_BYTES {
+                return Err(Error::CannotOpen);
+            }
+            let c = self
+                .cipher
+                .encrypt(
+                    &nonce(&self.prefijo, self.bloques),
+                    Payload {
+                        msg: trozo,
+                        aad: &aad_flujo(self.bloques),
+                    },
+                )
+                .map_err(|_| Error::CannotOpen)?;
+            destino
+                .write_all(&(c.len() as u64).to_be_bytes())
+                .and_then(|()| destino.write_all(&c))
+                .map_err(|_| Error::CannotOpen)?;
+            self.bloques += 1;
+            if n < BLOQUE {
+                break;
+            }
+        }
+        destino.flush().map_err(|_| Error::CannotOpen)?;
+        Ok(Llave {
+            clave: b64(&self.clave),
+            prefijo: b64(&self.prefijo),
+            bytes: self.bytes,
+            bloques: self.bloques,
+            sha256: hex(&self.hash.finalize()),
+        })
+    }
+}
+
+/// The other end of [`Cifrador`]: read the stream block by block, write the plaintext as it
+/// comes, and only at the end say whether the whole file is the one that was sent. A caller
+/// that writes to disk keeps the file under a temporary name until `Ok`.
+pub fn descifra_flujo<R: std::io::Read, W: std::io::Write>(
+    llave: &Llave,
+    mut origen: R,
+    mut destino: W,
+) -> Result<(), Error> {
+    let clave: [u8; 32] = de_b64(&llave.clave)?
+        .try_into()
+        .map_err(|_| Error::CannotOpen)?;
+    let prefijo: [u8; 16] = de_b64(&llave.prefijo)?
+        .try_into()
+        .map_err(|_| Error::CannotOpen)?;
+    if llave.bytes > MAX_BYTES {
+        return Err(Error::CannotOpen);
+    }
+    let cipher = XChaCha20Poly1305::new((&clave).into());
+    let mut hash = Sha256::new();
+    let mut bytes = 0u64;
+    let mut n = 0u64;
+    let mut largo = [0u8; 8];
+    while n < llave.bloques {
+        origen
+            .read_exact(&mut largo)
+            .map_err(|_| Error::CannotOpen)?;
+        let l = usize::try_from(u64::from_be_bytes(largo)).map_err(|_| Error::CannotOpen)?;
+        if l > BLOQUE + 64 {
+            return Err(Error::CannotOpen);
+        }
+        let mut c = vec![0u8; l];
+        origen.read_exact(&mut c).map_err(|_| Error::CannotOpen)?;
+        let trozo = cipher
+            .decrypt(
+                &nonce(&prefijo, n),
+                Payload {
+                    msg: &c,
+                    aad: &aad_flujo(n),
+                },
+            )
+            .map_err(|_| Error::CannotOpen)?;
+        hash.update(&trozo);
+        bytes += trozo.len() as u64;
+        destino.write_all(&trozo).map_err(|_| Error::CannotOpen)?;
+        n += 1;
+    }
+    destino.flush().map_err(|_| Error::CannotOpen)?;
+    if bytes != llave.bytes || hex(&hash.finalize()) != llave.sha256 {
+        return Err(Error::CannotOpen);
+    }
+    Ok(())
+}
+
+fn aad_flujo(n: u64) -> Vec<u8> {
+    let mut a = DOMINIO.to_vec();
+    a.extend_from_slice(b"|flujo|");
+    a.extend_from_slice(&n.to_be_bytes());
+    a
+}
+
+/// Fill `buf` as far as the reader allows; fewer bytes only at the end.
+fn lee_lleno<R: std::io::Read>(r: &mut R, buf: &mut [u8]) -> Result<usize, Error> {
+    let mut hecho = 0;
+    while hecho < buf.len() {
+        match r.read(&mut buf[hecho..]) {
+            Ok(0) => break,
+            Ok(k) => hecho += k,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(_) => return Err(Error::CannotOpen),
+        }
+    }
+    Ok(hecho)
+}
+
 fn b64(bytes: &[u8]) -> String {
     use base64::Engine as _;
     base64::engine::general_purpose::STANDARD.encode(bytes)
@@ -205,5 +363,41 @@ mod tests {
         // The key is a small JSON for Olm; it names no file.
         let json = serde_json::to_string(&llave).unwrap();
         assert!(json.contains("\"sha256\"") && !json.contains("nombre"));
+    }
+
+    #[test]
+    fn a_large_file_streams_through_block_by_block_and_comes_back_whole() {
+        // 1 MiB + a tail, through the streaming pair, without ever holding it all in the cipher.
+        let plano: Vec<u8> = (0..(BLOQUE * 16 + 777))
+            .map(|i| (i * 7 % 253) as u8)
+            .collect();
+        let mut cifrado = Vec::new();
+        let llave = Cifrador::new()
+            .unwrap()
+            .cifra(&plano[..], &mut cifrado)
+            .unwrap();
+        assert_eq!(llave.bloques, 17);
+        assert_eq!(llave.bytes, plano.len() as u64);
+        let mut vuelta = Vec::new();
+        descifra_flujo(&llave, &cifrado[..], &mut vuelta).unwrap();
+        assert_eq!(vuelta, plano);
+        // A byte changed on the road: refused, even though the earlier blocks were written out.
+        let mut t = cifrado.clone();
+        t[BLOQUE * 5] ^= 1;
+        assert!(descifra_flujo(&llave, &t[..], &mut Vec::new()).is_err());
+        // The stream cut short.
+        assert!(descifra_flujo(&llave, &cifrado[..cifrado.len() - 10], &mut Vec::new()).is_err());
+        // Another file's key over this stream.
+        let otra = Cifrador::new()
+            .unwrap()
+            .cifra(&b"x"[..], &mut Vec::new())
+            .unwrap();
+        assert!(descifra_flujo(&otra, &cifrado[..], &mut Vec::new()).is_err());
+        // Empty file: one block, comes back empty.
+        let l0 = Cifrador::new()
+            .unwrap()
+            .cifra(&b""[..], &mut Vec::new())
+            .unwrap();
+        assert_eq!(l0.bloques, 1);
     }
 }
