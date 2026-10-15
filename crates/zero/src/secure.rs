@@ -200,8 +200,8 @@ pub struct Secure {
     sas_mac_otra: Option<(Mac, Ed25519Signature)>,
     verificado: Option<Verified>,
     conversacion: Option<Conversation>,
-    /// Messages for the screen: (unix s, mine?, text).
-    pub mensajes: Vec<(u64, bool, String)>,
+    /// Messages for the screen: (unix s, mine?, text, who — empty for the other end of this link).
+    pub mensajes: Vec<(u64, bool, String, String)>,
     /// What the screen shows the whole time.
     pub monitor: Monitor,
     /// The chain of what was seen, for the signed evidence.
@@ -215,10 +215,13 @@ pub struct Secure {
     /// The last summary, signed, for the page to show and download.
     pub resumen: Option<Resumen>,
     version: String,
-    /// Media pieces for the page, drained by the session every tick.
-    pub media_para_pagina: VecDeque<String>,
+    /// Media pieces for the page, drained by the session every tick: (who, base64). `who` is
+    /// empty for the other end of this link; in a group the host relays with the original name.
+    pub media_para_pagina: VecDeque<(String, String)>,
     /// Something happened while the tab was not in front: the tab's name carries a mark.
     pub novedad: bool,
+    /// The group's members, as the host sends them (empty in a two-way talk).
+    grupo: Vec<String>,
     inicio: u64,
     /// Lines for the page's event list, drained by the session.
     pub avisos: VecDeque<Value>,
@@ -293,6 +296,7 @@ impl Secure {
             version: String::new(),
             media_para_pagina: VecDeque::new(),
             novedad: false,
+            grupo: Vec::new(),
             inicio: ahora_s(),
             avisos: VecDeque::new(),
             cambio: true,
@@ -324,6 +328,17 @@ impl Secure {
 
     /// Start listening on a port (0 lets the system choose). The address is never shown.
     pub fn escuchar(&mut self, puerto: u16) -> Result<u16, String> {
+        self.escuchar_grupo(puerto, None, true)
+    }
+
+    /// Listen for one more member of a group: the same port and the same relay code as the
+    /// first session, and the door left as it is (the first session opened it and keeps it).
+    pub fn escuchar_grupo(
+        &mut self,
+        puerto: u16,
+        codigo_rele: Option<String>,
+        abre_puerta: bool,
+    ) -> Result<u16, String> {
         self.cerrar("nueva escucha");
         // A fixed port when free (the code stays the same from one day to the next), any port
         // otherwise.
@@ -339,11 +354,13 @@ impl Secure {
                 let _ = tx.send(Entrante::Aceptado(s));
             }
         });
-        // The door in the router, asked for in its own thread: a few seconds, never blocking.
-        std::thread::spawn(move || {
-            let r = crate::puerta::abre(puerto, 3 * 3600);
-            let _ = tx2.send(Entrante::Puerta(r));
-        });
+        if abre_puerta {
+            // The door in the router, asked for in its own thread: a few seconds, never blocking.
+            std::thread::spawn(move || {
+                let r = crate::puerta::abre(puerto, 3 * 3600);
+                let _ = tx2.send(Entrante::Puerta(r));
+            });
+        }
         self.rx = Some(rx);
         self.tx = Some(tx_rele);
         self.puerto = puerto;
@@ -353,6 +370,9 @@ impl Secure {
         self.rele_error = None;
         self.fase = Fase::Escuchando;
         self.cambio = true;
+        if let Some(c) = codigo_rele {
+            self.espera_en_rele_con(c);
+        }
         Ok(puerto)
     }
 
@@ -389,6 +409,12 @@ impl Secure {
             TcpStream::connect_timeout(&addr, Duration::from_secs(8)).map_err(|e| e.to_string())?;
         self.adopta(s, false);
         Ok(())
+    }
+
+    /// A link someone else accepted or opened (the group layer): take it as ours.
+    pub fn adopta_enlace(&mut self, s: TcpStream, rele: bool) {
+        self.cerrar("nuevo enlace");
+        self.adopta(s, rele);
     }
 
     fn adopta(&mut self, s: TcpStream, rele: bool) {
@@ -557,11 +583,14 @@ impl Secure {
     /// No door in the router: wait at the blind relay with a fresh code (while the listener
     /// stays open for the same network).
     fn espera_en_rele(&mut self) {
+        self.espera_en_rele_con(crate::rele::codigo_nuevo());
+    }
+
+    fn espera_en_rele_con(&mut self, codigo: String) {
         if self.fase != Fase::Escuchando || self.rele_codigo.is_some() {
             return;
         }
         let Some(tx) = self.tx.clone() else { return };
-        let codigo = crate::rele::codigo_nuevo();
         let Some(sala) = crate::rele::sala_de(&codigo) else {
             return;
         };
@@ -888,6 +917,19 @@ impl Secure {
 
     fn carga(&mut self, c: &Value) {
         match c["m"].as_str().unwrap_or_default() {
+            "grupo" => {
+                self.grupo = c["nombres"]
+                    .as_array()
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(Value::as_str)
+                            .map(|n| n.chars().take(60).collect())
+                            .take(16)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                self.cambio = true;
+            }
             "texto" => {
                 let texto: String = c["texto"]
                     .as_str()
@@ -895,7 +937,13 @@ impl Secure {
                     .chars()
                     .take(8000)
                     .collect();
-                self.mensajes.push((ahora_s(), false, texto));
+                let de: String = c["de"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .chars()
+                    .take(60)
+                    .collect();
+                self.mensajes.push((ahora_s(), false, texto, de));
             }
             "llamada" | "llamada_ok" => {
                 let Some(clave) = c["clave"].as_str().and_then(|x| B64.decode(x).ok()) else {
@@ -1030,7 +1078,8 @@ impl Secure {
                     self.archivos.bytes += e.llave.as_ref().map_or(0, |l| l.bytes);
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, format!("archivo recibido: {n}"));
-                    self.mensajes.push((ahora_s(), false, format!("📎 {n}")));
+                    self.mensajes
+                        .push((ahora_s(), false, format!("📎 {n}"), String::new()));
                     self.aviso("sec_archivo_recibido", n);
                 } else {
                     if let Some(r) = &e.ruta {
@@ -1124,12 +1173,57 @@ impl Secure {
         let Some(l) = &mut self.llamada else {
             return Ok(());
         };
-        let c = l.emisor.cifra(&bytes).map_err(|e| e.to_string())?;
+        let c = l
+            .emisor
+            .cifra(&con_remitente("", &bytes))
+            .map_err(|e| e.to_string())?;
         l.bytes_enviados += bytes.len() as u64;
         let trama = json!({ "t": "media", "b": B64.encode(c) });
         self.manda(trama);
         self.tasa();
         Ok(())
+    }
+
+    /// A piece that someone else in the group recorded, passed on by this computer (the host):
+    /// it travels under this link's media key with the original name inside the cipher.
+    pub fn media_de(&mut self, de: &str, bytes: &[u8]) -> Result<(), String> {
+        if !self.estado.en_marcha() {
+            return Ok(());
+        }
+        let Some(l) = &mut self.llamada else {
+            return Ok(());
+        };
+        let c = l
+            .emisor
+            .cifra(&con_remitente(de, bytes))
+            .map_err(|e| e.to_string())?;
+        l.bytes_enviados += bytes.len() as u64;
+        let trama = json!({ "t": "media", "b": B64.encode(c) });
+        self.manda(trama);
+        Ok(())
+    }
+
+    /// Something someone else in the group said, passed on by this computer (the host).
+    pub fn texto_de(&mut self, de: &str, texto: &str) {
+        if self.fase != Fase::Lista {
+            return;
+        }
+        let t: String = texto.chars().take(8000).collect();
+        let d: String = de.chars().take(60).collect();
+        self.manda_olm(json!({ "m": "texto", "texto": t, "de": d }));
+    }
+
+    /// Who is in the group right now, for the other end's screen (sent by the host).
+    pub fn grupo_lista(&mut self, nombres: &[String]) {
+        if self.fase != Fase::Lista {
+            return;
+        }
+        self.manda_olm(json!({ "m": "grupo", "nombres": nombres }));
+    }
+
+    /// The group's members as the host told them (empty when this is a two-way talk).
+    pub fn grupo(&self) -> &[String] {
+        &self.grupo
     }
 
     fn media_entrante(&mut self, v: &Value) {
@@ -1143,8 +1237,10 @@ impl Secure {
         let Some(r) = &mut l.receptor else { return };
         match r.abre(&b) {
             Ok(plano) => {
-                l.bytes_recibidos += plano.len() as u64;
-                self.media_para_pagina.push_back(B64.encode(plano));
+                let (de, pieza) = sin_remitente(&plano);
+                l.bytes_recibidos += pieza.len() as u64;
+                self.media_para_pagina
+                    .push_back((de.to_owned(), B64.encode(pieza)));
                 if self.media_para_pagina.len() > 400 {
                     self.media_para_pagina.pop_front();
                 }
@@ -1191,7 +1287,8 @@ impl Secure {
             return;
         }
         let t: String = texto.chars().take(8000).collect();
-        self.mensajes.push((ahora_s(), true, t.clone()));
+        self.mensajes
+            .push((ahora_s(), true, t.clone(), String::new()));
         self.manda_olm(json!({ "m": "texto", "texto": t }));
         self.cambio = true;
     }
@@ -1231,7 +1328,7 @@ impl Secure {
             self.monitor
                 .anota(ahora_s(), Nivel::Info, format!("archivo enviado: {nombre}"));
             self.mensajes
-                .push((ahora_s(), true, format!("📎 {nombre}")));
+                .push((ahora_s(), true, format!("📎 {nombre}"), String::new()));
             self.cambio = true;
         }
         Ok(())
@@ -1245,6 +1342,30 @@ impl Secure {
         {
             self.cambio = true;
         }
+    }
+
+    /// Talking (verified and the cipher open).
+    pub fn lista(&self) -> bool {
+        self.fase == Fase::Lista
+    }
+
+    /// Nobody on the other end and nothing in progress.
+    pub fn sola(&self) -> bool {
+        self.fase == Fase::Sola
+    }
+
+    /// The other end's name once verified (or named).
+    pub fn contacto(&self) -> &str {
+        &self.nombre_contacto
+    }
+
+    /// The listening port, the relay code and the door code, for a group to reuse.
+    pub fn escucha(&self) -> (u16, Option<String>, Option<String>) {
+        (
+            self.puerto,
+            self.rele_codigo.clone(),
+            self.puerta.as_ref().map(crate::puerta::Puerta::codigo),
+        )
     }
 
     /// Whether the screen must be redrawn, and clear the flag.
@@ -1274,17 +1395,39 @@ impl Secure {
             "rele_codigo": self.rele_codigo,
             "rele": self.rele,
             "rele_error": self.rele_error,
+            "grupo": self.grupo,
             "huella": self.huella_propia(),
             "tarjeta": self.tarjeta(),
             "contacto": self.nombre_contacto,
             "numeros": self.numeros().map(|(a, b, c)| vec![a, b, c]),
             "llamada": self.llamada_activa().map(|(video, desde)| json!({ "video": video, "desde": desde, "mi_numero": self.mi_numero() })),
-            "mensajes": self.mensajes.iter().rev().take(200).rev().map(|(t, mio, x)| json!({ "t": t, "mio": mio, "texto": x })).collect::<Vec<_>>(),
+            "mensajes": self.mensajes.iter().rev().take(200).rev().map(|(t, mio, x, de)| json!({ "t": t, "mio": mio, "texto": x, "de": de })).collect::<Vec<_>>(),
             "contactos": self.agenda.contactos().iter().map(|c| json!({ "nombre": c.nombre, "verificado_en": c.verificado_en, "estado": matches!(c.estado, agenda::Estado::Verificado) })).collect::<Vec<_>>(),
             "monitor": monitor,
             "resumen": self.resumen.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "mensajes": r.mensajes_enviados + r.mensajes_recibidos, "archivos": r.archivos.enviados + r.archivos.recibidos, "observadas": r.observadas, "inusuales": r.inusuales, "fin": r.fin })),
         })
     }
+}
+
+/// One byte of name length, the name, the piece: the sender travels inside the cipher.
+fn con_remitente(de: &str, pieza: &[u8]) -> Vec<u8> {
+    let nombre: Vec<u8> = de.bytes().take(60).collect();
+    let mut v = Vec::with_capacity(1 + nombre.len() + pieza.len());
+    v.push(nombre.len() as u8);
+    v.extend_from_slice(&nombre);
+    v.extend_from_slice(pieza);
+    v
+}
+
+fn sin_remitente(plano: &[u8]) -> (&str, &[u8]) {
+    let n = usize::from(plano.first().copied().unwrap_or(0));
+    if plano.len() < 1 + n {
+        return ("", &[]);
+    }
+    (
+        std::str::from_utf8(&plano[1..1 + n]).unwrap_or(""),
+        &plano[1 + n..],
+    )
 }
 
 fn lee_o_crea_clave(ruta: &Path) -> [u8; 32] {
