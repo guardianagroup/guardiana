@@ -368,4 +368,129 @@ mod tests {
         assert_eq!(restored.public_key(), alice.public_key());
         assert_eq!(restored.signing_key(), alice.signing_key());
     }
+
+    /// The proof is built on one side's [`Codigo`] and checked on the other side's.
+    fn prove(
+        code: &Codigo,
+        device: &Identity,
+    ) -> (vodozemac::sas::Mac, vodozemac::Ed25519Signature) {
+        let mac = code.mac(device.signing_key(), device.public_key());
+        let signature = device.sign(&code.transcript(device.signing_key(), device.public_key()));
+        (mac, signature)
+    }
+
+    #[test]
+    fn each_side_checks_the_proof_the_other_made() {
+        let (alice, bob, alice_code, bob_code) = both();
+        assert_eq!(alice_code.decimals(), bob_code.decimals());
+
+        let (bob_mac, bob_signature) = prove(&bob_code, &bob);
+        let (alice_mac, alice_signature) = prove(&alice_code, &alice);
+
+        let bob_for_alice = alice_code
+            .confirm(
+                bob.public_key(),
+                bob.signing_key(),
+                &bob_mac,
+                &bob_signature,
+                true,
+            )
+            .unwrap();
+        let alice_for_bob = bob_code
+            .confirm(
+                alice.public_key(),
+                alice.signing_key(),
+                &alice_mac,
+                &alice_signature,
+                true,
+            )
+            .unwrap();
+        assert_eq!(bob_for_alice.curve(), bob.public_key());
+        assert_eq!(bob_for_alice.signing(), bob.signing_key());
+        assert_eq!(alice_for_bob.curve(), alice.public_key());
+        assert_eq!(alice_for_bob.signing(), alice.signing_key());
+    }
+
+    #[test]
+    fn a_received_proof_does_not_survive_a_substituted_key() {
+        let (_, bob, alice_code, bob_code) = both();
+        let (bob_mac, bob_signature) = prove(&bob_code, &bob);
+        let impostor = Identity::new();
+        assert_eq!(
+            alice_code
+                .confirm(
+                    impostor.public_key(),
+                    bob.signing_key(),
+                    &bob_mac,
+                    &bob_signature,
+                    true,
+                )
+                .unwrap_err(),
+            VerifyError::Failed
+        );
+        assert_eq!(
+            alice_code
+                .confirm(
+                    bob.public_key(),
+                    impostor.signing_key(),
+                    &bob_mac,
+                    &bob_signature,
+                    true,
+                )
+                .unwrap_err(),
+            VerifyError::Failed
+        );
+    }
+
+    #[test]
+    fn a_proof_from_one_session_does_not_open_another() {
+        let (_, bob, alice_code, bob_code) = both();
+        let (bob_mac, bob_signature) = prove(&bob_code, &bob);
+
+        let alice_start = Inicio::new();
+        let bob_start = Inicio::new();
+        let alice_pub = alice_start.public_key();
+        let bob_pub = bob_start.public_key();
+        let alice_again = alice_start.establish(bob_pub).unwrap();
+        let bob_again = bob_start.establish(alice_pub).unwrap();
+        let (bob_mac_again, bob_signature_again) = prove(&bob_again, &bob);
+
+        assert_eq!(
+            alice_again
+                .confirm(
+                    bob.public_key(),
+                    bob.signing_key(),
+                    &bob_mac,
+                    &bob_signature,
+                    true,
+                )
+                .unwrap_err(),
+            VerifyError::Failed
+        );
+        assert_eq!(
+            alice_code
+                .confirm(
+                    bob.public_key(),
+                    bob.signing_key(),
+                    &bob_mac_again,
+                    &bob_signature_again,
+                    true,
+                )
+                .unwrap_err(),
+            VerifyError::Failed
+        );
+        assert_eq!(
+            alice_again
+                .confirm(
+                    bob.public_key(),
+                    bob.signing_key(),
+                    &bob_mac_again,
+                    &bob_signature_again,
+                    true,
+                )
+                .unwrap()
+                .signing(),
+            bob.signing_key()
+        );
+    }
 }
