@@ -1015,10 +1015,10 @@
       // The deck follows «Todo · Datos · Antivirus», like the drawing.
       const mios = PROD.filter(enFiltro), ids = new Set(mios.map((p) => p.id)), DF = DEST.filter((d) => ids.has(d.p));
       const amplio = hudAmplio();
-      $('registro').innerHTML = st.eventos.filter((e) => st.filtro === 'todo' || (st.filtro === 'av') === !!e.av).slice(0, amplio ? 40 : 9).map((e) => `<li><span class="t">${esc(e.h)}</span> ${esc(e.prog)} → ${esc(e.host)} <span class="${e.cls}">${esc(e.que)}</span></li>`).join('') || `<li class="t">${esc(t('pd_registro_vacio'))}</li>`;
+      $('registro').innerHTML = st.eventos.filter((e) => st.filtro === 'todo' || (st.filtro === 'av') === !!e.av).slice(0, amplio ? 40 : (window.innerWidth >= 1700 ? 14 : 9)).map((e) => `<li><span class="t">${esc(e.h)}</span> ${esc(e.prog)} → ${esc(e.host)} <span class="${e.cls}">${esc(e.que)}</span></li>`).join('') || `<li class="t">${esc(t('pd_registro_vacio'))}</li>`;
       $('hud-min').textContent = bytes(mios.reduce((a, p) => a + (st.serieP[p.id] || []).reduce((x, y) => x + y, 0), 0));
       const pp = {}; DF.forEach((d) => { if (d.pais && d.pais[0] !== '@' && !d.sede) pp[d.pais] = (pp[d.pais] || 0) + d.sub; });
-      const todos = Object.entries(pp).filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]), top = amplio ? todos : todos.slice(0, 5), mx = Math.max(1, ...top.map((x) => x[1])), totalP = Math.max(1, todos.reduce((a, x) => a + x[1], 0));
+      const todos = Object.entries(pp).filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]), top = amplio ? todos : todos.slice(0, window.innerWidth >= 1700 ? 8 : 5), mx = Math.max(1, ...top.map((x) => x[1])), totalP = Math.max(1, todos.reduce((a, x) => a + x[1], 0));
       $('barras').innerHTML = top.map(([c, v]) => `<div class="enlace-fila" data-pais="${esc(c)}" tabindex="0" role="button"><span>${esc(nombrePais(c))}</span><s data-w="${Math.max(2, v / mx * 100)}"></s><span>${esc(bytes(v))}</span>${amplio ? `<span class="t">${Math.round(v / totalP * 100)} %</span>` : ''}</div>`).join('') || `<div class="t">—</div>`;
       estilos($('barras'));
       $('hud-cortes').textContent = num(DF.filter((d) => d.cortado).length + mios.filter((p) => p.cortado).length);
@@ -1026,7 +1026,7 @@
       sparkline();
       // «Lo que más envía ahora» (13 Oct 2026, in place of a needle that hardly ever moved): the
       // three destinations with most sent in the last minutes, each one a click away from its card.
-      const vivos = DF.filter((d) => d.ema > 0 && !bloqueado(d)).sort((a, b) => b.ema - a.ema).slice(0, amplio ? 30 : 3);
+      const vivos = DF.filter((d) => d.ema > 0 && !bloqueado(d)).sort((a, b) => b.ema - a.ema).slice(0, amplio ? 30 : (window.innerWidth >= 1700 ? 6 : 3));
       $('hud-top').innerHTML = vivos.map((d) => `<li class="enlace-fila" data-dest="${esc(d.k)}" tabindex="0" role="button"><span>${esc(d.host)}</span><span class="o">${esc(bytes(d.ema))}/s</span></li>`).join('') || `<li class="t">${esc(t('pd_top_nada'))}</li>`;
       pintaCorte(); pintaDetalle(); pintaExplorador();
     };
