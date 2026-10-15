@@ -15,6 +15,9 @@ use sha2::{Digest, Sha256};
 
 /// Where the relay lives (443 so it passes any office firewall).
 pub const RELE: &str = "rele.guardianagroup.com:443";
+/// The same relay by address, for a computer whose DNS cannot resolve the name (15 Oct 2026:
+/// the first server, Nuremberg). Tried only after the name.
+pub const RELE_IP: &str = "5.75.173.240:443";
 /// The letters of a code: no 0/O/1/I, so it reads well aloud.
 const ALFABETO: &[u8; 32] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -62,16 +65,23 @@ pub fn sala_de(texto: &str) -> Option<String> {
     Some(h[..16].iter().map(|x| format!("{x:02x}")).collect())
 }
 
-/// Connect to the relay, name the room and wait (up to ten minutes) for the other computer.
-/// Returns the stream once the relay says the pair is complete.
-pub fn conecta(rele: &str, sala: &str) -> Result<TcpStream, String> {
+fn abre_hacia(rele: &str) -> Result<TcpStream, String> {
     let addr = rele
         .to_socket_addrs()
         .map_err(|e| e.to_string())?
         .next()
         .ok_or_else(|| "relé sin dirección".to_owned())?;
-    let mut s =
-        TcpStream::connect_timeout(&addr, Duration::from_secs(10)).map_err(|e| e.to_string())?;
+    TcpStream::connect_timeout(&addr, Duration::from_secs(10)).map_err(|e| e.to_string())
+}
+
+/// Connect to the relay, name the room and wait (up to ten minutes) for the other computer.
+/// Returns the stream once the relay says the pair is complete.
+pub fn conecta(rele: &str, sala: &str) -> Result<TcpStream, String> {
+    let mut s = match abre_hacia(rele) {
+        Ok(s) => s,
+        Err(e) if rele == RELE => abre_hacia(RELE_IP).map_err(|e2| format!("{e}; {e2}"))?,
+        Err(e) => return Err(e),
+    };
     let _ = s.set_nodelay(true);
     s.write_all(format!("GUARDIANA-RELE 1 {sala}\n").as_bytes())
         .map_err(|e| e.to_string())?;
