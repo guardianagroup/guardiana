@@ -73,6 +73,51 @@ pub(crate) struct Universo {
     mide_bytes: bool,
     ventana_h: i64,
     ahora: i64,
+    /// The VPNs the traffic is leaving through now, by name (15 Oct 2026). `None` where it
+    /// cannot be known (not Windows, or Windows did not answer): the page then says nothing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    vpn: Option<Vec<String>>,
+}
+
+/// The VPN answer, kept for a while: asking Windows takes about a second and the page asks
+/// every five, so Windows is asked in its own thread and the page gets the last answer (none
+/// the first time, which the page shows as nothing).
+fn vpn_ahora() -> Option<Vec<String>> {
+    use std::sync::{Mutex, OnceLock};
+    use std::time::{Duration, Instant};
+    struct Estado {
+        cuando: Option<Instant>,
+        valor: Option<Vec<String>>,
+        preguntando: bool,
+    }
+    static CACHE: OnceLock<Mutex<Estado>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| {
+        Mutex::new(Estado {
+            cuando: None,
+            valor: None,
+            preguntando: false,
+        })
+    });
+    let Ok(mut c) = cache.lock() else {
+        return None;
+    };
+    let caducado = c
+        .cuando
+        .is_none_or(|t| t.elapsed() > Duration::from_secs(120));
+    if caducado && !c.preguntando {
+        c.preguntando = true;
+        std::thread::spawn(move || {
+            let v = guardiana_apps::vpn_activas()
+                .ok()
+                .map(|l| l.into_iter().map(|x| x.nombre).collect::<Vec<_>>());
+            if let Ok(mut c) = cache.lock() {
+                c.valor = v;
+                c.cuando = Some(Instant::now());
+                c.preguntando = false;
+            }
+        });
+    }
+    c.valor.clone()
 }
 
 #[derive(Serialize)]
@@ -658,6 +703,7 @@ pub(crate) async fn universo(
         mide_bytes: cfg!(windows),
         ventana_h: VENTANA_H,
         ahora: now,
+        vpn: vpn_ahora(),
     }))
 }
 

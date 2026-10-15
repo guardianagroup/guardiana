@@ -185,6 +185,7 @@
       if (!primeraLectura) primeraLectura = Date.now();
       const ahora = performance.now(), intervalo = ultimaCarga ? Math.max(1, (ahora - ultimaCarga) / 1000) : 5;
       ultimaCarga = ahora; st.intervalo = intervalo; st.datos = r;
+      pintaVpn(r.vpn);
       r.programas.forEach((p) => {
         let o = PROD.find((x) => x.id === p.id);
         if (!o) o = nuevoProducto(p);
@@ -998,24 +999,81 @@
         base = tope;
       });
     };
+    // The band, closed (a glance) or open (everything). Remembered in this browser.
+    const hudAmplio = () => $('hud').classList.contains('amplio');
+    const ponHud = (abierto) => {
+      $('hud').classList.toggle('amplio', abierto);
+      $('hud-asa').setAttribute('aria-expanded', String(abierto));
+      $('hud-asa').querySelector('span').textContent = t(abierto ? 'pd_hud_recoger' : 'pd_hud_desplegar');
+      $('hud-asa').title = t(abierto ? 'pd_hud_recoger' : 'pd_hud_desplegar');
+      try { localStorage.setItem('guardiana_pd_hud', abierto ? '1' : ''); } catch (_) {}
+      requestAnimationFrame(() => { try { sparkline(); } catch (_) {} ajusta(); });
+    };
+    $('hud-asa').addEventListener('click', () => ponHud(!hudAmplio()));
+    try { if (localStorage.getItem('guardiana_pd_hud') === '1') ponHud(true); else ponHud(false); } catch (_) { ponHud(false); }
     const pintaHud = () => {
       // The deck follows «Todo · Datos · Antivirus», like the drawing.
       const mios = PROD.filter(enFiltro), ids = new Set(mios.map((p) => p.id)), DF = DEST.filter((d) => ids.has(d.p));
-      $('registro').innerHTML = st.eventos.filter((e) => st.filtro === 'todo' || (st.filtro === 'av') === !!e.av).slice(0, 9).map((e) => `<li><span class="t">${esc(e.h)}</span> ${esc(e.prog)} → ${esc(e.host)} <span class="${e.cls}">${esc(e.que)}</span></li>`).join('') || `<li class="t">${esc(t('pd_registro_vacio'))}</li>`;
+      const amplio = hudAmplio();
+      $('registro').innerHTML = st.eventos.filter((e) => st.filtro === 'todo' || (st.filtro === 'av') === !!e.av).slice(0, amplio ? 40 : (window.innerWidth >= 1700 ? 14 : 9)).map((e) => `<li><span class="t">${esc(e.h)}</span> ${esc(e.prog)} → ${esc(e.host)} <span class="${e.cls}">${esc(e.que)}</span></li>`).join('') || `<li class="t">${esc(t('pd_registro_vacio'))}</li>`;
       $('hud-min').textContent = bytes(mios.reduce((a, p) => a + (st.serieP[p.id] || []).reduce((x, y) => x + y, 0), 0));
       const pp = {}; DF.forEach((d) => { if (d.pais && d.pais[0] !== '@' && !d.sede) pp[d.pais] = (pp[d.pais] || 0) + d.sub; });
-      const top = Object.entries(pp).filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 5), mx = Math.max(1, ...top.map((x) => x[1]));
-      $('barras').innerHTML = top.map(([c, v]) => `<div class="enlace-fila" data-pais="${esc(c)}" tabindex="0" role="button"><span>${esc(nombrePais(c))}</span><s data-w="${Math.max(2, v / mx * 100)}"></s><span>${esc(bytes(v))}</span></div>`).join('') || `<div class="t">—</div>`;
+      const todos = Object.entries(pp).filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]), top = amplio ? todos : todos.slice(0, window.innerWidth >= 1700 ? 8 : 5), mx = Math.max(1, ...top.map((x) => x[1])), totalP = Math.max(1, todos.reduce((a, x) => a + x[1], 0));
+      $('barras').innerHTML = top.map(([c, v]) => `<div class="enlace-fila" data-pais="${esc(c)}" tabindex="0" role="button"><span>${esc(nombrePais(c))}</span><s data-w="${Math.max(2, v / mx * 100)}"></s><span>${esc(bytes(v))}</span>${amplio ? `<span class="t">${Math.round(v / totalP * 100)} %</span>` : ''}</div>`).join('') || `<div class="t">—</div>`;
       estilos($('barras'));
       $('hud-cortes').textContent = num(DF.filter((d) => d.cortado).length + mios.filter((p) => p.cortado).length);
       $('hud-bloqueos').textContent = tn('pd_intentos', DF.reduce((a, d) => a + d.bloq, 0));
       sparkline();
       // «Lo que más envía ahora» (13 Oct 2026, in place of a needle that hardly ever moved): the
       // three destinations with most sent in the last minutes, each one a click away from its card.
-      const vivos = DF.filter((d) => d.ema > 0 && !bloqueado(d)).sort((a, b) => b.ema - a.ema).slice(0, 3);
+      const vivos = DF.filter((d) => d.ema > 0 && !bloqueado(d)).sort((a, b) => b.ema - a.ema).slice(0, amplio ? 30 : (window.innerWidth >= 1700 ? 6 : 3));
       $('hud-top').innerHTML = vivos.map((d) => `<li class="enlace-fila" data-dest="${esc(d.k)}" tabindex="0" role="button"><span>${esc(d.host)}</span><span class="o">${esc(bytes(d.ema))}/s</span></li>`).join('') || `<li class="t">${esc(t('pd_top_nada'))}</li>`;
+      pintaTabla(DF, amplio);
       pintaCorte(); pintaDetalle(); pintaExplorador();
     };
+    // The technical table and its downloads: exactly the rows on screen, nothing more. The file is
+    // made here and never leaves the computer unless the person sends it.
+    let ordenTabla = { k: 'sub', desc: true }, buscaTabla = '';
+    const valorOrden = (d, k) => k === 'programa' ? prod(d.p).nombre : k === 'destino' ? d.host : k === 'pais' ? (d.pais ? nombrePais(d.pais) : '') : k === 'ciudad' ? (d.lugar && d.lugar.ciudad) || '' : k === 'proto' ? (d.proto || '') + (d.puerto || '') : k === 'estado' ? (d.cortado ? 2 : d.bloq > 0 ? 1 : 0) : d[k];
+    const filasTabla = (DF) => {
+      const q = buscaTabla.trim().toLocaleLowerCase(LOC);
+      let f = DF.filter((d) => !d.sede);
+      if (q) f = f.filter((d) => [prod(d.p).nombre, d.host, d.destino, d.empresa, d.pais && nombrePais(d.pais), d.lugar && d.lugar.ciudad, d.red, d.asn && 'AS' + d.asn, d.proto, d.puerto].filter(Boolean).join(' ').toLocaleLowerCase(LOC).includes(q));
+      const { k, desc } = ordenTabla;
+      return f.sort((a, b) => { const x = valorOrden(a, k), y = valorOrden(b, k); const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x ?? '').localeCompare(String(y ?? ''), LOC); return (desc ? -c : c) || (b.sub + b.baj) - (a.sub + a.baj); });
+    };
+    $('ht-busca').addEventListener('input', () => { buscaTabla = $('ht-busca').value; pintaHud(); });
+    document.querySelectorAll('table.ht th[data-orden]').forEach((th) => {
+      const elige = () => { const k = th.dataset.orden; ordenTabla = ordenTabla.k === k ? { k, desc: !ordenTabla.desc } : { k, desc: !['programa', 'destino', 'empresa', 'pais', 'ciudad', 'red', 'proto'].includes(k) }; document.querySelectorAll('table.ht th[data-orden]').forEach((x) => x.removeAttribute('aria-sort')); th.setAttribute('aria-sort', ordenTabla.desc ? 'descending' : 'ascending'); pintaHud(); };
+      th.addEventListener('click', elige); th.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); elige(); } });
+    });
+    const fechaCorta = (ms) => ms ? new Date(ms).toLocaleString(LOC, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+    const pintaTabla = (DF, amplio) => {
+      $('hud-tabla').hidden = !amplio;
+      if (!amplio) return;
+      const todas = filasTabla(DF), filas = todas.slice(0, 300);
+      $('ht-cuantos').textContent = num(todas.length);
+      const paises = new Set(todas.map((d) => d.pais).filter((p) => p && p[0] !== '@'));
+      $('ht-kpi').innerHTML = [[bytes(todas.reduce((a, d) => a + d.sub, 0)), t('pd_ht_sube'), 'o'], [bytes(todas.reduce((a, d) => a + d.baj, 0)), t('pd_ht_baja'), 'i'], [num(todas.length), t('pd_ht_titulo').split(' ·')[0], ''], [num(paises.size), t('pd_ht_paises'), ''], [num(todas.reduce((a, d) => a + d.bloq, 0)), t('pd_ht_cortes'), 'c']].map(([v, l, c]) => `<div><b class="${c}">${esc(v)}</b><span>${esc(l)}</span></div>`).join('');
+      $('ht-filas').innerHTML = filas.map((d) => {
+        const estado = d.cortado ? `<span class="chip-ht c">${esc(t('pd_ht_cortado'))}</span>` : d.bloq > 0 ? `<span class="chip-ht o">${esc(tn('pd_intentos', d.bloq))}</span>` : d.doc === true ? `<span class="chip-ht t">${esc(t('pd_ht_documentado'))}</span>` : d.doc === false ? `<span class="chip-ht" style="color:var(--undoc)">${esc(t('pd_ht_sin_documentar'))}</span>` : '';
+        return `<tr class="enlace-fila" data-dest="${esc(d.k)}" tabindex="0" role="button"><td>${esc(prod(d.p).nombre)}</td><td title="${esc(d.destino || d.host)}">${esc(d.host)}</td><td>${esc(d.empresa || '—')}</td><td>${esc(d.pais ? nombrePais(d.pais) : '—')}</td><td>${esc(d.lugar && d.lugar.ciudad ? d.lugar.ciudad : '—')}</td><td title="AS${esc(d.asn || '')}">${esc(d.red || '—')}${d.asn ? ` <span class="t">AS${esc(d.asn)}</span>` : ''}</td><td>${esc((d.proto || '') + (d.puerto ? '/' + d.puerto : ''))}</td><td class="n o">${esc(bytes(d.sub))}</td><td class="n i">${esc(bytes(d.baj))}</td><td class="n">${esc(num(d.paq))}</td><td class="n">${esc(num(d.consultas))}</td><td class="n${d.bloq ? ' c' : ''}">${esc(num(d.bloq))}</td><td class="t">${esc(fechaCorta(d.primera))}</td><td class="t">${esc(fechaCorta(d.ultima))}</td><td>${estado}</td></tr>`;
+      }).join('') || `<tr><td colspan="15" class="t">${esc(t('pd_registro_vacio'))}</td></tr>`;
+    };
+    const descarga = (nombre, tipo, texto) => {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([texto], { type: tipo })); a.download = nombre; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    };
+    const selloArchivo = () => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; };
+    const filasExport = () => {
+      const mios = PROD.filter(enFiltro), ids = new Set(mios.map((p) => p.id));
+      return filasTabla(DEST.filter((d) => ids.has(d.p))).map((d) => ({ programa: prod(d.p).nombre, destino: d.destino || d.host, nombre: d.host, empresa: d.empresa || '', pais: d.pais || '', ciudad: d.lugar && d.lugar.ciudad ? d.lugar.ciudad : '', red: d.red || '', asn: d.asn || 0, protocolo: d.proto || '', puerto: d.puerto || 0, enviados_bytes: d.sub, recibidos_bytes: d.baj, paquetes: d.paq, consultas: d.consultas, cortes: d.bloq, cortado: !!d.cortado, documentado: d.doc === true ? 'si' : d.doc === false ? 'no' : '', uso: d.uso || '', primera: d.primera ? new Date(d.primera).toISOString() : '', ultima: d.ultima ? new Date(d.ultima).toISOString() : '' }));
+    };
+    $('ht-json').addEventListener('click', () => descarga(`guardiana-por-dentro-${selloArchivo()}.json`, 'application/json', JSON.stringify({ programa: 'GUARDIANA', pagina: 'por-dentro', ventana_h: st.datos && st.datos.ventana_h, generado: new Date().toISOString(), filtro: st.filtro, destinos: filasExport(), sucesos: st.eventos.map((e) => ({ hora: e.h, programa: e.prog, destino: e.host, que: e.que })) }, null, 2)));
+    $('ht-csv').addEventListener('click', () => {
+      const filas = filasExport(); if (!filas.length) return;
+      const cab = Object.keys(filas[0]); const q = (v) => { const s = String(v ?? ''); return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+      descarga(`guardiana-por-dentro-${selloArchivo()}.csv`, 'text/csv;charset=utf-8', '\ufeff' + cab.join(',') + '\n' + filas.map((f) => cab.map((k) => q(f[k])).join(',')).join('\n') + '\n');
+    });
     // «Cortar todo lo que envía el antivirus» (until 13 Oct 2026 «Protección máxima», a name that
     // hid that the antivirus then gets no updates): a small button in the antivirus's telemetry,
     // not in the top bar; while it is on, the bar's chip says so, so nobody forgets it.
@@ -1746,6 +1804,18 @@
     // a city when Windows, Microsoft or Google returns an imprecise or stale point. Everything
     // stays in this browser and GUARDIANA sends it nowhere.
     const etiquetaYo = document.querySelector('.lugar-yo [data-t="pd_tu_pais"]');
+    // The VPN chip (15 Oct 2026). While a VPN is up, the city a network measurement gives is the
+    // VPN's exit, so the chip names the VPN and the hint says how to place the computer right.
+    let VPN = [];
+    const pintaVpn = (lista) => {
+      VPN = Array.isArray(lista) ? lista : [];
+      const el = $('vpn');
+      if (!VPN.length) { el.hidden = true; return; }
+      el.hidden = false;
+      el.textContent = t('pd_vpn_saliendo').replace('{n}', VPN.join(', '));
+      el.title = t('pd_vpn_explica');
+      if (st.lugar.fuente === 'zona' || st.lugar.fuente === 'pais') { if (!pintaVpn.avisado) { pintaVpn.avisado = true; avisa(t('pd_vpn_aviso').replace('{n}', VPN.join(', ')), [{ texto: t('pd_corregir'), hacer: abreUbicacion }]); } }
+    };
     const pintaYo = () => {
       const aproximada = st.lugar.fuente === 'zona' || st.lugar.fuente === 'pais';
       etiquetaYo.textContent = t(aproximada ? 'pd_ubicacion_referencia' : 'pd_tu_pais');
@@ -1781,6 +1851,10 @@
         if (m && m.km < 35 && precision <= 25000) g = { lat, lon, ciudad: m.c.n + (m.c.adm ? ', ' + m.c.adm : ''), cc: m.c.cc, precision, fuente: 'equipo' };
         else g.cc = paisEn(lon, lat) || '';
       } catch (_) { g.cc = paisEn(lon, lat) || ''; }
+      if (VPN.length && precision > 1000) {
+        if (!callado) avisa(t('pd_vpn_medida').replace('{n}', VPN.join(', ')), [{ texto: t('pd_corregir'), hacer: abreUbicacion }]);
+        return;
+      }
       if (precision > 25000) {
         if (!callado) avisa(t('pd_precisar_impreciso').replace('{km}', String(Math.max(1, Math.round(precision / 1000)))), [{ texto: t('pd_corregir'), hacer: abreUbicacion }]);
         return;
@@ -1834,7 +1908,17 @@
       try { navigator.permissions.query({ name: 'geolocation' }).then((p) => { if (p.state === 'granted') precisar(true); }).catch(() => {}); } catch (_) {}
     }
     if (soloMirar) $('corregir-lugar').hidden = true;
-    else $('corregir-lugar').addEventListener('click', abreUbicacion);
+    else {
+      $('corregir-lugar').addEventListener('click', abreUbicacion);
+      // Placed by the time zone only (its capital): say so once, with the way to fix it, instead
+      // of letting a person in Cartagena see their computer in Bogotá (15 Oct 2026).
+      try {
+        if ((st.lugar.fuente === 'zona' || st.lugar.fuente === 'pais') && !localStorage.getItem('guardiana_pd_lugar_avisado')) {
+          localStorage.setItem('guardiana_pd_lugar_avisado', '1');
+          setTimeout(() => { if (st.lugar.fuente === 'zona' || st.lugar.fuente === 'pais') avisa(t('pd_lugar_zona_aviso').replace('{lugar}', [st.lugar.ciudad, nombrePais(st.yo)].filter(Boolean).join(', ')), [{ texto: t('pd_corregir'), hacer: abreUbicacion }, { texto: t('pd_precisar'), hacer: () => precisar(false) }]); }, 2500);
+        }
+      } catch (_) {}
+    }
     buscaUbicacion.addEventListener('input', pintaCiudades);
     $('ubicacion-cerrar').addEventListener('click', cierraUbicacion);
 
