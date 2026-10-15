@@ -249,6 +249,7 @@
   // one handed to the program, which encrypts it under the media layer and sends it. Receiving:
   // the pieces the program opened are played as they come. Direct, no media server, ~half a
   // second behind. (The real-time transport comes next; this is today's.)
+  let arrancando = false;
   let grabador = null, local = null, fuente = null, buffer = null, pendientes = [], silenciado = false, llamadaVideo = false;
   const pintaLlamada = (m) => {
     const l = m.llamada;
@@ -257,7 +258,7 @@
     caja.hidden = false;
     caja.classList.toggle('solo-voz', !l.video);
     $('c-l-estado').textContent = t(l.video ? 'sec_l_en_video' : 'sec_l_en_voz', { t: tiempo(Math.max(0, Math.floor(Date.now() / 1000) - (l.desde || 0))) });
-    if (!grabador) empiezaMedios(!!l.video);
+    if (!grabador && !arrancando) empiezaMedios(!!l.video);
   };
   setInterval(() => { if (!$('c-llamada').hidden && E.llamada) $('c-l-estado').textContent = t(E.llamada.video ? 'sec_l_en_video' : 'sec_l_en_voz', { t: tiempo(Math.max(0, Math.floor(Date.now() / 1000) - (E.llamada.desde || 0))) }); }, 1000);
   const mime = (video) => {
@@ -265,22 +266,24 @@
     return c.find((x) => window.MediaRecorder && MediaRecorder.isTypeSupported(x)) || c[c.length - 1];
   };
   const empiezaMedios = async (video) => {
+    arrancando = true;
     llamadaVideo = video;
+    preparaReproductor(mime(video));
     try {
       local = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 48000 }, video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false });
-    } catch (e) { aviso(t('sec_l_sin_permiso')); manda({ tipo: 'secure', accion: 'colgar' }); return; }
+    } catch (e) { arrancando = false; aviso(t('sec_l_sin_permiso')); manda({ tipo: 'secure', accion: 'colgar' }); return; }
     $('c-local').srcObject = local;
     const tipo = mime(video);
     grabador = new MediaRecorder(local, { mimeType: tipo, audioBitsPerSecond: 64000, videoBitsPerSecond: video ? 1500000 : undefined });
     grabador.ondataavailable = async (e) => { if (e.data && e.data.size) manda({ tipo: 'secure', accion: 'media', b64: b64De(await e.data.arrayBuffer()) }); };
     grabador.start(120);
-    preparaReproductor(tipo);
+    arrancando = false;
   };
   const preparaReproductor = (tipo) => {
     const v = $('c-remoto');
     fuente = new MediaSource();
     v.src = URL.createObjectURL(fuente);
-    pendientes = []; buffer = null;
+    buffer = null;
     fuente.addEventListener('sourceopen', () => {
       try { buffer = fuente.addSourceBuffer(tipo); buffer.mode = 'sequence'; buffer.addEventListener('updateend', vacia); vacia(); } catch (e) { aviso(t('sec_l_no_reproduce')); }
     });
@@ -301,6 +304,7 @@
     $('c-local').srcObject = null;
     try { if (fuente && fuente.readyState === 'open') fuente.endOfStream(); } catch (_) {}
     fuente = null; buffer = null; pendientes = [];
+    arrancando = false;
     $('c-remoto').removeAttribute('src');
   };
   $('c-voz').addEventListener('click', () => { timbre(); manda({ tipo: 'secure', accion: 'llamar', video: false }); });
