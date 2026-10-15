@@ -788,6 +788,10 @@ dependencies = [
 name = "guardiana-secure"
 version = "1.0.27"
 dependencies = [
+ "qrcode",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
  "vodozemac",
 ]
 

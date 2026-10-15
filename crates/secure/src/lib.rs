@@ -18,8 +18,11 @@
 use vodozemac::olm::{Account, OlmMessage, Session, SessionConfig, SessionCreationError};
 use vodozemac::{Curve25519PublicKey, Ed25519PublicKey};
 
+pub mod agenda;
 pub mod carry;
+pub mod monitor;
 pub mod puesto;
+pub mod tarjeta;
 pub mod verificar;
 
 /// Why a SECURE operation stopped. The text never names a key or a message.
@@ -39,6 +42,9 @@ pub enum Error {
     CannotOpen,
     /// The saved identity could not be restored. The key was wrong or the blob was not ours.
     CannotRestore,
+    /// This name arrived once with other keys and is blocked until a new short-code check
+    /// pins it again ([`agenda::Agenda::comprueba`]). There is no «accept anyway».
+    ReverifyNeeded,
 }
 
 impl std::fmt::Display for Error {
@@ -50,6 +56,7 @@ impl std::fmt::Display for Error {
             Error::NotAFirstMessage => "the first message was not a pre-key message",
             Error::CannotOpen => "the message could not be opened",
             Error::CannotRestore => "the identity could not be restored",
+            Error::ReverifyNeeded => "the keys changed: verify this person again before talking",
         })
     }
 }
@@ -108,6 +115,11 @@ impl Identity {
         Ok(Self {
             account: Account::from_pickle(pickle),
         })
+    }
+
+    /// This computer's signed card, the text behind its QR code ([`tarjeta`]).
+    pub fn tarjeta(&self, emitida: u64) -> String {
+        tarjeta::escribe(self, emitida)
     }
 
     /// One new one-time public key. The matching secret stays in this identity
@@ -208,6 +220,31 @@ impl Conversation {
     /// The identity key this conversation will encrypt to.
     pub fn peer(&self) -> Curve25519PublicKey {
         self.peer
+    }
+
+    /// The ratchet state, encrypted with a 32-byte key, so a conversation survives the program
+    /// closing (the plan of 15 Oct 2026: until then only the identity was kept, not the
+    /// session). The caller wraps the key as it wraps [`Identity::lock`].
+    pub fn lock(&self, key: &[u8; 32]) -> String {
+        format!(
+            "{}|{}",
+            self.peer.to_base64(),
+            self.session.pickle().encrypt(key)
+        )
+    }
+
+    /// Restore from [`Conversation::lock`]. A wrong key or a touched blob is
+    /// [`Error::CannotRestore`]; the peer comes back with it, so a restored conversation
+    /// still refuses any other key.
+    pub fn unlock(secret: &str, key: &[u8; 32]) -> Result<Self, Error> {
+        let (peer, pickle) = secret.split_once('|').ok_or(Error::CannotRestore)?;
+        let peer = Curve25519PublicKey::from_base64(peer).map_err(|_| Error::CannotRestore)?;
+        let pickle = vodozemac::olm::SessionPickle::from_encrypted(pickle, key)
+            .map_err(|_| Error::CannotRestore)?;
+        Ok(Self {
+            session: Session::from_pickle(pickle),
+            peer,
+        })
     }
 
     /// Encrypt `plaintext` only if `accepted` is still the peer of this conversation.
@@ -333,6 +370,21 @@ mod tests {
         let still = alice_side.send(accepted, b"sigue").unwrap();
         let (_, opened) = bob.receive_session(alice.public_key(), &still).unwrap();
         assert_eq!(opened, b"sigue");
+    }
+
+    #[test]
+    fn a_conversation_locked_and_unlocked_goes_on_where_it_was() {
+        let (alice, mut bob, mut alice_side, accepted) = pair();
+        let first = alice_side.send(accepted, b"uno").unwrap();
+        let (bob_side, _) = bob.receive_session(alice.public_key(), &first).unwrap();
+        let key = [7u8; 32];
+        let saved = bob_side.lock(&key);
+        assert!(Conversation::unlock(&saved, &[8u8; 32]).is_err());
+        let mut bob_again = Conversation::unlock(&saved, &key).unwrap();
+        assert_eq!(bob_again.peer(), alice.public_key());
+        let reply = bob_again.send(alice.public_key(), b"dos").unwrap();
+        assert_eq!(alice_side.open(&reply).unwrap(), b"dos");
+        assert!(Conversation::unlock("sin barra", &key).is_err());
     }
 
     #[test]
