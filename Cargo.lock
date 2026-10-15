@@ -826,6 +826,7 @@ dependencies = [
  "guardiana-core",
  "guardiana-license",
  "guardiana-lists",
+ "guardiana-secure",
  "ring",
  "serde",
  "serde_json",

@@ -7,33 +7,120 @@
 <link rel="stylesheet" href="diseno.css">
 <link rel="stylesheet" href="comun.css">
 <style>
-html, body { min-height: 100%; background: var(--hoja); }
-body { background-image: linear-gradient(color-mix(in srgb, var(--tinta) 4%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--tinta) 4%, transparent) 1px, transparent 1px); background-size: 44px 44px; background-position: -1px -1px; }
-.marca { position: fixed; top: 22px; left: 28px; display: flex; align-items: center; gap: 9px; color: var(--gris); }
-.marca i { width:16px; height:16px; display:inline-block; flex:none; background:radial-gradient(circle closest-side,var(--azul) 0 42%,var(--tinta) 42%); -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M160.59 69.13 A68 68 0 1 1 130.87 39.41' fill='none' stroke='%23000' stroke-width='30'/%3E%3Ccircle cx='100' cy='100' r='31' fill='%23000'/%3E%3C/svg%3E") center/contain no-repeat; mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M160.59 69.13 A68 68 0 1 1 130.87 39.41' fill='none' stroke='%23000' stroke-width='30'/%3E%3Ccircle cx='100' cy='100' r='31' fill='%23000'/%3E%3C/svg%3E") center/contain no-repeat; }
-.marca b { font: 600 12px/1 var(--display); letter-spacing: .03em; color: var(--tinta); }
-main { max-width: 760px; margin: 0 auto; padding: 16vh 28px 64px; }
-h1 { font: 600 clamp(32px, 4vw, 44px)/1.1 var(--display); letter-spacing: -.02em; margin: 0 0 14px; }
-.frase { margin: 0 0 36px; max-width: 38em; font-size: 17px; line-height: 1.5; color: var(--gris); }
+html, body { min-height: 100%; background: var(--bg); }
+body { background-image: linear-gradient(color-mix(in srgb, var(--fg) 4%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--fg) 4%, transparent) 1px, transparent 1px); background-size: 44px 44px; background-position: -1px -1px; }
+header.top { display: flex; align-items: center; gap: 14px; padding: 14px 22px; border-bottom: 1px solid var(--line); background: var(--card); }
+header.top .marca-g { font-size: 15px; }
+header.top .marca-g .sec { color: var(--muted); }
+header.top .chip { margin-left: auto; }
+/* Two columns: the conversation on the left, the monitor always on the right. */
+.secure { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--e5); max-width: 1240px; margin: 0 auto; padding: var(--e5) 22px 48px; }
+@media (max-width: 920px) { .secure { grid-template-columns: 1fr; } }
+h1 { font: 600 clamp(28px, 3.6vw, 38px)/1.1 var(--display); letter-spacing: -.02em; margin: 0 0 12px; }
+.frase { margin: 0 0 var(--e5); max-width: 38em; font-size: 16px; line-height: 1.5; color: var(--muted); }
 .tres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.tres article { padding: 18px 16px 16px; border: 1px solid var(--linea); border-radius: 16px; background: var(--hoja); box-shadow: var(--sombra); }
+.tres article.tarjeta { box-shadow: var(--sombra); }
 .tres h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
-.tres p { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--gris); }
+.tres p { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--muted); }
 @media (max-width: 680px) { .tres { grid-template-columns: 1fr; } }
+
+/* The monitor: one card, sections with a mono caption, two-column rows of label and value. */
+aside.monitor { position: sticky; top: var(--e5); align-self: start; display: grid; gap: var(--e3); }
+.monitor .tarjeta { padding: 14px 16px; }
+.monitor .cabecera { display: flex; align-items: center; gap: 10px; }
+.monitor .cabecera .rotulo { flex: 1; }
+.monitor .latido { width: 8px; height: 8px; border-radius: 50%; background: var(--muted-2); flex: none; }
+.monitor .latido.vivo { background: var(--ok); box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); animation: late 1.6s infinite; }
+@keyframes late { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.monitor .frase-m { margin: 6px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+.monitor dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 10px 0 0; font-size: 13px; }
+.monitor dt { color: var(--muted); white-space: nowrap; }
+.monitor dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.monitor dd.mono { font-family: var(--mono); font-size: 12px; letter-spacing: .02em; }
+.monitor dd.huella { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; letter-spacing: .04em; }
+.monitor .vacio { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
+.monitor ol { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.monitor li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: baseline; font-size: 12.5px; padding: 6px 0; border-top: 1px solid var(--line); }
+.monitor li:first-child { border-top: 0; }
+.monitor li time { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.monitor li .chip { grid-column: 1 / -1; justify-self: start; }
+.monitor .nota { margin: 10px 0 0; font-size: 11.5px; color: var(--muted); }
 </style>
 </head>
 <body>
-<div class="marca"><i></i><b>GUARDIANA</b><span data-t="sec_titulo">SECURE</span></div>
+<header class="top">
+  <span class="marca-g">GUARDIANA <span class="sec" data-t="sec_titulo">SECURE</span></span>
+  <span class="chip" id="m-estado-chip" data-t="sec_sin_sesion"></span>
+</header>
+<div class="secure">
 <main>
   <h1 data-t="sec_titulo">SECURE</h1>
   <p class="frase" data-t="sec_frase">Mensajes, archivos y llamadas privadas entre ordenadores. En desarrollo, con cifrado de extremo a extremo. Aún no envía nada.</p>
   <div class="tres">
-    <article><h2 data-t="sec_mensajes">Mensajes</h2><p data-t="sec_mensajes_vacio">Entre dos ordenadores. Aún no hay ninguno.</p></article>
-    <article><h2 data-t="sec_docs">Documentos</h2><p data-t="sec_docs_vacio">Archivos entre dos ordenadores. Aún no hay ninguno.</p></article>
-    <article><h2 data-t="sec_voz">Voz</h2><p data-t="sec_voz_vacio">Llamada entre dos ordenadores. Aún no hay ninguna.</p></article>
+    <article class="tarjeta"><h2 data-t="sec_mensajes">Mensajes</h2><p data-t="sec_mensajes_vacio">Entre dos ordenadores. Aún no hay ninguno.</p></article>
+    <article class="tarjeta"><h2 data-t="sec_docs">Documentos</h2><p data-t="sec_docs_vacio">Archivos entre dos ordenadores. Aún no hay ninguno.</p></article>
+    <article class="tarjeta"><h2 data-t="sec_voz">Voz</h2><p data-t="sec_voz_vacio">Llamada entre dos ordenadores. Aún no hay ninguna.</p></article>
   </div>
 </main>
+
+<aside class="monitor" aria-live="polite">
+  <section class="tarjeta">
+    <div class="cabecera"><span class="rotulo" data-t="sec_monitor"></span><i class="latido" id="m-latido"></i></div>
+    <p class="frase-m" data-t="sec_monitor_frase"></p>
+  </section>
+
+  <section class="tarjeta">
+    <div class="cabecera"><span class="rotulo" data-t="sec_identidad"></span></div>
+    <dl>
+      <dt data-t="sec_identidad_contacto"></dt><dd id="m-nombre">—</dd>
+      <dt data-t="sec_identidad_estado"></dt><dd id="m-estado">—</dd>
+      <dt data-t="sec_identidad_verificado"></dt><dd id="m-verificado">—</dd>
+      <dt data-t="sec_identidad_huella"></dt><dd class="huella" id="m-huella">—</dd>
+      <dt data-t="sec_identidad_propia"></dt><dd class="mono" id="m-propia">—</dd>
+      <dt data-t="sec_identidad_otra"></dt><dd class="mono" id="m-otra">—</dd>
+    </dl>
+  </section>
+
+  <section class="tarjeta">
+    <div class="cabecera"><span class="rotulo" data-t="sec_cifrado"></span></div>
+    <dl>
+      <dt data-t="sec_cifrado_algoritmo"></dt><dd id="m-algoritmo">—</dd>
+      <dt data-t="sec_cifrado_enviados"></dt><dd id="m-enviados">—</dd>
+      <dt data-t="sec_cifrado_recibidos"></dt><dd id="m-recibidos">—</dd>
+      <dt data-t="sec_cifrado_ultimo"></dt><dd id="m-ultimo">—</dd>
+      <dt data-t="sec_cifrado_sframe"></dt><dd id="m-sframe">—</dd>
+    </dl>
+  </section>
+
+  <section class="tarjeta">
+    <div class="cabecera"><span class="rotulo" data-t="sec_transporte"></span></div>
+    <dl>
+      <dt data-t="sec_transporte"></dt><dd id="m-directo">—</dd>
+      <dt data-t="sec_transporte_dtls"></dt><dd id="m-dtls">—</dd>
+      <dt data-t="sec_transporte_latencia"></dt><dd id="m-latencia">—</dd>
+      <dt data-t="sec_transporte_perdida"></dt><dd id="m-perdida">—</dd>
+      <dt data-t="sec_transporte_jitter"></dt><dd id="m-jitter">—</dd>
+      <dt data-t="sec_transporte_audio"></dt><dd id="m-audio">—</dd>
+      <dt data-t="sec_transporte_video"></dt><dd id="m-video">—</dd>
+    </dl>
+    <p class="nota" data-t="sec_transporte_sin_ip"></p>
+  </section>
+
+  <section class="tarjeta">
+    <div class="cabecera"><span class="rotulo" data-t="sec_vigilancia"></span></div>
+    <p class="frase-m" data-t="sec_vigilancia_frase"></p>
+    <ol id="m-vigilancia"></ol>
+    <p class="vacio" id="m-vigilancia-vacia" data-t="sec_vigilancia_vacia"></p>
+  </section>
+
+  <section class="tarjeta">
+    <div class="cabecera"><span class="rotulo" data-t="sec_historico"></span></div>
+    <ol id="m-historico"></ol>
+    <p class="vacio" id="m-historico-vacio" data-t="sec_historico_vacio"></p>
+  </section>
+</aside>
+</div>
 <script src="puente.js"></script>
-<script>Z.manda({ tipo: 'listo', vista: 'secure' });</script>
+<script src="secure.js"></script>
 </body>
 </html>

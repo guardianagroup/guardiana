@@ -1177,6 +1177,14 @@ impl Sesion {
         host_de(&p.url).unwrap_or_else(|| p.url.clone())
     }
 
+    /// The SECURE monitor as the page draws it: what `guardiana_secure::monitor::Monitor`
+    /// knows, nothing more. No conversation yet, so it is the empty screen.
+    fn msg_monitor_secure(&self) -> Value {
+        let monitor = guardiana_secure::monitor::Monitor::new();
+        let valor = serde_json::from_str::<Value>(&monitor.to_json()).unwrap_or(Value::Null);
+        json!({ "tipo": "monitor", "monitor": valor })
+    }
+
     fn msg_estado(&self) -> Value {
         let pestanas: Vec<Value> = self
             .pestanas
@@ -2148,7 +2156,7 @@ impl Sesion {
                 if let Some(p) = self.pestana_mut(id) {
                     p.lista = true;
                 }
-                [
+                let mut o: Vec<Orden> = [
                     self.a_pestana(id, &self.msg_tema()),
                     self.a_pestana(id, &self.msg_textos()),
                     self.a_pestana(id, &self.msg_hoy()),
@@ -2156,7 +2164,13 @@ impl Sesion {
                 ]
                 .into_iter()
                 .flatten()
-                .collect()
+                .collect();
+                // The SECURE tab draws its monitor from the first second (15 Oct 2026). Until a
+                // conversation exists every field is null and the page shows «—».
+                if m.get("vista").and_then(Value::as_str) == Some("secure") {
+                    o.extend(self.a_pestana(id, &self.msg_monitor_secure()));
+                }
+                o
             }
         }
     }
