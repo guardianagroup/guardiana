@@ -1,8 +1,10 @@
-//! A loopback post office for opaque frames.
+//! A loopback post office for opaque frames, used by the one-machine test.
 //!
 //! Each name holds one frame. A second put is refused before the body is read.
 //! The post office has no identity and does not look inside a frame. It is not
-//! the DNS service and it is not a server between two countries.
+//! the DNS service. It has no client authentication, no global memory quota and
+//! no expiry, so it must not be opened toward another computer. Two computers
+//! use [`crate::enlace`], which is one direct connection.
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
