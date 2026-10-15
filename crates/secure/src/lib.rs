@@ -19,6 +19,8 @@ use vodozemac::olm::{Account, OlmMessage, Session, SessionConfig, SessionCreatio
 use vodozemac::{Curve25519PublicKey, Ed25519PublicKey};
 
 pub mod carry;
+pub mod enlace;
+pub mod guardar;
 pub mod puesto;
 pub mod verificar;
 

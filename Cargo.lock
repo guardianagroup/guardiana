@@ -788,7 +788,9 @@ dependencies = [
 name = "guardiana-secure"
 version = "1.0.27"
 dependencies = [
+ "getrandom 0.4.3",
  "vodozemac",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

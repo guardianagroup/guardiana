@@ -11,6 +11,12 @@ publish = false
 
 [dependencies]
 vodozemac = { workspace = true }
+getrandom = { workspace = true }
+
+# DPAPI, current-user scope, only when this crate is built for Windows.
+# The DNS service does not depend on guardiana-secure, so it does not get this.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
 
 [lints]
 workspace = true

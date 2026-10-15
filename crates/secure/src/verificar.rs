@@ -141,6 +141,75 @@ fn mac_input(signing: Ed25519PublicKey, curve: Curve25519PublicKey) -> String {
     )
 }
 
+/// The bytes one device sends to the other: both public keys, the SAS MAC and
+/// the Ed25519 signature. Not a plaintext message.
+pub fn empaquetar(device: &crate::Identity, code: &Codigo) -> Result<Vec<u8>, VerifyError> {
+    let mac = code.mac(device.signing_key(), device.public_key());
+    if mac.as_bytes().len() != 32 {
+        return Err(VerifyError::Failed);
+    }
+    let signature = device.sign(&code.transcript(device.signing_key(), device.public_key()));
+    let mut out = Vec::with_capacity(160);
+    out.extend_from_slice(device.public_key().as_bytes());
+    out.extend_from_slice(device.signing_key().as_bytes());
+    out.extend_from_slice(mac.as_bytes());
+    out.extend_from_slice(&signature.to_bytes());
+    Ok(out)
+}
+
+/// A received proof that is not verified until the person compares the numbers.
+/// Nothing in this type reads the other side's claim of what the numbers were.
+pub struct Pendiente {
+    code: Codigo,
+    curve: Curve25519PublicKey,
+    signing: Ed25519PublicKey,
+    mac: Mac,
+    signature: Ed25519Signature,
+}
+
+impl Pendiente {
+    /// Hold a proof that arrived from the other device. This does not verify it.
+    pub fn sostener(code: Codigo, bytes: &[u8]) -> Result<Self, VerifyError> {
+        if bytes.len() != 160 {
+            return Err(VerifyError::Failed);
+        }
+        let curve =
+            Curve25519PublicKey::from_slice(&bytes[..32]).map_err(|_| VerifyError::Failed)?;
+        let mut signing_bytes = [0u8; 32];
+        signing_bytes.copy_from_slice(&bytes[32..64]);
+        let signing =
+            Ed25519PublicKey::from_slice(&signing_bytes).map_err(|_| VerifyError::Failed)?;
+        let mac = Mac::from_slice(&bytes[64..96]);
+        let signature =
+            Ed25519Signature::from_slice(&bytes[96..]).map_err(|_| VerifyError::Failed)?;
+        Ok(Self {
+            code,
+            curve,
+            signing,
+            mac,
+            signature,
+        })
+    }
+
+    /// The three numbers this device computed. Show these. Do not replace them
+    /// with numbers that arrived on the same socket.
+    pub fn numeros(&self) -> (u16, u16, u16) {
+        self.code.decimals()
+    }
+
+    /// The person compared [`Pendiente::numeros`] with the other person, out of band.
+    /// `false` verifies nothing.
+    pub fn la_persona_dice(self, coinciden: bool) -> Result<Verified, VerifyError> {
+        self.code.confirm(
+            self.curve,
+            self.signing,
+            &self.mac,
+            &self.signature,
+            coinciden,
+        )
+    }
+}
+
 /// One device that was checked with a short code. Not a name and not a profession.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Verified {
@@ -158,6 +227,10 @@ impl Verified {
     pub fn signing(&self) -> Ed25519PublicKey {
         self.signing
     }
+
+    pub(crate) fn from_public_keys(curve: Curve25519PublicKey, signing: Ed25519PublicKey) -> Self {
+        Self { curve, signing }
+    }
 }
 
 impl std::fmt::Debug for Verified {
@@ -169,30 +242,58 @@ impl std::fmt::Debug for Verified {
     }
 }
 
-/// The devices a person has accepted. An unknown device is not allowed to receive.
+/// The devices a person has accepted. An unknown or revoked device is not
+/// allowed to receive. Revocation stays in this value until it is saved and
+/// loaded again; a plain [`Trust::insert`] does not undo it.
 #[derive(Clone, Default)]
 pub struct Trust {
     peers: Vec<Verified>,
+    revoked: Vec<Ed25519PublicKey>,
 }
 
 impl Trust {
     /// No device is accepted.
     pub fn new() -> Self {
-        Self { peers: Vec::new() }
+        Self {
+            peers: Vec::new(),
+            revoked: Vec::new(),
+        }
     }
 
     /// Remember a device that passed [`Codigo::confirm`].
+    /// A revoked signing key is not added again. A new comparison uses [`Trust::aceptar`].
     pub fn insert(&mut self, peer: Verified) {
+        if self.revoked.contains(&peer.signing) {
+            return;
+        }
         if !self.peers.iter().any(|known| known.signing == peer.signing) {
             self.peers.push(peer);
         }
     }
 
-    /// Forget a device. Later sends to its Curve25519 key are refused.
+    /// Trust a device after a new short-code comparison, including one that
+    /// was revoked. This is a deliberate act. [`Trust::insert`] will not do it.
+    pub fn aceptar(&mut self, peer: Verified) {
+        self.revoked.retain(|key| *key != peer.signing);
+        if !self.peers.iter().any(|known| known.signing == peer.signing) {
+            self.peers.push(peer);
+        }
+    }
+
+    /// Forget a device. Later sends to its Curve25519 key are refused, and
+    /// [`Trust::insert`] will not put it back.
     pub fn revoke(&mut self, signing: Ed25519PublicKey) -> bool {
+        if !self.revoked.contains(&signing) {
+            self.revoked.push(signing);
+        }
         let before = self.peers.len();
         self.peers.retain(|peer| peer.signing != signing);
         self.peers.len() != before
+    }
+
+    /// Whether this signing key was revoked in this list.
+    pub fn is_revoked(&self, signing: Ed25519PublicKey) -> bool {
+        self.revoked.contains(&signing)
     }
 
     /// Whether messages may be encrypted to this Curve25519 key.
@@ -223,6 +324,22 @@ impl Trust {
             return Err(Error::IdentityChanged);
         }
         conversation.open(envelope)
+    }
+
+    pub(crate) fn restore(peers: Vec<Verified>, revoked: Vec<Ed25519PublicKey>) -> Self {
+        let peers = peers
+            .into_iter()
+            .filter(|peer| !revoked.contains(&peer.signing))
+            .collect();
+        Self { peers, revoked }
+    }
+
+    pub(crate) fn peers(&self) -> &[Verified] {
+        &self.peers
+    }
+
+    pub(crate) fn revoked_keys(&self) -> &[Ed25519PublicKey] {
+        &self.revoked
     }
 }
 
@@ -315,7 +432,7 @@ mod tests {
         assert_eq!(opened, b"hola");
 
         let reply = bob_trust.send(&mut bob_side, b"recibido").unwrap();
-        alice_trust.insert(verified);
+        alice_trust.aceptar(verified);
         assert_eq!(
             alice_trust.open(&mut conversation, &reply).unwrap(),
             b"recibido"
@@ -492,5 +609,31 @@ mod tests {
                 .signing(),
             bob.signing_key()
         );
+    }
+
+    #[test]
+    fn saying_the_numbers_differ_verifies_nothing_and_revocation_survives() {
+        let (alice, bob, alice_code, bob_code) = both();
+        let packed = empaquetar(&bob, &bob_code).unwrap();
+        let pending = Pendiente::sostener(alice_code, &packed).unwrap();
+        assert_eq!(pending.numeros(), bob_code.decimals());
+        assert_eq!(
+            pending.la_persona_dice(false).unwrap_err(),
+            VerifyError::DecimalsDiffer
+        );
+
+        let verified = accept(&bob_code, &alice);
+        let mut trust = Trust::new();
+        trust.insert(verified);
+        assert!(trust.revoke(alice.signing_key()));
+        trust.insert(verified);
+        assert!(!trust.allows(alice.public_key()));
+        let restored = Trust::restore(trust.peers().to_vec(), trust.revoked_keys().to_vec());
+        assert!(restored.is_revoked(alice.signing_key()));
+        assert!(!restored.allows(alice.public_key()));
+        let mut again = restored;
+        again.aceptar(verified);
+        assert!(again.allows(alice.public_key()));
+        assert!(!again.is_revoked(alice.signing_key()));
     }
 }
