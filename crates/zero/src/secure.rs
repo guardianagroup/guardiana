@@ -154,8 +154,11 @@ pub struct Secure {
     conversacion: Option<Conversation>,
     /// Messages for the screen: (unix s, mine?, text).
     pub mensajes: Vec<(u64, bool, String)>,
+    /// What the screen shows the whole time.
     pub monitor: Monitor,
+    /// The chain of what was seen, for the signed evidence.
     pub cadena: Cadena,
+    /// Running, or stopped with its reason.
     pub estado: EstadoSesion,
     entrada: Option<Entrada>,
     salida: Option<Salida>,
