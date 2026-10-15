@@ -1326,7 +1326,10 @@
     let abierto = null;
     const enlace = (href, txt) => (soloMirar ? '' : `<a href="${esc(href)}">${esc(txt)} →</a>`);
     const botonDest = (d) => `<button type="button" class="fila-det" data-dest="${esc(d.k)}"><span>${bloqueado(d) ? '✕ ' : ''}${esc(d.host)}</span><span class="${bloqueado(d) ? 'c' : 'o'}">${bloqueado(d) ? esc(tn('pd_parados', d.bloq)) : '↑ ' + esc(bytes(d.sub))}</span></button>`;
-    const listaDest = (ds, tope = 12) => { const o = ds.slice().sort((a, b) => b.sub - a.sub || b.bloq - a.bloq); return o.length ? `<div class="lista-det">${o.slice(0, tope).map(botonDest).join('')}${o.length > tope ? `<div class="t">${esc(tn('pd_y_mas', o.length - tope))}</div>` : ''}</div>` : ''; };
+    // Which «y N más» lists are open, so the live refresh does not fold them back.
+    const masAbiertos = new Set();
+    document.addEventListener('toggle', (e) => { const d = e.target; if (d && d.dataset && d.dataset.mas) { if (d.open) masAbiertos.add(d.dataset.mas); else masAbiertos.delete(d.dataset.mas); } }, true);
+    const listaDest = (ds, tope = 12) => { const o = ds.slice().sort((a, b) => b.sub - a.sub || b.bloq - a.bloq); return o.length ? `<div class="lista-det">${o.slice(0, tope).map(botonDest).join('')}${o.length > tope ? `<details class="mas-det" data-mas="${esc(o[0].k)}"${masAbiertos.has(o[0].k) ? ' open' : ''}><summary>${esc(tn('pd_y_mas', o.length - tope))}</summary>${o.slice(tope).map(botonDest).join('')}</details>` : ''}</div>` : ''; };
     const cerca = (lon, lat) => (st.vista === 'destinos' && lon !== undefined ? `<button type="button" class="btn-hud" data-cerca="${lon},${lat}">${esc(t('pd_ver_cerca'))}</button>` : '');
     const htmlDetalle = (hh) => {
       let h = `<div class="cuerpo">${textoTip(hh)}</div>`, acciones = '', enlaces = [];

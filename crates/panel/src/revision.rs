@@ -46,6 +46,53 @@ struct Cache {
     cuando: Option<i64>,
     datos: Option<Value>,
     error: Option<String>,
+    /// What the running review is doing, as the script says it (1.0.31).
+    vivo: Vivo,
+}
+
+/// The live view of a running review: real steps from the script, nothing made up. Only the
+/// last few lines are kept; it lives in memory and is cleared when a review starts.
+#[derive(Serialize, Default, Clone)]
+pub(crate) struct Vivo {
+    /// The section being read now (`arranque`, `salida`…).
+    seccion: Option<String>,
+    /// Sections finished, with how long each took (ms).
+    hechas: Vec<(String, u64)>,
+    /// Files whose signature was read so far.
+    firmas: u32,
+    /// How many items each list had (`tareas` → 41).
+    cuentas: Vec<(String, u64)>,
+    /// The last steps, newest last: (kind, text).
+    pasos: std::collections::VecDeque<(String, String)>,
+}
+
+impl Vivo {
+    fn anota(&mut self, tipo: &str, texto: &str) {
+        match tipo {
+            "seccion" => self.seccion = Some(texto.to_owned()),
+            "hecho" => {
+                let (s, ms) = texto.split_once('\t').unwrap_or((texto, "0"));
+                self.hechas
+                    .push((s.to_owned(), ms.trim().parse().unwrap_or(0)));
+            }
+            "firma" => self.firmas += 1,
+            "cuenta" => {
+                let (s, n) = texto.split_once('\t').unwrap_or((texto, "0"));
+                self.cuentas
+                    .push((s.to_owned(), n.trim().parse().unwrap_or(0)));
+            }
+            _ => {}
+        }
+        if tipo != "hecho" {
+            self.pasos.push_back((
+                tipo.chars().take(16).collect(),
+                texto.chars().take(160).collect(),
+            ));
+            while self.pasos.len() > 14 {
+                self.pasos.pop_front();
+            }
+        }
+    }
 }
 
 /// The names already seen, written next to the ledger (`revision-vistos.json`).
@@ -77,10 +124,19 @@ impl Revisor {
                 return;
             }
             c.corriendo = true;
+            c.vivo = Vivo::default();
         }
         let st = Arc::clone(state);
+        let st_vivo = Arc::clone(state);
         tokio::task::spawn_blocking(move || {
-            let r = guardiana_apps::revision_del_equipo(LIMITE);
+            let r = guardiana_apps::revision_del_equipo_en_vivo(
+                LIMITE,
+                Box::new(move |tipo, texto| {
+                    if let Ok(mut c) = st_vivo.revision.estado.lock() {
+                        c.vivo.anota(tipo, texto);
+                    }
+                }),
+            );
             let now = now_ms();
             if let Ok(datos) = &r {
                 // Remember what was seen (names only), the first time with its own date.
@@ -140,6 +196,9 @@ pub(crate) struct Respuesta {
     equipo: Option<Value>,
     grupos: Vec<Grupo>,
     resumen: Resumen,
+    /// While it runs: what it is doing (1.0.31).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    vivo: Option<Vivo>,
 }
 
 #[derive(Serialize, Default, Debug, PartialEq, Eq)]
@@ -211,11 +270,19 @@ pub(crate) async fn ahora(State(state): State<Arc<AppState>>, _s: Session) -> Ap
 }
 
 fn respuesta(state: &AppState) -> Respuesta {
-    let (corriendo, cuando, datos, error) = state
+    let (corriendo, cuando, datos, error, vivo) = state
         .revision
         .estado
         .lock()
-        .map(|c| (c.corriendo, c.cuando, c.datos.clone(), c.error.clone()))
+        .map(|c| {
+            (
+                c.corriendo,
+                c.cuando,
+                c.datos.clone(),
+                c.error.clone(),
+                c.corriendo.then(|| c.vivo.clone()),
+            )
+        })
         .unwrap_or_default();
     let vistos = lee_vistos(&state.db_path);
     let now = now_ms();
@@ -232,6 +299,7 @@ fn respuesta(state: &AppState) -> Respuesta {
         equipo: datos.as_ref().map(|d| d["equipo"].clone()),
         resumen: resumir(&grupos),
         grupos,
+        vivo,
     }
 }
 
@@ -1622,6 +1690,23 @@ mod tests {
             }
             assert!(faltan.is_empty(), "{l}: {faltan:?}");
         }
+    }
+
+    #[test]
+    fn the_live_view_keeps_real_steps_and_only_the_last_ones() {
+        let mut v = Vivo::default();
+        v.anota("seccion", "arranque");
+        for i in 0..30 {
+            v.anota("firma", &format!("p{i}.exe"));
+        }
+        v.anota("cuenta", "tareas\t41");
+        v.anota("hecho", "arranque\t5120");
+        assert_eq!(v.seccion.as_deref(), Some("arranque"));
+        assert_eq!(v.firmas, 30);
+        assert_eq!(v.cuentas, vec![("tareas".to_owned(), 41)]);
+        assert_eq!(v.hechas, vec![("arranque".to_owned(), 5120)]);
+        assert_eq!(v.pasos.len(), 14);
+        assert_eq!(v.pasos.back().unwrap().0, "cuenta");
     }
 
     #[test]

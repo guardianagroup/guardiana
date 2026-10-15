@@ -888,3 +888,18 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 .rv-conclusion{margin-top:22px;border-left:4px solid var(--azul,#1f4bff)}
 .rv-conclusion h2{margin-top:0}
 .rv-conclusion p{font-size:1.05rem;line-height:1.65;margin-bottom:0}
+/* «y N más» opens: the whole list of a place, not only its first rows (owner, 15 Oct 2026). */
+.lista-det details.mas-det summary{cursor:pointer;color:var(--muted);font-size:12px;padding:4px 2px;list-style:none}
+.lista-det details.mas-det summary::-webkit-details-marker{display:none}
+.lista-det details.mas-det summary::before{content:'▸ '}
+.lista-det details.mas-det[open] summary::before{content:'▾ '}
+/* The review, live (1.0.31): the script's real steps while it runs. */
+.rv-vivo{display:grid;gap:6px;margin-top:4px}.rv-vivo[hidden]{display:none}
+.rv-vivo-cab{display:flex;flex-wrap:wrap;gap:4px 12px;font:12px var(--mono);letter-spacing:.03em;text-transform:uppercase}
+.rv-vivo-lista{list-style:none;margin:0;padding:10px 12px;border:1px solid #253048;border-radius:10px;background:#0b1020;color:#c9d3ee;font:12px/1.55 var(--mono);max-height:230px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end}
+.rv-vivo-lista li{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.62}
+.rv-vivo-lista li::before{content:'› ';color:#6b8cff}
+.rv-vivo-lista li.seccion{opacity:.9;color:#edf2ff}.rv-vivo-lista li.cuenta{color:#3fc7a0;opacity:.9}
+.rv-vivo-lista li.ultimo{opacity:1;color:#fff}.rv-vivo-lista li.ultimo::after{content:'▍';margin-left:3px;animation:rv-pulso 1s steps(2) infinite}
+.rv-paso.listo>i{background:var(--nivel-verde)}.rv-paso.espera{opacity:.55}.rv-paso.espera>i{background:var(--desconocido)}
+@media (prefers-reduced-motion:reduce){.rv-vivo-lista li.ultimo::after{animation:none}}

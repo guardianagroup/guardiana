@@ -9,10 +9,15 @@ $T = [ordered]@{}
 function Ms($d) { if ($null -eq $d) { return $null }; try { return ([DateTimeOffset][DateTime]$d).ToUnixTimeMilliseconds() } catch { return $null } }
 function MsFt($ft) { try { $n = [long]$ft; if ($n -le 0) { return 0 }; return ([DateTimeOffset][DateTime]::FromFileTimeUtc($n)).ToUnixTimeMilliseconds() } catch { return $null } }
 function Corta($s) { $s = ([string]$s) -replace '\s+', ' '; if ($s.Length -gt 200) { $s = $s.Substring(0, 200) }; return $s }
+# What it is doing, live, for the page (1.0.31): one line per step on standard error, which the
+# panel reads while the review runs. Only what is really being read, never the answers' contents.
+function Paso([string]$tipo, [string]$texto) { try { [Console]::Error.WriteLine('@@' + $tipo + "`t" + (($texto -replace '[\r\n\t]', ' ').Trim())) } catch {} }
 function Seccion([string]$nombre, [scriptblock]$sb) {
+  Paso 'seccion' $nombre
   $w = [Diagnostics.Stopwatch]::StartNew()
   try { $R[$nombre] = (& $sb) } catch { $R[$nombre] = [ordered]@{ error = (Corta $_.Exception.Message) } }
   $T[$nombre] = $w.ElapsedMilliseconds
+  Paso 'hecho' ($nombre + "`t" + $w.ElapsedMilliseconds)
 }
 function Prop($ruta, $nombre) { try { return (Get-ItemProperty -LiteralPath $ruta -Name $nombre -ErrorAction Stop).$nombre } catch { return $null } }
 $USUARIOS = @()
@@ -36,6 +41,7 @@ function Firma([string]$ruta) {
   try {
     if (Test-Path -LiteralPath $ruta -PathType Leaf) {
       $f.existe = $true
+      Paso 'firma' (Split-Path -Leaf $ruta)
       $s = Get-AuthenticodeSignature -LiteralPath $ruta
       $f.estado = [string]$s.Status
       if ($s.SignerCertificate) { $f.firmante = $s.SignerCertificate.GetNameInfo([Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false) }
@@ -131,6 +137,7 @@ Seccion 'arranque' {
   try {
     $o.inicio = @(Get-CimInstance Win32_StartupCommand | ForEach-Object { $r = RutaDe $_.Command; $f = Firma $r
       [ordered]@{ nombre = [string]$_.Name; orden = (Corta $_.Command); ruta = $r; donde = [string]$_.Location; usuario = [string]$_.User; existe = $f.existe; firma = $f.estado; firmante = $f.firmante } })
+    Paso 'cuenta' ('inicio' + "`t" + @($o.inicio).Count)
   } catch {}
   try {
     $o.tareas = @(Get-ScheduledTask | Where-Object { $_.TaskPath -notlike '\Microsoft\*' } | ForEach-Object {
@@ -142,16 +149,19 @@ Seccion 'arranque' {
       }
       $dis = @($_.Triggers | ForEach-Object { ([string]$_.CimClass.CimClassName) -replace '^MSFT_Task', '' -replace 'Trigger$', '' })
       [ordered]@{ nombre = [string]$_.TaskName; carpeta = [string]$_.TaskPath; estado = [string]$_.State; autor = [string]$_.Author; ruta = $r; args = $args2; disparadores = $dis; oculta = [bool]$_.Settings.Hidden; existe = $f.existe; firma = $f.estado; firmante = $f.firmante } })
+    Paso 'cuenta' ('tareas' + "`t" + @($o.tareas).Count)
   } catch {}
   try {
     $o.servicios = @(Get-CimInstance Win32_Service | ForEach-Object { $r = RutaDe $_.PathName
       if ($r -match '(?i)\\svchost\.exe$') { $dll = Prop "HKLM:\SYSTEM\CurrentControlSet\Services\$($_.Name)\Parameters" 'ServiceDll'; if ($dll) { $r = [Environment]::ExpandEnvironmentVariables([string]$dll) } }
       $f = Firma $r
       if (-not (EsDeMicrosoft $f)) { [ordered]@{ nombre = [string]$_.Name; visible = [string]$_.DisplayName; estado = [string]$_.State; inicio = [string]$_.StartMode; ruta = $r; existe = $f.existe; firma = $f.estado; firmante = $f.firmante } } })
+    Paso 'cuenta' ('servicios' + "`t" + @($o.servicios).Count)
   } catch {}
   try {
     $o.controladores = @(Get-CimInstance Win32_SystemDriver | ForEach-Object { $r = RutaDe $_.PathName; $f = Firma $r
       if ($f.existe -and -not (EsDeMicrosoft $f)) { [ordered]@{ nombre = [string]$_.Name; visible = [string]$_.DisplayName; estado = [string]$_.State; inicio = [string]$_.StartMode; ruta = $r; firma = $f.estado; firmante = $f.firmante } } })
+    Paso 'cuenta' ('controladores' + "`t" + @($o.controladores).Count)
   } catch {}
   $o
 }
@@ -164,9 +174,9 @@ Seccion 'salida' {
     $falso = 'guardiana-' + [guid]::NewGuid().ToString('N').Substring(0, 12) + '.example.com'
     $o.prueba_dns = @($srv | Select-Object -First 4 | ForEach-Object {
       $s = $_; $p = [ordered]@{ servidor = $s; google = $null; cloudflare = $null; inexistente = $null }
-      try { $p.google = @(Resolve-DnsName -Name 'dns.google' -Type A -Server $s -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction Stop | Where-Object { $_.IPAddress } | ForEach-Object { [string]$_.IPAddress }) } catch { $p.google = 'error' }
-      try { $p.cloudflare = @(Resolve-DnsName -Name 'one.one.one.one' -Type A -Server $s -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction Stop | Where-Object { $_.IPAddress } | ForEach-Object { [string]$_.IPAddress }) } catch { $p.cloudflare = 'error' }
-      try { $p.inexistente = @(Resolve-DnsName -Name $falso -Type A -Server $s -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction Stop | Where-Object { $_.IPAddress } | ForEach-Object { [string]$_.IPAddress }) } catch { if ([string]$_.FullyQualifiedErrorId -like 'DNS_ERROR_RCODE_NAME_ERROR*') { $p.inexistente = @() } else { $p.inexistente = 'error' } }
+      Paso 'dns' 'dns.google'; try { $p.google = @(Resolve-DnsName -Name 'dns.google' -Type A -Server $s -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction Stop | Where-Object { $_.IPAddress } | ForEach-Object { [string]$_.IPAddress }) } catch { $p.google = 'error' }
+      Paso 'dns' 'one.one.one.one'; try { $p.cloudflare = @(Resolve-DnsName -Name 'one.one.one.one' -Type A -Server $s -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction Stop | Where-Object { $_.IPAddress } | ForEach-Object { [string]$_.IPAddress }) } catch { $p.cloudflare = 'error' }
+      Paso 'dns' $falso; try { $p.inexistente = @(Resolve-DnsName -Name $falso -Type A -Server $s -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction Stop | Where-Object { $_.IPAddress } | ForEach-Object { [string]$_.IPAddress }) } catch { if ([string]$_.FullyQualifiedErrorId -like 'DNS_ERROR_RCODE_NAME_ERROR*') { $p.inexistente = @() } else { $p.inexistente = 'error' } }
       $p })
   } catch {}
   try { $o.adaptadores = @(Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | ForEach-Object { [ordered]@{ nombre = [string]$_.Name; desc = [string]$_.InterfaceDescription; virtual = [bool]$_.Virtual } }) } catch {}

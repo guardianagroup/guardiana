@@ -8,8 +8,11 @@ use super::Error;
 /// The script, as it travels inside the binary.
 pub(crate) const SCRIPT: &str = include_str!("revision.ps1");
 
-pub(crate) fn revisar(limite: std::time::Duration) -> Result<serde_json::Value, Error> {
-    use std::io::{Read as _, Write as _};
+pub(crate) fn revisar(
+    limite: std::time::Duration,
+    avisa: Box<dyn Fn(&str, &str) + Send>,
+) -> Result<serde_json::Value, Error> {
+    use std::io::{BufRead as _, Read as _, Write as _};
     use std::os::windows::process::CommandExt;
     use std::process::{Command, Stdio};
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -32,7 +35,7 @@ pub(crate) fn revisar(limite: std::time::Duration) -> Result<serde_json::Value, 
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .creation_flags(CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS)
         .spawn()
         .map_err(|e| Error::Sistema(e.to_string()))?;
@@ -48,6 +51,19 @@ pub(crate) fn revisar(limite: std::time::Duration) -> Result<serde_json::Value, 
             let _ = s.read_to_end(&mut v);
         }
         v
+    });
+    // What the script says it is doing (`@@kind<TAB>text` on standard error), handed on as it
+    // comes so the page can show it live. Read always, or a full pipe would stop PowerShell.
+    let errores = hijo.stderr.take();
+    let pasos = std::thread::spawn(move || {
+        if let Some(e) = errores {
+            for linea in std::io::BufReader::new(e).lines().map_while(Result::ok) {
+                if let Some(resto) = linea.strip_prefix("@@") {
+                    let (tipo, texto) = resto.split_once('\t').unwrap_or((resto, ""));
+                    avisa(tipo, texto);
+                }
+            }
+        }
     });
     let inicio = std::time::Instant::now();
     loop {
@@ -66,6 +82,7 @@ pub(crate) fn revisar(limite: std::time::Duration) -> Result<serde_json::Value, 
         }
     }
     let bytes = lector.join().unwrap_or_default();
+    let _ = pasos.join();
     let texto = String::from_utf8_lossy(&bytes);
     let texto = texto.trim().trim_start_matches('\u{feff}');
     serde_json::from_str(texto).map_err(|e| Error::Sistema(format!("respuesta ilegible: {e}")))
@@ -81,7 +98,20 @@ mod tests {
     #[test]
     fn the_review_runs_on_windows_and_reads_the_basics() {
         let inicio = std::time::Instant::now();
-        let r = revisar(std::time::Duration::from_secs(400)).unwrap();
+        let vistos = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let v2 = std::sync::Arc::clone(&vistos);
+        let r = revisar(
+            std::time::Duration::from_secs(400),
+            Box::new(move |tipo, _| {
+                if let Ok(mut v) = v2.lock() {
+                    v.push(tipo.to_owned());
+                }
+            }),
+        )
+        .unwrap();
+        let tipos = vistos.lock().unwrap().clone();
+        assert!(tipos.iter().any(|t| t == "seccion"), "{tipos:?}");
+        assert!(tipos.iter().any(|t| t == "hecho"), "{tipos:?}");
         let secs = inicio.elapsed().as_secs();
         assert!(
             r["equipo"]["sistema"]
