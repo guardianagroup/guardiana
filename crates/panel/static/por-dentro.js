@@ -1336,7 +1336,7 @@
         acciones += cerca(g.lon, g.lat);
       } else if (hh.tipo === 'dest') {
         const d = hh.ref, p = prod(d.p);
-        if (d.lugar) h += `<p><b>${esc(t('pd_lugar_titulo'))}</b> ${esc(d.lugar.ciudad)} · ${esc(nombrePais(d.lugar.pais))}</p><p class="t">${esc(t(d.lugar.fuente === 'region' ? 'pd_lugar_region' : 'pd_lugar_geofeed').replace('{op}', t('pd_op_' + d.lugar.operador)).replace('{region}', d.lugar.region))}</p>`;
+        if (d.lugar) h += `<p><b>${esc(t('pd_lugar_titulo'))}</b> ${esc(d.lugar.ciudad)} · ${esc(nombrePais(d.lugar.pais))}</p><p class="t">${esc(t(d.lugar.fuente === 'region' ? 'pd_lugar_region' : d.lugar.fuente === 'base' ? 'pd_lugar_base' : 'pd_lugar_geofeed').replace('{op}', t('pd_op_' + d.lugar.operador)).replace('{region}', d.lugar.region))}</p>`;
         else if (!d.sede) h += `<p class="t">${esc(t('pd_pos_pais').replace('{pais}', d.pais ? nombrePais(d.pais) : '—'))}</p>`;
         if (!soloMirar) acciones += !d.destino ? `<p class="t">${esc(t('pd_sin_nombre_no_corta'))}</p>` : d.ancho ? `<p class="t">${esc(t('pd_ancho_dejar'))}</p>` : `<button type="button" class="btn-hud${d.cortado ? '' : ' peligro'}" data-cortar="dest">${esc(t(d.cortado ? 'pd_btn_dejar' : 'pd_btn_cortar'))}</button>`;
         acciones += cerca(d.lon, d.lat);

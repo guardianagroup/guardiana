@@ -303,13 +303,15 @@ fn filas_de_trafico(
                 enviados: m.enviados,
                 recibidos: m.recibidos,
                 paquetes: m.paquetes,
-                // The region or city the address's own operator publishes (1.0.24); none for
-                // an anycast address, which answers from many places.
+                // The operator's own place first. Where they publish none, the city the address
+                // database gives, approximate. An anycast address answers from many places.
                 lugar: if s.anycast {
                     String::new()
+                } else if let Some(l) = guardiana_lists::lugar_de(m.ip) {
+                    l.clave()
                 } else {
-                    guardiana_lists::lugar_de(m.ip)
-                        .map(guardiana_lists::Lugar::clave)
+                    guardiana_lists::ciudad_de(m.ip)
+                        .map(|c| c.clave())
                         .unwrap_or_default()
                 },
             }

@@ -692,6 +692,19 @@ pub(crate) async fn estado(
             },
         });
     }
+    let ciudad_ip: serde_json::Value =
+        serde_json::from_str(guardiana_lists::CIUDAD_IP_JSON).unwrap_or_default();
+    let rangos_ciudad = ["rangos_v4", "rangos_v6"]
+        .iter()
+        .filter_map(|k| ciudad_ip[k].as_u64())
+        .sum();
+    if rangos_ciudad > 0 {
+        listas.push(ListaInfo {
+            id: "dbip-ciudad".to_owned(),
+            entries: rangos_ciudad,
+            fetched: ciudad_ip["fecha"].as_str().unwrap_or("").to_owned(),
+        });
+    }
     listas.push(ListaInfo {
         id: guardiana_lists::OWN_SOURCE_TELEMETRIA.to_owned(),
         entries: guardiana_lists::parse_guardiana(guardiana_lists::TELEMETRIA).count() as u64,

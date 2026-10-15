@@ -1,0 +1,16 @@
+{
+  "fuente": "DB-IP IP to City Lite",
+  "fecha": "2026-10",
+  "licencia": "CC BY 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by/4.0/",
+  "atribucion": "IP Geolocation by DB-IP",
+  "web": "https://db-ip.com",
+  "url": "https://download.db-ip.com/free/dbip-city-lite-2026-10.csv.gz",
+  "archivo": "ip-ciudad.bin",
+  "ciudades": 194461,
+  "paises": 247,
+  "rangos_v4": 3419134,
+  "rangos_v6": 3836396,
+  "v6_por_debajo_de_64": 193,
+  "bytes": 72268826
+}

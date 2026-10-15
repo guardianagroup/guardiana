@@ -249,6 +249,17 @@ fn lugar_servidor(lugares: &HashMap<String, u64>) -> Option<LugarServidor> {
     let (clave, _) = lugares
         .iter()
         .max_by(|a, b| a.1.cmp(b.1).then(b.0.cmp(a.0)))?;
+    if let Some(c) = guardiana_lists::ciudad_desde_clave(clave) {
+        return Some(LugarServidor {
+            ciudad: c.ciudad,
+            pais: c.pais,
+            lat: c.lat,
+            lon: c.lon,
+            operador: "dbip".to_owned(),
+            region: c.region,
+            fuente: "base",
+        });
+    }
     let l = guardiana_lists::lugar_por_clave(clave)?;
     let geofeed = l.region.contains('|');
     Some(LugarServidor {

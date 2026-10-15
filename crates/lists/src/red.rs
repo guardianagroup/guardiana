@@ -11,8 +11,11 @@
 //! (a front server forwards it on), nor the country of the company that owns the name
 //! (`country_of`). For an anycast address not even that holds, and it is said instead.
 
+use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::OnceLock;
+
+use flate2::read::GzDecoder;
 
 use serde::{Deserialize, Serialize};
 
@@ -31,6 +34,11 @@ pub const NUBE_IP: &[u8] = include_bytes!("../data/nube-ip.bin");
 pub const LUGARES_JSON: &str = include_str!("../data/lugares.json");
 /// What those two are: sources, dates, licences, hashes (`build/geo.py`).
 pub const GEO_JSON: &str = include_str!("../data/geo.json");
+/// IP → city, gzip of the table from DB-IP «IP to City Lite» (CC BY 4.0, same credit as the
+/// country). Used only when the operator publishes no place. Anycast addresses are left out.
+pub const IP_CIUDAD_GZ: &[u8] = include_bytes!("../data/ip-ciudad.bin.gz");
+/// What that table is: month, licence, how many cities (`build` of the city base).
+pub const CIUDAD_IP_JSON: &str = include_str!("../data/ciudad-ip.json");
 
 /// A place an operator publishes for its addresses (owner, 13 Oct 2026: «saber la ciudad o el
 /// estado a dónde van… lo máximo que podáis de precisión»). Not a guess from a geolocation base:
@@ -104,6 +112,121 @@ pub fn lugar_por_clave(clave: &str) -> Option<&'static Lugar> {
             .collect()
     });
     lugares().get(*m.get(clave)?)
+}
+
+/// A city the address database gives. Approximate: it is not the operator's word, and not the
+/// building the data ends up in. `lat` and `lon` are the database's, to a hundredth of a degree.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Ciudad {
+    /// The city, as the database names it (`Cartagena`).
+    pub ciudad: String,
+    /// The state or department (`Bolívar`), empty when the database gives none.
+    pub region: String,
+    /// Two-letter country.
+    pub pais: String,
+    /// Latitude, to a hundredth of a degree.
+    pub lat: f64,
+    /// Longitude, likewise.
+    pub lon: f64,
+}
+
+impl Ciudad {
+    /// What a measurement keeps, so a later month of the database still draws this place.
+    #[must_use]
+    pub fn clave(&self) -> String {
+        format!(
+            "dbip:{}|{}|{}|{:.2}|{:.2}",
+            self.pais, self.region, self.ciudad, self.lat, self.lon
+        )
+    }
+}
+
+struct TablaCiudad {
+    lista: Vec<Ciudad>,
+    tabla: Tabla,
+}
+
+fn tabla_ciudad() -> Option<&'static TablaCiudad> {
+    static T: OnceLock<Option<TablaCiudad>> = OnceLock::new();
+    T.get_or_init(|| {
+        let mut dec = GzDecoder::new(IP_CIUDAD_GZ);
+        let mut v = Vec::new();
+        dec.read_to_end(&mut v).ok()?;
+        let datos: &'static [u8] = Box::leak(v.into_boxed_slice());
+        let mut l = Lector { datos, pos: 0 };
+        if l.bytes(8)? != b"GCIUDAD1" {
+            return None;
+        }
+        let ancho = *l.bytes(1)?.first()?;
+        if ancho != 2 && ancho != 3 {
+            return None;
+        }
+        let n = l.n()?;
+        let mut lista = Vec::with_capacity(n);
+        for _ in 0..n {
+            let pais = std::str::from_utf8(l.bytes(2)?).ok()?;
+            let lat = i16::from_le_bytes(l.bytes(2)?.try_into().ok()?);
+            let lon = i16::from_le_bytes(l.bytes(2)?.try_into().ok()?);
+            let rl = *l.bytes(1)?.first()? as usize;
+            let region = std::str::from_utf8(l.bytes(rl)?).unwrap_or("");
+            let cl = *l.bytes(1)?.first()? as usize;
+            let ciudad = std::str::from_utf8(l.bytes(cl)?).unwrap_or("");
+            lista.push(Ciudad {
+                ciudad: ciudad.to_owned(),
+                region: region.to_owned(),
+                pais: pais.to_owned(),
+                lat: f64::from(lat) / 100.0,
+                lon: f64::from(lon) / 100.0,
+            });
+        }
+        let tabla = l.rangos(ancho as usize)?;
+        Some(TablaCiudad { lista, tabla })
+    })
+    .as_ref()
+}
+
+/// The city the database gives this address, when it gives one. Nothing for a local address, an
+/// anycast address, or a block the database leaves without a city (the country still stands).
+#[must_use]
+pub fn ciudad_de(ip: IpAddr) -> Option<&'static Ciudad> {
+    let ip = normal(ip);
+    if es_local(ip) {
+        return None;
+    }
+    let red = redes().and_then(|r| r.red(r.tabla.buscar(ip)));
+    let any = anycast();
+    if any.prefijos.iter().any(|p| p.contiene(ip)) || red.is_some_and(|r| any.asns.contains(&r.asn))
+    {
+        return None;
+    }
+    let t = tabla_ciudad()?;
+    t.lista.get(t.tabla.buscar(ip).checked_sub(1)?)
+}
+
+/// A city key a measurement already stored (`dbip:CO|Bolívar|Cartagena|10.40|-75.49`).
+#[must_use]
+pub fn ciudad_desde_clave(clave: &str) -> Option<Ciudad> {
+    let rest = clave.strip_prefix("dbip:")?;
+    let mut p = rest.splitn(5, '|');
+    let pais = p.next()?;
+    let region = p.next()?;
+    let ciudad = p.next()?;
+    let lat: f64 = p.next()?.parse().ok()?;
+    let lon: f64 = p.next()?.parse().ok()?;
+    if pais.len() != 2
+        || ciudad.is_empty()
+        || !(-90.0..=90.0).contains(&lat)
+        || !(-180.0..=180.0).contains(&lon)
+    {
+        return None;
+    }
+    Some(Ciudad {
+        ciudad: ciudad.to_owned(),
+        region: region.to_owned(),
+        pais: pais.to_owned(),
+        lat,
+        lon,
+    })
 }
 
 /// A network (autonomous system): its number and the organisation name the base gives it.
@@ -724,5 +847,16 @@ mod lugar_tests {
         }
         // A private address has no place.
         assert!(lugar_de("192.168.1.1".parse().unwrap()).is_none());
+        // A city in a country no cloud region covers, and none for anycast or a private address.
+        let c = ciudad_de("181.49.0.1".parse().unwrap()).unwrap();
+        assert_eq!(c.pais, "CO");
+        assert_eq!(c.ciudad, "Cartagena");
+        assert_eq!(c.region, "Bolívar");
+        let otra = ciudad_desde_clave(&c.clave()).unwrap();
+        assert_eq!(otra.ciudad, "Cartagena");
+        assert_eq!(otra.pais, "CO");
+        assert!(ciudad_de("8.8.8.8".parse().unwrap()).is_none(), "anycast");
+        assert!(ciudad_de("192.168.0.1".parse().unwrap()).is_none());
+        assert!(ciudad_desde_clave("aws:us-east-1").is_none());
     }
 }
