@@ -328,21 +328,31 @@ impl Secure {
 
     /// Start listening on a port (0 lets the system choose). The address is never shown.
     pub fn escuchar(&mut self, puerto: u16) -> Result<u16, String> {
-        self.escuchar_grupo(puerto, None, true)
+        self.escuchar_grupo(Some(puerto), None, true)
+    }
+
+    /// Listen on a port the system picks (the tests, so two of them never meet on 47300).
+    pub fn escuchar_efimero(&mut self) -> Result<u16, String> {
+        self.escuchar_grupo(None, None, true)
     }
 
     /// Listen for one more member of a group: the same port and the same relay code as the
     /// first session, and the door left as it is (the first session opened it and keeps it).
     pub fn escuchar_grupo(
         &mut self,
-        puerto: u16,
+        puerto: Option<u16>,
         codigo_rele: Option<String>,
         abre_puerta: bool,
     ) -> Result<u16, String> {
         self.cerrar("nueva escucha");
         // A fixed port when free (the code stays the same from one day to the next), any port
-        // otherwise.
-        let listener = TcpListener::bind(("0.0.0.0", if puerto == 0 { 47300 } else { puerto }))
+        // otherwise; `None` asks the system for one.
+        let pedido = match puerto {
+            Some(0) => 47300,
+            Some(p) => p,
+            None => 0,
+        };
+        let listener = TcpListener::bind(("0.0.0.0", pedido))
             .or_else(|_| TcpListener::bind(("0.0.0.0", 0)))
             .map_err(|e| e.to_string())?;
         let puerto = listener.local_addr().map_err(|e| e.to_string())?.port();
@@ -1494,7 +1504,7 @@ mod tests {
         std::fs::create_dir_all(&db).unwrap();
         let mut a = Secure::abre(&da, &da);
         let mut b = Secure::abre(&db, &db);
-        let puerto = a.escuchar(0).unwrap();
+        let puerto = a.escuchar_efimero().unwrap();
         b.conectar(&format!("127.0.0.1:{puerto}")).unwrap();
         gira(&mut a, &mut b, 25);
         let (na, nb) = (a.numeros(), b.numeros());
@@ -1565,10 +1575,10 @@ mod tests {
         std::fs::create_dir_all(&db).unwrap();
         let mut a = Secure::abre(&da, &da);
         let mut b = Secure::abre(&db, &db);
-        a.escuchar(0).unwrap();
+        a.escuchar_efimero().unwrap();
         // Up to a few seconds for the router search to give up, then the relay code appears.
         let mut codigo = None;
-        for _ in 0..200 {
+        for _ in 0..600 {
             a.tic();
             if let Some(c) = a.estado_json()["rele_codigo"].as_str() {
                 codigo = Some(c.to_owned());

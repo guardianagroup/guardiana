@@ -102,6 +102,13 @@ impl Grupo {
         self.primera().escuchar(puerto)
     }
 
+    /// Invite on a port the system picks (the tests).
+    pub fn escuchar_efimero(&mut self) -> Result<u16, String> {
+        self.cierra_todo("nueva invitación");
+        self.anfitrion = true;
+        self.primera().escuchar_efimero()
+    }
+
     /// Join someone's group with their code.
     pub fn conectar(&mut self, direccion: &str) -> Result<(), String> {
         self.cierra_todo("nueva conexión");
@@ -172,7 +179,7 @@ impl Grupo {
         let (puerto, codigo_rele, _) = self.sesiones[0].escucha();
         if self.sesiones.last().is_some_and(Secure::lista) {
             let i = self.nueva_sesion();
-            let _ = self.sesiones[i].escuchar_grupo(puerto, codigo_rele, false);
+            let _ = self.sesiones[i].escuchar_grupo(Some(puerto), codigo_rele, false);
             self.cambio = true;
             self.manda_lista();
         }
@@ -537,7 +544,7 @@ mod tests {
         a.nombre_propio = "Ana".to_owned();
         let mut b = Grupo::abre(&db, &db);
         let mut c = Grupo::abre(&dc, &dc);
-        let puerto = a.escuchar(0).unwrap();
+        let puerto = a.escuchar_efimero().unwrap();
         b.conectar(&format!("127.0.0.1:{puerto}")).unwrap();
         gira(&mut [&mut a, &mut b], 25);
         assert!(a.numeros().is_some() && a.numeros() == b.numeros());
