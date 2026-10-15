@@ -76,18 +76,15 @@ async fn atiende(s: TcpStream, esperando: Esperando) -> std::io::Result<()> {
     let otro = {
         let mut m = esperando.lock().await;
         match m.remove(&sala) {
-            Some((otro, _)) => Some(otro),
+            Some((otro, _)) => otro,
             None => {
                 if m.len() >= MAX_SALAS {
                     return Ok(());
                 }
                 m.insert(sala, (lector, Instant::now()));
-                None
+                return Ok(());
             }
         }
-    };
-    let Some(otro) = otro else {
-        return Ok(());
     };
     // Paired: both hear it, then bytes flow. Anything the first one wrote while waiting is
     // still inside its reader's buffer, so it goes first.
