@@ -466,3 +466,171 @@ mod tests {
         assert_eq!(l0.bloques, 1);
     }
 }
+
+/// Block by block, as the pieces come from wherever the file is read (a page handing them
+/// over, a disk): the same stream format as [`Cifrador::cifra`], driven from outside.
+pub struct Trozos {
+    cifrador: Cifrador,
+    cerrado: bool,
+}
+
+impl Trozos {
+    /// A fresh key for one file.
+    pub fn new() -> Result<Self, Error> {
+        Ok(Self {
+            cifrador: Cifrador::new()?,
+            cerrado: false,
+        })
+    }
+
+    /// Encrypt the next block (every block [`BLOQUE`] bytes but the last, which may be shorter
+    /// and closes the file). Returns the ciphertext for the block's number.
+    pub fn empuja(&mut self, trozo: &[u8]) -> Result<(u64, Vec<u8>), Error> {
+        if self.cerrado || trozo.len() > BLOQUE {
+            return Err(Error::CannotOpen);
+        }
+        let n = self.cifrador.bloques;
+        self.cifrador.hash.update(trozo);
+        self.cifrador.bytes += trozo.len() as u64;
+        if self.cifrador.bytes > MAX_BYTES {
+            return Err(Error::CannotOpen);
+        }
+        let c = self
+            .cifrador
+            .cipher
+            .encrypt(
+                &nonce(&self.cifrador.prefijo, n),
+                Payload {
+                    msg: trozo,
+                    aad: &aad_flujo(n),
+                },
+            )
+            .map_err(|_| Error::CannotOpen)?;
+        self.cifrador.bloques += 1;
+        if trozo.len() < BLOQUE {
+            self.cerrado = true;
+        }
+        Ok((n, c))
+    }
+
+    /// Blocks sent so far.
+    pub fn bloques(&self) -> u64 {
+        self.cifrador.bloques
+    }
+
+    /// The key to send inside Olm once every block went out.
+    pub fn termina(self) -> Result<Llave, Error> {
+        if !self.cerrado {
+            return Err(Error::CannotOpen);
+        }
+        Ok(Llave {
+            clave: b64(&self.cifrador.clave),
+            prefijo: b64(&self.cifrador.prefijo),
+            bytes: self.cifrador.bytes,
+            bloques: self.cifrador.bloques,
+            sha256: hex(&self.cifrador.hash.finalize()),
+        })
+    }
+}
+
+/// The receiving side of [`Trozos`]: blocks in order, each opened as it comes, the whole
+/// checked at the end against the key's size and hash.
+pub struct Recepcion {
+    cipher: XChaCha20Poly1305,
+    prefijo: [u8; 16],
+    hash: Sha256,
+    bytes: u64,
+    siguiente: u64,
+}
+
+impl Recepcion {
+    /// From the key that came inside Olm (it may arrive after the blocks; the blocks wait).
+    pub fn new(llave: &Llave) -> Result<Self, Error> {
+        let clave: [u8; 32] = de_b64(&llave.clave)?
+            .try_into()
+            .map_err(|_| Error::CannotOpen)?;
+        let prefijo: [u8; 16] = de_b64(&llave.prefijo)?
+            .try_into()
+            .map_err(|_| Error::CannotOpen)?;
+        Ok(Self {
+            cipher: XChaCha20Poly1305::new((&clave).into()),
+            prefijo,
+            hash: Sha256::new(),
+            bytes: 0,
+            siguiente: 0,
+        })
+    }
+
+    /// Open block `n`; it must be the next one. The plaintext goes to the file.
+    pub fn mete(&mut self, n: u64, datos: &[u8]) -> Result<Vec<u8>, Error> {
+        if n != self.siguiente || datos.len() > BLOQUE + 64 {
+            return Err(Error::CannotOpen);
+        }
+        let plano = self
+            .cipher
+            .decrypt(
+                &nonce(&self.prefijo, n),
+                Payload {
+                    msg: datos,
+                    aad: &aad_flujo(n),
+                },
+            )
+            .map_err(|_| Error::CannotOpen)?;
+        self.hash.update(&plano);
+        self.bytes += plano.len() as u64;
+        self.siguiente += 1;
+        Ok(plano)
+    }
+
+    /// Blocks opened so far.
+    pub fn bloques(&self) -> u64 {
+        self.siguiente
+    }
+
+    /// The whole file arrived and is the one that was sent.
+    pub fn termina(self, llave: &Llave) -> Result<(), Error> {
+        if self.siguiente != llave.bloques
+            || self.bytes != llave.bytes
+            || hex(&self.hash.finalize()) != llave.sha256
+        {
+            return Err(Error::CannotOpen);
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod trozos_tests {
+    use super::*;
+
+    #[test]
+    fn pieces_pushed_one_by_one_make_the_same_stream_and_open_in_order() {
+        let plano: Vec<u8> = (0..(BLOQUE * 2 + 5)).map(|i| (i % 7) as u8).collect();
+        let mut tx = Trozos::new().unwrap();
+        let mut bloques = Vec::new();
+        for trozo in plano.chunks(BLOQUE) {
+            bloques.push(tx.empuja(trozo).unwrap());
+        }
+        assert!(tx.empuja(b"x").is_err(), "closed after a short block");
+        let llave = tx.termina().unwrap();
+        assert_eq!(llave.bloques, 3);
+        let mut rx = Recepcion::new(&llave).unwrap();
+        let mut salida = Vec::new();
+        assert!(rx.mete(1, &bloques[1].1).is_err(), "out of order");
+        for (n, c) in &bloques {
+            salida.extend(rx.mete(*n, c).unwrap());
+        }
+        assert_eq!(salida, plano);
+        rx.termina(&llave).unwrap();
+        // A file that ends exactly on a block boundary needs an empty closing block.
+        let exacto = vec![1u8; BLOQUE];
+        let mut tx = Trozos::new().unwrap();
+        tx.empuja(&exacto).unwrap();
+        let (n, c) = tx.empuja(b"").unwrap();
+        assert_eq!(n, 1);
+        let llave = tx.termina().unwrap();
+        let _ = c;
+        assert_eq!(llave.bloques, 2);
+    }
+}
