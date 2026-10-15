@@ -3,6 +3,9 @@
 //! Read-only: the adapters that are up, and the VPN connections Windows itself keeps, nothing
 //! else. The names are what Windows shows; no address is read or kept.
 
+// Off Windows only the decision and its test compile; the rest waits for Windows.
+#![cfg_attr(not(windows), allow(dead_code))]
+
 use super::Error;
 
 /// A VPN seen active: the adapter or connection name, as Windows shows it.
@@ -37,7 +40,6 @@ const TUNELES: &[&str] = &[
 ];
 
 /// Decide from what Windows listed. Separate from the call so it can be tested anywhere.
-#[cfg_attr(not(windows), allow(dead_code))]
 pub(crate) fn decide(adaptadores: &[(String, String)], conexiones: &[(String, bool)]) -> Vec<Vpn> {
     let mut v: Vec<Vpn> = adaptadores
         .iter()
