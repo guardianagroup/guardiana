@@ -92,7 +92,7 @@
   }
   $('p-verificar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'verificar' }));
   $('p-prueba').addEventListener('click', () => manda({ tipo: 'secure', accion: 'prueba' }));
-  $('p-terminar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'terminar' }));
+  $('p-terminar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'cerrar' }));
   // The «paused for» clock ticks on its own; the program resends the state every second anyway.
   setInterval(() => { if (!$('p').hidden) pintaPausa(ultimo); }, 1000);
 
@@ -158,7 +158,23 @@
     ol.innerHTML = (E.mensajes || []).map((m) => `<li class="${m.mio ? 'mio' : ''}">${esc(m.texto)}<time>${esc(hora(m.t))}</time></li>`).join('');
     if (abajo) ol.scrollTop = ol.scrollHeight;
   };
-  en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); fasePinta(); });
+  en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); fasePinta(); pintaResumen(m.resumen); });
+  // The summary when a conversation ends: on screen and as a file, signed by this computer.
+  const descarga = (nombre, tipo, texto) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([texto], { type: tipo })); a.download = nombre; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
+  const sello = (s) => { const d = new Date((s || Math.floor(Date.now() / 1000)) * 1000); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; };
+  let R = null;
+  const pintaResumen = (r) => {
+    R = r || null;
+    const caja = $('c-resumen');
+    if (!r || E.fase === 'lista') { caja.hidden = true; return; }
+    caja.hidden = false;
+    const filas = [[t('sec_r_clase'), t('sec_r_clase_' + r.clase)], [t('sec_identidad_contacto'), r.contacto], [t('sec_r_duracion'), tiempo(r.duracion_s)], [t('sec_r_mensajes'), n(r.mensajes)], [t('sec_r_archivos'), n(r.archivos)], [t('sec_r_vistas'), n(r.observadas + r.inusuales)]];
+    $('c-resumen-datos').innerHTML = filas.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${esc(b)}</dd>`).join('');
+  };
+  $('c-resumen-json').addEventListener('click', () => { if (R) descarga(`guardiana-secure-resumen-${sello(R.fin)}.json`, 'application/json', R.json); });
+  $('c-resumen-csv').addEventListener('click', () => { if (R) descarga(`guardiana-secure-resumen-${sello(R.fin)}.csv`, 'text/csv;charset=utf-8', '\ufeff' + R.csv); });
+  $('c-prueba').addEventListener('click', () => manda({ tipo: 'secure', accion: 'prueba' }));
+  en('secure_prueba', (m) => descarga(`guardiana-secure-prueba-${sello()}.json`, 'application/json', m.json));
   en('secure_aviso', (m) => { const txt = t(m.clave) + (m.texto ? ' ' + m.texto : ''); aviso(txt); });
   const avisos = [];
   function aviso(txt) { avisos.push(txt); const ol = $('c-mensajes'); const li = document.createElement('li'); li.className = 'aviso-li'; li.textContent = txt; ol.appendChild(li); ol.scrollTop = ol.scrollHeight; }
@@ -257,7 +273,7 @@
     const tipo = mime(video);
     grabador = new MediaRecorder(local, { mimeType: tipo, audioBitsPerSecond: 64000, videoBitsPerSecond: video ? 1500000 : undefined });
     grabador.ondataavailable = async (e) => { if (e.data && e.data.size) manda({ tipo: 'secure', accion: 'media', b64: b64De(await e.data.arrayBuffer()) }); };
-    grabador.start(250);
+    grabador.start(120);
     preparaReproductor(tipo);
   };
   const preparaReproductor = (tipo) => {
@@ -275,7 +291,7 @@
     try { buffer.appendBuffer(pendientes.shift()); } catch (_) { pendientes = []; }
     // Keep close to live: if the player fell more than 1.5 s behind, jump.
     const v = $('c-remoto');
-    try { if (v.buffered.length && v.buffered.end(v.buffered.length - 1) - v.currentTime > 1.5) v.currentTime = v.buffered.end(v.buffered.length - 1) - 0.3; } catch (_) {}
+    try { if (v.buffered.length && v.buffered.end(v.buffered.length - 1) - v.currentTime > 0.9) v.currentTime = v.buffered.end(v.buffered.length - 1) - 0.25; } catch (_) {}
   };
   en('secure_media', (m) => { (m.trozos || []).forEach((b) => { const s = atob(b); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); pendientes.push(u.buffer); }); vacia(); });
   const paraMedios = () => {

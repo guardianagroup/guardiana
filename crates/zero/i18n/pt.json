@@ -934,5 +934,18 @@
   "sec_l_sin_permiso": "Sem permissão para o microfone ou a câmara, não há chamada.",
   "sec_l_no_reproduce": "Este navegador não consegue reproduzir a chamada.",
   "sec_llamada_entrante": "Chamada a entrar.",
-  "sec_llamada_colgada": "A outra pessoa desligou."
+  "sec_llamada_colgada": "A outra pessoa desligou.",
+  "sec_r_titulo": "Resumo da conversa",
+  "sec_r_json": "Baixar JSON",
+  "sec_r_csv": "Baixar CSV",
+  "sec_r_nota": "Assinado com a chave deste computador. Sem conteúdo de mensagens, sem nomes de arquivos, sem endereços.",
+  "sec_r_clase": "O que foi",
+  "sec_r_clase_chat": "Chat",
+  "sec_r_clase_llamada": "Chamada de voz",
+  "sec_r_clase_videollamada": "Videochamada",
+  "sec_r_clase_envio": "Envio de arquivos",
+  "sec_r_duracion": "Duração",
+  "sec_r_mensajes": "Mensagens",
+  "sec_r_archivos": "Arquivos",
+  "sec_r_vistas": "Coisas vistas"
 }

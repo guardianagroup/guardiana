@@ -658,7 +658,8 @@ impl Sesion {
         } else {
             Idioma::de_etiqueta(&prefs.idioma)
         };
-        let secure = crate::secure::Secure::abre(&a.datos, &a.descargas);
+        let mut secure = crate::secure::Secure::abre(&a.datos, &a.descargas);
+        secure.pon_version(&a.version);
         let mut s = Self {
             datos: a.datos,
             descargas: a.descargas,
@@ -1267,6 +1268,13 @@ impl Sesion {
             "visto" => {
                 self.secure.novedad = false;
                 Ok(())
+            }
+            "prueba" => {
+                let j = self.secure.prueba_json();
+                return self
+                    .a_pestana(id, &json!({ "tipo": "secure_prueba", "json": j }))
+                    .into_iter()
+                    .collect();
             }
             _ => Ok(()),
         };
