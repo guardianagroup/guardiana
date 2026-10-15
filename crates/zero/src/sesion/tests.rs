@@ -133,6 +133,30 @@ fn the_three_product_tabs_open_together_and_the_panel_stays_in_front() {
     assert_eq!(e["pestanas"][0]["titulo"], "Radiografías");
     assert_eq!(e["pestanas"][1]["titulo"], "Navegador ZERO");
     assert_eq!(e["pestanas"][2]["titulo"], "Comunicaciones");
+
+    let id = s.pestanas[0].id;
+    let o = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        &json!({ "tipo": "pestana_cerrar", "id": id }).to_string(),
+    );
+    assert!(!o
+        .iter()
+        .any(|x| matches!(x, Orden::CierraPestana { id: cerrado } if *cerrado == id)));
+    assert_eq!(s.pestanas.len(), 3);
+
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"navegar","texto":"example.com"}"#,
+    );
+    assert_eq!(s.pestanas.len(), 4);
+    assert!(s.pestanas[0].fija);
+    assert_eq!(s.pestanas[0].url, url);
+
+    let _ = s.abre_guardiana(&format!("http://127.0.0.1:7443/?t={}", "b".repeat(64)));
+    assert_eq!(s.pestanas.iter().filter(|p| p.fija).count(), 3);
+    assert_eq!(s.pestanas.len(), 4);
 }
 
 #[test]
@@ -164,30 +188,6 @@ fn the_comunicaciones_page_buttons_reach_the_conversation() {
             r#"{"tipo":"secure","accion":"escuchar","puerto":0}"#
         )
         .is_empty());
-
-    let id = s.pestanas[0].id;
-    let o = s.mensaje(
-        Origen::Barra,
-        BARRA,
-        &json!({ "tipo": "pestana_cerrar", "id": id }).to_string(),
-    );
-    assert!(!o
-        .iter()
-        .any(|x| matches!(x, Orden::CierraPestana { id: cerrado } if *cerrado == id)));
-    assert_eq!(s.pestanas.len(), 3);
-
-    let _ = s.mensaje(
-        Origen::Barra,
-        BARRA,
-        r#"{"tipo":"navegar","texto":"example.com"}"#,
-    );
-    assert_eq!(s.pestanas.len(), 4);
-    assert!(s.pestanas[0].fija);
-    assert_eq!(s.pestanas[0].url, url);
-
-    let _ = s.abre_guardiana(&format!("http://127.0.0.1:7443/?t={}", "b".repeat(64)));
-    assert_eq!(s.pestanas.iter().filter(|p| p.fija).count(), 3);
-    assert_eq!(s.pestanas.len(), 4);
 }
 
 #[test]
