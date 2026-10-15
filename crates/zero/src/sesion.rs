@@ -48,6 +48,8 @@ pub const HOST_INTERNO: &str = "zero.guardiana";
 pub const ORIGEN_INTERNO: &str = "https://zero.guardiana/";
 /// The new tab.
 pub const INICIO: &str = "https://zero.guardiana/inicio.html";
+/// GUARDIANA Comunicaciones, the third product tab.
+pub const COMUNICACIONES: &str = "https://zero.guardiana/comunicaciones.html";
 /// The bar at the top.
 pub const BARRA: &str = "https://zero.guardiana/barra.html";
 /// The side panel.
@@ -724,9 +726,9 @@ impl Sesion {
         if url.len() > 8_192 || !(es_enlace_panel_guardiana(url) || espera_local) {
             return Vec::new();
         }
-        // The program is opening: the start page has not been shown yet. Point that one tab at
-        // the panel instead of opening a second one on top of it. Two pages, one after the
-        // other, was the screen being hit several times (the owner, 14 Oct 2026).
+        // The program is opening. Three product tabs, in this order, created together so the
+        // screen is not hit once per tab (the owner, 14 Oct 2026: GUARDIANA, then ZERO, then
+        // Comunicaciones, all three visible at the top). The panel stays in front.
         if self.pestanas.len() == 1 && self.pestanas[0].url == INICIO {
             let id = self.pestanas[0].id;
             let perfil = self.pestanas[0].perfil;
@@ -738,6 +740,8 @@ impl Sesion {
                 url: Some(url.to_owned()),
                 de: None,
             }];
+            o.push(self.anade_pestana(Perfil::General, INICIO, true));
+            o.push(self.anade_pestana(Perfil::General, COMUNICACIONES, true));
             o.extend(self.activar(id));
             return o;
         }
@@ -1154,6 +1158,15 @@ impl Sesion {
     // --- what the browser's pages are told ------------------------------------------------------
 
     fn titulo_de(&self, p: &Pestana) -> String {
+        if p.fija && (es_panel_guardiana(&p.url) || p.url.contains("guardiana-arrancando.html")) {
+            return self.t("pestana_guardiana");
+        }
+        if p.fija && (p.url == INICIO || p.url.is_empty()) {
+            return self.t("app_nombre");
+        }
+        if p.url.starts_with(COMUNICACIONES) {
+            return self.t("pestana_comunicaciones");
+        }
         if p.url == INICIO || p.url.is_empty() {
             return self.t("pestana_nueva");
         }
@@ -1479,16 +1492,26 @@ impl Sesion {
 
     fn nueva_pestana(&mut self, perfil: Perfil, url: &str) -> Vec<Orden> {
         let id = self.siguiente;
+        let orden = self.anade_pestana(perfil, url, false);
+        let mut o = vec![orden];
+        o.extend(self.activar(id));
+        o
+    }
+
+    /// A tab that is created without being brought to the front. `fija` is a product tab: it
+    /// stays, and it has no close button.
+    fn anade_pestana(&mut self, perfil: Perfil, url: &str, fija: bool) -> Orden {
+        let id = self.siguiente;
         self.siguiente += 1;
-        self.pestanas.push(Pestana::nueva(id, perfil, url));
-        let mut o = vec![Orden::CreaPestana {
+        let mut p = Pestana::nueva(id, perfil, url);
+        p.fija = fija;
+        self.pestanas.push(p);
+        Orden::CreaPestana {
             id,
             perfil,
             url: Some(url.to_string()),
             de: None,
-        }];
-        o.extend(self.activar(id));
-        o
+        }
     }
 
     /// The list of cuts, in a tab of its own that remembers where the person was. Already on
