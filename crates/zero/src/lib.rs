@@ -23,6 +23,7 @@ pub mod mandato;
 mod md5;
 pub mod medidas;
 pub mod paginas;
+pub mod puerta;
 pub mod recibo;
 pub mod secure;
 pub mod servidor;

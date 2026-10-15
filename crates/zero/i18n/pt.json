@@ -888,11 +888,11 @@
   "cortes_recibo_explica": "«Recibo assinado (prova)» salva nos seus Downloads um arquivo com cada pedido que o ZERO cortou neste período: a hora, a página, a empresa, o país dela e o que levava. O ZERO o sela com uma chave que só existe neste navegador, como o lacre de um envelope: se alguém mudar uma única letra, o selo deixa de bater. Serve como prova diante de um advogado, uma autoridade ou um jornalista, e qualquer pessoa pode conferir em guardianagroup.com/verificar sem instalar nada.",
   "sec_frase_v1": "Mensagens e arquivos cifrados de ponta a ponta entre dois computadores. Sem servidor: os dois falam diretamente. Antes de tudo, os dois comparam uns números.",
   "sec_c_recibir": "Receber uma conversa",
-  "sec_c_recibir_texto": "Este computador espera que o outro ligue. Dê à outra pessoa o seu endereço e a porta que aparece.",
+  "sec_c_recibir_texto": "Este computador espera que o outro ligue. A GUARDIANA abre a porta no seu router sozinha e dá-lhe um código para que lhe liguem.",
   "sec_c_escuchar": "Esperar chamada",
   "sec_c_puerto": "À espera na porta {p}",
   "sec_c_llamar": "Ligar a outro computador",
-  "sec_c_llamar_texto": "Escreva o endereço e a porta do outro computador (mesma rede, ou uma porta aberta no router). O endereço usa-se e não se guarda.",
+  "sec_c_llamar_texto": "Cole o código que a outra pessoa lhe deu (ou o endereço:porta se estiverem na mesma rede). Não se guarda.",
   "sec_c_direccion": "endereço:porta",
   "sec_c_conectar": "Ligar",
   "sec_c_tu_huella": "A sua chave:",
@@ -947,5 +947,13 @@
   "sec_r_duracion": "Duração",
   "sec_r_mensajes": "Mensagens",
   "sec_r_archivos": "Arquivos",
-  "sec_r_vistas": "Coisas vistas"
+  "sec_r_vistas": "Coisas vistas",
+  "sec_c_codigo_rotulo": "O seu código",
+  "sec_c_copiar": "Copiar",
+  "sec_c_copiado": "Copiado",
+  "sec_c_codigo_texto": "Dê este código à outra pessoa (por telefone, por mensagem). Com ele pode ligar-lhe de qualquer sítio. Caduca ao fechar.",
+  "sec_c_abriendo": "A abrir a porta no seu router…",
+  "sec_c_puerta_abierta": "Porta aberta. À espera.",
+  "sec_c_sin_puerta": "O seu router não deixou abrir a porta ({e}). Na sua rede podem ligar-lhe à porta {p}; de fora, melhor que espere a outra pessoa e você liga com o código dela.",
+  "sec_c_direccion_v2": "Código (GS-…) ou endereço:porta"
 }

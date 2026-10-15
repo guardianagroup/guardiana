@@ -41,6 +41,8 @@ const B64: base64::engine::GeneralPurpose = base64::engine::general_purpose::STA
 pub enum Entrante {
     /// Someone connected to our listener: the socket to adopt.
     Aceptado(TcpStream),
+    /// The router answered about the door.
+    Puerta(Result<crate::puerta::Puerta, crate::puerta::SinPuerta>),
     /// The link is up (we accepted or connected).
     Conectado,
     /// A frame arrived.
@@ -175,6 +177,8 @@ pub struct Secure {
     enlace: Option<Enlace>,
     rx: Option<Receiver<Entrante>>,
     puerto: u16,
+    puerta: Option<crate::puerta::Puerta>,
+    puerta_error: Option<String>,
     tarjeta_otra: Option<tarjeta::Tarjeta>,
     sas_inicio: Option<Inicio>,
     sas_codigo: Option<Codigo>,
@@ -250,6 +254,8 @@ impl Secure {
             enlace: None,
             rx: None,
             puerto: 0,
+            puerta: None,
+            puerta_error: None,
             tarjeta_otra: None,
             sas_inicio: None,
             sas_codigo: None,
@@ -301,16 +307,28 @@ impl Secure {
     /// Start listening on a port (0 lets the system choose). The address is never shown.
     pub fn escuchar(&mut self, puerto: u16) -> Result<u16, String> {
         self.cerrar("nueva escucha");
-        let listener = TcpListener::bind(("0.0.0.0", puerto)).map_err(|e| e.to_string())?;
+        // A fixed port when free (the code stays the same from one day to the next), any port
+        // otherwise.
+        let listener = TcpListener::bind(("0.0.0.0", if puerto == 0 { 47300 } else { puerto }))
+            .or_else(|_| TcpListener::bind(("0.0.0.0", 0)))
+            .map_err(|e| e.to_string())?;
         let puerto = listener.local_addr().map_err(|e| e.to_string())?.port();
         let (tx, rx) = mpsc::channel();
+        let tx2 = tx.clone();
         std::thread::spawn(move || {
             if let Ok((s, _)) = listener.accept() {
                 let _ = tx.send(Entrante::Aceptado(s));
             }
         });
+        // The door in the router, asked for in its own thread: a few seconds, never blocking.
+        std::thread::spawn(move || {
+            let r = crate::puerta::abre(puerto, 3 * 3600);
+            let _ = tx2.send(Entrante::Puerta(r));
+        });
         self.rx = Some(rx);
         self.puerto = puerto;
+        self.puerta = None;
+        self.puerta_error = None;
         self.fase = Fase::Escuchando;
         self.cambio = true;
         Ok(puerto)
@@ -320,6 +338,10 @@ impl Secure {
     /// nowhere.
     pub fn conectar(&mut self, direccion: &str) -> Result<(), String> {
         self.cerrar("nueva conexión");
+        let direccion = match crate::puerta::lee_codigo(direccion) {
+            Some((ip, puerto)) => format!("{ip}:{puerto}"),
+            None => direccion.trim().to_owned(),
+        };
         let addr: SocketAddr = direccion
             .trim()
             .to_socket_addrs()
@@ -399,6 +421,10 @@ impl Secure {
     /// Drop the link and forget the handshake; the identity and the book stay.
     pub fn cerrar(&mut self, por: &str) {
         self.cierra_resumen();
+        if let Some(p) = self.puerta.take() {
+            std::thread::spawn(move || p.cierra());
+        }
+        self.puerta_error = None;
         self.enlace = None;
         self.rx = None;
         self.tarjeta_otra = None;
@@ -441,6 +467,19 @@ impl Secure {
         for e in pendientes {
             match e {
                 Entrante::Aceptado(s) => self.adopta(s),
+                Entrante::Puerta(r) => {
+                    match r {
+                        Ok(p) => {
+                            self.puerta = Some(p);
+                            self.puerta_error = None;
+                        }
+                        Err(e) => {
+                            self.puerta = None;
+                            self.puerta_error = Some(e.to_string());
+                        }
+                    }
+                    self.cambio = true;
+                }
                 Entrante::Conectado => self.saluda(),
                 Entrante::Trama(v) => self.trama(v),
                 Entrante::Cerrado(por) => {
@@ -1145,6 +1184,8 @@ impl Secure {
             "tipo": "secure_estado",
             "fase": fase,
             "puerto": self.puerto,
+            "codigo": self.puerta.as_ref().map(crate::puerta::Puerta::codigo),
+            "puerta_error": self.puerta_error,
             "huella": self.huella_propia(),
             "tarjeta": self.tarjeta(),
             "contacto": self.nombre_contacto,

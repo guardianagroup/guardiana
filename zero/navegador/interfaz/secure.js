@@ -149,7 +149,11 @@
     $('c-espera').hidden = !(f === 'saludando' || f === 'abriendo' || (f === 'comparando' && !E.numeros));
     $('c-chat').hidden = f !== 'lista';
     $('c-huella').textContent = E.huella || RAYA;
-    if (f === 'escuchando') { $('c-puerto').hidden = false; $('c-puerto').textContent = t('sec_c_puerto', { p: E.puerto }); } else $('c-puerto').hidden = true;
+    if (f === 'escuchando') { $('c-puerto').hidden = false; $('c-puerto').textContent = E.codigo ? t('sec_c_puerta_abierta') : E.puerta_error ? t('sec_c_puerto', { p: E.puerto }) : t('sec_c_abriendo'); } else $('c-puerto').hidden = true;
+    $('c-codigo-caja').hidden = !(f === 'escuchando' && E.codigo);
+    if (E.codigo) $('c-codigo').textContent = E.codigo;
+    $('c-puerta-error').hidden = !(f === 'escuchando' && E.puerta_error && !E.codigo);
+    if (E.puerta_error) $('c-puerta-error').textContent = t('sec_c_sin_puerta', { p: E.puerto, e: E.puerta_error });
     $('c-espera-texto').textContent = t(f === 'saludando' ? 'sec_e_saludando' : f === 'abriendo' ? 'sec_e_abriendo' : 'sec_e_esperando');
     if (E.numeros) $('c-numeros').innerHTML = E.numeros.map((x) => `<b>${esc(String(x).padStart(4, '0'))}</b>`).join('');
     if (E.contacto && !$('c-nombre').value) $('c-nombre').value = E.contacto;
@@ -179,6 +183,7 @@
   const avisos = [];
   function aviso(txt) { avisos.push(txt); const ol = $('c-mensajes'); const li = document.createElement('li'); li.className = 'aviso-li'; li.textContent = txt; ol.appendChild(li); ol.scrollTop = ol.scrollHeight; }
   $('c-escuchar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'escuchar', puerto: 0 }));
+  $('c-copiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('c-codigo').textContent); $('c-copiar').textContent = t('sec_c_copiado'); setTimeout(() => { $('c-copiar').textContent = t('sec_c_copiar'); }, 1500); } catch (_) {} });
   $('c-conectar').addEventListener('click', () => { const d = $('c-direccion').value.trim(); if (d) manda({ tipo: 'secure', accion: 'conectar', direccion: d }); });
   $('c-direccion').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('c-conectar').click(); });
   $('c-sas-si').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sas', iguales: true, nombre: $('c-nombre').value.trim() }));
