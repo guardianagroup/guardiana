@@ -15,7 +15,9 @@
 //! checks both public keys of the other device. A verified device is not a
 //! professional licence. Neither check is a claim that spying was found.
 
-use vodozemac::olm::{Account, OlmMessage, Session, SessionConfig, SessionCreationError};
+use vodozemac::olm::{
+    Account, OlmMessage, Session, SessionConfig, SessionCreationError, SessionPickle,
+};
 use vodozemac::{Curve25519PublicKey, Ed25519PublicKey};
 
 pub mod carry;
@@ -210,6 +212,26 @@ impl Conversation {
     /// The identity key this conversation will encrypt to.
     pub fn peer(&self) -> Curve25519PublicKey {
         self.peer
+    }
+
+    /// Encrypt the ratchet with `key`. The string is not the plaintext.
+    pub(crate) fn seal(&self, key: &[u8; 32]) -> String {
+        self.session.pickle().encrypt(key)
+    }
+
+    /// Restore a ratchet sealed by [`Conversation::seal`]. A wrong key does not
+    /// produce a different peer.
+    pub(crate) fn unseal(
+        secret: &str,
+        key: &[u8; 32],
+        peer: Curve25519PublicKey,
+    ) -> Result<Self, Error> {
+        let pickle =
+            SessionPickle::from_encrypted(secret, key).map_err(|_| Error::CannotRestore)?;
+        Ok(Self {
+            session: Session::from_pickle(pickle),
+            peer,
+        })
     }
 
     /// Encrypt `plaintext` only if `accepted` is still the peer of this conversation.
