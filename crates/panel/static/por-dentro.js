@@ -547,30 +547,33 @@
       d.d = d.lugar ? 'exacto' : 'pais';
       return b;
     };
-    // One line per place on the screen. Cities that land on the same spot share it, until the
-    // view is close enough to separate them. The line ends on the busiest arrival.
-    const agrupa = (puntoDe) => {
-      const grupos = [];
+    // One line per city. A state is not a line: Dallas and Houston each keep their own,
+    // however far the view is. Without a published city, the line is the region, or the country.
+    const sitioDe = (d) => {
+      const ciudad = d.lugar && d.lugar.ciudad ? d.lugar.ciudad.trim() : '';
+      const region = d.lugar && d.lugar.region ? d.lugar.region.trim() : '';
+      const bruto = ((d.lugar && d.lugar.pais) || d.pais || '').trim();
+      const pais = bruto && bruto[0] !== '@' ? bruto : '';
+      return { ciudad, region, pais };
+    };
+    const agrupa = () => {
+      const map = new Map();
       VISIBLES.forEach((d) => {
         const b = baseLugar(d);
         if (!b) return;
         d.lon = b.lon; d.lat = b.lat;
-        const q = puntoDe(b.lon, b.lat);
-        let g = null;
-        if (q && q.v !== false) {
-          for (const h of grupos) if (h.frente && Math.hypot(h.ax - q.x, h.ay - q.y) < 16) { g = h; break; }
-        } else {
-          const key = b.lat.toFixed(1) + ',' + b.lon.toFixed(1);
-          g = grupos.find((h) => !h.frente && h.key === key) || null;
-          if (!g) { g = { ds: [], lon: b.lon, lat: b.lat, frente: false, key, ax: 0, ay: 0 }; grupos.push(g); }
-        }
-        if (!g) { g = { ds: [], lon: b.lon, lat: b.lat, frente: true, ax: q.x, ay: q.y }; grupos.push(g); }
+        const s = sitioDe(d);
+        const key = (s.ciudad ? 'c|' + s.pais + '|' + s.region + '|' + s.ciudad : s.region ? 'r|' + s.pais + '|' + s.region : 'p|' + s.pais).toLowerCase();
+        let g = map.get(key);
+        if (!g) { g = { ds: [], key, ciudad: s.ciudad, region: s.region, pais: s.pais }; map.set(key, g); }
         g.ds.push(d);
       });
+      const grupos = [...map.values()];
       grupos.forEach((g) => {
         g.ds.sort((a, c) => (c.sub + c.baj) - (a.sub + a.baj) || c.bloq - a.bloq);
-        const top = g.ds[0];
-        g.lon = top.lon; g.lat = top.lat; g.top = top;
+        g.top = g.ds[0];
+        g.lon = g.ds.reduce((a, d) => a + d.lon, 0) / g.ds.length;
+        g.lat = g.ds.reduce((a, d) => a + d.lat, 0) / g.ds.length;
       });
       return grupos;
     };
@@ -580,7 +583,7 @@
       const yo = st.lugar, cen = aPantalla(lugar(yo.lon, yo.lat, 0.002));
       const R0 = 26;
       const prods = posProductos(cen, 11);
-      GRUPOS = agrupa((lon, lat) => aPantalla(lugar(lon, lat, 0.002)));
+      GRUPOS = agrupa();
       GRUPOS.forEach((g) => {
         const d = g.top, lon1 = g.lon, lat1 = g.lat;
         const a = [Math.cos(yo.lat * RAD) * Math.sin(yo.lon * RAD), Math.sin(yo.lat * RAD), Math.cos(yo.lat * RAD) * Math.cos(yo.lon * RAD)];
@@ -645,9 +648,7 @@
         const sobre = st.hover && (st.hover.ref === g || st.hover.ref === d);
         const r = sobre ? 13 : 6.5;
         cx.drawImage(brillo(bl ? '#ff6b7a' : '#ffb547'), g.base.x - r, g.base.y - r, r * 2, r * 2);
-        st.dianas.push(g.ds.length > 1
-          ? { x: g.base.x, y: g.base.y, r: 18, tipo: 'lugar', ref: g }
-          : { x: g.base.x, y: g.base.y, r: 18, tipo: 'dest', ref: d });
+        st.dianas.push({ x: g.base.x, y: g.base.y, r: 18, tipo: 'lugar', ref: g });
       });
       // El escudo de GUARDIANA sobre tu ordenador.
       if (L.cen.v) {
@@ -722,7 +723,7 @@
     const layoutPlano = () => {
       const yo = st.lugar, cen = aPlano(yo.lon, yo.lat), R0 = 18;
       const prods = posProductos(cen, 8);
-      GRUPOS = agrupa((lon, lat) => aPlano(lon, lat));
+      GRUPOS = agrupa();
       GRUPOS.forEach((g) => {
         const d = g.top;
         const b = aPlano(g.lon, g.lat);
@@ -749,9 +750,7 @@
         const d = g.top;
         if (!g.vis) return;
         cx.drawImage(brillo(colorDe(d)), g.x - 5.2, g.y - 5.2, 10.4, 10.4);
-        st.dianas.push(g.ds.length > 1
-          ? { x: g.x, y: g.y, r: 16, tipo: 'lugar', ref: g }
-          : { x: g.x, y: g.y, r: 16, tipo: 'dest', ref: d });
+        st.dianas.push({ x: g.x, y: g.y, r: 16, tipo: 'lugar', ref: g });
       });
     };
 
@@ -1034,12 +1033,22 @@
     // ---------- «Datos en vivo» ----------
     const panelDatos = $('datos');
     let datosAbierto = true;
+    let zonaAbierta = '', ciudadAbierta = '';
     // Everything on this page is live; the side panel of figures closes with its × and comes back
     // with the small «‹ Cifras» tab on the edge (the owner, 13 Oct 2026: the «Datos en vivo» button
     // did not say what it did; «● En vivo» is now a fixed sign in the bar).
     const ponDatos = (on) => { datosAbierto = on; panelDatos.hidden = !on; $('btn-datos').hidden = on; $('btn-datos').setAttribute('aria-expanded', String(on)); try { localStorage.setItem('guardiana_pd_datos', on ? '1' : '0'); } catch (_) {} pintaDatos(); };
     $('btn-datos').addEventListener('click', () => ponDatos(true));
     $('cerrar-datos').addEventListener('click', () => ponDatos(false));
+    $('datos').addEventListener('click', (e) => {
+      const c = e.target.closest('[data-ciudad]');
+      const z = c ? null : e.target.closest('[data-zona]');
+      if (!c && !z) return;
+      e.stopPropagation();
+      if (c) ciudadAbierta = ciudadAbierta === c.dataset.ciudad ? '' : c.dataset.ciudad;
+      else { zonaAbierta = zonaAbierta === z.dataset.zona ? '' : z.dataset.zona; ciudadAbierta = ''; }
+      pintaDatos();
+    });
     // Two telemetries, apart (the owner, 13 Oct 2026): the data of the browser and the other
     // programs, and the antivirus's own, so what the person does is never mixed with what the
     // antivirus does.
@@ -1131,6 +1140,44 @@
       return h + '</div>';
     };
     const tipoTexto = (p) => t('pd_tipo_' + p.tipo);
+    // The side list: a state, then its cities, then the arrivals. Counts are how many go there.
+    const arbolZonas = () => {
+      if (!VISIBLES.length) return '';
+      const zonas = new Map();
+      VISIBLES.forEach((d) => {
+        const s = sitioDe(d);
+        const zkey = (s.pais + '|' + s.region).toLowerCase();
+        let z = zonas.get(zkey);
+        if (!z) { z = { pais: s.pais, region: s.region, n: 0, ciudades: new Map() }; zonas.set(zkey, z); }
+        z.n++;
+        const ckey = s.ciudad.toLowerCase();
+        let c = z.ciudades.get(ckey);
+        if (!c) { c = { ciudad: s.ciudad, ds: [] }; z.ciudades.set(ckey, c); }
+        c.ds.push(d);
+      });
+      const lista = [...zonas.values()].sort((a, b) => b.n - a.n || (a.region || a.pais).localeCompare(b.region || b.pais));
+      const varios = new Set(lista.map((z) => z.pais).filter(Boolean)).size > 1;
+      let h = `<h4>${esc(t('pd_adonde'))}</h4><div class="zonas">`;
+      lista.forEach((z) => {
+        const zkey = (z.pais + '|' + z.region).toLowerCase();
+        const abierta = zonaAbierta === zkey;
+        const titulo = z.region || (z.pais ? nombrePais(z.pais) : '—');
+        const extra = z.region && varios && z.pais ? ` <span class="t">${esc(nombrePais(z.pais))}</span>` : '';
+        h += `<button type="button" class="fila zona" data-zona="${esc(zkey)}" aria-expanded="${abierta}"><span>${esc(titulo)}${extra}</span><b>${num(z.n)}</b></button>`;
+        if (!abierta) return;
+        const ciudades = [...z.ciudades.values()].sort((a, b) => b.ds.length - a.ds.length);
+        h += `<div class="zona-dentro">`;
+        ciudades.forEach((c) => {
+          if (!c.ciudad) { h += listaDest(c.ds, 40); return; }
+          const ckey = zkey + '|' + c.ciudad.toLowerCase();
+          const cab = ciudadAbierta === ckey;
+          h += `<button type="button" class="fila ciudad" data-ciudad="${esc(ckey)}" aria-expanded="${cab}"><span>${esc(c.ciudad)}</span><b>${num(c.ds.length)}</b></button>`;
+          if (cab) h += listaDest(c.ds, 40);
+        });
+        h += `</div>`;
+      });
+      return h + `</div>`;
+    };
     const pintaDatos = () => {
       if (!datosAbierto) return;
       const ahoraMs = performance.now();
@@ -1140,7 +1187,7 @@
       $('datos-vivo').innerHTML = `<h4>${esc(t('pd_en_directo'))}</h4><div>${htmlDirecto(true)}</div>`;
       pintaCorte();
       // Programs.
-      let h = `<h4>${esc(t('pd_programas'))} <span class="s">${PROD.length}</span></h4>`;
+      let h = arbolZonas() + `<h4>${esc(t('pd_programas'))} <span class="s">${PROD.length}</span></h4>`;
       PROD.forEach((p) => {
         const ds = DEST.filter((d) => d.p === p.id), act = ds.filter((d) => d.ult && ahoraMs - d.ult < 15000 && !bloqueado(d)).length;
         const avs = ds.filter((d) => d.doc !== null && d.doc !== undefined), su = avs.reduce((a, d) => a + d.sub, 0), doc = avs.filter((d) => d.doc).reduce((a, d) => a + d.sub, 0);
@@ -1212,17 +1259,10 @@
     const usoTexto = (d) => (d.doc === null || d.doc === undefined ? '' : d.uso ? `<div>${esc(t('pd_para_que'))} <b>${esc(t('av_uso_' + d.uso))}</b></div>` : `<div class="nodoc">${esc(t('pd_no_documenta'))}</div>`);
     const textoTip = (hh) => {
       if (hh.tipo === 'lugar') {
-        const g = hh.ref, d0 = g.top;
-        const ciudades = [...new Set(g.ds.map((d) => d.lugar && d.lugar.ciudad).filter(Boolean))];
-        const pais = (d0.lugar && d0.lugar.pais) || d0.pais;
-        const titulo = ciudades.length === 1 ? ciudades[0] + ' · ' + nombrePais(pais) : (pais ? nombrePais(pais) : '—');
-        const env = g.ds.reduce((a, d) => a + d.sub, 0), baj = g.ds.reduce((a, d) => a + d.baj, 0);
-        const nPais = new Set(g.ds.map((d) => d.pais).filter((x) => x && x[0] !== '@')).size;
-        const lista = g.ds.slice(0, 8).map((d) => (bloqueado(d) ? '✕ ' : '· ') + esc(d.host)).join('<br>');
-        const resto = g.ds.length - 8;
-        return `<b>${esc(titulo)}</b><div>${esc(tn('pd_destinos_en', g.ds.length).replace('{p}', String(nPais)))}</div>
-          <div>${esc(t('pd_enviado'))} <b>${esc(bytes(env))}</b> · ${esc(t('pd_recibido'))} ${esc(bytes(baj))}</div>
-          <div class="mono arriba4">${lista}${resto > 0 ? '<br>' + esc(tn('pd_y_mas', resto)) : ''}</div>`;
+        const g = hh.ref;
+        const nombre = g.ciudad || g.region || (g.pais ? nombrePais(g.pais) : '—');
+        const linea = [g.ciudad ? g.region : '', g.pais ? nombrePais(g.pais) : ''].filter(Boolean).join(' · ');
+        return `<b>${esc(nombre)}</b>${linea && linea !== nombre ? `<div class="t">${esc(linea)}</div>` : ''}<div>${esc(tn('pd_llegadas', g.ds.length))}</div>`;
       }
       if (hh.tipo === 'dest') {
         const d = hh.ref, p = prod(d.p), bl = bloqueado(d);
@@ -1286,7 +1326,7 @@
     let abierto = null;
     const enlace = (href, txt) => (soloMirar ? '' : `<a href="${esc(href)}">${esc(txt)} →</a>`);
     const botonDest = (d) => `<button type="button" class="fila-det" data-dest="${esc(d.k)}"><span>${bloqueado(d) ? '✕ ' : ''}${esc(d.host)}</span><span class="${bloqueado(d) ? 'c' : 'o'}">${bloqueado(d) ? esc(tn('pd_parados', d.bloq)) : '↑ ' + esc(bytes(d.sub))}</span></button>`;
-    const listaDest = (ds) => { const o = ds.slice().sort((a, b) => b.sub - a.sub || b.bloq - a.bloq); return o.length ? `<div class="lista-det">${o.slice(0, 12).map(botonDest).join('')}${o.length > 12 ? `<div class="t">${esc(tn('pd_y_mas', o.length - 12))}</div>` : ''}</div>` : ''; };
+    const listaDest = (ds, tope = 12) => { const o = ds.slice().sort((a, b) => b.sub - a.sub || b.bloq - a.bloq); return o.length ? `<div class="lista-det">${o.slice(0, tope).map(botonDest).join('')}${o.length > tope ? `<div class="t">${esc(tn('pd_y_mas', o.length - tope))}</div>` : ''}</div>` : ''; };
     const cerca = (lon, lat) => (st.vista === 'destinos' && lon !== undefined ? `<button type="button" class="btn-hud" data-cerca="${lon},${lat}">${esc(t('pd_ver_cerca'))}</button>` : '');
     const htmlDetalle = (hh) => {
       let h = `<div class="cuerpo">${textoTip(hh)}</div>`, acciones = '', enlaces = [];
