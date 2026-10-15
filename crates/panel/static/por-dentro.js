@@ -638,6 +638,7 @@
         trazo(g.ruta, 0, 1, col + '24', 1.05);
         trazo(g.ruta, 0, 1, col + 'c8', 0.45);
       });
+      pelotitas(tt);
       GRUPOS.forEach((g) => {
         if (!g.base.v) return;
         const d = g.top, bl = bloqueado(d);
@@ -739,6 +740,7 @@
       cx.drawImage(tierraPlana(), 0, 0, st.W, st.H);
       const L = layoutPlano();
       tentaculos();
+      pelotitas(tiempo());
       escudo(L.cen, L.R0);
       st.dianas.push({ x: L.cen.x, y: L.cen.y, r: 10, tipo: 'yo' });
       L.prods.forEach(nodoProducto);
@@ -838,6 +840,23 @@
           trazo(g.ruta, 0, 1, base + 'c0', 0.45);
         }
       });
+    };
+    // A small ball travels each line and comes back. One per place, out of step with the others.
+    const pelotitas = (tt) => {
+      if (reducido) return;
+      const prev = cx.globalCompositeOperation;
+      cx.globalCompositeOperation = 'lighter';
+      GRUPOS.forEach((g) => {
+        if (!g.ruta || g.ruta.length < 2) return;
+        const d = g.top, col = bloqueado(d) ? '#ff6b7a' : prod(d.p).color;
+        const fase = ((g.lon * 13 + g.lat * 7) % 1 + 1) % 1;
+        const u = Math.abs((tt / 2.6 + fase) % 2 - 1);
+        const p = punto(g.ruta, u);
+        if (!p.v) return;
+        const s = 3.4;
+        cx.drawImage(brillo(col), p.x - s, p.y - s, s * 2, s * 2);
+      });
+      cx.globalCompositeOperation = prev;
     };
     const particulas = (dt) => {
       st.part = st.part.filter((q) => {
