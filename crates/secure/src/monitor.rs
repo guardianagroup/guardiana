@@ -101,6 +101,8 @@ pub struct Monitor {
     pub cifrado: Cifrado,
     /// The connection, once there is one.
     pub transporte: Transporte,
+    /// Running, or stopped with its reason ([`crate::pausa`]).
+    pub sesion: crate::pausa::Sesion,
     /// What other programs were seen doing during the session, newest last.
     pub vigilancia: Vec<Suceso>,
     /// The last [`Monitor::HISTORICO`] events of every kind, oldest first.

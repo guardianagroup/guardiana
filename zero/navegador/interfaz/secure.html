@@ -49,6 +49,20 @@ h1 { font: 600 clamp(28px, 3.6vw, 38px)/1.1 var(--display); letter-spacing: -.02
 .estado-g .nota-g { margin: 2px 0 0; font-size: 11.5px; color: var(--muted); }
 .estado-g .mas { justify-self: start; margin-top: 2px; }
 .detalles[hidden] { display: none; }
+/* The stop: why, since when, what is still pending, and the one way out. */
+.pausa { border-color: var(--alerta); display: grid; gap: 8px; padding: 18px; }
+.pausa[hidden] { display: none; }
+.pausa .p-titulo { margin: 0; font: 600 18px/1.2 var(--display); color: var(--alerta); }
+.pausa p { margin: 0; font-size: 13.5px; line-height: 1.5; }
+.pausa .p-motivo b { font-weight: 600; }
+.pausa .p-hora { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.pausa .p-desde { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.pausa .p-ahora, .pausa .p-reanuda { color: var(--muted); }
+.pausa .p-pendiente { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.pausa .p-pendiente li::before { content: "· "; color: var(--alerta); }
+.pausa .p-pendiente li.lista { color: var(--ok); }
+.pausa .p-botones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.pausa .p-nota { font-size: 11.5px; color: var(--muted); }
 
 /* The monitor: one card, sections with a mono caption, two-column rows of label and value. */
 aside.monitor { position: sticky; top: var(--e5); align-self: start; display: grid; gap: var(--e3); max-height: calc(100vh - 2 * var(--e5)); overflow: auto; }
@@ -102,6 +116,21 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
     </ul>
     <p class="nota-g" data-t="sec_g_nota"></p>
     <button type="button" class="boton chico mas" id="g-mas" aria-expanded="false" aria-controls="detalles"></button>
+  </section>
+  <section class="tarjeta pausa" id="p" hidden>
+    <h2 class="p-titulo" id="p-titulo"></h2>
+    <p class="p-motivo"><span class="rotulo" data-t="sec_p_motivo"></span> <b id="p-motivo"></b> <span class="p-hora" id="p-hora"></span></p>
+    <p class="p-desde" id="p-desde"></p>
+    <p class="p-ahora" data-t="sec_p_ahora"></p>
+    <p class="p-reanuda" id="p-reanuda"></p>
+    <ul class="p-pendiente" id="p-pendiente"></ul>
+    <div class="p-botones">
+      <button type="button" class="boton principal chico" id="p-reanudar" hidden></button>
+      <button type="button" class="boton principal chico" id="p-verificar" hidden></button>
+      <button type="button" class="boton chico" id="p-prueba"></button>
+      <button type="button" class="boton corta chico" id="p-terminar"></button>
+    </div>
+    <p class="p-nota" id="p-nota" hidden data-t="sec_p_reanudar_por"></p>
   </section>
   <div class="detalles" id="detalles" hidden>
   <section class="tarjeta">

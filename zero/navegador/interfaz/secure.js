@@ -28,7 +28,7 @@
   function estadoGlobal(m) {
     const id = m.identidad, tr = m.transporte || {}, vistos = m.vigilancia || [];
     if (!id) return 'sin';
-    if (id.estado === 'clave_cambiada') return 'pausada';
+    if ((m.sesion || {}).estado === 'pausada' || id.estado === 'clave_cambiada') return 'pausada';
     const perdida = typeof tr.perdida_pct === 'number' ? tr.perdida_pct : 0;
     if (perdida > 8 || vistos.some((s) => s.nivel === 'inusual')) return 'pausada';
     if (vistos.length > 0 || tr.directo === false || perdida >= 3) return 'revisar';
@@ -41,7 +41,8 @@
     caja.classList.remove('protegida', 'revisar', 'pausada', 'sin');
     caja.classList.add(g);
     $('g-palabra').textContent = t('sec_g_' + g);
-    $('g-frase').textContent = t('sec_g_' + g + '_frase');
+    const porCausa = g === 'pausada' && id.estado !== 'clave_cambiada' && ((m.sesion || {}).motivo || {}).por !== 'clave_cambiada';
+    $('g-frase').textContent = t(porCausa ? 'sec_g_pausada_frase_causa' : 'sec_g_' + g + '_frase');
     const chip = $('m-estado-chip');
     chip.textContent = g === 'sin' ? t('sec_sin_sesion') : t('sec_g_' + g);
     chip.className = 'chip' + (g === 'protegida' ? ' ok' : g === 'revisar' ? ' aviso' : g === 'pausada' ? ' alerta' : '');
@@ -64,8 +65,42 @@
     $('g-mas').textContent = t(abierto ? 'sec_ocultar_detalles' : 'sec_ver_detalles');
   }
 
+  // The stop card: why we stopped, what happens now, and when it resumes. Only while stopped.
+  let claseSesion = 'chat';
+  const tiempo = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  function pintaPausa(m) {
+    const se = m.sesion || {};
+    const caja = $('p');
+    if (se.estado !== 'pausada') { caja.hidden = true; return; }
+    caja.hidden = false;
+    const mo = se.motivo || {};
+    $('p-titulo').textContent = t('sec_p_titulo_' + claseSesion);
+    $('p-motivo').textContent = mo.por === 'clave_cambiada' ? t('sec_l_clave_cambiada', { n: mo.nombre }) : (mo.texto || RAYA);
+    $('p-hora').textContent = hora(se.desde);
+    $('p-desde').textContent = t('sec_p_desde', { t: tiempo(Math.max(0, Math.floor(Date.now() / 1000) - (se.desde || 0))) });
+    const clave = mo.por === 'clave_cambiada';
+    $('p-reanuda').textContent = clave ? t('sec_p_reanuda_clave', { n: mo.nombre }) : t('sec_p_reanuda_sola', { s: n(se.comprueba_cada_s || 2) });
+    const pend = se.pendiente || [];
+    $('p-pendiente').innerHTML = pend.length
+      ? `<li>${esc(t('sec_p_pendiente'))}</li>` + pend.map((x) => `<li>${esc(x)}</li>`).join('')
+      : (clave ? '' : `<li class="lista">${esc(t('sec_p_lista'))}</li>`);
+    $('p-reanudar').hidden = !se.puede_reanudar; $('p-reanudar').textContent = t('sec_p_reanudar');
+    $('p-nota').hidden = !se.puede_reanudar;
+    $('p-verificar').hidden = !clave; $('p-verificar').textContent = t('sec_p_verificar');
+    $('p-prueba').textContent = t('sec_p_prueba');
+    $('p-terminar').textContent = t('sec_p_terminar');
+  }
+  $('p-reanudar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'reanudar' }));
+  $('p-verificar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'verificar' }));
+  $('p-prueba').addEventListener('click', () => manda({ tipo: 'secure', accion: 'prueba' }));
+  $('p-terminar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'terminar' }));
+  // The «paused for» clock ticks on its own; the program resends the state every second anyway.
+  setInterval(() => { if (!$('p').hidden) pintaPausa(ultimo); }, 1000);
+
   function pinta(m) {
+    if (m.clase) claseSesion = m.clase;
     pintaGlobal(m);
+    pintaPausa(m);
     const id = m.identidad;
     $('m-latido').classList.toggle('vivo', !!id);
     $('m-nombre').textContent = id ? id.nombre : RAYA;
