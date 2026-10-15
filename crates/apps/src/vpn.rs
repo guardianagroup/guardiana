@@ -6,6 +6,7 @@
 // Off Windows only the decision and its test compile; the rest waits for Windows.
 #![cfg_attr(not(windows), allow(dead_code))]
 
+#[cfg(windows)]
 use super::Error;
 
 /// A VPN seen active: the adapter or connection name, as Windows shows it.
@@ -18,6 +19,7 @@ pub struct Vpn {
     pub via: &'static str,
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 const TUNELES: &[&str] = &[
     "wintun",
     "tap-windows",
