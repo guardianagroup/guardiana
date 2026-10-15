@@ -2,7 +2,7 @@
 //! planet placed the person where the VPN comes out, and «Precisar» measured the VPN's city).
 //! Read-only: the adapters that are up, and the VPN connections Windows itself keeps, nothing
 //! else. The names are what Windows shows; no address is read or kept.
-
+#![cfg_attr(not(windows), allow(dead_code))]
 // Off Windows only the decision and its test compile; the rest waits for Windows.
 #![cfg_attr(not(windows), allow(dead_code))]
 
