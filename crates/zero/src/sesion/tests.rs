@@ -164,7 +164,7 @@ fn the_comunicaciones_page_buttons_reach_the_conversation() {
     // 1.0.31 shipped with «Esperar llamada» doing nothing: the page's messages were not in the
     // list of what an internal tab may ask for. The button sends exactly this.
     let (mut s, _, _) = abre();
-    s.abre_guardiana("http://127.0.0.1:7443/");
+    let _ = s.abre_guardiana(&format!("http://127.0.0.1:7443/?t={}", "c".repeat(64)));
     let id = s.pestanas[2].id;
     let o = s.mensaje(
         Origen::Pestana(id),
