@@ -2477,6 +2477,8 @@
     "rv_marca_detectada": "detected",
     "rv_marca_clave_opcional": "password not required",
     "rv_certificados_nuevo": "{n} new root certificates since the first check-up. With one, a program can read your encrypted traffic: if you do not know where they come from, check it.",
-    "pd_lugar_zona_aviso": "Your computer is placed by its time zone, in {lugar}. If that is not your city, correct it or measure with GPS or Wi-Fi: it stays in this browser only."
+    "pd_lugar_zona_aviso": "Your computer is placed by its time zone, in {lugar}. If that is not your city, correct it or measure with GPS or Wi-Fi: it stays in this browser only.",
+    "pd_hud_desplegar": "See all the data",
+    "pd_hud_recoger": "Collapse"
   }
 }

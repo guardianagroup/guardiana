@@ -2477,6 +2477,8 @@
     "rv_marca_detectada": "detectada",
     "rv_marca_clave_opcional": "senha não obrigatória",
     "rv_certificados_nuevo": "{n} certificados raiz novos desde a primeira revisão. Com um assim, um programa pode ler seu tráfego criptografado: se não sabe de onde vêm, verifique.",
-    "pd_lugar_zona_aviso": "O seu computador está colocado pelo fuso horário, em {lugar}. Se não é a sua cidade, corrija ou meça com GPS ou Wi-Fi: fica só neste navegador."
+    "pd_lugar_zona_aviso": "O seu computador está colocado pelo fuso horário, em {lugar}. Se não é a sua cidade, corrija ou meça com GPS ou Wi-Fi: fica só neste navegador.",
+    "pd_hud_desplegar": "Ver todos os dados",
+    "pd_hud_recoger": "Recolher"
   }
 }
