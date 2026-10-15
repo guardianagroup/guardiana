@@ -22,6 +22,7 @@ pub mod licencia;
 pub mod mandato;
 mod md5;
 pub mod medidas;
+pub mod movil;
 pub mod paginas;
 pub mod puerta;
 pub mod recibo;

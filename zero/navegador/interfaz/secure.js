@@ -239,6 +239,38 @@
       });
     } catch (_) {}
   };
+  // ---------- The phone (15 Oct 2026) ----------
+  // «Pasar al móvil»: the program shows a QR code; the phone's camera opens our page, which
+  // talks to this computer directly (TLS 1.3 pinned to the certificate in the code). The
+  // first time, the person says OK here. While the phone talks, this screen steps back: no
+  // microphone or camera here, and the other side's pieces go to the phone.
+  let movilHabla = false;
+  const idioma = () => (document.documentElement.lang || navigator.language || 'es').slice(0, 2);
+  const pintaMovil = (m) => {
+    const mv = m.movil;
+    const caja = $('c-movil-caja');
+    $('c-movil').hidden = !!mv;
+    if (!mv) { caja.hidden = true; movilHabla = false; return; }
+    caja.hidden = false;
+    if (mv.error) { $('c-mv-estado-t').textContent = t('sec_mv_error', { e: mv.error }); $('c-mv-estado').className = 'm-estado'; return; }
+    if (mv.qr && $('c-mv-qr').dataset.qr !== mv.qr) { $('c-mv-qr').innerHTML = mv.qr; $('c-mv-qr').dataset.qr = mv.qr; }
+    $('c-mv-qr').hidden = !!mv.aprobado;
+    $('c-mv-texto').hidden = !!mv.aprobado;
+    $('c-mv-ok').hidden = !mv.pendiente;
+    $('c-mv-habla').hidden = !mv.habla;
+    const e = $('c-mv-estado');
+    e.className = 'm-estado ' + (mv.habla ? 'si' : mv.enganchado ? 'espera' : '');
+    $('c-mv-estado-t').textContent = t(mv.habla ? 'sec_mv_e_habla' : mv.pendiente ? 'sec_mv_e_pendiente' : mv.aprobado ? 'sec_mv_e_fuera' : 'sec_mv_e_espera');
+    $('c-mv-fuera').textContent = mv.fuera ? t('sec_mv_fuera_si') : mv.puerta_error ? t('sec_mv_fuera_no', { e: mv.puerta_error }) : t('sec_mv_fuera_abriendo');
+    movilHabla = !!mv.habla;
+  };
+  $('c-movil').addEventListener('click', () => manda({ tipo: 'secure', accion: 'movil', idioma: idioma() }));
+  $('c-mv-si').addEventListener('click', () => manda({ tipo: 'secure', accion: 'movil_ok' }));
+  $('c-mv-no').addEventListener('click', () => manda({ tipo: 'secure', accion: 'movil_fin' }));
+  $('c-mv-fin').addEventListener('click', () => manda({ tipo: 'secure', accion: 'movil_fin' }));
+  en('secure_estado', pintaMovil);
+  en('secure_aviso', (m) => { if (m.clave === 'sec_mv_enganchado') timbre(); });
+
   let faseAntes = 'sola';
   en('secure_estado', (m) => {
     if (m.fase === 'comparando' && faseAntes !== 'comparando' && faseAntes !== 'saludando') timbre();
@@ -256,14 +288,18 @@
   // second behind. (The real-time transport comes next; this is today's.)
   let arrancando = false;
   let grabador = null, local = null, fuente = null, buffer = null, pendientes = [], silenciado = false, llamadaVideo = false;
+  let mimeRemoto = null;
   const pintaLlamada = (m) => {
     const l = m.llamada;
     const caja = $('c-llamada');
-    if (!l) { caja.hidden = true; paraMedios(); return; }
+    if (!l) { caja.hidden = true; paraMedios(); mimeRemoto = null; return; }
     caja.hidden = false;
     caja.classList.toggle('solo-voz', !l.video);
-    $('c-l-estado').textContent = t(l.video ? 'sec_l_en_video' : 'sec_l_en_voz', { t: tiempo(Math.max(0, Math.floor(Date.now() / 1000) - (l.desde || 0))) });
+    $('c-l-estado').textContent = movilHabla ? t('sec_mv_habla') : t(l.video ? 'sec_l_en_video' : 'sec_l_en_voz', { t: tiempo(Math.max(0, Math.floor(Date.now() / 1000) - (l.desde || 0))) });
+    if (movilHabla) { if (grabador || arrancando) paraMedios(); return; }
     if (!grabador && !arrancando) empiezaMedios(!!l.video);
+    // The other side said what its pieces are: open the player for exactly that.
+    if (l.mime_remoto && l.mime_remoto !== mimeRemoto && buffer !== undefined) { mimeRemoto = l.mime_remoto; preparaReproductor(mimeRemoto); }
   };
   setInterval(() => { if (!$('c-llamada').hidden && E.llamada) $('c-l-estado').textContent = t(E.llamada.video ? 'sec_l_en_video' : 'sec_l_en_voz', { t: tiempo(Math.max(0, Math.floor(Date.now() / 1000) - (E.llamada.desde || 0))) }); }, 1000);
   const mime = (video) => {
@@ -273,7 +309,7 @@
   const empiezaMedios = async (video) => {
     arrancando = true;
     llamadaVideo = video;
-    preparaReproductor(mime(video));
+    preparaReproductor(mimeRemoto || mime(video));
     try {
       local = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 48000 }, video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false });
     } catch (e) { arrancando = false; aviso(t('sec_l_sin_permiso')); manda({ tipo: 'secure', accion: 'colgar' }); return; }
@@ -283,6 +319,7 @@
     grabador.ondataavailable = async (e) => { if (e.data && e.data.size) manda({ tipo: 'secure', accion: 'media', b64: b64De(await e.data.arrayBuffer()) }); };
     grabador.start(120);
     arrancando = false;
+    manda({ tipo: 'secure', accion: 'mime', mime: tipo });
   };
   const preparaReproductor = (tipo) => {
     const v = $('c-remoto');
@@ -312,8 +349,8 @@
     arrancando = false;
     $('c-remoto').removeAttribute('src');
   };
-  $('c-voz').addEventListener('click', () => { timbre(); manda({ tipo: 'secure', accion: 'llamar', video: false }); });
-  $('c-video').addEventListener('click', () => { timbre(); manda({ tipo: 'secure', accion: 'llamar', video: true }); });
+  $('c-voz').addEventListener('click', () => { timbre(); manda({ tipo: 'secure', accion: 'llamar', video: false, mime: mime(false) }); });
+  $('c-video').addEventListener('click', () => { timbre(); manda({ tipo: 'secure', accion: 'llamar', video: true, mime: mime(true) }); });
   $('c-colgar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'colgar' }));
   $('c-silencio').addEventListener('click', () => { silenciado = !silenciado; if (local) local.getAudioTracks().forEach((x) => { x.enabled = !silenciado; }); $('c-silencio').setAttribute('aria-pressed', String(silenciado)); $('c-silencio').textContent = t(silenciado ? 'sec_l_sonar' : 'sec_l_silenciar'); });
 

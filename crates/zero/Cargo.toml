@@ -26,6 +26,10 @@ sha2 = { workspace = true }
 url = { workspace = true }
 ring = { workspace = true }
 base64 = { workspace = true }
+# The phone takes a conversation over (15 Oct 2026): a QUIC listener the phone's browser
+# reaches with the certificate pinned from the QR code; tokio runs it on its own thread.
+wtransport = { workspace = true }
+tokio = { workspace = true }
 
 [lints]
 workspace = true
