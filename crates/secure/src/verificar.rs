@@ -9,7 +9,7 @@
 //! law firm still needs a check this module does not do.
 
 use vodozemac::sas::{EstablishedSas, Mac, Sas};
-use vodozemac::{Curve25519PublicKey, Ed25519PublicKey};
+use vodozemac::{Curve25519PublicKey, Ed25519PublicKey, Ed25519Signature};
 
 use crate::{Conversation, Envelope, Error};
 
@@ -84,13 +84,21 @@ impl Codigo {
             .calculate_mac(&mac_input(signing, curve), &self.info())
     }
 
-    /// Accept the other device only if the person saw the same numbers and the MAC
-    /// matches both of that device's public keys. A swapped key does not pass.
+    /// The bytes this device signs with its Ed25519 private key.
+    /// Both sides build the same bytes for the same two keys.
+    pub fn transcript(&self, signing: Ed25519PublicKey, curve: Curve25519PublicKey) -> Vec<u8> {
+        format!("{}|{}", self.info(), mac_input(signing, curve)).into_bytes()
+    }
+
+    /// Accept the other device only if the person saw the same numbers, the MAC
+    /// matches both public keys, and `their_signature` was made by the Ed25519
+    /// private key. A MAC over someone else's public keys does not pass.
     pub fn confirm(
         &self,
         their_curve: Curve25519PublicKey,
         their_signing: Ed25519PublicKey,
         their_mac: &Mac,
+        their_signature: &Ed25519Signature,
         same_decimals: bool,
     ) -> Result<Verified, VerifyError> {
         if !same_decimals {
@@ -102,6 +110,10 @@ impl Codigo {
                 &self.info(),
                 their_mac,
             )
+            .map_err(|_| VerifyError::Failed)?;
+        let transcript = self.transcript(their_signing, their_curve);
+        their_signing
+            .verify(&transcript, their_signature)
             .map_err(|_| VerifyError::Failed)?;
         Ok(Verified {
             curve: their_curve,
@@ -200,6 +212,18 @@ impl Trust {
         }
         conversation.send(conversation.peer(), plaintext)
     }
+
+    /// Open a later message only if this conversation's peer is still accepted.
+    pub fn open(
+        &self,
+        conversation: &mut Conversation,
+        envelope: &Envelope,
+    ) -> Result<Vec<u8>, Error> {
+        if !self.allows(conversation.peer()) {
+            return Err(Error::IdentityChanged);
+        }
+        conversation.open(envelope)
+    }
 }
 
 #[cfg(test)]
@@ -220,48 +244,118 @@ mod tests {
         (alice, bob, alice_code, bob_code)
     }
 
+    fn accept(code: &Codigo, device: &Identity) -> Verified {
+        let mac = code.mac(device.signing_key(), device.public_key());
+        let signature = device.sign(&code.transcript(device.signing_key(), device.public_key()));
+        code.confirm(
+            device.public_key(),
+            device.signing_key(),
+            &mac,
+            &signature,
+            true,
+        )
+        .unwrap()
+    }
+
     #[test]
     fn the_same_numbers_and_a_swapped_key_does_not_pass() {
         let (alice, bob, alice_code, bob_code) = both();
         assert_eq!(alice_code.decimals(), bob_code.decimals());
 
-        let mac = bob_code.mac(bob.signing_key(), bob.public_key());
-        let verified = alice_code
-            .confirm(bob.public_key(), bob.signing_key(), &mac, true)
-            .unwrap();
+        let verified = accept(&alice_code, &bob);
         assert_eq!(verified.curve(), bob.public_key());
         assert_eq!(verified.signing(), bob.signing_key());
 
+        let mac = bob_code.mac(bob.signing_key(), bob.public_key());
+        let signature = bob.sign(&bob_code.transcript(bob.signing_key(), bob.public_key()));
         let impostor = Identity::new();
         assert_eq!(
             alice_code
-                .confirm(impostor.public_key(), bob.signing_key(), &mac, true)
+                .confirm(
+                    impostor.public_key(),
+                    bob.signing_key(),
+                    &mac,
+                    &signature,
+                    true,
+                )
                 .unwrap_err(),
             VerifyError::Failed
         );
         assert_eq!(
             alice_code
-                .confirm(bob.public_key(), bob.signing_key(), &mac, false)
+                .confirm(bob.public_key(), bob.signing_key(), &mac, &signature, false)
                 .unwrap_err(),
             VerifyError::DecimalsDiffer
         );
 
-        let mut trust = Trust::new();
-        trust.insert(verified);
+        let mut alice_trust = Trust::new();
+        alice_trust.insert(verified);
         let mut bob_recv = Identity::unlock(&bob.lock(&[9u8; 32]), &[9u8; 32]).unwrap();
-        assert_eq!(bob_recv.public_key(), bob.public_key());
         let one_time = bob_recv.fresh_one_time_key().unwrap();
         let mut conversation = alice.start(verified.curve(), one_time).unwrap();
-        let envelope = trust.send(&mut conversation, b"hola").unwrap();
+        let envelope = alice_trust.send(&mut conversation, b"hola").unwrap();
 
-        trust.revoke(bob.signing_key());
+        alice_trust.revoke(bob.signing_key());
         assert_eq!(
-            trust.send(&mut conversation, b"otro").unwrap_err(),
+            alice_trust.send(&mut conversation, b"otro").unwrap_err(),
             Error::IdentityChanged
         );
 
-        let (_, opened) = bob_recv.receive(alice.public_key(), &envelope).unwrap();
+        let mut bob_trust = Trust::new();
+        assert_eq!(
+            bob_recv
+                .receive(&bob_trust, alice.public_key(), &envelope)
+                .unwrap_err(),
+            Error::IdentityChanged
+        );
+        bob_trust.insert(accept(&bob_code, &alice));
+        let (mut bob_side, opened) = bob_recv
+            .receive(&bob_trust, alice.public_key(), &envelope)
+            .unwrap();
         assert_eq!(opened, b"hola");
+
+        let reply = bob_trust.send(&mut bob_side, b"recibido").unwrap();
+        alice_trust.insert(verified);
+        assert_eq!(
+            alice_trust.open(&mut conversation, &reply).unwrap(),
+            b"recibido"
+        );
+        alice_trust.revoke(bob.signing_key());
+        let again = bob_trust.send(&mut bob_side, b"otra").unwrap();
+        assert_eq!(
+            alice_trust.open(&mut conversation, &again).unwrap_err(),
+            Error::IdentityChanged
+        );
+    }
+
+    #[test]
+    fn a_mac_of_someone_elses_keys_does_not_prove_possession() {
+        let bob = Identity::new();
+        let mallory = Identity::new();
+        let alice_start = Inicio::new();
+        let mallory_start = Inicio::new();
+        let alice_pub = alice_start.public_key();
+        let mallory_pub = mallory_start.public_key();
+        let alice_code = alice_start.establish(mallory_pub).unwrap();
+        let mallory_code = mallory_start.establish(alice_pub).unwrap();
+
+        let mac_of_bob = mallory_code.mac(bob.signing_key(), bob.public_key());
+        let forged = mallory.sign(&mallory_code.transcript(bob.signing_key(), bob.public_key()));
+        assert_eq!(
+            alice_code
+                .confirm(
+                    bob.public_key(),
+                    bob.signing_key(),
+                    &mac_of_bob,
+                    &forged,
+                    true,
+                )
+                .unwrap_err(),
+            VerifyError::Failed
+        );
+
+        let own = accept(&alice_code, &mallory);
+        assert_eq!(own.signing(), mallory.signing_key());
     }
 
     #[test]

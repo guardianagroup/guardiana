@@ -93,9 +93,11 @@ impl Drop for Relay {
     }
 }
 
-/// Give the relay one envelope from `from`. The relay answers `1` if it stored
-/// this envelope, or `0` if it already holds one. A rejection leaves the first
-/// envelope where it was.
+/// Give the relay one envelope from `from`.
+/// The relay answers before the envelope is sent: `0` if it already holds one,
+/// and the frame is not transmitted. `1` means it will take this frame, and a
+/// second `1` means the frame was stored. A rejection leaves the first envelope
+/// where it was.
 pub fn deposit(
     addr: SocketAddr,
     from: Curve25519PublicKey,
@@ -103,8 +105,17 @@ pub fn deposit(
 ) -> Result<(), CarryError> {
     let mut socket = connect(addr)?;
     socket.write_all(&[1]).map_err(|_| CarryError::Failed)?;
-    write_frame(&mut socket, &encode(from, envelope))?;
     let mut answer = [0u8; 1];
+    socket
+        .read_exact(&mut answer)
+        .map_err(|_| CarryError::Failed)?;
+    if answer[0] == 0 {
+        return Err(CarryError::Rejected);
+    }
+    if answer[0] != 1 {
+        return Err(CarryError::Failed);
+    }
+    write_frame(&mut socket, &encode(from, envelope))?;
     socket
         .read_exact(&mut answer)
         .map_err(|_| CarryError::Failed)?;
@@ -146,28 +157,32 @@ fn serve(listener: TcpListener, seen: Arc<Mutex<Vec<u8>>>) {
         }
         match command[0] {
             0 => break,
-            1 => match read_frame(&mut socket) {
-                Ok(frame) => {
-                    if deposited {
-                        let _ = socket.write_all(&[0]);
-                    } else {
-                        match seen.lock() {
-                            Ok(mut bytes) => bytes.extend_from_slice(&frame),
-                            Err(poisoned) => poisoned.into_inner().extend_from_slice(&frame),
-                        }
-                        if let Some(mut parked) = waiting.take() {
-                            if write_frame(&mut parked, &frame).is_ok() {
-                                collected = true;
+            1 => {
+                if deposited {
+                    let _ = socket.write_all(&[0]);
+                } else if socket.write_all(&[1]).is_err() {
+                    break;
+                } else {
+                    match read_frame(&mut socket) {
+                        Ok(frame) => {
+                            match seen.lock() {
+                                Ok(mut bytes) => bytes.extend_from_slice(&frame),
+                                Err(poisoned) => poisoned.into_inner().extend_from_slice(&frame),
                             }
-                        } else {
-                            stored = Some(frame);
+                            if let Some(mut parked) = waiting.take() {
+                                if write_frame(&mut parked, &frame).is_ok() {
+                                    collected = true;
+                                }
+                            } else {
+                                stored = Some(frame);
+                            }
+                            deposited = true;
+                            let _ = socket.write_all(&[1]);
                         }
-                        deposited = true;
-                        let _ = socket.write_all(&[1]);
+                        Err(_) => break,
                     }
                 }
-                Err(_) => break,
-            },
+            }
             2 => {
                 if let Some(frame) = stored.take() {
                     if write_frame(&mut socket, &frame).is_ok() {
@@ -251,7 +266,7 @@ mod tests {
 
         assert!(!seen.is_empty());
         assert!(!seen.windows(b"hola".len()).any(|window| window == b"hola"));
-        let (_, opened) = bob.receive(from, &carried).unwrap();
+        let (_, opened) = bob.receive_session(from, &carried).unwrap();
         assert_eq!(opened, b"hola");
     }
 
@@ -274,7 +289,7 @@ mod tests {
         assert_eq!(relay.seen().len(), held);
 
         let (from, carried) = collect(relay.addr()).unwrap();
-        let (_, opened) = bob.receive(from, &carried).unwrap();
+        let (_, opened) = bob.receive_session(from, &carried).unwrap();
         assert_eq!(opened, b"hola");
     }
 }

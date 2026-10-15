@@ -94,6 +94,12 @@ impl Identity {
         self.account.pickle().encrypt(key)
     }
 
+    /// Sign `transcript` with this device's Ed25519 key. Used by [`verificar`]
+    /// to prove the private key is held here. The signature is not the message.
+    pub fn sign(&self, transcript: &[u8]) -> vodozemac::Ed25519Signature {
+        self.account.sign(transcript)
+    }
+
     /// Restore an identity from [`Identity::lock`]. A wrong key does not restore a different person.
     pub fn unlock(secret: &str, key: &[u8; 32]) -> Result<Self, Error> {
         let pickle = vodozemac::olm::AccountPickle::from_encrypted(secret, key)
@@ -131,9 +137,23 @@ impl Identity {
         })
     }
 
-    /// Open the first message. `from` must be the sender's identity key; if it
-    /// is not the key inside the message, nothing is decrypted.
+    /// Open the first message from a device this person has already verified.
+    /// An unknown or revoked sender is refused before the one-time key is used.
     pub fn receive(
+        &mut self,
+        trust: &verificar::Trust,
+        from: Curve25519PublicKey,
+        envelope: &Envelope,
+    ) -> Result<(Conversation, Vec<u8>), Error> {
+        if !trust.allows(from) {
+            return Err(Error::IdentityChanged);
+        }
+        self.receive_session(from, envelope)
+    }
+
+    /// Open a first message without consulting [`verificar::Trust`].
+    /// Crate-private: the product calls [`Identity::receive`].
+    pub(crate) fn receive_session(
         &mut self,
         from: Curve25519PublicKey,
         envelope: &Envelope,
@@ -190,8 +210,9 @@ impl Conversation {
     }
 
     /// Encrypt `plaintext` only if `accepted` is still the peer of this conversation.
-    /// A different key returns [`Error::IdentityChanged`] and does not encrypt.
-    pub fn send(
+    /// Crate-private: the product calls [`verificar::Trust::send`], which refuses
+    /// a device that was not verified or was revoked.
+    pub(crate) fn send(
         &mut self,
         accepted: Curve25519PublicKey,
         plaintext: &[u8],
@@ -206,8 +227,8 @@ impl Conversation {
         Ok(Envelope { message })
     }
 
-    /// Open a later message on this conversation.
-    pub fn open(&mut self, envelope: &Envelope) -> Result<Vec<u8>, Error> {
+    /// Open a later message. Crate-private: the product calls [`verificar::Trust::open`].
+    pub(crate) fn open(&mut self, envelope: &Envelope) -> Result<Vec<u8>, Error> {
         self.session
             .decrypt(&envelope.message)
             .map_err(|_| Error::CannotOpen)
@@ -265,7 +286,7 @@ mod tests {
         let (_, bytes) = envelope.to_wire();
         assert!(!bytes.windows(b"hola".len()).any(|window| window == b"hola"));
 
-        let (mut bob_side, opened) = bob.receive(alice.public_key(), &envelope).unwrap();
+        let (mut bob_side, opened) = bob.receive_session(alice.public_key(), &envelope).unwrap();
         assert_eq!(opened, b"hola");
 
         let reply = bob_side.send(alice.public_key(), b"recibido").unwrap();
@@ -280,7 +301,7 @@ mod tests {
         let last = bytes.last_mut().unwrap();
         *last ^= 0x01;
         let tampered = Envelope::from_wire(kind, &bytes).unwrap();
-        assert!(bob.receive(alice.public_key(), &tampered).is_err());
+        assert!(bob.receive_session(alice.public_key(), &tampered).is_err());
     }
 
     #[test]
@@ -290,11 +311,14 @@ mod tests {
 
         let mut carol = Identity::new();
         assert_eq!(
-            carol.receive(alice.public_key(), &envelope).unwrap_err(),
+            carol
+                .receive_session(alice.public_key(), &envelope)
+                .unwrap_err(),
             Error::CannotOpen
         );
         assert_eq!(
-            bob.receive(carol.public_key(), &envelope).unwrap_err(),
+            bob.receive_session(carol.public_key(), &envelope)
+                .unwrap_err(),
             Error::IdentityChanged
         );
 
@@ -306,7 +330,7 @@ mod tests {
             Error::IdentityChanged
         );
         let still = alice_side.send(accepted, b"sigue").unwrap();
-        let (_, opened) = bob.receive(alice.public_key(), &still).unwrap();
+        let (_, opened) = bob.receive_session(alice.public_key(), &still).unwrap();
         assert_eq!(opened, b"sigue");
     }
 
@@ -314,7 +338,7 @@ mod tests {
     fn the_same_envelope_does_not_open_twice() {
         let (alice, mut bob, mut alice_side, accepted) = pair();
         let envelope = alice_side.send(accepted, b"hola").unwrap();
-        let (mut bob_side, opened) = bob.receive(alice.public_key(), &envelope).unwrap();
+        let (mut bob_side, opened) = bob.receive_session(alice.public_key(), &envelope).unwrap();
         assert_eq!(opened, b"hola");
         assert!(bob_side.open(&envelope).is_err());
     }
