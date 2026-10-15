@@ -12,6 +12,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::ffi::c_void;
 use std::io::Write as _;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use guardiana_zero::licencia::{Estado as EstadoLicencia, Fallo, Lugar as LugarLicencia};
