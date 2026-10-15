@@ -28,6 +28,7 @@ use guardiana_secure::claves::{Curve25519PublicKey, Ed25519Signature, Mac};
 use guardiana_secure::monitor::{Identidad, Monitor, Nivel};
 use guardiana_secure::pausa::Sesion as EstadoSesion;
 use guardiana_secure::prueba::Cadena;
+use guardiana_secure::sframe;
 use guardiana_secure::verificar::{Codigo, Inicio, Verified};
 use guardiana_secure::{tarjeta, Conversation, Envelope, Identity};
 use serde_json::{json, Value};
@@ -134,6 +135,20 @@ struct Salida {
     bytes: u64,
 }
 
+/// A voice or video call over the same link: the page records (Opus, VP9) in short pieces, each
+/// piece is encrypted here with the media layer ([`sframe`]) under a key that went inside Olm,
+/// and the other side plays them as they come. Direct between the two computers, no media server.
+struct Llamada {
+    video: bool,
+    emisor: sframe::Emisor,
+    receptor: Option<sframe::Receptor>,
+    desde: u64,
+    bytes_enviados: u64,
+    bytes_recibidos: u64,
+    /// For the bitrate on screen: (unix s, bytes at that second).
+    marca: (u64, u64, u64),
+}
+
 /// The SECURE side of a browser session.
 pub struct Secure {
     datos: PathBuf,
@@ -162,6 +177,11 @@ pub struct Secure {
     pub estado: EstadoSesion,
     entrada: Option<Entrada>,
     salida: Option<Salida>,
+    llamada: Option<Llamada>,
+    /// Media pieces for the page, drained by the session every tick.
+    pub media_para_pagina: VecDeque<String>,
+    /// Something happened while the tab was not in front: the tab's name carries a mark.
+    pub novedad: bool,
     inicio: u64,
     /// Lines for the page's event list, drained by the session.
     pub avisos: VecDeque<Value>,
@@ -224,6 +244,9 @@ impl Secure {
             estado: EstadoSesion::default(),
             entrada: None,
             salida: None,
+            llamada: None,
+            media_para_pagina: VecDeque::new(),
+            novedad: false,
             inicio: ahora_s(),
             avisos: VecDeque::new(),
             cambio: true,
@@ -319,6 +342,8 @@ impl Secure {
         self.conversacion = None;
         self.entrada = None;
         self.salida = None;
+        self.llamada = None;
+        self.monitor.transporte = Default::default();
         if self.fase != Fase::Sola {
             self.monitor
                 .anota(ahora_s(), Nivel::Info, format!("enlace cerrado: {por}"));
@@ -376,6 +401,7 @@ impl Secure {
             "otk" => self.otk(&v),
             "olm" => self.olm(&v),
             "bloque" => self.bloque(&v),
+            "media" => self.media_entrante(&v),
             _ => {}
         }
     }
@@ -457,6 +483,7 @@ impl Secure {
                 Ok(c) => {
                     self.sas_codigo = Some(c);
                     self.fase = Fase::Comparando;
+                    self.novedad = true;
                 }
                 Err(_) => self.cerrar("código corto fallido"),
             }
@@ -679,6 +706,42 @@ impl Secure {
                     .collect();
                 self.mensajes.push((ahora_s(), false, texto));
             }
+            "llamada" | "llamada_ok" => {
+                let Some(clave) = c["clave"].as_str().and_then(|x| B64.decode(x).ok()) else {
+                    return;
+                };
+                let Ok(clave) = <[u8; 32]>::try_from(clave.as_slice()) else {
+                    return;
+                };
+                let video = c["video"].as_bool().unwrap_or(false);
+                let otro = self.numero_del_otro();
+                if c["m"] == "llamada" {
+                    // Answer with our own key and start sending as soon as the page does.
+                    if self.llamada.is_none() {
+                        self.empieza_llamada(video, false);
+                    }
+                    if let Some(l) = &mut self.llamada {
+                        l.receptor = Some(sframe::Receptor::new(&clave, otro));
+                    }
+                    self.novedad = true;
+                    self.aviso("sec_llamada_entrante", "");
+                } else if let Some(l) = &mut self.llamada {
+                    l.receptor = Some(sframe::Receptor::new(&clave, otro));
+                }
+                self.cambio = true;
+            }
+            "cuelga" => {
+                if self.llamada.take().is_some() {
+                    self.monitor.anota(
+                        ahora_s(),
+                        Nivel::Info,
+                        "llamada terminada por la otra persona",
+                    );
+                    self.monitor.transporte = Default::default();
+                    self.aviso("sec_llamada_colgada", "");
+                    self.cambio = true;
+                }
+            }
             "archivo" => {
                 // The file's key: open what already arrived and whatever comes next.
                 let nombre = limpia_nombre(c["nombre"].as_str().unwrap_or("archivo"));
@@ -787,6 +850,147 @@ impl Secure {
         }
     }
 
+    /// 0 or 1: who is who in the call, decided by the keys so both sides agree.
+    fn mi_numero(&self) -> u8 {
+        match self.verificado {
+            Some(v) if self.identidad.public_key().to_bytes() < v.curve().to_bytes() => 0,
+            Some(_) => 1,
+            None => 0,
+        }
+    }
+
+    fn numero_del_otro(&self) -> u8 {
+        1 - self.mi_numero()
+    }
+
+    fn empieza_llamada(&mut self, video: bool, inicia: bool) {
+        let mut clave = [0u8; 32];
+        crate::sesion::azar(&mut clave);
+        let yo = self.mi_numero();
+        self.llamada = Some(Llamada {
+            video,
+            emisor: sframe::Emisor::new(&clave, yo),
+            receptor: None,
+            desde: ahora_s(),
+            bytes_enviados: 0,
+            bytes_recibidos: 0,
+            marca: (ahora_s(), 0, 0),
+        });
+        self.monitor.transporte.directo = Some(true);
+        self.monitor.transporte.dtls_verificado = None;
+        self.monitor.transporte.codec_audio = Some("Opus".to_owned());
+        self.monitor.transporte.codec_video = video.then(|| "VP9".to_owned());
+        self.monitor.cifrado.sframe = Some(true);
+        self.monitor.anota(
+            ahora_s(),
+            Nivel::Info,
+            if video {
+                "videollamada abierta"
+            } else {
+                "llamada de voz abierta"
+            },
+        );
+        self.manda_olm(json!({
+            "m": if inicia { "llamada" } else { "llamada_ok" },
+            "clave": B64.encode(clave),
+            "video": video
+        }));
+        self.cambio = true;
+    }
+
+    /// The person starts a call (voice, or voice and video).
+    pub fn llamar(&mut self, video: bool) -> Result<(), String> {
+        if self.fase != Fase::Lista {
+            return Err("sec_no_lista".to_owned());
+        }
+        if self.llamada.is_some() {
+            return Ok(());
+        }
+        self.empieza_llamada(video, true);
+        Ok(())
+    }
+
+    /// The person hangs up.
+    pub fn colgar(&mut self) {
+        if self.llamada.take().is_some() {
+            self.manda_olm(json!({ "m": "cuelga" }));
+            self.monitor
+                .anota(ahora_s(), Nivel::Info, "llamada terminada");
+            self.monitor.transporte = Default::default();
+            self.monitor.cifrado.sframe = None;
+            self.cambio = true;
+        }
+    }
+
+    /// One recorded piece from the page: encrypt it under the media layer and send it.
+    pub fn media_saliente(&mut self, b64: &str) -> Result<(), String> {
+        if !self.estado.en_marcha() {
+            return Ok(());
+        }
+        let bytes = B64.decode(b64).map_err(|e| e.to_string())?;
+        let Some(l) = &mut self.llamada else {
+            return Ok(());
+        };
+        let c = l.emisor.cifra(&bytes).map_err(|e| e.to_string())?;
+        l.bytes_enviados += bytes.len() as u64;
+        let trama = json!({ "t": "media", "b": B64.encode(c) });
+        self.manda(trama);
+        self.tasa();
+        Ok(())
+    }
+
+    fn media_entrante(&mut self, v: &Value) {
+        if !self.estado.en_marcha() {
+            return;
+        }
+        let Some(b) = v["b"].as_str().and_then(|s| B64.decode(s).ok()) else {
+            return;
+        };
+        let Some(l) = &mut self.llamada else { return };
+        let Some(r) = &mut l.receptor else { return };
+        match r.abre(&b) {
+            Ok(plano) => {
+                l.bytes_recibidos += plano.len() as u64;
+                self.media_para_pagina.push_back(B64.encode(plano));
+                if self.media_para_pagina.len() > 400 {
+                    self.media_para_pagina.pop_front();
+                }
+            }
+            Err(_) => {
+                self.monitor.anota(
+                    ahora_s(),
+                    Nivel::Inusual,
+                    "un trozo de la llamada no se pudo abrir; descartado",
+                );
+            }
+        }
+        self.tasa();
+    }
+
+    /// Bitrates for the screen, once a second.
+    fn tasa(&mut self) {
+        let ahora = ahora_s();
+        let Some(l) = &mut self.llamada else { return };
+        if ahora > l.marca.0 {
+            let dt = ahora - l.marca.0;
+            let sube = (l.bytes_enviados - l.marca.1) * 8 / 1000 / dt;
+            let baja = (l.bytes_recibidos - l.marca.2) * 8 / 1000 / dt;
+            l.marca = (ahora, l.bytes_enviados, l.bytes_recibidos);
+            let total = u32::try_from(sube + baja).unwrap_or(u32::MAX);
+            if l.video {
+                self.monitor.transporte.kbps_video = Some(total);
+            } else {
+                self.monitor.transporte.kbps_audio = Some(total);
+            }
+            self.cambio = true;
+        }
+    }
+
+    /// Whether a call is on, and with video.
+    pub fn llamada_activa(&self) -> Option<(bool, u64)> {
+        self.llamada.as_ref().map(|l| (l.video, l.desde))
+    }
+
     /// The person wrote something.
     pub fn texto(&mut self, texto: &str) {
         if self.fase != Fase::Lista {
@@ -873,6 +1077,7 @@ impl Secure {
             "tarjeta": self.tarjeta(),
             "contacto": self.nombre_contacto,
             "numeros": self.numeros().map(|(a, b, c)| vec![a, b, c]),
+            "llamada": self.llamada_activa().map(|(video, desde)| json!({ "video": video, "desde": desde, "mi_numero": self.mi_numero() })),
             "mensajes": self.mensajes.iter().rev().take(200).rev().map(|(t, mio, x)| json!({ "t": t, "mio": mio, "texto": x })).collect::<Vec<_>>(),
             "contactos": self.agenda.contactos().iter().map(|c| json!({ "nombre": c.nombre, "verificado_en": c.verificado_en, "estado": matches!(c.estado, agenda::Estado::Verificado) })).collect::<Vec<_>>(),
             "monitor": monitor,

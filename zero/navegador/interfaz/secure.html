@@ -43,6 +43,18 @@ main > .tarjeta { margin-top: 14px; }
 .c-progreso i { display: block; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .c-progreso b { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
 .escribir { display: flex; gap: 8px; }
+/* The call: the other person large, yourself small in the corner, as every call app does. */
+.llamada { margin: 10px 0; }
+.llamada[hidden] { display: none; }
+.pantallas { position: relative; background: #0B1020; border-radius: var(--r-tarjeta); overflow: hidden; aspect-ratio: 16 / 9; }
+.pantallas video { display: block; }
+#c-remoto { width: 100%; height: 100%; object-fit: contain; }
+#c-local { position: absolute; right: 12px; bottom: 12px; width: 22%; border-radius: 8px; border: 1px solid rgba(255,255,255,.3); background: #000; }
+.llamada-botones { margin-top: 8px; }
+.l-estado { font: 500 12px var(--mono); color: var(--muted); margin-right: auto; }
+.solo-voz #c-remoto, .solo-voz #c-local { visibility: hidden; }
+.solo-voz .pantallas { aspect-ratio: auto; height: 64px; display: grid; place-items: center; }
+.solo-voz .pantallas::after { content: "♪"; color: var(--ok); font-size: 28px; }
 .escribir .campo { flex: 1; }
 @media (max-width: 680px) { .conexion .c-dos { grid-template-columns: 1fr; } .mensajes li { max-width: 92%; } }
 .tres article.tarjeta { box-shadow: var(--sombra); }
@@ -151,7 +163,11 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
   <section class="tarjeta espera" id="c-espera" hidden><p class="t" id="c-espera-texto"></p></section>
 
   <section class="tarjeta chat" id="c-chat" hidden>
-    <div class="chat-cab"><h2 id="c-con"></h2><button type="button" class="boton chico" id="c-cerrar" data-t="sec_c_cerrar"></button></div>
+    <div class="chat-cab"><h2 id="c-con"></h2><div class="c-fila"><button type="button" class="boton chico" id="c-voz" data-t="sec_l_voz"></button><button type="button" class="boton chico" id="c-video" data-t="sec_l_video"></button><button type="button" class="boton chico" id="c-cerrar" data-t="sec_c_cerrar"></button></div></div>
+    <section class="llamada" id="c-llamada" hidden>
+      <div class="pantallas"><video id="c-remoto" autoplay playsinline></video><video id="c-local" autoplay playsinline muted></video></div>
+      <div class="c-fila llamada-botones"><span class="l-estado" id="c-l-estado"></span><button type="button" class="boton chico" id="c-silencio" aria-pressed="false" data-t="sec_l_silenciar"></button><button type="button" class="boton peligro chico" id="c-colgar" data-t="sec_l_colgar"></button></div>
+    </section>
     <ol class="mensajes" id="c-mensajes"></ol>
     <div class="zona-archivo" id="c-zona"><span data-t="sec_f_arrastra"></span> <label class="enlace" for="c-archivo" data-t="sec_f_elige"></label><input type="file" id="c-archivo" hidden multiple></div>
     <div class="c-progreso" id="c-progreso" hidden><span id="c-progreso-texto"></span><i><b id="c-progreso-barra"></b></i></div>

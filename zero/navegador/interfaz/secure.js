@@ -98,6 +98,8 @@
 
   function pinta(m) {
     if (m.clase) claseSesion = m.clase;
+    else if (E && E.llamada) claseSesion = E.llamada.video ? 'videollamada' : 'llamada';
+    else claseSesion = 'chat';
     pintaGlobal(m);
     pintaPausa(m);
     const id = m.identidad;
@@ -199,6 +201,96 @@
   ['dragleave', 'drop'].forEach((ev) => zona.addEventListener(ev, (e) => { e.preventDefault(); zona.classList.remove('sobre'); }));
   zona.addEventListener('drop', (e) => { if (e.dataTransfer && e.dataTransfer.files.length) encola(e.dataTransfer.files); });
   $('p-reanudar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'reanudar' }));
+
+  // ---------- Ring, voice and video (15 Oct 2026) ----------
+  // The ring is made here, by the page itself: two soft notes, no file, no network. It plays
+  // because the person pressed a button on this page earlier (the browser's rule for sound).
+  let audioCtx = null;
+  const timbre = () => {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const t0 = audioCtx.currentTime;
+      [[880, 0], [1174.7, 0.18], [880, 0.6], [1174.7, 0.78]].forEach(([f, d]) => {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = 'sine'; o.frequency.value = f; o.connect(g); g.connect(audioCtx.destination);
+        g.gain.setValueAtTime(0.0001, t0 + d); g.gain.exponentialRampToValueAtTime(0.25, t0 + d + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.16);
+        o.start(t0 + d); o.stop(t0 + d + 0.18);
+      });
+    } catch (_) {}
+  };
+  let faseAntes = 'sola';
+  en('secure_estado', (m) => {
+    if (m.fase === 'comparando' && faseAntes !== 'comparando' && faseAntes !== 'saludando') timbre();
+    if (m.fase === 'comparando' && faseAntes === 'escuchando') timbre();
+    faseAntes = m.fase;
+    pintaLlamada(m);
+  });
+  en('secure_aviso', (m) => { if (m.clave === 'sec_llamada_entrante') timbre(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) manda({ tipo: 'secure', accion: 'visto' }); });
+  window.addEventListener('focus', () => manda({ tipo: 'secure', accion: 'visto' }));
+
+  // Sending: the camera and microphone recorded in short pieces (Opus, and VP9 for video), each
+  // one handed to the program, which encrypts it under the media layer and sends it. Receiving:
+  // the pieces the program opened are played as they come. Direct, no media server, ~half a
+  // second behind. (The real-time transport comes next; this is today's.)
+  let grabador = null, local = null, fuente = null, buffer = null, pendientes = [], silenciado = false, llamadaVideo = false;
+  const pintaLlamada = (m) => {
+    const l = m.llamada;
+    const caja = $('c-llamada');
+    if (!l) { caja.hidden = true; paraMedios(); return; }
+    caja.hidden = false;
+    caja.classList.toggle('solo-voz', !l.video);
+    $('c-l-estado').textContent = t(l.video ? 'sec_l_en_video' : 'sec_l_en_voz', { t: tiempo(Math.max(0, Math.floor(Date.now() / 1000) - (l.desde || 0))) });
+    if (!grabador) empiezaMedios(!!l.video);
+  };
+  setInterval(() => { if (!$('c-llamada').hidden && E.llamada) $('c-l-estado').textContent = t(E.llamada.video ? 'sec_l_en_video' : 'sec_l_en_voz', { t: tiempo(Math.max(0, Math.floor(Date.now() / 1000) - (E.llamada.desde || 0))) }); }, 1000);
+  const mime = (video) => {
+    const c = video ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'] : ['audio/webm;codecs=opus', 'audio/webm'];
+    return c.find((x) => window.MediaRecorder && MediaRecorder.isTypeSupported(x)) || c[c.length - 1];
+  };
+  const empiezaMedios = async (video) => {
+    llamadaVideo = video;
+    try {
+      local = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 48000 }, video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false });
+    } catch (e) { aviso(t('sec_l_sin_permiso')); manda({ tipo: 'secure', accion: 'colgar' }); return; }
+    $('c-local').srcObject = local;
+    const tipo = mime(video);
+    grabador = new MediaRecorder(local, { mimeType: tipo, audioBitsPerSecond: 64000, videoBitsPerSecond: video ? 1500000 : undefined });
+    grabador.ondataavailable = async (e) => { if (e.data && e.data.size) manda({ tipo: 'secure', accion: 'media', b64: b64De(await e.data.arrayBuffer()) }); };
+    grabador.start(250);
+    preparaReproductor(tipo);
+  };
+  const preparaReproductor = (tipo) => {
+    const v = $('c-remoto');
+    fuente = new MediaSource();
+    v.src = URL.createObjectURL(fuente);
+    pendientes = []; buffer = null;
+    fuente.addEventListener('sourceopen', () => {
+      try { buffer = fuente.addSourceBuffer(tipo); buffer.mode = 'sequence'; buffer.addEventListener('updateend', vacia); vacia(); } catch (e) { aviso(t('sec_l_no_reproduce')); }
+    });
+    v.play().catch(() => {});
+  };
+  const vacia = () => {
+    if (!buffer || buffer.updating || !pendientes.length) return;
+    try { buffer.appendBuffer(pendientes.shift()); } catch (_) { pendientes = []; }
+    // Keep close to live: if the player fell more than 1.5 s behind, jump.
+    const v = $('c-remoto');
+    try { if (v.buffered.length && v.buffered.end(v.buffered.length - 1) - v.currentTime > 1.5) v.currentTime = v.buffered.end(v.buffered.length - 1) - 0.3; } catch (_) {}
+  };
+  en('secure_media', (m) => { (m.trozos || []).forEach((b) => { const s = atob(b); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); pendientes.push(u.buffer); }); vacia(); });
+  const paraMedios = () => {
+    try { if (grabador && grabador.state !== 'inactive') grabador.stop(); } catch (_) {}
+    grabador = null;
+    if (local) { local.getTracks().forEach((x) => x.stop()); local = null; }
+    $('c-local').srcObject = null;
+    try { if (fuente && fuente.readyState === 'open') fuente.endOfStream(); } catch (_) {}
+    fuente = null; buffer = null; pendientes = [];
+    $('c-remoto').removeAttribute('src');
+  };
+  $('c-voz').addEventListener('click', () => { timbre(); manda({ tipo: 'secure', accion: 'llamar', video: false }); });
+  $('c-video').addEventListener('click', () => { timbre(); manda({ tipo: 'secure', accion: 'llamar', video: true }); });
+  $('c-colgar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'colgar' }));
+  $('c-silencio').addEventListener('click', () => { silenciado = !silenciado; if (local) local.getAudioTracks().forEach((x) => { x.enabled = !silenciado; }); $('c-silencio').setAttribute('aria-pressed', String(silenciado)); $('c-silencio').textContent = t(silenciado ? 'sec_l_sonar' : 'sec_l_silenciar'); });
 
   let ultimo = {};
   en('monitor', (m) => { ultimo = m.monitor || {}; pinta(ultimo); });
