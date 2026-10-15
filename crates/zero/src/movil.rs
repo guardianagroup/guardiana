@@ -26,7 +26,6 @@ use std::time::Duration;
 
 use base64::Engine as _;
 use serde_json::{json, Value};
-use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::sync::mpsc as tmpsc;
 use wtransport::endpoint::IncomingSession;
 use wtransport::tls::Sha256DigestFmt;
