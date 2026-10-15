@@ -630,6 +630,8 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 .universo .lugar-yo { font: 12px 'IBM Plex Mono', ui-monospace, monospace; color: var(--hud-muted); white-space: nowrap; }
 
 .universo .lugar-yo b { color: var(--hud-fg); font-weight: 500; }
+/* On a VPN the measured place is the VPN's: the chip says so, with the way to fix it on hover. */
+.universo .chip-vpn { font: 500 11px 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--undoc); border: 1px solid var(--undoc); border-radius: 6px; padding: 3px 8px; white-space: nowrap; cursor: help; }
 
 .universo .hud #hud-doc { font-size: 10.5px; line-height: 1.35; }
 @media (max-width: 900px) {

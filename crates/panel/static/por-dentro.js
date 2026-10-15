@@ -185,6 +185,7 @@
       if (!primeraLectura) primeraLectura = Date.now();
       const ahora = performance.now(), intervalo = ultimaCarga ? Math.max(1, (ahora - ultimaCarga) / 1000) : 5;
       ultimaCarga = ahora; st.intervalo = intervalo; st.datos = r;
+      pintaVpn(r.vpn);
       r.programas.forEach((p) => {
         let o = PROD.find((x) => x.id === p.id);
         if (!o) o = nuevoProducto(p);
@@ -1743,6 +1744,18 @@
     // a city when Windows, Microsoft or Google returns an imprecise or stale point. Everything
     // stays in this browser and GUARDIANA sends it nowhere.
     const etiquetaYo = document.querySelector('.lugar-yo [data-t="pd_tu_pais"]');
+    // The VPN chip (15 Oct 2026). While a VPN is up, the city a network measurement gives is the
+    // VPN's exit, so the chip names the VPN and the hint says how to place the computer right.
+    let VPN = [];
+    const pintaVpn = (lista) => {
+      VPN = Array.isArray(lista) ? lista : [];
+      const el = $('vpn');
+      if (!VPN.length) { el.hidden = true; return; }
+      el.hidden = false;
+      el.textContent = t('pd_vpn_saliendo').replace('{n}', VPN.join(', '));
+      el.title = t('pd_vpn_explica');
+      if (st.lugar.fuente === 'zona' || st.lugar.fuente === 'pais') { if (!pintaVpn.avisado) { pintaVpn.avisado = true; avisa(t('pd_vpn_aviso').replace('{n}', VPN.join(', ')), [{ texto: t('pd_corregir'), hacer: abreUbicacion }]); } }
+    };
     const pintaYo = () => {
       const aproximada = st.lugar.fuente === 'zona' || st.lugar.fuente === 'pais';
       etiquetaYo.textContent = t(aproximada ? 'pd_ubicacion_referencia' : 'pd_tu_pais');
@@ -1778,6 +1791,10 @@
         if (m && m.km < 35 && precision <= 25000) g = { lat, lon, ciudad: m.c.n + (m.c.adm ? ', ' + m.c.adm : ''), cc: m.c.cc, precision, fuente: 'equipo' };
         else g.cc = paisEn(lon, lat) || '';
       } catch (_) { g.cc = paisEn(lon, lat) || ''; }
+      if (VPN.length && precision > 1000) {
+        if (!callado) avisa(t('pd_vpn_medida').replace('{n}', VPN.join(', ')), [{ texto: t('pd_corregir'), hacer: abreUbicacion }]);
+        return;
+      }
       if (precision > 25000) {
         if (!callado) avisa(t('pd_precisar_impreciso').replace('{km}', String(Math.max(1, Math.round(precision / 1000)))), [{ texto: t('pd_corregir'), hacer: abreUbicacion }]);
         return;
@@ -1831,7 +1848,17 @@
       try { navigator.permissions.query({ name: 'geolocation' }).then((p) => { if (p.state === 'granted') precisar(true); }).catch(() => {}); } catch (_) {}
     }
     if (soloMirar) $('corregir-lugar').hidden = true;
-    else $('corregir-lugar').addEventListener('click', abreUbicacion);
+    else {
+      $('corregir-lugar').addEventListener('click', abreUbicacion);
+      // Placed by the time zone only (its capital): say so once, with the way to fix it, instead
+      // of letting a person in Cartagena see their computer in Bogotá (15 Oct 2026).
+      try {
+        if ((st.lugar.fuente === 'zona' || st.lugar.fuente === 'pais') && !localStorage.getItem('guardiana_pd_lugar_avisado')) {
+          localStorage.setItem('guardiana_pd_lugar_avisado', '1');
+          setTimeout(() => { if (st.lugar.fuente === 'zona' || st.lugar.fuente === 'pais') avisa(t('pd_lugar_zona_aviso').replace('{lugar}', [st.lugar.ciudad, nombrePais(st.yo)].filter(Boolean).join(', ')), [{ texto: t('pd_corregir'), hacer: abreUbicacion }, { texto: t('pd_precisar'), hacer: () => precisar(false) }]); }, 2500);
+        }
+      } catch (_) {}
+    }
     buscaUbicacion.addEventListener('input', pintaCiudades);
     $('ubicacion-cerrar').addEventListener('click', cierraUbicacion);
 

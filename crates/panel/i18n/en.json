@@ -2073,10 +2073,10 @@
     "pd_documentado": "{n} % of what it sends goes to services its maker explains on its website",
     "pd_sin_documentar": "{n} places not explained",
     "pd_sin_documentar_uno": "1 place not explained",
-        "pd_llegadas": "{n} arrivals",
+    "pd_llegadas": "{n} arrivals",
     "pd_llegadas_uno": "1 arrival",
     "pd_adonde": "Where they go",
-"pd_destinos": "Destinations",
+    "pd_destinos": "Destinations",
     "pd_parados": "{n} stopped",
     "pd_parados_uno": "1 stopped",
     "pd_omitidos": "And {n} more destinations, with less data.",
@@ -2267,6 +2267,10 @@
     "pd_corregir_sin_resultados": "No city with that name was found.",
     "pd_corregir_hecho": "Location confirmed: {lugar}.",
     "pd_corregir_cancelar": "Cancel",
+    "pd_vpn_saliendo": "Leaving through a VPN: {n}",
+    "pd_vpn_explica": "While the VPN is on, anything measured through the network (and your way out to the internet) is where the VPN is, not where you are. To place yourself right, press “Pinpoint” (GPS or Wi-Fi, not the network) or “Correct city”.",
+    "pd_vpn_aviso": "You are leaving through a VPN ({n}): your computer is placed by its time zone, not by the network. If that is not your city, correct it.",
+    "pd_vpn_medida": "The measurement came through the network, and with the VPN ({n}) on that places the VPN’s exit, not your computer. It is not used. Choose your city or measure with GPS or Wi-Fi.",
     "pd_av_dentro": "{prog}, inside the computer",
     "pd_av_dentro_midiendo": "Measuring: the first figure arrives with the next reading (5 seconds).",
     "pd_av_cpu": "Processor",
@@ -2472,6 +2476,7 @@
     "rv_marca_actuo": "the antivirus acted",
     "rv_marca_detectada": "detected",
     "rv_marca_clave_opcional": "password not required",
-    "rv_certificados_nuevo": "{n} new root certificates since the first check-up. With one, a program can read your encrypted traffic: if you do not know where they come from, check it."
+    "rv_certificados_nuevo": "{n} new root certificates since the first check-up. With one, a program can read your encrypted traffic: if you do not know where they come from, check it.",
+    "pd_lugar_zona_aviso": "Your computer is placed by its time zone, in {lugar}. If that is not your city, correct it or measure with GPS or Wi-Fi: it stays in this browser only."
   }
 }
