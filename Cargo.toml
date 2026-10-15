@@ -95,6 +95,8 @@ qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 # SessionConfig::version_1 is the Olm that Matrix deploys. Version 2 is experimental
 # and is not enabled.
 vodozemac = "0.10"
+# XChaCha20-Poly1305 for SECURE's files in blocks; already in the tree via vodozemac.
+chacha20poly1305 = "0.10"
 
 [workspace.lints.rust]
 # Brief §2: `unsafe` is forbidden unless justified in a comment.
