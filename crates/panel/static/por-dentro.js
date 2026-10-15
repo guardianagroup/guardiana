@@ -541,25 +541,58 @@
     };
 
     // --- Globo y mapa: rutas, columnas de luz, escudo y rótulos sobre la Tierra ---
+    let GRUPOS = [];
+    const baseLugar = (d) => {
+      const b = d.lugar ? { lon: d.lugar.lon, lat: d.lugar.lat } : centros[d.pais];
+      d.d = d.lugar ? 'exacto' : 'pais';
+      return b;
+    };
+    // One line per place on the screen. Cities that land on the same spot share it, until the
+    // view is close enough to separate them. The line ends on the busiest arrival.
+    const agrupa = (puntoDe) => {
+      const grupos = [];
+      VISIBLES.forEach((d) => {
+        const b = baseLugar(d);
+        if (!b) return;
+        d.lon = b.lon; d.lat = b.lat;
+        const q = puntoDe(b.lon, b.lat);
+        let g = null;
+        if (q && q.v !== false) {
+          for (const h of grupos) if (h.frente && Math.hypot(h.ax - q.x, h.ay - q.y) < 16) { g = h; break; }
+        } else {
+          const key = b.lat.toFixed(1) + ',' + b.lon.toFixed(1);
+          g = grupos.find((h) => !h.frente && h.key === key) || null;
+          if (!g) { g = { ds: [], lon: b.lon, lat: b.lat, frente: false, key, ax: 0, ay: 0 }; grupos.push(g); }
+        }
+        if (!g) { g = { ds: [], lon: b.lon, lat: b.lat, frente: true, ax: q.x, ay: q.y }; grupos.push(g); }
+        g.ds.push(d);
+      });
+      grupos.forEach((g) => {
+        g.ds.sort((a, c) => (c.sub + c.baj) - (a.sub + a.baj) || c.bloq - a.bloq);
+        const top = g.ds[0];
+        g.lon = top.lon; g.lat = top.lat; g.top = top;
+      });
+      return grupos;
+    };
+    const aplicaRuta = (g) => { g.ds.forEach((d) => { d.ruta = g.ruta; d.tg = g.tg; d.vis = g.vis; d.x = g.x; d.y = g.y; d.base = g.base; }); };
     const layoutTierra = () => {
       camara();
       const yo = st.lugar, cen = aPantalla(lugar(yo.lon, yo.lat, 0.002));
       const R0 = 26;
       const prods = posProductos(cen, 11);
-      const mx = Math.max(1, ...VISIBLES.map((d) => d.sub));
-      VISIBLES.forEach((d) => {
-        const { lon: lon1, lat: lat1 } = sitio(d);
-        d.lon = lon1; d.lat = lat1;
+      GRUPOS = agrupa((lon, lat) => aPantalla(lugar(lon, lat, 0.002)));
+      GRUPOS.forEach((g) => {
+        const d = g.top, lon1 = g.lon, lat1 = g.lat;
         const a = [Math.cos(yo.lat * RAD) * Math.sin(yo.lon * RAD), Math.sin(yo.lat * RAD), Math.cos(yo.lat * RAD) * Math.cos(yo.lon * RAD)];
         const b = [Math.cos(lat1 * RAD) * Math.sin(lon1 * RAD), Math.sin(lat1 * RAD), Math.cos(lat1 * RAD) * Math.cos(lon1 * RAD)];
         const om = Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))) || 1e-6;
-        const alt = 0.05 + 0.3 * om / Math.PI + lado(d) * 0.03;
-        const dl = Math.hypot(lon1 - yo.lon, lat1 - yo.lat) * RAD, alzaMax = 0.12 + 0.22 * dl / Math.PI + lado(d) * 0.05;
+        const alt = 0.012 + 0.055 * om / Math.PI;
+        const dl = Math.hypot(lon1 - yo.lon, lat1 - yo.lat) * RAD, alzaMax = 0.028 + 0.04 * dl / Math.PI;
         const arco = [];
         for (let i = 0; i <= N; i++) {
-          const t = i / N, s1 = Math.sin((1 - t) * om) / Math.sin(om), s2 = Math.sin(t * om) / Math.sin(om), h = 1 + alt * Math.sin(Math.PI * t);
+          const u = i / N, s1 = Math.sin((1 - u) * om) / Math.sin(om), s2 = Math.sin(u * om) / Math.sin(om), h = 1 + alt * Math.sin(Math.PI * u);
           const sx = (a[0] * s1 + b[0] * s2) * h, sy = (a[1] * s1 + b[1] * s2) * h, sz = (a[2] * s1 + b[2] * s2) * h;
-          const pl = [(yo.lon + (lon1 - yo.lon) * t) * RAD, (yo.lat + (lat1 - yo.lat) * t) * RAD + alzaMax * Math.sin(Math.PI * t), 0.02];
+          const pl = [(yo.lon + (lon1 - yo.lon) * u) * RAD, (yo.lat + (lat1 - yo.lat) * u) * RAD + alzaMax * Math.sin(Math.PI * u), 0.02];
           const m = T.m;
           arco.push(aPantalla([sx + (pl[0] - sx) * m, sy + (pl[1] - sy) * m, sz + (pl[2] - sz) * m]));
         }
@@ -567,13 +600,12 @@
         let ig = arco.findIndex((q) => Math.hypot(q.x - cen.x, q.y - cen.y) > R0);
         if (ig < 1) ig = 1;
         const gte = arco[ig];
-        d.ruta = tramo((t) => ({ x: pr.x + (gte.x - pr.x) * t, y: pr.y + (gte.y - pr.y) * t, v: cen.v }), 5).concat(arco.slice(ig + 1));
-        d.tg = 5 / (d.ruta.length - 1);
-        const fin = d.ruta[d.ruta.length - 1];
-        d.x = fin.x; d.y = fin.y; d.vis = fin.v;
-        // Columna de luz en el destino: altura según lo enviado (raíz, con techo).
-        const hb = (0.025 + 0.11 * Math.sqrt(d.sub / mx)) / Math.pow(Math.max(1, T.m < 0.5 ? T.zoomG : T.zoomM), 0.85);
-        d.base = aPantalla(lugar(lon1, lat1, 0.002)); d.cima = aPantalla(lugar(lon1, lat1, hb, hb * 0.9));
+        g.ruta = tramo((u) => ({ x: pr.x + (gte.x - pr.x) * u, y: pr.y + (gte.y - pr.y) * u, v: cen.v }), 5).concat(arco.slice(ig + 1));
+        g.tg = 5 / (g.ruta.length - 1);
+        const fin = g.ruta[g.ruta.length - 1];
+        g.x = fin.x; g.y = fin.y; g.vis = fin.v;
+        g.base = aPantalla(lugar(lon1, lat1, 0.002));
+        aplicaRuta(g);
       });
       return { cen, R0, prods, yo };
     };
@@ -596,24 +628,25 @@
       const L = layoutTierra(), tt = tiempo();
       cx.globalCompositeOperation = 'lighter';
       // Arcos: un velo ancho y un hilo fino, más vivo en el centro del recorrido.
-      VISIBLES.forEach((d) => {
-        const bl = bloqueado(d), col = bl ? '#ff6b7a' : prod(d.p).color;
+      GRUPOS.forEach((g) => {
+        const d = g.top, bl = bloqueado(d), col = bl ? '#ff6b7a' : prod(d.p).color;
         if (bl) {
-          trazo(d.ruta, 0, d.tg, 'rgba(255,107,122,.75)', 0.7);
-          trazo(d.ruta, d.tg, 1, 'rgba(160,175,200,.22)', 0.45, [1.2, 3.2]);
+          trazo(g.ruta, 0, g.tg, 'rgba(255,107,122,.75)', 0.7);
+          trazo(g.ruta, g.tg, 1, 'rgba(160,175,200,.22)', 0.45, [1.2, 3.2]);
           return;
         }
-        trazo(d.ruta, 0, 1, col + '24', 1.05);
-        trazo(d.ruta, 0, 1, col + 'c8', 0.45);
+        trazo(g.ruta, 0, 1, col + '24', 1.05);
+        trazo(g.ruta, 0, 1, col + 'c8', 0.45);
       });
-      // Solo el punto donde llega el dato. El nombre sale al pasar el cursor, no escrito encima.
-      VISIBLES.forEach((d) => {
-        if (!d.base.v) return;
-        const bl = bloqueado(d);
-        const sobre = st.hover && st.hover.tipo === 'dest' && st.hover.ref === d;
+      GRUPOS.forEach((g) => {
+        if (!g.base.v) return;
+        const d = g.top, bl = bloqueado(d);
+        const sobre = st.hover && (st.hover.ref === g || st.hover.ref === d);
         const r = sobre ? 13 : 6.5;
-        cx.drawImage(brillo(bl ? '#ff6b7a' : '#ffb547'), d.base.x - r, d.base.y - r, r * 2, r * 2);
-        st.dianas.push({ x: d.base.x, y: d.base.y, r: 18, tipo: 'dest', ref: d });
+        cx.drawImage(brillo(bl ? '#ff6b7a' : '#ffb547'), g.base.x - r, g.base.y - r, r * 2, r * 2);
+        st.dianas.push(g.ds.length > 1
+          ? { x: g.base.x, y: g.base.y, r: 18, tipo: 'lugar', ref: g }
+          : { x: g.base.x, y: g.base.y, r: 18, tipo: 'dest', ref: d });
       });
       // El escudo de GUARDIANA sobre tu ordenador.
       if (L.cen.v) {
@@ -688,15 +721,17 @@
     const layoutPlano = () => {
       const yo = st.lugar, cen = aPlano(yo.lon, yo.lat), R0 = 18;
       const prods = posProductos(cen, 8);
-      VISIBLES.forEach((d) => {
-        const q0 = sitio(d); d.lon = q0.lon; d.lat = q0.lat;
-        const b = aPlano(d.lon, d.lat);
+      GRUPOS = agrupa((lon, lat) => aPlano(lon, lat));
+      GRUPOS.forEach((g) => {
+        const d = g.top;
+        const b = aPlano(g.lon, g.lat);
         const dx = b.x - cen.x, dy = b.y - cen.y, dist = Math.hypot(dx, dy) || 1;
-        const g = { x: cen.x + dx / dist * R0, y: cen.y + dy / dist * R0 };
-        const c1 = { x: (g.x + b.x) / 2, y: (g.y + b.y) / 2 - Math.min(120, dist * 0.28) - lado(d) * 10 };
+        const gate = { x: cen.x + dx / dist * R0, y: cen.y + dy / dist * R0 };
+        const c1 = { x: (gate.x + b.x) / 2, y: (gate.y + b.y) / 2 - Math.min(28, dist * 0.08) };
         const pr = posDe(prods, d, cen);
-        d.ruta = tramo((u) => ({ x: pr.x + (g.x - pr.x) * u, y: pr.y + (g.y - pr.y) * u }), 5).concat(tramo((u) => bez2(g, c1, b, u), N - 5).slice(1));
-        d.tg = 5 / N; d.x = b.x; d.y = b.y; d.vis = true;
+        g.ruta = tramo((u) => ({ x: pr.x + (gate.x - pr.x) * u, y: pr.y + (gate.y - pr.y) * u }), 5).concat(tramo((u) => bez2(gate, c1, b, u), N - 5).slice(1));
+        g.tg = 5 / N; g.x = b.x; g.y = b.y; g.vis = true; g.base = b;
+        aplicaRuta(g);
       });
       return { cen, R0, prods };
     };
@@ -708,7 +743,14 @@
       st.dianas.push({ x: L.cen.x, y: L.cen.y, r: 10, tipo: 'yo' });
       L.prods.forEach(nodoProducto);
       particulas(dt);
-      VISIBLES.forEach((d) => nodoDestino(d, false));
+      GRUPOS.forEach((g) => {
+        const d = g.top;
+        if (!g.vis) return;
+        cx.drawImage(brillo(colorDe(d)), g.x - 5.2, g.y - 5.2, 10.4, 10.4);
+        st.dianas.push(g.ds.length > 1
+          ? { x: g.x, y: g.y, r: 16, tipo: 'lugar', ref: g }
+          : { x: g.x, y: g.y, r: 16, tipo: 'dest', ref: d });
+      });
     };
 
 
@@ -782,17 +824,18 @@
       cx.restore();
     };
     const tentaculos = () => {
-      VISIBLES.forEach((d) => {
-        if (!d.ruta.length) return;
+      GRUPOS.forEach((g) => {
+        const d = g.top;
+        if (!g.ruta || !g.ruta.length) return;
         const bl = bloqueado(d), base = prod(d.p).color;
         if (bl) {
-          trazo(d.ruta, 0, d.tg, 'rgba(255,107,122,.75)', 0.7);
-          trazo(d.ruta, d.tg, 1, 'rgba(160,175,200,.22)', 0.45, [1.2, 3.2]);
-          const g = punto(d.ruta, d.tg), h = punto(d.ruta, d.tg + 0.01);
-          if (g.v) puerta(g, Math.atan2(h.y - g.y, h.x - g.x));
+          trazo(g.ruta, 0, g.tg, 'rgba(255,107,122,.75)', 0.7);
+          trazo(g.ruta, g.tg, 1, 'rgba(160,175,200,.22)', 0.45, [1.2, 3.2]);
+          const q = punto(g.ruta, g.tg), h = punto(g.ruta, g.tg + 0.01);
+          if (q.v) puerta(q, Math.atan2(h.y - q.y, h.x - q.x));
         } else {
-          trazo(d.ruta, 0, 1, base + '22', 1.05);
-          trazo(d.ruta, 0, 1, base + 'c0', 0.45);
+          trazo(g.ruta, 0, 1, base + '22', 1.05);
+          trazo(g.ruta, 0, 1, base + 'c0', 0.45);
         }
       });
     };
@@ -1149,6 +1192,19 @@
     };
     const usoTexto = (d) => (d.doc === null || d.doc === undefined ? '' : d.uso ? `<div>${esc(t('pd_para_que'))} <b>${esc(t('av_uso_' + d.uso))}</b></div>` : `<div class="nodoc">${esc(t('pd_no_documenta'))}</div>`);
     const textoTip = (hh) => {
+      if (hh.tipo === 'lugar') {
+        const g = hh.ref, d0 = g.top;
+        const ciudades = [...new Set(g.ds.map((d) => d.lugar && d.lugar.ciudad).filter(Boolean))];
+        const pais = (d0.lugar && d0.lugar.pais) || d0.pais;
+        const titulo = ciudades.length === 1 ? ciudades[0] + ' · ' + nombrePais(pais) : (pais ? nombrePais(pais) : '—');
+        const env = g.ds.reduce((a, d) => a + d.sub, 0), baj = g.ds.reduce((a, d) => a + d.baj, 0);
+        const nPais = new Set(g.ds.map((d) => d.pais).filter((x) => x && x[0] !== '@')).size;
+        const lista = g.ds.slice(0, 8).map((d) => (bloqueado(d) ? '✕ ' : '· ') + esc(d.host)).join('<br>');
+        const resto = g.ds.length - 8;
+        return `<b>${esc(titulo)}</b><div>${esc(tn('pd_destinos_en', g.ds.length).replace('{p}', String(nPais)))}</div>
+          <div>${esc(t('pd_enviado'))} <b>${esc(bytes(env))}</b> · ${esc(t('pd_recibido'))} ${esc(bytes(baj))}</div>
+          <div class="mono arriba4">${lista}${resto > 0 ? '<br>' + esc(tn('pd_y_mas', resto)) : ''}</div>`;
+      }
       if (hh.tipo === 'dest') {
         const d = hh.ref, p = prod(d.p), bl = bloqueado(d);
         const estado = bl ? `<span class="estado corta">${esc(d.cortado ? t('pd_cortado_nombre') : d.ancho ? t('pd_cortado_ancho') : t('pd_cortado_programa').replace('{prog}', p.nombre))}</span>` : `<span class="estado pasa">${esc(t('pd_pasa'))}</span>`;
@@ -1215,7 +1271,11 @@
     const cerca = (lon, lat) => (st.vista === 'destinos' && lon !== undefined ? `<button type="button" class="btn-hud" data-cerca="${lon},${lat}">${esc(t('pd_ver_cerca'))}</button>` : '');
     const htmlDetalle = (hh) => {
       let h = `<div class="cuerpo">${textoTip(hh)}</div>`, acciones = '', enlaces = [];
-      if (hh.tipo === 'dest') {
+      if (hh.tipo === 'lugar') {
+        const g = hh.ref;
+        h = `<div class="cuerpo">${textoTip(hh).replace(/<div class="mono arriba4">[\s\S]*$/, '')}</div><h4>${esc(t('pd_det_destinos'))}</h4>` + listaDest(g.ds);
+        acciones += cerca(g.lon, g.lat);
+      } else if (hh.tipo === 'dest') {
         const d = hh.ref, p = prod(d.p);
         if (d.lugar) h += `<p><b>${esc(t('pd_lugar_titulo'))}</b> ${esc(d.lugar.ciudad)} · ${esc(nombrePais(d.lugar.pais))}</p><p class="t">${esc(t(d.lugar.fuente === 'region' ? 'pd_lugar_region' : 'pd_lugar_geofeed').replace('{op}', t('pd_op_' + d.lugar.operador)).replace('{region}', d.lugar.region))}</p>`;
         else if (!d.sede) h += `<p class="t">${esc(t('pd_pos_pais').replace('{pais}', d.pais ? nombrePais(d.pais) : '—'))}</p>`;
