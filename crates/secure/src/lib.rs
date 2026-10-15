@@ -21,6 +21,7 @@ use vodozemac::{Curve25519PublicKey, Ed25519PublicKey};
 pub mod agenda;
 pub mod carry;
 pub mod monitor;
+pub mod prueba;
 pub mod puesto;
 pub mod tarjeta;
 pub mod verificar;
