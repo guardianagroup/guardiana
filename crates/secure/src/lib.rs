@@ -19,6 +19,7 @@ use vodozemac::olm::{Account, OlmMessage, Session, SessionConfig, SessionCreatio
 use vodozemac::{Curve25519PublicKey, Ed25519PublicKey};
 
 pub mod carry;
+pub mod puesto;
 pub mod verificar;
 
 /// Why a SECURE operation stopped. The text never names a key or a message.
