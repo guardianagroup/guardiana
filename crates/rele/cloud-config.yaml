@@ -36,13 +36,18 @@ write_files:
       #!/bin/bash
       # Recompila el relé desde el main publicado y lo reinicia. Se puede ejecutar cuando
       # haya una versión nueva: bash /opt/guardiana-rele/actualizar.sh
-      set -euo pipefail
+      set -uo pipefail
       export PATH="/root/.cargo/bin:$PATH"
       cd /opt/guardiana-rele
-      if [ -d guardiana/.git ]; then git -C guardiana pull -q --ff-only; else git clone -q --depth 1 https://github.com/guardianagroup/guardiana.git; fi
-      cd guardiana
-      cargo build --release -p guardiana-rele --locked
-      install -m 0755 target/release/guardiana-rele /opt/guardiana-rele/guardiana-rele
+      # Up to two hours of tries, two minutes apart: the first server may come up before the
+      # relay's code reaches main.
+      for intento in $(seq 1 60); do
+        if [ -d guardiana/.git ]; then git -C guardiana pull -q --ff-only; else git clone -q --depth 1 https://github.com/guardianagroup/guardiana.git; fi
+        if (cd guardiana && cargo build --release -p guardiana-rele --locked); then break; fi
+        echo "intento $intento: todavía no compila; espero dos minutos"
+        sleep 120
+      done
+      install -m 0755 guardiana/target/release/guardiana-rele /opt/guardiana-rele/guardiana-rele || exit 1
       systemctl daemon-reload
       systemctl enable --now guardiana-rele
       systemctl restart guardiana-rele
