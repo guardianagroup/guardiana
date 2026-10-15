@@ -923,5 +923,16 @@
   "sec_archivo_recibido": "File received in Downloads:",
   "sec_no_lista": "No conversation open yet.",
   "sec_en_pausa": "The conversation is paused; nothing is sent.",
-  "sec_error": "Error:"
+  "sec_error": "Error:",
+  "sec_l_voz": "Call (voice)",
+  "sec_l_video": "Video call",
+  "sec_l_colgar": "Hang up",
+  "sec_l_silenciar": "Mute microphone",
+  "sec_l_sonar": "Unmute microphone",
+  "sec_l_en_voz": "Encrypted voice call · {t}",
+  "sec_l_en_video": "Encrypted video call · {t}",
+  "sec_l_sin_permiso": "Without permission for the microphone or camera there is no call.",
+  "sec_l_no_reproduce": "This browser cannot play the call.",
+  "sec_llamada_entrante": "Incoming call.",
+  "sec_llamada_colgada": "The other person hung up."
 }

@@ -923,5 +923,16 @@
   "sec_archivo_recibido": "Archivo recibido en Descargas:",
   "sec_no_lista": "Todavía no hay conversación abierta.",
   "sec_en_pausa": "La conversación está en pausa; no se envía nada.",
-  "sec_error": "Error:"
+  "sec_error": "Error:",
+  "sec_l_voz": "Llamar (voz)",
+  "sec_l_video": "Videollamada",
+  "sec_l_colgar": "Colgar",
+  "sec_l_silenciar": "Silenciar micrófono",
+  "sec_l_sonar": "Activar micrófono",
+  "sec_l_en_voz": "Llamada de voz cifrada · {t}",
+  "sec_l_en_video": "Videollamada cifrada · {t}",
+  "sec_l_sin_permiso": "Sin permiso para el micrófono o la cámara, no hay llamada.",
+  "sec_l_no_reproduce": "Este navegador no puede reproducir la llamada.",
+  "sec_llamada_entrante": "Llamada entrante.",
+  "sec_llamada_colgada": "La otra persona colgó."
 }

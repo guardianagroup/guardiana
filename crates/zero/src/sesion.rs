@@ -1172,7 +1172,12 @@ impl Sesion {
             return self.t("pestana_zero");
         }
         if p.url.starts_with(SECURE) {
-            return self.t("pestana_secure");
+            let t = self.t("pestana_secure");
+            return if self.secure.novedad {
+                format!("● {t}")
+            } else {
+                t
+            };
         }
         if p.url == INICIO || p.url.is_empty() {
             return self.t("pestana_nueva");
@@ -1195,6 +1200,14 @@ impl Sesion {
     fn secure_tic(&mut self) -> Vec<Orden> {
         self.secure.tic();
         let mut o = Vec::new();
+        if !self.secure.media_para_pagina.is_empty() {
+            if let Some(id) = self.pestana_secure() {
+                let trozos: Vec<String> = self.secure.media_para_pagina.drain(..).collect();
+                o.extend(self.a_pestana(id, &json!({ "tipo": "secure_media", "trozos": trozos })));
+            } else {
+                self.secure.media_para_pagina.clear();
+            }
+        }
         if self.secure.cambiado() {
             if let Some(id) = self.pestana_secure() {
                 o.extend(self.a_pestana(id, &self.secure.estado_json()));
@@ -1245,6 +1258,16 @@ impl Sesion {
                 self.secure.reanudar_a_mano();
                 Ok(())
             }
+            "llamar" => self.secure.llamar(m["video"].as_bool().unwrap_or(false)),
+            "colgar" => {
+                self.secure.colgar();
+                Ok(())
+            }
+            "media" => self.secure.media_saliente(texto(m, "b64")),
+            "visto" => {
+                self.secure.novedad = false;
+                Ok(())
+            }
             _ => Ok(()),
         };
         let mut o = Vec::new();
@@ -1254,7 +1277,9 @@ impl Sesion {
                 &json!({ "tipo": "secure_aviso", "clave": "sec_error", "texto": e }),
             ));
         }
-        o.extend(self.a_pestana(id, &self.secure.estado_json()));
+        if accion != "media" && accion != "archivo_trozo" {
+            o.extend(self.a_pestana(id, &self.secure.estado_json()));
+        }
         o
     }
 

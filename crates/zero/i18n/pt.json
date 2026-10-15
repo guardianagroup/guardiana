@@ -923,5 +923,16 @@
   "sec_archivo_recibido": "Arquivo recebido em Transferências:",
   "sec_no_lista": "Ainda não há conversa aberta.",
   "sec_en_pausa": "A conversa está em pausa; nada é enviado.",
-  "sec_error": "Erro:"
+  "sec_error": "Erro:",
+  "sec_l_voz": "Ligar (voz)",
+  "sec_l_video": "Videochamada",
+  "sec_l_colgar": "Desligar",
+  "sec_l_silenciar": "Silenciar microfone",
+  "sec_l_sonar": "Ativar microfone",
+  "sec_l_en_voz": "Chamada de voz cifrada · {t}",
+  "sec_l_en_video": "Videochamada cifrada · {t}",
+  "sec_l_sin_permiso": "Sem permissão para o microfone ou a câmara, não há chamada.",
+  "sec_l_no_reproduce": "Este navegador não consegue reproduzir a chamada.",
+  "sec_llamada_entrante": "Chamada a entrar.",
+  "sec_llamada_colgada": "A outra pessoa desligou."
 }
