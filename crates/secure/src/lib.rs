@@ -26,6 +26,7 @@ pub mod pausa;
 pub mod prueba;
 pub mod puesto;
 pub mod resumen;
+pub mod sframe;
 pub mod tarjeta;
 pub mod verificar;
 
