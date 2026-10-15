@@ -178,10 +178,42 @@ impl Cifrador {
     /// Stream the whole file. The block count is not known until the end, so blocks are bound
     /// to their number only; the key (sent after) carries the count and the hash, and the
     /// receiver refuses a file whose count or hash differ.
+    /// The same file key again, to resume a transfer that broke: the receiver says how many
+    /// blocks it already holds and the sender encrypts the rest with the very same key and
+    /// nonces, so the blocks join up. The key only ever lives in the two computers.
+    pub fn con(llave: &Llave) -> Result<Self, Error> {
+        let clave: [u8; 32] = de_b64(&llave.clave)?
+            .try_into()
+            .map_err(|_| Error::CannotOpen)?;
+        let prefijo: [u8; 16] = de_b64(&llave.prefijo)?
+            .try_into()
+            .map_err(|_| Error::CannotOpen)?;
+        Ok(Self {
+            clave,
+            prefijo,
+            cipher: XChaCha20Poly1305::new((&clave).into()),
+            hash: Sha256::new(),
+            bytes: 0,
+            bloques: 0,
+        })
+    }
+
+    /// Encrypt the whole file as a stream.
     pub fn cifra<R: std::io::Read, W: std::io::Write>(
+        self,
+        origen: R,
+        destino: W,
+    ) -> Result<Llave, Error> {
+        self.cifra_desde(origen, destino, 0)
+    }
+
+    /// Encrypt from block `desde` on (the earlier ones are read and hashed, not written), so a
+    /// transfer resumes where it stopped. The returned key is the same as the first time.
+    pub fn cifra_desde<R: std::io::Read, W: std::io::Write>(
         mut self,
         mut origen: R,
         mut destino: W,
+        desde: u64,
     ) -> Result<Llave, Error> {
         let mut buf = vec![0u8; BLOQUE];
         let mut primero = true;
@@ -207,10 +239,12 @@ impl Cifrador {
                     },
                 )
                 .map_err(|_| Error::CannotOpen)?;
-            destino
-                .write_all(&(c.len() as u64).to_be_bytes())
-                .and_then(|()| destino.write_all(&c))
-                .map_err(|_| Error::CannotOpen)?;
+            if self.bloques >= desde {
+                destino
+                    .write_all(&(c.len() as u64).to_be_bytes())
+                    .and_then(|()| destino.write_all(&c))
+                    .map_err(|_| Error::CannotOpen)?;
+            }
             self.bloques += 1;
             if n < BLOQUE {
                 break;
@@ -317,6 +351,37 @@ fn de_b64(s: &str) -> Result<Vec<u8>, Error> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_broken_transfer_resumes_from_the_block_the_receiver_has() {
+        let plano: Vec<u8> = (0..(BLOQUE * 3 + 77)).map(|i| (i % 253) as u8).collect();
+        let mut todo = Vec::new();
+        let llave = Cifrador::new()
+            .unwrap()
+            .cifra(&plano[..], &mut todo)
+            .unwrap();
+        assert_eq!(llave.bloques, 4);
+        // The road broke after two blocks: the receiver kept them as they came.
+        let mut parcial = Vec::new();
+        let mut leido = &todo[..];
+        for _ in 0..2 {
+            let l = u64::from_be_bytes(leido[..8].try_into().unwrap()) as usize;
+            parcial.extend_from_slice(&leido[..8 + l]);
+            leido = &leido[8 + l..];
+        }
+        // The sender goes on from block 2 with the same key.
+        let mut resto = Vec::new();
+        let otra = Cifrador::con(&llave)
+            .unwrap()
+            .cifra_desde(&plano[..], &mut resto, 2)
+            .unwrap();
+        assert_eq!(otra, llave);
+        parcial.extend_from_slice(&resto);
+        assert_eq!(parcial, todo);
+        let mut salida = Vec::new();
+        descifra_flujo(&llave, &parcial[..], &mut salida).unwrap();
+        assert_eq!(salida, plano);
+    }
 
     #[test]
     fn a_file_comes_back_whole_and_any_change_on_the_road_is_refused() {
