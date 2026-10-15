@@ -33,3 +33,8 @@ tokio = { workspace = true }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+# The relay, run on this computer, for the test where two conversations meet through it.
+guardiana-rele = { workspace = true }
+tokio = { workspace = true }

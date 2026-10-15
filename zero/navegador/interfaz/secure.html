@@ -22,14 +22,24 @@ h1 { font: 600 clamp(28px, 3.6vw, 38px)/1.1 var(--display); letter-spacing: -.02
 /* The conversation: connect, compare the numbers, talk. One card at a time. */
 main > .tarjeta { margin-top: 14px; }
 .conexion .c-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+/* The three steps, read in two seconds: one invites, the other types the code, both compare. */
+.pasos { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.pasos li { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.4; color: var(--muted); }
+.pasos li b { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 600 12px var(--mono); color: var(--accent-fg); background: var(--accent); }
+.c-lado { padding: 14px; border: 1px solid var(--line); border-radius: var(--r-tarjeta); background: var(--campo); }
+.c-lado h2 { font-size: 16px; }
+.campo.codigo { font: 600 16px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.c-codigo .c-enviar { grid-column: 1 / -1; }
+.c-codigo .via { color: var(--muted); font-size: 12px; }
+@media (max-width: 680px) { .pasos { grid-template-columns: 1fr; } }
 .conexion h2, .comparar h2, .chat h2 { margin: 0 0 6px; font: 600 15px/1.3 var(--display); }
 .t { color: var(--muted); font-size: 13.5px; line-height: 1.45; margin: 0 0 10px; }
 .c-fila { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .c-fila .campo { flex: 1; min-width: 180px; }
 .c-puerto { font: 500 13px var(--mono); color: var(--ok); }
-.c-codigo { margin-top: 12px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--line)); background: color-mix(in srgb, var(--ok) 5%, var(--card)); border-radius: var(--r-tarjeta); display: grid; grid-template-columns: auto 1fr auto; gap: 6px 12px; align-items: center; }
+.c-codigo { margin-top: 12px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--line)); background: color-mix(in srgb, var(--ok) 5%, var(--card)); border-radius: var(--r-tarjeta); display: grid; grid-template-columns: 1fr; gap: 6px; align-items: start; }
 .c-codigo[hidden] { display: none; }
-.c-codigo b { font: 600 22px/1.2 var(--mono); letter-spacing: .06em; color: var(--fg); user-select: all; }
+.c-codigo b { font: 600 clamp(22px, 2.2vw, 30px)/1.2 var(--mono); letter-spacing: .08em; color: var(--fg); user-select: all; white-space: nowrap; }
 .c-codigo .t { grid-column: 1 / -1; margin: 0; font-size: 12.5px; }
 .c-puerta-error { margin-top: 10px; color: var(--aviso); }
 .c-puerta-error[hidden] { display: none; }
@@ -160,18 +170,25 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
   <p class="frase" data-t="sec_frase_v1"></p>
 
   <section class="tarjeta conexion" id="c-conexion">
+    <ol class="pasos"><li><b>1</b><span data-t="sec_paso_1"></span></li><li><b>2</b><span data-t="sec_paso_2"></span></li><li><b>3</b><span data-t="sec_paso_3"></span></li></ol>
     <div class="c-dos">
-      <div>
-        <h2 data-t="sec_c_recibir"></h2>
-        <p class="t" data-t="sec_c_recibir_texto"></p>
-        <div class="c-fila"><button type="button" class="boton principal" id="c-escuchar" data-t="sec_c_escuchar"></button><span class="c-puerto" id="c-puerto" hidden></span></div>
-        <div class="c-codigo" id="c-codigo-caja" hidden><span class="rotulo" data-t="sec_c_codigo_rotulo"></span><b id="c-codigo"></b><button type="button" class="boton chico" id="c-copiar" data-t="sec_c_copiar"></button><p class="t" data-t="sec_c_codigo_texto"></p></div>
+      <div class="c-lado" id="c-lado-invitar">
+        <h2 data-t="sec_c_invitar"></h2>
+        <p class="t" data-t="sec_c_invitar_texto"></p>
+        <div class="c-fila"><button type="button" class="boton principal" id="c-escuchar" data-t="sec_c_invitar_boton"></button><span class="c-puerto" id="c-puerto" hidden></span></div>
+        <div class="c-codigo" id="c-codigo-caja" hidden>
+          <span class="rotulo" data-t="sec_c_codigo_rotulo"></span>
+          <b id="c-codigo"></b>
+          <div class="c-fila c-enviar"><button type="button" class="boton chico" id="c-copiar" data-t="sec_c_copiar"></button><button type="button" class="boton chico secundario" id="c-whatsapp" data-t="sec_c_whatsapp"></button><button type="button" class="boton chico secundario" id="c-correo" data-t="sec_c_correo"></button></div>
+          <p class="t" id="c-codigo-texto" data-t="sec_c_listo"></p>
+          <p class="t via" id="c-via"></p>
+        </div>
         <p class="t c-puerta-error" id="c-puerta-error" hidden></p>
       </div>
-      <div>
-        <h2 data-t="sec_c_llamar"></h2>
-        <p class="t" data-t="sec_c_llamar_texto"></p>
-        <div class="c-fila"><input class="campo" id="c-direccion" data-t-ph="sec_c_direccion_v2" spellcheck="false" autocomplete="off"><button type="button" class="boton principal" id="c-conectar" data-t="sec_c_conectar"></button></div>
+      <div class="c-lado">
+        <h2 data-t="sec_c_tengo"></h2>
+        <p class="t" data-t="sec_c_tengo_texto"></p>
+        <div class="c-fila"><input class="campo codigo" id="c-direccion" data-t-ph="sec_c_codigo_ph" spellcheck="false" autocomplete="off" autocapitalize="characters"><button type="button" class="boton principal" id="c-conectar" data-t="sec_c_entrar"></button></div>
       </div>
     </div>
     <p class="c-huella"><span data-t="sec_c_tu_huella"></span> <code id="c-huella"></code></p>

@@ -31,7 +31,7 @@
     if ((m.sesion || {}).estado === 'pausada' || id.estado === 'clave_cambiada') return 'pausada';
     const perdida = typeof tr.perdida_pct === 'number' ? tr.perdida_pct : 0;
     if (perdida > 8 || vistos.some((s) => s.nivel === 'inusual')) return 'pausada';
-    if (vistos.length > 0 || tr.directo === false || perdida >= 3) return 'revisar';
+    if (vistos.length > 0 || perdida >= 3) return 'revisar';
     return 'protegida';
   }
   const linea = (el, clase, texto) => { el.className = clase; el.textContent = texto; };
@@ -56,7 +56,7 @@
       if (id.estado === 'clave_cambiada') linea($('g-identidad'), 'alerta', t('sec_l_clave_cambiada', { n: id.nombre }));
       else linea($('g-identidad'), 'ok', t('sec_l_verificado', { n: id.nombre, f: fecha(id.verificado_en) }));
       if (tr.directo === true) linea($('g-conexion'), typeof tr.perdida_pct === 'number' && tr.perdida_pct >= 3 ? 'aviso' : 'ok', typeof tr.perdida_pct === 'number' && tr.perdida_pct >= 3 ? t('sec_l_perdida', { p: n(tr.perdida_pct) }) : t('sec_l_directa'));
-      else if (tr.directo === false) linea($('g-conexion'), 'aviso', t('sec_l_rele'));
+      else if (tr.directo === false) linea($('g-conexion'), typeof tr.perdida_pct === 'number' && tr.perdida_pct >= 3 ? 'aviso' : 'ok', t('sec_l_rele'));
       else linea($('g-conexion'), '', t('sec_l_sin_conexion'));
       if (vistos.length === 0) linea($('g-visto'), 'ok', t('sec_l_nada'));
       else linea($('g-visto'), vistos.some((s) => s.nivel === 'inusual') ? 'alerta' : 'aviso', vistos.length === 1 ? t('sec_l_visto_uno', { t: vistos[0].texto }) : t('sec_l_visto', { n: n(vistos.length), t: vistos[vistos.length - 1].texto }));
@@ -146,15 +146,21 @@
     const f = E.fase;
     $('c-conexion').hidden = !(f === 'sola' || f === 'escuchando');
     $('c-comparar').hidden = f !== 'comparando' || !E.numeros;
-    $('c-espera').hidden = !(f === 'saludando' || f === 'abriendo' || (f === 'comparando' && !E.numeros));
+    $('c-espera').hidden = !(f === 'saludando' || f === 'abriendo' || f === 'buscando' || (f === 'comparando' && !E.numeros));
     $('c-chat').hidden = f !== 'lista';
     $('c-huella').textContent = E.huella || RAYA;
-    if (f === 'escuchando') { $('c-puerto').hidden = false; $('c-puerto').textContent = E.codigo ? t('sec_c_puerta_abierta') : E.puerta_error ? t('sec_c_puerto', { p: E.puerto }) : t('sec_c_abriendo'); } else $('c-puerto').hidden = true;
-    $('c-codigo-caja').hidden = !(f === 'escuchando' && E.codigo);
-    if (E.codigo) $('c-codigo').textContent = E.codigo;
-    $('c-puerta-error').hidden = !(f === 'escuchando' && E.puerta_error && !E.codigo);
-    if (E.puerta_error) $('c-puerta-error').textContent = t('sec_c_sin_puerta', { p: E.puerto, e: E.puerta_error });
-    $('c-espera-texto').textContent = t(f === 'saludando' ? 'sec_e_saludando' : f === 'abriendo' ? 'sec_e_abriendo' : 'sec_e_esperando');
+    // Waiting: the door in the router gives a GS code; no door, the blind relay gives a GR one.
+    const codigo = E.codigo || E.rele_codigo;
+    // While the code is being prepared, one line; once it is on screen, the code box says it all.
+    if (f === 'escuchando' && !codigo) { $('c-puerto').hidden = false; $('c-puerto').textContent = E.puerta_error && E.rele_error ? t('sec_c_puerto', { p: E.puerto }) : t('sec_c_preparando'); } else $('c-puerto').hidden = true;
+    $('c-escuchar').hidden = f === 'escuchando';
+    $('c-codigo-caja').hidden = !(f === 'escuchando' && codigo);
+    if (codigo) $('c-codigo').textContent = codigo;
+    $('c-codigo-texto').textContent = t('sec_c_listo');
+    $('c-via').textContent = E.codigo ? t('sec_c_via_puerta') : E.rele_codigo ? t('sec_c_via_rele') : '';
+    $('c-puerta-error').hidden = !(f === 'escuchando' && E.puerta_error && !codigo && E.rele_error);
+    if (E.puerta_error) $('c-puerta-error').textContent = t('sec_c_sin_puerta', { p: E.puerto, e: E.puerta_error }) + (E.rele_error ? ' ' + t('sec_rele_fallo', { e: E.rele_error }) : '');
+    $('c-espera-texto').textContent = t(f === 'saludando' ? 'sec_e_saludando' : f === 'abriendo' ? 'sec_e_abriendo' : f === 'buscando' ? 'sec_e_buscando' : 'sec_e_esperando');
     if (E.numeros) $('c-numeros').innerHTML = E.numeros.map((x) => `<b>${esc(String(x).padStart(4, '0'))}</b>`).join('');
     if (E.contacto && !$('c-nombre').value) $('c-nombre').value = E.contacto;
     $('c-con').textContent = E.contacto ? t('sec_m_con', { n: E.contacto }) : '';
@@ -183,6 +189,10 @@
   const avisos = [];
   function aviso(txt) { avisos.push(txt); const ol = $('c-mensajes'); const li = document.createElement('li'); li.className = 'aviso-li'; li.textContent = txt; ol.appendChild(li); ol.scrollTop = ol.scrollHeight; }
   $('c-escuchar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'escuchar', puerto: 0 }));
+  // Sending the code: WhatsApp (a tab with the message ready) or mail; the person picks who.
+  const invitacion = () => t('sec_c_mensaje_invitacion', { c: $('c-codigo').textContent });
+  $('c-whatsapp').addEventListener('click', () => manda({ tipo: 'navegar', texto: 'https://wa.me/?text=' + encodeURIComponent(invitacion()) }));
+  $('c-correo').addEventListener('click', () => manda({ tipo: 'abrir_correo', asunto: t('sec_c_asunto_invitacion'), cuerpo: invitacion() }));
   $('c-copiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('c-codigo').textContent); $('c-copiar').textContent = t('sec_c_copiado'); setTimeout(() => { $('c-copiar').textContent = t('sec_c_copiar'); }, 1500); } catch (_) {} });
   $('c-conectar').addEventListener('click', () => { const d = $('c-direccion').value.trim(); if (d) manda({ tipo: 'secure', accion: 'conectar', direccion: d }); });
   $('c-direccion').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('c-conectar').click(); });
