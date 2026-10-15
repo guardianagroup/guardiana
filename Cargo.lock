@@ -785,6 +785,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "guardiana-rele"
+version = "1.0.32"
+dependencies = [
+ "tokio",
+]
+
+[[package]]
 name = "guardiana-secure"
 version = "1.0.32"
 dependencies = [
@@ -829,11 +836,13 @@ dependencies = [
  "guardiana-core",
  "guardiana-license",
  "guardiana-lists",
+ "guardiana-rele",
  "guardiana-secure",
  "ring",
  "serde",
  "serde_json",
  "sha2 0.11.0",
+ "tokio",
  "url",
 ]
 
