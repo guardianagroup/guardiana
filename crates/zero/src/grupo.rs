@@ -216,8 +216,12 @@ impl Grupo {
             );
         } else if let Some(s) = self.sesiones.first() {
             if s.lista() {
-                v.push(s.contacto().to_owned());
-                v.extend(s.grupo().iter().cloned());
+                // The host's list starts with the host; before it arrives, the host alone.
+                if s.grupo().is_empty() {
+                    v.push(s.contacto().to_owned());
+                } else {
+                    v.extend(s.grupo().iter().cloned());
+                }
             }
         }
         v
@@ -461,6 +465,7 @@ impl Grupo {
                     v.extend(
                         s.grupo()
                             .iter()
+                            .skip(1)
                             .map(|n| json!({ "nombre": n, "verificado_por": s.contacto() })),
                     );
                     v
