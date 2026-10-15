@@ -264,7 +264,10 @@ pub(crate) fn pagina(html: &'static str) -> Html<String> {
     Html(
         html.replace("/static/app.js\"", &format!("/static/app.js?v={v}\""))
             .replace("/static/style.css\"", &format!("/static/style.css?v={v}\""))
-            .replace("/static/diseno.css\"", &format!("/static/diseno.css?v={v}\""))
+            .replace(
+                "/static/diseno.css\"",
+                &format!("/static/diseno.css?v={v}\""),
+            )
             .replace(
                 "/static/por-dentro.js\"",
                 &format!("/static/por-dentro.js?v={v}\""),
@@ -670,7 +673,11 @@ mod diseno_compartido {
     #[test]
     fn the_design_sheet_is_the_same_in_the_panel_and_in_zero() {
         let zero = include_str!("../../../zero/navegador/interfaz/diseno.css");
-        assert_eq!(super::DISENO_CSS, zero, "diseno.css differs between the panel and ZERO");
+        assert_eq!(
+            super::DISENO_CSS,
+            zero,
+            "diseno.css differs between the panel and ZERO"
+        );
     }
 }
 
