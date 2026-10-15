@@ -23,6 +23,7 @@ pub mod carry;
 pub mod monitor;
 pub mod prueba;
 pub mod puesto;
+pub mod resumen;
 pub mod tarjeta;
 pub mod verificar;
 
