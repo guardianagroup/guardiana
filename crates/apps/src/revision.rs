@@ -98,20 +98,32 @@ mod tests {
     #[test]
     fn the_review_runs_on_windows_and_reads_the_basics() {
         let inicio = std::time::Instant::now();
-        let vistos = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let vistos = std::sync::Arc::new(std::sync::Mutex::new(Vec::<(String, String)>::new()));
         let v2 = std::sync::Arc::clone(&vistos);
         let r = revisar(
             std::time::Duration::from_secs(400),
-            Box::new(move |tipo, _| {
+            Box::new(move |tipo, texto| {
                 if let Ok(mut v) = v2.lock() {
-                    v.push(tipo.to_owned());
+                    v.push((tipo.to_owned(), texto.to_owned()));
                 }
             }),
         )
         .unwrap();
-        let tipos = vistos.lock().unwrap().clone();
-        assert!(tipos.iter().any(|t| t == "seccion"), "{tipos:?}");
-        assert!(tipos.iter().any(|t| t == "hecho"), "{tipos:?}");
+        let pasos = vistos.lock().unwrap().clone();
+        let tipos: Vec<&str> = pasos.iter().map(|(t, _)| t.as_str()).collect();
+        assert!(tipos.contains(&"seccion"), "{pasos:?}");
+        // «hecho» carries the section and its milliseconds, tab-separated: the script must keep
+        // that tab (review by ChatGPT, 15 Oct 2026: it was being replaced by a space).
+        assert!(
+            pasos.iter().any(|(t, x)| t == "hecho"
+                && x.split_once('\t')
+                    .is_some_and(|(s, ms)| !s.is_empty() && ms.trim().parse::<u64>().is_ok())),
+            "{pasos:?}"
+        );
+        assert!(
+            pasos.iter().any(|(t, x)| t == "cuenta" && x.contains('\t')),
+            "{pasos:?}"
+        );
         let secs = inicio.elapsed().as_secs();
         assert!(
             r["equipo"]["sistema"]

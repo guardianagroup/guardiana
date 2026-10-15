@@ -11,7 +11,7 @@ function MsFt($ft) { try { $n = [long]$ft; if ($n -le 0) { return 0 }; return ([
 function Corta($s) { $s = ([string]$s) -replace '\s+', ' '; if ($s.Length -gt 200) { $s = $s.Substring(0, 200) }; return $s }
 # What it is doing, live, for the page (1.0.31): one line per step on standard error, which the
 # panel reads while the review runs. Only what is really being read, never the answers' contents.
-function Paso([string]$tipo, [string]$texto) { try { [Console]::Error.WriteLine('@@' + $tipo + "`t" + (($texto -replace '[\r\n\t]', ' ').Trim())) } catch {} }
+function Paso([string]$tipo, [string]$texto) { try { [Console]::Error.WriteLine('@@' + $tipo + "`t" + (($texto -replace '[\r\n]', ' ').Trim())) } catch {} }
 function Seccion([string]$nombre, [scriptblock]$sb) {
   Paso 'seccion' $nombre
   $w = [Diagnostics.Stopwatch]::StartNew()
