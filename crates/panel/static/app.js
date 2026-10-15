@@ -1015,7 +1015,7 @@
     $('maxima-quitar').addEventListener('click', (e) => cambia(false, e.currentTarget));
     try { pinta(await api('/api/proteccion-maxima')); } catch (_) {}
   }
-  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', antivirus: 'nav_antivirus', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo', borrado: 'nav_borrado', empresa: 'ficha_titulo', expedientes: 'nav_expedientes' };
+  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', antivirus: 'nav_antivirus', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo', borrado: 'nav_borrado', empresa: 'ficha_titulo', expedientes: 'nav_expedientes', comunicaciones: 'comunicaciones_titulo' };
   function applyTexts() {
     document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.getAttribute('data-t')); });
     document.querySelectorAll('[data-t-html]').forEach((el) => { el.innerHTML = t(el.getAttribute('data-t-html')); });

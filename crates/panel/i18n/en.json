@@ -607,6 +607,7 @@
     "Contentsquare": "Records how you move around a site: clicks and scrolling (it is the company behind Hotjar)."
   },
   "panel": {
+    "comunicaciones_titulo": "Communications",
     "nav_radiografia": "Snapshot",
     "nav_extracto": "Ledger",
     "nav_dispositivos": "Devices",

@@ -444,6 +444,10 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             get(|| async { pagina(include_str!("../static/ia.html")) }),
         )
         .route(
+            "/comunicaciones",
+            get(|| async { pagina(include_str!("../static/comunicaciones.html")) }),
+        )
+        .route(
             "/antivirus",
             get(|| async { pagina(include_str!("../static/antivirus.html")) }),
         )
@@ -709,6 +713,7 @@ mod textos {
             include_str!("../static/estado.html"),
             include_str!("../static/verify.html"),
             include_str!("../static/ia.html"),
+            include_str!("../static/comunicaciones.html"),
             include_str!("../static/antivirus.html"),
             include_str!("../static/comprobador.html"),
             include_str!("../static/borrado.html"),
