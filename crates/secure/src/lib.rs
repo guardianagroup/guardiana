@@ -11,12 +11,15 @@
 //! same bytes. That server is not deployed here.
 //!
 //! A changed identity key makes [`Conversation::send`] refuse before it
-//! encrypts. That is a check, not a claim that spying was found.
+//! encrypts. [`verificar`] is the short code, from `vodozemac::sas`, that
+//! checks both public keys of the other device. A verified device is not a
+//! professional licence. Neither check is a claim that spying was found.
 
 use vodozemac::olm::{Account, OlmMessage, Session, SessionConfig, SessionCreationError};
-use vodozemac::Curve25519PublicKey;
+use vodozemac::{Curve25519PublicKey, Ed25519PublicKey};
 
 pub mod carry;
+pub mod verificar;
 
 /// Why a SECURE operation stopped. The text never names a key or a message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,6 +36,8 @@ pub enum Error {
     /// The ciphertext could not be opened. A changed byte, a spent one-time
     /// key, and a stranger's attempt all end here, and this error does not say which.
     CannotOpen,
+    /// The saved identity could not be restored. The key was wrong or the blob was not ours.
+    CannotRestore,
 }
 
 impl std::fmt::Display for Error {
@@ -43,6 +48,7 @@ impl std::fmt::Display for Error {
             Error::IdentityChanged => "the identity key is not the one that was accepted",
             Error::NotAFirstMessage => "the first message was not a pre-key message",
             Error::CannotOpen => "the message could not be opened",
+            Error::CannotRestore => "the identity could not be restored",
         })
     }
 }
@@ -73,6 +79,28 @@ impl Identity {
     /// The public Curve25519 identity key. This is the key the other person accepts.
     pub fn public_key(&self) -> Curve25519PublicKey {
         self.account.curve25519_key()
+    }
+
+    /// The public Ed25519 signing key. It is not the key that encrypts messages.
+    /// A verified signature key is not a professional licence.
+    pub fn signing_key(&self) -> Ed25519PublicKey {
+        self.account.ed25519_key()
+    }
+
+    /// Encrypt this identity with a 32-byte key, using vodozemac's pickle.
+    /// The result is what a later Windows mechanism (DPAPI, CNG or TPM) should wrap.
+    /// This crate does not talk to Windows, and the DNS service must not hold the blob or the key.
+    pub fn lock(&self, key: &[u8; 32]) -> String {
+        self.account.pickle().encrypt(key)
+    }
+
+    /// Restore an identity from [`Identity::lock`]. A wrong key does not restore a different person.
+    pub fn unlock(secret: &str, key: &[u8; 32]) -> Result<Self, Error> {
+        let pickle = vodozemac::olm::AccountPickle::from_encrypted(secret, key)
+            .map_err(|_| Error::CannotRestore)?;
+        Ok(Self {
+            account: Account::from_pickle(pickle),
+        })
     }
 
     /// One new one-time public key. The matching secret stays in this identity
@@ -280,5 +308,14 @@ mod tests {
         let still = alice_side.send(accepted, b"sigue").unwrap();
         let (_, opened) = bob.receive(alice.public_key(), &still).unwrap();
         assert_eq!(opened, b"sigue");
+    }
+
+    #[test]
+    fn the_same_envelope_does_not_open_twice() {
+        let (alice, mut bob, mut alice_side, accepted) = pair();
+        let envelope = alice_side.send(accepted, b"hola").unwrap();
+        let (mut bob_side, opened) = bob.receive(alice.public_key(), &envelope).unwrap();
+        assert_eq!(opened, b"hola");
+        assert!(bob_side.open(&envelope).is_err());
     }
 }

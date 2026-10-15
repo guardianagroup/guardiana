@@ -1,8 +1,9 @@
 //! Carry one envelope from the side that encrypted it to the side that can open it.
 //!
-//! The relay binds to loopback and keeps the bytes it forwards. It never builds
-//! an [`crate::Identity`]. A call, a video call, and a server outside this
-//! machine are not this module.
+//! The relay binds to loopback and keeps the bytes of exactly one envelope.
+//! A second deposit is rejected and the first envelope stays. The relay never
+//! builds an [`crate::Identity`]. A call, a video call, and a server outside
+//! this machine are not this module.
 
 use std::io::{Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
@@ -23,11 +24,16 @@ const WAIT: Duration = Duration::from_secs(5);
 pub enum CarryError {
     /// The socket failed, the frame was not the agreed shape, or the ciphertext did not decode.
     Failed,
+    /// This relay already holds its one envelope. The new one was not stored.
+    Rejected,
 }
 
 impl std::fmt::Display for CarryError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("the envelope could not be carried")
+        f.write_str(match self {
+            CarryError::Failed => "the envelope could not be carried",
+            CarryError::Rejected => "the relay already holds an envelope",
+        })
     }
 }
 
@@ -87,7 +93,9 @@ impl Drop for Relay {
     }
 }
 
-/// Give the relay one envelope from `from`. The relay cannot open it.
+/// Give the relay one envelope from `from`. The relay answers `1` if it stored
+/// this envelope, or `0` if it already holds one. A rejection leaves the first
+/// envelope where it was.
 pub fn deposit(
     addr: SocketAddr,
     from: Curve25519PublicKey,
@@ -96,7 +104,15 @@ pub fn deposit(
     let mut socket = connect(addr)?;
     socket.write_all(&[1]).map_err(|_| CarryError::Failed)?;
     write_frame(&mut socket, &encode(from, envelope))?;
-    Ok(())
+    let mut answer = [0u8; 1];
+    socket
+        .read_exact(&mut answer)
+        .map_err(|_| CarryError::Failed)?;
+    match answer[0] {
+        1 => Ok(()),
+        0 => Err(CarryError::Rejected),
+        _ => Err(CarryError::Failed),
+    }
 }
 
 /// Take the one envelope the relay is holding.
@@ -132,18 +148,23 @@ fn serve(listener: TcpListener, seen: Arc<Mutex<Vec<u8>>>) {
             0 => break,
             1 => match read_frame(&mut socket) {
                 Ok(frame) => {
-                    match seen.lock() {
-                        Ok(mut bytes) => bytes.extend_from_slice(&frame),
-                        Err(poisoned) => poisoned.into_inner().extend_from_slice(&frame),
-                    }
-                    if let Some(mut parked) = waiting.take() {
-                        if write_frame(&mut parked, &frame).is_ok() {
-                            collected = true;
-                        }
+                    if deposited {
+                        let _ = socket.write_all(&[0]);
                     } else {
-                        stored = Some(frame);
+                        match seen.lock() {
+                            Ok(mut bytes) => bytes.extend_from_slice(&frame),
+                            Err(poisoned) => poisoned.into_inner().extend_from_slice(&frame),
+                        }
+                        if let Some(mut parked) = waiting.take() {
+                            if write_frame(&mut parked, &frame).is_ok() {
+                                collected = true;
+                            }
+                        } else {
+                            stored = Some(frame);
+                        }
+                        deposited = true;
+                        let _ = socket.write_all(&[1]);
                     }
-                    deposited = true;
                 }
                 Err(_) => break,
             },
@@ -230,6 +251,29 @@ mod tests {
 
         assert!(!seen.is_empty());
         assert!(!seen.windows(b"hola".len()).any(|window| window == b"hola"));
+        let (_, opened) = bob.receive(from, &carried).unwrap();
+        assert_eq!(opened, b"hola");
+    }
+
+    #[test]
+    fn a_second_deposit_is_rejected_and_the_first_envelope_stays() {
+        let relay = Relay::listen().unwrap();
+        let alice = Identity::new();
+        let mut bob = Identity::new();
+        let one_time = bob.fresh_one_time_key().unwrap();
+        let mut alice_side = alice.start(bob.public_key(), one_time).unwrap();
+        let first = alice_side.send(bob.public_key(), b"hola").unwrap();
+        let second = alice_side.send(bob.public_key(), b"otro").unwrap();
+
+        deposit(relay.addr(), alice.public_key(), &first).unwrap();
+        let held = relay.seen().len();
+        assert_eq!(
+            deposit(relay.addr(), alice.public_key(), &second).unwrap_err(),
+            CarryError::Rejected
+        );
+        assert_eq!(relay.seen().len(), held);
+
+        let (from, carried) = collect(relay.addr()).unwrap();
         let (_, opened) = bob.receive(from, &carried).unwrap();
         assert_eq!(opened, b"hola");
     }
