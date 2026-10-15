@@ -10,7 +10,7 @@ pub(crate) const SCRIPT: &str = include_str!("revision.ps1");
 
 pub(crate) fn revisar(
     limite: std::time::Duration,
-    avisa: Box<dyn Fn(&str, &str) + Send>,
+    avisa: super::AvisoRevision,
 ) -> Result<serde_json::Value, Error> {
     use std::io::{BufRead as _, Read as _, Write as _};
     use std::os::windows::process::CommandExt;

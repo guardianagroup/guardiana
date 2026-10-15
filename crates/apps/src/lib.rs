@@ -319,6 +319,9 @@ pub fn revision_del_equipo(limite: std::time::Duration) -> Result<serde_json::Va
     revision_del_equipo_en_vivo(limite, Box::new(|_, _| {}))
 }
 
+/// Who hears each live step of the review: `(kind, text)`.
+pub type AvisoRevision = Box<dyn Fn(&str, &str) + Send>;
+
 /// The same review, telling `avisa` each step as it happens: `seccion` (a section starts),
 /// `hecho` (a section ended, with its milliseconds), `firma` (the file whose signature is being
 /// read), `dns` (the name being asked) and `cuenta` (how many items a list had). 1.0.31: the
@@ -328,7 +331,7 @@ pub fn revision_del_equipo(limite: std::time::Duration) -> Result<serde_json::Va
 /// As [`revision_del_equipo`].
 pub fn revision_del_equipo_en_vivo(
     limite: std::time::Duration,
-    avisa: Box<dyn Fn(&str, &str) + Send>,
+    avisa: AvisoRevision,
 ) -> Result<serde_json::Value, Error> {
     #[cfg(windows)]
     {
