@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
 <title data-t="ficha_titulo">Ficha de empresa</title>
+<link rel="stylesheet" href="diseno.css">
 <link rel="stylesheet" href="comun.css">
 <style>
 html, body { min-height: 100%; background: var(--hoja); }
@@ -68,7 +69,7 @@ section p { margin: 0 0 8px; line-height: 1.55; max-width: 74ch; }
 .carta-datos .campo { width: auto; flex: 1 1 200px; }
 .carta-datos .recordar { font-size: 13px; color: var(--gris); display: inline-flex; gap: 6px; align-items: center; }
 .campo.falta { border-color: #C8102E; box-shadow: 0 0 0 3px rgba(200, 16, 46, .18); }
-.carta-controles select { border: 1px solid var(--linea); background: var(--hoja); border-radius: 9px; padding: 8px 10px; }
+.carta-controles select { border: 1px solid var(--linea); background: var(--hoja); border-radius: var(--r-campo); padding: 8px 10px; }
 pre.carta { display: none; }
 @media print {
   /* «Descargar la carta en PDF»: only the letter, ready to attach. */

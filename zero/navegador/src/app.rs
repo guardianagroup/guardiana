@@ -1670,9 +1670,9 @@ fn tema_oscuro() -> bool {
 /// The frame's colours: the person's day or night if they chose one, Windows' otherwise.
 fn colores(elegido: Option<bool>) -> Colores {
     let oscuro = elegido.unwrap_or_else(tema_oscuro);
-    // The same tokens as interfaz/comun.css: --marco and --hoja, light and dark.
+    // The same tokens as interfaz/diseno.css: --marco and --card, light and night.
     let (m, h) = if oscuro {
-        ((0x06, 0x09, 0x14), (0x0F, 0x15, 0x28))
+        ((0x0B, 0x10, 0x20), (0x14, 0x1A, 0x2E))
     } else {
         ((0xE8, 0xEC, 0xF4), (0xFF, 0xFF, 0xFF))
     };

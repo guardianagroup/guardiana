@@ -260,7 +260,7 @@
     x.fillStyle = '#1F4BFF'; x.beginPath(); x.arc(84, 84, 9, 0, Math.PI * 2); x.fill();
     x.fillStyle = '#0B1020'; x.font = "600 24px Unbounded"; x.fillText('GUARDIANA ZERO', 108, 93);
     const nombreMes = new Date().toLocaleDateString(document.documentElement.lang, { month: 'long', year: 'numeric' });
-    x.fillStyle = '#5B6275'; x.font = '500 22px Plex'; x.fillText(t('mes_titulo') + ' · ' + nombreMes, 72, 170);
+    x.fillStyle = '#5B6275'; x.font = '500 22px "IBM Plex Sans"'; x.fillText(t('mes_titulo') + ' · ' + nombreMes, 72, 170);
     x.fillStyle = '#0B1020'; x.font = "600 46px Unbounded";
     const frase = fraseMes(mes, new Date().toLocaleDateString(document.documentElement.lang, { month: 'long' }));
     const palabras = frase.split(' '); let linea = ''; let y = 250;
@@ -269,8 +269,8 @@
       if (x.measureText(prueba).width > 1056) { x.fillText(linea, 72, y); y += 60; linea = p; } else linea = prueba;
     }
     x.fillText(linea, 72, y);
-    x.fillStyle = '#1F4BFF'; x.font = '500 20px PlexMono'; x.fillText('guardianagroup.com', 72, 570);
-    x.fillStyle = '#5B6275'; x.font = '400 18px Plex'; x.fillText(t('lema'), 72, 540);
+    x.fillStyle = '#1F4BFF'; x.font = '500 20px "IBM Plex Mono"'; x.fillText('guardianagroup.com', 72, 570);
+    x.fillStyle = '#5B6275'; x.font = '400 18px "IBM Plex Sans"'; x.fillText(t('lema'), 72, 540);
     manda({ tipo: 'guardar_imagen', nombre: 'guardiana-zero-mes.png', datos: c.toDataURL('image/png') });
   });
 

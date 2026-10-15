@@ -231,6 +231,9 @@ pub(crate) fn static_response(body: &'static str, content_type: &'static str) ->
 /// The panel's script and style sheet, as the pages ask for them.
 const APP_JS: &str = include_str!("../static/app.js");
 const STYLE_CSS: &str = include_str!("../static/style.css");
+/// The design the three programs share (15 Oct 2026): tokens, buttons, chips, cards. The same
+/// file travels in ZERO (`zero/navegador/interfaz/diseno.css`); a test keeps them equal.
+const DISENO_CSS: &str = include_str!("../static/diseno.css");
 /// «GUARDIANA por dentro» (1.0.22): its own script, so the other pages do not carry its weight.
 const POR_DENTRO_JS: &str = include_str!("../static/por-dentro.js");
 /// «Revisión del ordenador» (1.0.24): its own script too.
@@ -247,6 +250,7 @@ pub(crate) fn version_estaticos() -> &'static str {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         APP_JS.hash(&mut h);
         STYLE_CSS.hash(&mut h);
+        DISENO_CSS.hash(&mut h);
         POR_DENTRO_JS.hash(&mut h);
         REVISION_JS.hash(&mut h);
         format!("{:016x}", h.finish())
@@ -260,6 +264,10 @@ pub(crate) fn pagina(html: &'static str) -> Html<String> {
     Html(
         html.replace("/static/app.js\"", &format!("/static/app.js?v={v}\""))
             .replace("/static/style.css\"", &format!("/static/style.css?v={v}\""))
+            .replace(
+                "/static/diseno.css\"",
+                &format!("/static/diseno.css?v={v}\""),
+            )
             .replace(
                 "/static/por-dentro.js\"",
                 &format!("/static/por-dentro.js?v={v}\""),
@@ -446,6 +454,12 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route(
             "/antivirus",
             get(|| async { pagina(include_str!("../static/antivirus.html")) }),
+        )
+        .route(
+            "/static/diseno.css",
+            get(|RawQuery(q): RawQuery| async move {
+                estatico(DISENO_CSS, "text/css; charset=utf-8", q.as_deref())
+            }),
         )
         .route(
             "/static/style.css",
@@ -651,6 +665,20 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         stop,
         tasks,
     })
+}
+
+#[cfg(test)]
+mod diseno_compartido {
+    /// The same design sheet in the panel and in ZERO, byte for byte, so the two never drift.
+    #[test]
+    fn the_design_sheet_is_the_same_in_the_panel_and_in_zero() {
+        let zero = include_str!("../../../zero/navegador/interfaz/diseno.css");
+        assert_eq!(
+            super::DISENO_CSS,
+            zero,
+            "diseno.css differs between the panel and ZERO"
+        );
+    }
 }
 
 #[cfg(test)]

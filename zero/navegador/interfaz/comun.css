@@ -1,85 +1,48 @@
 /* GUARDIANA ZERO — the browser's own pages. Same palette and typefaces as guardianagroup.com
    and the GUARDIANA panel; the fonts travel inside the program (OFL, see fuentes/). */
-@font-face { font-family: 'Plex'; font-weight: 400; font-display: block; src: url(fuentes/IBMPlexSans-400-latin.woff2) format('woff2'); }
-@font-face { font-family: 'Plex'; font-weight: 500; font-display: block; src: url(fuentes/IBMPlexSans-500-latin.woff2) format('woff2'); }
-@font-face { font-family: 'Plex'; font-weight: 600; font-display: block; src: url(fuentes/IBMPlexSans-600-latin.woff2) format('woff2'); }
-@font-face { font-family: 'PlexMono'; font-weight: 400; font-display: block; src: url(fuentes/IBMPlexMono-400-latin.woff2) format('woff2'); }
-@font-face { font-family: 'PlexMono'; font-weight: 500; font-display: block; src: url(fuentes/IBMPlexMono-500-latin.woff2) format('woff2'); }
+@font-face { font-family: 'IBM Plex Sans'; font-weight: 400; font-display: block; src: url(fuentes/IBMPlexSans-400-latin.woff2) format('woff2'); }
+@font-face { font-family: 'IBM Plex Sans'; font-weight: 500; font-display: block; src: url(fuentes/IBMPlexSans-500-latin.woff2) format('woff2'); }
+@font-face { font-family: 'IBM Plex Sans'; font-weight: 600; font-display: block; src: url(fuentes/IBMPlexSans-600-latin.woff2) format('woff2'); }
+@font-face { font-family: 'IBM Plex Mono'; font-weight: 400; font-display: block; src: url(fuentes/IBMPlexMono-400-latin.woff2) format('woff2'); }
+@font-face { font-family: 'IBM Plex Mono'; font-weight: 500; font-display: block; src: url(fuentes/IBMPlexMono-500-latin.woff2) format('woff2'); }
 @font-face { font-family: 'Unbounded'; font-weight: 600; font-display: block; src: url(fuentes/Unbounded-latin.woff2) format('woff2'); }
 
 :root {
-  --marco: #E8ECF4;      /* the frame around the page: tab strip */
-  --hoja: #FFFFFF;       /* toolbar, active tab, panels */
-  --campo: #F0F3F9;      /* fields */
-  --tinta: #0B1020;
-  --gris: #5B6275;
-  --gris-suave: #8A91A3;
-  --linea: #D9DEE8;
-  --azul: #1F4BFF;
-  --azul-suave: #E6ECFF;
-  --verde: #0E8F6E;
-  --verde-suave: #E2F4EE;
-  --rojo: #C0301A;
-  --rojo-suave: #FBE7E3;
-  --ambar: #9A5B00;
-  --ambar-suave: #FBF0DC;
-  --sobre: #FFFFFF;       /* text on a coloured button (blue, red) */
-  --sombra: 0 1px 2px rgba(11, 16, 32, .06), 0 8px 24px -12px rgba(11, 16, 32, .18);
-  --texto: 'Plex', 'Segoe UI', system-ui, sans-serif;
-  --mono: 'PlexMono', Consolas, ui-monospace, monospace;
-  --display: 'Unbounded', 'Plex', 'Segoe UI', sans-serif;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-tema="dia"]) {
-    --marco: #060914; --hoja: #0F1528; --campo: #182039; --tinta: #E8ECF6; --gris: #98A1B8;
-    --gris-suave: #6E7891; --linea: #232C45; --azul: #7B98FF; --azul-suave: #1B2550;
-    --verde: #3FC79A; --verde-suave: #10302A; --rojo: #FF7A6E; --rojo-suave: #3A1814;
-    --ambar: #E8AE55; --ambar-suave: #33270F; --sobre: #0B1020;
-    --sombra: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .7);
-    color-scheme: dark;
-  }
-}
-:root[data-tema="noche"] {
-  --marco: #060914; --hoja: #0F1528; --campo: #182039; --tinta: #E8ECF6; --gris: #98A1B8;
-  --gris-suave: #6E7891; --linea: #232C45; --azul: #7B98FF; --azul-suave: #1B2550;
-  --verde: #3FC79A; --verde-suave: #10302A; --rojo: #FF7A6E; --rojo-suave: #3A1814;
-  --ambar: #E8AE55; --ambar-suave: #33270F; --sobre: #0B1020;
-  --sombra: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .7);
-  color-scheme: dark;
+  /* The palette and the typefaces come from diseno.css, shared with the GUARDIANA panel and
+     SECURE (15 Oct 2026). These are the browser's older names for the same colours, kept so the
+     pages read as they always did; new rules use the shared names. */
+  --hoja: var(--card);        /* toolbar, active tab, panels */
+  --tinta: var(--fg);
+  --gris: var(--muted);
+  --gris-suave: var(--muted-2);
+  --linea: var(--line);
+  --azul: var(--accent);
+  --azul-suave: var(--accent-suave);
+  --verde: var(--ok);
+  --verde-suave: var(--ok-suave);
+  --rojo: var(--alerta);
+  --rojo-suave: var(--alerta-suave);
+  --ambar: var(--aviso);
+  --ambar-suave: var(--aviso-suave);
+  --sobre: var(--accent-fg);  /* text on a coloured button (blue, red) */
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; color: var(--tinta); font: 14px/1.5 var(--texto); -webkit-font-smoothing: antialiased; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
-:focus-visible { outline: 2px solid var(--azul); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .mono { font-family: var(--mono); font-size: .92em; }
 .gris { color: var(--gris); }
 .oculto { display: none !important; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
-/* Buttons: one quiet, one decided, one that cuts. */
-.boton { border: 1px solid var(--linea); background: var(--hoja); border-radius: 9px; padding: 7px 13px; font-weight: 500; }
-.boton:hover { border-color: var(--gris-suave); }
-.boton.principal { background: var(--azul); border-color: var(--azul); color: var(--sobre); }
-.boton.principal:hover { filter: brightness(1.08); }
-.boton.corta { color: var(--rojo); border-color: color-mix(in srgb, var(--rojo) 45%, transparent); background: transparent; }
-.boton.corta:hover { background: var(--rojo-suave); }
-.boton.deja { color: var(--verde); border-color: color-mix(in srgb, var(--verde) 45%, transparent); background: transparent; }
-.boton.deja:hover { background: var(--verde-suave); }
-.boton.chico { padding: 3px 10px; font-size: 12.5px; border-radius: 7px; min-width: 82px; text-align: center; }
-/* A way into more detail: text in the brand blue, underlined only when pointed at. */
-.enlace { border: 0; background: none; padding: 0; color: var(--azul); font-weight: 500; text-decoration: none; cursor: pointer; }
-.enlace:hover { text-decoration: underline; text-underline-offset: 3px; }
+/* Buttons (.boton, .principal, .corta, .deja, .chico), .enlace, .campo and .chip: in diseno.css,
+   the same as in the panel. */
 /* A company's name that opens its profile: it reads as the name, and shows it can be opened. */
 .enlace-empresa { border: 0; background: none; padding: 0; margin: 0; font: inherit; color: inherit; text-align: inherit; cursor: pointer; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 30%, transparent); text-underline-offset: 3px; }
 .enlace-empresa:hover { color: var(--azul); text-decoration-color: currentColor; }
 @media print { .enlace-empresa { text-decoration: none; } }
-
-/* Fields */
-.campo { width: 100%; border: 1px solid var(--linea); background: var(--campo); border-radius: 9px; padding: 8px 11px; }
-.campo:focus { outline: none; border-color: var(--azul); box-shadow: 0 0 0 3px var(--azul-suave); background: var(--hoja); }
 textarea.campo { resize: vertical; min-height: 84px; line-height: 1.45; }
 
 /* The switch the person flips: protection on or off. */
@@ -87,13 +50,6 @@ textarea.campo { resize: vertical; min-height: 84px; line-height: 1.45; }
 .interruptor::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
 .interruptor:checked { background: var(--verde); }
 .interruptor:checked::after { transform: translateX(16px); }
-
-/* Chips that say what a destination is. A label, never a verdict. */
-.chip { display: inline-block; font-size: 11.5px; line-height: 1; padding: 4px 7px 4px; border-radius: 6px; background: var(--campo); color: var(--gris); white-space: nowrap; }
-.chip.rojo { background: var(--rojo-suave); color: var(--rojo); }
-.chip.ambar { background: var(--ambar-suave); color: var(--ambar); }
-.chip.verde { background: var(--verde-suave); color: var(--verde); }
-.chip.azul { background: var(--azul-suave); color: var(--azul); }
 
 /* «Quién te siguió de web en web»: one row per company, how many of the person's webs it was on,
    and whether it got through anywhere. Shared by the shield and the new tab. */

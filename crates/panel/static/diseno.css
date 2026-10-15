@@ -1,0 +1,108 @@
+/* GUARDIANA — one design for the three: the panel, ZERO and SECURE.
+   Asked by the owner on 15 Oct 2026: «la interfaz de las 3 debe guardar un patrón de diseño igual,
+   los botones iguales, colores». The palette is guardianagroup.com's, name for name.
+   This file is the same, byte for byte, in crates/panel/static/diseno.css and
+   zero/navegador/interfaz/diseno.css; a test of the panel checks it. Change both or neither.
+   The typefaces travel inside each program (OFL); each declares its own @font-face because the
+   folders differ, but the family names are these three. */
+
+:root {
+  /* ground, ink and lines */
+  --bg: #F4F6FA; --fg: #0B1020; --muted: #5B6275; --muted-2: #8A91A3;
+  --card: #FFFFFF; --line: #D9DEE8; --campo: #F0F3F9; --marco: #E8ECF4;
+  /* the one blue */
+  --accent: #1F4BFF; --accent-fg: #FFFFFF; --accent-dark: #0F2FB8; --accent-suave: #E6ECFF;
+  /* states: ok, warning, alert (and info is the blue) */
+  --ok: #0E8F6E; --ok-suave: #E2F4EE;
+  --aviso: #9A5B00; --aviso-suave: #FBF0DC;
+  --alerta: #C0301A; --alerta-suave: #FBE7E3;
+  --sombra: 0 1px 2px rgba(11, 16, 32, .06), 0 8px 24px -12px rgba(11, 16, 32, .18);
+  /* type */
+  --display: 'Unbounded', 'IBM Plex Sans', system-ui, sans-serif;
+  --texto: 'IBM Plex Sans', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* spacing and corners: four steps of 4, then 24 and 32; fields 8, cards 12, pills round */
+  --e1: 4px; --e2: 8px; --e3: 12px; --e4: 16px; --e5: 24px; --e6: 32px;
+  --r-campo: 8px; --r-tarjeta: 12px; --r-pill: 999px;
+  color-scheme: light;
+}
+
+/* Night: the site's ink as the ground, the accents lifted enough to read on it. Chosen by the
+   person (data-tema="noche"), or Windows' own choice where the page follows it (data-sigue). */
+:root[data-tema="noche"] {
+  --bg: #0B1020; --fg: #E8ECF6; --muted: #98A1B8; --muted-2: #6E7891;
+  --card: #141A2E; --line: #253048; --campo: #1B2238; --marco: #0B1020;
+  --accent: #6B8CFF; --accent-fg: #0B1020; --accent-dark: #8AA5FF; --accent-suave: #1B2550;
+  --ok: #3FC79A; --ok-suave: #10302A;
+  --aviso: #E8AE55; --aviso-suave: #33270F;
+  --alerta: #FF7A6E; --alerta-suave: #3A1814;
+  --sombra: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .7);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-sigue]:not([data-tema="dia"]) {
+    --bg: #0B1020; --fg: #E8ECF6; --muted: #98A1B8; --muted-2: #6E7891;
+    --card: #141A2E; --line: #253048; --campo: #1B2238; --marco: #0B1020;
+    --accent: #6B8CFF; --accent-fg: #0B1020; --accent-dark: #8AA5FF; --accent-suave: #1B2550;
+    --ok: #3FC79A; --ok-suave: #10302A;
+    --aviso: #E8AE55; --aviso-suave: #33270F;
+    --alerta: #FF7A6E; --alerta-suave: #3A1814;
+    --sombra: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .7);
+    color-scheme: dark;
+  }
+}
+
+/* Buttons. One shape everywhere: a pill, small mono capitals, as on the website.
+   Primary: the blue, filled.          .btn                 .boton.principal
+   Secondary: quiet, a line around it. .btn.secondary       .boton
+   Cut: red outline, red when pointed. .btn.cut             .boton.corta
+   Let through: green outline.         .btn.deja            .boton.deja
+   Danger: red, filled.                .btn.danger          .boton.peligro
+   Small: .chico on any of them. */
+.btn, .boton {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--e2);
+  border-radius: var(--r-pill); padding: 9px 18px; min-height: 36px;
+  font: 500 12px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: background-color .15s, border-color .15s, color .15s;
+}
+.boton, .btn.secondary { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.boton:hover, .btn.secondary:hover { background: transparent; border-color: var(--fg); color: var(--fg); }
+.btn, .boton.principal { background: var(--accent); color: var(--accent-fg); border: 1px solid var(--accent); }
+.btn:hover, .boton.principal:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: var(--accent-fg); }
+.btn.cut, .boton.corta { background: transparent; color: var(--alerta); border: 1px solid var(--alerta); }
+.btn.cut:hover, .boton.corta:hover { background: var(--alerta); color: var(--accent-fg); border-color: var(--alerta); }
+.btn.deja, .boton.deja { background: transparent; color: var(--ok); border: 1px solid var(--ok); }
+.btn.deja:hover, .boton.deja:hover { background: var(--ok); color: var(--accent-fg); border-color: var(--ok); }
+.btn.danger, .boton.peligro { background: var(--alerta); color: #fff; border: 1px solid var(--alerta); }
+.btn.danger:hover, .boton.peligro:hover { filter: brightness(1.08); }
+.btn.chico, .boton.chico { padding: 5px 12px; min-height: 28px; font-size: 11px; }
+.btn[disabled], .boton[disabled], .btn[aria-disabled="true"], .boton[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+.btn:focus-visible, .boton:focus-visible, .campo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (pointer: coarse) { .btn, .boton { min-height: 44px; } .btn.chico, .boton.chico { min-height: 36px; } }
+
+/* A way into more detail: text in the blue, underlined only when pointed at. */
+.enlace { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-weight: 500; text-decoration: none; cursor: pointer; }
+.enlace:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Fields */
+.campo { width: 100%; font: 400 14px/1.4 var(--texto); color: var(--fg); border: 1px solid var(--line); background: var(--campo); border-radius: var(--r-campo); padding: 8px 11px; }
+.campo:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-suave); background: var(--card); }
+
+/* Cards: the paper of the receipt. */
+.tarjeta { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-tarjeta); padding: 18px 20px; }
+
+/* Chips: a label, never a verdict. Outlined pills in small mono capitals, like the website's. */
+.chip { display: inline-block; padding: 2px 9px; border-radius: var(--r-pill); font: 500 10.5px/1.5 var(--mono); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; background: transparent; border: 1px solid currentColor; color: var(--muted); }
+.chip.ok, .chip.verde { color: var(--ok); }
+.chip.aviso, .chip.ambar { color: var(--aviso); }
+.chip.alerta, .chip.rojo { color: var(--alerta); }
+.chip.info, .chip.azul { color: var(--accent); }
+
+/* The brand: the ring with its blue dot, then the name in Unbounded. */
+.marca-g { display: inline-flex; align-items: center; gap: 9px; font: 600 15px/1 var(--display); letter-spacing: .02em; color: var(--fg); }
+.marca-g::before { content: ""; width: 18px; height: 18px; display: inline-block; flex: none; background: radial-gradient(circle closest-side, var(--accent) 0 42%, var(--fg) 42%); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M160.59 69.13 A68 68 0 1 1 130.87 39.41' fill='none' stroke='%23000' stroke-width='30'/%3E%3Ccircle cx='100' cy='100' r='31' fill='%23000'/%3E%3C/svg%3E") center/contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M160.59 69.13 A68 68 0 1 1 130.87 39.41' fill='none' stroke='%23000' stroke-width='30'/%3E%3Ccircle cx='100' cy='100' r='31' fill='%23000'/%3E%3C/svg%3E") center/contain no-repeat; }
+.marca-g small { font: 500 11px/1 var(--texto); letter-spacing: .01em; color: var(--muted); }
+
+/* Section titles in small mono capitals, the same over every list. */
+.rotulo { font: 500 11px/1.3 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }

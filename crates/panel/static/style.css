@@ -12,27 +12,19 @@
 @font-face { font-family: 'Unbounded'; font-weight: 600; font-display: swap; src: url(/static/fonts/Unbounded-latin.woff2) format('woff2'); }
 
 :root {
-  /* the site's palette, name for name */
-  --bg: #F4F6FA; --fg: #0B1020; --muted: #5B6275; --card: #FFFFFF; --line: #D9DEE8;
-  --accent: #1F4BFF; --accent-fg: #FFFFFF; --accent-dark: #0F2FB8;
+  /* the ground, the ink, the blue and the typefaces come from diseno.css (shared with ZERO and
+     SECURE since 15 Oct 2026). Here only what the panel alone names. */
   --rastreador: #B3261E; --publicidad: #8A5A0F; --telemetria: #6B3FA0;
-  --esperado: #0E8F6E; --desconocido: #5B6275;
-  --cortado: #C0301A; --respondido: #0F2FB8;
+  --esperado: var(--ok); --desconocido: var(--muted);
+  --cortado: var(--alerta); --respondido: var(--accent-dark);
   --nivel-verde: #1E9E5A; --nivel-naranja: #E08A1E; --nivel-rojo: #D0301A;
-  --display: 'Unbounded', 'IBM Plex Sans', system-ui, sans-serif;
-  --texto: 'IBM Plex Sans', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 /* Night mode, asked for by the owner on 20 Sep. Not the generic dark grey the panel had before:
    the same design, with the site's ink as the ground and the accents lifted enough to read on it.
    The choice is kept in this browser only (localStorage), never sent anywhere. */
 :root[data-tema="noche"] {
-  --bg: #0B1020; --fg: #E8ECF6; --muted: #98A1B8; --card: #141A2E; --line: #253048;
-  --accent: #6B8CFF; --accent-fg: #0B1020; --accent-dark: #8AA5FF;
   --rastreador: #FF7A6E; --publicidad: #E0A64A; --telemetria: #B98CF0;
-  --esperado: #3FC79A; --desconocido: #98A1B8;
-  --cortado: #FF7A6E; --respondido: #8AA5FF;
   --nivel-verde: #3FD68A; --nivel-naranja: #F2B04A; --nivel-rojo: #FF6B5E;
 }
 :root[data-tema="noche"] input, :root[data-tema="noche"] select, :root[data-tema="noche"] textarea { color-scheme: dark; }
@@ -127,8 +119,9 @@ td.empresa-col { color: var(--fg); }
    two lines ("17:15:1 / 2"), which reads like a broken page. Only the name column needs it. */
 td:first-child.mono, th:first-child { white-space: nowrap; word-break: normal; }
 
-button, .btn { background: var(--accent); color: var(--accent-fg); border: 0; border-radius: 999px; padding: 9px 18px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; text-decoration: none; display: inline-block; }
-button:hover, .btn:hover { background: var(--accent-dark); color: var(--accent-fg); }
+/* Every button is the shared primary (diseno.css); a bare <button> gets it without a class. */
+button, .btn { background: var(--accent); color: var(--accent-fg); border: 1px solid var(--accent); border-radius: var(--r-pill); padding: 9px 18px; font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; text-decoration: none; display: inline-block; }
+button:hover, .btn:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: var(--accent-fg); }
 button.secondary, .btn.secondary { background: transparent; color: var(--fg); border: 1px solid var(--line); }
 button.secondary:hover, .btn.secondary:hover { background: transparent; border-color: var(--fg); color: var(--fg); }
 button.danger { background: var(--cortado); color: #fff; }
