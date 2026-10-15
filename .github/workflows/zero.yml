@@ -14,26 +14,57 @@ on:
       - 'crates/lists/**'
       - 'crates/core/**'
       - 'crates/license/**'
+      - 'crates/secure/**'
       - 'build/wix/**'
       - 'build/msi-zero.ps1'
       - '.github/workflows/zero.yml'
   workflow_dispatch:
     inputs:
       lock:
-        description: "«actualizar» updates zero/navegador/Cargo.lock for a new dependency of crates/zero (it comes back in the artifact, to be committed)"
+        description: "«actualizar» updates zero/navegador/Cargo.lock for a new dependency of crates/zero and commits it to this branch (never to main)"
         required: false
         default: ''
 
 permissions:
   contents: read
 
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # The lock, when asked (15 Oct 2026: guardiana-secure joined crates/zero and nobody can run
+  # cargo against crates.io from where the branches are written). Only on a branch, never on
+  # main; the commit is signed by nothing and carries only zero/navegador/Cargo.lock. A push by
+  # the CI's own token starts no workflow (GitHub's rule): the next human push checks it.
+  lock:
+    name: update the lock
+    if: ${{ github.event.inputs.lock == 'actualizar' && github.ref != 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - name: cargo update -p guardiana-zero
+        working-directory: zero/navegador
+        run: cargo update -p guardiana-zero
+      - name: commit the lock to this branch
+        run: |
+          if git diff --quiet -- zero/navegador/Cargo.lock; then echo "lock unchanged"; exit 0; fi
+          git config user.name "guardiana-ci"
+          git config user.email "ci@guardianagroup.com"
+          git add zero/navegador/Cargo.lock
+          git commit -m "ZERO: Cargo.lock al día (cargo update -p guardiana-zero, desde CI)"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
   windows:
     name: GUARDIANA ZERO (Windows)
     runs-on: windows-latest
+    # When the lock is being updated, the push of the new lock starts the real run.
+    if: ${{ github.event.inputs.lock != 'actualizar' }}
     defaults:
       run:
         shell: bash
@@ -52,10 +83,6 @@ jobs:
       # Only when asked: the browser's brain gained a dependency (9 Oct 2026: the subscription
       # brought guardiana-license). The rest of the lock stays as it was; every later step is
       # --locked against the updated file, which the artifact carries back to be committed.
-      - name: update the lock
-        if: ${{ github.event.inputs.lock == 'actualizar' }}
-        working-directory: zero/navegador
-        run: cargo update -p guardiana-zero
       - name: clippy
         working-directory: zero/navegador
         # Errors also as annotations: readable from the run page and the public API.

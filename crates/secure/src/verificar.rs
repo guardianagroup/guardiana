@@ -149,6 +149,12 @@ pub struct Verified {
 }
 
 impl Verified {
+    /// A device from its two keys. Crate-private: outside the crate a `Verified` only comes
+    /// from [`Codigo::confirm`], so it always means a short-code check happened.
+    pub(crate) fn new(curve: Curve25519PublicKey, signing: Ed25519PublicKey) -> Self {
+        Self { curve, signing }
+    }
+
     /// The Curve25519 key messages are encrypted to.
     pub fn curve(&self) -> Curve25519PublicKey {
         self.curve

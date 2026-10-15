@@ -788,6 +788,13 @@ dependencies = [
 name = "guardiana-secure"
 version = "1.0.27"
 dependencies = [
+ "base64 0.23.1",
+ "chacha20poly1305",
+ "getrandom 0.4.3",
+ "qrcode",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
  "vodozemac",
 ]
 
@@ -822,6 +829,7 @@ dependencies = [
  "guardiana-core",
  "guardiana-license",
  "guardiana-lists",
+ "guardiana-secure",
  "ring",
  "serde",
  "serde_json",
