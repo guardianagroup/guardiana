@@ -2,17 +2,21 @@
 //!
 //! Two identities exchange one message with Olm, the double ratchet
 //! [vodozemac](https://github.com/matrix-org/vodozemac) already implements
-//! (Apache-2.0). This crate does not write a cipher, does not open a socket,
-//! and is not linked from the DNS service. Keys stay inside the
-//! [`Identity`] that created them.
+//! (Apache-2.0). This crate does not write a cipher and is not linked from
+//! the DNS service. Keys stay inside the [`Identity`] that created them.
 //!
-//! What this is not: a conversation between two computers. Carrying the
-//! ciphertext to the other machine needs a delivery server, and that server
-//! is not here. A changed identity key makes [`Conversation::send`] refuse
-//! before it encrypts. That is a check, not a claim that spying was found.
+//! [`carry`] moves one envelope across a loopback socket. The relay stores
+//! the ciphertext and the sender's public key. It has no identity, so it
+//! cannot open the message. A server between two countries would carry these
+//! same bytes. That server is not deployed here.
+//!
+//! A changed identity key makes [`Conversation::send`] refuse before it
+//! encrypts. That is a check, not a claim that spying was found.
 
 use vodozemac::olm::{Account, OlmMessage, Session, SessionConfig, SessionCreationError};
 use vodozemac::Curve25519PublicKey;
+
+pub mod carry;
 
 /// Why a SECURE operation stopped. The text never names a key or a message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
