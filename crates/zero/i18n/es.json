@@ -934,5 +934,18 @@
   "sec_l_sin_permiso": "Sin permiso para el micrófono o la cámara, no hay llamada.",
   "sec_l_no_reproduce": "Este navegador no puede reproducir la llamada.",
   "sec_llamada_entrante": "Llamada entrante.",
-  "sec_llamada_colgada": "La otra persona colgó."
+  "sec_llamada_colgada": "La otra persona colgó.",
+  "sec_r_titulo": "Resumen de la conversación",
+  "sec_r_json": "Descargar JSON",
+  "sec_r_csv": "Descargar CSV",
+  "sec_r_nota": "Firmado con la clave de este ordenador. Sin contenido de mensajes, sin nombres de archivos, sin direcciones.",
+  "sec_r_clase": "Qué fue",
+  "sec_r_clase_chat": "Chat",
+  "sec_r_clase_llamada": "Llamada de voz",
+  "sec_r_clase_videollamada": "Videollamada",
+  "sec_r_clase_envio": "Envío de archivos",
+  "sec_r_duracion": "Duración",
+  "sec_r_mensajes": "Mensajes",
+  "sec_r_archivos": "Archivos",
+  "sec_r_vistas": "Cosas vistas"
 }

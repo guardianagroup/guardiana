@@ -934,5 +934,18 @@
   "sec_l_sin_permiso": "Without permission for the microphone or camera there is no call.",
   "sec_l_no_reproduce": "This browser cannot play the call.",
   "sec_llamada_entrante": "Incoming call.",
-  "sec_llamada_colgada": "The other person hung up."
+  "sec_llamada_colgada": "The other person hung up.",
+  "sec_r_titulo": "Conversation summary",
+  "sec_r_json": "Download JSON",
+  "sec_r_csv": "Download CSV",
+  "sec_r_nota": "Signed with this computer’s key. No message contents, no file names, no addresses.",
+  "sec_r_clase": "What it was",
+  "sec_r_clase_chat": "Chat",
+  "sec_r_clase_llamada": "Voice call",
+  "sec_r_clase_videollamada": "Video call",
+  "sec_r_clase_envio": "File transfer",
+  "sec_r_duracion": "Duration",
+  "sec_r_mensajes": "Messages",
+  "sec_r_archivos": "Files",
+  "sec_r_vistas": "Things seen"
 }

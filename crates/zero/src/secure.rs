@@ -27,7 +27,8 @@ use guardiana_secure::archivo::{Llave, Recepcion, Trozos};
 use guardiana_secure::claves::{Curve25519PublicKey, Ed25519Signature, Mac};
 use guardiana_secure::monitor::{Identidad, Monitor, Nivel};
 use guardiana_secure::pausa::Sesion as EstadoSesion;
-use guardiana_secure::prueba::Cadena;
+use guardiana_secure::prueba::{Cadena, Prueba};
+use guardiana_secure::resumen::{Archivos, Clase, Conexion, Resumen};
 use guardiana_secure::sframe;
 use guardiana_secure::verificar::{Codigo, Inicio, Verified};
 use guardiana_secure::{tarjeta, Conversation, Envelope, Identity};
@@ -178,6 +179,10 @@ pub struct Secure {
     entrada: Option<Entrada>,
     salida: Option<Salida>,
     llamada: Option<Llamada>,
+    archivos: Archivos,
+    /// The last summary, signed, for the page to show and download.
+    pub resumen: Option<Resumen>,
+    version: String,
     /// Media pieces for the page, drained by the session every tick.
     pub media_para_pagina: VecDeque<String>,
     /// Something happened while the tab was not in front: the tab's name carries a mark.
@@ -245,6 +250,9 @@ impl Secure {
             entrada: None,
             salida: None,
             llamada: None,
+            archivos: Archivos::default(),
+            resumen: None,
+            version: String::new(),
             media_para_pagina: VecDeque::new(),
             novedad: false,
             inicio: ahora_s(),
@@ -329,8 +337,56 @@ impl Secure {
         self.cambio = true;
     }
 
+    /// The program's version, for the signed sheets.
+    pub fn pon_version(&mut self, v: &str) {
+        self.version = v.to_owned();
+    }
+
+    /// The signed summary of what just happened, when there was a verified conversation.
+    fn cierra_resumen(&mut self) {
+        if self.monitor.identidad.is_none() || self.fase != Fase::Lista {
+            return;
+        }
+        let clase = match self.llamada.as_ref().map(|l| l.video) {
+            Some(true) => Clase::Videollamada,
+            Some(false) => Clase::Llamada,
+            None if self.archivos.enviados + self.archivos.recibidos > 0 => Clase::Envio,
+            None => Clase::Chat,
+        };
+        let conexion = Conexion {
+            directa: self.monitor.transporte.directo,
+            codec_audio: self.monitor.transporte.codec_audio.clone(),
+            codec_video: self.monitor.transporte.codec_video.clone(),
+            ..Conexion::default()
+        };
+        self.resumen = Resumen::cerrar(
+            &self.identidad,
+            &self.version,
+            clase,
+            &self.monitor,
+            &self.cadena,
+            self.inicio,
+            ahora_s(),
+            self.archivos.clone(),
+            conexion,
+        );
+        self.archivos = Archivos::default();
+    }
+
+    /// The chain of what was seen, signed, as JSON for a file.
+    pub fn prueba_json(&self) -> String {
+        Prueba::firmar(
+            &self.identidad,
+            self.cadena.clone(),
+            &self.version,
+            ahora_s(),
+        )
+        .to_json()
+    }
+
     /// Drop the link and forget the handshake; the identity and the book stay.
     pub fn cerrar(&mut self, por: &str) {
+        self.cierra_resumen();
         self.enlace = None;
         self.rx = None;
         self.tarjeta_otra = None;
@@ -835,6 +891,8 @@ impl Secure {
                 };
                 if ok {
                     let n = e.nombre.clone();
+                    self.archivos.recibidos += 1;
+                    self.archivos.bytes += e.llave.as_ref().map_or(0, |l| l.bytes);
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, format!("archivo recibido: {n}"));
                     self.mensajes.push((ahora_s(), false, format!("📎 {n}")));
@@ -1033,6 +1091,8 @@ impl Secure {
             let nombre = s.nombre.clone();
             let llave = s.trozos.termina().map_err(|e| e.to_string())?;
             self.manda_olm(json!({ "m": "archivo", "nombre": nombre, "llave": llave }));
+            self.archivos.enviados += 1;
+            self.archivos.bytes += s.bytes;
             self.monitor
                 .anota(ahora_s(), Nivel::Info, format!("archivo enviado: {nombre}"));
             self.mensajes
@@ -1081,6 +1141,7 @@ impl Secure {
             "mensajes": self.mensajes.iter().rev().take(200).rev().map(|(t, mio, x)| json!({ "t": t, "mio": mio, "texto": x })).collect::<Vec<_>>(),
             "contactos": self.agenda.contactos().iter().map(|c| json!({ "nombre": c.nombre, "verificado_en": c.verificado_en, "estado": matches!(c.estado, agenda::Estado::Verificado) })).collect::<Vec<_>>(),
             "monitor": monitor,
+            "resumen": self.resumen.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "mensajes": r.mensajes_enviados + r.mensajes_recibidos, "archivos": r.archivos.enviados + r.archivos.recibidos, "observadas": r.observadas, "inusuales": r.inusuales, "fin": r.fin })),
         })
     }
 }
