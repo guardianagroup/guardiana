@@ -333,7 +333,7 @@ mod tests {
     fn the_code_goes_round_and_a_typo_is_caught() {
         let ip = Ipv4Addr::new(190, 85, 12, 7);
         let c = codigo(ip, 47300);
-        assert!(c.starts_with("GS-") && c.len() == 15, "{c}");
+        assert!(c.starts_with("GS-") && c.len() == 16, "{c}");
         assert_eq!(lee_codigo(&c), Some((ip, 47300)));
         assert_eq!(
             lee_codigo(&c.to_lowercase().replace('-', " ")),
