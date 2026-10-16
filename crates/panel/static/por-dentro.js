@@ -927,7 +927,10 @@
       cx.globalCompositeOperation = 'lighter';
       GRUPOS.forEach((g) => {
         if (!g.ruta || g.ruta.length < 2) return;
-        const d = g.top, col = bloqueado(d) ? '#ff6b7a' : prod(d.p).color;
+        // A cut place has no ball going to it (the owner, 16 Oct 2026: «cuando corto un nombre la
+        // línea deja de aparecer pero sigue la pelotita yendo y viniendo»).
+        if (bloqueado(g.top)) return;
+        const d = g.top, col = prod(d.p).color;
         const fase = ((g.lon * 13 + g.lat * 7) % 1 + 1) % 1;
         const u = Math.abs((tt / 2.6 + fase) % 2 - 1);
         const p = punto(g.ruta, u);
