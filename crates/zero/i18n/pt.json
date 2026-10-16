@@ -961,7 +961,7 @@
   "sec_c_rele_buscando": "Sem porta no roteador. Conectando ao relé cego…",
   "sec_e_buscando": "Procurando a outra pessoa no relé cego…",
   "sec_rele_fallo": "Não foi possível usar o relé: {e}",
-  "sec_paso_1": "Um dos dois toca em «Convidar» e manda o código ao outro.",
+  "sec_paso_1": "Um dos dois toca em «Convidar» e manda o código ao outro (ou a vários: é um grupo).",
   "sec_paso_2": "O outro escreve esse código em «Tenho um código».",
   "sec_paso_3": "Os dois comparam três números e já podem falar.",
   "sec_c_invitar": "Convidar",
@@ -978,5 +978,10 @@
   "sec_c_preparando": "Preparando o seu código…",
   "sec_c_listo": "Envie-o. Assim que a pessoa o escrever, vocês se verão aqui.",
   "sec_c_via_puerta": "Caminho: direto entre os dois computadores (porta aberta no seu roteador).",
-  "sec_c_via_rele": "Caminho: pelo relé cego do GUARDIANA (só passa dados já cifrados; não pode lê-los)."
+  "sec_c_via_rele": "Caminho: pelo relé cego do GUARDIANA (só passa dados já cifrados; não pode lê-los).",
+  "sec_c_tu_nombre": "Seu nome (como os outros vão vê-lo)",
+  "sec_c_tu_nombre_ph": "Francisco",
+  "sec_c_mas": "Para convidar mais pessoas, o mesmo código:",
+  "sec_m_grupo": "Grupo: {n}",
+  "sec_s_nuevo": "{n} está entrando. Compare os números com essa pessoa."
 }
