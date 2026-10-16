@@ -374,6 +374,13 @@ details.av-avanzado > summary { margin: 10px 0 4px; }
 details.av-avanzado h3 { margin: 10px 0 4px; font-size: 15px; }
 details.av-avanzado p { margin: 8px 0; }
 
+/* Phone steps, numbered, with the address to type set apart (16 Oct 2026). */
+ol.pasos-tel { margin: 0; padding-left: 1.4em; display: grid; gap: 6px; font-size: 15.5px; }
+ol.pasos-tel li::marker { color: var(--accent); font-weight: 700; }
+ol.pasos-tel li::first-letter { text-transform: uppercase; }
+ol.pasos-tel li.nota-tel { list-style: none; margin-left: -1.4em; color: var(--muted); font-size: 14px; }
+.ip-tel { font-family: var(--mono); font-size: 1.05em; padding: 1px 7px; border-radius: 6px; background: var(--accent-suave); color: var(--fg); }
+.card.primero { border-color: var(--accent); }
 /* «Limitar una IA» (16 Oct 2026): three plain steps and quick picks. */
 .alcance-facil .paso { margin: 18px 0 8px; }
 .alcance-facil select, .alcance-facil textarea { width: 100%; max-width: 520px; }

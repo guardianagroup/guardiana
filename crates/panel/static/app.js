@@ -299,6 +299,14 @@
       doc.juntos(10 * 1.25 + 9 * 1.25 * 2).line(cabeza, 10, true).line(e.oficio, 9, false, 0.25).gap(3);
     }
   }
+  // The phone's steps as numbered steps, the address to type set apart (the owner, 16 Oct 2026:
+  // «hay que explicar cómo conectar el teléfono al Modo Hogar para que sea fácil»).
+  function pasosTel(el, texto, ip) {
+    const [pasos, ...cola] = texto.split(/(?<=\.)\s+(?=[A-ZÁÉÍÓÚ])/);
+    const resalta = (s) => esc(s).split(esc('{ip}')).join(`<b class="ip-tel">${esc(ip)}</b>`);
+    el.innerHTML = pasos.replace(/\.$/, '').split(' › ').map((x) => `<li>${resalta(x)}</li>`).join('')
+      + (cola.length ? `<li class="nota-tel">${resalta(cola.join(' '))}</li>` : '');
+  }
   async function api(path, opts = {}) {
     // The browser's offset in minutes east of UTC, so the dates written into sentences are the
     // person's own day (getTimezoneOffset counts the other way round).
@@ -1650,12 +1658,13 @@
         $('h-toggle').dataset.on = (r.encendido || r.aparcado) ? '1' : '0';
         $('h-aviso').textContent = aviso || '';
         $('h-conectar').classList.toggle('hidden', !r.encendido);
+        $('h-primero').classList.toggle('hidden', !!r.encendido);
         if (r.encendido) {
           $('h-qr').innerHTML = r.qr_svg || '';
           $('h-url').textContent = r.url || '';
           $('h-router').textContent = t('hogar_router_texto').replace('{ip}', r.ip || '');
-          $('h-iphone').textContent = t('hogar_iphone_pasos').replace('{ip}', r.ip || '');
-          $('h-android').textContent = t('hogar_android_pasos').replace('{ip}', r.ip || '');
+          pasosTel($('h-iphone'), t('hogar_iphone_pasos'), r.ip || '');
+          pasosTel($('h-android'), t('hogar_android_pasos'), r.ip || '');
         }
       };
       render(await api('/api/hogar'));
@@ -1703,8 +1712,8 @@
         const ip = /^\d{1,3}(\.\d{1,3}){3}$/.test(location.hostname) ? location.hostname : '';
         $('mi-guia').classList.toggle('hidden', pasa || !ip);
         if (!pasa && ip) {
-          $('mi-iphone').textContent = t('hogar_iphone_pasos').replace('{ip}', ip);
-          $('mi-android').textContent = t('hogar_android_pasos').replace('{ip}', ip);
+          pasosTel($('mi-iphone'), t('hogar_iphone_pasos'), ip);
+          pasosTel($('mi-android'), t('hogar_android_pasos'), ip);
         }
         $('m-consultas').textContent = num(r.totales.consultas); $('m-rastreadores').textContent = num(r.totales.rastreadores);
         $('m-esperados').textContent = num(r.totales.esperados); $('m-cortados').textContent = num(r.totales.cortados);
