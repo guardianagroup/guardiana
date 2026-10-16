@@ -5,11 +5,16 @@ name: tierra
 
 on:
   workflow_dispatch:
+    inputs:
+      guardar:
+        description: "«si»: commit the tiles to this branch (never main)"
+        required: false
+        default: ''
   push:
     branches: ['tierra-*']
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   tierra:
@@ -28,6 +33,15 @@ jobs:
           set -euo pipefail
           du -sh crates/panel/static/tierra/t
           cat fuentes-tierra/descargas.json
+      - name: guardar en la rama
+        if: ${{ github.event.inputs.guardar == 'si' && github.ref != 'refs/heads/main' }}
+        run: |
+          set -euo pipefail
+          git config user.name "guardiana-ci"
+          git config user.email "ci@guardianagroup.com"
+          git add crates/panel/static/tierra/t
+          git commit -m "tierra: las teselas de 45° cortadas por CI (build/tierra.py)"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: tierra-tiles
