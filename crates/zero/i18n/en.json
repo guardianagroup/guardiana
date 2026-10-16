@@ -90,6 +90,8 @@
   "sec_i_pdf_nota": "Report signed with this computer’s key: it proves who produced it and when, not who caused the stop. A very bad network or a reinstall on the other side cause it too.",
   "sec_llamada_cortada_red": "The call was cut by the network. The chat goes on; call again whenever you like.",
   "sec_reconectando": "Connection lost. Looking for {n} again… (try {i})",
+  "sec_mv_antes": "Use the phone from now",
+  "sec_mv_antes_texto": "Scan a code and carry the conversation on your phone from the start: inviting, comparing the numbers and talking.",
   "sec_l_sin_verificar": "Identity not verified",
   "sec_l_clave_cambiada": "{n}’s key changed · compare the numbers again",
   "sec_l_directa": "Direct connection, no intermediaries",

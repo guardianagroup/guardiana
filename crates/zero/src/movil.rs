@@ -74,6 +74,15 @@ pub enum Desde {
     Contestar(String),
     /// The phone rejects the call ringing.
     Rechazar,
+    /// The person compared the three numbers on the phone: whether they match, and the
+    /// contact's name as typed there (the phone is in the conversation from the start since
+    /// 16 Oct 2026).
+    Sas {
+        /// They matched.
+        ok: bool,
+        /// The name for the book.
+        nombre: String,
+    },
     /// The phone's player started: the other side's recorder must start again.
     PideInicio,
     /// One recorded piece from the phone's microphone or camera.
@@ -710,6 +719,15 @@ fn traduce(v: &Value) -> Option<Desde> {
                 .collect(),
         )),
         "rechazar" => Some(Desde::Rechazar),
+        "sas" => Some(Desde::Sas {
+            ok: v["ok"].as_bool().unwrap_or(false),
+            nombre: v["nombre"]
+                .as_str()
+                .unwrap_or_default()
+                .chars()
+                .take(60)
+                .collect(),
+        }),
         "pide_inicio" => Some(Desde::PideInicio),
         "visto" => Some(Desde::Visto),
         "reproduce" => Some(Desde::Reproduce(

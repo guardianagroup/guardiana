@@ -468,10 +468,16 @@ impl Grupo {
         let hablando: Vec<usize> = (0..self.sesiones.len())
             .filter(|&i| self.sesiones[i].lista())
             .collect();
-        if hablando.len() != 1 || self.nombres().len() > 2 {
+        if self.nombres().len() > 2 || hablando.len() > 1 {
             return Err("sec_mv_solo_dos".to_owned());
         }
-        self.sesiones[hablando[0]].movil_empieza(idioma)
+        // Nobody talking yet (16 Oct 2026, «conectar el móvil antes que el PC»): the phone
+        // joins the first link, the one waiting for or looking for the other side.
+        let i = hablando.first().copied().unwrap_or(0);
+        match self.sesiones.get_mut(i) {
+            Some(s) => s.movil_empieza(idioma),
+            None => Err("sec_mv_solo_dos".to_owned()),
+        }
     }
 
     /// Our new player needs the other side's pieces from a fresh start.
@@ -810,9 +816,14 @@ mod tests {
         let mut b = Grupo::abre(&db, &db);
         let mut c = Grupo::abre(&dc, &dc);
         let puerto = a.escuchar_efimero().unwrap();
+        // The phone may be in from the start (16 Oct 2026): nobody is talking yet, so the
+        // hand-off goes to the link that waits for the other side, not «only two people».
+        assert_eq!(a.movil_empieza("es"), Ok(()));
+        assert!(a.estado_json()["movil"].is_object());
         b.conectar(&format!("127.0.0.1:{puerto}")).unwrap();
         gira(&mut [&mut a, &mut b], 25);
         assert!(a.numeros().is_some() && a.numeros() == b.numeros());
+        a.movil_fin();
         a.sas_persona(true, "Bea");
         b.sas_persona(true, "Ana");
         gira(&mut [&mut a, &mut b], 25);

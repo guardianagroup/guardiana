@@ -2379,9 +2379,8 @@ impl Secure {
     /// and put the QR code on screen. `idioma` goes into the QR so the page opens in the
     /// person's language.
     pub fn movil_empieza(&mut self, idioma: &str) -> Result<(), String> {
-        if self.fase != Fase::Lista {
-            return Err("sec_no_lista".to_owned());
-        }
+        // Any moment, since 16 Oct 2026: the phone can be in from before the other side
+        // arrives (it then shows the code to share, the wait, the numbers to compare).
         if self.movil.is_some() {
             return Ok(());
         }
@@ -2548,6 +2547,7 @@ impl Secure {
                     let _ = self.contestar(&mime);
                 }
                 Desde::Rechazar if aprobado => self.rechazar(),
+                Desde::Sas { ok, nombre } if aprobado => self.sas_persona(ok, &nombre),
                 Desde::PideInicio if aprobado => self.pide_inicio(),
                 Desde::Media(b) if aprobado => {
                     let _ = self.media_bytes(b);

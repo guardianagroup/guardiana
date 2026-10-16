@@ -483,9 +483,10 @@
   const idioma = () => (document.documentElement.lang || navigator.language || 'es').slice(0, 2);
   const pintaMovil = (m) => {
     const mv = m.movil;
-    const caja = $('c-movil-caja');
+    const caja = $('c-movil-tarjeta');
     const varios = ((m.grupo || {}).nombres || []).length > 2;
     $('c-movil').hidden = !!mv || varios;
+    $('c-movil-antes').hidden = !!mv || varios;
     if (!mv) { caja.hidden = true; movilHabla = false; return; }
     caja.hidden = false;
     if (mv.error) { $('c-mv-estado-t').textContent = t('sec_mv_error', { e: mv.error }); $('c-mv-estado').className = 'm-estado'; return; }
@@ -501,6 +502,7 @@
     movilHabla = !!mv.habla;
   };
   $('c-movil').addEventListener('click', () => manda({ tipo: 'secure', accion: 'movil', idioma: idioma() }));
+  $('c-movil-antes').addEventListener('click', () => manda({ tipo: 'secure', accion: 'movil', idioma: idioma() }));
   $('c-mv-si').addEventListener('click', () => manda({ tipo: 'secure', accion: 'movil_ok' }));
   $('c-mv-no').addEventListener('click', () => manda({ tipo: 'secure', accion: 'movil_fin' }));
   $('c-mv-fin').addEventListener('click', () => manda({ tipo: 'secure', accion: 'movil_fin' }));

@@ -236,6 +236,7 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
         <p class="t" data-t="sec_c_invitar_texto"></p>
         <label class="c-nombre"><span data-t="sec_c_tu_nombre"></span><input class="campo" id="c-yo" data-t-ph="sec_c_tu_nombre_ph" autocomplete="off" maxlength="60"></label>
         <div class="c-fila"><button type="button" class="boton principal" id="c-escuchar" data-t="sec_c_invitar_boton"></button><span class="c-puerto" id="c-puerto" hidden></span></div>
+        <p class="t c-desde-movil"><button type="button" class="boton chico secundario" id="c-movil-antes" data-t="sec_mv_antes"></button> <span data-t="sec_mv_antes_texto"></span></p>
         <div class="c-codigo" id="c-codigo-caja" hidden>
           <span class="rotulo" data-t="sec_c_codigo_rotulo"></span>
           <b id="c-codigo"></b>
@@ -271,11 +272,8 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
     <p class="t r-nota" data-t="sec_r_nota"></p>
   </section>
 
-  <section class="tarjeta chat" id="c-chat" hidden>
-    <p class="cortada-nota" id="c-cortada" hidden data-t="sec_c_cortada"></p>
-    <div class="mas" id="c-mas" hidden><span data-t="sec_c_mas"></span> <b id="c-mas-codigo"></b> <button type="button" class="boton chico" id="c-mas-copiar" data-t="sec_c_copiar"></button></div>
-    <div class="chat-cab"><h2 id="c-con"></h2><div class="c-fila"><button type="button" class="boton chico" id="c-voz" data-t="sec_l_voz"></button><button type="button" class="boton chico" id="c-video" data-t="sec_l_video"></button><button type="button" class="boton chico" id="c-movil" data-t="sec_mv_boton"></button><button type="button" class="boton chico" id="c-cerrar" data-t="sec_c_cerrar"></button></div></div>
-    <section class="movil" id="c-movil-caja" hidden>
+  <section class="tarjeta" id="c-movil-tarjeta" hidden>
+    <section class="movil" id="c-movil-caja">
       <h3 data-t="sec_mv_titulo"></h3>
       <p id="c-mv-texto" data-t="sec_mv_texto"></p>
       <div class="qr" id="c-mv-qr"></div>
@@ -285,6 +283,11 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
       <p id="c-mv-fuera"></p>
       <div class="c-fila"><button type="button" class="boton chico secundario" id="c-mv-fin" data-t="sec_mv_fin"></button></div>
     </section>
+  </section>
+  <section class="tarjeta chat" id="c-chat" hidden>
+    <p class="cortada-nota" id="c-cortada" hidden data-t="sec_c_cortada"></p>
+    <div class="mas" id="c-mas" hidden><span data-t="sec_c_mas"></span> <b id="c-mas-codigo"></b> <button type="button" class="boton chico" id="c-mas-copiar" data-t="sec_c_copiar"></button></div>
+    <div class="chat-cab"><h2 id="c-con"></h2><div class="c-fila"><button type="button" class="boton chico" id="c-voz" data-t="sec_l_voz"></button><button type="button" class="boton chico" id="c-video" data-t="sec_l_video"></button><button type="button" class="boton chico" id="c-movil" data-t="sec_mv_boton"></button><button type="button" class="boton chico" id="c-cerrar" data-t="sec_c_cerrar"></button></div></div>
     <section class="timbre" id="c-timbre" hidden aria-live="assertive">
       <span class="t-icono" aria-hidden="true"></span>
       <div class="t-texto"><b id="c-timbre-t"></b><span id="c-timbre-s"></span></div>
