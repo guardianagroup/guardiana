@@ -1623,9 +1623,17 @@ impl Secure {
             "archivo_tengo" => {
                 let bloques = c["bloques"].as_u64().unwrap_or(0);
                 let ultimo = c["ultimo"].as_str().unwrap_or_default();
-                let ultimo = if ultimo.is_empty() { String::new() } else { limpia_nombre(ultimo) };
+                let ultimo = if ultimo.is_empty() {
+                    String::new()
+                } else {
+                    limpia_nombre(ultimo)
+                };
                 let nombre = c["nombre"].as_str().unwrap_or_default();
-                let nombre = if nombre.is_empty() { String::new() } else { limpia_nombre(nombre) };
+                let nombre = if nombre.is_empty() {
+                    String::new()
+                } else {
+                    limpia_nombre(nombre)
+                };
                 self.archivo_tengo(&nombre, bloques, &ultimo);
             }
             "archivo_ok" => {
@@ -2149,7 +2157,9 @@ impl Secure {
         let trozos = Trozos::new().map_err(|e| e.to_string())?;
         let inicial = trozos.llave_inicial();
         // The key first: the other side writes each block to disk as it comes.
-        self.manda_olm(json!({ "m": "archivo_inicio", "nombre": nombre, "llave": inicial, "bytes": bytes }));
+        self.manda_olm(
+            json!({ "m": "archivo_inicio", "nombre": nombre, "llave": inicial, "bytes": bytes }),
+        );
         let inicio = self.enlace.as_ref().map_or(0, |e| e.cuenta().0);
         self.enviados.push(Enviado {
             nombre: nombre.clone(),
@@ -2214,11 +2224,7 @@ impl Secure {
             bloques = 0;
             desde_el_principio = true;
         }
-        while s
-            .guardados
-            .front()
-            .is_some_and(|(n, _)| *n < bloques)
-        {
+        while s.guardados.front().is_some_and(|(n, _)| *n < bloques) {
             if let Some((_, c)) = s.guardados.pop_front() {
                 s.guardados_bytes = s.guardados_bytes.saturating_sub(c.len() as u64);
             }
@@ -2258,8 +2264,11 @@ impl Secure {
                 v.fin = Some(hasta);
             }
         }
-        self.monitor
-            .anota(ahora_s(), Nivel::Info, format!("archivo reanudado: {nombre}"));
+        self.monitor.anota(
+            ahora_s(),
+            Nivel::Info,
+            format!("archivo reanudado: {nombre}"),
+        );
         self.cambio = true;
     }
 
@@ -2285,10 +2294,20 @@ impl Secure {
         let (nombre, bloques) = self
             .entrada
             .as_ref()
-            .and_then(|e| e.recepcion.as_ref().map(|r| (e.nombre.clone(), r.bloques())))
+            .and_then(|e| {
+                e.recepcion
+                    .as_ref()
+                    .map(|r| (e.nombre.clone(), r.bloques()))
+            })
             .unwrap_or_default();
-        let ultimo = self.recibidos.last().map(|r| r.nombre.clone()).unwrap_or_default();
-        self.manda_olm(json!({ "m": "archivo_tengo", "nombre": nombre, "bloques": bloques, "ultimo": ultimo }));
+        let ultimo = self
+            .recibidos
+            .last()
+            .map(|r| r.nombre.clone())
+            .unwrap_or_default();
+        self.manda_olm(
+            json!({ "m": "archivo_tengo", "nombre": nombre, "bloques": bloques, "ultimo": ultimo }),
+        );
     }
 
     /// The file going out: how far, and the seconds left at the speed of the last seconds.
@@ -2384,7 +2403,8 @@ impl Secure {
             };
             let nombre = s.nombre.clone();
             let bytes = s.bytes;
-            let trozos = std::mem::replace(&mut s.trozos, Trozos::new().map_err(|e| e.to_string())?);
+            let trozos =
+                std::mem::replace(&mut s.trozos, Trozos::new().map_err(|e| e.to_string())?);
             let llave = trozos.termina().map_err(|e| e.to_string())?;
             s.llave = Some(llave.clone());
             if !pausada {
@@ -3207,7 +3227,16 @@ mod tests {
             a.archivo_trozo(&B64.encode(t), false).unwrap();
         }
         gira(&mut a, &mut b, 10);
-        assert_eq!(b.entrada.as_ref().unwrap().recepcion.as_ref().unwrap().bloques(), 2);
+        assert_eq!(
+            b.entrada
+                .as_ref()
+                .unwrap()
+                .recepcion
+                .as_ref()
+                .unwrap()
+                .bloques(),
+            2
+        );
         // The next block is handed over right as the link dies: nobody gets it.
         a.archivo_trozo(&B64.encode(trozos[2]), false).unwrap();
         for s in [&mut a, &mut b] {
@@ -3224,7 +3253,11 @@ mod tests {
         gira(&mut a, &mut b, 60);
         assert!(!a.reconectando() && !b.reconectando());
         gira(&mut a, &mut b, 10);
-        assert!(!a.envio_json()["pausado"].as_bool().unwrap(), "{}", a.envio_json());
+        assert!(
+            !a.envio_json()["pausado"].as_bool().unwrap(),
+            "{}",
+            a.envio_json()
+        );
         a.archivo_trozo(&B64.encode(trozos[5]), true).unwrap();
         gira(&mut a, &mut b, 20);
         let r = b.recibidos.last().expect("the file arrived whole");
