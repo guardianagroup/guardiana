@@ -20,6 +20,9 @@ html, body { height: 100%; overflow: hidden; background: var(--marco); user-sele
 .pestana.aislada .punto { background: none; border: 1.5px dashed var(--gris); }
 .pestana.fija { flex: 0 1 210px; }
 .pestana.fija .titulo { font-weight: 650; }
+.pestana.arrastrando { opacity: .45; }
+.pestana.antes::before, .pestana.despues::after { content: ""; position: absolute; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--accent, #3d6bff); }
+.pestana.antes::before { left: -2px; } .pestana.despues::after { right: -2px; }
 @keyframes gira { to { transform: rotate(360deg); } }
 .pestana .cerrar { flex: none; width: 20px; height: 20px; border: 0; border-radius: 6px; background: none; color: var(--gris); display: grid; place-items: center; opacity: 0; }
 .pestana:hover .cerrar, .pestana[aria-selected="true"] .cerrar { opacity: 1; }

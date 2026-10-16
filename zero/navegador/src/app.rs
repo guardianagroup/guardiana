@@ -411,8 +411,12 @@ fn ejecuta(o: Orden) {
             }
         }
         Orden::AbreFuera { url } => {
-            // Only mail: the letter opens in the person's own mail program, never a web address.
-            if url.starts_with("mailto:") {
+            // Only mail (the letter opens in the person's own mail program) and the two pages of
+            // Windows' privacy settings for the microphone and the camera; never a web address.
+            if url.starts_with("mailto:")
+                || url == "ms-settings:privacy-microphone"
+                || url == "ms-settings:privacy-webcam"
+            {
                 let u = Ancho::de(&url);
                 unsafe {
                     ShellExecuteW(
@@ -1374,6 +1378,19 @@ fn eventos_pestana(id: u32, web: &ICoreWebView2) -> windows::core::Result<()> {
                     };
                     let mut tipo = COREWEBVIEW2_PERMISSION_KIND::default();
                     args.PermissionKind(&mut tipo)?;
+                    // The microphone and the camera for GUARDIANA SECURE's own page (16 Oct
+                    // 2026): the person already chose by pressing «Llamar» or «Contestar»; a
+                    // second question from the engine (or a «no» saved once by mistake) only
+                    // left the other person in silence. Any other page asks as always.
+                    if tipo == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE
+                        || tipo == COREWEBVIEW2_PERMISSION_KIND_CAMERA
+                    {
+                        let url = texto_de(|p| args.Uri(p));
+                        if url.starts_with(guardiana_zero::sesion::SECURE) {
+                            args.SetState(COREWEBVIEW2_PERMISSION_STATE_ALLOW)?;
+                        }
+                        return Ok(());
+                    }
                     if tipo == COREWEBVIEW2_PERMISSION_KIND_NOTIFICATIONS {
                         let mut persona = BOOL::default();
                         let _ = args.IsUserInitiated(&mut persona);

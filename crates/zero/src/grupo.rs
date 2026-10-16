@@ -45,6 +45,11 @@ pub struct Grupo {
     llamada_desde: u64,
     /// The kind of recording this computer's page makes (MediaRecorder), for every link.
     mime: String,
+    /// This computer's time zone, as the page says it.
+    zona_propia: String,
+    /// The live file for the globe: written, and when.
+    directo_escrito: bool,
+    directo_ultimo: u64,
     cambio: bool,
 }
 
@@ -73,6 +78,9 @@ impl Grupo {
             llamada: None,
             llamada_desde: 0,
             mime: String::new(),
+            zona_propia: String::new(),
+            directo_escrito: false,
+            directo_ultimo: 0,
             cambio: false,
         }
     }
@@ -172,6 +180,58 @@ impl Grupo {
         }
         if self.sesiones.iter_mut().any(Secure::cambiado) {
             self.cambio = true;
+        }
+        self.en_directo();
+    }
+
+    /// The page said this computer's time zone.
+    pub fn pon_zona(&mut self, zona: &str) {
+        self.zona_propia = zona.chars().take(64).collect();
+        for s in &mut self.sesiones {
+            s.pon_zona(zona);
+        }
+    }
+
+    /// For the globe of this computer only (16 Oct 2026): a small file next to GUARDIANA's
+    /// ledger says with whom this computer is talking and where each end is (by time zone,
+    /// never by address), so «GUARDIANA por dentro» draws the line between the two. Written
+    /// while a conversation is open, removed when it ends; it never leaves this computer.
+    fn en_directo(&mut self) {
+        let ahora = ahora_s();
+        let abierta = self.sesiones.iter().any(Secure::lista);
+        let ruta = guardiana_core::paths::data_dir().join("secure-en-directo.json");
+        if !abierta {
+            if self.directo_escrito {
+                let _ = std::fs::remove_file(&ruta);
+                self.directo_escrito = false;
+            }
+            return;
+        }
+        if ahora.saturating_sub(self.directo_ultimo) < 2 && !self.cambio {
+            return;
+        }
+        self.directo_ultimo = ahora;
+        let abiertas: Vec<Value> = self
+            .sesiones
+            .iter()
+            .filter(|s| s.lista())
+            .map(|s| {
+                json!({
+                    "contacto": s.contacto(),
+                    "zona": s.zona_otra(),
+                    "llamada": s.llamada_activa().map(|(video, desde)| json!({ "video": video, "desde": desde, "conectada": s.conectada() })),
+                    "rele": s.por_rele(),
+                })
+            })
+            .collect();
+        let v = json!({
+            "version": 1,
+            "zona": self.zona_propia,
+            "conversaciones": abiertas,
+            "actualizado": ahora,
+        });
+        if std::fs::write(&ruta, v.to_string()).is_ok() {
+            self.directo_escrito = true;
         }
     }
 
@@ -402,10 +462,23 @@ impl Grupo {
 
     /// «Pasar al móvil»: only a two-person conversation (a group's call has several streams).
     pub fn movil_empieza(&mut self, idioma: &str) -> Result<(), String> {
-        if self.sesiones.len() != 1 || self.nombres().len() > 2 {
+        // Two people: one link talking. The host also keeps a session listening for the next
+        // member; that one does not count (16 Oct 2026: the host was told «only two people»
+        // with only two people in the conversation).
+        let hablando: Vec<usize> = (0..self.sesiones.len())
+            .filter(|&i| self.sesiones[i].lista())
+            .collect();
+        if hablando.len() != 1 || self.nombres().len() > 2 {
             return Err("sec_mv_solo_dos".to_owned());
         }
-        self.sesiones[0].movil_empieza(idioma)
+        self.sesiones[hablando[0]].movil_empieza(idioma)
+    }
+
+    /// Our new player needs the other side's pieces from a fresh start.
+    pub fn pide_inicio(&mut self) {
+        for s in &mut self.sesiones {
+            s.pide_inicio();
+        }
     }
 
     /// The person said «Sí, es mi móvil».
@@ -460,6 +533,14 @@ impl Grupo {
         }
         self.cambio = true;
         r
+    }
+
+    /// Close the «missed call» note.
+    pub fn olvida_perdida(&mut self) {
+        for s in &mut self.sesiones {
+            s.olvida_perdida();
+        }
+        self.cambio = true;
     }
 
     /// Reject the call ringing here.
@@ -620,6 +701,16 @@ impl Grupo {
         if let Some(video) = self.llamada {
             if e["llamada"].is_null() {
                 e["llamada"] = json!({ "video": video, "desde": self.llamada_desde, "conectada": self.sesiones.iter().any(Secure::conectada) });
+            }
+        }
+        if e["perdida"].is_null() {
+            if let Some(p) = self
+                .sesiones
+                .iter()
+                .map(|s| s.estado_perdida())
+                .find(|p| !p.is_null())
+            {
+                e["perdida"] = p;
             }
         }
         // A call ringing on any link, and the files that came on any link.

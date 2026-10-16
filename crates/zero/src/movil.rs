@@ -74,6 +74,8 @@ pub enum Desde {
     Contestar(String),
     /// The phone rejects the call ringing.
     Rechazar,
+    /// The phone's player started: the other side's recorder must start again.
+    PideInicio,
     /// One recorded piece from the phone's microphone or camera.
     Media(Vec<u8>),
     /// The phone's page was brought to the front.
@@ -712,6 +714,7 @@ fn traduce(v: &Value) -> Option<Desde> {
                 .collect(),
         )),
         "rechazar" => Some(Desde::Rechazar),
+        "pide_inicio" => Some(Desde::PideInicio),
         "visto" => Some(Desde::Visto),
         "reproduce" => Some(Desde::Reproduce(
             v["mimes"]

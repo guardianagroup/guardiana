@@ -398,6 +398,12 @@ pub struct Secure {
     llamada: Option<Llamada>,
     /// A call ringing here.
     entrante: Option<Timbre>,
+    /// A call nobody answered here: (when, with video), until the person calls back or
+    /// closes the note.
+    perdida: Option<(u64, bool)>,
+    /// How many times the other side asked our recorder to start again (a new player there,
+    /// on its phone or back on its computer, cannot open a stream joined halfway).
+    reinicios: u64,
     /// A file on its way out.
     envio: Option<Envio>,
     /// When something last went out on the link: a quiet link gets a small frame every
@@ -409,6 +415,11 @@ pub struct Secure {
     /// say so (16 Oct 2026: one side showed the conversation closed, the other still open).
     ultimo_recibido: std::time::Instant,
     otro_late: bool,
+    /// This computer's time zone (the page tells it) and the other side's, exchanged inside
+    /// Olm once the conversation is open (16 Oct 2026, «que salga en nuestro mapa, el de él y
+    /// el mío»): the globe places each computer by its time zone, never by an address.
+    pub zona_propia: String,
+    zona_otra: String,
     /// Files sent, with how long each took to arrive.
     pub enviados: Vec<Enviado>,
     /// Files that arrived in this conversation.
@@ -487,10 +498,14 @@ impl Secure {
             reproduce_otro: Vec::new(),
             reproduce_dicho: Vec::new(),
             entrante: None,
+            perdida: None,
+            reinicios: 0,
             envio: None,
             ultimo_envio: std::time::Instant::now(),
             ultimo_recibido: std::time::Instant::now(),
             otro_late: false,
+            zona_propia: String::new(),
+            zona_otra: String::new(),
             enviados: Vec::new(),
             recibidos: Vec::new(),
             llamado_en_grupo: false,
@@ -749,8 +764,10 @@ impl Secure {
         self.salida = None;
         self.llamada = None;
         self.entrante = None;
+        self.perdida = None;
         self.llamado_en_grupo = false;
         self.otro_late = false;
+        self.zona_otra.clear();
         self.reproduce_otro.clear();
         self.reproduce_dicho.clear();
         self.monitor.transporte = Default::default();
@@ -1095,6 +1112,7 @@ impl Secure {
                     self.manda_olm(json!({ "m": "hola" }));
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "conversación cifrada abierta");
+                    self.manda_zona();
                 }
                 Err(e) => {
                     self.aviso("sec_err_olm", e.to_string());
@@ -1158,6 +1176,7 @@ impl Secure {
                     self.fase = Fase::Lista;
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "conversación cifrada abierta");
+                    self.manda_zona();
                     Ok(plano)
                 }
                 Err(e) => Err(e),
@@ -1242,6 +1261,14 @@ impl Secure {
                 self.reproduce_otro = lista_de_formatos(&c["mimes"]);
                 self.cambio = true;
             }
+            "reinicia_media" => {
+                self.reinicios += 1;
+                self.cambio = true;
+            }
+            "zona" => {
+                self.zona_otra = zona_limpia(c["zona"].as_str().unwrap_or_default());
+                self.cambio = true;
+            }
             "mime" => {
                 if let Some(l) = &mut self.llamada {
                     l.mime_remoto = c["mime"].as_str().map(|m| m.chars().take(80).collect());
@@ -1249,7 +1276,8 @@ impl Secure {
                 }
             }
             "cuelga" => {
-                if self.entrante.take().is_some() {
+                if let Some(tm) = self.entrante.take() {
+                    self.perdida = Some((tm.desde, tm.video));
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "llamada perdida");
                     self.aviso("sec_llamada_perdida", self.nombre_contacto.clone());
@@ -1508,6 +1536,7 @@ impl Secure {
         if self.fase != Fase::Lista {
             return Err("sec_no_lista".to_owned());
         }
+        self.perdida = None;
         if self.llamada.is_some() {
             self.cambia_mime(mime);
             return Ok(());
@@ -1569,6 +1598,29 @@ impl Secure {
         Ok(())
     }
 
+    /// The missed call note, for the screen (null when none).
+    pub fn estado_perdida(&self) -> Value {
+        self.perdida.map_or(
+            Value::Null,
+            |(t, video)| json!({ "t": t, "video": video, "de": self.nombre_contacto }),
+        )
+    }
+
+    /// Our player starts fresh (the phone took the call, or gave it back): the other side's
+    /// recorder starts again so the first piece carries the stream's header.
+    pub fn pide_inicio(&mut self) {
+        if self.llamada.is_some() {
+            self.manda_olm(json!({ "m": "reinicia_media" }));
+        }
+    }
+
+    /// The person closed the «missed call» note.
+    pub fn olvida_perdida(&mut self) {
+        if self.perdida.take().is_some() {
+            self.cambio = true;
+        }
+    }
+
     /// The person rejects the call ringing here.
     pub fn rechazar(&mut self) {
         if self.entrante.take().is_some() {
@@ -1610,7 +1662,7 @@ impl Secure {
             .as_ref()
             .is_some_and(|t| ahora.saturating_sub(t.desde) > TIMBRE_S + 5)
         {
-            self.entrante = None;
+            self.perdida = self.entrante.take().map(|t| (t.desde, t.video));
             self.aviso("sec_llamada_perdida", self.nombre_contacto.clone());
             self.cambio = true;
         }
@@ -1979,6 +2031,34 @@ impl Secure {
         Ok(())
     }
 
+    /// The page said where this computer is (its time zone); the other side hears it once the
+    /// conversation is open. Nothing else about the place travels.
+    pub fn pon_zona(&mut self, zona: &str) {
+        let z = zona_limpia(zona);
+        if z == self.zona_propia {
+            return;
+        }
+        self.zona_propia = z;
+        self.manda_zona();
+    }
+
+    fn manda_zona(&mut self) {
+        if self.fase == Fase::Lista && !self.zona_propia.is_empty() {
+            let z = self.zona_propia.clone();
+            self.manda_olm(json!({ "m": "zona", "zona": z }));
+        }
+    }
+
+    /// This link goes through the relay.
+    pub fn por_rele(&self) -> bool {
+        self.rele
+    }
+
+    /// The other side's time zone, once it said it.
+    pub fn zona_otra(&self) -> &str {
+        &self.zona_otra
+    }
+
     /// Tell the other side what our player can open (empty: the computer's own, anything).
     pub fn reproduce(&mut self, mimes: Vec<String>) {
         if mimes == self.reproduce_dicho || self.fase != Fase::Lista {
@@ -2075,6 +2155,7 @@ impl Secure {
                     let _ = self.contestar(&mime);
                 }
                 Desde::Rechazar if aprobado => self.rechazar(),
+                Desde::PideInicio if aprobado => self.pide_inicio(),
                 Desde::Media(b) if aprobado => {
                     let _ = self.media_bytes(b);
                 }
@@ -2159,8 +2240,9 @@ impl Secure {
             "tarjeta": self.tarjeta(),
             "contacto": self.nombre_contacto,
             "numeros": self.numeros().map(|(a, b, c)| vec![a, b, c]),
-            "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "conectada": l.conectada, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto })),
+            "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "conectada": l.conectada, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto, "reinicio": self.reinicios })),
             "entrante": self.entrante.as_ref().map(|t| json!({ "video": t.video, "de": self.nombre_contacto, "desde": t.desde })),
+            "perdida": self.perdida.map(|(t, video)| json!({ "t": t, "video": video, "de": self.nombre_contacto })),
             "recibidos": self.recibidos.iter().map(Recibido::json).collect::<Vec<_>>(),
             "envio": self.envio_json(),
             "enviados": self.enviados.iter().filter(|x| x.t > 0).map(|x| json!({ "nombre": x.nombre, "t": x.t, "bytes": x.bytes, "llego_en": x.llego_en })).collect::<Vec<_>>(),
@@ -2171,6 +2253,19 @@ impl Secure {
             "monitor": monitor,
             "resumen": self.resumen.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "mensajes": r.mensajes_enviados + r.mensajes_recibidos, "archivos": r.archivos.enviados + r.archivos.recibidos, "observadas": r.observadas, "inusuales": r.inusuales, "fin": r.fin })),
         })
+    }
+}
+
+/// An IANA time zone name as the page gives it (`America/Bogota`): letters, digits, `/`, `_`,
+/// `-` and `+`, at most 64 characters; anything else is left out.
+fn zona_limpia(z: &str) -> String {
+    let ok = z
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '-' | '+'));
+    if ok && z.len() <= 64 && z.contains('/') {
+        z.to_owned()
+    } else {
+        String::new()
     }
 }
 

@@ -463,7 +463,7 @@
   // second behind. (The real-time transport comes next; this is today's.)
   let arrancando = false;
   let grabador = null, local = null, fuente = null, buffer = null, pendientes = [], silenciado = false, llamadaVideo = false;
-  let mimeRemoto = null, tipoGrabador = null, reproduceOtro = [];
+  let mimeRemoto = null, tipoGrabador = null, reproduceOtro = [], reinicioVisto = null;
   // A call has three moments (16 Oct 2026): it rings here (Contestar / Rechazar), we are
   // calling (the button stays pressed, «Llamando a…» with the seconds left), and we talk.
   let sonando = null, tonoLlamando = null;
@@ -474,7 +474,19 @@
     if (e) {
       $('c-timbre-t').textContent = t(e.video ? 'sec_l_te_videollama' : 'sec_l_te_llama', { n: e.de || m.contacto || '' });
       $('c-timbre-s').textContent = t('sec_l_cifrada_nota');
-      if (!sonando) { timbre(); sonando = setInterval(timbre, 2500); }
+      if (!sonando) {
+        timbre(); sonando = setInterval(timbre, 2500);
+        setTimeout(() => { try { $('c-contestar').focus(); } catch (_) {} }, 50);
+        // Before answering: is there a microphone (and a camera, for video) at all?
+        try {
+          navigator.mediaDevices.enumerateDevices().then((ds) => {
+            const mic = ds.some((d) => d.kind === 'audioinput'), cam = ds.some((d) => d.kind === 'videoinput');
+            const falta = !mic ? t('sec_p_no_hay_microfono') : (e.video && !cam ? t('sec_p_no_hay_camara') : '');
+            let x = $('c-timbre-s').querySelector('.t-aviso');
+            if (falta) { if (!x) { x = document.createElement('span'); x.className = 't-aviso'; $('c-timbre-s').appendChild(x); } x.textContent = falta; } else if (x) x.remove();
+          }).catch(() => {});
+        } catch (_) {}
+      }
     } else if (sonando) { clearInterval(sonando); sonando = null; }
   };
   $('c-contestar').addEventListener('click', () => { const e = (E || {}).entrante || {}; manda({ tipo: 'secure', accion: 'contestar', mime: mime(!!e.video) }); });
@@ -491,12 +503,20 @@
     if (!l.conectada) return t('sec_l_llamando_s', { s: Math.max(0, 45 - (ahora - (l.desde || ahora))) });
     return t(l.video ? 'sec_l_en_video' : 'sec_l_en_voz', { t: tiempo(Math.max(0, ahora - (l.desde || ahora))) });
   };
+  // A call nobody answered stays as a note with «Devolver llamada» (Grok's review, 16 Oct 2026).
+  const pintaPerdida = (m) => {
+    const p = m.perdida;
+    $('c-perdida').hidden = !p || !!m.llamada || !!m.entrante;
+    if (p) $('c-perdida-t').textContent = t(p.video ? 'sec_l_perdida_video' : 'sec_l_perdida_voz', { n: p.de || m.contacto || '', h: hora(p.t) });
+  };
+  $('c-devolver').addEventListener('click', () => { const p = (E || {}).perdida || {}; llama(!!p.video); });
+  $('c-perdida-x').addEventListener('click', () => manda({ tipo: 'secure', accion: 'perdida_vista' }));
   const pintaLlamada = (m) => {
     reproduceOtro = m.reproduce_otro || [];
-    pintaTimbre(m); pintaBotones(m);
+    pintaTimbre(m); pintaBotones(m); pintaPerdida(m);
     const l = m.llamada;
     const caja = $('c-llamada');
-    if (!l) { caja.hidden = true; caja.classList.remove('llamando'); paraMedios(); mimeRemoto = null; if (tonoLlamando) { clearInterval(tonoLlamando); tonoLlamando = null; } return; }
+    if (!l) { $('c-permiso').hidden = true; $('c-permiso').dataset.camara = ''; caja.hidden = true; caja.classList.remove('llamando'); paraMedios(); mimeRemoto = null; if (tonoLlamando) { clearInterval(tonoLlamando); tonoLlamando = null; } return; }
     caja.hidden = false;
     caja.classList.toggle('solo-voz', !l.video);
     const llamando = l.conectada === false;
@@ -506,6 +526,10 @@
     if (llamando) { if (!tonoLlamando) tonoLlamando = setInterval(() => { if (E && E.llamada && E.llamada.conectada === false) timbre(); }, 3000); return; }
     if (tonoLlamando) { clearInterval(tonoLlamando); tonoLlamando = null; }
     if (movilHabla) { if (grabador || arrancando) paraMedios(); return; }
+    // The other side's player started again (its phone took the call, or gave it back): our
+    // recorder starts again too, so its first piece carries the header that player needs.
+    if (grabador && typeof l.reinicio === 'number' && reinicioVisto !== null && l.reinicio !== reinicioVisto) cambiaGrabador();
+    if (typeof l.reinicio === 'number') reinicioVisto = l.reinicio;
     if (!grabador && !arrancando) empiezaMedios(!!l.video);
     // The other side's player (an iPhone) cannot open what we record: record in what it can.
     else if (grabador && tipoGrabador && mime(llamadaVideo) !== tipoGrabador) cambiaGrabador();
@@ -533,6 +557,27 @@
     try { if (grabador && grabador.state !== 'inactive') grabador.stop(); } catch (_) {}
     nuevoGrabador(llamadaVideo);
   };
+  // The microphone or the camera could not be used (16 Oct 2026, «que le salga ahí directo»):
+  // why, in plain words, with the button to Windows' own setting and one to try again. The
+  // call stays up meanwhile.
+  const muestraPermiso = (e, que) => {
+    const n = (e && e.name) || '';
+    const clave = n === 'NotFoundError' || n === 'OverconstrainedError' ? 'sec_p_no_hay' : n === 'NotReadableError' || n === 'AbortError' ? 'sec_p_ocupado' : 'sec_p_bloqueado';
+    $('c-permiso-t').textContent = t(clave + '_' + que);
+    $('c-permiso-s').textContent = t(clave + '_que');
+    $('c-permiso-mic').hidden = clave !== 'sec_p_bloqueado' || que !== 'microfono';
+    $('c-permiso-cam').hidden = clave !== 'sec_p_bloqueado' || que !== 'camara';
+    $('c-permiso').dataset.camara = que === 'camara' ? '1' : '';
+    $('c-permiso').hidden = false;
+  };
+  $('c-permiso-mic').addEventListener('click', () => manda({ tipo: 'secure', accion: 'ajustes_privacidad', que: 'microfono' }));
+  $('c-permiso-cam').addEventListener('click', () => manda({ tipo: 'secure', accion: 'ajustes_privacidad', que: 'camara' }));
+  $('c-permiso-otra').addEventListener('click', () => {
+    $('c-permiso').hidden = true; $('c-permiso').dataset.camara = '';
+    const l = E && E.llamada;
+    if (!l) return;
+    paraMedios(); empiezaMedios(!!l.video);
+  });
   const empiezaMedios = async (video) => {
     arrancando = true;
     llamadaVideo = video;
@@ -541,14 +586,18 @@
     try {
       local = await navigator.mediaDevices.getUserMedia({ audio, video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false });
     } catch (e) {
-      // No camera (or not allowed): the call goes on with the voice instead of ending.
+      // No camera (or not allowed): the call goes on with the voice instead of ending, and the
+      // way to turn it on is right there.
       local = null;
-      if (video) { try { local = await navigator.mediaDevices.getUserMedia({ audio, video: false }); aviso(t('sec_l_sin_camara')); } catch (_) {} }
-      if (!local) { arrancando = false; aviso(t('sec_l_sin_permiso')); manda({ tipo: 'secure', accion: 'colgar' }); return; }
+      if (video) { try { local = await navigator.mediaDevices.getUserMedia({ audio, video: false }); aviso(t('sec_l_sin_camara')); muestraPermiso(e, 'camara'); } catch (e2) { e = e2; } }
+      if (!local) { arrancando = false; muestraPermiso(e, 'microfono'); return; }
     }
+    $('c-permiso').hidden = !$('c-permiso').dataset.camara;
     $('c-local').srcObject = local;
     llamadaVideo = video && local.getVideoTracks().length > 0;
     nuevoGrabador(llamadaVideo);
+    // Our players are new: ask the other side for pieces from a fresh start.
+    manda({ tipo: 'secure', accion: 'pide_inicio' });
     arrancando = false;
   };
   // One player per member (a group) or one for the other person (a two-way talk): each
@@ -615,5 +664,8 @@
   en('monitor', (m) => { ultimo = m.monitor || {}; pinta(ultimo); });
   // The texts arrive after the page: draw again so «—» and the chips speak the person's language.
   en('textos', () => pinta(ultimo));
+  // Where this computer is, by its time zone (the same the globe uses): the other side hears it
+  // inside the cipher, and each computer draws the line between the two on its own globe.
+  try { manda({ tipo: 'secure', accion: 'zona', zona: Intl.DateTimeFormat().resolvedOptions().timeZone || '' }); } catch (_) {}
   manda({ tipo: 'listo', vista: 'secure' });
 })();
