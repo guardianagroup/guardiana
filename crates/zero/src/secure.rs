@@ -31,6 +31,7 @@ use guardiana_secure::resumen::{Archivos, Clase, Conexion, Resumen};
 use guardiana_secure::sframe;
 use guardiana_secure::verificar::{Codigo, Inicio, Verified};
 use guardiana_secure::{tarjeta, Conversation, Envelope, Identity};
+use serde::Serialize;
 use serde_json::{json, Value};
 
 const MAX_FRAME: usize = 2 * 1024 * 1024;
@@ -64,11 +65,15 @@ struct Enlace {
     /// difference is what is still on its way out (a file's «time left»).
     encolados: std::sync::Arc<std::sync::atomic::AtomicU64>,
     escritos: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// The other end's address, kept only in memory for an incident card on a direct link;
+    /// it is never written, shown or logged otherwise (decision 203).
+    otro: Option<std::net::IpAddr>,
 }
 
 impl Enlace {
     fn new(mut s: TcpStream) -> Self {
         use std::sync::atomic::{AtomicU64, Ordering};
+        let otro = s.peer_addr().ok().map(|a| a.ip());
         let (cola, rx) = mpsc::channel::<Vec<u8>>();
         let escritos = std::sync::Arc::new(AtomicU64::new(0));
         let hilo = escritos.clone();
@@ -88,7 +93,13 @@ impl Enlace {
             cola,
             encolados: std::sync::Arc::new(AtomicU64::new(0)),
             escritos,
+            otro,
         }
+    }
+
+    /// The other end's address (see the field).
+    fn ip_del_otro(&self) -> Option<std::net::IpAddr> {
+        self.otro
     }
 
     fn manda(&self, v: &Value) -> Result<(), String> {
@@ -346,6 +357,41 @@ struct Llamada {
     marca: (u64, u64, u64),
 }
 
+/// A stop that looks like an interference, as the screen and the saved report show it.
+#[derive(Debug, Clone, Serialize)]
+pub struct Incidente {
+    /// Unix seconds.
+    pub cuando: u64,
+    /// `sas_distinto`, `clave_cambiada`, `olm_fallos`, `media_fallos`, `archivo_mal`,
+    /// `rele_certificado`.
+    pub senal: &'static str,
+    /// The concrete fact, in Spanish for the chain (the screen translates `senal`).
+    pub detalle: String,
+    /// `directo`, `rele` or `ninguno`.
+    pub transporte: &'static str,
+    /// How many frames failed in the window, when that is the signal.
+    pub fallos: u32,
+    /// The contact's name as this computer knows it.
+    pub contacto: String,
+    /// The time zone the other side said, if it did (never an address).
+    pub zona_otra: String,
+    /// Only on a direct link, and only for this card: the other end's address as seen at that
+    /// moment, with the country and the network the bundled base gives it. Nothing is written
+    /// anywhere unless the person saves the report (decision 203 stands).
+    pub otro: Option<OtroExtremo>,
+}
+
+/// The other end of a direct link, at the moment of an incident.
+#[derive(Debug, Clone, Serialize)]
+pub struct OtroExtremo {
+    /// The address.
+    pub ip: String,
+    /// Two-letter country from the bundled base, if any.
+    pub pais: Option<String>,
+    /// The network's organisation from the bundled base, if any.
+    pub red: Option<String>,
+}
+
 /// The SECURE side of a browser session.
 pub struct Secure {
     datos: PathBuf,
@@ -401,6 +447,14 @@ pub struct Secure {
     /// A call nobody answered here: (when, with video), until the person calls back or
     /// closes the note.
     perdida: Option<(u64, bool)>,
+    /// A stop that looks like an interference (16 Oct 2026, the owner's first concern): what
+    /// tripped, when, by which path, and what can honestly be said about the other end. Kept
+    /// until the person saves it, verifies again or ends; `cerrar` leaves it alone.
+    incidente: Option<Incidente>,
+    /// Frames that failed to open lately (unix seconds): a burst stops the conversation, one
+    /// alone is a bad network.
+    fallos_olm: VecDeque<u64>,
+    fallos_media: VecDeque<u64>,
     /// How many times the other side asked our recorder to start again (a new player there,
     /// on its phone or back on its computer, cannot open a stream joined halfway).
     reinicios: u64,
@@ -504,6 +558,9 @@ impl Secure {
             reproduce_dicho: Vec::new(),
             entrante: None,
             perdida: None,
+            incidente: None,
+            fallos_olm: VecDeque::new(),
+            fallos_media: VecDeque::new(),
             reinicios: 0,
             envio: None,
             ultimo_envio: std::time::Instant::now(),
@@ -954,10 +1011,15 @@ impl Secure {
                 Err(_) => {
                     let n = self.nombre_contacto.clone();
                     self.estado.parar(
-                        guardiana_secure::pausa::Motivo::ClaveCambiada { nombre: n },
+                        guardiana_secure::pausa::Motivo::ClaveCambiada { nombre: n.clone() },
                         ahora_s(),
                         &mut self.monitor,
                         &mut self.cadena,
+                    );
+                    self.incidente(
+                        "clave_cambiada",
+                        format!("la clave de identidad de {n} no es la verificada"),
+                        0,
                     );
                 }
             }
@@ -1070,6 +1132,11 @@ impl Secure {
             }
             Err(_) => {
                 self.aviso("sec_sas_fallo", "");
+                self.incidente(
+                    "sas_distinto",
+                    "los números de verificación no cuadraron".to_owned(),
+                    0,
+                );
                 self.cerrar("la verificación no cuadró");
             }
         }
@@ -1199,7 +1266,10 @@ impl Secure {
                     self.carga(&carga);
                 }
             }
-            Err(e) => self.aviso("sec_err_olm", e.to_string()),
+            Err(e) => {
+                self.aviso("sec_err_olm", e.to_string());
+                self.fallo_abriendo(false);
+            }
         }
         self.cambio = true;
     }
@@ -1432,6 +1502,11 @@ impl Secure {
                         }
                         Err(_) => {
                             fallo = Some("sec_archivo_mal");
+                            self.incidente(
+                                "archivo_mal",
+                                "un bloque de archivo llegó alterado".to_owned(),
+                                1,
+                            );
                             break;
                         }
                     }
@@ -1799,6 +1874,7 @@ impl Secure {
                     Nivel::Inusual,
                     "un trozo de la llamada no se pudo abrir; descartado",
                 );
+                self.fallo_abriendo(true);
             }
         }
         self.tasa();
@@ -1976,6 +2052,139 @@ impl Secure {
             self.cambio = true;
         }
         Ok(())
+    }
+
+    /// What can be said about the other end right now: on a direct link, its address with the
+    /// country and network the bundled base gives (no lookup leaves this computer); through
+    /// the relay, nothing.
+    fn otro_extremo(&self) -> Option<OtroExtremo> {
+        if self.rele {
+            return None;
+        }
+        let ip = self.enlace.as_ref()?.ip_del_otro()?;
+        let s = guardiana_lists::red::servidor_de(ip);
+        Some(OtroExtremo {
+            ip: ip.to_string(),
+            pais: s.pais.map(str::to_owned),
+            red: s.red.map(|r| r.nombre.to_owned()).filter(|n| !n.is_empty()),
+        })
+    }
+
+    /// Stop everything and keep the card: sends frozen, the call hung up, the monitor and the
+    /// chain told. Only the first incident of a stop is kept.
+    fn incidente(&mut self, senal: &'static str, detalle: String, fallos: u32) {
+        if self.incidente.is_some() {
+            return;
+        }
+        let transporte = match self.monitor.transporte.directo {
+            Some(true) => "directo",
+            Some(false) => "rele",
+            None => "ninguno",
+        };
+        let otro = self.otro_extremo();
+        self.incidente = Some(Incidente {
+            cuando: ahora_s(),
+            senal,
+            detalle: detalle.clone(),
+            transporte,
+            fallos,
+            contacto: self.nombre_contacto.clone(),
+            zona_otra: self.zona_otra.clone(),
+            otro,
+        });
+        if self.llamada.is_some() {
+            self.manda_olm(json!({ "m": "cuelga" }));
+            self.fin_de_llamada();
+        }
+        if self.estado.en_marcha() {
+            self.estado.parar(
+                guardiana_secure::pausa::Motivo::Inusual {
+                    texto: format!("posible interferencia: {detalle}"),
+                },
+                ahora_s(),
+                &mut self.monitor,
+                &mut self.cadena,
+            );
+        }
+        self.cambio = true;
+    }
+
+    /// A frame that failed to open: one is a bad network; a burst (3 in 10 s or 5 in 60 s for
+    /// messages, 8 in 30 s for the call) is treated as an interference.
+    fn fallo_abriendo(&mut self, media: bool) {
+        let ahora = ahora_s();
+        let (cola, limite) = if media {
+            (&mut self.fallos_media, (8u32, 30u64))
+        } else {
+            (&mut self.fallos_olm, (5u32, 60u64))
+        };
+        cola.push_back(ahora);
+        while cola
+            .front()
+            .is_some_and(|&t| ahora.saturating_sub(t) > limite.1)
+        {
+            cola.pop_front();
+        }
+        let n = cola.len() as u32;
+        let corto = !media
+            && cola
+                .iter()
+                .filter(|&&t| ahora.saturating_sub(t) <= 10)
+                .count()
+                >= 3;
+        if n >= limite.0 || corto {
+            let (senal, detalle) = if media {
+                (
+                    "media_fallos",
+                    format!(
+                        "{n} trozos de la llamada no se pudieron abrir en {} s",
+                        limite.1
+                    ),
+                )
+            } else {
+                (
+                    "olm_fallos",
+                    format!("{n} mensajes no se pudieron autenticar"),
+                )
+            };
+            self.incidente(senal, detalle, n);
+        }
+    }
+
+    /// The incident, for the screen (null when none).
+    pub fn estado_incidente(&self) -> Value {
+        self.incidente.as_ref().map_or(Value::Null, |i| {
+            serde_json::to_value(i).unwrap_or(Value::Null)
+        })
+    }
+
+    /// The incident report the person saves: the card, this computer's version, and the signed
+    /// chain of everything seen, so the sheet proves who wrote it and when (not who attacked).
+    pub fn informe_incidente(&self) -> Option<String> {
+        let i = self.incidente.as_ref()?;
+        let prueba = Prueba::firmar(
+            &self.identidad,
+            self.cadena.clone(),
+            &self.version,
+            ahora_s(),
+        );
+        Some(
+            json!({
+                "tipo": "guardiana-secure-incidente",
+                "version": 1,
+                "programa": self.version,
+                "incidente": i,
+                "prueba": serde_json::from_str::<Value>(&prueba.to_json()).unwrap_or(Value::Null),
+            })
+            .to_string(),
+        )
+    }
+
+    /// The person closed the card (after saving it, verifying again or ending).
+    pub fn olvida_incidente(&mut self) {
+        if self.incidente.take().is_some() {
+            self.cambio = true;
+        }
     }
 
     /// The person says the program seen is theirs: go on (only for something observed).
@@ -2265,6 +2474,7 @@ impl Secure {
             "puerta_error": self.puerta_error,
             "reproduce_otro": self.reproduce_otro,
             "otro_movil": self.otro_movil,
+            "incidente": self.estado_incidente(),
             "rele_codigo": self.rele_codigo,
             "rele": self.rele,
             "rele_error": self.rele_error,
@@ -2488,6 +2698,30 @@ mod tests {
         assert!(a.estado_json()["envio"].is_null(), "the send is over");
         assert!(b.mensajes.last().unwrap().2.contains("informe.pdf"));
         assert!(b.monitor.cifrado.recibidos >= 2);
+
+        // Three frames that fail to open within ten seconds: a stop that looks like an
+        // interference, with the card, the signed report, and (direct link) the other end's
+        // address for this card only; the person closes it and the card goes.
+        assert!(b.estado_json()["incidente"].is_null());
+        b.fallo_abriendo(false);
+        assert!(
+            b.estado_json()["incidente"].is_null(),
+            "one failure is a bad network"
+        );
+        b.fallo_abriendo(false);
+        b.fallo_abriendo(false);
+        let inc = b.estado_json()["incidente"].clone();
+        assert_eq!(inc["senal"], "olm_fallos");
+        assert_eq!(inc["fallos"], 3);
+        assert_eq!(inc["transporte"], "directo");
+        assert_eq!(inc["otro"]["ip"], "127.0.0.1");
+        assert!(!b.estado.en_marcha(), "sends are frozen");
+        let informe: Value = serde_json::from_str(&b.informe_incidente().unwrap()).unwrap();
+        assert_eq!(informe["tipo"], "guardiana-secure-incidente");
+        assert_eq!(informe["incidente"]["senal"], "olm_fallos");
+        assert!(informe["prueba"]["firma"].is_string());
+        b.olvida_incidente();
+        assert!(b.estado_json()["incidente"].is_null());
 
         // Both books remember each other; the next hello skips the short code.
         assert_eq!(

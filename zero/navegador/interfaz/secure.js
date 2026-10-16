@@ -101,6 +101,56 @@
   // The «paused for» clock ticks on its own; the program resends the state every second anyway.
   setInterval(() => { if (!$('p').hidden) pintaPausa(ultimo); }, 1000);
 
+  // The incident card (16 Oct 2026): a stop that looks like an interference. Red, on top, with
+  // what tripped, by which path, and what can honestly be said about the other end: on a
+  // direct link, its address with country and network from the bundled base, for this card
+  // only; through the relay, nothing. Nothing is kept unless the person saves the report.
+  let I = null;
+  function pintaIncidente(m) {
+    const i = m.incidente || null;
+    const caja = $('inc');
+    if (!i) { I = null; caja.hidden = true; return; }
+    caja.hidden = false;
+    if (I && I.cuando === i.cuando && I.senal === i.senal) return;
+    I = i;
+    const filas = [
+      [t('sec_i_que'), t('sec_i_s_' + i.senal) + (i.fallos > 1 ? ` (${n(i.fallos)})` : '')],
+      [t('sec_i_cuando'), hora(i.cuando)],
+      [t('sec_identidad_contacto'), i.contacto || RAYA],
+      [t('sec_i_camino'), t('sec_i_c_' + i.transporte)],
+    ];
+    if (i.zona_otra) filas.push([t('sec_i_zona'), i.zona_otra]);
+    $('inc-datos').innerHTML = filas.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${esc(b)}</dd>`).join('');
+    const o = i.otro;
+    $('inc-otro').hidden = !o;
+    if (o) $('inc-otro').textContent = t('sec_i_otro', { ip: o.ip, p: o.pais || RAYA, r: o.red || RAYA });
+  }
+  en('secure_incidente', (m) => {
+    descarga(`guardiana-secure-incidente-${sello()}.json`, 'application/json', m.json);
+    let j = {}; try { j = JSON.parse(m.json); } catch (_) {}
+    const i = j.incidente || {}, pr = j.prueba || {};
+    const L = []; let y = 790;
+    L.push({ x: 56, y, tam: 18, negrita: true, texto: 'GUARDIANA SECURE' }); y -= 26;
+    L.push({ x: 56, y, tam: 13, negrita: true, texto: t('sec_i_titulo') }); y -= 18;
+    L.push({ x: 56, y, tam: 9.5, texto: t('sec_r_pdf_fecha') + ' ' + new Date().toLocaleString(document.documentElement.lang || 'es') }); y -= 30;
+    const filas = [[t('sec_i_que'), t('sec_i_s_' + i.senal) + (i.fallos > 1 ? ` (${i.fallos})` : '')], [t('sec_i_cuando'), hora(i.cuando)], [t('sec_identidad_contacto'), i.contacto || RAYA], [t('sec_i_camino'), t('sec_i_c_' + i.transporte)], [t('sec_i_zona'), i.zona_otra || RAYA]];
+    if (i.otro) filas.push([t('sec_i_otro_rotulo'), `${i.otro.ip} · ${i.otro.pais || RAYA} · ${i.otro.red || RAYA}`]);
+    for (const [a, b] of filas) { L.push({ x: 56, y, tam: 11, negrita: true, texto: a }); for (const s of parte(b, 60)) { L.push({ x: 230, y, tam: 11, texto: s }); y -= 16; } y -= 4; }
+    y -= 10;
+    for (const s of parte(i.detalle || '', 95)) { L.push({ x: 56, y, tam: 10, texto: s }); y -= 14; }
+    y -= 12;
+    L.push({ x: 56, y, tam: 11, negrita: true, texto: t('sec_r_pdf_firmado') }); y -= 16;
+    for (const s of parte(pr.firmante || '', 80)) { L.push({ x: 56, y, tam: 8.5, texto: s }); y -= 12; }
+    y -= 6;
+    for (const s of parte(pr.firma || '', 80)) { L.push({ x: 56, y, tam: 8.5, texto: s }); y -= 12; }
+    y -= 18;
+    for (const s of parte(t('sec_i_pdf_nota'), 95)) { L.push({ x: 56, y, tam: 9.5, texto: s }); y -= 14; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([pdfDe(L)], { type: 'application/pdf' })); a.download = `guardiana-secure-incidente-${sello()}.pdf`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  });
+  $('inc-guardar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'incidente_guardar' }));
+  $('inc-verificar').addEventListener('click', () => { manda({ tipo: 'secure', accion: 'incidente_vista' }); manda({ tipo: 'secure', accion: 'verificar' }); });
+  $('inc-terminar').addEventListener('click', () => { manda({ tipo: 'secure', accion: 'incidente_vista' }); manda({ tipo: 'secure', accion: 'cerrar' }); });
+
   function pinta(m) {
     if (m.clase) claseSesion = m.clase;
     else if (E && E.llamada) claseSesion = E.llamada.video ? 'videollamada' : 'llamada';
@@ -185,7 +235,7 @@
     if (g.anfitrion && E.codigo_grupo && nombres.length < (g.max || 6)) { mas.hidden = false; $('c-mas-codigo').textContent = E.codigo_grupo; } else mas.hidden = true;
     pintaChat(nombres.length > 2);
   };
-  en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); fasePinta(); pintaResumen(m.resumen); pintaProgreso(m); });
+  en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); fasePinta(); pintaResumen(m.resumen); pintaProgreso(m); pintaIncidente(m); });
   // How far a file is, both ways, and how long it has left (16 Oct 2026).
   const duracion = (s) => { s = Math.max(0, Math.round(s)); if (s < 60) return s + ' s'; if (s < 3600) return Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + (s % 60) + ' s' : ''); const h = Math.floor(s / 3600), mi = Math.floor((s % 3600) / 60); return h + ' h' + (mi ? ' ' + mi + ' min' : ''); };
   const pintaProgreso = (m) => {

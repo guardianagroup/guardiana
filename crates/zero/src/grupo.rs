@@ -602,6 +602,19 @@ impl Grupo {
         self.cambio = true;
     }
 
+    /// The incident report of whichever link stopped, signed (none when nothing stopped).
+    pub fn informe_incidente(&self) -> Option<String> {
+        self.sesiones.iter().find_map(Secure::informe_incidente)
+    }
+
+    /// The person closed the incident card.
+    pub fn olvida_incidente(&mut self) {
+        for s in &mut self.sesiones {
+            s.olvida_incidente();
+        }
+        self.cambio = true;
+    }
+
     /// The chain of what was seen on the first link, signed.
     pub fn prueba_json(&self) -> String {
         self.sesiones
@@ -703,6 +716,16 @@ impl Grupo {
         if let Some(video) = self.llamada {
             if e["llamada"].is_null() {
                 e["llamada"] = json!({ "video": video, "desde": self.llamada_desde, "conectada": self.sesiones.iter().any(Secure::conectada) });
+            }
+        }
+        if e["incidente"].is_null() {
+            if let Some(i) = self
+                .sesiones
+                .iter()
+                .map(Secure::estado_incidente)
+                .find(|i| !i.is_null())
+            {
+                e["incidente"] = i;
             }
         }
         if e["perdida"].is_null() {

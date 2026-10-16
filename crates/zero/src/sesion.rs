@@ -1339,6 +1339,19 @@ impl Sesion {
                 self.secure.olvida_perdida();
                 Ok(())
             }
+            "incidente_vista" => {
+                self.secure.olvida_incidente();
+                Ok(())
+            }
+            "incidente_guardar" => {
+                let Some(j) = self.secure.informe_incidente() else {
+                    return Vec::new();
+                };
+                return self
+                    .a_pestana(id, &json!({ "tipo": "secure_incidente", "json": j }))
+                    .into_iter()
+                    .collect();
+            }
             "archivo_abrir" | "archivo_carpeta" => {
                 let Some(r) = m["id"].as_u64().and_then(|i| self.secure.recibido(i)) else {
                     return Vec::new();
