@@ -2896,6 +2896,14 @@
       await cargaCarta().catch((e) => { $('b-msg').textContent = String(e.message || e); });
       sel.addEventListener('change', () => { pintaLey(); idiomaDelLugar(); pintaEmpresas(); cargaCarta().catch(() => {}); });
       ['b-corredor', 'b-idioma', 'b-evidencia'].forEach((id) => $(id).addEventListener('change', () => { cargaCarta().catch(() => {}); }));
+      // The letter's language, chosen right next to the letter too (the owner, 16 Oct 2026: «aquí
+      // debe dar la opción de qué idioma elegir»); both selects are the same choice.
+      const idiomaCarta = $('b-idioma-carta');
+      const sincroniza = () => { idiomaCarta.value = $('b-idioma').value; };
+      sincroniza();
+      $('b-idioma').addEventListener('change', sincroniza);
+      sel.addEventListener('change', sincroniza);
+      idiomaCarta.addEventListener('change', () => { $('b-idioma').value = idiomaCarta.value; $('b-idioma').dispatchEvent(new Event('change')); });
       ['b-nombre', 'b-correo'].forEach((id) => $(id).addEventListener('input', () => {
         pintaCarta();
         recuerda();
