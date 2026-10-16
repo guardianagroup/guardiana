@@ -194,70 +194,262 @@ async fn tierra(RutaUrl(archivo): RutaUrl<String>) -> Response {
 /// finer, loaded by the page only under a close view (build/tierra.py). Also carried inside the
 /// binary: the globe never asks the internet for anything.
 const TESELAS: &[(&str, &[u8])] = &[
-    ("dia-0-0.jpg", include_bytes!("../static/tierra/t/dia-0-0.jpg")),
-    ("dia-1-0.jpg", include_bytes!("../static/tierra/t/dia-1-0.jpg")),
-    ("dia-2-0.jpg", include_bytes!("../static/tierra/t/dia-2-0.jpg")),
-    ("dia-3-0.jpg", include_bytes!("../static/tierra/t/dia-3-0.jpg")),
-    ("dia-4-0.jpg", include_bytes!("../static/tierra/t/dia-4-0.jpg")),
-    ("dia-5-0.jpg", include_bytes!("../static/tierra/t/dia-5-0.jpg")),
-    ("dia-6-0.jpg", include_bytes!("../static/tierra/t/dia-6-0.jpg")),
-    ("dia-7-0.jpg", include_bytes!("../static/tierra/t/dia-7-0.jpg")),
-    ("dia-0-1.jpg", include_bytes!("../static/tierra/t/dia-0-1.jpg")),
-    ("dia-1-1.jpg", include_bytes!("../static/tierra/t/dia-1-1.jpg")),
-    ("dia-2-1.jpg", include_bytes!("../static/tierra/t/dia-2-1.jpg")),
-    ("dia-3-1.jpg", include_bytes!("../static/tierra/t/dia-3-1.jpg")),
-    ("dia-4-1.jpg", include_bytes!("../static/tierra/t/dia-4-1.jpg")),
-    ("dia-5-1.jpg", include_bytes!("../static/tierra/t/dia-5-1.jpg")),
-    ("dia-6-1.jpg", include_bytes!("../static/tierra/t/dia-6-1.jpg")),
-    ("dia-7-1.jpg", include_bytes!("../static/tierra/t/dia-7-1.jpg")),
-    ("dia-0-2.jpg", include_bytes!("../static/tierra/t/dia-0-2.jpg")),
-    ("dia-1-2.jpg", include_bytes!("../static/tierra/t/dia-1-2.jpg")),
-    ("dia-2-2.jpg", include_bytes!("../static/tierra/t/dia-2-2.jpg")),
-    ("dia-3-2.jpg", include_bytes!("../static/tierra/t/dia-3-2.jpg")),
-    ("dia-4-2.jpg", include_bytes!("../static/tierra/t/dia-4-2.jpg")),
-    ("dia-5-2.jpg", include_bytes!("../static/tierra/t/dia-5-2.jpg")),
-    ("dia-6-2.jpg", include_bytes!("../static/tierra/t/dia-6-2.jpg")),
-    ("dia-7-2.jpg", include_bytes!("../static/tierra/t/dia-7-2.jpg")),
-    ("dia-0-3.jpg", include_bytes!("../static/tierra/t/dia-0-3.jpg")),
-    ("dia-1-3.jpg", include_bytes!("../static/tierra/t/dia-1-3.jpg")),
-    ("dia-2-3.jpg", include_bytes!("../static/tierra/t/dia-2-3.jpg")),
-    ("dia-3-3.jpg", include_bytes!("../static/tierra/t/dia-3-3.jpg")),
-    ("dia-4-3.jpg", include_bytes!("../static/tierra/t/dia-4-3.jpg")),
-    ("dia-5-3.jpg", include_bytes!("../static/tierra/t/dia-5-3.jpg")),
-    ("dia-6-3.jpg", include_bytes!("../static/tierra/t/dia-6-3.jpg")),
-    ("dia-7-3.jpg", include_bytes!("../static/tierra/t/dia-7-3.jpg")),
-    ("luces-0-0.jpg", include_bytes!("../static/tierra/t/luces-0-0.jpg")),
-    ("luces-1-0.jpg", include_bytes!("../static/tierra/t/luces-1-0.jpg")),
-    ("luces-2-0.jpg", include_bytes!("../static/tierra/t/luces-2-0.jpg")),
-    ("luces-3-0.jpg", include_bytes!("../static/tierra/t/luces-3-0.jpg")),
-    ("luces-4-0.jpg", include_bytes!("../static/tierra/t/luces-4-0.jpg")),
-    ("luces-5-0.jpg", include_bytes!("../static/tierra/t/luces-5-0.jpg")),
-    ("luces-6-0.jpg", include_bytes!("../static/tierra/t/luces-6-0.jpg")),
-    ("luces-7-0.jpg", include_bytes!("../static/tierra/t/luces-7-0.jpg")),
-    ("luces-0-1.jpg", include_bytes!("../static/tierra/t/luces-0-1.jpg")),
-    ("luces-1-1.jpg", include_bytes!("../static/tierra/t/luces-1-1.jpg")),
-    ("luces-2-1.jpg", include_bytes!("../static/tierra/t/luces-2-1.jpg")),
-    ("luces-3-1.jpg", include_bytes!("../static/tierra/t/luces-3-1.jpg")),
-    ("luces-4-1.jpg", include_bytes!("../static/tierra/t/luces-4-1.jpg")),
-    ("luces-5-1.jpg", include_bytes!("../static/tierra/t/luces-5-1.jpg")),
-    ("luces-6-1.jpg", include_bytes!("../static/tierra/t/luces-6-1.jpg")),
-    ("luces-7-1.jpg", include_bytes!("../static/tierra/t/luces-7-1.jpg")),
-    ("luces-0-2.jpg", include_bytes!("../static/tierra/t/luces-0-2.jpg")),
-    ("luces-1-2.jpg", include_bytes!("../static/tierra/t/luces-1-2.jpg")),
-    ("luces-2-2.jpg", include_bytes!("../static/tierra/t/luces-2-2.jpg")),
-    ("luces-3-2.jpg", include_bytes!("../static/tierra/t/luces-3-2.jpg")),
-    ("luces-4-2.jpg", include_bytes!("../static/tierra/t/luces-4-2.jpg")),
-    ("luces-5-2.jpg", include_bytes!("../static/tierra/t/luces-5-2.jpg")),
-    ("luces-6-2.jpg", include_bytes!("../static/tierra/t/luces-6-2.jpg")),
-    ("luces-7-2.jpg", include_bytes!("../static/tierra/t/luces-7-2.jpg")),
-    ("luces-0-3.jpg", include_bytes!("../static/tierra/t/luces-0-3.jpg")),
-    ("luces-1-3.jpg", include_bytes!("../static/tierra/t/luces-1-3.jpg")),
-    ("luces-2-3.jpg", include_bytes!("../static/tierra/t/luces-2-3.jpg")),
-    ("luces-3-3.jpg", include_bytes!("../static/tierra/t/luces-3-3.jpg")),
-    ("luces-4-3.jpg", include_bytes!("../static/tierra/t/luces-4-3.jpg")),
-    ("luces-5-3.jpg", include_bytes!("../static/tierra/t/luces-5-3.jpg")),
-    ("luces-6-3.jpg", include_bytes!("../static/tierra/t/luces-6-3.jpg")),
-    ("luces-7-3.jpg", include_bytes!("../static/tierra/t/luces-7-3.jpg")),
+    (
+        "dia-0-0.jpg",
+        include_bytes!("../static/tierra/t/dia-0-0.jpg"),
+    ),
+    (
+        "dia-1-0.jpg",
+        include_bytes!("../static/tierra/t/dia-1-0.jpg"),
+    ),
+    (
+        "dia-2-0.jpg",
+        include_bytes!("../static/tierra/t/dia-2-0.jpg"),
+    ),
+    (
+        "dia-3-0.jpg",
+        include_bytes!("../static/tierra/t/dia-3-0.jpg"),
+    ),
+    (
+        "dia-4-0.jpg",
+        include_bytes!("../static/tierra/t/dia-4-0.jpg"),
+    ),
+    (
+        "dia-5-0.jpg",
+        include_bytes!("../static/tierra/t/dia-5-0.jpg"),
+    ),
+    (
+        "dia-6-0.jpg",
+        include_bytes!("../static/tierra/t/dia-6-0.jpg"),
+    ),
+    (
+        "dia-7-0.jpg",
+        include_bytes!("../static/tierra/t/dia-7-0.jpg"),
+    ),
+    (
+        "dia-0-1.jpg",
+        include_bytes!("../static/tierra/t/dia-0-1.jpg"),
+    ),
+    (
+        "dia-1-1.jpg",
+        include_bytes!("../static/tierra/t/dia-1-1.jpg"),
+    ),
+    (
+        "dia-2-1.jpg",
+        include_bytes!("../static/tierra/t/dia-2-1.jpg"),
+    ),
+    (
+        "dia-3-1.jpg",
+        include_bytes!("../static/tierra/t/dia-3-1.jpg"),
+    ),
+    (
+        "dia-4-1.jpg",
+        include_bytes!("../static/tierra/t/dia-4-1.jpg"),
+    ),
+    (
+        "dia-5-1.jpg",
+        include_bytes!("../static/tierra/t/dia-5-1.jpg"),
+    ),
+    (
+        "dia-6-1.jpg",
+        include_bytes!("../static/tierra/t/dia-6-1.jpg"),
+    ),
+    (
+        "dia-7-1.jpg",
+        include_bytes!("../static/tierra/t/dia-7-1.jpg"),
+    ),
+    (
+        "dia-0-2.jpg",
+        include_bytes!("../static/tierra/t/dia-0-2.jpg"),
+    ),
+    (
+        "dia-1-2.jpg",
+        include_bytes!("../static/tierra/t/dia-1-2.jpg"),
+    ),
+    (
+        "dia-2-2.jpg",
+        include_bytes!("../static/tierra/t/dia-2-2.jpg"),
+    ),
+    (
+        "dia-3-2.jpg",
+        include_bytes!("../static/tierra/t/dia-3-2.jpg"),
+    ),
+    (
+        "dia-4-2.jpg",
+        include_bytes!("../static/tierra/t/dia-4-2.jpg"),
+    ),
+    (
+        "dia-5-2.jpg",
+        include_bytes!("../static/tierra/t/dia-5-2.jpg"),
+    ),
+    (
+        "dia-6-2.jpg",
+        include_bytes!("../static/tierra/t/dia-6-2.jpg"),
+    ),
+    (
+        "dia-7-2.jpg",
+        include_bytes!("../static/tierra/t/dia-7-2.jpg"),
+    ),
+    (
+        "dia-0-3.jpg",
+        include_bytes!("../static/tierra/t/dia-0-3.jpg"),
+    ),
+    (
+        "dia-1-3.jpg",
+        include_bytes!("../static/tierra/t/dia-1-3.jpg"),
+    ),
+    (
+        "dia-2-3.jpg",
+        include_bytes!("../static/tierra/t/dia-2-3.jpg"),
+    ),
+    (
+        "dia-3-3.jpg",
+        include_bytes!("../static/tierra/t/dia-3-3.jpg"),
+    ),
+    (
+        "dia-4-3.jpg",
+        include_bytes!("../static/tierra/t/dia-4-3.jpg"),
+    ),
+    (
+        "dia-5-3.jpg",
+        include_bytes!("../static/tierra/t/dia-5-3.jpg"),
+    ),
+    (
+        "dia-6-3.jpg",
+        include_bytes!("../static/tierra/t/dia-6-3.jpg"),
+    ),
+    (
+        "dia-7-3.jpg",
+        include_bytes!("../static/tierra/t/dia-7-3.jpg"),
+    ),
+    (
+        "luces-0-0.jpg",
+        include_bytes!("../static/tierra/t/luces-0-0.jpg"),
+    ),
+    (
+        "luces-1-0.jpg",
+        include_bytes!("../static/tierra/t/luces-1-0.jpg"),
+    ),
+    (
+        "luces-2-0.jpg",
+        include_bytes!("../static/tierra/t/luces-2-0.jpg"),
+    ),
+    (
+        "luces-3-0.jpg",
+        include_bytes!("../static/tierra/t/luces-3-0.jpg"),
+    ),
+    (
+        "luces-4-0.jpg",
+        include_bytes!("../static/tierra/t/luces-4-0.jpg"),
+    ),
+    (
+        "luces-5-0.jpg",
+        include_bytes!("../static/tierra/t/luces-5-0.jpg"),
+    ),
+    (
+        "luces-6-0.jpg",
+        include_bytes!("../static/tierra/t/luces-6-0.jpg"),
+    ),
+    (
+        "luces-7-0.jpg",
+        include_bytes!("../static/tierra/t/luces-7-0.jpg"),
+    ),
+    (
+        "luces-0-1.jpg",
+        include_bytes!("../static/tierra/t/luces-0-1.jpg"),
+    ),
+    (
+        "luces-1-1.jpg",
+        include_bytes!("../static/tierra/t/luces-1-1.jpg"),
+    ),
+    (
+        "luces-2-1.jpg",
+        include_bytes!("../static/tierra/t/luces-2-1.jpg"),
+    ),
+    (
+        "luces-3-1.jpg",
+        include_bytes!("../static/tierra/t/luces-3-1.jpg"),
+    ),
+    (
+        "luces-4-1.jpg",
+        include_bytes!("../static/tierra/t/luces-4-1.jpg"),
+    ),
+    (
+        "luces-5-1.jpg",
+        include_bytes!("../static/tierra/t/luces-5-1.jpg"),
+    ),
+    (
+        "luces-6-1.jpg",
+        include_bytes!("../static/tierra/t/luces-6-1.jpg"),
+    ),
+    (
+        "luces-7-1.jpg",
+        include_bytes!("../static/tierra/t/luces-7-1.jpg"),
+    ),
+    (
+        "luces-0-2.jpg",
+        include_bytes!("../static/tierra/t/luces-0-2.jpg"),
+    ),
+    (
+        "luces-1-2.jpg",
+        include_bytes!("../static/tierra/t/luces-1-2.jpg"),
+    ),
+    (
+        "luces-2-2.jpg",
+        include_bytes!("../static/tierra/t/luces-2-2.jpg"),
+    ),
+    (
+        "luces-3-2.jpg",
+        include_bytes!("../static/tierra/t/luces-3-2.jpg"),
+    ),
+    (
+        "luces-4-2.jpg",
+        include_bytes!("../static/tierra/t/luces-4-2.jpg"),
+    ),
+    (
+        "luces-5-2.jpg",
+        include_bytes!("../static/tierra/t/luces-5-2.jpg"),
+    ),
+    (
+        "luces-6-2.jpg",
+        include_bytes!("../static/tierra/t/luces-6-2.jpg"),
+    ),
+    (
+        "luces-7-2.jpg",
+        include_bytes!("../static/tierra/t/luces-7-2.jpg"),
+    ),
+    (
+        "luces-0-3.jpg",
+        include_bytes!("../static/tierra/t/luces-0-3.jpg"),
+    ),
+    (
+        "luces-1-3.jpg",
+        include_bytes!("../static/tierra/t/luces-1-3.jpg"),
+    ),
+    (
+        "luces-2-3.jpg",
+        include_bytes!("../static/tierra/t/luces-2-3.jpg"),
+    ),
+    (
+        "luces-3-3.jpg",
+        include_bytes!("../static/tierra/t/luces-3-3.jpg"),
+    ),
+    (
+        "luces-4-3.jpg",
+        include_bytes!("../static/tierra/t/luces-4-3.jpg"),
+    ),
+    (
+        "luces-5-3.jpg",
+        include_bytes!("../static/tierra/t/luces-5-3.jpg"),
+    ),
+    (
+        "luces-6-3.jpg",
+        include_bytes!("../static/tierra/t/luces-6-3.jpg"),
+    ),
+    (
+        "luces-7-3.jpg",
+        include_bytes!("../static/tierra/t/luces-7-3.jpg"),
+    ),
 ];
 
 async fn tesela(RutaUrl(archivo): RutaUrl<String>) -> Response {
