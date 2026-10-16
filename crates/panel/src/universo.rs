@@ -747,3 +747,53 @@ mod tests {
         );
     }
 }
+
+/// `/api/secure-en-directo` (16 Oct 2026): the GUARDIANA SECURE conversations open on this
+/// computer right now, as GUARDIANA ZERO leaves them next to the ledger: the contact's name,
+/// where each end is by time zone (never an address), and whether a call is on. Only this
+/// computer's own panel reads it, behind its session; nothing is sent anywhere. A file older
+/// than fifteen seconds is a ZERO that closed: nothing is open.
+pub(crate) async fn secure_en_directo(
+    State(state): State<Arc<AppState>>,
+    _s: Session,
+) -> ApiResult<serde_json::Value> {
+    let vacio = serde_json::json!({ "conversaciones": [] });
+    let Some(carpeta) = state.db_path.parent() else {
+        return Ok(axum::Json(vacio));
+    };
+    let leido = std::fs::read(carpeta.join("secure-en-directo.json"))
+        .ok()
+        .filter(|b| b.len() < 64 * 1024)
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
+    let Some(v) = leido else {
+        return Ok(axum::Json(vacio));
+    };
+    let ahora = (now_ms() / 1000) as u64;
+    let fresco = v["actualizado"]
+        .as_u64()
+        .is_some_and(|t| ahora.saturating_sub(t) <= 15);
+    if !fresco {
+        return Ok(axum::Json(vacio));
+    }
+    // Only the fields the globe draws, whatever else the file holds.
+    let conversaciones: Vec<serde_json::Value> = v["conversaciones"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .take(8)
+                .map(|c| {
+                    serde_json::json!({
+                        "contacto": c["contacto"].as_str().unwrap_or_default().chars().take(60).collect::<String>(),
+                        "zona": c["zona"].as_str().unwrap_or_default().chars().take(64).collect::<String>(),
+                        "llamada": c["llamada"].clone(),
+                        "rele": c["rele"].as_bool().unwrap_or(false),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    Ok(axum::Json(serde_json::json!({
+        "zona": v["zona"].as_str().unwrap_or_default().chars().take(64).collect::<String>(),
+        "conversaciones": conversaciones,
+    })))
+}

@@ -409,6 +409,11 @@ pub struct Secure {
     /// say so (16 Oct 2026: one side showed the conversation closed, the other still open).
     ultimo_recibido: std::time::Instant,
     otro_late: bool,
+    /// This computer's time zone (the page tells it) and the other side's, exchanged inside
+    /// Olm once the conversation is open (16 Oct 2026, «que salga en nuestro mapa, el de él y
+    /// el mío»): the globe places each computer by its time zone, never by an address.
+    pub zona_propia: String,
+    zona_otra: String,
     /// Files sent, with how long each took to arrive.
     pub enviados: Vec<Enviado>,
     /// Files that arrived in this conversation.
@@ -491,6 +496,8 @@ impl Secure {
             ultimo_envio: std::time::Instant::now(),
             ultimo_recibido: std::time::Instant::now(),
             otro_late: false,
+            zona_propia: String::new(),
+            zona_otra: String::new(),
             enviados: Vec::new(),
             recibidos: Vec::new(),
             llamado_en_grupo: false,
@@ -751,6 +758,7 @@ impl Secure {
         self.entrante = None;
         self.llamado_en_grupo = false;
         self.otro_late = false;
+        self.zona_otra.clear();
         self.reproduce_otro.clear();
         self.reproduce_dicho.clear();
         self.monitor.transporte = Default::default();
@@ -1095,6 +1103,7 @@ impl Secure {
                     self.manda_olm(json!({ "m": "hola" }));
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "conversación cifrada abierta");
+                    self.manda_zona();
                 }
                 Err(e) => {
                     self.aviso("sec_err_olm", e.to_string());
@@ -1158,6 +1167,7 @@ impl Secure {
                     self.fase = Fase::Lista;
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "conversación cifrada abierta");
+                    self.manda_zona();
                     Ok(plano)
                 }
                 Err(e) => Err(e),
@@ -1240,6 +1250,10 @@ impl Secure {
             }
             "reproduce" => {
                 self.reproduce_otro = lista_de_formatos(&c["mimes"]);
+                self.cambio = true;
+            }
+            "zona" => {
+                self.zona_otra = zona_limpia(c["zona"].as_str().unwrap_or_default());
                 self.cambio = true;
             }
             "mime" => {
@@ -1979,6 +1993,34 @@ impl Secure {
         Ok(())
     }
 
+    /// The page said where this computer is (its time zone); the other side hears it once the
+    /// conversation is open. Nothing else about the place travels.
+    pub fn pon_zona(&mut self, zona: &str) {
+        let z = zona_limpia(zona);
+        if z == self.zona_propia {
+            return;
+        }
+        self.zona_propia = z;
+        self.manda_zona();
+    }
+
+    fn manda_zona(&mut self) {
+        if self.fase == Fase::Lista && !self.zona_propia.is_empty() {
+            let z = self.zona_propia.clone();
+            self.manda_olm(json!({ "m": "zona", "zona": z }));
+        }
+    }
+
+    /// This link goes through the relay.
+    pub fn por_rele(&self) -> bool {
+        self.rele
+    }
+
+    /// The other side's time zone, once it said it.
+    pub fn zona_otra(&self) -> &str {
+        &self.zona_otra
+    }
+
     /// Tell the other side what our player can open (empty: the computer's own, anything).
     pub fn reproduce(&mut self, mimes: Vec<String>) {
         if mimes == self.reproduce_dicho || self.fase != Fase::Lista {
@@ -2171,6 +2213,19 @@ impl Secure {
             "monitor": monitor,
             "resumen": self.resumen.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "mensajes": r.mensajes_enviados + r.mensajes_recibidos, "archivos": r.archivos.enviados + r.archivos.recibidos, "observadas": r.observadas, "inusuales": r.inusuales, "fin": r.fin })),
         })
+    }
+}
+
+/// An IANA time zone name as the page gives it (`America/Bogota`): letters, digits, `/`, `_`,
+/// `-` and `+`, at most 64 characters; anything else is left out.
+fn zona_limpia(z: &str) -> String {
+    let ok = z
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '-' | '+'));
+    if ok && z.len() <= 64 && z.contains('/') {
+        z.to_owned()
+    } else {
+        String::new()
     }
 }
 

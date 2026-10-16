@@ -615,5 +615,8 @@
   en('monitor', (m) => { ultimo = m.monitor || {}; pinta(ultimo); });
   // The texts arrive after the page: draw again so «—» and the chips speak the person's language.
   en('textos', () => pinta(ultimo));
+  // Where this computer is, by its time zone (the same the globe uses): the other side hears it
+  // inside the cipher, and each computer draws the line between the two on its own globe.
+  try { manda({ tipo: 'secure', accion: 'zona', zona: Intl.DateTimeFormat().resolvedOptions().timeZone || '' }); } catch (_) {}
   manda({ tipo: 'listo', vista: 'secure' });
 })();

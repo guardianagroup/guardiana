@@ -1267,6 +1267,10 @@ impl Sesion {
                 self.secure.texto(texto(m, "texto"));
                 Ok(())
             }
+            "zona" => {
+                self.secure.pon_zona(texto(m, "zona"));
+                Ok(())
+            }
             "nombre" => {
                 self.secure.nombre_propio = texto(m, "nombre").chars().take(60).collect();
                 Ok(())

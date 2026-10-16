@@ -884,6 +884,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/antivirus/maxima", post(antivirus::maxima))
         .route("/api/antivirus/vigilar", post(antivirus::vigilar))
         .route("/api/por-dentro", get(universo::universo))
+        .route("/api/secure-en-directo", get(universo::secure_en_directo))
         .route("/api/revision", get(revision::ver))
         .route("/api/revision/ahora", post(revision::ahora))
         .route("/api/ia/alcance", post(api::alcance))

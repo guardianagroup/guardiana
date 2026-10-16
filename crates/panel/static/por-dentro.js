@@ -183,6 +183,9 @@
         return;
       }
       if (!primeraLectura) primeraLectura = Date.now();
+      // The GUARDIANA SECURE conversations open on this computer (16 Oct 2026): drawn only
+      // here, from a file ZERO leaves next to the ledger; never in a replay.
+      if (!ctx.reproduccion) api('/api/secure-en-directo').then((s) => { st.secure = (s && s.conversaciones) || []; }).catch(() => { st.secure = []; });
       const ahora = performance.now(), intervalo = ultimaCarga ? Math.max(1, (ahora - ultimaCarga) / 1000) : 5;
       ultimaCarga = ahora; st.intervalo = intervalo; st.datos = r;
       pintaVpn(r.vpn);
@@ -727,6 +730,7 @@
         if (nombrados && nombrados.has(g) && !sobre) rotulo(x + r + 6, y + 8, g.ciudad || g.region || (g.pais ? nombrePais(g.pais) : d.host), bl ? '#ff8d99' : '#e9f1ff', puestos);
         st.dianas.push({ x, y, r: 18, tipo: 'lugar', ref: g });
       });
+      dibujaSecure(tt, puestos);
       cx.globalCompositeOperation = 'lighter';
       // El escudo de GUARDIANA sobre tu ordenador.
       if (L.cen.v) {
@@ -740,6 +744,54 @@
       }
       particulas(dt);
       cx.globalCompositeOperation = 'source-over';
+    };
+    // ---------- Your own SECURE conversation on your own globe (16 Oct 2026) ----------
+    // Francisco: «que salga en nuestro mapa, el de él y el mío… que la veamos solamente él y
+    // yo». Each computer knows where the other one is only by the time zone it said inside the
+    // cipher (Bogotá, Prague…), never by an address; the line goes from this computer to that
+    // city, in violet, with pulses both ways, faster during a call.
+    const SECURE_COL = '#b98cff';
+    const arcoEntre = (yo, lon1, lat1) => {
+      const a = [Math.cos(yo.lat * RAD) * Math.sin(yo.lon * RAD), Math.sin(yo.lat * RAD), Math.cos(yo.lat * RAD) * Math.cos(yo.lon * RAD)];
+      const b = [Math.cos(lat1 * RAD) * Math.sin(lon1 * RAD), Math.sin(lat1 * RAD), Math.cos(lat1 * RAD) * Math.cos(lon1 * RAD)];
+      const om = Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))) || 1e-6;
+      const alt = 0.03 + 0.09 * om / Math.PI, out = [];
+      for (let i = 0; i <= 64; i++) {
+        const u = i / 64, s1 = Math.sin((1 - u) * om) / Math.sin(om), s2 = Math.sin(u * om) / Math.sin(om), h = 1 + alt * Math.sin(Math.PI * u);
+        out.push(aPantalla([(a[0] * s1 + b[0] * s2) * h, (a[1] * s1 + b[1] * s2) * h, (a[2] * s1 + b[2] * s2) * h]));
+      }
+      return out;
+    };
+    const dibujaSecure = (tt, puestos) => {
+      const cs = st.secure || [];
+      if (!cs.length || st.proy !== 'globo') return;
+      cs.forEach((c, k) => {
+        const z = ZONAS[c.zona];
+        if (!z) return;
+        const lon1 = z[2], lat1 = z[1], ruta = arcoEntre(st.lugar, lon1, lat1);
+        const llamada = c.llamada && c.llamada.conectada !== false;
+        cx.globalCompositeOperation = 'lighter';
+        trazoPuntos(ruta, SECURE_COL + '30', llamada ? 4 : 2.6);
+        trazoPuntos(ruta, SECURE_COL + 'e0', llamada ? 1.6 : 1.1, [7, 6], -tt * (llamada ? 40 : 18));
+        // Pulses both ways: what you say goes out, what they say comes in.
+        const n = llamada ? 6 : 3;
+        for (let i = 0; i < n; i++) {
+          [1, -1].forEach((dir) => {
+            let u = ((tt * (llamada ? 0.42 : 0.22) + i / n + k * 0.13) % 1); if (dir < 0) u = 1 - u;
+            const q = ruta[Math.min(ruta.length - 1, Math.round(u * (ruta.length - 1)))];
+            if (q && q.v) cx.drawImage(brillo(dir > 0 ? SECURE_COL : '#e6d6ff'), q.x - 6, q.y - 6, 12, 12);
+          });
+        }
+        cx.globalCompositeOperation = 'source-over';
+        const fin = aPantalla(lugar(lon1, lat1, 0.002));
+        if (!fin.v) return;
+        cx.fillStyle = 'rgba(2,6,14,.85)'; cx.beginPath(); cx.arc(fin.x, fin.y, 9, 0, 7); cx.fill();
+        cx.strokeStyle = SECURE_COL; cx.lineWidth = 2; cx.beginPath(); cx.arc(fin.x, fin.y, 7, 0, 7); cx.stroke();
+        cx.fillStyle = '#ffffff'; cx.beginPath(); cx.arc(fin.x, fin.y, 2.6, 0, 7); cx.fill();
+        const ciudad = c.zona.split('/').pop().replace(/_/g, ' ');
+        const que = llamada ? (c.llamada.video ? t('pd_secure_video') : t('pd_secure_voz')) : t('pd_secure_chat');
+        rotulo(fin.x + 12, fin.y + 8, `${c.contacto || '—'} · ${ciudad} · ${que}`, '#e6d6ff', puestos);
+      });
     };
     const rotulo = (x, y, txt, col, puestos) => {
       // A city name you can read at a glance: sans, semibold, on a near-opaque pill.
