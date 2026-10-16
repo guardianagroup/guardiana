@@ -88,6 +88,8 @@
   "sec_i_terminar": "Terminar",
   "sec_i_nota": "Esto no demuestra quién fue ni dónde está: una red muy mala o una reinstalación del otro lado también lo provocan. La dirección, si aparece, solo se guarda si pulsas «Guardar pruebas».",
   "sec_i_pdf_nota": "Informe firmado con la clave de este equipo: prueba quién lo generó y cuándo, no quién provocó la parada. Una red muy mala o una reinstalación del otro lado también la provocan.",
+  "sec_llamada_cortada_red": "La llamada se cortó por la red. El chat sigue; vuelve a llamar cuando quieras.",
+  "sec_reconectando": "Se perdió la conexión. Buscando a {n} otra vez… (intento {i})",
   "sec_l_sin_verificar": "Identidad sin verificar",
   "sec_l_clave_cambiada": "La clave de {n} cambió · hay que comparar los números de nuevo",
   "sec_l_directa": "Conexión directa, sin intermediarios",

@@ -33,6 +33,7 @@ use guardiana_secure::verificar::{Codigo, Inicio, Verified};
 use guardiana_secure::{tarjeta, Conversation, Envelope, Identity};
 use serde::Serialize;
 use serde_json::{json, Value};
+use sha2::Digest as _;
 
 const MAX_FRAME: usize = 2 * 1024 * 1024;
 const B64: base64::engine::GeneralPurpose = base64::engine::general_purpose::STANDARD;
@@ -357,6 +358,19 @@ struct Llamada {
     marca: (u64, u64, u64),
 }
 
+/// A conversation whose link dropped, being picked up again through the relay.
+#[derive(Debug, Clone)]
+struct Reconexion {
+    sala: String,
+    desde: u64,
+    proximo: u64,
+    intentos: u32,
+    buscando: bool,
+}
+
+/// How long both sides keep trying to meet again before giving the conversation up.
+const RECONEXION_S: u64 = 5 * 60;
+
 /// A stop that looks like an interference, as the screen and the saved report show it.
 #[derive(Debug, Clone, Serialize)]
 pub struct Incidente {
@@ -424,6 +438,12 @@ pub struct Secure {
     /// This link goes through the blind relay.
     rele: bool,
     rele_error: Option<String>,
+    /// The link dropped in the middle of an open conversation and both sides are going back
+    /// to the relay to pick it up where it was (16 Oct 2026, «que sirva en cualquier router e
+    /// internet del mundo»): the room both derive, when the next try is due, how many tries.
+    /// The Olm session carries on; only the socket is new. A deliberate close sends «adios»
+    /// first, so the other side does not wait.
+    reconexion: Option<Reconexion>,
     tarjeta_otra: Option<tarjeta::Tarjeta>,
     sas_inicio: Option<Inicio>,
     sas_codigo: Option<Codigo>,
@@ -577,6 +597,7 @@ impl Secure {
             rele_codigo: None,
             rele: false,
             rele_error: None,
+            reconexion: None,
             tarjeta_otra: None,
             sas_inicio: None,
             sas_codigo: None,
@@ -805,6 +826,12 @@ impl Secure {
 
     /// Drop the link and forget the handshake; the identity and the book stay.
     pub fn cerrar(&mut self, por: &str) {
+        if self.enlace.is_some() && self.fase != Fase::Sola {
+            // Deliberate: tell the other side, so it does not wait at the relay for us.
+            self.manda(json!({ "t": "adios" }));
+            std::thread::sleep(Duration::from_millis(60));
+        }
+        self.reconexion = None;
         self.cierra_resumen();
         self.movil_fin();
         if let Some(p) = self.puerta.take() {
@@ -862,6 +889,7 @@ impl Secure {
         self.timbres();
         self.sigue_envio();
         self.di_dispositivo();
+        self.reconexion_tic();
         if self.enlace.is_some()
             && self.fase != Fase::Sola
             && self.ultimo_envio.elapsed() >= Duration::from_secs(20)
@@ -887,6 +915,13 @@ impl Secure {
                 Entrante::Aceptado(s) => self.adopta(s, false),
                 Entrante::AceptadoRele(s) => self.adopta(s, true),
                 Entrante::ReleFallo(e) => {
+                    if let Some(r) = &mut self.reconexion {
+                        r.buscando = false;
+                        r.proximo = ahora_s() + 3;
+                        self.rele_error = Some(e);
+                        self.cambio = true;
+                        continue;
+                    }
                     self.rele_error = Some(e.clone());
                     if self.fase == Fase::Buscando {
                         self.aviso("sec_rele_fallo", e);
@@ -910,16 +945,124 @@ impl Secure {
                     }
                     self.cambio = true;
                 }
-                Entrante::Conectado => self.saluda(),
+                Entrante::Conectado => {
+                    if self.reconexion.take().is_some() {
+                        self.fase = Fase::Lista;
+                        self.ultimo_recibido = std::time::Instant::now();
+                        self.monitor.anota(
+                            ahora_s(),
+                            Nivel::Info,
+                            "enlace recuperado; la conversación sigue",
+                        );
+                        self.manda(json!({ "t": "latido" }));
+                        self.di_dispositivo_otra_vez();
+                        self.cambio = true;
+                    } else {
+                        self.saluda();
+                    }
+                }
                 Entrante::Trama(v) => self.trama(v),
                 Entrante::Cerrado(por) => {
-                    if self.fase != Fase::Sola {
+                    if self.fase == Fase::Lista && self.empieza_reconexion() {
+                        // Not over: both sides go back to the relay.
+                    } else if self.fase != Fase::Sola && self.reconexion.is_none() {
                         self.aviso("sec_enlace_cerrado", por.clone());
                         self.cerrar(&por);
                     }
                 }
             }
         }
+    }
+
+    /// The link dropped with the conversation open: keep the Olm session, drop the socket and
+    /// the call, and go back to the relay to a room both sides derive from the two verified
+    /// keys and the moment the conversation opened. `false` when there is nothing to pick up.
+    fn empieza_reconexion(&mut self) -> bool {
+        let Some(v) = self.verificado else {
+            return false;
+        };
+        if self.conversacion.is_none() {
+            return false;
+        }
+        let (mut a, mut b) = (self.identidad.public_key().to_bytes(), v.curve().to_bytes());
+        if a > b {
+            std::mem::swap(&mut a, &mut b);
+        }
+        let h = sha2::Sha256::digest(
+            [
+                b"GUARDIANA SECURE reconexion".as_slice(),
+                &a,
+                &b,
+                &self.inicio.to_be_bytes(),
+            ]
+            .concat(),
+        );
+        let sala: String = h[..16].iter().map(|x| format!("{x:02x}")).collect();
+        self.enlace = None;
+        self.rx = None;
+        self.otro_late = false;
+        if self.llamada.is_some() {
+            self.fin_de_llamada();
+            self.aviso("sec_llamada_cortada_red", "");
+        }
+        self.movil_fin();
+        self.reconexion = Some(Reconexion {
+            sala,
+            desde: ahora_s(),
+            proximo: 0,
+            intentos: 0,
+            buscando: false,
+        });
+        self.monitor.anota(
+            ahora_s(),
+            Nivel::Info,
+            "enlace caído; buscando a la otra persona otra vez",
+        );
+        self.cambio = true;
+        true
+    }
+
+    /// Try again when due; give up after [`RECONEXION_S`].
+    fn reconexion_tic(&mut self) {
+        let Some(r) = self.reconexion.clone() else {
+            return;
+        };
+        let ahora = ahora_s();
+        if ahora.saturating_sub(r.desde) > RECONEXION_S {
+            self.reconexion = None;
+            self.aviso("sec_enlace_cerrado", "sin señal de la otra persona");
+            self.cerrar("no se recuperó el enlace");
+            return;
+        }
+        if r.buscando || ahora < r.proximo {
+            return;
+        }
+        let (tx, rx) = mpsc::channel();
+        self.rx = Some(rx);
+        self.tx = Some(tx.clone());
+        let sala = r.sala.clone();
+        std::thread::spawn(move || {
+            let res = crate::rele::conecta(&crate::rele::direccion(), &sala);
+            let _ = tx.send(match res {
+                Ok(s) => Entrante::AceptadoRele(s),
+                Err(e) => Entrante::ReleFallo(e),
+            });
+        });
+        if let Some(r) = &mut self.reconexion {
+            r.buscando = true;
+            r.intentos += 1;
+        }
+    }
+
+    /// After a new link, the other side hears again where we talk from.
+    fn di_dispositivo_otra_vez(&mut self) {
+        self.movil_dicho = None;
+        self.di_dispositivo();
+    }
+
+    /// Whether the conversation is waiting to meet the other side again.
+    pub fn reconectando(&self) -> bool {
+        self.reconexion.is_some()
     }
 
     /// No door in the router: wait at the blind relay with a fresh code (while the listener
@@ -959,6 +1102,13 @@ impl Secure {
         let t = v["t"].as_str().unwrap_or_default().to_owned();
         match t.as_str() {
             "latido" => self.otro_late = true,
+            "adios" => {
+                self.reconexion = None;
+                if self.fase != Fase::Sola {
+                    self.aviso("sec_enlace_cerrado", "la otra persona cerró");
+                    self.cerrar("la otra persona cerró");
+                }
+            }
             "hola" => self.hola(&v),
             "sas" => self.sas(&v),
             "sas_mac" => self.sas_mac(&v),
@@ -2475,6 +2625,7 @@ impl Secure {
             "reproduce_otro": self.reproduce_otro,
             "otro_movil": self.otro_movil,
             "incidente": self.estado_incidente(),
+            "reconectando": self.reconexion.as_ref().map(|r| json!({ "desde": r.desde, "intentos": r.intentos })),
             "rele_codigo": self.rele_codigo,
             "rele": self.rele,
             "rele_error": self.rele_error,
@@ -2783,6 +2934,37 @@ mod tests {
         a.texto("por el relé");
         gira(&mut a, &mut b, 15);
         assert_eq!(b.mensajes.last().unwrap().2, "por el relé");
+
+        // The link drops (a router reboot, a change of network): the conversation is not
+        // over. Both sides go back to the relay to a room they derive on their own, meet
+        // again, and the same Olm session carries on: no new greeting, no numbers again.
+        for s in [&mut a, &mut b] {
+            s.enlace = None;
+            s.rx = None;
+            assert!(s.empieza_reconexion());
+            assert!(s.reconectando());
+        }
+        assert_eq!(
+            a.reconexion.as_ref().unwrap().sala,
+            b.reconexion.as_ref().unwrap().sala
+        );
+        let sala = a.reconexion.as_ref().unwrap().sala.clone();
+        assert!(!sala.contains("127.0.0.1"));
+        gira(&mut a, &mut b, 60);
+        assert!(!a.reconectando(), "{}", a.estado_json());
+        assert!(!b.reconectando(), "{}", b.estado_json());
+        assert_eq!(a.estado_json()["fase"], "lista");
+        assert_eq!(b.estado_json()["fase"], "lista");
+        b.texto("sigo aquí");
+        gira(&mut a, &mut b, 15);
+        assert_eq!(a.mensajes.last().unwrap().2, "sigo aquí");
+        assert!(a.monitor.identidad.is_some(), "still verified");
+
+        // A deliberate close says goodbye: the other side does not wait at the relay.
+        a.cerrar("adiós");
+        gira(&mut a, &mut b, 15);
+        assert!(!b.reconectando());
+        assert_eq!(b.estado_json()["fase"], "sola");
         let _ = std::fs::remove_dir_all(base);
     }
 }

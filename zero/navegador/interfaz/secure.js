@@ -209,7 +209,13 @@
     const cortada = f !== 'lista' && (E.mensajes || []).length > 0 && (f === 'sola' || f === 'escuchando');
     $('c-chat').hidden = f !== 'lista' && !cortada;
     $('c-chat').classList.toggle('cortada', cortada);
-    $('c-cortada').hidden = !cortada;
+    // The link dropped and both sides look for each other again: the chat stays, read only,
+    // with a line saying so, until the link is back or five minutes pass.
+    const rc = E.reconectando;
+    $('c-chat').classList.toggle('cortada', cortada || !!rc);
+    $('c-cortada').hidden = !cortada && !rc;
+    if (rc) $('c-cortada').textContent = t('sec_reconectando', { n: E.contacto || '', i: n(rc.intentos || 1) });
+    else $('c-cortada').textContent = t('sec_c_cortada');
     // The key's fingerprint is no longer shown under the invitation (the owner, 15 Oct 2026: a
     // second «clave» under the code confused people). The check that matters is the numbers.
     // Waiting: the door in the router gives a GS code; no door, the blind relay gives a GR one.
