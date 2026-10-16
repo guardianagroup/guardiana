@@ -404,6 +404,11 @@ pub struct Secure {
     /// 20 s, so no router or office firewall drops it for being idle (16 Oct 2026: a chat via
     /// the relay was cut after five minutes without messages).
     ultimo_envio: std::time::Instant,
+    /// When something last came from the other side, and whether it sends heartbeats (a
+    /// version that does): then a minute of silence means the link is gone, and both screens
+    /// say so (16 Oct 2026: one side showed the conversation closed, the other still open).
+    ultimo_recibido: std::time::Instant,
+    otro_late: bool,
     /// Files sent, with how long each took to arrive.
     pub enviados: Vec<Enviado>,
     /// Files that arrived in this conversation.
@@ -484,6 +489,8 @@ impl Secure {
             entrante: None,
             envio: None,
             ultimo_envio: std::time::Instant::now(),
+            ultimo_recibido: std::time::Instant::now(),
+            otro_late: false,
             enviados: Vec::new(),
             recibidos: Vec::new(),
             llamado_en_grupo: false,
@@ -645,6 +652,7 @@ impl Secure {
 
     fn adopta(&mut self, s: TcpStream, rele: bool) {
         let _ = s.set_nodelay(true);
+        self.ultimo_recibido = std::time::Instant::now();
         self.rele = rele;
         self.monitor.transporte.directo = Some(!rele);
         if rele {
@@ -742,6 +750,7 @@ impl Secure {
         self.llamada = None;
         self.entrante = None;
         self.llamado_en_grupo = false;
+        self.otro_late = false;
         self.reproduce_otro.clear();
         self.reproduce_dicho.clear();
         self.monitor.transporte = Default::default();
@@ -775,6 +784,13 @@ impl Secure {
         {
             // Older versions ignore a frame they do not know.
             self.manda(json!({ "t": "latido" }));
+        }
+        if self.otro_late
+            && self.fase != Fase::Sola
+            && self.ultimo_recibido.elapsed() >= Duration::from_secs(65)
+        {
+            self.aviso("sec_enlace_cerrado", "sin señal de la otra persona");
+            self.cerrar("sin señal de la otra persona");
         }
         let mut pendientes = Vec::new();
         if let Some(rx) = &self.rx {
@@ -855,8 +871,10 @@ impl Secure {
     }
 
     fn trama(&mut self, v: Value) {
+        self.ultimo_recibido = std::time::Instant::now();
         let t = v["t"].as_str().unwrap_or_default().to_owned();
         match t.as_str() {
+            "latido" => self.otro_late = true,
             "hola" => self.hola(&v),
             "sas" => self.sas(&v),
             "sas_mac" => self.sas_mac(&v),

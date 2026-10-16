@@ -278,6 +278,51 @@
   };
   $('c-resumen-json').addEventListener('click', () => { if (R) descarga(`guardiana-secure-resumen-${sello(R.fin)}.json`, 'application/json', R.json); });
   $('c-resumen-csv').addEventListener('click', () => { if (R) descarga(`guardiana-secure-resumen-${sello(R.fin)}.csv`, 'text/csv;charset=utf-8', '\ufeff' + R.csv); });
+  // The summary as a PDF too (16 Oct 2026), built here with no library: one page, Helvetica,
+  // the same rows as on screen and the signature. The JSON stays the proof that can be checked.
+  const pdfDe = (lineas) => {
+    const MAPA = { 0x20AC: 0x80, 0x2026: 0x85, 0x2013: 0x96, 0x2014: 0x97, 0x2018: 0x91, 0x2019: 0x92, 0x201C: 0x93, 0x201D: 0x94, 0x2022: 0x95, 0xB7: 0xB7 };
+    const win = (s) => { const o = []; for (const ch of String(s)) { const c = ch.codePointAt(0); if (c < 0x80 || (c >= 0xA0 && c <= 0xFF)) o.push(c); else o.push(MAPA[c] || 0x3F); } return o; };
+    const cadena = (s) => { const o = [0x28]; for (const b of win(s)) { if (b === 0x28 || b === 0x29 || b === 0x5C) o.push(0x5C); o.push(b); } o.push(0x29); return o; };
+    const ascii = (s) => Array.from(s, (c) => c.charCodeAt(0));
+    let contenido = [];
+    for (const l of lineas) contenido = contenido.concat(ascii(`BT /${l.negrita ? 'F2' : 'F1'} ${l.tam} Tf ${l.x} ${l.y} Td `), cadena(l.texto), ascii(' Tj ET\n'));
+    const objetos = [
+      ascii('<< /Type /Catalog /Pages 2 0 R >>'),
+      ascii('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'),
+      ascii('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>'),
+      ascii('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'),
+      ascii('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'),
+      ascii(`<< /Length ${contenido.length} >>\nstream\n`).concat(contenido, ascii('\nendstream')),
+    ];
+    let bytes = ascii('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+    const pos = [];
+    objetos.forEach((o, i) => { pos.push(bytes.length); bytes = bytes.concat(ascii(`${i + 1} 0 obj\n`), o, ascii('\nendobj\n')); });
+    const xref = bytes.length;
+    let tabla = `xref\n0 ${objetos.length + 1}\n0000000000 65535 f \n`;
+    pos.forEach((p) => { tabla += String(p).padStart(10, '0') + ' 00000 n \n'; });
+    tabla += `trailer\n<< /Size ${objetos.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+    return new Uint8Array(bytes.concat(ascii(tabla)));
+  };
+  const parte = (s, n) => { const o = []; let x = String(s || ''); while (x.length > n) { o.push(x.slice(0, n)); x = x.slice(n); } if (x) o.push(x); return o; };
+  $('c-resumen-pdf').addEventListener('click', () => {
+    if (!R) return;
+    let j = {}; try { j = JSON.parse(R.json); } catch (_) {}
+    const filas = [[t('sec_r_clase'), t('sec_r_clase_' + R.clase)], [t('sec_identidad_contacto'), R.contacto], [t('sec_r_duracion'), tiempo(R.duracion_s)], [t('sec_r_mensajes'), n(R.mensajes)], [t('sec_r_archivos'), n(R.archivos)], [t('sec_r_vistas'), n(R.observadas + R.inusuales)]];
+    const L = []; let y = 790;
+    L.push({ x: 56, y, tam: 18, negrita: true, texto: 'GUARDIANA SECURE' }); y -= 26;
+    L.push({ x: 56, y, tam: 13, negrita: true, texto: t('sec_r_pdf_titulo') }); y -= 18;
+    L.push({ x: 56, y, tam: 9.5, texto: t('sec_r_pdf_fecha') + ' ' + new Date().toLocaleString(document.documentElement.lang || 'es') }); y -= 30;
+    for (const [a, b] of filas) { L.push({ x: 56, y, tam: 11, negrita: true, texto: a }); L.push({ x: 230, y, tam: 11, texto: String(b) }); y -= 20; }
+    y -= 16;
+    L.push({ x: 56, y, tam: 11, negrita: true, texto: t('sec_r_pdf_firmado') }); y -= 16;
+    for (const s of parte(j.firmante, 80)) { L.push({ x: 56, y, tam: 8.5, texto: s }); y -= 12; }
+    y -= 6;
+    for (const s of parte(j.firma, 80)) { L.push({ x: 56, y, tam: 8.5, texto: s }); y -= 12; }
+    y -= 18;
+    for (const s of parte(t('sec_r_pdf_nota'), 95)) { L.push({ x: 56, y, tam: 9.5, texto: s }); y -= 14; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([pdfDe(L)], { type: 'application/pdf' })); a.download = `guardiana-secure-resumen-${sello(R.fin)}.pdf`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  });
   $('c-prueba').addEventListener('click', () => manda({ tipo: 'secure', accion: 'prueba' }));
   en('secure_prueba', (m) => descarga(`guardiana-secure-prueba-${sello()}.json`, 'application/json', m.json));
   en('secure_aviso', (m) => { const extra = m.texto && /^sec_[a-z0-9_]+$/.test(m.texto) ? t(m.texto) : m.texto; const txt = t(m.clave) + (extra ? ' ' + extra : ''); aviso(txt); });
@@ -297,6 +342,19 @@
   $('c-copiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('c-codigo').textContent); $('c-copiar').textContent = t('sec_c_copiado'); setTimeout(() => { $('c-copiar').textContent = t('sec_c_copiar'); }, 1500); } catch (_) {} });
   $('c-conectar').addEventListener('click', () => { const d = $('c-direccion').value.trim(); if (d) manda({ tipo: 'secure', accion: 'conectar', direccion: d }); });
   $('c-direccion').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('c-conectar').click(); });
+  // A code is typed with its dashes put in by themselves: «GR4K2…» becomes «GR-4K2…».
+  $('c-direccion').addEventListener('input', (e) => {
+    const el = e.target, v = el.value;
+    if (/[.:]/.test(v) || (e.inputType || '').startsWith('delete')) return;
+    const limpio = v.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!/^G([SR][A-Z0-9]*)?$/.test(limpio)) return;
+    const r = limpio.slice(2, 13);
+    let s = limpio.slice(0, 2);
+    if (r.length) s += '-' + r.slice(0, 4);
+    if (r.length > 4) s += '-' + r.slice(4, 8);
+    if (r.length > 8) s += '-' + r.slice(8, 11);
+    if (s !== v) el.value = s;
+  });
   $('c-sas-si').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sas', iguales: true, nombre: $('c-nombre').value.trim() }));
   $('c-sas-no').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sas', iguales: false, nombre: '' }));
   $('c-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'cerrar' }));
