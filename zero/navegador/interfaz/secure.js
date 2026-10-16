@@ -463,7 +463,7 @@
   // second behind. (The real-time transport comes next; this is today's.)
   let arrancando = false;
   let grabador = null, local = null, fuente = null, buffer = null, pendientes = [], silenciado = false, llamadaVideo = false;
-  let mimeRemoto = null, tipoGrabador = null, reproduceOtro = [];
+  let mimeRemoto = null, tipoGrabador = null, reproduceOtro = [], reinicioVisto = null;
   // A call has three moments (16 Oct 2026): it rings here (Contestar / Rechazar), we are
   // calling (the button stays pressed, «Llamando a…» with the seconds left), and we talk.
   let sonando = null, tonoLlamando = null;
@@ -526,6 +526,10 @@
     if (llamando) { if (!tonoLlamando) tonoLlamando = setInterval(() => { if (E && E.llamada && E.llamada.conectada === false) timbre(); }, 3000); return; }
     if (tonoLlamando) { clearInterval(tonoLlamando); tonoLlamando = null; }
     if (movilHabla) { if (grabador || arrancando) paraMedios(); return; }
+    // The other side's player started again (its phone took the call, or gave it back): our
+    // recorder starts again too, so its first piece carries the header that player needs.
+    if (grabador && typeof l.reinicio === 'number' && reinicioVisto !== null && l.reinicio !== reinicioVisto) cambiaGrabador();
+    if (typeof l.reinicio === 'number') reinicioVisto = l.reinicio;
     if (!grabador && !arrancando) empiezaMedios(!!l.video);
     // The other side's player (an iPhone) cannot open what we record: record in what it can.
     else if (grabador && tipoGrabador && mime(llamadaVideo) !== tipoGrabador) cambiaGrabador();
@@ -592,6 +596,8 @@
     $('c-local').srcObject = local;
     llamadaVideo = video && local.getVideoTracks().length > 0;
     nuevoGrabador(llamadaVideo);
+    // Our players are new: ask the other side for pieces from a fresh start.
+    manda({ tipo: 'secure', accion: 'pide_inicio' });
     arrancando = false;
   };
   // One player per member (a group) or one for the other person (a two-way talk): each

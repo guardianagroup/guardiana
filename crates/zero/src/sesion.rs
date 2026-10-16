@@ -1331,6 +1331,10 @@ impl Sesion {
                 self.secure.rechazar();
                 Ok(())
             }
+            "pide_inicio" => {
+                self.secure.pide_inicio();
+                return Vec::new();
+            }
             "perdida_vista" => {
                 self.secure.olvida_perdida();
                 Ok(())

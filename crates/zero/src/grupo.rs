@@ -462,10 +462,23 @@ impl Grupo {
 
     /// «Pasar al móvil»: only a two-person conversation (a group's call has several streams).
     pub fn movil_empieza(&mut self, idioma: &str) -> Result<(), String> {
-        if self.sesiones.len() != 1 || self.nombres().len() > 2 {
+        // Two people: one link talking. The host also keeps a session listening for the next
+        // member; that one does not count (16 Oct 2026: the host was told «only two people»
+        // with only two people in the conversation).
+        let hablando: Vec<usize> = (0..self.sesiones.len())
+            .filter(|&i| self.sesiones[i].lista())
+            .collect();
+        if hablando.len() != 1 || self.nombres().len() > 2 {
             return Err("sec_mv_solo_dos".to_owned());
         }
-        self.sesiones[0].movil_empieza(idioma)
+        self.sesiones[hablando[0]].movil_empieza(idioma)
+    }
+
+    /// Our new player needs the other side's pieces from a fresh start.
+    pub fn pide_inicio(&mut self) {
+        for s in &mut self.sesiones {
+            s.pide_inicio();
+        }
     }
 
     /// The person said «Sí, es mi móvil».

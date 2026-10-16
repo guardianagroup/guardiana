@@ -401,6 +401,9 @@ pub struct Secure {
     /// A call nobody answered here: (when, with video), until the person calls back or
     /// closes the note.
     perdida: Option<(u64, bool)>,
+    /// How many times the other side asked our recorder to start again (a new player there,
+    /// on its phone or back on its computer, cannot open a stream joined halfway).
+    reinicios: u64,
     /// A file on its way out.
     envio: Option<Envio>,
     /// When something last went out on the link: a quiet link gets a small frame every
@@ -496,6 +499,7 @@ impl Secure {
             reproduce_dicho: Vec::new(),
             entrante: None,
             perdida: None,
+            reinicios: 0,
             envio: None,
             ultimo_envio: std::time::Instant::now(),
             ultimo_recibido: std::time::Instant::now(),
@@ -1257,6 +1261,10 @@ impl Secure {
                 self.reproduce_otro = lista_de_formatos(&c["mimes"]);
                 self.cambio = true;
             }
+            "reinicia_media" => {
+                self.reinicios += 1;
+                self.cambio = true;
+            }
             "zona" => {
                 self.zona_otra = zona_limpia(c["zona"].as_str().unwrap_or_default());
                 self.cambio = true;
@@ -1596,6 +1604,14 @@ impl Secure {
             Value::Null,
             |(t, video)| json!({ "t": t, "video": video, "de": self.nombre_contacto }),
         )
+    }
+
+    /// Our player starts fresh (the phone took the call, or gave it back): the other side's
+    /// recorder starts again so the first piece carries the stream's header.
+    pub fn pide_inicio(&mut self) {
+        if self.llamada.is_some() {
+            self.manda_olm(json!({ "m": "reinicia_media" }));
+        }
     }
 
     /// The person closed the «missed call» note.
@@ -2139,6 +2155,7 @@ impl Secure {
                     let _ = self.contestar(&mime);
                 }
                 Desde::Rechazar if aprobado => self.rechazar(),
+                Desde::PideInicio if aprobado => self.pide_inicio(),
                 Desde::Media(b) if aprobado => {
                     let _ = self.media_bytes(b);
                 }
@@ -2223,7 +2240,7 @@ impl Secure {
             "tarjeta": self.tarjeta(),
             "contacto": self.nombre_contacto,
             "numeros": self.numeros().map(|(a, b, c)| vec![a, b, c]),
-            "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "conectada": l.conectada, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto })),
+            "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "conectada": l.conectada, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto, "reinicio": self.reinicios })),
             "entrante": self.entrante.as_ref().map(|t| json!({ "video": t.video, "de": self.nombre_contacto, "desde": t.desde })),
             "perdida": self.perdida.map(|(t, video)| json!({ "t": t, "video": video, "de": self.nombre_contacto })),
             "recibidos": self.recibidos.iter().map(Recibido::json).collect::<Vec<_>>(),
