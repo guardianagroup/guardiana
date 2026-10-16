@@ -326,7 +326,7 @@ impl Secure {
         self.cambio = true;
     }
 
-    /// Start listening on a port (0 lets the system choose). The address is never shown.
+    /// Start listening on a port (0: a new random one). The address is never shown.
     pub fn escuchar(&mut self, puerto: u16) -> Result<u16, String> {
         self.escuchar_grupo(Some(puerto), None, true)
     }
@@ -345,10 +345,12 @@ impl Secure {
         abre_puerta: bool,
     ) -> Result<u16, String> {
         self.cerrar("nueva escucha");
-        // A fixed port when free (the code stays the same from one day to the next), any port
-        // otherwise; `None` asks the system for one.
+        // A new port for every invitation (the owner, 16 Oct 2026: «el código debe ser aleatorio
+        // cada vez»): the door code carries the port, so a fresh one gives a fresh code, and an
+        // old code shared somewhere stops leading here. Any free port otherwise; `None` asks the
+        // system for one.
         let pedido = match puerto {
-            Some(0) => 47300,
+            Some(0) => puerto_al_azar(),
             Some(p) => p,
             None => 0,
         };
@@ -1483,6 +1485,14 @@ fn nombre_libre(carpeta: &Path, nombre: &str) -> PathBuf {
         .unwrap_or(primera)
 }
 
+/// A port for a new invitation, at random in 20000-60999 (above the well-known and registered
+/// ranges most routers reserve, below the ephemeral range the system hands out).
+fn puerto_al_azar() -> u16 {
+    let mut b = [0u8; 2];
+    crate::sesion::azar(&mut b);
+    20000 + u16::from_be_bytes(b) % 41000
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -1494,6 +1504,23 @@ mod tests {
             b.tic();
             std::thread::sleep(Duration::from_millis(20));
         }
+    }
+
+    #[test]
+    fn every_invitation_gets_its_own_port_and_so_its_own_code() {
+        let puertos: std::collections::HashSet<u16> =
+            (0..8).map(|_| super::puerto_al_azar()).collect();
+        assert!(puertos.len() > 1, "{puertos:?}");
+        assert!(
+            puertos.iter().all(|p| (20000..61000).contains(p)),
+            "{puertos:?}"
+        );
+        let ip = std::net::Ipv4Addr::new(203, 0, 113, 7);
+        let codigos: std::collections::HashSet<String> = puertos
+            .iter()
+            .map(|&p| crate::puerta::codigo(ip, p))
+            .collect();
+        assert_eq!(codigos.len(), puertos.len());
     }
 
     #[test]
