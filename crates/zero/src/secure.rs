@@ -415,6 +415,11 @@ pub struct Secure {
     /// say so (16 Oct 2026: one side showed the conversation closed, the other still open).
     ultimo_recibido: std::time::Instant,
     otro_late: bool,
+    /// Whether the other side is talking from its phone (it says so inside Olm each time that
+    /// changes), and what we last told it about ours. The screen shows the protection level
+    /// from the two: both computers, the highest; a phone on either side, strong (16 Oct 2026).
+    otro_movil: bool,
+    movil_dicho: Option<bool>,
     /// This computer's time zone (the page tells it) and the other side's, exchanged inside
     /// Olm once the conversation is open (16 Oct 2026, «que salga en nuestro mapa, el de él y
     /// el mío»): the globe places each computer by its time zone, never by an address.
@@ -504,6 +509,8 @@ impl Secure {
             ultimo_envio: std::time::Instant::now(),
             ultimo_recibido: std::time::Instant::now(),
             otro_late: false,
+            otro_movil: false,
+            movil_dicho: None,
             zona_propia: String::new(),
             zona_otra: String::new(),
             enviados: Vec::new(),
@@ -767,6 +774,8 @@ impl Secure {
         self.perdida = None;
         self.llamado_en_grupo = false;
         self.otro_late = false;
+        self.otro_movil = false;
+        self.movil_dicho = None;
         self.zona_otra.clear();
         self.reproduce_otro.clear();
         self.reproduce_dicho.clear();
@@ -795,6 +804,7 @@ impl Secure {
         self.movil_tic();
         self.timbres();
         self.sigue_envio();
+        self.di_dispositivo();
         if self.enlace.is_some()
             && self.fase != Fase::Sola
             && self.ultimo_envio.elapsed() >= Duration::from_secs(20)
@@ -1263,6 +1273,10 @@ impl Secure {
             }
             "reinicia_media" => {
                 self.reinicios += 1;
+                self.cambio = true;
+            }
+            "dispositivo" => {
+                self.otro_movil = c["movil"].as_bool().unwrap_or(false);
                 self.cambio = true;
             }
             "zona" => {
@@ -2093,6 +2107,24 @@ impl Secure {
         }
     }
 
+    /// Tell the other side whether our phone is the one talking, each time that changes.
+    fn di_dispositivo(&mut self) {
+        if self.fase != Fase::Lista {
+            return;
+        }
+        let ahora = self.movil_manda();
+        if self.movil_dicho == Some(ahora) {
+            return;
+        }
+        self.movil_dicho = Some(ahora);
+        self.manda_olm(json!({ "m": "dispositivo", "movil": ahora }));
+    }
+
+    /// Whether the other side said it is talking from its phone.
+    pub fn otro_en_movil(&self) -> bool {
+        self.otro_movil
+    }
+
     /// Whether the phone is the one talking right now.
     fn movil_manda(&self) -> bool {
         self.movil
@@ -2232,6 +2264,7 @@ impl Secure {
             "codigo": self.puerta.as_ref().map(crate::puerta::Puerta::codigo),
             "puerta_error": self.puerta_error,
             "reproduce_otro": self.reproduce_otro,
+            "otro_movil": self.otro_movil,
             "rele_codigo": self.rele_codigo,
             "rele": self.rele,
             "rele_error": self.rele_error,
@@ -2425,6 +2458,10 @@ mod tests {
         a.movil_fin();
         gira(&mut a, &mut b, 15);
         assert_eq!(b.estado_json()["reproduce_otro"], json!([]));
+        // Each side told the other it talks from its computer: the screen shows the highest
+        // level. (A phone talking would say so the same way; see `di_dispositivo`.)
+        assert_eq!(b.estado_json()["otro_movil"], false);
+        assert_eq!(a.movil_dicho, Some(false));
 
         // A file in three pieces, the last one short.
         let plano: Vec<u8> = (0..(guardiana_secure::archivo::BLOQUE * 2 + 321))

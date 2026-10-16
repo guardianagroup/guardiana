@@ -64,6 +64,8 @@
   "sec_l_cifrado": "Criptografia de ponta a ponta",
   "sec_l_cifrado_no": "Criptografia: começa com a conversa",
   "sec_l_verificado": "Identidade de {n} verificada em {f}",
+  "sec_l_nivel_pc": "Proteção máxima: computador a computador, programa assinado nos dois lados e chaves no seu computador",
+  "sec_l_nivel_movil": "Proteção forte: um lado fala pelo celular (uma página no Safari ou Chrome, sob controle da Apple ou do Google)",
   "sec_l_sin_verificar": "Identidade não verificada",
   "sec_l_clave_cambiada": "A chave de {n} mudou · é preciso comparar os números de novo",
   "sec_l_directa": "Conexão direta, sem intermediários",

@@ -698,6 +698,8 @@ impl Grupo {
             "llamada": self.llamada,
         });
         e["contacto"] = json!(self.sesiones[0].contacto());
+        // A phone on any member's side: the level shown is the group's lowest.
+        e["otro_movil"] = json!(self.sesiones.iter().any(Secure::otro_en_movil));
         if let Some(video) = self.llamada {
             if e["llamada"].is_null() {
                 e["llamada"] = json!({ "video": video, "desde": self.llamada_desde, "conectada": self.sesiones.iter().any(Secure::conectada) });

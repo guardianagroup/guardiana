@@ -49,12 +49,17 @@
     if (!id) {
       linea($('g-cifrado'), '', t('sec_l_cifrado_no'));
       linea($('g-identidad'), '', t('sec_l_sin_verificar'));
+      linea($('g-nivel'), '', t('sec_l_nivel_pc'));
       linea($('g-conexion'), '', t('sec_l_sin_conexion'));
       linea($('g-visto'), '', t('sec_l_nada'));
     } else {
       linea($('g-cifrado'), 'ok', t('sec_l_cifrado'));
       if (id.estado === 'clave_cambiada') linea($('g-identidad'), 'alerta', t('sec_l_clave_cambiada', { n: id.nombre }));
       else linea($('g-identidad'), 'ok', t('sec_l_verificado', { n: id.nombre, f: fecha(id.verificado_en) }));
+      // The level comes from the two ends: both computers, the highest; a phone on either side
+      // is a web page inside Safari or Chrome, strong but a step below (16 Oct 2026).
+      const conMovil = !!(E.otro_movil || ((E.movil || {}).habla));
+      linea($('g-nivel'), 'ok', t(conMovil ? 'sec_l_nivel_movil' : 'sec_l_nivel_pc'));
       if (tr.directo === true) linea($('g-conexion'), typeof tr.perdida_pct === 'number' && tr.perdida_pct >= 3 ? 'aviso' : 'ok', typeof tr.perdida_pct === 'number' && tr.perdida_pct >= 3 ? t('sec_l_perdida', { p: n(tr.perdida_pct) }) : t('sec_l_directa'));
       else if (tr.directo === false) linea($('g-conexion'), typeof tr.perdida_pct === 'number' && tr.perdida_pct >= 3 ? 'aviso' : 'ok', t('sec_l_rele'));
       else linea($('g-conexion'), '', t('sec_l_sin_conexion'));

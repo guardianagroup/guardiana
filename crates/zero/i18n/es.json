@@ -64,6 +64,8 @@
   "sec_l_cifrado": "Cifrado de extremo a extremo",
   "sec_l_cifrado_no": "Cifrado: empieza con la conversación",
   "sec_l_verificado": "Identidad de {n} verificada el {f}",
+  "sec_l_nivel_pc": "Protección máxima: equipo a equipo, programa firmado en los dos lados y claves en tu equipo",
+  "sec_l_nivel_movil": "Protección fuerte: un lado habla desde el móvil (una página en Safari o Chrome, que controlan Apple o Google)",
   "sec_l_sin_verificar": "Identidad sin verificar",
   "sec_l_clave_cambiada": "La clave de {n} cambió · hay que comparar los números de nuevo",
   "sec_l_directa": "Conexión directa, sin intermediarios",

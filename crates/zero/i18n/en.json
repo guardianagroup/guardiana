@@ -64,6 +64,8 @@
   "sec_l_cifrado": "End-to-end encryption",
   "sec_l_cifrado_no": "Encryption: starts with the conversation",
   "sec_l_verificado": "{n}’s identity verified on {f}",
+  "sec_l_nivel_pc": "Highest protection: computer to computer, signed program on both sides and keys on your computer",
+  "sec_l_nivel_movil": "Strong protection: one side talks from a phone (a page in Safari or Chrome, under Apple or Google)",
   "sec_l_sin_verificar": "Identity not verified",
   "sec_l_clave_cambiada": "{n}’s key changed · compare the numbers again",
   "sec_l_directa": "Direct connection, no intermediaries",
