@@ -17,3 +17,12 @@ público), vía el paquete `world-atlas` 2.0.2.
 
 La luz del globo es la del sol de cada momento: el punto subsolar se calcula en el navegador con la
 declinación y la ecuación del tiempo (aproximación de pocos minutos de error).
+
+## De cerca: las teselas (`t/`, 15 Oct 2026)
+
+Al acercar el globo, la página carga solo las teselas de 45° que hay bajo la vista (8 columnas ×
+4 filas, 2048 × 2048 cada una, con 8 píxeles de sangre de las vecinas para que no se vean las
+juntas). Las corta `build/tierra.py` en CI (rama `tierra-*`) de las imágenes de la NASA a su
+tamaño completo: *Blue Marble Next Generation* de julio con relieve y fondo marino (21 600 ×
+10 800) y *Black Marble 2016* (13 500 × 6 750), ambas de dominio público. `t/tiles.json` dice de
+dónde salió cada una y su huella.

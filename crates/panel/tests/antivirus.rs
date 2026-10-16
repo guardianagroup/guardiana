@@ -422,6 +422,13 @@ async fn the_antivirus_page_shows_what_each_antivirus_asked_and_every_official_r
     }
     let (status, _) = get(addr, &t, "/static/tierra/otra.jpg").await;
     assert_eq!(status, 404);
+    // Up close (15 Oct 2026): the 45° tiles and their index, carried inside the binary too.
+    for tesela in ["tiles.json", "dia-0-0.jpg", "luces-7-3.jpg"] {
+        let (status, _) = get(addr, &t, &format!("/static/tierra/t/{tesela}")).await;
+        assert_eq!(status, 200, "{tesela}");
+    }
+    let (status, _) = get(addr, &t, "/static/tierra/t/dia-8-0.jpg").await;
+    assert_eq!(status, 404);
     // The way in is on the start page and on «Tu antivirus».
     for pagina in ["/", "/antivirus"] {
         let (_, html) = get(addr, &t, pagina).await;
