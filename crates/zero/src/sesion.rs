@@ -427,7 +427,7 @@ pub struct Sesion {
     datos: PathBuf,
     descargas: PathBuf,
     /// GUARDIANA SECURE, opened with the session (15 Oct 2026).
-    secure: crate::secure::Secure,
+    secure: crate::grupo::Grupo,
     version: String,
     motor: String,
     idioma_sistema: String,
@@ -658,7 +658,7 @@ impl Sesion {
         } else {
             Idioma::de_etiqueta(&prefs.idioma)
         };
-        let mut secure = crate::secure::Secure::abre(&a.datos, &a.descargas);
+        let mut secure = crate::grupo::Grupo::abre(&a.datos, &a.descargas);
         secure.pon_version(&a.version);
         let mut s = Self {
             datos: a.datos,
@@ -1174,7 +1174,7 @@ impl Sesion {
         }
         if p.url.starts_with(SECURE) {
             let t = self.t("pestana_secure");
-            return if self.secure.novedad {
+            return if self.secure.novedad() {
                 format!("● {t}")
             } else {
                 t
@@ -1203,7 +1203,12 @@ impl Sesion {
         let mut o = Vec::new();
         if !self.secure.media_para_pagina.is_empty() {
             if let Some(id) = self.pestana_secure() {
-                let trozos: Vec<String> = self.secure.media_para_pagina.drain(..).collect();
+                let trozos: Vec<Value> = self
+                    .secure
+                    .media_para_pagina
+                    .drain(..)
+                    .map(|(de, b)| json!({ "de": de, "b": b }))
+                    .collect();
                 o.extend(self.a_pestana(id, &json!({ "tipo": "secure_media", "trozos": trozos })));
             } else {
                 self.secure.media_para_pagina.clear();
@@ -1212,7 +1217,7 @@ impl Sesion {
         if self.secure.cambiado() {
             if let Some(id) = self.pestana_secure() {
                 o.extend(self.a_pestana(id, &self.secure.estado_json()));
-                while let Some(a) = self.secure.avisos.pop_front() {
+                for a in self.secure.avisos() {
                     o.extend(self.a_pestana(
                         id,
                         &json!({ "tipo": "secure_aviso", "clave": a["clave"], "texto": a["texto"] }),
@@ -1251,6 +1256,10 @@ impl Sesion {
                 self.secure.texto(texto(m, "texto"));
                 Ok(())
             }
+            "nombre" => {
+                self.secure.nombre_propio = texto(m, "nombre").chars().take(60).collect();
+                Ok(())
+            }
             "archivo_empieza" => self.secure.archivo_empieza(texto(m, "nombre")),
             "archivo_trozo" => self
                 .secure
@@ -1266,7 +1275,7 @@ impl Sesion {
             }
             "media" => self.secure.media_saliente(texto(m, "b64")),
             "visto" => {
-                self.secure.novedad = false;
+                self.secure.visto();
                 Ok(())
             }
             "prueba" => {

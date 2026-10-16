@@ -8,7 +8,8 @@
 #   pais: código de dos letras de su sede
 #   programa: nombre de archivo del proceso en Windows (uno por línea; un proceso, un producto)
 #   dominio: nombre | uso | página del fabricante que lo dice
-#            uso ∈ actualizaciones, nube, muestras, licencia, telemetria, publicidad, otros
+#            uso ∈ actualizaciones, nube, muestras, licencia, configuracion, certificados, conectividad,
+#                  telemetria, mensajes, publicidad, otros
 #   sancion: AAAA-MM-DD | autoridad (su nombre propio) | país (dos letras) | importe («16500000 USD») o - |
 #            tipo (multa, orden, sentencia, prohibicion, advertencia, compromiso) | clave | página oficial
 #            la clave es el texto en palabras llanas (av_sancion_<clave> en el panel)
@@ -59,6 +60,12 @@ dominio: wsuk1westprod.blob.core.windows.net | muestras | https://learn.microsof
 dominio: crl.microsoft.com | otros | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
 dominio: vortex-win.data.microsoft.com | telemetria | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
 dominio: settings-win.data.microsoft.com | telemetria | https://learn.microsoft.com/en-us/defender-endpoint/configure-network-connections-microsoft-defender-antivirus
+dominio: events.data.microsoft.com | telemetria | https://learn.microsoft.com/en-us/defender-endpoint/standard-device-connectivity-urls-commercial
+dominio: ecs.office.com | configuracion | https://learn.microsoft.com/en-us/defender-endpoint/standard-device-connectivity-urls-commercial
+dominio: reflector.defender.microsoft.com | conectividad | https://learn.microsoft.com/en-us/defender-endpoint/standard-device-connectivity-urls-commercial
+dominio: smartscreen-prod.microsoft.com | nube | https://learn.microsoft.com/en-us/defender-endpoint/standard-device-connectivity-urls-commercial
+dominio: smartscreen.microsoft.com | nube | https://learn.microsoft.com/en-us/defender-endpoint/standard-device-connectivity-urls-commercial
+dominio: oneocsp.microsoft.com | certificados | https://learn.microsoft.com/en-us/azure/security/fundamentals/azure-certificate-authority-details
 
 # Procesos: https://support.avast.com/en-us/article/windows-process-dump
 # afwServ.exe (cortafuegos) es común a Avast y AVG: no se atribuye a ninguno de los dos.

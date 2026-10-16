@@ -299,6 +299,14 @@
       doc.juntos(10 * 1.25 + 9 * 1.25 * 2).line(cabeza, 10, true).line(e.oficio, 9, false, 0.25).gap(3);
     }
   }
+  // The phone's steps as numbered steps, the address to type set apart (the owner, 16 Oct 2026:
+  // «hay que explicar cómo conectar el teléfono al Modo Hogar para que sea fácil»).
+  function pasosTel(el, texto, ip) {
+    const [pasos, ...cola] = texto.split(/(?<=\.)\s+(?=[A-ZÁÉÍÓÚ])/);
+    const resalta = (s) => esc(s).split(esc('{ip}')).join(`<b class="ip-tel">${esc(ip)}</b>`);
+    el.innerHTML = pasos.replace(/\.$/, '').split(' › ').map((x) => `<li>${resalta(x)}</li>`).join('')
+      + (cola.length ? `<li class="nota-tel">${resalta(cola.join(' '))}</li>` : '');
+  }
   async function api(path, opts = {}) {
     // The browser's offset in minutes east of UTC, so the dates written into sentences are the
     // person's own day (getTimezoneOffset counts the other way round).
@@ -1650,12 +1658,13 @@
         $('h-toggle').dataset.on = (r.encendido || r.aparcado) ? '1' : '0';
         $('h-aviso').textContent = aviso || '';
         $('h-conectar').classList.toggle('hidden', !r.encendido);
+        $('h-primero').classList.toggle('hidden', !!r.encendido);
         if (r.encendido) {
           $('h-qr').innerHTML = r.qr_svg || '';
           $('h-url').textContent = r.url || '';
           $('h-router').textContent = t('hogar_router_texto').replace('{ip}', r.ip || '');
-          $('h-iphone').textContent = t('hogar_iphone_pasos').replace('{ip}', r.ip || '');
-          $('h-android').textContent = t('hogar_android_pasos').replace('{ip}', r.ip || '');
+          pasosTel($('h-iphone'), t('hogar_iphone_pasos'), r.ip || '');
+          pasosTel($('h-android'), t('hogar_android_pasos'), r.ip || '');
         }
       };
       render(await api('/api/hogar'));
@@ -1703,8 +1712,8 @@
         const ip = /^\d{1,3}(\.\d{1,3}){3}$/.test(location.hostname) ? location.hostname : '';
         $('mi-guia').classList.toggle('hidden', pasa || !ip);
         if (!pasa && ip) {
-          $('mi-iphone').textContent = t('hogar_iphone_pasos').replace('{ip}', ip);
-          $('mi-android').textContent = t('hogar_android_pasos').replace('{ip}', ip);
+          pasosTel($('mi-iphone'), t('hogar_iphone_pasos'), ip);
+          pasosTel($('mi-android'), t('hogar_android_pasos'), ip);
         }
         $('m-consultas').textContent = num(r.totales.consultas); $('m-rastreadores').textContent = num(r.totales.rastreadores);
         $('m-esperados').textContent = num(r.totales.esperados); $('m-cortados').textContent = num(r.totales.cortados);
@@ -2015,8 +2024,26 @@
         if (keep && opts.some((o) => o[0] === keep)) sel.value = keep;
         const current = opts.find((o) => o[0] === sel.value);
         $('a-patrones').value = current ? current[2] : '';
-        sel.onchange = () => { const c = opts.find((o) => o[0] === sel.value); $('a-patrones').value = c ? c[2] : ''; };
+        sel.onchange = () => { const c = opts.find((o) => o[0] === sel.value); $('a-patrones').value = c ? c[2] : ''; marcaRapidos(); };
+        marcaRapidos();
       };
+      // The usual AIs, one tap each (the owner, 16 Oct 2026: «hazlo super fácil»): a chip adds its
+      // services to the list below, or takes them out; the list stays the source of truth.
+      const lineas = () => $('a-patrones').value.split(/\n+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
+      const marcaRapidos = () => {
+        const hay = new Set(lineas());
+        document.querySelectorAll('#a-rapidos .chip').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.dominios.split(' ').every((d) => hay.has(d)))));
+      };
+      $('a-rapidos').addEventListener('click', (e) => {
+        const c = e.target.closest('.chip'); if (!c) return;
+        const ds = c.dataset.dominios.split(' ');
+        let ls = lineas();
+        if (c.getAttribute('aria-pressed') === 'true') ls = ls.filter((x) => !ds.includes(x));
+        else ds.forEach((d) => { if (!ls.includes(d)) ls.push(d); });
+        $('a-patrones').value = ls.join('\n');
+        marcaRapidos();
+      });
+      $('a-patrones').addEventListener('input', marcaRapidos);
       paint(await api('/api/ia'));
       $('alcance-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -2869,6 +2896,14 @@
       await cargaCarta().catch((e) => { $('b-msg').textContent = String(e.message || e); });
       sel.addEventListener('change', () => { pintaLey(); idiomaDelLugar(); pintaEmpresas(); cargaCarta().catch(() => {}); });
       ['b-corredor', 'b-idioma', 'b-evidencia'].forEach((id) => $(id).addEventListener('change', () => { cargaCarta().catch(() => {}); }));
+      // The letter's language, chosen right next to the letter too (the owner, 16 Oct 2026: «aquí
+      // debe dar la opción de qué idioma elegir»); both selects are the same choice.
+      const idiomaCarta = $('b-idioma-carta');
+      const sincroniza = () => { idiomaCarta.value = $('b-idioma').value; };
+      sincroniza();
+      $('b-idioma').addEventListener('change', sincroniza);
+      sel.addEventListener('change', sincroniza);
+      idiomaCarta.addEventListener('change', () => { $('b-idioma').value = idiomaCarta.value; $('b-idioma').dispatchEvent(new Event('change')); });
       ['b-nombre', 'b-correo'].forEach((id) => $(id).addEventListener('input', () => {
         pintaCarta();
         recuerda();

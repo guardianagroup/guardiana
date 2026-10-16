@@ -284,7 +284,7 @@
     let fondoListo = false;
     const ajusta = () => {
       const r = lienzo.getBoundingClientRect();
-      st.dpr = Math.min(window.devicePixelRatio || 1, 2);
+      st.dpr = Math.min(window.devicePixelRatio || 1, 3);
       st.Wc = Math.max(1, r.width); st.W = st.Wc; st.H = Math.max(1, r.height);
       cv.width = Math.round(st.Wc * st.dpr); cv.height = Math.round(st.H * st.dpr);
       fondoListo = false;
@@ -352,15 +352,29 @@
     const FS_TIERRA = `#version 300 es
     precision highp float;
     uniform sampler2D uDia, uLuces, uAgua;
+    // De cerca (15 Oct 2026): hasta cuatro teselas de 45° a 2048 px, cuatro veces más finas que
+    // la Tierra entera. Se muestrean siempre (así el mipmap no se rompe en los bordes) y solo
+    // cuentan donde el píxel cae dentro de su rectángulo.
+    uniform sampler2D uDet0, uDet1, uDet2, uDet3, uLuz0, uLuz1, uLuz2, uLuz3;
+    uniform vec4 uRect0, uRect1, uRect2, uRect3; uniform vec4 uHay;
     uniform vec3 uSol, uCam; uniform mat3 uM3; uniform float uMorph;
     in vec2 vUv; in vec3 vN; in vec3 vW;
     out vec4 o;
     vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
+    vec2 enTesela(vec4 r) { vec2 t = clamp((vUv - r.xy) / (r.zw - r.xy), 0.0, 1.0); return (8.0 + t * 2032.0) / 2048.0; }
+    float dentro(vec4 r, float hay) { return hay * step(r.x, vUv.x) * step(vUv.x, r.z) * step(r.y, vUv.y) * step(vUv.y, r.w); }
     void main() {
       vec3 n = normalize(vN);
       float mu = dot(n, uSol);
-      vec3 dia = pow(texture(uDia, vUv).rgb, vec3(2.2));
+      vec3 diaT = texture(uDia, vUv).rgb;
       float luz = texture(uLuces, vUv).r;
+      float d0 = dentro(uRect0, uHay.x), d1 = dentro(uRect1, uHay.y), d2 = dentro(uRect2, uHay.z), d3 = dentro(uRect3, uHay.w);
+      vec2 q0 = enTesela(uRect0), q1 = enTesela(uRect1), q2 = enTesela(uRect2), q3 = enTesela(uRect3);
+      diaT = mix(diaT, texture(uDet0, q0).rgb, d0); luz = mix(luz, texture(uLuz0, q0).r, d0);
+      diaT = mix(diaT, texture(uDet1, q1).rgb, d1); luz = mix(luz, texture(uLuz1, q1).r, d1);
+      diaT = mix(diaT, texture(uDet2, q2).rgb, d2); luz = mix(luz, texture(uLuz2, q2).r, d2);
+      diaT = mix(diaT, texture(uDet3, q3).rgb, d3); luz = mix(luz, texture(uLuz3, q3).r, d3);
+      vec3 dia = pow(diaT, vec3(2.2));
       float agua = texture(uAgua, vUv).r;
       float lado = smoothstep(-0.08, 0.22, mu);
       // Luz del sol con una noche suave (the owner, 13 Oct 2026: «se ve muy oscuro… que se vea el
@@ -426,16 +440,17 @@
       for (let i = 0; i < 5200; i++) { const x = azar() * 2048, y = azar() < 0.45 ? 512 + gauss() * 150 + Math.sin(x / 2048 * Math.PI * 2) * 140 : azar() * 1024; const b = Math.pow(azar(), 6); const t = azar(); g.fillStyle = `rgba(${200 + 55 * t | 0},${210 + 30 * t | 0},${255 - 40 * (1 - t) | 0},${0.25 + b * 0.75})`; const s = 0.6 + b * 1.6; g.fillRect(x, y, s, s); }
       return c;
     };
-    const textura = (fuente, mip) => {
+    const textura = (fuente, mip, fija) => {
       const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
       if (fuente) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, fuente);
       else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([8, 20, 40, 255]));
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, fija ? gl.CLAMP_TO_EDGE : gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      if (fuente && mip) { gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); const an = gl.getExtension('EXT_texture_filter_anisotropic'); if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT))); }
+      if (fuente && mip) { gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); const an = gl.getExtension('EXT_texture_filter_anisotropic'); if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(16, gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT))); }
       else gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       return t;
     };
+    const DET = { cols: 8, filas: 4, hay: false, ruta: '', cache: new Map(), max: 20 };
     let PT, PF, vaoT, vaoF, nIdx, tex = {};
     if (gl) {
       try {
@@ -458,9 +473,39 @@
         const carga = (clave, url) => { const im = new Image(); im.onload = () => { gl.deleteTexture(tex[clave]); tex[clave] = textura(im, true); }; im.src = url; };
         const ruta = ctx.tierra || '/static/tierra/';
           carga('dia', ruta + 'dia.jpg'); carga('luces', ruta + 'luces.jpg'); carga('agua', ruta + 'agua.png');
+        DET.ruta = ruta + 't/';
+        // Are the close-up tiles there? (A build without them still shows the whole Earth.)
+        fetch(DET.ruta + 'tiles.json', { cache: 'force-cache' }).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j && j.cols === DET.cols && j.filas === DET.filas) DET.hay = true; }).catch(() => {});
         T.ok = true;
       } catch (e) { console.error(e); T.ok = false; }
     }
+    // --- De cerca: las teselas de 45° (build/tierra.py), cargadas solo bajo la vista ---
+    // The whole Earth is 11 px per degree; a tile is 45. Below ~14 px per degree on screen the
+    // whole Earth is enough; above it, the four tiles nearest the centre of the view take over,
+    // one at a time as each arrives. Up to twenty stay in memory; the oldest unused ones go.
+    const tesela = (c, r) => {
+      const k = c + '-' + r; let e = DET.cache.get(k);
+      if (e) { e.uso = tiempo(); return e; }
+      e = { c, r, dia: null, luces: null, uso: tiempo(), rect: [c / DET.cols, r / DET.filas, (c + 1) / DET.cols, (r + 1) / DET.filas] };
+      DET.cache.set(k, e);
+      for (const q of ['dia', 'luces']) { const im = new Image(); im.onload = () => { if (DET.cache.get(k) === e) e[q] = textura(im, true, true); }; im.src = DET.ruta + q + '-' + c + '-' + r + '.jpg'; }
+      if (DET.cache.size > DET.max) {
+        const viejas = [...DET.cache.values()].sort((a, b) => a.uso - b.uso).slice(0, DET.cache.size - DET.max);
+        viejas.forEach((v) => { if (v.dia) gl.deleteTexture(v.dia); if (v.luces) gl.deleteTexture(v.luces); DET.cache.delete(v.c + '-' + v.r); });
+      }
+      return e;
+    };
+    const teselasVisibles = () => {
+      if (!DET.hay || T.m > 0.2 && T.m < 0.8 || pxPorGrado() < 8) return [];
+      const c = lonLatBajo(st.W / 2, st.H / 2);
+      if (!c) return [];
+      const fx = (c[0] + 180) / 45, fy = (90 - c[1]) / 45;
+      const tc = Math.min(DET.cols - 1, Math.max(0, Math.floor(fx))), tr = Math.min(DET.filas - 1, Math.max(0, Math.floor(fy)));
+      const nc = (tc + (fx - tc < 0.5 ? -1 : 1) + DET.cols) % DET.cols, nr = tr + (fy - tr < 0.5 ? -1 : 1);
+      const lista = [[tc, tr], [nc, tr]];
+      if (nr >= 0 && nr < DET.filas) lista.push([tc, nr], [nc, nr]);
+      return lista.map(([a, b]) => tesela(a, b)).filter((e) => e.dia && e.luces);
+    };
 
     // Cámara y modelo de este cuadro. m = 0 globo, 1 mapa.
     const camara = () => {
@@ -506,7 +551,10 @@
     };
     const pintaTierra = () => {
       if (!T.ok) return false;
-      const W = Math.round(st.Wc * st.dpr), H = Math.round(st.H * st.dpr);
+      // Más calidad (the owner, 16 Oct 2026): the Earth is drawn at 1.5× the screen at least and the
+      // browser scales it down, which smooths coasts and city lights like supersampling.
+      const k = Math.min(3, Math.max(st.dpr, 1.5));
+      const W = Math.round(st.Wc * k), H = Math.round(st.H * k);
       if (glc.width !== W || glc.height !== H) { glc.width = W; glc.height = H; }
       gl.viewport(0, 0, W, H);
       // Fondo y halo.
@@ -516,7 +564,7 @@
       gl.disable(gl.DEPTH_TEST); gl.useProgram(PF.p); gl.bindVertexArray(vaoF);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex.cielo); gl.uniform1i(PF.u.uCielo, 0);
       gl.uniform2f(PF.u.uRes, W, H); gl.uniform1f(PF.u.uDesp, -T.rot * 0.04);
-      gl.uniform2f(PF.u.uCentro, o.x * st.dpr, H - o.y * st.dpr); gl.uniform1f(PF.u.uRadio, rpx * st.dpr);
+      gl.uniform2f(PF.u.uCentro, o.x * k, H - o.y * k); gl.uniform1f(PF.u.uRadio, rpx * k);
       gl.uniform1f(PF.u.uHalo, Math.max(0, 1 - T.m * 1.6)); gl.uniform2f(PF.u.uSolP, Lw[0] / ls, Lw[1] / ls);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       // La Tierra.
@@ -526,11 +574,21 @@
       gl.uniformMatrix3fv(PT.u.uM3, false, new Float32Array([T.M[0], T.M[1], T.M[2], T.M[4], T.M[5], T.M[6], T.M[8], T.M[9], T.M[10]]));
       gl.uniform1f(PT.u.uMorph, T.m); gl.uniform3fv(PT.u.uSol, T.sol); gl.uniform3fv(PT.u.uCam, T.C);
       [['uDia', tex.dia], ['uLuces', tex.luces], ['uAgua', tex.agua]].forEach(([n, t], i) => { gl.activeTexture(gl.TEXTURE1 + i); gl.bindTexture(gl.TEXTURE_2D, t); gl.uniform1i(PT.u[n], 1 + i); });
+      const det = teselasVisibles(), hay = [0, 0, 0, 0];
+      for (let i = 0; i < 4; i++) {
+        const e = det[i];
+        gl.activeTexture(gl.TEXTURE4 + i); gl.bindTexture(gl.TEXTURE_2D, e ? e.dia : tex.dia); gl.uniform1i(PT.u['uDet' + i], 4 + i);
+        gl.activeTexture(gl.TEXTURE8 + i); gl.bindTexture(gl.TEXTURE_2D, e ? e.luces : tex.luces); gl.uniform1i(PT.u['uLuz' + i], 8 + i);
+        gl.uniform4fv(PT.u['uRect' + i], e ? e.rect : [0, 0, 0, 0]); hay[i] = e ? 1 : 0;
+      }
+      gl.uniform4fv(PT.u.uHay, hay);
       gl.drawElements(gl.TRIANGLES, nIdx, gl.UNSIGNED_INT, 0);
       gl.bindVertexArray(null);
       return true;
     };
 
+    // Two hex digits of opacity, to append to a #rrggbb colour.
+    const alfa = (a) => Math.round(Math.max(0, Math.min(1, a)) * 255).toString(16).padStart(2, '0');
     // Brillos ya dibujados (uno por color), para que las partículas parezcan luz y no puntos.
     const brillos = {};
     const brillo = (col) => {
@@ -643,14 +701,33 @@
         trazo(g.ruta, 0, 1, col + 'c8', 0.45);
       });
       pelotitas(tt);
+      // Los puntos de llegada (15 Oct 2026): a pin, not a glow. The owner: «la gente tiene que
+      // saber que tiene que tocar ahí… el fondo es negro y hay puntos de luz». A dark disc cuts
+      // it out of the city lights, a white ring says «a control», the dot inside carries the
+      // program's colour, and a slow breathing ring (one every 3 s, out of step per place) draws
+      // the eye without blinking. Up close, the place is named next to it.
+      cx.globalCompositeOperation = 'source-over';
+      const puestos = [], ppg = pxPorGrado(), conNombre = ppg >= 7;
+      const nombrados = conNombre ? new Set(GRUPOS.filter((g) => g.base.v).sort((a, b) => (b.top.sub + b.top.baj) - (a.top.sub + a.top.baj)).slice(0, ppg >= 20 ? 30 : 16)) : null;
       GRUPOS.forEach((g) => {
         if (!g.base.v) return;
-        const d = g.top, bl = bloqueado(d);
+        const d = g.top, bl = bloqueado(d), col = bl ? '#ff6b7a' : prod(d.p).color;
         const sobre = st.hover && (st.hover.ref === g || st.hover.ref === d);
-        const r = sobre ? 13 : 6.5;
-        cx.drawImage(brillo(bl ? '#ff6b7a' : '#ffb547'), g.base.x - r, g.base.y - r, r * 2, r * 2);
-        st.dianas.push({ x: g.base.x, y: g.base.y, r: 18, tipo: 'lugar', ref: g });
+        const x = g.base.x, y = g.base.y, r = sobre ? 8.5 : 6.5;
+        if (!reducido) {
+          const u = ((tt / 3.2 + ((g.lon * 7 + g.lat * 3) % 1 + 1)) % 1);
+          cx.strokeStyle = (sobre ? '#ffffff' : col) + alfa(0.55 * (1 - u) * (1 - u)); cx.lineWidth = 1.2;
+          cx.beginPath(); cx.arc(x, y, r + 2 + u * 12, 0, 7); cx.stroke();
+        }
+        cx.fillStyle = 'rgba(2,6,14,.82)'; cx.beginPath(); cx.arc(x, y, r + 2.4, 0, 7); cx.fill();
+        cx.strokeStyle = bl ? '#ff6b7a' : sobre ? '#ffffff' : 'rgba(255,255,255,.92)'; cx.lineWidth = sobre ? 2 : 1.5;
+        cx.beginPath(); cx.arc(x, y, r, 0, 7); cx.stroke();
+        cx.fillStyle = col; cx.beginPath(); cx.arc(x, y, bl ? 2 : 2.4, 0, 7); cx.fill();
+        if (bl) { cx.strokeStyle = '#ffd9df'; cx.lineWidth = 1.2; cx.beginPath(); cx.moveTo(x - 2.2, y - 2.2); cx.lineTo(x + 2.2, y + 2.2); cx.moveTo(x + 2.2, y - 2.2); cx.lineTo(x - 2.2, y + 2.2); cx.stroke(); }
+        if (nombrados && nombrados.has(g) && !sobre) rotulo(x + r + 6, y + 8, g.ciudad || g.region || (g.pais ? nombrePais(g.pais) : d.host), bl ? '#ff8d99' : '#e9f1ff', puestos);
+        st.dianas.push({ x, y, r: 18, tipo: 'lugar', ref: g });
       });
+      cx.globalCompositeOperation = 'lighter';
       // El escudo de GUARDIANA sobre tu ordenador.
       if (L.cen.v) {
         [2.2, 3.6, 5.2].forEach((r, k) => trazoPuntos(circuloSuelo(L.yo.lon, L.yo.lat, r + (k === 2 ? Math.sin(tt * 1.6) * 0.3 : 0), 64), `rgba(63,224,197,${[0.9, 0.55, 0.3][k]})`, k ? 1 : 1.6, k === 1 ? [6, 5] : null, k === 1 ? -tt * 14 : 0));
@@ -665,13 +742,15 @@
       cx.globalCompositeOperation = 'source-over';
     };
     const rotulo = (x, y, txt, col, puestos) => {
-      cx.font = '500 10.5px "IBM Plex Mono", monospace';
-      const w = cx.measureText(txt).width + 12, h = 17;
+      // A city name you can read at a glance: sans, semibold, on a near-opaque pill.
+      cx.font = '600 12px "IBM Plex Sans", "Segoe UI", system-ui, sans-serif';
+      const w = cx.measureText(txt).width + 16, h = 21;
       let bx = Math.min(st.W - w - 6, Math.max(6, x)), by = y - h + 4;
       if (puestos) { let n = 0; while (n++ < 12 && puestos.some((b) => bx < b.x + b.w && bx + w > b.x && by < b.y + b.h && by + h > b.y)) by += h + 2; puestos.push({ x: bx, y: by, w, h }); }
-      cx.fillStyle = 'rgba(4,10,20,.72)'; cx.fillRect(bx, by, w, h);
-      cx.fillStyle = col; cx.fillRect(bx, by, 2, h);
-      cx.fillStyle = col; cx.textBaseline = 'middle'; cx.fillText(txt, bx + 7, by + h / 2 + 0.5); cx.textBaseline = 'alphabetic';
+      cx.fillStyle = 'rgba(3,8,18,.88)'; cx.beginPath(); if (cx.roundRect) cx.roundRect(bx, by, w, h, 5); else cx.rect(bx, by, w, h); cx.fill();
+      cx.strokeStyle = 'rgba(255,255,255,.14)'; cx.lineWidth = 1; cx.stroke();
+      cx.fillStyle = col; cx.fillRect(bx + 4, by + 5, 2, h - 10);
+      cx.fillStyle = col; cx.textBaseline = 'middle'; cx.fillText(txt, bx + 10, by + h / 2 + 0.5); cx.textBaseline = 'alphabetic';
     };
     // Up close, name the measured place. Keep the host as a fallback: the map never invents a
     // city or state when the operator did not publish one.

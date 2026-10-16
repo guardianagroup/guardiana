@@ -31,6 +31,9 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 var(--texto); -webkit-font-smoothing: antialiased; }
+/* One background for the three tabs (the owner, 16 Oct 2026: «los fondos de las 3 pestañas son
+   distintos»): the same navy and the same faint 44 px grid as ZERO, SECURE and the website. */
+body:not(.universo) { background-image: linear-gradient(color-mix(in srgb, var(--fg) 3.5%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--fg) 3.5%, transparent) 1px, transparent 1px); background-size: 44px 44px; background-position: -1px -1px; }
 a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 a:hover { color: var(--accent-dark); }
 
@@ -56,8 +59,16 @@ header.top .tema { margin-left: 8px; width: 32px; height: 26px; padding: 0; disp
 header.top .tema svg { width: 15px; height: 15px; display: block; }
 
 main { max-width: 1180px; margin: 0 auto; padding: 26px 22px 40px; }
-h1 { font-family: var(--display); font-weight: 600; font-size: 25px; line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 6px; }
-h2 { font-family: var(--display); font-weight: 600; font-size: 16px; line-height: 1.3; letter-spacing: -0.01em; margin: 30px 0 10px; }
+/* Titles that read as titles (the owner, 16 Oct 2026: «los títulos deben diferenciarse de los
+   textos»): display face, larger, full ink; running text a step softer and with air. */
+h1 { font-family: var(--display); font-weight: 600; font-size: 28px; line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 8px; color: var(--fg); }
+h2 { font-family: var(--display); font-weight: 600; font-size: 19px; line-height: 1.25; letter-spacing: -0.015em; margin: 34px 0 12px; color: var(--fg); }
+h3 { font-family: var(--display); font-weight: 600; font-size: 15.5px; line-height: 1.3; margin: 22px 0 8px; color: var(--fg); }
+main p, main li { color: color-mix(in srgb, var(--fg) 80%, var(--bg)); }
+main p b, main p strong, main li b, main li strong { color: var(--fg); }
+/* Anything that unfolds looks like it can be clicked. */
+summary { cursor: pointer; }
+summary:hover { color: var(--accent); }
 p.lead { color: var(--muted); font-size: 16px; margin: 0 0 18px; max-width: 62em; }
 p.limit { color: var(--muted); border-left: 2px solid var(--line); padding-left: 14px; font-size: 14px; margin: 0 0 18px; max-width: 62em; }
 
@@ -363,6 +374,21 @@ details.av-avanzado > summary { margin: 10px 0 4px; }
 details.av-avanzado h3 { margin: 10px 0 4px; font-size: 15px; }
 details.av-avanzado p { margin: 8px 0; }
 
+/* Phone steps, numbered, with the address to type set apart (16 Oct 2026). */
+ol.pasos-tel { margin: 0; padding-left: 1.4em; display: grid; gap: 6px; font-size: 15.5px; }
+ol.pasos-tel li::marker { color: var(--accent); font-weight: 700; }
+ol.pasos-tel li::first-letter { text-transform: uppercase; }
+ol.pasos-tel li.nota-tel { list-style: none; margin-left: -1.4em; color: var(--muted); font-size: 14px; }
+.ip-tel { font-family: var(--mono); font-size: 1.05em; padding: 1px 7px; border-radius: 6px; background: var(--accent-suave); color: var(--fg); }
+.card.primero { border-color: var(--accent); }
+/* «Limitar una IA» (16 Oct 2026): three plain steps and quick picks. */
+.alcance-facil .paso { margin: 18px 0 8px; }
+.alcance-facil select, .alcance-facil textarea { width: 100%; max-width: 520px; }
+.alcance-facil .rapidos { display: flex; flex-wrap: wrap; gap: 8px; }
+.alcance-facil .chip { border-radius: 999px; padding: 7px 14px; background: transparent; border: 1px solid var(--line, #33405c); color: inherit; font-weight: 600; cursor: pointer; }
+.alcance-facil .chip[aria-pressed="true"] { background: var(--accent, #5b7cff); border-color: var(--accent, #5b7cff); color: #fff; }
+.alcance-facil .como { margin-top: 14px; }
+.alcance-facil .como summary { cursor: pointer; color: var(--muted, #9aa6c0); }
 /* «GUARDIANA por dentro» (1.0.22): the way in, well in sight on the start page and on «Tu
    antivirus» (the owner, 13 Oct 2026: «quiero que esté bien visible en la portada»). */
 .por-dentro-cta { display: flex; align-items: center; gap: 16px; margin: 14px 0 18px; padding: 16px 18px; border-radius: 14px; text-decoration: none; color: #e8f4fb; background: radial-gradient(120% 140% at 0% 0%, #12304a 0%, #0a1726 45%, #04070d 100%); border: 1px solid #1d3550; box-shadow: 0 10px 30px rgba(4,7,13,.25); transition: transform .15s ease, box-shadow .15s ease; }

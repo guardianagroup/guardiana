@@ -28,9 +28,11 @@ BASE = f'''@font-face{{font-family:Unbounded;font-weight:400 800;src:url({FUENTE
 # leaves empty between its text (WiX ExitDialog: description down to y=147 px; FatalError to
 # 200; UserExit to 213) and the «open the panel» box (from y=253). On the first screen the
 # licence box covers it.
-FRASE = {'es': ('«Mira a quién habla tu PC mientras duermes.»', 'Haz que te borren.'),
-         'en': ('“See who your PC talks to while you sleep.”', 'Make them delete you.'),
-         'pt': ('«Veja com quem o seu PC fala enquanto você dorme.»', 'Faça que te apaguem.')}
+# 15 Oct 2026, the owner: «mientras duermes» read as if it only happened at night. It happens
+# whenever nobody is watching, so that is what the line says now.
+FRASE = {'es': ('«Mira a quién habla tu PC cuando tú no miras.»', 'Haz que te borren.'),
+         'en': ('“See who your PC talks to when you’re not looking.”', 'Make them delete you.'),
+         'pt': ('«Veja com quem o seu PC fala quando você não olha.»', 'Faça que te apaguem.')}
 def dialogo(zero, idioma):
     a, b = FRASE[idioma]
     return f'''<!doctype html><meta charset=utf-8><style>{BASE}

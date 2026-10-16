@@ -190,6 +190,292 @@ async fn tierra(RutaUrl(archivo): RutaUrl<String>) -> Response {
         .into_response()
 }
 
+/// The Earth up close (15 Oct 2026): 45° tiles of the same NASA pictures at 2048 px, four times
+/// finer, loaded by the page only under a close view (build/tierra.py). Also carried inside the
+/// binary: the globe never asks the internet for anything.
+const TESELAS: &[(&str, &[u8])] = &[
+    (
+        "dia-0-0.jpg",
+        include_bytes!("../static/tierra/t/dia-0-0.jpg"),
+    ),
+    (
+        "dia-1-0.jpg",
+        include_bytes!("../static/tierra/t/dia-1-0.jpg"),
+    ),
+    (
+        "dia-2-0.jpg",
+        include_bytes!("../static/tierra/t/dia-2-0.jpg"),
+    ),
+    (
+        "dia-3-0.jpg",
+        include_bytes!("../static/tierra/t/dia-3-0.jpg"),
+    ),
+    (
+        "dia-4-0.jpg",
+        include_bytes!("../static/tierra/t/dia-4-0.jpg"),
+    ),
+    (
+        "dia-5-0.jpg",
+        include_bytes!("../static/tierra/t/dia-5-0.jpg"),
+    ),
+    (
+        "dia-6-0.jpg",
+        include_bytes!("../static/tierra/t/dia-6-0.jpg"),
+    ),
+    (
+        "dia-7-0.jpg",
+        include_bytes!("../static/tierra/t/dia-7-0.jpg"),
+    ),
+    (
+        "dia-0-1.jpg",
+        include_bytes!("../static/tierra/t/dia-0-1.jpg"),
+    ),
+    (
+        "dia-1-1.jpg",
+        include_bytes!("../static/tierra/t/dia-1-1.jpg"),
+    ),
+    (
+        "dia-2-1.jpg",
+        include_bytes!("../static/tierra/t/dia-2-1.jpg"),
+    ),
+    (
+        "dia-3-1.jpg",
+        include_bytes!("../static/tierra/t/dia-3-1.jpg"),
+    ),
+    (
+        "dia-4-1.jpg",
+        include_bytes!("../static/tierra/t/dia-4-1.jpg"),
+    ),
+    (
+        "dia-5-1.jpg",
+        include_bytes!("../static/tierra/t/dia-5-1.jpg"),
+    ),
+    (
+        "dia-6-1.jpg",
+        include_bytes!("../static/tierra/t/dia-6-1.jpg"),
+    ),
+    (
+        "dia-7-1.jpg",
+        include_bytes!("../static/tierra/t/dia-7-1.jpg"),
+    ),
+    (
+        "dia-0-2.jpg",
+        include_bytes!("../static/tierra/t/dia-0-2.jpg"),
+    ),
+    (
+        "dia-1-2.jpg",
+        include_bytes!("../static/tierra/t/dia-1-2.jpg"),
+    ),
+    (
+        "dia-2-2.jpg",
+        include_bytes!("../static/tierra/t/dia-2-2.jpg"),
+    ),
+    (
+        "dia-3-2.jpg",
+        include_bytes!("../static/tierra/t/dia-3-2.jpg"),
+    ),
+    (
+        "dia-4-2.jpg",
+        include_bytes!("../static/tierra/t/dia-4-2.jpg"),
+    ),
+    (
+        "dia-5-2.jpg",
+        include_bytes!("../static/tierra/t/dia-5-2.jpg"),
+    ),
+    (
+        "dia-6-2.jpg",
+        include_bytes!("../static/tierra/t/dia-6-2.jpg"),
+    ),
+    (
+        "dia-7-2.jpg",
+        include_bytes!("../static/tierra/t/dia-7-2.jpg"),
+    ),
+    (
+        "dia-0-3.jpg",
+        include_bytes!("../static/tierra/t/dia-0-3.jpg"),
+    ),
+    (
+        "dia-1-3.jpg",
+        include_bytes!("../static/tierra/t/dia-1-3.jpg"),
+    ),
+    (
+        "dia-2-3.jpg",
+        include_bytes!("../static/tierra/t/dia-2-3.jpg"),
+    ),
+    (
+        "dia-3-3.jpg",
+        include_bytes!("../static/tierra/t/dia-3-3.jpg"),
+    ),
+    (
+        "dia-4-3.jpg",
+        include_bytes!("../static/tierra/t/dia-4-3.jpg"),
+    ),
+    (
+        "dia-5-3.jpg",
+        include_bytes!("../static/tierra/t/dia-5-3.jpg"),
+    ),
+    (
+        "dia-6-3.jpg",
+        include_bytes!("../static/tierra/t/dia-6-3.jpg"),
+    ),
+    (
+        "dia-7-3.jpg",
+        include_bytes!("../static/tierra/t/dia-7-3.jpg"),
+    ),
+    (
+        "luces-0-0.jpg",
+        include_bytes!("../static/tierra/t/luces-0-0.jpg"),
+    ),
+    (
+        "luces-1-0.jpg",
+        include_bytes!("../static/tierra/t/luces-1-0.jpg"),
+    ),
+    (
+        "luces-2-0.jpg",
+        include_bytes!("../static/tierra/t/luces-2-0.jpg"),
+    ),
+    (
+        "luces-3-0.jpg",
+        include_bytes!("../static/tierra/t/luces-3-0.jpg"),
+    ),
+    (
+        "luces-4-0.jpg",
+        include_bytes!("../static/tierra/t/luces-4-0.jpg"),
+    ),
+    (
+        "luces-5-0.jpg",
+        include_bytes!("../static/tierra/t/luces-5-0.jpg"),
+    ),
+    (
+        "luces-6-0.jpg",
+        include_bytes!("../static/tierra/t/luces-6-0.jpg"),
+    ),
+    (
+        "luces-7-0.jpg",
+        include_bytes!("../static/tierra/t/luces-7-0.jpg"),
+    ),
+    (
+        "luces-0-1.jpg",
+        include_bytes!("../static/tierra/t/luces-0-1.jpg"),
+    ),
+    (
+        "luces-1-1.jpg",
+        include_bytes!("../static/tierra/t/luces-1-1.jpg"),
+    ),
+    (
+        "luces-2-1.jpg",
+        include_bytes!("../static/tierra/t/luces-2-1.jpg"),
+    ),
+    (
+        "luces-3-1.jpg",
+        include_bytes!("../static/tierra/t/luces-3-1.jpg"),
+    ),
+    (
+        "luces-4-1.jpg",
+        include_bytes!("../static/tierra/t/luces-4-1.jpg"),
+    ),
+    (
+        "luces-5-1.jpg",
+        include_bytes!("../static/tierra/t/luces-5-1.jpg"),
+    ),
+    (
+        "luces-6-1.jpg",
+        include_bytes!("../static/tierra/t/luces-6-1.jpg"),
+    ),
+    (
+        "luces-7-1.jpg",
+        include_bytes!("../static/tierra/t/luces-7-1.jpg"),
+    ),
+    (
+        "luces-0-2.jpg",
+        include_bytes!("../static/tierra/t/luces-0-2.jpg"),
+    ),
+    (
+        "luces-1-2.jpg",
+        include_bytes!("../static/tierra/t/luces-1-2.jpg"),
+    ),
+    (
+        "luces-2-2.jpg",
+        include_bytes!("../static/tierra/t/luces-2-2.jpg"),
+    ),
+    (
+        "luces-3-2.jpg",
+        include_bytes!("../static/tierra/t/luces-3-2.jpg"),
+    ),
+    (
+        "luces-4-2.jpg",
+        include_bytes!("../static/tierra/t/luces-4-2.jpg"),
+    ),
+    (
+        "luces-5-2.jpg",
+        include_bytes!("../static/tierra/t/luces-5-2.jpg"),
+    ),
+    (
+        "luces-6-2.jpg",
+        include_bytes!("../static/tierra/t/luces-6-2.jpg"),
+    ),
+    (
+        "luces-7-2.jpg",
+        include_bytes!("../static/tierra/t/luces-7-2.jpg"),
+    ),
+    (
+        "luces-0-3.jpg",
+        include_bytes!("../static/tierra/t/luces-0-3.jpg"),
+    ),
+    (
+        "luces-1-3.jpg",
+        include_bytes!("../static/tierra/t/luces-1-3.jpg"),
+    ),
+    (
+        "luces-2-3.jpg",
+        include_bytes!("../static/tierra/t/luces-2-3.jpg"),
+    ),
+    (
+        "luces-3-3.jpg",
+        include_bytes!("../static/tierra/t/luces-3-3.jpg"),
+    ),
+    (
+        "luces-4-3.jpg",
+        include_bytes!("../static/tierra/t/luces-4-3.jpg"),
+    ),
+    (
+        "luces-5-3.jpg",
+        include_bytes!("../static/tierra/t/luces-5-3.jpg"),
+    ),
+    (
+        "luces-6-3.jpg",
+        include_bytes!("../static/tierra/t/luces-6-3.jpg"),
+    ),
+    (
+        "luces-7-3.jpg",
+        include_bytes!("../static/tierra/t/luces-7-3.jpg"),
+    ),
+];
+
+async fn tesela(RutaUrl(archivo): RutaUrl<String>) -> Response {
+    if archivo == "tiles.json" {
+        return (
+            [
+                (header::CONTENT_TYPE, "application/json"),
+                (header::CACHE_CONTROL, "public, max-age=86400"),
+            ],
+            include_bytes!("../static/tierra/t/tiles.json").as_slice(),
+        )
+            .into_response();
+    }
+    let Some((_, cuerpo)) = TESELAS.iter().find(|(n, _)| *n == archivo) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    (
+        [
+            (header::CONTENT_TYPE, "image/jpeg"),
+            (header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        *cuerpo,
+    )
+        .into_response()
+}
+
 /// The site's own typefaces, carried inside the binary. The panel never asks the internet for
 /// anything (brief, section 6), so looking like guardianagroup.com cannot mean fetching a font
 /// from a CDN: the six files travel with the program. Latin subset only, which is all Spanish,
@@ -531,6 +817,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         )
         .route("/static/fonts/{archivo}", get(fuente))
         .route("/static/tierra/{archivo}", get(tierra))
+        .route("/static/tierra/t/{archivo}", get(tesela))
         .route(
             "/static/por-dentro.js",
             get(|RawQuery(q): RawQuery| async move {

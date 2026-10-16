@@ -36,6 +36,7 @@ main > .tarjeta { margin-top: 14px; }
 .t { color: var(--muted); font-size: 13.5px; line-height: 1.45; margin: 0 0 10px; }
 .c-fila { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .c-fila .campo { flex: 1; min-width: 180px; }
+.beta { display: inline-block; vertical-align: middle; margin-left: 8px; font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ok); border: 1px solid currentColor; border-radius: 999px; padding: 2px 9px; }
 .c-puerto { font: 500 13px var(--mono); color: var(--ok); }
 .c-codigo { margin-top: 12px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--line)); background: color-mix(in srgb, var(--ok) 5%, var(--card)); border-radius: var(--r-tarjeta); display: grid; grid-template-columns: 1fr; gap: 6px; align-items: start; }
 .c-codigo[hidden] { display: none; }
@@ -43,8 +44,6 @@ main > .tarjeta { margin-top: 14px; }
 .c-codigo .t { grid-column: 1 / -1; margin: 0; font-size: 12.5px; }
 .c-puerta-error { margin-top: 10px; color: var(--aviso); }
 .c-puerta-error[hidden] { display: none; }
-.c-huella { margin: 14px 0 0; font-size: 12.5px; color: var(--muted); }
-.c-huella code { font-family: var(--mono); color: var(--fg); }
 .numeros { display: flex; gap: 14px; margin: 12px 0 16px; }
 .numeros b { font: 600 clamp(28px, 4vw, 40px)/1 var(--display); letter-spacing: .02em; padding: 12px 18px; border: 1px solid var(--line); border-radius: var(--r-tarjeta); background: var(--card); font-variant-numeric: tabular-nums; }
 .c-nombre { display: grid; gap: 4px; margin: 0 0 12px; font-size: 13px; color: var(--muted); max-width: 320px; }
@@ -68,13 +67,26 @@ main > .tarjeta { margin-top: 14px; }
 .llamada[hidden] { display: none; }
 .pantallas { position: relative; background: #0B1020; border-radius: var(--r-tarjeta); overflow: hidden; aspect-ratio: 16 / 9; }
 .pantallas video { display: block; }
-#c-remoto { width: 100%; height: 100%; object-fit: contain; }
+.rejilla { display: grid; width: 100%; height: 100%; gap: 4px; grid-template-columns: 1fr; }
+.rejilla[data-n="2"], .rejilla[data-n="3"], .rejilla[data-n="4"] { grid-template-columns: 1fr 1fr; }
+.rejilla[data-n="5"], .rejilla[data-n="6"] { grid-template-columns: 1fr 1fr 1fr; }
+.tile { position: relative; background: #000; min-height: 0; }
+.tile video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile-nombre { position: absolute; left: 8px; bottom: 8px; padding: 2px 8px; border-radius: 999px; background: rgba(0,0,0,.55); color: #fff; font: 500 11.5px var(--mono); }
+.solo-voz .tile video { visibility: hidden; }
+.solo-voz .tile { display: grid; place-items: center; background: transparent; }
+.solo-voz .tile-nombre { position: static; font-size: 13px; }
+.mas { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 8px 12px; border: 1px dashed var(--line); border-radius: var(--r-tarjeta); font-size: 13px; color: var(--muted); }
+.mas[hidden] { display: none; }
+.mas b { font: 600 15px var(--mono); letter-spacing: .06em; color: var(--fg); }
+.mensajes li .de { display: block; font: 600 11.5px var(--texto); font-style: normal; color: var(--accent); margin-bottom: 2px; }
+.comparar .quien { font-weight: 600; color: var(--fg); }
 #c-local { position: absolute; right: 12px; bottom: 12px; width: 22%; border-radius: 8px; border: 1px solid rgba(255,255,255,.3); background: #000; }
 .llamada-botones { margin-top: 8px; }
 .l-estado { font: 500 12px var(--mono); color: var(--muted); margin-right: auto; }
-.solo-voz #c-remoto, .solo-voz #c-local { visibility: hidden; }
-.solo-voz .pantallas { aspect-ratio: auto; height: 64px; display: grid; place-items: center; }
-.solo-voz .pantallas::after { content: "♪"; color: var(--ok); font-size: 28px; }
+.solo-voz #c-local { visibility: hidden; }
+.solo-voz .pantallas { aspect-ratio: auto; min-height: 64px; display: grid; place-items: center; background: var(--campo); }
+.solo-voz .rejilla { height: auto; }
 .escribir .campo { flex: 1; }
 @media (max-width: 680px) { .conexion .c-dos { grid-template-columns: 1fr; } .mensajes li { max-width: 92%; } }
 .tres article.tarjeta { box-shadow: var(--sombra); }
@@ -153,7 +165,7 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
 </header>
 <div class="secure">
 <main>
-  <h1 data-t="sec_titulo">SECURE</h1>
+  <h1><span data-t="sec_titulo">SECURE</span> <span class="beta" data-t="sec_beta">Beta</span></h1>
   <p class="frase" data-t="sec_frase_v1"></p>
 
   <section class="tarjeta conexion" id="c-conexion">
@@ -162,6 +174,7 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
       <div class="c-lado" id="c-lado-invitar">
         <h2 data-t="sec_c_invitar"></h2>
         <p class="t" data-t="sec_c_invitar_texto"></p>
+        <label class="c-nombre"><span data-t="sec_c_tu_nombre"></span><input class="campo" id="c-yo" data-t-ph="sec_c_tu_nombre_ph" autocomplete="off" maxlength="60"></label>
         <div class="c-fila"><button type="button" class="boton principal" id="c-escuchar" data-t="sec_c_invitar_boton"></button><span class="c-puerto" id="c-puerto" hidden></span></div>
         <div class="c-codigo" id="c-codigo-caja" hidden>
           <span class="rotulo" data-t="sec_c_codigo_rotulo"></span>
@@ -178,11 +191,11 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
         <div class="c-fila"><input class="campo codigo" id="c-direccion" data-t-ph="sec_c_codigo_ph" spellcheck="false" autocomplete="off" autocapitalize="characters"><button type="button" class="boton principal" id="c-conectar" data-t="sec_c_entrar"></button></div>
       </div>
     </div>
-    <p class="c-huella"><span data-t="sec_c_tu_huella"></span> <code id="c-huella"></code></p>
   </section>
 
   <section class="tarjeta comparar" id="c-comparar" hidden>
     <h2 data-t="sec_s_titulo"></h2>
+    <p class="t quien" id="c-comparar-quien"></p>
     <p class="t" data-t="sec_s_texto"></p>
     <div class="numeros" id="c-numeros"></div>
     <label class="c-nombre"><span data-t="sec_s_nombre"></span><input class="campo" id="c-nombre" data-t-ph="sec_s_nombre_ph" autocomplete="off"></label>
@@ -199,9 +212,10 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
   </section>
 
   <section class="tarjeta chat" id="c-chat" hidden>
+    <div class="mas" id="c-mas" hidden><span data-t="sec_c_mas"></span> <b id="c-mas-codigo"></b> <button type="button" class="boton chico" id="c-mas-copiar" data-t="sec_c_copiar"></button></div>
     <div class="chat-cab"><h2 id="c-con"></h2><div class="c-fila"><button type="button" class="boton chico" id="c-voz" data-t="sec_l_voz"></button><button type="button" class="boton chico" id="c-video" data-t="sec_l_video"></button><button type="button" class="boton chico" id="c-cerrar" data-t="sec_c_cerrar"></button></div></div>
     <section class="llamada" id="c-llamada" hidden>
-      <div class="pantallas"><video id="c-remoto" autoplay playsinline></video><video id="c-local" autoplay playsinline muted></video></div>
+      <div class="pantallas"><div class="rejilla" id="c-rejilla" data-n="0"></div><video id="c-local" autoplay playsinline muted></video></div>
       <div class="c-fila llamada-botones"><span class="l-estado" id="c-l-estado"></span><button type="button" class="boton chico" id="c-silencio" aria-pressed="false" data-t="sec_l_silenciar"></button><button type="button" class="boton peligro chico" id="c-colgar" data-t="sec_l_colgar"></button></div>
     </section>
     <ol class="mensajes" id="c-mensajes"></ol>

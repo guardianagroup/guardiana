@@ -145,10 +145,13 @@
   const fasePinta = () => {
     const f = E.fase;
     $('c-conexion').hidden = !(f === 'sola' || f === 'escuchando');
-    $('c-comparar').hidden = f !== 'comparando' || !E.numeros;
+    const comparando = E.comparando || (f === 'comparando' ? E.numeros : null);
+    $('c-comparar').hidden = !comparando;
+    $('c-comparar-quien').textContent = E.comparando && E.contacto_nuevo ? t('sec_s_nuevo', { n: E.contacto_nuevo }) : '';
     $('c-espera').hidden = !(f === 'saludando' || f === 'abriendo' || f === 'buscando' || (f === 'comparando' && !E.numeros));
     $('c-chat').hidden = f !== 'lista';
-    $('c-huella').textContent = E.huella || RAYA;
+    // The key's fingerprint is no longer shown under the invitation (the owner, 15 Oct 2026: a
+    // second «clave» under the code confused people). The check that matters is the numbers.
     // Waiting: the door in the router gives a GS code; no door, the blind relay gives a GR one.
     const codigo = E.codigo || E.rele_codigo;
     // While the code is being prepared, one line; once it is on screen, the code box says it all.
@@ -161,11 +164,18 @@
     $('c-puerta-error').hidden = !(f === 'escuchando' && E.puerta_error && !codigo && E.rele_error);
     if (E.puerta_error) $('c-puerta-error').textContent = t('sec_c_sin_puerta', { p: E.puerto, e: E.puerta_error }) + (E.rele_error ? ' ' + t('sec_rele_fallo', { e: E.rele_error }) : '');
     $('c-espera-texto').textContent = t(f === 'saludando' ? 'sec_e_saludando' : f === 'abriendo' ? 'sec_e_abriendo' : f === 'buscando' ? 'sec_e_buscando' : 'sec_e_esperando');
-    if (E.numeros) $('c-numeros').innerHTML = E.numeros.map((x) => `<b>${esc(String(x).padStart(4, '0'))}</b>`).join('');
-    if (E.contacto && !$('c-nombre').value) $('c-nombre').value = E.contacto;
-    $('c-con').textContent = E.contacto ? t('sec_m_con', { n: E.contacto }) : '';
+    if (comparando) $('c-numeros').innerHTML = comparando.map((x) => `<b>${esc(String(x).padStart(4, '0'))}</b>`).join('');
+    if (E.comparando) { if (!$('c-nombre').dataset.nuevo) { $('c-nombre').value = ''; $('c-nombre').dataset.nuevo = '1'; } }
+    else { delete $('c-nombre').dataset.nuevo; if (E.contacto && !$('c-nombre').value && f !== 'lista') $('c-nombre').value = E.contacto; }
+    const g = E.grupo || {};
+    const nombres = g.nombres || [];
+    $('c-con').textContent = nombres.length > 2 ? t('sec_m_grupo', { n: nombres.join(' · ') }) : E.contacto ? t('sec_m_con', { n: E.contacto }) : '';
+    // The host, once someone is in: the code stays on screen to invite more.
+    const mas = $('c-mas');
+    if (g.anfitrion && E.codigo_grupo && nombres.length < (g.max || 6)) { mas.hidden = false; $('c-mas-codigo').textContent = E.codigo_grupo; } else mas.hidden = true;
     const ol = $('c-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 30;
-    ol.innerHTML = (E.mensajes || []).map((m) => `<li class="${m.mio ? 'mio' : ''}">${esc(m.texto)}<time>${esc(hora(m.t))}</time></li>`).join('');
+    const conNombre = nombres.length > 2;
+    ol.innerHTML = (E.mensajes || []).map((m) => `<li class="${m.mio ? 'mio' : ''}">${!m.mio && conNombre && m.de ? `<i class="de">${esc(m.de)}</i>` : ''}${esc(m.texto)}<time>${esc(hora(m.t))}</time></li>`).join('');
     if (abajo) ol.scrollTop = ol.scrollHeight;
   };
   en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); fasePinta(); pintaResumen(m.resumen); });
@@ -188,7 +198,13 @@
   en('secure_aviso', (m) => { const txt = t(m.clave) + (m.texto ? ' ' + m.texto : ''); aviso(txt); });
   const avisos = [];
   function aviso(txt) { avisos.push(txt); const ol = $('c-mensajes'); const li = document.createElement('li'); li.className = 'aviso-li'; li.textContent = txt; ol.appendChild(li); ol.scrollTop = ol.scrollHeight; }
-  $('c-escuchar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'escuchar', puerto: 0 }));
+  // Your name, as the others will see it (kept here; sent before inviting).
+  try { $('c-yo').value = localStorage.getItem('secure_nombre') || ''; } catch (_) {}
+  const mandaNombre = () => { const n = $('c-yo').value.trim().slice(0, 60); try { localStorage.setItem('secure_nombre', n); } catch (_) {} manda({ tipo: 'secure', accion: 'nombre', nombre: n }); };
+  $('c-yo').addEventListener('change', mandaNombre);
+  mandaNombre();
+  $('c-escuchar').addEventListener('click', () => { mandaNombre(); manda({ tipo: 'secure', accion: 'escuchar', puerto: 0 }); });
+  $('c-mas-copiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('c-mas-codigo').textContent); $('c-mas-copiar').textContent = t('sec_c_copiado'); setTimeout(() => { $('c-mas-copiar').textContent = t('sec_c_copiar'); }, 1500); } catch (_) {} });
   // Sending the code: WhatsApp (a tab with the message ready) or mail; the person picks who.
   const invitacion = () => t('sec_c_mensaje_invitacion', { c: $('c-codigo').textContent });
   $('c-whatsapp').addEventListener('click', () => manda({ tipo: 'navegar', texto: 'https://wa.me/?text=' + encodeURIComponent(invitacion()) }));
@@ -294,33 +310,51 @@
     grabador.start(120);
     arrancando = false;
   };
-  const preparaReproductor = (tipo) => {
-    const v = $('c-remoto');
-    fuente = new MediaSource();
-    v.src = URL.createObjectURL(fuente);
-    buffer = null;
-    fuente.addEventListener('sourceopen', () => {
-      try { buffer = fuente.addSourceBuffer(tipo); buffer.mode = 'sequence'; buffer.addEventListener('updateend', vacia); vacia(); } catch (e) { aviso(t('sec_l_no_reproduce')); }
+  // One player per member (a group) or one for the other person (a two-way talk): each
+  // sender's pieces go to their own tile, created when the first piece arrives.
+  const jugadores = new Map();
+  let tipoRemoto = null;
+  const jugador = (de) => {
+    if (jugadores.has(de)) return jugadores.get(de);
+    const tile = document.createElement('div'); tile.className = 'tile';
+    const v = document.createElement('video'); v.autoplay = true; v.playsInline = true;
+    const n = document.createElement('span'); n.className = 'tile-nombre'; n.textContent = de || (E.contacto || '');
+    tile.appendChild(v); tile.appendChild(n);
+    $('c-rejilla').appendChild(tile);
+    const j = { v, fuente: null, buffer: null, pendientes: [] };
+    j.fuente = new MediaSource();
+    v.src = URL.createObjectURL(j.fuente);
+    j.fuente.addEventListener('sourceopen', () => {
+      try { j.buffer = j.fuente.addSourceBuffer(tipoRemoto || mime(llamadaVideo)); j.buffer.mode = 'sequence'; j.buffer.addEventListener('updateend', () => vacia(j)); vacia(j); } catch (e) { aviso(t('sec_l_no_reproduce')); }
     });
     v.play().catch(() => {});
+    jugadores.set(de, j);
+    $('c-rejilla').dataset.n = String(jugadores.size);
+    return j;
   };
-  const vacia = () => {
-    if (!buffer || buffer.updating || !pendientes.length) return;
-    try { buffer.appendBuffer(pendientes.shift()); } catch (_) { pendientes = []; }
-    // Keep close to live: if the player fell more than 1.5 s behind, jump.
-    const v = $('c-remoto');
-    try { if (v.buffered.length && v.buffered.end(v.buffered.length - 1) - v.currentTime > 0.9) v.currentTime = v.buffered.end(v.buffered.length - 1) - 0.25; } catch (_) {}
+  const preparaReproductor = (tipo) => { tipoRemoto = tipo; };
+  const vacia = (j) => {
+    if (!j.buffer || j.buffer.updating || !j.pendientes.length) return;
+    try { j.buffer.appendBuffer(j.pendientes.shift()); } catch (_) { j.pendientes = []; }
+    // Keep close to live: if the player fell behind, jump.
+    try { if (j.v.buffered.length && j.v.buffered.end(j.v.buffered.length - 1) - j.v.currentTime > 0.9) j.v.currentTime = j.v.buffered.end(j.v.buffered.length - 1) - 0.25; } catch (_) {}
   };
-  en('secure_media', (m) => { (m.trozos || []).forEach((b) => { const s = atob(b); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); pendientes.push(u.buffer); }); vacia(); });
+  en('secure_media', (m) => {
+    (m.trozos || []).forEach((x) => {
+      const b = typeof x === 'string' ? x : x.b, de = typeof x === 'string' ? '' : (x.de || '');
+      const s = atob(b); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+      const j = jugador(de); j.pendientes.push(u.buffer); vacia(j);
+    });
+  });
   const paraMedios = () => {
     try { if (grabador && grabador.state !== 'inactive') grabador.stop(); } catch (_) {}
     grabador = null;
     if (local) { local.getTracks().forEach((x) => x.stop()); local = null; }
     $('c-local').srcObject = null;
-    try { if (fuente && fuente.readyState === 'open') fuente.endOfStream(); } catch (_) {}
-    fuente = null; buffer = null; pendientes = [];
+    jugadores.forEach((j) => { try { if (j.fuente && j.fuente.readyState === 'open') j.fuente.endOfStream(); } catch (_) {} j.v.removeAttribute('src'); });
+    jugadores.clear();
+    $('c-rejilla').innerHTML = ''; $('c-rejilla').dataset.n = '0';
     arrancando = false;
-    $('c-remoto').removeAttribute('src');
   };
   $('c-voz').addEventListener('click', () => { timbre(); manda({ tipo: 'secure', accion: 'llamar', video: false }); });
   $('c-video').addEventListener('click', () => { timbre(); manda({ tipo: 'secure', accion: 'llamar', video: true }); });

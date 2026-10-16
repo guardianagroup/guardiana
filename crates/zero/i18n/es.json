@@ -6,6 +6,7 @@
   "pestana_zero": "Navegador ZERO",
   "pestana_secure": "Comunicaciones",
   "sec_titulo": "SECURE",
+  "sec_beta": "Beta · en pruebas",
   "sec_frase": "Mensajes, archivos y llamadas privadas entre ordenadores. En desarrollo, con cifrado de extremo a extremo. Aún no envía nada.",
   "sec_mensajes": "Mensajes",
   "sec_mensajes_vacio": "Entre dos ordenadores. Aún no hay ninguno.",
@@ -961,7 +962,7 @@
   "sec_c_rele_buscando": "Sin puerta en el router. Conectando con el relé ciego…",
   "sec_e_buscando": "Buscando a la otra persona en el relé ciego…",
   "sec_rele_fallo": "No se pudo usar el relé: {e}",
-  "sec_paso_1": "Uno de los dos pulsa «Invitar» y le manda el código al otro.",
+  "sec_paso_1": "Uno de los dos pulsa «Invitar» y le manda el código al otro (o a varios: es un grupo).",
   "sec_paso_2": "El otro escribe ese código en «Tengo un código».",
   "sec_paso_3": "Los dos comparáis tres números y ya podéis hablar.",
   "sec_c_invitar": "Invitar",
@@ -978,5 +979,10 @@
   "sec_c_preparando": "Preparando tu código…",
   "sec_c_listo": "Envíaselo. En cuanto lo escriba, os veréis aquí.",
   "sec_c_via_puerta": "Camino: directo entre los dos ordenadores (puerta abierta en tu router).",
-  "sec_c_via_rele": "Camino: por el relé ciego de GUARDIANA (solo pasa datos ya cifrados; no puede leerlos)."
+  "sec_c_via_rele": "Camino: por el relé ciego de GUARDIANA (solo pasa datos ya cifrados; no puede leerlos).",
+  "sec_c_tu_nombre": "Tu nombre (como te verán los demás)",
+  "sec_c_tu_nombre_ph": "Francisco",
+  "sec_c_mas": "Para invitar a más personas, el mismo código:",
+  "sec_m_grupo": "Grupo: {n}",
+  "sec_s_nuevo": "Se une {n}. Comparad los números con esa persona."
 }
