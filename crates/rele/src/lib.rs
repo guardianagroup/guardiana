@@ -285,16 +285,19 @@ async fn puente(mut equipo: Conexion, movil: Conexion) {
         }
         let _ = tx.send(ws::Saliente::Cierre).await;
     });
-    tokio::select! {
-        _ = &mut escritor => {}
-        _ = &mut desde_equipo => {}
-        _ = &mut desde_movil => {}
-    }
-    // Give the close frame a moment to leave, then drop both sides.
-    let _ = tokio::time::timeout(Duration::from_secs(2), &mut escritor).await;
-    escritor.abort();
+    let escritor_acabo = tokio::select! {
+        _ = &mut escritor => true,
+        _ = &mut desde_equipo => false,
+        _ = &mut desde_movil => false,
+    };
+    // Both readers stop now (each holds half of a connection); the writer gets a moment to
+    // send its close frame, then both sides are dropped.
     desde_equipo.abort();
     desde_movil.abort();
+    if !escritor_acabo {
+        let _ = tokio::time::timeout(Duration::from_secs(2), &mut escritor).await;
+    }
+    escritor.abort();
 }
 
 /// The room named in a computer's first line, if the line is well formed.
