@@ -30,6 +30,11 @@ base64 = { workspace = true }
 # reaches with the certificate pinned from the QR code; tokio runs it on its own thread.
 wtransport = { workspace = true }
 tokio = { workspace = true }
+# The relay inside TLS (16 Oct 2026: a Movistar home line passed only what looks like a web
+# page): the same rustls, ring and roots already in the tree.
+rustls = { workspace = true }
+tokio-rustls = { workspace = true }
+webpki-roots = { workspace = true }
 
 [lints]
 workspace = true

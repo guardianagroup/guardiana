@@ -78,6 +78,9 @@ wtransport = { version = "0.7", default-features = false, features = ["self-sign
 # ring; tokio-rustls is the thin async adapter from the same project.
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12", "logging"] }
+# The public authorities a browser trusts, for the relay's certificate when a computer reaches it
+# inside TLS (16 Oct 2026); already in the tree through ureq, same version.
+webpki-roots = "1"
 # DNS server, forwarding resolver with TTL cache, and wire types (brief §2, §4).
 hickory-server = { version = "0.26", default-features = false }
 hickory-resolver = { version = "0.26", default-features = false, features = ["tokio"] }
