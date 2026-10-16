@@ -41,6 +41,11 @@ const B64: base64::engine::GeneralPurpose = base64::engine::general_purpose::STA
 pub enum Entrante {
     /// Someone connected to our listener: the socket to adopt.
     Aceptado(TcpStream),
+    /// The relay joined us with the other computer: the socket to adopt (bytes pass through
+    /// the relay, which cannot read them).
+    AceptadoRele(TcpStream),
+    /// The relay could not be reached, or nobody came.
+    ReleFallo(String),
     /// The router answered about the door.
     Puerta(Result<crate::puerta::Puerta, crate::puerta::SinPuerta>),
     /// The link is up (we accepted or connected).
@@ -125,6 +130,8 @@ enum Fase {
     Sola,
     /// Listening for someone.
     Escuchando,
+    /// Connecting through the relay with the other person's code: waiting for the pair.
+    Buscando,
     /// Link up; cards exchanged or about to be.
     Saludando,
     /// Both ephemeral keys known: the numbers are on screen, waiting for the person.
@@ -179,6 +186,13 @@ pub struct Secure {
     puerto: u16,
     puerta: Option<crate::puerta::Puerta>,
     puerta_error: Option<String>,
+    /// To hand the network threads a way back while listening.
+    tx: Option<Sender<Entrante>>,
+    /// The relay code on screen while waiting through the relay (no door could be opened).
+    rele_codigo: Option<String>,
+    /// This link goes through the blind relay.
+    rele: bool,
+    rele_error: Option<String>,
     tarjeta_otra: Option<tarjeta::Tarjeta>,
     sas_inicio: Option<Inicio>,
     sas_codigo: Option<Codigo>,
@@ -256,6 +270,10 @@ impl Secure {
             puerto: 0,
             puerta: None,
             puerta_error: None,
+            tx: None,
+            rele_codigo: None,
+            rele: false,
+            rele_error: None,
             tarjeta_otra: None,
             sas_inicio: None,
             sas_codigo: None,
@@ -315,6 +333,7 @@ impl Secure {
         let puerto = listener.local_addr().map_err(|e| e.to_string())?.port();
         let (tx, rx) = mpsc::channel();
         let tx2 = tx.clone();
+        let tx_rele = tx.clone();
         std::thread::spawn(move || {
             if let Ok((s, _)) = listener.accept() {
                 let _ = tx.send(Entrante::Aceptado(s));
@@ -326,9 +345,12 @@ impl Secure {
             let _ = tx2.send(Entrante::Puerta(r));
         });
         self.rx = Some(rx);
+        self.tx = Some(tx_rele);
         self.puerto = puerto;
         self.puerta = None;
         self.puerta_error = None;
+        self.rele_codigo = None;
+        self.rele_error = None;
         self.fase = Fase::Escuchando;
         self.cambio = true;
         Ok(puerto)
@@ -338,6 +360,21 @@ impl Secure {
     /// nowhere.
     pub fn conectar(&mut self, direccion: &str) -> Result<(), String> {
         self.cerrar("nueva conexión");
+        if let Some(sala) = crate::rele::sala_de(direccion) {
+            // The other person waits at the relay: go there and wait for the pair.
+            let (tx, rx) = mpsc::channel();
+            std::thread::spawn(move || {
+                let r = crate::rele::conecta(&crate::rele::direccion(), &sala);
+                let _ = tx.send(match r {
+                    Ok(s) => Entrante::AceptadoRele(s),
+                    Err(e) => Entrante::ReleFallo(e),
+                });
+            });
+            self.rx = Some(rx);
+            self.fase = Fase::Buscando;
+            self.cambio = true;
+            return Ok(());
+        }
         let direccion = match crate::puerta::lee_codigo(direccion) {
             Some((ip, puerto)) => format!("{ip}:{puerto}"),
             None => direccion.trim().to_owned(),
@@ -350,12 +387,21 @@ impl Secure {
             .ok_or_else(|| "dirección vacía".to_owned())?;
         let s =
             TcpStream::connect_timeout(&addr, Duration::from_secs(8)).map_err(|e| e.to_string())?;
-        self.adopta(s);
+        self.adopta(s, false);
         Ok(())
     }
 
-    fn adopta(&mut self, s: TcpStream) {
+    fn adopta(&mut self, s: TcpStream, rele: bool) {
         let _ = s.set_nodelay(true);
+        self.rele = rele;
+        self.monitor.transporte.directo = Some(!rele);
+        if rele {
+            self.monitor.anota(
+                ahora_s(),
+                Nivel::Info,
+                "enlace por el relé ciego (solo ve cifrado)",
+            );
+        }
         let (tx, rx) = mpsc::channel();
         let lector = match s.try_clone() {
             Ok(l) => l,
@@ -425,6 +471,10 @@ impl Secure {
             std::thread::spawn(move || p.cierra());
         }
         self.puerta_error = None;
+        self.tx = None;
+        self.rele_codigo = None;
+        self.rele = false;
+        self.rele_error = None;
         self.enlace = None;
         self.rx = None;
         self.tarjeta_otra = None;
@@ -466,7 +516,18 @@ impl Secure {
         }
         for e in pendientes {
             match e {
-                Entrante::Aceptado(s) => self.adopta(s),
+                Entrante::Aceptado(s) => self.adopta(s, false),
+                Entrante::AceptadoRele(s) => self.adopta(s, true),
+                Entrante::ReleFallo(e) => {
+                    self.rele_error = Some(e.clone());
+                    if self.fase == Fase::Buscando {
+                        self.aviso("sec_rele_fallo", e);
+                        self.cerrar("relé sin pareja");
+                    } else {
+                        self.rele_codigo = None;
+                    }
+                    self.cambio = true;
+                }
                 Entrante::Puerta(r) => {
                     match r {
                         Ok(p) => {
@@ -476,6 +537,7 @@ impl Secure {
                         Err(e) => {
                             self.puerta = None;
                             self.puerta_error = Some(e.to_string());
+                            self.espera_en_rele();
                         }
                     }
                     self.cambio = true;
@@ -490,6 +552,28 @@ impl Secure {
                 }
             }
         }
+    }
+
+    /// No door in the router: wait at the blind relay with a fresh code (while the listener
+    /// stays open for the same network).
+    fn espera_en_rele(&mut self) {
+        if self.fase != Fase::Escuchando || self.rele_codigo.is_some() {
+            return;
+        }
+        let Some(tx) = self.tx.clone() else { return };
+        let codigo = crate::rele::codigo_nuevo();
+        let Some(sala) = crate::rele::sala_de(&codigo) else {
+            return;
+        };
+        std::thread::spawn(move || {
+            let r = crate::rele::conecta(&crate::rele::direccion(), &sala);
+            let _ = tx.send(match r {
+                Ok(s) => Entrante::AceptadoRele(s),
+                Err(e) => Entrante::ReleFallo(e),
+            });
+        });
+        self.rele_codigo = Some(codigo);
+        self.cambio = true;
     }
 
     fn saluda(&mut self) {
@@ -985,7 +1069,7 @@ impl Secure {
             bytes_recibidos: 0,
             marca: (ahora_s(), 0, 0),
         });
-        self.monitor.transporte.directo = Some(true);
+        self.monitor.transporte.directo = Some(!self.rele);
         self.monitor.transporte.dtls_verificado = None;
         self.monitor.transporte.codec_audio = Some("Opus".to_owned());
         self.monitor.transporte.codec_video = video.then(|| "VP9".to_owned());
@@ -1173,6 +1257,7 @@ impl Secure {
         let fase = match self.fase {
             Fase::Sola => "sola",
             Fase::Escuchando => "escuchando",
+            Fase::Buscando => "buscando",
             Fase::Saludando => "saludando",
             Fase::Comparando => "comparando",
             Fase::Abriendo => "abriendo",
@@ -1186,6 +1271,9 @@ impl Secure {
             "puerto": self.puerto,
             "codigo": self.puerta.as_ref().map(crate::puerta::Puerta::codigo),
             "puerta_error": self.puerta_error,
+            "rele_codigo": self.rele_codigo,
+            "rele": self.rele,
+            "rele_error": self.rele_error,
             "huella": self.huella_propia(),
             "tarjeta": self.tarjeta(),
             "contacto": self.nombre_contacto,
@@ -1308,6 +1396,59 @@ mod tests {
         );
         let json = a.estado_json().to_string();
         assert!(!json.contains("127.0.0.1"), "no address on screen");
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn two_computers_without_a_door_meet_through_the_blind_relay() {
+        // A relay on this computer; the waiting side gets no door (there is no router here),
+        // so it shows a GR code; the other side pastes it and the relay joins them.
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
+        let listener = rt
+            .block_on(tokio::net::TcpListener::bind("127.0.0.1:0"))
+            .unwrap();
+        let direccion = listener.local_addr().unwrap().to_string();
+        rt.spawn(guardiana_rele::sirve(listener));
+        // The whole test process shares the variable; both sides read it.
+        std::env::set_var("GUARDIANA_RELE", &direccion);
+
+        let base = std::env::temp_dir().join(format!("guardiana-rele-{}", std::process::id()));
+        let (da, db) = (base.join("a"), base.join("b"));
+        std::fs::create_dir_all(&da).unwrap();
+        std::fs::create_dir_all(&db).unwrap();
+        let mut a = Secure::abre(&da, &da);
+        let mut b = Secure::abre(&db, &db);
+        a.escuchar(0).unwrap();
+        // Up to a few seconds for the router search to give up, then the relay code appears.
+        let mut codigo = None;
+        for _ in 0..200 {
+            a.tic();
+            if let Some(c) = a.estado_json()["rele_codigo"].as_str() {
+                codigo = Some(c.to_owned());
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let codigo = codigo.unwrap();
+        assert!(codigo.starts_with("GR-"));
+        b.conectar(&codigo).unwrap();
+        assert_eq!(b.estado_json()["fase"], "buscando");
+        gira(&mut a, &mut b, 40);
+        assert_eq!(a.estado_json()["fase"], "comparando", "{}", a.estado_json());
+        assert_eq!(a.numeros(), b.numeros());
+        a.sas_persona(true, "Bea");
+        b.sas_persona(true, "Ana");
+        gira(&mut a, &mut b, 25);
+        assert_eq!(a.estado_json()["fase"], "lista");
+        assert_eq!(a.estado_json()["rele"], true);
+        assert_eq!(a.monitor.transporte.directo, Some(false));
+        a.texto("por el relé");
+        gira(&mut a, &mut b, 15);
+        assert_eq!(b.mensajes.last().unwrap().2, "por el relé");
         let _ = std::fs::remove_dir_all(base);
     }
 }

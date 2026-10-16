@@ -48,15 +48,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
         with:
           toolchain: stable
+      # The root workspace first (new dependencies of crates/zero land there), then ZERO's own.
+      - name: cargo update --workspace (root)
+        run: cargo update --workspace
       - name: cargo update -p guardiana-zero
         working-directory: zero/navegador
         run: cargo update -p guardiana-zero
       - name: commit the lock to this branch
         run: |
-          if git diff --quiet -- zero/navegador/Cargo.lock; then echo "lock unchanged"; exit 0; fi
+          if git diff --quiet -- Cargo.lock zero/navegador/Cargo.lock; then echo "lock unchanged"; exit 0; fi
           git config user.name "guardiana-ci"
           git config user.email "ci@guardianagroup.com"
-          git add zero/navegador/Cargo.lock
+          git add Cargo.lock zero/navegador/Cargo.lock
           git commit -m "ZERO: Cargo.lock al día (cargo update -p guardiana-zero, desde CI)"
           git push origin "HEAD:${GITHUB_REF_NAME}"
 

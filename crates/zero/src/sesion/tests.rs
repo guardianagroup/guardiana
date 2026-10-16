@@ -133,37 +133,6 @@ fn the_three_product_tabs_open_together_and_the_panel_stays_in_front() {
     assert_eq!(e["pestanas"][0]["titulo"], "Radiografías");
     assert_eq!(e["pestanas"][1]["titulo"], "Navegador ZERO");
     assert_eq!(e["pestanas"][2]["titulo"], "Comunicaciones");
-}
-
-#[test]
-fn the_comunicaciones_page_buttons_reach_the_conversation() {
-    // 1.0.31 shipped with «Esperar llamada» doing nothing: the page's messages were not in the
-    // list of what an internal tab may ask for. The button sends exactly this.
-    let (mut s, _, _) = abre();
-    s.abre_guardiana("http://127.0.0.1:7443/");
-    let id = s.pestanas[2].id;
-    let o = s.mensaje(
-        Origen::Pestana(id),
-        crate::sesion::SECURE,
-        r#"{"tipo":"secure","accion":"escuchar","puerto":0}"#,
-    );
-    let e = del_tipo(&o, Origen::Pestana(id), "secure_estado").unwrap_or_default();
-    assert_eq!(e["fase"], "escuchando", "the page gets the new state back");
-    assert!(e["puerto"].as_u64().unwrap_or(0) > 0);
-    // And a web page cannot send it.
-    let _ = s.mensaje(
-        Origen::Barra,
-        BARRA,
-        r#"{"tipo":"navegar","texto":"example.com"}"#,
-    );
-    let web = s.pestanas[3].id;
-    assert!(s
-        .mensaje(
-            Origen::Pestana(web),
-            "https://example.com/",
-            r#"{"tipo":"secure","accion":"escuchar","puerto":0}"#
-        )
-        .is_empty());
 
     let id = s.pestanas[0].id;
     let o = s.mensaje(
@@ -188,6 +157,37 @@ fn the_comunicaciones_page_buttons_reach_the_conversation() {
     let _ = s.abre_guardiana(&format!("http://127.0.0.1:7443/?t={}", "b".repeat(64)));
     assert_eq!(s.pestanas.iter().filter(|p| p.fija).count(), 3);
     assert_eq!(s.pestanas.len(), 4);
+}
+
+#[test]
+fn the_comunicaciones_page_buttons_reach_the_conversation() {
+    // 1.0.31 shipped with «Esperar llamada» doing nothing: the page's messages were not in the
+    // list of what an internal tab may ask for. The button sends exactly this.
+    let (mut s, _, _) = abre();
+    let _ = s.abre_guardiana(&format!("http://127.0.0.1:7443/?t={}", "c".repeat(64)));
+    let id = s.pestanas[2].id;
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        crate::sesion::SECURE,
+        r#"{"tipo":"secure","accion":"escuchar","puerto":0}"#,
+    );
+    let e = del_tipo(&o, Origen::Pestana(id), "secure_estado").unwrap_or_default();
+    assert_eq!(e["fase"], "escuchando", "the page gets the new state back");
+    assert!(e["puerto"].as_u64().unwrap_or(0) > 0);
+    // And a web page cannot send it.
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"navegar","texto":"example.com"}"#,
+    );
+    let web = s.pestanas[3].id;
+    assert!(s
+        .mensaje(
+            Origen::Pestana(web),
+            "https://example.com/",
+            r#"{"tipo":"secure","accion":"escuchar","puerto":0}"#
+        )
+        .is_empty());
 }
 
 #[test]

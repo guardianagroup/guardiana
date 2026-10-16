@@ -1,0 +1,21 @@
+[package]
+name = "guardiana-rele"
+description = "GUARDIANA SECURE's blind relay: joins two connections that share a room and passes bytes it cannot read (everything arrives encrypted end to end); keeps nothing, writes no addresses"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+publish = false
+
+[[bin]]
+name = "guardiana-rele"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { workspace = true }
+
+[lints]
+workspace = true

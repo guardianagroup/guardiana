@@ -14,10 +14,11 @@ members = [
     "crates/cli",
     "crates/zero",
     "crates/secure",
+    "crates/rele",
 ]
 
 [workspace.package]
-version = "1.0.32"
+version = "1.0.33"
 edition = "2021"
 rust-version = "1.85"
 license = "GPL-3.0-or-later"
@@ -44,6 +45,7 @@ guardiana-verify = { path = "crates/verify" }
 guardiana-cli = { path = "crates/cli" }
 guardiana-zero = { path = "crates/zero" }
 guardiana-secure = { path = "crates/secure" }
+guardiana-rele = { path = "crates/rele" }
 
 # --- third-party, each justified (brief §2) ---
 # --- GUARDIANA ZERO, the browser (decision 197). All four were already in the tree through
