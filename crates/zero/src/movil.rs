@@ -70,6 +70,10 @@ pub enum Desde {
     },
     /// The phone hangs up.
     Colgar,
+    /// The phone answers the call ringing; `mime` is what its recorder produces.
+    Contestar(String),
+    /// The phone rejects the call ringing.
+    Rechazar,
     /// One recorded piece from the phone's microphone or camera.
     Media(Vec<u8>),
     /// The phone's page was brought to the front.
@@ -699,6 +703,15 @@ fn traduce(v: &Value) -> Option<Desde> {
                 .collect(),
         }),
         "colgar" => Some(Desde::Colgar),
+        "contestar" => Some(Desde::Contestar(
+            v["mime"]
+                .as_str()
+                .unwrap_or_default()
+                .chars()
+                .take(80)
+                .collect(),
+        )),
+        "rechazar" => Some(Desde::Rechazar),
         "visto" => Some(Desde::Visto),
         "reproduce" => Some(Desde::Reproduce(
             v["mimes"]

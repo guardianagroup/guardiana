@@ -426,6 +426,35 @@ fn ejecuta(o: Orden) {
                 }
             }
         }
+        Orden::AbreArchivo { ruta } => {
+            // A file that arrived in SECURE, with its own program (the session never asks
+            // this for a program or a script; Windows also sees it marked as from outside).
+            let r = Ancho::de(&ruta);
+            unsafe {
+                ShellExecuteW(
+                    Some(hwnd()),
+                    w!("open"),
+                    r.p(),
+                    PCWSTR::null(),
+                    PCWSTR::null(),
+                    SW_SHOWNORMAL,
+                );
+            }
+        }
+        Orden::MuestraArchivo { ruta } => {
+            // The folder, with the file selected.
+            let argumentos = Ancho::de(&format!("/select,\"{ruta}\""));
+            unsafe {
+                ShellExecuteW(
+                    Some(hwnd()),
+                    w!("open"),
+                    w!("explorer.exe"),
+                    argumentos.p(),
+                    PCWSTR::null(),
+                    SW_SHOWNORMAL,
+                );
+            }
+        }
         Orden::BorraNavegacion => borra_navegacion(),
         Orden::Seguimiento { estricto } => {
             con_vistas(|v| v.estricto = estricto);

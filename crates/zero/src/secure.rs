@@ -60,11 +60,18 @@ pub enum Entrante {
 /// window), a reader thread for what comes.
 struct Enlace {
     cola: Sender<Vec<u8>>,
+    /// Bytes handed to the writer, and bytes it already wrote to the network: their
+    /// difference is what is still on its way out (a file's «time left»).
+    encolados: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    escritos: std::sync::Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl Enlace {
     fn new(mut s: TcpStream) -> Self {
+        use std::sync::atomic::{AtomicU64, Ordering};
         let (cola, rx) = mpsc::channel::<Vec<u8>>();
+        let escritos = std::sync::Arc::new(AtomicU64::new(0));
+        let hilo = escritos.clone();
         std::thread::spawn(move || {
             while let Ok(cuerpo) = rx.recv() {
                 if s.write_all(&(cuerpo.len() as u32).to_be_bytes())
@@ -74,9 +81,14 @@ impl Enlace {
                 {
                     return;
                 }
+                hilo.fetch_add(cuerpo.len() as u64 + 4, Ordering::Relaxed);
             }
         });
-        Self { cola }
+        Self {
+            cola,
+            encolados: std::sync::Arc::new(AtomicU64::new(0)),
+            escritos,
+        }
     }
 
     fn manda(&self, v: &Value) -> Result<(), String> {
@@ -84,10 +96,51 @@ impl Enlace {
         if cuerpo.len() > MAX_FRAME {
             return Err("trama demasiado grande".to_owned());
         }
+        let n = cuerpo.len() as u64 + 4;
         self.cola
             .send(cuerpo)
-            .map_err(|_| "enlace cerrado".to_owned())
+            .map_err(|_| "enlace cerrado".to_owned())?;
+        self.encolados
+            .fetch_add(n, std::sync::atomic::Ordering::Relaxed);
+        Ok(())
     }
+
+    /// (handed over, written).
+    fn cuenta(&self) -> (u64, u64) {
+        use std::sync::atomic::Ordering;
+        (
+            self.encolados.load(Ordering::Relaxed),
+            self.escritos.load(Ordering::Relaxed),
+        )
+    }
+}
+
+/// A file sent in this conversation: when it started and, once the other side said it is
+/// whole on its disk, how long it took to get there.
+#[derive(Debug, Clone)]
+pub struct Enviado {
+    /// Its name.
+    pub nombre: String,
+    /// When its line went into the chat (unix s).
+    pub t: u64,
+    /// Size.
+    pub bytes: u64,
+    empezo: std::time::Instant,
+    /// Seconds from the first byte to «it is here», when the other side confirmed it.
+    pub llego_en: Option<f64>,
+}
+
+/// A file on its way out, followed until its last byte left this computer.
+struct Envio {
+    nombre: String,
+    /// Its size, as the page said.
+    bytes: u64,
+    /// The link's «handed over» count when it started, and when its last piece was handed.
+    inicio: u64,
+    fin: Option<u64>,
+    /// (when, written) a few times a second, for the speed.
+    marcas: VecDeque<(std::time::Instant, u64)>,
+    aviso: std::time::Instant,
 }
 
 fn lee_tramas(mut s: TcpStream, tx: Sender<Entrante>) {
@@ -150,6 +203,9 @@ struct Entrada {
     llave: Option<Llave>,
     archivo: Option<std::fs::File>,
     ruta: Option<PathBuf>,
+    /// Size the sender announced (0: unknown), and what arrived so far.
+    esperado: u64,
+    recibido: u64,
 }
 
 /// A file going out, block by block as the page hands them over.
@@ -157,6 +213,115 @@ struct Salida {
     nombre: String,
     trozos: Trozos,
     bytes: u64,
+}
+
+/// How long a call rings before «no answer».
+pub const TIMBRE_S: u64 = 45;
+
+/// A call coming in, ringing until the person answers or rejects it.
+struct Timbre {
+    clave: [u8; 32],
+    video: bool,
+    mime: Option<String>,
+    desde: u64,
+}
+
+/// A file that arrived, kept on screen with what can be done with it.
+#[derive(Debug, Clone)]
+pub struct Recibido {
+    /// Unique in this run of the program.
+    pub id: u64,
+    /// The name the other side gave it.
+    pub nombre: String,
+    /// Where it was saved (Descargas).
+    pub ruta: PathBuf,
+    /// Size.
+    pub bytes: u64,
+    /// When it arrived (unix s): the same second as its line in the chat.
+    pub t: u64,
+    /// The person deleted it.
+    pub borrado: bool,
+}
+
+impl Recibido {
+    /// A picture the page can show small.
+    pub fn imagen(&self) -> bool {
+        matches!(
+            extension(&self.nombre).as_str(),
+            "jpg" | "jpeg" | "png" | "gif" | "webp" | "bmp"
+        )
+    }
+
+    /// Safe to open with a double click: never a program or a script.
+    pub fn abrible(&self) -> bool {
+        !matches!(
+            extension(&self.nombre).as_str(),
+            "exe"
+                | "msi"
+                | "bat"
+                | "cmd"
+                | "com"
+                | "scr"
+                | "pif"
+                | "ps1"
+                | "psm1"
+                | "vbs"
+                | "vbe"
+                | "js"
+                | "jse"
+                | "wsf"
+                | "wsh"
+                | "hta"
+                | "lnk"
+                | "reg"
+                | "jar"
+                | "dll"
+                | "cpl"
+                | "msc"
+                | "msix"
+                | "appx"
+                | "url"
+                | "iso"
+                | "img"
+                | "vhd"
+                | "vhdx"
+                | "chm"
+                | "sh"
+                | "app"
+                | "dmg"
+                | "pkg"
+                | "docm"
+                | "xlsm"
+                | "pptm"
+        ) && !self.borrado
+    }
+
+    /// What the page draws.
+    pub fn json(&self) -> Value {
+        json!({ "id": self.id, "nombre": self.nombre, "bytes": self.bytes, "t": self.t, "borrado": self.borrado, "imagen": self.imagen(), "abrible": self.abrible() })
+    }
+}
+
+fn extension(nombre: &str) -> String {
+    nombre
+        .rsplit_once('.')
+        .map(|(_, e)| e.to_ascii_lowercase())
+        .unwrap_or_default()
+}
+
+static SIGUIENTE_RECIBIDO: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+/// Windows marks what came from outside («Mark of the Web»): SmartScreen and Office's
+/// protected view then treat the file with the same care as a download.
+fn marca_de_fuera(ruta: &Path) {
+    #[cfg(windows)]
+    {
+        let mut ads = ruta.as_os_str().to_owned();
+        ads.push(":Zone.Identifier");
+        let _ = std::fs::write(ads, b"[ZoneTransfer]\r\nZoneId=3\r\n");
+    }
+    #[cfg(not(windows))]
+    let _ = ruta;
 }
 
 /// A voice or video call over the same link: the page records (Opus, VP9) in short pieces, each
@@ -171,6 +336,9 @@ struct Llamada {
     mime_remoto: Option<String>,
     emisor: sframe::Emisor,
     receptor: Option<sframe::Receptor>,
+    /// The other side answered (until then this side is «calling…» and sends nothing).
+    conectada: bool,
+    /// Since when: the call (or, while calling, the ring).
     desde: u64,
     bytes_enviados: u64,
     bytes_recibidos: u64,
@@ -228,6 +396,21 @@ pub struct Secure {
     entrada: Option<Entrada>,
     salida: Option<Salida>,
     llamada: Option<Llamada>,
+    /// A call ringing here.
+    entrante: Option<Timbre>,
+    /// A file on its way out.
+    envio: Option<Envio>,
+    /// When something last went out on the link: a quiet link gets a small frame every
+    /// 20 s, so no router or office firewall drops it for being idle (16 Oct 2026: a chat via
+    /// the relay was cut after five minutes without messages).
+    ultimo_envio: std::time::Instant,
+    /// Files sent, with how long each took to arrive.
+    pub enviados: Vec<Enviado>,
+    /// Files that arrived in this conversation.
+    pub recibidos: Vec<Recibido>,
+    /// In a group: the host already called this member for the current call (so someone who
+    /// hangs up is not called again and again).
+    pub llamado_en_grupo: bool,
     archivos: Archivos,
     /// The last summary, signed, for the page to show and download.
     pub resumen: Option<Resumen>,
@@ -298,6 +481,12 @@ impl Secure {
             movil_idioma: "es".to_owned(),
             reproduce_otro: Vec::new(),
             reproduce_dicho: Vec::new(),
+            entrante: None,
+            envio: None,
+            ultimo_envio: std::time::Instant::now(),
+            enviados: Vec::new(),
+            recibidos: Vec::new(),
+            llamado_en_grupo: false,
             tx: None,
             rele_codigo: None,
             rele: false,
@@ -551,6 +740,8 @@ impl Secure {
         self.entrada = None;
         self.salida = None;
         self.llamada = None;
+        self.entrante = None;
+        self.llamado_en_grupo = false;
         self.reproduce_otro.clear();
         self.reproduce_dicho.clear();
         self.monitor.transporte = Default::default();
@@ -564,6 +755,7 @@ impl Secure {
     }
 
     fn manda(&mut self, v: Value) {
+        self.ultimo_envio = std::time::Instant::now();
         if let Some(e) = &self.enlace {
             if let Err(err) = e.manda(&v) {
                 self.aviso("sec_err_enlace", err);
@@ -575,6 +767,15 @@ impl Secure {
     /// Called every tick: everything the network thread left, and the handshake that follows.
     pub fn tic(&mut self) {
         self.movil_tic();
+        self.timbres();
+        self.sigue_envio();
+        if self.enlace.is_some()
+            && self.fase != Fase::Sola
+            && self.ultimo_envio.elapsed() >= Duration::from_secs(20)
+        {
+            // Older versions ignore a frame they do not know.
+            self.manda(json!({ "t": "latido" }));
+        }
         let mut pendientes = Vec::new();
         if let Some(rx) = &self.rx {
             while let Ok(e) = rx.try_recv() {
@@ -996,20 +1197,26 @@ impl Secure {
                 let video = c["video"].as_bool().unwrap_or(false);
                 let mime_remoto = c["mime"].as_str().map(|m| m.chars().take(80).collect());
                 let otro = self.numero_del_otro();
-                if c["m"] == "llamada" {
-                    // Answer with our own key and start sending as soon as the page does.
-                    if self.llamada.is_none() {
-                        self.empieza_llamada(video, false, "");
-                    }
-                    if let Some(l) = &mut self.llamada {
-                        l.receptor = Some(sframe::Receptor::new(&clave, otro));
-                        l.mime_remoto = mime_remoto;
-                    }
+                if c["m"] == "llamada" && self.llamada.is_none() {
+                    // It rings here: the person answers or rejects it (16 Oct 2026: before,
+                    // a call started by itself on the other side).
+                    self.entrante = Some(Timbre {
+                        clave,
+                        video,
+                        mime: mime_remoto,
+                        desde: ahora_s(),
+                    });
                     self.novedad = true;
-                    self.aviso("sec_llamada_entrante", "");
+                    self.aviso("sec_llamada_entrante", self.nombre_contacto.clone());
                 } else if let Some(l) = &mut self.llamada {
+                    // The answer (or both called at the same moment: each call is the other's
+                    // answer).
                     l.receptor = Some(sframe::Receptor::new(&clave, otro));
                     l.mime_remoto = mime_remoto;
+                    if !l.conectada {
+                        l.conectada = true;
+                        l.desde = ahora_s();
+                    }
                 }
                 self.cambio = true;
             }
@@ -1024,23 +1231,47 @@ impl Secure {
                 }
             }
             "cuelga" => {
-                if self.llamada.take().is_some() {
+                if self.entrante.take().is_some() {
+                    self.monitor
+                        .anota(ahora_s(), Nivel::Info, "llamada perdida");
+                    self.aviso("sec_llamada_perdida", self.nombre_contacto.clone());
+                    self.cambio = true;
+                } else if let Some(l) = self.llamada.take() {
                     self.monitor.anota(
                         ahora_s(),
                         Nivel::Info,
-                        "llamada terminada por la otra persona",
+                        if l.conectada {
+                            "llamada terminada por la otra persona"
+                        } else {
+                            "llamada rechazada por la otra persona"
+                        },
                     );
-                    self.monitor.transporte = Default::default();
-                    self.aviso("sec_llamada_colgada", "");
+                    self.fin_de_llamada();
+                    self.aviso(
+                        if l.conectada {
+                            "sec_llamada_colgada"
+                        } else {
+                            "sec_llamada_rechazada"
+                        },
+                        "",
+                    );
                     self.cambio = true;
                 }
             }
             "archivo" => {
-                // The file's key: open what already arrived and whatever comes next.
+                // The file's key: open what already arrived and whatever comes next. If its
+                // first key came before the blocks (archivo_inicio), the file is already being
+                // written: this one only closes it.
                 let nombre = limpia_nombre(c["nombre"].as_str().unwrap_or("archivo"));
                 let Ok(llave) = serde_json::from_value::<Llave>(c["llave"].clone()) else {
                     return;
                 };
+                if let Some(e) = self.entrada.as_mut().filter(|e| e.recepcion.is_some()) {
+                    e.esperado = llave.bytes;
+                    e.llave = Some(llave);
+                    self.vacia_bloques();
+                    return;
+                }
                 let Ok(recepcion) = Recepcion::new(&llave) else {
                     return;
                 };
@@ -1053,14 +1284,52 @@ impl Secure {
                     llave: None,
                     archivo: None,
                     ruta: None,
+                    esperado: 0,
+                    recibido: 0,
                 });
                 e.nombre = nombre;
+                e.esperado = llave.bytes;
                 e.recepcion = Some(recepcion);
                 e.llave = Some(llave);
                 e.archivo = archivo;
                 e.ruta = Some(ruta);
                 self.entrada = Some(e);
                 self.vacia_bloques();
+            }
+            "archivo_ok" => {
+                let nombre = limpia_nombre(c["nombre"].as_str().unwrap_or_default());
+                if let Some(x) = self
+                    .enviados
+                    .iter_mut()
+                    .find(|x| x.nombre == nombre && x.llego_en.is_none())
+                {
+                    x.llego_en = Some(x.empezo.elapsed().as_secs_f64());
+                    self.cambio = true;
+                }
+            }
+            "archivo_inicio" => {
+                // A file starts (16 Oct 2026): its key comes first, so every block goes to
+                // disk as it arrives and the screen can show how much is left.
+                let nombre = limpia_nombre(c["nombre"].as_str().unwrap_or("archivo"));
+                let Ok(inicial) = serde_json::from_value::<Llave>(c["llave"].clone()) else {
+                    return;
+                };
+                let Ok(recepcion) = Recepcion::new(&inicial) else {
+                    return;
+                };
+                let ruta = nombre_libre(&self.descargas, &nombre);
+                let archivo = std::fs::File::create(&ruta).ok();
+                self.entrada = Some(Entrada {
+                    nombre,
+                    bloques_pendientes: VecDeque::new(),
+                    recepcion: Some(recepcion),
+                    llave: None,
+                    archivo,
+                    ruta: Some(ruta),
+                    esperado: c["bytes"].as_u64().unwrap_or(0),
+                    recibido: 0,
+                });
+                self.cambio = true;
             }
             _ => {}
         }
@@ -1080,6 +1349,8 @@ impl Secure {
             llave: None,
             archivo: None,
             ruta: None,
+            esperado: 0,
+            recibido: 0,
         });
         e.bloques_pendientes.push_back((n, b));
         self.vacia_bloques();
@@ -1093,6 +1364,7 @@ impl Secure {
                 while let Some((n, b)) = e.bloques_pendientes.pop_front() {
                     match r.mete(n, &b) {
                         Ok(plano) => {
+                            e.recibido += plano.len() as u64;
                             if f.write_all(&plano).is_err() {
                                 fallo = Some("sec_err_archivo");
                                 break;
@@ -1128,6 +1400,20 @@ impl Secure {
                 };
                 if ok {
                     let n = e.nombre.clone();
+                    if let Some(ruta) = &e.ruta {
+                        marca_de_fuera(ruta);
+                        self.recibidos.push(Recibido {
+                            id: SIGUIENTE_RECIBIDO
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+                            nombre: n.clone(),
+                            ruta: ruta.clone(),
+                            bytes: e.llave.as_ref().map_or(0, |l| l.bytes),
+                            t: ahora_s(),
+                            borrado: false,
+                        });
+                    }
+                    // Tell the sender it is here, whole: its screen shows how long it took.
+                    self.manda_olm(json!({ "m": "archivo_ok", "nombre": n }));
                     self.archivos.recibidos += 1;
                     self.archivos.bytes += e.llave.as_ref().map_or(0, |l| l.bytes);
                     self.monitor
@@ -1169,6 +1455,7 @@ impl Secure {
             mime_remoto: None,
             emisor: sframe::Emisor::new(&clave, yo),
             receptor: None,
+            conectada: !inicia,
             desde: ahora_s(),
             bytes_enviados: 0,
             bytes_recibidos: 0,
@@ -1232,10 +1519,101 @@ impl Secure {
             self.manda_olm(json!({ "m": "cuelga" }));
             self.monitor
                 .anota(ahora_s(), Nivel::Info, "llamada terminada");
-            self.monitor.transporte = Default::default();
-            self.monitor.cifrado.sframe = None;
+            self.fin_de_llamada();
             self.cambio = true;
         }
+    }
+
+    /// The call's figures go; how the two computers are linked stays on screen (16 Oct 2026:
+    /// after hanging up it said «Sin conexión todavía» with the conversation still open).
+    fn fin_de_llamada(&mut self) {
+        let directo = self.monitor.transporte.directo;
+        self.monitor.transporte = Default::default();
+        self.monitor.transporte.directo = directo;
+        self.monitor.cifrado.sframe = None;
+    }
+
+    /// The person answers the call ringing here, recording in `mime`.
+    pub fn contestar(&mut self, mime: &str) -> Result<(), String> {
+        let Some(t) = self.entrante.take() else {
+            return Ok(());
+        };
+        if self.fase != Fase::Lista {
+            return Err("sec_no_lista".to_owned());
+        }
+        self.empieza_llamada(t.video, false, mime);
+        let otro = self.numero_del_otro();
+        if let Some(l) = &mut self.llamada {
+            l.receptor = Some(sframe::Receptor::new(&t.clave, otro));
+            l.mime_remoto = t.mime;
+        }
+        self.cambio = true;
+        Ok(())
+    }
+
+    /// The person rejects the call ringing here.
+    pub fn rechazar(&mut self) {
+        if self.entrante.take().is_some() {
+            self.manda_olm(json!({ "m": "cuelga" }));
+            self.monitor
+                .anota(ahora_s(), Nivel::Info, "llamada rechazada");
+            self.cambio = true;
+        }
+    }
+
+    /// A call is ringing here: with video?
+    pub fn suena(&self) -> Option<bool> {
+        self.entrante.as_ref().map(|t| t.video)
+    }
+
+    /// The call is up on both sides.
+    pub fn conectada(&self) -> bool {
+        self.llamada.as_ref().is_some_and(|l| l.conectada)
+    }
+
+    /// Rings that nobody answered, either way.
+    fn timbres(&mut self) {
+        let ahora = ahora_s();
+        if self
+            .llamada
+            .as_ref()
+            .is_some_and(|l| !l.conectada && ahora.saturating_sub(l.desde) > TIMBRE_S)
+        {
+            self.llamada = None;
+            self.manda_olm(json!({ "m": "cuelga" }));
+            self.monitor
+                .anota(ahora_s(), Nivel::Info, "llamada sin respuesta");
+            self.fin_de_llamada();
+            self.aviso("sec_llamada_sin_respuesta", self.nombre_contacto.clone());
+            self.cambio = true;
+        }
+        if self
+            .entrante
+            .as_ref()
+            .is_some_and(|t| ahora.saturating_sub(t.desde) > TIMBRE_S + 5)
+        {
+            self.entrante = None;
+            self.aviso("sec_llamada_perdida", self.nombre_contacto.clone());
+            self.cambio = true;
+        }
+    }
+
+    /// A file that arrived, by its id.
+    pub fn recibido(&self, id: u64) -> Option<&Recibido> {
+        self.recibidos.iter().find(|r| r.id == id)
+    }
+
+    /// The person deletes a file that arrived (from Descargas too).
+    pub fn borra_recibido(&mut self, id: u64) -> bool {
+        let Some(r) = self.recibidos.iter_mut().find(|r| r.id == id && !r.borrado) else {
+            return false;
+        };
+        let ok = std::fs::remove_file(&r.ruta).is_ok() || !r.ruta.exists();
+        if ok {
+            r.borrado = true;
+            self.cambio = true;
+        }
+        ok
     }
 
     /// One recorded piece from the page: encrypt it under the media layer and send it.
@@ -1380,16 +1758,100 @@ impl Secure {
     }
 
     /// A file starts: the page will hand the pieces over.
-    pub fn archivo_empieza(&mut self, nombre: &str) -> Result<(), String> {
+    pub fn archivo_empieza(&mut self, nombre: &str, bytes: u64) -> Result<(), String> {
         if self.fase != Fase::Lista {
             return Err("sec_no_lista".to_owned());
         }
+        let nombre = limpia_nombre(nombre);
+        let trozos = Trozos::new().map_err(|e| e.to_string())?;
+        // The key first: the other side writes each block to disk as it comes.
+        self.manda_olm(json!({ "m": "archivo_inicio", "nombre": nombre, "llave": trozos.llave_inicial(), "bytes": bytes }));
+        let inicio = self.enlace.as_ref().map_or(0, |e| e.cuenta().0);
+        self.enviados.push(Enviado {
+            nombre: nombre.clone(),
+            t: 0,
+            bytes,
+            empezo: std::time::Instant::now(),
+            llego_en: None,
+        });
+        self.envio = Some(Envio {
+            nombre: nombre.clone(),
+            bytes,
+            inicio,
+            fin: None,
+            marcas: VecDeque::new(),
+            aviso: std::time::Instant::now(),
+        });
         self.salida = Some(Salida {
-            nombre: limpia_nombre(nombre),
-            trozos: Trozos::new().map_err(|e| e.to_string())?,
+            nombre,
+            trozos,
             bytes: 0,
         });
+        self.cambio = true;
         Ok(())
+    }
+
+    /// The file going out: how far, and the seconds left at the speed of the last seconds.
+    fn sigue_envio(&mut self) {
+        let Some((encolados, escritos)) = self.enlace.as_ref().map(Enlace::cuenta) else {
+            self.envio = None;
+            return;
+        };
+        let Some(v) = &mut self.envio else {
+            return;
+        };
+        let ahora = std::time::Instant::now();
+        if v.marcas
+            .back()
+            .is_none_or(|(t, _)| ahora.duration_since(*t) >= Duration::from_millis(250))
+        {
+            v.marcas.push_back((ahora, escritos));
+            while v.marcas.len() > 24 {
+                v.marcas.pop_front();
+            }
+        }
+        if v.fin.is_some_and(|f| escritos >= f) {
+            self.envio = None;
+            self.cambio = true;
+            return;
+        }
+        let _ = encolados;
+        if ahora.duration_since(v.aviso) >= Duration::from_millis(500) {
+            v.aviso = ahora;
+            self.cambio = true;
+        }
+    }
+
+    /// The file going out, for the screen (null when none).
+    pub fn envio_json(&self) -> Value {
+        let (Some(v), Some(e)) = (&self.envio, &self.enlace) else {
+            return Value::Null;
+        };
+        let (encolados, escritos) = e.cuenta();
+        // In base64 inside JSON a file takes about 4/3 of its size, plus a little per block.
+        let total = v
+            .fin
+            .map_or(v.bytes.saturating_mul(4) / 3 + v.bytes / 400 + 1, |f| {
+                f.saturating_sub(v.inicio)
+            })
+            .max(1);
+        let hecho = escritos.saturating_sub(v.inicio).min(total);
+        let velocidad = match (v.marcas.front(), v.marcas.back()) {
+            (Some((t0, b0)), Some((t1, b1))) if t1 > t0 => {
+                (b1.saturating_sub(*b0)) as f64 / t1.duration_since(*t0).as_secs_f64()
+            }
+            _ => 0.0,
+        };
+        let restante =
+            (velocidad > 1.0).then(|| ((total - hecho) as f64 / velocidad).ceil() as u64);
+        json!({
+            "nombre": v.nombre,
+            "bytes": v.bytes,
+            "pct": (hecho * 100 / total).min(if v.fin.is_some() { 100 } else { 99 }),
+            "restante_s": restante,
+            "kbps": (velocidad * 8.0 / 1000.0) as u64,
+            "cola": encolados.saturating_sub(escritos),
+        })
     }
 
     /// One piece of the file, base64 from the page; `ultimo` closes it.
@@ -1409,6 +1871,18 @@ impl Secure {
             let nombre = s.nombre.clone();
             let llave = s.trozos.termina().map_err(|e| e.to_string())?;
             self.manda_olm(json!({ "m": "archivo", "nombre": nombre, "llave": llave }));
+            let hasta = self.enlace.as_ref().map_or(0, |e| e.cuenta().0);
+            if let Some(v) = &mut self.envio {
+                v.fin = Some(hasta);
+            }
+            if let Some(x) = self
+                .enviados
+                .iter_mut()
+                .rev()
+                .find(|x| x.nombre == nombre && x.t == 0)
+            {
+                x.t = ahora_s();
+            }
             self.archivos.enviados += 1;
             self.archivos.bytes += s.bytes;
             self.monitor
@@ -1579,6 +2053,10 @@ impl Secure {
                     let _ = self.llamar(video, &mime);
                 }
                 Desde::Colgar if aprobado => self.colgar(),
+                Desde::Contestar(mime) if aprobado => {
+                    let _ = self.contestar(&mime);
+                }
+                Desde::Rechazar if aprobado => self.rechazar(),
                 Desde::Media(b) if aprobado => {
                     let _ = self.media_bytes(b);
                 }
@@ -1663,7 +2141,12 @@ impl Secure {
             "tarjeta": self.tarjeta(),
             "contacto": self.nombre_contacto,
             "numeros": self.numeros().map(|(a, b, c)| vec![a, b, c]),
-            "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto })),
+            "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "conectada": l.conectada, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto })),
+            "entrante": self.entrante.as_ref().map(|t| json!({ "video": t.video, "de": self.nombre_contacto, "desde": t.desde })),
+            "recibidos": self.recibidos.iter().map(Recibido::json).collect::<Vec<_>>(),
+            "envio": self.envio_json(),
+            "enviados": self.enviados.iter().filter(|x| x.t > 0).map(|x| json!({ "nombre": x.nombre, "t": x.t, "bytes": x.bytes, "llego_en": x.llego_en })).collect::<Vec<_>>(),
+            "recibiendo": self.entrada.as_ref().filter(|e| e.recepcion.is_some()).map(|e| json!({ "nombre": e.nombre, "bytes": e.esperado, "hecho": e.recibido })),
             "movil": self.movil_json(),
             "mensajes": self.mensajes.iter().rev().take(200).rev().map(|(t, mio, x, de)| json!({ "t": t, "mio": mio, "texto": x, "de": de })).collect::<Vec<_>>(),
             "contactos": self.agenda.contactos().iter().map(|c| json!({ "nombre": c.nombre, "verificado_en": c.verificado_en, "estado": matches!(c.estado, agenda::Estado::Verificado) })).collect::<Vec<_>>(),
@@ -1834,7 +2317,8 @@ mod tests {
         let plano: Vec<u8> = (0..(guardiana_secure::archivo::BLOQUE * 2 + 321))
             .map(|i| (i % 211) as u8)
             .collect();
-        a.archivo_empieza("informe.pdf").unwrap();
+        a.archivo_empieza("informe.pdf", plano.len() as u64)
+            .unwrap();
         let trozos: Vec<&[u8]> = plano.chunks(guardiana_secure::archivo::BLOQUE).collect();
         for (i, t) in trozos.iter().enumerate() {
             a.archivo_trozo(&B64.encode(t), i + 1 == trozos.len())
@@ -1843,6 +2327,15 @@ mod tests {
         gira(&mut a, &mut b, 30);
         let recibido = std::fs::read(db.join("informe.pdf")).unwrap();
         assert_eq!(recibido, plano);
+        // The receiver said it is whole: the sender knows how long it took, and both screens
+        // show the file (a card with its actions on the receiving side).
+        assert!(a.enviados[0].llego_en.is_some(), "{:?}", a.enviados);
+        assert_eq!(b.recibidos.len(), 1);
+        assert_eq!(b.estado_json()["recibidos"][0]["nombre"], "informe.pdf");
+        assert!(b.estado_json()["recibidos"][0]["abrible"]
+            .as_bool()
+            .unwrap());
+        assert!(a.estado_json()["envio"].is_null(), "the send is over");
         assert!(b.mensajes.last().unwrap().2.contains("informe.pdf"));
         assert!(b.monitor.cifrado.recibidos >= 2);
 
