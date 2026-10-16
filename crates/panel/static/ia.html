@@ -48,16 +48,26 @@
 <p class="lead" data-t="alcance_lead"></p>
 <div id="alcances"></div>
 
-<div class="card">
+<div class="card alcance-facil">
   <h2 data-t="alcance_nuevo_titulo"></h2>
-  <p class="lead" data-t="alcance_nuevo_lead"></p>
-  <form id="alcance-form" class="filters">
-    <label><span data-t="col_dispositivo"></span><select name="device_id" id="a-device"></select></label>
-    <label><span data-t="alcance_campo"></span><textarea name="patrones" id="a-patrones" rows="5" class="mono wide" placeholder="api.anthropic.com&#10;github.com"></textarea></label>
-    <button type="submit" data-t="alcance_guardar"></button> <span id="a-msg" class="ok" role="status" aria-live="polite"></span>
+  <form id="alcance-form">
+    <p class="paso"><b data-t="alcance_paso1"></b></p>
+    <select name="device_id" id="a-device"></select>
+    <p class="paso"><b data-t="alcance_paso2"></b></p>
+    <div class="rapidos" id="a-rapidos">
+      <button type="button" class="chip" aria-pressed="false" data-dominios="anthropic.com claude.ai claude.com">Claude</button>
+      <button type="button" class="chip" aria-pressed="false" data-dominios="openai.com chatgpt.com">ChatGPT</button>
+      <button type="button" class="chip" aria-pressed="false" data-dominios="gemini.google.com generativelanguage.googleapis.com">Gemini</button>
+      <button type="button" class="chip" aria-pressed="false" data-dominios="x.ai grok.com">Grok</button>
+      <button type="button" class="chip" aria-pressed="false" data-dominios="githubcopilot.com github.com">GitHub Copilot</button>
+      <button type="button" class="chip" aria-pressed="false" data-dominios="github.com">GitHub</button>
+    </div>
+    <p class="paso"><b data-t="alcance_paso3"></b></p>
+    <textarea name="patrones" id="a-patrones" rows="4" class="mono wide" placeholder="api.anthropic.com&#10;github.com"></textarea>
+    <p><button type="submit" data-t="alcance_guardar"></button> <span id="a-msg" class="ok" role="status" aria-live="polite"></span></p>
   </form>
+  <details class="como"><summary data-t="alcance_como"></summary><p data-t="alcance_nuevo_lead"></p><p class="limit" data-t="alcance_limite"></p></details>
 </div>
-<p class="limit" data-t="alcance_limite"></p>
 </main>
 <footer><span data-t="pie"></span></footer>
 <script src="/static/app.js"></script>

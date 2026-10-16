@@ -2015,8 +2015,26 @@
         if (keep && opts.some((o) => o[0] === keep)) sel.value = keep;
         const current = opts.find((o) => o[0] === sel.value);
         $('a-patrones').value = current ? current[2] : '';
-        sel.onchange = () => { const c = opts.find((o) => o[0] === sel.value); $('a-patrones').value = c ? c[2] : ''; };
+        sel.onchange = () => { const c = opts.find((o) => o[0] === sel.value); $('a-patrones').value = c ? c[2] : ''; marcaRapidos(); };
+        marcaRapidos();
       };
+      // The usual AIs, one tap each (the owner, 16 Oct 2026: «hazlo super fácil»): a chip adds its
+      // services to the list below, or takes them out; the list stays the source of truth.
+      const lineas = () => $('a-patrones').value.split(/\n+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
+      const marcaRapidos = () => {
+        const hay = new Set(lineas());
+        document.querySelectorAll('#a-rapidos .chip').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.dominios.split(' ').every((d) => hay.has(d)))));
+      };
+      $('a-rapidos').addEventListener('click', (e) => {
+        const c = e.target.closest('.chip'); if (!c) return;
+        const ds = c.dataset.dominios.split(' ');
+        let ls = lineas();
+        if (c.getAttribute('aria-pressed') === 'true') ls = ls.filter((x) => !ds.includes(x));
+        else ds.forEach((d) => { if (!ls.includes(d)) ls.push(d); });
+        $('a-patrones').value = ls.join('\n');
+        marcaRapidos();
+      });
+      $('a-patrones').addEventListener('input', marcaRapidos);
       paint(await api('/api/ia'));
       $('alcance-form').addEventListener('submit', async (e) => {
         e.preventDefault();

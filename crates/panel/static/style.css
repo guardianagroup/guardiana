@@ -363,6 +363,14 @@ details.av-avanzado > summary { margin: 10px 0 4px; }
 details.av-avanzado h3 { margin: 10px 0 4px; font-size: 15px; }
 details.av-avanzado p { margin: 8px 0; }
 
+/* «Limitar una IA» (16 Oct 2026): three plain steps and quick picks. */
+.alcance-facil .paso { margin: 18px 0 8px; }
+.alcance-facil select, .alcance-facil textarea { width: 100%; max-width: 520px; }
+.alcance-facil .rapidos { display: flex; flex-wrap: wrap; gap: 8px; }
+.alcance-facil .chip { border-radius: 999px; padding: 7px 14px; background: transparent; border: 1px solid var(--line, #33405c); color: inherit; font-weight: 600; cursor: pointer; }
+.alcance-facil .chip[aria-pressed="true"] { background: var(--accent, #5b7cff); border-color: var(--accent, #5b7cff); color: #fff; }
+.alcance-facil .como { margin-top: 14px; }
+.alcance-facil .como summary { cursor: pointer; color: var(--muted, #9aa6c0); }
 /* «GUARDIANA por dentro» (1.0.22): the way in, well in sight on the start page and on «Tu
    antivirus» (the owner, 13 Oct 2026: «quiero que esté bien visible en la portada»). */
 .por-dentro-cta { display: flex; align-items: center; gap: 16px; margin: 14px 0 18px; padding: 16px 18px; border-radius: 14px; text-decoration: none; color: #e8f4fb; background: radial-gradient(120% 140% at 0% 0%, #12304a 0%, #0a1726 45%, #04070d 100%); border: 1px solid #1d3550; box-shadow: 0 10px 30px rgba(4,7,13,.25); transition: transform .15s ease, box-shadow .15s ease; }
