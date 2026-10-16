@@ -59,4 +59,6 @@ runcmd:
   - ufw --force enable
   - curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
   - bash /opt/guardiana-rele/actualizar.sh
-  - bash /opt/guardiana-rele/guardiana/crates/rele/servidor-tls.sh
+  # El segundo servidor (América, 16 oct 2026) usa el mismo archivo cambiando solo este nombre
+  # por rele-am.guardianagroup.com, una vez que el DNS apunte a él.
+  - bash /opt/guardiana-rele/guardiana/crates/rele/servidor-tls.sh rele.guardianagroup.com

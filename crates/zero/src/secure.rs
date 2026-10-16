@@ -681,6 +681,7 @@ impl Secure {
             Some(p) => p,
             None => 0,
         };
+        crate::rele::mide_cercania();
         let listener = TcpListener::bind(("0.0.0.0", pedido))
             .or_else(|_| TcpListener::bind(("0.0.0.0", 0)))
             .map_err(|e| e.to_string())?;
@@ -720,10 +721,11 @@ impl Secure {
     pub fn conectar(&mut self, direccion: &str) -> Result<(), String> {
         self.cerrar("nueva conexión");
         if let Some(sala) = crate::rele::sala_de(direccion) {
-            // The other person waits at the relay: go there and wait for the pair.
+            // The other person waits at a relay: go to all of them and keep the one where
+            // the pair completes.
             let (tx, rx) = mpsc::channel();
             std::thread::spawn(move || {
-                let r = crate::rele::conecta(&crate::rele::direccion(), &sala);
+                let r = crate::rele::conecta_a_cualquiera(&sala);
                 let _ = tx.send(match r {
                     Ok(s) => Entrante::AceptadoRele(s),
                     Err(e) => Entrante::ReleFallo(e),
@@ -1048,8 +1050,12 @@ impl Secure {
         self.rx = Some(rx);
         self.tx = Some(tx.clone());
         let sala = r.sala.clone();
+        // Both sides derive the same relay from the room, so they meet.
+        let indice = usize::from(sala.bytes().next().unwrap_or(0) % 16) % crate::rele::RELES.len();
+        let rele = std::env::var("GUARDIANA_RELE")
+            .unwrap_or_else(|_| crate::rele::RELES[indice].direccion());
         std::thread::spawn(move || {
-            let res = crate::rele::conecta(&crate::rele::direccion(), &sala);
+            let res = crate::rele::conecta(&rele, &sala);
             let _ = tx.send(match res {
                 Ok(s) => Entrante::AceptadoRele(s),
                 Err(e) => Entrante::ReleFallo(e),
@@ -1086,8 +1092,12 @@ impl Secure {
         let Some(sala) = crate::rele::sala_de(&codigo) else {
             return;
         };
+        // Wait at the relay the code names (the nearest measured, see `rele::mide_cercania`).
+        let rele = std::env::var("GUARDIANA_RELE").unwrap_or_else(|_| {
+            crate::rele::RELES[crate::rele::rele_de_codigo(&codigo)].direccion()
+        });
         std::thread::spawn(move || {
-            let r = crate::rele::conecta(&crate::rele::direccion(), &sala);
+            let r = crate::rele::conecta(&rele, &sala);
             let _ = tx.send(match r {
                 Ok(s) => Entrante::AceptadoRele(s),
                 Err(e) => Entrante::ReleFallo(e),

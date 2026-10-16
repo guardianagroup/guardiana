@@ -11,7 +11,9 @@
 # El puerto 80 queda abierto solo para que Let's Encrypt compruebe el nombre al renovar; nadie
 # escucha en él el resto del tiempo. No se guarda nada de nadie.
 set -euo pipefail
-NOMBRE=rele.guardianagroup.com
+# El nombre de este servidor: el primero por defecto; el de América se pasa como argumento
+# (16 oct 2026): bash servidor-tls.sh rele-am.guardianagroup.com
+NOMBRE="${1:-rele.guardianagroup.com}"
 GRUPO="$(id -gn rele)"
 apt-get install -y -q certbot >/dev/null
 ufw allow 80/tcp >/dev/null

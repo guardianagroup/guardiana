@@ -19,7 +19,39 @@ use std::time::Duration;
 
 use sha2::{Digest, Sha256};
 
-/// Where the relay lives (443 so it passes any office firewall).
+/// One of GUARDIANA's relays.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rele {
+    /// The name in its certificate.
+    pub nombre: &'static str,
+    /// Its address, for a computer whose DNS cannot resolve the name (tried after the name;
+    /// empty while the server is not up yet).
+    pub ip: &'static str,
+}
+
+impl Rele {
+    /// `nombre:443`.
+    #[must_use]
+    pub fn direccion(&self) -> String {
+        format!("{}:443", self.nombre)
+    }
+}
+
+/// The relays, in a fixed order the invitation code refers to (two bits of it, since 16 Oct
+/// 2026: «el relé de América»). The first one is the original, Nuremberg; the second, America.
+/// A code made by an older version carries random bits there, so the joining side tries every
+/// relay at once and the one where the other person waits wins.
+pub const RELES: &[Rele] = &[
+    Rele {
+        nombre: "rele.guardianagroup.com",
+        ip: "5.75.173.240",
+    },
+    Rele {
+        nombre: "rele-am.guardianagroup.com",
+        ip: "",
+    },
+];
+/// Where the first relay lives (443 so it passes any office firewall).
 pub const RELE: &str = "rele.guardianagroup.com:443";
 /// The same relay by address, for a computer whose DNS cannot resolve the name (15 Oct 2026:
 /// the first server, Nuremberg). Tried only after the name.
@@ -29,16 +61,53 @@ pub const RELE_NOMBRE: &str = "rele.guardianagroup.com";
 /// The letters of a code: no 0/O/1/I, so it reads well aloud.
 const ALFABETO: &[u8; 32] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-/// The relay's address: the environment's, or the fixed one.
-pub fn direccion() -> String {
-    std::env::var("GUARDIANA_RELE").unwrap_or_else(|_| RELE.to_owned())
+/// The nearest relay, measured once (the time to open a TCP connection to each, two seconds
+/// at most); 0 until measured, or when the environment names a relay.
+static PREFERIDO: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+
+/// Measure once which relay answers fastest from here, in its own thread; `preferido()` reads
+/// the result when it is in. Nothing is sent but a connection that is closed at once.
+pub fn mide_cercania() {
+    if PREFERIDO.get().is_some() || std::env::var_os("GUARDIANA_RELE").is_some() {
+        return;
+    }
+    std::thread::spawn(|| {
+        let mut mejor = (0usize, Duration::MAX);
+        for (i, r) in RELES.iter().enumerate() {
+            let t = std::time::Instant::now();
+            if abre_hacia(&r.direccion()).is_ok() {
+                let d = t.elapsed();
+                if d < mejor.1 {
+                    mejor = (i, d);
+                }
+            }
+        }
+        let _ = PREFERIDO.set(mejor.0);
+    });
 }
 
-/// A fresh invitation code for the relay path: 50 random bits and a check letter.
+/// The relay this computer prefers (index into [`RELES`]).
+#[must_use]
+pub fn preferido() -> usize {
+    PREFERIDO.get().copied().unwrap_or(0)
+}
+
+/// The relay's address: the environment's, or the preferred one's.
+pub fn direccion() -> String {
+    std::env::var("GUARDIANA_RELE").unwrap_or_else(|_| RELES[preferido()].direccion())
+}
+
+/// A fresh invitation code for the relay path: the relay to wait at (two bits), 48 random bits
+/// and a check letter.
 pub fn codigo_nuevo() -> String {
+    codigo_nuevo_en(preferido())
+}
+
+/// A fresh code that names the relay `indice` (see [`RELES`]).
+pub fn codigo_nuevo_en(indice: usize) -> String {
     let mut azar = [0u8; 8];
     crate::sesion::azar(&mut azar);
-    let bits = u64::from_be_bytes(azar);
+    let bits = (u64::from_be_bytes(azar) & ((1u64 << 48) - 1)) | (((indice & 3) as u64) << 48);
     let mut letras = Vec::with_capacity(11);
     for i in (0..10).rev() {
         letras.push(ALFABETO[((bits >> (i * 5)) & 31) as usize]);
@@ -47,6 +116,33 @@ pub fn codigo_nuevo() -> String {
     letras.push(ALFABETO[(suma % 32) as usize]);
     let s: String = letras.iter().map(|&b| b as char).collect();
     format!("GR-{}-{}-{}", &s[..4], &s[4..8], &s[8..])
+}
+
+/// The relay a code names: the two top bits of its first letter. A code from an older version
+/// has random bits there, so the joining side still tries every relay.
+#[must_use]
+pub fn rele_de_codigo(texto: &str) -> usize {
+    let limpio: String = texto
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .map(|c| c.to_ascii_uppercase())
+        .collect();
+    let Some(cuerpo) = limpio.strip_prefix("GR") else {
+        return 0;
+    };
+    let Some(pos) = cuerpo
+        .bytes()
+        .next()
+        .and_then(|b| ALFABETO.iter().position(|&x| x == b))
+    else {
+        return 0;
+    };
+    let i = (pos >> 3) & 3;
+    if i < RELES.len() {
+        i
+    } else {
+        0
+    }
 }
 
 /// The room a code names, or `None` if the text is not a relay code. Spaces, dashes and case do
@@ -181,19 +277,48 @@ fn por_tls(
 /// address), and the plain line only if TLS could not be opened at all; any other relay (the
 /// tests) plain, as before.
 pub fn abre(rele: &str) -> Result<TcpStream, String> {
-    if rele != RELE {
+    let Some(r) = RELES.iter().find(|r| r.direccion() == rele) else {
         return abre_hacia(rele);
-    }
+    };
     let raices = raices_publicas();
     let mut fallos = Vec::new();
-    for destino in [RELE, RELE_IP] {
-        match por_tls(destino, RELE_NOMBRE, Arc::clone(&raices)) {
+    let mut destinos = vec![r.direccion()];
+    if !r.ip.is_empty() {
+        destinos.push(format!("{}:443", r.ip));
+    }
+    for destino in &destinos {
+        match por_tls(destino, r.nombre, Arc::clone(&raices)) {
             Ok(s) => return Ok(s),
             Err(e) => fallos.push(e),
         }
     }
-    for destino in [RELE, RELE_IP] {
+    for destino in &destinos {
         match abre_hacia(destino) {
+            Ok(s) => return Ok(s),
+            Err(e) => fallos.push(e),
+        }
+    }
+    Err(fallos.join("; "))
+}
+
+/// The joining side: go to every relay at once with the same room (the other person waits at
+/// one of them, the one its code names, or the first for an older version) and keep the first
+/// link the pairing completes. With `GUARDIANA_RELE` set (the tests), only that one.
+pub fn conecta_a_cualquiera(sala: &str) -> Result<TcpStream, String> {
+    if let Ok(uno) = std::env::var("GUARDIANA_RELE") {
+        return conecta(&uno, sala);
+    }
+    let (tx, rx) = std::sync::mpsc::channel();
+    for r in RELES {
+        let (tx, sala, d) = (tx.clone(), sala.to_owned(), r.direccion());
+        std::thread::spawn(move || {
+            let _ = tx.send(conecta(&d, &sala));
+        });
+    }
+    drop(tx);
+    let mut fallos = Vec::new();
+    while let Ok(r) = rx.recv() {
+        match r {
             Ok(s) => return Ok(s),
             Err(e) => fallos.push(e),
         }
@@ -252,6 +377,14 @@ mod tests {
         assert!(sala_de(std::str::from_utf8(&mal).unwrap()).is_none());
         assert!(sala_de("GS-ABCD-EFGH-JK").is_none());
         assert_ne!(sala_de(&codigo_nuevo()), Some(sala));
+        // The relay a code names (16 Oct 2026, the relay in America): two bits of the first
+        // letter; an index past the list reads as the first relay.
+        assert_eq!(rele_de_codigo(&codigo_nuevo_en(0)), 0);
+        assert_eq!(rele_de_codigo(&codigo_nuevo_en(1)), 1);
+        assert_eq!(rele_de_codigo(&codigo_nuevo_en(3)), 0);
+        assert_eq!(rele_de_codigo("nada"), 0);
+        let c1 = codigo_nuevo_en(1);
+        assert_eq!(sala_de(&c1).unwrap().len(), 32);
     }
 
     /// 16 Oct 2026, a Movistar home line in Cartagena: the plain line never reached the relay,
