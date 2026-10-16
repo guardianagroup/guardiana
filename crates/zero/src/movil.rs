@@ -18,6 +18,16 @@
 //! What travels between phone and computer is one bidirectional stream of frames: one byte of
 //! kind (0 = JSON text, 1 = a piece of a call), four bytes of length, the bytes.
 //!
+//! iPhone and iPad (16 Oct 2026, «necesito que funcione en iPhone y iPad también»): Safari does
+//! not accept a pinned certificate yet, so the QR code also carries a key of 32 random bytes.
+//! The phone's page can then go through GUARDIANA's relay (`wss://rele.guardianagroup.com`,
+//! the relay's own public certificate) to a room named by a hash of that key, where this
+//! computer waits. The relay passes messages it cannot read: after a greeting of two fresh
+//! random numbers, each side derives its sending key from the QR key with HKDF-SHA256 and seals
+//! every frame with AES-256-GCM and a counter, so nothing can be read, changed, replayed or
+//! reordered on the way. The same path serves an Android phone on mobile data when the router
+//! opened no door.
+//!
 //! Addresses are used to connect and are written nowhere (decision 203).
 
 use std::net::{Ipv4Addr, UdpSocket};
@@ -25,7 +35,10 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::Duration;
 
 use base64::Engine as _;
+use ring::aead;
 use serde_json::{json, Value};
+use sha2::{Digest as _, Sha256};
+use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::sync::mpsc as tmpsc;
 use wtransport::endpoint::IncomingSession;
 use wtransport::tls::Sha256DigestFmt;
@@ -86,6 +99,10 @@ pub struct Movil {
     pub huella: String,
     /// The secret only the QR code holds.
     secreto: String,
+    /// The key only the QR code holds, for the path through the relay.
+    clave: [u8; 32],
+    /// The relay the phone may go through (host, and port when it is not 443).
+    rele: String,
     /// Addresses the phone may try, LAN first; the public one is added when the door opens.
     pub direcciones: Vec<String>,
     /// A phone is connected right now.
@@ -111,6 +128,11 @@ impl Movil {
     /// Bind the listener and start the thread. `idioma` goes into the QR code so the page opens
     /// in the person's language.
     pub fn arranca() -> Result<Self, String> {
+        Self::arranca_con(&crate::rele::direccion())
+    }
+
+    /// The same, with the relay at `rele` (`host:port`; the tests run one on this computer).
+    pub fn arranca_con(rele: &str) -> Result<Self, String> {
         let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, PUERTO))
             .or_else(|_| UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)))
             .map_err(|e| e.to_string())?;
@@ -141,6 +163,10 @@ impl Movil {
         let mut azar = [0u8; 18];
         crate::sesion::azar(&mut azar);
         let secreto = B64URL.encode(azar);
+        let mut clave = [0u8; 32];
+        crate::sesion::azar(&mut clave);
+        let rele_dir = rele.to_owned();
+        let rele_host = rele.strip_suffix(":443").unwrap_or(rele).to_owned();
 
         let config = ServerConfig::builder()
             .with_bind_socket(socket)
@@ -165,13 +191,21 @@ impl Movil {
                         return;
                     }
                 };
-                rt.block_on(servidor(config, secreto_hilo, tx_desde, rx_hacia));
+                rt.block_on(servidor(
+                    config,
+                    secreto_hilo,
+                    (rele_dir, clave),
+                    tx_desde,
+                    rx_hacia,
+                ));
             })
             .map_err(|e| e.to_string())?;
         Ok(Self {
             puerto,
             huella,
             secreto,
+            clave,
+            rele: rele_host,
             direcciones,
             enganchado: false,
             pendiente: false,
@@ -197,6 +231,8 @@ impl Movil {
             "h": self.huella,
             "a": self.direcciones,
             "s": self.secreto,
+            "k": B64URL.encode(self.clave),
+            "r": self.rele,
             "l": idioma,
             "n": nombre,
         });
@@ -248,9 +284,13 @@ impl Drop for Movil {
 async fn servidor(
     config: ServerConfig,
     secreto: String,
+    (rele, clave): (String, [u8; 32]),
     tx: Sender<Desde>,
     mut rx: tmpsc::UnboundedReceiver<Hacia>,
 ) {
+    // The relay's path waits in its room from the start, for a phone that cannot come direct.
+    let (tx_rele, mut rx_rele) = tmpsc::unbounded_channel::<EnlaceRele>();
+    tokio::spawn(rele_bucle(rele, clave, tx_rele));
     let endpoint = match Endpoint::server(config) {
         Ok(e) => e,
         Err(e) => {
@@ -282,7 +322,7 @@ async fn servidor(
     let (tx_tramas, mut rx_tramas) = tmpsc::unbounded_channel::<(u64, u8, Vec<u8>)>();
     let mut generacion: u64 = 0;
     let mut conexion: Option<wtransport::Connection> = None;
-    let mut manda: Option<wtransport::SendStream> = None;
+    let mut manda: Option<Salida> = None;
     loop {
         tokio::select! {
             Some(c) = rx_con.recv() => {
@@ -304,10 +344,29 @@ async fn servidor(
                         }
                         let _ = tx_tramas.send((g, 255, Vec::new()));
                     });
-                    manda = Some(m);
+                    manda = Some(Salida::Directa(m));
                     conexion = Some(c);
                     let _ = tx.send(Desde::Enganchado);
                 }
+            }
+            Some(e) = rx_rele.recv() => {
+                if let Some(viejo) = conexion.take() {
+                    viejo.close(wtransport::VarInt::from_u32(0), b"otro movil");
+                }
+                generacion += 1;
+                let g = generacion;
+                let tx_tramas = tx_tramas.clone();
+                let mut entra = e.entra;
+                tokio::spawn(async move {
+                    while let Some((tipo, cuerpo)) = entra.recv().await {
+                        if tx_tramas.send((g, tipo, cuerpo)).is_err() {
+                            return;
+                        }
+                    }
+                    let _ = tx_tramas.send((g, 255, Vec::new()));
+                });
+                manda = Some(Salida::Rele(e.sale));
+                let _ = tx.send(Desde::Enganchado);
             }
             Some(h) = rx.recv() => {
                 let (tipo, cuerpo) = match h {
@@ -321,7 +380,11 @@ async fn servidor(
                     Hacia::Media(b) => (1u8, b),
                 };
                 if let Some(m) = &mut manda {
-                    if escribe(m, tipo, &cuerpo).await.is_err() {
+                    let ok = match m {
+                        Salida::Directa(s) => escribe(s, tipo, &cuerpo).await.is_ok(),
+                        Salida::Rele(s) => s.send((tipo, cuerpo)).is_ok(),
+                    };
+                    if !ok {
                         manda = None;
                         conexion = None;
                         let _ = tx.send(Desde::Soltado);
@@ -343,6 +406,7 @@ async fn servidor(
                     1 => {
                         let _ = tx.send(Desde::Media(cuerpo));
                     }
+                    2 => {}
                     _ => {
                         manda = None;
                         conexion = None;
@@ -352,6 +416,227 @@ async fn servidor(
             }
         }
     }
+}
+
+/// Where the phone's frames go: straight over WebTransport, or sealed through the relay.
+enum Salida {
+    Directa(wtransport::SendStream),
+    Rele(tmpsc::UnboundedSender<(u8, Vec<u8>)>),
+}
+
+/// A phone that came through the relay: frames to it, and its opened frames (kind, bytes).
+struct EnlaceRele {
+    sale: tmpsc::UnboundedSender<(u8, Vec<u8>)>,
+    entra: tmpsc::UnboundedReceiver<(u8, Vec<u8>)>,
+}
+
+/// The room at the relay: a hash of the QR key, so the relay never sees the key.
+pub fn sala_de_clave(clave: &[u8; 32]) -> String {
+    let mut h = Sha256::new();
+    h.update(b"guardiana-movil-sala");
+    h.update(clave);
+    h.finalize()
+        .iter()
+        .take(16)
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// The two sending keys of one link: phone → computer, computer → phone. Both random numbers
+/// are fresh every link, so a frame recorded from one link means nothing in the next.
+pub fn claves_de_enlace(
+    clave: &[u8; 32],
+    del_equipo: &[u8; 16],
+    del_movil: &[u8; 16],
+) -> Option<(aead::LessSafeKey, aead::LessSafeKey)> {
+    let mut sal = [0u8; 32];
+    sal[..16].copy_from_slice(del_equipo);
+    sal[16..].copy_from_slice(del_movil);
+    let prk = ring::hkdf::Salt::new(ring::hkdf::HKDF_SHA256, &sal).extract(clave);
+    let una = |info: &[u8]| -> Option<aead::LessSafeKey> {
+        let mut k = [0u8; 32];
+        prk.expand(&[info], ring::hkdf::HKDF_SHA256)
+            .ok()?
+            .fill(&mut k)
+            .ok()?;
+        Some(aead::LessSafeKey::new(
+            aead::UnboundKey::new(&aead::AES_256_GCM, &k).ok()?,
+        ))
+    };
+    Some((
+        una(b"guardiana-movil-1 m>e")?,
+        una(b"guardiana-movil-1 e>m")?,
+    ))
+}
+
+/// The nonce of frame number `n` (each direction has its own key, so its own count).
+pub fn nonce(n: u64) -> aead::Nonce {
+    let mut b = [0u8; 12];
+    b[4..].copy_from_slice(&n.to_be_bytes());
+    aead::Nonce::assume_unique_for_key(b)
+}
+
+/// Seal `datos` as frame `n`.
+pub fn sella(k: &aead::LessSafeKey, n: u64, aad: &[u8], datos: &[u8]) -> Vec<u8> {
+    let mut v = datos.to_vec();
+    if k.seal_in_place_append_tag(nonce(n), aead::Aad::from(aad), &mut v)
+        .is_err()
+    {
+        v.clear();
+    }
+    v
+}
+
+/// Open frame `n`, or `None` if it was changed, replayed or reordered.
+pub fn abre(k: &aead::LessSafeKey, n: u64, aad: &[u8], sellado: &[u8]) -> Option<Vec<u8>> {
+    let mut v = sellado.to_vec();
+    let largo = k
+        .open_in_place(nonce(n), aead::Aad::from(aad), &mut v)
+        .ok()?
+        .len();
+    v.truncate(largo);
+    Some(v)
+}
+
+/// Wait at the relay for the phone, over and over, until the hand-off ends.
+async fn rele_bucle(rele: String, clave: [u8; 32], tx: tmpsc::UnboundedSender<EnlaceRele>) {
+    let sala = sala_de_clave(&clave);
+    loop {
+        if tx.is_closed() {
+            return;
+        }
+        let desde = std::time::Instant::now();
+        let _ = rele_una_vez(&rele, &sala, &clave, &tx).await;
+        let pausa = if desde.elapsed() > Duration::from_secs(30) {
+            1
+        } else {
+            3
+        };
+        tokio::time::sleep(Duration::from_secs(pausa)).await;
+    }
+}
+
+async fn conecta_rele(rele: &str) -> Option<tokio::net::TcpStream> {
+    let intento = |d: String| async move {
+        tokio::time::timeout(Duration::from_secs(8), tokio::net::TcpStream::connect(d))
+            .await
+            .ok()?
+            .ok()
+    };
+    if let Some(s) = intento(rele.to_owned()).await {
+        return Some(s);
+    }
+    if rele == crate::rele::RELE {
+        return intento(crate::rele::RELE_IP.to_owned()).await;
+    }
+    None
+}
+
+async fn lee_rele(r: &mut (impl tokio::io::AsyncRead + Unpin)) -> Option<Vec<u8>> {
+    let mut n = [0u8; 4];
+    r.read_exact(&mut n).await.ok()?;
+    let n = u32::from_be_bytes(n) as usize;
+    if n > MAX_TRAMA + 64 {
+        return None;
+    }
+    let mut v = vec![0u8; n];
+    r.read_exact(&mut v).await.ok()?;
+    Some(v)
+}
+
+async fn escribe_rele(w: &mut (impl tokio::io::AsyncWrite + Unpin), datos: &[u8]) -> Option<()> {
+    let mut c = Vec::with_capacity(4 + datos.len());
+    c.extend_from_slice(&(datos.len() as u32).to_be_bytes());
+    c.extend_from_slice(datos);
+    w.write_all(&c).await.ok()?;
+    w.flush().await.ok()
+}
+
+/// One stay at the relay: wait for the phone, greet it, then carry frames until it goes.
+async fn rele_una_vez(
+    rele: &str,
+    sala: &str,
+    clave: &[u8; 32],
+    tx: &tmpsc::UnboundedSender<EnlaceRele>,
+) -> Option<()> {
+    let mut s = conecta_rele(rele).await?;
+    let _ = s.set_nodelay(true);
+    s.write_all(format!("GUARDIANA-RELE-M 1 {sala}\n").as_bytes())
+        .await
+        .ok()?;
+    // The relay keeps a room ten minutes; then this comes back and waits again.
+    let mut ok = [0u8; 3];
+    tokio::time::timeout(Duration::from_secs(11 * 60), s.read_exact(&mut ok))
+        .await
+        .ok()?
+        .ok()?;
+    if &ok != b"OK\n" {
+        return None;
+    }
+    // The greeting: our random number; the phone answers with its own and proves the key.
+    let mut del_equipo = [0u8; 16];
+    crate::sesion::azar(&mut del_equipo);
+    let mut saludo = b"GM1".to_vec();
+    saludo.extend_from_slice(&del_equipo);
+    escribe_rele(&mut s, &saludo).await?;
+    let respuesta = tokio::time::timeout(Duration::from_secs(20), lee_rele(&mut s))
+        .await
+        .ok()??;
+    if respuesta.len() < 16 {
+        return None;
+    }
+    let mut del_movil = [0u8; 16];
+    del_movil.copy_from_slice(&respuesta[..16]);
+    let (k_me, k_em) = claves_de_enlace(clave, &del_equipo, &del_movil)?;
+    if abre(&k_me, 0, b"GM1", &respuesta[16..]).as_deref() != Some(b"hola".as_slice()) {
+        return None;
+    }
+    let (mut r, mut w) = s.into_split();
+    let (tx_sale, mut rx_sale) = tmpsc::unbounded_channel::<(u8, Vec<u8>)>();
+    let (tx_entra, rx_entra) = tmpsc::unbounded_channel::<(u8, Vec<u8>)>();
+    tx.send(EnlaceRele {
+        sale: tx_sale,
+        entra: rx_entra,
+    })
+    .ok()?;
+    // To the phone: every frame sealed with the next number; an empty one every 25 s so no
+    // network in between drops a quiet link.
+    let escritor = tokio::spawn(async move {
+        let mut n: u64 = 0;
+        let mut latido = tokio::time::interval(Duration::from_secs(25));
+        latido.tick().await;
+        loop {
+            let (tipo, cuerpo) = tokio::select! {
+                f = rx_sale.recv() => match f { Some(f) => f, None => break },
+                _ = latido.tick() => (2u8, Vec::new()),
+            };
+            let mut plano = Vec::with_capacity(1 + cuerpo.len());
+            plano.push(tipo);
+            plano.extend_from_slice(&cuerpo);
+            let sellado = sella(&k_em, n, b"", &plano);
+            n += 1;
+            if escribe_rele(&mut w, &sellado).await.is_none() {
+                break;
+            }
+        }
+        let _ = w.shutdown().await;
+    });
+    // From the phone: frame 0 was the proof, so its frames count from 1.
+    let mut n: u64 = 1;
+    while let Some(sellado) = lee_rele(&mut r).await {
+        let Some(plano) = abre(&k_me, n, b"", &sellado) else {
+            break;
+        };
+        n += 1;
+        let Some((&tipo, cuerpo)) = plano.split_first() else {
+            continue;
+        };
+        if tx_entra.send((tipo, cuerpo.to_vec())).is_err() {
+            break;
+        }
+    }
+    escritor.abort();
+    Some(())
 }
 
 async fn escribe(m: &mut wtransport::SendStream, tipo: u8, cuerpo: &[u8]) -> Result<(), ()> {
@@ -427,6 +712,7 @@ pub fn lee_enlace(enlace: &str) -> Option<Value> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
     #[test]
     fn the_qr_link_carries_hash_addresses_secret_and_language_in_the_fragment() {
@@ -529,5 +815,135 @@ mod tests {
         assert!(visto
             .iter()
             .any(|d| matches!(d, Desde::Texto(t) if t == "hola desde el movil")));
+    }
+
+    async fn escribe_ws(t: &mut tokio::net::TcpStream, datos: &[u8]) {
+        let m = [1u8, 2, 3, 4];
+        let mut c = vec![0x82u8];
+        if datos.len() < 126 {
+            c.push(0x80 | datos.len() as u8);
+        } else {
+            c.push(0x80 | 126);
+            c.extend_from_slice(&(datos.len() as u16).to_be_bytes());
+        }
+        c.extend_from_slice(&m);
+        c.extend(datos.iter().enumerate().map(|(i, b)| b ^ m[i % 4]));
+        t.write_all(&c).await.unwrap();
+    }
+
+    /// The next binary message from the relay (pings skipped).
+    async fn lee_ws(t: &mut tokio::net::TcpStream) -> Vec<u8> {
+        loop {
+            let mut h = [0u8; 2];
+            t.read_exact(&mut h).await.unwrap();
+            let n = match h[1] & 0x7f {
+                126 => {
+                    let mut b = [0u8; 2];
+                    t.read_exact(&mut b).await.unwrap();
+                    u16::from_be_bytes(b) as usize
+                }
+                127 => {
+                    let mut b = [0u8; 8];
+                    t.read_exact(&mut b).await.unwrap();
+                    u64::from_be_bytes(b) as usize
+                }
+                n => n as usize,
+            };
+            let mut v = vec![0u8; n];
+            t.read_exact(&mut v).await.unwrap();
+            if h[0] & 0x0f == 0x2 {
+                return v;
+            }
+        }
+    }
+
+    #[test]
+    fn a_phone_through_the_relay_proves_the_key_and_everything_travels_sealed() {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
+        let listener = rt
+            .block_on(tokio::net::TcpListener::bind("127.0.0.1:0"))
+            .unwrap();
+        let dir = listener.local_addr().unwrap().to_string();
+        rt.spawn(guardiana_rele::sirve(listener));
+        let mut m = Movil::arranca_con(&dir).unwrap();
+        let d = lee_enlace(&m.enlace("es", "Marta")).unwrap();
+        assert_eq!(d["r"], dir.as_str());
+        let clave: [u8; 32] = B64URL
+            .decode(d["k"].as_str().unwrap())
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let sala = sala_de_clave(&clave);
+        assert_eq!(sala.len(), 32);
+        let (k_em, mut tel) = rt.block_on(async {
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            let mut t = tokio::net::TcpStream::connect(&dir).await.unwrap();
+            t.write_all(
+                format!(
+                    "GET /m/{sala} HTTP/1.1\r\nHost: rele\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nOrigin: https://guardianagroup.com\r\n\r\n"
+                )
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+            let mut r = Vec::new();
+            while !r.ends_with(b"\r\n\r\n") {
+                let mut b = [0u8; 1];
+                t.read_exact(&mut b).await.unwrap();
+                r.push(b[0]);
+            }
+            assert!(r.starts_with(b"HTTP/1.1 101"));
+            let saludo = lee_ws(&mut t).await;
+            assert_eq!(&saludo[..3], b"GM1");
+            let del_equipo: [u8; 16] = saludo[3..].try_into().unwrap();
+            let del_movil = [7u8; 16];
+            let (k_me, k_em) = claves_de_enlace(&clave, &del_equipo, &del_movil).unwrap();
+            let mut primera = del_movil.to_vec();
+            primera.extend(sella(&k_me, 0, b"GM1", b"hola"));
+            escribe_ws(&mut t, &primera).await;
+            let mut plano = vec![0u8];
+            plano.extend_from_slice(br#"{"t":"texto","texto":"hola por el rele"}"#);
+            escribe_ws(&mut t, &sella(&k_me, 1, b"", &plano)).await;
+            // A frame replayed with the same number is not accepted: it ends the link later,
+            // so it is not sent here; a changed byte is refused by the key itself.
+            let mut cambiado = sella(&k_me, 2, b"", &plano);
+            cambiado[3] ^= 1;
+            assert!(abre(&k_me, 2, b"", &cambiado).is_none());
+            (k_em, t)
+        });
+        let mut visto = Vec::new();
+        for _ in 0..100 {
+            std::thread::sleep(Duration::from_millis(50));
+            visto.extend(m.recoge());
+            if visto
+                .iter()
+                .any(|d| matches!(d, Desde::Texto(t) if t == "hola por el rele"))
+            {
+                break;
+            }
+        }
+        assert!(
+            visto.iter().any(|d| matches!(d, Desde::Enganchado)),
+            "{visto:?}"
+        );
+        assert!(
+            visto
+                .iter()
+                .any(|d| matches!(d, Desde::Texto(t) if t == "hola por el rele")),
+            "{visto:?}"
+        );
+        m.manda(Hacia::Estado(r#"{"tipo":"secure_estado"}"#.to_owned()));
+        let plano = rt.block_on(async {
+            let v = tokio::time::timeout(Duration::from_secs(5), lee_ws(&mut tel))
+                .await
+                .unwrap();
+            abre(&k_em, 0, b"", &v).unwrap()
+        });
+        assert_eq!(plano[0], 0);
+        assert_eq!(&plano[1..], br#"{"tipo":"secure_estado"}"#);
     }
 }

@@ -73,6 +73,11 @@ tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "macros",
 # from the phone's browser to this computer, with the certificate pinned by its hash. Pure Rust
 # (quinn + rustls with ring); the browser needs nothing installed.
 wtransport = { version = "0.7", default-features = false, features = ["self-signed", "ring"] }
+# The relay's certificate for the phones (16 Oct 2026, iPhone and iPad): a phone's browser only
+# opens wss:// to a publicly signed name. rustls is already in the tree (ureq, wtransport), with
+# ring; tokio-rustls is the thin async adapter from the same project.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12", "logging"] }
 # DNS server, forwarding resolver with TTL cache, and wire types (brief §2, §4).
 hickory-server = { version = "0.26", default-features = false }
 hickory-resolver = { version = "0.26", default-features = false, features = ["tokio"] }
