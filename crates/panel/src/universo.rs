@@ -722,32 +722,6 @@ fn documentado(prog: &str, tipo: &str, nombre: &str) -> (Option<bool>, Option<&'
     }
 }
 
-#[cfg(test)]
-#[allow(clippy::unwrap_used)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_process_belongs_to_its_antivirus_its_browser_or_itself() {
-        assert_eq!(
-            programa_de("MsMpEng.exe"),
-            ("Microsoft Defender".to_owned(), "antivirus")
-        );
-        assert_eq!(
-            programa_de("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"),
-            ("Chrome".to_owned(), "navegador")
-        );
-        assert_eq!(
-            programa_de("GUARDIANA ZERO.exe"),
-            ("GUARDIANA ZERO".to_owned(), "navegador")
-        );
-        assert_eq!(
-            programa_de("Spotify.exe"),
-            ("Spotify.exe".to_owned(), "programa")
-        );
-    }
-}
-
 /// `/api/secure-en-directo` (16 Oct 2026): the GUARDIANA SECURE conversations open on this
 /// computer right now, as GUARDIANA ZERO leaves them next to the ledger: the contact's name,
 /// where each end is by time zone (never an address), and whether a call is on. Only this
@@ -796,4 +770,30 @@ pub(crate) async fn secure_en_directo(
         "zona": v["zona"].as_str().unwrap_or_default().chars().take(64).collect::<String>(),
         "conversaciones": conversaciones,
     })))
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_process_belongs_to_its_antivirus_its_browser_or_itself() {
+        assert_eq!(
+            programa_de("MsMpEng.exe"),
+            ("Microsoft Defender".to_owned(), "antivirus")
+        );
+        assert_eq!(
+            programa_de("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"),
+            ("Chrome".to_owned(), "navegador")
+        );
+        assert_eq!(
+            programa_de("GUARDIANA ZERO.exe"),
+            ("GUARDIANA ZERO".to_owned(), "navegador")
+        );
+        assert_eq!(
+            programa_de("Spotify.exe"),
+            ("Spotify.exe".to_owned(), "programa")
+        );
+    }
 }
