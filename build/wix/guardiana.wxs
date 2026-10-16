@@ -171,15 +171,21 @@
          repair turned Home Mode off and put the old DNS back - measured on the
          test Windows on 16 sep 2026, and the phones in the house lost their DNS
          without anyone asking for it. Repairing must never remove protection. -->
+    <!-- 16 Oct 2026 (the owner: «pantallazos negros, tirones»): guardiana.exe is a console
+         program, so an ExeCommand flashed a black window at every step. WixQuietExec runs the
+         same commands with no window; a deferred action reads its command line from the
+         property of its own name, set just before it in the execute sequence. -->
+    <SetProperty Id="HomeOff" Value="&quot;[INSTALLFOLDER]guardiana.exe&quot; hogar off --desinstalando" Before="HomeOff" Sequence="execute" />
     <CustomAction Id="HomeOff"
-                  Directory="INSTALLFOLDER"
-                  ExeCommand="&quot;[INSTALLFOLDER]guardiana.exe&quot; hogar off --desinstalando"
+                  DllEntry="WixQuietExec"
+                  BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
+    <SetProperty Id="RestoreDns" Value="&quot;[INSTALLFOLDER]guardiana.exe&quot; dns --restore --desinstalando" Before="RestoreDns" Sequence="execute" />
     <CustomAction Id="RestoreDns"
-                  Directory="INSTALLFOLDER"
-                  ExeCommand="&quot;[INSTALLFOLDER]guardiana.exe&quot; dns --restore --desinstalando"
+                  DllEntry="WixQuietExec"
+                  BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
@@ -187,9 +193,10 @@
          Never on an upgrade or a repair (the person may have undone it on purpose) and never
          allowed to fail the install: if it cannot be done, the panel still has its button. -->
     <Property Id="VIGILAR" Value="1" Secure="yes" />
+    <SetProperty Id="ApplyDns" Value="&quot;[INSTALLFOLDER]guardiana.exe&quot; dns --apply --yes --instalador" Before="ApplyDns" Sequence="execute" />
     <CustomAction Id="ApplyDns"
-                  Directory="INSTALLFOLDER"
-                  ExeCommand="&quot;[INSTALLFOLDER]guardiana.exe&quot; dns --apply --yes --instalador"
+                  DllEntry="WixQuietExec"
+                  BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
