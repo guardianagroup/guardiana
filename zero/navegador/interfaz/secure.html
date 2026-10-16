@@ -47,6 +47,15 @@ main > .tarjeta { margin-top: 14px; }
 .numeros b { font: 600 clamp(28px, 4vw, 40px)/1 var(--display); letter-spacing: .02em; padding: 12px 18px; border: 1px solid var(--line); border-radius: var(--r-tarjeta); background: var(--card); font-variant-numeric: tabular-nums; }
 .c-nombre { display: grid; gap: 4px; margin: 0 0 12px; font-size: 13px; color: var(--muted); max-width: 320px; }
 .chat-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.c-quien { display: grid; gap: 2px; min-width: 0; }
+.c-quien h2 { margin: 0; }
+/* The quiet trust line (16 Oct 2026, agreed with the other two): lock · verified · level. Never
+   red here; an incident has its own card. */
+.c-sello { margin: 0; font-size: 12px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+.c-sello span { display: inline-flex; align-items: center; gap: 4px; }
+.c-sello span::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.c-sello span.ok::before { background: var(--ok); }
+.c-sello span.suave::before { background: var(--accent); }
 .mensajes { list-style: none; margin: 10px 0; padding: 12px; min-height: 220px; max-height: 50vh; overflow: auto; display: grid; gap: 6px; align-content: start; background: var(--campo); border-radius: var(--r-tarjeta); }
 .mensajes li { max-width: 72%; padding: 8px 12px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
 .mensajes li.mio { justify-self: end; background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
@@ -287,7 +296,7 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
   <section class="tarjeta chat" id="c-chat" hidden>
     <p class="cortada-nota" id="c-cortada" hidden data-t="sec_c_cortada"></p>
     <div class="mas" id="c-mas" hidden><span data-t="sec_c_mas"></span> <b id="c-mas-codigo"></b> <button type="button" class="boton chico" id="c-mas-copiar" data-t="sec_c_copiar"></button></div>
-    <div class="chat-cab"><h2 id="c-con"></h2><div class="c-fila"><button type="button" class="boton chico" id="c-voz" data-t="sec_l_voz"></button><button type="button" class="boton chico" id="c-video" data-t="sec_l_video"></button><button type="button" class="boton chico" id="c-movil" data-t="sec_mv_boton"></button><button type="button" class="boton chico" id="c-cerrar" data-t="sec_c_cerrar"></button></div></div>
+    <div class="chat-cab"><div class="c-quien"><h2 id="c-con"></h2><p class="c-sello" id="c-sello"></p></div><div class="c-fila"><button type="button" class="boton chico" id="c-voz" data-t="sec_l_voz"></button><button type="button" class="boton chico" id="c-video" data-t="sec_l_video"></button><button type="button" class="boton chico" id="c-movil" data-t="sec_mv_boton"></button><button type="button" class="boton chico" id="c-cerrar" data-t="sec_c_cerrar"></button></div></div>
     <section class="timbre" id="c-timbre" hidden aria-live="assertive">
       <span class="t-icono" aria-hidden="true"></span>
       <div class="t-texto"><b id="c-timbre-t"></b><span id="c-timbre-s"></span></div>
@@ -313,6 +322,18 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
 </main>
 
 <aside class="monitor" aria-live="polite">
+  <section class="tarjeta incidente" id="inc" hidden role="alert">
+    <h2 class="p-titulo" data-t="sec_i_titulo"></h2>
+    <p class="i-frase" data-t="sec_i_frase"></p>
+    <dl class="i-datos" id="inc-datos"></dl>
+    <p class="i-otro" id="inc-otro" hidden></p>
+    <div class="p-botones">
+      <button type="button" class="boton principal chico" id="inc-guardar" data-t="sec_i_guardar"></button>
+      <button type="button" class="boton chico" id="inc-verificar" data-t="sec_i_verificar"></button>
+      <button type="button" class="boton corta chico" id="inc-terminar" data-t="sec_i_terminar"></button>
+    </div>
+    <p class="p-nota" data-t="sec_i_nota"></p>
+  </section>
   <section class="tarjeta estado-g" id="g">
     <div class="fila"><i class="punto"></i><span class="palabra" id="g-palabra">—</span></div>
     <p class="frase-g" id="g-frase"></p>
@@ -325,18 +346,6 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
     </ul>
     <p class="nota-g" data-t="sec_g_nota"></p>
     <button type="button" class="boton chico mas" id="g-mas" aria-expanded="false" aria-controls="detalles"></button>
-  </section>
-  <section class="tarjeta incidente" id="inc" hidden role="alert">
-    <h2 class="p-titulo" data-t="sec_i_titulo"></h2>
-    <p class="i-frase" data-t="sec_i_frase"></p>
-    <dl class="i-datos" id="inc-datos"></dl>
-    <p class="i-otro" id="inc-otro" hidden></p>
-    <div class="p-botones">
-      <button type="button" class="boton principal chico" id="inc-guardar" data-t="sec_i_guardar"></button>
-      <button type="button" class="boton chico" id="inc-verificar" data-t="sec_i_verificar"></button>
-      <button type="button" class="boton corta chico" id="inc-terminar" data-t="sec_i_terminar"></button>
-    </div>
-    <p class="p-nota" data-t="sec_i_nota"></p>
   </section>
   <section class="tarjeta pausa" id="p" hidden>
     <h2 class="p-titulo" id="p-titulo"></h2>

@@ -76,7 +76,8 @@
   function pintaPausa(m) {
     const se = m.sesion || {};
     const caja = $('p');
-    if (se.estado !== 'pausada') { caja.hidden = true; return; }
+    // The incident card says it all; the stop card would repeat it.
+    if (se.estado !== 'pausada' || (E && E.incidente)) { caja.hidden = true; return; }
     caja.hidden = false;
     const mo = se.motivo || {};
     $('p-titulo').textContent = t('sec_p_titulo_' + claseSesion);
@@ -236,6 +237,15 @@
     const g = E.grupo || {};
     const nombres = g.nombres || [];
     $('c-con').textContent = nombres.length > 2 ? t('sec_m_grupo', { n: nombres.join(' · ') }) : E.contacto ? t('sec_m_con', { n: E.contacto }) : '';
+    // Under the name, three quiet dots: encrypted, verified with you, and the level.
+    const idn = (E.monitor || {}).identidad;
+    const verificado = !!idn && idn.estado !== 'clave_cambiada';
+    const conMovilSello = !!(E.otro_movil || ((E.movil || {}).habla));
+    $('c-sello').innerHTML = f === 'lista' ? [
+      `<span class="ok">${esc(t('sec_s_cifrado'))}</span>`,
+      `<span class="${verificado ? 'ok' : ''}">${esc(t(verificado ? 'sec_s_verificado' : 'sec_s_sin_verificar'))}</span>`,
+      `<span class="${conMovilSello ? 'suave' : 'ok'}">${esc(t(conMovilSello ? 'sec_s_nivel_movil' : 'sec_s_nivel_pc'))}</span>`,
+    ].join('') : '';
     // The host, once someone is in: the code stays on screen to invite more.
     const mas = $('c-mas');
     if (g.anfitrion && E.codigo_grupo && nombres.length < (g.max || 6)) { mas.hidden = false; $('c-mas-codigo').textContent = E.codigo_grupo; } else mas.hidden = true;
