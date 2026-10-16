@@ -315,8 +315,9 @@
   // second behind. (The real-time transport comes next; this is today's.)
   let arrancando = false;
   let grabador = null, local = null, fuente = null, buffer = null, pendientes = [], silenciado = false, llamadaVideo = false;
-  let mimeRemoto = null;
+  let mimeRemoto = null, tipoGrabador = null, reproduceOtro = [];
   const pintaLlamada = (m) => {
+    reproduceOtro = m.reproduce_otro || [];
     const l = m.llamada;
     const caja = $('c-llamada');
     if (!l) { caja.hidden = true; paraMedios(); mimeRemoto = null; return; }
@@ -325,13 +326,31 @@
     $('c-l-estado').textContent = movilHabla ? t('sec_mv_habla') : t(l.video ? 'sec_l_en_video' : 'sec_l_en_voz', { t: tiempo(Math.max(0, Math.floor(Date.now() / 1000) - (l.desde || 0))) });
     if (movilHabla) { if (grabador || arrancando) paraMedios(); return; }
     if (!grabador && !arrancando) empiezaMedios(!!l.video);
+    // The other side's player (an iPhone) cannot open what we record: record in what it can.
+    else if (grabador && tipoGrabador && mime(llamadaVideo) !== tipoGrabador) cambiaGrabador();
     // The other side said what its pieces are: open the player for exactly that.
     if (l.mime_remoto && l.mime_remoto !== mimeRemoto && buffer !== undefined) { mimeRemoto = l.mime_remoto; preparaReproductor(mimeRemoto); }
   };
   setInterval(() => { if (!$('c-llamada').hidden && E.llamada) $('c-l-estado').textContent = t(E.llamada.video ? 'sec_l_en_video' : 'sec_l_en_voz', { t: tiempo(Math.max(0, Math.floor(Date.now() / 1000) - (E.llamada.desde || 0))) }); }, 1000);
+  // The formats, best first; the phone's page knows the same list and tells which it can play.
+  const CANDIDATOS = { video: ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/webm'], voz: ['audio/webm;codecs=opus', 'audio/mp4;codecs=mp4a.40.2', 'audio/webm'] };
   const mime = (video) => {
-    const c = video ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'] : ['audio/webm;codecs=opus', 'audio/webm'];
-    return c.find((x) => window.MediaRecorder && MediaRecorder.isTypeSupported(x)) || c[c.length - 1];
+    const c = CANDIDATOS[video ? 'video' : 'voz'];
+    const puede = c.filter((x) => window.MediaRecorder && MediaRecorder.isTypeSupported(x));
+    return (reproduceOtro.length && puede.find((x) => reproduceOtro.includes(x))) || puede[0] || c[c.length - 1];
+  };
+  const nuevoGrabador = (video) => {
+    const tipo = mime(video);
+    grabador = new MediaRecorder(local, { mimeType: tipo, audioBitsPerSecond: 64000, videoBitsPerSecond: video ? 1500000 : undefined });
+    grabador.ondataavailable = async (e) => { if (e.data && e.data.size) manda({ tipo: 'secure', accion: 'media', b64: b64De(await e.data.arrayBuffer()) }); };
+    grabador.start(120);
+    tipoGrabador = tipo;
+    manda({ tipo: 'secure', accion: 'mime', mime: tipo });
+  };
+  const cambiaGrabador = () => {
+    if (!local) return;
+    try { if (grabador && grabador.state !== 'inactive') grabador.stop(); } catch (_) {}
+    nuevoGrabador(llamadaVideo);
   };
   const empiezaMedios = async (video) => {
     arrancando = true;
@@ -341,12 +360,8 @@
       local = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 48000 }, video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false });
     } catch (e) { arrancando = false; aviso(t('sec_l_sin_permiso')); manda({ tipo: 'secure', accion: 'colgar' }); return; }
     $('c-local').srcObject = local;
-    const tipo = mime(video);
-    grabador = new MediaRecorder(local, { mimeType: tipo, audioBitsPerSecond: 64000, videoBitsPerSecond: video ? 1500000 : undefined });
-    grabador.ondataavailable = async (e) => { if (e.data && e.data.size) manda({ tipo: 'secure', accion: 'media', b64: b64De(await e.data.arrayBuffer()) }); };
-    grabador.start(120);
+    nuevoGrabador(video);
     arrancando = false;
-    manda({ tipo: 'secure', accion: 'mime', mime: tipo });
   };
   // One player per member (a group) or one for the other person (a two-way talk): each
   // sender's pieces go to their own tile, created when the first piece arrives.
@@ -370,7 +385,15 @@
     $('c-rejilla').dataset.n = String(jugadores.size);
     return j;
   };
-  const preparaReproductor = (tipo) => { tipoRemoto = tipo; };
+  // A new format from the other side (its phone took over, or gave back): new players.
+  const preparaReproductor = (tipo) => {
+    if (tipoRemoto && tipo !== tipoRemoto && jugadores.size) {
+      jugadores.forEach((j) => { try { if (j.fuente && j.fuente.readyState === 'open') j.fuente.endOfStream(); } catch (_) {} j.v.removeAttribute('src'); });
+      jugadores.clear();
+      $('c-rejilla').innerHTML = ''; $('c-rejilla').dataset.n = '0';
+    }
+    tipoRemoto = tipo;
+  };
   const vacia = (j) => {
     if (!j.buffer || j.buffer.updating || !j.pendientes.length) return;
     try { j.buffer.appendBuffer(j.pendientes.shift()); } catch (_) { j.pendientes = []; }
@@ -386,7 +409,7 @@
   });
   const paraMedios = () => {
     try { if (grabador && grabador.state !== 'inactive') grabador.stop(); } catch (_) {}
-    grabador = null;
+    grabador = null; tipoGrabador = null;
     if (local) { local.getTracks().forEach((x) => x.stop()); local = null; }
     $('c-local').srcObject = null;
     jugadores.forEach((j) => { try { if (j.fuente && j.fuente.readyState === 'open') j.fuente.endOfStream(); } catch (_) {} j.v.removeAttribute('src'); });

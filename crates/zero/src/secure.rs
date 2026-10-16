@@ -198,6 +198,11 @@ pub struct Secure {
     movil_puerta_error: Option<String>,
     movil_error: Option<String>,
     movil_idioma: String,
+    /// What the other side's player can open (its phone, an iPhone, tells it): our recorder
+    /// picks from this list when it is not empty.
+    reproduce_otro: Vec<String>,
+    /// What we last told the other side about our own player.
+    reproduce_dicho: Vec<String>,
     /// To hand the network threads a way back while listening.
     tx: Option<Sender<Entrante>>,
     /// The relay code on screen while waiting through the relay (no door could be opened).
@@ -291,6 +296,8 @@ impl Secure {
             movil_puerta_error: None,
             movil_error: None,
             movil_idioma: "es".to_owned(),
+            reproduce_otro: Vec::new(),
+            reproduce_dicho: Vec::new(),
             tx: None,
             rele_codigo: None,
             rele: false,
@@ -544,6 +551,8 @@ impl Secure {
         self.entrada = None;
         self.salida = None;
         self.llamada = None;
+        self.reproduce_otro.clear();
+        self.reproduce_dicho.clear();
         self.monitor.transporte = Default::default();
         if self.fase != Fase::Sola {
             self.monitor
@@ -1002,6 +1011,10 @@ impl Secure {
                     l.receptor = Some(sframe::Receptor::new(&clave, otro));
                     l.mime_remoto = mime_remoto;
                 }
+                self.cambio = true;
+            }
+            "reproduce" => {
+                self.reproduce_otro = lista_de_formatos(&c["mimes"]);
                 self.cambio = true;
             }
             "mime" => {
@@ -1474,8 +1487,18 @@ impl Secure {
         Ok(())
     }
 
+    /// Tell the other side what our player can open (empty: the computer's own, anything).
+    pub fn reproduce(&mut self, mimes: Vec<String>) {
+        if mimes == self.reproduce_dicho || self.fase != Fase::Lista {
+            return;
+        }
+        self.manda_olm(json!({ "m": "reproduce", "mimes": mimes }));
+        self.reproduce_dicho = mimes;
+    }
+
     /// The person takes the conversation back to the computer (or it ended).
     pub fn movil_fin(&mut self) {
+        self.reproduce(Vec::new());
         if self.movil.take().is_some() {
             self.monitor
                 .anota(ahora_s(), Nivel::Info, "paso al móvil terminado");
@@ -1550,6 +1573,7 @@ impl Secure {
                     return;
                 }
                 Desde::Visto => self.novedad = false,
+                Desde::Reproduce(mimes) if aprobado => self.reproduce(mimes),
                 Desde::Texto(t) if aprobado => self.texto(&t),
                 Desde::Llamar { video, mime } if aprobado => {
                     let _ = self.llamar(video, &mime);
@@ -1630,6 +1654,7 @@ impl Secure {
             "puerto": self.puerto,
             "codigo": self.puerta.as_ref().map(crate::puerta::Puerta::codigo),
             "puerta_error": self.puerta_error,
+            "reproduce_otro": self.reproduce_otro,
             "rele_codigo": self.rele_codigo,
             "rele": self.rele,
             "rele_error": self.rele_error,
@@ -1646,6 +1671,19 @@ impl Secure {
             "resumen": self.resumen.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "mensajes": r.mensajes_enviados + r.mensajes_recibidos, "archivos": r.archivos.enviados + r.archivos.recibidos, "observadas": r.observadas, "inusuales": r.inusuales, "fin": r.fin })),
         })
     }
+}
+
+/// Up to eight container/codec strings from a JSON array, each at most 80 characters.
+fn lista_de_formatos(v: &Value) -> Vec<String> {
+    v.as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(Value::as_str)
+                .take(8)
+                .map(|s| s.chars().take(80).collect())
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// One byte of name length, the name, the piece: the sender travels inside the cipher.
@@ -1779,6 +1817,18 @@ mod tests {
         gira(&mut a, &mut b, 15);
         assert_eq!(b.mensajes.last().unwrap().2, "hola Bea");
         assert!(!b.mensajes.last().unwrap().1);
+
+        // An iPhone takes over on a's side and can only open MP4: b hears it, and hears when it
+        // goes back.
+        a.reproduce(vec!["video/mp4;codecs=avc1.42E01E,mp4a.40.2".to_owned()]);
+        gira(&mut a, &mut b, 15);
+        assert_eq!(
+            b.estado_json()["reproduce_otro"][0],
+            "video/mp4;codecs=avc1.42E01E,mp4a.40.2"
+        );
+        a.movil_fin();
+        gira(&mut a, &mut b, 15);
+        assert_eq!(b.estado_json()["reproduce_otro"], json!([]));
 
         // A file in three pieces, the last one short.
         let plano: Vec<u8> = (0..(guardiana_secure::archivo::BLOQUE * 2 + 321))

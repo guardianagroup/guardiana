@@ -74,6 +74,9 @@ pub enum Desde {
     Media(Vec<u8>),
     /// The phone's page was brought to the front.
     Visto,
+    /// What the phone's player can open (an iPhone may not open WebM): the other side records
+    /// in one of these when it can.
+    Reproduce(Vec<String>),
     /// The phone went away (network change, page closed); it may come back.
     Soltado,
     /// The listener itself failed.
@@ -697,6 +700,15 @@ fn traduce(v: &Value) -> Option<Desde> {
         }),
         "colgar" => Some(Desde::Colgar),
         "visto" => Some(Desde::Visto),
+        "reproduce" => Some(Desde::Reproduce(
+            v["mimes"]
+                .as_array()?
+                .iter()
+                .filter_map(Value::as_str)
+                .take(8)
+                .map(|s| s.chars().take(80).collect())
+                .collect(),
+        )),
         _ => None,
     }
 }
