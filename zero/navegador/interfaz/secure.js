@@ -251,7 +251,7 @@
     if (g.anfitrion && E.codigo_grupo && nombres.length < (g.max || 6)) { mas.hidden = false; $('c-mas-codigo').textContent = E.codigo_grupo; } else mas.hidden = true;
     pintaChat(nombres.length > 2);
   };
-  en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); fasePinta(); pintaResumen(m.resumen); pintaProgreso(m); pintaIncidente(m); });
+  en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); fasePinta(); pintaResumen(m.resumen); pintaProgreso(m); pintaIncidente(m); pintaVoz(); $('c-voz-otro').hidden = !m.otro_voz_protegida; });
   // How far a file is, both ways, and how long it has left (16 Oct 2026).
   const duracion = (s) => { s = Math.max(0, Math.round(s)); if (s < 60) return s + ' s'; if (s < 3600) return Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + (s % 60) + ' s' : ''); const h = Math.floor(s / 3600), mi = Math.floor((s % 3600) / 60); return h + ' h' + (mi ? ' ' + mi + ' min' : ''); };
   const pintaProgreso = (m) => {
@@ -617,9 +617,24 @@
     const puede = c.filter((x) => window.MediaRecorder && MediaRecorder.isTypeSupported(x));
     return (reproduceOtro.length && puede.find((x) => reproduceOtro.includes(x))) || puede[0] || c[c.length - 1];
   };
+  // «Voz protegida» (16 Oct 2026): the voice leaves transformed (voz.js) so this call is no
+  // clean sample for cloning it. The person's choice is kept; the other side is told.
+  let vozProt = null;
+  let vozActiva = false; try { vozActiva = localStorage.getItem('secure_voz') === '1'; } catch (_) {}
+  const fuenteGrabacion = () => {
+    if (vozProt) { vozProt.parar(); vozProt = null; }
+    if (!vozActiva || !local || !window.vozProtegida || !local.getAudioTracks().length) return local;
+    try { vozProt = window.vozProtegida(local, -4); return vozProt.stream; } catch (_) { return local; }
+  };
+  const pintaVoz = () => { $('c-voz-prot').setAttribute('aria-pressed', String(vozActiva)); $('c-voz-prot').textContent = t(vozActiva ? 'sec_v_activa' : 'sec_v_boton'); };
+  $('c-voz-prot').addEventListener('click', () => {
+    vozActiva = !vozActiva; try { localStorage.setItem('secure_voz', vozActiva ? '1' : '0'); } catch (_) {}
+    pintaVoz(); manda({ tipo: 'secure', accion: 'voz_protegida', activa: vozActiva });
+    if (local) cambiaGrabador();
+  });
   const nuevoGrabador = (video) => {
     const tipo = mime(video);
-    grabador = new MediaRecorder(local, { mimeType: tipo, audioBitsPerSecond: 64000, videoBitsPerSecond: video ? 1500000 : undefined });
+    grabador = new MediaRecorder(fuenteGrabacion(), { mimeType: tipo, audioBitsPerSecond: 64000, videoBitsPerSecond: video ? 1500000 : undefined });
     grabador.ondataavailable = async (e) => { if (e.data && e.data.size) manda({ tipo: 'secure', accion: 'media', b64: b64De(await e.data.arrayBuffer()) }); };
     grabador.start(120);
     tipoGrabador = tipo;
@@ -720,6 +735,7 @@
   const paraMedios = () => {
     try { if (grabador && grabador.state !== 'inactive') grabador.stop(); } catch (_) {}
     grabador = null; tipoGrabador = null;
+    if (vozProt) { vozProt.parar(); vozProt = null; }
     if (local) { local.getTracks().forEach((x) => x.stop()); local = null; }
     $('c-local').srcObject = null;
     jugadores.forEach((j) => { try { if (j.fuente && j.fuente.readyState === 'open') j.fuente.endOfStream(); } catch (_) {} j.v.removeAttribute('src'); });

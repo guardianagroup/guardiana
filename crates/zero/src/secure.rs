@@ -494,6 +494,10 @@ pub struct Secure {
     /// from the two: both computers, the highest; a phone on either side, strong (16 Oct 2026).
     otro_movil: bool,
     movil_dicho: Option<bool>,
+    /// «Voz protegida» on each side: ours (the page says it; told to the other side) and
+    /// theirs (shown on the call panel). 16 Oct 2026.
+    voz_protegida: bool,
+    otro_voz_protegida: bool,
     /// This computer's time zone (the page tells it) and the other side's, exchanged inside
     /// Olm once the conversation is open (16 Oct 2026, «que salga en nuestro mapa, el de él y
     /// el mío»): the globe places each computer by its time zone, never by an address.
@@ -588,6 +592,8 @@ impl Secure {
             otro_late: false,
             otro_movil: false,
             movil_dicho: None,
+            voz_protegida: false,
+            otro_voz_protegida: false,
             zona_propia: String::new(),
             zona_otra: String::new(),
             enviados: Vec::new(),
@@ -860,6 +866,7 @@ impl Secure {
         self.otro_late = false;
         self.otro_movil = false;
         self.movil_dicho = None;
+        self.otro_voz_protegida = false;
         self.zona_otra.clear();
         self.reproduce_otro.clear();
         self.reproduce_dicho.clear();
@@ -1497,6 +1504,10 @@ impl Secure {
             }
             "dispositivo" => {
                 self.otro_movil = c["movil"].as_bool().unwrap_or(false);
+                self.cambio = true;
+            }
+            "voz" => {
+                self.otro_voz_protegida = c["protegida"].as_bool().unwrap_or(false);
                 self.cambio = true;
             }
             "zona" => {
@@ -2467,6 +2478,15 @@ impl Secure {
         }
     }
 
+    /// The page turned «Voz protegida» on or off: remember it and tell the other side.
+    pub fn voz_protegida(&mut self, activa: bool) {
+        self.voz_protegida = activa;
+        if self.fase == Fase::Lista {
+            self.manda_olm(json!({ "m": "voz", "protegida": activa }));
+        }
+        self.cambio = true;
+    }
+
     /// Tell the other side whether our phone is the one talking, each time that changes.
     fn di_dispositivo(&mut self) {
         if self.fase != Fase::Lista {
@@ -2476,6 +2496,9 @@ impl Secure {
         if self.movil_dicho == Some(ahora) {
             return;
         }
+        if self.movil_dicho.is_none() && self.voz_protegida {
+            self.manda_olm(json!({ "m": "voz", "protegida": true }));
+        }
         self.movil_dicho = Some(ahora);
         self.manda_olm(json!({ "m": "dispositivo", "movil": ahora }));
     }
@@ -2483,6 +2506,11 @@ impl Secure {
     /// Whether the other side said it is talking from its phone.
     pub fn otro_en_movil(&self) -> bool {
         self.otro_movil
+    }
+
+    /// Whether the other side said its voice leaves transformed.
+    pub fn otro_voz_protegida(&self) -> bool {
+        self.otro_voz_protegida
     }
 
     /// Whether the phone is the one talking right now.
@@ -2626,6 +2654,7 @@ impl Secure {
             "puerta_error": self.puerta_error,
             "reproduce_otro": self.reproduce_otro,
             "otro_movil": self.otro_movil,
+            "otro_voz_protegida": self.otro_voz_protegida,
             "incidente": self.estado_incidente(),
             "reconectando": self.reconexion.as_ref().map(|r| json!({ "desde": r.desde, "intentos": r.intentos })),
             "rele_codigo": self.rele_codigo,
@@ -2825,6 +2854,13 @@ mod tests {
         // level. (A phone talking would say so the same way; see `di_dispositivo`.)
         assert_eq!(b.estado_json()["otro_movil"], false);
         assert_eq!(a.movil_dicho, Some(false));
+        // «Voz protegida» on a's side: b hears it and shows it on the call panel.
+        a.voz_protegida(true);
+        gira(&mut a, &mut b, 15);
+        assert_eq!(b.estado_json()["otro_voz_protegida"], true);
+        a.voz_protegida(false);
+        gira(&mut a, &mut b, 15);
+        assert_eq!(b.estado_json()["otro_voz_protegida"], false);
 
         // A file in three pieces, the last one short.
         let plano: Vec<u8> = (0..(guardiana_secure::archivo::BLOQUE * 2 + 321))

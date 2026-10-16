@@ -613,6 +613,14 @@ impl Grupo {
         self.sesiones.iter().find_map(Secure::informe_incidente)
     }
 
+    /// «Voz protegida» here, told to every member.
+    pub fn voz_protegida(&mut self, activa: bool) {
+        for s in &mut self.sesiones {
+            s.voz_protegida(activa);
+        }
+        self.cambio = true;
+    }
+
     /// The person closed the incident card.
     pub fn olvida_incidente(&mut self) {
         for s in &mut self.sesiones {
@@ -719,6 +727,7 @@ impl Grupo {
         e["contacto"] = json!(self.sesiones[0].contacto());
         // A phone on any member's side: the level shown is the group's lowest.
         e["otro_movil"] = json!(self.sesiones.iter().any(Secure::otro_en_movil));
+        e["otro_voz_protegida"] = json!(self.sesiones.iter().any(Secure::otro_voz_protegida));
         if let Some(video) = self.llamada {
             if e["llamada"].is_null() {
                 e["llamada"] = json!({ "video": video, "desde": self.llamada_desde, "conectada": self.sesiones.iter().any(Secure::conectada) });
