@@ -26,3 +26,11 @@ juntas). Las corta `build/tierra.py` en CI (rama `tierra-*`) de las imágenes de
 tamaño completo: *Blue Marble Next Generation* de julio con relieve y fondo marino (21 600 ×
 10 800) y *Black Marble 2016* (13 500 × 6 750), ambas de dominio público. `t/tiles.json` dice de
 dónde salió cada una y su huella.
+
+## El globo entero, del mismo mes (16 Oct 2026)
+
+`dia.jpg` y `luces.jpg` (4096 × 2048) se rehicieron a partir de las propias teselas (la parte
+interior de cada una, sin la sangre, juntas y reducidas con Lanczos). Antes venían de otra copia
+de la *Blue Marble* con nieve en Siberia, y al mover el globo se veía un recuadro nevado donde una
+tesela de julio todavía no se había cargado. Ahora el globo lejano y el de cerca son la misma
+imagen de julio.
