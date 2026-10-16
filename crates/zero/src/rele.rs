@@ -48,7 +48,8 @@ pub const RELES: &[Rele] = &[
     },
     Rele {
         nombre: "rele-am.guardianagroup.com",
-        ip: "",
+        // Vultr, Miami (16 Oct 2026).
+        ip: "207.246.115.38",
     },
 ];
 /// Where the first relay lives (443 so it passes any office firewall).
