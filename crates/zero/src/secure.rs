@@ -3260,7 +3260,7 @@ mod tests {
         );
         a.archivo_trozo(&B64.encode(trozos[5]), true).unwrap();
         gira(&mut a, &mut b, 20);
-        let r = b.recibidos.last().expect("the file arrived whole");
+        let r = b.recibidos.last().unwrap();
         assert_eq!(r.nombre, "grande.bin");
         assert_eq!(std::fs::read(&r.ruta).unwrap(), plano);
         assert!(a.enviados.last().unwrap().llego_en.is_some());
