@@ -1,0 +1,51 @@
+# The Earth up close, in tiles (build/tierra.py, 15 Oct 2026). Runs on a branch named tierra-*:
+# downloads the NASA pictures at full size, cuts the 45° tiles and leaves them as an artifact, to
+# be reviewed and committed by a person. It never commits anything and holds no keys.
+name: tierra
+
+on:
+  workflow_dispatch:
+    inputs:
+      guardar:
+        description: "«si»: commit the tiles to this branch (never main)"
+        required: false
+        default: ''
+  push:
+    branches: ['tierra-*']
+
+permissions:
+  contents: write
+
+jobs:
+  tierra:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: pillow
+        run: python3 -m pip install --quiet pillow
+      - name: descargar
+        run: python3 build/tierra.py descargar --dir fuentes-tierra
+      - name: cortar
+        run: python3 build/tierra.py cortar --dir fuentes-tierra
+      - name: huellas
+        run: |
+          set -euo pipefail
+          du -sh crates/panel/static/tierra/t
+          cat fuentes-tierra/descargas.json
+      - name: guardar en la rama
+        if: ${{ github.event.inputs.guardar == 'si' && github.ref != 'refs/heads/main' }}
+        run: |
+          set -euo pipefail
+          git config user.name "guardiana-ci"
+          git config user.email "ci@guardianagroup.com"
+          git add crates/panel/static/tierra/t
+          git commit -m "tierra: las teselas de 45° cortadas por CI (build/tierra.py)"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tierra-tiles
+          path: |
+            crates/panel/static/tierra/t
+            fuentes-tierra/descargas.json
+          retention-days: 7
