@@ -93,16 +93,21 @@
       $('rv-ahora').textContent = t(r.corriendo ? 'rv_boton_revisando' : 'rv_ahora');
       const e = r.equipo;
       $('rv-equipo').textContent = e && e.sistema ? [e.fabricante, e.modelo, e.sistema + (e.display ? ' ' + e.display : ''), e.compilacion ? 'build ' + e.compilacion + (e.ubr ? '.' + e.ubr : '') : ''].filter(Boolean).join(' · ') : '';
-      $('rv-grupos').innerHTML = r.grupos.map((g) => `<section class="rv-grupo"><h2>${esc(t('rv_g_' + g.id))}</h2>${g.checks.map((c) => {
+      // The lists the person opened stay open when the page refreshes (the owner, 16 Oct 2026: «se
+      // abre pero vuelve a cerrarse sola»), and one they closed stays closed.
+      const abiertos = new Set(), vistos = new Set();
+      $('rv-grupos').querySelectorAll('details[data-id]').forEach((d) => { vistos.add(d.dataset.id); if (d.open) abiertos.add(d.dataset.id); });
+      const html = r.grupos.map((g) => `<section class="rv-grupo"><h2>${esc(t('rv_g_' + g.id))}</h2>${g.checks.map((c) => {
         const fila = (i) => {
           const texto = [i.t, i.d, i.marcas.map((m) => t('rv_marca_' + m)).join(', '), i.cuando ? fecha(i.cuando) : ''].filter(Boolean).join(' · ');
           return `<li title="${esc(texto)}">${esc(i.t || '—')}${i.marcas.map(marca).join('')}${i.d || i.cuando ? `<div class="muted">${esc([i.d, i.cuando ? fecha(i.cuando) : ''].filter(Boolean).join(' · '))}</div>` : ''}</li>`;
         };
         const lista = !c.lista.length ? '' : c.lista.length <= 2
           ? `<ul>${c.lista.map(fila).join('')}</ul>`
-          : `<details${c.lista.some((i) => i.marcas.includes('nuevo')) ? ' open' : ''}><summary title="${esc(c.lista.slice(0, 8).map((i) => i.t || '—').join(' · '))}">${esc(t('rv_ver_lista').replace('{n}', c.lista.length))}</summary><ul>${c.lista.map(fila).join('')}</ul></details>`;
+          : `<details data-id="${esc(c.id)}"${abiertos.has(c.id) || (!vistos.has(c.id) && c.lista.some((i) => i.marcas.includes('nuevo'))) ? ' open' : ''}><summary title="${esc(c.lista.slice(0, 8).map((i) => i.t || '—').join(' · '))}">${esc(t('rv_ver_lista').replace('{n}', c.lista.length))}</summary><ul>${c.lista.map(fila).join('')}</ul></details>`;
         return `<div class="card rv-check ${c.estado}"><div class="rv-t"><span class="rv-punto ${c.estado}"></span>${esc(t('rv_t_' + c.id))}</div><div>${esc(frase(c))}</div>${lista}</div>`;
       }).join('')}</section>`).join('');
+      if ($('rv-grupos').dataset.html !== html) { $('rv-grupos').innerHTML = html; $('rv-grupos').dataset.html = html; }
       $('rv-conclusion').hidden = !!r.corriendo || !r.cuando;
       $('rv-conclusion-texto').textContent = r.corriendo || !r.cuando ? '' : conclusion(r);
     };

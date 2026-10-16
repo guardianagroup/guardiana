@@ -2128,7 +2128,7 @@
     "pd_primera": "Visto por primera vez hace {t}",
     "pd_alli_dia": "allí ahora es de día",
     "pd_alli_noche": "allí ahora es de noche",
-    "pd_pasa": "Pasa",
+    "pd_pasa": "Permitido",
     "pd_cortado_nombre": "Cortado: GUARDIANA no da la dirección de este nombre",
     "pd_cortado_programa": "Cortado: todo lo que envía {prog}",
     "pd_sin_nombre_no_corta": "Sin nombre no se puede cortar por nombre; un antivirus sí se puede cortar entero.",

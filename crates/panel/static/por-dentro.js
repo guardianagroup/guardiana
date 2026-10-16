@@ -284,7 +284,7 @@
     let fondoListo = false;
     const ajusta = () => {
       const r = lienzo.getBoundingClientRect();
-      st.dpr = Math.min(window.devicePixelRatio || 1, 2);
+      st.dpr = Math.min(window.devicePixelRatio || 1, 3);
       st.Wc = Math.max(1, r.width); st.W = st.Wc; st.H = Math.max(1, r.height);
       cv.width = Math.round(st.Wc * st.dpr); cv.height = Math.round(st.H * st.dpr);
       fondoListo = false;
@@ -446,7 +446,7 @@
       else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([8, 20, 40, 255]));
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, fija ? gl.CLAMP_TO_EDGE : gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      if (fuente && mip) { gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); const an = gl.getExtension('EXT_texture_filter_anisotropic'); if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT))); }
+      if (fuente && mip) { gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); const an = gl.getExtension('EXT_texture_filter_anisotropic'); if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(16, gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT))); }
       else gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       return t;
     };
@@ -496,7 +496,7 @@
       return e;
     };
     const teselasVisibles = () => {
-      if (!DET.hay || T.m > 0.2 && T.m < 0.8 || pxPorGrado() < 14) return [];
+      if (!DET.hay || T.m > 0.2 && T.m < 0.8 || pxPorGrado() < 8) return [];
       const c = lonLatBajo(st.W / 2, st.H / 2);
       if (!c) return [];
       const fx = (c[0] + 180) / 45, fy = (90 - c[1]) / 45;
@@ -551,7 +551,10 @@
     };
     const pintaTierra = () => {
       if (!T.ok) return false;
-      const W = Math.round(st.Wc * st.dpr), H = Math.round(st.H * st.dpr);
+      // Más calidad (the owner, 16 Oct 2026): the Earth is drawn at 1.5× the screen at least and the
+      // browser scales it down, which smooths coasts and city lights like supersampling.
+      const k = Math.min(3, Math.max(st.dpr, 1.5));
+      const W = Math.round(st.Wc * k), H = Math.round(st.H * k);
       if (glc.width !== W || glc.height !== H) { glc.width = W; glc.height = H; }
       gl.viewport(0, 0, W, H);
       // Fondo y halo.
@@ -561,7 +564,7 @@
       gl.disable(gl.DEPTH_TEST); gl.useProgram(PF.p); gl.bindVertexArray(vaoF);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex.cielo); gl.uniform1i(PF.u.uCielo, 0);
       gl.uniform2f(PF.u.uRes, W, H); gl.uniform1f(PF.u.uDesp, -T.rot * 0.04);
-      gl.uniform2f(PF.u.uCentro, o.x * st.dpr, H - o.y * st.dpr); gl.uniform1f(PF.u.uRadio, rpx * st.dpr);
+      gl.uniform2f(PF.u.uCentro, o.x * k, H - o.y * k); gl.uniform1f(PF.u.uRadio, rpx * k);
       gl.uniform1f(PF.u.uHalo, Math.max(0, 1 - T.m * 1.6)); gl.uniform2f(PF.u.uSolP, Lw[0] / ls, Lw[1] / ls);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       // La Tierra.
@@ -704,13 +707,13 @@
       // program's colour, and a slow breathing ring (one every 3 s, out of step per place) draws
       // the eye without blinking. Up close, the place is named next to it.
       cx.globalCompositeOperation = 'source-over';
-      const puestos = [], ppg = pxPorGrado(), conNombre = ppg >= 12;
-      const nombrados = conNombre ? new Set(GRUPOS.filter((g) => g.base.v).sort((a, b) => (b.top.sub + b.top.baj) - (a.top.sub + a.top.baj)).slice(0, 14)) : null;
+      const puestos = [], ppg = pxPorGrado(), conNombre = ppg >= 7;
+      const nombrados = conNombre ? new Set(GRUPOS.filter((g) => g.base.v).sort((a, b) => (b.top.sub + b.top.baj) - (a.top.sub + a.top.baj)).slice(0, ppg >= 20 ? 30 : 16)) : null;
       GRUPOS.forEach((g) => {
         if (!g.base.v) return;
         const d = g.top, bl = bloqueado(d), col = bl ? '#ff6b7a' : prod(d.p).color;
         const sobre = st.hover && (st.hover.ref === g || st.hover.ref === d);
-        const x = g.base.x, y = g.base.y, r = sobre ? 7.5 : 5.5;
+        const x = g.base.x, y = g.base.y, r = sobre ? 8.5 : 6.5;
         if (!reducido) {
           const u = ((tt / 3.2 + ((g.lon * 7 + g.lat * 3) % 1 + 1)) % 1);
           cx.strokeStyle = (sobre ? '#ffffff' : col) + alfa(0.55 * (1 - u) * (1 - u)); cx.lineWidth = 1.2;
@@ -739,13 +742,15 @@
       cx.globalCompositeOperation = 'source-over';
     };
     const rotulo = (x, y, txt, col, puestos) => {
-      cx.font = '500 10.5px "IBM Plex Mono", monospace';
-      const w = cx.measureText(txt).width + 12, h = 17;
+      // A city name you can read at a glance: sans, semibold, on a near-opaque pill.
+      cx.font = '600 12px "IBM Plex Sans", "Segoe UI", system-ui, sans-serif';
+      const w = cx.measureText(txt).width + 16, h = 21;
       let bx = Math.min(st.W - w - 6, Math.max(6, x)), by = y - h + 4;
       if (puestos) { let n = 0; while (n++ < 12 && puestos.some((b) => bx < b.x + b.w && bx + w > b.x && by < b.y + b.h && by + h > b.y)) by += h + 2; puestos.push({ x: bx, y: by, w, h }); }
-      cx.fillStyle = 'rgba(4,10,20,.72)'; cx.fillRect(bx, by, w, h);
-      cx.fillStyle = col; cx.fillRect(bx, by, 2, h);
-      cx.fillStyle = col; cx.textBaseline = 'middle'; cx.fillText(txt, bx + 7, by + h / 2 + 0.5); cx.textBaseline = 'alphabetic';
+      cx.fillStyle = 'rgba(3,8,18,.88)'; cx.beginPath(); if (cx.roundRect) cx.roundRect(bx, by, w, h, 5); else cx.rect(bx, by, w, h); cx.fill();
+      cx.strokeStyle = 'rgba(255,255,255,.14)'; cx.lineWidth = 1; cx.stroke();
+      cx.fillStyle = col; cx.fillRect(bx + 4, by + 5, 2, h - 10);
+      cx.fillStyle = col; cx.textBaseline = 'middle'; cx.fillText(txt, bx + 10, by + h / 2 + 0.5); cx.textBaseline = 'alphabetic';
     };
     // Up close, name the measured place. Keep the host as a fallback: the map never invents a
     // city or state when the operator did not publish one.

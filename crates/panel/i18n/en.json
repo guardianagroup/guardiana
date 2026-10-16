@@ -2128,7 +2128,7 @@
     "pd_primera": "First seen {t} ago",
     "pd_alli_dia": "it is daytime there now",
     "pd_alli_noche": "it is night there now",
-    "pd_pasa": "Passes",
+    "pd_pasa": "Allowed",
     "pd_cortado_nombre": "Cut: GUARDIANA does not give out this name's address",
     "pd_cortado_programa": "Cut: everything {prog} sends",
     "pd_sin_nombre_no_corta": "Without a name it cannot be cut by name; an antivirus can be cut as a whole.",

@@ -2128,7 +2128,7 @@
     "pd_primera": "Visto pela primeira vez há {t}",
     "pd_alli_dia": "lá agora é dia",
     "pd_alli_noche": "lá agora é noite",
-    "pd_pasa": "Passa",
+    "pd_pasa": "Permitido",
     "pd_cortado_nombre": "Cortado: a GUARDIANA não entrega o endereço deste nome",
     "pd_cortado_programa": "Cortado: tudo o que {prog} envia",
     "pd_sin_nombre_no_corta": "Sem nome não dá para cortar por nome; um antivírus pode ser cortado inteiro.",
