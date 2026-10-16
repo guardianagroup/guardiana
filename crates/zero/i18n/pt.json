@@ -340,7 +340,7 @@
   "mes_nota": "A imagem não leva o seu histórico nem os sites que você visitou: só estes números.",
   "pagina_cortada_titulo": "Cortado pelo GUARDIANA ZERO",
   "pagina_cortada_mandato": "{sitio} não está entre os sites desta tarefa, então esta aba não pode abri-lo. Se precisar dele, adicione-o à tarefa pelo painel.",
-  "pagina_cortada_tuya": "Você bloqueou {sitio}. Pode desbloqueá-lo pelo escudo.",
+  "pagina_cortada_tuya": "Você cortou {sitio}. Pode permiti-lo de novo pelo escudo.",
   "pagina_cortada_senuelo": "Esta página tentava levar a isca da sua tarefa. Foi cortada antes de sair.",
   "volver": "Voltar",
   "cerrar": "Fechar",

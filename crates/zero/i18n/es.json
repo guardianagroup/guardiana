@@ -340,7 +340,7 @@
   "mes_nota": "La imagen no lleva tu historial ni las webs que visitaste: solo estas cifras.",
   "pagina_cortada_titulo": "Cortado por GUARDIANA ZERO",
   "pagina_cortada_mandato": "{sitio} no está entre las webs de esta tarea, así que esta pestaña no puede abrirla. Si la necesitas, añádela a la tarea desde el panel.",
-  "pagina_cortada_tuya": "Bloqueaste {sitio}. Puedes desbloquearlo desde el escudo.",
+  "pagina_cortada_tuya": "Cortaste {sitio}. Puedes volver a permitirlo desde el escudo.",
   "pagina_cortada_senuelo": "Esta página intentaba llevarse el señuelo de tu tarea. Se cortó antes de salir.",
   "volver": "Volver",
   "cerrar": "Cerrar",
