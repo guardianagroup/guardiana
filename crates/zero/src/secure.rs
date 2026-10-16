@@ -1652,11 +1652,6 @@ impl Secure {
                         }
                         Err(_) => {
                             fallo = Some("sec_archivo_mal");
-                            self.incidente(
-                                "archivo_mal",
-                                "un bloque de archivo llegó alterado".to_owned(),
-                                1,
-                            );
                             break;
                         }
                     }
@@ -1675,6 +1670,13 @@ impl Secure {
                 }
             }
             self.aviso(clave, "");
+            if clave == "sec_archivo_mal" {
+                self.incidente(
+                    "archivo_mal",
+                    "un bloque de archivo llegó alterado".to_owned(),
+                    1,
+                );
+            }
             return;
         }
         if completo {
@@ -2212,7 +2214,7 @@ impl Secure {
             return None;
         }
         let ip = self.enlace.as_ref()?.ip_del_otro()?;
-        let s = guardiana_lists::red::servidor_de(ip);
+        let s = guardiana_lists::servidor_de(ip);
         Some(OtroExtremo {
             ip: ip.to_string(),
             pais: s.pais.map(str::to_owned),
