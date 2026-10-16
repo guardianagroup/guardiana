@@ -255,17 +255,20 @@ mod tests {
     }
 
     /// 16 Oct 2026, a Movistar home line in Cartagena: the plain line never reached the relay,
-    /// its HTTPS page did. Two computers now meet inside TLS (a made-up authority and name, see
-    /// tests/rele-prueba), a big piece crosses whole, a wrong name or an unknown authority is
-    /// refused, an older computer on the plain line still meets a newer one, and closing one
+    /// its HTTPS page did. Two computers now meet inside TLS (a certificate made up for the test
+    /// and trusted only here), a big piece crosses whole, a wrong name or an unknown authority
+    /// is refused, an older computer on the plain line still meets a newer one, and closing one
     /// side closes the other.
     #[test]
     fn two_computers_meet_inside_tls_and_an_older_one_still_meets_a_newer_one() {
-        use rustls::pki_types::pem::PemObject as _;
-        use rustls::pki_types::CertificateDer;
+        use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 
-        let certs = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/rele-prueba");
-        let servidor = guardiana_rele::tls::desde(&certs).unwrap().unwrap();
+        let id = wtransport::Identity::self_signed(["rele.prueba"]).unwrap();
+        let cert = CertificateDer::from(id.certificate_chain().as_slice()[0].der().to_vec());
+        let clave = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(
+            id.private_key().secret_der().to_vec(),
+        ));
+        let servidor = guardiana_rele::tls::config(vec![cert.clone()], clave).unwrap();
         let rt = tokio::runtime::Runtime::new().unwrap();
         let listener = rt
             .block_on(tokio::net::TcpListener::bind("127.0.0.1:0"))
@@ -273,9 +276,7 @@ mod tests {
         let dir = listener.local_addr().unwrap().to_string();
         rt.spawn(guardiana_rele::sirve_con(listener, Some(servidor)));
         let mut raices = rustls::RootCertStore::empty();
-        raices
-            .add(CertificateDer::from_pem_file(certs.join("ca.pem")).unwrap())
-            .unwrap();
+        raices.add(cert).unwrap();
         let raices = Arc::new(raices);
 
         let sala = sala_de(&codigo_nuevo()).unwrap();
