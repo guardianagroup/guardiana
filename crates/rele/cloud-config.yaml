@@ -55,6 +55,8 @@ write_files:
 runcmd:
   - ufw allow OpenSSH
   - ufw allow 443/tcp
+  - ufw allow 80/tcp
   - ufw --force enable
   - curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
   - bash /opt/guardiana-rele/actualizar.sh
+  - bash /opt/guardiana-rele/guardiana/crates/rele/servidor-tls.sh

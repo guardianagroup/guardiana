@@ -13,7 +13,7 @@
 </head>
 <body data-page="por-dentro" class="universo">
 <div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
-<section class="stage" id="stage" aria-label="GUARDIANA por dentro">
+<section class="stage" id="stage" aria-label="Globo en directo" data-t-label="pd_titulo">
   <div class="barra">
     <div class="marca"><a href="/" data-t="pd_volver">← Panel</a> <span data-t="pd_titulo">Globo en directo</span> <span class="chip-modo corte" id="chip-modo" role="status" hidden></span></div>
     <div class="pestanas" role="group" data-t-label="pd_vistas">
@@ -24,7 +24,7 @@
       <button type="button" data-filtro="todo" aria-pressed="true" data-t="pd_filtro_todo">Todo</button><button type="button" data-filtro="datos" aria-pressed="false" data-t="pd_filtro_datos">Datos</button><button type="button" data-filtro="av" aria-pressed="false" data-t="pd_filtro_av">Antivirus</button>
     </div>
     <div class="controles">
-      <span class="lugar-yo" title=""><span data-t="pd_tu_pais">Tu ordenador está en</span> <b id="yo"></b></span>
+      <span class="lugar-yo" title=""><span data-t="pd_tu_pais">Tu equipo está en</span> <b id="yo"></b></span>
       <button type="button" class="btn-hud" id="precisar" data-t="pd_precisar">◎ Precisar</button>
       <button type="button" class="btn-hud" id="corregir-lugar" data-t="pd_corregir">Corregir ciudad</button>
       <span class="chip-vpn" id="vpn" hidden role="status"></span>
@@ -61,7 +61,7 @@
     <div class="aviso" id="aviso" hidden role="status" aria-live="polite"></div>
     <div class="ubicacion" id="ubicacion" hidden role="dialog" aria-modal="true" aria-labelledby="ubicacion-t">
       <h2 id="ubicacion-t" data-t="pd_corregir_titulo">Confirma tu ciudad</h2>
-      <p data-t="pd_corregir_texto">Si el servicio de ubicación se equivoca, busca tu ciudad. La elección queda solo en este navegador.</p>
+      <p data-t="pd_corregir_texto">Si Windows o el servicio de ubicación se equivoca, busca tu ciudad. La elección queda solo en este navegador.</p>
       <label for="ubicacion-busca" data-t="pd_corregir_etiqueta">Ciudad o región</label>
       <input id="ubicacion-busca" type="search" autocomplete="off" spellcheck="false" data-t-placeholder="pd_corregir_placeholder">
       <div class="ubicacion-resultados" id="ubicacion-resultados" role="listbox"></div>

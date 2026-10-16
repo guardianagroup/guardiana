@@ -196,6 +196,16 @@ pub enum Orden {
         /// The address.
         url: String,
     },
+    /// Open a file that arrived in SECURE with its program (never a program itself).
+    AbreArchivo {
+        /// Where it is.
+        ruta: String,
+    },
+    /// Show a file that arrived in SECURE, selected in its folder.
+    MuestraArchivo {
+        /// Where it is.
+        ruta: String,
+    },
     /// Delete cookies, cache and history of the kept session.
     BorraNavegacion,
     /// The engine's own tracking prevention: strict while cutting, balanced while watching.
@@ -1215,6 +1225,7 @@ impl Sesion {
             }
         }
         if self.secure.cambiado() {
+            self.secure.movil_sincroniza();
             if let Some(id) = self.pestana_secure() {
                 o.extend(self.a_pestana(id, &self.secure.estado_json()));
                 for a in self.secure.avisos() {
@@ -1260,7 +1271,9 @@ impl Sesion {
                 self.secure.nombre_propio = texto(m, "nombre").chars().take(60).collect();
                 Ok(())
             }
-            "archivo_empieza" => self.secure.archivo_empieza(texto(m, "nombre")),
+            "archivo_empieza" => self
+                .secure
+                .archivo_empieza(texto(m, "nombre"), m["bytes"].as_u64().unwrap_or(0)),
             "archivo_trozo" => self
                 .secure
                 .archivo_trozo(texto(m, "b64"), m["ultimo"].as_bool().unwrap_or(false)),
@@ -1268,10 +1281,85 @@ impl Sesion {
                 self.secure.reanudar_a_mano();
                 Ok(())
             }
-            "llamar" => self.secure.llamar(m["video"].as_bool().unwrap_or(false)),
+            "llamar" => self
+                .secure
+                .llamar(m["video"].as_bool().unwrap_or(false), texto(m, "mime")),
+            "mime" => {
+                self.secure.cambia_mime(texto(m, "mime"));
+                Ok(())
+            }
+            "movil" => self.secure.movil_empieza(texto(m, "idioma")),
+            "movil_ok" => {
+                self.secure.movil_aprueba();
+                Ok(())
+            }
+            "movil_fin" => {
+                self.secure.movil_fin();
+                Ok(())
+            }
             "colgar" => {
                 self.secure.colgar();
                 Ok(())
+            }
+            "contestar" => self.secure.contestar(texto(m, "mime")),
+            "rechazar" => {
+                self.secure.rechazar();
+                Ok(())
+            }
+            "archivo_abrir" | "archivo_carpeta" => {
+                let Some(r) = m["id"].as_u64().and_then(|i| self.secure.recibido(i)) else {
+                    return Vec::new();
+                };
+                if r.borrado {
+                    return Vec::new();
+                }
+                let ruta = r.ruta.to_string_lossy().into_owned();
+                return if accion == "archivo_abrir" && r.abrible() {
+                    vec![Orden::AbreArchivo { ruta }]
+                } else {
+                    vec![Orden::MuestraArchivo { ruta }]
+                };
+            }
+            "archivo_borrar" => {
+                if let Some(i) = m["id"].as_u64() {
+                    self.secure.borra_recibido(i);
+                }
+                Ok(())
+            }
+            "archivo_vista" => {
+                // A small picture for the chat: only images, at most 12 MB, read once.
+                let Some(r) = m["id"].as_u64().and_then(|i| self.secure.recibido(i)) else {
+                    return Vec::new();
+                };
+                if !r.imagen() || r.borrado || r.bytes > 12 * 1024 * 1024 {
+                    return Vec::new();
+                }
+                let Ok(datos) = std::fs::read(&r.ruta) else {
+                    return Vec::new();
+                };
+                let tipo = match r
+                    .nombre
+                    .rsplit_once('.')
+                    .map(|(_, e)| e.to_ascii_lowercase())
+                    .as_deref()
+                {
+                    Some("png") => "image/png",
+                    Some("gif") => "image/gif",
+                    Some("webp") => "image/webp",
+                    Some("bmp") => "image/bmp",
+                    _ => "image/jpeg",
+                };
+                let url = format!(
+                    "data:{tipo};base64,{}",
+                    base64::engine::general_purpose::STANDARD.encode(datos)
+                );
+                return self
+                    .a_pestana(
+                        id,
+                        &json!({ "tipo": "secure_vista", "id": r.id, "url": url }),
+                    )
+                    .into_iter()
+                    .collect();
             }
             "media" => self.secure.media_saliente(texto(m, "b64")),
             "visto" => {
@@ -1294,8 +1382,9 @@ impl Sesion {
                 &json!({ "tipo": "secure_aviso", "clave": "sec_error", "texto": e }),
             ));
         }
-        if accion != "media" && accion != "archivo_trozo" {
+        if accion != "media" && accion != "archivo_trozo" && accion != "mime" {
             o.extend(self.a_pestana(id, &self.secure.estado_json()));
+            self.secure.movil_sincroniza();
         }
         o
     }

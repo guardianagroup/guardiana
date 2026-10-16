@@ -41,6 +41,10 @@ pub struct Grupo {
     pub media_para_pagina: VecDeque<(String, String)>,
     /// The call the host keeps going across members: with video?
     llamada: Option<bool>,
+    /// Since when (unix s).
+    llamada_desde: u64,
+    /// The kind of recording this computer's page makes (MediaRecorder), for every link.
+    mime: String,
     cambio: bool,
 }
 
@@ -67,6 +71,8 @@ impl Grupo {
             mensajes: Vec::new(),
             media_para_pagina: VecDeque::new(),
             llamada: None,
+            llamada_desde: 0,
+            mime: String::new(),
             cambio: false,
         }
     }
@@ -315,14 +321,30 @@ impl Grupo {
                 }
             }
         }
-        // A member joined while a call is on: bring them in.
+        // A member who joined while a call is on is called once; someone who hung up or
+        // rejected it is not called again (16 Oct 2026: the host kept calling a member who had
+        // hung up, over and over, and the screen shook).
         if let Some(video) = self.llamada {
             if anfitrion {
                 for s in &mut self.sesiones {
-                    if s.lista() && s.llamada_activa().is_none() {
-                        let _ = s.llamar(video);
+                    if s.lista() && s.llamada_activa().is_none() && !s.llamado_en_grupo {
+                        s.llamado_en_grupo = true;
+                        let _ = s.llamar(video, &self.mime);
                     }
                 }
+            }
+            // Nobody left in the call or ringing: it is over.
+            if ahora_s().saturating_sub(self.llamada_desde) > 2
+                && self
+                    .sesiones
+                    .iter()
+                    .all(|s| s.llamada_activa().is_none() && s.suena().is_none())
+            {
+                self.llamada = None;
+                for s in &mut self.sesiones {
+                    s.llamado_en_grupo = false;
+                }
+                self.cambio = true;
             }
         }
     }
@@ -348,27 +370,116 @@ impl Grupo {
     }
 
     /// Start a call with everyone (the host) or with the host (a member).
-    pub fn llamar(&mut self, video: bool) -> Result<(), String> {
+    pub fn llamar(&mut self, video: bool, mime: &str) -> Result<(), String> {
         let mut r = Err("sec_no_lista".to_owned());
+        if !mime.is_empty() {
+            self.mime = mime.chars().take(80).collect();
+        }
         for s in &mut self.sesiones {
             if s.lista() {
-                r = s.llamar(video).and(Ok(()));
+                s.llamado_en_grupo = true;
+                r = s.llamar(video, &self.mime).and(Ok(()));
             }
         }
         if r.is_ok() {
             self.llamada = Some(video);
+            self.llamada_desde = ahora_s();
         }
         self.cambio = true;
         r
+    }
+
+    /// The page records in another format now (it tells every link).
+    pub fn cambia_mime(&mut self, mime: &str) {
+        if mime.is_empty() {
+            return;
+        }
+        self.mime = mime.chars().take(80).collect();
+        for s in &mut self.sesiones {
+            s.cambia_mime(mime);
+        }
+    }
+
+    /// «Pasar al móvil»: only a two-person conversation (a group's call has several streams).
+    pub fn movil_empieza(&mut self, idioma: &str) -> Result<(), String> {
+        if self.sesiones.len() != 1 || self.nombres().len() > 2 {
+            return Err("sec_mv_solo_dos".to_owned());
+        }
+        self.sesiones[0].movil_empieza(idioma)
+    }
+
+    /// The person said «Sí, es mi móvil».
+    pub fn movil_aprueba(&mut self) {
+        for s in &mut self.sesiones {
+            s.movil_aprueba();
+        }
+    }
+
+    /// Back to the computer.
+    pub fn movil_fin(&mut self) {
+        for s in &mut self.sesiones {
+            s.movil_fin();
+        }
+        self.cambio = true;
+    }
+
+    /// The phone gets the state after every change.
+    pub fn movil_sincroniza(&self) {
+        for s in &self.sesiones {
+            s.movil_sincroniza();
+        }
     }
 
     /// Hang up with everyone.
     pub fn colgar(&mut self) {
         for s in &mut self.sesiones {
             s.colgar();
+            s.llamado_en_grupo = false;
         }
         self.llamada = None;
         self.cambio = true;
+    }
+
+    /// Answer the call ringing here (the host who answers a member brings the rest in).
+    pub fn contestar(&mut self, mime: &str) -> Result<(), String> {
+        if !mime.is_empty() {
+            self.mime = mime.chars().take(80).collect();
+        }
+        let mut r = Ok(());
+        let mut video = None;
+        for s in &mut self.sesiones {
+            if let Some(v) = s.suena() {
+                video = Some(v);
+                s.llamado_en_grupo = true;
+                r = s.contestar(mime);
+            }
+        }
+        if let (Some(v), true) = (video, self.anfitrion && self.sesiones.len() > 1) {
+            self.llamada = Some(v);
+            self.llamada_desde = ahora_s();
+        }
+        self.cambio = true;
+        r
+    }
+
+    /// Reject the call ringing here.
+    pub fn rechazar(&mut self) {
+        for s in &mut self.sesiones {
+            s.rechazar();
+        }
+        self.cambio = true;
+    }
+
+    /// A file that arrived on any link.
+    pub fn recibido(&self, id: u64) -> Option<crate::secure::Recibido> {
+        self.sesiones.iter().find_map(|s| s.recibido(id).cloned())
+    }
+
+    /// Delete a file that arrived.
+    pub fn borra_recibido(&mut self, id: u64) -> bool {
+        let r = self.sesiones.iter_mut().any(|s| s.borra_recibido(id));
+        self.cambio |= r;
+        r
     }
 
     /// One recorded piece from the page: to every link.
@@ -383,10 +494,10 @@ impl Grupo {
     }
 
     /// A file: to the first talking link (in a group, the host; the host passes files on later).
-    pub fn archivo_empieza(&mut self, nombre: &str) -> Result<(), String> {
+    pub fn archivo_empieza(&mut self, nombre: &str, bytes: u64) -> Result<(), String> {
         for s in &mut self.sesiones {
             if s.lista() {
-                return s.archivo_empieza(nombre);
+                return s.archivo_empieza(nombre, bytes);
             }
         }
         Err("sec_no_lista".to_owned())
@@ -508,9 +619,42 @@ impl Grupo {
         e["contacto"] = json!(self.sesiones[0].contacto());
         if let Some(video) = self.llamada {
             if e["llamada"].is_null() {
-                e["llamada"] = json!({ "video": video, "desde": 0 });
+                e["llamada"] = json!({ "video": video, "desde": self.llamada_desde, "conectada": self.sesiones.iter().any(Secure::conectada) });
             }
         }
+        // A call ringing on any link, and the files that came on any link.
+        if e["entrante"].is_null() {
+            if let Some(s) = self.sesiones.iter().find(|s| s.suena().is_some()) {
+                e["entrante"] = json!({ "video": s.suena(), "de": s.contacto() });
+            }
+        }
+        let mut recibidos: Vec<Value> = self
+            .sesiones
+            .iter()
+            .flat_map(|s| s.recibidos.iter().map(crate::secure::Recibido::json))
+            .collect();
+        recibidos.sort_by_key(|r| r["t"].as_u64().unwrap_or(0));
+        e["recibidos"] = json!(recibidos);
+        if e["envio"].is_null() {
+            if let Some(v) = self
+                .sesiones
+                .iter()
+                .map(Secure::envio_json)
+                .find(|v| !v.is_null())
+            {
+                e["envio"] = v;
+            }
+        }
+        let enviados: Vec<Value> = self
+            .sesiones
+            .iter()
+            .flat_map(|s| {
+                s.enviados.iter().filter(|x| x.t > 0).map(|x| {
+                    json!({ "nombre": x.nombre, "t": x.t, "bytes": x.bytes, "llego_en": x.llego_en })
+                })
+            })
+            .collect();
+        e["enviados"] = json!(enviados);
         e
     }
 }
@@ -589,10 +733,26 @@ mod tests {
         assert_eq!(c.mensajes.last().unwrap().2, "bienvenidos");
 
         // A call: a piece from Cris reaches Bea under Cris's name, through Ana.
-        a.llamar(false).unwrap();
+        a.llamar(false, "").unwrap();
+        gira(&mut [&mut a, &mut b, &mut c], 20);
+        // It rings for both, until each answers.
+        assert_eq!(b.sesiones[0].suena(), Some(false));
+        assert_eq!(c.sesiones[0].suena(), Some(false));
+        assert_eq!(b.estado_json()["entrante"]["video"], false);
+        assert!(
+            !a.sesiones.iter().any(Secure::conectada),
+            "calling, not talking yet"
+        );
+        b.contestar("").unwrap();
+        c.contestar("").unwrap();
         gira(&mut [&mut a, &mut b, &mut c], 20);
         assert!(b.sesiones[0].llamada_activa().is_some());
         assert!(c.sesiones[0].llamada_activa().is_some());
+        assert!(a
+            .sesiones
+            .iter()
+            .filter(|s| s.lista())
+            .all(Secure::conectada));
         c.media_saliente(&B64.encode(b"pieza-de-cris")).unwrap();
         gira(&mut [&mut a, &mut b, &mut c], 20);
         let (de, b64) = b.media_para_pagina.back().cloned().unwrap();
@@ -600,6 +760,25 @@ mod tests {
         assert_eq!(B64.decode(b64).unwrap(), b"pieza-de-cris");
         let (de_a, _) = a.media_para_pagina.back().cloned().unwrap();
         assert_eq!(de_a, "Cris");
+
+        // Cris hangs up: the host does not call Cris again (16 Oct 2026: it did, in a loop).
+        c.colgar();
+        gira(&mut [&mut a, &mut b, &mut c], 30);
+        assert!(c.sesiones[0].llamada_activa().is_none());
+        assert!(
+            c.sesiones[0].suena().is_none(),
+            "no new ring for whoever hung up"
+        );
+        assert!(b.sesiones[0].llamada_activa().is_some(), "the others go on");
+        // Bea too: nobody left, the call is over for the host.
+        b.colgar();
+        std::thread::sleep(Duration::from_millis(2200));
+        gira(&mut [&mut a, &mut b, &mut c], 30);
+        assert!(
+            a.estado_json()["llamada"].is_null(),
+            "{}",
+            a.estado_json()["llamada"]
+        );
         let _ = std::fs::remove_dir_all(base);
     }
 }

@@ -518,6 +518,19 @@ impl Trozos {
         self.cifrador.bloques
     }
 
+    /// The key to send before the first block (16 Oct 2026): with it the receiver writes each
+    /// block to disk as it comes, instead of keeping the whole file in memory until the end.
+    /// Size, count and hash are not known yet: the full [`Llave`] still closes the file.
+    pub fn llave_inicial(&self) -> Llave {
+        Llave {
+            clave: b64(&self.cifrador.clave),
+            prefijo: b64(&self.cifrador.prefijo),
+            bytes: 0,
+            bloques: 0,
+            sha256: String::new(),
+        }
+    }
+
     /// The key to send inside Olm once every block went out.
     pub fn termina(self) -> Result<Llave, Error> {
         if !self.cerrado {
@@ -603,6 +616,23 @@ impl Recepcion {
 #[allow(clippy::unwrap_used)]
 mod trozos_tests {
     use super::*;
+
+    #[test]
+    fn the_first_key_opens_the_blocks_and_the_last_one_closes_the_file() {
+        let plano: Vec<u8> = (0..(BLOQUE + 9)).map(|i| (i % 13) as u8).collect();
+        let mut tx = Trozos::new().unwrap();
+        let inicial = tx.llave_inicial();
+        let mut rx = Recepcion::new(&inicial).unwrap();
+        let mut abierto = Vec::new();
+        for trozo in plano.chunks(BLOQUE) {
+            let (n, c) = tx.empuja(trozo).unwrap();
+            abierto.extend(rx.mete(n, &c).unwrap());
+        }
+        let llave = tx.termina().unwrap();
+        assert_eq!(llave.clave, inicial.clave);
+        rx.termina(&llave).unwrap();
+        assert_eq!(abierto, plano);
+    }
 
     #[test]
     fn pieces_pushed_one_by_one_make_the_same_stream_and_open_in_order() {

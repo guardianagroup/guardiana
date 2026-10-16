@@ -1,6 +1,6 @@
 [package]
 name = "guardiana-rele"
-description = "GUARDIANA SECURE's blind relay: joins two connections that share a room and passes bytes it cannot read (everything arrives encrypted end to end); keeps nothing, writes no addresses"
+description = "GUARDIANA SECURE's blind relay: joins two connections that share a room (two computers, or a computer and its owner's phone) and passes bytes it cannot read (everything arrives encrypted end to end); keeps nothing, writes no addresses"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,6 +16,12 @@ path = "src/main.rs"
 
 [dependencies]
 tokio = { workspace = true }
+# Phones (16 Oct 2026): TLS with the server's own certificate, the WebSocket handshake's SHA-1
+# and base64.
+rustls = { workspace = true }
+tokio-rustls = { workspace = true }
+ring = { workspace = true }
+base64 = { workspace = true }
 
 [lints]
 workspace = true

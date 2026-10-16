@@ -15,7 +15,7 @@
 <header class="top">
   <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA<small data-t="lema"></small></span></a>
   <nav>
-    <a href="/por-dentro" class="nav-destacado" data-t="nav_por_dentro">Por dentro</a>
+    <a href="/por-dentro" class="nav-destacado" data-t="nav_por_dentro">Globo en directo</a>
     <a href="/revision" class="nav-destacado" data-t="nav_revision">Revisión</a>
     <a href="/"  data-t="nav_radiografia">Radiografía</a>
     <a href="/ia" aria-current="page" data-t="nav_ia">Tu IA</a>
@@ -52,7 +52,7 @@
   <h2 data-t="alcance_nuevo_titulo"></h2>
   <form id="alcance-form">
     <p class="paso"><b data-t="alcance_paso1"></b></p>
-    <select name="device_id" id="a-device"></select>
+    <select name="device_id" id="a-device" data-t-label="alcance_paso1"></select>
     <p class="paso"><b data-t="alcance_paso2"></b></p>
     <div class="rapidos" id="a-rapidos">
       <button type="button" class="chip" aria-pressed="false" data-dominios="anthropic.com claude.ai claudeusercontent.com claude.com">Claude</button>
@@ -77,7 +77,7 @@
       <button type="button" class="chip" aria-pressed="false" data-dominios="github.com">GitHub</button>
     </div>
     <p class="paso"><b data-t="alcance_paso3"></b></p>
-    <textarea name="patrones" id="a-patrones" rows="4" class="mono wide" placeholder="api.anthropic.com&#10;github.com"></textarea>
+    <textarea name="patrones" id="a-patrones" rows="4" class="mono wide" placeholder="api.anthropic.com&#10;github.com" data-t-label="alcance_campo"></textarea>
     <p><button type="submit" data-t="alcance_guardar"></button> <span id="a-msg" class="ok" role="status" aria-live="polite"></span></p>
   </form>
   <details class="como"><summary data-t="alcance_como"></summary><p data-t="alcance_nuevo_lead"></p><p class="limit" data-t="alcance_limite"></p></details>

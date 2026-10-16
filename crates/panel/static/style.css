@@ -683,6 +683,12 @@ body.universo { margin: 0; background: #04070d; color: #d3e6f3; overflow: hidden
 .universo .hud > div { padding: 10px 12px; border-right: 1px solid var(--hud-line); min-width: 0; display: grid; align-content: start; gap: 6px; }
 
 .universo .hud > div:last-child { border-right: 0; }
+/* The bottom band keeps one height whatever it lists (the owner, 16 Oct 2026: switching Todo /
+   Datos / Antivirus changed the globe's size, because the band grew or shrank with its lists and
+   the picture above it with it). Unfolded, it scrolls as before. */
+.universo .hud:not(.amplio) > div { height: 132px; overflow: hidden; }
+@media (min-width: 1700px) { .universo .hud:not(.amplio) > div { height: 206px; } }
+@media (min-width: 2400px) { .universo .hud:not(.amplio) > div { height: 256px; } }
 
 .universo .hud h3 { margin: 0; font: 500 10.5px 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--hud-muted); display: flex; justify-content: space-between; gap: 8px; }
 
