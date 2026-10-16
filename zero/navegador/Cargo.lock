@@ -580,7 +580,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-core"
-version = "1.0.36"
+version = "1.0.37"
 dependencies = [
  "rusqlite",
  "serde",
@@ -590,7 +590,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-license"
-version = "1.0.36"
+version = "1.0.37"
 dependencies = [
  "getrandom 0.4.3",
  "guardiana-core",
@@ -602,7 +602,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-lists"
-version = "1.0.36"
+version = "1.0.37"
 dependencies = [
  "flate2",
  "guardiana-core",
@@ -613,7 +613,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-secure"
-version = "1.0.36"
+version = "1.0.37"
 dependencies = [
  "base64 0.23.1",
  "chacha20poly1305",
@@ -627,7 +627,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-zero"
-version = "1.0.36"
+version = "1.0.37"
 dependencies = [
  "base64 0.23.1",
  "guardiana-core",
@@ -635,17 +635,20 @@ dependencies = [
  "guardiana-lists",
  "guardiana-secure",
  "ring",
+ "rustls",
  "serde",
  "serde_json",
  "sha2 0.11.0",
  "tokio",
+ "tokio-rustls",
  "url",
+ "webpki-roots",
  "wtransport",
 ]
 
 [[package]]
 name = "guardiana-zero-navegador"
-version = "1.0.36"
+version = "1.0.37"
 dependencies = [
  "guardiana-zero",
  "serde_json",
@@ -1876,6 +1879,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.6",
+]
+
+[[package]]
+name = "tokio-rustls"
+version = "0.26.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9cc2678c2cdd569ef8215e2afd7954ada2ae20b4fdd2c5fe6139a3b02d105db"
+dependencies = [
+ "rustls",
+ "tokio",
 ]
 
 [[package]]

@@ -526,19 +526,15 @@ async fn rele_bucle(rele: String, clave: [u8; 32], tx: tmpsc::UnboundedSender<En
 }
 
 async fn conecta_rele(rele: &str) -> Option<tokio::net::TcpStream> {
-    let intento = |d: String| async move {
-        tokio::time::timeout(Duration::from_secs(8), tokio::net::TcpStream::connect(d))
-            .await
-            .ok()?
-            .ok()
-    };
-    if let Some(s) = intento(rele.to_owned()).await {
-        return Some(s);
-    }
-    if rele == crate::rele::RELE {
-        return intento(crate::rele::RELE_IP.to_owned()).await;
-    }
-    None
+    // The same way in as a conversation's (inside TLS for GUARDIANA's relay, see `rele::abre`),
+    // handed over as a socket of this runtime.
+    let rele = rele.to_owned();
+    let s = tokio::task::spawn_blocking(move || crate::rele::abre(&rele))
+        .await
+        .ok()?
+        .ok()?;
+    s.set_nonblocking(true).ok()?;
+    tokio::net::TcpStream::from_std(s).ok()
 }
 
 async fn lee_rele(r: &mut (impl tokio::io::AsyncRead + Unpin)) -> Option<Vec<u8>> {
