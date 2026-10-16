@@ -150,7 +150,8 @@
     $('c-comparar-quien').textContent = E.comparando && E.contacto_nuevo ? t('sec_s_nuevo', { n: E.contacto_nuevo }) : '';
     $('c-espera').hidden = !(f === 'saludando' || f === 'abriendo' || f === 'buscando' || (f === 'comparando' && !E.numeros));
     $('c-chat').hidden = f !== 'lista';
-    $('c-huella').textContent = E.huella || RAYA;
+    // The key's fingerprint is no longer shown under the invitation (the owner, 15 Oct 2026: a
+    // second «clave» under the code confused people). The check that matters is the numbers.
     // Waiting: the door in the router gives a GS code; no door, the blind relay gives a GR one.
     const codigo = E.codigo || E.rele_codigo;
     // While the code is being prepared, one line; once it is on screen, the code box says it all.

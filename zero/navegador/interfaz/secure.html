@@ -43,8 +43,6 @@ main > .tarjeta { margin-top: 14px; }
 .c-codigo .t { grid-column: 1 / -1; margin: 0; font-size: 12.5px; }
 .c-puerta-error { margin-top: 10px; color: var(--aviso); }
 .c-puerta-error[hidden] { display: none; }
-.c-huella { margin: 14px 0 0; font-size: 12.5px; color: var(--muted); }
-.c-huella code { font-family: var(--mono); color: var(--fg); }
 .numeros { display: flex; gap: 14px; margin: 12px 0 16px; }
 .numeros b { font: 600 clamp(28px, 4vw, 40px)/1 var(--display); letter-spacing: .02em; padding: 12px 18px; border: 1px solid var(--line); border-radius: var(--r-tarjeta); background: var(--card); font-variant-numeric: tabular-nums; }
 .c-nombre { display: grid; gap: 4px; margin: 0 0 12px; font-size: 13px; color: var(--muted); max-width: 320px; }
@@ -192,7 +190,6 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
         <div class="c-fila"><input class="campo codigo" id="c-direccion" data-t-ph="sec_c_codigo_ph" spellcheck="false" autocomplete="off" autocapitalize="characters"><button type="button" class="boton principal" id="c-conectar" data-t="sec_c_entrar"></button></div>
       </div>
     </div>
-    <p class="c-huella"><span data-t="sec_c_tu_huella"></span> <code id="c-huella"></code></p>
   </section>
 
   <section class="tarjeta comparar" id="c-comparar" hidden>
