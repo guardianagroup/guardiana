@@ -1086,5 +1086,7 @@
   "sec_c_tu_nombre_ph": "Francisco",
   "sec_c_mas": "Para convidar mais pessoas, o mesmo código:",
   "sec_m_grupo": "Grupo: {n}",
-  "sec_s_nuevo": "{n} está entrando. Compare os números com essa pessoa."
+  "sec_s_nuevo": "{n} está entrando. Compare os números com essa pessoa.",
+  "sec_archivo_cortado": "A ligação caiu a meio do ficheiro e não foi possível retomá-lo; envia-o outra vez.",
+  "sec_f_esperando_enlace": "à espera de recuperar a ligação; continuará onde ficou"
 }

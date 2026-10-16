@@ -150,6 +150,8 @@ struct Envio {
     /// The link's «handed over» count when it started, and when its last piece was handed.
     inicio: u64,
     fin: Option<u64>,
+    /// Bytes written on links that dropped since it started (their counters are gone).
+    antes: u64,
     /// (when, written) a few times a second, for the speed.
     marcas: VecDeque<(std::time::Instant, u64)>,
     aviso: std::time::Instant,
@@ -225,7 +227,26 @@ struct Salida {
     nombre: String,
     trozos: Trozos,
     bytes: u64,
+    /// Encrypted blocks the other side has not confirmed yet (16 Oct 2026, «reanudación»):
+    /// if the link drops, the other side says how many it has and these go out again from
+    /// there. It confirms every [`CONFIRMA_CADA`] blocks, so this stays small.
+    guardados: VecDeque<(u64, Vec<u8>)>,
+    guardados_bytes: u64,
+    /// Blocks are kept but not sent: the link dropped and the other side has not yet said
+    /// where it is.
+    pausada: bool,
+    /// The closing key, once every block was handed over; sent again if the other side asks
+    /// after a drop.
+    llave: Option<Llave>,
+    /// The opening key and the announced size, to start over if the start was lost in a drop.
+    inicial: Llave,
+    anunciado: u64,
 }
+
+/// The receiver confirms every this many blocks (4 MB of 64 KB blocks).
+const CONFIRMA_CADA: u64 = 64;
+/// Unconfirmed blocks kept for a resend, at most; past this the page waits.
+const GUARDADOS_MAX: u64 = 32 * 1024 * 1024;
 
 /// How long a call rings before «no answer».
 pub const TIMBRE_S: u64 = 45;
@@ -965,6 +986,7 @@ impl Secure {
                         );
                         self.manda(json!({ "t": "latido" }));
                         self.di_dispositivo_otra_vez();
+                        self.digo_lo_que_tengo();
                         self.cambio = true;
                     } else {
                         self.saluda();
@@ -1007,6 +1029,7 @@ impl Secure {
             .concat(),
         );
         let sala: String = h[..16].iter().map(|x| format!("{x:02x}")).collect();
+        self.envio_al_caer();
         self.enlace = None;
         self.rx = None;
         self.otro_late = false;
@@ -1597,8 +1620,24 @@ impl Secure {
                 self.entrada = Some(e);
                 self.vacia_bloques();
             }
+            "archivo_tengo" => {
+                let bloques = c["bloques"].as_u64().unwrap_or(0);
+                let ultimo = c["ultimo"].as_str().unwrap_or_default();
+                let ultimo = if ultimo.is_empty() { String::new() } else { limpia_nombre(ultimo) };
+                let nombre = c["nombre"].as_str().unwrap_or_default();
+                let nombre = if nombre.is_empty() { String::new() } else { limpia_nombre(nombre) };
+                self.archivo_tengo(&nombre, bloques, &ultimo);
+            }
             "archivo_ok" => {
                 let nombre = limpia_nombre(c["nombre"].as_str().unwrap_or_default());
+                if self
+                    .salida
+                    .as_ref()
+                    .is_some_and(|s| s.nombre == nombre && s.llave.is_some())
+                {
+                    // Whole on the other disk: nothing left to resend.
+                    self.salida = None;
+                }
                 if let Some(x) = self
                     .enviados
                     .iter_mut()
@@ -1660,15 +1699,23 @@ impl Secure {
     fn vacia_bloques(&mut self) {
         let mut fallo: Option<&'static str> = None;
         let mut completo = false;
+        let mut confirma: Option<(String, u64)> = None;
         if let Some(e) = &mut self.entrada {
             if let (Some(r), Some(f)) = (&mut e.recepcion, &mut e.archivo) {
                 while let Some((n, b)) = e.bloques_pendientes.pop_front() {
+                    if n < r.bloques() {
+                        // Already here (sent again after a drop): let it pass.
+                        continue;
+                    }
                     match r.mete(n, &b) {
                         Ok(plano) => {
                             e.recibido += plano.len() as u64;
                             if f.write_all(&plano).is_err() {
                                 fallo = Some("sec_err_archivo");
                                 break;
+                            }
+                            if r.bloques() % CONFIRMA_CADA == 0 {
+                                confirma = Some((e.nombre.clone(), r.bloques()));
                             }
                         }
                         Err(_) => {
@@ -1699,6 +1746,9 @@ impl Secure {
                 );
             }
             return;
+        }
+        if let Some((nombre, bloques)) = confirma.filter(|_| !completo) {
+            self.manda_olm(json!({ "m": "archivo_tengo", "nombre": nombre, "bloques": bloques }));
         }
         if completo {
             if let Some(e) = self.entrada.take() {
@@ -2097,8 +2147,9 @@ impl Secure {
         }
         let nombre = limpia_nombre(nombre);
         let trozos = Trozos::new().map_err(|e| e.to_string())?;
+        let inicial = trozos.llave_inicial();
         // The key first: the other side writes each block to disk as it comes.
-        self.manda_olm(json!({ "m": "archivo_inicio", "nombre": nombre, "llave": trozos.llave_inicial(), "bytes": bytes }));
+        self.manda_olm(json!({ "m": "archivo_inicio", "nombre": nombre, "llave": inicial, "bytes": bytes }));
         let inicio = self.enlace.as_ref().map_or(0, |e| e.cuenta().0);
         self.enviados.push(Enviado {
             nombre: nombre.clone(),
@@ -2112,6 +2163,7 @@ impl Secure {
             bytes,
             inicio,
             fin: None,
+            antes: 0,
             marcas: VecDeque::new(),
             aviso: std::time::Instant::now(),
         });
@@ -2119,15 +2171,131 @@ impl Secure {
             nombre,
             trozos,
             bytes: 0,
+            guardados: VecDeque::new(),
+            guardados_bytes: 0,
+            pausada: self.enlace.is_none(),
+            llave: None,
+            inicial,
+            anunciado: bytes,
         });
         self.cambio = true;
         Ok(())
     }
 
+    /// The other side says how many blocks of the file it has (every few MB, and right after
+    /// a link comes back, when it also names the last file it got whole): the blocks before
+    /// that are let go, and if the sending was paused by a drop, it goes on from there. The
+    /// keys go again if they were lost in the drop.
+    fn archivo_tengo(&mut self, nombre: &str, bloques: u64, ultimo: &str) {
+        let Some(s) = &mut self.salida else {
+            return;
+        };
+        let mut bloques = bloques;
+        let mut desde_el_principio = false;
+        if s.nombre != nombre {
+            if !s.pausada {
+                return;
+            }
+            if s.llave.is_some() && ultimo == s.nombre {
+                // It got there whole; only the «it is here» was lost.
+                let llego = self.salida.take().map(|s| s.nombre);
+                if let Some(x) = self
+                    .enviados
+                    .iter_mut()
+                    .find(|x| Some(&x.nombre) == llego.as_ref() && x.llego_en.is_none())
+                {
+                    x.llego_en = Some(x.empezo.elapsed().as_secs_f64());
+                }
+                self.envio = None;
+                self.cambio = true;
+                return;
+            }
+            // The start never got there: from the first block, key first.
+            bloques = 0;
+            desde_el_principio = true;
+        }
+        while s
+            .guardados
+            .front()
+            .is_some_and(|(n, _)| *n < bloques)
+        {
+            if let Some((_, c)) = s.guardados.pop_front() {
+                s.guardados_bytes = s.guardados_bytes.saturating_sub(c.len() as u64);
+            }
+        }
+        if !s.pausada {
+            return;
+        }
+        // Everything from `bloques` on must still be here; otherwise the file is lost.
+        let enviados = s.llave.as_ref().map_or(s.trozos.bloques(), |l| l.bloques);
+        let primero = s.guardados.front().map_or(enviados, |(n, _)| *n);
+        if primero != bloques {
+            self.salida = None;
+            self.envio = None;
+            self.aviso("sec_archivo_cortado", "");
+            self.cambio = true;
+            return;
+        }
+        s.pausada = false;
+        let otra_vez: Vec<Value> = s
+            .guardados
+            .iter()
+            .map(|(n, c)| json!({ "t": "bloque", "n": n, "b": B64.encode(c) }))
+            .collect();
+        let llave = s.llave.clone();
+        let nombre = s.nombre.clone();
+        let inicio = desde_el_principio.then(|| (s.inicial.clone(), s.anunciado));
+        if let Some((inicial, anunciado)) = inicio {
+            self.manda_olm(json!({ "m": "archivo_inicio", "nombre": nombre, "llave": inicial, "bytes": anunciado }));
+        }
+        for t in otra_vez {
+            self.manda(t);
+        }
+        if let Some(l) = llave {
+            self.manda_olm(json!({ "m": "archivo", "nombre": nombre, "llave": l }));
+            let hasta = self.enlace.as_ref().map_or(0, |e| e.cuenta().0);
+            if let Some(v) = &mut self.envio {
+                v.fin = Some(hasta);
+            }
+        }
+        self.monitor
+            .anota(ahora_s(), Nivel::Info, format!("archivo reanudado: {nombre}"));
+        self.cambio = true;
+    }
+
+    /// The link dropped mid-file: keep what is on its way, pause, and count what was written.
+    fn envio_al_caer(&mut self) {
+        let escritos = self.enlace.as_ref().map(|e| e.cuenta().1);
+        if let Some(v) = &mut self.envio {
+            if let Some(w) = escritos {
+                v.antes += w.saturating_sub(v.inicio);
+            }
+            v.inicio = 0;
+            v.fin = None;
+            v.marcas.clear();
+        }
+        if let Some(s) = &mut self.salida {
+            s.pausada = true;
+        }
+    }
+
+    /// After the link came back: tell the sender where we are with the file coming in (or
+    /// that none is, and which was the last one that got here whole).
+    fn digo_lo_que_tengo(&mut self) {
+        let (nombre, bloques) = self
+            .entrada
+            .as_ref()
+            .and_then(|e| e.recepcion.as_ref().map(|r| (e.nombre.clone(), r.bloques())))
+            .unwrap_or_default();
+        let ultimo = self.recibidos.last().map(|r| r.nombre.clone()).unwrap_or_default();
+        self.manda_olm(json!({ "m": "archivo_tengo", "nombre": nombre, "bloques": bloques, "ultimo": ultimo }));
+    }
+
     /// The file going out: how far, and the seconds left at the speed of the last seconds.
     fn sigue_envio(&mut self) {
         let Some((encolados, escritos)) = self.enlace.as_ref().map(Enlace::cuenta) else {
-            self.envio = None;
+            // No link: the file waits for the reconnection (it is dropped with the
+            // conversation in `cerrar`).
             return;
         };
         let Some(v) = &mut self.envio else {
@@ -2157,18 +2325,23 @@ impl Secure {
 
     /// The file going out, for the screen (null when none).
     pub fn envio_json(&self) -> Value {
-        let (Some(v), Some(e)) = (&self.envio, &self.enlace) else {
+        let Some(v) = &self.envio else {
             return Value::Null;
         };
-        let (encolados, escritos) = e.cuenta();
+        let (encolados, escritos) = self.enlace.as_ref().map_or((0, 0), Enlace::cuenta);
         // In base64 inside JSON a file takes about 4/3 of its size, plus a little per block.
         let total = v
             .fin
             .map_or(v.bytes.saturating_mul(4) / 3 + v.bytes / 400 + 1, |f| {
-                f.saturating_sub(v.inicio)
+                v.antes + f.saturating_sub(v.inicio)
             })
             .max(1);
-        let hecho = escritos.saturating_sub(v.inicio).min(total);
+        let hecho = (v.antes + escritos.saturating_sub(v.inicio)).min(total);
+        let pausado = self.enlace.is_none()
+            || self
+                .salida
+                .as_ref()
+                .is_some_and(|s| s.pausada || s.guardados_bytes > GUARDADOS_MAX);
         let velocidad = match (v.marcas.front(), v.marcas.back()) {
             (Some((t0, b0)), Some((t1, b1))) if t1 > t0 => {
                 (b1.saturating_sub(*b0)) as f64 / t1.duration_since(*t0).as_secs_f64()
@@ -2184,6 +2357,7 @@ impl Secure {
             "restante_s": restante,
             "kbps": (velocidad * 8.0 / 1000.0) as u64,
             "cola": encolados.saturating_sub(escritos),
+            "pausado": pausado,
         })
     }
 
@@ -2195,18 +2369,30 @@ impl Secure {
         let bytes = B64.decode(b64).map_err(|e| e.to_string())?;
         let (n, c) = s.trozos.empuja(&bytes).map_err(|e| e.to_string())?;
         s.bytes += bytes.len() as u64;
-        let trama = json!({ "t": "bloque", "n": n, "b": B64.encode(c) });
-        self.manda(trama);
+        let trama = json!({ "t": "bloque", "n": n, "b": B64.encode(&c) });
+        s.guardados_bytes += c.len() as u64;
+        s.guardados.push_back((n, c));
+        let pausada = s.pausada;
+        if !pausada {
+            self.manda(trama);
+        }
         if ultimo {
-            let Some(s) = self.salida.take() else {
+            // The file stays in `salida` (blocks kept, key ready) until the other side says
+            // it is whole, or the next file starts: a drop in between can still be mended.
+            let Some(s) = &mut self.salida else {
                 return Ok(());
             };
             let nombre = s.nombre.clone();
-            let llave = s.trozos.termina().map_err(|e| e.to_string())?;
-            self.manda_olm(json!({ "m": "archivo", "nombre": nombre, "llave": llave }));
-            let hasta = self.enlace.as_ref().map_or(0, |e| e.cuenta().0);
-            if let Some(v) = &mut self.envio {
-                v.fin = Some(hasta);
+            let bytes = s.bytes;
+            let trozos = std::mem::replace(&mut s.trozos, Trozos::new().map_err(|e| e.to_string())?);
+            let llave = trozos.termina().map_err(|e| e.to_string())?;
+            s.llave = Some(llave.clone());
+            if !pausada {
+                self.manda_olm(json!({ "m": "archivo", "nombre": nombre, "llave": llave }));
+                let hasta = self.enlace.as_ref().map_or(0, |e| e.cuenta().0);
+                if let Some(v) = &mut self.envio {
+                    v.fin = Some(hasta);
+                }
             }
             if let Some(x) = self
                 .enviados
@@ -2217,7 +2403,7 @@ impl Secure {
                 x.t = ahora_s();
             }
             self.archivos.enviados += 1;
-            self.archivos.bytes += s.bytes;
+            self.archivos.bytes += bytes;
             self.monitor
                 .anota(ahora_s(), Nivel::Info, format!("archivo enviado: {nombre}"));
             self.mensajes
@@ -3007,6 +3193,45 @@ mod tests {
         gira(&mut a, &mut b, 15);
         assert_eq!(a.mensajes.last().unwrap().2, "sigo aquí");
         assert!(a.monitor.identidad.is_some(), "still verified");
+
+        // A file cut in the middle by another drop goes on from where the other side got to:
+        // the blocks the drop swallowed go out again, and the file arrives whole (16 Oct
+        // 2026, «reanudación»).
+        let plano: Vec<u8> = (0..(guardiana_secure::archivo::BLOQUE * 5 + 77))
+            .map(|i| (i % 251) as u8)
+            .collect();
+        let trozos: Vec<&[u8]> = plano.chunks(guardiana_secure::archivo::BLOQUE).collect();
+        a.archivo_empieza("grande.bin", plano.len() as u64).unwrap();
+        gira(&mut a, &mut b, 5);
+        for t in &trozos[..2] {
+            a.archivo_trozo(&B64.encode(t), false).unwrap();
+        }
+        gira(&mut a, &mut b, 10);
+        assert_eq!(b.entrada.as_ref().unwrap().recepcion.as_ref().unwrap().bloques(), 2);
+        // The next block is handed over right as the link dies: nobody gets it.
+        a.archivo_trozo(&B64.encode(trozos[2]), false).unwrap();
+        for s in [&mut a, &mut b] {
+            s.enlace = None;
+            s.rx = None;
+            assert!(s.empieza_reconexion());
+        }
+        assert!(a.envio_json()["pausado"].as_bool().unwrap());
+        // The page keeps handing pieces over only once `pausado` clears; here two more come
+        // while it is paused, to be sure they wait inside the program.
+        for t in &trozos[3..5] {
+            a.archivo_trozo(&B64.encode(t), false).unwrap();
+        }
+        gira(&mut a, &mut b, 60);
+        assert!(!a.reconectando() && !b.reconectando());
+        gira(&mut a, &mut b, 10);
+        assert!(!a.envio_json()["pausado"].as_bool().unwrap(), "{}", a.envio_json());
+        a.archivo_trozo(&B64.encode(trozos[5]), true).unwrap();
+        gira(&mut a, &mut b, 20);
+        let r = b.recibidos.last().expect("the file arrived whole");
+        assert_eq!(r.nombre, "grande.bin");
+        assert_eq!(std::fs::read(&r.ruta).unwrap(), plano);
+        assert!(a.enviados.last().unwrap().llego_en.is_some());
+        assert!(a.salida.is_none() && a.envio.is_none());
 
         // A deliberate close says goodbye: the other side does not wait at the relay.
         a.cerrar("adiós");

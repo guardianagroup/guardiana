@@ -1086,5 +1086,7 @@
   "sec_c_tu_nombre_ph": "Francisco",
   "sec_c_mas": "To invite more people, the same code:",
   "sec_m_grupo": "Group: {n}",
-  "sec_s_nuevo": "{n} is joining. Compare the numbers with them."
+  "sec_s_nuevo": "{n} is joining. Compare the numbers with them.",
+  "sec_archivo_cortado": "The connection dropped in the middle of the file and it could not be resumed; send it again.",
+  "sec_f_esperando_enlace": "waiting for the connection to come back; it will go on from where it was"
 }

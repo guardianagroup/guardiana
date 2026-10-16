@@ -258,7 +258,7 @@
     const v = m.envio, r = m.recibiendo;
     if (v && v.nombre) {
       $('c-progreso').hidden = false;
-      const queda = typeof v.restante_s === 'number' ? t('sec_f_quedan', { t: duracion(v.restante_s) }) : t('sec_f_calculando');
+      const queda = v.pausado ? t('sec_f_esperando_enlace') : typeof v.restante_s === 'number' ? t('sec_f_quedan', { t: duracion(v.restante_s) }) : t('sec_f_calculando');
       $('c-progreso-texto').textContent = t('sec_f_enviando', { n: v.nombre, p: v.pct }) + ' · ' + queda;
       $('c-progreso-barra').style.width = (v.pct || 0) + '%';
     } else if (r && r.nombre) {
@@ -446,7 +446,9 @@
     for (let i = 0; i < total; i++) {
       // Hand the pieces over only as fast as the network takes them (at most ~8 MB waiting):
       // a big file never fills the memory.
-      while (E && E.envio && E.envio.cola > 8 * 1024 * 1024) await new Promise((r) => setTimeout(r, 150));
+      // While the link is being recovered (`pausado`), nothing is handed over: what already
+      // left waits in the program and goes on from where the other side got to.
+      while (E && E.envio && (E.envio.pausado || E.envio.cola > 8 * 1024 * 1024)) await new Promise((r) => setTimeout(r, 150));
       const trozo = await f.slice(i * TROZO, (i + 1) * TROZO).arrayBuffer();
       const ultimo = i + 1 === total && trozo.byteLength < TROZO;
       manda({ tipo: 'secure', accion: 'archivo_trozo', b64: b64De(trozo), ultimo });
