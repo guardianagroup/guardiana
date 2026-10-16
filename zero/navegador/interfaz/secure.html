@@ -94,6 +94,8 @@ main > .tarjeta { margin-top: 14px; }
 .mensajes li .a-tam { font: 11px var(--mono); opacity: .8; }
 .permiso { display: grid; gap: 6px; margin: 10px 0; padding: 12px 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--alerta) 50%, var(--line)); background: color-mix(in srgb, var(--alerta) 8%, var(--card)); }
 .permiso[hidden] { display: none; }
+.perdida { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); font-size: 14px; }
+.perdida[hidden] { display: none; } .perdida span { margin-right: auto; }
 .permiso b { font: 600 15px/1.3 var(--display); } .permiso span { font-size: 13.5px; color: var(--muted); }
 .timbre .t-aviso { display: block; font-size: 12.5px; color: var(--alerta); margin-top: 2px; }
 .cortada-nota { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--aviso) 10%, var(--card)); border: 1px solid color-mix(in srgb, var(--aviso) 45%, var(--line)); font-size: 13.5px; }
@@ -279,6 +281,10 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
       <span class="t-icono" aria-hidden="true"></span>
       <div class="t-texto"><b id="c-timbre-t"></b><span id="c-timbre-s"></span></div>
       <div class="c-fila"><button type="button" class="boton contestar" id="c-contestar" data-t="sec_l_contestar"></button><button type="button" class="boton peligro" id="c-rechazar" data-t="sec_l_rechazar"></button></div>
+    </section>
+    <section class="perdida" id="c-perdida" hidden>
+      <span id="c-perdida-t"></span>
+      <div class="c-fila"><button type="button" class="boton chico contestar" id="c-devolver" data-t="sec_l_devolver"></button><button type="button" class="boton chico secundario" id="c-perdida-x" data-t="sec_l_perdida_cerrar"></button></div>
     </section>
     <section class="permiso" id="c-permiso" hidden role="alert">
       <b id="c-permiso-t"></b><span id="c-permiso-s"></span>

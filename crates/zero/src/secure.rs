@@ -398,6 +398,9 @@ pub struct Secure {
     llamada: Option<Llamada>,
     /// A call ringing here.
     entrante: Option<Timbre>,
+    /// A call nobody answered here: (when, with video), until the person calls back or
+    /// closes the note.
+    perdida: Option<(u64, bool)>,
     /// A file on its way out.
     envio: Option<Envio>,
     /// When something last went out on the link: a quiet link gets a small frame every
@@ -492,6 +495,7 @@ impl Secure {
             reproduce_otro: Vec::new(),
             reproduce_dicho: Vec::new(),
             entrante: None,
+            perdida: None,
             envio: None,
             ultimo_envio: std::time::Instant::now(),
             ultimo_recibido: std::time::Instant::now(),
@@ -756,6 +760,7 @@ impl Secure {
         self.salida = None;
         self.llamada = None;
         self.entrante = None;
+        self.perdida = None;
         self.llamado_en_grupo = false;
         self.otro_late = false;
         self.zona_otra.clear();
@@ -1263,7 +1268,8 @@ impl Secure {
                 }
             }
             "cuelga" => {
-                if self.entrante.take().is_some() {
+                if let Some(tm) = self.entrante.take() {
+                    self.perdida = Some((tm.desde, tm.video));
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "llamada perdida");
                     self.aviso("sec_llamada_perdida", self.nombre_contacto.clone());
@@ -1522,6 +1528,7 @@ impl Secure {
         if self.fase != Fase::Lista {
             return Err("sec_no_lista".to_owned());
         }
+        self.perdida = None;
         if self.llamada.is_some() {
             self.cambia_mime(mime);
             return Ok(());
@@ -1583,6 +1590,21 @@ impl Secure {
         Ok(())
     }
 
+    /// The missed call note, for the screen (null when none).
+    pub fn estado_perdida(&self) -> Value {
+        self.perdida.map_or(
+            Value::Null,
+            |(t, video)| json!({ "t": t, "video": video, "de": self.nombre_contacto }),
+        )
+    }
+
+    /// The person closed the «missed call» note.
+    pub fn olvida_perdida(&mut self) {
+        if self.perdida.take().is_some() {
+            self.cambio = true;
+        }
+    }
+
     /// The person rejects the call ringing here.
     pub fn rechazar(&mut self) {
         if self.entrante.take().is_some() {
@@ -1624,7 +1646,7 @@ impl Secure {
             .as_ref()
             .is_some_and(|t| ahora.saturating_sub(t.desde) > TIMBRE_S + 5)
         {
-            self.entrante = None;
+            self.perdida = self.entrante.take().map(|t| (t.desde, t.video));
             self.aviso("sec_llamada_perdida", self.nombre_contacto.clone());
             self.cambio = true;
         }
@@ -2203,6 +2225,7 @@ impl Secure {
             "numeros": self.numeros().map(|(a, b, c)| vec![a, b, c]),
             "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "conectada": l.conectada, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto })),
             "entrante": self.entrante.as_ref().map(|t| json!({ "video": t.video, "de": self.nombre_contacto, "desde": t.desde })),
+            "perdida": self.perdida.map(|(t, video)| json!({ "t": t, "video": video, "de": self.nombre_contacto })),
             "recibidos": self.recibidos.iter().map(Recibido::json).collect::<Vec<_>>(),
             "envio": self.envio_json(),
             "enviados": self.enviados.iter().filter(|x| x.t > 0).map(|x| json!({ "nombre": x.nombre, "t": x.t, "bytes": x.bytes, "llego_en": x.llego_en })).collect::<Vec<_>>(),

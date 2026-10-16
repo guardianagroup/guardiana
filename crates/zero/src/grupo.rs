@@ -522,6 +522,14 @@ impl Grupo {
         r
     }
 
+    /// Close the «missed call» note.
+    pub fn olvida_perdida(&mut self) {
+        for s in &mut self.sesiones {
+            s.olvida_perdida();
+        }
+        self.cambio = true;
+    }
+
     /// Reject the call ringing here.
     pub fn rechazar(&mut self) {
         for s in &mut self.sesiones {
@@ -680,6 +688,16 @@ impl Grupo {
         if let Some(video) = self.llamada {
             if e["llamada"].is_null() {
                 e["llamada"] = json!({ "video": video, "desde": self.llamada_desde, "conectada": self.sesiones.iter().any(Secure::conectada) });
+            }
+        }
+        if e["perdida"].is_null() {
+            if let Some(p) = self
+                .sesiones
+                .iter()
+                .map(|s| s.estado_perdida())
+                .find(|p| !p.is_null())
+            {
+                e["perdida"] = p;
             }
         }
         // A call ringing on any link, and the files that came on any link.

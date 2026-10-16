@@ -1331,6 +1331,10 @@ impl Sesion {
                 self.secure.rechazar();
                 Ok(())
             }
+            "perdida_vista" => {
+                self.secure.olvida_perdida();
+                Ok(())
+            }
             "archivo_abrir" | "archivo_carpeta" => {
                 let Some(r) = m["id"].as_u64().and_then(|i| self.secure.recibido(i)) else {
                     return Vec::new();

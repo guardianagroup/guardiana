@@ -503,9 +503,17 @@
     if (!l.conectada) return t('sec_l_llamando_s', { s: Math.max(0, 45 - (ahora - (l.desde || ahora))) });
     return t(l.video ? 'sec_l_en_video' : 'sec_l_en_voz', { t: tiempo(Math.max(0, ahora - (l.desde || ahora))) });
   };
+  // A call nobody answered stays as a note with «Devolver llamada» (Grok's review, 16 Oct 2026).
+  const pintaPerdida = (m) => {
+    const p = m.perdida;
+    $('c-perdida').hidden = !p || !!m.llamada || !!m.entrante;
+    if (p) $('c-perdida-t').textContent = t(p.video ? 'sec_l_perdida_video' : 'sec_l_perdida_voz', { n: p.de || m.contacto || '', h: hora(p.t) });
+  };
+  $('c-devolver').addEventListener('click', () => { const p = (E || {}).perdida || {}; llama(!!p.video); });
+  $('c-perdida-x').addEventListener('click', () => manda({ tipo: 'secure', accion: 'perdida_vista' }));
   const pintaLlamada = (m) => {
     reproduceOtro = m.reproduce_otro || [];
-    pintaTimbre(m); pintaBotones(m);
+    pintaTimbre(m); pintaBotones(m); pintaPerdida(m);
     const l = m.llamada;
     const caja = $('c-llamada');
     if (!l) { $('c-permiso').hidden = true; $('c-permiso').dataset.camara = ''; caja.hidden = true; caja.classList.remove('llamando'); paraMedios(); mimeRemoto = null; if (tonoLlamando) { clearInterval(tonoLlamando); tonoLlamando = null; } return; }
