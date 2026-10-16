@@ -724,7 +724,6 @@ pub fn lee_enlace(enlace: &str) -> Option<Value> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
     #[test]
     fn the_qr_link_carries_hash_addresses_secret_and_language_in_the_fragment() {
