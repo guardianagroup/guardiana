@@ -36,6 +36,7 @@ main > .tarjeta { margin-top: 14px; }
 .t { color: var(--muted); font-size: 13.5px; line-height: 1.45; margin: 0 0 10px; }
 .c-fila { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .c-fila .campo { flex: 1; min-width: 180px; }
+.beta { display: inline-block; vertical-align: middle; margin-left: 8px; font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ok); border: 1px solid currentColor; border-radius: 999px; padding: 2px 9px; }
 .c-puerto { font: 500 13px var(--mono); color: var(--ok); }
 .c-codigo { margin-top: 12px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--line)); background: color-mix(in srgb, var(--ok) 5%, var(--card)); border-radius: var(--r-tarjeta); display: grid; grid-template-columns: 1fr; gap: 6px; align-items: start; }
 .c-codigo[hidden] { display: none; }
@@ -164,7 +165,7 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
 </header>
 <div class="secure">
 <main>
-  <h1 data-t="sec_titulo">SECURE</h1>
+  <h1><span data-t="sec_titulo">SECURE</span> <span class="beta" data-t="sec_beta">Beta</span></h1>
   <p class="frase" data-t="sec_frase_v1"></p>
 
   <section class="tarjeta conexion" id="c-conexion">

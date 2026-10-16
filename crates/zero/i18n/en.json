@@ -6,6 +6,7 @@
   "pestana_zero": "ZERO browser",
   "pestana_secure": "Communications",
   "sec_titulo": "SECURE",
+  "sec_beta": "Beta · in testing",
   "sec_frase": "Private messages, files and calls between computers. In development, with end-to-end encryption. It sends nothing yet.",
   "sec_mensajes": "Messages",
   "sec_mensajes_vacio": "Between two computers. None yet.",
