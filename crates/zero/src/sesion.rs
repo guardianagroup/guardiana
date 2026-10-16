@@ -315,6 +315,10 @@ struct Preferencias {
     /// The person closed the shield: it no longer opens by itself at start (the owner, 10 Oct
     /// 2026: open from the start, live, until the person closes it).
     escudo_cerrado: bool,
+    /// The order the person gave the three product tabs by dragging them (16 Oct 2026, «que
+    /// se puedan separar para que el cliente lo ponga a su gusto»): `guardiana`, `zero`,
+    /// `secure`. Empty: the first order.
+    orden_fijas: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -758,10 +762,16 @@ impl Sesion {
             }];
             o.push(self.anade_pestana(Perfil::General, INICIO, true));
             o.push(self.anade_pestana(Perfil::General, SECURE, true));
+            self.ordena_fijas();
             o.extend(self.activar(id));
             return o;
         }
-        if let Some(id) = self.pestanas.iter().find(|p| p.fija).map(|p| p.id) {
+        if let Some(id) = self
+            .pestanas
+            .iter()
+            .find(|p| p.fija && Self::clase_fija(p) == "guardiana")
+            .map(|p| p.id)
+        {
             return vec![Orden::Navega {
                 id,
                 url: url.to_owned(),
@@ -1306,6 +1316,17 @@ impl Sesion {
                 Ok(())
             }
             "contestar" => self.secure.contestar(texto(m, "mime")),
+            "ajustes_privacidad" => {
+                // Windows' own page for the microphone or the camera, opened for the person.
+                let url = if texto(m, "que") == "camara" {
+                    "ms-settings:privacy-webcam"
+                } else {
+                    "ms-settings:privacy-microphone"
+                };
+                return vec![Orden::AbreFuera {
+                    url: url.to_owned(),
+                }];
+            }
             "rechazar" => {
                 self.secure.rechazar();
                 Ok(())
@@ -1713,6 +1734,57 @@ impl Sesion {
         let mut o = vec![orden];
         o.extend(self.activar(id));
         o
+    }
+
+    /// Which product tab this is: `guardiana`, `zero` or `secure`.
+    fn clase_fija(p: &Pestana) -> &'static str {
+        if es_panel_guardiana(&p.url) || p.url.contains("guardiana-arrancando.html") {
+            "guardiana"
+        } else if p.url.starts_with(SECURE) {
+            "secure"
+        } else {
+            "zero"
+        }
+    }
+
+    /// The three product tabs in the order the person left them.
+    fn ordena_fijas(&mut self) {
+        let orden = self.prefs.orden_fijas.clone();
+        if orden.is_empty() {
+            return;
+        }
+        let pos = |p: &Pestana| {
+            if p.fija {
+                orden
+                    .iter()
+                    .position(|c| c == Self::clase_fija(p))
+                    .unwrap_or(orden.len())
+            } else {
+                usize::MAX
+            }
+        };
+        self.pestanas.sort_by_key(|p| pos(p));
+    }
+
+    /// The person dragged a tab to position `a` of the bar.
+    fn mueve_pestana(&mut self, id: u32, a: usize) -> Vec<Orden> {
+        let Some(i) = self.pestanas.iter().position(|p| p.id == id) else {
+            return Vec::new();
+        };
+        let p = self.pestanas.remove(i);
+        let a = a.min(self.pestanas.len());
+        self.pestanas.insert(a, p);
+        let fijas: Vec<String> = self
+            .pestanas
+            .iter()
+            .filter(|p| p.fija)
+            .map(|p| Self::clase_fija(p).to_owned())
+            .collect();
+        if fijas != self.prefs.orden_fijas {
+            self.prefs.orden_fijas = fijas;
+            self.guarda_prefs();
+        }
+        vec![self.estado()]
     }
 
     /// A tab that is created without being brought to the front. `fija` is a product tab: it
@@ -2124,6 +2196,13 @@ impl Sesion {
                 .and_then(|n| u32::try_from(n).ok())
                 .map(|id| self.cerrar(id))
                 .unwrap_or_default(),
+            "pestana_mover" => match (
+                numero(m, "id").and_then(|n| u32::try_from(n).ok()),
+                numero(m, "a").and_then(|n| usize::try_from(n).ok()),
+            ) {
+                (Some(id), Some(a)) => self.mueve_pestana(id, a),
+                _ => Vec::new(),
+            },
             "pestana_activar" => numero(m, "id")
                 .and_then(|n| u32::try_from(n).ok())
                 .map(|id| self.activar(id))

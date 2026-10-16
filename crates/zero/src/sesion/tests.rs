@@ -160,6 +160,30 @@ fn the_three_product_tabs_open_together_and_the_panel_stays_in_front() {
 }
 
 #[test]
+fn the_person_drags_the_product_tabs_and_their_order_is_kept() {
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "a".repeat(64));
+    let _ = s.abre_guardiana(&url);
+    let secure = s.pestanas[2].id;
+    // Comunicaciones first.
+    let o = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        &json!({ "tipo": "pestana_mover", "id": secure, "a": 0 }).to_string(),
+    );
+    assert_eq!(s.pestanas[0].id, secure);
+    let e = del_tipo(&o, Origen::Barra, "estado").unwrap_or_default();
+    assert_eq!(e["pestanas"][0]["titulo"], "Comunicaciones");
+    assert_eq!(s.prefs.orden_fijas, vec!["secure", "guardiana", "zero"]);
+    // Opening the panel again goes to the Radiografías tab, wherever it is now.
+    let o = s.abre_guardiana(&format!("http://127.0.0.1:7443/?t={}", "b".repeat(64)));
+    let radio = s.pestanas[1].id;
+    assert!(o
+        .iter()
+        .any(|x| matches!(x, Orden::Navega { id, .. } if *id == radio)));
+}
+
+#[test]
 fn the_comunicaciones_page_buttons_reach_the_conversation() {
     // 1.0.31 shipped with «Esperar llamada» doing nothing: the page's messages were not in the
     // list of what an internal tab may ask for. The button sends exactly this.

@@ -474,7 +474,19 @@
     if (e) {
       $('c-timbre-t').textContent = t(e.video ? 'sec_l_te_videollama' : 'sec_l_te_llama', { n: e.de || m.contacto || '' });
       $('c-timbre-s').textContent = t('sec_l_cifrada_nota');
-      if (!sonando) { timbre(); sonando = setInterval(timbre, 2500); }
+      if (!sonando) {
+        timbre(); sonando = setInterval(timbre, 2500);
+        setTimeout(() => { try { $('c-contestar').focus(); } catch (_) {} }, 50);
+        // Before answering: is there a microphone (and a camera, for video) at all?
+        try {
+          navigator.mediaDevices.enumerateDevices().then((ds) => {
+            const mic = ds.some((d) => d.kind === 'audioinput'), cam = ds.some((d) => d.kind === 'videoinput');
+            const falta = !mic ? t('sec_p_no_hay_microfono') : (e.video && !cam ? t('sec_p_no_hay_camara') : '');
+            let x = $('c-timbre-s').querySelector('.t-aviso');
+            if (falta) { if (!x) { x = document.createElement('span'); x.className = 't-aviso'; $('c-timbre-s').appendChild(x); } x.textContent = falta; } else if (x) x.remove();
+          }).catch(() => {});
+        } catch (_) {}
+      }
     } else if (sonando) { clearInterval(sonando); sonando = null; }
   };
   $('c-contestar').addEventListener('click', () => { const e = (E || {}).entrante || {}; manda({ tipo: 'secure', accion: 'contestar', mime: mime(!!e.video) }); });
@@ -496,7 +508,7 @@
     pintaTimbre(m); pintaBotones(m);
     const l = m.llamada;
     const caja = $('c-llamada');
-    if (!l) { caja.hidden = true; caja.classList.remove('llamando'); paraMedios(); mimeRemoto = null; if (tonoLlamando) { clearInterval(tonoLlamando); tonoLlamando = null; } return; }
+    if (!l) { $('c-permiso').hidden = true; $('c-permiso').dataset.camara = ''; caja.hidden = true; caja.classList.remove('llamando'); paraMedios(); mimeRemoto = null; if (tonoLlamando) { clearInterval(tonoLlamando); tonoLlamando = null; } return; }
     caja.hidden = false;
     caja.classList.toggle('solo-voz', !l.video);
     const llamando = l.conectada === false;
@@ -533,6 +545,27 @@
     try { if (grabador && grabador.state !== 'inactive') grabador.stop(); } catch (_) {}
     nuevoGrabador(llamadaVideo);
   };
+  // The microphone or the camera could not be used (16 Oct 2026, «que le salga ahí directo»):
+  // why, in plain words, with the button to Windows' own setting and one to try again. The
+  // call stays up meanwhile.
+  const muestraPermiso = (e, que) => {
+    const n = (e && e.name) || '';
+    const clave = n === 'NotFoundError' || n === 'OverconstrainedError' ? 'sec_p_no_hay' : n === 'NotReadableError' || n === 'AbortError' ? 'sec_p_ocupado' : 'sec_p_bloqueado';
+    $('c-permiso-t').textContent = t(clave + '_' + que);
+    $('c-permiso-s').textContent = t(clave + '_que');
+    $('c-permiso-mic').hidden = clave !== 'sec_p_bloqueado' || que !== 'microfono';
+    $('c-permiso-cam').hidden = clave !== 'sec_p_bloqueado' || que !== 'camara';
+    $('c-permiso').dataset.camara = que === 'camara' ? '1' : '';
+    $('c-permiso').hidden = false;
+  };
+  $('c-permiso-mic').addEventListener('click', () => manda({ tipo: 'secure', accion: 'ajustes_privacidad', que: 'microfono' }));
+  $('c-permiso-cam').addEventListener('click', () => manda({ tipo: 'secure', accion: 'ajustes_privacidad', que: 'camara' }));
+  $('c-permiso-otra').addEventListener('click', () => {
+    $('c-permiso').hidden = true; $('c-permiso').dataset.camara = '';
+    const l = E && E.llamada;
+    if (!l) return;
+    paraMedios(); empiezaMedios(!!l.video);
+  });
   const empiezaMedios = async (video) => {
     arrancando = true;
     llamadaVideo = video;
@@ -541,11 +574,13 @@
     try {
       local = await navigator.mediaDevices.getUserMedia({ audio, video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false });
     } catch (e) {
-      // No camera (or not allowed): the call goes on with the voice instead of ending.
+      // No camera (or not allowed): the call goes on with the voice instead of ending, and the
+      // way to turn it on is right there.
       local = null;
-      if (video) { try { local = await navigator.mediaDevices.getUserMedia({ audio, video: false }); aviso(t('sec_l_sin_camara')); } catch (_) {} }
-      if (!local) { arrancando = false; aviso(t('sec_l_sin_permiso')); manda({ tipo: 'secure', accion: 'colgar' }); return; }
+      if (video) { try { local = await navigator.mediaDevices.getUserMedia({ audio, video: false }); aviso(t('sec_l_sin_camara')); muestraPermiso(e, 'camara'); } catch (e2) { e = e2; } }
+      if (!local) { arrancando = false; muestraPermiso(e, 'microfono'); return; }
     }
+    $('c-permiso').hidden = !$('c-permiso').dataset.camara;
     $('c-local').srcObject = local;
     llamadaVideo = video && local.getVideoTracks().length > 0;
     nuevoGrabador(llamadaVideo);

@@ -14,6 +14,7 @@
   };
 
   // --- tabs ---------------------------------------------------------------------------------
+  let arrastrada = null;
   function pintaPestanas(lista) {
     const cont = $('pestanas');
     cont.querySelectorAll('.pestana').forEach((p) => p.remove());
@@ -33,6 +34,27 @@
         if (!e.target.closest('.cerrar')) manda({ tipo: 'pestana_activar', id: p.id });
       });
       el.querySelector('.cerrar')?.addEventListener('click', () => manda({ tipo: 'pestana_cerrar', id: p.id }));
+      // Drag a tab to put it where you like (16 Oct 2026): Radiografías, Navegador ZERO and
+      // Comunicaciones too; the program remembers their order.
+      el.draggable = true;
+      el.addEventListener('dragstart', (e) => { arrastrada = p.id; el.classList.add('arrastrando'); try { e.dataTransfer.setData('text/plain', String(p.id)); e.dataTransfer.effectAllowed = 'move'; } catch (_) {} });
+      el.addEventListener('dragend', () => { arrastrada = null; el.classList.remove('arrastrando'); cont.querySelectorAll('.pestana').forEach((x) => x.classList.remove('antes', 'despues')); });
+      el.addEventListener('dragover', (e) => {
+        if (arrastrada === null || arrastrada === p.id) return;
+        e.preventDefault();
+        const r = el.getBoundingClientRect(), despues = e.clientX > r.left + r.width / 2;
+        el.classList.toggle('antes', !despues); el.classList.toggle('despues', despues);
+      });
+      el.addEventListener('dragleave', () => el.classList.remove('antes', 'despues'));
+      el.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (arrastrada === null || arrastrada === p.id) return;
+        const r = el.getBoundingClientRect(), despues = e.clientX > r.left + r.width / 2;
+        const ids = lista.map((x) => x.id).filter((x) => x !== arrastrada);
+        let a = ids.indexOf(p.id) + (despues ? 1 : 0);
+        manda({ tipo: 'pestana_mover', id: arrastrada, a });
+        el.classList.remove('antes', 'despues');
+      });
       cont.insertBefore(el, nueva);
     }
   }
