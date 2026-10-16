@@ -164,6 +164,11 @@ struct Salida {
 /// and the other side plays them as they come. Direct between the two computers, no media server.
 struct Llamada {
     video: bool,
+    /// What our recorder produces (container and codecs), told to the other side so its player
+    /// opens the right way; it changes when the phone takes the call over.
+    mime_local: String,
+    /// What the other side's pieces are, to open our player with it.
+    mime_remoto: Option<String>,
     emisor: sframe::Emisor,
     receptor: Option<sframe::Receptor>,
     desde: u64,
@@ -186,6 +191,13 @@ pub struct Secure {
     puerto: u16,
     puerta: Option<crate::puerta::Puerta>,
     puerta_error: Option<String>,
+    /// The phone, while the person has handed the conversation over to it.
+    movil: Option<crate::movil::Movil>,
+    movil_puerta: Option<crate::puerta::Puerta>,
+    movil_puerta_rx: Option<Receiver<Result<crate::puerta::Puerta, crate::puerta::SinPuerta>>>,
+    movil_puerta_error: Option<String>,
+    movil_error: Option<String>,
+    movil_idioma: String,
     /// To hand the network threads a way back while listening.
     tx: Option<Sender<Entrante>>,
     /// The relay code on screen while waiting through the relay (no door could be opened).
@@ -273,6 +285,12 @@ impl Secure {
             puerto: 0,
             puerta: None,
             puerta_error: None,
+            movil: None,
+            movil_puerta: None,
+            movil_puerta_rx: None,
+            movil_puerta_error: None,
+            movil_error: None,
+            movil_idioma: "es".to_owned(),
             tx: None,
             rele_codigo: None,
             rele: false,
@@ -505,6 +523,7 @@ impl Secure {
     /// Drop the link and forget the handshake; the identity and the book stay.
     pub fn cerrar(&mut self, por: &str) {
         self.cierra_resumen();
+        self.movil_fin();
         if let Some(p) = self.puerta.take() {
             std::thread::spawn(move || p.cierra());
         }
@@ -546,6 +565,7 @@ impl Secure {
 
     /// Called every tick: everything the network thread left, and the handshake that follows.
     pub fn tic(&mut self) {
+        self.movil_tic();
         let mut pendientes = Vec::new();
         if let Some(rx) = &self.rx {
             while let Ok(e) = rx.try_recv() {
@@ -965,21 +985,30 @@ impl Secure {
                     return;
                 };
                 let video = c["video"].as_bool().unwrap_or(false);
+                let mime_remoto = c["mime"].as_str().map(|m| m.chars().take(80).collect());
                 let otro = self.numero_del_otro();
                 if c["m"] == "llamada" {
                     // Answer with our own key and start sending as soon as the page does.
                     if self.llamada.is_none() {
-                        self.empieza_llamada(video, false);
+                        self.empieza_llamada(video, false, "");
                     }
                     if let Some(l) = &mut self.llamada {
                         l.receptor = Some(sframe::Receptor::new(&clave, otro));
+                        l.mime_remoto = mime_remoto;
                     }
                     self.novedad = true;
                     self.aviso("sec_llamada_entrante", "");
                 } else if let Some(l) = &mut self.llamada {
                     l.receptor = Some(sframe::Receptor::new(&clave, otro));
+                    l.mime_remoto = mime_remoto;
                 }
                 self.cambio = true;
+            }
+            "mime" => {
+                if let Some(l) = &mut self.llamada {
+                    l.mime_remoto = c["mime"].as_str().map(|m| m.chars().take(80).collect());
+                    self.cambio = true;
+                }
             }
             "cuelga" => {
                 if self.llamada.take().is_some() {
@@ -1117,12 +1146,14 @@ impl Secure {
         1 - self.mi_numero()
     }
 
-    fn empieza_llamada(&mut self, video: bool, inicia: bool) {
+    fn empieza_llamada(&mut self, video: bool, inicia: bool, mime: &str) {
         let mut clave = [0u8; 32];
         crate::sesion::azar(&mut clave);
         let yo = self.mi_numero();
         self.llamada = Some(Llamada {
             video,
+            mime_local: mime.chars().take(80).collect(),
+            mime_remoto: None,
             emisor: sframe::Emisor::new(&clave, yo),
             receptor: None,
             desde: ahora_s(),
@@ -1144,24 +1175,42 @@ impl Secure {
                 "llamada de voz abierta"
             },
         );
+        let mime_local = self.llamada.as_ref().map(|l| l.mime_local.clone());
         self.manda_olm(json!({
             "m": if inicia { "llamada" } else { "llamada_ok" },
             "clave": B64.encode(clave),
-            "video": video
+            "video": video,
+            "mime": mime_local
         }));
         self.cambio = true;
     }
 
     /// The person starts a call (voice, or voice and video).
-    pub fn llamar(&mut self, video: bool) -> Result<(), String> {
+    pub fn llamar(&mut self, video: bool, mime: &str) -> Result<(), String> {
         if self.fase != Fase::Lista {
             return Err("sec_no_lista".to_owned());
         }
         if self.llamada.is_some() {
+            self.cambia_mime(mime);
             return Ok(());
         }
-        self.empieza_llamada(video, true);
+        self.empieza_llamada(video, true, mime);
         Ok(())
+    }
+
+    /// Our pieces changed shape (the phone took the call over, or gave it back): tell the other
+    /// side so its player reopens.
+    pub fn cambia_mime(&mut self, mime: &str) {
+        let mime: String = mime.chars().take(80).collect();
+        if mime.is_empty() {
+            return;
+        }
+        if let Some(l) = &mut self.llamada {
+            if l.mime_local != mime {
+                l.mime_local = mime.clone();
+                self.manda_olm(json!({ "m": "mime", "mime": mime }));
+            }
+        }
     }
 
     /// The person hangs up.
@@ -1178,10 +1227,14 @@ impl Secure {
 
     /// One recorded piece from the page: encrypt it under the media layer and send it.
     pub fn media_saliente(&mut self, b64: &str) -> Result<(), String> {
+        let bytes = B64.decode(b64).map_err(|e| e.to_string())?;
+        self.media_bytes(bytes)
+    }
+
+    fn media_bytes(&mut self, bytes: Vec<u8>) -> Result<(), String> {
         if !self.estado.en_marcha() {
             return Ok(());
         }
-        let bytes = B64.decode(b64).map_err(|e| e.to_string())?;
         let Some(l) = &mut self.llamada else {
             return Ok(());
         };
@@ -1251,10 +1304,18 @@ impl Secure {
             Ok(plano) => {
                 let (de, pieza) = sin_remitente(&plano);
                 l.bytes_recibidos += pieza.len() as u64;
-                self.media_para_pagina
-                    .push_back((de.to_owned(), B64.encode(pieza)));
-                if self.media_para_pagina.len() > 400 {
-                    self.media_para_pagina.pop_front();
+                match &self.movil {
+                    // On the phone only a two-person call: a group's pieces come from several people.
+                    Some(m) if m.enganchado && m.aprobado && de.is_empty() => {
+                        m.manda(crate::movil::Hacia::Media(pieza.to_vec()));
+                    }
+                    _ => {
+                        self.media_para_pagina
+                            .push_back((de.to_owned(), B64.encode(pieza)));
+                        if self.media_para_pagina.len() > 400 {
+                            self.media_para_pagina.pop_front();
+                        }
+                    }
                 }
             }
             Err(_) => {
@@ -1380,6 +1441,171 @@ impl Secure {
         )
     }
 
+    // ---------- The phone (15 Oct 2026) ----------
+
+    /// Hand the conversation to the phone: start the listener, ask the router for the UDP door
+    /// and put the QR code on screen. `idioma` goes into the QR so the page opens in the
+    /// person's language.
+    pub fn movil_empieza(&mut self, idioma: &str) -> Result<(), String> {
+        if self.fase != Fase::Lista {
+            return Err("sec_no_lista".to_owned());
+        }
+        if self.movil.is_some() {
+            return Ok(());
+        }
+        let m = crate::movil::Movil::arranca()?;
+        let puerto = m.puerto;
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(crate::puerta::abre_udp(puerto, 3 * 3600));
+        });
+        self.movil_idioma = idioma.chars().take(5).collect();
+        self.movil = Some(m);
+        self.movil_puerta = None;
+        self.movil_puerta_rx = Some(rx);
+        self.movil_puerta_error = None;
+        self.movil_error = None;
+        self.monitor.anota(
+            ahora_s(),
+            Nivel::Info,
+            "paso al móvil preparado (código QR)",
+        );
+        self.cambio = true;
+        Ok(())
+    }
+
+    /// The person takes the conversation back to the computer (or it ended).
+    pub fn movil_fin(&mut self) {
+        if self.movil.take().is_some() {
+            self.monitor
+                .anota(ahora_s(), Nivel::Info, "paso al móvil terminado");
+            self.cambio = true;
+        }
+        self.movil_puerta_rx = None;
+        self.movil_puerta_error = None;
+        if let Some(p) = self.movil_puerta.take() {
+            std::thread::spawn(move || p.cierra());
+        }
+    }
+
+    /// The person said «OK» to the phone that connected.
+    pub fn movil_aprueba(&mut self) {
+        if let Some(m) = &mut self.movil {
+            m.aprueba();
+            self.monitor
+                .anota(ahora_s(), Nivel::Info, "móvil aceptado por la persona");
+            self.cambio = true;
+        }
+    }
+
+    /// Whether the phone is the one talking right now.
+    fn movil_manda(&self) -> bool {
+        self.movil
+            .as_ref()
+            .is_some_and(|m| m.enganchado && m.aprobado)
+    }
+
+    fn movil_tic(&mut self) {
+        if let Some(rx) = &self.movil_puerta_rx {
+            if let Ok(r) = rx.try_recv() {
+                match r {
+                    Ok(p) => {
+                        if let Some(m) = &mut self.movil {
+                            m.con_puerta(p.externa);
+                        }
+                        self.movil_puerta = Some(p);
+                    }
+                    Err(e) => self.movil_puerta_error = Some(e.to_string()),
+                }
+                self.movil_puerta_rx = None;
+                self.cambio = true;
+            }
+        }
+        let Some(m) = &mut self.movil else {
+            return;
+        };
+        let llegado = m.recoge();
+        if llegado.is_empty() {
+            return;
+        }
+        let aprobado = m.aprobado;
+        for d in llegado {
+            use crate::movil::Desde;
+            match d {
+                Desde::Enganchado => {
+                    self.aviso("sec_mv_enganchado", "");
+                    self.novedad = true;
+                    self.monitor
+                        .anota(ahora_s(), Nivel::Info, "un móvil se ha conectado");
+                }
+                Desde::Soltado => {
+                    self.aviso("sec_mv_soltado", "");
+                    self.monitor
+                        .anota(ahora_s(), Nivel::Info, "el móvil se ha desconectado");
+                }
+                Desde::Error(e) => {
+                    self.movil_error = Some(e);
+                    self.movil = None;
+                    self.cambio = true;
+                    return;
+                }
+                Desde::Visto => self.novedad = false,
+                Desde::Texto(t) if aprobado => self.texto(&t),
+                Desde::Llamar { video, mime } if aprobado => {
+                    let _ = self.llamar(video, &mime);
+                }
+                Desde::Colgar if aprobado => self.colgar(),
+                Desde::Media(b) if aprobado => {
+                    let _ = self.media_bytes(b);
+                }
+                _ => {}
+            }
+        }
+        self.cambio = true;
+    }
+
+    fn movil_json(&self) -> Value {
+        let Some(m) = &self.movil else {
+            return match &self.movil_error {
+                Some(e) => json!({ "error": e }),
+                None => Value::Null,
+            };
+        };
+        let enlace = m.enlace(&self.movil_idioma, &self.nombre_contacto);
+        json!({
+            "enganchado": m.enganchado,
+            "pendiente": m.pendiente,
+            "aprobado": m.aprobado,
+            "habla": self.movil_manda(),
+            "qr": tarjeta::qr_svg(&enlace).ok(),
+            "fuera": self.movil_puerta.is_some(),
+            "puerta_error": self.movil_puerta_error,
+            "error": self.movil_error,
+        })
+    }
+
+    /// After anything changed: the phone gets the same state the tab draws (minus the QR).
+    pub fn movil_sincroniza(&self) {
+        let Some(m) = &self.movil else { return };
+        if !m.enganchado {
+            return;
+        }
+        if !m.aprobado {
+            // Nothing of the conversation leaves until the person says OK on this screen.
+            m.manda(crate::movil::Hacia::Estado(
+                json!({ "tipo": "secure_estado", "movil": { "pendiente": true } }).to_string(),
+            ));
+            return;
+        }
+        let mut e = self.estado_json();
+        if let Some(mv) = e.get_mut("movil") {
+            if let Some(o) = mv.as_object_mut() {
+                o.remove("qr");
+            }
+        }
+        m.manda(crate::movil::Hacia::Estado(e.to_string()));
+    }
+
     /// Whether the screen must be redrawn, and clear the flag.
     pub fn cambiado(&mut self) -> bool {
         std::mem::take(&mut self.cambio)
@@ -1412,7 +1638,8 @@ impl Secure {
             "tarjeta": self.tarjeta(),
             "contacto": self.nombre_contacto,
             "numeros": self.numeros().map(|(a, b, c)| vec![a, b, c]),
-            "llamada": self.llamada_activa().map(|(video, desde)| json!({ "video": video, "desde": desde, "mi_numero": self.mi_numero() })),
+            "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto })),
+            "movil": self.movil_json(),
             "mensajes": self.mensajes.iter().rev().take(200).rev().map(|(t, mio, x, de)| json!({ "t": t, "mio": mio, "texto": x, "de": de })).collect::<Vec<_>>(),
             "contactos": self.agenda.contactos().iter().map(|c| json!({ "nombre": c.nombre, "verificado_en": c.verificado_en, "estado": matches!(c.estado, agenda::Estado::Verificado) })).collect::<Vec<_>>(),
             "monitor": monitor,

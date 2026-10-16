@@ -1215,6 +1215,7 @@ impl Sesion {
             }
         }
         if self.secure.cambiado() {
+            self.secure.movil_sincroniza();
             if let Some(id) = self.pestana_secure() {
                 o.extend(self.a_pestana(id, &self.secure.estado_json()));
                 for a in self.secure.avisos() {
@@ -1268,7 +1269,22 @@ impl Sesion {
                 self.secure.reanudar_a_mano();
                 Ok(())
             }
-            "llamar" => self.secure.llamar(m["video"].as_bool().unwrap_or(false)),
+            "llamar" => self
+                .secure
+                .llamar(m["video"].as_bool().unwrap_or(false), texto(m, "mime")),
+            "mime" => {
+                self.secure.cambia_mime(texto(m, "mime"));
+                Ok(())
+            }
+            "movil" => self.secure.movil_empieza(texto(m, "idioma")),
+            "movil_ok" => {
+                self.secure.movil_aprueba();
+                Ok(())
+            }
+            "movil_fin" => {
+                self.secure.movil_fin();
+                Ok(())
+            }
             "colgar" => {
                 self.secure.colgar();
                 Ok(())
@@ -1294,8 +1310,9 @@ impl Sesion {
                 &json!({ "tipo": "secure_aviso", "clave": "sec_error", "texto": e }),
             ));
         }
-        if accion != "media" && accion != "archivo_trozo" {
+        if accion != "media" && accion != "archivo_trozo" && accion != "mime" {
             o.extend(self.a_pestana(id, &self.secure.estado_json()));
+            self.secure.movil_sincroniza();
         }
         o
     }

@@ -27,6 +27,8 @@ pub struct Puerta {
     /// Where to undo the mapping later: the control URL.
     control: String,
     tipo: String,
+    /// "TCP" (the conversation between two computers) or "UDP" (the phone, over QUIC).
+    protocolo: &'static str,
 }
 
 /// Why no door could be opened, in words for the screen (never an address).
@@ -53,8 +55,17 @@ impl std::fmt::Display for SinPuerta {
     }
 }
 
-/// Ask the local network's router to open `puerto` to this computer, for `segundos`.
+/// Ask the local network's router to open TCP `puerto` to this computer, for `segundos`.
 pub fn abre(puerto: u16, segundos: u32) -> Result<Puerta, SinPuerta> {
+    abre_con(puerto, segundos, "TCP")
+}
+
+/// Ask the local network's router to open UDP `puerto` (the phone's QUIC) for `segundos`.
+pub fn abre_udp(puerto: u16, segundos: u32) -> Result<Puerta, SinPuerta> {
+    abre_con(puerto, segundos, "UDP")
+}
+
+fn abre_con(puerto: u16, segundos: u32, protocolo: &'static str) -> Result<Puerta, SinPuerta> {
     let ubicacion = descubre().ok_or(SinPuerta::SinRouter)?;
     let (host, ruta) = parte_url(&ubicacion).ok_or(SinPuerta::Ilegible)?;
     let descripcion = http(&host, "GET", &ruta, &[], "").map_err(|_| SinPuerta::SinRouter)?;
@@ -78,7 +89,7 @@ pub fn abre(puerto: u16, segundos: u32) -> Result<Puerta, SinPuerta> {
         return Err(SinPuerta::DireccionCompartida);
     }
     let args = format!(
-        "<NewRemoteHost></NewRemoteHost><NewExternalPort>{puerto}</NewExternalPort><NewProtocol>TCP</NewProtocol><NewInternalPort>{puerto}</NewInternalPort><NewInternalClient>{interna}</NewInternalClient><NewEnabled>1</NewEnabled><NewPortMappingDescription>{DESCRIPCION}</NewPortMappingDescription><NewLeaseDuration>{segundos}</NewLeaseDuration>"
+        "<NewRemoteHost></NewRemoteHost><NewExternalPort>{puerto}</NewExternalPort><NewProtocol>{protocolo}</NewProtocol><NewInternalPort>{puerto}</NewInternalPort><NewInternalClient>{interna}</NewInternalClient><NewEnabled>1</NewEnabled><NewPortMappingDescription>{DESCRIPCION}</NewPortMappingDescription><NewLeaseDuration>{segundos}</NewLeaseDuration>"
     );
     match soap(&chost, &cruta, &tipo, "AddPortMapping", &args) {
         Ok(r) if !r.contains("UPnPError") => {}
@@ -102,6 +113,7 @@ pub fn abre(puerto: u16, segundos: u32) -> Result<Puerta, SinPuerta> {
         puerto,
         control,
         tipo,
+        protocolo,
     })
 }
 
@@ -110,8 +122,8 @@ impl Puerta {
     pub fn cierra(&self) {
         if let Some((host, ruta)) = parte_url(&self.control) {
             let args = format!(
-                "<NewRemoteHost></NewRemoteHost><NewExternalPort>{}</NewExternalPort><NewProtocol>TCP</NewProtocol>",
-                self.puerto
+                "<NewRemoteHost></NewRemoteHost><NewExternalPort>{}</NewExternalPort><NewProtocol>{}</NewProtocol>",
+                self.puerto, self.protocolo
             );
             let _ = soap(&host, &ruta, &self.tipo, "DeletePortMapping", &args);
         }
@@ -215,6 +227,12 @@ fn codigo_error(r: &str) -> String {
     let c = entre(r, "errorCode").unwrap_or_default();
     let d = entre(r, "errorDescription").unwrap_or_default();
     format!("{} {}", c.trim(), d.trim()).trim().to_owned()
+}
+
+/// This computer's address on its own network (the one the router sees), found by asking the
+/// system which interface would route to the Internet. No packet is sent.
+pub fn ip_local() -> Option<Ipv4Addr> {
+    ip_local_hacia("1.1.1.1:53")
 }
 
 fn ip_local_hacia(host: &str) -> Option<Ipv4Addr> {

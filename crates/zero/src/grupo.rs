@@ -41,6 +41,8 @@ pub struct Grupo {
     pub media_para_pagina: VecDeque<(String, String)>,
     /// The call the host keeps going across members: with video?
     llamada: Option<bool>,
+    /// The kind of recording this computer's page makes (MediaRecorder), for every link.
+    mime: String,
     cambio: bool,
 }
 
@@ -67,6 +69,7 @@ impl Grupo {
             mensajes: Vec::new(),
             media_para_pagina: VecDeque::new(),
             llamada: None,
+            mime: String::new(),
             cambio: false,
         }
     }
@@ -320,7 +323,7 @@ impl Grupo {
             if anfitrion {
                 for s in &mut self.sesiones {
                     if s.lista() && s.llamada_activa().is_none() {
-                        let _ = s.llamar(video);
+                        let _ = s.llamar(video, &self.mime);
                     }
                 }
             }
@@ -348,11 +351,14 @@ impl Grupo {
     }
 
     /// Start a call with everyone (the host) or with the host (a member).
-    pub fn llamar(&mut self, video: bool) -> Result<(), String> {
+    pub fn llamar(&mut self, video: bool, mime: &str) -> Result<(), String> {
         let mut r = Err("sec_no_lista".to_owned());
+        if !mime.is_empty() {
+            self.mime = mime.chars().take(80).collect();
+        }
         for s in &mut self.sesiones {
             if s.lista() {
-                r = s.llamar(video).and(Ok(()));
+                r = s.llamar(video, &self.mime).and(Ok(()));
             }
         }
         if r.is_ok() {
@@ -360,6 +366,47 @@ impl Grupo {
         }
         self.cambio = true;
         r
+    }
+
+    /// The page records in another format now (it tells every link).
+    pub fn cambia_mime(&mut self, mime: &str) {
+        if mime.is_empty() {
+            return;
+        }
+        self.mime = mime.chars().take(80).collect();
+        for s in &mut self.sesiones {
+            s.cambia_mime(mime);
+        }
+    }
+
+    /// «Pasar al móvil»: only a two-person conversation (a group's call has several streams).
+    pub fn movil_empieza(&mut self, idioma: &str) -> Result<(), String> {
+        if self.sesiones.len() != 1 || self.nombres().len() > 2 {
+            return Err("sec_mv_solo_dos".to_owned());
+        }
+        self.sesiones[0].movil_empieza(idioma)
+    }
+
+    /// The person said «Sí, es mi móvil».
+    pub fn movil_aprueba(&mut self) {
+        for s in &mut self.sesiones {
+            s.movil_aprueba();
+        }
+    }
+
+    /// Back to the computer.
+    pub fn movil_fin(&mut self) {
+        for s in &mut self.sesiones {
+            s.movil_fin();
+        }
+        self.cambio = true;
+    }
+
+    /// The phone gets the state after every change.
+    pub fn movil_sincroniza(&self) {
+        for s in &self.sesiones {
+            s.movil_sincroniza();
+        }
     }
 
     /// Hang up with everyone.
@@ -589,7 +636,7 @@ mod tests {
         assert_eq!(c.mensajes.last().unwrap().2, "bienvenidos");
 
         // A call: a piece from Cris reaches Bea under Cris's name, through Ana.
-        a.llamar(false).unwrap();
+        a.llamar(false, "").unwrap();
         gira(&mut [&mut a, &mut b, &mut c], 20);
         assert!(b.sesiones[0].llamada_activa().is_some());
         assert!(c.sesiones[0].llamada_activa().is_some());
