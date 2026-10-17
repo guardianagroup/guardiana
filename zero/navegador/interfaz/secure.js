@@ -1460,7 +1460,7 @@
     const pc = (este.pantalla || []).map((p) => t('sec_eq_visto_pant', { p }));
     f.push([t('sec_in_grab_pantalla'), pc.length ? pc.join('; ') : t(este.pantalla_protegida ? 'sec_in_pant_bloq' : 'sec_in_pant_no'), pc.length ? 'alerta' : este.pantalla_protegida ? 'ok' : 'aviso']);
     const vo = o ? [...(o.microfono || []).map((p) => t('sec_eq_visto_mic', { p })), ...(o.camara || []).map((p) => t('sec_eq_visto_cam', { p })), ...(o.pantalla || []).map((p) => t('sec_eq_visto_pant', { p }))] : [];
-    f.push([t('sec_in_otro', { n: nom }), v.otro_movil ? t('sec_eq_otro_movil', { n: nom }) : !o ? t('sec_eq_otro_nada', { n: nom }) : !o.vigilado ? t('sec_eq_otro_no_vigilable', { n: nom }) : vo.length ? vo.join('; ') : t('sec_eq_otro_limpio', { n: nom }), vo.length ? 'alerta' : o && o.vigilado && !v.otro_movil ? 'ok' : 'aviso']);
+    f.push([t('sec_in_otro', { n: nom }), v.otro_movil ? t('sec_in_otro_movil') : !o ? t('sec_in_otro_nada') : !o.vigilado ? t('sec_in_otro_no_vigilable') : vo.length ? vo.join('; ') : t('sec_in_otro_limpio'), vo.length ? 'alerta' : o && o.vigilado && !v.otro_movil ? 'ok' : 'aviso']);
     const directa = r.conexion && r.conexion.directa === true;
     f.push([t('sec_in_servidor'), t(directa ? 'sec_in_directo_t' : 'sec_in_rele_t'), 'ok']);
     f.push([t('sec_in_identidad'), t(v.identidad_verificada ? 'sec_in_identidad_ok' : 'sec_in_identidad_mal'), v.identidad_verificada ? 'ok' : 'alerta']);

@@ -1260,5 +1260,9 @@
   "sec_vigia_parada": "Conversation paused: another program is using the microphone, the camera or the screen:",
   "sec_nv_normal_s": "As it sounds",
   "sec_nv_cambiada_s": "Transformed before it is encrypted: useless for cloning",
-  "sec_nv_normal_corta": "My voice"
+  "sec_nv_normal_corta": "My voice",
+  "sec_in_otro_limpio": "Nothing else used the microphone, the camera or the screen (its GUARDIANA says so)",
+  "sec_in_otro_movil": "Talked from a phone: its browser cannot check it",
+  "sec_in_otro_nada": "Its GUARDIANA did not report (older version)",
+  "sec_in_otro_no_vigilable": "Its system cannot check it"
 }

@@ -1260,5 +1260,9 @@
   "sec_vigia_parada": "Conversación en pausa: otro programa está usando el micrófono, la cámara o la pantalla:",
   "sec_nv_normal_s": "Tal como suena",
   "sec_nv_cambiada_s": "Transformada antes de cifrarse: no sirve para clonarla",
-  "sec_nv_normal_corta": "Mi voz"
+  "sec_nv_normal_corta": "Mi voz",
+  "sec_in_otro_limpio": "Nadie más usó su micrófono, su cámara ni su pantalla (lo dice su GUARDIANA)",
+  "sec_in_otro_movil": "Habló desde un móvil: su navegador no permite comprobarlo",
+  "sec_in_otro_nada": "Su GUARDIANA no informó (versión anterior)",
+  "sec_in_otro_no_vigilable": "Su sistema no permite comprobarlo"
 }
