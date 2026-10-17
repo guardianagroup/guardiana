@@ -1293,7 +1293,39 @@ impl Sesion {
                 Ok(())
             }
             "texto" => {
-                self.secure.texto(texto(m, "texto"));
+                self.secure
+                    .texto_re(texto(m, "texto"), crate::mensaje::id_de(&m["re"]));
+                Ok(())
+            }
+            "editar" => {
+                if let Some(id) = crate::mensaje::id_de(&m["id"]) {
+                    self.secure.editar(id, texto(m, "texto"));
+                }
+                Ok(())
+            }
+            "borrar" => {
+                if let Some(id) = crate::mensaje::id_de(&m["id"]) {
+                    self.secure
+                        .borrar(id, m["para_todos"].as_bool().unwrap_or(false));
+                }
+                Ok(())
+            }
+            "borrar_todo" => {
+                self.secure.borrar_todo();
+                Ok(())
+            }
+            "reaccion" => {
+                if let Some(id) = crate::mensaje::id_de(&m["id"]) {
+                    self.secure.reaccionar(id, texto(m, "emoji"));
+                }
+                Ok(())
+            }
+            "escribiendo" => {
+                self.secure.escribiendo();
+                Ok(())
+            }
+            "sin_visto" => {
+                self.secure.sin_visto(m["sin"].as_bool().unwrap_or(false));
                 Ok(())
             }
             "zona" => {
@@ -1331,7 +1363,7 @@ impl Sesion {
                 match crate::sala::Sala::abre(m["horas"].as_u64().unwrap_or(24), texto(m, "idioma"))
                 {
                     Ok(s) => {
-                        self.sala = Some(s);
+                        self.sala = Some(s.con_descargas(&self.descargas));
                         Ok(())
                     }
                     Err(e) => Err(e),
@@ -1351,7 +1383,31 @@ impl Sesion {
             }
             "sala_texto" => {
                 if let Some(s) = &mut self.sala {
-                    s.texto(texto(m, "texto"));
+                    s.texto_re(texto(m, "texto"), crate::mensaje::id_de(&m["re"]));
+                }
+                Ok(())
+            }
+            "sala_editar" => {
+                if let (Some(s), Some(id)) = (&mut self.sala, crate::mensaje::id_de(&m["id"])) {
+                    s.editar(id, texto(m, "texto"));
+                }
+                Ok(())
+            }
+            "sala_borrar" => {
+                if let (Some(s), Some(id)) = (&mut self.sala, crate::mensaje::id_de(&m["id"])) {
+                    s.borrar(id, m["para_todos"].as_bool().unwrap_or(false));
+                }
+                Ok(())
+            }
+            "sala_borrar_todo" => {
+                if let Some(s) = &mut self.sala {
+                    s.borrar_todo();
+                }
+                Ok(())
+            }
+            "sala_reaccion" => {
+                if let (Some(s), Some(id)) = (&mut self.sala, crate::mensaje::id_de(&m["id"])) {
+                    s.reaccionar(id, texto(m, "emoji"));
                 }
                 Ok(())
             }
@@ -1466,6 +1522,9 @@ impl Sesion {
             "media" => self.secure.media_saliente(texto(m, "b64")),
             "visto" => {
                 self.secure.visto();
+                if let Some(s) = &mut self.sala {
+                    s.visto();
+                }
                 Ok(())
             }
             "prueba" => {

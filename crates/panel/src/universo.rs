@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::extract::State;
-use guardiana_core::rules::{decide, RuleInput};
+use guardiana_core::rules::{cutting_rules, decide, RuleInput};
 use guardiana_core::time::{now_ms, HOUR_MS};
 use guardiana_core::{Action, Category, MatchKind, SELF_DEVICE_ID};
 use guardiana_lists::antivirus;
@@ -267,6 +267,14 @@ struct Destino {
     paradas: u64,
     /// The active rule of GUARDIANA that cuts the name on this computer, to undo it.
     regla: Option<i64>,
+    /// Every active rule that cuts the name (the deciding one included): «dejarlo pasar» undoes
+    /// them all. Empty when `regla` is `None`.
+    reglas: Vec<i64>,
+    /// Who made the deciding rule (`usuario`, or «protección máxima»).
+    regla_por: Option<String>,
+    /// The name is cut by a category rule (the person cut a whole kind of traffic, or «Cortar
+    /// todo lo que envía el antivirus»): undoing names does nothing; the category must go.
+    regla_categoria: Option<String>,
     /// True when nothing left: the name was stopped, so `pais` is its company's seat.
     sede: bool,
     /// Where the server is, to the region or the city, when its own operator publishes it
@@ -382,6 +390,58 @@ fn regla_de(
     )
     .filter(|r| r.action == Action::Cortar && r.match_kind != MatchKind::Category)
     .map(|r| r.id)
+}
+
+fn entrada<'a>(nombre: &'a str, categoria: Category) -> RuleInput<'a> {
+    RuleInput {
+        device_id: SELF_DEVICE_ID,
+        name: nombre,
+        category: categoria,
+        observed_ms: i64::MAX / 4,
+    }
+}
+
+fn reglas_de(
+    rules: &[guardiana_core::Rule],
+    nombre: &str,
+    categoria: Category,
+    now: i64,
+) -> Vec<i64> {
+    if nombre.is_empty() {
+        return Vec::new();
+    }
+    cutting_rules(rules, entrada(nombre, categoria), now)
+        .into_iter()
+        .map(|r| r.id)
+        .collect()
+}
+
+fn regla_por(
+    rules: &[guardiana_core::Rule],
+    nombre: &str,
+    categoria: Category,
+    now: i64,
+) -> Option<String> {
+    if nombre.is_empty() {
+        return None;
+    }
+    decide(rules, entrada(nombre, categoria), now)
+        .filter(|r| r.action == Action::Cortar)
+        .map(|r| r.created_by.clone())
+}
+
+fn regla_categoria(
+    rules: &[guardiana_core::Rule],
+    nombre: &str,
+    categoria: Category,
+    now: i64,
+) -> Option<String> {
+    if nombre.is_empty() {
+        return None;
+    }
+    decide(rules, entrada(nombre, categoria), now)
+        .filter(|r| r.action == Action::Cortar && r.match_kind == MatchKind::Category)
+        .map(|r| r.pattern.clone())
 }
 
 #[derive(Default)]
@@ -545,6 +605,9 @@ pub(crate) async fn universo(
             lugar: lugar_servidor(&a.lugares),
             empresa,
             regla: regla_de(&rules, &destino, categoria, now),
+            reglas: reglas_de(&rules, &destino, categoria, now),
+            regla_por: regla_por(&rules, &destino, categoria, now),
+            regla_categoria: regla_categoria(&rules, &destino, categoria, now),
             programa: prog,
             destino,
             pais,
@@ -588,6 +651,9 @@ pub(crate) async fn universo(
         let (documentado, uso) = documentado(prog, tipo, nombre);
         destinos.push(Destino {
             regla: regla_de(&rules, nombre, *categoria, now),
+            reglas: reglas_de(&rules, nombre, *categoria, now),
+            regla_por: regla_por(&rules, nombre, *categoria, now),
+            regla_categoria: regla_categoria(&rules, nombre, *categoria, now),
             programa: prog.clone(),
             destino: nombre.clone(),
             pais,

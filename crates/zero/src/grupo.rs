@@ -36,7 +36,7 @@ pub struct Grupo {
     /// How many messages of each session the group already took (to pass new ones on).
     vistos: Vec<usize>,
     /// The merged chat for the screen: (unix s, mine?, text, who).
-    pub mensajes: Vec<(u64, bool, String, String)>,
+    pub mensajes: Vec<crate::mensaje::Mensaje>,
     /// Pieces of the call for the page: (who, base64).
     pub media_para_pagina: VecDeque<(String, String)>,
     /// The call the host keeps going across members: with video?
@@ -332,21 +332,28 @@ impl Grupo {
         for i in 0..n {
             let de_enlace = self.sesiones[i].contacto().to_owned();
             let desde = self.vistos[i];
-            let nuevos: Vec<(u64, bool, String, String)> = self.sesiones[i]
+            let nuevos: Vec<crate::mensaje::Mensaje> = self.sesiones[i]
                 .mensajes
                 .iter()
                 .skip(desde)
                 .cloned()
                 .collect();
             self.vistos[i] = self.sesiones[i].mensajes.len();
-            for (t, mio, texto, de) in nuevos {
-                if mio {
+            for mut m in nuevos {
+                if m.mio {
                     // Our own texts are pushed into the group's list when sent, once.
                     continue;
                 }
-                let quien = if de.is_empty() { de_enlace.clone() } else { de };
-                self.mensajes.push((t, false, texto.clone(), quien.clone()));
-                if anfitrion {
+                let quien = if m.de.is_empty() {
+                    de_enlace.clone()
+                } else {
+                    m.de.clone()
+                };
+                m.de = quien.clone();
+                let texto = m.texto.clone();
+                let es_texto = m.llamada.is_none() && m.archivo.is_none();
+                self.mensajes.push(m);
+                if anfitrion && es_texto {
                     pasar_texto.push((i, quien, texto));
                 }
                 self.cambio = true;
@@ -420,13 +427,102 @@ impl Grupo {
             }
         }
         if enviado {
-            self.mensajes
-                .push((ahora_s(), true, t, self.nombre_o_anfitrion()));
+            let mut m = crate::mensaje::Mensaje::mio(t, None);
+            m.de = self.nombre_o_anfitrion();
+            // In a two-way talk the link's own line is the one on screen (it carries the ticks).
+            if let [s] = self.sesiones.as_slice() {
+                if let Some(ultimo) = s.mensajes.last() {
+                    m.id = ultimo.id;
+                }
+            }
+            self.mensajes.push(m);
             for (i, s) in self.sesiones.iter().enumerate() {
                 self.vistos[i] = s.mensajes.len();
             }
         }
         self.cambio = true;
+    }
+
+    /// The person answers a message (two-way talk: the link carries the quote).
+    pub fn texto_re(&mut self, texto: &str, re: Option<u64>) {
+        if self.sesiones.len() != 1 {
+            self.texto(texto);
+            return;
+        }
+        let de = self.nombre_o_anfitrion();
+        let s = &mut self.sesiones[0];
+        if s.lista() {
+            s.texto_re(texto, re);
+            let ultimo = s.mensajes.last().cloned();
+            let n = s.mensajes.len();
+            if let Some(mut m) = ultimo {
+                m.de = de;
+                self.mensajes.push(m);
+            }
+            self.vistos[0] = n;
+            self.cambio = true;
+        }
+    }
+
+    /// Edit, delete, react, typing: to every link that has the message.
+    pub fn editar(&mut self, id: u64, texto: &str) {
+        for s in &mut self.sesiones {
+            s.editar(id, texto);
+        }
+        if let Some(m) = self.mensajes.iter_mut().find(|m| m.id == id && m.mio) {
+            m.edita(texto.chars().take(8000).collect());
+        }
+        self.cambio = true;
+    }
+
+    /// Delete one message, for everyone (ours) or here.
+    pub fn borrar(&mut self, id: u64, para_todos: bool) {
+        for s in &mut self.sesiones {
+            s.borrar(id, para_todos);
+        }
+        if let Some(i) = self.mensajes.iter().position(|m| m.id == id) {
+            if para_todos && self.mensajes[i].mio {
+                self.mensajes[i].borra();
+            } else {
+                self.mensajes.remove(i);
+            }
+        }
+        self.cambio = true;
+    }
+
+    /// The whole conversation goes from this screen.
+    pub fn borrar_todo(&mut self) {
+        for s in &mut self.sesiones {
+            s.borrar_todo();
+        }
+        self.mensajes.clear();
+        self.vistos.fill(0);
+        self.cambio = true;
+    }
+
+    /// React with an emoji.
+    pub fn reaccionar(&mut self, id: u64, emoji: &str) {
+        for s in &mut self.sesiones {
+            s.reaccionar(id, emoji);
+        }
+        if let Some(m) = self.mensajes.iter_mut().find(|m| m.id == id) {
+            m.reacciona("", emoji);
+        }
+        self.cambio = true;
+    }
+
+    /// The person is typing.
+    pub fn escribiendo(&mut self) {
+        for s in &mut self.sesiones {
+            s.escribiendo();
+        }
+    }
+
+    /// Read receipts on or off.
+    pub fn sin_visto(&mut self, sin: bool) {
+        for s in &mut self.sesiones {
+            s.sin_visto = sin;
+        }
     }
 
     /// Start a call with everyone (the host) or with the host (a member).
@@ -650,7 +746,7 @@ impl Grupo {
     /// The tab was brought to the front.
     pub fn visto(&mut self) {
         for s in &mut self.sesiones {
-            s.novedad = false;
+            s.visto();
         }
     }
 
@@ -708,14 +804,39 @@ impl Grupo {
         if anfitrion && self.sesiones.iter().any(Secure::lista) {
             e["codigo_grupo"] = json!(codigo_puerta.or(codigo_rele));
         }
-        e["mensajes"] = json!(self
-            .mensajes
-            .iter()
-            .rev()
-            .take(300)
-            .rev()
-            .map(|(t, mio, x, de)| json!({ "t": t, "mio": mio, "texto": x, "de": de }))
-            .collect::<Vec<_>>());
+        // The link's own list carries the live state (ticks, edits, reactions) in a two-way
+        // talk; in a group the copy here is shown, refreshed by id from the links.
+        e["mensajes"] = json!(match self.sesiones.as_slice() {
+            [s] => s
+                .mensajes
+                .iter()
+                .rev()
+                .take(300)
+                .rev()
+                .map(crate::mensaje::Mensaje::json)
+                .collect::<Vec<_>>(),
+            _ => self
+                .mensajes
+                .iter()
+                .rev()
+                .take(300)
+                .rev()
+                .map(|m| {
+                    self.sesiones
+                        .iter()
+                        .find_map(|s| s.mensajes.iter().find(|x| x.id == m.id))
+                        .map_or_else(
+                            || m.json(),
+                            |x| {
+                                let mut j = x.json();
+                                j["de"] = json!(m.de);
+                                j
+                            },
+                        )
+                })
+                .collect::<Vec<_>>(),
+        });
+        e["escribiendo"] = json!(self.sesiones.iter().any(Secure::otro_escribiendo));
         e["grupo"] = json!({
             "anfitrion": anfitrion,
             "yo": self.nombre_o_anfitrion(),
@@ -861,14 +982,14 @@ mod tests {
         b.texto("hola a todos");
         gira(&mut [&mut a, &mut b, &mut c], 20);
         let ultimo = c.mensajes.last().unwrap();
-        assert_eq!(ultimo.2, "hola a todos");
-        assert_eq!(ultimo.3, "Bea");
-        assert_eq!(a.mensajes.last().unwrap().3, "Bea");
+        assert_eq!(ultimo.texto, "hola a todos");
+        assert_eq!(ultimo.de, "Bea");
+        assert_eq!(a.mensajes.last().unwrap().de, "Bea");
         // Ana speaks: both read it.
         a.texto("bienvenidos");
         gira(&mut [&mut a, &mut b, &mut c], 20);
-        assert_eq!(b.mensajes.last().unwrap().2, "bienvenidos");
-        assert_eq!(c.mensajes.last().unwrap().2, "bienvenidos");
+        assert_eq!(b.mensajes.last().unwrap().texto, "bienvenidos");
+        assert_eq!(c.mensajes.last().unwrap().texto, "bienvenidos");
 
         // A call: a piece from Cris reaches Bea under Cris's name, through Ana.
         a.llamar(false, "").unwrap();

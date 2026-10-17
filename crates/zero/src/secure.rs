@@ -34,6 +34,8 @@ use guardiana_secure::verificar::{Codigo, Inicio, Verified};
 use guardiana_secure::{tarjeta, Conversation, Envelope, Identity};
 use serde::Serialize;
 use serde_json::{json, Value};
+
+use crate::mensaje::{self, Mensaje};
 use sha2::Digest as _;
 
 const MAX_FRAME: usize = 2 * 1024 * 1024;
@@ -372,6 +374,8 @@ struct Llamada {
     receptor: Option<sframe::Receptor>,
     /// The other side answered (until then this side is «calling…» and sends nothing).
     conectada: bool,
+    /// Started from here.
+    saliente: bool,
     /// Since when: the call (or, while calling, the ring).
     desde: u64,
     bytes_enviados: u64,
@@ -473,8 +477,20 @@ pub struct Secure {
     sas_mac_otra: Option<(Mac, Ed25519Signature)>,
     verificado: Option<Verified>,
     conversacion: Option<Conversation>,
-    /// Messages for the screen: (unix s, mine?, text, who — empty for the other end of this link).
-    pub mensajes: Vec<(u64, bool, String, String)>,
+    /// Messages for the screen, with their state (see [`crate::mensaje`]).
+    pub mensajes: Vec<Mensaje>,
+    /// Ids received and not yet reported as seen (16 Oct 2026: the ✓✓ in green).
+    por_ver: Vec<u64>,
+    /// The other side is typing: unix seconds of its last «escribiendo».
+    otro_escribe: u64,
+    /// Our last «escribiendo» sent, so one goes every few seconds at most.
+    escribi_en: u64,
+    /// The last piece of a file coming from the phone, kept until the next one (or the end)
+    /// says whether it is the last.
+    movil_trozo: Option<Vec<u8>>,
+    /// The person turned the read receipts off: nothing is reported as seen (they then see no
+    /// green ticks either, as in the big apps).
+    pub sin_visto: bool,
     /// What the screen shows the whole time.
     pub monitor: Monitor,
     /// The chain of what was seen, for the signed evidence.
@@ -644,6 +660,11 @@ impl Secure {
             verificado: None,
             conversacion: None,
             mensajes: Vec::new(),
+            por_ver: Vec::new(),
+            otro_escribe: 0,
+            escribi_en: 0,
+            sin_visto: false,
+            movil_trozo: None,
             monitor: Monitor::new(),
             cadena: Cadena::new("sin sesion", ahora_s()),
             estado: EstadoSesion::default(),
@@ -1647,7 +1668,73 @@ impl Secure {
                     .chars()
                     .take(60)
                     .collect();
-                self.mensajes.push((ahora_s(), false, texto, de));
+                let id = mensaje::id_de(&c["id"]).unwrap_or_else(Mensaje::nuevo_id);
+                if self.mensajes.iter().any(|m| m.id == id) {
+                    return; // the same text twice (a resend after a cut)
+                }
+                let re = mensaje::id_de(&c["re"]);
+                self.mensajes.push(Mensaje::del_otro(id, texto, de, re));
+                self.por_ver.push(id);
+                self.otro_escribe = 0;
+                // Tell the sender it is here (its ✓✓): the relay never says that.
+                self.manda_olm(json!({ "m": "entregado", "id": id.to_string() }));
+                if !self.novedad && !self.sin_visto {
+                    // The tab is in front: seen at once.
+                    self.manda_vistos();
+                }
+            }
+            "entregado" => {
+                if let Some(id) = mensaje::id_de(&c["id"]) {
+                    if let Some(m) = self.mensajes.iter_mut().find(|m| m.id == id && m.mio) {
+                        m.entregado();
+                    }
+                }
+            }
+            "visto" => {
+                let ids: Vec<u64> = c["ids"]
+                    .as_array()
+                    .map(|a| a.iter().filter_map(mensaje::id_de).collect())
+                    .unwrap_or_default();
+                for m in self
+                    .mensajes
+                    .iter_mut()
+                    .filter(|m| m.mio && ids.contains(&m.id))
+                {
+                    m.visto();
+                }
+            }
+            "escribiendo" => {
+                self.otro_escribe = ahora_s();
+            }
+            "editar" => {
+                let texto: String = c["texto"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .chars()
+                    .take(8000)
+                    .collect();
+                if let Some(id) = mensaje::id_de(&c["id"]) {
+                    // Only the other side's own texts: ours are ours.
+                    if let Some(m) = self.mensajes.iter_mut().find(|m| m.id == id && !m.mio) {
+                        m.edita(texto);
+                    }
+                }
+            }
+            "borrar" => {
+                if let Some(id) = mensaje::id_de(&c["id"]) {
+                    if let Some(m) = self.mensajes.iter_mut().find(|m| m.id == id && !m.mio) {
+                        m.borra();
+                    }
+                }
+            }
+            "reaccion" => {
+                let emoji = c["emoji"].as_str().unwrap_or_default();
+                let quien = self.nombre_contacto.clone();
+                if let Some(id) = mensaje::id_de(&c["id"]) {
+                    if let Some(m) = self.mensajes.iter_mut().find(|m| m.id == id) {
+                        m.reacciona(&quien, emoji);
+                    }
+                }
             }
             "llamada" | "llamada_ok" => {
                 let Some(clave) = c["clave"].as_str().and_then(|x| B64.decode(x).ok()) else {
@@ -1711,11 +1798,22 @@ impl Secure {
             "cuelga" => {
                 if let Some(tm) = self.entrante.take() {
                     self.perdida = Some((tm.desde, tm.video));
+                    self.anota_llamada(tm.video, false, None, "perdida");
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "llamada perdida");
                     self.aviso("sec_llamada_perdida", self.nombre_contacto.clone());
                     self.cambio = true;
                 } else if let Some(l) = self.llamada.take() {
+                    if l.conectada {
+                        self.anota_llamada(
+                            l.video,
+                            l.saliente,
+                            Some(ahora_s().saturating_sub(l.desde)),
+                            "fin",
+                        );
+                    } else {
+                        self.anota_llamada(l.video, true, None, "rechazada");
+                    }
                     self.monitor.anota(
                         ahora_s(),
                         Nivel::Info,
@@ -1939,8 +2037,25 @@ impl Secure {
                     self.archivos.bytes += e.llave.as_ref().map_or(0, |l| l.bytes);
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, format!("archivo recibido: {n}"));
-                    self.mensajes
-                        .push((ahora_s(), false, format!("📎 {n}"), String::new()));
+                    let mut linea = Mensaje::archivo(n.clone(), false);
+                    // A picture goes on to the linked phone so it shows in its chat.
+                    if let Some(r) = self.recibidos.iter().find(|r| r.nombre == n && r.imagen()) {
+                        linea.archivo_id = (r.id & 0xffff_ffff) as u32;
+                        if let Some(m) = &self.movil {
+                            if m.enganchado && m.aprobado && r.bytes <= 16 * 1024 * 1024 {
+                                if let Ok(datos) = std::fs::read(&r.ruta) {
+                                    m.manda(crate::movil::Hacia::Estado(json!({ "tipo": "archivo_movil", "id": linea.archivo_id, "nombre": n, "mime": mime_imagen(&n), "bytes": datos.len() }).to_string()));
+                                    for trozo in datos.chunks(65536) {
+                                        m.manda(crate::movil::Hacia::Archivo(
+                                            linea.archivo_id,
+                                            trozo.to_vec(),
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    self.mensajes.push(linea);
                     self.aviso("sec_archivo_recibido", n);
                 } else {
                     if let Some(r) = &e.ruta {
@@ -1977,6 +2092,7 @@ impl Secure {
             emisor: sframe::Emisor::new(&clave, yo),
             receptor: None,
             conectada: !inicia,
+            saliente: inicia,
             desde: ahora_s(),
             bytes_enviados: 0,
             bytes_recibidos: 0,
@@ -2037,13 +2153,40 @@ impl Secure {
 
     /// The person hangs up.
     pub fn colgar(&mut self) {
-        if self.llamada.take().is_some() {
+        if let Some(l) = self.llamada.take() {
+            if l.conectada {
+                self.anota_llamada(
+                    l.video,
+                    l.saliente,
+                    Some(ahora_s().saturating_sub(l.desde)),
+                    "fin",
+                );
+            } else {
+                self.anota_llamada(l.video, true, None, "cancelada");
+            }
             self.manda_olm(json!({ "m": "cuelga" }));
             self.monitor
                 .anota(ahora_s(), Nivel::Info, "llamada terminada");
             self.fin_de_llamada();
             self.cambio = true;
         }
+    }
+
+    /// A line in the chat for the call that just ended (16 Oct 2026: «historial de llamadas»).
+    fn anota_llamada(
+        &mut self,
+        video: bool,
+        saliente: bool,
+        segundos: Option<u64>,
+        fin: &'static str,
+    ) {
+        self.mensajes.push(Mensaje::llamada(mensaje::Llamada {
+            video,
+            saliente,
+            segundos,
+            fin,
+        }));
+        self.cambio = true;
     }
 
     /// The call's figures go; how the two computers are linked stays on screen (16 Oct 2026:
@@ -2098,7 +2241,8 @@ impl Secure {
 
     /// The person rejects the call ringing here.
     pub fn rechazar(&mut self) {
-        if self.entrante.take().is_some() {
+        if let Some(t) = self.entrante.take() {
+            self.anota_llamada(t.video, false, None, "rechazada_aqui");
             self.manda_olm(json!({ "m": "cuelga" }));
             self.monitor
                 .anota(ahora_s(), Nivel::Info, "llamada rechazada");
@@ -2124,7 +2268,9 @@ impl Secure {
             .as_ref()
             .is_some_and(|l| !l.conectada && ahora.saturating_sub(l.desde) > TIMBRE_S)
         {
-            self.llamada = None;
+            if let Some(l) = self.llamada.take() {
+                self.anota_llamada(l.video, true, None, "sin_respuesta");
+            }
             self.manda_olm(json!({ "m": "cuelga" }));
             self.monitor
                 .anota(ahora_s(), Nivel::Info, "llamada sin respuesta");
@@ -2138,6 +2284,9 @@ impl Secure {
             .is_some_and(|t| ahora.saturating_sub(t.desde) > TIMBRE_S + 5)
         {
             self.perdida = self.entrante.take().map(|t| (t.desde, t.video));
+            if let Some((_, video)) = self.perdida {
+                self.anota_llamada(video, false, None, "perdida");
+            }
             self.aviso("sec_llamada_perdida", self.nombre_contacto.clone());
             self.cambio = true;
         }
@@ -2292,15 +2441,99 @@ impl Secure {
 
     /// The person wrote something.
     pub fn texto(&mut self, texto: &str) {
+        self.texto_re(texto, None);
+    }
+
+    /// The person wrote something, maybe answering another message.
+    pub fn texto_re(&mut self, texto: &str, re: Option<u64>) {
         if self.fase != Fase::Lista {
             self.aviso("sec_no_lista", "");
             return;
         }
         let t: String = texto.chars().take(8000).collect();
-        self.mensajes
-            .push((ahora_s(), true, t.clone(), String::new()));
-        self.manda_olm(json!({ "m": "texto", "texto": t }));
+        let m = Mensaje::mio(t.clone(), re);
+        let mut carga = json!({ "m": "texto", "texto": t, "id": m.id.to_string() });
+        if let Some(re) = re {
+            carga["re"] = json!(re.to_string());
+        }
+        self.mensajes.push(m);
+        self.manda_olm(carga);
         self.cambio = true;
+    }
+
+    /// The person changed a text of theirs.
+    pub fn editar(&mut self, id: u64, texto: &str) {
+        let t: String = texto.chars().take(8000).collect();
+        if let Some(m) = self.mensajes.iter_mut().find(|m| m.id == id && m.mio) {
+            m.edita(t.clone());
+            self.manda_olm(json!({ "m": "editar", "id": id.to_string(), "texto": t }));
+            self.cambio = true;
+        }
+    }
+
+    /// The person deletes a message: for everyone (theirs only), or just here.
+    pub fn borrar(&mut self, id: u64, para_todos: bool) {
+        let Some(i) = self.mensajes.iter().position(|m| m.id == id) else {
+            return;
+        };
+        if para_todos && self.mensajes[i].mio {
+            self.mensajes[i].borra();
+            self.manda_olm(json!({ "m": "borrar", "id": id.to_string() }));
+        } else {
+            self.mensajes.remove(i);
+        }
+        self.cambio = true;
+    }
+
+    /// The whole conversation goes from this screen (the other side keeps its copy).
+    pub fn borrar_todo(&mut self) {
+        self.mensajes.clear();
+        self.por_ver.clear();
+        self.cambio = true;
+    }
+
+    /// The person reacts to a message with an emoji (the same one again takes it away).
+    pub fn reaccionar(&mut self, id: u64, emoji: &str) {
+        let yo = self.mi_nombre();
+        if let Some(m) = self.mensajes.iter_mut().find(|m| m.id == id) {
+            m.reacciona(&yo, emoji);
+            self.manda_olm(json!({ "m": "reaccion", "id": id.to_string(), "emoji": emoji }));
+            self.cambio = true;
+        }
+    }
+
+    /// The person is typing: the other side shows «escribiendo…» for a few seconds. Sent at
+    /// most every three seconds.
+    pub fn escribiendo(&mut self) {
+        let ahora = ahora_s();
+        if self.fase == Fase::Lista && ahora.saturating_sub(self.escribi_en) >= 3 {
+            self.escribi_en = ahora;
+            self.manda_olm(json!({ "m": "escribiendo" }));
+        }
+    }
+
+    /// The other side is typing right now.
+    pub fn otro_escribiendo(&self) -> bool {
+        self.otro_escribe > 0 && ahora_s().saturating_sub(self.otro_escribe) < 6
+    }
+
+    /// The conversation is on screen here: whatever came since is reported as seen.
+    pub fn visto(&mut self) {
+        self.novedad = false;
+        self.manda_vistos();
+    }
+
+    fn manda_vistos(&mut self) {
+        if self.sin_visto || self.por_ver.is_empty() || self.fase != Fase::Lista {
+            return;
+        }
+        let ids: Vec<String> = self.por_ver.drain(..).map(|i| i.to_string()).collect();
+        self.manda_olm(json!({ "m": "visto", "ids": ids }));
+    }
+
+    /// Our own reactions are filed under the empty name: the screen says «tú».
+    fn mi_nombre(&self) -> String {
+        String::new()
     }
 
     /// A file starts: the page will hand the pieces over.
@@ -2581,8 +2814,7 @@ impl Secure {
             self.archivos.bytes += bytes;
             self.monitor
                 .anota(ahora_s(), Nivel::Info, format!("archivo enviado: {nombre}"));
-            self.mensajes
-                .push((ahora_s(), true, format!("📎 {nombre}"), String::new()));
+            self.mensajes.push(Mensaje::archivo(nombre.clone(), true));
             self.cambio = true;
         }
         Ok(())
@@ -2935,9 +3167,32 @@ impl Secure {
                     self.cambio = true;
                     return;
                 }
-                Desde::Visto => self.novedad = false,
+                Desde::Visto => self.visto(),
                 Desde::Reproduce(mimes) if aprobado => self.reproduce(mimes),
                 Desde::Texto(t) if aprobado => self.texto(&t),
+                Desde::TextoRe(t, re) if aprobado => self.texto_re(&t, Some(re)),
+                Desde::Editar(id, t) if aprobado => self.editar(id, &t),
+                Desde::Borrar(id, todos) if aprobado => self.borrar(id, todos),
+                Desde::Reaccion(id, e) if aprobado => self.reaccionar(id, &e),
+                Desde::Escribiendo if aprobado => self.escribiendo(),
+                // A file from the phone goes to the other side like one chosen here: the phone
+                // sends its bytes in pieces of 64 KB, each one becoming a block on the wire.
+                Desde::ArchivoEmpieza(nombre, bytes, _mime) if aprobado => {
+                    self.movil_trozo = None;
+                    if let Err(e) = self.archivo_empieza(&nombre, bytes) {
+                        self.aviso(&e, "");
+                    }
+                }
+                Desde::ArchivoTrozo(b) if aprobado => {
+                    if let Some(antes) = self.movil_trozo.replace(b) {
+                        let _ = self.archivo_trozo(&B64.encode(antes), false);
+                    }
+                }
+                Desde::ArchivoFin if aprobado => {
+                    if let Some(ultimo) = self.movil_trozo.take() {
+                        let _ = self.archivo_trozo(&B64.encode(ultimo), true);
+                    }
+                }
                 Desde::Llamar { video, mime } if aprobado => {
                     let _ = self.llamar(video, &mime);
                 }
@@ -3045,7 +3300,9 @@ impl Secure {
             "enviados": self.enviados.iter().filter(|x| x.t > 0).map(|x| json!({ "nombre": x.nombre, "t": x.t, "bytes": x.bytes, "llego_en": x.llego_en })).collect::<Vec<_>>(),
             "recibiendo": self.entrada.as_ref().filter(|e| e.recepcion.is_some()).map(|e| json!({ "nombre": e.nombre, "bytes": e.esperado, "hecho": e.recibido })),
             "movil": self.movil_json(),
-            "mensajes": self.mensajes.iter().rev().take(200).rev().map(|(t, mio, x, de)| json!({ "t": t, "mio": mio, "texto": x, "de": de })).collect::<Vec<_>>(),
+            "mensajes": self.mensajes.iter().rev().take(300).rev().map(Mensaje::json).collect::<Vec<_>>(),
+            "escribiendo": self.otro_escribiendo(),
+            "archivos": true,
             "contactos": self.agenda.contactos().iter().map(|c| json!({ "nombre": c.nombre, "verificado_en": c.verificado_en, "estado": matches!(c.estado, agenda::Estado::Verificado) })).collect::<Vec<_>>(),
             "monitor": monitor,
             "resumen": self.resumen.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "mensajes": r.mensajes_enviados + r.mensajes_recibidos, "archivos": r.archivos.enviados + r.archivos.recibidos, "observadas": r.observadas, "inusuales": r.inusuales, "fin": r.fin })),
@@ -3125,6 +3382,16 @@ fn limpia_nombre(n: &str) -> String {
         "archivo".to_owned()
     } else {
         s
+    }
+}
+
+fn mime_imagen(nombre: &str) -> &'static str {
+    match extension(nombre).as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        _ => "image/bmp",
     }
 }
 
@@ -3208,8 +3475,8 @@ mod tests {
 
         a.texto("hola Bea");
         gira(&mut a, &mut b, 15);
-        assert_eq!(b.mensajes.last().unwrap().2, "hola Bea");
-        assert!(!b.mensajes.last().unwrap().1);
+        assert_eq!(b.mensajes.last().unwrap().texto, "hola Bea");
+        assert!(!b.mensajes.last().unwrap().mio);
 
         // An iPhone takes over on a's side and can only open MP4: b hears it, and hears when it
         // goes back.
@@ -3257,7 +3524,7 @@ mod tests {
             .as_bool()
             .unwrap());
         assert!(a.estado_json()["envio"].is_null(), "the send is over");
-        assert!(b.mensajes.last().unwrap().2.contains("informe.pdf"));
+        assert!(b.mensajes.last().unwrap().archivo.as_deref() == Some("informe.pdf"));
         assert!(b.monitor.cifrado.recibidos >= 2);
 
         // Three frames that fail to open within ten seconds: a stop that looks like an
@@ -3343,7 +3610,7 @@ mod tests {
         assert_eq!(a.monitor.transporte.directo, Some(false));
         a.texto("por el relé");
         gira(&mut a, &mut b, 15);
-        assert_eq!(b.mensajes.last().unwrap().2, "por el relé");
+        assert_eq!(b.mensajes.last().unwrap().texto, "por el relé");
 
         // The link drops (a router reboot, a change of network): the conversation is not
         // over. Both sides go back to the relay to a room they derive on their own, meet
@@ -3367,7 +3634,7 @@ mod tests {
         assert_eq!(b.estado_json()["fase"], "lista");
         b.texto("sigo aquí");
         gira(&mut a, &mut b, 15);
-        assert_eq!(a.mensajes.last().unwrap().2, "sigo aquí");
+        assert_eq!(a.mensajes.last().unwrap().texto, "sigo aquí");
         assert!(a.monitor.identidad.is_some(), "still verified");
 
         // A file cut in the middle by another drop goes on from where the other side got to:

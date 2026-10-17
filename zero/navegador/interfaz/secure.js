@@ -203,7 +203,7 @@
   let E = { fase: 'sola' };
   const fasePinta = () => {
     const f = E.fase;
-    $('c-conexion').hidden = !(f === 'sola' || f === 'escuchando');
+    $('c-conexion').hidden = !(f === 'sola' || f === 'escuchando') || modo !== 'equipos';
     const comparando = E.comparando || (f === 'comparando' ? E.numeros : null);
     $('c-comparar').hidden = !comparando;
     $('c-comparar-quien').textContent = E.comparando && E.contacto_nuevo ? t('sec_s_nuevo', { n: E.contacto_nuevo }) : '';
@@ -292,32 +292,46 @@
     const botones = r.borrado ? '' : `<div class="a-botones">${r.abrible ? `<button type="button" class="boton chico" data-archivo="archivo_abrir" data-id="${r.id}">${esc(t('sec_f_abrir'))}</button>` : ''}<button type="button" class="boton chico secundario" data-archivo="archivo_carpeta" data-id="${r.id}">${esc(t('sec_f_carpeta'))}</button><button type="button" class="boton chico secundario" data-archivo="archivo_borrar" data-id="${r.id}">${esc(t('sec_f_eliminar'))}</button></div>`;
     return `<div class="archivo${r.borrado ? ' borrado' : ''}"><div class="a-mini">${mini}</div><div class="a-info"><b>${esc(r.nombre)}</b><span>${esc(tam(r.bytes))} · ${esc(t(r.borrado ? 'sec_f_eliminado' : 'sec_f_en_descargas'))}</span></div>${botones}</div>`;
   };
+  // The state of a message of ours, as the big apps show it (16 Oct 2026): 🕓 pending,
+  // ✓ sent, ✓✓ delivered, ✓✓ green seen. Plus «editado», «Mensaje eliminado», the line of a
+  // call and the reactions.
+  const TICK = { pendiente: '<span class="tick">🕓</span>', enviado: '<span class="tick">✓</span>', entregado: '<span class="tick">✓✓</span>', visto: '<span class="tick visto">✓✓</span>' };
+  const llamadaTexto = (l) => {
+    const d = l.segundos != null ? ' · ' + duracion(l.segundos) : '';
+    const k = l.segundos != null ? (l.video ? 'sec_ll_video' : 'sec_ll_voz') : l.fin === 'perdida' ? (l.video ? 'sec_ll_video_perdida' : 'sec_ll_voz_perdida') : l.fin === 'sin_respuesta' ? 'sec_ll_sin_respuesta' : (l.fin === 'rechazada' || l.fin === 'rechazada_aqui') ? 'sec_ll_rechazada' : 'sec_ll_cancelada';
+    return t(k) + d;
+  };
+  const metaMensaje = (m) => `<time>${m.editado ? esc(t('sec_m_editado')) + ' · ' : ''}${esc(hora(m.t))}${m.mio && m.estado ? ' ' + (TICK[m.estado] || '') : ''}</time>`;
+  const reacciones = (m) => (m.reacciones || []).length ? `<span class="reac">${m.reacciones.map((r) => `<span title="${esc(r.de || t('sec_m_tu'))}">${esc(r.emoji)}</span>`).join('')}</span>` : '';
+  const citaDe = (m, lista) => { if (!m.re) return ''; const o = (lista || []).find((y) => y.id === m.re); return o ? `<span class="cita">${esc((o.texto || (o.archivo && o.archivo.nombre) || '').slice(0, 160))}</span>` : ''; };
+  const lineaLlamada = (m) => `<li class="llamada-linea" data-id="${esc(m.id || '')}"><span>${m.llamada.video ? '🎥' : '📞'}</span><span>${esc(llamadaTexto(m.llamada))}</span><time>${esc(hora(m.t))}</time></li>`;
   const pintaChat = (conNombre) => {
     const recibidos = E.recibidos || [];
-    const clave = JSON.stringify([E.mensajes, recibidos, E.enviados, (E.envio || {}).nombre, conNombre, [...minis.keys()]]);
+    const clave = JSON.stringify([E.mensajes, recibidos, E.enviados, (E.envio || {}).nombre, conNombre, [...minis.keys()], E.escribiendo]);
     if (clave === chatAntes) return;
     chatAntes = clave;
     const ol = $('c-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 30;
     const usados = new Set();
     ol.innerHTML = (E.mensajes || []).map((m) => {
       const de = !m.mio && conNombre && m.de ? `<i class="de">${esc(m.de)}</i>` : '';
-      if (!m.mio && typeof m.texto === 'string' && m.texto.startsWith('📎 ')) {
-        const nombre = m.texto.slice(3);
-        const r = recibidos.find((x) => !usados.has(x.id) && x.nombre === nombre && Math.abs((x.t || 0) - (m.t || 0)) <= 3);
+      if (m.llamada) return lineaLlamada(m);
+      if (m.borrado) return `<li class="${m.mio ? 'mio' : ''}" data-id="${esc(m.id || '')}">${de}<i class="borrado">${esc(t('sec_m_borrado'))}</i>${metaMensaje(m)}</li>`;
+      const nombreArchivo = m.archivo ? m.archivo.nombre : (typeof m.texto === 'string' && m.texto.startsWith('📎 ') ? m.texto.slice(3) : null);
+      if (!m.mio && nombreArchivo) {
+        const r = recibidos.find((x) => !usados.has(x.id) && x.nombre === nombreArchivo && Math.abs((x.t || 0) - (m.t || 0)) <= 3);
         if (r) {
           usados.add(r.id);
           if (r.imagen && !r.borrado && !minis.has(r.id) && !pedidas.has(r.id)) { pedidas.add(r.id); manda({ tipo: 'secure', accion: 'archivo_vista', id: r.id }); }
-          return `<li class="archivo-li">${de}${tarjetaArchivo(r)}<time>${esc(hora(m.t))}</time></li>`;
+          return `<li class="archivo-li" data-id="${esc(m.id || '')}">${de}${tarjetaArchivo(r)}${reacciones(m)}<time>${esc(hora(m.t))}</time></li>`;
         }
       }
-      if (m.mio && typeof m.texto === 'string' && m.texto.startsWith('📎 ')) {
-        const nombre = m.texto.slice(3);
-        const x = (E.enviados || []).find((y) => y.nombre === nombre && Math.abs((y.t || 0) - (m.t || 0)) <= 3);
-        const estado = x && typeof x.llego_en === 'number' ? '✓ ' + t('sec_f_entregado_en', { t: duracion(x.llego_en) }) : (E.envio && E.envio.nombre === nombre ? t('sec_f_en_camino') : t('sec_f_enviado'));
-        return `<li class="mio">${esc(m.texto)}${x ? ` <small class="a-tam">${esc(tam(x.bytes))}</small>` : ''}<span class="a-entrega">${esc(estado)}</span><time>${esc(hora(m.t))}</time></li>`;
+      if (m.mio && nombreArchivo) {
+        const x = (E.enviados || []).find((y) => y.nombre === nombreArchivo && Math.abs((y.t || 0) - (m.t || 0)) <= 3);
+        const estado = x && typeof x.llego_en === 'number' ? '✓ ' + t('sec_f_entregado_en', { t: duracion(x.llego_en) }) : (E.envio && E.envio.nombre === nombreArchivo ? t('sec_f_en_camino') : t('sec_f_enviado'));
+        return `<li class="mio" data-id="${esc(m.id || '')}">📎 ${esc(nombreArchivo)}${x ? ` <small class="a-tam">${esc(tam(x.bytes))}</small>` : ''}<span class="a-entrega">${esc(estado)}</span>${reacciones(m)}<time>${esc(hora(m.t))}</time></li>`;
       }
-      return `<li class="${m.mio ? 'mio' : ''}">${de}${esc(m.texto)}<time>${esc(hora(m.t))}</time></li>`;
-    }).join('');
+      return `<li class="${m.mio ? 'mio' : ''}" data-id="${esc(m.id || '')}">${de}${citaDe(m, E.mensajes)}${esc(m.texto)}${reacciones(m)}${metaMensaje(m)}</li>`;
+    }).join('') + (E.escribiendo ? `<li class="escribiendo"><span></span><span></span><span></span></li>` : '');
     if (abajo) ol.scrollTop = ol.scrollHeight;
   };
   // The picture comes once, full size: keep a small copy only.
@@ -437,7 +451,50 @@
   $('c-sas-si').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sas', iguales: true, nombre: $('c-nombre').value.trim() }));
   $('c-sas-no').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sas', iguales: false, nombre: '' }));
   $('c-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'cerrar' }));
-  $('c-form').addEventListener('submit', (e) => { e.preventDefault(); const x = $('c-texto').value.trim(); if (!x) return; manda({ tipo: 'secure', accion: 'texto', texto: x }); $('c-texto').value = ''; });
+  // Reply, edit, delete, react (16 Oct 2026): right click or long press on a message.
+  let contexto = { re: null, editar: null, sala: false };
+  const limpiaContexto = () => { contexto = { re: null, editar: null, sala: false }; $('c-contexto').hidden = true; $('c-sala-contexto').hidden = true; };
+  const mandaTexto = (x, sala) => {
+    if (contexto.editar) manda({ tipo: 'secure', accion: sala ? 'sala_editar' : 'editar', id: contexto.editar, texto: x });
+    else if (contexto.re) manda({ tipo: 'secure', accion: sala ? 'sala_texto' : 'texto', texto: x, re: contexto.re });
+    else manda({ tipo: 'secure', accion: sala ? 'sala_texto' : 'texto', texto: x });
+    limpiaContexto();
+  };
+  $('c-form').addEventListener('submit', (e) => { e.preventDefault(); const x = $('c-texto').value.trim(); if (!x) return; mandaTexto(x, false); $('c-texto').value = ''; });
+  let escribiEn = 0;
+  const avisaEscribiendo = () => { const ahora = Date.now(); if (ahora - escribiEn > 3000) { escribiEn = ahora; manda({ tipo: 'secure', accion: 'escribiendo' }); } };
+  $('c-texto').addEventListener('input', () => { if ($('c-texto').value) avisaEscribiendo(); });
+  const menuMsg = $('menu-msg');
+  let msgMenu = null;
+  const abreMenuMsg = (li, x, y, sala) => {
+    const id = li.dataset.id; if (!id) return;
+    const lista = sala ? ((E.sala || {}).mensajes || []) : (E.mensajes || []);
+    const m = lista.find((z) => z.id === id); if (!m) return;
+    msgMenu = { m, sala };
+    $('mm-editar').hidden = !m.mio || !!m.archivo || !!m.llamada || !!m.borrado;
+    $('mm-emojis').hidden = !!m.llamada;
+    $('mm-responder').hidden = !!m.llamada;
+    menuMsg.hidden = false;
+    const w = menuMsg.offsetWidth || 240, h = menuMsg.offsetHeight || 80;
+    menuMsg.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, x)) + 'px';
+    menuMsg.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, y)) + 'px';
+  };
+  const cierraMenuMsg = () => { menuMsg.hidden = true; msgMenu = null; };
+  for (const [id, sala] of [['c-mensajes', false], ['c-sala-mensajes', true]]) {
+    let pulsando = null;
+    $(id).addEventListener('contextmenu', (e) => { const li = e.target.closest('li[data-id]'); if (!li) return; e.preventDefault(); abreMenuMsg(li, e.clientX, e.clientY, sala); });
+    $(id).addEventListener('pointerdown', (e) => { const li = e.target.closest('li[data-id]'); if (!li || e.button !== 0) return; clearTimeout(pulsando); pulsando = setTimeout(() => abreMenuMsg(li, e.clientX, e.clientY, sala), 500); });
+    for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) $(id).addEventListener(ev, () => clearTimeout(pulsando));
+  }
+  document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#menu-msg')) cierraMenuMsg(); }, true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { cierraMenuMsg(); if (contexto.re || contexto.editar) { limpiaContexto(); $('c-texto').value = ''; $('c-sala-texto').value = ''; } } });
+  $('mm-emojis').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b || !msgMenu) return; manda({ tipo: 'secure', accion: msgMenu.sala ? 'sala_reaccion' : 'reaccion', id: msgMenu.m.id, emoji: b.dataset.e }); cierraMenuMsg(); });
+  $('mm-responder').addEventListener('click', () => { if (!msgMenu) return; const { m, sala } = msgMenu; contexto = { re: m.id, editar: null, sala }; const caja = $(sala ? 'c-sala-contexto' : 'c-contexto'); caja.hidden = false; caja.querySelector('span').textContent = t('sec_m_respondiendo', { t: (m.texto || (m.archivo && m.archivo.nombre) || '').slice(0, 100) }); $(sala ? 'c-sala-texto' : 'c-texto').focus(); cierraMenuMsg(); });
+  $('mm-copiar').addEventListener('click', async () => { if (!msgMenu) return; try { await navigator.clipboard.writeText(msgMenu.m.texto || ''); } catch (_) {} cierraMenuMsg(); });
+  $('mm-editar').addEventListener('click', () => { if (!msgMenu) return; const { m, sala } = msgMenu; contexto = { re: null, editar: m.id, sala }; const caja = $(sala ? 'c-sala-contexto' : 'c-contexto'); caja.hidden = false; caja.querySelector('span').textContent = t('sec_m_editando'); const campo = $(sala ? 'c-sala-texto' : 'c-texto'); campo.value = m.texto || ''; campo.focus(); cierraMenuMsg(); });
+  $('mm-borrar').addEventListener('click', () => { if (!msgMenu) return; const { m, sala } = msgMenu; cierraMenuMsg(); if (m.mio && !m.borrado) { $('c-borrar-dialogo').hidden = false; $('c-borrar-todos').onclick = () => { manda({ tipo: 'secure', accion: sala ? 'sala_borrar' : 'borrar', id: m.id, para_todos: true }); $('c-borrar-dialogo').hidden = true; }; $('c-borrar-mi').onclick = () => { manda({ tipo: 'secure', accion: sala ? 'sala_borrar' : 'borrar', id: m.id, para_todos: false }); $('c-borrar-dialogo').hidden = true; }; $('c-borrar-no').onclick = () => { $('c-borrar-dialogo').hidden = true; }; } else manda({ tipo: 'secure', accion: sala ? 'sala_borrar' : 'borrar', id: m.id, para_todos: false }); });
+  $('c-contexto-no').addEventListener('click', () => { limpiaContexto(); $('c-texto').value = ''; });
+  $('c-sala-contexto-no').addEventListener('click', () => { limpiaContexto(); $('c-sala-texto').value = ''; });
   // Files: read here in 64 KB pieces and handed to the program one by one, so a big file never
   // sits in memory; the program encrypts each piece and sends it, and the key goes inside Olm.
   const TROZO = 64 * 1024;
@@ -497,17 +554,24 @@
   // ---------- The phone (15 Oct 2026) ----------
   // The left column: the conversation this computer is in (one at a time), with the last line
   // and its time, as the chosen design lists them; empty, a quiet sentence.
+  const filaSala = (m) => {
+    const s = m.sala; if (!s) return '';
+    const ultimo = (s.mensajes || []).slice(-1)[0];
+    const linea = s.llamada ? t('sec_l_en_curso') : ultimo ? `${ultimo.de}: ${ultimo.texto}` : t('sec_lista_sin_mensajes');
+    return `<li class="${vista === 'sala' ? 'activa' : ''}" data-vista="sala"><span class="avatar casa"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><i></i></span><b>${esc(t('sec_sala_titulo'))}</b><time>${ultimo ? esc(hora(ultimo.t).slice(0, 5)) : ''}</time><span class="ultimo">${esc(linea)}</span></li>`;
+  };
   const pintaLista = (m, quien, nombres) => {
     const ol = $('c-lista');
     const f = m.fase;
-    if (!f || f === 'sola') { ol.innerHTML = `<li class="vacia">${esc(t('sec_lista_vacia'))}</li>`; $('miga-donde').textContent = t('sec_miga_inicio'); return; }
+    if (!f || f === 'sola') { ol.innerHTML = filaSala(m) || `<li class="vacia">${esc(t('sec_lista_vacia'))}</li>`; if (!m.sala) $('miga-donde').textContent = t('sec_miga_inicio'); return; }
     const ultimo = (m.mensajes || []).slice(-1)[0];
     const nombre = nombres.length > 2 ? t('sec_m_grupo', { n: nombres.length }) : (quien || t('sec_lista_nueva'));
     const linea = f !== 'lista' ? t(f === 'comparando' ? 'sec_lista_comparando' : 'sec_lista_conectando') : m.llamada ? t('sec_l_en_curso') : ultimo ? ultimo.texto : t('sec_lista_sin_mensajes');
-    ol.innerHTML = `<li class="activa"><span class="avatar">${esc((nombre.trim()[0] || '·').toUpperCase())}${f === 'lista' ? '<i></i>' : ''}</span><b>${esc(nombre)}</b><time>${ultimo ? esc(hora(ultimo.t).slice(0, 5)) : ''}</time><span class="ultimo">${esc(linea)}</span></li>`;
-    $('miga-donde').textContent = t('sec_miga_conv');
+    ol.innerHTML = filaSala(m) + `<li class="${vista === 'contacto' || !m.sala ? 'activa' : ''}" data-vista="contacto"><span class="avatar">${esc((nombre.trim()[0] || '·').toUpperCase())}${f === 'lista' ? '<i></i>' : ''}</span><b>${esc(nombre)}</b><time>${ultimo ? esc(hora(ultimo.t).slice(0, 5)) : ''}</time><span class="ultimo">${esc(linea)}</span></li>`;
+    if (vista !== 'sala' || !m.sala) $('miga-donde').textContent = t('sec_miga_conv');
   };
-  $('c-nueva').addEventListener('click', () => { const c = $('c-conexion'); if (!c.hidden) { c.scrollIntoView({ behavior: 'smooth' }); $('c-yo').focus(); } });
+  $('c-lista').addEventListener('click', (e) => { const li = e.target.closest('li[data-vista]'); if (!li || !E.sala) return; vista = li.dataset.vista; fasePinta(); pintaLista(E, E.contacto, ((E.grupo || {}).nombres || [])); pintaVista(E); });
+  $('c-nueva').addEventListener('click', () => { if (!hayContacto(E) && !E.sala && !movilActivo(E)) { modo = null; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); } });
 
   // «Pasar al móvil»: the program shows a QR code; the phone's camera opens our page, which
   // talks to this computer directly (TLS 1.3 pinned to the certificate in the code). The
@@ -546,6 +610,69 @@
   // «Sala de casa» (16 Oct 2026): one code for the phones of the house, this computer as the
   // exchange for as many hours as chosen; the phones talk to each other through it from
   // anywhere. The person here lets each phone in by the name it typed.
+  // The room is a conversation of its own (16 Oct 2026, the owner: «que se vea en el centro»):
+  // its chat fills the middle column while no other conversation is open, and the left list
+  // offers both when there is one.
+  let vista = 'contacto';
+  const hayContacto = (m) => m.fase && m.fase !== 'sola' || (m.mensajes || []).length > 0;
+  // Three ways to talk (16 Oct 2026): computer to computer, from the phone, the home room.
+  // The start shows the three; once one is chosen (or one is already going) only it is on screen.
+  let modo = null;
+  try { modo = sessionStorage.getItem('secure-modo') || null; } catch (_) {}
+  const guardaModo = () => { try { if (modo) sessionStorage.setItem('secure-modo', modo); else sessionStorage.removeItem('secure-modo'); } catch (_) {} };
+  const movilActivo = (m) => !!(m.movil && (m.movil.enganchado || m.movil.pendiente || m.movil.qr));
+  const pintaModo = (m) => {
+    // What is going on decides the mode; the person's choice only while nothing is going on.
+    if (m.sala) modo = 'sala';
+    else if (movilActivo(m)) modo = 'movil';
+    else if (hayContacto(m)) modo = 'equipos';
+    guardaModo();
+    const activo = !!m.sala || movilActivo(m) || hayContacto(m);
+    $('c-inicio').hidden = !!modo;
+    $('c-modo-cab').hidden = !modo || activo;
+    if (modo) $('c-modo-nombre').textContent = t('sec_modo_' + modo);
+    $('c-modo-movil').hidden = modo !== 'movil';
+    const sala = $('c-sala-tarjeta');
+    sala.hidden = modo !== 'sala';
+    // The room's code and members: in the middle while it is not open, on the left once it is.
+    const colIzq = document.querySelector('.col-izq'), main = document.querySelector('main');
+    if (modo === 'sala' && m.sala && sala.parentElement !== colIzq) colIzq.insertBefore(sala, colIzq.querySelector('.pie-izq'));
+    if ((modo !== 'sala' || !m.sala) && sala.parentElement !== main) main.insertBefore(sala, $('c-conexion'));
+    const secure = document.querySelector('.secure');
+    secure.classList.toggle('sin-lados', !activo);
+    secure.classList.toggle('sin-derecha', false);
+    $('miga-donde').textContent = modo ? t('sec_modo_' + modo) : t('sec_miga_inicio');
+  };
+  document.querySelectorAll('.modo').forEach((b) => b.addEventListener('click', () => { modo = b.dataset.modo; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); if (modo === 'sala') $('c-sala-horas').focus(); }));
+  $('c-volver').addEventListener('click', () => { modo = null; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); });
+  const pintaVista = (m) => {
+    pintaModo(m);
+    const s = m.sala;
+    if (!s) vista = 'contacto';
+    else if (!hayContacto(m)) vista = 'sala';
+    const enSala = !!s && vista === 'sala';
+    $('c-sala-chat').hidden = !enSala;
+    for (const id of ['c-conexion', 'c-comparar', 'c-espera', 'c-resumen', 'c-chat']) if (enSala) $(id).hidden = true;
+    if (!enSala) return;
+    const dentro = (s.miembros || []).filter((x) => x.aprobado);
+    $('c-sc-sello').textContent = t('sec_sala_sello', { n: n(dentro.length), h: n(s.horas), f: fecha(s.caduca) });
+    $('c-sc-llamada').hidden = !s.llamada;
+    if (s.llamada) $('c-sc-llamada').textContent = t(s.llamada.a ? 'sec_sala_llamada' : 'sec_sala_llamando', { a: s.llamada.de, b: s.llamada.a || '' });
+    $('miga-donde').textContent = t('sec_sala_titulo');
+    // The panel on the right tells the room's state in real time (the owner, 16 Oct 2026).
+    const caja = $('g'); caja.classList.remove('protegida', 'revisar', 'pausada', 'sin');
+    const conectados = dentro.filter((x) => x.enganchado);
+    caja.classList.add(dentro.length ? 'protegida' : 'sin');
+    $('g-palabra').textContent = t(dentro.length ? 'sec_g_protegida' : 'sec_g_sin');
+    $('g-frase').textContent = t(dentro.length ? 'sec_g_sala_frase' : 'sec_g_sala_vacia');
+    const chip = $('m-estado-chip'); chip.textContent = t(dentro.length ? 'sec_g_protegida' : 'sec_g_sin'); chip.className = 'chip' + (dentro.length ? ' ok' : '');
+    linea($('g-cifrado'), dentro.length ? 'ok' : '', t('sec_l_sala_cifrado'));
+    linea($('g-identidad'), dentro.length ? 'ok' : '', dentro.length ? t('sec_l_sala_miembros', { n: n(dentro.length), l: dentro.map((x) => x.nombre).join(', ') }) : t('sec_l_sala_nadie'));
+    linea($('g-nivel'), 'ok', t('sec_l_nivel_movil'));
+    linea($('g-cuantico'), '', t('sec_l_sala_cuantico'));
+    linea($('g-conexion'), conectados.length ? 'ok' : '', conectados.length ? t('sec_l_sala_conexion', { c: n(conectados.length), n: n(dentro.length) }) : t('sec_l_sin_conexion'));
+    linea($('g-visto'), s.llamada ? 'ok' : '', s.llamada ? t(s.llamada.a ? 'sec_sala_llamada' : 'sec_sala_llamando', { a: s.llamada.de, b: s.llamada.a || '' }) : t('sec_l_sala_mensajes', { n: n((s.mensajes || []).length) }));
+  };
   const pintaSala = (m) => {
     const s = m.sala;
     $('c-sala-antes').hidden = !!s;
@@ -556,12 +683,13 @@
     $('c-sala-miembros').innerHTML = (s.miembros || []).filter((x) => x.enganchado || x.aprobado || x.con_nombre).map((x) => {
       const estado = x.pendiente ? t('sec_sala_m_pendiente') : x.aprobado ? (x.enganchado ? t('sec_sala_m_dentro') : t('sec_sala_m_fuera')) : t('sec_sala_m_espera');
       const botones = x.pendiente ? `<button type="button" class="boton chico" data-sala-ok="${x.i}">${esc(t('sec_sala_dejar'))}</button>` : x.aprobado ? `<button type="button" class="boton chico secundario" data-sala-fuera="${x.i}">${esc(t('sec_sala_echar'))}</button>` : '';
-      return `<li class="${x.enganchado ? 'si' : ''}"><i></i><b>${esc(x.nombre)}</b><span class="t">${esc(estado)}</span>${botones}</li>`;
+      return `<li class="${x.enganchado ? 'si' : ''}"><i></i><span class="c-sala-q"><b>${esc(x.nombre)}</b><span class="t">${esc(estado)}</span></span>${botones}</li>`;
     }).join('');
     const ol = $('c-sala-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 40;
-    ol.innerHTML = (s.mensajes || []).map((x) => `<li class="${x.mio ? 'mio' : ''}"><b>${esc(x.de)}:</b> ${esc(x.texto)}<time>${esc(hora(x.t))}</time></li>`).join('') + (s.llamada ? `<li class="t">${esc(t(s.llamada.a ? 'sec_sala_llamada' : 'sec_sala_llamando', { a: s.llamada.de, b: s.llamada.a || '' }))}</li>` : '');
+    ol.innerHTML = (s.mensajes || []).map((x) => x.llamada ? lineaLlamada(x) : `<li class="${x.mio ? 'mio' : ''}" data-id="${esc(x.id || '')}"><b>${esc(x.de || t('sec_m_tu'))}</b>${citaDe(x, s.mensajes)}${x.borrado ? `<i class="borrado">${esc(t('sec_m_borrado'))}</i>` : x.archivo ? `<span>📎 ${esc(x.archivo.nombre)}</span>` : `<span>${esc(x.texto)}</span>`}${reacciones(x)}${metaMensaje(x)}</li>`).join('') + (s.escribiendo ? `<li class="escribiendo"><span></span><span></span><span></span></li>` : '');
     if (abajo) ol.scrollTop = ol.scrollHeight;
   };
+  $('c-sc-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala_cerrar' }));
   $('c-sala-abrir').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala', horas: Number($('c-sala-horas').value), idioma: idioma() }));
   $('c-sala-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala_cerrar' }));
   $('c-sala-miembros').addEventListener('click', (e) => {
@@ -569,8 +697,9 @@
     if (b.dataset.salaOk !== undefined) manda({ tipo: 'secure', accion: 'sala_ok', i: Number(b.dataset.salaOk) });
     if (b.dataset.salaFuera !== undefined) manda({ tipo: 'secure', accion: 'sala_fuera', i: Number(b.dataset.salaFuera) });
   });
-  $('c-sala-form').addEventListener('submit', (e) => { e.preventDefault(); const x = $('c-sala-texto').value.trim(); if (!x) return; manda({ tipo: 'secure', accion: 'sala_texto', texto: x }); $('c-sala-texto').value = ''; });
+  $('c-sala-form').addEventListener('submit', (e) => { e.preventDefault(); const x = $('c-sala-texto').value.trim(); if (!x) return; mandaTexto(x, true); $('c-sala-texto').value = ''; });
   en('secure_estado', pintaSala);
+  en('secure_estado', pintaVista);
   en('secure_estado', (m) => { const s = m.sala; if (s && (s.miembros || []).some((x) => x.pendiente) && !salaPendienteAntes) timbre(); salaPendienteAntes = !!(s && (s.miembros || []).some((x) => x.pendiente)); });
   let salaPendienteAntes = false;
 

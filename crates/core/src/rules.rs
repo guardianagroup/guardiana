@@ -156,6 +156,24 @@ pub fn decide<'r>(rules: &'r [Rule], input: RuleInput<'_>, now: i64) -> Option<&
     best.map(|(r, _)| r)
 }
 
+/// Every active rule that cuts `input.name` by its name (not by category), most specific
+/// first: what «dejarlo pasar» must undo so the name really passes again (16 Oct 2026: undoing
+/// only the deciding rule left a wider one in place and the button seemed to do nothing).
+pub fn cutting_rules<'r>(rules: &'r [Rule], input: RuleInput<'_>, now: i64) -> Vec<&'r Rule> {
+    let mut v: Vec<&Rule> = rules
+        .iter()
+        .filter(|r| r.is_active(now) && r.action == Action::Cortar)
+        .filter(|r| r.match_kind != MatchKind::Category)
+        .filter(|r| match r.scope {
+            Scope::Home => true,
+            Scope::Device => r.device_id.as_deref() == Some(input.device_id),
+        })
+        .filter(|r| name_matches(r.match_kind, &r.pattern, input.name, input.category))
+        .collect();
+    v.sort_by_key(|r| std::cmp::Reverse(specificity(r.match_kind)));
+    v
+}
+
 /// A name dressed as another (decision 205, cut with the owner's express OK of 11 Oct 2026):
 /// whether the person's own rules cut it by the category of the tracker that answered behind it.
 ///

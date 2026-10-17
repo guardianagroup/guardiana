@@ -201,7 +201,7 @@
         const esNuevo = !d;
         if (!d) { d = { k, p: x.programa, ruta: [], tg: 0.3, x: 0, y: 0, vis: true, ema: 0, bloq: x.paradas }; porClave.set(k, d); DEST.push(d); }
         const antes = d.bloq || 0;
-        Object.assign(d, { host: nombreDe(x), destino: x.destino, pais: x.pais, red: x.red, asn: x.asn, proto: x.proto, puerto: x.puerto, vias: x.vias, sub: x.enviados, baj: x.recibidos, paq: x.paquetes, noche: x.noche, primera: x.primera, ultima: x.ultima, doc: x.documentado, uso: x.uso, consultas: x.consultas, bloq: x.paradas, regla: x.regla ?? null, cortado: x.regla !== null && x.regla !== undefined, sede: x.sede, empresa: x.empresa || '', lugar: x.lugar || null });
+        Object.assign(d, { host: nombreDe(x), destino: x.destino, pais: x.pais, red: x.red, asn: x.asn, proto: x.proto, puerto: x.puerto, vias: x.vias, sub: x.enviados, baj: x.recibidos, paq: x.paquetes, noche: x.noche, primera: x.primera, ultima: x.ultima, doc: x.documentado, uso: x.uso, consultas: x.consultas, bloq: x.paradas, regla: x.regla ?? null, reglas: x.reglas || [], reglaPor: x.regla_por || '', reglaCat: x.regla_categoria || '', cortado: x.regla !== null && x.regla !== undefined, sede: x.sede, empresa: x.empresa || '', lugar: x.lugar || null });
         d.ancho = !d.cortado && d.sede && d.bloq > 0;
         if (!st.primeraCarga && esNuevo) {
           d.visto = Date.now();
@@ -1533,7 +1533,14 @@
         const d = hh.ref, p = prod(d.p);
         if (d.lugar) h += `<p><b>${esc(t('pd_lugar_titulo'))}</b> ${esc(d.lugar.ciudad)} · ${esc(nombrePais(d.lugar.pais))}</p><p class="t">${esc(t(d.lugar.fuente === 'region' ? 'pd_lugar_region' : d.lugar.fuente === 'base' ? 'pd_lugar_base' : 'pd_lugar_geofeed').replace('{op}', t('pd_op_' + d.lugar.operador)).replace('{region}', d.lugar.region))}</p>`;
         else if (!d.sede) h += `<p class="t">${esc(t('pd_pos_pais').replace('{pais}', d.pais ? nombrePais(d.pais) : '—'))}</p>`;
-        if (!soloMirar) acciones += !d.destino ? `<p class="t">${esc(t('pd_sin_nombre_no_corta'))}</p>` : d.ancho ? `<p class="t">${esc(t('pd_ancho_dejar'))}</p>` : `<button type="button" class="btn-hud${d.cortado ? '' : ' peligro'}" data-cortar="dest">${esc(t(d.cortado ? 'pd_btn_dejar' : 'pd_btn_cortar'))}</button>`;
+        if (!soloMirar) {
+          if (!d.destino) acciones += `<p class="t">${esc(t('pd_sin_nombre_no_corta'))}</p>`;
+          else if (d.ancho) acciones += `<p class="t">${esc(t('pd_ancho_dejar'))}</p>`;
+          else if (d.cortado && d.reglaPor === 'protección máxima') acciones += `<p class="t">${esc(t('pd_cortado_por_maxima'))}</p><button type="button" class="btn-hud" data-cortar="maxima">${esc(t('pd_btn_quitar_maxima'))}</button>`;
+          else if (d.reglaCat) acciones += `<p class="t">${esc(t('pd_cortado_por_categoria').replace('{cat}', d.reglaCat))}</p>`;
+          else acciones += `<button type="button" class="btn-hud${d.cortado ? ' ok' : ' peligro'}" data-cortar="dest">${d.cortado ? '🔓 ' : '✂ '}${esc(t(d.cortado ? 'pd_btn_dejar' : 'pd_btn_cortar'))}</button>`;
+          if (d.hecho) acciones += `<p class="t hecho">${esc(d.hecho)}</p>`;
+        }
         acciones += cerca(d.lon, d.lat);
         if (d.empresa) enlaces.push(enlace('/empresa?e=' + encodeURIComponent(d.empresa), t('pd_ver_empresa').replace('{empresa}', d.empresa)));
         if (d.red && d.red[0] !== '@' && d.red !== d.empresa) enlaces.push(enlace('/empresa?e=' + encodeURIComponent(d.red), t('pd_ver_red').replace('{red}', d.red)));
@@ -1572,7 +1579,9 @@
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.dest) { const d = porClave.get(b.dataset.dest); if (d) abreDetalle({ tipo: 'dest', ref: d }); return; }
       if (b.dataset.cerca) { const [lon, lat] = b.dataset.cerca.split(',').map(Number); vuela(lon, lat); return; }
+      if (b.dataset.cortar) { b.disabled = true; b.textContent = t('pd_un_momento'); }
       if (b.dataset.cortar === 'dest' && abierto && abierto.tipo === 'dest') corteNombre(abierto.ref);
+      if (b.dataset.cortar === 'maxima') $('corte-av-btn').click();
       if (b.dataset.cortar === 'prod' && abierto && abierto.tipo === 'prod') corteProducto(abierto.ref);
     });
     // The side panel and the deck open the same card.
@@ -1602,8 +1611,12 @@
       if (d.ancho) { avisa(t('pd_ancho_dejar')); return; }
       try {
         if (d.regla !== null && d.regla !== undefined && d.regla >= 0) {
-          await api(`/api/reglas/${d.regla}/deshacer`, { method: 'POST' });
-          avisa(t('pd_hecho_dejar').replace('{nombre}', d.host));
+          // Every rule that cuts the name goes, not only the deciding one: a wider one left in
+          // place made the button look dead (16 Oct 2026).
+          const ids = (d.reglas && d.reglas.length ? d.reglas : [d.regla]);
+          for (const id of ids) await api(`/api/reglas/${id}/deshacer`, { method: 'POST' });
+          d.hecho = t('pd_hecho_dejar').replace('{nombre}', d.host);
+          avisa(d.hecho);
         } else {
           const cuerpo = { scope: 'device', device_id: 'self', match_kind: 'domain', pattern: d.destino, action: 'cortar' };
           let r = await api('/api/reglas', { method: 'POST', body: cuerpo });
@@ -1614,11 +1627,15 @@
             ]);
             return;
           }
-          if (r.mensaje && !r.creada) { avisa(r.mensaje); return; }
-          avisa(t('pd_hecho_cortar').replace('{nombre}', d.host) + ' ' + t('pd_dns_tarda'));
+          if (r.mensaje && !r.creada) { avisa(r.mensaje); pintaDetalle(); return; }
+          d.hecho = t('pd_hecho_cortar').replace('{nombre}', d.host);
+          avisa(d.hecho + ' ' + t('pd_dns_tarda'));
         }
+        const hecho = d.hecho;
         await cargar();
-      } catch (e) { avisa(String(e && e.message || e)); }
+        // The card shows the new state at once, with the line of what just happened.
+        if (abierto && abierto.tipo === 'dest') { const n = porClave.get(abierto.ref.k); if (n) { n.hecho = hecho; abierto.ref = n; } cuerpoDet.innerHTML = ''; pintaDetalle(); setTimeout(() => { if (n) { delete n.hecho; pintaDetalle(); } }, 6000); }
+      } catch (e) { avisa(String(e && e.message || e)); pintaDetalle(); }
     };
     const corteProducto = async (p) => {
       if (soloMirar) { avisa(t('pd_repro_no_corta')); return; }
