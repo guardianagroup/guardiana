@@ -292,32 +292,46 @@
     const botones = r.borrado ? '' : `<div class="a-botones">${r.abrible ? `<button type="button" class="boton chico" data-archivo="archivo_abrir" data-id="${r.id}">${esc(t('sec_f_abrir'))}</button>` : ''}<button type="button" class="boton chico secundario" data-archivo="archivo_carpeta" data-id="${r.id}">${esc(t('sec_f_carpeta'))}</button><button type="button" class="boton chico secundario" data-archivo="archivo_borrar" data-id="${r.id}">${esc(t('sec_f_eliminar'))}</button></div>`;
     return `<div class="archivo${r.borrado ? ' borrado' : ''}"><div class="a-mini">${mini}</div><div class="a-info"><b>${esc(r.nombre)}</b><span>${esc(tam(r.bytes))} · ${esc(t(r.borrado ? 'sec_f_eliminado' : 'sec_f_en_descargas'))}</span></div>${botones}</div>`;
   };
+  // The state of a message of ours, as the big apps show it (16 Oct 2026): 🕓 pending,
+  // ✓ sent, ✓✓ delivered, ✓✓ green seen. Plus «editado», «Mensaje eliminado», the line of a
+  // call and the reactions.
+  const TICK = { pendiente: '<span class="tick">🕓</span>', enviado: '<span class="tick">✓</span>', entregado: '<span class="tick">✓✓</span>', visto: '<span class="tick visto">✓✓</span>' };
+  const llamadaTexto = (l) => {
+    const d = l.segundos != null ? ' · ' + duracion(l.segundos) : '';
+    const k = l.segundos != null ? (l.video ? 'sec_ll_video' : 'sec_ll_voz') : l.fin === 'perdida' ? (l.video ? 'sec_ll_video_perdida' : 'sec_ll_voz_perdida') : l.fin === 'sin_respuesta' ? 'sec_ll_sin_respuesta' : (l.fin === 'rechazada' || l.fin === 'rechazada_aqui') ? 'sec_ll_rechazada' : 'sec_ll_cancelada';
+    return t(k) + d;
+  };
+  const metaMensaje = (m) => `<time>${m.editado ? esc(t('sec_m_editado')) + ' · ' : ''}${esc(hora(m.t))}${m.mio && m.estado ? ' ' + (TICK[m.estado] || '') : ''}</time>`;
+  const reacciones = (m) => (m.reacciones || []).length ? `<span class="reac">${m.reacciones.map((r) => `<span title="${esc(r.de || t('sec_m_tu'))}">${esc(r.emoji)}</span>`).join('')}</span>` : '';
+  const citaDe = (m, lista) => { if (!m.re) return ''; const o = (lista || []).find((y) => y.id === m.re); return o ? `<span class="cita">${esc((o.texto || (o.archivo && o.archivo.nombre) || '').slice(0, 160))}</span>` : ''; };
+  const lineaLlamada = (m) => `<li class="llamada-linea" data-id="${esc(m.id || '')}"><span>${m.llamada.video ? '🎥' : '📞'}</span><span>${esc(llamadaTexto(m.llamada))}</span><time>${esc(hora(m.t))}</time></li>`;
   const pintaChat = (conNombre) => {
     const recibidos = E.recibidos || [];
-    const clave = JSON.stringify([E.mensajes, recibidos, E.enviados, (E.envio || {}).nombre, conNombre, [...minis.keys()]]);
+    const clave = JSON.stringify([E.mensajes, recibidos, E.enviados, (E.envio || {}).nombre, conNombre, [...minis.keys()], E.escribiendo]);
     if (clave === chatAntes) return;
     chatAntes = clave;
     const ol = $('c-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 30;
     const usados = new Set();
     ol.innerHTML = (E.mensajes || []).map((m) => {
       const de = !m.mio && conNombre && m.de ? `<i class="de">${esc(m.de)}</i>` : '';
-      if (!m.mio && typeof m.texto === 'string' && m.texto.startsWith('📎 ')) {
-        const nombre = m.texto.slice(3);
-        const r = recibidos.find((x) => !usados.has(x.id) && x.nombre === nombre && Math.abs((x.t || 0) - (m.t || 0)) <= 3);
+      if (m.llamada) return lineaLlamada(m);
+      if (m.borrado) return `<li class="${m.mio ? 'mio' : ''}" data-id="${esc(m.id || '')}">${de}<i class="borrado">${esc(t('sec_m_borrado'))}</i>${metaMensaje(m)}</li>`;
+      const nombreArchivo = m.archivo ? m.archivo.nombre : (typeof m.texto === 'string' && m.texto.startsWith('📎 ') ? m.texto.slice(3) : null);
+      if (!m.mio && nombreArchivo) {
+        const r = recibidos.find((x) => !usados.has(x.id) && x.nombre === nombreArchivo && Math.abs((x.t || 0) - (m.t || 0)) <= 3);
         if (r) {
           usados.add(r.id);
           if (r.imagen && !r.borrado && !minis.has(r.id) && !pedidas.has(r.id)) { pedidas.add(r.id); manda({ tipo: 'secure', accion: 'archivo_vista', id: r.id }); }
-          return `<li class="archivo-li">${de}${tarjetaArchivo(r)}<time>${esc(hora(m.t))}</time></li>`;
+          return `<li class="archivo-li" data-id="${esc(m.id || '')}">${de}${tarjetaArchivo(r)}${reacciones(m)}<time>${esc(hora(m.t))}</time></li>`;
         }
       }
-      if (m.mio && typeof m.texto === 'string' && m.texto.startsWith('📎 ')) {
-        const nombre = m.texto.slice(3);
-        const x = (E.enviados || []).find((y) => y.nombre === nombre && Math.abs((y.t || 0) - (m.t || 0)) <= 3);
-        const estado = x && typeof x.llego_en === 'number' ? '✓ ' + t('sec_f_entregado_en', { t: duracion(x.llego_en) }) : (E.envio && E.envio.nombre === nombre ? t('sec_f_en_camino') : t('sec_f_enviado'));
-        return `<li class="mio">${esc(m.texto)}${x ? ` <small class="a-tam">${esc(tam(x.bytes))}</small>` : ''}<span class="a-entrega">${esc(estado)}</span><time>${esc(hora(m.t))}</time></li>`;
+      if (m.mio && nombreArchivo) {
+        const x = (E.enviados || []).find((y) => y.nombre === nombreArchivo && Math.abs((y.t || 0) - (m.t || 0)) <= 3);
+        const estado = x && typeof x.llego_en === 'number' ? '✓ ' + t('sec_f_entregado_en', { t: duracion(x.llego_en) }) : (E.envio && E.envio.nombre === nombreArchivo ? t('sec_f_en_camino') : t('sec_f_enviado'));
+        return `<li class="mio" data-id="${esc(m.id || '')}">📎 ${esc(nombreArchivo)}${x ? ` <small class="a-tam">${esc(tam(x.bytes))}</small>` : ''}<span class="a-entrega">${esc(estado)}</span>${reacciones(m)}<time>${esc(hora(m.t))}</time></li>`;
       }
-      return `<li class="${m.mio ? 'mio' : ''}">${de}${esc(m.texto)}<time>${esc(hora(m.t))}</time></li>`;
-    }).join('');
+      return `<li class="${m.mio ? 'mio' : ''}" data-id="${esc(m.id || '')}">${de}${citaDe(m, E.mensajes)}${esc(m.texto)}${reacciones(m)}${metaMensaje(m)}</li>`;
+    }).join('') + (E.escribiendo ? `<li class="escribiendo"><span></span><span></span><span></span></li>` : '');
     if (abajo) ol.scrollTop = ol.scrollHeight;
   };
   // The picture comes once, full size: keep a small copy only.
@@ -437,7 +451,50 @@
   $('c-sas-si').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sas', iguales: true, nombre: $('c-nombre').value.trim() }));
   $('c-sas-no').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sas', iguales: false, nombre: '' }));
   $('c-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'cerrar' }));
-  $('c-form').addEventListener('submit', (e) => { e.preventDefault(); const x = $('c-texto').value.trim(); if (!x) return; manda({ tipo: 'secure', accion: 'texto', texto: x }); $('c-texto').value = ''; });
+  // Reply, edit, delete, react (16 Oct 2026): right click or long press on a message.
+  let contexto = { re: null, editar: null, sala: false };
+  const limpiaContexto = () => { contexto = { re: null, editar: null, sala: false }; $('c-contexto').hidden = true; $('c-sala-contexto').hidden = true; };
+  const mandaTexto = (x, sala) => {
+    if (contexto.editar) manda({ tipo: 'secure', accion: sala ? 'sala_editar' : 'editar', id: contexto.editar, texto: x });
+    else if (contexto.re) manda({ tipo: 'secure', accion: sala ? 'sala_texto' : 'texto', texto: x, re: contexto.re });
+    else manda({ tipo: 'secure', accion: sala ? 'sala_texto' : 'texto', texto: x });
+    limpiaContexto();
+  };
+  $('c-form').addEventListener('submit', (e) => { e.preventDefault(); const x = $('c-texto').value.trim(); if (!x) return; mandaTexto(x, false); $('c-texto').value = ''; });
+  let escribiEn = 0;
+  const avisaEscribiendo = () => { const ahora = Date.now(); if (ahora - escribiEn > 3000) { escribiEn = ahora; manda({ tipo: 'secure', accion: 'escribiendo' }); } };
+  $('c-texto').addEventListener('input', () => { if ($('c-texto').value) avisaEscribiendo(); });
+  const menuMsg = $('menu-msg');
+  let msgMenu = null;
+  const abreMenuMsg = (li, x, y, sala) => {
+    const id = li.dataset.id; if (!id) return;
+    const lista = sala ? ((E.sala || {}).mensajes || []) : (E.mensajes || []);
+    const m = lista.find((z) => z.id === id); if (!m) return;
+    msgMenu = { m, sala };
+    $('mm-editar').hidden = !m.mio || !!m.archivo || !!m.llamada || !!m.borrado;
+    $('mm-emojis').hidden = !!m.llamada;
+    $('mm-responder').hidden = !!m.llamada;
+    menuMsg.hidden = false;
+    const w = menuMsg.offsetWidth || 240, h = menuMsg.offsetHeight || 80;
+    menuMsg.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, x)) + 'px';
+    menuMsg.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, y)) + 'px';
+  };
+  const cierraMenuMsg = () => { menuMsg.hidden = true; msgMenu = null; };
+  for (const [id, sala] of [['c-mensajes', false], ['c-sala-mensajes', true]]) {
+    let pulsando = null;
+    $(id).addEventListener('contextmenu', (e) => { const li = e.target.closest('li[data-id]'); if (!li) return; e.preventDefault(); abreMenuMsg(li, e.clientX, e.clientY, sala); });
+    $(id).addEventListener('pointerdown', (e) => { const li = e.target.closest('li[data-id]'); if (!li || e.button !== 0) return; clearTimeout(pulsando); pulsando = setTimeout(() => abreMenuMsg(li, e.clientX, e.clientY, sala), 500); });
+    for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) $(id).addEventListener(ev, () => clearTimeout(pulsando));
+  }
+  document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#menu-msg')) cierraMenuMsg(); }, true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { cierraMenuMsg(); if (contexto.re || contexto.editar) { limpiaContexto(); $('c-texto').value = ''; $('c-sala-texto').value = ''; } } });
+  $('mm-emojis').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b || !msgMenu) return; manda({ tipo: 'secure', accion: msgMenu.sala ? 'sala_reaccion' : 'reaccion', id: msgMenu.m.id, emoji: b.dataset.e }); cierraMenuMsg(); });
+  $('mm-responder').addEventListener('click', () => { if (!msgMenu) return; const { m, sala } = msgMenu; contexto = { re: m.id, editar: null, sala }; const caja = $(sala ? 'c-sala-contexto' : 'c-contexto'); caja.hidden = false; caja.querySelector('span').textContent = t('sec_m_respondiendo', { t: (m.texto || (m.archivo && m.archivo.nombre) || '').slice(0, 100) }); $(sala ? 'c-sala-texto' : 'c-texto').focus(); cierraMenuMsg(); });
+  $('mm-copiar').addEventListener('click', async () => { if (!msgMenu) return; try { await navigator.clipboard.writeText(msgMenu.m.texto || ''); } catch (_) {} cierraMenuMsg(); });
+  $('mm-editar').addEventListener('click', () => { if (!msgMenu) return; const { m, sala } = msgMenu; contexto = { re: null, editar: m.id, sala }; const caja = $(sala ? 'c-sala-contexto' : 'c-contexto'); caja.hidden = false; caja.querySelector('span').textContent = t('sec_m_editando'); const campo = $(sala ? 'c-sala-texto' : 'c-texto'); campo.value = m.texto || ''; campo.focus(); cierraMenuMsg(); });
+  $('mm-borrar').addEventListener('click', () => { if (!msgMenu) return; const { m, sala } = msgMenu; cierraMenuMsg(); if (m.mio && !m.borrado) { $('c-borrar-dialogo').hidden = false; $('c-borrar-todos').onclick = () => { manda({ tipo: 'secure', accion: sala ? 'sala_borrar' : 'borrar', id: m.id, para_todos: true }); $('c-borrar-dialogo').hidden = true; }; $('c-borrar-mi').onclick = () => { manda({ tipo: 'secure', accion: sala ? 'sala_borrar' : 'borrar', id: m.id, para_todos: false }); $('c-borrar-dialogo').hidden = true; }; $('c-borrar-no').onclick = () => { $('c-borrar-dialogo').hidden = true; }; } else manda({ tipo: 'secure', accion: sala ? 'sala_borrar' : 'borrar', id: m.id, para_todos: false }); });
+  $('c-contexto-no').addEventListener('click', () => { limpiaContexto(); $('c-texto').value = ''; });
+  $('c-sala-contexto-no').addEventListener('click', () => { limpiaContexto(); $('c-sala-texto').value = ''; });
   // Files: read here in 64 KB pieces and handed to the program one by one, so a big file never
   // sits in memory; the program encrypts each piece and sends it, and the key goes inside Olm.
   const TROZO = 64 * 1024;
@@ -629,7 +686,7 @@
       return `<li class="${x.enganchado ? 'si' : ''}"><i></i><span class="c-sala-q"><b>${esc(x.nombre)}</b><span class="t">${esc(estado)}</span></span>${botones}</li>`;
     }).join('');
     const ol = $('c-sala-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 40;
-    ol.innerHTML = (s.mensajes || []).map((x) => `<li class="${x.mio ? 'mio' : ''}"><b>${esc(x.de)}</b><span>${esc(x.texto)}</span><time>${esc(hora(x.t))}</time></li>`).join('');
+    ol.innerHTML = (s.mensajes || []).map((x) => x.llamada ? lineaLlamada(x) : `<li class="${x.mio ? 'mio' : ''}" data-id="${esc(x.id || '')}"><b>${esc(x.de || t('sec_m_tu'))}</b>${citaDe(x, s.mensajes)}${x.borrado ? `<i class="borrado">${esc(t('sec_m_borrado'))}</i>` : x.archivo ? `<span>📎 ${esc(x.archivo.nombre)}</span>` : `<span>${esc(x.texto)}</span>`}${reacciones(x)}${metaMensaje(x)}</li>`).join('') + (s.escribiendo ? `<li class="escribiendo"><span></span><span></span><span></span></li>` : '');
     if (abajo) ol.scrollTop = ol.scrollHeight;
   };
   $('c-sc-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala_cerrar' }));
@@ -640,7 +697,7 @@
     if (b.dataset.salaOk !== undefined) manda({ tipo: 'secure', accion: 'sala_ok', i: Number(b.dataset.salaOk) });
     if (b.dataset.salaFuera !== undefined) manda({ tipo: 'secure', accion: 'sala_fuera', i: Number(b.dataset.salaFuera) });
   });
-  $('c-sala-form').addEventListener('submit', (e) => { e.preventDefault(); const x = $('c-sala-texto').value.trim(); if (!x) return; manda({ tipo: 'secure', accion: 'sala_texto', texto: x }); $('c-sala-texto').value = ''; });
+  $('c-sala-form').addEventListener('submit', (e) => { e.preventDefault(); const x = $('c-sala-texto').value.trim(); if (!x) return; mandaTexto(x, true); $('c-sala-texto').value = ''; });
   en('secure_estado', pintaSala);
   en('secure_estado', pintaVista);
   en('secure_estado', (m) => { const s = m.sala; if (s && (s.miembros || []).some((x) => x.pendiente) && !salaPendienteAntes) timbre(); salaPendienteAntes = !!(s && (s.miembros || []).some((x) => x.pendiente)); });

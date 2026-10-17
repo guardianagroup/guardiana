@@ -231,6 +231,29 @@ main { min-height: 0; overflow: auto; padding: 24px 28px 36px; display: grid; ga
 .secure.sin-derecha { grid-template-columns: 290px minmax(0, 1fr); }
 .secure.sin-derecha aside.monitor { display: none; }
 @media (max-width: 1180px) { .secure:not(.sin-lados):not(.sin-derecha) { grid-template-columns: 260px minmax(0, 1fr); } .secure:not(.sin-lados):not(.sin-derecha) aside.monitor { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); } }
+.mensajes li .tick { font-size: 11px; margin-left: 3px; letter-spacing: -2px; }
+.mensajes li .tick.visto { color: var(--ok); font-weight: 700; }
+.mensajes li .borrado { color: var(--muted); }
+.mensajes li .cita { display: block; border-left: 3px solid var(--accent); padding: 4px 8px; margin-bottom: 6px; border-radius: 6px; background: color-mix(in srgb, var(--fg) 6%, transparent); font-size: 12.5px; color: var(--muted); }
+.mensajes li .reac { display: flex; gap: 4px; margin-top: 4px; }
+.mensajes li .reac span { font-size: 13px; background: var(--campo); border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px; }
+.mensajes li.llamada-linea { justify-self: center; max-width: 95%; display: flex; align-items: center; gap: 8px; background: transparent; border: 1px solid var(--line); color: var(--muted); font-size: 12.5px; padding: 5px 12px; border-radius: 999px; box-shadow: none; }
+.mensajes li.llamada-linea time { display: inline; margin: 0 0 0 4px; }
+.mensajes li.escribiendo { display: flex; gap: 4px; padding: 10px 14px; width: 52px; }
+.mensajes li.escribiendo span { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: pt 1.2s infinite ease-in-out; }
+.mensajes li.escribiendo span:nth-child(2) { animation-delay: .2s; } .mensajes li.escribiendo span:nth-child(3) { animation-delay: .4s; }
+@keyframes pt { 0%, 60%, 100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+.contexto { display: flex; align-items: center; gap: 8px; margin: 0 18px; padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--campo); border-radius: 8px; font-size: 13px; color: var(--muted); }
+.contexto span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-msg { position: fixed; z-index: 40; display: grid; gap: 6px; padding: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.menu-msg .emojis { display: flex; gap: 2px; } .menu-msg .emojis button { font-size: 20px; padding: 4px 6px; }
+.menu-msg .fila-menu { display: flex; gap: 2px; }
+.menu-msg button { appearance: none; border: 0; background: transparent; color: var(--fg); font: 13.5px var(--texto); padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+.menu-msg button:hover { background: var(--campo); } .menu-msg button[hidden] { display: none; }
+.velo { position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; background: rgba(11,16,32,.45); }
+.velo[hidden] { display: none; }
+.dialogo { display: grid; gap: 10px; min-width: 300px; padding: 22px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
+.dialogo b { font: 600 15px/1.3 var(--display); margin-bottom: 6px; }
 /* The panel «Esta conversación»: the level as a picture, four plain lines, the details folded. */
 aside.monitor { border-left: 1px solid var(--line); background: var(--card); padding: 18px 16px; display: grid; gap: 12px; align-content: start; }
 aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
@@ -484,6 +507,7 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
     <ol class="mensajes" id="c-mensajes"></ol>
     <div class="zona-archivo" id="c-zona"><span data-t="sec_f_arrastra"></span> <label class="enlace" for="c-archivo" data-t="sec_f_elige"></label><input type="file" id="c-archivo" hidden multiple></div>
     <div class="c-progreso" id="c-progreso" hidden><span id="c-progreso-texto"></span><i><b id="c-progreso-barra"></b></i></div>
+    <div class="contexto" id="c-contexto" hidden><span></span><button type="button" class="boton chico icono-solo" id="c-contexto-no" aria-label="×">×</button></div>
     <form class="escribir" id="c-form"><label class="boton chico icono-solo" for="c-archivo" data-t-title="sec_f_elige"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/></svg></label><input class="campo" id="c-texto" data-t-ph="sec_m_escribe" autocomplete="off" maxlength="8000"><button type="submit" class="boton principal" data-t-title="sec_m_enviar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg></button></form>
   </section>
 
@@ -495,9 +519,15 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
     </div>
     <p class="cortada-nota" id="c-sc-llamada" hidden></p>
     <ol class="mensajes" id="c-sala-mensajes"></ol>
+    <div class="contexto" id="c-sala-contexto" hidden><span></span><button type="button" class="boton chico icono-solo" id="c-sala-contexto-no" aria-label="×">×</button></div>
     <form class="escribir" id="c-sala-form"><input class="campo" id="c-sala-texto" data-t-ph="sec_sala_texto_ph" autocomplete="off" maxlength="8000"><button type="submit" class="boton principal" data-t-title="sec_sala_enviar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg></button></form>
   </section>
 </main>
+<div class="menu-msg" id="menu-msg" hidden>
+  <div class="emojis" id="mm-emojis"><button type="button" data-e="❤️">❤️</button><button type="button" data-e="👍">👍</button><button type="button" data-e="😂">😂</button><button type="button" data-e="😮">😮</button><button type="button" data-e="😢">😢</button><button type="button" data-e="🙏">🙏</button></div>
+  <div class="fila-menu"><button type="button" id="mm-responder" data-t="sec_m_responder"></button><button type="button" id="mm-copiar" data-t="sec_m_copiar"></button><button type="button" id="mm-editar" data-t="sec_m_editar"></button><button type="button" id="mm-borrar" data-t="sec_m_borrar"></button></div>
+</div>
+<div class="velo" id="c-borrar-dialogo" hidden><div class="dialogo"><b data-t="sec_m_borrar_pregunta"></b><button type="button" class="boton peligro" id="c-borrar-todos" data-t="sec_m_borrar_todos"></button><button type="button" class="boton" id="c-borrar-mi" data-t="sec_m_borrar_mi"></button><button type="button" class="boton secundario" id="c-borrar-no" data-t="sec_m_cancelar"></button></div></div>
 
 <aside class="monitor" aria-live="polite">
   <h2 data-t="sec_panel_titulo"></h2>
