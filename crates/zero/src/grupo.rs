@@ -445,20 +445,23 @@ impl Grupo {
 
     /// The person answers a message (two-way talk: the link carries the quote).
     pub fn texto_re(&mut self, texto: &str, re: Option<u64>) {
-        if let [s] = self.sesiones.as_mut_slice() {
-            if s.lista() {
-                s.texto_re(texto, re);
-                let ultimo = s.mensajes.last().cloned();
-                if let Some(mut m) = ultimo {
-                    m.de = self.nombre_o_anfitrion();
-                    self.mensajes.push(m);
-                }
-                self.vistos[0] = s.mensajes.len();
-                self.cambio = true;
-            }
+        if self.sesiones.len() != 1 {
+            self.texto(texto);
             return;
         }
-        self.texto(texto);
+        let de = self.nombre_o_anfitrion();
+        let s = &mut self.sesiones[0];
+        if s.lista() {
+            s.texto_re(texto, re);
+            let ultimo = s.mensajes.last().cloned();
+            let n = s.mensajes.len();
+            if let Some(mut m) = ultimo {
+                m.de = de;
+                self.mensajes.push(m);
+            }
+            self.vistos[0] = n;
+            self.cambio = true;
+        }
     }
 
     /// Edit, delete, react, typing: to every link that has the message.

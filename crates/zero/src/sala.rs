@@ -783,7 +783,11 @@ impl Sala {
                 "pendiente": a.pendiente,
                 "aprobado": a.aprobado,
             })).collect::<Vec<_>>(),
-            "mensajes": self.mensajes.iter().filter(|m| !m.ocultos.contains(&CASA)).rev().take(300).rev().map(|m| self.mensaje_json(m, CASA)).collect::<Vec<_>>(),
+            "mensajes": {
+                let mut v: Vec<Value> = self.mensajes.iter().rev().filter(|m| !m.ocultos.contains(&CASA)).take(300).map(|m| self.mensaje_json(m, CASA)).collect();
+                v.reverse();
+                v
+            },
             "escribiendo": self.asientos.iter().any(|a| a.aprobado && ahora_s().saturating_sub(a.escribe_en) < 6),
             "llamada": self.llamada.as_ref().map(|l| json!({
                 "de": self.nombre_de(l.de),
