@@ -942,10 +942,13 @@ impl Sala {
                     if let Some(otro) = self.pareja(i) {
                         // WebRTC between the two phones when the relay's call service is in:
                         // the caller offers.
+                        // Without it, the two phones still try WebRTC with local addresses only
+                        // (same wifi, 17 Oct 2026: the recorded pieces were slow and choppy);
+                        // the page falls back to the pieces if that does not connect.
                         let rtc = match (&self.turn, &self.turn_rx) {
                             (Some(t), _) => json!({ "ice": t.json(), "ofrece": l.de == i }),
                             (None, Some(_)) => json!({ "pendiente": true }),
-                            _ => Value::Null,
+                            _ => json!({ "ice": [], "local": true, "ofrece": l.de == i }),
                         };
                         llamada = json!({
                             "video": l.video,
