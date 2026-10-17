@@ -612,6 +612,25 @@ impl Grupo {
         }
     }
 
+    /// A WebRTC message from the page: to the one link talking (a group call keeps the old
+    /// way, so there is none to send to then).
+    pub fn rtc(&mut self, d: &Value) {
+        if let Some(i) = self.unica() {
+            if let Some(s) = self.sesiones.get_mut(i) {
+                s.rtc(d);
+            }
+        }
+    }
+
+    /// WebRTC messages from the other side for the page.
+    pub fn rtc_para_pagina(&mut self) -> Vec<Value> {
+        let mut v = Vec::new();
+        for s in &mut self.sesiones {
+            v.extend(s.rtc_para_pagina.drain(..));
+        }
+        v
+    }
+
     /// Our new player needs the other side's pieces from a fresh start.
     pub fn pide_inicio(&mut self) {
         for s in &mut self.sesiones {
@@ -887,6 +906,12 @@ impl Grupo {
         e["otro_voz_protegida"] = json!(self.sesiones.iter().any(Secure::otro_voz_protegida));
         // The post-quantum lock: shown only when every open link in the group has it.
         e["cuantico"] = json!(self.sesiones.iter().all(Secure::cuantico));
+        // WebRTC only in a two-way talk: a group call goes the old way, through the host.
+        if self.unica().is_none() {
+            if let Some(l) = e["llamada"].as_object_mut() {
+                l.remove("rtc");
+            }
+        }
         if let Some(video) = self.llamada {
             if e["llamada"].is_null() {
                 e["llamada"] = json!({ "video": video, "desde": self.llamada_desde, "conectada": self.sesiones.iter().any(Secure::conectada) });

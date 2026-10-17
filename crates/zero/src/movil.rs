@@ -87,6 +87,8 @@ pub enum Desde {
     PideInicio,
     /// «Proteger mi voz» on the phone (17 Oct 2026): the other side is told.
     VozProtegida(bool),
+    /// A WebRTC message from the phone's call (17 Oct 2026): offer, answer, ICE candidate.
+    Rtc(serde_json::Value),
     /// One recorded piece from the phone's microphone or camera.
     Media(Vec<u8>),
     /// The phone's page was brought to the front.
@@ -821,6 +823,7 @@ fn traduce(v: &Value) -> Option<Desde> {
         }),
         "pide_inicio" => Some(Desde::PideInicio),
         "voz_protegida" => Some(Desde::VozProtegida(v["activa"].as_bool().unwrap_or(false))),
+        "rtc" => Some(Desde::Rtc(v["d"].clone())),
         "visto" => Some(Desde::Visto),
         "nombre" => Some(Desde::Nombre(
             v["nombre"]

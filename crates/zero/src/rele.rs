@@ -332,6 +332,67 @@ pub fn conecta_a_cualquiera(sala: &str) -> Result<(TcpStream, String), String> {
     Err(fallos.join("; "))
 }
 
+/// The relay's call service (TURN), for one conversation (17 Oct 2026: calls move to WebRTC,
+/// like WhatsApp and Google Meet). Voice and video then go over UDP through the relay, which
+/// passes packets it cannot read (DTLS-SRTP from one end to the other); nobody sees the other
+/// person's address. The relay hands these only for a room it is joining right now.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Turn {
+    /// `turn:` addresses, UDP first.
+    pub urls: Vec<String>,
+    /// The time-limited user name the relay made (`<expiry>:g`).
+    pub usuario: String,
+    /// Its key.
+    pub clave: String,
+}
+
+impl Turn {
+    /// As the pages' `RTCPeerConnection` takes it (`iceServers`).
+    #[must_use]
+    pub fn json(&self) -> serde_json::Value {
+        serde_json::json!([{ "urls": self.urls, "username": self.usuario, "credential": self.clave }])
+    }
+}
+
+/// Ask `rele` (the one this conversation meets at) for its call service, for room `sala`.
+pub fn turn(rele: &str, sala: &str) -> Result<Turn, String> {
+    let mut s = abre(rele)?;
+    s.write_all(format!("GUARDIANA-TURN 1 {sala}\n").as_bytes())
+        .map_err(|e| e.to_string())?;
+    s.set_read_timeout(Some(Duration::from_secs(10)))
+        .map_err(|e| e.to_string())?;
+    let mut linea = Vec::new();
+    loop {
+        let mut b = [0u8; 1];
+        s.read_exact(&mut b).map_err(|e| e.to_string())?;
+        if b[0] == b'\n' {
+            break;
+        }
+        linea.push(b[0]);
+        if linea.len() > 400 {
+            return Err("respuesta del relé ilegible".to_owned());
+        }
+    }
+    let linea = String::from_utf8(linea).map_err(|e| e.to_string())?;
+    let mut partes = linea.trim().split(' ');
+    let (Some("OK"), Some(usuario), Some(clave)) = (partes.next(), partes.next(), partes.next())
+    else {
+        return Err("el relé no da servicio de llamadas".to_owned());
+    };
+    let host = RELES.iter().find(|r| r.direccion() == rele).map_or_else(
+        || rele.rsplit_once(':').map_or(rele, |(h, _)| h).to_owned(),
+        |r| r.nombre.to_owned(),
+    );
+    Ok(Turn {
+        urls: vec![
+            format!("turn:{host}:3478?transport=udp"),
+            format!("turn:{host}:3478?transport=tcp"),
+        ],
+        usuario: usuario.to_owned(),
+        clave: clave.to_owned(),
+    })
+}
+
 /// Connect to the relay, name the room and wait (up to ten minutes) for the other computer.
 /// Returns the stream once the relay says the pair is complete.
 pub fn conecta(rele: &str, sala: &str) -> Result<TcpStream, String> {

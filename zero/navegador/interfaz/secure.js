@@ -838,13 +838,23 @@
     // recorder starts again too, so its first piece carries the header that player needs.
     if (grabador && typeof l.reinicio === 'number' && reinicioVisto !== null && l.reinicio !== reinicioVisto) cambiaGrabador();
     if (typeof l.reinicio === 'number') reinicioVisto = l.reinicio;
+    // WebRTC when both programs and the relay's call service allow it (17 Oct 2026); the
+    // recorded pieces otherwise, or when WebRTC did not connect.
+    const conRtc = l.rtc && l.rtc.ice && !rtcFallo && window.RTCPeerConnection;
+    if (rtc || (conRtc && !grabador)) { if (!rtc && !arrancando) empiezaRtc(l); return; }
+    // The relay is still being asked for its call service: a few seconds, then the old way.
+    if (l.rtc && l.rtc.pendiente && !rtcFallo && !grabador && !arrancando) { rtcEspera = rtcEspera || Date.now(); if (Date.now() - rtcEspera < 5000) return; rtcManda({ t: 'fallo' }); rtcFallo = true; }
     if (!grabador && !arrancando) empiezaMedios(!!l.video);
     // The other side's player (an iPhone) cannot open what we record: record in what it can.
     else if (grabador && tipoGrabador && mime(llamadaVideo) !== tipoGrabador) cambiaGrabador();
     // The other side said what its pieces are: open the player for exactly that.
     if (l.mime_remoto && l.mime_remoto !== mimeRemoto && buffer !== undefined) { mimeRemoto = l.mime_remoto; preparaReproductor(mimeRemoto); }
   };
-  setInterval(() => { if (!$('c-llamada').hidden && E.llamada && !movilHabla) $('c-l-estado').textContent = textoLlamada(E.llamada); }, 1000);
+  setInterval(() => {
+    if (!$('c-llamada').hidden && E.llamada && !movilHabla) $('c-l-estado').textContent = textoLlamada(E.llamada);
+    // A connected call with nothing started yet (it was waiting for the relay): start now.
+    if (rtcEspera && E && E.llamada && E.llamada.conectada !== false && !rtc && !grabador && !arrancando && !movilHabla) pintaLlamada(E);
+  }, 1000);
   // The formats, best first; the phone's page knows the same list and tells which it can play.
   const CANDIDATOS = { video: ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/webm'], voz: ['audio/webm;codecs=opus', 'audio/mp4;codecs=mp4a.40.2', 'audio/webm'] };
   const mime = (video) => {
@@ -865,7 +875,7 @@
   $('c-voz-prot').addEventListener('click', () => {
     vozActiva = !vozActiva; try { localStorage.setItem('secure_voz', vozActiva ? '1' : '0'); } catch (_) {}
     pintaVoz(); manda({ tipo: 'secure', accion: 'voz_protegida', activa: vozActiva });
-    if (local) cambiaGrabador();
+    if (rtc) rtcVoz(); else if (local) cambiaGrabador();
   });
   const nuevoGrabador = (video) => {
     const tipo = mime(video);
@@ -968,6 +978,7 @@
     });
   });
   const paraMedios = () => {
+    paraRtc(); rtcFallo = false; rtcEspera = 0;
     try { if (grabador && grabador.state !== 'inactive') grabador.stop(); } catch (_) {}
     grabador = null; tipoGrabador = null;
     if (vozProt) { vozProt.parar(); vozProt = null; }
@@ -977,6 +988,123 @@
     jugadores.clear();
     $('c-rejilla').innerHTML = ''; $('c-rejilla').dataset.n = '0';
     arrancando = false;
+  };
+  // ---------- WebRTC (17 Oct 2026, «la tecnología de WhatsApp y Google Meet») ----------
+  // Voice and video go over UDP through GUARDIANA's relay (TURN, «relay» only: neither side
+  // ever sees the other's address), encrypted from this page to the other end (DTLS-SRTP).
+  // What sets the call up (offer, answer, candidates) travels inside Olm through the program,
+  // so the keys in it are the verified person's. Real-time audio and video, with the jitter
+  // buffer, loss recovery and bitrate that adapt to the network: what the recorded pieces
+  // could not do. If it does not connect within 15 s, both ends go back to the pieces.
+  let rtc = null, rtcFallo = false, rtcEspera = 0;
+  const rtcManda = (d) => manda({ tipo: 'secure', accion: 'rtc', d });
+  const obtenLocal = async (video) => {
+    const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+    try {
+      return await navigator.mediaDevices.getUserMedia({ audio, video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false });
+    } catch (e) {
+      if (video) { try { const s = await navigator.mediaDevices.getUserMedia({ audio, video: false }); aviso(t('sec_l_sin_camara')); muestraPermiso(e, 'camara'); return s; } catch (e2) { e = e2; } }
+      muestraPermiso(e, 'microfono');
+      return null;
+    }
+  };
+  // What leaves: the voice changed when «Proteger mi voz» is on, the camera as it is.
+  const rtcEnvio = () => fuenteGrabacion();
+  const rtcTile = (stream) => {
+    $('c-rejilla').innerHTML = '';
+    const tile = document.createElement('div'); tile.className = 'tile';
+    const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; v.srcObject = stream;
+    const n = document.createElement('span'); n.className = 'tile-nombre'; n.textContent = (E && E.contacto) || '';
+    tile.appendChild(v); tile.appendChild(n); $('c-rejilla').appendChild(tile); $('c-rejilla').dataset.n = '1';
+    v.play().catch(() => {});
+  };
+  const rtcNuevaPc = () => {
+    const pc = new RTCPeerConnection({ iceServers: rtc.ice, iceTransportPolicy: 'relay', bundlePolicy: 'max-bundle' });
+    const envio = rtcEnvio();
+    envio.getTracks().forEach((x) => pc.addTrack(x, envio));
+    pc.onicecandidate = (e) => { if (e.candidate && rtc && rtc.pc === pc) rtcManda({ t: 'ice', s: rtc.s, c: e.candidate.toJSON() }); };
+    pc.ontrack = (e) => { if (rtc && rtc.pc === pc) rtcTile(e.streams[0] || new MediaStream([e.track])); };
+    pc.onconnectionstatechange = () => {
+      if (!rtc || rtc.pc !== pc) return;
+      if (pc.connectionState === 'connected') { rtc.conectada = true; clearTimeout(rtc.reloj); }
+      else if (pc.connectionState === 'failed') rtcFalla(true);
+    };
+    // Video up to 1.2 Mbps; WebRTC lowers it by itself when the network cannot carry it.
+    pc.getSenders().forEach((x) => { if (x.track && x.track.kind === 'video') { try { const p = x.getParameters(); p.encodings = p.encodings && p.encodings.length ? p.encodings : [{}]; p.encodings[0].maxBitrate = 1200000; x.setParameters(p).catch(() => {}); } catch (_) {} } });
+    return pc;
+  };
+  const rtcOfrece = async () => {
+    if (!rtc) return;
+    try { if (rtc.pc) rtc.pc.close(); } catch (_) {}
+    rtc.s = Math.random().toString(36).slice(2, 10);
+    rtc.pc = rtcNuevaPc(); rtc.pendientes = [];
+    const o = await rtc.pc.createOffer();
+    await rtc.pc.setLocalDescription(o);
+    rtcManda({ t: 'offer', s: rtc.s, sdp: rtc.pc.localDescription.sdp });
+  };
+  const empiezaRtc = async (l) => {
+    arrancando = true;
+    llamadaVideo = !!l.video;
+    const s = await obtenLocal(!!l.video);
+    if (!s || !(E && E.llamada)) { if (s) s.getTracks().forEach((x) => x.stop()); arrancando = false; return; }
+    local = s;
+    local.getAudioTracks().forEach((x) => { x.enabled = !silenciado; });
+    $('c-permiso').hidden = !$('c-permiso').dataset.camara;
+    $('c-local').srcObject = local;
+    llamadaVideo = !!l.video && local.getVideoTracks().length > 0;
+    rtc = { ice: l.rtc.ice, ofrece: !!l.rtc.ofrece, pc: null, s: null, pendientes: [], conectada: false, reloj: null };
+    rtc.reloj = setTimeout(() => { if (rtc && !rtc.conectada) rtcFalla(true); }, 15000);
+    arrancando = false;
+    // «I am here»: the side that offers starts again with a fresh offer when it hears it, so
+    // the two meet whichever started first (or when a phone takes the call over).
+    rtcManda({ t: 'hola' });
+    if (rtc.ofrece) rtcOfrece().catch(() => rtcFalla(true));
+  };
+  const rtcAplicaPendientes = () => { if (!rtc || !rtc.pc || !rtc.pc.remoteDescription) return; const p = rtc.pendientes.filter((x) => x.s === rtc.s); rtc.pendientes = []; p.forEach((x) => rtc.pc.addIceCandidate(x.c).catch(() => {})); };
+  en('secure_rtc', async (m) => {
+    const d = m.d || {};
+    if (d.t === 'fallo') { if (rtc) rtcFalla(false); else rtcFallo = true; return; }
+    if (!rtc) return;
+    try {
+      if (d.t === 'hola') { if (rtc.ofrece) await rtcOfrece(); }
+      else if (d.t === 'offer' && !rtc.ofrece) {
+        try { if (rtc.pc) rtc.pc.close(); } catch (_) {}
+        rtc.s = d.s; rtc.pc = rtcNuevaPc();
+        await rtc.pc.setRemoteDescription({ type: 'offer', sdp: d.sdp });
+        const a = await rtc.pc.createAnswer();
+        await rtc.pc.setLocalDescription(a);
+        rtcManda({ t: 'answer', s: rtc.s, sdp: rtc.pc.localDescription.sdp });
+        rtcAplicaPendientes();
+      } else if (d.t === 'answer' && rtc.ofrece && d.s === rtc.s && rtc.pc && rtc.pc.signalingState === 'have-local-offer') {
+        await rtc.pc.setRemoteDescription({ type: 'answer', sdp: d.sdp });
+        rtcAplicaPendientes();
+      } else if (d.t === 'ice' && d.c) {
+        if (rtc.pc && d.s === rtc.s && rtc.pc.remoteDescription) await rtc.pc.addIceCandidate(d.c).catch(() => {});
+        else if (rtc.pendientes.length < 200) rtc.pendientes.push({ s: d.s, c: d.c });
+      }
+    } catch (_) { rtcFalla(true); }
+  });
+  const paraRtc = () => {
+    if (!rtc) return;
+    clearTimeout(rtc.reloj);
+    try { if (rtc.pc) rtc.pc.close(); } catch (_) {}
+    rtc = null;
+  };
+  // WebRTC did not connect: both ends go back to the recorded pieces for this call.
+  const rtcFalla = (decirlo) => {
+    if (decirlo) rtcManda({ t: 'fallo' });
+    rtcFallo = true;
+    const l = E && E.llamada;
+    paraRtc();
+    if (local) { local.getTracks().forEach((x) => x.stop()); local = null; }
+    $('c-rejilla').innerHTML = ''; $('c-rejilla').dataset.n = '0';
+    if (l && !movilHabla) empiezaMedios(!!l.video);
+  };
+  // «Proteger mi voz» switched during a WebRTC call: the same sender, the other voice.
+  const rtcVoz = () => {
+    if (!rtc || !rtc.pc || !local) return;
+    const pista = rtcEnvio().getAudioTracks()[0];
+    rtc.pc.getSenders().forEach((x) => { if (x.track && x.track.kind === 'audio' && pista) x.replaceTrack(pista).catch(() => {}); });
   };
   const llama = (video) => { if ($('c-voz').disabled) return; $(video ? 'c-video' : 'c-voz').classList.add('pulsado'); $('c-voz').disabled = true; $('c-video').disabled = true; timbre(); manda({ tipo: 'secure', accion: 'llamar', video, mime: mime(video) }); };
   $('c-voz').addEventListener('click', () => llama(false));

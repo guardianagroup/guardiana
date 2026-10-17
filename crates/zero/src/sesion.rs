@@ -1258,6 +1258,15 @@ impl Sesion {
                 o.extend(self.a_pestana(id, &self.secure_estado_json()));
             }
         }
+        // WebRTC messages for the page (17 Oct 2026), as they come.
+        let rtc = self.secure.rtc_para_pagina();
+        if !rtc.is_empty() {
+            if let Some(id) = self.pestana_secure() {
+                for d in rtc {
+                    o.extend(self.a_pestana(id, &json!({ "tipo": "secure_rtc", "d": d })));
+                }
+            }
+        }
         if !self.secure.media_para_pagina.is_empty() {
             if let Some(id) = self.pestana_secure() {
                 let trozos: Vec<Value> = self
@@ -1354,6 +1363,10 @@ impl Sesion {
                 self.secure
                     .voz_protegida(m["activa"].as_bool().unwrap_or(false));
                 Ok(())
+            }
+            "rtc" => {
+                self.secure.rtc(&m["d"]);
+                return Vec::new();
             }
             "nombre" => {
                 self.secure.nombre_propio = texto(m, "nombre").chars().take(60).collect();

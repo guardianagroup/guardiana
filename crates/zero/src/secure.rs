@@ -48,7 +48,7 @@ pub enum Entrante {
     Aceptado(TcpStream),
     /// The relay joined us with the other computer: the socket to adopt (bytes pass through
     /// the relay, which cannot read them).
-    AceptadoRele(TcpStream, String),
+    AceptadoRele(TcpStream, String, String),
     /// The relay could not be reached, or nobody came.
     ReleFallo(String),
     /// The router answered about the door.
@@ -545,6 +545,18 @@ pub struct Secure {
     /// theirs (shown on the call panel). 16 Oct 2026.
     voz_protegida: bool,
     otro_voz_protegida: bool,
+    /// The relay room this conversation met in (a hash; kept in memory only): the call
+    /// service is asked for it.
+    sala_rele: Option<String>,
+    /// The other side's program can carry calls over WebRTC (17 Oct 2026).
+    otro_rtc: bool,
+    /// The relay's call service for this conversation, once it answered.
+    turn: Option<crate::rele::Turn>,
+    turn_rx: Option<mpsc::Receiver<Result<crate::rele::Turn, String>>>,
+    /// When it was last asked (unix s), so a relay without the service is not asked each tick.
+    turn_pedido: u64,
+    /// WebRTC messages from the other side for this computer's page (SDP, ICE candidates).
+    pub rtc_para_pagina: VecDeque<Value>,
     /// The post-quantum lock over Olm (16 Oct 2026, [`cuantico`]): side 0 offers an ML-KEM
     /// key once the conversation opens, side 1 answers, and from then every Olm payload is
     /// sealed with the layer too. `cuantico_visto`: a sealed message already came from the
@@ -649,6 +661,12 @@ impl Secure {
             movil_dicho: None,
             voz_protegida: false,
             otro_voz_protegida: false,
+            sala_rele: None,
+            otro_rtc: false,
+            turn: None,
+            turn_rx: None,
+            turn_pedido: 0,
+            rtc_para_pagina: VecDeque::new(),
             cuantico_oferta: None,
             capa: None,
             cuantico_visto: false,
@@ -791,7 +809,7 @@ impl Secure {
             std::thread::spawn(move || {
                 let r = crate::rele::conecta_a_cualquiera(&sala);
                 let _ = tx.send(match r {
-                    Ok((s, rele)) => Entrante::AceptadoRele(s, rele),
+                    Ok((s, rele)) => Entrante::AceptadoRele(s, rele, sala),
                     Err(e) => Entrante::ReleFallo(e),
                 });
             });
@@ -937,6 +955,12 @@ impl Secure {
         self.otro_movil = false;
         self.movil_dicho = None;
         self.otro_voz_protegida = false;
+        self.sala_rele = None;
+        self.otro_rtc = false;
+        self.turn = None;
+        self.turn_rx = None;
+        self.turn_pedido = 0;
+        self.rtc_para_pagina.clear();
         // A pause belongs to the conversation that had the incident: the next one starts
         // running (17 Oct 2026 review: it stayed paused until the program restarted, and the
         // next conversation hung at «abriendo»). A changed key is caught again by `hola`.
@@ -971,6 +995,7 @@ impl Secure {
         self.sigue_envio();
         self.di_dispositivo();
         self.reconexion_tic();
+        self.turn_tic();
         if self.enlace.is_some()
             && self.fase != Fase::Sola
             && self.ultimo_envio.elapsed() >= Duration::from_secs(20)
@@ -999,8 +1024,9 @@ impl Secure {
         for e in pendientes {
             match e {
                 Entrante::Aceptado(s) => self.adopta(s, false),
-                Entrante::AceptadoRele(s, rele) => {
+                Entrante::AceptadoRele(s, rele, sala) => {
                     self.rele_usado = Some(rele);
+                    self.sala_rele = Some(sala);
                     self.adopta(s, true);
                 }
                 Entrante::ReleFallo(e) => {
@@ -1143,7 +1169,7 @@ impl Secure {
         std::thread::spawn(move || {
             let res = crate::rele::conecta(&rele, &sala);
             let _ = tx.send(match res {
-                Ok(s) => Entrante::AceptadoRele(s, rele),
+                Ok(s) => Entrante::AceptadoRele(s, rele, sala),
                 Err(e) => Entrante::ReleFallo(e),
             });
         });
@@ -1185,7 +1211,7 @@ impl Secure {
         std::thread::spawn(move || {
             let r = crate::rele::conecta(&rele, &sala);
             let _ = tx.send(match r {
-                Ok(s) => Entrante::AceptadoRele(s, rele),
+                Ok(s) => Entrante::AceptadoRele(s, rele, sala),
                 Err(e) => Entrante::ReleFallo(e),
             });
         });
@@ -1439,6 +1465,7 @@ impl Secure {
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "conversación cifrada abierta");
                     self.manda_zona();
+                    self.manda_olm(json!({ "m": "rtc_si" }));
                     self.cuantico_empieza();
                 }
                 Err(e) => {
@@ -1524,6 +1551,7 @@ impl Secure {
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "conversación cifrada abierta");
                     self.manda_zona();
+                    self.manda_olm(json!({ "m": "rtc_si" }));
                     self.cuantico_empieza();
                     Ok(plano)
                 }
@@ -1815,6 +1843,23 @@ impl Secure {
             "voz" => {
                 self.otro_voz_protegida = c["protegida"].as_bool().unwrap_or(false);
                 self.cambio = true;
+            }
+            "rtc_si" => {
+                self.otro_rtc = true;
+                self.cambio = true;
+            }
+            "rtc" => {
+                // For whoever talks here: the phone when it took the call, else the page.
+                let d = c["d"].clone();
+                if self.movil_manda() {
+                    if let Some(m) = &self.movil {
+                        m.manda(crate::movil::Hacia::Estado(
+                            json!({ "tipo": "secure_rtc", "d": d }).to_string(),
+                        ));
+                    }
+                } else if self.rtc_para_pagina.len() < 256 {
+                    self.rtc_para_pagina.push_back(d);
+                }
             }
             "zona" => {
                 self.zona_otra = zona_limpia(c["zona"].as_str().unwrap_or_default());
@@ -3099,6 +3144,73 @@ impl Secure {
         self.manda_zona();
     }
 
+    /// WebRTC (17 Oct 2026): as soon as the conversation is open and both programs can carry
+    /// calls this way, ask the relay it met at for its call service (valid for hours), so it is
+    /// ready before anyone calls; at most once a minute while the relay says no.
+    fn turn_tic(&mut self) {
+        if let Some(rx) = &self.turn_rx {
+            if let Ok(r) = rx.try_recv() {
+                self.turn_rx = None;
+                match r {
+                    Ok(t) => {
+                        self.turn = Some(t);
+                        self.cambio = true;
+                    }
+                    Err(e) => self.monitor.anota(
+                        ahora_s(),
+                        Nivel::Info,
+                        format!("servicio de llamadas del relé no disponible: {e}"),
+                    ),
+                }
+            }
+        }
+        if self.turn.is_some()
+            || self.turn_rx.is_some()
+            || !self.otro_rtc
+            || self.fase != Fase::Lista
+            || ahora_s().saturating_sub(self.turn_pedido) < 60
+        {
+            return;
+        }
+        let (Some(rele), Some(sala)) = (self.rele_usado.clone(), self.sala_rele.clone()) else {
+            return;
+        };
+        self.turn_pedido = ahora_s();
+        let (tx, rx) = mpsc::channel();
+        self.turn_rx = Some(rx);
+        std::thread::spawn(move || {
+            let _ = tx.send(crate::rele::turn(&rele, &sala));
+        });
+    }
+
+    /// The WebRTC part of the call for the screens (or null: the call then goes the old way,
+    /// recorded pieces through this program). Who makes the offer is fixed by the two keys.
+    fn rtc_json(&self) -> Value {
+        match (&self.turn, self.otro_rtc) {
+            (Some(t), true) => json!({ "ice": t.json(), "ofrece": self.mi_numero() == 0 }),
+            // Still asking the relay: the screens wait a moment before the old way.
+            (None, true) if self.turn_rx.is_some() => json!({ "pendiente": true }),
+            _ => Value::Null,
+        }
+    }
+
+    /// A WebRTC message from whoever talks here (the page, or the phone that took the call):
+    /// an offer, an answer, an ICE candidate or a restart. It goes to the other side inside
+    /// Olm, which is what makes the media keys (DTLS fingerprints in the SDP) trustworthy.
+    pub fn rtc(&mut self, d: &Value) {
+        if self.fase != Fase::Lista || self.llamada.is_none() {
+            return;
+        }
+        let grande = match serde_json::to_vec(d) {
+            Ok(v) => v.len() > 64 * 1024,
+            Err(_) => true,
+        };
+        if grande {
+            return;
+        }
+        self.manda_olm(json!({ "m": "rtc", "d": d }));
+    }
+
     fn manda_zona(&mut self) {
         if self.fase == Fase::Lista && !self.zona_propia.is_empty() {
             let z = self.zona_propia.clone();
@@ -3284,6 +3396,7 @@ impl Secure {
                 Desde::Sas { ok, nombre } if aprobado => self.sas_persona(ok, &nombre),
                 Desde::PideInicio if aprobado => self.pide_inicio(),
                 Desde::VozProtegida(a) if aprobado => self.voz_protegida(a),
+                Desde::Rtc(d) if aprobado => self.rtc(&d),
                 Desde::Media(b) if aprobado => {
                     let _ = self.media_bytes(b);
                 }
@@ -3375,7 +3488,7 @@ impl Secure {
             "tarjeta": self.tarjeta(),
             "contacto": self.nombre_contacto,
             "numeros": self.numeros().map(|(a, b, c)| vec![a, b, c]),
-            "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "conectada": l.conectada, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto, "reinicio": self.reinicios })),
+            "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "conectada": l.conectada, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto, "reinicio": self.reinicios, "rtc": self.rtc_json() })),
             "entrante": self.entrante.as_ref().map(|t| json!({ "video": t.video, "de": self.nombre_contacto, "desde": t.desde })),
             "perdida": self.perdida.map(|(t, video)| json!({ "t": t, "video": video, "de": self.nombre_contacto })),
             "recibidos": self.recibidos.iter().map(Recibido::json).collect::<Vec<_>>(),
