@@ -63,6 +63,26 @@ impl std::fmt::Debug for Grupo {
 }
 
 impl Grupo {
+    /// The one link that is talking, in a two-way talk. The host keeps a listener open for more
+    /// members, which does not make it a group: its own lines must still share the link's id
+    /// (ticks, edits, deleting for everyone) (17 Oct 2026 review).
+    fn unica(&self) -> Option<usize> {
+        if self.sesiones.len() == 1 {
+            return Some(0);
+        }
+        let mut hablando = self.sesiones.iter().enumerate().filter(|(_, s)| s.lista());
+        match (hablando.next(), hablando.next()) {
+            (Some((i, _)), None) => Some(i),
+            _ => None,
+        }
+    }
+
+    /// Whether a call is going on in any link (the window then runs its clock faster, so the
+    /// call's pieces do not wait for the next tick).
+    pub fn en_llamada(&self) -> bool {
+        self.llamada.is_some() || self.sesiones.iter().any(|s| s.llamada_activa().is_some())
+    }
+
     /// A group with one idle session (the identity and the book live in `datos/secure`).
     pub fn abre(datos: &Path, descargas: &Path) -> Self {
         Self {
@@ -330,6 +350,8 @@ impl Grupo {
     fn reparte(&mut self) {
         let n = self.sesiones.len();
         let anfitrion = self.anfitrion;
+        let unica = self.unica();
+        let yo = self.nombre_o_anfitrion();
         let mut pasar_texto: Vec<(usize, String, String)> = Vec::new();
         let mut pasar_media: Vec<(usize, String, Vec<u8>)> = Vec::new();
         for i in 0..n {
@@ -343,11 +365,15 @@ impl Grupo {
                 .collect();
             self.vistos[i] = self.sesiones[i].mensajes.len();
             for mut m in nuevos {
-                if m.mio {
-                    // Our own texts are pushed into the group's list when sent, once.
+                // Our own texts are pushed into the group's list when sent, once; our call and
+                // file lines come from the link when only one is talking (in a group each link
+                // would bring its own copy).
+                if m.mio && !(unica == Some(i) && (m.llamada.is_some() || m.archivo.is_some())) {
                     continue;
                 }
-                let quien = if m.de.is_empty() {
+                let quien = if m.mio {
+                    yo.clone()
+                } else if m.de.is_empty() {
                     de_enlace.clone()
                 } else {
                     m.de.clone()
@@ -433,8 +459,8 @@ impl Grupo {
             let mut m = crate::mensaje::Mensaje::mio(t, None);
             m.de = self.nombre_o_anfitrion();
             // In a two-way talk the link's own line is the one on screen (it carries the ticks).
-            if let [s] = self.sesiones.as_slice() {
-                if let Some(ultimo) = s.mensajes.last() {
+            if let Some(i) = self.unica() {
+                if let Some(ultimo) = self.sesiones[i].mensajes.last() {
                     m.id = ultimo.id;
                 }
             }
@@ -448,12 +474,12 @@ impl Grupo {
 
     /// The person answers a message (two-way talk: the link carries the quote).
     pub fn texto_re(&mut self, texto: &str, re: Option<u64>) {
-        if self.sesiones.len() != 1 {
+        let Some(i) = self.unica() else {
             self.texto(texto);
             return;
-        }
+        };
         let de = self.nombre_o_anfitrion();
-        let s = &mut self.sesiones[0];
+        let s = &mut self.sesiones[i];
         if s.lista() {
             s.texto_re(texto, re);
             let ultimo = s.mensajes.last().cloned();
@@ -462,7 +488,7 @@ impl Grupo {
                 m.de = de;
                 self.mensajes.push(m);
             }
-            self.vistos[0] = n;
+            self.vistos[i] = n;
             self.cambio = true;
         }
     }
@@ -488,6 +514,13 @@ impl Grupo {
                 self.mensajes[i].borra();
             } else {
                 self.mensajes.remove(i);
+            }
+        }
+        // «Delete for me» shortened the links' lists: count from where they are now, or the
+        // next message would be skipped.
+        for (i, s) in self.sesiones.iter().enumerate() {
+            if let Some(v) = self.vistos.get_mut(i) {
+                *v = (*v).min(s.mensajes.len());
             }
         }
         self.cambio = true;

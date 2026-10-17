@@ -78,6 +78,8 @@ impl Enlace {
     fn new(mut s: TcpStream) -> Self {
         use std::sync::atomic::{AtomicU64, Ordering};
         let otro = s.peer_addr().ok().map(|a| a.ip());
+        // Small frames (voice) leave at once instead of waiting to be grouped.
+        let _ = s.set_nodelay(true);
         let (cola, rx) = mpsc::channel::<Vec<u8>>();
         let escritos = std::sync::Arc::new(AtomicU64::new(0));
         let hilo = escritos.clone();
@@ -521,6 +523,8 @@ pub struct Secure {
     /// How many times the other side asked our recorder to start again (a new player there,
     /// on its phone or back on its computer, cannot open a stream joined halfway).
     reinicios: u64,
+    /// Our call's pieces were dropped because the link was full (see `media_atascada`).
+    media_saltada: bool,
     /// A file on its way out.
     envio: Option<Envio>,
     /// When something last went out on the link: a quiet link gets a small frame every
@@ -636,6 +640,7 @@ impl Secure {
             fallos_olm: VecDeque::new(),
             fallos_media: VecDeque::new(),
             reinicios: 0,
+            media_saltada: false,
             envio: None,
             ultimo_envio: std::time::Instant::now(),
             ultimo_recibido: std::time::Instant::now(),
@@ -932,6 +937,10 @@ impl Secure {
         self.otro_movil = false;
         self.movil_dicho = None;
         self.otro_voz_protegida = false;
+        // A pause belongs to the conversation that had the incident: the next one starts
+        // running (17 Oct 2026 review: it stayed paused until the program restarted, and the
+        // next conversation hung at «abriendo»). A changed key is caught again by `hola`.
+        self.estado = EstadoSesion::default();
         self.zona_otra.clear();
         self.reproduce_otro.clear();
         self.reproduce_dicho.clear();
@@ -973,8 +982,13 @@ impl Secure {
             && self.fase != Fase::Sola
             && self.ultimo_recibido.elapsed() >= Duration::from_secs(65)
         {
-            self.aviso("sec_enlace_cerrado", "sin señal de la otra persona");
-            self.cerrar("sin señal de la otra persona");
+            // A silent link in an open conversation is a drop like any other: look for the
+            // other side again at the relay (it does the same) before giving up.
+            let reconecta = self.fase == Fase::Lista && self.empieza_reconexion();
+            if !reconecta {
+                self.aviso("sec_enlace_cerrado", "sin señal de la otra persona");
+                self.cerrar("sin señal de la otra persona");
+            }
         }
         let mut pendientes = Vec::new();
         if let Some(rx) = &self.rx {
@@ -1083,7 +1097,8 @@ impl Secure {
             self.fin_de_llamada();
             self.aviso("sec_llamada_cortada_red", "");
         }
-        self.movil_fin();
+        // The phone stays linked to this computer: only the other side's link is being found
+        // again (17 Oct 2026 review: a blip ended the hand-off and the QR had to be read again).
         self.reconexion = Some(Reconexion {
             sala,
             desde: ahora_s(),
@@ -1417,8 +1432,10 @@ impl Secure {
                     self.inicio = ahora_s();
                     self.cadena = Cadena::new("secure", self.inicio);
                     self.fase = Fase::Lista;
-                    // The first envelope opens the session on the other side.
-                    self.manda_olm(json!({ "m": "hola" }));
+                    // The first envelope opens the session on the other side, and carries the
+                    // moment the conversation opened: both sides derive the room they meet in
+                    // again after a drop from it, so it must be the same second on both.
+                    self.manda_olm(json!({ "m": "hola", "inicio": self.inicio }));
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "conversación cifrada abierta");
                     self.manda_zona();
@@ -1598,6 +1615,12 @@ impl Secure {
 
     fn carga(&mut self, c: &Value) {
         match c["m"].as_str().unwrap_or_default() {
+            "hola" => {
+                // The opening second of the side that started (an older version sends none).
+                if let Some(t) = c["inicio"].as_u64() {
+                    self.inicio = t;
+                }
+            }
             "pq_llave" => {
                 // Side 1: a secret for that key, its ciphertext back, and the layer from here
                 // on (the answer itself goes plain: the other side has no layer yet).
@@ -1676,7 +1699,9 @@ impl Secure {
                     .collect();
                 let id = mensaje::id_de(&c["id"]).unwrap_or_else(Mensaje::nuevo_id);
                 if self.mensajes.iter().any(|m| m.id == id) {
-                    return; // the same text twice (a resend after a cut)
+                    // The same text twice (a resend after a cut): it is here, say so again.
+                    self.manda_olm(json!({ "m": "entregado", "id": id.to_string() }));
+                    return;
                 }
                 let re = mensaje::id_de(&c["re"]);
                 self.mensajes.push(Mensaje::del_otro(id, texto, de, re));
@@ -1684,10 +1709,10 @@ impl Secure {
                 self.otro_escribe = 0;
                 // Tell the sender it is here (its ✓✓): the relay never says that.
                 self.manda_olm(json!({ "m": "entregado", "id": id.to_string() }));
-                if !self.novedad && !self.sin_visto {
-                    // The tab is in front: seen at once.
-                    self.manda_vistos();
-                }
+                // «Seen» only when someone looks: the page (or the phone) says so when the
+                // message is on a screen in front (17 Oct 2026 review: green ticks went out
+                // with the window minimised).
+                self.novedad = true;
             }
             "entregado" => {
                 if let Some(id) = mensaje::id_de(&c["id"]) {
@@ -1943,6 +1968,16 @@ impl Secure {
     }
 
     fn bloque(&mut self, v: &Value) {
+        // Only inside an open conversation (before it, anyone who reached the port could fill
+        // memory with blocks), and never more than 256 waiting.
+        if self.fase != Fase::Lista
+            || self
+                .entrada
+                .as_ref()
+                .is_some_and(|e| e.bloques_pendientes.len() >= 256)
+        {
+            return;
+        }
         let (Some(n), Some(b)) = (
             v["n"].as_u64(),
             v["b"].as_str().and_then(|s| B64.decode(s).ok()),
@@ -2045,7 +2080,12 @@ impl Secure {
                         .anota(ahora_s(), Nivel::Info, format!("archivo recibido: {n}"));
                     let mut linea = Mensaje::archivo(n.clone(), false);
                     // A picture goes on to the linked phone so it shows in its chat.
-                    if let Some(r) = self.recibidos.iter().find(|r| r.nombre == n && r.imagen()) {
+                    if let Some(r) = self
+                        .recibidos
+                        .iter()
+                        .rev()
+                        .find(|r| r.nombre == n && r.imagen())
+                    {
                         linea.archivo_id = (r.id & 0xffff_ffff) as u32;
                         if let Some(m) = &self.movil {
                             if m.enganchado && m.aprobado && r.bytes <= 16 * 1024 * 1024 {
@@ -2322,8 +2362,31 @@ impl Secure {
         self.media_bytes(bytes)
     }
 
+    /// More than this of our call waiting in the link: the pieces are dropped (a call that
+    /// waits is worse than one that skips a moment), and once it drains the recorder starts
+    /// again so the other player gets a fresh header (17 Oct 2026 review: a slow uplink made
+    /// the delay grow without end).
+    fn media_atascada(&mut self) -> bool {
+        const MEDIA_COLA_MAX: u64 = 512 * 1024;
+        let cola = self.enlace.as_ref().map_or(0, |e| {
+            let (a, b) = e.cuenta();
+            a.saturating_sub(b)
+        });
+        if cola > MEDIA_COLA_MAX {
+            self.media_saltada = true;
+            return true;
+        }
+        if self.media_saltada {
+            self.media_saltada = false;
+            self.reinicios += 1;
+            self.cambio = true;
+            return true;
+        }
+        false
+    }
+
     fn media_bytes(&mut self, bytes: Vec<u8>) -> Result<(), String> {
-        if !self.estado.en_marcha() {
+        if !self.estado.en_marcha() || self.media_atascada() {
             return Ok(());
         }
         let Some(l) = &mut self.llamada else {
@@ -2343,7 +2406,7 @@ impl Secure {
     /// A piece that someone else in the group recorded, passed on by this computer (the host):
     /// it travels under this link's media key with the original name inside the cipher.
     pub fn media_de(&mut self, de: &str, bytes: &[u8]) -> Result<(), String> {
-        if !self.estado.en_marcha() {
+        if !self.estado.en_marcha() || self.media_atascada() {
             return Ok(());
         }
         let Some(l) = &mut self.llamada else {
@@ -3220,6 +3283,7 @@ impl Secure {
                 Desde::Rechazar if aprobado => self.rechazar(),
                 Desde::Sas { ok, nombre } if aprobado => self.sas_persona(ok, &nombre),
                 Desde::PideInicio if aprobado => self.pide_inicio(),
+                Desde::VozProtegida(a) if aprobado => self.voz_protegida(a),
                 Desde::Media(b) if aprobado => {
                     let _ = self.media_bytes(b);
                 }
@@ -3357,7 +3421,13 @@ fn lista_de_formatos(v: &Value) -> Vec<String> {
 
 /// One byte of name length, the name, the piece: the sender travels inside the cipher.
 fn con_remitente(de: &str, pieza: &[u8]) -> Vec<u8> {
-    let nombre: Vec<u8> = de.bytes().take(60).collect();
+    // At most 60 bytes, cut where a character ends (a cut letter made the name unreadable and
+    // mixed two people's pieces in one player).
+    let mut fin = de.len().min(60);
+    while !de.is_char_boundary(fin) {
+        fin -= 1;
+    }
+    let nombre: Vec<u8> = de.get(..fin).unwrap_or_default().as_bytes().to_vec();
     let mut v = Vec::with_capacity(1 + nombre.len() + pieza.len());
     v.push(nombre.len() as u8);
     v.extend_from_slice(&nombre);
@@ -3396,12 +3466,37 @@ fn limpia_nombre(n: &str) -> String {
         })
         .take(120)
         .collect();
-    let s = s.trim().trim_start_matches('.').to_owned();
+    // No dot or space at the end either: Windows drops them, so «x.exe.» would be saved and
+    // opened as «x.exe» after passing as a file with no extension (17 Oct 2026 review).
+    let s = s
+        .trim()
+        .trim_start_matches('.')
+        .trim_end_matches(['.', ' '])
+        .to_owned();
     if s.is_empty() {
         "archivo".to_owned()
+    } else if nombre_de_dispositivo(&s) {
+        format!("_{s}")
     } else {
         s
     }
+}
+
+/// Windows keeps these names for devices, with any extension («CON.txt» too).
+pub(crate) fn nombre_de_dispositivo(n: &str) -> bool {
+    let base = n
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_uppercase();
+    matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || ((base.starts_with("COM") || base.starts_with("LPT"))
+            && base.len() == 4
+            && base
+                .as_bytes()
+                .get(3)
+                .is_some_and(|d| (b'1'..=b'9').contains(d)))
 }
 
 fn mime_imagen(nombre: &str) -> &'static str {
@@ -3440,6 +3535,21 @@ fn puerto_al_azar() -> u16 {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    #[test]
+    fn received_names_cannot_hide_a_program_or_a_device() {
+        assert_eq!(super::limpia_nombre("x.exe."), "x.exe");
+        assert_eq!(super::limpia_nombre("foto.jpg . "), "foto.jpg");
+        assert_eq!(super::limpia_nombre("CON.txt"), "_CON.txt");
+        assert_eq!(super::limpia_nombre("lpt1"), "_lpt1");
+        assert_eq!(super::limpia_nombre("COM0.txt"), "COM0.txt");
+        assert_eq!(super::limpia_nombre("console.txt"), "console.txt");
+        assert_eq!(super::limpia_nombre("..."), "archivo");
+        let largo = "ñ".repeat(40);
+        let v = super::con_remitente(&largo, b"x");
+        let n = usize::from(v[0]);
+        assert!(std::str::from_utf8(&v[1..=n]).is_ok());
+    }
+
     use super::*;
 
     fn gira(a: &mut Secure, b: &mut Secure, veces: u32) {

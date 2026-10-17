@@ -61,7 +61,7 @@ use windows::Win32::UI::Shell::{
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateIconFromResourceEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
     FindWindowW, GetClientRect, GetMessageW, GetWindowLongPtrW, GetWindowRect,
-    GetWindowThreadProcessId, IsIconic, LoadCursorW, MessageBoxW, PostMessageW, PostQuitMessage,
+    GetWindowThreadProcessId, IsIconic, KillTimer, LoadCursorW, MessageBoxW, PostMessageW, PostQuitMessage,
     RegisterClassExW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowPos,
     SetWindowTextW, ShowWindow, SystemParametersInfoW, TranslateMessage, GWL_STYLE, HICON,
     HWND_TOP, ICON_BIG, ICON_SMALL, IDC_ARROW, LR_DEFAULTCOLOR, MB_ICONWARNING, MB_OK, MINMAXINFO,
@@ -82,6 +82,10 @@ const CLASE: PCWSTR = w!("GuardianaZeroVentana");
 const WM_ORDENES: u32 = WM_APP + 1;
 /// The session's clock (batches, figures, saves).
 const TIC: usize = 1;
+/// The conversations' fast clock, only while a call is going on.
+const TIC_LLAMADA: usize = 2;
+/// Whether the fast clock is running.
+static RAPIDO: AtomicBool = AtomicBool::new(false);
 /// Shown once, when a page has loaded: not empty, then white, then the page.
 static VENTANA_LISTA: AtomicBool = AtomicBool::new(false);
 static TICS_SIN_PAGINA: AtomicU32 = AtomicU32::new(0);
@@ -1626,10 +1630,26 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
             }
             LRESULT(0)
         }
+        WM_TIMER if wp.0 == TIC_LLAMADA => {
+            encola(con_sesion(Sesion::tic_llamada).unwrap_or_default());
+            drena();
+            LRESULT(0)
+        }
         WM_TIMER => {
             recoge_licencia();
             encola(con_sesion(Sesion::tic).unwrap_or_default());
             drena();
+            // During a call the conversations also run on a 20 ms clock; it stops with the call.
+            let llamada = con_sesion(|s| s.en_llamada()).unwrap_or(false);
+            if llamada != RAPIDO.swap(llamada, Ordering::Relaxed) {
+                unsafe {
+                    if llamada {
+                        SetTimer(Some(h), TIC_LLAMADA, 20, None);
+                    } else {
+                        let _ = KillTimer(Some(h), TIC_LLAMADA);
+                    }
+                }
+            }
             // A page that never arrives still has to appear: three seconds, then the window.
             if !VENTANA_LISTA.load(Ordering::Relaxed)
                 && TICS_SIN_PAGINA.fetch_add(1, Ordering::Relaxed) >= 15
@@ -1998,6 +2018,10 @@ pub fn arranca() {
         });
     });
     encola(iniciales);
+    // Which relay is nearest, measured once in the background at start: the phone hand-off and
+    // the house's room use it too, not only an invitation (17 Oct 2026 review: from Colombia
+    // they always went through Germany).
+    guardiana_zero::rele::mide_cercania();
 
     let marco = col.fondo_marco;
     let hoja = col.hoja;

@@ -134,6 +134,11 @@ impl Monitor {
         };
         if nivel != Nivel::Info {
             self.vigilancia.push(s.clone());
+            // The newest 200 are enough to read; the list goes in every state the screens get.
+            if self.vigilancia.len() > 200 {
+                let sobra = self.vigilancia.len() - 200;
+                self.vigilancia.drain(..sobra);
+            }
         }
         self.historico.push_back(s);
         while self.historico.len() > Self::HISTORICO {

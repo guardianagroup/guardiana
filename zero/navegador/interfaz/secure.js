@@ -288,7 +288,7 @@
   // the chat each time made the screen shake). A file that arrived is a card: a small picture
   // when it is one, its size, where it is, and Abrir / Ver en la carpeta / Eliminar.
   const minis = new Map(), pedidas = new Set();
-  let chatAntes = '';
+  let chatAntes = '', ultimoSuyo = null;
   const tam = (b) => (b >= 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b >= 1e6 ? (b / 1e6).toFixed(1) + ' MB' : b >= 1e3 ? Math.round(b / 1e3) + ' KB' : b + ' B');
   const tarjetaArchivo = (r) => {
     const ext = (r.nombre.split('.').pop() || '').slice(0, 4).toUpperCase();
@@ -337,6 +337,9 @@
       return `<li class="${m.mio ? 'mio' : ''}" data-id="${esc(m.id || '')}">${de}${citaDe(m, E.mensajes)}${esc(m.texto)}${reacciones(m)}${metaMensaje(m)}</li>`;
     }).join('') + (E.escribiendo ? `<li class="escribiendo"><span></span><span></span><span></span></li>` : '');
     if (abajo) ol.scrollTop = ol.scrollHeight;
+    // Seen: a new message from the other side, on a screen in front (17 Oct 2026 review).
+    const suyo = (E.mensajes || []).filter((x) => !x.mio && !x.llamada).slice(-1)[0];
+    if (suyo && suyo.id !== ultimoSuyo) { ultimoSuyo = suyo.id; if (!document.hidden && document.hasFocus()) manda({ tipo: 'secure', accion: 'visto' }); }
   };
   // The picture comes once, full size: keep a small copy only.
   en('secure_vista', (m) => {
@@ -520,7 +523,8 @@
       // a big file never fills the memory.
       // While the link is being recovered (`pausado`), nothing is handed over: what already
       // left waits in the program and goes on from where the other side got to.
-      while (E && E.envio && (E.envio.pausado || E.envio.cola > 8 * 1024 * 1024)) await new Promise((r) => setTimeout(r, 150));
+      // During a call a file goes slowly (256 KB queued at most), so the call never waits behind it.
+      while (E && E.envio && (E.envio.pausado || E.envio.cola > (E.llamada ? 256 * 1024 : 8 * 1024 * 1024))) await new Promise((r) => setTimeout(r, 150));
       const trozo = await f.slice(i * TROZO, (i + 1) * TROZO).arrayBuffer();
       const ultimo = i + 1 === total && trozo.byteLength < TROZO;
       manda({ tipo: 'secure', accion: 'archivo_trozo', b64: b64De(trozo), ultimo });

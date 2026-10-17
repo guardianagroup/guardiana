@@ -85,6 +85,8 @@ pub enum Desde {
     },
     /// The phone's player started: the other side's recorder must start again.
     PideInicio,
+    /// «Proteger mi voz» on the phone (17 Oct 2026): the other side is told.
+    VozProtegida(bool),
     /// One recorded piece from the phone's microphone or camera.
     Media(Vec<u8>),
     /// The phone's page was brought to the front.
@@ -818,6 +820,7 @@ fn traduce(v: &Value) -> Option<Desde> {
                 .collect(),
         }),
         "pide_inicio" => Some(Desde::PideInicio),
+        "voz_protegida" => Some(Desde::VozProtegida(v["activa"].as_bool().unwrap_or(false))),
         "visto" => Some(Desde::Visto),
         "nombre" => Some(Desde::Nombre(
             v["nombre"]

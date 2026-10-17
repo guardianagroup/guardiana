@@ -44,9 +44,16 @@ fn nombre_limpio(n: &str) -> String {
         })
         .take(120)
         .collect();
-    let n = n.trim().trim_start_matches('.').to_owned();
+    // No dot or space at the end either (Windows drops them), and no device names.
+    let n = n
+        .trim()
+        .trim_start_matches('.')
+        .trim_end_matches(['.', ' '])
+        .to_owned();
     if n.is_empty() {
         "archivo".to_owned()
+    } else if crate::secure::nombre_de_dispositivo(&n) {
+        format!("_{n}")
     } else {
         n
     }
@@ -189,6 +196,11 @@ fn ahora_s() -> u64 {
 }
 
 impl Sala {
+    /// Whether two phones of the house are on a call through this computer.
+    pub fn en_llamada(&self) -> bool {
+        self.llamada.is_some()
+    }
+
     /// Open a room for `horas` hours, with the relay the conversations use.
     pub fn abre(horas: u64, idioma: &str) -> Result<Self, String> {
         Self::abre_con(&crate::rele::direccion(), horas, idioma)
@@ -585,6 +597,29 @@ impl Sala {
                         let a = &mut self.asientos[i];
                         a.enganchado = false;
                         a.pendiente = false;
+                        // A phone that leaves ends its call (17 Oct 2026 review: the call
+                        // stayed open and nobody in the house could call again).
+                        if self
+                            .llamada
+                            .as_ref()
+                            .is_some_and(|l| l.de == i || l.a == Some(i))
+                        {
+                            if let Some(l) = self.llamada.take() {
+                                if l.a.is_some() {
+                                    self.anota_llamada(
+                                        l.de,
+                                        l.video,
+                                        Some(ahora_s().saturating_sub(l.desde)),
+                                        "fin",
+                                    );
+                                } else {
+                                    self.anota_llamada(l.de, l.video, None, "cancelada");
+                                }
+                            }
+                            for a in &mut self.asientos {
+                                a.mime = None;
+                            }
+                        }
                         self.cambio = true;
                     }
                     Desde::Error(e) => {

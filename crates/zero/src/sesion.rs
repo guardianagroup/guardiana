@@ -1216,8 +1216,26 @@ impl Sesion {
     fn pestana_secure(&self) -> Option<u32> {
         self.pestanas
             .iter()
-            .find(|p| p.url.starts_with(SECURE))
+            // Only once the page said «listo»: the state drawn before its texts arrived showed
+            // raw keys (17 Oct 2026 review); «listo» sends the whole state anyway.
+            .find(|p| p.url.starts_with(SECURE) && p.lista)
             .map(|p| p.id)
+    }
+
+    /// Whether a call is going on (in a conversation or in the house's room).
+    pub fn en_llamada(&self) -> bool {
+        self.secure.en_llamada()
+            || self
+                .sala
+                .as_ref()
+                .is_some_and(crate::sala::Sala::en_llamada)
+    }
+
+    /// Only the conversations' clock: run every 20 ms during a call, so a piece of voice or
+    /// video goes on at once instead of waiting up to 200 ms twice on its way (17 Oct 2026
+    /// review: that wait, in bursts, was a cause of the stutter).
+    pub fn tic_llamada(&mut self) -> Vec<Orden> {
+        self.secure_tic()
     }
 
     /// Every tick: let the network in, and redraw the tab when something changed.
