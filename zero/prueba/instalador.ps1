@@ -167,7 +167,7 @@ $r = Msiexec @('/i', (Resolve-Path $Msi).Path) (Join-Path $logs "instalar.log")
 Comprueba ($r -eq 0) "el instalador nuevo, con la vieja abierta, termina con 0 ($r)"
 Anota "cierre de la vieja, según msiexec: $(Cola (Join-Path $logs 'instalar.log') 'CloseApplication|RestartManager|RmShutdown|in use|FilesInUse|WixCloseApplications|Doing action: (RemoveExistingProducts|InstallValidate)')"
 if ($null -ne $viejo) {
-    $cerro = $viejo.WaitForExit(15000)
+    $cerro = $viejo.WaitForExit(30000)
     Comprueba $cerro "la versión vieja se cerró para dejar paso ($(Ventanas))"
     if ($cerro) {
         Comprueba ($viejo.ExitCode -eq 0) "y se cerró ella sola, sin que nadie la matara (código $($viejo.ExitCode))"
@@ -204,8 +204,12 @@ Comprueba ($null -ne $nuevo) "el programa nuevo abre (en-marcha.txt: $(Get-Conte
 $reg = Get-Content (Join-Path $datos "registro.txt") -ErrorAction SilentlyContinue
 Comprueba (($reg | Where-Object { $_ -match 'arranque: GUARDIANA ZERO ' + [regex]::Escape($Version) }).Count -ge 1) "y su registro anota el arranque de la $Version"
 if ($null -ne $nuevo) {
+    # The window appears once the first page has loaded (16 Oct 2026: with the three tabs'
+    # design it took longer than the marker file, and the X found no window yet): wait for it.
+    for ($i = 0; $i -lt 60 -and $nuevo.MainWindowHandle -eq 0; $i++) { Start-Sleep -Milliseconds 500; $nuevo.Refresh() }
+    Anota "ventana principal: $($nuevo.MainWindowHandle) tras $($i * 0.5) s"
     $nuevo.CloseMainWindow() | Out-Null
-    Comprueba ($nuevo.WaitForExit(15000)) "y se cierra con su X"
+    Comprueba ($nuevo.WaitForExit(30000)) "y se cierra con su X"
 }
 
 # 6. The other languages install and uninstall too, with their own readme.

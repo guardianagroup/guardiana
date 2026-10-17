@@ -24,6 +24,7 @@ use base64::Engine as _;
 use guardiana_secure::agenda::{self, Agenda};
 use guardiana_secure::archivo::{Llave, Recepcion, Trozos};
 use guardiana_secure::claves::{Curve25519PublicKey, Ed25519Signature, Mac};
+use guardiana_secure::cuantico;
 use guardiana_secure::monitor::{Identidad, Monitor, Nivel};
 use guardiana_secure::pausa::Sesion as EstadoSesion;
 use guardiana_secure::prueba::{Cadena, Prueba};
@@ -31,7 +32,9 @@ use guardiana_secure::resumen::{Archivos, Clase, Conexion, Resumen};
 use guardiana_secure::sframe;
 use guardiana_secure::verificar::{Codigo, Inicio, Verified};
 use guardiana_secure::{tarjeta, Conversation, Envelope, Identity};
+use serde::Serialize;
 use serde_json::{json, Value};
+use sha2::Digest as _;
 
 const MAX_FRAME: usize = 2 * 1024 * 1024;
 const B64: base64::engine::GeneralPurpose = base64::engine::general_purpose::STANDARD;
@@ -64,11 +67,15 @@ struct Enlace {
     /// difference is what is still on its way out (a file's «time left»).
     encolados: std::sync::Arc<std::sync::atomic::AtomicU64>,
     escritos: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// The other end's address, kept only in memory for an incident card on a direct link;
+    /// it is never written, shown or logged otherwise (decision 203).
+    otro: Option<std::net::IpAddr>,
 }
 
 impl Enlace {
     fn new(mut s: TcpStream) -> Self {
         use std::sync::atomic::{AtomicU64, Ordering};
+        let otro = s.peer_addr().ok().map(|a| a.ip());
         let (cola, rx) = mpsc::channel::<Vec<u8>>();
         let escritos = std::sync::Arc::new(AtomicU64::new(0));
         let hilo = escritos.clone();
@@ -88,7 +95,13 @@ impl Enlace {
             cola,
             encolados: std::sync::Arc::new(AtomicU64::new(0)),
             escritos,
+            otro,
         }
+    }
+
+    /// The other end's address (see the field).
+    fn ip_del_otro(&self) -> Option<std::net::IpAddr> {
+        self.otro
     }
 
     fn manda(&self, v: &Value) -> Result<(), String> {
@@ -138,6 +151,8 @@ struct Envio {
     /// The link's «handed over» count when it started, and when its last piece was handed.
     inicio: u64,
     fin: Option<u64>,
+    /// Bytes written on links that dropped since it started (their counters are gone).
+    antes: u64,
     /// (when, written) a few times a second, for the speed.
     marcas: VecDeque<(std::time::Instant, u64)>,
     aviso: std::time::Instant,
@@ -213,7 +228,26 @@ struct Salida {
     nombre: String,
     trozos: Trozos,
     bytes: u64,
+    /// Encrypted blocks the other side has not confirmed yet (16 Oct 2026, «reanudación»):
+    /// if the link drops, the other side says how many it has and these go out again from
+    /// there. It confirms every [`CONFIRMA_CADA`] blocks, so this stays small.
+    guardados: VecDeque<(u64, Vec<u8>)>,
+    guardados_bytes: u64,
+    /// Blocks are kept but not sent: the link dropped and the other side has not yet said
+    /// where it is.
+    pausada: bool,
+    /// The closing key, once every block was handed over; sent again if the other side asks
+    /// after a drop.
+    llave: Option<Llave>,
+    /// The opening key and the announced size, to start over if the start was lost in a drop.
+    inicial: Llave,
+    anunciado: u64,
 }
+
+/// The receiver confirms every this many blocks (4 MB of 64 KB blocks).
+const CONFIRMA_CADA: u64 = 64;
+/// Unconfirmed blocks kept for a resend, at most; past this the page waits.
+const GUARDADOS_MAX: u64 = 32 * 1024 * 1024;
 
 /// How long a call rings before «no answer».
 pub const TIMBRE_S: u64 = 45;
@@ -346,6 +380,54 @@ struct Llamada {
     marca: (u64, u64, u64),
 }
 
+/// A conversation whose link dropped, being picked up again through the relay.
+#[derive(Debug, Clone)]
+struct Reconexion {
+    sala: String,
+    desde: u64,
+    proximo: u64,
+    intentos: u32,
+    buscando: bool,
+}
+
+/// How long both sides keep trying to meet again before giving the conversation up.
+const RECONEXION_S: u64 = 5 * 60;
+
+/// A stop that looks like an interference, as the screen and the saved report show it.
+#[derive(Debug, Clone, Serialize)]
+pub struct Incidente {
+    /// Unix seconds.
+    pub cuando: u64,
+    /// `sas_distinto`, `clave_cambiada`, `olm_fallos`, `media_fallos`, `archivo_mal`,
+    /// `rele_certificado`.
+    pub senal: &'static str,
+    /// The concrete fact, in Spanish for the chain (the screen translates `senal`).
+    pub detalle: String,
+    /// `directo`, `rele` or `ninguno`.
+    pub transporte: &'static str,
+    /// How many frames failed in the window, when that is the signal.
+    pub fallos: u32,
+    /// The contact's name as this computer knows it.
+    pub contacto: String,
+    /// The time zone the other side said, if it did (never an address).
+    pub zona_otra: String,
+    /// Only on a direct link, and only for this card: the other end's address as seen at that
+    /// moment, with the country and the network the bundled base gives it. Nothing is written
+    /// anywhere unless the person saves the report (decision 203 stands).
+    pub otro: Option<OtroExtremo>,
+}
+
+/// The other end of a direct link, at the moment of an incident.
+#[derive(Debug, Clone, Serialize)]
+pub struct OtroExtremo {
+    /// The address.
+    pub ip: String,
+    /// Two-letter country from the bundled base, if any.
+    pub pais: Option<String>,
+    /// The network's organisation from the bundled base, if any.
+    pub red: Option<String>,
+}
+
 /// The SECURE side of a browser session.
 pub struct Secure {
     datos: PathBuf,
@@ -378,6 +460,12 @@ pub struct Secure {
     /// This link goes through the blind relay.
     rele: bool,
     rele_error: Option<String>,
+    /// The link dropped in the middle of an open conversation and both sides are going back
+    /// to the relay to pick it up where it was (16 Oct 2026, «que sirva en cualquier router e
+    /// internet del mundo»): the room both derive, when the next try is due, how many tries.
+    /// The Olm session carries on; only the socket is new. A deliberate close sends «adios»
+    /// first, so the other side does not wait.
+    reconexion: Option<Reconexion>,
     tarjeta_otra: Option<tarjeta::Tarjeta>,
     sas_inicio: Option<Inicio>,
     sas_codigo: Option<Codigo>,
@@ -401,6 +489,14 @@ pub struct Secure {
     /// A call nobody answered here: (when, with video), until the person calls back or
     /// closes the note.
     perdida: Option<(u64, bool)>,
+    /// A stop that looks like an interference (16 Oct 2026, the owner's first concern): what
+    /// tripped, when, by which path, and what can honestly be said about the other end. Kept
+    /// until the person saves it, verifies again or ends; `cerrar` leaves it alone.
+    incidente: Option<Incidente>,
+    /// Frames that failed to open lately (unix seconds): a burst stops the conversation, one
+    /// alone is a bad network.
+    fallos_olm: VecDeque<u64>,
+    fallos_media: VecDeque<u64>,
     /// How many times the other side asked our recorder to start again (a new player there,
     /// on its phone or back on its computer, cannot open a stream joined halfway).
     reinicios: u64,
@@ -415,6 +511,22 @@ pub struct Secure {
     /// say so (16 Oct 2026: one side showed the conversation closed, the other still open).
     ultimo_recibido: std::time::Instant,
     otro_late: bool,
+    /// Whether the other side is talking from its phone (it says so inside Olm each time that
+    /// changes), and what we last told it about ours. The screen shows the protection level
+    /// from the two: both computers, the highest; a phone on either side, strong (16 Oct 2026).
+    otro_movil: bool,
+    movil_dicho: Option<bool>,
+    /// «Voz protegida» on each side: ours (the page says it; told to the other side) and
+    /// theirs (shown on the call panel). 16 Oct 2026.
+    voz_protegida: bool,
+    otro_voz_protegida: bool,
+    /// The post-quantum lock over Olm (16 Oct 2026, [`cuantico`]): side 0 offers an ML-KEM
+    /// key once the conversation opens, side 1 answers, and from then every Olm payload is
+    /// sealed with the layer too. `cuantico_visto`: a sealed message already came from the
+    /// other side, so a plain one now would be a downgrade.
+    cuantico_oferta: Option<(cuantico::Oferta, Vec<u8>)>,
+    capa: Option<cuantico::Capa>,
+    cuantico_visto: bool,
     /// This computer's time zone (the page tells it) and the other side's, exchanged inside
     /// Olm once the conversation is open (16 Oct 2026, «que salga en nuestro mapa, el de él y
     /// el mío»): the globe places each computer by its time zone, never by an address.
@@ -499,11 +611,21 @@ impl Secure {
             reproduce_dicho: Vec::new(),
             entrante: None,
             perdida: None,
+            incidente: None,
+            fallos_olm: VecDeque::new(),
+            fallos_media: VecDeque::new(),
             reinicios: 0,
             envio: None,
             ultimo_envio: std::time::Instant::now(),
             ultimo_recibido: std::time::Instant::now(),
             otro_late: false,
+            otro_movil: false,
+            movil_dicho: None,
+            voz_protegida: false,
+            otro_voz_protegida: false,
+            cuantico_oferta: None,
+            capa: None,
+            cuantico_visto: false,
             zona_propia: String::new(),
             zona_otra: String::new(),
             enviados: Vec::new(),
@@ -513,6 +635,7 @@ impl Secure {
             rele_codigo: None,
             rele: false,
             rele_error: None,
+            reconexion: None,
             tarjeta_otra: None,
             sas_inicio: None,
             sas_codigo: None,
@@ -590,6 +713,7 @@ impl Secure {
             Some(p) => p,
             None => 0,
         };
+        crate::rele::mide_cercania();
         let listener = TcpListener::bind(("0.0.0.0", pedido))
             .or_else(|_| TcpListener::bind(("0.0.0.0", 0)))
             .map_err(|e| e.to_string())?;
@@ -629,10 +753,11 @@ impl Secure {
     pub fn conectar(&mut self, direccion: &str) -> Result<(), String> {
         self.cerrar("nueva conexión");
         if let Some(sala) = crate::rele::sala_de(direccion) {
-            // The other person waits at the relay: go there and wait for the pair.
+            // The other person waits at a relay: go to all of them and keep the one where
+            // the pair completes.
             let (tx, rx) = mpsc::channel();
             std::thread::spawn(move || {
-                let r = crate::rele::conecta(&crate::rele::direccion(), &sala);
+                let r = crate::rele::conecta_a_cualquiera(&sala);
                 let _ = tx.send(match r {
                     Ok(s) => Entrante::AceptadoRele(s),
                     Err(e) => Entrante::ReleFallo(e),
@@ -741,6 +866,12 @@ impl Secure {
 
     /// Drop the link and forget the handshake; the identity and the book stay.
     pub fn cerrar(&mut self, por: &str) {
+        if self.enlace.is_some() && self.fase != Fase::Sola {
+            // Deliberate: tell the other side, so it does not wait at the relay for us.
+            self.manda(json!({ "t": "adios" }));
+            std::thread::sleep(Duration::from_millis(60));
+        }
+        self.reconexion = None;
         self.cierra_resumen();
         self.movil_fin();
         if let Some(p) = self.puerta.take() {
@@ -762,11 +893,17 @@ impl Secure {
         self.conversacion = None;
         self.entrada = None;
         self.salida = None;
+        self.cuantico_oferta = None;
+        self.capa = None;
+        self.cuantico_visto = false;
         self.llamada = None;
         self.entrante = None;
         self.perdida = None;
         self.llamado_en_grupo = false;
         self.otro_late = false;
+        self.otro_movil = false;
+        self.movil_dicho = None;
+        self.otro_voz_protegida = false;
         self.zona_otra.clear();
         self.reproduce_otro.clear();
         self.reproduce_dicho.clear();
@@ -795,6 +932,8 @@ impl Secure {
         self.movil_tic();
         self.timbres();
         self.sigue_envio();
+        self.di_dispositivo();
+        self.reconexion_tic();
         if self.enlace.is_some()
             && self.fase != Fase::Sola
             && self.ultimo_envio.elapsed() >= Duration::from_secs(20)
@@ -820,6 +959,13 @@ impl Secure {
                 Entrante::Aceptado(s) => self.adopta(s, false),
                 Entrante::AceptadoRele(s) => self.adopta(s, true),
                 Entrante::ReleFallo(e) => {
+                    if let Some(r) = &mut self.reconexion {
+                        r.buscando = false;
+                        r.proximo = ahora_s() + 3;
+                        self.rele_error = Some(e);
+                        self.cambio = true;
+                        continue;
+                    }
                     self.rele_error = Some(e.clone());
                     if self.fase == Fase::Buscando {
                         self.aviso("sec_rele_fallo", e);
@@ -843,16 +989,131 @@ impl Secure {
                     }
                     self.cambio = true;
                 }
-                Entrante::Conectado => self.saluda(),
+                Entrante::Conectado => {
+                    if self.reconexion.take().is_some() {
+                        self.fase = Fase::Lista;
+                        self.ultimo_recibido = std::time::Instant::now();
+                        self.monitor.anota(
+                            ahora_s(),
+                            Nivel::Info,
+                            "enlace recuperado; la conversación sigue",
+                        );
+                        self.manda(json!({ "t": "latido" }));
+                        self.di_dispositivo_otra_vez();
+                        self.digo_lo_que_tengo();
+                        self.cuantico_empieza();
+                        self.cambio = true;
+                    } else {
+                        self.saluda();
+                    }
+                }
                 Entrante::Trama(v) => self.trama(v),
                 Entrante::Cerrado(por) => {
-                    if self.fase != Fase::Sola {
+                    if self.fase == Fase::Lista && self.empieza_reconexion() {
+                        // Not over: both sides go back to the relay.
+                    } else if self.fase != Fase::Sola && self.reconexion.is_none() {
                         self.aviso("sec_enlace_cerrado", por.clone());
                         self.cerrar(&por);
                     }
                 }
             }
         }
+    }
+
+    /// The link dropped with the conversation open: keep the Olm session, drop the socket and
+    /// the call, and go back to the relay to a room both sides derive from the two verified
+    /// keys and the moment the conversation opened. `false` when there is nothing to pick up.
+    fn empieza_reconexion(&mut self) -> bool {
+        let Some(v) = self.verificado else {
+            return false;
+        };
+        if self.conversacion.is_none() {
+            return false;
+        }
+        let (mut a, mut b) = (self.identidad.public_key().to_bytes(), v.curve().to_bytes());
+        if a > b {
+            std::mem::swap(&mut a, &mut b);
+        }
+        let h = sha2::Sha256::digest(
+            [
+                b"GUARDIANA SECURE reconexion".as_slice(),
+                &a,
+                &b,
+                &self.inicio.to_be_bytes(),
+            ]
+            .concat(),
+        );
+        let sala: String = h[..16].iter().map(|x| format!("{x:02x}")).collect();
+        self.envio_al_caer();
+        self.enlace = None;
+        self.rx = None;
+        self.otro_late = false;
+        if self.llamada.is_some() {
+            self.fin_de_llamada();
+            self.aviso("sec_llamada_cortada_red", "");
+        }
+        self.movil_fin();
+        self.reconexion = Some(Reconexion {
+            sala,
+            desde: ahora_s(),
+            proximo: 0,
+            intentos: 0,
+            buscando: false,
+        });
+        self.monitor.anota(
+            ahora_s(),
+            Nivel::Info,
+            "enlace caído; buscando a la otra persona otra vez",
+        );
+        self.cambio = true;
+        true
+    }
+
+    /// Try again when due; give up after [`RECONEXION_S`].
+    fn reconexion_tic(&mut self) {
+        let Some(r) = self.reconexion.clone() else {
+            return;
+        };
+        let ahora = ahora_s();
+        if ahora.saturating_sub(r.desde) > RECONEXION_S {
+            self.reconexion = None;
+            self.aviso("sec_enlace_cerrado", "sin señal de la otra persona");
+            self.cerrar("no se recuperó el enlace");
+            return;
+        }
+        if r.buscando || ahora < r.proximo {
+            return;
+        }
+        let (tx, rx) = mpsc::channel();
+        self.rx = Some(rx);
+        self.tx = Some(tx.clone());
+        let sala = r.sala.clone();
+        // Both sides derive the same relay from the room, so they meet.
+        let indice = usize::from(sala.bytes().next().unwrap_or(0) % 16) % crate::rele::RELES.len();
+        let rele = std::env::var("GUARDIANA_RELE")
+            .unwrap_or_else(|_| crate::rele::RELES[indice].direccion());
+        std::thread::spawn(move || {
+            let res = crate::rele::conecta(&rele, &sala);
+            let _ = tx.send(match res {
+                Ok(s) => Entrante::AceptadoRele(s),
+                Err(e) => Entrante::ReleFallo(e),
+            });
+        });
+        if let Some(r) = &mut self.reconexion {
+            r.buscando = true;
+            r.intentos += 1;
+        }
+    }
+
+    /// After a new link, the other side hears again where we talk from.
+    fn di_dispositivo_otra_vez(&mut self) {
+        self.movil_dicho = None;
+        self.di_dispositivo();
+    }
+
+    /// Whether the conversation is waiting to meet the other side again.
+    pub fn reconectando(&self) -> bool {
+        self.reconexion.is_some()
     }
 
     /// No door in the router: wait at the blind relay with a fresh code (while the listener
@@ -869,8 +1130,12 @@ impl Secure {
         let Some(sala) = crate::rele::sala_de(&codigo) else {
             return;
         };
+        // Wait at the relay the code names (the nearest measured, see `rele::mide_cercania`).
+        let rele = std::env::var("GUARDIANA_RELE").unwrap_or_else(|_| {
+            crate::rele::RELES[crate::rele::rele_de_codigo(&codigo)].direccion()
+        });
         std::thread::spawn(move || {
-            let r = crate::rele::conecta(&crate::rele::direccion(), &sala);
+            let r = crate::rele::conecta(&rele, &sala);
             let _ = tx.send(match r {
                 Ok(s) => Entrante::AceptadoRele(s),
                 Err(e) => Entrante::ReleFallo(e),
@@ -892,6 +1157,13 @@ impl Secure {
         let t = v["t"].as_str().unwrap_or_default().to_owned();
         match t.as_str() {
             "latido" => self.otro_late = true,
+            "adios" => {
+                self.reconexion = None;
+                if self.fase != Fase::Sola {
+                    self.aviso("sec_enlace_cerrado", "la otra persona cerró");
+                    self.cerrar("la otra persona cerró");
+                }
+            }
             "hola" => self.hola(&v),
             "sas" => self.sas(&v),
             "sas_mac" => self.sas_mac(&v),
@@ -944,10 +1216,15 @@ impl Secure {
                 Err(_) => {
                     let n = self.nombre_contacto.clone();
                     self.estado.parar(
-                        guardiana_secure::pausa::Motivo::ClaveCambiada { nombre: n },
+                        guardiana_secure::pausa::Motivo::ClaveCambiada { nombre: n.clone() },
                         ahora_s(),
                         &mut self.monitor,
                         &mut self.cadena,
+                    );
+                    self.incidente(
+                        "clave_cambiada",
+                        format!("la clave de identidad de {n} no es la verificada"),
+                        0,
                     );
                 }
             }
@@ -1060,6 +1337,11 @@ impl Secure {
             }
             Err(_) => {
                 self.aviso("sec_sas_fallo", "");
+                self.incidente(
+                    "sas_distinto",
+                    "los números de verificación no cuadraron".to_owned(),
+                    0,
+                );
                 self.cerrar("la verificación no cuadró");
             }
         }
@@ -1113,6 +1395,7 @@ impl Secure {
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "conversación cifrada abierta");
                     self.manda_zona();
+                    self.cuantico_empieza();
                 }
                 Err(e) => {
                     self.aviso("sec_err_olm", e.to_string());
@@ -1135,10 +1418,27 @@ impl Secure {
             return;
         }
         let trust = self.agenda.trust();
+        let mut bytes = serde_json::to_vec(&carga).unwrap_or_default();
+        let renovar = self
+            .capa
+            .as_ref()
+            .is_some_and(|c| c.sellados() >= cuantico::RENUEVA_CADA);
+        if let Some(capa) = &mut self.capa {
+            // The post-quantum lock first; Olm wraps the sealed bytes as any other payload.
+            match capa.sella(&bytes) {
+                Ok(sellado) => {
+                    bytes = serde_json::to_vec(&json!({ "pq": B64.encode(sellado) }))
+                        .unwrap_or_default();
+                }
+                Err(e) => {
+                    self.aviso("sec_err_olm", e.to_string());
+                    return;
+                }
+            }
+        }
         let Some(conv) = &mut self.conversacion else {
             return;
         };
-        let bytes = serde_json::to_vec(&carga).unwrap_or_default();
         match trust.send(conv, &bytes) {
             Ok(env) => {
                 let (tipo, cuerpo) = env.to_wire();
@@ -1148,6 +1448,9 @@ impl Secure {
             Err(e) => {
                 self.aviso("sec_err_olm", e.to_string());
             }
+        }
+        if renovar {
+            self.cuantico_empieza();
         }
     }
 
@@ -1177,6 +1480,7 @@ impl Secure {
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "conversación cifrada abierta");
                     self.manda_zona();
+                    self.cuantico_empieza();
                     Ok(plano)
                 }
                 Err(e) => Err(e),
@@ -1186,16 +1490,137 @@ impl Secure {
             Ok(plano) => {
                 self.monitor.recibido(ahora_s());
                 if let Ok(carga) = serde_json::from_slice::<Value>(&plano) {
-                    self.carga(&carga);
+                    if let Some(carga) = self.cuantico_abre(carga) {
+                        self.carga(&carga);
+                    }
                 }
             }
-            Err(e) => self.aviso("sec_err_olm", e.to_string()),
+            Err(e) => {
+                self.aviso("sec_err_olm", e.to_string());
+                self.fallo_abriendo(false);
+            }
         }
         self.cambio = true;
     }
 
+    /// Side 0 (by the order of the keys) offers the ML-KEM key once the conversation is open,
+    /// and again after every link and every [`cuantico::RENUEVA_CADA`] sealed messages (a new
+    /// epoch, so a secret that leaked opens only what it sealed).
+    fn cuantico_empieza(&mut self) {
+        if self.mi_numero() != 0 || self.cuantico_oferta.is_some() {
+            return;
+        }
+        let (oferta, llave) = cuantico::Oferta::nueva();
+        self.cuantico_oferta = Some((oferta, llave.clone()));
+        self.manda_olm(json!({ "m": "pq_llave", "llave": B64.encode(llave) }));
+    }
+
+    /// The two verified identities in the order the layer binds them to (side 0 first).
+    fn identidades_ordenadas(&self) -> (Vec<u8>, Vec<u8>) {
+        let mia = self.identidad.public_key().to_bytes().to_vec();
+        let suya = self
+            .verificado
+            .map(|v| v.curve().to_bytes().to_vec())
+            .unwrap_or_default();
+        if self.mi_numero() == 0 {
+            (mia, suya)
+        } else {
+            (suya, mia)
+        }
+    }
+
+    /// What came inside Olm: sealed by the post-quantum layer, or plain. Plain is fine until
+    /// the layer is agreed and the other side has used it; after that it is a downgrade and
+    /// is dropped as an attack signal.
+    fn cuantico_abre(&mut self, carga: Value) -> Option<Value> {
+        let Some(sellado) = carga["pq"].as_str().and_then(|s| B64.decode(s).ok()) else {
+            if self.capa.is_some() && self.cuantico_visto {
+                self.incidente(
+                    "cuantico_degradado",
+                    "llegó un mensaje sin la capa poscuántica ya acordada".to_owned(),
+                    1,
+                );
+                return None;
+            }
+            return Some(carga);
+        };
+        let Some(capa) = &mut self.capa else {
+            return None;
+        };
+        match capa.abre(&sellado) {
+            Ok(plano) => {
+                self.cuantico_visto = true;
+                serde_json::from_slice::<Value>(&plano).ok()
+            }
+            Err(_) => {
+                self.incidente(
+                    "cuantico_mal",
+                    "un mensaje no pasó la capa poscuántica (repetido o alterado)".to_owned(),
+                    1,
+                );
+                None
+            }
+        }
+    }
+
+    /// The layer is on: shown on screen as «resistente a ordenadores cuánticos».
+    #[must_use]
+    pub fn cuantico(&self) -> bool {
+        self.capa.is_some()
+    }
+
     fn carga(&mut self, c: &Value) {
         match c["m"].as_str().unwrap_or_default() {
+            "pq_llave" => {
+                // Side 1: a secret for that key, its ciphertext back, and the layer from here
+                // on (the answer itself goes plain: the other side has no layer yet).
+                let Some(llave) = c["llave"].as_str().and_then(|s| B64.decode(s).ok()) else {
+                    return;
+                };
+                if self.mi_numero() != 1 {
+                    return;
+                }
+                match cuantico::encapsula(&llave) {
+                    Ok((cifrado, secreto)) => {
+                        let (id0, id1) = self.identidades_ordenadas();
+                        let t = cuantico::transcript(&id0, &id1, &llave, &cifrado);
+                        // The answer goes out under the epoch the other side still has.
+                        self.manda_olm(
+                            json!({ "m": "pq_cifrado", "cifrado": B64.encode(cifrado) }),
+                        );
+                        match &mut self.capa {
+                            Some(capa) => capa.renueva(&secreto, &t),
+                            None => self.capa = Some(cuantico::Capa::nueva(&secreto, &t, 1)),
+                        }
+                        self.monitor
+                            .anota(ahora_s(), Nivel::Info, "capa poscuántica activa");
+                        self.cambio = true;
+                    }
+                    Err(e) => self.aviso("sec_err_olm", e.to_string()),
+                }
+            }
+            "pq_cifrado" => {
+                let Some(cifrado) = c["cifrado"].as_str().and_then(|s| B64.decode(s).ok()) else {
+                    return;
+                };
+                let Some((oferta, llave)) = self.cuantico_oferta.take() else {
+                    return;
+                };
+                match oferta.abre(&cifrado) {
+                    Ok(secreto) => {
+                        let (id0, id1) = self.identidades_ordenadas();
+                        let t = cuantico::transcript(&id0, &id1, &llave, &cifrado);
+                        match &mut self.capa {
+                            Some(capa) => capa.renueva(&secreto, &t),
+                            None => self.capa = Some(cuantico::Capa::nueva(&secreto, &t, 0)),
+                        }
+                        self.monitor
+                            .anota(ahora_s(), Nivel::Info, "capa poscuántica activa");
+                        self.cambio = true;
+                    }
+                    Err(e) => self.aviso("sec_err_olm", e.to_string()),
+                }
+            }
             "grupo" => {
                 self.grupo = c["nombres"]
                     .as_array()
@@ -1263,6 +1688,14 @@ impl Secure {
             }
             "reinicia_media" => {
                 self.reinicios += 1;
+                self.cambio = true;
+            }
+            "dispositivo" => {
+                self.otro_movil = c["movil"].as_bool().unwrap_or(false);
+                self.cambio = true;
+            }
+            "voz" => {
+                self.otro_voz_protegida = c["protegida"].as_bool().unwrap_or(false);
                 self.cambio = true;
             }
             "zona" => {
@@ -1342,8 +1775,32 @@ impl Secure {
                 self.entrada = Some(e);
                 self.vacia_bloques();
             }
+            "archivo_tengo" => {
+                let bloques = c["bloques"].as_u64().unwrap_or(0);
+                let ultimo = c["ultimo"].as_str().unwrap_or_default();
+                let ultimo = if ultimo.is_empty() {
+                    String::new()
+                } else {
+                    limpia_nombre(ultimo)
+                };
+                let nombre = c["nombre"].as_str().unwrap_or_default();
+                let nombre = if nombre.is_empty() {
+                    String::new()
+                } else {
+                    limpia_nombre(nombre)
+                };
+                self.archivo_tengo(&nombre, bloques, &ultimo);
+            }
             "archivo_ok" => {
                 let nombre = limpia_nombre(c["nombre"].as_str().unwrap_or_default());
+                if self
+                    .salida
+                    .as_ref()
+                    .is_some_and(|s| s.nombre == nombre && s.llave.is_some())
+                {
+                    // Whole on the other disk: nothing left to resend.
+                    self.salida = None;
+                }
                 if let Some(x) = self
                     .enviados
                     .iter_mut()
@@ -1405,15 +1862,23 @@ impl Secure {
     fn vacia_bloques(&mut self) {
         let mut fallo: Option<&'static str> = None;
         let mut completo = false;
+        let mut confirma: Option<(String, u64)> = None;
         if let Some(e) = &mut self.entrada {
             if let (Some(r), Some(f)) = (&mut e.recepcion, &mut e.archivo) {
                 while let Some((n, b)) = e.bloques_pendientes.pop_front() {
+                    if n < r.bloques() {
+                        // Already here (sent again after a drop): let it pass.
+                        continue;
+                    }
                     match r.mete(n, &b) {
                         Ok(plano) => {
                             e.recibido += plano.len() as u64;
                             if f.write_all(&plano).is_err() {
                                 fallo = Some("sec_err_archivo");
                                 break;
+                            }
+                            if r.bloques() % CONFIRMA_CADA == 0 {
+                                confirma = Some((e.nombre.clone(), r.bloques()));
                             }
                         }
                         Err(_) => {
@@ -1436,7 +1901,17 @@ impl Secure {
                 }
             }
             self.aviso(clave, "");
+            if clave == "sec_archivo_mal" {
+                self.incidente(
+                    "archivo_mal",
+                    "un bloque de archivo llegó alterado".to_owned(),
+                    1,
+                );
+            }
             return;
+        }
+        if let Some((nombre, bloques)) = confirma.filter(|_| !completo) {
+            self.manda_olm(json!({ "m": "archivo_tengo", "nombre": nombre, "bloques": bloques }));
         }
         if completo {
             if let Some(e) = self.entrada.take() {
@@ -1785,6 +2260,7 @@ impl Secure {
                     Nivel::Inusual,
                     "un trozo de la llamada no se pudo abrir; descartado",
                 );
+                self.fallo_abriendo(true);
             }
         }
         self.tasa();
@@ -1834,8 +2310,11 @@ impl Secure {
         }
         let nombre = limpia_nombre(nombre);
         let trozos = Trozos::new().map_err(|e| e.to_string())?;
+        let inicial = trozos.llave_inicial();
         // The key first: the other side writes each block to disk as it comes.
-        self.manda_olm(json!({ "m": "archivo_inicio", "nombre": nombre, "llave": trozos.llave_inicial(), "bytes": bytes }));
+        self.manda_olm(
+            json!({ "m": "archivo_inicio", "nombre": nombre, "llave": inicial, "bytes": bytes }),
+        );
         let inicio = self.enlace.as_ref().map_or(0, |e| e.cuenta().0);
         self.enviados.push(Enviado {
             nombre: nombre.clone(),
@@ -1849,6 +2328,7 @@ impl Secure {
             bytes,
             inicio,
             fin: None,
+            antes: 0,
             marcas: VecDeque::new(),
             aviso: std::time::Instant::now(),
         });
@@ -1856,15 +2336,140 @@ impl Secure {
             nombre,
             trozos,
             bytes: 0,
+            guardados: VecDeque::new(),
+            guardados_bytes: 0,
+            pausada: self.enlace.is_none(),
+            llave: None,
+            inicial,
+            anunciado: bytes,
         });
         self.cambio = true;
         Ok(())
     }
 
+    /// The other side says how many blocks of the file it has (every few MB, and right after
+    /// a link comes back, when it also names the last file it got whole): the blocks before
+    /// that are let go, and if the sending was paused by a drop, it goes on from there. The
+    /// keys go again if they were lost in the drop.
+    fn archivo_tengo(&mut self, nombre: &str, bloques: u64, ultimo: &str) {
+        let Some(s) = &mut self.salida else {
+            return;
+        };
+        let mut bloques = bloques;
+        let mut desde_el_principio = false;
+        if s.nombre != nombre {
+            if !s.pausada {
+                return;
+            }
+            if s.llave.is_some() && ultimo == s.nombre {
+                // It got there whole; only the «it is here» was lost.
+                let llego = self.salida.take().map(|s| s.nombre);
+                if let Some(x) = self
+                    .enviados
+                    .iter_mut()
+                    .find(|x| Some(&x.nombre) == llego.as_ref() && x.llego_en.is_none())
+                {
+                    x.llego_en = Some(x.empezo.elapsed().as_secs_f64());
+                }
+                self.envio = None;
+                self.cambio = true;
+                return;
+            }
+            // The start never got there: from the first block, key first.
+            bloques = 0;
+            desde_el_principio = true;
+        }
+        while s.guardados.front().is_some_and(|(n, _)| *n < bloques) {
+            if let Some((_, c)) = s.guardados.pop_front() {
+                s.guardados_bytes = s.guardados_bytes.saturating_sub(c.len() as u64);
+            }
+        }
+        if !s.pausada {
+            return;
+        }
+        // Everything from `bloques` on must still be here; otherwise the file is lost.
+        let enviados = s.llave.as_ref().map_or(s.trozos.bloques(), |l| l.bloques);
+        let primero = s.guardados.front().map_or(enviados, |(n, _)| *n);
+        if primero != bloques {
+            self.salida = None;
+            self.envio = None;
+            self.aviso("sec_archivo_cortado", "");
+            self.cambio = true;
+            return;
+        }
+        s.pausada = false;
+        let otra_vez: Vec<Value> = s
+            .guardados
+            .iter()
+            .map(|(n, c)| json!({ "t": "bloque", "n": n, "b": B64.encode(c) }))
+            .collect();
+        let llave = s.llave.clone();
+        let nombre = s.nombre.clone();
+        let inicio = desde_el_principio.then(|| (s.inicial.clone(), s.anunciado));
+        if let Some((inicial, anunciado)) = inicio {
+            self.manda_olm(json!({ "m": "archivo_inicio", "nombre": nombre, "llave": inicial, "bytes": anunciado }));
+        }
+        for t in otra_vez {
+            self.manda(t);
+        }
+        if let Some(l) = llave {
+            self.manda_olm(json!({ "m": "archivo", "nombre": nombre, "llave": l }));
+            let hasta = self.enlace.as_ref().map_or(0, |e| e.cuenta().0);
+            if let Some(v) = &mut self.envio {
+                v.fin = Some(hasta);
+            }
+        }
+        self.monitor.anota(
+            ahora_s(),
+            Nivel::Info,
+            format!("archivo reanudado: {nombre}"),
+        );
+        self.cambio = true;
+    }
+
+    /// The link dropped mid-file: keep what is on its way, pause, and count what was written.
+    fn envio_al_caer(&mut self) {
+        let escritos = self.enlace.as_ref().map(|e| e.cuenta().1);
+        if let Some(v) = &mut self.envio {
+            if let Some(w) = escritos {
+                v.antes += w.saturating_sub(v.inicio);
+            }
+            v.inicio = 0;
+            v.fin = None;
+            v.marcas.clear();
+        }
+        if let Some(s) = &mut self.salida {
+            s.pausada = true;
+        }
+    }
+
+    /// After the link came back: tell the sender where we are with the file coming in (or
+    /// that none is, and which was the last one that got here whole).
+    fn digo_lo_que_tengo(&mut self) {
+        let (nombre, bloques) = self
+            .entrada
+            .as_ref()
+            .and_then(|e| {
+                e.recepcion
+                    .as_ref()
+                    .map(|r| (e.nombre.clone(), r.bloques()))
+            })
+            .unwrap_or_default();
+        let ultimo = self
+            .recibidos
+            .last()
+            .map(|r| r.nombre.clone())
+            .unwrap_or_default();
+        self.manda_olm(
+            json!({ "m": "archivo_tengo", "nombre": nombre, "bloques": bloques, "ultimo": ultimo }),
+        );
+    }
+
     /// The file going out: how far, and the seconds left at the speed of the last seconds.
     fn sigue_envio(&mut self) {
         let Some((encolados, escritos)) = self.enlace.as_ref().map(Enlace::cuenta) else {
-            self.envio = None;
+            // No link: the file waits for the reconnection (it is dropped with the
+            // conversation in `cerrar`).
             return;
         };
         let Some(v) = &mut self.envio else {
@@ -1894,18 +2499,23 @@ impl Secure {
 
     /// The file going out, for the screen (null when none).
     pub fn envio_json(&self) -> Value {
-        let (Some(v), Some(e)) = (&self.envio, &self.enlace) else {
+        let Some(v) = &self.envio else {
             return Value::Null;
         };
-        let (encolados, escritos) = e.cuenta();
+        let (encolados, escritos) = self.enlace.as_ref().map_or((0, 0), Enlace::cuenta);
         // In base64 inside JSON a file takes about 4/3 of its size, plus a little per block.
         let total = v
             .fin
             .map_or(v.bytes.saturating_mul(4) / 3 + v.bytes / 400 + 1, |f| {
-                f.saturating_sub(v.inicio)
+                v.antes + f.saturating_sub(v.inicio)
             })
             .max(1);
-        let hecho = escritos.saturating_sub(v.inicio).min(total);
+        let hecho = (v.antes + escritos.saturating_sub(v.inicio)).min(total);
+        let pausado = self.enlace.is_none()
+            || self
+                .salida
+                .as_ref()
+                .is_some_and(|s| s.pausada || s.guardados_bytes > GUARDADOS_MAX);
         let velocidad = match (v.marcas.front(), v.marcas.back()) {
             (Some((t0, b0)), Some((t1, b1))) if t1 > t0 => {
                 (b1.saturating_sub(*b0)) as f64 / t1.duration_since(*t0).as_secs_f64()
@@ -1921,6 +2531,7 @@ impl Secure {
             "restante_s": restante,
             "kbps": (velocidad * 8.0 / 1000.0) as u64,
             "cola": encolados.saturating_sub(escritos),
+            "pausado": pausado,
         })
     }
 
@@ -1932,18 +2543,31 @@ impl Secure {
         let bytes = B64.decode(b64).map_err(|e| e.to_string())?;
         let (n, c) = s.trozos.empuja(&bytes).map_err(|e| e.to_string())?;
         s.bytes += bytes.len() as u64;
-        let trama = json!({ "t": "bloque", "n": n, "b": B64.encode(c) });
-        self.manda(trama);
+        let trama = json!({ "t": "bloque", "n": n, "b": B64.encode(&c) });
+        s.guardados_bytes += c.len() as u64;
+        s.guardados.push_back((n, c));
+        let pausada = s.pausada;
+        if !pausada {
+            self.manda(trama);
+        }
         if ultimo {
-            let Some(s) = self.salida.take() else {
+            // The file stays in `salida` (blocks kept, key ready) until the other side says
+            // it is whole, or the next file starts: a drop in between can still be mended.
+            let Some(s) = &mut self.salida else {
                 return Ok(());
             };
             let nombre = s.nombre.clone();
-            let llave = s.trozos.termina().map_err(|e| e.to_string())?;
-            self.manda_olm(json!({ "m": "archivo", "nombre": nombre, "llave": llave }));
-            let hasta = self.enlace.as_ref().map_or(0, |e| e.cuenta().0);
-            if let Some(v) = &mut self.envio {
-                v.fin = Some(hasta);
+            let bytes = s.bytes;
+            let trozos =
+                std::mem::replace(&mut s.trozos, Trozos::new().map_err(|e| e.to_string())?);
+            let llave = trozos.termina().map_err(|e| e.to_string())?;
+            s.llave = Some(llave.clone());
+            if !pausada {
+                self.manda_olm(json!({ "m": "archivo", "nombre": nombre, "llave": llave }));
+                let hasta = self.enlace.as_ref().map_or(0, |e| e.cuenta().0);
+                if let Some(v) = &mut self.envio {
+                    v.fin = Some(hasta);
+                }
             }
             if let Some(x) = self
                 .enviados
@@ -1954,7 +2578,7 @@ impl Secure {
                 x.t = ahora_s();
             }
             self.archivos.enviados += 1;
-            self.archivos.bytes += s.bytes;
+            self.archivos.bytes += bytes;
             self.monitor
                 .anota(ahora_s(), Nivel::Info, format!("archivo enviado: {nombre}"));
             self.mensajes
@@ -1962,6 +2586,139 @@ impl Secure {
             self.cambio = true;
         }
         Ok(())
+    }
+
+    /// What can be said about the other end right now: on a direct link, its address with the
+    /// country and network the bundled base gives (no lookup leaves this computer); through
+    /// the relay, nothing.
+    fn otro_extremo(&self) -> Option<OtroExtremo> {
+        if self.rele {
+            return None;
+        }
+        let ip = self.enlace.as_ref()?.ip_del_otro()?;
+        let s = guardiana_lists::servidor_de(ip);
+        Some(OtroExtremo {
+            ip: ip.to_string(),
+            pais: s.pais.map(str::to_owned),
+            red: s.red.map(|r| r.nombre.to_owned()).filter(|n| !n.is_empty()),
+        })
+    }
+
+    /// Stop everything and keep the card: sends frozen, the call hung up, the monitor and the
+    /// chain told. Only the first incident of a stop is kept.
+    fn incidente(&mut self, senal: &'static str, detalle: String, fallos: u32) {
+        if self.incidente.is_some() {
+            return;
+        }
+        let transporte = match self.monitor.transporte.directo {
+            Some(true) => "directo",
+            Some(false) => "rele",
+            None => "ninguno",
+        };
+        let otro = self.otro_extremo();
+        self.incidente = Some(Incidente {
+            cuando: ahora_s(),
+            senal,
+            detalle: detalle.clone(),
+            transporte,
+            fallos,
+            contacto: self.nombre_contacto.clone(),
+            zona_otra: self.zona_otra.clone(),
+            otro,
+        });
+        if self.llamada.is_some() {
+            self.manda_olm(json!({ "m": "cuelga" }));
+            self.fin_de_llamada();
+        }
+        if self.estado.en_marcha() {
+            self.estado.parar(
+                guardiana_secure::pausa::Motivo::Inusual {
+                    texto: format!("posible interferencia: {detalle}"),
+                },
+                ahora_s(),
+                &mut self.monitor,
+                &mut self.cadena,
+            );
+        }
+        self.cambio = true;
+    }
+
+    /// A frame that failed to open: one is a bad network; a burst (3 in 10 s or 5 in 60 s for
+    /// messages, 8 in 30 s for the call) is treated as an interference.
+    fn fallo_abriendo(&mut self, media: bool) {
+        let ahora = ahora_s();
+        let (cola, limite) = if media {
+            (&mut self.fallos_media, (8u32, 30u64))
+        } else {
+            (&mut self.fallos_olm, (5u32, 60u64))
+        };
+        cola.push_back(ahora);
+        while cola
+            .front()
+            .is_some_and(|&t| ahora.saturating_sub(t) > limite.1)
+        {
+            cola.pop_front();
+        }
+        let n = cola.len() as u32;
+        let corto = !media
+            && cola
+                .iter()
+                .filter(|&&t| ahora.saturating_sub(t) <= 10)
+                .count()
+                >= 3;
+        if n >= limite.0 || corto {
+            let (senal, detalle) = if media {
+                (
+                    "media_fallos",
+                    format!(
+                        "{n} trozos de la llamada no se pudieron abrir en {} s",
+                        limite.1
+                    ),
+                )
+            } else {
+                (
+                    "olm_fallos",
+                    format!("{n} mensajes no se pudieron autenticar"),
+                )
+            };
+            self.incidente(senal, detalle, n);
+        }
+    }
+
+    /// The incident, for the screen (null when none).
+    pub fn estado_incidente(&self) -> Value {
+        self.incidente.as_ref().map_or(Value::Null, |i| {
+            serde_json::to_value(i).unwrap_or(Value::Null)
+        })
+    }
+
+    /// The incident report the person saves: the card, this computer's version, and the signed
+    /// chain of everything seen, so the sheet proves who wrote it and when (not who attacked).
+    pub fn informe_incidente(&self) -> Option<String> {
+        let i = self.incidente.as_ref()?;
+        let prueba = Prueba::firmar(
+            &self.identidad,
+            self.cadena.clone(),
+            &self.version,
+            ahora_s(),
+        );
+        Some(
+            json!({
+                "tipo": "guardiana-secure-incidente",
+                "version": 1,
+                "programa": self.version,
+                "incidente": i,
+                "prueba": serde_json::from_str::<Value>(&prueba.to_json()).unwrap_or(Value::Null),
+            })
+            .to_string(),
+        )
+    }
+
+    /// The person closed the card (after saving it, verifying again or ending).
+    pub fn olvida_incidente(&mut self) {
+        if self.incidente.take().is_some() {
+            self.cambio = true;
+        }
     }
 
     /// The person says the program seen is theirs: go on (only for something observed).
@@ -2004,9 +2761,8 @@ impl Secure {
     /// and put the QR code on screen. `idioma` goes into the QR so the page opens in the
     /// person's language.
     pub fn movil_empieza(&mut self, idioma: &str) -> Result<(), String> {
-        if self.fase != Fase::Lista {
-            return Err("sec_no_lista".to_owned());
-        }
+        // Any moment, since 16 Oct 2026: the phone can be in from before the other side
+        // arrives (it then shows the code to share, the wait, the numbers to compare).
         if self.movil.is_some() {
             return Ok(());
         }
@@ -2093,6 +2849,41 @@ impl Secure {
         }
     }
 
+    /// The page turned «Voz protegida» on or off: remember it and tell the other side.
+    pub fn voz_protegida(&mut self, activa: bool) {
+        self.voz_protegida = activa;
+        if self.fase == Fase::Lista {
+            self.manda_olm(json!({ "m": "voz", "protegida": activa }));
+        }
+        self.cambio = true;
+    }
+
+    /// Tell the other side whether our phone is the one talking, each time that changes.
+    fn di_dispositivo(&mut self) {
+        if self.fase != Fase::Lista {
+            return;
+        }
+        let ahora = self.movil_manda();
+        if self.movil_dicho == Some(ahora) {
+            return;
+        }
+        if self.movil_dicho.is_none() && self.voz_protegida {
+            self.manda_olm(json!({ "m": "voz", "protegida": true }));
+        }
+        self.movil_dicho = Some(ahora);
+        self.manda_olm(json!({ "m": "dispositivo", "movil": ahora }));
+    }
+
+    /// Whether the other side said it is talking from its phone.
+    pub fn otro_en_movil(&self) -> bool {
+        self.otro_movil
+    }
+
+    /// Whether the other side said its voice leaves transformed.
+    pub fn otro_voz_protegida(&self) -> bool {
+        self.otro_voz_protegida
+    }
+
     /// Whether the phone is the one talking right now.
     fn movil_manda(&self) -> bool {
         self.movil
@@ -2155,6 +2946,7 @@ impl Secure {
                     let _ = self.contestar(&mime);
                 }
                 Desde::Rechazar if aprobado => self.rechazar(),
+                Desde::Sas { ok, nombre } if aprobado => self.sas_persona(ok, &nombre),
                 Desde::PideInicio if aprobado => self.pide_inicio(),
                 Desde::Media(b) if aprobado => {
                     let _ = self.media_bytes(b);
@@ -2232,6 +3024,11 @@ impl Secure {
             "codigo": self.puerta.as_ref().map(crate::puerta::Puerta::codigo),
             "puerta_error": self.puerta_error,
             "reproduce_otro": self.reproduce_otro,
+            "otro_movil": self.otro_movil,
+            "otro_voz_protegida": self.otro_voz_protegida,
+            "incidente": self.estado_incidente(),
+            "reconectando": self.reconexion.as_ref().map(|r| json!({ "desde": r.desde, "intentos": r.intentos })),
+            "cuantico": self.capa.is_some(),
             "rele_codigo": self.rele_codigo,
             "rele": self.rele,
             "rele_error": self.rele_error,
@@ -2425,6 +3222,17 @@ mod tests {
         a.movil_fin();
         gira(&mut a, &mut b, 15);
         assert_eq!(b.estado_json()["reproduce_otro"], json!([]));
+        // Each side told the other it talks from its computer: the screen shows the highest
+        // level. (A phone talking would say so the same way; see `di_dispositivo`.)
+        assert_eq!(b.estado_json()["otro_movil"], false);
+        assert_eq!(a.movil_dicho, Some(false));
+        // «Voz protegida» on a's side: b hears it and shows it on the call panel.
+        a.voz_protegida(true);
+        gira(&mut a, &mut b, 15);
+        assert_eq!(b.estado_json()["otro_voz_protegida"], true);
+        a.voz_protegida(false);
+        gira(&mut a, &mut b, 15);
+        assert_eq!(b.estado_json()["otro_voz_protegida"], false);
 
         // A file in three pieces, the last one short.
         let plano: Vec<u8> = (0..(guardiana_secure::archivo::BLOQUE * 2 + 321))
@@ -2451,6 +3259,30 @@ mod tests {
         assert!(a.estado_json()["envio"].is_null(), "the send is over");
         assert!(b.mensajes.last().unwrap().2.contains("informe.pdf"));
         assert!(b.monitor.cifrado.recibidos >= 2);
+
+        // Three frames that fail to open within ten seconds: a stop that looks like an
+        // interference, with the card, the signed report, and (direct link) the other end's
+        // address for this card only; the person closes it and the card goes.
+        assert!(b.estado_json()["incidente"].is_null());
+        b.fallo_abriendo(false);
+        assert!(
+            b.estado_json()["incidente"].is_null(),
+            "one failure is a bad network"
+        );
+        b.fallo_abriendo(false);
+        b.fallo_abriendo(false);
+        let inc = b.estado_json()["incidente"].clone();
+        assert_eq!(inc["senal"], "olm_fallos");
+        assert_eq!(inc["fallos"], 3);
+        assert_eq!(inc["transporte"], "directo");
+        assert_eq!(inc["otro"]["ip"], "127.0.0.1");
+        assert!(!b.estado.en_marcha(), "sends are frozen");
+        let informe: Value = serde_json::from_str(&b.informe_incidente().unwrap()).unwrap();
+        assert_eq!(informe["tipo"], "guardiana-secure-incidente");
+        assert_eq!(informe["incidente"]["senal"], "olm_fallos");
+        assert!(informe["prueba"]["firma"].is_string());
+        b.olvida_incidente();
+        assert!(b.estado_json()["incidente"].is_null());
 
         // Both books remember each other; the next hello skips the short code.
         assert_eq!(
@@ -2512,6 +3344,89 @@ mod tests {
         a.texto("por el relé");
         gira(&mut a, &mut b, 15);
         assert_eq!(b.mensajes.last().unwrap().2, "por el relé");
+
+        // The link drops (a router reboot, a change of network): the conversation is not
+        // over. Both sides go back to the relay to a room they derive on their own, meet
+        // again, and the same Olm session carries on: no new greeting, no numbers again.
+        for s in [&mut a, &mut b] {
+            s.enlace = None;
+            s.rx = None;
+            assert!(s.empieza_reconexion());
+            assert!(s.reconectando());
+        }
+        assert_eq!(
+            a.reconexion.as_ref().unwrap().sala,
+            b.reconexion.as_ref().unwrap().sala
+        );
+        let sala = a.reconexion.as_ref().unwrap().sala.clone();
+        assert!(!sala.contains("127.0.0.1"));
+        gira(&mut a, &mut b, 60);
+        assert!(!a.reconectando(), "{}", a.estado_json());
+        assert!(!b.reconectando(), "{}", b.estado_json());
+        assert_eq!(a.estado_json()["fase"], "lista");
+        assert_eq!(b.estado_json()["fase"], "lista");
+        b.texto("sigo aquí");
+        gira(&mut a, &mut b, 15);
+        assert_eq!(a.mensajes.last().unwrap().2, "sigo aquí");
+        assert!(a.monitor.identidad.is_some(), "still verified");
+
+        // A file cut in the middle by another drop goes on from where the other side got to:
+        // the blocks the drop swallowed go out again, and the file arrives whole (16 Oct
+        // 2026, «reanudación»).
+        let plano: Vec<u8> = (0..(guardiana_secure::archivo::BLOQUE * 5 + 77))
+            .map(|i| (i % 251) as u8)
+            .collect();
+        let trozos: Vec<&[u8]> = plano.chunks(guardiana_secure::archivo::BLOQUE).collect();
+        a.archivo_empieza("grande.bin", plano.len() as u64).unwrap();
+        gira(&mut a, &mut b, 5);
+        for t in &trozos[..2] {
+            a.archivo_trozo(&B64.encode(t), false).unwrap();
+        }
+        gira(&mut a, &mut b, 10);
+        assert_eq!(
+            b.entrada
+                .as_ref()
+                .unwrap()
+                .recepcion
+                .as_ref()
+                .unwrap()
+                .bloques(),
+            2
+        );
+        // The next block is handed over right as the link dies: nobody gets it.
+        a.archivo_trozo(&B64.encode(trozos[2]), false).unwrap();
+        for s in [&mut a, &mut b] {
+            s.enlace = None;
+            s.rx = None;
+            assert!(s.empieza_reconexion());
+        }
+        assert!(a.envio_json()["pausado"].as_bool().unwrap());
+        // The page keeps handing pieces over only once `pausado` clears; here two more come
+        // while it is paused, to be sure they wait inside the program.
+        for t in &trozos[3..5] {
+            a.archivo_trozo(&B64.encode(t), false).unwrap();
+        }
+        gira(&mut a, &mut b, 60);
+        assert!(!a.reconectando() && !b.reconectando());
+        gira(&mut a, &mut b, 10);
+        assert!(
+            !a.envio_json()["pausado"].as_bool().unwrap(),
+            "{}",
+            a.envio_json()
+        );
+        a.archivo_trozo(&B64.encode(trozos[5]), true).unwrap();
+        gira(&mut a, &mut b, 20);
+        let r = b.recibidos.last().unwrap();
+        assert_eq!(r.nombre, "grande.bin");
+        assert_eq!(std::fs::read(&r.ruta).unwrap(), plano);
+        assert!(a.enviados.last().unwrap().llego_en.is_some());
+        assert!(a.salida.is_none() && a.envio.is_none());
+
+        // A deliberate close says goodbye: the other side does not wait at the relay.
+        a.cerrar("adiós");
+        gira(&mut a, &mut b, 15);
+        assert!(!b.reconectando());
+        assert_eq!(b.estado_json()["fase"], "sola");
         let _ = std::fs::remove_dir_all(base);
     }
 }

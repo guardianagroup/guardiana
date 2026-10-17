@@ -27,6 +27,7 @@ pub mod claves {
 pub mod agenda;
 pub mod archivo;
 pub mod carry;
+pub mod cuantico;
 pub mod monitor;
 pub mod pausa;
 pub mod prueba;

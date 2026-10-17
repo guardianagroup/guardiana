@@ -23,7 +23,7 @@
   --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   /* spacing and corners: four steps of 4, then 24 and 32; fields 8, cards 12, pills round */
   --e1: 4px; --e2: 8px; --e3: 12px; --e4: 16px; --e5: 24px; --e6: 32px;
-  --r-campo: 8px; --r-tarjeta: 12px; --r-pill: 999px;
+  --r-campo: 10px; --r-boton: 10px; --r-tarjeta: 14px; --r-pill: 999px;
   color-scheme: light;
 }
 
@@ -52,7 +52,9 @@
   }
 }
 
-/* Buttons. One shape everywhere: a pill, small mono capitals, as on the website.
+/* Buttons. One shape everywhere (16 Oct 2026, the design the owner chose for the three tabs):
+   a soft rectangle of 10 px, sentence case, 13 px of the text face; an icon may sit before the
+   word as a 1.8 px stroke. The website keeps its own pills.
    Primary: the blue, filled.          .btn                 .boton.principal
    Secondary: quiet, a line around it. .btn.secondary       .boton
    Cut: red outline, red when pointed. .btn.cut             .boton.corta
@@ -61,8 +63,8 @@
    Small: .chico on any of them. */
 .btn, .boton {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--e2);
-  border-radius: var(--r-pill); padding: 9px 18px; min-height: 36px;
-  font: 500 12px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  border-radius: var(--r-boton); padding: 8px 16px; min-height: 38px;
+  font: 500 13.5px/1.2 var(--texto); letter-spacing: 0; text-transform: none;
   text-decoration: none; white-space: nowrap; cursor: pointer;
   transition: background-color .15s, border-color .15s, color .15s;
 }
@@ -76,7 +78,8 @@
 .btn.deja:hover, .boton.deja:hover { background: var(--ok); color: var(--accent-fg); border-color: var(--ok); }
 .btn.danger, .boton.peligro { background: var(--alerta); color: #fff; border: 1px solid var(--alerta); }
 .btn.danger:hover, .boton.peligro:hover { filter: brightness(1.08); }
-.btn.chico, .boton.chico { padding: 5px 12px; min-height: 28px; font-size: 11px; }
+.btn.chico, .boton.chico { padding: 6px 12px; min-height: 32px; font-size: 12.5px; }
+.btn svg, .boton svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .btn[hidden], .boton[hidden] { display: none; }
 .btn[disabled], .boton[disabled], .btn[aria-disabled="true"], .boton[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
 .btn:focus-visible, .boton:focus-visible, .campo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -87,11 +90,13 @@
 .enlace:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* Fields */
-.campo { width: 100%; font: 400 14px/1.4 var(--texto); color: var(--fg); border: 1px solid var(--line); background: var(--campo); border-radius: var(--r-campo); padding: 8px 11px; }
+.campo { width: 100%; font: 400 14px/1.4 var(--texto); color: var(--fg); border: 1px solid var(--line); background: var(--campo); border-radius: var(--r-campo); padding: 9px 12px; }
 .campo:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-suave); background: var(--card); }
 
 /* Cards: the paper of the receipt. */
 .tarjeta { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-tarjeta); padding: 18px 20px; }
+/* Icons everywhere: 1.8 px strokes of the current colour, 20 px by default. */
+.icono { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 /* Chips: a label, never a verdict. Outlined pills in small mono capitals, like the website's. */
 .chip { display: inline-block; padding: 2px 9px; border-radius: var(--r-pill); font: 500 10.5px/1.5 var(--mono); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; background: transparent; border: 1px solid currentColor; color: var(--muted); }

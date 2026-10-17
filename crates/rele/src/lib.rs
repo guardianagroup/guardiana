@@ -10,7 +10,9 @@
 //! who came, no addresses (decision 203 applies to the relay too). Memory holds only the
 //! connections waiting for their pair, for ten minutes at most.
 //!
-//! Wire: the client sends one line, `GUARDIANA-RELE 1 <room, 32 hex>\n`. The relay answers
+//! Wire: the client sends one line, `GUARDIANA-RELE 1 <room, 32 hex>\n`, plain or, since
+//! 16 Oct 2026, inside TLS with the relay's certificate (some networks pass port 443 only when it
+//! looks like a web page). The relay answers
 //! `OK\n` to both when the pair is complete, or `LLENO\n` to a third one, then copies bytes in
 //! both directions until either side closes.
 //!

@@ -468,10 +468,16 @@ impl Grupo {
         let hablando: Vec<usize> = (0..self.sesiones.len())
             .filter(|&i| self.sesiones[i].lista())
             .collect();
-        if hablando.len() != 1 || self.nombres().len() > 2 {
+        if self.nombres().len() > 2 || hablando.len() > 1 {
             return Err("sec_mv_solo_dos".to_owned());
         }
-        self.sesiones[hablando[0]].movil_empieza(idioma)
+        // Nobody talking yet (16 Oct 2026, «conectar el móvil antes que el PC»): the phone
+        // joins the first link, the one waiting for or looking for the other side.
+        let i = hablando.first().copied().unwrap_or(0);
+        match self.sesiones.get_mut(i) {
+            Some(s) => s.movil_empieza(idioma),
+            None => Err("sec_mv_solo_dos".to_owned()),
+        }
     }
 
     /// Our new player needs the other side's pieces from a fresh start.
@@ -602,6 +608,27 @@ impl Grupo {
         self.cambio = true;
     }
 
+    /// The incident report of whichever link stopped, signed (none when nothing stopped).
+    pub fn informe_incidente(&self) -> Option<String> {
+        self.sesiones.iter().find_map(Secure::informe_incidente)
+    }
+
+    /// «Voz protegida» here, told to every member.
+    pub fn voz_protegida(&mut self, activa: bool) {
+        for s in &mut self.sesiones {
+            s.voz_protegida(activa);
+        }
+        self.cambio = true;
+    }
+
+    /// The person closed the incident card.
+    pub fn olvida_incidente(&mut self) {
+        for s in &mut self.sesiones {
+            s.olvida_incidente();
+        }
+        self.cambio = true;
+    }
+
     /// The chain of what was seen on the first link, signed.
     pub fn prueba_json(&self) -> String {
         self.sesiones
@@ -698,9 +725,24 @@ impl Grupo {
             "llamada": self.llamada,
         });
         e["contacto"] = json!(self.sesiones[0].contacto());
+        // A phone on any member's side: the level shown is the group's lowest.
+        e["otro_movil"] = json!(self.sesiones.iter().any(Secure::otro_en_movil));
+        e["otro_voz_protegida"] = json!(self.sesiones.iter().any(Secure::otro_voz_protegida));
+        // The post-quantum lock: shown only when every open link in the group has it.
+        e["cuantico"] = json!(self.sesiones.iter().all(Secure::cuantico));
         if let Some(video) = self.llamada {
             if e["llamada"].is_null() {
                 e["llamada"] = json!({ "video": video, "desde": self.llamada_desde, "conectada": self.sesiones.iter().any(Secure::conectada) });
+            }
+        }
+        if e["incidente"].is_null() {
+            if let Some(i) = self
+                .sesiones
+                .iter()
+                .map(Secure::estado_incidente)
+                .find(|i| !i.is_null())
+            {
+                e["incidente"] = i;
             }
         }
         if e["perdida"].is_null() {
@@ -785,9 +827,14 @@ mod tests {
         let mut b = Grupo::abre(&db, &db);
         let mut c = Grupo::abre(&dc, &dc);
         let puerto = a.escuchar_efimero().unwrap();
+        // The phone may be in from the start (16 Oct 2026): nobody is talking yet, so the
+        // hand-off goes to the link that waits for the other side, not «only two people».
+        assert_eq!(a.movil_empieza("es"), Ok(()));
+        assert!(a.estado_json()["movil"].is_object());
         b.conectar(&format!("127.0.0.1:{puerto}")).unwrap();
         gira(&mut [&mut a, &mut b], 25);
         assert!(a.numeros().is_some() && a.numeros() == b.numeros());
+        a.movil_fin();
         a.sas_persona(true, "Bea");
         b.sas_persona(true, "Ana");
         gira(&mut [&mut a, &mut b], 25);

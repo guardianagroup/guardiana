@@ -44,17 +44,25 @@
     const porCausa = g === 'pausada' && id.estado !== 'clave_cambiada' && ((m.sesion || {}).motivo || {}).por !== 'clave_cambiada';
     $('g-frase').textContent = t(porCausa ? 'sec_g_pausada_frase_causa' : 'sec_g_' + g + '_frase');
     const chip = $('m-estado-chip');
-    chip.textContent = g === 'sin' ? t('sec_sin_sesion') : t('sec_g_' + g);
+    chip.textContent = t('sec_g_' + g);
     chip.className = 'chip' + (g === 'protegida' ? ' ok' : g === 'revisar' ? ' aviso' : g === 'pausada' ? ' alerta' : '');
     if (!id) {
       linea($('g-cifrado'), '', t('sec_l_cifrado_no'));
       linea($('g-identidad'), '', t('sec_l_sin_verificar'));
+      linea($('g-nivel'), '', t('sec_l_nivel_pc'));
+      linea($('g-cuantico'), '', t('sec_l_cuantico_no'));
       linea($('g-conexion'), '', t('sec_l_sin_conexion'));
       linea($('g-visto'), '', t('sec_l_nada'));
     } else {
       linea($('g-cifrado'), 'ok', t('sec_l_cifrado'));
       if (id.estado === 'clave_cambiada') linea($('g-identidad'), 'alerta', t('sec_l_clave_cambiada', { n: id.nombre }));
       else linea($('g-identidad'), 'ok', t('sec_l_verificado', { n: id.nombre, f: fecha(id.verificado_en) }));
+      // The level comes from the two ends: both computers, the highest; a phone on either side
+      // is a web page inside Safari or Chrome, strong but a step below (16 Oct 2026).
+      const conMovil = !!(E.otro_movil || ((E.movil || {}).habla));
+      linea($('g-nivel'), 'ok', t(conMovil ? 'sec_l_nivel_movil' : 'sec_l_nivel_pc'));
+      // The post-quantum lock (16 Oct 2026): on once both sides agreed it inside Olm.
+      linea($('g-cuantico'), E.cuantico ? 'ok' : '', t(E.cuantico ? 'sec_l_cuantico' : 'sec_l_cuantico_no'));
       if (tr.directo === true) linea($('g-conexion'), typeof tr.perdida_pct === 'number' && tr.perdida_pct >= 3 ? 'aviso' : 'ok', typeof tr.perdida_pct === 'number' && tr.perdida_pct >= 3 ? t('sec_l_perdida', { p: n(tr.perdida_pct) }) : t('sec_l_directa'));
       else if (tr.directo === false) linea($('g-conexion'), typeof tr.perdida_pct === 'number' && tr.perdida_pct >= 3 ? 'aviso' : 'ok', t('sec_l_rele'));
       else linea($('g-conexion'), '', t('sec_l_sin_conexion'));
@@ -71,7 +79,8 @@
   function pintaPausa(m) {
     const se = m.sesion || {};
     const caja = $('p');
-    if (se.estado !== 'pausada') { caja.hidden = true; return; }
+    // The incident card says it all; the stop card would repeat it.
+    if (se.estado !== 'pausada' || (E && E.incidente)) { caja.hidden = true; return; }
     caja.hidden = false;
     const mo = se.motivo || {};
     $('p-titulo').textContent = t('sec_p_titulo_' + claseSesion);
@@ -95,6 +104,56 @@
   $('p-terminar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'cerrar' }));
   // The «paused for» clock ticks on its own; the program resends the state every second anyway.
   setInterval(() => { if (!$('p').hidden) pintaPausa(ultimo); }, 1000);
+
+  // The incident card (16 Oct 2026): a stop that looks like an interference. Red, on top, with
+  // what tripped, by which path, and what can honestly be said about the other end: on a
+  // direct link, its address with country and network from the bundled base, for this card
+  // only; through the relay, nothing. Nothing is kept unless the person saves the report.
+  let I = null;
+  function pintaIncidente(m) {
+    const i = m.incidente || null;
+    const caja = $('inc');
+    if (!i) { I = null; caja.hidden = true; return; }
+    caja.hidden = false;
+    if (I && I.cuando === i.cuando && I.senal === i.senal) return;
+    I = i;
+    const filas = [
+      [t('sec_i_que'), t('sec_i_s_' + i.senal) + (i.fallos > 1 ? ` (${n(i.fallos)})` : '')],
+      [t('sec_i_cuando'), hora(i.cuando)],
+      [t('sec_identidad_contacto'), i.contacto || RAYA],
+      [t('sec_i_camino'), t('sec_i_c_' + i.transporte)],
+    ];
+    if (i.zona_otra) filas.push([t('sec_i_zona'), i.zona_otra]);
+    $('inc-datos').innerHTML = filas.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${esc(b)}</dd>`).join('');
+    const o = i.otro;
+    $('inc-otro').hidden = !o;
+    if (o) $('inc-otro').textContent = t('sec_i_otro', { ip: o.ip, p: o.pais || RAYA, r: o.red || RAYA });
+  }
+  en('secure_incidente', (m) => {
+    descarga(`guardiana-secure-incidente-${sello()}.json`, 'application/json', m.json);
+    let j = {}; try { j = JSON.parse(m.json); } catch (_) {}
+    const i = j.incidente || {}, pr = j.prueba || {};
+    const L = []; let y = 790;
+    L.push({ x: 56, y, tam: 18, negrita: true, texto: 'GUARDIANA SECURE' }); y -= 26;
+    L.push({ x: 56, y, tam: 13, negrita: true, texto: t('sec_i_titulo') }); y -= 18;
+    L.push({ x: 56, y, tam: 9.5, texto: t('sec_r_pdf_fecha') + ' ' + new Date().toLocaleString(document.documentElement.lang || 'es') }); y -= 30;
+    const filas = [[t('sec_i_que'), t('sec_i_s_' + i.senal) + (i.fallos > 1 ? ` (${i.fallos})` : '')], [t('sec_i_cuando'), hora(i.cuando)], [t('sec_identidad_contacto'), i.contacto || RAYA], [t('sec_i_camino'), t('sec_i_c_' + i.transporte)], [t('sec_i_zona'), i.zona_otra || RAYA]];
+    if (i.otro) filas.push([t('sec_i_otro_rotulo'), `${i.otro.ip} · ${i.otro.pais || RAYA} · ${i.otro.red || RAYA}`]);
+    for (const [a, b] of filas) { L.push({ x: 56, y, tam: 11, negrita: true, texto: a }); for (const s of parte(b, 60)) { L.push({ x: 230, y, tam: 11, texto: s }); y -= 16; } y -= 4; }
+    y -= 10;
+    for (const s of parte(i.detalle || '', 95)) { L.push({ x: 56, y, tam: 10, texto: s }); y -= 14; }
+    y -= 12;
+    L.push({ x: 56, y, tam: 11, negrita: true, texto: t('sec_r_pdf_firmado') }); y -= 16;
+    for (const s of parte(pr.firmante || '', 80)) { L.push({ x: 56, y, tam: 8.5, texto: s }); y -= 12; }
+    y -= 6;
+    for (const s of parte(pr.firma || '', 80)) { L.push({ x: 56, y, tam: 8.5, texto: s }); y -= 12; }
+    y -= 18;
+    for (const s of parte(t('sec_i_pdf_nota'), 95)) { L.push({ x: 56, y, tam: 9.5, texto: s }); y -= 14; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([pdfDe(L)], { type: 'application/pdf' })); a.download = `guardiana-secure-incidente-${sello()}.pdf`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  });
+  $('inc-guardar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'incidente_guardar' }));
+  $('inc-verificar').addEventListener('click', () => { manda({ tipo: 'secure', accion: 'incidente_vista' }); manda({ tipo: 'secure', accion: 'verificar' }); });
+  $('inc-terminar').addEventListener('click', () => { manda({ tipo: 'secure', accion: 'incidente_vista' }); manda({ tipo: 'secure', accion: 'cerrar' }); });
 
   function pinta(m) {
     if (m.clase) claseSesion = m.clase;
@@ -154,7 +213,13 @@
     const cortada = f !== 'lista' && (E.mensajes || []).length > 0 && (f === 'sola' || f === 'escuchando');
     $('c-chat').hidden = f !== 'lista' && !cortada;
     $('c-chat').classList.toggle('cortada', cortada);
-    $('c-cortada').hidden = !cortada;
+    // The link dropped and both sides look for each other again: the chat stays, read only,
+    // with a line saying so, until the link is back or five minutes pass.
+    const rc = E.reconectando;
+    $('c-chat').classList.toggle('cortada', cortada || !!rc);
+    $('c-cortada').hidden = !cortada && !rc;
+    if (rc) $('c-cortada').textContent = t('sec_reconectando', { n: E.contacto || '', i: n(rc.intentos || 1) });
+    else $('c-cortada').textContent = t('sec_c_cortada');
     // The key's fingerprint is no longer shown under the invitation (the owner, 15 Oct 2026: a
     // second «clave» under the code confused people). The check that matters is the numbers.
     // Waiting: the door in the router gives a GS code; no door, the blind relay gives a GR one.
@@ -175,19 +240,33 @@
     const g = E.grupo || {};
     const nombres = g.nombres || [];
     $('c-con').textContent = nombres.length > 2 ? t('sec_m_grupo', { n: nombres.join(' · ') }) : E.contacto ? t('sec_m_con', { n: E.contacto }) : '';
+    // The avatar: the first letter of the name (the design the owner chose, 16 Oct 2026).
+    const quien = nombres.length > 2 ? nombres.filter((x) => x !== g.yo)[0] || '' : (E.contacto || '');
+    $('c-avatar-letra').textContent = (quien.trim()[0] || '·').toUpperCase();
+    pintaLista(E, quien, nombres);
+    // Under the name, three quiet dots: encrypted, verified with you, and the level.
+    const idn = (E.monitor || {}).identidad;
+    const verificado = !!idn && idn.estado !== 'clave_cambiada';
+    const conMovilSello = !!(E.otro_movil || ((E.movil || {}).habla));
+    $('c-sello').innerHTML = f === 'lista' ? [
+      `<span class="ok">${esc(t('sec_s_cifrado'))}</span>`,
+      `<span class="${verificado ? 'ok' : ''}">${esc(t(verificado ? 'sec_s_verificado' : 'sec_s_sin_verificar'))}</span>`,
+      `<span class="${conMovilSello ? 'suave' : 'ok'}">${esc(t(conMovilSello ? 'sec_s_nivel_movil' : 'sec_s_nivel_pc'))}</span>`,
+      E.cuantico ? `<span class="ok">${esc(t('sec_s_cuantico'))}</span>` : '',
+    ].join('') : '';
     // The host, once someone is in: the code stays on screen to invite more.
     const mas = $('c-mas');
     if (g.anfitrion && E.codigo_grupo && nombres.length < (g.max || 6)) { mas.hidden = false; $('c-mas-codigo').textContent = E.codigo_grupo; } else mas.hidden = true;
     pintaChat(nombres.length > 2);
   };
-  en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); fasePinta(); pintaResumen(m.resumen); pintaProgreso(m); });
+  en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); fasePinta(); pintaResumen(m.resumen); pintaProgreso(m); pintaIncidente(m); pintaVoz(); $('c-voz-otro').hidden = !m.otro_voz_protegida; });
   // How far a file is, both ways, and how long it has left (16 Oct 2026).
   const duracion = (s) => { s = Math.max(0, Math.round(s)); if (s < 60) return s + ' s'; if (s < 3600) return Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + (s % 60) + ' s' : ''); const h = Math.floor(s / 3600), mi = Math.floor((s % 3600) / 60); return h + ' h' + (mi ? ' ' + mi + ' min' : ''); };
   const pintaProgreso = (m) => {
     const v = m.envio, r = m.recibiendo;
     if (v && v.nombre) {
       $('c-progreso').hidden = false;
-      const queda = typeof v.restante_s === 'number' ? t('sec_f_quedan', { t: duracion(v.restante_s) }) : t('sec_f_calculando');
+      const queda = v.pausado ? t('sec_f_esperando_enlace') : typeof v.restante_s === 'number' ? t('sec_f_quedan', { t: duracion(v.restante_s) }) : t('sec_f_calculando');
       $('c-progreso-texto').textContent = t('sec_f_enviando', { n: v.nombre, p: v.pct }) + ' · ' + queda;
       $('c-progreso-barra').style.width = (v.pct || 0) + '%';
     } else if (r && r.nombre) {
@@ -375,7 +454,9 @@
     for (let i = 0; i < total; i++) {
       // Hand the pieces over only as fast as the network takes them (at most ~8 MB waiting):
       // a big file never fills the memory.
-      while (E && E.envio && E.envio.cola > 8 * 1024 * 1024) await new Promise((r) => setTimeout(r, 150));
+      // While the link is being recovered (`pausado`), nothing is handed over: what already
+      // left waits in the program and goes on from where the other side got to.
+      while (E && E.envio && (E.envio.pausado || E.envio.cola > 8 * 1024 * 1024)) await new Promise((r) => setTimeout(r, 150));
       const trozo = await f.slice(i * TROZO, (i + 1) * TROZO).arrayBuffer();
       const ultimo = i + 1 === total && trozo.byteLength < TROZO;
       manda({ tipo: 'secure', accion: 'archivo_trozo', b64: b64De(trozo), ultimo });
@@ -414,6 +495,20 @@
     } catch (_) {}
   };
   // ---------- The phone (15 Oct 2026) ----------
+  // The left column: the conversation this computer is in (one at a time), with the last line
+  // and its time, as the chosen design lists them; empty, a quiet sentence.
+  const pintaLista = (m, quien, nombres) => {
+    const ol = $('c-lista');
+    const f = m.fase;
+    if (!f || f === 'sola') { ol.innerHTML = `<li class="vacia">${esc(t('sec_lista_vacia'))}</li>`; $('miga-donde').textContent = t('sec_miga_inicio'); return; }
+    const ultimo = (m.mensajes || []).slice(-1)[0];
+    const nombre = nombres.length > 2 ? t('sec_m_grupo', { n: nombres.length }) : (quien || t('sec_lista_nueva'));
+    const linea = f !== 'lista' ? t(f === 'comparando' ? 'sec_lista_comparando' : 'sec_lista_conectando') : m.llamada ? t('sec_l_en_curso') : ultimo ? ultimo.texto : t('sec_lista_sin_mensajes');
+    ol.innerHTML = `<li class="activa"><span class="avatar">${esc((nombre.trim()[0] || '·').toUpperCase())}${f === 'lista' ? '<i></i>' : ''}</span><b>${esc(nombre)}</b><time>${ultimo ? esc(hora(ultimo.t).slice(0, 5)) : ''}</time><span class="ultimo">${esc(linea)}</span></li>`;
+    $('miga-donde').textContent = t('sec_miga_conv');
+  };
+  $('c-nueva').addEventListener('click', () => { const c = $('c-conexion'); if (!c.hidden) { c.scrollIntoView({ behavior: 'smooth' }); $('c-yo').focus(); } });
+
   // «Pasar al móvil»: the program shows a QR code; the phone's camera opens our page, which
   // talks to this computer directly (TLS 1.3 pinned to the certificate in the code). The
   // first time, the person says OK here. While the phone talks, this screen steps back: no
@@ -422,9 +517,10 @@
   const idioma = () => (document.documentElement.lang || navigator.language || 'es').slice(0, 2);
   const pintaMovil = (m) => {
     const mv = m.movil;
-    const caja = $('c-movil-caja');
+    const caja = $('c-movil-tarjeta');
     const varios = ((m.grupo || {}).nombres || []).length > 2;
     $('c-movil').hidden = !!mv || varios;
+    $('c-movil-antes').hidden = !!mv || varios;
     if (!mv) { caja.hidden = true; movilHabla = false; return; }
     caja.hidden = false;
     if (mv.error) { $('c-mv-estado-t').textContent = t('sec_mv_error', { e: mv.error }); $('c-mv-estado').className = 'm-estado'; return; }
@@ -440,11 +536,43 @@
     movilHabla = !!mv.habla;
   };
   $('c-movil').addEventListener('click', () => manda({ tipo: 'secure', accion: 'movil', idioma: idioma() }));
+  $('c-movil-antes').addEventListener('click', () => manda({ tipo: 'secure', accion: 'movil', idioma: idioma() }));
   $('c-mv-si').addEventListener('click', () => manda({ tipo: 'secure', accion: 'movil_ok' }));
   $('c-mv-no').addEventListener('click', () => manda({ tipo: 'secure', accion: 'movil_fin' }));
   $('c-mv-fin').addEventListener('click', () => manda({ tipo: 'secure', accion: 'movil_fin' }));
   en('secure_estado', pintaMovil);
   en('secure_aviso', (m) => { if (m.clave === 'sec_mv_enganchado') timbre(); });
+
+  // «Sala de casa» (16 Oct 2026): one code for the phones of the house, this computer as the
+  // exchange for as many hours as chosen; the phones talk to each other through it from
+  // anywhere. The person here lets each phone in by the name it typed.
+  const pintaSala = (m) => {
+    const s = m.sala;
+    $('c-sala-antes').hidden = !!s;
+    $('c-sala-abierta').hidden = !s;
+    if (!s) return;
+    if (s.qr && $('c-sala-qr').dataset.qr !== s.qr) { $('c-sala-qr').innerHTML = s.qr; $('c-sala-qr').dataset.qr = s.qr; }
+    $('c-sala-hasta').textContent = t('sec_sala_hasta', { h: n(s.horas), f: fecha(s.caduca) });
+    $('c-sala-miembros').innerHTML = (s.miembros || []).filter((x) => x.enganchado || x.aprobado || x.con_nombre).map((x) => {
+      const estado = x.pendiente ? t('sec_sala_m_pendiente') : x.aprobado ? (x.enganchado ? t('sec_sala_m_dentro') : t('sec_sala_m_fuera')) : t('sec_sala_m_espera');
+      const botones = x.pendiente ? `<button type="button" class="boton chico" data-sala-ok="${x.i}">${esc(t('sec_sala_dejar'))}</button>` : x.aprobado ? `<button type="button" class="boton chico secundario" data-sala-fuera="${x.i}">${esc(t('sec_sala_echar'))}</button>` : '';
+      return `<li class="${x.enganchado ? 'si' : ''}"><i></i><b>${esc(x.nombre)}</b><span class="t">${esc(estado)}</span>${botones}</li>`;
+    }).join('');
+    const ol = $('c-sala-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 40;
+    ol.innerHTML = (s.mensajes || []).map((x) => `<li class="${x.mio ? 'mio' : ''}"><b>${esc(x.de)}:</b> ${esc(x.texto)}<time>${esc(hora(x.t))}</time></li>`).join('') + (s.llamada ? `<li class="t">${esc(t(s.llamada.a ? 'sec_sala_llamada' : 'sec_sala_llamando', { a: s.llamada.de, b: s.llamada.a || '' }))}</li>` : '');
+    if (abajo) ol.scrollTop = ol.scrollHeight;
+  };
+  $('c-sala-abrir').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala', horas: Number($('c-sala-horas').value), idioma: idioma() }));
+  $('c-sala-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala_cerrar' }));
+  $('c-sala-miembros').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.salaOk !== undefined) manda({ tipo: 'secure', accion: 'sala_ok', i: Number(b.dataset.salaOk) });
+    if (b.dataset.salaFuera !== undefined) manda({ tipo: 'secure', accion: 'sala_fuera', i: Number(b.dataset.salaFuera) });
+  });
+  $('c-sala-form').addEventListener('submit', (e) => { e.preventDefault(); const x = $('c-sala-texto').value.trim(); if (!x) return; manda({ tipo: 'secure', accion: 'sala_texto', texto: x }); $('c-sala-texto').value = ''; });
+  en('secure_estado', pintaSala);
+  en('secure_estado', (m) => { const s = m.sala; if (s && (s.miembros || []).some((x) => x.pendiente) && !salaPendienteAntes) timbre(); salaPendienteAntes = !!(s && (s.miembros || []).some((x) => x.pendiente)); });
+  let salaPendienteAntes = false;
 
   let faseAntes = 'sola';
   en('secure_estado', (m) => {
@@ -544,9 +672,24 @@
     const puede = c.filter((x) => window.MediaRecorder && MediaRecorder.isTypeSupported(x));
     return (reproduceOtro.length && puede.find((x) => reproduceOtro.includes(x))) || puede[0] || c[c.length - 1];
   };
+  // «Voz protegida» (16 Oct 2026): the voice leaves transformed (voz.js) so this call is no
+  // clean sample for cloning it. The person's choice is kept; the other side is told.
+  let vozProt = null;
+  let vozActiva = false; try { vozActiva = localStorage.getItem('secure_voz') === '1'; } catch (_) {}
+  const fuenteGrabacion = () => {
+    if (vozProt) { vozProt.parar(); vozProt = null; }
+    if (!vozActiva || !local || !window.vozProtegida || !local.getAudioTracks().length) return local;
+    try { vozProt = window.vozProtegida(local, -4); return vozProt.stream; } catch (_) { return local; }
+  };
+  const pintaVoz = () => { $('c-voz-prot').setAttribute('aria-pressed', String(vozActiva)); $('c-voz-prot').querySelector('span').textContent = t(vozActiva ? 'sec_v_activa' : 'sec_v_boton'); };
+  $('c-voz-prot').addEventListener('click', () => {
+    vozActiva = !vozActiva; try { localStorage.setItem('secure_voz', vozActiva ? '1' : '0'); } catch (_) {}
+    pintaVoz(); manda({ tipo: 'secure', accion: 'voz_protegida', activa: vozActiva });
+    if (local) cambiaGrabador();
+  });
   const nuevoGrabador = (video) => {
     const tipo = mime(video);
-    grabador = new MediaRecorder(local, { mimeType: tipo, audioBitsPerSecond: 64000, videoBitsPerSecond: video ? 1500000 : undefined });
+    grabador = new MediaRecorder(fuenteGrabacion(), { mimeType: tipo, audioBitsPerSecond: 64000, videoBitsPerSecond: video ? 1500000 : undefined });
     grabador.ondataavailable = async (e) => { if (e.data && e.data.size) manda({ tipo: 'secure', accion: 'media', b64: b64De(await e.data.arrayBuffer()) }); };
     grabador.start(120);
     tipoGrabador = tipo;
@@ -647,6 +790,7 @@
   const paraMedios = () => {
     try { if (grabador && grabador.state !== 'inactive') grabador.stop(); } catch (_) {}
     grabador = null; tipoGrabador = null;
+    if (vozProt) { vozProt.parar(); vozProt = null; }
     if (local) { local.getTracks().forEach((x) => x.stop()); local = null; }
     $('c-local').srcObject = null;
     jugadores.forEach((j) => { try { if (j.fuente && j.fuente.readyState === 'open') j.fuente.endOfStream(); } catch (_) {} j.v.removeAttribute('src'); });
@@ -658,7 +802,11 @@
   $('c-voz').addEventListener('click', () => llama(false));
   $('c-video').addEventListener('click', () => llama(true));
   $('c-colgar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'colgar' }));
-  $('c-silencio').addEventListener('click', () => { silenciado = !silenciado; if (local) local.getAudioTracks().forEach((x) => { x.enabled = !silenciado; }); $('c-silencio').setAttribute('aria-pressed', String(silenciado)); $('c-silencio').textContent = t(silenciado ? 'sec_l_sonar' : 'sec_l_silenciar'); });
+  // Full screen for the video call (the owner, 16 Oct 2026): the pictures fill the screen; Esc
+  // or the same button brings them back.
+  $('c-pantalla').addEventListener('click', () => { const p = document.querySelector('#c-llamada .pantallas'); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else if (p && p.requestFullscreen) p.requestFullscreen().catch(() => {}); });
+  en('secure_estado', (m) => { $('c-pantalla').hidden = !(m.llamada && m.llamada.video && m.llamada.conectada !== false); });
+  $('c-silencio').addEventListener('click', () => { silenciado = !silenciado; if (local) local.getAudioTracks().forEach((x) => { x.enabled = !silenciado; }); $('c-silencio').setAttribute('aria-pressed', String(silenciado)); $('c-silencio').querySelector('span').textContent = t(silenciado ? 'sec_l_sonar' : 'sec_l_silenciar'); });
 
   let ultimo = {};
   en('monitor', (m) => { ultimo = m.monitor || {}; pinta(ultimo); });

@@ -442,6 +442,8 @@ pub struct Sesion {
     descargas: PathBuf,
     /// GUARDIANA SECURE, opened with the session (15 Oct 2026).
     secure: crate::grupo::Grupo,
+    /// The house's room for the phones, while one is open (16 Oct 2026, «Sala de casa»).
+    sala: Option<crate::sala::Sala>,
     version: String,
     motor: String,
     idioma_sistema: String,
@@ -678,6 +680,7 @@ impl Sesion {
             datos: a.datos,
             descargas: a.descargas,
             secure,
+            sala: None,
             version: a.version,
             motor: String::new(),
             idioma_sistema: a.idioma_sistema,
@@ -1221,6 +1224,22 @@ impl Sesion {
     fn secure_tic(&mut self) -> Vec<Orden> {
         self.secure.tic();
         let mut o = Vec::new();
+        let mut sala_cambio = false;
+        if let Some(sala) = &mut self.sala {
+            sala.tic();
+            if sala.caducada() {
+                self.sala = None;
+                sala_cambio = true;
+            } else if sala.cambiado() {
+                sala.sincroniza();
+                sala_cambio = true;
+            }
+        }
+        if sala_cambio {
+            if let Some(id) = self.pestana_secure() {
+                o.extend(self.a_pestana(id, &self.secure_estado_json()));
+            }
+        }
         if !self.secure.media_para_pagina.is_empty() {
             if let Some(id) = self.pestana_secure() {
                 let trozos: Vec<Value> = self
@@ -1237,7 +1256,7 @@ impl Sesion {
         if self.secure.cambiado() {
             self.secure.movil_sincroniza();
             if let Some(id) = self.pestana_secure() {
-                o.extend(self.a_pestana(id, &self.secure.estado_json()));
+                o.extend(self.a_pestana(id, &self.secure_estado_json()));
                 for a in self.secure.avisos() {
                     o.extend(self.a_pestana(
                         id,
@@ -1281,6 +1300,11 @@ impl Sesion {
                 self.secure.pon_zona(texto(m, "zona"));
                 Ok(())
             }
+            "voz_protegida" => {
+                self.secure
+                    .voz_protegida(m["activa"].as_bool().unwrap_or(false));
+                Ok(())
+            }
             "nombre" => {
                 self.secure.nombre_propio = texto(m, "nombre").chars().take(60).collect();
                 Ok(())
@@ -1303,6 +1327,38 @@ impl Sesion {
                 Ok(())
             }
             "movil" => self.secure.movil_empieza(texto(m, "idioma")),
+            "sala" => {
+                match crate::sala::Sala::abre(m["horas"].as_u64().unwrap_or(24), texto(m, "idioma"))
+                {
+                    Ok(s) => {
+                        self.sala = Some(s);
+                        Ok(())
+                    }
+                    Err(e) => Err(e),
+                }
+            }
+            "sala_ok" => {
+                if let Some(s) = &mut self.sala {
+                    s.aprueba(m["i"].as_u64().unwrap_or(99) as usize);
+                }
+                Ok(())
+            }
+            "sala_fuera" => {
+                if let Some(s) = &mut self.sala {
+                    s.expulsa(m["i"].as_u64().unwrap_or(99) as usize);
+                }
+                Ok(())
+            }
+            "sala_texto" => {
+                if let Some(s) = &mut self.sala {
+                    s.texto(texto(m, "texto"));
+                }
+                Ok(())
+            }
+            "sala_cerrar" => {
+                self.sala = None;
+                Ok(())
+            }
             "movil_ok" => {
                 self.secure.movil_aprueba();
                 Ok(())
@@ -1338,6 +1394,19 @@ impl Sesion {
             "perdida_vista" => {
                 self.secure.olvida_perdida();
                 Ok(())
+            }
+            "incidente_vista" => {
+                self.secure.olvida_incidente();
+                Ok(())
+            }
+            "incidente_guardar" => {
+                let Some(j) = self.secure.informe_incidente() else {
+                    return Vec::new();
+                };
+                return self
+                    .a_pestana(id, &json!({ "tipo": "secure_incidente", "json": j }))
+                    .into_iter()
+                    .collect();
             }
             "archivo_abrir" | "archivo_carpeta" => {
                 let Some(r) = m["id"].as_u64().and_then(|i| self.secure.recibido(i)) else {
@@ -1416,10 +1485,25 @@ impl Sesion {
             ));
         }
         if accion != "media" && accion != "archivo_trozo" && accion != "mime" {
-            o.extend(self.a_pestana(id, &self.secure.estado_json()));
+            o.extend(self.a_pestana(id, &self.secure_estado_json()));
             self.secure.movil_sincroniza();
+            if let Some(sala) = &mut self.sala {
+                if sala.cambiado() {
+                    sala.sincroniza();
+                }
+            }
         }
         o
+    }
+
+    /// The tab's state: the conversations, plus the house's room when one is open.
+    fn secure_estado_json(&self) -> Value {
+        let mut e = self.secure.estado_json();
+        e["sala"] = self
+            .sala
+            .as_ref()
+            .map_or(Value::Null, crate::sala::Sala::json);
+        e
     }
 
     fn msg_estado(&self) -> Value {

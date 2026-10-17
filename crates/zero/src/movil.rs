@@ -74,12 +74,23 @@ pub enum Desde {
     Contestar(String),
     /// The phone rejects the call ringing.
     Rechazar,
+    /// The person compared the three numbers on the phone: whether they match, and the
+    /// contact's name as typed there (the phone is in the conversation from the start since
+    /// 16 Oct 2026).
+    Sas {
+        /// They matched.
+        ok: bool,
+        /// The name for the book.
+        nombre: String,
+    },
     /// The phone's player started: the other side's recorder must start again.
     PideInicio,
     /// One recorded piece from the phone's microphone or camera.
     Media(Vec<u8>),
     /// The phone's page was brought to the front.
     Visto,
+    /// The person typed their name on the phone (a home room, 16 Oct 2026).
+    Nombre(String),
     /// What the phone's player can open (an iPhone may not open WebM): the other side records
     /// in one of these when it can.
     Reproduce(Vec<String>),
@@ -142,6 +153,14 @@ impl Movil {
 
     /// The same, with the relay at `rele` (`host:port`; the tests run one on this computer).
     pub fn arranca_con(rele: &str) -> Result<Self, String> {
+        let mut clave = [0u8; 32];
+        crate::sesion::azar(&mut clave);
+        Self::arranca_con_clave(rele, clave)
+    }
+
+    /// The same, with the key the QR code will carry chosen by the caller (a home room derives
+    /// one per seat from a single code, 16 Oct 2026).
+    pub fn arranca_con_clave(rele: &str, clave: [u8; 32]) -> Result<Self, String> {
         let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, PUERTO))
             .or_else(|_| UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)))
             .map_err(|e| e.to_string())?;
@@ -172,8 +191,6 @@ impl Movil {
         let mut azar = [0u8; 18];
         crate::sesion::azar(&mut azar);
         let secreto = B64URL.encode(azar);
-        let mut clave = [0u8; 32];
-        crate::sesion::azar(&mut clave);
         let rele_dir = rele.to_owned();
         let rele_host = rele.strip_suffix(":443").unwrap_or(rele).to_owned();
 
@@ -452,16 +469,22 @@ pub fn sala_de_clave(clave: &[u8; 32]) -> String {
 }
 
 /// The two sending keys of one link: phone → computer, computer → phone. Both random numbers
-/// are fresh every link, so a frame recorded from one link means nothing in the next.
+/// are fresh every link, so a frame recorded from one link means nothing in the next. Since
+/// 16 Oct 2026 (review with ChatGPT for the home room) the link also agrees a fresh secret
+/// (ECDH P-256, `secreto`), mixed in with the QR key: whoever photographed the code can ask
+/// to come in, but cannot read a link, not even another phone of the same room.
 pub fn claves_de_enlace(
     clave: &[u8; 32],
+    secreto: &[u8],
     del_equipo: &[u8; 16],
     del_movil: &[u8; 16],
 ) -> Option<(aead::LessSafeKey, aead::LessSafeKey)> {
     let mut sal = [0u8; 32];
     sal[..16].copy_from_slice(del_equipo);
     sal[16..].copy_from_slice(del_movil);
-    let prk = ring::hkdf::Salt::new(ring::hkdf::HKDF_SHA256, &sal).extract(clave);
+    let mut ikm = clave.to_vec();
+    ikm.extend_from_slice(secreto);
+    let prk = ring::hkdf::Salt::new(ring::hkdf::HKDF_SHA256, &sal).extract(&ikm);
     let una = |info: &[u8]| -> Option<aead::LessSafeKey> {
         let mut k = [0u8; 32];
         prk.expand(&[info], ring::hkdf::HKDF_SHA256)
@@ -526,19 +549,15 @@ async fn rele_bucle(rele: String, clave: [u8; 32], tx: tmpsc::UnboundedSender<En
 }
 
 async fn conecta_rele(rele: &str) -> Option<tokio::net::TcpStream> {
-    let intento = |d: String| async move {
-        tokio::time::timeout(Duration::from_secs(8), tokio::net::TcpStream::connect(d))
-            .await
-            .ok()?
-            .ok()
-    };
-    if let Some(s) = intento(rele.to_owned()).await {
-        return Some(s);
-    }
-    if rele == crate::rele::RELE {
-        return intento(crate::rele::RELE_IP.to_owned()).await;
-    }
-    None
+    // The same way in as a conversation's (inside TLS for GUARDIANA's relay, see `rele::abre`),
+    // handed over as a socket of this runtime.
+    let rele = rele.to_owned();
+    let s = tokio::task::spawn_blocking(move || crate::rele::abre(&rele))
+        .await
+        .ok()?
+        .ok()?;
+    s.set_nonblocking(true).ok()?;
+    tokio::net::TcpStream::from_std(s).ok()
 }
 
 async fn lee_rele(r: &mut (impl tokio::io::AsyncRead + Unpin)) -> Option<Vec<u8>> {
@@ -582,22 +601,34 @@ async fn rele_una_vez(
     if &ok != b"OK\n" {
         return None;
     }
-    // The greeting: our random number; the phone answers with its own and proves the key.
+    // The greeting («GM2», 16 Oct 2026): our random number and a fresh P-256 public key; the
+    // phone answers with its own number, its public key, and proves it holds the QR key with
+    // the keys both derive from the QR key, the agreed secret and the two numbers.
+    let rng = ring::rand::SystemRandom::new();
+    let privada =
+        ring::agreement::EphemeralPrivateKey::generate(&ring::agreement::ECDH_P256, &rng).ok()?;
+    let publica = privada.compute_public_key().ok()?;
     let mut del_equipo = [0u8; 16];
     crate::sesion::azar(&mut del_equipo);
-    let mut saludo = b"GM1".to_vec();
+    let mut saludo = b"GM2".to_vec();
     saludo.extend_from_slice(&del_equipo);
+    saludo.extend_from_slice(publica.as_ref());
     escribe_rele(&mut s, &saludo).await?;
     let respuesta = tokio::time::timeout(Duration::from_secs(20), lee_rele(&mut s))
         .await
         .ok()??;
-    if respuesta.len() < 16 {
+    if respuesta.len() < 16 + 65 {
         return None;
     }
     let mut del_movil = [0u8; 16];
     del_movil.copy_from_slice(&respuesta[..16]);
-    let (k_me, k_em) = claves_de_enlace(clave, &del_equipo, &del_movil)?;
-    if abre(&k_me, 0, b"GM1", &respuesta[16..]).as_deref() != Some(b"hola".as_slice()) {
+    let suya = ring::agreement::UnparsedPublicKey::new(
+        &ring::agreement::ECDH_P256,
+        respuesta[16..16 + 65].to_vec(),
+    );
+    let secreto = ring::agreement::agree_ephemeral(privada, &suya, |s| s.to_vec()).ok()?;
+    let (k_me, k_em) = claves_de_enlace(clave, &secreto, &del_equipo, &del_movil)?;
+    if abre(&k_me, 0, b"GM2", &respuesta[16 + 65..]).as_deref() != Some(b"hola".as_slice()) {
         return None;
     }
     let (mut r, mut w) = s.into_split();
@@ -714,8 +745,26 @@ fn traduce(v: &Value) -> Option<Desde> {
                 .collect(),
         )),
         "rechazar" => Some(Desde::Rechazar),
+        "sas" => Some(Desde::Sas {
+            ok: v["ok"].as_bool().unwrap_or(false),
+            nombre: v["nombre"]
+                .as_str()
+                .unwrap_or_default()
+                .chars()
+                .take(60)
+                .collect(),
+        }),
         "pide_inicio" => Some(Desde::PideInicio),
         "visto" => Some(Desde::Visto),
+        "nombre" => Some(Desde::Nombre(
+            v["nombre"]
+                .as_str()
+                .unwrap_or_default()
+                .trim()
+                .chars()
+                .take(40)
+                .collect(),
+        )),
         "reproduce" => Some(Desde::Reproduce(
             v["mimes"]
                 .as_array()?
@@ -925,12 +974,30 @@ mod tests {
             }
             assert!(r.starts_with(b"HTTP/1.1 101"));
             let saludo = lee_ws(&mut t).await;
-            assert_eq!(&saludo[..3], b"GM1");
-            let del_equipo: [u8; 16] = saludo[3..].try_into().unwrap();
+            assert_eq!(&saludo[..3], b"GM2");
+            assert_eq!(saludo.len(), 3 + 16 + 65);
+            let del_equipo: [u8; 16] = saludo[3..19].try_into().unwrap();
+            // The phone's half of the agreement: its own P-256 key, the shared secret.
+            let rng = ring::rand::SystemRandom::new();
+            let privada = ring::agreement::EphemeralPrivateKey::generate(
+                &ring::agreement::ECDH_P256,
+                &rng,
+            )
+            .unwrap();
+            let publica = privada.compute_public_key().unwrap();
+            let del_equipo_pub = ring::agreement::UnparsedPublicKey::new(
+                &ring::agreement::ECDH_P256,
+                saludo[19..].to_vec(),
+            );
+            let secreto =
+                ring::agreement::agree_ephemeral(privada, &del_equipo_pub, |s| s.to_vec())
+                    .unwrap();
             let del_movil = [7u8; 16];
-            let (k_me, k_em) = claves_de_enlace(&clave, &del_equipo, &del_movil).unwrap();
+            let (k_me, k_em) =
+                claves_de_enlace(&clave, &secreto, &del_equipo, &del_movil).unwrap();
             let mut primera = del_movil.to_vec();
-            primera.extend(sella(&k_me, 0, b"GM1", b"hola"));
+            primera.extend_from_slice(publica.as_ref());
+            primera.extend(sella(&k_me, 0, b"GM2", b"hola"));
             escribe_ws(&mut t, &primera).await;
             let mut plano = vec![0u8];
             plano.extend_from_slice(br#"{"t":"texto","texto":"hola por el rele"}"#);
