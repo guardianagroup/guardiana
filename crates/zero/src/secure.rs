@@ -650,13 +650,14 @@ impl Secure {
             .ok()
             .and_then(|s| Agenda::from_json(&s).ok())
             .unwrap_or_default();
+        let bloqueados = std::fs::read_to_string(carpeta.join("bloqueados.json"))
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
         let mut s = Self {
             datos: carpeta,
             descargas: descargas.to_path_buf(),
-            bloqueados: std::fs::read_to_string(carpeta.join("bloqueados.json"))
-                .ok()
-                .and_then(|s| serde_json::from_str(&s).ok())
-                .unwrap_or_default(),
+            bloqueados,
             identidad,
             agenda,
             nombre_contacto: String::new(),
