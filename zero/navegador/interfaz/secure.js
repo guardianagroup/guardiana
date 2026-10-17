@@ -211,7 +211,11 @@
     // A conversation that was cut keeps its messages on screen (16 Oct 2026: «se ha eliminado
     // el chat»): read only, with a line saying so, until the person starts another one.
     const cortada = f !== 'lista' && (E.mensajes || []).length > 0 && (f === 'sola' || f === 'escuchando');
-    $('c-chat').hidden = f !== 'lista' && !cortada;
+    const chatOculto = $('c-chat').hidden;
+    $('c-chat').hidden = f !== 'lista' && !(cortada && (modo === 'equipos' || modo === 'movil'));
+    // When the conversation appears, bring it whole into view (writing bar included).
+    if (chatOculto && !$('c-chat').hidden) requestAnimationFrame(() => $('c-chat').scrollIntoView({ block: 'end' }));
+    document.querySelector('main').classList.toggle('con-chat', !$('c-chat').hidden || !$('c-sala-chat').hidden);
     $('c-chat').classList.toggle('cortada', cortada);
     // The link dropped and both sides look for each other again: the chat stays, read only,
     // with a line saying so, until the link is back or five minutes pass.
@@ -259,7 +263,7 @@
     if (g.anfitrion && E.codigo_grupo && nombres.length < (g.max || 6)) { mas.hidden = false; $('c-mas-codigo').textContent = E.codigo_grupo; } else mas.hidden = true;
     pintaChat(nombres.length > 2);
   };
-  en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); fasePinta(); pintaResumen(m.resumen); pintaProgreso(m); pintaIncidente(m); pintaVoz(); $('c-voz-otro').hidden = !m.otro_voz_protegida; });
+  en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); pintaModo(m); fasePinta(); pintaResumen(m.resumen); pintaProgreso(m); pintaIncidente(m); pintaVoz(); $('c-voz-otro').hidden = !m.otro_voz_protegida; });
   // How far a file is, both ways, and how long it has left (16 Oct 2026).
   const duracion = (s) => { s = Math.max(0, Math.round(s)); if (s < 60) return s + ' s'; if (s < 3600) return Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + (s % 60) + ' s' : ''); const h = Math.floor(s / 3600), mi = Math.floor((s % 3600) / 60); return h + ' h' + (mi ? ' ' + mi + ' min' : ''); };
   const pintaProgreso = (m) => {
@@ -420,12 +424,15 @@
   en('secure_prueba', (m) => descarga(`guardiana-secure-prueba-${sello()}.json`, 'application/json', m.json));
   en('secure_aviso', (m) => { const extra = m.texto && /^sec_[a-z0-9_]+$/.test(m.texto) ? t(m.texto) : m.texto; const txt = t(m.clave) + (extra ? ' ' + extra : ''); aviso(txt); });
   const avisos = [];
-  function aviso(txt) { avisos.push(txt); const ol = $('c-mensajes'); const li = document.createElement('li'); li.className = 'aviso-li'; li.textContent = txt; ol.appendChild(li); ol.scrollTop = ol.scrollHeight; }
+  function aviso(txt) {
+    // With no conversation on screen the notice goes under the invitation (a wrong code, a
+    // failed invitation), where the person is looking.
+    if ($('c-chat').hidden) { $('c-aviso').textContent = txt; $('c-aviso').hidden = false; clearTimeout(aviso.r); aviso.r = setTimeout(() => { $('c-aviso').hidden = true; }, 15000); return; }
+    avisos.push(txt); const ol = $('c-mensajes'); const li = document.createElement('li'); li.className = 'aviso-li'; li.textContent = txt; ol.appendChild(li); ol.scrollTop = ol.scrollHeight; }
   // Your name, as the others will see it (kept here; sent before inviting).
   try { $('c-yo').value = localStorage.getItem('secure_nombre') || ''; } catch (_) {}
   const mandaNombre = () => { const n = $('c-yo').value.trim().slice(0, 60); try { localStorage.setItem('secure_nombre', n); } catch (_) {} manda({ tipo: 'secure', accion: 'nombre', nombre: n }); };
   $('c-yo').addEventListener('change', mandaNombre);
-  mandaNombre();
   $('c-escuchar').addEventListener('click', () => { mandaNombre(); manda({ tipo: 'secure', accion: 'escuchar', puerto: 0 }); });
   $('c-mas-copiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('c-mas-codigo').textContent); $('c-mas-copiar').textContent = t('sec_c_copiado'); setTimeout(() => { $('c-mas-copiar').textContent = t('sec_c_copiar'); }, 1500); } catch (_) {} });
   // Sending the code: WhatsApp (a tab with the message ready) or mail; the person picks who.
@@ -565,7 +572,7 @@
     const f = m.fase;
     if (!f || f === 'sola') { ol.innerHTML = filaSala(m) || `<li class="vacia">${esc(t('sec_lista_vacia'))}</li>`; if (!m.sala) $('miga-donde').textContent = t('sec_miga_inicio'); return; }
     const ultimo = (m.mensajes || []).slice(-1)[0];
-    const nombre = nombres.length > 2 ? t('sec_m_grupo', { n: nombres.length }) : (quien || t('sec_lista_nueva'));
+    const nombre = nombres.length > 2 ? nombres.join(' · ') : (quien || t('sec_lista_nueva'));
     const linea = f !== 'lista' ? t(f === 'comparando' ? 'sec_lista_comparando' : 'sec_lista_conectando') : m.llamada ? t('sec_l_en_curso') : ultimo ? ultimo.texto : t('sec_lista_sin_mensajes');
     ol.innerHTML = filaSala(m) + `<li class="${vista === 'contacto' || !m.sala ? 'activa' : ''}" data-vista="contacto"><span class="avatar">${esc((nombre.trim()[0] || '·').toUpperCase())}${f === 'lista' ? '<i></i>' : ''}</span><b>${esc(nombre)}</b><time>${ultimo ? esc(hora(ultimo.t).slice(0, 5)) : ''}</time><span class="ultimo">${esc(linea)}</span></li>`;
     if (vista !== 'sala' || !m.sala) $('miga-donde').textContent = t('sec_miga_conv');
@@ -614,11 +621,14 @@
   // its chat fills the middle column while no other conversation is open, and the left list
   // offers both when there is one.
   let vista = 'contacto';
-  const hayContacto = (m) => m.fase && m.fase !== 'sola' || (m.mensajes || []).length > 0;
+  // Someone on the line (17 Oct 2026 review: counting the messages a finished conversation
+  // leaves on screen kept the start hidden and the way back gone until the program restarted).
+  const hayContacto = (m) => !!m.fase && m.fase !== 'sola';
   // Three ways to talk (16 Oct 2026): computer to computer, from the phone, the home room.
   // The start shows the three; once one is chosen (or one is already going) only it is on screen.
   let modo = null;
   try { modo = sessionStorage.getItem('secure-modo') || null; } catch (_) {}
+  if (!['equipos', 'movil', 'sala'].includes(modo)) modo = null;
   const guardaModo = () => { try { if (modo) sessionStorage.setItem('secure-modo', modo); else sessionStorage.removeItem('secure-modo'); } catch (_) {} };
   const movilActivo = (m) => !!(m.movil && (m.movil.enganchado || m.movil.pendiente || m.movil.qr));
   const pintaModo = (m) => {
@@ -631,7 +641,9 @@
     guardaModo();
     const activo = !!m.sala || movilActivo(m) || hayContacto(m);
     $('c-inicio').hidden = !!modo;
-    $('c-modo-cab').hidden = !modo || hayContacto(m) || movilActivo(m);
+    // The way back stays while an invitation waits or the numbers are compared; only an open
+    // conversation (which has «Cerrar conversación») or the phone link hide it.
+    $('c-modo-cab').hidden = !modo || m.fase === 'lista' || movilActivo(m);
     if (modo) $('c-modo-nombre').textContent = t('sec_modo_' + modo);
     $('c-modo-movil').hidden = modo !== 'movil' && !m.movil;
     $('c-modo-movil-intro').hidden = !!m.movil || hayContacto(m);
@@ -641,13 +653,22 @@
     const colIzq = document.querySelector('.col-izq'), main = document.querySelector('main');
     if (modo === 'sala' && m.sala && sala.parentElement !== colIzq) colIzq.insertBefore(sala, colIzq.querySelector('.pie-izq'));
     if ((modo !== 'sala' || !m.sala) && sala.parentElement !== main) main.insertBefore(sala, $('c-conexion'));
+    // The phone card goes to the left while a conversation is open, so the chat keeps the
+    // whole middle (17 Oct 2026, the owner: «se ve el margen de abajo cortado»).
+    const mvC = $('c-modo-movil'), mvLado = hayContacto(m) && !!m.movil;
+    if (mvLado && mvC.parentElement !== colIzq) colIzq.insertBefore(mvC, colIzq.querySelector('.pie-izq'));
+    if (!mvLado && mvC.parentElement !== main) main.insertBefore(mvC, $('c-modo-cab').nextSibling);
     const secure = document.querySelector('.secure');
     secure.classList.toggle('sin-lados', !activo);
     secure.classList.toggle('sin-derecha', false);
     $('miga-donde').textContent = modo ? t('sec_modo_' + modo) : t('sec_miga_inicio');
   };
   document.querySelectorAll('.modo').forEach((b) => b.addEventListener('click', () => { modo = b.dataset.modo; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); if (modo === 'sala') $('c-sala-horas').focus(); }));
-  $('c-volver').addEventListener('click', () => { modo = null; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); });
+  $('c-volver').addEventListener('click', () => {
+    // Going back cancels an invitation still waiting, so nothing is left half open.
+    if (E.fase && E.fase !== 'sola' && E.fase !== 'lista') { manda({ tipo: 'secure', accion: 'cerrar' }); E = Object.assign({}, E, { fase: 'sola' }); }
+    modo = null; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E);
+  });
   const pintaVista = (m) => {
     pintaModo(m);
     const s = m.sala;
@@ -657,6 +678,7 @@
     const enSala = !!s && vista === 'sala' && modo === 'sala';
     $('c-sala-chat').hidden = !enSala;
     for (const id of ['c-conexion', 'c-comparar', 'c-espera', 'c-resumen', 'c-chat']) if (enSala) $(id).hidden = true;
+    document.querySelector('main').classList.toggle('con-chat', !$('c-chat').hidden || enSala);
     if (!enSala) return;
     const dentro = (s.miembros || []).filter((x) => x.aprobado);
     $('c-sc-sello').textContent = t('sec_sala_sello', { n: n(dentro.length), h: n(s.horas), f: fecha(s.caduca) });
@@ -710,7 +732,6 @@
   let faseAntes = 'sola';
   en('secure_estado', (m) => {
     if (m.fase === 'comparando' && faseAntes !== 'comparando' && faseAntes !== 'saludando') timbre();
-    if (m.fase === 'comparando' && faseAntes === 'escuchando') timbre();
     faseAntes = m.fase;
     pintaLlamada(m);
   });
@@ -871,7 +892,7 @@
     $('c-permiso').hidden = !$('c-permiso').dataset.camara;
     $('c-local').srcObject = local;
     llamadaVideo = video && local.getVideoTracks().length > 0;
-    nuevoGrabador(llamadaVideo);
+    try { nuevoGrabador(llamadaVideo); } catch (e) { arrancando = false; aviso(t('sec_l_sin_medios')); return; }
     // Our players are new: ask the other side for pieces from a fresh start.
     manda({ tipo: 'secure', accion: 'pide_inicio' });
     arrancando = false;
@@ -944,9 +965,13 @@
   let ultimo = {};
   en('monitor', (m) => { ultimo = m.monitor || {}; pinta(ultimo); });
   // The texts arrive after the page: draw again so «—» and the chips speak the person's language.
-  en('textos', () => pinta(ultimo));
+  // The chat too (17 Oct 2026: call lines drawn before the texts arrived stayed as
+  // «sec_ll_video · 20 s», because the list is only redrawn when the messages change).
+  en('textos', () => { pinta(ultimo); chatAntes = ''; if (E && E.fase) { fasePinta(); pintaSala(E); } });
   // Where this computer is, by its time zone (the same the globe uses): the other side hears it
   // inside the cipher, and each computer draws the line between the two on its own globe.
-  try { manda({ tipo: 'secure', accion: 'zona', zona: Intl.DateTimeFormat().resolvedOptions().timeZone || '' }); } catch (_) {}
+  // «listo» first, so the texts arrive before any state is drawn (17 Oct 2026 review).
   manda({ tipo: 'listo', vista: 'secure' });
+  mandaNombre();
+  try { manda({ tipo: 'secure', accion: 'zona', zona: Intl.DateTimeFormat().resolvedOptions().timeZone || '' }); } catch (_) {}
 })();

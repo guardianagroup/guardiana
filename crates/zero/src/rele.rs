@@ -309,15 +309,16 @@ pub fn abre(rele: &str) -> Result<TcpStream, String> {
 /// The joining side: go to every relay at once with the same room (the other person waits at
 /// one of them, the one its code names, or the first for an older version) and keep the first
 /// link the pairing completes. With `GUARDIANA_RELE` set (the tests), only that one.
-pub fn conecta_a_cualquiera(sala: &str) -> Result<TcpStream, String> {
+/// Also says which relay it was, so a dropped link meets the other side there again.
+pub fn conecta_a_cualquiera(sala: &str) -> Result<(TcpStream, String), String> {
     if let Ok(uno) = std::env::var("GUARDIANA_RELE") {
-        return conecta(&uno, sala);
+        return conecta(&uno, sala).map(|s| (s, uno));
     }
     let (tx, rx) = std::sync::mpsc::channel();
     for r in RELES {
         let (tx, sala, d) = (tx.clone(), sala.to_owned(), r.direccion());
         std::thread::spawn(move || {
-            let _ = tx.send(conecta(&d, &sala));
+            let _ = tx.send(conecta(&d, &sala).map(|s| (s, d)));
         });
     }
     drop(tx);

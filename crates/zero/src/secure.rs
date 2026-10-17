@@ -48,7 +48,7 @@ pub enum Entrante {
     Aceptado(TcpStream),
     /// The relay joined us with the other computer: the socket to adopt (bytes pass through
     /// the relay, which cannot read them).
-    AceptadoRele(TcpStream),
+    AceptadoRele(TcpStream, String),
     /// The relay could not be reached, or nobody came.
     ReleFallo(String),
     /// The router answered about the door.
@@ -464,6 +464,11 @@ pub struct Secure {
     /// This link goes through the blind relay.
     rele: bool,
     rele_error: Option<String>,
+    /// The relay this conversation met at (a name, kept in memory only): a dropped link goes
+    /// back to that same one, where the other side also goes (17 Oct 2026: with one relay
+    /// down, or one side pinned to another, both sides waited at different relays and the
+    /// conversation died after five minutes).
+    rele_usado: Option<String>,
     /// The link dropped in the middle of an open conversation and both sides are going back
     /// to the relay to pick it up where it was (16 Oct 2026, «que sirva en cualquier router e
     /// internet del mundo»): the room both derive, when the next try is due, how many tries.
@@ -651,6 +656,7 @@ impl Secure {
             rele_codigo: None,
             rele: false,
             rele_error: None,
+            rele_usado: None,
             reconexion: None,
             tarjeta_otra: None,
             sas_inicio: None,
@@ -780,7 +786,7 @@ impl Secure {
             std::thread::spawn(move || {
                 let r = crate::rele::conecta_a_cualquiera(&sala);
                 let _ = tx.send(match r {
-                    Ok(s) => Entrante::AceptadoRele(s),
+                    Ok((s, rele)) => Entrante::AceptadoRele(s, rele),
                     Err(e) => Entrante::ReleFallo(e),
                 });
             });
@@ -893,6 +899,7 @@ impl Secure {
             std::thread::sleep(Duration::from_millis(60));
         }
         self.reconexion = None;
+        self.rele_usado = None;
         self.cierra_resumen();
         self.movil_fin();
         if let Some(p) = self.puerta.take() {
@@ -978,7 +985,10 @@ impl Secure {
         for e in pendientes {
             match e {
                 Entrante::Aceptado(s) => self.adopta(s, false),
-                Entrante::AceptadoRele(s) => self.adopta(s, true),
+                Entrante::AceptadoRele(s, rele) => {
+                    self.rele_usado = Some(rele);
+                    self.adopta(s, true);
+                }
                 Entrante::ReleFallo(e) => {
                     if let Some(r) = &mut self.reconexion {
                         r.buscando = false;
@@ -1111,12 +1121,14 @@ impl Secure {
         let sala = r.sala.clone();
         // Both sides derive the same relay from the room, so they meet.
         let indice = usize::from(sala.bytes().next().unwrap_or(0) % 16) % crate::rele::RELES.len();
-        let rele = std::env::var("GUARDIANA_RELE")
-            .unwrap_or_else(|_| crate::rele::RELES[indice].direccion());
+        let rele = self.rele_usado.clone().unwrap_or_else(|| {
+            std::env::var("GUARDIANA_RELE")
+                .unwrap_or_else(|_| crate::rele::RELES[indice].direccion())
+        });
         std::thread::spawn(move || {
             let res = crate::rele::conecta(&rele, &sala);
             let _ = tx.send(match res {
-                Ok(s) => Entrante::AceptadoRele(s),
+                Ok(s) => Entrante::AceptadoRele(s, rele),
                 Err(e) => Entrante::ReleFallo(e),
             });
         });
@@ -1158,7 +1170,7 @@ impl Secure {
         std::thread::spawn(move || {
             let r = crate::rele::conecta(&rele, &sala);
             let _ = tx.send(match r {
-                Ok(s) => Entrante::AceptadoRele(s),
+                Ok(s) => Entrante::AceptadoRele(s, rele),
                 Err(e) => Entrante::ReleFallo(e),
             });
         });
@@ -1223,17 +1235,11 @@ impl Secure {
         if !self.nombre_contacto.is_empty() {
             let n = self.nombre_contacto.clone();
             match self.agenda.comprueba(&n, t.curve(), t.signing(), ahora_s()) {
-                Ok(()) => {
-                    if let Some(v) = self
-                        .agenda
-                        .contacto(&n)
-                        .and_then(agenda::Contacto::verified)
-                    {
-                        self.verificado = Some(v);
-                        self.abre_olm();
-                        return;
-                    }
-                }
+                // Known and the same keys: still the numbers, every new conversation (17 Oct
+                // 2026, the owner: «la identidad hay que hacerla cada vez que se conecta por
+                // seguridad»). A link that drops and comes back inside the same conversation
+                // does not greet again, so it does not ask again either.
+                Ok(()) => {}
                 Err(_) => {
                     let n = self.nombre_contacto.clone();
                     self.estado.parar(
@@ -1250,7 +1256,7 @@ impl Secure {
                 }
             }
         }
-        // Not known (or changed): the short code.
+        // Every new conversation (known, new or changed keys): the short code.
         let inicio = Inicio::new();
         let pk = inicio.public_key().to_base64();
         self.sas_inicio = Some(inicio);
@@ -3062,6 +3068,10 @@ impl Secure {
         if self.movil.take().is_some() {
             self.monitor
                 .anota(ahora_s(), Nivel::Info, "paso al móvil terminado");
+            self.cambio = true;
+        }
+        // An old error must not keep the «continue on the phone» card on screen for good.
+        if self.movil_error.take().is_some() {
             self.cambio = true;
         }
         self.movil_puerta_rx = None;

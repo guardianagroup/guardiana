@@ -2610,7 +2610,9 @@ impl Sesion {
                 // The SECURE tab draws its monitor from the first second (15 Oct 2026). Until a
                 // conversation exists every field is null and the page shows «—».
                 if m.get("vista").and_then(Value::as_str) == Some("secure") {
-                    o.extend(self.a_pestana(id, &self.secure.estado_json()));
+                    // With the house's room (17 Oct 2026 review: after a refresh an open room
+                    // looked closed until something changed).
+                    o.extend(self.a_pestana(id, &self.secure_estado_json()));
                 }
                 o
             }

@@ -983,6 +983,7 @@
   "sec_llamada_rechazada": "Ha rechazado la llamada.",
   "sec_llamada_sin_respuesta": "No contesta:",
   "sec_l_sin_camara": "Sin cámara: la llamada sigue solo con voz.",
+  "sec_l_sin_medios": "No se pudo arrancar el micrófono ni la cámara para la llamada. Cuelga y vuelve a intentarlo.",
   "sec_l_grupo": "el grupo",
   "sec_l_llamando_s": "Llamando… {s} s",
   "sec_l_llamando": "Llamando a {n}…",

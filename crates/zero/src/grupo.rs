@@ -131,8 +131,11 @@ impl Grupo {
     }
 
     fn cierra_todo(&mut self, por: &str) {
+        // A new conversation starts empty (17 Oct 2026 review: the last contact's messages
+        // showed in the next one's chat).
         for s in &mut self.sesiones {
             s.cerrar(por);
+            s.borrar_todo();
         }
         self.sesiones.truncate(1);
         self.vistos.truncate(1);

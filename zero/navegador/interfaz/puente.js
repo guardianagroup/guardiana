@@ -21,7 +21,8 @@ const Z = (() => {
       pintaTextos(document);
     }
     if (m.tipo === 'tema') document.documentElement.dataset.tema = m.tema || '';
-    (oyentes[m.tipo] || []).forEach((f) => f(m));
+    // One drawing that fails must not leave the rest of the screen frozen.
+    (oyentes[m.tipo] || []).forEach((f) => { try { f(m); } catch (e) { console.error(e); } });
   };
   // The pages follow Windows' day or night until the person chooses (diseno.css, data-sigue).
   document.documentElement.dataset.sigue = '';
