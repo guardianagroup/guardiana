@@ -1088,5 +1088,10 @@
   "sec_m_grupo": "Grupo: {n}",
   "sec_s_nuevo": "Se une {n}. Compara los números con esa persona.",
   "sec_archivo_cortado": "Se cortó la conexión en mitad del archivo y no se pudo retomar; envíalo otra vez.",
-  "sec_f_esperando_enlace": "esperando a recuperar la conexión; seguirá donde se quedó"
+  "sec_f_esperando_enlace": "esperando a recuperar la conexión; seguirá donde se quedó",
+  "sec_i_s_cuantico_degradado": "Llegó un mensaje sin la capa poscuántica ya acordada (intento de rebajar el cifrado)",
+  "sec_i_s_cuantico_mal": "Un mensaje no pasó la capa poscuántica (repetido o alterado)",
+  "sec_l_cuantico": "Cifrado resistente a ordenadores cuánticos activo (ML-KEM-768 sobre el cifrado habitual)",
+  "sec_l_cuantico_no": "Capa poscuántica: pendiente (los dos lados necesitan la versión 1.0.39 o posterior)",
+  "sec_s_cuantico": "Poscuántico"
 }

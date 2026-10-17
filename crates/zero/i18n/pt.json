@@ -1088,5 +1088,10 @@
   "sec_m_grupo": "Grupo: {n}",
   "sec_s_nuevo": "{n} está entrando. Compare os números com essa pessoa.",
   "sec_archivo_cortado": "A ligação caiu a meio do ficheiro e não foi possível retomá-lo; envia-o outra vez.",
-  "sec_f_esperando_enlace": "à espera de recuperar a ligação; continuará onde ficou"
+  "sec_f_esperando_enlace": "à espera de recuperar a ligação; continuará onde ficou",
+  "sec_i_s_cuantico_degradado": "Chegou uma mensagem sem a camada pós-quântica já acordada (tentativa de rebaixar a cifra)",
+  "sec_i_s_cuantico_mal": "Uma mensagem não passou a camada pós-quântica (repetida ou alterada)",
+  "sec_l_cuantico": "Cifra resistente a computadores quânticos ativa (ML-KEM-768 sobre a cifra habitual)",
+  "sec_l_cuantico_no": "Camada pós-quântica: pendente (ambos os lados precisam da versão 1.0.39 ou posterior)",
+  "sec_s_cuantico": "Pós-quântico"
 }

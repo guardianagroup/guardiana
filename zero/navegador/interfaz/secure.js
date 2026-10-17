@@ -50,6 +50,7 @@
       linea($('g-cifrado'), '', t('sec_l_cifrado_no'));
       linea($('g-identidad'), '', t('sec_l_sin_verificar'));
       linea($('g-nivel'), '', t('sec_l_nivel_pc'));
+      linea($('g-cuantico'), '', t('sec_l_cuantico_no'));
       linea($('g-conexion'), '', t('sec_l_sin_conexion'));
       linea($('g-visto'), '', t('sec_l_nada'));
     } else {
@@ -60,6 +61,8 @@
       // is a web page inside Safari or Chrome, strong but a step below (16 Oct 2026).
       const conMovil = !!(E.otro_movil || ((E.movil || {}).habla));
       linea($('g-nivel'), 'ok', t(conMovil ? 'sec_l_nivel_movil' : 'sec_l_nivel_pc'));
+      // The post-quantum lock (16 Oct 2026): on once both sides agreed it inside Olm.
+      linea($('g-cuantico'), E.cuantico ? 'ok' : '', t(E.cuantico ? 'sec_l_cuantico' : 'sec_l_cuantico_no'));
       if (tr.directo === true) linea($('g-conexion'), typeof tr.perdida_pct === 'number' && tr.perdida_pct >= 3 ? 'aviso' : 'ok', typeof tr.perdida_pct === 'number' && tr.perdida_pct >= 3 ? t('sec_l_perdida', { p: n(tr.perdida_pct) }) : t('sec_l_directa'));
       else if (tr.directo === false) linea($('g-conexion'), typeof tr.perdida_pct === 'number' && tr.perdida_pct >= 3 ? 'aviso' : 'ok', t('sec_l_rele'));
       else linea($('g-conexion'), '', t('sec_l_sin_conexion'));
@@ -245,6 +248,7 @@
       `<span class="ok">${esc(t('sec_s_cifrado'))}</span>`,
       `<span class="${verificado ? 'ok' : ''}">${esc(t(verificado ? 'sec_s_verificado' : 'sec_s_sin_verificar'))}</span>`,
       `<span class="${conMovilSello ? 'suave' : 'ok'}">${esc(t(conMovilSello ? 'sec_s_nivel_movil' : 'sec_s_nivel_pc'))}</span>`,
+      E.cuantico ? `<span class="ok">${esc(t('sec_s_cuantico'))}</span>` : '',
     ].join('') : '';
     // The host, once someone is in: the code stays on screen to invite more.
     const mas = $('c-mas');

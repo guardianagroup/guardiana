@@ -1088,5 +1088,10 @@
   "sec_m_grupo": "Group: {n}",
   "sec_s_nuevo": "{n} is joining. Compare the numbers with them.",
   "sec_archivo_cortado": "The connection dropped in the middle of the file and it could not be resumed; send it again.",
-  "sec_f_esperando_enlace": "waiting for the connection to come back; it will go on from where it was"
+  "sec_f_esperando_enlace": "waiting for the connection to come back; it will go on from where it was",
+  "sec_i_s_cuantico_degradado": "A message arrived without the agreed post-quantum layer (an attempt to downgrade the encryption)",
+  "sec_i_s_cuantico_mal": "A message failed the post-quantum layer (replayed or altered)",
+  "sec_l_cuantico": "Quantum-resistant encryption on (ML-KEM-768 over the usual encryption)",
+  "sec_l_cuantico_no": "Post-quantum layer: pending (both sides need version 1.0.39 or later)",
+  "sec_s_cuantico": "Post-quantum"
 }

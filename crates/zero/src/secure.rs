@@ -24,6 +24,7 @@ use base64::Engine as _;
 use guardiana_secure::agenda::{self, Agenda};
 use guardiana_secure::archivo::{Llave, Recepcion, Trozos};
 use guardiana_secure::claves::{Curve25519PublicKey, Ed25519Signature, Mac};
+use guardiana_secure::cuantico;
 use guardiana_secure::monitor::{Identidad, Monitor, Nivel};
 use guardiana_secure::pausa::Sesion as EstadoSesion;
 use guardiana_secure::prueba::{Cadena, Prueba};
@@ -519,6 +520,13 @@ pub struct Secure {
     /// theirs (shown on the call panel). 16 Oct 2026.
     voz_protegida: bool,
     otro_voz_protegida: bool,
+    /// The post-quantum lock over Olm (16 Oct 2026, [`cuantico`]): side 0 offers an ML-KEM
+    /// key once the conversation opens, side 1 answers, and from then every Olm payload is
+    /// sealed with the layer too. `cuantico_visto`: a sealed message already came from the
+    /// other side, so a plain one now would be a downgrade.
+    cuantico_oferta: Option<cuantico::Oferta>,
+    capa: Option<cuantico::Capa>,
+    cuantico_visto: bool,
     /// This computer's time zone (the page tells it) and the other side's, exchanged inside
     /// Olm once the conversation is open (16 Oct 2026, «que salga en nuestro mapa, el de él y
     /// el mío»): the globe places each computer by its time zone, never by an address.
@@ -615,6 +623,9 @@ impl Secure {
             movil_dicho: None,
             voz_protegida: false,
             otro_voz_protegida: false,
+            cuantico_oferta: None,
+            capa: None,
+            cuantico_visto: false,
             zona_propia: String::new(),
             zona_otra: String::new(),
             enviados: Vec::new(),
@@ -882,6 +893,9 @@ impl Secure {
         self.conversacion = None;
         self.entrada = None;
         self.salida = None;
+        self.cuantico_oferta = None;
+        self.capa = None;
+        self.cuantico_visto = false;
         self.llamada = None;
         self.entrante = None;
         self.perdida = None;
@@ -1380,6 +1394,7 @@ impl Secure {
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "conversación cifrada abierta");
                     self.manda_zona();
+                    self.cuantico_empieza();
                 }
                 Err(e) => {
                     self.aviso("sec_err_olm", e.to_string());
@@ -1402,10 +1417,23 @@ impl Secure {
             return;
         }
         let trust = self.agenda.trust();
+        let mut bytes = serde_json::to_vec(&carga).unwrap_or_default();
+        if let Some(capa) = &mut self.capa {
+            // The post-quantum lock first; Olm wraps the sealed bytes as any other payload.
+            match capa.sella(&bytes) {
+                Ok(sellado) => {
+                    bytes = serde_json::to_vec(&json!({ "pq": B64.encode(sellado) }))
+                        .unwrap_or_default();
+                }
+                Err(e) => {
+                    self.aviso("sec_err_olm", e.to_string());
+                    return;
+                }
+            }
+        }
         let Some(conv) = &mut self.conversacion else {
             return;
         };
-        let bytes = serde_json::to_vec(&carga).unwrap_or_default();
         match trust.send(conv, &bytes) {
             Ok(env) => {
                 let (tipo, cuerpo) = env.to_wire();
@@ -1444,6 +1472,7 @@ impl Secure {
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "conversación cifrada abierta");
                     self.manda_zona();
+                    self.cuantico_empieza();
                     Ok(plano)
                 }
                 Err(e) => Err(e),
@@ -1453,7 +1482,9 @@ impl Secure {
             Ok(plano) => {
                 self.monitor.recibido(ahora_s());
                 if let Ok(carga) = serde_json::from_slice::<Value>(&plano) {
-                    self.carga(&carga);
+                    if let Some(carga) = self.cuantico_abre(carga) {
+                        self.carga(&carga);
+                    }
                 }
             }
             Err(e) => {
@@ -1464,8 +1495,97 @@ impl Secure {
         self.cambio = true;
     }
 
+    /// Side 0 (by the order of the keys) offers the ML-KEM key once the conversation is open.
+    fn cuantico_empieza(&mut self) {
+        if self.mi_numero() != 0 || self.capa.is_some() {
+            return;
+        }
+        let (oferta, llave) = cuantico::Oferta::nueva();
+        self.cuantico_oferta = Some(oferta);
+        self.manda_olm(json!({ "m": "pq_llave", "llave": B64.encode(llave) }));
+    }
+
+    /// What came inside Olm: sealed by the post-quantum layer, or plain. Plain is fine until
+    /// the layer is agreed and the other side has used it; after that it is a downgrade and
+    /// is dropped as an attack signal.
+    fn cuantico_abre(&mut self, carga: Value) -> Option<Value> {
+        let Some(sellado) = carga["pq"].as_str().and_then(|s| B64.decode(s).ok()) else {
+            if self.capa.is_some() && self.cuantico_visto {
+                self.incidente(
+                    "cuantico_degradado",
+                    "llegó un mensaje sin la capa poscuántica ya acordada".to_owned(),
+                    1,
+                );
+                return None;
+            }
+            return Some(carga);
+        };
+        let Some(capa) = &mut self.capa else {
+            return None;
+        };
+        match capa.abre(&sellado) {
+            Ok(plano) => {
+                self.cuantico_visto = true;
+                serde_json::from_slice::<Value>(&plano).ok()
+            }
+            Err(_) => {
+                self.incidente(
+                    "cuantico_mal",
+                    "un mensaje no pasó la capa poscuántica (repetido o alterado)".to_owned(),
+                    1,
+                );
+                None
+            }
+        }
+    }
+
+    /// The layer is on: shown on screen as «resistente a ordenadores cuánticos».
+    #[must_use]
+    pub fn cuantico(&self) -> bool {
+        self.capa.is_some()
+    }
+
     fn carga(&mut self, c: &Value) {
         match c["m"].as_str().unwrap_or_default() {
+            "pq_llave" => {
+                // Side 1: a secret for that key, its ciphertext back, and the layer from here
+                // on (the answer itself goes plain: the other side has no layer yet).
+                let Some(llave) = c["llave"].as_str().and_then(|s| B64.decode(s).ok()) else {
+                    return;
+                };
+                if self.mi_numero() != 1 || self.capa.is_some() {
+                    return;
+                }
+                match cuantico::encapsula(&llave) {
+                    Ok((cifrado, secreto)) => {
+                        self.manda_olm(
+                            json!({ "m": "pq_cifrado", "cifrado": B64.encode(cifrado) }),
+                        );
+                        self.capa = Some(cuantico::Capa::nueva(&secreto, 1));
+                        self.monitor
+                            .anota(ahora_s(), Nivel::Info, "capa poscuántica activa");
+                        self.cambio = true;
+                    }
+                    Err(e) => self.aviso("sec_err_olm", e.to_string()),
+                }
+            }
+            "pq_cifrado" => {
+                let Some(cifrado) = c["cifrado"].as_str().and_then(|s| B64.decode(s).ok()) else {
+                    return;
+                };
+                let Some(oferta) = self.cuantico_oferta.take() else {
+                    return;
+                };
+                match oferta.abre(&cifrado) {
+                    Ok(secreto) => {
+                        self.capa = Some(cuantico::Capa::nueva(&secreto, 0));
+                        self.monitor
+                            .anota(ahora_s(), Nivel::Info, "capa poscuántica activa");
+                        self.cambio = true;
+                    }
+                    Err(e) => self.aviso("sec_err_olm", e.to_string()),
+                }
+            }
             "grupo" => {
                 self.grupo = c["nombres"]
                     .as_array()
@@ -2873,6 +2993,7 @@ impl Secure {
             "otro_voz_protegida": self.otro_voz_protegida,
             "incidente": self.estado_incidente(),
             "reconectando": self.reconexion.as_ref().map(|r| json!({ "desde": r.desde, "intentos": r.intentos })),
+            "cuantico": self.capa.is_some(),
             "rele_codigo": self.rele_codigo,
             "rele": self.rele,
             "rele_error": self.rele_error,
