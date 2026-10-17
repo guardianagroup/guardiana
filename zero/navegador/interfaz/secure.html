@@ -198,18 +198,19 @@ main { min-height: 0; overflow: auto; padding: 24px 28px 36px; display: grid; ga
 .avatar.casa { background: var(--accent); color: #fff; }
 .avatar.casa .icono { width: 22px; height: 22px; }
 /* The start: three ways, three cards; the chosen one becomes the whole screen. */
-.inicio { display: grid; gap: 10px; justify-items: center; text-align: center; padding: 28px 8px 8px; }
-.inicio-titulo { margin: 0; font: 600 22px/1.2 var(--display); }
-.inicio-frase { margin: 0 0 14px; max-width: 56ch; }
-.modos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; width: 100%; max-width: 920px; }
-.modo { appearance: none; display: grid; gap: 10px; justify-items: center; text-align: center; padding: 26px 18px 22px; border: 1px solid var(--line); border-radius: var(--r-tarjeta); background: var(--card); color: var(--fg); cursor: pointer; box-shadow: var(--sombra); transition: border-color .15s, transform .15s; }
-.modo:hover { border-color: var(--accent); transform: translateY(-2px); }
-.modo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.modo-icono { width: 56px; height: 56px; border-radius: 16px; background: var(--accent-suave); color: var(--accent); display: grid; place-items: center; }
-.modo-icono .icono { width: 28px; height: 28px; }
-.modo b { font: 600 16px/1.25 var(--display); }
-.modo .t { font-size: 13px; line-height: 1.5; max-width: 30ch; }
-@media (max-width: 900px) { .modos { grid-template-columns: 1fr; } }
+.inicio { display: grid; gap: 14px; justify-items: center; align-content: center; text-align: center; min-height: calc(100vh - 160px); padding: 24px 8px; }
+.inicio-titulo { margin: 0; font: 600 30px/1.15 var(--display); letter-spacing: -.01em; }
+.inicio-frase { margin: 0 0 28px; max-width: 52ch; font-size: 15px; line-height: 1.55; }
+.modos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; width: 100%; max-width: 1080px; }
+.modo { appearance: none; display: grid; grid-template-rows: auto auto 1fr auto; gap: 14px; justify-items: center; text-align: center; padding: 36px 26px 30px; min-height: 300px; border: 1px solid var(--line); border-radius: 20px; background: var(--card); color: var(--fg); cursor: pointer; box-shadow: var(--sombra); transition: border-color .15s, transform .15s, box-shadow .15s; }
+.modo:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 12px 30px color-mix(in srgb, var(--accent) 18%, transparent); }
+.modo:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.modo-icono { width: 72px; height: 72px; border-radius: 22px; background: var(--accent-suave); color: var(--accent); display: grid; place-items: center; }
+.modo-icono .icono { width: 34px; height: 34px; }
+.modo b { font: 600 19px/1.2 var(--display); }
+.modo .t { font-size: 14px; line-height: 1.55; max-width: 28ch; align-self: start; }
+.modo .modo-boton { margin-top: 6px; padding: 9px 18px; border-radius: 10px; background: var(--accent); color: var(--accent-fg); font: 500 13.5px var(--texto); }
+@media (max-width: 1000px) { .modos { grid-template-columns: 1fr; max-width: 520px; } .modo { min-height: 0; } .inicio { min-height: 0; } }
 .modo-cab { display: flex; align-items: center; gap: 14px; padding: 10px 14px; }
 .modo-cab b { font: 600 15px/1.2 var(--display); }
 .modo-movil { display: grid; gap: 12px; }
@@ -337,16 +338,19 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
         <span class="modo-icono"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="9" height="7" rx="1.5"/><rect x="13" y="12" width="9" height="7" rx="1.5"/><path d="M6.5 12v3M17.5 9v3M4 15h5M15 22h5"/></svg></span>
         <b data-t="sec_modo_equipos"></b>
         <span class="t" data-t="sec_modo_equipos_texto"></span>
+        <span class="modo-boton" data-t="sec_modo_equipos_boton"></span>
       </button>
       <button type="button" class="modo" data-modo="movil">
         <span class="modo-icono"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="12" height="9" rx="1.5"/><rect x="16" y="7" width="6" height="12" rx="1.5"/><path d="M5 16h6M19 16v.01"/></svg></span>
         <b data-t="sec_modo_movil"></b>
         <span class="t" data-t="sec_modo_movil_texto"></span>
+        <span class="modo-boton" data-t="sec_modo_movil_boton"></span>
       </button>
       <button type="button" class="modo" data-modo="sala">
         <span class="modo-icono"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><rect x="9" y="13" width="6" height="7" rx="1"/></svg></span>
         <b data-t="sec_modo_sala"></b>
         <span class="t" data-t="sec_modo_sala_texto"></span>
+        <span class="modo-boton" data-t="sec_modo_sala_boton"></span>
       </button>
     </div>
   </section>
