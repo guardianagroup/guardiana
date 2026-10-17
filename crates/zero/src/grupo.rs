@@ -1039,6 +1039,9 @@ mod tests {
 
     #[test]
     fn three_computers_meet_through_the_host_and_everyone_reads_everyone() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let base = std::env::temp_dir().join(format!("guardiana-grupo-{}", std::process::id()));
         let d = |n: &str| {
             let p = base.join(n);

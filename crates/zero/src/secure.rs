@@ -4204,6 +4204,9 @@ mod tests {
 
     #[test]
     fn another_program_on_the_microphone_stops_the_talk_and_the_call_report_says_so() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let base = std::env::temp_dir().join(format!("guardiana-vigia-{}", std::process::id()));
         let (da, db) = (base.join("a"), base.join("b"));
         std::fs::create_dir_all(&da).unwrap();

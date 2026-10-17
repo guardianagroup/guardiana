@@ -40,3 +40,9 @@ pub mod textos;
 pub mod tinta;
 pub mod url_limpia;
 pub mod vigia;
+
+/// The tests that set up conversations over real sockets take turns: on a slow runner (macOS,
+/// three cores) two of them at once starved the three-computer group of its greeting
+/// (17 Oct 2026).
+#[cfg(test)]
+pub(crate) static PRUEBAS_RED: std::sync::Mutex<()> = std::sync::Mutex::new(());
