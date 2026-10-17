@@ -1100,6 +1100,8 @@
   "sec_sala_abrir": "Abrir la sala",
   "sec_sala_hasta": "Sala abierta {h} h, hasta el {f}. Deja este equipo encendido y con GUARDIANA abierta.",
   "sec_sala_escanea": "Cada móvil lee este código con la cámara, escribe su nombre y espera a que aquí pulses «Dejar entrar».",
+  "sec_sala_en": "En la sala",
+  "sec_sala_mensajes": "Mensajes",
   "sec_sala_texto_ph": "Escribir a todos desde casa",
   "sec_sala_enviar": "Enviar",
   "sec_sala_nivel": "Protección fuerte: los móviles van cifrados hasta este equipo, que reparte lo que dicen (ve el chat). Un código fotografiado no entra sin tu «Dejar entrar».",

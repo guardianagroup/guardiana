@@ -1100,6 +1100,8 @@
   "sec_sala_abrir": "Open the room",
   "sec_sala_hasta": "Room open for {h} h, until {f}. Keep this computer on with GUARDIANA open.",
   "sec_sala_escanea": "Each phone reads this code with its camera, types a name and waits for you to press «Let in» here.",
+  "sec_sala_en": "In the room",
+  "sec_sala_mensajes": "Messages",
   "sec_sala_texto_ph": "Write to everyone from home",
   "sec_sala_enviar": "Send",
   "sec_sala_nivel": "Strong protection: the phones are encrypted up to this computer, which passes on what they say (it sees the chat). A photographed code gets nobody in without your «Let in».",

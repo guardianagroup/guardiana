@@ -1100,6 +1100,8 @@
   "sec_sala_abrir": "Abrir a sala",
   "sec_sala_hasta": "Sala aberta {h} h, até {f}. Deixe este computador ligado e com a GUARDIANA aberta.",
   "sec_sala_escanea": "Cada celular lê este código com a câmera, escreve o nome e espera você tocar em «Deixar entrar» aqui.",
+  "sec_sala_en": "Na sala",
+  "sec_sala_mensajes": "Mensagens",
   "sec_sala_texto_ph": "Escrever para todos de casa",
   "sec_sala_enviar": "Enviar",
   "sec_sala_nivel": "Proteção forte: os celulares vão cifrados até este computador, que distribui o que dizem (vê o chat). Um código fotografado não entra sem o seu «Deixar entrar».",

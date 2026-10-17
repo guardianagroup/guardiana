@@ -179,13 +179,25 @@ main { min-height: 0; overflow: auto; padding: 24px 28px 36px; display: grid; ga
 .movil .m-ok p { color: var(--fg); }
 .movil .m-habla { font-size: 13px; color: var(--fg); }
 .col-izq .tarjeta { padding: 14px; }
-.c-sala-miembros { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
-.c-sala-miembros li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
-.c-sala-miembros li i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); display: inline-block; }
+#c-sala-abierta { display: grid; gap: 14px; }
+#c-sala-abierta .qr { margin: 4px 0 6px; }
+.c-sala-sub { margin: 0; font: 600 12px/1.2 var(--display); color: var(--muted); letter-spacing: .02em; }
+.c-sala-miembros { list-style: none; padding: 0; margin: 0; display: grid; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.c-sala-miembros li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; column-gap: 10px; padding: 10px 12px; font-size: 13px; min-height: 44px; }
+.c-sala-miembros li + li { border-top: 1px solid var(--line); }
+.c-sala-miembros li i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: inline-block; }
 .c-sala-miembros li.si i { background: var(--ok); }
-.c-sala-mensajes { list-style: none; padding: 8px 10px; margin: 0; max-height: 220px; overflow: auto; display: grid; gap: 4px; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; background: var(--campo); }
-.c-sala-mensajes li time { opacity: .6; font: 11px var(--mono); margin-left: 6px; }
-.c-sala-mensajes li.mio { font-weight: 500; }
+.c-sala-miembros li .c-sala-q { display: grid; gap: 2px; min-width: 0; }
+.c-sala-miembros li .c-sala-q b { font-weight: 600; }
+.c-sala-miembros li .c-sala-q .t { font-size: 12px; line-height: 1.35; }
+.c-sala-miembros li .boton.chico { padding: 6px 12px; }
+.c-sala-mensajes { list-style: none; padding: 12px; margin: 0; max-height: 260px; overflow: auto; display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; background: var(--campo); }
+.c-sala-mensajes li { max-width: 88%; padding: 8px 12px; border-radius: 14px 14px 14px 4px; background: var(--card); border: 1px solid var(--line); line-height: 1.45; display: grid; gap: 2px; }
+.c-sala-mensajes li.mio { justify-self: end; border-radius: 14px 14px 4px 14px; background: color-mix(in srgb, var(--accent) 14%, var(--card)); border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
+.c-sala-mensajes li b { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.c-sala-mensajes li time { opacity: .6; font: 10.5px var(--mono); justify-self: end; }
+.c-sala-mensajes li.aviso { max-width: 100%; justify-self: center; background: transparent; border: 0; padding: 2px 0; color: var(--muted); font-size: 12px; }
+.c-sala-mensajes:empty { display: none; }
 /* The panel «Esta conversación»: the level as a picture, four plain lines, the details folded. */
 aside.monitor { border-left: 1px solid var(--line); background: var(--card); padding: 18px 16px; display: grid; gap: 12px; align-content: start; }
 aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
@@ -306,7 +318,9 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
         <p class="t" id="c-sala-hasta"></p>
         <p class="t" data-t="sec_sala_escanea"></p>
         <div class="qr" id="c-sala-qr"></div>
+        <p class="c-sala-sub" data-t="sec_sala_en"></p>
         <ul class="c-sala-miembros" id="c-sala-miembros"></ul>
+        <p class="c-sala-sub" data-t="sec_sala_mensajes"></p>
         <ol class="c-sala-mensajes" id="c-sala-mensajes"></ol>
         <form id="c-sala-form" class="c-fila"><input class="campo" id="c-sala-texto" data-t-ph="sec_sala_texto_ph" autocomplete="off" maxlength="8000"><button type="submit" class="boton chico" data-t="sec_sala_enviar"></button></form>
         <p class="t" data-t="sec_sala_nivel"></p>
