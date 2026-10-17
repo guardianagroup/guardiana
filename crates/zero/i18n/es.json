@@ -1125,5 +1125,6 @@
   "sec_l_en_curso": "Llamada cifrada en curso",
   "sec_panel_titulo": "Esta conversación",
   "sec_pie_titulo": "Tu espacio. Tus conversaciones.",
-  "sec_pie_texto": "Mensajes, archivos y llamadas protegidos de extremo a extremo. Sin cuentas obligatorias."
+  "sec_pie_texto": "Mensajes, archivos y llamadas protegidos de extremo a extremo. Sin cuentas obligatorias.",
+  "sec_l_pantalla": "Pantalla completa"
 }

@@ -44,7 +44,7 @@
     const porCausa = g === 'pausada' && id.estado !== 'clave_cambiada' && ((m.sesion || {}).motivo || {}).por !== 'clave_cambiada';
     $('g-frase').textContent = t(porCausa ? 'sec_g_pausada_frase_causa' : 'sec_g_' + g + '_frase');
     const chip = $('m-estado-chip');
-    chip.textContent = g === 'sin' ? t('sec_sin_sesion') : t('sec_g_' + g);
+    chip.textContent = t('sec_g_' + g);
     chip.className = 'chip' + (g === 'protegida' ? ' ok' : g === 'revisar' ? ' aviso' : g === 'pausada' ? ' alerta' : '');
     if (!id) {
       linea($('g-cifrado'), '', t('sec_l_cifrado_no'));
@@ -802,6 +802,10 @@
   $('c-voz').addEventListener('click', () => llama(false));
   $('c-video').addEventListener('click', () => llama(true));
   $('c-colgar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'colgar' }));
+  // Full screen for the video call (the owner, 16 Oct 2026): the pictures fill the screen; Esc
+  // or the same button brings them back.
+  $('c-pantalla').addEventListener('click', () => { const p = document.querySelector('#c-llamada .pantallas'); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else if (p && p.requestFullscreen) p.requestFullscreen().catch(() => {}); });
+  en('secure_estado', (m) => { $('c-pantalla').hidden = !(m.llamada && m.llamada.video && m.llamada.conectada !== false); });
   $('c-silencio').addEventListener('click', () => { silenciado = !silenciado; if (local) local.getAudioTracks().forEach((x) => { x.enabled = !silenciado; }); $('c-silencio').setAttribute('aria-pressed', String(silenciado)); $('c-silencio').querySelector('span').textContent = t(silenciado ? 'sec_l_sonar' : 'sec_l_silenciar'); });
 
   let ultimo = {};

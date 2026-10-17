@@ -1125,5 +1125,6 @@
   "sec_l_en_curso": "Encrypted call in progress",
   "sec_panel_titulo": "This conversation",
   "sec_pie_titulo": "Your space. Your conversations.",
-  "sec_pie_texto": "Messages, files and calls protected end to end. No accounts required."
+  "sec_pie_texto": "Messages, files and calls protected end to end. No accounts required.",
+  "sec_l_pantalla": "Full screen"
 }
