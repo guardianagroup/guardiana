@@ -178,6 +178,10 @@ pub struct Sala {
     descargas: Option<PathBuf>,
     /// The last file id handed to the phones.
     ultimo_archivo: u32,
+    /// The relay's call service (WebRTC between two phones of the house, 17 Oct 2026).
+    turn: Option<crate::rele::Turn>,
+    turn_rx: Option<std::sync::mpsc::Receiver<Result<crate::rele::Turn, String>>>,
+    turn_pedido: u64,
 }
 
 impl std::fmt::Debug for Sala {
@@ -239,6 +243,9 @@ impl Sala {
             error: None,
             descargas: None,
             ultimo_archivo: 0,
+            turn: None,
+            turn_rx: None,
+            turn_pedido: 0,
         })
     }
 
@@ -557,6 +564,41 @@ impl Sala {
             .unwrap_or_default()
     }
 
+    /// Ask the relay for its call service with the room of a phone that is in (the relay hands
+    /// it only for a room it is joining), at most once a minute while it says no.
+    fn turn_tic(&mut self) {
+        if let Some(rx) = &self.turn_rx {
+            if let Ok(r) = rx.try_recv() {
+                self.turn_rx = None;
+                if let Ok(t) = r {
+                    self.turn = Some(t);
+                    self.cambio = true;
+                }
+            }
+        }
+        if self.turn.is_some()
+            || self.turn_rx.is_some()
+            || ahora_s().saturating_sub(self.turn_pedido) < 60
+        {
+            return;
+        }
+        let Some(i) = (0..self.asientos.len()).find(|&i| self.asientos[i].enganchado) else {
+            return;
+        };
+        self.turn_pedido = ahora_s();
+        let sala = crate::movil::sala_de_clave(&llave_de_asiento(&self.clave, i));
+        let rele = if self.rele.contains(':') {
+            self.rele.clone()
+        } else {
+            format!("{}:443", self.rele)
+        };
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.turn_rx = Some(rx);
+        std::thread::spawn(move || {
+            let _ = tx.send(crate::rele::turn(&rele, &sala));
+        });
+    }
+
     /// Whom seat `i` is talking to in the call, if it is in one that is connected.
     fn pareja(&self, i: usize) -> Option<usize> {
         let l = self.llamada.as_ref()?;
@@ -572,6 +614,7 @@ impl Sala {
 
     /// Everything the phones left since the last tick.
     pub fn tic(&mut self) {
+        self.turn_tic();
         if self
             .llamada
             .as_ref()
@@ -730,6 +773,16 @@ impl Sala {
                             self.asientos[otro].movil.manda(Hacia::Media(b));
                         }
                     }
+                    // WebRTC between the two phones in the call: passed on as it is (the
+                    // phones' links are sealed with their seats' keys; the media is
+                    // DTLS-SRTP between the two phones).
+                    Desde::Rtc(d) if aprobado => {
+                        if let Some(otro) = self.pareja(i) {
+                            self.asientos[otro].movil.manda(Hacia::Estado(
+                                json!({ "tipo": "secure_rtc", "d": d }).to_string(),
+                            ));
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -771,12 +824,20 @@ impl Sala {
                 }
                 Some(_) => {
                     if let Some(otro) = self.pareja(i) {
+                        // WebRTC between the two phones when the relay's call service is in:
+                        // the caller offers.
+                        let rtc = match (&self.turn, &self.turn_rx) {
+                            (Some(t), _) => json!({ "ice": t.json(), "ofrece": l.de == i }),
+                            (None, Some(_)) => json!({ "pendiente": true }),
+                            _ => Value::Null,
+                        };
                         llamada = json!({
                             "video": l.video,
                             "desde": l.desde,
                             "conectada": true,
                             "reinicio": self.asientos[i].reinicio,
                             "mime_remoto": self.asientos[otro].mime,
+                            "rtc": rtc,
                         });
                     }
                 }
