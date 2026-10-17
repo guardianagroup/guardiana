@@ -90,6 +90,15 @@ pub struct Sala {
     error: Option<String>,
 }
 
+impl std::fmt::Debug for Sala {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Sala")
+            .field("horas", &self.horas)
+            .field("asientos", &self.asientos.len())
+            .finish()
+    }
+}
+
 fn ahora_s() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
