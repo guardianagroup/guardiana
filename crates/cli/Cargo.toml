@@ -28,10 +28,13 @@ guardiana-verify = { workspace = true }
 guardiana-license = { workspace = true }
 tokio = { workspace = true }
 serde_json = { workspace = true }
+
 # Comunicaciones on Linux and macOS (17 Oct 2026): `guardiana comunicaciones` serves ZERO's
 # SECURE page to the person's own browser, on 127.0.0.1 and as that person, with the same
 # engine (guardiana-zero) and the same local HTTP stack as the panel (axum). Only that command
-# reaches SECURE: the DNS service (`guardiana service run`, root) never opens it.
+# reaches SECURE: the DNS service (`guardiana service run`, root) never opens it. Not on
+# Windows, where Comunicaciones is a tab of GUARDIANA ZERO and guardiana.exe stays as it was.
+[target.'cfg(not(windows))'.dependencies]
 guardiana-zero = { workspace = true }
 axum = { workspace = true }
 

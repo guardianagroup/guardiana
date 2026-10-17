@@ -15,6 +15,9 @@
 //!   browser comes in with a one-use, two-minute key in its address. The key that opens the
 //!   browser is useless once used, so a glance at the process list is not a way in.
 //! - The person's folder is theirs alone (0700), like `%LOCALAPPDATA%` on Windows.
+//!
+//! Not built on Windows: there Comunicaciones is a tab of GUARDIANA ZERO, on the same identity
+//! folder, and two programs on one identity would step on each other.
 
 use std::collections::VecDeque;
 use std::error::Error;
@@ -990,12 +993,6 @@ async fn sirve(t: &'static i18n::Texts, motor: Motor, ficha: &Path) -> Result<()
 
 pub fn run(_opts: &Opts) -> Result<(), Box<dyn Error>> {
     let t = i18n::current();
-    if cfg!(windows) {
-        // On Windows it is a tab of GUARDIANA ZERO, with the same identity: two programs on one
-        // identity folder would step on each other.
-        println!("{}", t.cli("comunicaciones.windows"));
-        return Ok(());
-    }
     if por_sudo() {
         return Err(t.cli("comunicaciones.sin_sudo").into());
     }
