@@ -1437,6 +1437,17 @@
         // With the trial over and no Plus, Guardiana is not watching: offering to point the DNS at
         // it only broke names (review of 28 Sep 2026, G6).
         $('dns-card').classList.toggle('hidden', est.dns_aplicado || est.caducado);
+        // Comunicaciones (chat and calls) is a tab of GUARDIANA ZERO on Windows; on Linux and the Mac
+        // it opens in the browser from its own command, run as the person (17 Oct 2026: a friend
+        // with GUARDIANA on Linux had no way to find it).
+        if (est.so === 'linux' || est.so === 'macos') {
+          if (est.so === 'macos') {
+            $('com-texto').dataset.t = 'com_card_mac';
+            $('com-texto').textContent = t('com_card_mac');
+            $('com-orden').textContent = '/usr/local/guardiana/guardiana comunicaciones';
+          }
+          $('com-card').classList.remove('hidden');
+        }
         $('dns-apply').addEventListener('click', async () => {
           $('dns-msg').textContent = t('dns_aplicando'); $('dns-apply').disabled = true;
           try { const r = await api('/api/dns/aplicar', { method: 'POST' }); $('dns-msg').textContent = r.mensaje; $('dns-apply').classList.add('hidden'); }

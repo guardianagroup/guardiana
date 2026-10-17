@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=GUARDIANA Comunicaciones
+Name[es]=GUARDIANA Comunicaciones
+Name[en]=GUARDIANA Communications
+Name[pt]=GUARDIANA Comunicações
+Comment=Chat y llamadas cifradas de GUARDIANA SECURE, en tu navegador
+Comment[es]=Chat y llamadas cifradas de GUARDIANA SECURE, en tu navegador
+Comment[en]=GUARDIANA SECURE encrypted chat and calls, in your browser
+Comment[pt]=Chat e chamadas cifradas do GUARDIANA SECURE, no seu navegador
+Exec=guardiana comunicaciones
+Icon=guardiana
+Terminal=false
+Categories=Network;Chat;
+Keywords=GUARDIANA;SECURE;chat;llamadas;calls;chamadas;
+StartupNotify=false

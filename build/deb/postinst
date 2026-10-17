@@ -15,8 +15,11 @@ fi
 # In the terminal's language, as the .tar.gz installer does (review of 5 Oct 2026). The panel key
 # belongs to the service, so a person opens the panel with sudo, which prints the link.
 case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
-    es* | "" | C | C.* | POSIX) echo "GUARDIANA instalada. Para abrir el panel: sudo guardiana panel" ;;
-    pt*) echo "GUARDIANA instalada. Para abrir o painel: sudo guardiana panel" ;;
-    *) echo "GUARDIANA installed. To open the panel: sudo guardiana panel" ;;
+    es* | "" | C | C.* | POSIX) echo "GUARDIANA instalada. Para abrir el panel: sudo guardiana panel"
+        echo "Comunicaciones (chat y llamadas): en el menú de aplicaciones, «GUARDIANA Comunicaciones», o con tu usuario y sin sudo: guardiana comunicaciones" ;;
+    pt*) echo "GUARDIANA instalada. Para abrir o painel: sudo guardiana panel"
+        echo "Comunicações (chat e chamadas): no menu de aplicativos, «GUARDIANA Comunicações», ou com o seu usuário e sem sudo: guardiana comunicaciones" ;;
+    *) echo "GUARDIANA installed. To open the panel: sudo guardiana panel"
+        echo "Communications (chat and calls): in the applications menu, “GUARDIANA Communications”, or as your own user and without sudo: guardiana comunicaciones" ;;
 esac
 exit 0

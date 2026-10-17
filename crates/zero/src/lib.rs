@@ -9,6 +9,7 @@
 pub mod campos;
 pub mod cartas;
 pub mod chivatos;
+pub mod comunicaciones;
 pub mod cortes;
 pub mod datos;
 pub mod decision;

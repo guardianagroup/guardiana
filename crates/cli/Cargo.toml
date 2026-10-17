@@ -28,6 +28,12 @@ guardiana-verify = { workspace = true }
 guardiana-license = { workspace = true }
 tokio = { workspace = true }
 serde_json = { workspace = true }
+# Comunicaciones on Linux and macOS (17 Oct 2026): `guardiana comunicaciones` serves ZERO's
+# SECURE page to the person's own browser, on 127.0.0.1 and as that person, with the same
+# engine (guardiana-zero) and the same local HTTP stack as the panel (axum). Only that command
+# reaches SECURE: the DNS service (`guardiana service run`, root) never opens it.
+guardiana-zero = { workspace = true }
+axum = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-service = { workspace = true }
@@ -61,6 +67,10 @@ maintainer-scripts = "../../build/deb"
 assets = [
     ["target/release/guardiana", "usr/bin/", "755"],
     ["../../build/deb/guardiana.service", "lib/systemd/system/", "644"],
+    # Comunicaciones in the applications menu (17 Oct 2026): `guardiana comunicaciones`, run as
+    # the person who clicks it, opens chat and calls in their browser. With the program's icon.
+    ["../../build/deb/guardiana-comunicaciones.desktop", "usr/share/applications/", "644"],
+    ["../../build/mac/icono-512.png", "usr/share/icons/hicolor/512x512/apps/guardiana.png", "644"],
     ["../../build/tarball/LEEME.txt", "usr/share/doc/guardiana/", "644"],
     ["../../build/tarball/README.txt", "usr/share/doc/guardiana/", "644"],
     ["../../build/tarball/LEIAME.txt", "usr/share/doc/guardiana/", "644"],
