@@ -1067,7 +1067,14 @@ mod tests {
         gira(&mut [&mut a, &mut b], 5);
         assert_eq!(a.sesiones.len(), 2, "a second session listens");
         c.conectar(&format!("127.0.0.1:{puerto}")).unwrap();
-        gira(&mut [&mut a, &mut b, &mut c], 25);
+        // Up to a few seconds: a slow runner (macOS, with the other tests in parallel) needs
+        // more than half a second for the greeting (17 Oct 2026).
+        for _ in 0..40 {
+            gira(&mut [&mut a, &mut b, &mut c], 5);
+            if a.numeros().is_some() && a.numeros() == c.numeros() {
+                break;
+            }
+        }
         assert!(
             a.numeros().is_some() && a.numeros() == c.numeros(),
             "{:?}",
@@ -1076,6 +1083,12 @@ mod tests {
         a.sas_persona(true, "Cris");
         c.sas_persona(true, "Ana");
         gira(&mut [&mut a, &mut b, &mut c], 30);
+        for _ in 0..40 {
+            if c.sesiones[0].lista() && a.nombres().len() == 3 {
+                break;
+            }
+            gira(&mut [&mut a, &mut b, &mut c], 5);
+        }
         assert!(c.sesiones[0].lista());
         assert_eq!(a.nombres(), vec!["Ana", "Bea", "Cris"]);
         assert_eq!(b.nombres(), vec!["Ana", "Cris"]);
