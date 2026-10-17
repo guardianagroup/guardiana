@@ -203,7 +203,7 @@
   let E = { fase: 'sola' };
   const fasePinta = () => {
     const f = E.fase;
-    $('c-conexion').hidden = !(f === 'sola' || f === 'escuchando');
+    $('c-conexion').hidden = !(f === 'sola' || f === 'escuchando') || modo !== 'equipos';
     const comparando = E.comparando || (f === 'comparando' ? E.numeros : null);
     $('c-comparar').hidden = !comparando;
     $('c-comparar-quien').textContent = E.comparando && E.contacto_nuevo ? t('sec_s_nuevo', { n: E.contacto_nuevo }) : '';
@@ -514,7 +514,7 @@
     if (vista !== 'sala' || !m.sala) $('miga-donde').textContent = t('sec_miga_conv');
   };
   $('c-lista').addEventListener('click', (e) => { const li = e.target.closest('li[data-vista]'); if (!li || !E.sala) return; vista = li.dataset.vista; fasePinta(); pintaLista(E, E.contacto, ((E.grupo || {}).nombres || [])); pintaVista(E); });
-  $('c-nueva').addEventListener('click', () => { const c = $('c-conexion'); if (!c.hidden) { c.scrollIntoView({ behavior: 'smooth' }); $('c-yo').focus(); } });
+  $('c-nueva').addEventListener('click', () => { if (!hayContacto(E) && !E.sala && !movilActivo(E)) { modo = null; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); } });
 
   // «Pasar al móvil»: the program shows a QR code; the phone's camera opens our page, which
   // talks to this computer directly (TLS 1.3 pinned to the certificate in the code). The
@@ -558,7 +558,38 @@
   // offers both when there is one.
   let vista = 'contacto';
   const hayContacto = (m) => m.fase && m.fase !== 'sola' || (m.mensajes || []).length > 0;
+  // Three ways to talk (16 Oct 2026): computer to computer, from the phone, the home room.
+  // The start shows the three; once one is chosen (or one is already going) only it is on screen.
+  let modo = null;
+  try { modo = sessionStorage.getItem('secure-modo') || null; } catch (_) {}
+  const guardaModo = () => { try { if (modo) sessionStorage.setItem('secure-modo', modo); else sessionStorage.removeItem('secure-modo'); } catch (_) {} };
+  const movilActivo = (m) => !!(m.movil && (m.movil.enganchado || m.movil.pendiente || m.movil.qr));
+  const pintaModo = (m) => {
+    // What is going on decides the mode; the person's choice only while nothing is going on.
+    if (m.sala) modo = 'sala';
+    else if (movilActivo(m)) modo = 'movil';
+    else if (hayContacto(m)) modo = 'equipos';
+    guardaModo();
+    const activo = !!m.sala || movilActivo(m) || hayContacto(m);
+    $('c-inicio').hidden = !!modo;
+    $('c-modo-cab').hidden = !modo || activo;
+    if (modo) $('c-modo-nombre').textContent = t('sec_modo_' + modo);
+    $('c-modo-movil').hidden = modo !== 'movil';
+    const sala = $('c-sala-tarjeta');
+    sala.hidden = modo !== 'sala';
+    // The room's code and members: in the middle while it is not open, on the left once it is.
+    const colIzq = document.querySelector('.col-izq'), main = document.querySelector('main');
+    if (modo === 'sala' && m.sala && sala.parentElement !== colIzq) colIzq.insertBefore(sala, colIzq.querySelector('.pie-izq'));
+    if ((modo !== 'sala' || !m.sala) && sala.parentElement !== main) main.insertBefore(sala, $('c-conexion'));
+    const secure = document.querySelector('.secure');
+    secure.classList.toggle('sin-lados', !activo);
+    secure.classList.toggle('sin-derecha', false);
+    $('miga-donde').textContent = modo ? t('sec_modo_' + modo) : t('sec_miga_inicio');
+  };
+  document.querySelectorAll('.modo').forEach((b) => b.addEventListener('click', () => { modo = b.dataset.modo; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); if (modo === 'sala') $('c-sala-horas').focus(); }));
+  $('c-volver').addEventListener('click', () => { modo = null; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); });
   const pintaVista = (m) => {
+    pintaModo(m);
     const s = m.sala;
     if (!s) vista = 'contacto';
     else if (!hayContacto(m)) vista = 'sala';
@@ -600,7 +631,6 @@
     const ol = $('c-sala-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 40;
     ol.innerHTML = (s.mensajes || []).map((x) => `<li class="${x.mio ? 'mio' : ''}"><b>${esc(x.de)}</b><span>${esc(x.texto)}</span><time>${esc(hora(x.t))}</time></li>`).join('');
     if (abajo) ol.scrollTop = ol.scrollHeight;
-    pintaVista(m);
   };
   $('c-sc-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala_cerrar' }));
   $('c-sala-abrir').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala', horas: Number($('c-sala-horas').value), idioma: idioma() }));
@@ -612,6 +642,7 @@
   });
   $('c-sala-form').addEventListener('submit', (e) => { e.preventDefault(); const x = $('c-sala-texto').value.trim(); if (!x) return; manda({ tipo: 'secure', accion: 'sala_texto', texto: x }); $('c-sala-texto').value = ''; });
   en('secure_estado', pintaSala);
+  en('secure_estado', pintaVista);
   en('secure_estado', (m) => { const s = m.sala; if (s && (s.miembros || []).some((x) => x.pendiente) && !salaPendienteAntes) timbre(); salaPendienteAntes = !!(s && (s.miembros || []).some((x) => x.pendiente)); });
   let salaPendienteAntes = false;
 
