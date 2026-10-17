@@ -29,8 +29,6 @@ use crate::auth::Session;
 use crate::AppState;
 
 const DIA: i64 = 24 * 3_600_000;
-/// A review older than this is repeated when the page is opened.
-const VIGENCIA_MS: i64 = 30 * 60_000;
 /// How long PowerShell may take before it is stopped.
 const LIMITE: std::time::Duration = std::time::Duration::from_secs(300);
 
@@ -167,21 +165,6 @@ impl Revisor {
     }
 }
 
-/// Every six hours, from three minutes after the panel starts, so what appears on its own is
-/// noticed even when nobody opens the page. Windows only.
-pub(crate) fn vigilar(state: Arc<AppState>) {
-    if !cfg!(windows) {
-        return;
-    }
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(180)).await;
-        loop {
-            Revisor::lanzar(&state);
-            tokio::time::sleep(std::time::Duration::from_secs(6 * 3600)).await;
-        }
-    });
-}
-
 // ---------------------------------------------------------------------------------------------
 // The page's answer.
 
@@ -247,17 +230,10 @@ impl Item {
     }
 }
 
-/// `/api/revision`: the last review, and a new one started if it is old.
+/// `/api/revision`: the last review. Nothing starts from here: a review runs only when the
+/// person presses «Revisar ahora» (the owner, 17 Oct 2026: «no puede empezar el proceso antes
+/// de dar al botón»; it used to start on its own on opening the page and every six hours).
 pub(crate) async fn ver(State(state): State<Arc<AppState>>, _s: Session) -> ApiResult<Respuesta> {
-    let viejo = state
-        .revision
-        .estado
-        .lock()
-        .map(|c| !c.corriendo && c.cuando.is_none_or(|t| now_ms() - t > VIGENCIA_MS))
-        .unwrap_or(false);
-    if viejo && cfg!(windows) {
-        Revisor::lanzar(&state);
-    }
     Ok(Json(respuesta(&state)))
 }
 

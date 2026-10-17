@@ -634,7 +634,6 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         cortes,
         revision: revision::Revisor::default(),
     });
-    revision::vigilar(Arc::clone(&state));
 
     let app = Router::new()
         .route("/", get(api::root_page))

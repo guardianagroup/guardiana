@@ -2326,7 +2326,7 @@
     "rv_mapa": "Ver actividad en el mapa",
     "rv_cuando": "Revisado el {fecha}",
     "rv_desde": "GUARDIANA recuerda este equipo desde el {fecha}",
-    "rv_aun_no": "Aún no hay revisión: empieza en cuanto abres esta página.",
+    "rv_aun_no": "Aún no hay revisión. Pulsa «Revisar ahora» para empezar.",
     "rv_error": "La revisión no pudo terminar: {e}",
     "rv_no_windows": "Por ahora la revisión del equipo es solo para Windows.",
     "rv_ver_lista": "Ver la lista ({n})",

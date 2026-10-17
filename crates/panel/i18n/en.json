@@ -2326,7 +2326,7 @@
     "rv_mapa": "View activity on the map",
     "rv_cuando": "Checked on {fecha}",
     "rv_desde": "GUARDIANA remembers this computer since {fecha}",
-    "rv_aun_no": "No check-up yet: it starts as soon as you open this page.",
+    "rv_aun_no": "No check-up yet. Press «Check now» to start.",
     "rv_error": "The check-up could not finish: {e}",
     "rv_no_windows": "For now the computer check-up is Windows only.",
     "rv_ver_lista": "See the list ({n})",

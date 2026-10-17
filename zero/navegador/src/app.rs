@@ -99,6 +99,10 @@ static TICS_VIGIA: AtomicU32 = AtomicU32::new(0);
 static OCULTA_A_CAPTURAS: AtomicBool = AtomicBool::new(false);
 /// Whether Windows accepted.
 static PROTEGIDA: AtomicBool = AtomicBool::new(false);
+/// Whether the program's own pages are in night colours: a tab showing one of them is painted
+/// in its background colour between a reload and the first paint, never white (the owner,
+/// 17 Oct 2026: reloading GUARDIANA «hace una luz blanca … un fogonazo»).
+static FONDO_OSCURO: AtomicBool = AtomicBool::new(false);
 
 /// A string the way Win32 wants it: UTF-16, ending in zero, alive while it is used.
 struct Ancho(Vec<u16>);
@@ -490,6 +494,19 @@ fn ejecuta(o: Orden) {
         Orden::Tema { oscuro } => {
             let col = colores(oscuro);
             pinta_marco_ventana(hwnd(), &col);
+            FONDO_OSCURO.store(col.oscuro, Ordering::Relaxed);
+            let vistas: Vec<(ICoreWebView2Controller, ICoreWebView2)> = con_vistas(|v| {
+                v.pestanas
+                    .values()
+                    .filter_map(|p| p.vista.as_ref())
+                    .map(|x| (x.controlador.clone(), x.web.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
+            for (c, w) in vistas {
+                let url = texto_de(|p| unsafe { w.Source(p) });
+                color_fondo(&c, fondo_para(&url));
+            }
         }
         Orden::Titulo { texto } => {
             let t = Ancho::de(&texto);
@@ -1036,6 +1053,39 @@ fn escucha_teclas(c: &ICoreWebView2Controller) -> windows::core::Result<()> {
     unsafe { c.add_AcceleratorKeyPressed(&h, &mut t) }
 }
 
+/// The background of the program's own pages (--bg in interfaz/diseno.css, day or night).
+fn fondo_propio() -> COREWEBVIEW2_COLOR {
+    let (r, g, b) = if FONDO_OSCURO.load(Ordering::Relaxed) {
+        (0x0B, 0x10, 0x20)
+    } else {
+        (0xF4, 0xF6, 0xFA)
+    };
+    COREWEBVIEW2_COLOR {
+        A: 255,
+        R: r,
+        G: g,
+        B: b,
+    }
+}
+
+/// What a tab shows before its page paints: the program's colour for its own pages (ZERO's,
+/// SECURE, GUARDIANA's panel and its wait page), white for the web, as every browser does.
+fn fondo_para(url: &str) -> COREWEBVIEW2_COLOR {
+    if sesion::es_interna(url)
+        || url.starts_with("http://127.0.0.1:7443/")
+        || url.contains("guardiana-arrancando.html")
+    {
+        fondo_propio()
+    } else {
+        COREWEBVIEW2_COLOR {
+            A: 255,
+            R: 255,
+            G: 255,
+            B: 255,
+        }
+    }
+}
+
 fn color_fondo(c: &ICoreWebView2Controller, color: COREWEBVIEW2_COLOR) {
     if let Ok(c2) = c.cast::<ICoreWebView2Controller2>() {
         let _ = unsafe { c2.SetDefaultBackgroundColor(color) };
@@ -1165,7 +1215,9 @@ fn prepara_pestana(id: u32, c: &ICoreWebView2Controller) -> windows::core::Resul
             }
         }
     }
-    eventos_pestana(id, &web)?;
+    // Most tabs open on one of the program's own pages: their colour from the start.
+    color_fondo(c, fondo_propio());
+    eventos_pestana(id, &web, c.clone())?;
     escucha_mensajes(&web, Origen::Pestana(id))?;
     escucha_marcos(&web, id);
     escucha_teclas(c)?;
@@ -1252,7 +1304,11 @@ fn lee_flujo(flujo: &windows::Win32::System::Com::IStream, max: usize) -> Vec<u8
     out
 }
 
-fn eventos_pestana(id: u32, web: &ICoreWebView2) -> windows::core::Result<()> {
+fn eventos_pestana(
+    id: u32,
+    web: &ICoreWebView2,
+    controlador: ICoreWebView2Controller,
+) -> windows::core::Result<()> {
     let mut t = 0i64;
     unsafe {
         web.add_NavigationStarting(
@@ -1262,6 +1318,8 @@ fn eventos_pestana(id: u32, web: &ICoreWebView2) -> windows::core::Result<()> {
                         return Ok(());
                     };
                     let url = texto_de(|p| args.Uri(p));
+                    // A reload or a new page: the right colour behind it until it paints.
+                    color_fondo(&controlador, fondo_para(&url));
                     let mut redirigida = BOOL::default();
                     let _ = args.IsRedirected(&mut redirigida);
                     let r = con_sesion(|s| s.navegacion_empieza(id, &url, redirigida.as_bool()));
@@ -2137,6 +2195,7 @@ pub fn arranca() {
     SESION.with(|c| *c.borrow_mut() = Some(s));
 
     let col = colores(tema_elegido);
+    FONDO_OSCURO.store(col.oscuro, Ordering::Relaxed);
     let h = match crea_ventana(&col) {
         Ok(h) => h,
         Err(e) => {
