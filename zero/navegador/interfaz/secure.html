@@ -227,6 +227,13 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
 .monitor li time { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .monitor li .chip { grid-column: 1 / -1; justify-self: start; }
 .monitor .nota { margin: 10px 0 0; font-size: 11.5px; color: var(--muted); }
+    .c-sala-miembros { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; }
+    .c-sala-miembros li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .c-sala-miembros li i { width: 8px; height: 8px; border-radius: 50%; background: var(--gris, #999); display: inline-block; }
+    .c-sala-miembros li.si i { background: var(--verde, #17865f); }
+    .c-sala-mensajes { list-style: none; padding: 8px; margin: 8px 0; max-height: 240px; overflow: auto; display: grid; gap: 4px; border: 1px solid var(--bruma, #e6eaf2); border-radius: 10px; font-size: 14px; }
+    .c-sala-mensajes li time { opacity: .6; font-size: 11px; margin-left: 6px; }
+    .c-sala-mensajes li.mio { font-weight: 500; }
 </style>
 </head>
 <body>
@@ -293,6 +300,27 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
       <p class="m-habla" id="c-mv-habla" hidden data-t="sec_mv_habla"></p>
       <p id="c-mv-fuera"></p>
       <div class="c-fila"><button type="button" class="boton chico secundario" id="c-mv-fin" data-t="sec_mv_fin"></button></div>
+    </section>
+  </section>
+  <!-- «Sala de casa» (16 Oct 2026): this computer as the house's exchange; the phones read one
+       code, leave, and keep talking all day through the relay. -->
+  <section class="tarjeta" id="c-sala-tarjeta">
+    <section class="movil">
+      <h3 data-t="sec_sala_titulo"></h3>
+      <div id="c-sala-antes">
+        <p class="t" data-t="sec_sala_texto"></p>
+        <div class="c-fila"><label class="c-nombre"><span data-t="sec_sala_horas"></span><select class="campo" id="c-sala-horas"><option value="12">12 h</option><option value="24" selected>24 h</option><option value="48">48 h</option></select></label><button type="button" class="boton chico" id="c-sala-abrir" data-t="sec_sala_abrir"></button></div>
+      </div>
+      <div id="c-sala-abierta" hidden>
+        <p class="t" id="c-sala-hasta"></p>
+        <p class="t" data-t="sec_sala_escanea"></p>
+        <div class="qr" id="c-sala-qr"></div>
+        <ul class="c-sala-miembros" id="c-sala-miembros"></ul>
+        <ol class="c-sala-mensajes" id="c-sala-mensajes"></ol>
+        <form id="c-sala-form" class="c-fila"><input class="campo" id="c-sala-texto" data-t-ph="sec_sala_texto_ph" autocomplete="off" maxlength="8000"><button type="submit" class="boton chico" data-t="sec_sala_enviar"></button></form>
+        <p class="t" data-t="sec_sala_nivel"></p>
+        <div class="c-fila"><button type="button" class="boton chico secundario" id="c-sala-cerrar" data-t="sec_sala_cerrar"></button></div>
+      </div>
     </section>
   </section>
   <section class="tarjeta chat" id="c-chat" hidden>

@@ -525,6 +525,37 @@
   en('secure_estado', pintaMovil);
   en('secure_aviso', (m) => { if (m.clave === 'sec_mv_enganchado') timbre(); });
 
+  // «Sala de casa» (16 Oct 2026): one code for the phones of the house, this computer as the
+  // exchange for as many hours as chosen; the phones talk to each other through it from
+  // anywhere. The person here lets each phone in by the name it typed.
+  const pintaSala = (m) => {
+    const s = m.sala;
+    $('c-sala-antes').hidden = !!s;
+    $('c-sala-abierta').hidden = !s;
+    if (!s) return;
+    if (s.qr && $('c-sala-qr').dataset.qr !== s.qr) { $('c-sala-qr').innerHTML = s.qr; $('c-sala-qr').dataset.qr = s.qr; }
+    $('c-sala-hasta').textContent = t('sec_sala_hasta', { h: n(s.horas), f: fecha(s.caduca) });
+    $('c-sala-miembros').innerHTML = (s.miembros || []).filter((x) => x.enganchado || x.aprobado || x.con_nombre).map((x) => {
+      const estado = x.pendiente ? t('sec_sala_m_pendiente') : x.aprobado ? (x.enganchado ? t('sec_sala_m_dentro') : t('sec_sala_m_fuera')) : t('sec_sala_m_espera');
+      const botones = x.pendiente ? `<button type="button" class="boton chico" data-sala-ok="${x.i}">${esc(t('sec_sala_dejar'))}</button>` : x.aprobado ? `<button type="button" class="boton chico secundario" data-sala-fuera="${x.i}">${esc(t('sec_sala_echar'))}</button>` : '';
+      return `<li class="${x.enganchado ? 'si' : ''}"><i></i><b>${esc(x.nombre)}</b><span class="t">${esc(estado)}</span>${botones}</li>`;
+    }).join('');
+    const ol = $('c-sala-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 40;
+    ol.innerHTML = (s.mensajes || []).map((x) => `<li class="${x.mio ? 'mio' : ''}"><b>${esc(x.de)}:</b> ${esc(x.texto)}<time>${esc(hora(x.t))}</time></li>`).join('') + (s.llamada ? `<li class="t">${esc(t(s.llamada.a ? 'sec_sala_llamada' : 'sec_sala_llamando', { a: s.llamada.de, b: s.llamada.a || '' }))}</li>` : '');
+    if (abajo) ol.scrollTop = ol.scrollHeight;
+  };
+  $('c-sala-abrir').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala', horas: Number($('c-sala-horas').value), idioma: idioma() }));
+  $('c-sala-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala_cerrar' }));
+  $('c-sala-miembros').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.salaOk !== undefined) manda({ tipo: 'secure', accion: 'sala_ok', i: Number(b.dataset.salaOk) });
+    if (b.dataset.salaFuera !== undefined) manda({ tipo: 'secure', accion: 'sala_fuera', i: Number(b.dataset.salaFuera) });
+  });
+  $('c-sala-form').addEventListener('submit', (e) => { e.preventDefault(); const x = $('c-sala-texto').value.trim(); if (!x) return; manda({ tipo: 'secure', accion: 'sala_texto', texto: x }); $('c-sala-texto').value = ''; });
+  en('secure_estado', pintaSala);
+  en('secure_estado', (m) => { const s = m.sala; if (s && (s.miembros || []).some((x) => x.pendiente) && !salaPendienteAntes) timbre(); salaPendienteAntes = !!(s && (s.miembros || []).some((x) => x.pendiente)); });
+  let salaPendienteAntes = false;
+
   let faseAntes = 'sola';
   en('secure_estado', (m) => {
     if (m.fase === 'comparando' && faseAntes !== 'comparando' && faseAntes !== 'saludando') timbre();

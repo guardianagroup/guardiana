@@ -89,6 +89,8 @@ pub enum Desde {
     Media(Vec<u8>),
     /// The phone's page was brought to the front.
     Visto,
+    /// The person typed their name on the phone (a home room, 16 Oct 2026).
+    Nombre(String),
     /// What the phone's player can open (an iPhone may not open WebM): the other side records
     /// in one of these when it can.
     Reproduce(Vec<String>),
@@ -151,6 +153,14 @@ impl Movil {
 
     /// The same, with the relay at `rele` (`host:port`; the tests run one on this computer).
     pub fn arranca_con(rele: &str) -> Result<Self, String> {
+        let mut clave = [0u8; 32];
+        crate::sesion::azar(&mut clave);
+        Self::arranca_con_clave(rele, clave)
+    }
+
+    /// The same, with the key the QR code will carry chosen by the caller (a home room derives
+    /// one per seat from a single code, 16 Oct 2026).
+    pub fn arranca_con_clave(rele: &str, clave: [u8; 32]) -> Result<Self, String> {
         let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, PUERTO))
             .or_else(|_| UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)))
             .map_err(|e| e.to_string())?;
@@ -181,8 +191,6 @@ impl Movil {
         let mut azar = [0u8; 18];
         crate::sesion::azar(&mut azar);
         let secreto = B64URL.encode(azar);
-        let mut clave = [0u8; 32];
-        crate::sesion::azar(&mut clave);
         let rele_dir = rele.to_owned();
         let rele_host = rele.strip_suffix(":443").unwrap_or(rele).to_owned();
 
@@ -730,6 +738,15 @@ fn traduce(v: &Value) -> Option<Desde> {
         }),
         "pide_inicio" => Some(Desde::PideInicio),
         "visto" => Some(Desde::Visto),
+        "nombre" => Some(Desde::Nombre(
+            v["nombre"]
+                .as_str()
+                .unwrap_or_default()
+                .trim()
+                .chars()
+                .take(40)
+                .collect(),
+        )),
         "reproduce" => Some(Desde::Reproduce(
             v["mimes"]
                 .as_array()?

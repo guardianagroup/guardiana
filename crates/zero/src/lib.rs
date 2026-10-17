@@ -30,6 +30,7 @@ pub mod paginas;
 pub mod puerta;
 pub mod recibo;
 pub mod rele;
+pub mod sala;
 pub mod secure;
 pub mod servidor;
 pub mod sesion;
