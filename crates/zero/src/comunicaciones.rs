@@ -442,10 +442,20 @@ mod tests {
         let c = Comunicaciones::abre(&d.join("datos"), &d.join("descargas"), "0.1.0");
         // Exactly what the browser's SECURE tab drew before the engine left `Sesion`: the
         // group's state, with `sala` null while no room is open.
+        // The contact card is signed with the second it is made in, so two readings a moment
+        // apart may differ there and only there (seen on macOS CI, 17 Oct 2026).
+        let sin_tarjeta = |mut e: Value| {
+            if let Some(o) = e.as_object_mut() {
+                o.remove("tarjeta");
+            }
+            e
+        };
         let mut esperado = c.secure.estado_json();
         esperado["sala"] = Value::Null;
-        assert_eq!(c.estado_json()["tipo"], "secure_estado");
-        assert_eq!(c.estado_json(), esperado);
+        let estado = c.estado_json();
+        assert_eq!(estado["tipo"], "secure_estado");
+        assert!(estado["tarjeta"].is_string());
+        assert_eq!(sin_tarjeta(estado), sin_tarjeta(esperado));
         assert!(d
             .join("datos")
             .join("secure")
