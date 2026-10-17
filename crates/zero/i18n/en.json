@@ -1283,6 +1283,9 @@
   "sec_nv_normal_corta": "My voice",
   "sec_in_otro_limpio": "Nothing else used the microphone, the camera or the screen (its GUARDIANA says so)",
   "sec_in_otro_movil": "Talked from a phone: its browser cannot check it",
+  "sec_in_identidad_sala": "Phones you let in yourself, each with its four-digit number",
+  "sec_in_moviles": "On the phones",
+  "sec_in_moviles_t": "They are web pages inside the phone's browser: what other apps do on them cannot be checked from here",
   "sec_in_otro_nada": "Its GUARDIANA did not report (older version)",
   "sec_in_otro_no_vigilable": "Its system cannot check it"
 }

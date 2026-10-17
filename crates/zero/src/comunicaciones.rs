@@ -180,17 +180,23 @@ impl Comunicaciones {
 
     /// Whether a SECURE conversation is open (the window then watches and hides from captures).
     pub fn conversando(&self) -> bool {
-        self.secure.conversando()
+        self.secure.conversando() || self.sala.as_ref().is_some_and(Sala::en_llamada)
     }
 
     /// What Windows recorded about the microphone, the camera and the screen (17 Oct 2026).
     pub fn vigia(&mut self, usos: &[crate::vigia::Uso]) {
         self.secure.vigia(usos);
+        if let Some(s) = &mut self.sala {
+            s.vigia(usos);
+        }
     }
 
     /// Whether the window could keep itself out of screenshots and recordings.
     pub fn pantalla(&mut self, si: bool) {
         self.secure.pantalla(si);
+        if let Some(s) = &mut self.sala {
+            s.pantalla(si);
+        }
     }
 
     /// What the Comunicaciones page asks for (`{"tipo":"secure","accion":…}`).
@@ -270,6 +276,12 @@ impl Comunicaciones {
             }
             "informe_visto" => {
                 self.secure.olvida_informe();
+                Ok(())
+            }
+            "sala_informe_visto" => {
+                if let Some(s) = &mut self.sala {
+                    s.informe_visto();
+                }
                 Ok(())
             }
             "nombre" => {

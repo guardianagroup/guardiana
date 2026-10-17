@@ -188,6 +188,25 @@ pub struct Sala {
     turn: Option<crate::rele::Turn>,
     turn_rx: Option<std::sync::mpsc::Receiver<Result<crate::rele::Turn, String>>>,
     turn_pedido: u64,
+    /// The watch over this computer while two phones of the house talk (1.0.42).
+    vigia: crate::vigia::Vigia,
+    /// The summary of the last call that was answered: for the computer and the two phones.
+    informe: Option<InformeSala>,
+}
+
+/// What GUARDIANA checked during a call between two phones of the house (1.0.42, the owner:
+/// «cuando se acabe la llamada… un resumen de lo que ha chequeado»). Only facts: who, how long,
+/// how it travelled, and what this computer (the exchange) saw. A phone is a web page: what
+/// other apps do on it cannot be seen from here, and the summary says so.
+#[derive(Debug, Clone)]
+struct InformeSala {
+    de: usize,
+    a: usize,
+    video: bool,
+    desde: u64,
+    fin: u64,
+    rtc: bool,
+    veredicto: crate::vigia::Veredicto,
 }
 
 impl std::fmt::Debug for Sala {
@@ -254,6 +273,8 @@ impl Sala {
             turn: None,
             turn_rx: None,
             turn_pedido: 0,
+            vigia: crate::vigia::Vigia::default(),
+            informe: None,
         })
     }
 
@@ -515,6 +536,67 @@ impl Sala {
         self.guarda(m);
     }
 
+    /// A call that ends: its line in the room and, when it was answered, the summary.
+    fn termina(&mut self, l: Llamada) {
+        match l.a {
+            Some(a) => {
+                let fin = ahora_s();
+                self.anota_llamada(l.de, l.video, Some(fin.saturating_sub(l.desde)), "fin");
+                self.informe = Some(InformeSala {
+                    de: l.de,
+                    a,
+                    video: l.video,
+                    desde: l.desde,
+                    fin,
+                    rtc: self.turn.is_some(),
+                    veredicto: self.vigia.veredicto(l.desde),
+                });
+            }
+            None => self.anota_llamada(l.de, l.video, None, "cancelada"),
+        }
+        for a in &mut self.asientos {
+            a.mime = None;
+        }
+    }
+
+    /// What Windows recorded about the microphone, the camera and the screen, while a call of
+    /// the house is answered.
+    pub fn vigia(&mut self, usos: &[crate::vigia::Uso]) {
+        if let Some(Llamada {
+            a: Some(_), desde, ..
+        }) = self.llamada
+        {
+            self.vigia.mira(usos, desde);
+        }
+    }
+
+    /// Whether this window was kept out of screen captures.
+    pub fn pantalla(&mut self, protegida: bool) {
+        self.vigia.pon_pantalla(protegida);
+    }
+
+    /// The person at the computer closed the summary.
+    pub fn informe_visto(&mut self) {
+        if self.informe.take().is_some() {
+            self.cambio = true;
+        }
+    }
+
+    fn informe_json(&self) -> Value {
+        self.informe.as_ref().map_or(Value::Null, |r| {
+            json!({
+                "de": self.nombre_de(r.de),
+                "a": self.nombre_de(r.a),
+                "video": r.video,
+                "desde": r.desde,
+                "fin": r.fin,
+                "duracion_s": r.fin.saturating_sub(r.desde),
+                "rtc": r.rtc,
+                "equipo": r.veredicto,
+            })
+        })
+    }
+
     /// The computer's view of the room's messages (the last 300 it did not delete).
     fn mensajes_casa(&self) -> Vec<Value> {
         let mut v: Vec<Value> = self
@@ -668,19 +750,7 @@ impl Sala {
                             .is_some_and(|l| l.de == i || l.a == Some(i))
                         {
                             if let Some(l) = self.llamada.take() {
-                                if l.a.is_some() {
-                                    self.anota_llamada(
-                                        l.de,
-                                        l.video,
-                                        Some(ahora_s().saturating_sub(l.desde)),
-                                        "fin",
-                                    );
-                                } else {
-                                    self.anota_llamada(l.de, l.video, None, "cancelada");
-                                }
-                            }
-                            for a in &mut self.asientos {
-                                a.mime = None;
+                                self.termina(l);
                             }
                         }
                         self.cambio = true;
@@ -745,6 +815,7 @@ impl Sala {
                             if l.a.is_none() && l.de != i {
                                 l.a = Some(i);
                                 l.desde = ahora_s();
+                                self.vigia = crate::vigia::Vigia::default();
                                 self.asientos[i].mime = Some(mime);
                                 self.cambio = true;
                             }
@@ -765,19 +836,7 @@ impl Sala {
                             .is_some_and(|l| l.de == i || l.a == Some(i))
                         {
                             if let Some(l) = self.llamada.take() {
-                                if l.a.is_some() {
-                                    self.anota_llamada(
-                                        l.de,
-                                        l.video,
-                                        Some(ahora_s().saturating_sub(l.desde)),
-                                        "fin",
-                                    );
-                                } else {
-                                    self.anota_llamada(l.de, l.video, None, "cancelada");
-                                }
-                            }
-                            for a in &mut self.asientos {
-                                a.mime = None;
+                                self.termina(l);
                             }
                             self.cambio = true;
                         }
@@ -902,6 +961,7 @@ impl Sala {
             "archivos": true,
             "llamada": llamada,
             "entrante": entrante,
+            "informe": if self.informe.as_ref().is_some_and(|r| r.de == i || r.a == i) { self.informe_json() } else { Value::Null },
             "monitor": { "identidad": { "estado": "sala" }, "transporte": {} },
             "sala": {
                 "yo": i,
@@ -978,6 +1038,7 @@ impl Sala {
                 "desde": l.desde,
             })),
             "error": self.error,
+            "informe": self.informe_json(),
         })
     }
 }
@@ -986,6 +1047,44 @@ impl Sala {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_answered_call_leaves_a_summary_of_what_was_checked() {
+        let mut s = Sala::abre_con("127.0.0.1:1", 24, "es").unwrap();
+        let desde = ahora_s().saturating_sub(65);
+        s.llamada = Some(Llamada {
+            de: 0,
+            a: Some(1),
+            video: true,
+            desde,
+        });
+        s.vigia(&[crate::vigia::Uso {
+            programa: "Grabador.exe".to_owned(),
+            ruta: None,
+            recurso: crate::vigia::Recurso::Microfono,
+            desde: desde + 5,
+            hasta: None,
+        }]);
+        let l = s.llamada.take().unwrap();
+        s.termina(l);
+        let r = &s.json()["informe"];
+        assert_eq!(r["video"], true);
+        assert!(r["duracion_s"].as_u64().unwrap() >= 65);
+        assert_eq!(r["equipo"]["microfono"][0], "Grabador.exe");
+        assert_eq!(r["equipo"]["vigilado"], true);
+        s.informe_visto();
+        assert!(s.json()["informe"].is_null());
+        // A call nobody answered leaves no summary.
+        s.llamada = Some(Llamada {
+            de: 0,
+            a: None,
+            video: false,
+            desde,
+        });
+        let l = s.llamada.take().unwrap();
+        s.termina(l);
+        assert!(s.json()["informe"].is_null());
+    }
 
     #[test]
     fn seat_keys_differ_and_the_code_names_the_room() {

@@ -1488,10 +1488,11 @@
     const pc = (este.pantalla || []).map((p) => t('sec_eq_visto_pant', { p }));
     f.push([t('sec_in_grab_pantalla'), pc.length ? pc.join('; ') : t(este.pantalla_protegida ? 'sec_in_pant_bloq' : 'sec_in_pant_no'), pc.length ? 'alerta' : este.pantalla_protegida ? 'ok' : 'aviso']);
     const vo = o ? [...(o.microfono || []).map((p) => t('sec_eq_visto_mic', { p })), ...(o.camara || []).map((p) => t('sec_eq_visto_cam', { p })), ...(o.pantalla || []).map((p) => t('sec_eq_visto_pant', { p }))] : [];
-    f.push([t('sec_in_otro', { n: nom }), v.otro_movil ? t('sec_in_otro_movil') : !o ? t('sec_in_otro_nada') : !o.vigilado ? t('sec_in_otro_no_vigilable') : vo.length ? vo.join('; ') : t('sec_in_otro_limpio'), vo.length ? 'alerta' : o && o.vigilado && !v.otro_movil ? 'ok' : 'aviso']);
+    if (r.sala) f.push([t('sec_in_moviles'), t('sec_in_moviles_t'), 'aviso']);
+    else f.push([t('sec_in_otro', { n: nom }), v.otro_movil ? t('sec_in_otro_movil') : !o ? t('sec_in_otro_nada') : !o.vigilado ? t('sec_in_otro_no_vigilable') : vo.length ? vo.join('; ') : t('sec_in_otro_limpio'), vo.length ? 'alerta' : o && o.vigilado && !v.otro_movil ? 'ok' : 'aviso']);
     const directa = r.conexion && r.conexion.directa === true;
     f.push([t('sec_in_servidor'), t(directa ? 'sec_in_directo_t' : 'sec_in_rele_t'), 'ok']);
-    f.push([t('sec_in_identidad'), t(v.identidad_verificada ? 'sec_in_identidad_ok' : 'sec_in_identidad_mal'), v.identidad_verificada ? 'ok' : 'alerta']);
+    f.push([t('sec_in_identidad'), t(r.sala ? 'sec_in_identidad_sala' : v.identidad_verificada ? 'sec_in_identidad_ok' : 'sec_in_identidad_mal'), v.identidad_verificada ? 'ok' : 'alerta']);
     f.push([t('sec_in_interf'), v.interferencias ? n(v.interferencias) : t('sec_in_interf_no'), v.interferencias ? 'alerta' : 'ok']);
     const c = r.conexion || {};
     if (c.latencia_media_ms != null || c.kbps_audio_medio != null) {
@@ -1502,11 +1503,24 @@
       if (cod) partes.push(cod);
       f.push([t('sec_in_conexion'), partes.join(' · '), '']);
     }
-    f.push([t('sec_in_firmado'), String(r.firmante || '').slice(0, 22) + '…', '']);
+    if (r.firmante) f.push([t('sec_in_firmado'), String(r.firmante || '').slice(0, 22) + '…', '']);
     return f;
   };
+  // 1.0.42: a call between two phones of the house leaves its summary too (the owner: «cuando se
+  // acabe la llamada… un resumen de lo que ha chequeado»), in the same card: this computer was the
+  // exchange and was watched; the phones are web pages and cannot be.
+  const deSala = (x) => {
+    if (!x) return null;
+    const e = x.equipo || {};
+    const limpio = !(e.microfono || []).length && !(e.camara || []).length && !(e.pantalla || []).length;
+    const datos = { tipo: 'guardiana-secure-informe-casa', de: x.de, a: x.a, video: x.video, inicio: x.desde, fin: x.fin, duracion_s: x.duracion_s, camino: x.rtc ? 'webrtc-turn' : 'pc', este_pc: e };
+    const csv = ['campo,valor', ...Object.entries({ de: x.de, a: x.a, video: x.video, inicio: x.desde, fin: x.fin, duracion_s: x.duracion_s, microfono: (e.microfono || []).join(' / '), camara: (e.camara || []).join(' / '), pantalla: (e.pantalla || []).join(' / '), pantalla_protegida: !!e.pantalla_protegida, vigilado: !!e.vigilado }).map(([k, v]) => `${k},"${String(v).replace(/"/g, '""')}"`)].join('\n');
+    return { sala: true, clase: x.video ? 'videollamada' : 'llamada', contacto: `${x.de} · ${x.a}`, duracion_s: x.duracion_s, inicio: x.desde, fin: x.fin,
+      veredicto: { este: e, otro: null, otro_movil: true, identidad_verificada: true, interferencias: 0 }, sin_espionaje: limpio,
+      conexion: { directa: false }, firmante: '', firma: '', json: JSON.stringify(datos, null, 2), csv };
+  };
   const pintaInforme = (m) => {
-    const r = m.informe;
+    const r = m.informe || deSala((m.sala || {}).informe);
     INF = r || null;
     const velo = $('informe'), caja = $('informe-caja');
     const nuevo = velo.hidden && !!r;
@@ -1520,8 +1534,9 @@
     $('in-datos').innerHTML = filasInforme(r).map(([a, b, c]) => `<div class="in-dato"><dt>${esc(a)}</dt><dd class="${c}">${esc(b)}</dd></div>`).join('');
     if (nuevo) $('in-pdf').focus();
   };
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('informe').hidden) manda({ tipo: 'secure', accion: 'informe_visto' }); });
-  $('in-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'informe_visto' }));
+  const cierraInforme = () => manda({ tipo: 'secure', accion: INF && INF.sala ? 'sala_informe_visto' : 'informe_visto' });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('informe').hidden) cierraInforme(); });
+  $('in-cerrar').addEventListener('click', cierraInforme);
   $('in-json').addEventListener('click', () => { if (INF) descarga(`guardiana-secure-informe-${sello(INF.fin)}.json`, 'application/json', INF.json); });
   $('in-csv').addEventListener('click', () => { if (INF) descarga(`guardiana-secure-informe-${sello(INF.fin)}.csv`, 'text/csv;charset=utf-8', '﻿' + INF.csv); });
   $('in-pdf').addEventListener('click', () => {
@@ -1545,12 +1560,14 @@
     y -= 10;
     linea2(56, 9.5, t('sec_in_limite'), false, 100);
     y -= 12;
-    L.push({ x: 56, y, tam: 10.5, negrita: true, texto: t('sec_r_pdf_firmado') }); y -= 15;
-    for (const s2 of parte(r.firmante, 80)) { L.push({ x: 56, y, tam: 8.5, texto: s2 }); y -= 12; }
-    y -= 4;
-    for (const s2 of parte(r.firma, 80)) { L.push({ x: 56, y, tam: 8.5, texto: s2 }); y -= 12; }
-    y -= 14;
-    linea2(56, 9.5, t('sec_r_pdf_nota'), false, 100);
+    if (r.firmante) {
+      L.push({ x: 56, y, tam: 10.5, negrita: true, texto: t('sec_r_pdf_firmado') }); y -= 15;
+      for (const s2 of parte(r.firmante, 80)) { L.push({ x: 56, y, tam: 8.5, texto: s2 }); y -= 12; }
+      y -= 4;
+      for (const s2 of parte(r.firma, 80)) { L.push({ x: 56, y, tam: 8.5, texto: s2 }); y -= 12; }
+      y -= 14;
+      linea2(56, 9.5, t('sec_r_pdf_nota'), false, 100);
+    }
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([pdfDe(L)], { type: 'application/pdf' })); a.download = `guardiana-secure-informe-${sello(r.fin)}.pdf`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   });
 

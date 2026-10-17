@@ -1283,6 +1283,9 @@
   "sec_nv_normal_corta": "Minha voz",
   "sec_in_otro_limpio": "Nada mais usou o microfone, a câmera nem a tela (diz o GUARDIANA de lá)",
   "sec_in_otro_movil": "Falou de um celular: o navegador não permite verificar",
+  "sec_in_identidad_sala": "Celulares que você mesmo deixou entrar, cada um com seu número de quatro dígitos",
+  "sec_in_moviles": "Nos celulares",
+  "sec_in_moviles_t": "São páginas web dentro do navegador do celular: daqui não é possível verificar o que outros apps fazem neles",
   "sec_in_otro_nada": "O GUARDIANA de lá não informou (versão anterior)",
   "sec_in_otro_no_vigilable": "O sistema de lá não permite verificar"
 }
