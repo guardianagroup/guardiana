@@ -93,8 +93,9 @@
     $('p-pendiente').innerHTML = pend.length
       ? `<li>${esc(t('sec_p_pendiente'))}</li>` + pend.map((x) => `<li>${esc(x)}</li>`).join('')
       : (clave ? '' : `<li class="lista">${esc(t('sec_p_lista'))}</li>`);
-    $('p-reanudar').hidden = !se.puede_reanudar; $('p-reanudar').textContent = t('sec_p_reanudar');
-    $('p-nota').hidden = !se.puede_reanudar;
+    // 1.0.42: no way to skip a stop; it resumes on its own when the cause is gone.
+    $('p-reanudar').hidden = true;
+    $('p-nota').hidden = true;
     $('p-verificar').hidden = !clave; $('p-verificar').textContent = t('sec_p_verificar');
     $('p-prueba').textContent = t('sec_p_prueba');
     $('p-terminar').textContent = t('sec_p_terminar');

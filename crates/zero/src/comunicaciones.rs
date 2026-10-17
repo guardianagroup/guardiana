@@ -256,10 +256,9 @@ impl Comunicaciones {
             "archivo_trozo" => self
                 .secure
                 .archivo_trozo(texto(m, "b64"), m["ultimo"].as_bool().unwrap_or(false)),
-            "reanudar" => {
-                self.secure.reanudar_a_mano();
-                Ok(())
-            }
+            // 1.0.42 (committee with ChatGPT and Grok): a stop for something seen cannot be
+            // skipped from the screen any more; it resumes on its own once the cause is gone.
+            "reanudar" => Ok(()),
             "llamar" => self
                 .secure
                 .llamar(m["video"].as_bool().unwrap_or(false), texto(m, "mime")),
