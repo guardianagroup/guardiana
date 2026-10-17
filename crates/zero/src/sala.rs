@@ -514,8 +514,16 @@ impl Sala {
         let mut m = Mensaje::nuevo(de, String::new(), None);
         m.archivo = Some(archivo.clone());
         self.guarda(m);
-        // Pictures go to the other phones at once; other files on demand (1.0.41).
-        if mime.starts_with("image/") {
+        // Pictures, voice notes and videos go to the other phones at once (17 Oct 2026: a voice
+        // note from one iPhone arrived on the other as a line that never played, because only
+        // pictures were sent on). Other files stay on this computer, in Descargas.
+        let base = mime
+            .split(';')
+            .next()
+            .unwrap_or("")
+            .trim()
+            .to_ascii_lowercase();
+        if base.starts_with("image/") || base.starts_with("audio/") || base.starts_with("video/") {
             for (j, a) in self.asientos.iter().enumerate() {
                 if j != de && a.aprobado && a.enganchado {
                     reparte_archivo(&a.movil, &archivo, &datos);
