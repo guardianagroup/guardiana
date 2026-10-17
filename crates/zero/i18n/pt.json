@@ -1120,7 +1120,7 @@
   "sec_modo_equipos": "De PC a PC",
   "sec_modo_equipos_texto": "Você neste computador e a outra pessoa no dela. Você convida com um código ou digita o que recebeu.",
   "sec_modo_movil": "De PC a celular",
-  "sec_modo_movil_texto": "Leia um código com a câmera e leve a conversa no celular, com este computador por trás protegendo-a.",
+  "sec_modo_movil_texto": "Leia um código com a câmera e leve a conversa no celular, com este PC por trás protegendo-a. A outra pessoa pode fazer o mesmo em casa: celular com celular, cada um pelo seu PC.",
   "sec_modo_sala": "Modo casa",
   "sec_modo_sala_texto": "Este computador fica em casa como central e os celulares da casa conversam e se ligam o dia todo, onde estiverem.",
   "sec_volver": "← Voltar ao início",

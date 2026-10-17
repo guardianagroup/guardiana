@@ -1120,7 +1120,7 @@
   "sec_modo_equipos": "PC to PC",
   "sec_modo_equipos_texto": "You on this computer and the other person on theirs. You invite with a code or type the one you were sent.",
   "sec_modo_movil": "PC to phone",
-  "sec_modo_movil_texto": "Read a code with the camera and carry the conversation on the phone, with this computer behind it keeping it safe.",
+  "sec_modo_movil_texto": "Read a code with the camera and carry the conversation on the phone, with this PC behind it keeping it safe. The other person can do the same at home: phone to phone, each through their own PC.",
   "sec_modo_sala": "Home mode",
   "sec_modo_sala_texto": "This computer stays at home as the exchange and the phones of the house chat and call each other all day, wherever they are.",
   "sec_volver": "← Back to start",
