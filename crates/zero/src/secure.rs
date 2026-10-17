@@ -3157,8 +3157,15 @@ impl Secure {
             return;
         }
         let aprobado = m.aprobado;
+        // Call pieces and file pieces change nothing on screen: redrawing (and sending the
+        // whole state to the phone) for each one, about eight times a second during a call,
+        // was a cause of the stutter (17 Oct 2026 review).
+        let mut algo = false;
         for d in llegado {
             use crate::movil::Desde;
+            if !matches!(d, Desde::Media(_) | Desde::ArchivoTrozo(_)) {
+                algo = true;
+            }
             match d {
                 Desde::Enganchado => {
                     self.aviso("sec_mv_enganchado", "");
@@ -3219,7 +3226,9 @@ impl Secure {
                 _ => {}
             }
         }
-        self.cambio = true;
+        if algo {
+            self.cambio = true;
+        }
     }
 
     fn movil_json(&self) -> Value {
