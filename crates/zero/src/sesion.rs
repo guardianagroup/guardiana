@@ -4000,11 +4000,7 @@ impl Sesion {
         }
         p.navegando = Some(sin_fragmento(url).to_string());
         p.cargando = true;
-        let mut o = Vec::new();
-        if id == self.activa {
-            o.push(self.estado());
-        }
-        (false, o)
+        (false, vec![self.estado()])
     }
 
     /// The new page is there (the engine's ContentLoading, with the address it really loaded).
@@ -4082,9 +4078,11 @@ impl Sesion {
         };
         p.cargando = false;
         p.navegando = None;
-        let mut o = Vec::new();
+        // The tab bar shows every tab's spinner, so a tab in the background that finished
+        // must reach it too (17 Oct 2026, the owner: «Navegador y Comunicaciones siguen dando
+        // vueltas todo el tiempo»).
+        let mut o = vec![self.estado()];
         if id == self.activa {
-            o.push(self.estado());
             o.push(self.titulo_ventana());
         }
         o
