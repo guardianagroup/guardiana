@@ -3955,6 +3955,9 @@ mod tests {
 
     #[test]
     fn two_computers_verify_each_other_then_a_message_and_a_file_cross_encrypted() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let base = std::env::temp_dir().join(format!("guardiana-secure-{}", std::process::id()));
         let (da, db) = (base.join("a"), base.join("b"));
         std::fs::create_dir_all(&da).unwrap();
@@ -4068,6 +4071,9 @@ mod tests {
 
     #[test]
     fn two_computers_without_a_door_meet_through_the_blind_relay() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         // A relay on this computer; the waiting side gets no door (there is no router here),
         // so it shows a GR code; the other side pastes it and the relay joins them.
         let rt = tokio::runtime::Builder::new_multi_thread()
@@ -4200,6 +4206,8 @@ mod tests {
         assert!(!b.reconectando());
         assert_eq!(b.estado_json()["fase"], "sola");
         let _ = std::fs::remove_dir_all(base);
+        // The next test must not find this relay, gone with this runtime.
+        std::env::remove_var("GUARDIANA_RELE");
     }
 
     #[test]
