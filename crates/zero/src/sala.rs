@@ -885,6 +885,9 @@ impl Sala {
             "horas": self.horas,
             "caduca": self.caduca(),
             "qr": guardiana_secure::tarjeta::qr_svg(&self.enlace()).ok(),
+            // The same room as a link, for a device without a camera (a computer) or someone who
+            // is not at home: it still waits for «Dejar entrar» (17 Oct 2026, asked by the owner).
+            "enlace": self.enlace(),
             "miembros": self.asientos.iter().enumerate().map(|(i, a)| json!({
                 "i": i,
                 "nombre": self.nombre_de(i),

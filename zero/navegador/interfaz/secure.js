@@ -793,12 +793,14 @@
     linea($('g-conexion'), conectados.length ? 'ok' : '', conectados.length ? t('sec_l_sala_conexion', { c: n(conectados.length), n: n(dentro.length) }) : t('sec_l_sin_conexion'));
     linea($('g-visto'), s.llamada ? 'ok' : '', s.llamada ? t(s.llamada.a ? 'sec_sala_llamada' : 'sec_sala_llamando', { a: s.llamada.de, b: s.llamada.a || '' }) : t('sec_l_sala_mensajes', { n: n((s.mensajes || []).length) }));
   };
+  let salaEnlace = '';
   const pintaSala = (m) => {
     const s = m.sala;
     $('c-sala-antes').hidden = !!s;
     $('c-sala-abierta').hidden = !s;
     if (!s) return;
     if (s.qr && $('c-sala-qr').dataset.qr !== s.qr) { $('c-sala-qr').innerHTML = s.qr; $('c-sala-qr').dataset.qr = s.qr; }
+    salaEnlace = s.enlace || '';
     $('c-sala-hasta').textContent = t('sec_sala_hasta', { h: n(s.horas), f: fecha(s.caduca) });
     $('c-sala-miembros').innerHTML = (s.miembros || []).filter((x) => x.enganchado || x.aprobado || x.con_nombre).map((x) => {
       const estado = x.pendiente ? t('sec_sala_m_pendiente') : x.aprobado ? (x.enganchado ? t('sec_sala_m_dentro') : t('sec_sala_m_fuera')) : t('sec_sala_m_espera');
@@ -813,6 +815,8 @@
   $('c-sc-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala_cerrar' }));
   $('c-sala-abrir').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala', horas: Number($('c-sala-horas').value), idioma: idioma() }));
   $('c-sala-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala_cerrar' }));
+  $('c-sala-copiar').addEventListener('click', async () => { if (!salaEnlace) return; try { await navigator.clipboard.writeText(salaEnlace); $('c-sala-copiar').textContent = t('sec_c_copiado'); setTimeout(() => { $('c-sala-copiar').textContent = t('sec_sala_copiar'); }, 1500); } catch (_) {} });
+  $('c-sala-whatsapp').addEventListener('click', () => { if (salaEnlace) manda({ tipo: 'navegar', texto: 'https://wa.me/?text=' + encodeURIComponent(t('sec_sala_invita', { e: salaEnlace })) }); });
   $('c-sala-miembros').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.salaOk !== undefined) manda({ tipo: 'secure', accion: 'sala_ok', i: Number(b.dataset.salaOk) });
