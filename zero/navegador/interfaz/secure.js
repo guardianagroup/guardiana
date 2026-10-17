@@ -497,16 +497,23 @@
   // ---------- The phone (15 Oct 2026) ----------
   // The left column: the conversation this computer is in (one at a time), with the last line
   // and its time, as the chosen design lists them; empty, a quiet sentence.
+  const filaSala = (m) => {
+    const s = m.sala; if (!s) return '';
+    const ultimo = (s.mensajes || []).slice(-1)[0];
+    const linea = s.llamada ? t('sec_l_en_curso') : ultimo ? `${ultimo.de}: ${ultimo.texto}` : t('sec_lista_sin_mensajes');
+    return `<li class="${vista === 'sala' ? 'activa' : ''}" data-vista="sala"><span class="avatar casa"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><i></i></span><b>${esc(t('sec_sala_titulo'))}</b><time>${ultimo ? esc(hora(ultimo.t).slice(0, 5)) : ''}</time><span class="ultimo">${esc(linea)}</span></li>`;
+  };
   const pintaLista = (m, quien, nombres) => {
     const ol = $('c-lista');
     const f = m.fase;
-    if (!f || f === 'sola') { ol.innerHTML = `<li class="vacia">${esc(t('sec_lista_vacia'))}</li>`; $('miga-donde').textContent = t('sec_miga_inicio'); return; }
+    if (!f || f === 'sola') { ol.innerHTML = filaSala(m) || `<li class="vacia">${esc(t('sec_lista_vacia'))}</li>`; if (!m.sala) $('miga-donde').textContent = t('sec_miga_inicio'); return; }
     const ultimo = (m.mensajes || []).slice(-1)[0];
     const nombre = nombres.length > 2 ? t('sec_m_grupo', { n: nombres.length }) : (quien || t('sec_lista_nueva'));
     const linea = f !== 'lista' ? t(f === 'comparando' ? 'sec_lista_comparando' : 'sec_lista_conectando') : m.llamada ? t('sec_l_en_curso') : ultimo ? ultimo.texto : t('sec_lista_sin_mensajes');
-    ol.innerHTML = `<li class="activa"><span class="avatar">${esc((nombre.trim()[0] || '·').toUpperCase())}${f === 'lista' ? '<i></i>' : ''}</span><b>${esc(nombre)}</b><time>${ultimo ? esc(hora(ultimo.t).slice(0, 5)) : ''}</time><span class="ultimo">${esc(linea)}</span></li>`;
-    $('miga-donde').textContent = t('sec_miga_conv');
+    ol.innerHTML = filaSala(m) + `<li class="${vista === 'contacto' || !m.sala ? 'activa' : ''}" data-vista="contacto"><span class="avatar">${esc((nombre.trim()[0] || '·').toUpperCase())}${f === 'lista' ? '<i></i>' : ''}</span><b>${esc(nombre)}</b><time>${ultimo ? esc(hora(ultimo.t).slice(0, 5)) : ''}</time><span class="ultimo">${esc(linea)}</span></li>`;
+    if (vista !== 'sala' || !m.sala) $('miga-donde').textContent = t('sec_miga_conv');
   };
+  $('c-lista').addEventListener('click', (e) => { const li = e.target.closest('li[data-vista]'); if (!li || !E.sala) return; vista = li.dataset.vista; fasePinta(); pintaLista(E, E.contacto, ((E.grupo || {}).nombres || [])); pintaVista(E); });
   $('c-nueva').addEventListener('click', () => { const c = $('c-conexion'); if (!c.hidden) { c.scrollIntoView({ behavior: 'smooth' }); $('c-yo').focus(); } });
 
   // «Pasar al móvil»: the program shows a QR code; the phone's camera opens our page, which
@@ -546,6 +553,38 @@
   // «Sala de casa» (16 Oct 2026): one code for the phones of the house, this computer as the
   // exchange for as many hours as chosen; the phones talk to each other through it from
   // anywhere. The person here lets each phone in by the name it typed.
+  // The room is a conversation of its own (16 Oct 2026, the owner: «que se vea en el centro»):
+  // its chat fills the middle column while no other conversation is open, and the left list
+  // offers both when there is one.
+  let vista = 'contacto';
+  const hayContacto = (m) => m.fase && m.fase !== 'sola' || (m.mensajes || []).length > 0;
+  const pintaVista = (m) => {
+    const s = m.sala;
+    if (!s) vista = 'contacto';
+    else if (!hayContacto(m)) vista = 'sala';
+    const enSala = !!s && vista === 'sala';
+    $('c-sala-chat').hidden = !enSala;
+    for (const id of ['c-conexion', 'c-comparar', 'c-espera', 'c-resumen', 'c-chat']) if (enSala) $(id).hidden = true;
+    if (!enSala) return;
+    const dentro = (s.miembros || []).filter((x) => x.aprobado);
+    $('c-sc-sello').textContent = t('sec_sala_sello', { n: n(dentro.length), h: n(s.horas), f: fecha(s.caduca) });
+    $('c-sc-llamada').hidden = !s.llamada;
+    if (s.llamada) $('c-sc-llamada').textContent = t(s.llamada.a ? 'sec_sala_llamada' : 'sec_sala_llamando', { a: s.llamada.de, b: s.llamada.a || '' });
+    $('miga-donde').textContent = t('sec_sala_titulo');
+    // The panel on the right tells the room's state in real time (the owner, 16 Oct 2026).
+    const caja = $('g'); caja.classList.remove('protegida', 'revisar', 'pausada', 'sin');
+    const conectados = dentro.filter((x) => x.enganchado);
+    caja.classList.add(dentro.length ? 'protegida' : 'sin');
+    $('g-palabra').textContent = t(dentro.length ? 'sec_g_protegida' : 'sec_g_sin');
+    $('g-frase').textContent = t(dentro.length ? 'sec_g_sala_frase' : 'sec_g_sala_vacia');
+    const chip = $('m-estado-chip'); chip.textContent = t(dentro.length ? 'sec_g_protegida' : 'sec_g_sin'); chip.className = 'chip' + (dentro.length ? ' ok' : '');
+    linea($('g-cifrado'), dentro.length ? 'ok' : '', t('sec_l_sala_cifrado'));
+    linea($('g-identidad'), dentro.length ? 'ok' : '', dentro.length ? t('sec_l_sala_miembros', { n: n(dentro.length), l: dentro.map((x) => x.nombre).join(', ') }) : t('sec_l_sala_nadie'));
+    linea($('g-nivel'), 'ok', t('sec_l_nivel_movil'));
+    linea($('g-cuantico'), '', t('sec_l_sala_cuantico'));
+    linea($('g-conexion'), conectados.length ? 'ok' : '', conectados.length ? t('sec_l_sala_conexion', { c: n(conectados.length), n: n(dentro.length) }) : t('sec_l_sin_conexion'));
+    linea($('g-visto'), s.llamada ? 'ok' : '', s.llamada ? t(s.llamada.a ? 'sec_sala_llamada' : 'sec_sala_llamando', { a: s.llamada.de, b: s.llamada.a || '' }) : t('sec_l_sala_mensajes', { n: n((s.mensajes || []).length) }));
+  };
   const pintaSala = (m) => {
     const s = m.sala;
     $('c-sala-antes').hidden = !!s;
@@ -559,9 +598,11 @@
       return `<li class="${x.enganchado ? 'si' : ''}"><i></i><span class="c-sala-q"><b>${esc(x.nombre)}</b><span class="t">${esc(estado)}</span></span>${botones}</li>`;
     }).join('');
     const ol = $('c-sala-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 40;
-    ol.innerHTML = (s.mensajes || []).map((x) => `<li class="${x.mio ? 'mio' : ''}"><b>${esc(x.de)}</b><span>${esc(x.texto)}</span><time>${esc(hora(x.t))}</time></li>`).join('') + (s.llamada ? `<li class="aviso">${esc(t(s.llamada.a ? 'sec_sala_llamada' : 'sec_sala_llamando', { a: s.llamada.de, b: s.llamada.a || '' }))}</li>` : '');
+    ol.innerHTML = (s.mensajes || []).map((x) => `<li class="${x.mio ? 'mio' : ''}"><b>${esc(x.de)}</b><span>${esc(x.texto)}</span><time>${esc(hora(x.t))}</time></li>`).join('');
     if (abajo) ol.scrollTop = ol.scrollHeight;
+    pintaVista(m);
   };
+  $('c-sc-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala_cerrar' }));
   $('c-sala-abrir').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala', horas: Number($('c-sala-horas').value), idioma: idioma() }));
   $('c-sala-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala_cerrar' }));
   $('c-sala-miembros').addEventListener('click', (e) => {

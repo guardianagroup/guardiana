@@ -191,13 +191,12 @@ main { min-height: 0; overflow: auto; padding: 24px 28px 36px; display: grid; ga
 .c-sala-miembros li .c-sala-q b { font-weight: 600; }
 .c-sala-miembros li .c-sala-q .t { font-size: 12px; line-height: 1.35; }
 .c-sala-miembros li .boton.chico { padding: 6px 12px; }
-.c-sala-mensajes { list-style: none; padding: 12px; margin: 0; max-height: 260px; overflow: auto; display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; background: var(--campo); }
-.c-sala-mensajes li { max-width: 88%; padding: 8px 12px; border-radius: 14px 14px 14px 4px; background: var(--card); border: 1px solid var(--line); line-height: 1.45; display: grid; gap: 2px; }
-.c-sala-mensajes li.mio { justify-self: end; border-radius: 14px 14px 4px 14px; background: color-mix(in srgb, var(--accent) 14%, var(--card)); border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
-.c-sala-mensajes li b { font-size: 11.5px; font-weight: 600; color: var(--muted); }
-.c-sala-mensajes li time { opacity: .6; font: 10.5px var(--mono); justify-self: end; }
-.c-sala-mensajes li.aviso { max-width: 100%; justify-self: center; background: transparent; border: 0; padding: 2px 0; color: var(--muted); font-size: 12px; }
-.c-sala-mensajes:empty { display: none; }
+.sala-chat .mensajes li { display: grid; gap: 2px; }
+.sala-chat .mensajes li b { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.sala-chat .mensajes li.mio b { color: var(--accent); }
+.sala-chat .mensajes li.aviso { justify-self: center; max-width: 100%; background: transparent; border: 0; box-shadow: none; color: var(--muted); font-size: 12.5px; }
+.avatar.casa { background: var(--accent); color: #fff; }
+.avatar.casa .icono { width: 22px; height: 22px; }
 /* The panel «Esta conversación»: the level as a picture, four plain lines, the details folded. */
 aside.monitor { border-left: 1px solid var(--line); background: var(--card); padding: 18px 16px; display: grid; gap: 12px; align-content: start; }
 aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
@@ -320,9 +319,6 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
         <div class="qr" id="c-sala-qr"></div>
         <p class="c-sala-sub" data-t="sec_sala_en"></p>
         <ul class="c-sala-miembros" id="c-sala-miembros"></ul>
-        <p class="c-sala-sub" data-t="sec_sala_mensajes"></p>
-        <ol class="c-sala-mensajes" id="c-sala-mensajes"></ol>
-        <form id="c-sala-form" class="c-fila"><input class="campo" id="c-sala-texto" data-t-ph="sec_sala_texto_ph" autocomplete="off" maxlength="8000"><button type="submit" class="boton chico" data-t="sec_sala_enviar"></button></form>
         <p class="t" data-t="sec_sala_nivel"></p>
         <div class="c-fila"><button type="button" class="boton chico secundario" id="c-sala-cerrar" data-t="sec_sala_cerrar"></button></div>
       </div>
@@ -418,6 +414,17 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
     <div class="zona-archivo" id="c-zona"><span data-t="sec_f_arrastra"></span> <label class="enlace" for="c-archivo" data-t="sec_f_elige"></label><input type="file" id="c-archivo" hidden multiple></div>
     <div class="c-progreso" id="c-progreso" hidden><span id="c-progreso-texto"></span><i><b id="c-progreso-barra"></b></i></div>
     <form class="escribir" id="c-form"><label class="boton chico icono-solo" for="c-archivo" data-t-title="sec_f_elige"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/></svg></label><input class="campo" id="c-texto" data-t-ph="sec_m_escribe" autocomplete="off" maxlength="8000"><button type="submit" class="boton principal" data-t-title="sec_m_enviar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg></button></form>
+  </section>
+
+  <section class="tarjeta chat sala-chat" id="c-sala-chat" hidden>
+    <div class="chat-cab">
+      <span class="avatar grande casa" aria-hidden="true"><svg class="icono" viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><i></i></span>
+      <div class="c-quien"><h2 data-t="sec_sala_titulo"></h2><p class="c-sello" id="c-sc-sello"></p></div>
+      <div class="c-fila"><button type="button" class="boton chico secundario" id="c-sc-cerrar" data-t="sec_sala_cerrar"></button></div>
+    </div>
+    <p class="cortada-nota" id="c-sc-llamada" hidden></p>
+    <ol class="mensajes" id="c-sala-mensajes"></ol>
+    <form class="escribir" id="c-sala-form"><input class="campo" id="c-sala-texto" data-t-ph="sec_sala_texto_ph" autocomplete="off" maxlength="8000"><button type="submit" class="boton principal" data-t-title="sec_sala_enviar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg></button></form>
   </section>
 </main>
 
