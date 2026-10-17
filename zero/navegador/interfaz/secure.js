@@ -1567,3 +1567,43 @@
   mandaNombre();
   try { manda({ tipo: 'secure', accion: 'zona', zona: Intl.DateTimeFormat().resolvedOptions().timeZone || '' }); } catch (_) {}
 })();
+
+// 1.0.42 — the GUARDIANA number (17 Oct 2026, the owner: «a cada persona que descarga GUARDIANA se
+// le asigne un número… para siempre… sin tener que compartir QR»). The number is shown on the
+// start screen; typing someone's number calls their PC; the first time, the three numbers are
+// compared as with any invitation, so nobody can pass for someone else. The agenda lists the
+// people already verified, each with its number and «Llamar».
+'use strict';
+(() => {
+  const { manda, en, t, esc, $ } = Z;
+  const formatea = (v) => { const d = String(v || '').replace(/\D/g, '').slice(0, 12); return [d.slice(0, 4), d.slice(4, 8), d.slice(8, 12)].filter(Boolean).join('-'); };
+  const llama = (numero) => manda({ tipo: 'secure', accion: 'conectar', direccion: numero });
+  let estado = {};
+  const pinta = (m) => {
+    estado = m || {};
+    const mio = estado.mi_numero;
+    $('c-mi-numero-caja').hidden = !mio;
+    if (mio) $('c-mi-numero').textContent = mio;
+    const cs = (estado.contactos || []).filter((c) => c.estado && c.numero);
+    $('c-agenda').hidden = !cs.length;
+    const html = cs.map((c) => `<li><span class="avatar">${esc(((c.nombre || '·').trim()[0] || '·').toUpperCase())}</span><span class="ag-quien"><b>${esc(c.nombre || c.numero)}</b><span>${esc(c.numero)}</span></span><button type="button" class="boton chico principal" data-numero="${esc(c.numero)}">${esc(t('sec_num_llamar'))}</button></li>`).join('');
+    if ($('c-agenda-lista').dataset.html !== html) { $('c-agenda-lista').innerHTML = html; $('c-agenda-lista').dataset.html = html; }
+    const otro = estado.comparando && estado.numero_otro;
+    $('c-comparar-num').hidden = !otro;
+    if (otro) $('c-comparar-num').textContent = t('sec_num_de_quien', { n: estado.numero_otro });
+  };
+  en('secure_estado', pinta);
+  en('textos', () => { $('c-agenda-lista').dataset.html = ''; pinta(estado); });
+  $('c-mi-numero-copiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('c-mi-numero').textContent); $('c-mi-numero-copiar').textContent = t('sec_c_copiado'); setTimeout(() => { $('c-mi-numero-copiar').textContent = t('sec_c_copiar'); }, 1500); } catch (_) {} });
+  const campo = $('c-llamar-num-campo');
+  campo.addEventListener('input', () => { const f = formatea(campo.value); if (f !== campo.value) campo.value = f; $('c-llamar-num-error').hidden = true; });
+  $('c-llamar-num').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const d = campo.value.replace(/\D/g, '');
+    if (d.length !== 12) { $('c-llamar-num-error').hidden = false; return; }
+    llama(formatea(d));
+  });
+  $('c-agenda-lista').addEventListener('click', (e) => { const b = e.target.closest('button[data-numero]'); if (b) llama(b.dataset.numero); });
+  // Block: this key never gets through again, by number or by invitation; the conversation ends.
+  $('c-bloquear').addEventListener('click', () => { manda({ tipo: 'secure', accion: 'bloquear' }); manda({ tipo: 'secure', accion: 'sas', iguales: false, nombre: '' }); });
+})();

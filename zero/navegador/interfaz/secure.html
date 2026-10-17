@@ -545,6 +545,48 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
   .secure.en-llamada .viaje { flex: none; display: grid; }
   .secure.en-llamada aside.monitor > h2, .secure.en-llamada .panel-ilu { display: none; }
 }
+
+/* 1.0.42 (17 Oct 2026, the owner with a ChatGPT mock: «el tipo de botonería… de su propio chat…
+   muy profesionales»): inside Comunicaciones the buttons become pills, the cards get large round
+   corners and the writing bar floats. Only this page: diseno.css stays the same for the panel. */
+.secure .boton, .secure .btn { border-radius: var(--r-pill); }
+.secure .boton.icono-solo, .secure .escribir .boton.principal, .secure .escribir #c-microfono, .secure .boton.redondo { border-radius: 50%; }
+.secure .tarjeta, .secure .c-lado, .secure .c-codigo, .secure .llamada, .secure .timbre { border-radius: 22px; }
+.secure .campo { border-radius: 14px; }
+.secure .lista li { border-radius: 16px; }
+.secure .chat { box-shadow: var(--sombra); }
+.secure .escribir { margin: 0 14px 14px; padding: 8px 8px 8px 12px; border: 1px solid var(--line); border-radius: 28px; background: var(--card); box-shadow: var(--sombra); }
+.secure .escribir .campo { border: 0; background: transparent; box-shadow: none; padding: 10px 6px; }
+.secure .escribir .campo:focus { box-shadow: none; background: transparent; }
+.secure .mensajes li { border-radius: 20px; }
+/* The GUARDIANA number, the way to call one, and the contacts. */
+.numero-g { display: grid; gap: 6px; margin-top: 22px; padding: 18px 20px; border-radius: 22px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--sombra); text-align: left; }
+.numero-g[hidden], .agenda-g[hidden], .llamar-num-error[hidden], .quien-num[hidden] { display: none; }
+.ng-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ng-fila b { font: 600 clamp(22px, 2.6vw, 30px)/1.1 var(--mono); letter-spacing: .06em; font-variant-numeric: tabular-nums; user-select: all; }
+.numero-g .t { margin: 0; font-size: 12.5px; }
+.llamar-num { display: flex; gap: 8px; margin-top: 12px; padding: 6px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--card); }
+.llamar-num .campo { flex: 1; min-width: 0; border: 0; background: transparent; font: 600 16px var(--mono); letter-spacing: .06em; padding: 8px 14px; }
+.llamar-num .campo:focus { box-shadow: none; }
+.llamar-num-error { color: var(--alerta); margin: 6px 0 0; }
+.agenda-g { display: grid; gap: 8px; margin-top: 18px; text-align: left; }
+.agenda-g ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.agenda-g li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); }
+.agenda-g li .avatar { width: 36px; height: 36px; border-radius: 50%; font-size: 14px; }
+.agenda-g li .ag-quien { display: grid; gap: 1px; flex: 1; min-width: 0; }
+.agenda-g li .ag-quien b { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agenda-g li .ag-quien span { font: 12px var(--mono); color: var(--muted); }
+.c-bloquear { margin-left: auto; color: var(--alerta); font-size: 13px; }
+.quien-num { font: 500 13px var(--mono); }
+/* The protection is felt the whole time (the owner: «la persona tiene que sentir el monitoreo
+   constante»): the state at the top is a pill with a dot that beats while GUARDIANA watches. */
+header.top #m-estado-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; font: 600 12px/1 var(--texto); letter-spacing: .02em; text-transform: none; }
+header.top #m-estado-chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+header.top #m-estado-chip.ok { background: var(--ok-suave); border-color: transparent; }
+header.top #m-estado-chip.ok::before { animation: latido 1.6s ease-out infinite; }
+header.top #m-estado-chip.aviso { background: var(--aviso-suave); border-color: transparent; }
+header.top #m-estado-chip.alerta { background: var(--alerta-suave); border-color: transparent; }
+@media (prefers-reduced-motion: reduce) { header.top #m-estado-chip.ok::before { animation: none; } }
 </style>
 </head>
 <body>
@@ -579,6 +621,22 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
         <span aria-hidden="true">·</span>
         <button type="button" class="enlace" data-modo="movil" data-t="sec_inicio_mi_movil"></button>
       </div>
+      <!-- 1.0.42: the GUARDIANA number, given once at install and kept for good; whoever has it can
+           call this PC without a QR. The first call compares three numbers, as always. -->
+      <section class="numero-g" id="c-mi-numero-caja" hidden>
+        <span class="rotulo" data-t="sec_num_tuyo"></span>
+        <div class="ng-fila"><b id="c-mi-numero"></b><button type="button" class="boton chico" id="c-mi-numero-copiar" data-t="sec_c_copiar"></button></div>
+        <p class="t" data-t="sec_num_tuyo_texto"></p>
+      </section>
+      <form class="llamar-num" id="c-llamar-num" autocomplete="off">
+        <input class="campo" id="c-llamar-num-campo" inputmode="numeric" maxlength="14" data-t-ph="sec_num_llamar_ph" spellcheck="false">
+        <button type="submit" class="boton principal" data-t="sec_num_llamar"></button>
+      </form>
+      <p class="t llamar-num-error" id="c-llamar-num-error" hidden data-t="sec_num_mal"></p>
+      <section class="agenda-g" id="c-agenda" hidden>
+        <span class="rotulo" data-t="sec_num_contactos"></span>
+        <ul id="c-agenda-lista"></ul>
+      </section>
       <p class="t inicio-pie" data-t="sec_inicio_pie"></p>
     </div>
     </div>
@@ -662,10 +720,11 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
   <section class="tarjeta comparar" id="c-comparar" hidden>
     <h2 data-t="sec_s_titulo"></h2>
     <p class="t quien" id="c-comparar-quien"></p>
+    <p class="t quien-num" id="c-comparar-num" hidden></p>
     <p class="t" data-t="sec_s_texto"></p>
     <div class="numeros" id="c-numeros"></div>
     <label class="c-nombre"><span data-t="sec_s_nombre"></span><input class="campo" id="c-nombre" data-t-ph="sec_s_nombre_ph" autocomplete="off"></label>
-    <div class="c-fila"><button type="button" class="boton deja" id="c-sas-si" data-t="sec_s_iguales"></button><button type="button" class="boton corta" id="c-sas-no" data-t="sec_s_distintos"></button></div>
+    <div class="c-fila"><button type="button" class="boton deja" id="c-sas-si" data-t="sec_s_iguales"></button><button type="button" class="boton corta" id="c-sas-no" data-t="sec_s_distintos"></button><button type="button" class="enlace c-bloquear" id="c-bloquear" data-t="sec_num_bloquear"></button></div>
   </section>
 
   <section class="tarjeta espera" id="c-espera" hidden><p class="t" id="c-espera-texto"></p></section>
