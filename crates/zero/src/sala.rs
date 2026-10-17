@@ -16,6 +16,7 @@
 //! says so, by the name it typed; the room ends at the hour chosen.
 
 use std::collections::VecDeque;
+use std::path::PathBuf;
 
 use base64::Engine as _;
 use serde_json::{json, Value};
@@ -33,6 +34,33 @@ const TIMBRE_S: u64 = 45;
 const MENSAJES_MAX: usize = 400;
 /// The computer itself, when it writes.
 const CASA: usize = usize::MAX;
+
+/// A file name a phone sent, safe to write under Descargas.
+fn nombre_limpio(n: &str) -> String {
+    let n: String = n
+        .chars()
+        .filter(|c| {
+            !matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') && !c.is_control()
+        })
+        .take(120)
+        .collect();
+    let n = n.trim().trim_start_matches('.').to_owned();
+    if n.is_empty() {
+        "archivo".to_owned()
+    } else {
+        n
+    }
+}
+
+/// Hand a file to one phone: the announcement, then the bytes in pieces of 64 KB.
+fn reparte_archivo(movil: &Movil, a: &Archivo, datos: &[u8]) {
+    movil.manda(Hacia::Estado(
+        json!({ "tipo": "archivo_movil", "id": a.id, "nombre": a.nombre, "mime": a.mime, "bytes": a.bytes }).to_string(),
+    ));
+    for trozo in datos.chunks(65536) {
+        movil.manda(Hacia::Archivo(a.id, trozo.to_vec()));
+    }
+}
 
 const B64URL: base64::engine::GeneralPurpose = base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
@@ -61,13 +89,64 @@ struct Asiento {
     mime: Option<String>,
     /// Grows when the other side's player started anew: this phone's recorder starts again.
     reinicio: u64,
+    /// Unix seconds of its last «escribiendo».
+    escribe_en: u64,
+    /// A file on its way from this phone: name, size, type, bytes so far.
+    archivo: Option<(String, u64, String, Vec<u8>)>,
+}
+
+/// A file that lives in the room: saved on the computer and handed to the phones.
+#[derive(Clone)]
+struct Archivo {
+    /// Its id on the phone link (frames of type 2).
+    id: u32,
+    nombre: String,
+    mime: String,
+    ruta: PathBuf,
+    bytes: u64,
 }
 
 struct Mensaje {
+    /// Shared with the phones (see [`crate::mensaje`]).
+    id: u64,
     t: u64,
     de: usize,
     texto: String,
+    /// The message it answers.
+    re: Option<u64>,
+    /// Seats (and `CASA`) that had it on screen.
+    vistos: Vec<usize>,
+    /// Seats that deleted it for themselves.
+    ocultos: Vec<usize>,
+    editado: bool,
+    borrado: bool,
+    /// (seat, emoji).
+    reacciones: Vec<(usize, String)>,
+    archivo: Option<Archivo>,
+    llamada: Option<crate::mensaje::Llamada>,
 }
+
+impl Mensaje {
+    fn nuevo(de: usize, texto: String, re: Option<u64>) -> Self {
+        Self {
+            id: crate::mensaje::Mensaje::nuevo_id(),
+            t: ahora_s(),
+            de,
+            texto,
+            re,
+            vistos: vec![de],
+            ocultos: Vec::new(),
+            editado: false,
+            borrado: false,
+            reacciones: Vec::new(),
+            archivo: None,
+            llamada: None,
+        }
+    }
+}
+
+/// The biggest file a phone may put in the room (the whole thing sits in memory a moment).
+const ARCHIVO_MAX: u64 = 64 * 1024 * 1024;
 
 struct Llamada {
     de: usize,
@@ -88,6 +167,10 @@ pub struct Sala {
     llamada: Option<Llamada>,
     cambio: bool,
     error: Option<String>,
+    /// Where the room's files are saved (Descargas); none while unset (tests).
+    descargas: Option<PathBuf>,
+    /// The last file id handed to the phones.
+    ultimo_archivo: u32,
 }
 
 impl std::fmt::Debug for Sala {
@@ -127,6 +210,8 @@ impl Sala {
                 enganchado: false,
                 mime: None,
                 reinicio: 0,
+                escribe_en: 0,
+                archivo: None,
             });
         }
         Ok(Self {
@@ -140,6 +225,8 @@ impl Sala {
             llamada: None,
             cambio: true,
             error: None,
+            descargas: None,
+            ultimo_archivo: 0,
         })
     }
 
@@ -211,15 +298,221 @@ impl Sala {
     }
 
     fn mete(&mut self, de: usize, texto: String) {
-        self.mensajes.push_back(Mensaje {
-            t: ahora_s(),
-            de,
-            texto,
-        });
+        self.mete_re(de, texto, None);
+    }
+
+    fn mete_re(&mut self, de: usize, texto: String, re: Option<u64>) {
+        self.guarda(Mensaje::nuevo(de, texto, re));
+    }
+
+    fn guarda(&mut self, m: Mensaje) {
+        self.mensajes.push_back(m);
         while self.mensajes.len() > MENSAJES_MAX {
             self.mensajes.pop_front();
         }
         self.cambio = true;
+    }
+
+    /// Where the room keeps its files.
+    pub fn con_descargas(mut self, carpeta: &std::path::Path) -> Self {
+        self.descargas = Some(carpeta.to_path_buf());
+        self
+    }
+
+    /// The computer answers a message.
+    pub fn texto_re(&mut self, texto: &str, re: Option<u64>) {
+        let t: String = texto.trim().chars().take(8000).collect();
+        if !t.is_empty() {
+            self.mete_re(CASA, t, re);
+        }
+    }
+
+    /// Someone (`quien`: a seat or `CASA`) had the room on screen: everything is seen by them.
+    fn visto_por(&mut self, quien: usize) {
+        let mut cambio = false;
+        for m in &mut self.mensajes {
+            if !m.vistos.contains(&quien) {
+                m.vistos.push(quien);
+                cambio = true;
+            }
+        }
+        if cambio {
+            self.cambio = true;
+        }
+    }
+
+    /// The computer's screen is in front.
+    pub fn visto(&mut self) {
+        self.visto_por(CASA);
+    }
+
+    fn edita(&mut self, quien: usize, id: u64, texto: String) {
+        if let Some(m) = self
+            .mensajes
+            .iter_mut()
+            .find(|m| m.id == id && m.de == quien)
+        {
+            if !m.borrado && m.archivo.is_none() && m.llamada.is_none() {
+                m.texto = texto.chars().take(8000).collect();
+                m.editado = true;
+                self.cambio = true;
+            }
+        }
+    }
+
+    fn borra(&mut self, quien: usize, id: u64, para_todos: bool) {
+        if let Some(m) = self.mensajes.iter_mut().find(|m| m.id == id) {
+            if para_todos && m.de == quien {
+                m.texto.clear();
+                m.borrado = true;
+                m.reacciones.clear();
+                if let Some(a) = m.archivo.take() {
+                    let _ = std::fs::remove_file(a.ruta);
+                }
+            } else if !m.ocultos.contains(&quien) {
+                m.ocultos.push(quien);
+            }
+            self.cambio = true;
+        }
+    }
+
+    fn reacciona(&mut self, quien: usize, id: u64, emoji: &str) {
+        let emoji: String = emoji.chars().take(8).collect();
+        if let Some(m) = self.mensajes.iter_mut().find(|m| m.id == id) {
+            if let Some(i) = m.reacciones.iter().position(|(q, _)| *q == quien) {
+                if m.reacciones[i].1 == emoji {
+                    m.reacciones.remove(i);
+                } else {
+                    m.reacciones[i].1 = emoji;
+                }
+            } else if !emoji.is_empty() {
+                m.reacciones.push((quien, emoji));
+            }
+            self.cambio = true;
+        }
+    }
+
+    /// The computer edits, deletes, reacts.
+    pub fn editar(&mut self, id: u64, texto: &str) {
+        self.edita(CASA, id, texto.to_owned());
+    }
+
+    /// Delete a message from the computer: for everyone (its own) or for itself.
+    pub fn borrar(&mut self, id: u64, para_todos: bool) {
+        self.borra(CASA, id, para_todos);
+    }
+
+    /// React from the computer.
+    pub fn reaccionar(&mut self, id: u64, emoji: &str) {
+        self.reacciona(CASA, id, emoji);
+    }
+
+    /// Everything goes from the computer's screen (the phones keep theirs).
+    pub fn borrar_todo(&mut self) {
+        for m in &mut self.mensajes {
+            if !m.ocultos.contains(&CASA) {
+                m.ocultos.push(CASA);
+            }
+        }
+        self.cambio = true;
+    }
+
+    /// A file a phone finished sending: saved on the computer, a line in the room, and the
+    /// bytes handed to the other phones (a picture shows in their chat).
+    fn archivo_listo(&mut self, de: usize, nombre: String, mime: String, datos: Vec<u8>) {
+        let Some(carpeta) = self.descargas.clone() else {
+            return;
+        };
+        let nombre = nombre_limpio(&nombre);
+        let _ = std::fs::create_dir_all(&carpeta);
+        let ruta = {
+            let primera = carpeta.join(&nombre);
+            if primera.exists() {
+                let (base, ext) = match nombre.rsplit_once('.') {
+                    Some((b, e)) if !b.is_empty() => (b.to_owned(), format!(".{e}")),
+                    _ => (nombre.clone(), String::new()),
+                };
+                (2..1000)
+                    .map(|n| carpeta.join(format!("{base} ({n}){ext}")))
+                    .find(|p| !p.exists())
+                    .unwrap_or(primera)
+            } else {
+                primera
+            }
+        };
+        if std::fs::write(&ruta, &datos).is_err() {
+            return;
+        }
+        self.ultimo_archivo += 1;
+        let archivo = Archivo {
+            id: self.ultimo_archivo,
+            nombre: nombre.clone(),
+            mime: mime.clone(),
+            ruta,
+            bytes: datos.len() as u64,
+        };
+        let mut m = Mensaje::nuevo(de, String::new(), None);
+        m.archivo = Some(archivo.clone());
+        self.guarda(m);
+        // Pictures go to the other phones at once; other files on demand (1.0.41).
+        if mime.starts_with("image/") {
+            for (j, a) in self.asientos.iter().enumerate() {
+                if j != de && a.aprobado && a.enganchado {
+                    reparte_archivo(&a.movil, &archivo, &datos);
+                }
+            }
+        }
+    }
+
+    /// The call that just ended, as a line in the room.
+    fn anota_llamada(&mut self, de: usize, video: bool, segundos: Option<u64>, fin: &'static str) {
+        let mut m = Mensaje::nuevo(de, String::new(), None);
+        m.llamada = Some(crate::mensaje::Llamada {
+            video,
+            saliente: true,
+            segundos,
+            fin,
+        });
+        self.guarda(m);
+    }
+
+    /// One message as seat `yo` (or the computer) sees it.
+    fn mensaje_json(&self, m: &Mensaje, yo: usize) -> Value {
+        let mio = m.de == yo;
+        let visto_por_otro = m.vistos.iter().any(|&v| v != m.de);
+        let mut v = json!({
+            "id": m.id.to_string(),
+            "t": m.t,
+            "mio": mio,
+            "de": if mio { String::new() } else { self.nombre_de(m.de) },
+            "texto": m.texto,
+            "estado": if !mio { "visto" } else if visto_por_otro { "visto" } else { "entregado" },
+        });
+        if m.editado {
+            v["editado"] = json!(true);
+        }
+        if m.borrado {
+            v["borrado"] = json!(true);
+        }
+        if let Some(re) = m.re {
+            v["re"] = json!(re.to_string());
+        }
+        if !m.reacciones.is_empty() {
+            v["reacciones"] = json!(m
+                .reacciones
+                .iter()
+                .map(|(q, e)| json!({ "de": if *q == yo { String::new() } else { self.nombre_de(*q) }, "emoji": e }))
+                .collect::<Vec<_>>());
+        }
+        if let Some(a) = &m.archivo {
+            v["archivo"] =
+                json!({ "id": a.id, "nombre": a.nombre, "mime": a.mime, "bytes": a.bytes });
+        }
+        if let Some(l) = &m.llamada {
+            v["llamada"] =
+                json!({ "video": l.video, "saliente": mio, "segundos": l.segundos, "fin": l.fin });
+        }
+        v
     }
 
     fn nombre_de(&self, i: usize) -> String {
@@ -258,7 +551,9 @@ impl Sala {
             .as_ref()
             .is_some_and(|l| l.a.is_none() && ahora_s().saturating_sub(l.desde) > TIMBRE_S)
         {
-            self.llamada = None;
+            if let Some(l) = self.llamada.take() {
+                self.anota_llamada(l.de, l.video, None, "sin_respuesta");
+            }
             self.cambio = true;
         }
         for i in 0..self.asientos.len() {
@@ -289,6 +584,34 @@ impl Sala {
                         }
                     }
                     Desde::Texto(t) if aprobado => self.mete(i, t),
+                    Desde::TextoRe(t, re) if aprobado => self.mete_re(i, t, Some(re)),
+                    Desde::Visto if aprobado => self.visto_por(i),
+                    Desde::Editar(id, t) if aprobado => self.edita(i, id, t),
+                    Desde::Borrar(id, todos) if aprobado => self.borra(i, id, todos),
+                    Desde::Reaccion(id, e) if aprobado => self.reacciona(i, id, &e),
+                    Desde::Escribiendo if aprobado => {
+                        self.asientos[i].escribe_en = ahora_s();
+                        self.cambio = true;
+                    }
+                    Desde::ArchivoEmpieza(nombre, bytes, mime) if aprobado => {
+                        if bytes <= ARCHIVO_MAX {
+                            self.asientos[i].archivo = Some((nombre, bytes, mime, Vec::new()));
+                        }
+                    }
+                    Desde::ArchivoTrozo(b) if aprobado => {
+                        if let Some(a) = &mut self.asientos[i].archivo {
+                            if (a.3.len() + b.len()) as u64 <= a.1.max(1) {
+                                a.3.extend_from_slice(&b);
+                            } else {
+                                self.asientos[i].archivo = None;
+                            }
+                        }
+                    }
+                    Desde::ArchivoFin if aprobado => {
+                        if let Some((nombre, _, mime, datos)) = self.asientos[i].archivo.take() {
+                            self.archivo_listo(i, nombre, mime, datos);
+                        }
+                    }
                     Desde::Llamar { video, mime } if aprobado => {
                         if self.llamada.is_none() {
                             self.llamada = Some(Llamada {
@@ -317,7 +640,9 @@ impl Sala {
                     }
                     Desde::Rechazar if aprobado => {
                         if self.llamada.as_ref().is_some_and(|l| l.a.is_none()) {
-                            self.llamada = None;
+                            if let Some(l) = self.llamada.take() {
+                                self.anota_llamada(l.de, l.video, None, "rechazada");
+                            }
                             self.cambio = true;
                         }
                     }
@@ -327,7 +652,18 @@ impl Sala {
                             .as_ref()
                             .is_some_and(|l| l.de == i || l.a == Some(i))
                         {
-                            self.llamada = None;
+                            if let Some(l) = self.llamada.take() {
+                                if l.a.is_some() {
+                                    self.anota_llamada(
+                                        l.de,
+                                        l.video,
+                                        Some(ahora_s().saturating_sub(l.desde)),
+                                        "fin",
+                                    );
+                                } else {
+                                    self.anota_llamada(l.de, l.video, None, "cancelada");
+                                }
+                            }
                             for a in &mut self.asientos {
                                 a.mime = None;
                             }
@@ -366,15 +702,14 @@ impl Sala {
         let mensajes: Vec<Value> = self
             .mensajes
             .iter()
-            .map(|m| {
-                let mio = m.de == i;
-                json!({
-                    "t": m.t,
-                    "mio": mio,
-                    "texto": if mio { m.texto.clone() } else { format!("{}: {}", self.nombre_de(m.de), m.texto) },
-                })
-            })
+            .filter(|m| !m.ocultos.contains(&i))
+            .map(|m| self.mensaje_json(m, i))
             .collect();
+        let escribiendo = self
+            .asientos
+            .iter()
+            .enumerate()
+            .any(|(j, a)| j != i && a.aprobado && ahora_s().saturating_sub(a.escribe_en) < 6);
         let mut llamada = Value::Null;
         let mut entrante = Value::Null;
         if let Some(l) = &self.llamada {
@@ -403,6 +738,8 @@ impl Sala {
             "fase": "lista",
             "contacto": otros.join(" · "),
             "mensajes": mensajes,
+            "escribiendo": escribiendo,
+            "archivos": true,
             "llamada": llamada,
             "entrante": entrante,
             "monitor": { "identidad": { "estado": "sala" }, "transporte": {} },
@@ -446,9 +783,8 @@ impl Sala {
                 "pendiente": a.pendiente,
                 "aprobado": a.aprobado,
             })).collect::<Vec<_>>(),
-            "mensajes": self.mensajes.iter().rev().take(200).rev().map(|m| json!({
-                "t": m.t, "de": self.nombre_de(m.de), "mio": m.de == CASA, "texto": m.texto,
-            })).collect::<Vec<_>>(),
+            "mensajes": self.mensajes.iter().filter(|m| !m.ocultos.contains(&CASA)).rev().take(300).rev().map(|m| self.mensaje_json(m, CASA)).collect::<Vec<_>>(),
+            "escribiendo": self.asientos.iter().any(|a| a.aprobado && ahora_s().saturating_sub(a.escribe_en) < 6),
             "llamada": self.llamada.as_ref().map(|l| json!({
                 "de": self.nombre_de(l.de),
                 "a": l.a.map(|a| self.nombre_de(a)),

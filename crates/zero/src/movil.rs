@@ -89,6 +89,22 @@ pub enum Desde {
     Media(Vec<u8>),
     /// The phone's page was brought to the front.
     Visto,
+    /// The phone answers a message: the text and the id it answers (16 Oct 2026).
+    TextoRe(String, u64),
+    /// The phone changed a text of ours.
+    Editar(u64, String),
+    /// The phone deletes a message; `para_todos` tells the other side too.
+    Borrar(u64, bool),
+    /// The phone reacts with an emoji.
+    Reaccion(u64, String),
+    /// The person is typing on the phone.
+    Escribiendo,
+    /// A file from the phone starts: name, size, type (its bytes come as frames of type 2).
+    ArchivoEmpieza(String, u64, String),
+    /// One piece of that file.
+    ArchivoTrozo(Vec<u8>),
+    /// The file is complete.
+    ArchivoFin,
     /// The person typed their name on the phone (a home room, 16 Oct 2026).
     Nombre(String),
     /// What the phone's player can open (an iPhone may not open WebM): the other side records
@@ -107,6 +123,8 @@ pub enum Hacia {
     Estado(String),
     /// One opened piece of the call from the other side.
     Media(Vec<u8>),
+    /// One piece of a file for the phone (frame type 2): the file's id and the bytes.
+    Archivo(u32, Vec<u8>),
     /// The person took the conversation back to the computer, or closed it.
     Fin,
 }
@@ -404,6 +422,11 @@ async fn servidor(
                     }
                     Hacia::Estado(j) => (0u8, j.into_bytes()),
                     Hacia::Media(b) => (1u8, b),
+                    Hacia::Archivo(id, b) => {
+                        let mut c = id.to_be_bytes().to_vec();
+                        c.extend_from_slice(&b);
+                        (2u8, c)
+                    }
                 };
                 if let Some(m) = &mut manda {
                     let ok = match m {
@@ -432,7 +455,9 @@ async fn servidor(
                     1 => {
                         let _ = tx.send(Desde::Media(cuerpo));
                     }
-                    2 => {}
+                    2 => {
+                        let _ = tx.send(Desde::ArchivoTrozo(cuerpo));
+                    }
                     _ => {
                         manda = None;
                         conexion = None;
@@ -723,9 +748,47 @@ fn iguales(a: &str, b: &str) -> bool {
 
 fn traduce(v: &Value) -> Option<Desde> {
     match v["t"].as_str()? {
-        "texto" => Some(Desde::Texto(
+        "texto" => {
+            let t: String = v["texto"].as_str()?.chars().take(8000).collect();
+            match crate::mensaje::id_de(&v["re"]) {
+                Some(re) => Some(Desde::TextoRe(t, re)),
+                None => Some(Desde::Texto(t)),
+            }
+        }
+        "editar" => Some(Desde::Editar(
+            crate::mensaje::id_de(&v["id"])?,
             v["texto"].as_str()?.chars().take(8000).collect(),
         )),
+        "borrar" => Some(Desde::Borrar(
+            crate::mensaje::id_de(&v["id"])?,
+            v["para_todos"].as_bool().unwrap_or(false),
+        )),
+        "reaccion" => Some(Desde::Reaccion(
+            crate::mensaje::id_de(&v["id"])?,
+            v["emoji"]
+                .as_str()
+                .unwrap_or_default()
+                .chars()
+                .take(8)
+                .collect(),
+        )),
+        "escribiendo" => Some(Desde::Escribiendo),
+        "archivo" => Some(Desde::ArchivoEmpieza(
+            v["nombre"]
+                .as_str()
+                .unwrap_or("archivo")
+                .chars()
+                .take(120)
+                .collect(),
+            v["bytes"].as_u64().unwrap_or(0),
+            v["mime"]
+                .as_str()
+                .unwrap_or_default()
+                .chars()
+                .take(80)
+                .collect(),
+        )),
+        "archivo_fin" => Some(Desde::ArchivoFin),
         "llamar" => Some(Desde::Llamar {
             video: v["video"].as_bool().unwrap_or(false),
             mime: v["mime"]
