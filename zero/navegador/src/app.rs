@@ -61,15 +61,15 @@ use windows::Win32::UI::Shell::{
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateIconFromResourceEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
     FindWindowW, GetClientRect, GetMessageW, GetWindowLongPtrW, GetWindowRect,
-    GetWindowThreadProcessId, IsIconic, KillTimer, LoadCursorW, MessageBoxW, PostMessageW, PostQuitMessage,
-    RegisterClassExW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowPos,
-    SetWindowTextW, ShowWindow, SystemParametersInfoW, TranslateMessage, GWL_STYLE, HICON,
-    HWND_TOP, ICON_BIG, ICON_SMALL, IDC_ARROW, LR_DEFAULTCOLOR, MB_ICONWARNING, MB_OK, MINMAXINFO,
-    MSG, SIZE_MINIMIZED, SPI_GETWORKAREA, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOOWNERZORDER,
-    SWP_NOZORDER, SW_RESTORE, SW_SHOW, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
-    WINDOW_EX_STYLE, WM_APP, WM_CLOSE, WM_COPYDATA, WM_DESTROY, WM_DPICHANGED, WM_GETMINMAXINFO,
-    WM_MOVE, WM_MOVING, WM_SETFOCUS, WM_SETICON, WM_SIZE, WM_TIMER, WNDCLASSEXW,
-    WS_OVERLAPPEDWINDOW,
+    GetWindowThreadProcessId, IsIconic, KillTimer, LoadCursorW, MessageBoxW, PostMessageW,
+    PostQuitMessage, RegisterClassExW, SendMessageW, SetForegroundWindow, SetTimer,
+    SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, SystemParametersInfoW,
+    TranslateMessage, GWL_STYLE, HICON, HWND_TOP, ICON_BIG, ICON_SMALL, IDC_ARROW, LR_DEFAULTCOLOR,
+    MB_ICONWARNING, MB_OK, MINMAXINFO, MSG, SIZE_MINIMIZED, SPI_GETWORKAREA, SWP_FRAMECHANGED,
+    SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOZORDER, SW_RESTORE, SW_SHOW, SW_SHOWNORMAL,
+    SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WINDOW_EX_STYLE, WM_APP, WM_CLOSE, WM_COPYDATA,
+    WM_DESTROY, WM_DPICHANGED, WM_GETMINMAXINFO, WM_MOVE, WM_MOVING, WM_SETFOCUS, WM_SETICON,
+    WM_SIZE, WM_TIMER, WNDCLASSEXW, WS_OVERLAPPEDWINDOW,
 };
 
 /// Height of the bar (tabs 38 + tools 46), in CSS pixels; see `interfaz/barra.html`.
