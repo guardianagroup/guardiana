@@ -93,8 +93,9 @@
     $('p-pendiente').innerHTML = pend.length
       ? `<li>${esc(t('sec_p_pendiente'))}</li>` + pend.map((x) => `<li>${esc(x)}</li>`).join('')
       : (clave ? '' : `<li class="lista">${esc(t('sec_p_lista'))}</li>`);
-    $('p-reanudar').hidden = !se.puede_reanudar; $('p-reanudar').textContent = t('sec_p_reanudar');
-    $('p-nota').hidden = !se.puede_reanudar;
+    // 1.0.42: no way to skip a stop; it resumes on its own when the cause is gone.
+    $('p-reanudar').hidden = true;
+    $('p-nota').hidden = true;
     $('p-verificar').hidden = !clave; $('p-verificar').textContent = t('sec_p_verificar');
     $('p-prueba').textContent = t('sec_p_prueba');
     $('p-terminar').textContent = t('sec_p_terminar');
@@ -204,6 +205,8 @@
   const fasePinta = () => {
     const f = E.fase;
     $('c-conexion').hidden = !(f === 'sola' || f === 'escuchando') || (modo !== 'equipos' && modo !== 'movil');
+    // «Tengo una invitación» (1.0.42): only the box for the code; inviting is «Nueva conversación».
+    $('c-lado-invitar').hidden = modo === 'equipos' && f !== 'escuchando';
     const comparando = E.comparando || (f === 'comparando' ? E.numeros : null);
     $('c-comparar').hidden = !comparando;
     $('c-comparar-quien').textContent = E.comparando && E.contacto_nuevo ? t('sec_s_nuevo', { n: E.contacto_nuevo }) : '';
@@ -664,7 +667,7 @@
   const pintaLista = (m, quien, nombres) => {
     const ol = $('c-lista');
     const f = m.fase;
-    if (!f || f === 'sola') { ol.innerHTML = filaSala(m) || `<li class="vacia">${esc(t('sec_lista_vacia'))}</li>`; if (!m.sala) $('miga-donde').textContent = t('sec_miga_inicio'); return; }
+    if (!f || f === 'sola' || (f === 'escuchando' && m.sala)) { ol.innerHTML = filaSala(m) || `<li class="vacia">${esc(t('sec_lista_vacia'))}</li>`; if (!m.sala) $('miga-donde').textContent = t('sec_miga_inicio'); return; }
     const ultimo = (m.mensajes || []).slice(-1)[0];
     const nombre = nombres.length > 2 ? nombres.join(' · ') : (quien || t('sec_lista_nueva'));
     const linea = f !== 'lista' ? t(f === 'comparando' ? 'sec_lista_comparando' : 'sec_lista_conectando') : m.llamada ? t('sec_l_en_curso') : ultimo ? ultimo.texto : t('sec_lista_sin_mensajes');
@@ -717,7 +720,9 @@
   let vista = 'contacto';
   // Someone on the line (17 Oct 2026 review: counting the messages a finished conversation
   // leaves on screen kept the start hidden and the way back gone until the program restarted).
-  const hayContacto = (m) => !!m.fase && m.fase !== 'sola';
+  // 1.0.42: «escuchando» is the invitation waiting for a PC (it travels with the QR of «Nueva
+  // conversación»): nobody is on the line yet, so the screen stays on the invitation.
+  const hayContacto = (m) => !!m.fase && m.fase !== 'sola' && m.fase !== 'escuchando';
   // Three ways to talk (16 Oct 2026): computer to computer, from the phone, the home room.
   // The start shows the three; once one is chosen (or one is already going) only it is on screen.
   let modo = null;
@@ -757,7 +762,17 @@
     secure.classList.toggle('sin-derecha', false);
     $('miga-donde').textContent = modo ? t('sec_modo_' + modo) : t('sec_miga_inicio');
   };
-  document.querySelectorAll('.modo').forEach((b) => b.addEventListener('click', () => { modo = b.dataset.modo; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); if (modo === 'sala') $('c-sala-horas').focus(); }));
+  // 1.0.42: «Nueva conversación» opens the invitation at once: the room for phones and, at the
+  // same time, the code for a PC (it travels inside the same link). «Tengo una invitación» and
+  // «Usar en mi móvil» are the other two ways in.
+  document.querySelectorAll('#c-inicio [data-modo]').forEach((b) => b.addEventListener('click', () => {
+    modo = b.dataset.modo; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E);
+    if (modo === 'sala') {
+      if (!E.sala) manda({ tipo: 'secure', accion: 'sala', horas: 24, idioma: idioma() });
+      if (!E.fase || E.fase === 'sola') { mandaNombre(); manda({ tipo: 'secure', accion: 'escuchar', puerto: 0 }); }
+    }
+    if (modo === 'equipos') { const c = document.querySelector('#c-conexion input:not(#c-yo)'); if (c) c.focus(); }
+  }));
   $('c-volver').addEventListener('click', () => {
     // Going back cancels an invitation still waiting, so nothing is left half open.
     if (E.fase && E.fase !== 'sola' && E.fase !== 'lista') { manda({ tipo: 'secure', accion: 'cerrar' }); E = Object.assign({}, E, { fase: 'sola' }); }
@@ -809,11 +824,14 @@
     if (!s) return;
     if (s.qr && $('c-sala-qr').dataset.qr !== s.qr) { $('c-sala-qr').innerHTML = s.qr; $('c-sala-qr').dataset.qr = s.qr; }
     salaEnlace = s.enlace || '';
+    $('c-sala-pc').hidden = !s.codigo_pc; $('c-sala-pc-codigo').textContent = s.codigo_pc || '';
     $('c-sala-hasta').textContent = t('sec_sala_hasta', { h: n(s.horas), f: fecha(s.caduca) });
     $('c-sala-miembros').innerHTML = (s.miembros || []).filter((x) => x.enganchado || x.aprobado || x.con_nombre).map((x) => {
       const estado = x.pendiente ? t('sec_sala_m_pendiente') : x.aprobado ? (x.enganchado ? t('sec_sala_m_dentro') : t('sec_sala_m_fuera')) : t('sec_sala_m_espera');
       const botones = x.pendiente ? `<button type="button" class="boton chico" data-sala-ok="${x.i}">${esc(t('sec_sala_dejar'))}</button>` : x.aprobado ? `<button type="button" class="boton chico secundario" data-sala-fuera="${x.i}">${esc(t('sec_sala_echar'))}</button>` : '';
-      return `<li class="${x.enganchado ? 'si' : ''}"><i></i><span class="c-sala-q"><b>${esc(x.nombre)}</b><span class="t">${esc(estado)}</span></span>${botones}</li>`;
+      // 1.0.42: the four digits of the link, the same the phone shows; checked before «Aceptar».
+      const num = x.numero && (x.pendiente || x.aprobado) ? `<span class="c-sala-num" title="${esc(t('sec_sala_numero_t'))}">${esc(x.numero.split('').join(' '))}</span>` : '';
+      return `<li class="${x.enganchado ? 'si' : ''}"><i></i><span class="c-sala-q"><b>${esc(x.nombre)}</b><span class="t">${esc(estado)}</span></span>${num || botones ? `<span class="c-sala-acc">${num}${botones}</span>` : ''}</li>`;
     }).join('');
     const ol = $('c-sala-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 40;
     ol.innerHTML = (s.mensajes || []).map((x) => x.llamada ? lineaLlamada(x) : `<li class="${x.mio ? 'mio' : ''}" data-id="${esc(x.id || '')}"><b>${esc(x.de || t('sec_m_tu'))}</b>${citaDe(x, s.mensajes)}${x.borrado ? `<i class="borrado">${esc(t('sec_m_borrado'))}</i>` : x.archivo ? notaSala(x.archivo) : `<span>${esc(x.texto)}</span>`}${reacciones(x)}${metaMensaje(x)}</li>`).join('') + (s.escribiendo ? `<li class="escribiendo"><span></span><span></span><span></span></li>` : '');
@@ -1472,10 +1490,11 @@
     const pc = (este.pantalla || []).map((p) => t('sec_eq_visto_pant', { p }));
     f.push([t('sec_in_grab_pantalla'), pc.length ? pc.join('; ') : t(este.pantalla_protegida ? 'sec_in_pant_bloq' : 'sec_in_pant_no'), pc.length ? 'alerta' : este.pantalla_protegida ? 'ok' : 'aviso']);
     const vo = o ? [...(o.microfono || []).map((p) => t('sec_eq_visto_mic', { p })), ...(o.camara || []).map((p) => t('sec_eq_visto_cam', { p })), ...(o.pantalla || []).map((p) => t('sec_eq_visto_pant', { p }))] : [];
-    f.push([t('sec_in_otro', { n: nom }), v.otro_movil ? t('sec_in_otro_movil') : !o ? t('sec_in_otro_nada') : !o.vigilado ? t('sec_in_otro_no_vigilable') : vo.length ? vo.join('; ') : t('sec_in_otro_limpio'), vo.length ? 'alerta' : o && o.vigilado && !v.otro_movil ? 'ok' : 'aviso']);
+    if (r.sala) f.push([t('sec_in_moviles'), t('sec_in_moviles_t'), 'aviso']);
+    else f.push([t('sec_in_otro', { n: nom }), v.otro_movil ? t('sec_in_otro_movil') : !o ? t('sec_in_otro_nada') : !o.vigilado ? t('sec_in_otro_no_vigilable') : vo.length ? vo.join('; ') : t('sec_in_otro_limpio'), vo.length ? 'alerta' : o && o.vigilado && !v.otro_movil ? 'ok' : 'aviso']);
     const directa = r.conexion && r.conexion.directa === true;
     f.push([t('sec_in_servidor'), t(directa ? 'sec_in_directo_t' : 'sec_in_rele_t'), 'ok']);
-    f.push([t('sec_in_identidad'), t(v.identidad_verificada ? 'sec_in_identidad_ok' : 'sec_in_identidad_mal'), v.identidad_verificada ? 'ok' : 'alerta']);
+    f.push([t('sec_in_identidad'), t(r.sala ? 'sec_in_identidad_sala' : v.identidad_verificada ? 'sec_in_identidad_ok' : 'sec_in_identidad_mal'), v.identidad_verificada ? 'ok' : 'alerta']);
     f.push([t('sec_in_interf'), v.interferencias ? n(v.interferencias) : t('sec_in_interf_no'), v.interferencias ? 'alerta' : 'ok']);
     const c = r.conexion || {};
     if (c.latencia_media_ms != null || c.kbps_audio_medio != null) {
@@ -1486,11 +1505,24 @@
       if (cod) partes.push(cod);
       f.push([t('sec_in_conexion'), partes.join(' · '), '']);
     }
-    f.push([t('sec_in_firmado'), String(r.firmante || '').slice(0, 22) + '…', '']);
+    if (r.firmante) f.push([t('sec_in_firmado'), String(r.firmante || '').slice(0, 22) + '…', '']);
     return f;
   };
+  // 1.0.42: a call between two phones of the house leaves its summary too (the owner: «cuando se
+  // acabe la llamada… un resumen de lo que ha chequeado»), in the same card: this computer was the
+  // exchange and was watched; the phones are web pages and cannot be.
+  const deSala = (x) => {
+    if (!x) return null;
+    const e = x.equipo || {};
+    const limpio = !(e.microfono || []).length && !(e.camara || []).length && !(e.pantalla || []).length;
+    const datos = { tipo: 'guardiana-secure-informe-casa', de: x.de, a: x.a, video: x.video, inicio: x.desde, fin: x.fin, duracion_s: x.duracion_s, camino: x.rtc ? 'webrtc-turn' : 'pc', este_pc: e };
+    const csv = ['campo,valor', ...Object.entries({ de: x.de, a: x.a, video: x.video, inicio: x.desde, fin: x.fin, duracion_s: x.duracion_s, microfono: (e.microfono || []).join(' / '), camara: (e.camara || []).join(' / '), pantalla: (e.pantalla || []).join(' / '), pantalla_protegida: !!e.pantalla_protegida, vigilado: !!e.vigilado }).map(([k, v]) => `${k},"${String(v).replace(/"/g, '""')}"`)].join('\n');
+    return { sala: true, clase: x.video ? 'videollamada' : 'llamada', contacto: `${x.de} · ${x.a}`, duracion_s: x.duracion_s, inicio: x.desde, fin: x.fin,
+      veredicto: { este: e, otro: null, otro_movil: true, identidad_verificada: true, interferencias: 0 }, sin_espionaje: limpio,
+      conexion: { directa: false }, firmante: '', firma: '', json: JSON.stringify(datos, null, 2), csv };
+  };
   const pintaInforme = (m) => {
-    const r = m.informe;
+    const r = m.informe || deSala((m.sala || {}).informe);
     INF = r || null;
     const velo = $('informe'), caja = $('informe-caja');
     const nuevo = velo.hidden && !!r;
@@ -1504,8 +1536,9 @@
     $('in-datos').innerHTML = filasInforme(r).map(([a, b, c]) => `<div class="in-dato"><dt>${esc(a)}</dt><dd class="${c}">${esc(b)}</dd></div>`).join('');
     if (nuevo) $('in-pdf').focus();
   };
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('informe').hidden) manda({ tipo: 'secure', accion: 'informe_visto' }); });
-  $('in-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'informe_visto' }));
+  const cierraInforme = () => manda({ tipo: 'secure', accion: INF && INF.sala ? 'sala_informe_visto' : 'informe_visto' });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('informe').hidden) cierraInforme(); });
+  $('in-cerrar').addEventListener('click', cierraInforme);
   $('in-json').addEventListener('click', () => { if (INF) descarga(`guardiana-secure-informe-${sello(INF.fin)}.json`, 'application/json', INF.json); });
   $('in-csv').addEventListener('click', () => { if (INF) descarga(`guardiana-secure-informe-${sello(INF.fin)}.csv`, 'text/csv;charset=utf-8', '﻿' + INF.csv); });
   $('in-pdf').addEventListener('click', () => {
@@ -1529,12 +1562,14 @@
     y -= 10;
     linea2(56, 9.5, t('sec_in_limite'), false, 100);
     y -= 12;
-    L.push({ x: 56, y, tam: 10.5, negrita: true, texto: t('sec_r_pdf_firmado') }); y -= 15;
-    for (const s2 of parte(r.firmante, 80)) { L.push({ x: 56, y, tam: 8.5, texto: s2 }); y -= 12; }
-    y -= 4;
-    for (const s2 of parte(r.firma, 80)) { L.push({ x: 56, y, tam: 8.5, texto: s2 }); y -= 12; }
-    y -= 14;
-    linea2(56, 9.5, t('sec_r_pdf_nota'), false, 100);
+    if (r.firmante) {
+      L.push({ x: 56, y, tam: 10.5, negrita: true, texto: t('sec_r_pdf_firmado') }); y -= 15;
+      for (const s2 of parte(r.firmante, 80)) { L.push({ x: 56, y, tam: 8.5, texto: s2 }); y -= 12; }
+      y -= 4;
+      for (const s2 of parte(r.firma, 80)) { L.push({ x: 56, y, tam: 8.5, texto: s2 }); y -= 12; }
+      y -= 14;
+      linea2(56, 9.5, t('sec_r_pdf_nota'), false, 100);
+    }
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([pdfDe(L)], { type: 'application/pdf' })); a.download = `guardiana-secure-informe-${sello(r.fin)}.pdf`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   });
 
@@ -1550,4 +1585,44 @@
   manda({ tipo: 'listo', vista: 'secure' });
   mandaNombre();
   try { manda({ tipo: 'secure', accion: 'zona', zona: Intl.DateTimeFormat().resolvedOptions().timeZone || '' }); } catch (_) {}
+})();
+
+// 1.0.42 — the GUARDIANA number (17 Oct 2026, the owner: «a cada persona que descarga GUARDIANA se
+// le asigne un número… para siempre… sin tener que compartir QR»). The number is shown on the
+// start screen; typing someone's number calls their PC; the first time, the three numbers are
+// compared as with any invitation, so nobody can pass for someone else. The agenda lists the
+// people already verified, each with its number and «Llamar».
+'use strict';
+(() => {
+  const { manda, en, t, esc, $ } = Z;
+  const formatea = (v) => { const d = String(v || '').replace(/\D/g, '').slice(0, 12); return [d.slice(0, 4), d.slice(4, 8), d.slice(8, 12)].filter(Boolean).join('-'); };
+  const llama = (numero) => manda({ tipo: 'secure', accion: 'conectar', direccion: numero });
+  let estado = {};
+  const pinta = (m) => {
+    estado = m || {};
+    const mio = estado.mi_numero;
+    $('c-mi-numero-caja').hidden = !mio;
+    if (mio) $('c-mi-numero').textContent = mio;
+    const cs = (estado.contactos || []).filter((c) => c.estado && c.numero);
+    $('c-agenda').hidden = !cs.length;
+    const html = cs.map((c) => `<li><span class="avatar">${esc(((c.nombre || '·').trim()[0] || '·').toUpperCase())}</span><span class="ag-quien"><b>${esc(c.nombre || c.numero)}</b><span>${esc(c.numero)}</span></span><button type="button" class="boton chico principal" data-numero="${esc(c.numero)}">${esc(t('sec_num_llamar'))}</button></li>`).join('');
+    if ($('c-agenda-lista').dataset.html !== html) { $('c-agenda-lista').innerHTML = html; $('c-agenda-lista').dataset.html = html; }
+    const otro = estado.comparando && estado.numero_otro;
+    $('c-comparar-num').hidden = !otro;
+    if (otro) $('c-comparar-num').textContent = t('sec_num_de_quien', { n: estado.numero_otro });
+  };
+  en('secure_estado', pinta);
+  en('textos', () => { $('c-agenda-lista').dataset.html = ''; pinta(estado); });
+  $('c-mi-numero-copiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('c-mi-numero').textContent); $('c-mi-numero-copiar').textContent = t('sec_c_copiado'); setTimeout(() => { $('c-mi-numero-copiar').textContent = t('sec_c_copiar'); }, 1500); } catch (_) {} });
+  const campo = $('c-llamar-num-campo');
+  campo.addEventListener('input', () => { const f = formatea(campo.value); if (f !== campo.value) campo.value = f; $('c-llamar-num-error').hidden = true; });
+  $('c-llamar-num').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const d = campo.value.replace(/\D/g, '');
+    if (d.length !== 12) { $('c-llamar-num-error').hidden = false; return; }
+    llama(formatea(d));
+  });
+  $('c-agenda-lista').addEventListener('click', (e) => { const b = e.target.closest('button[data-numero]'); if (b) llama(b.dataset.numero); });
+  // Block: this key never gets through again, by number or by invitation; the conversation ends.
+  $('c-bloquear').addEventListener('click', () => { manda({ tipo: 'secure', accion: 'bloquear' }); manda({ tipo: 'secure', accion: 'sas', iguales: false, nombre: '' }); });
 })();

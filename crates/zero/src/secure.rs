@@ -445,6 +445,8 @@ pub struct Secure {
     descargas: PathBuf,
     identidad: Identity,
     agenda: Agenda,
+    /// Identities this person blocked (Ed25519, base64): their calls end at the greeting.
+    bloqueados: Vec<String>,
     nombre_contacto: String,
     fase: Fase,
     enlace: Option<Enlace>,
@@ -648,9 +650,14 @@ impl Secure {
             .ok()
             .and_then(|s| Agenda::from_json(&s).ok())
             .unwrap_or_default();
+        let bloqueados = std::fs::read_to_string(carpeta.join("bloqueados.json"))
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
         let mut s = Self {
             datos: carpeta,
             descargas: descargas.to_path_buf(),
+            bloqueados,
             identidad,
             agenda,
             nombre_contacto: String::new(),
@@ -827,11 +834,45 @@ impl Secure {
         Ok(puerto)
     }
 
-    /// Connect to the other computer. `direccion` is `host:puerto`; it is used now and kept
-    /// nowhere.
+    /// This computer's GUARDIANA number (1.0.42): from its identity key, the same forever.
+    #[must_use]
+    pub fn numero_propio(&self) -> String {
+        agenda::numero(self.identidad.signing_key())
+    }
+
+    /// Block the person on the other end (their identity, not their number), and end.
+    pub fn bloquear(&mut self) {
+        if let Some(t) = &self.tarjeta_otra {
+            let k = t.signing().to_base64();
+            if !self.bloqueados.contains(&k) {
+                self.bloqueados.push(k);
+                let _ = std::fs::write(
+                    self.datos.join("bloqueados.json"),
+                    serde_json::to_string(&self.bloqueados).unwrap_or_default(),
+                );
+            }
+        }
+        self.cerrar("bloqueado por la persona");
+    }
+
+    /// Connect to the other computer. `direccion` is `host:puerto`, an invitation code or a
+    /// GUARDIANA number; it is used now and kept nowhere.
     pub fn conectar(&mut self, direccion: &str) -> Result<(), String> {
         self.cerrar("nueva conexión");
-        if let Some(sala) = crate::rele::sala_de(direccion) {
+        let por_numero = crate::rele::sala_de_numero(direccion);
+        if let Some(n) = por_numero.as_ref().and(agenda::lee_numero(direccion)) {
+            // Calling a number saved in the book: whoever answers must hold the key verified
+            // for it, or the conversation stops as a possible impersonation (see `hola`).
+            if let Some(c) = self
+                .agenda
+                .contactos()
+                .iter()
+                .find(|c| agenda::numero_de_base64(&c.signing).as_deref() == Some(n.as_str()))
+            {
+                self.nombre_contacto = c.nombre.clone();
+            }
+        }
+        if let Some(sala) = por_numero.or_else(|| crate::rele::sala_de(direccion)) {
             // The other person waits at a relay: go to all of them and keep the one where
             // the pair completes.
             let (tx, rx) = mpsc::channel();
@@ -1512,6 +1553,10 @@ impl Secure {
         };
         if t.signing() == self.identidad.signing_key() {
             self.cerrar("es este mismo ordenador");
+            return;
+        }
+        if self.bloqueados.contains(&t.signing().to_base64()) {
+            self.cerrar("identidad bloqueada");
             return;
         }
         self.tarjeta_otra = Some(t);
@@ -3797,7 +3842,9 @@ impl Secure {
             "mensajes": self.mensajes.iter().rev().take(300).rev().map(Mensaje::json).collect::<Vec<_>>(),
             "escribiendo": self.otro_escribiendo(),
             "archivos": true,
-            "contactos": self.agenda.contactos().iter().map(|c| json!({ "nombre": c.nombre, "verificado_en": c.verificado_en, "estado": matches!(c.estado, agenda::Estado::Verificado) })).collect::<Vec<_>>(),
+            "contactos": self.agenda.contactos().iter().map(|c| json!({ "nombre": c.nombre, "verificado_en": c.verificado_en, "estado": matches!(c.estado, agenda::Estado::Verificado), "numero": agenda::numero_de_base64(&c.signing) })).collect::<Vec<_>>(),
+            "mi_numero": self.numero_propio(),
+            "numero_otro": self.tarjeta_otra.as_ref().map(|t| agenda::numero(t.signing())),
             "monitor": monitor,
             "vigia": {
                 "este": self.vigia.veredicto(self.inicio),

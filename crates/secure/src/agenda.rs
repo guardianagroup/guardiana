@@ -205,6 +205,63 @@ pub fn huella(a: Ed25519PublicKey, b: Ed25519PublicKey) -> String {
     grupos.join(" ")
 }
 
+/// The GUARDIANA number of an identity (1.0.42, the owner with ChatGPT and Grok): eleven digits
+/// from the Ed25519 key (SHA-256, «GUARDIANA número V1») and a Luhn check digit, written
+/// `XXXX-XXXX-XXXX`. It is an address to find someone, not a proof of who answers: the key is
+/// compared on every conversation (the safety numbers, the pinned contact), never the number.
+pub fn numero(k: Ed25519PublicKey) -> String {
+    use sha2::{Digest as _, Sha256};
+    let h = Sha256::digest([b"GUARDIANA numero V1".as_slice(), k.as_bytes().as_slice()].concat());
+    let n = u64::from_be_bytes([h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7]]) % 100_000_000_000;
+    let mut cifras: Vec<u8> = format!("{n:011}").bytes().map(|b| b - b'0').collect();
+    cifras.push(luhn(&cifras));
+    let s: String = cifras.iter().map(|d| char::from(b'0' + d)).collect();
+    format!("{}-{}-{}", &s[..4], &s[4..8], &s[8..])
+}
+
+/// The number of a key kept in base64 (a contact in the book).
+pub fn numero_de_base64(k: &str) -> Option<String> {
+    Ed25519PublicKey::from_base64(k).ok().map(numero)
+}
+
+/// The Luhn check digit of `cifras` (each 0–9).
+fn luhn(cifras: &[u8]) -> u8 {
+    let suma: u32 = cifras
+        .iter()
+        .rev()
+        .enumerate()
+        .map(|(i, &d)| {
+            let d = u32::from(d);
+            if i % 2 == 0 {
+                let x = d * 2;
+                if x > 9 {
+                    x - 9
+                } else {
+                    x
+                }
+            } else {
+                d
+            }
+        })
+        .sum();
+    ((10 - suma % 10) % 10) as u8
+}
+
+/// The digits of a GUARDIANA number typed by a person (spaces, dashes and dots do not matter),
+/// if it is twelve digits with a right check digit.
+pub fn lee_numero(texto: &str) -> Option<String> {
+    let cifras: Vec<u8> = texto
+        .chars()
+        .filter(|c| !matches!(c, ' ' | '-' | '.' | '\u{a0}'))
+        .map(|c| c.to_digit(10).map(|d| d as u8))
+        .collect::<Option<Vec<u8>>>()?;
+    if cifras.len() != 12 || luhn(&cifras[..11]) != cifras[11] {
+        return None;
+    }
+    let s: String = cifras.iter().map(|d| char::from(b'0' + d)).collect();
+    Some(format!("{}-{}-{}", &s[..4], &s[4..8], &s[8..]))
+}
+
 /// The short form of one key for a screen: the first and last four base64 characters.
 pub fn huella_corta(k: Ed25519PublicKey) -> String {
     let b = k.to_base64();
@@ -228,6 +285,30 @@ pub fn huella_corta(k: Ed25519PublicKey) -> String {
 mod tests {
     use super::*;
     use crate::Identity;
+
+    #[test]
+    fn the_number_is_twelve_digits_with_a_check_and_a_typo_is_caught() {
+        let k = Identity::new().signing_key();
+        let n = numero(k);
+        assert_eq!(n.len(), 14);
+        assert_eq!(numero(k), n);
+        assert_eq!(lee_numero(&n).as_deref(), Some(n.as_str()));
+        assert_eq!(
+            lee_numero(&n.replace('-', " ")).as_deref(),
+            Some(n.as_str())
+        );
+        // One digit wrong: the check digit says so.
+        let mut mal: Vec<char> = n.chars().collect();
+        mal[0] = if mal[0] == '9' {
+            '8'
+        } else {
+            char::from(mal[0] as u8 + 1)
+        };
+        let mal: String = mal.into_iter().collect();
+        assert!(lee_numero(&mal).is_none());
+        assert!(lee_numero("GR-ABCD-EFGH-IJK").is_none());
+        assert_ne!(numero(Identity::new().signing_key()), n);
+    }
 
     #[test]
     fn a_changed_key_blocks_the_name_until_it_is_pinned_again() {

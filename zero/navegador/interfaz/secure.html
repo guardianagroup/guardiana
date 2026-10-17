@@ -261,6 +261,17 @@ main { min-height: 0; overflow: auto; padding: 24px 28px 36px; display: grid; ga
 .modo .t { font-size: 14px; line-height: 1.55; max-width: 28ch; align-self: start; }
 .modo .modo-boton { margin-top: 6px; padding: 9px 18px; border-radius: 10px; background: var(--accent); color: var(--accent-fg); font: 500 13.5px var(--texto); }
 @media (max-width: 1000px) { .modos { grid-template-columns: 1fr; max-width: 520px; } .modo { min-height: 0; } .inicio { min-height: 0; } }
+/* 1.0.42: one button to start; the other two are quiet links under it. */
+.inicio-uno { display: grid; gap: 14px; justify-items: center; max-width: 460px; }
+.nueva-conv { display: inline-flex; align-items: center; gap: 10px; padding: 16px 34px; border-radius: 14px; font: 600 18px/1 var(--display); cursor: pointer; box-shadow: 0 12px 30px color-mix(in srgb, var(--accent) 22%, transparent); }
+.nueva-conv .icono { width: 22px; height: 22px; }
+.inicio-uno > .t { margin: 0; font-size: 14.5px; line-height: 1.55; max-width: 40ch; }
+.inicio-otros { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; margin-top: 8px; font-size: 15px; }
+.inicio-otros span { color: var(--muted, #8892a6); }
+.inicio-pie { margin: 22px 0 0; font-size: 12.5px; opacity: .75; }
+.c-sala-pc { margin: 4px 0 0; font-size: 13.5px; }
+.c-sala-num { font: 600 18px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .06em; padding: 6px 10px; border-radius: 8px; background: var(--accent-suave); color: var(--accent); white-space: nowrap; }
+.c-sala-pc b { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: .04em; user-select: all; }
 .modo-cab { display: flex; align-items: center; gap: 14px; padding: 10px 14px; }
 .modo-cab b { font: 600 15px/1.2 var(--display); }
 .modo-movil { display: grid; gap: 12px; }
@@ -534,6 +545,54 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
   .secure.en-llamada .viaje { flex: none; display: grid; }
   .secure.en-llamada aside.monitor > h2, .secure.en-llamada .panel-ilu { display: none; }
 }
+
+/* 1.0.42 (17 Oct 2026, the owner with a ChatGPT mock: «el tipo de botonería… de su propio chat…
+   muy profesionales»): inside Comunicaciones the buttons become pills, the cards get large round
+   corners and the writing bar floats. Only this page: diseno.css stays the same for the panel. */
+.secure .boton, .secure .btn { border-radius: var(--r-pill); }
+.secure .boton.icono-solo, .secure .escribir .boton.principal, .secure .escribir #c-microfono, .secure .boton.redondo { border-radius: 50%; }
+.secure .tarjeta, .secure .c-lado, .secure .c-codigo, .secure .llamada, .secure .timbre { border-radius: 22px; }
+.secure .campo { border-radius: 14px; }
+.secure .lista li { border-radius: 16px; }
+.secure .chat { box-shadow: var(--sombra); }
+.secure .escribir { margin: 0 14px 14px; padding: 8px 8px 8px 12px; border: 1px solid var(--line); border-radius: 28px; background: var(--card); box-shadow: var(--sombra); }
+.secure .escribir .campo { border: 0; background: transparent; box-shadow: none; padding: 10px 6px; }
+.secure .escribir .campo:focus { box-shadow: none; background: transparent; }
+.secure .mensajes li { border-radius: 20px; }
+/* The GUARDIANA number, the way to call one, and the contacts. */
+.numero-g { display: grid; gap: 6px; margin-top: 22px; padding: 18px 20px; border-radius: 22px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--sombra); text-align: left; }
+.numero-g[hidden], .agenda-g[hidden], .llamar-num-error[hidden], .quien-num[hidden] { display: none; }
+.ng-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ng-fila b { font: 600 clamp(22px, 2.6vw, 30px)/1.1 var(--mono); letter-spacing: .06em; font-variant-numeric: tabular-nums; user-select: all; }
+.numero-g .t { margin: 0; font-size: 12.5px; }
+.llamar-num { display: flex; gap: 8px; margin-top: 12px; padding: 6px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--card); }
+.llamar-num .campo { flex: 1; min-width: 0; border: 0; background: transparent; font: 600 16px var(--mono); letter-spacing: .06em; padding: 8px 14px; }
+.llamar-num .campo:focus { box-shadow: none; }
+.llamar-num-error { color: var(--alerta); margin: 6px 0 0; }
+.agenda-g { display: grid; gap: 8px; margin-top: 18px; text-align: left; }
+.agenda-g ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.agenda-g li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); }
+.agenda-g li .avatar { width: 36px; height: 36px; border-radius: 50%; font-size: 14px; }
+.agenda-g li .ag-quien { display: grid; gap: 1px; flex: 1; min-width: 0; }
+.agenda-g li .ag-quien b { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agenda-g li .ag-quien span { font: 12px var(--mono); color: var(--muted); }
+.c-bloquear { margin-left: auto; color: var(--alerta); font-size: 13px; }
+.quien-num { font: 500 13px var(--mono); }
+/* The protection is felt the whole time (the owner: «la persona tiene que sentir el monitoreo
+   constante»): the state at the top is a pill with a dot that beats while GUARDIANA watches. */
+header.top #m-estado-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; font: 600 12px/1 var(--texto); letter-spacing: .02em; text-transform: none; }
+header.top #m-estado-chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+header.top #m-estado-chip.ok { background: var(--ok-suave); border-color: transparent; }
+header.top #m-estado-chip.ok::before { animation: latido 1.6s ease-out infinite; }
+header.top #m-estado-chip.aviso { background: var(--aviso-suave); border-color: transparent; }
+header.top #m-estado-chip.alerta { background: var(--alerta-suave); border-color: transparent; }
+@media (prefers-reduced-motion: reduce) { header.top #m-estado-chip.ok::before { animation: none; } }
+.numero-g, .llamar-num, .agenda-g, .llamar-num-error { width: 100%; max-width: 460px; margin-inline: auto; box-sizing: border-box; }
+.llamar-num .campo::placeholder { font: 400 14px var(--texto); letter-spacing: 0; }
+/* A phone waiting at the door: its name, then its four digits and «Dejar entrar» on a line of
+   their own, so they fit the narrow column. */
+.c-sala-miembros li { grid-template-columns: auto 1fr; row-gap: 8px; }
+.c-sala-miembros li .c-sala-acc { grid-column: 2; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -555,25 +614,36 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
   <section class="inicio" id="c-inicio">
     <h2 class="inicio-titulo" data-t="sec_inicio_titulo"></h2>
     <p class="t inicio-frase" data-t="sec_inicio_frase"></p>
-    <div class="modos">
-      <button type="button" class="modo" data-modo="equipos">
-        <span class="modo-icono"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="9" height="7" rx="1.5"/><rect x="13" y="12" width="9" height="7" rx="1.5"/><path d="M6.5 12v3M17.5 9v3M4 15h5M15 22h5"/></svg></span>
-        <b data-t="sec_modo_equipos"></b>
-        <span class="t" data-t="sec_modo_equipos_texto"></span>
-        <span class="modo-boton" data-t="sec_modo_equipos_boton"></span>
+    <!-- One way to start (1.0.42, the owner with ChatGPT and Grok): one invitation, a QR code and
+         a link; whoever opens it chooses there whether to talk on that phone or on their PC. -->
+    <div class="inicio-uno">
+      <button type="button" class="boton principal nueva-conv" data-modo="sala">
+        <svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        <span data-t="sec_nueva_conv"></span>
       </button>
-      <button type="button" class="modo" data-modo="movil">
-        <span class="modo-icono"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="12" height="9" rx="1.5"/><rect x="16" y="7" width="6" height="12" rx="1.5"/><path d="M5 16h6M19 16v.01"/></svg></span>
-        <b data-t="sec_modo_movil"></b>
-        <span class="t" data-t="sec_modo_movil_texto"></span>
-        <span class="modo-boton" data-t="sec_modo_movil_boton"></span>
-      </button>
-      <button type="button" class="modo" data-modo="sala">
-        <span class="modo-icono"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="7" height="14" rx="1.5"/><rect x="14" y="5" width="7" height="14" rx="1.5"/><path d="M6.5 16.5v.01M17.5 16.5v.01M10 11h4"/></svg></span>
-        <b data-t="sec_modo_sala"></b>
-        <span class="t" data-t="sec_modo_sala_texto"></span>
-        <span class="modo-boton" data-t="sec_modo_sala_boton"></span>
-      </button>
+      <p class="t" data-t="sec_nueva_conv_texto"></p>
+      <div class="inicio-otros">
+        <button type="button" class="enlace" data-modo="equipos" data-t="sec_inicio_invitacion"></button>
+        <span aria-hidden="true">·</span>
+        <button type="button" class="enlace" data-modo="movil" data-t="sec_inicio_mi_movil"></button>
+      </div>
+      <!-- 1.0.42: the GUARDIANA number, given once at install and kept for good; whoever has it can
+           call this PC without a QR. The first call compares three numbers, as always. -->
+      <section class="numero-g" id="c-mi-numero-caja" hidden>
+        <span class="rotulo" data-t="sec_num_tuyo"></span>
+        <div class="ng-fila"><b id="c-mi-numero"></b><button type="button" class="boton chico" id="c-mi-numero-copiar" data-t="sec_c_copiar"></button></div>
+        <p class="t" data-t="sec_num_tuyo_texto"></p>
+      </section>
+      <form class="llamar-num" id="c-llamar-num" autocomplete="off">
+        <input class="campo" id="c-llamar-num-campo" inputmode="numeric" maxlength="14" data-t-ph="sec_num_llamar_ph" spellcheck="false">
+        <button type="submit" class="boton principal" data-t="sec_num_llamar"></button>
+      </form>
+      <p class="t llamar-num-error" id="c-llamar-num-error" hidden data-t="sec_num_mal"></p>
+      <section class="agenda-g" id="c-agenda" hidden>
+        <span class="rotulo" data-t="sec_num_contactos"></span>
+        <ul id="c-agenda-lista"></ul>
+      </section>
+      <p class="t inicio-pie" data-t="sec_inicio_pie"></p>
     </div>
   </section>
 
@@ -615,6 +685,7 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
         <p class="t" id="c-sala-hasta"></p>
         <p class="t" data-t="sec_sala_escanea"></p>
         <div class="qr" id="c-sala-qr"></div>
+        <p class="c-sala-pc" id="c-sala-pc" hidden><span data-t="sec_sala_codigo_pc"></span> <b id="c-sala-pc-codigo"></b></p>
         <div class="c-fila c-enviar"><button type="button" class="boton chico" id="c-sala-copiar" data-t="sec_sala_copiar"></button><button type="button" class="boton chico secundario" id="c-sala-whatsapp" data-t="sec_c_whatsapp"></button></div>
         <p class="c-sala-sub" data-t="sec_sala_en"></p>
         <ul class="c-sala-miembros" id="c-sala-miembros"></ul>
@@ -654,10 +725,11 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
   <section class="tarjeta comparar" id="c-comparar" hidden>
     <h2 data-t="sec_s_titulo"></h2>
     <p class="t quien" id="c-comparar-quien"></p>
+    <p class="t quien-num" id="c-comparar-num" hidden></p>
     <p class="t" data-t="sec_s_texto"></p>
     <div class="numeros" id="c-numeros"></div>
     <label class="c-nombre"><span data-t="sec_s_nombre"></span><input class="campo" id="c-nombre" data-t-ph="sec_s_nombre_ph" autocomplete="off"></label>
-    <div class="c-fila"><button type="button" class="boton deja" id="c-sas-si" data-t="sec_s_iguales"></button><button type="button" class="boton corta" id="c-sas-no" data-t="sec_s_distintos"></button></div>
+    <div class="c-fila"><button type="button" class="boton deja" id="c-sas-si" data-t="sec_s_iguales"></button><button type="button" class="boton corta" id="c-sas-no" data-t="sec_s_distintos"></button><button type="button" class="enlace c-bloquear" id="c-bloquear" data-t="sec_num_bloquear"></button></div>
   </section>
 
   <section class="tarjeta espera" id="c-espera" hidden><p class="t" id="c-espera-texto"></p></section>

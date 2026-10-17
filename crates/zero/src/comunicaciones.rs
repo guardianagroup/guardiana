@@ -50,6 +50,9 @@ pub struct Comunicaciones {
     sala: Option<Sala>,
     /// The person's downloads: the room's files are kept there.
     descargas: PathBuf,
+    /// Links that came in through this computer's GUARDIANA number (1.0.42), once
+    /// [`Comunicaciones::abre_buzon`] opened the mailbox at the relay.
+    buzon: Option<std::sync::mpsc::Receiver<std::net::TcpStream>>,
 }
 
 fn texto<'a>(m: &'a Value, k: &str) -> &'a str {
@@ -66,6 +69,15 @@ impl Comunicaciones {
             secure,
             sala: None,
             descargas: descargas.to_path_buf(),
+            buzon: None,
+        }
+    }
+
+    /// Wait at the relay in the room of this computer's number, so others can call it
+    /// (1.0.42). The program does it once at start; the tests do not.
+    pub fn abre_buzon(&mut self) {
+        if self.buzon.is_none() {
+            self.buzon = crate::rele::buzon(&self.secure.numero_propio());
         }
     }
 
@@ -86,6 +98,18 @@ impl Comunicaciones {
     pub fn estado_json(&self) -> Value {
         let mut e = self.secure.estado_json();
         e["sala"] = self.sala.as_ref().map_or(Value::Null, Sala::json);
+        // 1.0.42: while this computer also waits for a PC, the room's link and QR code carry
+        // that code too, so there is a single invitation.
+        let codigo = (e["fase"] == "escuchando")
+            .then(|| e["rele_codigo"].as_str().or_else(|| e["codigo"].as_str()))
+            .flatten()
+            .map(str::to_owned);
+        if let (Some(s), Some(c)) = (&self.sala, codigo) {
+            let enlace = s.enlace_con(Some(&c));
+            e["sala"]["qr"] = json!(guardiana_secure::tarjeta::qr_svg(&enlace).ok());
+            e["sala"]["enlace"] = json!(enlace);
+            e["sala"]["codigo_pc"] = json!(c);
+        }
         e
     }
 
@@ -94,6 +118,16 @@ impl Comunicaciones {
     /// (WebRTC messages, pieces of a call) is dropped and the notices wait for it, as they
     /// always did in the browser.
     pub fn tic(&mut self, pagina: bool) -> Vec<Value> {
+        // Someone dialled this number: the conversation takes the link if it is free; if it is
+        // busy the link is dropped and the caller sees the call fail.
+        let llegados: Vec<std::net::TcpStream> = self
+            .buzon
+            .as_ref()
+            .map(|r| r.try_iter().collect())
+            .unwrap_or_default();
+        for s in llegados {
+            let _ = self.secure.entra_por_numero(s);
+        }
         self.secure.tic();
         let mut o = Vec::new();
         let mut sala_cambio = false;
@@ -146,17 +180,23 @@ impl Comunicaciones {
 
     /// Whether a SECURE conversation is open (the window then watches and hides from captures).
     pub fn conversando(&self) -> bool {
-        self.secure.conversando()
+        self.secure.conversando() || self.sala.as_ref().is_some_and(Sala::en_llamada)
     }
 
     /// What Windows recorded about the microphone, the camera and the screen (17 Oct 2026).
     pub fn vigia(&mut self, usos: &[crate::vigia::Uso]) {
         self.secure.vigia(usos);
+        if let Some(s) = &mut self.sala {
+            s.vigia(usos);
+        }
     }
 
     /// Whether the window could keep itself out of screenshots and recordings.
     pub fn pantalla(&mut self, si: bool) {
         self.secure.pantalla(si);
+        if let Some(s) = &mut self.sala {
+            s.pantalla(si);
+        }
     }
 
     /// What the Comunicaciones page asks for (`{"tipo":"secure","accion":…}`).
@@ -168,6 +208,10 @@ impl Comunicaciones {
                 .escuchar(u16::try_from(m["puerto"].as_u64().unwrap_or(0)).unwrap_or(0))
                 .map(|_| ()),
             "conectar" => self.secure.conectar(texto(m, "direccion")),
+            "bloquear" => {
+                self.secure.bloquear();
+                Ok(())
+            }
             "cerrar" => {
                 self.secure.cerrar("la persona cerró");
                 Ok(())
@@ -234,6 +278,12 @@ impl Comunicaciones {
                 self.secure.olvida_informe();
                 Ok(())
             }
+            "sala_informe_visto" => {
+                if let Some(s) = &mut self.sala {
+                    s.informe_visto();
+                }
+                Ok(())
+            }
             "nombre" => {
                 self.secure.nombre_propio = texto(m, "nombre").chars().take(60).collect();
                 Ok(())
@@ -244,10 +294,9 @@ impl Comunicaciones {
             "archivo_trozo" => self
                 .secure
                 .archivo_trozo(texto(m, "b64"), m["ultimo"].as_bool().unwrap_or(false)),
-            "reanudar" => {
-                self.secure.reanudar_a_mano();
-                Ok(())
-            }
+            // 1.0.42 (committee with ChatGPT and Grok): a stop for something seen cannot be
+            // skipped from the screen any more; it resumes on its own once the cause is gone.
+            "reanudar" => Ok(()),
             "llamar" => self
                 .secure
                 .llamar(m["video"].as_bool().unwrap_or(false), texto(m, "mime")),
