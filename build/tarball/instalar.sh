@@ -29,6 +29,30 @@ install -d -m 755 /usr/local/share/doc/guardiana
 for f in LEEME.txt README.txt LEIAME.txt WHAT_IT_DOES_NOT_DO.md VERIFY.md HOGAR.md LISTS.md; do
     [ -f "$here/$f" ] && install -m 644 "$here/$f" /usr/local/share/doc/guardiana/
 done
+# Comunicaciones (chat and calls) in the applications menu, the same entry the .deb ships
+# (build/deb/guardiana-comunicaciones.desktop), written here so the tarball carries no extra file.
+# It runs as whoever clicks it, never as root: the conversation's keys stay in that person's folder.
+install -d -m 755 /usr/local/share/applications
+cat > /usr/local/share/applications/guardiana-comunicaciones.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=GUARDIANA Comunicaciones
+Name[es]=GUARDIANA Comunicaciones
+Name[en]=GUARDIANA Communications
+Name[pt]=GUARDIANA Comunicações
+Comment=Chat y llamadas cifradas de GUARDIANA SECURE, en tu navegador
+Comment[es]=Chat y llamadas cifradas de GUARDIANA SECURE, en tu navegador
+Comment[en]=GUARDIANA SECURE encrypted chat and calls, in your browser
+Comment[pt]=Chat e chamadas cifradas do GUARDIANA SECURE, no seu navegador
+Exec=/usr/local/bin/guardiana comunicaciones
+Icon=guardiana
+Terminal=false
+Categories=Network;Chat;
+Keywords=GUARDIANA;SECURE;chat;llamadas;calls;chamadas;
+StartupNotify=false
+EOF
+chmod 644 /usr/local/share/applications/guardiana-comunicaciones.desktop
 # Writes the unit (the same one the .deb ships) and restarts the service, so an update over a
 # running copy picks up the new program and the new unit, not only the next boot.
 /usr/local/bin/guardiana service install
@@ -41,6 +65,9 @@ if systemctl is-active --quiet guardiana; then
     m "GUARDIANA instalada y en marcha. Para abrir el panel: sudo guardiana panel" \
       "GUARDIANA is installed and running. To open the panel: sudo guardiana panel" \
       "A GUARDIANA está instalada e funcionando. Para abrir o painel: sudo guardiana panel"
+    m "Comunicaciones (chat y llamadas): en el menú de aplicaciones, «GUARDIANA Comunicaciones», o con tu usuario y sin sudo: guardiana comunicaciones" \
+      "Communications (chat and calls): in the applications menu, “GUARDIANA Communications”, or as your own user and without sudo: guardiana comunicaciones" \
+      "Comunicações (chat e chamadas): no menu de aplicativos, «GUARDIANA Comunicações», ou com o seu usuário e sem sudo: guardiana comunicaciones"
 else
     m "GUARDIANA está instalada, pero el servicio no está en marcha. Mira por qué con: journalctl -u guardiana -n 20" \
       "GUARDIANA is installed, but the service is not running. See why with: journalctl -u guardiana -n 20" \

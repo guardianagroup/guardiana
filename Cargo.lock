@@ -792,6 +792,7 @@ dependencies = [
 name = "guardiana-cli"
 version = "1.0.41"
 dependencies = [
+ "axum",
  "getrandom 0.4.3",
  "guardiana-apps",
  "guardiana-classify",
@@ -803,6 +804,7 @@ dependencies = [
  "guardiana-panel",
  "guardiana-service",
  "guardiana-verify",
+ "guardiana-zero",
  "libc",
  "serde_json",
  "tokio",
