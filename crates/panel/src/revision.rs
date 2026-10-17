@@ -58,6 +58,11 @@ pub(crate) struct Vivo {
     hechas: Vec<(String, u64)>,
     /// Files whose signature was read so far.
     firmas: u32,
+    /// Of those, the ones without a valid signature (17 Oct 2026: shown as they come).
+    sin_firma: u32,
+    /// How many steps there have been since the review started: the page animates each new one
+    /// even when several arrive between two looks.
+    n: u64,
     /// How many items each list had (`tareas` → 41).
     cuentas: Vec<(String, u64)>,
     /// The last steps, newest last: (kind, text).
@@ -73,7 +78,14 @@ impl Vivo {
                 self.hechas
                     .push((s.to_owned(), ms.trim().parse().unwrap_or(0)));
             }
-            "firma" => self.firmas += 1,
+            "firma" => {
+                self.firmas += 1;
+                // `name<TAB>status<TAB>signer` since 17 Oct 2026; older scripts sent the name only.
+                let estado = texto.split('\t').nth(1).unwrap_or("");
+                if !estado.is_empty() && estado != "Valid" {
+                    self.sin_firma += 1;
+                }
+            }
             "cuenta" => {
                 let (s, n) = texto.split_once('\t').unwrap_or((texto, "0"));
                 self.cuentas
@@ -86,7 +98,8 @@ impl Vivo {
                 tipo.chars().take(16).collect(),
                 texto.chars().take(160).collect(),
             ));
-            while self.pasos.len() > 14 {
+            self.n += 1;
+            while self.pasos.len() > 60 {
                 self.pasos.pop_front();
             }
         }
@@ -1681,8 +1694,11 @@ mod tests {
         assert_eq!(v.firmas, 30);
         assert_eq!(v.cuentas, vec![("tareas".to_owned(), 41)]);
         assert_eq!(v.hechas, vec![("arranque".to_owned(), 5120)]);
-        assert_eq!(v.pasos.len(), 14);
-        assert_eq!(v.pasos.back().unwrap().0, "cuenta");
+        assert_eq!(v.pasos.len(), 31);
+        assert_eq!(v.n, 32);
+        v.anota("firma", "x.exe\tNotSigned\t");
+        v.anota("firma", "y.exe\tValid\tMicrosoft Corporation");
+        assert_eq!((v.firmas, v.sin_firma), (32, 1));
     }
 
     #[test]

@@ -41,10 +41,10 @@ function Firma([string]$ruta) {
   try {
     if (Test-Path -LiteralPath $ruta -PathType Leaf) {
       $f.existe = $true
-      Paso 'firma' (Split-Path -Leaf $ruta)
       $s = Get-AuthenticodeSignature -LiteralPath $ruta
       $f.estado = [string]$s.Status
       if ($s.SignerCertificate) { $f.firmante = $s.SignerCertificate.GetNameInfo([Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false) }
+      Paso 'firma' ((Split-Path -Leaf $ruta) + "`t" + $f.estado + "`t" + $f.firmante)
     }
   } catch {}
   $FIRMAS[$ruta] = $f
