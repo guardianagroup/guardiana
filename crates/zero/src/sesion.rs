@@ -673,8 +673,12 @@ impl Sesion {
         } else {
             Idioma::de_etiqueta(&prefs.idioma)
         };
-        let comunicaciones =
+        let mut comunicaciones =
             crate::comunicaciones::Comunicaciones::abre(&a.datos, &a.descargas, &a.version);
+        if !cfg!(test) {
+            // 1.0.42: others can call this computer by its GUARDIANA number.
+            comunicaciones.abre_buzon();
+        }
         let mut s = Self {
             datos: a.datos,
             descargas: a.descargas,

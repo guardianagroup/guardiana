@@ -420,6 +420,8 @@ struct Motor {
 impl Motor {
     fn corre(&self, entradas: &mpsc::Receiver<Entrada>, c: &Compartido) {
         let mut com = Comunicaciones::abre(&self.datos, &self.descargas, env!("CARGO_PKG_VERSION"));
+        // 1.0.42: others can call this computer by its GUARDIANA number.
+        com.abre_buzon();
         let arranque = Instant::now();
         let mut proximo = Instant::now();
         loop {

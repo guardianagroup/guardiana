@@ -165,6 +165,33 @@ impl Grupo {
         self.cambio = true;
     }
 
+    /// This computer's GUARDIANA number (1.0.42).
+    pub fn numero_propio(&self) -> String {
+        self.sesiones
+            .first()
+            .map(Secure::numero_propio)
+            .unwrap_or_default()
+    }
+
+    /// Someone dialled this computer's number and the relay paired them (1.0.42): take the
+    /// link when nothing else is going on; `false` (busy) otherwise, and the link is dropped.
+    pub fn entra_por_numero(&mut self, s: std::net::TcpStream) -> bool {
+        if self.anfitrion || !self.sesiones.iter().all(Secure::sola) {
+            return false;
+        }
+        self.cierra_todo("llamada por número");
+        self.primera().adopta_enlace(s, true);
+        true
+    }
+
+    /// Block the person being verified or talked to, and end with them.
+    pub fn bloquear(&mut self) {
+        if let Some(s) = self.sesiones.iter_mut().rev().find(|s| !s.sola()) {
+            s.bloquear();
+        }
+        self.cambio = true;
+    }
+
     /// Close the conversation (every link).
     pub fn cerrar(&mut self, por: &str) {
         self.cierra_todo(por);

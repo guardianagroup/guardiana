@@ -175,6 +175,37 @@ pub fn sala_de(texto: &str) -> Option<String> {
     Some(h[..16].iter().map(|x| format!("{x:02x}")).collect())
 }
 
+/// The room of a GUARDIANA number (1.0.42): a hash of its twelve digits, so the relay never
+/// learns the number either. `None` if the text is not a number with a right check digit.
+pub fn sala_de_numero(texto: &str) -> Option<String> {
+    let n = guardiana_secure::agenda::lee_numero(texto)?;
+    let h = Sha256::digest(format!("GUARDIANA SECURE numero {n}").as_bytes());
+    Some(h[..16].iter().map(|x| format!("{x:02x}")).collect())
+}
+
+/// This computer's mailbox at its relay (1.0.42): it waits in the room of its own number and
+/// hands over every link that pairs there, one after another, for as long as the program runs.
+/// What comes in is only a link: the conversation still greets, checks the keys and asks for
+/// the safety numbers like any other.
+pub fn buzon(numero: &str) -> Option<mpsc::Receiver<TcpStream>> {
+    let sala = sala_de_numero(numero)?;
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        mide_cercania();
+        loop {
+            match conecta(&direccion(), &sala) {
+                Ok(s) => {
+                    if tx.send(s).is_err() {
+                        return;
+                    }
+                }
+                Err(_) => std::thread::sleep(Duration::from_secs(5)),
+            }
+        }
+    });
+    Some(rx)
+}
+
 fn abre_hacia(rele: &str) -> Result<TcpStream, String> {
     let addr = rele
         .to_socket_addrs()

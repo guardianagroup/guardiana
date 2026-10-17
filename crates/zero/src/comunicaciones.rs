@@ -50,6 +50,9 @@ pub struct Comunicaciones {
     sala: Option<Sala>,
     /// The person's downloads: the room's files are kept there.
     descargas: PathBuf,
+    /// Links that came in through this computer's GUARDIANA number (1.0.42), once
+    /// [`Comunicaciones::abre_buzon`] opened the mailbox at the relay.
+    buzon: Option<std::sync::mpsc::Receiver<std::net::TcpStream>>,
 }
 
 fn texto<'a>(m: &'a Value, k: &str) -> &'a str {
@@ -66,6 +69,15 @@ impl Comunicaciones {
             secure,
             sala: None,
             descargas: descargas.to_path_buf(),
+            buzon: None,
+        }
+    }
+
+    /// Wait at the relay in the room of this computer's number, so others can call it
+    /// (1.0.42). The program does it once at start; the tests do not.
+    pub fn abre_buzon(&mut self) {
+        if self.buzon.is_none() {
+            self.buzon = crate::rele::buzon(&self.secure.numero_propio());
         }
     }
 
@@ -106,6 +118,16 @@ impl Comunicaciones {
     /// (WebRTC messages, pieces of a call) is dropped and the notices wait for it, as they
     /// always did in the browser.
     pub fn tic(&mut self, pagina: bool) -> Vec<Value> {
+        // Someone dialled this number: the conversation takes the link if it is free; if it is
+        // busy the link is dropped and the caller sees the call fail.
+        let llegados: Vec<std::net::TcpStream> = self
+            .buzon
+            .as_ref()
+            .map(|r| r.try_iter().collect())
+            .unwrap_or_default();
+        for s in llegados {
+            let _ = self.secure.entra_por_numero(s);
+        }
         self.secure.tic();
         let mut o = Vec::new();
         let mut sala_cambio = false;
@@ -180,6 +202,10 @@ impl Comunicaciones {
                 .escuchar(u16::try_from(m["puerto"].as_u64().unwrap_or(0)).unwrap_or(0))
                 .map(|_| ()),
             "conectar" => self.secure.conectar(texto(m, "direccion")),
+            "bloquear" => {
+                self.secure.bloquear();
+                Ok(())
+            }
             "cerrar" => {
                 self.secure.cerrar("la persona cerró");
                 Ok(())
