@@ -100,8 +100,8 @@ main { min-height: 0; overflow: auto; padding: 24px 28px 36px; display: grid; ga
   main.con-chat { display: flex; flex-direction: column; }
   main.con-chat > * { flex: none; }
   main.con-chat > .chat:not([hidden]) { flex: 1 0 0; min-height: 380px; display: flex; flex-direction: column; }
-  main.con-chat > .chat > * { flex: none; }
-  main.con-chat > .chat > .mensajes { flex: 1 1 0; min-height: 0; max-height: none; }
+  main.con-chat > .chat > *, main.con-chat > .chat > .chat-lado > * { flex: none; }
+  main.con-chat > .chat > .mensajes, main.con-chat > .chat .chat-lado > .mensajes { flex: 1 1 0; min-height: 0; max-height: none; }
   .secure.sin-lados main.con-chat > .tarjeta { margin-inline: auto; }
   .col-izq .modo-movil .qr svg { width: 100%; height: auto; }
 }
@@ -381,6 +381,155 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
   .escribir { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); z-index: 5; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
   header.top .miga { display: none; }
 }
+
+/* ---------- The call, as chosen on 17 Oct 2026 («Pulso, con el chat a la izquierda») ----------
+   Narrow: the chat's parts and the call keep one column, the call above the messages.
+   Wide, during a connected call (.en-llamada): the chat on the left, the call and its journey in
+   the middle, the live vitals on the right. */
+.chat-lado { display: contents; }
+.chat-lado > .mensajes, .chat-lado > .zona-archivo, .chat-lado > .c-progreso, .chat-lado > .contexto, .chat-lado > .escribir { order: 2; }
+.chat > .llamada { order: 1; }
+.llamada { display: grid; gap: 12px; padding: 0; border: 0; background: transparent; }
+.escenario { position: relative; border-radius: 18px; overflow: hidden; color: #F4F6FA; aspect-ratio: 16 / 9; max-height: 42vh; min-height: 220px;
+  background: radial-gradient(120% 90% at 50% 40%, #1A2650 0%, #0D1430 55%, #080C1C 100%); }
+.solo-voz .escenario, .llamando .escenario { aspect-ratio: auto; height: 250px; }
+.escenario .pantallas { position: absolute; inset: 0; border-radius: 0; aspect-ratio: auto; background: transparent; }
+.escenario .rejilla { grid-auto-rows: minmax(0, 1fr); }
+.escenario .tile { height: 100%; }
+.llamando .escenario .pantallas { display: none; }
+.escenario .pantallas::after { content: none; }
+.l-avatar { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.con-video .l-avatar { display: none; }
+.l-letra { --voz: 0; width: 112px; height: 112px; border-radius: 50%; background: #5C7CFF; color: #fff; display: grid; place-items: center; font: 600 44px/1 var(--display);
+  box-shadow: 0 0 0 calc(8px + var(--voz) * 16px) rgba(92, 124, 255, calc(.10 + var(--voz) * .14)), 0 0 0 calc(20px + var(--voz) * 26px) rgba(92, 124, 255, .05); transition: box-shadow .12s linear; }
+.llamando .l-letra { animation: llama-anillo 1.6s ease-out infinite; }
+@keyframes llama-anillo { 0% { box-shadow: 0 0 0 0 rgba(92, 124, 255, .45); } 100% { box-shadow: 0 0 0 34px rgba(92, 124, 255, 0); } }
+.l-cab { position: absolute; left: 20px; top: 16px; right: 40%; display: grid; gap: 3px; text-shadow: 0 1px 10px rgba(0, 0, 0, .55); }
+.l-cab b { font: 600 17px/1.2 var(--display); }
+.escenario .l-estado { font: 500 12.5px var(--mono); color: #C9D1E6; }
+.l-voz-otro { justify-self: start; margin-top: 4px; padding: 3px 9px; border-radius: 999px; background: rgba(242, 181, 68, .16); color: #F2B544; font: 500 11.5px var(--texto); }
+.l-voz-otro[hidden] { display: none; }
+.llamada-botones { position: absolute; left: 0; right: 0; bottom: 0; padding: 26px 12px 16px; display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: nowrap; background: linear-gradient(transparent, rgba(5, 8, 20, .78)); }
+.boton.redondo { width: 50px; height: 50px; min-height: 0; padding: 0; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .15); color: #fff; display: grid; place-items: center; }
+.boton.redondo:hover { background: rgba(255, 255, 255, .24); }
+.boton.redondo[aria-pressed="true"] { background: #fff; color: #0B1020; }
+.boton.redondo.colgar { width: 58px; height: 58px; background: #E04A4A; }
+.boton.redondo.colgar:hover { background: #C83B3B; }
+.boton.redondo .icono { width: 22px; height: 22px; }
+.boton.redondo span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.boton.redondo[hidden] { display: none; }
+.boton.redondo:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.escenario #c-local { left: auto; right: 16px; top: 16px; bottom: auto; width: 24%; max-width: 210px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .22); box-shadow: 0 10px 30px rgba(0, 0, 0, .45); }
+.solo-voz #c-local { display: none; }
+.pantallas:fullscreen { position: fixed; }
+/* The journey: this computer, GUARDIANA's relay, the other one; packets on their way, and a
+   voice meter at each end (who is talking). Real figures from the call, every second. */
+.viaje { border: 1px solid var(--line); border-radius: 16px; background: var(--card); padding: 12px 16px 10px; display: none; gap: 2px; }
+.viaje[hidden] { display: none; }
+.vj-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.vj-cifra { font: 500 11.5px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.vj-mapa { width: 100%; height: auto; max-height: 214px; display: block; }
+.vj-ida { fill: none; stroke: url(#vj-arco); stroke-width: 2; opacity: .8; }
+.vj-vuelta { fill: none; stroke: color-mix(in srgb, var(--accent) 45%, transparent); stroke-width: 1.5; stroke-dasharray: 3 6; }
+.vj-sale circle { fill: color-mix(in srgb, var(--accent) 70%, #fff); }
+.vj-llega circle { fill: color-mix(in srgb, var(--ok) 75%, #fff); }
+.vj-paquetes.quieto { opacity: 0; }
+.vj-paquetes { transition: opacity .6s; }
+.vj-halo { opacity: .28; transition: r .12s linear; }
+.vj-halo.yo { fill: #5C7CFF; } .vj-halo.el { fill: #3CC79A; } .vj-halo.rele { fill: #F2B544; opacity: .18; }
+.vj-nodo { fill: var(--card); stroke-width: 2.5; }
+.vj-nodo.yo { stroke: #5C7CFF; } .vj-nodo.el { stroke: #3CC79A; } .vj-nodo.rele { stroke: #F2B544; }
+.directo .vj-nodo.rele, .directo .vj-halo.rele { opacity: 0; }
+.directo .vj-t.rele { fill: var(--ok); }
+.vj-t { font: 500 11px var(--texto); fill: var(--muted); text-anchor: middle; }
+.vj-t.rele { font: 600 12.5px var(--texto); fill: #C98A12; }
+.vj-t.nombre { font: 600 13px var(--texto); fill: var(--fg); }
+.vj-t.estado { font: 500 10.5px var(--mono); }
+.vj-t.estado.habla.yo { fill: #5C7CFF; } .vj-t.estado.habla.el { fill: var(--ok); }
+.vj-barras rect { transition: y .12s linear, height .12s linear; }
+.vj-barras.yo rect { fill: #5C7CFF; } .vj-barras.el rect { fill: #3CC79A; }
+.vj-pie { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 16px; font: 500 11.5px var(--mono); color: var(--muted); }
+.vj-pie .ok { color: var(--ok); }
+/* The live vitals on the right: the round trip as a pulse, four small graphs. */
+.vivo { display: grid; gap: 10px; }
+.vivo[hidden] { display: none; }
+.vp { border: 1px solid var(--line); border-radius: 16px; background: var(--card); padding: 14px 16px 12px; display: grid; gap: 10px; }
+.vp-cab { display: flex; align-items: center; gap: 10px; }
+.vp-cab .latido { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); }
+.vp-cab .latido.vivo { animation: late 1.6s infinite; }
+.vp-cab b { font: 600 22px/1.1 var(--display); color: var(--ok); }
+.vivo.pausada .vp-cab b { color: var(--alerta); } .vivo.pausada .vp-cab .latido { background: var(--alerta); animation: none; }
+.vp-cab span { margin-left: auto; font: 500 11px var(--mono); color: var(--muted); }
+.vp-grafico { position: relative; height: 92px; border-radius: 10px; overflow: hidden; background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--fg) 4%, transparent) 0 1px, transparent 1px 22px), repeating-linear-gradient(0deg, color-mix(in srgb, var(--fg) 4%, transparent) 0 1px, transparent 1px 23px), var(--campo); }
+.vp-grafico svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+#vp-area { fill: color-mix(in srgb, var(--ok) 12%, transparent); stroke: none; }
+#vp-linea { fill: none; stroke: var(--ok); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.vp-punto { position: absolute; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; background: var(--ok); transition: top .9s ease, left .9s ease; }
+.vp-barrido { position: absolute; top: 0; bottom: 0; left: 0; width: 1px; background: linear-gradient(transparent, color-mix(in srgb, var(--ok) 70%, transparent), transparent); animation: barrido 4s linear infinite; }
+@keyframes barrido { from { left: 0; } to { left: 100%; } }
+.vp-rotulo { position: absolute; left: 10px; top: 8px; font: 500 10.5px var(--mono); color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+.vp-valor { position: absolute; right: 10px; top: 6px; font: 600 15px var(--mono); color: var(--fg); font-variant-numeric: tabular-nums; }
+.vitales { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.vital { border: 1px solid var(--line); border-radius: 14px; background: var(--card); padding: 11px 12px 8px; display: grid; gap: 2px; min-width: 0; }
+.vital .rotulo { font-size: 10.5px; }
+.v-num { display: flex; align-items: baseline; gap: 4px; }
+.v-num b { font: 600 22px var(--mono); font-variant-numeric: tabular-nums; }
+.v-num span { font-size: 12px; color: var(--muted); }
+.vital svg { width: 100%; height: 26px; }
+.vital polyline { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.vital polyline.verde { stroke: var(--ok); }
+.v-nota { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v-nota.mal { color: var(--aviso); }
+@media (prefers-reduced-motion: reduce) { .vp-barrido, .llamando .l-letra { animation: none; } .vj-paquetes { display: none; } }
+/* This computer, watched: the microphone, the camera and the screen, and the other side's. */
+.equipo { display: grid; gap: 8px; padding: 12px 14px; }
+.equipo[hidden] { display: none; }
+.eq-tres { display: grid; gap: 6px; }
+.eq { border-radius: 10px; background: var(--campo); padding: 8px 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; min-width: 0; }
+.eq span { font-size: 12.5px; color: var(--muted); flex: none; }
+.eq b { font-size: 12.5px; font-weight: 600; line-height: 1.3; text-align: right; overflow-wrap: break-word; min-width: 0; }
+.eq.ok b { color: var(--ok); } .eq.aviso b { color: var(--aviso); } .eq.alerta b { color: var(--alerta); } .eq.nada b { color: var(--muted); font-weight: 500; }
+.eq-otro { margin: 0; font-size: 12px; line-height: 1.45; color: var(--muted); }
+.eq-otro.ok { color: var(--fg); } .eq-otro.aviso { color: var(--aviso); }
+/* The call's report, right after hanging up: the verdict first, then what it rests on. */
+.velo-informe { z-index: 40; padding: 24px; overflow: auto; }
+.informe { display: grid; gap: 14px; padding: 22px 24px; width: min(760px, 100%); max-height: calc(100vh - 48px); overflow: auto; box-sizing: border-box; border-radius: 18px; box-shadow: var(--sombra); }
+.in-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.in-cab .boton { width: 32px; height: 32px; padding: 0; display: grid; place-items: center; }
+.in-que { margin: 0; font: 600 21px/1.25 var(--display); letter-spacing: -.01em; text-wrap: balance; }
+.in-veredicto { display: flex; gap: 14px; align-items: flex-start; padding: 16px 18px; border-radius: 12px; background: var(--ok-suave); border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent); }
+.in-veredicto .icono { width: 40px; height: 40px; flex: none; color: var(--ok); }
+.in-veredicto div { display: grid; gap: 3px; }
+.in-veredicto b { font: 600 19px/1.25 var(--display); color: var(--ok); }
+.in-veredicto span { font-size: 13.5px; line-height: 1.5; max-width: 60ch; }
+.informe.revisar .in-veredicto { background: var(--alerta-suave); border-color: color-mix(in srgb, var(--alerta) 45%, transparent); }
+.informe.revisar .in-veredicto .icono, .informe.revisar .in-veredicto b { color: var(--alerta); }
+.informe.revisar .in-marca { d: path("M12 8v5M12 16.5v.5"); }
+.informe.incompleto .in-veredicto { background: var(--aviso-suave); border-color: color-mix(in srgb, var(--aviso) 45%, transparent); }
+.informe.incompleto .in-veredicto .icono, .informe.incompleto .in-veredicto b { color: var(--aviso); }
+.in-datos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; font-size: 13px; }
+.in-dato { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 3px; align-content: start; background: var(--campo); }
+.in-datos dt { color: var(--muted); font-size: 11.5px; }
+.in-datos dd { margin: 0; line-height: 1.4; overflow-wrap: break-word; font-weight: 500; }
+@media (max-width: 640px) { .in-datos { grid-template-columns: 1fr; } }
+.in-datos dd.ok { color: var(--ok); } .in-datos dd.aviso { color: var(--aviso); } .in-datos dd.alerta { color: var(--alerta); font-weight: 600; }
+.in-limite { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.informe .p-botones { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (min-width: 1181px) {
+  .secure.en-llamada { grid-template-columns: minmax(0, 1fr) 360px; }
+  .secure.en-llamada .col-izq { display: none; }
+  .secure.en-llamada main.con-chat { padding: 16px 18px; background-image: none; }
+  .secure.en-llamada main.con-chat > .chat:not([hidden]) { display: grid; grid-template-columns: 340px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 0; padding: 0; overflow: hidden; }
+  .secure.en-llamada .chat-lado { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); gap: 10px; }
+  .secure.en-llamada .chat-lado > .mensajes { flex: 1 1 0; min-height: 0; max-height: none; }
+  .secure.en-llamada .chat-lado .chat-cab #c-voz, .secure.en-llamada .chat-lado .chat-cab #c-video, .secure.en-llamada .chat-lado .c-sello { display: none; }
+  .secure.en-llamada .chat-lado .chat-cab { padding: 10px 14px; gap: 10px; }
+  .secure.en-llamada .chat-lado .escribir { gap: 6px; }
+  .secure.en-llamada .chat > .llamada { margin: 0; padding: 16px; display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .secure.en-llamada .escenario { flex: 1 1 0; min-height: 260px; max-height: none; aspect-ratio: auto; height: auto; }
+  .secure.en-llamada .viaje { flex: none; display: grid; }
+  .secure.en-llamada aside.monitor > h2, .secure.en-llamada .panel-ilu { display: none; }
+}
 </style>
 </head>
 <body>
@@ -516,6 +665,7 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
   </section>
 
   <section class="tarjeta chat" id="c-chat" hidden>
+    <div class="chat-lado" id="c-chat-lado">
     <div class="chat-cab">
       <span class="avatar grande" id="c-avatar"><span id="c-avatar-letra">·</span><i></i></span>
       <div class="c-quien"><h2 id="c-con"></h2><p class="c-sello" id="c-sello"></p></div>
@@ -541,23 +691,63 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
       <b id="c-permiso-t"></b><span id="c-permiso-s"></span>
       <div class="c-fila"><button type="button" class="boton chico" id="c-permiso-mic" data-t="sec_p_abrir_mic"></button><button type="button" class="boton chico" id="c-permiso-cam" data-t="sec_p_abrir_cam"></button><button type="button" class="boton chico principal" id="c-permiso-otra" data-t="sec_p_reintentar"></button></div>
     </section>
-    <section class="llamada" id="c-llamada" hidden>
-      <div class="c-fila llamada-botones">
-        <span class="l-cuadro" aria-hidden="true"><span class="onda"><b></b><b></b><b></b><b></b><b></b></span></span>
-        <div class="l-titulo"><b id="c-l-titulo" data-t="sec_l_en_curso"></b><span class="l-estado" id="c-l-estado"></span></div>
-        <button type="button" class="boton chico" id="c-silencio" aria-pressed="false"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span data-t="sec_l_silenciar"></span></button>
-        <button type="button" class="boton chico" id="c-voz-prot" aria-pressed="false" data-t-title="sec_v_titulo"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h2M8 8v8M12 5v14M16 8v8M20 11v2"/></svg><span data-t="sec_v_boton"></span></button>
-        <span class="l-voz-otro" id="c-voz-otro" hidden data-t="sec_v_otro"></span>
-        <button type="button" class="boton chico icono-solo" id="c-pantalla" data-t-title="sec_l_pantalla" hidden><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
-        <button type="button" class="boton peligro chico" id="c-colgar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14c5-5 13-5 18 0l-2 3-4-1-1-3a9 9 0 0 0-4 0l-1 3-4 1z"/></svg><span data-t="sec_l_colgar"></span></button>
-      </div>
-      <div class="pantallas"><div class="rejilla" id="c-rejilla" data-n="0"></div><video id="c-local" autoplay playsinline muted></video></div>
-    </section>
     <ol class="mensajes" id="c-mensajes"></ol>
     <div class="zona-archivo" id="c-zona"><span data-t="sec_f_arrastra"></span> <label class="enlace" for="c-archivo" data-t="sec_f_elige"></label><input type="file" id="c-archivo" hidden multiple></div>
     <div class="c-progreso" id="c-progreso" hidden><span id="c-progreso-texto"></span><i><b id="c-progreso-barra"></b></i></div>
     <div class="contexto" id="c-contexto" hidden><span></span><button type="button" class="boton chico icono-solo" id="c-contexto-no" aria-label="×">×</button></div>
     <form class="escribir" id="c-form"><label class="boton chico icono-solo" for="c-archivo" data-t-title="sec_f_elige"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/></svg></label><input class="campo" id="c-texto" data-t-ph="sec_m_escribe" autocomplete="off" maxlength="8000"><div class="grabando" id="c-grabando" hidden><i class="rec" aria-hidden="true"></i><b id="c-grabando-t">0:00</b><span id="c-grabando-modo"></span><button type="button" class="boton chico secundario" id="c-nv-cancelar" data-t="sec_nv_cancelar"></button></div><div class="nv-elige" id="c-nv-elige" hidden role="menu"><button type="button" role="menuitem" id="c-nv-normal"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span data-t="sec_nv_normal"></span></button><button type="button" role="menuitem" id="c-nv-cambiada"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h2M8 8v8M12 5v14M16 8v8M20 11v2"/></svg><span data-t="sec_nv_cambiada"></span></button></div><button type="button" class="boton chico icono-solo" id="c-microfono" data-t-title="sec_nv_grabar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><button type="submit" class="boton principal" id="c-enviar" data-t-title="sec_m_enviar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg></button></form>
+    </div>
+    <section class="llamada" id="c-llamada" hidden>
+      <div class="escenario" id="c-escenario">
+        <div class="pantallas"><div class="rejilla" id="c-rejilla" data-n="0"></div><video id="c-local" autoplay playsinline muted></video></div>
+        <div class="l-avatar" aria-hidden="true"><span class="l-letra" id="c-l-letra">·</span></div>
+        <div class="l-cab">
+          <b id="c-l-titulo" data-t="sec_l_en_curso"></b>
+          <span class="l-estado" id="c-l-estado"></span>
+          <span class="l-voz-otro" id="c-voz-otro" hidden data-t="sec_v_otro"></span>
+        </div>
+        <div class="llamada-botones">
+          <button type="button" class="boton redondo" id="c-silencio" aria-pressed="false" data-t-title="sec_l_silenciar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span data-t="sec_l_silenciar"></span></button>
+          <button type="button" class="boton redondo" id="c-voz-prot" aria-pressed="false" data-t-title="sec_v_titulo"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h2M8 8v8M12 5v14M16 8v8M20 11v2"/></svg><span data-t="sec_v_boton"></span></button>
+          <button type="button" class="boton redondo" id="c-pantalla" data-t-title="sec_l_pantalla" hidden><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span data-t="sec_l_pantalla"></span></button>
+          <button type="button" class="boton redondo colgar" id="c-colgar" data-t-title="sec_l_colgar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 13.5c4.7-4.7 12.3-4.7 17 0l-2.4 2.4a2 2 0 0 1-2.4.3l-2-1.3a2 2 0 0 1-.9-1.7v-1.3a11 11 0 0 0-5.6 0v1.3a2 2 0 0 1-.9 1.7l-2 1.3a2 2 0 0 1-2.4-.3z"/></svg><span data-t="sec_l_colgar"></span></button>
+        </div>
+      </div>
+      <section class="viaje" id="c-viaje">
+        <div class="vj-cab"><span class="rotulo" data-t="sec_vj_titulo"></span><span class="vj-cifra" id="vj-cifra"></span></div>
+        <svg class="vj-mapa" viewBox="0 0 700 214" role="img" id="vj-mapa">
+          <defs>
+            <linearGradient id="vj-arco" x1="0" x2="1"><stop offset="0" stop-color="#5C7CFF"/><stop offset="1" stop-color="#3CC79A"/></linearGradient>
+            <filter id="vj-brillo" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
+            <path id="vj-ida1" d="M96 108 C 180 36, 266 36, 350 76"/>
+            <path id="vj-ida2" d="M350 76 C 434 36, 520 36, 604 108"/>
+            <path id="vj-vuelta2" d="M604 108 C 520 150, 434 150, 350 76"/>
+            <path id="vj-vuelta1" d="M350 76 C 266 150, 180 150, 96 108"/>
+          </defs>
+          <use href="#vj-ida1" class="vj-ida"/><use href="#vj-ida2" class="vj-ida"/>
+          <use href="#vj-vuelta2" class="vj-vuelta"/><use href="#vj-vuelta1" class="vj-vuelta"/>
+          <g class="vj-paquetes" id="vj-paquetes">
+            <g class="vj-sale"><circle r="3"><animateMotion dur="1.4s" repeatCount="indefinite"><mpath href="#vj-ida1"/></animateMotion></circle><circle r="3"><animateMotion dur="1.4s" begin="-0.47s" repeatCount="indefinite"><mpath href="#vj-ida1"/></animateMotion></circle><circle r="3"><animateMotion dur="1.4s" begin="-0.93s" repeatCount="indefinite"><mpath href="#vj-ida1"/></animateMotion></circle><circle r="3"><animateMotion dur="1.4s" begin="-0.2s" repeatCount="indefinite"><mpath href="#vj-ida2"/></animateMotion></circle><circle r="3"><animateMotion dur="1.4s" begin="-0.67s" repeatCount="indefinite"><mpath href="#vj-ida2"/></animateMotion></circle><circle r="3"><animateMotion dur="1.4s" begin="-1.13s" repeatCount="indefinite"><mpath href="#vj-ida2"/></animateMotion></circle></g>
+            <g class="vj-llega"><circle r="2.6"><animateMotion dur="1.8s" repeatCount="indefinite"><mpath href="#vj-vuelta2"/></animateMotion></circle><circle r="2.6"><animateMotion dur="1.8s" begin="-0.9s" repeatCount="indefinite"><mpath href="#vj-vuelta2"/></animateMotion></circle><circle r="2.6"><animateMotion dur="1.8s" begin="-0.3s" repeatCount="indefinite"><mpath href="#vj-vuelta1"/></animateMotion></circle><circle r="2.6"><animateMotion dur="1.8s" begin="-1.2s" repeatCount="indefinite"><mpath href="#vj-vuelta1"/></animateMotion></circle></g>
+          </g>
+          <circle cx="96" cy="108" r="16" class="vj-halo yo" id="vj-halo-yo" filter="url(#vj-brillo)"/>
+          <circle cx="350" cy="76" r="24" class="vj-halo rele" filter="url(#vj-brillo)"/>
+          <circle cx="604" cy="108" r="16" class="vj-halo el" id="vj-halo-el" filter="url(#vj-brillo)"/>
+          <circle cx="96" cy="108" r="11" class="vj-nodo yo"/>
+          <rect x="337" y="63" width="26" height="26" rx="8" class="vj-nodo rele" id="vj-nodo-rele"/>
+          <circle cx="604" cy="108" r="11" class="vj-nodo el"/>
+          <text x="350" y="22" class="vj-t rele" id="vj-rele"></text>
+          <text x="350" y="38" class="vj-t sub" id="vj-rele-s"></text>
+          <text x="96" y="146" class="vj-t nombre" data-t="sec_vj_tu"></text>
+          <text x="604" y="146" class="vj-t nombre" id="vj-otro"></text>
+          <g id="vj-barras-yo" class="vj-barras yo"></g>
+          <g id="vj-barras-el" class="vj-barras el"></g>
+          <text x="96" y="200" class="vj-t estado" id="vj-yo-estado"></text>
+          <text x="604" y="200" class="vj-t estado" id="vj-el-estado"></text>
+        </svg>
+        <div class="vj-pie" id="vj-pie"></div>
+      </section>
+    </section>
   </section>
 
   <section class="tarjeta chat sala-chat" id="c-sala-chat" hidden>
@@ -591,6 +781,33 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
       <button type="button" class="boton corta chico" id="inc-terminar" data-t="sec_i_terminar"></button>
     </div>
     <p class="p-nota" data-t="sec_i_nota"></p>
+  </section>
+  <section class="vivo" id="vivo" hidden>
+    <div class="vp">
+      <div class="vp-cab"><i class="latido vivo" id="vp-latido"></i><b id="vp-palabra"></b><span id="vp-capas"></span></div>
+      <div class="vp-grafico">
+        <svg viewBox="0 0 320 92" preserveAspectRatio="none" aria-hidden="true"><polyline id="vp-area" points=""/><polyline id="vp-linea" points=""/></svg>
+        <i class="vp-punto" id="vp-punto"></i>
+        <i class="vp-barrido" aria-hidden="true"></i>
+        <span class="vp-rotulo" data-t="sec_vv_pulso"></span>
+        <span class="vp-valor" id="vp-rtt">—</span>
+      </div>
+    </div>
+    <div class="vitales">
+      <div class="vital"><span class="rotulo" data-t="sec_vv_latencia"></span><div class="v-num"><b id="vv-lat">—</b><span>ms</span></div><svg viewBox="0 0 146 26" preserveAspectRatio="none" aria-hidden="true"><polyline id="vv-lat-l" points=""/></svg><span class="v-nota" id="vv-lat-n"></span></div>
+      <div class="vital"><span class="rotulo" data-t="sec_vv_jitter"></span><div class="v-num"><b id="vv-jit">—</b><span>ms</span></div><svg viewBox="0 0 146 26" preserveAspectRatio="none" aria-hidden="true"><polyline id="vv-jit-l" points=""/></svg><span class="v-nota" id="vv-jit-n"></span></div>
+      <div class="vital"><span class="rotulo" data-t="sec_vv_perdida"></span><div class="v-num"><b id="vv-per">—</b><span>%</span></div><svg viewBox="0 0 146 26" preserveAspectRatio="none" aria-hidden="true"><polyline id="vv-per-l" class="verde" points=""/></svg><span class="v-nota" id="vv-per-n"></span></div>
+      <div class="vital"><span class="rotulo" data-t="sec_vv_caudal"></span><div class="v-num"><b id="vv-kb">—</b><span>Mbps</span></div><svg viewBox="0 0 146 26" preserveAspectRatio="none" aria-hidden="true"><polyline id="vv-kb-l" points=""/></svg><span class="v-nota" id="vv-kb-n"></span></div>
+    </div>
+  </section>
+  <section class="tarjeta equipo" id="equipo" hidden>
+    <span class="rotulo" data-t="sec_eq_titulo"></span>
+    <div class="eq-tres">
+      <div class="eq" id="eq-mic"><span data-t="sec_eq_mic"></span><b></b></div>
+      <div class="eq" id="eq-cam"><span data-t="sec_eq_cam"></span><b></b></div>
+      <div class="eq" id="eq-pant"><span data-t="sec_eq_pant"></span><b></b></div>
+    </div>
+    <p class="eq-otro" id="eq-otro"></p>
   </section>
   <section class="estado-g" id="g">
     <div class="panel-ilu">
@@ -681,6 +898,16 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
   </section>
   </div>
 </aside>
+</div>
+<div class="velo velo-informe" id="informe" hidden>
+  <section class="tarjeta informe" id="informe-caja" role="dialog" aria-modal="true" aria-labelledby="in-que">
+    <div class="in-cab"><span class="rotulo" data-t="sec_in_titulo"></span><button type="button" class="boton chico icono-solo" id="in-cerrar" data-t-title="sec_in_cerrar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <p class="in-que" id="in-que"></p>
+    <div class="in-veredicto" id="in-veredicto"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6z"/><path class="in-marca" d="m8.5 12 2.5 2.5 4.5-5"/></svg><div><b id="in-palabra"></b><span id="in-frase"></span></div></div>
+    <dl class="in-datos" id="in-datos"></dl>
+    <p class="in-limite" data-t="sec_in_limite"></p>
+    <div class="p-botones"><button type="button" class="boton principal chico" id="in-pdf" data-t="sec_r_pdf"></button><button type="button" class="boton chico" id="in-json" data-t="sec_r_json"></button><button type="button" class="boton chico" id="in-csv" data-t="sec_r_csv"></button></div>
+  </section>
 </div>
 <script src="puente.js"></script>
 <script src="voz.js"></script>

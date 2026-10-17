@@ -622,6 +622,42 @@ impl Grupo {
         }
     }
 
+    /// The call's figures as the page measures them, for the talking link's report.
+    pub fn medidas(&mut self, d: &Value) {
+        if let Some(i) = self.unica() {
+            if let Some(s) = self.sesiones.get_mut(i) {
+                s.medidas(d);
+            }
+        }
+    }
+
+    /// The person closed the call's report.
+    pub fn olvida_informe(&mut self) {
+        for s in &mut self.sesiones {
+            s.olvida_informe();
+        }
+    }
+
+    /// What Windows recorded about the microphone, the camera and the screen, for every open
+    /// conversation.
+    pub fn vigia(&mut self, usos: &[crate::vigia::Uso]) {
+        for s in &mut self.sesiones {
+            s.vigia(usos);
+        }
+    }
+
+    /// Whether the window is kept out of screenshots and recordings right now.
+    pub fn pantalla(&mut self, protegida: bool) {
+        for s in &mut self.sesiones {
+            s.pantalla(protegida);
+        }
+    }
+
+    /// Whether any conversation is open (the window then watches and hides from captures).
+    pub fn conversando(&self) -> bool {
+        self.sesiones.iter().any(Secure::lista)
+    }
+
     /// WebRTC messages from the other side for the page.
     pub fn rtc_para_pagina(&mut self) -> Vec<Value> {
         let mut v = Vec::new();
@@ -845,6 +881,12 @@ impl Grupo {
         // The first link carries the codes, the door and the monitor; a newer link being set
         // up (a member comparing numbers with the host) is shown on top of the chat.
         let mut e = self.sesiones[0].estado_json();
+        // The call's report and the watch are the talking link's (a group's host shows its own).
+        if let Some(i) = self.unica().filter(|&i| i > 0) {
+            let otra = self.sesiones[i].estado_json();
+            e["informe"] = otra["informe"].clone();
+            e["vigia"] = otra["vigia"].clone();
+        }
         if let Some(nueva) = self
             .sesiones
             .iter()

@@ -28,7 +28,7 @@ use guardiana_secure::cuantico;
 use guardiana_secure::monitor::{Identidad, Monitor, Nivel};
 use guardiana_secure::pausa::Sesion as EstadoSesion;
 use guardiana_secure::prueba::{Cadena, Prueba};
-use guardiana_secure::resumen::{Archivos, Clase, Conexion, Resumen};
+use guardiana_secure::resumen::{Archivos, Clase, Conexion, Resumen, Veredicto, Vigilancia};
 use guardiana_secure::sframe;
 use guardiana_secure::verificar::{Codigo, Inicio, Verified};
 use guardiana_secure::{tarjeta, Conversation, Envelope, Identity};
@@ -584,6 +584,19 @@ pub struct Secure {
     archivos: Archivos,
     /// The last summary, signed, for the page to show and download.
     pub resumen: Option<Resumen>,
+    /// The last call's report, signed, with its verdict (17 Oct 2026: «la valoración final:
+    /// si ha habido espionaje, si ha habido grabación»), until the person closes it.
+    pub informe: Option<Resumen>,
+    /// The call's figures as the page measured them (WebRTC), refreshed every few seconds.
+    medidas: Option<Conexion>,
+    /// The watch over the microphone, the camera and the screen (Windows' record).
+    vigia: crate::vigia::Vigia,
+    /// What the other side's GUARDIANA said its own watch saw.
+    vigia_otro: Option<Vigilancia>,
+    /// The last verdict sent to the other side, so it is sent only when it changes.
+    vigia_mandado: Option<Value>,
+    /// When a stop for something seen may end (the cause gone and the countdown run).
+    reanuda_en: Option<u64>,
     version: String,
     /// Media pieces for the page, drained by the session every tick: (who, base64). `who` is
     /// empty for the other end of this link; in a group the host relays with the original name.
@@ -707,6 +720,12 @@ impl Secure {
             llamada: None,
             archivos: Archivos::default(),
             resumen: None,
+            informe: None,
+            medidas: None,
+            vigia: crate::vigia::Vigia::default(),
+            vigia_otro: None,
+            vigia_mandado: None,
+            reanuda_en: None,
             version: String::new(),
             media_para_pagina: VecDeque::new(),
             novedad: false,
@@ -888,12 +907,13 @@ impl Secure {
             None if self.archivos.enviados + self.archivos.recibidos > 0 => Clase::Envio,
             None => Clase::Chat,
         };
-        let conexion = Conexion {
+        let conexion = self.medidas.clone().unwrap_or_else(|| Conexion {
             directa: self.monitor.transporte.directo,
             codec_audio: self.monitor.transporte.codec_audio.clone(),
             codec_video: self.monitor.transporte.codec_video.clone(),
             ..Conexion::default()
-        };
+        });
+        let veredicto = self.veredicto(self.inicio, ahora_s());
         self.resumen = Resumen::cerrar(
             &self.identidad,
             &self.version,
@@ -904,8 +924,224 @@ impl Secure {
             ahora_s(),
             self.archivos.clone(),
             conexion,
-        );
+        )
+        .map(|r| r.con_veredicto(&self.identidad, veredicto));
         self.archivos = Archivos::default();
+        self.vigia = crate::vigia::Vigia::default();
+        self.vigia_otro = None;
+        self.vigia_mandado = None;
+    }
+
+    /// The verdict for the part of the conversation between `desde` and `hasta`.
+    fn veredicto(&self, desde: u64, hasta: u64) -> Veredicto {
+        let interferencias = self
+            .cadena
+            .registros
+            .iter()
+            .filter(|r| r.nivel == Nivel::Inusual && r.cuando >= desde && r.cuando <= hasta)
+            .count() as u64;
+        Veredicto {
+            este: self.vigia.veredicto(desde),
+            otro: self.vigia_otro.clone(),
+            otro_movil: self.otro_movil,
+            identidad_verificada: self
+                .monitor
+                .identidad
+                .as_ref()
+                .is_some_and(|i| i.estado == "verificado"),
+            interferencias,
+        }
+    }
+
+    /// The report of a call that just ended (it was answered): signed, with the verdict and the
+    /// figures the page measured, for the page to show at once and to download.
+    fn cierra_informe(&mut self, video: bool, desde: u64) {
+        if self.monitor.identidad.is_none() {
+            return;
+        }
+        let fin = ahora_s();
+        let conexion = self.medidas.take().unwrap_or_else(|| Conexion {
+            directa: self.monitor.transporte.directo,
+            codec_audio: self.monitor.transporte.codec_audio.clone(),
+            codec_video: self.monitor.transporte.codec_video.clone(),
+            ..Conexion::default()
+        });
+        let veredicto = self.veredicto(desde, fin);
+        self.informe = Resumen::cerrar_parte(
+            &self.identidad,
+            &self.version,
+            if video {
+                Clase::Videollamada
+            } else {
+                Clase::Llamada
+            },
+            &self.monitor,
+            &self.cadena,
+            desde,
+            fin,
+            Archivos::default(),
+            conexion,
+            veredicto,
+        );
+        self.cambio = true;
+    }
+
+    /// The person closed the call's report.
+    pub fn olvida_informe(&mut self) {
+        if self.informe.take().is_some() {
+            self.cambio = true;
+        }
+    }
+
+    /// The call's figures as the page measures them (every few seconds during a call): what the
+    /// report will say about the connection. Only numbers and codec names, bounded.
+    pub fn medidas(&mut self, d: &Value) {
+        if self.llamada.is_none() {
+            return;
+        }
+        let n = |k: &str, max: u64| {
+            d[k].as_u64()
+                .filter(|v| *v <= max)
+                .and_then(|v| u32::try_from(v).ok())
+        };
+        let corto = |k: &str| {
+            d[k].as_str().filter(|s| !s.is_empty()).map(|s| {
+                s.chars()
+                    .filter(|c| !c.is_control())
+                    .take(40)
+                    .collect::<String>()
+            })
+        };
+        self.medidas = Some(Conexion {
+            directa: Some(!d["rele"].as_bool().unwrap_or(true)),
+            latencia_media_ms: n("latencia_media_ms", 60_000),
+            perdida_max_pct: d["perdida_max_pct"]
+                .as_f64()
+                .filter(|p| (0.0..=100.0).contains(p))
+                .map(|p| p as f32),
+            kbps_audio_medio: n("kbps_audio_medio", 100_000),
+            kbps_video_medio: n("kbps_video_medio", 100_000),
+            codec_audio: corto("codec_audio"),
+            codec_video: corto("codec_video"),
+            resolucion: corto("resolucion"),
+        });
+    }
+
+    /// What Windows recorded about the microphone, the camera and the screen (the window looks
+    /// every two seconds while a conversation is open). Another program using one of them during
+    /// the conversation goes into the history and the chain with its name and path, and stops
+    /// the conversation while it goes on (Francisco, 15 Oct 2026: «que pare automáticamente»);
+    /// it resumes on its own once that program lets go, or at once if the person says it is
+    /// theirs.
+    pub fn vigia(&mut self, usos: &[crate::vigia::Uso]) {
+        if self.fase != Fase::Lista {
+            return;
+        }
+        let ahora = ahora_s();
+        let antes = self.vigia.en_uso.clone();
+        for v in self.vigia.mira(usos, self.inicio) {
+            let texto = format!("«{}» {}", v.uso.programa, v.uso.recurso.verbo());
+            let hecho = guardiana_secure::prueba::Hecho {
+                texto: texto.clone(),
+                proceso: Some(v.uso.programa.clone()),
+                ruta: v.uso.ruta.clone(),
+                sha256_exe: None,
+                evidencia: Some(format!(
+                    "Windows ConsentStore · {} · LastUsedTimeStart {} · {}",
+                    match v.uso.recurso {
+                        crate::vigia::Recurso::Microfono => "microphone",
+                        crate::vigia::Recurso::Camara => "webcam",
+                        crate::vigia::Recurso::Pantalla => "graphicsCaptureProgrammatic",
+                    },
+                    v.uso.desde,
+                    v.uso
+                        .hasta
+                        .map_or_else(|| "en uso".to_owned(), |h| format!("LastUsedTimeStop {h}")),
+                )),
+            };
+            if v.ahora && self.estado.en_marcha() {
+                // The stop writes its own line in the history and the chain.
+                self.cadena.anota(ahora, Nivel::Observada, hecho);
+                self.estado.parar(
+                    guardiana_secure::pausa::Motivo::Observado {
+                        texto,
+                        proceso: Some(v.uso.programa.clone()),
+                    },
+                    ahora,
+                    &mut self.monitor,
+                    &mut self.cadena,
+                );
+                self.aviso("sec_vigia_parada", v.uso.programa.clone());
+            } else {
+                self.monitor.anota(ahora, Nivel::Observada, texto);
+                self.cadena.anota(ahora, Nivel::Observada, hecho);
+            }
+            self.cambio = true;
+        }
+        // A stop for something seen: what still keeps it, and the way back once it is gone.
+        let por_algo_visto = matches!(
+            &self.estado,
+            EstadoSesion::Pausada(p) if matches!(p.motivo, guardiana_secure::pausa::Motivo::Observado { .. })
+        );
+        {
+            if por_algo_visto {
+                let pendiente: Vec<String> = self
+                    .vigia
+                    .en_uso
+                    .iter()
+                    .map(|(p, r)| format!("«{p}» {}", r.ahora()))
+                    .collect();
+                self.estado.comprobada(pendiente);
+                if self.estado.lista_para_reanudar() {
+                    match self.reanuda_en {
+                        None => {
+                            self.reanuda_en =
+                                Some(ahora + u64::from(guardiana_secure::pausa::CUENTA_ATRAS_S));
+                        }
+                        Some(t) if ahora >= t => {
+                            self.reanuda_en = None;
+                            self.estado
+                                .reanudar(ahora, &mut self.monitor, &mut self.cadena);
+                        }
+                        Some(_) => {}
+                    }
+                } else {
+                    self.reanuda_en = None;
+                }
+                self.cambio = true;
+            }
+        }
+        if antes != self.vigia.en_uso {
+            self.cambio = true;
+        }
+        self.manda_vigia();
+    }
+
+    /// Whether the window is kept out of screenshots and recordings (the window says, after
+    /// asking Windows; `false` where it could not).
+    pub fn pantalla(&mut self, protegida: bool) {
+        if self.fase != Fase::Lista {
+            return;
+        }
+        if self.vigia.pantalla_protegida != protegida {
+            self.vigia.pon_pantalla(protegida);
+            self.cambio = true;
+            self.manda_vigia();
+        }
+    }
+
+    /// Tell the other side what this computer's watch sees, when it changed: its report says
+    /// it too («en el equipo de ferrari, según su GUARDIANA»).
+    fn manda_vigia(&mut self) {
+        if self.fase != Fase::Lista || !self.estado.en_marcha() || !self.vigia.activa {
+            return;
+        }
+        let v = serde_json::to_value(self.vigia.veredicto(self.inicio)).unwrap_or(Value::Null);
+        if self.vigia_mandado.as_ref() == Some(&v) {
+            return;
+        }
+        self.vigia_mandado = Some(v.clone());
+        self.manda_olm(json!({ "m": "vigia", "v": v }));
     }
 
     /// The chain of what was seen, signed, as JSON for a file.
@@ -1853,6 +2089,10 @@ impl Secure {
                 self.otro_rtc = true;
                 self.cambio = true;
             }
+            "vigia" => {
+                self.vigia_otro = Vigilancia::de_json(&c["v"]);
+                self.cambio = true;
+            }
             "rtc" => {
                 // For whoever talks here: the phone when it took the call, else the page.
                 let d = c["d"].clone();
@@ -1892,6 +2132,7 @@ impl Secure {
                             Some(ahora_s().saturating_sub(l.desde)),
                             "fin",
                         );
+                        self.cierra_informe(l.video, l.desde);
                     } else {
                         self.anota_llamada(l.video, true, None, "rechazada");
                     }
@@ -2181,6 +2422,7 @@ impl Secure {
         let mut clave = [0u8; 32];
         crate::sesion::azar(&mut clave);
         let yo = self.mi_numero();
+        self.medidas = None;
         self.llamada = Some(Llamada {
             video,
             mime_local: mime.chars().take(80).collect(),
@@ -2257,6 +2499,7 @@ impl Secure {
                     Some(ahora_s().saturating_sub(l.desde)),
                     "fin",
                 );
+                self.cierra_informe(l.video, l.desde);
             } else {
                 self.anota_llamada(l.video, true, None, "cancelada");
             }
@@ -2977,9 +3220,18 @@ impl Secure {
             zona_otra: self.zona_otra.clone(),
             otro,
         });
-        if self.llamada.is_some() {
+        if let Some(l) = self.llamada.take() {
             self.manda_olm(json!({ "m": "cuelga" }));
             self.fin_de_llamada();
+            if l.conectada {
+                self.anota_llamada(
+                    l.video,
+                    l.saliente,
+                    Some(ahora_s().saturating_sub(l.desde)),
+                    "fin",
+                );
+                self.cierra_informe(l.video, l.desde);
+            }
         }
         if self.estado.en_marcha() {
             self.estado.parar(
@@ -3506,6 +3758,12 @@ impl Secure {
             "archivos": true,
             "contactos": self.agenda.contactos().iter().map(|c| json!({ "nombre": c.nombre, "verificado_en": c.verificado_en, "estado": matches!(c.estado, agenda::Estado::Verificado) })).collect::<Vec<_>>(),
             "monitor": monitor,
+            "vigia": {
+                "este": self.vigia.veredicto(self.inicio),
+                "en_uso": self.vigia.en_uso.iter().map(|(p, r)| json!({ "programa": p, "recurso": r })).collect::<Vec<_>>(),
+                "otro": self.vigia_otro,
+            },
+            "informe": self.informe.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "inicio": r.inicio, "fin": r.fin, "veredicto": r.veredicto, "sin_espionaje": r.veredicto.as_ref().is_some_and(Veredicto::sin_espionaje), "conexion": r.conexion, "observadas": r.observadas, "inusuales": r.inusuales, "firmante": r.firmante, "firma": r.firma, "hash_cadena": r.hash_cadena })),
             "resumen": self.resumen.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "mensajes": r.mensajes_enviados + r.mensajes_recibidos, "archivos": r.archivos.enviados + r.archivos.recibidos, "observadas": r.observadas, "inusuales": r.inusuales, "fin": r.fin })),
         })
     }
@@ -3941,6 +4199,105 @@ mod tests {
         gira(&mut a, &mut b, 15);
         assert!(!b.reconectando());
         assert_eq!(b.estado_json()["fase"], "sola");
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn another_program_on_the_microphone_stops_the_talk_and_the_call_report_says_so() {
+        let base = std::env::temp_dir().join(format!("guardiana-vigia-{}", std::process::id()));
+        let (da, db) = (base.join("a"), base.join("b"));
+        std::fs::create_dir_all(&da).unwrap();
+        std::fs::create_dir_all(&db).unwrap();
+        let mut a = Secure::abre(&da, &da);
+        let mut b = Secure::abre(&db, &db);
+        let puerto = a.escuchar_efimero().unwrap();
+        b.conectar(&format!("127.0.0.1:{puerto}")).unwrap();
+        gira(&mut a, &mut b, 25);
+        a.sas_persona(true, "Bea");
+        b.sas_persona(true, "Ana");
+        gira(&mut a, &mut b, 25);
+        assert_eq!(b.estado_json()["fase"], "lista");
+
+        // GUARDIANA's own window and its engine never count; a recorder that is on now does.
+        let ahora = ahora_s();
+        let ft = |t: u64| (t + 11_644_473_600) * 10_000_000;
+        let propio = crate::vigia::de_registro(
+            "C:#EdgeWebView#msedgewebview2.exe",
+            crate::vigia::Recurso::Microfono,
+            ft(ahora),
+            0,
+        )
+        .unwrap();
+        b.vigia(std::slice::from_ref(&propio));
+        assert!(b.estado.en_marcha());
+        let zoom = crate::vigia::de_registro(
+            "C:#Program Files#Zoom#Zoom.exe",
+            crate::vigia::Recurso::Microfono,
+            ft(ahora),
+            0,
+        )
+        .unwrap();
+        b.vigia(&[propio.clone(), zoom.clone()]);
+        assert!(
+            !b.estado.en_marcha(),
+            "stopped while Zoom.exe holds the microphone"
+        );
+        assert!(b
+            .cadena
+            .registros
+            .iter()
+            .any(|r| r.proceso.as_deref() == Some("Zoom.exe")
+                && r.evidencia
+                    .as_deref()
+                    .is_some_and(|e| e.contains("ConsentStore"))));
+        assert_eq!(
+            b.estado_json()["vigia"]["en_uso"][0]["programa"],
+            "Zoom.exe"
+        );
+        // The person says it is theirs: the talk goes on, and is not stopped again for it.
+        b.reanudar_a_mano();
+        b.vigia(&[propio.clone(), zoom.clone()]);
+        assert!(b.estado.en_marcha());
+        b.pantalla(true);
+        gira(&mut a, &mut b, 15);
+        // The other side heard what b's watch saw.
+        let otro = a.vigia_otro.clone().unwrap();
+        assert!(otro.vigilado && otro.pantalla_protegida);
+        assert_eq!(otro.microfono, vec!["Zoom.exe".to_owned()]);
+
+        // A call, measured by the page, then hung up: both get a signed report with a verdict.
+        a.llamar(false, "audio/webm;codecs=opus").unwrap();
+        gira(&mut a, &mut b, 15);
+        b.contestar("audio/webm;codecs=opus").unwrap();
+        gira(&mut a, &mut b, 15);
+        a.medidas(&json!({ "rele": true, "latencia_media_ms": 96, "perdida_max_pct": 1.1, "kbps_audio_medio": 48, "codec_audio": "opus" }));
+        a.colgar();
+        gira(&mut a, &mut b, 15);
+        let ia = a.informe.clone().unwrap();
+        assert!(ia.verificar().is_ok());
+        assert_eq!(ia.clase, Clase::Llamada);
+        assert_eq!(ia.conexion.latencia_media_ms, Some(96));
+        let va = ia.veredicto.clone().unwrap();
+        assert!(va.identidad_verificada);
+        assert_eq!(
+            va.otro.as_ref().unwrap().microfono,
+            vec!["Zoom.exe".to_owned()]
+        );
+        assert!(
+            !va.sin_espionaje(),
+            "the other side's microphone was shared"
+        );
+        assert!(
+            !va.este.vigilado,
+            "a never got Windows' record in this test"
+        );
+        let ib = b.informe.clone().unwrap();
+        let vb = ib.veredicto.unwrap();
+        assert_eq!(vb.este.microfono, vec!["Zoom.exe".to_owned()]);
+        assert!(vb.este.pantalla_protegida);
+        assert_eq!(a.estado_json()["informe"]["sin_espionaje"], false);
+        a.olvida_informe();
+        assert!(a.estado_json()["informe"].is_null());
         let _ = std::fs::remove_dir_all(base);
     }
 }

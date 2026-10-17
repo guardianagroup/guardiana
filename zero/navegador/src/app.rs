@@ -49,7 +49,10 @@ use windows::Win32::System::Com::{
 };
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
+use windows::Win32::System::Registry::{
+    RegCloseKey, RegEnumKeyExW, RegGetValueW, RegOpenKeyExW, HKEY, HKEY_CURRENT_USER,
+    HKEY_LOCAL_MACHINE, KEY_READ, RRF_RT_REG_DWORD, RRF_RT_REG_QWORD,
+};
 use windows::Win32::System::Threading::{CreateMutexW, WaitForSingleObject};
 use windows::Win32::UI::HiDpi::{
     GetDpiForWindow, SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
@@ -63,13 +66,14 @@ use windows::Win32::UI::WindowsAndMessaging::{
     FindWindowW, GetClientRect, GetMessageW, GetWindowLongPtrW, GetWindowRect,
     GetWindowThreadProcessId, IsIconic, KillTimer, LoadCursorW, MessageBoxW, PostMessageW,
     PostQuitMessage, RegisterClassExW, SendMessageW, SetForegroundWindow, SetTimer,
-    SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, SystemParametersInfoW,
-    TranslateMessage, GWL_STYLE, HICON, HWND_TOP, ICON_BIG, ICON_SMALL, IDC_ARROW, LR_DEFAULTCOLOR,
-    MB_ICONWARNING, MB_OK, MINMAXINFO, MSG, SIZE_MINIMIZED, SPI_GETWORKAREA, SWP_FRAMECHANGED,
-    SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOZORDER, SW_RESTORE, SW_SHOW, SW_SHOWNORMAL,
-    SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WINDOW_EX_STYLE, WM_APP, WM_CLOSE, WM_COPYDATA,
-    WM_DESTROY, WM_DPICHANGED, WM_GETMINMAXINFO, WM_MOVE, WM_MOVING, WM_SETFOCUS, WM_SETICON,
-    WM_SIZE, WM_TIMER, WNDCLASSEXW, WS_OVERLAPPEDWINDOW,
+    SetWindowDisplayAffinity, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow,
+    SystemParametersInfoW, TranslateMessage, GWL_STYLE, HICON, HWND_TOP, ICON_BIG, ICON_SMALL,
+    IDC_ARROW, LR_DEFAULTCOLOR, MB_ICONWARNING, MB_OK, MINMAXINFO, MSG, SIZE_MINIMIZED,
+    SPI_GETWORKAREA, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOZORDER, SW_RESTORE,
+    SW_SHOW, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WDA_EXCLUDEFROMCAPTURE,
+    WDA_MONITOR, WDA_NONE, WINDOW_EX_STYLE, WM_APP, WM_CLOSE, WM_COPYDATA, WM_DESTROY,
+    WM_DPICHANGED, WM_GETMINMAXINFO, WM_MOVE, WM_MOVING, WM_SETFOCUS, WM_SETICON, WM_SIZE,
+    WM_TIMER, WNDCLASSEXW, WS_OVERLAPPEDWINDOW,
 };
 
 /// Height of the bar (tabs 38 + tools 46), in CSS pixels; see `interfaz/barra.html`.
@@ -89,6 +93,12 @@ static RAPIDO: AtomicBool = AtomicBool::new(false);
 /// Shown once, when a page has loaded: not empty, then white, then the page.
 static VENTANA_LISTA: AtomicBool = AtomicBool::new(false);
 static TICS_SIN_PAGINA: AtomicU32 = AtomicU32::new(0);
+/// Ticks while a SECURE conversation is open: every tenth (two seconds) the watch looks.
+static TICS_VIGIA: AtomicU32 = AtomicU32::new(0);
+/// Whether the window asked to be kept out of screen captures (while a conversation is open).
+static OCULTA_A_CAPTURAS: AtomicBool = AtomicBool::new(false);
+/// Whether Windows accepted.
+static PROTEGIDA: AtomicBool = AtomicBool::new(false);
 
 /// A string the way Win32 wants it: UTF-16, ending in zero, alive while it is used.
 struct Ancho(Vec<u16>);
@@ -1650,6 +1660,26 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                     }
                 }
             }
+            // The watch (17 Oct 2026): while a conversation is open the window keeps itself out of
+            // screenshots and screen recordings (they get black), and every two seconds reads
+            // Windows' record of who is using the microphone, the camera and the screen.
+            let conversando = con_sesion(|s| s.conversando()).unwrap_or(false);
+            if conversando != OCULTA_A_CAPTURAS.load(Ordering::Relaxed) {
+                // Windows before 10 2004 may refuse both ways of hiding: the report then says the
+                // screen was not protected; nothing else changes.
+                let ok = oculta_a_capturas(h, conversando);
+                OCULTA_A_CAPTURAS.store(conversando, Ordering::Relaxed);
+                PROTEGIDA.store(conversando && ok, Ordering::Relaxed);
+                TICS_VIGIA.store(0, Ordering::Relaxed);
+            }
+            if conversando && TICS_VIGIA.fetch_add(1, Ordering::Relaxed) % 10 == 0 {
+                let usos = lee_usos();
+                let protegida = PROTEGIDA.load(Ordering::Relaxed);
+                let _ = con_sesion(|s| {
+                    s.pantalla_protegida(protegida);
+                    s.vigia(&usos);
+                });
+            }
             // A page that never arrives still has to appear: three seconds, then the window.
             if !VENTANA_LISTA.load(Ordering::Relaxed)
                 && TICS_SIN_PAGINA.fetch_add(1, Ordering::Relaxed) >= 15
@@ -1714,6 +1744,121 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
         }
         _ => unsafe { DefWindowProcW(h, msg, wp, lp) },
     }
+}
+
+/// Keep the window out of screenshots and screen recordings (they show it black), or let it
+/// back in. Windows 10 2004 and later exclude it outright; before that, «monitor only» does the
+/// same for captures. Returns whether Windows accepted.
+fn oculta_a_capturas(h: HWND, si: bool) -> bool {
+    unsafe {
+        if !si {
+            return SetWindowDisplayAffinity(h, WDA_NONE).is_ok();
+        }
+        SetWindowDisplayAffinity(h, WDA_EXCLUDEFROMCAPTURE).is_ok()
+            || SetWindowDisplayAffinity(h, WDA_MONITOR).is_ok()
+    }
+}
+
+/// The registry path as Windows wants it: UTF-16, ending in zero.
+fn ancho(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+/// The names of a key's subkeys (at most 512; none if it cannot be opened).
+fn subclaves(raiz: HKEY, ruta: &str) -> Vec<String> {
+    let r = ancho(ruta);
+    let mut clave = HKEY(std::ptr::null_mut());
+    if unsafe { RegOpenKeyExW(raiz, PCWSTR(r.as_ptr()), None, KEY_READ, &mut clave) }
+        != ERROR_SUCCESS
+    {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for i in 0..512u32 {
+        let mut buf = [0u16; 512];
+        let mut largo = buf.len() as u32;
+        let e = unsafe {
+            RegEnumKeyExW(
+                clave,
+                i,
+                Some(PWSTR(buf.as_mut_ptr())),
+                &mut largo,
+                None,
+                None,
+                None,
+                None,
+            )
+        };
+        if e != ERROR_SUCCESS {
+            break;
+        }
+        let n = (largo as usize).min(buf.len());
+        out.push(String::from_utf16_lossy(&buf[..n]));
+    }
+    unsafe {
+        let _ = RegCloseKey(clave);
+    }
+    out
+}
+
+/// A QWORD value of a key (zero when absent).
+fn qword(raiz: HKEY, ruta: &[u16], valor: PCWSTR) -> u64 {
+    let mut v = 0u64;
+    let mut largo = std::mem::size_of::<u64>() as u32;
+    let e = unsafe {
+        RegGetValueW(
+            raiz,
+            PCWSTR(ruta.as_ptr()),
+            valor,
+            RRF_RT_REG_QWORD,
+            None,
+            Some((&mut v as *mut u64).cast::<c_void>()),
+            Some(&mut largo as *mut u32),
+        )
+    };
+    if e == ERROR_SUCCESS {
+        v
+    } else {
+        0
+    }
+}
+
+/// Windows' own record of who used the microphone, the camera and programmatic screen capture,
+/// and when (the privacy settings' «recent activity»: `CapabilityAccessManager\ConsentStore`),
+/// for this account and for the computer. Read only; nothing is written or kept here.
+fn lee_usos() -> Vec<guardiana_zero::vigia::Uso> {
+    use guardiana_zero::vigia::{de_registro, Recurso};
+    let mut v = Vec::new();
+    for raiz in [HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE] {
+        for (cap, recurso) in [
+            ("microphone", Recurso::Microfono),
+            ("webcam", Recurso::Camara),
+            ("graphicsCaptureProgrammatic", Recurso::Pantalla),
+        ] {
+            let base = format!(
+                "Software\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\{cap}"
+            );
+            let mut una = |ruta: String, nombre: &str| {
+                let r = ancho(&ruta);
+                let inicio = qword(raiz, &r, w!("LastUsedTimeStart"));
+                let fin = qword(raiz, &r, w!("LastUsedTimeStop"));
+                if let Some(u) = de_registro(nombre, recurso, inicio, fin) {
+                    v.push(u);
+                }
+            };
+            for sub in subclaves(raiz, &base) {
+                if sub.eq_ignore_ascii_case("NonPackaged") {
+                    let np = format!("{base}\\NonPackaged");
+                    for app in subclaves(raiz, &np) {
+                        una(format!("{np}\\{app}"), &app);
+                    }
+                } else {
+                    una(format!("{base}\\{sub}"), &sub);
+                }
+            }
+        }
+    }
+    v
 }
 
 fn tema_oscuro() -> bool {

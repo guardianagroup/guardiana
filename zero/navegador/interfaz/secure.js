@@ -263,7 +263,7 @@
     if (g.anfitrion && E.codigo_grupo && nombres.length < (g.max || 6)) { mas.hidden = false; $('c-mas-codigo').textContent = E.codigo_grupo; } else mas.hidden = true;
     pintaChat(nombres.length > 2);
   };
-  en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); pintaModo(m); fasePinta(); pintaResumen(m.resumen); pintaProgreso(m); pintaIncidente(m); pintaVoz(); $('c-voz-otro').hidden = !m.otro_voz_protegida; });
+  en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); pintaModo(m); fasePinta(); pintaResumen(m.resumen); pintaProgreso(m); pintaIncidente(m); pintaVoz(); $('c-voz-otro').hidden = !m.otro_voz_protegida; pintaVigia(m); pintaInforme(m); aplicaPausa(m); pintaVivo(m); });
   // How far a file is, both ways, and how long it has left (16 Oct 2026).
   const duracion = (s) => { s = Math.max(0, Math.round(s)); if (s < 60) return s + ' s'; if (s < 3600) return Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + (s % 60) + ' s' : ''); const h = Math.floor(s / 3600), mi = Math.floor((s % 3600) / 60); return h + ' h' + (mi ? ' ' + mi + ' min' : ''); };
   const pintaProgreso = (m) => {
@@ -893,9 +893,15 @@
     pintaTimbre(m); pintaBotones(m); pintaPerdida(m);
     const l = m.llamada;
     const caja = $('c-llamada');
+    const enLlamada = !!l && l.conectada !== false && !movilHabla && !$('c-chat').hidden;
+    document.querySelector('.secure').classList.toggle('en-llamada', enLlamada);
+    if (!l) medidorPara();
     if (!l) { $('c-permiso').hidden = true; $('c-permiso').dataset.camara = ''; caja.hidden = true; caja.classList.remove('llamando'); paraMedios(); mimeRemoto = null; if (tonoLlamando) { clearInterval(tonoLlamando); tonoLlamando = null; } return; }
     caja.hidden = false;
     caja.classList.toggle('solo-voz', !l.video);
+    $('c-l-letra').textContent = ((m.contacto || quien(m) || '·').trim()[0] || '·').toUpperCase();
+    $('vj-otro').textContent = quien(m);
+    if (l.conectada !== false && !movilHabla) medidorEmpieza();
     const llamando = l.conectada === false;
     caja.classList.toggle('llamando', llamando);
     caja.querySelector('.pantallas').dataset.llamando = t('sec_l_llamando', { n: quien(m) });
@@ -1080,6 +1086,7 @@
   // What leaves: the voice changed when «Proteger mi voz» is on, the camera as it is.
   const rtcEnvio = () => fuenteGrabacion();
   const rtcTile = (stream) => {
+    remoto = stream;
     $('c-rejilla').innerHTML = '';
     const tile = document.createElement('div'); tile.className = 'tile';
     const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; v.srcObject = stream;
@@ -1118,6 +1125,7 @@
     if (!s || !(E && E.llamada)) { if (s) s.getTracks().forEach((x) => x.stop()); arrancando = false; return; }
     local = s;
     local.getAudioTracks().forEach((x) => { x.enabled = !silenciado; });
+    if (pausaAplicada) local.getTracks().forEach((x) => { x.enabled = false; });
     $('c-permiso').hidden = !$('c-permiso').dataset.camara;
     $('c-local').srcObject = local;
     llamadaVideo = !!l.video && local.getVideoTracks().length > 0;
@@ -1183,7 +1191,340 @@
   // or the same button brings them back.
   $('c-pantalla').addEventListener('click', () => { const p = document.querySelector('#c-llamada .pantallas'); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else if (p && p.requestFullscreen) p.requestFullscreen().catch(() => {}); });
   en('secure_estado', (m) => { $('c-pantalla').hidden = !(m.llamada && m.llamada.video && m.llamada.conectada !== false); });
-  $('c-silencio').addEventListener('click', () => { silenciado = !silenciado; if (local) local.getAudioTracks().forEach((x) => { x.enabled = !silenciado; }); $('c-silencio').setAttribute('aria-pressed', String(silenciado)); $('c-silencio').querySelector('span').textContent = t(silenciado ? 'sec_l_sonar' : 'sec_l_silenciar'); });
+  $('c-silencio').addEventListener('click', () => { silenciado = !silenciado; if (local) local.getAudioTracks().forEach((x) => { x.enabled = !silenciado && !pausaAplicada; }); $('c-silencio').setAttribute('aria-pressed', String(silenciado)); $('c-silencio').querySelector('span').textContent = t(silenciado ? 'sec_l_sonar' : 'sec_l_silenciar'); });
+
+  // ---------- The call, live (17 Oct 2026: «que se vea movimiento … datos los más posibles
+  // durante una llamada», the design the owner chose: Pulso, with the chat on the left) ----------
+  // Every figure here is measured: WebRTC's own statistics once a second (round trip, jitter,
+  // loss, bitrate, codecs, the route), and the voices' levels from the sound itself every
+  // 120 ms. Where something cannot be measured (the recorded pieces have no round trip) it
+  // shows «—», never an invented number.
+  let remoto = null;
+  let ctxVoz = null;
+  const analizadores = new Map();
+  const analizador = (stream) => {
+    if (!stream || !stream.getAudioTracks || !stream.getAudioTracks().length) return null;
+    let a = analizadores.get(stream.id);
+    if (a) return a;
+    try {
+      ctxVoz = ctxVoz || new AudioContext();
+      if (ctxVoz.state === 'suspended') ctxVoz.resume().catch(() => {});
+      const fuenteVoz = ctxVoz.createMediaStreamSource(stream);
+      const an = ctxVoz.createAnalyser(); an.fftSize = 512;
+      fuenteVoz.connect(an);
+      a = { an, buf: new Float32Array(an.fftSize), fuenteVoz };
+      analizadores.set(stream.id, a);
+      return a;
+    } catch (_) { return null; }
+  };
+  const nivelDe = (a) => {
+    if (!a) return 0;
+    a.an.getFloatTimeDomainData(a.buf);
+    let suma = 0; for (let i = 0; i < a.buf.length; i++) suma += a.buf[i] * a.buf[i];
+    return Math.min(1, Math.sqrt(suma / a.buf.length) * 5);
+  };
+  // The other voice: the WebRTC stream, or what the player of the recorded pieces is playing.
+  const streamRemoto = () => {
+    if (remoto && remoto.active) return remoto;
+    const v = document.querySelector('#c-rejilla video');
+    if (v && v.captureStream) { try { if (!v.dataset.capturado) { v.dataset.capturado = '1'; v._captura = v.captureStream(); } return v._captura; } catch (_) {} }
+    return null;
+  };
+  const BARRAS = 12;
+  const barras = { yo: Array(BARRAS).fill(0), el: Array(BARRAS).fill(0) };
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  ['yo', 'el'].forEach((k) => {
+    const g = $('vj-barras-' + k), cx = k === 'yo' ? 96 : 604;
+    for (let i = 0; i < BARRAS; i++) { const r = document.createElementNS(SVGNS, 'rect'); r.setAttribute('x', String(cx - 40.5 + i * 7)); r.setAttribute('width', '4'); r.setAttribute('rx', '2'); r.setAttribute('y', '169'); r.setAttribute('height', '2'); g.appendChild(r); }
+  });
+  const nivel = { yo: 0, el: 0 };
+  const pintaVoces = () => {
+    const pausa = pausaAplicada;
+    const crudoYo = silenciado || pausa ? 0 : nivelDe(analizador(local));
+    const crudoEl = pausa ? 0 : nivelDe(analizador(streamRemoto()));
+    nivel.yo = nivel.yo * 0.45 + crudoYo * 0.55; nivel.el = nivel.el * 0.45 + crudoEl * 0.55;
+    ['yo', 'el'].forEach((k) => {
+      const b = barras[k]; b.shift(); b.push(nivel[k]);
+      const rects = $('vj-barras-' + k).children;
+      for (let i = 0; i < BARRAS; i++) { const h = Math.max(2, Math.round(2 + b[i] * 20)); rects[i].setAttribute('y', String(170 - h / 2)); rects[i].setAttribute('height', String(h)); }
+      $('vj-halo-' + k).setAttribute('r', (16 + nivel[k] * 16).toFixed(1));
+      const habla = nivel[k] > 0.07;
+      const e = $('vj-' + k + '-estado');
+      e.textContent = k === 'yo' && silenciado ? t('sec_vj_silenciado') : habla ? t(k === 'yo' && vozActiva ? 'sec_vj_hablando_prot' : 'sec_vj_hablando') : t('sec_vj_silencio');
+      e.setAttribute('class', 'vj-t estado ' + k + (habla ? ' habla' : ''));
+    });
+    $('c-l-letra').style.setProperty('--voz', nivel.el.toFixed(3));
+  };
+  // Once a second: WebRTC's statistics, as differences from the previous second.
+  const MAXS = 60;
+  const nuevaMedida = () => ({ rtt: [], jit: [], per: [], kb: [], prev: null, sumaRtt: 0, nRtt: 0, sumaKa: 0, sumaKv: 0, nK: 0, perMax: 0, codecA: '', codecV: '', res: '', fps: 0, proto: '', relay: true, url: '', pps: 0, bytes: 0, enviado: 0 });
+  let MED = nuevaMedida();
+  let relojVoz = null, relojMide = null;
+  const leeRtc = async (pc) => {
+    const st = await pc.getStats();
+    const por = new Map(); st.forEach((x) => por.set(x.id, x));
+    let par = null;
+    st.forEach((x) => { if (x.type === 'transport' && x.selectedCandidatePairId) par = por.get(x.selectedCandidatePairId) || par; });
+    if (!par) st.forEach((x) => { if (!par && x.type === 'candidate-pair' && x.nominated && x.state === 'succeeded') par = x; });
+    const lc = par ? por.get(par.localCandidateId) : null;
+    let ai = null, vi = null, ao = null, vo = null;
+    st.forEach((x) => {
+      if (x.type === 'inbound-rtp' && x.kind === 'audio') ai = x;
+      if (x.type === 'inbound-rtp' && x.kind === 'video') vi = x;
+      if (x.type === 'outbound-rtp' && x.kind === 'audio') ao = x;
+      if (x.type === 'outbound-rtp' && x.kind === 'video') vo = x;
+    });
+    const codec = (r) => { const c = r && r.codecId ? por.get(r.codecId) : null; return c && c.mimeType ? String(c.mimeType).split('/')[1] || '' : ''; };
+    const v = (r, k) => (r && typeof r[k] === 'number' ? r[k] : 0);
+    return {
+      t: performance.now(),
+      rtt: par && typeof par.currentRoundTripTime === 'number' ? par.currentRoundTripTime * 1000 : null,
+      jit: ai && typeof ai.jitter === 'number' ? ai.jitter * 1000 : null,
+      perdidos: v(ai, 'packetsLost') + v(vi, 'packetsLost'), recibidos: v(ai, 'packetsReceived') + v(vi, 'packetsReceived'),
+      bAi: v(ai, 'bytesReceived'), bVi: v(vi, 'bytesReceived'),
+      bytes: v(par, 'bytesSent') + v(par, 'bytesReceived'), pk: v(par, 'packetsSent') + v(par, 'packetsReceived'),
+      codecA: codec(ai) || codec(ao), codecV: codec(vi) || codec(vo),
+      res: vi && vi.frameWidth ? vi.frameWidth + '×' + vi.frameHeight : '', fps: vi && vi.framesPerSecond ? Math.round(vi.framesPerSecond) : 0,
+      relay: lc ? lc.candidateType === 'relay' : true, proto: lc ? String(lc.relayProtocol || lc.protocol || '').toUpperCase() : '',
+    };
+  };
+  const ciudadDe = (h) => (/rele-am\./i.test(h || '') ? 'Miami' : /rele\.guardianagroup/i.test(h || '') ? 'Núremberg' : '');
+  const empuja = (a, x) => { a.push(x); if (a.length > MAXS) a.shift(); };
+  const mide = async () => {
+    const l = E && E.llamada;
+    if (!l || l.conectada === false || movilHabla) return;
+    const tr = (E.monitor || {}).transporte || {};
+    let r = null;
+    if (rtc && rtc.pc && rtc.conectada) { try { r = await leeRtc(rtc.pc); } catch (_) { r = null; } }
+    const p = MED.prev;
+    if (r) {
+      const dt = p ? Math.max(0.2, (r.t - p.t) / 1000) : 0;
+      if (r.rtt != null) { empuja(MED.rtt, r.rtt); MED.sumaRtt += r.rtt; MED.nRtt++; }
+      if (r.jit != null) empuja(MED.jit, r.jit);
+      if (p && dt) {
+        const dL = Math.max(0, r.perdidos - p.perdidos), dR = Math.max(0, r.recibidos - p.recibidos);
+        const per = dL + dR ? (100 * dL) / (dL + dR) : 0;
+        empuja(MED.per, per); MED.perMax = Math.max(MED.perMax, per);
+        const kb = (Math.max(0, r.bytes - p.bytes) * 8) / 1000 / dt;
+        empuja(MED.kb, kb);
+        MED.sumaKa += (Math.max(0, r.bAi - p.bAi) * 8) / 1000 / dt; MED.sumaKv += (Math.max(0, r.bVi - p.bVi) * 8) / 1000 / dt; MED.nK++;
+        MED.pps = Math.max(0, r.pk - p.pk) / dt;
+      }
+      MED.bytes = r.bytes; MED.codecA = r.codecA || MED.codecA; MED.codecV = r.codecV || MED.codecV; MED.res = r.res || MED.res; MED.fps = r.fps || MED.fps;
+      MED.relay = r.relay; MED.proto = r.proto || MED.proto;
+      MED.url = ((rtc.ice || [])[0] || {}).urls; MED.url = Array.isArray(MED.url) ? MED.url[0] : MED.url || '';
+      MED.prev = r;
+    } else {
+      // The recorded pieces: only the bitrate the program measured; no round trip to show.
+      const kb = (tr.kbps_audio || 0) + (tr.kbps_video || 0);
+      if (kb) { empuja(MED.kb, kb); MED.sumaKa += tr.kbps_audio || 0; MED.sumaKv += tr.kbps_video || 0; MED.nK++; }
+      MED.pps = kb ? 8 : 0; MED.bytes += (kb * 1000) / 8;
+      MED.relay = !!E.rele || tr.directo === false; MED.proto = ''; MED.url = E.rele_usado || '';
+      MED.codecA = tr.codec_audio || MED.codecA; MED.codecV = tr.codec_video || MED.codecV; MED.res = tr.resolucion || MED.res;
+    }
+    pintaMedidas();
+    // What the report will say about the connection, kept current in the program.
+    if (Date.now() - MED.enviado > 5000) {
+      MED.enviado = Date.now();
+      const d = { rele: MED.relay, codec_audio: MED.codecA, codec_video: llamadaVideo ? MED.codecV : '', resolucion: llamadaVideo ? MED.res : '' };
+      if (MED.nRtt) d.latencia_media_ms = Math.round(MED.sumaRtt / MED.nRtt);
+      if (MED.per.length) d.perdida_max_pct = Math.round(MED.perMax * 10) / 10;
+      if (MED.nK) { d.kbps_audio_medio = Math.round(MED.sumaKa / MED.nK); if (llamadaVideo) d.kbps_video_medio = Math.round(MED.sumaKv / MED.nK); }
+      manda({ tipo: 'secure', accion: 'medidas', d });
+    }
+    const conVideo = !!(E.llamada && E.llamada.video) && (rtc ? !!(remoto && remoto.getVideoTracks().some((x) => x.readyState === 'live')) : jugadores.size > 0);
+    $('c-llamada').classList.toggle('con-video', conVideo);
+  };
+  const trazo = (a, w, h, lo, hi) => (a.length < 2 ? '' : a.map((v, i) => `${((i * w) / (a.length - 1)).toFixed(1)},${(h - 2 - ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * (h - 4)).toFixed(1)}`).join(' '));
+  const coma = (x, d) => Number(x).toLocaleString(document.documentElement.lang || 'es', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const ultimoDe = (a) => (a.length ? a[a.length - 1] : null);
+  const pintaMedidas = () => {
+    const rtt = ultimoDe(MED.rtt), jit = ultimoDe(MED.jit), per = ultimoDe(MED.per), kb = ultimoDe(MED.kb);
+    const techo = Math.max(150, ...MED.rtt.map((x) => x * 1.15));
+    const pts = trazo(MED.rtt, 320, 92, 0, techo);
+    $('vp-linea').setAttribute('points', pts);
+    $('vp-area').setAttribute('points', pts ? `0,92 ${pts} 320,92` : '');
+    if (rtt != null) { const y = 92 - 2 - (rtt / techo) * 88; $('vp-punto').style.left = '100%'; $('vp-punto').style.top = `${(y / 92) * 100}%`; $('vp-punto').hidden = false; } else $('vp-punto').hidden = true;
+    $('vp-rtt').textContent = rtt != null ? `${Math.round(rtt)} ms` : RAYA;
+    $('vv-lat').textContent = rtt != null ? String(Math.round(rtt)) : RAYA;
+    $('vv-lat-l').setAttribute('points', trazo(MED.rtt.slice(-40), 146, 26, 0, techo));
+    $('vv-lat-n').textContent = t('sec_vv_latencia_n', { n: quien(E) });
+    $('vv-jit').textContent = jit != null ? coma(jit, 1) : RAYA;
+    $('vv-jit-l').setAttribute('points', trazo(MED.jit, 146, 26, 0, 30));
+    const jitMal = jit != null && jit > 30;
+    $('vv-jit-n').textContent = jit == null ? '' : t(jitMal ? 'sec_vv_jitter_mal' : 'sec_vv_jitter_ok');
+    $('vv-jit-n').classList.toggle('mal', jitMal);
+    $('vv-per').textContent = per != null ? coma(per, 1) : RAYA;
+    $('vv-per-l').setAttribute('points', trazo(MED.per, 146, 26, 0, 5));
+    const perMal = per != null && per > 2;
+    $('vv-per-n').textContent = per == null ? '' : t(perMal ? 'sec_vv_perdida_mal' : 'sec_vv_perdida_ok');
+    $('vv-per-n').classList.toggle('mal', perMal);
+    $('vv-kb').textContent = kb != null ? coma(kb / 1000, 2) : RAYA;
+    $('vv-kb-l').setAttribute('points', trazo(MED.kb, 146, 26, 0, Math.max(200, ...MED.kb.map((x) => x * 1.1))));
+    const codecs = [llamadaVideo && MED.codecV ? MED.codecV.toUpperCase() + (MED.res ? ' ' + MED.res : '') + (MED.fps ? ' · ' + MED.fps + ' fps' : '') : '', MED.codecA ? MED.codecA.charAt(0).toUpperCase() + MED.codecA.slice(1) : ''].filter(Boolean).join(' · ');
+    $('vv-kb-n').textContent = codecs;
+    // The journey's figures and its route.
+    const mb = MED.bytes / 1e6;
+    $('vj-cifra').textContent = t('sec_vj_cifra', { p: n(Math.round(MED.pps)), mb: coma(mb, 1) });
+    $('vj-paquetes').classList.toggle('quieto', !MED.pps);
+    const ciudad = ciudadDe(MED.url);
+    $('c-viaje').classList.toggle('directo', !MED.relay);
+    $('vj-rele').textContent = MED.relay ? t('sec_vj_rele') + (ciudad ? ' · ' + ciudad : '') : t('sec_vj_directo');
+    $('vj-rele-s').textContent = t(MED.relay ? 'sec_vj_rele_s' : 'sec_vj_directo_s');
+    const pie = [];
+    if (rtc && rtc.conectada) { pie.push(esc([MED.proto || 'UDP', MED.relay ? 'TURN' : ''].filter(Boolean).join(' · '))); pie.push(`<span class="ok">${esc(t('sec_vj_dtls'))}</span>`); }
+    else pie.push(esc(t('sec_vj_trozos')));
+    if (rtt != null) pie.push(esc(t('sec_vj_ida', { ms: n(Math.round(rtt)) })));
+    $('vj-pie').innerHTML = pie.map((x) => `<span>${x}</span>`).join('');
+  };
+  const medidorEmpieza = () => {
+    if (relojMide) return;
+    MED = nuevaMedida();
+    pintaMedidas();
+    relojMide = setInterval(() => { mide().catch(() => {}); }, 1000);
+    relojVoz = setInterval(pintaVoces, 120);
+  };
+  const medidorPara = () => {
+    clearInterval(relojMide); clearInterval(relojVoz); relojMide = null; relojVoz = null;
+    analizadores.forEach((a) => { try { a.fuenteVoz.disconnect(); } catch (_) {} });
+    analizadores.clear(); remoto = null; nivel.yo = 0; nivel.el = 0;
+    $('c-llamada').classList.remove('con-video');
+  };
+  const capasActivas = (m) => [m.fase === 'lista', true, !!m.cuantico, !!(m.llamada && m.llamada.conectada !== false)].filter(Boolean).length;
+  const pintaVivo = (m) => {
+    const l = m.llamada;
+    const caja = $('vivo');
+    caja.hidden = !(l && l.conectada !== false && !movilHabla);
+    if (caja.hidden) return;
+    const pausada = !!(m.monitor && m.monitor.sesion && m.monitor.sesion.estado === 'pausada');
+    caja.classList.toggle('pausada', pausada);
+    $('vp-palabra').textContent = t(pausada ? 'sec_vv_pausada' : 'sec_vv_protegida');
+    $('vp-capas').textContent = t('sec_vv_capas', { n: n(capasActivas(m)) });
+  };
+  // A stop (something seen, an interference) holds the call's media here as well: WebRTC
+  // flows outside the program, so the page itself sends nothing and plays nothing until it ends.
+  let pausaAplicada = false;
+  const aplicaPausa = (m) => {
+    const p = !!(m.monitor && m.monitor.sesion && m.monitor.sesion.estado === 'pausada');
+    if (p === pausaAplicada) return;
+    pausaAplicada = p;
+    if (local) local.getTracks().forEach((x) => { x.enabled = p ? false : (x.kind === 'audio' ? !silenciado : true); });
+    document.querySelectorAll('#c-rejilla video').forEach((v) => { v.muted = p; });
+  };
+  // ---------- This computer, watched (Windows' own record), and the other side's ----------
+  const pintaVigia = (m) => {
+    const caja = $('equipo'), vg = m.vigia;
+    caja.hidden = !(m.fase === 'lista' && vg);
+    if (caja.hidden) return;
+    const este = vg.este || {};
+    const usando = (r) => (vg.en_uso || []).filter((x) => x.recurso === r).map((x) => x.programa);
+    const celda = (id, r, lista) => {
+      const el = $(id), u = usando(r);
+      let c, txt;
+      if (u.length) { c = 'alerta'; txt = t('sec_eq_usando', { p: u.join(', ') }); }
+      else if (lista.length) { c = 'aviso'; txt = t('sec_eq_uso', { p: lista.join(', ') }); }
+      else if (r === 'pantalla' && este.pantalla_protegida) { c = 'ok'; txt = t('sec_eq_protegida_corto'); }
+      else if (!este.vigilado) { c = 'nada'; txt = t('sec_eq_no_vigilable_corto'); }
+      else if (r === 'pantalla') { c = 'aviso'; txt = t('sec_eq_sin_proteger'); }
+      else { c = 'ok'; txt = t('sec_eq_solo'); }
+      el.className = 'eq ' + c; el.querySelector('b').textContent = txt;
+    };
+    celda('eq-mic', 'microfono', este.microfono || []);
+    celda('eq-cam', 'camara', este.camara || []);
+    celda('eq-pant', 'pantalla', este.pantalla || []);
+    const o = vg.otro, nom = m.contacto || '';
+    const visto = (x) => [...(x.microfono || []).map((p) => t('sec_eq_visto_mic', { p })), ...(x.camara || []).map((p) => t('sec_eq_visto_cam', { p })), ...(x.pantalla || []).map((p) => t('sec_eq_visto_pant', { p }))];
+    let oc = '', ot;
+    if (m.otro_movil) ot = t('sec_eq_otro_movil', { n: nom });
+    else if (!o) ot = t('sec_eq_otro_nada', { n: nom });
+    else if (!o.vigilado) ot = t('sec_eq_otro_no_vigilable', { n: nom });
+    else if (!visto(o).length) { oc = 'ok'; ot = t('sec_eq_otro_limpio', { n: nom }); }
+    else { oc = 'aviso'; ot = t('sec_eq_otro_visto', { n: nom, l: visto(o).join('; ') }); }
+    $('eq-otro').className = 'eq-otro ' + oc; $('eq-otro').textContent = ot;
+  };
+  // ---------- The call's report (17 Oct 2026: «la valoración final … si ha habido espionaje,
+  // si ha habido grabación … ese es el resumen») ----------
+  let INF = null;
+  const nivelInforme = (r) => {
+    const v = r.veredicto || {}, este = v.este || {}, o = v.otro;
+    if (!r.sin_espionaje) return 'revisar';
+    return !este.vigilado || v.otro_movil || !o || !o.vigilado ? 'incompleto' : 'limpio';
+  };
+  const filasInforme = (r) => {
+    const v = r.veredicto || {}, este = v.este || {}, o = v.otro, nom = r.contacto || '';
+    const nivelR = nivelInforme(r);
+    const f = [];
+    f.push([t('sec_in_espionaje'), t(nivelR === 'revisar' ? 'sec_in_esp_si' : nivelR === 'incompleto' ? 'sec_in_esp_no_visto' : 'sec_in_esp_no'), nivelR === 'revisar' ? 'alerta' : 'ok']);
+    const mc = [...(este.microfono || []).map((p) => t('sec_eq_visto_mic', { p })), ...(este.camara || []).map((p) => t('sec_eq_visto_cam', { p }))];
+    f.push([t('sec_in_grab_equipo'), !este.vigilado ? t('sec_eq_no_vigilable') : mc.length ? mc.join('; ') : t('sec_in_grab_no'), !este.vigilado ? 'aviso' : mc.length ? 'alerta' : 'ok']);
+    const pc = (este.pantalla || []).map((p) => t('sec_eq_visto_pant', { p }));
+    f.push([t('sec_in_grab_pantalla'), pc.length ? pc.join('; ') : t(este.pantalla_protegida ? 'sec_in_pant_bloq' : 'sec_in_pant_no'), pc.length ? 'alerta' : este.pantalla_protegida ? 'ok' : 'aviso']);
+    const vo = o ? [...(o.microfono || []).map((p) => t('sec_eq_visto_mic', { p })), ...(o.camara || []).map((p) => t('sec_eq_visto_cam', { p })), ...(o.pantalla || []).map((p) => t('sec_eq_visto_pant', { p }))] : [];
+    f.push([t('sec_in_otro', { n: nom }), v.otro_movil ? t('sec_eq_otro_movil', { n: nom }) : !o ? t('sec_eq_otro_nada', { n: nom }) : !o.vigilado ? t('sec_eq_otro_no_vigilable', { n: nom }) : vo.length ? vo.join('; ') : t('sec_eq_otro_limpio', { n: nom }), vo.length ? 'alerta' : o && o.vigilado && !v.otro_movil ? 'ok' : 'aviso']);
+    const directa = r.conexion && r.conexion.directa === true;
+    f.push([t('sec_in_servidor'), t(directa ? 'sec_in_directo_t' : 'sec_in_rele_t'), 'ok']);
+    f.push([t('sec_in_identidad'), t(v.identidad_verificada ? 'sec_in_identidad_ok' : 'sec_in_identidad_mal'), v.identidad_verificada ? 'ok' : 'alerta']);
+    f.push([t('sec_in_interf'), v.interferencias ? n(v.interferencias) : t('sec_in_interf_no'), v.interferencias ? 'alerta' : 'ok']);
+    const c = r.conexion || {};
+    if (c.latencia_media_ms != null || c.kbps_audio_medio != null) {
+      const partes = [];
+      if (c.latencia_media_ms != null) partes.push(t('sec_in_con_lat', { ms: n(c.latencia_media_ms) }));
+      if (c.perdida_max_pct != null) partes.push(t('sec_in_con_per', { p: coma(c.perdida_max_pct, 1) }));
+      const cod = [c.codec_video ? String(c.codec_video).toUpperCase() + (c.resolucion ? ' ' + c.resolucion : '') : '', c.codec_audio ? String(c.codec_audio) : ''].filter(Boolean).join(' · ');
+      if (cod) partes.push(cod);
+      f.push([t('sec_in_conexion'), partes.join(' · '), '']);
+    }
+    f.push([t('sec_in_firmado'), String(r.firmante || '').slice(0, 22) + '…', '']);
+    return f;
+  };
+  const pintaInforme = (m) => {
+    const r = m.informe;
+    INF = r || null;
+    const velo = $('informe'), caja = $('informe-caja');
+    const nuevo = velo.hidden && !!r;
+    velo.hidden = !r;
+    if (!r) return;
+    const nv = nivelInforme(r);
+    caja.classList.toggle('revisar', nv === 'revisar'); caja.classList.toggle('incompleto', nv === 'incompleto');
+    $('in-que').textContent = `${t('sec_r_clase_' + r.clase)} · ${r.contacto || ''} · ${tiempo(r.duracion_s || 0)}`;
+    $('in-palabra').textContent = t(nv === 'revisar' ? 'sec_in_revisar' : nv === 'incompleto' ? 'sec_in_incompleto' : 'sec_in_limpio');
+    $('in-frase').textContent = t(nv === 'revisar' ? 'sec_in_revisar_frase' : nv === 'incompleto' ? 'sec_in_incompleto_frase' : 'sec_in_limpio_frase');
+    $('in-datos').innerHTML = filasInforme(r).map(([a, b, c]) => `<div class="in-dato"><dt>${esc(a)}</dt><dd class="${c}">${esc(b)}</dd></div>`).join('');
+    if (nuevo) $('in-pdf').focus();
+  };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('informe').hidden) manda({ tipo: 'secure', accion: 'informe_visto' }); });
+  $('in-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'informe_visto' }));
+  $('in-json').addEventListener('click', () => { if (INF) descarga(`guardiana-secure-informe-${sello(INF.fin)}.json`, 'application/json', INF.json); });
+  $('in-csv').addEventListener('click', () => { if (INF) descarga(`guardiana-secure-informe-${sello(INF.fin)}.csv`, 'text/csv;charset=utf-8', '﻿' + INF.csv); });
+  $('in-pdf').addEventListener('click', () => {
+    if (!INF) return;
+    const r = INF, L = []; let y = 792;
+    const linea2 = (x, tam, texto, negrita, ancho) => { for (const s2 of parte(texto, ancho || 92)) { L.push({ x, y, tam, negrita, texto: s2 }); y -= tam + 4; } };
+    L.push({ x: 56, y, tam: 18, negrita: true, texto: 'GUARDIANA SECURE' }); y -= 26;
+    L.push({ x: 56, y, tam: 13, negrita: true, texto: `${t('sec_in_titulo')} · ${r.contacto || ''}` }); y -= 18;
+    L.push({ x: 56, y, tam: 9.5, texto: `${t('sec_r_clase_' + r.clase)} · ${fechaHora(r.inicio)} – ${hora(r.fin)} · ${tiempo(r.duracion_s || 0)}` }); y -= 30;
+    const nv = nivelInforme(r);
+    linea2(56, 15, t(nv === 'revisar' ? 'sec_in_revisar' : nv === 'incompleto' ? 'sec_in_incompleto' : 'sec_in_limpio'), true, 60);
+    y -= 2;
+    linea2(56, 10.5, t(nv === 'revisar' ? 'sec_in_revisar_frase' : nv === 'incompleto' ? 'sec_in_incompleto_frase' : 'sec_in_limpio_frase'), false, 95);
+    y -= 14;
+    for (const [a, b] of filasInforme(r)) {
+      L.push({ x: 56, y, tam: 10.5, negrita: true, texto: a });
+      const trozos = parte(b, 62);
+      trozos.forEach((s2, i) => { L.push({ x: 220, y: y - i * 14, tam: 10.5, texto: s2 }); });
+      y -= Math.max(1, trozos.length) * 14 + 6;
+    }
+    y -= 10;
+    linea2(56, 9.5, t('sec_in_limite'), false, 100);
+    y -= 12;
+    L.push({ x: 56, y, tam: 10.5, negrita: true, texto: t('sec_r_pdf_firmado') }); y -= 15;
+    for (const s2 of parte(r.firmante, 80)) { L.push({ x: 56, y, tam: 8.5, texto: s2 }); y -= 12; }
+    y -= 4;
+    for (const s2 of parte(r.firma, 80)) { L.push({ x: 56, y, tam: 8.5, texto: s2 }); y -= 12; }
+    y -= 14;
+    linea2(56, 9.5, t('sec_r_pdf_nota'), false, 100);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([pdfDe(L)], { type: 'application/pdf' })); a.download = `guardiana-secure-informe-${sello(r.fin)}.pdf`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  });
 
   let ultimo = {};
   en('monitor', (m) => { ultimo = m.monitor || {}; pinta(ultimo); });

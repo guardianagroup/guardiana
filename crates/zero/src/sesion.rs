@@ -1222,6 +1222,22 @@ impl Sesion {
             .map(|p| p.id)
     }
 
+    /// Whether a SECURE conversation is open: the window then reads Windows' record of the
+    /// microphone, the camera and the screen, and keeps itself out of screen captures.
+    pub fn conversando(&self) -> bool {
+        self.secure.conversando()
+    }
+
+    /// What Windows recorded about the microphone, the camera and the screen (17 Oct 2026).
+    pub fn vigia(&mut self, usos: &[crate::vigia::Uso]) {
+        self.secure.vigia(usos);
+    }
+
+    /// Whether the window could keep itself out of screenshots and recordings.
+    pub fn pantalla_protegida(&mut self, si: bool) {
+        self.secure.pantalla(si);
+    }
+
     /// Whether a call is going on (in a conversation or in the house's room).
     pub fn en_llamada(&self) -> bool {
         self.secure.en_llamada()
@@ -1367,6 +1383,14 @@ impl Sesion {
             "rtc" => {
                 self.secure.rtc(&m["d"]);
                 return Vec::new();
+            }
+            "medidas" => {
+                self.secure.medidas(&m["d"]);
+                return Vec::new();
+            }
+            "informe_visto" => {
+                self.secure.olvida_informe();
+                Ok(())
             }
             "nombre" => {
                 self.secure.nombre_propio = texto(m, "nombre").chars().take(60).collect();
