@@ -570,8 +570,8 @@
     ol.innerHTML = filaSala(m) + `<li class="${vista === 'contacto' || !m.sala ? 'activa' : ''}" data-vista="contacto"><span class="avatar">${esc((nombre.trim()[0] || '·').toUpperCase())}${f === 'lista' ? '<i></i>' : ''}</span><b>${esc(nombre)}</b><time>${ultimo ? esc(hora(ultimo.t).slice(0, 5)) : ''}</time><span class="ultimo">${esc(linea)}</span></li>`;
     if (vista !== 'sala' || !m.sala) $('miga-donde').textContent = t('sec_miga_conv');
   };
-  $('c-lista').addEventListener('click', (e) => { const li = e.target.closest('li[data-vista]'); if (!li || !E.sala) return; vista = li.dataset.vista; fasePinta(); pintaLista(E, E.contacto, ((E.grupo || {}).nombres || [])); pintaVista(E); });
-  $('c-nueva').addEventListener('click', () => { if (!hayContacto(E) && !E.sala && !movilActivo(E)) { modo = null; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); } });
+  $('c-lista').addEventListener('click', (e) => { const li = e.target.closest('li[data-vista]'); if (!li || !E.sala) return; vista = li.dataset.vista; modo = vista === 'sala' ? 'sala' : (movilActivo(E) && !hayContacto(E) ? 'movil' : 'equipos'); guardaModo(); fasePinta(); pintaLista(E, E.contacto, ((E.grupo || {}).nombres || [])); pintaVista(E); });
+  $('c-nueva').addEventListener('click', () => { if (!hayContacto(E) && !movilActivo(E)) { modo = null; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); } });
 
   // «Pasar al móvil»: the program shows a QR code; the phone's camera opens our page, which
   // talks to this computer directly (TLS 1.3 pinned to the certificate in the code). The
@@ -622,14 +622,16 @@
   const guardaModo = () => { try { if (modo) sessionStorage.setItem('secure-modo', modo); else sessionStorage.removeItem('secure-modo'); } catch (_) {} };
   const movilActivo = (m) => !!(m.movil && (m.movil.enganchado || m.movil.pendiente || m.movil.qr));
   const pintaModo = (m) => {
-    // What is going on decides the mode; the person's choice only while nothing is going on.
-    if (m.sala) modo = 'sala';
-    else if (movilActivo(m)) modo = 'movil';
-    else if (hayContacto(m)) modo = 'equipos';
+    // The person's choice wins; what is going on only fills the gap (17 Oct 2026: an open room
+    // kept the screen in «Modo casa» and the other two cards did nothing). A conversation with
+    // someone takes the screen when it starts.
+    const enConversacion = hayContacto(m) || movilActivo(m);
+    if (enConversacion && modo !== 'equipos' && modo !== 'movil') modo = movilActivo(m) && !hayContacto(m) ? 'movil' : 'equipos';
+    else if (!modo && m.sala) modo = 'sala';
     guardaModo();
     const activo = !!m.sala || movilActivo(m) || hayContacto(m);
     $('c-inicio').hidden = !!modo;
-    $('c-modo-cab').hidden = !modo || activo;
+    $('c-modo-cab').hidden = !modo || hayContacto(m) || movilActivo(m);
     if (modo) $('c-modo-nombre').textContent = t('sec_modo_' + modo);
     $('c-modo-movil').hidden = modo !== 'movil';
     const sala = $('c-sala-tarjeta');
@@ -649,8 +651,9 @@
     pintaModo(m);
     const s = m.sala;
     if (!s) vista = 'contacto';
-    else if (!hayContacto(m)) vista = 'sala';
-    const enSala = !!s && vista === 'sala';
+    else if (modo === 'sala') vista = 'sala';
+    else if (!hayContacto(m) && !movilActivo(m)) vista = 'sala';
+    const enSala = !!s && vista === 'sala' && modo === 'sala';
     $('c-sala-chat').hidden = !enSala;
     for (const id of ['c-conexion', 'c-comparar', 'c-espera', 'c-resumen', 'c-chat']) if (enSala) $(id).hidden = true;
     if (!enSala) return;

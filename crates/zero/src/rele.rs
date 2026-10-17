@@ -62,8 +62,8 @@ pub const RELE_NOMBRE: &str = "rele.guardianagroup.com";
 /// The letters of a code: no 0/O/1/I, so it reads well aloud.
 const ALFABETO: &[u8; 32] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-/// The nearest relay, measured once (the time to open a TCP connection to each, two seconds
-/// at most); 0 until measured, or when the environment names a relay.
+/// The nearest relay, measured once (the time to open a TLS connection to each, certificate
+/// checked); 0 until measured, or when the environment names a relay.
 static PREFERIDO: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
 
 /// Measure once which relay answers fastest from here, in its own thread; `preferido()` reads
@@ -74,9 +74,13 @@ pub fn mide_cercania() {
     }
     std::thread::spawn(|| {
         let mut mejor = (0usize, Duration::MAX);
+        let raices = raices_publicas();
         for (i, r) in RELES.iter().enumerate() {
             let t = std::time::Instant::now();
-            if abre_hacia(&r.direccion()).is_ok() {
+            // The whole way in, certificate included (17 Oct 2026: a relay half set up answered
+            // on 443 without a valid certificate, won the race by distance, and every phone
+            // link from Colombia failed on it). A relay that cannot complete TLS is not near.
+            if por_tls(&r.direccion(), r.nombre, raices.clone()).is_ok() {
                 let d = t.elapsed();
                 if d < mejor.1 {
                     mejor = (i, d);
