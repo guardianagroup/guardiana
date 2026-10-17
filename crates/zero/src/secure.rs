@@ -290,6 +290,11 @@ impl Recibido {
         )
     }
 
+    /// A sound the page can play in the chat (a voice note, 17 Oct 2026).
+    pub fn audio(&self) -> bool {
+        mensaje::mime_de(&self.nombre).starts_with("audio/")
+    }
+
     /// Safe to open with a double click: never a program or a script.
     pub fn abrible(&self) -> bool {
         !matches!(
@@ -336,7 +341,7 @@ impl Recibido {
 
     /// What the page draws.
     pub fn json(&self) -> Value {
-        json!({ "id": self.id, "nombre": self.nombre, "bytes": self.bytes, "t": self.t, "borrado": self.borrado, "imagen": self.imagen(), "abrible": self.abrible() })
+        json!({ "id": self.id, "nombre": self.nombre, "bytes": self.bytes, "t": self.t, "borrado": self.borrado, "imagen": self.imagen(), "audio": self.audio(), "abrible": self.abrible() })
     }
 }
 
@@ -2129,13 +2134,13 @@ impl Secure {
                         .recibidos
                         .iter()
                         .rev()
-                        .find(|r| r.nombre == n && r.imagen())
+                        .find(|r| r.nombre == n && (r.imagen() || r.audio()))
                     {
                         linea.archivo_id = (r.id & 0xffff_ffff) as u32;
                         if let Some(m) = &self.movil {
                             if m.enganchado && m.aprobado && r.bytes <= 16 * 1024 * 1024 {
                                 if let Ok(datos) = std::fs::read(&r.ruta) {
-                                    m.manda(crate::movil::Hacia::Estado(json!({ "tipo": "archivo_movil", "id": linea.archivo_id, "nombre": n, "mime": mime_imagen(&n), "bytes": datos.len() }).to_string()));
+                                    m.manda(crate::movil::Hacia::Estado(json!({ "tipo": "archivo_movil", "id": linea.archivo_id, "nombre": n, "mime": if r.audio() { mensaje::mime_de(&n) } else { mime_imagen(&n) }, "bytes": datos.len() }).to_string()));
                                     for trozo in datos.chunks(65536) {
                                         m.manda(crate::movil::Hacia::Archivo(
                                             linea.archivo_id,

@@ -243,7 +243,7 @@
     else { delete $('c-nombre').dataset.nuevo; if (E.contacto && !$('c-nombre').value && f !== 'lista') $('c-nombre').value = E.contacto; }
     const g = E.grupo || {};
     const nombres = g.nombres || [];
-    $('c-con').textContent = nombres.length > 2 ? t('sec_m_grupo', { n: nombres.join(' · ') }) : E.contacto ? t('sec_m_con', { n: E.contacto }) : '';
+    $('c-con').textContent = nombres.length > 2 ? t('sec_m_grupo', { n: nombres.join(' · ') }) : E.contacto ? E.contacto : '';
     // The avatar: the first letter of the name (the design the owner chose, 16 Oct 2026).
     const quien = nombres.length > 2 ? nombres.filter((x) => x !== g.yo)[0] || '' : (E.contacto || '');
     $('c-avatar-letra').textContent = (quien.trim()[0] || '·').toUpperCase();
@@ -290,6 +290,9 @@
   const minis = new Map(), pedidas = new Set();
   let chatAntes = '', ultimoSuyo = null;
   const tam = (b) => (b >= 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b >= 1e6 ? (b / 1e6).toFixed(1) + ' MB' : b >= 1e3 ? Math.round(b / 1e3) + ' KB' : b + ' B');
+  // Voice notes: the player, or a quiet «…» while the sound comes from the program.
+  const audios = new Map(), notasPropias = new Map();
+  const notaVoz = (url, nombre) => `<div class="nota-voz">${url ? `<audio controls preload="metadata" src="${esc(url)}"></audio>` : `<span class="nv-etiqueta">${esc(t('sec_nv_nota'))} · …</span>`}${/cambiada/.test(nombre || '') ? `<span class="nv-etiqueta">${esc(t('sec_nv_cambiada_corta'))}</span>` : ''}</div>`;
   const tarjetaArchivo = (r) => {
     const ext = (r.nombre.split('.').pop() || '').slice(0, 4).toUpperCase();
     const mini = r.imagen && !r.borrado && minis.has(r.id) ? `<img src="${minis.get(r.id)}" alt="">` : esc(ext || '·');
@@ -331,7 +334,7 @@
   };
   const pintaChat = (conNombre) => {
     const recibidos = E.recibidos || [];
-    const clave = JSON.stringify([E.mensajes, recibidos, E.enviados, (E.envio || {}).nombre, conNombre, [...minis.keys()], E.escribiendo]);
+    const clave = JSON.stringify([E.mensajes, recibidos, E.enviados, (E.envio || {}).nombre, conNombre, [...minis.keys()], [...audios.keys()], E.escribiendo]);
     if (clave === chatAntes) return;
     chatAntes = clave;
     const ol = $('c-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 30;
@@ -345,13 +348,16 @@
         const r = recibidos.find((x) => !usados.has(x.id) && x.nombre === nombreArchivo && Math.abs((x.t || 0) - (m.t || 0)) <= 3);
         if (r) {
           usados.add(r.id);
-          if (r.imagen && !r.borrado && !minis.has(r.id) && !pedidas.has(r.id)) { pedidas.add(r.id); manda({ tipo: 'secure', accion: 'archivo_vista', id: r.id }); }
+          if ((r.imagen || r.audio) && !r.borrado && !minis.has(r.id) && !audios.has(r.id) && !pedidas.has(r.id)) { pedidas.add(r.id); manda({ tipo: 'secure', accion: 'archivo_vista', id: r.id }); }
+          // A voice note plays right in the chat, like WhatsApp.
+          if (r.audio && !r.borrado) return `<li class="archivo-li" data-id="${esc(m.id || '')}">${de}${notaVoz(audios.get(r.id), r.nombre)}${reacciones(m)}<time>${esc(hora(m.t))}</time></li>`;
           return `<li class="archivo-li" data-id="${esc(m.id || '')}">${de}${tarjetaArchivo(r)}${reacciones(m)}<time>${esc(hora(m.t))}</time></li>`;
         }
       }
       if (m.mio && nombreArchivo) {
         const x = (E.enviados || []).find((y) => y.nombre === nombreArchivo && Math.abs((y.t || 0) - (m.t || 0)) <= 3);
         const estado = x && typeof x.llego_en === 'number' ? '✓ ' + t('sec_f_entregado_en', { t: duracion(x.llego_en) }) : (E.envio && E.envio.nombre === nombreArchivo ? t('sec_f_en_camino') : t('sec_f_enviado'));
+        if (notasPropias.has(nombreArchivo)) return `<li class="mio" data-id="${esc(m.id || '')}">${notaVoz(notasPropias.get(nombreArchivo), nombreArchivo)}<span class="a-entrega">${esc(estado)}</span>${reacciones(m)}<time>${esc(hora(m.t))}</time></li>`;
         return `<li class="mio" data-id="${esc(m.id || '')}">📎 ${esc(nombreArchivo)}${x ? ` <small class="a-tam">${esc(tam(x.bytes))}</small>` : ''}<span class="a-entrega">${esc(estado)}</span>${reacciones(m)}<time>${esc(hora(m.t))}</time></li>`;
       }
       return `<li class="${m.mio ? 'mio' : ''}" data-id="${esc(m.id || '')}">${de}${citaDe(m, E.mensajes)}${esc(m.texto)}${reacciones(m)}${metaMensaje(m)}</li>`;
@@ -364,6 +370,8 @@
   };
   // The picture comes once, full size: keep a small copy only.
   en('secure_vista', (m) => {
+    // A voice note: kept as it came, to play.
+    if (typeof m.url === 'string' && m.url.startsWith('data:audio/')) { audios.set(m.id, m.url); if (E) pintaChat(((E.grupo || {}).nombres || []).length > 2); return; }
     const img = new Image();
     img.onload = () => {
       const lado = 112, c = document.createElement('canvas'); c.width = lado; c.height = lado;
@@ -561,11 +569,72 @@
   };
   const encola = (files) => { for (const f of files) cola.push(f); enviaSiguiente(); };
   $('c-archivo').addEventListener('change', () => { encola($('c-archivo').files); $('c-archivo').value = ''; });
-  const zona = $('c-zona');
-  ['dragenter', 'dragover'].forEach((ev) => zona.addEventListener(ev, (e) => { e.preventDefault(); zona.classList.add('sobre'); }));
-  ['dragleave', 'drop'].forEach((ev) => zona.addEventListener(ev, (e) => { e.preventDefault(); zona.classList.remove('sobre'); }));
-  zona.addEventListener('drop', (e) => { if (e.dataTransfer && e.dataTransfer.files.length) encola(e.dataTransfer.files); });
+  // A file dragged anywhere over the conversation: the drop area appears; dropped, it goes.
+  const zona = $('c-zona'), chatCaja = $('c-chat');
+  ['dragenter', 'dragover'].forEach((ev) => chatCaja.addEventListener(ev, (e) => { if (e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files')) { e.preventDefault(); zona.classList.add('sobre'); } }));
+  chatCaja.addEventListener('dragleave', (e) => { if (!chatCaja.contains(e.relatedTarget)) zona.classList.remove('sobre'); });
+  chatCaja.addEventListener('drop', (e) => { e.preventDefault(); zona.classList.remove('sobre'); if (e.dataTransfer && e.dataTransfer.files.length) encola(e.dataTransfer.files); });
   $('p-reanudar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'reanudar' }));
+
+  // ---------- Voice notes (17 Oct 2026, «como WhatsApp, normal y con la voz cambiada») ----------
+  // The microphone offers two ways: the voice as it is, or changed (the same «Proteger mi voz»
+  // as in calls, voz.js). The note is recorded here, then goes like any file: encrypted end to
+  // end, in pieces. Five minutes at most.
+  let nota = null;
+  const NV_MAX = 5 * 60;
+  const mimeNota = () => ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find((x) => window.MediaRecorder && MediaRecorder.isTypeSupported(x)) || '';
+  const pintaNota = () => {
+    const g = !!nota;
+    $('c-grabando').hidden = !g; $('c-texto').hidden = g;
+    $('c-microfono').classList.toggle('activo', g);
+    $('c-microfono').title = t(g ? 'sec_nv_enviar' : 'sec_nv_grabar');
+    if (g) { const s = Math.floor((Date.now() - nota.desde) / 1000); $('c-grabando-t').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); $('c-grabando-modo').textContent = t(nota.cambiada ? 'sec_nv_cambiada' : 'sec_nv_normal'); }
+  };
+  const empiezaNota = async (cambiada) => {
+    $('c-nv-elige').hidden = true;
+    if (nota || !window.MediaRecorder) return;
+    let s;
+    try { s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); } catch (e) { muestraPermiso(e, 'microfono'); return; }
+    let vp = null, fuente = s;
+    if (cambiada && window.vozProtegida) { try { vp = window.vozProtegida(s, -4); fuente = vp.stream; } catch (_) { vp = null; } }
+    const tipo = mimeNota();
+    let r;
+    try { r = new MediaRecorder(fuente, tipo ? { mimeType: tipo, audioBitsPerSecond: 32000 } : undefined); } catch (_) { s.getTracks().forEach((x) => x.stop()); if (vp) vp.parar(); aviso(t('sec_l_sin_medios')); return; }
+    nota = { s, vp, r, trozos: [], cambiada, desde: Date.now(), tipo: r.mimeType || tipo, reloj: null, enviar: false };
+    r.ondataavailable = (e) => { if (e.data && e.data.size) nota && nota.trozos.push(e.data); };
+    r.onstop = () => terminaNota();
+    r.start(250);
+    nota.reloj = setInterval(() => { if (!nota) return; pintaNota(); if (Date.now() - nota.desde > NV_MAX * 1000) paraNota(true); }, 250);
+    pintaNota();
+  };
+  const paraNota = (enviar) => { if (!nota) return; nota.enviar = enviar; try { nota.r.stop(); } catch (_) { terminaNota(); } };
+  const terminaNota = () => {
+    const n = nota; if (!n) return;
+    nota = null; clearInterval(n.reloj);
+    n.s.getTracks().forEach((x) => x.stop()); if (n.vp) n.vp.parar();
+    pintaNota();
+    if (!n.enviar || !n.trozos.length || Date.now() - n.desde < 700) return;
+    const tipo = (n.tipo || 'audio/webm').split(';')[0];
+    const ext = tipo === 'audio/mp4' ? 'm4a' : 'webm';
+    const d = new Date(), p = (x) => String(x).padStart(2, '0');
+    const nombre = `nota-de-voz${n.cambiada ? '-cambiada' : ''}-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.${ext}`;
+    const blob = new Blob(n.trozos, { type: tipo });
+    notasPropias.set(nombre, URL.createObjectURL(blob));
+    encola([new File([blob], nombre, { type: tipo })]);
+  };
+  $('c-microfono').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (nota) { paraNota(true); return; }
+    $('c-nv-elige').hidden = !$('c-nv-elige').hidden;
+    if (!$('c-nv-elige').hidden) $('c-nv-normal').focus();
+  });
+  $('c-nv-normal').addEventListener('click', () => empiezaNota(false));
+  $('c-nv-cambiada').addEventListener('click', () => empiezaNota(true));
+  $('c-nv-cancelar').addEventListener('click', () => paraNota(false));
+  document.addEventListener('click', (e) => { if (!e.target.closest('#c-nv-elige') && !e.target.closest('#c-microfono')) $('c-nv-elige').hidden = true; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('c-nv-elige').hidden = true; if (nota) paraNota(false); } });
+  // Enter or «send» while recording sends the note.
+  $('c-form').addEventListener('submit', (e) => { if (nota) { e.preventDefault(); e.stopImmediatePropagation(); paraNota(true); } }, true);
 
   // ---------- Ring, voice and video (15 Oct 2026) ----------
   // The ring is made here, by the page itself: two soft notes, no file, no network. It plays

@@ -233,8 +233,10 @@ impl Mensaje {
     }
 }
 
-/// The media type a picture name suggests (what the phone needs to show it).
-fn mime_de(nombre: &str) -> &'static str {
+/// The media type a picture or sound name suggests (what the phone needs to show or play it).
+/// A voice note (`nota-de-voz-…`, 17 Oct 2026) is sound whatever its container.
+pub fn mime_de(nombre: &str) -> &'static str {
+    let voz = nombre.to_ascii_lowercase().starts_with("nota-de-voz");
     match nombre
         .rsplit('.')
         .next()
@@ -242,6 +244,12 @@ fn mime_de(nombre: &str) -> &'static str {
         .to_ascii_lowercase()
         .as_str()
     {
+        "webm" if voz => "audio/webm",
+        "mp4" if voz => "audio/mp4",
+        "mp3" => "audio/mpeg",
+        "wav" => "audio/wav",
+        "aac" => "audio/aac",
+        "oga" => "audio/ogg",
         "jpg" | "jpeg" => "image/jpeg",
         "png" => "image/png",
         "gif" => "image/gif",

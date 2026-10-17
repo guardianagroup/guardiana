@@ -1516,11 +1516,12 @@ impl Sesion {
                 Ok(())
             }
             "archivo_vista" => {
-                // A small picture for the chat: only images, at most 12 MB, read once.
+                // A small picture for the chat, or a voice note to play there: at most 12 MB,
+                // read once.
                 let Some(r) = m["id"].as_u64().and_then(|i| self.secure.recibido(i)) else {
                     return Vec::new();
                 };
-                if !r.imagen() || r.borrado || r.bytes > 12 * 1024 * 1024 {
+                if !(r.imagen() || r.audio()) || r.borrado || r.bytes > 12 * 1024 * 1024 {
                     return Vec::new();
                 }
                 let Ok(datos) = std::fs::read(&r.ruta) else {
@@ -1532,6 +1533,7 @@ impl Sesion {
                     .map(|(_, e)| e.to_ascii_lowercase())
                     .as_deref()
                 {
+                    _ if r.audio() => crate::mensaje::mime_de(&r.nombre),
                     Some("png") => "image/png",
                     Some("gif") => "image/gif",
                     Some("webp") => "image/webp",
