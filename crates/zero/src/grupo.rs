@@ -496,9 +496,7 @@ impl Grupo {
             s.borrar_todo();
         }
         self.mensajes.clear();
-        for v in &mut self.vistos {
-            *v = 0;
-        }
+        self.vistos.fill(0);
         self.cambio = true;
     }
 

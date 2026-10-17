@@ -500,7 +500,7 @@ impl Sala {
             "mio": mio,
             "de": if mio { String::new() } else { self.nombre_de(m.de) },
             "texto": m.texto,
-            "estado": if !mio { "visto" } else if visto_por_otro { "visto" } else { "entregado" },
+            "estado": if !mio || visto_por_otro { "visto" } else { "entregado" },
         });
         if m.editado {
             v["editado"] = json!(true);
