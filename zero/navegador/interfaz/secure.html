@@ -7,22 +7,42 @@
 <link rel="stylesheet" href="diseno.css">
 <link rel="stylesheet" href="comun.css">
 <style>
-html, body { min-height: 100%; background: var(--bg); }
-body { background-image: linear-gradient(color-mix(in srgb, var(--fg) 4%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--fg) 4%, transparent) 1px, transparent 1px); background-size: 44px 44px; background-position: -1px -1px; }
-header.top { display: flex; align-items: center; gap: 14px; padding: 14px 22px; border-bottom: 1px solid var(--line); background: var(--card); }
+/* GUARDIANA SECURE, the design the owner chose on 16 Oct 2026 for the three tabs: three columns
+   on a computer (conversations · the chat with the call as a card on top · the panel «Esta
+   conversación»), one column on a phone with the call over the chat and the writing bar at the
+   bottom. Tokens and buttons come from diseno.css, shared with the panel and ZERO. */
+html, body { height: 100%; background: var(--bg); }
+body { margin: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+header.top { display: flex; align-items: center; gap: 18px; padding: 12px 22px; border-bottom: 1px solid var(--line); background: var(--card); }
 header.top .marca-g { font-size: 15px; }
-header.top .marca-g .sec { color: var(--muted); }
+header.top .marca-g .sec { color: var(--muted); font: 500 11px/1 var(--mono); letter-spacing: .08em; }
+header.top .miga { display: flex; gap: 8px; font-size: 13.5px; color: var(--muted); }
+header.top .miga b { color: var(--fg); font-weight: 600; }
 header.top .chip { margin-left: auto; }
-/* Two columns: the conversation on the left, the monitor always on the right. */
-.secure { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--e5); max-width: 1240px; margin: 0 auto; padding: var(--e5) 22px 48px; }
-@media (max-width: 920px) { .secure { grid-template-columns: 1fr; } }
-h1 { font: 600 clamp(28px, 3.6vw, 38px)/1.1 var(--display); letter-spacing: -.02em; margin: 0 0 12px; }
-.frase { margin: 0 0 var(--e5); max-width: 38em; font-size: 16px; line-height: 1.5; color: var(--muted); }
-.tres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+/* The three columns. */
+.secure { display: grid; grid-template-columns: 290px minmax(0, 1fr) 320px; min-height: 0; }
+.col-izq, aside.monitor { min-height: 0; overflow: auto; }
+.col-izq { border-right: 1px solid var(--line); background: var(--card); padding: 18px 16px; display: grid; gap: 14px; align-content: start; }
+.col-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.col-cab h2 { margin: 0; font: 600 20px/1.2 var(--display); letter-spacing: -.01em; }
+.icono-solo { width: 36px; min-width: 36px; padding: 0; justify-content: center; }
+.lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.lista li { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 10px 12px; border-radius: 12px; cursor: default; }
+.lista li.activa { background: var(--accent-suave); }
+.lista .avatar { grid-row: 1 / 3; }
+.lista b { font-weight: 600; font-size: 14px; }
+.lista .ultimo { grid-column: 2; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lista time { font: 11px var(--mono); color: var(--muted); align-self: start; }
+.lista li.vacia { display: block; padding: 10px 12px; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.avatar { width: 40px; height: 40px; border-radius: 12px; background: var(--accent-suave); color: var(--accent); display: grid; place-items: center; font: 600 16px/1 var(--display); position: relative; flex: none; }
+.avatar.grande { width: 48px; height: 48px; font-size: 19px; }
+.avatar i { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%; background: var(--ok); border: 2px solid var(--card); }
+.pie-izq { margin: auto 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.pie-izq b { display: block; color: var(--fg); font-weight: 600; }
+main { min-height: 0; overflow: auto; padding: 22px 24px 32px; display: grid; gap: 14px; align-content: start; background-image: linear-gradient(color-mix(in srgb, var(--fg) 3%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--fg) 3%, transparent) 1px, transparent 1px); background-size: 44px 44px; }
+.frase { margin: 0 0 14px; max-width: 40em; font-size: 14.5px; line-height: 1.5; color: var(--muted); }
 /* The conversation: connect, compare the numbers, talk. One card at a time. */
-main > .tarjeta { margin-top: 14px; }
 .conexion .c-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-/* The three steps, read in two seconds: one invites, the other types the code, both compare. */
 .pasos { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .pasos li { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.4; color: var(--muted); }
 .pasos li b { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 600 12px var(--mono); color: var(--accent-fg); background: var(--accent); }
@@ -32,7 +52,7 @@ main > .tarjeta { margin-top: 14px; }
 .c-codigo .c-enviar { grid-column: 1 / -1; }
 .c-codigo .via { color: var(--muted); font-size: 12px; }
 @media (max-width: 680px) { .pasos { grid-template-columns: 1fr; } }
-.conexion h2, .comparar h2, .chat h2 { margin: 0 0 6px; font: 600 15px/1.3 var(--display); }
+.conexion h2, .comparar h2 { margin: 0 0 6px; font: 600 15px/1.3 var(--display); }
 .t { color: var(--muted); font-size: 13.5px; line-height: 1.45; margin: 0 0 10px; }
 .c-fila { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .c-fila .campo { flex: 1; min-width: 180px; }
@@ -46,34 +66,40 @@ main > .tarjeta { margin-top: 14px; }
 .numeros { display: flex; gap: 14px; margin: 12px 0 16px; }
 .numeros b { font: 600 clamp(28px, 4vw, 40px)/1 var(--display); letter-spacing: .02em; padding: 12px 18px; border: 1px solid var(--line); border-radius: var(--r-tarjeta); background: var(--card); font-variant-numeric: tabular-nums; }
 .c-nombre { display: grid; gap: 4px; margin: 0 0 12px; font-size: 13px; color: var(--muted); max-width: 320px; }
-.chat-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.c-quien { display: grid; gap: 2px; min-width: 0; }
-.c-quien h2 { margin: 0; }
-/* The quiet trust line (16 Oct 2026, agreed with the other two): lock · verified · level. Never
-   red here; an incident has its own card. */
+/* The chat: a header with the avatar, the trust line and the actions; the call card; the
+   messages; the writing bar. */
+.chat { display: grid; gap: 12px; padding: 0; overflow: hidden; }
+.chat-cab { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.c-quien { display: grid; gap: 2px; min-width: 0; margin-right: auto; }
+.c-quien h2 { margin: 0; font: 600 18px/1.2 var(--display); }
 .c-sello { margin: 0; font-size: 12px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
 .c-sello span { display: inline-flex; align-items: center; gap: 4px; }
 .c-sello span::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
 .c-sello span.ok::before { background: var(--ok); }
 .c-sello span.suave::before { background: var(--accent); }
+.chat-cab .c-fila .boton { padding: 6px 10px; }
+.chat .cortada-nota, .chat .mas, .chat .timbre, .chat .perdida, .chat .permiso, .chat .llamada, .chat .zona-archivo, .chat .c-progreso { margin-left: 18px; margin-right: 18px; }
 #c-voz-prot[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 .l-voz-otro { font-size: 12px; color: var(--muted); }
-.mensajes { list-style: none; margin: 10px 0; padding: 12px; min-height: 220px; max-height: 50vh; overflow: auto; display: grid; gap: 6px; align-content: start; background: var(--campo); border-radius: var(--r-tarjeta); }
-.mensajes li { max-width: 72%; padding: 8px 12px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
-.mensajes li.mio { justify-self: end; background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
-.mensajes li time { display: block; font: 10.5px var(--mono); opacity: .7; margin-top: 2px; }
-.zona-archivo { border: 1px dashed var(--line); border-radius: var(--r-tarjeta); padding: 10px 14px; font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+.mensajes { list-style: none; margin: 0; padding: 6px 18px; min-height: 260px; max-height: 52vh; overflow: auto; display: grid; gap: 8px; align-content: start; }
+.mensajes li { max-width: 68%; padding: 10px 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; box-shadow: var(--sombra); }
+.mensajes li.mio { justify-self: end; background: var(--accent-suave); color: var(--fg); border-color: color-mix(in srgb, var(--accent) 22%, var(--line)); border-bottom-right-radius: 6px; }
+.mensajes li:not(.mio) { border-bottom-left-radius: 6px; }
+.mensajes li time { display: block; font: 10.5px var(--mono); opacity: .7; margin-top: 3px; text-align: right; }
+.zona-archivo { border: 1px dashed var(--line); border-radius: 12px; padding: 8px 14px; font-size: 12.5px; color: var(--muted); }
 .zona-archivo.sobre { border-color: var(--accent); background: var(--accent-suave); }
-.c-progreso { display: grid; gap: 4px; font: 12px var(--mono); color: var(--muted); margin: 0 0 8px; }
+.c-progreso { display: grid; gap: 4px; font: 12px var(--mono); color: var(--muted); }
 .c-progreso i { display: block; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .c-progreso b { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
-.escribir { display: flex; gap: 8px; }
+.escribir { display: flex; gap: 10px; align-items: center; padding: 12px 18px 16px; border-top: 1px solid var(--line); }
+.escribir .campo { flex: 1; border-radius: 12px; padding: 12px 14px; }
+.escribir .boton.principal { width: 42px; min-width: 42px; height: 42px; padding: 0; border-radius: 12px; }
 .resumen h2 { margin: 0 0 8px; font: 600 15px/1.3 var(--display); }
 .r-datos { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; margin: 0 0 12px; font-size: 13.5px; }
 .r-datos dt { color: var(--muted); } .r-datos dd { margin: 0; font-variant-numeric: tabular-nums; }
 .r-nota { margin-top: 10px; font-size: 12px; }
-/* A call ringing here (16 Oct 2026): who, with video or not, and the two answers. */
-.timbre { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 10px 0; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--ok) 55%, var(--line)); border-radius: var(--r-tarjeta); background: color-mix(in srgb, var(--ok) 8%, var(--card)); }
+/* A call ringing here: who, with video or not, and the two answers. */
+.timbre { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--ok) 55%, var(--line)); border-radius: var(--r-tarjeta); background: color-mix(in srgb, var(--ok) 8%, var(--card)); }
 .timbre[hidden] { display: none; }
 .timbre .t-icono { width: 14px; height: 14px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); animation: latido 1.2s ease-out infinite; flex: none; }
 .timbre .t-texto { display: grid; gap: 2px; margin-right: auto; }
@@ -81,41 +107,26 @@ main > .tarjeta { margin-top: 14px; }
 .timbre .t-texto span { font-size: 13px; color: var(--muted); }
 .boton.contestar { background: var(--ok); border-color: var(--ok); color: #fff; }
 @keyframes latido { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
-@media (prefers-reduced-motion: reduce) { .timbre .t-icono, .llamando .l-estado::before { animation: none; } }
-/* Calling: the screen says so and the button stays pressed until the other side answers. */
-.llamando .pantallas { display: grid; place-items: center; aspect-ratio: auto; min-height: 120px; background: var(--campo); }
+@media (prefers-reduced-motion: reduce) { .timbre .t-icono, .llamando .l-estado::before, .onda b { animation: none; } }
+/* The call card: the blue square with its wave, the title and the time, the three buttons. */
+.llamada { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-tarjeta); background: var(--campo); }
+.llamada[hidden] { display: none; }
+.llamada-botones { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.l-cuadro { width: 44px; height: 44px; border-radius: 12px; background: var(--accent); color: #fff; display: grid; place-items: center; flex: none; }
+.onda { display: flex; gap: 3px; align-items: center; height: 18px; }
+.onda b { width: 3px; border-radius: 2px; background: currentColor; height: 30%; animation: o 1.1s ease-in-out infinite; }
+.onda b:nth-child(2n) { animation-delay: .15s; height: 70%; } .onda b:nth-child(3n) { animation-delay: .3s; height: 50%; } .onda b:nth-child(5n) { animation-delay: .45s; height: 90%; }
+@keyframes o { 50% { transform: scaleY(.35); } }
+.l-titulo { display: grid; gap: 2px; margin-right: auto; }
+.l-titulo b { font: 600 15px/1.2 var(--display); }
+.l-estado { font: 500 12.5px var(--texto); color: var(--muted); }
+.llamando .pantallas { display: grid; place-items: center; aspect-ratio: auto; min-height: 120px; background: var(--card); }
 .llamando .rejilla, .llamando #c-local { display: none; }
 .llamando .pantallas::after { content: attr(data-llamando); font: 600 17px/1.3 var(--display); color: var(--fg); }
 .llamando .l-estado::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--ok); animation: latido 1.2s ease-out infinite; vertical-align: 1px; }
 .boton.pulsado { background: var(--accent-suave); border-color: var(--accent); color: var(--accent); }
 .boton:disabled { opacity: .5; cursor: default; }
-/* A file that arrived: a card in the chat with what can be done with it. */
-.mensajes li.archivo-li { padding: 10px 12px; }
-.archivo { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center; }
-.a-mini { width: 56px; height: 56px; border-radius: 8px; background: var(--campo); display: grid; place-items: center; overflow: hidden; font: 600 11px var(--mono); color: var(--muted); }
-.a-mini img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.a-info { display: grid; gap: 2px; min-width: 0; }
-.a-info b { font-weight: 600; overflow-wrap: anywhere; }
-.a-info span { font-size: 12px; color: var(--muted); }
-.a-botones { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
-.a-botones .boton { padding: 6px 10px; font-size: 11px; }
-.a-botones .boton.confirmar { background: var(--alerta); border-color: var(--alerta); color: #fff; }
-.archivo.borrado .a-mini, .archivo.borrado .a-info b { opacity: .5; text-decoration: line-through; }
-.mensajes li .a-entrega { display: block; font: 500 11px var(--mono); opacity: .85; margin-top: 3px; }
-.mensajes li .a-tam { font: 11px var(--mono); opacity: .8; }
-.permiso { display: grid; gap: 6px; margin: 10px 0; padding: 12px 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--alerta) 50%, var(--line)); background: color-mix(in srgb, var(--alerta) 8%, var(--card)); }
-.permiso[hidden] { display: none; }
-.perdida { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); font-size: 14px; }
-.perdida[hidden] { display: none; } .perdida span { margin-right: auto; }
-.permiso b { font: 600 15px/1.3 var(--display); } .permiso span { font-size: 13.5px; color: var(--muted); }
-.timbre .t-aviso { display: block; font-size: 12.5px; color: var(--alerta); margin-top: 2px; }
-.cortada-nota { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--aviso) 10%, var(--card)); border: 1px solid color-mix(in srgb, var(--aviso) 45%, var(--line)); font-size: 13.5px; }
-.cortada-nota[hidden] { display: none; }
-.chat.cortada #c-voz, .chat.cortada #c-video, .chat.cortada #c-movil, .chat.cortada .zona-archivo, .chat.cortada .escribir, .chat.cortada .mas, .chat.cortada .llamada, .chat.cortada .timbre { display: none; }
-/* The call: the other person large, yourself small in the corner, as every call app does. */
-.llamada { margin: 10px 0; }
-.llamada[hidden] { display: none; }
-.pantallas { position: relative; background: #0B1020; border-radius: var(--r-tarjeta); overflow: hidden; aspect-ratio: 16 / 9; }
+.pantallas { position: relative; background: #0B1020; border-radius: 12px; overflow: hidden; aspect-ratio: 16 / 9; }
 .pantallas video { display: block; }
 .rejilla { display: grid; width: 100%; height: 100%; gap: 4px; grid-template-columns: 1fr; }
 .rejilla[data-n="2"], .rejilla[data-n="3"], .rejilla[data-n="4"] { grid-template-columns: 1fr 1fr; }
@@ -123,78 +134,91 @@ main > .tarjeta { margin-top: 14px; }
 .tile { position: relative; background: #000; min-height: 0; }
 .tile video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tile-nombre { position: absolute; left: 8px; bottom: 8px; padding: 2px 8px; border-radius: 999px; background: rgba(0,0,0,.55); color: #fff; font: 500 11.5px var(--mono); }
-.solo-voz .tile video { visibility: hidden; }
-.solo-voz .tile { display: grid; place-items: center; background: transparent; }
-.solo-voz .tile-nombre { position: static; font-size: 13px; }
-.mas { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 8px 12px; border: 1px dashed var(--line); border-radius: var(--r-tarjeta); font-size: 13px; color: var(--muted); }
+.solo-voz .pantallas { display: none; }
+#c-local { position: absolute; right: 12px; bottom: 12px; width: 22%; border-radius: 8px; border: 1px solid rgba(255,255,255,.3); background: #000; }
+/* A file that arrived: a card in the chat with what can be done with it. */
+.mensajes li.archivo-li { padding: 10px 12px; }
+.archivo { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center; }
+.a-mini { width: 56px; height: 56px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); display: grid; place-items: center; overflow: hidden; font: 600 11px var(--mono); color: var(--accent); }
+.a-mini img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.a-info { display: grid; gap: 2px; min-width: 0; }
+.a-info b { font-weight: 600; overflow-wrap: anywhere; }
+.a-info span { font-size: 12px; color: var(--muted); }
+.a-botones { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+.a-botones .boton { padding: 4px 10px; min-height: 28px; font-size: 12px; }
+.a-botones .boton.confirmar { background: var(--alerta); border-color: var(--alerta); color: #fff; }
+.archivo.borrado .a-mini, .archivo.borrado .a-info b { opacity: .5; text-decoration: line-through; }
+.mensajes li .a-entrega { display: block; font: 500 11px var(--mono); opacity: .85; margin-top: 3px; }
+.mensajes li .a-tam { font: 11px var(--mono); opacity: .8; }
+.mensajes li .de { display: block; font: 600 11.5px var(--texto); font-style: normal; color: var(--accent); margin-bottom: 2px; }
+.permiso { display: grid; gap: 6px; padding: 12px 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--alerta) 50%, var(--line)); background: color-mix(in srgb, var(--alerta) 8%, var(--card)); }
+.permiso[hidden] { display: none; }
+.permiso b { font: 600 15px/1.3 var(--display); } .permiso span { font-size: 13.5px; color: var(--muted); }
+.perdida { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); font-size: 14px; }
+.perdida[hidden] { display: none; } .perdida span { margin-right: auto; }
+.timbre .t-aviso { display: block; font-size: 12.5px; color: var(--alerta); margin-top: 2px; }
+.cortada-nota { padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--aviso) 10%, var(--card)); border: 1px solid color-mix(in srgb, var(--aviso) 45%, var(--line)); font-size: 13.5px; }
+.cortada-nota[hidden] { display: none; }
+.chat.cortada #c-voz, .chat.cortada #c-video, .chat.cortada #c-movil, .chat.cortada .zona-archivo, .chat.cortada .escribir, .chat.cortada .mas, .chat.cortada .llamada, .chat.cortada .timbre { display: none; }
+.mas { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px dashed var(--line); border-radius: 12px; font-size: 13px; color: var(--muted); }
 .mas[hidden] { display: none; }
 .mas b { font: 600 15px var(--mono); letter-spacing: .06em; color: var(--fg); }
-.mensajes li .de { display: block; font: 600 11.5px var(--texto); font-style: normal; color: var(--accent); margin-bottom: 2px; }
 .comparar .quien { font-weight: 600; color: var(--fg); }
-#c-local { position: absolute; right: 12px; bottom: 12px; width: 22%; border-radius: 8px; border: 1px solid rgba(255,255,255,.3); background: #000; }
-.llamada-botones { margin-top: 8px; }
-.l-estado { font: 500 12px var(--mono); color: var(--muted); margin-right: auto; }
-.solo-voz #c-local { visibility: hidden; }
-.solo-voz .pantallas { aspect-ratio: auto; min-height: 64px; display: grid; place-items: center; background: var(--campo); }
-.solo-voz .rejilla { height: auto; }
-.escribir .campo { flex: 1; }
-/* The phone: the QR code large and alone, one sentence, and the state of the hand-off. */
-.movil { margin: 10px 0; display: grid; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: var(--r-tarjeta); background: var(--card); }
-.movil[hidden] { display: none; }
-.movil h3 { margin: 0; font: 600 15px/1.3 var(--display); }
-.movil p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
-.movil .qr { display: grid; justify-items: center; gap: 8px; padding: 14px; background: #fff; border-radius: 12px; justify-self: start; }
-.movil .qr svg { width: 232px; height: 232px; display: block; }
-.movil .m-estado { display: flex; align-items: center; gap: 8px; font: 500 12.5px var(--mono); color: var(--muted); }
+/* The phone and the house's room, in the left column: the QR code and the state. */
+.movil { display: grid; gap: 10px; }
+.movil h3 { margin: 0; font: 600 14px/1.3 var(--display); }
+.movil p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.movil .qr { display: grid; justify-items: center; padding: 10px; background: #fff; border-radius: 12px; justify-self: start; }
+.movil .qr svg { width: 200px; height: 200px; display: block; }
+.movil .m-estado { display: flex; align-items: center; gap: 8px; font: 500 12px var(--mono); color: var(--muted); }
 .movil .m-estado i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
 .movil .m-estado.si i { background: var(--ok); } .movil .m-estado.espera i { background: var(--aviso); }
 .movil .m-ok { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--aviso) 55%, var(--line)); border-radius: 12px; background: color-mix(in srgb, var(--aviso) 6%, var(--card)); }
 .movil .m-ok p { color: var(--fg); }
-.movil .m-habla { font-size: 14px; color: var(--fg); }
-@media (max-width: 680px) { .conexion .c-dos { grid-template-columns: 1fr; } .mensajes li { max-width: 92%; } }
-.tres article.tarjeta { box-shadow: var(--sombra); }
-.tres h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
-.tres p { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--muted); }
-@media (max-width: 680px) { .tres { grid-template-columns: 1fr; } }
-
-/* The one state on top: a colour, a word, a sentence, four plain lines. The numbers live
-   below, folded, so a lawyer or a doctor reads the top and only opens the rest if they want. */
-.estado-g { display: grid; gap: 10px; padding: 18px 18px 16px; border-width: 1px; transition: border-color .3s, background-color .3s; }
-.estado-g .fila { display: flex; align-items: center; gap: 12px; }
-.estado-g .punto { width: 14px; height: 14px; border-radius: 50%; flex: none; background: var(--muted-2); transition: background-color .3s; }
-.estado-g .palabra { font: 600 22px/1.1 var(--display); letter-spacing: -.01em; }
-.estado-g .frase-g { margin: 0; font-size: 15px; color: var(--fg); }
-.estado-g ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 7px; }
-.estado-g li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; color: var(--muted); }
-.estado-g li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; margin-top: 7px; flex: none; background: var(--line); }
+.movil .m-habla { font-size: 13px; color: var(--fg); }
+.col-izq .tarjeta { padding: 14px; }
+.c-sala-miembros { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.c-sala-miembros li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.c-sala-miembros li i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); display: inline-block; }
+.c-sala-miembros li.si i { background: var(--ok); }
+.c-sala-mensajes { list-style: none; padding: 8px 10px; margin: 0; max-height: 220px; overflow: auto; display: grid; gap: 4px; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; background: var(--campo); }
+.c-sala-mensajes li time { opacity: .6; font: 11px var(--mono); margin-left: 6px; }
+.c-sala-mensajes li.mio { font-weight: 500; }
+/* The panel «Esta conversación»: the level as a picture, four plain lines, the details folded. */
+aside.monitor { border-left: 1px solid var(--line); background: var(--card); padding: 18px 16px; display: grid; gap: 12px; align-content: start; }
+aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
+.estado-g { display: grid; gap: 10px; padding: 0; border: 0; background: transparent; }
+.panel-ilu { display: grid; justify-items: center; gap: 6px; padding: 22px 14px 18px; border: 1px solid var(--line); border-radius: var(--r-tarjeta); background: var(--card); text-align: center; }
+.panel-ilu .anillo { width: 104px; height: 104px; border-radius: 50%; border: 1px dashed var(--line); display: grid; place-items: center; position: relative; margin-bottom: 8px; }
+.panel-ilu .anillo::before { content: ""; position: absolute; inset: 14px; border-radius: 50%; border: 1px solid var(--line); }
+.panel-ilu .anillo .icono { width: 28px; height: 28px; color: var(--accent); }
+.panel-ilu .anillo .punto { position: absolute; top: 4px; right: 10px; width: 10px; height: 10px; border-radius: 50%; background: var(--muted-2); }
+.panel-ilu .palabra { font: 600 16px/1.2 var(--display); }
+.panel-ilu .frase-g { margin: 0; font-size: 12.5px; color: var(--muted); }
+.estado-g.protegida .anillo .punto { background: var(--ok); } .estado-g.protegida .palabra { color: var(--fg); }
+.estado-g.revisar .anillo .punto { background: var(--aviso); } .estado-g.revisar .palabra { color: var(--aviso); }
+.estado-g.pausada .anillo .punto { background: var(--alerta); } .estado-g.pausada .palabra { color: var(--alerta); }
+.estado-g ul { list-style: none; margin: 0; padding: 0; display: grid; }
+.estado-g li { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.4; color: var(--muted); padding: 10px 2px; border-top: 1px solid var(--line); }
+.estado-g li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; background: var(--line); }
 .estado-g li.ok { color: var(--fg); } .estado-g li.ok::before { background: var(--ok); }
 .estado-g li.aviso { color: var(--fg); } .estado-g li.aviso::before { background: var(--aviso); }
 .estado-g li.alerta { color: var(--alerta); } .estado-g li.alerta::before { background: var(--alerta); }
-.estado-g.protegida { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); background: color-mix(in srgb, var(--ok) 5%, var(--card)); }
-.estado-g.protegida .punto { background: var(--ok); animation: late-g 4s ease-in-out infinite; }
-.estado-g.protegida .palabra { color: var(--ok); }
-.estado-g.revisar { border-color: color-mix(in srgb, var(--aviso) 55%, var(--line)); background: color-mix(in srgb, var(--aviso) 6%, var(--card)); }
-.estado-g.revisar .punto { background: var(--aviso); } .estado-g.revisar .palabra { color: var(--aviso); }
-.estado-g.pausada { border-color: var(--alerta); background: color-mix(in srgb, var(--alerta) 6%, var(--card)); }
-.estado-g.pausada .punto { background: var(--alerta); } .estado-g.pausada .palabra { color: var(--alerta); }
-@keyframes late-g { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 45%, transparent); } 50% { box-shadow: 0 0 0 7px transparent; } }
-@media (prefers-reduced-motion: reduce) { .estado-g .punto { animation: none !important; } }
-.estado-g .nota-g { margin: 2px 0 0; font-size: 11.5px; color: var(--muted); }
-.estado-g .mas { justify-self: start; margin-top: 2px; }
+.estado-g .nota-g { margin: 0; font-size: 11.5px; color: var(--muted); }
+.estado-g .mas { justify-self: start; border: 0; background: none; color: var(--accent); padding: 4px 0; font-weight: 500; }
 .detalles[hidden] { display: none; }
-/* The stop: why, since when, what is still pending, and the one way out. */
-.pausa { border-color: var(--alerta); display: grid; gap: 8px; padding: 18px; }
+.pausa { border-color: var(--alerta); display: grid; gap: 8px; padding: 16px; }
 .pausa[hidden] { display: none; }
-.incidente { border: 2px solid var(--alerta); display: grid; gap: 8px; padding: 18px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--alerta) 18%, transparent); }
+.incidente { border: 2px solid var(--alerta); display: grid; gap: 8px; padding: 16px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--alerta) 18%, transparent); }
 .incidente[hidden] { display: none; }
-.incidente .p-titulo { margin: 0; font: 700 20px/1.2 var(--display); color: var(--alerta); }
-.incidente p { margin: 0; font-size: 13.5px; line-height: 1.5; }
-.incidente .i-datos { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 4px 0; font-size: 13px; }
+.incidente .p-titulo { margin: 0; font: 700 18px/1.2 var(--display); color: var(--alerta); }
+.incidente p { margin: 0; font-size: 13px; line-height: 1.5; }
+.incidente .i-datos { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 4px 0; font-size: 12.5px; }
 .incidente .i-datos dt { color: var(--muted); }
 .incidente .i-datos dd { margin: 0; font-weight: 600; }
-.incidente .i-otro { font-family: var(--mono); font-size: 12.5px; }
-.pausa .p-titulo { margin: 0; font: 600 18px/1.2 var(--display); color: var(--alerta); }
-.pausa p { margin: 0; font-size: 13.5px; line-height: 1.5; }
+.incidente .i-otro { font-family: var(--mono); font-size: 12px; }
+.pausa .p-titulo { margin: 0; font: 600 17px/1.2 var(--display); color: var(--alerta); }
+.pausa p { margin: 0; font-size: 13px; line-height: 1.5; }
 .pausa .p-motivo b { font-weight: 600; }
 .pausa .p-hora { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
 .pausa .p-desde { font-family: var(--mono); font-size: 12px; color: var(--muted); }
@@ -202,24 +226,21 @@ main > .tarjeta { margin-top: 14px; }
 .pausa .p-pendiente { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
 .pausa .p-pendiente li::before { content: "· "; color: var(--alerta); }
 .pausa .p-pendiente li.lista { color: var(--ok); }
-.pausa .p-botones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-.pausa .p-nota { font-size: 11.5px; color: var(--muted); }
-
-/* The monitor: one card, sections with a mono caption, two-column rows of label and value. */
-aside.monitor { position: sticky; top: var(--e5); align-self: start; display: grid; gap: var(--e3); max-height: calc(100vh - 2 * var(--e5)); overflow: auto; }
+.pausa .p-botones, .incidente .p-botones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.pausa .p-nota, .incidente .p-nota { font-size: 11.5px; color: var(--muted); }
 .detalles { display: grid; gap: var(--e3); }
-.monitor .tarjeta { padding: 14px 16px; }
+.monitor .detalles .tarjeta { padding: 12px 14px; }
 .monitor .cabecera { display: flex; align-items: center; gap: 10px; }
 .monitor .cabecera .rotulo { flex: 1; }
 .monitor .latido { width: 8px; height: 8px; border-radius: 50%; background: var(--muted-2); flex: none; }
 .monitor .latido.vivo { background: var(--ok); box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); animation: late 1.6s infinite; }
 @keyframes late { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
 .monitor .frase-m { margin: 6px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
-.monitor dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 10px 0 0; font-size: 13px; }
+.monitor dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 10px 0 0; font-size: 12.5px; }
 .monitor dt { color: var(--muted); white-space: nowrap; }
 .monitor dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .monitor dd.mono { font-family: var(--mono); font-size: 12px; letter-spacing: .02em; }
-.monitor dd.huella { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; letter-spacing: .04em; }
+.monitor dd.huella { font-family: var(--mono); font-size: 12px; line-height: 1.6; letter-spacing: .04em; }
 .monitor .vacio { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
 .monitor ol { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
 .monitor li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: baseline; font-size: 12.5px; padding: 6px 0; border-top: 1px solid var(--line); }
@@ -227,26 +248,75 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
 .monitor li time { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 .monitor li .chip { grid-column: 1 / -1; justify-self: start; }
 .monitor .nota { margin: 10px 0 0; font-size: 11.5px; color: var(--muted); }
-    .c-sala-miembros { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; }
-    .c-sala-miembros li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .c-sala-miembros li i { width: 8px; height: 8px; border-radius: 50%; background: var(--gris, #999); display: inline-block; }
-    .c-sala-miembros li.si i { background: var(--verde, #17865f); }
-    .c-sala-mensajes { list-style: none; padding: 8px; margin: 8px 0; max-height: 240px; overflow: auto; display: grid; gap: 4px; border: 1px solid var(--bruma, #e6eaf2); border-radius: 10px; font-size: 14px; }
-    .c-sala-mensajes li time { opacity: .6; font-size: 11px; margin-left: 6px; }
-    .c-sala-mensajes li.mio { font-weight: 500; }
+/* Narrow: one column, the panel after the chat, the writing bar at the bottom. */
+[hidden] { display: none !important; }
+.mensajes { overflow-x: hidden; }
+.chat-cab .c-fila { flex-wrap: nowrap; }
+#c-voz span, #c-video span { display: none; }
+#c-voz, #c-video { width: 38px; min-width: 38px; padding: 0; justify-content: center; }
+@media (max-width: 1080px) { .secure { grid-template-columns: 230px minmax(0, 1fr); } aside.monitor { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); } }
+@media (max-width: 760px) {
+  body { display: block; }
+  .secure { grid-template-columns: 1fr; }
+  .col-izq { border-right: 0; border-bottom: 1px solid var(--line); }
+  main { padding: 14px 12px 90px; }
+  .conexion .c-dos { grid-template-columns: 1fr; }
+  .mensajes li { max-width: 88%; }
+  .chat { border-radius: 0; }
+  .escribir { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); z-index: 5; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  header.top .miga { display: none; }
+}
 </style>
 </head>
 <body>
 <header class="top">
-  <span class="marca-g">GUARDIANA <span class="sec" data-t="sec_titulo">SECURE</span></span>
+  <span class="marca-g">GUARDIANA <span class="sec">ZERO · SECURE</span></span>
+  <nav class="miga"><span data-t="sec_miga_com"></span><span>/</span><b id="miga-donde" data-t="sec_miga_conv"></b></nav>
   <span class="chip" id="m-estado-chip" data-t="sec_sin_sesion"></span>
 </header>
 <div class="secure">
-<main>
-  <h1><span data-t="sec_titulo">SECURE</span></h1>
-  <p class="frase" data-t="sec_frase_v1"></p>
+<nav class="col-izq">
+  <div class="col-cab"><h2 data-t="sec_conversaciones"></h2><button type="button" class="boton chico icono-solo" id="c-nueva" data-t-title="sec_c_invitar" aria-label="+"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>
+  <ol class="lista" id="c-lista"></ol>
 
+  <section class="tarjeta" id="c-movil-tarjeta" hidden>
+    <section class="movil" id="c-movil-caja">
+      <h3 data-t="sec_mv_titulo"></h3>
+      <p id="c-mv-texto" data-t="sec_mv_texto"></p>
+      <div class="qr" id="c-mv-qr"></div>
+      <div class="m-estado" id="c-mv-estado"><i></i><span id="c-mv-estado-t"></span></div>
+      <div class="m-ok" id="c-mv-ok" hidden><p data-t="sec_mv_ok_texto"></p><div class="c-fila"><button type="button" class="boton chico" id="c-mv-si" data-t="sec_mv_ok_si"></button><button type="button" class="boton chico secundario" id="c-mv-no" data-t="sec_mv_ok_no"></button></div></div>
+      <p class="m-habla" id="c-mv-habla" hidden data-t="sec_mv_habla"></p>
+      <p id="c-mv-fuera"></p>
+      <div class="c-fila"><button type="button" class="boton chico secundario" id="c-mv-fin" data-t="sec_mv_fin"></button></div>
+    </section>
+  </section>
+  <!-- «Sala de casa» (16 Oct 2026): this computer as the house's exchange; the phones read one
+       code, leave, and keep talking all day through the relay. -->
+  <section class="tarjeta" id="c-sala-tarjeta">
+    <section class="movil">
+      <h3 data-t="sec_sala_titulo"></h3>
+      <div id="c-sala-antes">
+        <p class="t" data-t="sec_sala_texto"></p>
+        <div class="c-fila"><label class="c-nombre"><span data-t="sec_sala_horas"></span><select class="campo" id="c-sala-horas"><option value="12">12 h</option><option value="24" selected>24 h</option><option value="48">48 h</option></select></label><button type="button" class="boton chico" id="c-sala-abrir" data-t="sec_sala_abrir"></button></div>
+      </div>
+      <div id="c-sala-abierta" hidden>
+        <p class="t" id="c-sala-hasta"></p>
+        <p class="t" data-t="sec_sala_escanea"></p>
+        <div class="qr" id="c-sala-qr"></div>
+        <ul class="c-sala-miembros" id="c-sala-miembros"></ul>
+        <ol class="c-sala-mensajes" id="c-sala-mensajes"></ol>
+        <form id="c-sala-form" class="c-fila"><input class="campo" id="c-sala-texto" data-t-ph="sec_sala_texto_ph" autocomplete="off" maxlength="8000"><button type="submit" class="boton chico" data-t="sec_sala_enviar"></button></form>
+        <p class="t" data-t="sec_sala_nivel"></p>
+        <div class="c-fila"><button type="button" class="boton chico secundario" id="c-sala-cerrar" data-t="sec_sala_cerrar"></button></div>
+      </div>
+    </section>
+  </section>
+  <p class="pie-izq"><b data-t="sec_pie_titulo"></b><span data-t="sec_pie_texto"></span></p>
+</nav>
+<main>
   <section class="tarjeta conexion" id="c-conexion">
+    <p class="frase" data-t="sec_frase_v1"></p>
     <ol class="pasos"><li><b>1</b><span data-t="sec_paso_1"></span></li><li><b>2</b><span data-t="sec_paso_2"></span></li><li><b>3</b><span data-t="sec_paso_3"></span></li></ol>
     <div class="c-dos">
       <div class="c-lado" id="c-lado-invitar">
@@ -290,43 +360,19 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
     <p class="t r-nota" data-t="sec_r_nota"></p>
   </section>
 
-  <section class="tarjeta" id="c-movil-tarjeta" hidden>
-    <section class="movil" id="c-movil-caja">
-      <h3 data-t="sec_mv_titulo"></h3>
-      <p id="c-mv-texto" data-t="sec_mv_texto"></p>
-      <div class="qr" id="c-mv-qr"></div>
-      <div class="m-estado" id="c-mv-estado"><i></i><span id="c-mv-estado-t"></span></div>
-      <div class="m-ok" id="c-mv-ok" hidden><p data-t="sec_mv_ok_texto"></p><div class="c-fila"><button type="button" class="boton chico" id="c-mv-si" data-t="sec_mv_ok_si"></button><button type="button" class="boton chico secundario" id="c-mv-no" data-t="sec_mv_ok_no"></button></div></div>
-      <p class="m-habla" id="c-mv-habla" hidden data-t="sec_mv_habla"></p>
-      <p id="c-mv-fuera"></p>
-      <div class="c-fila"><button type="button" class="boton chico secundario" id="c-mv-fin" data-t="sec_mv_fin"></button></div>
-    </section>
-  </section>
-  <!-- «Sala de casa» (16 Oct 2026): this computer as the house's exchange; the phones read one
-       code, leave, and keep talking all day through the relay. -->
-  <section class="tarjeta" id="c-sala-tarjeta">
-    <section class="movil">
-      <h3 data-t="sec_sala_titulo"></h3>
-      <div id="c-sala-antes">
-        <p class="t" data-t="sec_sala_texto"></p>
-        <div class="c-fila"><label class="c-nombre"><span data-t="sec_sala_horas"></span><select class="campo" id="c-sala-horas"><option value="12">12 h</option><option value="24" selected>24 h</option><option value="48">48 h</option></select></label><button type="button" class="boton chico" id="c-sala-abrir" data-t="sec_sala_abrir"></button></div>
-      </div>
-      <div id="c-sala-abierta" hidden>
-        <p class="t" id="c-sala-hasta"></p>
-        <p class="t" data-t="sec_sala_escanea"></p>
-        <div class="qr" id="c-sala-qr"></div>
-        <ul class="c-sala-miembros" id="c-sala-miembros"></ul>
-        <ol class="c-sala-mensajes" id="c-sala-mensajes"></ol>
-        <form id="c-sala-form" class="c-fila"><input class="campo" id="c-sala-texto" data-t-ph="sec_sala_texto_ph" autocomplete="off" maxlength="8000"><button type="submit" class="boton chico" data-t="sec_sala_enviar"></button></form>
-        <p class="t" data-t="sec_sala_nivel"></p>
-        <div class="c-fila"><button type="button" class="boton chico secundario" id="c-sala-cerrar" data-t="sec_sala_cerrar"></button></div>
-      </div>
-    </section>
-  </section>
   <section class="tarjeta chat" id="c-chat" hidden>
+    <div class="chat-cab">
+      <span class="avatar grande" id="c-avatar"><span id="c-avatar-letra">·</span><i></i></span>
+      <div class="c-quien"><h2 id="c-con"></h2><p class="c-sello" id="c-sello"></p></div>
+      <div class="c-fila">
+        <button type="button" class="boton chico" id="c-voz" data-t-title="sec_l_voz"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg><span data-t="sec_l_voz"></span></button>
+        <button type="button" class="boton chico" id="c-video" data-t-title="sec_l_video"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg><span data-t="sec_l_video"></span></button>
+        <button type="button" class="boton chico" id="c-movil" data-t="sec_mv_boton"></button>
+        <button type="button" class="boton chico" id="c-cerrar" data-t="sec_c_cerrar"></button>
+      </div>
+    </div>
     <p class="cortada-nota" id="c-cortada" hidden data-t="sec_c_cortada"></p>
     <div class="mas" id="c-mas" hidden><span data-t="sec_c_mas"></span> <b id="c-mas-codigo"></b> <button type="button" class="boton chico" id="c-mas-copiar" data-t="sec_c_copiar"></button></div>
-    <div class="chat-cab"><div class="c-quien"><h2 id="c-con"></h2><p class="c-sello" id="c-sello"></p></div><div class="c-fila"><button type="button" class="boton chico" id="c-voz" data-t="sec_l_voz"></button><button type="button" class="boton chico" id="c-video" data-t="sec_l_video"></button><button type="button" class="boton chico" id="c-movil" data-t="sec_mv_boton"></button><button type="button" class="boton chico" id="c-cerrar" data-t="sec_c_cerrar"></button></div></div>
     <section class="timbre" id="c-timbre" hidden aria-live="assertive">
       <span class="t-icono" aria-hidden="true"></span>
       <div class="t-texto"><b id="c-timbre-t"></b><span id="c-timbre-s"></span></div>
@@ -341,17 +387,25 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
       <div class="c-fila"><button type="button" class="boton chico" id="c-permiso-mic" data-t="sec_p_abrir_mic"></button><button type="button" class="boton chico" id="c-permiso-cam" data-t="sec_p_abrir_cam"></button><button type="button" class="boton chico principal" id="c-permiso-otra" data-t="sec_p_reintentar"></button></div>
     </section>
     <section class="llamada" id="c-llamada" hidden>
+      <div class="c-fila llamada-botones">
+        <span class="l-cuadro" aria-hidden="true"><span class="onda"><b></b><b></b><b></b><b></b><b></b></span></span>
+        <div class="l-titulo"><b id="c-l-titulo" data-t="sec_l_en_curso"></b><span class="l-estado" id="c-l-estado"></span></div>
+        <button type="button" class="boton chico" id="c-silencio" aria-pressed="false"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span data-t="sec_l_silenciar"></span></button>
+        <button type="button" class="boton chico" id="c-voz-prot" aria-pressed="false" data-t-title="sec_v_titulo"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h2M8 8v8M12 5v14M16 8v8M20 11v2"/></svg><span data-t="sec_v_boton"></span></button>
+        <span class="l-voz-otro" id="c-voz-otro" hidden data-t="sec_v_otro"></span>
+        <button type="button" class="boton peligro chico" id="c-colgar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14c5-5 13-5 18 0l-2 3-4-1-1-3a9 9 0 0 0-4 0l-1 3-4 1z"/></svg><span data-t="sec_l_colgar"></span></button>
+      </div>
       <div class="pantallas"><div class="rejilla" id="c-rejilla" data-n="0"></div><video id="c-local" autoplay playsinline muted></video></div>
-      <div class="c-fila llamada-botones"><span class="l-estado" id="c-l-estado"></span><button type="button" class="boton chico" id="c-silencio" aria-pressed="false" data-t="sec_l_silenciar"></button><button type="button" class="boton chico" id="c-voz-prot" aria-pressed="false" data-t="sec_v_boton" data-t-title="sec_v_titulo"></button><span class="l-voz-otro" id="c-voz-otro" hidden data-t="sec_v_otro"></span><button type="button" class="boton peligro chico" id="c-colgar" data-t="sec_l_colgar"></button></div>
     </section>
     <ol class="mensajes" id="c-mensajes"></ol>
     <div class="zona-archivo" id="c-zona"><span data-t="sec_f_arrastra"></span> <label class="enlace" for="c-archivo" data-t="sec_f_elige"></label><input type="file" id="c-archivo" hidden multiple></div>
     <div class="c-progreso" id="c-progreso" hidden><span id="c-progreso-texto"></span><i><b id="c-progreso-barra"></b></i></div>
-    <form class="escribir" id="c-form"><input class="campo" id="c-texto" data-t-ph="sec_m_escribe" autocomplete="off" maxlength="8000"><button type="submit" class="boton principal" data-t="sec_m_enviar"></button></form>
+    <form class="escribir" id="c-form"><label class="boton chico icono-solo" for="c-archivo" data-t-title="sec_f_elige"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/></svg></label><input class="campo" id="c-texto" data-t-ph="sec_m_escribe" autocomplete="off" maxlength="8000"><button type="submit" class="boton principal" data-t-title="sec_m_enviar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg></button></form>
   </section>
 </main>
 
 <aside class="monitor" aria-live="polite">
+  <h2 data-t="sec_panel_titulo"></h2>
   <section class="tarjeta incidente" id="inc" hidden role="alert">
     <h2 class="p-titulo" data-t="sec_i_titulo"></h2>
     <p class="i-frase" data-t="sec_i_frase"></p>
@@ -364,9 +418,12 @@ aside.monitor { position: sticky; top: var(--e5); align-self: start; display: gr
     </div>
     <p class="p-nota" data-t="sec_i_nota"></p>
   </section>
-  <section class="tarjeta estado-g" id="g">
-    <div class="fila"><i class="punto"></i><span class="palabra" id="g-palabra">—</span></div>
-    <p class="frase-g" id="g-frase"></p>
+  <section class="estado-g" id="g">
+    <div class="panel-ilu">
+      <span class="anillo"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg><i class="punto"></i></span>
+      <span class="palabra" id="g-palabra">—</span>
+      <p class="frase-g" id="g-frase"></p>
+    </div>
     <ul>
       <li id="g-cifrado"></li>
       <li id="g-identidad"></li>

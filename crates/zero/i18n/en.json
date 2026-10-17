@@ -1112,5 +1112,18 @@
   "sec_sala_echar": "Put out",
   "sec_sala_llamando": "{a} is calling…",
   "sec_sala_llamada": "{a} and {b} on a call",
-  "sec_m_sala_nombre": "Your name"
+  "sec_m_sala_nombre": "Your name",
+  "sec_miga_com": "Communications",
+  "sec_miga_conv": "Conversation",
+  "sec_miga_inicio": "Start",
+  "sec_conversaciones": "Conversations",
+  "sec_lista_vacia": "No conversation yet. Invite someone or type the code you were sent.",
+  "sec_lista_nueva": "New conversation",
+  "sec_lista_comparando": "Comparing the numbers…",
+  "sec_lista_conectando": "Connecting…",
+  "sec_lista_sin_mensajes": "Conversation open",
+  "sec_l_en_curso": "Encrypted call in progress",
+  "sec_panel_titulo": "This conversation",
+  "sec_pie_titulo": "Your space. Your conversations.",
+  "sec_pie_texto": "Messages, files and calls protected end to end. No accounts required."
 }

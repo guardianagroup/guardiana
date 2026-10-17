@@ -1112,5 +1112,18 @@
   "sec_sala_echar": "Tirar",
   "sec_sala_llamando": "{a} está ligando…",
   "sec_sala_llamada": "{a} e {b} em chamada",
-  "sec_m_sala_nombre": "O seu nome"
+  "sec_m_sala_nombre": "O seu nome",
+  "sec_miga_com": "Comunicações",
+  "sec_miga_conv": "Conversa",
+  "sec_miga_inicio": "Começar",
+  "sec_conversaciones": "Conversas",
+  "sec_lista_vacia": "Ainda não há nenhuma conversa. Convide alguém ou escreva o código que recebeu.",
+  "sec_lista_nueva": "Nova conversa",
+  "sec_lista_comparando": "Comparando os números…",
+  "sec_lista_conectando": "Conectando…",
+  "sec_lista_sin_mensajes": "Conversa aberta",
+  "sec_l_en_curso": "Chamada cifrada em curso",
+  "sec_panel_titulo": "Esta conversa",
+  "sec_pie_titulo": "O seu espaço. As suas conversas.",
+  "sec_pie_texto": "Mensagens, ficheiros e chamadas protegidos de ponta a ponta. Sem contas obrigatórias."
 }

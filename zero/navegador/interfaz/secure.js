@@ -240,6 +240,10 @@
     const g = E.grupo || {};
     const nombres = g.nombres || [];
     $('c-con').textContent = nombres.length > 2 ? t('sec_m_grupo', { n: nombres.join(' · ') }) : E.contacto ? t('sec_m_con', { n: E.contacto }) : '';
+    // The avatar: the first letter of the name (the design the owner chose, 16 Oct 2026).
+    const quien = nombres.length > 2 ? nombres.filter((x) => x !== g.yo)[0] || '' : (E.contacto || '');
+    $('c-avatar-letra').textContent = (quien.trim()[0] || '·').toUpperCase();
+    pintaLista(E, quien, nombres);
     // Under the name, three quiet dots: encrypted, verified with you, and the level.
     const idn = (E.monitor || {}).identidad;
     const verificado = !!idn && idn.estado !== 'clave_cambiada';
@@ -491,6 +495,20 @@
     } catch (_) {}
   };
   // ---------- The phone (15 Oct 2026) ----------
+  // The left column: the conversation this computer is in (one at a time), with the last line
+  // and its time, as the chosen design lists them; empty, a quiet sentence.
+  const pintaLista = (m, quien, nombres) => {
+    const ol = $('c-lista');
+    const f = m.fase;
+    if (!f || f === 'sola') { ol.innerHTML = `<li class="vacia">${esc(t('sec_lista_vacia'))}</li>`; $('miga-donde').textContent = t('sec_miga_inicio'); return; }
+    const ultimo = (m.mensajes || []).slice(-1)[0];
+    const nombre = nombres.length > 2 ? t('sec_m_grupo', { n: nombres.length }) : (quien || t('sec_lista_nueva'));
+    const linea = f !== 'lista' ? t(f === 'comparando' ? 'sec_lista_comparando' : 'sec_lista_conectando') : m.llamada ? t('sec_l_en_curso') : ultimo ? ultimo.texto : t('sec_lista_sin_mensajes');
+    ol.innerHTML = `<li class="activa"><span class="avatar">${esc((nombre.trim()[0] || '·').toUpperCase())}${f === 'lista' ? '<i></i>' : ''}</span><b>${esc(nombre)}</b><time>${ultimo ? esc(hora(ultimo.t).slice(0, 5)) : ''}</time><span class="ultimo">${esc(linea)}</span></li>`;
+    $('miga-donde').textContent = t('sec_miga_conv');
+  };
+  $('c-nueva').addEventListener('click', () => { const c = $('c-conexion'); if (!c.hidden) { c.scrollIntoView({ behavior: 'smooth' }); $('c-yo').focus(); } });
+
   // «Pasar al móvil»: the program shows a QR code; the phone's camera opens our page, which
   // talks to this computer directly (TLS 1.3 pinned to the certificate in the code). The
   // first time, the person says OK here. While the phone talks, this screen steps back: no
@@ -663,7 +681,7 @@
     if (!vozActiva || !local || !window.vozProtegida || !local.getAudioTracks().length) return local;
     try { vozProt = window.vozProtegida(local, -4); return vozProt.stream; } catch (_) { return local; }
   };
-  const pintaVoz = () => { $('c-voz-prot').setAttribute('aria-pressed', String(vozActiva)); $('c-voz-prot').textContent = t(vozActiva ? 'sec_v_activa' : 'sec_v_boton'); };
+  const pintaVoz = () => { $('c-voz-prot').setAttribute('aria-pressed', String(vozActiva)); $('c-voz-prot').querySelector('span').textContent = t(vozActiva ? 'sec_v_activa' : 'sec_v_boton'); };
   $('c-voz-prot').addEventListener('click', () => {
     vozActiva = !vozActiva; try { localStorage.setItem('secure_voz', vozActiva ? '1' : '0'); } catch (_) {}
     pintaVoz(); manda({ tipo: 'secure', accion: 'voz_protegida', activa: vozActiva });
@@ -784,7 +802,7 @@
   $('c-voz').addEventListener('click', () => llama(false));
   $('c-video').addEventListener('click', () => llama(true));
   $('c-colgar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'colgar' }));
-  $('c-silencio').addEventListener('click', () => { silenciado = !silenciado; if (local) local.getAudioTracks().forEach((x) => { x.enabled = !silenciado; }); $('c-silencio').setAttribute('aria-pressed', String(silenciado)); $('c-silencio').textContent = t(silenciado ? 'sec_l_sonar' : 'sec_l_silenciar'); });
+  $('c-silencio').addEventListener('click', () => { silenciado = !silenciado; if (local) local.getAudioTracks().forEach((x) => { x.enabled = !silenciado; }); $('c-silencio').setAttribute('aria-pressed', String(silenciado)); $('c-silencio').querySelector('span').textContent = t(silenciado ? 'sec_l_sonar' : 'sec_l_silenciar'); });
 
   let ultimo = {};
   en('monitor', (m) => { ultimo = m.monitor || {}; pinta(ultimo); });
