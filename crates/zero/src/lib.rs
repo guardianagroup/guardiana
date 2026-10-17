@@ -3,6 +3,8 @@
 //! The window, the tabs and the hooks into the engine live in `zero/` (Windows, WebView2) and
 //! ask this crate what each request is, whether it may leave, and what to write down. Nothing
 //! here opens a connection: the browser's only traffic is the pages the person asks for.
+// SECURE's state for the page is one big `json!` (16 Oct 2026: past the default limit).
+#![recursion_limit = "256"]
 
 pub mod campos;
 pub mod cartas;
