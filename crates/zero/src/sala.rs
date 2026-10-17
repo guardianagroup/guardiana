@@ -805,6 +805,24 @@ impl Sala {
         std::mem::take(&mut self.cambio)
     }
 
+    /// A voice note in the room, for the computer's own player: its type and where it is
+    /// saved. Until 1.0.41 the computer showed a note from a phone as a name that could not be
+    /// played or clicked (17 Oct 2026, owner's test). At most 12 MB, like a conversation's.
+    #[must_use]
+    pub fn nota_de_voz(&self, id: u32) -> Option<(String, PathBuf)> {
+        self.mensajes.iter().find_map(|m| {
+            let a = m.archivo.as_ref().filter(|a| a.id == id)?;
+            let es_voz = a.mime.starts_with("audio/")
+                || a.nombre.to_ascii_lowercase().starts_with("nota-de-voz");
+            (es_voz && !m.borrado && a.bytes <= 12 * 1024 * 1024).then(|| {
+                (
+                    crate::mensaje::mime_de(&a.nombre).to_owned(),
+                    a.ruta.clone(),
+                )
+            })
+        })
+    }
+
     /// What seat `i`'s phone draws: the shape the page already knows (a conversation that is
     /// «lista»), with the room on top.
     fn estado_de(&self, i: usize) -> Value {

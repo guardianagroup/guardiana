@@ -371,7 +371,7 @@
   // The picture comes once, full size: keep a small copy only.
   en('secure_vista', (m) => {
     // A voice note: kept as it came, to play.
-    if (typeof m.url === 'string' && m.url.startsWith('data:audio/')) { audios.set(m.id, m.url); if (E) pintaChat(((E.grupo || {}).nombres || []).length > 2); return; }
+    if (typeof m.url === 'string' && m.url.startsWith('data:audio/')) { audios.set(m.id, m.url); if (typeof m.id === 'string' && m.id.startsWith('sala-')) { if (E && E.sala) pintaSala(E); return; } if (E) pintaChat(((E.grupo || {}).nombres || []).length > 2); return; }
     const img = new Image();
     img.onload = () => {
       const lado = 112, c = document.createElement('canvas'); c.width = lado; c.height = lado;
@@ -794,6 +794,14 @@
     linea($('g-visto'), s.llamada ? 'ok' : '', s.llamada ? t(s.llamada.a ? 'sec_sala_llamada' : 'sec_sala_llamando', { a: s.llamada.de, b: s.llamada.a || '' }) : t('sec_l_sala_mensajes', { n: n((s.mensajes || []).length) }));
   };
   let salaEnlace = '';
+  // A voice note from a phone: the player, asked once from the program (17 Oct 2026).
+  const notaSala = (a) => {
+    const voz = /^audio\//.test(a.mime || '') || /^nota-de-voz/i.test(a.nombre || '');
+    if (!voz) return `<span>📎 ${esc(a.nombre)}</span>`;
+    const clave = 'sala-' + a.id;
+    if (!audios.has(clave) && !pedidas.has(clave)) { pedidas.add(clave); manda({ tipo: 'secure', accion: 'sala_nota', id: a.id }); }
+    return notaVoz(audios.get(clave), a.nombre);
+  };
   const pintaSala = (m) => {
     const s = m.sala;
     $('c-sala-antes').hidden = !!s;
@@ -808,7 +816,7 @@
       return `<li class="${x.enganchado ? 'si' : ''}"><i></i><span class="c-sala-q"><b>${esc(x.nombre)}</b><span class="t">${esc(estado)}</span></span>${botones}</li>`;
     }).join('');
     const ol = $('c-sala-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 40;
-    ol.innerHTML = (s.mensajes || []).map((x) => x.llamada ? lineaLlamada(x) : `<li class="${x.mio ? 'mio' : ''}" data-id="${esc(x.id || '')}"><b>${esc(x.de || t('sec_m_tu'))}</b>${citaDe(x, s.mensajes)}${x.borrado ? `<i class="borrado">${esc(t('sec_m_borrado'))}</i>` : x.archivo ? `<span>📎 ${esc(x.archivo.nombre)}</span>` : `<span>${esc(x.texto)}</span>`}${reacciones(x)}${metaMensaje(x)}</li>`).join('') + (s.escribiendo ? `<li class="escribiendo"><span></span><span></span><span></span></li>` : '');
+    ol.innerHTML = (s.mensajes || []).map((x) => x.llamada ? lineaLlamada(x) : `<li class="${x.mio ? 'mio' : ''}" data-id="${esc(x.id || '')}"><b>${esc(x.de || t('sec_m_tu'))}</b>${citaDe(x, s.mensajes)}${x.borrado ? `<i class="borrado">${esc(t('sec_m_borrado'))}</i>` : x.archivo ? notaSala(x.archivo) : `<span>${esc(x.texto)}</span>`}${reacciones(x)}${metaMensaje(x)}</li>`).join('') + (s.escribiendo ? `<li class="escribiendo"><span></span><span></span><span></span></li>` : '');
     agrupa(ol, s.mensajes);
     if (abajo) ol.scrollTop = ol.scrollHeight;
   };
