@@ -102,6 +102,8 @@ struct Asiento {
     /// these. Until 1.0.41 the room dropped it, and an Android sent an iPad pictures it could
     /// not show (17 Oct 2026, owner's test).
     reproduce: Vec<String>,
+    /// The four digits of its current link (1.0.42), shown next to «Aceptar».
+    numero: String,
     /// A file on its way from this phone: name, size, type, bytes so far.
     archivo: Option<(String, u64, String, Vec<u8>)>,
 }
@@ -232,6 +234,7 @@ impl Sala {
                 reinicio: 0,
                 escribe_en: 0,
                 reproduce: Vec::new(),
+                numero: String::new(),
                 archivo: None,
             });
         }
@@ -779,6 +782,10 @@ impl Sala {
                             self.cambio = true;
                         }
                     }
+                    Desde::Numero(n) => {
+                        self.asientos[i].numero = n;
+                        self.cambio = true;
+                    }
                     Desde::Reproduce(m) if aprobado => {
                         if self.asientos[i].reproduce != m {
                             self.asientos[i].reproduce = m;
@@ -960,6 +967,7 @@ impl Sala {
                 "enganchado": a.enganchado,
                 "pendiente": a.pendiente,
                 "aprobado": a.aprobado,
+                "numero": a.numero,
             })).collect::<Vec<_>>(),
             "mensajes": self.mensajes_casa(),
             "escribiendo": self.asientos.iter().any(|a| a.aprobado && ahora_s().saturating_sub(a.escribe_en) < 6),

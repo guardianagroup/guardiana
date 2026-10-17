@@ -59,6 +59,10 @@ const B64URL: base64::engine::GeneralPurpose = base64::engine::general_purpose::
 pub enum Desde {
     /// A phone that knows the secret connected (first time: the person must say OK).
     Enganchado,
+    /// The four digits of this link (1.0.42): the phone shows the same ones, so the person at
+    /// the computer can check by phone or aloud that it is who they think before «Aceptar».
+    /// They come from the link's own keys: someone in the middle would see other digits.
+    Numero(String),
     /// The phone wrote something.
     Texto(String),
     /// The phone starts, or takes over, a call; `mime` is what its recorder produces.
@@ -414,6 +418,9 @@ async fn servidor(
                     let _ = tx_tramas.send((g, 255, Vec::new()));
                 });
                 manda = Some(Salida::Rele(e.sale));
+                if !e.numero.is_empty() {
+                    let _ = tx.send(Desde::Numero(e.numero));
+                }
                 let _ = tx.send(Desde::Enganchado);
             }
             Some(h) = rx.recv() => {
@@ -483,6 +490,38 @@ enum Salida {
 struct EnlaceRele {
     sale: tmpsc::UnboundedSender<(u8, Vec<u8>)>,
     entra: tmpsc::UnboundedReceiver<(u8, Vec<u8>)>,
+    numero: String,
+}
+
+/// The four digits of a link (1.0.42), from the same secret as its keys (QR key, the agreed
+/// ECDH secret, both random numbers). The page derives them the same way (HKDF-SHA256,
+/// «guardiana-movil-1 numero», first four bytes as a big-endian number, modulo 10 000).
+pub fn numero_de_enlace(
+    clave: &[u8; 32],
+    secreto: &[u8],
+    del_equipo: &[u8; 16],
+    del_movil: &[u8; 16],
+) -> Option<String> {
+    let mut sal = [0u8; 32];
+    sal[..16].copy_from_slice(del_equipo);
+    sal[16..].copy_from_slice(del_movil);
+    let mut ikm = clave.to_vec();
+    ikm.extend_from_slice(secreto);
+    let prk = ring::hkdf::Salt::new(ring::hkdf::HKDF_SHA256, &sal).extract(&ikm);
+    let mut b = [0u8; 4];
+    prk.expand(&[b"guardiana-movil-1 numero"], NumeroLargo)
+        .ok()?
+        .fill(&mut b)
+        .ok()?;
+    Some(format!("{:04}", u32::from_be_bytes(b) % 10_000))
+}
+
+/// Four bytes out of HKDF.
+struct NumeroLargo;
+impl ring::hkdf::KeyType for NumeroLargo {
+    fn len(&self) -> usize {
+        4
+    }
 }
 
 /// The room at the relay: a hash of the QR key, so the relay never sees the key.
@@ -660,12 +699,14 @@ async fn rele_una_vez(
     if abre(&k_me, 0, b"GM2", &respuesta[16 + 65..]).as_deref() != Some(b"hola".as_slice()) {
         return None;
     }
+    let numero = numero_de_enlace(clave, &secreto, &del_equipo, &del_movil).unwrap_or_default();
     let (mut r, mut w) = s.into_split();
     let (tx_sale, mut rx_sale) = tmpsc::unbounded_channel::<(u8, Vec<u8>)>();
     let (tx_entra, rx_entra) = tmpsc::unbounded_channel::<(u8, Vec<u8>)>();
     tx.send(EnlaceRele {
         sale: tx_sale,
         entra: rx_entra,
+        numero,
     })
     .ok()?;
     // To the phone: every frame sealed with the next number; an empty one every 25 s so no
@@ -858,6 +899,16 @@ pub fn lee_enlace(enlace: &str) -> Option<Value> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_four_digits_come_from_the_link_and_match_the_page() {
+        // Same vector as the page's (HKDF-SHA256, «guardiana-movil-1 numero»).
+        let n = numero_de_enlace(&[1; 32], &[2; 32], &[3; 16], &[4; 16]).unwrap();
+        assert_eq!(n, "0311");
+        let otro = numero_de_enlace(&[1; 32], &[9; 32], &[3; 16], &[4; 16]).unwrap();
+        assert_eq!(otro.len(), 4);
+        assert_ne!(n, otro);
+    }
 
     #[test]
     fn the_qr_link_carries_hash_addresses_secret_and_language_in_the_fragment() {
