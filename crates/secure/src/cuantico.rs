@@ -92,75 +92,161 @@ impl Cadena {
     }
 }
 
-/// The two directions, from the shared secret and who is who (0 or 1, agreed by the keys).
+/// The two directions of the layer, from the shared secret, who is who (0 or 1, agreed by the
+/// keys) and the transcript of the exchange (both identities, the encapsulation key and the
+/// ciphertext): a secret reached through any other exchange opens nothing here.
 pub struct Capa {
+    /// The root every chain comes from; a renewal mixes the next ML-KEM secret into it.
+    raiz: [u8; 32],
+    yo: u8,
+    /// Grows by one with every renewal; the first byte of every sealed message.
+    epoca: u8,
     envio: Cadena,
     recibo: Cadena,
+    /// The previous epoch's receiving chain, kept until the first message of the new one
+    /// arrives: what the other side sealed before it switched still opens.
+    anterior: Option<Cadena>,
+}
+
+/// Sealed messages per epoch before side 0 offers a new key.
+pub const RENUEVA_CADA: u64 = 500;
+
+/// The transcript the layer is bound to.
+#[must_use]
+pub fn transcript(
+    identidad_0: &[u8],
+    identidad_1: &[u8],
+    llave: &[u8],
+    cifrado: &[u8],
+) -> [u8; 32] {
+    use sha2::Digest as _;
+    let h = sha2::Sha256::new()
+        .chain_update(DOMINIO)
+        .chain_update(identidad_0)
+        .chain_update(identidad_1)
+        .chain_update(llave)
+        .chain_update(cifrado)
+        .finalize();
+    let mut t = [0u8; 32];
+    t.copy_from_slice(&h);
+    t
 }
 
 impl Capa {
-    /// From the secret ML-KEM gave both sides.
+    /// From the secret ML-KEM gave both sides and the transcript of that exchange.
     #[must_use]
-    pub fn nueva(secreto: &[u8; 32], yo: u8) -> Self {
-        let (a, b) = (b"de 0 a 1".as_slice(), b"de 1 a 0".as_slice());
-        let (mio, suyo) = if yo == 0 { (a, b) } else { (b, a) };
+    pub fn nueva(secreto: &[u8; 32], transcript: &[u8; 32], yo: u8) -> Self {
+        let mut raiz = [0u8; 32];
+        hkdf(transcript, secreto, b"raiz", &mut raiz);
+        let (envio, recibo) = Self::cadenas(&raiz, yo);
         Self {
-            envio: Cadena::nueva(secreto, mio),
-            recibo: Cadena::nueva(secreto, suyo),
+            raiz,
+            yo,
+            epoca: 0,
+            envio,
+            recibo,
+            anterior: None,
         }
     }
 
-    fn nonce(n: u64) -> Nonce {
+    fn cadenas(raiz: &[u8; 32], yo: u8) -> (Cadena, Cadena) {
+        let (a, b) = (b"de 0 a 1".as_slice(), b"de 1 a 0".as_slice());
+        let (mio, suyo) = if yo == 0 { (a, b) } else { (b, a) };
+        (Cadena::nueva(raiz, mio), Cadena::nueva(raiz, suyo))
+    }
+
+    /// A new ML-KEM secret (and its transcript) mixed into the root: a new epoch with fresh
+    /// chains. The other side's previous chain stays open for what it sealed before switching.
+    pub fn renueva(&mut self, secreto: &[u8; 32], transcript: &[u8; 32]) {
+        let mut mezcla = [0u8; 64];
+        mezcla[..32].copy_from_slice(&self.raiz);
+        mezcla[32..].copy_from_slice(secreto);
+        let mut raiz = [0u8; 32];
+        hkdf(transcript, &mezcla, b"raiz", &mut raiz);
+        self.raiz = raiz;
+        self.epoca = self.epoca.wrapping_add(1);
+        let (envio, recibo) = Self::cadenas(&raiz, self.yo);
+        self.envio = envio;
+        self.anterior = Some(std::mem::replace(&mut self.recibo, recibo));
+    }
+
+    /// Messages sealed in this epoch so far.
+    #[must_use]
+    pub fn sellados(&self) -> u64 {
+        self.envio.n
+    }
+
+    /// The current epoch.
+    #[must_use]
+    pub fn epoca(&self) -> u8 {
+        self.epoca
+    }
+
+    fn nonce(epoca: u8, n: u64) -> Nonce {
         let mut b = [0u8; 12];
+        b[0] = epoca;
         b[4..].copy_from_slice(&n.to_be_bytes());
         Nonce::from(b)
     }
 
-    /// Seal a message: its number (8 bytes) then the ciphertext.
+    /// Seal a message: the epoch (1 byte), its number (8 bytes), then the ciphertext.
     pub fn sella(&mut self, plano: &[u8]) -> Result<Vec<u8>, Error> {
         let (clave, n) = self.envio.siguiente();
+        let mut cabecera = vec![self.epoca];
+        cabecera.extend_from_slice(&n.to_be_bytes());
         let c = ChaCha20Poly1305::new((&clave).into())
             .encrypt(
-                &Self::nonce(n),
+                &Self::nonce(self.epoca, n),
                 Payload {
                     msg: plano,
-                    aad: &n.to_be_bytes(),
+                    aad: &cabecera,
                 },
             )
             .map_err(|_| Error::CannotOpen)?;
-        let mut out = n.to_be_bytes().to_vec();
-        out.extend_from_slice(&c);
-        Ok(out)
+        cabecera.extend_from_slice(&c);
+        Ok(cabecera)
     }
 
-    /// Open a sealed message. A number already used (a replay) or one too far ahead is refused;
-    /// numbers skipped by a dropped link are passed over.
+    /// Open a sealed message. A number already used (a replay), one too far ahead, or an
+    /// epoch that is neither the current one nor the one just left, is refused; numbers
+    /// skipped by a dropped link are passed over.
     pub fn abre(&mut self, sellado: &[u8]) -> Result<Vec<u8>, Error> {
-        if sellado.len() < 8 {
+        if sellado.len() < 9 {
             return Err(Error::CannotOpen);
         }
+        let epoca = sellado[0];
         let mut nb = [0u8; 8];
-        nb.copy_from_slice(&sellado[..8]);
+        nb.copy_from_slice(&sellado[1..9]);
         let n = u64::from_be_bytes(nb);
-        if n < self.recibo.n || n.saturating_sub(self.recibo.n) > 4096 {
+        let actual = epoca == self.epoca;
+        let cadena = if actual {
+            &mut self.recibo
+        } else if epoca.wrapping_add(1) == self.epoca {
+            self.anterior.as_mut().ok_or(Error::CannotOpen)?
+        } else {
+            return Err(Error::CannotOpen);
+        };
+        if n < cadena.n || n.saturating_sub(cadena.n) > 4096 {
             return Err(Error::CannotOpen);
         }
         let mut clave = [0u8; 32];
-        let mut m = self.recibo.n;
-        while m <= n {
-            let (k, _) = self.recibo.siguiente();
+        while cadena.n <= n {
+            let (k, _) = cadena.siguiente();
             clave = k;
-            m += 1;
         }
-        ChaCha20Poly1305::new((&clave).into())
+        let plano = ChaCha20Poly1305::new((&clave).into())
             .decrypt(
-                &Self::nonce(n),
+                &Self::nonce(epoca, n),
                 Payload {
-                    msg: &sellado[8..],
-                    aad: &nb,
+                    msg: &sellado[9..],
+                    aad: &sellado[..9],
                 },
             )
-            .map_err(|_| Error::CannotOpen)
+            .map_err(|_| Error::CannotOpen)?;
+        if actual {
+            self.anterior = None;
+        }
+        Ok(plano)
     }
 }
 
@@ -177,10 +263,11 @@ mod tests {
         assert_eq!(ct.len(), CIFRADO_BYTES);
         let s0 = oferta.abre(&ct).unwrap();
         assert_eq!(s0, s1);
-        let (mut a, mut b) = (Capa::nueva(&s0, 0), Capa::nueva(&s1, 1));
+        let t = transcript(b"id0", b"id1", &ek, &ct);
+        let (mut a, mut b) = (Capa::nueva(&s0, &t, 0), Capa::nueva(&s1, &t, 1));
         let x = a.sella(b"hola").unwrap();
         let y = a.sella(b"otra").unwrap();
-        assert_ne!(&x[8..], &y[8..]);
+        assert_ne!(&x[9..], &y[9..]);
         assert_eq!(b.abre(&x).unwrap(), b"hola");
         assert_eq!(b.abre(&y).unwrap(), b"otra");
         // The other direction has its own chain.
@@ -193,7 +280,12 @@ mod tests {
         let (oferta, ek) = Oferta::nueva();
         let (ct, s1) = encapsula(&ek).unwrap();
         let s0 = oferta.abre(&ct).unwrap();
-        let (mut a, mut b) = (Capa::nueva(&s0, 0), Capa::nueva(&s1, 1));
+        let t = transcript(b"id0", b"id1", &ek, &ct);
+        // A different transcript (another exchange) opens nothing, even with the same secret.
+        let mut a = Capa::nueva(&s0, &t, 0);
+        let mut c = Capa::nueva(&s1, &transcript(b"id0", b"idX", &ek, &ct), 1);
+        assert!(c.abre(&a.sella(b"cero").unwrap()).is_err());
+        let (mut a, mut b) = (Capa::nueva(&s0, &t, 0), Capa::nueva(&s1, &t, 1));
         let x = a.sella(b"uno").unwrap();
         let _perdido = a.sella(b"dos").unwrap();
         let z = a.sella(b"tres").unwrap();
@@ -203,6 +295,36 @@ mod tests {
         let mut w = a.sella(b"cuatro").unwrap();
         w[12] ^= 1;
         assert!(b.abre(&w).is_err());
+    }
+
+    #[test]
+    fn a_renewal_opens_a_new_epoch_and_what_was_sealed_before_it_still_opens() {
+        let (oferta, ek) = Oferta::nueva();
+        let (ct, s1) = encapsula(&ek).unwrap();
+        let s0 = oferta.abre(&ct).unwrap();
+        let t = transcript(b"id0", b"id1", &ek, &ct);
+        let (mut a, mut b) = (Capa::nueva(&s0, &t, 0), Capa::nueva(&s1, &t, 1));
+        // Side 0 sealed one in epoch 0 that is still on its way when side 1 switches.
+        let en_vuelo = a.sella(b"antes").unwrap();
+        let (oferta2, ek2) = Oferta::nueva();
+        let (ct2, s1b) = encapsula(&ek2).unwrap();
+        let s0b = oferta2.abre(&ct2).unwrap();
+        let t2 = transcript(b"id0", b"id1", &ek2, &ct2);
+        b.renueva(&s1b, &t2);
+        assert_eq!(b.epoca(), 1);
+        assert_eq!(
+            b.abre(&en_vuelo).unwrap(),
+            b"antes",
+            "the old epoch still opens"
+        );
+        a.renueva(&s0b, &t2);
+        let y = a.sella(b"despues").unwrap();
+        assert_eq!(y[0], 1);
+        assert_eq!(b.abre(&y).unwrap(), b"despues");
+        // Once the new epoch spoke, the old one is closed for good.
+        assert!(b.abre(&en_vuelo).is_err());
+        let z = b.sella(b"vuelta").unwrap();
+        assert_eq!(a.abre(&z).unwrap(), b"vuelta");
     }
 
     #[test]
