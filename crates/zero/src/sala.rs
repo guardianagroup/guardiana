@@ -98,6 +98,10 @@ struct Asiento {
     reinicio: u64,
     /// Unix seconds of its last «escribiendo».
     escribe_en: u64,
+    /// What its player can open (an iPad may not open WebM): the other phone records in one of
+    /// these. Until 1.0.41 the room dropped it, and an Android sent an iPad pictures it could
+    /// not show (17 Oct 2026, owner's test).
+    reproduce: Vec<String>,
     /// A file on its way from this phone: name, size, type, bytes so far.
     archivo: Option<(String, u64, String, Vec<u8>)>,
 }
@@ -227,6 +231,7 @@ impl Sala {
                 mime: None,
                 reinicio: 0,
                 escribe_en: 0,
+                reproduce: Vec::new(),
                 archivo: None,
             });
         }
@@ -762,6 +767,12 @@ impl Sala {
                             self.cambio = true;
                         }
                     }
+                    Desde::Reproduce(m) if aprobado => {
+                        if self.asientos[i].reproduce != m {
+                            self.asientos[i].reproduce = m;
+                            self.cambio = true;
+                        }
+                    }
                     Desde::PideInicio if aprobado => {
                         if let Some(otro) = self.pareja(i) {
                             self.asientos[otro].reinicio += 1;
@@ -812,6 +823,7 @@ impl Sala {
             .iter()
             .enumerate()
             .any(|(j, a)| j != i && a.aprobado && ahora_s().saturating_sub(a.escribe_en) < 6);
+        let reproduce_otro = self.reproduce_de_los_otros(i);
         let mut llamada = Value::Null;
         let mut entrante = Value::Null;
         if let Some(l) = &self.llamada {
@@ -849,6 +861,7 @@ impl Sala {
             "contacto": otros.join(" · "),
             "mensajes": mensajes,
             "escribiendo": escribiendo,
+            "reproduce_otro": reproduce_otro,
             "archivos": true,
             "llamada": llamada,
             "entrante": entrante,
@@ -860,6 +873,26 @@ impl Sala {
                 "caduca": self.caduca(),
             },
         })
+    }
+
+    /// What the others can open, for seat `i`'s recorder: in a call, the other phone's list; out
+    /// of one, the formats every other phone in the room said it opens (none said: empty, and
+    /// the page picks its own).
+    fn reproduce_de_los_otros(&self, i: usize) -> Vec<String> {
+        if let Some(otro) = self.pareja(i) {
+            return self.asientos[otro].reproduce.clone();
+        }
+        let mut listas = (0..self.asientos.len())
+            .filter(|&j| j != i && self.asientos[j].aprobado && !self.asientos[j].reproduce.is_empty())
+            .map(|j| &self.asientos[j].reproduce);
+        let Some(primera) = listas.next() else {
+            return Vec::new();
+        };
+        let mut comun = primera.clone();
+        for l in listas {
+            comun.retain(|x| l.contains(x));
+        }
+        comun
     }
 
     /// After anything changed: every phone gets its view.
