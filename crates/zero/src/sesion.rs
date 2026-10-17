@@ -1317,6 +1317,8 @@ impl Sesion {
                 "cargando": p.cargando,
                 "segura": p.url.starts_with("https://"),
                 "interna": es_interna(&p.url),
+                // The panel of GUARDIANA on this computer (127.0.0.1): it never leaves it.
+                "local": es_panel_guardiana(&p.url),
                 "mandato": p.perfil == Perfil::Mandato,
                 "favorito": self.favoritos.contiene(&p.url),
             })

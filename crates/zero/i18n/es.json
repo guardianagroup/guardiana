@@ -138,6 +138,7 @@
   "detener": "Detener",
   "menu": "Menú",
   "direccion_placeholder": "Busca o escribe una dirección",
+  "conexion_local": "Página de GUARDIANA en este equipo: no sale a internet",
   "conexion_segura": "Conexión cifrada",
   "conexion_no_segura": "Conexión sin cifrar: lo que envíes aquí se puede leer por el camino",
   "pagina_interna": "Página de GUARDIANA ZERO",

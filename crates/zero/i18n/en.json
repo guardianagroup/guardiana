@@ -138,6 +138,7 @@
   "detener": "Stop",
   "menu": "Menu",
   "direccion_placeholder": "Search or type an address",
+  "conexion_local": "GUARDIANA page on this computer: it never goes to the internet",
   "conexion_segura": "Encrypted connection",
   "conexion_no_segura": "Unencrypted connection: what you send here can be read on the way",
   "pagina_interna": "GUARDIANA ZERO page",
