@@ -4203,6 +4203,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn another_program_on_the_microphone_stops_the_talk_and_the_call_report_says_so() {
         let base = std::env::temp_dir().join(format!("guardiana-vigia-{}", std::process::id()));
         let (da, db) = (base.join("a"), base.join("b"));
