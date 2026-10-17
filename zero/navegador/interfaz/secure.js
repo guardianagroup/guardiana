@@ -588,7 +588,7 @@
     $('c-grabando').hidden = !g; $('c-texto').hidden = g;
     $('c-microfono').classList.toggle('activo', g);
     $('c-microfono').title = t(g ? 'sec_nv_enviar' : 'sec_nv_grabar');
-    if (g) { const s = Math.floor((Date.now() - nota.desde) / 1000); $('c-grabando-t').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); $('c-grabando-modo').textContent = t(nota.cambiada ? 'sec_nv_cambiada' : 'sec_nv_normal'); }
+    if (g) { const s = Math.floor((Date.now() - nota.desde) / 1000); $('c-grabando-t').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); $('c-grabando-modo').textContent = t(nota.cambiada ? 'sec_nv_cambiada_corta' : 'sec_nv_normal_corta'); }
   };
   const empiezaNota = async (cambiada) => {
     $('c-nv-elige').hidden = true;

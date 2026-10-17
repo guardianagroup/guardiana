@@ -987,9 +987,9 @@
   "sec_fecha_hoy": "Hoje",
   "sec_fecha_ayer": "Ontem",
   "sec_nv_grabar": "Gravar uma mensagem de voz",
-  "sec_nv_normal": "Mensagem de voz com a minha voz",
-  "sec_nv_cambiada": "Mensagem de voz com a voz alterada",
-  "sec_nv_cambiada_corta": "voz alterada",
+  "sec_nv_normal": "Gravar com a minha voz",
+  "sec_nv_cambiada": "Gravar com voz protegida",
+  "sec_nv_cambiada_corta": "Voz protegida",
   "sec_nv_cancelar": "Cancelar",
   "sec_nv_enviar": "Enviar a mensagem de voz",
   "sec_nv_nota": "Mensagem de voz",
@@ -1257,5 +1257,8 @@
   "sec_in_con_per": "perda máx. {p} %",
   "sec_in_firmado": "Assinado por",
   "sec_in_limite": "O que o GUARDIANA não pode ver: alguém gravando com outro aparelho, como um celular apontado para a tela ou para um alto-falante.",
-  "sec_vigia_parada": "Conversa em pausa: outro programa está usando o microfone, a câmera ou a tela:"
+  "sec_vigia_parada": "Conversa em pausa: outro programa está usando o microfone, a câmera ou a tela:",
+  "sec_nv_normal_s": "Do jeito que soa",
+  "sec_nv_cambiada_s": "Transformada antes de ser cifrada: não serve para cloná-la",
+  "sec_nv_normal_corta": "Minha voz"
 }

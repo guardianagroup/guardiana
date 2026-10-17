@@ -987,9 +987,9 @@
   "sec_fecha_hoy": "Hoy",
   "sec_fecha_ayer": "Ayer",
   "sec_nv_grabar": "Grabar una nota de voz",
-  "sec_nv_normal": "Nota de voz con mi voz",
-  "sec_nv_cambiada": "Nota de voz con la voz cambiada",
-  "sec_nv_cambiada_corta": "voz cambiada",
+  "sec_nv_normal": "Grabar con mi voz",
+  "sec_nv_cambiada": "Grabar con voz protegida",
+  "sec_nv_cambiada_corta": "Voz protegida",
   "sec_nv_cancelar": "Cancelar",
   "sec_nv_enviar": "Enviar la nota de voz",
   "sec_nv_nota": "Nota de voz",
@@ -1257,5 +1257,8 @@
   "sec_in_con_per": "pérdida máx. {p} %",
   "sec_in_firmado": "Firmado por",
   "sec_in_limite": "Lo que GUARDIANA no puede ver: alguien que grabe con otro aparato, como un móvil apuntando a la pantalla o a un altavoz.",
-  "sec_vigia_parada": "Conversación en pausa: otro programa está usando el micrófono, la cámara o la pantalla:"
+  "sec_vigia_parada": "Conversación en pausa: otro programa está usando el micrófono, la cámara o la pantalla:",
+  "sec_nv_normal_s": "Tal como suena",
+  "sec_nv_cambiada_s": "Transformada antes de cifrarse: no sirve para clonarla",
+  "sec_nv_normal_corta": "Mi voz"
 }

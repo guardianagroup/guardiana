@@ -987,9 +987,9 @@
   "sec_fecha_hoy": "Today",
   "sec_fecha_ayer": "Yesterday",
   "sec_nv_grabar": "Record a voice note",
-  "sec_nv_normal": "Voice note with my voice",
-  "sec_nv_cambiada": "Voice note with a changed voice",
-  "sec_nv_cambiada_corta": "changed voice",
+  "sec_nv_normal": "Record with my voice",
+  "sec_nv_cambiada": "Record with protected voice",
+  "sec_nv_cambiada_corta": "Protected voice",
   "sec_nv_cancelar": "Cancel",
   "sec_nv_enviar": "Send the voice note",
   "sec_nv_nota": "Voice note",
@@ -1257,5 +1257,8 @@
   "sec_in_con_per": "max. loss {p} %",
   "sec_in_firmado": "Signed by",
   "sec_in_limite": "What GUARDIANA cannot see: someone recording with another device, like a phone pointed at the screen or a speaker.",
-  "sec_vigia_parada": "Conversation paused: another program is using the microphone, the camera or the screen:"
+  "sec_vigia_parada": "Conversation paused: another program is using the microphone, the camera or the screen:",
+  "sec_nv_normal_s": "As it sounds",
+  "sec_nv_cambiada_s": "Transformed before it is encrypted: useless for cloning",
+  "sec_nv_normal_corta": "My voice"
 }
