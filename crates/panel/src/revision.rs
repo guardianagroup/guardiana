@@ -1694,7 +1694,7 @@ mod tests {
         assert_eq!(v.firmas, 30);
         assert_eq!(v.cuentas, vec![("tareas".to_owned(), 41)]);
         assert_eq!(v.hechas, vec![("arranque".to_owned(), 5120)]);
-        assert_eq!(v.pasos.len(), 31);
+        assert_eq!(v.pasos.len(), 32);
         assert_eq!(v.n, 32);
         v.anota("firma", "x.exe\tNotSigned\t");
         v.anota("firma", "y.exe\tValid\tMicrosoft Corporation");
