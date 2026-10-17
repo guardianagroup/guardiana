@@ -1447,6 +1447,9 @@
             $('com-orden').textContent = '/usr/local/guardiana/guardiana comunicaciones';
           }
           $('com-card').classList.remove('hidden');
+          // The browser, GUARDIANA ZERO, is Windows only for now: say so here, instead of letting
+          // its absence look like a fault (17 Oct 2026, the same friend on Linux).
+          $('zero-card').classList.remove('hidden');
         }
         $('dns-apply').addEventListener('click', async () => {
           $('dns-msg').textContent = t('dns_aplicando'); $('dns-apply').disabled = true;

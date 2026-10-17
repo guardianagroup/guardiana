@@ -995,6 +995,8 @@
     "com_card_titulo": "Comunicaciones: chat y llamadas cifradas",
     "com_card_linux": "En este equipo, Comunicaciones se abre en tu navegador. Ábrelo desde el menú de aplicaciones («GUARDIANA Comunicaciones») o escribe en una terminal, con tu usuario y sin sudo:",
     "com_card_mac": "En el Mac, Comunicaciones se abre en tu navegador. Abre la app Terminal y escribe, con tu usuario y sin sudo:",
+    "zero_card_titulo": "El navegador GUARDIANA ZERO",
+    "zero_card_texto": "Por ahora, el navegador GUARDIANA ZERO solo está disponible para Windows. Tu licencia ya lo incluye: si tienes un PC con Windows, puedes instalarlo allí con la misma clave.",
     "dns_aplicando": "Cambiando el DNS…",
     "e_dns_aplicar": "Apuntar el DNS a GUARDIANA",
     "e_dns_restaurar": "Deshacer: restaurar el DNS como estaba",
