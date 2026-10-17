@@ -900,10 +900,18 @@ fn pide(
         "Content-Length: {}\r\nConnection: close\r\n\r\n",
         cuerpo.len()
     ));
-    s.write_all(p.as_bytes())?;
-    s.write_all(cuerpo)?;
+    // Head and body in one write: a refusal answered before the body arrived, on a connection
+    // then closed, came back as «connection reset» on macOS instead of its status.
+    let mut todo = p.into_bytes();
+    todo.extend_from_slice(cuerpo);
+    s.write_all(&todo)?;
     let mut r = Vec::new();
-    s.read_to_end(&mut r)?;
+    // What arrived before a reset is still the answer.
+    if let Err(e) = s.read_to_end(&mut r) {
+        if r.is_empty() {
+            return Err(e);
+        }
+    }
     let corte = r
         .windows(4)
         .position(|w| w == b"\r\n\r\n")
