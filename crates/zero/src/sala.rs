@@ -883,7 +883,9 @@ impl Sala {
             return self.asientos[otro].reproduce.clone();
         }
         let mut listas = (0..self.asientos.len())
-            .filter(|&j| j != i && self.asientos[j].aprobado && !self.asientos[j].reproduce.is_empty())
+            .filter(|&j| {
+                j != i && self.asientos[j].aprobado && !self.asientos[j].reproduce.is_empty()
+            })
             .map(|j| &self.asientos[j].reproduce);
         let Some(primera) = listas.next() else {
             return Vec::new();
