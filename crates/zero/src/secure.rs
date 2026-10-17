@@ -524,7 +524,7 @@ pub struct Secure {
     /// key once the conversation opens, side 1 answers, and from then every Olm payload is
     /// sealed with the layer too. `cuantico_visto`: a sealed message already came from the
     /// other side, so a plain one now would be a downgrade.
-    cuantico_oferta: Option<cuantico::Oferta>,
+    cuantico_oferta: Option<(cuantico::Oferta, Vec<u8>)>,
     capa: Option<cuantico::Capa>,
     cuantico_visto: bool,
     /// This computer's time zone (the page tells it) and the other side's, exchanged inside
@@ -1001,6 +1001,7 @@ impl Secure {
                         self.manda(json!({ "t": "latido" }));
                         self.di_dispositivo_otra_vez();
                         self.digo_lo_que_tengo();
+                        self.cuantico_empieza();
                         self.cambio = true;
                     } else {
                         self.saluda();
@@ -1418,6 +1419,10 @@ impl Secure {
         }
         let trust = self.agenda.trust();
         let mut bytes = serde_json::to_vec(&carga).unwrap_or_default();
+        let renovar = self
+            .capa
+            .as_ref()
+            .is_some_and(|c| c.sellados() >= cuantico::RENUEVA_CADA);
         if let Some(capa) = &mut self.capa {
             // The post-quantum lock first; Olm wraps the sealed bytes as any other payload.
             match capa.sella(&bytes) {
@@ -1443,6 +1448,9 @@ impl Secure {
             Err(e) => {
                 self.aviso("sec_err_olm", e.to_string());
             }
+        }
+        if renovar {
+            self.cuantico_empieza();
         }
     }
 
@@ -1495,14 +1503,30 @@ impl Secure {
         self.cambio = true;
     }
 
-    /// Side 0 (by the order of the keys) offers the ML-KEM key once the conversation is open.
+    /// Side 0 (by the order of the keys) offers the ML-KEM key once the conversation is open,
+    /// and again after every link and every [`cuantico::RENUEVA_CADA`] sealed messages (a new
+    /// epoch, so a secret that leaked opens only what it sealed).
     fn cuantico_empieza(&mut self) {
-        if self.mi_numero() != 0 || self.capa.is_some() {
+        if self.mi_numero() != 0 || self.cuantico_oferta.is_some() {
             return;
         }
         let (oferta, llave) = cuantico::Oferta::nueva();
-        self.cuantico_oferta = Some(oferta);
+        self.cuantico_oferta = Some((oferta, llave.clone()));
         self.manda_olm(json!({ "m": "pq_llave", "llave": B64.encode(llave) }));
+    }
+
+    /// The two verified identities in the order the layer binds them to (side 0 first).
+    fn identidades_ordenadas(&self) -> (Vec<u8>, Vec<u8>) {
+        let mia = self.identidad.public_key().to_bytes().to_vec();
+        let suya = self
+            .verificado
+            .map(|v| v.curve().to_bytes().to_vec())
+            .unwrap_or_default();
+        if self.mi_numero() == 0 {
+            (mia, suya)
+        } else {
+            (suya, mia)
+        }
     }
 
     /// What came inside Olm: sealed by the post-quantum layer, or plain. Plain is fine until
@@ -1553,15 +1577,21 @@ impl Secure {
                 let Some(llave) = c["llave"].as_str().and_then(|s| B64.decode(s).ok()) else {
                     return;
                 };
-                if self.mi_numero() != 1 || self.capa.is_some() {
+                if self.mi_numero() != 1 {
                     return;
                 }
                 match cuantico::encapsula(&llave) {
                     Ok((cifrado, secreto)) => {
+                        let (id0, id1) = self.identidades_ordenadas();
+                        let t = cuantico::transcript(&id0, &id1, &llave, &cifrado);
+                        // The answer goes out under the epoch the other side still has.
                         self.manda_olm(
                             json!({ "m": "pq_cifrado", "cifrado": B64.encode(cifrado) }),
                         );
-                        self.capa = Some(cuantico::Capa::nueva(&secreto, 1));
+                        match &mut self.capa {
+                            Some(capa) => capa.renueva(&secreto, &t),
+                            None => self.capa = Some(cuantico::Capa::nueva(&secreto, &t, 1)),
+                        }
                         self.monitor
                             .anota(ahora_s(), Nivel::Info, "capa poscuántica activa");
                         self.cambio = true;
@@ -1573,12 +1603,17 @@ impl Secure {
                 let Some(cifrado) = c["cifrado"].as_str().and_then(|s| B64.decode(s).ok()) else {
                     return;
                 };
-                let Some(oferta) = self.cuantico_oferta.take() else {
+                let Some((oferta, llave)) = self.cuantico_oferta.take() else {
                     return;
                 };
                 match oferta.abre(&cifrado) {
                     Ok(secreto) => {
-                        self.capa = Some(cuantico::Capa::nueva(&secreto, 0));
+                        let (id0, id1) = self.identidades_ordenadas();
+                        let t = cuantico::transcript(&id0, &id1, &llave, &cifrado);
+                        match &mut self.capa {
+                            Some(capa) => capa.renueva(&secreto, &t),
+                            None => self.capa = Some(cuantico::Capa::nueva(&secreto, &t, 0)),
+                        }
                         self.monitor
                             .anota(ahora_s(), Nivel::Info, "capa poscuántica activa");
                         self.cambio = true;
