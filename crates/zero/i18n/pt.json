@@ -984,6 +984,8 @@
   "sec_llamada_sin_respuesta": "Não atende:",
   "sec_l_sin_camara": "Sem câmera: a chamada continua só com voz.",
   "sec_l_sin_medios": "Não foi possível iniciar o microfone nem a câmera para a chamada. Desligue e tente de novo.",
+  "sec_fecha_hoy": "Hoje",
+  "sec_fecha_ayer": "Ontem",
   "sec_l_grupo": "o grupo",
   "sec_l_llamando_s": "Ligando… {s} s",
   "sec_l_llamando": "Ligando para {n}…",

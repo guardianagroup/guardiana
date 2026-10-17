@@ -309,6 +309,26 @@
   const reacciones = (m) => (m.reacciones || []).length ? `<span class="reac">${m.reacciones.map((r) => `<span title="${esc(r.de || t('sec_m_tu'))}">${esc(r.emoji)}</span>`).join('')}</span>` : '';
   const citaDe = (m, lista) => { if (!m.re) return ''; const o = (lista || []).find((y) => y.id === m.re); return o ? `<span class="cita">${esc((o.texto || (o.archivo && o.archivo.nombre) || '').slice(0, 160))}</span>` : ''; };
   const lineaLlamada = (m) => `<li class="llamada-linea" data-id="${esc(m.id || '')}"><span>${m.llamada.video ? '🎥' : '📞'}</span><span>${esc(llamadaTexto(m.llamada))}</span><time>${esc(hora(m.t))}</time></li>`;
+  // Like WhatsApp and Telegram (17 Oct 2026, review with ChatGPT and Grok): a date between
+  // days, and lines of the same person within five minutes grouped close together.
+  const diaDe = (s) => { const d = new Date((s || 0) * 1000); return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate(); };
+  const fechaLinea = (s) => {
+    const hoy = diaDe(Date.now() / 1000), ayer = diaDe(Date.now() / 1000 - 86400), d = diaDe(s);
+    if (d === hoy) return t('sec_fecha_hoy');
+    if (d === ayer) return t('sec_fecha_ayer');
+    const f = new Date(s * 1000), lang = document.documentElement.lang || 'es';
+    return f.toLocaleDateString(lang, f.getFullYear() === new Date().getFullYear() ? { weekday: 'long', day: 'numeric', month: 'long' } : { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+  const agrupa = (ol, lista) => {
+    const lis = [...ol.children].slice(0, (lista || []).length);
+    let antes = null;
+    lis.forEach((li, i) => {
+      const m = lista[i] || {};
+      if (!antes || diaDe(m.t) !== diaDe(antes.t)) { const f = document.createElement('li'); f.className = 'fecha'; f.textContent = fechaLinea(m.t); ol.insertBefore(f, li); }
+      else if (!m.llamada && !antes.llamada && !!m.mio === !!antes.mio && (m.de || '') === (antes.de || '') && (m.t || 0) - (antes.t || 0) < 300) li.classList.add('sigue');
+      antes = m;
+    });
+  };
   const pintaChat = (conNombre) => {
     const recibidos = E.recibidos || [];
     const clave = JSON.stringify([E.mensajes, recibidos, E.enviados, (E.envio || {}).nombre, conNombre, [...minis.keys()], E.escribiendo]);
@@ -336,6 +356,7 @@
       }
       return `<li class="${m.mio ? 'mio' : ''}" data-id="${esc(m.id || '')}">${de}${citaDe(m, E.mensajes)}${esc(m.texto)}${reacciones(m)}${metaMensaje(m)}</li>`;
     }).join('') + (E.escribiendo ? `<li class="escribiendo"><span></span><span></span><span></span></li>` : '');
+    agrupa(ol, E.mensajes);
     if (abajo) ol.scrollTop = ol.scrollHeight;
     // Seen: a new message from the other side, on a screen in front (17 Oct 2026 review).
     const suyo = (E.mensajes || []).filter((x) => !x.mio && !x.llamada).slice(-1)[0];
@@ -717,6 +738,7 @@
     }).join('');
     const ol = $('c-sala-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 40;
     ol.innerHTML = (s.mensajes || []).map((x) => x.llamada ? lineaLlamada(x) : `<li class="${x.mio ? 'mio' : ''}" data-id="${esc(x.id || '')}"><b>${esc(x.de || t('sec_m_tu'))}</b>${citaDe(x, s.mensajes)}${x.borrado ? `<i class="borrado">${esc(t('sec_m_borrado'))}</i>` : x.archivo ? `<span>📎 ${esc(x.archivo.nombre)}</span>` : `<span>${esc(x.texto)}</span>`}${reacciones(x)}${metaMensaje(x)}</li>`).join('') + (s.escribiendo ? `<li class="escribiendo"><span></span><span></span><span></span></li>` : '');
+    agrupa(ol, s.mensajes);
     if (abajo) ol.scrollTop = ol.scrollHeight;
   };
   $('c-sc-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala_cerrar' }));

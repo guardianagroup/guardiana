@@ -984,6 +984,8 @@
   "sec_llamada_sin_respuesta": "No answer:",
   "sec_l_sin_camara": "No camera: the call goes on with voice only.",
   "sec_l_sin_medios": "The microphone and camera could not start for the call. Hang up and try again.",
+  "sec_fecha_hoy": "Today",
+  "sec_fecha_ayer": "Yesterday",
   "sec_l_grupo": "the group",
   "sec_l_llamando_s": "Calling… {s} s",
   "sec_l_llamando": "Calling {n}…",
