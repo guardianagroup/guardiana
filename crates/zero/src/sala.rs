@@ -476,6 +476,20 @@ impl Sala {
         self.guarda(m);
     }
 
+    /// The computer's view of the room's messages (the last 300 it did not delete).
+    fn mensajes_casa(&self) -> Vec<Value> {
+        let mut v: Vec<Value> = self
+            .mensajes
+            .iter()
+            .rev()
+            .filter(|m| !m.ocultos.contains(&CASA))
+            .take(300)
+            .map(|m| self.mensaje_json(m, CASA))
+            .collect();
+        v.reverse();
+        v
+    }
+
     /// One message as seat `yo` (or the computer) sees it.
     fn mensaje_json(&self, m: &Mensaje, yo: usize) -> Value {
         let mio = m.de == yo;
@@ -783,11 +797,7 @@ impl Sala {
                 "pendiente": a.pendiente,
                 "aprobado": a.aprobado,
             })).collect::<Vec<_>>(),
-            "mensajes": {
-                let mut v: Vec<Value> = self.mensajes.iter().rev().filter(|m| !m.ocultos.contains(&CASA)).take(300).map(|m| self.mensaje_json(m, CASA)).collect();
-                v.reverse();
-                v
-            },
+            "mensajes": self.mensajes_casa(),
             "escribiendo": self.asientos.iter().any(|a| a.aprobado && ahora_s().saturating_sub(a.escribe_en) < 6),
             "llamada": self.llamada.as_ref().map(|l| json!({
                 "de": self.nombre_de(l.de),
