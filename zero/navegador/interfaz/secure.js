@@ -203,7 +203,7 @@
   let E = { fase: 'sola' };
   const fasePinta = () => {
     const f = E.fase;
-    $('c-conexion').hidden = !(f === 'sola' || f === 'escuchando') || modo !== 'equipos';
+    $('c-conexion').hidden = !(f === 'sola' || f === 'escuchando') || (modo !== 'equipos' && modo !== 'movil');
     const comparando = E.comparando || (f === 'comparando' ? E.numeros : null);
     $('c-comparar').hidden = !comparando;
     $('c-comparar-quien').textContent = E.comparando && E.contacto_nuevo ? t('sec_s_nuevo', { n: E.contacto_nuevo }) : '';
@@ -211,7 +211,11 @@
     // A conversation that was cut keeps its messages on screen (16 Oct 2026: «se ha eliminado
     // el chat»): read only, with a line saying so, until the person starts another one.
     const cortada = f !== 'lista' && (E.mensajes || []).length > 0 && (f === 'sola' || f === 'escuchando');
-    $('c-chat').hidden = f !== 'lista' && !cortada;
+    const chatOculto = $('c-chat').hidden;
+    $('c-chat').hidden = f !== 'lista' && !(cortada && (modo === 'equipos' || modo === 'movil'));
+    // When the conversation appears, bring it whole into view (writing bar included).
+    if (chatOculto && !$('c-chat').hidden) requestAnimationFrame(() => $('c-chat').scrollIntoView({ block: 'end' }));
+    document.querySelector('main').classList.toggle('con-chat', !$('c-chat').hidden || !$('c-sala-chat').hidden);
     $('c-chat').classList.toggle('cortada', cortada);
     // The link dropped and both sides look for each other again: the chat stays, read only,
     // with a line saying so, until the link is back or five minutes pass.
@@ -239,7 +243,7 @@
     else { delete $('c-nombre').dataset.nuevo; if (E.contacto && !$('c-nombre').value && f !== 'lista') $('c-nombre').value = E.contacto; }
     const g = E.grupo || {};
     const nombres = g.nombres || [];
-    $('c-con').textContent = nombres.length > 2 ? t('sec_m_grupo', { n: nombres.join(' · ') }) : E.contacto ? t('sec_m_con', { n: E.contacto }) : '';
+    $('c-con').textContent = nombres.length > 2 ? t('sec_m_grupo', { n: nombres.join(' · ') }) : E.contacto ? E.contacto : '';
     // The avatar: the first letter of the name (the design the owner chose, 16 Oct 2026).
     const quien = nombres.length > 2 ? nombres.filter((x) => x !== g.yo)[0] || '' : (E.contacto || '');
     $('c-avatar-letra').textContent = (quien.trim()[0] || '·').toUpperCase();
@@ -259,7 +263,7 @@
     if (g.anfitrion && E.codigo_grupo && nombres.length < (g.max || 6)) { mas.hidden = false; $('c-mas-codigo').textContent = E.codigo_grupo; } else mas.hidden = true;
     pintaChat(nombres.length > 2);
   };
-  en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); fasePinta(); pintaResumen(m.resumen); pintaProgreso(m); pintaIncidente(m); pintaVoz(); $('c-voz-otro').hidden = !m.otro_voz_protegida; });
+  en('secure_estado', (m) => { E = m; ultimo = m.monitor || {}; pinta(ultimo); pintaModo(m); fasePinta(); pintaResumen(m.resumen); pintaProgreso(m); pintaIncidente(m); pintaVoz(); $('c-voz-otro').hidden = !m.otro_voz_protegida; pintaVigia(m); pintaInforme(m); aplicaPausa(m); pintaVivo(m); });
   // How far a file is, both ways, and how long it has left (16 Oct 2026).
   const duracion = (s) => { s = Math.max(0, Math.round(s)); if (s < 60) return s + ' s'; if (s < 3600) return Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + (s % 60) + ' s' : ''); const h = Math.floor(s / 3600), mi = Math.floor((s % 3600) / 60); return h + ' h' + (mi ? ' ' + mi + ' min' : ''); };
   const pintaProgreso = (m) => {
@@ -284,8 +288,11 @@
   // the chat each time made the screen shake). A file that arrived is a card: a small picture
   // when it is one, its size, where it is, and Abrir / Ver en la carpeta / Eliminar.
   const minis = new Map(), pedidas = new Set();
-  let chatAntes = '';
+  let chatAntes = '', ultimoSuyo = null;
   const tam = (b) => (b >= 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b >= 1e6 ? (b / 1e6).toFixed(1) + ' MB' : b >= 1e3 ? Math.round(b / 1e3) + ' KB' : b + ' B');
+  // Voice notes: the player, or a quiet «…» while the sound comes from the program.
+  const audios = new Map(), notasPropias = new Map();
+  const notaVoz = (url, nombre) => `<div class="nota-voz">${url ? `<audio controls preload="metadata" src="${esc(url)}"></audio>` : `<span class="nv-etiqueta">${esc(t('sec_nv_nota'))} · …</span>`}${/cambiada/.test(nombre || '') ? `<span class="nv-etiqueta">${esc(t('sec_nv_cambiada_corta'))}</span>` : ''}</div>`;
   const tarjetaArchivo = (r) => {
     const ext = (r.nombre.split('.').pop() || '').slice(0, 4).toUpperCase();
     const mini = r.imagen && !r.borrado && minis.has(r.id) ? `<img src="${minis.get(r.id)}" alt="">` : esc(ext || '·');
@@ -305,9 +312,29 @@
   const reacciones = (m) => (m.reacciones || []).length ? `<span class="reac">${m.reacciones.map((r) => `<span title="${esc(r.de || t('sec_m_tu'))}">${esc(r.emoji)}</span>`).join('')}</span>` : '';
   const citaDe = (m, lista) => { if (!m.re) return ''; const o = (lista || []).find((y) => y.id === m.re); return o ? `<span class="cita">${esc((o.texto || (o.archivo && o.archivo.nombre) || '').slice(0, 160))}</span>` : ''; };
   const lineaLlamada = (m) => `<li class="llamada-linea" data-id="${esc(m.id || '')}"><span>${m.llamada.video ? '🎥' : '📞'}</span><span>${esc(llamadaTexto(m.llamada))}</span><time>${esc(hora(m.t))}</time></li>`;
+  // Like WhatsApp and Telegram (17 Oct 2026, review with ChatGPT and Grok): a date between
+  // days, and lines of the same person within five minutes grouped close together.
+  const diaDe = (s) => { const d = new Date((s || 0) * 1000); return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate(); };
+  const fechaLinea = (s) => {
+    const hoy = diaDe(Date.now() / 1000), ayer = diaDe(Date.now() / 1000 - 86400), d = diaDe(s);
+    if (d === hoy) return t('sec_fecha_hoy');
+    if (d === ayer) return t('sec_fecha_ayer');
+    const f = new Date(s * 1000), lang = document.documentElement.lang || 'es';
+    return f.toLocaleDateString(lang, f.getFullYear() === new Date().getFullYear() ? { weekday: 'long', day: 'numeric', month: 'long' } : { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+  const agrupa = (ol, lista) => {
+    const lis = [...ol.children].slice(0, (lista || []).length);
+    let antes = null;
+    lis.forEach((li, i) => {
+      const m = lista[i] || {};
+      if (!antes || diaDe(m.t) !== diaDe(antes.t)) { const f = document.createElement('li'); f.className = 'fecha'; f.textContent = fechaLinea(m.t); ol.insertBefore(f, li); }
+      else if (!m.llamada && !antes.llamada && !!m.mio === !!antes.mio && (m.de || '') === (antes.de || '') && (m.t || 0) - (antes.t || 0) < 300) li.classList.add('sigue');
+      antes = m;
+    });
+  };
   const pintaChat = (conNombre) => {
     const recibidos = E.recibidos || [];
-    const clave = JSON.stringify([E.mensajes, recibidos, E.enviados, (E.envio || {}).nombre, conNombre, [...minis.keys()], E.escribiendo]);
+    const clave = JSON.stringify([E.mensajes, recibidos, E.enviados, (E.envio || {}).nombre, conNombre, [...minis.keys()], [...audios.keys()], E.escribiendo]);
     if (clave === chatAntes) return;
     chatAntes = clave;
     const ol = $('c-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 30;
@@ -321,21 +348,30 @@
         const r = recibidos.find((x) => !usados.has(x.id) && x.nombre === nombreArchivo && Math.abs((x.t || 0) - (m.t || 0)) <= 3);
         if (r) {
           usados.add(r.id);
-          if (r.imagen && !r.borrado && !minis.has(r.id) && !pedidas.has(r.id)) { pedidas.add(r.id); manda({ tipo: 'secure', accion: 'archivo_vista', id: r.id }); }
+          if ((r.imagen || r.audio) && !r.borrado && !minis.has(r.id) && !audios.has(r.id) && !pedidas.has(r.id)) { pedidas.add(r.id); manda({ tipo: 'secure', accion: 'archivo_vista', id: r.id }); }
+          // A voice note plays right in the chat, like WhatsApp.
+          if (r.audio && !r.borrado) return `<li class="archivo-li" data-id="${esc(m.id || '')}">${de}${notaVoz(audios.get(r.id), r.nombre)}${reacciones(m)}<time>${esc(hora(m.t))}</time></li>`;
           return `<li class="archivo-li" data-id="${esc(m.id || '')}">${de}${tarjetaArchivo(r)}${reacciones(m)}<time>${esc(hora(m.t))}</time></li>`;
         }
       }
       if (m.mio && nombreArchivo) {
         const x = (E.enviados || []).find((y) => y.nombre === nombreArchivo && Math.abs((y.t || 0) - (m.t || 0)) <= 3);
         const estado = x && typeof x.llego_en === 'number' ? '✓ ' + t('sec_f_entregado_en', { t: duracion(x.llego_en) }) : (E.envio && E.envio.nombre === nombreArchivo ? t('sec_f_en_camino') : t('sec_f_enviado'));
+        if (notasPropias.has(nombreArchivo)) return `<li class="mio" data-id="${esc(m.id || '')}">${notaVoz(notasPropias.get(nombreArchivo), nombreArchivo)}<span class="a-entrega">${esc(estado)}</span>${reacciones(m)}<time>${esc(hora(m.t))}</time></li>`;
         return `<li class="mio" data-id="${esc(m.id || '')}">📎 ${esc(nombreArchivo)}${x ? ` <small class="a-tam">${esc(tam(x.bytes))}</small>` : ''}<span class="a-entrega">${esc(estado)}</span>${reacciones(m)}<time>${esc(hora(m.t))}</time></li>`;
       }
       return `<li class="${m.mio ? 'mio' : ''}" data-id="${esc(m.id || '')}">${de}${citaDe(m, E.mensajes)}${esc(m.texto)}${reacciones(m)}${metaMensaje(m)}</li>`;
     }).join('') + (E.escribiendo ? `<li class="escribiendo"><span></span><span></span><span></span></li>` : '');
+    agrupa(ol, E.mensajes);
     if (abajo) ol.scrollTop = ol.scrollHeight;
+    // Seen: a new message from the other side, on a screen in front (17 Oct 2026 review).
+    const suyo = (E.mensajes || []).filter((x) => !x.mio && !x.llamada).slice(-1)[0];
+    if (suyo && suyo.id !== ultimoSuyo) { ultimoSuyo = suyo.id; if (!document.hidden && document.hasFocus()) manda({ tipo: 'secure', accion: 'visto' }); }
   };
   // The picture comes once, full size: keep a small copy only.
   en('secure_vista', (m) => {
+    // A voice note: kept as it came, to play.
+    if (typeof m.url === 'string' && m.url.startsWith('data:audio/')) { audios.set(m.id, m.url); if (E) pintaChat(((E.grupo || {}).nombres || []).length > 2); return; }
     const img = new Image();
     img.onload = () => {
       const lado = 112, c = document.createElement('canvas'); c.width = lado; c.height = lado;
@@ -420,12 +456,15 @@
   en('secure_prueba', (m) => descarga(`guardiana-secure-prueba-${sello()}.json`, 'application/json', m.json));
   en('secure_aviso', (m) => { const extra = m.texto && /^sec_[a-z0-9_]+$/.test(m.texto) ? t(m.texto) : m.texto; const txt = t(m.clave) + (extra ? ' ' + extra : ''); aviso(txt); });
   const avisos = [];
-  function aviso(txt) { avisos.push(txt); const ol = $('c-mensajes'); const li = document.createElement('li'); li.className = 'aviso-li'; li.textContent = txt; ol.appendChild(li); ol.scrollTop = ol.scrollHeight; }
+  function aviso(txt) {
+    // With no conversation on screen the notice goes under the invitation (a wrong code, a
+    // failed invitation), where the person is looking.
+    if ($('c-chat').hidden) { $('c-aviso').textContent = txt; $('c-aviso').hidden = false; clearTimeout(aviso.r); aviso.r = setTimeout(() => { $('c-aviso').hidden = true; }, 15000); return; }
+    avisos.push(txt); const ol = $('c-mensajes'); const li = document.createElement('li'); li.className = 'aviso-li'; li.textContent = txt; ol.appendChild(li); ol.scrollTop = ol.scrollHeight; }
   // Your name, as the others will see it (kept here; sent before inviting).
   try { $('c-yo').value = localStorage.getItem('secure_nombre') || ''; } catch (_) {}
   const mandaNombre = () => { const n = $('c-yo').value.trim().slice(0, 60); try { localStorage.setItem('secure_nombre', n); } catch (_) {} manda({ tipo: 'secure', accion: 'nombre', nombre: n }); };
   $('c-yo').addEventListener('change', mandaNombre);
-  mandaNombre();
   $('c-escuchar').addEventListener('click', () => { mandaNombre(); manda({ tipo: 'secure', accion: 'escuchar', puerto: 0 }); });
   $('c-mas-copiar').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('c-mas-codigo').textContent); $('c-mas-copiar').textContent = t('sec_c_copiado'); setTimeout(() => { $('c-mas-copiar').textContent = t('sec_c_copiar'); }, 1500); } catch (_) {} });
   // Sending the code: WhatsApp (a tab with the message ready) or mail; the person picks who.
@@ -513,7 +552,8 @@
       // a big file never fills the memory.
       // While the link is being recovered (`pausado`), nothing is handed over: what already
       // left waits in the program and goes on from where the other side got to.
-      while (E && E.envio && (E.envio.pausado || E.envio.cola > 8 * 1024 * 1024)) await new Promise((r) => setTimeout(r, 150));
+      // During a call a file goes slowly (256 KB queued at most), so the call never waits behind it.
+      while (E && E.envio && (E.envio.pausado || E.envio.cola > (E.llamada ? 256 * 1024 : 8 * 1024 * 1024))) await new Promise((r) => setTimeout(r, 150));
       const trozo = await f.slice(i * TROZO, (i + 1) * TROZO).arrayBuffer();
       const ultimo = i + 1 === total && trozo.byteLength < TROZO;
       manda({ tipo: 'secure', accion: 'archivo_trozo', b64: b64De(trozo), ultimo });
@@ -529,11 +569,72 @@
   };
   const encola = (files) => { for (const f of files) cola.push(f); enviaSiguiente(); };
   $('c-archivo').addEventListener('change', () => { encola($('c-archivo').files); $('c-archivo').value = ''; });
-  const zona = $('c-zona');
-  ['dragenter', 'dragover'].forEach((ev) => zona.addEventListener(ev, (e) => { e.preventDefault(); zona.classList.add('sobre'); }));
-  ['dragleave', 'drop'].forEach((ev) => zona.addEventListener(ev, (e) => { e.preventDefault(); zona.classList.remove('sobre'); }));
-  zona.addEventListener('drop', (e) => { if (e.dataTransfer && e.dataTransfer.files.length) encola(e.dataTransfer.files); });
+  // A file dragged anywhere over the conversation: the drop area appears; dropped, it goes.
+  const zona = $('c-zona'), chatCaja = $('c-chat');
+  ['dragenter', 'dragover'].forEach((ev) => chatCaja.addEventListener(ev, (e) => { if (e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files')) { e.preventDefault(); zona.classList.add('sobre'); } }));
+  chatCaja.addEventListener('dragleave', (e) => { if (!chatCaja.contains(e.relatedTarget)) zona.classList.remove('sobre'); });
+  chatCaja.addEventListener('drop', (e) => { e.preventDefault(); zona.classList.remove('sobre'); if (e.dataTransfer && e.dataTransfer.files.length) encola(e.dataTransfer.files); });
   $('p-reanudar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'reanudar' }));
+
+  // ---------- Voice notes (17 Oct 2026, «como WhatsApp, normal y con la voz cambiada») ----------
+  // The microphone offers two ways: the voice as it is, or changed (the same «Proteger mi voz»
+  // as in calls, voz.js). The note is recorded here, then goes like any file: encrypted end to
+  // end, in pieces. Five minutes at most.
+  let nota = null;
+  const NV_MAX = 5 * 60;
+  const mimeNota = () => ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find((x) => window.MediaRecorder && MediaRecorder.isTypeSupported(x)) || '';
+  const pintaNota = () => {
+    const g = !!nota;
+    $('c-grabando').hidden = !g; $('c-texto').hidden = g;
+    $('c-microfono').classList.toggle('activo', g);
+    $('c-microfono').title = t(g ? 'sec_nv_enviar' : 'sec_nv_grabar');
+    if (g) { const s = Math.floor((Date.now() - nota.desde) / 1000); $('c-grabando-t').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); $('c-grabando-modo').textContent = t(nota.cambiada ? 'sec_nv_cambiada_corta' : 'sec_nv_normal_corta'); }
+  };
+  const empiezaNota = async (cambiada) => {
+    $('c-nv-elige').hidden = true;
+    if (nota || !window.MediaRecorder) return;
+    let s;
+    try { s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); } catch (e) { muestraPermiso(e, 'microfono'); return; }
+    let vp = null, fuente = s;
+    if (cambiada && window.vozProtegida) { try { vp = window.vozProtegida(s, -4); fuente = vp.stream; } catch (_) { vp = null; } }
+    const tipo = mimeNota();
+    let r;
+    try { r = new MediaRecorder(fuente, tipo ? { mimeType: tipo, audioBitsPerSecond: 32000 } : undefined); } catch (_) { s.getTracks().forEach((x) => x.stop()); if (vp) vp.parar(); aviso(t('sec_l_sin_medios')); return; }
+    nota = { s, vp, r, trozos: [], cambiada, desde: Date.now(), tipo: r.mimeType || tipo, reloj: null, enviar: false };
+    r.ondataavailable = (e) => { if (e.data && e.data.size) nota && nota.trozos.push(e.data); };
+    r.onstop = () => terminaNota();
+    r.start(250);
+    nota.reloj = setInterval(() => { if (!nota) return; pintaNota(); if (Date.now() - nota.desde > NV_MAX * 1000) paraNota(true); }, 250);
+    pintaNota();
+  };
+  const paraNota = (enviar) => { if (!nota) return; nota.enviar = enviar; try { nota.r.stop(); } catch (_) { terminaNota(); } };
+  const terminaNota = () => {
+    const n = nota; if (!n) return;
+    nota = null; clearInterval(n.reloj);
+    n.s.getTracks().forEach((x) => x.stop()); if (n.vp) n.vp.parar();
+    pintaNota();
+    if (!n.enviar || !n.trozos.length || Date.now() - n.desde < 700) return;
+    const tipo = (n.tipo || 'audio/webm').split(';')[0];
+    const ext = tipo === 'audio/mp4' ? 'm4a' : 'webm';
+    const d = new Date(), p = (x) => String(x).padStart(2, '0');
+    const nombre = `nota-de-voz${n.cambiada ? '-cambiada' : ''}-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.${ext}`;
+    const blob = new Blob(n.trozos, { type: tipo });
+    notasPropias.set(nombre, URL.createObjectURL(blob));
+    encola([new File([blob], nombre, { type: tipo })]);
+  };
+  $('c-microfono').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (nota) { paraNota(true); return; }
+    $('c-nv-elige').hidden = !$('c-nv-elige').hidden;
+    if (!$('c-nv-elige').hidden) $('c-nv-normal').focus();
+  });
+  $('c-nv-normal').addEventListener('click', () => empiezaNota(false));
+  $('c-nv-cambiada').addEventListener('click', () => empiezaNota(true));
+  $('c-nv-cancelar').addEventListener('click', () => paraNota(false));
+  document.addEventListener('click', (e) => { if (!e.target.closest('#c-nv-elige') && !e.target.closest('#c-microfono')) $('c-nv-elige').hidden = true; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('c-nv-elige').hidden = true; if (nota) paraNota(false); } });
+  // Enter or «send» while recording sends the note.
+  $('c-form').addEventListener('submit', (e) => { if (nota) { e.preventDefault(); e.stopImmediatePropagation(); paraNota(true); } }, true);
 
   // ---------- Ring, voice and video (15 Oct 2026) ----------
   // The ring is made here, by the page itself: two soft notes, no file, no network. It plays
@@ -565,13 +666,13 @@
     const f = m.fase;
     if (!f || f === 'sola') { ol.innerHTML = filaSala(m) || `<li class="vacia">${esc(t('sec_lista_vacia'))}</li>`; if (!m.sala) $('miga-donde').textContent = t('sec_miga_inicio'); return; }
     const ultimo = (m.mensajes || []).slice(-1)[0];
-    const nombre = nombres.length > 2 ? t('sec_m_grupo', { n: nombres.length }) : (quien || t('sec_lista_nueva'));
+    const nombre = nombres.length > 2 ? nombres.join(' · ') : (quien || t('sec_lista_nueva'));
     const linea = f !== 'lista' ? t(f === 'comparando' ? 'sec_lista_comparando' : 'sec_lista_conectando') : m.llamada ? t('sec_l_en_curso') : ultimo ? ultimo.texto : t('sec_lista_sin_mensajes');
     ol.innerHTML = filaSala(m) + `<li class="${vista === 'contacto' || !m.sala ? 'activa' : ''}" data-vista="contacto"><span class="avatar">${esc((nombre.trim()[0] || '·').toUpperCase())}${f === 'lista' ? '<i></i>' : ''}</span><b>${esc(nombre)}</b><time>${ultimo ? esc(hora(ultimo.t).slice(0, 5)) : ''}</time><span class="ultimo">${esc(linea)}</span></li>`;
     if (vista !== 'sala' || !m.sala) $('miga-donde').textContent = t('sec_miga_conv');
   };
-  $('c-lista').addEventListener('click', (e) => { const li = e.target.closest('li[data-vista]'); if (!li || !E.sala) return; vista = li.dataset.vista; fasePinta(); pintaLista(E, E.contacto, ((E.grupo || {}).nombres || [])); pintaVista(E); });
-  $('c-nueva').addEventListener('click', () => { if (!hayContacto(E) && !E.sala && !movilActivo(E)) { modo = null; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); } });
+  $('c-lista').addEventListener('click', (e) => { const li = e.target.closest('li[data-vista]'); if (!li || !E.sala) return; vista = li.dataset.vista; modo = vista === 'sala' ? 'sala' : (movilActivo(E) && !hayContacto(E) ? 'movil' : 'equipos'); guardaModo(); fasePinta(); pintaLista(E, E.contacto, ((E.grupo || {}).nombres || [])); pintaVista(E); });
+  $('c-nueva').addEventListener('click', () => { if (!hayContacto(E) && !movilActivo(E)) { modo = null; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); } });
 
   // «Pasar al móvil»: the program shows a QR code; the phone's camera opens our page, which
   // talks to this computer directly (TLS 1.3 pinned to the certificate in the code). The
@@ -614,45 +715,64 @@
   // its chat fills the middle column while no other conversation is open, and the left list
   // offers both when there is one.
   let vista = 'contacto';
-  const hayContacto = (m) => m.fase && m.fase !== 'sola' || (m.mensajes || []).length > 0;
+  // Someone on the line (17 Oct 2026 review: counting the messages a finished conversation
+  // leaves on screen kept the start hidden and the way back gone until the program restarted).
+  const hayContacto = (m) => !!m.fase && m.fase !== 'sola';
   // Three ways to talk (16 Oct 2026): computer to computer, from the phone, the home room.
   // The start shows the three; once one is chosen (or one is already going) only it is on screen.
   let modo = null;
   try { modo = sessionStorage.getItem('secure-modo') || null; } catch (_) {}
+  if (!['equipos', 'movil', 'sala'].includes(modo)) modo = null;
   const guardaModo = () => { try { if (modo) sessionStorage.setItem('secure-modo', modo); else sessionStorage.removeItem('secure-modo'); } catch (_) {} };
   const movilActivo = (m) => !!(m.movil && (m.movil.enganchado || m.movil.pendiente || m.movil.qr));
   const pintaModo = (m) => {
-    // What is going on decides the mode; the person's choice only while nothing is going on.
-    if (m.sala) modo = 'sala';
-    else if (movilActivo(m)) modo = 'movil';
-    else if (hayContacto(m)) modo = 'equipos';
+    // The person's choice wins; what is going on only fills the gap (17 Oct 2026: an open room
+    // kept the screen in «Modo casa» and the other two cards did nothing). A conversation with
+    // someone takes the screen when it starts.
+    const enConversacion = hayContacto(m) || movilActivo(m);
+    if (enConversacion && modo !== 'equipos' && modo !== 'movil') modo = movilActivo(m) && !hayContacto(m) ? 'movil' : 'equipos';
+    else if (!modo && m.sala) modo = 'sala';
     guardaModo();
     const activo = !!m.sala || movilActivo(m) || hayContacto(m);
     $('c-inicio').hidden = !!modo;
-    $('c-modo-cab').hidden = !modo || activo;
+    // The way back stays while an invitation waits or the numbers are compared; only an open
+    // conversation (which has «Cerrar conversación») or the phone link hide it.
+    $('c-modo-cab').hidden = !modo || m.fase === 'lista' || movilActivo(m);
     if (modo) $('c-modo-nombre').textContent = t('sec_modo_' + modo);
-    $('c-modo-movil').hidden = modo !== 'movil';
+    $('c-modo-movil').hidden = modo !== 'movil' && !m.movil;
+    $('c-modo-movil-intro').hidden = !!m.movil || hayContacto(m);
     const sala = $('c-sala-tarjeta');
     sala.hidden = modo !== 'sala';
     // The room's code and members: in the middle while it is not open, on the left once it is.
     const colIzq = document.querySelector('.col-izq'), main = document.querySelector('main');
     if (modo === 'sala' && m.sala && sala.parentElement !== colIzq) colIzq.insertBefore(sala, colIzq.querySelector('.pie-izq'));
     if ((modo !== 'sala' || !m.sala) && sala.parentElement !== main) main.insertBefore(sala, $('c-conexion'));
+    // The phone card goes to the left while a conversation is open, so the chat keeps the
+    // whole middle (17 Oct 2026, the owner: «se ve el margen de abajo cortado»).
+    const mvC = $('c-modo-movil'), mvLado = hayContacto(m) && !!m.movil;
+    if (mvLado && mvC.parentElement !== colIzq) colIzq.insertBefore(mvC, colIzq.querySelector('.pie-izq'));
+    if (!mvLado && mvC.parentElement !== main) main.insertBefore(mvC, $('c-modo-cab').nextSibling);
     const secure = document.querySelector('.secure');
     secure.classList.toggle('sin-lados', !activo);
     secure.classList.toggle('sin-derecha', false);
     $('miga-donde').textContent = modo ? t('sec_modo_' + modo) : t('sec_miga_inicio');
   };
   document.querySelectorAll('.modo').forEach((b) => b.addEventListener('click', () => { modo = b.dataset.modo; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); if (modo === 'sala') $('c-sala-horas').focus(); }));
-  $('c-volver').addEventListener('click', () => { modo = null; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); });
+  $('c-volver').addEventListener('click', () => {
+    // Going back cancels an invitation still waiting, so nothing is left half open.
+    if (E.fase && E.fase !== 'sola' && E.fase !== 'lista') { manda({ tipo: 'secure', accion: 'cerrar' }); E = Object.assign({}, E, { fase: 'sola' }); }
+    modo = null; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E);
+  });
   const pintaVista = (m) => {
     pintaModo(m);
     const s = m.sala;
     if (!s) vista = 'contacto';
-    else if (!hayContacto(m)) vista = 'sala';
-    const enSala = !!s && vista === 'sala';
+    else if (modo === 'sala') vista = 'sala';
+    else if (!hayContacto(m) && !movilActivo(m)) vista = 'sala';
+    const enSala = !!s && vista === 'sala' && modo === 'sala';
     $('c-sala-chat').hidden = !enSala;
     for (const id of ['c-conexion', 'c-comparar', 'c-espera', 'c-resumen', 'c-chat']) if (enSala) $(id).hidden = true;
+    document.querySelector('main').classList.toggle('con-chat', !$('c-chat').hidden || enSala);
     if (!enSala) return;
     const dentro = (s.miembros || []).filter((x) => x.aprobado);
     $('c-sc-sello').textContent = t('sec_sala_sello', { n: n(dentro.length), h: n(s.horas), f: fecha(s.caduca) });
@@ -687,6 +807,7 @@
     }).join('');
     const ol = $('c-sala-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 40;
     ol.innerHTML = (s.mensajes || []).map((x) => x.llamada ? lineaLlamada(x) : `<li class="${x.mio ? 'mio' : ''}" data-id="${esc(x.id || '')}"><b>${esc(x.de || t('sec_m_tu'))}</b>${citaDe(x, s.mensajes)}${x.borrado ? `<i class="borrado">${esc(t('sec_m_borrado'))}</i>` : x.archivo ? `<span>📎 ${esc(x.archivo.nombre)}</span>` : `<span>${esc(x.texto)}</span>`}${reacciones(x)}${metaMensaje(x)}</li>`).join('') + (s.escribiendo ? `<li class="escribiendo"><span></span><span></span><span></span></li>` : '');
+    agrupa(ol, s.mensajes);
     if (abajo) ol.scrollTop = ol.scrollHeight;
   };
   $('c-sc-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'sala_cerrar' }));
@@ -706,7 +827,6 @@
   let faseAntes = 'sola';
   en('secure_estado', (m) => {
     if (m.fase === 'comparando' && faseAntes !== 'comparando' && faseAntes !== 'saludando') timbre();
-    if (m.fase === 'comparando' && faseAntes === 'escuchando') timbre();
     faseAntes = m.fase;
     pintaLlamada(m);
   });
@@ -773,9 +893,15 @@
     pintaTimbre(m); pintaBotones(m); pintaPerdida(m);
     const l = m.llamada;
     const caja = $('c-llamada');
+    const enLlamada = !!l && l.conectada !== false && !movilHabla && !$('c-chat').hidden;
+    document.querySelector('.secure').classList.toggle('en-llamada', enLlamada);
+    if (!l) medidorPara();
     if (!l) { $('c-permiso').hidden = true; $('c-permiso').dataset.camara = ''; caja.hidden = true; caja.classList.remove('llamando'); paraMedios(); mimeRemoto = null; if (tonoLlamando) { clearInterval(tonoLlamando); tonoLlamando = null; } return; }
     caja.hidden = false;
     caja.classList.toggle('solo-voz', !l.video);
+    $('c-l-letra').textContent = ((m.contacto || quien(m) || '·').trim()[0] || '·').toUpperCase();
+    $('vj-otro').textContent = quien(m);
+    if (l.conectada !== false && !movilHabla) medidorEmpieza();
     const llamando = l.conectada === false;
     caja.classList.toggle('llamando', llamando);
     caja.querySelector('.pantallas').dataset.llamando = t('sec_l_llamando', { n: quien(m) });
@@ -787,13 +913,23 @@
     // recorder starts again too, so its first piece carries the header that player needs.
     if (grabador && typeof l.reinicio === 'number' && reinicioVisto !== null && l.reinicio !== reinicioVisto) cambiaGrabador();
     if (typeof l.reinicio === 'number') reinicioVisto = l.reinicio;
+    // WebRTC when both programs and the relay's call service allow it (17 Oct 2026); the
+    // recorded pieces otherwise, or when WebRTC did not connect.
+    const conRtc = l.rtc && l.rtc.ice && !rtcFallo && window.RTCPeerConnection;
+    if (rtc || (conRtc && !grabador)) { if (!rtc && !arrancando) empiezaRtc(l); return; }
+    // The relay is still being asked for its call service: a few seconds, then the old way.
+    if (l.rtc && l.rtc.pendiente && !rtcFallo && !grabador && !arrancando) { rtcEspera = rtcEspera || Date.now(); if (Date.now() - rtcEspera < 5000) return; rtcManda({ t: 'fallo' }); rtcFallo = true; }
     if (!grabador && !arrancando) empiezaMedios(!!l.video);
     // The other side's player (an iPhone) cannot open what we record: record in what it can.
     else if (grabador && tipoGrabador && mime(llamadaVideo) !== tipoGrabador) cambiaGrabador();
     // The other side said what its pieces are: open the player for exactly that.
     if (l.mime_remoto && l.mime_remoto !== mimeRemoto && buffer !== undefined) { mimeRemoto = l.mime_remoto; preparaReproductor(mimeRemoto); }
   };
-  setInterval(() => { if (!$('c-llamada').hidden && E.llamada && !movilHabla) $('c-l-estado').textContent = textoLlamada(E.llamada); }, 1000);
+  setInterval(() => {
+    if (!$('c-llamada').hidden && E.llamada && !movilHabla) $('c-l-estado').textContent = textoLlamada(E.llamada);
+    // A connected call with nothing started yet (it was waiting for the relay): start now.
+    if (rtcEspera && E && E.llamada && E.llamada.conectada !== false && !rtc && !grabador && !arrancando && !movilHabla) pintaLlamada(E);
+  }, 1000);
   // The formats, best first; the phone's page knows the same list and tells which it can play.
   const CANDIDATOS = { video: ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/webm'], voz: ['audio/webm;codecs=opus', 'audio/mp4;codecs=mp4a.40.2', 'audio/webm'] };
   const mime = (video) => {
@@ -814,7 +950,7 @@
   $('c-voz-prot').addEventListener('click', () => {
     vozActiva = !vozActiva; try { localStorage.setItem('secure_voz', vozActiva ? '1' : '0'); } catch (_) {}
     pintaVoz(); manda({ tipo: 'secure', accion: 'voz_protegida', activa: vozActiva });
-    if (local) cambiaGrabador();
+    if (rtc) rtcVoz(); else if (local) cambiaGrabador();
   });
   const nuevoGrabador = (video) => {
     const tipo = mime(video);
@@ -867,7 +1003,7 @@
     $('c-permiso').hidden = !$('c-permiso').dataset.camara;
     $('c-local').srcObject = local;
     llamadaVideo = video && local.getVideoTracks().length > 0;
-    nuevoGrabador(llamadaVideo);
+    try { nuevoGrabador(llamadaVideo); } catch (e) { arrancando = false; aviso(t('sec_l_sin_medios')); return; }
     // Our players are new: ask the other side for pieces from a fresh start.
     manda({ tipo: 'secure', accion: 'pide_inicio' });
     arrancando = false;
@@ -917,6 +1053,7 @@
     });
   });
   const paraMedios = () => {
+    paraRtc(); rtcFallo = false; rtcEspera = 0;
     try { if (grabador && grabador.state !== 'inactive') grabador.stop(); } catch (_) {}
     grabador = null; tipoGrabador = null;
     if (vozProt) { vozProt.parar(); vozProt = null; }
@@ -927,6 +1064,125 @@
     $('c-rejilla').innerHTML = ''; $('c-rejilla').dataset.n = '0';
     arrancando = false;
   };
+  // ---------- WebRTC (17 Oct 2026, «la tecnología de WhatsApp y Google Meet») ----------
+  // Voice and video go over UDP through GUARDIANA's relay (TURN, «relay» only: neither side
+  // ever sees the other's address), encrypted from this page to the other end (DTLS-SRTP).
+  // What sets the call up (offer, answer, candidates) travels inside Olm through the program,
+  // so the keys in it are the verified person's. Real-time audio and video, with the jitter
+  // buffer, loss recovery and bitrate that adapt to the network: what the recorded pieces
+  // could not do. If it does not connect within 15 s, both ends go back to the pieces.
+  let rtc = null, rtcFallo = false, rtcEspera = 0;
+  const rtcManda = (d) => manda({ tipo: 'secure', accion: 'rtc', d });
+  const obtenLocal = async (video) => {
+    const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+    try {
+      return await navigator.mediaDevices.getUserMedia({ audio, video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false });
+    } catch (e) {
+      if (video) { try { const s = await navigator.mediaDevices.getUserMedia({ audio, video: false }); aviso(t('sec_l_sin_camara')); muestraPermiso(e, 'camara'); return s; } catch (e2) { e = e2; } }
+      muestraPermiso(e, 'microfono');
+      return null;
+    }
+  };
+  // What leaves: the voice changed when «Proteger mi voz» is on, the camera as it is.
+  const rtcEnvio = () => fuenteGrabacion();
+  const rtcTile = (stream) => {
+    remoto = stream;
+    $('c-rejilla').innerHTML = '';
+    const tile = document.createElement('div'); tile.className = 'tile';
+    const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; v.srcObject = stream;
+    const n = document.createElement('span'); n.className = 'tile-nombre'; n.textContent = (E && E.contacto) || '';
+    tile.appendChild(v); tile.appendChild(n); $('c-rejilla').appendChild(tile); $('c-rejilla').dataset.n = '1';
+    v.play().catch(() => {});
+  };
+  const rtcNuevaPc = () => {
+    const pc = new RTCPeerConnection({ iceServers: rtc.ice, iceTransportPolicy: 'relay', bundlePolicy: 'max-bundle' });
+    const envio = rtcEnvio();
+    envio.getTracks().forEach((x) => pc.addTrack(x, envio));
+    pc.onicecandidate = (e) => { if (e.candidate && rtc && rtc.pc === pc) rtcManda({ t: 'ice', s: rtc.s, c: e.candidate.toJSON() }); };
+    pc.ontrack = (e) => { if (rtc && rtc.pc === pc) rtcTile(e.streams[0] || new MediaStream([e.track])); };
+    pc.onconnectionstatechange = () => {
+      if (!rtc || rtc.pc !== pc) return;
+      if (pc.connectionState === 'connected') { rtc.conectada = true; clearTimeout(rtc.reloj); }
+      else if (pc.connectionState === 'failed') rtcFalla(true);
+    };
+    // Video up to 1.2 Mbps; WebRTC lowers it by itself when the network cannot carry it.
+    pc.getSenders().forEach((x) => { if (x.track && x.track.kind === 'video') { try { const p = x.getParameters(); p.encodings = p.encodings && p.encodings.length ? p.encodings : [{}]; p.encodings[0].maxBitrate = 1200000; x.setParameters(p).catch(() => {}); } catch (_) {} } });
+    return pc;
+  };
+  const rtcOfrece = async () => {
+    if (!rtc) return;
+    try { if (rtc.pc) rtc.pc.close(); } catch (_) {}
+    rtc.s = Math.random().toString(36).slice(2, 10);
+    rtc.pc = rtcNuevaPc(); rtc.pendientes = [];
+    const o = await rtc.pc.createOffer();
+    await rtc.pc.setLocalDescription(o);
+    rtcManda({ t: 'offer', s: rtc.s, sdp: rtc.pc.localDescription.sdp });
+  };
+  const empiezaRtc = async (l) => {
+    arrancando = true;
+    llamadaVideo = !!l.video;
+    const s = await obtenLocal(!!l.video);
+    if (!s || !(E && E.llamada)) { if (s) s.getTracks().forEach((x) => x.stop()); arrancando = false; return; }
+    local = s;
+    local.getAudioTracks().forEach((x) => { x.enabled = !silenciado; });
+    if (pausaAplicada) local.getTracks().forEach((x) => { x.enabled = false; });
+    $('c-permiso').hidden = !$('c-permiso').dataset.camara;
+    $('c-local').srcObject = local;
+    llamadaVideo = !!l.video && local.getVideoTracks().length > 0;
+    rtc = { ice: l.rtc.ice, ofrece: !!l.rtc.ofrece, pc: null, s: null, pendientes: [], conectada: false, reloj: null };
+    rtc.reloj = setTimeout(() => { if (rtc && !rtc.conectada) rtcFalla(true); }, 15000);
+    arrancando = false;
+    // «I am here»: the side that offers starts again with a fresh offer when it hears it, so
+    // the two meet whichever started first (or when a phone takes the call over).
+    rtcManda({ t: 'hola' });
+    if (rtc.ofrece) rtcOfrece().catch(() => rtcFalla(true));
+  };
+  const rtcAplicaPendientes = () => { if (!rtc || !rtc.pc || !rtc.pc.remoteDescription) return; const p = rtc.pendientes.filter((x) => x.s === rtc.s); rtc.pendientes = []; p.forEach((x) => rtc.pc.addIceCandidate(x.c).catch(() => {})); };
+  en('secure_rtc', async (m) => {
+    const d = m.d || {};
+    if (d.t === 'fallo') { if (rtc) rtcFalla(false); else rtcFallo = true; return; }
+    if (!rtc) return;
+    try {
+      if (d.t === 'hola') { if (rtc.ofrece) await rtcOfrece(); }
+      else if (d.t === 'offer' && !rtc.ofrece) {
+        try { if (rtc.pc) rtc.pc.close(); } catch (_) {}
+        rtc.s = d.s; rtc.pc = rtcNuevaPc();
+        await rtc.pc.setRemoteDescription({ type: 'offer', sdp: d.sdp });
+        const a = await rtc.pc.createAnswer();
+        await rtc.pc.setLocalDescription(a);
+        rtcManda({ t: 'answer', s: rtc.s, sdp: rtc.pc.localDescription.sdp });
+        rtcAplicaPendientes();
+      } else if (d.t === 'answer' && rtc.ofrece && d.s === rtc.s && rtc.pc && rtc.pc.signalingState === 'have-local-offer') {
+        await rtc.pc.setRemoteDescription({ type: 'answer', sdp: d.sdp });
+        rtcAplicaPendientes();
+      } else if (d.t === 'ice' && d.c) {
+        if (rtc.pc && d.s === rtc.s && rtc.pc.remoteDescription) await rtc.pc.addIceCandidate(d.c).catch(() => {});
+        else if (rtc.pendientes.length < 200) rtc.pendientes.push({ s: d.s, c: d.c });
+      }
+    } catch (_) { rtcFalla(true); }
+  });
+  const paraRtc = () => {
+    if (!rtc) return;
+    clearTimeout(rtc.reloj);
+    try { if (rtc.pc) rtc.pc.close(); } catch (_) {}
+    rtc = null;
+  };
+  // WebRTC did not connect: both ends go back to the recorded pieces for this call.
+  const rtcFalla = (decirlo) => {
+    if (decirlo) rtcManda({ t: 'fallo' });
+    rtcFallo = true;
+    const l = E && E.llamada;
+    paraRtc();
+    if (local) { local.getTracks().forEach((x) => x.stop()); local = null; }
+    $('c-rejilla').innerHTML = ''; $('c-rejilla').dataset.n = '0';
+    if (l && !movilHabla) empiezaMedios(!!l.video);
+  };
+  // «Proteger mi voz» switched during a WebRTC call: the same sender, the other voice.
+  const rtcVoz = () => {
+    if (!rtc || !rtc.pc || !local) return;
+    const pista = rtcEnvio().getAudioTracks()[0];
+    rtc.pc.getSenders().forEach((x) => { if (x.track && x.track.kind === 'audio' && pista) x.replaceTrack(pista).catch(() => {}); });
+  };
   const llama = (video) => { if ($('c-voz').disabled) return; $(video ? 'c-video' : 'c-voz').classList.add('pulsado'); $('c-voz').disabled = true; $('c-video').disabled = true; timbre(); manda({ tipo: 'secure', accion: 'llamar', video, mime: mime(video) }); };
   $('c-voz').addEventListener('click', () => llama(false));
   $('c-video').addEventListener('click', () => llama(true));
@@ -935,14 +1191,351 @@
   // or the same button brings them back.
   $('c-pantalla').addEventListener('click', () => { const p = document.querySelector('#c-llamada .pantallas'); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else if (p && p.requestFullscreen) p.requestFullscreen().catch(() => {}); });
   en('secure_estado', (m) => { $('c-pantalla').hidden = !(m.llamada && m.llamada.video && m.llamada.conectada !== false); });
-  $('c-silencio').addEventListener('click', () => { silenciado = !silenciado; if (local) local.getAudioTracks().forEach((x) => { x.enabled = !silenciado; }); $('c-silencio').setAttribute('aria-pressed', String(silenciado)); $('c-silencio').querySelector('span').textContent = t(silenciado ? 'sec_l_sonar' : 'sec_l_silenciar'); });
+  $('c-silencio').addEventListener('click', () => { silenciado = !silenciado; if (local) local.getAudioTracks().forEach((x) => { x.enabled = !silenciado && !pausaAplicada; }); $('c-silencio').setAttribute('aria-pressed', String(silenciado)); $('c-silencio').querySelector('span').textContent = t(silenciado ? 'sec_l_sonar' : 'sec_l_silenciar'); });
+
+  // ---------- The call, live (17 Oct 2026: «que se vea movimiento … datos los más posibles
+  // durante una llamada», the design the owner chose: Pulso, with the chat on the left) ----------
+  // Every figure here is measured: WebRTC's own statistics once a second (round trip, jitter,
+  // loss, bitrate, codecs, the route), and the voices' levels from the sound itself every
+  // 120 ms. Where something cannot be measured (the recorded pieces have no round trip) it
+  // shows «—», never an invented number.
+  let remoto = null;
+  let ctxVoz = null;
+  const analizadores = new Map();
+  const analizador = (stream) => {
+    if (!stream || !stream.getAudioTracks || !stream.getAudioTracks().length) return null;
+    let a = analizadores.get(stream.id);
+    if (a) return a;
+    try {
+      ctxVoz = ctxVoz || new AudioContext();
+      if (ctxVoz.state === 'suspended') ctxVoz.resume().catch(() => {});
+      const fuenteVoz = ctxVoz.createMediaStreamSource(stream);
+      const an = ctxVoz.createAnalyser(); an.fftSize = 512;
+      fuenteVoz.connect(an);
+      a = { an, buf: new Float32Array(an.fftSize), fuenteVoz };
+      analizadores.set(stream.id, a);
+      return a;
+    } catch (_) { return null; }
+  };
+  const nivelDe = (a) => {
+    if (!a) return 0;
+    a.an.getFloatTimeDomainData(a.buf);
+    let suma = 0; for (let i = 0; i < a.buf.length; i++) suma += a.buf[i] * a.buf[i];
+    return Math.min(1, Math.sqrt(suma / a.buf.length) * 5);
+  };
+  // The other voice: the WebRTC stream, or what the player of the recorded pieces is playing.
+  const streamRemoto = () => {
+    if (remoto && remoto.active) return remoto;
+    const v = document.querySelector('#c-rejilla video');
+    if (v && v.captureStream) { try { if (!v.dataset.capturado) { v.dataset.capturado = '1'; v._captura = v.captureStream(); } return v._captura; } catch (_) {} }
+    return null;
+  };
+  const BARRAS = 12;
+  const barras = { yo: Array(BARRAS).fill(0), el: Array(BARRAS).fill(0) };
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  ['yo', 'el'].forEach((k) => {
+    const g = $('vj-barras-' + k), cx = k === 'yo' ? 96 : 604;
+    for (let i = 0; i < BARRAS; i++) { const r = document.createElementNS(SVGNS, 'rect'); r.setAttribute('x', String(cx - 40.5 + i * 7)); r.setAttribute('width', '4'); r.setAttribute('rx', '2'); r.setAttribute('y', '169'); r.setAttribute('height', '2'); g.appendChild(r); }
+  });
+  const nivel = { yo: 0, el: 0 };
+  const pintaVoces = () => {
+    const pausa = pausaAplicada;
+    const crudoYo = silenciado || pausa ? 0 : nivelDe(analizador(local));
+    const crudoEl = pausa ? 0 : nivelDe(analizador(streamRemoto()));
+    nivel.yo = nivel.yo * 0.45 + crudoYo * 0.55; nivel.el = nivel.el * 0.45 + crudoEl * 0.55;
+    ['yo', 'el'].forEach((k) => {
+      const b = barras[k]; b.shift(); b.push(nivel[k]);
+      const rects = $('vj-barras-' + k).children;
+      for (let i = 0; i < BARRAS; i++) { const h = Math.max(2, Math.round(2 + b[i] * 20)); rects[i].setAttribute('y', String(170 - h / 2)); rects[i].setAttribute('height', String(h)); }
+      $('vj-halo-' + k).setAttribute('r', (16 + nivel[k] * 16).toFixed(1));
+      const habla = nivel[k] > 0.07;
+      const e = $('vj-' + k + '-estado');
+      e.textContent = k === 'yo' && silenciado ? t('sec_vj_silenciado') : habla ? t(k === 'yo' && vozActiva ? 'sec_vj_hablando_prot' : 'sec_vj_hablando') : t('sec_vj_silencio');
+      e.setAttribute('class', 'vj-t estado ' + k + (habla ? ' habla' : ''));
+    });
+    $('c-l-letra').style.setProperty('--voz', nivel.el.toFixed(3));
+  };
+  // Once a second: WebRTC's statistics, as differences from the previous second.
+  const MAXS = 60;
+  const nuevaMedida = () => ({ rtt: [], jit: [], per: [], kb: [], prev: null, sumaRtt: 0, nRtt: 0, sumaKa: 0, sumaKv: 0, nK: 0, perMax: 0, codecA: '', codecV: '', res: '', fps: 0, proto: '', relay: true, url: '', pps: 0, bytes: 0, enviado: 0 });
+  let MED = nuevaMedida();
+  let relojVoz = null, relojMide = null;
+  const leeRtc = async (pc) => {
+    const st = await pc.getStats();
+    const por = new Map(); st.forEach((x) => por.set(x.id, x));
+    let par = null;
+    st.forEach((x) => { if (x.type === 'transport' && x.selectedCandidatePairId) par = por.get(x.selectedCandidatePairId) || par; });
+    if (!par) st.forEach((x) => { if (!par && x.type === 'candidate-pair' && x.nominated && x.state === 'succeeded') par = x; });
+    const lc = par ? por.get(par.localCandidateId) : null;
+    let ai = null, vi = null, ao = null, vo = null;
+    st.forEach((x) => {
+      if (x.type === 'inbound-rtp' && x.kind === 'audio') ai = x;
+      if (x.type === 'inbound-rtp' && x.kind === 'video') vi = x;
+      if (x.type === 'outbound-rtp' && x.kind === 'audio') ao = x;
+      if (x.type === 'outbound-rtp' && x.kind === 'video') vo = x;
+    });
+    const codec = (r) => { const c = r && r.codecId ? por.get(r.codecId) : null; return c && c.mimeType ? String(c.mimeType).split('/')[1] || '' : ''; };
+    const v = (r, k) => (r && typeof r[k] === 'number' ? r[k] : 0);
+    return {
+      t: performance.now(),
+      rtt: par && typeof par.currentRoundTripTime === 'number' ? par.currentRoundTripTime * 1000 : null,
+      jit: ai && typeof ai.jitter === 'number' ? ai.jitter * 1000 : null,
+      perdidos: v(ai, 'packetsLost') + v(vi, 'packetsLost'), recibidos: v(ai, 'packetsReceived') + v(vi, 'packetsReceived'),
+      bAi: v(ai, 'bytesReceived'), bVi: v(vi, 'bytesReceived'),
+      bytes: v(par, 'bytesSent') + v(par, 'bytesReceived'), pk: v(par, 'packetsSent') + v(par, 'packetsReceived'),
+      codecA: codec(ai) || codec(ao), codecV: codec(vi) || codec(vo),
+      res: vi && vi.frameWidth ? vi.frameWidth + '×' + vi.frameHeight : '', fps: vi && vi.framesPerSecond ? Math.round(vi.framesPerSecond) : 0,
+      relay: lc ? lc.candidateType === 'relay' : true, proto: lc ? String(lc.relayProtocol || lc.protocol || '').toUpperCase() : '',
+    };
+  };
+  const ciudadDe = (h) => (/rele-am\./i.test(h || '') ? 'Miami' : /rele\.guardianagroup/i.test(h || '') ? 'Núremberg' : '');
+  const empuja = (a, x) => { a.push(x); if (a.length > MAXS) a.shift(); };
+  const mide = async () => {
+    const l = E && E.llamada;
+    if (!l || l.conectada === false || movilHabla) return;
+    const tr = (E.monitor || {}).transporte || {};
+    let r = null;
+    if (rtc && rtc.pc && rtc.conectada) { try { r = await leeRtc(rtc.pc); } catch (_) { r = null; } }
+    const p = MED.prev;
+    if (r) {
+      const dt = p ? Math.max(0.2, (r.t - p.t) / 1000) : 0;
+      if (r.rtt != null) { empuja(MED.rtt, r.rtt); MED.sumaRtt += r.rtt; MED.nRtt++; }
+      if (r.jit != null) empuja(MED.jit, r.jit);
+      if (p && dt) {
+        const dL = Math.max(0, r.perdidos - p.perdidos), dR = Math.max(0, r.recibidos - p.recibidos);
+        const per = dL + dR ? (100 * dL) / (dL + dR) : 0;
+        empuja(MED.per, per); MED.perMax = Math.max(MED.perMax, per);
+        const kb = (Math.max(0, r.bytes - p.bytes) * 8) / 1000 / dt;
+        empuja(MED.kb, kb);
+        MED.sumaKa += (Math.max(0, r.bAi - p.bAi) * 8) / 1000 / dt; MED.sumaKv += (Math.max(0, r.bVi - p.bVi) * 8) / 1000 / dt; MED.nK++;
+        MED.pps = Math.max(0, r.pk - p.pk) / dt;
+      }
+      MED.bytes = r.bytes; MED.codecA = r.codecA || MED.codecA; MED.codecV = r.codecV || MED.codecV; MED.res = r.res || MED.res; MED.fps = r.fps || MED.fps;
+      MED.relay = r.relay; MED.proto = r.proto || MED.proto;
+      MED.url = ((rtc.ice || [])[0] || {}).urls; MED.url = Array.isArray(MED.url) ? MED.url[0] : MED.url || '';
+      MED.prev = r;
+    } else {
+      // The recorded pieces: only the bitrate the program measured; no round trip to show.
+      const kb = (tr.kbps_audio || 0) + (tr.kbps_video || 0);
+      if (kb) { empuja(MED.kb, kb); MED.sumaKa += tr.kbps_audio || 0; MED.sumaKv += tr.kbps_video || 0; MED.nK++; }
+      MED.pps = kb ? 8 : 0; MED.bytes += (kb * 1000) / 8;
+      MED.relay = !!E.rele || tr.directo === false; MED.proto = ''; MED.url = E.rele_usado || '';
+      MED.codecA = tr.codec_audio || MED.codecA; MED.codecV = tr.codec_video || MED.codecV; MED.res = tr.resolucion || MED.res;
+    }
+    pintaMedidas();
+    // What the report will say about the connection, kept current in the program.
+    if (Date.now() - MED.enviado > 5000) {
+      MED.enviado = Date.now();
+      const d = { rele: MED.relay, codec_audio: MED.codecA, codec_video: llamadaVideo ? MED.codecV : '', resolucion: llamadaVideo ? MED.res : '' };
+      if (MED.nRtt) d.latencia_media_ms = Math.round(MED.sumaRtt / MED.nRtt);
+      if (MED.per.length) d.perdida_max_pct = Math.round(MED.perMax * 10) / 10;
+      if (MED.nK) { d.kbps_audio_medio = Math.round(MED.sumaKa / MED.nK); if (llamadaVideo) d.kbps_video_medio = Math.round(MED.sumaKv / MED.nK); }
+      manda({ tipo: 'secure', accion: 'medidas', d });
+    }
+    const conVideo = !!(E.llamada && E.llamada.video) && (rtc ? !!(remoto && remoto.getVideoTracks().some((x) => x.readyState === 'live')) : jugadores.size > 0);
+    $('c-llamada').classList.toggle('con-video', conVideo);
+  };
+  const trazo = (a, w, h, lo, hi) => (a.length < 2 ? '' : a.map((v, i) => `${((i * w) / (a.length - 1)).toFixed(1)},${(h - 2 - ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * (h - 4)).toFixed(1)}`).join(' '));
+  const coma = (x, d) => Number(x).toLocaleString(document.documentElement.lang || 'es', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const ultimoDe = (a) => (a.length ? a[a.length - 1] : null);
+  const pintaMedidas = () => {
+    const rtt = ultimoDe(MED.rtt), jit = ultimoDe(MED.jit), per = ultimoDe(MED.per), kb = ultimoDe(MED.kb);
+    const techo = Math.max(150, ...MED.rtt.map((x) => x * 1.15));
+    const pts = trazo(MED.rtt, 320, 92, 0, techo);
+    $('vp-linea').setAttribute('points', pts);
+    $('vp-area').setAttribute('points', pts ? `0,92 ${pts} 320,92` : '');
+    if (rtt != null) { const y = 92 - 2 - (rtt / techo) * 88; $('vp-punto').style.left = '100%'; $('vp-punto').style.top = `${(y / 92) * 100}%`; $('vp-punto').hidden = false; } else $('vp-punto').hidden = true;
+    $('vp-rtt').textContent = rtt != null ? `${Math.round(rtt)} ms` : RAYA;
+    $('vv-lat').textContent = rtt != null ? String(Math.round(rtt)) : RAYA;
+    $('vv-lat-l').setAttribute('points', trazo(MED.rtt.slice(-40), 146, 26, 0, techo));
+    $('vv-lat-n').textContent = t('sec_vv_latencia_n', { n: quien(E) });
+    $('vv-jit').textContent = jit != null ? coma(jit, 1) : RAYA;
+    $('vv-jit-l').setAttribute('points', trazo(MED.jit, 146, 26, 0, 30));
+    const jitMal = jit != null && jit > 30;
+    $('vv-jit-n').textContent = jit == null ? '' : t(jitMal ? 'sec_vv_jitter_mal' : 'sec_vv_jitter_ok');
+    $('vv-jit-n').classList.toggle('mal', jitMal);
+    $('vv-per').textContent = per != null ? coma(per, 1) : RAYA;
+    $('vv-per-l').setAttribute('points', trazo(MED.per, 146, 26, 0, 5));
+    const perMal = per != null && per > 2;
+    $('vv-per-n').textContent = per == null ? '' : t(perMal ? 'sec_vv_perdida_mal' : 'sec_vv_perdida_ok');
+    $('vv-per-n').classList.toggle('mal', perMal);
+    $('vv-kb').textContent = kb != null ? coma(kb / 1000, 2) : RAYA;
+    $('vv-kb-l').setAttribute('points', trazo(MED.kb, 146, 26, 0, Math.max(200, ...MED.kb.map((x) => x * 1.1))));
+    const codecs = [llamadaVideo && MED.codecV ? MED.codecV.toUpperCase() + (MED.res ? ' ' + MED.res : '') + (MED.fps ? ' · ' + MED.fps + ' fps' : '') : '', MED.codecA ? MED.codecA.charAt(0).toUpperCase() + MED.codecA.slice(1) : ''].filter(Boolean).join(' · ');
+    $('vv-kb-n').textContent = codecs;
+    // The journey's figures and its route.
+    const mb = MED.bytes / 1e6;
+    $('vj-cifra').textContent = t('sec_vj_cifra', { p: n(Math.round(MED.pps)), mb: coma(mb, 1) });
+    $('vj-paquetes').classList.toggle('quieto', !MED.pps);
+    const ciudad = ciudadDe(MED.url);
+    $('c-viaje').classList.toggle('directo', !MED.relay);
+    $('vj-rele').textContent = MED.relay ? t('sec_vj_rele') + (ciudad ? ' · ' + ciudad : '') : t('sec_vj_directo');
+    $('vj-rele-s').textContent = t(MED.relay ? 'sec_vj_rele_s' : 'sec_vj_directo_s');
+    const pie = [];
+    if (rtc && rtc.conectada) { pie.push(esc([MED.proto || 'UDP', MED.relay ? 'TURN' : ''].filter(Boolean).join(' · '))); pie.push(`<span class="ok">${esc(t('sec_vj_dtls'))}</span>`); }
+    else pie.push(esc(t('sec_vj_trozos')));
+    if (rtt != null) pie.push(esc(t('sec_vj_ida', { ms: n(Math.round(rtt)) })));
+    $('vj-pie').innerHTML = pie.map((x) => `<span>${x}</span>`).join('');
+  };
+  const medidorEmpieza = () => {
+    if (relojMide) return;
+    MED = nuevaMedida();
+    pintaMedidas();
+    relojMide = setInterval(() => { mide().catch(() => {}); }, 1000);
+    relojVoz = setInterval(pintaVoces, 120);
+  };
+  const medidorPara = () => {
+    clearInterval(relojMide); clearInterval(relojVoz); relojMide = null; relojVoz = null;
+    analizadores.forEach((a) => { try { a.fuenteVoz.disconnect(); } catch (_) {} });
+    analizadores.clear(); remoto = null; nivel.yo = 0; nivel.el = 0;
+    $('c-llamada').classList.remove('con-video');
+  };
+  const capasActivas = (m) => [m.fase === 'lista', true, !!m.cuantico, !!(m.llamada && m.llamada.conectada !== false)].filter(Boolean).length;
+  const pintaVivo = (m) => {
+    const l = m.llamada;
+    const caja = $('vivo');
+    caja.hidden = !(l && l.conectada !== false && !movilHabla);
+    if (caja.hidden) return;
+    const pausada = !!(m.monitor && m.monitor.sesion && m.monitor.sesion.estado === 'pausada');
+    caja.classList.toggle('pausada', pausada);
+    $('vp-palabra').textContent = t(pausada ? 'sec_vv_pausada' : 'sec_vv_protegida');
+    $('vp-capas').textContent = t('sec_vv_capas', { n: n(capasActivas(m)) });
+  };
+  // A stop (something seen, an interference) holds the call's media here as well: WebRTC
+  // flows outside the program, so the page itself sends nothing and plays nothing until it ends.
+  let pausaAplicada = false;
+  const aplicaPausa = (m) => {
+    const p = !!(m.monitor && m.monitor.sesion && m.monitor.sesion.estado === 'pausada');
+    if (p === pausaAplicada) return;
+    pausaAplicada = p;
+    if (local) local.getTracks().forEach((x) => { x.enabled = p ? false : (x.kind === 'audio' ? !silenciado : true); });
+    document.querySelectorAll('#c-rejilla video').forEach((v) => { v.muted = p; });
+  };
+  // ---------- This computer, watched (Windows' own record), and the other side's ----------
+  const pintaVigia = (m) => {
+    const caja = $('equipo'), vg = m.vigia;
+    caja.hidden = !(m.fase === 'lista' && vg);
+    if (caja.hidden) return;
+    const este = vg.este || {};
+    const usando = (r) => (vg.en_uso || []).filter((x) => x.recurso === r).map((x) => x.programa);
+    const celda = (id, r, lista) => {
+      const el = $(id), u = usando(r);
+      let c, txt;
+      if (u.length) { c = 'alerta'; txt = t('sec_eq_usando', { p: u.join(', ') }); }
+      else if (lista.length) { c = 'aviso'; txt = t('sec_eq_uso', { p: lista.join(', ') }); }
+      else if (r === 'pantalla' && este.pantalla_protegida) { c = 'ok'; txt = t('sec_eq_protegida_corto'); }
+      else if (!este.vigilado) { c = 'nada'; txt = t('sec_eq_no_vigilable_corto'); }
+      else if (r === 'pantalla') { c = 'aviso'; txt = t('sec_eq_sin_proteger'); }
+      else { c = 'ok'; txt = t('sec_eq_solo'); }
+      el.className = 'eq ' + c; el.querySelector('b').textContent = txt;
+    };
+    celda('eq-mic', 'microfono', este.microfono || []);
+    celda('eq-cam', 'camara', este.camara || []);
+    celda('eq-pant', 'pantalla', este.pantalla || []);
+    const o = vg.otro, nom = m.contacto || '';
+    const visto = (x) => [...(x.microfono || []).map((p) => t('sec_eq_visto_mic', { p })), ...(x.camara || []).map((p) => t('sec_eq_visto_cam', { p })), ...(x.pantalla || []).map((p) => t('sec_eq_visto_pant', { p }))];
+    let oc = '', ot;
+    if (m.otro_movil) ot = t('sec_eq_otro_movil', { n: nom });
+    else if (!o) ot = t('sec_eq_otro_nada', { n: nom });
+    else if (!o.vigilado) ot = t('sec_eq_otro_no_vigilable', { n: nom });
+    else if (!visto(o).length) { oc = 'ok'; ot = t('sec_eq_otro_limpio', { n: nom }); }
+    else { oc = 'aviso'; ot = t('sec_eq_otro_visto', { n: nom, l: visto(o).join('; ') }); }
+    $('eq-otro').className = 'eq-otro ' + oc; $('eq-otro').textContent = ot;
+  };
+  // ---------- The call's report (17 Oct 2026: «la valoración final … si ha habido espionaje,
+  // si ha habido grabación … ese es el resumen») ----------
+  let INF = null;
+  const nivelInforme = (r) => {
+    const v = r.veredicto || {}, este = v.este || {}, o = v.otro;
+    if (!r.sin_espionaje) return 'revisar';
+    return !este.vigilado || v.otro_movil || !o || !o.vigilado ? 'incompleto' : 'limpio';
+  };
+  const filasInforme = (r) => {
+    const v = r.veredicto || {}, este = v.este || {}, o = v.otro, nom = r.contacto || '';
+    const nivelR = nivelInforme(r);
+    const f = [];
+    f.push([t('sec_in_espionaje'), t(nivelR === 'revisar' ? 'sec_in_esp_si' : nivelR === 'incompleto' ? 'sec_in_esp_no_visto' : 'sec_in_esp_no'), nivelR === 'revisar' ? 'alerta' : 'ok']);
+    const mc = [...(este.microfono || []).map((p) => t('sec_eq_visto_mic', { p })), ...(este.camara || []).map((p) => t('sec_eq_visto_cam', { p }))];
+    f.push([t('sec_in_grab_equipo'), !este.vigilado ? t('sec_eq_no_vigilable') : mc.length ? mc.join('; ') : t('sec_in_grab_no'), !este.vigilado ? 'aviso' : mc.length ? 'alerta' : 'ok']);
+    const pc = (este.pantalla || []).map((p) => t('sec_eq_visto_pant', { p }));
+    f.push([t('sec_in_grab_pantalla'), pc.length ? pc.join('; ') : t(este.pantalla_protegida ? 'sec_in_pant_bloq' : 'sec_in_pant_no'), pc.length ? 'alerta' : este.pantalla_protegida ? 'ok' : 'aviso']);
+    const vo = o ? [...(o.microfono || []).map((p) => t('sec_eq_visto_mic', { p })), ...(o.camara || []).map((p) => t('sec_eq_visto_cam', { p })), ...(o.pantalla || []).map((p) => t('sec_eq_visto_pant', { p }))] : [];
+    f.push([t('sec_in_otro', { n: nom }), v.otro_movil ? t('sec_in_otro_movil') : !o ? t('sec_in_otro_nada') : !o.vigilado ? t('sec_in_otro_no_vigilable') : vo.length ? vo.join('; ') : t('sec_in_otro_limpio'), vo.length ? 'alerta' : o && o.vigilado && !v.otro_movil ? 'ok' : 'aviso']);
+    const directa = r.conexion && r.conexion.directa === true;
+    f.push([t('sec_in_servidor'), t(directa ? 'sec_in_directo_t' : 'sec_in_rele_t'), 'ok']);
+    f.push([t('sec_in_identidad'), t(v.identidad_verificada ? 'sec_in_identidad_ok' : 'sec_in_identidad_mal'), v.identidad_verificada ? 'ok' : 'alerta']);
+    f.push([t('sec_in_interf'), v.interferencias ? n(v.interferencias) : t('sec_in_interf_no'), v.interferencias ? 'alerta' : 'ok']);
+    const c = r.conexion || {};
+    if (c.latencia_media_ms != null || c.kbps_audio_medio != null) {
+      const partes = [];
+      if (c.latencia_media_ms != null) partes.push(t('sec_in_con_lat', { ms: n(c.latencia_media_ms) }));
+      if (c.perdida_max_pct != null) partes.push(t('sec_in_con_per', { p: coma(c.perdida_max_pct, 1) }));
+      const cod = [c.codec_video ? String(c.codec_video).toUpperCase() + (c.resolucion ? ' ' + c.resolucion : '') : '', c.codec_audio ? String(c.codec_audio) : ''].filter(Boolean).join(' · ');
+      if (cod) partes.push(cod);
+      f.push([t('sec_in_conexion'), partes.join(' · '), '']);
+    }
+    f.push([t('sec_in_firmado'), String(r.firmante || '').slice(0, 22) + '…', '']);
+    return f;
+  };
+  const pintaInforme = (m) => {
+    const r = m.informe;
+    INF = r || null;
+    const velo = $('informe'), caja = $('informe-caja');
+    const nuevo = velo.hidden && !!r;
+    velo.hidden = !r;
+    if (!r) return;
+    const nv = nivelInforme(r);
+    caja.classList.toggle('revisar', nv === 'revisar'); caja.classList.toggle('incompleto', nv === 'incompleto');
+    $('in-que').textContent = `${t('sec_r_clase_' + r.clase)} · ${r.contacto || ''} · ${tiempo(r.duracion_s || 0)}`;
+    $('in-palabra').textContent = t(nv === 'revisar' ? 'sec_in_revisar' : nv === 'incompleto' ? 'sec_in_incompleto' : 'sec_in_limpio');
+    $('in-frase').textContent = t(nv === 'revisar' ? 'sec_in_revisar_frase' : nv === 'incompleto' ? 'sec_in_incompleto_frase' : 'sec_in_limpio_frase');
+    $('in-datos').innerHTML = filasInforme(r).map(([a, b, c]) => `<div class="in-dato"><dt>${esc(a)}</dt><dd class="${c}">${esc(b)}</dd></div>`).join('');
+    if (nuevo) $('in-pdf').focus();
+  };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('informe').hidden) manda({ tipo: 'secure', accion: 'informe_visto' }); });
+  $('in-cerrar').addEventListener('click', () => manda({ tipo: 'secure', accion: 'informe_visto' }));
+  $('in-json').addEventListener('click', () => { if (INF) descarga(`guardiana-secure-informe-${sello(INF.fin)}.json`, 'application/json', INF.json); });
+  $('in-csv').addEventListener('click', () => { if (INF) descarga(`guardiana-secure-informe-${sello(INF.fin)}.csv`, 'text/csv;charset=utf-8', '﻿' + INF.csv); });
+  $('in-pdf').addEventListener('click', () => {
+    if (!INF) return;
+    const r = INF, L = []; let y = 792;
+    const linea2 = (x, tam, texto, negrita, ancho) => { for (const s2 of parte(texto, ancho || 92)) { L.push({ x, y, tam, negrita, texto: s2 }); y -= tam + 4; } };
+    L.push({ x: 56, y, tam: 18, negrita: true, texto: 'GUARDIANA SECURE' }); y -= 26;
+    L.push({ x: 56, y, tam: 13, negrita: true, texto: `${t('sec_in_titulo')} · ${r.contacto || ''}` }); y -= 18;
+    L.push({ x: 56, y, tam: 9.5, texto: `${t('sec_r_clase_' + r.clase)} · ${fechaHora(r.inicio)} – ${hora(r.fin)} · ${tiempo(r.duracion_s || 0)}` }); y -= 30;
+    const nv = nivelInforme(r);
+    linea2(56, 15, t(nv === 'revisar' ? 'sec_in_revisar' : nv === 'incompleto' ? 'sec_in_incompleto' : 'sec_in_limpio'), true, 60);
+    y -= 2;
+    linea2(56, 10.5, t(nv === 'revisar' ? 'sec_in_revisar_frase' : nv === 'incompleto' ? 'sec_in_incompleto_frase' : 'sec_in_limpio_frase'), false, 95);
+    y -= 14;
+    for (const [a, b] of filasInforme(r)) {
+      L.push({ x: 56, y, tam: 10.5, negrita: true, texto: a });
+      const trozos = parte(b, 62);
+      trozos.forEach((s2, i) => { L.push({ x: 220, y: y - i * 14, tam: 10.5, texto: s2 }); });
+      y -= Math.max(1, trozos.length) * 14 + 6;
+    }
+    y -= 10;
+    linea2(56, 9.5, t('sec_in_limite'), false, 100);
+    y -= 12;
+    L.push({ x: 56, y, tam: 10.5, negrita: true, texto: t('sec_r_pdf_firmado') }); y -= 15;
+    for (const s2 of parte(r.firmante, 80)) { L.push({ x: 56, y, tam: 8.5, texto: s2 }); y -= 12; }
+    y -= 4;
+    for (const s2 of parte(r.firma, 80)) { L.push({ x: 56, y, tam: 8.5, texto: s2 }); y -= 12; }
+    y -= 14;
+    linea2(56, 9.5, t('sec_r_pdf_nota'), false, 100);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([pdfDe(L)], { type: 'application/pdf' })); a.download = `guardiana-secure-informe-${sello(r.fin)}.pdf`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  });
 
   let ultimo = {};
   en('monitor', (m) => { ultimo = m.monitor || {}; pinta(ultimo); });
   // The texts arrive after the page: draw again so «—» and the chips speak the person's language.
-  en('textos', () => pinta(ultimo));
+  // The chat too (17 Oct 2026: call lines drawn before the texts arrived stayed as
+  // «sec_ll_video · 20 s», because the list is only redrawn when the messages change).
+  en('textos', () => { pinta(ultimo); chatAntes = ''; if (E && E.fase) { fasePinta(); pintaSala(E); } });
   // Where this computer is, by its time zone (the same the globe uses): the other side hears it
   // inside the cipher, and each computer draws the line between the two on its own globe.
-  try { manda({ tipo: 'secure', accion: 'zona', zona: Intl.DateTimeFormat().resolvedOptions().timeZone || '' }); } catch (_) {}
+  // «listo» first, so the texts arrive before any state is drawn (17 Oct 2026 review).
   manda({ tipo: 'listo', vista: 'secure' });
+  mandaNombre();
+  try { manda({ tipo: 'secure', accion: 'zona', zona: Intl.DateTimeFormat().resolvedOptions().timeZone || '' }); } catch (_) {}
 })();

@@ -440,10 +440,9 @@ struct Pregunta {
 pub struct Sesion {
     datos: PathBuf,
     descargas: PathBuf,
-    /// GUARDIANA SECURE, opened with the session (15 Oct 2026).
-    secure: crate::grupo::Grupo,
-    /// The house's room for the phones, while one is open (16 Oct 2026, «Sala de casa»).
-    sala: Option<crate::sala::Sala>,
+    /// GUARDIANA SECURE and the house's room, opened with the session (15 Oct 2026); its own
+    /// module since 17 Oct 2026, so Linux and macOS serve the same page from it.
+    comunicaciones: crate::comunicaciones::Comunicaciones,
     version: String,
     motor: String,
     idioma_sistema: String,
@@ -674,13 +673,12 @@ impl Sesion {
         } else {
             Idioma::de_etiqueta(&prefs.idioma)
         };
-        let mut secure = crate::grupo::Grupo::abre(&a.datos, &a.descargas);
-        secure.pon_version(&a.version);
+        let comunicaciones =
+            crate::comunicaciones::Comunicaciones::abre(&a.datos, &a.descargas, &a.version);
         let mut s = Self {
             datos: a.datos,
             descargas: a.descargas,
-            secure,
-            sala: None,
+            comunicaciones,
             version: a.version,
             motor: String::new(),
             idioma_sistema: a.idioma_sistema,
@@ -1197,7 +1195,7 @@ impl Sesion {
         }
         if p.url.starts_with(SECURE) {
             let t = self.t("pestana_secure");
-            return if self.secure.novedad() {
+            return if self.comunicaciones.novedad() {
                 format!("● {t}")
             } else {
                 t
@@ -1216,59 +1214,55 @@ impl Sesion {
     fn pestana_secure(&self) -> Option<u32> {
         self.pestanas
             .iter()
-            .find(|p| p.url.starts_with(SECURE))
+            // Only once the page said «listo»: the state drawn before its texts arrived showed
+            // raw keys (17 Oct 2026 review); «listo» sends the whole state anyway.
+            .find(|p| p.url.starts_with(SECURE) && p.lista)
             .map(|p| p.id)
     }
 
-    /// Every tick: let the network in, and redraw the tab when something changed.
-    fn secure_tic(&mut self) -> Vec<Orden> {
-        self.secure.tic();
-        let mut o = Vec::new();
-        let mut sala_cambio = false;
-        if let Some(sala) = &mut self.sala {
-            sala.tic();
-            if sala.caducada() {
-                self.sala = None;
-                sala_cambio = true;
-            } else if sala.cambiado() {
-                sala.sincroniza();
-                sala_cambio = true;
-            }
-        }
-        if sala_cambio {
-            if let Some(id) = self.pestana_secure() {
-                o.extend(self.a_pestana(id, &self.secure_estado_json()));
-            }
-        }
-        if !self.secure.media_para_pagina.is_empty() {
-            if let Some(id) = self.pestana_secure() {
-                let trozos: Vec<Value> = self
-                    .secure
-                    .media_para_pagina
-                    .drain(..)
-                    .map(|(de, b)| json!({ "de": de, "b": b }))
-                    .collect();
-                o.extend(self.a_pestana(id, &json!({ "tipo": "secure_media", "trozos": trozos })));
-            } else {
-                self.secure.media_para_pagina.clear();
-            }
-        }
-        if self.secure.cambiado() {
-            self.secure.movil_sincroniza();
-            if let Some(id) = self.pestana_secure() {
-                o.extend(self.a_pestana(id, &self.secure_estado_json()));
-                for a in self.secure.avisos() {
-                    o.extend(self.a_pestana(
-                        id,
-                        &json!({ "tipo": "secure_aviso", "clave": a["clave"], "texto": a["texto"] }),
-                    ));
-                }
-            }
-        }
-        o
+    /// Whether a SECURE conversation is open: the window then reads Windows' record of the
+    /// microphone, the camera and the screen, and keeps itself out of screen captures.
+    pub fn conversando(&self) -> bool {
+        self.comunicaciones.conversando()
     }
 
-    /// What the Comunicaciones page asks for.
+    /// What Windows recorded about the microphone, the camera and the screen (17 Oct 2026).
+    pub fn vigia(&mut self, usos: &[crate::vigia::Uso]) {
+        self.comunicaciones.vigia(usos);
+    }
+
+    /// Whether the window could keep itself out of screenshots and recordings.
+    pub fn pantalla_protegida(&mut self, si: bool) {
+        self.comunicaciones.pantalla(si);
+    }
+
+    /// Whether a call is going on (in a conversation or in the house's room).
+    pub fn en_llamada(&self) -> bool {
+        self.comunicaciones.en_llamada()
+    }
+
+    /// Only the conversations' clock: run every 20 ms during a call, so a piece of voice or
+    /// video goes on at once instead of waiting up to 200 ms twice on its way (17 Oct 2026
+    /// review: that wait, in bursts, was a cause of the stutter).
+    pub fn tic_llamada(&mut self) -> Vec<Orden> {
+        self.secure_tic()
+    }
+
+    /// Every tick: let the network in, and redraw the tab when something changed. Only a tab
+    /// that said «listo» hears it (`pestana_secure`).
+    fn secure_tic(&mut self) -> Vec<Orden> {
+        let tab = self.pestana_secure();
+        let mensajes = self.comunicaciones.tic(tab.is_some());
+        let Some(id) = tab else {
+            return Vec::new();
+        };
+        mensajes
+            .iter()
+            .filter_map(|v| self.a_pestana(id, v))
+            .collect()
+    }
+
+    /// What the Comunicaciones page asks for: only from the SECURE tab itself.
     fn secure_accion(&mut self, origen: Origen, m: &Value) -> Vec<Orden> {
         let Origen::Pestana(id) = origen else {
             return Vec::new();
@@ -1276,293 +1270,20 @@ impl Sesion {
         if !self.pestana(id).is_some_and(|p| p.url.starts_with(SECURE)) {
             return Vec::new();
         }
-        let accion = texto(m, "accion");
-        let r: Result<(), String> = match accion {
-            "escuchar" => self
-                .secure
-                .escuchar(u16::try_from(m["puerto"].as_u64().unwrap_or(0)).unwrap_or(0))
-                .map(|_| ()),
-            "conectar" => self.secure.conectar(texto(m, "direccion")),
-            "cerrar" => {
-                self.secure.cerrar("la persona cerró");
-                Ok(())
-            }
-            "sas" => {
-                self.secure
-                    .sas_persona(m["iguales"].as_bool().unwrap_or(false), texto(m, "nombre"));
-                Ok(())
-            }
-            "texto" => {
-                self.secure
-                    .texto_re(texto(m, "texto"), crate::mensaje::id_de(&m["re"]));
-                Ok(())
-            }
-            "editar" => {
-                if let Some(id) = crate::mensaje::id_de(&m["id"]) {
-                    self.secure.editar(id, texto(m, "texto"));
+        let salidas = self.comunicaciones.accion(m);
+        salidas
+            .into_iter()
+            .filter_map(|s| match s {
+                crate::comunicaciones::Salida::Pagina(v) => self.a_pestana(id, &v),
+                crate::comunicaciones::Salida::AbreArchivo { ruta } => {
+                    Some(Orden::AbreArchivo { ruta })
                 }
-                Ok(())
-            }
-            "borrar" => {
-                if let Some(id) = crate::mensaje::id_de(&m["id"]) {
-                    self.secure
-                        .borrar(id, m["para_todos"].as_bool().unwrap_or(false));
+                crate::comunicaciones::Salida::MuestraArchivo { ruta } => {
+                    Some(Orden::MuestraArchivo { ruta })
                 }
-                Ok(())
-            }
-            "borrar_todo" => {
-                self.secure.borrar_todo();
-                Ok(())
-            }
-            "reaccion" => {
-                if let Some(id) = crate::mensaje::id_de(&m["id"]) {
-                    self.secure.reaccionar(id, texto(m, "emoji"));
-                }
-                Ok(())
-            }
-            "escribiendo" => {
-                self.secure.escribiendo();
-                Ok(())
-            }
-            "sin_visto" => {
-                self.secure.sin_visto(m["sin"].as_bool().unwrap_or(false));
-                Ok(())
-            }
-            "zona" => {
-                self.secure.pon_zona(texto(m, "zona"));
-                Ok(())
-            }
-            "voz_protegida" => {
-                self.secure
-                    .voz_protegida(m["activa"].as_bool().unwrap_or(false));
-                Ok(())
-            }
-            "nombre" => {
-                self.secure.nombre_propio = texto(m, "nombre").chars().take(60).collect();
-                Ok(())
-            }
-            "archivo_empieza" => self
-                .secure
-                .archivo_empieza(texto(m, "nombre"), m["bytes"].as_u64().unwrap_or(0)),
-            "archivo_trozo" => self
-                .secure
-                .archivo_trozo(texto(m, "b64"), m["ultimo"].as_bool().unwrap_or(false)),
-            "reanudar" => {
-                self.secure.reanudar_a_mano();
-                Ok(())
-            }
-            "llamar" => self
-                .secure
-                .llamar(m["video"].as_bool().unwrap_or(false), texto(m, "mime")),
-            "mime" => {
-                self.secure.cambia_mime(texto(m, "mime"));
-                Ok(())
-            }
-            "movil" => self.secure.movil_empieza(texto(m, "idioma")),
-            "sala" => {
-                match crate::sala::Sala::abre(m["horas"].as_u64().unwrap_or(24), texto(m, "idioma"))
-                {
-                    Ok(s) => {
-                        self.sala = Some(s.con_descargas(&self.descargas));
-                        Ok(())
-                    }
-                    Err(e) => Err(e),
-                }
-            }
-            "sala_ok" => {
-                if let Some(s) = &mut self.sala {
-                    s.aprueba(m["i"].as_u64().unwrap_or(99) as usize);
-                }
-                Ok(())
-            }
-            "sala_fuera" => {
-                if let Some(s) = &mut self.sala {
-                    s.expulsa(m["i"].as_u64().unwrap_or(99) as usize);
-                }
-                Ok(())
-            }
-            "sala_texto" => {
-                if let Some(s) = &mut self.sala {
-                    s.texto_re(texto(m, "texto"), crate::mensaje::id_de(&m["re"]));
-                }
-                Ok(())
-            }
-            "sala_editar" => {
-                if let (Some(s), Some(id)) = (&mut self.sala, crate::mensaje::id_de(&m["id"])) {
-                    s.editar(id, texto(m, "texto"));
-                }
-                Ok(())
-            }
-            "sala_borrar" => {
-                if let (Some(s), Some(id)) = (&mut self.sala, crate::mensaje::id_de(&m["id"])) {
-                    s.borrar(id, m["para_todos"].as_bool().unwrap_or(false));
-                }
-                Ok(())
-            }
-            "sala_borrar_todo" => {
-                if let Some(s) = &mut self.sala {
-                    s.borrar_todo();
-                }
-                Ok(())
-            }
-            "sala_reaccion" => {
-                if let (Some(s), Some(id)) = (&mut self.sala, crate::mensaje::id_de(&m["id"])) {
-                    s.reaccionar(id, texto(m, "emoji"));
-                }
-                Ok(())
-            }
-            "sala_cerrar" => {
-                self.sala = None;
-                Ok(())
-            }
-            "movil_ok" => {
-                self.secure.movil_aprueba();
-                Ok(())
-            }
-            "movil_fin" => {
-                self.secure.movil_fin();
-                Ok(())
-            }
-            "colgar" => {
-                self.secure.colgar();
-                Ok(())
-            }
-            "contestar" => self.secure.contestar(texto(m, "mime")),
-            "ajustes_privacidad" => {
-                // Windows' own page for the microphone or the camera, opened for the person.
-                let url = if texto(m, "que") == "camara" {
-                    "ms-settings:privacy-webcam"
-                } else {
-                    "ms-settings:privacy-microphone"
-                };
-                return vec![Orden::AbreFuera {
-                    url: url.to_owned(),
-                }];
-            }
-            "rechazar" => {
-                self.secure.rechazar();
-                Ok(())
-            }
-            "pide_inicio" => {
-                self.secure.pide_inicio();
-                return Vec::new();
-            }
-            "perdida_vista" => {
-                self.secure.olvida_perdida();
-                Ok(())
-            }
-            "incidente_vista" => {
-                self.secure.olvida_incidente();
-                Ok(())
-            }
-            "incidente_guardar" => {
-                let Some(j) = self.secure.informe_incidente() else {
-                    return Vec::new();
-                };
-                return self
-                    .a_pestana(id, &json!({ "tipo": "secure_incidente", "json": j }))
-                    .into_iter()
-                    .collect();
-            }
-            "archivo_abrir" | "archivo_carpeta" => {
-                let Some(r) = m["id"].as_u64().and_then(|i| self.secure.recibido(i)) else {
-                    return Vec::new();
-                };
-                if r.borrado {
-                    return Vec::new();
-                }
-                let ruta = r.ruta.to_string_lossy().into_owned();
-                return if accion == "archivo_abrir" && r.abrible() {
-                    vec![Orden::AbreArchivo { ruta }]
-                } else {
-                    vec![Orden::MuestraArchivo { ruta }]
-                };
-            }
-            "archivo_borrar" => {
-                if let Some(i) = m["id"].as_u64() {
-                    self.secure.borra_recibido(i);
-                }
-                Ok(())
-            }
-            "archivo_vista" => {
-                // A small picture for the chat: only images, at most 12 MB, read once.
-                let Some(r) = m["id"].as_u64().and_then(|i| self.secure.recibido(i)) else {
-                    return Vec::new();
-                };
-                if !r.imagen() || r.borrado || r.bytes > 12 * 1024 * 1024 {
-                    return Vec::new();
-                }
-                let Ok(datos) = std::fs::read(&r.ruta) else {
-                    return Vec::new();
-                };
-                let tipo = match r
-                    .nombre
-                    .rsplit_once('.')
-                    .map(|(_, e)| e.to_ascii_lowercase())
-                    .as_deref()
-                {
-                    Some("png") => "image/png",
-                    Some("gif") => "image/gif",
-                    Some("webp") => "image/webp",
-                    Some("bmp") => "image/bmp",
-                    _ => "image/jpeg",
-                };
-                let url = format!(
-                    "data:{tipo};base64,{}",
-                    base64::engine::general_purpose::STANDARD.encode(datos)
-                );
-                return self
-                    .a_pestana(
-                        id,
-                        &json!({ "tipo": "secure_vista", "id": r.id, "url": url }),
-                    )
-                    .into_iter()
-                    .collect();
-            }
-            "media" => self.secure.media_saliente(texto(m, "b64")),
-            "visto" => {
-                self.secure.visto();
-                if let Some(s) = &mut self.sala {
-                    s.visto();
-                }
-                Ok(())
-            }
-            "prueba" => {
-                let j = self.secure.prueba_json();
-                return self
-                    .a_pestana(id, &json!({ "tipo": "secure_prueba", "json": j }))
-                    .into_iter()
-                    .collect();
-            }
-            _ => Ok(()),
-        };
-        let mut o = Vec::new();
-        if let Err(e) = r {
-            o.extend(self.a_pestana(
-                id,
-                &json!({ "tipo": "secure_aviso", "clave": "sec_error", "texto": e }),
-            ));
-        }
-        if accion != "media" && accion != "archivo_trozo" && accion != "mime" {
-            o.extend(self.a_pestana(id, &self.secure_estado_json()));
-            self.secure.movil_sincroniza();
-            if let Some(sala) = &mut self.sala {
-                if sala.cambiado() {
-                    sala.sincroniza();
-                }
-            }
-        }
-        o
-    }
-
-    /// The tab's state: the conversations, plus the house's room when one is open.
-    fn secure_estado_json(&self) -> Value {
-        let mut e = self.secure.estado_json();
-        e["sala"] = self
-            .sala
-            .as_ref()
-            .map_or(Value::Null, crate::sala::Sala::json);
-        e
+                crate::comunicaciones::Salida::AbreFuera { url } => Some(Orden::AbreFuera { url }),
+            })
+            .collect()
     }
 
     fn msg_estado(&self) -> Value {
@@ -2610,7 +2331,9 @@ impl Sesion {
                 // The SECURE tab draws its monitor from the first second (15 Oct 2026). Until a
                 // conversation exists every field is null and the page shows «—».
                 if m.get("vista").and_then(Value::as_str) == Some("secure") {
-                    o.extend(self.a_pestana(id, &self.secure.estado_json()));
+                    // With the house's room (17 Oct 2026 review: after a refresh an open room
+                    // looked closed until something changed).
+                    o.extend(self.a_pestana(id, &self.comunicaciones.estado_json()));
                 }
                 o
             }

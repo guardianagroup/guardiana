@@ -28,6 +28,7 @@ if [ -x "$bin" ]; then
     rm -f "$bin"
 fi
 rm -rf /usr/local/share/doc/guardiana
+rm -f /usr/local/share/applications/guardiana-comunicaciones.desktop
 if [ "${1:-}" = "--purge" ]; then
     rm -rf /var/lib/guardiana
     m "Extracto borrado." "Ledger deleted." "Extrato apagado."

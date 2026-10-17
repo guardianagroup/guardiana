@@ -34,7 +34,7 @@ use guardiana_core::{Hash, Ledger};
 use tokio::net::TcpListener;
 use tokio::sync::Notify;
 
-pub use auth::{load_or_create_token, TOKEN_FILE};
+pub use auth::{constant_time_eq, load_or_create_token, origin_es_este_panel, TOKEN_FILE};
 
 /// Default panel port (brief §0).
 pub const DEFAULT_PORT: u16 = 7443;
@@ -634,7 +634,6 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         cortes,
         revision: revision::Revisor::default(),
     });
-    revision::vigilar(Arc::clone(&state));
 
     let app = Router::new()
         .route("/", get(api::root_page))

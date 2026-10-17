@@ -44,6 +44,38 @@
     <div class="rv-orbe" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
     <div id="rv-pasos" class="rv-pasos"></div>
   </div>
+  <section id="rv-directo" class="rv-directo" hidden aria-live="polite" aria-busy="true">
+    <div class="rd-cab">
+      <div class="rd-tit"><span class="rd-ceja" data-t="rd_ceja">Revisión del equipo, en directo</span><h2 id="rd-titulo"></h2><span id="rd-ahora" class="rd-ahora"></span></div>
+      <dl class="rd-cifras">
+        <div><dt data-t="rd_secciones">Secciones</dt><dd><b id="rd-secciones">0</b><span>/11</span></dd></div>
+        <div><dt data-t="rd_firmas">Firmas leídas</dt><dd><b id="rd-firmas">0</b></dd></div>
+        <div><dt data-t="rd_tiempo">Tiempo</dt><dd><b id="rd-tiempo">0:00</b></dd></div>
+      </dl>
+    </div>
+    <ol id="rd-barra" class="rd-barra"></ol>
+    <div class="rd-cuerpo">
+      <div class="rd-lado">
+        <section class="rd-mod">
+          <span class="rd-rot" data-t="rd_firmas_titulo">Firmas digitales</span>
+          <div class="rd-grande"><b id="rd-firmas-n">0</b><span data-t="rd_archivos">archivos comprobados</span></div>
+          <div class="rd-prop" aria-hidden="true"><i id="rd-prop-ok"></i><i id="rd-prop-sin"></i></div>
+          <span id="rd-firmas-frase" class="rd-nota"></span>
+        </section>
+        <section class="rd-mod">
+          <span class="rd-rot" data-t="rd_dns_titulo">Pruebas de DNS</span>
+          <ul id="rd-dns" class="rd-dns"></ul>
+        </section>
+      </div>
+      <div class="rd-torre">
+        <div class="rd-torre-cab"><span data-t="rd_evidencias">Evidencias, en directo</span><span id="rd-registradas"></span></div>
+        <div class="rd-pila"><div id="rd-lista" class="rd-lista"></div></div>
+        <div class="rd-escaner" aria-hidden="true"><i id="rd-linea"></i></div>
+        <div id="rd-actual" class="rd-actual"></div>
+      </div>
+    </div>
+    <div id="rd-cuentas" class="rd-cuentas"></div>
+  </section>
   <div id="rv-progreso" class="rv-progreso" hidden>
     <div class="rv-progreso-barra" aria-hidden="true"><i></i></div>
     <div><strong data-t="rv_progreso_texto">Consultando Windows</strong> <span id="rv-tiempo" class="muted"></span></div>
@@ -54,7 +86,6 @@
   </div>
   <div class="rv-botones">
     <button type="button" id="rv-ahora" data-t="rv_ahora">Revisar ahora</button>
-    <a class="btn secondary rv-mapa" href="/por-dentro" data-t="rv_mapa">Ver actividad en el mapa</a>
     <button type="button" id="rv-pdf" class="secondary" data-t="rv_pdf">Guardar PDF</button>
     <button type="button" id="rv-json" class="secondary" data-t="rv_json">Exportar datos</button>
     <button type="button" id="rv-compartir" class="secondary" data-t="rv_compartir">Compartir</button>

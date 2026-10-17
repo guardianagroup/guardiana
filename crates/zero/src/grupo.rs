@@ -63,6 +63,26 @@ impl std::fmt::Debug for Grupo {
 }
 
 impl Grupo {
+    /// The one link that is talking, in a two-way talk. The host keeps a listener open for more
+    /// members, which does not make it a group: its own lines must still share the link's id
+    /// (ticks, edits, deleting for everyone) (17 Oct 2026 review).
+    fn unica(&self) -> Option<usize> {
+        if self.sesiones.len() == 1 {
+            return Some(0);
+        }
+        let mut hablando = self.sesiones.iter().enumerate().filter(|(_, s)| s.lista());
+        match (hablando.next(), hablando.next()) {
+            (Some((i, _)), None) => Some(i),
+            _ => None,
+        }
+    }
+
+    /// Whether a call is going on in any link (the window then runs its clock faster, so the
+    /// call's pieces do not wait for the next tick).
+    pub fn en_llamada(&self) -> bool {
+        self.llamada.is_some() || self.sesiones.iter().any(|s| s.llamada_activa().is_some())
+    }
+
     /// A group with one idle session (the identity and the book live in `datos/secure`).
     pub fn abre(datos: &Path, descargas: &Path) -> Self {
         Self {
@@ -131,8 +151,11 @@ impl Grupo {
     }
 
     fn cierra_todo(&mut self, por: &str) {
+        // A new conversation starts empty (17 Oct 2026 review: the last contact's messages
+        // showed in the next one's chat).
         for s in &mut self.sesiones {
             s.cerrar(por);
+            s.borrar_todo();
         }
         self.sesiones.truncate(1);
         self.vistos.truncate(1);
@@ -245,7 +268,27 @@ impl Grupo {
         let (puerto, codigo_rele, _) = self.sesiones[0].escucha();
         if self.sesiones.last().is_some_and(Secure::lista) {
             let i = self.nueva_sesion();
-            let _ = self.sesiones[i].escuchar_grupo(Some(puerto), codigo_rele, false);
+            // One wait per room at the relay. A session that met its member directly left its
+            // wait in the room; a second one there would be joined with it by the relay (the
+            // host with itself, and the next member waiting alone: 17 Oct 2026). The new
+            // listener takes that wait over instead of opening another.
+            let espera = self.sesiones[..i]
+                .iter_mut()
+                .rev()
+                .find_map(Secure::toma_espera_rele);
+            match (espera, codigo_rele) {
+                (Some(espera), Some(codigo)) => {
+                    if self.sesiones[i]
+                        .escuchar_grupo(Some(puerto), None, false)
+                        .is_ok()
+                    {
+                        self.sesiones[i].hereda_espera_rele(espera, codigo);
+                    }
+                }
+                (_, codigo) => {
+                    let _ = self.sesiones[i].escuchar_grupo(Some(puerto), codigo, false);
+                }
+            }
             self.cambio = true;
             self.manda_lista();
         }
@@ -327,6 +370,8 @@ impl Grupo {
     fn reparte(&mut self) {
         let n = self.sesiones.len();
         let anfitrion = self.anfitrion;
+        let unica = self.unica();
+        let yo = self.nombre_o_anfitrion();
         let mut pasar_texto: Vec<(usize, String, String)> = Vec::new();
         let mut pasar_media: Vec<(usize, String, Vec<u8>)> = Vec::new();
         for i in 0..n {
@@ -340,11 +385,15 @@ impl Grupo {
                 .collect();
             self.vistos[i] = self.sesiones[i].mensajes.len();
             for mut m in nuevos {
-                if m.mio {
-                    // Our own texts are pushed into the group's list when sent, once.
+                // Our own texts are pushed into the group's list when sent, once; our call and
+                // file lines come from the link when only one is talking (in a group each link
+                // would bring its own copy).
+                if m.mio && !(unica == Some(i) && (m.llamada.is_some() || m.archivo.is_some())) {
                     continue;
                 }
-                let quien = if m.de.is_empty() {
+                let quien = if m.mio {
+                    yo.clone()
+                } else if m.de.is_empty() {
                     de_enlace.clone()
                 } else {
                     m.de.clone()
@@ -430,8 +479,8 @@ impl Grupo {
             let mut m = crate::mensaje::Mensaje::mio(t, None);
             m.de = self.nombre_o_anfitrion();
             // In a two-way talk the link's own line is the one on screen (it carries the ticks).
-            if let [s] = self.sesiones.as_slice() {
-                if let Some(ultimo) = s.mensajes.last() {
+            if let Some(i) = self.unica() {
+                if let Some(ultimo) = self.sesiones[i].mensajes.last() {
                     m.id = ultimo.id;
                 }
             }
@@ -445,12 +494,12 @@ impl Grupo {
 
     /// The person answers a message (two-way talk: the link carries the quote).
     pub fn texto_re(&mut self, texto: &str, re: Option<u64>) {
-        if self.sesiones.len() != 1 {
+        let Some(i) = self.unica() else {
             self.texto(texto);
             return;
-        }
+        };
         let de = self.nombre_o_anfitrion();
-        let s = &mut self.sesiones[0];
+        let s = &mut self.sesiones[i];
         if s.lista() {
             s.texto_re(texto, re);
             let ultimo = s.mensajes.last().cloned();
@@ -459,7 +508,7 @@ impl Grupo {
                 m.de = de;
                 self.mensajes.push(m);
             }
-            self.vistos[0] = n;
+            self.vistos[i] = n;
             self.cambio = true;
         }
     }
@@ -485,6 +534,13 @@ impl Grupo {
                 self.mensajes[i].borra();
             } else {
                 self.mensajes.remove(i);
+            }
+        }
+        // «Delete for me» shortened the links' lists: count from where they are now, or the
+        // next message would be skipped.
+        for (i, s) in self.sesiones.iter().enumerate() {
+            if let Some(v) = self.vistos.get_mut(i) {
+                *v = (*v).min(s.mensajes.len());
             }
         }
         self.cambio = true;
@@ -574,6 +630,61 @@ impl Grupo {
             Some(s) => s.movil_empieza(idioma),
             None => Err("sec_mv_solo_dos".to_owned()),
         }
+    }
+
+    /// A WebRTC message from the page: to the one link talking (a group call keeps the old
+    /// way, so there is none to send to then).
+    pub fn rtc(&mut self, d: &Value) {
+        if let Some(i) = self.unica() {
+            if let Some(s) = self.sesiones.get_mut(i) {
+                s.rtc(d);
+            }
+        }
+    }
+
+    /// The call's figures as the page measures them, for the talking link's report.
+    pub fn medidas(&mut self, d: &Value) {
+        if let Some(i) = self.unica() {
+            if let Some(s) = self.sesiones.get_mut(i) {
+                s.medidas(d);
+            }
+        }
+    }
+
+    /// The person closed the call's report.
+    pub fn olvida_informe(&mut self) {
+        for s in &mut self.sesiones {
+            s.olvida_informe();
+        }
+    }
+
+    /// What Windows recorded about the microphone, the camera and the screen, for every open
+    /// conversation.
+    pub fn vigia(&mut self, usos: &[crate::vigia::Uso]) {
+        for s in &mut self.sesiones {
+            s.vigia(usos);
+        }
+    }
+
+    /// Whether the window is kept out of screenshots and recordings right now.
+    pub fn pantalla(&mut self, protegida: bool) {
+        for s in &mut self.sesiones {
+            s.pantalla(protegida);
+        }
+    }
+
+    /// Whether any conversation is open (the window then watches and hides from captures).
+    pub fn conversando(&self) -> bool {
+        self.sesiones.iter().any(Secure::lista)
+    }
+
+    /// WebRTC messages from the other side for the page.
+    pub fn rtc_para_pagina(&mut self) -> Vec<Value> {
+        let mut v = Vec::new();
+        for s in &mut self.sesiones {
+            v.extend(s.rtc_para_pagina.drain(..));
+        }
+        v
     }
 
     /// Our new player needs the other side's pieces from a fresh start.
@@ -790,6 +901,12 @@ impl Grupo {
         // The first link carries the codes, the door and the monitor; a newer link being set
         // up (a member comparing numbers with the host) is shown on top of the chat.
         let mut e = self.sesiones[0].estado_json();
+        // The call's report and the watch are the talking link's (a group's host shows its own).
+        if let Some(i) = self.unica().filter(|&i| i > 0) {
+            let otra = self.sesiones[i].estado_json();
+            e["informe"] = otra["informe"].clone();
+            e["vigia"] = otra["vigia"].clone();
+        }
         if let Some(nueva) = self
             .sesiones
             .iter()
@@ -851,6 +968,12 @@ impl Grupo {
         e["otro_voz_protegida"] = json!(self.sesiones.iter().any(Secure::otro_voz_protegida));
         // The post-quantum lock: shown only when every open link in the group has it.
         e["cuantico"] = json!(self.sesiones.iter().all(Secure::cuantico));
+        // WebRTC only in a two-way talk: a group call goes the old way, through the host.
+        if self.unica().is_none() {
+            if let Some(l) = e["llamada"].as_object_mut() {
+                l.remove("rtc");
+            }
+        }
         if let Some(video) = self.llamada {
             if e["llamada"].is_null() {
                 e["llamada"] = json!({ "video": video, "desde": self.llamada_desde, "conectada": self.sesiones.iter().any(Secure::conectada) });
@@ -934,8 +1057,94 @@ mod tests {
         }
     }
 
+    /// The first member came in directly while the host also waited at the relay: the next
+    /// one, with the relay code, meets the host there (17 Oct 2026: the new listener opened a
+    /// second wait in the same room, the relay joined the host with itself, and the third
+    /// person waited alone).
+    #[test]
+    fn a_member_by_the_relay_after_one_who_came_in_directly_meets_the_host() {
+        // The variable is the whole process's: leave it as it was, even if this fails.
+        struct Quita;
+        impl Drop for Quita {
+            fn drop(&mut self) {
+                std::env::remove_var("GUARDIANA_RELE");
+            }
+        }
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
+        let listener = rt
+            .block_on(tokio::net::TcpListener::bind("127.0.0.1:0"))
+            .unwrap();
+        let direccion = listener.local_addr().unwrap().to_string();
+        rt.spawn(guardiana_rele::sirve(listener));
+        std::env::set_var("GUARDIANA_RELE", &direccion);
+        let _quita = Quita;
+
+        let base =
+            std::env::temp_dir().join(format!("guardiana-grupo-rele-{}", std::process::id()));
+        let d = |n: &str| {
+            let p = base.join(n);
+            std::fs::create_dir_all(&p).unwrap();
+            p
+        };
+        let (da, db, dc) = (d("a"), d("b"), d("c"));
+        let mut a = Grupo::abre(&da, &da);
+        a.nombre_propio = "Ana".to_owned();
+        let mut b = Grupo::abre(&db, &db);
+        let mut c = Grupo::abre(&dc, &dc);
+        let puerto = a.escuchar_efimero().unwrap();
+        // No router here: the door search gives up and the host waits at the relay as well.
+        let mut codigo = None;
+        for _ in 0..600 {
+            a.tic();
+            if let (_, Some(cod), _) = a.sesiones[0].escucha() {
+                codigo = Some(cod);
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let codigo = codigo.unwrap();
+        // Bea is on the same network: straight to the door.
+        b.conectar(&format!("127.0.0.1:{puerto}")).unwrap();
+        gira(&mut [&mut a, &mut b], 25);
+        a.sas_persona(true, "Bea");
+        b.sas_persona(true, "Ana");
+        for _ in 0..40 {
+            if a.sesiones[0].lista() && b.sesiones[0].lista() {
+                break;
+            }
+            gira(&mut [&mut a, &mut b], 5);
+        }
+        assert!(a.sesiones[0].lista() && b.sesiones[0].lista());
+        gira(&mut [&mut a, &mut b], 5);
+        assert_eq!(a.sesiones.len(), 2, "a second session listens");
+        // Cris is somewhere else: the relay code.
+        c.conectar(&codigo).unwrap();
+        for _ in 0..80 {
+            gira(&mut [&mut a, &mut b, &mut c], 5);
+            if a.numeros().is_some() && a.numeros() == c.numeros() {
+                break;
+            }
+        }
+        assert!(
+            a.numeros().is_some() && a.numeros() == c.numeros(),
+            "{:?}",
+            c.estado_json()["fase"]
+        );
+        rt.shutdown_background();
+    }
+
     #[test]
     fn three_computers_meet_through_the_host_and_everyone_reads_everyone() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let base = std::env::temp_dir().join(format!("guardiana-grupo-{}", std::process::id()));
         let d = |n: &str| {
             let p = base.join(n);
@@ -964,7 +1173,14 @@ mod tests {
         gira(&mut [&mut a, &mut b], 5);
         assert_eq!(a.sesiones.len(), 2, "a second session listens");
         c.conectar(&format!("127.0.0.1:{puerto}")).unwrap();
-        gira(&mut [&mut a, &mut b, &mut c], 25);
+        // Up to a few seconds: a slow runner (macOS, with the other tests in parallel) needs
+        // more than half a second for the greeting (17 Oct 2026).
+        for _ in 0..40 {
+            gira(&mut [&mut a, &mut b, &mut c], 5);
+            if a.numeros().is_some() && a.numeros() == c.numeros() {
+                break;
+            }
+        }
         assert!(
             a.numeros().is_some() && a.numeros() == c.numeros(),
             "{:?}",
@@ -973,6 +1189,12 @@ mod tests {
         a.sas_persona(true, "Cris");
         c.sas_persona(true, "Ana");
         gira(&mut [&mut a, &mut b, &mut c], 30);
+        for _ in 0..40 {
+            if c.sesiones[0].lista() && a.nombres().len() == 3 {
+                break;
+            }
+            gira(&mut [&mut a, &mut b, &mut c], 5);
+        }
         assert!(c.sesiones[0].lista());
         assert_eq!(a.nombres(), vec!["Ana", "Bea", "Cris"]);
         assert_eq!(b.nombres(), vec!["Ana", "Cris"]);

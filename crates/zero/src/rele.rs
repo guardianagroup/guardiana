@@ -62,21 +62,26 @@ pub const RELE_NOMBRE: &str = "rele.guardianagroup.com";
 /// The letters of a code: no 0/O/1/I, so it reads well aloud.
 const ALFABETO: &[u8; 32] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-/// The nearest relay, measured once (the time to open a TCP connection to each, two seconds
-/// at most); 0 until measured, or when the environment names a relay.
+/// The nearest relay, measured once (the time to open a TLS connection to each, certificate
+/// checked); 0 until measured, or when the environment names a relay.
 static PREFERIDO: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
 
 /// Measure once which relay answers fastest from here, in its own thread; `preferido()` reads
 /// the result when it is in. Nothing is sent but a connection that is closed at once.
 pub fn mide_cercania() {
-    if PREFERIDO.get().is_some() || std::env::var_os("GUARDIANA_RELE").is_some() {
+    // The tests measure nothing out there either (see `abre`).
+    if PREFERIDO.get().is_some() || std::env::var_os("GUARDIANA_RELE").is_some() || cfg!(test) {
         return;
     }
     std::thread::spawn(|| {
         let mut mejor = (0usize, Duration::MAX);
+        let raices = raices_publicas();
         for (i, r) in RELES.iter().enumerate() {
             let t = std::time::Instant::now();
-            if abre_hacia(&r.direccion()).is_ok() {
+            // The whole way in, certificate included (17 Oct 2026: a relay half set up answered
+            // on 443 without a valid certificate, won the race by distance, and every phone
+            // link from Colombia failed on it). A relay that cannot complete TLS is not near.
+            if por_tls(&r.direccion(), r.nombre, raices.clone()).is_ok() {
                 let d = t.elapsed();
                 if d < mejor.1 {
                     mejor = (i, d);
@@ -281,6 +286,16 @@ pub fn abre(rele: &str) -> Result<TcpStream, String> {
     let Some(r) = RELES.iter().find(|r| r.direccion() == rele) else {
         return abre_hacia(rele);
     };
+    if cfg!(test) {
+        // The tests never reach GUARDIANA's own relays (17 Oct 2026: on the macOS runner, which
+        // has a network, a test's listener went to wait at a real relay, and the owner's
+        // servers saw test traffic). A test that needs a relay runs one on this computer and
+        // names it in `GUARDIANA_RELE`.
+        return Err(format!(
+            "{}: relé de GUARDIANA, fuera de las pruebas",
+            r.nombre
+        ));
+    }
     let raices = raices_publicas();
     let mut fallos = Vec::new();
     let mut destinos = vec![r.direccion()];
@@ -305,15 +320,16 @@ pub fn abre(rele: &str) -> Result<TcpStream, String> {
 /// The joining side: go to every relay at once with the same room (the other person waits at
 /// one of them, the one its code names, or the first for an older version) and keep the first
 /// link the pairing completes. With `GUARDIANA_RELE` set (the tests), only that one.
-pub fn conecta_a_cualquiera(sala: &str) -> Result<TcpStream, String> {
+/// Also says which relay it was, so a dropped link meets the other side there again.
+pub fn conecta_a_cualquiera(sala: &str) -> Result<(TcpStream, String), String> {
     if let Ok(uno) = std::env::var("GUARDIANA_RELE") {
-        return conecta(&uno, sala);
+        return conecta(&uno, sala).map(|s| (s, uno));
     }
     let (tx, rx) = std::sync::mpsc::channel();
     for r in RELES {
         let (tx, sala, d) = (tx.clone(), sala.to_owned(), r.direccion());
         std::thread::spawn(move || {
-            let _ = tx.send(conecta(&d, &sala));
+            let _ = tx.send(conecta(&d, &sala).map(|s| (s, d)));
         });
     }
     drop(tx);
@@ -325,6 +341,67 @@ pub fn conecta_a_cualquiera(sala: &str) -> Result<TcpStream, String> {
         }
     }
     Err(fallos.join("; "))
+}
+
+/// The relay's call service (TURN), for one conversation (17 Oct 2026: calls move to WebRTC,
+/// like WhatsApp and Google Meet). Voice and video then go over UDP through the relay, which
+/// passes packets it cannot read (DTLS-SRTP from one end to the other); nobody sees the other
+/// person's address. The relay hands these only for a room it is joining right now.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Turn {
+    /// `turn:` addresses, UDP first.
+    pub urls: Vec<String>,
+    /// The time-limited user name the relay made (`<expiry>:g`).
+    pub usuario: String,
+    /// Its key.
+    pub clave: String,
+}
+
+impl Turn {
+    /// As the pages' `RTCPeerConnection` takes it (`iceServers`).
+    #[must_use]
+    pub fn json(&self) -> serde_json::Value {
+        serde_json::json!([{ "urls": self.urls, "username": self.usuario, "credential": self.clave }])
+    }
+}
+
+/// Ask `rele` (the one this conversation meets at) for its call service, for room `sala`.
+pub fn turn(rele: &str, sala: &str) -> Result<Turn, String> {
+    let mut s = abre(rele)?;
+    s.write_all(format!("GUARDIANA-TURN 1 {sala}\n").as_bytes())
+        .map_err(|e| e.to_string())?;
+    s.set_read_timeout(Some(Duration::from_secs(10)))
+        .map_err(|e| e.to_string())?;
+    let mut linea = Vec::new();
+    loop {
+        let mut b = [0u8; 1];
+        s.read_exact(&mut b).map_err(|e| e.to_string())?;
+        if b[0] == b'\n' {
+            break;
+        }
+        linea.push(b[0]);
+        if linea.len() > 400 {
+            return Err("respuesta del relé ilegible".to_owned());
+        }
+    }
+    let linea = String::from_utf8(linea).map_err(|e| e.to_string())?;
+    let mut partes = linea.trim().split(' ');
+    let (Some("OK"), Some(usuario), Some(clave)) = (partes.next(), partes.next(), partes.next())
+    else {
+        return Err("el relé no da servicio de llamadas".to_owned());
+    };
+    let host = RELES.iter().find(|r| r.direccion() == rele).map_or_else(
+        || rele.rsplit_once(':').map_or(rele, |(h, _)| h).to_owned(),
+        |r| r.nombre.to_owned(),
+    );
+    Ok(Turn {
+        urls: vec![
+            format!("turn:{host}:3478?transport=udp"),
+            format!("turn:{host}:3478?transport=tcp"),
+        ],
+        usuario: usuario.to_owned(),
+        clave: clave.to_owned(),
+    })
 }
 
 /// Connect to the relay, name the room and wait (up to ten minutes) for the other computer.

@@ -5,6 +5,8 @@
 
 mod apps_cmd;
 mod args;
+#[cfg(not(windows))]
+mod comunicaciones_cmd;
 mod dns_cmd;
 mod engine;
 mod export_cmd;
@@ -97,6 +99,14 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("reglas") => reglas_cmd::run(&opts),
         Some("service" | "servicio") => service_cmd::run(&opts),
         Some("panel") => panel_cmd::run(&opts),
+        #[cfg(not(windows))]
+        Some("comunicaciones" | "secure") => comunicaciones_cmd::run(&opts),
+        // On Windows, Comunicaciones is a tab of GUARDIANA ZERO, on the same identity.
+        #[cfg(windows)]
+        Some("comunicaciones" | "secure") => {
+            println!("{}", t.cli("comunicaciones.windows"));
+            Ok(())
+        }
         Some("apps") => apps_cmd::run(&opts),
         Some("trampa" | "trampas") => trampa_cmd::run(&opts),
         Some("verify" | "verificar") => verify_cmd::run(&opts),
@@ -131,6 +141,7 @@ mod tests {
     fn every_text_key_exists_in_every_language() {
         let sources = [
             include_str!("apps_cmd.rs"),
+            include_str!("comunicaciones_cmd.rs"),
             include_str!("dns_cmd.rs"),
             include_str!("engine.rs"),
             include_str!("export_cmd.rs"),

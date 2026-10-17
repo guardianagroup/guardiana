@@ -29,8 +29,6 @@ use crate::auth::Session;
 use crate::AppState;
 
 const DIA: i64 = 24 * 3_600_000;
-/// A review older than this is repeated when the page is opened.
-const VIGENCIA_MS: i64 = 30 * 60_000;
 /// How long PowerShell may take before it is stopped.
 const LIMITE: std::time::Duration = std::time::Duration::from_secs(300);
 
@@ -60,6 +58,11 @@ pub(crate) struct Vivo {
     hechas: Vec<(String, u64)>,
     /// Files whose signature was read so far.
     firmas: u32,
+    /// Of those, the ones without a valid signature (17 Oct 2026: shown as they come).
+    sin_firma: u32,
+    /// How many steps there have been since the review started: the page animates each new one
+    /// even when several arrive between two looks.
+    n: u64,
     /// How many items each list had (`tareas` → 41).
     cuentas: Vec<(String, u64)>,
     /// The last steps, newest last: (kind, text).
@@ -75,7 +78,14 @@ impl Vivo {
                 self.hechas
                     .push((s.to_owned(), ms.trim().parse().unwrap_or(0)));
             }
-            "firma" => self.firmas += 1,
+            "firma" => {
+                self.firmas += 1;
+                // `name<TAB>status<TAB>signer` since 17 Oct 2026; older scripts sent the name only.
+                let estado = texto.split('\t').nth(1).unwrap_or("");
+                if !estado.is_empty() && estado != "Valid" {
+                    self.sin_firma += 1;
+                }
+            }
             "cuenta" => {
                 let (s, n) = texto.split_once('\t').unwrap_or((texto, "0"));
                 self.cuentas
@@ -88,7 +98,8 @@ impl Vivo {
                 tipo.chars().take(16).collect(),
                 texto.chars().take(160).collect(),
             ));
-            while self.pasos.len() > 14 {
+            self.n += 1;
+            while self.pasos.len() > 60 {
                 self.pasos.pop_front();
             }
         }
@@ -167,21 +178,6 @@ impl Revisor {
     }
 }
 
-/// Every six hours, from three minutes after the panel starts, so what appears on its own is
-/// noticed even when nobody opens the page. Windows only.
-pub(crate) fn vigilar(state: Arc<AppState>) {
-    if !cfg!(windows) {
-        return;
-    }
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(180)).await;
-        loop {
-            Revisor::lanzar(&state);
-            tokio::time::sleep(std::time::Duration::from_secs(6 * 3600)).await;
-        }
-    });
-}
-
 // ---------------------------------------------------------------------------------------------
 // The page's answer.
 
@@ -247,17 +243,10 @@ impl Item {
     }
 }
 
-/// `/api/revision`: the last review, and a new one started if it is old.
+/// `/api/revision`: the last review. Nothing starts from here: a review runs only when the
+/// person presses «Revisar ahora» (the owner, 17 Oct 2026: «no puede empezar el proceso antes
+/// de dar al botón»; it used to start on its own on opening the page and every six hours).
 pub(crate) async fn ver(State(state): State<Arc<AppState>>, _s: Session) -> ApiResult<Respuesta> {
-    let viejo = state
-        .revision
-        .estado
-        .lock()
-        .map(|c| !c.corriendo && c.cuando.is_none_or(|t| now_ms() - t > VIGENCIA_MS))
-        .unwrap_or(false);
-    if viejo && cfg!(windows) {
-        Revisor::lanzar(&state);
-    }
     Ok(Json(respuesta(&state)))
 }
 
@@ -1705,8 +1694,11 @@ mod tests {
         assert_eq!(v.firmas, 30);
         assert_eq!(v.cuentas, vec![("tareas".to_owned(), 41)]);
         assert_eq!(v.hechas, vec![("arranque".to_owned(), 5120)]);
-        assert_eq!(v.pasos.len(), 14);
-        assert_eq!(v.pasos.back().unwrap().0, "cuenta");
+        assert_eq!(v.pasos.len(), 32);
+        assert_eq!(v.n, 32);
+        v.anota("firma", "x.exe\tNotSigned\t");
+        v.anota("firma", "y.exe\tValid\tMicrosoft Corporation");
+        assert_eq!((v.firmas, v.sin_firma), (32, 1));
     }
 
     #[test]

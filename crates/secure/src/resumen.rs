@@ -62,6 +62,87 @@ pub struct Conexion {
     pub resolucion: Option<String>,
 }
 
+/// What one computer's watch saw over the microphone, the camera and the screen (Francisco,
+/// 17 Oct 2026: the summary must say «si ha habido espionaje, si ha habido grabación»). Only
+/// what Windows recorded, by program name; `vigilado` is `false` where nothing could be watched
+/// (another system, a phone's browser), and the summary says so instead of «nothing».
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Vigilancia {
+    /// Whether that computer could watch at all.
+    pub vigilado: bool,
+    /// Other programs that used the microphone during the session, by name.
+    #[serde(default)]
+    pub microfono: Vec<String>,
+    /// Other programs that used the camera.
+    #[serde(default)]
+    pub camara: Vec<String>,
+    /// Other programs that captured the screen through Windows.
+    #[serde(default)]
+    pub pantalla: Vec<String>,
+    /// Whether the window was kept out of screenshots and screen recordings the whole time.
+    #[serde(default)]
+    pub pantalla_protegida: bool,
+}
+
+impl Vigilancia {
+    /// Nothing else used the microphone, the camera or the screen.
+    #[must_use]
+    pub fn limpio(&self) -> bool {
+        self.microfono.is_empty() && self.camara.is_empty() && self.pantalla.is_empty()
+    }
+
+    /// Read what the other side said, with limits (it is never trusted for more than it says).
+    #[must_use]
+    pub fn de_json(v: &serde_json::Value) -> Option<Self> {
+        let lista = |k: &str| -> Vec<String> {
+            v[k].as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(serde_json::Value::as_str)
+                        .take(20)
+                        .map(|s| s.chars().filter(|c| !c.is_control()).take(120).collect())
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        Some(Self {
+            vigilado: v["vigilado"].as_bool()?,
+            microfono: lista("microfono"),
+            camara: lista("camara"),
+            pantalla: lista("pantalla"),
+            pantalla_protegida: v["pantalla_protegida"].as_bool().unwrap_or(false),
+        })
+    }
+}
+
+/// The final judgement of a session: was anyone listening, watching or recording.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Veredicto {
+    /// This computer.
+    pub este: Vigilancia,
+    /// The other side, as its own GUARDIANA reported it inside the encrypted session; `None`
+    /// when it said nothing (an older version).
+    pub otro: Option<Vigilancia>,
+    /// The other side talked from a phone's browser, which cannot watch its own microphone.
+    pub otro_movil: bool,
+    /// The contact's identity matched the safety number the whole session.
+    pub identidad_verificada: bool,
+    /// Signs of interference (unusual entries in the chain) during the session.
+    pub interferencias: u64,
+}
+
+impl Veredicto {
+    /// No sign of anyone listening, watching, recording or interfering, on either side that
+    /// could tell.
+    #[must_use]
+    pub fn sin_espionaje(&self) -> bool {
+        self.identidad_verificada
+            && self.interferencias == 0
+            && self.este.limpio()
+            && self.otro.as_ref().is_none_or(Vigilancia::limpio)
+    }
+}
+
 /// The summary itself.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Resumen {
@@ -103,6 +184,10 @@ pub struct Resumen {
     pub hash_cadena: String,
     /// How many entries that chain has.
     pub registros_cadena: u64,
+    /// The final judgement (17 Oct 2026). Absent in older summaries, whose signatures must still
+    /// check: an absent field is not written, so their signed text is unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub veredicto: Option<Veredicto>,
     /// The signing computer's Ed25519 key, base64.
     pub firmante: String,
     /// Ed25519 signature over the fields above (see [`Resumen::verificar`]).
@@ -147,11 +232,52 @@ impl Resumen {
             no_verificables: cuenta(Nivel::NoVerificable),
             hash_cadena: cadena.ultimo_hash(),
             registros_cadena: cadena.registros.len() as u64,
+            veredicto: None,
             firmante: identity.signing_key().to_base64(),
             firma: String::new(),
         };
         r.firma = identity.sign(r.transcript().as_bytes()).to_base64();
         Some(r)
+    }
+
+    /// The same for a part of the session (a call): the counts are of what the chain recorded
+    /// between `inicio` and `fin`, and the verdict goes in, signed with the rest.
+    #[allow(clippy::too_many_arguments)]
+    pub fn cerrar_parte(
+        identity: &Identity,
+        programa: &str,
+        clase: Clase,
+        monitor: &Monitor,
+        cadena: &Cadena,
+        inicio: u64,
+        fin: u64,
+        archivos: Archivos,
+        conexion: Conexion,
+        veredicto: Veredicto,
+    ) -> Option<Self> {
+        let mut r = Self::cerrar(
+            identity, programa, clase, monitor, cadena, inicio, fin, archivos, conexion,
+        )?;
+        let cuenta = |nivel: Nivel| {
+            cadena
+                .registros
+                .iter()
+                .filter(|x| x.nivel == nivel && x.cuando >= inicio && x.cuando <= fin)
+                .count() as u64
+        };
+        r.observadas = cuenta(Nivel::Observada);
+        r.inusuales = cuenta(Nivel::Inusual);
+        r.no_verificables = cuenta(Nivel::NoVerificable);
+        r.veredicto = Some(veredicto);
+        r.firma = identity.sign(r.transcript().as_bytes()).to_base64();
+        Some(r)
+    }
+
+    /// Put the verdict in and sign again (the whole conversation's summary).
+    pub fn con_veredicto(mut self, identity: &Identity, veredicto: Veredicto) -> Self {
+        self.veredicto = Some(veredicto);
+        self.firma = identity.sign(self.transcript().as_bytes()).to_base64();
+        self
     }
 
     /// Seconds the session lasted.
@@ -192,15 +318,26 @@ impl Resumen {
         serde_json::from_str(texto).map_err(|_| Error::CannotRestore)
     }
 
-    /// One CSV line (with its header) for a spreadsheet of sessions.
+    /// One CSV line (with its header) for a spreadsheet of sessions. The verdict and the call's
+    /// figures come last, so older sheets keep their first columns.
     pub fn to_csv(&self) -> String {
         let clase = serde_json::to_string(&self.clase).unwrap_or_default();
+        let v = self.veredicto.as_ref();
+        let si_no = |b: bool| if b { "si" } else { "no" };
+        let lista = |l: Option<&Vec<String>>| csv(&l.map(|l| l.join(" ")).unwrap_or_default());
+        let num = |n: Option<u32>| n.map(|n| n.to_string()).unwrap_or_default();
+        let otro = match v {
+            Some(v) if v.otro_movil => "movil".to_owned(),
+            Some(Veredicto { otro: Some(o), .. }) if o.vigilado => si_no(o.limpio()).to_owned(),
+            Some(Veredicto { otro: Some(_), .. }) => "no_vigilado".to_owned(),
+            _ => String::new(),
+        };
         format!(
-            "clase,contacto,verificado_en,estado_identidad,inicio,fin,duracion_s,mensajes_enviados,mensajes_recibidos,archivos_enviados,archivos_recibidos,bytes,observadas,inusuales,no_verificables,hash_cadena,firmante\n{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
+            "clase,contacto,verificado_en,estado_identidad,inicio,fin,duracion_s,mensajes_enviados,mensajes_recibidos,archivos_enviados,archivos_recibidos,bytes,observadas,inusuales,no_verificables,hash_cadena,firmante,sin_espionaje,vigilado,microfono_otros,camara_otros,pantalla_otros,pantalla_protegida,otro_lado_limpio,latencia_media_ms,perdida_max_pct,kbps_audio_medio,kbps_video_medio,resolucion\n{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
             clase.trim_matches('"'),
             csv(&self.contacto),
             self.verificado_en,
-            self.estado_identidad,
+            csv(&self.estado_identidad),
             self.inicio,
             self.fin,
             self.duracion_s(),
@@ -213,12 +350,35 @@ impl Resumen {
             self.inusuales,
             self.no_verificables,
             self.hash_cadena,
-            self.firmante
+            self.firmante,
+            v.map(|v| si_no(v.sin_espionaje())).unwrap_or_default(),
+            v.map(|v| si_no(v.este.vigilado)).unwrap_or_default(),
+            lista(v.map(|v| &v.este.microfono)),
+            lista(v.map(|v| &v.este.camara)),
+            lista(v.map(|v| &v.este.pantalla)),
+            v.map(|v| si_no(v.este.pantalla_protegida)).unwrap_or_default(),
+            otro,
+            num(self.conexion.latencia_media_ms),
+            self.conexion
+                .perdida_max_pct
+                .map(|p| format!("{p:.1}"))
+                .unwrap_or_default(),
+            num(self.conexion.kbps_audio_medio),
+            num(self.conexion.kbps_video_medio),
+            csv(self.conexion.resolucion.as_deref().unwrap_or_default()),
         )
     }
 }
 
 fn csv(s: &str) -> String {
+    // A name that starts like a formula would run as one in a spreadsheet (17 Oct 2026 review):
+    // a leading apostrophe keeps it text.
+    let s = if s.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+        format!("'{s}")
+    } else {
+        s.to_owned()
+    };
+    let s = s.as_str();
     if s.contains([',', '"', '\n', '\r']) {
         format!("\"{}\"", s.replace('"', "\"\""))
     } else {
@@ -320,5 +480,101 @@ mod tests {
             .unwrap()
             .starts_with("llamada,Marta,900,verificado,1000,1600,600,2,1,1,0,2048,1,0,1,"));
         assert!(!r.to_json().contains("127.0.0.1"));
+    }
+
+    #[test]
+    fn a_call_summary_carries_a_signed_verdict_and_older_ones_still_check() {
+        let yo = Identity::new();
+        let mut m = Monitor::new();
+        m.identidad = Some(Identidad {
+            nombre: "=Marta".to_owned(),
+            huella: "1".to_owned(),
+            propia: "a".to_owned(),
+            contacto: "c".to_owned(),
+            verificado_en: 900,
+            estado: "verificado".to_owned(),
+        });
+        let mut c = Cadena::new("s", 1_000);
+        // Before the call: not counted in the call's summary.
+        c.anota(
+            1_010,
+            Nivel::Inusual,
+            Hecho {
+                texto: "antes".to_owned(),
+                ..Hecho::default()
+            },
+        );
+        c.anota(
+            1_210,
+            Nivel::Observada,
+            Hecho {
+                texto: "Zoom.exe usó el micrófono".to_owned(),
+                ..Hecho::default()
+            },
+        );
+        let mut v = Veredicto {
+            este: Vigilancia {
+                vigilado: true,
+                pantalla_protegida: true,
+                ..Vigilancia::default()
+            },
+            otro: Some(Vigilancia {
+                vigilado: true,
+                ..Vigilancia::default()
+            }),
+            otro_movil: false,
+            identidad_verificada: true,
+            interferencias: 0,
+        };
+        assert!(v.sin_espionaje());
+        v.este.microfono.push("Zoom.exe".to_owned());
+        assert!(!v.sin_espionaje());
+        let r = Resumen::cerrar_parte(
+            &yo,
+            "1.0.41",
+            Clase::Videollamada,
+            &m,
+            &c,
+            1_200,
+            1_500,
+            Archivos::default(),
+            Conexion {
+                latencia_media_ms: Some(96),
+                perdida_max_pct: Some(1.1),
+                ..Conexion::default()
+            },
+            v,
+        )
+        .unwrap();
+        assert_eq!((r.observadas, r.inusuales), (1, 0));
+        assert!(r.verificar().is_ok());
+        let mut t = r.clone();
+        if let Some(v) = &mut t.veredicto {
+            v.este.microfono.clear();
+        }
+        assert!(t.verificar().is_err(), "the verdict is signed");
+        let fila = r.to_csv().lines().nth(1).unwrap().to_owned();
+        assert!(fila.starts_with("videollamada,'=Marta,"), "{fila}");
+        assert!(
+            fila.ends_with(",no,si,Zoom.exe,,,si,si,96,1.1,,,"),
+            "{fila}"
+        );
+
+        // A summary written before the verdict existed keeps its signature.
+        let viejo = Resumen::cerrar(
+            &yo,
+            "1.0.31",
+            Clase::Chat,
+            &m,
+            &c,
+            1_000,
+            1_100,
+            Archivos::default(),
+            Conexion::default(),
+        )
+        .unwrap();
+        let texto = viejo.to_json();
+        assert!(!texto.contains("veredicto"));
+        assert!(Resumen::from_json(&texto).unwrap().verificar().is_ok());
     }
 }

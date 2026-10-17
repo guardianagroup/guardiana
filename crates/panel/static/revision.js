@@ -54,19 +54,109 @@
         return `<div class="rv-paso ${estado}" title="${esc(nombre + ' · ' + detalle)}"><i aria-hidden="true"></i><span><b>${esc(nombre)}</b><small>${esc(detalle)}</small></span></div>`;
       }).join('');
       progreso(!!r.corriendo);
+      $('rv-escena').hidden = !!r.corriendo;
+      $('rv-progreso').hidden = true;
       pintaVivo(r);
+    };
+
+    // ---- The review, live (17 Oct 2026): the best of the three proposals the owner saw. Each
+    // real step the script reports becomes one line; new lines cross the scanning line one at a
+    // time (at most four a second) and rise into the tower. Counts appear only once Windows
+    // gave them. Nothing is made up to keep it moving.
+    const SECS = ['equipo', 'actualizaciones', 'defensa', 'sistema', 'acceso', 'arranque', 'salida', 'certificados', 'privacidad', 'programas', 'defender_sucesos'];
+    const CUENTAS = ['tareas', 'servicios', 'inicio', 'controladores'];
+    const ICONO = { firma: 'M7 3h7l5 5v13H7zM14 3v5h5', dns: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18', cuenta: 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01' };
+    let visto = 0, cola = [], relojCola = null, seccionActual = '', dnsVistos = [], filas = 0, empezoDirecto = 0, relojDirecto = null;
+    const seg = (ms) => (ms / 1000).toLocaleString(LOC, { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + ' s';
+    const filaDe = ([tipo, texto]) => {
+      if (tipo === 'firma') {
+        const [nombre, estado, firmante] = texto.split('\t');
+        if (estado === undefined) return { tipo, titulo: nombre, sub: t('rd_firma_leida'), tono: 'info', sello: t('rd_sello_leida') };
+        const ok = estado === 'Valid';
+        return { tipo, titulo: nombre, sub: ok ? t('rd_firma_valida').replace('{x}', firmante || '—') : t('rd_firma_sin'), tono: ok ? 'ok' : 'aviso', sello: ok ? t('rd_sello_valida').replace('{x}', firmante || '—') : t('rd_sello_sin') };
+      }
+      if (tipo === 'dns') return { tipo, titulo: texto, sub: t('rd_dns_sub'), tono: 'info', sello: t('rd_sello_dns') };
+      if (tipo === 'cuenta') { const [k, n] = texto.split('\t'); return { tipo, titulo: t('rd_cuenta_' + k), sub: t('rd_contados').replace('{n}', n), tono: 'info', sello: t('rd_sello_contados').replace('{n}', n) }; }
+      return null;
+    };
+    const muestra = (f) => {
+      const act = $('rd-actual');
+      act.innerHTML = `<b>${esc(f.titulo)}</b><span class="rd-sello ${f.tono}">${esc(f.sello)}</span>`;
+      act.classList.remove('entra'); void act.offsetWidth; act.classList.add('entra');
+      const l = $('rd-linea'); l.classList.remove('pulsa'); void l.offsetWidth; l.classList.add('pulsa');
+      // The one before goes up into the tower.
+      const prev = act.dataset.fila ? JSON.parse(act.dataset.fila) : null;
+      act.dataset.fila = JSON.stringify(f);
+      if (!prev) return;
+      const lista = $('rd-lista');
+      const d = document.createElement('div');
+      d.className = 'rd-fila ' + prev.tono;
+      d.innerHTML = `<span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONO[prev.tipo]}"/></svg></span><span><b>${esc(prev.titulo)}</b><small>${esc(prev.sub)}</small></span><span class="sec">${esc(prev.seccion || '')}</span>`;
+      lista.appendChild(d);
+      while (lista.children.length > 7) lista.removeChild(lista.firstChild);
+      lista.classList.remove('sube'); void lista.offsetWidth; lista.classList.add('sube');
+      filas++;
+      $('rd-registradas').textContent = t('rd_registradas').replace('{n}', filas);
+    };
+    const sigueCola = () => {
+      if (!cola.length) { clearInterval(relojCola); relojCola = null; return; }
+      muestra(cola.shift());
+    };
+    const reinicia = () => {
+      visto = 0; cola = []; filas = 0; dnsVistos = []; seccionActual = '';
+      $('rd-lista').innerHTML = ''; $('rd-actual').innerHTML = `<span class="rd-sello espera">${esc(t('rd_preparando'))}</span>`; delete $('rd-actual').dataset.fila; $('rd-registradas').textContent = '';
+    };
+    const directo = (r) => {
+      const v = r.corriendo ? r.vivo : null;
+      const caja = $('rv-directo');
+      if (!v) {
+        if (!caja.hidden) { caja.hidden = true; clearInterval(relojDirecto); relojDirecto = null; }
+        return;
+      }
+      if (caja.hidden) { caja.hidden = false; reinicia(); empezoDirecto = empezo || Date.now(); relojDirecto = setInterval(() => { const s2 = Math.max(0, Math.round((Date.now() - empezoDirecto) / 1000)); $('rd-tiempo').textContent = Math.floor(s2 / 60) + ':' + String(s2 % 60).padStart(2, '0'); }, 1000); }
+      // New steps since the last look (the server keeps the last 60, numbered).
+      const total = v.n || 0, pasos = v.pasos || [];
+      const nuevos = total < visto ? pasos : pasos.slice(Math.max(0, pasos.length - (total - visto)));
+      visto = total;
+      nuevos.forEach((p) => {
+        if (p[0] === 'seccion') { seccionActual = p[1]; return; }
+        if (p[0] === 'dns' && !dnsVistos.includes(p[1])) dnsVistos.push(p[1]);
+        const f = filaDe(p);
+        if (f) { f.seccion = t('rd_s_' + seccionActual); cola.push(f); }
+      });
+      if (cola.length > 40) cola = cola.slice(-40);
+      if (cola.length && !relojCola) { sigueCola(); relojCola = setInterval(sigueCola, 260); }
+      // Header, bar and modules.
+      const hechas = new Map(v.hechas || []);
+      $('rd-titulo').textContent = t('rd_titulo');
+      $('rd-ahora').textContent = v.seccion ? t('rd_ahora').replace('{x}', t('rv_vivo_s_' + v.seccion)) : t('rd_preparando');
+      $('rd-secciones').textContent = hechas.size;
+      $('rd-firmas').textContent = v.firmas || 0;
+      $('rd-barra').innerHTML = SECS.map((id) => {
+        const h = hechas.has(id), a = !h && v.seccion === id;
+        return `<li class="${h ? 'hecha' : a ? 'ahora' : ''}"><i></i><span>${esc(t('rd_s_' + id))}</span><small>${h ? esc(seg(hechas.get(id))) : a ? esc(t('rd_ahora_corto')) : ''}</small></li>`;
+      }).join('');
+      const fi = v.firmas || 0, sin = v.sin_firma || 0;
+      $('rd-firmas-n').textContent = fi;
+      $('rd-prop-ok').style.width = fi ? ((100 * (fi - sin)) / fi).toFixed(1) + '%' : '0';
+      $('rd-prop-sin').style.width = fi ? ((100 * sin) / fi).toFixed(1) + '%' : '0';
+      $('rd-firmas-frase').textContent = fi ? t('rd_firmas_frase').replace('{ok}', fi - sin).replace('{sin}', sin) : t('rd_firmas_aun');
+      $('rd-dns').innerHTML = dnsVistos.length ? dnsVistos.map((d) => `<li class="hecha"><span>${esc(d)}</span><span>${esc(t('rd_dns_hecha'))}</span></li>`).join('') : `<li><span>${esc(t('rd_dns_aun'))}</span><span>—</span></li>`;
+      const cu = new Map(v.cuentas || []);
+      $('rd-cuentas').innerHTML = CUENTAS.map((k) => `<div class="rd-cuenta${cu.has(k) ? ' dada' : ''}"><span>${esc(t('rd_cuenta_' + k))}</span><b>${cu.has(k) ? esc(String(cu.get(k))) : '—'}</b><small>${esc(t(cu.has(k) ? 'rd_cuenta_hecha' : 'rd_cuenta_pend'))}</small></div>`).join('');
     };
     // The live feed: the script's real steps, newest at the bottom (1.0.31). Nothing invented.
     const lineaVivo = ([tipo, texto]) => {
       if (tipo === 'seccion') return t('rv_vivo_seccion').replace('{x}', t('rv_vivo_s_' + texto));
-      if (tipo === 'firma') return t('rv_vivo_firma').replace('{x}', texto);
+      if (tipo === 'firma') return t('rv_vivo_firma').replace('{x}', texto.split('\t')[0]);
       if (tipo === 'dns') return t('rv_vivo_dns').replace('{x}', texto);
       if (tipo === 'cuenta') { const [k, n] = texto.split('\t'); return t('rv_vivo_cuenta_' + k).replace('{n}', n); }
       return texto;
     };
     const pintaVivo = (r) => {
       const v = r.corriendo ? r.vivo : null;
-      $('rv-vivo').hidden = !v;
+      directo(r);
+      $('rv-vivo').hidden = true;
       if (!v) return;
       $('rv-vivo-cifras').textContent = t('rv_vivo_cifras').replace('{s}', v.hechas.length).replace('{t}', TOTAL_SECCIONES).replace('{f}', v.firmas);
       $('rv-vivo-lista').innerHTML = v.pasos.map((p, i) => `<li class="${esc(p[0])}${i === v.pasos.length - 1 ? ' ultimo' : ''}">${esc(lineaVivo(p))}</li>`).join('');
@@ -115,7 +205,7 @@
     const carga = async () => { const r = await api('/api/revision'); pinta(r); return r; };
     // While Windows is answering (tens of seconds), ask again every 4 s; then every 5 minutes.
     let espera = null;
-    const sigue = (r) => { clearTimeout(espera); espera = setTimeout(async () => { try { sigue(await carga()); } catch (_) {} }, r && r.corriendo ? 1500 : 300000); };
+    const sigue = (r) => { clearTimeout(espera); espera = setTimeout(async () => { try { sigue(await carga()); } catch (_) {} }, r && r.corriendo ? 700 : 300000); };
     sigue(await carga());
     $('rv-ahora').addEventListener('click', async () => {
       $('rv-ahora').disabled = true; $('rv-ahora').textContent = t('rv_boton_revisando'); empezo = Date.now(); progreso(true);

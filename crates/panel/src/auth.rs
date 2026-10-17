@@ -76,8 +76,9 @@ pub(crate) async fn check_host(
     next.run(req).await
 }
 
-/// Whether the `Origin` of a request names the same authority as its `Host`.
-fn origin_es_este_panel(origin: &str, host: &str) -> bool {
+/// Whether the `Origin` of a request names the same authority as its `Host`. Also the check of
+/// `guardiana comunicaciones`, the person's own local server (17 Oct 2026).
+pub fn origin_es_este_panel(origin: &str, host: &str) -> bool {
     origin
         .split_once("://")
         .is_some_and(|(_, autoridad)| autoridad.eq_ignore_ascii_case(host))
@@ -191,7 +192,8 @@ impl<S: Send + Sync> FromRequestParts<S> for Zona {
     }
 }
 
-pub(crate) fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+/// Compare two keys in a time that does not depend on where they differ.
+pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
     }

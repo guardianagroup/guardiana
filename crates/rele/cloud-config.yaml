@@ -3,6 +3,7 @@
 # (Hetzner Cloud, Ubuntu 24.04). Instala Rust, compila guardiana-rele desde el código
 # publicado y lo deja arrancado en el puerto 443 como un usuario sin privilegios. No
 # guarda nada: ni direcciones ni mensajes; solo une dos conexiones con el mismo código.
+# Desde el 17 oct 2026 instala también el servicio de llamadas (TURN, coturn, sin registros).
 package_update: true
 packages: [build-essential, pkg-config, git, ufw, curl]
 users:
@@ -56,9 +57,16 @@ runcmd:
   - ufw allow OpenSSH
   - ufw allow 443/tcp
   - ufw allow 80/tcp
+  # Llamadas (TURN, 17 oct 2026): coturn en 3478 y sus puertos de relevo UDP.
+  - ufw allow 3478/udp
+  - ufw allow 3478/tcp
+  - ufw allow 49160:49400/udp
   - ufw --force enable
   - curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
   - bash /opt/guardiana-rele/actualizar.sh
   # El segundo servidor (América, 16 oct 2026) usa el mismo archivo cambiando solo este nombre
   # por rele-am.guardianagroup.com, una vez que el DNS apunte a él.
   - bash /opt/guardiana-rele/guardiana/crates/rele/servidor-tls.sh rele.guardianagroup.com
+  # Las llamadas por WebRTC (17 oct 2026): coturn y el secreto que comparte con el relé.
+  # En América, igual que arriba: rele-am.guardianagroup.com.
+  - bash /opt/guardiana-rele/guardiana/crates/rele/turn.sh rele.guardianagroup.com

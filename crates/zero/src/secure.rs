@@ -28,7 +28,7 @@ use guardiana_secure::cuantico;
 use guardiana_secure::monitor::{Identidad, Monitor, Nivel};
 use guardiana_secure::pausa::Sesion as EstadoSesion;
 use guardiana_secure::prueba::{Cadena, Prueba};
-use guardiana_secure::resumen::{Archivos, Clase, Conexion, Resumen};
+use guardiana_secure::resumen::{Archivos, Clase, Conexion, Resumen, Veredicto, Vigilancia};
 use guardiana_secure::sframe;
 use guardiana_secure::verificar::{Codigo, Inicio, Verified};
 use guardiana_secure::{tarjeta, Conversation, Envelope, Identity};
@@ -48,7 +48,7 @@ pub enum Entrante {
     Aceptado(TcpStream),
     /// The relay joined us with the other computer: the socket to adopt (bytes pass through
     /// the relay, which cannot read them).
-    AceptadoRele(TcpStream),
+    AceptadoRele(TcpStream, String, String),
     /// The relay could not be reached, or nobody came.
     ReleFallo(String),
     /// The router answered about the door.
@@ -78,6 +78,8 @@ impl Enlace {
     fn new(mut s: TcpStream) -> Self {
         use std::sync::atomic::{AtomicU64, Ordering};
         let otro = s.peer_addr().ok().map(|a| a.ip());
+        // Small frames (voice) leave at once instead of waiting to be grouped.
+        let _ = s.set_nodelay(true);
         let (cola, rx) = mpsc::channel::<Vec<u8>>();
         let escritos = std::sync::Arc::new(AtomicU64::new(0));
         let hilo = escritos.clone();
@@ -288,6 +290,11 @@ impl Recibido {
         )
     }
 
+    /// A sound the page can play in the chat (a voice note, 17 Oct 2026).
+    pub fn audio(&self) -> bool {
+        mensaje::mime_de(&self.nombre).starts_with("audio/")
+    }
+
     /// Safe to open with a double click: never a program or a script.
     pub fn abrible(&self) -> bool {
         !matches!(
@@ -334,7 +341,7 @@ impl Recibido {
 
     /// What the page draws.
     pub fn json(&self) -> Value {
-        json!({ "id": self.id, "nombre": self.nombre, "bytes": self.bytes, "t": self.t, "borrado": self.borrado, "imagen": self.imagen(), "abrible": self.abrible() })
+        json!({ "id": self.id, "nombre": self.nombre, "bytes": self.bytes, "t": self.t, "borrado": self.borrado, "imagen": self.imagen(), "audio": self.audio(), "abrible": self.abrible() })
     }
 }
 
@@ -461,9 +468,18 @@ pub struct Secure {
     tx: Option<Sender<Entrante>>,
     /// The relay code on screen while waiting through the relay (no door could be opened).
     rele_codigo: Option<String>,
+    /// A wait at the relay still in its room after this session met its member another way
+    /// (directly): the group's next listener takes it over, so one room never holds two waits
+    /// of the same host, which the relay would join with each other (17 Oct 2026).
+    espera_rele: Option<mpsc::Receiver<Entrante>>,
     /// This link goes through the blind relay.
     rele: bool,
     rele_error: Option<String>,
+    /// The relay this conversation met at (a name, kept in memory only): a dropped link goes
+    /// back to that same one, where the other side also goes (17 Oct 2026: with one relay
+    /// down, or one side pinned to another, both sides waited at different relays and the
+    /// conversation died after five minutes).
+    rele_usado: Option<String>,
     /// The link dropped in the middle of an open conversation and both sides are going back
     /// to the relay to pick it up where it was (16 Oct 2026, «que sirva en cualquier router e
     /// internet del mundo»): the room both derive, when the next try is due, how many tries.
@@ -516,6 +532,8 @@ pub struct Secure {
     /// How many times the other side asked our recorder to start again (a new player there,
     /// on its phone or back on its computer, cannot open a stream joined halfway).
     reinicios: u64,
+    /// Our call's pieces were dropped because the link was full (see `media_atascada`).
+    media_saltada: bool,
     /// A file on its way out.
     envio: Option<Envio>,
     /// When something last went out on the link: a quiet link gets a small frame every
@@ -536,6 +554,18 @@ pub struct Secure {
     /// theirs (shown on the call panel). 16 Oct 2026.
     voz_protegida: bool,
     otro_voz_protegida: bool,
+    /// The relay room this conversation met in (a hash; kept in memory only): the call
+    /// service is asked for it.
+    sala_rele: Option<String>,
+    /// The other side's program can carry calls over WebRTC (17 Oct 2026).
+    otro_rtc: bool,
+    /// The relay's call service for this conversation, once it answered.
+    turn: Option<crate::rele::Turn>,
+    turn_rx: Option<mpsc::Receiver<Result<crate::rele::Turn, String>>>,
+    /// When it was last asked (unix s), so a relay without the service is not asked each tick.
+    turn_pedido: u64,
+    /// WebRTC messages from the other side for this computer's page (SDP, ICE candidates).
+    pub rtc_para_pagina: VecDeque<Value>,
     /// The post-quantum lock over Olm (16 Oct 2026, [`cuantico`]): side 0 offers an ML-KEM
     /// key once the conversation opens, side 1 answers, and from then every Olm payload is
     /// sealed with the layer too. `cuantico_visto`: a sealed message already came from the
@@ -558,6 +588,19 @@ pub struct Secure {
     archivos: Archivos,
     /// The last summary, signed, for the page to show and download.
     pub resumen: Option<Resumen>,
+    /// The last call's report, signed, with its verdict (17 Oct 2026: «la valoración final:
+    /// si ha habido espionaje, si ha habido grabación»), until the person closes it.
+    pub informe: Option<Resumen>,
+    /// The call's figures as the page measured them (WebRTC), refreshed every few seconds.
+    medidas: Option<Conexion>,
+    /// The watch over the microphone, the camera and the screen (Windows' record).
+    vigia: crate::vigia::Vigia,
+    /// What the other side's GUARDIANA said its own watch saw.
+    vigia_otro: Option<Vigilancia>,
+    /// The last verdict sent to the other side, so it is sent only when it changes.
+    vigia_mandado: Option<Value>,
+    /// When a stop for something seen may end (the cause gone and the countdown run).
+    reanuda_en: Option<u64>,
     version: String,
     /// Media pieces for the page, drained by the session every tick: (who, base64). `who` is
     /// empty for the other end of this link; in a group the host relays with the original name.
@@ -631,6 +674,7 @@ impl Secure {
             fallos_olm: VecDeque::new(),
             fallos_media: VecDeque::new(),
             reinicios: 0,
+            media_saltada: false,
             envio: None,
             ultimo_envio: std::time::Instant::now(),
             ultimo_recibido: std::time::Instant::now(),
@@ -639,6 +683,12 @@ impl Secure {
             movil_dicho: None,
             voz_protegida: false,
             otro_voz_protegida: false,
+            sala_rele: None,
+            otro_rtc: false,
+            turn: None,
+            turn_rx: None,
+            turn_pedido: 0,
+            rtc_para_pagina: VecDeque::new(),
             cuantico_oferta: None,
             capa: None,
             cuantico_visto: false,
@@ -649,8 +699,10 @@ impl Secure {
             llamado_en_grupo: false,
             tx: None,
             rele_codigo: None,
+            espera_rele: None,
             rele: false,
             rele_error: None,
+            rele_usado: None,
             reconexion: None,
             tarjeta_otra: None,
             sas_inicio: None,
@@ -673,6 +725,12 @@ impl Secure {
             llamada: None,
             archivos: Archivos::default(),
             resumen: None,
+            informe: None,
+            medidas: None,
+            vigia: crate::vigia::Vigia::default(),
+            vigia_otro: None,
+            vigia_mandado: None,
+            reanuda_en: None,
             version: String::new(),
             media_para_pagina: VecDeque::new(),
             novedad: false,
@@ -780,7 +838,7 @@ impl Secure {
             std::thread::spawn(move || {
                 let r = crate::rele::conecta_a_cualquiera(&sala);
                 let _ = tx.send(match r {
-                    Ok(s) => Entrante::AceptadoRele(s),
+                    Ok((s, rele)) => Entrante::AceptadoRele(s, rele, sala),
                     Err(e) => Entrante::ReleFallo(e),
                 });
             });
@@ -832,6 +890,11 @@ impl Secure {
             }
         };
         std::thread::spawn(move || lee_tramas(lector, tx));
+        if !rele && self.fase == Fase::Escuchando && self.rele_codigo.is_some() {
+            // Met directly while also waiting at the relay: that wait stays in its room, and
+            // the next listener of the group takes it (see `espera_rele`).
+            self.espera_rele = self.rx.take();
+        }
         self.enlace = Some(Enlace::new(s));
         self.rx = Some(rx);
         self.fase = Fase::Saludando;
@@ -854,12 +917,13 @@ impl Secure {
             None if self.archivos.enviados + self.archivos.recibidos > 0 => Clase::Envio,
             None => Clase::Chat,
         };
-        let conexion = Conexion {
+        let conexion = self.medidas.clone().unwrap_or_else(|| Conexion {
             directa: self.monitor.transporte.directo,
             codec_audio: self.monitor.transporte.codec_audio.clone(),
             codec_video: self.monitor.transporte.codec_video.clone(),
             ..Conexion::default()
-        };
+        });
+        let veredicto = self.veredicto(self.inicio, ahora_s());
         self.resumen = Resumen::cerrar(
             &self.identidad,
             &self.version,
@@ -870,8 +934,224 @@ impl Secure {
             ahora_s(),
             self.archivos.clone(),
             conexion,
-        );
+        )
+        .map(|r| r.con_veredicto(&self.identidad, veredicto));
         self.archivos = Archivos::default();
+        self.vigia = crate::vigia::Vigia::default();
+        self.vigia_otro = None;
+        self.vigia_mandado = None;
+    }
+
+    /// The verdict for the part of the conversation between `desde` and `hasta`.
+    fn veredicto(&self, desde: u64, hasta: u64) -> Veredicto {
+        let interferencias = self
+            .cadena
+            .registros
+            .iter()
+            .filter(|r| r.nivel == Nivel::Inusual && r.cuando >= desde && r.cuando <= hasta)
+            .count() as u64;
+        Veredicto {
+            este: self.vigia.veredicto(desde),
+            otro: self.vigia_otro.clone(),
+            otro_movil: self.otro_movil,
+            identidad_verificada: self
+                .monitor
+                .identidad
+                .as_ref()
+                .is_some_and(|i| i.estado == "verificado"),
+            interferencias,
+        }
+    }
+
+    /// The report of a call that just ended (it was answered): signed, with the verdict and the
+    /// figures the page measured, for the page to show at once and to download.
+    fn cierra_informe(&mut self, video: bool, desde: u64) {
+        if self.monitor.identidad.is_none() {
+            return;
+        }
+        let fin = ahora_s();
+        let conexion = self.medidas.take().unwrap_or_else(|| Conexion {
+            directa: self.monitor.transporte.directo,
+            codec_audio: self.monitor.transporte.codec_audio.clone(),
+            codec_video: self.monitor.transporte.codec_video.clone(),
+            ..Conexion::default()
+        });
+        let veredicto = self.veredicto(desde, fin);
+        self.informe = Resumen::cerrar_parte(
+            &self.identidad,
+            &self.version,
+            if video {
+                Clase::Videollamada
+            } else {
+                Clase::Llamada
+            },
+            &self.monitor,
+            &self.cadena,
+            desde,
+            fin,
+            Archivos::default(),
+            conexion,
+            veredicto,
+        );
+        self.cambio = true;
+    }
+
+    /// The person closed the call's report.
+    pub fn olvida_informe(&mut self) {
+        if self.informe.take().is_some() {
+            self.cambio = true;
+        }
+    }
+
+    /// The call's figures as the page measures them (every few seconds during a call): what the
+    /// report will say about the connection. Only numbers and codec names, bounded.
+    pub fn medidas(&mut self, d: &Value) {
+        if self.llamada.is_none() {
+            return;
+        }
+        let n = |k: &str, max: u64| {
+            d[k].as_u64()
+                .filter(|v| *v <= max)
+                .and_then(|v| u32::try_from(v).ok())
+        };
+        let corto = |k: &str| {
+            d[k].as_str().filter(|s| !s.is_empty()).map(|s| {
+                s.chars()
+                    .filter(|c| !c.is_control())
+                    .take(40)
+                    .collect::<String>()
+            })
+        };
+        self.medidas = Some(Conexion {
+            directa: Some(!d["rele"].as_bool().unwrap_or(true)),
+            latencia_media_ms: n("latencia_media_ms", 60_000),
+            perdida_max_pct: d["perdida_max_pct"]
+                .as_f64()
+                .filter(|p| (0.0..=100.0).contains(p))
+                .map(|p| p as f32),
+            kbps_audio_medio: n("kbps_audio_medio", 100_000),
+            kbps_video_medio: n("kbps_video_medio", 100_000),
+            codec_audio: corto("codec_audio"),
+            codec_video: corto("codec_video"),
+            resolucion: corto("resolucion"),
+        });
+    }
+
+    /// What Windows recorded about the microphone, the camera and the screen (the window looks
+    /// every two seconds while a conversation is open). Another program using one of them during
+    /// the conversation goes into the history and the chain with its name and path, and stops
+    /// the conversation while it goes on (Francisco, 15 Oct 2026: «que pare automáticamente»);
+    /// it resumes on its own once that program lets go, or at once if the person says it is
+    /// theirs.
+    pub fn vigia(&mut self, usos: &[crate::vigia::Uso]) {
+        if self.fase != Fase::Lista {
+            return;
+        }
+        let ahora = ahora_s();
+        let antes = self.vigia.en_uso.clone();
+        for v in self.vigia.mira(usos, self.inicio) {
+            let texto = format!("«{}» {}", v.uso.programa, v.uso.recurso.verbo());
+            let hecho = guardiana_secure::prueba::Hecho {
+                texto: texto.clone(),
+                proceso: Some(v.uso.programa.clone()),
+                ruta: v.uso.ruta.clone(),
+                sha256_exe: None,
+                evidencia: Some(format!(
+                    "Windows ConsentStore · {} · LastUsedTimeStart {} · {}",
+                    match v.uso.recurso {
+                        crate::vigia::Recurso::Microfono => "microphone",
+                        crate::vigia::Recurso::Camara => "webcam",
+                        crate::vigia::Recurso::Pantalla => "graphicsCaptureProgrammatic",
+                    },
+                    v.uso.desde,
+                    v.uso
+                        .hasta
+                        .map_or_else(|| "en uso".to_owned(), |h| format!("LastUsedTimeStop {h}")),
+                )),
+            };
+            if v.ahora && self.estado.en_marcha() {
+                // The stop writes its own line in the history and the chain.
+                self.cadena.anota(ahora, Nivel::Observada, hecho);
+                self.estado.parar(
+                    guardiana_secure::pausa::Motivo::Observado {
+                        texto,
+                        proceso: Some(v.uso.programa.clone()),
+                    },
+                    ahora,
+                    &mut self.monitor,
+                    &mut self.cadena,
+                );
+                self.aviso("sec_vigia_parada", v.uso.programa.clone());
+            } else {
+                self.monitor.anota(ahora, Nivel::Observada, texto);
+                self.cadena.anota(ahora, Nivel::Observada, hecho);
+            }
+            self.cambio = true;
+        }
+        // A stop for something seen: what still keeps it, and the way back once it is gone.
+        let por_algo_visto = matches!(
+            &self.estado,
+            EstadoSesion::Pausada(p) if matches!(p.motivo, guardiana_secure::pausa::Motivo::Observado { .. })
+        );
+        {
+            if por_algo_visto {
+                let pendiente: Vec<String> = self
+                    .vigia
+                    .en_uso
+                    .iter()
+                    .map(|(p, r)| format!("«{p}» {}", r.ahora()))
+                    .collect();
+                self.estado.comprobada(pendiente);
+                if self.estado.lista_para_reanudar() {
+                    match self.reanuda_en {
+                        None => {
+                            self.reanuda_en =
+                                Some(ahora + u64::from(guardiana_secure::pausa::CUENTA_ATRAS_S));
+                        }
+                        Some(t) if ahora >= t => {
+                            self.reanuda_en = None;
+                            self.estado
+                                .reanudar(ahora, &mut self.monitor, &mut self.cadena);
+                        }
+                        Some(_) => {}
+                    }
+                } else {
+                    self.reanuda_en = None;
+                }
+                self.cambio = true;
+            }
+        }
+        if antes != self.vigia.en_uso {
+            self.cambio = true;
+        }
+        self.manda_vigia();
+    }
+
+    /// Whether the window is kept out of screenshots and recordings (the window says, after
+    /// asking Windows; `false` where it could not).
+    pub fn pantalla(&mut self, protegida: bool) {
+        if self.fase != Fase::Lista {
+            return;
+        }
+        if self.vigia.pantalla_protegida != protegida {
+            self.vigia.pon_pantalla(protegida);
+            self.cambio = true;
+            self.manda_vigia();
+        }
+    }
+
+    /// Tell the other side what this computer's watch sees, when it changed: its report says
+    /// it too («en el equipo de ferrari, según su GUARDIANA»).
+    fn manda_vigia(&mut self) {
+        if self.fase != Fase::Lista || !self.estado.en_marcha() || !self.vigia.activa {
+            return;
+        }
+        let v = serde_json::to_value(self.vigia.veredicto(self.inicio)).unwrap_or(Value::Null);
+        if self.vigia_mandado.as_ref() == Some(&v) {
+            return;
+        }
+        self.vigia_mandado = Some(v.clone());
+        self.manda_olm(json!({ "m": "vigia", "v": v }));
     }
 
     /// The chain of what was seen, signed, as JSON for a file.
@@ -893,6 +1173,7 @@ impl Secure {
             std::thread::sleep(Duration::from_millis(60));
         }
         self.reconexion = None;
+        self.rele_usado = None;
         self.cierra_resumen();
         self.movil_fin();
         if let Some(p) = self.puerta.take() {
@@ -905,6 +1186,7 @@ impl Secure {
         self.rele_error = None;
         self.enlace = None;
         self.rx = None;
+        self.espera_rele = None;
         self.tarjeta_otra = None;
         self.sas_inicio = None;
         self.sas_codigo = None;
@@ -925,6 +1207,16 @@ impl Secure {
         self.otro_movil = false;
         self.movil_dicho = None;
         self.otro_voz_protegida = false;
+        self.sala_rele = None;
+        self.otro_rtc = false;
+        self.turn = None;
+        self.turn_rx = None;
+        self.turn_pedido = 0;
+        self.rtc_para_pagina.clear();
+        // A pause belongs to the conversation that had the incident: the next one starts
+        // running (17 Oct 2026 review: it stayed paused until the program restarted, and the
+        // next conversation hung at «abriendo»). A changed key is caught again by `hola`.
+        self.estado = EstadoSesion::default();
         self.zona_otra.clear();
         self.reproduce_otro.clear();
         self.reproduce_dicho.clear();
@@ -955,6 +1247,7 @@ impl Secure {
         self.sigue_envio();
         self.di_dispositivo();
         self.reconexion_tic();
+        self.turn_tic();
         if self.enlace.is_some()
             && self.fase != Fase::Sola
             && self.ultimo_envio.elapsed() >= Duration::from_secs(20)
@@ -966,8 +1259,13 @@ impl Secure {
             && self.fase != Fase::Sola
             && self.ultimo_recibido.elapsed() >= Duration::from_secs(65)
         {
-            self.aviso("sec_enlace_cerrado", "sin señal de la otra persona");
-            self.cerrar("sin señal de la otra persona");
+            // A silent link in an open conversation is a drop like any other: look for the
+            // other side again at the relay (it does the same) before giving up.
+            let reconecta = self.fase == Fase::Lista && self.empieza_reconexion();
+            if !reconecta {
+                self.aviso("sec_enlace_cerrado", "sin señal de la otra persona");
+                self.cerrar("sin señal de la otra persona");
+            }
         }
         let mut pendientes = Vec::new();
         if let Some(rx) = &self.rx {
@@ -978,7 +1276,11 @@ impl Secure {
         for e in pendientes {
             match e {
                 Entrante::Aceptado(s) => self.adopta(s, false),
-                Entrante::AceptadoRele(s) => self.adopta(s, true),
+                Entrante::AceptadoRele(s, rele, sala) => {
+                    self.rele_usado = Some(rele);
+                    self.sala_rele = Some(sala);
+                    self.adopta(s, true);
+                }
                 Entrante::ReleFallo(e) => {
                     if let Some(r) = &mut self.reconexion {
                         r.buscando = false;
@@ -1073,7 +1375,8 @@ impl Secure {
             self.fin_de_llamada();
             self.aviso("sec_llamada_cortada_red", "");
         }
-        self.movil_fin();
+        // The phone stays linked to this computer: only the other side's link is being found
+        // again (17 Oct 2026 review: a blip ended the hand-off and the QR had to be read again).
         self.reconexion = Some(Reconexion {
             sala,
             desde: ahora_s(),
@@ -1111,12 +1414,14 @@ impl Secure {
         let sala = r.sala.clone();
         // Both sides derive the same relay from the room, so they meet.
         let indice = usize::from(sala.bytes().next().unwrap_or(0) % 16) % crate::rele::RELES.len();
-        let rele = std::env::var("GUARDIANA_RELE")
-            .unwrap_or_else(|_| crate::rele::RELES[indice].direccion());
+        let rele = self.rele_usado.clone().unwrap_or_else(|| {
+            std::env::var("GUARDIANA_RELE")
+                .unwrap_or_else(|_| crate::rele::RELES[indice].direccion())
+        });
         std::thread::spawn(move || {
             let res = crate::rele::conecta(&rele, &sala);
             let _ = tx.send(match res {
-                Ok(s) => Entrante::AceptadoRele(s),
+                Ok(s) => Entrante::AceptadoRele(s, rele, sala),
                 Err(e) => Entrante::ReleFallo(e),
             });
         });
@@ -1158,7 +1463,7 @@ impl Secure {
         std::thread::spawn(move || {
             let r = crate::rele::conecta(&rele, &sala);
             let _ = tx.send(match r {
-                Ok(s) => Entrante::AceptadoRele(s),
+                Ok(s) => Entrante::AceptadoRele(s, rele, sala),
                 Err(e) => Entrante::ReleFallo(e),
             });
         });
@@ -1223,17 +1528,11 @@ impl Secure {
         if !self.nombre_contacto.is_empty() {
             let n = self.nombre_contacto.clone();
             match self.agenda.comprueba(&n, t.curve(), t.signing(), ahora_s()) {
-                Ok(()) => {
-                    if let Some(v) = self
-                        .agenda
-                        .contacto(&n)
-                        .and_then(agenda::Contacto::verified)
-                    {
-                        self.verificado = Some(v);
-                        self.abre_olm();
-                        return;
-                    }
-                }
+                // Known and the same keys: still the numbers, every new conversation (17 Oct
+                // 2026, the owner: «la identidad hay que hacerla cada vez que se conecta por
+                // seguridad»). A link that drops and comes back inside the same conversation
+                // does not greet again, so it does not ask again either.
+                Ok(()) => {}
                 Err(_) => {
                     let n = self.nombre_contacto.clone();
                     self.estado.parar(
@@ -1250,7 +1549,7 @@ impl Secure {
                 }
             }
         }
-        // Not known (or changed): the short code.
+        // Every new conversation (known, new or changed keys): the short code.
         let inicio = Inicio::new();
         let pk = inicio.public_key().to_base64();
         self.sas_inicio = Some(inicio);
@@ -1411,11 +1710,14 @@ impl Secure {
                     self.inicio = ahora_s();
                     self.cadena = Cadena::new("secure", self.inicio);
                     self.fase = Fase::Lista;
-                    // The first envelope opens the session on the other side.
-                    self.manda_olm(json!({ "m": "hola" }));
+                    // The first envelope opens the session on the other side, and carries the
+                    // moment the conversation opened: both sides derive the room they meet in
+                    // again after a drop from it, so it must be the same second on both.
+                    self.manda_olm(json!({ "m": "hola", "inicio": self.inicio }));
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "conversación cifrada abierta");
                     self.manda_zona();
+                    self.manda_olm(json!({ "m": "rtc_si" }));
                     self.cuantico_empieza();
                 }
                 Err(e) => {
@@ -1501,6 +1803,7 @@ impl Secure {
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "conversación cifrada abierta");
                     self.manda_zona();
+                    self.manda_olm(json!({ "m": "rtc_si" }));
                     self.cuantico_empieza();
                     Ok(plano)
                 }
@@ -1592,6 +1895,12 @@ impl Secure {
 
     fn carga(&mut self, c: &Value) {
         match c["m"].as_str().unwrap_or_default() {
+            "hola" => {
+                // The opening second of the side that started (an older version sends none).
+                if let Some(t) = c["inicio"].as_u64() {
+                    self.inicio = t;
+                }
+            }
             "pq_llave" => {
                 // Side 1: a secret for that key, its ciphertext back, and the layer from here
                 // on (the answer itself goes plain: the other side has no layer yet).
@@ -1670,7 +1979,9 @@ impl Secure {
                     .collect();
                 let id = mensaje::id_de(&c["id"]).unwrap_or_else(Mensaje::nuevo_id);
                 if self.mensajes.iter().any(|m| m.id == id) {
-                    return; // the same text twice (a resend after a cut)
+                    // The same text twice (a resend after a cut): it is here, say so again.
+                    self.manda_olm(json!({ "m": "entregado", "id": id.to_string() }));
+                    return;
                 }
                 let re = mensaje::id_de(&c["re"]);
                 self.mensajes.push(Mensaje::del_otro(id, texto, de, re));
@@ -1678,10 +1989,10 @@ impl Secure {
                 self.otro_escribe = 0;
                 // Tell the sender it is here (its ✓✓): the relay never says that.
                 self.manda_olm(json!({ "m": "entregado", "id": id.to_string() }));
-                if !self.novedad && !self.sin_visto {
-                    // The tab is in front: seen at once.
-                    self.manda_vistos();
-                }
+                // «Seen» only when someone looks: the page (or the phone) says so when the
+                // message is on a screen in front (17 Oct 2026 review: green ticks went out
+                // with the window minimised).
+                self.novedad = true;
             }
             "entregado" => {
                 if let Some(id) = mensaje::id_de(&c["id"]) {
@@ -1785,6 +2096,27 @@ impl Secure {
                 self.otro_voz_protegida = c["protegida"].as_bool().unwrap_or(false);
                 self.cambio = true;
             }
+            "rtc_si" => {
+                self.otro_rtc = true;
+                self.cambio = true;
+            }
+            "vigia" => {
+                self.vigia_otro = Vigilancia::de_json(&c["v"]);
+                self.cambio = true;
+            }
+            "rtc" => {
+                // For whoever talks here: the phone when it took the call, else the page.
+                let d = c["d"].clone();
+                if self.movil_manda() {
+                    if let Some(m) = &self.movil {
+                        m.manda(crate::movil::Hacia::Estado(
+                            json!({ "tipo": "secure_rtc", "d": d }).to_string(),
+                        ));
+                    }
+                } else if self.rtc_para_pagina.len() < 256 {
+                    self.rtc_para_pagina.push_back(d);
+                }
+            }
             "zona" => {
                 self.zona_otra = zona_limpia(c["zona"].as_str().unwrap_or_default());
                 self.cambio = true;
@@ -1811,6 +2143,7 @@ impl Secure {
                             Some(ahora_s().saturating_sub(l.desde)),
                             "fin",
                         );
+                        self.cierra_informe(l.video, l.desde);
                     } else {
                         self.anota_llamada(l.video, true, None, "rechazada");
                     }
@@ -1937,6 +2270,16 @@ impl Secure {
     }
 
     fn bloque(&mut self, v: &Value) {
+        // Only inside an open conversation (before it, anyone who reached the port could fill
+        // memory with blocks), and never more than 256 waiting.
+        if self.fase != Fase::Lista
+            || self
+                .entrada
+                .as_ref()
+                .is_some_and(|e| e.bloques_pendientes.len() >= 256)
+        {
+            return;
+        }
         let (Some(n), Some(b)) = (
             v["n"].as_u64(),
             v["b"].as_str().and_then(|s| B64.decode(s).ok()),
@@ -2039,12 +2382,17 @@ impl Secure {
                         .anota(ahora_s(), Nivel::Info, format!("archivo recibido: {n}"));
                     let mut linea = Mensaje::archivo(n.clone(), false);
                     // A picture goes on to the linked phone so it shows in its chat.
-                    if let Some(r) = self.recibidos.iter().find(|r| r.nombre == n && r.imagen()) {
+                    if let Some(r) = self
+                        .recibidos
+                        .iter()
+                        .rev()
+                        .find(|r| r.nombre == n && (r.imagen() || r.audio()))
+                    {
                         linea.archivo_id = (r.id & 0xffff_ffff) as u32;
                         if let Some(m) = &self.movil {
                             if m.enganchado && m.aprobado && r.bytes <= 16 * 1024 * 1024 {
                                 if let Ok(datos) = std::fs::read(&r.ruta) {
-                                    m.manda(crate::movil::Hacia::Estado(json!({ "tipo": "archivo_movil", "id": linea.archivo_id, "nombre": n, "mime": mime_imagen(&n), "bytes": datos.len() }).to_string()));
+                                    m.manda(crate::movil::Hacia::Estado(json!({ "tipo": "archivo_movil", "id": linea.archivo_id, "nombre": n, "mime": if r.audio() { mensaje::mime_de(&n) } else { mime_imagen(&n) }, "bytes": datos.len() }).to_string()));
                                     for trozo in datos.chunks(65536) {
                                         m.manda(crate::movil::Hacia::Archivo(
                                             linea.archivo_id,
@@ -2085,6 +2433,7 @@ impl Secure {
         let mut clave = [0u8; 32];
         crate::sesion::azar(&mut clave);
         let yo = self.mi_numero();
+        self.medidas = None;
         self.llamada = Some(Llamada {
             video,
             mime_local: mime.chars().take(80).collect(),
@@ -2161,6 +2510,7 @@ impl Secure {
                     Some(ahora_s().saturating_sub(l.desde)),
                     "fin",
                 );
+                self.cierra_informe(l.video, l.desde);
             } else {
                 self.anota_llamada(l.video, true, None, "cancelada");
             }
@@ -2316,8 +2666,31 @@ impl Secure {
         self.media_bytes(bytes)
     }
 
+    /// More than this of our call waiting in the link: the pieces are dropped (a call that
+    /// waits is worse than one that skips a moment), and once it drains the recorder starts
+    /// again so the other player gets a fresh header (17 Oct 2026 review: a slow uplink made
+    /// the delay grow without end).
+    fn media_atascada(&mut self) -> bool {
+        const MEDIA_COLA_MAX: u64 = 512 * 1024;
+        let cola = self.enlace.as_ref().map_or(0, |e| {
+            let (a, b) = e.cuenta();
+            a.saturating_sub(b)
+        });
+        if cola > MEDIA_COLA_MAX {
+            self.media_saltada = true;
+            return true;
+        }
+        if self.media_saltada {
+            self.media_saltada = false;
+            self.reinicios += 1;
+            self.cambio = true;
+            return true;
+        }
+        false
+    }
+
     fn media_bytes(&mut self, bytes: Vec<u8>) -> Result<(), String> {
-        if !self.estado.en_marcha() {
+        if !self.estado.en_marcha() || self.media_atascada() {
             return Ok(());
         }
         let Some(l) = &mut self.llamada else {
@@ -2337,7 +2710,7 @@ impl Secure {
     /// A piece that someone else in the group recorded, passed on by this computer (the host):
     /// it travels under this link's media key with the original name inside the cipher.
     pub fn media_de(&mut self, de: &str, bytes: &[u8]) -> Result<(), String> {
-        if !self.estado.en_marcha() {
+        if !self.estado.en_marcha() || self.media_atascada() {
             return Ok(());
         }
         let Some(l) = &mut self.llamada else {
@@ -2858,9 +3231,18 @@ impl Secure {
             zona_otra: self.zona_otra.clone(),
             otro,
         });
-        if self.llamada.is_some() {
+        if let Some(l) = self.llamada.take() {
             self.manda_olm(json!({ "m": "cuelga" }));
             self.fin_de_llamada();
+            if l.conectada {
+                self.anota_llamada(
+                    l.video,
+                    l.saliente,
+                    Some(ahora_s().saturating_sub(l.desde)),
+                    "fin",
+                );
+                self.cierra_informe(l.video, l.desde);
+            }
         }
         if self.estado.en_marcha() {
             self.estado.parar(
@@ -2987,6 +3369,36 @@ impl Secure {
         )
     }
 
+    /// The wait at the relay this session left in its room when it met its member directly
+    /// (see `espera_rele`), for the group's next listener.
+    pub(crate) fn toma_espera_rele(&mut self) -> Option<mpsc::Receiver<Entrante>> {
+        self.espera_rele.take()
+    }
+
+    /// Listen through a wait already in the relay room as well (another session's, which met
+    /// its member directly): whoever the relay joins there comes to this session. For as long
+    /// as the relay keeps a wait, then nothing.
+    pub(crate) fn hereda_espera_rele(&mut self, espera: mpsc::Receiver<Entrante>, codigo: String) {
+        let Some(tx) = self.tx.clone() else {
+            return;
+        };
+        std::thread::spawn(move || {
+            let hasta = std::time::Instant::now() + Duration::from_secs(12 * 60);
+            while let Some(queda) = hasta.checked_duration_since(std::time::Instant::now()) {
+                match espera.recv_timeout(queda) {
+                    Ok(e @ (Entrante::AceptadoRele(..) | Entrante::ReleFallo(_))) => {
+                        let _ = tx.send(e);
+                        return;
+                    }
+                    Ok(_) => {}
+                    Err(_) => return,
+                }
+            }
+        });
+        self.rele_codigo = Some(codigo);
+        self.cambio = true;
+    }
+
     // ---------- The phone (15 Oct 2026) ----------
 
     /// Hand the conversation to the phone: start the listener, ask the router for the UDP door
@@ -3030,6 +3442,73 @@ impl Secure {
         self.manda_zona();
     }
 
+    /// WebRTC (17 Oct 2026): as soon as the conversation is open and both programs can carry
+    /// calls this way, ask the relay it met at for its call service (valid for hours), so it is
+    /// ready before anyone calls; at most once a minute while the relay says no.
+    fn turn_tic(&mut self) {
+        if let Some(rx) = &self.turn_rx {
+            if let Ok(r) = rx.try_recv() {
+                self.turn_rx = None;
+                match r {
+                    Ok(t) => {
+                        self.turn = Some(t);
+                        self.cambio = true;
+                    }
+                    Err(e) => self.monitor.anota(
+                        ahora_s(),
+                        Nivel::Info,
+                        format!("servicio de llamadas del relé no disponible: {e}"),
+                    ),
+                }
+            }
+        }
+        if self.turn.is_some()
+            || self.turn_rx.is_some()
+            || !self.otro_rtc
+            || self.fase != Fase::Lista
+            || ahora_s().saturating_sub(self.turn_pedido) < 60
+        {
+            return;
+        }
+        let (Some(rele), Some(sala)) = (self.rele_usado.clone(), self.sala_rele.clone()) else {
+            return;
+        };
+        self.turn_pedido = ahora_s();
+        let (tx, rx) = mpsc::channel();
+        self.turn_rx = Some(rx);
+        std::thread::spawn(move || {
+            let _ = tx.send(crate::rele::turn(&rele, &sala));
+        });
+    }
+
+    /// The WebRTC part of the call for the screens (or null: the call then goes the old way,
+    /// recorded pieces through this program). Who makes the offer is fixed by the two keys.
+    fn rtc_json(&self) -> Value {
+        match (&self.turn, self.otro_rtc) {
+            (Some(t), true) => json!({ "ice": t.json(), "ofrece": self.mi_numero() == 0 }),
+            // Still asking the relay: the screens wait a moment before the old way.
+            (None, true) if self.turn_rx.is_some() => json!({ "pendiente": true }),
+            _ => Value::Null,
+        }
+    }
+
+    /// A WebRTC message from whoever talks here (the page, or the phone that took the call):
+    /// an offer, an answer, an ICE candidate or a restart. It goes to the other side inside
+    /// Olm, which is what makes the media keys (DTLS fingerprints in the SDP) trustworthy.
+    pub fn rtc(&mut self, d: &Value) {
+        if self.fase != Fase::Lista || self.llamada.is_none() {
+            return;
+        }
+        let grande = match serde_json::to_vec(d) {
+            Ok(v) => v.len() > 64 * 1024,
+            Err(_) => true,
+        };
+        if grande {
+            return;
+        }
+        self.manda_olm(json!({ "m": "rtc", "d": d }));
+    }
+
     fn manda_zona(&mut self) {
         if self.fase == Fase::Lista && !self.zona_propia.is_empty() {
             let z = self.zona_propia.clone();
@@ -3062,6 +3541,10 @@ impl Secure {
         if self.movil.take().is_some() {
             self.monitor
                 .anota(ahora_s(), Nivel::Info, "paso al móvil terminado");
+            self.cambio = true;
+        }
+        // An old error must not keep the «continue on the phone» card on screen for good.
+        if self.movil_error.take().is_some() {
             self.cambio = true;
         }
         self.movil_puerta_rx = None;
@@ -3147,8 +3630,15 @@ impl Secure {
             return;
         }
         let aprobado = m.aprobado;
+        // Call pieces and file pieces change nothing on screen: redrawing (and sending the
+        // whole state to the phone) for each one, about eight times a second during a call,
+        // was a cause of the stutter (17 Oct 2026 review).
+        let mut algo = false;
         for d in llegado {
             use crate::movil::Desde;
+            if !matches!(d, Desde::Media(_) | Desde::ArchivoTrozo(_)) {
+                algo = true;
+            }
             match d {
                 Desde::Enganchado => {
                     self.aviso("sec_mv_enganchado", "");
@@ -3203,13 +3693,17 @@ impl Secure {
                 Desde::Rechazar if aprobado => self.rechazar(),
                 Desde::Sas { ok, nombre } if aprobado => self.sas_persona(ok, &nombre),
                 Desde::PideInicio if aprobado => self.pide_inicio(),
+                Desde::VozProtegida(a) if aprobado => self.voz_protegida(a),
+                Desde::Rtc(d) if aprobado => self.rtc(&d),
                 Desde::Media(b) if aprobado => {
                     let _ = self.media_bytes(b);
                 }
                 _ => {}
             }
         }
-        self.cambio = true;
+        if algo {
+            self.cambio = true;
+        }
     }
 
     fn movil_json(&self) -> Value {
@@ -3292,7 +3786,7 @@ impl Secure {
             "tarjeta": self.tarjeta(),
             "contacto": self.nombre_contacto,
             "numeros": self.numeros().map(|(a, b, c)| vec![a, b, c]),
-            "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "conectada": l.conectada, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto, "reinicio": self.reinicios })),
+            "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "conectada": l.conectada, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto, "reinicio": self.reinicios, "rtc": self.rtc_json() })),
             "entrante": self.entrante.as_ref().map(|t| json!({ "video": t.video, "de": self.nombre_contacto, "desde": t.desde })),
             "perdida": self.perdida.map(|(t, video)| json!({ "t": t, "video": video, "de": self.nombre_contacto })),
             "recibidos": self.recibidos.iter().map(Recibido::json).collect::<Vec<_>>(),
@@ -3305,6 +3799,12 @@ impl Secure {
             "archivos": true,
             "contactos": self.agenda.contactos().iter().map(|c| json!({ "nombre": c.nombre, "verificado_en": c.verificado_en, "estado": matches!(c.estado, agenda::Estado::Verificado) })).collect::<Vec<_>>(),
             "monitor": monitor,
+            "vigia": {
+                "este": self.vigia.veredicto(self.inicio),
+                "en_uso": self.vigia.en_uso.iter().map(|(p, r)| json!({ "programa": p, "recurso": r })).collect::<Vec<_>>(),
+                "otro": self.vigia_otro,
+            },
+            "informe": self.informe.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "inicio": r.inicio, "fin": r.fin, "veredicto": r.veredicto, "sin_espionaje": r.veredicto.as_ref().is_some_and(Veredicto::sin_espionaje), "conexion": r.conexion, "observadas": r.observadas, "inusuales": r.inusuales, "firmante": r.firmante, "firma": r.firma, "hash_cadena": r.hash_cadena })),
             "resumen": self.resumen.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "mensajes": r.mensajes_enviados + r.mensajes_recibidos, "archivos": r.archivos.enviados + r.archivos.recibidos, "observadas": r.observadas, "inusuales": r.inusuales, "fin": r.fin })),
         })
     }
@@ -3338,7 +3838,13 @@ fn lista_de_formatos(v: &Value) -> Vec<String> {
 
 /// One byte of name length, the name, the piece: the sender travels inside the cipher.
 fn con_remitente(de: &str, pieza: &[u8]) -> Vec<u8> {
-    let nombre: Vec<u8> = de.bytes().take(60).collect();
+    // At most 60 bytes, cut where a character ends (a cut letter made the name unreadable and
+    // mixed two people's pieces in one player).
+    let mut fin = de.len().min(60);
+    while !de.is_char_boundary(fin) {
+        fin -= 1;
+    }
+    let nombre: Vec<u8> = de.get(..fin).unwrap_or_default().as_bytes().to_vec();
     let mut v = Vec::with_capacity(1 + nombre.len() + pieza.len());
     v.push(nombre.len() as u8);
     v.extend_from_slice(&nombre);
@@ -3377,12 +3883,37 @@ fn limpia_nombre(n: &str) -> String {
         })
         .take(120)
         .collect();
-    let s = s.trim().trim_start_matches('.').to_owned();
+    // No dot or space at the end either: Windows drops them, so «x.exe.» would be saved and
+    // opened as «x.exe» after passing as a file with no extension (17 Oct 2026 review).
+    let s = s
+        .trim()
+        .trim_start_matches('.')
+        .trim_end_matches(['.', ' '])
+        .to_owned();
     if s.is_empty() {
         "archivo".to_owned()
+    } else if nombre_de_dispositivo(&s) {
+        format!("_{s}")
     } else {
         s
     }
+}
+
+/// Windows keeps these names for devices, with any extension («CON.txt» too).
+pub(crate) fn nombre_de_dispositivo(n: &str) -> bool {
+    let base = n
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_uppercase();
+    matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || ((base.starts_with("COM") || base.starts_with("LPT"))
+            && base.len() == 4
+            && base
+                .as_bytes()
+                .get(3)
+                .is_some_and(|d| (b'1'..=b'9').contains(d)))
 }
 
 fn mime_imagen(nombre: &str) -> &'static str {
@@ -3421,6 +3952,21 @@ fn puerto_al_azar() -> u16 {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    #[test]
+    fn received_names_cannot_hide_a_program_or_a_device() {
+        assert_eq!(super::limpia_nombre("x.exe."), "x.exe");
+        assert_eq!(super::limpia_nombre("foto.jpg . "), "foto.jpg");
+        assert_eq!(super::limpia_nombre("CON.txt"), "_CON.txt");
+        assert_eq!(super::limpia_nombre("lpt1"), "_lpt1");
+        assert_eq!(super::limpia_nombre("COM0.txt"), "COM0.txt");
+        assert_eq!(super::limpia_nombre("console.txt"), "console.txt");
+        assert_eq!(super::limpia_nombre("..."), "archivo");
+        let largo = "ñ".repeat(40);
+        let v = super::con_remitente(&largo, b"x");
+        let n = usize::from(v[0]);
+        assert!(std::str::from_utf8(&v[1..=n]).is_ok());
+    }
+
     use super::*;
 
     fn gira(a: &mut Secure, b: &mut Secure, veces: u32) {
@@ -3450,6 +3996,9 @@ mod tests {
 
     #[test]
     fn two_computers_verify_each_other_then_a_message_and_a_file_cross_encrypted() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let base = std::env::temp_dir().join(format!("guardiana-secure-{}", std::process::id()));
         let (da, db) = (base.join("a"), base.join("b"));
         std::fs::create_dir_all(&da).unwrap();
@@ -3563,6 +4112,9 @@ mod tests {
 
     #[test]
     fn two_computers_without_a_door_meet_through_the_blind_relay() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         // A relay on this computer; the waiting side gets no door (there is no router here),
         // so it shows a GR code; the other side pastes it and the relay joins them.
         let rt = tokio::runtime::Builder::new_multi_thread()
@@ -3694,6 +4246,110 @@ mod tests {
         gira(&mut a, &mut b, 15);
         assert!(!b.reconectando());
         assert_eq!(b.estado_json()["fase"], "sola");
+        let _ = std::fs::remove_dir_all(base);
+        // The next test must not find this relay, gone with this runtime.
+        std::env::remove_var("GUARDIANA_RELE");
+    }
+
+    #[test]
+    fn another_program_on_the_microphone_stops_the_talk_and_the_call_report_says_so() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let base = std::env::temp_dir().join(format!("guardiana-vigia-{}", std::process::id()));
+        let (da, db) = (base.join("a"), base.join("b"));
+        std::fs::create_dir_all(&da).unwrap();
+        std::fs::create_dir_all(&db).unwrap();
+        let mut a = Secure::abre(&da, &da);
+        let mut b = Secure::abre(&db, &db);
+        let puerto = a.escuchar_efimero().unwrap();
+        b.conectar(&format!("127.0.0.1:{puerto}")).unwrap();
+        gira(&mut a, &mut b, 25);
+        a.sas_persona(true, "Bea");
+        b.sas_persona(true, "Ana");
+        gira(&mut a, &mut b, 25);
+        assert_eq!(b.estado_json()["fase"], "lista");
+
+        // GUARDIANA's own window and its engine never count; a recorder that is on now does.
+        let ahora = ahora_s();
+        let ft = |t: u64| (t + 11_644_473_600) * 10_000_000;
+        let propio = crate::vigia::de_registro(
+            "C:#EdgeWebView#msedgewebview2.exe",
+            crate::vigia::Recurso::Microfono,
+            ft(ahora),
+            0,
+        )
+        .unwrap();
+        b.vigia(std::slice::from_ref(&propio));
+        assert!(b.estado.en_marcha());
+        let zoom = crate::vigia::de_registro(
+            "C:#Program Files#Zoom#Zoom.exe",
+            crate::vigia::Recurso::Microfono,
+            ft(ahora),
+            0,
+        )
+        .unwrap();
+        b.vigia(&[propio.clone(), zoom.clone()]);
+        assert!(
+            !b.estado.en_marcha(),
+            "stopped while Zoom.exe holds the microphone"
+        );
+        assert!(b
+            .cadena
+            .registros
+            .iter()
+            .any(|r| r.proceso.as_deref() == Some("Zoom.exe")
+                && r.evidencia
+                    .as_deref()
+                    .is_some_and(|e| e.contains("ConsentStore"))));
+        assert_eq!(
+            b.estado_json()["vigia"]["en_uso"][0]["programa"],
+            "Zoom.exe"
+        );
+        // The person says it is theirs: the talk goes on, and is not stopped again for it.
+        b.reanudar_a_mano();
+        b.vigia(&[propio.clone(), zoom.clone()]);
+        assert!(b.estado.en_marcha());
+        b.pantalla(true);
+        gira(&mut a, &mut b, 15);
+        // The other side heard what b's watch saw.
+        let otro = a.vigia_otro.clone().unwrap();
+        assert!(otro.vigilado && otro.pantalla_protegida);
+        assert_eq!(otro.microfono, vec!["Zoom.exe".to_owned()]);
+
+        // A call, measured by the page, then hung up: both get a signed report with a verdict.
+        a.llamar(false, "audio/webm;codecs=opus").unwrap();
+        gira(&mut a, &mut b, 15);
+        b.contestar("audio/webm;codecs=opus").unwrap();
+        gira(&mut a, &mut b, 15);
+        a.medidas(&json!({ "rele": true, "latencia_media_ms": 96, "perdida_max_pct": 1.1, "kbps_audio_medio": 48, "codec_audio": "opus" }));
+        a.colgar();
+        gira(&mut a, &mut b, 15);
+        let ia = a.informe.clone().unwrap();
+        assert!(ia.verificar().is_ok());
+        assert_eq!(ia.clase, Clase::Llamada);
+        assert_eq!(ia.conexion.latencia_media_ms, Some(96));
+        let va = ia.veredicto.clone().unwrap();
+        assert!(va.identidad_verificada);
+        assert_eq!(
+            va.otro.as_ref().unwrap().microfono,
+            vec!["Zoom.exe".to_owned()]
+        );
+        assert!(
+            !va.sin_espionaje(),
+            "the other side's microphone was shared"
+        );
+        assert!(
+            !va.este.vigilado,
+            "a never got Windows' record in this test"
+        );
+        let ib = b.informe.clone().unwrap();
+        let vb = ib.veredicto.unwrap();
+        assert_eq!(vb.este.microfono, vec!["Zoom.exe".to_owned()]);
+        assert!(vb.este.pantalla_protegida);
+        assert_eq!(a.estado_json()["informe"]["sin_espionaje"], false);
+        a.olvida_informe();
+        assert!(a.estado_json()["informe"].is_null());
         let _ = std::fs::remove_dir_all(base);
     }
 }
