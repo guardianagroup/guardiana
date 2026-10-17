@@ -1529,7 +1529,8 @@
     velo.hidden = !r;
     if (!r) return;
     const nv = nivelInforme(r);
-    caja.classList.toggle('revisar', nv === 'revisar'); caja.classList.toggle('incompleto', nv === 'incompleto');
+    // No incident is green (the owner, 17 Oct 2026); what could not be checked is said in the rows.
+    caja.classList.toggle('revisar', nv === 'revisar'); caja.classList.toggle('incompleto', false);
     $('in-que').textContent = `${t('sec_r_clase_' + r.clase)} · ${r.contacto || ''} · ${tiempo(r.duracion_s || 0)}`;
     $('in-palabra').textContent = t(nv === 'revisar' ? 'sec_in_revisar' : nv === 'incompleto' ? 'sec_in_incompleto' : 'sec_in_limpio');
     $('in-frase').textContent = t(nv === 'revisar' ? 'sec_in_revisar_frase' : nv === 'incompleto' ? 'sec_in_incompleto_frase' : 'sec_in_limpio_frase');
