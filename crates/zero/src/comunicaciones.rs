@@ -305,6 +305,34 @@ impl Comunicaciones {
                 }
                 Ok(())
             }
+            "sala_nota" => {
+                // A phone's voice note, to play on the computer (17 Oct 2026).
+                let Some((tipo, ruta)) = self
+                    .sala
+                    .as_ref()
+                    .zip(m["id"].as_u64().and_then(|i| u32::try_from(i).ok()))
+                    .and_then(|(s, id)| s.nota_de_voz(id))
+                else {
+                    return Vec::new();
+                };
+                let Ok(datos) = std::fs::read(&ruta) else {
+                    return Vec::new();
+                };
+                let tipo = if tipo.starts_with("audio/") {
+                    tipo
+                } else {
+                    "audio/mp4".to_owned()
+                };
+                let url = format!(
+                    "data:{tipo};base64,{}",
+                    base64::engine::general_purpose::STANDARD.encode(datos)
+                );
+                return vec![Salida::Pagina(json!({
+                    "tipo": "secure_vista",
+                    "id": format!("sala-{}", m["id"].as_u64().unwrap_or_default()),
+                    "url": url,
+                }))];
+            }
             "sala_cerrar" => {
                 self.sala = None;
                 Ok(())
