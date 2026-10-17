@@ -1869,9 +1869,11 @@
       if (arrastre && arrastre.id === e.pointerId && enGlobo()) {
         const dx = e.clientX - arrastre.x, dy = e.clientY - arrastre.y;
         arrastre.total += Math.hypot(dx, dy);
-        if (arrastre.total > 3) {
+        if (arrastre.total > 6) {
           toca(); st.interactuando = true;
-          const sensibilidad = 2 * Math.PI / Math.max(420, Math.min(st.W || 800, st.H || 600));
+          // Calm (17 Oct 2026, the owner: «el globo es demasiado sensible»): dragging across the whole
+          // view turns it about a quarter of a turn, the way a heavy globe on a desk moves.
+          const sensibilidad = 0.5 * Math.PI / Math.max(600, Math.max(st.W || 800, st.H || 600));
           const dt = Math.max(8, Math.min(80, e.timeStamp - arrastre.t));
           st.dRot += dx * sensibilidad; st.dTilt = Math.max(-1.4, Math.min(1.4, st.dTilt + dy * sensibilidad * 0.82));
           arrastre.vr = dx * sensibilidad * 1000 / dt; arrastre.vt = dy * sensibilidad * 0.82 * 1000 / dt;
@@ -1884,7 +1886,7 @@
     cv.addEventListener('wheel', (e) => {
       if (!zoomable()) return; e.preventDefault();
       const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
-      zoomBoton(Math.exp(-Math.max(-200, Math.min(200, dy)) * 0.0022));
+      zoomBoton(Math.exp(-Math.max(-120, Math.min(120, dy)) * 0.0012));
     }, { passive: false });
     cv.addEventListener('dblclick', () => zoomBoton(2));
     cv.addEventListener('pointerleave', () => { st.raton = null; tip.hidden = true; });
@@ -1897,7 +1899,7 @@
     cv.addEventListener('pointercancel', (e) => { if (arrastre && arrastre.id === e.pointerId) arrastre = null; suelta(e); });
     cv.addEventListener('pointerup', (e) => {
       const movido = !!(arrastre && arrastre.id === e.pointerId && arrastre.movido);
-      if (movido && !reducido && dedos.size < 2) st.inercia = { vr: arrastre.vr, vt: arrastre.vt };
+      if (movido && !reducido && dedos.size < 2) st.inercia = { vr: arrastre.vr * 0.5, vt: arrastre.vt * 0.5 };
       if (arrastre && arrastre.id === e.pointerId) arrastre = null;
       suelta(e);
       if (dedos.size || movido) return;
@@ -2088,7 +2090,7 @@
       try {
         if (st.inercia && !reducido) {
           st.dRot += st.inercia.vr * dt; st.dTilt = Math.max(-1.4, Math.min(1.4, st.dTilt + st.inercia.vt * dt));
-          const freno = Math.exp(-4.5 * dt); st.inercia.vr *= freno; st.inercia.vt *= freno;
+          const freno = Math.exp(-7 * dt); st.inercia.vr *= freno; st.inercia.vt *= freno;
           if (Math.hypot(st.inercia.vr, st.inercia.vt) < 0.004) st.inercia = null;
         }
         if (ahora - ultimaTele > 1000) { ultimaTele = ahora; telemetria(); pintaDatos(); }
