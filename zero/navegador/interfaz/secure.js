@@ -203,7 +203,7 @@
   let E = { fase: 'sola' };
   const fasePinta = () => {
     const f = E.fase;
-    $('c-conexion').hidden = !(f === 'sola' || f === 'escuchando') || modo !== 'equipos';
+    $('c-conexion').hidden = !(f === 'sola' || f === 'escuchando') || (modo !== 'equipos' && modo !== 'movil');
     const comparando = E.comparando || (f === 'comparando' ? E.numeros : null);
     $('c-comparar').hidden = !comparando;
     $('c-comparar-quien').textContent = E.comparando && E.contacto_nuevo ? t('sec_s_nuevo', { n: E.contacto_nuevo }) : '';
@@ -633,7 +633,8 @@
     $('c-inicio').hidden = !!modo;
     $('c-modo-cab').hidden = !modo || hayContacto(m) || movilActivo(m);
     if (modo) $('c-modo-nombre').textContent = t('sec_modo_' + modo);
-    $('c-modo-movil').hidden = modo !== 'movil';
+    $('c-modo-movil').hidden = modo !== 'movil' && !m.movil;
+    $('c-modo-movil-intro').hidden = !!m.movil || hayContacto(m);
     const sala = $('c-sala-tarjeta');
     sala.hidden = modo !== 'sala';
     // The room's code and members: in the middle while it is not open, on the left once it is.
