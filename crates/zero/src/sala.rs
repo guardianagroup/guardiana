@@ -270,7 +270,16 @@ impl Sala {
     /// web server).
     #[must_use]
     pub fn enlace(&self) -> String {
-        let datos = json!({
+        self.enlace_con(None)
+    }
+
+    /// The same link carrying also the code a PC types in «Tengo una invitación» (1.0.42): one
+    /// invitation for everyone, and the person who opens it chooses there whether to talk on
+    /// that phone or on their PC. The code is the one the relay already gives the invitation;
+    /// it lets a PC ask to come in, and the person at this computer still compares the numbers.
+    #[must_use]
+    pub fn enlace_con(&self, codigo_pc: Option<&str>) -> String {
+        let mut datos = json!({
             "v": 2,
             "sala": 1,
             "k": B64URL.encode(self.clave),
@@ -279,6 +288,9 @@ impl Sala {
             "h": self.horas,
             "c": self.caduca(),
         });
+        if let Some(c) = codigo_pc.filter(|c| !c.is_empty()) {
+            datos["g"] = json!(c);
+        }
         format!(
             "{}#{}",
             crate::movil::PAGINA,
@@ -988,6 +1000,22 @@ mod tests {
         let j = s.json();
         assert_eq!(j["miembros"].as_array().unwrap().len(), ASIENTOS);
         assert!(j["qr"].as_str().unwrap().contains("<svg"));
+    }
+
+    #[test]
+    fn one_invitation_carries_the_code_for_a_pc_too() {
+        let s = Sala::abre_con("127.0.0.1:1", 24, "es").unwrap();
+        let v = crate::movil::lee_enlace(&s.enlace_con(Some("GR-ABCD-EFGH"))).unwrap();
+        assert_eq!(v["sala"], 1);
+        assert_eq!(v["g"], "GR-ABCD-EFGH");
+        assert!(crate::movil::lee_enlace(&s.enlace())
+            .unwrap()
+            .get("g")
+            .is_none());
+        assert!(crate::movil::lee_enlace(&s.enlace_con(Some("")))
+            .unwrap()
+            .get("g")
+            .is_none());
     }
 
     #[test]

@@ -86,6 +86,18 @@ impl Comunicaciones {
     pub fn estado_json(&self) -> Value {
         let mut e = self.secure.estado_json();
         e["sala"] = self.sala.as_ref().map_or(Value::Null, Sala::json);
+        // 1.0.42: while this computer also waits for a PC, the room's link and QR code carry
+        // that code too, so there is a single invitation.
+        let codigo = (e["fase"] == "escuchando")
+            .then(|| e["rele_codigo"].as_str().or_else(|| e["codigo"].as_str()))
+            .flatten()
+            .map(str::to_owned);
+        if let (Some(s), Some(c)) = (&self.sala, codigo) {
+            let enlace = s.enlace_con(Some(&c));
+            e["sala"]["qr"] = json!(guardiana_secure::tarjeta::qr_svg(&enlace).ok());
+            e["sala"]["enlace"] = json!(enlace);
+            e["sala"]["codigo_pc"] = json!(c);
+        }
         e
     }
 

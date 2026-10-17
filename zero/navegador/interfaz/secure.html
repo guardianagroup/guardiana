@@ -261,6 +261,16 @@ main { min-height: 0; overflow: auto; padding: 24px 28px 36px; display: grid; ga
 .modo .t { font-size: 14px; line-height: 1.55; max-width: 28ch; align-self: start; }
 .modo .modo-boton { margin-top: 6px; padding: 9px 18px; border-radius: 10px; background: var(--accent); color: var(--accent-fg); font: 500 13.5px var(--texto); }
 @media (max-width: 1000px) { .modos { grid-template-columns: 1fr; max-width: 520px; } .modo { min-height: 0; } .inicio { min-height: 0; } }
+/* 1.0.42: one button to start; the other two are quiet links under it. */
+.inicio-uno { display: grid; gap: 14px; justify-items: center; max-width: 460px; }
+.nueva-conv { display: inline-flex; align-items: center; gap: 10px; padding: 16px 34px; border-radius: 14px; font: 600 18px/1 var(--display); cursor: pointer; box-shadow: 0 12px 30px color-mix(in srgb, var(--accent) 22%, transparent); }
+.nueva-conv .icono { width: 22px; height: 22px; }
+.inicio-uno > .t { margin: 0; font-size: 14.5px; line-height: 1.55; max-width: 40ch; }
+.inicio-otros { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; margin-top: 8px; font-size: 15px; }
+.inicio-otros span { color: var(--muted, #8892a6); }
+.inicio-pie { margin: 22px 0 0; font-size: 12.5px; opacity: .75; }
+.c-sala-pc { margin: 4px 0 0; font-size: 13.5px; }
+.c-sala-pc b { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: .04em; user-select: all; }
 .modo-cab { display: flex; align-items: center; gap: 14px; padding: 10px 14px; }
 .modo-cab b { font: 600 15px/1.2 var(--display); }
 .modo-movil { display: grid; gap: 12px; }
@@ -555,25 +565,21 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
   <section class="inicio" id="c-inicio">
     <h2 class="inicio-titulo" data-t="sec_inicio_titulo"></h2>
     <p class="t inicio-frase" data-t="sec_inicio_frase"></p>
-    <div class="modos">
-      <button type="button" class="modo" data-modo="equipos">
-        <span class="modo-icono"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="9" height="7" rx="1.5"/><rect x="13" y="12" width="9" height="7" rx="1.5"/><path d="M6.5 12v3M17.5 9v3M4 15h5M15 22h5"/></svg></span>
-        <b data-t="sec_modo_equipos"></b>
-        <span class="t" data-t="sec_modo_equipos_texto"></span>
-        <span class="modo-boton" data-t="sec_modo_equipos_boton"></span>
+    <!-- One way to start (1.0.42, the owner with ChatGPT and Grok): one invitation, a QR code and
+         a link; whoever opens it chooses there whether to talk on that phone or on their PC. -->
+    <div class="inicio-uno">
+      <button type="button" class="boton principal nueva-conv" data-modo="sala">
+        <svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        <span data-t="sec_nueva_conv"></span>
       </button>
-      <button type="button" class="modo" data-modo="movil">
-        <span class="modo-icono"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="12" height="9" rx="1.5"/><rect x="16" y="7" width="6" height="12" rx="1.5"/><path d="M5 16h6M19 16v.01"/></svg></span>
-        <b data-t="sec_modo_movil"></b>
-        <span class="t" data-t="sec_modo_movil_texto"></span>
-        <span class="modo-boton" data-t="sec_modo_movil_boton"></span>
-      </button>
-      <button type="button" class="modo" data-modo="sala">
-        <span class="modo-icono"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="7" height="14" rx="1.5"/><rect x="14" y="5" width="7" height="14" rx="1.5"/><path d="M6.5 16.5v.01M17.5 16.5v.01M10 11h4"/></svg></span>
-        <b data-t="sec_modo_sala"></b>
-        <span class="t" data-t="sec_modo_sala_texto"></span>
-        <span class="modo-boton" data-t="sec_modo_sala_boton"></span>
-      </button>
+      <p class="t" data-t="sec_nueva_conv_texto"></p>
+      <div class="inicio-otros">
+        <button type="button" class="enlace" data-modo="equipos" data-t="sec_inicio_invitacion"></button>
+        <span aria-hidden="true">·</span>
+        <button type="button" class="enlace" data-modo="movil" data-t="sec_inicio_mi_movil"></button>
+      </div>
+      <p class="t inicio-pie" data-t="sec_inicio_pie"></p>
+    </div>
     </div>
   </section>
 
@@ -615,6 +621,7 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
         <p class="t" id="c-sala-hasta"></p>
         <p class="t" data-t="sec_sala_escanea"></p>
         <div class="qr" id="c-sala-qr"></div>
+        <p class="c-sala-pc" id="c-sala-pc" hidden><span data-t="sec_sala_codigo_pc"></span> <b id="c-sala-pc-codigo"></b></p>
         <div class="c-fila c-enviar"><button type="button" class="boton chico" id="c-sala-copiar" data-t="sec_sala_copiar"></button><button type="button" class="boton chico secundario" id="c-sala-whatsapp" data-t="sec_c_whatsapp"></button></div>
         <p class="c-sala-sub" data-t="sec_sala_en"></p>
         <ul class="c-sala-miembros" id="c-sala-miembros"></ul>

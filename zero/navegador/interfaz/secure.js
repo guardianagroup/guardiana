@@ -204,6 +204,8 @@
   const fasePinta = () => {
     const f = E.fase;
     $('c-conexion').hidden = !(f === 'sola' || f === 'escuchando') || (modo !== 'equipos' && modo !== 'movil');
+    // «Tengo una invitación» (1.0.42): only the box for the code; inviting is «Nueva conversación».
+    $('c-lado-invitar').hidden = modo === 'equipos' && f !== 'escuchando';
     const comparando = E.comparando || (f === 'comparando' ? E.numeros : null);
     $('c-comparar').hidden = !comparando;
     $('c-comparar-quien').textContent = E.comparando && E.contacto_nuevo ? t('sec_s_nuevo', { n: E.contacto_nuevo }) : '';
@@ -757,7 +759,17 @@
     secure.classList.toggle('sin-derecha', false);
     $('miga-donde').textContent = modo ? t('sec_modo_' + modo) : t('sec_miga_inicio');
   };
-  document.querySelectorAll('.modo').forEach((b) => b.addEventListener('click', () => { modo = b.dataset.modo; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E); if (modo === 'sala') $('c-sala-horas').focus(); }));
+  // 1.0.42: «Nueva conversación» opens the invitation at once: the room for phones and, at the
+  // same time, the code for a PC (it travels inside the same link). «Tengo una invitación» and
+  // «Usar en mi móvil» are the other two ways in.
+  document.querySelectorAll('#c-inicio [data-modo]').forEach((b) => b.addEventListener('click', () => {
+    modo = b.dataset.modo; guardaModo(); fasePinta(); pintaModo(E); pintaVista(E);
+    if (modo === 'sala') {
+      if (!E.sala) manda({ tipo: 'secure', accion: 'sala', horas: 24, idioma: idioma() });
+      if (!E.fase || E.fase === 'sola') { mandaNombre(); manda({ tipo: 'secure', accion: 'escuchar', puerto: 0 }); }
+    }
+    if (modo === 'equipos') { const c = document.querySelector('#c-conexion input:not(#c-yo)'); if (c) c.focus(); }
+  }));
   $('c-volver').addEventListener('click', () => {
     // Going back cancels an invitation still waiting, so nothing is left half open.
     if (E.fase && E.fase !== 'sola' && E.fase !== 'lista') { manda({ tipo: 'secure', accion: 'cerrar' }); E = Object.assign({}, E, { fase: 'sola' }); }
@@ -809,6 +821,7 @@
     if (!s) return;
     if (s.qr && $('c-sala-qr').dataset.qr !== s.qr) { $('c-sala-qr').innerHTML = s.qr; $('c-sala-qr').dataset.qr = s.qr; }
     salaEnlace = s.enlace || '';
+    $('c-sala-pc').hidden = !s.codigo_pc; $('c-sala-pc-codigo').textContent = s.codigo_pc || '';
     $('c-sala-hasta').textContent = t('sec_sala_hasta', { h: n(s.horas), f: fecha(s.caduca) });
     $('c-sala-miembros').innerHTML = (s.miembros || []).filter((x) => x.enganchado || x.aprobado || x.con_nombre).map((x) => {
       const estado = x.pendiente ? t('sec_sala_m_pendiente') : x.aprobado ? (x.enganchado ? t('sec_sala_m_dentro') : t('sec_sala_m_fuera')) : t('sec_sala_m_espera');
