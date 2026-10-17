@@ -69,7 +69,8 @@ static PREFERIDO: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
 /// Measure once which relay answers fastest from here, in its own thread; `preferido()` reads
 /// the result when it is in. Nothing is sent but a connection that is closed at once.
 pub fn mide_cercania() {
-    if PREFERIDO.get().is_some() || std::env::var_os("GUARDIANA_RELE").is_some() {
+    // The tests measure nothing out there either (see `abre`).
+    if PREFERIDO.get().is_some() || std::env::var_os("GUARDIANA_RELE").is_some() || cfg!(test) {
         return;
     }
     std::thread::spawn(|| {
@@ -285,6 +286,16 @@ pub fn abre(rele: &str) -> Result<TcpStream, String> {
     let Some(r) = RELES.iter().find(|r| r.direccion() == rele) else {
         return abre_hacia(rele);
     };
+    if cfg!(test) {
+        // The tests never reach GUARDIANA's own relays (17 Oct 2026: on the macOS runner, which
+        // has a network, a test's listener went to wait at a real relay, and the owner's
+        // servers saw test traffic). A test that needs a relay runs one on this computer and
+        // names it in `GUARDIANA_RELE`.
+        return Err(format!(
+            "{}: relé de GUARDIANA, fuera de las pruebas",
+            r.nombre
+        ));
+    }
     let raices = raices_publicas();
     let mut fallos = Vec::new();
     let mut destinos = vec![r.direccion()];

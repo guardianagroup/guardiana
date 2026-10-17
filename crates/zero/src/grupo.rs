@@ -268,7 +268,27 @@ impl Grupo {
         let (puerto, codigo_rele, _) = self.sesiones[0].escucha();
         if self.sesiones.last().is_some_and(Secure::lista) {
             let i = self.nueva_sesion();
-            let _ = self.sesiones[i].escuchar_grupo(Some(puerto), codigo_rele, false);
+            // One wait per room at the relay. A session that met its member directly left its
+            // wait in the room; a second one there would be joined with it by the relay (the
+            // host with itself, and the next member waiting alone: 17 Oct 2026). The new
+            // listener takes that wait over instead of opening another.
+            let espera = self.sesiones[..i]
+                .iter_mut()
+                .rev()
+                .find_map(Secure::toma_espera_rele);
+            match (espera, codigo_rele) {
+                (Some(espera), Some(codigo)) => {
+                    if self.sesiones[i]
+                        .escuchar_grupo(Some(puerto), None, false)
+                        .is_ok()
+                    {
+                        self.sesiones[i].hereda_espera_rele(espera, codigo);
+                    }
+                }
+                (_, codigo) => {
+                    let _ = self.sesiones[i].escuchar_grupo(Some(puerto), codigo, false);
+                }
+            }
             self.cambio = true;
             self.manda_lista();
         }
@@ -1035,6 +1055,89 @@ mod tests {
             }
             std::thread::sleep(Duration::from_millis(20));
         }
+    }
+
+    /// The first member came in directly while the host also waited at the relay: the next
+    /// one, with the relay code, meets the host there (17 Oct 2026: the new listener opened a
+    /// second wait in the same room, the relay joined the host with itself, and the third
+    /// person waited alone).
+    #[test]
+    fn a_member_by_the_relay_after_one_who_came_in_directly_meets_the_host() {
+        // The variable is the whole process's: leave it as it was, even if this fails.
+        struct Quita;
+        impl Drop for Quita {
+            fn drop(&mut self) {
+                std::env::remove_var("GUARDIANA_RELE");
+            }
+        }
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap();
+        let listener = rt
+            .block_on(tokio::net::TcpListener::bind("127.0.0.1:0"))
+            .unwrap();
+        let direccion = listener.local_addr().unwrap().to_string();
+        rt.spawn(guardiana_rele::sirve(listener));
+        std::env::set_var("GUARDIANA_RELE", &direccion);
+        let _quita = Quita;
+
+        let base =
+            std::env::temp_dir().join(format!("guardiana-grupo-rele-{}", std::process::id()));
+        let d = |n: &str| {
+            let p = base.join(n);
+            std::fs::create_dir_all(&p).unwrap();
+            p
+        };
+        let (da, db, dc) = (d("a"), d("b"), d("c"));
+        let mut a = Grupo::abre(&da, &da);
+        a.nombre_propio = "Ana".to_owned();
+        let mut b = Grupo::abre(&db, &db);
+        let mut c = Grupo::abre(&dc, &dc);
+        let puerto = a.escuchar_efimero().unwrap();
+        // No router here: the door search gives up and the host waits at the relay as well.
+        let mut codigo = None;
+        for _ in 0..600 {
+            a.tic();
+            if let (_, Some(cod), _) = a.sesiones[0].escucha() {
+                codigo = Some(cod);
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let codigo = codigo.unwrap();
+        // Bea is on the same network: straight to the door.
+        b.conectar(&format!("127.0.0.1:{puerto}")).unwrap();
+        gira(&mut [&mut a, &mut b], 25);
+        a.sas_persona(true, "Bea");
+        b.sas_persona(true, "Ana");
+        for _ in 0..40 {
+            if a.sesiones[0].lista() && b.sesiones[0].lista() {
+                break;
+            }
+            gira(&mut [&mut a, &mut b], 5);
+        }
+        assert!(a.sesiones[0].lista() && b.sesiones[0].lista());
+        gira(&mut [&mut a, &mut b], 5);
+        assert_eq!(a.sesiones.len(), 2, "a second session listens");
+        // Cris is somewhere else: the relay code.
+        c.conectar(&codigo).unwrap();
+        for _ in 0..80 {
+            gira(&mut [&mut a, &mut b, &mut c], 5);
+            if a.numeros().is_some() && a.numeros() == c.numeros() {
+                break;
+            }
+        }
+        assert!(
+            a.numeros().is_some() && a.numeros() == c.numeros(),
+            "{:?}",
+            c.estado_json()["fase"]
+        );
+        rt.shutdown_background();
     }
 
     #[test]

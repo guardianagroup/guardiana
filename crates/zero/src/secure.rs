@@ -468,6 +468,10 @@ pub struct Secure {
     tx: Option<Sender<Entrante>>,
     /// The relay code on screen while waiting through the relay (no door could be opened).
     rele_codigo: Option<String>,
+    /// A wait at the relay still in its room after this session met its member another way
+    /// (directly): the group's next listener takes it over, so one room never holds two waits
+    /// of the same host, which the relay would join with each other (17 Oct 2026).
+    espera_rele: Option<mpsc::Receiver<Entrante>>,
     /// This link goes through the blind relay.
     rele: bool,
     rele_error: Option<String>,
@@ -695,6 +699,7 @@ impl Secure {
             llamado_en_grupo: false,
             tx: None,
             rele_codigo: None,
+            espera_rele: None,
             rele: false,
             rele_error: None,
             rele_usado: None,
@@ -885,6 +890,11 @@ impl Secure {
             }
         };
         std::thread::spawn(move || lee_tramas(lector, tx));
+        if !rele && self.fase == Fase::Escuchando && self.rele_codigo.is_some() {
+            // Met directly while also waiting at the relay: that wait stays in its room, and
+            // the next listener of the group takes it (see `espera_rele`).
+            self.espera_rele = self.rx.take();
+        }
         self.enlace = Some(Enlace::new(s));
         self.rx = Some(rx);
         self.fase = Fase::Saludando;
@@ -1176,6 +1186,7 @@ impl Secure {
         self.rele_error = None;
         self.enlace = None;
         self.rx = None;
+        self.espera_rele = None;
         self.tarjeta_otra = None;
         self.sas_inicio = None;
         self.sas_codigo = None;
@@ -3356,6 +3367,36 @@ impl Secure {
             self.rele_codigo.clone(),
             self.puerta.as_ref().map(crate::puerta::Puerta::codigo),
         )
+    }
+
+    /// The wait at the relay this session left in its room when it met its member directly
+    /// (see `espera_rele`), for the group's next listener.
+    pub(crate) fn toma_espera_rele(&mut self) -> Option<mpsc::Receiver<Entrante>> {
+        self.espera_rele.take()
+    }
+
+    /// Listen through a wait already in the relay room as well (another session's, which met
+    /// its member directly): whoever the relay joins there comes to this session. For as long
+    /// as the relay keeps a wait, then nothing.
+    pub(crate) fn hereda_espera_rele(&mut self, espera: mpsc::Receiver<Entrante>, codigo: String) {
+        let Some(tx) = self.tx.clone() else {
+            return;
+        };
+        std::thread::spawn(move || {
+            let hasta = std::time::Instant::now() + Duration::from_secs(12 * 60);
+            while let Some(queda) = hasta.checked_duration_since(std::time::Instant::now()) {
+                match espera.recv_timeout(queda) {
+                    Ok(e @ (Entrante::AceptadoRele(..) | Entrante::ReleFallo(_))) => {
+                        let _ = tx.send(e);
+                        return;
+                    }
+                    Ok(_) => {}
+                    Err(_) => return,
+                }
+            }
+        });
+        self.rele_codigo = Some(codigo);
+        self.cambio = true;
     }
 
     // ---------- The phone (15 Oct 2026) ----------
