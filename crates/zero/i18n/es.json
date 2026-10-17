@@ -1152,7 +1152,7 @@
   "sec_sala_hasta": "Sala abierta {h} h, hasta el {f}. Deja este equipo encendido y con GUARDIANA abierta.",
   "sec_sala_escanea": "Envía el enlace por WhatsApp o que lean el código con la cámara. Quien lo abra elige si sigue en su móvil o en su PC, y tú pulsas «Aceptar». Tú también puedes entrar desde tu móvil.",
   "sec_sala_copiar": "Copiar el enlace",
-  "sec_sala_invita": "Entra en mi sala de GUARDIANA (cuando entres, te dejo pasar yo): {e}",
+  "sec_sala_invita": "Te invito a una conversación privada en GUARDIANA. Ábrelo y elige si hablamos desde tu móvil o desde tu PC: {e}",
   "sec_sala_en": "En la sala",
   "sec_sala_sello": "{n} en casa · abierta {h} h, hasta el {f}",
   "sec_g_sala_frase": "Los móviles de casa hablan cifrados hasta este equipo, que reparte a los demás.",

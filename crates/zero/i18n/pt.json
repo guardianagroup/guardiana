@@ -1152,7 +1152,7 @@
   "sec_sala_hasta": "Sala aberta {h} h, até {f}. Deixe este computador ligado e com a GUARDIANA aberta.",
   "sec_sala_escanea": "Envie o link pelo WhatsApp ou deixe lerem o código com a câmera. Quem abrir escolhe se continua no celular ou no PC, e você toca em «Aceitar». Você também pode entrar pelo seu celular.",
   "sec_sala_copiar": "Copiar o link",
-  "sec_sala_invita": "Entre na minha sala do GUARDIANA (quando você entrar, eu deixo passar): {e}",
+  "sec_sala_invita": "Estou te convidando para uma conversa privada no GUARDIANA. Abra e escolha se conversamos pelo celular ou pelo PC: {e}",
   "sec_sala_en": "Na sala",
   "sec_sala_sello": "{n} em casa · aberta {h} h, até {f}",
   "sec_g_sala_frase": "Os celulares de casa falam cifrados até este computador, que repassa aos demais.",

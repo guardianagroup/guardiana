@@ -1152,7 +1152,7 @@
   "sec_sala_hasta": "Room open for {h} h, until {f}. Keep this computer on with GUARDIANA open.",
   "sec_sala_escanea": "Send the link by WhatsApp or let them read the code with their camera. Whoever opens it chooses whether to stay on their phone or go to their PC, and you press «Accept». You can join from your own phone too.",
   "sec_sala_copiar": "Copy the link",
-  "sec_sala_invita": "Join my GUARDIANA room (I'll let you in when you arrive): {e}",
+  "sec_sala_invita": "I'm inviting you to a private conversation on GUARDIANA. Open it and choose whether we talk from your phone or your PC: {e}",
   "sec_sala_en": "In the room",
   "sec_sala_sello": "{n} at home · open {h} h, until {f}",
   "sec_g_sala_frase": "The phones at home talk encrypted to this computer, which passes it on to the others.",
