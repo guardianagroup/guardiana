@@ -667,7 +667,7 @@
   const pintaLista = (m, quien, nombres) => {
     const ol = $('c-lista');
     const f = m.fase;
-    if (!f || f === 'sola') { ol.innerHTML = filaSala(m) || `<li class="vacia">${esc(t('sec_lista_vacia'))}</li>`; if (!m.sala) $('miga-donde').textContent = t('sec_miga_inicio'); return; }
+    if (!f || f === 'sola' || (f === 'escuchando' && m.sala)) { ol.innerHTML = filaSala(m) || `<li class="vacia">${esc(t('sec_lista_vacia'))}</li>`; if (!m.sala) $('miga-donde').textContent = t('sec_miga_inicio'); return; }
     const ultimo = (m.mensajes || []).slice(-1)[0];
     const nombre = nombres.length > 2 ? nombres.join(' · ') : (quien || t('sec_lista_nueva'));
     const linea = f !== 'lista' ? t(f === 'comparando' ? 'sec_lista_comparando' : 'sec_lista_conectando') : m.llamada ? t('sec_l_en_curso') : ultimo ? ultimo.texto : t('sec_lista_sin_mensajes');
@@ -720,7 +720,9 @@
   let vista = 'contacto';
   // Someone on the line (17 Oct 2026 review: counting the messages a finished conversation
   // leaves on screen kept the start hidden and the way back gone until the program restarted).
-  const hayContacto = (m) => !!m.fase && m.fase !== 'sola';
+  // 1.0.42: «escuchando» is the invitation waiting for a PC (it travels with the QR of «Nueva
+  // conversación»): nobody is on the line yet, so the screen stays on the invitation.
+  const hayContacto = (m) => !!m.fase && m.fase !== 'sola' && m.fase !== 'escuchando';
   // Three ways to talk (16 Oct 2026): computer to computer, from the phone, the home room.
   // The start shows the three; once one is chosen (or one is already going) only it is on screen.
   let modo = null;
@@ -829,7 +831,7 @@
       const botones = x.pendiente ? `<button type="button" class="boton chico" data-sala-ok="${x.i}">${esc(t('sec_sala_dejar'))}</button>` : x.aprobado ? `<button type="button" class="boton chico secundario" data-sala-fuera="${x.i}">${esc(t('sec_sala_echar'))}</button>` : '';
       // 1.0.42: the four digits of the link, the same the phone shows; checked before «Aceptar».
       const num = x.numero && (x.pendiente || x.aprobado) ? `<span class="c-sala-num" title="${esc(t('sec_sala_numero_t'))}">${esc(x.numero.split('').join(' '))}</span>` : '';
-      return `<li class="${x.enganchado ? 'si' : ''}"><i></i><span class="c-sala-q"><b>${esc(x.nombre)}</b><span class="t">${esc(estado)}</span></span>${num}${botones}</li>`;
+      return `<li class="${x.enganchado ? 'si' : ''}"><i></i><span class="c-sala-q"><b>${esc(x.nombre)}</b><span class="t">${esc(estado)}</span></span>${num || botones ? `<span class="c-sala-acc">${num}${botones}</span>` : ''}</li>`;
     }).join('');
     const ol = $('c-sala-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 40;
     ol.innerHTML = (s.mensajes || []).map((x) => x.llamada ? lineaLlamada(x) : `<li class="${x.mio ? 'mio' : ''}" data-id="${esc(x.id || '')}"><b>${esc(x.de || t('sec_m_tu'))}</b>${citaDe(x, s.mensajes)}${x.borrado ? `<i class="borrado">${esc(t('sec_m_borrado'))}</i>` : x.archivo ? notaSala(x.archivo) : `<span>${esc(x.texto)}</span>`}${reacciones(x)}${metaMensaje(x)}</li>`).join('') + (s.escribiendo ? `<li class="escribiendo"><span></span><span></span><span></span></li>` : '');

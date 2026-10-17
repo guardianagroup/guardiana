@@ -589,6 +589,10 @@ header.top #m-estado-chip.alerta { background: var(--alerta-suave); border-color
 @media (prefers-reduced-motion: reduce) { header.top #m-estado-chip.ok::before { animation: none; } }
 .numero-g, .llamar-num, .agenda-g, .llamar-num-error { width: 100%; max-width: 460px; margin-inline: auto; box-sizing: border-box; }
 .llamar-num .campo::placeholder { font: 400 14px var(--texto); letter-spacing: 0; }
+/* A phone waiting at the door: its name, then its four digits and «Dejar entrar» on a line of
+   their own, so they fit the narrow column. */
+.c-sala-miembros li { grid-template-columns: auto 1fr; row-gap: 8px; }
+.c-sala-miembros li .c-sala-acc { grid-column: 2; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
