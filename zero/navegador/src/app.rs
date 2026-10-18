@@ -38,7 +38,6 @@ use windows::Win32::Foundation::{
     GetLastError, COLORREF, ERROR_ALREADY_EXISTS, ERROR_SUCCESS, E_POINTER, HINSTANCE, HWND,
     LPARAM, LRESULT, POINT, RECT, S_FALSE, WAIT_ABANDONED, WAIT_OBJECT_0, WAIT_TIMEOUT, WPARAM,
 };
-use windows::Win32::Globalization::GetUserDefaultUILanguage;
 use windows::Win32::Graphics::Dwm::{
     DwmSetWindowAttribute, DWMWA_CAPTION_COLOR, DWMWA_TEXT_COLOR, DWMWA_USE_IMMERSIVE_DARK_MODE,
 };
@@ -52,7 +51,7 @@ use windows::Win32::System::DataExchange::COPYDATASTRUCT;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Registry::{
     RegCloseKey, RegEnumKeyExW, RegGetValueW, RegOpenKeyExW, HKEY, HKEY_CURRENT_USER,
-    HKEY_LOCAL_MACHINE, KEY_READ, RRF_RT_REG_QWORD,
+    HKEY_LOCAL_MACHINE, KEY_READ, RRF_RT_REG_QWORD, RRF_RT_REG_SZ,
 };
 use windows::Win32::System::Threading::{CreateMutexW, WaitForSingleObject};
 use windows::Win32::UI::HiDpi::{
@@ -1133,6 +1132,13 @@ fn escucha_teclas(c: &ICoreWebView2Controller) -> windows::core::Result<()> {
             unsafe { args.PhysicalKeyStatus(&mut estado)? };
             let mut vk = 0u32;
             unsafe { args.VirtualKey(&mut vk)? };
+            // F7 turns on caret browsing in WebView2: a blinking text bar wherever one clicks,
+            // on text that is not meant to be edited (the owner, 18 Oct 2026: «donde no hay enlace
+            // no debe salir nada»). It is swallowed here, in the bar, the panel and every tab.
+            if vk == 0x76 {
+                unsafe { args.SetHandled(true)? };
+                return Ok(());
+            }
             let (ctrl, shift, alt) = (pulsada(0x11), pulsada(0x10), pulsada(0x12));
             if let Some(o) = con_sesion(|s| s.tecla(vk, ctrl, shift, alt)).flatten() {
                 unsafe { args.SetHandled(true)? };
@@ -2087,13 +2093,39 @@ fn carpeta_descargas() -> PathBuf {
         .unwrap_or_default()
 }
 
+/// The language ZERO starts in until the person picks one in its settings (18 Oct 2026, the
+/// owner: «English is the first language on screen»). The Spanish and Portuguese installers were
+/// an explicit choice, and they leave it in the registry (`idioma`); anything else is English.
+/// Windows's own language is not asked any more: it says where the computer was bought, not what
+/// the person chose.
 fn idioma_sistema() -> String {
-    let lang = unsafe { GetUserDefaultUILanguage() } & 0x3ff;
-    match lang {
-        0x0a => "es".into(),
-        0x16 => "pt".into(),
-        _ => "en".into(),
+    for ruta in [
+        "Software\\GUARDIANA GROUP\\GUARDIANA ZERO",
+        "Software\\Guardiana",
+    ] {
+        let r = ancho(ruta);
+        let mut buf = [0u16; 16];
+        let mut largo = std::mem::size_of_val(&buf) as u32;
+        let e = unsafe {
+            RegGetValueW(
+                HKEY_CURRENT_USER,
+                PCWSTR(r.as_ptr()),
+                w!("idioma"),
+                RRF_RT_REG_SZ,
+                None,
+                Some(buf.as_mut_ptr().cast::<c_void>()),
+                Some(&mut largo as *mut u32),
+            )
+        };
+        if e == ERROR_SUCCESS {
+            let n = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+            let v = String::from_utf16_lossy(&buf[..n]);
+            if matches!(v.as_str(), "es" | "en" | "pt") {
+                return v;
+            }
+        }
     }
+    "en".into()
 }
 
 fn aviso(textos: &Textos, titulo: &str, cuerpo: &str) {

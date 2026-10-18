@@ -184,18 +184,23 @@ function pantalla(nombre) {
     // «Hoy, en todo el navegador», at the top of the shield: the same figures as the new tab.
     dia: await panel.evaluate(() => ['e-dia-frase', 'e-dia-cortadas', 'e-dia-datos', 'e-dia-parametros', 'e-dia-corredores'].map((k) => document.getElementById(k).textContent)),
   });
-  const enfocado = () => panel.evaluate(() => { const b = document.activeElement; const l = b && b.closest && b.closest('#e-terceros li'); return l ? [l.dataset.sitio, b.textContent] : null; });
-  // A button press, and what must hold after it: the same place, height and button column,
-  // the focus on that row's button, the figures untouched; only the words change.
-  const pulsa = async (sitio, palabraAntes, palabraDespues, que) => {
+  const enfocado = () => panel.evaluate(() => { const b = document.activeElement; const l = b && b.closest && b.closest('#e-terceros li'); return l ? [l.dataset.sitio, b.getAttribute('aria-checked') || b.textContent] : null; });
+  // A switch press (18 Oct 2026: the cut switch replaced «Bloquear» / «Desbloquear»), and what
+  // must hold after it: the same place, height and button column, the focus on that row's
+  // switch, the figures untouched; only the switch and its word change.
+  // aria-checked="true" is «Permitido» and «false» is «Cortado» (the switch's common standard).
+  const interruptor = (sitio) => fila(sitio).locator('.botones button.interruptor');
+  const pulsa = async (sitio, cortadoAntes, que) => {
     const pos = await posicion(sitio);
     const medidas = await caja(sitio);
     await espera(1500);
     const antes = await cifras();
-    const boton = fila(sitio).locator('.botones button', { hasText: palabraAntes });
-    comprueba((await boton.count()) === 1, `${que}: la fila ofrece «${palabraAntes}»`);
-    await boton.click();
-    comprueba(await hasta(async () => (await fila(sitio).locator('.botones button').first().textContent()) === palabraDespues), `${que}: el botón pasa a «${palabraDespues}» en su sitio`);
+    const sw = interruptor(sitio);
+    comprueba((await sw.count()) === 1 && (await sw.getAttribute('aria-checked')) === String(!cortadoAntes) && !(await sw.isDisabled()), `${que}: la fila tiene su interruptor ${cortadoAntes ? 'en rojo (cortado)' : 'en verde (permitido)'}`);
+    await sw.click();
+    comprueba(await hasta(async () => (await sw.getAttribute('aria-checked')) === String(cortadoAntes) && (await sw.getAttribute('aria-busy')) === null), `${que}: el interruptor pasa a ${cortadoAntes ? 'verde (permitido)' : 'rojo (cortado)'} en su sitio`);
+    const palabra = await fila(sitio).locator('.botones .interruptor-estado').textContent();
+    comprueba(!!palabra && palabra.trim().length > 0, `${que}: el interruptor dice su estado en palabras («${palabra}»)`);
     comprueba((await posicion(sitio)) === pos, `${que}: la fila sigue en la posición ${pos}`);
     comprueba(JSON.stringify(await caja(sitio)) === JSON.stringify(medidas), `${que}: misma altura y misma columna de botones (${JSON.stringify(medidas)})`);
     const foco = await enfocado();
@@ -204,9 +209,9 @@ function pantalla(nombre) {
     const despues = await cifras();
     comprueba(despues === antes, `${que}: las cifras del escudo, del día y de «Hoy» no cambian al pulsar${despues === antes ? '' : ` (${antes} → ${despues})`}`);
   };
-  await pulsa('doubleclick.net', 'Desbloquear', 'Volver a bloquear', 'desbloquear');
-  comprueba(await fila('doubleclick.net').evaluate((l) => !l.classList.contains('cortado') && l.textContent.includes('desbloqueado por ti')), 'desbloqueado, la fila dice que fue cosa tuya');
-  await pulsa('doubleclick.net', 'Volver a bloquear', 'Desbloquear', 'volver a bloquear');
+  await pulsa('doubleclick.net', true, 'desbloquear');
+  comprueba(await fila('doubleclick.net').evaluate((l) => !l.classList.contains('cortado') && l.textContent.includes('permitido por ti')), 'desbloqueado, la fila dice que fue cosa tuya');
+  await pulsa('doubleclick.net', false, 'volver a bloquear');
   comprueba(await fila('doubleclick.net').evaluate((l) => l.classList.contains('cortado')), 'y vuelve a quedar cortado, como estaba');
   // Maximum protection: a beacon to another company, which passed, no longer leaves.
   const baliza = async (ruta) => { await web.evaluate(([p, r]) => navigator.sendBeacon(`http://collect.otra-empresa.io:${p}${r}`, 'x'), [PUERTO, ruta]); await espera(800); };
@@ -218,10 +223,10 @@ function pantalla(nombre) {
   comprueba(!vio('collect.otra-empresa.io', '/baliza-2'), 'con protección máxima, ese aviso ya no sale');
   // And it has its way back, like any other cut (review of 10 Oct 2026).
   comprueba(await hasta(async () => (await fila('otra-empresa.io').count()) === 1 && (await fila('otra-empresa.io').evaluate((l) => l.classList.contains('cortado') || l.classList.contains('parcial')))), 'lo que corta la protección máxima sale como cortado, con «Desbloquear»');
-  await pulsa('otra-empresa.io', 'Desbloquear', 'Volver a bloquear', 'protección máxima, desbloquear');
+  await pulsa('otra-empresa.io', true, 'protección máxima, desbloquear');
   await baliza('/baliza-3');
   comprueba(vio('collect.otra-empresa.io', '/baliza-3'), 'desbloqueado, ese aviso vuelve a salir');
-  await pulsa('otra-empresa.io', 'Volver a bloquear', 'Desbloquear', 'protección máxima, volver a bloquear');
+  await pulsa('otra-empresa.io', false, 'protección máxima, volver a bloquear');
   await panel.click('#e-maxima-quitar');
   comprueba(await hasta(() => panel.evaluate(() => document.querySelector('#e-maxima-activa').classList.contains('oculto'))), 'y se puede desactivar');
   await espera(600);
@@ -291,11 +296,11 @@ function pantalla(nombre) {
   await hasta(() => panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa')));
   const textoChivatos = async () => panel.evaluate(() => document.querySelector('#e-chivatos').textContent);
   comprueba(await hasta(async () => { const x = await textoChivatos(); return x.includes('A Meta') && x.includes('compra') && x.includes('89.900 COP'); }), `el escudo dice lo que la página intentó contarle a Meta: la compra y el importe (${await textoChivatos()})`);
-  comprueba((await textoChivatos()).includes('con tu correo cifrado'), 'y que llevaba tu correo cifrado');
+  comprueba((await textoChivatos()).includes('con tu correo convertido en hash'), 'y que llevaba tu correo cifrado');
   comprueba(await panel.evaluate(() => [...document.querySelectorAll('#e-chivatos li')].every((l) => l.classList.contains('cortado'))), 'cada línea dice «cortado»');
   comprueba((await panel.textContent('#e-chivatos-titulo')) === 'Lo que esta página intentó contar de ti', 'la sección se titula «Lo que esta página intentó contar de ti»');
   const tarjeta = await panel.textContent('#e-tarjeta-frase');
-  comprueba(tarjeta.includes('intentó contarles a 2 empresas que compré, con mi correo cifrado'), `la tarjeta para compartir lo dice en una frase (${tarjeta})`);
+  comprueba(tarjeta.includes('intentó contarles a 2 empresas que compré, con mi correo convertido en hash'), `la tarjeta para compartir lo dice en una frase (${tarjeta})`);
   comprueba(!/89|COP|ana@/.test(tarjeta), 'y no lleva importes ni el correo');
   comprueba(await panel.locator('#e-terceros li.cortado', { hasText: 'facebook.com' }).count() === 1, 'Meta sale cortada');
   await espera(500);

@@ -85,6 +85,8 @@ p { margin: 0 0 10px; }
 .tercero .botones .boton { width: 100%; min-width: 0; height: 26px; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tercero .botones .boton.vacio { visibility: hidden; }
 .tercero .botones .boton[aria-busy="true"] { opacity: .55; cursor: progress; }
+.tercero .botones .interruptor-caja { min-width: 0; height: 26px; gap: 8px; }
+.tercero .botones .interruptor-estado { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tercero.enviando .chip.estado { opacity: .55; }
 .tercero .nota-dato { grid-column: 1 / -1; grid-row: 4; color: var(--gris); font-size: 12px; }
 .vacio { padding: 18px 0; color: var(--gris); }
@@ -451,6 +453,7 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
 
 </main>
 <div id="aviso" role="status" aria-live="polite"></div>
+<script src="interruptor.js"></script>
 <script src="puente.js"></script>
 <script src="panel.js"></script>
 </body>

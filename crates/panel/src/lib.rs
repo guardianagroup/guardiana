@@ -535,6 +535,9 @@ const DISENO_CSS: &str = include_str!("../static/diseno.css");
 const POR_DENTRO_JS: &str = include_str!("../static/por-dentro.js");
 /// «Revisión del ordenador» (1.0.24): its own script too.
 const REVISION_JS: &str = include_str!("../static/revision.js");
+/// The cut switch (18 Oct 2026): one component for the panel and ZERO. The same file travels in
+/// ZERO (`zero/navegador/interfaz/interruptor.js`); a test keeps them equal.
+const INTERRUPTOR_JS: &str = include_str!("../static/interruptor.js");
 
 /// A short tag of the script and the style sheet, so the pages ask for them by a name that
 /// changes when they do and the browser may keep them for a while. Until 1.0.12 every navigation
@@ -550,6 +553,7 @@ pub(crate) fn version_estaticos() -> &'static str {
         DISENO_CSS.hash(&mut h);
         POR_DENTRO_JS.hash(&mut h);
         REVISION_JS.hash(&mut h);
+        INTERRUPTOR_JS.hash(&mut h);
         format!("{:016x}", h.finish())
     })
 }
@@ -572,6 +576,10 @@ pub(crate) fn pagina(html: &'static str) -> Html<String> {
             .replace(
                 "/static/revision.js\"",
                 &format!("/static/revision.js?v={v}\""),
+            )
+            .replace(
+                "/static/interruptor.js\"",
+                &format!("/static/interruptor.js?v={v}\""),
             ),
     )
 }
@@ -849,6 +857,16 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             }),
         )
         .route(
+            "/static/interruptor.js",
+            get(|RawQuery(q): RawQuery| async move {
+                estatico(
+                    INTERRUPTOR_JS,
+                    "application/javascript; charset=utf-8",
+                    q.as_deref(),
+                )
+            }),
+        )
+        .route(
             "/revision",
             get(|| async { pagina(include_str!("../static/revision.html")) }),
         )
@@ -975,6 +993,17 @@ mod diseno_compartido {
             super::DISENO_CSS,
             zero,
             "diseno.css differs between the panel and ZERO"
+        );
+    }
+
+    /// The cut switch too: one component, byte for byte, in the panel and in ZERO.
+    #[test]
+    fn the_cut_switch_is_the_same_in_the_panel_and_in_zero() {
+        let zero = include_str!("../../../zero/navegador/interfaz/interruptor.js");
+        assert_eq!(
+            super::INTERRUPTOR_JS,
+            zero,
+            "interruptor.js differs between the panel and ZERO"
         );
     }
 }
