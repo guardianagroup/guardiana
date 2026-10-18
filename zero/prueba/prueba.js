@@ -210,7 +210,7 @@ function pantalla(nombre) {
     comprueba(despues === antes, `${que}: las cifras del escudo, del día y de «Hoy» no cambian al pulsar${despues === antes ? '' : ` (${antes} → ${despues})`}`);
   };
   await pulsa('doubleclick.net', true, 'desbloquear');
-  comprueba(await fila('doubleclick.net').evaluate((l) => !l.classList.contains('cortado') && l.textContent.includes('desbloqueado por ti')), 'desbloqueado, la fila dice que fue cosa tuya');
+  comprueba(await fila('doubleclick.net').evaluate((l) => !l.classList.contains('cortado') && l.textContent.includes('permitido por ti')), 'desbloqueado, la fila dice que fue cosa tuya');
   await pulsa('doubleclick.net', false, 'volver a bloquear');
   comprueba(await fila('doubleclick.net').evaluate((l) => l.classList.contains('cortado')), 'y vuelve a quedar cortado, como estaba');
   // Maximum protection: a beacon to another company, which passed, no longer leaves.
@@ -296,11 +296,11 @@ function pantalla(nombre) {
   await hasta(() => panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa')));
   const textoChivatos = async () => panel.evaluate(() => document.querySelector('#e-chivatos').textContent);
   comprueba(await hasta(async () => { const x = await textoChivatos(); return x.includes('A Meta') && x.includes('compra') && x.includes('89.900 COP'); }), `el escudo dice lo que la página intentó contarle a Meta: la compra y el importe (${await textoChivatos()})`);
-  comprueba((await textoChivatos()).includes('con tu correo cifrado'), 'y que llevaba tu correo cifrado');
+  comprueba((await textoChivatos()).includes('con tu correo convertido en hash'), 'y que llevaba tu correo cifrado');
   comprueba(await panel.evaluate(() => [...document.querySelectorAll('#e-chivatos li')].every((l) => l.classList.contains('cortado'))), 'cada línea dice «cortado»');
   comprueba((await panel.textContent('#e-chivatos-titulo')) === 'Lo que esta página intentó contar de ti', 'la sección se titula «Lo que esta página intentó contar de ti»');
   const tarjeta = await panel.textContent('#e-tarjeta-frase');
-  comprueba(tarjeta.includes('intentó contarles a 2 empresas que compré, con mi correo cifrado'), `la tarjeta para compartir lo dice en una frase (${tarjeta})`);
+  comprueba(tarjeta.includes('intentó contarles a 2 empresas que compré, con mi correo convertido en hash'), `la tarjeta para compartir lo dice en una frase (${tarjeta})`);
   comprueba(!/89|COP|ana@/.test(tarjeta), 'y no lleva importes ni el correo');
   comprueba(await panel.locator('#e-terceros li.cortado', { hasText: 'facebook.com' }).count() === 1, 'Meta sale cortada');
   await espera(500);
