@@ -1794,6 +1794,11 @@
       if (!window.GuardianaUniverso) return;
       await window.GuardianaUniverso.iniciar({ api, t, tn, esc, LOC, LANG, cadaTanto, pdf: { pdfDocument, savePdfFile } });
     },
+    // «Quién es cada destino» (1.0.45): its own script (identificacion.js), loaded before this one.
+    async identificacion() {
+      if (!window.GuardianaIdentificacion) return;
+      await window.GuardianaIdentificacion.iniciar({ api, t, tn, esc, LOC, LANG });
+    },
     // «Revisión del ordenador» (1.0.24): its own script (revision.js), loaded before this one.
     async revision() {
       if (!window.GuardianaRevision) return;

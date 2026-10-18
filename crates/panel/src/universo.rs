@@ -280,6 +280,21 @@ struct Destino {
     /// Where the server is, to the region or the city, when its own operator publishes it
     /// (1.0.24); `None` when only the country is known.
     lugar: Option<LugarServidor>,
+    /// Who is behind the destination, how sure and why, apart from the network (1.0.45; fields
+    /// documented in `identificacion.rs`).
+    identidad: Option<guardiana_lists::atribucion::Atribucion>,
+    /// Where its server is, as precisely as the evidence says (1.0.45). `None` for a name that
+    /// was stopped before it left.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ubicacion: Option<guardiana_lists::ubicacion::Ubicacion>,
+}
+
+/// The place key most of a destination's bytes went to.
+fn clave_lugar(lugares: &HashMap<String, u64>) -> Option<&String> {
+    lugares
+        .iter()
+        .max_by(|a, b| a.1.cmp(b.1).then(b.0.cmp(a.0)))
+        .map(|(k, _)| k)
 }
 
 /// The place an operator publishes for its servers, as the page draws and tells it.
@@ -602,6 +617,17 @@ pub(crate) async fn universo(
             .unwrap_or("")
             .to_owned();
         destinos.push(Destino {
+            identidad: Some(guardiana_lists::atribucion::atribuir(
+                &guardiana_lists::atribucion::Pistas {
+                    qname: &destino,
+                    asn: a.asn,
+                    ..Default::default()
+                },
+            )),
+            ubicacion: Some(guardiana_lists::ubicacion::ubicacion_de_clave(
+                clave_lugar(&a.lugares).map_or("", String::as_str),
+                &pais,
+            )),
             lugar: lugar_servidor(&a.lugares),
             empresa,
             regla: regla_de(&rules, &destino, categoria, now),
@@ -675,6 +701,13 @@ pub(crate) async fn universo(
             paradas: *paradas,
             sede: true,
             lugar: None,
+            identidad: Some(guardiana_lists::atribucion::atribuir(
+                &guardiana_lists::atribucion::Pistas {
+                    qname: nombre,
+                    ..Default::default()
+                },
+            )),
+            ubicacion: None,
         });
     }
     destinos.sort_by(|a, b| {
@@ -685,6 +718,28 @@ pub(crate) async fn universo(
     });
     let destinos_omitidos = destinos.len().saturating_sub(MAX_DESTINOS);
     destinos.truncate(MAX_DESTINOS);
+    // 1.0.45: the alias sites the resolver kept say whose service answered under a name.
+    let alias = crate::identificacion::alias_de(
+        &state,
+        destinos
+            .iter()
+            .filter(|d| !d.destino.is_empty())
+            .map(|d| d.destino.clone())
+            .collect(),
+    )?;
+    for d in &mut destinos {
+        if let Some(a) = alias.get(&d.destino) {
+            let visto = guardiana_core::time::day_utc(a.last_seen);
+            d.identidad = Some(guardiana_lists::atribucion::atribuir(
+                &guardiana_lists::atribucion::Pistas {
+                    qname: &d.destino,
+                    alias: &a.sites,
+                    alias_visto: Some(&visto),
+                    asn: d.asn,
+                },
+            ));
+        }
+    }
 
     let recientes: Vec<Reciente> = filas
         .iter()

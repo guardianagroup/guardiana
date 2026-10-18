@@ -367,26 +367,23 @@ fn dueno_directo(qname: &str) -> Option<DuenoDirecto> {
         });
     }
     // The maker's own documentation: a second proof for a company already known, or the owner.
-    for av in antivirus::antivirus() {
-        if let Some(d) = antivirus::uso_documentado(av, qname) {
-            let prueba = Prueba {
-                fuente: Fuente::Fabricante,
-                detalle: d.fuente.to_owned(),
-                fecha: FECHA_ANTIVIRUS.to_owned(),
-            };
-            match out.as_mut() {
-                Some(o) => o.pruebas.push(prueba),
-                None => {
-                    out = Some(DuenoDirecto {
-                        empresa: av.empresa,
-                        grupo: None,
-                        pais: Some(av.pais).filter(|p| p.len() == 2),
-                        ciudad: None,
-                        pruebas: vec![prueba],
-                    });
-                }
+    if let Some((av, d)) = documentado(qname) {
+        let prueba = Prueba {
+            fuente: Fuente::Fabricante,
+            detalle: d.fuente.to_owned(),
+            fecha: FECHA_ANTIVIRUS.to_owned(),
+        };
+        match out.as_mut() {
+            Some(o) => o.pruebas.push(prueba),
+            None => {
+                out = Some(DuenoDirecto {
+                    empresa: av.empresa,
+                    grupo: None,
+                    pais: Some(av.pais).filter(|p| p.len() == 2),
+                    ciudad: None,
+                    pruebas: vec![prueba],
+                });
             }
-            break;
         }
     }
     if let Some(b) = data_broker_of(qname) {
@@ -428,6 +425,23 @@ fn dueno_directo(qname: &str) -> Option<DuenoDirecto> {
         }
     }
     out
+}
+
+/// The antivirus maker that documents `qname` (or a parent of it) as its own, with the entry:
+/// the longest documented name wins, the first maker in the list's order on a tie.
+fn documentado(qname: &str) -> Option<(&'static antivirus::Antivirus, antivirus::DominioAv)> {
+    type Mapa = HashMap<&'static str, (&'static antivirus::Antivirus, antivirus::DominioAv)>;
+    static M: OnceLock<Mapa> = OnceLock::new();
+    let m = M.get_or_init(|| {
+        let mut m: Mapa = HashMap::new();
+        for av in antivirus::antivirus() {
+            for d in &av.dominios {
+                m.entry(d.dominio).or_insert((av, *d));
+            }
+        }
+        m
+    });
+    crate::lookup(m, qname)
 }
 
 fn fecha_lista_o(texto: &'static str, otra: &str) -> String {

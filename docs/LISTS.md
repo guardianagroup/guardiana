@@ -104,7 +104,33 @@ AdGuard DNS filter (GPL-3.0, ~176 000 dominios, mezcla publicidad y rastreo) y S
 | `sectores.txt` | etiqueta de sector | A qué se dedica una web conocida (deporte, noticias, banca, compras, red social, gobierno…): unas 560 webs grandes de Colombia, España, América Latina, Brasil, Portugal y Estados Unidos, comprobadas por su propia web. El panel lo dice en lugar de «sin clasificar» para la dirección principal de esa web; un subnombre que dice lo que es (`cdn.`, `login.`) sigue diciendo eso. No cambia la categoría ni corta nada (9 oct 2026). |
 | `antivirus.txt` | «Tu antivirus» (desde 1.0.20) | Los procesos de Windows de 14 antivirus, los nombres que su propio fabricante documenta con su uso (actualizaciones, nube, muestras, licencia, telemetría, mensajes) y la página que lo dice, y las decisiones oficiales de autoridades sobre cada uno (multas, órdenes, sentencias, prohibiciones, advertencias, compromisos) con el enlace a la autoridad. No cambia la categoría ni corta nada. Método y límites en [ANTIVIRUS.md](ANTIVIRUS.md). |
 
+| `empresas-mundo.txt` | etiqueta (no categoría) | Desde 1.0.45: más dueños para personas de cualquier país, con el mismo formato que `empresas.txt` y secciones `@=Empresa` que añaden nombres a una empresa ya escrita (hereda de allí su país, su ciudad y su grupo). Sistemas, navegadores, nube, antivirus y seguridad, IA, comercio y pagos de China, Corea, Japón, India y el Sudeste Asiático, Rusia, Europa y América Latina, gobiernos, universidades, prensa, bancos. Un dominio está una sola vez entre los dos archivos. Lleva su línea `# edicion:`. |
+| `redes.txt` | etiqueta de la red | Desde 1.0.45: qué clase de red es cada sistema autónomo (propia de una empresa, mixta, nube, reparto, seguridad, alojamiento, operador de acceso), con unas palabras que el nombre que da DB-IP debe contener: una prueba lo comprueba contra la base que va en el programa. Es lo que deja decir «servidor alquilado en Amazon Web Services» sin decir «Amazon». |
+| `alojamiento.txt` | etiqueta | Nubes y plataformas donde cualquiera publica bajo el nombre de la plataforma (`x.herokuapp.com`, `tienda.myshopify.com`, `blog.blogspot.com`): el nombre es de quien alquila, no de la nube. Una entrada más larga de las listas de empresas gana. |
+
 Cualquiera puede proponer cambios a estas listas con un cambio en el repositorio.
+
+## Quién hay detrás de un destino, y con qué seguridad (1.0.45)
+
+`crates/lists/src/atribucion.rs` junta, en este orden, todo lo que el programa sabe de un nombre sin
+preguntar a nadie: (1) el nombre en las listas de empresas, en la documentación del fabricante
+(`antivirus.txt`), en el registro de corredores o en la lista de IA; (2) los alias (CNAME) que vio el
+propio resolutor de GUARDIANA en la respuesta, que dicen de quién es el servicio que contesta bajo un
+nombre que parece propio (`metricas.tienda.com` → Adobe); (3) la red que respondió, solo si es una red
+propia de una empresa en `redes.txt` **y** DB-IP dice lo mismo. Da tres niveles: «Identificada» (una
+fuente directa), «Probable» (la red propia y DB-IP coinciden) y «Sin identificar» (se enseña el
+operador de la red). Cada pista lleva su fuente y su fecha. La empresa del servicio va aparte de la
+infraestructura: una nube, una red de reparto o un operador de acceso nunca son «la empresa».
+
+El lugar del servidor (`crates/lists/src/ubicacion.rs`) va con la precisión de su prueba y ninguna
+más: ciudad solo cuando el operador la declara en su geofeed (RFC 8805); región cuando una nube
+publica la región de sus direcciones; si no, la región o el país de DB-IP, siempre «aprox.», y la
+ciudad que adivina la base solo como «cerca de». Nunca se da un radio de error: ninguna de estas
+fuentes lo publica para una dirección.
+
+Los alias se guardan por nombre en la tabla `alias_sites` (solo sitios, nunca direcciones; fuera de la
+cadena de hashes; con la retención del detalle; «Borrar todo» los borra), y solo de los aparatos cuyo
+detalle se comparte con la casa.
 
 Y una lista de otros, para leer los nombres: `public_suffix_list.dat`, la Public Suffix List de Mozilla
 (MPL-2.0), en `crates/lists/data/` desde el 11 de octubre de 2026 (antes estaba en `crates/zero/data/`;
