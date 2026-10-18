@@ -860,8 +860,18 @@
       // A city name you can read at a glance: sans, semibold, on a near-opaque pill.
       cx.font = '600 12px "Hanken Grotesk", "Segoe UI", system-ui, sans-serif';
       const w = cx.measureText(txt).width + 16, h = 21;
-      let bx = Math.min(st.W - w - 6, Math.max(6, x)), by = y - h + 4;
-      if (puestos) { let n = 0; while (n++ < 12 && puestos.some((b) => bx < b.x + b.w && bx + w > b.x && by < b.y + b.h && by + h > b.y)) by += h + 2; puestos.push({ x: bx, y: by, w, h }); }
+      // A name stays next to its own dot (the owner, 18 Oct 2026: looking at South America he saw
+      // «Virginia del Norte» and «Toronto» there). Before, a name that collided was pushed down
+      // up to 12 rows and squeezed inside the screen, so it slid far from its place. Now it may
+      // only move to the other side of its dot or one row up or down; if none is free, or it
+      // would leave the screen, it is not drawn (the dot is still there, and hover names it).
+      const y0 = y - h + 4, sitios = [[x, y0], [x - w - 28, y0], [x, y0 - h - 2], [x, y0 + h + 2]];
+      const libre = (bx, by) => bx >= 6 && bx + w <= st.W - 6 && by >= 6 && by + h <= st.H - 6
+        && !(puestos && puestos.some((b) => bx < b.x + b.w && bx + w > b.x && by < b.y + b.h && by + h > b.y));
+      const s = sitios.find(([a, b]) => libre(a, b));
+      if (!s) return false;
+      const [bx, by] = s;
+      if (puestos) puestos.push({ x: bx, y: by, w, h });
       cx.fillStyle = 'rgba(3,8,18,.88)'; cx.beginPath(); if (cx.roundRect) cx.roundRect(bx, by, w, h, 5); else cx.rect(bx, by, w, h); cx.fill();
       cx.strokeStyle = 'rgba(255,255,255,.14)'; cx.lineWidth = 1; cx.stroke();
       cx.fillStyle = col; cx.fillRect(bx + 4, by + 5, 2, h - 10);

@@ -71,7 +71,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SystemParametersInfoW, TranslateMessage, GWL_STYLE, HICON, HWND_TOP, ICON_BIG, ICON_SMALL,
     IDC_ARROW, LR_DEFAULTCOLOR, MB_ICONWARNING, MB_OK, MINMAXINFO, MSG, SIZE_MINIMIZED,
     SPI_GETWORKAREA, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOZORDER, SW_RESTORE,
-    SW_SHOW, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WDA_EXCLUDEFROMCAPTURE,
+    SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WDA_EXCLUDEFROMCAPTURE,
     WDA_MONITOR, WDA_NONE, WINDOW_EX_STYLE, WM_APP, WM_CLOSE, WM_COPYDATA, WM_DESTROY,
     WM_DPICHANGED, WM_GETMINMAXINFO, WM_MOVE, WM_MOVING, WM_SETFOCUS, WM_SETICON, WM_SIZE,
     WM_TIMER, WNDCLASSEXW, WS_OVERLAPPEDWINDOW,
@@ -330,8 +330,10 @@ fn muestra_ventana() {
         return;
     }
     let h = hwnd();
+    // Maximised from the first moment (the owner, 18 Oct 2026: «nada más abrir… debe hacerse a
+    // pantalla completa»). The 85 % size above stays as the size it returns to when restored.
     unsafe {
-        let _ = ShowWindow(h, SW_SHOW);
+        let _ = ShowWindow(h, SW_SHOWMAXIMIZED);
         let _ = SetForegroundWindow(h);
     }
 }
