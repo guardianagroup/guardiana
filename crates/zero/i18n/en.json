@@ -1288,5 +1288,8 @@
   "sec_in_moviles": "Phones",
   "sec_in_moviles_t": "They take part from the browser: the phone's system does not allow other apps to be checked",
   "sec_in_otro_nada": "No data: their GUARDIANA version is older",
-  "sec_in_otro_no_vigilable": "Their system does not allow this check"
+  "sec_in_otro_no_vigilable": "Their system does not allow this check",
+  "lanzador_esperando": "GUARDIANA is starting. The panel opens here as soon as the service answers.",
+  "lanzador_sin_servicio": "The GUARDIANA service is not answering. Restart the computer; if nothing changes, run the GUARDIANA installer again and choose “Repair”.",
+  "lanzador_sin_llave": "The GUARDIANA service answers, but the panel's key could not be read. Close this window and open GUARDIANA again from the Start menu; if nothing changes, restart the computer."
 }

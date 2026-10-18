@@ -655,8 +655,24 @@ fn es_panel_guardiana(url: &str) -> bool {
 }
 
 fn es_enlace_panel_guardiana(url: &str) -> bool {
-    url.strip_prefix("http://127.0.0.1:7443/?t=")
-        .is_some_and(|token| token.len() == 64 && token.bytes().all(|b| b.is_ascii_hexdigit()))
+    let llave = |token: &str| token.len() == 64 && token.bytes().all(|b| b.is_ascii_hexdigit());
+    if let Some(token) = url.strip_prefix("http://127.0.0.1:7443/?t=") {
+        return llave(token);
+    }
+    // 1.0.44: the licence page with a key from a `guardiana://activar` link, in the fragment.
+    url.strip_prefix("http://127.0.0.1:7443/licencia?t=")
+        .and_then(|resto| resto.split_once("#clave="))
+        .is_some_and(|(token, clave)| llave(token) && crate::lanzador::es_clave_valida(clave))
+}
+
+/// ZERO's own wait page for the panel (1.0.44), as it is or saying what failed.
+fn es_espera_propia(url: &str) -> bool {
+    [
+        crate::lanzador::ESPERA,
+        crate::lanzador::ESPERA_SIN_SERVICIO,
+        crate::lanzador::ESPERA_SIN_LLAVE,
+    ]
+    .contains(&url)
 }
 
 impl Sesion {
@@ -746,13 +762,16 @@ impl Sesion {
     }
 
     /// Open Guardiana's local panel inside this same window. The launcher only hands us the
-    /// loopback panel (or its local wait page), never an arbitrary external address.
+    /// loopback panel (or its local wait page, or ZERO's own), never an arbitrary external
+    /// address.
     pub fn abre_guardiana(&mut self, url: &str) -> Vec<Orden> {
         let url = url.trim();
         let espera_local = url.starts_with("file:///")
             && url.ends_with("/guardiana-arrancando.html")
             && !url.contains("../");
-        if url.len() > 8_192 || !(es_enlace_panel_guardiana(url) || espera_local) {
+        if url.len() > 8_192
+            || !(es_enlace_panel_guardiana(url) || espera_local || es_espera_propia(url))
+        {
             return Vec::new();
         }
         // The program is opening. Three product tabs, in this order, created together so the
@@ -796,6 +815,12 @@ impl Sesion {
             ordenes.push(self.estado());
         }
         ordenes
+    }
+
+    /// The texts in the language the person reads the browser in.
+    #[must_use]
+    pub const fn textos(&self) -> Textos {
+        self.textos
     }
 
     /// The engine's version, once the shell knows it.

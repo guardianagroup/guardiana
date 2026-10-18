@@ -21,6 +21,7 @@ pub mod favoritos;
 pub mod fecha;
 pub mod filtros;
 pub mod grupo;
+pub mod lanzador;
 pub mod libro;
 pub mod licencia;
 pub mod mandato;

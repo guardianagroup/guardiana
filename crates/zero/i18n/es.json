@@ -1288,5 +1288,8 @@
   "sec_in_moviles": "Móviles",
   "sec_in_moviles_t": "Participan desde el navegador: el sistema del móvil no permite verificar otras aplicaciones",
   "sec_in_otro_nada": "Sin datos: su versión de GUARDIANA es anterior",
-  "sec_in_otro_no_vigilable": "Su sistema no permite esta verificación"
+  "sec_in_otro_no_vigilable": "Su sistema no permite esta verificación",
+  "lanzador_esperando": "GUARDIANA está arrancando. El panel se abre aquí en cuanto el servicio responda.",
+  "lanzador_sin_servicio": "El servicio de GUARDIANA no responde. Reinicia el equipo; si sigue igual, vuelve a ejecutar el instalador de GUARDIANA y elige «Reparar».",
+  "lanzador_sin_llave": "El servicio de GUARDIANA responde, pero no se pudo leer la llave del panel. Cierra esta ventana y abre GUARDIANA otra vez desde el menú Inicio; si sigue igual, reinicia el equipo."
 }
