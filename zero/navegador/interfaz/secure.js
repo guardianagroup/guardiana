@@ -11,6 +11,8 @@
   const fechaHora = (s) => (s ? new Date(s * 1000).toLocaleString(document.documentElement.lang || 'es') : RAYA);
   const sino = (v) => (v === true ? t('sec_si') : v === false ? t('sec_no') : RAYA);
   const num = (v, unidad) => (v === null || v === undefined ? RAYA : n(v) + (unidad || ''));
+  // 1.0.46 (C2): two initials, «Laura Méndez» → «LM», «Oscar» → «O».
+  const iniciales = (x) => { const p = String(x || '').trim().split(/\s+/).filter(Boolean); return p.length ? (Array.from(p[0])[0] + (p.length > 1 ? Array.from(p[p.length - 1])[0] : '')).toUpperCase() : '·'; };
   const NIVEL = { info: 'sec_nivel_info', observada: 'sec_nivel_observada', inusual: 'sec_nivel_inusual', no_verificable: 'sec_nivel_no_verificable' };
   const CHIP = { info: '', observada: ' aviso', inusual: ' aviso', no_verificable: '' };
 
@@ -107,9 +109,9 @@
   setInterval(() => { if (!$('p').hidden) pintaPausa(ultimo); }, 1000);
 
   // The incident card (16 Oct 2026): a stop that looks like an interference. Red, on top, with
-  // what tripped, by which path, and what can honestly be said about the other end: on a
-  // direct link, its address with country and network from the bundled base, for this card
-  // only; through the relay, nothing. Nothing is kept unless the person saves the report.
+  // what tripped and by which path: «directo por la misma red», «directo» or «por relé · ciudad».
+  // Never the other end's address, not on the card and not in the saved report (18 Oct 2026, the
+  // owner: «nunca guardar IPs»). Nothing is kept unless the person saves the report.
   let I = null;
   function pintaIncidente(m) {
     const i = m.incidente || null;
@@ -238,7 +240,7 @@
     $('c-codigo-texto').textContent = t('sec_c_listo');
     $('c-via').textContent = E.codigo ? t('sec_c_via_puerta') : E.rele_codigo ? t('sec_c_via_rele') : '';
     $('c-puerta-error').hidden = !(f === 'escuchando' && E.puerta_error && !codigo && E.rele_error);
-    if (E.puerta_error) $('c-puerta-error').textContent = t('sec_c_sin_puerta', { p: E.puerto, e: E.puerta_error }) + (E.rele_error ? ' ' + t('sec_rele_fallo', { e: E.rele_error }) : '');
+    if (E.puerta_error) $('c-puerta-error').textContent = t('sec_c_sin_puerta', { p: E.puerto, e: E.puerta_error }) + (E.rele_error ? ' ' + (String(E.rele_error).includes('GUARDIANA Free') ? t('sala_plus_rele') : t('sec_rele_fallo', { e: E.rele_error })) : '');
     $('c-espera-texto').textContent = t(f === 'saludando' ? 'sec_e_saludando' : f === 'abriendo' ? 'sec_e_abriendo' : f === 'buscando' ? 'sec_e_buscando' : 'sec_e_esperando');
     if (comparando) $('c-numeros').innerHTML = comparando.map((x) => `<b>${esc(String(x).padStart(4, '0'))}</b>`).join('');
     if (E.comparando) { if (!$('c-nombre').dataset.nuevo) { $('c-nombre').value = ''; $('c-nombre').dataset.nuevo = '1'; } }
@@ -248,7 +250,7 @@
     $('c-con').textContent = nombres.length > 2 ? t('sec_m_grupo', { n: nombres.join(' · ') }) : E.contacto ? E.contacto : '';
     // The avatar: the first letter of the name (the design the owner chose, 16 Oct 2026).
     const quien = nombres.length > 2 ? nombres.filter((x) => x !== g.yo)[0] || '' : (E.contacto || '');
-    $('c-avatar-letra').textContent = (quien.trim()[0] || '·').toUpperCase();
+    $('c-avatar-letra').textContent = iniciales(quien);
     pintaLista(E, quien, nombres);
     // Under the name, three quiet dots: encrypted, verified with you, and the level.
     const idn = (E.monitor || {}).identidad;
@@ -310,7 +312,24 @@
     const k = l.segundos != null ? (l.video ? 'sec_ll_video' : 'sec_ll_voz') : l.fin === 'perdida' ? (l.video ? 'sec_ll_video_perdida' : 'sec_ll_voz_perdida') : l.fin === 'sin_respuesta' ? 'sec_ll_sin_respuesta' : (l.fin === 'rechazada' || l.fin === 'rechazada_aqui') ? 'sec_ll_rechazada' : 'sec_ll_cancelada';
     return t(k) + d;
   };
-  const metaMensaje = (m) => `<time>${m.editado ? esc(t('sec_m_editado')) + ' · ' : ''}${esc(hora(m.t))}${m.mio && m.estado ? ' ' + (TICK[m.estado] || '') : ''}</time>`;
+  // 1.0.46 (C2-a): a file this side sent, as a card. Nothing is estimated: the speed is the
+  // file's size over the measured time, and while it travels, the program's own percentage.
+  const coma1 = (x) => Number(x).toLocaleString(document.documentElement.lang || 'es', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const tarjetaEnvio = (nombre, x) => {
+    const idn = (E.monitor || {}).identidad;
+    const verificado = !!idn && idn.estado !== 'clave_cambiada';
+    const llego = x && typeof x.llego_en === 'number';
+    const viaja = E.envio && E.envio.nombre === nombre;
+    const cifras = [x ? tam(x.bytes) : ''];
+    if (llego && x.llego_en > 0) { cifras.push(t('sala_mbs', { v: coma1(x.bytes / x.llego_en / 1e6) })); cifras.push(coma1(x.llego_en) + ' s'); }
+    const insignia = llego ? `<span class="sala-insignia ok">${esc(t('sala_f_completa'))}</span>` : `<span class="sala-insignia info">${esc(viaja ? t('sala_f_en_camino', { p: n(E.envio.pct || 0) }) : t('sala_f_enviado'))}</span>`;
+    const barra = viaja ? `<i class="sala-barra"><b style="width:${Math.min(100, E.envio.pct || 0)}%"></b></i>` : '';
+    const pie = `<div class="sala-archivo-pie"><span class="${verificado ? 'ok' : 'aviso'}">${esc(t(verificado ? 'sala_f_receptor' : 'sala_f_receptor_no'))}</span><time>${esc(hora(x ? x.t : 0).slice(0, 5))}</time></div>`;
+    return `<div class="sala-archivo-cab"><span class="sala-archivo-ico" aria-hidden="true"><svg class="icono" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></span><span class="sala-archivo-q"><b>${esc(nombre)}</b><small>${esc(cifras.filter(Boolean).join(' · '))}</small></span>${insignia}</div>${barra}${pie}`;
+  };
+  // 1.0.46 (C2-a): the hour and minute under each bubble; the seconds stay in the tooltip.
+  const horaCorta = (s) => (s ? new Date(s * 1000).toLocaleTimeString(document.documentElement.lang || 'es', { hour: '2-digit', minute: '2-digit' }) : RAYA);
+  const metaMensaje = (m) => `<time title="${esc(hora(m.t))}">${m.editado ? esc(t('sec_m_editado')) + ' · ' : ''}${esc(horaCorta(m.t))}${m.mio && m.estado ? ' ' + (TICK[m.estado] || '') : ''}</time>`;
   const reacciones = (m) => (m.reacciones || []).length ? `<span class="reac">${m.reacciones.map((r) => `<span title="${esc(r.de || t('sec_m_tu'))}">${esc(r.emoji)}</span>`).join('')}</span>` : '';
   const citaDe = (m, lista) => { if (!m.re) return ''; const o = (lista || []).find((y) => y.id === m.re); return o ? `<span class="cita">${esc((o.texto || (o.archivo && o.archivo.nombre) || '').slice(0, 160))}</span>` : ''; };
   const lineaLlamada = (m) => `<li class="llamada-linea" data-id="${esc(m.id || '')}"><span>${m.llamada.video ? '🎥' : '📞'}</span><span>${esc(llamadaTexto(m.llamada))}</span><time>${esc(hora(m.t))}</time></li>`;
@@ -336,7 +355,7 @@
   };
   const pintaChat = (conNombre) => {
     const recibidos = E.recibidos || [];
-    const clave = JSON.stringify([E.mensajes, recibidos, E.enviados, (E.envio || {}).nombre, conNombre, [...minis.keys()], [...audios.keys()], E.escribiendo]);
+    const clave = JSON.stringify([E.mensajes, recibidos, E.enviados, (E.envio || {}).nombre, (E.envio || {}).pct, ((E.monitor || {}).identidad || {}).estado, conNombre, [...minis.keys()], [...audios.keys()], E.escribiendo]);
     if (clave === chatAntes) return;
     chatAntes = clave;
     const ol = $('c-mensajes'); const abajo = ol.scrollTop + ol.clientHeight >= ol.scrollHeight - 30;
@@ -360,7 +379,10 @@
         const x = (E.enviados || []).find((y) => y.nombre === nombreArchivo && Math.abs((y.t || 0) - (m.t || 0)) <= 3);
         const estado = x && typeof x.llego_en === 'number' ? '✓ ' + t('sec_f_entregado_en', { t: duracion(x.llego_en) }) : (E.envio && E.envio.nombre === nombreArchivo ? t('sec_f_en_camino') : t('sec_f_enviado'));
         if (notasPropias.has(nombreArchivo)) return `<li class="mio" data-id="${esc(m.id || '')}">${notaVoz(notasPropias.get(nombreArchivo), nombreArchivo)}<span class="a-entrega">${esc(estado)}</span>${reacciones(m)}<time>${esc(hora(m.t))}</time></li>`;
-        return `<li class="mio" data-id="${esc(m.id || '')}">📎 ${esc(nombreArchivo)}${x ? ` <small class="a-tam">${esc(tam(x.bytes))}</small>` : ''}<span class="a-entrega">${esc(estado)}</span>${reacciones(m)}<time>${esc(hora(m.t))}</time></li>`;
+        // 1.0.46 (C2-a): the delivery as a card, with the real figures: size, speed and time
+        // from the first byte to the other side's «it is here»; «Receptor comprobado» only when
+        // the person on the other end is the one whose numbers were compared.
+        return `<li class="mio sala-archivo" data-id="${esc(m.id || '')}">${tarjetaEnvio(nombreArchivo, x)}${reacciones(m)}</li>`;
       }
       return `<li class="${m.mio ? 'mio' : ''}" data-id="${esc(m.id || '')}">${de}${citaDe(m, E.mensajes)}${esc(m.texto)}${reacciones(m)}${metaMensaje(m)}</li>`;
     }).join('') + (E.escribiendo ? `<li class="escribiendo"><span></span><span></span><span></span></li>` : '');
@@ -456,7 +478,11 @@
   });
   $('c-prueba').addEventListener('click', () => manda({ tipo: 'secure', accion: 'prueba' }));
   en('secure_prueba', (m) => descarga(`guardiana-secure-prueba-${sello()}.json`, 'application/json', m.json));
-  en('secure_aviso', (m) => { const extra = m.texto && /^sec_[a-z0-9_]+$/.test(m.texto) ? t(m.texto) : m.texto; const txt = t(m.clave) + (extra ? ' ' + extra : ''); aviso(txt); });
+  en('secure_aviso', (m) => {
+    // 1.0.46: a relay asked for at the free level is not an error; the Plus line says why.
+    if (typeof m.texto === 'string' && m.texto.includes('GUARDIANA Free')) { aviso(t('sala_plus_rele')); return; }
+    const extra = m.texto && /^sec_[a-z0-9_]+$/.test(m.texto) ? t(m.texto) : m.texto; const txt = t(m.clave) + (extra ? ' ' + extra : ''); aviso(txt);
+  });
   const avisos = [];
   function aviso(txt) {
     // With no conversation on screen the notice goes under the invitation (a wrong code, a
@@ -699,7 +725,9 @@
     const s = m.sala; if (!s) return '';
     const ultimo = (s.mensajes || []).slice(-1)[0];
     const linea = s.llamada ? t('sec_l_en_curso') : ultimo ? `${ultimo.de}: ${ultimo.texto}` : t('sec_lista_sin_mensajes');
-    return `<li class="${vista === 'sala' ? 'activa' : ''}" data-vista="sala"><span class="avatar casa"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><i></i></span><b>${esc(t('sec_sala_titulo'))}</b><time>${ultimo ? esc(hora(ultimo.t).slice(0, 5)) : ''}</time><span class="ultimo">${esc(linea)}</span></li>`;
+    // 1.0.46 (C2-a): the state under the name, with its dot; the last line as the row's title.
+    const dentro = (s.miembros || []).filter((x) => x.aprobado && x.enganchado).length;
+    return `<li class="${vista === 'sala' ? 'activa' : ''}" data-vista="sala" title="${esc(linea)}"><span class="avatar casa"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg></span><b>${esc(t('sec_sala_titulo'))}</b><span class="ultimo sala-punto ${dentro ? 'ok' : ''}">${esc(s.llamada ? t('sala_en_llamada') : dentro ? t('sec_l_sala_conexion', { c: n(dentro), n: n((s.miembros || []).filter((x) => x.aprobado).length) }) : t('sala_sin_conexion'))}</span></li>`;
   };
   const pintaLista = (m, quien, nombres) => {
     const ol = $('c-lista');
@@ -708,7 +736,10 @@
     const ultimo = (m.mensajes || []).slice(-1)[0];
     const nombre = nombres.length > 2 ? nombres.join(' · ') : (quien || t('sec_lista_nueva'));
     const linea = f !== 'lista' ? t(f === 'comparando' ? 'sec_lista_comparando' : 'sec_lista_conectando') : m.llamada ? t('sec_l_en_curso') : ultimo ? ultimo.texto : t('sec_lista_sin_mensajes');
-    ol.innerHTML = filaSala(m) + `<li class="${vista === 'contacto' || !m.sala ? 'activa' : ''}" data-vista="contacto"><span class="avatar">${esc((nombre.trim()[0] || '·').toUpperCase())}${f === 'lista' ? '<i></i>' : ''}</span><b>${esc(nombre)}</b><time>${ultimo ? esc(hora(ultimo.t).slice(0, 5)) : ''}</time><span class="ultimo">${esc(linea)}</span></li>`;
+    // 1.0.46 (C2-a): «Conectado» with a green dot only while the link is up; the rest as it is.
+    const estado = f !== 'lista' ? linea : m.reconectando ? t('sala_reconectando') : m.llamada && m.llamada.conectada !== false ? t('sala_en_llamada') : t(m.otro_movil ? 'sala_conectado_movil' : 'sala_conectado');
+    const punto = f === 'lista' && !m.reconectando ? 'ok' : f === 'lista' ? 'aviso' : 'info';
+    ol.innerHTML = filaSala(m) + `<li class="${vista === 'contacto' || !m.sala ? 'activa' : ''}" data-vista="contacto" title="${esc(linea)}"><span class="avatar">${esc(iniciales(nombre))}</span><b>${esc(nombre)}</b><span class="ultimo sala-punto ${punto}">${esc(estado)}</span></li>`;
     if (vista !== 'sala' || !m.sala) $('miga-donde').textContent = t('sec_miga_conv');
   };
   $('c-lista').addEventListener('click', (e) => { const li = e.target.closest('li[data-vista]'); if (!li || !E.sala) return; vista = li.dataset.vista; modo = vista === 'sala' ? 'sala' : (movilActivo(E) && !hayContacto(E) ? 'movil' : 'equipos'); guardaModo(); fasePinta(); pintaLista(E, E.contacto, ((E.grupo || {}).nombres || [])); pintaVista(E); });
@@ -951,7 +982,9 @@
   const textoLlamada = (l) => {
     const ahora = Math.floor(Date.now() / 1000);
     if (!l.conectada) return t('sec_l_llamando_s', { s: Math.max(0, 45 - (ahora - (l.desde || ahora))) });
-    return t(l.video ? 'sec_l_en_video' : 'sec_l_en_voz', { t: tiempo(Math.max(0, ahora - (l.desde || ahora))) });
+    // 1.0.46 (C2-b): «En llamada · 08:42» under the name.
+    const d = Math.max(0, ahora - (l.desde || ahora));
+    return t(l.video ? 'sec_l_en_video' : 'sala_chip_llamada', { t: l.video ? tiempo(d) : (d >= 3600 ? Math.floor(d / 3600) + ':' : '') + String(Math.floor((d % 3600) / 60)).padStart(2, '0') + ':' + String(d % 60).padStart(2, '0') });
   };
   // A call nobody answered stays as a note with «Devolver llamada» (Grok's review, 16 Oct 2026).
   const pintaPerdida = (m) => {
@@ -972,7 +1005,7 @@
     if (!l) { $('c-permiso').hidden = true; $('c-permiso').dataset.camara = ''; caja.hidden = true; caja.classList.remove('llamando'); paraMedios(); mimeRemoto = null; if (tonoLlamando) { clearInterval(tonoLlamando); tonoLlamando = null; } return; }
     caja.hidden = false;
     caja.classList.toggle('solo-voz', !l.video);
-    $('c-l-letra').textContent = ((m.contacto || quien(m) || '·').trim()[0] || '·').toUpperCase();
+    $('c-l-letra').textContent = iniciales(m.contacto || quien(m));
     $('vj-otro').textContent = quien(m);
     if (l.conectada !== false && !movilHabla) medidorEmpieza();
     const llamando = l.conectada === false;
@@ -1064,7 +1097,8 @@
     arrancando = true;
     llamadaVideo = video;
     preparaReproductor(mimeRemoto || mime(video));
-    const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 48000 };
+    // 1.0.46: the microphone as chosen before the call («Voz natural» or with noise reduction).
+    const audio = window.GuardianaOpus ? window.GuardianaOpus.restricciones() : { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 48000 };
     try {
       local = await navigator.mediaDevices.getUserMedia({ audio, video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false });
     } catch (e) {
@@ -1509,6 +1543,8 @@
     else pie.push(esc(t('sec_vj_trozos')));
     if (rtt != null) pie.push(esc(t('sec_vj_ida', { ms: n(Math.round(rtt)) })));
     $('vj-pie').innerHTML = pie.map((x) => `<span>${x}</span>`).join('');
+    // 1.0.46 (C2-b): the shield's «Calidad de la conexión» reads the same measures.
+    window.dispatchEvent(new CustomEvent('guardiana-medidas', { detail: { rele: !!MED.relay, ciudad, rtt: rtt == null ? null : Math.round(rtt), perdida: per, webrtc: !!(rtc && rtc.conectada) } }));
   };
   const medidorEmpieza = () => {
     if (relojMide) return;
@@ -1627,6 +1663,8 @@
   const pintaInforme = (m) => {
     const r = m.informe || deSala((m.sala || {}).informe);
     INF = r || null;
+    // 1.0.46 (C2-c): sala.js draws «Resumen de seguridad» from this same report.
+    window.dispatchEvent(new CustomEvent('guardiana-informe', { detail: { r: r || null, nivel: r ? nivelInforme(r) : '' } }));
     const velo = $('informe'), caja = $('informe-caja');
     const nuevo = velo.hidden && !!r;
     velo.hidden = !r;

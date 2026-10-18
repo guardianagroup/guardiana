@@ -193,6 +193,12 @@ pub fn buzon(numero: &str) -> Option<mpsc::Receiver<TcpStream>> {
     std::thread::spawn(move || {
         mide_cercania();
         loop {
+            // The free level waits at no relay (see `reles_permitidos`); a licence that turns
+            // Plus is seen within half a minute.
+            if !reles_permitidos() {
+                std::thread::sleep(Duration::from_secs(30));
+                continue;
+            }
             match conecta(&direccion(), &sala) {
                 Ok(s) => {
                     if tx.send(s).is_err() {
@@ -314,6 +320,15 @@ fn por_tls(
 /// address), and the plain line only if TLS could not be opened at all; any other relay (the
 /// tests) plain, as before.
 pub fn abre(rele: &str) -> Result<TcpStream, String> {
+    abre_segun(reles_permitidos(), rele)
+}
+
+/// [`abre`] with the plan said: the free level opens no line to a relay (see
+/// [`reles_permitidos`]).
+fn abre_segun(permitido: bool, rele: &str) -> Result<TcpStream, String> {
+    if !permitido {
+        return Err(SOLO_PLUS.to_owned());
+    }
     let Some(r) = RELES.iter().find(|r| r.direccion() == rele) else {
         return abre_hacia(rele);
     };
@@ -415,10 +430,35 @@ pub fn turn_permitido() -> bool {
     TURN_PERMITIDO.load(std::sync::atomic::Ordering::Relaxed)
 }
 
+/// What a relay use answers at the free level (the screen shows its own line for it).
+pub const SOLO_PLUS: &str = "GUARDIANA Free: el servidor intermedio es de Plus";
+
+/// Whether this program may use GUARDIANA's relays at all (1.0.46). The plan of 1.0.45 says
+/// «no usar relés en Gratis»: the relay's TURN and its TCP line cost money for every byte that
+/// crosses them, so at the free level nothing goes through them — not the chat, not the old
+/// way of calling, not the phone link, the home room or the delivery room. A conversation still
+/// works directly (the same network, or a door opened in the router). Same switch as
+/// [`permite_turn`], so a host sets both with one call.
+#[must_use]
+pub fn reles_permitidos() -> bool {
+    turn_permitido()
+}
+
+/// Whether an error is the free level's answer.
+#[must_use]
+pub fn es_solo_plus(e: &str) -> bool {
+    e.contains(SOLO_PLUS) || e.contains("GUARDIANA Free")
+}
+
 /// Ask `rele` (the one this conversation meets at) for its call service, for room `sala`.
 /// At the free level it asks nothing and says so ([`permite_turn`]).
 pub fn turn(rele: &str, sala: &str) -> Result<Turn, String> {
-    if !turn_permitido() {
+    turn_segun(turn_permitido(), rele, sala)
+}
+
+/// [`turn`] with the plan said.
+fn turn_segun(permitido: bool, rele: &str, sala: &str) -> Result<Turn, String> {
+    if !permitido {
         return Err("GUARDIANA Free: el servicio de llamadas del relé es de Plus".to_owned());
     }
     let mut s = abre(rele)?;
@@ -500,10 +540,24 @@ mod tests {
     /// connection (port 9 of this computer would fail differently, after trying).
     #[test]
     fn the_free_level_asks_the_relay_for_no_call_service() {
-        permite_turn(false);
-        let r = turn("127.0.0.1:9", "sala");
-        permite_turn(true);
+        // The plan is said, not flipped: the switch is global and other tests use a relay.
+        let r = turn_segun(false, "127.0.0.1:9", "sala");
         assert!(r.is_err_and(|e| e.contains("Plus")));
+    }
+
+    /// 1.0.46: at the free level no line to a relay is opened at all — not for the chat, the
+    /// old way of calling, the phone or a delivery — and the answer says it is Plus. (The
+    /// switch itself is global; the test says the plan instead of flipping it under the other
+    /// tests that use a relay.)
+    #[test]
+    fn the_free_level_opens_no_line_to_a_relay() {
+        let escucha = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let dir = escucha.local_addr().unwrap().to_string();
+        let r = abre_segun(false, &dir);
+        assert!(r.is_err_and(|e| es_solo_plus(&e)));
+        escucha.set_nonblocking(true).unwrap();
+        assert!(escucha.accept().is_err(), "nothing reached the relay");
+        assert!(abre_segun(true, &dir).is_ok(), "with Plus the line opens");
     }
 
     #[test]

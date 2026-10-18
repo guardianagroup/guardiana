@@ -290,6 +290,13 @@ impl Movil {
         !self.usado && self.nacido.elapsed() >= VIGENCIA_QR
     }
 
+    /// Whole seconds the code on screen has left, while no phone has used it (1.0.46: the call's
+    /// panel says «Caduca en 42 s» under the code). `None` once a phone came with it.
+    #[must_use]
+    pub fn caduca_en_s(&self) -> Option<u64> {
+        (!self.usado).then(|| VIGENCIA_QR.saturating_sub(self.nacido.elapsed()).as_secs())
+    }
+
     /// The door in the router opened: the phone can also come from outside.
     pub fn con_puerta(&mut self, externa: Ipv4Addr) {
         let d = format!("{externa}:{}", self.puerto);

@@ -131,6 +131,17 @@ const ARCHIVOS: &[(&str, &str, &[u8])] = &[
         CSS,
         include_bytes!("../../../zero/navegador/interfaz/entrega.css"),
     ),
+    // 1.0.46 «C2 · SALA»: the conversation, the call and its summary as the owner chose them.
+    (
+        "/sala.css",
+        CSS,
+        include_bytes!("../../../zero/navegador/interfaz/sala.css"),
+    ),
+    (
+        "/sala.js",
+        JS,
+        include_bytes!("../../../zero/navegador/interfaz/sala.js"),
+    ),
     (
         "/diseno.css",
         CSS,
@@ -1054,10 +1065,44 @@ fn plus_de_guardiana() -> Option<bool> {
         .map(|s| s.plus_activo)
 }
 
-/// The relay's call service (TURN) costs money per minute of call: it is Plus (the owner's free
-/// plan, 18 Oct 2026). Read now and every ten minutes while the command runs.
+/// The same answer from the service itself (1.0.46): on macOS and Linux this command runs as the
+/// person and the licence lives in the service's folder (0700), so [`plus_de_guardiana`] cannot
+/// read it. The panel answers `/api/plan/llamadas` — one bit, only to this computer — and that is
+/// what is asked. `None` when the service does not answer (then, as everywhere, nothing is taken
+/// away).
+fn plus_del_servicio() -> Option<bool> {
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], guardiana_panel::DEFAULT_PORT));
+    let mut s = std::net::TcpStream::connect_timeout(&addr, Duration::from_secs(2)).ok()?;
+    s.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
+    s.write_all(b"GET /api/plan/llamadas HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+        .ok()?;
+    let mut raw = Vec::new();
+    s.take(4096).read_to_end(&mut raw).ok()?;
+    respuesta_de_plan(&String::from_utf8_lossy(&raw))
+}
+
+/// The bit out of the panel's answer: a `200` whose body says `"reles":true` or `false`.
+fn respuesta_de_plan(raw: &str) -> Option<bool> {
+    let (cabeza, cuerpo) = raw.split_once("\r\n\r\n")?;
+    if cabeza.split_whitespace().nth(1) != Some("200") {
+        return None;
+    }
+    let v: serde_json::Value = serde_json::from_str(cuerpo.trim()).ok()?;
+    v["reles"].as_bool()
+}
+
+/// GUARDIANA's relays (the chat's line and the calls' TURN) cost money for every byte that
+/// crosses them: they are Plus (the owner's free plan, 18 Oct 2026; 1.0.46 extends it from TURN
+/// to every relay use). Read now and every ten minutes while the command runs: the licence when
+/// this user can read it, otherwise the service's own answer.
 fn vigila_plan_de_llamadas() {
-    let mira = || guardiana_zero::rele::permite_turn(plus_de_guardiana().unwrap_or(true));
+    let mira = || {
+        guardiana_zero::rele::permite_turn(
+            plus_de_guardiana()
+                .or_else(plus_del_servicio)
+                .unwrap_or(true),
+        );
+    };
     mira();
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(600));
@@ -1107,6 +1152,20 @@ mod tests {
     use super::*;
 
     static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+    /// 1.0.46: the service's answer about the relays, and nothing taken from what is not one.
+    #[test]
+    fn the_plan_bit_is_read_from_the_panel_answer_only() {
+        let ok = "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n\r\n{\"reles\":false}";
+        assert_eq!(respuesta_de_plan(ok), Some(false));
+        assert_eq!(respuesta_de_plan(&ok.replace("false", "true")), Some(true));
+        assert_eq!(
+            respuesta_de_plan("HTTP/1.1 404 Not Found\r\n\r\n{\"reles\":false}"),
+            None
+        );
+        assert_eq!(respuesta_de_plan("HTTP/1.1 200 OK\r\n\r\nno"), None);
+        assert_eq!(respuesta_de_plan(""), None);
+    }
 
     /// A server on a free port with the real engine in a folder of its own, as the command
     /// starts it.
