@@ -347,7 +347,7 @@ async fn the_report_measures_nights_companies_cadence_and_disguises() {
     // The text to share: two short sentences more, without a device or a site named.
     let texto = v["texto_whatsapp"].as_str().unwrap();
     assert!(
-        texto.contains("Entre las 0:00 y las 6:00 de estos 7 días, los aparatos hicieron 27 consultas a rastreadores, publicidad o telemetría."),
+        texto.contains("Entre las 0:00 y las 6:00 de estos 7 días, los dispositivos hicieron 27 consultas a rastreadores, publicidad o telemetría."),
         "{texto}"
     );
     assert!(
