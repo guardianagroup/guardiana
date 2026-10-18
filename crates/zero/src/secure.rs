@@ -4913,7 +4913,7 @@ mod tests {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let base = std::env::temp_dir().join(format!("guardiana-falsa-{}", std::process::id()));
-        let (mut a, mut b) = par(&base);
+        let (a, mut b) = par(&base);
         let ahora = ahora_s();
         let inicio = b.inicio_destruccion();
         let sesion = b.sesion_destruccion(inicio);

@@ -870,6 +870,11 @@ impl Entregas {
                     .carga
                     .as_ref()
                     .map(|c| json!({ "nombre": c.nombre, "trozos": c.escritos })));
+                // Pieces sealed so far in all: the page hands bytes over only as fast as this grows.
+                v["sellados"] = json!(
+                    s.e.archivos.iter().map(|a| a.trozos).sum::<u64>()
+                        + s.carga.as_ref().map_or(0, |c| c.escritos)
+                );
                 v["progreso"] = json!({
                     "trozos_enviados": s.enviados,
                     "trozos_total": s.e.archivos.iter().map(|a| a.trozos).sum::<u64>(),

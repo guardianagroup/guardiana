@@ -1,0 +1,76 @@
+/* Comunicaciones 1.0.45 (18 Oct 2026): the «Escudo en directo», the voice choice, the notice of a
+   destroyed conversation and the «Sala de entrega». Tokens and families from diseno.css only;
+   steel for information, green only for what is verified, amber to look at, red only for a
+   confirmed problem. Kept apart from secure.html's own styles so the panel's redesign can move
+   these pieces without touching the rest. */
+
+/* Escudo en directo: fits the right-hand inspector (320–400 px). */
+.escudo-directo { padding: var(--e4); display: grid; gap: var(--e3); }
+.escudo-directo .ed-cab { display: flex; align-items: center; justify-content: space-between; gap: var(--e2); }
+.escudo-directo .ed-vivo { font: 500 11.5px/1.3 var(--texto); color: var(--muted); }
+.ed-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e2); }
+.ed-fila { display: grid; grid-template-columns: 10px 1fr auto; gap: var(--e2); align-items: start; padding: var(--e2) 0; border-top: 1px solid var(--line); }
+.ed-fila:first-child { border-top: 0; }
+.ed-fila div { display: grid; gap: 2px; min-width: 0; }
+.ed-fila b { font: 600 13px/1.3 var(--texto); color: var(--fg); }
+.ed-fila span { font: 400 12.5px/1.4 var(--texto); color: var(--muted); overflow-wrap: anywhere; }
+.ed-fila time { font: 400 11.5px/1.3 var(--mono); color: var(--muted-2); white-space: nowrap; }
+.ed-punto { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; background: var(--muted-2); }
+.ed-fila.ok .ed-punto { background: var(--ok); }
+.ed-fila.info .ed-punto { background: var(--accent); }
+.ed-fila.aviso .ed-punto { background: var(--aviso); }
+.ed-fila.alerta .ed-punto { background: var(--alerta); }
+.ed-fila.alerta span { color: var(--alerta); }
+.ed-ajustes { display: grid; gap: var(--e2); padding-top: var(--e2); border-top: 1px solid var(--line); }
+.ed-ajuste { display: flex; align-items: center; gap: var(--e2); font: 400 12.5px/1.4 var(--texto); color: var(--fg); }
+.ed-ajuste select { width: auto; flex: 1; }
+.ed-como summary { cursor: pointer; font: 600 12.5px/1.4 var(--texto); color: var(--accent); }
+.ed-como ul { margin: var(--e2) 0 0; padding-left: 18px; display: grid; gap: 6px; font: 400 12px/1.5 var(--texto); color: var(--muted); }
+.ed-limite { margin: 0; font: 400 12px/1.45 var(--texto); color: var(--muted); }
+
+/* The notice of a destroyed conversation: calm, centred, nothing behind it to read. */
+.ed-destruida { position: fixed; inset: 0; z-index: 9000; display: grid; place-items: center; padding: var(--e4); background: rgba(6, 8, 12, .86); }
+.ed-destruida .tarjeta { max-width: 460px; display: grid; gap: var(--e3); }
+.ed-destruida h2 { margin: 0; font: 600 18px/1.35 var(--display); color: var(--fg); }
+.ed-destruida p { margin: 0; font: 400 14px/1.5 var(--texto); color: var(--muted); }
+.ed-destruida .ed-cuando { font: 400 12px/1.3 var(--mono); color: var(--muted-2); }
+
+/* «¿Cómo quieres hablar?» */
+.ve-capa { position: fixed; inset: 0; z-index: 8000; display: grid; place-items: center; padding: var(--e4); background: rgba(6, 8, 12, .72); }
+.ve-caja { max-width: 420px; width: 100%; display: grid; gap: var(--e3); }
+.ve-caja h2 { margin: 0; font: 600 18px/1.3 var(--display); }
+.ve-opcion { display: grid; gap: 4px; text-align: left; padding: var(--e3) var(--e4); border-radius: var(--r-campo); border: 1px solid var(--line); background: transparent; color: var(--fg); cursor: pointer; min-height: 56px; }
+.ve-opcion b { font: 600 14px/1.3 var(--texto); }
+.ve-opcion span { font: 400 12.5px/1.4 var(--texto); color: var(--muted); }
+.ve-opcion:hover, .ve-opcion:focus-visible { border-color: var(--fg); outline: none; }
+.ve-opcion.elegida { border-color: var(--accent); background: var(--accent-suave); }
+
+/* Sala de entrega */
+main.con-entrega > section:not(#sala-entrega) { display: none !important; }
+.sala-entrega { display: grid; gap: var(--e4); }
+.ent-arriba { display: flex; align-items: center; gap: var(--e3); }
+.ent-arriba h2 { margin: 0; font: 600 20px/1.3 var(--display); }
+.ent-nueva { display: grid; gap: var(--e3); }
+.ent-soltar { display: grid; place-items: center; min-height: 96px; padding: var(--e4); border: 1px dashed var(--line); border-radius: var(--r-tarjeta); color: var(--muted); cursor: pointer; text-align: center; font: 500 14px/1.4 var(--texto); }
+.ent-soltar.encima, .ent-soltar:hover { border-color: var(--accent); color: var(--fg); }
+.ent-casilla { display: flex; gap: var(--e2); align-items: center; font: 400 13px/1.4 var(--texto); }
+.ent-archivos { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.ent-archivos li { display: grid; grid-template-columns: 1fr auto 16px; gap: var(--e2); font: 400 12.5px/1.5 var(--texto); color: var(--muted); }
+.ent-archivos li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); }
+.ent-subiendo { color: var(--accent); }
+.ent-como { display: grid; gap: var(--e2); padding-top: var(--e3); border-top: 1px solid var(--line); }
+.ent-lista { display: grid; gap: var(--e3); }
+.ent-una { display: grid; gap: var(--e2); }
+.ent-cab { display: flex; justify-content: space-between; gap: var(--e2); align-items: center; }
+.ent-enlace { display: grid; grid-template-columns: 148px 1fr; gap: var(--e3); align-items: start; }
+.ent-enlace .qr svg { width: 148px; height: 148px; background: #fff; border-radius: var(--r-campo); padding: 6px; }
+.ent-enlace > div { display: grid; gap: var(--e2); min-width: 0; }
+.ent-codigo { font: 600 26px/1.2 var(--mono); letter-spacing: .14em; color: var(--fg); }
+.ent-motivo { margin: 0; color: var(--alerta); font: 500 13px/1.4 var(--texto); }
+.ent-viaje { display: grid; grid-template-columns: auto 1fr auto 1fr auto; gap: var(--e2); align-items: center; font: 500 12px/1.3 var(--texto); color: var(--fg); }
+.ent-viaje i { height: 1px; background: var(--accent); position: relative; }
+.ent-viaje i::after { content: "🔒"; position: absolute; left: 50%; top: -9px; transform: translateX(-50%); font-size: 10px; }
+.ent-cifras { margin: 0; font: 400 12px/1.4 var(--mono); color: var(--muted); }
+.ent-barra { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.ent-barra i { display: block; height: 100%; background: var(--accent); }
+@media (max-width: 640px) { .ent-enlace { grid-template-columns: 1fr; } }

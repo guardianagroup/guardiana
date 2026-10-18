@@ -20,7 +20,7 @@
   // Where GUARDIANA's relays are (crates/zero/src/rele.rs): the name, the city, the country.
   const RELES = [['rele-am.guardianagroup.com', 'esc_rele_miami'], ['rele.guardianagroup.com', 'esc_rele_nuremberg']];
   const dondeRele = (n) => { const r = RELES.find(([h]) => String(n || '').startsWith(h)); return r ? t(r[1]) : ''; };
-  let ultimo = null, calidad = null;
+  let ultimo = null, calidad = null, abiertoComo = false;
   // The voice call's quality, from the call's own getStats (opus.js): a word and a dot.
   window.addEventListener('guardiana-calidad', (e) => { calidad = e.detail; if (ultimo) pinta(ultimo); });
 
@@ -78,7 +78,10 @@
       + `<div class="ed-ajustes">`
       + `<label class="ed-ajuste"><input type="checkbox" id="ed-auto" ${e.auto_destruccion ? 'checked' : ''}><span>${esc(t('esc_auto'))}</span></label>`
       + `<label class="ed-ajuste"><span>${esc(t('esc_temporizador'))}</span><select class="campo" id="ed-temp">${temporizadores.map((s) => `<option value="${s}" ${s === m.temporizador ? 'selected' : ''}>${esc(t('esc_temp_' + s))}</option>`).join('')}</select></label>`
-      + `<p class="ed-limite">${esc(t('esc_limite'))}</p></div>`;
+      + `<p class="ed-limite">${esc(t('esc_limite'))}</p></div>`
+      // «Cómo te protegemos»: exactly what is used, and what is not post-quantum.
+      + `<details class="ed-como" ${abiertoComo ? 'open' : ''}><summary>${esc(t('esc_como_titulo'))}</summary><ul>${[1, 2, 3, 4, 5, 6, 7, 8].map((i) => `<li>${esc(t('esc_como_' + i))}</li>`).join('')}</ul></details>`;
+    caja.querySelector('.ed-como').addEventListener('toggle', (x) => { abiertoComo = x.target.open; });
     $('ed-auto').addEventListener('change', (x) => {
       try { localStorage.setItem('secure_auto_destruccion', x.target.checked ? '1' : '0'); } catch (_) {}
       manda({ tipo: 'secure', accion: 'auto_destruccion', si: x.target.checked });

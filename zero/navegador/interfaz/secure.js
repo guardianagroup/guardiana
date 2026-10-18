@@ -1109,7 +1109,9 @@
   let rtc = null, rtcFallo = false, rtcEspera = 0;
   const rtcManda = (d) => manda({ tipo: 'secure', accion: 'rtc', d });
   const obtenLocal = async (video) => {
-    const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+    // 18 Oct 2026: the microphone as opus.js asks for it (mono, 48 kHz, the browser's echo
+    // canceller, noise suppression and gain).
+    const audio = window.GuardianaOpus ? window.GuardianaOpus.restricciones() : { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
     try {
       return await navigator.mediaDevices.getUserMedia({ audio, video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false });
     } catch (e) {
@@ -1142,6 +1144,8 @@
     };
     // Video up to 1.2 Mbps; WebRTC lowers it by itself when the network cannot carry it.
     pc.getSenders().forEach((x) => { if (x.track && x.track.kind === 'video') { try { const p = x.getParameters(); p.encodings = p.encodings && p.encodings.length ? p.encodings : [{}]; p.encodings[0].maxBitrate = 1200000; x.setParameters(p).catch(() => {}); } catch (_) {} } });
+    // 18 Oct 2026 (opus.js): RED first, the voice's limits, the quality estimate every 2 s.
+    if (window.GuardianaOpus) { const o = window.GuardianaOpus.prepara(pc); pc.addEventListener('connectionstatechange', () => { if (pc.connectionState === 'closed') o.para(); }); }
     return pc;
   };
   const rtcOfrece = async () => {
@@ -1150,6 +1154,7 @@
     rtc.s = Math.random().toString(36).slice(2, 10);
     rtc.pc = rtcNuevaPc(); rtc.pendientes = [];
     const o = await rtc.pc.createOffer();
+    if (window.GuardianaOpus) o.sdp = window.GuardianaOpus.sdp(o.sdp);
     await rtc.pc.setLocalDescription(o);
     rtcManda({ t: 'offer', s: rtc.s, sdp: rtc.pc.localDescription.sdp });
   };
@@ -1179,11 +1184,19 @@
     if (!rtc) return;
     try {
       if (d.t === 'hola') { if (rtc.ofrece) await rtcOfrece(); }
-      else if (d.t === 'offer' && !rtc.ofrece) {
+      else if (d.t === 'offer' && !rtc.ofrece && d.s === rtc.s && rtc.pc && rtc.pc.signalingState === 'stable' && d.reinicio) {
+        // An ICE restart after a change of network (18 Oct 2026): the same connection, new paths.
+        await rtc.pc.setRemoteDescription({ type: 'offer', sdp: d.sdp });
+        const a = await rtc.pc.createAnswer();
+        if (window.GuardianaOpus) a.sdp = window.GuardianaOpus.sdp(a.sdp);
+        await rtc.pc.setLocalDescription(a);
+        rtcManda({ t: 'answer', s: rtc.s, sdp: rtc.pc.localDescription.sdp });
+      } else if (d.t === 'offer' && !rtc.ofrece) {
         try { if (rtc.pc) rtc.pc.close(); } catch (_) {}
         rtc.s = d.s; rtc.pc = rtcNuevaPc();
         await rtc.pc.setRemoteDescription({ type: 'offer', sdp: d.sdp });
         const a = await rtc.pc.createAnswer();
+        if (window.GuardianaOpus) a.sdp = window.GuardianaOpus.sdp(a.sdp);
         await rtc.pc.setLocalDescription(a);
         rtcManda({ t: 'answer', s: rtc.s, sdp: rtc.pc.localDescription.sdp });
         rtcAplicaPendientes();
@@ -1195,6 +1208,17 @@
         else if (rtc.pendientes.length < 200) rtc.pendientes.push({ s: d.s, c: d.c });
       }
     } catch (_) { rtcFalla(true); }
+  });
+  // Wi-Fi to 4G or back: the side that offers restarts ICE on the same connection, so the
+  // voice comes back on the new network without hanging up (18 Oct 2026).
+  if (window.GuardianaOpus) window.GuardianaOpus.enCambioDeRed(async () => {
+    if (!rtc || !rtc.ofrece || !rtc.pc || rtc.pc.signalingState !== 'stable') return;
+    try {
+      const o = await rtc.pc.createOffer({ iceRestart: true });
+      o.sdp = window.GuardianaOpus.sdp(o.sdp);
+      await rtc.pc.setLocalDescription(o);
+      rtcManda({ t: 'offer', s: rtc.s, sdp: rtc.pc.localDescription.sdp, reinicio: true });
+    } catch (_) {}
   });
   const paraRtc = () => {
     if (!rtc) return;
