@@ -558,7 +558,14 @@
         const b = C[0] * D[0] + C[1] * D[1] + C[2] * D[2], cc = C[0] * C[0] + C[1] * C[1] + C[2] * C[2] - 1, disc = b * b - cc;
         if (disc > 0) { const t1 = -b - Math.sqrt(disc); if (t1 > 0 && t1 < L - 0.012) v = false; }
       }
-      return { x, y, v, w };
+      // How squarely the place faces the camera (1 = straight on, 0 = on the horizon). Names use it
+      // to fade out towards the edge of the Earth instead of piling up on the horizon.
+      let cara = 1;
+      if (T.m < 0.5) {
+        const n = Math.hypot(w[0], w[1], w[2]) || 1, C = T.C, V = [C[0] - w[0], C[1] - w[1], C[2] - w[2]], lv = Math.hypot(V[0], V[1], V[2]) || 1;
+        cara = (w[0] * V[0] + w[1] * V[1] + w[2] * V[2]) / (n * lv);
+      }
+      return { x, y, v, w, cara };
     };
     // Un lugar de la Tierra a una altura (fracción del radio), mezclando globo y mapa.
     const lugar = (lon, lat, alt = 0, alza = 0) => {
@@ -722,8 +729,23 @@
       return m;
     })();
     let ciudadesGeo = null, pidiendoCiudades = false;
+    // Every name stays nailed to its own place on the Earth (the owner, 18 Oct 2026: «que no se
+    // vengan con él… a medida que nos acercamos aparecen, a medida que nos vamos desaparecen y no
+    // nos siguen»). A name is never moved to fit: if its spot is taken it is simply not drawn. Each
+    // one fades in when it earns its place and fades out when it loses it (zoom, horizon or a
+    // bigger neighbour), so nothing pops or appears to slide.
+    const VISTOS = new Map();
+    let tNombres = 0;
+    const aparece = (clave, objetivo, dt) => {
+      const a = VISTOS.has(clave) ? VISTOS.get(clave) : 0;
+      const n = a + (objetivo - a) * Math.min(1, dt / 220);
+      VISTOS.set(clave, n); return n;
+    };
+    const horizonte = (q) => Math.max(0, Math.min(1, (q.cara - 0.12) / 0.28));
     const nombresGeo = (ppg) => {
-      if (T.m > 0.15 && T.m < 0.85) return;
+      const ahora = performance.now(), dt = tNombres ? Math.min(100, ahora - tNombres) : 16; tNombres = ahora;
+      const vivos = new Set();
+      if (T.m > 0.15 && T.m < 0.85) { VISTOS.clear(); return; }
       const libres = [], choca = (b) => libres.some((o) => b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y);
       const dentro = (q, m) => q.v && q.x > m && q.x < st.W - m && q.y > m && q.y < st.H - m;
       cx.save(); cx.lineJoin = 'round'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
@@ -732,11 +754,12 @@
       const paises = Object.keys(centros).map((c) => ({ c, px: TAM_PAIS[c] * ppg })).filter((p) => p.px >= 38).sort((a, b) => b.px - a.px);
       for (const p of paises) {
         const q = aPantalla(lugar(centros[p.c].lon, centros[p.c].lat, 0.002));
-        if (!dentro(q, 20)) continue;
+        if (!dentro(q, 20) || horizonte(q) <= 0) continue;
         const txt = nombrePais(p.c), w = cx.measureText(txt).width + 10, b = { x: q.x - w / 2, y: q.y - 10, w, h: 20 };
         if (choca(b)) continue;
         libres.push(b);
-        cx.globalAlpha = Math.min(1, (p.px - 38) / 30) * 0.62;
+        const k = 'p' + p.c; vivos.add(k);
+        cx.globalAlpha = aparece(k, 1, dt) * horizonte(q) * Math.min(1, (p.px - 38) / 30) * 0.62;
         cx.lineWidth = 3.2; cx.strokeStyle = 'rgba(2,6,14,.85)'; cx.strokeText(txt, q.x, q.y);
         cx.fillStyle = '#f2f5fa'; cx.fillText(txt, q.x, q.y);
       }
@@ -752,11 +775,12 @@
             const c = ciudadesGeo[i];
             if (c0 && (Math.abs(c.la - c0[1]) > radio || Math.abs(((c.lo - c0[0] + 540) % 360) - 180) * Math.cos(c.la * RAD) > radio)) continue;
             const q = aPantalla(lugar(c.lo, c.la, 0.002));
-            if (!dentro(q, 12)) continue;
+            if (!dentro(q, 12) || horizonte(q) <= 0) continue;
             const w = cx.measureText(c.n).width + 14, b = { x: q.x - 4, y: q.y - 9, w, h: 18 };
             if (choca(b)) continue;
             libres.push(b); puestas++;
-            cx.globalAlpha = Math.min(1, (ppg - 10) / 6) * (i < cuantas * 0.7 ? 0.95 : 0.7);
+            const k = 'c' + i; vivos.add(k);
+            cx.globalAlpha = aparece(k, 1, dt) * horizonte(q) * Math.min(1, (ppg - 10) / 6) * (i < cuantas * 0.7 ? 0.95 : 0.7);
             cx.fillStyle = 'rgba(2,6,14,.9)'; cx.beginPath(); cx.arc(q.x, q.y, 3.2, 0, 7); cx.fill();
             cx.fillStyle = '#e6ecf5'; cx.beginPath(); cx.arc(q.x, q.y, 1.8, 0, 7); cx.fill();
             cx.lineWidth = 3; cx.strokeStyle = 'rgba(2,6,14,.85)'; cx.strokeText(c.n, q.x + 7, q.y);
@@ -764,6 +788,8 @@
           }
         }
       }
+      // Names that lost their place start from nothing again when they come back.
+      for (const k of VISTOS.keys()) if (!vivos.has(k)) VISTOS.delete(k);
       cx.restore();
     };
     // How much a place weighs: its lookups, or what was sent when the system counts no lookups.
