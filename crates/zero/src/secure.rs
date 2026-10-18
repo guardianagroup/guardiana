@@ -460,13 +460,15 @@ pub struct Incidente {
 
 /// The relay's city from its name, for «por relé · ciudad» (no address involved).
 fn ciudad_de_rele(rele: &str) -> Option<&'static str> {
+    // By name or by the relay's own address (the fallback when DNS fails): GUARDIANA's servers.
     let host = rele.split(':').next().unwrap_or_default();
-    if host.starts_with("rele-am.") {
-        Some("Miami")
-    } else if host == crate::rele::RELE_NOMBRE {
-        Some("Núremberg")
-    } else {
-        None
+    let r = crate::rele::RELES
+        .iter()
+        .find(|r| host == r.nombre || host == r.ip)?;
+    match r.nombre {
+        "rele.guardianagroup.com" => Some("Núremberg"),
+        "rele-am.guardianagroup.com" => Some("Miami"),
+        _ => None,
     }
 }
 
@@ -4698,6 +4700,7 @@ mod tests {
             super::ciudad_de_rele("rele-am.guardianagroup.com:443"),
             Some("Miami")
         );
+        assert_eq!(super::ciudad_de_rele("207.246.115.38:443"), Some("Miami"));
         assert_eq!(super::ciudad_de_rele("127.0.0.1:9"), None);
     }
 
