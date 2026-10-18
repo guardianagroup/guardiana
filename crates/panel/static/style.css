@@ -1086,8 +1086,8 @@ body.universo { display: flex; flex-direction: column; height: 100vh; height: 10
 .universo .hud { position: relative; z-index: 4; background: var(--card); border-top: 1px solid var(--line); }
 .universo .riel { display: flex; align-items: center; height: 48px; padding: 0 24px; }
 .universo .riel[hidden] { display: none; }
-.universo .riel button { appearance: none; display: inline-flex; align-items: center; gap: 9px; min-height: 0; height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--muted); font: 400 13.5px var(--texto); cursor: pointer; white-space: nowrap; }
-.universo .riel button:hover { background: transparent; color: var(--fg); }
+.universo .riel > button { appearance: none; display: inline-flex; align-items: center; gap: 9px; min-height: 0; height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--muted); font: 400 13.5px var(--texto); cursor: pointer; white-space: nowrap; }
+.universo .riel > button:hover { background: transparent; color: var(--fg); }
 .universo .riel b { color: var(--fg); font-weight: 600; }
 .universo .riel-vivo { gap: 20px !important; }
 .universo .riel-vivo > i, .universo .ban-tabs [data-tab="vivo"] i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(156, 195, 228, .16); margin-right: -11px; animation: pd-vivo 2.4s ease-in-out infinite; }
@@ -1098,6 +1098,10 @@ body.universo { display: flex; flex-direction: column; height: 100vh; height: 10
 .universo .riel-cortadas { display: inline-flex; align-items: center; gap: 8px; }
 .universo .riel-cortadas i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted-2); }
 .universo .hud.con-cortes .riel-cortadas i { background: var(--alerta); }
+.universo .riel-maxima { display: inline-flex; align-items: center; gap: 10px; margin-left: 20px; color: var(--muted); font: 400 13.5px var(--texto); white-space: nowrap; }
+.universo .riel-maxima[hidden] { display: none; }
+.universo .riel-maxima > b { color: var(--fg); font-weight: 600; }
+.universo .riel-maxima .espera { color: var(--muted-2); font-size: 12.5px; }
 .universo .riel-5 { margin-left: auto; gap: 8px !important; color: var(--fg) !important; font-weight: 500 !important; }
 .universo .riel-5 svg { width: 14px; height: 14px; fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .universo .bandeja { height: 280px; display: grid; grid-template-rows: 56px minmax(0, 1fr); padding: 0 24px; }

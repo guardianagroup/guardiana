@@ -1992,6 +1992,30 @@
         throw err;
       }
     };
+    // «Protección máxima» on the globe itself (the owner, 18 Oct 2026: «¿también está en el
+    // globo?» — «SI»). The same switch as everywhere: green «Activada», red «Desactivada». It calls
+    // the same /api/proteccion-maxima as the card on the X-ray, so both always agree, and after a
+    // change the globe reloads so the routes it cuts turn red dashed in front of the person.
+    const MAXIMA_TXT = () => ({ permitido: t('pd_maxima_activada'), cortado: t('pd_maxima_desactivada'), cortando: t('pd_maxima_desactivando'), permitiendo: t('pd_maxima_activando') });
+    const pintaMaxima = (m) => {
+      const caja = $('riel-maxima');
+      if (!caja || !m || soloMirar) return;
+      caja.hidden = false;
+      caja.innerHTML = `<b>${esc(t('maxima_titulo'))}</b>` + window.GuardianaInterruptor.html({ cortado: !m.activa, texto: MAXIMA_TXT(), etiqueta: t('maxima_titulo'), chico: true })
+        + (m.activa && m.esperando ? `<span class="espera">${esc(t('pd_maxima_espera_corta'))}</span>` : '');
+    };
+    const leeMaxima = () => api('/api/proteccion-maxima').then(pintaMaxima).catch(() => {});
+    if (window.GuardianaInterruptor && $('riel-maxima')) {
+      window.GuardianaInterruptor.engancha($('riel-maxima'), async (b, quiere) => {
+        // quiere = cut = switch it off.
+        const m = await api('/api/proteccion-maxima', { method: 'POST', body: { activa: !quiere } });
+        avisa(t(m.activa ? 'maxima_activa' : 'pd_maxima_off_aviso'));
+        pintaMaxima(m);
+        await cargar();
+      }, MAXIMA_TXT());
+      leeMaxima();
+      setInterval(() => { if (!document.hidden) leeMaxima(); }, 30000);
+    }
     if (window.GuardianaInterruptor) window.GuardianaInterruptor.engancha(detalle, async (b, quiere) => {
       if (soloMirar) throw new Error(t('pd_repro_no_corta'));
       if (b.dataset.empresaCorte) {
