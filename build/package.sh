@@ -90,7 +90,7 @@ for idioma in es en pt; do
     if wix build -arch x64 \
         -culture "$cultura" -loc "build/wix/loc-$cultura.wxl" \
         -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext \
-        -d "Version=$VERSION" -d "Lang=0" -d "Exe=$WIN_BIN" \
+        -d "Version=$VERSION" -d "Lang=0" -d "Idioma=$idioma" -d "Exe=$WIN_BIN" \
         -d "Readme=build/wix/textos/leeme-$idioma.txt" \
         -d "Welcome=build/wix/textos/bienvenida-$idioma.rtf" \
         -d "Icon=build/wix/guardiana.ico" \

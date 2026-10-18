@@ -3,6 +3,7 @@
 // «Cortado»; the state is always said in words beside it, so colour is never the only sign. It is a
 // real switch (role="switch", aria-checked, Space and Enter), with a hit area of 44 px, a short
 // «Cortando…» while the service confirms, and it goes back, saying why, if the service refuses.
+// It also carries GuardianaRespuesta, the few rules that make every click answer (see below).
 // This file is the same, byte for byte, in crates/panel/static/interruptor.js and
 // zero/navegador/interfaz/interruptor.js; a test of the panel checks it. Its look is in diseno.css.
 //
@@ -79,4 +80,61 @@
     // Space and Enter are a button's own keys; nothing else is needed.
   }
   window.GuardianaInterruptor = { html: html, engancha: engancha };
+
+  // ---------- Every click answers (18 Oct 2026, the owner's «revisión extrema») ----------
+  // No control may leave the person unsure whether the click registered:
+  //  · a control at work says so within a frame (aria-busy: a small spinner, no second click);
+  //  · when it ends it says how: a short «hecho» mark, or back as it was with the reason;
+  //  · a link to another page shows a thin bar at the top at once, until the page arrives;
+  //  · a second click on something still working is ignored.
+  // GuardianaRespuesta.trabaja(control, promesa) wraps any work started from a control;
+  // GuardianaRespuesta.breve(texto) is a two-second notice («Guardado»).
+  function trabaja(c, promesa) {
+    if (!c || c.getAttribute('aria-busy') === 'true') return Promise.resolve(promesa);
+    var estabaDesactivado = c.disabled;
+    c.setAttribute('aria-busy', 'true');
+    c.classList.add('trabajando');
+    if ('disabled' in c) c.disabled = true;
+    var fin = function (ok, motivo) {
+      c.removeAttribute('aria-busy');
+      c.classList.remove('trabajando');
+      if ('disabled' in c && !estabaDesactivado) c.disabled = false;
+      c.classList.add(ok ? 'respondio' : 'fallo');
+      if (!ok && motivo) c.title = String(motivo);
+      setTimeout(function () { c.classList.remove('respondio', 'fallo'); }, ok ? 900 : 2400);
+    };
+    return Promise.resolve(promesa).then(function (v) { fin(true); return v; }, function (e) { fin(false, e && e.message || e); throw e; });
+  }
+  var avisoBreve = null;
+  function breve(texto) {
+    if (!avisoBreve) {
+      avisoBreve = document.createElement('div');
+      avisoBreve.className = 'aviso-breve';
+      avisoBreve.setAttribute('role', 'status');
+      document.body.appendChild(avisoBreve);
+    }
+    avisoBreve.textContent = texto;
+    avisoBreve.classList.add('visto');
+    clearTimeout(breve.t);
+    breve.t = setTimeout(function () { avisoBreve.classList.remove('visto'); }, 2000);
+  }
+  function barra() {
+    var b = document.getElementById('gd-progreso');
+    if (!b) { b = document.createElement('div'); b.id = 'gd-progreso'; b.className = 'gd-progreso'; b.setAttribute('aria-hidden', 'true'); document.body.appendChild(b); }
+    b.classList.remove('va'); void b.offsetWidth; b.classList.add('va');
+  }
+  // A second click on a control still at work does nothing.
+  document.addEventListener('click', function (e) {
+    var c = e.target.closest && e.target.closest('[aria-busy="true"]');
+    if (c) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+    var a = e.target.closest && e.target.closest('a[href]');
+    if (!a || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    if (a.target && a.target !== '_self') return;
+    var h = a.getAttribute('href') || '';
+    if (!h || h.charAt(0) === '#' || /^(mailto|tel|javascript):/i.test(h) || a.hasAttribute('download')) return;
+    try { if (new URL(a.href, location.href).origin !== location.origin) return; } catch (_) { return; }
+    barra();
+  }, true);
+  window.addEventListener('pageshow', function () { var b = document.getElementById('gd-progreso'); if (b) b.classList.remove('va'); });
+  window.GuardianaRespuesta = { trabaja: trabaja, breve: breve, barra: barra };
 })();

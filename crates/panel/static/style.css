@@ -72,7 +72,7 @@ header.top.g-barra .brand { flex: 1 1 0; min-width: 0; }
 .g-menu a:hover, .g-menu a:focus-visible { background: var(--campo); outline: none; }
 .g-menu a[aria-current="page"] { color: var(--accent); }
 .g-menu-t { padding: 8px 10px 4px; font: 500 12px var(--texto); color: var(--muted-2); }
-.g-menu .idiomas { display: flex; gap: 6px; padding: 2px 8px 6px; }
+.g-menu .idiomas { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 8px 6px; }
 .g-menu .lang { min-height: 30px; padding: 0 12px; font: 600 12px var(--texto); border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); }
 .g-menu .lang:hover { border-color: #3A4656; color: var(--fg); background: transparent; }
 .g-menu .lang.actual { border-color: var(--accent); color: var(--accent); opacity: 1; cursor: default; }
@@ -1202,3 +1202,7 @@ body.universo { display: flex; flex-direction: column; height: 100vh; height: 10
 .universo .btn-hud { appearance: none; display: inline-flex; align-items: center; min-height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid #2A3442; background: var(--campo); color: var(--fg); font: 600 13px var(--texto); cursor: pointer; }
 .universo .btn-hud:hover { border-color: #3A4656; background: #141B25; color: var(--fg); }
 .universo .btn-hud.peligro:hover { border-color: var(--alerta); background: color-mix(in srgb, var(--alerta) 8%, var(--campo)); }
+/* The language switch on the pages with a header of their own (the phone's page, the checker). */
+header.top .idiomas { margin-left: auto; display: inline-flex; gap: 6px; }
+header.top .idiomas .lang { min-height: 30px; padding: 0 12px; font: 600 12px var(--texto); border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); }
+header.top .idiomas .lang.actual { border-color: var(--accent); color: var(--accent); opacity: 1; }

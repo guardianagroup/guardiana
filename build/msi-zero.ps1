@@ -41,6 +41,6 @@ $outDir = Split-Path -Parent $Out
 if ($outDir -and -not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir | Out-Null }
 if ($Wix -like "*.dll") { $cmd = "dotnet"; $pre = @($Wix) } else { $cmd = $Wix; $pre = @() }
 Write-Host "idioma del instalador: $Idioma ($cultura)"
-& $cmd @pre build -arch x64 -culture $cultura -loc $loc -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d "Version=$Version" -d "Exe=$Exe" -d "Readme=$readme" -d "Welcome=$welcome" -d "Dialogo=$dialogo" -d "Icon=$icon" -o $Out $wxs
+& $cmd @pre build -arch x64 -culture $cultura -loc $loc -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d "Version=$Version" -d "Idioma=$Idioma" -d "Exe=$Exe" -d "Readme=$readme" -d "Welcome=$welcome" -d "Dialogo=$dialogo" -d "Icon=$icon" -o $Out $wxs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Get-FileHash -Algorithm SHA256 $Out | Format-List

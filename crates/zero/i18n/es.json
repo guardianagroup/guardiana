@@ -1291,5 +1291,10 @@
   "sec_in_otro_no_vigilable": "Su sistema no permite esta verificación",
   "lanzador_esperando": "GUARDIANA está arrancando. El panel se abre aquí en cuanto el servicio responda.",
   "lanzador_sin_servicio": "El servicio de GUARDIANA no responde. Reinicia el equipo; si sigue igual, vuelve a ejecutar el instalador de GUARDIANA y elige «Reparar».",
-  "lanzador_sin_llave": "El servicio de GUARDIANA responde, pero no se pudo leer la llave del panel. Cierra esta ventana y abre GUARDIANA otra vez desde el menú Inicio; si sigue igual, reinicia el equipo."
+  "lanzador_sin_llave": "El servicio de GUARDIANA responde, pero no se pudo leer la llave del panel. Cierra esta ventana y abre GUARDIANA otra vez desde el menú Inicio; si sigue igual, reinicia el equipo.",
+  "interruptor_permitido": "Permitido",
+  "interruptor_cortado": "Cortado",
+  "interruptor_cortando": "Cortando…",
+  "interruptor_permitiendo": "Permitiendo…",
+  "interruptor_sin_respuesta": "ZERO no confirmó el cambio: sigue como estaba. Inténtalo otra vez."
 }

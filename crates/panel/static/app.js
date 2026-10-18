@@ -27,9 +27,13 @@
   let LANG = '';
   try { LANG = localStorage.getItem('guardiana_lang') || ''; } catch (_) {}
   if (LANG !== 'es' && LANG !== 'en' && LANG !== 'pt') {
-    // Spanish or Portuguese browsers get their language; any other one gets English, not Spanish
-    // (28 Sep 2026: a browser in German got the whole panel in Spanish).
-    const dos = (navigator.language || 'es').slice(0, 2).toLowerCase();
+    // English first (18 Oct 2026, the owner: «English is the first language on screen»), and the
+    // browser's language is no longer a guess of the person's. The one exception is a choice the
+    // person did make: inside GUARDIANA ZERO the page speaks the language ZERO runs in, which is
+    // the installer's (Spanish or Portuguese MSI) or English. ZERO sets that language on its
+    // engine, so there it is what navigator.language says.
+    const enZero = !!(window.chrome && window.chrome.webview);
+    const dos = enZero ? (navigator.language || 'en').slice(0, 2).toLowerCase() : 'en';
     LANG = (dos === 'es' || dos === 'pt') ? dos : 'en';
   }
   try { document.documentElement.lang = LANG; } catch (_) {}
@@ -318,7 +322,26 @@
     el.innerHTML = pasos.replace(/\.$/, '').split(' › ').map((x) => `<li>${resalta(x)}</li>`).join('')
       + (cola.length ? `<li class="nota-tel">${resalta(cola.join(' '))}</li>` : '');
   }
+  // Every action answers (18 Oct 2026, the owner's «revisión extrema»): whatever a click on a
+  // control asks the service to change, that control shows it is working from the same instant,
+  // ignores a second click, and ends with a mark or with the reason it failed
+  // (GuardianaRespuesta, interruptor.js). The switches handle their own.
+  let ultimoControl = null;
+  document.addEventListener('click', (e) => {
+    const c = e.target.closest && e.target.closest('button, [role="button"], input[type="checkbox"], input[type="radio"]');
+    ultimoControl = c && !c.classList.contains('interruptor') ? { c, ts: performance.now() } : null;
+  }, true);
   async function api(path, opts = {}) {
+    const metodo = String(opts.method || 'GET').toUpperCase();
+    const R = window.GuardianaRespuesta;
+    if (metodo !== 'GET' && R && ultimoControl && performance.now() - ultimoControl.ts < 1500 && ultimoControl.c.isConnected) {
+      const c = ultimoControl.c;
+      ultimoControl = null;
+      return R.trabaja(c, apiDirecta(path, opts));
+    }
+    return apiDirecta(path, opts);
+  }
+  async function apiDirecta(path, opts = {}) {
     // The browser's offset in minutes east of UTC, so the dates written into sentences are the
     // person's own day (getTimezoneOffset counts the other way round).
     const headers = Object.assign({ 'X-Guardiana-Token': token, 'X-Guardiana-Lang': LANG, 'X-Guardiana-Tz': String(-new Date().getTimezoneOffset()) }, opts.headers || {});
@@ -1086,11 +1109,23 @@
     const page = document.body.getAttribute('data-page');
     const header = document.querySelector('header.top');
     // The phone's own page and the checker have a world of their own: no menu of the house.
-    if (!header || page === 'miDispositivo' || page === 'comprobador') return;
+    if (!header) return;
+    const CORTO0 = { en: 'English', es: 'Español', pt: 'Português' };
+    if (page === 'miDispositivo' || page === 'comprobador') {
+      // Their own header keeps only the language switch, English first.
+      if (!$('lang-toggle')) {
+        const b = document.createElement('div');
+        b.id = 'lang-toggle'; b.className = 'idiomas';
+        b.innerHTML = ['en', 'es', 'pt'].map((l) => `<button type="button" class="secondary lang${l === LANG ? ' actual' : ''}" lang="${l}"${l === LANG ? ' aria-current="true" disabled' : ` data-lang="${l}"`}>${CORTO0[l]}</button>`).join('');
+        b.querySelectorAll('[data-lang]').forEach((a) => a.addEventListener('click', () => { try { localStorage.setItem('guardiana_lang', a.dataset.lang); } catch (_) {} location.reload(); }));
+        header.appendChild(b);
+      }
+      return;
+    }
     const seccion = MENU.find((s) => s.paginas.some((p) => p[0] === page)) || (AJUSTES.paginas.some((p) => p[0] === page) ? AJUSTES : null);
-    const CORTO = { es: 'ES', en: 'EN', pt: 'PT' };
+    const CORTO = { en: 'English', es: 'Español', pt: 'Português' };
     const CAMBIAR = { es: 'Cambiar a español', en: 'Switch to English', pt: 'Mudar para português' };
-    const idiomas = ['es', 'en', 'pt'].map((l) => (l === LANG
+    const idiomas = ['en', 'es', 'pt'].map((l) => (l === LANG
       ? `<button type="button" class="lang actual" lang="${l}" aria-current="true" disabled>${CORTO[l]}</button>`
       : `<button type="button" class="lang" lang="${l}" data-lang="${l}" aria-label="${esc(CAMBIAR[l])}">${CORTO[l]}</button>`)).join('');
     const enlace = (p, clase) => `<a href="${p[1]}"${clase ? ` class="${clase}"` : ''}${p[0] === page ? ' aria-current="page"' : ''}>${esc(t(p[2]))}</a>`;
@@ -1900,7 +1935,7 @@
         if (v.device_id !== 'self') return '';
         const on = corte.cortados.includes(v.producto);
         if (!corte.disponible) return `<p class="limit">${esc(t('av_cortar_no_disponible'))}</p>`;
-        return `<p class="vigilante"><label><input type="checkbox" class="av-cortar" data-producto="${esc(v.producto)}"${on ? ' checked' : ''}> <b>${esc(t('av_cortar'))}</b></label>
+        return `<p class="vigilante"><label><input type="checkbox" role="switch" class="av-cortar interruptor" data-producto="${esc(v.producto)}"${on ? ' checked' : ''}> <b>${esc(t('av_cortar'))}</b></label>
           <br><span class="${on ? 'bad' : 'muted'}">${esc(t(on ? 'av_cortar_on' : 'av_cortar_off'))}</span>
           <br><span class="muted">${esc(t('av_cortar_aviso'))}</span></p>`;
       };
@@ -2113,7 +2148,7 @@
           <h3>${esc(nombreAparato(a.device_id, a.device_name))}</h3>
           <p class="mono muted">${a.patrones.map(esc).join(' · ')}</p>
           ${cifrasAlcance(a)}
-          <p class="vigilante"><label><input type="checkbox" class="a-cortar" data-device="${esc(a.device_id)}"${a.cortar ? ' checked' : ''}> <b>${esc(t('alcance_cortar'))}</b></label>
+          <p class="vigilante"><label><input type="checkbox" role="switch" class="a-cortar interruptor" data-device="${esc(a.device_id)}"${a.cortar ? ' checked' : ''}> <b>${esc(t('alcance_cortar'))}</b></label>
             <br><span class="muted">${esc(t(a.cortar ? 'alcance_cortar_on' : 'alcance_cortar_off'))}</span>
             <br><span class="muted">${esc(t('alcance_cortar_todo'))}</span></p>
           ${a.pase_hasta ? `<p class="ok">${esc(t('alcance_pase_activo').replace('{hora}', when(a.pase_hasta)))}</p>`

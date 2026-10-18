@@ -150,3 +150,27 @@ input[type="checkbox"].interruptor::before { content: ""; position: absolute; to
 input[type="checkbox"].interruptor:checked { background: var(--alerta); }
 input[type="checkbox"].interruptor:checked::before { transform: translateX(20px); }
 @media (prefers-reduced-motion: reduce) { .interruptor, .interruptor .interruptor-bola, input[type="checkbox"].interruptor::before { transition: none; } }
+
+/* Every click answers (18 Oct 2026, the owner's «revisión extrema»; interruptor.js has the helper).
+   Pointed at: a visible change at once. Pressed: a little smaller for as long as it is held.
+   At work: a small spinner and no second click. Done: a short mark. Failed: a short shake and the
+   reason in its tooltip (the page says it in words too). Nothing that is not a control looks like one. */
+.btn, .boton, .boton-icono, .interruptor, button, [role="button"], summary { transition: background-color .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease, transform .08s ease, opacity .12s ease; }
+.btn:active:not([disabled]), .boton:active:not([disabled]), .boton-icono:active:not([disabled]), button:active:not([disabled]), [role="button"]:active, summary:active { transform: scale(.97); }
+.interruptor:active:not([disabled]) .interruptor-bola { width: 22px; }
+.interruptor[aria-checked="true"]:active:not([disabled]) .interruptor-bola { transform: translateX(16px); }
+a:active { opacity: .78; }
+[aria-busy="true"] { cursor: progress !important; }
+.trabajando { position: relative; }
+button.trabajando, .btn.trabajando, .boton.trabajando { color: transparent !important; }
+button.trabajando::after, .btn.trabajando::after, .boton.trabajando::after { content: ""; position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid var(--muted); border-right-color: transparent; animation: gd-gira .8s linear infinite; }
+input.trabajando { opacity: .55; }
+.respondio { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px color-mix(in srgb, var(--accent) 70%, transparent) !important; }
+.fallo { animation: gd-fallo .32s ease; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--alerta) !important; }
+@keyframes gd-fallo { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.aviso-breve { position: fixed; left: 50%; bottom: 72px; z-index: 90; transform: translate(-50%, 8px); opacity: 0; pointer-events: none; padding: 10px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--fg); font: 600 13.5px/1.2 var(--texto); box-shadow: var(--sombra); transition: opacity .15s ease, transform .15s ease; }
+.aviso-breve.visto { opacity: 1; transform: translate(-50%, 0); }
+.gd-progreso { position: fixed; left: 0; top: 0; z-index: 100; height: 2px; width: 0; background: var(--accent); opacity: 0; pointer-events: none; }
+.gd-progreso.va { opacity: 1; animation: gd-progreso 2.4s cubic-bezier(.1, .7, .2, 1) forwards; }
+@keyframes gd-progreso { from { width: 0; } to { width: 88%; } }
+@media (prefers-reduced-motion: reduce) { .btn:active, .boton:active, button:active, [role="button"]:active { transform: none; } .fallo { animation: none; } .gd-progreso.va { animation-duration: .01s; } }
