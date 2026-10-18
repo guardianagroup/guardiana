@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>GUARDIANA · Contratos</title>
+<link rel="stylesheet" href="/static/diseno.css">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="preload" href="/static/fonts/HankenGrotesk-var.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="/static/fonts/SchibstedGrotesk-var.woff" as="font" type="font/woff" crossorigin>
+<script src="/static/arranque.js"></script>
+<style>
+/* «Contratos» (1.0.45). Only the page's own pieces; buttons, chips and cards are diseno.css's. */
+.ct-cifras { display: flex; flex-wrap: wrap; gap: var(--e3); margin: var(--e4) 0; }
+.ct-cifra { flex: 1 1 120px; }
+.ct-cifra .n { font: 600 26px/1.1 var(--display); color: var(--fg); }
+.ct-cifra .l { color: var(--muted); font-size: 13px; margin-top: var(--e1); }
+.ct-nota { color: var(--muted); font-size: 13.5px; line-height: 1.5; margin: var(--e2) 0; }
+.ct-lista { display: grid; gap: var(--e3); margin: var(--e3) 0 var(--e5); }
+.ct-aviso .ct-cabeza, .ct-prog .ct-cabeza { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e2) var(--e3); justify-content: space-between; }
+.ct-aviso h3, .ct-prog h3 { margin: 0; font: 600 16px/1.35 var(--display); color: var(--fg); overflow-wrap: anywhere; }
+.ct-meta { color: var(--muted); font-size: 12.5px; margin-top: var(--e1); overflow-wrap: anywhere; }
+.ct-antes-despues { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--e3); margin: var(--e3) 0; }
+.ct-col { border: 1px solid var(--line); border-radius: var(--r-campo); padding: var(--e3); min-width: 0; }
+.ct-col ul { list-style: none; margin: var(--e2) 0 0; padding: 0; display: grid; gap: var(--e1); }
+.ct-col li { overflow-wrap: anywhere; font-size: 13.5px; }
+.ct-col.nuevo { border-color: var(--aviso); }
+.ct-col.nuevo li b { color: var(--fg); }
+.ct-mono { font: 400 12px/1.5 var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.ct-botones { display: flex; flex-wrap: wrap; gap: var(--e2); align-items: center; margin-top: var(--e3); }
+.ct-detalle { margin-top: var(--e3); }
+.ct-detalle[hidden] { display: none; }
+.ct-registro { list-style: none; padding: 0; margin: var(--e3) 0; display: grid; gap: var(--e2); }
+.ct-registro li { display: grid; grid-template-columns: minmax(110px, auto) 1fr; gap: var(--e3); font-size: 13.5px; border-bottom: 1px solid var(--line); padding-bottom: var(--e2); }
+.ct-registro time { color: var(--muted); font-size: 12.5px; }
+.ct-registro .ct-mono { grid-column: 2; }
+.ct-msg { min-height: 1.4em; font-size: 13.5px; color: var(--muted); }
+details.ct-plegable > summary { cursor: pointer; color: var(--accent); font-weight: 500; margin-top: var(--e2); }
+/* Until the shared switch of diseno.css arrives (redesign branch): the same look with no weight,
+   :where() keeps these at zero specificity so the shared rules win once they are there. */
+:where(.interruptor-caja) { display: inline-flex; align-items: center; gap: 8px; }
+:where(.interruptor) { appearance: none; position: relative; width: 44px; height: 24px; padding: 0; border: 0; border-radius: 999px; background: var(--ok); cursor: pointer; }
+:where(.interruptor .interruptor-bola) { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #F4F6FA; transition: transform .18s ease; }
+:where(.interruptor[aria-checked="true"]) { background: var(--alerta); }
+:where(.interruptor[aria-checked="true"] .interruptor-bola) { transform: translateX(20px); }
+:where(.interruptor-estado) { font: 600 12.5px/1.2 var(--texto); color: var(--ok); }
+:where(.interruptor-caja.cortado .interruptor-estado) { color: var(--alerta); }
+@media (max-width: 560px) { .ct-registro li { grid-template-columns: 1fr; } .ct-registro .ct-mono { grid-column: 1; } }
+</style>
+</head>
+<body data-page="contratos">
+<header class="top">
+  <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA<small data-t="lema"></small></span></a>
+  <nav>
+    <a href="/por-dentro" class="nav-destacado" data-t="nav_por_dentro">Globo en directo</a>
+    <a href="/revision" class="nav-destacado" data-t="nav_revision">Revisión</a>
+    <a href="/"  data-t="nav_radiografia">Radiografía</a>
+    <a href="/contratos" aria-current="page" data-t="nav_contratos">Contratos</a>
+    <a href="/ia" data-t="nav_ia">Tu IA</a>
+    <a href="/antivirus" data-t="nav_antivirus">Tu antivirus</a>
+    <a href="/extracto"  data-t="nav_extracto">Extracto</a>
+    <a href="/dispositivos"  data-t="nav_dispositivos">Dispositivos</a>
+    <a href="/sabe-de-ti" data-t="nav_sabe">Lo que GUARDIANA sabe de ti</a>
+    <a href="/reglas" data-t="nav_reglas">Reglas</a>
+    <a href="/informe" data-t="nav_informe">Informe semanal</a>
+    <a href="/hogar" data-t="nav_hogar">Modo Hogar</a>
+    <a href="/licencia" data-t="nav_licencia">Licencia</a>
+    <a href="/verify" data-t="nav_verify">Verificar</a>
+    <a href="/estado"  data-t="nav_estado">Estado</a>
+  </nav>
+</header>
+<main class="contratos">
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<h1 data-t="ct_titulo">Contratos de tus programas</h1>
+<p class="lead" data-t="ct_lead"></p>
+<p class="ct-nota" id="ct-como"></p>
+<p class="ct-nota" data-t="ct_limite"></p>
+<p class="ct-nota hidden" id="ct-solo-windows" data-t="ct_solo_windows"></p>
+
+<div class="ct-cifras" aria-live="polite">
+  <div class="tarjeta ct-cifra"><div class="n" id="ct-n-aprendiendo">0</div><div class="l" data-t="ct_n_aprendiendo"></div></div>
+  <div class="tarjeta ct-cifra"><div class="n" id="ct-n-vigilando">0</div><div class="l" data-t="ct_n_vigilando"></div></div>
+  <div class="tarjeta ct-cifra"><div class="n" id="ct-n-fijado">0</div><div class="l" data-t="ct_n_fijado"></div></div>
+  <div class="tarjeta ct-cifra"><div class="n" id="ct-n-no-aplica">0</div><div class="l" data-t="ct_n_no_aplica"></div></div>
+</div>
+
+<h2 class="rotulo" data-t="ct_avisos_titulo">Cambios</h2>
+<p id="ct-msg" class="ct-msg" role="status" aria-live="polite"></p>
+<div id="ct-avisos" class="ct-lista"></div>
+<p class="ct-nota" data-t="ct_limite_corte"></p>
+
+<h2 class="rotulo" data-t="ct_programas_titulo">Programas</h2>
+<div id="ct-programas" class="ct-lista"></div>
+
+<h2 class="rotulo" data-t="ct_historial">Historial verificable</h2>
+<p class="ct-nota" data-t="ct_historial_lead"></p>
+<div class="ct-botones">
+  <button type="button" class="btn secondary" id="ct-comprobar" data-t="ct_comprobar">Comprobar el registro</button>
+  <span id="ct-comprobado" class="ct-msg" role="status" aria-live="polite"></span>
+</div>
+<ol id="ct-registro" class="ct-registro" reversed></ol>
+</main>
+<script src="/static/contratos.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

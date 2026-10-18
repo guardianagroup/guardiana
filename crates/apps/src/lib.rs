@@ -250,6 +250,63 @@ pub const fn lee_estado(estado: u32) -> (bool, bool) {
     (proteccion & 0x10 != 0, firmas == 0)
 }
 
+/// Reads what the signature-and-version check printed: a line `F:<signer>` when the signature is
+/// valid and a line `V:<version>` when the file declares one (1.0.45). Anything else is ignored,
+/// the signer is cut at 200 characters and the version is kept only when it looks like one
+/// (digits, letters, dots, dashes, plus signs, brackets and spaces, at most 40, with a digit), so
+/// a strange file cannot write a sentence into the panel through its version field.
+#[must_use]
+pub fn lee_firma_y_version(salida: &str) -> (String, String) {
+    let mut firma = String::new();
+    let mut version = String::new();
+    for linea in salida.lines().map(str::trim) {
+        if let Some(f) = linea.strip_prefix("F:") {
+            if firma.is_empty() {
+                firma = f.trim().chars().take(200).collect();
+            }
+        } else if let Some(v) = linea.strip_prefix("V:") {
+            let v = v.trim();
+            let parece = !v.is_empty()
+                && v.chars().count() <= 40
+                && v.chars().any(|c| c.is_ascii_digit())
+                && v.chars().all(|c| {
+                    c.is_ascii_alphanumeric()
+                        || matches!(c, '.' | '-' | '+' | ' ' | ',' | '(' | ')')
+                });
+            if version.is_empty() && parece {
+                // «6, 2, 1, 0» is how some old files write it: the same number, said with dots.
+                version = v.replace(", ", ".").replace(',', ".");
+            }
+        }
+    }
+    (firma, version)
+}
+
+#[cfg(test)]
+mod firma_y_version {
+    #[test]
+    fn the_signer_and_the_version_are_read_from_their_own_lines() {
+        let (f, v) =
+            super::lee_firma_y_version("F:Zoom Video Communications, Inc.\r\nV:6.2.1 (45678)\r\n");
+        assert_eq!(f, "Zoom Video Communications, Inc.");
+        assert_eq!(v, "6.2.1 (45678)");
+    }
+
+    #[test]
+    fn a_version_that_does_not_look_like_one_is_left_out() {
+        let (f, v) = super::lee_firma_y_version("V:<b>hola</b>\n");
+        assert!(f.is_empty());
+        assert!(v.is_empty());
+        let (_, v) = super::lee_firma_y_version("V:6, 2, 1, 0\n");
+        assert_eq!(v, "6.2.1.0");
+        let (f, v) = super::lee_firma_y_version("Microsoft Windows\n");
+        assert!(
+            f.is_empty() && v.is_empty(),
+            "untagged lines are not trusted"
+        );
+    }
+}
+
 /// Lo que el canal de sucesos está contando, tal cual, durante unos segundos.
 ///
 /// Es la comprobación que pide el brief (§12.3): antes de fiarse de un número de suceso hay que

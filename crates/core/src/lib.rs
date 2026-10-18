@@ -16,6 +16,7 @@
 
 mod alias;
 mod changes;
+pub mod contratos;
 mod error;
 mod export;
 mod gaps;

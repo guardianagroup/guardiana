@@ -63,6 +63,7 @@ fn proceso(nombre: &str, firma: &str) -> Proceso {
         ruta: String::new(),
         sha256: String::new(),
         firmado_por: firma.into(),
+        version: String::new(),
     }
 }
 
