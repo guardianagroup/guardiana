@@ -427,7 +427,8 @@ pub(crate) async fn api(
         .unwrap_or(7)
         .clamp(1, 30);
     let hasta = now_ms();
-    let desde = hasta - dias * 24 * 3_600_000;
+    // The last 24 hours at the free level, whatever was asked (display only: nothing is pruned).
+    let desde = crate::plan::desde(&state, hasta - dias * 24 * 3_600_000, hasta);
     let (filas, alias) = with_ledger(&state, move |l| {
         let filas = l.destinations_by_network(desde, hasta)?;
         let mut nombres: Vec<&str> = filas.iter().map(|f| f.qname.as_str()).collect();

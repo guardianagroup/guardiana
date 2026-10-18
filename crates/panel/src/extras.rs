@@ -338,7 +338,8 @@ async fn que_se_rompe(
         return Err((StatusCode::BAD_REQUEST, "empresa o dominio").into_response());
     };
     let hasta = now_ms();
-    let desde = hasta - 7 * DAY_MS;
+    // The last 24 hours at the free level (display only), and the page then says «desde» with it.
+    let desde = crate::plan::desde(&state, hasta - 7 * DAY_MS, hasta);
     let (grupos, detalle_desde) = with_ledger(&state, |l| {
         let g = l.names_grouped(desde, hasta + 1)?;
         let min: Option<i64> = l
@@ -349,7 +350,7 @@ async fn que_se_rompe(
                 |r| r.get(0),
             )
             .unwrap_or(None);
-        Ok((g, min))
+        Ok((g, min.map(|m: i64| m.max(desde))))
     })?;
     Ok(Json(QueSeRompe {
         objetivo,

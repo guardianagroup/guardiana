@@ -639,9 +639,16 @@ pub(crate) async fn vista(
     Query(q): Query<HashMap<String, String>>,
     _s: Session,
 ) -> ApiResult<Vista> {
-    let dias = dias_de(&q);
+    let pedido = dias_de(&q);
     let ahora = now_ms();
-    let desde = ahora - dias * DAY_MS;
+    // The last 24 hours at the free level (a display filter: nothing is pruned), and the page is
+    // told the period it really shows.
+    let desde = crate::plan::desde(&state, ahora - pedido * DAY_MS, ahora);
+    let dias = if desde > ahora - pedido * DAY_MS {
+        1
+    } else {
+        pedido
+    };
     let (filas, transferencias, archivos, cadena) = with_ledger(&state, |l| {
         let hasta = l.vision_hasta().unwrap_or(desde).max(desde);
         let mut filas = l.resumen_vision(desde, hasta)?;
