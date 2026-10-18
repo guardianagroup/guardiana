@@ -178,3 +178,44 @@ input.trabajando { opacity: .55; }
 .gd-progreso.va { opacity: 1; animation: gd-progreso 2.4s cubic-bezier(.1, .7, .2, 1) forwards; }
 @keyframes gd-progreso { from { width: 0; } to { width: 88%; } }
 @media (prefers-reduced-motion: reduce) { .btn:active, .boton:active, button:active, [role="button"]:active { transform: none; } .fallo { animation: none; } .gd-progreso.va { animation-duration: .01s; } }
+/* === SISTEMA 1.0.46 · una sola medida para todo el programa (no editar en una rama: se cambia aquí y en todas) === */
+:root {
+  /* Marco */
+  --s-barra: 56px;          /* barra superior: logo · selector · estado · ajustes */
+  --s-fila2: 44px;          /* segunda fila: En vivo · Actividad · Diagnóstico · Privacidad (ZERO: pestañas) */
+  --s-franja: 64px;         /* franja inferior del globo (AHORA · pulso · Protección máxima) */
+  --s-margen: 40px;         /* margen lateral de barra, fila 2, franja y páginas a 1440 */
+  --s-margen-movil: 16px;
+  --s-pagina: 1200px;       /* ancho máximo de toda página interior (Lente) */
+  --s-inspector: 400px;     /* panel derecho: lugar, empresa, programa, escudo de llamada */
+  --s-lista: 264px;         /* columna izquierda de salas (Comunicaciones) y de categorías (tabla en vivo) */
+  --s-cristal: 56px;        /* franja de ZERO plegada; desplegada = 360px */
+  --s-cristal-abierto: 360px;
+  /* Rejilla de página: 12 columnas, separación 24; contenido 8 + lateral 4 */
+  --s-col-gap: 24px;
+  /* Espaciado: solo múltiplos de 4 → usar --e1..--e6 (4 8 12 16 24 32) y 40/48 */
+  --e7: 40px; --e8: 48px;
+  /* Tipografía (Hanken Grotesk; títulos Schibsted Grotesk 600) */
+  --t-12: 12px/16px var(--texto);   /* etiquetas, cabeceras de tabla (sin mayúsculas forzadas salvo AHORA y cabeceras de tabla, +0.06em) */
+  --t-13: 13px/18px var(--texto);   /* secundario, filas de tabla, píldoras */
+  --t-15: 15px/22px var(--texto);   /* texto normal, botones, menú */
+  --t-20: 600 20px/28px var(--display); /* título de tarjeta / panel */
+  --t-28: 600 28px/36px var(--display); /* título de página */
+  --t-40: 600 40px/44px var(--display); /* nombre grande en inspector (empresa) */
+  /* Alturas de control */
+  --h-boton: 40px; --h-fila: 40px; --h-fila-lista: 56px; --h-chip: 32px;
+  /* Radios */
+  --r-tarjeta: 12px; --r-control: 8px; --r-pill: 999px; --r-burbuja: 16px;
+  /* Movimiento */
+  --m-rapido: 160ms; --m-normal: 200ms; --m-curva: cubic-bezier(.2,.7,.2,1);
+}
+/* Reglas comunes:
+   - Mismo borde izquierdo en barra, fila 2, breadcrumb, título y contenido de cada página (margen --s-margen, centrado en --s-pagina).
+   - Tarjetas: fondo var(--card), borde 1px var(--line), radio --r-tarjeta, padding 24; separación 24. Sin sombras de colores ni degradados.
+   - Botones: 3 familias (principal acero relleno, secundario borde, texto). Altura --h-boton, radio --r-control.
+   - Cifras: font-variant-numeric: tabular-nums; separador de miles del idioma.
+   - Iconos: trazo 1.6, 20 px (16 px en filas), color var(--muted).
+   - Interruptor: el estándar `interruptor` (44×24), nunca otro control para on/off.
+   - Paneles que se abren (inspector, tabla en vivo, escudo de ZERO): se cierran con ✕, Esc o clic fuera; animación --m-normal --m-curva.
+*/
+/* === FIN SISTEMA 1.0.46 === */

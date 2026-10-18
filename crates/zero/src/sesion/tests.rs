@@ -3627,7 +3627,7 @@ fn one_navigation_the_selector_moves_between_the_three_products() {
     assert_eq!(marco_de(&m), Some((ALTO_ZERO, 0)));
     assert_eq!(
         del_tipo(&m, Origen::Barra, "marco").unwrap_or_default()["barra"],
-        140
+        144
     );
     // A web page cannot ask for it.
     let web = s.activa();
@@ -3682,6 +3682,31 @@ fn the_glass_strip_shows_beside_a_web_and_the_summary_opens_to_360() {
     let _ = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"pestana_nueva"}"#);
     assert_eq!(s.marco(), (ALTO_ZERO, 0));
     let _ = id;
+}
+
+#[test]
+fn a_click_on_the_web_folds_its_summary_into_the_glass_strip() {
+    let (mut s, _, id) = con_pagina(true);
+    let _ = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"panel","vista":"escudo"}"#);
+    assert_eq!(s.marco(), (ALTO_ZERO, ANCHO_LATERAL));
+    let _ = s.mensaje(
+        Origen::Pestana(id),
+        "https://eltiempo.com/",
+        r#"{"tipo":"zg_toque"}"#,
+    );
+    assert_eq!(s.marco(), (ALTO_ZERO, ANCHO_FRANJA));
+    // Another view the person opened (settings) is not folded by a click on the page.
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"panel","vista":"ajustes"}"#,
+    );
+    let _ = s.mensaje(
+        Origen::Pestana(id),
+        "https://eltiempo.com/",
+        r#"{"tipo":"zg_toque"}"#,
+    );
+    assert_eq!(s.marco(), (ALTO_ZERO, ANCHO_LATERAL));
 }
 
 #[test]

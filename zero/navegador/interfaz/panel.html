@@ -200,13 +200,85 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
 /* What the browser just did, said once at the foot of the panel. */
 #aviso { position: fixed; left: 16px; right: 16px; bottom: 14px; padding: 10px 14px; border-radius: 10px; background: var(--tinta); color: var(--hoja); font-size: 13px; box-shadow: var(--sombra); opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s; pointer-events: none; }
 #aviso.visto { opacity: 1; transform: none; }
+
+/* 1.0.46 (zero-1.0.46), Z1-b: the side summary of a web, the owner's choice. Beside a web it
+   rests as a glass strip of 56 px with a small shield and the page's figure; pressed, it opens to
+   360 px: this web's shield, its attempts (domain · company · category, and the switch), the
+   signed receipt of the page and «Permitir en esta web». The rest of the shield (the day, the
+   protection, what the page's pixels said) follows below, as before. */
+body.vidrio { background: var(--card); border-left: 1px solid var(--line); }
+body.vidrio.en-escudo header { display: none; }
+body.vidrio.en-escudo main { padding: var(--e5) var(--e5) var(--e6); }
+#franja { display: none; }
+body.plegado header, body.plegado main, body.plegado #aviso { display: none !important; }
+body.plegado #franja { display: flex; flex-direction: column; align-items: center; gap: var(--e2); width: 100%; height: 100%; padding: var(--e4) 0; border: 0; background: none; color: var(--tinta); cursor: pointer; transition: background-color var(--m-rapido); }
+body.plegado #franja:hover { background: var(--campo); }
+#franja canvas { width: 32px; height: 36px; display: block; }
+#franja b { font: 600 var(--t-15); font-variant-numeric: tabular-nums; }
+#franja span { font: var(--t-12); color: var(--gris); text-align: center; padding: 0 var(--e1); }
+#franja .flecha { margin-top: var(--e2); color: var(--muted-2); }
+.z1-cab { display: flex; align-items: flex-start; gap: var(--e3); }
+.z1-cap { font: 600 var(--t-12); letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2); }
+.z1-web { font: 400 13px/18px var(--mono); margin-top: var(--e1); word-break: break-all; }
+#z1-plegar { margin-left: auto; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--linea); background: var(--bg); color: var(--gris); display: grid; place-items: center; flex: none; padding: 0; }
+#z1-plegar:hover { color: var(--tinta); border-color: #3A4656; }
+.z1-cifra { display: flex; align-items: center; gap: var(--e4); margin-top: var(--e5); }
+#z1-escudo { width: 76px; height: 88px; flex: none; }
+#z1-n { font: 600 40px/44px var(--texto); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+#z1-que { margin-top: var(--e1); font: var(--t-13); color: var(--gris); }
+.z1-columnas { display: flex; margin-top: var(--e5); font: 600 var(--t-12); letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2); }
+.z1-columnas span:last-child { margin-left: auto; }
+body.vidrio .terceros .tercero { padding: var(--e2) 0; border-bottom: 1px solid var(--line); grid-template-columns: minmax(0, 1fr) 8.75rem; grid-template-rows: auto auto; row-gap: 2px; }
+body.vidrio .terceros .tercero::before { display: none; }
+body.vidrio .tercero .linea { grid-column: 1 / -1; grid-row: 1; font: var(--t-13); color: var(--tinta); }
+body.vidrio .tercero .linea .mono { font-size: 13px; }
+body.vidrio .tercero .linea .cuenta { display: none; }
+body.vidrio .tercero .quien { grid-column: 1; grid-row: 2; font: var(--t-12); color: var(--gris); }
+body.vidrio .tercero .quien .enlace-empresa { color: var(--gris); }
+body.vidrio .tercero .quien .cat::before { content: ' · '; }
+body.vidrio .tercero .botones { grid-column: 2; grid-row: 2; grid-template-rows: auto; }
+body.vidrio .tercero .botones .boton.vacio { display: none; }
+body.vidrio .tercero .chips { grid-column: 1 / -1; grid-row: 3; font: var(--t-12); }
+body.vidrio .tercero .chips .chip.estado, body.vidrio .tercero .chips .chip.cat { display: none; }
+body.vidrio .tercero .chips:empty { display: none; }
+body.vidrio .tercero.cortado .interruptor-estado { color: var(--rojo); font-weight: 600; }
+body.vidrio .lista-resumen { margin: var(--e3) 0 0; font: var(--t-12); color: var(--gris); }
+.z1-acciones { margin-top: var(--e5); display: grid; gap: var(--e3); }
+.z1-acciones .boton.principal { width: 100%; min-height: var(--h-boton); }
+.z1-permitir { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); min-height: var(--h-boton); padding: 0 var(--e3) 0 var(--e4); border: 1px solid var(--linea); border-radius: var(--r-pill); }
+.z1-permitir label { font: 500 var(--t-15); }
+.z1-mas { margin: var(--e6) 0 var(--e3); padding-top: var(--e4); border-top: 1px solid var(--linea); }
+#zero-subasta:not([hidden]) { margin-top: var(--e5); }
+body.vidrio #e-pagina-cab, body.vidrio #e-sitio, body.vidrio #e-resumen, body.vidrio .tercero .quien small { display: none; }
 </style>
 </head>
 <body>
+<button id="franja" type="button" data-t-title="z1_franja_titulo"><canvas id="franja-escudo"></canvas><b id="franja-n">0</b><span id="franja-que"></span><svg class="flecha" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button>
 <header><h1 id="titulo"></h1><button id="cerrar" data-t-title="cerrar"><svg viewBox="0 0 14 14" width="12" height="12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2.5 2.5l9 9M11.5 2.5l-9 9"/></svg></button></header>
 <main>
 
 <section class="vista" id="v-escudo" data-titulo="escudo_titulo">
+  <div class="z1-cab">
+    <div><div class="z1-cap" data-t="z1_escudo_web"></div><div class="z1-web" id="z1-web"></div></div>
+    <button id="z1-plegar" type="button" data-t-title="z1_plegar"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg></button>
+  </div>
+  <div class="z1-cifra">
+    <canvas id="z1-escudo"></canvas>
+    <div><div id="z1-n">0</div><div id="z1-que"></div></div>
+  </div>
+  <div class="z1-columnas"><span data-t="z1_columnas"></span><span data-t="z1_estado"></span></div>
+  <div id="e-lista-caja" class="oculto"><ul class="terceros" id="e-terceros"></ul><p class="lista-resumen" id="e-lista-resumen" role="status"></p></div>
+  <p class="vacio oculto" id="e-vacio" data-t="escudo_vacio"></p>
+  <div class="recarga oculto" id="e-recarga"><span data-t="escudo_recarga"></span><button class="boton chico" id="e-recargar" data-t="recargar"></button></div>
+  <div class="z1-acciones">
+    <button class="boton principal" id="z1-recibo" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg><span data-t="z1_recibo"></span></button>
+    <div class="z1-permitir" id="z1-permitir"><label data-t="z1_permitir"></label><span id="z1-permitir-sw"></span></div>
+  </div>
+  <!-- 1.0.46 · «Tu visita, a subasta» (agent 4, branch subastas-1.0.46): its own script fills this
+       section through window.ZeroSubasta.montar(el, pagina), called on every update of the page
+       (panel.js, «escudo»). Hidden until it says something. -->
+  <section id="zero-subasta" hidden></section>
+  <p class="z1-mas z1-cap" data-t="z1_mas"></p>
   <div class="tarjeta sin-proteccion oculto" id="e-licencia" style="margin:0 0 14px"><p class="pequeno" id="e-licencia-txt" style="margin:0"></p><div class="fila-acciones"><button class="boton principal chico" id="e-licencia-ver" data-t="licencia_ver"></button></div></div>
   <section class="dia" id="e-dia">
     <div class="dia-cab"><h2><i class="pulso"></i><span data-t="escudo_dia"></span></h2><button class="enlace" id="e-dia-ver" data-t="inicio_ver_todo"></button></div>
@@ -241,9 +313,6 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
     <button class="boton principal" id="e-maxima-activar" data-t="maxima_activar"></button>
     <p class="maxima-activa oculto" id="e-maxima-activa"><span data-t="maxima_activa"></span> <button class="enlace" id="e-maxima-quitar" data-t="maxima_quitar"></button></p>
   </div>
-  <div id="e-lista-caja" class="oculto"><p class="lista-resumen" id="e-lista-resumen" role="status"></p><ul class="terceros" id="e-terceros"></ul></div>
-  <div class="recarga oculto" id="e-recarga"><span data-t="escudo_recarga"></span><button class="boton chico" id="e-recargar" data-t="recargar"></button></div>
-  <p class="vacio oculto" id="e-vacio" data-t="escudo_vacio"></p>
   <div class="hechos" id="e-hechos"></div>
   <div class="chivatos oculto" id="e-chivatos-caja">
     <h2 id="e-chivatos-titulo"></h2>
@@ -455,6 +524,7 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
 <div id="aviso" role="status" aria-live="polite"></div>
 <script src="interruptor.js"></script>
 <script src="puente.js"></script>
+<script src="escudo-puntos.js"></script>
 <script src="panel.js"></script>
 </body>
 </html>

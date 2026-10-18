@@ -27,6 +27,8 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
 function pagina(req, res) {
   const ruta = req.url.split('?')[0];
   if (ruta === '/propio.png') { res.writeHead(200, { 'Content-Type': 'image/png' }); return res.end(PNG); }
+  // 1.0.46 (Z4): a long page, to try the mouse wheel for real.
+  if (ruta === '/largo') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end('<!doctype html><title>Larga</title><body style="font:16px system-ui;margin:0">' + Array.from({ length: 200 }, (_, i) => `<p style="margin:0;padding:12px 24px">Línea ${i + 1}</p>`).join('') + '</body>'); }
   if (ruta === '/enviar') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end('<!doctype html><title>Recibido</title><p id="r">recibido</p>'); }
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
   res.end(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Sitio de prueba</title></head>
@@ -86,6 +88,28 @@ async function hasta(f, ms = 15000) {
   const fin = Date.now() + ms;
   while (Date.now() < fin) { try { if (await f()) return true; } catch (_) {} await espera(250); }
   return false;
+}
+// A real turn of the mouse wheel over the page area of ZERO's window (Windows' own input, not
+// the engine's debugging port: the owner's report was about where Windows sends the wheel).
+function rueda(pid) {
+  const ps = path.join(os.tmpdir(), 'zero-rueda.ps1');
+  fs.writeFileSync(ps, `Add-Type @"
+using System; using System.Runtime.InteropServices;
+public class Rueda {
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")] public static extern void mouse_event(uint f, uint x, uint y, int d, UIntPtr e);
+}
+"@
+$h = (Get-Process -Id ${pid}).MainWindowHandle
+$r = New-Object Rueda+RECT
+[Rueda]::GetWindowRect($h, [ref]$r) | Out-Null
+[Rueda]::SetCursorPos([int](($r.L + $r.R) / 2) - 220, [int](($r.T + $r.B) / 2) + 120) | Out-Null
+Start-Sleep -Milliseconds 300
+for ($i = 0; $i -lt 6; $i++) { [Rueda]::mouse_event(0x0800, 0, 0, -120, [UIntPtr]::Zero); Start-Sleep -Milliseconds 120 }
+`);
+  try { execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${ps}"`, { stdio: 'ignore' }); } catch (_) {}
 }
 function pantalla(nombre) {
   const ruta = path.join(salida, nombre).replace(/'/g, "''");
@@ -163,11 +187,22 @@ function pantalla(nombre) {
   // The star keeps the page in the favourites.
   await barra.click('#estrella');
   comprueba(await hasta(() => barra.evaluate(() => document.querySelector('#estrella').getAttribute('aria-pressed') === 'true')), 'la estrella guarda la web en favoritos');
-  const n = Number(await barra.textContent('#b-escudo-n'));
-  comprueba(n === 1, `el escudo cuenta empresas, no dominios: DoubleClick y Analytics son Google (${n})`);
+  // 1.0.46 (Z1-b): the bar's shield counts the attempts cut on this page (the pixel, the script
+  // and the advertising frame), and says so beside the figure.
+  const n = Number((await barra.textContent('#b-escudo-n')).replace(/\D/g, ''));
+  comprueba(n >= 3, `el escudo cuenta los intentos cortados en esta página (${n})`);
+  comprueba((await barra.textContent('#b-escudo-que')) === 'en esta página', 'y dice «en esta página»');
+  // One navigation (Z3): the product selector, with ZERO in front.
+  comprueba(await barra.evaluate(() => document.querySelector('#productos [data-producto="zero"]').getAttribute('aria-current') === 'true'), 'el selector de productos marca ZERO');
+  // Beside a web, the glass strip of 56 px; the summary opens to 360 px.
+  comprueba(await hasta(() => panel.evaluate(() => document.body.classList.contains('plegado') || document.querySelector('#v-licencia').classList.contains('vista-activa'))), 'junto a la web, la franja de cristal (o la vista que estaba abierta)');
   comprueba(await hasta(async () => (await barra.textContent('#aviso-corte')).includes('Google')), 'la barra dice a quién cortó');
   await abreVista('b-escudo');
   comprueba(await hasta(async () => (await panel.locator('#e-terceros li.cortado').count()) >= 1), 'el panel lista lo cortado');
+  comprueba(await hasta(async () => Number((await panel.textContent('#z1-n')).replace(/\D/g, '')) === n), 'el resumen de la web dice la misma cifra que la barra');
+  comprueba(await panel.evaluate(() => !!document.getElementById('zero-subasta')), 'y deja su sitio a «Tu visita, a subasta»');
+  await espera(600);
+  pantalla('z1-b-resumen.png');
   comprueba((await panel.textContent('#titulo')) === 'Conexiones con otras empresas', 'el escudo se titula «Conexiones con otras empresas»');
   const filas = await panel.locator('#e-terceros .quien').allTextContents();
   comprueba(filas.some((f) => f.includes('Google')), `el panel nombra a la empresa (${filas.join(', ')})`);
@@ -429,13 +464,13 @@ function pantalla(nombre) {
   // «Todo» is the whole log the browser keeps.
   await cortes.click('.periodos button[data-periodo="31"]');
   comprueba(await hasta(async () => (await cortes.textContent('.periodos button[data-periodo="31"]')) === 'Todo'), 'el periodo largo se llama «Todo»');
-  // From the shield, too. Already on the list: it stays, no second copy.
-  await abreVista('b-escudo');
-  await hasta(() => panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa')));
-  comprueba(await hasta(async () => /empresas? de fuera/.test(await panel.textContent('#e-dia-frase'))), `el escudo enseña también el día entero (${await panel.textContent('#e-dia-frase')})`);
-  await panel.click('#e-ver-todo');
+  // From the bar's shield, too: on the browser's own pages it is the day's and leads to the list.
+  // Already on the list: it stays, no second copy.
+  comprueba(await hasta(async () => (await barra.textContent('#b-escudo-que')) === 'hoy'), 'en las páginas propias el escudo de la barra es el del día');
+  await barra.click('#b-escudo');
   await espera(1000);
-  comprueba((await barra.locator('.pestana').count()) === 2, 'desde la lista, «ver todo» no abre otra copia');
+  comprueba((await barra.locator('.pestana').count()) === 2, 'desde la lista, el escudo no abre otra copia');
+  comprueba(await hasta(async () => /empresas? de fuera/.test(await panel.textContent('#e-dia-frase'))), `el escudo enseña también el día entero (${await panel.textContent('#e-dia-frase')})`);
   // From the web page: a tab of its own, and «Volver» brings the web back.
   await barra.click('.pestana[aria-selected="false"]');
   await espera(500);
@@ -457,6 +492,16 @@ function pantalla(nombre) {
   comprueba(await hasta(async () => /última versión|versión nueva/.test(await panel.textContent('#a-version-res')), 30000), `«Buscar actualización» lee el registro público (${await panel.textContent('#a-version-res')})`);
   await panel.click('#a-licencia-ver');
   comprueba(await hasta(async () => (await panel.textContent('#l-conexiones')).includes('raw.githubusercontent.com')), 'y esa conexión queda anotada en «Suscripción»');
+
+  // Z4 (1.0.46): the wheel scrolls the page in front right after the bar had the focus.
+  await barra.click('#b-menu');
+  await barra.fill('#campo-dir', `${SITIO}/largo`);
+  await barra.press('#campo-dir', 'Enter');
+  const larga = await paginaQue(nav, (u) => u.startsWith(SITIO + '/largo'));
+  await larga.waitForLoadState('load').catch(() => {});
+  await espera(1000);
+  rueda(proceso.pid);
+  comprueba(await hasta(async () => (await larga.evaluate(() => window.scrollY)) > 0, 6000), `la rueda del ratón desplaza la página en cuanto se carga (Z4, ${await larga.evaluate(() => window.scrollY).catch(() => -1)} px)`);
 
   // Closing writes everything down.
   try { execSync('taskkill /IM guardiana-zero.exe', { stdio: 'ignore' }); } catch (_) {}

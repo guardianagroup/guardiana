@@ -120,6 +120,45 @@ a.hecho:hover span { color: var(--tinta); text-decoration: underline; text-under
 .mes .boton { grid-row: 1 / span 2; grid-column: 2; }
 .mes small { grid-column: 1 / -1; color: var(--gris); font-size: 12px; }
 #guardada { margin-top: 10px; font-size: 12.5px; color: var(--verde); }
+/* 1.0.46 (zero-1.0.46), Z1-a: the new tab the owner chose. The search, centred, 640 px; under it
+   «Diario de hoy», the shield with one dot per attempt cut today and the day's real figure; four
+   ways out. The rest of the day (favourites, the summary, the month) follows below, as before. */
+body { background-image: none; }
+.marca, #tema, #fecha, #saludo { display: none; }
+/* Only the design system's tokens: the page's width and margins are the panel's (--s-pagina,
+   --s-margen), the search 640 px centred, the type --t-*. */
+main { max-width: calc(var(--s-pagina) + 2 * var(--s-margen)); padding: var(--e8) var(--s-margen) 64px; }
+#buscar { width: 640px; max-width: 100%; height: 52px; margin: 0 auto; padding: 0 var(--e5); border-radius: var(--r-pill); background: var(--campo); border: 1px solid var(--linea); box-shadow: none; gap: var(--e3); }
+#buscar svg { color: var(--gris); }
+#q { font: var(--t-15); }
+#q::placeholder { color: var(--gris); }
+.diario { display: flex; align-items: center; justify-content: center; gap: 72px; width: 960px; max-width: 100%; margin: var(--e8) auto 0; min-height: 380px; }
+#z1a-escudo { width: 288px; height: 348px; flex: none; }
+.diario-txt { flex: 1; min-width: 0; max-width: 520px; }
+.z1-cap { font: 600 var(--t-12); letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2); }
+#z1a-n { font: 600 72px/1 var(--texto); letter-spacing: -.035em; margin-top: var(--e4); font-variant-numeric: tabular-nums; }
+#z1a-frase { font: var(--t-20); font-family: var(--texto); font-weight: 500; margin-top: var(--e3); }
+#z1a-frase .ac { color: var(--accent); }
+#z1a-explica { font: var(--t-15); color: var(--gris); margin: var(--e3) 0 0; max-width: 472px; }
+.leyenda-z { display: flex; flex-wrap: wrap; gap: var(--e2) var(--e5); margin-top: var(--e5); font: var(--t-13); color: var(--gris); }
+.leyenda-z span { display: inline-flex; align-items: center; gap: var(--e2); }
+.leyenda-z i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.atajos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-col-gap); width: 960px; max-width: 100%; margin: var(--e8) auto 0; }
+.atajo { display: flex; align-items: center; gap: var(--e4); height: 64px; padding: 0 var(--e5); border-radius: var(--r-tarjeta); border: 1px solid var(--linea); background: var(--card); color: var(--tinta); text-align: left; cursor: pointer; font: var(--t-15); text-decoration: none; transition: border-color var(--m-rapido); }
+.atajo:hover { border-color: #3A4656; }
+.atajo .ico { width: 36px; height: 36px; border-radius: var(--r-control); background: var(--campo); color: var(--muted); display: grid; place-items: center; flex: none; }
+.atajo .ico svg { width: 20px; height: 20px; }
+.atajo b { display: block; font-weight: 600; }
+.atajo small { display: block; font: var(--t-12); color: var(--gris); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.atajo > span:last-child { min-width: 0; }
+.debajo { width: 860px; max-width: 100%; margin: 72px auto 0; }
+@media (max-width: 980px) {
+  main { padding: var(--e6) var(--s-margen-movil) var(--e8); }
+  .diario { flex-direction: column; gap: var(--e6); margin-top: var(--e6); }
+  #z1a-escudo { width: 200px; height: 240px; }
+  #z1a-n { font-size: 56px; }
+  .atajos { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e3); }
+}
 @media (max-width: 760px) {
   .hoy .resumen { grid-template-columns: 1fr; margin: 4px 0 14px; }
   .caja.ancha { grid-row: auto; min-height: 360px; }
@@ -148,6 +187,28 @@ a.hecho:hover span { color: var(--tinta); text-decoration: underline; text-under
     <input id="q" spellcheck="false" autofocus data-t-ph="buscar_ph_inicio">
     <select id="motor" data-t-title="buscador"></select>
   </form>
+  <section class="diario" aria-labelledby="z1a-cap">
+    <canvas id="z1a-escudo" role="img"></canvas>
+    <div class="diario-txt">
+      <div class="z1-cap" id="z1a-cap"></div>
+      <div id="z1a-n">0</div>
+      <div id="z1a-frase"></div>
+      <p id="z1a-explica"></p>
+      <div class="leyenda-z" id="z1a-leyenda">
+        <span><i style="background:var(--ambar)"></i><span data-t="z1_ley_ahora"></span></span>
+        <span><i style="background:var(--rojo)"></i><span data-t="z1_ley_cortado"></span></span>
+        <span><i style="background:rgba(156,195,228,.25)"></i><span data-t="z1_ley_hueco"></span></span>
+        <span id="z1a-porpunto" class="oculto"></span>
+      </div>
+    </div>
+  </section>
+  <nav class="atajos">
+    <button class="atajo" type="button" data-producto="guardiana"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3z"/></svg></span><span><b data-t="pestana_guardiana"></b><small data-t="z1_atajo_radiografias"></small></span></button>
+    <button class="atajo" type="button" data-producto="secure"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></span><span><b data-t="pestana_secure"></b><small data-t="z1_atajo_comunicaciones"></small></span></button>
+    <a class="atajo" href="cortes.html" id="z1a-recibos"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg></span><span><b data-t="z1_atajo_recibos"></b><small data-t="z1_atajo_recibos_sub"></small></span></a>
+    <button class="atajo" type="button" id="z1a-ajustes"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></span><span><b data-t="z1_atajo_ajustes"></b><small id="z1a-maxima"></small></span></button>
+  </nav>
+  <div class="debajo">
   <section class="favs" id="favs" aria-labelledby="favs-t">
     <h2 id="favs-t" class="oculto" data-t="favoritos"></h2>
     <div class="favs-rejilla" id="favs-rejilla"></div>
@@ -211,10 +272,12 @@ a.hecho:hover span { color: var(--tinta); text-decoration: underline; text-under
     <small data-t="mes_nota"></small>
   </div>
   <p id="guardada" class="oculto" role="status"></p>
+  </div>
 </main>
 <canvas id="lienzo" width="1200" height="630" class="oculto"></canvas>
 <script src="interruptor.js"></script>
 <script src="puente.js"></script>
+<script src="escudo-puntos.js"></script>
 <script src="inicio.js"></script>
 </body>
 </html>

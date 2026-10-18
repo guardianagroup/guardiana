@@ -60,10 +60,12 @@ pub const CORTES: &str = "https://zero.guardiana/cortes.html";
 /// A company's profile (`?e=<its name>`).
 pub const EMPRESA: &str = "https://zero.guardiana/empresa.html";
 /// 1.0.46 layout, in CSS pixels: the top row alone (Comunicaciones), the whole bar of the
-/// browser (top row 56, tabs 40, address 44), the glass strip beside a web, and the side view.
+/// browser (top row `--s-barra` 56, tabs `--s-fila2` 44, address 44), the glass strip beside a
+/// web (`--s-cristal`) and the side view (`--s-cristal-abierto`): the design system's tokens
+/// (`interfaz/diseno.css`, «SISTEMA 1.0.46»).
 pub const ALTO_ARRIBA: i32 = 56;
 /// See [`ALTO_ARRIBA`].
-pub const ALTO_ZERO: i32 = 140;
+pub const ALTO_ZERO: i32 = 144;
 /// See [`ALTO_ARRIBA`].
 pub const ANCHO_FRANJA: i32 = 56;
 /// See [`ALTO_ARRIBA`].
@@ -241,7 +243,7 @@ pub enum Orden {
     CierraVentana,
     /// 1.0.46, one navigation only: how the window is laid out for what is in front. `barra` is
     /// the height of the bar in CSS pixels (0 on GUARDIANA's own panel, which draws its own top
-    /// row; 56 for Comunicaciones, only the top row; 140 for the browser: top row, tabs and
+    /// row; 56 for Comunicaciones, only the top row; 144 for the browser: top row, tabs and
     /// address). `lateral` is the width of ZERO's side view: 0, 56 (the glass strip beside a
     /// web) or 360 (the side summary or another view, open).
     Marco {
@@ -1835,6 +1837,18 @@ impl Sesion {
         self.ajuste("idioma", &Value::String(idioma.to_string()))
     }
 
+    /// A click on the web in front while its side summary is open (Z1-b): it folds back into
+    /// the glass strip, as with ✕, and stays folded like that.
+    fn toque(&mut self, id: u32) -> Vec<Orden> {
+        if id != self.activa || self.panel.as_deref() != Some("escudo") {
+            return Vec::new();
+        }
+        self.prefs.escudo_cerrado = true;
+        self.guarda_prefs();
+        self.panel = None;
+        self.cierra_del_todo()
+    }
+
     /// «Permitir en esta web» (Z1-b): the lists cut nothing on the web in front, or again.
     fn permitir_web(&mut self, si: bool) -> Vec<Orden> {
         let Some(sitio_web) = self
@@ -2251,6 +2265,9 @@ impl Sesion {
                     "zg_enlace" => self.enlace(id, &m),
                     "zg_emergente" => self.emergente(id, &m),
                     "zg_molesta" => self.molesta(id),
+                    // 1.0.46 (Z1-b): a click on the web folds its side summary back into the
+                    // glass strip, as ✕ and Esc do («clic fuera»).
+                    "zg_toque" => self.toque(id),
                     "zg_huella" => self.huella(id, fuente, &m, false),
                     "zg_escribe" => self.escribe(id, fuente, false),
                     // 1.0.46: GUARDIANA's own panel, open in this tab, asks for another product
@@ -2286,6 +2303,8 @@ impl Sesion {
                         // Comunicaciones: its own page's buttons (15 Oct 2026; the page's
                         // actions were missing here, so the buttons did nothing in 1.0.31).
                         | "secure"
+                        // 1.0.46: the new tab's ways to the other products (Z1-a).
+                        | "producto"
                 ) || (tipo == "ajuste"
                     && ((texto(&m, "clave") == "cortar_seguimiento" && si(&m, "valor"))
                         || matches!(texto(&m, "clave"), "buscador" | "tema")));
