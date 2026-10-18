@@ -293,3 +293,4 @@ aside.monitor > *:not(.sala-escudo):not(.sala-aside-cab) { margin: 0 var(--e5) v
   .sala-menu-mas { left: var(--s-margen-movil); min-width: 0; right: var(--s-margen-movil); }
 }
 .ve-capa .boton { border-radius: var(--r-control); }
+.sala-in-alcance { margin: var(--e3) 0 0; font: var(--t-12); color: var(--muted); }

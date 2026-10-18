@@ -1525,7 +1525,7 @@
   "sala_e_sin_uso": "Sem uso",
   "sala_e_no_comprobable": "Não é possível verificar por completo",
   "sala_e_no_comprobable_t": "Este sistema não registra quais programas usam o microfone, a câmera ou a captura de tela.",
-  "sala_e_sin_comprobar": "Não verificado",
+  "sala_e_sin_comprobar": "Ainda não verificado",
   "sala_e_calidad": "Qualidade da conexão",
   "sala_e_calidad_t": "Uma estimativa a partir das estatísticas da própria chamada (atraso, perda e variação).",
   "sala_e_cal_directa": "Direta",
@@ -1586,5 +1586,7 @@
   "sala_ent_p3": "Transferindo",
   "sala_ent_p4": "Entregue, com recibo",
   "sala_ent_cifras": "{hecho} de {total} · {v}/s · faltam {r}",
-  "sala_ent_cerrar": "Fechar"
+  "sala_ent_cerrar": "Fechar",
+  "sala_e_mirando": "A primeira verificação ainda não foi feita",
+  "sala_in_alcance": "A assinatura comprova que este relatório não foi alterado depois de selado. Não garante que todos os eventos do sistema tenham sido detectados."
 }

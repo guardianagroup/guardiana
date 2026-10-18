@@ -316,8 +316,8 @@
   // file's size over the measured time, and while it travels, the program's own percentage.
   const coma1 = (x) => Number(x).toLocaleString(document.documentElement.lang || 'es', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const tarjetaEnvio = (nombre, x) => {
-    const idn = (E.monitor || {}).identidad;
-    const verificado = !!idn && idn.estado !== 'clave_cambiada';
+    // «Receptor comprobado» only with the safety numbers confirmed (owner, 16:16).
+    const verificado = ((E.escudo || {}).identidad || {}).ok === true && ((E.monitor || {}).identidad || {}).estado !== 'clave_cambiada';
     const llego = x && typeof x.llego_en === 'number';
     const viaja = E.envio && E.envio.nombre === nombre;
     const cifras = [x ? tam(x.bytes) : ''];

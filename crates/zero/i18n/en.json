@@ -1525,7 +1525,7 @@
   "sala_e_sin_uso": "Not in use",
   "sala_e_no_comprobable": "Can't be fully checked",
   "sala_e_no_comprobable_t": "This system doesn't record which apps use the microphone, the camera or screen capture.",
-  "sala_e_sin_comprobar": "Unchecked",
+  "sala_e_sin_comprobar": "Not checked yet",
   "sala_e_calidad": "Connection quality",
   "sala_e_calidad_t": "An estimate from the call's own statistics (delay, loss and jitter).",
   "sala_e_cal_directa": "Direct",
@@ -1586,5 +1586,7 @@
   "sala_ent_p3": "Transferring",
   "sala_ent_p4": "Delivered, with receipt",
   "sala_ent_cifras": "{hecho} of {total} · {v}/s · {r} left",
-  "sala_ent_cerrar": "Close"
+  "sala_ent_cerrar": "Close",
+  "sala_e_mirando": "The first check hasn't run yet",
+  "sala_in_alcance": "The signature proves this report hasn't been altered since it was sealed. It doesn't guarantee that every system event was detected."
 }

@@ -59,8 +59,11 @@
   // ---------- C2-a: the person on top, the rooms on the left ----------
   const pintaCabecera = (m) => {
     const f = m.fase;
-    const idn = (m.monitor || {}).identidad;
-    const verificado = !!idn && idn.estado !== 'clave_cambiada';
+    // Green «Identidad verificada» only once the safety numbers were compared and confirmed
+    // (owner, 18 Oct 16:16): the program's own yes/no, not merely an open channel.
+    const idEsc = (m.escudo || {}).identidad || {};
+    const idn = { verificado_en: idEsc.desde };
+    const verificado = idEsc.ok === true && ((m.monitor || {}).identidad || {}).estado !== 'clave_cambiada';
     const cortada = f !== 'lista';
     let clase = 'info', texto = t('sala_conectando');
     if (f === 'lista' && m.reconectando) { clase = 'aviso'; texto = t('sala_reconectando'); }
@@ -244,7 +247,11 @@
       ? fila('identidad', t('sala_e_identidad'), t('sala_e_identidad_ok', { f: fechaCorta(id.desde) }), 'ok', t('sala_e_verificada'))
       : fila('identidad', t('sala_e_identidad'), t('sala_e_identidad_no'), 'aviso', t('sala_e_sin_verificar'), t('sala_identidad_no_t')));
     const v = e.vigia || {}, uso = (r) => (v.en_uso || []).filter((x) => x.recurso === r).map((x) => x.programa);
-    if (!v.activa) {
+    if (v.activa && !v.mirado) {
+      // Never a green state before the first look (owner, 16:16): «Sin revisar» until then.
+      filas.push(fila('mic', t('sala_e_mic'), t('sala_e_mirando'), '', t('sala_e_sin_comprobar')));
+      filas.push(fila('cam', t('sala_e_cam'), t('sala_e_mirando'), '', t('sala_e_sin_comprobar')));
+    } else if (!v.activa) {
       filas.push(fila('mic', t('sala_e_mic'), t('sala_e_no_comprobable'), 'aviso', t('sala_e_sin_comprobar'), t('sala_e_no_comprobable_t')));
       filas.push(fila('cam', t('sala_e_cam'), t('sala_e_no_comprobable'), 'aviso', t('sala_e_sin_comprobar'), t('sala_e_no_comprobable_t')));
     } else {
@@ -272,7 +279,7 @@
       else qr = `<div class="sala-qr-caja vacia"><button type="button" class="boton" id="sala-qr-crear">${esc(t('sala_e_movil_crear'))}</button></div><p class="sala-qr-t">${esc(t('sala_e_movil_crear_t'))}</p>`;
     }
     const caduca = typeof mv.qr_caduca_s === 'number' && mv.qr && !mv.aprobado ? Math.max(0, mv.qr_caduca_s - Math.floor((Date.now() - recibidoEn) / 1000)) : null;
-    const html = `<div class="sala-e-cab"><h2>${esc(t('esc_titulo'))}</h2><span class="sala-estado ok"><i></i><span>${esc(t('sala_e_comprobando'))}</span></span></div>`
+    const html = `<div class="sala-e-cab"><h2>${esc(t('esc_titulo'))}</h2><span class="sala-estado info"><i></i><span>${esc(t('sala_e_comprobando'))}</span></span></div>`
       + `<ul class="sala-e-lista">${filas.join('')}</ul>`
       + (qr ? `<section class="sala-qr"><div class="sala-qr-cab"><b>${esc(t('sala_e_movil'))}</b>${caduca != null ? `<span>${esc(t('sala_e_caduca', { s: n(caduca) }))}</span>` : ''}</div>${qr}</section>` : '');
     if (caja.dataset.html !== html) {
@@ -319,7 +326,7 @@
       ? `<section class="sala-in-sec integridad"><h3>${esc(t('sala_in_integridad'))}</h3><dl>`
         + `<div class="sala-kv mono"><dt>${esc(t('sala_in_huella'))}</dt><dd>${esc(huella(r.hash_cadena))}</dd></div>`
         + `<div class="sala-kv mono"><dt>${esc(t('sala_in_firma'))}</dt><dd>${esc(t('sala_in_firma_v'))}</dd>${r.firma_ok === true ? `<span class="sala-insignia ok">${esc(t('sala_in_firma_ok'))}</span>` : r.firma_ok === false ? `<span class="sala-insignia alerta">${esc(t('sala_in_firma_no'))}</span>` : ''}</div>`
-        + `</dl></section>`
+        + `</dl><p class="sala-in-alcance">${esc(t('sala_in_alcance'))}</p></section>`
       : '';
     $('sala-in-secciones').innerHTML = seccion(t('sala_in_seguridad'), seg) + seccion(t('sala_in_conexion'), con) + seccion(t('sala_in_sensores'), sen) + integ;
   };
