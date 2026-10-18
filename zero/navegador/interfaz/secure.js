@@ -698,7 +698,8 @@
     $('c-mv-habla').hidden = !mv.habla;
     const e = $('c-mv-estado');
     e.className = 'm-estado ' + (mv.habla ? 'si' : mv.enganchado ? 'espera' : '');
-    $('c-mv-estado-t').textContent = t(mv.habla ? 'sec_mv_e_habla' : mv.pendiente ? 'sec_mv_e_pendiente' : mv.aprobado ? 'sec_mv_e_fuera' : 'sec_mv_e_espera');
+    const pasoMv = mv.paso || {};
+    $('c-mv-estado-t').textContent = t(pasoMv.fallo_paso ? 'sec_mv_no_paso' : pasoMv.relevo === 'pasando' && m.llamada ? 'sec_mv_e_pasando' : mv.habla ? 'sec_mv_e_habla' : mv.pendiente ? 'sec_mv_e_pendiente' : mv.aprobado ? 'sec_mv_e_fuera' : 'sec_mv_e_espera');
     $('c-mv-fuera').textContent = mv.fuera ? t('sec_mv_fuera_si') : mv.puerta_error ? t('sec_mv_fuera_no', { e: mv.puerta_error }) : t('sec_mv_fuera_abriendo');
     movilHabla = !!mv.habla;
   };
@@ -942,7 +943,8 @@
     $('c-l-estado').textContent = movilHabla ? t('sec_mv_habla') : textoLlamada(l);
     if (llamando) { if (!tonoLlamando) tonoLlamando = setInterval(() => { if (E && E.llamada && E.llamada.conectada === false) timbre(); }, 3000); return; }
     if (tonoLlamando) { clearInterval(tonoLlamando); tonoLlamando = null; }
-    if (movilHabla) { if (grabador || arrancando) paraMedios(); return; }
+    // With the bridge this page keeps its leg while the phone talks through it (relevo.js).
+    if (movilHabla && !puenteAhora(m)) { if (grabador || arrancando) paraMedios(); return; }
     // The other side's player started again (its phone took the call, or gave it back): our
     // recorder starts again too, so its first piece carries the header that player needs.
     if (grabador && typeof l.reinicio === 'number' && reinicioVisto !== null && l.reinicio !== reinicioVisto) cambiaGrabador();
@@ -962,7 +964,7 @@
   setInterval(() => {
     if (!$('c-llamada').hidden && E.llamada && !movilHabla) $('c-l-estado').textContent = textoLlamada(E.llamada);
     // A connected call with nothing started yet (it was waiting for the relay): start now.
-    if (rtcEspera && E && E.llamada && E.llamada.conectada !== false && !rtc && !grabador && !arrancando && !movilHabla) pintaLlamada(E);
+    if (rtcEspera && E && E.llamada && E.llamada.conectada !== false && !rtc && !grabador && !arrancando && (!movilHabla || puenteAhora(E))) pintaLlamada(E);
   }, 1000);
   // The formats, best first; the phone's page knows the same list and tells which it can play.
   const CANDIDATOS = { video: ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/webm'], voz: ['audio/webm;codecs=opus', 'audio/mp4;codecs=mp4a.40.2', 'audio/webm'] };
@@ -1106,6 +1108,10 @@
   // buffer, loss recovery and bitrate that adapt to the network: what the recorded pieces
   // could not do. If it does not connect within 15 s, both ends go back to the pieces.
   let rtc = null, rtcFallo = false, rtcEspera = 0;
+  // The phone's voice while the phone carries the call through this page's bridge (relevo.js,
+  // 18 Oct 2026): it is what this computer sends to the other person then.
+  let enMovil = null;
+  const puenteAhora = (m) => !!((((m || {}).movil || {}).paso || {}).puente);
   const rtcManda = (d) => manda({ tipo: 'secure', accion: 'rtc', d });
   const obtenLocal = async (video) => {
     // 18 Oct 2026: the microphone as opus.js asks for it (mono, 48 kHz, the browser's echo
@@ -1120,15 +1126,16 @@
     }
   };
   // What leaves: the voice changed when «Proteger mi voz» is on, the camera as it is.
-  const rtcEnvio = () => fuenteGrabacion();
+  const rtcEnvio = () => (enMovil ? new MediaStream([enMovil]) : fuenteGrabacion());
   const rtcTile = (stream) => {
     remoto = stream;
     $('c-rejilla').innerHTML = '';
     const tile = document.createElement('div'); tile.className = 'tile';
-    const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; v.srcObject = stream;
+    const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; v.srcObject = stream; v.muted = !!enMovil;
     const n = document.createElement('span'); n.className = 'tile-nombre'; n.textContent = (E && E.contacto) || '';
     tile.appendChild(v); tile.appendChild(n); $('c-rejilla').appendChild(tile); $('c-rejilla').dataset.n = '1';
     v.play().catch(() => {});
+    window.dispatchEvent(new CustomEvent('guardiana-remoto'));
   };
   const rtcNuevaPc = () => {
     const pc = new RTCPeerConnection({ iceServers: rtc.ice, iceTransportPolicy: 'relay', bundlePolicy: 'max-bundle' });
@@ -1160,7 +1167,8 @@
   const empiezaRtc = async (l) => {
     arrancando = true;
     llamadaVideo = !!l.video;
-    const s = await obtenLocal(!!l.video);
+    // The phone already carries the voice through the bridge: this computer's microphone stays closed.
+    const s = enMovil ? new MediaStream() : await obtenLocal(!!l.video);
     if (!s || !(E && E.llamada)) { if (s) s.getTracks().forEach((x) => x.stop()); arrancando = false; return; }
     local = s;
     local.getAudioTracks().forEach((x) => { x.enabled = !silenciado; });
@@ -1230,6 +1238,9 @@
     if (decirlo) rtcManda({ t: 'fallo' });
     rtcFallo = true;
     const l = E && E.llamada;
+    // The bridge to the phone rides on this connection: it ends too, and the voice is here again.
+    if (window.GuardianaRelevo) window.GuardianaRelevo.rtcCayo();
+    if (enMovil) { enMovil = null; $('c-rejilla').querySelectorAll('video').forEach((v) => { v.muted = false; }); }
     paraRtc();
     if (local) { local.getTracks().forEach((x) => x.stop()); local = null; }
     $('c-rejilla').innerHTML = ''; $('c-rejilla').dataset.n = '0';
@@ -1240,6 +1251,32 @@
     if (!rtc || !rtc.pc || !local) return;
     const pista = rtcEnvio().getAudioTracks()[0];
     rtc.pc.getSenders().forEach((x) => { if (x.track && x.track.kind === 'audio' && pista) x.replaceTrack(pista).catch(() => {}); });
+  };
+  // What the bridge to the phone needs from this call (relevo.js, 18 Oct 2026).
+  window.GuardianaLlamada = {
+    pc: () => (rtc && rtc.pc) || null,
+    remoto: () => remoto,
+    // The phone carries the voice: its track replaces ours on the same connection, this
+    // microphone closes and this speaker goes quiet.
+    alMovil: (pista) => {
+      enMovil = pista;
+      if (rtc && rtc.pc) rtc.pc.getSenders().forEach((x) => { if (x.track && x.track.kind === 'audio') x.replaceTrack(pista).catch(() => {}); });
+      if (local) local.getAudioTracks().forEach((x) => { x.stop(); local.removeTrack(x); });
+      if (vozProt) { vozProt.parar(); vozProt = null; }
+      $('c-rejilla').querySelectorAll('video').forEach((v) => { v.muted = true; });
+    },
+    // «Volver al PC»: the microphone opens again and its voice replaces the phone's.
+    alPc: async () => {
+      enMovil = null;
+      $('c-rejilla').querySelectorAll('video').forEach((v) => { v.muted = false; v.play().catch(() => {}); });
+      if (!rtc || !rtc.pc) return;
+      const s = await obtenLocal(false);
+      if (!s || !rtc || !rtc.pc || enMovil) { if (s) s.getTracks().forEach((x) => x.stop()); return; }
+      if (!local) local = new MediaStream();
+      s.getAudioTracks().forEach((x) => { x.enabled = !silenciado && !pausaAplicada; local.addTrack(x); });
+      const pista = rtcEnvio().getAudioTracks()[0];
+      rtc.pc.getSenders().forEach((x) => { if ((!x.track || x.track.kind === 'audio') && pista) x.replaceTrack(pista).catch(() => {}); });
+    },
   };
   const llama = (video) => { if ($('c-voz').disabled) return; $(video ? 'c-video' : 'c-voz').classList.add('pulsado'); $('c-voz').disabled = true; $('c-video').disabled = true; timbre(); manda({ tipo: 'secure', accion: 'llamar', video, mime: mime(video) }); };
   $('c-voz').addEventListener('click', () => llama(false));

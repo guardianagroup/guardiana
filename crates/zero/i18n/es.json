@@ -1067,6 +1067,8 @@
   "sec_mv_e_espera": "Esperando a que escanees el código",
   "sec_mv_e_pendiente": "Un móvil se ha conectado",
   "sec_mv_e_fuera": "Móvil aceptado · sin conexión ahora",
+  "sec_mv_e_pasando": "Pasando la llamada al móvil… este equipo sigue con ella hasta que el móvil suene.",
+  "sec_mv_no_paso": "No se pudo pasar — vuelve a escanear",
   "sec_mv_e_habla": "La conversación está en tu móvil",
   "sec_mv_ok_texto": "Un móvil acaba de conectarse con este código. ¿Es el tuyo?",
   "sec_mv_ok_si": "Sí, es mi móvil",

@@ -92,6 +92,11 @@ const ARCHIVOS: &[(&str, &str, &[u8])] = &[
         include_bytes!("../../../zero/navegador/interfaz/puente.js"),
     ),
     (
+        "/relevo.js",
+        JS,
+        include_bytes!("../../../zero/navegador/interfaz/relevo.js"),
+    ),
+    (
         "/voz.js",
         JS,
         include_bytes!("../../../zero/navegador/interfaz/voz.js"),

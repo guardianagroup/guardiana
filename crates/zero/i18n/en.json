@@ -1067,6 +1067,8 @@
   "sec_mv_e_espera": "Waiting for you to scan the code",
   "sec_mv_e_pendiente": "A phone has connected",
   "sec_mv_e_fuera": "Phone accepted · not connected right now",
+  "sec_mv_e_pasando": "Moving the call to the phone… this computer keeps it until the phone has sound.",
+  "sec_mv_no_paso": "Could not move it — scan again",
   "sec_mv_e_habla": "The conversation is on your phone",
   "sec_mv_ok_texto": "A phone just connected with this code. Is it yours?",
   "sec_mv_ok_si": "Yes, it’s my phone",

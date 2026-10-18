@@ -1067,6 +1067,8 @@
   "sec_mv_e_espera": "Esperando você escanear o código",
   "sec_mv_e_pendiente": "Um celular se conectou",
   "sec_mv_e_fuera": "Celular aceito · sem conexão agora",
+  "sec_mv_e_pasando": "Passando a chamada para o celular… este computador continua com ela até o celular ter som.",
+  "sec_mv_no_paso": "Não foi possível passar — escaneie de novo",
   "sec_mv_e_habla": "A conversa está no seu celular",
   "sec_mv_ok_texto": "Um celular acabou de se conectar com este código. É o seu?",
   "sec_mv_ok_si": "Sim, é o meu celular",
