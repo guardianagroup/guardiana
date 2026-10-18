@@ -588,9 +588,9 @@ pub(crate) struct Estado {
     /// Which system this is running on. The panel uses it to say, on a Mac, that Home Mode is
     /// not part of 1.0 there: the site says so and the program must not offer it silently.
     so: &'static str,
-    /// True when the trial or the subscription is over: Guardiana has stood down, given the
-    /// system DNS back and stopped watching. Every page says so, and only activating and taking
-    /// your own extract away still make sense.
+    /// True when the program has stood down and stopped watching. Since 1.0.45 that no longer
+    /// happens when the trial or the subscription ends (it moves to the free level, `nivel`), so
+    /// this stays false; kept for older pages.
     caducado: bool,
     /// Stood down because a subscription ended, not the trial: the banner says which, so a
     /// customer who paid is not told "the trial is over".
