@@ -19,14 +19,17 @@
     const cont = $('pestanas');
     cont.querySelectorAll('.pestana').forEach((p) => p.remove());
     const nueva = $('nueva');
-    for (const p of lista) {
+    // 1.0.46: only the browser's own tabs; the products are in the selector above (Z3).
+    const propias = lista.filter((p) => !p.producto || p.producto === 'zero');
+    for (const p of propias) {
       const el = document.createElement('div');
       el.className = 'pestana' + (p.cargando ? ' cargando' : '') + (p.mandato ? ' mandato' : '') + (p.aislada ? ' aislada' : '') + (p.fija ? ' fija' : '');
       el.setAttribute('role', 'tab');
       el.setAttribute('aria-selected', p.activa ? 'true' : 'false');
       el.dataset.id = p.id;
       el.title = p.titulo || p.url || '';
-      const icono = p.icono && !p.cargando && /^data:image\/png;base64,/.test(p.icono) ? `<img class="icono" alt="" src="${esc(p.icono)}">` : '<i class="punto"></i>';
+      const letra = String(p.titulo || t('pestana_nueva')).trim().charAt(0).toUpperCase();
+      const icono = p.icono && !p.cargando && /^data:image\/png;base64,/.test(p.icono) ? `<img class="icono" alt="" src="${esc(p.icono)}">` : `<i class="punto">${p.cargando ? '' : esc(letra)}</i>`;
       el.innerHTML = `${icono}<span class="titulo">${esc(p.titulo || t('pestana_nueva'))}</span>`
         + (p.fija ? '' : `<button class="cerrar" aria-label="${esc(t('cerrar_pestana'))}" title="${esc(t('cerrar_pestana'))}"><svg viewBox="0 0 12 12" width="10" height="10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></button>`);
       el.addEventListener('mousedown', (e) => {
@@ -51,7 +54,7 @@
         if (arrastrada === null || arrastrada === p.id) return;
         const r = el.getBoundingClientRect(), despues = e.clientX > r.left + r.width / 2;
         const ids = lista.map((x) => x.id).filter((x) => x !== arrastrada);
-        let a = ids.indexOf(p.id) + (despues ? 1 : 0);
+        const a = ids.indexOf(p.id) + (despues ? 1 : 0);
         manda({ tipo: 'pestana_mover', id: arrastrada, a });
         el.classList.remove('antes', 'despues');
       });
@@ -64,9 +67,19 @@
   const campo = $('campo-dir');
   const vista = $('vista-dir');
   let urlActual = '';
-  function pintaDireccion(url, interna) {
+  let propiaActual = false;
+  function pintaDireccion(url, interna, propia) {
     urlActual = url || '';
-    if (document.activeElement !== campo) campo.value = interna ? '' : urlActual;
+    propiaActual = !!propia;
+    if (document.activeElement !== campo) campo.value = interna || propia ? '' : urlActual;
+    // GUARDIANA's own pages on this computer read «🔒 GUARDIANA», never 127.0.0.1:7443 (Z3).
+    if (propia) {
+      vista.innerHTML = `<span class="propia">GUARDIANA</span>`;
+      const ver = document.activeElement !== campo;
+      vista.classList.toggle('oculto', !ver);
+      campo.style.color = ver ? 'transparent' : '';
+      return;
+    }
     let host = '', resto = '';
     try {
       const u = new URL(urlActual);
@@ -78,8 +91,8 @@
     vista.classList.toggle('oculto', !mostrarVista);
     campo.style.color = mostrarVista ? 'transparent' : '';
   }
-  campo.addEventListener('focus', () => { campo.value = urlActual.startsWith('https://zero.guardiana') ? '' : urlActual; campo.style.color = ''; vista.classList.add('oculto'); setTimeout(() => campo.select(), 0); });
-  campo.addEventListener('blur', () => pintaDireccion(urlActual, urlActual.startsWith('https://zero.guardiana')));
+  campo.addEventListener('focus', () => { campo.value = urlActual.startsWith('https://zero.guardiana') || propiaActual ? '' : urlActual; campo.style.color = ''; vista.classList.add('oculto'); setTimeout(() => campo.select(), 0); });
+  campo.addEventListener('blur', () => pintaDireccion(urlActual, urlActual.startsWith('https://zero.guardiana'), propiaActual));
   $('direccion').addEventListener('submit', (e) => {
     e.preventDefault();
     const texto = campo.value.trim();
@@ -87,7 +100,7 @@
     manda({ tipo: 'navegar', texto });
     campo.blur();
   });
-  campo.addEventListener('keydown', (e) => { if (e.key === 'Escape') { campo.value = urlActual; campo.blur(); } });
+  campo.addEventListener('keydown', (e) => { if (e.key === 'Escape') { campo.value = propiaActual ? '' : urlActual; campo.blur(); } });
 
   // --- buttons ------------------------------------------------------------------------------
   $('atras').addEventListener('click', () => manda({ tipo: 'atras' }));
@@ -96,21 +109,47 @@
   $('recargar').addEventListener('click', () => manda({ tipo: $('ic-detener').classList.contains('oculto') ? 'recargar' : 'detener' }));
   const vistas = { 'b-escudo': 'escudo', 'b-mandato': 'mandato', 'b-tachon': 'tachon', 'b-datos': 'datos', 'b-menu': 'ajustes' };
   for (const [id, v] of Object.entries(vistas)) {
-    $(id).addEventListener('click', () => manda({ tipo: 'panel', vista: panel === v ? null : v }));
+    $(id).addEventListener('click', () => {
+      // On the browser's own pages the shield is the day's: it leads to the day's list of cuts.
+      if (id === 'b-escudo' && enPropia) { manda({ tipo: 'abrir_cortes' }); return; }
+      manda({ tipo: 'panel', vista: panel === v ? null : v });
+    });
   }
 
   // --- the shield ------------------------------------------------------------------------------
+  // 1.0.46 (Z1): on a web, the attempts cut on this page («23 en esta página»); on the browser's
+  // own pages, the day's («1.284 hoy»). Watching without cutting, the companies seen, in amber.
+  let escudoUltimo = null, hoyUltimo = null, enPropia = true;
+  function pintaPastilla() {
+    const b = $('b-escudo');
+    if (enPropia) {
+      const h = hoyUltimo || {};
+      const total = Number((h.hoy && h.hoy.cortadas) || 0);
+      b.classList.toggle('mirando', h.cortando === false);
+      b.classList.toggle('cero', total === 0);
+      $('b-escudo-n').textContent = Z.n(total);
+      $('b-escudo-que').textContent = t('z1_pastilla_hoy');
+      return;
+    }
+    const m = escudoUltimo || {};
+    const r = m.resumen || {};
+    const mirando = !m.cortando;
+    const cifra = mirando ? (r.empresas || 0) : (r.cortadas || 0);
+    b.classList.toggle('mirando', mirando);
+    b.classList.toggle('cero', cifra === 0);
+    $('b-escudo-n').textContent = Z.n(cifra);
+    $('b-escudo-que').textContent = t(mirando ? 'z1_pastilla_empresas' : 'z1_pastilla_pagina');
+  }
   function pintaEscudo(m) {
     const b = $('b-escudo');
     const r = m.resumen || {};
     const mirando = !m.cortando;
-    b.classList.toggle('mirando', mirando);
-    const cifra = mirando ? r.empresas : r.empresas_cortadas;
-    $('b-escudo-n').textContent = Z.n(cifra || 0);
-    if (!mirando && cortesPrevios >= 0 && (r.empresas_cortadas || 0) > cortesPrevios) {
+    escudoUltimo = m;
+    pintaPastilla();
+    if (!mirando && !enPropia && cortesPrevios >= 0 && (r.cortadas || 0) > cortesPrevios) {
       b.classList.remove('late'); void b.offsetWidth; b.classList.add('late');
     }
-    cortesPrevios = mirando ? -1 : (r.empresas_cortadas || 0);
+    cortesPrevios = mirando ? -1 : (r.cortadas || 0);
     // A pop-up just not opened on this page: said beside the address.
     const clave = `${m.pestana}:${m.carga}`;
     const e = m.emergentes || 0;
@@ -180,6 +219,27 @@
     $('b-escudo').classList.toggle('oculto', sin);
   }
   $('b-licencia').addEventListener('click', () => manda({ tipo: 'panel', vista: panel === 'licencia' ? null : 'licencia' }));
+
+  // --- 1.0.46: the top row, GUARDIANA's in the three products ---------------------------------
+  // The selector is the only navigation between them (Z3); the state says, in words, what ZERO
+  // does now: cutting, only watching (the person said no, or maximum is off and nothing is cut),
+  // or not protecting (no trial or subscription).
+  for (const b of document.querySelectorAll('#productos [data-producto]')) {
+    b.addEventListener('click', () => manda({ tipo: 'producto', producto: b.dataset.producto }));
+  }
+  function pintaEstadoZ() {
+    const el = $('estado-z');
+    const h = hoyUltimo || {};
+    const sin = (licencia && licencia.protege === false) || h.protege === false;
+    const mirando = !sin && h.cortando === false;
+    el.classList.toggle('sin', sin);
+    el.classList.toggle('mirando', mirando);
+    el.querySelector('span').textContent = t(sin ? 'z1_estado_sin' : mirando ? 'z1_estado_mirando' : 'z1_estado_protegido');
+  }
+  en('hoy', (m) => { hoyUltimo = m; pintaPastilla(); pintaEstadoZ(); });
+  en('licencia', () => pintaEstadoZ());
+  en('marco', (m) => { document.body.classList.toggle('solo-arriba', Number(m.barra) > 0 && Number(m.barra) <= 56); });
+  en('textos', () => { $('productos').setAttribute('aria-label', t('z1_productos')); pintaPastilla(); pintaEstadoZ(); });
   en('licencia', pintaLicencia);
   en('textos', () => { if (licencia) pintaLicencia(licencia); });
 
@@ -188,6 +248,9 @@
   en('estado', (m) => {
     activa = m.activa ? m.activa.id : null;
     panel = m.panel || null;
+    for (const b of document.querySelectorAll('#productos [data-producto]')) {
+      b.setAttribute('aria-current', String(b.dataset.producto === (m.producto || 'zero')));
+    }
     pintaPestanas(m.pestanas || []);
     const a = m.activa || {};
     $('atras').disabled = !a.puede_atras;
@@ -199,9 +262,11 @@
     // GUARDIANA's own panel is on this computer and never goes out: a green closed lock, not the
     // amber of an unencrypted website (17 Oct 2026, the owner).
     c.className = a.interna ? 'interno' : (a.segura || a.local ? '' : 'abierto');
-    c.innerHTML = a.interna ? CANDADO.interno : (a.segura || a.local ? CANDADO.seguro : CANDADO.abierto);
+    c.innerHTML = a.interna ? '' : (a.segura || a.local ? CANDADO.seguro : CANDADO.abierto);
     c.title = t(a.interna ? 'pagina_interna' : a.local ? 'conexion_local' : (a.segura ? 'conexion_segura' : 'conexion_no_segura'));
-    pintaDireccion(a.url, a.interna);
+    pintaDireccion(a.url, a.interna, a.guardiana);
+    enPropia = !!a.interna || !a.url;
+    pintaPastilla();
     const e = $('estrella');
     e.classList.toggle('oculto', !!a.interna || !a.url);
     e.classList.toggle('puesta', !!a.favorito);

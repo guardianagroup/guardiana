@@ -3,12 +3,18 @@
 (() => {
   const { manda, en, t, tn, esc, $, n } = Z;
   let vista = null;
+  let ultimoEscudo = null; // 1.0.46: the last shield message, to redraw the dots at their size
   let pais = (c) => c || '';
   const fecha = (ms) => new Date(ms).toLocaleDateString(document.documentElement.lang, { day: 'numeric', month: 'long', year: 'numeric' });
   const hora = (ms) => new Date(ms).toLocaleTimeString(document.documentElement.lang, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
+  // 1.0.46 (Z1-b): the panel is ZERO's glass beside the page.
+  document.body.classList.add('vidrio');
   function muestra(v) {
     vista = v;
+    document.body.classList.toggle('en-escudo', v === 'escudo');
+    // The shields are drawn at their size once they can be seen.
+    if (v === 'escudo' && ultimoEscudo) requestAnimationFrame(() => pintaCifra(ultimoEscudo));
     document.querySelectorAll('section.vista').forEach((s) => s.classList.toggle('vista-activa', s.id === 'v-' + v));
     const s = $('v-' + v);
     $('titulo').textContent = s ? t(s.dataset.titulo) : '';
@@ -90,6 +96,7 @@
     if (corta) return { interruptor: x.deshace ? ['desbloquear_sitio', 'accion_desbloquear'] : null, boton: parcial ? ['bloquear_todo', 'accion_bloquear_todo', 'corta'] : null };
     return { interruptor: ['bloquear_sitio', 'accion_bloquear'], boton: null };
   }
+  const mayuscula = (s) => String(s).charAt(0).toLocaleUpperCase(document.documentElement.lang || 'en') + String(s).slice(1);
   function pintaFila(li, x) {
     const corta = x.ahora === 'cortado' || x.ahora === 'parcial';
     const parcial = x.ahora === 'parcial';
@@ -98,7 +105,7 @@
     if (parcial) li.classList.add('parcial');
     else if (corta) li.classList.add('cortado');
     else if (sigue) li.classList.add('sigue');
-    li.querySelector('.quien').innerHTML = `<button class="enlace-empresa" data-empresa="${esc(x.quien)}" title="${esc(t('ficha_ver'))}">${esc(x.quien)}</button>${x.pais ? `<small>${esc(pais(x.pais))}</small>` : ''}`;
+    li.querySelector('.quien').innerHTML = `<button class="enlace-empresa" data-empresa="${esc(x.quien)}" title="${esc(t('ficha_ver'))}">${esc(x.quien)}</button>${x.pais ? `<small>${esc(pais(x.pais))}</small>` : ''}<span class="cat">${esc(mayuscula(t('cat_' + x.categoria)))}</span>`;
     // The site may be shortened; its counts never are.
     li.querySelector('.linea').innerHTML = `<span class="mono">${esc(x.sitio)}</span><span class="cuenta">${esc(x.cortadas > 0 ? t('escudo_cortadas_de', { c: n(x.cortadas), n: n(x.vistas) }) : tn('escudo_peticiones', x.vistas, { n: n(x.vistas) }))}</span>`;
     // What holds now, in one chip: the person's rule when there is one, else cut, partly or not.
@@ -108,7 +115,7 @@
     const por = corta ? (x.por || x.motivo) : null;
     li.querySelector('.chips').innerHTML = [
       `<span class="chip estado ${color}">${esc(estado)}</span>`,
-      `<span class="chip ${COLOR_CAT[x.categoria] || ''}">${esc(t('cat_' + x.categoria))}</span>`,
+      `<span class="chip cat ${COLOR_CAT[x.categoria] || ''}">${esc(t('cat_' + x.categoria))}</span>`,
       x.corredor ? `<span class="chip rojo" title="${esc(x.corredor)}">${esc(t('corredor_etiqueta'))}</span>` : '',
       por && !['rastreador', 'publicidad', 'corredor', 'corte_tuyo', 'telemetria'].includes(por) ? `<span class="motivo">${esc(t('motivo_' + por))}</span>` : '',
     ].join('');
@@ -221,7 +228,68 @@
   $('e-hechos').addEventListener('click', (e) => {
     if (e.target && e.target.id === 'e-emergente-abrir') manda({ tipo: 'abre_emergente' });
   });
+  // --- 1.0.46 (zero-1.0.46): the glass strip and the top of the side summary (Z1-b) -----------
+  // The shield fills with one dot per attempt cut on this page; the ones of the last minute are
+  // amber, read from how the page's figure grew while the panel was watching (never guessed).
+  const historia = [];
+  let paginaHistoria = '';
+  function ambarDe(m, total) {
+    const clave = m.pestana + ':' + (m.carga || 0);
+    if (clave !== paginaHistoria) { paginaHistoria = clave; historia.length = 0; }
+    const ahora = Date.now();
+    historia.push([ahora, total]);
+    while (historia.length > 1 && ahora - historia[0][0] > 60000) historia.shift();
+    return Math.max(0, total - historia[0][1]);
+  }
+  function pintaCifra(m) {
+    const r = m.resumen || {};
+    const mirando = !m.cortando;
+    const cifra = mirando ? Number(r.empresas || 0) : Number(r.cortadas || 0);
+    const ambar = mirando ? 0 : ambarDe(m, cifra);
+    $('z1-web').textContent = m.sitio || '';
+    $('z1-n').textContent = n(cifra);
+    $('z1-que').textContent = mirando ? tn('z1_empresas_sin_cortar', cifra) : tn('z1_intentos_pagina', cifra);
+    $('franja-n').textContent = n(cifra);
+    $('franja-que').textContent = mirando ? t('z1_franja_empresas') : t('z1_franja_cortados');
+    if (window.ZeroEscudo) {
+      ZeroEscudo.dibuja($('z1-escudo'), { n: mirando ? 0 : cifra, ambar, minimo: 30, maximo: 120, semilla: 8 });
+      ZeroEscudo.dibuja($('franja-escudo'), { n: mirando ? 0 : cifra, ambar, minimo: 12, maximo: 30, semilla: 8 });
+    }
+    // «Permitir en esta web»: the standard switch, «Permitido» when the lists cut nothing here.
+    const caja = $('z1-permitir');
+    caja.classList.toggle('oculto', !m.sitio || !m.protege);
+    const G = window.GuardianaInterruptor;
+    if (G && m.sitio) {
+      $('z1-permitir-sw').innerHTML = G.html({ cortado: !m.web_permitida, texto: { permitido: t('interruptor_permitido'), cortado: t('interruptor_cortado'), cortando: t('interruptor_cortando'), permitiendo: t('interruptor_permitiendo') }, etiqueta: t('z1_permitir'), chico: true });
+      G.engancha($('z1-permitir-sw'), (b, quiereCortar) => { manda({ tipo: 'permitir_web', valor: !quiereCortar }); return Promise.resolve(); });
+    }
+    $('z1-recibo').disabled = !m.sitio;
+    // «Tu visita, a subasta» (agent 4): mounted here, given what this page is.
+    const sub = $('zero-subasta');
+    if (window.ZeroSubasta && typeof window.ZeroSubasta.montar === 'function') {
+      try {
+        window.ZeroSubasta.montar(sub, { sitio: m.sitio || '', pestana: m.pestana, carga: m.carga || 0, cortando: !!m.cortando, protege: !!m.protege, resumen: r, terceros: m.terceros || [], idioma: document.documentElement.lang || 'en' });
+      } catch (e) { console.error(e); }
+    }
+  }
+  $('franja').addEventListener('click', () => manda({ tipo: 'panel', vista: 'escudo' }));
+  $('z1-plegar').addEventListener('click', () => manda({ tipo: 'panel', vista: null }));
+  $('z1-recibo').addEventListener('click', () => manda({ tipo: 'recibo_pagina' }));
+  // Esc folds the summary, as ✕ does (the design system: panels close with ✕, Esc or a click
+  // outside; the click on the web is told by the page itself).
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && vista === 'escudo' && !document.body.classList.contains('plegado')) manda({ tipo: 'panel', vista: null });
+  });
+  en('marco', (m) => {
+    const l = Number(m.lateral || 0);
+    document.body.classList.toggle('plegado', l > 0 && l <= 56);
+    if (ultimoEscudo) requestAnimationFrame(() => pintaCifra(ultimoEscudo));
+  });
+  window.addEventListener('resize', () => { if (ultimoEscudo) pintaCifra(ultimoEscudo); });
+
   en('escudo', (m) => {
+    ultimoEscudo = m;
+    pintaCifra(m);
     // On the browser's own pages there is no page to speak of: only the day.
     $('e-pagina-cab').classList.toggle('oculto', !m.sitio);
     if (m.sitio !== sitioEscudo) { sitioEscudo = m.sitio; $('e-recarga').classList.add('oculto'); }

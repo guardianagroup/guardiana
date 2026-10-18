@@ -7,90 +7,128 @@
 <link rel="stylesheet" href="diseno.css">
 <link rel="stylesheet" href="comun.css">
 <style>
-html, body { height: 100%; overflow: hidden; background: var(--marco); user-select: none; }
-#pestanas { height: 38px; display: flex; align-items: flex-end; gap: 2px; padding: 0 8px 0 10px; }
-.pestana { position: relative; display: flex; align-items: center; gap: 8px; height: 32px; min-width: 64px; max-width: 232px; flex: 1 1 232px; padding: 0 6px 0 12px; border-radius: 10px 10px 0 0; color: var(--gris); cursor: default; }
-.pestana:hover { background: color-mix(in srgb, var(--hoja) 55%, transparent); }
-.pestana[aria-selected="true"] { background: var(--hoja); color: var(--tinta); box-shadow: 0 -1px 0 var(--linea), 1px 0 0 var(--linea), -1px 0 0 var(--linea); }
-.pestana .titulo { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; }
-.pestana img.icono { width: 16px; height: 16px; flex: none; border-radius: 3px; }
-.pestana .punto { width: 8px; height: 8px; border-radius: 50%; background: var(--gris-suave); flex: none; }
-.pestana.cargando .punto { background: none; border: 2px solid var(--azul); border-right-color: transparent; width: 10px; height: 10px; animation: gira .8s linear infinite; }
-.pestana.mandato .punto { border-radius: 2px; background: var(--azul); }
+/* 1.0.46 (zero-1.0.46), Z1: three rows, the chosen design. The top row (56) is GUARDIANA's, the
+   same in the three products: the name once, the selector «Radiografías · ZERO · Comunicaciones»
+   (the only navigation), the state and the settings. Under it, only in the browser, its tabs (40)
+   and its address (44). On GUARDIANA's own panel this bar steps aside (the panel draws the same
+   top row) and in Comunicaciones only the top row shows. */
+html, body { height: 100%; overflow: hidden; background: var(--bg); user-select: none; }
+/* Only the design system's tokens (diseno.css, «SISTEMA 1.0.46»): the top row --s-barra, the tabs
+   --s-fila2, the address --s-fila2, the same --s-margen as every page of the panel. */
+:root { --sf: var(--campo); --t3: var(--muted-2); --tira: var(--card); }
+
+#arriba { position: relative; height: var(--s-barra); display: flex; align-items: center; padding: 0 var(--s-margen); border-bottom: 1px solid var(--linea); background: var(--bg); }
+.marca { display: flex; align-items: center; gap: var(--e3); font: 700 14px/1 var(--texto); letter-spacing: .14em; color: var(--tinta); white-space: nowrap; }
+.marca svg { width: 20px; height: 22px; flex: none; }
+#productos { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: var(--e1); padding: var(--e1); border: 1px solid var(--linea); border-radius: var(--r-pill); background: #0A0E14; }
+#productos button { height: var(--h-chip); padding: 0 var(--e4); border: 0; border-radius: var(--r-pill); background: none; color: var(--gris); font: 500 var(--t-13); white-space: nowrap; transition: background-color var(--m-rapido), color var(--m-rapido); }
+#productos button:hover { color: var(--tinta); }
+#productos button[aria-current="true"] { background: #151C26; color: var(--tinta); }
+.derecha { margin-left: auto; display: flex; align-items: center; gap: var(--e4); }
+#estado-z { display: flex; align-items: center; gap: var(--e2); color: var(--gris); font: 500 var(--t-13); white-space: nowrap; }
+#estado-z i { width: 8px; height: 8px; border-radius: 50%; background: var(--verde); flex: none; }
+#estado-z.mirando i { background: var(--ambar); }
+#estado-z.sin i { background: var(--rojo); }
+#b-menu { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--linea); background: var(--card); color: var(--gris); display: grid; place-items: center; flex: none; padding: 0; }
+#b-menu:hover, #b-menu.activo { color: var(--tinta); border-color: #3A4656; }
+#b-menu svg { width: 16px; height: 16px; }
+
+#pestanas { height: var(--s-fila2); display: flex; align-items: flex-end; gap: var(--e1); padding: 0 var(--s-margen); background: var(--tira); }
+.pestana { position: relative; display: flex; align-items: center; gap: var(--e2); height: 36px; min-width: 64px; max-width: 220px; flex: 0 1 220px; padding: 0 var(--e2) 0 var(--e3); border-radius: var(--r-control) var(--r-control) 0 0; color: var(--gris); font: var(--t-13); cursor: default; }
+.pestana:hover { background: color-mix(in srgb, var(--bg) 55%, transparent); }
+.pestana[aria-selected="true"] { background: var(--bg); color: var(--tinta); }
+.pestana .titulo { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pestana img.icono { width: 16px; height: 16px; flex: none; border-radius: 4px; }
+.pestana .punto { width: 16px; height: 16px; border-radius: 4px; background: var(--campo); border: 1px solid var(--linea); flex: none; display: grid; place-items: center; font: 700 9px/1 var(--texto); color: var(--gris); font-style: normal; }
+.pestana.cargando .punto { background: none; border: 2px solid var(--azul); border-right-color: transparent; border-radius: 50%; width: 12px; height: 12px; animation: gira .8s linear infinite; }
+.pestana.mandato .punto { background: var(--azul); color: var(--sobre); }
 .pestana.aislada .punto { background: none; border: 1.5px dashed var(--gris); }
-.pestana.fija { flex: 0 1 210px; }
-.pestana.fija .titulo { font-weight: 650; }
 .pestana.arrastrando { opacity: .45; }
-.pestana.antes::before, .pestana.despues::after { content: ""; position: absolute; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--accent, #3d6bff); }
+.pestana.antes::before, .pestana.despues::after { content: ""; position: absolute; top: 8px; bottom: 8px; width: 4px; border-radius: 2px; background: var(--accent); }
 .pestana.antes::before { left: -2px; } .pestana.despues::after { right: -2px; }
 @keyframes gira { to { transform: rotate(360deg); } }
-.pestana .cerrar { flex: none; width: 20px; height: 20px; border: 0; border-radius: 6px; background: none; color: var(--gris); display: grid; place-items: center; opacity: 0; }
-.pestana:hover .cerrar, .pestana[aria-selected="true"] .cerrar { opacity: 1; }
+.pestana .cerrar { flex: none; width: 20px; height: 20px; border: 0; border-radius: 4px; background: none; color: var(--t3); display: grid; place-items: center; padding: 0; }
 .pestana .cerrar:hover { background: var(--campo); color: var(--tinta); }
-#nueva { width: 30px; height: 30px; margin: 0 0 1px 4px; border: 0; border-radius: 8px; background: none; color: var(--gris); display: grid; place-items: center; }
-#nueva:hover { background: color-mix(in srgb, var(--hoja) 60%, transparent); color: var(--tinta); }
-.marca { margin-left: auto; align-self: center; display: flex; align-items: center; gap: 7px; font: 600 11.5px/1 var(--display); letter-spacing: .02em; color: var(--gris); padding-left: 16px; white-space: nowrap; }
-.marca i { width:15px; height:15px; display:inline-block; flex:none; background:url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100' height='100' rx='22' fill='%2306080C'/%3E%3Cg transform='translate%289 7%29 scale%28.82%29'%3E%3Cdefs%3E%3Cmask id='i'%3E%3Crect width='100' height='100' fill='%23fff'/%3E%3Cpath d='M63 58.29 V55.07 Q63 54 58.71 54 H44.15 Q37 54 37 61.15 V72.85 Q37 80 44.15 80 H58.71 Q63 80 63 75.71 V67 H51' fill='none' stroke='%23000' stroke-width='7.5'/%3E%3C/mask%3E%3C/defs%3E%3Cpath d='M31 44 V31 A19 19 0 0 1 69 31 V44' fill='none' stroke='%23E8ECF1' stroke-width='9'/%3E%3Crect x='17' y='42' width='66' height='50' rx='13' fill='%239CC3E4' mask='url%28%23i%29'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat; }
+#nueva { width: 32px; height: 32px; margin: 0 0 var(--e1) var(--e1); border: 0; border-radius: var(--r-control); background: none; color: var(--t3); display: grid; place-items: center; padding: 0; }
+#nueva:hover { color: var(--tinta); }
 
-#herramientas { position: relative; height: 46px; background: var(--hoja); display: flex; align-items: center; gap: 4px; padding: 0 10px; border-bottom: 1px solid var(--linea); }
-.icono { width: 34px; height: 34px; border: 0; border-radius: 9px; background: none; color: var(--tinta); display: grid; place-items: center; flex: none; }
-.icono:hover:not(:disabled) { background: var(--campo); }
-.icono:disabled { color: var(--gris-suave); opacity: .55; cursor: default; }
-.icono.activo { background: var(--azul-suave); color: var(--azul); }
-.icono svg { width: 18px; height: 18px; }
+#herramientas { position: relative; height: var(--s-fila2); background: var(--bg); display: flex; align-items: center; gap: var(--e3); padding: 0 var(--s-margen); border-bottom: 1px solid var(--linea); }
+.icono { width: 28px; height: 28px; border: 0; border-radius: var(--r-control); background: none; color: var(--gris); display: grid; place-items: center; flex: none; padding: 0; }
+.icono:hover:not(:disabled) { color: var(--tinta); background: var(--campo); }
+.icono:disabled { color: var(--t3); opacity: .6; cursor: default; }
+.icono.activo { color: var(--azul); }
+.icono svg { width: 16px; height: 16px; }
+.nav { display: flex; gap: var(--e1); }
 
-#direccion { flex: 1; min-width: 120px; height: 34px; margin: 0 6px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 17px; background: var(--campo); border: 1px solid transparent; }
-#direccion:focus-within { background: var(--hoja); border-color: var(--azul); box-shadow: 0 0 0 3px var(--azul-suave); }
-#candado { flex: none; display: grid; place-items: center; color: var(--verde); }
+#direccion { flex: 1; min-width: 120px; height: var(--h-chip); display: flex; align-items: center; gap: var(--e2); padding: 0 var(--e4); border-radius: var(--r-pill); background: var(--sf); border: 1px solid var(--linea); }
+#direccion:focus-within { border-color: var(--azul); box-shadow: 0 0 0 3px var(--azul-suave); }
+#candado { flex: none; display: grid; place-items: center; color: var(--t3); }
 #candado.abierto { color: var(--ambar); }
-#candado.interno { color: var(--azul); }
-#candado svg { width: 15px; height: 15px; }
-#campo-dir { flex: 1; min-width: 0; border: 0; background: none; outline: none; font-size: 14px; color: var(--tinta); }
-#vista-dir { position: absolute; left: 0; right: 0; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
-#vista-dir b { font-weight: 500; color: var(--tinta); }
-#vista-dir span { color: var(--gris); }
-#aviso-corte { flex: none; max-width: 42%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12.5px; color: var(--rojo); opacity: 0; transform: translateX(6px); transition: opacity .2s, transform .2s; }
+#candado.interno { color: var(--gris); }
+#candado svg { width: 16px; height: 16px; }
+#campo-dir { flex: 1; min-width: 0; border: 0; background: none; outline: none; font: var(--t-13); color: var(--tinta); }
+#campo-dir::placeholder { color: var(--gris); }
+#vista-dir { position: absolute; left: 0; right: 0; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font: 400 13px/1 var(--mono); letter-spacing: -.01em; }
+#vista-dir b { font-weight: 400; color: var(--tinta); }
+#vista-dir span { color: var(--t3); }
+#vista-dir .propia { font: 600 13px/1 var(--texto); letter-spacing: .08em; color: var(--tinta); }
+#aviso-corte { flex: none; max-width: 42%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: var(--t-12); color: var(--rojo); opacity: 0; transform: translateX(8px); transition: opacity var(--m-normal), transform var(--m-normal) var(--m-curva); }
 #aviso-corte.visto { opacity: 1; transform: none; }
-/* The star: keep this page in the favourites (it shows on the new tab). */
-#estrella { flex: none; width: 26px; height: 26px; margin-right: -6px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 13px; background: none; color: var(--gris); }
-#estrella:hover { color: var(--tinta); background: var(--hoja); }
+#estrella { flex: none; width: 24px; height: 24px; margin-right: calc(-1 * var(--e2)); padding: 0; display: grid; place-items: center; border: 0; border-radius: var(--r-pill); background: none; color: var(--t3); }
+#estrella:hover { color: var(--tinta); }
 #estrella svg { width: 16px; height: 16px; }
 #estrella.puesta { color: var(--azul); }
 #estrella.puesta svg path { fill: currentColor; }
 
-/* The shield: how many companies were stopped on this page. It is the browser's pulse. */
-#b-escudo { height: 34px; padding: 0 12px 0 9px; border: 1px solid var(--linea); border-radius: 17px; background: var(--hoja); display: flex; align-items: center; gap: 7px; color: var(--verde); font-weight: 600; font-variant-numeric: tabular-nums; flex: none; }
-#b-escudo:hover { background: var(--verde-suave); }
-#b-escudo.mirando { color: var(--ambar); }
-#b-escudo.mirando:hover { background: var(--ambar-suave); }
-#b-escudo.activo { border-color: currentColor; }
-#b-escudo svg { width: 17px; height: 17px; }
+/* The shield: the attempts cut on this page (on a new tab, today's). It opens the side summary. */
+#b-escudo { height: var(--h-chip); padding: 0 var(--e3); border: 1px solid var(--linea); border-radius: var(--r-pill); background: none; display: flex; align-items: center; gap: var(--e2); color: var(--tinta); flex: none; white-space: nowrap; font: var(--t-13); }
+#b-escudo svg { width: 16px; height: 16px; color: var(--rojo); flex: none; }
+#b-escudo.cero svg { color: var(--gris); }
+#b-escudo.mirando svg { color: var(--ambar); }
+#b-escudo:hover, #b-escudo.activo { border-color: #3A4656; }
+#b-escudo-n { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 1ch; }
+#b-escudo-que { color: var(--gris); }
 #b-escudo.late { animation: late .45s ease-out; }
-@keyframes late { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
-#b-escudo-n { min-width: 1ch; }
+@keyframes late { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--rojo) 45%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
+.extra { display: flex; gap: var(--e1); }
 
-/* The subscription, when there is something to say: the last two days of the trial, or no protection. */
-#b-licencia { height: 30px; padding: 0 12px; border: 1px solid var(--ambar); border-radius: 15px; background: var(--ambar-suave); color: var(--tinta); font-weight: 600; font-size: 12.5px; flex: none; white-space: nowrap; }
+#b-licencia { height: var(--h-chip); padding: 0 var(--e3); border: 1px solid var(--ambar); border-radius: var(--r-pill); background: var(--ambar-suave); color: var(--tinta); font: 600 var(--t-13); flex: none; white-space: nowrap; }
 #b-licencia.sin-proteccion { border-color: var(--rojo); background: var(--rojo); color: var(--sobre); }
 #b-licencia:hover { filter: brightness(1.05); }
-/* A mandate's tab: the AI can be stopped from the bar, in one click. */
-#b-parar { height: 30px; padding: 0 12px 0 10px; border: 0; border-radius: 15px; background: var(--rojo); color: var(--sobre); font-weight: 600; font-size: 12.5px; display: flex; align-items: center; gap: 7px; flex: none; }
+#b-parar { height: var(--h-chip); padding: 0 var(--e3); border: 0; border-radius: var(--r-pill); background: var(--rojo); color: var(--sobre); font: 600 var(--t-13); display: flex; align-items: center; gap: var(--e2); flex: none; }
 #b-parar i { width: 8px; height: 8px; border-radius: 2px; background: var(--sobre); }
 #b-parar:hover { filter: brightness(1.08); }
-/* The guard line: the last minute of this tab, one mark per request to another company. */
-#guardia { position: absolute; left: 0; right: 0; bottom: -1px; width: 100%; height: 3px; display: block; }
-#herramientas:hover #guardia { height: 5px; }
+#guardia { position: absolute; left: 0; right: 0; bottom: -1px; width: 100%; height: 2px; display: block; }
+#herramientas:hover #guardia { height: 4px; }
+
+/* Comunicaciones: only the top row. */
+body.solo-arriba #pestanas, body.solo-arriba #herramientas { display: none; }
+@media (max-width: 900px) { #arriba, #pestanas, #herramientas { padding-left: var(--s-margen-movil); padding-right: var(--s-margen-movil); } #estado-z span { display: none; } .extra { display: none; } }
+@media (max-width: 640px) { .marca span, #estado-z { display: none; } #productos { position: static; transform: none; margin: 0 auto; } #productos button { padding: 0 var(--e3); } .derecha { margin-left: 0; } }
 </style>
 </head>
 <body>
+<div id="arriba">
+  <span class="marca"><svg viewBox="0 0 20 22" aria-hidden="true"><path d="M5.2 9V6.6a4.8 4.8 0 0 1 9.6 0V9" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="1.5" y="9" width="17" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12.6 13.2a3 3 0 1 0 .3 3.2h-2.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>GUARDIANA</span></span>
+  <nav id="productos">
+    <button type="button" data-producto="guardiana" data-t="pestana_guardiana"></button>
+    <button type="button" data-producto="zero" aria-current="true">ZERO</button>
+    <button type="button" data-producto="secure" data-t="pestana_secure"></button>
+  </nav>
+  <div class="derecha">
+    <span id="estado-z" role="status"><i></i><span></span></span>
+    <button id="b-menu" data-t-title="ajustes"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.6"/><circle cx="6" cy="11.5" r="1.6"/></svg></button>
+  </div>
+</div>
 <div id="pestanas" role="tablist">
-  <button id="nueva" data-t-title="pestana_nueva"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg></button>
-  <span class="marca"><i></i><span data-t="app_nombre"></span></span>
+  <button id="nueva" data-t-title="pestana_nueva"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg></button>
 </div>
 <div id="herramientas">
-  <button class="icono" id="atras" data-t-title="atras" disabled><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-6 6 6 6"/></svg></button>
-  <button class="icono" id="adelante" data-t-title="adelante" disabled><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4l6 6-6 6"/></svg></button>
+  <div class="nav">
+  <button class="icono" id="atras" data-t-title="atras" disabled><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10H4M9 5l-5 5 5 5"/></svg></button>
+  <button class="icono" id="adelante" data-t-title="adelante" disabled><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h12M11 5l5 5-5 5"/></svg></button>
   <button class="icono" id="recargar" data-t-title="recargar"><svg id="ic-recargar" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9"/><path d="M14.5 3v3.5H11"/></svg><svg id="ic-detener" class="oculto" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 5l10 10M15 5L5 15"/></svg></button>
+  </div>
   <form id="direccion" autocomplete="off">
     <span id="candado"></span>
     <span style="position:relative;flex:1;min-width:0;display:flex;align-items:center">
@@ -102,11 +140,12 @@ html, body { height: 100%; overflow: hidden; background: var(--marco); user-sele
   </form>
   <button id="b-parar" class="oculto" data-t-title="mandato_parar_titulo"><i></i><span data-t="mandato_parar"></span></button>
   <button id="b-licencia" class="oculto" data-t-title="licencia_boton_titulo"></button>
-  <button id="b-escudo" data-t-title="escudo_boton_titulo"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M10 2.5l6 2.3v4.6c0 3.9-2.6 6.6-6 8.1-3.4-1.5-6-4.2-6-8.1V4.8z"/><path d="M7.3 10l2 2 3.6-3.8" stroke-linecap="round"/></svg><span id="b-escudo-n">0</span></button>
+  <button id="b-escudo" data-t-title="escudo_boton_titulo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3l7.5 2.8v5.6c0 4.6-3.1 8.2-7.5 9.6-4.4-1.4-7.5-5-7.5-9.6V5.8z"/></svg><span id="b-escudo-n">0</span><span id="b-escudo-que"></span></button>
+  <div class="extra">
   <button class="icono" id="b-mandato" data-t-title="mandato_boton_titulo"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="14" height="14" rx="3"/><path d="M7 3v14M3 8h4M3 12h4"/><circle cx="12" cy="10" r="2"/></svg></button>
   <button class="icono" id="b-tachon" data-t-title="tachon_boton_titulo"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3.5 6.5h13M3.5 10h5M3.5 13.5h13"/><rect x="10" y="8.2" width="6.5" height="3.6" rx="1" fill="currentColor" stroke="none"/></svg></button>
   <button class="icono" id="b-datos" data-t-title="mis_datos"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5c.8-3 3.2-4.5 6-4.5s5.2 1.5 6 4.5"/><circle cx="10" cy="7" r="3.2"/></svg></button>
-  <button class="icono" id="b-menu" data-t-title="ajustes"><svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="4.5" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="10" cy="15.5" r="1.5"/></svg></button>
+  </div>
   <canvas id="guardia" data-t-title="linea_guardia_titulo"></canvas>
 </div>
 <script src="interruptor.js"></script>

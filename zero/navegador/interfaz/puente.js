@@ -144,8 +144,9 @@ const Z = (() => {
     raiz.querySelectorAll('[data-t-title]').forEach((el) => { el.title = t(el.dataset.tTitle); el.setAttribute('aria-label', t(el.dataset.tTitle)); });
   }
   const $ = (id) => document.getElementById(id);
-  // Numbers in the person's language, never rounded.
-  const n = (x) => Number(x || 0).toLocaleString(document.documentElement.lang || 'es');
+  // Numbers in the person's language, never rounded, always with the thousands separator (1.0.46,
+  // the owner: «1.284», not Spanish's default «1284» for four digits).
+  const n = (x) => { try { return Number(x || 0).toLocaleString(document.documentElement.lang || 'es', { useGrouping: 'always' }); } catch (_) { return Number(x || 0).toLocaleString(document.documentElement.lang || 'es'); } };
   // Day or night as the page shows it now: the person's choice, or Windows' when there is none.
   const oscuro = () => {
     const e = document.documentElement.dataset.tema;

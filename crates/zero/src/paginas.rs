@@ -156,6 +156,48 @@ const GUION: &str = r#"(() => {
   // Web pages do not need the channel to the browser: hidden for good, so a page can neither
   // talk to the browser nor use it to tell this browser apart.
   try { Object.defineProperty(c, 'webview', { value: undefined, configurable: false, writable: false }); } catch (_) {}
+  // 1.0.46 (zero-1.0.46): GUARDIANA's own panel on this computer, open in ZERO. Its selector
+  // «Radiografías · ZERO · Comunicaciones» moves between the products, the only navigation (Z3);
+  // and the language GUARDIANA speaks (its /api/ajustes/idioma once the person chose one, or the
+  // choice kept by the panel) is ZERO's too (Z5). Absent or not chosen yet, nothing changes.
+  // Only that page, only its own top document.
+  if (!marco && location.origin === 'http://127.0.0.1:7443') {
+    try { document.documentElement.dataset.enZero = '1'; } catch (_) {}
+    document.addEventListener('click', (e) => {
+      const b = e.target && e.target.closest && e.target.closest('[data-producto]');
+      if (!b) return;
+      const p = String(b.dataset.producto || '');
+      const cual = p === 'zero' ? 'zero' : (p === 'com' || p === 'comunicaciones' || p === 'secure') ? 'secure' : (p === 'radiografias' || p === 'guardiana') ? 'guardiana' : '';
+      if (!cual) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      manda({ tipo: 'zg_producto', producto: cual });
+    }, true);
+    const idioma = async () => {
+      let l = '';
+      try {
+        let tk = '';
+        try { tk = sessionStorage.getItem('guardiana_token') || ''; } catch (_) {}
+        const r = await fetch('/api/ajustes/idioma', { headers: { 'X-Guardiana-Token': tk }, cache: 'no-store' });
+        if (r.ok) { const j = await r.json(); if (j && j.elegido !== false) l = j.idioma; }
+      } catch (_) {}
+      if (l !== 'es' && l !== 'en' && l !== 'pt') { try { l = localStorage.getItem('guardiana_lang') || ''; } catch (_) {} }
+      if (l === 'es' || l === 'en' || l === 'pt') manda({ tipo: 'zg_idioma', idioma: l });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', idioma, { once: true }); else idioma();
+  }
+  // 1.0.46 (Z1-b): a click on the web itself folds ZERO's side summary («clic fuera»). Only the
+  // fact of a click, never where or on what.
+  if (!marco && location.origin !== 'http://127.0.0.1:7443') {
+    let ultimo = 0;
+    document.addEventListener('pointerdown', (e) => {
+      if (!e.isTrusted) return;
+      const ahora = Date.now();
+      if (ahora - ultimo < 400) return;
+      ultimo = ahora;
+      manda({ tipo: 'zg_toque' });
+    }, { capture: true, passive: true });
+  }
   const ficha = new Uint32Array(4);
   crypto.getRandomValues(ficha);
   const yo = Array.from(ficha, (x) => x.toString(16)).join('');

@@ -76,10 +76,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_TIMER, WNDCLASSEXW, WS_OVERLAPPEDWINDOW,
 };
 
-/// Height of the bar (tabs 38 + tools 46), in CSS pixels; see `interfaz/barra.html`.
-const ALTO_BARRA: i32 = 84;
-/// Width of the side panel, in CSS pixels.
-const ANCHO_PANEL: i32 = 380;
+/// Before the session says otherwise (1.0.46, [`Orden::Marco`]): the browser's whole bar (top
+/// row 56, tabs 40, address 44) and no side view; see `interfaz/barra.html`.
+const MARCO_INICIAL: (i32, i32) = (sesion::ALTO_ZERO, 0);
 /// The window class, also used to find a running copy.
 const CLASE: PCWSTR = w!("GuardianaZeroVentana");
 /// «The session queued orders».
@@ -150,7 +149,8 @@ struct Vistas {
     panel: Option<Vista>,
     pestanas: BTreeMap<u32, PestanaW>,
     activa: u32,
-    panel_abierto: bool,
+    /// The bar's height and the side view's width, in CSS pixels, as the session last said.
+    marco: (i32, i32),
     /// Tabs opened by a page (a new window): handed to the engine when their view exists.
     ventanas: HashMap<
         u32,
@@ -392,6 +392,11 @@ fn drena() {
     while let Some(o) = COLA.with(|c| c.borrow_mut().pop_front()) {
         ejecuta(o);
     }
+    // 1.0.46: the layout for what is in front now (the bar, the glass strip, the side view),
+    // when it changed.
+    for o in con_sesion(Sesion::marco_nuevo).unwrap_or_default() {
+        ejecuta(o);
+    }
 }
 
 fn vista_de(a: Origen) -> Option<Vista> {
@@ -476,9 +481,14 @@ fn ejecuta(o: Orden) {
                 let _ = unsafe { v.web.Stop() };
             }
         }
-        Orden::Panel { abierto } => {
-            con_vistas(|v| v.panel_abierto = abierto);
+        // The side view's place comes with the layout (`Orden::Marco`), given after every turn.
+        Orden::Panel { .. } => {}
+        Orden::Marco { barra, lateral } => {
+            con_vistas(|v| v.marco = (barra, lateral));
             coloca();
+        }
+        Orden::PideGuardiana => {
+            encola(con_sesion(|s| abre_panel(s, None)).unwrap_or_default());
         }
         Orden::Envia { a, json } => envia(a, &json),
         Orden::RespondeFormulario { id, json } => {
@@ -763,7 +773,7 @@ fn px(css: i32, s: f64) -> i32 {
 /// Place every view: the bar on top, the panel on the right when open, the active tab in the
 /// rest. A tab in full screen takes the whole window.
 fn coloca() {
-    let Some((h, barra, panel, pestanas, activa, abierto, completa)) = con_vistas(|v| {
+    let Some((h, barra, panel, pestanas, activa, marco, completa)) = con_vistas(|v| {
         (
             v.hwnd,
             v.barra.clone(),
@@ -773,7 +783,7 @@ fn coloca() {
                 .filter_map(|(id, p)| p.vista.clone().map(|x| (*id, x)))
                 .collect::<Vec<_>>(),
             v.activa,
-            v.panel_abierto,
+            v.marco,
             v.completa.map(|c| c.0),
         )
     }) else {
@@ -785,12 +795,9 @@ fn coloca() {
     }
     let s = escala(h);
     let (ancho, alto) = (r.right - r.left, r.bottom - r.top);
-    let alto_barra = px(ALTO_BARRA, s).min(alto);
-    let ancho_panel = if abierto {
-        px(ANCHO_PANEL, s).min(ancho / 2)
-    } else {
-        0
-    };
+    let alto_barra = px(marco.0, s).min(alto);
+    let ancho_panel = px(marco.1, s).min(ancho / 2);
+    let abierto = ancho_panel > 0;
     let en_completa = completa.is_some();
     let contenido = if en_completa {
         RECT {
@@ -815,7 +822,7 @@ fn coloca() {
                 right: ancho,
                 bottom: alto_barra,
             });
-            let _ = b.controlador.SetIsVisible(!en_completa);
+            let _ = b.controlador.SetIsVisible(!en_completa && alto_barra > 0);
         }
         if let Some(p) = &panel {
             let _ = p.controlador.SetBounds(RECT {
@@ -2433,7 +2440,7 @@ pub fn arranca() {
             panel: None,
             pestanas: BTreeMap::new(),
             activa: 0,
-            panel_abierto: false,
+            marco: MARCO_INICIAL,
             ventanas: HashMap::new(),
             carpeta_ui,
             estricto,
@@ -2579,11 +2586,9 @@ fn pinta_marco_ventana(hwnd: HWND, col: &Colores) {
             (&col.marco as *const COLORREF).cast::<c_void>(),
             std::mem::size_of::<COLORREF>() as u32,
         );
-        let texto = if col.oscuro {
-            COLORREF(0x00F1_ECE8)
-        } else {
-            COLORREF(0x0020_100B)
-        };
+        // 1.0.46, the name once: the caption's words take the caption's own colour, so the
+        // window's name is read in GUARDIANA's top row and in the taskbar, not twice on screen.
+        let texto = col.marco;
         let _ = DwmSetWindowAttribute(
             hwnd,
             DWMWA_TEXT_COLOR,

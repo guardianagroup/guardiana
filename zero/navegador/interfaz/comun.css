@@ -43,11 +43,15 @@ button { cursor: pointer; }
 @media print { .enlace-empresa { text-decoration: none; } }
 textarea.campo { resize: vertical; min-height: 84px; line-height: 1.45; }
 
-/* The switch the person flips: protection on or off. */
-.interruptor { position: relative; width: 38px; height: 22px; flex: none; appearance: none; background: var(--linea); border-radius: 11px; transition: background .15s; cursor: pointer; margin: 0; }
-.interruptor::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
-.interruptor:checked { background: var(--verde); }
-.interruptor:checked::after { transform: translateX(16px); }
+/* The switch the person flips: protection on or off. Only the settings' checkboxes: the cut
+   switch (a button, role="switch") is the standard one of diseno.css, untouched here (1.0.46: these
+   rules turned it grey with a second knob in the side summary). */
+input.interruptor { position: relative; width: 38px; height: 22px; flex: none; appearance: none; background: var(--linea); border-radius: 11px; transition: background .15s; cursor: pointer; margin: 0; }
+input.interruptor::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
+input.interruptor:checked { background: var(--verde); }
+input.interruptor:checked::after { transform: translateX(16px); }
+input.interruptor:hover { background: var(--linea); }
+input.interruptor:checked:hover { background: var(--verde); }
 
 /* «Quién te siguió de web en web»: one row per company, how many of the person's webs it was on,
    and whether it got through anywhere. Shared by the shield and the new tab. */

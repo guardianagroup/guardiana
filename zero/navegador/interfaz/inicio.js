@@ -274,6 +274,44 @@
     manda({ tipo: 'guardar_imagen', nombre: 'guardiana-zero-mes.png', datos: c.toDataURL('image/png') });
   });
 
+  // --- 1.0.46 (zero-1.0.46): «Diario de hoy», Z1-a ------------------------------------------
+  // The shield fills with one dot per attempt cut today; amber, those of the last minute this
+  // tab saw happen. Every figure is the program's own; with nothing cut yet, it says so.
+  const historiaDia = [];
+  let diaUltimo = null;
+  function pintaDiario(m) {
+    diaUltimo = m;
+    const h = m.hoy || {};
+    const total = Number(h.cortadas || 0);
+    const webs = Number(m.webs_cortes || 0);
+    const ahora = Date.now();
+    historiaDia.push([ahora, total]);
+    while (historiaDia.length > 1 && ahora - historiaDia[0][0] > 60000) historiaDia.shift();
+    const ambar = Math.max(0, total - historiaDia[0][1]);
+    const fecha = new Date().toLocaleDateString(lang(), { weekday: 'long', day: 'numeric', month: 'long' });
+    $('z1a-cap').textContent = t('z1_diario', { fecha });
+    $('z1a-n').textContent = n(total);
+    const frase = $('z1a-frase');
+    if (total > 0) {
+      const websTxt = tn('z1_webs', webs, { n: n(webs) });
+      frase.innerHTML = Z.esc(tn('z1_intentos_hoy', total, { webs: '\u0000' })).replace('\u0000', `<span class="ac">${Z.esc(websTxt)}</span>`);
+    } else {
+      frase.textContent = t('z1_cero');
+    }
+    $('z1a-explica').textContent = m.protege === false ? t('z1_sin_proteccion') : m.cortando === false ? t('z1_solo_mira') : t('z1_explica');
+    const r = ZeroEscudo.dibuja($('z1a-escudo'), { n: total, ambar, minimo: 120, maximo: 1400, semilla: 5 });
+    $('z1a-escudo').setAttribute('aria-label', tn('z1_intentos_hoy', total, { webs: tn('z1_webs', webs, { n: n(webs) }) }));
+    const pp = $('z1a-porpunto');
+    pp.classList.toggle('oculto', r.porPunto <= 1);
+    pp.textContent = r.porPunto > 1 ? t('z1_por_punto', { n: n(r.porPunto) }) : '';
+    $('z1a-maxima').textContent = t(m.maxima ? 'z1_maxima_si' : 'z1_maxima_no');
+  }
+  en('hoy', pintaDiario);
+  en('textos', () => { if (diaUltimo) pintaDiario(diaUltimo); });
+  window.addEventListener('resize', () => { if (diaUltimo) pintaDiario(diaUltimo); });
+  document.querySelectorAll('.atajo[data-producto]').forEach((b) => b.addEventListener('click', () => manda({ tipo: 'producto', producto: b.dataset.producto })));
+  $('z1a-ajustes').addEventListener('click', () => manda({ tipo: 'panel', vista: 'ajustes' }));
+
   en('guardado', (m) => { const g = $('guardada'); g.textContent = m.texto || ''; g.classList.remove('oculto'); });
 
   manda({ tipo: 'listo', vista: 'inicio' });
