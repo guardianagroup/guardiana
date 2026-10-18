@@ -221,7 +221,7 @@ p{{font-size:16px;line-height:1.5;color:#5B6275;margin:0 0 10px}}
 a{{color:#1F4BFF}}
 </style></head>
 <body><main>
-<svg class="logo" viewBox="0 0 200 200" aria-hidden="true"><rect x="8" y="8" width="184" height="184" rx="40" fill="#0B1220" stroke="#17324A" stroke-width="2"/><g><circle cx="100" cy="100" r="42" fill="none" stroke="#62E6FF" stroke-width="12"/><circle cx="100" cy="100" r="14" fill="#62E6FF"/></g></svg>
+<svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#06080C"/><g transform="translate(9 7) scale(.82)"><defs><mask id="g"><rect width="100" height="100" fill="#fff"/><path d="M63 58.29 V55.07 Q63 54 58.71 54 H44.15 Q37 54 37 61.15 V72.85 Q37 80 44.15 80 H58.71 Q63 80 63 75.71 V67 H51" fill="none" stroke="#000" stroke-width="7.5"/></mask></defs><path d="M31 44 V31 A19 19 0 0 1 69 31 V44" fill="none" stroke="#E8ECF1" stroke-width="9"/><rect x="17" y="42" width="66" height="50" rx="13" fill="#9CC3E4" mask="url(#g)"/></g></svg>
 <h1>GUARDIANA</h1>
 <p>{texto}</p>
 <div class="barra"><i></i></div>

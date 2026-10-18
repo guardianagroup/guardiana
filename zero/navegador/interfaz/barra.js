@@ -196,9 +196,11 @@
     $('ic-detener').classList.toggle('oculto', !a.cargando);
     $('recargar').title = t(a.cargando ? 'detener' : 'recargar');
     const c = $('candado');
-    c.className = a.interna ? 'interno' : (a.segura ? '' : 'abierto');
-    c.innerHTML = a.interna ? CANDADO.interno : (a.segura ? CANDADO.seguro : CANDADO.abierto);
-    c.title = t(a.interna ? 'pagina_interna' : (a.segura ? 'conexion_segura' : 'conexion_no_segura'));
+    // GUARDIANA's own panel is on this computer and never goes out: a green closed lock, not the
+    // amber of an unencrypted website (17 Oct 2026, the owner).
+    c.className = a.interna ? 'interno' : (a.segura || a.local ? '' : 'abierto');
+    c.innerHTML = a.interna ? CANDADO.interno : (a.segura || a.local ? CANDADO.seguro : CANDADO.abierto);
+    c.title = t(a.interna ? 'pagina_interna' : a.local ? 'conexion_local' : (a.segura ? 'conexion_segura' : 'conexion_no_segura'));
     pintaDireccion(a.url, a.interna);
     const e = $('estrella');
     e.classList.toggle('oculto', !!a.interna || !a.url);

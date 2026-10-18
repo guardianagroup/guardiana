@@ -1268,7 +1268,22 @@ impl Secure {
         }
         self.fase = Fase::Sola;
         self.monitor.identidad = None;
+        self.borra_rastro();
         self.cambio = true;
+    }
+
+    /// When a conversation ends, nothing of it stays (17 Oct 2026, the owner: «cuando una
+    /// conversación termina, tiene que quedar todo borrado, absolutamente todo… en caso de robo
+    /// o pérdida»): its messages leave the screen and the files it brought leave Descargas.
+    /// The signed summary of the conversation is kept until the person closes it.
+    fn borra_rastro(&mut self) {
+        for r in self.recibidos.drain(..) {
+            if !r.borrado {
+                let _ = std::fs::remove_file(&r.ruta);
+            }
+        }
+        self.mensajes.clear();
+        self.por_ver.clear();
     }
 
     fn manda(&mut self, v: Value) {

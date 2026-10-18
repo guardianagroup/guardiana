@@ -593,6 +593,14 @@ header.top #m-estado-chip.alerta { background: var(--alerta-suave); border-color
    their own, so they fit the narrow column. */
 .c-sala-miembros li { grid-template-columns: auto 1fr; row-gap: 8px; }
 .c-sala-miembros li .c-sala-acc { grid-column: 2; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+/* The start breathes the same above and below (17 Oct 2026, the owner: «la primera frase está
+   demasiado pegada al navegador… tiene que guardar simetría»): equal space at the top and at the
+   bottom, the block centred when it fits. */
+.inicio { padding: clamp(48px, 9vh, 96px) 8px; box-sizing: border-box; align-content: safe center; }
+main:has(> .inicio:not([hidden])) { align-content: safe center; }
+/* No video calls (17 Oct 2026, the owner: «el vídeo lo vamos a quitar… chat, audios, archivos y
+   la llamada de voz de máxima calidad»). */
+#c-video { display: none !important; }
 </style>
 </head>
 <body>

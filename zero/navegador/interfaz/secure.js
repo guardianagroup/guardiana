@@ -726,6 +726,7 @@
   // Three ways to talk (16 Oct 2026): computer to computer, from the phone, the home room.
   // The start shows the three; once one is chosen (or one is already going) only it is on screen.
   let modo = null;
+  try { const nav = performance.getEntriesByType('navigation')[0]; if (nav && nav.type === 'reload') sessionStorage.removeItem('secure-modo'); } catch (_) {}
   try { modo = sessionStorage.getItem('secure-modo') || null; } catch (_) {}
   if (!['equipos', 'movil', 'sala'].includes(modo)) modo = null;
   const guardaModo = () => { try { if (modo) sessionStorage.setItem('secure-modo', modo); else sessionStorage.removeItem('secure-modo'); } catch (_) {} };
@@ -817,7 +818,11 @@
     if (!audios.has(clave) && !pedidas.has(clave)) { pedidas.add(clave); manda({ tipo: 'secure', accion: 'sala_nota', id: a.id }); }
     return notaVoz(audios.get(clave), a.nombre);
   };
+  // A new room starts with nothing of the last one on screen (its voice notes were cached by
+  // number, and a new room's numbers could match).
+  let salaVista = null;
   const pintaSala = (m) => {
+    if (m && m.sala && m.sala.creada !== salaVista) { salaVista = m.sala.creada; for (const k of [...audios.keys()]) if (typeof k === 'string' && k.startsWith('sala-')) audios.delete(k); }
     const s = m.sala;
     $('c-sala-antes').hidden = !!s;
     $('c-sala-abierta').hidden = !s;
@@ -1529,7 +1534,8 @@
     velo.hidden = !r;
     if (!r) return;
     const nv = nivelInforme(r);
-    caja.classList.toggle('revisar', nv === 'revisar'); caja.classList.toggle('incompleto', nv === 'incompleto');
+    // No incident is green (the owner, 17 Oct 2026); what could not be checked is said in the rows.
+    caja.classList.toggle('revisar', nv === 'revisar'); caja.classList.toggle('incompleto', false);
     $('in-que').textContent = `${t('sec_r_clase_' + r.clase)} · ${r.contacto || ''} · ${tiempo(r.duracion_s || 0)}`;
     $('in-palabra').textContent = t(nv === 'revisar' ? 'sec_in_revisar' : nv === 'incompleto' ? 'sec_in_incompleto' : 'sec_in_limpio');
     $('in-frase').textContent = t(nv === 'revisar' ? 'sec_in_revisar_frase' : nv === 'incompleto' ? 'sec_in_incompleto_frase' : 'sec_in_limpio_frase');
@@ -1583,6 +1589,9 @@
   // inside the cipher, and each computer draws the line between the two on its own globe.
   // «listo» first, so the texts arrive before any state is drawn (17 Oct 2026 review).
   manda({ tipo: 'listo', vista: 'secure' });
+  // Reloading the page starts from nothing: no conversation, no messages, no open invitation
+  // (the program keeps a call that is still going).
+  try { const nav = performance.getEntriesByType('navigation')[0]; if (nav && nav.type === 'reload') manda({ tipo: 'secure', accion: 'empezar_limpio' }); } catch (_) {}
   mandaNombre();
   try { manda({ tipo: 'secure', accion: 'zona', zona: Intl.DateTimeFormat().resolvedOptions().timeZone || '' }); } catch (_) {}
 })();

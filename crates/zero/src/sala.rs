@@ -184,6 +184,9 @@ pub struct Sala {
     descargas: Option<PathBuf>,
     /// The last file id handed to the phones.
     ultimo_archivo: u32,
+    /// Every file the room saved in Descargas: removed when the room ends (17 Oct 2026, the
+    /// owner: nothing of a conversation may stay once it is over).
+    guardados: Vec<PathBuf>,
     /// The relay's call service (WebRTC between two phones of the house, 17 Oct 2026).
     turn: Option<crate::rele::Turn>,
     turn_rx: Option<std::sync::mpsc::Receiver<Result<crate::rele::Turn, String>>>,
@@ -207,6 +210,15 @@ struct InformeSala {
     fin: u64,
     rtc: bool,
     veredicto: crate::vigia::Veredicto,
+}
+
+impl Drop for Sala {
+    /// The room ends (closed, expired, or the page started again): its files go with it.
+    fn drop(&mut self) {
+        for r in self.guardados.drain(..) {
+            let _ = std::fs::remove_file(r);
+        }
+    }
 }
 
 impl std::fmt::Debug for Sala {
@@ -269,7 +281,10 @@ impl Sala {
             cambio: true,
             error: None,
             descargas: None,
-            ultimo_archivo: 0,
+            // Each room numbers its files from its own random start (17 Oct 2026: a new room's
+            // first voice note showed the previous room's, cached on the screen by number).
+            ultimo_archivo: u32::from_le_bytes([clave[0], clave[1], clave[2], 0]) << 4,
+            guardados: Vec::new(),
             turn: None,
             turn_rx: None,
             turn_pedido: 0,
@@ -503,6 +518,7 @@ impl Sala {
         if std::fs::write(&ruta, &datos).is_err() {
             return;
         }
+        self.guardados.push(ruta.clone());
         self.ultimo_archivo += 1;
         let archivo = Archivo {
             id: self.ultimo_archivo,
@@ -514,8 +530,16 @@ impl Sala {
         let mut m = Mensaje::nuevo(de, String::new(), None);
         m.archivo = Some(archivo.clone());
         self.guarda(m);
-        // Pictures go to the other phones at once; other files on demand (1.0.41).
-        if mime.starts_with("image/") {
+        // Pictures, voice notes and videos go to the other phones at once (17 Oct 2026: a voice
+        // note from one iPhone arrived on the other as a line that never played, because only
+        // pictures were sent on). Other files stay on this computer, in Descargas.
+        let base = mime
+            .split(';')
+            .next()
+            .unwrap_or("")
+            .trim()
+            .to_ascii_lowercase();
+        if base.starts_with("image/") || base.starts_with("audio/") || base.starts_with("video/") {
             for (j, a) in self.asientos.iter().enumerate() {
                 if j != de && a.aprobado && a.enganchado {
                     reparte_archivo(&a.movil, &archivo, &datos);
@@ -934,10 +958,13 @@ impl Sala {
                     if let Some(otro) = self.pareja(i) {
                         // WebRTC between the two phones when the relay's call service is in:
                         // the caller offers.
+                        // Without it, the two phones still try WebRTC with local addresses only
+                        // (same wifi, 17 Oct 2026: the recorded pieces were slow and choppy);
+                        // the page falls back to the pieces if that does not connect.
                         let rtc = match (&self.turn, &self.turn_rx) {
                             (Some(t), _) => json!({ "ice": t.json(), "ofrece": l.de == i }),
                             (None, Some(_)) => json!({ "pendiente": true }),
-                            _ => Value::Null,
+                            _ => json!({ "ice": [], "local": true, "ofrece": l.de == i }),
                         };
                         llamada = json!({
                             "video": l.video,

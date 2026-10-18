@@ -386,6 +386,18 @@ impl Comunicaciones {
                 self.sala = None;
                 Ok(())
             }
+            // «Actualizar» on the page once the talk is over (17 Oct 2026, the owner: «le doy
+            // actualizar y se tiene que borrar todo»): the conversation, its messages, the
+            // invitation and its link go; a call still going is never cut by a reload.
+            "empezar_limpio" => {
+                if !self.en_llamada() {
+                    self.secure.cerrar("la persona empezó de nuevo");
+                    self.secure.borrar_todo();
+                    self.secure.olvida_informe();
+                    self.sala = None;
+                }
+                Ok(())
+            }
             "movil_ok" => {
                 self.secure.movil_aprueba();
                 Ok(())
