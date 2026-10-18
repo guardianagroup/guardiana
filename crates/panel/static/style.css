@@ -12,7 +12,7 @@
 :root {
   /* the ground, the ink, the blue and the typefaces come from diseno.css (shared with ZERO and
      SECURE since 15 Oct 2026). Here only what the panel alone names. */
-  --rastreador: #E07A6C; --publicidad: #E0B66A; --telemetria: #B9A6E8;
+  --rastreador: #E07A6C; --publicidad: #E0B66A; --telemetria: #A9B3BE;
   --esperado: var(--ok); --desconocido: var(--muted);
   --cortado: var(--alerta); --respondido: var(--accent-dark);
   --nivel-verde: #6CCBA5; --nivel-naranja: #E0B66A; --nivel-rojo: #E07A6C;
@@ -22,7 +22,7 @@
    the same design, with the site's ink as the ground and the accents lifted enough to read on it.
    The choice is kept in this browser only (localStorage), never sent anywhere. */
 :root[data-tema="noche"] {
-  --rastreador: #E07A6C; --publicidad: #E0B66A; --telemetria: #B9A6E8;
+  --rastreador: #E07A6C; --publicidad: #E0B66A; --telemetria: #A9B3BE;
   --nivel-verde: #6CCBA5; --nivel-naranja: #E0B66A; --nivel-rojo: #E07A6C;
 }
 :root[data-tema="noche"] input, :root[data-tema="noche"] select, :root[data-tema="noche"] textarea { color-scheme: dark; }
@@ -35,27 +35,74 @@ html, body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 
 a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 a:hover { color: var(--accent-dark); }
 
-/* the top bar of the site: the brand with its blue dot, and the sections in small mono capitals */
-header.top { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; align-items: center; padding: 14px 24px; border-bottom: 1px solid #141920; background: rgba(6, 8, 12, .92); }
-header.top .brand { font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: 0.14em; display: inline-flex; align-items: center; gap: 10px; }
-/* «Tus datos, bajo tu control» under the brand, as on the website (9 Oct 2026). */
+/* The header (18 Oct 2026, the menu the owner approved: «de 16 entradas a 3 pestañas»). One slim
+   bar: the brand, the three products in a pill in the middle, the state of the service and
+   «Ajustes» on the right. Under it, quietly, the four parts of Radiografías; the pages of the part
+   you are in as small tabs. app.js builds it once for every page (pintaCabecera). */
+header.top { position: relative; z-index: 20; display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; align-items: center; min-height: 56px; padding: 0 24px; border-bottom: 1px solid var(--line); background: rgba(6, 8, 12, .86); }
+header.top .brand { font-family: var(--display); font-weight: 700; font-size: 14px; letter-spacing: 0.1em; display: inline-flex; align-items: center; gap: 10px; color: var(--fg); text-decoration: none; }
 header.top .brand-txt { display: flex; flex-direction: column; gap: 2px; line-height: 1.05; }
 header.top .brand-txt small { font-family: var(--texto); font-weight: 500; font-size: 10.5px; letter-spacing: 0.03em; color: #8E99A6; }
-header.top a.brand { color: inherit; text-decoration: none; }
-header.top a.brand:hover .brand-txt { text-decoration: underline; text-underline-offset: 3px; }
+header.top a.brand:hover { color: var(--fg); }
 header.top .brand::before { content: ""; width:24px; height:24px; display:inline-block; flex:none; background:url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100' height='100' rx='22' fill='%2306080C'/%3E%3Cg transform='translate%289 7%29 scale%28.82%29'%3E%3Cdefs%3E%3Cmask id='i'%3E%3Crect width='100' height='100' fill='%23fff'/%3E%3Cpath d='M63 58.29 V55.07 Q63 54 58.71 54 H44.15 Q37 54 37 61.15 V72.85 Q37 80 44.15 80 H58.71 Q63 80 63 75.71 V67 H51' fill='none' stroke='%23000' stroke-width='7.5'/%3E%3C/mask%3E%3C/defs%3E%3Cpath d='M31 44 V31 A19 19 0 0 1 69 31 V44' fill='none' stroke='%23E8ECF1' stroke-width='9'/%3E%3Crect x='17' y='42' width='66' height='50' rx='13' fill='%239CC3E4' mask='url%28%23i%29'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat; }
 header.top nav { display: flex; flex-wrap: wrap; gap: 4px 18px; }
-header.top nav a { font-family: var(--texto); font-size: 14px; font-weight: 500; letter-spacing: 0; text-transform: none; text-decoration: none; color: var(--muted); padding: 4px 0; border-bottom: 2px solid transparent; }
+header.top nav a { font-family: var(--texto); font-size: 14px; font-weight: 500; text-decoration: none; color: var(--muted); padding: 4px 0; border-bottom: 2px solid transparent; }
 header.top nav a:hover { color: var(--fg); }
 header.top nav a[aria-current="page"] { color: var(--fg); border-bottom-color: var(--accent); }
-header.top .lang { margin-left: auto; font-family: var(--texto); font-weight: 600; font-size: 12px; letter-spacing: 0.04em; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); }
-header.top .lang:hover { border-color: var(--fg); color: var(--fg); }
-header.top .idiomas { margin-left: auto; display: inline-flex; flex-wrap: nowrap; gap: 6px; align-items: center; }
-header.top .idiomas .lang { margin-left: 0; }
-header.top .lang.actual { border-color: var(--accent); color: var(--accent); background: transparent; opacity: 1; cursor: default; }
-/* One look only since 17 Oct 2026: the day/night switch is gone. */
-header.top .tema { display: none !important; margin-left: 8px; width: 32px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
-header.top .tema svg { width: 15px; height: 15px; display: block; }
+/* The built bar. */
+header.top.g-barra { flex-wrap: nowrap; height: 56px; gap: 16px; }
+header.top.g-barra .brand { flex: 1 1 0; min-width: 0; }
+.g-productos { display: flex !important; flex: none; gap: 2px !important; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); }
+.g-productos .g-producto { appearance: none; display: inline-flex; align-items: center; min-height: 0; margin: 0; padding: 7px 18px !important; border: 0 !important; border-radius: 999px; background: transparent; color: var(--muted) !important; font: 500 13.5px/1.2 var(--texto); text-decoration: none; cursor: pointer; white-space: nowrap; }
+.g-productos .g-producto:hover { background: transparent; color: var(--fg) !important; }
+.g-productos .g-producto[aria-current] { background: var(--accent-suave); color: var(--fg) !important; }
+.g-productos .g-producto[aria-expanded="true"] { color: var(--fg) !important; background: #10161E; }
+.g-productos .g-producto:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
+.g-der { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 14px; position: relative; }
+.g-pulso { display: inline-flex; align-items: center; gap: 8px; min-width: 0; font: 500 13px/1.2 var(--texto); color: var(--muted); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-pulso:hover { color: var(--fg); }
+.g-pulso i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; }
+.g-pulso.atencion i { background: var(--aviso); }
+.g-pulso.atencion { color: var(--aviso); }
+.g-pulso span:empty, .g-pulso:has(span:empty) i { display: none; }
+.g-menu, .g-pop { position: absolute; top: calc(100% + 10px); z-index: 40; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 18px 40px rgba(0,0,0,.45); }
+.g-menu { right: 0; width: 240px; padding: 8px; display: grid; gap: 2px; }
+.g-menu[hidden], .g-pop[hidden] { display: none; }
+.g-menu a { display: block; padding: 8px 10px; border-radius: 8px; color: var(--fg); text-decoration: none; font-size: 14px; }
+.g-menu a:hover, .g-menu a:focus-visible { background: var(--campo); outline: none; }
+.g-menu a[aria-current="page"] { color: var(--accent); }
+.g-menu-t { padding: 8px 10px 4px; font: 500 12px var(--texto); color: var(--muted-2); }
+.g-menu .idiomas { display: flex; gap: 6px; padding: 2px 8px 6px; }
+.g-menu .lang { min-height: 30px; padding: 0 12px; font: 600 12px var(--texto); border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); }
+.g-menu .lang:hover { border-color: #3A4656; color: var(--fg); background: transparent; }
+.g-menu .lang.actual { border-color: var(--accent); color: var(--accent); opacity: 1; cursor: default; }
+.g-pop { top: 52px; width: 340px; padding: 14px 16px; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
+.g-pop b { color: var(--fg); font-weight: 600; }
+.g-pop p { margin: 6px 0 0; }
+.g-pop code { font-family: var(--mono); font-size: 12.5px; color: var(--fg); }
+/* The four parts of Radiografías. */
+.g-secciones { position: relative; z-index: 19; display: flex; align-items: center; gap: 28px; height: 40px; padding: 0 24px; border-bottom: 1px solid #121821; background: rgba(6, 8, 12, .6); font: 500 13.5px/1 var(--texto); }
+.g-secciones a { position: relative; color: var(--muted); text-decoration: none; padding: 12px 0; white-space: nowrap; }
+.g-secciones a:hover { color: var(--fg); }
+.g-secciones a[aria-current] { color: var(--fg); }
+.g-secciones a[aria-current]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+.g-secciones .g-sep { width: 1px; height: 16px; background: var(--line); margin: 0 -10px; }
+.g-secciones .g-hueco { flex: 1; }
+.g-secciones a:focus-visible, .g-paginas a:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); border-radius: 6px; }
+/* The pages of the part you are in, as small tabs. */
+.g-paginas { display: flex; flex-wrap: wrap; gap: 6px; max-width: 1180px; margin: 0 auto; padding: 18px 22px 0; }
+.g-paginas a { padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); text-decoration: none; font: 500 13px/1.2 var(--texto); }
+.g-paginas a:hover { color: var(--fg); border-color: #3A4656; }
+.g-paginas a[aria-current] { color: var(--fg); background: var(--accent-suave); border-color: var(--accent-suave); }
+@media (max-width: 900px) {
+  header.top.g-barra { height: auto; flex-wrap: wrap; padding: 10px 16px; row-gap: 10px; }
+  header.top.g-barra .brand { flex: 1 1 auto; }
+  .g-productos { order: 3; width: 100%; justify-content: center; }
+  .g-pulso span { display: none; }
+  .g-secciones { gap: 18px; padding: 0 16px; overflow-x: auto; }
+  .g-pop { top: auto; bottom: auto; }
+}
+@media print { .g-productos, .g-der, .g-pop, .g-secciones, .g-paginas { display: none !important; } header.top { border: 0; background: none; } }
 
 main { max-width: 1180px; margin: 0 auto; padding: 26px 22px 40px; }
 /* Titles that read as titles (the owner, 16 Oct 2026: «los títulos deben diferenciarse de los
@@ -129,18 +176,27 @@ td.empresa-col { color: var(--fg); }
    two lines ("17:15:1 / 2"), which reads like a broken page. Only the name column needs it. */
 td:first-child.mono, th:first-child { white-space: nowrap; word-break: normal; }
 
-/* Every button is the shared primary (diseno.css); a bare <button> gets it without a class. */
-button, .btn { background: var(--accent); color: var(--accent-fg); border: 1px solid var(--accent); border-radius: var(--r-pill); padding: 9px 18px; font-family: var(--texto); font-size: 14px; font-weight: 600; letter-spacing: 0; text-transform: none; cursor: pointer; text-decoration: none; display: inline-block; }
-button:hover, .btn:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: var(--accent-fg); }
-button.secondary, .btn.secondary { background: transparent; color: var(--fg); border: 1px solid var(--line); }
-button.secondary:hover, .btn.secondary:hover { background: transparent; border-color: var(--fg); color: var(--fg); }
-button.danger { background: var(--cortado); color: #fff; }
-/* Cortar en rojo, desbloquear en verde: el color dice lo que hace el botón antes de leerlo
-   (pedido del responsable, 21 sep 2026). Y los dos son botones de verdad, con su mano encima:
-   cuando «cortado» era un cartel apagado nadie adivinaba que se podía pulsar para deshacerlo. */
-/* Bloquear and Desbloquear share one outer size, whatever the word and the language, so the
-   column keeps its geometry (the responsible, 9 Oct 2026); the word sits centred inside. */
-button.cut, button.cortado { white-space: nowrap; cursor: pointer; width: 128px; padding-left: 0; padding-right: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; }
+/* Every button is one of the three families of diseno.css (18 Oct 2026, «Sistema de botones»): a
+   bare <button> is the principal, .secondary the secundario. The panel's own older names land on
+   them here, so every page gets the new buttons without rewriting its markup. */
+:where(button), .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; background: var(--accent); color: var(--accent-fg); border: 1px solid var(--accent); border-radius: var(--r-pill); padding: 0 18px; font: 600 14px/1.2 var(--texto); letter-spacing: 0; text-transform: none; cursor: pointer; text-decoration: none; white-space: nowrap; }
+:where(button):hover, .btn:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: var(--accent-fg); }
+button.secondary, .btn.secondary { background: var(--campo); color: var(--fg); border: 1px solid #2A3442; }
+button.secondary:hover, .btn.secondary:hover { background: #141B25; border-color: #3A4656; color: var(--fg); }
+:where(button):focus-visible, .btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+:where(button)[disabled] { opacity: .62; cursor: not-allowed; }
+button.danger { background: var(--campo); color: var(--alerta); border-color: #2A3442; }
+button.danger:hover { background: color-mix(in srgb, var(--alerta) 8%, var(--campo)); border-color: var(--alerta); color: var(--alerta); }
+/* «Deshacer» on the Rules pages: a secundario with the undo icon, 32 px in its row. */
+button.undo { min-height: 32px; padding: 0 14px; font-size: 13px; gap: 7px; }
+button.undo::before { content: ""; width: 16px; height: 16px; flex: none; background: var(--muted); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 4 2.5 7l3 3'/%3E%3Cpath d='M2.8 7H10a3.5 3.5 0 0 1 0 7H7'/%3E%3C/svg%3E") center/contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 4 2.5 7l3 3'/%3E%3Cpath d='M2.8 7H10a3.5 3.5 0 0 1 0 7H7'/%3E%3C/svg%3E") center/contain no-repeat; }
+/* Cortar and Desbloquear in the tables: the cut component of diseno.css (.boton.cortar /
+   .boton.deshacer), 32 px high inside a row. Until 18 Oct 2026 «Bloquear» was red and
+   «Desbloquear» green before anything happened; now red is only what is cut (the status beside it,
+   with its word and its dot) or what the pointer is about to cut. Both keep one outer size,
+   whatever the word and the language, so the column keeps its geometry (the responsible,
+   9 Oct 2026). */
+button.cut, button.cortado { width: 136px; min-height: 32px; padding: 0 10px; font-size: 13px; gap: 7px; overflow: hidden; text-overflow: ellipsis; }
 /* The button column: as narrow as its button, with the same margin on the right as the first
    column has on the left, and always in view — when a long row makes the table scroll sideways,
    it stays pinned to the right edge instead of being cut by it (the responsible, 9 Oct 2026). */
@@ -150,11 +206,8 @@ button.cut, button.cortado { white-space: nowrap; cursor: pointer; width: 128px;
 td.estado { width: 136px; }
 td.accion { width: 1%; white-space: nowrap; padding-right: 16px; position: sticky; right: 0; background: var(--card); }
 @media print { td.accion { position: static; } }
-button.cut { background: transparent; color: var(--cortado); border: 1px solid var(--cortado); }
-button.cut:hover { background: var(--cortado); color: #fff; border-color: var(--cortado); }
-button.cortado { background: transparent; color: var(--esperado); border: 1px solid var(--esperado); opacity: 1; }
-button.cortado:hover { background: var(--esperado); color: #fff; border-color: var(--esperado); }
-button.cortado[disabled] { cursor: progress; opacity: .6; }
+/* A status is a word with its dot, never colour alone. */
+.verdict.cortado::before, .verdict.levantado::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 7px; vertical-align: 1px; }
 
 p.vigilante { border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; background: var(--card); }
 p.vigilante b { font-size: 16px; }
@@ -392,15 +445,15 @@ ol.pasos-tel li.nota-tel { list-style: none; margin-left: -1.4em; color: var(--m
    antivirus» (the owner, 13 Oct 2026: «quiero que esté bien visible en la portada»). */
 .por-dentro-cta { display: flex; align-items: center; gap: 16px; margin: 14px 0 18px; padding: 16px 18px; border-radius: 14px; text-decoration: none; color: #e8f4fb; background: radial-gradient(120% 140% at 0% 0%, #12304a 0%, #0a1726 45%, #04070d 100%); border: 1px solid #1d3550; box-shadow: 0 10px 30px rgba(4,7,13,.25); transition: transform .15s ease, box-shadow .15s ease; }
 .por-dentro-cta:hover, .por-dentro-cta:focus-visible { transform: translateY(-1px); box-shadow: 0 14px 36px rgba(4,7,13,.35), 0 0 0 1px #6CCBA5 inset; }
-.por-dentro-cta .cta-globo { position: relative; flex: none; width: 58px; height: 58px; border-radius: 50%; background: radial-gradient(circle at 34% 32%, #9be3ff 0%, #2f86c0 30%, #0f3d63 58%, #04121f 80%); box-shadow: 0 0 22px rgba(63,224,197,.4), inset -10px -8px 16px rgba(0,0,0,.65); }
-.por-dentro-cta .cta-globo::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; border: 1px dashed rgba(63,224,197,.85); animation: cta-gira 14s linear infinite; }
+.por-dentro-cta .cta-globo { position: relative; flex: none; width: 58px; height: 58px; border-radius: 50%; background: radial-gradient(circle at 34% 32%, #9be3ff 0%, #2f86c0 30%, #0f3d63 58%, #04121f 80%); box-shadow: 0 0 22px rgba(156,195,228,.4), inset -10px -8px 16px rgba(0,0,0,.65); }
+.por-dentro-cta .cta-globo::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; border: 1px dashed rgba(156,195,228,.85); animation: cta-gira 14s linear infinite; }
 .por-dentro-cta .cta-texto { display: grid; gap: 4px; min-width: 0; }
 .por-dentro-cta strong { font-family: 'Schibsted Grotesk', 'Segoe UI', system-ui, sans-serif; font-weight: 500; font-size: 1.05rem; line-height: 1.3; color: #ffffff; }
 .por-dentro-cta .cta-texto > span { color: #a9c4d8; font-size: .92rem; }
 .por-dentro-cta .cta-flecha { margin-left: auto; font-size: 1.4rem; color: #6CCBA5; }
 @keyframes cta-gira { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .por-dentro-cta .cta-globo::after { animation: none; } }
-nav a.nav-destacado { color: #0b8a7c; font-weight: 600; }
+nav a.nav-destacado { color: var(--muted); }
 :root[data-tema="noche"] nav a.nav-destacado { color: var(--ok); }
 
 /* «GUARDIANA por dentro» (1.0.22): everything under body.universo, so no other page changes. */
@@ -408,8 +461,10 @@ nav a.nav-destacado { color: #0b8a7c; font-weight: 600; }
    theme too. The panel's own pages keep their light and night themes. */
 body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden; }
 
-/* 17 Oct 2026: the globe's instruments in the website's palette (steel, green, amber, the red of a cut). */
-.universo { --hud: #0C1118; --hud-line: #1E2631; --hud-fg: #E8ECF1; --hud-muted: #8E99A6; --shield: #6CCBA5; --out: #E0B66A; --in: #9CC3E4; --cut: #E07A6C; --undoc: #E0B66A; }
+/* 17 Oct 2026: the globe's instruments in the website's palette. 18 Oct 2026 (the approved redesign): neutrals and
+   steel everywhere; red only for what is cut, amber for what is worth a look, green only for what
+   is verified (and the globe has nothing verified to show). */
+.universo { --hud: #0C1118; --hud-line: #1E2631; --hud-fg: #E8ECF1; --hud-muted: #A9B3BE; --shield: #9CC3E4; --out: #DCE3EC; --in: #9CC3E4; --cut: #E07A6C; --undoc: #E0B66A; }
 
 /* «Sin sesión», the panel's own card, said in the middle of the picture and readable on the dark. */
 .universo #no-session { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 60; width: max-content; max-width: min(560px, calc(100vw - 32px)); margin: 0; background: rgba(6,12,22,.95); border-color: #172638; color: #d3e6f3; text-align: center; }
@@ -418,57 +473,33 @@ body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden
 
 .universo #no-session span { color: #7690a8; font-size: 14px; }
 
-.universo .stage { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr); background: #04070d; color: var(--hud-fg); font-family: 'Hanken Grotesk', 'Segoe UI', system-ui, sans-serif; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 
-.universo .barra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 14px; border-bottom: 1px solid var(--hud-line); background: rgba(8,16,27,.9); position: relative; z-index: 3; }
 
-.universo .marca { font-family: 'Schibsted Grotesk', 'Segoe UI', system-ui, sans-serif; font-size: 13px; letter-spacing: .04em; display: flex; align-items: center; gap: 10px; white-space: nowrap; }
 
-.universo .marca a { color: var(--hud-muted); text-decoration: none; font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 12px; border: 1px solid var(--hud-line); border-radius: 6px; padding: 4px 8px; }
 
-.universo .marca a:hover { color: var(--hud-fg); }
 
-.universo .chip-modo { font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; border: 1px solid var(--undoc); color: var(--undoc); border-radius: 4px; padding: 1px 6px; }
 
 /* «Antivirus: todo cortado»: while the cut is on, the bar says so, in the colour of what is cut. */
-.universo .chip-modo.corte { border-color: var(--cut); color: var(--cut); }
 
-.universo .pestanas { display: flex; gap: 4px; flex-wrap: wrap; }
 
-.universo .pestanas button, .universo .btn-hud { appearance: none; background: transparent; color: var(--hud-muted); border: 1px solid var(--hud-line); border-radius: 6px; padding: 5px 10px; font: 500 12.5px 'Hanken Grotesk', system-ui, sans-serif; cursor: pointer; }
 
-.universo .btn-hud { color: var(--hud-fg); font-size: 12px; }
 
-.universo .pestanas button[aria-pressed="true"] { color: #04070d; background: var(--shield); border-color: var(--shield); }
 
 /* The tab's key on a keyboard, before its name. */
-.universo .pestanas .tecla { opacity: .6; margin-right: 7px; }
 
 /* Map or globe, and «Todo · Datos · Antivirus»: small segmented switches (13 Oct 2026). */
-.universo .seg { display: inline-flex; border: 1px solid var(--hud-line); border-radius: 6px; overflow: hidden; }
 
-.universo .seg[hidden] { display: none; }
 
-.universo .seg button { appearance: none; background: transparent; color: var(--hud-muted); border: 0; border-right: 1px solid var(--hud-line); padding: 5px 10px; font: 500 12px 'Hanken Grotesk', system-ui, sans-serif; cursor: pointer; }
 
-.universo .seg button:last-child { border-right: 0; }
 
-.universo .seg button:hover { color: var(--hud-fg); }
 
-.universo .seg button[aria-pressed="true"] { color: var(--hud-fg); background: rgba(63,224,197,.16); box-shadow: inset 0 -2px 0 var(--shield); }
 
 /* Without the Fullscreen API (an iPhone), «Pantalla completa» leaves the picture alone with the bar. */
-.universo .stage.full .hud { display: none; }
 
-.universo .btn-hud.peligro { border-color: var(--cut); color: var(--cut); }
 
-.universo .btn-hud.peligro[aria-pressed="true"] { background: var(--cut); color: #04070d; }
 
-.universo .btn-hud[aria-pressed="true"]:not(.peligro) { border-color: var(--shield); color: var(--shield); }
 
-.universo .stage button:focus-visible, .universo .stage select:focus-visible, .universo .marca a:focus-visible { outline: 2px solid var(--shield); outline-offset: 2px; }
 
-.universo .controles { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 .universo .lienzo { position: relative; min-height: 0; }
 
@@ -479,39 +510,28 @@ body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden
 
 .universo .lienzo #gl { pointer-events: none; visibility: hidden; }
 
-.universo .leyenda { position: absolute; left: 14px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 2px 14px; font: 11px/1.6 'Hanken Grotesk', system-ui, sans-serif; color: var(--hud-muted); pointer-events: none; z-index: 2; }
 
-.universo .leyenda i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
 
-.universo .ayuda-vista { position: absolute; left: 14px; bottom: 30px; max-width: 460px; font: 12px/1.5 'Hanken Grotesk', system-ui, sans-serif; color: var(--hud-muted); pointer-events: none; z-index: 2; }
 
-.universo .telemetria { position: absolute; left: 14px; top: 12px; z-index: 2; pointer-events: none; font: 11px/1.65 'Hanken Grotesk', system-ui, sans-serif; color: var(--hud-fg); background: rgba(4,10,20,.58); border: 1px solid var(--hud-line); border-radius: 8px; padding: 8px 11px; max-width: min(360px, 70%); }
 
-.universo .telemetria b, .universo .datos b.s, .universo .datos .s { color: var(--shield); font-weight: 500; }
 
 /* The data's telemetry and the antivirus's, one under the other and apart. */
 .universo .tele { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--hud-line); }
 
 .universo .tele > b.s { letter-spacing: .06em; font-size: 10.5px; }
 
-.universo .telemetria .o, .universo .datos .o { color: var(--out); }
 
-.universo .telemetria .i, .universo .datos .i { color: var(--in); }
 
-.universo .telemetria .c, .universo .datos .c { color: var(--cut); }
 
-.universo .telemetria .t, .universo .datos .t { color: var(--hud-muted); }
 
-.universo .datos { position: absolute; right: 10px; top: 10px; bottom: 46px; width: 330px; z-index: 2; overflow-y: auto; overscroll-behavior: contain; background: rgba(4,10,20,.7); border: 1px solid var(--hud-line); border-radius: 10px; padding: 10px 12px 14px; font: 11.5px/1.5 'Hanken Grotesk', system-ui, sans-serif; color: var(--hud-fg); scrollbar-width: thin; scrollbar-color: var(--hud-line) transparent; }
 
-.universo .datos[hidden], .universo .telemetria[hidden] { display: none; }
 
 .universo .datos h4 { margin: 12px 0 6px; font: 600 11.5px var(--texto); letter-spacing: .05em; text-transform: uppercase; color: var(--hud-muted); display: flex; justify-content: space-between; gap: 6px; }
 
 .universo .datos h4:first-child { margin-top: 0; }
 .universo .datos .zonas { display: grid; gap: 1px; }
 .universo .datos .zona, .universo .datos .ciudad { appearance: none; width: 100%; background: transparent; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 4px; padding: 3px 4px; }
-.universo .datos .zona:hover, .universo .datos .ciudad:hover, .universo .datos .zona:focus-visible, .universo .datos .ciudad:focus-visible { background: rgba(63,224,197,.10); outline: none; }
+.universo .datos .zona:hover, .universo .datos .ciudad:hover, .universo .datos .zona:focus-visible, .universo .datos .ciudad:focus-visible { background: rgba(156,195,228,.10); outline: none; }
 .universo .datos .zona b, .universo .datos .ciudad b { font-weight: 500; font-variant-numeric: tabular-nums; }
 .universo .datos .zona-dentro { margin: 1px 0 8px 8px; border-left: 1px solid var(--hud-line); padding-left: 8px; }
 .universo .datos .lista-det { display: grid; gap: 2px; margin: 2px 0 6px; }
@@ -538,23 +558,14 @@ body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden
 
 .universo .datos .leyenda-j i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
 
-.universo .tip { position: absolute; z-index: 4; pointer-events: none; background: rgba(6,12,22,.95); border: 1px solid var(--hud-line); border-radius: 8px; padding: 10px 12px; font: 12.5px/1.5 'Hanken Grotesk', system-ui, sans-serif; color: var(--hud-fg); max-width: 320px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
 
-.universo .tip .mono { font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 12px; word-break: break-all; }
 
-.universo .tip .estado { display: inline-block; margin-top: 4px; font: 600 12px var(--texto); letter-spacing: .05em; text-transform: uppercase; }
 
-.universo .tip .pasa { color: var(--shield); }
 
-.universo .tip .corta { color: var(--cut); }
 
-.universo .tip .nodoc { color: var(--undoc); }
 
-.universo .tip .t { color: var(--hud-muted); }
 
-.universo .aviso { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 5; background: rgba(6,12,22,.96); border: 1px solid var(--hud-line); color: var(--hud-fg); border-radius: 8px; padding: 9px 14px; font: 12.5px/1.5 'Hanken Grotesk', system-ui, sans-serif; width: max-content; max-width: min(620px, 92%); text-align: center; }
 
-.universo .aviso.pide { border-color: var(--cut); }
 
 .universo .aviso-botones { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
 
@@ -567,7 +578,7 @@ body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden
 .universo .ubicacion input:focus { outline: 2px solid var(--shield); outline-offset: 2px; }
 .universo .ubicacion-resultados { display: grid; gap: 4px; margin-top: 8px; }
 .universo .ubicacion-resultados button { appearance: none; width: 100%; padding: 9px 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--hud-fg); text-align: left; cursor: pointer; }
-.universo .ubicacion-resultados button:hover, .universo .ubicacion-resultados button:focus-visible { border-color: var(--shield); background: rgba(63,224,197,.1); outline: 0; }
+.universo .ubicacion-resultados button:hover, .universo .ubicacion-resultados button:focus-visible { border-color: var(--shield); background: rgba(156,195,228,.1); outline: 0; }
 .universo .ubicacion-resultados small { display: block; margin-top: 2px; color: var(--hud-muted); }
 
 .universo .vacio { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4; width: max-content; max-width: min(520px, 90%); background: rgba(6,12,22,.92); border: 1px solid var(--hud-line); border-radius: 12px; padding: 18px 20px; text-align: center; }
@@ -576,7 +587,6 @@ body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden
 
 .universo .vacio p { margin: 0 0 12px; color: var(--hud-muted); font-size: 14px; }
 
-.universo .vacio .btn-hud { border-color: var(--shield); color: var(--shield); padding: 8px 14px; }
 
 .universo .vigilancia-off { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 3; font: 500 11px/1.5 'Hanken Grotesk', system-ui, sans-serif; color: var(--cut); border: 1px solid var(--cut); border-radius: 6px; padding: 3px 8px; background: rgba(6,12,22,.85); width: max-content; max-width: min(560px, 90%); text-align: center; }
 
@@ -590,201 +600,88 @@ body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden
 @media (prefers-reduced-motion: reduce) { .universo .vacio h2.midiendo::after { animation: none; width: auto; } }
 
 /* With «Datos en vivo» open beside the picture, the notices are centred on the picture. */
-.universo .lienzo.con-datos .vacio, .universo .lienzo.con-datos .vigilancia-off, .universo .lienzo.con-datos .aviso { left: calc(50% - 175px); }
 
-.universo .lienzo.con-datos .aviso { max-width: min(620px, calc(100% - 380px)); }
 
-.universo .lienzo.con-datos .vacio { max-width: min(520px, calc(100% - 380px)); }
 
-.universo .lienzo.con-datos .vigilancia-off { max-width: min(560px, calc(100% - 380px)); }
 
 /* The cut's button, small and second to the figures, at the foot of the antivirus's telemetry. */
-.universo .datos .corte-av { margin: 8px 0 0; }
 
-.universo .datos .corte-av button { font-size: 11px; padding: 4px 8px; color: var(--hud-muted); border-color: var(--hud-line); white-space: normal; text-align: left; text-transform: none; letter-spacing: 0; box-shadow: none; }
 
-.universo .datos .corte-av button:hover { color: var(--cut); border-color: var(--cut); }
 
-.universo .datos .corte-av button.quitar { color: var(--shield); border-color: var(--shield); }
 
-.universo .datos #datos-resto > h4:first-child { margin-top: 12px; }
 
-.universo .hud { position: relative; display: grid; grid-template-columns: 2fr 1fr 1fr 0.8fr 0.8fr; border-top: 1px solid var(--hud-line); background: var(--hud); transition: height .25s ease; }
 /* The band opens upwards (the owner, 15 Oct 2026: «el margen inferior debe poder desplegarse hacia
    arriba y ver todos los datos»): the handle on its top edge, and once open every column shows
    everything it has, scrolling on its own, with a taller chart. */
-.universo .hud-asa { position: absolute; left: 50%; top: -1px; transform: translate(-50%, -100%); z-index: 3; display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px 3px; border: 1px solid var(--hud-line); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--hud); color: var(--hud-muted); font: 600 11.5px var(--texto); letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
-.universo .hud-asa:hover { color: var(--hud-fg); }
-.universo .hud-asa i { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 6px solid currentColor; transition: transform .2s; }
-.universo .hud.amplio .hud-asa i { transform: rotate(180deg); }
-.universo .hud.amplio { height: min(62vh, 560px); grid-template-columns: 2.2fr 1.4fr 1fr 0.7fr 1fr; }
-.universo .hud.amplio > div { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--hud-line) transparent; padding: 14px 16px; gap: 10px; }
-.universo .hud.amplio h3 { position: sticky; top: 0; background: var(--hud); padding-bottom: 6px; z-index: 1; }
-.universo .hud.amplio .registro { height: auto; overflow: visible; font-size: 11.5px; line-height: 1.7; }
-.universo .hud.amplio .registro li { white-space: normal; overflow: visible; text-overflow: clip; padding: 3px 0; border-bottom: 1px solid var(--hud-line); }
-.universo .hud.amplio canvas { height: 180px; }
-.universo .hud.amplio .barras { gap: 7px; }
-.universo .hud.amplio .barras div { grid-template-columns: 120px 1fr auto auto; }
-.universo .hud.amplio .grande { font-size: 34px; }
-.universo .hud.amplio .top-ahora { gap: 5px; }
-.universo .hud.amplio .top-ahora li { padding: 3px 4px; border-bottom: 1px solid var(--hud-line); }
 /* Open, the band first shows the technical table of every destination (the owner, 15 Oct 2026:
    «datos reales e interesantes para el cliente que quiere saber muchos datos técnicos y
    descargar»), with CSV and JSON of exactly what is on screen; the five panels sit under it. */
-.universo .hud.amplio { grid-template-rows: minmax(0, 1.25fr) minmax(0, 1fr); }
-.universo .hud-tabla { grid-column: 1 / -1; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 0; padding: 0 !important; border-bottom: 1px solid var(--hud-line); }
-.universo .hud-tabla[hidden] { display: none; }
-.universo .ht-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px 8px; border-bottom: 1px solid var(--hud-line); position: static !important; }
-.universo .ht-acciones { display: flex; gap: 8px; align-items: center; }
-.universo .ht-busca { width: 200px; background: transparent; color: var(--hud-fg); border: 1px solid var(--hud-line); border-radius: 6px; padding: 5px 9px; font: 12px 'Hanken Grotesk', system-ui, sans-serif; }
-.universo .ht-busca:focus { outline: none; border-color: var(--shield); }
 /* The figures strip, as the network monitors people trust show them (Little Snitch, GlassWire,
    Cloudflare Radar): the whole picture in five numbers before the rows. */
-.universo .ht-kpi { display: flex; gap: 18px; flex-wrap: wrap; }
-.universo .ht-kpi div { display: grid; gap: 1px; }
-.universo .ht-kpi b { font: 600 16px 'Hanken Grotesk', system-ui, sans-serif; font-variant-numeric: tabular-nums; color: var(--hud-fg); }
-.universo .ht-kpi b.o { color: var(--out); } .universo .ht-kpi b.i { color: var(--in); } .universo .ht-kpi b.c { color: var(--cut); }
-.universo .ht-kpi span { font: 600 11px var(--texto); letter-spacing: .05em; text-transform: uppercase; color: var(--hud-muted); }
-.universo table.ht th[data-orden] { cursor: pointer; user-select: none; }
-.universo table.ht th[data-orden]:hover { color: var(--hud-fg); }
-.universo table.ht th[aria-sort="descending"]::after { content: " ▾"; color: var(--shield); }
-.universo table.ht th[aria-sort="ascending"]::after { content: " ▴"; color: var(--shield); }
-.universo .ht-scroll { overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--hud-line) transparent; }
-.universo table.ht { width: 100%; border-collapse: collapse; font: 11.5px/1.4 'Hanken Grotesk', system-ui, sans-serif; color: var(--hud-fg); background: transparent; font-variant-numeric: tabular-nums; }
-.universo table.ht th { position: sticky; top: 0; z-index: 1; background: var(--hud); color: var(--hud-muted); font-weight: 500; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--hud-line); white-space: nowrap; }
-.universo table.ht td { padding: 5px 10px; border-bottom: 1px solid color-mix(in srgb, var(--hud-line) 60%, transparent); white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
-.universo table.ht th.n, .universo table.ht td.n { text-align: right; }
-.universo table.ht tr.enlace-fila { cursor: pointer; }
-.universo table.ht tr.enlace-fila:hover td { background: color-mix(in srgb, var(--shield) 8%, transparent); }
-.universo table.ht td.o { color: var(--out); } .universo table.ht td.i { color: var(--in); } .universo table.ht td.c { color: var(--cut); } .universo table.ht td.t { color: var(--hud-muted); }
-.universo table.ht .chip-ht { display: inline-block; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; border: 1px solid currentColor; border-radius: 4px; padding: 0 5px; }
 @media (min-width: 1700px) { .universo table.ht { font-size: 13px; } .universo table.ht th { font-size: 11.5px; } }
 /* A big monitor (a friend's, 15 Oct 2026) gets a taller band and larger type from the start. */
 @media (min-width: 1700px) {
-  .universo .hud > div { padding: 14px 18px; gap: 8px; }
-  .universo .hud h3 { font-size: 12px; }
-  .universo .registro { height: 150px; font-size: 12.5px; line-height: 1.6; }
-  .universo .hud canvas { height: 120px; }
-  .universo .barras, .universo .top-ahora, .universo .pequeno { font-size: 12.5px; }
-  .universo .barras div { grid-template-columns: 110px 1fr auto; }
-  .universo .grande { font-size: 32px; }
-  .universo .hud.amplio { height: min(60vh, 760px); }
-  .universo .hud.amplio canvas { height: 240px; }
 }
 @media (min-width: 2400px) {
-  .universo .hud > div { padding: 18px 22px; }
-  .universo .hud h3 { font-size: 13px; }
-  .universo .registro { height: 190px; font-size: 14px; }
-  .universo .hud canvas { height: 150px; }
-  .universo .barras, .universo .top-ahora, .universo .pequeno { font-size: 14px; }
-  .universo .grande { font-size: 40px; }
 }
 
-.universo .hud > div { padding: 10px 12px; border-right: 1px solid var(--hud-line); min-width: 0; display: grid; align-content: start; gap: 6px; }
 
-.universo .hud > div:last-child { border-right: 0; }
 /* The bottom band keeps one height whatever it lists (the owner, 16 Oct 2026: switching Todo /
    Datos / Antivirus changed the globe's size, because the band grew or shrank with its lists and
    the picture above it with it). Unfolded, it scrolls as before. */
-.universo .hud:not(.amplio) > div { height: 132px; overflow: hidden; }
 @media (min-width: 1700px) { .universo .hud:not(.amplio) > div { height: 206px; } }
 @media (min-width: 2400px) { .universo .hud:not(.amplio) > div { height: 256px; } }
 
-.universo .hud h3 { margin: 0; font: 600 11.5px var(--texto); letter-spacing: .05em; text-transform: uppercase; color: var(--hud-muted); display: flex; justify-content: space-between; gap: 8px; }
 
-.universo .hud h3 span { color: var(--shield); }
 
-.universo .registro { list-style: none; margin: 0; padding: 0; font: 11px/1.55 'Hanken Grotesk', system-ui, sans-serif; color: var(--hud-fg); height: 86px; overflow: hidden; }
 
-.universo .registro li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.universo .registro .t { color: var(--hud-muted); }
 
-.universo .registro .c { color: var(--cut); }
 
-.universo .registro .o { color: var(--out); }
 
-.universo .registro .n { color: var(--shield); }
 
-.universo .hud canvas { width: 100%; height: 70px; display: block; }
 
-.universo .barras { display: grid; gap: 5px; font: 11px 'Hanken Grotesk', system-ui, sans-serif; }
 
-.universo .barras div { display: grid; grid-template-columns: 82px 1fr auto; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
 
-.universo .barras div span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.universo .barras s { display: block; height: 6px; border-radius: 3px; background: var(--out); text-decoration: none; }
 
-.universo .grande { font: 600 24px 'Hanken Grotesk', system-ui, sans-serif; font-variant-numeric: tabular-nums; }
 
-.universo .pequeno { font: 11px/1.4 'Hanken Grotesk', system-ui, sans-serif; color: var(--hud-muted); }
 
 /* Where the computer is: detected from the system, said and not chosen. */
-.universo .lugar-yo { font: 12px 'Hanken Grotesk', system-ui, sans-serif; color: var(--hud-muted); white-space: nowrap; }
 
-.universo .lugar-yo b { color: var(--hud-fg); font-weight: 500; }
 /* On a VPN the measured place is the VPN's: the chip says so, with the way to fix it on hover. */
-.universo .chip-vpn { font: 600 12px var(--texto); letter-spacing: .05em; text-transform: uppercase; color: var(--undoc); border: 1px solid var(--undoc); border-radius: 6px; padding: 3px 8px; white-space: nowrap; cursor: help; }
 
-.universo .hud #hud-doc { font-size: 10.5px; line-height: 1.35; }
 @media (max-width: 900px) {
 
-.universo .hud { grid-template-columns: 1fr 1fr; }
 
-.universo .hud > div { border-bottom: 1px solid var(--hud-line); }
 
-.universo .hud > div:first-child { grid-column: 1 / -1; }
 
-.universo .ayuda-vista { display: none; }
 
 }
 @media (max-width: 700px) {
 
-.universo .datos { left: 8px; right: 8px; width: auto; }
 
 /* On a phone «Datos en vivo» covers the picture; what is said on the picture waits behind it. */
-.universo .datos:not([hidden]) ~ .vacio, .universo .datos:not([hidden]) ~ .vigilancia-off { display: none; }
 
-.universo .controles { margin-left: 0; }
 
 /* A phone: the title may wrap; the two tabs and the two switches share the rows (the tabs
    without their keys); the deck below keeps what reads at a glance, so the picture gets the
    room. The side panel «Datos en vivo» still has everything. */
-.universo .barra { padding: 8px 10px; gap: 6px 10px; }
 
-.universo .marca { white-space: normal; flex-wrap: wrap; gap: 6px 10px; font-size: 12px; }
 
-.universo .pestanas { flex: 0 0 auto; min-width: 0; flex-wrap: nowrap; }
 
-.universo .pestanas::-webkit-scrollbar { display: none; }
 
-.universo .pestanas button { flex: 0 0 auto; }
 
-.universo .pestanas .tecla { display: none; }
 
-.universo .pestanas button, .universo .controles .btn-hud, .universo .seg button { padding: 5px 8px; font-size: 12px; }
 
-.universo .hud > div:nth-child(3), .universo .hud > div:nth-child(5) { display: none; }
 
-.universo .hud > div { padding: 8px 10px; }
 
-.universo .registro { height: 36px; }
 
-.universo .hud canvas { height: 40px; }
 
-.universo .leyenda { left: 10px; bottom: 6px; gap: 0 10px; font-size: 10px; }
 
-.universo .ayuda-vista { left: 10px; right: 10px; bottom: 60px; font-size: 11.5px; }
  }
 
-.universo .leyenda i.ley-o { background: var(--out); } .universo .leyenda i.ley-i { background: var(--in); } .universo .leyenda i.ley-c { background: var(--cut); } .universo .leyenda i.ley-n { background: var(--undoc); }
-.universo .hud h3 .h3-titulo { color: inherit; }
 .universo .datos .barrita.gruesa { height: 8px; }
-.universo .tip .arriba4 { margin-top: 4px; }
-.universo .barra button, .universo .vacio button, .universo .aviso button { text-transform: none; letter-spacing: 0; box-shadow: none; }
-.universo .ayuda-vista { transition: opacity .8s ease; }
-.universo .ayuda-vista.oculta { opacity: 0; }
 
 /* «Lo que dicen sus términos» in each antivirus card (13 Oct 2026). */
 .av-terminos { margin: 10px 0 12px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
@@ -795,7 +692,6 @@ body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden
 .av-terminos p { margin: 6px 0; overflow-wrap: anywhere; }
 
 /* «Retrato»: five real minutes, kept by the person (13 Oct 2026). */
-.universo .btn-hud.graba[aria-pressed="true"] { border-color: var(--cut); color: var(--cut); }
 .universo .retrato { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 6; width: min(520px, calc(100% - 24px)); background: rgba(6,12,22,.97); border: 1px solid var(--shield); border-radius: 12px; padding: 18px 20px; font: 13px/1.55 'Hanken Grotesk', system-ui, sans-serif; color: var(--hud-fg); text-align: center; }
 .universo .retrato[hidden] { display: none; }
 .universo .retrato h2 { margin: 0 0 8px; font: 500 16px 'Schibsted Grotesk', system-ui, sans-serif; }
@@ -804,83 +700,37 @@ body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden
 .universo .retrato .aviso-botones { flex-wrap: wrap; }
 .universo .retrato button:disabled { opacity: .45; cursor: default; }
 /* Everything on «Por dentro» is live: a fixed sign in the bar instead of a button (13 Oct 2026). */
-.universo .en-vivo { display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--texto); letter-spacing: .05em; text-transform: uppercase; color: var(--shield); }
-.universo .en-vivo i { width: 8px; height: 8px; border-radius: 50%; background: var(--shield); box-shadow: 0 0 8px var(--shield); animation: pd-vivo 2s ease-in-out infinite; }
-@keyframes pd-vivo { 50% { opacity: .35; } }
-@media (prefers-reduced-motion: reduce) { .universo .en-vivo i { animation: none; } }
 /* The side panel closes with its ×, and the tab on the edge brings it back. */
-.universo .datos { padding-top: 26px; }
-.universo .cerrar-datos { position: absolute; right: 6px; top: 4px; appearance: none; background: transparent; border: 0; color: var(--hud-muted); font: 400 20px/1 'Hanken Grotesk', system-ui, sans-serif; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; }
-.universo .cerrar-datos:hover { color: var(--hud-fg); background: rgba(118,144,168,.14); }
-.universo .abrir-datos { position: absolute; right: 0; top: 14px; z-index: 3; appearance: none; background: rgba(4,10,20,.85); border: 1px solid var(--hud-line); border-right: 0; border-radius: 8px 0 0 8px; color: var(--hud-fg); padding: 7px 10px; font: 500 11.5px 'Hanken Grotesk', system-ui, sans-serif; cursor: pointer; }
-.universo .abrir-datos[hidden] { display: none; }
-.universo .abrir-datos:hover { color: var(--shield); }
 /* Zoom: + − and back to the start, like a map application. */
-.universo .zoom { position: absolute; right: 14px; bottom: 16px; z-index: 3; display: grid; border: 1px solid var(--hud-line); border-radius: 8px; overflow: hidden; background: rgba(4,10,20,.85); }
-.universo .zoom[hidden] { display: none; }
-.universo .zoom button { appearance: none; background: transparent; border: 0; border-bottom: 1px solid var(--hud-line); color: var(--hud-fg); width: 36px; height: 34px; font: 500 18px/1 'Hanken Grotesk', system-ui, sans-serif; cursor: pointer; }
-.universo .zoom button:last-child { border-bottom: 0; font-size: 15px; }
-.universo .zoom button:hover { background: rgba(63,224,197,.16); color: var(--shield); }
-.universo .lienzo.con-datos .zoom { right: 352px; }
 /* The card a click opens: what the panel knows, links to say more, and the one button that cuts. */
-.universo .detalle { position: absolute; left: 14px; top: 12px; z-index: 6; width: min(360px, calc(100% - 28px)); max-height: calc(100% - 70px); overflow-y: auto; overscroll-behavior: contain; background: rgba(6,12,22,.97); border: 1px solid var(--shield); border-radius: 10px; padding: 14px 14px 12px; font: 12.5px/1.55 'Hanken Grotesk', system-ui, sans-serif; color: var(--hud-fg); box-shadow: 0 12px 40px rgba(0,0,0,.55); scrollbar-width: thin; scrollbar-color: var(--hud-line) transparent; }
-.universo .detalle[hidden] { display: none; }
-.universo .detalle .cuerpo { padding-right: 22px; }
-.universo .detalle .mono { font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 12px; word-break: break-all; }
-.universo .detalle .t { color: var(--hud-muted); }
-.universo .detalle .estado { display: inline-block; margin-top: 4px; font: 600 12px var(--texto); letter-spacing: .05em; text-transform: uppercase; }
-.universo .detalle .pasa { color: var(--shield); } .universo .detalle .corta, .universo .detalle .c { color: var(--cut); } .universo .detalle .nodoc { color: var(--undoc); } .universo .detalle .o { color: var(--out); }
-.universo .detalle p { margin: 8px 0 0; font-size: 12px; }
-.universo .detalle h4 { margin: 12px 0 6px; font: 600 11.5px var(--texto); letter-spacing: .05em; text-transform: uppercase; color: var(--hud-muted); }
-.universo .detalle .acciones-det { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.universo .detalle .acciones-det p { margin: 0; }
-.universo .detalle .enlaces-det { display: grid; gap: 4px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--hud-line); }
-.universo .detalle .enlaces-det a { color: var(--shield); text-decoration: none; font-size: 12.5px; }
-.universo .detalle .enlaces-det a:hover { text-decoration: underline; text-underline-offset: 2px; }
-.universo .detalle .lista-det { display: grid; gap: 2px; }
-.universo .fila-det { appearance: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; width: 100%; text-align: left; background: transparent; border: 0; border-radius: 4px; padding: 3px 6px; color: var(--hud-fg); font: 11.5px/1.45 'Hanken Grotesk', system-ui, sans-serif; cursor: pointer; }
-.universo .fila-det span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.universo .fila-det:hover, .universo .fila-det:focus-visible { background: rgba(63,224,197,.12); }
 /* Rows of the side panel and the deck open the same card. */
-.universo .enlace-fila { cursor: pointer; border-radius: 4px; }
-.universo .enlace-fila:hover, .universo .enlace-fila:focus-visible { background: rgba(63,224,197,.10); outline: none; }
-.universo .tip .clic { margin-top: 6px; font-size: 11px; }
 /* The antivirus, in full. */
 .universo .datos .sub-av { margin: 9px 0 3px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--hud-muted); }
 .universo .datos .nd { color: var(--undoc); }
 .universo .datos .bloques { font-size: 13px; letter-spacing: 1px; color: var(--shield); white-space: nowrap; overflow: hidden; }
 /* «Lo que más envía ahora», in the deck. */
-.universo .top-ahora { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font: 11px/1.45 'Hanken Grotesk', system-ui, sans-serif; }
-.universo .top-ahora li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding: 1px 4px; }
-.universo .top-ahora li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.universo .top-ahora .o { color: var(--out); }
-.universo .top-ahora .t { color: var(--hud-muted); }
 @media (max-width: 700px) {
-.universo .lienzo.con-datos .zoom { right: 14px; }
-.universo .zoom { bottom: 60px; }
-.universo .detalle { max-height: calc(100% - 24px); }
 }
 /* «Programas»: the activity explorer (13 Oct 2026), designed with Grok and ChatGPT. One row per
    program, antivirus first; a click unfolds its destinations; colour only says state. */
 .universo .explorador { position: absolute; inset: 0; z-index: 2; overflow-y: auto; overscroll-behavior: contain; padding: 18px 24px 24px; background: #04070d; color: #e9f2f7; font: 13px/1.45 'Hanken Grotesk', system-ui, sans-serif; scrollbar-width: thin; scrollbar-color: var(--hud-line) transparent; }
 .universo .explorador[hidden] { display: none; }
-.universo .lienzo.con-datos .explorador { right: 350px; }
 .universo .stage[data-vista="programas"] .leyenda, .universo .stage[data-vista="programas"] .ayuda-vista { display: none; }
-.universo .explorador .t { color: #92a6b7; }
+.universo .explorador .t { color: #A9B3BE; }
 .universo .explorador .mono { font-family: 'Hanken Grotesk', system-ui, sans-serif; font-size: 12px; }
-.universo .explorador .o { color: var(--shield); } .universo .explorador .i { color: #80add6; } .universo .explorador .c { color: var(--cut); } .universo .explorador .nd { color: var(--out); }
+.universo .explorador .o { color: var(--shield); } .universo .explorador .i { color: #9CC3E4; } .universo .explorador .c { color: var(--cut); } .universo .explorador .nd { color: var(--out); }
 .universo .explorador .num { font-family: 'Hanken Grotesk', system-ui, sans-serif; font-variant-numeric: tabular-nums; font-size: 12.5px; white-space: nowrap; }
 .universo .ex-cab { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
 .universo .ex-cab h2 { margin: 0; font: 600 22px/1.2 'Hanken Grotesk', system-ui, sans-serif; color: #e9f2f7; }
 .universo .ex-cab p { margin: 4px 0 0; font-size: 12px; }
 .universo .ex-ind { display: grid; justify-items: end; gap: 2px; font: 12px 'Hanken Grotesk', system-ui, sans-serif; }
-.universo .ex-herr { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin: 16px 0 10px; font-size: 12px; color: #92a6b7; }
+.universo .ex-herr { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin: 16px 0 10px; font-size: 12px; color: #A9B3BE; }
 .universo .ex-herr select, .universo .ex-herr input { background: #0b111b; color: #e9f2f7; border: 1px solid #1f2b3b; border-radius: 6px; padding: 6px 9px; font: 12.5px 'Hanken Grotesk', system-ui, sans-serif; }
 .universo .ex-herr input { flex: 1 1 220px; max-width: 360px; }
 .universo .ex-herr select:focus-visible, .universo .ex-herr input:focus-visible { outline: 2px solid var(--shield); outline-offset: 1px; }
 .universo .ex-cols, .universo .ex-fila { display: grid; grid-template-columns: minmax(170px, 1.7fr) minmax(150px, 2fr) 120px 96px minmax(90px, .9fr) 128px 22px; gap: 14px; align-items: center; }
 .universo .ex-cols { padding: 0 12px 6px; font: 600 11.5px var(--texto); letter-spacing: .05em; text-transform: uppercase; border-bottom: 1px solid #1f2b3b; }
-.universo .ex-seccion { margin: 16px 0 6px; padding: 0 12px; font: 600 11px 'Hanken Grotesk', system-ui, sans-serif; letter-spacing: .8px; text-transform: uppercase; color: #92a6b7; }
+.universo .ex-seccion { margin: 16px 0 6px; padding: 0 12px; font: 600 11px 'Hanken Grotesk', system-ui, sans-serif; letter-spacing: .8px; text-transform: uppercase; color: #A9B3BE; }
 .universo .ex-seccion span { color: #e9f2f7; margin-left: 4px; }
 .universo .ex-prog { background: #0b111b; border: 1px solid #1f2b3b; border-radius: 8px; margin-bottom: 6px; overflow: hidden; }
 .universo .ex-prog.cortado { border-color: rgba(255,107,122,.55); }
@@ -892,16 +742,14 @@ body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden
 .universo .ex-nombre b { font-size: 14px; font-weight: 600; color: #e9f2f7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .universo .ex-nombre .t { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .universo .ex-nombre .pto { flex: 0 0 auto; width: 9px; height: 9px; margin-top: 5px; border-radius: 50%; background: var(--c); opacity: .55; }
-.universo .ex-nombre .pto.vivo { opacity: 1; box-shadow: 0 0 0 3px rgba(63,224,197,.18); }
+.universo .ex-nombre .pto.vivo { opacity: 1; box-shadow: 0 0 0 3px rgba(156,195,228,.18); }
 .universo .ex-destinos { display: grid; gap: 1px; min-width: 0; }
 .universo .ex-destinos > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .universo .ex-destinos .t { font-size: 11px; }
 .universo .ex-env { display: grid; gap: 5px; }
-.universo .barra-env { height: 4px; border-radius: 2px; background: rgba(118,144,168,.16); overflow: hidden; }
-.universo .barra-env i { display: block; height: 100%; background: var(--shield); border-radius: 2px; }
 .universo .ex-cortes { display: grid; gap: 2px; font: 11.5px 'Hanken Grotesk', system-ui, sans-serif; }
 .universo .ex-5m canvas { width: 120px; height: 28px; display: block; }
-.universo .ex-flecha { color: #92a6b7; font-size: 18px; transition: transform .16s ease; justify-self: end; }
+.universo .ex-flecha { color: #A9B3BE; font-size: 18px; transition: transform .16s ease; justify-self: end; }
 .universo .ex-prog.abierto .ex-flecha { transform: rotate(90deg); color: var(--shield); }
 .universo .explorador .chip { display: inline-block; border: 1px solid var(--shield); color: var(--shield); border-radius: 3px; padding: 0 5px; font: 600 10.5px var(--texto); letter-spacing: .05em; text-transform: uppercase; margin-right: 4px; }
 .universo .explorador .chip.c { border-color: var(--cut); color: var(--cut); } .universo .explorador .chip.nd { border-color: var(--out); color: var(--out); }
@@ -924,7 +772,6 @@ body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden
 }
 @media (max-width: 700px) {
 .universo .explorador { padding: 12px 10px 18px; }
-.universo .lienzo.con-datos .explorador { right: 0; }
 .universo .ex-cab h2 { font-size: 18px; }
 .universo .ex-ind { justify-items: start; }
 .universo .ex-cols { display: none; }
@@ -1073,3 +920,285 @@ body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden
 @media(prefers-reduced-motion:reduce){.rd-lista.sube,.rd-actual.entra,.rd-escaner i.pulsa,.rd-barra li.ahora i,.rd-cuenta.dada b{animation:none}}
 .rv-escena[hidden]{display:none}
 .rd-fila small{font-weight:400}
+
+/* ===== «Globo en directo», redesigned (18 Oct 2026, approved by the owner) =====================
+   On opening, only the Earth under the slim bar. Hover a pin: a small card. Click: the inspector
+   slides in from the right (400 px) and the globe, dimmed a little, moves to the left. The live log
+   waits in a 48 px rail at the foot and opens into a tray of about 280 px. Everything else the page
+   had lives under «Opciones», in the inspector or in the tray. */
+body.universo { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+.universo header.top, .universo .g-secciones { flex: none; }
+.universo .stage { position: relative; flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); background: #06080C; color: var(--hud-fg); font-family: var(--texto); }
+.universo .stage:fullscreen, .universo .stage.full { position: fixed; inset: 0; z-index: 50; }
+.universo .lienzo { position: relative; min-height: 0; overflow: hidden; }
+.universo .lienzo #gl { transition: filter .25s ease; }
+.universo .lienzo.con-inspector #gl { filter: brightness(.82); }
+.universo .lienzo.con-inspector #cv { opacity: .96; }
+.universo .stage button:focus-visible, .universo .globo-herr button:focus-visible { outline: none; box-shadow: 0 0 0 2px #06080C, 0 0 0 4px var(--accent); }
+
+/* The globe's own controls, at the right of the row of sections. */
+.globo-herr { position: relative; display: flex; align-items: center; gap: 10px; }
+.globo-herr .chip-modo, .globo-herr .chip-vpn { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 var(--texto); border: 1px solid currentColor; border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+.globo-herr .chip-modo::before, .globo-herr .chip-vpn::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.globo-herr .chip-modo { color: var(--alerta); }
+.globo-herr .chip-vpn { color: var(--aviso); cursor: help; }
+.globo-herr [hidden] { display: none !important; }
+.opciones-btn { appearance: none; display: inline-flex; align-items: center; gap: 7px; min-height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: rgba(6, 8, 12, .7); color: var(--muted); font: 500 12.5px/1 var(--texto); cursor: pointer; }
+.opciones-btn:hover, .opciones-btn[aria-expanded="true"] { color: var(--fg); border-color: #3A4656; background: rgba(6, 8, 12, .7); }
+.opciones-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+.opciones { position: absolute; right: 0; top: calc(100% + 10px); z-index: 45; width: 340px; max-height: calc(100vh - 140px); overflow-y: auto; padding: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 18px 40px rgba(0, 0, 0, .45); font-size: 13px; color: var(--muted); }
+.opciones[hidden] { display: none; }
+.opciones .op-grupo { padding: 8px 10px 12px; border-bottom: 1px solid #151C25; display: grid; gap: 8px; }
+.opciones .op-grupo:last-child { border-bottom: 0; }
+.opciones .op-t { font: 500 12px var(--texto); color: var(--muted-2); }
+.opciones .seg { display: inline-flex; width: max-content; padding: 3px; gap: 2px; border: 1px solid var(--line); border-radius: 999px; }
+.opciones .seg button { appearance: none; min-height: 0; padding: 5px 12px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: 500 12.5px var(--texto); cursor: pointer; }
+.opciones .seg button:hover { color: var(--fg); background: transparent; }
+.opciones .seg button[aria-pressed="true"] { background: var(--accent-suave); color: var(--fg); }
+.opciones .seg .tecla { display: none; }
+.opciones .lugar-yo { font-size: 13px; color: var(--muted); }
+.opciones .lugar-yo b { color: var(--fg); font-weight: 600; }
+.opciones .op-botones { display: flex; flex-wrap: wrap; gap: 8px; }
+.opciones .op-fila { appearance: none; display: block; width: 100%; min-height: 0; padding: 8px 10px; margin: 0 -10px; width: calc(100% + 20px); border: 0; border-radius: 8px; background: transparent; color: var(--fg); font: 500 13.5px var(--texto); text-align: left; cursor: pointer; }
+.opciones .op-fila:hover { background: var(--campo); color: var(--fg); }
+.opciones .op-fila.graba[aria-pressed="true"] { color: var(--alerta); }
+.opciones .leyenda { font-size: 12.5px; }
+.opciones .leyenda > span { display: flex; align-items: center; gap: 8px; }
+.opciones .leyenda i { width: 16px; height: 2px; border-radius: 2px; background: #E8EEF7; }
+.opciones .leyenda i.ley-i { background: var(--accent); }
+.opciones .leyenda i.ley-c { background: repeating-linear-gradient(90deg, var(--alerta) 0 4px, transparent 4px 7px); }
+.opciones .leyenda i.ley-n { background: var(--aviso); }
+.opciones .ayuda-vista { margin: 4px 0 0; color: var(--muted-2); font-size: 12px; line-height: 1.5; }
+
+/* Zoom: small round controls at the bottom right of the globe. */
+.universo .zoom { position: absolute; right: 24px; bottom: 24px; z-index: 3; display: grid; gap: 8px; transition: right .25s ease; }
+.universo .zoom[hidden] { display: none; }
+.universo .zoom .boton-icono { width: 36px; height: 36px; background: rgba(12, 17, 24, .9); }
+.universo .zoom .boton-icono svg { width: 15px; height: 15px; }
+.universo .lienzo.con-inspector .zoom { right: 424px; }
+
+/* The card on hover (mockup «Al pasar»). */
+.universo .tip { position: absolute; z-index: 6; pointer-events: none; width: max-content; max-width: 300px; background: rgba(12, 17, 24, .96); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font: 13px/1.45 var(--texto); color: var(--fg); box-shadow: 0 18px 40px rgba(0, 0, 0, .45); }
+.universo .tip[hidden] { display: none; }
+.universo .tip.lugar { width: 268px; }
+.universo .tip .tip-t { font-weight: 600; font-size: 14px; }
+.universo .tip .tip-s { color: var(--muted); margin-top: 3px; }
+.universo .tip .tip-cifra { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--muted); }
+.universo .tip .tip-cifra b { font: 600 22px/1 var(--display); color: var(--fg); letter-spacing: -.01em; }
+.universo .tip .tip-pie { margin-top: 10px; padding-top: 8px; border-top: 1px solid #172030; color: var(--muted-2); font-size: 12px; }
+.universo .tip .aprox, .universo .inspector .aprox { color: var(--aviso); }
+.universo .tip .mono { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+.universo .tip .t { color: var(--muted); }
+.universo .tip .nodoc { color: var(--aviso); }
+.universo .tip .punto-estado { margin-top: 6px; font-size: 12.5px; }
+.universo .tip .tip-cifra .punto-estado { margin-top: 0; }
+
+/* The inspector. */
+.universo .inspector { position: absolute; top: 0; right: 0; bottom: 0; z-index: 5; width: 400px; max-width: 100%; display: flex; flex-direction: column; background: var(--card); border-left: 1px solid var(--line); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line) transparent; animation: insp-entra .22s ease-out; }
+.universo .inspector[hidden] { display: none; }
+@keyframes insp-entra { from { transform: translateX(16px); } }
+@media (prefers-reduced-motion: reduce) { .universo .inspector { animation: none; } }
+.universo .insp-cab { position: sticky; top: 0; z-index: 2; height: 0; }
+.universo .insp-cab > * { position: absolute; top: 20px; }
+.universo .insp-cab .insp-atras { left: 28px; top: 24px; }
+.universo .insp-cab .insp-cerrar { right: 24px; }
+.universo .inspector.con-atras .insp-cuerpo { padding-top: 64px; }
+.universo .insp-atras { appearance: none; display: inline-flex; align-items: center; gap: 6px; min-height: 0; padding: 4px 0; border: 0; background: transparent; color: var(--muted); font: 500 13px var(--texto); cursor: pointer; }
+.universo .insp-atras:hover { color: var(--fg); background: transparent; }
+.universo .insp-atras svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.universo .insp-atras[hidden] { display: none; }
+.universo .insp-cerrar { margin-left: auto; width: 32px; height: 32px; }
+.universo .insp-cerrar svg { width: 14px; height: 14px; }
+.universo .insp-cuerpo { flex: 1 0 auto; padding: 28px 28px 20px; display: flex; flex-direction: column; gap: 20px; font-size: 13.5px; }
+.universo .insp-cuerpo[hidden] { display: none; }
+.universo .insp-cabeza { padding-right: 44px; }
+.universo .inspector.con-atras .insp-cabeza { padding-right: 0; }
+.universo .insp-cabeza h2 { margin: 0; font: 600 28px/1.15 var(--display); letter-spacing: -.01em; color: var(--fg); }
+.universo .insp-cabeza h2.grande { font-size: 32px; }
+.universo .insp-sub { margin: 6px 0 0; color: var(--muted); font-size: 13.5px; }
+.universo .insp-fuente { margin: 4px 0 0; color: var(--muted-2); font-size: 12px; }
+.universo .insp-lead { margin: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.universo .insp-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.universo .insp-chips span { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 12px; color: var(--muted); }
+.universo .insp-chips.progs { margin-top: 0; }
+.universo .insp-chips.progs span { padding: 5px 11px; font-size: 12.5px; color: var(--fg); }
+.universo .insp-chips.progs i { font-style: normal; color: var(--muted-2); margin-left: 4px; }
+.universo .insp-figs { display: flex; gap: 28px; }
+.universo .insp-figs div { display: flex; flex-direction: column; gap: 2px; }
+.universo .insp-figs b { font: 600 28px/1.1 var(--display); letter-spacing: -.01em; color: var(--fg); font-variant-numeric: tabular-nums; }
+.universo .insp-figs span { font-size: 12.5px; color: var(--muted); }
+.universo .insp-lista { display: grid; }
+.universo .insp-h { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 6px; font: 500 12.5px var(--texto); color: var(--muted-2); }
+.universo .insp-fila { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; margin: 0 -12px; padding: 10px 12px; border-top: 1px solid #151C25; border-radius: 12px; }
+.universo .insp-fila:hover { background: var(--campo); }
+.universo .insp-abre { appearance: none; display: grid; justify-content: stretch; justify-items: start; align-items: start; gap: 2px; min-height: 0; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--fg); text-align: left; font: inherit; cursor: pointer; }
+.universo .insp-abre:hover { background: transparent; color: var(--fg); }
+.universo .insp-abre .n { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.universo .insp-abre .n svg { width: 14px; height: 14px; flex: none; fill: none; stroke: var(--muted-2); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transition: opacity .15s; }
+.universo .insp-fila:hover .n svg, .universo .insp-abre:focus-visible .n svg { opacity: 1; }
+.universo .insp-abre .sub { font-size: 12.5px; color: var(--muted); white-space: normal; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.universo .insp-abre .sub .hora { font-size: 12.5px; }
+.universo .insp-fila .q { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13.5px; text-align: right; min-width: 44px; }
+.universo .insp-fila .a .interruptor-caja { min-width: 128px; }
+.universo .insp-fila .corte-hecho .hora { font-size: 12.5px; }
+.universo .insp-nombre { appearance: none; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; min-height: 0; width: 100%; padding: 7px 0; border: 0; border-top: 1px solid #151C25; border-radius: 0; background: transparent; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.universo .insp-nombre:hover { background: transparent; color: var(--accent); }
+.universo .insp-nombre .mono { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+.universo .insp-nombre .q { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.universo .insp-nombre.cortada .mono { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(224, 122, 108, .6); }
+.universo .insp-corte { margin-top: auto; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--campo); display: grid; gap: 10px; }
+.universo .insp-corte .fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.universo .insp-corte p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.universo .insp-corte.hecho { border-color: rgba(224, 122, 108, .32); background: rgba(224, 122, 108, .06); }
+.universo .insp-corte.hecho .hora { font-size: 14px; }
+.universo .insp-acciones:empty { display: none; }
+.universo .insp-pie { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 28px 18px; background: var(--card); font-size: 12.5px; color: var(--muted-2); }
+.universo .insp-pie kbd { font: 500 11px var(--texto); color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; margin-right: 4px; }
+.universo .insp-pie a[hidden] { display: none; }
+/* The older cards (a name, a program, a country, a network, this computer), in the same panel. */
+.universo .insp-cuerpo .cuerpo { font-size: 13.5px; line-height: 1.55; }
+.universo .insp-cuerpo .cuerpo b { font-size: 15px; }
+.universo .insp-cuerpo .mono { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+.universo .insp-cuerpo .cuerpo > .mono:first-child { font: 600 20px/1.25 var(--display); word-break: break-all; margin-bottom: 4px; }
+.universo .insp-cuerpo .t { color: var(--muted); }
+.universo .insp-cuerpo .c { color: var(--alerta); }
+.universo .insp-cuerpo .nodoc { color: var(--aviso); }
+.universo .insp-cuerpo p { margin: 0; font-size: 13px; }
+.universo .insp-cuerpo h4 { margin: 0 0 -12px; font: 500 12.5px var(--texto); color: var(--muted-2); }
+.universo .insp-cuerpo .acciones-det { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.universo .insp-cuerpo .enlaces-det { display: grid; justify-items: start; gap: 2px; padding-top: 10px; border-top: 1px solid #151C25; }
+.universo .insp-cuerpo .enlaces-det a { padding-left: 0; }
+.universo .lista-det { display: grid; }
+.universo .fila-det { appearance: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; width: 100%; min-height: 0; padding: 7px 0; border: 0; border-top: 1px solid #151C25; border-radius: 0; background: transparent; color: var(--fg); font: 12.5px var(--mono); text-align: left; cursor: pointer; }
+.universo .fila-det span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.universo .fila-det:hover, .universo .fila-det:focus-visible { background: transparent; color: var(--accent); }
+.universo .mas-det summary { cursor: pointer; padding: 7px 0; color: var(--muted); font-size: 12.5px; }
+/* «Cifras en directo», the side panel of 1.0.22–1.0.44, now a view of the inspector. */
+.universo .inspector .datos { padding: 30px 28px 20px; font: 12.5px/1.6 var(--texto); color: var(--fg); }
+.universo .inspector .datos[hidden] { display: none; }
+.universo .datos .o { color: var(--out); } .universo .datos .i { color: var(--in); } .universo .datos .c { color: var(--cut); } .universo .datos .t { color: var(--hud-muted); }
+.universo .datos b.s, .universo .datos .s { color: var(--accent); font-weight: 500; }
+.universo .datos .enlace-fila { cursor: pointer; border-radius: 4px; }
+.universo .datos .enlace-fila:hover { background: var(--campo); }
+.universo .datos .corte-av { margin: 10px 0 0; }
+
+/* The rail and its tray. */
+.universo .hud { position: relative; z-index: 4; background: var(--card); border-top: 1px solid var(--line); }
+.universo .riel { display: flex; align-items: center; height: 48px; padding: 0 24px; }
+.universo .riel[hidden] { display: none; }
+.universo .riel button { appearance: none; display: inline-flex; align-items: center; gap: 9px; min-height: 0; height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--muted); font: 400 13.5px var(--texto); cursor: pointer; white-space: nowrap; }
+.universo .riel button:hover { background: transparent; color: var(--fg); }
+.universo .riel b { color: var(--fg); font-weight: 600; }
+.universo .riel-vivo { gap: 20px !important; }
+.universo .riel-vivo > i, .universo .ban-tabs [data-tab="vivo"] i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(156, 195, 228, .16); margin-right: -11px; animation: pd-vivo 2.4s ease-in-out infinite; }
+.universo .ban-tabs [data-tab="vivo"] i { margin-right: 0; box-shadow: 0 0 0 3px rgba(156, 195, 228, .18); }
+@keyframes pd-vivo { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .universo .riel-vivo > i, .universo .ban-tabs i { animation: none; } }
+.universo .riel .vr { width: 1px; height: 16px; background: var(--line); }
+.universo .riel-cortadas { display: inline-flex; align-items: center; gap: 8px; }
+.universo .riel-cortadas i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted-2); }
+.universo .hud.con-cortes .riel-cortadas i { background: var(--alerta); }
+.universo .riel-5 { margin-left: auto; gap: 8px !important; color: var(--fg) !important; font-weight: 500 !important; }
+.universo .riel-5 svg { width: 14px; height: 14px; fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.universo .bandeja { height: 280px; display: grid; grid-template-rows: 56px minmax(0, 1fr); padding: 0 24px; }
+.universo .bandeja[hidden] { display: none; }
+@media (min-height: 1000px) { .universo .bandeja { height: 340px; } }
+.universo .ban-cab { display: flex; align-items: center; gap: 16px; }
+.universo .ban-tabs { display: flex; gap: 2px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); }
+.universo .ban-tabs button { appearance: none; display: inline-flex; align-items: center; gap: 8px; min-height: 0; padding: 7px 16px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: 500 13.5px var(--texto); cursor: pointer; }
+.universo .ban-tabs button:hover { background: transparent; color: var(--fg); }
+.universo .ban-tabs button[aria-selected="true"] { background: var(--accent-suave); color: var(--fg); }
+.universo .ban-cifras { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.universo .ban-cifras b { color: var(--fg); font-weight: 600; }
+.universo .ban-cab .btn.texto { margin-left: auto; }
+.universo .ban-cerrar { width: 32px; height: 32px; }
+.universo .ban-panel { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.universo .ban-panel[hidden] { display: none; }
+.universo table.registro-t { width: 100%; border-collapse: collapse; background: transparent; font-size: 13.5px; table-layout: fixed; }
+.universo table.registro-t th { position: sticky; top: 0; z-index: 1; background: var(--card); padding: 6px 12px 6px 0; border-bottom: 0; font: 500 12.5px var(--texto); text-transform: none; letter-spacing: 0; color: var(--muted-2); text-align: left; }
+.universo table.registro-t td { padding: 0 12px 0 0; height: 36px; border-top: 1px solid #151C25; border-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.universo table.registro-t th:nth-child(1) { width: 96px; } .universo table.registro-t th:nth-child(2) { width: 15%; } .universo table.registro-t th:nth-child(4) { width: 14%; } .universo table.registro-t th:nth-child(5) { width: 12%; } .universo table.registro-t th:nth-child(6) { width: 16%; } .universo table.registro-t th:nth-child(7) { width: 150px; }
+.universo table.registro-t .t { color: var(--muted); font-variant-numeric: tabular-nums; }
+.universo table.registro-t .mono { font-family: var(--mono); font-size: 13px; color: var(--fg); }
+.universo table.registro-t tr.enlace-fila { cursor: pointer; }
+.universo table.registro-t tr.enlace-fila:hover td { background: var(--campo); }
+.universo .ban-min5 { display: grid; grid-template-columns: 1.6fr 1.2fr .7fr 1.2fr; gap: 0; }
+.universo .ban-min5[hidden] { display: none; }
+.universo .ban-min5 > div { min-width: 0; padding: 4px 18px 12px; border-right: 1px solid #151C25; display: grid; align-content: start; gap: 8px; overflow-y: auto; }
+.universo .ban-min5 > div:first-child { padding-left: 0; }
+.universo .ban-min5 > div:last-child { border-right: 0; }
+.universo .ban-min5 h3 { margin: 0; display: flex; justify-content: space-between; gap: 8px; font: 500 12.5px var(--texto); color: var(--muted-2); }
+.universo .ban-min5 h3 span:last-child { color: var(--fg); }
+.universo .ban-min5 h3 .h3-titulo { color: inherit !important; }
+.universo .ban-min5 canvas { width: 100%; height: 150px; display: block; }
+.universo .barras { display: grid; gap: 7px; font-size: 12.5px; }
+.universo .barras div { display: grid; grid-template-columns: 110px 1fr auto auto; gap: 8px; align-items: center; font-variant-numeric: tabular-nums; }
+.universo .barras div span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.universo .barras s { display: block; height: 4px; border-radius: 2px; background: var(--accent); text-decoration: none; }
+.universo .barras .t { color: var(--muted-2); }
+.universo .grande { font: 600 32px/1.1 var(--display); font-variant-numeric: tabular-nums; }
+.universo .pequeno { font-size: 12.5px; line-height: 1.4; color: var(--muted); }
+.universo .top-ahora { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 12.5px; }
+.universo .top-ahora li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 4px 0; border-bottom: 1px solid #151C25; }
+.universo .top-ahora li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; }
+.universo .top-ahora .o { color: var(--fg); } .universo .top-ahora .t { color: var(--muted); }
+.universo .enlace-fila { cursor: pointer; }
+.universo .barras .enlace-fila:hover span:first-child, .universo .top-ahora .enlace-fila:hover span:first-child { color: var(--accent); }
+/* «Todos los datos»: the technical table with its downloads (15 Oct 2026), now a tab of the tray. */
+.universo .hud-tabla { display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+.universo .hud-tabla[hidden] { display: none; }
+.universo .ht-cab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 4px 0 10px; }
+.universo .ht-cab h3 { margin: 0; font: 500 12.5px var(--texto); color: var(--muted-2); }
+.universo .ht-acciones { display: flex; gap: 8px; align-items: center; }
+.universo .ht-busca { width: 200px; min-height: 32px; background: var(--campo); color: var(--fg); border: 1px solid var(--line); border-radius: 999px; padding: 0 12px; font: 13px var(--texto); }
+.universo .ht-busca:focus { outline: none; border-color: var(--accent); }
+.universo .ht-kpi { display: flex; gap: 18px; flex-wrap: wrap; }
+.universo .ht-kpi div { display: grid; gap: 1px; }
+.universo .ht-kpi b { font: 600 15px var(--texto); font-variant-numeric: tabular-nums; color: var(--fg); }
+.universo .ht-kpi b.o, .universo .ht-kpi b.i { color: var(--fg); } .universo .ht-kpi b.c { color: var(--cut); }
+.universo .ht-kpi span { font: 500 11.5px var(--texto); color: var(--muted-2); }
+.universo .ht-scroll { overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.universo table.ht { width: 100%; border-collapse: collapse; font: 12.5px/1.4 var(--texto); color: var(--fg); background: transparent; font-variant-numeric: tabular-nums; }
+.universo table.ht th { position: sticky; top: 0; z-index: 1; background: var(--card); color: var(--muted-2); font: 500 12px var(--texto); text-transform: none; letter-spacing: 0; text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; cursor: pointer; user-select: none; }
+.universo table.ht th:hover { color: var(--fg); }
+.universo table.ht th[aria-sort="descending"]::after { content: " ▾"; color: var(--accent); }
+.universo table.ht th[aria-sort="ascending"]::after { content: " ▴"; color: var(--accent); }
+.universo table.ht td { padding: 6px 10px; border-bottom: 1px solid #151C25; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.universo table.ht th.n, .universo table.ht td.n { text-align: right; }
+.universo table.ht tr.enlace-fila:hover td { background: var(--campo); }
+.universo table.ht td.o, .universo table.ht td.i { color: var(--fg); } .universo table.ht td.c { color: var(--cut); } .universo table.ht td.t { color: var(--muted); }
+.universo table.ht .chip-ht { display: inline-block; font-size: 11px; border: 1px solid currentColor; border-radius: 999px; padding: 0 7px; }
+
+/* Words on the picture: a notice, the empty state, «¿Dónde está este ordenador?». */
+.universo .aviso { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); z-index: 9; width: max-content; max-width: min(560px, calc(100% - 32px)); background: rgba(12, 17, 24, .97); border: 1px solid var(--line); color: var(--fg); border-radius: 14px; padding: 12px 16px; font-size: 13.5px; line-height: 1.45; box-shadow: 0 18px 40px rgba(0, 0, 0, .45); }
+.universo .aviso[hidden] { display: none; }
+.universo .aviso.pide { border-color: rgba(224, 122, 108, .5); }
+.universo .aviso .btn-hud { appearance: none; min-height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid #2A3442; background: var(--campo); color: var(--fg); font: 600 13px var(--texto); cursor: pointer; }
+.universo .aviso .btn-hud:hover { border-color: #3A4656; background: #141B25; color: var(--fg); }
+.universo .aviso .btn-hud.peligro:hover { border-color: var(--alerta); background: color-mix(in srgb, var(--alerta) 8%, var(--campo)); }
+.universo .lienzo.con-inspector .aviso, .universo .lienzo.con-inspector .vacio, .universo .lienzo.con-inspector .vigilancia-off, .universo .lienzo.con-inspector .donde { left: calc(50% - 200px); }
+.universo .donde { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 8; width: min(460px, calc(100% - 32px)); padding: 24px 26px 20px; background: rgba(12, 17, 24, .97); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 24px 60px rgba(0, 0, 0, .55); }
+.universo .donde[hidden] { display: none; }
+.universo .donde h2 { margin: 0 0 8px; font: 600 22px/1.2 var(--display); color: var(--fg); }
+.universo .donde p { margin: 0 0 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.universo .donde-botones { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.universo .donde-botones .texto { margin-left: auto; }
+.universo .vacio .btn-hud { border: 1px solid var(--line); border-radius: 999px; color: var(--accent); padding: 8px 14px; background: transparent; }
+.universo .vigilancia-off { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); z-index: 3; display: inline-flex; gap: 6px; align-items: center; font: 500 12.5px/1.4 var(--texto); color: var(--aviso); border: 1px solid currentColor; border-radius: 999px; padding: 4px 12px; background: rgba(6, 8, 12, .85); }
+.universo .vigilancia-off[hidden] { display: none; }
+.universo .explorador { background: #06080C; }
+
+@media (max-width: 900px) {
+  .universo .inspector { width: 100%; border-left: 0; }
+  .universo .lienzo.con-inspector .zoom { right: 24px; display: none; }
+  .universo .ban-min5 { grid-template-columns: 1fr 1fr; }
+  .universo .ban-cifras, .universo .riel .vr, .universo .riel-ahora-t { display: none; }
+  .universo table.registro-t th:nth-child(4), .universo table.registro-t td:nth-child(4), .universo table.registro-t th:nth-child(6), .universo table.registro-t td:nth-child(6) { display: none; }
+  .globo-herr .opciones-btn span { display: none; }
+  .opciones { position: fixed; left: 16px; right: 16px; top: 120px; width: auto; }
+}
+.universo .insp-corte .fila b { font-weight: 600; font-size: 14px; color: var(--fg); }
+/* The older «btn-hud» buttons (the program explorer, the notices): a secundario of 32 px. */
+.universo .btn-hud { appearance: none; display: inline-flex; align-items: center; min-height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid #2A3442; background: var(--campo); color: var(--fg); font: 600 13px var(--texto); cursor: pointer; }
+.universo .btn-hud:hover { border-color: #3A4656; background: #141B25; color: var(--fg); }
+.universo .btn-hud.peligro:hover { border-color: var(--alerta); background: color-mix(in srgb, var(--alerta) 8%, var(--campo)); }

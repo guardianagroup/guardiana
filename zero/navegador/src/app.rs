@@ -1133,6 +1133,13 @@ fn escucha_teclas(c: &ICoreWebView2Controller) -> windows::core::Result<()> {
             unsafe { args.PhysicalKeyStatus(&mut estado)? };
             let mut vk = 0u32;
             unsafe { args.VirtualKey(&mut vk)? };
+            // F7 turns on caret browsing in WebView2: a blinking text bar wherever one clicks,
+            // on text that is not meant to be edited (the owner, 18 Oct 2026: «donde no hay enlace
+            // no debe salir nada»). It is swallowed here, in the bar, the panel and every tab.
+            if vk == 0x76 {
+                unsafe { args.SetHandled(true)? };
+                return Ok(());
+            }
             let (ctrl, shift, alt) = (pulsada(0x11), pulsada(0x10), pulsada(0x12));
             if let Some(o) = con_sesion(|s| s.tecla(vk, ctrl, shift, alt)).flatten() {
                 unsafe { args.SetHandled(true)? };
