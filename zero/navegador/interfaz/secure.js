@@ -726,6 +726,7 @@
   // Three ways to talk (16 Oct 2026): computer to computer, from the phone, the home room.
   // The start shows the three; once one is chosen (or one is already going) only it is on screen.
   let modo = null;
+  try { const nav = performance.getEntriesByType('navigation')[0]; if (nav && nav.type === 'reload') sessionStorage.removeItem('secure-modo'); } catch (_) {}
   try { modo = sessionStorage.getItem('secure-modo') || null; } catch (_) {}
   if (!['equipos', 'movil', 'sala'].includes(modo)) modo = null;
   const guardaModo = () => { try { if (modo) sessionStorage.setItem('secure-modo', modo); else sessionStorage.removeItem('secure-modo'); } catch (_) {} };
@@ -1584,6 +1585,9 @@
   // inside the cipher, and each computer draws the line between the two on its own globe.
   // «listo» first, so the texts arrive before any state is drawn (17 Oct 2026 review).
   manda({ tipo: 'listo', vista: 'secure' });
+  // Reloading the page starts from nothing: no conversation, no messages, no open invitation
+  // (the program keeps a call that is still going).
+  try { const nav = performance.getEntriesByType('navigation')[0]; if (nav && nav.type === 'reload') manda({ tipo: 'secure', accion: 'empezar_limpio' }); } catch (_) {}
   mandaNombre();
   try { manda({ tipo: 'secure', accion: 'zona', zona: Intl.DateTimeFormat().resolvedOptions().timeZone || '' }); } catch (_) {}
 })();
