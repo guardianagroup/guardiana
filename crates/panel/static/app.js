@@ -1919,6 +1919,11 @@
       if (!window.GuardianaRevision) return;
       await window.GuardianaRevision.iniciar({ api, t, tn, esc, LOC, LANG, pdf: { pdfDocument, savePdfFile } });
     },
+    // «Vigilancia» (1.0.45): its own script (vigilancia.js), loaded before this one.
+    async vigilancia() {
+      if (!window.GuardianaVigilancia) return;
+      await window.GuardianaVigilancia.iniciar({ api, t, tn, esc, LOC, LANG, cadaTanto });
+    },
     async antivirus() {
       let pais = (c) => c;
       try { const dn = new Intl.DisplayNames([LOC], { type: 'region' }); pais = (c) => { try { return dn.of(c) || c; } catch (_) { return c; } }; } catch (_) {}

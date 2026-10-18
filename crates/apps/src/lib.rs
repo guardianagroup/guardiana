@@ -66,6 +66,7 @@ mod revision;
 mod seguridad;
 #[cfg(windows)]
 mod ventanas;
+pub mod vigilancia;
 mod vpn;
 
 /// Listens to what the system says about who asked for each name.

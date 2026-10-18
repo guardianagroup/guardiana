@@ -33,6 +33,7 @@ mod stats;
 pub mod time;
 mod trafico;
 pub mod trampas;
+pub mod vigilancia;
 
 pub use alias::{AliasSites, NameNetwork, MAX_ALIAS_SITES};
 pub use changes::{Change, ChangeKind, ChangeWho};

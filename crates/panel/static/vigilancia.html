@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>GUARDIANA · Vigilancia</title>
+<link rel="stylesheet" href="/static/diseno.css">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/vigilancia.css">
+<link rel="preload" href="/static/fonts/HankenGrotesk-var.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="/static/fonts/SchibstedGrotesk-var.woff" as="font" type="font/woff" crossorigin>
+<script src="/static/arranque.js"></script>
+</head>
+<body data-page="vigilancia">
+<header class="top">
+  <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA<small data-t="lema"></small></span></a>
+  <nav>
+    <a href="/por-dentro" class="nav-destacado" data-t="nav_por_dentro">Globo en directo</a>
+    <a href="/revision" class="nav-destacado" data-t="nav_revision">Revisión</a>
+    <a href="/vigilancia" class="nav-destacado" aria-current="page" data-t="nav_vigilancia">Vigilancia</a>
+    <a href="/"  data-t="nav_radiografia">Radiografía</a>
+    <a href="/ia" data-t="nav_ia">Tu IA</a>
+    <a href="/antivirus" data-t="nav_antivirus">Tu antivirus</a>
+    <a href="/extracto"  data-t="nav_extracto">Extracto</a>
+    <a href="/dispositivos"  data-t="nav_dispositivos">Dispositivos</a>
+    <a href="/sabe-de-ti"  data-t="nav_sabe">Lo que GUARDIANA sabe de ti</a>
+    <a href="/reglas" data-t="nav_reglas">Reglas</a>
+    <a href="/informe" data-t="nav_informe">Informe semanal</a>
+    <a href="/hogar" data-t="nav_hogar">Modo Hogar</a>
+    <a href="/licencia" data-t="nav_licencia">Licencia</a>
+    <a href="/verify" data-t="nav_verify">Verificar</a>
+    <a href="/estado" data-t="nav_estado">Estado</a>
+  </nav>
+</header>
+<main class="vg">
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<span class="rotulo" data-t="vg_ceja">Diagnóstico</span>
+<h1 data-t="vg_titulo">Vigilancia constante</h1>
+<p class="muted vg-intro" data-t="vg_intro"></p>
+
+<section class="tarjeta vg-cab" aria-live="polite">
+  <div class="vg-cab-fila">
+    <div id="vg-pastilla" class="vg-pastilla esperando"><i aria-hidden="true"></i><b id="vg-pastilla-texto"></b><span id="vg-pastilla-senal"></span></div>
+    <button type="button" id="vg-ahora" class="boton chico" data-t="vg_comprobar_ahora">Comprobar ahora</button>
+  </div>
+  <p id="vg-ritmo" class="muted vg-ritmo"></p>
+  <div class="vg-pulso">
+    <div class="vg-pulso-cab"><span class="rotulo" data-t="vg_pulso_titulo">Pulso del día</span><span id="vg-hoy" class="muted"></span></div>
+    <ol id="vg-horas" class="vg-horas" aria-hidden="true"></ol>
+  </div>
+</section>
+
+<section id="vg-atencion" class="vg-atencion" hidden></section>
+<section id="vg-avisos" class="vg-avisos" hidden>
+  <h2 data-t="vg_avisos_titulo">Avisos nuevos</h2>
+  <ul id="vg-avisos-lista" class="vg-lineas"></ul>
+</section>
+
+<div id="vg-rejilla" class="vg-rejilla"></div>
+
+<section class="vg-historial">
+  <div class="vg-historial-cab">
+    <h2 data-t="vg_historial">Lo que ha visto</h2>
+    <span id="vg-cadena" class="chip"></span>
+  </div>
+  <ul id="vg-historial" class="vg-lineas"></ul>
+</section>
+<p class="muted vg-pie" data-t="vg_pie"></p>
+</main>
+<script src="/static/vigilancia.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
