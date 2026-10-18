@@ -92,9 +92,44 @@ const ARCHIVOS: &[(&str, &str, &[u8])] = &[
         include_bytes!("../../../zero/navegador/interfaz/puente.js"),
     ),
     (
+        "/relevo.js",
+        JS,
+        include_bytes!("../../../zero/navegador/interfaz/relevo.js"),
+    ),
+    (
         "/voz.js",
         JS,
         include_bytes!("../../../zero/navegador/interfaz/voz.js"),
+    ),
+    (
+        "/interruptor.js",
+        JS,
+        include_bytes!("../../../zero/navegador/interfaz/interruptor.js"),
+    ),
+    (
+        "/opus.js",
+        JS,
+        include_bytes!("../../../zero/navegador/interfaz/opus.js"),
+    ),
+    (
+        "/voz-eleccion.js",
+        JS,
+        include_bytes!("../../../zero/navegador/interfaz/voz-eleccion.js"),
+    ),
+    (
+        "/escudo-directo.js",
+        JS,
+        include_bytes!("../../../zero/navegador/interfaz/escudo-directo.js"),
+    ),
+    (
+        "/entrega.js",
+        JS,
+        include_bytes!("../../../zero/navegador/interfaz/entrega.js"),
+    ),
+    (
+        "/entrega.css",
+        CSS,
+        include_bytes!("../../../zero/navegador/interfaz/entrega.css"),
     ),
     (
         "/diseno.css",
@@ -1001,8 +1036,38 @@ async fn sirve(t: &'static i18n::Texts, motor: Motor, ficha: &Path) -> Result<()
     }
 }
 
+/// Whether GUARDIANA's licence is Plus (trial, subscription or Lifetime), read from the machine's
+/// ledger without creating or changing anything. `None` when this user cannot read it (the data
+/// folder is the service's): then nothing is taken away, as everywhere else a licence that
+/// cannot be read counts as Plus.
+fn plus_de_guardiana() -> Option<bool> {
+    let dir = guardiana_core::paths::data_dir();
+    let db = dir.join(guardiana_core::paths::LEDGER_FILE);
+    let secreto = std::fs::read_to_string(dir.join(guardiana_panel::TOKEN_FILE)).ok()?;
+    let secreto = secreto.trim();
+    if secreto.len() != 64 || !db.is_file() {
+        return None;
+    }
+    let ledger = guardiana_core::Ledger::open(&db, guardiana_core::identity::genesis()).ok()?;
+    guardiana_license::status(&ledger, secreto, guardiana_core::time::now_ms())
+        .ok()
+        .map(|s| s.plus_activo)
+}
+
+/// The relay's call service (TURN) costs money per minute of call: it is Plus (the owner's free
+/// plan, 18 Oct 2026). Read now and every ten minutes while the command runs.
+fn vigila_plan_de_llamadas() {
+    let mira = || guardiana_zero::rele::permite_turn(plus_de_guardiana().unwrap_or(true));
+    mira();
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_secs(600));
+        mira();
+    });
+}
+
 pub fn run(_opts: &Opts) -> Result<(), Box<dyn Error>> {
     let t = i18n::current();
+    vigila_plan_de_llamadas();
     if por_sudo() {
         return Err(t.cli("comunicaciones.sin_sudo").into());
     }

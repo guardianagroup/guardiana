@@ -927,6 +927,11 @@ impl Sesion {
         }
         let antes = self.licencia.protege();
         self.licencia = e;
+        if !cfg!(test) {
+            // The relay's call service (TURN) costs money per minute: only while the licence
+            // protects (trial or subscription), never after it (the free plan, 18 Oct 2026).
+            crate::rele::permite_turn(self.licencia.protege());
+        }
         let mut o = Vec::new();
         if antes != self.licencia.protege() {
             if !self.licencia.protege() && self.mandato.is_some() {

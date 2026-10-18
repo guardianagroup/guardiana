@@ -30,37 +30,61 @@
   color-scheme: dark;
 }
 
-/* Buttons. One shape everywhere (16 Oct 2026, the design the owner chose for the three tabs):
-   a soft rectangle of 10 px, sentence case, 13 px of the text face; an icon may sit before the
-   word as a 1.8 px stroke. The website keeps its own pills.
-   Primary: the blue, filled.          .btn                 .boton.principal
-   Secondary: quiet, a line around it. .btn.secondary       .boton
-   Cut: red outline, red when pointed. .btn.cut             .boton.corta
-   Let through: green outline.         .btn.deja            .boton.deja
-   Danger: red, filled.                .btn.danger          .boton.peligro
-   Small: .chico on any of them. */
+/* Buttons (18 Oct 2026, the redesign the owner approved: «Sistema de botones»). Three families and
+   no more, the same in the panel, ZERO and SECURE: a pill, 40 px high (32 px inside a row), Hanken
+   Grotesk 600 at 14 px, a 16 px icon before the word, and a steel ring of 2 px for the keyboard.
+   Principal: steel, filled; one per screen.   .btn                 .boton.principal
+   Secundario: a fine border on the field.      .btn.secondary       .boton
+   Texto: steel words, no box; goes elsewhere.  .btn.texto           .boton.texto
+   Red only for what is cut or about to be (the owner: «rojo solo para lo que ya está cortado o va a
+   cortarse»): a destructive button rests neutral and shows its red when pointed at.
+   Cortar (the cut component): .cortar on a secundario; it carries its own icon. While it works it is
+   disabled and says «Cortando…» ([aria-busy="true"]); once done, the same place shows
+   .corte-hecho («● Cortado 14:32», red words) and a .deshacer button. Nothing moves.
+   Older names stay, now in these families: .cut/.corta (destructive, neutral until pointed),
+   .deja (let through, neutral), .danger/.peligro (destructive, red words).
+   Small: .chico on any of them (32 px). A round icon button: .boton-icono. */
 .btn, .boton {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--e2);
-  border-radius: var(--r-boton); padding: 9px 18px; min-height: 40px;
+  border-radius: var(--r-boton); padding: 0 18px; min-height: 40px;
   font: 600 14px/1.2 var(--texto); letter-spacing: 0; text-transform: none;
   text-decoration: none; white-space: nowrap; cursor: pointer;
-  transition: background-color .15s, border-color .15s, color .15s;
+  transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s;
 }
-.boton, .btn.secondary { background: transparent; color: var(--fg); border: 1px solid var(--line); }
-.boton:hover, .btn.secondary:hover { background: transparent; border-color: var(--fg); color: var(--fg); }
+.boton, .btn.secondary { background: var(--campo); color: var(--fg); border: 1px solid #2A3442; }
+.boton:hover, .btn.secondary:hover { background: #141B25; border-color: #3A4656; color: var(--fg); }
 .btn, .boton.principal { background: var(--accent); color: var(--accent-fg); border: 1px solid var(--accent); }
 .btn:hover, .boton.principal:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: var(--accent-fg); }
-.btn.cut, .boton.corta { background: transparent; color: var(--alerta); border: 1px solid var(--alerta); }
-.btn.cut:hover, .boton.corta:hover { background: var(--alerta); color: var(--accent-fg); border-color: var(--alerta); }
-.btn.deja, .boton.deja { background: transparent; color: var(--ok); border: 1px solid var(--ok); }
-.btn.deja:hover, .boton.deja:hover { background: var(--ok); color: var(--accent-fg); border-color: var(--ok); }
-.btn.danger, .boton.peligro { background: var(--alerta); color: #06080C; border: 1px solid var(--alerta); }
-.btn.danger:hover, .boton.peligro:hover { filter: brightness(1.08); }
-.btn.chico, .boton.chico { padding: 6px 12px; min-height: 32px; font-size: 12.5px; }
-.btn svg, .boton svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.btn[hidden], .boton[hidden] { display: none; }
-.btn[disabled], .boton[disabled], .btn[aria-disabled="true"], .boton[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
-.btn:focus-visible, .boton:focus-visible, .campo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.texto, .boton.texto { background: transparent; border: 1px solid transparent; color: var(--accent); padding: 0 6px; }
+.btn.texto:hover, .boton.texto:hover { background: transparent; border-color: transparent; color: var(--accent-dark); text-decoration: underline; text-underline-offset: 3px; }
+.btn.texto.sigue::after, .boton.texto.sigue::after { content: ""; width: 13px; height: 13px; flex: none; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3.5 10.5 8 6 12.5'/%3E%3C/svg%3E") center/contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3.5 10.5 8 6 12.5'/%3E%3C/svg%3E") center/contain no-repeat; }
+.btn.cut, .boton.corta, .btn.cortar, .boton.cortar, .btn.danger, .boton.peligro, .btn.deja, .boton.deja { background: var(--campo); color: var(--fg); border: 1px solid #2A3442; }
+.btn.danger, .boton.peligro { color: var(--alerta); }
+.btn.cut:hover, .boton.corta:hover, .btn.cortar:hover, .boton.cortar:hover, .btn.danger:hover, .boton.peligro:hover { background: color-mix(in srgb, var(--alerta) 8%, var(--campo)); border-color: var(--alerta); color: var(--fg); }
+.btn.deja:hover, .boton.deja:hover { background: #141B25; border-color: #3A4656; color: var(--fg); }
+.btn.cortar::before, .boton.cortar::before, .btn.deshacer::before, .boton.deshacer::before { content: ""; width: 16px; height: 16px; flex: none; background: var(--muted); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6.2'/%3E%3Cpath d='M3.7 12.3 12.3 3.7'/%3E%3C/svg%3E") center/contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6.2'/%3E%3Cpath d='M3.7 12.3 12.3 3.7'/%3E%3C/svg%3E") center/contain no-repeat; }
+.btn.cortar:hover::before, .boton.cortar:hover::before { background: var(--alerta); }
+.btn.deshacer::before, .boton.deshacer::before { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 4 2.5 7l3 3'/%3E%3Cpath d='M2.8 7H10a3.5 3.5 0 0 1 0 7H7'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 4 2.5 7l3 3'/%3E%3Cpath d='M2.8 7H10a3.5 3.5 0 0 1 0 7H7'/%3E%3C/svg%3E"); }
+.btn.cortar[aria-busy="true"]::before, .boton.cortar[aria-busy="true"]::before, .btn.deshacer[aria-busy="true"]::before, .boton.deshacer[aria-busy="true"]::before { background: var(--accent); -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 2a6 6 0 1 1-6 6'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 2a6 6 0 1 1-6 6'/%3E%3C/svg%3E"); animation: gd-gira .9s linear infinite; }
+@keyframes gd-gira { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .btn[aria-busy="true"]::before, .boton[aria-busy="true"]::before { animation: none; } }
+/* What a cut leaves where its button was: the hour, in red words with a red dot, never colour alone. */
+.corte-hecho { display: inline-flex; align-items: center; gap: 14px; white-space: nowrap; }
+.corte-hecho .hora { display: inline-flex; align-items: center; gap: 7px; color: var(--alerta); font: 600 13px/1.2 var(--texto); }
+.corte-hecho .hora::before, .punto-estado::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.punto-estado { display: inline-flex; align-items: center; gap: 7px; font: 600 13px/1.2 var(--texto); }
+.punto-estado.ok { color: var(--ok); } .punto-estado.aviso { color: var(--aviso); } .punto-estado.alerta { color: var(--alerta); } .punto-estado.info { color: var(--accent); }
+.btn.chico, .boton.chico { padding: 0 14px; min-height: 32px; font-size: 13px; gap: 7px; }
+.btn.texto.chico, .boton.texto.chico { padding: 0 6px; }
+.boton-icono { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--muted); cursor: pointer; flex: none; transition: border-color .15s, color .15s; }
+.boton-icono:hover { border-color: #3A4656; color: var(--fg); }
+.boton-icono svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.btn svg, .boton svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.btn[hidden], .boton[hidden], .boton-icono[hidden] { display: none; }
+.btn[disabled], .boton[disabled], .btn[aria-disabled="true"], .boton[aria-disabled="true"] { opacity: .62; cursor: not-allowed; }
+.btn[aria-busy="true"], .boton[aria-busy="true"] { cursor: progress; }
+.btn:focus-visible, .boton:focus-visible, .boton-icono:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+.campo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (pointer: coarse) { .btn, .boton { min-height: 44px; } .btn.chico, .boton.chico { min-height: 36px; } }
 
 /* A way into more detail: text in the blue, underlined only when pointed at. */
@@ -90,3 +114,65 @@
 
 /* Section titles in small capitals of the text face, the same over every list. */
 .rotulo { font: 600 12px/1.3 var(--texto); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+/* Clicking where there is nothing to click shows nothing (the owner, 18 Oct 2026: no text caret, no
+   selection, no tap flash, no focus ring after a mouse click). Text stays selectable where it is
+   meant to be copied or typed. */
+html{-webkit-tap-highlight-color:transparent}
+body{caret-color:transparent;-webkit-user-select:none;user-select:none;cursor:default}
+input,textarea,select,[contenteditable="true"]{caret-color:auto;-webkit-user-select:text;user-select:text;cursor:text}
+code,pre,kbd,samp,.huella,.copiable,[data-copiable]{-webkit-user-select:text;user-select:text;cursor:text}
+a,button,summary,label,[role="button"],[tabindex]:not([tabindex="-1"]){cursor:pointer}
+:focus:not(:focus-visible){outline:none}
+
+/* The cut switch (18 Oct 2026, the owner: «un interruptor profesional que pase de verde a rojo»).
+   The common standard of the switch: on (aria-checked="true", knob to the right, green track) is
+   «Permitido»; off (aria-checked="false", knob to the left, red track) is «Cortado».
+   The word always sits beside it (interruptor.js writes both). 44 px to touch, 24 px to see. The one
+   place where green appears in a list, by the owner's choice. */
+.interruptor-caja { display: inline-flex; align-items: center; gap: 10px; position: relative; white-space: nowrap; vertical-align: middle; }
+.interruptor { appearance: none; position: relative; flex: none; width: 44px; height: 24px; min-height: 0; padding: 0; margin: 0; border: 0; border-radius: 999px; background: var(--alerta); cursor: pointer; transition: background-color .18s ease, opacity .18s ease; }
+.interruptor::after { content: ""; position: absolute; inset: -10px -2px; }
+.interruptor .interruptor-bola { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #F4F6FA; box-shadow: 0 1px 2px rgba(0, 0, 0, .45); transition: transform .18s ease; }
+.interruptor[aria-checked="true"] { background: var(--ok); }
+.interruptor[aria-checked="true"] .interruptor-bola { transform: translateX(20px); }
+.interruptor:hover { background: color-mix(in srgb, var(--alerta) 88%, #fff); }
+.interruptor[aria-checked="true"]:hover { background: color-mix(in srgb, var(--ok) 88%, #fff); }
+.interruptor:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+.interruptor[disabled] { cursor: progress; opacity: .7; }
+.interruptor-estado { font: 600 13px/1.2 var(--texto); color: var(--ok); }
+.interruptor-caja.cortado .interruptor-estado { color: var(--alerta); }
+.interruptor-caja.ocupado .interruptor-estado { color: var(--muted); font-weight: 500; }
+.interruptor-motivo { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: max-content; max-width: 280px; white-space: normal; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--fg); font: 500 12.5px/1.4 var(--texto); box-shadow: var(--sombra); }
+.interruptor-caja.chico { gap: 8px; }
+.interruptor-caja.chico .interruptor-estado { font-size: 12.5px; }
+/* A checkbox whose «checked» means «cut» (.interruptor on an <input>): drawn the same way. */
+input[type="checkbox"].interruptor { width: 44px; height: 24px; vertical-align: middle; background: var(--ok); }
+input[type="checkbox"].interruptor::before { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #F4F6FA; box-shadow: 0 1px 2px rgba(0, 0, 0, .45); transition: transform .18s ease; transform: translateX(20px); }
+input[type="checkbox"].interruptor:checked { background: var(--alerta); }
+input[type="checkbox"].interruptor:checked::before { transform: none; }
+@media (prefers-reduced-motion: reduce) { .interruptor, .interruptor .interruptor-bola, input[type="checkbox"].interruptor::before { transition: none; } }
+
+/* Every click answers (18 Oct 2026, the owner's «revisión extrema»; interruptor.js has the helper).
+   Pointed at: a visible change at once. Pressed: a little smaller for as long as it is held.
+   At work: a small spinner and no second click. Done: a short mark. Failed: a short shake and the
+   reason in its tooltip (the page says it in words too). Nothing that is not a control looks like one. */
+.btn, .boton, .boton-icono, .interruptor, button, [role="button"], summary { transition: background-color .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease, transform .08s ease, opacity .12s ease; }
+.btn:active:not([disabled]), .boton:active:not([disabled]), .boton-icono:active:not([disabled]), button:active:not([disabled]), [role="button"]:active, summary:active { transform: scale(.97); }
+.interruptor:active:not([disabled]) .interruptor-bola { width: 22px; }
+.interruptor[aria-checked="true"]:active:not([disabled]) .interruptor-bola { transform: translateX(16px); }
+a:active { opacity: .78; }
+[aria-busy="true"] { cursor: progress !important; }
+.trabajando { position: relative; }
+button.trabajando, .btn.trabajando, .boton.trabajando { color: transparent !important; }
+button.trabajando::after, .btn.trabajando::after, .boton.trabajando::after { content: ""; position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid var(--muted); border-right-color: transparent; animation: gd-gira .8s linear infinite; }
+input.trabajando { opacity: .55; }
+.respondio { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px color-mix(in srgb, var(--accent) 70%, transparent) !important; }
+.fallo { animation: gd-fallo .32s ease; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--alerta) !important; }
+@keyframes gd-fallo { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.aviso-breve { position: fixed; left: 50%; bottom: 72px; z-index: 90; transform: translate(-50%, 8px); opacity: 0; pointer-events: none; padding: 10px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--fg); font: 600 13.5px/1.2 var(--texto); box-shadow: var(--sombra); transition: opacity .15s ease, transform .15s ease; }
+.aviso-breve.visto { opacity: 1; transform: translate(-50%, 0); }
+.gd-progreso { position: fixed; left: 0; top: 0; z-index: 100; height: 2px; width: 0; background: var(--accent); opacity: 0; pointer-events: none; }
+.gd-progreso.va { opacity: 1; animation: gd-progreso 2.4s cubic-bezier(.1, .7, .2, 1) forwards; }
+@keyframes gd-progreso { from { width: 0; } to { width: 88%; } }
+@media (prefers-reduced-motion: reduce) { .btn:active, .boton:active, button:active, [role="button"]:active { transform: none; } .fallo { animation: none; } .gd-progreso.va { animation-duration: .01s; } }

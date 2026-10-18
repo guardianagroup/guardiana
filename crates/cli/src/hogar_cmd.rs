@@ -129,6 +129,11 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
             if crate::dns_cmd::apartado(&ledger) {
                 return Err(t.panel("caducado_hogar").into());
             }
+            // Home Mode (the rest of the house) is Plus since 1.0.45; the free level watches this
+            // computer (the owner's free plan, 18 Oct 2026).
+            if !crate::dns_cmd::hogar_permitido(&ledger) {
+                return Err(t.panel("plan_hogar_plus").into());
+            }
             let Some(lan) = guardiana_devices::local_lan_ipv4() else {
                 return Err(t.panel("hogar_sin_lan").into());
             };

@@ -768,7 +768,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-apps"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "ferrisetw",
  "guardiana-core",
@@ -780,7 +780,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-classify"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "guardiana-core",
  "guardiana-lists",
@@ -790,7 +790,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-cli"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "axum",
  "getrandom 0.4.3",
@@ -814,7 +814,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-core"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "rusqlite",
  "serde",
@@ -824,14 +824,14 @@ dependencies = [
 
 [[package]]
 name = "guardiana-devices"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "guardiana-core",
 ]
 
 [[package]]
 name = "guardiana-dns"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "async-trait",
  "guardiana-core",
@@ -844,7 +844,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-license"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "getrandom 0.4.3",
  "guardiana-core",
@@ -856,7 +856,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-lists"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "flate2",
  "guardiana-core",
@@ -867,7 +867,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-panel"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "axum",
  "getrandom 0.4.3",
@@ -887,7 +887,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-rele"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "base64 0.23.1",
  "ring",
@@ -898,22 +898,24 @@ dependencies = [
 
 [[package]]
 name = "guardiana-secure"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "base64 0.23.1",
  "chacha20poly1305",
  "getrandom 0.4.3",
  "ml-kem",
  "qrcode",
+ "ring",
  "serde",
  "serde_json",
  "sha2 0.11.0",
  "vodozemac",
+ "zeroize",
 ]
 
 [[package]]
 name = "guardiana-service"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "guardiana-core",
  "serde",
@@ -923,7 +925,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-verify"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "guardiana-core",
  "guardiana-lists",
@@ -936,7 +938,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-zero"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "base64 0.23.1",
  "guardiana-core",
@@ -953,6 +955,7 @@ dependencies = [
  "tokio-rustls",
  "url",
  "webpki-roots",
+ "windows-sys 0.61.2",
  "wtransport",
 ]
 

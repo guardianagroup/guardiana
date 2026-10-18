@@ -13,12 +13,21 @@ mod antivirus;
 mod api;
 mod auth;
 mod borrado;
+mod certificado;
+mod contratos;
+mod derechos;
 mod destinos;
 mod empresa;
 mod expedientes;
+// Customer tools of 1.0.45 (18 Oct 2026): their own routes, page and scripts.
+mod extras;
+mod identificacion;
 mod medidas;
+mod plan;
 mod revision;
 mod universo;
+mod vigilancia;
+pub mod vision;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -125,6 +134,8 @@ pub(crate) struct AppState {
     pub(crate) cortes: antivirus::CortesAntivirus,
     /// «Revisión del ordenador» (1.0.24): the last review, in memory.
     pub(crate) revision: revision::Revisor,
+    /// «Vigilancia» (1.0.45): the constant watch's last looks, in memory.
+    pub(crate) vigilancia: vigilancia::Vigilancia,
 }
 
 /// A running panel.
@@ -535,6 +546,12 @@ const DISENO_CSS: &str = include_str!("../static/diseno.css");
 const POR_DENTRO_JS: &str = include_str!("../static/por-dentro.js");
 /// «Revisión del ordenador» (1.0.24): its own script too.
 const REVISION_JS: &str = include_str!("../static/revision.js");
+/// The cut switch (18 Oct 2026): one component for the panel and ZERO. The same file travels in
+/// ZERO (`zero/navegador/interfaz/interruptor.js`); a test keeps them equal.
+const INTERRUPTOR_JS: &str = include_str!("../static/interruptor.js");
+/// «Certificado y derechos» (1.0.45): its own script and style sheet, as the pages above.
+const DERECHOS_JS: &str = include_str!("../static/derechos.js");
+const DERECHOS_CSS: &str = include_str!("../static/derechos.css");
 
 /// A short tag of the script and the style sheet, so the pages ask for them by a name that
 /// changes when they do and the browser may keep them for a while. Until 1.0.12 every navigation
@@ -550,6 +567,9 @@ pub(crate) fn version_estaticos() -> &'static str {
         DISENO_CSS.hash(&mut h);
         POR_DENTRO_JS.hash(&mut h);
         REVISION_JS.hash(&mut h);
+        INTERRUPTOR_JS.hash(&mut h);
+        DERECHOS_JS.hash(&mut h);
+        DERECHOS_CSS.hash(&mut h);
         format!("{:016x}", h.finish())
     })
 }
@@ -572,6 +592,18 @@ pub(crate) fn pagina(html: &'static str) -> Html<String> {
             .replace(
                 "/static/revision.js\"",
                 &format!("/static/revision.js?v={v}\""),
+            )
+            .replace(
+                "/static/interruptor.js\"",
+                &format!("/static/interruptor.js?v={v}\""),
+            )
+            .replace(
+                "/static/derechos.js\"",
+                &format!("/static/derechos.js?v={v}\""),
+            )
+            .replace(
+                "/static/derechos.css\"",
+                &format!("/static/derechos.css?v={v}\""),
             ),
     )
 }
@@ -644,7 +676,10 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         primario: Mutex::new(None),
         cortes,
         revision: revision::Revisor::default(),
+        vigilancia: vigilancia::Vigilancia::default(),
     });
+    // The constant watch (1.0.45) runs as long as the panel does.
+    vigilancia::Vigilancia::arrancar(&state);
 
     let app = Router::new()
         .route("/", get(api::root_page))
@@ -737,6 +772,45 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/expedientes/{id}/carta", get(expedientes::carta))
         .route("/api/expedientes/{id}/queja", get(expedientes::queja))
         .route("/api/borrado", get(borrado::resumen))
+        // «Certificado de flujos» and «Tu derecho con un clic» (1.0.45).
+        .route(
+            "/certificado",
+            get(|| async { pagina(include_str!("../static/certificado.html")) }),
+        )
+        .route(
+            "/certificado.html",
+            get(|| async { pagina(include_str!("../static/certificado.html")) }),
+        )
+        .route("/api/certificado", get(certificado::generar))
+        .route("/api/certificado/verificar", post(certificado::verificar))
+        .route("/api/derechos", get(derechos::resumen))
+        .route("/api/derechos/carta", get(derechos::carta))
+        .route(
+            "/static/derechos.js",
+            get(|RawQuery(q): RawQuery| async move {
+                estatico(
+                    DERECHOS_JS,
+                    "application/javascript; charset=utf-8",
+                    q.as_deref(),
+                )
+            }),
+        )
+        .route(
+            "/static/derechos.css",
+            get(|RawQuery(q): RawQuery| async move {
+                estatico(DERECHOS_CSS, "text/css; charset=utf-8", q.as_deref())
+            }),
+        )
+        // The certificate's own style, for the panel's view of it (the saved file inlines it).
+        .route(
+            "/static/certificado.css",
+            get(|| async {
+                static_response(
+                    guardiana_verify::certificado_html::CSS,
+                    "text/css; charset=utf-8",
+                )
+            }),
+        )
         .route("/api/borrado/carta", get(borrado::carta_api))
         .route("/api/borrado/envios", post(borrado::nuevo_envio))
         .route(
@@ -849,6 +923,16 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             }),
         )
         .route(
+            "/static/interruptor.js",
+            get(|RawQuery(q): RawQuery| async move {
+                estatico(
+                    INTERRUPTOR_JS,
+                    "application/javascript; charset=utf-8",
+                    q.as_deref(),
+                )
+            }),
+        )
+        .route(
             "/revision",
             get(|| async { pagina(include_str!("../static/revision.html")) }),
         )
@@ -856,6 +940,34 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             "/revision.html",
             get(|| async { pagina(include_str!("../static/revision.html")) }),
         )
+        // «Quién es cada destino» (1.0.45): its page, script and style sheet, and its figures.
+        .route(
+            "/identificacion",
+            get(|| async { pagina(include_str!("../static/identificacion.html")) }),
+        )
+        .route(
+            "/identificacion.html",
+            get(|| async { pagina(include_str!("../static/identificacion.html")) }),
+        )
+        .route(
+            "/static/identificacion.js",
+            get(|| async {
+                static_response(
+                    include_str!("../static/identificacion.js"),
+                    "application/javascript; charset=utf-8",
+                )
+            }),
+        )
+        .route(
+            "/static/identificacion.css",
+            get(|| async {
+                static_response(
+                    include_str!("../static/identificacion.css"),
+                    "text/css; charset=utf-8",
+                )
+            }),
+        )
+        .route("/api/identificacion", get(identificacion::api))
         .route(
             "/por-dentro",
             get(|| async { pagina(include_str!("../static/por-dentro.html")) }),
@@ -897,6 +1009,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/secure-en-directo", get(universo::secure_en_directo))
         .route("/api/revision", get(revision::ver))
         .route("/api/revision/ahora", post(revision::ahora))
+        .merge(vision::rutas())
         .route("/api/ia/alcance", post(api::alcance))
         .route("/api/ia/alcance/anadir", post(api::alcance_anadir))
         .route("/api/dns/aplicar", post(api::dns_aplicar))
@@ -922,12 +1035,55 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/mi-dispositivo", get(api::mi_dispositivo))
         .route("/api/mi-dispositivo/nombre", post(api::mi_nombre))
         .route("/api/mi-dispositivo/compartir", post(api::mi_compartir))
+        // «Vigilancia» (1.0.45): its page (under Diagnóstico), its script, and the answers for
+        // the page and for the top bar's pill and «Pulso del día».
+        .route(
+            "/vigilancia",
+            get(|| async { pagina(include_str!("../static/vigilancia.html")) }),
+        )
+        .route(
+            "/vigilancia.html",
+            get(|| async { pagina(include_str!("../static/vigilancia.html")) }),
+        )
+        .route(
+            "/static/vigilancia.js",
+            get(|| async {
+                static_response(
+                    include_str!("../static/vigilancia.js"),
+                    "application/javascript; charset=utf-8",
+                )
+            }),
+        )
+        .route(
+            "/static/vigilancia.css",
+            get(|| async {
+                static_response(
+                    include_str!("../static/vigilancia.css"),
+                    "text/css; charset=utf-8",
+                )
+            }),
+        )
+        .route("/api/vigilancia", get(vigilancia::ver))
+        .route("/api/vigilancia/resumen", get(vigilancia::resumen))
+        .route("/api/vigilancia/visto", post(vigilancia::visto))
+        .route("/api/vigilancia/ahora", post(vigilancia::ahora))
+        // «Contratos» (1.0.45, «contrato vivo»): its page, script and API, in their own module.
+        .merge(contratos::rutas())
+        .merge(extras::rutas())
+        // The free level and Plus (the owner's free plan, 18 Oct 2026): `/api/plan` says which is
+        // in force, and the Plus routes listed in `plan::RUTAS_PLUS` answer 402 at the free level.
+        // Routes merged above this line are covered.
+        .route("/api/plan", get(plan::ver))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            plan::solo_plus,
+        ))
         .layer(middleware::from_fn(add_security_headers))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::check_host,
         ))
-        .with_state(state);
+        .with_state(state.clone());
 
     let stop = Arc::new(Notify::new());
     let mut addrs = Vec::new();
@@ -956,6 +1112,9 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             .await;
         }));
     }
+    // The contracts' watcher (1.0.45): learns and cuts with no page open, and stops with the
+    // panel. Started once the panel is really up, so a failed start leaves nothing behind.
+    tasks.push(contratos::vigia(state, stop.clone()));
     Ok(Running {
         addrs,
         failed_optional,
@@ -975,6 +1134,17 @@ mod diseno_compartido {
             super::DISENO_CSS,
             zero,
             "diseno.css differs between the panel and ZERO"
+        );
+    }
+
+    /// The cut switch too: one component, byte for byte, in the panel and in ZERO.
+    #[test]
+    fn the_cut_switch_is_the_same_in_the_panel_and_in_zero() {
+        let zero = include_str!("../../../zero/navegador/interfaz/interruptor.js");
+        assert_eq!(
+            super::INTERRUPTOR_JS,
+            zero,
+            "interruptor.js differs between the panel and ZERO"
         );
     }
 }
@@ -1065,11 +1235,17 @@ mod textos {
             include_str!("../static/expedientes.html"),
             include_str!("../static/por-dentro.html"),
             include_str!("../static/revision.html"),
+            include_str!("../static/identificacion.html"),
+            include_str!("../static/vigilancia.html"),
+            include_str!("../static/certificado.html"),
         ];
         const SCRIPTS: &[&str] = &[
             include_str!("../static/app.js"),
             include_str!("../static/por-dentro.js"),
             include_str!("../static/revision.js"),
+            include_str!("../static/identificacion.js"),
+            include_str!("../static/vigilancia.js"),
+            include_str!("../static/derechos.js"),
         ];
         // The keys asked for with a literal: `data-t="x"` in the pages, `t('x')` in the scripts.
         // The ones built at run time (`t('cambio_' + x)`) cannot be read here and are covered by

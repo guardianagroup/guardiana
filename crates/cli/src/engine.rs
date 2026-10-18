@@ -82,8 +82,54 @@ impl EngineConfig {
 /// Rules loaded from the ledger, refreshed when their version changes.
 struct RuleCache {
     rules: Vec<Rule>,
+    /// The same rules without the category ones: what applies at the free level, where only
+    /// the person's own cuts of a name count and nothing is cut automatically by category,
+    /// list or «Protección máxima» (the owner's free plan, 18 Oct 2026). The rules stay in the
+    /// ledger as they are and apply again the moment Plus is back.
+    gratis: Vec<Rule>,
     version: u64,
     checked: Instant,
+}
+
+impl RuleCache {
+    fn new(rules: Vec<Rule>, version: u64) -> Self {
+        let gratis = reglas_gratis(&rules);
+        Self {
+            rules,
+            gratis,
+            version,
+            checked: Instant::now(),
+        }
+    }
+
+    /// The rules that apply at this level.
+    fn para(&self, plus: bool) -> &[Rule] {
+        if plus {
+            &self.rules
+        } else {
+            &self.gratis
+        }
+    }
+}
+
+/// The rules the free level applies: those that name a domain or a suffix (a manual cut and its
+/// undo), never a whole category.
+fn reglas_gratis(rules: &[Rule]) -> Vec<Rule> {
+    rules
+        .iter()
+        .filter(|r| r.match_kind != guardiana_core::MatchKind::Category)
+        .cloned()
+        .collect()
+}
+
+/// How often the engine reads the licence level again: the trial ends within this.
+const NIVEL_CADA: Duration = Duration::from_secs(30);
+
+/// The licence level as the engine last read it, so `decide` does not read the licence on
+/// every query.
+struct NivelCache {
+    plus: bool,
+    visto: Option<Instant>,
 }
 
 /// How often a device's last activity and address are written while it keeps asking.
@@ -106,6 +152,12 @@ struct Inner {
     /// on every query.
     alcances: HashMap<String, Alcance>,
     alcances_vistos: Option<Instant>,
+    /// «Modo apagón» (18 Oct 2026), re-read on the same 2-second beat as the scopes.
+    apagon: guardiana_core::apagon::Apagon,
+    apagon_visto: Option<Instant>,
+    /// The licence's secret, to read the level with.
+    secreto: String,
+    nivel: NivelCache,
 }
 
 /// What a device's declared scope says (decision 154).
@@ -134,6 +186,8 @@ struct Pending {
     classified: Classified,
     /// Cut because it fell outside the declared scope, not because of a rule.
     fuera_de_alcance: bool,
+    /// Cut by «Modo apagón», not because of a rule.
+    por_apagon: bool,
     /// Cut after the answer as a name dressed as another (decision 205): the tracker's site it
     /// answered as. The outcome then says `Blocked` and carries no aliases, so the site rides here.
     disfraz_cortado: Option<String>,
@@ -303,6 +357,8 @@ fn filas_de_trafico(
                 enviados: m.enviados,
                 recibidos: m.recibidos,
                 paquetes: m.paquetes,
+                reenviados: m.reenviados,
+                conexiones: m.conexiones,
                 // The operator's own place first. Where they publish none, the city the address
                 // database gives, approximate. An anycast address answers from many places.
                 lugar: if s.anycast {
@@ -317,6 +373,67 @@ fn filas_de_trafico(
             }
         })
         .collect()
+}
+
+/// «Visión profunda» (1.0.45), the service's half: the file-name watch (only while the person
+/// has it on), the «posible transferencia» detector fed with every take of traffic, and the
+/// hourly chained summary closed when an hour ends. All in memory but the warnings and the
+/// summary; no address and no content is kept.
+#[derive(Default)]
+struct Vision {
+    detector: guardiana_core::vision::Detector,
+    archivos: Option<guardiana_apps::Archivos>,
+    /// The file session could not open: said once and not retried every ten seconds, until the
+    /// person turns the watch off and on again.
+    archivos_fallo: bool,
+    ultima_hora: i64,
+}
+
+impl Vision {
+    fn paso(&mut self, l: &mut Ledger, filas: &[guardiana_core::Trafico], ahora: i64) {
+        let quiere = l.vision_archivos();
+        match (quiere, self.archivos.is_some()) {
+            (true, false) if !self.archivos_fallo => match guardiana_apps::Archivos::arrancar() {
+                Ok(a) => self.archivos = Some(a),
+                Err(guardiana_apps::Error::NoSoportado) => self.archivos_fallo = true,
+                Err(e) => {
+                    eprintln!("guardiana: {e}");
+                    self.archivos_fallo = true;
+                }
+            },
+            (false, true) => {
+                // Off: the session closes and what it remembered goes with it.
+                self.archivos = None;
+                self.detector = guardiana_core::vision::Detector::new();
+            }
+            (false, false) => self.archivos_fallo = false,
+            _ => {}
+        }
+        if let Some(a) = &self.archivos {
+            for x in a.toma() {
+                self.detector.lectura(x);
+            }
+            for e in guardiana_panel::vision::envios_de(filas, ahora) {
+                self.detector.envio(e);
+            }
+            let nuevas = self.detector.revisa(ahora);
+            if !nuevas.is_empty() {
+                if let Err(e) = l.anota_transferencias(&nuevas) {
+                    eprintln!("guardiana: {e}");
+                }
+            }
+        }
+        let hora = guardiana_core::vision::hora_de(ahora);
+        if hora != self.ultima_hora {
+            self.ultima_hora = hora;
+            if let Err(e) = guardiana_panel::vision::cierra_horas(l, ahora) {
+                eprintln!("guardiana: {e}");
+            }
+            if let Err(e) = l.poda_vision(ahora) {
+                eprintln!("guardiana: {e}");
+            }
+        }
+    }
 }
 
 /// The rules as the resolver matches them. A rule saved before 1.0.2 may hold what was typed
@@ -341,6 +458,19 @@ fn key_of(q: &Query) -> PendingKey {
 }
 
 impl Inner {
+    /// Whether Plus is on (trial, subscription or Lifetime), read again every [`NIVEL_CADA`].
+    /// A licence that cannot be read counts as Plus: an error must never take features away
+    /// from someone who paid.
+    fn plus(&mut self) -> bool {
+        if self.nivel.visto.is_none_or(|t| t.elapsed() >= NIVEL_CADA) {
+            self.nivel.plus = guardiana_license::status(&self.ledger, &self.secreto, now_ms())
+                .map(|s| s.plus_activo)
+                .unwrap_or(true);
+            self.nivel.visto = Some(Instant::now());
+        }
+        self.nivel.plus
+    }
+
     /// The declared scope of one device, from the settings, re-read at most every two
     /// seconds. A device with no scope written gets an empty one, which never cuts.
     fn alcance_de(&mut self, device_id: &str) -> Alcance {
@@ -384,6 +514,24 @@ impl Inner {
         a
     }
 
+    /// Whether «Modo apagón» cuts this computer's query for `name`, from the setting read at
+    /// most every two seconds (the resolver's hot path must not touch the disk on every query).
+    fn apagon_corta(&mut self, name: &str) -> bool {
+        if self
+            .apagon_visto
+            .is_none_or(|t| t.elapsed() >= Duration::from_secs(2))
+        {
+            let valor = self
+                .ledger
+                .setting(guardiana_core::apagon::AJUSTE_APAGON)
+                .ok()
+                .flatten();
+            self.apagon = guardiana_core::apagon::Apagon::de_ajuste(valor.as_deref());
+            self.apagon_visto = Some(Instant::now());
+        }
+        self.apagon.corta(name)
+    }
+
     fn refresh_rules(&mut self) {
         if self.rules.checked.elapsed() < Duration::from_secs(2) {
             return;
@@ -393,6 +541,7 @@ impl Inner {
         if version != self.rules.version {
             if let Ok(all) = self.ledger.rules() {
                 self.rules.rules = reglas_legibles(all);
+                self.rules.gratis = reglas_gratis(&self.rules.rules);
                 self.rules.version = version;
             }
             // «Borrar todo» bumps the version too: what this pass remembered about the devices
@@ -426,6 +575,9 @@ impl EnginePolicy {
     fn sin_decidir(&self, q: &Query) -> Option<Pending> {
         let who = self.devices.identify(q.client.ip());
         let mut inner = self.inner.lock().ok()?;
+        if !inner.plus() && who.id != guardiana_core::SELF_DEVICE_ID {
+            return None;
+        }
         let first_time = inner
             .ledger
             .first_time(&who.id, &q.name, q.ts)
@@ -441,6 +593,7 @@ impl EnginePolicy {
             ip: q.client.ip().to_string(),
             classified,
             fuera_de_alcance: false,
+            por_apagon: false,
             disfraz_cortado: None,
             first_seen: q.ts,
         })
@@ -455,6 +608,14 @@ impl Policy for EnginePolicy {
         let Ok(mut inner) = self.inner.lock() else {
             return Decision::Forward;
         };
+        // The free level watches this computer only (the owner's free plan, 18 Oct 2026). Another
+        // device that still asks here (Home Mode switched on during the trial, the router still
+        // pointing at this computer) is answered as always, so nobody in the house loses
+        // internet, but nothing about it is looked at or written down.
+        let plus = inner.plus();
+        if !plus && who.id != guardiana_core::SELF_DEVICE_ID {
+            return Decision::Forward;
+        }
         let ip = q.client.ip().to_string();
         let device_id = who.id;
         let first_seen = match inner.devices_seen.get(&device_id) {
@@ -491,7 +652,7 @@ impl Policy for EnginePolicy {
         });
         inner.refresh_rules();
         let regla = rules::decide(
-            &inner.rules.rules,
+            inner.rules.para(plus),
             RuleInput {
                 device_id: &device_id,
                 name: &q.name,
@@ -522,7 +683,9 @@ impl Policy for EnginePolicy {
             // checks, resolvers, messaging): Guard mode is a wide cut, and the inviolable rule
             // of brief §6 covers it like a category rule. Until 1.0.2 it cut them while the
             // panel left them out of its count (G3, 28 Sep 2026).
-            if alcance.cortar
+            // An automatic cut: Plus only.
+            if plus
+                && alcance.cortar
                 && !alcance.patrones.is_empty()
                 && !alcance.cubre(&q.name)
                 && classified.category != guardiana_core::Category::Esperado
@@ -536,6 +699,21 @@ impl Policy for EnginePolicy {
         } else {
             decision
         };
+        // «Modo apagón» (customer request, 18 Oct 2026): this computer's own queries only, and
+        // never the essential list or what the person approved (`guardiana_core::apagon`). It
+        // applies from the first minute, with no 24 hours of observation: it is the person's
+        // own switch, on this computer, and the same switch takes it off. A name already cut by
+        // a rule stays recorded as cut by that rule.
+        let mut por_apagon = false;
+        let decision = if !matches!(decision, Decision::Block { .. })
+            && device_id == guardiana_core::SELF_DEVICE_ID
+            && inner.apagon_corta(&q.name)
+        {
+            por_apagon = true;
+            Decision::Block { rule_id: None }
+        } else {
+            decision
+        };
         drop(inner);
         if let Ok(mut pending) = self.pending.lock() {
             pending.insert(
@@ -545,6 +723,7 @@ impl Policy for EnginePolicy {
                     ip,
                     classified,
                     fuera_de_alcance,
+                    por_apagon,
                     disfraz_cortado: None,
                     first_seen,
                 },
@@ -576,8 +755,9 @@ impl Policy for EnginePolicy {
             return Decision::Forward;
         };
         inner.refresh_rules();
+        let plus = inner.plus();
         let regla = rules::decide_cloaked(
-            &inner.rules.rules,
+            inner.rules.para(plus),
             RuleInput {
                 device_id: &p.device_id,
                 name: &q.name,
@@ -628,6 +808,9 @@ impl Policy for EnginePolicy {
         if p.fuera_de_alcance && verdict == Verdict::Cortado {
             decided_by = DecidedBy::AlcanceDeclarado;
         }
+        if p.por_apagon && verdict == Verdict::Cortado {
+            decided_by = DecidedBy::ModoApagon;
+        }
         let Ok(mut inner) = self.inner.lock() else {
             return;
         };
@@ -644,10 +827,12 @@ impl Policy for EnginePolicy {
         // extracto (decisión 203, con el ok del responsable del 11 oct 2026). La dirección no
         // pasa de esta línea. Nada para lo cortado ni para lo que contestó GUARDIANA.
         if let Outcome::Forwarded {
-            server: Some(ip), ..
-        } = outcome
+            server: Some(ip),
+            otras,
+            ..
+        } = &outcome
         {
-            event.server = Some(guardiana_lists::server_info_de(ip));
+            event.server = Some(guardiana_lists::server_info_de(*ip));
             if p.device_id == guardiana_core::SELF_DEVICE_ID {
                 if let Ok(mut m) = self.nombres_ip.lock() {
                     if m.len() >= MAX_NOMBRES_IP {
@@ -657,10 +842,12 @@ impl Policy for EnginePolicy {
                             m.clear();
                         }
                     }
-                    m.insert(
-                        ip,
-                        (q.name.trim_end_matches('.').to_ascii_lowercase(), q.ts),
-                    );
+                    let nombre = q.name.trim_end_matches('.').to_ascii_lowercase();
+                    // 1.0.45: every address of the answer, not only the first, so a program
+                    // that connects to the second one is not shown as «without a name».
+                    for a in std::iter::once(ip).chain(otras.iter()) {
+                        m.insert(*a, (nombre.clone(), q.ts));
+                    }
                 }
             }
         }
@@ -671,6 +858,20 @@ impl Policy for EnginePolicy {
         if let Outcome::Forwarded { aliases, .. } = &outcome {
             if !aliases.is_empty() {
                 event.cname_target = inner.classifier.catalog().cloaked_target(&q.name, aliases);
+                // 1.0.45: the sites of the whole chain, by name, so the panel can say whose
+                // service answers under it (`atribucion`). Only for a device whose names the
+                // household may read: a phone that does not share its detail leaves no name here.
+                let comparte = p.device_id == guardiana_core::SELF_DEVICE_ID
+                    || inner.ledger.shares_detail(&p.device_id).unwrap_or(false);
+                if comparte {
+                    let sitios = guardiana_lists::atribucion::sitios_de_cadena(
+                        &q.name,
+                        aliases,
+                        guardiana_core::MAX_ALIAS_SITES,
+                    );
+                    // A failure here loses a clue, never the query's own row.
+                    let _ = inner.ledger.note_alias_sites(&q.name, &sitios, q.ts);
+                }
             }
         }
         if verdict == Verdict::Cortado && p.disfraz_cortado.is_some() {
@@ -1682,14 +1883,17 @@ async fn run_once<F: Future<Output = ()>>(
             classifier,
             devices_seen: HashMap::new(),
             devices_touched: HashMap::new(),
-            rules: RuleCache {
-                rules: initial_rules,
-                version: initial_version,
-                checked: Instant::now(),
-            },
+            rules: RuleCache::new(initial_rules, initial_version),
             recorded: 0,
             alcances: HashMap::new(),
             alcances_vistos: None,
+            apagon: guardiana_core::apagon::Apagon::default(),
+            apagon_visto: None,
+            secreto: secret.clone(),
+            nivel: NivelCache {
+                plus: true,
+                visto: None,
+            },
         }),
         pending: Mutex::new(HashMap::new()),
         devices: guardiana_devices::Resolver::default(),
@@ -1817,36 +2021,41 @@ async fn run_once<F: Future<Output = ()>>(
             Some(tokio::spawn(async move {
                 let mut cada = tokio::time::interval(Duration::from_secs(TRAFICO_CADA_S));
                 let mut conexion: Option<Ledger> = None;
+                let mut vision = Vision::default();
                 loop {
                     cada.tick().await;
-                    let medidas = red.toma();
-                    if medidas.is_empty() {
-                        continue;
-                    }
-                    let filas = filas_de_trafico(&medidas, &nombres, now_ms());
+                    let ahora = now_ms();
                     if conexion.is_none() {
                         conexion = Ledger::open(&db, identity::genesis()).ok();
                     }
-                    if let Some(l) = conexion.as_mut() {
-                        // «Que GUARDIANA lo mire» apagado (1.0.22): lo que miden los antivirus
-                        // se tira, no se guarda. La lectura de cada vez es la que manda, no una copia.
-                        let filas: Vec<_> = if l.vigilando_antivirus() {
-                            filas
-                        } else {
-                            filas
-                                .into_iter()
-                                .filter(|f| {
-                                    guardiana_lists::antivirus::antivirus_de_programa(&f.programa)
-                                        .is_none()
-                                })
-                                .collect()
-                        };
-                        if filas.is_empty() {
-                            continue;
-                        }
-                        if let Err(e) = l.suma_trafico(&filas) {
-                            eprintln!("guardiana: {e}");
-                        }
+                    let medidas = red.toma();
+                    let filas = filas_de_trafico(&medidas, &nombres, ahora);
+                    let Some(l) = conexion.as_mut() else {
+                        continue;
+                    };
+                    // «Que GUARDIANA lo mire» apagado (1.0.22): lo que miden los antivirus
+                    // se tira, no se guarda. La lectura de cada vez es la que manda, no una copia.
+                    let filas: Vec<_> = if l.vigilando_antivirus() {
+                        filas
+                    } else {
+                        filas
+                            .into_iter()
+                            .filter(|f| {
+                                guardiana_lists::antivirus::antivirus_de_programa(&f.programa)
+                                    .is_none()
+                            })
+                            .collect()
+                    };
+                    // «Visión profunda» (1.0.45): the file watch, the possible transfers and the
+                    // hourly chained summary, from the same rows (what the person chose not to
+                    // keep is not used there either). Every tick, so an hour closes on time even
+                    // when nothing was measured.
+                    vision.paso(l, &filas, ahora);
+                    if filas.is_empty() {
+                        continue;
+                    }
+                    if let Err(e) = l.suma_trafico(&filas) {
+                        eprintln!("guardiana: {e}");
                     }
                 }
             }))
@@ -2520,6 +2729,7 @@ mod aparte_tests {
         s.anota(&Outcome::Forwarded {
             rcode: dns::ResponseCode::NoError,
             server: None,
+            otras: Vec::new(),
             aliases: Vec::new(),
         });
         s.anota(&Outcome::Canary);
@@ -2816,6 +3026,38 @@ mod reglas_tests {
         assert_eq!(r[1].pattern, "ejemplo.com");
         assert_eq!(r[1].match_kind, MatchKind::Suffix);
         assert_eq!(r[2].pattern, "rastreador");
+    }
+
+    /// The free level applies the person's own cuts of a name and their allows, never a cut of a
+    /// whole category (the owner's free plan, 18 Oct 2026); Plus applies all of them. The rules
+    /// themselves are not touched.
+    #[test]
+    fn gratis_aplica_los_cortes_a_mano_y_no_los_de_categoria() {
+        let regla = |id: i64, pattern: &str, kind: MatchKind| Rule {
+            id,
+            scope: Scope::Home,
+            device_id: None,
+            match_kind: kind,
+            pattern: pattern.to_owned(),
+            action: Action::Cortar,
+            created_at: 0,
+            created_by: "panel".to_owned(),
+            expires_at: None,
+            undone_at: None,
+            confirmed: false,
+        };
+        let cache = RuleCache::new(
+            vec![
+                regla(1, "tiktok.com", MatchKind::Suffix),
+                regla(2, "rastreador", MatchKind::Category),
+                regla(3, "ads.ejemplo.com", MatchKind::Domain),
+            ],
+            7,
+        );
+        let ids = |rs: &[Rule]| rs.iter().map(|r| r.id).collect::<Vec<_>>();
+        assert_eq!(ids(cache.para(true)), vec![1, 2, 3]);
+        assert_eq!(ids(cache.para(false)), vec![1, 3]);
+        assert_eq!(cache.version, 7);
     }
 }
 

@@ -8,6 +8,10 @@
 //!
 //! The check runs once per program file, on a thread of its own, and is remembered: the first
 //! query of a program goes without its signer, the next ones carry it.
+//!
+//! The same call reads the version the file declares (1.0.45, «contrato vivo»): its product
+//! version, else its file version, as Explorer's «Details» tab shows them. One PowerShell per
+//! program file for both, never one per query.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Condvar, Mutex};
@@ -17,7 +21,8 @@ const MAXIMO: usize = 4_096;
 
 #[derive(Default)]
 struct Estado {
-    hechas: HashMap<String, String>,
+    /// Program file → (signer, declared version).
+    hechas: HashMap<String, (String, String)>,
     pedidas: HashSet<String>,
     cola: VecDeque<String>,
 }
@@ -42,12 +47,18 @@ impl Firmas {
 
     /// Who signs the program at `ruta`, if already checked; asking queues it.
     pub(crate) fn de(&self, ruta: &str) -> String {
+        self.firma_y_version(ruta).0
+    }
+
+    /// Who signs the program at `ruta` and the version its file declares, if already checked;
+    /// asking queues it. Both empty until the check is done.
+    pub(crate) fn firma_y_version(&self, ruta: &str) -> (String, String) {
         if ruta.is_empty() {
-            return String::new();
+            return (String::new(), String::new());
         }
         let (m, cv) = &*self.estado;
         let Ok(mut e) = m.lock() else {
-            return String::new();
+            return (String::new(), String::new());
         };
         if let Some(f) = e.hechas.get(ruta) {
             return f.clone();
@@ -56,7 +67,7 @@ impl Firmas {
             e.cola.push_back(ruta.to_owned());
             cv.notify_one();
         }
-        String::new()
+        (String::new(), String::new())
     }
 }
 
@@ -82,31 +93,29 @@ fn trabaja(estado: &(Mutex<Estado>, Condvar)) {
     }
 }
 
-/// The signer's common name when the signature is valid, empty otherwise.
-fn firmante(ruta: &str) -> String {
+/// The signer's common name when the signature is valid (empty otherwise), and the version the
+/// file declares (empty when it declares none).
+fn firmante(ruta: &str) -> (String, String) {
     use std::os::windows::process::CommandExt;
     // CREATE_NO_WINDOW: no console flashing when this runs from the service.
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     // The path goes as a literal between single quotes, with its own quotes doubled: nothing in
     // a file name can become a command.
     let literal = ruta.replace('\'', "''");
+    // Two tagged lines, `F:` the signer and `V:` the version, so neither can pass for the other.
     let orden = format!(
         "$s = Get-AuthenticodeSignature -LiteralPath '{literal}'; \
-         if ($s.Status -eq 'Valid') {{ $s.SignerCertificate.GetNameInfo(0, $false) }}"
+         if ($s.Status -eq 'Valid') {{ 'F:' + $s.SignerCertificate.GetNameInfo(0, $false) }}; \
+         $v = (Get-Item -LiteralPath '{literal}').VersionInfo; \
+         if ($v) {{ $p = $v.ProductVersion; if (-not $p) {{ $p = $v.FileVersion }}; \
+         if ($p) {{ 'V:' + $p }} }}"
     );
     let Ok(salida) = std::process::Command::new("powershell.exe")
         .args(["-NoProfile", "-NonInteractive", "-Command", &orden])
         .creation_flags(CREATE_NO_WINDOW)
         .output()
     else {
-        return String::new();
+        return (String::new(), String::new());
     };
-    String::from_utf8_lossy(&salida.stdout)
-        .lines()
-        .map(str::trim)
-        .find(|l| !l.is_empty())
-        .unwrap_or_default()
-        .chars()
-        .take(200)
-        .collect()
+    crate::lee_firma_y_version(&String::from_utf8_lossy(&salida.stdout))
 }

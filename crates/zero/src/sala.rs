@@ -823,7 +823,8 @@ impl Sala {
                             self.llamada = Some(Llamada {
                                 de: i,
                                 a: None,
-                                video,
+                                // Voice only (18 Oct 2026, `secure::VIDEO`).
+                                video: video && crate::secure::VIDEO,
                                 desde: ahora_s(),
                             });
                         }

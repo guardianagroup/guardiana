@@ -2,7 +2,7 @@
 
 *Languages: [Español](README.md) · **English** · [Português](README.pt.md)*
 
-A program for Windows, Linux and macOS that turns the computer into the **DNS guardian of the home**:
+A program for Windows and macOS that turns the computer into the **DNS guardian of the home**:
 first of itself, then of the phones, the TV and everything that uses the Wi‑Fi, without
 installing anything on them. It sees which services each device tries to talk to, classifies it,
 explains it in one sentence, writes it down in a hash-chained ledger and blocks only what the
@@ -41,10 +41,9 @@ anything. The first 7 days are free; after that it comes with the GUARDIANA subs
 | System | Package | How |
 |---|---|---|
 | Windows 10/11 (64-bit) | `guardiana-<version>-windows-x64-en.msi` (Spanish: `…-x64.msi`; Portuguese: `…-x64-pt.msi`) | Double-click. Installs into Program Files and registers the service. |
-| Debian, Ubuntu and derivatives | `guardiana_<version>_amd64.deb` | `sudo apt install ./guardiana_<version>_amd64.deb` |
-| Other Linux with systemd | `guardiana-<version>-linux-x86_64.tar.gz` | Unpack and `sudo ./instalar.sh` |
+| macOS (Apple chip) | `guardiana-<version>-macos.app.zip` | Unzip and drag GUARDIANA.app to Applications. |
 
-On Linux and on the Mac, installing **does not change the system DNS**: that is done from the panel,
+On the Mac, installing **does not change the system DNS**: that is done from the panel,
 with consent, and undone in the same place. On Windows, a first install makes GUARDIANA the DNS (the
 welcome screen says so before “Install”), and it is undone in the panel, under “Status”. Uninstalling turns Home Mode off, removes the firewall rule and restores
 the DNS exactly as it was.
@@ -78,7 +77,7 @@ cargo test --workspace --locked
 ```
 
 Reproducible build in a digest-pinned container: `build/repro.sh` (see
-[docs/VERIFY.md](docs/VERIFY.md)). Packages: `build/package.sh` (Linux) and `build/msi.ps1`
+[docs/VERIFY.md](docs/VERIFY.md)). Packages: `build/package.sh` and `build/msi.ps1`
 (Windows). Code layout and working rules: [docs/BRIEF.md](docs/BRIEF.md).
 
 ## Licence

@@ -39,7 +39,7 @@ Una línea por versión publicada, en este repositorio, **antes** de que exista 
 
 - `sha256_unsigned`: huella del binario tal cual sale de la compilación reproducible.
 - `sha256_signed`: huella del mismo binario después de la firma de código de Windows (cambia porque
-  la firma se añade dentro del archivo). En Linux ambas coinciden.
+  la firma se añade dentro del archivo). En la app de Mac y en los archivos sin firma de código ambas coinciden.
 - `minisign`: la firma minisign del binario sin firmar.
 - `rekor_uuid`: la entrada en Rekor (registro de transparencia público de Sigstore) donde se subió
   esta línea. Sirve para demostrar que la línea existía en esa fecha y no se cambió después.
@@ -60,9 +60,12 @@ La firma minisign de esa misma línea va dentro de la entrada de Rekor, con la c
 
 ## Reproducir la compilación
 
-`build/repro.sh` compila GUARDIANA dentro de un contenedor fijado por huella (mismo compilador,
-mismas dependencias, misma fecha de compilación tomada del commit) y escribe los SHA‑256 de los
-binarios. Quien lo ejecute sobre el mismo commit debe obtener las mismas huellas que
+`build/repro.sh` compila el binario de Windows de GUARDIANA (`guardiana-<versión>-windows-x86_64.exe`)
+dentro de un contenedor fijado por huella (mismo compilador, mismas dependencias, misma fecha de
+compilación tomada del commit, el sello de tiempo del .exe reescrito con esa fecha) y escribe su
+SHA‑256. Desde 1.0.45 solo ese binario: GUARDIANA se publica para Windows y macOS, y la app de
+Mac se hace en un Mac, así que no sale del contenedor (las versiones anteriores publicaron también
+un binario de Linux; su línea del registro sigue igual). Quien lo ejecute sobre el mismo commit debe obtener las mismas huellas que
 `sha256_unsigned` en `ledger.jsonl`. Si alguien ajeno lo hace, se anota aquí:
 
 | Fecha | Quién | Versión | Resultado |
@@ -72,9 +75,49 @@ binarios. Quien lo ejecute sobre el mismo commit debe obtener las mismas huellas
 ## Comprobar a mano, sin GUARDIANA
 
 ```bash
-sha256sum guardiana-1.0.0-linux-x86_64          # compara con ledger.jsonl
-minisign -Vm guardiana-1.0.0-linux-x86_64 -P <clave pública publicada en la web>
+sha256sum guardiana-1.0.45-windows-x64.msi          # compara con ledger.jsonl
+minisign -Vm guardiana-1.0.45-windows-x64.msi -P <clave pública publicada en la web>
 ```
 
 La clave pública minisign está en `build/pubkey/minisign.pub` de este repositorio y en la web.
 Si esa clave cambiara alguna vez, sería un aviso serio: la clave es la identidad del programa.
+
+## El certificado de flujos (1.0.45)
+
+El panel («Certificado y derechos») y `guardiana certificado [--mes AAAA-MM]` hacen, desde el
+extracto de este equipo, un **certificado de flujos** de un mes o de cualquier periodo: a qué
+empresas preguntó este equipo, cuántas veces, desde qué países respondieron los servidores, qué se
+cortó y a qué empresas de referencia (las que tienen ficha comprobada) no preguntó nunca. Sin
+direcciones IP y, salvo que se pida, sin nombres: por empresas. Son tres archivos:
+
+- `guardiana-certificado-<desde>_<hasta>.json`: el certificado (formato
+  `guardiana-certificado-flujos/1`).
+- `….json.sha256`: el **sello**, el SHA-256 de ese `.json` en el formato de `sha256sum`.
+- `….html`: el mismo contenido para leer e imprimir (guardar como PDF desde el navegador).
+
+No hay criptografía nueva. El `.json` apunta a la cadena del extracto: la primera y la última fila
+de este equipo en el periodo (`id`, `prev_hash`, `row_hash`), cuántas son, y `huella_filas`, el
+SHA-256 de sus `row_hash` (los 32 bytes de cada uno, uno tras otro, en orden de `id`). Tampoco hay
+firma de nadie: en el equipo no hay una clave privada, y una que estuviera junto al extracto no
+probaría nada que no pruebe un hash. Se dice así en el propio certificado.
+
+Para comprobarlo:
+
+```bash
+sha256sum -c guardiana-certificado-2026-09-01_2026-09-30.json.sha256   # el .json no cambió
+guardiana verify --certificado guardiana-certificado-2026-09-01_2026-09-30.json
+```
+
+`guardiana verify --certificado` (y «Comprobar un certificado» en el panel) lo rehace desde el
+extracto de este equipo con sus mismas opciones y compara: **coincide**; **mismas filas, otra
+versión** (las filas son las mismas, pero otra versión de las listas atribuyó algún nombre a otra
+empresa); **ya recortado** (las filas se recortaron por el plazo de conservación: solo queda el
+sello); o **no coincide** (otro equipo, un archivo cambiado o filas cambiadas).
+
+Quien no tenga este equipo puede comprobar `huella_filas` con las filas del periodo exportadas
+(`guardiana export --json --device self --since <ms> --until <ms>`): cada `row_hash` se recalcula
+como arriba y su concatenación debe dar la huella. Los bytes medidos (Windows) van en el `.json` y
+quedan sellados, pero no están en la cadena: son medidas, no filas.
+
+El extracto para una carta («Tu derecho con un clic») es un certificado con `solo_empresa`: solo
+esa empresa, la misma referencia a la cadena.

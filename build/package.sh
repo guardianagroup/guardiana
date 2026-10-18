@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# build/package.sh: produce the installers (brief §11) from the cross-compiled
-# release binaries: Linux tarball, Linux .deb (cargo-deb) and Windows MSI (WiX
-# v5 as a dotnet tool, which runs on Linux/macOS too, so the MSI can be built
-# inside the reproducible container; DECISIONES #34). Output in dist/<version>/
+# build/package.sh: produce the Windows installers (brief §11) from the cross-compiled
+# release binary: the MSI (WiX v5 as a dotnet tool; DECISIONES #34). Output in dist/<version>/
 # with SHA256SUMS. Signing and the ledger line are build/release.sh's job.
+# Since 1.0.45 there is no Linux package (the owner, 18 Oct 2026: «QUITA LINUX. SOLO MAC Y
+# WINDOWS»); the Mac app is made on a Mac (build/mac/crear-app.sh).
 #
-# Needs: cargo-zigbuild + zig, cargo-deb, dotnet + `dotnet tool install -g wix`.
+# Needs: cargo-zigbuild + zig, dotnet + `dotnet tool install -g wix`.
 set -euo pipefail
 # The Python to use. On Windows, Git Bash finds a "python3" that is only the Microsoft Store
 # shortcut and fails ("Python was not found"); the real one is "python" (found on the Windows PC
@@ -18,17 +18,15 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
 OUT="dist/$VERSION"
-LINUX_BIN="target/x86_64-unknown-linux-gnu/release/guardiana"
 WIN_BIN="target/x86_64-pc-windows-gnu/release/guardiana.exe"
 export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
 export PATH="$HOME/.cargo/bin:$HOME/.local/zig:$DOTNET_ROOT:$DOTNET_ROOT/tools:$PATH"
 
 if [ "${1:-}" != "--no-build" ]; then
-    cargo zigbuild --release --locked -p guardiana-cli --target x86_64-unknown-linux-gnu
     cargo zigbuild --release --locked -p guardiana-cli --target x86_64-pc-windows-gnu
 fi
-[ -f "$LINUX_BIN" ] && [ -f "$WIN_BIN" ] || { echo "release binaries missing; run without --no-build"; exit 1; }
+[ -f "$WIN_BIN" ] || { echo "release binaries missing; run without --no-build"; exit 1; }
 
 # Mismo sello de tiempo que build/repro.sh: sin esto, el .exe de aquí y el del contenedor no
 # pueden coincidir nunca, por mucho que el código sea el mismo.
@@ -38,37 +36,7 @@ fi
 mkdir -p "$OUT"
 find "$OUT" -type f ! -name '*.msi' -delete
 
-# 1. Linux tarball with a readable install script.
-TAR_DIR="guardiana-$VERSION-linux-x86_64"
-STAGE=$(mktemp -d)
-mkdir -p "$STAGE/$TAR_DIR"
-cp "$LINUX_BIN" build/tarball/instalar.sh build/tarball/desinstalar.sh build/tarball/LEEME.txt \
-    build/tarball/README.txt build/tarball/LEIAME.txt "$STAGE/$TAR_DIR/"
-cp docs/WHAT_IT_DOES_NOT_DO.md docs/VERIFY.md docs/HOGAR.md docs/LISTS.md LICENSE "$STAGE/$TAR_DIR/"
-# Modes set here, not inherited: the binary that release.sh packs comes out of a GitHub artifact,
-# which drops the exec bit, and 1.0.0 shipped a `guardiana` that could not be run in place.
-chmod 644 "$STAGE/$TAR_DIR"/*
-chmod 755 "$STAGE/$TAR_DIR/guardiana" "$STAGE/$TAR_DIR/instalar.sh" "$STAGE/$TAR_DIR/desinstalar.sh"
-# Fixed mtime, owner and file order so the tarball is reproducible from the
-# same inputs (GNU tar in the container, bsdtar on a Mac).
-EPOCH=$(git log -1 --format=%ct 2>/dev/null || date +%s)
-find "$STAGE/$TAR_DIR" -exec touch -h -d "@$EPOCH" {} + 2>/dev/null || \
-    find "$STAGE/$TAR_DIR" -exec touch -h -t "$(date -r "$EPOCH" +%Y%m%d%H%M.%S)" {} +
-FILES=$(cd "$STAGE" && find "$TAR_DIR" | LC_ALL=C sort)
-if tar --version 2>/dev/null | grep -q GNU; then
-    OWNER=(--owner=0 --group=0 --numeric-owner --mtime="@$EPOCH" --no-recursion)
-else
-    OWNER=(--uid 0 --gid 0 --numeric-owner -n)
-fi
-# shellcheck disable=SC2086
-(cd "$STAGE" && tar --format=ustar "${OWNER[@]}" -cf - $FILES) | gzip -n > "$OUT/$TAR_DIR.tar.gz"
-rm -rf "$STAGE"
-
-# 2. Debian package from the already built binary.
-cargo deb -p guardiana-cli --no-build --no-strip --target x86_64-unknown-linux-gnu \
-    -o "$OUT/guardiana_${VERSION}_amd64.deb"
-
-# 3. Windows MSI, one per language: whoever downloads from the English page must not be handed
+# 1. Windows MSI, one per language: whoever downloads from the English page must not be handed
 # a Spanish installer (22 sep 2026). The three are the same package with the same neutral
 # ProductLanguage, so one replaces another cleanly; only the words change.
 # WiX 4/5 rejects Directory/@Name when it runs on Linux or macOS (it assumes a C:\ root); on
@@ -90,7 +58,7 @@ for idioma in es en pt; do
     if wix build -arch x64 \
         -culture "$cultura" -loc "build/wix/loc-$cultura.wxl" \
         -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext \
-        -d "Version=$VERSION" -d "Lang=0" -d "Exe=$WIN_BIN" \
+        -d "Version=$VERSION" -d "Lang=0" -d "Idioma=$idioma" -d "Exe=$WIN_BIN" \
         -d "Readme=build/wix/textos/leeme-$idioma.txt" \
         -d "Welcome=build/wix/textos/bienvenida-$idioma.rtf" \
         -d "Icon=build/wix/guardiana.ico" \
@@ -119,7 +87,7 @@ if [ -n "$falta_msi" ]; then
     fi
 fi
 
-# 4. Hashes.
+# 2. Hashes.
 rm -f "$OUT/SHA256SUMS"
 SUMS=$(mktemp)
 (cd "$OUT" && if command -v sha256sum >/dev/null; then sha256sum -- *; else shasum -a 256 -- *; fi) > "$SUMS"

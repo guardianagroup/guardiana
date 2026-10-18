@@ -14,11 +14,16 @@
 //! Only DNS *queries* are ever stored: name, type, device, time, category,
 //! signals and verdict. Answers are never stored (brief §4).
 
+mod alias;
+pub mod apagon;
 mod changes;
+pub mod contratos;
 mod error;
 mod export;
+mod flujos;
 mod gaps;
 mod hash;
+pub mod huellas;
 pub mod i18n;
 pub mod identity;
 mod ledger;
@@ -32,12 +37,16 @@ mod stats;
 pub mod time;
 mod trafico;
 pub mod trampas;
+pub mod vigilancia;
+pub mod vision;
 
+pub use alias::{AliasSites, NameNetwork, MAX_ALIAS_SITES};
 pub use changes::{Change, ChangeKind, ChangeWho};
 pub use error::{Error, Result};
 pub use export::{
     write_csv, write_csv_for_spreadsheet, write_csv_for_spreadsheet_with, write_json,
 };
+pub use flujos::{BytesDestino, FilaFlujo};
 pub use gaps::{Gap, GAP_THRESHOLD_MS, KEY_HEARTBEAT};
 pub use hash::{chain_hash, Hash, HashInput};
 pub use ledger::{

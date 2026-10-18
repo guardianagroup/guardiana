@@ -1,0 +1,662 @@
+# GUARDIANA — lista «redes»: qué clase de red es cada sistema autónomo de internet (1.0.45).
+# Mantenida por nosotros, abierta.
+#
+# edicion: 2026-10-18
+#
+# Para qué. La base de IP que va en el programa (DB-IP «IP to ASN Lite», CC BY 4.0) dice de quién
+# es la red que anunció una dirección, pero no qué clase de red es. Y eso cambia lo que se puede
+# decir: un servidor dentro de la red de Meta es de Meta; uno dentro de la red de Amazon Web
+# Services es de quien se lo alquila a Amazon, no de Amazon (el responsable, 18 oct 2026: «alojado
+# en AWS no es Amazon»); uno dentro de la red de tu operador puede ser la caché de Netflix o de
+# Google que el operador tiene en su casa.
+#
+# FORMATO: `@Operador|tipo|señas|Empresa`, y debajo una línea `AS<número>` por red.
+#   tipo     propia      la red solo lleva los servicios de su dueño (Meta, Apple, Netflix…).
+#                        Es la única que deja decir «probablemente es de esa empresa».
+#            mixta       lleva los servicios de su dueño y también los de clientes que alquilan
+#                        (Microsoft con Azure, Google con App Engine): no prueba nada del nombre.
+#            nube        alquila servidores a quien sea (AWS, Google Cloud, Hetzner…).
+#            reparto     red de entrega que sirve contenido de otros (Akamai, Cloudflare…).
+#            seguridad   red de un filtro o proxy por el que pasa el tráfico de sus clientes.
+#            alojamiento empresa de alojamiento web para terceros.
+#            acceso      operador que da internet a personas y empresas (Claro, Movistar…).
+#   señas    palabras, en minúsculas y separadas por comas, que aparecen en el nombre que DB-IP da
+#            a cada una de esas redes. Una prueba lo comprueba contra la base que va en el programa,
+#            así que esta lista no puede decir de una red lo que la base no dice de ella. Para
+#            «propia», además, el programa solo da la empresa como probable si en ese momento el
+#            nombre de la base coincide con estas señas.
+#   Empresa  la empresa de `empresas.txt` o `empresas-mundo.txt` dueña del operador, si la hay.
+# Fuente de los números: PeeringDB y el registro de cada red (RIR); fuente del nombre: DB-IP.
+
+# --------------------------------------------------------------------------------------------
+# Redes propias: solo sus servicios
+# --------------------------------------------------------------------------------------------
+
+@Meta|propia|facebook|Meta
+AS32934
+AS54115
+AS63293
+
+@Apple|propia|apple|Apple
+AS714
+AS6185
+
+@Netflix|propia|netflix|Netflix
+AS2906
+AS40027
+
+@X|propia|twitter|X
+AS13414
+AS35995
+AS63179
+
+@GitHub|propia|github|Microsoft
+AS36459
+
+@LinkedIn|propia|linkedin|Microsoft
+AS14413
+
+@YouTube|propia|google|Google
+AS36040
+
+@Dropbox|propia|dropbox|Dropbox
+AS19679
+
+@Telegram|propia|telegram|Telegram
+AS62041
+AS59930
+AS62014
+AS44907
+AS211157
+
+@Zoom|propia|zoom|Zoom
+AS30103
+
+@Cisco Webex|propia|webex|Cisco
+AS13445
+
+@Valve|propia|valve|Valve
+AS32590
+
+@Blizzard|propia|blizzard|Activision
+AS57976
+
+@Riot Games|propia|riot|Riot Games
+AS6507
+
+@Roblox|propia|roblox|Roblox
+AS22697
+
+@Wikimedia|propia|wikimedia|Wikimedia Foundation
+AS14907
+
+@Yahoo|propia|yahoo,oath|Yahoo
+AS10310
+AS36647
+
+@TikTok|propia|tiktok|ByteDance
+AS138699
+AS11983
+
+@Kaspersky|propia|kaspersky|Kaspersky
+AS200107
+
+@Yandex|propia|yandex llc|Yandex
+AS13238
+AS44534
+
+@LINE|propia|line corporation|LY Corporation
+AS38631
+
+# --------------------------------------------------------------------------------------------
+# Redes mixtas: sus servicios y los de clientes
+# --------------------------------------------------------------------------------------------
+
+@Google|mixta|google|Google
+AS15169
+AS16550
+AS19527
+AS22577
+AS33715
+AS36383
+AS36384
+AS36385
+AS36411
+AS36492
+AS41264
+AS43515
+AS45566
+AS139070
+AS139190
+AS394089
+AS395973
+AS396178
+
+@Microsoft|mixta|microsoft|Microsoft
+AS3598
+AS5761
+AS8068
+AS8069
+AS8070
+AS8075
+AS12076
+AS17144
+AS35106
+AS45139
+AS46182
+AS54396
+AS58862
+AS59067
+AS63314
+
+@Amazon|mixta|amazon|Amazon
+AS801
+AS401395
+
+@Oracle|mixta|oracle|Oracle
+AS1215
+AS1217
+AS1218
+AS1219
+AS6142
+AS11049
+AS11479
+AS11506
+AS14544
+AS15519
+AS20037
+AS20054
+AS46558
+AS54253
+AS393773
+AS395010
+
+@Tencent|mixta|tencent|Tencent
+AS45090
+AS132203
+AS137876
+
+@Huawei|mixta|huawei|Huawei
+AS63727
+AS200756
+AS206798
+AS265443
+
+@Baidu|mixta|baidu|Baidu
+AS38365
+AS55967
+
+@ByteDance|mixta|bytedance|ByteDance
+AS396986
+
+@VK|mixta|llc vk|VK
+AS28709
+AS47541
+AS47764
+AS49797
+AS49988
+AS57973
+AS60863
+AS207970
+AS213235
+
+@Kakao|mixta|kakao|Kakao
+AS7625
+AS10158
+AS38099
+AS152199
+
+@Rakuten|mixta|rakuten group,rakuten inc|Rakuten
+AS23820
+AS54058
+AS131914
+
+@Xiaomi|mixta|xiaomi|Xiaomi
+AS63855
+AS63915
+
+@Automattic|mixta|automattic|Automattic
+AS2635
+
+@Salesforce|mixta|salesforce|Salesforce
+AS14340
+
+@Adobe|mixta|adobe|Adobe
+AS15224
+
+# --------------------------------------------------------------------------------------------
+# Nubes: servidores que se alquilan a cualquiera
+# --------------------------------------------------------------------------------------------
+
+@Amazon Web Services|nube|amazon|Amazon
+AS16509
+AS14618
+AS8987
+AS7224
+AS21664
+AS36263
+AS62785
+AS214101
+
+@Google Cloud|nube|google|Google
+AS396982
+AS214609
+AS214611
+
+@Oracle Cloud|nube|oracle|Oracle
+AS31898
+
+@Tencent Cloud|nube|tencent|Tencent
+AS133478
+
+@Alibaba Cloud|nube|alibaba|Alibaba Cloud
+AS37963
+AS45102
+AS134963
+
+@Huawei Cloud|nube|huawei|Huawei
+AS55990
+AS131444
+AS136907
+AS141180
+AS151610
+
+@Yandex Cloud|nube|yandex.cloud|Yandex
+AS200350
+AS210656
+AS215013
+
+@Naver Cloud|nube|naver|Naver
+AS23576
+
+@IBM Cloud|nube|ibm cloud|IBM
+AS36351
+
+@Akamai Cloud (Linode)|nube|akamai|Akamai
+AS63949
+
+@DigitalOcean|nube|digitalocean|DigitalOcean
+AS14061
+AS46652
+AS393406
+
+@Hetzner|nube|hetzner|Hetzner
+AS24940
+AS212317
+AS213230
+AS215859
+
+@OVHcloud|nube|ovh|OVHcloud
+AS16276
+AS35540
+
+@Vultr|nube|constant company|Vultr
+AS20473
+AS46407
+
+@Leaseweb|nube|leaseweb
+AS7203
+AS19148
+AS27411
+AS28753
+AS30633
+AS32613
+AS38930
+AS59253
+AS60781
+AS133752
+AS134351
+AS136988
+AS205544
+AS393886
+AS394380
+AS395954
+AS396190
+AS396362
+
+@Contabo|nube|contabo
+AS40021
+AS51167
+AS141995
+
+@Scaleway|nube|scaleway
+AS12876
+AS29447
+AS202023
+AS205537
+
+@M247|nube|m247
+AS9009
+
+@Zenlayer|nube|zenlayer
+AS21859
+
+# --------------------------------------------------------------------------------------------
+# Redes de reparto (CDN): llevan el contenido de otras empresas
+# --------------------------------------------------------------------------------------------
+
+@Akamai|reparto|akamai|Akamai
+AS12222
+AS16625
+AS17204
+AS20940
+AS21342
+AS24319
+AS26008
+AS31108
+AS32787
+AS33905
+AS34164
+AS35994
+AS36183
+AS49846
+AS200005
+AS213120
+AS393560
+
+@Cloudflare|reparto|cloudflare|Cloudflare
+AS13335
+AS14789
+AS22061
+AS132892
+AS139242
+AS202623
+AS203898
+AS209242
+AS394536
+AS395747
+AS400095
+AS402542
+
+@Fastly|reparto|fastly|Fastly
+AS54113
+AS394192
+
+@Edgecast|reparto|edgecast
+AS14210
+
+@Limelight|reparto|limelight
+AS38621
+
+@CDN77|reparto|datacamp
+AS60068
+AS211612
+AS212238
+
+@Bunny.net|reparto|bunnyway|Bunny.net
+AS200325
+
+@Gcore|reparto|g-core
+AS59245
+AS199524
+AS202422
+AS210559
+
+# --------------------------------------------------------------------------------------------
+# Seguridad y alojamiento web para terceros
+# --------------------------------------------------------------------------------------------
+
+@Imperva|seguridad|incapsula,imperva
+AS19551
+AS62571
+
+@Sucuri|seguridad|sucuri
+AS30148
+
+@Zscaler|seguridad|zscaler|Zscaler
+AS22616
+AS53444
+AS53813
+AS62044
+AS62907
+
+@Rackspace|alojamiento|rackspace
+AS12200
+AS15395
+AS19994
+AS24867
+AS27357
+AS33070
+AS39921
+AS44009
+AS45187
+AS54636
+AS58683
+AS198220
+AS213735
+AS213740
+
+@GoDaddy|alojamiento|godaddy|GoDaddy
+AS26496
+
+@Newfold Digital (Unified Layer)|alojamiento|unified layer
+AS46606
+
+@HostPapa|alojamiento|hostpapa
+AS36352
+
+@Shopify|alojamiento|shopify|Shopify
+AS62679
+
+# --------------------------------------------------------------------------------------------
+# Operadores de acceso: la red de quien da internet (a veces con cachés de otros dentro)
+# --------------------------------------------------------------------------------------------
+
+@Claro|acceso|telmex,claro,comcel,uninet|Claro
+AS10620
+AS14080
+AS27864
+AS6429
+AS23002
+AS4230
+AS22085
+AS27652
+AS27995
+AS28351
+AS28573
+AS26611
+AS8151
+
+@Telefónica|acceso|telefonica,telefônica,colombia telecomunicaciones|Telefónica
+AS3352
+AS6813
+AS4926
+AS10834
+AS6147
+AS6306
+AS6805
+AS12638
+AS19196
+AS19422
+AS12956
+AS18881
+AS26599
+AS3816
+AS27921
+
+@Tigo|acceso|epm telecomunicaciones,millicom|Tigo
+AS13489
+AS27695
+AS27773
+AS262197
+
+@ETB|acceso|etb|ETB
+AS19429
+
+@Comcast|acceso|comcast|Comcast
+AS7922
+AS7015
+AS7016
+AS7725
+AS13367
+AS20214
+AS21508
+AS22258
+AS22909
+AS33287
+AS33489
+AS33490
+AS33491
+AS33650
+AS33651
+AS33652
+AS33654
+AS33655
+
+@Charter|acceso|charter communications
+AS3456
+AS6534
+AS7843
+AS10796
+AS11351
+AS11426
+AS11427
+AS12271
+AS20001
+AS20115
+
+@Verizon|acceso|verizon
+AS701
+AS702
+AS703
+
+@AT&T|acceso|at&t
+AS7018
+AS797
+AS2386
+
+@T-Mobile US|acceso|t-mobile usa|T-Mobile US
+AS21928
+AS6614
+AS17133
+AS18933
+AS22140
+
+@Deutsche Telekom|acceso|deutsche telekom|Deutsche Telekom
+AS3320
+AS2792
+AS2773
+
+@Vodafone|acceso|vodafone|Vodafone
+AS1273
+AS3209
+AS5378
+AS6739
+AS12353
+AS12357
+AS12430
+AS15502
+AS25135
+AS25310
+
+@Orange|acceso|orange s.a|Orange
+AS3215
+AS5511
+AS2278
+AS2280
+AS2286
+AS2287
+AS2288
+AS8891
+AS16028
+
+@BT|acceso|british telecommunications
+AS2856
+AS3300
+AS5400
+AS6685
+AS6871
+AS13205
+
+@Free|acceso|free sas
+AS12322
+
+@Telecom Italia|acceso|telecom italia
+AS3269
+
+@Virgin Media|acceso|virgin media
+AS5089
+
+@Telstra|acceso|telstra
+AS1221
+AS4637
+
+@Reliance Jio|acceso|reliance jio|Reliance Jio
+AS55836
+AS64049
+
+@Bharti Airtel|acceso|bharti airtel
+AS9498
+AS9730
+AS24560
+AS45609
+
+@China Telecom|acceso|chinanet
+AS4134
+
+@China Unicom|acceso|china unicom
+AS4837
+
+@China Mobile|acceso|china mobile
+AS9808
+AS24400
+AS56040
+AS56041
+AS56042
+AS56044
+AS56045
+AS56046
+AS56047
+AS56048
+
+@NTT|acceso|ntt
+AS2914
+AS4713
+
+@KDDI|acceso|kddi
+AS2516
+
+@SoftBank|acceso|softbank
+AS4725
+AS17505
+AS17676
+
+@Rakuten Mobile|acceso|rakuten mobile|Rakuten
+AS10012
+AS23720
+AS138384
+
+@Rostelecom|acceso|rostelecom
+AS12389
+
+@Beeline (VEON)|acceso|vimpelcom
+AS3216
+AS8402
+
+@MegaFon|acceso|megafon
+AS31133
+AS25159
+
+@MTS|acceso|mts pjsc|MTS
+AS8359
+
+@Türk Telekom|acceso|turk telekom
+AS9121
+
+@Oi|acceso|oi s.a
+AS14571
+
+@TIM Brasil|acceso|tim s/a
+AS26615
+
+@Entel|acceso|entel
+AS6471
+AS27651
+AS21575
+AS6568
+
+@CANTV|acceso|cantv
+AS8048
+
+@Google Fiber|acceso|google fiber|Google
+AS16591

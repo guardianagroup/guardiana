@@ -151,6 +151,7 @@ ley. La carta va en **inglés** en todos: el panel no está en esos idiomas, y l
 | `ph` | Filipinas | RA 10173 s. 16(e) · s. 16(c) | 15 días naturales de **referencia** (Reglas de procedimiento de la NPC 2021, regla II s. 2: sin respuesta en 15 días se puede reclamar) | igual | borrado (bloqueo, retirada o destrucción, con condiciones) | NPC https://privacy.gov.ph | https://privacy.gov.ph/data-privacy-act/ · https://privacy.gov.ph/wp-content/uploads/2024/03/2021-Rules-of-Procedure-of-the-NPC-As-Amended.pdf |
 | `id` | Indonesia | UU 27/2022 arts. 8 y 43 · arts. 7 y 32 | **sin días** (art. 45: avisar del borrado) | 3 × 24 horas (art. 32.2) | borrado | la agencia que designe el Presidente (art. 58), sin enlace; conflicto: arbitraje o tribunales (art. 64) | https://peraturan.bpk.go.id/Details/229798/uu-no-27-tahun-2022 |
 | `sa` | Arabia Saudí | PDPL art. 4.5 · art. 4.2 | 30 + 30 días (Reglamento de aplicación art. 3.1.a) | igual | borrado (cuando ya no hace falta, salvo art. 18) | SDAIA https://sdaia.gov.sa (art. 34) | https://sdaia.gov.sa/en/SDAIA/about/Documents/PersonalDataProtectionLaw.pdf · https://sdaia.gov.sa/en/SDAIA/about/Documents/ImplementingRegulationPersonalDataProtectionLaw.pdf |
+| `otro` | Cualquier otro país (1.0.45) | ninguna: la carta es una petición según la política de la propia empresa, como la de EE. UU. sin ley estatal | sin plazo | — | ninguno | ninguna conocida; se dice que la busque la persona | Mapa mundial de leyes de protección de datos de la UNCTAD: https://unctad.org/page/data-protection-and-privacy-legislation-worldwide |
 
 Notas:
 - **Los que no entran todavía**: India (los derechos de acceso y borrado de la DPDP Act 2023 y su
@@ -222,6 +223,24 @@ Hallazgos que cambian lo que se le dice a la persona:
 Los nombres de cada empresa vienen del registro de California, de `empresas.txt` (líneas
 `=Empresa`) o de la documentación de la propia empresa (Lotame). Un test comprueba que cada
 `=Empresa` existe de verdad en `empresas.txt`.
+
+## Los canales de privacidad de las empresas grandes (`crates/panel/data/derechos-contactos.txt`, 1.0.45)
+
+«Tu derecho con un clic» escribe a las empresas que este equipo contactó, que casi nunca son
+corredores: Microsoft, Apple, Google, Meta. Para ellas, el canal que **ellas** publican para estas
+peticiones, mirado el 18 oct 2026, mismo formato y mismo lector que la lista de arriba:
+
+- Microsoft: https://www.microsoft.com/privacy/privacy-support-requests (dos formularios, con cuenta
+  personal y sin ella; la página dice que son también el contacto de su delegado; sin correo).
+- Apple: https://www.apple.com/legal/privacy/contact/ww/ (formulario de consultas de privacidad y
+  de su delegado; sin correo).
+- Google: https://support.google.com/policies/contact/general_privacy_form («Privacy Inquiry form»).
+- Meta: https://www.facebook.com/help/contact/540977946302970, según la base abierta de
+  datarequests.org (https://www.datarequests.org/company/facebook), que cita la política de Meta.
+  **No se abrió el formulario sin cuenta**: pendiente de comprobar a mano.
+
+Amazon no está: la única fuente que se pudo leer era un resumen de terceros. Una empresa sin canal
+comprobado recibe la carta sin destinatario y la persona pone el de su web.
 
 ## Lo que no se pudo comprobar (resumen)
 

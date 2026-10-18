@@ -526,6 +526,7 @@ mod tests {
             ruta: ruta.into(),
             sha256: String::new(),
             firmado_por: String::new(),
+            version: String::new(),
         };
         let mut a = NewEvent::observed(1_000, "self", "127.0.0.1", "a.example", "A");
         a.process = Some(prog("AvSvc.exe", r"C:\Av\AvSvc.exe"));
@@ -556,6 +557,7 @@ mod tests {
             ruta: String::new(),
             sha256: String::new(),
             firmado_por: firma.into(),
+            version: String::new(),
         };
         // Two in the person's night (UTC-5: 07:00 UTC is 02:00 there), one cut; one in the day.
         for (h, cortar) in [(7, false), (8, true), (15, false)] {

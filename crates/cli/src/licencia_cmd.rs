@@ -67,7 +67,12 @@ pub(crate) fn describe(t: &i18n::Texts, s: &license::Status) -> String {
                 // panel has the same branch.
                 (Some(p), _, _) if *p == license::DE_POR_VIDA => {
                     text.push(' ');
-                    text.push_str(t.panel("licencia_de_por_vida"));
+                    // Bought under the plan's first name: «Fundador original · De por vida» (18 Oct 2026).
+                    text.push_str(t.panel(if s.fundador_original {
+                        "licencia_de_por_vida_fundador"
+                    } else {
+                        "licencia_de_por_vida"
+                    }));
                     // The gateway turned the key down: from when it stops, said with its date.
                     if let Some(c) = caduca_ms {
                         text.push(' ');

@@ -4,6 +4,9 @@
 # sha256_unsigned. Output: build/out/<files> and build/out/SHA256SUMS.
 #
 # Usage: build/repro.sh [git-ref]      (default: HEAD)
+#
+# Since 1.0.45 it builds only the Windows binary (the owner, 18 Oct 2026: «QUITA LINUX. SOLO MAC
+# Y WINDOWS»). Linux is only the machine the build runs on; no Linux package is published.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -36,9 +39,7 @@ docker run --rm \
     -e CARGO_TARGET_DIR=/tmp/target \
     guardiana-repro \
     bash -euxc '
-        cargo zigbuild --release --locked -p guardiana-cli --target x86_64-unknown-linux-gnu
         cargo zigbuild --release --locked -p guardiana-cli --target x86_64-pc-windows-gnu
-        cp /tmp/target/x86_64-unknown-linux-gnu/release/guardiana "/out/guardiana-'"$version"'-linux-x86_64"
         cp /tmp/target/x86_64-pc-windows-gnu/release/guardiana.exe "/out/guardiana-'"$version"'-windows-x86_64.exe"
         chmod 644 /out/*
     '

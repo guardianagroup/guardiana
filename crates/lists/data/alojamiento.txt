@@ -8,21 +8,75 @@
 # 2026; el 8 se metieron en "entrega" y salían en verde, como "normal").
 # Cada sección @ es la nube; cada línea, un sufijo suyo.
 
+# Lo que un nombre más largo de `empresas.txt` diga de un nombre de aquí gana (una empresa que
+# documenta su propio servidor alquilado: `triplewhale-pixel.web.app`).
+#
+# 18 oct 2026 (1.0.45): más nubes y plataformas donde cualquiera publica con su propio nombre
+# debajo del de la plataforma, de su propia documentación de dominios por defecto.
+
 @Amazon Web Services
 amazonaws.com
 awsglobalaccelerator.com
+amplifyapp.com
+elasticbeanstalk.com
+awsapprunner.com
 
 @Microsoft Azure
 core.windows.net
 azurewebsites.net
 azure-api.net
 cloudapp.net
+azurestaticapps.net
+azurecontainerapps.io
 
 @Google Cloud
 firebaseio.com
 appspot.com
 run.app
 cloudfunctions.net
+firebaseapp.com
+web.app
+
+@Blogger
+blogspot.com
+
+@Cloudflare Pages y Workers
+pages.dev
+workers.dev
+
+@DigitalOcean
+ondigitalocean.app
+digitaloceanspaces.com
+
+@Railway
+railway.app
+
+@Fly.io
+fly.dev
+
+@Render
+onrender.com
+
+@Glitch
+glitch.me
+
+@GitLab Pages
+gitlab.io
+
+@Shopify
+myshopify.com
+
+@Wix
+wixsite.com
+
+@Webflow
+webflow.io
+
+@Supabase
+supabase.co
+
+@Deno Deploy
+deno.dev
 
 @GitHub Pages
 github.io

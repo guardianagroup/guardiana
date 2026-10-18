@@ -36,6 +36,11 @@ rustls = { workspace = true }
 tokio-rustls = { workspace = true }
 webpki-roots = { workspace = true }
 
+# DPAPI for the secrets at rest (18 Oct 2026, `dpapi`): already in the tree for the CLI and
+# the apps, same version; only the cryptography part of Win32 is turned on here.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Cryptography"] }
+
 [lints]
 workspace = true
 

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>GUARDIANA · Certificado y derechos</title>
+<link rel="stylesheet" href="/static/diseno.css">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/derechos.css">
+<link rel="preload" href="/static/fonts/HankenGrotesk-var.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="/static/fonts/SchibstedGrotesk-var.woff" as="font" type="font/woff" crossorigin>
+<script src="/static/arranque.js"></script>
+</head>
+<body data-page="certificado">
+<header class="top">
+  <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA<small data-t="lema"></small></span></a>
+  <nav>
+    <a href="/por-dentro" data-t="menu_en_vivo">En vivo</a>
+    <a href="/extracto" data-t="menu_actividad">Actividad</a>
+    <a href="/contratos" data-t="nav_contratos">Contratos</a>
+    <a href="/revision" data-t="menu_diagnostico">Diagnóstico</a>
+    <a href="/sabe-de-ti" aria-current="true" data-t="menu_privacidad">Privacidad</a>
+    <a href="/hogar" data-t="menu_ajustes">Ajustes</a>
+  </nav>
+</header>
+<main class="derechos">
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+
+<section aria-labelledby="c-titulo">
+  <h1 id="c-titulo" data-t="cert_pagina_titulo"></h1>
+  <p class="lead" data-t="cert_pagina_lead"></p>
+  <div class="card">
+    <form class="filters" id="c-form">
+      <label><span data-t="cert_campo_mes"></span><select id="c-mes"></select></label>
+      <label id="c-desde-l" class="hidden"><span data-t="cert_campo_desde"></span><input id="c-desde" type="date"></label>
+      <label id="c-hasta-l" class="hidden"><span data-t="cert_campo_hasta"></span><input id="c-hasta" type="date"></label>
+      <label class="d-check"><input id="c-dominios" type="checkbox"> <span data-t="cert_campo_dominios"></span></label>
+      <button type="submit" class="boton principal" data-t="cert_hacer"></button>
+    </form>
+    <p class="muted d-nota" data-t="cert_campo_dominios_nota"></p>
+    <p id="c-msg" class="bad" role="status" aria-live="polite"></p>
+  </div>
+
+  <div id="c-resultado" class="card hidden" aria-live="polite">
+    <p class="d-rotulo" id="c-periodo"></p>
+    <div class="counters">
+      <div class="counter"><div class="n" id="c-n-consultas">0</div><div class="l" data-t="cert_cifra_consultas"></div></div>
+      <div class="counter"><div class="n" id="c-n-empresas">0</div><div class="l" data-t="cert_cifra_empresas"></div></div>
+      <div class="counter"><div class="n" id="c-n-cortadas">0</div><div class="l" data-t="cert_cifra_cortadas"></div></div>
+      <div class="counter"><div class="n" id="c-n-no">0</div><div class="l" data-t="cert_cifra_no_contactadas"></div></div>
+    </div>
+    <p id="c-cadena"></p>
+    <p id="c-cobertura" class="muted"></p>
+    <ul id="c-principales" class="d-lista"></ul>
+    <p class="d-acciones">
+      <button type="button" class="boton principal" id="c-ver" data-t="cert_ver_imprimir"></button>
+      <button type="button" class="boton" id="c-html" data-t="cert_guardar_html"></button>
+      <button type="button" class="boton" id="c-json" data-t="cert_guardar_json"></button>
+      <button type="button" class="boton" id="c-sha" data-t="cert_guardar_sello"></button>
+    </p>
+    <p class="muted d-sello"><span data-t="cert_sello"></span>: <code id="c-sello"></code></p>
+    <p id="c-guardado" class="muted" role="status" aria-live="polite"></p>
+  </div>
+
+  <details class="b-plegable">
+    <summary data-t="cert_comprobar_titulo"></summary>
+    <div class="card">
+      <p class="muted" data-t="cert_comprobar_lead"></p>
+      <label class="d-archivo"><span data-t="cert_comprobar_archivo"></span> <input id="c-archivo" type="file" accept=".json,application/json"></label>
+      <p id="c-comprobado" role="status" aria-live="polite"></p>
+    </div>
+  </details>
+</section>
+
+<section aria-labelledby="d-titulo">
+  <h2 id="d-titulo" data-t="der_titulo"></h2>
+  <p class="lead" data-t="der_lead"></p>
+  <div class="card">
+    <form class="filters" id="d-form">
+      <label><span data-t="borrado_campo_pais"></span><select id="d-pais"></select></label>
+      <label><span data-t="exp_campo_tipo"></span><select id="d-tipo"><option value="acceso" data-t="exp_tipo_acceso"></option><option value="borrado" data-t="exp_tipo_borrado"></option></select></label>
+      <label><span data-t="der_campo_idioma"></span><select id="d-idioma"><option value="es">Español</option><option value="en">English</option><option value="pt">Português</option></select></label>
+    </form>
+    <p id="d-ley" class="b-corta"></p>
+    <p id="d-nota" class="muted"></p>
+  </div>
+  <details class="b-plegable" id="d-datos-det">
+    <summary data-t="exp_datos_titulo"></summary>
+    <div class="card">
+      <form class="filters" id="d-datos">
+        <label><span data-t="borrado_campo_nombre"></span><input id="d-nombre" type="text" autocomplete="name" spellcheck="false"></label>
+        <label><span data-t="borrado_campo_correo"></span><input id="d-correo" type="email" autocomplete="email" spellcheck="false"></label>
+      </form>
+      <p class="muted" data-t="borrado_privado"></p>
+    </div>
+  </details>
+  <p class="muted" id="d-periodo"></p>
+  <div id="d-lista"></div>
+  <p id="d-vacio" class="muted hidden" data-t="der_vacio"></p>
+  <p id="d-cortadas" class="muted hidden"></p>
+  <p class="limit" data-t="der_nunca_envia"></p>
+  <p class="limit" data-t="borrado_aviso_abogados"></p>
+</section>
+</main>
+<footer><span data-t="pie"></span></footer>
+<script src="/static/derechos.js"></script>
+<script src="/static/interruptor.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

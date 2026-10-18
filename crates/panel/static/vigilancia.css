@@ -1,0 +1,59 @@
+/* «Vigilancia» (1.0.45): the constant watch's page. Tokens and components from diseno.css only;
+   amber for what needs attention, green for what was verified, steel for the rest. Red is kept for
+   confirmed cuts and is not used here. */
+.vg [hidden] { display: none !important; }
+.vg .vg-intro { max-width: 760px; margin-bottom: var(--e5); }
+.vg .rotulo { display: block; margin-bottom: var(--e1); }
+
+.vg-cab { display: grid; gap: var(--e3); }
+.vg-cab-fila { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e3); }
+.vg-pastilla { display: inline-flex; align-items: center; gap: var(--e2); padding: 6px 14px 6px 12px; border: 1px solid var(--line); border-radius: var(--r-pill); font: 600 14px/1.3 var(--texto); color: var(--fg); }
+.vg-pastilla i { width: 9px; height: 9px; border-radius: 50%; background: var(--muted-2); flex: none; }
+.vg-pastilla span { color: var(--muted); font-weight: 500; }
+.vg-pastilla.observando i { background: var(--ok); animation: vg-late 2.4s ease-in-out infinite; }
+.vg-pastilla.atencion { border-color: var(--aviso); }
+.vg-pastilla.atencion i { background: var(--aviso); }
+.vg-pastilla.atencion b { color: var(--aviso); }
+@keyframes vg-late { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); } 50% { box-shadow: 0 0 0 6px transparent; } }
+.vg-ritmo { margin: 0; font-size: 13px; }
+
+.vg-pulso-cab { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--e2); margin-bottom: var(--e2); font-size: 13px; }
+.vg-horas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 3px; height: 44px; align-items: end; }
+.vg-horas li { position: relative; height: 100%; display: flex; align-items: flex-end; }
+.vg-horas li b { display: block; width: 100%; min-height: 2px; border-radius: 2px; background: color-mix(in srgb, var(--accent) 55%, var(--card)); }
+.vg-horas li.futuro b { background: var(--line); }
+.vg-horas li.ahora b { background: var(--accent); }
+.vg-horas li.aviso::after { content: ""; position: absolute; top: -2px; left: 50%; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--aviso); }
+
+.vg-atencion { display: grid; gap: var(--e2); margin: var(--e4) 0; }
+.vg-atencion p { margin: 0; padding: 12px 16px; border: 1px solid var(--aviso); border-radius: var(--r-campo); background: var(--aviso-suave); color: var(--fg); }
+
+.vg-lineas { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.vg-lineas li { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: var(--e3); align-items: baseline; padding: 9px 12px; border-radius: var(--r-campo); background: var(--card); border: 1px solid var(--line); }
+.vg-lineas li time { color: var(--muted); font: 500 12.5px/1.4 var(--mono); }
+.vg-lineas li span { overflow-wrap: anywhere; }
+.vg-lineas li.aviso { border-color: color-mix(in srgb, var(--aviso) 60%, var(--line)); }
+.vg-lineas li small { color: var(--muted-2); font: 500 11px/1.4 var(--mono); }
+.vg-lineas li.vacio { grid-template-columns: 1fr; color: var(--muted); }
+
+.vg-rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--e3); margin: var(--e5) 0; }
+.vg-vigia { display: grid; gap: var(--e2); align-content: start; }
+.vg-vigia-cab { display: flex; justify-content: space-between; align-items: center; gap: var(--e2); }
+.vg-vigia h3 { margin: 0; font: 600 15px/1.3 var(--display); color: var(--fg); }
+.vg-vigia .vg-ultima { color: var(--muted); font-size: 12.5px; margin: 0; }
+.vg-vigia .vg-frase { margin: 0; color: var(--fg); }
+.vg-vigia .vg-nota { margin: 0; color: var(--muted); font-size: 12.5px; }
+.vg-vigia ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.vg-vigia li { display: flex; justify-content: space-between; gap: var(--e2); padding: 7px 10px; border-radius: 8px; background: var(--campo); font-size: 13px; }
+.vg-vigia li span { overflow-wrap: anywhere; }
+.vg-vigia li em { font-style: normal; color: var(--muted); white-space: nowrap; }
+.vg-vigia.atencion { border-color: var(--aviso); }
+
+.vg-historial-cab { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--e2); }
+.vg-pie { margin-top: var(--e5); font-size: 12.5px; }
+
+@media (max-width: 560px) {
+  .vg-lineas li { grid-template-columns: 1fr; gap: 2px; }
+  .vg-horas { height: 34px; gap: 2px; }
+}
+@media (prefers-reduced-motion: reduce) { .vg-pastilla.observando i { animation: none; } }

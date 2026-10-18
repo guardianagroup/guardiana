@@ -10,7 +10,7 @@ Pega este documento como primer mensaje en el repositorio vacío. Todo lo que di
 
 ## 0 · Qué construimos
 
-Un programa para Windows y Linux que convierte el computador en el **guardián DNS de la casa**: primero de sí mismo, después de los teléfonos, el televisor y todo lo que use la Wi‑Fi, sin instalar nada en ellos. Ve a qué servicios intenta hablar cada dispositivo, lo clasifica, lo explica en una frase, lo anota en un extracto encadenado por hash, y corta lo que el usuario decida.
+Un programa para Windows y macOS (desde 1.0.45, por decisión del dueño del 18 oct 2026, ya no se publica para Linux) que convierte el computador en el **guardián DNS de la casa**: primero de sí mismo, después de los teléfonos, el televisor y todo lo que use la Wi‑Fi, sin instalar nada en ellos. Ve a qué servicios intenta hablar cada dispositivo, lo clasifica, lo explica en una frase, lo anota en un extracto encadenado por hash, y corta lo que el usuario decida.
 
 Sobre ese motor va **la capa de agentes**, que es lo primero que se cuenta: cuando en el equipo trabaja un agente de inteligencia artificial, el usuario le dio permiso para una tarea, y nadie le enseña con cuántos servicios habla mientras la hace. Guardiana se pone en medio y se lo enseña: el usuario declara a qué servicios necesita hablar ese aparato y Guardiana lista todo lo que se salió de ahí. **Comprueba a dónde habla, no qué lee.** Esa frase se dice en la portada, en la página del panel y en cualquier sitio donde alguien pudiera entender otra cosa.
 
@@ -37,7 +37,7 @@ El marco es de permiso, no de miedo: Guardiana existe para poder soltarle el tra
 - **Capa de agentes:** lista propia de servicios de inteligencia artificial, etiqueta por consulta, página `/ia` del panel y **alcance declarado por dispositivo** (el usuario escribe los servicios permitidos; Guardiana informa de lo que se salió en las últimas 24 horas y no corta nada por su cuenta). Se comprueban destinos, nunca procesos ni archivos.
 - Prueba de 7 días con todas las funciones; después, licencia activada con una sola conexión (decisiones 180 y 182).
 - Firma minisign, hashes, `ledger.jsonl`, Rekor, `guardiana verify`, script de compilación reproducible publicado.
-- Instaladores: Windows (MSI) y Linux (.deb y tarball).
+- Instaladores: Windows (MSI) y macOS (GUARDIANA.app). Linux (.deb y tarball) se publicó hasta 1.0.44; desde 1.0.45 no (el dueño, 18 oct 2026: «QUITA LINUX. SOLO MAC Y WINDOWS»). El código de Linux se queda.
 
 **Entra solo si está probado en una máquina ajena el día 24 (sección 12):** reproducibilidad verificada byte a byte; aviso de actualización con verificación de firma; "qué app" en Windows, solo lectura.
 
@@ -173,7 +173,7 @@ guardiana/
 - Prueba de 7 días con todas las funciones: la fecha de inicio se guarda en `settings` **y** en una marca fuera de los datos (registro en Windows, `/etc/guardiana` en Linux y Mac) que solo un administrador puede quitar; manda la más antigua de las dos, así que borrar el extracto no devuelve la prueba. La pantalla dice dónde está la marca (decisión 187 bis, 22 sep 2026).
 - Activación con clave (pasarela de pago): una única llamada `POST` a la API de licencias de la pasarela, iniciada por el usuario desde `/licencia`, anotada en `outbound` con host y bytes; el resultado se guarda firmado localmente. Después, una comprobación por periodo de pago.
 - Activación con archivo: retirada el 21 sep 2026 (decisión 182). Una sola manera de activar: la clave.
-- Sin licencia y sin prueba: el programa deja de mirar y devuelve el DNS tal y como estaba; lo anotado se queda en el disco de la persona (decisión 180).
+- Sin licencia y sin prueba: ~~el programa deja de mirar y devuelve el DNS tal y como estaba (decisión 180)~~. Desde 1.0.45 (plan gratis aprobado por el responsable el 18 oct 2026) no se apaga: pasa a **GUARDIANA Gratis**, para siempre, sin tocar el DNS. Gratis: globo en vivo, vista DNS por programa con país, empresa y categoría, cortar/deshacer a mano, historial de las últimas 24 h (filtro de vista: no se borra nada) y un solo aparato (este equipo). Plus (suscripción o De por vida, antes «Fundador»): todo lo demás. Lo anotado se queda en el disco de la persona.
 
 ## 10 · Confianza y publicación
 
@@ -187,7 +187,7 @@ guardiana/
 ## 11 · Instaladores y pruebas
 
 - Windows: MSI con `cargo-wix` (WiX es libre). Instala en `Program Files`, registra el servicio, crea el lanzador del panel, cambia el DNS con consentimiento en el primer arranque del panel (no en la instalación). Desinstalar restaura el DNS y quita la regla de cortafuegos si existe. La regla de cortafuegos solo se crea al activar Modo Hogar.
-- Linux: `.deb` con `cargo-deb` (unidad systemd, `postinst` que habilita el servicio, `prerm` que restaura el DNS) y tarball con script de instalación legible. Flathub después del lanzamiento.
+- Linux (publicado hasta 1.0.44; desde 1.0.45 no se publica, decisión del dueño del 18 oct 2026, y el código se queda): `.deb` con `cargo-deb` (unidad systemd, `postinst` que habilita el servicio, `prerm` que restaura el DNS) y tarball con script de instalación legible. Flathub después del lanzamiento.
 - Calidad: `cargo test`, `cargo clippy -D warnings`, `cargo fmt --check`, `cargo audit`, `cargo deny`; pruebas de integración del resolutor (resolver, cachear, bloquear, canario, comprobador) y de la cadena del extracto; prueba de "servicio caído" (el sistema sigue resolviendo por el secundario).
 - Cada hito se prueba en una máquina que no sea la de desarrollo, instalando desde cero.
 

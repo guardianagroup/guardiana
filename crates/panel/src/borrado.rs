@@ -743,6 +743,23 @@ pub(crate) static JURISDICCIONES: &[Jurisdiccion] = &[
             "https://sdaia.gov.sa/en/SDAIA/about/Documents/ImplementingRegulationPersonalDataProtectionLaw.pdf",
         ],
     },
+    // Any other country (1.0.45, «Tu derecho con un clic»): no law GUARDIANA has checked, so
+    // the letter is a request under the company's own policy and says so, as the federal US
+    // one does. Last, and no browser region picks it: the page offers it when none matches.
+    Jurisdiccion {
+        codigo: "otro",
+        idioma: "en",
+        regiones: &[],
+        derecho: Derecho::Ninguno,
+        plazo: None,
+        prorroga: None,
+        plazo_acceso: None,
+        prorroga_acceso: None,
+        referencia: false,
+        autoridad: None,
+        autoridad_url: None,
+        fuentes: &["https://unctad.org/page/data-protection-and-privacy-legislation-worldwide"],
+    },
 ];
 
 /// A jurisdiction by its code.
@@ -849,7 +866,12 @@ pub(crate) fn parse_corredores(texto: &str) -> Result<Vec<Corredor>, String> {
             let [id, nombre, pais, tipo] = partes.as_slice() else {
                 return Err(err("cabecera con cuatro campos"));
             };
-            if !matches!(*tipo, "personas" | "datos" | "publicidad" | "credito") {
+            // `servicios`: the big companies of `derechos-contactos.txt` (1.0.45), which are
+            // not brokers but publish a channel for these requests too.
+            if !matches!(
+                *tipo,
+                "personas" | "datos" | "publicidad" | "credito" | "servicios"
+            ) {
                 return Err(err("tipo desconocido"));
             }
             if out.iter().any(|c| c.id == *id) {
@@ -926,6 +948,22 @@ pub(crate) fn corredores() -> &'static [Corredor] {
 /// A company by id.
 pub(crate) fn corredor(id: &str) -> Option<&'static Corredor> {
     corredores().iter().find(|c| c.id == id)
+}
+
+const DATOS_CONTACTOS: &str = include_str!("../data/derechos-contactos.txt");
+
+/// The privacy channels of the big companies that are not brokers (`derechos-contactos.txt`,
+/// 1.0.45), read once with the same reader.
+pub(crate) fn contactos() -> &'static [Corredor] {
+    static C: OnceLock<Vec<Corredor>> = OnceLock::new();
+    C.get_or_init(|| parse_corredores(DATOS_CONTACTOS).unwrap_or_default())
+}
+
+/// The privacy channel of a company of `empresas.txt` by its section name, when one is curated.
+pub(crate) fn contacto_de(empresa: &str) -> Option<&'static Corredor> {
+    contactos()
+        .iter()
+        .find(|c| c.empresas.iter().any(|e| e == empresa))
 }
 
 // ----- what the house saw -------------------------------------------------------------------
@@ -1167,16 +1205,13 @@ pub(crate) fn carta_de(
     zona: i64,
     tipo: Tipo,
 ) -> Carta {
-    let (k_asunto, k_cuerpo) = match (tipo, j.derecho) {
-        (Tipo::Acceso, Derecho::Ninguno) => {
-            ("borrado_asunto_acceso", "borrado_carta_acceso_ninguno")
-        }
-        (Tipo::Acceso, _) => ("borrado_asunto_acceso", "borrado_carta_acceso"),
-        (Tipo::Borrado, Derecho::Borrado) => ("borrado_asunto_borrado", "borrado_carta_borrado"),
-        (Tipo::Borrado, Derecho::Limitado) => ("borrado_asunto_limitado", "borrado_carta_limitado"),
-        (Tipo::Borrado, Derecho::Ninguno) => ("borrado_asunto_ninguno", "borrado_carta_ninguno"),
-    };
-    let evidencia = match ev.filter(|e| e.consultas > 0) {
+    let evidencia = evidencia_de_casa(t, ev, zona);
+    carta_con(t, j, c, &evidencia, hoy, tipo)
+}
+
+/// The paragraph «the devices in my home looked up these names of your company», or nothing.
+fn evidencia_de_casa(t: &Texts, ev: Option<&Evidencia>, zona: i64) -> String {
+    match ev.filter(|e| e.consultas > 0) {
         None => String::new(),
         Some(e) => {
             let lineas: Vec<String> = e
@@ -1201,6 +1236,28 @@ pub(crate) fn carta_de(
             t.panel("borrado_carta_evidencia")
                 .replace("{lineas}", &lineas.join("\n"))
         }
+    }
+}
+
+/// The letter with its evidence paragraph already written: the one «Haz que te borren» writes
+/// from the house's names, or the one «Tu derecho con un clic» writes from the certificate
+/// (1.0.45). Same bodies, same laws, same markers for the name and the e-mail.
+pub(crate) fn carta_con(
+    t: &'static Texts,
+    j: &Jurisdiccion,
+    c: &Corredor,
+    evidencia: &str,
+    hoy: i64,
+    tipo: Tipo,
+) -> Carta {
+    let (k_asunto, k_cuerpo) = match (tipo, j.derecho) {
+        (Tipo::Acceso, Derecho::Ninguno) => {
+            ("borrado_asunto_acceso", "borrado_carta_acceso_ninguno")
+        }
+        (Tipo::Acceso, _) => ("borrado_asunto_acceso", "borrado_carta_acceso"),
+        (Tipo::Borrado, Derecho::Borrado) => ("borrado_asunto_borrado", "borrado_carta_borrado"),
+        (Tipo::Borrado, Derecho::Limitado) => ("borrado_asunto_limitado", "borrado_carta_limitado"),
+        (Tipo::Borrado, Derecho::Ninguno) => ("borrado_asunto_ninguno", "borrado_carta_ninguno"),
     };
     let cuerpo = t
         .panel(k_cuerpo)
@@ -1208,7 +1265,7 @@ pub(crate) fn carta_de(
         .replace("{ley}", &texto_jur(t, "ley", j))
         .replace("{articulo}", &texto_jur_tipo(t, "articulo", j, tipo))
         .replace("{plazo}", &texto_jur_tipo(t, "plazo", j, tipo))
-        .replace("{evidencia}", &evidencia)
+        .replace("{evidencia}", evidencia)
         .replace("{fecha}", &fecha_texto(t, hoy))
         .replace("{nombre}", MARCA_NOMBRE)
         .replace("{correo}", MARCA_CORREO);

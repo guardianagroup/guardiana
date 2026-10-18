@@ -41,7 +41,7 @@
   <label><span data-t="f_dispositivo"></span><select name="device_id" id="f-device"><option value="" data-t="f_todas"></option></select></label>
   <label><span data-t="f_categoria"></span><select name="category"><option value="" data-t="f_todas"></option><option value="rastreador">rastreador</option><option value="publicidad">publicidad</option><option value="telemetria">telemetría</option><option value="esperado">normal</option><option value="desconocido">sin clasificar</option></select></label>
   <label><span data-t="f_senal"></span><select name="signal"><option value="" data-t="f_todas"></option><option value="baliza">baliza</option><option value="destino_nuevo">destino nuevo</option><option value="fuera_de_horas">fuera de horas</option><option value="evasion_dns">evasión de DNS</option><option value="volumen">volumen</option></select></label>
-  <label><span data-t="f_veredicto"></span><select name="verdict"><option value="" data-t="f_todas"></option><option value="observado">observado</option><option value="respondido">respondido</option><option value="cortado">bloqueado</option></select></label>
+  <label><span data-t="f_veredicto"></span><select name="verdict"><option value="" data-t="f_todas"></option><option value="observado">observado</option><option value="respondido">permitido</option><option value="cortado">cortado</option></select></label>
   <label><span data-t="f_pais_servidor"></span><select name="pais" id="f-pais"><option value="" data-t="f_todas"></option></select></label>
   <label><span data-t="f_limite"></span><input name="limit" type="number" min="1" max="5000" value="200"></label>
   <button type="submit" data-t="filtrar"></button>
@@ -67,6 +67,7 @@
 <p class="limit" data-t="leyenda_desconocido"></p>
 </main>
 <footer><span data-t="pie"></span></footer>
+<script src="/static/interruptor.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

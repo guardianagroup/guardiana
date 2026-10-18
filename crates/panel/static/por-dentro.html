@@ -7,40 +7,67 @@
 <title>GUARDIANA · Globo en directo</title>
 <link rel="stylesheet" href="/static/diseno.css">
 <link rel="stylesheet" href="/static/style.css">
+<link rel="preload" href="/static/fonts/HankenGrotesk-var.woff" as="font" type="font/woff" crossorigin>
 <link rel="preload" href="/static/fonts/IBMPlexMono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/static/tierra/dia.jpg" as="image">
 <script src="/static/arranque.js"></script>
 </head>
 <body data-page="por-dentro" class="universo">
-<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
-<section class="stage" id="stage" aria-label="Globo en directo" data-t-label="pd_titulo">
-  <div class="barra">
-    <div class="marca"><a href="/" data-t="pd_volver">← Panel</a> <span data-t="pd_titulo">Globo en directo</span> <span class="chip-modo corte" id="chip-modo" role="status" hidden></span></div>
-    <div class="pestanas" role="group" data-t-label="pd_vistas">
-      <button type="button" data-vista="destinos" aria-pressed="true"><span class="tecla" aria-hidden="true">1</span><span data-t="pd_vista_destinos">Destinos</span></button>
-      <button type="button" data-vista="programas" aria-pressed="false"><span class="tecla" aria-hidden="true">2</span><span data-t="pd_vista_programas">Programas</span></button>
+<!-- The globe, redesigned (18 Oct 2026, approved by the owner): on opening, only the Earth under a
+     slim bar. A pin answers on hover; a click opens the inspector on the right; the live log waits
+     folded in the rail at the bottom. Every older control is still here, moved, not removed. -->
+<header class="top">
+  <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA</span></a>
+  <nav>
+    <a href="/por-dentro" aria-current="page" data-t="nav_por_dentro">Globo en directo</a>
+    <a href="/revision" data-t="nav_revision">Revisión</a>
+    <a href="/" data-t="nav_radiografia">Radiografía</a>
+    <a href="/extracto" data-t="nav_extracto">Extracto</a>
+    <a href="/estado" data-t="nav_estado">Estado</a>
+  </nav>
+</header>
+<div class="globo-herr" id="globo-herr" data-nav-extra>
+  <span class="chip-modo corte" id="chip-modo" role="status" hidden></span>
+  <span class="chip-vpn" id="vpn" hidden role="status"></span>
+  <button type="button" class="opciones-btn" id="opciones-btn" aria-haspopup="true" aria-expanded="false" aria-controls="opciones"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.6"/><circle cx="6" cy="11.5" r="1.6"/></svg><span data-t="pd_opciones">Opciones</span></button>
+  <div class="opciones" id="opciones" hidden>
+    <div class="op-grupo"><div class="op-t" data-t="pd_op_vista">Qué ver</div>
+      <div class="seg pestanas" role="group" data-t-label="pd_vistas">
+        <button type="button" data-vista="destinos" aria-pressed="true"><span class="tecla" aria-hidden="true">1</span><span data-t="pd_vista_destinos">Destinos</span></button><button type="button" data-vista="programas" aria-pressed="false"><span class="tecla" aria-hidden="true">2</span><span data-t="pd_vista_programas">Programas</span></button>
+      </div>
+      <div class="seg" id="filtro" role="group" data-t-label="pd_filtro">
+        <button type="button" data-filtro="todo" aria-pressed="true" data-t="pd_filtro_todo">Todo</button><button type="button" data-filtro="datos" aria-pressed="false" data-t="pd_filtro_datos">Datos</button><button type="button" data-filtro="av" aria-pressed="false" data-t="pd_filtro_av">Antivirus</button>
+      </div>
     </div>
-    <div class="seg" id="filtro" role="group" data-t-label="pd_filtro">
-      <button type="button" data-filtro="todo" aria-pressed="true" data-t="pd_filtro_todo">Todo</button><button type="button" data-filtro="datos" aria-pressed="false" data-t="pd_filtro_datos">Datos</button><button type="button" data-filtro="av" aria-pressed="false" data-t="pd_filtro_av">Antivirus</button>
+    <div class="op-grupo"><div class="op-t" data-t="pd_op_lugar">Dónde está este ordenador</div>
+      <div class="lugar-yo"><span data-t="pd_tu_pais">Tu equipo está en</span> <b id="yo"></b></div>
+      <div class="op-botones"><button type="button" class="boton chico" id="precisar" data-t="pd_usar_windows">Usar la ubicación de Windows</button><button type="button" class="boton chico" id="corregir-lugar" data-t="pd_elegir_ciudad">Elegir mi ciudad</button></div>
     </div>
-    <div class="controles">
-      <span class="lugar-yo" title=""><span data-t="pd_tu_pais">Tu equipo está en</span> <b id="yo"></b></span>
-      <button type="button" class="btn-hud" id="precisar" data-t="pd_precisar">◎ Precisar</button>
-      <button type="button" class="btn-hud" id="corregir-lugar" data-t="pd_corregir">Corregir ciudad</button>
-      <span class="chip-vpn" id="vpn" hidden role="status"></span>
-      <span class="en-vivo" role="status"><i aria-hidden="true"></i><span data-t="pd_en_vivo">En vivo</span></span>
-      <button type="button" class="btn-hud graba" id="grabar" aria-pressed="false" data-t="pd_grabar">● Guardar 5 minutos de medidas</button>
-      <button type="button" class="btn-hud" id="pantalla" data-t="pd_pantalla_completa">Pantalla completa</button>
+    <div class="op-grupo"><div class="op-t" data-t="pd_op_mas">Más</div>
+      <button type="button" class="op-fila" id="btn-datos" aria-controls="inspector" data-t="pd_op_cifras">Cifras en directo</button>
+      <button type="button" class="op-fila graba" id="grabar" aria-pressed="false" data-t="pd_grabar">Guardar 5 minutos de medidas</button>
+      <button type="button" class="op-fila" id="zoom-0" data-t="pd_zoom_inicio">Volver a la vista inicial</button>
+    </div>
+    <div class="op-grupo leyenda" aria-hidden="true"><div class="op-t" data-t="pd_op_leyenda">Cómo se lee</div>
+      <span><i class="ley-o"></i><span data-t="pd_ley_sale"></span></span>
+      <span><i class="ley-i"></i><span data-t="pd_ley_entra"></span></span>
+      <span><i class="ley-c"></i><span data-t="pd_ley_cortado"></span></span>
+      <span><i class="ley-n"></i><span data-t="pd_ley_nodoc"></span></span>
+      <p class="ayuda-vista" id="ayuda-vista"></p>
     </div>
   </div>
+</div>
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<section class="stage" id="stage" aria-label="Globo en directo" data-t-label="pd_titulo">
   <div class="lienzo" id="lienzo">
     <canvas id="gl"></canvas>
     <canvas id="cv"></canvas>
     <div class="telemetria" id="telemetria" hidden></div>
-    <aside class="datos" id="datos"><button type="button" class="cerrar-datos" id="cerrar-datos" data-t-label="pd_ocultar_cifras" aria-controls="datos">×</button><div id="datos-vivo"></div><p class="corte-av" id="corte-av" hidden><button type="button" class="btn-hud" id="corte-av-btn"></button></p><div id="datos-resto"></div></aside>
-    <button type="button" class="abrir-datos" id="btn-datos" aria-controls="datos" hidden data-t="pd_ver_cifras">‹ Cifras</button>
-    <div class="zoom" id="zoom" role="group" data-t-label="pd_zoom"><button type="button" id="zoom-mas" data-t-label="pd_zoom_mas">+</button><button type="button" id="zoom-menos" data-t-label="pd_zoom_menos">−</button><button type="button" id="zoom-0" data-t-label="pd_zoom_inicio">⌂</button></div>
-    <div class="detalle" id="detalle" hidden role="dialog" aria-modal="false" data-t-label="pd_detalle"><button type="button" class="cerrar-datos" id="detalle-cerrar" data-t-label="pd_cerrar">×</button><div id="detalle-cuerpo"></div></div>
+    <div class="zoom" id="zoom" role="group" data-t-label="pd_zoom">
+      <button type="button" class="boton-icono" id="zoom-mas" data-t-label="pd_zoom_mas" data-t-title="pd_zoom_mas"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg></button>
+      <button type="button" class="boton-icono" id="zoom-menos" data-t-label="pd_zoom_menos" data-t-title="pd_zoom_menos"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg></button>
+      <button type="button" class="boton-icono" id="pantalla" data-t-label="pd_pantalla_completa" data-t-title="pd_pantalla_completa"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg></button>
+    </div>
     <section class="explorador" id="explorador" hidden aria-labelledby="expl-t">
       <div class="ex-cab"><div><h2 id="expl-t" data-t="pd_ex_titulo">Actividad por programa</h2><p class="t" data-t="pd_ex_sub"></p></div><div class="ex-ind"><span id="expl-mayor"></span><span id="expl-ultima" class="t"></span></div></div>
       <div class="ex-herr"><label><span data-t="pd_ex_ordenar"></span> <select id="expl-orden"><option value="enviado" data-t="pd_ex_ord_env"></option><option value="recibido" data-t="pd_ex_ord_rec"></option><option value="ahora" data-t="pd_ex_ord_ahora"></option><option value="nombre" data-t="pd_ex_ord_nombre"></option></select></label><input type="search" id="expl-busca" autocomplete="off" spellcheck="false" data-t-label="pd_ex_buscar"></div>
@@ -48,15 +75,13 @@
       <div id="expl-filas"></div>
     </section>
     <div class="vigilancia-off" id="vigilancia-off" hidden><span data-t="pd_vigilancia_off"></span> <a href="/antivirus" data-t="pd_vigilancia_enciende"></a></div>
-    <div class="leyenda" aria-hidden="true">
-      <span><i class="ley-o"></i><span data-t="pd_ley_sale"></span></span>
-      <span><i class="ley-i"></i><span data-t="pd_ley_entra"></span></span>
-      <span><i class="ley-c"></i><span data-t="pd_ley_cortado"></span></span>
-      <span><i class="ley-n"></i><span data-t="pd_ley_nodoc"></span></span>
-    </div>
-    <div class="ayuda-vista" id="ayuda-vista"></div>
     <div class="vacio" id="vacio" hidden role="status" aria-live="polite"><h2 id="vacio-titulo"></h2><p id="vacio-texto"></p><p id="vacio-enlace" hidden><a href="/" data-t="pd_ver_radiografia"></a></p></div>
-    <div class="retrato" id="retrato" hidden role="dialog" aria-labelledby="retrato-t"><h2 id="retrato-t"></h2><p id="retrato-txt"></p><p class="pequeno" id="retrato-modo"></p><div class="aviso-botones"><button type="button" class="btn-hud" id="retrato-pdf" data-t="pd_retrato_pdf"></button><button type="button" class="btn-hud" id="retrato-csv" data-t="pd_retrato_csv"></button><button type="button" class="btn-hud" id="retrato-json" data-t="pd_retrato_json"></button><button type="button" class="btn-hud" id="retrato-cerrar" data-t="pd_retrato_cerrar"></button></div></div>
+    <div class="donde" id="donde" hidden role="dialog" aria-labelledby="donde-t">
+      <h2 id="donde-t" data-t="pd_donde_titulo">¿Dónde está este ordenador?</h2>
+      <p id="donde-txt" data-t="pd_donde_texto"></p>
+      <div class="donde-botones"><button type="button" class="boton principal" id="donde-windows" data-t="pd_usar_windows">Usar la ubicación de Windows</button><button type="button" class="boton" id="donde-ciudad" data-t="pd_elegir_ciudad">Elegir mi ciudad</button><button type="button" class="boton texto" id="donde-no" data-t="pd_ahora_no">Ahora no</button></div>
+    </div>
+    <div class="retrato" id="retrato" hidden role="dialog" aria-labelledby="retrato-t"><h2 id="retrato-t"></h2><p id="retrato-txt"></p><p class="pequeno" id="retrato-modo"></p><div class="aviso-botones"><button type="button" class="boton chico" id="retrato-pdf" data-t="pd_retrato_pdf"></button><button type="button" class="boton chico" id="retrato-csv" data-t="pd_retrato_csv"></button><button type="button" class="boton chico" id="retrato-json" data-t="pd_retrato_json"></button><button type="button" class="boton texto chico" id="retrato-cerrar" data-t="pd_retrato_cerrar"></button></div></div>
     <div class="tip" id="tip" hidden></div>
     <div class="aviso" id="aviso" hidden role="status" aria-live="polite"></div>
     <div class="ubicacion" id="ubicacion" hidden role="dialog" aria-modal="true" aria-labelledby="ubicacion-t">
@@ -65,24 +90,54 @@
       <label for="ubicacion-busca" data-t="pd_corregir_etiqueta">Ciudad o región</label>
       <input id="ubicacion-busca" type="search" autocomplete="off" spellcheck="false" data-t-placeholder="pd_corregir_placeholder">
       <div class="ubicacion-resultados" id="ubicacion-resultados" role="listbox"></div>
-      <div class="aviso-botones"><button type="button" class="btn-hud" id="ubicacion-cerrar" data-t="pd_corregir_cancelar">Cancelar</button></div>
+      <div class="aviso-botones"><button type="button" class="boton chico" id="ubicacion-cerrar" data-t="pd_corregir_cancelar">Cancelar</button></div>
     </div>
+    <!-- The inspector: a place, a company, a name, a program, or the live figures. -->
+    <aside class="inspector" id="inspector" hidden aria-labelledby="insp-titulo">
+      <div class="insp-cab">
+        <button type="button" class="insp-atras" id="insp-atras" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5"/></svg><span id="insp-atras-t"></span></button>
+        <button type="button" class="boton-icono insp-cerrar" id="insp-cerrar" data-t-label="pd_cerrar" data-t-title="pd_cerrar"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+      </div>
+      <div class="insp-cuerpo" id="detalle-cuerpo"></div>
+      <div class="datos" id="datos" hidden><div id="datos-vivo"></div><p class="corte-av" id="corte-av" hidden><button type="button" class="boton chico" id="corte-av-btn"></button></p><div id="datos-resto"></div></div>
+      <div class="insp-pie"><span><kbd>Esc</kbd> <span data-t="pd_cerrar_min">cerrar</span></span><a class="btn texto chico sigue" id="insp-enlace" href="/extracto" hidden></a></div>
+    </aside>
   </div>
+  <!-- The rail: folded, one line; open, the tray with the live log, the last five minutes and every row. -->
   <div class="hud" id="hud">
-    <button type="button" class="hud-asa" id="hud-asa" aria-expanded="false" aria-controls="hud" data-t-title="pd_hud_desplegar"><i aria-hidden="true"></i><span data-t="pd_hud_desplegar"></span></button>
-    <div class="hud-tabla" id="hud-tabla" hidden>
-      <div class="ht-cab"><h3><span data-t="pd_ht_titulo" class="h3-titulo"></span> <span id="ht-cuantos"></span></h3><div class="ht-kpi" id="ht-kpi"></div><div class="ht-acciones"><input type="search" id="ht-busca" class="ht-busca" autocomplete="off" spellcheck="false" data-t-placeholder="pd_ht_buscar"><button type="button" class="btn-hud" id="ht-csv" data-t="pd_ht_csv"></button><button type="button" class="btn-hud" id="ht-json" data-t="pd_ht_json"></button></div></div>
-      <div class="ht-scroll"><table class="ht"><thead><tr>
-        <th data-t="pd_ht_programa" data-orden="programa" tabindex="0" role="button"></th><th data-t="pd_ht_destino" data-orden="destino" tabindex="0" role="button"></th><th data-t="pd_ht_empresa" data-orden="empresa" tabindex="0" role="button"></th><th data-t="pd_ht_pais" data-orden="pais" tabindex="0" role="button"></th><th data-t="pd_ht_ciudad" data-orden="ciudad" tabindex="0" role="button"></th><th data-t="pd_ht_red" data-orden="red" tabindex="0" role="button"></th><th data-t="pd_ht_proto" data-orden="proto" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_sube" data-orden="sub" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_baja" data-orden="baj" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_paquetes" data-orden="paq" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_consultas" data-orden="consultas" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_cortes" data-orden="bloq" tabindex="0" role="button"></th><th data-t="pd_ht_primera" data-orden="primera" tabindex="0" role="button"></th><th data-t="pd_ht_ultima" data-orden="ultima" tabindex="0" role="button"></th><th data-t="pd_ht_estado" data-orden="estado" tabindex="0" role="button"></th>
-      </tr></thead><tbody id="ht-filas"></tbody></table></div>
+    <div class="riel" id="riel">
+      <button type="button" class="riel-vivo" id="hud-asa" aria-expanded="false" aria-controls="bandeja" data-tab="vivo"><i aria-hidden="true"></i><b data-t="pd_en_vivo">En vivo</b><span class="vr" aria-hidden="true"></span><span><b id="riel-ahora">0</b> <span id="riel-ahora-t"></span></span><span class="vr" aria-hidden="true"></span><span class="riel-cortadas"><i aria-hidden="true"></i><b id="riel-cortadas">0</b> <span id="riel-cortadas-t"></span></span></button>
+      <span class="vr" aria-hidden="true"></span><span class="riel-maxima" id="riel-maxima" hidden></span>
+      <button type="button" class="riel-5" data-tab="min5" aria-controls="bandeja"><span data-t="pd_ultimos_5">Últimos 5 min</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 10 8 5.5l4.5 4.5"/></svg></button>
     </div>
-    <div><h3><span data-t="pd_hud_registro" class="h3-titulo"></span> <span data-t="pd_hud_vivo"></span></h3><ul class="registro" id="registro"></ul></div>
-    <div><h3><span data-t="pd_hud_enviado" class="h3-titulo"></span> <span id="hud-min"></span></h3><canvas id="spark"></canvas></div>
-    <div><h3 data-t="pd_hud_paises"></h3><div class="barras" id="barras"></div></div>
-    <div><h3 data-t="pd_hud_puertas"></h3><div class="grande" id="hud-cortes">0</div><div class="pequeno" id="hud-bloqueos"></div></div>
-    <div><h3 data-t="pd_hud_top"></h3><ol class="top-ahora" id="hud-top"></ol></div>
+    <div class="bandeja" id="bandeja" hidden>
+      <div class="ban-cab">
+        <div class="ban-tabs" role="tablist">
+          <button type="button" role="tab" data-tab="vivo" aria-selected="true"><i aria-hidden="true"></i><span data-t="pd_en_vivo">En vivo</span></button><button type="button" role="tab" data-tab="min5" aria-selected="false" data-t="pd_ultimos_5">Últimos 5 min</button><button type="button" role="tab" data-tab="tabla" aria-selected="false" data-t="pd_todos_datos">Todos los datos</button>
+        </div>
+        <span class="ban-cifras" id="ban-cifras"></span>
+        <a class="btn texto chico sigue" href="/extracto" data-t="pd_ver_registro">Ver todo el registro</a>
+        <button type="button" class="boton-icono ban-cerrar" id="ban-cerrar" data-t-label="pd_hud_recoger" data-t-title="pd_hud_recoger"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 6 8 10.5 12.5 6"/></svg></button>
+      </div>
+      <div class="ban-panel" data-panel="vivo" role="tabpanel">
+        <table class="registro-t"><thead><tr><th data-t="pd_col_hora">Hora</th><th data-t="pd_ht_programa">Programa</th><th data-t="pd_ht_destino">Destino</th><th data-t="pd_ht_empresa">Empresa</th><th data-t="pd_ht_pais">País</th><th data-t="pd_col_datos">Datos</th><th data-t="pd_ht_estado">Estado</th></tr></thead><tbody id="registro"></tbody></table>
+      </div>
+      <div class="ban-panel ban-min5" data-panel="min5" role="tabpanel" hidden>
+        <div><h3><span data-t="pd_hud_enviado" class="h3-titulo"></span> <span id="hud-min"></span></h3><canvas id="spark"></canvas></div>
+        <div><h3 data-t="pd_hud_paises"></h3><div class="barras" id="barras"></div></div>
+        <div><h3 data-t="pd_hud_puertas"></h3><div class="grande" id="hud-cortes">0</div><div class="pequeno" id="hud-bloqueos"></div></div>
+        <div><h3 data-t="pd_hud_top"></h3><ol class="top-ahora" id="hud-top"></ol></div>
+      </div>
+      <div class="ban-panel hud-tabla" data-panel="tabla" id="hud-tabla" role="tabpanel" hidden>
+        <div class="ht-cab"><h3><span data-t="pd_ht_titulo" class="h3-titulo"></span> <span id="ht-cuantos"></span></h3><div class="ht-kpi" id="ht-kpi"></div><div class="ht-acciones"><input type="search" id="ht-busca" class="ht-busca" autocomplete="off" spellcheck="false" data-t-placeholder="pd_ht_buscar"><button type="button" class="boton chico" id="ht-csv" data-t="pd_ht_csv"></button><button type="button" class="boton chico" id="ht-json" data-t="pd_ht_json"></button></div></div>
+        <div class="ht-scroll"><table class="ht"><thead><tr>
+          <th data-t="pd_ht_programa" data-orden="programa" tabindex="0" role="button"></th><th data-t="pd_ht_destino" data-orden="destino" tabindex="0" role="button"></th><th data-t="pd_ht_empresa" data-orden="empresa" tabindex="0" role="button"></th><th data-t="pd_ht_pais" data-orden="pais" tabindex="0" role="button"></th><th data-t="pd_ht_ciudad" data-orden="ciudad" tabindex="0" role="button"></th><th data-t="pd_ht_red" data-orden="red" tabindex="0" role="button"></th><th data-t="pd_ht_proto" data-orden="proto" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_sube" data-orden="sub" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_baja" data-orden="baj" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_paquetes" data-orden="paq" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_consultas" data-orden="consultas" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_cortes" data-orden="bloq" tabindex="0" role="button"></th><th data-t="pd_ht_primera" data-orden="primera" tabindex="0" role="button"></th><th data-t="pd_ht_ultima" data-orden="ultima" tabindex="0" role="button"></th><th data-t="pd_ht_estado" data-orden="estado" tabindex="0" role="button"></th>
+        </tr></thead><tbody id="ht-filas"></tbody></table></div>
+      </div>
+    </div>
   </div>
 </section>
+<script src="/static/interruptor.js"></script>
 <script src="/static/por-dentro.js"></script>
 <script src="/static/app.js"></script>
 </body>

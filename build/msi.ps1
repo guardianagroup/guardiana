@@ -69,7 +69,7 @@ if ($ZeroExe) {
     if (-not (Test-Path $zicon)) { throw "Falta $zicon" }
     $conZero = @("-d", "ZeroExe=$ZeroExe", "-d", "ZeroIcon=$zicon")
 }
-& $cmd @pre build -arch x64 -culture $cultura -loc $loc -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d "Version=$Version" -d "Lang=$lcid" -d "Exe=$Exe" -d "Readme=$readme" -d "Welcome=$welcome" -d "Dialogo=$dialogo" -d "Icon=$icon" @conZero -o $Out $wxs
+& $cmd @pre build -arch x64 -culture $cultura -loc $loc -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d "Version=$Version" -d "Idioma=$Idioma" -d "Lang=$lcid" -d "Exe=$Exe" -d "Readme=$readme" -d "Welcome=$welcome" -d "Dialogo=$dialogo" -d "Icon=$icon" @conZero -o $Out $wxs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 # Code signing of the MSI itself (decision 66): the installer is what the person double-clicks, so
 # it must carry the certificate too, not only guardiana.exe. Pass -CertSha1 with the thumbprint of

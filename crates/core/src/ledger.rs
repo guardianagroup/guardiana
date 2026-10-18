@@ -312,6 +312,10 @@ impl Ledger {
         ledger.ensure_gaps_table()?;
         ledger.ensure_changes_table()?;
         ledger.ensure_trafico_table()?;
+        ledger.ensure_alias_table()?;
+        ledger.ensure_vigilancia_table()?;
+        ledger.ensure_contratos_tables()?;
+        ledger.ensure_vision_tables()?;
         ledger.migrate_rules_confirmed()?;
         ledger.migrate_events_process()?;
         ledger.migrate_events_server()?;
@@ -801,12 +805,17 @@ impl Ledger {
     pub fn wipe(&mut self) -> Result<()> {
         let genesis = self.setting(KEY_GENESIS)?.unwrap_or_default();
         let tx = self.conn.transaction()?;
+        // `trafico` (1.0.21) and `alias_sites` (1.0.45) are detail too: until 1.0.45 «Borrar todo»
+        // left what each program sent, minute by minute, behind.
         tx.execute_batch(
             "DELETE FROM events; DELETE FROM devices; DELETE FROM rules; DELETE FROM outbound; \
              DELETE FROM seen_domains; DELETE FROM daily_totals; DELETE FROM gaps; DELETE FROM changes; \
-             DELETE FROM server_bases; \
+             DELETE FROM server_bases; DELETE FROM alias_sites; DELETE FROM trafico; \
              DELETE FROM sqlite_sequence WHERE name IN ('events', 'rules', 'outbound', 'gaps', 'changes');",
         )?;
+        // 1.0.45: the traffic minutes were left behind by «Borrar todo» until now, and so would
+        // «Visión profunda»'s rows be.
+        Self::borra_vision_en(&tx)?;
         tx.execute(
             "UPDATE settings SET value = ?1 WHERE key = ?2",
             params![genesis, KEY_ANCHOR],
@@ -822,6 +831,8 @@ impl Ledger {
         )?;
         // A fresh start keeps a head and has lost nothing.
         tx.execute("DELETE FROM settings WHERE key = ?1", [KEY_HEAD_LOST_AT])?;
+        // What the constant watch noticed and remembers (1.0.45) goes with the rest.
+        Self::borra_vigilancia(&tx)?;
         // The rules are gone, and the resolver has to hear it: it reloads them only when this
         // number moves. Until 1.0.2 it did not, and the names cut before «Borrar todo» went on
         // being cut until the next restart (review of 5 Oct 2026, serious 13). Guard mode's
@@ -835,6 +846,8 @@ impl Ledger {
             "DELETE FROM settings WHERE key LIKE 'alcance:%' OR key LIKE 'alcance_modo:%'",
             [],
         )?;
+        // «Contrato vivo» (1.0.45) names programs and what they asked for: it goes too.
+        Self::borra_contratos_en(&tx)?;
         set_schema(&tx, SCHEMA_HEAD)?;
         tx.commit()?;
         // Gone from the tables is not gone from the file: a DELETE only marks pages free, and
@@ -1724,6 +1737,7 @@ mod tests {
                 ruta: String::new(),
                 sha256: String::new(),
                 firmado_por: String::new(),
+                version: String::new(),
             });
             p.server = Some(servidor("US", 15_169));
             l.append(p).unwrap();

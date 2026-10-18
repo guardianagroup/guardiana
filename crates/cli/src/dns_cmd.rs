@@ -44,6 +44,19 @@ pub(crate) fn apartado(ledger: &Ledger) -> bool {
     guardiana_license::status(ledger, &secret, now_ms()).is_ok_and(|s| !s.puede_funcionar)
 }
 
+/// Whether Home Mode may be switched on: with Plus (trial, subscription or Lifetime). A licence
+/// that cannot be read does not take it away.
+pub(crate) fn hogar_permitido(ledger: &Ledger) -> bool {
+    let Ok(secret) =
+        guardiana_panel::load_or_create_token(&paths::data_dir().join(guardiana_panel::TOKEN_FILE))
+    else {
+        return true;
+    };
+    guardiana_license::status(ledger, &secret, now_ms())
+        .map(|s| s.hogar_permitido)
+        .unwrap_or(true)
+}
+
 /// `--restore` when the extract cannot be opened: the copy from its plain file, put back, and the
 /// file removed once it really was. `None` when there is no such copy (the caller then reports
 /// why the extract would not open).

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>GUARDIANA · Quién es cada destino</title>
+<link rel="stylesheet" href="/static/diseno.css">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/identificacion.css">
+<link rel="preload" href="/static/fonts/HankenGrotesk-var.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="/static/fonts/SchibstedGrotesk-var.woff" as="font" type="font/woff" crossorigin>
+<script src="/static/arranque.js"></script>
+</head>
+<body data-page="identificacion">
+<header class="top">
+  <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA<small data-t="lema"></small></span></a>
+  <nav>
+    <a href="/por-dentro" data-t="menu_en_vivo">En vivo</a>
+    <a href="/extracto" data-t="menu_actividad">Actividad</a>
+    <a href="/contratos" data-t="nav_contratos">Contratos</a>
+    <a href="/revision" data-t="menu_diagnostico">Diagnóstico</a>
+    <a href="/sabe-de-ti" aria-current="true" data-t="menu_privacidad">Privacidad</a>
+    <a href="/hogar" data-t="menu_ajustes">Ajustes</a>
+  </nav>
+</header>
+<main>
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<h1 data-t="id_titulo">Quién es cada destino</h1>
+<p class="muted" data-t="id_intro"></p>
+
+<section class="tarjeta id-cabeza" aria-live="polite">
+  <div class="id-cifra"><span id="id-pct">—</span><small data-t="id_pct_rotulo">identificado</small></div>
+  <div class="id-barra" id="id-barra" role="img"><i class="id-ok"></i><i class="id-prob"></i><i class="id-sin"></i></div>
+  <ul class="id-leyenda">
+    <li><span class="chip id-chip-ok" data-t="id_nivel_identificada">Identificada</span> <span id="id-n-ok"></span> · <span class="muted" data-t="id_nivel_identificada_que"></span></li>
+    <li><span class="chip id-chip-prob" data-t="id_nivel_probable">Probable</span> <span id="id-n-prob"></span> · <span class="muted" data-t="id_nivel_probable_que"></span></li>
+    <li><span class="chip" data-t="id_nivel_sin_identificar">Sin identificar</span> <span id="id-n-sin"></span> · <span class="muted" data-t="id_nivel_sin_identificar_que"></span></li>
+  </ul>
+  <div class="id-ventana">
+    <span class="muted" data-t="id_ventana">Ventana</span>
+    <button type="button" class="boton chico" data-dias="1" data-t="id_dias_1">24 h</button>
+    <button type="button" class="boton chico" data-dias="7" data-t="id_dias_7">7 días</button>
+    <button type="button" class="boton chico" data-dias="30" data-t="id_dias_30">30 días</button>
+  </div>
+</section>
+
+<section class="tarjeta">
+  <h2 data-t="id_probables_titulo">Probables</h2>
+  <p class="muted" data-t="id_probables_texto"></p>
+  <ul class="id-lista" id="id-probables"></ul>
+</section>
+
+<section class="tarjeta">
+  <h2 data-t="id_sin_titulo">Sin identificar</h2>
+  <p class="muted" data-t="id_sin_texto"></p>
+  <ul class="id-lista" id="id-sin"></ul>
+</section>
+
+<p class="muted" id="id-ediciones"></p>
+<p class="muted" data-t="id_pie"></p>
+</main>
+<script src="/static/identificacion.js"></script>
+<script src="/static/interruptor.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

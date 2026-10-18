@@ -1,0 +1,38 @@
+/* «Herramientas» (1.0.45): layout only. Colours, buttons, chips and cards come from diseno.css;
+   nothing here redefines them. */
+.hx .hx-bloque { margin: var(--e4) 0; }
+.hx .hx-bloque h2 { margin: var(--e1) 0 var(--e2); }
+.hx .hx-bloque h3 { font-size: 15px; margin: var(--e4) 0 var(--e1); }
+.hx-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--e3); flex-wrap: wrap; }
+.hx-botones { display: flex; gap: var(--e2); flex-wrap: wrap; align-items: center; margin: var(--e3) 0; }
+.hx-confirmar { border: 1px solid var(--line); border-radius: var(--r-campo); padding: var(--e3) var(--e4); margin: var(--e3) 0; }
+.hx-columnas { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e5); }
+@media (max-width: 760px) { .hx-columnas { grid-template-columns: 1fr; } }
+.hx-lista { list-style: none; padding: 0; margin: 0; max-height: 320px; overflow-y: auto; }
+.hx-lista li { display: flex; justify-content: space-between; align-items: center; gap: var(--e2); padding: var(--e2) 0; border-bottom: 1px solid var(--line); }
+.hx-lista li span { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.hx-lista li small { font-size: 12px; }
+.hx-fila { display: flex; gap: var(--e2); margin-top: var(--e3); }
+.hx-fila .campo { flex: 1; min-width: 0; }
+.hx-esenciales { margin-top: var(--e4); }
+.hx-esenciales summary { cursor: pointer; color: var(--accent); }
+.hx-zona { display: block; border: 1px dashed var(--line); border-radius: var(--r-tarjeta); padding: var(--e5); text-align: center; cursor: pointer; color: var(--muted); margin: var(--e3) 0; }
+.hx-zona:hover, .hx-zona.sobre { border-color: var(--accent); color: var(--fg); }
+.hx-oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.hx-archivo { margin: var(--e3) 0 var(--e2); overflow-wrap: anywhere; }
+.hx-huellas { margin: var(--e2) 0; padding-left: var(--e5); }
+.hx-huellas li span { overflow-wrap: anywhere; }
+.hx-datos { display: grid; grid-template-columns: max-content 1fr; gap: var(--e1) var(--e4); margin: var(--e3) 0; }
+.hx-datos div { display: contents; }
+.hx-datos dt { color: var(--muted); }
+.hx-datos dd { margin: 0; overflow-wrap: anywhere; }
+/* The switch, green «Permitido» ↔ red «Cortado» (the owner, 18 Oct 2026). Its real style is the
+   shared `interruptor` of diseno.css (redesign branch); until that lands, this fallback, written
+   with :where() so it weighs nothing and the shared one wins as soon as it exists. */
+.hx-interruptor { display: inline-flex; align-items: center; gap: var(--e2); flex: none; }
+:where(.interruptor) { position: relative; width: 40px; height: 22px; border-radius: var(--r-pill); border: 1px solid var(--ok); background: var(--ok-suave); cursor: pointer; padding: 0; }
+:where(.interruptor)::after { content: ""; position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--ok); }
+:where(.interruptor[aria-checked="false"]) { border-color: var(--alerta); background: var(--alerta-suave); }
+:where(.interruptor[aria-checked="false"])::after { right: auto; left: 2px; background: var(--alerta); }
+:where(.interruptor-estado) { font-size: 13px; font-weight: 600; color: var(--ok); }
+:where(.interruptor[aria-checked="false"] + .interruptor-estado) { color: var(--alerta); }

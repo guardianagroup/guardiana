@@ -396,8 +396,31 @@ impl Turn {
     }
 }
 
+/// Whether this program may ask the relay for its call service. The relay's TURN costs money
+/// for every minute of a call, so it belongs to Plus (the owner's free plan, 18 Oct 2026): at
+/// the free level calls go the old way and no TURN credential is ever asked for. Whoever hosts
+/// Comunicaciones says which: ZERO from its licence, `guardiana comunicaciones` from GUARDIANA's.
+/// Until one says otherwise it is allowed: a licence that cannot be read never takes a feature
+/// away from someone who paid.
+static TURN_PERMITIDO: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+/// Set by the host whenever the licence is read: `true` with Plus (or the trial).
+pub fn permite_turn(si: bool) {
+    TURN_PERMITIDO.store(si, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether [`turn`] may ask the relay now.
+#[must_use]
+pub fn turn_permitido() -> bool {
+    TURN_PERMITIDO.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 /// Ask `rele` (the one this conversation meets at) for its call service, for room `sala`.
+/// At the free level it asks nothing and says so ([`permite_turn`]).
 pub fn turn(rele: &str, sala: &str) -> Result<Turn, String> {
+    if !turn_permitido() {
+        return Err("GUARDIANA Free: el servicio de llamadas del relé es de Plus".to_owned());
+    }
     let mut s = abre(rele)?;
     s.write_all(format!("GUARDIANA-TURN 1 {sala}\n").as_bytes())
         .map_err(|e| e.to_string())?;
@@ -472,6 +495,16 @@ fn empareja(mut s: TcpStream, sala: &str) -> Result<TcpStream, String> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    /// At the free level no TURN credential is asked for: the answer comes before any
+    /// connection (port 9 of this computer would fail differently, after trying).
+    #[test]
+    fn the_free_level_asks_the_relay_for_no_call_service() {
+        permite_turn(false);
+        let r = turn("127.0.0.1:9", "sala");
+        permite_turn(true);
+        assert!(r.is_err_and(|e| e.contains("Plus")));
+    }
 
     #[test]
     fn a_relay_code_names_a_room_and_a_typo_does_not() {

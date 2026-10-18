@@ -29,7 +29,10 @@
     const li = document.createElement('li');
     li.className = 'tercero';
     li.dataset.sitio = sitio;
-    li.innerHTML = '<span class="quien"></span><span class="botones"><button class="boton chico" type="button"></button><button class="boton chico" type="button"></button></span>'
+    // The cut switch (18 Oct 2026, the owner: «un interruptor que pase de verde a rojo»): the same
+    // component as GUARDIANA's panel (interruptor.js, diseno.css). Under it, the second place for
+    // a button, kept for «Bloquear todo» on a row cut only in part.
+    li.innerHTML = '<span class="quien"></span><span class="botones"><span class="interruptor-caja chico"><button type="button" role="switch" class="interruptor" aria-checked="false"><span class="interruptor-bola" aria-hidden="true"></span></button><span class="interruptor-estado" aria-live="polite"></span></span><button class="boton chico" type="button"></button></span>'
       + '<span class="linea"></span><span class="chips"></span><span class="nota-dato oculto"></span>';
     li.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => pulsa(li, b)));
     return li;
@@ -37,12 +40,21 @@
   // The button answers at once (it waits, marked, until the program says what holds now), and
   // the row is lit for a moment once it changed. The view is never scrolled.
   function pulsa(li, b) {
-    if (b.classList.contains('vacio') || b.getAttribute('aria-busy') === 'true') return;
+    if (b.classList.contains('vacio') || b.getAttribute('aria-busy') === 'true' || b.disabled) return;
     const x = filas.get(li.dataset.sitio);
     if (!x) return;
     pendiente = { sitio: x.datos.sitio, antes: clave(x.datos), hasta: Date.now() + 3000 };
     b.setAttribute('aria-busy', 'true');
     li.classList.add('enviando');
+    if (b.classList.contains('interruptor')) {
+      // The switch moves at once and says it is working; the program's answer settles it.
+      // On is «Permitido» (the common standard): pressing an allowed switch asks to cut.
+      const quiere = b.getAttribute('aria-checked') === 'true';
+      b.setAttribute('aria-checked', String(!quiere));
+      const caja = b.closest('.interruptor-caja');
+      caja.classList.add('ocupado'); caja.classList.toggle('cortado', quiere);
+      caja.querySelector('.interruptor-estado').textContent = t(quiere ? 'interruptor_cortando' : 'interruptor_permitiendo');
+    }
     manda({ tipo: b.dataset.accion, sitio: x.datos.sitio });
     $('e-recarga').classList.remove('oculto');
     // If no answer changes it, the button is free again (never stuck waiting).
@@ -51,24 +63,32 @@
         pendiente = null;
         li.classList.remove('enviando');
         li.querySelectorAll('button').forEach((y) => y.removeAttribute('aria-busy'));
+        // No answer: the switch goes back to what holds, and says why.
+        if (b.classList.contains('interruptor')) {
+          pintaFila(li, x.datos);
+          const caja = b.closest('.interruptor-caja');
+          caja.classList.add('fallo');
+          caja.querySelector('.interruptor-estado').title = t('interruptor_sin_respuesta');
+          const aviso = document.createElement('span');
+          aviso.className = 'interruptor-motivo'; aviso.setAttribute('role', 'alert'); aviso.textContent = t('interruptor_sin_respuesta');
+          caja.appendChild(aviso);
+          setTimeout(() => { aviso.remove(); caja.classList.remove('fallo'); }, 6000);
+        }
       }
     }, 3100);
   }
   const clave = (x) => x.ahora + '|' + (x.regla || '');
-  function botonesDe(x, corta, parcial) {
-    // Every button has its way back: «Volver a bloquear» on what the person unblocked (even if
-    // something of it is still cut: their marked data never passes by a rule), «Desbloquear»
-    // on what a rule or the lists cut, «Bloquear» on what passes; a row cut only in part also
-    // offers «Bloquear todo». What the task's limits cut, or a row cut only for carrying marked
-    // data, has no «Desbloquear»: it would do nothing.
-    const b = [];
-    if (x.fijo) return b;
-    if (x.regla === 'permitido') b.push(['bloquear_sitio', 'accion_rebloquear', 'corta']);
-    else if (corta) {
-      if (x.deshace) b.push(['desbloquear_sitio', 'accion_desbloquear', 'deja']);
-      if (parcial) b.push(['bloquear_todo', 'accion_bloquear_todo', 'corta']);
-    } else b.push(['bloquear_sitio', 'accion_bloquear', 'corta']);
-    return b;
+  // What the switch does from here, and the one button under it. Every cut has its way back:
+  // what the person unblocked can be blocked again (even if something of it is still cut: their
+  // marked data never passes by a rule), what a rule or the lists cut can be let through, what
+  // passes can be blocked; a row cut only in part also offers «Bloquear todo». What the task's
+  // limits cut, or a row cut only for carrying marked data, has a switch that cannot move: it
+  // would do nothing.
+  function accionesDe(x, corta, parcial) {
+    if (x.fijo) return { interruptor: null, boton: null };
+    if (x.regla === 'permitido') return { interruptor: ['bloquear_sitio', 'accion_rebloquear'], boton: null };
+    if (corta) return { interruptor: x.deshace ? ['desbloquear_sitio', 'accion_desbloquear'] : null, boton: parcial ? ['bloquear_todo', 'accion_bloquear_todo', 'corta'] : null };
+    return { interruptor: ['bloquear_sitio', 'accion_bloquear'], boton: null };
   }
   function pintaFila(li, x) {
     const corta = x.ahora === 'cortado' || x.ahora === 'parcial';
@@ -98,12 +118,27 @@
     nota.textContent = x.dato ? t('escudo_dato_cortado') : '';
     // Two places for buttons in every row, always: the column keeps its width and the row its
     // height whatever the words, and the same button stays under the finger.
-    const lista = botonesDe(x, corta, parcial);
+    const acc = accionesDe(x, corta, parcial);
     const huecos = [...li.querySelectorAll('.botones button')];
     // Taken before anything changes: a button about to be hidden loses the focus at once.
     const enFoco = huecos.indexOf(document.activeElement);
     const cambio = pendiente && pendiente.sitio === x.sitio && (clave(x) !== pendiente.antes || Date.now() > pendiente.hasta);
+    // The switch: red and «Cortado» (or «en parte cortado») while something of it is cut, green
+    // and «Permitido» while it passes; still, and saying so, when nothing can be done from here.
+    const sw = huecos[0], cajaSw = sw.closest('.interruptor-caja');
+    if (!sw.hasAttribute('aria-busy') || cambio) {
+      sw.setAttribute('aria-checked', String(!corta));
+      cajaSw.classList.toggle('cortado', corta);
+      cajaSw.classList.remove('ocupado');
+      cajaSw.querySelector('.interruptor-estado').textContent = parcial ? t('escudo_parcial') : t(corta ? 'interruptor_cortado' : 'interruptor_permitido');
+    }
+    sw.disabled = !acc.interruptor;
+    if (acc.interruptor) { sw.dataset.accion = acc.interruptor[0]; sw.title = t(acc.interruptor[1] + '_titulo'); sw.setAttribute('aria-label', t(acc.interruptor[1])); }
+    else { sw.dataset.accion = ''; sw.title = ''; sw.setAttribute('aria-label', t(corta ? 'interruptor_cortado' : 'interruptor_permitido')); }
+    if (cambio) sw.removeAttribute('aria-busy');
+    const lista = [null, acc.boton];
     huecos.forEach((b, i) => {
+      if (i === 0) return;
       const d = lista[i];
       b.classList.remove('corta', 'deja', 'vacio');
       if (d) {

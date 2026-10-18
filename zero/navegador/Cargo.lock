@@ -607,7 +607,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-core"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "rusqlite",
  "serde",
@@ -617,7 +617,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-license"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "getrandom 0.4.3",
  "guardiana-core",
@@ -629,7 +629,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-lists"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "flate2",
  "guardiana-core",
@@ -640,22 +640,24 @@ dependencies = [
 
 [[package]]
 name = "guardiana-secure"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "base64 0.23.1",
  "chacha20poly1305",
  "getrandom 0.4.3",
  "ml-kem",
  "qrcode",
+ "ring",
  "serde",
  "serde_json",
  "sha2 0.11.0",
  "vodozemac",
+ "zeroize",
 ]
 
 [[package]]
 name = "guardiana-zero"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "base64 0.23.1",
  "guardiana-core",
@@ -671,12 +673,13 @@ dependencies = [
  "tokio-rustls",
  "url",
  "webpki-roots",
+ "windows-sys 0.61.2",
  "wtransport",
 ]
 
 [[package]]
 name = "guardiana-zero-navegador"
-version = "1.0.44"
+version = "1.0.45"
 dependencies = [
  "guardiana-zero",
  "serde_json",

@@ -5,6 +5,7 @@
 
 mod apps_cmd;
 mod args;
+mod certificado_cmd;
 #[cfg(not(windows))]
 mod comunicaciones_cmd;
 mod dns_cmd;
@@ -110,6 +111,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("apps") => apps_cmd::run(&opts),
         Some("trampa" | "trampas") => trampa_cmd::run(&opts),
         Some("verify" | "verificar") => verify_cmd::run(&opts),
+        Some("certificado") => certificado_cmd::run(&opts),
         Some("version" | "--version" | "-V") => {
             println!("guardiana {}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -141,6 +143,7 @@ mod tests {
     fn every_text_key_exists_in_every_language() {
         let sources = [
             include_str!("apps_cmd.rs"),
+            include_str!("certificado_cmd.rs"),
             include_str!("comunicaciones_cmd.rs"),
             include_str!("dns_cmd.rs"),
             include_str!("engine.rs"),

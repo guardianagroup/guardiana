@@ -28,15 +28,34 @@ const PALABRAS: u64 = 0x30;
 const SESION: &str = "Guardiana-Red";
 const SESION_DIAGNOSTICO: &str = "Guardiana-Red-Diagnostico";
 
-/// What each event number is: (protocol, sent?).
-fn que_es(id: u16) -> Option<(&'static str, bool)> {
+/// What an event of the channel counts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Que {
+    /// Data sent.
+    Envia,
+    /// Data received.
+    Recibe,
+    /// Data sent again (a TCP retransmission). 1.0.45: counted apart, never as more data sent.
+    Reenvia,
+    /// A connection opened or accepted. 1.0.45.
+    Conecta,
+}
+
+/// What each event number is: (protocol, what it counts).
+///
+/// The numbers are the manifest's (`Microsoft-Windows-Kernel-Network`, the same as the classic
+/// kernel logger's TcpIp/UdpIp types): 10/26 send, 11/27 receive, 12/28 connect, 14/30
+/// retransmit, 15/31 accept, IPv4/IPv6; UDP 42/58 send, 43/59 receive. A retransmission is its
+/// own event, so its bytes go apart and are not added to what event 10 counted;
+/// `guardiana apps --red` shows the raw numbers, to check this on a real machine.
+fn que_es(id: u16) -> Option<(&'static str, Que)> {
     match id {
-        // TCP data sent / received, IPv4 and IPv6.
-        10 | 26 => Some(("tcp", true)),
-        11 | 27 => Some(("tcp", false)),
-        // UDP data sent / received, IPv4 and IPv6.
-        42 | 58 => Some(("udp", true)),
-        43 | 59 => Some(("udp", false)),
+        10 | 26 => Some(("tcp", Que::Envia)),
+        11 | 27 => Some(("tcp", Que::Recibe)),
+        12 | 28 | 15 | 31 => Some(("tcp", Que::Conecta)),
+        14 | 30 => Some(("tcp", Que::Reenvia)),
+        42 | 58 => Some(("udp", Que::Envia)),
+        43 | 59 => Some(("udp", Que::Recibe)),
         _ => None,
     }
 }
@@ -48,10 +67,20 @@ const MAXIMO_PARES: usize = 50_000;
 
 type Clave = (String, String, IpAddr, u16, &'static str);
 
+/// What one (program, address) pair added up between two takes.
+#[derive(Default, Clone, Copy)]
+struct Cuenta {
+    enviados: u64,
+    recibidos: u64,
+    paquetes: u64,
+    reenviados: u64,
+    conexiones: u64,
+}
+
 #[derive(Default)]
 struct Compartido {
-    /// (program name, path, address, port, protocol) → (sent, received, packets).
-    suma: HashMap<Clave, (u64, u64, u64)>,
+    /// (program name, path, address, port, protocol) → its counts.
+    suma: HashMap<Clave, Cuenta>,
     /// Process id → (name, path, when looked at).
     rutas: HashMap<u32, (String, String, i64)>,
     huellas: HashMap<String, String>,
@@ -99,42 +128,48 @@ impl Sesion {
             (std::mem::take(&mut d.suma), d.huellas.clone())
         };
         suma.into_iter()
-            .map(
-                |((nombre, ruta, ip, puerto, proto), (env, rec, paq))| Medida {
-                    proceso: Proceso {
-                        pid: 0,
-                        firmado_por: self.firmas.de(&ruta),
-                        sha256: huellas.get(&ruta).cloned().unwrap_or_default(),
-                        nombre,
-                        ruta,
-                    },
-                    ip,
-                    puerto,
-                    proto,
-                    enviados: env,
-                    recibidos: rec,
-                    paquetes: paq,
+            .map(|((nombre, ruta, ip, puerto, proto), c)| Medida {
+                proceso: Proceso {
+                    pid: 0,
+                    firmado_por: self.firmas.de(&ruta),
+                    version: String::new(),
+                    sha256: huellas.get(&ruta).cloned().unwrap_or_default(),
+                    nombre,
+                    ruta,
                 },
-            )
+                ip,
+                puerto,
+                proto,
+                enviados: c.enviados,
+                recibidos: c.recibidos,
+                paquetes: c.paquetes,
+                reenviados: c.reenviados,
+                conexiones: c.conexiones,
+            })
             .collect()
     }
 }
 
 fn anotar(datos: &Arc<Mutex<Compartido>>, registro: &EventRecord, esquemas: &SchemaLocator) {
-    let Some((proto, enviado)) = que_es(registro.event_id()) else {
+    let Some((proto, que)) = que_es(registro.event_id()) else {
         return;
     };
     let Ok(esquema) = esquemas.event_schema(registro) else {
         return;
     };
     let lector = Parser::create(registro, &esquema);
-    let (Ok(pid), Ok(tamano), Ok(ip), Ok(puerto)) = (
+    let (Ok(pid), Ok(ip), Ok(puerto)) = (
         lector.try_parse::<u32>("PID"),
-        lector.try_parse::<u32>("size"),
         lector.try_parse::<IpAddr>("daddr"),
         lector.try_parse::<u16>("dport"),
     ) else {
         return;
+    };
+    // A connection counts without a size; data without one is not counted at all.
+    let tamano = match (lector.try_parse::<u32>("size"), que) {
+        (Ok(t), _) => t,
+        (Err(_), Que::Conecta) => 0,
+        (Err(_), _) => return,
     };
     // The port travels in network order.
     let puerto = u16::from_be(puerto);
@@ -172,13 +207,20 @@ fn anotar(datos: &Arc<Mutex<Compartido>>, registro: &EventRecord, esquemas: &Sch
     if lleno && !d.suma.contains_key(&clave) {
         return;
     }
-    let e = d.suma.entry(clave).or_insert((0, 0, 0));
-    if enviado {
-        e.0 += u64::from(tamano);
-    } else {
-        e.1 += u64::from(tamano);
+    let e = d.suma.entry(clave).or_default();
+    let t = u64::from(tamano);
+    match que {
+        Que::Envia => {
+            e.enviados += t;
+            e.paquetes += 1;
+        }
+        Que::Recibe => {
+            e.recibidos += t;
+            e.paquetes += 1;
+        }
+        Que::Reenvia => e.reenviados += t,
+        Que::Conecta => e.conexiones += 1,
     }
-    e.2 += 1;
 }
 
 /// One raw network event seen by the diagnostic: event number, process id, size, and the two

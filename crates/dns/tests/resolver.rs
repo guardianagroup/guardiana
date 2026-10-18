@@ -236,6 +236,7 @@ async fn forwards_and_serves_second_query_from_cache() {
         Outcome::Forwarded {
             rcode: ResponseCode::NoError,
             server: Some(std::net::IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4))),
+            otras: Vec::new(),
             aliases: Vec::new(),
         }
     );
@@ -255,6 +256,7 @@ async fn the_alias_chain_reaches_the_policy() {
         Outcome::Forwarded {
             rcode: ResponseCode::NoError,
             server: Some(std::net::IpAddr::V4(Ipv4Addr::new(5, 6, 7, 8))),
+            otras: Vec::new(),
             aliases: vec![
                 "tienda.sc.medidor.test".to_owned(),
                 "e1.reparto.test".to_owned()
@@ -314,6 +316,7 @@ async fn nxdomain_from_upstream_passes_through() {
         Outcome::Forwarded {
             rcode: ResponseCode::NXDomain,
             server: None,
+            otras: Vec::new(),
             aliases: Vec::new(),
         }
     );

@@ -110,6 +110,8 @@ impl Ledger {
             let cutoff = crate::trafico::minuto_de(now - keep);
             report.trafico_pruned =
                 tx.execute("DELETE FROM trafico WHERE minuto < ?1", [cutoff])? as u64;
+            // The alias sites of a name too (1.0.45): which names were asked is detail.
+            tx.execute("DELETE FROM alias_sites WHERE last_seen < ?1", [now - keep])?;
         }
 
         if let Some(keep) = policy.totals_ms {

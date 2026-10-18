@@ -77,15 +77,27 @@ pub(crate) fn destinatario(empresa: &str) -> Option<Corredor> {
         .and_then(|f| f.get("borrar"))
         .and_then(|u| u.as_str())
         .unwrap_or_default();
-    let url = borrar.starts_with("https://").then(|| borrar.to_owned());
+    // A big company that is not a broker may have its privacy channel curated, with its source
+    // (`derechos-contactos.txt`, 1.0.45): the letter goes to that form, not to a general page.
+    let curado = registro
+        .as_ref()
+        .and_then(|r| crate::borrado::contacto_de(r.name));
+    let url = curado
+        .and_then(|c| c.url.clone())
+        .or_else(|| borrar.starts_with("https://").then(|| borrar.to_owned()));
     // A profile may give the company's own address for these requests (`mailto:`): the letter
     // goes there, under every law (review of 12 Oct 2026: Cloudflare's was ignored).
-    let correos = borrar
-        .strip_prefix("mailto:")
-        .map(|c| c.split('?').next().unwrap_or_default().trim())
-        .filter(|c| c.contains('@') && !c.contains([' ', ',', ';', '<', '>']))
-        .map(|c| vec![(c.to_owned(), vec!["*".to_owned()])])
-        .unwrap_or_default();
+    let correos = curado
+        .filter(|c| !c.correos.is_empty())
+        .map(|c| c.correos.clone());
+    let correos = correos.unwrap_or_else(|| {
+        borrar
+            .strip_prefix("mailto:")
+            .map(|c| c.split('?').next().unwrap_or_default().trim())
+            .filter(|c| c.contains('@') && !c.contains([' ', ',', ';', '<', '>']))
+            .map(|c| vec![(c.to_owned(), vec!["*".to_owned()])])
+            .unwrap_or_default()
+    });
     Some(Corredor {
         id: format!("empresa:{empresa}"),
         nombre: registro

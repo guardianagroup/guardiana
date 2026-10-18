@@ -2,7 +2,7 @@
 
 *Idiomas: [Español](README.md) · [English](README.en.md) · **Português***
 
-Programa para Windows, Linux e macOS que transforma o computador no **guardião DNS da casa**:
+Programa para Windows e macOS que transforma o computador no **guardião DNS da casa**:
 primeiro dele mesmo, depois dos celulares, da TV e de tudo o que usa o Wi‑Fi, sem instalar nada
 neles. Vê com quais serviços cada aparelho tenta falar, classifica, explica em uma frase, anota
 em um extrato encadeado por hash e bloqueia apenas o que o usuário decidir.
@@ -37,10 +37,9 @@ Os primeiros 7 dias são grátis; depois ele vem incluído na assinatura da GUAR
 | Sistema | Pacote | Como |
 |---|---|---|
 | Windows 10/11 (64 bits) | `guardiana-<versão>-windows-x64-pt.msi` (em espanhol, `…-x64.msi`; em inglês, `…-x64-en.msi`) | Clique duplo. Instala em Arquivos de Programas e registra o serviço. |
-| Debian, Ubuntu e derivados | `guardiana_<versão>_amd64.deb` | `sudo apt install ./guardiana_<versão>_amd64.deb` |
-| Outro Linux com systemd | `guardiana-<versão>-linux-x86_64.tar.gz` | Descompactar e `sudo ./instalar.sh` |
+| macOS (chip Apple) | `guardiana-<versão>-macos.app.zip` | Descompactar e arrastar o GUARDIANA.app para Aplicativos. |
 
-No Linux e no Mac, instalar **não muda o DNS do sistema**: isso se faz pelo painel, com
+No Mac, instalar **não muda o DNS do sistema**: isso se faz pelo painel, com
 consentimento, e se desfaz no mesmo lugar. No Windows, a primeira instalação coloca a GUARDIANA
 como DNS (a tela de boas-vindas avisa antes de «Instalar») e isso se desfaz no painel, em «Estado». Desinstalar desliga o Modo Casa, tira a regra do firewall e restaura o DNS
 exatamente como estava.
@@ -74,7 +73,7 @@ cargo test --workspace --locked
 ```
 
 Compilação reproduzível em um contêiner fixado por digest: `build/repro.sh` (veja
-[docs/VERIFY.md](docs/VERIFY.md)). Pacotes: `build/package.sh` (Linux) e `build/msi.ps1`
+[docs/VERIFY.md](docs/VERIFY.md)). Pacotes: `build/package.sh` e `build/msi.ps1`
 (Windows). Estrutura do código e regras de trabalho: [docs/BRIEF.md](docs/BRIEF.md).
 
 ## Licença

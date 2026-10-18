@@ -21,6 +21,11 @@ getrandom = { workspace = true }
 chacha20poly1305 = { workspace = true }
 # The post-quantum layer (cuantico.rs).
 ml-kem = { workspace = true }
+# The delivery room's pieces (flujo.rs): AES-256-GCM, the one authenticated cipher every
+# receiver's browser has in WebCrypto; ring's, already in the tree for TLS.
+ring = { workspace = true }
+# Keys wiped when dropped (flujo.rs); already in the tree through ml-kem and vodozemac.
+zeroize = { workspace = true }
 
 [lints]
 workspace = true

@@ -2,7 +2,7 @@
 
 *Idiomas: **Español** · [English](README.en.md) · [Português](README.pt.md)*
 
-Programa para Windows, Linux y macOS que convierte el PC en el **guardián DNS de la casa**:
+Programa para Windows y macOS que convierte el PC en el **guardián DNS de la casa**:
 primero de sí mismo, después de los teléfonos, el televisor y todo lo que use la Wi‑Fi, sin
 instalar nada en ellos. Ve a qué servicios intenta hablar cada dispositivo, lo clasifica, lo
 explica en una frase, lo anota en un extracto encadenado por hash y bloquea solo lo que el usuario
@@ -38,10 +38,9 @@ Los primeros 7 días son gratis; después va incluido en la suscripción de GUAR
 | Sistema | Paquete | Cómo |
 |---|---|---|
 | Windows 10/11 (64 bits) | `guardiana-<versión>-windows-x64.msi` (en inglés, `…-x64-en.msi`; en portugués, `…-x64-pt.msi`) | Doble clic. Instala en Archivos de programa y registra el servicio. |
-| Debian, Ubuntu y derivados | `guardiana_<versión>_amd64.deb` | `sudo apt install ./guardiana_<versión>_amd64.deb` |
-| Otro Linux con systemd | `guardiana-<versión>-linux-x86_64.tar.gz` | Descomprimir y `sudo ./instalar.sh` |
+| macOS (chip Apple) | `guardiana-<versión>-macos.app.zip` | Descomprimir y arrastrar GUARDIANA.app a Aplicaciones. |
 
-En Linux y en el Mac, instalar **no cambia el DNS del sistema**: eso se hace desde el panel, con
+En el Mac, instalar **no cambia el DNS del sistema**: eso se hace desde el panel, con
 consentimiento, y se deshace en el mismo sitio. En Windows, la primera instalación pone a GUARDIANA
 como DNS (la pantalla de bienvenida lo dice antes de «Instalar») y se deshace en el panel, en «Estado». Desinstalar apaga Modo Hogar, quita la regla del cortafuegos y
 restaura el DNS exactamente como estaba.
@@ -75,7 +74,7 @@ cargo test --workspace --locked
 ```
 
 Compilación reproducible en un contenedor fijado por digest: `build/repro.sh` (véase
-[docs/VERIFY.md](docs/VERIFY.md)). Paquetes: `build/package.sh` (Linux) y `build/msi.ps1`
+[docs/VERIFY.md](docs/VERIFY.md)). Paquetes: `build/package.sh` y `build/msi.ps1`
 (Windows). Estructura del código y reglas de trabajo: [docs/BRIEF.md](docs/BRIEF.md).
 
 ## Licencia

@@ -27,9 +27,13 @@
   let LANG = '';
   try { LANG = localStorage.getItem('guardiana_lang') || ''; } catch (_) {}
   if (LANG !== 'es' && LANG !== 'en' && LANG !== 'pt') {
-    // Spanish or Portuguese browsers get their language; any other one gets English, not Spanish
-    // (28 Sep 2026: a browser in German got the whole panel in Spanish).
-    const dos = (navigator.language || 'es').slice(0, 2).toLowerCase();
+    // English first (18 Oct 2026, the owner: «English is the first language on screen»), and the
+    // browser's language is no longer a guess of the person's. The one exception is a choice the
+    // person did make: inside GUARDIANA ZERO the page speaks the language ZERO runs in, which is
+    // the installer's (Spanish or Portuguese MSI) or English. ZERO sets that language on its
+    // engine, so there it is what navigator.language says.
+    const enZero = !!(window.chrome && window.chrome.webview);
+    const dos = enZero ? (navigator.language || 'en').slice(0, 2).toLowerCase() : 'en';
     LANG = (dos === 'es' || dos === 'pt') ? dos : 'en';
   }
   try { document.documentElement.lang = LANG; } catch (_) {}
@@ -318,15 +322,47 @@
     el.innerHTML = pasos.replace(/\.$/, '').split(' › ').map((x) => `<li>${resalta(x)}</li>`).join('')
       + (cola.length ? `<li class="nota-tel">${resalta(cola.join(' '))}</li>` : '');
   }
+  // Every action answers (18 Oct 2026, the owner's «revisión extrema»): whatever a click on a
+  // control asks the service to change, that control shows it is working from the same instant,
+  // ignores a second click, and ends with a mark or with the reason it failed
+  // (GuardianaRespuesta, interruptor.js). The switches handle their own.
+  let ultimoControl = null;
+  document.addEventListener('click', (e) => {
+    const c = e.target.closest && e.target.closest('button, [role="button"], input[type="checkbox"], input[type="radio"]');
+    ultimoControl = c && !c.classList.contains('interruptor') ? { c, ts: performance.now() } : null;
+  }, true);
   async function api(path, opts = {}) {
+    const metodo = String(opts.method || 'GET').toUpperCase();
+    const R = window.GuardianaRespuesta;
+    if (metodo !== 'GET' && R && ultimoControl && performance.now() - ultimoControl.ts < 1500 && ultimoControl.c.isConnected) {
+      const c = ultimoControl.c;
+      ultimoControl = null;
+      return R.trabaja(c, apiDirecta(path, opts));
+    }
+    return apiDirecta(path, opts);
+  }
+  async function apiDirecta(path, opts = {}) {
     // The browser's offset in minutes east of UTC, so the dates written into sentences are the
     // person's own day (getTimezoneOffset counts the other way round).
     const headers = Object.assign({ 'X-Guardiana-Token': token, 'X-Guardiana-Lang': LANG, 'X-Guardiana-Tz': String(-new Date().getTimezoneOffset()) }, opts.headers || {});
     if (opts.body && typeof opts.body !== 'string') { opts.body = JSON.stringify(opts.body); headers['Content-Type'] = 'application/json'; }
     const r = await fetch(path, Object.assign({}, opts, { headers }));
     if (r.status === 401) { showNoSession(); throw new Error('sin sesión'); }
+    // A Plus feature at the free level (plan.rs): one calm line and «Pasar a Plus», once per page.
+    // `callado`: the top bar's own questions, which must not put that line on every page.
+    if (r.status === 402) { let j = {}; try { j = await r.json(); } catch (_) {} if (!opts.callado) lineaPlus(j); const e = new Error(j.texto || 'Plus'); e.plus = true; throw e; }
     if (!r.ok) throw new Error(await r.text());
     return r.json();
+  }
+  // The free level's single line for a Plus feature: no popup, no repetition (owner, 18 Oct 2026).
+  function lineaPlus(j) {
+    if (document.getElementById('linea-plus') || !j || !j.texto) return;
+    const caja = document.createElement('div');
+    caja.id = 'linea-plus';
+    caja.className = 'tarjeta plan-linea plan-plus';
+    caja.innerHTML = `<span>${esc(j.texto)}</span> <a class="boton chico" href="${esc(j.enlace || '')}" target="_blank" rel="noopener">${esc(j.boton || '')}</a>`;
+    const m = document.querySelector('main');
+    if (m) m.insertBefore(caja, m.firstChild);
   }
   function showNoSession() {
     const el = document.getElementById('no-session');
@@ -755,20 +791,31 @@
       if (acc) acc.innerHTML = cutCell(ev);
     });
   }
+  // The cut switch (18 Oct 2026, the owner: «un interruptor que pase de verde a rojo»), the same
+  // component as the globe and ZERO (interruptor.js): green «Permitido», red «Cortado 14:32».
+  const TEXTO_INTERRUPTOR = () => ({ permitido: t('interruptor_permitido'), cortado: t('interruptor_cortado'), cortando: t('cortando'), permitiendo: t('permitiendo') });
+  const interruptor = (cortado, datos, nombre, hora) => {
+    const tx = TEXTO_INTERRUPTOR();
+    if (cortado && hora) tx.cortado = t('interruptor_cortado_hora').replace('{h}', hora);
+    const G = window.GuardianaInterruptor;
+    if (!G) return '';
+    return G.html({ cortado, texto: tx, datos, chico: true, etiqueta: t(cortado ? 'interruptor_etiqueta_permitir' : 'interruptor_etiqueta_cortar').replace('{nombre}', nombre) });
+  };
+  const horaCorta = (ms) => (typeof ms === 'number' ? new Date(ms).toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' }) : '');
   function cutCell(ev) {
-    const d = `data-device="${esc(ev.device_id)}" data-name="${esc(ev.qname)}"`;
+    const d = { device: ev.device_id, name: ev.qname };
     const enSuPagina = document.body.getAttribute('data-page') === 'miDispositivo';
     const corte = reglaDeCorte(ev);
     if (corte !== undefined) {
       // A block the household panel set on this device: its own page cannot lift it (the
       // server refuses it too), so the row says where it is changed instead of a button.
       if (enSuPagina && REGLAS_DE_LA_CASA.has(corte)) return `<span class="muted">${esc(t('mi_bloqueo_de_la_casa'))}</span>`;
-      return `<button class="cut cortado" data-deshacer="${corte}" ${d}>${esc(t('desbloquear_boton'))}</button>`;
+      return interruptor(true, Object.assign({ deshacer: corte }, d), ev.qname, horaCorta(HORAS_REGLA.get(corte)?.creada));
     }
     // Blocking a name undoes the hand-made allow first, but only one this page may undo.
     const permiso = reglaDePermiso(ev);
     const permisoPropio = permiso !== undefined && !(enSuPagina && REGLAS_DE_LA_CASA.has(permiso));
-    const bloquear = `<button class="secondary cut" ${permisoPropio ? `data-permiso="${permiso}" ` : ''}${d}>${esc(t('cortar'))}</button>`;
+    const bloquear = interruptor(false, Object.assign(permisoPropio ? { permiso } : {}, d), ev.qname);
     if (ev.verdict === 'cortado') {
       // Lifted since: the status cell says «desbloqueado» (estadoCelda), and the button offers
       // what can be done now.
@@ -777,12 +824,12 @@
         // The scope belongs to the home's panel: from the phone's own page there is no key for
         // it, so the row says where to change it instead of a button that would fail.
         if (enSuPagina) return `<span class="muted">${esc(t('mi_fuera_alcance'))}</span>`;
-        return `<button class="cut cortado" data-alcance="1" ${d}>${esc(t('desbloquear_boton'))}</button>`;
+        return interruptor(true, Object.assign({ alcance: 1 }, d), ev.qname);
       }
       // Blocked by a rule this page does not hold: on the phone's own page that is the home's
       // rule, which only the home's panel lifts (the server refuses it too).
       if (enSuPagina) return `<span class="muted">${esc(t('mi_bloqueo_de_la_casa'))}</span>`;
-      return `<button class="cut cortado" data-permitir="1" ${d}>${esc(t('desbloquear_boton'))}</button>`;
+      return interruptor(true, Object.assign({ permitir: 1 }, d), ev.qname);
     }
     return bloquear;
   }
@@ -850,9 +897,11 @@
   }
 
   function bindCutButtons(container, path) {
-    container.addEventListener('click', async (e) => {
-      const b = e.target.closest('button.cut');
-      if (!b) return;
+    // One switch per row (interruptor.js): it moves at once and says «Cortando…», cannot be
+    // pressed twice, and goes back saying why if the service refuses (18 Oct 2026).
+    const G = window.GuardianaInterruptor;
+    if (!G) return;
+    G.engancha(container, async (b) => {
       const name = b.dataset.name, dev = b.dataset.device;
       const k = claveCorte(dev, sinPunto(name)), kCasa = claveCorte('home', sinPunto(name));
       const deshecha = (id) => {
@@ -864,60 +913,55 @@
         REGLAS_VISTAS.add(Number(id)); REGLAS_ACTIVAS.add(Number(id));
         HORAS_REGLA.set(Number(id), { creada: Date.now(), deshecha: null });
       };
-      b.disabled = true;
-      try {
-        if (b.dataset.deshacer) {
-          // Desbloquear: se deshace la regla de este nombre.
-          await api(`${path}/${b.dataset.deshacer}/deshacer`, { method: 'POST' });
-          deshecha(b.dataset.deshacer);
-          anotaDesbloqueo(CORTADOS.get(k) === Number(b.dataset.deshacer) ? k : kCasa, Date.now());
-          if (CORTADOS.get(k) === Number(b.dataset.deshacer)) CORTADOS.delete(k); else CORTADOS.delete(kCasa);
-        } else if (b.dataset.alcance) {
-          // Fuera del alcance declarado: el nombre entra en el alcance de ese aparato.
-          await api('/api/ia/alcance/anadir', { method: 'POST', body: { device_id: dev, nombre: name } });
-          DEJADOS_PASAR.add(k);
-          HORA_DEJADO.set(k, Date.now());
-        } else if (b.dataset.permitir) {
-          // The map is from when the page loaded: a rule of this name made since then (another
-          // tab, the Rules page) is undone, not covered with an allow (second pass, 8 Oct 2026).
-          await cargarCortados(path);
-          const corte = CORTADOS.get(k) ?? CORTADOS.get(kCasa);
-          if (corte !== undefined) {
-            await api(`${path}/${corte}/deshacer`, { method: 'POST' });
-            deshecha(corte);
-            anotaDesbloqueo(CORTADOS.get(k) === corte ? k : kCasa, Date.now());
-            CORTADOS.delete(k); CORTADOS.delete(kCasa);
-          } else {
-            // Bloqueado por una regla ancha: una regla concreta que lo permite gana a la ancha.
-            const nueva = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'permitir' }, path);
-            if (nueva) { PERMITIDOS.set(k, nueva.id); creada(nueva.id); }
-          }
+      let hecho = true;
+      if (b.dataset.deshacer) {
+        // Desbloquear: se deshace la regla de este nombre.
+        await api(`${path}/${b.dataset.deshacer}/deshacer`, { method: 'POST' });
+        deshecha(b.dataset.deshacer);
+        anotaDesbloqueo(CORTADOS.get(k) === Number(b.dataset.deshacer) ? k : kCasa, Date.now());
+        if (CORTADOS.get(k) === Number(b.dataset.deshacer)) CORTADOS.delete(k); else CORTADOS.delete(kCasa);
+      } else if (b.dataset.alcance) {
+        // Fuera del alcance declarado: el nombre entra en el alcance de ese aparato.
+        await api('/api/ia/alcance/anadir', { method: 'POST', body: { device_id: dev, nombre: name } });
+        DEJADOS_PASAR.add(k);
+        HORA_DEJADO.set(k, Date.now());
+      } else if (b.dataset.permitir) {
+        // The map is from when the page loaded: a rule of this name made since then (another
+        // tab, the Rules page) is undone, not covered with an allow (second pass, 8 Oct 2026).
+        await cargarCortados(path);
+        const corte = CORTADOS.get(k) ?? CORTADOS.get(kCasa);
+        if (corte !== undefined) {
+          await api(`${path}/${corte}/deshacer`, { method: 'POST' });
+          deshecha(corte);
+          anotaDesbloqueo(CORTADOS.get(k) === corte ? k : kCasa, Date.now());
+          CORTADOS.delete(k); CORTADOS.delete(kCasa);
         } else {
-          // Sin confirm aquí: lo pide el servidor con la frase que corresponda (una sola ventana).
-          const nueva = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'cortar' }, path);
-          // The allow made by hand goes only once the block exists: undone first, a cancelled
-          // confirmation left the wide rule blocking the name again (review of 9 Oct 2026).
-          if (nueva && b.dataset.permiso) {
-            await api(`${path}/${b.dataset.permiso}/deshacer`, { method: 'POST' });
-            deshecha(b.dataset.permiso);
-            PERMITIDOS.delete(k);
-          }
-          if (nueva) { CORTADOS.set(k, nueva.id); creada(nueva.id); DEJADOS_PASAR.delete(k); }
+          // Bloqueado por una regla ancha: una regla concreta que lo permite gana a la ancha.
+          const nueva = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'permitir' }, path);
+          if (nueva) { PERMITIDOS.set(k, nueva.id); creada(nueva.id); } else hecho = false;
         }
-      } catch (err) {
-        alert(String(err.message || err));
+      } else {
+        // Sin confirm aquí: lo pide el servidor con la frase que corresponda (una sola ventana).
+        const nueva = await createRule({ scope: 'device', device_id: dev, match_kind: 'domain', pattern: name, action: 'cortar' }, path);
+        // The allow made by hand goes only once the block exists: undone first, a cancelled
+        // confirmation left the wide rule blocking the name again (review of 9 Oct 2026).
+        if (nueva && b.dataset.permiso) {
+          await api(`${path}/${b.dataset.permiso}/deshacer`, { method: 'POST' });
+          deshecha(b.dataset.permiso);
+          PERMITIDOS.delete(k);
+        }
+        if (nueva) { CORTADOS.set(k, nueva.id); creada(nueva.id); DEJADOS_PASAR.delete(k); } else hecho = false;
       }
-      // The button turns into what can be done now and the status beside it says what holds
-      // now, on this row and on every other row of the same name, in every table of the page.
-      b.disabled = false;
-      // The button is drawn anew: the focus stays on this row's button, not on the page.
+      if (!hecho) return false;
+      // The switch and the status beside it say what holds now, on this row and on every other
+      // row of the same name, in every table of the page; the focus stays on this row's switch.
       const fila = b.closest('tr');
       redibujaNombre(name);
       const nuevo = fila && fila.querySelector('td.accion button');
       if (nuevo) nuevo.focus({ preventScroll: true });
-    });
+      return true;
+    }, TEXTO_INTERRUPTOR());
   }
-
   // One connection asks the same name several ways at once: the IPv4 address (A), the IPv6 one
   // (AAAA) and the HTTPS record. Printed as one row each, the table looked like it was repeating
   // itself, and a person reading it counted the same service two or three times. They are folded
@@ -1034,7 +1078,7 @@
     $('maxima-quitar').addEventListener('click', (e) => cambia(false, e.currentTarget));
     try { pinta(await api('/api/proteccion-maxima')); } catch (_) {}
   }
-  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', antivirus: 'nav_antivirus', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo', borrado: 'nav_borrado', empresa: 'ficha_titulo', expedientes: 'nav_expedientes' };
+  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', antivirus: 'nav_antivirus', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo', borrado: 'nav_borrado', empresa: 'ficha_titulo', expedientes: 'nav_expedientes', certificado: 'nav_certificado', contratos: 'nav_contratos', vision: 'nav_vision', vigilancia: 'nav_vigilancia', herramientas: 'nav_herramientas', identificacion: 'nav_identificacion' };
   function applyTexts() {
     document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.getAttribute('data-t')); });
     document.querySelectorAll('[data-t-html]').forEach((el) => { el.innerHTML = t(el.getAttribute('data-t-html')); });
@@ -1055,53 +1099,166 @@
     document.querySelectorAll('th[data-cat]').forEach((th) => { th.textContent = (T.categorias && T.categorias[th.getAttribute('data-cat')]) || th.getAttribute('data-cat'); });
     const page = document.body.getAttribute('data-page');
     if (PAGE_TITLE[page]) document.title = 'GUARDIANA · ' + t(PAGE_TITLE[page]);
-    // The language switch lives in the header of every page; the choice is kept in this browser only.
+    pintaCabecera();
+  }
+
+  // ----- The header (18 Oct 2026) -----------------------------------------------------------
+  // The owner approved the new menu: «de 16 entradas a 3 pestañas». The top bar is the brand,
+  // the three products in the middle (Radiografías · ZERO · Comunicaciones) and, on the right,
+  // the state of the service and a single «Ajustes» button. Under it, quietly, the four parts of
+  // Radiografías; the pages of the part you are in show as small tabs. Every page keeps its
+  // address, and every page is still one or two clicks away. Built here, once, for every page:
+  // the links written in each page's HTML stay as they were for a browser without scripts.
+  const MENU = [
+    { t: 'menu_en_vivo', paginas: [['por-dentro', '/por-dentro', 'menu_globo']] },
+    { t: 'menu_actividad', paginas: [['extracto', '/extracto', 'menu_registro'], ['radiografia', '/', 'menu_foto'], ['informe', '/informe', 'nav_informe']] },
+    // 1.0.45: «Contratos» right after Actividad (what each program normally contacts), the two
+    // new looks of Diagnóstico after the check-up, and the three new pages of Privacidad.
+    { t: 'nav_contratos', paginas: [['contratos', '/contratos', 'nav_contratos']] },
+    { t: 'menu_diagnostico', paginas: [['revision', '/revision', 'nav_revision'], ['vision', '/vision', 'nav_vision'], ['vigilancia', '/vigilancia', 'nav_vigilancia'], ['ia', '/ia', 'nav_ia'], ['antivirus', '/antivirus', 'nav_antivirus'], ['dispositivos', '/dispositivos', 'nav_dispositivos']] },
+    { t: 'menu_privacidad', paginas: [['sabeDeTi', '/sabe-de-ti', 'menu_sabe'], ['identificacion', '/identificacion', 'nav_identificacion'], ['certificado', '/certificado', 'nav_certificado'], ['borrado', '/borrado', 'menu_borrado'], ['expedientes', '/expedientes', 'nav_expedientes'], ['reglas', '/reglas', 'nav_reglas'], ['herramientas', '/herramientas', 'nav_herramientas']] },
+  ];
+  const AJUSTES = { t: 'menu_ajustes', paginas: [['hogar', '/hogar', 'nav_hogar'], ['licencia', '/licencia', 'nav_licencia'], ['verify', '/verify', 'nav_verify'], ['estado', '/estado', 'nav_estado']] };
+  const ICONO_AJUSTES = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.6"/><circle cx="6" cy="11.5" r="1.6"/></svg>';
+  let pulso = null;
+  function pintaCabecera() {
+    const page = document.body.getAttribute('data-page');
     const header = document.querySelector('header.top');
-    if (header && !$('lang-toggle')) {
-      // Los tres idiomas a la vista, como en la web: un botón que va rotando escondía el tercero
-      // justo a quien lo estaba buscando. El de esta pantalla queda marcado y no se puede pulsar.
-      const b = document.createElement('div');
-      b.id = 'lang-toggle'; b.className = 'idiomas';
-      const CORTO = { es: 'ES', en: 'EN', pt: 'PT' };
-      const CAMBIAR = { es: 'Cambiar a español', en: 'Switch to English', pt: 'Mudar para português' };
-      ['es', 'en', 'pt'].forEach((l) => {
-        const a = document.createElement('button');
-        a.type = 'button';
-        a.className = 'secondary lang' + (l === LANG ? ' actual' : '');
-        a.textContent = CORTO[l];
-        a.setAttribute('lang', l);
-        if (l === LANG) {
-          a.setAttribute('aria-current', 'true');
-          a.disabled = true;
-        } else {
-          a.setAttribute('aria-label', CAMBIAR[l]);
-          a.addEventListener('click', () => {
-            try { localStorage.setItem('guardiana_lang', l); } catch (_) {}
-            location.reload();
-          });
-        }
-        b.appendChild(a);
-      });
-      const n = document.createElement('button');
-      n.id = 'tema-toggle'; n.type = 'button'; n.className = 'secondary lang tema';
-      const OTRO = TEMA === 'noche' ? 'dia' : 'noche';
-      // A moon by day (to go to night) and a sun by night: the icon says where it takes you,
-      // the name stays in the tooltip and for screen readers.
-      const ICONO_TEMA = {
-        noche: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg>',
-        dia: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>',
+    // The phone's own page and the checker have a world of their own: no menu of the house.
+    if (!header) return;
+    const CORTO0 = { en: 'English', es: 'Español', pt: 'Português' };
+    if (page === 'miDispositivo' || page === 'comprobador') {
+      // Their own header keeps only the language switch, English first.
+      if (!$('lang-toggle')) {
+        const b = document.createElement('div');
+        b.id = 'lang-toggle'; b.className = 'idiomas';
+        b.innerHTML = ['en', 'es', 'pt'].map((l) => `<button type="button" class="secondary lang${l === LANG ? ' actual' : ''}" lang="${l}"${l === LANG ? ' aria-current="true" disabled' : ` data-lang="${l}"`}>${CORTO0[l]}</button>`).join('');
+        b.querySelectorAll('[data-lang]').forEach((a) => a.addEventListener('click', () => { try { localStorage.setItem('guardiana_lang', a.dataset.lang); } catch (_) {} location.reload(); }));
+        header.appendChild(b);
+      }
+      return;
+    }
+    const seccion = MENU.find((s) => s.paginas.some((p) => p[0] === page)) || (AJUSTES.paginas.some((p) => p[0] === page) ? AJUSTES : null);
+    const CORTO = { en: 'English', es: 'Español', pt: 'Português' };
+    const CAMBIAR = { es: 'Cambiar a español', en: 'Switch to English', pt: 'Mudar para português' };
+    const idiomas = ['en', 'es', 'pt'].map((l) => (l === LANG
+      ? `<button type="button" class="lang actual" lang="${l}" aria-current="true" disabled>${CORTO[l]}</button>`
+      : `<button type="button" class="lang" lang="${l}" data-lang="${l}" aria-label="${esc(CAMBIAR[l])}">${CORTO[l]}</button>`)).join('');
+    const enlace = (p, clase) => `<a href="${p[1]}"${clase ? ` class="${clase}"` : ''}${p[0] === page ? ' aria-current="page"' : ''}>${esc(t(p[2]))}</a>`;
+    const impreso = header.querySelector('.print-only') ? ` <span class="print-only">${esc(t('pdf_pie'))}</span>` : '';
+    header.classList.add('g-barra');
+    header.innerHTML = `<a class="brand" href="/" title="${esc(t('ir_inicio'))}"><span class="brand-txt">GUARDIANA</span></a>${impreso}
+      <nav class="g-productos" aria-label="${esc(t('menu_productos'))}">
+        <a href="/" class="g-producto" aria-current="true">${esc(t('menu_radiografias'))}</a>
+        <button type="button" class="g-producto" data-producto="zero" aria-expanded="false" aria-controls="g-pop">${esc(t('menu_zero'))}</button>
+        <button type="button" class="g-producto" data-producto="com" aria-expanded="false" aria-controls="g-pop">${esc(t('menu_comunicaciones'))}</button>
+      </nav>
+      <div class="g-pop" id="g-pop" role="dialog" hidden></div>
+      <div class="g-der">
+        <a class="g-pulso" id="g-pulso" href="/estado" role="status" aria-live="polite"><i aria-hidden="true"></i><span>${esc(pulso ? pulso.texto : '')}</span></a>
+        <button type="button" class="boton-icono" id="g-ajustes" aria-haspopup="true" aria-expanded="false" aria-controls="g-menu" title="${esc(t('menu_ajustes'))}" aria-label="${esc(t('menu_ajustes'))}">${ICONO_AJUSTES}</button>
+        <div class="g-menu" id="g-menu" hidden>
+          <div class="g-menu-t">${esc(t('menu_ajustes'))}</div>
+          ${AJUSTES.paginas.map((p) => enlace(p)).join('')}
+          <div class="g-menu-t">${esc(t('menu_idioma'))}</div>
+          <div class="idiomas" id="lang-toggle">${idiomas}</div>
+        </div>
+      </div>`;
+    // The four parts of Radiografías, and the pages of the one you are in.
+    let sub = document.getElementById('g-secciones');
+    if (!sub) { sub = document.createElement('nav'); sub.id = 'g-secciones'; sub.className = 'g-secciones'; header.after(sub); }
+    sub.setAttribute('aria-label', t('menu_secciones'));
+    const extra = document.getElementById('g-extra');
+    sub.innerHTML = MENU.map((s) => `<a href="${s.paginas[0][1]}"${s === seccion ? ' aria-current="true"' : ''}>${esc(t(s.t))}</a>`).join('')
+      + (seccion === AJUSTES ? `<span class="g-sep" aria-hidden="true"></span><a href="${AJUSTES.paginas[0][1]}" aria-current="true">${esc(t(AJUSTES.t))}</a>` : '');
+    const hueco = document.createElement('span'); hueco.className = 'g-hueco'; sub.appendChild(hueco);
+    // Whatever the page puts on the right of that row (the globe's own controls).
+    const propio = extra || document.querySelector('[data-nav-extra]');
+    if (propio) { propio.id = 'g-extra'; sub.appendChild(propio); }
+    let pags = document.getElementById('g-paginas');
+    if (seccion && seccion.paginas.length > 1) {
+      if (!pags) { pags = document.createElement('nav'); pags.id = 'g-paginas'; pags.className = 'g-paginas'; sub.after(pags); }
+      pags.setAttribute('aria-label', t(seccion.t));
+      pags.innerHTML = seccion.paginas.map((p) => enlace(p)).join('');
+    } else if (pags) pags.remove();
+    // The two other products. Inside GUARDIANA ZERO they are its fixed tabs; elsewhere the panel
+    // says where they are, in the same words the start page used (17 Oct 2026).
+    const pop = $('g-pop');
+    const cierraPop = () => { pop.hidden = true; header.querySelectorAll('[data-producto]').forEach((b) => b.setAttribute('aria-expanded', 'false')); };
+    header.querySelectorAll('[data-producto]').forEach((b) => b.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const abierto = !pop.hidden && pop.dataset.p === b.dataset.producto;
+      cierraPop(); cierraMenu();
+      if (abierto) return;
+      let so = '';
+      try { so = (await estadoBase()).so; } catch (_) {}
+      const fuera = so === 'linux' || so === 'macos';
+      const zero = b.dataset.producto === 'zero';
+      const orden = so === 'macos' ? '/usr/local/guardiana/guardiana comunicaciones' : 'guardiana comunicaciones';
+      pop.dataset.p = b.dataset.producto;
+      pop.innerHTML = `<b>${esc(t(zero ? 'zero_card_titulo' : 'com_card_titulo'))}</b><p>${esc(t(zero ? (fuera ? 'zero_card_texto' : 'menu_zero_texto') : (fuera ? (so === 'macos' ? 'com_card_mac' : 'com_card_linux') : 'menu_com_texto')))}</p>`
+        + (!zero && fuera ? `<p><code>${esc(orden)}</code></p>` : '');
+      pop.hidden = false; b.setAttribute('aria-expanded', 'true');
+      pop.style.left = Math.max(12, b.offsetLeft + b.offsetWidth / 2 - 170) + 'px';
+    }));
+    const menu = $('g-menu'), boton = $('g-ajustes');
+    function cierraMenu() { menu.hidden = true; boton.setAttribute('aria-expanded', 'false'); }
+    boton.addEventListener('click', (e) => { e.stopPropagation(); const abrir = menu.hidden; cierraPop(); cierraMenu(); if (abrir) { menu.hidden = false; boton.setAttribute('aria-expanded', 'true'); const a = menu.querySelector('a'); if (a) a.focus(); } });
+    menu.querySelectorAll('[data-lang]').forEach((a) => a.addEventListener('click', () => {
+      try { localStorage.setItem('guardiana_lang', a.dataset.lang); } catch (_) {}
+      location.reload();
+    }));
+    if (!pintaCabecera.una) {
+      pintaCabecera.una = true;
+      document.addEventListener('click', (e) => { if (!e.target.closest('#g-menu, #g-pop')) { const m = $('g-menu'), p = $('g-pop'); if (m) m.hidden = true; if (p) p.hidden = true; document.querySelectorAll('header.top [aria-expanded="true"]').forEach((x) => x.setAttribute('aria-expanded', 'false')); } });
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        const m = $('g-menu'), p = $('g-pop');
+        if ((m && !m.hidden) || (p && !p.hidden)) { if (m) m.hidden = true; if (p) p.hidden = true; document.querySelectorAll('header.top [aria-expanded="true"]').forEach((x) => x.setAttribute('aria-expanded', 'false')); e.stopImmediatePropagation(); }
+      }, true);
+      // The state of the service, from what the panel already asks (/api/estado): green while it
+      // answers and watches, amber with the word «Atención» when it does not. Never a guess.
+      // 1.0.45: it also says what the constant watch (/api/vigilancia/resumen) and the programs'
+      // contracts (/api/contratos/atencion) have that the person has not seen, and leads there.
+      // Both are Plus: at the free level they answer 402 quietly and the pill says only the
+      // service's state. «última señal» is the watch's own last look when there is one.
+      const enlacePulso = (href) => { const el = $('g-pulso'); if (el) el.setAttribute('href', href); };
+      const mira = async () => {
+        let e = null;
+        try { e = await api('/api/estado'); } catch (_) {}
+        const [vg, ct] = e && !e.caducado
+          ? await Promise.all([
+            api('/api/vigilancia/resumen', { callado: true }).catch(() => null),
+            api('/api/contratos/atencion', { callado: true }).catch(() => null),
+          ])
+          : [null, null];
+        const ms = vg && vg.ultima_senal ? vg.ultima_senal : Date.now();
+        const hora = new Date(ms).toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' });
+        const sinVer = vg ? Number(vg.avisos_sin_ver || 0) : 0;
+        if (!e) pulso = { ok: false, texto: t('pulso_atencion') + ' · ' + t('pulso_sin_respuesta'), href: '/estado' };
+        else if (e.caducado) pulso = { ok: false, texto: t('pulso_atencion') + ' · ' + t('pulso_apartado'), href: '/estado' };
+        else if (ct && ct.atencion) pulso = { ok: false, texto: ct.texto, href: ct.enlace || '/contratos' };
+        else if (sinVer > 0) {
+          // Seen «up to» a notice is by its row id (vigilancia.rs, sin_ver).
+          const ultimo = (vg.avisos || []).reduce((m, a) => Math.max(m, Number(a.id) || 0), 0);
+          pulso = { ok: false, texto: t('pulso_atencion') + ' · ' + tn('pulso_vigilancia_avisos', sinVer), href: '/vigilancia', visto: ultimo };
+        } else if (vg && vg.estado === 'atencion') pulso = { ok: false, texto: t('pulso_atencion') + ' · ' + t('nav_vigilancia'), href: '/vigilancia' };
+        else pulso = { ok: true, texto: t('pulso_observando') + ' · ' + t('pulso_ultima').replace('{h}', hora), href: vg ? '/vigilancia' : '/estado' };
+        const el = $('g-pulso');
+        if (el) { el.classList.toggle('atencion', !pulso.ok); el.querySelector('span').textContent = pulso.texto; }
+        enlacePulso(pulso.href);
       };
-      n.innerHTML = ICONO_TEMA[OTRO];
-      n.title = t(OTRO === 'noche' ? 'tema_noche' : 'tema_dia');
-      n.setAttribute('aria-label', n.title);
-      n.addEventListener('click', () => {
-        try { localStorage.setItem('guardiana_tema', OTRO); } catch (_) {}
-        location.reload();
-      });
-      // El botón del tema viaja con los idiomas: sueltos en la cabecera, en inglés se caían a una
-      // segunda línea porque el menú es más largo que en español.
-      b.appendChild(n);
-      header.appendChild(b);
+      // Seen once clicked: the notices it named stop counting (the page shows them all).
+      document.addEventListener('click', (ev) => {
+        const a = ev.target.closest && ev.target.closest('#g-pulso');
+        if (!a || !pulso || !pulso.visto) return;
+        api('/api/vigilancia/visto', { method: 'POST', body: { hasta: pulso.visto }, callado: true }).catch(() => {});
+      }, true);
+      mira();
+      cadaTanto(mira, 30000);
+    } else if (pulso) {
+      const el = $('g-pulso');
+      if (el) { el.classList.toggle('atencion', !pulso.ok); if (pulso.href) el.setAttribute('href', pulso.href); }
     }
   }
 
@@ -1794,10 +1951,41 @@
       if (!window.GuardianaUniverso) return;
       await window.GuardianaUniverso.iniciar({ api, t, tn, esc, LOC, LANG, cadaTanto, pdf: { pdfDocument, savePdfFile } });
     },
+    // «Quién es cada destino» (1.0.45): its own script (identificacion.js), loaded before this one.
+    async identificacion() {
+      if (!window.GuardianaIdentificacion) return;
+      await window.GuardianaIdentificacion.iniciar({ api, t, tn, esc, LOC, LANG });
+    },
+    // «Herramientas» (1.0.45): its own script (herramientas.js), loaded before this one. Files go
+    // to GUARDIANA as they are, not as JSON, so it gets the session headers too.
+    async herramientas() {
+      if (!window.GuardianaHerramientas) return;
+      await window.GuardianaHerramientas.iniciar({ api, t, tn, esc, LOC, LANG, cabeceras: () => ({ 'X-Guardiana-Token': token, 'X-Guardiana-Lang': LANG }) });
+    },
+    // «Visión profunda» (1.0.45): its own script (vision.js), loaded before this one.
+    async vision() {
+      if (!window.GuardianaVision) return;
+      await window.GuardianaVision.iniciar({ api, t, tn, esc, LOC, LANG, cadaTanto });
+    },
     // «Revisión del ordenador» (1.0.24): its own script (revision.js), loaded before this one.
     async revision() {
       if (!window.GuardianaRevision) return;
       await window.GuardianaRevision.iniciar({ api, t, tn, esc, LOC, LANG, pdf: { pdfDocument, savePdfFile } });
+    },
+    // «Vigilancia» (1.0.45): its own script (vigilancia.js), loaded before this one.
+    async vigilancia() {
+      if (!window.GuardianaVigilancia) return;
+      await window.GuardianaVigilancia.iniciar({ api, t, tn, esc, LOC, LANG, cadaTanto });
+    },
+    // «Contratos» (1.0.45, «contrato vivo»): its own script (contratos.js), loaded before this one.
+    async contratos() {
+      if (!window.GuardianaContratos) return;
+      await window.GuardianaContratos.iniciar({ api, t, tn, esc, LOC, LANG, cadaTanto });
+    },
+    // «Certificado y derechos» (1.0.45): its own script (derechos.js), loaded before this one.
+    async certificado() {
+      if (!window.GuardianaDerechos) return;
+      await window.GuardianaDerechos.iniciar({ api, t, tn, esc, LOC, LANG });
     },
     async antivirus() {
       let pais = (c) => c;
@@ -1820,7 +2008,11 @@
         if (v.device_id !== 'self') return '';
         const on = corte.cortados.includes(v.producto);
         if (!corte.disponible) return `<p class="limit">${esc(t('av_cortar_no_disponible'))}</p>`;
-        return `<p class="vigilante"><label><input type="checkbox" class="av-cortar" data-producto="${esc(v.producto)}"${on ? ' checked' : ''}> <b>${esc(t('av_cortar'))}</b></label>
+        // The shared switch (1.0.45): green «Permitido» (on) while it talks to its company, red
+        // «Cortado» once cut, the word beside it, as on every other cut of the program.
+        const G = window.GuardianaInterruptor;
+        const sw = G ? G.html({ cortado: on, texto: { permitido: t('interruptor_permitido'), cortado: t('interruptor_cortado'), cortando: t('cortando'), permitiendo: t('permitiendo') }, etiqueta: t('av_cortar'), datos: { producto: v.producto } }) : '';
+        return `<p class="vigilante"><b>${esc(t('av_cortar'))}</b> ${sw}
           <br><span class="${on ? 'bad' : 'muted'}">${esc(t(on ? 'av_cortar_on' : 'av_cortar_off'))}</span>
           <br><span class="muted">${esc(t('av_cortar_aviso'))}</span></p>`;
       };
@@ -1922,19 +2114,18 @@
       };
       // Cortar / dejar pasar: la casilla manda la decisión; si Windows no deja, vuelve atrás y
       // se dice por qué.
-      $('av-vistos').addEventListener('change', async (e) => {
-        const c = e.target.closest('input.av-cortar');
-        if (!c) return;
-        c.disabled = true;
+      if (window.GuardianaInterruptor) window.GuardianaInterruptor.engancha($('av-vistos'), async (b, quiere) => {
+        if (!b.dataset.producto) return false;
         try {
-          const x = await api('/api/antivirus/cortar', { method: 'POST', body: { producto: c.dataset.producto, cortar: c.checked } });
+          const x = await api('/api/antivirus/cortar', { method: 'POST', body: { producto: b.dataset.producto, cortar: quiere } });
           corte.cortados = x.cortados || [];
           paint(await api('/api/antivirus'));
+          return true;
         } catch (err) {
-          c.checked = !c.checked;
           $('av-detectar-msg').textContent = String(err.message || err);
-        } finally { c.disabled = false; }
-      });
+          throw err;
+        }
+      }, { permitido: t('interruptor_permitido'), cortado: t('interruptor_cortado'), cortando: t('cortando'), permitiendo: t('permitiendo') });
       // Exportar: se pide con el token en la cabecera (nunca en la dirección) y se descarga.
       $('av-export').addEventListener('click', async (e) => {
         e.preventDefault();
@@ -2033,7 +2224,7 @@
           <h3>${esc(nombreAparato(a.device_id, a.device_name))}</h3>
           <p class="mono muted">${a.patrones.map(esc).join(' · ')}</p>
           ${cifrasAlcance(a)}
-          <p class="vigilante"><label><input type="checkbox" class="a-cortar" data-device="${esc(a.device_id)}"${a.cortar ? ' checked' : ''}> <b>${esc(t('alcance_cortar'))}</b></label>
+          <p class="vigilante"><label><input type="checkbox" role="switch" class="a-cortar interruptor" data-device="${esc(a.device_id)}"${a.cortar ? ' checked' : ''}> <b>${esc(t('alcance_cortar'))}</b></label>
             <br><span class="muted">${esc(t(a.cortar ? 'alcance_cortar_on' : 'alcance_cortar_off'))}</span>
             <br><span class="muted">${esc(t('alcance_cortar_todo'))}</span></p>
           ${a.pase_hasta ? `<p class="ok">${esc(t('alcance_pase_activo').replace('{hora}', when(a.pase_hasta)))}</p>`
@@ -3108,6 +3299,21 @@
     let e;
     try { e = await estadoBase(); } catch (_) { return; }
     franjaExpedientes(e);
+    // The free level: one calm card where it matters (the radiography, the licence, the pages
+    // whose view it limits), nowhere else.
+    if (e.nivel === 'gratis') {
+      const pg = document.body.getAttribute('data-page');
+      const linea = { radiografia: 'plan_gratis_franja', licencia: 'plan_gratis_franja', extracto: 'plan_historial_24h', dispositivos: 'plan_otros_aparatos', hogar: 'plan_hogar_plus' }[pg];
+      if (!linea) return;
+      const caja = document.createElement('div');
+      caja.className = 'tarjeta plan-linea plan-gratis';
+      caja.id = 'linea-plus'; // a Plus route answered later does not add a second line
+      caja.innerHTML = `<strong>${esc(t(e.gratis_tras_plus ? 'caducado_titulo_plus' : 'plan_gratis_nombre'))}</strong> <span>${esc(t(linea))}</span>
+        <a class="boton chico" href="${esc(t('licencia_comprar_url'))}" target="_blank" rel="noopener">${esc(t('plan_pasar_plus'))}</a>`;
+      const m = document.querySelector('main');
+      if (m) m.insertBefore(caja, m.firstChild);
+      return;
+    }
     if (!e.caducado && !(e.prueba_dias !== null && e.prueba_dias !== undefined)) return;
     const caja = document.createElement('div');
     caja.className = 'card ' + (e.caducado ? 'caducado' : 'prueba');

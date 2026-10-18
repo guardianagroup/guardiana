@@ -1,10 +1,10 @@
 # The customer test, before a release exists: the same afternoon as cliente.yml, run on the
 # packages this branch would publish, built the way the release builds them.
 #
-# Linux and Windows binaries come from build/repro.sh (the build anyone can repeat), the .deb and
-# the .tar.gz are packed from that Linux binary, the three MSIs from that .exe with WiX 5 on
-# Windows, and the Mac app on a Mac. Then a fresh machine per system installs, uses, stops,
-# uninstalls and reinstalls, and on Windows updates from the version people have today.
+# The Windows binary comes from build/repro.sh (the build anyone can repeat), the three MSIs from
+# that .exe with WiX 5 on Windows, and the Mac app on a Mac. Since 1.0.45 nothing is built for
+# Linux (the owner, 18 Oct 2026: «QUITA LINUX. SOLO MAC Y WINDOWS»): no .deb, no .tar.gz.
+# Then a fresh machine per system installs, uses, stops, uninstalls and reinstalls, and on Windows updates from the version people have today.
 # Nothing is signed here (the key never comes near CI), so the download check of cliente.yml does
 # not apply: that one runs on what is published, after the release.
 # Written on 1 Oct 2026, so that 1.0.2 is tested as a customer would, before it reaches one.
@@ -24,7 +24,7 @@ env:
 
 jobs:
   binarios:
-    name: binarios reproducibles, .deb y .tar.gz
+    name: binario reproducible de Windows
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -33,20 +33,11 @@ jobs:
           fetch-depth: 0
       - name: compilación reproducible
         run: build/repro.sh HEAD
-      - name: .deb y .tar.gz del binario reproducible
+      - name: el .exe y sus huellas
         run: |
           set -euo pipefail
           v=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
-          mkdir -p paquetes target/release
-          install -m 755 "build/out/guardiana-$v-linux-x86_64" target/release/guardiana
-          cargo install cargo-deb@3.8.0 --locked --quiet
-          cargo deb -p guardiana-cli --no-build --no-strip -o "paquetes/guardiana_${v}_amd64.deb"
-          d="guardiana-$v-linux-x86_64"; mkdir -p "/tmp/$d"
-          cp target/release/guardiana build/tarball/instalar.sh build/tarball/desinstalar.sh \
-             build/tarball/LEEME.txt build/tarball/README.txt build/tarball/LEIAME.txt "/tmp/$d/"
-          cp docs/WHAT_IT_DOES_NOT_DO.md docs/VERIFY.md docs/HOGAR.md docs/LISTS.md LICENSE "/tmp/$d/"
-          chmod 644 "/tmp/$d"/*; chmod 755 "/tmp/$d/guardiana" "/tmp/$d/instalar.sh" "/tmp/$d/desinstalar.sh"
-          tar -C /tmp -czf "paquetes/$d.tar.gz" "$d"
+          mkdir -p paquetes
           cp "build/out/guardiana-$v-windows-x86_64.exe" paquetes/
           (cd paquetes && sha256sum *) | tee paquetes/SHA256SUMS
           # As notices too: they show on the run page without signing in, so the release machine
@@ -54,7 +45,7 @@ jobs:
           while read -r h n; do echo "::notice title=${n#\*}::$h"; done < paquetes/SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: candidato-linux
+          name: candidato-binario
           path: paquetes/
           retention-days: 7
 
@@ -67,11 +58,11 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: candidato-linux
+          name: candidato-binario
           path: paquetes
       # GUARDIANA ZERO, the browser, goes inside the same installer since 1.0.25 (the owner:
       # «uno solo»). It is built here, on Windows, as zero.yml builds it: WebView2 makes it a
-      # Windows program, so it is not part of the reproducible Linux-hosted build, and the
+      # Windows program, so it is not part of the reproducible container build, and the
       # installer's hash (in the public ledger) covers it.
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
         with:
@@ -152,32 +143,6 @@ jobs:
           Get-MpThreatDetection | Select-Object ThreatID, Resources | Format-List
       - name: instalar, usar, parar, desinstalar, reinstalar y actualizar
         run: python build/cliente/instalacion.py --tipo msi --dir paquetes --anterior anterior --candidato
-
-  ubuntu:
-    name: cliente en Ubuntu (.deb)
-    needs: binarios
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: candidato-linux
-          path: paquetes
-      - run: python3 build/cliente/instalacion.py --tipo deb --dir paquetes --candidato
-
-  ubuntu-tarball:
-    name: cliente en otro Linux (.tar.gz)
-    needs: binarios
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: candidato-linux
-          path: paquetes
-      - run: python3 build/cliente/instalacion.py --tipo tar --dir paquetes --candidato
 
   mac:
     name: cliente en macOS (GUARDIANA.app)
