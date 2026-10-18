@@ -953,6 +953,7 @@
     "licencia_clave_lead": "The key arrives by email when you pay. One connection to {host}, started by you, to activate it; then one check 8 days after activation and one per billing period (monthly or yearly; the Founder licence, paid once, one a month, so that a refund reaches this computer too). If a check cannot be done (no internet, the gateway down), it is tried again every hour until it goes through. All of them are recorded in “What GUARDIANA knows about you”. Nothing else leaves your computer.",
     "licencia_clave_campo": "licence key",
     "licencia_clave_boton": "Activate",
+    "licencia_enlace_listo": "Your key is already filled in, exactly as it came in your email. Press “Activate” to confirm it.",
     "licencia_comprar": "Subscribe at guardianagroup.com →",
     "licencia_comprar_url": "https://guardianagroup.com/en/buy.html",
     "licencia_activada": "Licence activated.",

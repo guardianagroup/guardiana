@@ -3,6 +3,17 @@
 // memory (sessionStorage) and sent as a header on every API call.
 (() => {
   'use strict';
+  // A licence key from the welcome email's guardiana://activar link (1.0.44): GUARDIANA ZERO
+  // opens /licencia with it in the fragment (#clave=...), which no server and no log ever sees.
+  // It is read before anything else and taken out of the address bar at once; the licence page
+  // fills the field with it and waits for the person's click on «Activar».
+  let CLAVE_ENLACE = '';
+  {
+    const m = /^#clave=([A-Za-z0-9_-]{8,100})$/.exec(location.hash || '');
+    if (m) CLAVE_ENLACE = m[1];
+    // Valid or not, a key never stays in the address (nor in the tab's history).
+    if (/^#clave=/.test(location.hash || '')) history.replaceState(null, '', location.pathname + location.search);
+  }
   const params = new URLSearchParams(location.search);
   if (params.has('t')) {
     try { sessionStorage.setItem('guardiana_token', params.get('t')); } catch (_) {}
@@ -2990,6 +3001,16 @@
       // clicks; the panel itself still sends nothing anywhere.
       $('l-comprar').href = t('licencia_comprar_url');
       render(await api('/api/licencia'));
+      // The key from the email's link (read at the top of this file): in the field, with the
+      // «Activar» button made the obvious next step and focused. Nothing is sent until the
+      // person presses it: a link alone never activates anything.
+      if (CLAVE_ENLACE) {
+        $('l-clave').querySelector('input[name="clave"]').value = CLAVE_ENLACE;
+        $('l-clave-boton').classList.add('btn');
+        $('l-clave-msg').textContent = t('licencia_enlace_listo');
+        $('l-clave').scrollIntoView({ block: 'center' });
+        $('l-clave-boton').focus();
+      }
       $('l-clave').addEventListener('submit', async (e) => {
         e.preventDefault();
         // One activation at a time: a second Enter during the gateway's wait spent a second

@@ -194,7 +194,9 @@ fn abrir_en_guardiana_zero(url: &str) -> bool {
 /// script that asks the panel every half second and goes there with the key as soon as it
 /// answers. Until 1.0.5 that wait was a black console window with a line of text, and the
 /// owner asked for something with the logo, more professional (8 Oct 2026). Everything is in
-/// the file: no fonts, no scripts, no network but the panel's own port.
+/// the file: no fonts, no scripts, no network but the panel's own port. Dark since 1.0.44, in the
+/// website's colours, like ZERO's own wait page: a white page between a dark window and a dark
+/// panel was a flash (the owner's video of 1.0.43).
 fn pagina_de_espera(t: &'static i18n::Texts, url: &str) -> String {
     let esc = |s: &str| {
         s.replace('&', "&amp;")
@@ -206,22 +208,22 @@ fn pagina_de_espera(t: &'static i18n::Texts, url: &str) -> String {
     format!(
         r##"<!doctype html>
 <html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="referrer" content="no-referrer"><title>GUARDIANA</title>
+<meta name="referrer" content="no-referrer"><meta name="color-scheme" content="dark"><title>GUARDIANA</title>
 <style>
-html,body{{height:100%;margin:0}}
-body{{background:#F4F6FA;color:#0B1020;font-family:"IBM Plex Sans","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}}
+html,body{{height:100%;margin:0;background:#06080C}}
+body{{background:#06080C;color:#E8ECF1;font-family:"IBM Plex Sans","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}}
 main{{max-width:520px;padding:32px 24px}}
 .logo{{width:112px;height:112px;margin:0 auto 22px;display:block}}
 h1{{font-family:"Unbounded","IBM Plex Sans","Segoe UI",system-ui,sans-serif;font-weight:700;letter-spacing:.18em;font-size:22px;margin:0 0 14px}}
-p{{font-size:16px;line-height:1.5;color:#5B6275;margin:0 0 10px}}
-.barra{{height:2px;width:160px;margin:22px auto 0;background:#D9DEE8;border-radius:2px;overflow:hidden}}
-.barra i{{display:block;height:100%;width:35%;background:#1F4BFF;border-radius:2px;animation:va 2.4s ease-in-out infinite}}
+p{{font-size:16px;line-height:1.5;color:#A9B3BE;margin:0 0 10px}}
+.barra{{height:2px;width:160px;margin:22px auto 0;background:#1E2631;border-radius:2px;overflow:hidden}}
+.barra i{{display:block;height:100%;width:35%;background:#9CC3E4;border-radius:2px;animation:va 2.4s ease-in-out infinite}}
 @keyframes va{{0%{{transform:translateX(-120%)}}100%{{transform:translateX(340%)}}}}
-#tarda{{display:none;color:#5B6275;font-size:14px;margin-top:18px}}
-a{{color:#1F4BFF}}
+#tarda{{display:none;color:#A9B3BE;font-size:14px;margin-top:18px}}
+a{{color:#9CC3E4}}
 </style></head>
 <body><main>
-<svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#06080C"/><g transform="translate(9 7) scale(.82)"><defs><mask id="g"><rect width="100" height="100" fill="#fff"/><path d="M63 58.29 V55.07 Q63 54 58.71 54 H44.15 Q37 54 37 61.15 V72.85 Q37 80 44.15 80 H58.71 Q63 80 63 75.71 V67 H51" fill="none" stroke="#000" stroke-width="7.5"/></mask></defs><path d="M31 44 V31 A19 19 0 0 1 69 31 V44" fill="none" stroke="#E8ECF1" stroke-width="9"/><rect x="17" y="42" width="66" height="50" rx="13" fill="#9CC3E4" mask="url(#g)"/></g></svg>
+<svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#0C1118"/><g transform="translate(9 7) scale(.82)"><defs><mask id="g"><rect width="100" height="100" fill="#fff"/><path d="M63 58.29 V55.07 Q63 54 58.71 54 H44.15 Q37 54 37 61.15 V72.85 Q37 80 44.15 80 H58.71 Q63 80 63 75.71 V67 H51" fill="none" stroke="#000" stroke-width="7.5"/></mask></defs><path d="M31 44 V31 A19 19 0 0 1 69 31 V44" fill="none" stroke="#E8ECF1" stroke-width="9"/><rect x="17" y="42" width="66" height="50" rx="13" fill="#9CC3E4" mask="url(#g)"/></g></svg>
 <h1>GUARDIANA</h1>
 <p>{texto}</p>
 <div class="barra"><i></i></div>
@@ -269,8 +271,45 @@ fn soltar_consola() {
     let _ = unsafe { windows_sys::Win32::System::Console::FreeConsole() };
 }
 
+/// 1.0.44: with GUARDIANA ZERO installed, `guardiana panel` hands the whole start to it
+/// (`--panel`): ZERO opens at once on its own dark wait page, waits for the service and opens the
+/// panel by itself, and this console goes away at once instead of waiting for the key. Not when
+/// `GUARDIANA_DATA` points elsewhere (development): ZERO reads the installed service's key, so
+/// that case keeps the path below.
+#[cfg(windows)]
+fn pasar_a_guardiana_zero() -> bool {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    if std::env::var_os(paths::DATA_ENV).is_some() {
+        return false;
+    }
+    let Some(exe) = std::env::current_exe()
+        .ok()
+        .and_then(|p| {
+            p.parent()
+                .map(|p| p.join("ZERO").join("GUARDIANA ZERO.exe"))
+        })
+        .filter(|p| p.is_file())
+    else {
+        return false;
+    };
+    std::process::Command::new(exe)
+        .arg("--panel")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .is_ok()
+}
+
 pub fn run(_opts: &Opts) -> Result<(), Box<dyn Error>> {
     let t = i18n::current();
+    #[cfg(windows)]
+    if pasar_a_guardiana_zero() {
+        soltar_consola();
+        return Ok(());
+    }
     let path = paths::data_dir().join(guardiana_panel::TOKEN_FILE);
     let arrancando = !panel_responde();
     if arrancando {
