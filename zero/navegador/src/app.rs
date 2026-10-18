@@ -938,7 +938,7 @@ fn marca_completa(h: HWND, si: bool) {
     let r = (|| unsafe {
         let t: ITaskbarList2 = CoCreateInstance(&TaskbarList, None, CLSCTX_INPROC_SERVER)?;
         t.HrInit()?;
-        t.MarkFullscreenWindow(h, si.into())
+        t.MarkFullscreenWindow(h, si)
     })();
     vale("barra de tareas", r);
 }
