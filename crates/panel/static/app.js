@@ -1103,7 +1103,7 @@
     try {
       await Promise.all([
         document.fonts.load("600 88px Unbounded"),
-        document.fonts.load("400 40px 'IBM Plex Sans'"),
+        document.fonts.load("400 40px 'Hanken Grotesk'"),
         document.fonts.load("500 30px 'IBM Plex Mono'"),
       ]);
     } catch (_) { /* the fallbacks below still draw */ }
@@ -1111,8 +1111,8 @@
     const v = (name) => css.getPropertyValue(name).trim();
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
-    const DISPLAY = "Unbounded, 'IBM Plex Sans', sans-serif";
-    const TEXTO = "'IBM Plex Sans', system-ui, sans-serif";
+    const DISPLAY = "Unbounded, 'Hanken Grotesk', sans-serif";
+    const TEXTO = "'Hanken Grotesk', system-ui, sans-serif";
     ctx.fillStyle = v('--bg');
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = v('--fg');

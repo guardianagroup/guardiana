@@ -269,22 +269,22 @@
     try { await document.fonts.ready; } catch (_) {}
     if (frase !== fraseTarjeta) return;
     x.clearRect(0, 0, 1200, 630);
-    x.fillStyle = '#F4F6FA'; x.fillRect(0, 0, 1200, 630);
+    x.fillStyle = '#06080C'; x.fillRect(0, 0, 1200, 630);
     x.strokeStyle = 'rgba(11,16,32,.05)';
     for (let i = 0; i < 1200; i += 44) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 630); x.stroke(); }
     for (let j = 0; j < 630; j += 44) { x.beginPath(); x.moveTo(0, j); x.lineTo(1200, j); x.stroke(); }
     x.fillStyle = '#C0301A'; x.beginPath(); x.arc(84, 84, 9, 0, Math.PI * 2); x.fill();
-    x.fillStyle = '#0B1020'; x.font = '600 24px Unbounded'; x.fillText('GUARDIANA ZERO', 108, 93);
-    x.fillStyle = '#5B6275'; x.font = '500 22px "IBM Plex Sans"'; x.fillText(t('chivatos_titulo'), 72, 170);
-    x.fillStyle = '#0B1020'; x.font = '600 40px Unbounded';
+    x.fillStyle = '#E8ECF1'; x.font = '600 24px "Schibsted Grotesk"'; x.fillText('GUARDIANA ZERO', 108, 93);
+    x.fillStyle = '#A9B3BE'; x.font = '500 22px "Hanken Grotesk"'; x.fillText(t('chivatos_titulo'), 72, 170);
+    x.fillStyle = '#E8ECF1'; x.font = '600 40px "Schibsted Grotesk"';
     let linea = ''; let y = 240;
     for (const p of frase.split(' ')) {
       const prueba = linea ? linea + ' ' + p : p;
       if (x.measureText(prueba).width > 1056 && linea) { x.fillText(linea, 72, y); y += 54; linea = p; } else linea = prueba;
     }
     x.fillText(linea, 72, y);
-    x.fillStyle = '#5B6275'; x.font = '400 18px "IBM Plex Sans"'; x.fillText(t('lema'), 72, 540);
-    x.fillStyle = '#1F4BFF'; x.font = '500 20px "IBM Plex Mono"'; x.fillText('guardianagroup.com', 72, 570);
+    x.fillStyle = '#A9B3BE'; x.font = '400 18px "Hanken Grotesk"'; x.fillText(t('lema'), 72, 540);
+    x.fillStyle = '#9CC3E4'; x.font = '500 20px "Hanken Grotesk"'; x.fillText('guardianagroup.com', 72, 570);
   }
   // The consent audit: which tracking or advertising companies the page asked for before its
   // cookie notice was answered, and after. Only once it was answered.

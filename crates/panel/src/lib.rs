@@ -498,11 +498,22 @@ async fn fuente(RutaUrl(archivo): RutaUrl<String>) -> Response {
             include_bytes!("../static/fonts/IBMPlexMono-500-latin.woff2")
         }
         "Unbounded-latin.woff2" => include_bytes!("../static/fonts/Unbounded-latin.woff2"),
+        // The website's two faces since 17 Oct 2026 (Schibsted Grotesk for titles, Hanken
+        // Grotesk for text), the same WOFF files guardianagroup.com serves.
+        "SchibstedGrotesk-var.woff" => {
+            include_bytes!("../static/fonts/SchibstedGrotesk-var.woff")
+        }
+        "HankenGrotesk-var.woff" => include_bytes!("../static/fonts/HankenGrotesk-var.woff"),
         _ => return StatusCode::NOT_FOUND.into_response(),
+    };
+    let tipo = if archivo.ends_with(".woff2") {
+        "font/woff2"
+    } else {
+        "font/woff"
     };
     (
         [
-            (header::CONTENT_TYPE, "font/woff2"),
+            (header::CONTENT_TYPE, tipo),
             (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
         ],
         cuerpo,
