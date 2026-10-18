@@ -4,8 +4,10 @@
 //! limited "Fundador" licence, a single payment that never expires:
 //!
 //! - a 7-day trial that starts the first time the program runs and lives in the local settings
-//!   and in a mark only an administrator can remove (`ancla`); when it ends the program stops
-//!   watching and gives the system DNS back, nothing is charged;
+//!   and in a mark only an administrator can remove (`ancla`); when it ends nothing is charged
+//!   and the program does not stop: it goes on watching this computer on the free level
+//!   ([`Nivel::Gratis`]), with the DNS left as it is (the owner's decision of 18 Oct 2026: a
+//!   free plan for ever, so nobody is left unwatched for not paying);
 //! - a key from the gateway (Dodo Payments): one activation call when the user types the key,
 //!   then one validation when the gateway's own free week ends and one per billing period,
 //!   recorded in `outbound` and shown in the panel. Only an explicit "not valid" from the
@@ -72,6 +74,13 @@ pub const SETTING_LICENSE_PERIOD_DAYS: &str = "license_period_days";
 pub const SETTING_CLOCK_SEEN: &str = "license_clock_seen";
 /// Trial length.
 pub const TRIAL_DAYS: i64 = 7;
+/// How far back the free level shows the history: the last 24 hours. What is older stays in the
+/// ledger, whole and chained, and comes back into view with Plus; it is only not shown.
+pub const GRATIS_HISTORIAL_MS: i64 = DAY_MS;
+/// Devices the free level watches: this computer.
+pub const GRATIS_DISPOSITIVOS: usize = 1;
+/// Devices Plus (and Fundador) watches.
+pub const PLUS_DISPOSITIVOS: usize = 5;
 /// Days a key subscription keeps working after its first failed validation attempt.
 pub const GRACE_DAYS: i64 = 7;
 /// Days after activating a subscription key when it is checked for the first time. Until 5 Oct
@@ -253,7 +262,8 @@ pub enum Plan {
         /// Whole days left, between 0 and `TRIAL_DAYS`.
         dias_restantes: i64,
     },
-    /// Trial used up, no subscription: the program stops watching and gives the system DNS back.
+    /// Trial used up, no subscription: the program goes on, on the free level ([`Nivel::Gratis`]).
+    /// Until 1.0.44 it stopped watching here and gave the system DNS back.
     PruebaAgotada {
         /// When it ended.
         termino: i64,
@@ -279,8 +289,8 @@ pub enum Plan {
         comprobacion: Option<Comprobacion>,
     },
     /// Plus ended: the subscription was cancelled, or the key could not be checked for the
-    /// whole grace period. The program stops watching and gives the system DNS
-    /// back; the ledger stays on the machine, whole, to be exported.
+    /// whole grace period. The program goes on, on the free level ([`Nivel::Gratis`]); the
+    /// ledger stays on the machine, whole, to be exported. Until 1.0.44 it stopped watching.
     PlusTerminado {
         /// When it ended.
         termino: i64,
@@ -290,19 +300,69 @@ pub enum Plan {
     },
 }
 
+/// The level the program works at: everything (trial, subscription, Fundador) or the free one.
+///
+/// The free level is for ever (the owner, 18 Oct 2026): the live globe, the DNS view of every
+/// program with its country, company and category, the person's own manual cuts and their undo,
+/// the last 24 hours of history, this one computer. Everything else is Plus.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Nivel {
+    /// Trial, subscription or Fundador: everything.
+    Plus,
+    /// No licence in force: the free level.
+    Gratis,
+}
+
+impl Nivel {
+    /// Its name in the panel's API: `plus` or `gratis`.
+    #[must_use]
+    pub const fn nombre(self) -> &'static str {
+        match self {
+            Self::Plus => "plus",
+            Self::Gratis => "gratis",
+        }
+    }
+
+    /// How far back the history is shown, in ms; `None` is all of it.
+    #[must_use]
+    pub const fn historial_ms(self) -> Option<i64> {
+        match self {
+            Self::Plus => None,
+            Self::Gratis => Some(GRATIS_HISTORIAL_MS),
+        }
+    }
+
+    /// How many devices this level watches.
+    #[must_use]
+    pub const fn dispositivos(self) -> usize {
+        match self {
+            Self::Plus => PLUS_DISPOSITIVOS,
+            Self::Gratis => GRATIS_DISPOSITIVOS,
+        }
+    }
+}
+
 /// Licence status.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Status {
     /// The plan in force.
     pub plan: Plan,
-    /// Whether Plus features are on (subscription or trial).
+    /// The level it gives: `plus` while the trial or a licence is on, `gratis` otherwise.
+    pub nivel: Nivel,
+    /// Whether Plus features are on (subscription or trial). Same as `nivel == Plus`.
     pub plus_activo: bool,
-    /// Whether the program may watch at all. False once the trial or the subscription is over:
-    /// Guardiana then stops watching and restores the system DNS, and the panel offers only the
-    /// licence page and the export of what is already on the machine.
+    /// Whether the program may watch at all. Always true since 1.0.45: when the trial or the
+    /// subscription is over the program goes on at the free level instead of standing down
+    /// (the owner, 18 Oct 2026). Kept so older callers keep compiling and reading it.
     pub puede_funcionar: bool,
-    /// Home Mode is always allowed (decision 52); kept for the callers.
+    /// Whether Home Mode (the rest of the house) may be on: with Plus only, since 1.0.45.
     pub hogar_permitido: bool,
+    /// A licence paid once that was bought under its first name, «Fundador» (the gateway's
+    /// product name in the stored activation says so). Since 18 Oct 2026 the plan is sold as
+    /// «Lifetime» / «De por vida» / «Vitalício», same price and same features; the people who
+    /// bought it before are shown as «Fundador original». Display only: nothing else changes.
+    pub fundador_original: bool,
     /// Milliseconds this installation has been observing.
     pub observado_ms: i64,
     /// While a key licence is still on: when the gateway itself turned the key down (one of its
@@ -432,6 +492,20 @@ fn observed_ms(ledger: &Ledger, now: i64) -> Result<i64, Error> {
     Ok(first.map_or(0, |f| (now - f).max(0)))
 }
 
+/// Whether the stored activation is of the one-off product under its first name, «Fundador».
+fn es_fundador_original(ledger: &Ledger, plan: &Plan) -> Result<bool, Error> {
+    if !matches!(plan, Plan::Plus { periodo_dias: Some(p), .. } if *p == DE_POR_VIDA) {
+        return Ok(false);
+    }
+    Ok(setting_text(ledger, SETTING_LICENSE_ACTIVATION)?
+        .and_then(|a| serde_json::from_str::<ActivationResponse>(&a).ok())
+        .and_then(|a| a.product.and_then(|p| p.name))
+        .is_some_and(|n| {
+            let n = n.to_lowercase();
+            n.contains("fundador") || n.contains("founder")
+        }))
+}
+
 fn finish(ledger: &Ledger, plan: Plan, now: i64) -> Result<Status, Error> {
     let plus_activo = matches!(plan, Plan::Plus { .. } | Plan::Prueba { .. });
     let observado_ms = observed_ms(ledger, now)?;
@@ -446,12 +520,19 @@ fn finish(ledger: &Ledger, plan: Plan, now: i64) -> Result<Status, Error> {
     Ok(Status {
         rechazada_desde,
         ultimo_fallo,
-        // There is one program and one plan: while the trial or the subscription is on it works,
-        // and when neither is it stops watching and gives the system DNS back. It never keeps
-        // resolving badly and it never leaves the machine without a resolver.
-        puede_funcionar: plus_activo,
+        // One program, two levels: while the trial or a licence is on it does everything, and
+        // when neither is it goes on at the free level, watching this computer, with the DNS as
+        // it is. Until 1.0.44 it stood down here and gave the system DNS back (the owner's free
+        // plan, approved 18 Oct 2026).
+        nivel: if plus_activo {
+            Nivel::Plus
+        } else {
+            Nivel::Gratis
+        },
+        puede_funcionar: true,
         plus_activo,
-        hogar_permitido: true,
+        hogar_permitido: plus_activo,
+        fundador_original: es_fundador_original(ledger, &plan)?,
         observado_ms,
         plan,
     })
@@ -1451,7 +1532,7 @@ mod tests {
         let l = ledger_observing();
         let s = status(&l, "k", empezo + 8 * DAY_MS).unwrap();
         assert!(matches!(s.plan, Plan::PruebaAgotada { .. }), "{:?}", s.plan);
-        assert!(!s.puede_funcionar);
+        assert!(!s.plus_activo);
     }
 
     /// There is one program and one plan: the first run starts the seven days by itself, and
@@ -1492,11 +1573,64 @@ mod tests {
             s.plan
         );
 
-        // On the eighth day it is over and the program must stand down.
+        // On the eighth day the trial is over and the program goes on at the free level.
         let s = status(&l, "tok", t0 + 7 * DAY_MS + 1).unwrap();
         assert!(matches!(s.plan, Plan::PruebaAgotada { .. }), "{:?}", s.plan);
         assert!(!s.plus_activo);
-        assert!(!s.puede_funcionar);
+        assert_eq!(s.nivel, Nivel::Gratis);
+        assert!(s.puede_funcionar, "the free level keeps watching");
+    }
+
+    /// The end of the trial is not the end of the program (the owner's free plan, 18 Oct 2026):
+    /// from the trial to the free level, and back to everything when a key is activated. The
+    /// free level keeps watching (`puede_funcionar`), shows a day of history, one device, and no
+    /// Home Mode.
+    #[test]
+    fn al_terminar_la_prueba_pasa_a_gratis_y_con_clave_vuelve_a_plus() {
+        let _a_solas = a_solas();
+        let l = Ledger::open_in_memory(Hash::of(b"g")).unwrap();
+        let t0 = reloj_minimo() + DAY_MS;
+        let s = status(&l, "tok", t0).unwrap();
+        assert_eq!(s.nivel, Nivel::Plus);
+        assert_eq!(s.nivel.historial_ms(), None);
+        assert_eq!(s.nivel.dispositivos(), PLUS_DISPOSITIVOS);
+        assert!(s.hogar_permitido);
+
+        let s = status(&l, "tok", t0 + 8 * DAY_MS).unwrap();
+        assert!(matches!(s.plan, Plan::PruebaAgotada { .. }), "{:?}", s.plan);
+        assert_eq!(s.nivel, Nivel::Gratis);
+        assert_eq!(s.nivel.nombre(), "gratis");
+        assert!(s.puede_funcionar);
+        assert!(!s.plus_activo);
+        assert!(!s.hogar_permitido);
+        assert_eq!(s.nivel.historial_ms(), Some(24 * HOUR_MS));
+        assert_eq!(s.nivel.dispositivos(), 1);
+        let json = serde_json::to_value(&s).unwrap();
+        assert_eq!(json["nivel"], "gratis");
+        assert_eq!(json["puede_funcionar"], true);
+
+        // A Fundador key typed after the trial: everything again, for ever.
+        let lejos = t0 + 50 * 365 * DAY_MS;
+        store_key(&l, "tok", t0 + 8 * DAY_MS, "GUARDIANA Fundador");
+        let s = status(&l, "tok", t0 + 9 * DAY_MS).unwrap();
+        assert!(matches!(s.plan, Plan::Plus { .. }), "{:?}", s.plan);
+        assert_eq!(s.nivel, Nivel::Plus);
+        assert!(s.hogar_permitido);
+        assert!(s.fundador_original, "bought under the name «Fundador»");
+        assert_eq!(status(&l, "tok", lejos).unwrap().nivel, Nivel::Plus);
+
+        // The same plan under its new name (18 Oct 2026): for life, not shown as «Fundador».
+        store_key(&l, "tok", t0 + 8 * DAY_MS, "GUARDIANA Lifetime");
+        let s = status(&l, "tok", t0 + 9 * DAY_MS).unwrap();
+        assert_eq!(plus_con(&s).0, Comprobacion::AlDia);
+        assert!(matches!(
+            s.plan,
+            Plan::Plus {
+                periodo_dias: Some(DE_POR_VIDA),
+                ..
+            }
+        ));
+        assert!(!s.fundador_original);
     }
 
     /// Atrasar el reloj del equipo no devuelve días de prueba ni inventa un contador: manda la
@@ -1714,7 +1848,7 @@ mod tests {
             l.set_setting(k, "").unwrap();
         }
         let s = status(&l, "tok", 20).unwrap();
-        assert!(!s.puede_funcionar, "{:?}", s.plan);
+        assert!(!s.plus_activo, "{:?}", s.plan);
         assert!(matches!(s.plan, Plan::PlusTerminado { termino: 15, .. }));
     }
 
@@ -1901,6 +2035,9 @@ mod tests {
         let s = status(&l, "tok", year + (GRACE_DAYS + 3) * DAY_MS).unwrap();
         assert!(!s.plus_activo);
         assert!(matches!(s.plan, Plan::PlusTerminado { ref motivo, .. } if motivo == "cancelada"));
+        // A subscription that ended leaves the free level, not a program that stopped.
+        assert_eq!(s.nivel, Nivel::Gratis);
+        assert!(s.puede_funcionar);
         assert!(!check_due(&l, "tok", year + (GRACE_DAYS + 3) * DAY_MS).unwrap());
     }
 
@@ -1938,7 +2075,7 @@ mod tests {
         );
         // Day 23: cut, and still retried.
         let s = status(&l, "tok", 23 * DAY_MS).unwrap();
-        assert!(!s.puede_funcionar);
+        assert!(!s.plus_activo);
         assert!(
             matches!(s.plan, Plan::PlusTerminado { ref motivo, .. } if motivo == "sin_comprobar")
         );
@@ -2010,12 +2147,12 @@ mod tests {
         let fin = t0 + TRIAL_DAYS * DAY_MS;
         let s = status(&l, "tok", fin + 1).unwrap();
         assert!(!s.plus_activo);
-        assert!(!s.puede_funcionar);
+        assert!(!s.plus_activo);
         assert!(matches!(s.plan, Plan::PruebaAgotada { .. }));
 
         // Y un año después sigue sin borrarse.
         let s = status(&l, "tok", fin + 365 * DAY_MS).unwrap();
-        assert!(!s.puede_funcionar);
+        assert!(!s.plus_activo);
         assert!(matches!(s.plan, Plan::PruebaAgotada { .. }));
     }
 
@@ -2145,7 +2282,7 @@ mod tests {
         assert!(matches!(s.plan, Plan::Plus { caduca_ms: Some(c), .. } if c == 97 * DAY_MS));
         // …and over once it has run, asked again every hour in case it was a mistake.
         let s = status(&l, "tok", 97 * DAY_MS).unwrap();
-        assert!(!s.puede_funcionar);
+        assert!(!s.plus_activo);
         assert!(matches!(s.plan, Plan::PlusTerminado { ref motivo, .. } if motivo == "rechazada"));
         assert!(check_due(&l, "tok", 97 * DAY_MS).unwrap());
         aplicar_comprobacion(&l, ok_200(r#"{"valid":true}"#), 98 * DAY_MS).unwrap();
@@ -2190,7 +2327,7 @@ mod tests {
         store_key(&m, "tok", 0, "GUARDIANA Plus · mensual");
         m.set_setting(SETTING_LICENSE_ENDED_AT, &(20 * DAY_MS).to_string())
             .unwrap();
-        assert!(!status(&m, "tok", 30 * DAY_MS).unwrap().puede_funcionar);
+        assert!(!status(&m, "tok", 30 * DAY_MS).unwrap().plus_activo);
         let activation = m.setting(SETTING_LICENSE_ACTIVATION).unwrap().unwrap();
         assert!(aplicar_revision(
             &m,
@@ -2200,13 +2337,13 @@ mod tests {
             30 * DAY_MS
         )
         .unwrap());
-        assert!(status(&m, "tok", 30 * DAY_MS).unwrap().puede_funcionar);
+        assert!(status(&m, "tok", 30 * DAY_MS).unwrap().plus_activo);
         // Asked once: the next end stands.
         m.set_setting(SETTING_LICENSE_ENDED_AT, &(40 * DAY_MS).to_string())
             .unwrap();
         let mut m = m;
         assert!(!revisar_herencia(&mut m, "tok", 41 * DAY_MS).unwrap());
-        assert!(!status(&m, "tok", 41 * DAY_MS).unwrap().puede_funcionar);
+        assert!(!status(&m, "tok", 41 * DAY_MS).unwrap().plus_activo);
 
         // An end the gateway confirms stays, and is not asked again.
         let n = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
@@ -2222,7 +2359,7 @@ mod tests {
             30 * DAY_MS
         )
         .unwrap());
-        assert!(!status(&n, "tok", 30 * DAY_MS).unwrap().puede_funcionar);
+        assert!(!status(&n, "tok", 30 * DAY_MS).unwrap().plus_activo);
         assert_eq!(
             n.setting(SETTING_LICENSE_REVISADA).unwrap().as_deref(),
             Some("1")
@@ -2623,7 +2760,7 @@ mod tests {
         let s = status(&l, "tok", 62 * DAY_MS).unwrap();
         assert!(s.plus_activo);
         assert_eq!(s.rechazada_desde, Some(61 * DAY_MS));
-        assert!(!status(&l, "tok", 68 * DAY_MS).unwrap().puede_funcionar);
+        assert!(!status(&l, "tok", 68 * DAY_MS).unwrap().plus_activo);
         // A good answer clears all of it.
         aplicar_comprobacion(&l, ok_200(r#"{"valid":true}"#), 69 * DAY_MS).unwrap();
         let s = status(&l, "tok", 69 * DAY_MS).unwrap();
@@ -2656,7 +2793,7 @@ mod tests {
         let nuevo = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
         let s = status(&nuevo, "", 10 * DAY_MS).unwrap();
         assert_eq!(s.rechazada_desde, Some(9 * DAY_MS), "{:?}", s.plan);
-        assert!(!status(&nuevo, "", 17 * DAY_MS).unwrap().puede_funcionar);
+        assert!(!status(&nuevo, "", 17 * DAY_MS).unwrap().plus_activo);
         // An end too.
         aplicar_comprobacion(&l, ok_200(r#"{"valid":false}"#), 20 * DAY_MS).unwrap();
         let _ = status(&l, "tok", 20 * DAY_MS).unwrap();

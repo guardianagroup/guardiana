@@ -17,6 +17,7 @@ mod destinos;
 mod empresa;
 mod expedientes;
 mod medidas;
+mod plan;
 mod revision;
 mod universo;
 
@@ -922,6 +923,14 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/mi-dispositivo", get(api::mi_dispositivo))
         .route("/api/mi-dispositivo/nombre", post(api::mi_nombre))
         .route("/api/mi-dispositivo/compartir", post(api::mi_compartir))
+        // The free level and Plus (the owner's free plan, 18 Oct 2026): `/api/plan` says which is
+        // in force, and the Plus routes listed in `plan::RUTAS_PLUS` answer 402 at the free level.
+        // Routes merged above this line are covered.
+        .route("/api/plan", get(plan::ver))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            plan::solo_plus,
+        ))
         .layer(middleware::from_fn(add_security_headers))
         .layer(middleware::from_fn_with_state(
             state.clone(),

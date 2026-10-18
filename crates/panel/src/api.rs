@@ -605,6 +605,12 @@ pub(crate) struct Estado {
     /// Days left of the trial while it runs, so every page can count down honestly instead of
     /// letting the day arrive as a surprise. `None` with a subscription.
     prueba_dias: Option<i64>,
+    /// `plus` (trial, subscription, Lifetime) or `gratis`: the level in force (the owner's free
+    /// plan, 18 Oct 2026). At the free level `caducado` stays false: the program keeps watching.
+    nivel: &'static str,
+    /// When the level is `gratis`, whether that came from a subscription that ended (`true`) or
+    /// from the trial (`false`), so the banner says the right thing.
+    gratis_tras_plus: bool,
 }
 
 #[derive(Serialize)]
@@ -740,6 +746,15 @@ pub(crate) async fn estado(
         prueba_dias: licencia.as_ref().and_then(|s| match s.plan {
             guardiana_license::Plan::Prueba { dias_restantes, .. } => Some(dias_restantes),
             _ => None,
+        }),
+        // A licence that cannot be read counts as Plus, as everywhere else.
+        nivel: licencia
+            .as_ref()
+            .map_or(guardiana_license::Nivel::Plus, |s| s.nivel)
+            .nombre(),
+        gratis_tras_plus: licencia.as_ref().is_some_and(|s| {
+            s.nivel == guardiana_license::Nivel::Gratis
+                && matches!(s.plan, guardiana_license::Plan::PlusTerminado { .. })
         }),
     }))
 }
@@ -1367,7 +1382,8 @@ pub(crate) async fn rafagas(
 ) -> ApiResult<Vec<Rafaga>> {
     let horas: i64 = q.get("horas").and_then(|s| s.parse().ok()).unwrap_or(24);
     let minimo: usize = q.get("min").and_then(|s| s.parse().ok()).unwrap_or(4);
-    let since = now_ms() - horas.clamp(1, 24 * 30) * 3600 * 1000;
+    let ahora = now_ms();
+    let since = crate::plan::desde(&state, ahora - horas.clamp(1, 24 * 30) * 3600 * 1000, ahora);
     let (events, devices) = with_ledger(&state, |l| {
         let events = l.events(&EventFilter {
             since: Some(since),
@@ -1435,7 +1451,7 @@ pub(crate) async fn recibo(
 ) -> ApiResult<Vec<Recibo>> {
     let dias: i64 = q.get("dias").and_then(|s| s.parse().ok()).unwrap_or(7);
     let hasta = now_ms();
-    let desde = hasta - dias.clamp(1, 90) * 24 * 3600 * 1000;
+    let desde = crate::plan::desde(&state, hasta - dias.clamp(1, 90) * 24 * 3600 * 1000, hasta);
     let (events, devices) = with_ledger(&state, |l| {
         let events = l.events(&EventFilter {
             since: Some(desde),
@@ -1544,6 +1560,10 @@ pub(crate) async fn extracto(
     // whole ledger in memory (review of 8 Oct 2026).
     filter.limit = Some(filter.limit.unwrap_or(200).min(5_000));
     filter.server = pais;
+    // At the free level the extract shows the last 24 hours; nothing older is deleted, and the
+    // export (`/api/extracto/exportar`) stays whole: the ledger is the person's.
+    let ahora = now_ms();
+    filter.since = Some(crate::plan::desde(&state, filter.since.unwrap_or(0), ahora));
     let (events, total, todos, devices, huecos, cubos) = with_ledger(&state, |l| {
         Ok((
             l.events(&filter)?,
@@ -1864,9 +1884,17 @@ pub(crate) async fn sabe_de_ti(
     _s: Session,
 ) -> ApiResult<SabeDeTi> {
     let (counts, outbound) = with_ledger(&state, |l| Ok((l.table_counts()?, l.outbound()?)))?;
-    // Un solo plan y ninguna poda: mientras Guardiana mire, lo guarda todo, y si deja de mirar
-    // lo anotado sigue en el disco hasta que la persona lo borre. No hay nada que matizar.
-    let retencion = t.panel("retencion_ilimitada").to_owned();
+    // Ninguna poda: Guardiana lo guarda todo hasta que la persona lo borre. En Gratis (1.0.45) el
+    // panel solo enseña las últimas 24 horas, y así se dice; el disco lo tiene entero.
+    let retencion = t
+        .panel(
+            if crate::plan::nivel(&state) == guardiana_license::Nivel::Gratis {
+                "retencion_gratis"
+            } else {
+                "retencion_ilimitada"
+            },
+        )
+        .to_owned();
     Ok(Json(SabeDeTi {
         eventos: counts.events,
         dispositivos: counts.devices,
@@ -2780,6 +2808,15 @@ fn create_rule(
         .action
         .parse()
         .map_err(|e: guardiana_core::Error| bad(e.to_string()))?;
+    // A rule that cuts a whole category is an automatic cut: Plus. At the free level the person
+    // cuts each name or program by hand (the owner's free plan, 18 Oct 2026); the engine leaves
+    // category rules out there anyway, so one made here would only promise what does not happen.
+    if match_kind == MatchKind::Category
+        && action == Action::Cortar
+        && crate::plan::nivel(state) == guardiana_license::Nivel::Gratis
+    {
+        return Err(crate::plan::respuesta_plus(t, "plan_categoria_plus"));
+    }
     let mut pattern = body
         .pattern
         .trim()
@@ -3200,7 +3237,12 @@ fn licencia_texto(t: &Texts, s: &guardiana_license::Status, zona: i64) -> String
                 // devolución sí la termina.
                 (Some(p), _, _) if *p == guardiana_license::DE_POR_VIDA => {
                     text.push(' ');
-                    text.push_str(t.panel("licencia_de_por_vida"));
+                    // Bought under the plan's first name: «Fundador original · De por vida» (18 Oct 2026).
+                    text.push_str(t.panel(if s.fundador_original {
+                        "licencia_de_por_vida_fundador"
+                    } else {
+                        "licencia_de_por_vida"
+                    }));
                     // The gateway turned the key down: what it said, and from when it stops if it
                     // keeps saying so. «It does not expire… The licence expires on…» read as a
                     // contradiction (review of 10 Oct 2026, panel 23).
@@ -3360,14 +3402,21 @@ mod tests {
             plus_activo: puede_funcionar,
             puede_funcionar,
             hogar_permitido: true,
+            fundador_original: false,
+            nivel: if puede_funcionar {
+                guardiana_license::Nivel::Plus
+            } else {
+                guardiana_license::Nivel::Gratis
+            },
             observado_ms: 0,
             rechazada_desde: None,
             ultimo_fallo: None,
         }
     }
 
-    /// Cuando la prueba se acaba, la pantalla de licencia lo dice con su fecha y no promete
-    /// nada más. Antes hablaba de un plan gratis al que se volvía; ese plan ya no existe.
+    /// Cuando la prueba se acaba, la pantalla de licencia lo dice con su fecha y dice que
+    /// GUARDIANA sigue en Gratis: desde 1.0.45 no se apaga (el plan gratis que aprobó el
+    /// responsable el 18 oct 2026), y no puede seguir diciendo que dejó de mirar.
     #[test]
     fn al_acabarse_la_prueba_la_pantalla_lo_dice_con_su_fecha() {
         let t = guardiana_core::i18n::es();
@@ -3376,6 +3425,8 @@ mod tests {
         let dia = fecha_local(t, fin, 0);
         assert!(texto.contains(&dia), "{texto}");
         assert!(!dia.contains('-'), "{dia}");
+        assert!(texto.contains("Gratis"), "{texto}");
+        assert!(!texto.contains("dejado de mirar"), "{texto}");
     }
 
     /// Mientras la prueba corre, la pantalla dice cuántos días quedan: que se acabe no puede

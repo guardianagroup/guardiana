@@ -325,8 +325,20 @@
     if (opts.body && typeof opts.body !== 'string') { opts.body = JSON.stringify(opts.body); headers['Content-Type'] = 'application/json'; }
     const r = await fetch(path, Object.assign({}, opts, { headers }));
     if (r.status === 401) { showNoSession(); throw new Error('sin sesión'); }
+    // A Plus feature at the free level (plan.rs): one calm line and «Pasar a Plus», once per page.
+    if (r.status === 402) { let j = {}; try { j = await r.json(); } catch (_) {} lineaPlus(j); const e = new Error(j.texto || 'Plus'); e.plus = true; throw e; }
     if (!r.ok) throw new Error(await r.text());
     return r.json();
+  }
+  // The free level's single line for a Plus feature: no popup, no repetition (owner, 18 Oct 2026).
+  function lineaPlus(j) {
+    if (document.getElementById('linea-plus') || !j || !j.texto) return;
+    const caja = document.createElement('div');
+    caja.id = 'linea-plus';
+    caja.className = 'card plan-plus';
+    caja.innerHTML = `<span>${esc(j.texto)}</span> <a class="btn secondary" href="${esc(j.enlace || '')}" target="_blank" rel="noopener">${esc(j.boton || '')}</a>`;
+    const m = document.querySelector('main');
+    if (m) m.insertBefore(caja, m.firstChild);
   }
   function showNoSession() {
     const el = document.getElementById('no-session');
@@ -3108,6 +3120,21 @@
     let e;
     try { e = await estadoBase(); } catch (_) { return; }
     franjaExpedientes(e);
+    // The free level: one calm card where it matters (the radiography, the licence, the pages
+    // whose view it limits), nowhere else.
+    if (e.nivel === 'gratis') {
+      const pg = document.body.getAttribute('data-page');
+      const linea = { radiografia: 'plan_gratis_franja', licencia: 'plan_gratis_franja', extracto: 'plan_historial_24h', dispositivos: 'plan_otros_aparatos', hogar: 'plan_hogar_plus' }[pg];
+      if (!linea) return;
+      const caja = document.createElement('div');
+      caja.className = 'card plan-gratis';
+      caja.id = 'linea-plus'; // a Plus route answered later does not add a second line
+      caja.innerHTML = `<strong>${esc(t(e.gratis_tras_plus ? 'caducado_titulo_plus' : 'plan_gratis_nombre'))}</strong> <span>${esc(t(linea))}</span>
+        <a class="btn secondary" href="${esc(t('licencia_comprar_url'))}" target="_blank" rel="noopener">${esc(t('plan_pasar_plus'))}</a>`;
+      const m = document.querySelector('main');
+      if (m) m.insertBefore(caja, m.firstChild);
+      return;
+    }
     if (!e.caducado && !(e.prueba_dias !== null && e.prueba_dias !== undefined)) return;
     const caja = document.createElement('div');
     caja.className = 'card ' + (e.caducado ? 'caducado' : 'prueba');

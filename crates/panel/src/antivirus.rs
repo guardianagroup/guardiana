@@ -603,11 +603,13 @@ pub(crate) async fn vista(
 ) -> ApiResult<Vista> {
     const DIAS: i64 = 7;
     let now = now_ms();
+    // The week with Plus, the last 24 hours at the free level (display only).
+    let semana = crate::plan::desde(&state, now - DIAS * 24 * HOUR_MS, now);
     let (filas, devices, trafico, recientes, vigilando, con_ruta) = with_ledger(&state, |l| {
         Ok((
-            l.program_names(now - DIAS * 24 * HOUR_MS, now + 1, zona)?,
+            l.program_names(semana, now + 1, zona)?,
             l.devices()?,
-            l.trafico(now - DIAS * 24 * HOUR_MS, now + 1, &[])?,
+            l.trafico(semana, now + 1, &[])?,
             l.trafico(now - VIVO_MINUTOS * 60_000, now + 1, &[])?,
             l.vigilando_antivirus(),
             CortesAntivirus::rutas_por_producto(l)
