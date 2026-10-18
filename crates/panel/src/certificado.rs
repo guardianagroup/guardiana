@@ -54,7 +54,9 @@ fn mal(que: &str) -> Response {
 
 /// The options of a request, in the person's zone, or why they cannot be.
 pub(crate) fn opciones(q: &PeriodoQuery, zona: i64, ahora: i64) -> Result<Opciones, Response> {
-    let vacio = |s: &Option<String>| s.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    fn vacio(s: &Option<String>) -> Option<&str> {
+        s.as_deref().map(str::trim).filter(|s| !s.is_empty())
+    }
     let (desde, hasta) = match (vacio(&q.desde), vacio(&q.hasta), vacio(&q.mes)) {
         (Some(d), Some(h), _) => certificado::periodo_dias(d, h, zona),
         (None, None, Some(m)) => certificado::periodo_mes(m, zona),
