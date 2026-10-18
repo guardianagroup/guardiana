@@ -62,6 +62,7 @@ mod archivos;
 mod defender;
 #[cfg(windows)]
 mod firmas;
+pub mod instalador;
 #[cfg(windows)]
 mod red;
 #[cfg(windows)]

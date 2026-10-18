@@ -15,6 +15,7 @@
 //! signals and verdict. Answers are never stored (brief §4).
 
 mod alias;
+pub mod apagon;
 mod changes;
 pub mod contratos;
 mod error;
@@ -22,6 +23,7 @@ mod export;
 mod flujos;
 mod gaps;
 mod hash;
+pub mod huellas;
 pub mod i18n;
 pub mod identity;
 mod ledger;

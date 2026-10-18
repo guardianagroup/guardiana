@@ -507,6 +507,27 @@ impl Comunicaciones {
                 }
                 Ok(())
             }
+            // «Compartir sin huellas» (customer request, 18 Oct 2026): before a photo or a
+            // document goes, what its metadata says about the person (GPS, phone, author,
+            // company, dates), and a copy without it ready in the same answer. Only the headers
+            // are read (`guardiana_core::huellas`); the page decides with the person which one
+            // goes. Nothing leaves this computer here.
+            "huellas" => {
+                let b64 = &base64::engine::general_purpose::STANDARD;
+                let datos = b64.decode(texto(m, "b64")).unwrap_or_default();
+                let informe = guardiana_core::huellas::mirar(&datos);
+                let limpio = (informe.limpiable && !informe.huellas.is_empty())
+                    .then(|| guardiana_core::huellas::limpiar(&datos).ok())
+                    .flatten()
+                    .map(|l| b64.encode(l));
+                return vec![Salida::Pagina(json!({
+                    "tipo": "secure_huellas",
+                    "id": m["id"].clone(),
+                    "informe": informe,
+                    "nombre_limpio": guardiana_core::huellas::nombre_limpio(texto(m, "nombre")),
+                    "b64": limpio,
+                }))];
+            }
             "prueba" => {
                 let j = self.secure.prueba_json();
                 return vec![Salida::Pagina(
@@ -598,6 +619,38 @@ mod tests {
         // Without a page that said «listo», the clock says nothing to anybody.
         assert!(c.tic(false).is_empty());
         c.accion(&json!({ "accion": "cerrar" }));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// «Compartir sin huellas»: a photo with GPS gets its findings and a clean copy in one
+    /// answer; a plain text gets neither, and nothing else changes in the conversation.
+    #[test]
+    fn a_photo_about_to_go_says_what_it_reveals_and_brings_its_clean_copy() {
+        use base64::Engine as _;
+        let d = carpeta("huellas");
+        let mut c = Comunicaciones::abre(&d.join("datos"), &d.join("descargas"), "0.1.0");
+        let b64 = &base64::engine::general_purpose::STANDARD;
+        let foto = include_bytes!("../../core/tests/huellas/foto-gps.jpg");
+        let o = c.accion(&json!({ "accion": "huellas", "id": 7, "nombre": "playa.jpg", "b64": b64.encode(foto) }));
+        let [Salida::Pagina(r)] = o.as_slice() else {
+            unreachable!("one answer and no state: {o:?}");
+        };
+        assert_eq!(r["tipo"], "secure_huellas");
+        assert_eq!(r["id"], 7);
+        assert_eq!(r["informe"]["huellas"][0]["clave"], "gps");
+        assert_eq!(r["nombre_limpio"], "playa-sin-huellas.jpg");
+        let limpio = b64
+            .decode(r["b64"].as_str().unwrap_or_default())
+            .unwrap_or_default();
+        assert!(guardiana_core::huellas::mirar(&limpio).huellas.is_empty());
+        let o = c.accion(
+            &json!({ "accion": "huellas", "id": 8, "nombre": "a.txt", "b64": b64.encode("hola") }),
+        );
+        let [Salida::Pagina(r)] = o.as_slice() else {
+            unreachable!("{o:?}");
+        };
+        assert_eq!(r["informe"]["formato"], "otro");
+        assert!(r["b64"].is_null());
         let _ = std::fs::remove_dir_all(&d);
     }
 }

@@ -570,7 +570,45 @@
     enviando = false;
     enviaSiguiente();
   };
-  const encola = (files) => { for (const f of files) cola.push(f); enviaSiguiente(); };
+  // «Compartir sin huellas» (customer request, 18 Oct 2026): a photo or a document is looked at
+  // first, its headers only and by the program on this computer; when they say something about
+  // the person (where, with which phone, who wrote it, which company), the person chooses: a
+  // clean copy, or the file as it is. Anything else, or anything over 25 MB, goes as before.
+  const HUELLAS_MAX = 25 * 1024 * 1024;
+  const MIRABLE = /\.(jpe?g|png|heic|heif|avif|pdf|docx|xlsx|pptx|docm|xlsm|pptm)$/i;
+  let huellasId = 0;
+  const huellasEspera = new Map();
+  en('secure_huellas', (m) => { const r = huellasEspera.get(m.id); if (r) { huellasEspera.delete(m.id); r(m); } });
+  const desdeB64 = (s) => { const b = atob(s); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+  const preguntaHuellas = (f, m) => new Promise((listo) => {
+    const inf = m.informe;
+    $('c-huellas-nombre').textContent = f.name;
+    $('c-huellas-lista').innerHTML = (inf.huellas || []).map((h) => `<li><b>${esc(t('sec_h_' + h.clave))}</b>${h.valor ? ' ' + esc(h.valor) : ''}</li>`).join('');
+    $('c-huellas-nota').textContent = inf.nota ? t('sec_h_nota_' + inf.nota) : '';
+    $('c-huellas-limpia').hidden = !m.b64;
+    $('c-huellas-dialogo').hidden = false;
+    const fin = (x) => { $('c-huellas-dialogo').hidden = true; listo(x); };
+    $('c-huellas-limpia').onclick = () => fin(new File([desdeB64(m.b64)], m.nombre_limpio, { type: f.type }));
+    $('c-huellas-tal').onclick = () => fin(f);
+    $('c-huellas-no').onclick = () => fin(null);
+  });
+  const revisa = async (f) => {
+    if (f.size > HUELLAS_MAX || !MIRABLE.test(f.name)) return f;
+    const b64 = b64De(await f.arrayBuffer());
+    const id = ++huellasId;
+    const m = await new Promise((r) => {
+      huellasEspera.set(id, r);
+      manda({ tipo: 'secure', accion: 'huellas', id, nombre: f.name, b64 });
+      // An older program that does not know the action never answers: the file goes as before.
+      setTimeout(() => { if (huellasEspera.delete(id)) r(null); }, 15000);
+    });
+    if (!m || !m.informe || (!(m.informe.huellas || []).length && !m.informe.nota)) return f;
+    return preguntaHuellas(f, m);
+  };
+  const encola = async (files) => {
+    const lista = [...files];
+    for (const f of lista) { const g = await revisa(f); if (g) { cola.push(g); enviaSiguiente(); } }
+  };
   $('c-archivo').addEventListener('change', () => { encola($('c-archivo').files); $('c-archivo').value = ''; });
   // A file dragged anywhere over the conversation: the drop area appears; dropped, it goes.
   const zona = $('c-zona'), chatCaja = $('c-chat');

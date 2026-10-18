@@ -90,6 +90,10 @@ str_enum! {
         /// `ReglaUsuario` because the person did not name this destination: they named
         /// what the agent was allowed, and this was not in it.
         AlcanceDeclarado => "alcance_declarado",
+        /// Cut by «Modo apagón» (customer request, 18 Oct 2026): the switch that cuts everything
+        /// this computer asks for except the essential list and what the person approved
+        /// (`apagon.rs`). Kept apart because the person did not name this destination either.
+        ModoApagon => "modo_apagon",
     }
 }
 

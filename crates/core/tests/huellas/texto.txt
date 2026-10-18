@@ -1,0 +1,100 @@
+import io, struct, zlib, zipfile, subprocess, sys, os
+from PIL import Image
+out = sys.argv[1]
+os.chdir(out)
+t=open(__file__,'rb').read()[:6000]
+z=zlib.compress(t,9); print("btype", (z[2]>>1)&3)
+open('texto.zlib','wb').write(z); open('texto.txt','wb').write(t)
+
+def build(entries, base):
+    n=len(entries); head=2+n*12+4
+    data=b''; ents=b''
+    for tag,typ,cnt,val in entries:
+        if len(val)<=4:
+            ents+=struct.pack('>HHI',tag,typ,cnt)+val.ljust(4,b'\0')
+        else:
+            off=base+head+len(data)
+            ents+=struct.pack('>HHII',tag,typ,cnt,off)
+            data+=val+(b'\0' if len(val)%2 else b'')
+    return struct.pack('>H',n)+ents+b'\0\0\0\0'+data
+
+def tiff(ifd0, exif, gps):
+    tmp=build(ifd0+[(0x8769,4,1,b'\0\0\0\0'),(0x8825,4,1,b'\0\0\0\0')],8)
+    exif_off=8+len(tmp)
+    exif_b=build(exif,exif_off)
+    gps_off=exif_off+len(exif_b)
+    ifd=build(ifd0+[(0x8769,4,1,struct.pack('>I',exif_off)),(0x8825,4,1,struct.pack('>I',gps_off))],8)
+    assert len(ifd)==len(tmp)
+    return b'MM\0*\0\0\0\x08'+ifd+exif_b+build(gps,gps_off)
+def A(tag,s): b=s.encode()+b'\0'; return (tag,2,len(b),b)
+def R(tag,*vals): return (tag,5,len(vals),b''.join(struct.pack('>II',n,d) for n,d in vals))
+ifd0=[A(0x010f,'Apple'), A(0x0110,'iPhone 15 Pro'), (0x0112,3,1,struct.pack('>H',6)), A(0x0131,'17.4.1'), A(0x0132,'2026:10:12 18:41:07'), A(0x013b,'Ana Perez')]
+exif=[A(0x9003,'2026:10:12 18:41:07'), A(0xa431,'F2LXK0123456')]
+gps=[(1,2,2,b'N\0'), R(2,(10,1),(23,1),(4512,100)), (3,2,2,b'W\0'), R(4,(75,1),(33,1),(1188,100))]
+T=tiff(ifd0,exif,gps)
+
+im=Image.new('RGB',(16,16),(200,120,40))
+b=io.BytesIO(); im.save(b,'JPEG',quality=90); j=b.getvalue()
+def seg(m,body): return b'\xff'+bytes([m])+struct.pack('>H',len(body)+2)+body
+xmp=b'http://ns.adobe.com/xap/1.0/\0'+b'<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF><rdf:Description xmp:CreatorTool="Lightroom 7.1"/></rdf:RDF></x:xmpmeta>'
+assert j[2:4]==b'\xff\xe0'
+l=struct.unpack('>H',j[4:6])[0]
+jj=j[:4+l]+seg(0xe1,b'Exif\0\0'+T)+seg(0xe1,xmp)+seg(0xfe,b'Hecho por Ana en casa')+j[4+l:]+b'TRAILER-DE-FABRICANTE'
+open('foto-gps.jpg','wb').write(jj)
+Image.open(io.BytesIO(jj)).load()
+
+b=io.BytesIO(); im.save(b,'PNG'); p=b.getvalue()
+def chunk(t,d): return struct.pack('>I',len(d))+t+d+struct.pack('>I',zlib.crc32(t+d)&0xffffffff)
+extra=chunk(b'tEXt',b'Author\0Ana Perez')+chunk(b'zTXt',b'Software\0\0'+zlib.compress(b'GIMP 2.10'))+chunk(b'eXIf',T)+chunk(b'tIME',struct.pack('>HBBBBB',2026,10,12,18,41,7))
+pp=p[:33]+extra+p[33:]
+open('foto.png','wb').write(pp)
+Image.open(io.BytesIO(pp)).load()
+
+def box(t,d): return struct.pack('>I',8+len(d))+t+d
+def full(t,v,f,d): return box(t,bytes([v])+f.to_bytes(3,'big')+d)
+ftyp=box(b'ftyp',b'heic'+b'\0\0\0\0'+b'mif1heic')
+hdlr=full(b'hdlr',0,0,b'\0'*4+b'pict'+b'\0'*12+b'\0')
+infe1=full(b'infe',2,0,struct.pack('>HH',1,0)+b'hvc1'+b'\0')
+infe2=full(b'infe',2,0,struct.pack('>HH',2,0)+b'Exif'+b'\0')
+infe3=full(b'infe',2,0,struct.pack('>HH',3,0)+b'mime'+b'\0'+b'application/rdf+xml\0')
+iinf=full(b'iinf',0,0,struct.pack('>H',3)+infe1+infe2+infe3)
+pic=b'PICTURE-BYTES-NEVER-READ'*4
+exif_item=struct.pack('>I',6)+b'Exif\0\0'+T
+xmp_item=b'<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF><rdf:Description xmp:CreatorTool="iOS 17.4.1"/></rdf:RDF></x:xmpmeta>'
+def meta_de(offs):
+    items=b''
+    for (iid,off,ln) in offs:
+        items+=struct.pack('>HHHH',iid,0,0,1)+struct.pack('>II',off,ln)
+    iloc=full(b'iloc',1,0,bytes([0x44,0x00])+struct.pack('>H',len(offs))+items)
+    return full(b'meta',0,0,hdlr+iinf+iloc)
+meta=meta_de([(1,0,0),(2,0,0),(3,0,0)])
+o1=len(ftyp)+len(meta)+8; o2=o1+len(pic); o3=o2+len(exif_item)
+meta=meta_de([(1,o1,len(pic)),(2,o2,len(exif_item)),(3,o3,len(xmp_item))])
+h=ftyp+meta+box(b'mdat',pic+exif_item+xmp_item)
+assert h[o2:o2+4]==struct.pack('>I',6)
+open('foto.heic','wb').write(h)
+
+def pdf(info):
+    x=b'<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?><x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xmp="http://ns.adobe.com/xap/1.0/"><dc:creator><rdf:Seq><rdf:li>Ana Perez</rdf:li></rdf:Seq></dc:creator><xmp:CreatorTool>Microsoft Word</xmp:CreatorTool></rdf:Description></rdf:RDF></x:xmpmeta><?xpacket end="w"?>'
+    objs=[b'<< /Type /Catalog /Pages 2 0 R /Metadata 5 0 R >>',
+          b'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+          b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >>',
+          info,
+          b'<< /Type /Metadata /Subtype /XML /Length %d >>\nstream\n'%len(x)+x+b'\nendstream']
+    o=b'%PDF-1.7\n'; offs=[]
+    for i,ob in enumerate(objs):
+        offs.append(len(o)); o+=b'%d 0 obj\n'%(i+1)+ob+b'\nendobj\n'
+    xr=len(o)
+    o+=b'xref\n0 %d\n0000000000 65535 f \n'%(len(objs)+1)
+    for of in offs: o+=b'%010d 00000 n \n'%of
+    o+=b'trailer\n<< /Size %d /Root 1 0 R /Info 4 0 R >>\nstartxref\n%d\n%%%%EOF\n'%(len(objs)+1,xr)
+    return o
+autor='Ana Pérez'.encode('utf-16-be')
+info=b'<< /Author <FEFF'+autor.hex().upper().encode()+b'> /Producer (macOS Quartz \\(15.1\\)) /Company (Ejemplo S.A.) /CreationDate (D:20261012184107+02\'00\') >>'
+open('documento.pdf','wb').write(pdf(info))
+subprocess.run(['qpdf','--check','documento.pdf'],check=True,capture_output=True)
+subprocess.run(['qpdf','--object-streams=generate','--compress-streams=y','documento.pdf','comprimido.pdf'],check=True)
+
+core='''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Presupuesto</dc:title><dc:creator>Ana Perez</dc:creator><cp:lastModifiedBy>Luis G&amp;M</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">2026-10-01T09:00:00Z</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">2026-10-12T18:41:00Z</dcterms:modified></cp:coreProperties>'''
+ap

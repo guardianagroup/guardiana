@@ -19,6 +19,8 @@ mod derechos;
 mod destinos;
 mod empresa;
 mod expedientes;
+// Customer tools of 1.0.45 (18 Oct 2026): their own routes, page and scripts.
+mod extras;
 mod identificacion;
 mod medidas;
 mod revision;
@@ -1066,6 +1068,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/vigilancia/ahora", post(vigilancia::ahora))
         // «Contratos» (1.0.45, «contrato vivo»): its page, script and API, in their own module.
         .merge(contratos::rutas())
+        .merge(extras::rutas())
         .layer(middleware::from_fn(add_security_headers))
         .layer(middleware::from_fn_with_state(
             state.clone(),
