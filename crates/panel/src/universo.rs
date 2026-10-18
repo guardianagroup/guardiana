@@ -287,6 +287,10 @@ struct Destino {
     /// was stopped before it left.
     #[serde(skip_serializing_if = "Option::is_none")]
     ubicacion: Option<guardiana_lists::ubicacion::Ubicacion>,
+    /// 1.0.46 (the globe's table, R1-c): the category GUARDIANA gave the name when it was asked
+    /// (`publicidad`, `rastreador`, `telemetria`, `esperado`), or `desconocido` when no lookup of
+    /// it was seen in the window. The table's filter counts these, so its counts add up.
+    categoria: &'static str,
 }
 
 /// The place key most of a destination's bytes went to.
@@ -657,6 +661,7 @@ pub(crate) async fn universo(
             consultas,
             paradas,
             sede: false,
+            categoria: categoria.as_str(),
         });
     }
     // Names stopped before they left: no server, so the company's seat, said as such.
@@ -708,6 +713,7 @@ pub(crate) async fn universo(
                 },
             )),
             ubicacion: None,
+            categoria: categoria.as_str(),
         });
     }
     destinos.sort_by(|a, b| {

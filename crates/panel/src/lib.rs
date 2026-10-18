@@ -22,6 +22,8 @@ mod expedientes;
 // Customer tools of 1.0.45 (18 Oct 2026): their own routes, page and scripts.
 mod extras;
 mod identificacion;
+// 1.0.46 (radiografias-globo): the program's language, kept by the service (R10).
+mod idioma;
 mod medidas;
 mod plan;
 mod revision;
@@ -972,6 +974,20 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             "/por-dentro",
             get(|| async { pagina(include_str!("../static/por-dentro.html")) }),
         )
+        // ---- 1.0.46 radiografias-globo: begin ----
+        // The program always opens on En vivo (R11): «/» is the globe now (api::root_page), and
+        // the 60-second snapshot that lived at «/» keeps its own address. The language of the
+        // whole program is a setting of the service (R10).
+        .route(
+            "/foto",
+            get(|| async { pagina(include_str!("../static/index.html")) }),
+        )
+        .route(
+            "/radiografia",
+            get(|| async { pagina(include_str!("../static/index.html")) }),
+        )
+        .merge(idioma::rutas())
+        // ---- 1.0.46 radiografias-globo: end ----
         .route(
             "/por-dentro.html",
             get(|| async { pagina(include_str!("../static/por-dentro.html")) }),

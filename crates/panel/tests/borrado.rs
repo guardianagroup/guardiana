@@ -116,7 +116,7 @@ async fn the_page_counts_right_writes_the_letter_and_keeps_no_name() {
     ] {
         assert!(html.contains(paso), "{paso}");
     }
-    let (_, inicio) = pide(addr, &t, "GET", "/", "").await;
+    let (_, inicio) = pide(addr, &t, "GET", "/foto", "").await;
     assert!(inicio.contains("href=\"/borrado\""), "the nav links to it");
 
     // What the house saw, by company.

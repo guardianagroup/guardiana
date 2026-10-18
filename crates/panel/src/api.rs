@@ -1994,7 +1994,9 @@ pub(crate) async fn root_page(headers: HeaderMap) -> Html<String> {
     if host.starts_with(crate::CHECKER_HOST) {
         crate::pagina(include_str!("../static/comprobador.html"))
     } else {
-        crate::pagina(include_str!("../static/index.html"))
+        // 1.0.46 (R11): every launch path opens `/?t=…`, and the program always opens on En
+        // vivo, the globe. The 60-second snapshot lives at `/foto`.
+        crate::pagina(include_str!("../static/por-dentro.html"))
     }
 }
 

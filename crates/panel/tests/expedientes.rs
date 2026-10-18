@@ -110,7 +110,7 @@ async fn files_open_send_answer_close_and_complain_without_a_name() {
     let (status, html) = pide(addr, &t, "GET", "/expedientes", "").await;
     assert_eq!(status, 200);
     assert!(html.contains("data-page=\"expedientes\""));
-    let (_, inicio) = pide(addr, &t, "GET", "/", "").await;
+    let (_, inicio) = pide(addr, &t, "GET", "/foto", "").await;
     assert!(
         inicio.contains("href=\"/expedientes\""),
         "the nav links to it"

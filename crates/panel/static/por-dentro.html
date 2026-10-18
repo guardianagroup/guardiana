@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
-<title>GUARDIANA · Globo en directo</title>
+<title>GUARDIANA · En vivo</title>
 <link rel="stylesheet" href="/static/diseno.css">
 <link rel="stylesheet" href="/static/style.css">
 <link rel="preload" href="/static/fonts/HankenGrotesk-var.woff" as="font" type="font/woff" crossorigin>
@@ -17,13 +17,12 @@
      slim bar. A pin answers on hover; a click opens the inspector on the right; the live log waits
      folded in the rail at the bottom. Every older control is still here, moved, not removed. -->
 <header class="top">
-  <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA</span></a>
+  <a class="brand" href="/por-dentro" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA</span></a>
   <nav>
-    <a href="/por-dentro" aria-current="page" data-t="nav_por_dentro">Globo en directo</a>
-    <a href="/revision" data-t="nav_revision">Revisión</a>
-    <a href="/" data-t="nav_radiografia">Radiografía</a>
-    <a href="/extracto" data-t="nav_extracto">Extracto</a>
-    <a href="/estado" data-t="nav_estado">Estado</a>
+    <a href="/por-dentro" aria-current="page" data-t="menu_en_vivo">En vivo</a>
+    <a href="/extracto" data-t="menu_actividad">Actividad</a>
+    <a href="/revision" data-t="menu_diagnostico">Diagnóstico</a>
+    <a href="/sabe-de-ti" data-t="menu_privacidad">Privacidad</a>
   </nav>
 </header>
 <div class="globo-herr" id="globo-herr" data-nav-extra>
@@ -75,7 +74,7 @@
       <div id="expl-filas"></div>
     </section>
     <div class="vigilancia-off" id="vigilancia-off" hidden><span data-t="pd_vigilancia_off"></span> <a href="/antivirus" data-t="pd_vigilancia_enciende"></a></div>
-    <div class="vacio" id="vacio" hidden role="status" aria-live="polite"><h2 id="vacio-titulo"></h2><p id="vacio-texto"></p><p id="vacio-enlace" hidden><a href="/" data-t="pd_ver_radiografia"></a></p></div>
+    <div class="vacio" id="vacio" hidden role="status" aria-live="polite"><h2 id="vacio-titulo"></h2><p id="vacio-texto"></p><p id="vacio-enlace" hidden><a href="/foto" data-t="pd_ver_radiografia"></a></p></div>
     <div class="donde" id="donde" hidden role="dialog" aria-labelledby="donde-t">
       <h2 id="donde-t" data-t="pd_donde_titulo">¿Dónde está este ordenador?</h2>
       <p id="donde-txt" data-t="pd_donde_texto"></p>
@@ -103,33 +102,34 @@
       <div class="insp-pie"><span><kbd>Esc</kbd> <span data-t="pd_cerrar_min">cerrar</span></span><a class="btn texto chico sigue" id="insp-enlace" href="/extracto" hidden></a></div>
     </aside>
   </div>
-  <!-- The rail: folded, one line; open, the tray with the live log, the last five minutes and every row. -->
+  <!-- 1.0.46 (the owner's chosen R1-a and R1-c): the strip at the foot says what the last five
+       minutes held, in three figures that the table under it adds up to, with the pulse of those
+       minutes (red marks where something was blocked) and «Protección máxima». A click on it
+       raises the table; its chevron, Esc or a click outside lowers it. -->
   <div class="hud" id="hud">
-    <div class="riel" id="riel">
-      <button type="button" class="riel-vivo" id="hud-asa" aria-expanded="false" aria-controls="bandeja" data-tab="vivo"><i aria-hidden="true"></i><b data-t="pd_en_vivo">En vivo</b><span class="vr" aria-hidden="true"></span><span><b id="riel-ahora">0</b> <span id="riel-ahora-t"></span></span><span class="vr" aria-hidden="true"></span><span class="riel-cortadas"><i aria-hidden="true"></i><b id="riel-cortadas">0</b> <span id="riel-cortadas-t"></span></span></button>
-      <span class="vr" aria-hidden="true"></span><span class="riel-maxima" id="riel-maxima" hidden></span>
-      <button type="button" class="riel-5" data-tab="min5" aria-controls="bandeja"><span data-t="pd_ultimos_5">Últimos 5 min</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 10 8 5.5l4.5 4.5"/></svg></button>
+    <div class="riel tira" id="riel">
+      <button type="button" class="tira-cifras" id="hud-asa" aria-expanded="false" aria-controls="bandeja" data-t-title="rg_tira_explica">
+        <span class="tira-r" data-t="rg_tira_ventana">Últimos 5 min</span>
+        <span class="tira-n"><b id="riel-ahora">0</b> <span id="riel-ahora-t"></span></span>
+        <span class="tira-n"><b id="riel-empresas">0</b> <span id="riel-empresas-t"></span></span>
+        <span class="tira-n tira-cortadas"><b id="riel-cortadas">0</b> <span id="riel-cortadas-t"></span></span>
+      </button>
+      <button type="button" class="tira-pulso" id="tira-pulso" aria-controls="bandeja" tabindex="-1" data-t-label="rg_tira_pulso"><canvas id="pulso"></canvas><span class="tira-ejes" aria-hidden="true"><span data-t="rg_tira_hace5">hace 5 min</span><span data-t="rg_tira_ahora">ahora</span></span></button>
+      <span class="riel-maxima" id="riel-maxima" hidden></span>
+      <button type="button" class="boton-icono tira-chev" id="ban-cerrar" hidden data-t-label="rg_tira_cerrar" data-t-title="rg_tira_cerrar"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 6 8 10.5 12.5 6"/></svg></button>
     </div>
     <div class="bandeja" id="bandeja" hidden>
-      <div class="ban-cab">
-        <div class="ban-tabs" role="tablist">
-          <button type="button" role="tab" data-tab="vivo" aria-selected="true"><i aria-hidden="true"></i><span data-t="pd_en_vivo">En vivo</span></button><button type="button" role="tab" data-tab="min5" aria-selected="false" data-t="pd_ultimos_5">Últimos 5 min</button><button type="button" role="tab" data-tab="tabla" aria-selected="false" data-t="pd_todos_datos">Todos los datos</button>
-        </div>
-        <span class="ban-cifras" id="ban-cifras"></span>
-        <a class="btn texto chico sigue" href="/extracto" data-t="pd_ver_registro">Ver todo el registro</a>
-        <button type="button" class="boton-icono ban-cerrar" id="ban-cerrar" data-t-label="pd_hud_recoger" data-t-title="pd_hud_recoger"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 6 8 10.5 12.5 6"/></svg></button>
+      <div class="ban-cats">
+        <div class="ban-cats-t" data-t="rg_cat_titulo">Categoría</div>
+        <div class="ban-cats-l" id="ban-cats" role="group" data-t-label="rg_cat_titulo"></div>
+        <div class="ban-cats-pie"><button type="button" class="btn texto chico" id="ban-todos" data-t="pd_todos_datos">Todos los datos</button><a class="btn texto chico sigue" href="/extracto" data-t="pd_ver_registro">Ver todo el registro</a></div>
       </div>
-      <div class="ban-panel" data-panel="vivo" role="tabpanel">
-        <table class="registro-t"><thead><tr><th data-t="pd_col_hora">Hora</th><th data-t="pd_ht_programa">Programa</th><th data-t="pd_ht_destino">Destino</th><th data-t="pd_ht_empresa">Empresa</th><th data-t="pd_ht_pais">País</th><th data-t="pd_col_datos">Datos</th><th data-t="pd_ht_estado">Estado</th></tr></thead><tbody id="registro"></tbody></table>
+      <div class="ban-panel" data-panel="vivo" role="region" data-t-label="pd_en_vivo">
+        <table class="registro-t"><thead><tr><th data-t="pd_col_hora">Hora</th><th data-t="pd_ht_programa">Programa</th><th data-t="pd_ht_destino">Destino</th><th data-t="pd_ht_empresa">Empresa</th><th data-t="pd_ht_pais">País</th><th data-t="pd_ht_estado">Estado</th></tr></thead><tbody id="registro"></tbody></table>
       </div>
-      <div class="ban-panel ban-min5" data-panel="min5" role="tabpanel" hidden>
-        <div><h3><span data-t="pd_hud_enviado" class="h3-titulo"></span> <span id="hud-min"></span></h3><canvas id="spark"></canvas></div>
-        <div><h3 data-t="pd_hud_paises"></h3><div class="barras" id="barras"></div></div>
-        <div><h3 data-t="pd_hud_puertas"></h3><div class="grande" id="hud-cortes">0</div><div class="pequeno" id="hud-bloqueos"></div></div>
-        <div><h3 data-t="pd_hud_top"></h3><ol class="top-ahora" id="hud-top"></ol></div>
-      </div>
-      <div class="ban-panel hud-tabla" data-panel="tabla" id="hud-tabla" role="tabpanel" hidden>
-        <div class="ht-cab"><h3><span data-t="pd_ht_titulo" class="h3-titulo"></span> <span id="ht-cuantos"></span></h3><div class="ht-kpi" id="ht-kpi"></div><div class="ht-acciones"><input type="search" id="ht-busca" class="ht-busca" autocomplete="off" spellcheck="false" data-t-placeholder="pd_ht_buscar"><button type="button" class="boton chico" id="ht-csv" data-t="pd_ht_csv"></button><button type="button" class="boton chico" id="ht-json" data-t="pd_ht_json"></button></div></div>
+      <!-- «Todos los datos»: the technical table with its downloads (15 Oct 2026), kept. -->
+      <div class="ban-panel hud-tabla" data-panel="tabla" id="hud-tabla" hidden>
+        <div class="ht-cab"><h3><span data-t="pd_ht_titulo" class="h3-titulo"></span> <span id="ht-cuantos"></span></h3><div class="ht-kpi" id="ht-kpi"></div><div class="ht-acciones"><input type="search" id="ht-busca" class="ht-busca" autocomplete="off" spellcheck="false" data-t-placeholder="pd_ht_buscar"><button type="button" class="boton chico" id="ht-csv" data-t="pd_ht_csv"></button><button type="button" class="boton chico" id="ht-json" data-t="pd_ht_json"></button><button type="button" class="btn texto chico" id="ht-volver" data-t="rg_volver_tabla">Volver a la tabla</button></div></div>
         <div class="ht-scroll"><table class="ht"><thead><tr>
           <th data-t="pd_ht_programa" data-orden="programa" tabindex="0" role="button"></th><th data-t="pd_ht_destino" data-orden="destino" tabindex="0" role="button"></th><th data-t="pd_ht_empresa" data-orden="empresa" tabindex="0" role="button"></th><th data-t="pd_ht_pais" data-orden="pais" tabindex="0" role="button"></th><th data-t="pd_ht_ciudad" data-orden="ciudad" tabindex="0" role="button"></th><th data-t="pd_ht_red" data-orden="red" tabindex="0" role="button"></th><th data-t="pd_ht_proto" data-orden="proto" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_sube" data-orden="sub" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_baja" data-orden="baj" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_paquetes" data-orden="paq" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_consultas" data-orden="consultas" tabindex="0" role="button"></th><th class="n" data-t="pd_ht_cortes" data-orden="bloq" tabindex="0" role="button"></th><th data-t="pd_ht_primera" data-orden="primera" tabindex="0" role="button"></th><th data-t="pd_ht_ultima" data-orden="ultima" tabindex="0" role="button"></th><th data-t="pd_ht_estado" data-orden="estado" tabindex="0" role="button"></th>
         </tr></thead><tbody id="ht-filas"></tbody></table></div>

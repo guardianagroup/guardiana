@@ -1102,24 +1102,80 @@
     pintaCabecera();
   }
 
-  // ----- The header (18 Oct 2026) -----------------------------------------------------------
-  // The owner approved the new menu: «de 16 entradas a 3 pestañas». The top bar is the brand,
-  // the three products in the middle (Radiografías · ZERO · Comunicaciones) and, on the right,
-  // the state of the service and a single «Ajustes» button. Under it, quietly, the four parts of
-  // Radiografías; the pages of the part you are in show as small tabs. Every page keeps its
-  // address, and every page is still one or two clicks away. Built here, once, for every page:
-  // the links written in each page's HTML stay as they were for a browser without scripts.
+  // ---- 1.0.46 radiografias-globo: the app shell (begin) ---------------------------------------
+  // The owner's chosen mockups (R1-a…R1-d, 18 Oct 2026). One navigation for the whole program,
+  // built here once for every page (the links written in each page's HTML stay as they were for a
+  // browser without scripts):
+  //   · a 56 px top bar: the padlock and GUARDIANA on the left; Radiografías · ZERO ·
+  //     Comunicaciones in the middle; on the right a calm pill («● Protegido»), amber «Atención · N»
+  //     only for real issues (a click says which), and the settings gear, always there;
+  //   · a 44 px row with the four sections (En vivo · Actividad · Diagnóstico · Privacidad); each
+  //     opens its first page, and a compact menu (on hover, on focus, or on its small chevron)
+  //     lists its pages;
+  //   · interior pages get «Sección › Página» (into `[data-migas]` when the page has one, or at
+  //     the top of its <main>).
+  // Other pages build on it through `window.GuardianaShell` (the menu, the section of a page, the
+  // breadcrumb, the «Datos de ejemplo» chip). Every page keeps its address.
   const MENU = [
-    { t: 'menu_en_vivo', paginas: [['por-dentro', '/por-dentro', 'menu_globo']] },
-    { t: 'menu_actividad', paginas: [['extracto', '/extracto', 'menu_registro'], ['radiografia', '/', 'menu_foto'], ['informe', '/informe', 'nav_informe']] },
-    // 1.0.45: «Contratos» right after Actividad (what each program normally contacts), the two
-    // new looks of Diagnóstico after the check-up, and the three new pages of Privacidad.
-    { t: 'nav_contratos', paginas: [['contratos', '/contratos', 'nav_contratos']] },
-    { t: 'menu_diagnostico', paginas: [['revision', '/revision', 'nav_revision'], ['vision', '/vision', 'nav_vision'], ['vigilancia', '/vigilancia', 'nav_vigilancia'], ['ia', '/ia', 'nav_ia'], ['antivirus', '/antivirus', 'nav_antivirus'], ['dispositivos', '/dispositivos', 'nav_dispositivos']] },
-    { t: 'menu_privacidad', paginas: [['sabeDeTi', '/sabe-de-ti', 'menu_sabe'], ['identificacion', '/identificacion', 'nav_identificacion'], ['certificado', '/certificado', 'nav_certificado'], ['borrado', '/borrado', 'menu_borrado'], ['expedientes', '/expedientes', 'nav_expedientes'], ['reglas', '/reglas', 'nav_reglas'], ['herramientas', '/herramientas', 'nav_herramientas']] },
+    { id: 'vivo', t: 'menu_en_vivo', paginas: [['por-dentro', '/por-dentro', 'menu_globo']] },
+    { id: 'actividad', t: 'menu_actividad', paginas: [['extracto', '/extracto', 'menu_registro'], ['radiografia', '/foto', 'menu_foto'], ['informe', '/informe', 'nav_informe'], ['contratos', '/contratos', 'nav_contratos']] },
+    { id: 'diagnostico', t: 'menu_diagnostico', paginas: [['revision', '/revision', 'rg_nav_revision_equipo'], ['ia', '/ia', 'nav_ia'], ['antivirus', '/antivirus', 'nav_antivirus'], ['dispositivos', '/dispositivos', 'nav_dispositivos'], ['vigilancia', '/vigilancia', 'nav_vigilancia'], ['vision', '/vision', 'nav_vision'], ['quienVende', '/quien-vende', 'rg_nav_quien_vende']] },
+    { id: 'privacidad', t: 'menu_privacidad', paginas: [['sabeDeTi', '/sabe-de-ti', 'rg_nav_sabe'], ['identificacion', '/identificacion', 'nav_identificacion'], ['certificado', '/certificado', 'nav_certificado'], ['borrado', '/borrado', 'menu_borrado'], ['expedientes', '/expedientes', 'nav_expedientes'], ['reglas', '/reglas', 'nav_reglas'], ['herramientas', '/herramientas', 'nav_herramientas'], ['audita', '/audita', 'rg_nav_audita']],
+      // Pages reached from inside a section, not listed in its menu: their breadcrumb says where.
+      ocultas: [['empresa', '/empresa', 'ficha_titulo']] },
   ];
-  const AJUSTES = { t: 'menu_ajustes', paginas: [['hogar', '/hogar', 'nav_hogar'], ['licencia', '/licencia', 'nav_licencia'], ['verify', '/verify', 'nav_verify'], ['estado', '/estado', 'nav_estado']] };
+  const AJUSTES = { id: 'ajustes', t: 'menu_ajustes', paginas: [['hogar', '/hogar', 'nav_hogar'], ['licencia', '/licencia', 'nav_licencia'], ['verify', '/verify', 'nav_verify'], ['estado', '/estado', 'nav_estado']] };
   const ICONO_AJUSTES = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.6"/><circle cx="6" cy="11.5" r="1.6"/></svg>';
+  const ICONO_CHEVRON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>';
+  const ICONO_MIGA = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg>';
+  // Numbers with the thousands separator of the language, always (Spanish leaves «1234» bare by
+  // default; the owner wants «1.234» everywhere).
+  const numero = (n) => { try { return Number(n || 0).toLocaleString(LOC, { useGrouping: 'always' }); } catch (_) { return Number(n || 0).toLocaleString(LOC); } };
+  // The page's section and its entry, by the page's name or, for a page this script does not know
+  // yet (another branch's), by its address.
+  const enSeccion = (page) => {
+    const ruta = location.pathname.replace(/\.html$/, '');
+    for (const s of MENU.concat([AJUSTES])) {
+      const p = s.paginas.concat(s.ocultas || []).find((x) => x[0] === page || (ruta !== '/' && x[1] === ruta));
+      if (p) return { s, p };
+    }
+    return { s: null, p: null };
+  };
+  // «Actividad › Contratos»: the section links to its first page; the page is the current one.
+  const migasHtml = (page) => {
+    const { s, p } = enSeccion(page);
+    if (!s || !p || s.id === 'vivo') return '';
+    return `<nav class="g-migas" aria-label="${esc(t('rg_migas'))}"><a href="${s.paginas[0][1]}">${esc(t(s.t))}</a>${ICONO_MIGA}<span aria-current="page">${esc(t(p[2]))}</span></nav>`;
+  };
+  const pintaMigas = (page) => {
+    const html = migasHtml(page);
+    let sitio = document.querySelector('[data-migas]');
+    if (!sitio) {
+      if (!html) return;
+      const m = document.querySelector('main');
+      if (!m) return;
+      sitio = m.querySelector(':scope > .g-migas-sitio');
+      if (!sitio) { sitio = document.createElement('div'); sitio.className = 'g-migas-sitio'; m.insertBefore(sitio, m.firstChild); }
+    }
+    sitio.innerHTML = html;
+  };
+  // «Datos de ejemplo»: the chip at the right of the sections row, only when what is on screen is
+  // a sample (tests and screenshots), never real data.
+  const muestra = (on) => {
+    const sub = document.getElementById('g-secciones');
+    if (!sub) return;
+    let chip = document.getElementById('g-muestra');
+    if (on && !chip) { chip = document.createElement('span'); chip.id = 'g-muestra'; chip.className = 'g-muestra'; chip.textContent = t('rg_muestra'); sub.appendChild(chip); }
+    if (!on && chip) chip.remove();
+  };
+  // The language, one for the whole program (R10): kept by the service, changed here.
+  const cambiaIdioma = async (l) => {
+    try { await api('/api/ajustes/idioma', { method: 'PUT', body: { idioma: l } }); } catch (_) {}
+    try { localStorage.setItem('guardiana_lang', l); } catch (_) {}
+    location.reload();
+  };
+  window.GuardianaShell = { MENU, AJUSTES, enSeccion, migasHtml, pintaMigas, muestra, numero, cambiaIdioma };
+  PAGE_TITLE['por-dentro'] = 'menu_en_vivo';
   let pulso = null;
   function pintaCabecera() {
     const page = document.body.getAttribute('data-page');
@@ -1138,7 +1194,7 @@
       }
       return;
     }
-    const seccion = MENU.find((s) => s.paginas.some((p) => p[0] === page)) || (AJUSTES.paginas.some((p) => p[0] === page) ? AJUSTES : null);
+    const { s: seccion } = enSeccion(page);
     const CORTO = { en: 'English', es: 'Español', pt: 'Português' };
     const CAMBIAR = { es: 'Cambiar a español', en: 'Switch to English', pt: 'Mudar para português' };
     const idiomas = ['en', 'es', 'pt'].map((l) => (l === LANG
@@ -1147,16 +1203,17 @@
     const enlace = (p, clase) => `<a href="${p[1]}"${clase ? ` class="${clase}"` : ''}${p[0] === page ? ' aria-current="page"' : ''}>${esc(t(p[2]))}</a>`;
     const impreso = header.querySelector('.print-only') ? ` <span class="print-only">${esc(t('pdf_pie'))}</span>` : '';
     header.classList.add('g-barra');
-    header.innerHTML = `<a class="brand" href="/" title="${esc(t('ir_inicio'))}"><span class="brand-txt">GUARDIANA</span></a>${impreso}
+    header.innerHTML = `<a class="brand" href="/por-dentro" title="${esc(t('ir_inicio'))}"><span class="brand-txt">GUARDIANA</span></a>${impreso}
       <nav class="g-productos" aria-label="${esc(t('menu_productos'))}">
-        <a href="/" class="g-producto" aria-current="true">${esc(t('menu_radiografias'))}</a>
+        <a href="/por-dentro" class="g-producto" aria-current="true">${esc(t('menu_radiografias'))}</a>
         <button type="button" class="g-producto" data-producto="zero" aria-expanded="false" aria-controls="g-pop">${esc(t('menu_zero'))}</button>
         <button type="button" class="g-producto" data-producto="com" aria-expanded="false" aria-controls="g-pop">${esc(t('menu_comunicaciones'))}</button>
       </nav>
       <div class="g-pop" id="g-pop" role="dialog" hidden></div>
       <div class="g-der">
-        <a class="g-pulso" id="g-pulso" href="/estado" role="status" aria-live="polite"><i aria-hidden="true"></i><span>${esc(pulso ? pulso.texto : '')}</span></a>
-        <button type="button" class="boton-icono" id="g-ajustes" aria-haspopup="true" aria-expanded="false" aria-controls="g-menu" title="${esc(t('menu_ajustes'))}" aria-label="${esc(t('menu_ajustes'))}">${ICONO_AJUSTES}</button>
+        <button type="button" class="g-pulso${pulso && !pulso.ok ? ' atencion' : ''}" id="g-pulso" aria-haspopup="dialog" aria-expanded="false" aria-controls="g-pulso-pop"><i aria-hidden="true"></i><span>${esc(pulso ? pulso.texto : t('rg_pulso_protegido'))}</span></button>
+        <div class="g-pulso-pop" id="g-pulso-pop" role="dialog" hidden></div>
+        <button type="button" class="boton-icono g-ajustes" id="g-ajustes" aria-haspopup="true" aria-expanded="false" aria-controls="g-menu" title="${esc(t('menu_ajustes'))}" aria-label="${esc(t('menu_ajustes'))}">${ICONO_AJUSTES}</button>
         <div class="g-menu" id="g-menu" hidden>
           <div class="g-menu-t">${esc(t('menu_ajustes'))}</div>
           ${AJUSTES.paginas.map((p) => enlace(p)).join('')}
@@ -1164,31 +1221,47 @@
           <div class="idiomas" id="lang-toggle">${idiomas}</div>
         </div>
       </div>`;
-    // The four parts of Radiografías, and the pages of the one you are in.
+    // The four sections, each with its compact menu.
     let sub = document.getElementById('g-secciones');
     if (!sub) { sub = document.createElement('nav'); sub.id = 'g-secciones'; sub.className = 'g-secciones'; header.after(sub); }
     sub.setAttribute('aria-label', t('menu_secciones'));
     const extra = document.getElementById('g-extra');
-    sub.innerHTML = MENU.map((s) => `<a href="${s.paginas[0][1]}"${s === seccion ? ' aria-current="true"' : ''}>${esc(t(s.t))}</a>`).join('')
-      + (seccion === AJUSTES ? `<span class="g-sep" aria-hidden="true"></span><a href="${AJUSTES.paginas[0][1]}" aria-current="true">${esc(t(AJUSTES.t))}</a>` : '');
+    const chipMuestra = document.getElementById('g-muestra');
+    sub.innerHTML = MENU.map((s) => {
+      const actual = s === seccion ? ' aria-current="true"' : '';
+      if (s.paginas.length < 2) return `<div class="g-sec"><a class="g-sec-a" href="${s.paginas[0][1]}"${actual}>${esc(t(s.t))}</a></div>`;
+      return `<div class="g-sec" data-sec="${s.id}"><a class="g-sec-a" href="${s.paginas[0][1]}"${actual}>${esc(t(s.t))}</a>`
+        + `<button type="button" class="g-sec-chev" aria-expanded="false" aria-controls="g-dd-${s.id}" aria-label="${esc(t('rg_paginas_de').replace('{s}', t(s.t)))}">${ICONO_CHEVRON}</button>`
+        + `<div class="g-dd" id="g-dd-${s.id}">${s.paginas.map((p) => enlace(p)).join('')}</div></div>`;
+    }).join('')
+      + (seccion === AJUSTES ? `<span class="g-sep" aria-hidden="true"></span><div class="g-sec"><a class="g-sec-a" href="${AJUSTES.paginas[0][1]}" aria-current="true">${esc(t(AJUSTES.t))}</a></div>` : '');
     const hueco = document.createElement('span'); hueco.className = 'g-hueco'; sub.appendChild(hueco);
     // Whatever the page puts on the right of that row (the globe's own controls).
     const propio = extra || document.querySelector('[data-nav-extra]');
     if (propio) { propio.id = 'g-extra'; sub.appendChild(propio); }
-    let pags = document.getElementById('g-paginas');
-    if (seccion && seccion.paginas.length > 1) {
-      if (!pags) { pags = document.createElement('nav'); pags.id = 'g-paginas'; pags.className = 'g-paginas'; sub.after(pags); }
-      pags.setAttribute('aria-label', t(seccion.t));
-      pags.innerHTML = seccion.paginas.map((p) => enlace(p)).join('');
-    } else if (pags) pags.remove();
+    if (chipMuestra) sub.appendChild(chipMuestra);
+    // The pills row of 1.0.45 gave way to the menus and the breadcrumb.
+    const viejas = document.getElementById('g-paginas'); if (viejas) viejas.remove();
+    pintaMigas(page);
+    const cierraSecciones = (salvo) => sub.querySelectorAll('.g-sec.abierta').forEach((x) => { if (x !== salvo) { x.classList.remove('abierta'); const c = x.querySelector('.g-sec-chev'); if (c) c.setAttribute('aria-expanded', 'false'); } });
+    sub.querySelectorAll('.g-sec-chev').forEach((c) => c.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const sec = c.closest('.g-sec'), abrir = !sec.classList.contains('abierta');
+      cierraSecciones(sec); cierraPop(); cierraMenu(); cierraPulso();
+      sec.classList.toggle('abierta', abrir); c.setAttribute('aria-expanded', String(abrir));
+      // On a phone the row scrolls sideways, so the menu is placed on the screen, under the row.
+      const dd = sec.querySelector('.g-dd');
+      if (abrir && dd && matchMedia('(max-width: 600px)').matches) { dd.style.top = Math.round(sub.getBoundingClientRect().bottom + 6) + 'px'; }
+      if (abrir) { const a = sec.querySelector('.g-dd a'); if (a) a.focus(); }
+    }));
     // The two other products. Inside GUARDIANA ZERO they are its fixed tabs; elsewhere the panel
     // says where they are, in the same words the start page used (17 Oct 2026).
     const pop = $('g-pop');
-    const cierraPop = () => { pop.hidden = true; header.querySelectorAll('[data-producto]').forEach((b) => b.setAttribute('aria-expanded', 'false')); };
+    function cierraPop() { pop.hidden = true; header.querySelectorAll('[data-producto]').forEach((b) => b.setAttribute('aria-expanded', 'false')); }
     header.querySelectorAll('[data-producto]').forEach((b) => b.addEventListener('click', async (e) => {
       e.stopPropagation();
       const abierto = !pop.hidden && pop.dataset.p === b.dataset.producto;
-      cierraPop(); cierraMenu();
+      cierraPop(); cierraMenu(); cierraPulso(); cierraSecciones();
       if (abierto) return;
       let so = '';
       try { so = (await estadoBase()).so; } catch (_) {}
@@ -1203,26 +1276,38 @@
     }));
     const menu = $('g-menu'), boton = $('g-ajustes');
     function cierraMenu() { menu.hidden = true; boton.setAttribute('aria-expanded', 'false'); }
-    boton.addEventListener('click', (e) => { e.stopPropagation(); const abrir = menu.hidden; cierraPop(); cierraMenu(); if (abrir) { menu.hidden = false; boton.setAttribute('aria-expanded', 'true'); const a = menu.querySelector('a'); if (a) a.focus(); } });
-    menu.querySelectorAll('[data-lang]').forEach((a) => a.addEventListener('click', () => {
-      try { localStorage.setItem('guardiana_lang', a.dataset.lang); } catch (_) {}
-      location.reload();
-    }));
+    boton.addEventListener('click', (e) => { e.stopPropagation(); const abrir = menu.hidden; cierraPop(); cierraMenu(); cierraPulso(); cierraSecciones(); if (abrir) { menu.hidden = false; boton.setAttribute('aria-expanded', 'true'); const a = menu.querySelector('a'); if (a) a.focus(); } });
+    menu.querySelectorAll('[data-lang]').forEach((a) => a.addEventListener('click', () => cambiaIdioma(a.dataset.lang)));
+    // The pill: a click says what it means, in words, and leads where each thing is.
+    const pill = $('g-pulso'), pillPop = $('g-pulso-pop');
+    function cierraPulso() { pillPop.hidden = true; pill.setAttribute('aria-expanded', 'false'); }
+    pill.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const abrir = pillPop.hidden; cierraPop(); cierraMenu(); cierraPulso(); cierraSecciones();
+      if (!abrir) return;
+      pillPop.innerHTML = htmlPulso();
+      pillPop.hidden = false; pill.setAttribute('aria-expanded', 'true');
+      // Seen once opened: the notices it named stop counting (the page shows them all).
+      if (pulso && pulso.visto) api('/api/vigilancia/visto', { method: 'POST', body: { hasta: pulso.visto }, callado: true }).catch(() => {});
+    });
     if (!pintaCabecera.una) {
       pintaCabecera.una = true;
-      document.addEventListener('click', (e) => { if (!e.target.closest('#g-menu, #g-pop')) { const m = $('g-menu'), p = $('g-pop'); if (m) m.hidden = true; if (p) p.hidden = true; document.querySelectorAll('header.top [aria-expanded="true"]').forEach((x) => x.setAttribute('aria-expanded', 'false')); } });
+      const cierraTodo = () => {
+        ['g-menu', 'g-pop', 'g-pulso-pop'].forEach((id) => { const m = $(id); if (m) m.hidden = true; });
+        document.querySelectorAll('header.top [aria-expanded="true"], .g-secciones [aria-expanded="true"]').forEach((x) => x.setAttribute('aria-expanded', 'false'));
+        document.querySelectorAll('.g-sec.abierta').forEach((x) => x.classList.remove('abierta'));
+      };
+      document.addEventListener('click', (e) => { if (!e.target.closest('#g-menu, #g-pop, #g-pulso-pop, .g-dd')) cierraTodo(); });
       document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        const m = $('g-menu'), p = $('g-pop');
-        if ((m && !m.hidden) || (p && !p.hidden)) { if (m) m.hidden = true; if (p) p.hidden = true; document.querySelectorAll('header.top [aria-expanded="true"]').forEach((x) => x.setAttribute('aria-expanded', 'false')); e.stopImmediatePropagation(); }
+        const abierto = ['g-menu', 'g-pop', 'g-pulso-pop'].some((id) => $(id) && !$(id).hidden) || document.querySelector('.g-sec.abierta');
+        if (abierto) { cierraTodo(); e.stopImmediatePropagation(); }
       }, true);
-      // The state of the service, from what the panel already asks (/api/estado): green while it
-      // answers and watches, amber with the word «Atención» when it does not. Never a guess.
-      // 1.0.45: it also says what the constant watch (/api/vigilancia/resumen) and the programs'
-      // contracts (/api/contratos/atencion) have that the person has not seen, and leads there.
-      // Both are Plus: at the free level they answer 402 quietly and the pill says only the
-      // service's state. «última señal» is the watch's own last look when there is one.
-      const enlacePulso = (href) => { const el = $('g-pulso'); if (el) el.setAttribute('href', href); };
+      // The state, from what the panel already asks (/api/estado), and what the constant watch
+      // (/api/vigilancia/resumen) and the programs' contracts (/api/contratos/atencion) have that
+      // the person has not seen. Both are Plus: at the free level they answer 402 quietly and the
+      // pill says only the service's state. Calm by default: «● Protegido»; amber «Atención · N»
+      // only for real issues, N of them, each one named in the pill's card. Never a guess.
       const mira = async () => {
         let e = null;
         try { e = await api('/api/estado'); } catch (_) {}
@@ -1234,33 +1319,39 @@
           : [null, null];
         const ms = vg && vg.ultima_senal ? vg.ultima_senal : Date.now();
         const hora = new Date(ms).toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' });
+        const asuntos = [];
+        if (!e) asuntos.push({ n: 1, texto: t('rg_pulso_sin_respuesta'), href: '/estado' });
+        else if (e.caducado) asuntos.push({ n: 1, texto: t('rg_pulso_apartado'), href: '/licencia' });
+        if (ct && ct.atencion) (ct.avisos && ct.avisos.length ? ct.avisos : [{ titulo: ct.texto }]).forEach((a) => asuntos.push({ n: 1, texto: a.titulo || ct.texto, href: ct.enlace || '/contratos' }));
         const sinVer = vg ? Number(vg.avisos_sin_ver || 0) : 0;
-        if (!e) pulso = { ok: false, texto: t('pulso_atencion') + ' · ' + t('pulso_sin_respuesta'), href: '/estado' };
-        else if (e.caducado) pulso = { ok: false, texto: t('pulso_atencion') + ' · ' + t('pulso_apartado'), href: '/estado' };
-        else if (ct && ct.atencion) pulso = { ok: false, texto: ct.texto, href: ct.enlace || '/contratos' };
-        else if (sinVer > 0) {
+        let visto = 0;
+        if (sinVer > 0) {
           // Seen «up to» a notice is by its row id (vigilancia.rs, sin_ver).
-          const ultimo = (vg.avisos || []).reduce((m, a) => Math.max(m, Number(a.id) || 0), 0);
-          pulso = { ok: false, texto: t('pulso_atencion') + ' · ' + tn('pulso_vigilancia_avisos', sinVer), href: '/vigilancia', visto: ultimo };
-        } else if (vg && vg.estado === 'atencion') pulso = { ok: false, texto: t('pulso_atencion') + ' · ' + t('nav_vigilancia'), href: '/vigilancia' };
-        else pulso = { ok: true, texto: t('pulso_observando') + ' · ' + t('pulso_ultima').replace('{h}', hora), href: vg ? '/vigilancia' : '/estado' };
+          visto = (vg.avisos || []).reduce((m, a) => Math.max(m, Number(a.id) || 0), 0);
+          asuntos.push({ n: sinVer, texto: tn('pulso_vigilancia_avisos', sinVer), href: '/vigilancia' });
+        }
+        (vg && Array.isArray(vg.atencion) ? vg.atencion : []).forEach((a) => asuntos.push({ n: 1, texto: t(a.frase).replace('{x}', a.x || ''), href: '/vigilancia' }));
+        if (vg && vg.estado === 'atencion' && !asuntos.length) asuntos.push({ n: 1, texto: t('rg_pulso_vigilancia_estado'), href: '/vigilancia' });
+        const n = asuntos.reduce((a, x) => a + x.n, 0);
+        pulso = n
+          ? { ok: false, texto: t('rg_pulso_atencion_n').replace('{n}', numero(n)), asuntos, visto }
+          : { ok: true, texto: t('rg_pulso_protegido'), hora, asuntos: [] };
         const el = $('g-pulso');
         if (el) { el.classList.toggle('atencion', !pulso.ok); el.querySelector('span').textContent = pulso.texto; }
-        enlacePulso(pulso.href);
+        const pp = $('g-pulso-pop');
+        if (pp && !pp.hidden) pp.innerHTML = htmlPulso();
       };
-      // Seen once clicked: the notices it named stop counting (the page shows them all).
-      document.addEventListener('click', (ev) => {
-        const a = ev.target.closest && ev.target.closest('#g-pulso');
-        if (!a || !pulso || !pulso.visto) return;
-        api('/api/vigilancia/visto', { method: 'POST', body: { hasta: pulso.visto }, callado: true }).catch(() => {});
-      }, true);
       mira();
       cadaTanto(mira, 30000);
-    } else if (pulso) {
-      const el = $('g-pulso');
-      if (el) { el.classList.toggle('atencion', !pulso.ok); if (pulso.href) el.setAttribute('href', pulso.href); }
     }
   }
+  // The pill's card: «Todo en orden» with the last signal, or each issue with where it is.
+  function htmlPulso() {
+    if (!pulso) return `<p>${esc(t('rg_pulso_protegido'))}</p>`;
+    if (pulso.ok) return `<b>${esc(t('rg_pulso_ok_titulo'))}</b><p>${esc(t('rg_pulso_ok_texto').replace('{h}', pulso.hora || ''))}</p><a class="btn texto chico sigue" href="/estado">${esc(t('rg_pulso_ver_estado'))}</a>`;
+    return `<b>${esc(t('rg_pulso_at_titulo'))}</b><ul>${pulso.asuntos.map((a) => `<li><span>${esc(a.texto)}</span><a class="btn texto chico sigue" href="${esc(a.href)}">${esc(t('rg_ir'))}</a></li>`).join('')}</ul>`;
+  }
+  // ---- 1.0.46 radiografias-globo: the app shell (end) -----------------------------------------
 
   // ----- share card (brief §8): drawn in the browser, real figures, no names ----
   // The card people share. Until 1.0.2 its last row sat on top of the date, it used the system
@@ -1949,7 +2040,8 @@
     // the page loads before this one; here it gets the session, the texts and the language.
     async 'por-dentro'() {
       if (!window.GuardianaUniverso) return;
-      await window.GuardianaUniverso.iniciar({ api, t, tn, esc, LOC, LANG, cadaTanto, pdf: { pdfDocument, savePdfFile } });
+      // 1.0.46: the category names too, for the table's filter (R1-c).
+      await window.GuardianaUniverso.iniciar({ api, t, tn, esc, LOC, LANG, cadaTanto, pdf: { pdfDocument, savePdfFile }, categoria: (k) => (T.categorias && T.categorias[k]) || k });
     },
     // «Quién es cada destino» (1.0.45): its own script (identificacion.js), loaded before this one.
     async identificacion() {
@@ -3332,7 +3424,30 @@
     if (main2) main2.insertBefore(caja, main2.firstChild);
   }
 
+  // ---- 1.0.46 radiografias-globo: the language of the whole program (R10, begin) ----
+  // One choice for the whole program, kept by the service (GET/PUT /api/ajustes/idioma), English
+  // until the person picks another. This page remembers the last answer, so it opens in the
+  // right language at once; when the service says another (changed in ZERO, or in another
+  // window), the page, still hidden by arranque.js, reloads once in that language.
+  async function idiomaDelServicio() {
+    if (!token) return false;
+    try {
+      const r = await fetch('/api/ajustes/idioma', { headers: { 'X-Guardiana-Token': token } });
+      if (!r.ok) return false;
+      const j = await r.json();
+      // Until the person chooses, the page keeps its own start (English, or ZERO's installer language).
+      if (!j.elegido || !['en', 'es', 'pt'].includes(j.idioma) || j.idioma === LANG) return false;
+      try { localStorage.setItem('guardiana_lang', j.idioma); } catch (_) {}
+      if (sessionStorage.getItem('guardiana_idioma_recarga') === j.idioma) return false;
+      try { sessionStorage.setItem('guardiana_idioma_recarga', j.idioma); } catch (_) {}
+      location.reload();
+      return true;
+    } catch (_) { return false; }
+  }
+  // ---- 1.0.46 radiografias-globo: the language of the whole program (end) ----
+
   async function main() {
+    if (await idiomaDelServicio()) return;
     document.documentElement.lang = LANG;
     const previo = cached();
     if (previo) { T = previo; applyTexts(); }
