@@ -97,7 +97,7 @@ pub fn reabre(limpia: &str) -> String {
 /// them across frames can tell; decision 206 says so).
 #[must_use]
 pub fn guion_paginas() -> String {
-    GUION.to_string()
+    guion(Opciones::default())
 }
 
 /// The script of a mandate's tab: WebRTC and WebTransport turned off, then the same as every
@@ -107,7 +107,10 @@ pub fn guion_paginas() -> String {
 /// GUARDIANA ZERO does not see, and the receipt says so (review of 10 Oct 2026, grave 4).
 #[must_use]
 pub fn guion_mandato() -> String {
-    format!("{APAGA_CONEXIONES}\n{GUION}")
+    guion(Opciones {
+        mandato: true,
+        ..Opciones::default()
+    })
 }
 
 const APAGA_CONEXIONES: &str = r#"(() => {
@@ -138,13 +141,68 @@ const APAGA_CONEXIONES: &str = r#"(() => {
   }
 })();"#;
 
-const GUION: &str = r#"(() => {
+/// Global Privacy Control in the page (`navigator.globalPrivacyControl`): the person does not
+/// want their data sold or shared. On unless the person turns it off (1.0.46); the shell sends
+/// `Sec-GPC: 1` with it.
+const GPC: &str = r#"(() => {
   'use strict';
-  // Global Privacy Control: the person does not want their data sold or shared.
   try {
     Object.defineProperty(Navigator.prototype, 'globalPrivacyControl', { get: () => true, configurable: true, enumerable: true });
   } catch (_) {}
+})();"#;
+
+/// What the script of a tab carries, decided when the tab opens (a page never sees a value
+/// change under it).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Opciones {
+    /// A mandate's tab: WebRTC and WebTransport off first.
+    pub mandato: bool,
+    /// Global Privacy Control.
+    pub gpc: bool,
+    /// «Huella uniforme» (1.0.46, strict mode): the same generic values for every site.
+    pub uniforme: bool,
+}
+
+impl Default for Opciones {
+    fn default() -> Self {
+        Self {
+            mandato: false,
+            gpc: true,
+            uniforme: false,
+        }
+    }
+}
+
+/// The script of a tab with these options.
+#[must_use]
+pub fn guion(o: Opciones) -> String {
+    let mut s = String::new();
+    if o.mandato {
+        s.push_str(APAGA_CONEXIONES);
+        s.push('\n');
+    }
+    if o.gpc {
+        s.push_str(GPC);
+        s.push('\n');
+    }
+    if o.uniforme {
+        s.push_str(&GUION.replacen(UNIFORME_NO, UNIFORME_SI, 1));
+    } else {
+        s.push_str(GUION);
+    }
+    s
+}
+
+/// The switch of the strict mode inside the script, as written and when on.
+const UNIFORME_NO: &str = "const uniforme = false;";
+const UNIFORME_SI: &str = "const uniforme = true;";
+
+const GUION: &str = r#"(() => {
+  'use strict';
   if (location.origin === 'https://zero.guardiana') return;
+  // «Huella uniforme» (1.0.46): written `true` here when the person turned the strict mode on
+  // before the tab opened (`guion`).
+  const uniforme = false;
   // Frames get this script too (WebView2 runs it in «all future top level document and child
   // frame navigations»): there it only measures, and protects, on the frame's own channel.
   const marco = window.top !== window;
@@ -222,6 +280,66 @@ const GUION: &str = r#"(() => {
     };
     const lector = (o, k) => { const d = o && Object.getOwnPropertyDescriptor(o, k); return d && d.get; };
     const escritor = (o, k) => { const d = o && Object.getOwnPropertyDescriptor(o, k); return d && d.set; };
+    // A read whose answer is replaced (strict mode only): the original getter is still called
+    // first, and keeps its name, length and native text.
+    const cambiaLector = (o, k, f) => {
+      const d = o && Object.getOwnPropertyDescriptor(o, k);
+      if (!d || typeof d.get !== 'function') return;
+      const g = new Px(d.get, { apply: (f0, ese, a) => { const r = R(f0, ese, a); try { return f(r, ese); } catch (_) { return r; } } });
+      originales.set(g, d.get);
+      Object.defineProperty(o, k, { get: g });
+    };
+    // «Huella uniforme» (1.0.46, strict mode, off unless the person turns it on): the values a
+    // page reads to tell this computer apart come back the same as on many others, for every
+    // script of every site. The screen in four common sizes (and the whole screen as available),
+    // 24-bit colour, 4 processors, 8 GB, one language, no high-precision system details from the
+    // browser's client hints, no motion, orientation, light or battery sensors, and a generic
+    // graphics card (below). What stays real, and the settings page says so: the time zone (pages
+    // would show wrong hours), the pixel ratio (CSS reveals it anyway), the fonts installed, the
+    // address the server sees, and the canvas, which gets the per-site noise instead.
+    if (uniforme) {
+      try {
+        const SP = window.Screen && Screen.prototype;
+        const ancho0 = lector(SP, 'width');
+        const alto0 = lector(SP, 'height');
+        const tam = () => {
+          const w = ancho0 ? R(ancho0, window.screen, []) : 1920;
+          if (w >= 1920) return [1920, 1080];
+          if (w >= 1536) return [1536, 864];
+          if (w >= 1366) return [1366, 768];
+          return [1280, 720];
+        };
+        if (alto0) {
+          cambiaLector(SP, 'width', () => tam()[0]);
+          cambiaLector(SP, 'availWidth', () => tam()[0]);
+          cambiaLector(SP, 'height', () => tam()[1]);
+          cambiaLector(SP, 'availHeight', () => tam()[1]);
+          cambiaLector(SP, 'availLeft', () => 0);
+          cambiaLector(SP, 'availTop', () => 0);
+          cambiaLector(SP, 'colorDepth', () => 24);
+          cambiaLector(SP, 'pixelDepth', () => 24);
+        }
+        const NP = window.Navigator && Navigator.prototype;
+        cambiaLector(NP, 'hardwareConcurrency', () => 4);
+        cambiaLector(NP, 'deviceMemory', () => 8);
+        const idioma0 = lector(NP, 'language');
+        if (idioma0) {
+          const una = Object.freeze([String(R(idioma0, navigator, []) || 'en-US')]);
+          cambiaLector(NP, 'languages', () => una);
+        }
+        const UA = window.NavigatorUAData && NavigatorUAData.prototype;
+        const marcas = lector(UA, 'brands');
+        const movil = lector(UA, 'mobile');
+        const plataforma = lector(UA, 'platform');
+        if (marcas && movil && plataforma) {
+          envuelve(UA, 'getHighEntropyValues', () => (f, ese) => Promise.resolve({ brands: R(marcas, ese, []), mobile: R(movil, ese, []), platform: R(plataforma, ese, []) }));
+        }
+        for (const k of ['DeviceMotionEvent', 'DeviceOrientationEvent', 'DeviceOrientationAbsoluteEvent', 'Accelerometer', 'LinearAccelerationSensor', 'GravitySensor', 'Gyroscope', 'Magnetometer', 'AbsoluteOrientationSensor', 'RelativeOrientationSensor', 'AmbientLightSensor']) {
+          try { delete window[k]; } catch (_) {}
+        }
+        if (NP && 'getBattery' in NP) { try { delete NP.getBattery; } catch (_) {} }
+      } catch (_) {}
+    }
     // The web addresses on the stack, closest first, without the trap's own frames (V8's
     // captureStackTrace starts below `desde`), their line numbers or their queries.
     const pila = (desde) => {
@@ -392,9 +510,9 @@ const GUION: &str = r#"(() => {
       envuelve(G.prototype, 'getParameter', (ctx, a, desde) => {
         const p = a[0];
         if (p !== 0x9245 && p !== 0x9246) return undefined;
-        if (proteccion === false) { apunta('webgl', desde, false); return undefined; }
+        if (proteccion === false && !uniforme) { apunta('webgl', desde, false); return undefined; }
         const u = pila(desde);
-        if (!ajeno(u)) { apunta('webgl', desde, false, u); return undefined; }
+        if (!ajeno(u) && !uniforme) { apunta('webgl', desde, false, u); return undefined; }
         return (f, ese, args) => {
           const r = R(f, ese, args);
           const otro = typeof r === 'string';
@@ -628,9 +746,224 @@ const GUION: &str = r#"(() => {
     }
     return out;
   };
+  // «Tu visita, a subasta» (1.0.46): the page's own auction program, read in the page (this is
+  // the person's browser and the page runs on their computer). Prebid.js tells its own events to
+  // whoever asks (`onEvent`, `getEvents`): the companies asked, the slots, the bids and their
+  // CPM, the winner, the time limit. Only the *names* of the fields of the request are taken
+  // (`device.ua`, never the browser it says), the names of the identifier systems (`id5-sync.com`,
+  // never an identifier) and whether a consent string went (never the string). Amazon's `apstag`
+  // and Google's `googletag` are only noticed: their auctions run on their servers. Nothing is
+  // changed in the page, and everything goes only to the browser.
+  const pideFuera = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
+  let leeAdsTxt = () => {};
+  try {
+    const W = window;
+    const ya = Date.now;
+    const luego = W.setTimeout.bind(W);
+    const U3 = URL;
+    const enganchados = new WeakSet();
+    const encolados = new WeakSet();
+    const porSubasta = new Map();
+    let enviadas = 0;
+    const avisa = (m) => { if (enviadas++ < 150) manda(Object.assign({ tipo: 'zg_subasta', zg: yo }, m)); };
+    const nombreDe = (u) => { try { return new U3(String(u), location.href).hostname.toLowerCase().slice(0, 120); } catch (_) { return ''; } };
+    const CLAVE = /^[A-Za-z0-9_]{1,30}$/;
+    const rutas = (o, pre, out, prof) => {
+      if (!o || typeof o !== 'object' || out.size >= 80) return;
+      for (const k of Object.keys(o).slice(0, 40)) {
+        if (!CLAVE.test(k)) continue;
+        const p = pre ? pre + '.' + k : k;
+        const v = o[k];
+        if (v && typeof v === 'object' && !Array.isArray(v) && prof < 3) rutas(v, p, out, prof + 1);
+        else out.add(p);
+      }
+    };
+    const sub = (id) => {
+      if (id == null) return null;
+      const k = String(id).slice(0, 64);
+      let s = porSubasta.get(k);
+      if (!s) {
+        if (porSubasta.size > 40) return null;
+        s = { ini: 0, limite: 0, espacios: new Set(), pujadores: new Map(), campos: new Set(), ids: new Set(), cons: { tcf: false, usp: false, gpp: false }, vend: new Set(), avisos: new Set(), fin: false };
+        porSubasta.set(k, s);
+      }
+      return s;
+    };
+    const pujador = (s, c) => {
+      c = String(c || '').slice(0, 40);
+      if (!/^[A-Za-z0-9_-]+$/.test(c)) return null;
+      let p = s.pujadores.get(c);
+      if (!p) {
+        if (s.pujadores.size >= 60) return null;
+        p = { c, n: 0, pujas: [], nb: false, to: false };
+        s.pujadores.set(c, p);
+      }
+      return p;
+    };
+    const pedido = (s, r) => {
+      const p = pujador(s, r && r.bidderCode);
+      if (!p) return;
+      const bids = Array.isArray(r.bids) ? r.bids : [];
+      p.n += bids.length || 1;
+      for (const b of bids.slice(0, 50)) {
+        if (!b) continue;
+        if (b.adUnitCode != null && s.espacios.size < 500) s.espacios.add(String(b.adUnitCode).slice(0, 100));
+        for (const e of (Array.isArray(b.userIdAsEids) ? b.userIdAsEids : []).slice(0, 40)) if (e && typeof e.source === 'string') s.ids.add(e.source.slice(0, 120));
+        const o2 = b.ortb2 && b.ortb2.source && b.ortb2.source.ext;
+        const sc = b.schain || (o2 && o2.schain);
+        if (sc && Array.isArray(sc.nodes)) for (const nd of sc.nodes.slice(0, 10)) if (nd && typeof nd.asi === 'string') s.vend.add(nd.asi.slice(0, 120));
+      }
+      if (r.ortb2 && typeof r.ortb2 === 'object') rutas(r.ortb2, '', s.campos, 0);
+      const g = r.gdprConsent;
+      if (g && typeof g.consentString === 'string' && g.consentString) s.cons.tcf = true;
+      if (typeof r.uspConsent === 'string' && r.uspConsent) s.cons.usp = true;
+      const gp = r.gppConsent;
+      if (gp && typeof gp.gppString === 'string' && gp.gppString) s.cons.gpp = true;
+    };
+    const puja = (s, b) => {
+      const p = pujador(s, b && (b.bidderCode || b.bidder));
+      if (!p) return;
+      const cpm = Number(b.cpm);
+      if (isFinite(cpm) && cpm >= 0 && p.pujas.length < 50) p.pujas.push({ cpm: Math.round(cpm * 1000) / 1000, moneda: String(b.currency || '').slice(0, 3) });
+      for (const k of ['burl', 'nurl']) if (typeof b[k] === 'string') { const h = nombreDe(b[k]); if (h) s.avisos.add(h); }
+    };
+    const EV = {
+      auctionInit: (a) => {
+        const s = sub(a && a.auctionId);
+        if (!s) return;
+        s.ini = Number(a.timestamp) || ya();
+        s.limite = Number(a.timeout) || 0;
+        for (const u of (Array.isArray(a.adUnitCodes) ? a.adUnitCodes : []).slice(0, 200)) s.espacios.add(String(u).slice(0, 100));
+      },
+      bidRequested: (r) => { const s = sub(r && r.auctionId); if (s && !s.fin) pedido(s, r); },
+      bidResponse: (b) => { const s = sub(b && b.auctionId); if (s && !s.fin) puja(s, b); },
+      noBid: (b) => { const s = sub(b && b.auctionId); const p = s && pujador(s, b.bidder || b.bidderCode); if (p) p.nb = true; },
+      bidTimeout: (l) => {
+        for (const b of (Array.isArray(l) ? l : []).slice(0, 300)) {
+          const s = sub(b && b.auctionId);
+          const p = s && pujador(s, b.bidder || b.bidderCode);
+          if (p) p.to = true;
+        }
+      },
+      auctionEnd: (a) => {
+        const id = a && a.auctionId;
+        const s = sub(id);
+        if (!s || s.fin) return;
+        // Missed the events before (Prebid was already running): the end carries them all.
+        if (!s.pujadores.size) {
+          for (const r of (Array.isArray(a.bidderRequests) ? a.bidderRequests : []).slice(0, 60)) pedido(s, r);
+          for (const b of (Array.isArray(a.bidsReceived) ? a.bidsReceived : []).slice(0, 300)) puja(s, b);
+          for (const b of (Array.isArray(a.noBids) ? a.noBids : []).slice(0, 300)) { const p = pujador(s, b && (b.bidder || b.bidderCode)); if (p) p.nb = true; }
+          if (!s.ini) s.ini = Number(a.timestamp) || 0;
+          if (!s.limite) s.limite = Number(a.timeout) || 0;
+        }
+        s.fin = true;
+        if (!s.pujadores.size) return;
+        const fin = Number(a.auctionEnd) || ya();
+        avisa({ que: 'subasta', s: {
+          id: String(id).slice(0, 64),
+          ms: s.ini ? Math.max(0, Math.round(fin - s.ini)) : null,
+          limite: s.limite || null,
+          espacios: s.espacios.size,
+          pujadores: Array.from(s.pujadores.values()),
+          campos: Array.from(s.campos).slice(0, 80),
+          ids: Array.from(s.ids).slice(0, 40),
+          consentimiento: s.cons,
+          vendedores: Array.from(s.vend).slice(0, 20),
+          avisos: Array.from(s.avisos).slice(0, 20),
+        } });
+      },
+      bidWon: (b) => {
+        if (!b) return;
+        const cpm = Number(b.cpm);
+        if (!isFinite(cpm)) return;
+        avisa({ que: 'gana', id: String(b.auctionId == null ? '' : b.auctionId).slice(0, 64), c: String(b.bidderCode || b.bidder || '').slice(0, 40), cpm: Math.round(cpm * 1000) / 1000, moneda: String(b.currency || '').slice(0, 3) });
+      },
+    };
+    const programas = { prebid: null, apstag: false, gpt: false, gpt_espacios: 0, tcf: null };
+    let dichos2 = '';
+    const cuentaProgramas = () => {
+      const k = JSON.stringify(programas);
+      if (k === dichos2) return;
+      dichos2 = k;
+      avisa(Object.assign({ que: 'programas' }, programas));
+    };
+    const engancha = (pb) => {
+      if (!pb || (typeof pb !== 'object' && typeof pb !== 'function') || enganchados.has(pb)) return;
+      if (typeof pb.onEvent !== 'function') {
+        // Not loaded yet: its own queue runs this when it is.
+        if (Array.isArray(pb.que) && !encolados.has(pb.que)) { encolados.add(pb.que); try { pb.que.push(() => engancha(pb)); } catch (_) {} }
+        return;
+      }
+      enganchados.add(pb);
+      try {
+        if (typeof pb.getEvents === 'function') {
+          const lista = pb.getEvents();
+          for (const e of (Array.isArray(lista) ? lista : []).slice(-3000)) { const f = e && EV[e.eventType]; if (f) { try { f(e.args); } catch (_) {} } }
+        }
+      } catch (_) {}
+      for (const k of Object.keys(EV)) { try { pb.onEvent(k, (x) => { try { EV[k](x); } catch (_) {} }); } catch (_) {} }
+      try { programas.prebid = String(pb.version || '?').slice(0, 24); } catch (_) { programas.prebid = '?'; }
+      cuentaProgramas();
+    };
+    let vueltas = 0;
+    const mira = () => {
+      vueltas++;
+      try {
+        const nombres = ['pbjs'];
+        if (Array.isArray(W._pbjsGlobals)) for (const n of W._pbjsGlobals.slice(0, 5)) if (typeof n === 'string' && !nombres.includes(n)) nombres.push(n);
+        for (const n of nombres) engancha(W[n]);
+        const ap = W.apstag;
+        if (ap && typeof ap.fetchBids === 'function') programas.apstag = true;
+        const gt = W.googletag;
+        if (gt && typeof gt === 'object') {
+          programas.gpt = true;
+          try { if (gt.apiReady && typeof gt.pubads === 'function') programas.gpt_espacios = Math.min(200, gt.pubads().getSlots().length); } catch (_) {}
+        }
+        if (programas.tcf === null && typeof W.__tcfapi === 'function') {
+          programas.tcf = { gdpr: false };
+          try { W.__tcfapi('ping', 2, (r) => { try { programas.tcf = { gdpr: !!(r && r.gdprApplies) }; cuentaProgramas(); } catch (_) {} }); } catch (_) {}
+        }
+        if (programas.apstag || programas.gpt || programas.tcf) cuentaProgramas();
+      } catch (_) {}
+      // Half a second for the first 20 s of the page, then every 3 s up to the first minute.
+      if (vueltas < 40) luego(mira, 500); else if (vueltas < 54) luego(mira, 3000);
+    };
+    luego(mira, 0);
+    // What the site declares in its own `ads.txt`, only when the person asks (one request to the
+    // same site, without cookies): the advertising systems it names and how many lines are
+    // DIRECT or RESELLER.
+    leeAdsTxt = () => {
+      if (!pideFuera) return;
+      const no = () => avisa({ que: 'adstxt', hay: false });
+      try {
+        pideFuera('/ads.txt', { credentials: 'omit', cache: 'no-store' })
+          .then((r) => (r && r.ok && /text\/plain/i.test(r.headers.get('content-type') || '') ? r.text() : null))
+          .then((t) => {
+            if (typeof t !== 'string') { no(); return; }
+            const out = { que: 'adstxt', hay: true, lineas: 0, directos: 0, revendedores: 0, sistemas: [] };
+            const vistos3 = new Set();
+            for (const l of t.slice(0, 2000000).split(/\r?\n/)) {
+              const x = l.split('#')[0].trim();
+              if (!x || x.includes('=')) continue;
+              const c = x.split(',').map((y) => y.trim());
+              if (c.length < 3) continue;
+              out.lineas++;
+              const tipo = c[2].toUpperCase();
+              if (tipo === 'DIRECT') out.directos++; else if (tipo === 'RESELLER') out.revendedores++;
+              const d = c[0].toLowerCase();
+              if (/^[a-z0-9.-]+\.[a-z]{2,}$/.test(d) && vistos3.size < 300) vistos3.add(d);
+            }
+            out.sistemas = Array.from(vistos3);
+            avisa(out);
+          }, no);
+      } catch (_) { no(); }
+    };
+  } catch (_) {}
   escucha('message', (e) => {
     const m = e && e.data;
     if (!m || m.zg !== yo) return;
+    if (m.adstxt === true) { leeAdsTxt(); return; }
     if (m.huella !== undefined) pon(m.huella);
     if (m.emergentes !== undefined) { emergentes = m.emergentes === true; if (emergentes) ventanasDeLaPagina(); }
     if (m.cookies !== undefined) { if (m.cookies === true) avisosDeCookies(); return; }
@@ -927,10 +1260,56 @@ mod tests {
         assert!(marcos < g.find("HTMLFormElement.prototype").unwrap_or(0));
         assert!(marcos < g.find("zg_cookies_pide").unwrap_or(0));
         assert!(g.contains("tipo: 'zg_marco_pide'"));
-        // Navigator's properties (plugins, hardwareConcurrency, deviceMemory) are not touched.
-        for no in ["hardwareConcurrency", "deviceMemory", "'plugins'"] {
-            assert!(!g.contains(no), "{no}");
+        // Navigator's properties are not touched, except in the strict mode the person turns on
+        // (1.0.46): plugins never.
+        assert!(!g.contains("'plugins'"));
+        assert!(g.contains("const uniforme = false;") && !g.contains("const uniforme = true;"));
+        let fuera = g.find("if (uniforme) {").unwrap_or(0);
+        assert!(fuera > 0 && fuera < g.find("'hardwareConcurrency'").unwrap_or(0));
+    }
+
+    #[test]
+    fn the_options_of_a_tab_go_into_its_script() {
+        let sin_gpc = guion(Opciones {
+            gpc: false,
+            ..Opciones::default()
+        });
+        assert!(!sin_gpc.contains("globalPrivacyControl"));
+        let estricto = guion(Opciones {
+            uniforme: true,
+            ..Opciones::default()
+        });
+        assert!(estricto.contains("const uniforme = true;"));
+        assert!(estricto.contains("globalPrivacyControl"));
+        assert_eq!(guion(Opciones::default()), guion_paginas());
+    }
+
+    #[test]
+    fn the_page_script_reads_the_auction_without_values_or_names_a_page_can_find() {
+        let g = guion_paginas();
+        assert!(g.contains("tipo: 'zg_subasta'"));
+        for ev in [
+            "auctionInit",
+            "bidRequested",
+            "bidResponse",
+            "noBid",
+            "bidTimeout",
+            "auctionEnd",
+            "bidWon",
+        ] {
+            assert!(g.contains(&format!("{ev}:")), "{ev}");
         }
+        // Names of fields and identifier systems, whether a consent string went: never the
+        // string, never an identifier's value.
+        assert!(!g.contains("consentString.slice") && !g.contains("e.uid"));
+        assert!(
+            g.contains("typeof g.consentString === 'string' && g.consentString) s.cons.tcf = true")
+        );
+        // Only in the page itself, never in a frame, and ads.txt only when asked.
+        let marcos = g.find("if (marco) {").unwrap_or(usize::MAX);
+        assert!(marcos < g.find("'zg_subasta'").unwrap_or(0));
+        assert!(g.contains("if (m.adstxt === true) { leeAdsTxt(); return; }"));
+        assert!(!g.contains("__zg"));
     }
 
     #[test]

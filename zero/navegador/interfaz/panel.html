@@ -6,6 +6,8 @@
 <title>GUARDIANA ZERO</title>
 <link rel="stylesheet" href="diseno.css">
 <link rel="stylesheet" href="comun.css">
+<!-- 1.0.46 subastas-1.0.46: «Tu visita, a subasta» -->
+<link rel="stylesheet" href="subasta.css">
 <style>
 html, body { height: 100%; background: var(--hoja); }
 body { display: flex; flex-direction: column; border-left: 1px solid var(--linea); }
@@ -385,6 +387,27 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
     <input type="checkbox" class="interruptor" id="a-emergentes">
     <div><label for="a-emergentes" data-t="emergentes_ajuste"></label><p class="explica" data-t="emergentes_ajuste_explica"></p></div>
   </div>
+  <!-- 1.0.46 subastas-1.0.46: «No me subastes» y «Tus datos, sin valor» (subasta.js) -->
+  <h2 class="sub-ajustes-cab" data-t="sub_aj_titulo"></h2>
+  <div class="ajuste">
+    <input type="checkbox" class="interruptor" id="sub-a-subastas">
+    <div><label for="sub-a-subastas" data-t="sub_aj_subastas"></label><p class="explica" data-t="sub_aj_subastas_explica"></p></div>
+  </div>
+  <div class="ajuste">
+    <input type="checkbox" class="interruptor" id="sub-a-gpc">
+    <div><label for="sub-a-gpc" data-t="sub_aj_gpc"></label><p class="explica" data-t="sub_aj_gpc_explica"></p></div>
+  </div>
+  <div class="ajuste">
+    <input type="checkbox" class="interruptor" id="sub-a-ruido">
+    <div><label for="sub-a-ruido" data-t="sub_aj_ruido"></label><p class="explica" data-t="sub_aj_ruido_explica"></p></div>
+  </div>
+  <div class="ajuste">
+    <input type="checkbox" class="interruptor" id="sub-a-uniforme">
+    <div><label for="sub-a-uniforme" data-t="sub_aj_uniforme"></label><p class="explica" data-t="sub_aj_uniforme_explica"></p></div>
+  </div>
+  <p class="sub-ajuste-nota" data-t="sub_aj_ubicacion"></p>
+  <p class="sub-ajuste-nota oculto" id="sub-a-plus" data-t="sub_aj_plus"></p>
+  <!-- fin 1.0.46 subastas -->
   <div class="linea-ajuste"><span class="que"><span data-t="licencia_titulo"></span><span class="explica" id="a-licencia"></span></span><button class="boton chico" id="a-licencia-ver" data-t="licencia_abrir"></button></div>
   <div class="linea-ajuste"><span data-t="buscador"></span><select id="a-buscador" data-t-title="buscador"></select></div>
   <div class="linea-ajuste oculto" id="a-importar-caja"><span class="que"><span data-t="ajustes_favoritos"></span><span class="explica" data-t="ajustes_favoritos_explica"></span></span><span id="a-importar"></span></div>
@@ -456,5 +479,7 @@ table.sust td:first-child { font-family: var(--mono); width: 45%; }
 <script src="interruptor.js"></script>
 <script src="puente.js"></script>
 <script src="panel.js"></script>
+<!-- 1.0.46 subastas-1.0.46: fills #zero-subasta (window.ZeroSubasta) and the «Subastas y huella» settings -->
+<script src="subasta.js"></script>
 </body>
 </html>

@@ -37,6 +37,7 @@ use crate::mandato::{Mandato, Recurso};
 use crate::medidas::{self, Tecnica};
 use crate::paginas;
 use crate::recibo::{self, Recibo};
+use crate::subasta;
 use crate::tachon::{self, Sustitucion};
 use crate::textos::{Idioma, Textos};
 use crate::tinta::{self, Forma, Marcado, Tipo};
@@ -319,6 +320,16 @@ struct Preferencias {
     /// se puedan separar para que el cliente lo ponga a su gusto»): `guardiana`, `zero`,
     /// `secure`. Empty: the first order.
     orden_fijas: Vec<String>,
+    // --- 1.0.46 «Tus datos, sin valor» (subastas-1.0.46) ---------------------------------------
+    /// Global Privacy Control turned off by the person (on unless they do).
+    gpc_apagado: bool,
+    /// The fingerprint noise for other companies' scripts turned off by the person (on with the
+    /// protection unless they do; before 1.0.46 only with maximum protection).
+    huella_sin_ruido: bool,
+    /// «Huella uniforme», the strict mode: the same generic values for every site (off unless
+    /// the person turns it on; tabs opened after that).
+    huella_uniforme: bool,
+    // --- fin 1.0.46 ----------------------------------------------------------------------------
 }
 
 #[derive(Debug, Clone)]
@@ -367,6 +378,8 @@ struct Pestana {
     /// Pages this tab has shown: tells the panel when its shield starts again (a reload of the
     /// same site too), the only moment its rows are laid out anew.
     carga: u32,
+    /// «Tu visita, a subasta» (1.0.46): what this page showed of its ad auctions, in memory.
+    subasta: subasta::Pagina,
 }
 
 /// A sending the person approved: `clases` of data to `sitio`, until `hasta`.
@@ -420,6 +433,7 @@ impl Pestana {
             enlace: None,
             juzga_primera: false,
             carga: 0,
+            subasta: subasta::Pagina::default(),
         }
     }
 }
@@ -515,6 +529,9 @@ pub struct Sesion {
     /// This run's secret for the different values maximum protection gives to other companies'
     /// scripts (one seed per site and run, `medidas::semilla`). Never written anywhere.
     secreto: [u8; 32],
+    /// «Tu visita, a subasta» (1.0.46): auctions and distinct companies by day (`subastas.json`).
+    subastas: subasta::Diario,
+    subastas_sucio: bool,
 }
 
 fn lee<T: DeserializeOwned + Default>(ruta: &Path) -> T {
@@ -684,6 +701,7 @@ impl Sesion {
         let libro: Libro = lee(&a.datos.join("libro.json"));
         let favoritos: Favoritos = lee(&a.datos.join("favoritos.json"));
         let mut diario: Diario = lee(&a.datos.join("diario.json"));
+        let subastas_dia: subasta::Diario = lee(&a.datos.join("subastas.json"));
         while diario.dias.len() > 400 {
             diario.dias.pop_first();
         }
@@ -751,6 +769,8 @@ impl Sesion {
             licencia_ilegible: false,
             medidas: medidas::Total::default(),
             secreto: [0; 32],
+            subastas: subastas_dia,
+            subastas_sucio: false,
         };
         azar(&mut s.secreto);
         s.dia_visto = s.hoy();
@@ -848,11 +868,25 @@ impl Sesion {
     /// WebTransport turned off (see [`paginas::guion_mandato`]).
     #[must_use]
     pub fn guion_pestana(&self, id: u32) -> String {
-        if self.perfil_de(id) == Some(Perfil::Mandato) {
-            paginas::guion_mandato()
-        } else {
-            paginas::guion_paginas()
-        }
+        paginas::guion(paginas::Opciones {
+            mandato: self.perfil_de(id) == Some(Perfil::Mandato),
+            gpc: self.gpc(),
+            uniforme: self.huella_uniforme(),
+        })
+    }
+
+    /// Global Privacy Control goes with every request and in every page (on unless the person
+    /// turns it off, 1.0.46). The shell asks before setting `Sec-GPC: 1`.
+    #[must_use]
+    pub const fn gpc(&self) -> bool {
+        !self.prefs.gpc_apagado
+    }
+
+    /// The strict fingerprint mode is on (and the browser protects): new tabs get it, and the
+    /// shell sends only the first language in `Accept-Language`.
+    #[must_use]
+    pub const fn huella_uniforme(&self) -> bool {
+        self.prefs.huella_uniforme && self.licencia.protege()
     }
 
     /// How names are resolved to place the servers of names nobody owns (the shell gives the
@@ -1187,6 +1221,11 @@ impl Sesion {
         self.diario_sucio = false;
     }
 
+    fn guarda_subastas(&mut self) {
+        escribe_json(&self.datos.join("subastas.json"), &self.subastas);
+        self.subastas_sucio = false;
+    }
+
     fn guarda_cortes(&mut self) {
         if self.cortes_pend.is_empty() {
             return;
@@ -1431,7 +1470,9 @@ impl Sesion {
                 json!({ "antes": lado(&p.escudo.antes_aviso), "despues": lado(&p.escudo.tras_aviso) })
             }),
             // Global Privacy Control goes on every request that leaves (app.rs): the page got it.
-            "gpc": !es_interna(&p.url) && !p.escudo.sitio.is_empty(),
+            "gpc": self.gpc() && !es_interna(&p.url) && !p.escudo.sitio.is_empty(),
+            // «Tu visita, a subasta» (1.0.46): the side summary mounts it (`subasta.js`).
+            "subasta": self.msg_subasta(p),
             "emergentes": p.escudo.emergentes,
             "emergente": p.escudo.emergente.as_deref().and_then(host_de).map(|h| sitio(&h)),
             "molestas": p.escudo.molestas,
@@ -1509,6 +1550,13 @@ impl Sesion {
             "importar": favoritos::otros_navegadores().into_iter().map(|(n, _)| n).collect::<Vec<_>>(),
             "sin_preguntar": self.prefs.sin_preguntar,
             "huella_clave": self.huella_clave(),
+            // --- 1.0.46 (subastas-1.0.46) ---
+            "gpc": self.gpc(),
+            "subastas": !self.prefs.reglas.subastas_sin_cortar,
+            "huella_ruido": !self.prefs.huella_sin_ruido || self.prefs.reglas.maxima,
+            "huella_uniforme": self.prefs.huella_uniforme,
+            "subastas_permitidas": self.prefs.reglas.subastas_permitidas,
+            "sub_protege": self.licencia.protege(),
         })
     }
 
@@ -1986,7 +2034,14 @@ impl Sesion {
             Origen::Pestana(id) if !propia => {
                 return match tipo.as_str() {
                     "zg_formulario" => self.formulario(id, fuente, &m),
-                    "zg_cookies_pide" => self.cookies_pide(id, fuente, &m),
+                    "zg_cookies_pide" => {
+                        // The page script's token: to ask it for the site's ads.txt (1.0.46).
+                        if let Some(p) = self.pestana_mut(id) {
+                            p.subasta.zg = texto(&m, "zg").chars().take(64).collect();
+                        }
+                        self.cookies_pide(id, fuente, &m)
+                    }
+                    "zg_subasta" => self.subasta_mensaje(id, fuente, &m),
                     "zg_cookies" => self.cookies_hecho(id, &m),
                     "zg_enlace" => self.enlace(id, &m),
                     "zg_emergente" => self.emergente(id, &m),
@@ -2044,6 +2099,7 @@ impl Sesion {
                 | "tachon_pegar"
                 | "tinta_anadir"
                 | "carta"
+                | "subasta_carta"
         );
         if de_pago && !self.licencia.protege() {
             let mut o = self.abre_panel("licencia");
@@ -2054,6 +2110,52 @@ impl Sesion {
             return o;
         }
         match tipo {
+            // --- 1.0.46 «Tu visita, a subasta» (subastas-1.0.46) -------------------------------
+            "subasta_permitir" => {
+                let web = sitio(texto(m, "sitio"));
+                if web.is_empty() || web.len() > 253 {
+                    return Vec::new();
+                }
+                let r = &mut self.prefs.reglas;
+                if si(m, "permitir") {
+                    if r.subastas_permitidas.len() < 2000 {
+                        r.subastas_permitidas.insert(web);
+                    }
+                } else {
+                    r.subastas_permitidas.remove(&web);
+                }
+                self.guarda_prefs();
+                let mut o = vec![envia(Origen::Panel, &self.msg_ajustes())];
+                o.extend(self.escudo_activa(true));
+                o
+            }
+            // An opt-out page of an identifier system or a declared seller's sellers.json, from
+            // the side summary: only an https address, in a new tab.
+            "subasta_abrir" => {
+                let url = texto(m, "url");
+                let valida = url::Url::parse(url).is_ok_and(|u| {
+                    u.scheme() == "https" && u.username().is_empty() && u.password().is_none()
+                });
+                if !valida || url.len() > 300 {
+                    return Vec::new();
+                }
+                self.nueva_pestana(Perfil::General, url)
+            }
+            "subasta_recibo" => self.subasta_recibo(origen),
+            "subasta_carta" => self.subasta_carta(origen, m),
+            "subasta_adstxt" => {
+                let Some(p) = self.pestana(activa) else {
+                    return Vec::new();
+                };
+                if p.subasta.zg.is_empty() || es_interna(&p.url) {
+                    return Vec::new();
+                }
+                vec![Orden::RespondeFormulario {
+                    id: activa,
+                    json: json!({ "zg": p.subasta.zg, "adstxt": true }).to_string(),
+                }]
+            }
+            // --- fin 1.0.46 ------------------------------------------------------------------
             "licencia_activar" => {
                 if self.licencia_ocupada {
                     return Vec::new();
@@ -2412,6 +2514,21 @@ impl Sesion {
                 o.extend(self.hoy_a_todos());
                 o
             }
+            // --- 1.0.46 «No me subastes» y «Tus datos, sin valor» (subastas-1.0.46) ----------
+            "subastas" | "gpc" | "huella_ruido" | "huella_uniforme" => {
+                let v = valor.as_bool().unwrap_or(clave != "huella_uniforme");
+                match clave {
+                    "subastas" => self.prefs.reglas.subastas_sin_cortar = !v,
+                    "gpc" => self.prefs.gpc_apagado = !v,
+                    "huella_ruido" => self.prefs.huella_sin_ruido = !v,
+                    _ => self.prefs.huella_uniforme = v,
+                }
+                self.guarda_prefs();
+                let mut o = vec![envia(Origen::Panel, &self.msg_ajustes())];
+                o.extend(self.escudo_activa(false));
+                o
+            }
+            // --- fin 1.0.46 ------------------------------------------------------------------
             "buscador" => {
                 let id = valor.as_str().unwrap_or("");
                 if BUSCADORES.iter().any(|b| b.id == id) {
@@ -3408,6 +3525,262 @@ impl Sesion {
 
     // --- the form guard ------------------------------------------------------------------------
 
+    // --- 1.0.46 «Tu visita, a subasta» (subastas-1.0.46) ---------------------------------------
+
+    /// A request of a tab while the browser does not protect (Free): only the auction view
+    /// learns from it; nothing is cut, counted elsewhere or written but the day's two figures.
+    fn subasta_sin_proteccion(&mut self, id: u32, url: &str) {
+        let Ok(dir) = url::Url::parse(url) else {
+            return;
+        };
+        let host = dir
+            .host_str()
+            .map(crate::dominio::normaliza_host)
+            .unwrap_or_default();
+        if host.is_empty() {
+            return;
+        }
+        let hoy = self.hoy();
+        let destino = crate::destino::clasifica_en(&host, dir.path());
+        let Some(p) = self.pestanas.iter_mut().find(|p| p.id == id) else {
+            return;
+        };
+        let otro = !destino.sitio.is_empty() && destino.sitio != p.subasta.sitio;
+        if p.subasta
+            .anota_peticion(&dir, &host, otro, destino.sigue(), false)
+        {
+            if p.perfil != Perfil::Aislada {
+                self.subastas.empresa(&hoy, &destino.sitio);
+                self.subastas_sucio = true;
+            }
+            self.sucios.insert(id);
+        }
+    }
+
+    /// A report of the page script about the page's auction (`zg_subasta`), from the page the
+    /// tab shows now and with that page's token.
+    fn subasta_mensaje(&mut self, id: u32, fuente: &str, m: &Value) -> Vec<Orden> {
+        let ahora = (self.reloj)();
+        let hoy = self.hoy();
+        let web = host_de(fuente).map(|h| sitio(&h)).unwrap_or_default();
+        let zg: String = texto(m, "zg").chars().take(64).collect();
+        let Some(p) = self.pestanas.iter_mut().find(|p| p.id == id) else {
+            return Vec::new();
+        };
+        if web.is_empty() || web != p.subasta.sitio || zg.is_empty() {
+            return Vec::new();
+        }
+        if p.subasta.zg.is_empty() {
+            p.subasta.zg = zg;
+        } else if p.subasta.zg != zg {
+            return Vec::new();
+        }
+        let aislada = p.perfil == Perfil::Aislada;
+        if let Some(s) = p.subasta.anota_mensaje(m, ahora) {
+            if !aislada {
+                let pagina = &p.subasta;
+                self.subastas
+                    .anota(&hoy, &s, |x| pagina.estado_de(x) == "cortada");
+                self.subastas_sucio = true;
+            }
+        }
+        self.sucios.insert(id);
+        Vec::new()
+    }
+
+    /// The page's auction for the side summary, with the day's and the week's figures and what
+    /// «No me subastes» does on this web now.
+    fn msg_subasta(&self, p: &Pestana) -> Value {
+        let ahora = (self.reloj)();
+        let hoy = self.hoy();
+        let semana = fecha::dia_antes(ahora, self.zona, 6);
+        let r = &self.prefs.reglas;
+        let protege = self.licencia.protege();
+        let mut v = p.subasta.vista();
+        if let Some(o) = v.as_object_mut() {
+            o.insert("hoy".into(), self.subastas.suma(&hoy, &hoy));
+            o.insert("semana".into(), self.subastas.suma(&semana, &hoy));
+            o.insert("protege".into(), json!(protege));
+            o.insert(
+                "activo".into(),
+                json!(protege && r.cortar_seguimiento && !r.subastas_sin_cortar),
+            );
+            o.insert(
+                "corta".into(),
+                json!(protege && r.corta_subastas(&p.subasta.sitio)),
+            );
+            o.insert(
+                "permitida".into(),
+                json!(r.subastas_permitidas.contains(&p.subasta.sitio)),
+            );
+            o.insert("gpc".into(), json!(self.gpc()));
+            o.insert("aislada".into(), json!(p.perfil == Perfil::Aislada));
+        }
+        v
+    }
+
+    /// The signed receipt of the page's auction, saved in Downloads.
+    fn subasta_recibo(&mut self, origen: Origen) -> Vec<Orden> {
+        let Some(p) = self.pestana(self.activa) else {
+            return Vec::new();
+        };
+        if p.subasta.sitio.is_empty() || p.subasta.vacia() {
+            return Vec::new();
+        }
+        let contenido = p.subasta.recibo(&self.version, (self.reloj)()).to_string();
+        let base = format!(
+            "guardiana-zero-subasta-{}-{}",
+            p.subasta.sitio.replace('.', "-"),
+            self.hoy()
+        );
+        let ruta = self.nombre_libre(&base, "json");
+        let firmado = self
+            .clave_recibos()
+            .and_then(|k| recibo::firma(&k, contenido).ok());
+        let v = match firmado.map(|r| escribe_json_ok(&ruta, &r)) {
+            Some(true) => {
+                let r = ruta.display().to_string();
+                json!({ "tipo": "sub_recibo", "ruta": r, "texto": self.tf("sub_recibo_guardado", &[("ruta", &r), ("huella", &self.huella_clave())]) })
+            }
+            _ => json!({ "tipo": "sub_recibo", "ruta": "", "texto": self.t("guardar_error") }),
+        };
+        vec![envia(origen, &v)]
+    }
+
+    /// A letter to a company this page showed in its auction: access (GDPR art. 15), objection
+    /// and erasure (GDPR art. 21 and 17), or Colombia's Habeas Data (Ley 1581). With what was
+    /// seen, in the language the company must answer in. The person sends it; ZERO never does.
+    fn subasta_carta(&self, origen: Origen, m: &Value) -> Vec<Orden> {
+        let Some(tipo) = subasta::Carta::de(texto(m, "carta")) else {
+            return Vec::new();
+        };
+        let Some(p) = self.pestana(self.activa) else {
+            return Vec::new();
+        };
+        let pag = &p.subasta;
+        let objetivo = sitio(texto(m, "sitio"));
+        if objetivo.is_empty() || pag.sitio.is_empty() {
+            return Vec::new();
+        }
+        let pujador: Vec<&subasta::Pujador> = pag
+            .subastas
+            .iter()
+            .flat_map(|s| s.pujadores.iter())
+            .filter(|x| x.sitio.as_deref() == Some(objetivo.as_str()))
+            .collect();
+        let empresa = pag.empresas.get(&objetivo);
+        let quien = match (pujador.first(), empresa) {
+            (Some(x), _) => x.quien.clone(),
+            (None, Some(e)) => e.quien.clone(),
+            (None, None) => return Vec::new(),
+        };
+        let t = match tipo {
+            subasta::Carta::Habeas => Textos::de(Idioma::Es),
+            _ => self.textos,
+        };
+        let fecha = self.hoy();
+        let mut hechos: Vec<String> = Vec::new();
+        let peticiones: u32 = pujador.iter().map(|x| x.peticiones).sum();
+        if peticiones > 0 {
+            hechos.push(
+                t.t("sub_carta_hecho_peticiones")
+                    .replace("{n}", &peticiones.to_string()),
+            );
+            let campos: BTreeSet<&String> = pag
+                .subastas
+                .iter()
+                .filter(|s| {
+                    s.pujadores
+                        .iter()
+                        .any(|x| x.sitio.as_deref() == Some(objetivo.as_str()))
+                })
+                .flat_map(|s| s.campos.iter())
+                .collect();
+            if !campos.is_empty() {
+                let lista: Vec<&str> = campos.iter().map(|c| c.as_str()).collect();
+                hechos.push(
+                    t.t("sub_carta_hecho_campos")
+                        .replace("{campos}", &lista.join(", ")),
+                );
+            }
+            let ids: BTreeSet<&String> = pag.subastas.iter().flat_map(|s| s.ids.iter()).collect();
+            if !ids.is_empty() {
+                let lista: Vec<&str> = ids.iter().map(|c| c.as_str()).collect();
+                hechos.push(
+                    t.t("sub_carta_hecho_ids")
+                        .replace("{ids}", &lista.join(", ")),
+                );
+            }
+        }
+        if empresa.is_some_and(|e| e.papeles.contains("sincroniza")) {
+            hechos.push(t.t("sub_carta_hecho_sincroniza"));
+        }
+        let cortada = match (pujador.first(), empresa) {
+            (Some(x), _) => pag.estado_de(x) == "cortada",
+            (None, Some(e)) => e.peticiones > 0 && e.cortadas >= e.peticiones,
+            _ => false,
+        };
+        hechos.push(t.t(if cortada {
+            "sub_carta_hecho_cortada"
+        } else {
+            "sub_carta_hecho_salio"
+        }));
+        let hechos = hechos
+            .iter()
+            .map(|h| format!("- {h}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let primero = |ti: Tipo| {
+            self.tinta
+                .iter()
+                .find(|x| x.tipo == ti)
+                .map(|x| x.valor.clone())
+                .unwrap_or_default()
+        };
+        let vacio = t.t("carta_hueco");
+        let nombre = dicho(texto(m, "nombre"), || primero(Tipo::Nombre));
+        let correo = dicho(texto(m, "correo"), || primero(Tipo::Correo));
+        let recibo_txt = t
+            .t("sub_carta_recibo")
+            .replace("{huella}", &self.huella_clave());
+        let huecos = [
+            ("empresa", quien.as_str()),
+            ("web", pag.sitio.as_str()),
+            ("fecha", fecha.as_str()),
+            ("hechos", hechos.as_str()),
+            ("recibo", recibo_txt.as_str()),
+            (
+                "nombre",
+                if nombre.is_empty() {
+                    vacio.as_str()
+                } else {
+                    nombre.as_str()
+                },
+            ),
+            (
+                "correo",
+                if correo.is_empty() {
+                    vacio.as_str()
+                } else {
+                    correo.as_str()
+                },
+            ),
+        ];
+        let clave = tipo.clave();
+        vec![envia(
+            origen,
+            &json!({
+                "tipo": "sub_carta",
+                "sitio": objetivo,
+                "carta": clave,
+                "asunto": subasta::rellena(&t.t(&format!("sub_carta_{clave}_asunto")), &huecos),
+                "cuerpo": subasta::rellena(&t.t(&format!("sub_carta_{clave}_cuerpo")), &huecos),
+            }),
+        )]
+    }
+
+    // --- fin 1.0.46 ------------------------------------------------------------------------------
+
     /// A web page's guard asks whether to deal with cookie notices: yes with the subscription on
     /// and the setting on. The answer goes on the guard's own channel, like a form's.
     /// The same answer carries what maximum protection gives other companies' scripts on this
@@ -3434,7 +3807,12 @@ impl Sesion {
     /// `null` otherwise: nothing changes.
     fn proteccion_huella(&self, id: u32, fuente: &str) -> Value {
         let r = &self.prefs.reglas;
-        if !(self.licencia.protege() && r.cortar_seguimiento && r.maxima) {
+        // 1.0.46: on with the protection unless the person turned the noise off; maximum
+        // protection always has it.
+        if !(self.licencia.protege()
+            && r.cortar_seguimiento
+            && (r.maxima || !self.prefs.huella_sin_ruido))
+        {
             return Value::Null;
         }
         let Some(p) = self.pestana(id) else {
@@ -3926,6 +4304,7 @@ impl Sesion {
             "tinta.json",
             "libro.json",
             "diario.json",
+            "subastas.json",
             "clave-recibos.p8",
             "registro.txt",
         ] {
@@ -3939,6 +4318,7 @@ impl Sesion {
         self.tinta.clear();
         self.libro = Libro::default();
         self.diario = Diario::default();
+        self.subastas = subasta::Diario::default();
         self.medidas = medidas::Total::default();
         self.mandato = None;
         self.terminado = None;
@@ -4070,6 +4450,7 @@ impl Sesion {
         p.url = url.to_string();
         p.al_libro.clear();
         p.escudo = escudo::Pestana::nueva(&s);
+        p.subasta = subasta::Pagina::nueva(&s);
         p.carga = p.carga.wrapping_add(1);
         p.escudo.parametros_quitados = quitados;
         if !es_interna(url) {
@@ -4382,7 +4763,11 @@ impl Sesion {
             .any(|e| url.starts_with(e));
         if !web || es_interna(url) || !self.licencia.protege() {
             // Without the trial or a subscription the browser opens pages and does nothing of
-            // its own: no cut, no cleaning, no count.
+            // its own: no cut, no cleaning, no count. It still shows the page's ad auction
+            // (1.0.46: the auction view is in every plan); nothing of it is cut.
+            if web && !es_interna(url) {
+                self.subasta_sin_proteccion(id, url);
+            }
             return Respuesta::default();
         }
         let ahora = (self.reloj)();
@@ -4496,6 +4881,14 @@ impl Sesion {
         }
         let p = &mut self.pestanas[i];
         p.escudo.anota(&d);
+        // «Tu visita, a subasta» (1.0.46): the auction's companies and crossings of identifiers.
+        let empresa_subasta = dir.as_ref().and_then(|u| {
+            let otro = !d.destino.sitio.is_empty() && d.destino.sitio != p.subasta.sitio;
+            let publicidad = d.destino.sigue() || d.lista.is_some();
+            p.subasta
+                .anota_peticion(u, &host, otro, publicidad, d.cortar)
+                .then(|| d.destino.sitio.clone())
+        });
         // Code of another company that will run on the page: later requests say it was there.
         if recurso == Recurso::Script && d.de_fuera() && !d.cortar {
             p.escudo.anota_codigo(d.destino.quien());
@@ -4528,6 +4921,10 @@ impl Sesion {
         // The person's own webs of the day: not an isolated tab, and not the AI's mandate tab.
         let web = (perfil == Perfil::General && !es_interna(&p.url) && !p.escudo.sitio.is_empty())
             .then(|| p.escudo.sitio.clone());
+        if let (Some(s), false) = (&empresa_subasta, aislada) {
+            self.subastas.empresa(&hoy, s);
+            self.subastas_sucio = true;
+        }
         if !aislada {
             self.diario.anota(&hoy, &d, web.as_deref());
             if let Some((red, evento, true)) = chivato {
@@ -4786,6 +5183,9 @@ impl Sesion {
             if self.diario_sucio {
                 self.guarda_diario();
             }
+            if self.subastas_sucio {
+                self.guarda_subastas();
+            }
             self.guarda_cortes();
             if self.libro_sucio {
                 self.guarda_libro();
@@ -4849,6 +5249,7 @@ impl Sesion {
         }
         self.guarda_cortes();
         self.guarda_diario();
+        self.guarda_subastas();
         self.guarda_libro();
         self.guarda_prefs();
     }

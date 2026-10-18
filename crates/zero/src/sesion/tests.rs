@@ -3581,3 +3581,192 @@ fn a_key_typed_in_guardianas_panel_is_kept_for_the_browser_too() {
     );
     assert!(s.clave_del_panel.is_none());
 }
+
+// --- 1.0.46 «Tu visita, a subasta» (subastas-1.0.46) ------------------------------------------
+
+/// The auction of eltiempo.com on 18 Oct 2026, as the page script reports it («Datos de
+/// ejemplo» built from that test): two of its six bidders are enough here.
+fn subasta_eltiempo(zg: &str) -> String {
+    json!({ "tipo": "zg_subasta", "zg": zg, "que": "subasta", "s": {
+        "id": "a1", "ms": 1300, "limite": 1300, "espacios": 4,
+        "pujadores": [ { "c": "criteo", "n": 4, "nb": true }, { "c": "teads", "n": 4, "nb": true } ],
+        "campos": ["site.page", "device.ua", "regs.ext.gdpr"],
+        "consentimiento": { "tcf": true }
+    } })
+    .to_string()
+}
+
+#[test]
+fn the_auction_of_a_page_is_seen_cut_and_counted_for_the_day() {
+    let (mut s, _, id) = con_pagina(true);
+    let web = "https://www.eltiempo.com/";
+    // The page's own Prebid.js and a bid request to another company: cut.
+    assert!(
+        s.peticion(
+            id,
+            "https://www.eltiempo.com/static/js/prebid11.12.min.js",
+            "GET",
+            b"",
+            6
+        )
+        .cortar
+    );
+    assert!(
+        s.peticion(
+            id,
+            "https://grid-bidder.criteo.com/openrtb_2_5/pbjs/auction/request",
+            "POST",
+            b"{}",
+            8
+        )
+        .cortar
+    );
+    let o = s.mensaje(Origen::Pestana(id), web, &subasta_eltiempo("z1"));
+    assert!(o.is_empty());
+    // Another token for the same page is not that page's script: ignored.
+    let _ = s.mensaje(Origen::Pestana(id), web, &subasta_eltiempo("otro"));
+    // From another site: ignored.
+    let _ = s.mensaje(
+        Origen::Pestana(id),
+        "https://otra.co/",
+        &subasta_eltiempo("z1"),
+    );
+    let o = s.tic();
+    let e = del_tipo(&o, Origen::Barra, "escudo").unwrap_or_default();
+    let v = &e["subasta"];
+    assert_eq!(v["sitio"], "eltiempo.com");
+    assert_eq!(v["subastas"], 1);
+    assert_eq!(v["ofrecida"].as_array().map(Vec::len), Some(2));
+    assert_eq!(v["peticiones"], 8);
+    assert_eq!(v["ms"], 1300);
+    let criteo = v["ofrecida"]
+        .as_array()
+        .and_then(|a| a.iter().find(|x| x["codigo"] == "criteo"))
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(criteo["quien"], "Criteo");
+    assert_eq!(criteo["estado"], "cortada");
+    assert_eq!(v["hoy"]["subastas"], 1);
+    assert_eq!(v["corta"], true);
+    assert_eq!(v["gpc"], true);
+    // Field names only: no value of the page travels in the view.
+    assert!(!v.to_string().contains("Mozilla"));
+    // The day's figures are kept, never a page or an address.
+    let datos = s.datos.clone();
+    s.cierra();
+    let dia = fs::read_to_string(datos.join("subastas.json")).unwrap_or_default();
+    assert!(
+        dia.contains("criteo.com") && !dia.contains("eltiempo"),
+        "{dia}"
+    );
+}
+
+#[test]
+fn auctions_can_be_allowed_on_one_site_and_the_settings_reach_the_page_script() {
+    let (mut s, _, id) = con_pagina(true);
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"subasta_permitir","sitio":"www.eltiempo.com","permitir":true}"#,
+    );
+    let a = del_tipo(&o, Origen::Panel, "ajustes").unwrap_or_default();
+    assert_eq!(a["subastas_permitidas"], json!(["eltiempo.com"]));
+    assert!(s.prefs.reglas.subastas_permitidas.contains("eltiempo.com"));
+    assert!(!s.prefs.reglas.corta_subastas("eltiempo.com"));
+    assert!(s.prefs.reglas.corta_subastas("otra.co"));
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"subasta_permitir","sitio":"eltiempo.com","permitir":false}"#,
+    );
+    assert!(s.prefs.reglas.corta_subastas("eltiempo.com"));
+    // Global Privacy Control: on unless turned off, and then out of the page script.
+    assert!(s.gpc());
+    assert!(s.guion_pestana(id).contains("globalPrivacyControl"));
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"gpc","valor":false}"#,
+    );
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "ajustes").unwrap_or_default()["gpc"],
+        false
+    );
+    assert!(!s.gpc());
+    assert!(!s.guion_pestana(id).contains("globalPrivacyControl"));
+    // The fingerprint noise is on with the protection; the strict mode only when turned on.
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"panel","vista":"ajustes"}"#,
+    );
+    let a = del_tipo(&o, Origen::Panel, "ajustes").unwrap_or_default();
+    assert_eq!(a["huella_ruido"], true);
+    assert_eq!(a["huella_uniforme"], false);
+    assert!(s.guion_pestana(id).contains("const uniforme = false;"));
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"huella_uniforme","valor":true}"#,
+    );
+    assert!(s.huella_uniforme());
+    assert!(s.guion_pestana(id).contains("const uniforme = true;"));
+    // «No me subastes» off: nothing of the auction is cut by it anywhere.
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"subastas","valor":false}"#,
+    );
+    assert!(!s.prefs.reglas.corta_subastas("otra.co"));
+}
+
+#[test]
+fn a_letter_to_a_company_of_the_auction_says_what_was_seen_and_is_never_sent() {
+    let (mut s, _, id) = con_pagina(true);
+    let _ = s.peticion(
+        id,
+        "https://grid-bidder.criteo.com/openrtb_2_5/pbjs/auction/request",
+        "POST",
+        b"{}",
+        8,
+    );
+    let _ = s.mensaje(
+        Origen::Pestana(id),
+        "https://www.eltiempo.com/",
+        &subasta_eltiempo("z1"),
+    );
+    for (carta, ley) in [("acceso", "15"), ("oposicion", "21"), ("habeas", "1581")] {
+        let o = s.mensaje(
+            Origen::Panel,
+            PANEL,
+            &json!({ "tipo": "subasta_carta", "sitio": "criteo.com", "carta": carta }).to_string(),
+        );
+        let c = del_tipo(&o, Origen::Panel, "sub_carta").unwrap_or_default();
+        let cuerpo = c["cuerpo"].as_str().unwrap_or("");
+        assert!(
+            cuerpo.contains("Criteo") && cuerpo.contains("eltiempo.com"),
+            "{cuerpo}"
+        );
+        assert!(c["asunto"].as_str().unwrap_or("").contains(ley) || cuerpo.contains(ley));
+        assert!(
+            cuerpo.contains("site.page") && !cuerpo.contains('{'),
+            "{cuerpo}"
+        );
+        // The person sends it: no order leaves the browser.
+        assert!(!o.iter().any(|x| matches!(x, Orden::AbreFuera { .. })));
+    }
+    // A company the page did not show: nothing.
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"subasta_carta","sitio":"nadie.co","carta":"acceso"}"#,
+    );
+    assert!(del_tipo(&o, Origen::Panel, "sub_carta").is_none());
+    // The signed receipt of the page's auction goes to Downloads.
+    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"subasta_recibo"}"#);
+    let r = del_tipo(&o, Origen::Panel, "sub_recibo").unwrap_or_default();
+    let ruta = r["ruta"].as_str().unwrap_or("");
+    assert!(ruta.contains("guardiana-zero-subasta-eltiempo-com"), "{r}");
+    let recibo = fs::read_to_string(ruta).unwrap_or_default();
+    assert!(recibo.contains("subastas_en_los_servidores_de_la_web"));
+}
