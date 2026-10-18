@@ -42,9 +42,13 @@ impl Rect {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Ocultas {
+    /// On the left edge.
     pub izquierda: bool,
+    /// On the top edge.
     pub arriba: bool,
+    /// On the right edge.
     pub derecha: bool,
+    /// On the bottom edge.
     pub abajo: bool,
 }
 
