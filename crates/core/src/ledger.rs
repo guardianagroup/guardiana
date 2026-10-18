@@ -312,6 +312,7 @@ impl Ledger {
         ledger.ensure_gaps_table()?;
         ledger.ensure_changes_table()?;
         ledger.ensure_trafico_table()?;
+        ledger.ensure_vigilancia_table()?;
         ledger.migrate_rules_confirmed()?;
         ledger.migrate_events_process()?;
         ledger.migrate_events_server()?;
@@ -822,6 +823,8 @@ impl Ledger {
         )?;
         // A fresh start keeps a head and has lost nothing.
         tx.execute("DELETE FROM settings WHERE key = ?1", [KEY_HEAD_LOST_AT])?;
+        // What the constant watch noticed and remembers (1.0.45) goes with the rest.
+        Self::borra_vigilancia(&tx)?;
         // The rules are gone, and the resolver has to hear it: it reloads them only when this
         // number moves. Until 1.0.2 it did not, and the names cut before «Borrar todo» went on
         // being cut until the next restart (review of 5 Oct 2026, serious 13). Guard mode's

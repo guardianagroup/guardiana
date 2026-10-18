@@ -19,6 +19,7 @@ mod expedientes;
 mod medidas;
 mod revision;
 mod universo;
+mod vigilancia;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -125,6 +126,8 @@ pub(crate) struct AppState {
     pub(crate) cortes: antivirus::CortesAntivirus,
     /// «Revisión del ordenador» (1.0.24): the last review, in memory.
     pub(crate) revision: revision::Revisor,
+    /// «Vigilancia» (1.0.45): the constant watch's last looks, in memory.
+    pub(crate) vigilancia: vigilancia::Vigilancia,
 }
 
 /// A running panel.
@@ -644,7 +647,10 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         primario: Mutex::new(None),
         cortes,
         revision: revision::Revisor::default(),
+        vigilancia: vigilancia::Vigilancia::default(),
     });
+    // The constant watch (1.0.45) runs as long as the panel does.
+    vigilancia::Vigilancia::arrancar(&state);
 
     let app = Router::new()
         .route("/", get(api::root_page))
@@ -922,6 +928,38 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/mi-dispositivo", get(api::mi_dispositivo))
         .route("/api/mi-dispositivo/nombre", post(api::mi_nombre))
         .route("/api/mi-dispositivo/compartir", post(api::mi_compartir))
+        // «Vigilancia» (1.0.45): its page (under Diagnóstico), its script, and the answers for
+        // the page and for the top bar's pill and «Pulso del día».
+        .route(
+            "/vigilancia",
+            get(|| async { pagina(include_str!("../static/vigilancia.html")) }),
+        )
+        .route(
+            "/vigilancia.html",
+            get(|| async { pagina(include_str!("../static/vigilancia.html")) }),
+        )
+        .route(
+            "/static/vigilancia.js",
+            get(|| async {
+                static_response(
+                    include_str!("../static/vigilancia.js"),
+                    "application/javascript; charset=utf-8",
+                )
+            }),
+        )
+        .route(
+            "/static/vigilancia.css",
+            get(|| async {
+                static_response(
+                    include_str!("../static/vigilancia.css"),
+                    "text/css; charset=utf-8",
+                )
+            }),
+        )
+        .route("/api/vigilancia", get(vigilancia::ver))
+        .route("/api/vigilancia/resumen", get(vigilancia::resumen))
+        .route("/api/vigilancia/visto", post(vigilancia::visto))
+        .route("/api/vigilancia/ahora", post(vigilancia::ahora))
         .layer(middleware::from_fn(add_security_headers))
         .layer(middleware::from_fn_with_state(
             state.clone(),
@@ -1065,11 +1103,13 @@ mod textos {
             include_str!("../static/expedientes.html"),
             include_str!("../static/por-dentro.html"),
             include_str!("../static/revision.html"),
+            include_str!("../static/vigilancia.html"),
         ];
         const SCRIPTS: &[&str] = &[
             include_str!("../static/app.js"),
             include_str!("../static/por-dentro.js"),
             include_str!("../static/revision.js"),
+            include_str!("../static/vigilancia.js"),
         ];
         // The keys asked for with a literal: `data-t="x"` in the pages, `t('x')` in the scripts.
         // The ones built at run time (`t('cambio_' + x)`) cannot be read here and are covered by
