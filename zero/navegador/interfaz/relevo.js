@@ -22,14 +22,15 @@
   const vozDelOtro = () => { const r = L() && L().remoto(); return (r && r.getAudioTracks()[0]) || null; };
   const transceptor = () => (p && p.pc.getTransceivers().find((x) => x.receiver && x.receiver.track && x.receiver.track.kind === 'audio')) || null;
 
-  const cierra = (avisar) => {
+  // The voice comes back here only if it had gone to the phone, and the phone's leg is closed
+  // only once this microphone carries it again (make before break on the way back too).
+  const cierra = async (avisar) => {
     if (!p) return;
     const fue = p;
     p = null;
     clearTimeout(fue.reloj); clearInterval(fue.oido);
+    if (fue.viva && L()) { try { await L().alPc(); } catch (_) {} }
     try { fue.pc.close(); } catch (_) {}
-    // The voice comes back here only if it had gone to the phone.
-    if (fue.viva && L()) L().alPc();
     if (avisar) dice({ t: 'fin', s: fue.s });
   };
   const falla = () => { cierra(true); manda({ tipo: 'secure', accion: 'puente_fallo', sin_rtc: false }); };
