@@ -78,6 +78,9 @@ pub struct Mensaje {
     pub archivo: Option<String>,
     /// The file's id on the phone link (0: none handed over).
     pub archivo_id: u32,
+    /// When it disappears from both screens (unix s), for a conversation with a timer
+    /// (18 Oct 2026); `None`: it stays until the conversation ends.
+    pub caduca: Option<u64>,
 }
 
 impl Mensaje {
@@ -115,6 +118,7 @@ impl Mensaje {
             llamada: None,
             archivo: None,
             archivo_id: 0,
+            caduca: None,
         }
     }
 
@@ -229,8 +233,18 @@ impl Mensaje {
         if let Some(a) = &self.archivo {
             v["archivo"] = json!({ "nombre": a, "id": self.archivo_id, "mime": mime_de(a) });
         }
+        if let Some(c) = self.caduca {
+            v["caduca"] = json!(c);
+        }
         v
     }
+}
+
+/// Take out the messages whose time came (a conversation with a timer); whether any went.
+pub fn purga(mensajes: &mut Vec<Mensaje>, ahora: u64) -> bool {
+    let antes = mensajes.len();
+    mensajes.retain(|m| m.caduca.is_none_or(|c| c > ahora));
+    mensajes.len() != antes
 }
 
 /// The media type a picture or sound name suggests (what the phone needs to show or play it).

@@ -50,6 +50,8 @@ pub const PAGINA: &str = "https://guardianagroup.com/m/";
 const ORIGEN: &str = "https://guardianagroup.com";
 /// The port asked first for the phone (next to SECURE's 47300); any port if taken.
 pub const PUERTO: u16 = 47302;
+/// How long a QR code for the phone is good for if no phone uses it.
+pub const VIGENCIA_QR: Duration = Duration::from_secs(60);
 /// Largest frame accepted from the phone (a piece of a call is ~16 KB; a text, ~8 KB).
 const MAX_TRAMA: usize = 1024 * 1024;
 const B64URL: base64::engine::GeneralPurpose = base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -95,6 +97,13 @@ pub enum Desde {
     Rtc(serde_json::Value),
     /// One recorded piece from the phone's microphone or camera.
     Media(Vec<u8>),
+    /// The phone's WebRTC bridge to this computer's page (18 Oct 2026, «Continuar en el
+    /// móvil» without a gap): offer, ICE candidate, end.
+    Puente(serde_json::Value),
+    /// «Volver al PC» on the phone.
+    Volver,
+    /// «Pasar al móvil» on the phone, for a call that is on the computer.
+    Pasar,
     /// The phone's page was brought to the front.
     Visto,
     /// The phone answers a message: the text and the id it answers (16 Oct 2026).
@@ -157,6 +166,12 @@ pub struct Movil {
     pub pendiente: bool,
     /// The person said OK: this secret is trusted until the hand-off ends.
     pub aprobado: bool,
+    /// When this code was made, and whether a phone ever came with it: a code nobody used in
+    /// [`VIGENCIA_QR`] is replaced by a new one (18 Oct 2026, the owner: the QR carries a
+    /// one-time, short-lived hand-off; a photo of an old screen opens nothing).
+    pub nacido: std::time::Instant,
+    /// A phone came with this code at least once.
+    pub usado: bool,
     rx: Receiver<Desde>,
     tx: tmpsc::UnboundedSender<Hacia>,
 }
@@ -262,9 +277,17 @@ impl Movil {
             enganchado: false,
             pendiente: false,
             aprobado: false,
+            nacido: std::time::Instant::now(),
+            usado: false,
             rx,
             tx,
         })
+    }
+
+    /// The code on screen is past [`VIGENCIA_QR`] and no phone came with it: time for a new one.
+    #[must_use]
+    pub fn caducado(&self) -> bool {
+        !self.usado && self.nacido.elapsed() >= VIGENCIA_QR
     }
 
     /// The door in the router opened: the phone can also come from outside.
@@ -298,6 +321,7 @@ impl Movil {
             match &d {
                 Desde::Enganchado => {
                     self.enganchado = true;
+                    self.usado = true;
                     if !self.aprobado {
                         self.pendiente = true;
                     }
@@ -616,7 +640,7 @@ async fn rele_bucle(rele: String, clave: [u8; 32], tx: tmpsc::UnboundedSender<En
     }
 }
 
-async fn conecta_rele(rele: &str) -> Option<tokio::net::TcpStream> {
+pub(crate) async fn conecta_rele(rele: &str) -> Option<tokio::net::TcpStream> {
     // The same way in as a conversation's (inside TLS for GUARDIANA's relay, see `rele::abre`),
     // handed over as a socket of this runtime.
     let rele = rele.to_owned();
@@ -628,7 +652,7 @@ async fn conecta_rele(rele: &str) -> Option<tokio::net::TcpStream> {
     tokio::net::TcpStream::from_std(s).ok()
 }
 
-async fn lee_rele(r: &mut (impl tokio::io::AsyncRead + Unpin)) -> Option<Vec<u8>> {
+pub(crate) async fn lee_rele(r: &mut (impl tokio::io::AsyncRead + Unpin)) -> Option<Vec<u8>> {
     let mut n = [0u8; 4];
     r.read_exact(&mut n).await.ok()?;
     let n = u32::from_be_bytes(n) as usize;
@@ -640,7 +664,10 @@ async fn lee_rele(r: &mut (impl tokio::io::AsyncRead + Unpin)) -> Option<Vec<u8>
     Some(v)
 }
 
-async fn escribe_rele(w: &mut (impl tokio::io::AsyncWrite + Unpin), datos: &[u8]) -> Option<()> {
+pub(crate) async fn escribe_rele(
+    w: &mut (impl tokio::io::AsyncWrite + Unpin),
+    datos: &[u8],
+) -> Option<()> {
     let mut c = Vec::with_capacity(4 + datos.len());
     c.extend_from_slice(&(datos.len() as u32).to_be_bytes());
     c.extend_from_slice(datos);
@@ -865,6 +892,9 @@ fn traduce(v: &Value) -> Option<Desde> {
         "pide_inicio" => Some(Desde::PideInicio),
         "voz_protegida" => Some(Desde::VozProtegida(v["activa"].as_bool().unwrap_or(false))),
         "rtc" => Some(Desde::Rtc(v["d"].clone())),
+        "puente" => Some(Desde::Puente(v["d"].clone())),
+        "volver" => Some(Desde::Volver),
+        "pasar" => Some(Desde::Pasar),
         "visto" => Some(Desde::Visto),
         "nombre" => Some(Desde::Nombre(
             v["nombre"]
@@ -926,6 +956,20 @@ mod tests {
         }
         // Nothing before the fragment names this computer.
         assert_eq!(e.split('#').next().unwrap(), PAGINA);
+    }
+
+    #[test]
+    fn the_hand_off_messages_are_understood() {
+        let d = traduce(&serde_json::json!({ "t": "puente", "d": { "t": "offer", "s": "x" } }));
+        assert!(matches!(d, Some(Desde::Puente(v)) if v["t"] == "offer"));
+        assert!(matches!(
+            traduce(&serde_json::json!({ "t": "volver" })),
+            Some(Desde::Volver)
+        ));
+        assert!(matches!(
+            traduce(&serde_json::json!({ "t": "pasar" })),
+            Some(Desde::Pasar)
+        ));
     }
 
     #[test]
@@ -1051,6 +1095,19 @@ mod tests {
                 return v;
             }
         }
+    }
+
+    #[test]
+    fn a_qr_code_nobody_used_in_a_minute_is_spent() {
+        let mut m = Movil::arranca_con("127.0.0.1:1").unwrap();
+        assert!(!m.caducado());
+        m.nacido = std::time::Instant::now()
+            .checked_sub(VIGENCIA_QR + Duration::from_secs(1))
+            .unwrap();
+        assert!(m.caducado());
+        // A phone that came with it keeps the hand-off going (a network change comes back).
+        m.usado = true;
+        assert!(!m.caducado());
     }
 
     #[test]

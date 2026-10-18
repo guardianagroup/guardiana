@@ -122,14 +122,14 @@
       [t('sec_i_que'), t('sec_i_s_' + i.senal) + (i.fallos > 1 ? ` (${n(i.fallos)})` : '')],
       [t('sec_i_cuando'), hora(i.cuando)],
       [t('sec_identidad_contacto'), i.contacto || RAYA],
-      [t('sec_i_camino'), t('sec_i_c_' + i.transporte)],
+      [t('sec_i_camino'), caminoInc(i)],
     ];
     if (i.zona_otra) filas.push([t('sec_i_zona'), i.zona_otra]);
     $('inc-datos').innerHTML = filas.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${esc(b)}</dd>`).join('');
-    const o = i.otro;
-    $('inc-otro').hidden = !o;
-    if (o) $('inc-otro').textContent = t('sec_i_otro', { ip: o.ip, p: o.pais || RAYA, r: o.red || RAYA });
   }
+  // The path as the card says it: «directo por la misma red» or «por relé · ciudad»; the
+  // other end's address is never on the card nor in the report (18 Oct 2026, the owner).
+  function caminoInc(i) { return t('sec_i_c_' + i.transporte) + (i.ciudad_rele ? ' · ' + i.ciudad_rele : ''); }
   en('secure_incidente', (m) => {
     descarga(`guardiana-secure-incidente-${sello()}.json`, 'application/json', m.json);
     let j = {}; try { j = JSON.parse(m.json); } catch (_) {}
@@ -138,8 +138,7 @@
     L.push({ x: 56, y, tam: 18, negrita: true, texto: 'GUARDIANA SECURE' }); y -= 26;
     L.push({ x: 56, y, tam: 13, negrita: true, texto: t('sec_i_titulo') }); y -= 18;
     L.push({ x: 56, y, tam: 9.5, texto: t('sec_r_pdf_fecha') + ' ' + new Date().toLocaleString(document.documentElement.lang || 'es') }); y -= 30;
-    const filas = [[t('sec_i_que'), t('sec_i_s_' + i.senal) + (i.fallos > 1 ? ` (${i.fallos})` : '')], [t('sec_i_cuando'), hora(i.cuando)], [t('sec_identidad_contacto'), i.contacto || RAYA], [t('sec_i_camino'), t('sec_i_c_' + i.transporte)], [t('sec_i_zona'), i.zona_otra || RAYA]];
-    if (i.otro) filas.push([t('sec_i_otro_rotulo'), `${i.otro.ip} · ${i.otro.pais || RAYA} · ${i.otro.red || RAYA}`]);
+    const filas = [[t('sec_i_que'), t('sec_i_s_' + i.senal) + (i.fallos > 1 ? ` (${i.fallos})` : '')], [t('sec_i_cuando'), hora(i.cuando)], [t('sec_identidad_contacto'), i.contacto || RAYA], [t('sec_i_camino'), caminoInc(i)], [t('sec_i_zona'), i.zona_otra || RAYA]];
     for (const [a, b] of filas) { L.push({ x: 56, y, tam: 11, negrita: true, texto: a }); for (const s of parte(b, 60)) { L.push({ x: 230, y, tam: 11, texto: s }); y -= 16; } y -= 4; }
     y -= 10;
     for (const s of parte(i.detalle || '', 95)) { L.push({ x: 56, y, tam: 10, texto: s }); y -= 14; }
@@ -737,7 +736,8 @@
     $('c-mv-habla').hidden = !mv.habla;
     const e = $('c-mv-estado');
     e.className = 'm-estado ' + (mv.habla ? 'si' : mv.enganchado ? 'espera' : '');
-    $('c-mv-estado-t').textContent = t(mv.habla ? 'sec_mv_e_habla' : mv.pendiente ? 'sec_mv_e_pendiente' : mv.aprobado ? 'sec_mv_e_fuera' : 'sec_mv_e_espera');
+    const pasoMv = mv.paso || {};
+    $('c-mv-estado-t').textContent = t(pasoMv.fallo_paso ? 'sec_mv_no_paso' : pasoMv.relevo === 'pasando' && m.llamada ? 'sec_mv_e_pasando' : mv.habla ? 'sec_mv_e_habla' : mv.pendiente ? 'sec_mv_e_pendiente' : mv.aprobado ? 'sec_mv_e_fuera' : 'sec_mv_e_espera');
     $('c-mv-fuera').textContent = mv.fuera ? t('sec_mv_fuera_si') : mv.puerta_error ? t('sec_mv_fuera_no', { e: mv.puerta_error }) : t('sec_mv_fuera_abriendo');
     movilHabla = !!mv.habla;
   };
@@ -981,7 +981,8 @@
     $('c-l-estado').textContent = movilHabla ? t('sec_mv_habla') : textoLlamada(l);
     if (llamando) { if (!tonoLlamando) tonoLlamando = setInterval(() => { if (E && E.llamada && E.llamada.conectada === false) timbre(); }, 3000); return; }
     if (tonoLlamando) { clearInterval(tonoLlamando); tonoLlamando = null; }
-    if (movilHabla) { if (grabador || arrancando) paraMedios(); return; }
+    // With the bridge this page keeps its leg while the phone talks through it (relevo.js).
+    if (movilHabla && !puenteAhora(m)) { if (grabador || arrancando) paraMedios(); return; }
     // The other side's player started again (its phone took the call, or gave it back): our
     // recorder starts again too, so its first piece carries the header that player needs.
     if (grabador && typeof l.reinicio === 'number' && reinicioVisto !== null && l.reinicio !== reinicioVisto) cambiaGrabador();
@@ -1001,7 +1002,7 @@
   setInterval(() => {
     if (!$('c-llamada').hidden && E.llamada && !movilHabla) $('c-l-estado').textContent = textoLlamada(E.llamada);
     // A connected call with nothing started yet (it was waiting for the relay): start now.
-    if (rtcEspera && E && E.llamada && E.llamada.conectada !== false && !rtc && !grabador && !arrancando && !movilHabla) pintaLlamada(E);
+    if (rtcEspera && E && E.llamada && E.llamada.conectada !== false && !rtc && !grabador && !arrancando && (!movilHabla || puenteAhora(E))) pintaLlamada(E);
   }, 1000);
   // The formats, best first; the phone's page knows the same list and tells which it can play.
   const CANDIDATOS = { video: ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/webm'], voz: ['audio/webm;codecs=opus', 'audio/mp4;codecs=mp4a.40.2', 'audio/webm'] };
@@ -1145,9 +1146,15 @@
   // buffer, loss recovery and bitrate that adapt to the network: what the recorded pieces
   // could not do. If it does not connect within 15 s, both ends go back to the pieces.
   let rtc = null, rtcFallo = false, rtcEspera = 0;
+  // The phone's voice while the phone carries the call through this page's bridge (relevo.js,
+  // 18 Oct 2026): it is what this computer sends to the other person then.
+  let enMovil = null;
+  const puenteAhora = (m) => !!((((m || {}).movil || {}).paso || {}).puente);
   const rtcManda = (d) => manda({ tipo: 'secure', accion: 'rtc', d });
   const obtenLocal = async (video) => {
-    const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+    // 18 Oct 2026: the microphone as opus.js asks for it (mono, 48 kHz, the browser's echo
+    // canceller, noise suppression and gain).
+    const audio = window.GuardianaOpus ? window.GuardianaOpus.restricciones() : { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
     try {
       return await navigator.mediaDevices.getUserMedia({ audio, video: video ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false });
     } catch (e) {
@@ -1157,15 +1164,16 @@
     }
   };
   // What leaves: the voice changed when «Proteger mi voz» is on, the camera as it is.
-  const rtcEnvio = () => fuenteGrabacion();
+  const rtcEnvio = () => (enMovil ? new MediaStream([enMovil]) : fuenteGrabacion());
   const rtcTile = (stream) => {
     remoto = stream;
     $('c-rejilla').innerHTML = '';
     const tile = document.createElement('div'); tile.className = 'tile';
-    const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; v.srcObject = stream;
+    const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; v.srcObject = stream; v.muted = !!enMovil;
     const n = document.createElement('span'); n.className = 'tile-nombre'; n.textContent = (E && E.contacto) || '';
     tile.appendChild(v); tile.appendChild(n); $('c-rejilla').appendChild(tile); $('c-rejilla').dataset.n = '1';
     v.play().catch(() => {});
+    window.dispatchEvent(new CustomEvent('guardiana-remoto'));
   };
   const rtcNuevaPc = () => {
     const pc = new RTCPeerConnection({ iceServers: rtc.ice, iceTransportPolicy: 'relay', bundlePolicy: 'max-bundle' });
@@ -1180,6 +1188,8 @@
     };
     // Video up to 1.2 Mbps; WebRTC lowers it by itself when the network cannot carry it.
     pc.getSenders().forEach((x) => { if (x.track && x.track.kind === 'video') { try { const p = x.getParameters(); p.encodings = p.encodings && p.encodings.length ? p.encodings : [{}]; p.encodings[0].maxBitrate = 1200000; x.setParameters(p).catch(() => {}); } catch (_) {} } });
+    // 18 Oct 2026 (opus.js): RED first, the voice's limits, the quality estimate every 2 s.
+    if (window.GuardianaOpus) { const o = window.GuardianaOpus.prepara(pc); pc.addEventListener('connectionstatechange', () => { if (pc.connectionState === 'closed') o.para(); }); }
     return pc;
   };
   const rtcOfrece = async () => {
@@ -1188,13 +1198,15 @@
     rtc.s = Math.random().toString(36).slice(2, 10);
     rtc.pc = rtcNuevaPc(); rtc.pendientes = [];
     const o = await rtc.pc.createOffer();
+    if (window.GuardianaOpus) o.sdp = window.GuardianaOpus.sdp(o.sdp);
     await rtc.pc.setLocalDescription(o);
     rtcManda({ t: 'offer', s: rtc.s, sdp: rtc.pc.localDescription.sdp });
   };
   const empiezaRtc = async (l) => {
     arrancando = true;
     llamadaVideo = !!l.video;
-    const s = await obtenLocal(!!l.video);
+    // The phone already carries the voice through the bridge: this computer's microphone stays closed.
+    const s = enMovil ? new MediaStream() : await obtenLocal(!!l.video);
     if (!s || !(E && E.llamada)) { if (s) s.getTracks().forEach((x) => x.stop()); arrancando = false; return; }
     local = s;
     local.getAudioTracks().forEach((x) => { x.enabled = !silenciado; });
@@ -1217,11 +1229,19 @@
     if (!rtc) return;
     try {
       if (d.t === 'hola') { if (rtc.ofrece) await rtcOfrece(); }
-      else if (d.t === 'offer' && !rtc.ofrece) {
+      else if (d.t === 'offer' && !rtc.ofrece && d.s === rtc.s && rtc.pc && rtc.pc.signalingState === 'stable' && d.reinicio) {
+        // An ICE restart after a change of network (18 Oct 2026): the same connection, new paths.
+        await rtc.pc.setRemoteDescription({ type: 'offer', sdp: d.sdp });
+        const a = await rtc.pc.createAnswer();
+        if (window.GuardianaOpus) a.sdp = window.GuardianaOpus.sdp(a.sdp);
+        await rtc.pc.setLocalDescription(a);
+        rtcManda({ t: 'answer', s: rtc.s, sdp: rtc.pc.localDescription.sdp });
+      } else if (d.t === 'offer' && !rtc.ofrece) {
         try { if (rtc.pc) rtc.pc.close(); } catch (_) {}
         rtc.s = d.s; rtc.pc = rtcNuevaPc();
         await rtc.pc.setRemoteDescription({ type: 'offer', sdp: d.sdp });
         const a = await rtc.pc.createAnswer();
+        if (window.GuardianaOpus) a.sdp = window.GuardianaOpus.sdp(a.sdp);
         await rtc.pc.setLocalDescription(a);
         rtcManda({ t: 'answer', s: rtc.s, sdp: rtc.pc.localDescription.sdp });
         rtcAplicaPendientes();
@@ -1234,6 +1254,17 @@
       }
     } catch (_) { rtcFalla(true); }
   });
+  // Wi-Fi to 4G or back: the side that offers restarts ICE on the same connection, so the
+  // voice comes back on the new network without hanging up (18 Oct 2026).
+  if (window.GuardianaOpus) window.GuardianaOpus.enCambioDeRed(async () => {
+    if (!rtc || !rtc.ofrece || !rtc.pc || rtc.pc.signalingState !== 'stable') return;
+    try {
+      const o = await rtc.pc.createOffer({ iceRestart: true });
+      o.sdp = window.GuardianaOpus.sdp(o.sdp);
+      await rtc.pc.setLocalDescription(o);
+      rtcManda({ t: 'offer', s: rtc.s, sdp: rtc.pc.localDescription.sdp, reinicio: true });
+    } catch (_) {}
+  });
   const paraRtc = () => {
     if (!rtc) return;
     clearTimeout(rtc.reloj);
@@ -1245,6 +1276,9 @@
     if (decirlo) rtcManda({ t: 'fallo' });
     rtcFallo = true;
     const l = E && E.llamada;
+    // The bridge to the phone rides on this connection: it ends too, and the voice is here again.
+    if (window.GuardianaRelevo) window.GuardianaRelevo.rtcCayo();
+    if (enMovil) { enMovil = null; $('c-rejilla').querySelectorAll('video').forEach((v) => { v.muted = false; }); }
     paraRtc();
     if (local) { local.getTracks().forEach((x) => x.stop()); local = null; }
     $('c-rejilla').innerHTML = ''; $('c-rejilla').dataset.n = '0';
@@ -1255,6 +1289,32 @@
     if (!rtc || !rtc.pc || !local) return;
     const pista = rtcEnvio().getAudioTracks()[0];
     rtc.pc.getSenders().forEach((x) => { if (x.track && x.track.kind === 'audio' && pista) x.replaceTrack(pista).catch(() => {}); });
+  };
+  // What the bridge to the phone needs from this call (relevo.js, 18 Oct 2026).
+  window.GuardianaLlamada = {
+    pc: () => (rtc && rtc.pc) || null,
+    remoto: () => remoto,
+    // The phone carries the voice: its track replaces ours on the same connection, this
+    // microphone closes and this speaker goes quiet.
+    alMovil: (pista) => {
+      enMovil = pista;
+      if (rtc && rtc.pc) rtc.pc.getSenders().forEach((x) => { if (x.track && x.track.kind === 'audio') x.replaceTrack(pista).catch(() => {}); });
+      if (local) local.getAudioTracks().forEach((x) => { x.stop(); local.removeTrack(x); });
+      if (vozProt) { vozProt.parar(); vozProt = null; }
+      $('c-rejilla').querySelectorAll('video').forEach((v) => { v.muted = true; });
+    },
+    // «Volver al PC»: the microphone opens again and its voice replaces the phone's.
+    alPc: async () => {
+      enMovil = null;
+      $('c-rejilla').querySelectorAll('video').forEach((v) => { v.muted = false; v.play().catch(() => {}); });
+      if (!rtc || !rtc.pc) return;
+      const s = await obtenLocal(false);
+      if (!s || !rtc || !rtc.pc || enMovil) { if (s) s.getTracks().forEach((x) => x.stop()); return; }
+      if (!local) local = new MediaStream();
+      s.getAudioTracks().forEach((x) => { x.enabled = !silenciado && !pausaAplicada; local.addTrack(x); });
+      const pista = rtcEnvio().getAudioTracks()[0];
+      rtc.pc.getSenders().forEach((x) => { if ((!x.track || x.track.kind === 'audio') && pista) x.replaceTrack(pista).catch(() => {}); });
+    },
   };
   const llama = (video) => { if ($('c-voz').disabled) return; $(video ? 'c-video' : 'c-voz').classList.add('pulsado'); $('c-voz').disabled = true; $('c-video').disabled = true; timbre(); manda({ tipo: 'secure', accion: 'llamar', video, mime: mime(video) }); };
   $('c-voz').addEventListener('click', () => llama(false));

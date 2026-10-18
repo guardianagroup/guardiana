@@ -108,8 +108,28 @@ pub struct Capa {
     anterior: Option<Cadena>,
 }
 
-/// Sealed messages per epoch before side 0 offers a new key.
-pub const RENUEVA_CADA: u64 = 500;
+/// Sealed messages per epoch before side 0 offers a new key. 18 Oct 2026, the owner: «quiero la
+/// máxima tecnología disponible actualmente en el chat»: from 500 down to 50, and a clock as well
+/// ([`RENUEVA_S`]), whichever comes first.
+///
+/// This is post-compromise security for the post-quantum layer, in the spirit of Signal's sparse
+/// post-quantum ratchet (SPQR, the «triple ratchet» of 2025): a fresh ML-KEM-768 encapsulation is
+/// mixed into the root inside a live conversation, not only when a link opens, so a state that
+/// leaked heals at the next epoch even against an attacker with a quantum computer. It is not
+/// SPQR itself: SPQR splits the encapsulation key into erasure-coded chunks carried on every
+/// message; here the whole key (1184 bytes) and ciphertext (1088 bytes) travel inside Olm in two
+/// messages of their own. Olm's own Curve25519 ratchet goes on underneath, unchanged.
+pub const RENUEVA_CADA: u64 = 50;
+
+/// Seconds an epoch may last before side 0 offers a new key, even in a quiet conversation.
+pub const RENUEVA_S: u64 = 10 * 60;
+
+/// Whether an epoch that sealed `sellados` messages and began at `desde` (unix s) is due for a
+/// new encapsulation at `ahora`.
+#[must_use]
+pub fn toca_renovar(sellados: u64, desde: u64, ahora: u64) -> bool {
+    sellados >= RENUEVA_CADA || ahora.saturating_sub(desde) >= RENUEVA_S
+}
 
 /// The transcript the layer is bound to.
 #[must_use]
@@ -325,6 +345,15 @@ mod tests {
         assert!(b.abre(&en_vuelo).is_err());
         let z = b.sella(b"vuelta").unwrap();
         assert_eq!(a.abre(&z).unwrap(), b"vuelta");
+    }
+
+    #[test]
+    fn an_epoch_is_renewed_after_fifty_messages_or_ten_minutes() {
+        assert!(!toca_renovar(0, 1000, 1000));
+        assert!(!toca_renovar(RENUEVA_CADA - 1, 1000, 1000 + RENUEVA_S - 1));
+        assert!(toca_renovar(RENUEVA_CADA, 1000, 1000));
+        assert!(toca_renovar(3, 1000, 1000 + RENUEVA_S));
+        assert_eq!((RENUEVA_CADA, RENUEVA_S), (50, 600));
     }
 
     #[test]

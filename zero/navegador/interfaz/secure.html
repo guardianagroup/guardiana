@@ -6,6 +6,7 @@
 <title data-t="pestana_secure">GUARDIANA SECURE</title>
 <link rel="stylesheet" href="diseno.css">
 <link rel="stylesheet" href="comun.css">
+<link rel="stylesheet" href="entrega.css">
 <style>
 /* GUARDIANA SECURE, the design the owner chose on 16 Oct 2026 for the three tabs: three columns
    on a computer (conversations · the chat with the call as a card on top · the panel «Esta
@@ -347,7 +348,6 @@ aside.monitor > h2 { margin: 0; font: 600 14px/1.3 var(--display); }
 .incidente .i-datos { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 4px 0; font-size: 12.5px; }
 .incidente .i-datos dt { color: var(--muted); }
 .incidente .i-datos dd { margin: 0; font-weight: 600; }
-.incidente .i-otro { font-family: var(--mono); font-size: 12px; }
 .pausa .p-titulo { margin: 0; font: 600 17px/1.2 var(--display); color: var(--alerta); }
 .pausa p { margin: 0; font-size: 13px; line-height: 1.5; }
 .pausa .p-motivo b { font-weight: 600; }
@@ -634,6 +634,9 @@ main:has(> .inicio:not([hidden])) { align-content: safe center; }
         <button type="button" class="enlace" data-modo="equipos" data-t="sec_inicio_invitacion"></button>
         <span aria-hidden="true">·</span>
         <button type="button" class="enlace" data-modo="movil" data-t="sec_inicio_mi_movil"></button>
+        <span aria-hidden="true">·</span>
+        <!-- 18 Oct 2026: «Sala de entrega» (entrega.js). -->
+        <button type="button" class="enlace" id="ent-abrir" data-t="ent_abrir"></button>
       </div>
       <!-- 1.0.42: the GUARDIANA number, given once at install and kept for good; whoever has it can
            call this PC without a QR. The first call compares three numbers, as always. -->
@@ -654,6 +657,9 @@ main:has(> .inicio:not([hidden])) { align-content: safe center; }
       <p class="t inicio-pie" data-t="sec_inicio_pie"></p>
     </div>
   </section>
+
+  <!-- «Sala de entrega» (18 Oct 2026): drawn by entrega.js. -->
+  <section class="tarjeta sala-entrega" id="sala-entrega" hidden></section>
 
   <section class="tarjeta modo-cab" id="c-modo-cab" hidden>
     <button type="button" class="boton chico secundario" id="c-volver" data-t="sec_volver"></button>
@@ -856,11 +862,12 @@ main:has(> .inicio:not([hidden])) { align-content: safe center; }
 
 <aside class="monitor" aria-live="polite">
   <h2 data-t="sec_panel_titulo"></h2>
+  <!-- 18 Oct 2026: «Escudo en directo» (escudo-directo.js), every line a real check. -->
+  <section class="tarjeta escudo-directo" id="escudo-directo" hidden></section>
   <section class="tarjeta incidente" id="inc" hidden role="alert">
     <h2 class="p-titulo" data-t="sec_i_titulo"></h2>
     <p class="i-frase" data-t="sec_i_frase"></p>
     <dl class="i-datos" id="inc-datos"></dl>
-    <p class="i-otro" id="inc-otro" hidden></p>
     <div class="p-botones">
       <button type="button" class="boton principal chico" id="inc-guardar" data-t="sec_i_guardar"></button>
       <button type="button" class="boton chico" id="inc-verificar" data-t="sec_i_verificar"></button>
@@ -998,6 +1005,11 @@ main:has(> .inicio:not([hidden])) { align-content: safe center; }
 <script src="interruptor.js"></script>
 <script src="puente.js"></script>
 <script src="voz.js"></script>
+<script src="opus.js"></script>
 <script src="secure.js"></script>
+<script src="relevo.js"></script>
+<script src="voz-eleccion.js"></script>
+<script src="escudo-directo.js"></script>
+<script src="entrega.js"></script>
 </body>
 </html>

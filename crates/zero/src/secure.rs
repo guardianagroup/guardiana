@@ -25,6 +25,7 @@ use guardiana_secure::agenda::{self, Agenda};
 use guardiana_secure::archivo::{Llave, Recepcion, Trozos};
 use guardiana_secure::claves::{Curve25519PublicKey, Ed25519Signature, Mac};
 use guardiana_secure::cuantico;
+use guardiana_secure::destruccion::{self, Motivo as MotivoDestruccion};
 use guardiana_secure::monitor::{Identidad, Monitor, Nivel};
 use guardiana_secure::pausa::Sesion as EstadoSesion;
 use guardiana_secure::prueba::{Cadena, Prueba};
@@ -39,6 +40,12 @@ use crate::mensaje::{self, Mensaje};
 use sha2::Digest as _;
 
 const MAX_FRAME: usize = 2 * 1024 * 1024;
+/// Video calls (18 Oct 2026, the committee — Claude, ChatGPT, Grok, Kimi — and the owner: «si no
+/// llegamos a eso, nos quedaríamos solamente con voz»). A web page on a phone cannot reach the
+/// quality of FaceTime or WhatsApp (no CallKit, no PushKit, no background on an iPhone), so video
+/// is off everywhere: a call asked with video starts as voice, and a video call that arrives from
+/// an older version rings as voice. The code stays, behind this switch.
+pub const VIDEO: bool = false;
 const B64: base64::engine::GeneralPurpose = base64::engine::general_purpose::STANDARD;
 
 /// What the network thread tells the session.
@@ -69,15 +76,28 @@ struct Enlace {
     /// difference is what is still on its way out (a file's «time left»).
     encolados: std::sync::Arc<std::sync::atomic::AtomicU64>,
     escritos: std::sync::Arc<std::sync::atomic::AtomicU64>,
-    /// The other end's address, kept only in memory for an incident card on a direct link;
-    /// it is never written, shown or logged otherwise (decision 203).
-    otro: Option<std::net::IpAddr>,
+    /// Whether the other end of a direct link sat on this same network (a private, link-local
+    /// or loopback address) when the link opened. Only this yes/no is kept, never the address
+    /// (18 Oct 2026, the owner: never store IPs; decision 203).
+    misma_red: Option<bool>,
+}
+
+/// Whether an address belongs to the same local network (private, link-local, loopback or
+/// unique-local): what a direct link may say about where the other end was, and all it says.
+fn es_misma_red(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v) => v.is_private() || v.is_link_local() || v.is_loopback(),
+        std::net::IpAddr::V6(v) => {
+            let s = v.segments()[0];
+            v.is_loopback() || (s & 0xfe00) == 0xfc00 || (s & 0xffc0) == 0xfe80
+        }
+    }
 }
 
 impl Enlace {
     fn new(mut s: TcpStream) -> Self {
         use std::sync::atomic::{AtomicU64, Ordering};
-        let otro = s.peer_addr().ok().map(|a| a.ip());
+        let misma_red = s.peer_addr().ok().map(|a| es_misma_red(a.ip()));
         // Small frames (voice) leave at once instead of waiting to be grouped.
         let _ = s.set_nodelay(true);
         let (cola, rx) = mpsc::channel::<Vec<u8>>();
@@ -99,20 +119,23 @@ impl Enlace {
             cola,
             encolados: std::sync::Arc::new(AtomicU64::new(0)),
             escritos,
-            otro,
+            misma_red,
         }
     }
 
-    /// The other end's address (see the field).
-    fn ip_del_otro(&self) -> Option<std::net::IpAddr> {
-        self.otro
+    /// Whether the other end was on this network (see the field).
+    fn misma_red(&self) -> Option<bool> {
+        self.misma_red
     }
 
     fn manda(&self, v: &Value) -> Result<(), String> {
-        let cuerpo = serde_json::to_vec(v).map_err(|e| e.to_string())?;
+        let mut cuerpo = serde_json::to_vec(v).map_err(|e| e.to_string())?;
         if cuerpo.len() > MAX_FRAME {
             return Err("trama demasiado grande".to_owned());
         }
+        // Sizes in buckets (18 Oct 2026, `relleno`): spaces after the JSON, which every reader,
+        // older versions included, skips; the relay sees a few sizes instead of every length.
+        guardiana_secure::relleno::rellena(&mut cuerpo, b' ', MAX_FRAME);
         let n = cuerpo.len() as u64 + 4;
         self.cola
             .send(cuerpo)
@@ -255,6 +278,11 @@ const GUARDADOS_MAX: u64 = 32 * 1024 * 1024;
 
 /// How long a call rings before «no answer».
 pub const TIMBRE_S: u64 = 45;
+
+/// The longest a disappearing message or file may wait (a week), whatever the other side asks.
+pub const TEMPORIZADOR_MAX: u64 = 7 * 24 * 3600;
+/// The timers the screen offers, in seconds (off, 30 s, 5 min, 1 h, 1 day, 1 week).
+pub const TEMPORIZADORES: [u64; 6] = [0, 30, 300, 3600, 86_400, 604_800];
 
 /// A call coming in, ringing until the person answers or rejects it.
 struct Timbre {
@@ -414,29 +442,34 @@ pub struct Incidente {
     pub senal: &'static str,
     /// The concrete fact, in Spanish for the chain (the screen translates `senal`).
     pub detalle: String,
-    /// `directo`, `rele` or `ninguno`.
+    /// `misma_red` (direct, the other end on this network), `directo` (direct across the
+    /// internet), `rele` or `ninguno`.
     pub transporte: &'static str,
+    /// Through the relay: the relay's city (`Núremberg`, `Miami`), the only place named.
+    pub ciudad_rele: Option<&'static str>,
     /// How many frames failed in the window, when that is the signal.
     pub fallos: u32,
     /// The contact's name as this computer knows it.
     pub contacto: String,
     /// The time zone the other side said, if it did (never an address).
     pub zona_otra: String,
-    /// Only on a direct link, and only for this card: the other end's address as seen at that
-    /// moment, with the country and the network the bundled base gives it. Nothing is written
-    /// anywhere unless the person saves the report (decision 203 stands).
-    pub otro: Option<OtroExtremo>,
+    // No address of the other end, not even on a direct link and not in the saved report
+    // (18 Oct 2026, the owner: «nunca guardar IPs»): only «directo por la misma red» or
+    // «por relé · ciudad».
 }
 
-/// The other end of a direct link, at the moment of an incident.
-#[derive(Debug, Clone, Serialize)]
-pub struct OtroExtremo {
-    /// The address.
-    pub ip: String,
-    /// Two-letter country from the bundled base, if any.
-    pub pais: Option<String>,
-    /// The network's organisation from the bundled base, if any.
-    pub red: Option<String>,
+/// The relay's city from its name, for «por relé · ciudad» (no address involved).
+fn ciudad_de_rele(rele: &str) -> Option<&'static str> {
+    // By name or by the relay's own address (the fallback when DNS fails): GUARDIANA's servers.
+    let host = rele.split(':').next().unwrap_or_default();
+    let r = crate::rele::RELES
+        .iter()
+        .find(|r| host == r.nombre || host == r.ip)?;
+    match r.nombre {
+        "rele.guardianagroup.com" => Some("Núremberg"),
+        "rele-am.guardianagroup.com" => Some("Miami"),
+        _ => None,
+    }
 }
 
 /// The SECURE side of a browser session.
@@ -568,6 +601,14 @@ pub struct Secure {
     turn_pedido: u64,
     /// WebRTC messages from the other side for this computer's page (SDP, ICE candidates).
     pub rtc_para_pagina: VecDeque<Value>,
+    /// «Continuar en el móvil» without a gap (18 Oct 2026, [`crate::relevo`]): where the
+    /// call's voice is, and the bridge's messages from the phone for this computer's page.
+    relevo: crate::relevo::Relevo,
+    /// The phone's bridge messages for the page (offer, ICE candidates, end).
+    pub puente_para_pagina: VecDeque<Value>,
+    /// How the computer's own leg of the call sounds, as the page estimated it (`excelente`,
+    /// `buena`, `debil`) and when: the phone shows the worse of its leg and this one.
+    calidad_pc: Option<(String, u64)>,
     /// The post-quantum lock over Olm (16 Oct 2026, [`cuantico`]): side 0 offers an ML-KEM
     /// key once the conversation opens, side 1 answers, and from then every Olm payload is
     /// sealed with the layer too. `cuantico_visto`: a sealed message already came from the
@@ -575,6 +616,33 @@ pub struct Secure {
     cuantico_oferta: Option<(cuantico::Oferta, Vec<u8>)>,
     capa: Option<cuantico::Capa>,
     cuantico_visto: bool,
+    /// When the layer's current epoch began (unix s): a new ML-KEM encapsulation is due every
+    /// [`cuantico::RENUEVA_CADA`] messages or [`cuantico::RENUEVA_S`] seconds (18 Oct 2026), and
+    /// the shield shows how long ago it was renewed.
+    capa_desde: u64,
+    /// Epochs of the layer in this conversation (the first one counts).
+    capa_epocas: u64,
+    /// When the numbers were confirmed on both sides in this conversation (unix s).
+    verificado_en: u64,
+    /// Messages that opened (Olm and the layer) and that did not, and file blocks that passed
+    /// their authentication and that did not: the shield's integrity line, from real events.
+    abiertos_ok: u64,
+    abiertos_mal: u64,
+    trozos_ok: u64,
+    trozos_mal: u64,
+    /// When the window last handed the watch a look (unix s).
+    vigia_visto: u64,
+    /// Destroy the conversation on an anomaly (18 Oct 2026, the owner: «si detectamos espionaje o
+    /// anomalía, destrucción del contenido automáticamente»). On by default; the person may turn
+    /// it off, and then the old pause applies.
+    pub auto_destruccion: bool,
+    /// The last destruction, for the calm notice, until the person closes it.
+    destruida: Option<Value>,
+    /// Messages and files that disappear after this many seconds (0: they stay until the
+    /// conversation ends). Both sides use the same value: changing it tells the other side.
+    temporizador: u64,
+    /// Files received with a timer: (id, unix s when they go).
+    caducan: Vec<(u64, u64)>,
     /// This computer's time zone (the page tells it) and the other side's, exchanged inside
     /// Olm once the conversation is open (16 Oct 2026, «que salga en nuestro mapa, el de él y
     /// el mío»): the globe places each computer by its time zone, never by an address.
@@ -696,9 +764,24 @@ impl Secure {
             turn_rx: None,
             turn_pedido: 0,
             rtc_para_pagina: VecDeque::new(),
+            relevo: crate::relevo::Relevo::default(),
+            puente_para_pagina: VecDeque::new(),
+            calidad_pc: None,
             cuantico_oferta: None,
             capa: None,
             cuantico_visto: false,
+            capa_desde: 0,
+            capa_epocas: 0,
+            verificado_en: 0,
+            abiertos_ok: 0,
+            abiertos_mal: 0,
+            trozos_ok: 0,
+            trozos_mal: 0,
+            vigia_visto: 0,
+            auto_destruccion: true,
+            destruida: None,
+            temporizador: 0,
+            caducan: Vec::new(),
             zona_propia: String::new(),
             zona_otra: String::new(),
             enviados: Vec::new(),
@@ -1089,6 +1172,7 @@ impl Secure {
             return;
         }
         let ahora = ahora_s();
+        self.vigia_visto = ahora;
         let antes = self.vigia.en_uso.clone();
         for v in self.vigia.mira(usos, self.inicio) {
             let texto = format!("«{}» {}", v.uso.programa, v.uso.recurso.verbo());
@@ -1110,6 +1194,19 @@ impl Secure {
                         .map_or_else(|| "en uso".to_owned(), |h| format!("LastUsedTimeStop {h}")),
                 )),
             };
+            // Something that *started* during the conversation destroys it (18 Oct 2026); a
+            // program that was already using it before keeps the old pause, so a person can
+            // close it and go on.
+            if v.ahora && self.auto_destruccion && v.uso.desde >= self.inicio {
+                self.cadena.anota(ahora, Nivel::Observada, hecho);
+                let p = v.uso.programa.clone();
+                self.destruir(match v.uso.recurso {
+                    crate::vigia::Recurso::Microfono => MotivoDestruccion::Microfono(p),
+                    crate::vigia::Recurso::Camara => MotivoDestruccion::Camara(p),
+                    crate::vigia::Recurso::Pantalla => MotivoDestruccion::Captura(p),
+                });
+                return;
+            }
             if v.ahora && self.estado.en_marcha() {
                 // The stop writes its own line in the history and the chain.
                 self.cadena.anota(ahora, Nivel::Observada, hecho);
@@ -1206,6 +1303,278 @@ impl Secure {
         .to_json()
     }
 
+    /// Destroy this conversation for an anomaly (18 Oct 2026, the owner: «si detectamos espionaje
+    /// o anomalía, destrucción del contenido automáticamente»): the other side is told with a
+    /// notice signed by this computer's identity (so it does the same), the event goes into the
+    /// signed chain and to disk as signed evidence (no content, no address), and then every key
+    /// of the session, every message, every file it brought and anything half received goes.
+    /// With [`Secure::auto_destruccion`] off nothing happens here and the old pause applies.
+    ///
+    /// What it cannot do, and the screen says so: erase what was already saved, copied or
+    /// photographed on a device that was compromised.
+    pub fn destruir(&mut self, motivo: MotivoDestruccion) {
+        if !self.auto_destruccion {
+            return;
+        }
+        self.destruye(motivo, true);
+    }
+
+    fn destruye(&mut self, motivo: MotivoDestruccion, avisar: bool) {
+        let ahora = ahora_s();
+        let clave = motivo.clave();
+        if avisar && self.enlace.is_some() && self.fase != Fase::Sola {
+            let inicio = self.inicio_destruccion();
+            let sesion = self.sesion_destruccion(inicio);
+            let firma = destruccion::firma(&self.identidad, &sesion, clave, ahora);
+            // Plain, not inside Olm: the session may be the thing that failed. The signature is
+            // what the other side trusts.
+            self.manda(json!({ "t": "destruir", "motivo": clave, "cuando": ahora, "inicio": inicio, "firma": firma }));
+        }
+        self.cadena.anota(
+            ahora,
+            Nivel::Inusual,
+            guardiana_secure::prueba::Hecho {
+                texto: motivo.texto(),
+                proceso: motivo.programa().map(str::to_owned),
+                ruta: None,
+                sha256_exe: None,
+                evidencia: Some(format!("GUARDIANA SECURE · destrucción · {clave}")),
+            },
+        );
+        self.guarda_destruccion(ahora, clave);
+        self.monitor.anota(ahora, Nivel::Inusual, motivo.texto());
+        self.destruida = Some(json!({
+            "cuando": ahora,
+            "motivo": clave,
+            "programa": motivo.programa(),
+            "contacto": self.nombre_contacto,
+            "otro_lado": matches!(motivo, MotivoDestruccion::OtroLado(_)),
+        }));
+        self.reconexion = None;
+        // The phone that carries this conversation empties its screen too (guardianagroup.com/m/).
+        if let Some(m) = &self.movil {
+            m.manda(crate::movil::Hacia::Estado(
+                json!({ "tipo": "secure_destruida", "motivo": clave }).to_string(),
+            ));
+            std::thread::sleep(Duration::from_millis(60));
+        }
+        self.cerrar("destruida por seguridad");
+        // What `cerrar` keeps for a normal end goes too: the lists of files, the summaries.
+        self.enviados.clear();
+        self.recibidos.clear();
+        self.caducan.clear();
+        self.resumen = None;
+        self.informe = None;
+        self.media_para_pagina.clear();
+        self.rtc_para_pagina.clear();
+        self.puente_para_pagina.clear();
+        self.calidad_pc = None;
+        self.mensajes.clear();
+        self.aviso("sec_destruida", clave);
+        self.novedad = true;
+        self.cambio = true;
+    }
+
+    /// The signed chain of this conversation, kept as evidence of the destruction: what tripped
+    /// and when, never a message, a file or an address.
+    fn guarda_destruccion(&self, cuando: u64, clave: &str) {
+        let carpeta = self.datos.join("destrucciones");
+        if std::fs::create_dir_all(&carpeta).is_err() {
+            return;
+        }
+        let prueba = Prueba::firmar(&self.identidad, self.cadena.clone(), &self.version, cuando);
+        let _ = std::fs::write(
+            carpeta.join(format!("{cuando}-{clave}.json")),
+            prueba.to_json(),
+        );
+    }
+
+    /// The second the destruction notice is bound to: the conversation's opening second once it
+    /// is open (both sides share it), 0 before.
+    fn inicio_destruccion(&self) -> u64 {
+        if self.fase == Fase::Lista {
+            self.inicio
+        } else {
+            0
+        }
+    }
+
+    /// The session a notice names: both identity keys, in byte order, and `inicio`.
+    fn sesion_destruccion(&self, inicio: u64) -> String {
+        let mia = self.identidad.public_key().to_bytes().to_vec();
+        let suya = self
+            .verificado
+            .map(|v| v.curve())
+            .or_else(|| self.tarjeta_otra.as_ref().map(tarjeta::Tarjeta::curve))
+            .map(|k| k.to_bytes().to_vec())
+            .unwrap_or_default();
+        if mia <= suya {
+            destruccion::sesion(&mia, &suya, inicio)
+        } else {
+            destruccion::sesion(&suya, &mia, inicio)
+        }
+    }
+
+    /// The other side destroyed the conversation: if the notice is signed by the key verified
+    /// for it, about this conversation and recent, do the same here; anything else is ignored
+    /// (nobody on the road can cut a conversation by forging one).
+    fn destruir_recibido(&mut self, v: &Value) {
+        let Some(firmante) = self
+            .verificado
+            .map(|x| x.signing())
+            .or_else(|| self.tarjeta_otra.as_ref().map(tarjeta::Tarjeta::signing))
+        else {
+            return;
+        };
+        let (Some(cuando), Some(inicio)) = (v["cuando"].as_u64(), v["inicio"].as_u64()) else {
+            return;
+        };
+        let motivo = v["motivo"].as_str().unwrap_or_default();
+        let firma = v["firma"].as_str().unwrap_or_default();
+        if ahora_s().abs_diff(cuando) > 300 || self.inicio_destruccion().abs_diff(inicio) > 5 {
+            return;
+        }
+        let sesion = self.sesion_destruccion(inicio);
+        if !destruccion::comprueba(firmante, &sesion, motivo, cuando, firma) {
+            return;
+        }
+        self.destruye(
+            MotivoDestruccion::OtroLado(MotivoDestruccion::de_clave(motivo).to_owned()),
+            false,
+        );
+    }
+
+    /// The last destruction, for the notice (null when none).
+    #[must_use]
+    pub fn destruida(&self) -> Option<&Value> {
+        self.destruida.as_ref()
+    }
+
+    /// The person closed the notice.
+    pub fn olvida_destruida(&mut self) {
+        if self.destruida.take().is_some() {
+            self.cambio = true;
+        }
+    }
+
+    /// Sign a chain with this computer's identity (the delivery room's ledger uses it too).
+    #[must_use]
+    pub fn firma_cadena(&self, cadena: Cadena) -> String {
+        Prueba::firmar(&self.identidad, cadena, &self.version, ahora_s()).to_json()
+    }
+
+    /// Messages and files that disappear after `segundos` (0: off). Told to the other side, so
+    /// both screens use the same timer, as in the big apps.
+    pub fn pon_temporizador(&mut self, segundos: u64, decirlo: bool) {
+        let s = segundos.min(TEMPORIZADOR_MAX);
+        if s == self.temporizador {
+            return;
+        }
+        self.temporizador = s;
+        if decirlo && self.fase == Fase::Lista {
+            self.manda_olm(json!({ "m": "temporizador", "s": s }));
+        }
+        self.cambio = true;
+    }
+
+    /// The timer in use.
+    #[must_use]
+    pub fn temporizador(&self) -> u64 {
+        self.temporizador
+    }
+
+    /// Messages whose time came leave the screen, and files whose time came leave the disk.
+    fn caducidades(&mut self) {
+        let ahora = ahora_s();
+        if crate::mensaje::purga(&mut self.mensajes, ahora) {
+            self.cambio = true;
+        }
+        if self.caducan.is_empty() {
+            return;
+        }
+        let idos: Vec<u64> = self
+            .caducan
+            .iter()
+            .filter(|(_, t)| *t <= ahora)
+            .map(|(id, _)| *id)
+            .collect();
+        self.caducan.retain(|(_, t)| *t > ahora);
+        for id in idos {
+            self.borra_recibido(id);
+        }
+    }
+
+    /// What the «Escudo en directo» shows (18 Oct 2026, the owner: «somos como un escudo»): every
+    /// line a check this program really made, with the second it was last true. Nothing is
+    /// estimated here; a line without a measure says so.
+    #[must_use]
+    pub fn escudo_json(&self) -> Value {
+        let verificado = self.verificado.is_some();
+        let olm = self.conversacion.is_some();
+        let movil_aqui = self
+            .movil
+            .as_ref()
+            .is_some_and(|m| m.enganchado && m.aprobado);
+        let mut dispositivos = Vec::new();
+        if self.fase != Fase::Sola {
+            dispositivos.push("este_equipo");
+            if self.tarjeta_otra.is_some() {
+                dispositivos.push(if self.otro_movil {
+                    "movil_del_otro"
+                } else {
+                    "equipo_del_otro"
+                });
+            }
+            if movil_aqui {
+                dispositivos.push("mi_movil");
+            }
+        }
+        let en_uso: Vec<Value> = self
+            .vigia
+            .en_uso
+            .iter()
+            .map(|(p, r)| json!({ "programa": p, "recurso": r }))
+            .collect();
+        json!({
+            "identidad": {
+                "ok": verificado,
+                "desde": (self.verificado_en > 0).then_some(self.verificado_en),
+                "contacto": self.nombre_contacto,
+            },
+            "cifrado": {
+                "olm": olm,
+                "cuantico": self.capa.is_some(),
+                "renovado": (self.capa_desde > 0).then_some(self.capa_desde),
+                "epocas": self.capa_epocas,
+                "renueva_cada": cuantico::RENUEVA_CADA,
+                "renueva_s": cuantico::RENUEVA_S,
+            },
+            "ruta": {
+                "directa": self.monitor.transporte.directo,
+                "rele": self.rele,
+                "rele_nombre": self.rele_usado,
+                "camino": self.camino().0,
+                "ciudad": self.camino().1,
+            },
+            "vigia": {
+                // Only Windows records it; elsewhere the line says it is not measured.
+                "activa": self.vigia.activa,
+                "mirado": (self.vigia_visto > 0).then_some(self.vigia_visto),
+                "en_uso": en_uso,
+                "pantalla_protegida": self.vigia.pantalla_protegida,
+            },
+            "integridad": {
+                "mensajes_ok": self.abiertos_ok,
+                "mensajes_mal": self.abiertos_mal,
+                "trozos_ok": self.trozos_ok,
+                "trozos_mal": self.trozos_mal,
+            },
+            "dispositivos": dispositivos,
+            "auto_destruccion": self.auto_destruccion,
+            "temporizador": self.temporizador,
+        })
+    }
+
     /// Drop the link and forget the handshake; the identity and the book stay.
     pub fn cerrar(&mut self, por: &str) {
         if self.enlace.is_some() && self.fase != Fase::Sola {
@@ -1235,11 +1604,23 @@ impl Secure {
         self.sas_mac_otra = None;
         self.verificado = None;
         self.conversacion = None;
-        self.entrada = None;
+        // A file half received goes too: nothing of the conversation stays on the disk.
+        if let Some(r) = self.entrada.take().and_then(|e| e.ruta) {
+            let _ = std::fs::remove_file(r);
+        }
         self.salida = None;
         self.cuantico_oferta = None;
         self.capa = None;
         self.cuantico_visto = false;
+        self.capa_desde = 0;
+        self.capa_epocas = 0;
+        self.verificado_en = 0;
+        self.abiertos_ok = 0;
+        self.abiertos_mal = 0;
+        self.trozos_ok = 0;
+        self.trozos_mal = 0;
+        self.temporizador = 0;
+        self.caducan.clear();
         self.llamada = None;
         self.entrante = None;
         self.perdida = None;
@@ -1254,6 +1635,8 @@ impl Secure {
         self.turn_rx = None;
         self.turn_pedido = 0;
         self.rtc_para_pagina.clear();
+        self.puente_para_pagina.clear();
+        self.calidad_pc = None;
         // A pause belongs to the conversation that had the incident: the next one starts
         // running (17 Oct 2026 review: it stayed paused until the program restarted, and the
         // next conversation hung at «abriendo»). A changed key is caught again by `hola`.
@@ -1299,7 +1682,20 @@ impl Secure {
     /// Called every tick: everything the network thread left, and the handshake that follows.
     pub fn tic(&mut self) {
         self.movil_tic();
+        self.relevo_tic();
         self.timbres();
+        self.caducidades();
+        // A quiet conversation renews its post-quantum epoch on the clock too (18 Oct 2026).
+        if self.fase == Fase::Lista
+            && self.estado.en_marcha()
+            && self.cuantico_oferta.is_none()
+            && self
+                .capa
+                .as_ref()
+                .is_some_and(|c| cuantico::toca_renovar(c.sellados(), self.capa_desde, ahora_s()))
+        {
+            self.cuantico_empieza();
+        }
         self.sigue_envio();
         self.di_dispositivo();
         self.reconexion_tic();
@@ -1553,6 +1949,7 @@ impl Secure {
             "olm" => self.olm(&v),
             "bloque" => self.bloque(&v),
             "media" => self.media_entrante(&v),
+            "destruir" => self.destruir_recibido(&v),
             _ => {}
         }
     }
@@ -1606,6 +2003,11 @@ impl Secure {
                         format!("la clave de identidad de {n} no es la verificada"),
                         0,
                     );
+                    // Another device under a known name: an unexpected device (18 Oct 2026).
+                    if self.auto_destruccion {
+                        self.destruir(MotivoDestruccion::DispositivoNuevo);
+                        return;
+                    }
                 }
             }
         }
@@ -1654,6 +2056,7 @@ impl Secure {
     pub fn sas_persona(&mut self, iguales: bool, nombre: &str) {
         if !iguales {
             self.aviso("sec_sas_no", "");
+            self.destruir(MotivoDestruccion::CodigoDistinto);
             self.cerrar("los números no coincidían");
             return;
         }
@@ -1698,6 +2101,7 @@ impl Secure {
                     self.nombre_contacto = agenda::huella_corta(t.signing());
                 }
                 let n = self.nombre_contacto.clone();
+                self.verificado_en = ahora_s();
                 self.agenda.fijar(&n, verificado, ahora_s());
                 self.guarda_agenda();
                 self.verificado = Some(verificado);
@@ -1722,6 +2126,7 @@ impl Secure {
                     "los números de verificación no cuadraron".to_owned(),
                     0,
                 );
+                self.destruir(MotivoDestruccion::CodigoDistinto);
                 self.cerrar("la verificación no cuadró");
             }
         }
@@ -1805,7 +2210,7 @@ impl Secure {
         let renovar = self
             .capa
             .as_ref()
-            .is_some_and(|c| c.sellados() >= cuantico::RENUEVA_CADA);
+            .is_some_and(|c| cuantico::toca_renovar(c.sellados(), self.capa_desde, ahora_s()));
         if let Some(capa) = &mut self.capa {
             // The post-quantum lock first; Olm wraps the sealed bytes as any other payload.
             match capa.sella(&bytes) {
@@ -1872,6 +2277,7 @@ impl Secure {
         };
         match abierto {
             Ok(plano) => {
+                self.abiertos_ok += 1;
                 self.monitor.recibido(ahora_s());
                 if let Ok(carga) = serde_json::from_slice::<Value>(&plano) {
                     if let Some(carga) = self.cuantico_abre(carga) {
@@ -1880,6 +2286,7 @@ impl Secure {
                 }
             }
             Err(e) => {
+                self.abiertos_mal += 1;
                 self.aviso("sec_err_olm", e.to_string());
                 self.fallo_abriendo(false);
             }
@@ -1924,6 +2331,7 @@ impl Secure {
                     "llegó un mensaje sin la capa poscuántica ya acordada".to_owned(),
                     1,
                 );
+                self.destruir(MotivoDestruccion::Manipulada);
                 return None;
             }
             return Some(carga);
@@ -1937,11 +2345,13 @@ impl Secure {
                 serde_json::from_slice::<Value>(&plano).ok()
             }
             Err(_) => {
+                self.abiertos_mal += 1;
                 self.incidente(
                     "cuantico_mal",
                     "un mensaje no pasó la capa poscuántica (repetido o alterado)".to_owned(),
                     1,
                 );
+                self.destruir(MotivoDestruccion::Repeticion);
                 None
             }
         }
@@ -1982,6 +2392,8 @@ impl Secure {
                             Some(capa) => capa.renueva(&secreto, &t),
                             None => self.capa = Some(cuantico::Capa::nueva(&secreto, &t, 1)),
                         }
+                        self.capa_desde = ahora_s();
+                        self.capa_epocas += 1;
                         self.monitor
                             .anota(ahora_s(), Nivel::Info, "capa poscuántica activa");
                         self.cambio = true;
@@ -2004,12 +2416,17 @@ impl Secure {
                             Some(capa) => capa.renueva(&secreto, &t),
                             None => self.capa = Some(cuantico::Capa::nueva(&secreto, &t, 0)),
                         }
+                        self.capa_desde = ahora_s();
+                        self.capa_epocas += 1;
                         self.monitor
                             .anota(ahora_s(), Nivel::Info, "capa poscuántica activa");
                         self.cambio = true;
                     }
                     Err(e) => self.aviso("sec_err_olm", e.to_string()),
                 }
+            }
+            "temporizador" => {
+                self.pon_temporizador(c["s"].as_u64().unwrap_or(0), false);
             }
             "grupo" => {
                 self.grupo = c["nombres"]
@@ -2044,7 +2461,12 @@ impl Secure {
                     return;
                 }
                 let re = mensaje::id_de(&c["re"]);
-                self.mensajes.push(Mensaje::del_otro(id, texto, de, re));
+                let mut m = Mensaje::del_otro(id, texto, de, re);
+                // A message that disappears: from when it arrived here, at most a week.
+                if let Some(d) = c["dura"].as_u64().filter(|&d| d > 0) {
+                    m.caduca = Some(m.t + d.min(TEMPORIZADOR_MAX));
+                }
+                self.mensajes.push(m);
                 self.por_ver.push(id);
                 self.otro_escribe = 0;
                 // Tell the sender it is here (its ✓✓): the relay never says that.
@@ -2114,7 +2536,7 @@ impl Secure {
                 let Ok(clave) = <[u8; 32]>::try_from(clave.as_slice()) else {
                     return;
                 };
-                let video = c["video"].as_bool().unwrap_or(false);
+                let video = c["video"].as_bool().unwrap_or(false) && VIDEO;
                 let mime_remoto = c["mime"].as_str().map(|m| m.chars().take(80).collect());
                 let otro = self.numero_del_otro();
                 if c["m"] == "llamada" && self.llamada.is_none() {
@@ -2167,7 +2589,9 @@ impl Secure {
             "rtc" => {
                 // For whoever talks here: the phone when it took the call, else the page.
                 let d = c["d"].clone();
-                if self.movil_manda() {
+                // With the bridge (18 Oct 2026) the page always holds the leg to the other side,
+                // also while the phone talks through it.
+                if self.movil_manda() && !self.puente_modo() {
                     if let Some(m) = &self.movil {
                         m.manda(crate::movil::Hacia::Estado(
                             json!({ "tipo": "secure_rtc", "d": d }).to_string(),
@@ -2361,6 +2785,7 @@ impl Secure {
     }
 
     fn vacia_bloques(&mut self) {
+        let mut ok_trozos = 0u64;
         let mut fallo: Option<&'static str> = None;
         let mut completo = false;
         let mut confirma: Option<(String, u64)> = None;
@@ -2373,6 +2798,7 @@ impl Secure {
                     }
                     match r.mete(n, &b) {
                         Ok(plano) => {
+                            ok_trozos += 1;
                             e.recibido += plano.len() as u64;
                             if f.write_all(&plano).is_err() {
                                 fallo = Some("sec_err_archivo");
@@ -2395,6 +2821,7 @@ impl Secure {
                 }
             }
         }
+        self.trozos_ok += ok_trozos;
         if let Some(clave) = fallo {
             if let Some(e) = self.entrada.take() {
                 if let Some(r) = &e.ruta {
@@ -2403,11 +2830,13 @@ impl Secure {
             }
             self.aviso(clave, "");
             if clave == "sec_archivo_mal" {
+                self.trozos_mal += 1;
                 self.incidente(
                     "archivo_mal",
                     "un bloque de archivo llegó alterado".to_owned(),
                     1,
                 );
+                self.destruir(MotivoDestruccion::Manipulada);
             }
             return;
         }
@@ -2441,6 +2870,12 @@ impl Secure {
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, format!("archivo recibido: {n}"));
                     let mut linea = Mensaje::archivo(n.clone(), false);
+                    if self.temporizador > 0 {
+                        linea.caduca = Some(linea.t + self.temporizador);
+                        if let Some(r) = self.recibidos.last() {
+                            self.caducan.push((r.id, linea.t + self.temporizador));
+                        }
+                    }
                     // A picture goes on to the linked phone so it shows in its chat.
                     if let Some(r) = self
                         .recibidos
@@ -2541,7 +2976,7 @@ impl Secure {
             self.cambia_mime(mime);
             return Ok(());
         }
-        self.empieza_llamada(video, true, mime);
+        self.empieza_llamada(video && VIDEO, true, mime);
         Ok(())
     }
 
@@ -2722,6 +3157,10 @@ impl Secure {
 
     /// One recorded piece from the page: encrypt it under the media layer and send it.
     pub fn media_saliente(&mut self, b64: &str) -> Result<(), String> {
+        // The phone carries the voice: what the page still records stays here.
+        if !self.relevo.pagina_envia(self.movil_listo()) {
+            return Ok(());
+        }
         let bytes = B64.decode(b64).map_err(|e| e.to_string())?;
         self.media_bytes(bytes)
     }
@@ -2822,17 +3261,23 @@ impl Secure {
             Ok(plano) => {
                 let (de, pieza) = sin_remitente(&plano);
                 l.bytes_recibidos += pieza.len() as u64;
-                match &self.movil {
-                    // On the phone only a two-person call: a group's pieces come from several people.
-                    Some(m) if m.enganchado && m.aprobado && de.is_empty() => {
+                // On the phone only a two-person call: a group's pieces come from several
+                // people. While the voice moves there, both players get them (make before break).
+                let listo = self
+                    .movil
+                    .as_ref()
+                    .is_some_and(|m| m.enganchado && m.aprobado);
+                let al_movil = de.is_empty() && self.relevo.piezas_al_movil(listo);
+                if al_movil {
+                    if let Some(m) = &self.movil {
                         m.manda(crate::movil::Hacia::Media(pieza.to_vec()));
                     }
-                    _ => {
-                        self.media_para_pagina
-                            .push_back((de.to_owned(), B64.encode(pieza)));
-                        if self.media_para_pagina.len() > 400 {
-                            self.media_para_pagina.pop_front();
-                        }
+                }
+                if !al_movil || self.relevo.piezas_a_pagina(listo) {
+                    self.media_para_pagina
+                        .push_back((de.to_owned(), B64.encode(pieza)));
+                    if self.media_para_pagina.len() > 400 {
+                        self.media_para_pagina.pop_front();
                     }
                 }
             }
@@ -2884,10 +3329,14 @@ impl Secure {
             return;
         }
         let t: String = texto.chars().take(8000).collect();
-        let m = Mensaje::mio(t.clone(), re);
+        let mut m = Mensaje::mio(t.clone(), re);
         let mut carga = json!({ "m": "texto", "texto": t, "id": m.id.to_string() });
         if let Some(re) = re {
             carga["re"] = json!(re.to_string());
+        }
+        if self.temporizador > 0 {
+            m.caduca = Some(m.t + self.temporizador);
+            carga["dura"] = json!(self.temporizador);
         }
         self.mensajes.push(m);
         self.manda_olm(carga);
@@ -3247,26 +3696,34 @@ impl Secure {
             self.archivos.bytes += bytes;
             self.monitor
                 .anota(ahora_s(), Nivel::Info, format!("archivo enviado: {nombre}"));
-            self.mensajes.push(Mensaje::archivo(nombre.clone(), true));
+            let mut linea = Mensaje::archivo(nombre.clone(), true);
+            if self.temporizador > 0 {
+                linea.caduca = Some(linea.t + self.temporizador);
+            }
+            self.mensajes.push(linea);
             self.cambio = true;
         }
         Ok(())
     }
 
-    /// What can be said about the other end right now: on a direct link, its address with the
-    /// country and network the bundled base gives (no lookup leaves this computer); through
-    /// the relay, nothing.
-    fn otro_extremo(&self) -> Option<OtroExtremo> {
-        if self.rele {
-            return None;
+    /// The path right now, as the card says it: `misma_red`, `directo`, `rele` or `ninguno`,
+    /// with the relay's city when through it. Never an address.
+    fn camino(&self) -> (&'static str, Option<&'static str>) {
+        match self.monitor.transporte.directo {
+            Some(true) => {
+                let misma = self.enlace.as_ref().and_then(Enlace::misma_red);
+                (
+                    if misma == Some(true) {
+                        "misma_red"
+                    } else {
+                        "directo"
+                    },
+                    None,
+                )
+            }
+            Some(false) => ("rele", self.rele_usado.as_deref().and_then(ciudad_de_rele)),
+            None => ("ninguno", None),
         }
-        let ip = self.enlace.as_ref()?.ip_del_otro()?;
-        let s = guardiana_lists::servidor_de(ip);
-        Some(OtroExtremo {
-            ip: ip.to_string(),
-            pais: s.pais.map(str::to_owned),
-            red: s.red.map(|r| r.nombre.to_owned()).filter(|n| !n.is_empty()),
-        })
     }
 
     /// Stop everything and keep the card: sends frozen, the call hung up, the monitor and the
@@ -3275,21 +3732,16 @@ impl Secure {
         if self.incidente.is_some() {
             return;
         }
-        let transporte = match self.monitor.transporte.directo {
-            Some(true) => "directo",
-            Some(false) => "rele",
-            None => "ninguno",
-        };
-        let otro = self.otro_extremo();
+        let (transporte, ciudad_rele) = self.camino();
         self.incidente = Some(Incidente {
             cuando: ahora_s(),
             senal,
             detalle: detalle.clone(),
             transporte,
+            ciudad_rele,
             fallos,
             contacto: self.nombre_contacto.clone(),
             zona_otra: self.zona_otra.clone(),
-            otro,
         });
         if let Some(l) = self.llamada.take() {
             self.manda_olm(json!({ "m": "cuelga" }));
@@ -3356,6 +3808,7 @@ impl Secure {
                 )
             };
             self.incidente(senal, detalle, n);
+            self.destruir(MotivoDestruccion::Manipulada);
         }
     }
 
@@ -3622,6 +4075,8 @@ impl Secure {
                 .anota(ahora_s(), Nivel::Info, "móvil aceptado por la persona");
             self.cambio = true;
         }
+        // During a call the voice moves only once the phone's leg is live.
+        self.relevo_empieza();
     }
 
     /// The page turned «Voz protegida» on or off: remember it and tell the other side.
@@ -3659,11 +4114,162 @@ impl Secure {
         self.otro_voz_protegida
     }
 
-    /// Whether the phone is the one talking right now.
-    fn movil_manda(&self) -> bool {
+    /// A phone is connected and the person accepted it.
+    fn movil_listo(&self) -> bool {
         self.movil
             .as_ref()
             .is_some_and(|m| m.enganchado && m.aprobado)
+    }
+
+    /// Whether the phone is the one talking right now: during a call, only once its own leg
+    /// carries the voice (make before break, [`crate::relevo`]).
+    fn movil_manda(&self) -> bool {
+        self.relevo
+            .movil_manda(self.movil_listo(), self.llamada.is_some())
+    }
+
+    /// The call goes by WebRTC (the relay's call service, both programs able).
+    fn rtc_disponible(&self) -> bool {
+        self.turn.is_some() && self.otro_rtc
+    }
+
+    /// The phone's voice travels by the bridge to this computer's page (not by pieces).
+    fn puente_modo(&self) -> bool {
+        self.relevo.puente(self.rtc_disponible())
+    }
+
+    /// What a step of the hand-off did: the monitor, the person and the screens are told.
+    fn relevo_suceso(&mut self, s: Option<crate::relevo::Suceso>) {
+        use crate::relevo::Suceso;
+        let Some(s) = s else { return };
+        match s {
+            Suceso::EnElMovil => {
+                self.monitor
+                    .anota(ahora_s(), Nivel::Info, "la voz de la llamada pasó al móvil");
+            }
+            Suceso::NoPaso => {
+                self.monitor.anota(
+                    ahora_s(),
+                    Nivel::Info,
+                    "no se pudo pasar la llamada al móvil; sigue en el equipo",
+                );
+                self.aviso("sec_mv_no_paso", "");
+            }
+            Suceso::Volvio => {
+                self.monitor.anota(
+                    ahora_s(),
+                    Nivel::Info,
+                    "la voz de la llamada volvió al equipo",
+                );
+            }
+        }
+        // The other side's player starts again with whoever records now.
+        self.reinicios += 1;
+        self.cambio = true;
+    }
+
+    /// Once a tick: the hand-off follows the phone and the call.
+    fn relevo_tic(&mut self) {
+        let antes = self.relevo.donde();
+        let conectada = self.llamada.as_ref().is_some_and(|l| l.conectada);
+        let s = self.relevo.tic(
+            self.movil_listo(),
+            self.llamada.is_some(),
+            conectada,
+            ahora_s(),
+        );
+        self.relevo_suceso(s);
+        if antes != self.relevo.donde() {
+            self.cambio = true;
+        }
+    }
+
+    /// Start moving the call's voice to the phone (accepted, back, or asked for).
+    fn relevo_empieza(&mut self) {
+        if self
+            .relevo
+            .empieza(self.movil_listo(), self.llamada.is_some(), ahora_s())
+        {
+            self.monitor
+                .anota(ahora_s(), Nivel::Info, "pasando la llamada al móvil");
+            self.cambio = true;
+        }
+    }
+
+    /// The person asked to move the call to the phone (on the phone or on this screen).
+    pub fn relevo_pasar(&mut self) {
+        self.relevo_empieza();
+    }
+
+    /// «Volver al PC»: during a call the voice comes back to this computer (whose leg never
+    /// stopped) and the phone stays for the chat; without a call the phone hands the whole
+    /// conversation back.
+    pub fn relevo_volver(&mut self) {
+        if self.llamada.is_none() {
+            self.movil_fin();
+            return;
+        }
+        let s = self.relevo.volver();
+        self.relevo_suceso(s);
+    }
+
+    /// A bridge message from the phone (offer, ICE candidate, end) for this computer's page.
+    fn puente_del_movil(&mut self, d: Value) {
+        if self.llamada.is_none() || !self.puente_modo() {
+            return;
+        }
+        let grande = match serde_json::to_vec(&d) {
+            Ok(v) => v.len() > 64 * 1024,
+            Err(_) => true,
+        };
+        if !grande && self.puente_para_pagina.len() < 256 {
+            self.puente_para_pagina.push_back(d);
+        }
+    }
+
+    /// A bridge message from this computer's page (answer, ICE candidate) for the phone.
+    pub fn puente_de_pagina(&mut self, d: &Value) {
+        let grande = match serde_json::to_vec(d) {
+            Ok(v) => v.len() > 64 * 1024,
+            Err(_) => true,
+        };
+        if grande || !self.movil_listo() {
+            return;
+        }
+        if let Some(m) = &self.movil {
+            m.manda(crate::movil::Hacia::Estado(
+                json!({ "tipo": "secure_puente", "d": d }).to_string(),
+            ));
+        }
+    }
+
+    /// The page says its bridge to the phone carries sound: the voice is on the phone.
+    pub fn puente_listo(&mut self) {
+        let s = self.relevo.puente_listo(self.movil_listo());
+        self.relevo_suceso(s);
+    }
+
+    /// The page's bridge broke or never came up; `sin_rtc`: the page's own leg left WebRTC.
+    pub fn puente_fallo(&mut self, sin_rtc: bool) {
+        let s = self.relevo.puente_fallo(sin_rtc, ahora_s());
+        self.relevo_suceso(s);
+    }
+
+    /// How the computer's leg of the call sounds, as the page estimated it.
+    pub fn calidad(&mut self, nivel: &str) {
+        if matches!(nivel, "excelente" | "buena" | "debil") && self.llamada.is_some() {
+            self.calidad_pc = Some((nivel.to_owned(), ahora_s()));
+        }
+    }
+
+    /// The page's estimate, while it is fresh (6 s: it comes every 2 s).
+    fn calidad_pc_json(&self) -> Value {
+        match &self.calidad_pc {
+            Some((n, t)) if self.llamada.is_some() && ahora_s().saturating_sub(*t) <= 6 => {
+                json!(n)
+            }
+            _ => Value::Null,
+        }
     }
 
     fn movil_tic(&mut self) {
@@ -3681,6 +4287,22 @@ impl Secure {
                 self.movil_puerta_rx = None;
                 self.cambio = true;
             }
+        }
+        // A code nobody used within a minute is replaced by a new one (18 Oct 2026).
+        if self
+            .movil
+            .as_ref()
+            .is_some_and(crate::movil::Movil::caducado)
+        {
+            let idioma = self.movil_idioma.clone();
+            self.movil = None;
+            if let Some(p) = self.movil_puerta.take() {
+                std::thread::spawn(move || p.cierra());
+            }
+            if self.movil_empieza(&idioma).is_err() {
+                self.cambio = true;
+            }
+            return;
         }
         let Some(m) = &mut self.movil else {
             return;
@@ -3705,6 +4327,11 @@ impl Secure {
                     self.novedad = true;
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "un móvil se ha conectado");
+                    // An accepted phone that comes back during a call takes it again, the
+                    // same way: the computer keeps it until the phone's leg is live.
+                    if aprobado {
+                        self.relevo_empieza();
+                    }
                 }
                 Desde::Soltado => {
                     self.aviso("sec_mv_soltado", "");
@@ -3754,9 +4381,25 @@ impl Secure {
                 Desde::Sas { ok, nombre } if aprobado => self.sas_persona(ok, &nombre),
                 Desde::PideInicio if aprobado => self.pide_inicio(),
                 Desde::VozProtegida(a) if aprobado => self.voz_protegida(a),
-                Desde::Rtc(d) if aprobado => self.rtc(&d),
+                // The phone's own WebRTC leg to the other side (a page from before the bridge):
+                // only once it holds the voice and the call does not go by the bridge.
+                Desde::Rtc(d)
+                    if aprobado
+                        && self.relevo.donde() == crate::relevo::Donde::Movil
+                        && !self.puente_modo() =>
+                {
+                    self.rtc(&d);
+                }
+                Desde::Puente(d) if aprobado => self.puente_del_movil(d),
+                Desde::Volver if aprobado => self.relevo_volver(),
+                Desde::Pasar if aprobado => self.relevo_pasar(),
                 Desde::Media(b) if aprobado => {
-                    let _ = self.media_bytes(b);
+                    // Make before break with pieces: the phone's first piece moves the voice.
+                    let (vale, s) = self.relevo.pieza_del_movil(true);
+                    self.relevo_suceso(s);
+                    if vale {
+                        let _ = self.media_bytes(b);
+                    }
                 }
                 _ => {}
             }
@@ -3779,6 +4422,8 @@ impl Secure {
             "pendiente": m.pendiente,
             "aprobado": m.aprobado,
             "habla": self.movil_manda(),
+            "listo": self.movil_listo(),
+            "paso": self.relevo.json(self.rtc_disponible(), ahora_s()),
             "qr": tarjeta::qr_svg(&enlace).ok(),
             "fuera": self.movil_puerta.is_some(),
             "puerta_error": self.movil_puerta_error,
@@ -3826,7 +4471,7 @@ impl Secure {
         };
         let mut monitor = serde_json::to_value(&self.monitor).unwrap_or(Value::Null);
         monitor["sesion"] = serde_json::to_value(&self.estado).unwrap_or(Value::Null);
-        json!({
+        let mut e = json!({
             "tipo": "secure_estado",
             "fase": fase,
             "puerto": self.puerto,
@@ -3846,7 +4491,7 @@ impl Secure {
             "tarjeta": self.tarjeta(),
             "contacto": self.nombre_contacto,
             "numeros": self.numeros().map(|(a, b, c)| vec![a, b, c]),
-            "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "conectada": l.conectada, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto, "reinicio": self.reinicios, "rtc": self.rtc_json() })),
+            "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "conectada": l.conectada, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto, "reinicio": self.reinicios, "rtc": self.rtc_json(), "calidad_pc": self.calidad_pc_json() })),
             "entrante": self.entrante.as_ref().map(|t| json!({ "video": t.video, "de": self.nombre_contacto, "desde": t.desde })),
             "perdida": self.perdida.map(|(t, video)| json!({ "t": t, "video": video, "de": self.nombre_contacto })),
             "recibidos": self.recibidos.iter().map(Recibido::json).collect::<Vec<_>>(),
@@ -3868,7 +4513,12 @@ impl Secure {
             },
             "informe": self.informe.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "inicio": r.inicio, "fin": r.fin, "veredicto": r.veredicto, "sin_espionaje": r.veredicto.as_ref().is_some_and(Veredicto::sin_espionaje), "conexion": r.conexion, "observadas": r.observadas, "inusuales": r.inusuales, "firmante": r.firmante, "firma": r.firma, "hash_cadena": r.hash_cadena })),
             "resumen": self.resumen.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "mensajes": r.mensajes_enviados + r.mensajes_recibidos, "archivos": r.archivos.enviados + r.archivos.recibidos, "observadas": r.observadas, "inusuales": r.inusuales, "fin": r.fin })),
-        })
+        });
+        e["escudo"] = self.escudo_json();
+        e["video"] = json!(VIDEO);
+        e["temporizador"] = json!(self.temporizador);
+        e["temporizadores"] = json!(TEMPORIZADORES);
+        e
     }
 }
 
@@ -3925,16 +4575,22 @@ fn sin_remitente(plano: &[u8]) -> (&str, &[u8]) {
     )
 }
 
+/// The key that locks the identity and the book: sealed with DPAPI for this Windows account
+/// since 18 Oct 2026 (an older plain file is sealed on the first read), owner-only elsewhere.
 fn lee_o_crea_clave(ruta: &Path) -> [u8; 32] {
-    if let Ok(b) = std::fs::read(ruta) {
-        if let Ok(k) = <[u8; 32]>::try_from(b.as_slice()) {
-            return k;
-        }
-    }
-    let mut k = [0u8; 32];
-    crate::sesion::azar(&mut k);
-    let _ = std::fs::write(ruta, k);
-    k
+    let nueva = || {
+        let mut k = [0u8; 32];
+        crate::sesion::azar(&mut k);
+        Some(k.to_vec())
+    };
+    crate::dpapi::lee_o_crea(ruta, nueva, |b| b.len() == 32)
+        .and_then(|b| <[u8; 32]>::try_from(b.as_slice()).ok())
+        .unwrap_or_else(|| {
+            // No disk at all: a key for this run only (nothing can be restored later).
+            let mut k = [0u8; 32];
+            crate::sesion::azar(&mut k);
+            k
+        })
 }
 
 fn limpia_nombre(n: &str) -> String {
@@ -4014,6 +4670,40 @@ fn puerto_al_azar() -> u16 {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    #[test]
+    fn the_path_is_named_without_an_address() {
+        use std::net::IpAddr;
+        for (ip, misma) in [
+            ("192.168.1.20", true),
+            ("10.0.0.5", true),
+            ("172.16.3.4", true),
+            ("169.254.1.1", true),
+            ("127.0.0.1", true),
+            ("fe80::1", true),
+            ("fd12::1", true),
+            ("::1", true),
+            ("203.0.113.7", false),
+            ("8.8.8.8", false),
+            ("2001:db8::1", false),
+        ] {
+            assert_eq!(
+                super::es_misma_red(ip.parse::<IpAddr>().unwrap()),
+                misma,
+                "{ip}"
+            );
+        }
+        assert_eq!(
+            super::ciudad_de_rele("rele.guardianagroup.com:443"),
+            Some("Núremberg")
+        );
+        assert_eq!(
+            super::ciudad_de_rele("rele-am.guardianagroup.com:443"),
+            Some("Miami")
+        );
+        assert_eq!(super::ciudad_de_rele("207.246.115.38:443"), Some("Miami"));
+        assert_eq!(super::ciudad_de_rele("127.0.0.1:9"), None);
+    }
+
     #[test]
     fn received_names_cannot_hide_a_program_or_a_device() {
         assert_eq!(super::limpia_nombre("x.exe."), "x.exe");
@@ -4139,8 +4829,10 @@ mod tests {
         assert!(b.monitor.cifrado.recibidos >= 2);
 
         // Three frames that fail to open within ten seconds: a stop that looks like an
-        // interference, with the card, the signed report, and (direct link) the other end's
-        // address for this card only; the person closes it and the card goes.
+        // interference, with the card and the signed report, which say «directo por la misma
+        // red» and never the other end's address; the person closes it and the card goes. (With the
+        // destruction on an anomaly turned off: the old pause; see the next test for it on.)
+        b.auto_destruccion = false;
         assert!(b.estado_json()["incidente"].is_null());
         b.fallo_abriendo(false);
         assert!(
@@ -4152,13 +4844,21 @@ mod tests {
         let inc = b.estado_json()["incidente"].clone();
         assert_eq!(inc["senal"], "olm_fallos");
         assert_eq!(inc["fallos"], 3);
-        assert_eq!(inc["transporte"], "directo");
-        assert_eq!(inc["otro"]["ip"], "127.0.0.1");
+        assert_eq!(inc["transporte"], "misma_red");
+        assert!(inc.get("otro").is_none(), "no other end on the card");
+        assert!(
+            !inc.to_string().contains("127.0.0.1"),
+            "no address on the card"
+        );
         assert!(!b.estado.en_marcha(), "sends are frozen");
         let informe: Value = serde_json::from_str(&b.informe_incidente().unwrap()).unwrap();
         assert_eq!(informe["tipo"], "guardiana-secure-incidente");
         assert_eq!(informe["incidente"]["senal"], "olm_fallos");
         assert!(informe["prueba"]["firma"].is_string());
+        assert!(
+            !b.informe_incidente().unwrap().contains("127.0.0.1"),
+            "no address in the saved report"
+        );
         b.olvida_incidente();
         assert!(b.estado_json()["incidente"].is_null());
 
@@ -4331,6 +5031,8 @@ mod tests {
         b.sas_persona(true, "Ana");
         gira(&mut a, &mut b, 25);
         assert_eq!(b.estado_json()["fase"], "lista");
+        // The old pause (destruction on an anomaly is tested on its own below).
+        b.auto_destruccion = false;
 
         // GUARDIANA's own window and its engine never count; a recorder that is on now does.
         let ahora = ahora_s();
@@ -4412,6 +5114,192 @@ mod tests {
         assert_eq!(a.estado_json()["informe"]["sin_espionaje"], false);
         a.olvida_informe();
         assert!(a.estado_json()["informe"].is_null());
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    /// Two computers verified and talking, through a port on this computer.
+    fn par(base: &Path) -> (Secure, Secure) {
+        let (da, db) = (base.join("a"), base.join("b"));
+        std::fs::create_dir_all(&da).unwrap();
+        std::fs::create_dir_all(&db).unwrap();
+        let mut a = Secure::abre(&da, &da);
+        let mut b = Secure::abre(&db, &db);
+        let puerto = a.escuchar_efimero().unwrap();
+        b.conectar(&format!("127.0.0.1:{puerto}")).unwrap();
+        gira(&mut a, &mut b, 25);
+        a.sas_persona(true, "Bea");
+        b.sas_persona(true, "Ana");
+        gira(&mut a, &mut b, 25);
+        assert_eq!(a.estado_json()["fase"], "lista");
+        assert_eq!(b.estado_json()["fase"], "lista");
+        (a, b)
+    }
+
+    #[test]
+    fn a_recorder_that_starts_destroys_the_talk_on_both_sides_and_leaves_signed_evidence() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let base = std::env::temp_dir().join(format!("guardiana-destruye-{}", std::process::id()));
+        let (mut a, mut b) = par(&base);
+        a.texto("confidencial");
+        gira(&mut a, &mut b, 15);
+        assert_eq!(b.mensajes.last().unwrap().texto, "confidencial");
+        // The shield's lines come from real events.
+        let e = b.estado_json()["escudo"].clone();
+        assert_eq!(e["identidad"]["ok"], true);
+        assert!(e["identidad"]["desde"].as_u64().is_some());
+        assert_eq!(e["cifrado"]["olm"], true);
+        assert!(e["integridad"]["mensajes_ok"].as_u64().unwrap() >= 1);
+        assert_eq!(e["integridad"]["mensajes_mal"], 0);
+        assert_eq!(e["dispositivos"], json!(["este_equipo", "equipo_del_otro"]));
+        // A recorder starts on b's microphone during the talk.
+        let ft = |t: u64| (t + 11_644_473_600) * 10_000_000;
+        let grabador = crate::vigia::de_registro(
+            "C:#Users#x#Grabador.exe",
+            crate::vigia::Recurso::Microfono,
+            ft(ahora_s() + 1),
+            0,
+        )
+        .unwrap();
+        b.vigia(&[grabador]);
+        let d = b.estado_json();
+        assert_eq!(d["fase"], "sola");
+        assert!(b.mensajes.is_empty(), "nothing of the talk stays on screen");
+        assert!(b
+            .destruida()
+            .is_some_and(|d| d["motivo"] == "microfono" && d["programa"] == "Grabador.exe"));
+        // The evidence: the signed chain, on disk, with the program and no message.
+        let dir = base.join("b").join("secure").join("destrucciones");
+        let f = std::fs::read_dir(&dir)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let texto = std::fs::read_to_string(&f).unwrap();
+        let p = Prueba::from_json(&texto).unwrap();
+        assert!(p.verificar().is_ok());
+        assert!(texto.contains("Grabador.exe"));
+        assert!(!texto.contains("confidencial"));
+        assert!(!texto.contains("127.0.0.1"));
+        // The other side got the signed notice and did the same.
+        gira(&mut a, &mut b, 15);
+        assert_eq!(a.estado_json()["fase"], "sola");
+        assert!(a.mensajes.is_empty());
+        assert!(a
+            .destruida()
+            .is_some_and(|d| d["motivo"] == "otro_lado" && d["otro_lado"] == true));
+        a.olvida_destruida();
+        assert!(a.destruida().is_none());
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn a_forged_or_foreign_destruction_notice_is_ignored() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let base = std::env::temp_dir().join(format!("guardiana-falsa-{}", std::process::id()));
+        let (a, mut b) = par(&base);
+        let ahora = ahora_s();
+        let inicio = b.inicio_destruccion();
+        let sesion = b.sesion_destruccion(inicio);
+        // Signed by a stranger (the relay, say), or for another conversation: nothing happens.
+        let extrano = Identity::new();
+        b.trama(
+            json!({ "t": "destruir", "motivo": "microfono", "cuando": ahora, "inicio": inicio,
+            "firma": destruccion::firma(&extrano, &sesion, "microfono", ahora) }),
+        );
+        b.trama(json!({ "t": "destruir", "motivo": "microfono", "cuando": ahora, "inicio": inicio + 1000,
+            "firma": destruccion::firma(&a.identidad, &b.sesion_destruccion(inicio + 1000), "microfono", ahora) }));
+        b.trama(json!({ "t": "destruir", "motivo": "microfono", "cuando": ahora - 3600, "inicio": inicio,
+            "firma": destruccion::firma(&a.identidad, &sesion, "microfono", ahora - 3600) }));
+        assert_eq!(b.estado_json()["fase"], "lista");
+        assert!(b.destruida().is_none());
+        // Both sides name the session the same way; a's real notice is obeyed.
+        assert_eq!(a.sesion_destruccion(a.inicio_destruccion()), sesion);
+        b.trama(
+            json!({ "t": "destruir", "motivo": "camara", "cuando": ahora, "inicio": inicio,
+            "firma": destruccion::firma(&a.identidad, &sesion, "camara", ahora) }),
+        );
+        assert_eq!(b.estado_json()["fase"], "sola");
+        assert!(b.destruida().is_some_and(|d| d["motivo"] == "otro_lado"));
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn numbers_that_do_not_match_or_a_burst_of_bad_frames_destroy_the_talk() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let base = std::env::temp_dir().join(format!("guardiana-sas-{}", std::process::id()));
+        let (da, db) = (base.join("a"), base.join("b"));
+        std::fs::create_dir_all(&da).unwrap();
+        std::fs::create_dir_all(&db).unwrap();
+        let mut a = Secure::abre(&da, &da);
+        let mut b = Secure::abre(&db, &db);
+        let puerto = a.escuchar_efimero().unwrap();
+        b.conectar(&format!("127.0.0.1:{puerto}")).unwrap();
+        gira(&mut a, &mut b, 25);
+        assert!(a.numeros().is_some());
+        a.sas_persona(false, "");
+        assert!(a
+            .destruida()
+            .is_some_and(|d| d["motivo"] == "codigo_distinto"));
+        gira(&mut a, &mut b, 15);
+        assert_eq!(b.estado_json()["fase"], "sola");
+        assert!(
+            b.destruida().is_some(),
+            "told with a signed notice before the link closed"
+        );
+        let _ = std::fs::remove_dir_all(&base);
+
+        let (mut a, mut b) = par(&base);
+        a.texto("uno");
+        gira(&mut a, &mut b, 10);
+        b.fallo_abriendo(false);
+        b.fallo_abriendo(false);
+        b.fallo_abriendo(false);
+        assert!(b.destruida().is_some_and(|d| d["motivo"] == "manipulada"));
+        assert!(b.mensajes.is_empty());
+        gira(&mut a, &mut b, 15);
+        assert!(a.destruida().is_some());
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn disappearing_messages_go_from_both_screens_and_frames_are_padded() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let base = std::env::temp_dir().join(format!("guardiana-temporal-{}", std::process::id()));
+        let (mut a, mut b) = par(&base);
+        a.pon_temporizador(30, true);
+        gira(&mut a, &mut b, 10);
+        assert_eq!(b.temporizador(), 30, "both screens use the same timer");
+        a.texto("se borra");
+        gira(&mut a, &mut b, 10);
+        let t = b.mensajes.last().unwrap().clone();
+        assert_eq!(t.texto, "se borra");
+        assert!(t.caduca.is_some_and(|c| c >= t.t + 30));
+        assert!(a.mensajes.last().unwrap().caduca.is_some());
+        // Time passes (the lines carry their own end): both go.
+        for m in a.mensajes.iter_mut().chain(b.mensajes.iter_mut()) {
+            m.caduca = m.caduca.map(|_| 1);
+        }
+        gira(&mut a, &mut b, 2);
+        assert!(a.mensajes.iter().all(|m| m.texto != "se borra"));
+        assert!(b.mensajes.iter().all(|m| m.texto != "se borra"));
+        // Every frame on the wire is one of a few sizes.
+        let mut v = serde_json::to_vec(&json!({ "t": "latido" })).unwrap();
+        guardiana_secure::relleno::rellena(&mut v, b' ', MAX_FRAME);
+        assert_eq!(v.len(), guardiana_secure::relleno::MINIMO);
+        // Video stays off: a call asked with video is voice.
+        a.llamar(true, "audio/webm;codecs=opus").unwrap();
+        assert_eq!(a.estado_json()["llamada"]["video"], false);
+        assert_eq!(a.estado_json()["video"], false);
+        a.colgar();
         let _ = std::fs::remove_dir_all(base);
     }
 }

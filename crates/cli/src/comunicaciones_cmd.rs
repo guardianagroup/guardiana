@@ -92,6 +92,11 @@ const ARCHIVOS: &[(&str, &str, &[u8])] = &[
         include_bytes!("../../../zero/navegador/interfaz/puente.js"),
     ),
     (
+        "/relevo.js",
+        JS,
+        include_bytes!("../../../zero/navegador/interfaz/relevo.js"),
+    ),
+    (
         "/voz.js",
         JS,
         include_bytes!("../../../zero/navegador/interfaz/voz.js"),
@@ -100,6 +105,31 @@ const ARCHIVOS: &[(&str, &str, &[u8])] = &[
         "/interruptor.js",
         JS,
         include_bytes!("../../../zero/navegador/interfaz/interruptor.js"),
+    ),
+    (
+        "/opus.js",
+        JS,
+        include_bytes!("../../../zero/navegador/interfaz/opus.js"),
+    ),
+    (
+        "/voz-eleccion.js",
+        JS,
+        include_bytes!("../../../zero/navegador/interfaz/voz-eleccion.js"),
+    ),
+    (
+        "/escudo-directo.js",
+        JS,
+        include_bytes!("../../../zero/navegador/interfaz/escudo-directo.js"),
+    ),
+    (
+        "/entrega.js",
+        JS,
+        include_bytes!("../../../zero/navegador/interfaz/entrega.js"),
+    ),
+    (
+        "/entrega.css",
+        CSS,
+        include_bytes!("../../../zero/navegador/interfaz/entrega.css"),
     ),
     (
         "/diseno.css",
