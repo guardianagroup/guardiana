@@ -1440,7 +1440,7 @@
   "ent_quitar": "Remove from the list",
   "ent_libro": "Download the signed record",
   "ent_como_titulo": "How it works",
-  "ent_como": "Each file is sealed on your disk with its own AES-256-GCM key, in pieces of 1 MiB (STREAM). The link carries a 256-bit key your browser never sends; the receiver joins through the relay with an ECDH P-256 + AES-256-GCM channel and, only after the right code, gets the keys. Each piece is verified on arrival and checked against the hash tree; a broken download resumes where it stopped. No IP address is stored.",
+  "ent_como": "Each file is sealed on your disk with its own AES-256-GCM key, in pieces of 1 MiB (STREAM). The link carries a 256-bit key your browser never sends; the receiver joins through the relay server with an ECDH P-256 + AES-256-GCM channel and, only after the right code, gets the keys. Each piece is verified on arrival and checked against the hash tree; a broken download resumes where it stopped. No IP address is stored.",
   "ent_limite": "This PC must stay on until the receiver finishes. What the receiver saves cannot be erased from here.",
   "ent_sin_dpapi": "This system has no DPAPI: the delivery keys stay in a file readable by your user only.",
   "ent_huella": "Fingerprint of the key that signs the receipts: {h}"
