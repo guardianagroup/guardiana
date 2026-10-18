@@ -195,6 +195,12 @@ str_enum! {
         Version => "version",
         /// List update.
         Listas => "listas",
+        /// A link to GUARDIANA's relay for Comunicaciones (1.0.46, «Audita a GUARDIANA»): the
+        /// relay's name only, never an address.
+        Rele => "rele",
+        /// A direct link to the other person of a conversation (their invitation code), written
+        /// down without their address.
+        Directo => "directo",
     }
 }
 

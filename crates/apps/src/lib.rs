@@ -63,6 +63,8 @@ mod defender;
 #[cfg(windows)]
 mod firmas;
 pub mod instalador;
+// «Quién vende tus datos dentro de tu PC» (1.0.46): the system's own advertising settings.
+pub mod privacidad;
 #[cfg(windows)]
 mod red;
 #[cfg(windows)]

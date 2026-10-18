@@ -26,6 +26,8 @@ mod hash;
 pub mod huellas;
 pub mod i18n;
 pub mod identity;
+// «Audita a GUARDIANA» (1.0.46): what the ledger file holds, measured.
+pub mod inventario;
 mod ledger;
 mod medidas;
 mod model;
