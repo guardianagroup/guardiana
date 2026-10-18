@@ -1,0 +1,17 @@
+/* «Certificado y derechos» (1.0.45). Only what this page adds; everything else comes from
+   diseno.css and style.css, with their tokens. */
+.derechos section + section { margin-top: var(--e6); }
+.derechos .d-check { flex-direction: row; align-items: center; gap: var(--e2); }
+.derechos .d-nota { margin-top: var(--e2); }
+.derechos .d-rotulo { color: var(--muted); margin: 0 0 var(--e3); }
+.derechos .d-acciones { display: flex; flex-wrap: wrap; gap: var(--e2); margin: var(--e3) 0; }
+.derechos .d-lista { list-style: none; padding: 0; margin: var(--e3) 0; display: grid; gap: var(--e1); }
+.derechos .d-sello code, .derechos .d-archivo + p code { font-family: var(--mono); font-size: .85em; word-break: break-all; }
+.derechos .d-empresa { margin: var(--e3) 0; }
+.derechos .d-cabeza { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); }
+.derechos .d-cabeza h3 { margin: 0; }
+.derechos .d-texto { white-space: pre-wrap; word-break: break-word; font-family: var(--texto); font-size: .95em; line-height: 1.5; background: var(--campo); border: 1px solid var(--line); border-radius: var(--r-campo); padding: var(--e3) var(--e4); max-height: 28em; overflow: auto; }
+.derechos .d-archivo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e2); }
+@media (max-width: 640px) {
+  .derechos .d-acciones .boton { flex: 1 1 100%; justify-content: center; }
+}

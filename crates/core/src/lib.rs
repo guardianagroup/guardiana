@@ -17,6 +17,7 @@
 mod changes;
 mod error;
 mod export;
+mod flujos;
 mod gaps;
 mod hash;
 pub mod i18n;
@@ -38,6 +39,7 @@ pub use error::{Error, Result};
 pub use export::{
     write_csv, write_csv_for_spreadsheet, write_csv_for_spreadsheet_with, write_json,
 };
+pub use flujos::{BytesDestino, FilaFlujo};
 pub use gaps::{Gap, GAP_THRESHOLD_MS, KEY_HEARTBEAT};
 pub use hash::{chain_hash, Hash, HashInput};
 pub use ledger::{

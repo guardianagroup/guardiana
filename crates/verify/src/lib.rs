@@ -2,6 +2,9 @@
 //! installed program is the published one and that nothing is open that
 //! should not be. Every check reports a fact, never a promise.
 
+pub mod certificado;
+pub mod certificado_html;
+
 use std::path::{Path, PathBuf};
 
 use guardiana_core::{identity, paths, ChangeKind, ChangeWho, Ledger};
