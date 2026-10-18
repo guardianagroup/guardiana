@@ -29,6 +29,11 @@
     // On means allowed (the common standard): a cut switch is off.
     var permitido = !rojo;
     var palabra = ocupado ? (o.ocupado === 'cortar' ? t.cortando : t.permitiendo) : (o.cortado ? t.cortado : t.permitido);
+    // The word beside the switch keeps one width whatever it says (the owner, 18 Oct 2026: «esa zona
+    // se expande o se contrae»): the widest of its words, with room for an hour, is reserved in
+    // data-ancho and drawn invisibly under it (diseno.css), so a table column never jumps.
+    var ancho = [t.permitido, t.cortado && (/\d:\d\d/.test(t.cortado) ? t.cortado : t.cortado + ' 00:00'), t.cortando, t.permitiendo]
+      .filter(Boolean).reduce(function (a, b) { return String(b).length > a.length ? String(b) : a; }, '');
     var datos = '';
     var d = o.datos || {};
     Object.keys(d).forEach(function (k) { if (d[k] !== undefined && d[k] !== null && d[k] !== '') datos += ' data-' + k + '="' + esc(d[k]) + '"'; });
@@ -36,7 +41,7 @@
       + '<button type="button" role="switch" class="interruptor" aria-checked="' + (permitido ? 'true' : 'false') + '"'
       + (o.etiqueta ? ' aria-label="' + esc(o.etiqueta) + '" title="' + esc(o.etiqueta) + '"' : '')
       + (ocupado ? ' aria-busy="true" disabled' : '') + datos + '><span class="interruptor-bola" aria-hidden="true"></span></button>'
-      + '<span class="interruptor-estado" aria-live="polite">' + esc(palabra || '') + '</span></span>';
+      + '<span class="interruptor-estado" aria-live="polite" data-ancho="' + esc(ancho) + '">' + esc(palabra || '') + '</span></span>';
   }
   function engancha(raiz, alCambiar, texto) {
     if (!raiz || raiz.dataset.interruptor) return;

@@ -140,7 +140,9 @@ a,button,summary,label,[role="button"],[tabindex]:not([tabindex="-1"]){cursor:po
 .interruptor[aria-checked="true"]:hover { background: color-mix(in srgb, var(--ok) 88%, #fff); }
 .interruptor:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
 .interruptor[disabled] { cursor: progress; opacity: .7; }
-.interruptor-estado { font: 600 13px/1.2 var(--texto); color: var(--ok); }
+.interruptor-estado { display: inline-flex; flex-direction: column; font: 600 13px/1.2 var(--texto); color: var(--ok); font-variant-numeric: tabular-nums; text-align: left; }
+/* The widest word, invisible and without height: it only holds the width (see interruptor.js). */
+.interruptor-estado::after { content: attr(data-ancho); height: 0; overflow: hidden; visibility: hidden; font-weight: 600; pointer-events: none; }
 .interruptor-caja.cortado .interruptor-estado { color: var(--alerta); }
 .interruptor-caja.ocupado .interruptor-estado { color: var(--muted); font-weight: 500; }
 .interruptor-motivo { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: max-content; max-width: 280px; white-space: normal; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--fg); font: 500 12.5px/1.4 var(--texto); box-shadow: var(--sombra); }
