@@ -1322,6 +1322,13 @@ impl Secure {
             "otro_lado": matches!(motivo, MotivoDestruccion::OtroLado(_)),
         }));
         self.reconexion = None;
+        // The phone that carries this conversation empties its screen too (guardianagroup.com/m/).
+        if let Some(m) = &self.movil {
+            m.manda(crate::movil::Hacia::Estado(
+                json!({ "tipo": "secure_destruida", "motivo": clave }).to_string(),
+            ));
+            std::thread::sleep(Duration::from_millis(60));
+        }
         self.cerrar("destruida por seguridad");
         // What `cerrar` keeps for a normal end goes too: the lists of files, the summaries.
         self.enviados.clear();
