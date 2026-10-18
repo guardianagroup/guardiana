@@ -1210,6 +1210,16 @@ body.universo { display: flex; flex-direction: column; height: 100vh; height: 10
   .globo-herr .opciones-btn span { display: none; }
   .opciones { position: fixed; left: 16px; right: 16px; top: 120px; width: auto; }
 }
+/* A phone (1.0.45 integration): «Protección máxima» takes a row of its own under the live
+   figures instead of pushing the page sideways, and the globe's options button stays at the
+   right end of the sections row, which scrolls under it now that it has five parts. */
+@media (max-width: 600px) {
+  .universo .riel { flex-wrap: wrap; height: auto; min-height: 48px; padding: 4px 16px 6px; row-gap: 2px; }
+  .universo .riel > button { height: 40px; }
+  .universo #riel-ahora-t { display: none; }
+  .universo .riel-maxima { order: 3; width: 100%; margin-left: 0; height: 36px; }
+  .g-secciones #g-extra { position: sticky; right: -16px; margin-right: -16px; padding: 0 16px 0 12px; height: 100%; display: flex; align-items: center; background: linear-gradient(90deg, transparent, #06080C 14px); }
+}
 .universo .insp-corte .fila b { font-weight: 600; font-size: 14px; color: var(--fg); }
 /* The older «btn-hud» buttons (the program explorer, the notices): a secundario of 32 px. */
 .universo .btn-hud { appearance: none; display: inline-flex; align-items: center; min-height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid #2A3442; background: var(--campo); color: var(--fg); font: 600 13px var(--texto); cursor: pointer; }
