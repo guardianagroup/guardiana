@@ -12,13 +12,18 @@
 /// A rectangle in screen pixels: left, top, right, bottom (right and bottom excluded).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Rect {
+    /// Left edge.
     pub left: i32,
+    /// Top edge.
     pub top: i32,
+    /// Right edge (excluded).
     pub right: i32,
+    /// Bottom edge (excluded).
     pub bottom: i32,
 }
 
 impl Rect {
+    /// A rectangle from its four edges.
     #[must_use]
     pub const fn new(left: i32, top: i32, right: i32, bottom: i32) -> Self {
         Self {
@@ -28,10 +33,12 @@ impl Rect {
             bottom,
         }
     }
+    /// Its width.
     #[must_use]
     pub const fn ancho(&self) -> i32 {
         self.right - self.left
     }
+    /// Its height.
     #[must_use]
     pub const fn alto(&self) -> i32 {
         self.bottom - self.top
@@ -42,9 +49,13 @@ impl Rect {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Ocultas {
+    /// On the left edge.
     pub izquierda: bool,
+    /// On the top edge.
     pub arriba: bool,
+    /// On the right edge.
     pub derecha: bool,
+    /// On the bottom edge.
     pub abajo: bool,
 }
 

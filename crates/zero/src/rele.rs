@@ -81,7 +81,10 @@ pub fn mide_cercania() {
             // The whole way in, certificate included (17 Oct 2026: a relay half set up answered
             // on 443 without a valid certificate, won the race by distance, and every phone
             // link from Colombia failed on it). A relay that cannot complete TLS is not near.
-            if por_tls(&r.direccion(), r.nombre, raices.clone()).is_ok() {
+            // 1.0.46 agent 5: the measure is a connection too, and it is written down.
+            let medido = por_tls(&r.direccion(), r.nombre, raices.clone());
+            crate::licencia::anota_conexion(guardiana_core::Purpose::Rele, r.nombre);
+            if medido.is_ok() {
                 let d = t.elapsed();
                 if d < mejor.1 {
                     mejor = (i, d);
@@ -333,15 +336,23 @@ pub fn abre(rele: &str) -> Result<TcpStream, String> {
     if !r.ip.is_empty() {
         destinos.push(format!("{}:443", r.ip));
     }
+    // 1.0.46 agent 5: every link to GUARDIANA's relay is written down by name («Audita a
+    // GUARDIANA»), never by address.
     for destino in &destinos {
         match por_tls(destino, r.nombre, Arc::clone(&raices)) {
-            Ok(s) => return Ok(s),
+            Ok(s) => {
+                crate::licencia::anota_conexion(guardiana_core::Purpose::Rele, r.nombre);
+                return Ok(s);
+            }
             Err(e) => fallos.push(e),
         }
     }
     for destino in &destinos {
         match abre_hacia(destino) {
-            Ok(s) => return Ok(s),
+            Ok(s) => {
+                crate::licencia::anota_conexion(guardiana_core::Purpose::Rele, r.nombre);
+                return Ok(s);
+            }
             Err(e) => fallos.push(e),
         }
     }

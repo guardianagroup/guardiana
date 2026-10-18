@@ -11,6 +11,11 @@
 
 mod antivirus;
 mod api;
+// ===== 1.0.46 quien-vende-audita (agent 5): «Audita a GUARDIANA», browser extensions and «Quién vende tus datos» =====
+mod audita;
+mod extensiones;
+mod quien_vende;
+// ===== end agent 5 =====
 mod auth;
 mod borrado;
 mod certificado;
@@ -1070,6 +1075,10 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         // «Contratos» (1.0.45, «contrato vivo»): its page, script and API, in their own module.
         .merge(contratos::rutas())
         .merge(extras::rutas())
+        // ===== 1.0.46 agent 5: /quien-vende (Diagnóstico) and /audita (Privacidad, free level too) =====
+        .merge(quien_vende::rutas())
+        .merge(audita::rutas())
+        // ===== end agent 5 =====
         // The free level and Plus (the owner's free plan, 18 Oct 2026): `/api/plan` says which is
         // in force, and the Plus routes listed in `plan::RUTAS_PLUS` answer 402 at the free level.
         // Routes merged above this line are covered.

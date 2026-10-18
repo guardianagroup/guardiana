@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>GUARDIANA · Quién vende tus datos</title>
+<link rel="stylesheet" href="/static/diseno.css">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/lente-qv.css">
+<link rel="preload" href="/static/fonts/HankenGrotesk-var.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="/static/fonts/SchibstedGrotesk-var.woff" as="font" type="font/woff" crossorigin>
+<script src="/static/arranque.js"></script>
+</head>
+<body data-page="quienVende">
+<header class="top">
+  <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA<small data-t="lema"></small></span></a>
+  <nav>
+    <a href="/por-dentro" data-t="menu_en_vivo">En vivo</a>
+    <a href="/extracto" data-t="menu_actividad">Actividad</a>
+    <a href="/contratos" data-t="nav_contratos">Contratos</a>
+    <a href="/revision" aria-current="true" data-t="menu_diagnostico">Diagnóstico</a>
+    <a href="/sabe-de-ti" data-t="menu_privacidad">Privacidad</a>
+    <a href="/hogar" data-t="menu_ajustes">Ajustes</a>
+  </nav>
+</header>
+<main class="lente" data-lente="quienVende" id="qv">
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<nav class="lente-miga" aria-label="breadcrumb"><a href="/revision" data-t="menu_diagnostico">Diagnóstico</a><i aria-hidden="true"></i><span aria-current="page" data-t="qv_nav">Quién vende tus datos</span></nav>
+<header class="lente-cabeza"><div>
+  <h1 data-t="qv_titulo">Quién vende tus datos dentro de tu PC</h1>
+  <p class="lente-lead" data-t="qv_frase">Qué programas, extensiones y ajustes de este equipo hablan con empresas que compran o venden datos personales.</p>
+</div></header>
+
+<section class="lente-cifras" aria-live="polite">
+  <div class="lente-cifra"><b class="n" id="qv-n-programas"></b><span class="l" data-t="qv_c_programas">Programas que hablan con compradores de datos</span></div>
+  <div class="lente-cifra"><b class="n" id="qv-n-extensiones"></b><span class="l" data-t="qv_c_extensiones">Extensiones que leen todas las webs</span></div>
+  <div class="lente-cifra"><b class="n" id="qv-n-ajustes"></b><span class="l" data-t="qv_c_ajustes">Ajustes de publicidad activados</span></div>
+  <div class="lente-cifra"><b class="n" id="qv-n-ia"></b><span class="l" data-t="qv_c_ia">Servicios de IA en uso</span></div>
+</section>
+
+<div class="lente-cuerpo">
+  <div class="lente-principal">
+    <section class="lente-tarjeta" aria-labelledby="qv-prog-t">
+      <div class="lente-tc"><h2 id="qv-prog-t" data-t="qv_prog_titulo">Programas que hablan con un comprador o vendedor de datos</h2><div class="lente-tc-der" id="qv-ventana"></div></div>
+      <div id="qv-programas"><p class="qv-mirando" data-t="qv_mirando">Mirando este equipo…</p></div>
+    </section>
+
+    <section class="lente-tarjeta" aria-labelledby="qv-ext-t">
+      <div class="lente-tc"><h2 id="qv-ext-t" data-t="qv_ext_titulo">Extensiones del navegador</h2><div class="lente-tc-der" id="qv-ext-cuentas"></div></div>
+      <div id="qv-extensiones"></div>
+    </section>
+
+    <section class="lente-tarjeta" aria-labelledby="qv-aj-t">
+      <div class="lente-tc"><h2 id="qv-aj-t" data-t="qv_aj_titulo">Publicidad del sistema</h2></div>
+      <div id="qv-ajustes"></div>
+    </section>
+
+    <section class="lente-tarjeta" aria-labelledby="qv-ia-t">
+      <div class="lente-tc"><h2 id="qv-ia-t" data-t="qv_ia_titulo">Tus IA y con quién hablan</h2><div class="lente-tc-der"><a href="/ia" data-t="nav_ia">Tu IA</a></div></div>
+      <div id="qv-ia"></div>
+    </section>
+
+    <section class="lente-tarjeta" aria-labelledby="qv-fab-t">
+      <div class="lente-tc"><h2 id="qv-fab-t" data-t="qv_fab_titulo">Programas del fabricante</h2></div>
+      <div id="qv-fabricante"></div>
+    </section>
+
+    <section class="lente-tarjeta" aria-labelledby="qv-av-t">
+      <div class="lente-tc"><h2 id="qv-av-t" data-t="qv_av_titulo">Tu antivirus</h2><div class="lente-tc-der"><a href="/antivirus" data-t="qv_av_ver">Ver con quién habla</a></div></div>
+      <div id="qv-antivirus"></div>
+    </section>
+
+    <section class="lente-tarjeta" aria-labelledby="qv-tv-t">
+      <div class="lente-tc"><h2 id="qv-tv-t" data-t="qv_tv_titulo">Televisores de casa que cuentan lo que ves</h2></div>
+      <div id="qv-tv"></div>
+    </section>
+  </div>
+
+  <aside class="lente-lado">
+    <div class="lente-significa">
+      <div class="rotulo" data-t="qv_significa">Qué significa</div>
+      <p class="lente-s1" data-t="qv_sig_dice">Un comprador de datos junta lo que hacen las personas en sus equipos y lo vende o lo cruza con otras fuentes.</p>
+      <p class="lente-s2" data-t="qv_sig_mas">Aquí ves quién dentro de este equipo habla con una de esas empresas. No es una alarma: decides tú si lo dejas, lo cortas o lo apagas.</p>
+      <div class="lente-sep"></div>
+      <p class="lente-estado" id="qv-pendiente" hidden></p>
+      <button type="button" class="boton principal lente-accion" id="qv-apagar" hidden></button>
+      <a class="boton lente-accion" href="#qv-casos-t" data-t="qv_ver_casos">Ver los casos documentados</a>
+    </div>
+    <p class="lente-pie" id="qv-pie"></p>
+    <div class="lente-significa">
+      <div class="rotulo" data-t="qv_limites">Lo que GUARDIANA ve y lo que no</div>
+      <ul class="qv-lista">
+        <li data-t="qv_lim_ve">Ve con quién habla cada programa, cada extensión instalada y los ajustes de este equipo.</li>
+        <li data-t="qv_lim_no">No ve qué hace una empresa con los datos una vez que los tiene, ni lo que pasa dentro de tus cuentas en la nube.</li>
+        <li data-t="qv_lim_nombres">Ve nombres de destino, nunca el contenido: no descifra nada.</li>
+      </ul>
+    </div>
+    <div class="lente-significa">
+      <div class="rotulo" id="qv-casos-t" data-t="qv_casos">Casos documentados</div>
+      <ul class="qv-lista" id="qv-casos"></ul>
+    </div>
+  </aside>
+</div>
+</main>
+<script src="/static/quien-vende.js"></script>
+<script src="/static/interruptor.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -230,6 +230,33 @@ pub struct Conexion {
     pub version: bool,
 }
 
+// ===== 1.0.46 agent 5: «Audita a GUARDIANA» reads every connection GUARDIANA ZERO opens =====
+/// The file where GUARDIANA ZERO writes down its own connections: its licence file, whose
+/// `outbound` table already holds the licence's and the version check's. Set once by
+/// [`Lugar::nuevo`].
+static REGISTRO_CONEXIONES: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// Write down a connection GUARDIANA ZERO opened that is not the licence's (a link to the
+/// Comunicaciones relay, a direct link to the other person): when, why and to which name, never
+/// an address. In a thread of its own, so the link never waits for the disk; a write that fails
+/// is lost, never retried in the link's way. Nothing is written in the tests.
+pub fn anota_conexion(proposito: Purpose, host: &str) {
+    if cfg!(test) {
+        return;
+    }
+    let Some(ruta) = REGISTRO_CONEXIONES.get().cloned() else {
+        return;
+    };
+    let host = host.to_owned();
+    std::thread::spawn(move || {
+        if let Ok(mut l) = Ledger::open(&ruta, identity::genesis()) {
+            let ahora = guardiana_core::time::now_ms();
+            let _ = l.record_outbound(ahora, proposito, &host, 0, true);
+        }
+    });
+}
+// ===== end agent 5 =====
+
 /// Where the licence lives, and the calls that read or change it. Cheap to clone: the shell keeps
 /// one for its worker thread, the session another.
 #[derive(Debug, Clone)]
@@ -244,6 +271,8 @@ impl Lugar {
     #[must_use]
     pub fn nuevo(datos: &Path, ancla: PathBuf) -> Self {
         lic::ancla::usar_carpeta(Some(ancla.clone()));
+        // 1.0.46 agent 5: the same file keeps the relay's connections too.
+        let _ = REGISTRO_CONEXIONES.set(datos.join(ARCHIVO));
         Self {
             db: datos.join(ARCHIVO),
             ancla,

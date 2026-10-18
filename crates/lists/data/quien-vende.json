@@ -1,0 +1,78 @@
+{
+  "_que": "GUARDIANA 1.0.46, «Quién vende tus datos dentro de tu PC». Lista abierta y mantenida a mano. Complementa corredores.txt (registro de corredores de datos de California, CPPA): aquí van los nombres que un programa, una extensión o un televisor de casa puede llamar y que una autoridad o una investigación pública documentó vendiendo o pasando datos. Cada entrada nombra su caso, con fecha y fuente. Es una etiqueta sobre la empresa dueña del nombre, nunca un veredicto sobre lo que llevó una consulta concreta. Pendiente: los registros de Vermont, Texas y Oregón (solo California está cargado, en corredores.txt).",
+  "casos": [
+    { "id": "ftc-avast-2024", "fecha": "2024-02-22", "medio": "FTC", "url": "https://www.ftc.gov/news-events/news/press-releases/2024/02/ftc-order-will-ban-avast-selling-browsing-data-advertising-purposes-require-it-pay-165-million-over" },
+    { "id": "koi-urbanvpn-2025", "fecha": "2025-12-15", "medio": "Koi Security · Infosecurity Magazine", "url": "https://www.infosecurity-magazine.com/news/urban-vpn-proxy-harvesting-ai-chats/" },
+    { "id": "texas-acr-2025", "fecha": "2025-12-15", "medio": "Texas AG · TechSpot", "url": "https://www.techspot.com/news/110630-texas-sues-five-smart-tv-makers-over-claims.html" },
+    { "id": "ftc-gm-2026", "fecha": "2026-01-14", "medio": "FTC · TechCrunch", "url": "https://techcrunch.com/2026/01/14/the-ftcs-data-sharing-order-against-gm-is-finally-settled/" },
+    { "id": "openai-anuncios-2026", "fecha": "2026-01-16", "medio": "OpenAI · SiliconANGLE", "url": "https://siliconangle.com/2026/01/16/openai-start-testing-chatgpt-ads-across-free-go-tiers/" },
+    { "id": "anthropic-entrenamiento-2025", "fecha": "2025-09-28", "medio": "Anthropic", "url": "https://www.anthropic.com/news/updates-to-our-consumer-terms" },
+    { "id": "ftc-lenovo-2017", "fecha": "2017-09-05", "medio": "FTC", "url": "https://www.ftc.gov/news-events/news/press-releases/2017/09/lenovo-settles-ftc-charges-it-harmed-consumers-preinstalled-software-its-laptops-compromised-online-security" },
+    { "id": "ftc-kochava-2022", "fecha": "2022-08-29", "medio": "FTC", "url": "https://www.ftc.gov/news-events/news/press-releases/2022/08/ftc-sues-kochava-selling-data-tracks-people-reproductive-health-clinics-places-worship-other-sensitive-locations" },
+    { "id": "ftc-xmode-2024", "fecha": "2024-01-09", "medio": "FTC", "url": "https://www.ftc.gov/news-events/news/press-releases/2024/01/ftc-order-prohibits-data-broker-x-mode-social-outlogic-selling-sensitive-location-data" },
+    { "id": "ftc-inmarket-2024", "fecha": "2024-01-18", "medio": "FTC", "url": "https://www.ftc.gov/news-events/news/press-releases/2024/01/ftc-order-will-ban-inmarket-selling-precise-consumer-location-data" },
+    { "id": "ftc-gravy-2024", "fecha": "2024-12-03", "medio": "FTC", "url": "https://www.ftc.gov/news-events/news/press-releases/2024/12/ftc-takes-action-against-gravy-analytics-venntel-unlawfully-selling-location-data-tracking-consumers" },
+    { "id": "ftc-mobilewalla-2024", "fecha": "2024-12-03", "medio": "FTC", "url": "https://www.ftc.gov/news-events/news/press-releases/2024/12/ftc-takes-action-against-mobilewalla-collecting-selling-sensitive-location-data" },
+    { "id": "listas-tv", "fecha": "2026-10-18", "medio": "PiHoleBlocklist (SmartTV)", "url": "https://github.com/Perflyst/PiHoleBlocklist" }
+  ],
+  "dominios": [
+    { "dominio": "jumpshot.com", "empresa": "Jumpshot (Avast)", "tipo": "venta", "caso": "ftc-avast-2024" },
+    { "dominio": "biscience.com", "empresa": "BiScience", "tipo": "venta", "caso": "koi-urbanvpn-2025" },
+    { "dominio": "urban-vpn.com", "empresa": "Urban VPN", "tipo": "venta", "caso": "koi-urbanvpn-2025" },
+    { "dominio": "kochava.com", "empresa": "Kochava", "tipo": "ubicacion", "caso": "ftc-kochava-2022" },
+    { "dominio": "xmode.io", "empresa": "X-Mode Social (Outlogic)", "tipo": "ubicacion", "caso": "ftc-xmode-2024" },
+    { "dominio": "outlogic.io", "empresa": "X-Mode Social (Outlogic)", "tipo": "ubicacion", "caso": "ftc-xmode-2024" },
+    { "dominio": "inmarket.com", "empresa": "InMarket", "tipo": "ubicacion", "caso": "ftc-inmarket-2024" },
+    { "dominio": "gravyanalytics.com", "empresa": "Gravy Analytics", "tipo": "ubicacion", "caso": "ftc-gravy-2024" },
+    { "dominio": "venntel.com", "empresa": "Venntel (Gravy Analytics)", "tipo": "ubicacion", "caso": "ftc-gravy-2024" },
+    { "dominio": "mobilewalla.com", "empresa": "Mobilewalla", "tipo": "ubicacion", "caso": "ftc-mobilewalla-2024" },
+    { "dominio": "samsungacr.com", "empresa": "Samsung ACR", "tipo": "acr", "caso": "texas-acr-2025" },
+    { "dominio": "samsungads.com", "empresa": "Samsung Ads", "tipo": "acr", "caso": "texas-acr-2025" },
+    { "dominio": "lgtvsdp.com", "empresa": "LG TV", "tipo": "acr", "caso": "texas-acr-2025" },
+    { "dominio": "lgsmartad.com", "empresa": "LG Ads", "tipo": "acr", "caso": "texas-acr-2025" },
+    { "dominio": "alphonso.tv", "empresa": "Alphonso (LG Ads)", "tipo": "acr", "caso": "listas-tv" },
+    { "dominio": "tvinteractive.tv", "empresa": "Vizio Inscape", "tipo": "acr", "caso": "listas-tv" },
+    { "dominio": "samba.tv", "empresa": "Samba TV", "tipo": "acr", "caso": "listas-tv" }
+  ],
+  "extensiones": [
+    { "id": "eppiocemhmnlbhjplcgkofciiegomcon", "nombre": "Urban VPN Proxy", "caso": "koi-urbanvpn-2025" },
+    { "nombre": "Urban VPN Proxy", "caso": "koi-urbanvpn-2025" },
+    { "nombre": "1ClickVPN Proxy", "caso": "koi-urbanvpn-2025" },
+    { "nombre": "Urban Browser Guard", "caso": "koi-urbanvpn-2025" },
+    { "nombre": "Urban Ad Blocker", "caso": "koi-urbanvpn-2025" },
+    { "id": "gomekmidlodglbbmalcneegieacbdmki", "nombre": "Avast Online Security", "caso": "ftc-avast-2024" },
+    { "nombre": "Avast Online Security", "caso": "ftc-avast-2024" },
+    { "nombre": "AVG Online Security", "caso": "ftc-avast-2024" },
+    { "nombre": "Avast SafePrice", "caso": "ftc-avast-2024" },
+    { "nombre": "AVG SafePrice", "caso": "ftc-avast-2024" }
+  ],
+  "antivirus": [
+    { "contiene": "avast", "caso": "ftc-avast-2024" },
+    { "contiene": "avg", "caso": "ftc-avast-2024" }
+  ],
+  "fabricantes": [
+    { "firmante": "hp inc", "marca": "HP" },
+    { "firmante": "hewlett-packard", "marca": "HP" },
+    { "firmante": "dell", "marca": "Dell" },
+    { "firmante": "lenovo", "marca": "Lenovo" },
+    { "firmante": "asustek", "marca": "ASUS" },
+    { "firmante": "acer", "marca": "Acer" },
+    { "firmante": "micro-star", "marca": "MSI" },
+    { "firmante": "samsung electronics", "marca": "Samsung" },
+    { "firmante": "huawei", "marca": "Huawei" },
+    { "firmante": "toshiba", "marca": "Toshiba" },
+    { "firmante": "dynabook", "marca": "Dynabook" }
+  ],
+  "ia": [
+    { "servicio": "OpenAI (ChatGPT)", "guia": "chatgpt", "caso": "openai-anuncios-2026" },
+    { "servicio": "Anthropic (Claude)", "guia": "claude", "caso": "anthropic-entrenamiento-2025" },
+    { "servicio": "Google Gemini", "guia": "gemini" },
+    { "servicio": "Microsoft Copilot", "guia": "copilot" },
+    { "servicio": "xAI (Grok)", "guia": "grok" },
+    { "servicio": "Perplexity", "guia": "perplexity" },
+    { "servicio": "Mistral (Le Chat)", "guia": "mistral" },
+    { "servicio": "Meta AI", "guia": "meta" },
+    { "servicio": "DeepSeek", "guia": "deepseek" }
+  ],
+  "ia_dominios_chat": ["chatgpt.com", "chat.openai.com", "claude.ai", "gemini.google.com", "copilot.microsoft.com", "grok.com", "perplexity.ai", "chat.mistral.ai", "meta.ai", "chat.deepseek.com"]
+}

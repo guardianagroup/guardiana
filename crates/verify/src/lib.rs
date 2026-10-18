@@ -247,8 +247,10 @@ fn check_signature(binary: &Path) -> SignatureState {
 /// Find `ledger.jsonl` in the current directory first (the install page says to download it
 /// there and run verify from that folder), then next to the binary, then in the data directory.
 /// Until 1.0.5 the data directory won, so an old copy left there beat the one just downloaded
-/// and verify said the hash was not in the ledger (review of 8 Oct 2026).
-fn find_ledger_file(binary: &Path) -> Option<PathBuf> {
+/// and verify said the hash was not in the ledger (review of 8 Oct 2026). Public since 1.0.46:
+/// «Audita a GUARDIANA» reads it too.
+#[must_use]
+pub fn find_ledger_file(binary: &Path) -> Option<PathBuf> {
     let mut candidates = vec![PathBuf::from("ledger.jsonl")];
     if let Some(dir) = binary.parent() {
         candidates.push(dir.join("ledger.jsonl"));

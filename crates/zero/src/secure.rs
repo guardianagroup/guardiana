@@ -983,6 +983,8 @@ impl Secure {
             .ok_or_else(|| "dirección vacía".to_owned())?;
         let s =
             TcpStream::connect_timeout(&addr, Duration::from_secs(8)).map_err(|e| e.to_string())?;
+        // 1.0.46 agent 5: a direct link to the other person is written down, without its address.
+        crate::licencia::anota_conexion(guardiana_core::Purpose::Directo, "—");
         self.adopta(s, false);
         Ok(())
     }

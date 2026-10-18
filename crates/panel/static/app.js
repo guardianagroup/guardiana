@@ -1078,7 +1078,7 @@
     $('maxima-quitar').addEventListener('click', (e) => cambia(false, e.currentTarget));
     try { pinta(await api('/api/proteccion-maxima')); } catch (_) {}
   }
-  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', antivirus: 'nav_antivirus', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo', borrado: 'nav_borrado', empresa: 'ficha_titulo', expedientes: 'nav_expedientes', certificado: 'nav_certificado', contratos: 'nav_contratos', vision: 'nav_vision', vigilancia: 'nav_vigilancia', herramientas: 'nav_herramientas', identificacion: 'nav_identificacion' };
+  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', antivirus: 'nav_antivirus', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo', borrado: 'nav_borrado', empresa: 'ficha_titulo', expedientes: 'nav_expedientes', certificado: 'nav_certificado', contratos: 'nav_contratos', vision: 'nav_vision', vigilancia: 'nav_vigilancia', herramientas: 'nav_herramientas', identificacion: 'nav_identificacion', /* 1.0.46 agent 5 */ quienVende: 'qv_nav', audita: 'au_nav' };
   function applyTexts() {
     document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.getAttribute('data-t')); });
     document.querySelectorAll('[data-t-html]').forEach((el) => { el.innerHTML = t(el.getAttribute('data-t-html')); });
@@ -1115,8 +1115,8 @@
     // 1.0.45: «Contratos» right after Actividad (what each program normally contacts), the two
     // new looks of Diagnóstico after the check-up, and the three new pages of Privacidad.
     { t: 'nav_contratos', paginas: [['contratos', '/contratos', 'nav_contratos']] },
-    { t: 'menu_diagnostico', paginas: [['revision', '/revision', 'nav_revision'], ['vision', '/vision', 'nav_vision'], ['vigilancia', '/vigilancia', 'nav_vigilancia'], ['ia', '/ia', 'nav_ia'], ['antivirus', '/antivirus', 'nav_antivirus'], ['dispositivos', '/dispositivos', 'nav_dispositivos']] },
-    { t: 'menu_privacidad', paginas: [['sabeDeTi', '/sabe-de-ti', 'menu_sabe'], ['identificacion', '/identificacion', 'nav_identificacion'], ['certificado', '/certificado', 'nav_certificado'], ['borrado', '/borrado', 'menu_borrado'], ['expedientes', '/expedientes', 'nav_expedientes'], ['reglas', '/reglas', 'nav_reglas'], ['herramientas', '/herramientas', 'nav_herramientas']] },
+    { t: 'menu_diagnostico', paginas: [['revision', '/revision', 'nav_revision'], ['vision', '/vision', 'nav_vision'], ['vigilancia', '/vigilancia', 'nav_vigilancia'], ['ia', '/ia', 'nav_ia'], ['antivirus', '/antivirus', 'nav_antivirus'], ['dispositivos', '/dispositivos', 'nav_dispositivos'], /* 1.0.46 agent 5 */ ['quienVende', '/quien-vende', 'qv_nav']] },
+    { t: 'menu_privacidad', paginas: [['sabeDeTi', '/sabe-de-ti', 'menu_sabe'], ['identificacion', '/identificacion', 'nav_identificacion'], ['certificado', '/certificado', 'nav_certificado'], ['borrado', '/borrado', 'menu_borrado'], ['expedientes', '/expedientes', 'nav_expedientes'], ['reglas', '/reglas', 'nav_reglas'], ['herramientas', '/herramientas', 'nav_herramientas'], /* 1.0.46 agent 5 */ ['audita', '/audita', 'au_nav']] },
   ];
   const AJUSTES = { t: 'menu_ajustes', paginas: [['hogar', '/hogar', 'nav_hogar'], ['licencia', '/licencia', 'nav_licencia'], ['verify', '/verify', 'nav_verify'], ['estado', '/estado', 'nav_estado']] };
   const ICONO_AJUSTES = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.6"/><circle cx="6" cy="11.5" r="1.6"/></svg>';
@@ -1962,6 +1962,18 @@
       if (!window.GuardianaHerramientas) return;
       await window.GuardianaHerramientas.iniciar({ api, t, tn, esc, LOC, LANG, cabeceras: () => ({ 'X-Guardiana-Token': token, 'X-Guardiana-Lang': LANG }) });
     },
+    // ===== 1.0.46 quien-vende-audita (agent 5) =====
+    // «Quién vende tus datos dentro de tu PC» (Diagnóstico) and «Audita a GUARDIANA»
+    // (Privacidad): each in its own script, loaded before this one.
+    async quienVende() {
+      if (!window.GuardianaQuienVende) return;
+      await window.GuardianaQuienVende.iniciar({ api, t, tn, esc, LOC, LANG });
+    },
+    async audita() {
+      if (!window.GuardianaAudita) return;
+      await window.GuardianaAudita.iniciar({ api, t, tn, esc, LOC, LANG });
+    },
+    // ===== end agent 5 =====
     // «Visión profunda» (1.0.45): its own script (vision.js), loaded before this one.
     async vision() {
       if (!window.GuardianaVision) return;

@@ -14,6 +14,8 @@ pub mod antivirus;
 pub mod atribucion;
 pub mod dominio;
 mod parse;
+// «Quién vende tus datos dentro de tu PC» (1.0.46): its documented cases and names.
+pub mod quien_vende;
 mod red;
 pub mod ubicacion;
 
