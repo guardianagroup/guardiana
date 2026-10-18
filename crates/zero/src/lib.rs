@@ -16,6 +16,8 @@ pub mod decision;
 pub mod destino;
 pub mod direccion;
 pub mod dominio;
+pub mod dpapi;
+pub mod entrega;
 pub mod escudo;
 pub mod favoritos;
 pub mod fecha;

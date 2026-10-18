@@ -25,6 +25,7 @@ use guardiana_secure::agenda::{self, Agenda};
 use guardiana_secure::archivo::{Llave, Recepcion, Trozos};
 use guardiana_secure::claves::{Curve25519PublicKey, Ed25519Signature, Mac};
 use guardiana_secure::cuantico;
+use guardiana_secure::destruccion::{self, Motivo as MotivoDestruccion};
 use guardiana_secure::monitor::{Identidad, Monitor, Nivel};
 use guardiana_secure::pausa::Sesion as EstadoSesion;
 use guardiana_secure::prueba::{Cadena, Prueba};
@@ -39,6 +40,12 @@ use crate::mensaje::{self, Mensaje};
 use sha2::Digest as _;
 
 const MAX_FRAME: usize = 2 * 1024 * 1024;
+/// Video calls (18 Oct 2026, the committee — Claude, ChatGPT, Grok, Kimi — and the owner: «si no
+/// llegamos a eso, nos quedaríamos solamente con voz»). A web page on a phone cannot reach the
+/// quality of FaceTime or WhatsApp (no CallKit, no PushKit, no background on an iPhone), so video
+/// is off everywhere: a call asked with video starts as voice, and a video call that arrives from
+/// an older version rings as voice. The code stays, behind this switch.
+pub const VIDEO: bool = false;
 const B64: base64::engine::GeneralPurpose = base64::engine::general_purpose::STANDARD;
 
 /// What the network thread tells the session.
@@ -109,10 +116,13 @@ impl Enlace {
     }
 
     fn manda(&self, v: &Value) -> Result<(), String> {
-        let cuerpo = serde_json::to_vec(v).map_err(|e| e.to_string())?;
+        let mut cuerpo = serde_json::to_vec(v).map_err(|e| e.to_string())?;
         if cuerpo.len() > MAX_FRAME {
             return Err("trama demasiado grande".to_owned());
         }
+        // Sizes in buckets (18 Oct 2026, `relleno`): spaces after the JSON, which every reader,
+        // older versions included, skips; the relay sees a few sizes instead of every length.
+        guardiana_secure::relleno::rellena(&mut cuerpo, b' ', MAX_FRAME);
         let n = cuerpo.len() as u64 + 4;
         self.cola
             .send(cuerpo)
@@ -255,6 +265,11 @@ const GUARDADOS_MAX: u64 = 32 * 1024 * 1024;
 
 /// How long a call rings before «no answer».
 pub const TIMBRE_S: u64 = 45;
+
+/// The longest a disappearing message or file may wait (a week), whatever the other side asks.
+pub const TEMPORIZADOR_MAX: u64 = 7 * 24 * 3600;
+/// The timers the screen offers, in seconds (off, 30 s, 5 min, 1 h, 1 day, 1 week).
+pub const TEMPORIZADORES: [u64; 6] = [0, 30, 300, 3600, 86_400, 604_800];
 
 /// A call coming in, ringing until the person answers or rejects it.
 struct Timbre {
@@ -575,6 +590,33 @@ pub struct Secure {
     cuantico_oferta: Option<(cuantico::Oferta, Vec<u8>)>,
     capa: Option<cuantico::Capa>,
     cuantico_visto: bool,
+    /// When the layer's current epoch began (unix s): a new ML-KEM encapsulation is due every
+    /// [`cuantico::RENUEVA_CADA`] messages or [`cuantico::RENUEVA_S`] seconds (18 Oct 2026), and
+    /// the shield shows how long ago it was renewed.
+    capa_desde: u64,
+    /// Epochs of the layer in this conversation (the first one counts).
+    capa_epocas: u64,
+    /// When the numbers were confirmed on both sides in this conversation (unix s).
+    verificado_en: u64,
+    /// Messages that opened (Olm and the layer) and that did not, and file blocks that passed
+    /// their authentication and that did not: the shield's integrity line, from real events.
+    abiertos_ok: u64,
+    abiertos_mal: u64,
+    trozos_ok: u64,
+    trozos_mal: u64,
+    /// When the window last handed the watch a look (unix s).
+    vigia_visto: u64,
+    /// Destroy the conversation on an anomaly (18 Oct 2026, the owner: «si detectamos espionaje o
+    /// anomalía, destrucción del contenido automáticamente»). On by default; the person may turn
+    /// it off, and then the old pause applies.
+    pub auto_destruccion: bool,
+    /// The last destruction, for the calm notice, until the person closes it.
+    destruida: Option<Value>,
+    /// Messages and files that disappear after this many seconds (0: they stay until the
+    /// conversation ends). Both sides use the same value: changing it tells the other side.
+    temporizador: u64,
+    /// Files received with a timer: (id, unix s when they go).
+    caducan: Vec<(u64, u64)>,
     /// This computer's time zone (the page tells it) and the other side's, exchanged inside
     /// Olm once the conversation is open (16 Oct 2026, «que salga en nuestro mapa, el de él y
     /// el mío»): the globe places each computer by its time zone, never by an address.
@@ -699,6 +741,18 @@ impl Secure {
             cuantico_oferta: None,
             capa: None,
             cuantico_visto: false,
+            capa_desde: 0,
+            capa_epocas: 0,
+            verificado_en: 0,
+            abiertos_ok: 0,
+            abiertos_mal: 0,
+            trozos_ok: 0,
+            trozos_mal: 0,
+            vigia_visto: 0,
+            auto_destruccion: true,
+            destruida: None,
+            temporizador: 0,
+            caducan: Vec::new(),
             zona_propia: String::new(),
             zona_otra: String::new(),
             enviados: Vec::new(),
@@ -1089,6 +1143,7 @@ impl Secure {
             return;
         }
         let ahora = ahora_s();
+        self.vigia_visto = ahora;
         let antes = self.vigia.en_uso.clone();
         for v in self.vigia.mira(usos, self.inicio) {
             let texto = format!("«{}» {}", v.uso.programa, v.uso.recurso.verbo());
@@ -1110,6 +1165,19 @@ impl Secure {
                         .map_or_else(|| "en uso".to_owned(), |h| format!("LastUsedTimeStop {h}")),
                 )),
             };
+            // Something that *started* during the conversation destroys it (18 Oct 2026); a
+            // program that was already using it before keeps the old pause, so a person can
+            // close it and go on.
+            if v.ahora && self.auto_destruccion && v.uso.desde >= self.inicio {
+                self.cadena.anota(ahora, Nivel::Observada, hecho);
+                let p = v.uso.programa.clone();
+                self.destruir(match v.uso.recurso {
+                    crate::vigia::Recurso::Microfono => MotivoDestruccion::Microfono(p),
+                    crate::vigia::Recurso::Camara => MotivoDestruccion::Camara(p),
+                    crate::vigia::Recurso::Pantalla => MotivoDestruccion::Captura(p),
+                });
+                return;
+            }
             if v.ahora && self.estado.en_marcha() {
                 // The stop writes its own line in the history and the chain.
                 self.cadena.anota(ahora, Nivel::Observada, hecho);
@@ -1206,6 +1274,263 @@ impl Secure {
         .to_json()
     }
 
+    /// Destroy this conversation for an anomaly (18 Oct 2026, the owner: «si detectamos espionaje
+    /// o anomalía, destrucción del contenido automáticamente»): the other side is told with a
+    /// notice signed by this computer's identity (so it does the same), the event goes into the
+    /// signed chain and to disk as signed evidence (no content, no address), and then every key
+    /// of the session, every message, every file it brought and anything half received goes.
+    /// With [`Secure::auto_destruccion`] off nothing happens here and the old pause applies.
+    ///
+    /// What it cannot do, and the screen says so: erase what was already saved, copied or
+    /// photographed on a device that was compromised.
+    pub fn destruir(&mut self, motivo: MotivoDestruccion) {
+        if !self.auto_destruccion {
+            return;
+        }
+        self.destruye(motivo, true);
+    }
+
+    fn destruye(&mut self, motivo: MotivoDestruccion, avisar: bool) {
+        let ahora = ahora_s();
+        let clave = motivo.clave();
+        if avisar && self.enlace.is_some() && self.fase != Fase::Sola {
+            let inicio = self.inicio_destruccion();
+            let sesion = self.sesion_destruccion(inicio);
+            let firma = destruccion::firma(&self.identidad, &sesion, clave, ahora);
+            // Plain, not inside Olm: the session may be the thing that failed. The signature is
+            // what the other side trusts.
+            self.manda(json!({ "t": "destruir", "motivo": clave, "cuando": ahora, "inicio": inicio, "firma": firma }));
+        }
+        self.cadena.anota(
+            ahora,
+            Nivel::Inusual,
+            guardiana_secure::prueba::Hecho {
+                texto: motivo.texto(),
+                proceso: motivo.programa().map(str::to_owned),
+                ruta: None,
+                sha256_exe: None,
+                evidencia: Some(format!("GUARDIANA SECURE · destrucción · {clave}")),
+            },
+        );
+        self.guarda_destruccion(ahora, clave);
+        self.monitor.anota(ahora, Nivel::Inusual, motivo.texto());
+        self.destruida = Some(json!({
+            "cuando": ahora,
+            "motivo": clave,
+            "programa": motivo.programa(),
+            "contacto": self.nombre_contacto,
+            "otro_lado": matches!(motivo, MotivoDestruccion::OtroLado(_)),
+        }));
+        self.reconexion = None;
+        self.cerrar("destruida por seguridad");
+        // What `cerrar` keeps for a normal end goes too: the lists of files, the summaries.
+        self.enviados.clear();
+        self.recibidos.clear();
+        self.caducan.clear();
+        self.resumen = None;
+        self.informe = None;
+        self.media_para_pagina.clear();
+        self.rtc_para_pagina.clear();
+        self.mensajes.clear();
+        self.aviso("sec_destruida", clave);
+        self.novedad = true;
+        self.cambio = true;
+    }
+
+    /// The signed chain of this conversation, kept as evidence of the destruction: what tripped
+    /// and when, never a message, a file or an address.
+    fn guarda_destruccion(&self, cuando: u64, clave: &str) {
+        let carpeta = self.datos.join("destrucciones");
+        if std::fs::create_dir_all(&carpeta).is_err() {
+            return;
+        }
+        let prueba = Prueba::firmar(&self.identidad, self.cadena.clone(), &self.version, cuando);
+        let _ = std::fs::write(
+            carpeta.join(format!("{cuando}-{clave}.json")),
+            prueba.to_json(),
+        );
+    }
+
+    /// The second the destruction notice is bound to: the conversation's opening second once it
+    /// is open (both sides share it), 0 before.
+    fn inicio_destruccion(&self) -> u64 {
+        if self.fase == Fase::Lista {
+            self.inicio
+        } else {
+            0
+        }
+    }
+
+    /// The session a notice names: both identity keys, in byte order, and `inicio`.
+    fn sesion_destruccion(&self, inicio: u64) -> String {
+        let mia = self.identidad.public_key().to_bytes().to_vec();
+        let suya = self
+            .verificado
+            .map(|v| v.curve())
+            .or_else(|| self.tarjeta_otra.as_ref().map(tarjeta::Tarjeta::curve))
+            .map(|k| k.to_bytes().to_vec())
+            .unwrap_or_default();
+        if mia <= suya {
+            destruccion::sesion(&mia, &suya, inicio)
+        } else {
+            destruccion::sesion(&suya, &mia, inicio)
+        }
+    }
+
+    /// The other side destroyed the conversation: if the notice is signed by the key verified
+    /// for it, about this conversation and recent, do the same here; anything else is ignored
+    /// (nobody on the road can cut a conversation by forging one).
+    fn destruir_recibido(&mut self, v: &Value) {
+        let Some(firmante) = self
+            .verificado
+            .map(|x| x.signing())
+            .or_else(|| self.tarjeta_otra.as_ref().map(tarjeta::Tarjeta::signing))
+        else {
+            return;
+        };
+        let (Some(cuando), Some(inicio)) = (v["cuando"].as_u64(), v["inicio"].as_u64()) else {
+            return;
+        };
+        let motivo = v["motivo"].as_str().unwrap_or_default();
+        let firma = v["firma"].as_str().unwrap_or_default();
+        if ahora_s().abs_diff(cuando) > 300 || self.inicio_destruccion().abs_diff(inicio) > 5 {
+            return;
+        }
+        let sesion = self.sesion_destruccion(inicio);
+        if !destruccion::comprueba(firmante, &sesion, motivo, cuando, firma) {
+            return;
+        }
+        self.destruye(
+            MotivoDestruccion::OtroLado(MotivoDestruccion::de_clave(motivo).to_owned()),
+            false,
+        );
+    }
+
+    /// The last destruction, for the notice (null when none).
+    #[must_use]
+    pub fn destruida(&self) -> Option<&Value> {
+        self.destruida.as_ref()
+    }
+
+    /// The person closed the notice.
+    pub fn olvida_destruida(&mut self) {
+        if self.destruida.take().is_some() {
+            self.cambio = true;
+        }
+    }
+
+    /// Sign a chain with this computer's identity (the delivery room's ledger uses it too).
+    #[must_use]
+    pub fn firma_cadena(&self, cadena: Cadena) -> String {
+        Prueba::firmar(&self.identidad, cadena, &self.version, ahora_s()).to_json()
+    }
+
+    /// Messages and files that disappear after `segundos` (0: off). Told to the other side, so
+    /// both screens use the same timer, as in the big apps.
+    pub fn pon_temporizador(&mut self, segundos: u64, decirlo: bool) {
+        let s = segundos.min(TEMPORIZADOR_MAX);
+        if s == self.temporizador {
+            return;
+        }
+        self.temporizador = s;
+        if decirlo && self.fase == Fase::Lista {
+            self.manda_olm(json!({ "m": "temporizador", "s": s }));
+        }
+        self.cambio = true;
+    }
+
+    /// The timer in use.
+    #[must_use]
+    pub fn temporizador(&self) -> u64 {
+        self.temporizador
+    }
+
+    /// Messages whose time came leave the screen, and files whose time came leave the disk.
+    fn caducidades(&mut self) {
+        let ahora = ahora_s();
+        if crate::mensaje::purga(&mut self.mensajes, ahora) {
+            self.cambio = true;
+        }
+        if self.caducan.is_empty() {
+            return;
+        }
+        let (idos, quedan): (Vec<(u64, u64)>, Vec<(u64, u64)>) =
+            self.caducan.iter().partition(|(_, t)| *t <= ahora);
+        self.caducan = quedan;
+        for (id, _) in idos {
+            self.borra_recibido(id);
+        }
+    }
+
+    /// What the «Escudo en directo» shows (18 Oct 2026, the owner: «somos como un escudo»): every
+    /// line a check this program really made, with the second it was last true. Nothing is
+    /// estimated here; a line without a measure says so.
+    #[must_use]
+    pub fn escudo_json(&self) -> Value {
+        let verificado = self.verificado.is_some();
+        let olm = self.conversacion.is_some();
+        let movil_aqui = self
+            .movil
+            .as_ref()
+            .is_some_and(|m| m.enganchado && m.aprobado);
+        let mut dispositivos = Vec::new();
+        if self.fase != Fase::Sola {
+            dispositivos.push("este_equipo");
+            if self.tarjeta_otra.is_some() {
+                dispositivos.push(if self.otro_movil {
+                    "movil_del_otro"
+                } else {
+                    "equipo_del_otro"
+                });
+            }
+            if movil_aqui {
+                dispositivos.push("mi_movil");
+            }
+        }
+        let en_uso: Vec<Value> = self
+            .vigia
+            .en_uso
+            .iter()
+            .map(|(p, r)| json!({ "programa": p, "recurso": r }))
+            .collect();
+        json!({
+            "identidad": {
+                "ok": verificado,
+                "desde": (self.verificado_en > 0).then_some(self.verificado_en),
+                "contacto": self.nombre_contacto,
+            },
+            "cifrado": {
+                "olm": olm,
+                "cuantico": self.capa.is_some(),
+                "renovado": (self.capa_desde > 0).then_some(self.capa_desde),
+                "epocas": self.capa_epocas,
+                "renueva_cada": cuantico::RENUEVA_CADA,
+                "renueva_s": cuantico::RENUEVA_S,
+            },
+            "ruta": {
+                "directa": self.monitor.transporte.directo,
+                "rele": self.rele,
+                "rele_nombre": self.rele_usado,
+            },
+            "vigia": {
+                // Only Windows records it; elsewhere the line says it is not measured.
+                "activa": self.vigia.activa,
+                "mirado": (self.vigia_visto > 0).then_some(self.vigia_visto),
+                "en_uso": en_uso,
+                "pantalla_protegida": self.vigia.pantalla_protegida,
+            },
+            "integridad": {
+                "mensajes_ok": self.abiertos_ok,
+                "mensajes_mal": self.abiertos_mal,
+                "trozos_ok": self.trozos_ok,
+                "trozos_mal": self.trozos_mal,
+            },
+            "dispositivos": dispositivos,
+            "auto_destruccion": self.auto_destruccion,
+            "temporizador": self.temporizador,
+        })
+    }
+
     /// Drop the link and forget the handshake; the identity and the book stay.
     pub fn cerrar(&mut self, por: &str) {
         if self.enlace.is_some() && self.fase != Fase::Sola {
@@ -1235,11 +1560,23 @@ impl Secure {
         self.sas_mac_otra = None;
         self.verificado = None;
         self.conversacion = None;
-        self.entrada = None;
+        // A file half received goes too: nothing of the conversation stays on the disk.
+        if let Some(r) = self.entrada.take().and_then(|e| e.ruta) {
+            let _ = std::fs::remove_file(r);
+        }
         self.salida = None;
         self.cuantico_oferta = None;
         self.capa = None;
         self.cuantico_visto = false;
+        self.capa_desde = 0;
+        self.capa_epocas = 0;
+        self.verificado_en = 0;
+        self.abiertos_ok = 0;
+        self.abiertos_mal = 0;
+        self.trozos_ok = 0;
+        self.trozos_mal = 0;
+        self.temporizador = 0;
+        self.caducan.clear();
         self.llamada = None;
         self.entrante = None;
         self.perdida = None;
@@ -1300,6 +1637,18 @@ impl Secure {
     pub fn tic(&mut self) {
         self.movil_tic();
         self.timbres();
+        self.caducidades();
+        // A quiet conversation renews its post-quantum epoch on the clock too (18 Oct 2026).
+        if self.fase == Fase::Lista
+            && self.estado.en_marcha()
+            && self.cuantico_oferta.is_none()
+            && self
+                .capa
+                .as_ref()
+                .is_some_and(|c| cuantico::toca_renovar(c.sellados(), self.capa_desde, ahora_s()))
+        {
+            self.cuantico_empieza();
+        }
         self.sigue_envio();
         self.di_dispositivo();
         self.reconexion_tic();
@@ -1553,6 +1902,7 @@ impl Secure {
             "olm" => self.olm(&v),
             "bloque" => self.bloque(&v),
             "media" => self.media_entrante(&v),
+            "destruir" => self.destruir_recibido(&v),
             _ => {}
         }
     }
@@ -1606,6 +1956,11 @@ impl Secure {
                         format!("la clave de identidad de {n} no es la verificada"),
                         0,
                     );
+                    // Another device under a known name: an unexpected device (18 Oct 2026).
+                    if self.auto_destruccion {
+                        self.destruir(MotivoDestruccion::DispositivoNuevo);
+                        return;
+                    }
                 }
             }
         }
@@ -1654,6 +2009,7 @@ impl Secure {
     pub fn sas_persona(&mut self, iguales: bool, nombre: &str) {
         if !iguales {
             self.aviso("sec_sas_no", "");
+            self.destruir(MotivoDestruccion::CodigoDistinto);
             self.cerrar("los números no coincidían");
             return;
         }
@@ -1698,6 +2054,7 @@ impl Secure {
                     self.nombre_contacto = agenda::huella_corta(t.signing());
                 }
                 let n = self.nombre_contacto.clone();
+                self.verificado_en = ahora_s();
                 self.agenda.fijar(&n, verificado, ahora_s());
                 self.guarda_agenda();
                 self.verificado = Some(verificado);
@@ -1722,6 +2079,7 @@ impl Secure {
                     "los números de verificación no cuadraron".to_owned(),
                     0,
                 );
+                self.destruir(MotivoDestruccion::CodigoDistinto);
                 self.cerrar("la verificación no cuadró");
             }
         }
@@ -1805,7 +2163,7 @@ impl Secure {
         let renovar = self
             .capa
             .as_ref()
-            .is_some_and(|c| c.sellados() >= cuantico::RENUEVA_CADA);
+            .is_some_and(|c| cuantico::toca_renovar(c.sellados(), self.capa_desde, ahora_s()));
         if let Some(capa) = &mut self.capa {
             // The post-quantum lock first; Olm wraps the sealed bytes as any other payload.
             match capa.sella(&bytes) {
@@ -1872,6 +2230,7 @@ impl Secure {
         };
         match abierto {
             Ok(plano) => {
+                self.abiertos_ok += 1;
                 self.monitor.recibido(ahora_s());
                 if let Ok(carga) = serde_json::from_slice::<Value>(&plano) {
                     if let Some(carga) = self.cuantico_abre(carga) {
@@ -1880,6 +2239,7 @@ impl Secure {
                 }
             }
             Err(e) => {
+                self.abiertos_mal += 1;
                 self.aviso("sec_err_olm", e.to_string());
                 self.fallo_abriendo(false);
             }
@@ -1924,6 +2284,7 @@ impl Secure {
                     "llegó un mensaje sin la capa poscuántica ya acordada".to_owned(),
                     1,
                 );
+                self.destruir(MotivoDestruccion::Manipulada);
                 return None;
             }
             return Some(carga);
@@ -1937,11 +2298,13 @@ impl Secure {
                 serde_json::from_slice::<Value>(&plano).ok()
             }
             Err(_) => {
+                self.abiertos_mal += 1;
                 self.incidente(
                     "cuantico_mal",
                     "un mensaje no pasó la capa poscuántica (repetido o alterado)".to_owned(),
                     1,
                 );
+                self.destruir(MotivoDestruccion::Repeticion);
                 None
             }
         }
@@ -1982,6 +2345,8 @@ impl Secure {
                             Some(capa) => capa.renueva(&secreto, &t),
                             None => self.capa = Some(cuantico::Capa::nueva(&secreto, &t, 1)),
                         }
+                        self.capa_desde = ahora_s();
+                        self.capa_epocas += 1;
                         self.monitor
                             .anota(ahora_s(), Nivel::Info, "capa poscuántica activa");
                         self.cambio = true;
@@ -2004,12 +2369,17 @@ impl Secure {
                             Some(capa) => capa.renueva(&secreto, &t),
                             None => self.capa = Some(cuantico::Capa::nueva(&secreto, &t, 0)),
                         }
+                        self.capa_desde = ahora_s();
+                        self.capa_epocas += 1;
                         self.monitor
                             .anota(ahora_s(), Nivel::Info, "capa poscuántica activa");
                         self.cambio = true;
                     }
                     Err(e) => self.aviso("sec_err_olm", e.to_string()),
                 }
+            }
+            "temporizador" => {
+                self.pon_temporizador(c["s"].as_u64().unwrap_or(0), false);
             }
             "grupo" => {
                 self.grupo = c["nombres"]
@@ -2044,7 +2414,12 @@ impl Secure {
                     return;
                 }
                 let re = mensaje::id_de(&c["re"]);
-                self.mensajes.push(Mensaje::del_otro(id, texto, de, re));
+                let mut m = Mensaje::del_otro(id, texto, de, re);
+                // A message that disappears: from when it arrived here, at most a week.
+                if let Some(d) = c["dura"].as_u64().filter(|&d| d > 0) {
+                    m.caduca = Some(m.t + d.min(TEMPORIZADOR_MAX));
+                }
+                self.mensajes.push(m);
                 self.por_ver.push(id);
                 self.otro_escribe = 0;
                 // Tell the sender it is here (its ✓✓): the relay never says that.
@@ -2114,7 +2489,7 @@ impl Secure {
                 let Ok(clave) = <[u8; 32]>::try_from(clave.as_slice()) else {
                     return;
                 };
-                let video = c["video"].as_bool().unwrap_or(false);
+                let video = c["video"].as_bool().unwrap_or(false) && VIDEO;
                 let mime_remoto = c["mime"].as_str().map(|m| m.chars().take(80).collect());
                 let otro = self.numero_del_otro();
                 if c["m"] == "llamada" && self.llamada.is_none() {
@@ -2361,6 +2736,7 @@ impl Secure {
     }
 
     fn vacia_bloques(&mut self) {
+        let mut ok_trozos = 0u64;
         let mut fallo: Option<&'static str> = None;
         let mut completo = false;
         let mut confirma: Option<(String, u64)> = None;
@@ -2373,6 +2749,7 @@ impl Secure {
                     }
                     match r.mete(n, &b) {
                         Ok(plano) => {
+                            ok_trozos += 1;
                             e.recibido += plano.len() as u64;
                             if f.write_all(&plano).is_err() {
                                 fallo = Some("sec_err_archivo");
@@ -2395,6 +2772,7 @@ impl Secure {
                 }
             }
         }
+        self.trozos_ok += ok_trozos;
         if let Some(clave) = fallo {
             if let Some(e) = self.entrada.take() {
                 if let Some(r) = &e.ruta {
@@ -2403,11 +2781,13 @@ impl Secure {
             }
             self.aviso(clave, "");
             if clave == "sec_archivo_mal" {
+                self.trozos_mal += 1;
                 self.incidente(
                     "archivo_mal",
                     "un bloque de archivo llegó alterado".to_owned(),
                     1,
                 );
+                self.destruir(MotivoDestruccion::Manipulada);
             }
             return;
         }
@@ -2441,6 +2821,12 @@ impl Secure {
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, format!("archivo recibido: {n}"));
                     let mut linea = Mensaje::archivo(n.clone(), false);
+                    if self.temporizador > 0 {
+                        linea.caduca = Some(linea.t + self.temporizador);
+                        if let Some(r) = self.recibidos.last() {
+                            self.caducan.push((r.id, linea.t + self.temporizador));
+                        }
+                    }
                     // A picture goes on to the linked phone so it shows in its chat.
                     if let Some(r) = self
                         .recibidos
@@ -2541,7 +2927,7 @@ impl Secure {
             self.cambia_mime(mime);
             return Ok(());
         }
-        self.empieza_llamada(video, true, mime);
+        self.empieza_llamada(video && VIDEO, true, mime);
         Ok(())
     }
 
@@ -2884,10 +3270,14 @@ impl Secure {
             return;
         }
         let t: String = texto.chars().take(8000).collect();
-        let m = Mensaje::mio(t.clone(), re);
+        let mut m = Mensaje::mio(t.clone(), re);
         let mut carga = json!({ "m": "texto", "texto": t, "id": m.id.to_string() });
         if let Some(re) = re {
             carga["re"] = json!(re.to_string());
+        }
+        if self.temporizador > 0 {
+            m.caduca = Some(m.t + self.temporizador);
+            carga["dura"] = json!(self.temporizador);
         }
         self.mensajes.push(m);
         self.manda_olm(carga);
@@ -3247,7 +3637,11 @@ impl Secure {
             self.archivos.bytes += bytes;
             self.monitor
                 .anota(ahora_s(), Nivel::Info, format!("archivo enviado: {nombre}"));
-            self.mensajes.push(Mensaje::archivo(nombre.clone(), true));
+            let mut linea = Mensaje::archivo(nombre.clone(), true);
+            if self.temporizador > 0 {
+                linea.caduca = Some(linea.t + self.temporizador);
+            }
+            self.mensajes.push(linea);
             self.cambio = true;
         }
         Ok(())
@@ -3356,6 +3750,7 @@ impl Secure {
                 )
             };
             self.incidente(senal, detalle, n);
+            self.destruir(MotivoDestruccion::Manipulada);
         }
     }
 
@@ -3826,7 +4221,7 @@ impl Secure {
         };
         let mut monitor = serde_json::to_value(&self.monitor).unwrap_or(Value::Null);
         monitor["sesion"] = serde_json::to_value(&self.estado).unwrap_or(Value::Null);
-        json!({
+        let mut e = json!({
             "tipo": "secure_estado",
             "fase": fase,
             "puerto": self.puerto,
@@ -3868,7 +4263,12 @@ impl Secure {
             },
             "informe": self.informe.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "inicio": r.inicio, "fin": r.fin, "veredicto": r.veredicto, "sin_espionaje": r.veredicto.as_ref().is_some_and(Veredicto::sin_espionaje), "conexion": r.conexion, "observadas": r.observadas, "inusuales": r.inusuales, "firmante": r.firmante, "firma": r.firma, "hash_cadena": r.hash_cadena })),
             "resumen": self.resumen.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "mensajes": r.mensajes_enviados + r.mensajes_recibidos, "archivos": r.archivos.enviados + r.archivos.recibidos, "observadas": r.observadas, "inusuales": r.inusuales, "fin": r.fin })),
-        })
+        });
+        e["escudo"] = self.escudo_json();
+        e["video"] = json!(VIDEO);
+        e["temporizador"] = json!(self.temporizador);
+        e["temporizadores"] = json!(TEMPORIZADORES);
+        e
     }
 }
 
@@ -3925,16 +4325,22 @@ fn sin_remitente(plano: &[u8]) -> (&str, &[u8]) {
     )
 }
 
+/// The key that locks the identity and the book: sealed with DPAPI for this Windows account
+/// since 18 Oct 2026 (an older plain file is sealed on the first read), owner-only elsewhere.
 fn lee_o_crea_clave(ruta: &Path) -> [u8; 32] {
-    if let Ok(b) = std::fs::read(ruta) {
-        if let Ok(k) = <[u8; 32]>::try_from(b.as_slice()) {
-            return k;
-        }
-    }
-    let mut k = [0u8; 32];
-    crate::sesion::azar(&mut k);
-    let _ = std::fs::write(ruta, k);
-    k
+    let nueva = || {
+        let mut k = [0u8; 32];
+        crate::sesion::azar(&mut k);
+        Some(k.to_vec())
+    };
+    crate::dpapi::lee_o_crea(ruta, nueva, |b| b.len() == 32)
+        .and_then(|b| <[u8; 32]>::try_from(b.as_slice()).ok())
+        .unwrap_or_else(|| {
+            // No disk at all: a key for this run only (nothing can be restored later).
+            let mut k = [0u8; 32];
+            crate::sesion::azar(&mut k);
+            k
+        })
 }
 
 fn limpia_nombre(n: &str) -> String {

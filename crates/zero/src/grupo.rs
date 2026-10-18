@@ -50,6 +50,12 @@ pub struct Grupo {
     /// The live file for the globe: written, and when.
     directo_escrito: bool,
     directo_ultimo: u64,
+    /// Destroy on an anomaly (18 Oct 2026), for every link, the new ones included.
+    auto_destruccion: bool,
+    /// The disappearing-messages timer, for every link.
+    temporizador: u64,
+    /// A link was destroyed for an anomaly: the whole group goes, and this is the notice.
+    destruida: Option<Value>,
     cambio: bool,
 }
 
@@ -101,6 +107,9 @@ impl Grupo {
             zona_propia: String::new(),
             directo_escrito: false,
             directo_ultimo: 0,
+            auto_destruccion: true,
+            temporizador: 0,
+            destruida: None,
             cambio: false,
         }
     }
@@ -116,6 +125,7 @@ impl Grupo {
     fn nueva_sesion(&mut self) -> usize {
         let mut s = Secure::abre(&self.datos, &self.descargas);
         s.pon_version(&self.version);
+        s.auto_destruccion = self.auto_destruccion;
         self.sesiones.push(s);
         self.vistos.push(0);
         self.sesiones.len() - 1
@@ -224,6 +234,7 @@ impl Grupo {
         for s in &mut self.sesiones {
             s.tic();
         }
+        self.destruccion_tic();
         self.reparte();
         if self.anfitrion {
             self.siguiente_escucha();
@@ -855,6 +866,74 @@ impl Grupo {
         self.cambio = true;
     }
 
+    /// One link was destroyed for an anomaly (18 Oct 2026): every other link is destroyed too,
+    /// each one telling its member with a signed notice, and the group's own copy of the chat
+    /// goes. A member's screen has a single link; the host's has one per member.
+    fn destruccion_tic(&mut self) {
+        if self.destruida.is_some() {
+            return;
+        }
+        let Some(d) = self.sesiones.iter().find_map(|s| s.destruida().cloned()) else {
+            return;
+        };
+        let clave = d["motivo"].as_str().unwrap_or("otro_lado").to_owned();
+        for s in &mut self.sesiones {
+            if s.destruida().is_none() && !s.sola() {
+                s.destruir(guardiana_secure::destruccion::Motivo::OtroLado(
+                    clave.clone(),
+                ));
+            }
+        }
+        self.mensajes.clear();
+        self.media_para_pagina.clear();
+        self.llamada = None;
+        self.destruida = Some(d);
+        self.cambio = true;
+    }
+
+    /// The notice of the last destruction (null when none).
+    #[must_use]
+    pub fn destruida(&self) -> Value {
+        self.destruida.clone().unwrap_or(Value::Null)
+    }
+
+    /// The person closed the notice.
+    pub fn olvida_destruida(&mut self) {
+        self.destruida = None;
+        for s in &mut self.sesiones {
+            s.olvida_destruida();
+        }
+        self.cambio = true;
+    }
+
+    /// Destroy on an anomaly, or (off) only pause as before.
+    pub fn pon_auto_destruccion(&mut self, si: bool) {
+        self.auto_destruccion = si;
+        for s in &mut self.sesiones {
+            s.auto_destruccion = si;
+        }
+        self.cambio = true;
+    }
+
+    /// Messages and files that disappear after `segundos` (0: off), on every link.
+    pub fn pon_temporizador(&mut self, segundos: u64) {
+        self.temporizador = segundos;
+        for s in &mut self.sesiones {
+            s.pon_temporizador(segundos, true);
+        }
+        self.cambio = true;
+    }
+
+    /// Sign a chain with this computer's identity (the delivery room's ledger).
+    #[must_use]
+    pub fn firma_cadena(&self, cadena: guardiana_secure::prueba::Cadena) -> String {
+        // (A group of none cannot be: `abre` makes the first link.)
+        self.sesiones
+            .first()
+            .map(|s| s.firma_cadena(cadena))
+            .unwrap_or_default()
+    }
+
     /// The person closed the incident card.
     pub fn olvida_incidente(&mut self) {
         for s in &mut self.sesiones {
@@ -933,6 +1012,8 @@ impl Grupo {
             let otra = self.sesiones[i].estado_json();
             e["informe"] = otra["informe"].clone();
             e["vigia"] = otra["vigia"].clone();
+            e["escudo"] = otra["escudo"].clone();
+            e["temporizador"] = otra["temporizador"].clone();
         }
         if let Some(nueva) = self
             .sesiones
@@ -981,6 +1062,7 @@ impl Grupo {
                 .collect::<Vec<_>>(),
         });
         e["escribiendo"] = json!(self.sesiones.iter().any(Secure::otro_escribiendo));
+        e["destruida"] = self.destruida();
         e["grupo"] = json!({
             "anfitrion": anfitrion,
             "yo": self.nombre_o_anfitrion(),

@@ -616,7 +616,7 @@ async fn rele_bucle(rele: String, clave: [u8; 32], tx: tmpsc::UnboundedSender<En
     }
 }
 
-async fn conecta_rele(rele: &str) -> Option<tokio::net::TcpStream> {
+pub(crate) async fn conecta_rele(rele: &str) -> Option<tokio::net::TcpStream> {
     // The same way in as a conversation's (inside TLS for GUARDIANA's relay, see `rele::abre`),
     // handed over as a socket of this runtime.
     let rele = rele.to_owned();
@@ -628,7 +628,7 @@ async fn conecta_rele(rele: &str) -> Option<tokio::net::TcpStream> {
     tokio::net::TcpStream::from_std(s).ok()
 }
 
-async fn lee_rele(r: &mut (impl tokio::io::AsyncRead + Unpin)) -> Option<Vec<u8>> {
+pub(crate) async fn lee_rele(r: &mut (impl tokio::io::AsyncRead + Unpin)) -> Option<Vec<u8>> {
     let mut n = [0u8; 4];
     r.read_exact(&mut n).await.ok()?;
     let n = u32::from_be_bytes(n) as usize;
@@ -640,7 +640,10 @@ async fn lee_rele(r: &mut (impl tokio::io::AsyncRead + Unpin)) -> Option<Vec<u8>
     Some(v)
 }
 
-async fn escribe_rele(w: &mut (impl tokio::io::AsyncWrite + Unpin), datos: &[u8]) -> Option<()> {
+pub(crate) async fn escribe_rele(
+    w: &mut (impl tokio::io::AsyncWrite + Unpin),
+    datos: &[u8],
+) -> Option<()> {
     let mut c = Vec::with_capacity(4 + datos.len());
     c.extend_from_slice(&(datos.len() as u32).to_be_bytes());
     c.extend_from_slice(datos);

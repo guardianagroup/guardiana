@@ -53,6 +53,10 @@ pub struct Comunicaciones {
     /// Links that came in through this computer's GUARDIANA number (1.0.42), once
     /// [`Comunicaciones::abre_buzon`] opened the mailbox at the relay.
     buzon: Option<std::sync::mpsc::Receiver<std::net::TcpStream>>,
+    /// «Sala de entrega» (18 Oct 2026): files for someone outside, by a one-use link and a code.
+    entregas: crate::entrega::Entregas,
+    /// The language the delivery links open in (the page says it).
+    idioma: String,
 }
 
 fn texto<'a>(m: &'a Value, k: &str) -> &'a str {
@@ -70,6 +74,8 @@ impl Comunicaciones {
             sala: None,
             descargas: descargas.to_path_buf(),
             buzon: None,
+            entregas: crate::entrega::Entregas::abre(datos),
+            idioma: "es".to_owned(),
         }
     }
 
@@ -129,7 +135,14 @@ impl Comunicaciones {
             let _ = self.secure.entra_por_numero(s);
         }
         self.secure.tic();
+        self.entregas.tic();
         let mut o = Vec::new();
+        if self.entregas.cambiado() && pagina {
+            o.push(self.entregas.json(&self.idioma));
+            for a in self.entregas.avisos() {
+                o.push(json!({ "tipo": "secure_aviso", "clave": a["clave"], "texto": a["texto"] }));
+            }
+        }
         let mut sala_cambio = false;
         if let Some(sala) = &mut self.sala {
             sala.tic();
@@ -513,6 +526,22 @@ impl Comunicaciones {
                     json!({ "tipo": "secure_prueba", "json": j }),
                 )];
             }
+            // Destruction on an anomaly and disappearing messages (18 Oct 2026).
+            "destruida_vista" => {
+                self.secure.olvida_destruida();
+                Ok(())
+            }
+            "auto_destruccion" => {
+                self.secure
+                    .pon_auto_destruccion(m["si"].as_bool().unwrap_or(true));
+                Ok(())
+            }
+            "temporizador" => {
+                self.secure.pon_temporizador(m["s"].as_u64().unwrap_or(0));
+                Ok(())
+            }
+            // «Sala de entrega» (18 Oct 2026).
+            a if a.starts_with("entrega") => return self.accion_entrega(a, m),
             _ => Ok(()),
         };
         let mut o = Vec::new();
@@ -530,6 +559,91 @@ impl Comunicaciones {
                 }
             }
         }
+        o
+    }
+}
+
+impl Comunicaciones {
+    /// What the delivery room's part of the page asks for.
+    fn accion_entrega(&mut self, accion: &str, m: &Value) -> Vec<Salida> {
+        let id = texto(m, "id");
+        let r: Result<(), String> = match accion {
+            "entrega_nueva" => self
+                .entregas
+                .nueva(
+                    texto(m, "caducidad"),
+                    m["digitos"]
+                        .as_u64()
+                        .map_or(guardiana_secure::entrega::DIGITOS, |d| {
+                            usize::try_from(d).unwrap_or(guardiana_secure::entrega::DIGITOS)
+                        }),
+                    m["nombres"].as_bool().unwrap_or(true),
+                    texto(m, "titulo"),
+                )
+                .map(|_| ()),
+            "entrega_archivo" => self
+                .entregas
+                .archivo(texto(m, "nombre"), m["bytes"].as_u64().unwrap_or(0)),
+            "entrega_trozo" => {
+                let r = base64::engine::general_purpose::STANDARD
+                    .decode(texto(m, "b64"))
+                    .map_err(|e| e.to_string())
+                    .and_then(|b| {
+                        self.entregas
+                            .trozo(&b, m["ultimo"].as_bool().unwrap_or(false))
+                    });
+                // Pieces get no answer of their own, only an error (as a file in a chat).
+                return match r {
+                    Ok(()) if m["ultimo"].as_bool().unwrap_or(false) => {
+                        vec![Salida::Pagina(self.entregas.json(&self.idioma))]
+                    }
+                    Ok(()) => Vec::new(),
+                    Err(e) => vec![Salida::Pagina(
+                        json!({ "tipo": "secure_aviso", "clave": "sec_error", "texto": e }),
+                    )],
+                };
+            }
+            "entrega_lista" => {
+                let i = texto(m, "idioma");
+                if !i.is_empty() {
+                    self.idioma = i.chars().take(5).collect();
+                }
+                self.entregas.lista().map(|_| ())
+            }
+            "entrega_revocar" => {
+                self.entregas.revoca(id);
+                Ok(())
+            }
+            "entrega_olvidar" => {
+                self.entregas.olvida(id);
+                Ok(())
+            }
+            "entrega_recibo" => {
+                return self
+                    .entregas
+                    .recibo(id)
+                    .map(|j| {
+                        vec![Salida::Pagina(
+                            json!({ "tipo": "entrega_recibo", "id": id, "json": j }),
+                        )]
+                    })
+                    .unwrap_or_default();
+            }
+            "entrega_libro" => {
+                let j = self.secure.firma_cadena(self.entregas.cadena());
+                return vec![Salida::Pagina(
+                    json!({ "tipo": "entrega_libro", "json": j }),
+                )];
+            }
+            _ => Ok(()),
+        };
+        let mut o = Vec::new();
+        if let Err(e) = r {
+            o.push(Salida::Pagina(
+                json!({ "tipo": "secure_aviso", "clave": "sec_error", "texto": e }),
+            ));
+        }
+        o.push(Salida::Pagina(self.entregas.json(&self.idioma)));
         o
     }
 }
@@ -598,6 +712,60 @@ mod tests {
         // Without a page that said «listo», the clock says nothing to anybody.
         assert!(c.tic(false).is_empty());
         c.accion(&json!({ "accion": "cerrar" }));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn the_delivery_room_answers_with_its_list_and_its_signed_ledger() {
+        let d = carpeta("entregas");
+        let mut c = Comunicaciones::abre(&d.join("datos"), &d.join("descargas"), "0.1.0");
+        let o = c.accion(&json!({ "accion": "entrega_nueva", "caducidad": "7d", "digitos": 8 }));
+        let Some(Salida::Pagina(l)) = o.last() else {
+            unreachable!("{o:?}");
+        };
+        assert_eq!(l["tipo"], "entregas");
+        assert_eq!(l["entregas"][0]["estado"], "preparando");
+        assert_eq!(l["entregas"][0]["caducidad"], "7d");
+        assert_eq!(
+            l["entregas"][0]["codigo"]
+                .as_str()
+                .unwrap_or_default()
+                .len(),
+            8
+        );
+        // Nothing to hand over yet: no link.
+        let o = c.accion(&json!({ "accion": "entrega_lista" }));
+        assert!(matches!(o.first(), Some(Salida::Pagina(v)) if v["clave"] == "sec_error"));
+        c.accion(&json!({ "accion": "entrega_archivo", "nombre": "a.txt", "bytes": 4 }));
+        assert!(c
+            .accion(&json!({ "accion": "entrega_trozo", "b64": "aG9s", "ultimo": false }))
+            .is_empty());
+        let o = c.accion(&json!({ "accion": "entrega_trozo", "b64": "YQ==", "ultimo": true }));
+        let Some(Salida::Pagina(l)) = o.last() else {
+            unreachable!("{o:?}");
+        };
+        assert_eq!(l["entregas"][0]["bytes"], 4);
+        let id = l["entregas"][0]["id"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned();
+        c.accion(&json!({ "accion": "entrega_revocar", "id": id }));
+        let o = c.accion(&json!({ "accion": "entrega_libro" }));
+        let Some(Salida::Pagina(libro)) = o.last() else {
+            unreachable!("{o:?}");
+        };
+        let p =
+            guardiana_secure::prueba::Prueba::from_json(libro["json"].as_str().unwrap_or_default());
+        assert!(
+            p.is_ok_and(|p| p.verificar().is_ok()),
+            "the ledger is signed"
+        );
+        // The settings of the conversation part.
+        c.accion(&json!({ "accion": "temporizador", "s": 300 }));
+        c.accion(&json!({ "accion": "auto_destruccion", "si": false }));
+        let e = c.estado_json();
+        assert_eq!(e["escudo"]["auto_destruccion"], false);
+        assert!(e["destruida"].is_null());
         let _ = std::fs::remove_dir_all(&d);
     }
 }
