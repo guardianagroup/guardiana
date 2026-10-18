@@ -74,6 +74,12 @@ fn lugares() -> &'static [Lugar] {
     L.get_or_init(|| serde_json::from_str(LUGARES_JSON).unwrap_or_default())
 }
 
+/// Every published place, for the tests of other modules.
+#[cfg(test)]
+pub(crate) fn lugares_para_pruebas() -> &'static [Lugar] {
+    lugares()
+}
+
 fn tabla_nube() -> Option<&'static Tabla> {
     static T: OnceLock<Option<Tabla>> = OnceLock::new();
     T.get_or_init(|| {
