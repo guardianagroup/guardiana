@@ -184,6 +184,9 @@ pub struct Sala {
     descargas: Option<PathBuf>,
     /// The last file id handed to the phones.
     ultimo_archivo: u32,
+    /// Every file the room saved in Descargas: removed when the room ends (17 Oct 2026, the
+    /// owner: nothing of a conversation may stay once it is over).
+    guardados: Vec<PathBuf>,
     /// The relay's call service (WebRTC between two phones of the house, 17 Oct 2026).
     turn: Option<crate::rele::Turn>,
     turn_rx: Option<std::sync::mpsc::Receiver<Result<crate::rele::Turn, String>>>,
@@ -207,6 +210,15 @@ struct InformeSala {
     fin: u64,
     rtc: bool,
     veredicto: crate::vigia::Veredicto,
+}
+
+impl Drop for Sala {
+    /// The room ends (closed, expired, or the page started again): its files go with it.
+    fn drop(&mut self) {
+        for r in self.guardados.drain(..) {
+            let _ = std::fs::remove_file(r);
+        }
+    }
 }
 
 impl std::fmt::Debug for Sala {
@@ -272,6 +284,7 @@ impl Sala {
             // Each room numbers its files from its own random start (17 Oct 2026: a new room's
             // first voice note showed the previous room's, cached on the screen by number).
             ultimo_archivo: u32::from_le_bytes([clave[0], clave[1], clave[2], 0]) << 4,
+            guardados: Vec::new(),
             turn: None,
             turn_rx: None,
             turn_pedido: 0,
@@ -505,6 +518,7 @@ impl Sala {
         if std::fs::write(&ruta, &datos).is_err() {
             return;
         }
+        self.guardados.push(ruta.clone());
         self.ultimo_archivo += 1;
         let archivo = Archivo {
             id: self.ultimo_archivo,
