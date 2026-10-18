@@ -34,46 +34,48 @@
     let A = null, confirmando = false;
     // The owner, 18 Oct 2026: every cut or let-through is a switch, green «Permitido» ↔ red
     // «Cortado», with the word beside it; never a «Cortar» text button. aria-checked="true" is
-    // «Permitido». The class `interruptor` is the shared component of diseno.css.
-    const interruptor = (permitido, datos, etiqueta) => `<span class="hx-interruptor"><button type="button" class="interruptor" role="switch" aria-checked="${permitido ? 'true' : 'false'}" data-estado="${permitido ? 'permitido' : 'cortado'}" aria-label="${esc(etiqueta)}" ${datos}></button><span class="interruptor-estado">${esc(t(permitido ? 'hx_permitido' : 'hx_cortado'))}</span></span>`;
+    // «Permitido». It is the shared component (interruptor.js), the same as everywhere.
+    const G = window.GuardianaInterruptor;
+    const TEXTO_INT = () => ({ permitido: t('interruptor_permitido'), cortado: t('interruptor_cortado'), cortando: t('cortando'), permitiendo: t('permitiendo') });
+    const interruptor = (permitido, datos, etiqueta) => (G ? `<span class="hx-interruptor">${G.html({ cortado: !permitido, texto: TEXTO_INT(), etiqueta, datos, chico: true })}</span>` : '');
     const pintaApagon = (a) => {
       A = a;
       // The main switch: «Permitido» while the blackout is off, «Cortado» while it is on.
-      const b = $('hx-ap-boton');
-      b.setAttribute('aria-checked', a.activo ? 'false' : 'true');
-      b.dataset.estado = a.activo ? 'cortado' : 'permitido';
+      if (G) $('hx-ap-int').innerHTML = G.html({ cortado: !!a.activo, texto: TEXTO_INT(), etiqueta: t('hx_ap_rotulo'), datos: { ap: '1' } });
       $('hx-ap-estado').textContent = t(a.activo ? 'hx_ap_estado_on' : 'hx_ap_estado_off');
       $('hx-ap-confirmar').hidden = !confirmando || a.activo;
       $('hx-ap-desde').textContent = a.activo && a.desde ? t('hx_ap_desde').replace('{fecha}', fecha(a.desde)) : '';
       const cortados = a.cortados || [];
       $('hx-ap-cortados').innerHTML = cortados.length
-        ? cortados.map((c) => `<li><span><b>${esc(c.nombre)}</b><small class="muted">${esc(tn('hx_ap_veces', c.veces))}${c.programa ? ' · ' + esc(c.programa) : ''} · ${esc(fecha(c.ultima))}</small></span>${interruptor(false, `data-aprobar="${esc(c.nombre)}"`, c.nombre)}</li>`).join('')
+        ? cortados.map((c) => `<li><span><b>${esc(c.nombre)}</b><small class="muted">${esc(tn('hx_ap_veces', c.veces))}${c.programa ? ' · ' + esc(c.programa) : ''} · ${esc(fecha(c.ultima))}</small></span>${interruptor(false, { aprobar: c.nombre }, c.nombre)}</li>`).join('')
         : `<li class="muted">${esc(t(a.activo ? 'hx_ap_nada_cortado' : 'hx_ap_apagado_nada'))}</li>`;
       const ap = a.aprobados || [];
       $('hx-ap-aprobados').innerHTML = ap.length
-        ? ap.map((n) => `<li><span><b>${esc(n)}</b><small class="muted">${esc(t('hx_ap_y_debajo'))}</small></span>${interruptor(true, `data-quitar="${esc(n)}"`, n)}</li>`).join('')
+        ? ap.map((n) => `<li><span><b>${esc(n)}</b><small class="muted">${esc(t('hx_ap_y_debajo'))}</small></span>${interruptor(true, { quitar: n }, n)}</li>`).join('')
         : `<li class="muted">${esc(t('hx_ap_sin_aprobados'))}</li>`;
       $('hx-ap-esenciales').innerHTML = (a.esenciales || []).map((e) => `<li><span><b>${esc(e.dominio)}</b><small class="muted">${esc(t('hx_para_' + e.para))}</small></span></li>`).join('');
     };
     const cargaApagon = async () => { try { pintaApagon(await api('/api/apagon')); } catch (_) {} };
-    $('hx-ap-boton').addEventListener('click', async () => {
-      if (!A) return;
-      // Turning it off is always one click; turning it on asks once, because it cuts a lot.
-      if (A.activo) { confirmando = false; pintaApagon(await api('/api/apagon', { method: 'POST', body: { activo: false } })); return; }
-      confirmando = true; pintaApagon(A);
-    });
     $('hx-ap-si').addEventListener('click', async () => { confirmando = false; pintaApagon(await api('/api/apagon', { method: 'POST', body: { activo: true } })); });
     $('hx-ap-no').addEventListener('click', () => { confirmando = false; pintaApagon(A); });
     const aprueba = async (nombre) => {
       $('hx-ap-msg').textContent = '';
       try { pintaApagon(await api('/api/apagon/aprobar', { method: 'POST', body: { nombre } })); $('hx-ap-nombre').value = ''; } catch (_) { $('hx-ap-msg').textContent = t('hx_ap_no_nombre'); }
     };
-    $('hx-apagon').addEventListener('click', async (e) => {
-      const ok = e.target.closest('button[data-aprobar]');
-      if (ok) { aprueba(ok.dataset.aprobar); return; }
-      const fuera = e.target.closest('button[data-quitar]');
-      if (fuera) pintaApagon(await api('/api/apagon/quitar', { method: 'POST', body: { nombre: fuera.dataset.quitar } }));
-    });
+    // Every switch of the section, through the shared component: the main one asks once before
+    // cutting (it cuts a lot) and is put back until the person says yes; a name cut by the
+    // blackout is allowed by switching it on; an allowed name goes by switching it off.
+    if (G) G.engancha($('hx-apagon'), async (b, quiere) => {
+      if (b.dataset.ap) {
+        if (!A) return false;
+        if (!quiere) { confirmando = false; pintaApagon(await api('/api/apagon', { method: 'POST', body: { activo: false } })); return true; }
+        confirmando = true; pintaApagon(A);
+        return false;
+      }
+      if (b.dataset.aprobar && !quiere) { await aprueba(b.dataset.aprobar); return true; }
+      if (b.dataset.quitar && quiere) { pintaApagon(await api('/api/apagon/quitar', { method: 'POST', body: { nombre: b.dataset.quitar } })); return true; }
+      return false;
+    }, TEXTO_INT());
     $('hx-ap-form').addEventListener('submit', (e) => { e.preventDefault(); const n = $('hx-ap-nombre').value.trim(); if (n) aprueba(n); });
     await cargaApagon();
     // While it is on, what it cuts appears as it happens (every five seconds, not while hidden).

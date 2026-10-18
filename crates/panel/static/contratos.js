@@ -14,8 +14,8 @@
     document.title = 'GUARDIANA · ' + t('nav_contratos');
     const fecha = (ms) => (ms ? new Date(ms).toLocaleDateString(LOC, { dateStyle: 'medium' }) : '');
     const fechaHora = (ms) => (ms ? new Date(ms).toLocaleString(LOC, { dateStyle: 'medium', timeStyle: 'short' }) : '');
-    const CHIP = { aprendiendo: 'info', vigilando: 'ok', fijado: 'azul', no_aplica: '' };
-    const CHIP_AVISO = { abierto: 'aviso', aceptado: 'ok', cortado: 'rojo', cortado_auto: 'rojo', deshecho: '' };
+    const CHIP = { aprendiendo: 'info', vigilando: 'ok', fijado: 'info', no_aplica: '' };
+    const CHIP_AVISO = { abierto: 'aviso', aceptado: 'ok', cortado: 'alerta', cortado_auto: 'alerta', deshecho: '' };
     const abiertos = new Set();
     let ultimo = null;
 
@@ -27,13 +27,13 @@
     };
 
     // The cut is a switch, green «Permitido» ↔ red «Cortado», with the word beside it (the owner,
-    // 18 Oct 2026: every cut control is a switch, never a «Cortar» text button). The markup is the
-    // shared `interruptor` component of the redesign; on means cut. Turning it on cuts only what
-    // is new; turning it off undoes that cut.
-    const interruptor = (a, cortado) => `<span class="interruptor-caja chico${cortado ? ' cortado' : ''}">
-        <button type="button" class="interruptor" role="switch" aria-checked="${cortado}" data-accion="${cortado ? 'deshacer' : 'cortar'}" aria-label="${esc(t('ct_interruptor_nuevo').replace('{programa}', a.programa))}"><span class="interruptor-bola" aria-hidden="true"></span></button>
-        <span class="interruptor-estado">${esc(t(cortado ? 'ct_cortado' : 'ct_permitido'))}</span>
-      </span>`;
+    // 18 Oct 2026: every cut control is a switch, never a «Cortar» text button). It is the shared
+    // component (interruptor.js): on (aria-checked="true", green) is allowed, as everywhere.
+    // Switching it off cuts only what is new; switching it back on undoes that cut.
+    const TEXTO_INT = () => ({ permitido: t('interruptor_permitido'), cortado: t('interruptor_cortado'), cortando: t('cortando'), permitiendo: t('permitiendo') });
+    const interruptor = (a, cortado) => (window.GuardianaInterruptor
+      ? window.GuardianaInterruptor.html({ cortado, texto: TEXTO_INT(), etiqueta: t('ct_interruptor_nuevo').replace('{programa}', a.programa), chico: true })
+      : '');
 
     const pintaAviso = (a) => {
       const abierto = a.estado === 'abierto';
@@ -57,7 +57,7 @@
         ${sinCortar ? `<ul class="ct-nota">${sinCortar}</ul>` : ''}
         <div class="ct-botones">
           ${abierto || deshacible ? interruptor(a, deshacible) : ''}
-          ${abierto ? `<button type="button" class="btn secondary chico" data-accion="aceptar">${esc(t('ct_accion_aceptar'))}</button>` : ''}
+          ${abierto ? `<button type="button" class="boton chico" data-accion="aceptar">${esc(t('ct_accion_aceptar'))}</button>` : ''}
           <button type="button" class="enlace" data-accion="detalle" aria-expanded="${visto}">${esc(t('ct_accion_detalle'))}</button>
         </div>
         <div class="ct-detalle"${visto ? '' : ' hidden'}><div class="rotulo">${esc(t('ct_nombres'))}</div><div class="ct-col"><ul>${detalle}</ul></div></div>
@@ -89,8 +89,8 @@
           ${versiones ? `<p class="ct-meta">${esc(t('ct_versiones'))}: ${esc(versiones)}</p>` : ''}
         </details>
         <div class="ct-botones">
-          ${puedeFijar ? `<button type="button" class="btn secondary chico" data-fijar="1">${esc(t('ct_accion_fijar'))}</button>` : ''}
-          ${c.estado === 'fijado' ? `<button type="button" class="btn secondary chico" data-fijar="0">${esc(t('ct_accion_soltar'))}</button>` : ''}
+          ${puedeFijar ? `<button type="button" class="boton chico" data-fijar="1">${esc(t('ct_accion_fijar'))}</button>` : ''}
+          ${c.estado === 'fijado' ? `<button type="button" class="boton chico" data-fijar="0">${esc(t('ct_accion_soltar'))}</button>` : ''}
           <span class="ct-meta">${esc(t('ct_fijar_explica'))}</span>
         </div>` : ''}
       </article>`;
@@ -122,6 +122,18 @@
       pinta(r);
       pintaRegistro(reg);
     };
+
+    // The switch: off asks to cut what is new, on undoes it. The component keeps the knob where
+    // the person put it while the service works and puts it back, saying why, if it refuses.
+    if (window.GuardianaInterruptor) {
+      window.GuardianaInterruptor.engancha($('ct-avisos'), async (b, quiereCortar) => {
+        const id = Number(b.closest('[data-id]').getAttribute('data-id'));
+        const r = await api(`/api/contratos/avisos/${id}/${quiereCortar ? 'cortar' : 'deshacer'}`, { method: 'POST' });
+        msg(r.texto);
+        await carga();
+        return true;
+      }, TEXTO_INT());
+    }
 
     $('ct-avisos').addEventListener('click', async (ev) => {
       const b = ev.target.closest('button[data-accion]');

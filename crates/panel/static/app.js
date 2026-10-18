@@ -349,7 +349,8 @@
     const r = await fetch(path, Object.assign({}, opts, { headers }));
     if (r.status === 401) { showNoSession(); throw new Error('sin sesión'); }
     // A Plus feature at the free level (plan.rs): one calm line and «Pasar a Plus», once per page.
-    if (r.status === 402) { let j = {}; try { j = await r.json(); } catch (_) {} lineaPlus(j); const e = new Error(j.texto || 'Plus'); e.plus = true; throw e; }
+    // `callado`: the top bar's own questions, which must not put that line on every page.
+    if (r.status === 402) { let j = {}; try { j = await r.json(); } catch (_) {} if (!opts.callado) lineaPlus(j); const e = new Error(j.texto || 'Plus'); e.plus = true; throw e; }
     if (!r.ok) throw new Error(await r.text());
     return r.json();
   }
@@ -358,8 +359,8 @@
     if (document.getElementById('linea-plus') || !j || !j.texto) return;
     const caja = document.createElement('div');
     caja.id = 'linea-plus';
-    caja.className = 'card plan-plus';
-    caja.innerHTML = `<span>${esc(j.texto)}</span> <a class="btn secondary" href="${esc(j.enlace || '')}" target="_blank" rel="noopener">${esc(j.boton || '')}</a>`;
+    caja.className = 'tarjeta plan-linea plan-plus';
+    caja.innerHTML = `<span>${esc(j.texto)}</span> <a class="boton chico" href="${esc(j.enlace || '')}" target="_blank" rel="noopener">${esc(j.boton || '')}</a>`;
     const m = document.querySelector('main');
     if (m) m.insertBefore(caja, m.firstChild);
   }
@@ -1077,7 +1078,7 @@
     $('maxima-quitar').addEventListener('click', (e) => cambia(false, e.currentTarget));
     try { pinta(await api('/api/proteccion-maxima')); } catch (_) {}
   }
-  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', antivirus: 'nav_antivirus', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo', borrado: 'nav_borrado', empresa: 'ficha_titulo', expedientes: 'nav_expedientes', certificado: 'nav_certificado' };
+  const PAGE_TITLE = { radiografia: 'nav_radiografia', ia: 'nav_ia', antivirus: 'nav_antivirus', extracto: 'nav_extracto', dispositivos: 'nav_dispositivos', sabeDeTi: 'nav_sabe', estado: 'nav_estado', hogar: 'nav_hogar', miDispositivo: 'nav_mi', informe: 'nav_informe', reglas: 'nav_reglas', verify: 'nav_verify', licencia: 'nav_licencia', comprobador: 'comprobador_titulo', borrado: 'nav_borrado', empresa: 'ficha_titulo', expedientes: 'nav_expedientes', certificado: 'nav_certificado', contratos: 'nav_contratos', vision: 'nav_vision', vigilancia: 'nav_vigilancia', herramientas: 'nav_herramientas', identificacion: 'nav_identificacion' };
   function applyTexts() {
     document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.getAttribute('data-t')); });
     document.querySelectorAll('[data-t-html]').forEach((el) => { el.innerHTML = t(el.getAttribute('data-t-html')); });
@@ -1111,8 +1112,11 @@
   const MENU = [
     { t: 'menu_en_vivo', paginas: [['por-dentro', '/por-dentro', 'menu_globo']] },
     { t: 'menu_actividad', paginas: [['extracto', '/extracto', 'menu_registro'], ['radiografia', '/', 'menu_foto'], ['informe', '/informe', 'nav_informe']] },
-    { t: 'menu_diagnostico', paginas: [['revision', '/revision', 'nav_revision'], ['ia', '/ia', 'nav_ia'], ['antivirus', '/antivirus', 'nav_antivirus'], ['dispositivos', '/dispositivos', 'nav_dispositivos']] },
-    { t: 'menu_privacidad', paginas: [['sabeDeTi', '/sabe-de-ti', 'menu_sabe'], ['borrado', '/borrado', 'menu_borrado'], ['expedientes', '/expedientes', 'nav_expedientes'], ['reglas', '/reglas', 'nav_reglas']] },
+    // 1.0.45: «Contratos» right after Actividad (what each program normally contacts), the two
+    // new looks of Diagnóstico after the check-up, and the three new pages of Privacidad.
+    { t: 'nav_contratos', paginas: [['contratos', '/contratos', 'nav_contratos']] },
+    { t: 'menu_diagnostico', paginas: [['revision', '/revision', 'nav_revision'], ['vision', '/vision', 'nav_vision'], ['vigilancia', '/vigilancia', 'nav_vigilancia'], ['ia', '/ia', 'nav_ia'], ['antivirus', '/antivirus', 'nav_antivirus'], ['dispositivos', '/dispositivos', 'nav_dispositivos']] },
+    { t: 'menu_privacidad', paginas: [['sabeDeTi', '/sabe-de-ti', 'menu_sabe'], ['identificacion', '/identificacion', 'nav_identificacion'], ['certificado', '/certificado', 'nav_certificado'], ['borrado', '/borrado', 'menu_borrado'], ['expedientes', '/expedientes', 'nav_expedientes'], ['reglas', '/reglas', 'nav_reglas'], ['herramientas', '/herramientas', 'nav_herramientas']] },
   ];
   const AJUSTES = { t: 'menu_ajustes', paginas: [['hogar', '/hogar', 'nav_hogar'], ['licencia', '/licencia', 'nav_licencia'], ['verify', '/verify', 'nav_verify'], ['estado', '/estado', 'nav_estado']] };
   const ICONO_AJUSTES = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.6"/><circle cx="6" cy="11.5" r="1.6"/></svg>';
@@ -1214,21 +1218,47 @@
       }, true);
       // The state of the service, from what the panel already asks (/api/estado): green while it
       // answers and watches, amber with the word «Atención» when it does not. Never a guess.
+      // 1.0.45: it also says what the constant watch (/api/vigilancia/resumen) and the programs'
+      // contracts (/api/contratos/atencion) have that the person has not seen, and leads there.
+      // Both are Plus: at the free level they answer 402 quietly and the pill says only the
+      // service's state. «última señal» is the watch's own last look when there is one.
+      const enlacePulso = (href) => { const el = $('g-pulso'); if (el) el.setAttribute('href', href); };
       const mira = async () => {
         let e = null;
         try { e = await api('/api/estado'); } catch (_) {}
-        const hora = new Date().toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' });
-        pulso = !e ? { ok: false, texto: t('pulso_atencion') + ' · ' + t('pulso_sin_respuesta') }
-          : e.caducado ? { ok: false, texto: t('pulso_atencion') + ' · ' + t('pulso_apartado') }
-            : { ok: true, texto: t('pulso_observando') + ' · ' + t('pulso_ultima').replace('{h}', hora) };
+        const [vg, ct] = e && !e.caducado
+          ? await Promise.all([
+            api('/api/vigilancia/resumen', { callado: true }).catch(() => null),
+            api('/api/contratos/atencion', { callado: true }).catch(() => null),
+          ])
+          : [null, null];
+        const ms = vg && vg.ultima_senal ? vg.ultima_senal : Date.now();
+        const hora = new Date(ms).toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' });
+        const sinVer = vg ? Number(vg.avisos_sin_ver || 0) : 0;
+        if (!e) pulso = { ok: false, texto: t('pulso_atencion') + ' · ' + t('pulso_sin_respuesta'), href: '/estado' };
+        else if (e.caducado) pulso = { ok: false, texto: t('pulso_atencion') + ' · ' + t('pulso_apartado'), href: '/estado' };
+        else if (ct && ct.atencion) pulso = { ok: false, texto: ct.texto, href: ct.enlace || '/contratos' };
+        else if (sinVer > 0) {
+          // Seen «up to» a notice is by its row id (vigilancia.rs, sin_ver).
+          const ultimo = (vg.avisos || []).reduce((m, a) => Math.max(m, Number(a.id) || 0), 0);
+          pulso = { ok: false, texto: t('pulso_atencion') + ' · ' + tn('pulso_vigilancia_avisos', sinVer), href: '/vigilancia', visto: ultimo };
+        } else if (vg && vg.estado === 'atencion') pulso = { ok: false, texto: t('pulso_atencion') + ' · ' + t('nav_vigilancia'), href: '/vigilancia' };
+        else pulso = { ok: true, texto: t('pulso_observando') + ' · ' + t('pulso_ultima').replace('{h}', hora), href: vg ? '/vigilancia' : '/estado' };
         const el = $('g-pulso');
         if (el) { el.classList.toggle('atencion', !pulso.ok); el.querySelector('span').textContent = pulso.texto; }
+        enlacePulso(pulso.href);
       };
+      // Seen once clicked: the notices it named stop counting (the page shows them all).
+      document.addEventListener('click', (ev) => {
+        const a = ev.target.closest && ev.target.closest('#g-pulso');
+        if (!a || !pulso || !pulso.visto) return;
+        api('/api/vigilancia/visto', { method: 'POST', body: { hasta: pulso.visto }, callado: true }).catch(() => {});
+      }, true);
       mira();
-      cadaTanto(mira, 60000);
+      cadaTanto(mira, 30000);
     } else if (pulso) {
       const el = $('g-pulso');
-      if (el) el.classList.toggle('atencion', !pulso.ok);
+      if (el) { el.classList.toggle('atencion', !pulso.ok); if (pulso.href) el.setAttribute('href', pulso.href); }
     }
   }
 
@@ -1978,7 +2008,11 @@
         if (v.device_id !== 'self') return '';
         const on = corte.cortados.includes(v.producto);
         if (!corte.disponible) return `<p class="limit">${esc(t('av_cortar_no_disponible'))}</p>`;
-        return `<p class="vigilante"><label><input type="checkbox" role="switch" class="av-cortar interruptor" data-producto="${esc(v.producto)}"${on ? ' checked' : ''}> <b>${esc(t('av_cortar'))}</b></label>
+        // The shared switch (1.0.45): green «Permitido» (on) while it talks to its company, red
+        // «Cortado» once cut, the word beside it, as on every other cut of the program.
+        const G = window.GuardianaInterruptor;
+        const sw = G ? G.html({ cortado: on, texto: { permitido: t('interruptor_permitido'), cortado: t('interruptor_cortado'), cortando: t('cortando'), permitiendo: t('permitiendo') }, etiqueta: t('av_cortar'), datos: { producto: v.producto } }) : '';
+        return `<p class="vigilante"><b>${esc(t('av_cortar'))}</b> ${sw}
           <br><span class="${on ? 'bad' : 'muted'}">${esc(t(on ? 'av_cortar_on' : 'av_cortar_off'))}</span>
           <br><span class="muted">${esc(t('av_cortar_aviso'))}</span></p>`;
       };
@@ -2080,19 +2114,18 @@
       };
       // Cortar / dejar pasar: la casilla manda la decisión; si Windows no deja, vuelve atrás y
       // se dice por qué.
-      $('av-vistos').addEventListener('change', async (e) => {
-        const c = e.target.closest('input.av-cortar');
-        if (!c) return;
-        c.disabled = true;
+      if (window.GuardianaInterruptor) window.GuardianaInterruptor.engancha($('av-vistos'), async (b, quiere) => {
+        if (!b.dataset.producto) return false;
         try {
-          const x = await api('/api/antivirus/cortar', { method: 'POST', body: { producto: c.dataset.producto, cortar: c.checked } });
+          const x = await api('/api/antivirus/cortar', { method: 'POST', body: { producto: b.dataset.producto, cortar: quiere } });
           corte.cortados = x.cortados || [];
           paint(await api('/api/antivirus'));
+          return true;
         } catch (err) {
-          c.checked = !c.checked;
           $('av-detectar-msg').textContent = String(err.message || err);
-        } finally { c.disabled = false; }
-      });
+          throw err;
+        }
+      }, { permitido: t('interruptor_permitido'), cortado: t('interruptor_cortado'), cortando: t('cortando'), permitiendo: t('permitiendo') });
       // Exportar: se pide con el token en la cabecera (nunca en la dirección) y se descarga.
       $('av-export').addEventListener('click', async (e) => {
         e.preventDefault();
@@ -3273,10 +3306,10 @@
       const linea = { radiografia: 'plan_gratis_franja', licencia: 'plan_gratis_franja', extracto: 'plan_historial_24h', dispositivos: 'plan_otros_aparatos', hogar: 'plan_hogar_plus' }[pg];
       if (!linea) return;
       const caja = document.createElement('div');
-      caja.className = 'card plan-gratis';
+      caja.className = 'tarjeta plan-linea plan-gratis';
       caja.id = 'linea-plus'; // a Plus route answered later does not add a second line
       caja.innerHTML = `<strong>${esc(t(e.gratis_tras_plus ? 'caducado_titulo_plus' : 'plan_gratis_nombre'))}</strong> <span>${esc(t(linea))}</span>
-        <a class="btn secondary" href="${esc(t('licencia_comprar_url'))}" target="_blank" rel="noopener">${esc(t('plan_pasar_plus'))}</a>`;
+        <a class="boton chico" href="${esc(t('licencia_comprar_url'))}" target="_blank" rel="noopener">${esc(t('plan_pasar_plus'))}</a>`;
       const m = document.querySelector('main');
       if (m) m.insertBefore(caja, m.firstChild);
       return;

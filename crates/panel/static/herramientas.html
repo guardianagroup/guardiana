@@ -16,12 +16,12 @@
 <header class="top">
   <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA<small data-t="lema"></small></span></a>
   <nav>
-    <a href="/por-dentro" class="nav-destacado" data-t="nav_por_dentro">Globo en directo</a>
-    <a href="/revision" class="nav-destacado" data-t="nav_revision">Revisión</a>
-    <a href="/"  data-t="nav_radiografia">Radiografía</a>
-    <a href="/herramientas" aria-current="page" data-t="nav_herramientas">Herramientas</a>
-    <a href="/reglas" data-t="nav_reglas">Reglas</a>
-    <a href="/estado" data-t="nav_estado">Estado</a>
+    <a href="/por-dentro" data-t="menu_en_vivo">En vivo</a>
+    <a href="/extracto" data-t="menu_actividad">Actividad</a>
+    <a href="/contratos" data-t="nav_contratos">Contratos</a>
+    <a href="/revision" data-t="menu_diagnostico">Diagnóstico</a>
+    <a href="/sabe-de-ti" aria-current="true" data-t="menu_privacidad">Privacidad</a>
+    <a href="/hogar" data-t="menu_ajustes">Ajustes</a>
   </nav>
 </header>
 <main class="hx">
@@ -37,12 +37,10 @@
       <h2 id="hx-apagon-t" data-t="hx_ap_titulo"></h2>
     </div>
     <!-- The owner, 18 Oct 2026: every cut is a switch, green «Permitido» ↔ red «Cortado», with
-         the word beside it. `interruptor` is styled by diseno.css on the redesign branch. -->
-    <span class="hx-interruptor">
-      <button type="button" id="hx-ap-boton" class="interruptor" role="switch" aria-checked="true" aria-labelledby="hx-apagon-t"></button>
-      <span id="hx-ap-estado" class="interruptor-estado" aria-live="polite"></span>
-    </span>
+         the word beside it: the shared component (interruptor.js) is drawn here. -->
+    <span id="hx-ap-int" class="hx-interruptor"></span>
   </div>
+  <p id="hx-ap-estado" class="muted" aria-live="polite"></p>
   <p class="muted" data-t="hx_ap_que"></p>
   <div id="hx-ap-confirmar" class="hx-confirmar" hidden>
     <p data-t="hx_ap_confirmar"></p>
@@ -103,6 +101,7 @@
 
 </main>
 <script src="/static/herramientas.js"></script>
+<script src="/static/interruptor.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

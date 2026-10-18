@@ -1834,6 +1834,12 @@
       const lp = [...progs.values()].sort((a, b) => b.c - a.c || b.sub - a.sub);
       const hora = horaCorte(ds), cuantos = ds.filter(porNombre).length;
       let accion = '';
+      // «Qué se rompe si corto»: asked once when the company opens, so the line is under the
+      // switch before the person cuts, not only after (the customer's request, 18 Oct 2026).
+      if (!soloMirar && est === 'normal' && !rompe.has(nombre) && !rompePedido.has(nombre)) {
+        rompePedido.add(nombre);
+        setTimeout(() => queSeRompe(nombre, ds), 0);
+      }
       if (!soloMirar) {
         if (est === 'cortado' || est === 'deshacer') accion = `<div class="insp-corte hecho"><div class="fila"><b>${esc(t('pd_corte_titulo').replace('{empresa}', nombre))}</b>${botonCorte(nombre, ds, true)}</div>${rompe.has(nombre) ? `<p class="explica">${esc(rompe.get(nombre))}</p>` : ''}<p>${esc((hora ? t('pd_cortado_explica') : t('pd_cortado_explica_sin')).replace('{h}', hora).replace('{n}', cuantos))}</p></div>`;
         else if (est === 'normal' || est === 'cortar') accion = `<div class="insp-corte"><div class="fila"><b>${esc(t('pd_corte_titulo').replace('{empresa}', nombre))}</b>${botonCorte(nombre, ds, true)}</div>${rompe.has(nombre) ? `<p class="explica">${esc(rompe.get(nombre))}</p>` : ''}<p>${esc(tn('pd_cortar_explica', ds.filter((d) => porNombre(d) && !d.cortado).length))} ${esc(t('pd_cortar_reversible'))}</p></div>`;
@@ -1985,7 +1991,7 @@
     };
     // «Qué se rompe» (18 Oct 2026): a helper of its own (que-se-rompe.js), loaded when it exists;
     // without it the switch says nothing more, never a guess.
-    const rompe = new Map();
+    const rompe = new Map(), rompePedido = new Set();
     let rompeCargado = null;
     const cargaRompe = () => {
       if (window.GuardianaQueSeRompe) return Promise.resolve(true);

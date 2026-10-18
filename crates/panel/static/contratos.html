@@ -37,15 +37,6 @@
 .ct-registro .ct-mono { grid-column: 2; }
 .ct-msg { min-height: 1.4em; font-size: 13.5px; color: var(--muted); }
 details.ct-plegable > summary { cursor: pointer; color: var(--accent); font-weight: 500; margin-top: var(--e2); }
-/* Until the shared switch of diseno.css arrives (redesign branch): the same look with no weight,
-   :where() keeps these at zero specificity so the shared rules win once they are there. */
-:where(.interruptor-caja) { display: inline-flex; align-items: center; gap: 8px; }
-:where(.interruptor) { appearance: none; position: relative; width: 44px; height: 24px; padding: 0; border: 0; border-radius: 999px; background: var(--ok); cursor: pointer; }
-:where(.interruptor .interruptor-bola) { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #F4F6FA; transition: transform .18s ease; }
-:where(.interruptor[aria-checked="true"]) { background: var(--alerta); }
-:where(.interruptor[aria-checked="true"] .interruptor-bola) { transform: translateX(20px); }
-:where(.interruptor-estado) { font: 600 12.5px/1.2 var(--texto); color: var(--ok); }
-:where(.interruptor-caja.cortado .interruptor-estado) { color: var(--alerta); }
 @media (max-width: 560px) { .ct-registro li { grid-template-columns: 1fr; } .ct-registro .ct-mono { grid-column: 1; } }
 </style>
 </head>
@@ -53,21 +44,12 @@ details.ct-plegable > summary { cursor: pointer; color: var(--accent); font-weig
 <header class="top">
   <a class="brand" href="/" data-t-title="ir_inicio"><span class="brand-txt">GUARDIANA<small data-t="lema"></small></span></a>
   <nav>
-    <a href="/por-dentro" class="nav-destacado" data-t="nav_por_dentro">Globo en directo</a>
-    <a href="/revision" class="nav-destacado" data-t="nav_revision">Revisión</a>
-    <a href="/"  data-t="nav_radiografia">Radiografía</a>
-    <a href="/contratos" aria-current="page" data-t="nav_contratos">Contratos</a>
-    <a href="/ia" data-t="nav_ia">Tu IA</a>
-    <a href="/antivirus" data-t="nav_antivirus">Tu antivirus</a>
-    <a href="/extracto"  data-t="nav_extracto">Extracto</a>
-    <a href="/dispositivos"  data-t="nav_dispositivos">Dispositivos</a>
-    <a href="/sabe-de-ti" data-t="nav_sabe">Lo que GUARDIANA sabe de ti</a>
-    <a href="/reglas" data-t="nav_reglas">Reglas</a>
-    <a href="/informe" data-t="nav_informe">Informe semanal</a>
-    <a href="/hogar" data-t="nav_hogar">Modo Hogar</a>
-    <a href="/licencia" data-t="nav_licencia">Licencia</a>
-    <a href="/verify" data-t="nav_verify">Verificar</a>
-    <a href="/estado"  data-t="nav_estado">Estado</a>
+    <a href="/por-dentro" data-t="menu_en_vivo">En vivo</a>
+    <a href="/extracto" data-t="menu_actividad">Actividad</a>
+    <a href="/contratos" aria-current="true" data-t="nav_contratos">Contratos</a>
+    <a href="/revision" data-t="menu_diagnostico">Diagnóstico</a>
+    <a href="/sabe-de-ti" data-t="menu_privacidad">Privacidad</a>
+    <a href="/hogar" data-t="menu_ajustes">Ajustes</a>
   </nav>
 </header>
 <main class="contratos">
@@ -96,12 +78,13 @@ details.ct-plegable > summary { cursor: pointer; color: var(--accent); font-weig
 <h2 class="rotulo" data-t="ct_historial">Historial verificable</h2>
 <p class="ct-nota" data-t="ct_historial_lead"></p>
 <div class="ct-botones">
-  <button type="button" class="btn secondary" id="ct-comprobar" data-t="ct_comprobar">Comprobar el registro</button>
+  <button type="button" class="boton" id="ct-comprobar" data-t="ct_comprobar">Comprobar el registro</button>
   <span id="ct-comprobado" class="ct-msg" role="status" aria-live="polite"></span>
 </div>
 <ol id="ct-registro" class="ct-registro" reversed></ol>
 </main>
 <script src="/static/contratos.js"></script>
+<script src="/static/interruptor.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

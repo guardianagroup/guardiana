@@ -3175,6 +3175,8 @@
     "menu_borrado": "Borrado de datos",
     "pulso_observando": "Observando",
     "pulso_ultima": "última señal {h}",
+    "pulso_vigilancia_avisos": "{n} novedades en Vigilancia",
+    "pulso_vigilancia_avisos_uno": "1 novedad en Vigilancia",
     "pulso_atencion": "Atención",
     "pulso_sin_respuesta": "el servicio no responde",
     "pulso_apartado": "GUARDIANA se ha apartado",

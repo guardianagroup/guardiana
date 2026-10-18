@@ -3175,6 +3175,8 @@
     "menu_borrado": "Data deletion",
     "pulso_observando": "Watching",
     "pulso_ultima": "last signal {h}",
+    "pulso_vigilancia_avisos": "{n} new notices in Watch",
+    "pulso_vigilancia_avisos_uno": "1 new notice in Watch",
     "pulso_atencion": "Attention",
     "pulso_sin_respuesta": "the service is not answering",
     "pulso_apartado": "GUARDIANA has stepped aside",

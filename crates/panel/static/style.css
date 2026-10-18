@@ -292,6 +292,11 @@ footer { max-width: 1180px; margin: 26px auto 40px; padding: 0 22px; color: var(
 .card.caducado{border-left:4px solid var(--cortado);background:rgba(192,48,26,.06)}
 .card.caducado strong,.card.prueba strong{display:block;margin-bottom:4px}
 .card.caducado .btn{margin-right:8px}
+/* The free level's one line (1.0.45): a quiet card of the redesign, neutral (it is no warning),
+   the words and «Pasar a Plus» on one row that wraps on a phone. */
+.tarjeta.plan-linea{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:12px 0;padding:14px 18px}
+.tarjeta.plan-linea span{flex:1 1 260px;min-width:0;color:var(--muted);overflow-wrap:anywhere}
+.tarjeta.plan-linea strong{color:var(--fg)}
 
 /* La ciudad de la sede, debajo del país y en gris: el país dice bajo qué leyes está la empresa,
    la ciudad dice dónde está de verdad. Se escribe en la lista de empresas y se corrige cuando
