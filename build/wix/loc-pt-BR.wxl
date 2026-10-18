@@ -6,7 +6,5 @@
   <String Id="AbrirZero" Value="Abrir o navegador GUARDIANA ZERO" />
   <String Id="VersionMasNueva" Value="Já existe uma versão mais nova da GUARDIANA instalada." />
   <String Id="ServicioDescripcion" Value="GUARDIANA: veja com quem a sua IA e cada aparelho da casa falam. Tudo acontece neste computador; sem conta e sem servidor." />
-  <String Id="AccesoMenu" Value="Guardiana (menu)" />
-  <String Id="AccesoMenuDescripcion" Value="O menu da GUARDIANA numa janela de texto" />
   <String Id="ArchivoLeeme" Value="LEIAME.txt" />
 </WixLocalization>

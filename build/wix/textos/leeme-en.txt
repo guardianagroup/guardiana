@@ -10,8 +10,8 @@ What the installer did
 ----------------------
 - Copied the program to “Program Files\Guardiana”.
 - Registered the “Guardiana” service, which starts with Windows.
-- Added the “Guardiana” and “Guardiana (menu)” shortcuts to the Start menu, and
-  “Guardiana” to the desktop.
+- Added the “Guardiana” shortcut, which opens the panel, to the Start menu and
+  the desktop.
 - Made GUARDIANA this computer's DNS, over IPv6 too, with an exact copy of the
   previous setting. If the service stops, the computer gets its previous DNS
   back; uninstalling leaves it exactly as it was.
@@ -39,8 +39,7 @@ want it.
 
 Checking the installation
 -------------------------
-“Guardiana (menu)” > option 13, “Verify”, or in a new command window or
-PowerShell:
+In a new command window or PowerShell:
     guardiana verify
 
 Before installing: check the hash of the .msi file and compare it with
