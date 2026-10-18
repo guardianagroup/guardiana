@@ -25,13 +25,18 @@ pub mod claves {
 }
 
 pub mod agenda;
+pub mod arbol;
 pub mod archivo;
 pub mod carry;
 pub mod cuantico;
+pub mod destruccion;
+pub mod entrega;
+pub mod flujo;
 pub mod monitor;
 pub mod pausa;
 pub mod prueba;
 pub mod puesto;
+pub mod relleno;
 pub mod resumen;
 pub mod sframe;
 pub mod tarjeta;

@@ -647,10 +647,12 @@ dependencies = [
  "getrandom 0.4.3",
  "ml-kem",
  "qrcode",
+ "ring",
  "serde",
  "serde_json",
  "sha2 0.11.0",
  "vodozemac",
+ "zeroize",
 ]
 
 [[package]]
