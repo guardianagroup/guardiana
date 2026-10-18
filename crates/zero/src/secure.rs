@@ -76,15 +76,28 @@ struct Enlace {
     /// difference is what is still on its way out (a file's «time left»).
     encolados: std::sync::Arc<std::sync::atomic::AtomicU64>,
     escritos: std::sync::Arc<std::sync::atomic::AtomicU64>,
-    /// The other end's address, kept only in memory for an incident card on a direct link;
-    /// it is never written, shown or logged otherwise (decision 203).
-    otro: Option<std::net::IpAddr>,
+    /// Whether the other end of a direct link sat on this same network (a private, link-local
+    /// or loopback address) when the link opened. Only this yes/no is kept, never the address
+    /// (18 Oct 2026, the owner: never store IPs; decision 203).
+    misma_red: Option<bool>,
+}
+
+/// Whether an address belongs to the same local network (private, link-local, loopback or
+/// unique-local): what a direct link may say about where the other end was, and all it says.
+fn es_misma_red(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v) => v.is_private() || v.is_link_local() || v.is_loopback(),
+        std::net::IpAddr::V6(v) => {
+            let s = v.segments()[0];
+            v.is_loopback() || (s & 0xfe00) == 0xfc00 || (s & 0xffc0) == 0xfe80
+        }
+    }
 }
 
 impl Enlace {
     fn new(mut s: TcpStream) -> Self {
         use std::sync::atomic::{AtomicU64, Ordering};
-        let otro = s.peer_addr().ok().map(|a| a.ip());
+        let misma_red = s.peer_addr().ok().map(|a| es_misma_red(a.ip()));
         // Small frames (voice) leave at once instead of waiting to be grouped.
         let _ = s.set_nodelay(true);
         let (cola, rx) = mpsc::channel::<Vec<u8>>();
@@ -106,13 +119,13 @@ impl Enlace {
             cola,
             encolados: std::sync::Arc::new(AtomicU64::new(0)),
             escritos,
-            otro,
+            misma_red,
         }
     }
 
-    /// The other end's address (see the field).
-    fn ip_del_otro(&self) -> Option<std::net::IpAddr> {
-        self.otro
+    /// Whether the other end was on this network (see the field).
+    fn misma_red(&self) -> Option<bool> {
+        self.misma_red
     }
 
     fn manda(&self, v: &Value) -> Result<(), String> {
@@ -429,29 +442,32 @@ pub struct Incidente {
     pub senal: &'static str,
     /// The concrete fact, in Spanish for the chain (the screen translates `senal`).
     pub detalle: String,
-    /// `directo`, `rele` or `ninguno`.
+    /// `misma_red` (direct, the other end on this network), `directo` (direct across the
+    /// internet), `rele` or `ninguno`.
     pub transporte: &'static str,
+    /// Through the relay: the relay's city (`Núremberg`, `Miami`), the only place named.
+    pub ciudad_rele: Option<&'static str>,
     /// How many frames failed in the window, when that is the signal.
     pub fallos: u32,
     /// The contact's name as this computer knows it.
     pub contacto: String,
     /// The time zone the other side said, if it did (never an address).
     pub zona_otra: String,
-    /// Only on a direct link, and only for this card: the other end's address as seen at that
-    /// moment, with the country and the network the bundled base gives it. Nothing is written
-    /// anywhere unless the person saves the report (decision 203 stands).
-    pub otro: Option<OtroExtremo>,
+    // No address of the other end, not even on a direct link and not in the saved report
+    // (18 Oct 2026, the owner: «nunca guardar IPs»): only «directo por la misma red» or
+    // «por relé · ciudad».
 }
 
-/// The other end of a direct link, at the moment of an incident.
-#[derive(Debug, Clone, Serialize)]
-pub struct OtroExtremo {
-    /// The address.
-    pub ip: String,
-    /// Two-letter country from the bundled base, if any.
-    pub pais: Option<String>,
-    /// The network's organisation from the bundled base, if any.
-    pub red: Option<String>,
+/// The relay's city from its name, for «por relé · ciudad» (no address involved).
+fn ciudad_de_rele(rele: &str) -> Option<&'static str> {
+    let host = rele.split(':').next().unwrap_or_default();
+    if host.starts_with("rele-am.") {
+        Some("Miami")
+    } else if host == crate::rele::RELE_NOMBRE {
+        Some("Núremberg")
+    } else {
+        None
+    }
 }
 
 /// The SECURE side of a browser session.
@@ -3658,20 +3674,24 @@ impl Secure {
         Ok(())
     }
 
-    /// What can be said about the other end right now: on a direct link, its address with the
-    /// country and network the bundled base gives (no lookup leaves this computer); through
-    /// the relay, nothing.
-    fn otro_extremo(&self) -> Option<OtroExtremo> {
-        if self.rele {
-            return None;
+    /// The path right now, as the card says it: `misma_red`, `directo`, `rele` or `ninguno`,
+    /// with the relay's city when through it. Never an address.
+    fn camino(&self) -> (&'static str, Option<&'static str>) {
+        match self.monitor.transporte.directo {
+            Some(true) => {
+                let misma = self.enlace.as_ref().and_then(Enlace::misma_red);
+                (
+                    if misma == Some(true) {
+                        "misma_red"
+                    } else {
+                        "directo"
+                    },
+                    None,
+                )
+            }
+            Some(false) => ("rele", self.rele_usado.as_deref().and_then(ciudad_de_rele)),
+            None => ("ninguno", None),
         }
-        let ip = self.enlace.as_ref()?.ip_del_otro()?;
-        let s = guardiana_lists::servidor_de(ip);
-        Some(OtroExtremo {
-            ip: ip.to_string(),
-            pais: s.pais.map(str::to_owned),
-            red: s.red.map(|r| r.nombre.to_owned()).filter(|n| !n.is_empty()),
-        })
     }
 
     /// Stop everything and keep the card: sends frozen, the call hung up, the monitor and the
@@ -3680,21 +3700,16 @@ impl Secure {
         if self.incidente.is_some() {
             return;
         }
-        let transporte = match self.monitor.transporte.directo {
-            Some(true) => "directo",
-            Some(false) => "rele",
-            None => "ninguno",
-        };
-        let otro = self.otro_extremo();
+        let (transporte, ciudad_rele) = self.camino();
         self.incidente = Some(Incidente {
             cuando: ahora_s(),
             senal,
             detalle: detalle.clone(),
             transporte,
+            ciudad_rele,
             fallos,
             contacto: self.nombre_contacto.clone(),
             zona_otra: self.zona_otra.clone(),
-            otro,
         });
         if let Some(l) = self.llamada.take() {
             self.manda_olm(json!({ "m": "cuelga" }));
@@ -4448,6 +4463,39 @@ fn puerto_al_azar() -> u16 {
 #[allow(clippy::unwrap_used)]
 mod tests {
     #[test]
+    fn the_path_is_named_without_an_address() {
+        use std::net::IpAddr;
+        for (ip, misma) in [
+            ("192.168.1.20", true),
+            ("10.0.0.5", true),
+            ("172.16.3.4", true),
+            ("169.254.1.1", true),
+            ("127.0.0.1", true),
+            ("fe80::1", true),
+            ("fd12::1", true),
+            ("::1", true),
+            ("203.0.113.7", false),
+            ("8.8.8.8", false),
+            ("2001:db8::1", false),
+        ] {
+            assert_eq!(
+                super::es_misma_red(ip.parse::<IpAddr>().unwrap()),
+                misma,
+                "{ip}"
+            );
+        }
+        assert_eq!(
+            super::ciudad_de_rele("rele.guardianagroup.com:443"),
+            Some("Núremberg")
+        );
+        assert_eq!(
+            super::ciudad_de_rele("rele-am.guardianagroup.com:443"),
+            Some("Miami")
+        );
+        assert_eq!(super::ciudad_de_rele("127.0.0.1:9"), None);
+    }
+
+    #[test]
     fn received_names_cannot_hide_a_program_or_a_device() {
         assert_eq!(super::limpia_nombre("x.exe."), "x.exe");
         assert_eq!(super::limpia_nombre("foto.jpg . "), "foto.jpg");
@@ -4572,8 +4620,8 @@ mod tests {
         assert!(b.monitor.cifrado.recibidos >= 2);
 
         // Three frames that fail to open within ten seconds: a stop that looks like an
-        // interference, with the card, the signed report, and (direct link) the other end's
-        // address for this card only; the person closes it and the card goes. (With the
+        // interference, with the card and the signed report, which say «directo por la misma
+        // red» and never the other end's address; the person closes it and the card goes. (With the
         // destruction on an anomaly turned off: the old pause; see the next test for it on.)
         b.auto_destruccion = false;
         assert!(b.estado_json()["incidente"].is_null());
@@ -4587,13 +4635,21 @@ mod tests {
         let inc = b.estado_json()["incidente"].clone();
         assert_eq!(inc["senal"], "olm_fallos");
         assert_eq!(inc["fallos"], 3);
-        assert_eq!(inc["transporte"], "directo");
-        assert_eq!(inc["otro"]["ip"], "127.0.0.1");
+        assert_eq!(inc["transporte"], "misma_red");
+        assert!(inc.get("otro").is_none(), "no other end on the card");
+        assert!(
+            !inc.to_string().contains("127.0.0.1"),
+            "no address on the card"
+        );
         assert!(!b.estado.en_marcha(), "sends are frozen");
         let informe: Value = serde_json::from_str(&b.informe_incidente().unwrap()).unwrap();
         assert_eq!(informe["tipo"], "guardiana-secure-incidente");
         assert_eq!(informe["incidente"]["senal"], "olm_fallos");
         assert!(informe["prueba"]["firma"].is_string());
+        assert!(
+            !b.informe_incidente().unwrap().contains("127.0.0.1"),
+            "no address in the saved report"
+        );
         b.olvida_incidente();
         assert!(b.estado_json()["incidente"].is_null());
 

@@ -122,14 +122,14 @@
       [t('sec_i_que'), t('sec_i_s_' + i.senal) + (i.fallos > 1 ? ` (${n(i.fallos)})` : '')],
       [t('sec_i_cuando'), hora(i.cuando)],
       [t('sec_identidad_contacto'), i.contacto || RAYA],
-      [t('sec_i_camino'), t('sec_i_c_' + i.transporte)],
+      [t('sec_i_camino'), caminoInc(i)],
     ];
     if (i.zona_otra) filas.push([t('sec_i_zona'), i.zona_otra]);
     $('inc-datos').innerHTML = filas.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${esc(b)}</dd>`).join('');
-    const o = i.otro;
-    $('inc-otro').hidden = !o;
-    if (o) $('inc-otro').textContent = t('sec_i_otro', { ip: o.ip, p: o.pais || RAYA, r: o.red || RAYA });
   }
+  // The path as the card says it: «directo por la misma red» or «por relé · ciudad»; the
+  // other end's address is never on the card nor in the report (18 Oct 2026, the owner).
+  function caminoInc(i) { return t('sec_i_c_' + i.transporte) + (i.ciudad_rele ? ' · ' + i.ciudad_rele : ''); }
   en('secure_incidente', (m) => {
     descarga(`guardiana-secure-incidente-${sello()}.json`, 'application/json', m.json);
     let j = {}; try { j = JSON.parse(m.json); } catch (_) {}
@@ -138,8 +138,7 @@
     L.push({ x: 56, y, tam: 18, negrita: true, texto: 'GUARDIANA SECURE' }); y -= 26;
     L.push({ x: 56, y, tam: 13, negrita: true, texto: t('sec_i_titulo') }); y -= 18;
     L.push({ x: 56, y, tam: 9.5, texto: t('sec_r_pdf_fecha') + ' ' + new Date().toLocaleString(document.documentElement.lang || 'es') }); y -= 30;
-    const filas = [[t('sec_i_que'), t('sec_i_s_' + i.senal) + (i.fallos > 1 ? ` (${i.fallos})` : '')], [t('sec_i_cuando'), hora(i.cuando)], [t('sec_identidad_contacto'), i.contacto || RAYA], [t('sec_i_camino'), t('sec_i_c_' + i.transporte)], [t('sec_i_zona'), i.zona_otra || RAYA]];
-    if (i.otro) filas.push([t('sec_i_otro_rotulo'), `${i.otro.ip} · ${i.otro.pais || RAYA} · ${i.otro.red || RAYA}`]);
+    const filas = [[t('sec_i_que'), t('sec_i_s_' + i.senal) + (i.fallos > 1 ? ` (${i.fallos})` : '')], [t('sec_i_cuando'), hora(i.cuando)], [t('sec_identidad_contacto'), i.contacto || RAYA], [t('sec_i_camino'), caminoInc(i)], [t('sec_i_zona'), i.zona_otra || RAYA]];
     for (const [a, b] of filas) { L.push({ x: 56, y, tam: 11, negrita: true, texto: a }); for (const s of parte(b, 60)) { L.push({ x: 230, y, tam: 11, texto: s }); y -= 16; } y -= 4; }
     y -= 10;
     for (const s of parte(i.detalle || '', 95)) { L.push({ x: 56, y, tam: 10, texto: s }); y -= 14; }
