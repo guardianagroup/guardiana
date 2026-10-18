@@ -50,6 +50,8 @@ pub const PAGINA: &str = "https://guardianagroup.com/m/";
 const ORIGEN: &str = "https://guardianagroup.com";
 /// The port asked first for the phone (next to SECURE's 47300); any port if taken.
 pub const PUERTO: u16 = 47302;
+/// How long a QR code for the phone is good for if no phone uses it.
+pub const VIGENCIA_QR: Duration = Duration::from_secs(60);
 /// Largest frame accepted from the phone (a piece of a call is ~16 KB; a text, ~8 KB).
 const MAX_TRAMA: usize = 1024 * 1024;
 const B64URL: base64::engine::GeneralPurpose = base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -157,6 +159,12 @@ pub struct Movil {
     pub pendiente: bool,
     /// The person said OK: this secret is trusted until the hand-off ends.
     pub aprobado: bool,
+    /// When this code was made, and whether a phone ever came with it: a code nobody used in
+    /// [`VIGENCIA_QR`] is replaced by a new one (18 Oct 2026, the owner: the QR carries a
+    /// one-time, short-lived hand-off; a photo of an old screen opens nothing).
+    pub nacido: std::time::Instant,
+    /// A phone came with this code at least once.
+    pub usado: bool,
     rx: Receiver<Desde>,
     tx: tmpsc::UnboundedSender<Hacia>,
 }
@@ -262,9 +270,17 @@ impl Movil {
             enganchado: false,
             pendiente: false,
             aprobado: false,
+            nacido: std::time::Instant::now(),
+            usado: false,
             rx,
             tx,
         })
+    }
+
+    /// The code on screen is past [`VIGENCIA_QR`] and no phone came with it: time for a new one.
+    #[must_use]
+    pub fn caducado(&self) -> bool {
+        !self.usado && self.nacido.elapsed() >= VIGENCIA_QR
     }
 
     /// The door in the router opened: the phone can also come from outside.
@@ -298,6 +314,7 @@ impl Movil {
             match &d {
                 Desde::Enganchado => {
                     self.enganchado = true;
+                    self.usado = true;
                     if !self.aprobado {
                         self.pendiente = true;
                     }
@@ -1054,6 +1071,19 @@ mod tests {
                 return v;
             }
         }
+    }
+
+    #[test]
+    fn a_qr_code_nobody_used_in_a_minute_is_spent() {
+        let mut m = Movil::arranca_con("127.0.0.1:1").unwrap();
+        assert!(!m.caducado());
+        m.nacido = std::time::Instant::now()
+            .checked_sub(VIGENCIA_QR + Duration::from_secs(1))
+            .unwrap();
+        assert!(m.caducado());
+        // A phone that came with it keeps the hand-off going (a network change comes back).
+        m.usado = true;
+        assert!(!m.caducado());
     }
 
     #[test]

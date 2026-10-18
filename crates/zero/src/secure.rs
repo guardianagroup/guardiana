@@ -4081,6 +4081,22 @@ impl Secure {
                 self.cambio = true;
             }
         }
+        // A code nobody used within a minute is replaced by a new one (18 Oct 2026).
+        if self
+            .movil
+            .as_ref()
+            .is_some_and(crate::movil::Movil::caducado)
+        {
+            let idioma = self.movil_idioma.clone();
+            self.movil = None;
+            if let Some(p) = self.movil_puerta.take() {
+                std::thread::spawn(move || p.cierra());
+            }
+            if self.movil_empieza(&idioma).is_err() {
+                self.cambio = true;
+            }
+            return;
+        }
         let Some(m) = &mut self.movil else {
             return;
         };
