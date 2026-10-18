@@ -7,6 +7,7 @@
 <title>GUARDIANA · Expedientes</title>
 <link rel="stylesheet" href="/static/diseno.css">
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/lente.css">
 <link rel="preload" href="/static/fonts/HankenGrotesk-var.woff" as="font" type="font/woff" crossorigin>
 <link rel="preload" href="/static/fonts/SchibstedGrotesk-var.woff" as="font" type="font/woff" crossorigin>
 <script src="/static/arranque.js"></script>
@@ -33,20 +34,19 @@
     <a href="/estado"  data-t="nav_estado">Estado</a>
   </nav>
 </header>
-<main class="expedientes">
+<main class="lente" data-lente="expedientes">
 <div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
-<h1 data-t="exp_titulo"></h1>
-<p class="lead" data-t="exp_lead"></p>
-
-<div class="counters">
-  <div class="counter"><div class="n" id="x-abiertos">0</div><div class="l" data-t="exp_n_abiertos"></div></div>
-  <div class="counter"><div class="n x-rojo" id="x-vencidos">0</div><div class="l" data-t="exp_n_vencidos"></div></div>
-  <div class="counter"><div class="n" id="x-resueltos">0</div><div class="l" data-t="exp_n_resueltos"></div></div>
-</div>
-
-<h2 data-t="exp_nuevo_titulo"></h2>
-<p class="muted" data-t="exp_nuevo_lead"></p>
-<div class="card">
+<nav class="lente-miga" data-t-label="lente_miga"><a href="/sabe-de-ti" data-t="menu_privacidad"></a><i aria-hidden="true"></i><span aria-current="page" data-t="nav_expedientes"></span></nav>
+<header class="lente-cabeza"><div><h1 data-t="nav_expedientes"></h1><p class="lente-lead" data-t="lente_exp_lead"></p></div></header>
+<section class="lente-cifras" aria-live="polite">
+  <div class="lente-cifra"><b class="n" id="x-abiertos"></b><span class="l" data-t="exp_n_abiertos"></span></div>
+  <div class="lente-cifra"><b class="n" id="x-vencidos"></b><span class="l" data-t="exp_n_vencidos"></span></div>
+  <div class="lente-cifra"><b class="n" id="x-pronto"></b><span class="l" data-t="lente_exp_c4"></span></div>
+  <div class="lente-cifra"><b class="n" id="x-resueltos"></b><span class="l" data-t="exp_n_resueltos"></span></div>
+</section>
+<div class="lente-cuerpo">
+<div class="lente-principal">
+<section class="lente-tarjeta" id="x-nuevo-tarjeta"><div class="lente-tc"><h2 data-t="exp_nuevo_titulo"></h2></div><div class="lente-tb"><p class="muted" data-t="exp_nuevo_lead"></p>
   <form class="filters" id="x-nuevo">
     <label class="x-ancho"><span data-t="exp_campo_empresa"></span><input id="x-empresa" type="text" list="x-empresas" autocomplete="off" spellcheck="false" data-t-label="exp_campo_empresa"></label>
     <datalist id="x-empresas"></datalist>
@@ -58,30 +58,41 @@
   </form>
   <p id="x-ley" class="b-corta"></p>
   <p id="x-msg" class="bad" role="status" aria-live="polite"></p>
-</div>
-
-<details class="b-plegable" id="x-datos-det">
-  <summary data-t="exp_datos_titulo"></summary>
-  <div class="card">
+  <details class="b-plegable" id="x-datos-det">
+    <summary data-t="exp_datos_titulo"></summary>
     <form class="filters" id="x-datos">
       <label><span data-t="borrado_campo_nombre"></span><input id="x-nombre" type="text" autocomplete="name" spellcheck="false"></label>
       <label><span data-t="borrado_campo_correo"></span><input id="x-correo" type="email" autocomplete="email" spellcheck="false"></label>
     </form>
     <p class="muted" data-t="borrado_privado"></p>
-  </div>
-</details>
-
-<p class="x-filtros" role="group">
-  <button type="button" class="secondary" data-filtro="todos" aria-pressed="true" data-t="exp_filtro_todos"></button>
-  <button type="button" class="secondary" data-filtro="abiertos" aria-pressed="false" data-t="exp_filtro_abiertos"></button>
-  <button type="button" class="secondary" data-filtro="vencidos" aria-pressed="false" data-t="exp_filtro_vencidos"></button>
-  <button type="button" class="secondary" data-filtro="cerrados" aria-pressed="false" data-t="exp_filtro_cerrados"></button>
+  </details></div></section>
+<section class="lente-pila">
+<p class="x-filtros lente-fila-botones" role="group">
+  <button type="button" class="lente-chip" data-filtro="todos" aria-pressed="true" data-t="exp_filtro_todos"></button>
+  <button type="button" class="lente-chip" data-filtro="abiertos" aria-pressed="false" data-t="exp_filtro_abiertos"></button>
+  <button type="button" class="lente-chip" data-filtro="vencidos" aria-pressed="false" data-t="exp_filtro_vencidos"></button>
+  <button type="button" class="lente-chip" data-filtro="cerrados" aria-pressed="false" data-t="exp_filtro_cerrados"></button>
 </p>
 <div id="x-lista"></div>
-<p id="x-vacio" class="muted hidden" data-t="exp_vacio"></p>
-<p class="limit" data-t="borrado_aviso_abogados"></p>
+<div id="x-vacio" class="lente-tarjeta hidden"><div class="lente-vacio"><p data-t="exp_vacio"></p></div></div>
+</section>
+<details class="lente-tarjeta lente-mas"><summary data-t="lente_mas"></summary><div class="lente-mas-c"><p data-t="exp_lead"></p><p data-t="borrado_aviso_abogados"></p></div></details>
+</div>
+<aside class="lente-lado">
+  <div class="lente-significa">
+    <span class="rotulo" data-t="lente_que_significa"></span>
+    <p class="lente-s1" data-t="lente_exp_s1"></p>
+    <p class="lente-s2" data-t="lente_exp_s2"></p>
+    <div class="lente-sep"></div>
+    <p class="lente-estado" hidden></p>
+    <a class="boton principal lente-accion" href="#x-nuevo-tarjeta" data-lente-abre="x-nuevo-tarjeta" data-t="lente_exp_accion"></a>
+  </div>
+  <p class="lente-pie"></p>
+</aside>
+</div>
 </main>
 <footer><span data-t="pie"></span></footer>
+<script src="/static/lente.js"></script>
 <script src="/static/interruptor.js"></script>
 <script src="/static/app.js"></script>
 </body>

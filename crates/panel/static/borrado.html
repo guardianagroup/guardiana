@@ -7,6 +7,7 @@
 <title>GUARDIANA · Haz que te borren</title>
 <link rel="stylesheet" href="/static/diseno.css">
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/lente.css">
 <link rel="preload" href="/static/fonts/HankenGrotesk-var.woff" as="font" type="font/woff" crossorigin>
 <link rel="preload" href="/static/fonts/SchibstedGrotesk-var.woff" as="font" type="font/woff" crossorigin>
 <script src="/static/arranque.js"></script>
@@ -33,23 +34,25 @@
     <a href="/estado"  data-t="nav_estado">Estado</a>
   </nav>
 </header>
-<main>
+<main class="lente" data-lente="borrado">
 <div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
-<h1 data-t="borrado_titulo"></h1>
-<p class="lead" data-t="borrado_lead"></p>
-
-<h2 data-t="borrado_como_titulo"></h2>
-<ol class="counters pasos">
-  <li class="counter"><div class="n">1</div><p data-t="borrado_paso1"></p></li>
-  <li class="counter"><div class="n">2</div><p data-t="borrado_paso2"></p></li>
-  <li class="counter"><div class="n">3</div><p data-t="borrado_paso3"></p></li>
-  <li class="counter"><div class="n">4</div><p data-t="borrado_paso4"></p></li>
-</ol>
-<p class="limit"><strong data-t="borrado_aviso_abogados"></strong> <span data-t="borrado_privado"></span></p>
-
-<h2 data-t="borrado_paso_datos"></h2>
-<div class="card" id="b-datos">
-  <form class="filters" id="b-datos-form">
+<nav class="lente-miga" data-t-label="lente_miga"><a href="/sabe-de-ti" data-t="menu_privacidad"></a><i aria-hidden="true"></i><span aria-current="page" data-t="nav_borrado"></span></nav>
+<header class="lente-cabeza"><div><h1 data-t="nav_borrado"></h1><p class="lente-lead" data-t="lente_borrado_lead"></p></div></header>
+<section class="lente-cifras" aria-live="polite">
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_borrado_c1"></span></div>
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_borrado_c2"></span></div>
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_borrado_c3"></span></div>
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_borrado_c4"></span></div>
+</section>
+<div class="lente-cuerpo">
+<div class="lente-principal">
+<section class="lente-tarjeta"><div class="lente-tc"><h2 data-t="lente_borrado_pasos"></h2></div><div class="lente-tb"><ol class="lente-pasos">
+  <li><b>1</b><p data-t="borrado_paso1"></p></li>
+  <li><b>2</b><p data-t="borrado_paso2"></p></li>
+  <li><b>3</b><p data-t="borrado_paso3"></p></li>
+  <li><b>4</b><p data-t="borrado_paso4"></p></li>
+</ol></div></section>
+<section class="lente-tarjeta" id="b-datos"><div class="lente-tc"><h2 data-t="borrado_paso_datos"></h2></div><div class="lente-tb"><form class="filters" id="b-datos-form">
     <label><span data-t="borrado_campo_nombre"></span><input id="b-nombre" type="text" autocomplete="name" spellcheck="false"></label>
     <label><span data-t="borrado_campo_correo"></span><input id="b-correo" type="email" autocomplete="email" spellcheck="false"></label>
     <label><span data-t="borrado_campo_pais"></span><select id="b-pais"></select></label>
@@ -61,14 +64,14 @@
   <p id="b-qc" class="muted hidden" data-t="borrado_qc_frances"></p>
   <p id="b-ley-corta" class="b-corta"></p>
   <details class="b-plegable" id="b-ley-det"><summary data-t="borrado_ver_ley"></summary><div id="b-ley"></div></details>
-</div>
-
+  <p class="muted" data-t="borrado_privado"></p></div></section>
+<section class="lente-pila">
 <h2 data-t="borrado_paso_empresa"></h2>
-<p class="lead" id="b-empresa-lead"></p>
+<p class="muted" id="b-empresa-lead"></p>
 <div class="card hidden" id="b-drop">
   <h3 data-t="borrado_drop_titulo"></h3>
   <p data-t="borrado_drop_texto"></p>
-  <p><a class="btn" href="https://consumer.drop.privacy.ca.gov" target="_blank" rel="noopener noreferrer" data-t="borrado_drop_enlace"></a></p>
+  <p><a class="btn secondary" href="https://consumer.drop.privacy.ca.gov" target="_blank" rel="noopener noreferrer" data-t="borrado_drop_enlace"></a></p>
   <p class="muted"><a href="https://privacy.ca.gov/drop/" target="_blank" rel="noopener noreferrer" data-t="borrado_drop_mas"></a> · <span data-t="borrado_drop_debajo"></span></p>
 </div>
 <div id="b-vistas"></div>
@@ -92,23 +95,32 @@
     <p id="b-canal" class="muted"></p>
     <p><strong id="b-asunto"></strong></p>
     <textarea id="b-texto" class="mono wide" rows="22" readonly data-t-label="borrado_ver_carta"></textarea>
-    <p class="b-acciones">
+    <p class="b-acciones lente-fila-botones">
       <button type="button" class="secondary" id="b-copiar" data-t="borrado_copiar"></button>
       <button type="button" class="secondary" id="b-descargar" data-t="borrado_descargar"></button>
     </p>
     <p id="b-msg" class="bad" role="status" aria-live="polite"></p>
   </div>
 </details>
-
-<h2 data-t="borrado_paso_reloj"></h2>
-<p class="lead" data-t="borrado_reloj_lead"></p>
-<p class="muted"><span data-t="borrado_reloj_en_expedientes"></span> <a href="/expedientes" data-t="exp_aviso_ver"></a></p>
-<p id="b-envio-msg" class="bad" role="status" aria-live="polite"></p>
-<div id="b-envios"></div>
-<p class="limit" data-t="borrado_reloj_limite"></p>
-<p class="limit" data-t="borrado_aviso_abogados"></p>
+</section>
+<section class="lente-tarjeta"><div class="lente-tc"><h2 data-t="borrado_paso_reloj"></h2></div><div class="lente-tb"><p class="muted" data-t="borrado_reloj_lead"></p><p class="muted"><span data-t="borrado_reloj_en_expedientes"></span> <a href="/expedientes" data-t="exp_aviso_ver"></a></p><p id="b-envio-msg" class="bad" role="status" aria-live="polite"></p><div id="b-envios"></div></div></section>
+<details class="lente-tarjeta lente-mas"><summary data-t="lente_mas"></summary><div class="lente-mas-c"><p data-t="borrado_lead"></p><p data-t="borrado_aviso_abogados"></p><p data-t="borrado_reloj_limite"></p></div></details>
+</div>
+<aside class="lente-lado">
+  <div class="lente-significa">
+    <span class="rotulo" data-t="lente_que_significa"></span>
+    <p class="lente-s1" data-t="lente_borrado_s1"></p>
+    <p class="lente-s2" data-t="lente_borrado_s2"></p>
+    <div class="lente-sep"></div>
+    <p class="lente-estado" hidden></p>
+    <a class="boton principal lente-accion" href="#b-ver-carta" data-lente-abre="b-ver-carta" data-t="lente_borrado_accion"></a>
+  </div>
+  <p class="lente-pie"></p>
+</aside>
+</div>
 </main>
 <footer><span data-t="pie"></span></footer>
+<script src="/static/lente.js"></script>
 <script src="/static/interruptor.js"></script>
 <script src="/static/app.js"></script>
 </body>

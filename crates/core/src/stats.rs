@@ -28,6 +28,13 @@ pub struct Counters {
     pub expected: i64,
     /// Distinct names with verdict `cortado`.
     pub blocked: i64,
+    /// Distinct names categorised as `telemetria` (1.0.46: the figures add up).
+    pub telemetry: i64,
+    /// Distinct names the lists never put in a category in the window (`desconocido` every
+    /// time). With the four categories above they make `services` (a name the lists moved from
+    /// one category to another in the window counts in both): the owner's PC showed counters
+    /// that did not add up (18 Oct 2026).
+    pub unclassified: i64,
 }
 
 /// Totals for one device.
@@ -80,7 +87,9 @@ impl Ledger {
                     COUNT(DISTINCT CASE WHEN instr(signals_json, '\"destino_nuevo\"') > 0 \
                                         THEN qname END), \
                     COUNT(DISTINCT CASE WHEN category = 'esperado' THEN qname END), \
-                    COUNT(DISTINCT CASE WHEN verdict = 'cortado' THEN qname END) \
+                    COUNT(DISTINCT CASE WHEN verdict = 'cortado' THEN qname END), \
+                    COUNT(DISTINCT CASE WHEN category = 'telemetria' THEN qname END), \
+                    COUNT(DISTINCT CASE WHEN category != 'desconocido' THEN qname END) \
              FROM events WHERE ts >= ?1 AND ts < ?2",
             params![since, until],
             |r| {
@@ -93,6 +102,8 @@ impl Ledger {
                     new_destinations: r.get::<_, Option<i64>>(3)?.unwrap_or(0),
                     expected: r.get::<_, Option<i64>>(4)?.unwrap_or(0),
                     blocked: r.get::<_, Option<i64>>(5)?.unwrap_or(0),
+                    telemetry: r.get::<_, Option<i64>>(6)?.unwrap_or(0),
+                    unclassified: r.get::<_, i64>(0)? - r.get::<_, Option<i64>>(7)?.unwrap_or(0),
                 })
             },
         )?;
@@ -173,6 +184,30 @@ mod tests {
     use crate::model::{Category, NewEvent, Signal, Verdict};
 
     #[test]
+    fn the_counters_add_up_to_the_names_with_the_unclassified_ones() {
+        let mut l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
+        for (ts, q, cat) in [
+            (10, "t.example", Category::Rastreador),
+            (20, "ads.example", Category::Publicidad),
+            (30, "m.example", Category::Telemetria),
+            (40, "ok.example", Category::Esperado),
+            (50, "nadie.example", Category::Desconocido),
+            (60, "nadie.example", Category::Desconocido),
+            (70, "otro.example", Category::Desconocido),
+        ] {
+            let mut e = NewEvent::observed(ts, "self", "127.0.0.1", q, "A");
+            e.category = cat;
+            l.append(e).unwrap();
+        }
+        let c = l.counters(0, 100).unwrap();
+        assert_eq!((c.services, c.telemetry, c.unclassified), (6, 1, 2));
+        assert_eq!(
+            c.trackers + c.ads + c.telemetry + c.expected + c.unclassified,
+            c.services
+        );
+    }
+
+    #[test]
     fn counters_and_totals() {
         let mut l = Ledger::open_in_memory(Hash::of(b"k")).unwrap();
         let mut a = NewEvent::observed(10, "self", "127.0.0.1", "t.example", "A");
@@ -204,6 +239,11 @@ mod tests {
         assert_eq!(c.new_destinations, 1);
         assert_eq!(c.expected, 1);
         assert_eq!(c.blocked, 1);
+        assert_eq!((c.telemetry, c.unclassified), (0, 0));
+        assert_eq!(
+            c.trackers + c.ads + c.telemetry + c.expected + c.unclassified,
+            c.services
+        );
         // From t=25 on there are two names left: the tracker asked again and the advertising one.
         assert_eq!(l.counters(25, 100).unwrap().services, 2);
 

@@ -7,6 +7,7 @@
 <title>GUARDIANA · Herramientas</title>
 <link rel="stylesheet" href="/static/diseno.css">
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/lente.css">
 <link rel="stylesheet" href="/static/herramientas.css">
 <link rel="preload" href="/static/fonts/HankenGrotesk-var.woff" as="font" type="font/woff" crossorigin>
 <link rel="preload" href="/static/fonts/SchibstedGrotesk-var.woff" as="font" type="font/woff" crossorigin>
@@ -24,11 +25,18 @@
     <a href="/hogar" data-t="menu_ajustes">Ajustes</a>
   </nav>
 </header>
-<main class="hx">
+<main class="lente hx" data-lente="herramientas">
 <div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
-<h1 data-t="hx_titulo">Herramientas</h1>
-<p class="muted" data-t="hx_intro"></p>
-
+<nav class="lente-miga" data-t-label="lente_miga"><a href="/sabe-de-ti" data-t="menu_privacidad"></a><i aria-hidden="true"></i><span aria-current="page" data-t="nav_herramientas"></span></nav>
+<header class="lente-cabeza"><div><h1 data-t="nav_herramientas"></h1><p class="lente-lead" data-t="lente_hx_lead"></p></div></header>
+<section class="lente-cifras" aria-live="polite">
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="hx_ap_rotulo"></span></div>
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_hx_c2"></span></div>
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_hx_c3"></span></div>
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_hx_c4"></span></div>
+</section>
+<div class="lente-cuerpo">
+<div class="lente-principal">
 <!-- «Modo apagón» -->
 <section class="tarjeta hx-bloque" id="hx-apagon" aria-labelledby="hx-apagon-t">
   <div class="hx-cab">
@@ -98,8 +106,22 @@
   <div id="hx-in-resultado" aria-live="polite"></div>
   <p class="muted small" data-t="hx_in_aviso"></p>
 </section>
-
+<details class="lente-tarjeta lente-mas"><summary data-t="lente_mas"></summary><div class="lente-mas-c"><p data-t="hx_intro"></p></div></details>
+</div>
+<aside class="lente-lado">
+  <div class="lente-significa">
+    <span class="rotulo" data-t="lente_que_significa"></span>
+    <p class="lente-s1" data-t="lente_hx_s1"></p>
+    <p class="lente-s2" data-t="lente_hx_s2"></p>
+    <div class="lente-sep"></div>
+    <p class="lente-estado" hidden></p>
+    <a class="boton principal lente-accion" href="#hx-limpiar" data-lente-abre="hx-limpiar" data-t="lente_hx_accion"></a>
+  </div>
+  <p class="lente-pie"></p>
+</aside>
+</div>
 </main>
+<script src="/static/lente.js"></script>
 <script src="/static/herramientas.js"></script>
 <script src="/static/interruptor.js"></script>
 <script src="/static/app.js"></script>

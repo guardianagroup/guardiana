@@ -7,6 +7,7 @@
 <title>GUARDIANA · Tu antivirus</title>
 <link rel="stylesheet" href="/static/diseno.css">
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/lente.css">
 <link rel="preload" href="/static/fonts/HankenGrotesk-var.woff" as="font" type="font/woff" crossorigin>
 <link rel="preload" href="/static/fonts/SchibstedGrotesk-var.woff" as="font" type="font/woff" crossorigin>
 <script src="/static/arranque.js"></script>
@@ -33,20 +34,23 @@
     <a href="/estado" data-t="nav_estado">Estado</a>
   </nav>
 </header>
-<main id="arriba">
+<main class="lente" data-lente="antivirus">
 <div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
-<h1 data-t="av_titulo"></h1>
-<p class="lead" data-t="av_lead"></p>
-<p class="limit" data-t="av_limite"></p>
-
-<a class="por-dentro-cta" href="/por-dentro"><span class="cta-globo" aria-hidden="true"></span><span class="cta-texto"><strong data-t="pd_boton_portada"></strong><span data-t="pd_portada_texto"></span></span><span class="cta-flecha" aria-hidden="true">→</span></a>
-
+<nav class="lente-miga" data-t-label="lente_miga"><a href="/revision" data-t="menu_diagnostico"></a><i aria-hidden="true"></i><span aria-current="page" data-t="nav_antivirus"></span></nav>
+<header class="lente-cabeza"><div><h1 data-t="nav_antivirus"></h1><p class="lente-lead" data-t="lente_av_lead"></p></div></header>
+<section class="lente-cifras" aria-live="polite">
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_av_c1"></span></div>
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_av_c2"></span></div>
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_av_c3"></span></div>
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_av_c4"></span></div>
+</section>
+<div class="lente-cuerpo">
+<div class="lente-principal">
 <div class="card av-resumen" id="av-resumen-card">
   <div class="av-vivo-cab"><span class="av-latido" aria-hidden="true"></span> <strong data-t="av_resumen_titulo"></strong></div>
   <div id="av-resumen"></div>
   <div id="av-detectados" class="muted"></div>
-  <hr>
-  <p class="vigilante"><label><input type="checkbox" id="av-vigilar"> <b data-t="av_vigilar"></b></label><br><span id="av-vigilar-txt" class="muted"></span></p>
+  <div class="lente-ajuste vigilante"><b data-t="av_vigilar"></b><span class="lente-ajuste-sw" id="lente-av-sw"></span><span id="av-vigilar-txt" class="muted"></span><label class="lente-oculto"><input type="checkbox" id="av-vigilar"></label></div>
   <p id="av-max-fuera" class="bad hidden" role="status"></p>
   <details class="b-plegable av-avanzado" id="av-avanzado">
     <summary data-t="av_avanzado"></summary>
@@ -59,42 +63,58 @@
   <p id="av-detectar-msg" class="muted" role="status" aria-live="polite"></p>
 </div>
 
-<h2 data-t="av_vivo_titulo"></h2>
-<p class="lead" data-t="av_vivo_lead"></p>
-<div class="card" id="av-vivo-card">
+<div class="card" id="av-vivo-card"><h2 data-t="av_vivo_titulo"></h2><p class="muted" data-t="av_vivo_lead"></p>
   <div class="av-vivo-cab"><span class="av-latido" aria-hidden="true"></span> <strong data-t="av_vivo_directo"></strong> <span id="av-vivo-resumen" class="muted"></span></div>
   <div class="wrap"><table><thead><tr><th data-t="col_hora"></th><th data-t="av_col_producto"></th><th data-t="av_col_nombre"></th><th data-t="col_pais"></th><th data-t="av_sube"></th><th data-t="av_baja"></th></tr></thead><tbody id="av-vivo"></tbody></table></div>
   <p id="av-vivo-vacio" class="muted" data-t="av_vivo_vacio"></p>
 </div>
 
+<section class="lente-tarjeta lente-sec">
 <h2 data-t="av_trafico_titulo"></h2>
 <p class="lead" id="av-trafico-lead"></p>
 <p class="limit" data-t="av_trafico_limite"></p>
-<p><a id="av-export" class="secondary" download>⬇ <span data-t="av_export"></span></a></p>
+<p class="lente-oculto"><a id="av-export" class="secondary" download><span data-t="av_export"></span></a></p>
 <div id="av-trafico"></div>
+</section>
 
+<section class="lente-tarjeta lente-sec">
 <h2 data-t="av_vistos_titulo"></h2>
 <p class="lead" data-t="av_vistos_lead"></p>
 <div id="av-vistos"></div>
 <p id="av-ocultos" class="muted hidden"></p>
+</section>
 
+<section class="lente-tarjeta lente-sec">
 <h2 data-t="av_historial_titulo"></h2>
 <p class="lead" data-t="av_historial_lead"></p>
 <div id="av-catalogo"></div>
 <p class="limit" data-t="av_historial_limite"></p>
+</section>
 
+<section class="lente-tarjeta lente-sec">
 <h2 data-t="av_mercado_titulo"></h2>
 <p class="lead" data-t="av_mercado_lead"></p>
 <div id="av-mercado" class="av-mercado"></div>
 <p class="limit" data-t="av_mercado_limite"></p>
+</section>
 
-<h2 data-t="av_como_titulo"></h2>
-<p data-t="av_como_1"></p>
-<p data-t="av_como_2"></p>
-<p data-t="av_como_3"></p>
-<p class="limit" data-t="av_nunca"></p>
+<details class="lente-tarjeta lente-mas"><summary data-t="lente_mas"></summary><div class="lente-mas-c"><p data-t="av_lead"></p><p data-t="av_limite"></p><p data-t="av_como_1"></p><p data-t="av_como_2"></p><p data-t="av_como_3"></p><p data-t="av_nunca"></p></div></details>
+</div>
+<aside class="lente-lado">
+  <div class="lente-significa">
+    <span class="rotulo" data-t="lente_que_significa"></span>
+    <p class="lente-s1" data-t="lente_av_s1"></p>
+    <p class="lente-s2" data-t="lente_av_s2"></p>
+    <div class="lente-sep"></div>
+    <p class="lente-estado" hidden></p>
+    <a class="boton principal lente-accion" href="#" data-lente-pulsa="av-export" data-t="lente_av_exportar"></a>
+  </div>
+  <p class="lente-pie"></p>
+</aside>
+</div>
 </main>
 <footer><span data-t="pie"></span></footer>
+<script src="/static/lente.js"></script>
 <script src="/static/interruptor.js"></script>
 <script src="/static/app.js"></script>
 </body>
