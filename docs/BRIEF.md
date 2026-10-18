@@ -173,7 +173,7 @@ guardiana/
 - Prueba de 7 días con todas las funciones: la fecha de inicio se guarda en `settings` **y** en una marca fuera de los datos (registro en Windows, `/etc/guardiana` en Linux y Mac) que solo un administrador puede quitar; manda la más antigua de las dos, así que borrar el extracto no devuelve la prueba. La pantalla dice dónde está la marca (decisión 187 bis, 22 sep 2026).
 - Activación con clave (pasarela de pago): una única llamada `POST` a la API de licencias de la pasarela, iniciada por el usuario desde `/licencia`, anotada en `outbound` con host y bytes; el resultado se guarda firmado localmente. Después, una comprobación por periodo de pago.
 - Activación con archivo: retirada el 21 sep 2026 (decisión 182). Una sola manera de activar: la clave.
-- Sin licencia y sin prueba: el programa deja de mirar y devuelve el DNS tal y como estaba; lo anotado se queda en el disco de la persona (decisión 180).
+- Sin licencia y sin prueba: ~~el programa deja de mirar y devuelve el DNS tal y como estaba (decisión 180)~~. Desde 1.0.45 (plan gratis aprobado por el responsable el 18 oct 2026) no se apaga: pasa a **GUARDIANA Gratis**, para siempre, sin tocar el DNS. Gratis: globo en vivo, vista DNS por programa con país, empresa y categoría, cortar/deshacer a mano, historial de las últimas 24 h (filtro de vista: no se borra nada) y un solo aparato (este equipo). Plus (suscripción o De por vida, antes «Fundador»): todo lo demás. Lo anotado se queda en el disco de la persona.
 
 ## 10 · Confianza y publicación
 

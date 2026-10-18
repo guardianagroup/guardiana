@@ -82,8 +82,54 @@ impl EngineConfig {
 /// Rules loaded from the ledger, refreshed when their version changes.
 struct RuleCache {
     rules: Vec<Rule>,
+    /// The same rules without the category ones: what applies at the free level, where only
+    /// the person's own cuts of a name count and nothing is cut automatically by category,
+    /// list or «Protección máxima» (the owner's free plan, 18 Oct 2026). The rules stay in the
+    /// ledger as they are and apply again the moment Plus is back.
+    gratis: Vec<Rule>,
     version: u64,
     checked: Instant,
+}
+
+impl RuleCache {
+    fn new(rules: Vec<Rule>, version: u64) -> Self {
+        let gratis = reglas_gratis(&rules);
+        Self {
+            rules,
+            gratis,
+            version,
+            checked: Instant::now(),
+        }
+    }
+
+    /// The rules that apply at this level.
+    fn para(&self, plus: bool) -> &[Rule] {
+        if plus {
+            &self.rules
+        } else {
+            &self.gratis
+        }
+    }
+}
+
+/// The rules the free level applies: those that name a domain or a suffix (a manual cut and its
+/// undo), never a whole category.
+fn reglas_gratis(rules: &[Rule]) -> Vec<Rule> {
+    rules
+        .iter()
+        .filter(|r| r.match_kind != guardiana_core::MatchKind::Category)
+        .cloned()
+        .collect()
+}
+
+/// How often the engine reads the licence level again: the trial ends within this.
+const NIVEL_CADA: Duration = Duration::from_secs(30);
+
+/// The licence level as the engine last read it, so `decide` does not read the licence on
+/// every query.
+struct NivelCache {
+    plus: bool,
+    visto: Option<Instant>,
 }
 
 /// How often a device's last activity and address are written while it keeps asking.
@@ -109,6 +155,9 @@ struct Inner {
     /// «Modo apagón» (18 Oct 2026), re-read on the same 2-second beat as the scopes.
     apagon: guardiana_core::apagon::Apagon,
     apagon_visto: Option<Instant>,
+    /// The licence's secret, to read the level with.
+    secreto: String,
+    nivel: NivelCache,
 }
 
 /// What a device's declared scope says (decision 154).
@@ -409,6 +458,19 @@ fn key_of(q: &Query) -> PendingKey {
 }
 
 impl Inner {
+    /// Whether Plus is on (trial, subscription or Lifetime), read again every [`NIVEL_CADA`].
+    /// A licence that cannot be read counts as Plus: an error must never take features away
+    /// from someone who paid.
+    fn plus(&mut self) -> bool {
+        if self.nivel.visto.is_none_or(|t| t.elapsed() >= NIVEL_CADA) {
+            self.nivel.plus = guardiana_license::status(&self.ledger, &self.secreto, now_ms())
+                .map(|s| s.plus_activo)
+                .unwrap_or(true);
+            self.nivel.visto = Some(Instant::now());
+        }
+        self.nivel.plus
+    }
+
     /// The declared scope of one device, from the settings, re-read at most every two
     /// seconds. A device with no scope written gets an empty one, which never cuts.
     fn alcance_de(&mut self, device_id: &str) -> Alcance {
@@ -479,6 +541,7 @@ impl Inner {
         if version != self.rules.version {
             if let Ok(all) = self.ledger.rules() {
                 self.rules.rules = reglas_legibles(all);
+                self.rules.gratis = reglas_gratis(&self.rules.rules);
                 self.rules.version = version;
             }
             // «Borrar todo» bumps the version too: what this pass remembered about the devices
@@ -512,6 +575,9 @@ impl EnginePolicy {
     fn sin_decidir(&self, q: &Query) -> Option<Pending> {
         let who = self.devices.identify(q.client.ip());
         let mut inner = self.inner.lock().ok()?;
+        if !inner.plus() && who.id != guardiana_core::SELF_DEVICE_ID {
+            return None;
+        }
         let first_time = inner
             .ledger
             .first_time(&who.id, &q.name, q.ts)
@@ -542,6 +608,14 @@ impl Policy for EnginePolicy {
         let Ok(mut inner) = self.inner.lock() else {
             return Decision::Forward;
         };
+        // The free level watches this computer only (the owner's free plan, 18 Oct 2026). Another
+        // device that still asks here (Home Mode switched on during the trial, the router still
+        // pointing at this computer) is answered as always, so nobody in the house loses
+        // internet, but nothing about it is looked at or written down.
+        let plus = inner.plus();
+        if !plus && who.id != guardiana_core::SELF_DEVICE_ID {
+            return Decision::Forward;
+        }
         let ip = q.client.ip().to_string();
         let device_id = who.id;
         let first_seen = match inner.devices_seen.get(&device_id) {
@@ -578,7 +652,7 @@ impl Policy for EnginePolicy {
         });
         inner.refresh_rules();
         let regla = rules::decide(
-            &inner.rules.rules,
+            inner.rules.para(plus),
             RuleInput {
                 device_id: &device_id,
                 name: &q.name,
@@ -609,7 +683,9 @@ impl Policy for EnginePolicy {
             // checks, resolvers, messaging): Guard mode is a wide cut, and the inviolable rule
             // of brief §6 covers it like a category rule. Until 1.0.2 it cut them while the
             // panel left them out of its count (G3, 28 Sep 2026).
-            if alcance.cortar
+            // An automatic cut: Plus only.
+            if plus
+                && alcance.cortar
                 && !alcance.patrones.is_empty()
                 && !alcance.cubre(&q.name)
                 && classified.category != guardiana_core::Category::Esperado
@@ -679,8 +755,9 @@ impl Policy for EnginePolicy {
             return Decision::Forward;
         };
         inner.refresh_rules();
+        let plus = inner.plus();
         let regla = rules::decide_cloaked(
-            &inner.rules.rules,
+            inner.rules.para(plus),
             RuleInput {
                 device_id: &p.device_id,
                 name: &q.name,
@@ -1806,16 +1883,17 @@ async fn run_once<F: Future<Output = ()>>(
             classifier,
             devices_seen: HashMap::new(),
             devices_touched: HashMap::new(),
-            rules: RuleCache {
-                rules: initial_rules,
-                version: initial_version,
-                checked: Instant::now(),
-            },
+            rules: RuleCache::new(initial_rules, initial_version),
             recorded: 0,
             alcances: HashMap::new(),
             alcances_vistos: None,
             apagon: guardiana_core::apagon::Apagon::default(),
             apagon_visto: None,
+            secreto: secret.clone(),
+            nivel: NivelCache {
+                plus: true,
+                visto: None,
+            },
         }),
         pending: Mutex::new(HashMap::new()),
         devices: guardiana_devices::Resolver::default(),
@@ -2948,6 +3026,38 @@ mod reglas_tests {
         assert_eq!(r[1].pattern, "ejemplo.com");
         assert_eq!(r[1].match_kind, MatchKind::Suffix);
         assert_eq!(r[2].pattern, "rastreador");
+    }
+
+    /// The free level applies the person's own cuts of a name and their allows, never a cut of a
+    /// whole category (the owner's free plan, 18 Oct 2026); Plus applies all of them. The rules
+    /// themselves are not touched.
+    #[test]
+    fn gratis_aplica_los_cortes_a_mano_y_no_los_de_categoria() {
+        let regla = |id: i64, pattern: &str, kind: MatchKind| Rule {
+            id,
+            scope: Scope::Home,
+            device_id: None,
+            match_kind: kind,
+            pattern: pattern.to_owned(),
+            action: Action::Cortar,
+            created_at: 0,
+            created_by: "panel".to_owned(),
+            expires_at: None,
+            undone_at: None,
+            confirmed: false,
+        };
+        let cache = RuleCache::new(
+            vec![
+                regla(1, "tiktok.com", MatchKind::Suffix),
+                regla(2, "rastreador", MatchKind::Category),
+                regla(3, "ads.ejemplo.com", MatchKind::Domain),
+            ],
+            7,
+        );
+        let ids = |rs: &[Rule]| rs.iter().map(|r| r.id).collect::<Vec<_>>();
+        assert_eq!(ids(cache.para(true)), vec![1, 2, 3]);
+        assert_eq!(ids(cache.para(false)), vec![1, 3]);
+        assert_eq!(cache.version, 7);
     }
 }
 

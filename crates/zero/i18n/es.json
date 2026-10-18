@@ -526,7 +526,7 @@
   "licencia_suscrita": "Suscripción activa desde el {fecha}.",
   "licencia_periodo_30": "Se paga al mes.",
   "licencia_periodo_365": "Se paga al año.",
-  "licencia_periodo_0": "Licencia Fundador, de por vida: se pagó una vez y no caduca. Lo único que la termina es que la pasarela diga que ya no vale, por ejemplo tras una devolución.",
+  "licencia_periodo_0": "Licencia De por vida (también la Fundador original): se pagó una vez y no caduca. Lo único que la termina es que la pasarela diga que ya no vale, por ejemplo tras una devolución.",
   "licencia_proxima": "La clave se vuelve a comprobar el {fecha}.",
   "licencia_fallida": "No se pudo comprobar la clave (sin conexión con la pasarela). Se reintenta cada hora; si no se consigue antes del {fecha}, GUARDIANA ZERO dejará de proteger hasta que se pueda.",
   "licencia_prueba_terminada": "La prueba terminó el {fecha}. GUARDIANA ZERO sigue abriendo páginas, pero ya no protege: no corta rastreadores, publicidad ni corredores de datos, no limpia las direcciones, no vigila tus datos marcados y no hace tareas para la IA ni tachones. Queda solo la protección básica del motor web, la misma de Microsoft Edge. Lo que ya está en tu equipo sigue ahí.",

@@ -23,6 +23,7 @@ mod expedientes;
 mod extras;
 mod identificacion;
 mod medidas;
+mod plan;
 mod revision;
 mod universo;
 mod vigilancia;
@@ -1069,6 +1070,14 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         // «Contratos» (1.0.45, «contrato vivo»): its page, script and API, in their own module.
         .merge(contratos::rutas())
         .merge(extras::rutas())
+        // The free level and Plus (the owner's free plan, 18 Oct 2026): `/api/plan` says which is
+        // in force, and the Plus routes listed in `plan::RUTAS_PLUS` answer 402 at the free level.
+        // Routes merged above this line are covered.
+        .route("/api/plan", get(plan::ver))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            plan::solo_plus,
+        ))
         .layer(middleware::from_fn(add_security_headers))
         .layer(middleware::from_fn_with_state(
             state.clone(),
