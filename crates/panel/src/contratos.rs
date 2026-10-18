@@ -115,6 +115,12 @@ pub(crate) fn vigia(
 /// `Zoom.exe` → `Zoom`.
 fn visible(nombre: &str) -> String {
     let n = nombre.trim();
+    // GUARDIANA's own programs by the names people know (1.0.46).
+    match n.to_ascii_lowercase().as_str() {
+        "guardiana-zero.exe" | "zero.exe" => return "GUARDIANA ZERO".to_owned(),
+        "guardiana.exe" => return "GUARDIANA".to_owned(),
+        _ => {}
+    }
     if n.len() > 4 && n[n.len() - 4..].eq_ignore_ascii_case(".exe") {
         n[..n.len() - 4].to_owned()
     } else {
@@ -125,6 +131,17 @@ fn visible(nombre: &str) -> String {
 /// `6.2.11 (49849)` → `6.2.11`: the number people know.
 fn version_corta(v: &str) -> &str {
     v.split(' ').next().unwrap_or(v)
+}
+
+/// A version label as the person reads it (1.0.46). The core labels a file that declares no
+/// version `huella` and the start of its hash: a Spanish word on every English and Portuguese
+/// screen («HUELLA») and a raw hash in a headline. Here it becomes «File without a version».
+pub(crate) fn version_visible(t: &Texts, etiqueta: &str) -> String {
+    if etiqueta.starts_with("huella ") {
+        t.panel("ct_version_archivo").to_owned()
+    } else {
+        etiqueta.to_owned()
+    }
 }
 
 /// The notice's sentence: «Zoom 6.2 ha cambiado: empezó a contactar con 3 empresas nuevas».
@@ -140,7 +157,10 @@ pub(crate) fn titulo(t: &Texts, a: &Aviso) -> String {
     };
     t.panel_n(clave, n)
         .replace("{programa}", &programa)
-        .replace("{version}", version_corta(&a.version_ahora))
+        .replace(
+            "{version}",
+            version_corta(&version_visible(t, &a.version_ahora)),
+        )
 }
 
 fn estado_texto(t: &Texts, e: EstadoContrato) -> &str {
@@ -150,6 +170,13 @@ fn estado_texto(t: &Texts, e: EstadoContrato) -> &str {
         EstadoContrato::Fijado => "ct_estado_fijado",
         EstadoContrato::NoAplica => "ct_estado_no_aplica",
     })
+}
+
+/// A version seen, with the day it was first seen (the page's timeline, 1.0.46).
+#[derive(Serialize)]
+struct VersionApi {
+    etiqueta: String,
+    desde: i64,
 }
 
 fn estado_aviso(e: EstadoAviso) -> &'static str {
@@ -175,6 +202,7 @@ struct EmpresaVistaApi {
 }
 
 fn empresas_api(
+    t: &Texts,
     m: &std::collections::BTreeMap<String, guardiana_core::contratos::EmpresaVista>,
 ) -> Vec<EmpresaVistaApi> {
     m.iter()
@@ -185,7 +213,7 @@ fn empresas_api(
             veces: e.veces,
             desde: e.desde,
             ultimo: e.ultimo,
-            version: e.version.clone(),
+            version: version_visible(t, &e.version),
             esperado: e.esperado,
         })
         .collect()
@@ -223,15 +251,15 @@ fn aviso_api(t: &Texts, a: &Aviso) -> AvisoApi {
         programa: visible(&a.programa),
         titulo: titulo(t, a),
         nota: t.panel("ct_aviso_nota").to_owned(),
-        version_antes: a.version_antes.clone(),
-        version_ahora: a.version_ahora.clone(),
+        version_antes: version_visible(t, &a.version_antes),
+        version_ahora: version_visible(t, &a.version_ahora),
         version_cambio: a.version_cambio(),
         desde: a.desde,
         ultimo: a.ultimo,
         estado,
         estado_texto: t.panel(&format!("ct_aviso_estado_{estado}")).to_owned(),
         antes: a.antes.clone(),
-        nuevas: empresas_api(&a.nuevas),
+        nuevas: empresas_api(t, &a.nuevas),
         reglas: n_reglas,
         reglas_texto: if n_reglas == 0 {
             String::new()
@@ -275,6 +303,10 @@ struct ContratoApi {
     empresas: Vec<EmpresaVistaApi>,
     cortadas: Vec<String>,
     versiones: Vec<String>,
+    /// The versions with their dates, oldest first (1.0.46).
+    historial: Vec<VersionApi>,
+    /// One of GUARDIANA's own programs: its connections are documented, never an alarm.
+    propio: bool,
     pendientes: usize,
 }
 
@@ -284,7 +316,7 @@ fn contrato_api(t: &Texts, c: &Contrato) -> ContratoApi {
         programa: visible(&c.nombre),
         nombre: c.nombre.clone(),
         ruta: c.ruta.clone(),
-        version: c.etiqueta(),
+        version: version_visible(t, &c.etiqueta()),
         firmado_por: c.firmado_por.clone(),
         estado: c.estado,
         estado_texto: estado_texto(t, c.estado).to_owned(),
@@ -299,9 +331,22 @@ fn contrato_api(t: &Texts, c: &Contrato) -> ContratoApi {
         aprende_hasta: (c.estado == EstadoContrato::Aprendiendo)
             .then_some(c.desde + APRENDE_DIAS * DAY_MS),
         lanzamientos: c.lanzamientos,
-        empresas: empresas_api(&c.empresas),
+        empresas: empresas_api(t, &c.empresas),
         cortadas: c.cortadas.iter().cloned().collect(),
-        versiones: c.versiones.iter().map(|v| v.etiqueta.clone()).collect(),
+        versiones: c
+            .versiones
+            .iter()
+            .map(|v| version_visible(t, &v.etiqueta))
+            .collect(),
+        historial: c
+            .versiones
+            .iter()
+            .map(|v| VersionApi {
+                etiqueta: version_visible(t, &v.etiqueta),
+                desde: v.desde,
+            })
+            .collect(),
+        propio: c.motivo == "propio",
         pendientes: c.pendientes.len(),
     }
 }
@@ -332,7 +377,7 @@ fn lista(v: &serde_json::Value) -> String {
 /// The sentence of a register row, from its detail.
 fn frase_registro(t: &Texts, r: &Registro) -> String {
     let d: serde_json::Value = serde_json::from_str(&r.detalle).unwrap_or_default();
-    let s = |k: &str| d[k].as_str().unwrap_or_default().to_owned();
+    let s = |k: &str| version_visible(t, d[k].as_str().unwrap_or_default());
     let n_empresas = d["empresas"].as_array().map_or(0, Vec::len);
     let clave = format!("ct_reg_{}", r.tipo);
     let base = if r.tipo == "aprendido" {
@@ -675,6 +720,23 @@ mod tests {
     }
 
     #[test]
+    fn a_file_without_a_version_reads_in_the_person_s_language_and_never_as_a_hash() {
+        for code in ["es", "en", "pt"] {
+            let t = i18n::by_code(code);
+            let v = super::version_visible(t, "huella 1a2b3c4d");
+            assert!(
+                !v.to_lowercase().contains("huella") || code == "es",
+                "{code}: {v}"
+            );
+            assert!(!v.contains("1a2b3c4d"), "{code}: {v}");
+            let titulo = super::titulo(t, &aviso("huella aaaaaaaa", "huella bbbbbbbb", 2));
+            assert!(!titulo.contains("aaaaaaaa") && !titulo.contains("bbbbbbbb"));
+            assert!(!titulo.to_lowercase().contains("huella") || code == "es");
+            assert_eq!(super::version_visible(t, "6.2.0"), "6.2.0");
+        }
+    }
+
+    #[test]
     fn the_pill_names_the_program_when_there_is_one() {
         let t = i18n::by_code("es");
         let a = super::atencion_de(t, &[aviso("6.1", "6.2", 2)]);
@@ -739,7 +801,7 @@ mod tests {
         for e in ["abierto", "aceptado", "cortado", "cortado_auto", "deshecho"] {
             claves.push(format!("ct_aviso_estado_{e}"));
         }
-        for m in ["navegador", "compartido", "variado"] {
+        for m in ["navegador", "compartido", "variado", "propio"] {
             claves.push(format!("ct_motivo_{m}"));
         }
         for m in ["esperado", "compartido"] {
@@ -757,6 +819,7 @@ mod tests {
             "deshecho",
             "fijado",
             "soltado",
+            "reaprende",
         ] {
             claves.push(format!("ct_reg_{r}"));
         }
@@ -777,6 +840,7 @@ mod tests {
             "ct_hecho_aceptar",
             "ct_hecho_cortar",
             "ct_hecho_deshacer",
+            "ct_version_archivo",
         ] {
             claves.push(k.to_owned());
         }

@@ -74,6 +74,28 @@ const KEY_CURSOR: &str = "contratos_cursor";
 const KEY_REG_HEAD: &str = "contratos_registro_head";
 /// Settings key: rows the register has written since its genesis.
 const KEY_REG_COUNT: &str = "contratos_registro_count";
+/// Settings key (1.0.46): when GUARDIANA started learning contracts on this computer, Unix ms.
+/// The learning is counted from here, never from the history already in the extract: on the
+/// owner's PC (18 Oct 2026) the first pass after installing 1.0.45 read weeks of history, every
+/// program «finished» its week inside that one pass and the very first day was full of notices.
+/// A baseline is a week watched, not a week read.
+const KEY_INICIO: &str = "contratos_inicio";
+
+/// GUARDIANA's own programs (1.0.46): their connections are documented (licence, updates, relay
+/// servers) and a notice about them would be GUARDIANA raising an alarm about itself.
+const PROPIOS: [&str; 3] = ["guardiana.exe", "guardiana-zero.exe", "zero.exe"];
+/// GUARDIANA's own sites: another program reaching them (ZERO's WebView2, an installer checking
+/// for updates) is never «a new company».
+const SITIOS_PROPIOS: [&str; 1] = ["guardianagroup.com"];
+
+/// Whether a site is one of GUARDIANA's own documented ones.
+#[must_use]
+pub fn sitio_propio(sitio: &str) -> bool {
+    let s = sitio.trim_end_matches('.').to_ascii_lowercase();
+    SITIOS_PROPIOS
+        .iter()
+        .any(|p| s == *p || s.ends_with(&format!(".{p}")))
+}
 
 /// Programs that talk to whatever the person visits: no contract can describe them.
 const NAVEGADORES: [&str; 11] = [
@@ -102,7 +124,8 @@ pub enum EstadoContrato {
     Vigilando,
     /// Fixed by the person: a new company is cut automatically and recorded.
     Fijado,
-    /// No contract makes sense for it (a browser, a shared Windows host, or too varied).
+    /// No contract makes sense for it (a browser, a shared Windows host, too varied, or one of
+    /// GUARDIANA's own programs).
     NoAplica,
 }
 
@@ -289,7 +312,9 @@ pub fn etiqueta_version(version: &str, huella: &str) -> String {
 #[must_use]
 pub fn sin_contrato(nombre: &str) -> Option<&'static str> {
     let n = nombre.to_ascii_lowercase();
-    if NAVEGADORES.contains(&n.as_str()) {
+    if PROPIOS.contains(&n.as_str()) {
+        Some("propio")
+    } else if NAVEGADORES.contains(&n.as_str()) {
         Some("navegador")
     } else if COMPARTIDOS.contains(&n.as_str()) {
         Some("compartido")
@@ -438,6 +463,15 @@ impl Contrato {
                     self.empresas.clear();
                     efectos.push(Efecto::NoAplica);
                 }
+            }
+            // GUARDIANA's own documented sites join the contract quietly (1.0.46).
+            EstadoContrato::Vigilando | EstadoContrato::Fijado if sitio_propio(o.sitio) => {
+                let mut e = EmpresaVista {
+                    version: self.etiqueta(),
+                    ..EmpresaVista::default()
+                };
+                e.anota(o);
+                self.empresas.insert(o.empresa.to_owned(), e);
             }
             EstadoContrato::Vigilando | EstadoContrato::Fijado => {
                 if !self.cortadas.contains(o.empresa) {
@@ -876,6 +910,15 @@ impl Ledger {
         lee: &dyn Fn(&str) -> Option<Lectura>,
         ahora: i64,
     ) -> Result<Pasada> {
+        // When the learning began on this computer (1.0.46). The first pass of 1.0.46 also puts
+        // back to learning, quietly, what 1.0.45 «learnt» from history alone.
+        let inicio: i64 = if let Some(i) = self.setting(KEY_INICIO)?.and_then(|v| v.parse().ok()) {
+            i
+        } else {
+            self.reaprende(ahora)?;
+            self.set_setting(KEY_INICIO, &ahora.to_string())?;
+            ahora
+        };
         let cursor: i64 = self
             .setting(KEY_CURSOR)?
             .and_then(|c| c.parse().ok())
@@ -918,7 +961,8 @@ impl Ledger {
                 if contratos.len() >= MAX_CONTRATOS {
                     continue;
                 }
-                let c = Contrato::nuevo(&p, ts);
+                // Seen in the history before the learning began: it starts learning from then.
+                let c = Contrato::nuevo(&p, ts.max(inicio));
                 let tipo = if c.estado == EstadoContrato::NoAplica {
                     "no_aplica"
                 } else {
@@ -980,6 +1024,57 @@ impl Ledger {
         }
         self.set_setting(KEY_CURSOR, &ultimo_id.to_string())?;
         Ok(pasada)
+    }
+
+    /// The first pass of 1.0.46 (no [`KEY_INICIO`] yet): every contract that 1.0.45 settled is
+    /// learnt again from `ahora`, quietly, with what it had seen (its open notices included) as
+    /// the start of its baseline; those open notices go, and the register says why. GUARDIANA's
+    /// own programs get no contract. Fixed contracts are the person's choice and stay as they are.
+    fn reaprende(&self, ahora: i64) -> Result<()> {
+        for mut c in self.contratos()? {
+            let propio = sin_contrato(&c.nombre) == Some("propio");
+            let vigilaba = c.estado == EstadoContrato::Vigilando;
+            let reaprender = c.estado == EstadoContrato::Vigilando
+                || (c.estado == EstadoContrato::Aprendiendo && !propio && c.desde < ahora);
+            if !propio && !reaprender {
+                continue;
+            }
+            let abiertos = self.avisos_de(&c.clave, EstadoAviso::Abierto)?;
+            for a in &abiertos {
+                if !propio {
+                    for (empresa, e) in &a.nuevas {
+                        c.empresas
+                            .entry(empresa.clone())
+                            .or_insert_with(|| e.clone());
+                    }
+                }
+                self.conn
+                    .execute("DELETE FROM contratos_avisos WHERE id = ?1", params![a.id])?;
+            }
+            c.pendientes.clear();
+            c.aprendido = None;
+            if propio {
+                c.estado = EstadoContrato::NoAplica;
+                "propio".clone_into(&mut c.motivo);
+                c.empresas.clear();
+            } else {
+                c.estado = EstadoContrato::Aprendiendo;
+                c.desde = c.desde.max(ahora);
+                c.version_contrato = c.etiqueta();
+            }
+            if propio || vigilaba || !abiertos.is_empty() {
+                self.registra_contrato(
+                    ahora,
+                    &c.clave,
+                    if propio { "no_aplica" } else { "reaprende" },
+                    &serde_json::json!({
+                        "programa": c.nombre, "motivo": c.motivo, "avisos": abiertos.len(),
+                    }),
+                )?;
+            }
+            self.guarda_contrato(&c)?;
+        }
+        Ok(())
     }
 
     fn registra_aprendido(&self, c: &Contrato, ts: i64, e: &Efecto) -> Result<()> {
@@ -1324,7 +1419,7 @@ impl Ledger {
             "DELETE FROM contratos; DELETE FROM contratos_avisos; DELETE FROM contratos_registro; \
              DELETE FROM sqlite_sequence WHERE name IN ('contratos_avisos', 'contratos_registro'); \
              DELETE FROM settings WHERE key IN ('contratos_cursor', 'contratos_registro_head', \
-             'contratos_registro_count');",
+             'contratos_registro_count', 'contratos_inicio');",
         )?;
         Ok(())
     }
@@ -1613,6 +1708,86 @@ mod tests {
             vec!["aprendiendo", "aprendido", "version", "novedad", "novedad"]
         );
         assert!(l.comprueba_contratos().unwrap().ok);
+    }
+
+    #[test]
+    fn the_history_already_in_the_extract_is_learnt_quietly_from_the_first_day() {
+        // 1.0.46, the owner's PC: weeks of history read in the first pass are not a week
+        // watched. Nothing is flagged until a week after GUARDIANA started learning.
+        let mut l = ledger();
+        let v1 = zoom(1, "6.1.0", "");
+        let v2 = zoom(2, "6.2.0", "");
+        evento(&mut l, 0, "zoom.us", &v1);
+        evento(&mut l, 20 * DAY_MS, "zoom.us", &v2);
+        evento(&mut l, 20 * DAY_MS + 1, "api2.amplitude.com", &v2);
+        let hoy = 30 * DAY_MS;
+        let p = l.contratos_pasada(&lee, hoy).unwrap();
+        assert_eq!(p.avisos_nuevos, 0);
+        let c = l.contrato(&clave_de(&v1.ruta, "")).unwrap().unwrap();
+        assert_eq!(c.estado, EstadoContrato::Aprendiendo);
+        assert_eq!(c.desde, hoy);
+        assert!(c.empresas.contains_key("Amplitude"));
+        // Six days later still learning; after the week, watching, with all of it as baseline.
+        evento(&mut l, hoy + 6 * DAY_MS, "zoom.us", &v2);
+        l.contratos_pasada(&lee, hoy + 6 * DAY_MS).unwrap();
+        let c = l.contrato(&clave_de(&v1.ruta, "")).unwrap().unwrap();
+        assert_eq!(c.estado, EstadoContrato::Aprendiendo);
+        evento(&mut l, hoy + 8 * DAY_MS, "api2.amplitude.com", &v2);
+        let p = l.contratos_pasada(&lee, hoy + 8 * DAY_MS).unwrap();
+        assert_eq!(p.avisos_nuevos, 0);
+        let c = l.contrato(&clave_de(&v1.ruta, "")).unwrap().unwrap();
+        assert_eq!(c.estado, EstadoContrato::Vigilando);
+    }
+
+    #[test]
+    fn guardiana_never_raises_an_alarm_about_itself() {
+        let mut l = ledger();
+        let mut zero = zoom(7, "1.0.46", "");
+        zero.nombre = "guardiana-zero.exe".into();
+        zero.ruta = r"C:\Program Files\GUARDIANA\guardiana-zero.exe".into();
+        assert_eq!(sin_contrato("GUARDIANA.exe"), Some("propio"));
+        evento(&mut l, 0, "rele.guardianagroup.com", &zero);
+        l.contratos_pasada(&lee, 0).unwrap();
+        let c = l.contrato(&clave_de(&zero.ruta, "")).unwrap().unwrap();
+        assert_eq!(c.estado, EstadoContrato::NoAplica);
+        assert_eq!(c.motivo, "propio");
+        // Another program reaching GUARDIANA's own documented sites is not a new company.
+        let v1 = zoom(1, "6.1.0", "");
+        evento(&mut l, 0, "zoom.us", &v1);
+        l.contratos_pasada(&lee, 0).unwrap();
+        evento(&mut l, 8 * DAY_MS, "guardianagroup.com", &v1);
+        evento(&mut l, 8 * DAY_MS + 1, "rele.guardianagroup.com", &v1);
+        let p = l.contratos_pasada(&lee, 8 * DAY_MS + 2).unwrap();
+        assert_eq!(p.avisos_nuevos, 0);
+        assert!(l.avisos_contrato(true, 10).unwrap().is_empty());
+        assert!(sitio_propio("rele-am.guardianagroup.com"));
+        assert!(!sitio_propio("guardianagroup.com.evil.io"));
+    }
+
+    #[test]
+    fn what_1_0_45_settled_from_history_alone_is_learnt_again_quietly() {
+        let (l, a) = con_aviso();
+        // A ledger from 1.0.45: no start of the learning recorded.
+        l.conn
+            .execute("DELETE FROM settings WHERE key = 'contratos_inicio'", [])
+            .unwrap();
+        let mut l = l;
+        l.contratos_pasada(&lee, 9 * DAY_MS).unwrap();
+        assert!(l.avisos_contrato(true, 10).unwrap().is_empty());
+        let c = l.contrato(&a.clave).unwrap().unwrap();
+        assert_eq!(c.estado, EstadoContrato::Aprendiendo);
+        assert_eq!(c.desde, 9 * DAY_MS);
+        assert!(c.empresas.contains_key("Amplitude"));
+        assert!(c.pendientes.is_empty());
+        let reg = l.registro_contratos(Some(&a.clave), 5).unwrap();
+        assert_eq!(reg[0].tipo, "reaprende");
+        assert!(l.comprueba_contratos().unwrap().ok);
+        // Only once: the next pass leaves it alone.
+        l.contratos_pasada(&lee, 9 * DAY_MS + 1).unwrap();
+        assert_eq!(
+            l.registro_contratos(Some(&a.clave), 5).unwrap()[0].tipo,
+            "reaprende"
+        );
     }
 
     fn con_aviso() -> (Ledger, Aviso) {

@@ -7,6 +7,7 @@
 <title>GUARDIANA · Radiografía</title>
 <link rel="stylesheet" href="/static/diseno.css">
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/lente.css">
 <link rel="preload" href="/static/fonts/HankenGrotesk-var.woff" as="font" type="font/woff" crossorigin>
 <link rel="preload" href="/static/fonts/SchibstedGrotesk-var.woff" as="font" type="font/woff" crossorigin>
 <script src="/static/arranque.js"></script>
@@ -33,43 +34,63 @@
     <a href="/estado"  data-t="nav_estado">Estado</a>
   </nav>
 </header>
-<main>
+<main class="lente" data-lente="radiografia">
 <div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
-<h1 data-t="radiografia_titulo"></h1>
-<p class="lead" data-t="radiografia_lead"></p>
-<a class="por-dentro-cta" href="/por-dentro"><span class="cta-globo" aria-hidden="true"></span><span class="cta-texto"><strong data-t="pd_boton_portada"></strong><span data-t="pd_portada_texto"></span></span><span class="cta-flecha" aria-hidden="true">→</span></a>
-<p><button id="share-open" class="secondary" data-t="compartir"></button> <button id="r-pdf" type="button" class="secondary" data-t="exportar_pdf"></button> <span id="r-pdf-msg" class="muted" role="status" aria-live="polite"></span></p>
+<nav class="lente-miga" data-t-label="lente_miga"><a href="/extracto" data-t="menu_actividad"></a><i aria-hidden="true"></i><span aria-current="page" data-t="menu_foto"></span></nav>
+<header class="lente-cabeza"><div><h1 data-t="menu_foto"></h1><p class="lente-lead" data-t="lente_foto_lead"></p></div></header>
+<section class="lente-cifras" aria-live="polite">
+  <div class="lente-cifra"><b class="n" id="c-servicios"></b><span class="l" data-t="lente_foto_c1"></span></div>
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_foto_c2"></span></div>
+  <div class="lente-cifra"><b class="n" id="c-nuevos"></b><span class="l" data-t="lente_foto_c3"></span></div>
+  <div class="lente-cifra"><b class="n" id="c-cortados"></b><span class="l" data-t="lente_foto_c4"></span></div>
+</section>
+<div class="lente-cuerpo">
+<div class="lente-principal">
+<div class="lente-oculto"><span id="c-rastreadores"></span><span id="c-publicidad"></span><span id="c-esperados"></span></div>
+<p id="hueco" class="limit hidden"></p>
+<section class="lente-tarjeta"><div class="lente-tc"><h2 data-t="lente_foto_desglose"></h2></div><div class="lente-tb sin-margen"><div id="lente-desglose"></div></div></section>
+<section id="maxima" class="lente-tarjeta hidden"><div class="lente-tb lente-ajuste">
+  <h2 data-t="maxima_titulo"></h2>
+  <p class="muted" data-t="lente_maxima_sub"></p>
+  <span class="lente-ajuste-sw" id="lente-maxima-sw"></span>
+  <details class="lente-detalle"><summary class="muted" data-t="lente_mas"></summary><p class="muted" data-t="maxima_explica"></p><p class="muted" data-t="maxima_limite"></p></details>
+  <p class="lente-oculto"><button id="maxima-activar" class="hidden" data-t="maxima_activar"></button><strong id="maxima-activa" class="ok hidden" data-t="maxima_activa"></strong> <button id="maxima-quitar" class="secondary hidden" data-t="maxima_quitar"></button></p>
+  <span id="maxima-msg" class="muted" role="status" aria-live="polite"></span>
+</div></section>
+<div id="dns-card" class="card hidden"><h2 data-t="dns_card_titulo"></h2><p data-t="dns_card_texto"></p><p><button id="dns-apply" data-t="dns_card_boton"></button> <span id="dns-msg" class="muted" role="status" aria-live="polite"></span></p></div>
+<div id="com-card" class="card hidden"><h2 data-t="com_card_titulo"></h2><p id="com-texto" data-t="com_card_linux"></p><p><code id="com-orden">guardiana comunicaciones</code></p></div>
+<div id="zero-card" class="card hidden"><h2 data-t="zero_card_titulo"></h2><p data-t="zero_card_texto"></p></div>
+
+</div>
+<aside class="lente-lado">
+  <div class="lente-significa">
+    <span class="rotulo" data-t="lente_que_significa"></span>
+    <p class="lente-s1" data-t="lente_foto_s1"></p>
+    <p class="lente-s2" data-t="lente_foto_s2"></p>
+    <div class="lente-sep"></div>
+    <p class="lente-estado" hidden></p>
+    <a class="boton principal lente-accion" href="/por-dentro" data-t="lente_foto_ir_globo"></a>
+    <a class="boton lente-accion" href="#" data-lente-pulsa="r-pdf" data-t="exportar_pdf"></a>
+  </div>
+  <p class="lente-pie"></p>
+</aside>
+<div class="lente-completa">
+<section class="lente-tarjeta"><div class="lente-tc"><h2 data-t="lente_foto_tabla"></h2><div class="lente-tc-der"><button id="share-open" type="button" class="boton chico" data-t="compartir"></button></div></div><div class="lente-tb sin-margen"><div class="lente-tabla"><table><thead><tr><th data-t="col_hora"></th><th data-t="col_nombre"></th><th data-t="col_empresa_n"></th><th data-t="col_categoria"></th><th data-t="col_pais"></th><th data-t="col_dispositivo"></th><th data-t="col_veredicto"></th><th></th></tr></thead><tbody id="live"></tbody></table></div></div></section>
 <div id="share" class="card hidden">
   <h2 data-t="compartir_titulo"></h2>
   <p class="lead" data-t="compartir_lead"></p>
   <canvas id="share-canvas" width="1080" height="1080" role="img" data-t-label="tarjeta_titulo"></canvas>
-  <p><a id="share-download" class="btn" href="#" download="guardiana-radiografia.png" data-t="compartir_tarjeta"></a> <a id="share-wa" class="btn" href="#" target="_blank" rel="noopener noreferrer" data-t="informe_abrir_whatsapp"></a> <button id="share-close" class="secondary" data-t="compartir_cerrar"></button></p>
+  <p><a id="share-download" class="btn" href="#" download="guardiana-radiografia.png" data-t="compartir_tarjeta"></a> <a id="share-wa" class="btn secondary" href="#" target="_blank" rel="noopener noreferrer" data-t="informe_abrir_whatsapp"></a> <button id="share-close" class="secondary" data-t="compartir_cerrar"></button></p>
 </div>
-<div class="counters">
-  <div class="counter"><div class="n" id="c-servicios">–</div><div class="l" data-t="c_servicios"></div></div>
-  <div class="counter"><div class="n" id="c-rastreadores">–</div><div class="l" data-t="c_rastreadores"></div></div>
-  <div class="counter"><div class="n" id="c-publicidad">–</div><div class="l" data-t="c_publicidad"></div></div>
-  <div class="counter"><div class="n" id="c-nuevos">–</div><div class="l" data-t="c_nuevos"></div></div>
-  <div class="counter"><div class="n" id="c-esperados">–</div><div class="l" data-t="c_esperados"></div></div>
-  <div class="counter"><div class="n" id="c-cortados">–</div><div class="l" data-t="c_cortados"></div></div>
-</div>
-<p id="hueco" class="limit hidden"></p>
-<div id="maxima" class="card hidden"><h2 data-t="maxima_titulo"></h2><p data-t="maxima_explica"></p><p class="muted" data-t="maxima_limite"></p><p><button id="maxima-activar" class="hidden" data-t="maxima_activar"></button><strong id="maxima-activa" class="ok hidden" data-t="maxima_activa"></strong> <button id="maxima-quitar" class="secondary hidden" data-t="maxima_quitar"></button> <span id="maxima-msg" class="muted" role="status" aria-live="polite"></span></p></div>
-<div id="dns-card" class="card hidden"><h2 data-t="dns_card_titulo"></h2><p data-t="dns_card_texto"></p><p><button id="dns-apply" data-t="dns_card_boton"></button> <span id="dns-msg" class="muted" role="status" aria-live="polite"></span></p></div>
-<div id="com-card" class="card hidden"><h2 data-t="com_card_titulo"></h2><p id="com-texto" data-t="com_card_linux"></p><p><code id="com-orden">guardiana comunicaciones</code></p></div>
-<div id="zero-card" class="card hidden"><h2 data-t="zero_card_titulo"></h2><p data-t="zero_card_texto"></p></div>
-<div class="card wrap"><table><thead><tr><th data-t="col_hora"></th><th data-t="col_nombre"></th><th data-t="col_empresa_n"></th><th data-t="col_categoria"></th><th data-t="col_pais"></th><th data-t="col_dispositivo"></th><th data-t="col_veredicto"></th><th></th></tr></thead><tbody id="live"></tbody></table></div>
 <p class="limit fuente-red hidden" id="fuente-red"></p>
-<p class="limit" data-t="radiografia_limite"></p>
-<p class="limit leyenda-colores" data-t-html="leyenda_colores"></p>
-<p class="limit" data-t="leyenda_desconocido"></p>
-<p class="limit" data-t="cortar_limite"></p>
-<h2 data-t="rafagas_titulo"></h2>
-<p class="lead" data-t="rafagas_lead"></p>
-<div id="rafagas"></div>
-<p class="limit" data-t="rafagas_limite"></p>
+<section class="lente-tarjeta"><div class="lente-tc"><h2 data-t="rafagas_titulo"></h2></div><div class="lente-tb"><p class="muted" data-t="rafagas_lead"></p><div id="rafagas"></div></div></section>
+<p class="lente-oculto"><button id="r-pdf" type="button" class="secondary" data-t="exportar_pdf"></button></p><span id="r-pdf-msg" class="muted" role="status" aria-live="polite"></span>
+<details class="lente-tarjeta lente-mas"><summary data-t="lente_mas"></summary><div class="lente-mas-c"><p data-t="radiografia_limite"></p><p class="leyenda-colores" data-t-html="leyenda_colores"></p><p data-t="leyenda_desconocido"></p><p data-t="cortar_limite"></p><p data-t="rafagas_limite"></p></div></details>
+</div>
+</div>
 </main>
 <footer><span data-t="pie"></span></footer>
+<script src="/static/lente.js"></script>
 <script src="/static/interruptor.js"></script>
 <script src="/static/app.js"></script>
 </body>

@@ -803,6 +803,9 @@ pub(crate) struct Radiografia {
     destinos_nuevos: i64,
     esperados: i64,
     cortados: i64,
+    /// 1.0.46: the two that were missing for the figures to add up to `servicios`.
+    telemetria: i64,
+    sin_clasificar: i64,
     eventos: Vec<EventView>,
     /// Latest period (last 7 days) in which the service was not watching.
     hueco: Option<HuecoView>,
@@ -1332,6 +1335,8 @@ pub(crate) async fn radiografia(
         destinos_nuevos: c.new_destinations,
         esperados: c.expected,
         cortados: c.blocked,
+        telemetria: c.telemetry,
+        sin_clasificar: c.unclassified,
         eventos,
     }))
 }

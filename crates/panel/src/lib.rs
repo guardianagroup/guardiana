@@ -554,6 +554,12 @@ const INTERRUPTOR_JS: &str = include_str!("../static/interruptor.js");
 /// «Certificado y derechos» (1.0.45): its own script and style sheet, as the pages above.
 const DERECHOS_JS: &str = include_str!("../static/derechos.js");
 const DERECHOS_CSS: &str = include_str!("../static/derechos.css");
+// --- 1.0.46 agente 2 (Lente) ---
+/// «Lente» (1.0.46): the interior page pattern the owner chose (mockup R1-d), its style sheet
+/// and the small script that fills the four tiles and the «Qué significa» card.
+const LENTE_CSS: &str = include_str!("../static/lente.css");
+const LENTE_JS: &str = include_str!("../static/lente.js");
+// --- fin 1.0.46 agente 2 ---
 
 /// A short tag of the script and the style sheet, so the pages ask for them by a name that
 /// changes when they do and the browser may keep them for a while. Until 1.0.12 every navigation
@@ -572,6 +578,8 @@ pub(crate) fn version_estaticos() -> &'static str {
         INTERRUPTOR_JS.hash(&mut h);
         DERECHOS_JS.hash(&mut h);
         DERECHOS_CSS.hash(&mut h);
+        LENTE_CSS.hash(&mut h); // 1.0.46 agente 2
+        LENTE_JS.hash(&mut h); // 1.0.46 agente 2
         format!("{:016x}", h.finish())
     })
 }
@@ -606,7 +614,10 @@ pub(crate) fn pagina(html: &'static str) -> Html<String> {
             .replace(
                 "/static/derechos.css\"",
                 &format!("/static/derechos.css?v={v}\""),
-            ),
+            )
+            // 1.0.46 agente 2 (Lente)
+            .replace("/static/lente.css\"", &format!("/static/lente.css?v={v}\""))
+            .replace("/static/lente.js\"", &format!("/static/lente.js?v={v}\"")),
     )
 }
 
@@ -833,6 +844,24 @@ pub async fn start(config: Config) -> Result<Running, Error> {
                 estatico(DISENO_CSS, "text/css; charset=utf-8", q.as_deref())
             }),
         )
+        // --- 1.0.46 agente 2 (Lente) ---
+        .route(
+            "/static/lente.css",
+            get(|RawQuery(q): RawQuery| async move {
+                estatico(LENTE_CSS, "text/css; charset=utf-8", q.as_deref())
+            }),
+        )
+        .route(
+            "/static/lente.js",
+            get(|RawQuery(q): RawQuery| async move {
+                estatico(
+                    LENTE_JS,
+                    "application/javascript; charset=utf-8",
+                    q.as_deref(),
+                )
+            }),
+        )
+        // --- fin 1.0.46 agente 2 ---
         .route(
             "/static/style.css",
             get(|RawQuery(q): RawQuery| async move {
@@ -1262,6 +1291,7 @@ mod textos {
             include_str!("../static/identificacion.js"),
             include_str!("../static/vigilancia.js"),
             include_str!("../static/derechos.js"),
+            include_str!("../static/lente.js"), // 1.0.46 agente 2
         ];
         // The keys asked for with a literal: `data-t="x"` in the pages, `t('x')` in the scripts.
         // The ones built at run time (`t('cambio_' + x)`) cannot be read here and are covered by

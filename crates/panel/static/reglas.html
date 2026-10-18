@@ -7,6 +7,7 @@
 <title>GUARDIANA · Reglas</title>
 <link rel="stylesheet" href="/static/diseno.css">
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/lente.css">
 <link rel="preload" href="/static/fonts/HankenGrotesk-var.woff" as="font" type="font/woff" crossorigin>
 <link rel="preload" href="/static/fonts/SchibstedGrotesk-var.woff" as="font" type="font/woff" crossorigin>
 <script src="/static/arranque.js"></script>
@@ -33,14 +34,27 @@
     <a href="/estado" data-t="nav_estado">Estado</a>
   </nav>
 </header>
-<main>
+<main class="lente" data-lente="reglas">
 <div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
-<h1 data-t="reglas_titulo"></h1>
-<p class="lead" data-t="reglas_lead"></p>
-<p class="limit" data-t="reglas_inviolables"></p>
-<div id="maxima" class="card hidden"><h2 data-t="maxima_titulo"></h2><p data-t="maxima_explica"></p><p class="muted" data-t="maxima_limite"></p><p><button id="maxima-activar" class="hidden" data-t="maxima_activar"></button><strong id="maxima-activa" class="ok hidden" data-t="maxima_activa"></strong> <button id="maxima-quitar" class="secondary hidden" data-t="maxima_quitar"></button> <span id="maxima-msg" class="muted" role="status" aria-live="polite"></span></p></div>
-<h2 data-t="reglas_nueva_titulo"></h2>
-<p class="lead" data-t="reglas_nueva_lead"></p>
+<nav class="lente-miga" data-t-label="lente_miga"><a href="/sabe-de-ti" data-t="menu_privacidad"></a><i aria-hidden="true"></i><span aria-current="page" data-t="nav_reglas"></span></nav>
+<header class="lente-cabeza"><div><h1 data-t="nav_reglas"></h1><p class="lente-lead" data-t="lente_reglas_lead"></p></div></header>
+<section class="lente-cifras" aria-live="polite">
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_reglas_c1"></span></div>
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_reglas_c2"></span></div>
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_reglas_c3"></span></div>
+  <div class="lente-cifra"><b class="n"></b><span class="l" data-t="lente_reglas_c4"></span></div>
+</section>
+<div class="lente-cuerpo">
+<div class="lente-principal">
+<section id="maxima" class="lente-tarjeta hidden"><div class="lente-tb lente-ajuste">
+  <h2 data-t="maxima_titulo"></h2>
+  <p class="muted" data-t="lente_maxima_sub"></p>
+  <span class="lente-ajuste-sw" id="lente-maxima-sw"></span>
+  <details class="lente-detalle"><summary class="muted" data-t="lente_mas"></summary><p class="muted" data-t="maxima_explica"></p><p class="muted" data-t="maxima_limite"></p></details>
+  <p class="lente-oculto"><button id="maxima-activar" class="hidden" data-t="maxima_activar"></button><strong id="maxima-activa" class="ok hidden" data-t="maxima_activa"></strong> <button id="maxima-quitar" class="secondary hidden" data-t="maxima_quitar"></button></p>
+  <span id="maxima-msg" class="muted" role="status" aria-live="polite"></span>
+</div></section>
+<section class="lente-tarjeta" id="nueva-tarjeta"><div class="lente-tc"><h2 data-t="reglas_nueva_titulo"></h2></div><div class="lente-tb"><p class="muted" data-t="reglas_nueva_lead"></p>
 <form id="nueva" class="filters">
   <label><span data-t="f_alcance"></span><select name="scope" id="n-scope"><option value="home" data-t="alcance_casa"></option><option value="device" data-t="alcance_dispositivo"></option></select></label>
   <label id="n-device-wrap" class="hidden"><span data-t="f_dispositivo"></span><select name="device_id" id="n-device"></select></label>
@@ -49,15 +63,28 @@
   <label><span data-t="f_accion"></span><select name="action"><option value="cortar" data-t="accion_cortar"></option><option value="permitir" data-t="accion_permitir"></option></select></label>
   <button type="submit" data-t="crear_regla"></button>
 </form>
-<p id="n-msg" class="muted" role="status" aria-live="polite"></p>
-<h2 data-t="reglas_lista_titulo"></h2>
-<p><button id="undo-today" class="secondary" data-t="deshacer_hoy"></button> <span id="undo-msg" class="ok" role="status" aria-live="polite"></span></p>
-<div class="card wrap"><table><thead><tr><th>#</th><th data-t="col_estado"></th><th data-t="col_alcance"></th><th data-t="col_tipo"></th><th data-t="col_patron"></th><th data-t="col_accion"></th><th data-t="col_quien"></th><th data-t="col_creada"></th><th></th></tr></thead><tbody id="r-rows"></tbody></table><p class="muted" id="r-ocultas"></p></div>
-<h2 data-t="modo_bloqueo_titulo"></h2>
-<p class="lead" data-t="modo_bloqueo_lead"></p>
-<p><label><input type="radio" name="modo" value="nxdomain"> <span data-t="modo_nxdomain"></span></label> &nbsp; <label><input type="radio" name="modo" value="zero"> <span data-t="modo_zero"></span></label> &nbsp; <button id="modo-guardar" class="secondary" data-t="guardar"></button> <span id="modo-msg" class="ok" role="status" aria-live="polite"></span></p>
+<p id="n-msg" class="muted" role="status" aria-live="polite"></p></div></section>
+</div>
+<aside class="lente-lado">
+  <div class="lente-significa">
+    <span class="rotulo" data-t="lente_que_significa"></span>
+    <p class="lente-s1" data-t="lente_reglas_s1"></p>
+    <p class="lente-s2" data-t="lente_reglas_s2"></p>
+    <div class="lente-sep"></div>
+    <p class="lente-estado" hidden></p>
+    <a class="boton principal lente-accion" href="#nueva-tarjeta" data-lente-abre="nueva-tarjeta" data-t="lente_reglas_accion"></a>
+  </div>
+  <p class="lente-pie"></p>
+</aside>
+<div class="lente-completa">
+<section class="lente-tarjeta"><div class="lente-tc"><h2 data-t="reglas_lista_titulo"></h2><div class="lente-tc-der"><span id="undo-msg" class="ok" role="status" aria-live="polite"></span><button id="undo-today" class="secondary undo" data-t="lente_reglas_deshacer"></button></div></div><div class="lente-tb sin-margen"><div class="lente-tabla"><table><thead><tr><th>#</th><th data-t="col_estado"></th><th data-t="col_alcance"></th><th data-t="col_tipo"></th><th data-t="col_patron"></th><th data-t="col_accion"></th><th data-t="col_quien"></th><th data-t="col_creada"></th><th></th></tr></thead><tbody id="r-rows"></tbody></table><p class="muted" id="r-ocultas"></p></div></div></section>
+<section class="lente-tarjeta"><div class="lente-tc"><h2 data-t="modo_bloqueo_titulo"></h2></div><div class="lente-tb"><p class="muted" data-t="modo_bloqueo_lead"></p><p class="lente-fila-botones"><label><input type="radio" name="modo" value="nxdomain"> <span data-t="modo_nxdomain"></span></label> <label><input type="radio" name="modo" value="zero"> <span data-t="modo_zero"></span></label> <button id="modo-guardar" class="secondary" data-t="guardar"></button> <span id="modo-msg" class="ok" role="status" aria-live="polite"></span></p></div></section>
+<details class="lente-tarjeta lente-mas"><summary data-t="lente_mas"></summary><div class="lente-mas-c"><p data-t="reglas_lead"></p><p data-t="reglas_inviolables"></p></div></details>
+</div>
+</div>
 </main>
 <footer><span data-t="pie"></span></footer>
+<script src="/static/lente.js"></script>
 <script src="/static/interruptor.js"></script>
 <script src="/static/app.js"></script>
 </body>
