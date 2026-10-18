@@ -48,8 +48,9 @@
     li.classList.add('enviando');
     if (b.classList.contains('interruptor')) {
       // The switch moves at once and says it is working; the program's answer settles it.
-      const quiere = b.getAttribute('aria-checked') !== 'true';
-      b.setAttribute('aria-checked', String(quiere));
+      // On is «Permitido» (the common standard): pressing an allowed switch asks to cut.
+      const quiere = b.getAttribute('aria-checked') === 'true';
+      b.setAttribute('aria-checked', String(!quiere));
       const caja = b.closest('.interruptor-caja');
       caja.classList.add('ocupado'); caja.classList.toggle('cortado', quiere);
       caja.querySelector('.interruptor-estado').textContent = t(quiere ? 'interruptor_cortando' : 'interruptor_permitiendo');
@@ -126,7 +127,7 @@
     // and «Permitido» while it passes; still, and saying so, when nothing can be done from here.
     const sw = huecos[0], cajaSw = sw.closest('.interruptor-caja');
     if (!sw.hasAttribute('aria-busy') || cambio) {
-      sw.setAttribute('aria-checked', String(corta));
+      sw.setAttribute('aria-checked', String(!corta));
       cajaSw.classList.toggle('cortado', corta);
       cajaSw.classList.remove('ocupado');
       cajaSw.querySelector('.interruptor-estado').textContent = parcial ? t('escudo_parcial') : t(corta ? 'interruptor_cortado' : 'interruptor_permitido');

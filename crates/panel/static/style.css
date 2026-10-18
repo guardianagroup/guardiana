@@ -1209,3 +1209,19 @@ header.top .idiomas .lang.actual { border-color: var(--accent); color: var(--acc
 /* The plain meaning of a word of the trade, in one muted line under it (18 Oct 2026). */
 .universo .explica { margin-top: 2px; font-size: 12px; line-height: 1.4; color: var(--muted-2); font-weight: 400; }
 .universo .insp-cabeza .explica { margin: 8px 0 0; }
+/* 18 Oct 2026 (the approved colour discipline): the way into the globe in neutrals and steel, no
+   glow, no gradient of colours. */
+.por-dentro-cta { background: var(--card); border-color: var(--line); box-shadow: none; color: var(--fg); }
+.por-dentro-cta:hover, .por-dentro-cta:focus-visible { border-color: #3A4656; box-shadow: none; }
+.por-dentro-cta .cta-globo { background: radial-gradient(circle at 35% 32%, #C9DFF2 0%, #4E6E8E 45%, #142231 80%); box-shadow: none; }
+.por-dentro-cta .cta-globo::after { border-color: rgba(156, 195, 228, .35); }
+.por-dentro-cta .cta-texto > span { color: var(--muted); }
+.por-dentro-cta .cta-flecha { color: var(--accent); }
+/* 18 Oct 2026 (the approved colour discipline): the live review in neutrals and steel; green stays
+   for what was verified, amber for what is worth a look. */
+.rv-escena { background: var(--card); border-color: var(--line); }
+.rv-escena::after { display: none; }
+.rv-progreso-barra i { background: var(--accent); }
+.rv-directo { --rd-bg: #06080C; --rd-card: #0C1118; --rd-line: #1E2631; --rd-fg: #E8ECF1; --rd-muted: #A9B3BE; --rd-dim: #6F7B88; --rd-azul: #9CC3E4; --rd-verde: #6CCBA5; --rd-ambar: #E0B66A; background: var(--card); border-color: var(--line); }
+.rd-escaner i { background: var(--accent); box-shadow: none; }
+.universo .insp-fila .rompe { grid-column: 1 / -1; margin-top: -4px; }

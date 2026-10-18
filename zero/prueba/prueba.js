@@ -188,6 +188,7 @@ function pantalla(nombre) {
   // A switch press (18 Oct 2026: the cut switch replaced «Bloquear» / «Desbloquear»), and what
   // must hold after it: the same place, height and button column, the focus on that row's
   // switch, the figures untouched; only the switch and its word change.
+  // aria-checked="true" is «Permitido» and «false» is «Cortado» (the switch's common standard).
   const interruptor = (sitio) => fila(sitio).locator('.botones button.interruptor');
   const pulsa = async (sitio, cortadoAntes, que) => {
     const pos = await posicion(sitio);
@@ -195,9 +196,9 @@ function pantalla(nombre) {
     await espera(1500);
     const antes = await cifras();
     const sw = interruptor(sitio);
-    comprueba((await sw.count()) === 1 && (await sw.getAttribute('aria-checked')) === String(cortadoAntes) && !(await sw.isDisabled()), `${que}: la fila tiene su interruptor ${cortadoAntes ? 'en rojo (cortado)' : 'en verde (permitido)'}`);
+    comprueba((await sw.count()) === 1 && (await sw.getAttribute('aria-checked')) === String(!cortadoAntes) && !(await sw.isDisabled()), `${que}: la fila tiene su interruptor ${cortadoAntes ? 'en rojo (cortado)' : 'en verde (permitido)'}`);
     await sw.click();
-    comprueba(await hasta(async () => (await sw.getAttribute('aria-checked')) === String(!cortadoAntes) && (await sw.getAttribute('aria-busy')) === null), `${que}: el interruptor pasa a ${cortadoAntes ? 'verde (permitido)' : 'rojo (cortado)'} en su sitio`);
+    comprueba(await hasta(async () => (await sw.getAttribute('aria-checked')) === String(cortadoAntes) && (await sw.getAttribute('aria-busy')) === null), `${que}: el interruptor pasa a ${cortadoAntes ? 'verde (permitido)' : 'rojo (cortado)'} en su sitio`);
     const palabra = await fila(sitio).locator('.botones .interruptor-estado').textContent();
     comprueba(!!palabra && palabra.trim().length > 0, `${que}: el interruptor dice su estado en palabras («${palabra}»)`);
     comprueba((await posicion(sitio)) === pos, `${que}: la fila sigue en la posición ${pos}`);

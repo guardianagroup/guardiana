@@ -1758,7 +1758,7 @@
       const filas = emps.map((e) => {
         const est = estadoCorte(e.nombre, e.ds), sub = est === 'ajeno' ? lineaCortado(e.ds)
           : esc(unaLinea(e.nombre) || (e.ds.length > 1 ? t('pd_n_nombres').replace('{nombre}', e.ds[0].host).replace('{n}', e.ds.length - 1) : e.ds[0].host));
-        return `<div class="insp-fila${est === 'cortado' || est === 'ajeno' ? ' cortada' : ''}"><button type="button" class="insp-abre" data-empresa="${esc(e.nombre)}"><span class="n">${esc(e.nombre)}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg></span><span class="sub">${sub}</span></button><span class="q">${esc(cuanto(e.consultas, e.sub))}</span><span class="a">${botonCorte(e.nombre, e.ds)}</span></div>`;
+        return `<div class="insp-fila${est === 'cortado' || est === 'ajeno' ? ' cortada' : ''}"><button type="button" class="insp-abre" data-empresa="${esc(e.nombre)}"><span class="n">${esc(e.nombre)}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg></span><span class="sub">${sub}</span></button><span class="q">${esc(cuanto(e.consultas, e.sub))}</span><span class="a">${botonCorte(e.nombre, e.ds)}</span>${rompe.has(e.nombre) ? `<span class="rompe explica">${esc(rompe.get(e.nombre))}</span>` : ''}</div>`;
       }).join('');
       return `<div class="insp-cabeza"><h2 id="insp-titulo">${esc(nombreLugar(g))}</h2>${linea ? `<p class="insp-sub">${esc(linea)}</p>` : ''}<p class="insp-fuente">${f.aprox ? `<span class="aprox">${esc(t('pd_aprox'))}</span> · ` : ''}${esc(f.txt)}</p></div>
         ${cifras([[cuanto(c, g.ds.reduce((a, d) => a + d.sub, 0)), c ? t('pd_consultas_palabra') : t('pd_enviado_palabra')], [num(emps.length), t('pd_empresas_palabra')], [num(cortadas), t('pd_cortadas_palabra')]])}
@@ -1787,8 +1787,8 @@
       const hora = horaCorte(ds), cuantos = ds.filter(porNombre).length;
       let accion = '';
       if (!soloMirar) {
-        if (est === 'cortado' || est === 'deshacer') accion = `<div class="insp-corte hecho"><div class="fila"><b>${esc(t('pd_corte_titulo').replace('{empresa}', nombre))}</b>${botonCorte(nombre, ds, true)}</div><p>${esc((hora ? t('pd_cortado_explica') : t('pd_cortado_explica_sin')).replace('{h}', hora).replace('{n}', cuantos))}</p></div>`;
-        else if (est === 'normal' || est === 'cortar') accion = `<div class="insp-corte"><div class="fila"><b>${esc(t('pd_corte_titulo').replace('{empresa}', nombre))}</b>${botonCorte(nombre, ds, true)}</div><p>${esc(tn('pd_cortar_explica', ds.filter((d) => porNombre(d) && !d.cortado).length))} ${esc(t('pd_cortar_reversible'))}</p></div>`;
+        if (est === 'cortado' || est === 'deshacer') accion = `<div class="insp-corte hecho"><div class="fila"><b>${esc(t('pd_corte_titulo').replace('{empresa}', nombre))}</b>${botonCorte(nombre, ds, true)}</div>${rompe.has(nombre) ? `<p class="explica">${esc(rompe.get(nombre))}</p>` : ''}<p>${esc((hora ? t('pd_cortado_explica') : t('pd_cortado_explica_sin')).replace('{h}', hora).replace('{n}', cuantos))}</p></div>`;
+        else if (est === 'normal' || est === 'cortar') accion = `<div class="insp-corte"><div class="fila"><b>${esc(t('pd_corte_titulo').replace('{empresa}', nombre))}</b>${botonCorte(nombre, ds, true)}</div>${rompe.has(nombre) ? `<p class="explica">${esc(rompe.get(nombre))}</p>` : ''}<p>${esc(tn('pd_cortar_explica', ds.filter((d) => porNombre(d) && !d.cortado).length))} ${esc(t('pd_cortar_reversible'))}</p></div>`;
         else if (est === 'ajeno') accion = `<div class="insp-corte hecho"><div class="fila"><span class="corte-hecho"><span class="hora">${esc(t('pd_estado_cortado'))}</span></span></div><p>${esc(t('pd_cortado_por_otra'))}</p></div>`;
       }
       return `<div class="insp-cabeza"><h2 id="insp-titulo" class="grande">${esc(nombre)}</h2>${lead ? `<p class="insp-lead" title="${esc(lead)}">${esc(lead)}</p>` : ''}${chips.length ? `<div class="insp-chips">${chips.map((x) => `<span>${esc(x)}</span>`).join('')}</div>` : ''}${ds.some((d) => d.uso === 'telemetria') ? `<p class="explica">${esc(t('pd_explica_telemetria').replace('{empresa}', nombre))}</p>` : ''}</div>
@@ -1935,6 +1935,24 @@
       await cargar();
       return true;
     };
+    // «Qué se rompe» (18 Oct 2026): a helper of its own (que-se-rompe.js), loaded when it exists;
+    // without it the switch says nothing more, never a guess.
+    const rompe = new Map();
+    let rompeCargado = null;
+    const cargaRompe = () => {
+      if (window.GuardianaQueSeRompe) return Promise.resolve(true);
+      if (!rompeCargado) rompeCargado = new Promise((res) => { const s = document.createElement('script'); s.src = '/static/que-se-rompe.js'; s.onload = () => res(!!window.GuardianaQueSeRompe); s.onerror = () => res(false); document.head.appendChild(s); });
+      return rompeCargado;
+    };
+    const queSeRompe = async (nombre, ds) => {
+      if (soloMirar || !(await cargaRompe())) return;
+      try {
+        const Q = window.GuardianaQueSeRompe, conocida = ds.some((d) => d.empresa === nombre);
+        const r = await Q.consultar(api, conocida ? { empresa: nombre } : { dominio: (ds.find((d) => d.destino) || {}).destino || nombre });
+        const linea = Q.resumen(r, { t, tn });
+        if (linea) { rompe.set(nombre, linea); htmlPuesto = ''; pintaDetalle(); }
+      } catch (_) {}
+    };
     const conTrabajo = async (clave, que, hacer) => {
       trabajando.set(clave, que);
       try {
@@ -1952,6 +1970,9 @@
       if (soloMirar) throw new Error(t('pd_repro_no_corta'));
       if (b.dataset.empresaCorte) {
         const nombre = b.dataset.empresaCorte, ds = DEST.filter((d) => empresaDe(d) === nombre);
+        // What may stop working once it is cut, in one line under the switch («La usaron Chrome
+        // y Teams esta semana»), when GuardianaQueSeRompe is there to say it.
+        if (quiere) queSeRompe(nombre, ds); else rompe.delete(nombre);
         return conTrabajo(nombre, quiere ? 'cortar' : 'deshacer', () => (quiere
           ? cortaNombres([...new Set(ds.filter((d) => porNombre(d) && !d.cortado).map((d) => d.destino))])
           : quitaReglas(ds)));
