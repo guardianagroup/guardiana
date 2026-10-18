@@ -463,14 +463,23 @@ fn company_entries() -> impl Iterator<Item = (&'static str, &'static str)> {
         .map(|(h, d, _)| (*h, *d))
 }
 
-/// Domain → (header, origin). The first list to write a domain keeps it.
+/// Domain → (header, origin). Inside `empresas.txt` the last section to write a domain keeps
+/// it, as it always did (`segment.io` is Segment's, written after Twilio's); `empresas-mundo.txt`
+/// only fills what `empresas.txt` does not write.
 fn companies() -> &'static HashMap<&'static str, (&'static str, OrigenEmpresa)> {
     static M: std::sync::OnceLock<HashMap<&'static str, (&'static str, OrigenEmpresa)>> =
         std::sync::OnceLock::new();
     M.get_or_init(|| {
         let mut m = HashMap::new();
         for (h, d, o) in company_entries_con_origen() {
-            m.entry(*d).or_insert((*h, *o));
+            match o {
+                OrigenEmpresa::Empresas => {
+                    m.insert(*d, (*h, *o));
+                }
+                OrigenEmpresa::Mundo => {
+                    m.entry(*d).or_insert((*h, *o));
+                }
+            }
         }
         m
     })
@@ -1130,6 +1139,9 @@ mod company_tests {
         assert_eq!(company_of("gateway.fe2.apple-dns.net"), Some("Apple"));
         assert_eq!(company_of("e673.dsce9.akamaiedge.net"), Some("Akamai"));
         assert_eq!(company_of("ejemplo.example"), None);
+        // A domain written twice in empresas.txt keeps its last section (1.0.45 kept the first
+        // for a moment and Segment read as Twilio).
+        assert_eq!(company_of("api.segment.io"), Some("Segment"));
     }
 
     #[test]
