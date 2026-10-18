@@ -106,6 +106,9 @@ struct Inner {
     /// on every query.
     alcances: HashMap<String, Alcance>,
     alcances_vistos: Option<Instant>,
+    /// «Modo apagón» (18 Oct 2026), re-read on the same 2-second beat as the scopes.
+    apagon: guardiana_core::apagon::Apagon,
+    apagon_visto: Option<Instant>,
 }
 
 /// What a device's declared scope says (decision 154).
@@ -134,6 +137,8 @@ struct Pending {
     classified: Classified,
     /// Cut because it fell outside the declared scope, not because of a rule.
     fuera_de_alcance: bool,
+    /// Cut by «Modo apagón», not because of a rule.
+    por_apagon: bool,
     /// Cut after the answer as a name dressed as another (decision 205): the tracker's site it
     /// answered as. The outcome then says `Blocked` and carries no aliases, so the site rides here.
     disfraz_cortado: Option<String>,
@@ -384,6 +389,24 @@ impl Inner {
         a
     }
 
+    /// Whether «Modo apagón» cuts this computer's query for `name`, from the setting read at
+    /// most every two seconds (the resolver's hot path must not touch the disk on every query).
+    fn apagon_corta(&mut self, name: &str) -> bool {
+        if self
+            .apagon_visto
+            .is_none_or(|t| t.elapsed() >= Duration::from_secs(2))
+        {
+            let valor = self
+                .ledger
+                .setting(guardiana_core::apagon::AJUSTE_APAGON)
+                .ok()
+                .flatten();
+            self.apagon = guardiana_core::apagon::Apagon::de_ajuste(valor.as_deref());
+            self.apagon_visto = Some(Instant::now());
+        }
+        self.apagon.corta(name)
+    }
+
     fn refresh_rules(&mut self) {
         if self.rules.checked.elapsed() < Duration::from_secs(2) {
             return;
@@ -441,6 +464,7 @@ impl EnginePolicy {
             ip: q.client.ip().to_string(),
             classified,
             fuera_de_alcance: false,
+            por_apagon: false,
             disfraz_cortado: None,
             first_seen: q.ts,
         })
@@ -536,6 +560,21 @@ impl Policy for EnginePolicy {
         } else {
             decision
         };
+        // «Modo apagón» (customer request, 18 Oct 2026): this computer's own queries only, and
+        // never the essential list or what the person approved (`guardiana_core::apagon`). It
+        // applies from the first minute, with no 24 hours of observation: it is the person's
+        // own switch, on this computer, and the same switch takes it off. A name already cut by
+        // a rule stays recorded as cut by that rule.
+        let mut por_apagon = false;
+        let decision = if !matches!(decision, Decision::Block { .. })
+            && device_id == guardiana_core::SELF_DEVICE_ID
+            && inner.apagon_corta(&q.name)
+        {
+            por_apagon = true;
+            Decision::Block { rule_id: None }
+        } else {
+            decision
+        };
         drop(inner);
         if let Ok(mut pending) = self.pending.lock() {
             pending.insert(
@@ -545,6 +584,7 @@ impl Policy for EnginePolicy {
                     ip,
                     classified,
                     fuera_de_alcance,
+                    por_apagon,
                     disfraz_cortado: None,
                     first_seen,
                 },
@@ -627,6 +667,9 @@ impl Policy for EnginePolicy {
         // so, because the person never named this destination.
         if p.fuera_de_alcance && verdict == Verdict::Cortado {
             decided_by = DecidedBy::AlcanceDeclarado;
+        }
+        if p.por_apagon && verdict == Verdict::Cortado {
+            decided_by = DecidedBy::ModoApagon;
         }
         let Ok(mut inner) = self.inner.lock() else {
             return;
@@ -1690,6 +1733,8 @@ async fn run_once<F: Future<Output = ()>>(
             recorded: 0,
             alcances: HashMap::new(),
             alcances_vistos: None,
+            apagon: guardiana_core::apagon::Apagon::default(),
+            apagon_visto: None,
         }),
         pending: Mutex::new(HashMap::new()),
         devices: guardiana_devices::Resolver::default(),

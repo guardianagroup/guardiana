@@ -1794,6 +1794,12 @@
       if (!window.GuardianaUniverso) return;
       await window.GuardianaUniverso.iniciar({ api, t, tn, esc, LOC, LANG, cadaTanto, pdf: { pdfDocument, savePdfFile } });
     },
+    // «Herramientas» (1.0.45): its own script (herramientas.js), loaded before this one. Files go
+    // to GUARDIANA as they are, not as JSON, so it gets the session headers too.
+    async herramientas() {
+      if (!window.GuardianaHerramientas) return;
+      await window.GuardianaHerramientas.iniciar({ api, t, tn, esc, LOC, LANG, cabeceras: () => ({ 'X-Guardiana-Token': token, 'X-Guardiana-Lang': LANG }) });
+    },
     // «Revisión del ordenador» (1.0.24): its own script (revision.js), loaded before this one.
     async revision() {
       if (!window.GuardianaRevision) return;

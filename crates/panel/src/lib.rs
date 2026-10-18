@@ -16,6 +16,8 @@ mod borrado;
 mod destinos;
 mod empresa;
 mod expedientes;
+// Customer tools of 1.0.45 (18 Oct 2026): their own routes, page and scripts.
+mod extras;
 mod medidas;
 mod revision;
 mod universo;
@@ -922,6 +924,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/mi-dispositivo", get(api::mi_dispositivo))
         .route("/api/mi-dispositivo/nombre", post(api::mi_nombre))
         .route("/api/mi-dispositivo/compartir", post(api::mi_compartir))
+        .merge(extras::rutas())
         .layer(middleware::from_fn(add_security_headers))
         .layer(middleware::from_fn_with_state(
             state.clone(),

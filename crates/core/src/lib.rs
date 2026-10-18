@@ -14,11 +14,13 @@
 //! Only DNS *queries* are ever stored: name, type, device, time, category,
 //! signals and verdict. Answers are never stored (brief §4).
 
+pub mod apagon;
 mod changes;
 mod error;
 mod export;
 mod gaps;
 mod hash;
+pub mod huellas;
 pub mod i18n;
 pub mod identity;
 mod ledger;
