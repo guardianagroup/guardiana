@@ -599,6 +599,14 @@ pub struct Secure {
     turn_pedido: u64,
     /// WebRTC messages from the other side for this computer's page (SDP, ICE candidates).
     pub rtc_para_pagina: VecDeque<Value>,
+    /// «Continuar en el móvil» without a gap (18 Oct 2026, [`crate::relevo`]): where the
+    /// call's voice is, and the bridge's messages from the phone for this computer's page.
+    relevo: crate::relevo::Relevo,
+    /// The phone's bridge messages for the page (offer, ICE candidates, end).
+    pub puente_para_pagina: VecDeque<Value>,
+    /// How the computer's own leg of the call sounds, as the page estimated it (`excelente`,
+    /// `buena`, `debil`) and when: the phone shows the worse of its leg and this one.
+    calidad_pc: Option<(String, u64)>,
     /// The post-quantum lock over Olm (16 Oct 2026, [`cuantico`]): side 0 offers an ML-KEM
     /// key once the conversation opens, side 1 answers, and from then every Olm payload is
     /// sealed with the layer too. `cuantico_visto`: a sealed message already came from the
@@ -754,6 +762,9 @@ impl Secure {
             turn_rx: None,
             turn_pedido: 0,
             rtc_para_pagina: VecDeque::new(),
+            relevo: crate::relevo::Relevo::default(),
+            puente_para_pagina: VecDeque::new(),
+            calidad_pc: None,
             cuantico_oferta: None,
             capa: None,
             cuantico_visto: false,
@@ -1354,6 +1365,8 @@ impl Secure {
         self.informe = None;
         self.media_para_pagina.clear();
         self.rtc_para_pagina.clear();
+        self.puente_para_pagina.clear();
+        self.calidad_pc = None;
         self.mensajes.clear();
         self.aviso("sec_destruida", clave);
         self.novedad = true;
@@ -1538,6 +1551,8 @@ impl Secure {
                 "directa": self.monitor.transporte.directo,
                 "rele": self.rele,
                 "rele_nombre": self.rele_usado,
+                "camino": self.camino().0,
+                "ciudad": self.camino().1,
             },
             "vigia": {
                 // Only Windows records it; elsewhere the line says it is not measured.
@@ -1618,6 +1633,8 @@ impl Secure {
         self.turn_rx = None;
         self.turn_pedido = 0;
         self.rtc_para_pagina.clear();
+        self.puente_para_pagina.clear();
+        self.calidad_pc = None;
         // A pause belongs to the conversation that had the incident: the next one starts
         // running (17 Oct 2026 review: it stayed paused until the program restarted, and the
         // next conversation hung at «abriendo»). A changed key is caught again by `hola`.
@@ -1663,6 +1680,7 @@ impl Secure {
     /// Called every tick: everything the network thread left, and the handshake that follows.
     pub fn tic(&mut self) {
         self.movil_tic();
+        self.relevo_tic();
         self.timbres();
         self.caducidades();
         // A quiet conversation renews its post-quantum epoch on the clock too (18 Oct 2026).
@@ -2569,7 +2587,9 @@ impl Secure {
             "rtc" => {
                 // For whoever talks here: the phone when it took the call, else the page.
                 let d = c["d"].clone();
-                if self.movil_manda() {
+                // With the bridge (18 Oct 2026) the page always holds the leg to the other side,
+                // also while the phone talks through it.
+                if self.movil_manda() && !self.puente_modo() {
                     if let Some(m) = &self.movil {
                         m.manda(crate::movil::Hacia::Estado(
                             json!({ "tipo": "secure_rtc", "d": d }).to_string(),
@@ -3135,6 +3155,10 @@ impl Secure {
 
     /// One recorded piece from the page: encrypt it under the media layer and send it.
     pub fn media_saliente(&mut self, b64: &str) -> Result<(), String> {
+        // The phone carries the voice: what the page still records stays here.
+        if !self.relevo.pagina_envia(self.movil_listo()) {
+            return Ok(());
+        }
         let bytes = B64.decode(b64).map_err(|e| e.to_string())?;
         self.media_bytes(bytes)
     }
@@ -3235,17 +3259,23 @@ impl Secure {
             Ok(plano) => {
                 let (de, pieza) = sin_remitente(&plano);
                 l.bytes_recibidos += pieza.len() as u64;
-                match &self.movil {
-                    // On the phone only a two-person call: a group's pieces come from several people.
-                    Some(m) if m.enganchado && m.aprobado && de.is_empty() => {
+                // On the phone only a two-person call: a group's pieces come from several
+                // people. While the voice moves there, both players get them (make before break).
+                let listo = self
+                    .movil
+                    .as_ref()
+                    .is_some_and(|m| m.enganchado && m.aprobado);
+                let al_movil = de.is_empty() && self.relevo.piezas_al_movil(listo);
+                if al_movil {
+                    if let Some(m) = &self.movil {
                         m.manda(crate::movil::Hacia::Media(pieza.to_vec()));
                     }
-                    _ => {
-                        self.media_para_pagina
-                            .push_back((de.to_owned(), B64.encode(pieza)));
-                        if self.media_para_pagina.len() > 400 {
-                            self.media_para_pagina.pop_front();
-                        }
+                }
+                if !al_movil || self.relevo.piezas_a_pagina(listo) {
+                    self.media_para_pagina
+                        .push_back((de.to_owned(), B64.encode(pieza)));
+                    if self.media_para_pagina.len() > 400 {
+                        self.media_para_pagina.pop_front();
                     }
                 }
             }
@@ -4043,6 +4073,8 @@ impl Secure {
                 .anota(ahora_s(), Nivel::Info, "móvil aceptado por la persona");
             self.cambio = true;
         }
+        // During a call the voice moves only once the phone's leg is live.
+        self.relevo_empieza();
     }
 
     /// The page turned «Voz protegida» on or off: remember it and tell the other side.
@@ -4080,11 +4112,162 @@ impl Secure {
         self.otro_voz_protegida
     }
 
-    /// Whether the phone is the one talking right now.
-    fn movil_manda(&self) -> bool {
+    /// A phone is connected and the person accepted it.
+    fn movil_listo(&self) -> bool {
         self.movil
             .as_ref()
             .is_some_and(|m| m.enganchado && m.aprobado)
+    }
+
+    /// Whether the phone is the one talking right now: during a call, only once its own leg
+    /// carries the voice (make before break, [`crate::relevo`]).
+    fn movil_manda(&self) -> bool {
+        self.relevo
+            .movil_manda(self.movil_listo(), self.llamada.is_some())
+    }
+
+    /// The call goes by WebRTC (the relay's call service, both programs able).
+    fn rtc_disponible(&self) -> bool {
+        self.turn.is_some() && self.otro_rtc
+    }
+
+    /// The phone's voice travels by the bridge to this computer's page (not by pieces).
+    fn puente_modo(&self) -> bool {
+        self.relevo.puente(self.rtc_disponible())
+    }
+
+    /// What a step of the hand-off did: the monitor, the person and the screens are told.
+    fn relevo_suceso(&mut self, s: Option<crate::relevo::Suceso>) {
+        use crate::relevo::Suceso;
+        let Some(s) = s else { return };
+        match s {
+            Suceso::EnElMovil => {
+                self.monitor
+                    .anota(ahora_s(), Nivel::Info, "la voz de la llamada pasó al móvil");
+            }
+            Suceso::NoPaso => {
+                self.monitor.anota(
+                    ahora_s(),
+                    Nivel::Info,
+                    "no se pudo pasar la llamada al móvil; sigue en el equipo",
+                );
+                self.aviso("sec_mv_no_paso", "");
+            }
+            Suceso::Volvio => {
+                self.monitor.anota(
+                    ahora_s(),
+                    Nivel::Info,
+                    "la voz de la llamada volvió al equipo",
+                );
+            }
+        }
+        // The other side's player starts again with whoever records now.
+        self.reinicios += 1;
+        self.cambio = true;
+    }
+
+    /// Once a tick: the hand-off follows the phone and the call.
+    fn relevo_tic(&mut self) {
+        let antes = self.relevo.donde();
+        let conectada = self.llamada.as_ref().is_some_and(|l| l.conectada);
+        let s = self.relevo.tic(
+            self.movil_listo(),
+            self.llamada.is_some(),
+            conectada,
+            ahora_s(),
+        );
+        self.relevo_suceso(s);
+        if antes != self.relevo.donde() {
+            self.cambio = true;
+        }
+    }
+
+    /// Start moving the call's voice to the phone (accepted, back, or asked for).
+    fn relevo_empieza(&mut self) {
+        if self
+            .relevo
+            .empieza(self.movil_listo(), self.llamada.is_some(), ahora_s())
+        {
+            self.monitor
+                .anota(ahora_s(), Nivel::Info, "pasando la llamada al móvil");
+            self.cambio = true;
+        }
+    }
+
+    /// The person asked to move the call to the phone (on the phone or on this screen).
+    pub fn relevo_pasar(&mut self) {
+        self.relevo_empieza();
+    }
+
+    /// «Volver al PC»: during a call the voice comes back to this computer (whose leg never
+    /// stopped) and the phone stays for the chat; without a call the phone hands the whole
+    /// conversation back.
+    pub fn relevo_volver(&mut self) {
+        if self.llamada.is_none() {
+            self.movil_fin();
+            return;
+        }
+        let s = self.relevo.volver();
+        self.relevo_suceso(s);
+    }
+
+    /// A bridge message from the phone (offer, ICE candidate, end) for this computer's page.
+    fn puente_del_movil(&mut self, d: Value) {
+        if self.llamada.is_none() || !self.puente_modo() {
+            return;
+        }
+        let grande = match serde_json::to_vec(&d) {
+            Ok(v) => v.len() > 64 * 1024,
+            Err(_) => true,
+        };
+        if !grande && self.puente_para_pagina.len() < 256 {
+            self.puente_para_pagina.push_back(d);
+        }
+    }
+
+    /// A bridge message from this computer's page (answer, ICE candidate) for the phone.
+    pub fn puente_de_pagina(&mut self, d: &Value) {
+        let grande = match serde_json::to_vec(d) {
+            Ok(v) => v.len() > 64 * 1024,
+            Err(_) => true,
+        };
+        if grande || !self.movil_listo() {
+            return;
+        }
+        if let Some(m) = &self.movil {
+            m.manda(crate::movil::Hacia::Estado(
+                json!({ "tipo": "secure_puente", "d": d }).to_string(),
+            ));
+        }
+    }
+
+    /// The page says its bridge to the phone carries sound: the voice is on the phone.
+    pub fn puente_listo(&mut self) {
+        let s = self.relevo.puente_listo(self.movil_listo());
+        self.relevo_suceso(s);
+    }
+
+    /// The page's bridge broke or never came up; `sin_rtc`: the page's own leg left WebRTC.
+    pub fn puente_fallo(&mut self, sin_rtc: bool) {
+        let s = self.relevo.puente_fallo(sin_rtc, ahora_s());
+        self.relevo_suceso(s);
+    }
+
+    /// How the computer's leg of the call sounds, as the page estimated it.
+    pub fn calidad(&mut self, nivel: &str) {
+        if matches!(nivel, "excelente" | "buena" | "debil") && self.llamada.is_some() {
+            self.calidad_pc = Some((nivel.to_owned(), ahora_s()));
+        }
+    }
+
+    /// The page's estimate, while it is fresh (6 s: it comes every 2 s).
+    fn calidad_pc_json(&self) -> Value {
+        match &self.calidad_pc {
+            Some((n, t)) if self.llamada.is_some() && ahora_s().saturating_sub(*t) <= 6 => {
+                json!(n)
+            }
+            _ => Value::Null,
+        }
     }
 
     fn movil_tic(&mut self) {
@@ -4142,6 +4325,11 @@ impl Secure {
                     self.novedad = true;
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "un móvil se ha conectado");
+                    // An accepted phone that comes back during a call takes it again, the
+                    // same way: the computer keeps it until the phone's leg is live.
+                    if aprobado {
+                        self.relevo_empieza();
+                    }
                 }
                 Desde::Soltado => {
                     self.aviso("sec_mv_soltado", "");
@@ -4191,9 +4379,25 @@ impl Secure {
                 Desde::Sas { ok, nombre } if aprobado => self.sas_persona(ok, &nombre),
                 Desde::PideInicio if aprobado => self.pide_inicio(),
                 Desde::VozProtegida(a) if aprobado => self.voz_protegida(a),
-                Desde::Rtc(d) if aprobado => self.rtc(&d),
+                // The phone's own WebRTC leg to the other side (a page from before the bridge):
+                // only once it holds the voice and the call does not go by the bridge.
+                Desde::Rtc(d)
+                    if aprobado
+                        && self.relevo.donde() == crate::relevo::Donde::Movil
+                        && !self.puente_modo() =>
+                {
+                    self.rtc(&d);
+                }
+                Desde::Puente(d) if aprobado => self.puente_del_movil(d),
+                Desde::Volver if aprobado => self.relevo_volver(),
+                Desde::Pasar if aprobado => self.relevo_pasar(),
                 Desde::Media(b) if aprobado => {
-                    let _ = self.media_bytes(b);
+                    // Make before break with pieces: the phone's first piece moves the voice.
+                    let (vale, s) = self.relevo.pieza_del_movil(true);
+                    self.relevo_suceso(s);
+                    if vale {
+                        let _ = self.media_bytes(b);
+                    }
                 }
                 _ => {}
             }
@@ -4216,6 +4420,8 @@ impl Secure {
             "pendiente": m.pendiente,
             "aprobado": m.aprobado,
             "habla": self.movil_manda(),
+            "listo": self.movil_listo(),
+            "paso": self.relevo.json(self.rtc_disponible(), ahora_s()),
             "qr": tarjeta::qr_svg(&enlace).ok(),
             "fuera": self.movil_puerta.is_some(),
             "puerta_error": self.movil_puerta_error,
@@ -4283,7 +4489,7 @@ impl Secure {
             "tarjeta": self.tarjeta(),
             "contacto": self.nombre_contacto,
             "numeros": self.numeros().map(|(a, b, c)| vec![a, b, c]),
-            "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "conectada": l.conectada, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto, "reinicio": self.reinicios, "rtc": self.rtc_json() })),
+            "llamada": self.llamada.as_ref().map(|l| json!({ "video": l.video, "desde": l.desde, "conectada": l.conectada, "mi_numero": self.mi_numero(), "mime_remoto": l.mime_remoto, "reinicio": self.reinicios, "rtc": self.rtc_json(), "calidad_pc": self.calidad_pc_json() })),
             "entrante": self.entrante.as_ref().map(|t| json!({ "video": t.video, "de": self.nombre_contacto, "desde": t.desde })),
             "perdida": self.perdida.map(|(t, video)| json!({ "t": t, "video": video, "de": self.nombre_contacto })),
             "recibidos": self.recibidos.iter().map(Recibido::json).collect::<Vec<_>>(),

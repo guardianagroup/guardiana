@@ -97,6 +97,13 @@ pub enum Desde {
     Rtc(serde_json::Value),
     /// One recorded piece from the phone's microphone or camera.
     Media(Vec<u8>),
+    /// The phone's WebRTC bridge to this computer's page (18 Oct 2026, «Continuar en el
+    /// móvil» without a gap): offer, ICE candidate, end.
+    Puente(serde_json::Value),
+    /// «Volver al PC» on the phone.
+    Volver,
+    /// «Pasar al móvil» on the phone, for a call that is on the computer.
+    Pasar,
     /// The phone's page was brought to the front.
     Visto,
     /// The phone answers a message: the text and the id it answers (16 Oct 2026).
@@ -885,6 +892,9 @@ fn traduce(v: &Value) -> Option<Desde> {
         "pide_inicio" => Some(Desde::PideInicio),
         "voz_protegida" => Some(Desde::VozProtegida(v["activa"].as_bool().unwrap_or(false))),
         "rtc" => Some(Desde::Rtc(v["d"].clone())),
+        "puente" => Some(Desde::Puente(v["d"].clone())),
+        "volver" => Some(Desde::Volver),
+        "pasar" => Some(Desde::Pasar),
         "visto" => Some(Desde::Visto),
         "nombre" => Some(Desde::Nombre(
             v["nombre"]
@@ -946,6 +956,20 @@ mod tests {
         }
         // Nothing before the fragment names this computer.
         assert_eq!(e.split('#').next().unwrap(), PAGINA);
+    }
+
+    #[test]
+    fn the_hand_off_messages_are_understood() {
+        let d = traduce(&serde_json::json!({ "t": "puente", "d": { "t": "offer", "s": "x" } }));
+        assert!(matches!(d, Some(Desde::Puente(v)) if v["t"] == "offer"));
+        assert!(matches!(
+            traduce(&serde_json::json!({ "t": "volver" })),
+            Some(Desde::Volver)
+        ));
+        assert!(matches!(
+            traduce(&serde_json::json!({ "t": "pasar" })),
+            Some(Desde::Pasar)
+        ));
     }
 
     #[test]

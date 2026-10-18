@@ -680,6 +680,61 @@ impl Grupo {
         }
     }
 
+    /// «Continuar en el móvil» without a gap (18 Oct 2026, [`crate::relevo`]): the page's
+    /// bridge messages, its «the bridge carries sound» and «it broke», «Volver al PC» and
+    /// «Pasar al móvil» from this screen, and how its own leg sounds. To every link: only the
+    /// one with the phone acts on them.
+    pub fn puente(&mut self, d: &Value) {
+        for s in &mut self.sesiones {
+            s.puente_de_pagina(d);
+        }
+    }
+
+    /// The page's bridge carries the phone's voice.
+    pub fn puente_listo(&mut self) {
+        for s in &mut self.sesiones {
+            s.puente_listo();
+        }
+    }
+
+    /// The page's bridge broke (`sin_rtc`: its own leg left WebRTC).
+    pub fn puente_fallo(&mut self, sin_rtc: bool) {
+        for s in &mut self.sesiones {
+            s.puente_fallo(sin_rtc);
+        }
+    }
+
+    /// The call's voice back to this computer.
+    pub fn relevo_volver(&mut self) {
+        for s in &mut self.sesiones {
+            s.relevo_volver();
+        }
+        self.cambio = true;
+    }
+
+    /// The call's voice to the phone.
+    pub fn relevo_pasar(&mut self) {
+        for s in &mut self.sesiones {
+            s.relevo_pasar();
+        }
+    }
+
+    /// How the computer's leg of the call sounds (the page's estimate).
+    pub fn calidad(&mut self, nivel: &str) {
+        for s in &mut self.sesiones {
+            s.calidad(nivel);
+        }
+    }
+
+    /// The phone's bridge messages for the page.
+    pub fn puente_para_pagina(&mut self) -> Vec<Value> {
+        let mut v = Vec::new();
+        for s in &mut self.sesiones {
+            v.extend(s.puente_para_pagina.drain(..));
+        }
+        v
+    }
+
     /// The call's figures as the page measures them, for the talking link's report.
     pub fn medidas(&mut self, d: &Value) {
         if let Some(i) = self.unica() {

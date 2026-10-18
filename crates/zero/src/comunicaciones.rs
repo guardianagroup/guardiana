@@ -164,6 +164,13 @@ impl Comunicaciones {
                 o.push(json!({ "tipo": "secure_rtc", "d": d }));
             }
         }
+        // The phone's bridge to this page (18 Oct 2026, «Continuar en el móvil» without a gap).
+        let puente = self.secure.puente_para_pagina();
+        if pagina {
+            for d in puente {
+                o.push(json!({ "tipo": "secure_puente", "d": d }));
+            }
+        }
         if !self.secure.media_para_pagina.is_empty() {
             if pagina {
                 let trozos: Vec<Value> = self
@@ -417,6 +424,32 @@ impl Comunicaciones {
             }
             "movil_fin" => {
                 self.secure.movil_fin();
+                Ok(())
+            }
+            // «Continuar en el móvil» without a gap (18 Oct 2026, `relevo`).
+            "puente" => {
+                self.secure.puente(&m["d"]);
+                Ok(())
+            }
+            "puente_listo" => {
+                self.secure.puente_listo();
+                Ok(())
+            }
+            "puente_fallo" => {
+                self.secure
+                    .puente_fallo(m["sin_rtc"].as_bool().unwrap_or(false));
+                Ok(())
+            }
+            "relevo_volver" => {
+                self.secure.relevo_volver();
+                Ok(())
+            }
+            "relevo_pasar" => {
+                self.secure.relevo_pasar();
+                Ok(())
+            }
+            "calidad" => {
+                self.secure.calidad(texto(m, "nivel"));
                 Ok(())
             }
             "colgar" => {
