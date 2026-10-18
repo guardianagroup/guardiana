@@ -800,16 +800,38 @@
     // person, or only its country, until the person says (the owner, 18 Oct 2026).
     const yoAproximado = () => !soloMirar && (st.lugar.fuente === 'zona' || st.lugar.fuente === 'pais');
     const ciudadCorta = (c) => String(c || '').split(',')[0].trim();
+    // When each place last changed between cut and allowed (by its stable key).
+    const CORTES = new Map();
+    const hex2 = (f) => Math.round(Math.max(0, Math.min(1, f)) * 255).toString(16).padStart(2, '0');
     const dibujaTierra = (dt) => {
       const L = layoutTierra(), tt = tiempo();
       // Routes (18 Oct 2026, the approved redesign): white, as wide as the place weighs, with a soft
       // veil; a cut route is a red dashed line and nothing travels on it.
       const pesoMax = Math.max(1, ...GRUPOS.map(pesoGrupo));
+      const ahoraT = performance.now();
       GRUPOS.forEach((g) => {
-        if (grupoCortado(g)) {
-          trazo(g.ruta, 0, 1, ROJO + 'f2', 1.6, [5, 5]);
+        // How a cut is seen (committee Claude + ChatGPT + Grok, 18 Oct 2026; the owner: «que
+        // la persona sepa que ha habido un bloqueo… y dónde ha sido»). When the service confirms
+        // it, the white line turns red and dashed in 200 ms and stays bright for 1.5 s, so the
+        // eye finds where it happened; then it settles to a quiet red dash, so 40 cuts at once
+        // never flood the Earth. It does not blink, the globe does not spin towards it, and the
+        // packets on it stop. Pointing at the place brings it back to full red. Undone, the red
+        // fades back to white in 250 ms; packets come back only with real traffic. With
+        // «reducir movimiento» every change is instant.
+        const cort = grupoCortado(g), prev = CORTES.get(g.key);
+        if (!prev || prev.cort !== cort) CORTES.set(g.key, { cort, t: prev ? ahoraT : -1e9 });
+        const edad = ahoraT - CORTES.get(g.key).t, sobreG = st.hover && (st.hover.ref === g);
+        if (cort) {
+          let a;
+          if (reducido || edad > 2200) a = 0.42;
+          else if (edad < 200) { trazo(g.ruta, 0, 1, BLANCO + hex2(1 - edad / 200), 1.6); a = edad / 200; }
+          else if (edad < 1700) a = 1;
+          else a = 1 - 0.58 * ((edad - 1700) / 500);
+          if (sobreG) a = 1;
+          trazo(g.ruta, 0, 1, ROJO + hex2(a), edad < 1700 && !reducido ? 2.2 : 1.6, [5, 5]);
           return;
         }
+        if (!reducido && edad < 250) trazo(g.ruta, 0, 1, ROJO + hex2(0.42 * (1 - edad / 250)), 1.6, [5, 5]);
         const sw = 0.9 + 1.5 * Math.sqrt(pesoGrupo(g) / pesoMax), sobre = st.hover && (st.hover.ref === g);
         trazo(g.ruta, 0, 1, BLANCO + (sobre ? '2e' : '1a'), sw * 4);
         trazo(g.ruta, 0, 1, BLANCO + (sobre ? 'f0' : 'c4'), sobre ? sw + 0.4 : sw);
@@ -2009,9 +2031,12 @@
       window.GuardianaInterruptor.engancha($('riel-maxima'), async (b, quiere) => {
         // quiere = cut = switch it off.
         const m = await api('/api/proteccion-maxima', { method: 'POST', body: { activa: !quiere } });
-        avisa(t(m.activa ? 'maxima_activa' : 'pd_maxima_off_aviso'));
         pintaMaxima(m);
         await cargar();
+        // One message for the whole change, with the routes the globe now shows cut (counted from
+        // what the service confirmed, never from what was asked).
+        const n = GRUPOS.filter(grupoCortado).length;
+        avisa(m.activa ? (n === 1 ? t('pd_maxima_on_1') : t('pd_maxima_on_n').replace('{n}', num(n))) : t('pd_maxima_off_aviso'));
       }, MAXIMA_TXT());
       leeMaxima();
       setInterval(() => { if (!document.hidden) leeMaxima(); }, 30000);

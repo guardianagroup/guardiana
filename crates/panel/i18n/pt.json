@@ -2652,6 +2652,8 @@
     "pd_maxima_desactivando": "Desativando…",
     "pd_maxima_espera_corta": "começa após 24 h de monitoramento",
     "pd_maxima_off_aviso": "Proteção máxima desativada.",
+    "pd_maxima_on_n": "Proteção máxima ativada · {n} locais bloqueados no globo",
+    "pd_maxima_on_1": "Proteção máxima ativada · 1 local bloqueado no globo",
     "pd_estado_cortado": "Cortado",
     "pd_estado_nuevo": "Novo",
     "pd_estado_observado": "Observado",

@@ -2652,6 +2652,8 @@
     "pd_maxima_desactivando": "Turning off…",
     "pd_maxima_espera_corta": "starts after 24 hours of monitoring",
     "pd_maxima_off_aviso": "Maximum protection turned off.",
+    "pd_maxima_on_n": "Maximum protection on · {n} places blocked on the globe",
+    "pd_maxima_on_1": "Maximum protection on · 1 place blocked on the globe",
     "pd_estado_cortado": "Cut",
     "pd_estado_nuevo": "New",
     "pd_estado_observado": "Observed",
