@@ -1,0 +1,47 @@
+/* «Certificado de flujos» (1.0.45): a document for paper. Black on white whatever the screen's
+   theme, the panel's steel for structure, red only for what was cut, green only for a chain that
+   verified, amber for what limits the certificate. The same text is inlined in the saved file
+   and served to the panel's view, so both look the same. */
+html, body { margin: 0; background: #fff; }
+.cert { color: #16191d; background: #fff; font: 10.5pt/1.45 "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 190mm; margin: 0 auto; padding: 12mm 10mm; box-sizing: border-box; }
+.cert * { box-sizing: border-box; }
+.cert h1 { font-size: 19pt; line-height: 1.15; margin: 0 0 2mm; letter-spacing: -0.01em; }
+.cert h2 { font-size: 12pt; margin: 7mm 0 2mm; padding-bottom: 1mm; border-bottom: 1.5px solid #9CC3E4; break-after: avoid; }
+.cert p { margin: 0 0 2mm; }
+.cert .c-marca { font-size: 8.5pt; letter-spacing: 0.14em; text-transform: uppercase; color: #4c5a68; margin-bottom: 4mm; }
+.cert .c-sub { font-size: 11pt; color: #2b3138; }
+.cert .c-meta { font-size: 9pt; color: #4c5a68; }
+.cert .c-resumen { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; margin: 5mm 0 2mm; }
+.cert .c-cifra { border: 1px solid #c9d6e2; border-radius: 3mm; padding: 2.5mm 3mm; }
+.cert .c-cifra b { display: block; font-size: 15pt; line-height: 1.1; }
+.cert .c-cifra span { font-size: 8.5pt; color: #4c5a68; }
+.cert .c-cortado { color: #b5483b; }
+.cert .c-ok { color: #1f7a57; }
+.cert .c-aviso { border-left: 3px solid #E0B66A; background: #fdf7ea; padding: 2mm 3mm; margin: 2mm 0; }
+.cert .c-mal { border-left: 3px solid #E07A6C; background: #fdf0ee; padding: 2mm 3mm; margin: 2mm 0; }
+.cert .c-bien { border-left: 3px solid #6CCBA5; background: #effaf5; padding: 2mm 3mm; margin: 2mm 0; }
+.cert table { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 1mm 0 2mm; }
+.cert th { text-align: left; font-weight: 600; color: #4c5a68; border-bottom: 1px solid #9CC3E4; padding: 1.2mm 1.5mm; }
+.cert td { border-bottom: 1px solid #e3e9ef; padding: 1.2mm 1.5mm; vertical-align: top; }
+.cert td.n, .cert th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cert tr { break-inside: avoid; }
+.cert .c-chico { font-size: 8.5pt; color: #4c5a68; }
+.cert .c-lista { columns: 3; column-gap: 6mm; font-size: 9pt; padding-left: 4mm; margin: 1mm 0 2mm; }
+.cert .c-lista li { break-inside: avoid; }
+.cert code, .cert .c-hash { font: 8pt/1.35 ui-monospace, "SFMono-Regular", Consolas, monospace; word-break: break-all; }
+.cert dl { display: grid; grid-template-columns: max-content 1fr; gap: 1mm 4mm; font-size: 9pt; margin: 1mm 0 2mm; }
+.cert dt { color: #4c5a68; }
+.cert dd { margin: 0; }
+.cert .c-pie { margin-top: 7mm; padding-top: 3mm; border-top: 1.5px solid #9CC3E4; font-size: 9pt; }
+.cert .c-pie ul { padding-left: 4mm; margin: 1mm 0 2mm; }
+@media (max-width: 640px) {
+  .cert { padding: 16px; }
+  .cert .c-resumen { grid-template-columns: repeat(2, 1fr); }
+  .cert .c-lista { columns: 1; }
+  .cert table { display: block; overflow-x: auto; }
+}
+@media print {
+  @page { size: A4; margin: 12mm; }
+  html, body { background: #fff; }
+  .cert { padding: 0; max-width: none; }
+}

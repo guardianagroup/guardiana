@@ -13,7 +13,9 @@ mod antivirus;
 mod api;
 mod auth;
 mod borrado;
+mod certificado;
 mod contratos;
+mod derechos;
 mod destinos;
 mod empresa;
 mod expedientes;
@@ -544,6 +546,9 @@ const REVISION_JS: &str = include_str!("../static/revision.js");
 /// The cut switch (18 Oct 2026): one component for the panel and ZERO. The same file travels in
 /// ZERO (`zero/navegador/interfaz/interruptor.js`); a test keeps them equal.
 const INTERRUPTOR_JS: &str = include_str!("../static/interruptor.js");
+/// «Certificado y derechos» (1.0.45): its own script and style sheet, as the pages above.
+const DERECHOS_JS: &str = include_str!("../static/derechos.js");
+const DERECHOS_CSS: &str = include_str!("../static/derechos.css");
 
 /// A short tag of the script and the style sheet, so the pages ask for them by a name that
 /// changes when they do and the browser may keep them for a while. Until 1.0.12 every navigation
@@ -560,6 +565,8 @@ pub(crate) fn version_estaticos() -> &'static str {
         POR_DENTRO_JS.hash(&mut h);
         REVISION_JS.hash(&mut h);
         INTERRUPTOR_JS.hash(&mut h);
+        DERECHOS_JS.hash(&mut h);
+        DERECHOS_CSS.hash(&mut h);
         format!("{:016x}", h.finish())
     })
 }
@@ -586,6 +593,14 @@ pub(crate) fn pagina(html: &'static str) -> Html<String> {
             .replace(
                 "/static/interruptor.js\"",
                 &format!("/static/interruptor.js?v={v}\""),
+            )
+            .replace(
+                "/static/derechos.js\"",
+                &format!("/static/derechos.js?v={v}\""),
+            )
+            .replace(
+                "/static/derechos.css\"",
+                &format!("/static/derechos.css?v={v}\""),
             ),
     )
 }
@@ -754,6 +769,45 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/expedientes/{id}/carta", get(expedientes::carta))
         .route("/api/expedientes/{id}/queja", get(expedientes::queja))
         .route("/api/borrado", get(borrado::resumen))
+        // «Certificado de flujos» and «Tu derecho con un clic» (1.0.45).
+        .route(
+            "/certificado",
+            get(|| async { pagina(include_str!("../static/certificado.html")) }),
+        )
+        .route(
+            "/certificado.html",
+            get(|| async { pagina(include_str!("../static/certificado.html")) }),
+        )
+        .route("/api/certificado", get(certificado::generar))
+        .route("/api/certificado/verificar", post(certificado::verificar))
+        .route("/api/derechos", get(derechos::resumen))
+        .route("/api/derechos/carta", get(derechos::carta))
+        .route(
+            "/static/derechos.js",
+            get(|RawQuery(q): RawQuery| async move {
+                estatico(
+                    DERECHOS_JS,
+                    "application/javascript; charset=utf-8",
+                    q.as_deref(),
+                )
+            }),
+        )
+        .route(
+            "/static/derechos.css",
+            get(|RawQuery(q): RawQuery| async move {
+                estatico(DERECHOS_CSS, "text/css; charset=utf-8", q.as_deref())
+            }),
+        )
+        // The certificate's own style, for the panel's view of it (the saved file inlines it).
+        .route(
+            "/static/certificado.css",
+            get(|| async {
+                static_response(
+                    guardiana_verify::certificado_html::CSS,
+                    "text/css; charset=utf-8",
+                )
+            }),
+        )
         .route("/api/borrado/carta", get(borrado::carta_api))
         .route("/api/borrado/envios", post(borrado::nuevo_envio))
         .route(
@@ -1171,6 +1225,7 @@ mod textos {
             include_str!("../static/revision.html"),
             include_str!("../static/identificacion.html"),
             include_str!("../static/vigilancia.html"),
+            include_str!("../static/certificado.html"),
         ];
         const SCRIPTS: &[&str] = &[
             include_str!("../static/app.js"),
@@ -1178,6 +1233,7 @@ mod textos {
             include_str!("../static/revision.js"),
             include_str!("../static/identificacion.js"),
             include_str!("../static/vigilancia.js"),
+            include_str!("../static/derechos.js"),
         ];
         // The keys asked for with a literal: `data-t="x"` in the pages, `t('x')` in the scripts.
         // The ones built at run time (`t('cambio_' + x)`) cannot be read here and are covered by

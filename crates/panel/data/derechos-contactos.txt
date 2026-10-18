@@ -1,0 +1,38 @@
+# Guardiana — «Tu derecho con un clic» (1.0.45): el canal de privacidad que publican las
+# empresas grandes que casi todo equipo contacta y que no son corredores de datos (por eso no
+# están en borrado-corredores.txt). Sirve para dirigir la carta de acceso o de borrado al sitio
+# que la propia empresa da para eso, en vez de a su página general.
+#
+# Mismo formato que borrado-corredores.txt (lo lee el mismo código), con el tipo `servicios`.
+# Lo mismo vale aquí: ninguna dirección se inventa ni se deduce. Si la empresa no publica un
+# correo, no hay correo y la carta se pega en su formulario. Cada sección dice de dónde sale y
+# cuándo se miró. Una empresa que no esté aquí ni en su ficha recibe la carta sin destinatario:
+# la persona pone el que vea en la web de la empresa.
+
+@microsoft|Microsoft|US|servicios
+url https://www.microsoft.com/privacy/privacy-support-requests
+fuente https://www.microsoft.com/privacy/privacy-support-requests 2026-10-18
+# La página da dos formularios (con cuenta personal y sin ella) y dice que son también el
+# contacto de su delegado de protección de datos; no da correo.
+=Microsoft
+
+@apple|Apple|US|servicios
+url https://www.apple.com/legal/privacy/contact/ww/
+fuente https://www.apple.com/legal/privacy/contact/ww/ 2026-10-18
+# Formulario de consultas de privacidad, también para escribir a su delegado de protección de
+# datos; no da correo. Para descargar o borrar la cuenta remite a appleid.apple.com.
+=Apple
+
+@google|Google|US|servicios
+url https://support.google.com/policies/contact/general_privacy_form
+fuente https://support.google.com/policies/contact/general_privacy_form 2026-10-18
+# «Privacy Inquiry form»: preguntas y peticiones sobre privacidad al equipo de Google.
+=Google
+
+@meta|Meta|US|servicios
+url https://www.facebook.com/help/contact/540977946302970
+fuente https://www.datarequests.org/company/facebook 2026-10-18
+# El formulario de contacto de privacidad de Meta Platforms Ireland, según la base abierta de
+# datarequests.org, que cita la política de privacidad de Meta como fuente. No se pudo abrir el
+# formulario desde aquí sin cuenta: comprobar a mano en la próxima revisión.
+=Meta
