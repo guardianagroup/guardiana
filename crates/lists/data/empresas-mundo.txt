@@ -1,0 +1,2810 @@
+# GUARDIANA — lista «empresas-mundo»: más nombres con su dueño, para personas de cualquier país
+# (1.0.45). Mantenida por nosotros, abierta, igual que `empresas.txt`, que sigue siendo la base.
+#
+# Por qué existe. El responsable, 18 oct 2026: «precisión máxima de todos los datos hacia dónde
+# van, vienen desde cualquier país del mundo». `empresas.txt` nació mirando un PC de Colombia y
+# España; con una muestra de nombres corrientes de todo el mundo (crates/lists/tests/data/
+# muestra-mundo.txt) un tercio salía sin dueño: bancos de Brasil, tiendas de China, antivirus de
+# Europa, prensa de Alemania. Aquí van esos dueños.
+#
+# edicion: 2026-10-18
+#
+# QUÉ ES UNA LÍNEA. Un dominio que es de esa empresa: lo registra ella y lo usa para sus propios
+# servicios (coincide con el dominio y con sus subdominios). La fuente es la propia empresa: su web,
+# sus avisos legales y las listas de nombres que publica para que los cortafuegos de las empresas
+# la dejen pasar (Microsoft, Apple, Zoom, Adobe, los antivirus…). Solo dice el dueño del nombre,
+# nunca qué hace con lo que recibe: es una etiqueta, no un veredicto (decisión 61).
+#
+# QUÉ NO ENTRA. (1) Nombres donde cualquiera alquila un servidor (`blob.core.windows.net`,
+# `herokuapp.com`, `blogspot.com`, `firebaseapp.com`): son de quien los alquila, no de la nube
+# (`alojamiento.txt`). (2) Redes de reparto que solo llevan lo de otros (`entrega.txt`). (3) Lo que
+# no se ha podido comprobar: un dueño inventado es peor que un «sin identificar».
+#
+# FORMATO. Dos clases de sección:
+#   `@=Empresa`  más dominios de una empresa que ya está en `empresas.txt`, con ese nombre exacto:
+#                hereda de allí el país, la ciudad y el grupo (una sola verdad por empresa).
+#   `@Empresa|XX|Ciudad|Grupo`  una empresa nueva, con las mismas reglas que `empresas.txt`: el país
+#                es el de la sede del grupo, la ciudad en español, el grupo solo con su fuente en una
+#                línea `# Grupo:` encima. Cualquiera de los campos puede ir vacío si no está comprobado.
+# Un dominio aparece una sola vez entre los dos archivos (lo comprueba una prueba).
+
+# ============================================================================================
+# 1. Más nombres de empresas que ya están en empresas.txt
+# ============================================================================================
+
+@=Microsoft
+# Inicio de sesión de cuentas Microsoft y Entra ID (lista de puntos de conexión de Microsoft 365).
+microsoftonline.com
+microsoftonline-p.com
+microsoftonline-p.net
+msftauth.net
+msauth.net
+msauthimages.net
+msftauthimages.net
+msidentity.com
+microsoftazuread-sso.com
+passport.net
+live.net
+# Recursos web de Microsoft y sus experimentos de producto.
+s-microsoft.com
+gfx.ms
+exp-tas.com
+aspnetcdn.com
+aka.ms
+svc.ms
+onestore.ms
+msocsp.com
+msocdn.com
+windowsazure.com
+azure.net
+lync.com
+onenote.com
+onenote.net
+outlookmobile.com
+sharepointonline.com
+skype.net
+skypeassets.com
+sway.com
+yammer.com
+dynamics.com
+powerbi.com
+powerapps.com
+microsoftstore.com
+microsofttranslator.com
+virtualearth.net
+bingapis.com
+windowsphone.com
+nuance.com
+# Juegos de Microsoft: Xbox, Mojang (Minecraft), PlayFab.
+xboxservices.com
+xboxab.com
+mojang.com
+minecraft.net
+minecraftservices.com
+playfab.com
+playfabapi.com
+halowaypoint.com
+# GitHub y npm son de Microsoft.
+npmjs.com
+npmjs.org
+ghcr.io
+github.dev
+githubapp.com
+nuget.org
+vsassets.io
+vscode-cdn.net
+vscode.dev
+
+@=Google
+google.co.uk
+google.de
+google.fr
+google.it
+google.nl
+google.pl
+google.pt
+google.be
+google.ch
+google.at
+google.se
+google.no
+google.dk
+google.fi
+google.ie
+google.gr
+google.cz
+google.ro
+google.hu
+google.ru
+google.com.tr
+google.com.ua
+google.ca
+google.com.mx
+google.com.br
+google.com.ar
+google.cl
+google.com.pe
+google.co.ve
+google.com.ec
+google.com.uy
+google.com.py
+google.com.bo
+google.co.cr
+google.com.gt
+google.com.do
+google.com.pa
+google.com.sv
+google.hn
+google.com.ni
+google.com.pr
+google.com.cu
+google.co.jp
+google.co.kr
+google.com.hk
+google.com.tw
+google.co.in
+google.com.pk
+google.co.id
+google.com.sg
+google.com.my
+google.co.th
+google.com.vn
+google.com.ph
+google.com.au
+google.co.nz
+google.co.za
+google.com.eg
+google.com.sa
+google.ae
+google.co.il
+google.com.ng
+google.co.ke
+goo.gl
+g.co
+youtu.be
+youtube-nocookie.com
+youtubekids.com
+youtubeeducation.com
+gmail.com
+googlemail.com
+googlesource.com
+googledomains.com
+googleblog.com
+google.org
+gvt3.com
+doubleclick.com
+dartsearch.net
+urchin.com
+adsensecustomsearchads.com
+chromium.org
+chrome.com
+golang.org
+go.dev
+waze.com
+kaggle.com
+fabric.io
+dns.google
+
+@=Apple
+apple.co
+mac.com
+appstore.com
+applemusic.com
+apple-mapkit.com
+shazam.com
+beatsbydre.com
+
+@=Amazon
+amazon.co.uk
+amazon.de
+amazon.fr
+amazon.it
+amazon.nl
+amazon.se
+amazon.pl
+amazon.com.be
+amazon.co.jp
+amazon.ca
+amazon.com.mx
+amazon.com.br
+amazon.in
+amazon.com.au
+amazon.com.tr
+amazon.ae
+amazon.sa
+amazon.sg
+amazon.eg
+amazon.cn
+amazontrust.com
+images-amazon.com
+aiv-cdn.net
+aiv-delivery.net
+pv-cdn.net
+awsstatic.com
+assoc-amazon.com
+imdb.com
+media-imdb.com
+goodreads.com
+zappos.com
+wholefoodsmarket.com
+eero.com
+twitchcdn.net
+twitchsvc.net
+
+@=ByteDance
+douyin.com
+douyinpic.com
+douyinvod.com
+amemv.com
+snssdk.com
+pstatp.com
+toutiao.com
+ixigua.com
+byteimg.com
+bytecdn.cn
+ttwstatic.com
+tiktokcdn-eu.com
+tiktokv.eu
+lemon8-app.com
+doubao.com
+ciciai.com
+volcengine.com
+volces.com
+larksuite.com
+feishu.cn
+
+@=Baidu
+bdstatic.com
+bdimg.com
+baidustatic.com
+baidupcs.com
+hao123.com
+shifen.com
+
+@=Huawei
+huaweicloud.com
+dbankcdn.com
+vmall.com
+huaweimobileservices.com
+petalsearch.com
+
+@=Xiaomi
+mi-img.com
+miwifi.com
+xiaomiyoupin.com
+
+@=Samsung
+samsungknox.com
+samsungotn.net
+
+@=Sony
+sony.net
+crunchyroll.com
+
+@=Nintendo
+nintendo.co.jp
+nintendowifi.net
+
+@=Activision
+# Activision Blizzard: Blizzard (Battle.net) y King (Candy Crush).
+battle.net
+blizzard.com
+worldofwarcraft.com
+king.com
+
+@=Electronic Arts
+origin.com
+easports.com
+
+@=Ubisoft
+ubisoftconnect.com
+uplay.com
+
+@=Epic Games
+epicgames.dev
+epicgamescdn.com
+fortnite.com
+fab.com
+artstation.com
+sketchfab.com
+eac-cdn.com
+easy.ac
+psyonix.com
+rocketleague.com
+
+@=Riot Games
+riotcdn.net
+leagueoflegends.com
+playvalorant.com
+lolstatic.com
+lolesports.com
+pvp.net
+
+@=Valve
+steamserver.net
+steamusercontent.com
+steam-chat.com
+valvesoftware.com
+steamgames.com
+s.team
+
+@=Netflix
+netflix.net
+fast.com
+
+@=Disney
+go.com
+abc.com
+hulu.com
+huluim.com
+hulustream.com
+marvel.com
+starwars.com
+
+@=Warner Bros. Discovery
+cnn.com
+turner.com
+discoveryplus.com
+eurosport.com
+
+@=Telegram
+telegram.me
+telesco.pe
+tdesktop.com
+telegra.ph
+cdn-telegram.org
+
+@=Signal
+whispersystems.org
+
+@=Zoom
+zoom.com
+
+@=Slack
+slack-imgs.com
+slack-msgs.com
+slack-files.com
+slackb.com
+
+@=Dropbox
+dropboxstatic.com
+dropboxapi.com
+db.tt
+getdropbox.com
+hellosign.com
+docsend.com
+
+@=Uber
+ubereats.com
+postmates.com
+
+@=Airbnb
+muscache.com
+
+@=Adobe
+adobelogin.com
+adobecc.com
+adobess.com
+behance.net
+ftcdn.net
+frame.io
+acrobat.com
+echosign.com
+magento.com
+scene7.com
+
+@=Oracle
+java.com
+mysql.com
+netsuite.com
+cerner.com
+oracleinfinity.io
+maxymiser.net
+responsys.net
+custhelp.com
+
+@=Salesforce
+sfdcstatic.com
+tableau.com
+mulesoft.com
+heroku.com
+herokucdn.com
+evergage.com
+igodigital.com
+visualforce.com
+
+@=Cloudflare
+cloudflareaccess.com
+cloudflareclient.com
+cloudflare-gateway.com
+cloudflarestream.com
+cfargotunnel.com
+cloudflare-ech.com
+
+@=Akamai
+akamai.com
+akamaitechnologies.com
+linode.com
+
+@=Fastly
+fastly.com
+
+@=Gen Digital
+# Avast, AVG, Avira, Norton, CCleaner: todas de Gen Digital.
+avg.com
+avira.com
+avira-update.com
+nortonlifelock.com
+symantecliveupdate.com
+lifelock.com
+ccleaner.com
+piriform.com
+hidemyass.com
+
+@=McAfee
+siteadvisor.com
+
+@=NVIDIA
+geforce.com
+nvidiagrid.net
+
+@=HP
+hpsmart.com
+hpeprint.com
+
+@=Dell
+alienware.com
+delltechnologies.com
+dellcdn.com
+
+@=Logitech
+logitechg.com
+
+@=Yandex
+yandex.net
+yandex.by
+yandex.kz
+yandex.com.tr
+ya.ru
+yandex.st
+kinopoisk.ru
+adfox.ru
+yandexadexchange.net
+auto.ru
+yango.com
+
+@=VK
+vk.com
+vk.ru
+vk.me
+vkontakte.ru
+userapi.com
+vkuser.net
+mycdn.me
+ok.ru
+odnoklassniki.ru
+imgsmail.ru
+list.ru
+bk.ru
+inbox.ru
+mradx.net
+dzen.ru
+rustore.ru
+
+@=Sber
+sber.ru
+
+@=Kakao
+kakao.com
+kakaocdn.net
+kakaocorp.com
+
+@=Naver
+pstatic.net
+navercorp.com
+naver.net
+webtoons.com
+
+@=LY Corporation
+# LINE es de LY Corporation (la fusión de LINE y Yahoo Japan, 2023).
+line.me
+line-scdn.net
+line-apps.com
+yimg.jp
+
+@=Rakuten
+# Viber es de Rakuten desde 2014.
+viber.com
+rakuten.tv
+
+@=Telefónica
+vivo.com.br
+o2online.de
+movistar.cl
+movistar.com.ar
+movistar.com.pe
+movistar.com.mx
+movistar.com.ve
+movistar.com.uy
+
+@=Claro
+claro.com.br
+claro.com.ar
+claro.cl
+claro.com.pe
+claro.com.ec
+telcel.com
+telmex.com
+clarovideo.com
+embratel.com.br
+
+@=Tigo
+tigo.com
+tigo.com.gt
+tigo.com.bo
+tigo.com.py
+tigo.com.hn
+tigo.com.sv
+millicom.com
+
+@=Mercado Libre
+mercadolivre.com.br
+mercadolibre.com.mx
+mercadolibre.com.ar
+mercadolibre.cl
+mercadolibre.com.pe
+mercadolibre.com.uy
+mercadolibre.com.ec
+mercadolibre.com.ve
+mercadopago.com.br
+mercadopago.com.mx
+mercadopago.com.ar
+
+@=Bancolombia
+transaccionesbancolombia.com
+grupobancolombia.com
+
+@=Davivienda
+daviplata.com
+
+@=Unity
+# ironSource se fusionó con Unity en 2022.
+ironsrc.mobi
+
+
+@=Sentry
+sentry-cdn.com
+
+@=Usercentrics
+# Cookiebot es de Usercentrics desde 2021.
+cookiebot.com
+
+@=PayPal
+braintreegateway.com
+braintree-api.com
+venmo.com
+xoom.com
+
+
+# ============================================================================================
+# 2. Empresas nuevas: tecnología, sistemas, nube y software de uso diario
+# ============================================================================================
+
+@Booking Holdings|US|Norwalk (Connecticut)
+priceline.com
+kayak.com
+agoda.com
+opentable.com
+
+@Cisco|US|San José (California)
+cisco.com
+webex.com
+wbx2.com
+ciscospark.com
+umbrella.com
+opendns.com
+duosecurity.com
+duo.com
+meraki.com
+splunk.com
+appdynamics.com
+thousandeyes.com
+talosintelligence.com
+
+@IBM|US|Armonk (Nueva York)
+ibm.com
+ibmcloud.com
+
+@Red Hat|US|Raleigh (Carolina del Norte)
+redhat.com
+openshift.com
+ansible.com
+quay.io
+
+@SAP|DE|Walldorf
+sap.com
+successfactors.com
+concur.com
+ariba.com
+
+@Broadcom|US|Palo Alto
+broadcom.com
+vmware.com
+
+@AMD|US|Santa Clara
+amd.com
+
+@Qualcomm|US|San Diego
+qualcomm.com
+
+@MediaTek|TW|Hsinchu
+mediatek.com
+
+@Realtek|TW|Hsinchu
+realtek.com
+
+@ASUS|TW|Taipéi
+asus.com
+asuswebstorage.com
+
+@Acer|TW|Nueva Taipéi
+acer.com
+
+@MSI|TW|Nueva Taipéi
+msi.com
+
+@Lenovo|HK
+lenovo.com
+
+@Motorola Mobility|US|Chicago
+motorola.com
+
+@Hewlett Packard Enterprise|US
+hpe.com
+arubanetworks.com
+
+@Corsair|US|Fremont (California)
+corsair.com
+
+@Razer
+razer.com
+razerzone.com
+
+@Canon|JP|Tokio
+canon.com
+c-ij.com
+
+@Epson|JP|Suwa
+epson.com
+epson.net
+epsonconnect.com
+
+@Brother|JP|Nagoya
+brother.com
+
+@Panasonic|JP|Kadoma
+panasonic.com
+
+@Philips|NL|Ámsterdam
+philips.com
+
+@Signify|NL|Eindhoven
+signify.com
+meethue.com
+
+@Bose|US|Framingham (Massachusetts)
+bose.com
+
+@Sonos|US|Santa Bárbara (California)
+sonos.com
+
+@TCL|CN|Huizhou
+tcl.com
+
+@Hisense|CN|Qingdao
+hisense.com
+
+@Vizio|US|Irvine (California)
+vizio.com
+
+@Wyze|US|Kirkland (Washington)
+wyze.com
+wyzecam.com
+
+@Netgear|US|San José (California)
+netgear.com
+
+@Ubiquiti|US|Nueva York
+ui.com
+ubnt.com
+ubiquiti.com
+
+@D-Link|TW|Taipéi
+dlink.com
+mydlink.com
+
+@Hikvision|CN|Hangzhou
+hikvision.com
+hik-connect.com
+ezviz.com
+ezvizlife.com
+
+@Dahua|CN|Hangzhou
+dahuatech.com
+imoulife.com
+
+@Anker|CN|Changsha
+anker.com
+eufylife.com
+soundcore.com
+
+@DJI|CN|Shenzhen
+dji.com
+
+@OPPO|CN|Dongguan
+oppo.com
+oppomobile.com
+heytap.com
+heytapmobile.com
+coloros.com
+
+@vivo|CN|Dongguan
+vivo.com
+vivo.com.cn
+vivoglobal.com
+
+@OnePlus|CN|Shenzhen
+oneplus.com
+oneplus.net
+
+@realme|CN|Shenzhen
+realme.com
+realmemobile.com
+
+@Honor|CN|Shenzhen
+hihonor.com
+honor.com
+
+@ZTE|CN|Shenzhen
+zte.com.cn
+ztedevices.com
+
+@Autodesk|US|San Francisco
+autodesk.com
+
+@JetBrains
+jetbrains.com
+kotlinlang.org
+
+@Docker|US|Palo Alto
+docker.com
+docker.io
+
+@Python Software Foundation|US|Beaverton (Oregón)
+python.org
+pypi.org
+pythonhosted.org
+
+@OpenJS Foundation|US|San Francisco
+jquery.com
+nodejs.org
+
+@VideoLAN|FR|París
+videolan.org
+
+@win.rar|DE|Berlín
+win-rar.com
+rarlab.com
+
+@TeamViewer|DE|Göppingen
+teamviewer.com
+
+@AnyDesk|DE|Stuttgart
+anydesk.com
+
+@Atlassian
+# Atlassian se trasladó a Estados Unidos en 2022 y tiene dos sedes (Sídney y San Francisco):
+# sin país ni ciudad hasta comprobarlo.
+atlassian.com
+atlassian.net
+atl-paas.net
+jira.com
+trello.com
+bitbucket.org
+statuspage.io
+loom.com
+opsgenie.com
+
+@Notion|US|San Francisco
+notion.so
+notion.com
+notion.site
+notion-static.com
+
+@Figma|US|San Francisco
+figma.com
+
+@Box|US|Redwood City (California)
+box.com
+box.net
+boxcdn.net
+
+@Zendesk|US|San Francisco
+zendesk.com
+zdassets.com
+zopim.com
+
+@Freshworks|US|San Mateo (California)
+freshworks.com
+freshdesk.com
+freshchat.com
+
+@Intuit|US|Mountain View (California)
+intuit.com
+quickbooks.com
+turbotax.com
+creditkarma.com
+# Mailchimp es de Intuit desde 2021.
+mailchimp.com
+list-manage.com
+chimpstatic.com
+mcusercontent.com
+
+@Typeform|ES|Barcelona
+typeform.com
+
+@SurveyMonkey|US|San Mateo (California)
+surveymonkey.com
+
+@DocuSign|US|San Francisco
+docusign.com
+docusign.net
+
+@Okta|US|San Francisco
+okta.com
+oktacdn.com
+okta-emea.com
+oktapreview.com
+auth0.com
+
+@OneTrust|US|Atlanta (Georgia)
+onetrust.com
+onetrust.io
+cookielaw.org
+cookiepro.com
+
+@Fonticons|US
+fontawesome.com
+
+@Cloudinary|US|Santa Clara (California)
+cloudinary.com
+
+@Vercel|US|San Francisco
+vercel.com
+vercel-insights.com
+
+@Netlify|US|San Francisco
+netlify.com
+
+@DigitalOcean|US|Nueva York
+digitalocean.com
+
+@Vultr|US|West Palm Beach (Florida)
+vultr.com
+
+@OVHcloud|FR|Roubaix
+ovh.com
+ovhcloud.com
+
+@Hetzner|DE|Gunzenhausen
+hetzner.com
+hetzner.de
+
+@Dynatrace|US|Waltham (Massachusetts)
+dynatrace.com
+ruxit.com
+
+@LaunchDarkly|US|Oakland (California)
+launchdarkly.com
+
+@Pendo|US|Raleigh (Carolina del Norte)
+pendo.io
+
+@Elastic
+elastic.co
+
+@United Internet|DE|Montabaur
+gmx.net
+gmx.com
+gmx.de
+web.de
+ionos.com
+ionos.es
+ionos.de
+1und1.de
+
+@Proton|CH|Ginebra
+proton.me
+protonmail.com
+protonmail.ch
+protonvpn.com
+pm.me
+
+@1Password|CA|Toronto
+1password.com
+1password.ca
+
+@LastPass|US|Boston
+lastpass.com
+
+@Bitwarden|US|Santa Bárbara (California)
+bitwarden.com
+
+@Nord Security
+nordvpn.com
+nordcdn.com
+nordpass.com
+nordaccount.com
+nordlayer.com
+
+@ExpressVPN
+expressvpn.com
+
+@Ecosia|DE|Berlín
+ecosia.org
+
+@Qwant|FR|París
+qwant.com
+
+@Wikimedia Foundation|US|San Francisco
+wikipedia.org
+wikimedia.org
+wikidata.org
+wiktionary.org
+wikisource.org
+wikibooks.org
+wikiquote.org
+wikinews.org
+wikivoyage.org
+wikiversity.org
+mediawiki.org
+wikimediafoundation.org
+
+@Bluesky|US
+bsky.app
+
+@Quora|US|Mountain View (California)
+quora.com
+quoracdn.net
+poe.com
+
+# ============================================================================================
+# 3. Inteligencia artificial
+# ============================================================================================
+
+@DeepSeek|CN|Hangzhou
+deepseek.com
+
+@Moonshot AI|CN|Pekín
+moonshot.cn
+kimi.com
+
+@Zhipu AI|CN|Pekín
+zhipuai.cn
+chatglm.cn
+bigmodel.cn
+
+@MiniMax|CN|Shanghái
+minimaxi.com
+hailuoai.com
+
+@Mistral AI|FR|París
+mistral.ai
+
+@Perplexity|US|San Francisco
+perplexity.ai
+pplx.ai
+
+@Hugging Face|US|Nueva York
+huggingface.co
+hf.co
+
+@Midjourney|US|San Francisco
+midjourney.com
+
+@Character.AI|US|Menlo Park (California)
+character.ai
+
+@Cohere|CA|Toronto
+cohere.com
+cohere.ai
+
+@Stability AI|GB|Londres
+stability.ai
+
+@ElevenLabs
+elevenlabs.io
+
+@Runway|US|Nueva York
+runwayml.com
+
+@Suno|US|Cambridge (Massachusetts)
+suno.com
+suno.ai
+
+@DeepL|DE|Colonia
+deepl.com
+
+@Grammarly|US|San Francisco
+grammarly.com
+grammarly.io
+
+@Anysphere (Cursor)|US|San Francisco
+cursor.com
+cursor.sh
+
+# ============================================================================================
+# 4. Antivirus y seguridad
+# ============================================================================================
+
+@Kaspersky|RU|Moscú
+kaspersky.com
+kaspersky.ru
+kaspersky-labs.com
+kas-labs.com
+securelist.com
+
+@ESET|SK|Bratislava
+eset.com
+eset.sk
+e5.sk
+welivesecurity.com
+
+@Bitdefender|RO|Bucarest
+bitdefender.com
+bitdefender.net
+
+@Sophos|GB|Abingdon
+sophos.com
+sophosupd.com
+sophosupd.net
+sophosxl.net
+
+@Trend Micro|JP|Tokio
+trendmicro.com
+trendmicro.co.jp
+
+@Malwarebytes|US|Santa Clara (California)
+malwarebytes.com
+malwarebytes.org
+mwbsys.com
+
+@F-Secure|FI|Helsinki
+f-secure.com
+
+@WithSecure|FI|Helsinki
+withsecure.com
+
+@Panda Security|ES|Bilbao
+pandasecurity.com
+
+@G DATA|DE|Bochum
+gdata.de
+gdatasoftware.com
+
+@Webroot
+webroot.com
+webrootcloudav.com
+
+@Emsisoft|NZ
+emsisoft.com
+
+@Check Point|IL|Tel Aviv
+checkpoint.com
+zonealarm.com
+
+@CrowdStrike|US|Austin (Texas)
+crowdstrike.com
+
+@SentinelOne|US|Mountain View (California)
+sentinelone.com
+sentinelone.net
+
+@Palo Alto Networks|US|Santa Clara (California)
+paloaltonetworks.com
+
+@Fortinet|US|Sunnyvale (California)
+fortinet.com
+fortinet.net
+fortiguard.com
+
+@Zscaler|US|San José (California)
+zscaler.com
+zscaler.net
+zscalertwo.net
+zscloud.net
+
+# ============================================================================================
+# 5. China, Asia y Oceanía
+# ============================================================================================
+
+@Tencent|CN|Shenzhen
+qq.com
+wechat.com
+gtimg.com
+gtimg.cn
+qpic.cn
+qlogo.cn
+idqqimg.com
+tencent.com
+tenpay.com
+weiyun.com
+wetv.vip
+
+@Alibaba Group|CN|Hangzhou
+taobao.com
+tmall.com
+tmall.hk
+1688.com
+alibaba.com
+alicdn.com
+aliexpress.com
+aliexpress.us
+mmstat.com
+tbcdn.cn
+dingtalk.com
+youku.com
+ykimg.com
+amap.com
+autonavi.com
+ele.me
+lazada.com
+tanx.com
+alimama.com
+ucweb.com
+uc.cn
+
+@Ant Group|CN|Hangzhou
+alipay.com
+alipayobjects.com
+alipayplus.com
+antgroup.com
+
+@Kuaishou|CN|Pekín
+kuaishou.com
+kwai.com
+gifshow.com
+yximgs.com
+
+@NetEase|CN|Hangzhou
+163.com
+126.com
+126.net
+127.net
+netease.com
+neteasegames.com
+yeah.net
+youdao.com
+
+@Sina|CN|Pekín
+sina.com.cn
+sina.cn
+sinaimg.cn
+sinajs.cn
+
+@Weibo|CN|Pekín
+weibo.com
+weibo.cn
+
+@JD.com|CN|Pekín
+jd.com
+jd.hk
+360buyimg.com
+jdpay.com
+joybuy.com
+
+@Pinduoduo|CN|Shanghái
+pinduoduo.com
+yangkeduo.com
+pddpic.com
+
+@Xiaohongshu|CN|Shanghái
+xiaohongshu.com
+xhscdn.com
+xhslink.com
+
+@Bilibili|CN|Shanghái
+bilibili.com
+hdslb.com
+biligame.com
+bilivideo.com
+b23.tv
+
+@Meituan|CN|Pekín
+meituan.com
+meituan.net
+dianping.com
+
+@DiDi|CN|Pekín
+didiglobal.com
+didichuxing.com
+99app.com
+
+@Trip.com Group|CN|Shanghái
+trip.com
+ctrip.com
+
+@iQIYI|CN|Pekín
+iqiyi.com
+iq.com
+qiyipic.com
+71.am
+
+@Zhihu|CN|Pekín
+zhihu.com
+zhimg.com
+
+@Qihoo 360|CN|Pekín
+360.cn
+360.com
+qhimg.com
+so.com
+
+@Kingsoft|CN|Pekín
+wps.com
+wps.cn
+
+@miHoYo|CN|Shanghái
+mihoyo.com
+hoyoverse.com
+hoyolab.com
+
+@Shein|SG|Singapur
+shein.com
+ltwebstatic.com
+
+@Sea Limited|SG|Singapur
+shopee.com
+shopee.sg
+shopee.com.my
+shopee.co.id
+shopee.co.th
+shopee.vn
+shopee.ph
+shopee.tw
+shopee.com.br
+shopee.com.mx
+shopee.com.co
+shopee.cl
+susercontent.com
+garena.com
+
+@Grab|SG|Singapur
+grab.com
+
+@Mintegral
+mintegral.com
+mintegral.net
+rayjump.com
+
+@GoTo|ID|Yakarta
+gojek.com
+tokopedia.com
+
+@Coupang|US|Seattle
+coupang.com
+coupangcdn.com
+
+@Krafton|KR|Seúl
+krafton.com
+pubg.com
+
+@Flipkart|IN|Bangalore
+flipkart.com
+flixcart.com
+
+@Reliance Jio|IN|Bombay
+jio.com
+
+@Paytm|IN|Noida
+paytm.com
+
+# ============================================================================================
+# 6. Rusia y su entorno
+# ============================================================================================
+
+@Avito|RU|Moscú
+avito.ru
+avito.st
+
+@Ozon|RU|Moscú
+ozon.ru
+ozone.ru
+
+@Wildberries|RU|Moscú
+wildberries.ru
+wb.ru
+wbstatic.net
+
+@T-Bank|RU|Moscú
+tinkoff.ru
+tbank.ru
+
+# ============================================================================================
+# 7. Europa
+# ============================================================================================
+
+@Klarna|SE|Estocolmo
+klarna.com
+klarnaservices.com
+klarnacdn.net
+
+@Adyen|NL|Ámsterdam
+adyen.com
+adyenpayments.com
+
+@Revolut|GB|Londres
+revolut.com
+
+@N26|DE|Berlín
+n26.com
+tech26.de
+
+@Wise|GB|Londres
+wise.com
+transferwise.com
+
+@Zalando|DE|Berlín
+zalando.com
+zalando.es
+zalando.de
+zalando.fr
+zalando.it
+zalan.do
+ztat.net
+
+@Otto Group|DE|Hamburgo
+otto.de
+
+@IKEA
+# Inter IKEA (la marca) y Ingka (las tiendas) son dos grupos distintos en Países Bajos: sin país
+# ni ciudad hasta saber cuál responde por la web.
+ikea.com
+
+@Inditex|ES|Arteixo
+inditex.com
+zara.com
+zara.net
+pullandbear.com
+bershka.com
+massimodutti.com
+stradivarius.com
+oysho.com
+zarahome.com
+
+@El Corte Inglés|ES|Madrid
+elcorteingles.es
+
+@Carrefour|FR|Massy
+carrefour.com
+carrefour.fr
+carrefour.es
+
+@Wallapop|ES|Barcelona
+wallapop.com
+
+@Idealista|ES|Madrid
+idealista.com
+idealista.pt
+idealista.it
+
+@Vinted|LT|Vilna
+vinted.com
+vinted.es
+vinted.fr
+vinted.de
+vinted.it
+vinted.net
+
+@Adevinta|NO|Oslo
+adevinta.com
+leboncoin.fr
+mobile.de
+kleinanzeigen.de
+milanuncios.com
+fotocasa.es
+infojobs.net
+coches.net
+subito.it
+marktplaats.nl
+
+@Allegro|PL|Poznań
+allegro.pl
+allegrostatic.com
+allegroimg.com
+
+@Axel Springer|DE|Berlín
+bild.de
+welt.de
+politico.com
+politico.eu
+businessinsider.com
+idealo.de
+
+@Der Spiegel|DE|Hamburgo
+spiegel.de
+
+@Le Monde|FR|París
+lemonde.fr
+
+@Le Figaro|FR|París
+lefigaro.fr
+
+@RTVE|ES
+rtve.es
+
+@Atresmedia|ES|San Sebastián de los Reyes
+atresmedia.com
+antena3.com
+lasexta.com
+atresplayer.com
+
+@Mediaset España|ES|Madrid
+telecinco.es
+cuatro.com
+mitele.es
+
+@Vocento|ES|Madrid
+abc.es
+elcorreo.com
+diariovasco.com
+elnortedecastilla.es
+lasprovincias.es
+larioja.com
+ideal.es
+diariosur.es
+hoy.es
+laverdad.es
+elcomercio.es
+
+@Grupo Godó|ES|Barcelona
+lavanguardia.com
+mundodeportivo.com
+
+@El Confidencial|ES|Madrid
+elconfidencial.com
+
+@eldiario.es|ES|Madrid
+eldiario.es
+
+@RAI|IT|Roma
+rai.it
+raiplay.it
+
+@RCS MediaGroup|IT|Milán
+corriere.it
+gazzetta.it
+
+@RTP|PT|Lisboa
+rtp.pt
+
+@Público|PT|Oporto
+publico.pt
+
+@ORF|AT|Viena
+orf.at
+
+@SRG SSR|CH|Berna
+srf.ch
+rts.ch
+rsi.ch
+swissinfo.ch
+
+@ZDF|DE|Maguncia
+zdf.de
+
+@ARD|DE
+ard.de
+ardmediathek.de
+tagesschau.de
+
+@France Télévisions|FR|París
+france.tv
+francetvinfo.fr
+
+@TF1|FR|Boulogne-Billancourt
+tf1.fr
+tf1info.fr
+
+@Guardian Media Group|GB|Londres
+theguardian.com
+guim.co.uk
+
+@DMG Media|GB|Londres
+dailymail.co.uk
+
+@Ryanair|IE|Dublín
+ryanair.com
+
+@TUI|DE|Hanóver
+tui.com
+tui.co.uk
+
+@Lufthansa|DE|Colonia
+lufthansa.com
+
+@Iberia|ES|Madrid
+iberia.com
+
+@Air France-KLM|FR
+airfrance.com
+klm.com
+
+@Skyscanner|GB|Edimburgo
+skyscanner.net
+skyscanner.com
+skyscanner.es
+
+@Deutsche Bank|DE|Fráncfort
+deutsche-bank.de
+db.com
+
+@ING|NL|Ámsterdam
+ing.com
+ing.es
+ing.nl
+ing.de
+
+@Santander|ES|Santander
+santander.com
+bancosantander.es
+santander.com.br
+santander.com.mx
+santander.co.uk
+openbank.es
+
+@BBVA|ES|Bilbao
+bbva.com
+bbva.es
+bbva.mx
+bbva.com.co
+
+@CaixaBank|ES
+caixabank.es
+caixabank.com
+lacaixa.es
+
+@Banco Sabadell|ES
+bancsabadell.com
+
+@BNP Paribas|FR|París
+bnpparibas.com
+
+@HSBC|GB|Londres
+hsbc.com
+hsbc.co.uk
+
+@Barclays|GB|Londres
+barclays.com
+barclays.co.uk
+
+@UniCredit|IT|Milán
+unicredit.it
+
+@Intesa Sanpaolo|IT|Turín
+intesasanpaolo.com
+
+@Bolt|EE|Tallin
+bolt.eu
+
+@Delivery Hero|DE|Berlín
+deliveryhero.com
+pedidosya.com
+talabat.com
+foodpanda.com
+
+@Glovo|ES|Barcelona
+glovoapp.com
+
+@Ericsson|SE|Estocolmo
+ericsson.com
+
+@Nokia|FI|Espoo
+nokia.com
+
+@Vodafone|GB|Newbury
+vodafone.com
+vodafone.es
+vodafone.de
+vodafone.it
+vodafone.co.uk
+
+@Orange|FR|Issy-les-Moulineaux
+orange.com
+orange.fr
+orange.es
+wanadoo.fr
+
+@Deutsche Telekom|DE|Bonn
+telekom.de
+telekom.com
+
+@T-Mobile US|US|Bellevue (Washington)
+t-mobile.com
+
+@SoundCloud|DE|Berlín
+soundcloud.com
+sndcdn.com
+
+@Deezer|FR|París
+deezer.com
+dzcdn.net
+
+@Dailymotion|FR|París
+dailymotion.com
+dmcdn.net
+
+@DAZN|GB|Londres
+dazn.com
+
+# ============================================================================================
+# 8. Estados Unidos y Canadá (además de los que ya estaban)
+# ============================================================================================
+
+@Vimeo|US|Nueva York
+vimeo.com
+vimeocdn.com
+
+@Comcast|US|Filadelfia
+comcast.com
+comcast.net
+xfinity.com
+nbcuniversal.com
+nbc.com
+peacocktv.com
+sky.com
+skysports.com
+sky.it
+
+@Paramount|US|Nueva York
+paramount.com
+paramountplus.com
+cbs.com
+pluto.tv
+
+@Fox Corporation|US|Nueva York
+fox.com
+foxnews.com
+foxsports.com
+tubi.tv
+tubitv.com
+
+@News Corp|US|Nueva York
+wsj.com
+dowjones.com
+barrons.com
+marketwatch.com
+nypost.com
+thetimes.co.uk
+thesun.co.uk
+realtor.com
+
+@The New York Times|US|Nueva York
+nytimes.com
+nyt.com
+
+@The Washington Post|US|Washington D. C.
+washingtonpost.com
+
+@Thomson Reuters|CA|Toronto
+reuters.com
+thomsonreuters.com
+
+@Bloomberg|US|Nueva York
+bloomberg.com
+bloomberg.net
+
+@The Weather Company|US|Atlanta (Georgia)
+weather.com
+imwx.com
+
+@Take-Two Interactive|US|Nueva York
+take2games.com
+rockstargames.com
+2k.com
+zynga.com
+
+@Walmart|US|Bentonville (Arkansas)
+walmart.com
+walmart.com.mx
+walmartimages.com
+samsclub.com
+
+@Target|US|Minneapolis
+target.com
+
+@Best Buy|US|Richfield (Minnesota)
+bestbuy.com
+bbystatic.com
+
+@eBay|US|San José (California)
+ebay.com
+ebay.es
+ebay.de
+ebay.co.uk
+ebayimg.com
+ebaystatic.com
+ebaydesc.com
+
+@Etsy|US|Nueva York
+etsy.com
+etsystatic.com
+
+@Expedia Group|US|Seattle
+expedia.com
+hotels.com
+vrbo.com
+trivago.com
+orbitz.com
+travelocity.com
+trvl-media.com
+
+@Tripadvisor|US|Needham (Massachusetts)
+tripadvisor.com
+tacdn.com
+thefork.com
+viator.com
+
+@Lyft|US|San Francisco
+lyft.com
+
+@DoorDash|US|San Francisco
+doordash.com
+
+@Visa|US|San Francisco
+visa.com
+cybersource.com
+authorize.net
+
+@Mastercard|US|Purchase (Nueva York)
+mastercard.com
+
+@American Express|US|Nueva York
+americanexpress.com
+aexp-static.com
+
+@Block|US|Oakland (California)
+squareup.com
+square.com
+cash.app
+afterpay.com
+tidal.com
+
+# ============================================================================================
+# 9. América Latina
+# ============================================================================================
+
+@Grupo Aval|CO|Bogotá
+grupoaval.com
+bancodebogota.com
+bancodeoccidente.com.co
+bancopopular.com.co
+bancoavvillas.com.co
+porvenir.com.co
+
+@Banco de la República|CO|Bogotá
+banrep.gov.co
+
+@DIAN|CO|Bogotá
+dian.gov.co
+
+@Registraduría Nacional del Estado Civil|CO|Bogotá
+registraduria.gov.co
+
+@Sector público de Colombia|CO
+gov.co
+
+@Sector público de México|MX
+gob.mx
+
+@Sector público de Brasil|BR
+gov.br
+
+@Gobierno de España|ES|Madrid
+gob.es
+agenciatributaria.es
+seg-social.es
+
+@Gobierno de Argentina|AR|Buenos Aires
+argentina.gob.ar
+
+@Sector público de Chile|CL
+gob.cl
+
+@Sector público del Perú|PE
+gob.pe
+
+@Publicaciones Semana|CO|Bogotá
+semana.com
+
+@Caracol Televisión|CO|Bogotá
+caracoltv.com
+noticiascaracol.com
+
+@RCN|CO|Bogotá
+rcnradio.com
+canalrcn.com
+noticiasrcn.com
+lafm.com.co
+
+@El Espectador|CO|Bogotá
+elespectador.com
+
+@El Colombiano|CO
+elcolombiano.com
+
+@ETB|CO|Bogotá
+etb.com.co
+
+@Falabella|CL|Santiago
+falabella.com
+falabella.com.co
+falabella.com.pe
+linio.com
+
+@Grupo Éxito|CO|Envigado
+exito.com
+carulla.com
+
+@Avianca
+avianca.com
+
+@LATAM Airlines|CL|Santiago
+latam.com
+latamairlines.com
+
+@Globo|BR|Río de Janeiro
+globo.com
+glbimg.com
+
+@UOL|BR|São Paulo
+uol.com.br
+uol.com
+imguol.com.br
+
+@Itaú Unibanco|BR|São Paulo
+itau.com.br
+itau.com
+
+@Bradesco|BR|Osasco
+bradesco.com.br
+
+@Nubank|BR|São Paulo
+nubank.com.br
+nu.com.mx
+nu.com.co
+
+@Banco do Brasil|BR|Brasilia
+bb.com.br
+
+@Caixa Econômica Federal|BR|Brasilia
+caixa.gov.br
+
+@Magazine Luiza|BR|Franca
+magazineluiza.com.br
+magalu.com
+
+@Americanas|BR|Río de Janeiro
+americanas.com.br
+submarino.com.br
+shoptime.com.br
+
+@iFood|BR|Osasco
+ifood.com.br
+
+@Grupo Clarín|AR|Buenos Aires
+clarin.com
+ole.com.ar
+tn.com.ar
+
+@La Nación|AR|Buenos Aires
+lanacion.com.ar
+
+@Infobae|AR|Buenos Aires
+infobae.com
+
+@El Universal|MX|Ciudad de México
+eluniversal.com.mx
+
+@TelevisaUnivision
+televisa.com
+univision.com
+vix.com
+
+@Banorte|MX|Monterrey
+banorte.com
+
+@FEMSA|MX|Monterrey
+femsa.com
+oxxo.com
+
+@Coppel|MX|Culiacán
+coppel.com
+
+@Liverpool|MX|Ciudad de México
+liverpool.com.mx
+
+@dLocal|UY|Montevideo
+dlocal.com
+
+@EBANX|BR|Curitiba
+ebanx.com
+
+@PayU|NL|Hoofddorp
+payu.com
+
+# ============================================================================================
+# 10. Webs conocidas de `sectores.txt` que aún no tenían dueño: deporte, prensa, bancos, tiendas,
+#     gobiernos, universidades, viajes, salud, empleo, comida y transporte. El dueño es la entidad
+#     que firma la web; la sede, la suya.
+# ============================================================================================
+
+@Real Betis Balompié|ES|Sevilla
+realbetisbalompie.es
+
+@Valencia CF|ES|Valencia
+valenciacf.com
+
+@Villarreal CF|ES|Villarreal
+villarrealcf.es
+
+@Athletic Club|ES|Bilbao
+athletic-club.eus
+
+@Real Federación Española de Fútbol|ES|Las Rozas de Madrid
+rfef.es
+
+@Chelsea FC|GB|Londres
+chelseafc.com
+
+@Arsenal FC|GB|Londres
+arsenal.com
+
+@Tottenham Hotspur|GB|Londres
+tottenhamhotspur.com
+
+@AC Milan|IT|Milán
+acmilan.com
+
+@Inter de Milán|IT|Milán
+inter.it
+
+@AS Roma|IT|Roma
+asroma.com
+
+@SSC Napoli|IT|Nápoles
+sscnapoli.it
+
+@Lega Serie A|IT|Milán
+legaseriea.it
+
+@Borussia Dortmund|DE|Dortmund
+bvb.de
+
+@DFL (Bundesliga)|DE|Fráncfort
+bundesliga.com
+
+@LFP (Ligue 1)|FR|París
+ligue1.com
+
+@AFC Ajax|NL|Ámsterdam
+ajax.nl
+
+@SL Benfica|PT|Lisboa
+slbenfica.pt
+
+@FC Porto|PT|Oporto
+fcporto.pt
+
+@Sporting CP|PT|Lisboa
+sporting.pt
+
+@CONMEBOL|PY|Luque
+conmebol.com
+
+@Concacaf|US|Miami
+concacaf.com
+
+@Federación Colombiana de Fútbol|CO|Bogotá
+fcf.com.co
+
+@América de Cali|CO|Cali
+americadecali.co
+
+@Deportivo Cali|CO|Cali
+deportivocali.co
+
+@Asociación del Fútbol Argentino|AR|Buenos Aires
+afa.com.ar
+
+@Club América|MX|Ciudad de México
+clubamerica.com.mx
+
+@Liga MX|MX|Ciudad de México
+ligamx.net
+
+@Palmeiras|BR|São Paulo
+palmeiras.com.br
+
+@Corinthians|BR|São Paulo
+corinthians.com.br
+
+@São Paulo FC|BR|São Paulo
+saopaulofc.net
+
+@Santos FC|BR|Santos
+santosfc.com.br
+
+@Confederação Brasileira de Futebol|BR|Río de Janeiro
+cbf.com.br
+
+@Major League Soccer|US|Nueva York
+mlssoccer.com
+
+@MLB|US|Nueva York
+mlb.com
+
+@NHL|US|Nueva York
+nhl.com
+
+@Formula 1|GB|Londres
+formula1.com
+
+@Dorna (MotoGP)|ES|Madrid
+motogp.com
+
+@Comité Olímpico Internacional|CH|Lausana
+olympics.com
+
+@ATP Tour|GB|Londres
+atptour.com
+
+@WTA|US|San Petersburgo (Florida)
+wtatennis.com
+
+@PGA Tour|US|Ponte Vedra Beach (Florida)
+pgatour.com
+
+@UFC|US|Las Vegas
+ufc.com
+
+@Prensa Ibérica|ES|Barcelona
+sport.es
+
+@TyC Sports|AR|Buenos Aires
+tycsports.com
+
+@Win Sports|CO|Bogotá
+winsports.co
+
+@Lance!|BR|Río de Janeiro
+lance.com.br
+
+@L'Équipe|FR|Boulogne-Billancourt
+lequipe.fr
+
+@FotMob|NO|Oslo
+fotmob.com
+
+@Sofascore|HR|Zagreb
+sofascore.com
+
+@Livesport (Flashscore)|CZ|Praga
+flashscore.com
+
+@Transfermarkt|DE|Hamburgo
+transfermarkt.com
+transfermarkt.es
+
+@El Heraldo|CO|Barranquilla
+elheraldo.co
+
+@El País (Cali)|CO|Cali
+elpais.com.co
+
+@El Universal (Cartagena)|CO|Cartagena
+eluniversal.com.co
+
+@La República (Colombia)|CO|Bogotá
+larepublica.co
+
+@Pulzo|CO|Bogotá
+pulzo.com
+
+@20minutos|ES|Madrid
+20minutos.es
+
+@Público (España)|ES|Madrid
+publico.es
+
+@La Razón|ES|Madrid
+larazon.es
+
+@Página/12|AR|Buenos Aires
+pagina12.com.ar
+
+@Milenio|MX
+milenio.com
+
+@Excélsior|MX|Ciudad de México
+excelsior.com.mx
+
+@Proceso|MX|Ciudad de México
+proceso.com.mx
+
+@El Mercurio|CL|Santiago
+emol.com
+
+@La Tercera|CL|Santiago
+latercera.com
+
+@El Comercio (Perú)|PE|Lima
+elcomercio.pe
+
+@La República (Perú)|PE|Lima
+larepublica.pe
+
+@Estadão|BR|São Paulo
+estadao.com.br
+
+@Expresso|PT
+expresso.pt
+
+@Associated Press|US|Nueva York
+apnews.com
+
+@Financial Times|GB|Londres
+ft.com
+
+@The Economist|GB|Londres
+economist.com
+
+@Forbes|US
+forbes.com
+
+@Deutsche Welle|DE|Bonn
+dw.com
+
+@France Médias Monde|FR|Issy-les-Moulineaux
+france24.com
+
+@Euronews
+euronews.com
+
+@Al Jazeera|QA|Doha
+aljazeera.com
+
+@El Financiero|MX|Ciudad de México
+elfinanciero.com.mx
+
+@El Economista (España)|ES|Madrid
+eleconomista.es
+
+@Channel 4|GB|Londres
+channel4.com
+
+@ITV|GB|Londres
+itv.com
+
+@CBC/Radio-Canada|CA|Ottawa
+cbc.ca
+
+@Future plc|GB|Bath
+space.com
+techradar.com
+tomsguide.com
+tomshardware.com
+pcgamer.com
+
+@Ziff Davis|US|Nueva York
+ign.com
+mashable.com
+pcmag.com
+speedtest.net
+ookla.com
+downdetector.com
+
+@Live Nation|US|Beverly Hills
+livenation.com
+ticketmaster.com
+
+@Imgur|US|San Francisco
+imgur.com
+
+@Scotiabank Colpatria|CO|Bogotá
+scotiabankcolpatria.com
+
+@Banco Caja Social|CO|Bogotá
+bancocajasocial.com
+
+@BancoEstado|CL|Santiago
+bancoestado.cl
+
+@Banco de Chile|CL|Santiago
+bancochile.cl
+
+@Credicorp (BCP)|PE|Lima
+viabcp.com
+bcp.com.bo
+
+@Interbank|PE|Lima
+interbank.pe
+
+@Banamex|MX|Ciudad de México
+citibanamex.com
+
+@Bankinter|ES|Madrid
+bankinter.com
+
+@Unicaja|ES|Málaga
+unicajabanco.es
+
+@Ibercaja|ES|Zaragoza
+ibercaja.es
+
+@Abanca|ES
+abanca.com
+
+@Kutxabank|ES|Bilbao
+kutxabank.es
+
+@Caixa Geral de Depósitos|PT|Lisboa
+cgd.pt
+
+@Millennium bcp|PT
+millenniumbcp.pt
+
+@Novo Banco|PT|Lisboa
+novobanco.pt
+
+@JPMorgan Chase|US|Nueva York
+chase.com
+
+@Bank of America|US|Charlotte (Carolina del Norte)
+bankofamerica.com
+
+@Wells Fargo|US|San Francisco
+wellsfargo.com
+
+@Citigroup|US|Nueva York
+citi.com
+
+@Capital One|US|McLean (Virginia)
+capitalone.com
+
+@ACH Colombia (PSE)|CO|Bogotá
+pse.com.co
+
+@Banco de España|ES|Madrid
+bde.es
+
+@Banco de México|MX|Ciudad de México
+banxico.org.mx
+
+@Binance
+binance.com
+
+@Coinbase|US
+coinbase.com
+
+@Kraken|US
+kraken.com
+
+@Costco|US|Issaquah (Washington)
+costco.com
+
+@Alkosto|CO|Bogotá
+alkosto.com
+ktronix.com
+
+@Sodimac Colombia|CO|Bogotá
+homecenter.com.co
+
+@Olímpica|CO|Barranquilla
+olimpica.com
+
+@Tiendas D1|CO
+tiendasd1.com
+
+@Mercadona|ES|Valencia
+mercadona.es
+
+@Lidl|DE|Neckarsulm
+lidl.es
+lidl.com
+
+@Mango|ES
+mango.com
+
+@Primark|IE|Dublín
+primark.com
+
+@H&M|SE|Estocolmo
+hm.com
+
+@Decathlon|FR|Villeneuve-d'Ascq
+decathlon.es
+decathlon.com.co
+
+@PcComponentes|ES|Alhama de Murcia
+pccomponentes.com
+
+@MediaMarkt|DE|Ingolstadt
+mediamarkt.es
+
+@Fnac Darty|FR|Ivry-sur-Seine
+fnac.es
+
+@Casas Bahia|BR|São Caetano do Sul
+casasbahia.com.br
+
+@OLX Brasil|BR
+olx.com.br
+
+@Mastodon|DE|Berlín
+mastodon.social
+
+@Kick|AU|Melbourne
+kick.com
+
+@DIRECTV|US|El Segundo (California)
+directvgo.com
+
+@Bandcamp|US
+bandcamp.com
+
+@Genius|US|Nueva York
+genius.com
+
+@Studio Sol (Letras)|BR|Belo Horizonte
+letras.com
+
+@Musixmatch|IT|Bolonia
+musixmatch.com
+
+@Confecámaras (RUES)|CO|Bogotá
+rues.org.co
+
+@AFIP / ARCA|AR|Buenos Aires
+afip.gob.ar
+
+@Servicio de Impuestos Internos|CL|Santiago
+sii.cl
+
+@Sector público de Portugal|PT
+gov.pt
+
+@Gobierno federal de EE. UU.|US|Washington D. C.
+usa.gov
+irs.gov
+cdc.gov
+nih.gov
+medlineplus.gov
+
+@Unión Europea|BE|Bruselas
+europa.eu
+
+@Real Academia Española|ES|Madrid
+rae.es
+
+@Khan Academy|US|Mountain View (California)
+khanacademy.org
+
+@Coursera|US|Mountain View (California)
+coursera.org
+
+@edX|US
+edx.org
+
+@Udemy|US|San Francisco
+udemy.com
+
+@Platzi|CO|Bogotá
+platzi.com
+
+@Moodle|AU|Perth
+moodle.org
+
+@Instructure (Canvas)|US|Salt Lake City
+instructure.com
+
+@Encyclopaedia Britannica|US|Chicago
+britannica.com
+
+@Universidad Nacional de Colombia|CO|Bogotá
+unal.edu.co
+
+@Universidad de los Andes|CO|Bogotá
+uniandes.edu.co
+
+@Pontificia Universidad Javeriana|CO|Bogotá
+javeriana.edu.co
+
+@Universidad de Antioquia|CO|Medellín
+udea.edu.co
+
+@SENA|CO|Bogotá
+sena.edu.co
+
+@Universidad Complutense de Madrid|ES|Madrid
+ucm.es
+
+@UNED|ES|Madrid
+uned.es
+
+@Universidade de São Paulo|BR|São Paulo
+usp.br
+
+@UNAM|MX|Ciudad de México
+unam.mx
+
+@Universidad de Buenos Aires|AR|Buenos Aires
+uba.ar
+
+@Harvard University|US|Cambridge (Massachusetts)
+harvard.edu
+
+@MIT|US|Cambridge (Massachusetts)
+mit.edu
+
+@Stanford University|US|Stanford (California)
+stanford.edu
+
+@ResearchGate|DE|Berlín
+researchgate.net
+
+@Academia.edu|US|San Francisco
+academia.edu
+
+@Copa Holdings|PA|Ciudad de Panamá
+copaair.com
+wingo.com
+
+@Vueling|ES|El Prat de Llobregat
+vueling.com
+
+@easyJet|GB|Luton
+easyjet.com
+
+@Air Europa|ES|Llucmajor
+aireuropa.com
+
+@Aeroméxico|MX|Ciudad de México
+aeromexico.com
+
+@Volaris|MX|Ciudad de México
+volaris.com
+
+@Viva Aerobus|MX|Monterrey
+vivaaerobus.com
+
+@JetSMART|CL|Santiago
+jetsmart.com
+
+@Azul|BR|Barueri
+azul.com.br
+
+@GOL|BR|São Paulo
+voegol.com.br
+
+@TAP Air Portugal|PT|Lisboa
+tap.pt
+
+@United Airlines|US|Chicago
+united.com
+
+@American Airlines|US|Fort Worth (Texas)
+aa.com
+
+@Delta Air Lines|US|Atlanta (Georgia)
+delta.com
+
+@Despegar|AR|Buenos Aires
+despegar.com
+despegar.com.co
+decolar.com
+
+@Renfe|ES|Madrid
+renfe.com
+
+@ALSA|ES|Oviedo
+alsa.es
+
+@redBus
+redbus.co
+
+@Civitatis|ES|Madrid
+civitatis.com
+
+@Chess.com|US
+chess.com
+
+@Lichess|FR
+lichess.org
+
+@itch.io|US
+itch.io
+
+@CD PROJEKT (GOG)|PL|Varsovia
+gog.com
+
+@Mayo Clinic|US|Rochester (Minnesota)
+mayoclinic.org
+
+@Organización Mundial de la Salud|CH|Ginebra
+who.int
+
+@Organización Panamericana de la Salud|US|Washington D. C.
+paho.org
+
+@WebMD|US|Nueva York
+webmd.com
+
+@EPS Sura|CO|Medellín
+epssura.com
+
+@Sanitas (España)|ES|Madrid
+sanitas.es
+
+@Compensar|CO|Bogotá
+compensar.com
+
+@Famisanar|CO|Bogotá
+famisanar.com.co
+
+@Nueva EPS|CO|Bogotá
+nuevaeps.com.co
+
+@Colsanitas|CO|Bogotá
+colsanitas.com
+
+@Cafam|CO|Bogotá
+cafam.com.co
+
+@Colsubsidio|CO|Bogotá
+colsubsidio.com
+
+@Quirónsalud|ES|Madrid
+quironsalud.com
+
+@Docplanner (Doctoralia)|PL|Varsovia
+doctoralia.com
+doctoralia.co
+doctoralia.es
+
+@Farmatodo
+farmatodo.com.co
+
+@Drogas La Rebaja|CO|Bogotá
+larebajavirtual.com
+
+@Cruz Verde|CL|Santiago
+cruzverde.com.co
+
+@Redarbor (Computrabajo)|ES|Barcelona
+computrabajo.com
+
+@Indeed|US|Austin (Texas)
+indeed.com
+
+@Glassdoor|US|San Francisco
+glassdoor.com
+
+@Magneto365|CO
+magneto365.com
+
+@Upwork|US
+upwork.com
+
+@Fiverr|IL|Tel Aviv
+fiverr.com
+
+@Workana|AR|Buenos Aires
+workana.com
+
+@Bumeran|AR|Buenos Aires
+bumeran.com
+
+@Catho|BR
+catho.com.br
+
+@OCC Mundial|MX|Ciudad de México
+occ.com.mx
+
+@Asana|US|San Francisco
+asana.com
+
+@Startpage|NL
+startpage.com
+
+@Tuta|DE|Hanóver
+tutanota.com
+tuta.com
+
+@Just Eat Takeaway|NL|Ámsterdam
+justeat.es
+
+@Grubhub|US
+grubhub.com
+
+@McDonald's|US|Chicago
+mcdonalds.com
+
+@Starbucks|US|Seattle
+starbucks.com
+
+@Domino's|US|Ann Arbor (Míchigan)
+dominos.com
+
+@KFC|US|Louisville (Kentucky)
+kfc.com
+
+@Burger King|US|Miami
+burgerking.com
+
+@Juan Valdez Café|CO|Bogotá
+juanvaldezcafe.com
+
+@Frisby|CO|Pereira
+frisby.com.co
+
+@El Corral|CO|Bogotá
+elcorral.com
+
+@Cabify|ES|Madrid
+cabify.com
+
+@inDrive|US|Mountain View (California)
+indrive.com
+
+@BlaBlaCar|FR|París
+blablacar.es
+blablacar.com.br
+
+@Metro de Madrid|ES|Madrid
+metromadrid.es
+
+@TMB|ES|Barcelona
+tmb.cat
+
+@Gannett|US
+usatoday.com
+
+# ============================================================================================
+# 11. Publicidad y medición que faltaban (nombres de la lista de Peter Lowe y de EasyPrivacy cuyo
+#     dueño es claro)
+# ============================================================================================
+
+@Adcash|EE|Tallin
+adcash.com
+
+@illumin (AcuityAds)|CA|Toronto
+acuityads.com
+acuityplatform.com
+
+@Adyoulike|FR|París
+adyoulike.com
+
+@Admitad|DE|Berlín
+admitad.com
+
+@Kevel|US|Durham (Carolina del Norte)
+adzerk.net
+
+@Medallia|US|San Francisco
+medallia.eu
+medallia.com
+
+@Picsart|US|Miami
+picsart.com
+
+@=Adform
+adform.com
+adformdsp.net
+
+@=ADITION technologies
+adition.de
+adition.net
+
+@=Singular
+apsalar.com
+
+@=Bidtellect
+bidtellect.com
+
+@=Beachfront
+beachfront.com
+
+@=Oracle
+bkrtx.com
+
+@=Adobe
+bizible.com
+
+@=Mozilla
+mozgcp.net
+
+@=Disney
+abcnews.com
+
+@=Paramount
+cbsnews.com
+
+@=Wix
+deviantart.com
+
+@=Fandom
+wikia.com
+nocookie.net
+
+@=Datadog
+datadoghq.eu
+
+@=LogRocket
+logrocket.io
+
+@=Kameleoon
+kameleoon.com
+
+@=Akamai
+akstat.io
+
+@=Globo
+ge.globo
+g1.globo
+
+@=Disney
+espn.com.co
+espndeportes.com
+starplus.com
+
+@=PRISA
+caracol.com.co
+
+@=Airbnb
+airbnb.com.co
+
+@=Tripadvisor
+tripadvisor.es
+
+@=Expedia Group
+trivago.es
+
+@=Yahoo
+yahoo.es
+
+@=Telefónica
+movistarplus.es
+
+@=Grupo Aval
+avvillas.com.co
+
+@=Itaú Unibanco
+itau.co
+
+@=Falabella
+bancofalabella.com.co
+
+@=Banco do Brasil
+bancobrasil.com.br
+
+@=Banco Sabadell
+sabadell.com
+
+@=Carrefour
+carrefour.com.br
+
+@=Gobierno de España
+sepe.es
+dgt.es
+boe.es

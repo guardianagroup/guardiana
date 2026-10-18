@@ -16,6 +16,7 @@ mod borrado;
 mod destinos;
 mod empresa;
 mod expedientes;
+mod identificacion;
 mod medidas;
 mod revision;
 mod universo;
@@ -874,6 +875,34 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             "/revision.html",
             get(|| async { pagina(include_str!("../static/revision.html")) }),
         )
+        // «Quién es cada destino» (1.0.45): its page, script and style sheet, and its figures.
+        .route(
+            "/identificacion",
+            get(|| async { pagina(include_str!("../static/identificacion.html")) }),
+        )
+        .route(
+            "/identificacion.html",
+            get(|| async { pagina(include_str!("../static/identificacion.html")) }),
+        )
+        .route(
+            "/static/identificacion.js",
+            get(|| async {
+                static_response(
+                    include_str!("../static/identificacion.js"),
+                    "application/javascript; charset=utf-8",
+                )
+            }),
+        )
+        .route(
+            "/static/identificacion.css",
+            get(|| async {
+                static_response(
+                    include_str!("../static/identificacion.css"),
+                    "text/css; charset=utf-8",
+                )
+            }),
+        )
+        .route("/api/identificacion", get(identificacion::api))
         .route(
             "/por-dentro",
             get(|| async { pagina(include_str!("../static/por-dentro.html")) }),
@@ -1094,11 +1123,13 @@ mod textos {
             include_str!("../static/expedientes.html"),
             include_str!("../static/por-dentro.html"),
             include_str!("../static/revision.html"),
+            include_str!("../static/identificacion.html"),
         ];
         const SCRIPTS: &[&str] = &[
             include_str!("../static/app.js"),
             include_str!("../static/por-dentro.js"),
             include_str!("../static/revision.js"),
+            include_str!("../static/identificacion.js"),
         ];
         // The keys asked for with a literal: `data-t="x"` in the pages, `t('x')` in the scripts.
         // The ones built at run time (`t('cambio_' + x)`) cannot be read here and are covered by

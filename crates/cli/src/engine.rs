@@ -671,6 +671,20 @@ impl Policy for EnginePolicy {
         if let Outcome::Forwarded { aliases, .. } = &outcome {
             if !aliases.is_empty() {
                 event.cname_target = inner.classifier.catalog().cloaked_target(&q.name, aliases);
+                // 1.0.45: the sites of the whole chain, by name, so the panel can say whose
+                // service answers under it (`atribucion`). Only for a device whose names the
+                // household may read: a phone that does not share its detail leaves no name here.
+                let comparte = p.device_id == guardiana_core::SELF_DEVICE_ID
+                    || inner.ledger.shares_detail(&p.device_id).unwrap_or(false);
+                if comparte {
+                    let sitios = guardiana_lists::atribucion::sitios_de_cadena(
+                        &q.name,
+                        aliases,
+                        guardiana_core::MAX_ALIAS_SITES,
+                    );
+                    // A failure here loses a clue, never the query's own row.
+                    let _ = inner.ledger.note_alias_sites(&q.name, &sitios, q.ts);
+                }
             }
         }
         if verdict == Verdict::Cortado && p.disfraz_cortado.is_some() {

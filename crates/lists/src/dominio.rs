@@ -125,6 +125,27 @@ pub fn bajo_sufijo_privado(host: &str) -> bool {
     (1..etiquetas.len()).any(|i| r.privados.contains(&etiquetas[i..].join(".")))
 }
 
+/// The site an alias stands for when GUARDIANA keeps it (1.0.45): its registrable site, except
+/// under a suffix of the list's private section (`d1x.cloudfront.net`, `tienda.myshopify.com`),
+/// where it is the service's suffix itself (`cloudfront.net`): which customer of the service it
+/// was is not needed to say whose road it is, so it is not kept.
+#[must_use]
+pub fn sitio_de_alias(host: &str) -> String {
+    let host = normaliza_host(host);
+    if host.parse::<IpAddr>().is_ok() {
+        return host;
+    }
+    let etiquetas: Vec<&str> = host.split('.').filter(|e| !e.is_empty()).collect();
+    let r = reglas();
+    for i in 1..etiquetas.len() {
+        let s = etiquetas[i..].join(".");
+        if r.privados.contains(&s) {
+            return s;
+        }
+    }
+    sitio(&host)
+}
+
 /// Whether the last label of `host` is a top-level domain the Public Suffix List knows
 /// (`com`, `co`, `xn--p1ai`): what tells «elpais.com» (an address) from «node.js» (a search).
 #[must_use]

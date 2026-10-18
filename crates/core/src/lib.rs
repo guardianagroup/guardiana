@@ -14,6 +14,7 @@
 //! Only DNS *queries* are ever stored: name, type, device, time, category,
 //! signals and verdict. Answers are never stored (brief §4).
 
+mod alias;
 mod changes;
 mod error;
 mod export;
@@ -33,6 +34,7 @@ pub mod time;
 mod trafico;
 pub mod trampas;
 
+pub use alias::{AliasSites, NameNetwork, MAX_ALIAS_SITES};
 pub use changes::{Change, ChangeKind, ChangeWho};
 pub use error::{Error, Result};
 pub use export::{

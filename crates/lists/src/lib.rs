@@ -11,9 +11,11 @@
 //! `esperado` > `telemetria` > `rastreador` > `publicidad`.
 
 pub mod antivirus;
+pub mod atribucion;
 pub mod dominio;
 mod parse;
 mod red;
+pub mod ubicacion;
 
 use std::collections::HashMap;
 
@@ -42,6 +44,12 @@ pub const EVASION_DNS: &str = include_str!("../data/evasion_dns.txt");
 pub const MANIFEST_JSON: &str = include_str!("../data/MANIFEST.json");
 /// Guardiana's own "empresas" list: who owns each name (decision 61). A label, never a verdict.
 pub const EMPRESAS: &str = include_str!("../data/empresas.txt");
+/// More owners, for people in any country (1.0.45): the same format, plus `@=Empresa` sections
+/// that add names to a company already written, which keeps one country and one city per company.
+pub const EMPRESAS_MUNDO: &str = include_str!("../data/empresas-mundo.txt");
+/// What kind of network each autonomous system is: a company's own, a cloud, a delivery network,
+/// an access provider (1.0.45). What lets a server on AWS not read as Amazon.
+pub const REDES: &str = include_str!("../data/redes.txt");
 
 /// Guardiana's own "IA" list: which names belong to an artificial-intelligence service (decision 62).
 pub const IA: &str = include_str!("../data/ia.txt");
@@ -156,8 +164,6 @@ pub fn data_brokers() -> Vec<DataBroker> {
         .collect()
 }
 
-static COMPANIES: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
-    std::sync::OnceLock::new();
 static AI_SERVICES: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
     std::sync::OnceLock::new();
 static HOSTING: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
@@ -169,11 +175,20 @@ static SECTORS: std::sync::OnceLock<HashMap<&'static str, &'static str>> =
 
 /// Longest matching domain of a name map: `graph.facebook.com` matches an entry `facebook.com`.
 fn lookup<V: Copy>(map: &HashMap<&'static str, V>, qname: &str) -> Option<V> {
+    lookup_con_sufijo(map, qname).map(|(v, _)| v)
+}
+
+/// [`lookup`], with the entry that matched (`facebook.com`), so two lists can be told which one
+/// said the more specific thing.
+fn lookup_con_sufijo<V: Copy>(
+    map: &HashMap<&'static str, V>,
+    qname: &str,
+) -> Option<(V, &'static str)> {
     let name = qname.trim_end_matches('.').to_ascii_lowercase();
     let mut rest = name.as_str();
     loop {
-        if let Some(v) = map.get(rest) {
-            return Some(*v);
+        if let Some((k, v)) = map.get_key_value(rest) {
+            return Some((*v, *k));
         }
         let i = rest.find('.')?;
         rest = &rest[i + 1..];
@@ -241,6 +256,10 @@ pub fn sector_of(qname: &str) -> Option<&'static str> {
 
 /// The cloud a queried name is hosted on, when it is a rented server there (`x.herokuapp.com` →
 /// `Heroku`): the name belongs to whoever rents it, not to the cloud.
+///
+/// A longer entry of the companies' lists wins: a company that documents its own rented server
+/// (`triplewhale-pixel.web.app`) owns that name, the cloud does not (1.0.45, when `web.app` joined
+/// the list).
 #[must_use]
 pub fn hosting_of(qname: &str) -> Option<&'static str> {
     let map = HOSTING.get_or_init(|| {
@@ -248,7 +267,11 @@ pub fn hosting_of(qname: &str) -> Option<&'static str> {
             .filter_map(|(section, domain)| section.map(|c| (domain, c)))
             .collect()
     });
-    lookup(map, qname)
+    let (nube, sufijo) = lookup_con_sufijo(map, qname)?;
+    match lookup_con_sufijo(companies(), qname) {
+        Some((_, de_empresa)) if de_empresa.len() > sufijo.len() => None,
+        _ => Some(nube),
+    }
 }
 
 /// The company behind a queried name, by longest matching domain of the "empresas" list
@@ -331,8 +354,8 @@ pub fn company_of_asn(asn: u32) -> Option<&'static str> {
     .copied()
 }
 
-/// What `empresas.txt` says of one company, found by its name as the lists show it
-/// (`Criteo`): its country, city and group when written, and the names it owns.
+/// What `empresas.txt` (and `empresas-mundo.txt`) say of one company, found by its name as the
+/// lists show it (`Criteo`): its country, city and group when written, and the names it owns.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CompanyRecord {
     /// The name, as written in its header.
@@ -355,34 +378,116 @@ pub fn company_record(name: &str) -> Option<CompanyRecord> {
     if name.is_empty() {
         return None;
     }
-    let mut out: Option<CompanyRecord> = None;
-    for line in EMPRESAS.lines() {
-        let line = line.split('#').next().unwrap_or("").trim();
-        if let Some(header) = line.strip_prefix('@') {
-            if out.is_some() {
-                break;
-            }
-            let mut f = header.split('|').map(str::trim);
-            let n = f.next().unwrap_or("");
-            if n == name {
-                let country = f.next().filter(|p| p.len() == 2);
-                let city = f.next().filter(|c| !c.is_empty());
-                let group = f.next().filter(|g| !g.is_empty());
-                out = Some(CompanyRecord {
-                    name: n,
-                    country,
-                    city,
-                    group,
-                    domains: Vec::new(),
-                });
-            }
-        } else if let Some(r) = out.as_mut() {
-            if !line.is_empty() && !line.starts_with("AS") {
-                r.domains.push(line);
-            }
+    let header = *headers().get(name)?;
+    let mut f = header.split('|').map(str::trim);
+    let n = f.next().unwrap_or("");
+    let country = f.next().filter(|p| p.len() == 2);
+    let city = f.next().filter(|c| !c.is_empty());
+    let group = f.next().filter(|g| !g.is_empty());
+    let mut domains = Vec::new();
+    for (section, domain) in company_entries() {
+        if section.split('|').next().map(str::trim) == Some(n) {
+            domains.push(domain);
         }
     }
-    out
+    Some(CompanyRecord {
+        name: n,
+        country,
+        city,
+        group,
+        domains,
+    })
+}
+
+/// Every company header of the two lists by its name (`Google` → `Google|US|Mountain View|…`).
+/// `empresas.txt` first: a name written in both keeps its first header.
+fn headers() -> &'static HashMap<&'static str, &'static str> {
+    static H: std::sync::OnceLock<HashMap<&'static str, &'static str>> = std::sync::OnceLock::new();
+    H.get_or_init(|| {
+        let mut h = HashMap::new();
+        for text in [EMPRESAS, EMPRESAS_MUNDO] {
+            for line in text.lines() {
+                let line = line.split('#').next().unwrap_or("").trim();
+                if let Some(header) = line.strip_prefix('@') {
+                    if header.starts_with('=') {
+                        continue;
+                    }
+                    let name = header.split('|').next().unwrap_or(header).trim();
+                    if !name.is_empty() {
+                        h.entry(name).or_insert(header.trim());
+                    }
+                }
+            }
+        }
+        h
+    })
+}
+
+/// Which list wrote an owner: `empresas.txt` or `empresas-mundo.txt`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum OrigenEmpresa {
+    Empresas,
+    Mundo,
+}
+
+/// Every (header, domain) of the two lists, an `@=Empresa` section resolved to that company's
+/// own header. A section `@=` naming no company is dropped (a test makes sure there is none).
+fn company_entries_con_origen() -> &'static [(&'static str, &'static str, OrigenEmpresa)] {
+    static E: std::sync::OnceLock<Vec<(&'static str, &'static str, OrigenEmpresa)>> =
+        std::sync::OnceLock::new();
+    E.get_or_init(|| {
+        let mut out = Vec::new();
+        for (text, origen) in [
+            (EMPRESAS, OrigenEmpresa::Empresas),
+            (EMPRESAS_MUNDO, OrigenEmpresa::Mundo),
+        ] {
+            for (section, domain) in parse_guardiana(text) {
+                let Some(section) = section else { continue };
+                let header = match section.strip_prefix('=') {
+                    Some(name) => match headers().get(name.trim()) {
+                        Some(h) => *h,
+                        None => continue,
+                    },
+                    None => section,
+                };
+                out.push((header, domain, origen));
+            }
+        }
+        out
+    })
+}
+
+fn company_entries() -> impl Iterator<Item = (&'static str, &'static str)> {
+    company_entries_con_origen()
+        .iter()
+        .map(|(h, d, _)| (*h, *d))
+}
+
+/// Domain → (header, origin). Inside `empresas.txt` the last section to write a domain keeps
+/// it, as it always did (`segment.io` is Segment's, written after Twilio's); `empresas-mundo.txt`
+/// only fills what `empresas.txt` does not write.
+fn companies() -> &'static HashMap<&'static str, (&'static str, OrigenEmpresa)> {
+    static M: std::sync::OnceLock<HashMap<&'static str, (&'static str, OrigenEmpresa)>> =
+        std::sync::OnceLock::new();
+    M.get_or_init(|| {
+        let mut m = HashMap::new();
+        for (h, d, o) in company_entries_con_origen() {
+            match o {
+                OrigenEmpresa::Empresas => {
+                    m.insert(*d, (*h, *o));
+                }
+                OrigenEmpresa::Mundo => {
+                    m.entry(*d).or_insert((*h, *o));
+                }
+            }
+        }
+        m
+    })
+}
+
+/// The owner entry that matched `qname`, with the domain it matched and which list wrote it.
+pub(crate) fn company_match(qname: &str) -> Option<(&'static str, &'static str, OrigenEmpresa)> {
+    lookup_con_sufijo(companies(), qname).map(|((h, o), sufijo)| (h, sufijo, o))
 }
 
 /// Profiles of the companies people meet most (`data/fichas.json`): what each does, its
@@ -417,12 +522,7 @@ pub fn profiles_checked() -> &'static str {
 }
 
 fn seccion_de(qname: &str) -> Option<&'static str> {
-    let map = COMPANIES.get_or_init(|| {
-        parse_guardiana(EMPRESAS)
-            .filter_map(|(section, domain)| section.map(|c| (domain, c)))
-            .collect()
-    });
-    lookup(map, qname)
+    lookup(companies(), qname).map(|(h, _)| h)
 }
 
 /// A third-party list: where it comes from and under what terms.
@@ -1039,6 +1139,9 @@ mod company_tests {
         assert_eq!(company_of("gateway.fe2.apple-dns.net"), Some("Apple"));
         assert_eq!(company_of("e673.dsce9.akamaiedge.net"), Some("Akamai"));
         assert_eq!(company_of("ejemplo.example"), None);
+        // A domain written twice in empresas.txt keeps its last section (1.0.45 kept the first
+        // for a moment and Segment read as Twilio).
+        assert_eq!(company_of("api.segment.io"), Some("Segment"));
     }
 
     #[test]

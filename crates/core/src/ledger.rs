@@ -312,6 +312,7 @@ impl Ledger {
         ledger.ensure_gaps_table()?;
         ledger.ensure_changes_table()?;
         ledger.ensure_trafico_table()?;
+        ledger.ensure_alias_table()?;
         ledger.migrate_rules_confirmed()?;
         ledger.migrate_events_process()?;
         ledger.migrate_events_server()?;
@@ -801,10 +802,12 @@ impl Ledger {
     pub fn wipe(&mut self) -> Result<()> {
         let genesis = self.setting(KEY_GENESIS)?.unwrap_or_default();
         let tx = self.conn.transaction()?;
+        // `trafico` (1.0.21) and `alias_sites` (1.0.45) are detail too: until 1.0.45 «Borrar todo»
+        // left what each program sent, minute by minute, behind.
         tx.execute_batch(
             "DELETE FROM events; DELETE FROM devices; DELETE FROM rules; DELETE FROM outbound; \
              DELETE FROM seen_domains; DELETE FROM daily_totals; DELETE FROM gaps; DELETE FROM changes; \
-             DELETE FROM server_bases; \
+             DELETE FROM server_bases; DELETE FROM alias_sites; DELETE FROM trafico; \
              DELETE FROM sqlite_sequence WHERE name IN ('events', 'rules', 'outbound', 'gaps', 'changes');",
         )?;
         tx.execute(

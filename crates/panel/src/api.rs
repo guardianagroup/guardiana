@@ -74,7 +74,13 @@ fn en_hilo_aparte<T>(f: impl FnOnce() -> T) -> T {
 pub(crate) struct EventView {
     id: i64,
     ts: i64,
-    qname: String,
+    pub(crate) qname: String,
+    /// Who is behind the name, how sure and why, apart from the network that served it (1.0.45,
+    /// `identificacion.rs` documents the fields).
+    pub(crate) identidad: crate::identificacion::IdentidadView,
+    /// Where the server is, as precisely as its evidence says: for a query, its country at most.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ubicacion: Option<crate::identificacion::UbicacionView>,
     qtype: String,
     category: String,
     signals: Vec<Signal>,
@@ -172,6 +178,8 @@ fn disfraz_view(t: &Texts, qname: &str, sitio: Option<&str>) -> Option<DisfrazVi
 /// Rows of disguised names that a rule cut after their answer say which decision of the person
 /// cut them (decision 205). The rules are read only when there is such a row.
 fn con_motivos(t: &Texts, state: &AppState, evs: &mut [EventView]) -> Result<(), Response> {
+    // 1.0.45: the alias sites the resolver kept for these names say more than the row alone.
+    con_alias(t, state, evs)?;
     let hay = evs
         .iter()
         .any(|e| e.verdict == "cortado" && e.disfraz.is_some() && e.rule_id.is_some());
@@ -189,6 +197,24 @@ fn con_motivos(t: &Texts, state: &AppState, evs: &mut [EventView]) -> Result<(),
         };
         if r.match_kind == MatchKind::Category {
             d.frase = crate::medidas::frase_disfraz_cortado(t, &e.qname, &d.sitio, r);
+        }
+    }
+    Ok(())
+}
+
+/// Every row whose name has alias sites kept is attributed again with them (1.0.45).
+fn con_alias(t: &Texts, state: &AppState, evs: &mut [EventView]) -> Result<(), Response> {
+    let mut nombres: Vec<String> = evs.iter().map(|e| e.qname.clone()).collect();
+    nombres.sort_unstable();
+    nombres.dedup();
+    let alias = crate::identificacion::alias_de(state, nombres)?;
+    if alias.is_empty() {
+        return Ok(());
+    }
+    for e in evs.iter_mut() {
+        if let Some(a) = alias.get(&e.qname) {
+            let asn = e.servidor.as_ref().and_then(|s| s.asn).unwrap_or(0);
+            e.identidad = crate::identificacion::identidad(t, &e.qname, Some(a), None, asn);
         }
     }
     Ok(())
@@ -294,6 +320,14 @@ fn pais_de(t: &Texts, qname: &str) -> Option<String> {
 fn view(t: &Texts, e: Event, names: &HashMap<String, Option<String>>) -> EventView {
     let alojado = guardiana_lists::hosting_of(&e.qname);
     EventView {
+        identidad: crate::identificacion::identidad(
+            t,
+            &e.qname,
+            None,
+            e.cname_target.as_deref(),
+            e.server.as_ref().map_or(0, |s| s.asn),
+        ),
+        ubicacion: crate::identificacion::ubicacion_servidor(t, e.server.as_ref()),
         frases: e.signals.iter().map(|s| t.signal(s)).collect(),
         device_name: names.get(&e.device_id).cloned().flatten(),
         empresa: empresa_de(&e.qname).filter(|_| alojado.is_none()),
