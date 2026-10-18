@@ -1192,7 +1192,11 @@ body.universo { display: flex; flex-direction: column; height: 100vh; height: 10
   .universo .inspector { width: 100%; border-left: 0; }
   .universo .lienzo.con-inspector .zoom { right: 24px; display: none; }
   .universo .ban-min5 { grid-template-columns: 1fr 1fr; }
-  .universo .ban-cifras, .universo .riel .vr, .universo .riel-ahora-t { display: none; }
+  .universo .ban-cifras, .universo .riel .vr, .universo .riel-5 span { display: none; }
+  .universo .riel { padding: 0 16px; }
+  .universo .riel-vivo { gap: 14px !important; }
+  .universo .bandeja { padding: 0 16px; }
+  .universo .ban-cab .btn.texto { display: none; }
   .universo table.registro-t th:nth-child(4), .universo table.registro-t td:nth-child(4), .universo table.registro-t th:nth-child(6), .universo table.registro-t td:nth-child(6) { display: none; }
   .globo-herr .opciones-btn span { display: none; }
   .opciones { position: fixed; left: 16px; right: 16px; top: 120px; width: auto; }
