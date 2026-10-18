@@ -1128,6 +1128,8 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         // in force, and the Plus routes listed in `plan::RUTAS_PLUS` answer 402 at the free level.
         // Routes merged above this line are covered.
         .route("/api/plan", get(plan::ver))
+        // comunicaciones-1.0.46: the plan's one bit for `guardiana comunicaciones` (plan.rs).
+        .route("/api/plan/llamadas", get(plan::llamadas))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             plan::solo_plus,

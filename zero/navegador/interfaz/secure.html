@@ -602,19 +602,35 @@ main:has(> .inicio:not([hidden])) { align-content: safe center; }
    la llamada de voz de máxima calidad»). */
 #c-video { display: none !important; }
 </style>
+<!-- 1.0.46 «C2 · SALA» (the design the owner chose on 18 Oct 2026): sala.css after the page's
+     own style so it wins; sala.js draws the parts that are new. -->
+<link rel="stylesheet" href="sala.css">
 </head>
 <body>
 <header class="top">
-  <span class="marca-g">GUARDIANA <span class="sec">ZERO · SECURE</span></span>
+  <span class="marca-g"><svg viewBox="0 0 20 22" aria-hidden="true"><path d="M5.2 9V6.6a4.8 4.8 0 0 1 9.6 0V9" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="1.5" y="9" width="17" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12.6 13.2a3 3 0 1 0 .3 3.2h-2.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>GUARDIANA</span></span>
+  <!-- 1.0.46: the products' selector, as in the panel and ZERO. Here (Comunicaciones opened in
+       the person's browser) only what this computer really has: the panel and this page. Inside
+       ZERO its own frame draws this whole row and this header is hidden (sala.css, en-zero). -->
+  <nav class="sala-productos" aria-label="GUARDIANA"><a href="http://127.0.0.1:7443/" data-t="pestana_guardiana"></a><span aria-current="page" data-t="pestana_secure"></span></nav>
   <nav class="miga"><span data-t="sec_miga_com"></span><span>/</span><b id="miga-donde" data-t="sec_miga_conv"></b></nav>
   <span class="chip" id="m-estado-chip" data-t="sec_sin_sesion"></span>
 </header>
 <div class="secure">
 <nav class="col-izq">
-  <div class="col-cab"><h2 data-t="sec_conversaciones"></h2><button type="button" class="boton chico icono-solo" id="c-nueva" data-t-title="sec_c_invitar" aria-label="+"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>
+  <!-- 1.0.46 (C2-a): «Nueva conexión», the rooms that are open, the people already verified
+       and what waits for an answer. Only what is real: one conversation at a time, the home
+       room, the book of verified contacts, an invitation or a delivery still open. -->
+  <button type="button" class="boton principal sala-nueva" id="c-nueva"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span data-t="sala_nueva_conexion"></span></button>
+  <h2 class="sala-cap" data-t="sala_activas"></h2>
   <ol class="lista" id="c-lista"></ol>
+  <h2 class="sala-cap" id="sala-cap-contactos" data-t="sala_contactos" hidden></h2>
+  <ol class="lista" id="sala-contactos" hidden></ol>
+  <h2 class="sala-cap" id="sala-cap-inv" data-t="sala_invitaciones" hidden></h2>
+  <ol class="lista" id="sala-invitaciones" hidden></ol>
 
   <p class="pie-izq"><b data-t="sec_pie_titulo"></b><span data-t="sec_pie_texto"></span></p>
+  <span class="sala-ejemplo" id="sala-ejemplo" hidden data-t="sala_datos_ejemplo"></span>
 </nav>
 <main>
   <!-- Start (16 Oct 2026, the owner: «si es PC-PC, una sección entera; PC-móvil, otra; móvil-móvil, otra»):
@@ -758,13 +774,18 @@ main:has(> .inicio:not([hidden])) { align-content: safe center; }
   <section class="tarjeta chat" id="c-chat" hidden>
     <div class="chat-lado" id="c-chat-lado">
     <div class="chat-cab">
-      <span class="avatar grande" id="c-avatar"><span id="c-avatar-letra">·</span><i></i></span>
-      <div class="c-quien"><h2 id="c-con"></h2><p class="c-sello" id="c-sello"></p></div>
-      <div class="c-fila">
-        <button type="button" class="boton chico" id="c-voz" data-t-title="sec_l_voz"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg><span data-t="sec_l_voz"></span></button>
-        <button type="button" class="boton chico" id="c-video" data-t-title="sec_l_video"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg><span data-t="sec_l_video"></span></button>
-        <button type="button" class="boton chico icono-solo" id="c-movil" data-t-title="sec_mv_boton"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></button>
-        <button type="button" class="boton chico icono-solo" id="c-cerrar" data-t-title="sec_c_cerrar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <span class="avatar" id="c-avatar"><span id="c-avatar-letra">·</span></span>
+      <div class="c-quien"><h2 id="c-con"></h2><p class="sala-estado" id="sala-estado"><i></i><span></span></p><p class="c-sello" id="c-sello" hidden></p></div>
+      <div class="sala-insignias" id="sala-insignias"></div>
+      <div class="c-fila sala-acciones">
+        <button type="button" class="boton" id="c-voz" data-t-title="sec_l_voz"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h3.5l1.8 4.5-2.3 1.4a11 11 0 0 0 6.1 6.1l1.4-2.3L20 15.5V19a1.5 1.5 0 0 1-1.6 1.5A16 16 0 0 1 3.5 5.6 1.5 1.5 0 0 1 5 4z"/></svg><span data-t="sala_llamar"></span></button>
+        <button type="button" class="boton chico" id="c-video" data-t-title="sec_l_video" hidden><span data-t="sec_l_video"></span></button>
+        <button type="button" class="boton icono-solo" id="sala-opciones" aria-haspopup="menu" aria-expanded="false" data-t-title="sala_opciones"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="18.5" cy="12" r="1.3" fill="currentColor"/></svg></button>
+        <div class="sala-menu sala-menu-opciones" id="sala-opciones-menu" role="menu" hidden>
+          <button type="button" role="menuitem" id="c-movil"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg><span data-t="sala_movil"></span></button>
+          <button type="button" role="menuitem" id="sala-ver-seguridad"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7.5 2.8v5.6c0 4.6-3.1 8.2-7.5 9.6-4.4-1.4-7.5-5-7.5-9.6V5.8z"/></svg><span data-t="sala_seguridad"></span></button>
+          <button type="button" role="menuitem" id="c-cerrar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span data-t="sala_cerrar_conv"></span></button>
+        </div>
       </div>
     </div>
     <p class="cortada-nota" id="c-cortada" hidden data-t="sec_c_cortada"></p>
@@ -786,21 +807,29 @@ main:has(> .inicio:not([hidden])) { align-content: safe center; }
     <div class="zona-archivo" id="c-zona"><span data-t="sec_f_arrastra"></span> <label class="enlace" for="c-archivo" data-t="sec_f_elige"></label><input type="file" id="c-archivo" hidden multiple></div>
     <div class="c-progreso" id="c-progreso" hidden><span id="c-progreso-texto"></span><i><b id="c-progreso-barra"></b></i></div>
     <div class="contexto" id="c-contexto" hidden><span></span><button type="button" class="boton chico icono-solo" id="c-contexto-no" aria-label="×">×</button></div>
-    <form class="escribir" id="c-form"><label class="boton chico icono-solo" for="c-archivo" data-t-title="sec_f_elige"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"/></svg></label><input class="campo" id="c-texto" data-t-ph="sec_m_escribe" autocomplete="off" maxlength="8000"><div class="grabando" id="c-grabando" hidden><i class="rec" aria-hidden="true"></i><b id="c-grabando-t">0:00</b><span id="c-grabando-modo"></span><button type="button" class="boton chico secundario" id="c-nv-cancelar" data-t="sec_nv_cancelar"></button></div><div class="nv-elige" id="c-nv-elige" hidden role="menu"><button type="button" role="menuitem" id="c-nv-normal"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span class="nv-op"><b data-t="sec_nv_normal"></b><small data-t="sec_nv_normal_s"></small></span></button><button type="button" role="menuitem" id="c-nv-cambiada"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h2M8 8v8M12 5v14M16 8v8M20 11v2"/></svg><span class="nv-op"><b data-t="sec_nv_cambiada"></b><small data-t="sec_nv_cambiada_s"></small></span></button></div><button type="button" class="boton chico icono-solo" id="c-microfono" data-t-title="sec_nv_grabar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><button type="submit" class="boton principal" id="c-enviar" data-t-title="sec_m_enviar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg></button></form>
+    <form class="escribir" id="c-form"><button type="button" class="boton icono-solo sala-mas" id="sala-mas" aria-haspopup="menu" aria-expanded="false" data-t-title="sala_mas"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><div class="sala-menu sala-menu-mas" id="sala-mas-menu" role="menu" hidden><label role="menuitem" for="c-archivo" tabindex="0"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg><span><b data-t="sala_archivo"></b><small data-t="sala_archivo_t"></small></span></label><button type="button" role="menuitem" id="sala-mas-nota"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span><b data-t="sala_nota"></b><small data-t="sala_nota_t"></small></span></button><button type="button" role="menuitem" id="sala-mas-entrega"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 13.5l2.5-8h12l2.5 8v5a1.5 1.5 0 0 1-1.5 1.5h-14a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M3.5 13.5h5l1 2h5l1-2h5"/></svg><span><b data-t="sala_entrega"></b><small data-t="sala_entrega_t"></small></span></button></div><input class="campo" id="c-texto" data-t-ph="sec_m_escribe" autocomplete="off" maxlength="8000"><div class="grabando" id="c-grabando" hidden><i class="rec" aria-hidden="true"></i><b id="c-grabando-t">0:00</b><span id="c-grabando-modo"></span><button type="button" class="boton chico secundario" id="c-nv-cancelar" data-t="sec_nv_cancelar"></button></div><div class="nv-elige" id="c-nv-elige" hidden role="menu"><button type="button" role="menuitem" id="c-nv-normal"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span class="nv-op"><b data-t="sec_nv_normal"></b><small data-t="sec_nv_normal_s"></small></span></button><button type="button" role="menuitem" id="c-nv-cambiada"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h2M8 8v8M12 5v14M16 8v8M20 11v2"/></svg><span class="nv-op"><b data-t="sec_nv_cambiada"></b><small data-t="sec_nv_cambiada_s"></small></span></button></div><button type="button" class="boton chico icono-solo" id="c-microfono" data-t-title="sec_nv_grabar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><button type="submit" class="boton principal" id="c-enviar" data-t-title="sec_m_enviar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg></button></form>
     </div>
     <section class="llamada" id="c-llamada" hidden>
       <div class="escenario" id="c-escenario">
         <div class="pantallas"><div class="rejilla" id="c-rejilla" data-n="0"></div><video id="c-local" autoplay playsinline muted></video></div>
         <div class="l-avatar" aria-hidden="true"><span class="l-letra" id="c-l-letra">·</span></div>
         <div class="l-cab">
+          <b class="sala-l-nombre" id="sala-l-nombre"></b>
           <b id="c-l-titulo" data-t="sec_l_en_curso"></b>
           <span class="l-estado" id="c-l-estado"></span>
           <span class="l-voz-otro" id="c-voz-otro" hidden data-t="sec_v_otro"></span>
         </div>
+        <!-- 1.0.46 (C2-b): the other voice's real level (the same measure as the call panel),
+             and how this side sounds. -->
+        <div class="sala-onda" id="sala-onda" aria-hidden="true"></div>
+        <p class="sala-onda-t" id="sala-onda-t"></p>
         <div class="llamada-botones">
           <button type="button" class="boton redondo" id="c-silencio" aria-pressed="false" data-t-title="sec_l_silenciar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span data-t="sec_l_silenciar"></span></button>
           <button type="button" class="boton redondo" id="c-voz-prot" aria-pressed="false" data-t-title="sec_v_titulo"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h2M8 8v8M12 5v14M16 8v8M20 11v2"/></svg><span data-t="sec_v_boton"></span></button>
           <button type="button" class="boton redondo" id="c-pantalla" data-t-title="sec_l_pantalla" hidden><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span data-t="sec_l_pantalla"></span></button>
+          <button type="button" class="boton redondo" id="sala-salida" aria-haspopup="menu" aria-expanded="false" data-t-title="sala_l_salida"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg><span data-t="sala_l_salida"></span></button>
+          <div class="sala-menu sala-menu-salida" id="sala-salida-menu" role="menu" hidden></div>
+          <button type="button" class="boton redondo" id="sala-l-movil" data-t-title="sala_movil"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg><span data-t="sala_movil"></span></button>
           <button type="button" class="boton redondo colgar" id="c-colgar" data-t-title="sec_l_colgar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 13.5c4.7-4.7 12.3-4.7 17 0l-2.4 2.4a2 2 0 0 1-2.4.3l-2-1.3a2 2 0 0 1-.9-1.7v-1.3a11 11 0 0 0-5.6 0v1.3a2 2 0 0 1-.9 1.7l-2 1.3a2 2 0 0 1-2.4-.3z"/></svg><span data-t="sec_l_colgar"></span></button>
         </div>
       </div>
@@ -861,7 +890,10 @@ main:has(> .inicio:not([hidden])) { align-content: safe center; }
 <div class="velo" id="c-borrar-dialogo" hidden><div class="dialogo"><b data-t="sec_m_borrar_pregunta"></b><button type="button" class="boton peligro" id="c-borrar-todos" data-t="sec_m_borrar_todos"></button><button type="button" class="boton" id="c-borrar-mi" data-t="sec_m_borrar_mi"></button><button type="button" class="boton secundario" id="c-borrar-no" data-t="sec_m_cancelar"></button></div></div>
 
 <aside class="monitor" aria-live="polite">
-  <h2 data-t="sec_panel_titulo"></h2>
+  <!-- 1.0.46 (C2-b): «Escudo en directo» during a call, five checks and the code to move the
+       call to the phone (sala.js). -->
+  <section class="sala-escudo" id="sala-escudo" hidden></section>
+  <div class="sala-aside-cab"><h2 data-t="sec_panel_titulo"></h2><button type="button" class="boton icono-solo" id="sala-aside-cerrar" data-t-title="sala_in_cerrar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
   <!-- 18 Oct 2026: «Escudo en directo» (escudo-directo.js), every line a real check. -->
   <section class="tarjeta escudo-directo" id="escudo-directo" hidden></section>
   <section class="tarjeta incidente" id="inc" hidden role="alert">
@@ -993,19 +1025,25 @@ main:has(> .inicio:not([hidden])) { align-content: safe center; }
 </aside>
 </div>
 <div class="velo velo-informe" id="informe" hidden>
-  <section class="tarjeta informe" id="informe-caja" role="dialog" aria-modal="true" aria-labelledby="in-que">
-    <div class="in-cab"><span class="rotulo" data-t="sec_in_titulo"></span><button type="button" class="boton chico icono-solo" id="in-cerrar" data-t-title="sec_in_cerrar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
-    <p class="in-que" id="in-que"></p>
-    <div class="in-veredicto" id="in-veredicto"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6z"/><path class="in-marca" d="m8.5 12 2.5 2.5 4.5-5"/></svg><div><b id="in-palabra"></b><span id="in-frase"></span></div></div>
-    <dl class="in-datos" id="in-datos"></dl>
-    <p class="in-limite" data-t="sec_in_limite"></p>
-    <div class="p-botones"><button type="button" class="boton principal chico" id="in-pdf" data-t="sec_r_pdf"></button><button type="button" class="boton chico" id="in-json" data-t="sec_r_json"></button><button type="button" class="boton chico" id="in-csv" data-t="sec_r_csv"></button></div>
+  <section class="tarjeta informe" id="informe-caja" role="dialog" aria-modal="true" aria-labelledby="sala-in-titulo">
+    <!-- 1.0.46 (C2-c): «Resumen de seguridad» after hanging up; every row from the signed
+         report (sala.js), the full verdict under «Ver detalles». -->
+    <div class="in-cab"><div><h2 id="sala-in-titulo" data-t="sala_in_titulo"></h2><p class="in-que" id="in-que"></p></div><span class="sala-insignia info" data-t="sala_in_badge"></span></div>
+    <div class="sala-in-secciones" id="sala-in-secciones"></div>
+    <div class="sala-in-detalles" id="sala-in-detalles" hidden>
+      <div class="in-veredicto" id="in-veredicto"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6z"/><path class="in-marca" d="m8.5 12 2.5 2.5 4.5-5"/></svg><div><b id="in-palabra"></b><span id="in-frase"></span></div></div>
+      <dl class="in-datos" id="in-datos"></dl>
+      <p class="in-limite" data-t="sec_in_limite"></p>
+      <div class="c-fila"><button type="button" class="boton chico" id="in-json" data-t="sec_r_json"></button><button type="button" class="boton chico" id="in-csv" data-t="sec_r_csv"></button></div>
+    </div>
+    <div class="sala-in-pie"><button type="button" class="boton" id="in-cerrar" data-t="sala_in_cerrar"></button><button type="button" class="boton" id="sala-in-ver" aria-expanded="false" aria-controls="sala-in-detalles" data-t="sala_in_detalles"></button><button type="button" class="boton principal" id="in-pdf"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg><span data-t="sala_in_guardar"></span></button></div>
   </section>
 </div>
 <script src="interruptor.js"></script>
 <script src="puente.js"></script>
 <script src="voz.js"></script>
 <script src="opus.js"></script>
+<script src="sala.js"></script>
 <script src="secure.js"></script>
 <script src="relevo.js"></script>
 <script src="voz-eleccion.js"></script>

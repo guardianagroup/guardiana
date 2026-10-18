@@ -22,14 +22,39 @@
   // Shown instead of the start screen, and back.
   const muestra = (si) => {
     caja.hidden = !si;
-    // The rest of the middle column steps aside while the room is on screen (entrega.css).
-    const medio = caja.closest('main');
-    if (medio) medio.classList.toggle('con-entrega', si);
+    // 1.0.46 (C2-a): a 400 px panel on the right, over what is open (sala.css), so a
+    // conversation stays on screen behind it.
+    document.body.classList.toggle('sala-con-entrega', si);
     if (si) { pide(); pinta(); }
   };
   abrir.addEventListener('click', () => muestra(true));
 
   const ESTADO = { preparando: '', esperando: 'info', abierta: 'info', entregada: 'ok', caducada: '', revocada: '', destruida: 'alerta' };
+  // 1.0.46 (C2-a, «Sala de entrega» as a 400 px panel): the four steps as they really go, and
+  // the bytes, the speed and the time left measured from the receiver's own verified pieces
+  // between two updates — never estimated beforehand.
+  const muestras = new Map();
+  const duracion = (s) => { s = Math.max(0, Math.round(s)); return s < 60 ? s + ' s' : Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + (s % 60) + ' s' : ''); };
+  function cifras(e) {
+    const p = e.progreso || {}, total = p.trozos_total || 0;
+    if (e.estado !== 'abierta' || !total || !e.bytes) { muestras.delete(e.id); return ''; }
+    const hecho = Math.min(e.bytes, Math.round(e.bytes * (p.verificados || 0) / total));
+    const ahora = Date.now(), m = muestras.get(e.id);
+    let v = m ? m.v : 0;
+    if (!m || hecho !== m.hecho) {
+      if (m && ahora > m.t) v = Math.max(0, (hecho - m.hecho) / ((ahora - m.t) / 1000));
+      muestras.set(e.id, { t: ahora, hecho, v });
+    }
+    if (!v) return `<p class="ent-cifras">${esc(tam(hecho) + ' / ' + tam(e.bytes))}</p>`;
+    return `<p class="ent-cifras">${esc(t('sala_ent_cifras', { hecho: tam(hecho), total: tam(e.bytes), v: tam(v), r: duracion((e.bytes - hecho) / v) }))}</p>`;
+  }
+  function pasos(e) {
+    const orden = ['preparando', 'esperando', 'abierta', 'entregada'];
+    const i = orden.indexOf(e.estado);
+    if (i < 0) return '';
+    const hecho = (k) => (k < i || (k === 3 && i === 3) ? ' hecho' : k === i ? ' ahora' : '');
+    return `<ol class="ent-pasos">${['sala_ent_p1', 'sala_ent_p2', 'sala_ent_p3', 'sala_ent_p4'].map((c, k) => `<li class="${hecho(k)}">${esc(t(c))}</li>`).join('')}</ol>`;
+  }
   function tarjeta(e) {
     const p = e.progreso || {};
     const total = p.trozos_total || 0;
@@ -50,7 +75,7 @@
     return `<article class="tarjeta ent-una" data-id="${esc(e.id)}"><div class="ent-cab"><b>${esc(e.titulo || t('ent_sin_titulo'))}</b>`
       + `<span class="chip ${ESTADO[e.estado] || ''}">${esc(t('ent_estado_' + e.estado))}</span></div>`
       + `<p class="t">${esc(t('ent_resumen', { n: (e.archivos || []).length, bytes: tam(e.bytes), vence: hora(e.vence), cad: t('ent_cad_' + e.caducidad) }))}</p>`
-      + motivo + enlace + viaje + `<ul class="ent-archivos">${archivos}</ul>`
+      + motivo + pasos(e) + enlace + viaje + cifras(e) + `<ul class="ent-archivos">${archivos}</ul>`
       + `<div class="c-fila">`
       + (e.recibo ? `<button type="button" class="boton chico principal" data-recibo="${esc(e.id)}">${esc(t('ent_recibo'))}</button>` : '')
       + (['esperando', 'abierta', 'preparando'].includes(e.estado) ? `<button type="button" class="boton chico corta" data-revoca="${esc(e.id)}">${esc(t('ent_revocar'))}</button>` : '')

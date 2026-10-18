@@ -956,6 +956,13 @@ impl Secure {
             }
         }
         if let Some(sala) = por_numero.or_else(|| crate::rele::sala_de(direccion)) {
+            // The free level goes through no relay (1.0.46, the plan of 1.0.45): a code or a
+            // number that needs one is answered at once, and the page shows the Plus line.
+            if !crate::rele::reles_permitidos() {
+                self.rele_error = Some(crate::rele::SOLO_PLUS.to_owned());
+                self.cambio = true;
+                return Err(crate::rele::SOLO_PLUS.to_owned());
+            }
             // The other person waits at a relay: go to all of them and keep the one where
             // the pair completes.
             let (tx, rx) = mpsc::channel();
@@ -1904,6 +1911,13 @@ impl Secure {
 
     fn espera_en_rele_con(&mut self, codigo: String) {
         if self.fase != Fase::Escuchando || self.rele_codigo.is_some() {
+            return;
+        }
+        // The free level waits at no relay: the invitation stays the direct one (the same
+        // network, or the door in the router) and the page says why there is no relay code.
+        if !crate::rele::reles_permitidos() {
+            self.rele_error = Some(crate::rele::SOLO_PLUS.to_owned());
+            self.cambio = true;
             return;
         }
         let Some(tx) = self.tx.clone() else { return };
@@ -4427,6 +4441,7 @@ impl Secure {
             "listo": self.movil_listo(),
             "paso": self.relevo.json(self.rtc_disponible(), ahora_s()),
             "qr": tarjeta::qr_svg(&enlace).ok(),
+            "qr_caduca_s": m.caduca_en_s(),
             "fuera": self.movil_puerta.is_some(),
             "puerta_error": self.movil_puerta_error,
             "error": self.movil_error,
@@ -4513,10 +4528,13 @@ impl Secure {
                 "en_uso": self.vigia.en_uso.iter().map(|(p, r)| json!({ "programa": p, "recurso": r })).collect::<Vec<_>>(),
                 "otro": self.vigia_otro,
             },
-            "informe": self.informe.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "inicio": r.inicio, "fin": r.fin, "veredicto": r.veredicto, "sin_espionaje": r.veredicto.as_ref().is_some_and(Veredicto::sin_espionaje), "conexion": r.conexion, "observadas": r.observadas, "inusuales": r.inusuales, "firmante": r.firmante, "firma": r.firma, "hash_cadena": r.hash_cadena })),
+            "informe": self.informe.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "inicio": r.inicio, "fin": r.fin, "veredicto": r.veredicto, "sin_espionaje": r.veredicto.as_ref().is_some_and(Veredicto::sin_espionaje), "conexion": r.conexion, "observadas": r.observadas, "inusuales": r.inusuales, "firmante": r.firmante, "firma": r.firma, "hash_cadena": r.hash_cadena, "firma_ok": r.verificar().is_ok() })),
             "resumen": self.resumen.as_ref().map(|r| json!({ "json": r.to_json(), "csv": r.to_csv(), "clase": serde_json::to_value(r.clase).unwrap_or(Value::Null), "contacto": r.contacto, "duracion_s": r.duracion_s(), "mensajes": r.mensajes_enviados + r.mensajes_recibidos, "archivos": r.archivos.enviados + r.archivos.recibidos, "observadas": r.observadas, "inusuales": r.inusuales, "fin": r.fin })),
         });
         e["escudo"] = self.escudo_json();
+        // 1.0.46: whether GUARDIANA's relays may be used (Plus); the page shows the Plus line
+        // where a relay would be needed at the free level.
+        e["reles"] = json!(crate::rele::reles_permitidos());
         e["video"] = json!(VIDEO);
         e["temporizador"] = json!(self.temporizador);
         e["temporizadores"] = json!(TEMPORIZADORES);

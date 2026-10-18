@@ -55,9 +55,12 @@
     } catch (_) { return texto; }
   }
 
-  // The microphone as the call wants it.
+  // The microphone as the call wants it. 1.0.46: «¿Cómo prefieres que te escuchen?» (sala.js /
+  // voz-eleccion.js) may turn the browser's own noise suppression off («Voz natural»); the echo
+  // canceller stays on either way.
   function restricciones() {
-    return { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 48000 };
+    const ruido = !(raiz.GuardianaVoz && raiz.GuardianaVoz.ruido === false);
+    return { echoCancellation: true, noiseSuppression: ruido, autoGainControl: true, channelCount: 1, sampleRate: 48000 };
   }
 
   // A simplified E-model (ITU-T G.107) for a wideband codec: delay one way (ms) and loss (%) to

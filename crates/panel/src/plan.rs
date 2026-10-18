@@ -174,6 +174,35 @@ pub(crate) async fn ver(
     }))
 }
 
+// ---- comunicaciones-1.0.46 ----
+/// What `/api/plan/llamadas` says: only whether GUARDIANA's relays (the chat's line and the
+/// calls' TURN) are part of the plan in force.
+#[derive(Serialize)]
+pub(crate) struct LlamadasView {
+    /// `true` with Plus (trial, subscription or Lifetime).
+    reles: bool,
+}
+
+/// `/api/plan/llamadas` (1.0.46): `guardiana comunicaciones` runs as the person, and on macOS
+/// and Linux it cannot read the service's folder (0700) where the licence is, so it asks the
+/// service here. One bit and nothing else, so it needs no key — the key is in that same folder
+/// — and it is answered only to this computer: any other address gets 403. A program that
+/// pretended to be the panel could only give itself, or take from itself, the relay.
+pub(crate) async fn llamadas(State(state): State<Arc<AppState>>, req: Request) -> Response {
+    let local = req
+        .extensions()
+        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+        .is_some_and(|c| c.0.ip().is_loopback());
+    if !local {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    Json(LlamadasView {
+        reles: nivel(&state) == Nivel::Plus,
+    })
+    .into_response()
+}
+// ---- fin comunicaciones-1.0.46 ----
+
 #[cfg(test)]
 mod tests {
     use super::*;
