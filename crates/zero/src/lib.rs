@@ -44,6 +44,7 @@ pub mod tachon;
 pub mod textos;
 pub mod tinta;
 pub mod url_limpia;
+pub mod ventana;
 pub mod vigia;
 
 /// The tests that set up conversations over real sockets take turns: on a slow runner (macOS,

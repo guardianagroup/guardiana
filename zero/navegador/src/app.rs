@@ -854,6 +854,95 @@ fn avisa_movimiento() {
     }
 }
 
+/// The maximised window on the monitor it is on: its work area (the monitor minus the taskbar,
+/// on any edge), at that monitor's scale, a pixel free on the edge of a taskbar that hides
+/// itself (the owner, 18 Oct 2026: «abajo se ve cortado»; see `guardiana_zero::ventana`).
+fn maximo_en_area(h: HWND) -> Option<(POINT, POINT)> {
+    use guardiana_zero::ventana::{maximizada, Ocultas, Rect};
+    use windows::Win32::UI::Shell::{
+        SHAppBarMessage, ABE_BOTTOM, ABE_LEFT, ABE_RIGHT, ABE_TOP, ABM_GETAUTOHIDEBAREX, APPBARDATA,
+    };
+    let monitor = unsafe { MonitorFromWindow(h, MONITOR_DEFAULTTONEAREST) };
+    let mut mi = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    if !unsafe { GetMonitorInfoW(monitor, &mut mi) }.as_bool() {
+        return None;
+    }
+    let r = |x: RECT| Rect::new(x.left, x.top, x.right, x.bottom);
+    let oculta = |borde: u32| {
+        let mut abd = APPBARDATA {
+            cbSize: std::mem::size_of::<APPBARDATA>() as u32,
+            uEdge: borde,
+            rc: mi.rcMonitor,
+            ..Default::default()
+        };
+        unsafe { SHAppBarMessage(ABM_GETAUTOHIDEBAREX, &mut abd) != 0 }
+    };
+    let ocultas = Ocultas {
+        izquierda: oculta(ABE_LEFT),
+        arriba: oculta(ABE_TOP),
+        derecha: oculta(ABE_RIGHT),
+        abajo: oculta(ABE_BOTTOM),
+    };
+    let dpi = unsafe { GetDpiForWindow(h) }.max(96);
+    let borde = unsafe {
+        windows::Win32::UI::HiDpi::GetSystemMetricsForDpi(
+            windows::Win32::UI::WindowsAndMessaging::SM_CXSIZEFRAME,
+            dpi,
+        ) + windows::Win32::UI::HiDpi::GetSystemMetricsForDpi(
+            windows::Win32::UI::WindowsAndMessaging::SM_CXPADDEDBORDER,
+            dpi,
+        )
+    };
+    let ((x, y), (w, al)) = maximizada(r(mi.rcMonitor), r(mi.rcWork), borde, ocultas);
+    Some((POINT { x, y }, POINT { x: w, y: al }))
+}
+
+/// Maximised and the taskbar moved, appeared or changed size: fit the work area again.
+fn reajusta_maximizada(h: HWND) {
+    if !unsafe { windows::Win32::UI::WindowsAndMessaging::IsZoomed(h) }.as_bool()
+        || con_vistas(|v| v.completa.is_some()) == Some(true)
+    {
+        return;
+    }
+    let monitor = unsafe { MonitorFromWindow(h, MONITOR_DEFAULTTONEAREST) };
+    let mut mi = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    if !unsafe { GetMonitorInfoW(monitor, &mut mi) }.as_bool() {
+        return;
+    }
+    if let Some((pos, tam)) = maximo_en_area(h) {
+        let _ = unsafe {
+            SetWindowPos(
+                h,
+                None,
+                mi.rcMonitor.left + pos.x,
+                mi.rcMonitor.top + pos.y,
+                tam.x,
+                tam.y,
+                SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER,
+            )
+        };
+    }
+}
+
+/// Tell the taskbar that the window is in full screen (a video, the globe's «Full screen»), so
+/// it steps aside instead of covering the bottom of the page, the way browsers do it.
+fn marca_completa(h: HWND, si: bool) {
+    use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
+    use windows::Win32::UI::Shell::{ITaskbarList2, TaskbarList};
+    let r = (|| unsafe {
+        let t: ITaskbarList2 = CoCreateInstance(&TaskbarList, None, CLSCTX_INPROC_SERVER)?;
+        t.HrInit()?;
+        t.MarkFullscreenWindow(h, si.into())
+    })();
+    vale("barra de tareas", r);
+}
+
 /// A video (or any page) asks for the whole screen, or gives it back.
 fn pantalla_completa(id: u32, si: bool) {
     let h = hwnd();
@@ -864,7 +953,13 @@ fn pantalla_completa(id: u32, si: bool) {
             let mut sitio = RECT::default();
             let _ = GetWindowRect(h, &mut sitio);
             con_vistas(|v| v.completa = Some((id, estilo, sitio)));
-            SetWindowLongPtrW(h, GWL_STYLE, estilo & !(WS_OVERLAPPEDWINDOW.0 as isize));
+            // A popup without a frame: what the taskbar recognises as full screen.
+            SetWindowLongPtrW(
+                h,
+                GWL_STYLE,
+                (estilo & !(WS_OVERLAPPEDWINDOW.0 as isize))
+                    | windows::Win32::UI::WindowsAndMessaging::WS_POPUP.0 as isize,
+            );
             let mut mi = MONITORINFO {
                 cbSize: std::mem::size_of::<MONITORINFO>() as u32,
                 ..Default::default()
@@ -880,9 +975,11 @@ fn pantalla_completa(id: u32, si: bool) {
                 m.bottom - m.top,
                 SWP_NOOWNERZORDER | SWP_FRAMECHANGED,
             );
+            marca_completa(h, true);
         } else if !si {
             if let Some((_, estilo, r)) = antes {
                 con_vistas(|v| v.completa = None);
+                marca_completa(h, false);
                 SetWindowLongPtrW(h, GWL_STYLE, estilo);
                 let _ = SetWindowPos(
                     h,
@@ -1783,6 +1880,8 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                     )
                 };
             }
+            // Moved to a monitor at another scale while maximised: that monitor's work area.
+            reajusta_maximizada(h);
             coloca();
             LRESULT(0)
         }
@@ -1795,9 +1894,20 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                         x: px(560, s),
                         y: px(420, s),
                     };
+                    // Maximised: the work area of this window's monitor, never under the taskbar.
+                    if let Some((pos, tam)) = maximo_en_area(h) {
+                        (*m).ptMaxPosition = pos;
+                        (*m).ptMaxSize = tam;
+                    }
                 }
             }
             LRESULT(0)
+        }
+        // The taskbar moved, appeared, changed size, or a monitor came or went.
+        windows::Win32::UI::WindowsAndMessaging::WM_SETTINGCHANGE
+        | windows::Win32::UI::WindowsAndMessaging::WM_DISPLAYCHANGE => {
+            reajusta_maximizada(h);
+            unsafe { DefWindowProcW(h, msg, wp, lp) }
         }
         WM_TIMER if wp.0 == TIC_LLAMADA => {
             encola(con_sesion(Sesion::tic_llamada).unwrap_or_default());
