@@ -199,6 +199,7 @@ async fn what_breaks_names_the_programs_that_used_the_domain() {
                 ruta: String::new(),
                 sha256: String::new(),
                 firmado_por: String::new(),
+                version: String::new(),
             });
             l.append(e).unwrap();
         }
