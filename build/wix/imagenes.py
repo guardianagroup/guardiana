@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""The installer pictures (WiX, 1.0.18), for GUARDIANA and for GUARDIANA ZERO: the side of the
+"""The installer pictures (WiX, 1.0.18; new logo 17 Oct 2026), for GUARDIANA and for GUARDIANA ZERO: the side of the
 first and last screens (493x312, one per language: it carries the phrase of every social
-profile) and the band of the others (493x58). Navy panel, the white symmetric symbol, the name
+profile) and the band of the others (493x58). Near-black panel, the padlock-G symbol, the name
 centred under it. Rendered by Chromium with the panel's own fonts and saved as 24-bit BMP next
 to this file.
 Usage: python3 build/wix/imagenes.py <scratch dir for the html and png>"""
@@ -10,19 +10,31 @@ from playwright.sync_api import sync_playwright
 from PIL import Image
 D = pathlib.Path(__file__).resolve().parent
 FUENTES = D.parents[1] / 'crates' / 'panel' / 'static' / 'fonts'
-SYM = lambda w, trazo='#FFFFFF': f'<svg viewBox="0 0 200 200" width="{w}" height="{w}"><path d="M160.59 69.13 A68 68 0 1 1 130.87 39.41" fill="none" stroke="{trazo}" stroke-width="24"/><circle cx="100" cy="100" r="27" fill="#1F4BFF"/></svg>'
-BASE = f'''@font-face{{font-family:Unbounded;font-weight:400 800;src:url({FUENTES}/Unbounded-latin.woff2)}}
+# The brand symbol since 17 Oct 2026 (the owner chose it): a padlock whose body carries a square
+# G cut out, the shackle in white and the body in steel blue. Same geometry as
+# guardianagroup.com/marca/guardiana-simbolo.svg.
+_n = iter(range(1, 99))
+def SYM(w):
+    m = f'g{next(_n)}'
+    return (f'<svg viewBox="0 0 100 100" width="{w}" height="{w}"><defs><mask id="{m}"><rect width="100" height="100" fill="#fff"/>'
+            '<path d="M63 58.29 V55.07 Q63 54 58.71 54 H44.15 Q37 54 37 61.15 V72.85 Q37 80 44.15 80 H58.71 Q63 80 63 75.71 V67 H51" fill="none" stroke="#000" stroke-width="7.5"/></mask></defs>'
+            '<path d="M31 44 V31 A19 19 0 0 1 69 31 V44" fill="none" stroke="#E8ECF1" stroke-width="9"/>'
+            f'<rect x="17" y="42" width="66" height="50" rx="13" fill="#9CC3E4" mask="url(#{m})"/></svg>')
+# The name in the letter of the brand (Schibsted Grotesk, OFL), from the web's copy when it is
+# next to this checkout; otherwise the panel's IBM Plex Sans.
+_SCHIBSTED = D.parents[2] / 'guardianagroup.com' / 'fonts' / 'SchibstedGrotesk-var.woff'
+MARCA_FUENTE = (f"@font-face{{font-family:Marca;font-weight:400 900;src:url({_SCHIBSTED})}}" if _SCHIBSTED.is_file()
+                else f"@font-face{{font-family:Marca;font-weight:600;src:url({FUENTES}/IBMPlexSans-600-latin.woff2)}}")
+BASE = MARCA_FUENTE + f'''
 @font-face{{font-family:'IBM Plex Mono';font-weight:500;src:url({FUENTES}/IBMPlexMono-500-latin.woff2)}}
 *{{box-sizing:border-box}}html,body{{margin:0;background:#fff;overflow:hidden;-webkit-font-smoothing:antialiased}}
-.panel{{position:absolute;left:0;top:0;background:#0B1020;
- background-image:radial-gradient(120% 70% at 50% 18%,rgba(31,75,255,.30),rgba(31,75,255,0) 62%),
- linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
- background-size:100% 100%,16px 16px,16px 16px;background-position:0 0,-1px -1px,-1px -1px}}
+.panel{{position:absolute;left:0;top:0;background:#06080C}}
 .col{{position:absolute;left:0;right:0;display:flex;justify-content:center}}
-.marca{{font:700 12px/1 Unbounded;letter-spacing:.2em;padding-left:.2em;color:#fff}}
-.zero{{font:700 10px/1 Unbounded;letter-spacing:.32em;padding:5px 6px 5px calc(6px + .32em);color:#fff;background:#1F4BFF;border-radius:999px}}
-.web{{font:500 9.5px/1 'IBM Plex Mono';color:#8E9AC6;letter-spacing:.02em}}
-.filo{{position:absolute;background:linear-gradient(180deg,#1F4BFF,rgba(31,75,255,0))}}
+.marca{{font:600 13px/1 Marca;letter-spacing:.12em;padding-left:.12em;color:#E8ECF1}}
+.grupo{{font:600 7px/1 Marca;letter-spacing:.42em;padding-left:.42em;color:#E8ECF1;opacity:.72}}
+.zero{{font:700 9.5px/1 Marca;letter-spacing:.32em;padding:5px 6px 5px calc(6px + .32em);color:#06080C;background:#9CC3E4;border-radius:999px}}
+.web{{font:500 9.5px/1 'IBM Plex Mono';color:#8E99A6;letter-spacing:.02em}}
+.filo{{position:absolute;background:#1E2631}}
 '''
 # The phrase of every social profile (the owner, 12 Oct 2026), in the white that the last screen
 # leaves empty between its text (WiX ExitDialog: description down to y=147 px; FatalError to
@@ -40,26 +52,26 @@ def dialogo(zero, idioma):
 @font-face{{font-family:'IBM Plex Sans';font-weight:600;src:url({FUENTES}/IBMPlexSans-600-latin.woff2)}}
 html,body{{width:493px;height:312px}}.panel{{width:164px;height:312px}}
 .filo{{left:163px;top:0;width:1px;height:312px}}
-.cita{{position:absolute;left:180px;top:208px;width:296px;padding-left:12px;border-left:3px solid #1F4BFF}}
+.cita{{position:absolute;left:180px;top:208px;width:296px;padding-left:12px;border-left:3px solid #3E6E96}}
 .cita p{{margin:0;font:500 12px/1.4 'IBM Plex Sans';color:#0B1020;white-space:nowrap}}
-.cita .b{{font-weight:600;color:#1F4BFF}}</style>
+.cita .b{{font-weight:600;color:#2F5C84}}</style>
 <div class=cita><p>{a}</p><p class=b>{b}</p></div>
 <script>document.fonts.ready.then(()=>{{for(const e of document.querySelectorAll('.cita p')){{let t=12;while(e.scrollWidth>282&&t>9){{t-=.25;e.style.fontSize=t+'px'}}}}document.body.dataset.listo=1}})</script>
 <div class=panel>
- <div class=col style="top:{70 if zero else 82}px">{SYM(68)}</div>
- <div class=col style="top:{158 if zero else 170}px"><span class=marca>GUARDIANA</span></div>
- {'<div class=col style="top:182px"><span class=zero>ZERO</span></div>' if zero else ''}
+ <div class=col style="top:{66 if zero else 78}px">{SYM(76)}</div>
+ <div class=col style="top:{160 if zero else 172}px"><span class=marca>GUARDIANA</span></div>
+ <div class=col style="top:{179 if zero else 191}px"><span class=grupo>GROUP</span></div>
+ {'<div class=col style="top:202px"><span class=zero>ZERO</span></div>' if zero else ''}
  <div class=col style="top:284px"><span class=web>guardianagroup.com</span></div>
 </div><div class=filo></div>'''
 def banner(zero):
     return f'''<!doctype html><meta charset=utf-8><style>{BASE}
-html,body{{width:493px;height:58px}}.panel{{left:auto;right:0;width:82px;height:58px;
- background-image:radial-gradient(90% 90% at 50% 30%,rgba(31,75,255,.32),rgba(31,75,255,0) 70%)}}
-.panel .marca{{font-size:6.6px;letter-spacing:.16em;padding-left:.16em}}
+html,body{{width:493px;height:58px}}.panel{{left:auto;right:0;width:82px;height:58px}}
+.panel .marca{{font-size:7.4px;letter-spacing:.1em;padding-left:.1em}}
 .panel .zero{{font-size:6.6px;padding:2.5px 4px 2.5px calc(4px + .32em)}}</style>
 <div class=panel>
- <div class=col style="top:{6 if zero else 10}px">{SYM(22 if zero else 26)}</div>
- <div class=col style="top:{32 if zero else 42}px"><span class=marca>GUARDIANA</span></div>
+ <div class=col style="top:{5 if zero else 8}px">{SYM(24 if zero else 30)}</div>
+ <div class=col style="top:{31 if zero else 41}px"><span class=marca>GUARDIANA</span></div>
  {'<div class=col style="top:41px"><span class=zero>ZERO</span></div>' if zero else ''}
 </div>'''
 out = pathlib.Path(sys.argv[1])
