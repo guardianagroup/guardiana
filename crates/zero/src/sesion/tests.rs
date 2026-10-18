@@ -3514,3 +3514,26 @@ fn a_name_nobody_owns_gets_its_servers_country() {
     }
     assert!(pais.starts_with('@') || pais == "!anycast", "{pais}");
 }
+
+#[test]
+fn a_key_typed_in_guardianas_panel_is_kept_for_the_browser_too() {
+    let (mut s, _, id) = con_pagina(false);
+    let _ = s.peticion(
+        id,
+        "http://127.0.0.1:7443/api/licencia/activar-clave",
+        "POST",
+        br#"{"clave":"  ABCD-1234  "}"#,
+        1,
+    );
+    assert_eq!(s.clave_del_panel.as_deref(), Some("ABCD-1234"));
+    // Any other address leaves it alone.
+    s.clave_del_panel = None;
+    let _ = s.peticion(
+        id,
+        "https://example.com/api/licencia/activar-clave",
+        "POST",
+        br#"{"clave":"X"}"#,
+        1,
+    );
+    assert!(s.clave_del_panel.is_none());
+}

@@ -496,6 +496,9 @@ pub struct Sesion {
     lugar: Option<LugarLicencia>,
     /// A key is being activated.
     licencia_ocupada: bool,
+    /// A key typed in GUARDIANA's own panel (Licencia), opened in a tab here: the browser
+    /// activates itself with it at the next tick, so the person pastes it once (17 Oct 2026).
+    clave_del_panel: Option<String>,
     /// What the last activation failed with, in words, until the next try.
     licencia_error: Option<String>,
     /// When the state was last read from disk, and when the periodic check was last asked for.
@@ -724,6 +727,7 @@ impl Sesion {
             licencia: EstadoLicencia::Desconocido,
             lugar: None,
             licencia_ocupada: false,
+            clave_del_panel: None,
             licencia_error: None,
             licencia_leida: 0,
             licencia_pedida: 0,
@@ -4333,6 +4337,16 @@ impl Sesion {
         cookies: &str,
         contexto: i32,
     ) -> Respuesta {
+        if metodo.eq_ignore_ascii_case("POST")
+            && url.starts_with("http://127.0.0.1:7443/api/licencia/activar-clave")
+            && !matches!(self.licencia, EstadoLicencia::Suscrita { .. })
+        {
+            self.clave_del_panel = serde_json::from_slice::<Value>(cuerpo)
+                .ok()
+                .and_then(|v| v.get("clave").and_then(Value::as_str).map(str::to_owned))
+                .map(|c| c.trim().chars().take(200).collect::<String>())
+                .filter(|c| !c.is_empty());
+        }
         let web = ["http://", "https://", "ws://", "wss://"]
             .iter()
             .any(|e| url.starts_with(e));
@@ -4672,6 +4686,15 @@ impl Sesion {
         let ahora = (self.reloj)();
         let mut o = Vec::new();
         o.extend(self.secure_tic());
+        // The same key, typed once in GUARDIANA's panel, switches the browser on too.
+        if !self.licencia_ocupada && self.lugar.is_some() {
+            if let Some(clave) = self.clave_del_panel.take() {
+                self.licencia_ocupada = true;
+                self.licencia_error = None;
+                o.extend(self.avisa_licencia());
+                o.push(Orden::ActivaLicencia { clave });
+            }
+        }
         // The subscription: read again every minute (the trial ends at a time of day, not at a
         // start), and the periodic check asked for every ten minutes; it connects only when due,
         // and at most once an hour. A file that cannot be read gets a day, said on screen.
