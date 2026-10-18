@@ -1799,6 +1799,11 @@
       if (!window.GuardianaRevision) return;
       await window.GuardianaRevision.iniciar({ api, t, tn, esc, LOC, LANG, pdf: { pdfDocument, savePdfFile } });
     },
+    // «Contratos» (1.0.45, «contrato vivo»): its own script (contratos.js), loaded before this one.
+    async contratos() {
+      if (!window.GuardianaContratos) return;
+      await window.GuardianaContratos.iniciar({ api, t, tn, esc, LOC, LANG, cadaTanto });
+    },
     async antivirus() {
       let pais = (c) => c;
       try { const dn = new Intl.DisplayNames([LOC], { type: 'region' }); pais = (c) => { try { return dn.of(c) || c; } catch (_) { return c; } }; } catch (_) {}

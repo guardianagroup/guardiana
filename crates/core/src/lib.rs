@@ -15,6 +15,7 @@
 //! signals and verdict. Answers are never stored (brief §4).
 
 mod changes;
+pub mod contratos;
 mod error;
 mod export;
 mod gaps;

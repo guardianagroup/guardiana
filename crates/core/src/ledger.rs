@@ -312,6 +312,7 @@ impl Ledger {
         ledger.ensure_gaps_table()?;
         ledger.ensure_changes_table()?;
         ledger.ensure_trafico_table()?;
+        ledger.ensure_contratos_tables()?;
         ledger.migrate_rules_confirmed()?;
         ledger.migrate_events_process()?;
         ledger.migrate_events_server()?;
@@ -835,6 +836,8 @@ impl Ledger {
             "DELETE FROM settings WHERE key LIKE 'alcance:%' OR key LIKE 'alcance_modo:%'",
             [],
         )?;
+        // «Contrato vivo» (1.0.45) names programs and what they asked for: it goes too.
+        Self::borra_contratos_en(&tx)?;
         set_schema(&tx, SCHEMA_HEAD)?;
         tx.commit()?;
         // Gone from the tables is not gone from the file: a DELETE only marks pages free, and
@@ -1724,6 +1727,7 @@ mod tests {
                 ruta: String::new(),
                 sha256: String::new(),
                 firmado_por: String::new(),
+                version: String::new(),
             });
             p.server = Some(servidor("US", 15_169));
             l.append(p).unwrap();

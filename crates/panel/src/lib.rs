@@ -13,6 +13,7 @@ mod antivirus;
 mod api;
 mod auth;
 mod borrado;
+mod contratos;
 mod destinos;
 mod empresa;
 mod expedientes;
@@ -922,12 +923,14 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/mi-dispositivo", get(api::mi_dispositivo))
         .route("/api/mi-dispositivo/nombre", post(api::mi_nombre))
         .route("/api/mi-dispositivo/compartir", post(api::mi_compartir))
+        // «Contratos» (1.0.45, «contrato vivo»): its page, script and API, in their own module.
+        .merge(contratos::rutas())
         .layer(middleware::from_fn(add_security_headers))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::check_host,
         ))
-        .with_state(state);
+        .with_state(state.clone());
 
     let stop = Arc::new(Notify::new());
     let mut addrs = Vec::new();
@@ -956,6 +959,9 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             .await;
         }));
     }
+    // The contracts' watcher (1.0.45): learns and cuts with no page open, and stops with the
+    // panel. Started once the panel is really up, so a failed start leaves nothing behind.
+    tasks.push(contratos::vigia(state, stop.clone()));
     Ok(Running {
         addrs,
         failed_optional,

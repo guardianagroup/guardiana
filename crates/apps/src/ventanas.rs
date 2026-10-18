@@ -183,7 +183,7 @@ fn anotar(
             }
         }
     };
-    let firmado_por = firmas.de(&ruta);
+    let (firmado_por, version) = firmas.firma_y_version(&ruta);
     d.cola.push_back(Oida {
         ts: ahora,
         qname,
@@ -193,6 +193,7 @@ fn anotar(
             ruta,
             sha256,
             firmado_por,
+            version,
         },
     });
 }

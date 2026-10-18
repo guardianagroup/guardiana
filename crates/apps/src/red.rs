@@ -104,6 +104,7 @@ impl Sesion {
                     proceso: Proceso {
                         pid: 0,
                         firmado_por: self.firmas.de(&ruta),
+                        version: String::new(),
                         sha256: huellas.get(&ruta).cloned().unwrap_or_default(),
                         nombre,
                         ruta,

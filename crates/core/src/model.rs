@@ -213,6 +213,11 @@ pub struct Proceso {
     /// Who signs the program, as the system reports it; empty when unsigned or not checked yet.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub firmado_por: String,
+    /// The version the program's file declares (its product version, else its file version), as
+    /// Windows reads it; empty when the file declares none or it was not read yet (1.0.45, «contrato
+    /// vivo»: «Zoom 6.2 ha cambiado»). Rows written before 1.0.45 have none and hash as they did.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub version: String,
 }
 
 str_enum! {
