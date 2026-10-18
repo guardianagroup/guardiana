@@ -2697,6 +2697,11 @@
     "permitiendo": "Permitindo…",
     "interruptor_etiqueta_cortar": "Cortar {nombre}",
     "interruptor_etiqueta_permitir": "Voltar a permitir {nombre}",
-    "pd_corte_titulo": "{empresa} neste computador"
+    "pd_corte_titulo": "{empresa} neste computador",
+    "pd_explica_asn": "O número público da rede que entrega este endereço; diz por onde passa, não quem usa os dados.",
+    "pd_explica_cifrado": "Isto significa que a conexão vai cifrada: quem a vir pelo caminho não lê o conteúdo.",
+    "pd_explica_sin_cifrar": "Isto significa que a conexão não vai cifrada: quem a vir pelo caminho pode ler o que leva.",
+    "pd_explica_via": "O protocolo e a porta por onde saiu; por si sós não dizem o que foi enviado.",
+    "pd_explica_telemetria": "Isto significa que {empresa} recebe dados de uso deste PC."
   }
 }

@@ -2697,6 +2697,11 @@
     "permitiendo": "Allowing…",
     "interruptor_etiqueta_cortar": "Cut {nombre}",
     "interruptor_etiqueta_permitir": "Allow {nombre} again",
-    "pd_corte_titulo": "{empresa} on this computer"
+    "pd_corte_titulo": "{empresa} on this computer",
+    "pd_explica_asn": "The public number of the network that delivers this address; it says which way it goes, not who uses the data.",
+    "pd_explica_cifrado": "This means the connection is encrypted: whoever sees it on the way cannot read what it carries.",
+    "pd_explica_sin_cifrar": "This means the connection is not encrypted: whoever sees it on the way can read what it carries.",
+    "pd_explica_via": "The protocol and the port it left through; on their own they do not say what was sent.",
+    "pd_explica_telemetria": "This means {empresa} receives usage data from this PC."
   }
 }

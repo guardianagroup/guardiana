@@ -1206,3 +1206,6 @@ body.universo { display: flex; flex-direction: column; height: 100vh; height: 10
 header.top .idiomas { margin-left: auto; display: inline-flex; gap: 6px; }
 header.top .idiomas .lang { min-height: 30px; padding: 0 12px; font: 600 12px var(--texto); border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); }
 header.top .idiomas .lang.actual { border-color: var(--accent); color: var(--accent); opacity: 1; }
+/* The plain meaning of a word of the trade, in one muted line under it (18 Oct 2026). */
+.universo .explica { margin-top: 2px; font-size: 12px; line-height: 1.4; color: var(--muted-2); font-weight: 400; }
+.universo .insp-cabeza .explica { margin: 8px 0 0; }

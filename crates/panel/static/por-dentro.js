@@ -263,7 +263,9 @@
         const n = Math.min(4, 1 + Math.floor(Math.log10(1 + e / 3000)));
         for (let k = 0; k < n; k++) nuevo(d, 'out', false, e, azar() * segundos * 900);
         if (b > 0) nuevo(d, 'in', false, b, 300 + azar() * segundos * 800);
-        evento(p.nombre, d.host, `${bytes(e)} ↑ · ${bytes(b)} ↓${d.asn ? ' · AS' + d.asn : ''}${d.proto ? ' · ' + d.proto + '/' + d.puerto : ''}`, 'o', d);
+        // In the log, what was sent and received; the network's number and the protocol are in the
+        // card, each with its plain meaning (18 Oct 2026: no jargon without its consequence).
+        evento(p.nombre, d.host, `${bytes(e)} ↑ · ${bytes(b)} ↓`, 'o', d);
       });
       avanzaCubos();
       st.serie[N_CUBOS - 1] += env;
@@ -1586,7 +1588,10 @@
       // measurements; empty countries and oceans stay still.
       return mejor;
     };
-    const usoTexto = (d) => (d.doc === null || d.doc === undefined ? '' : d.uso ? `<div>${esc(t('pd_para_que'))} <b>${esc(t('av_uso_' + d.uso))}</b></div>` : `<div class="nodoc">${esc(t('pd_no_documenta'))}</div>`);
+    // A word of the trade always comes with what it means for the person, in one plain line
+    // (18 Oct 2026, the committee: «Telemetría · Esto significa que…»), never an accusation.
+    const explicaUso = (d) => (d.uso === 'telemetria' ? `<div class="explica">${esc(t('pd_explica_telemetria').replace('{empresa}', d.empresa || prod(d.p).nombre))}</div>` : '');
+    const usoTexto = (d) => (d.doc === null || d.doc === undefined ? '' : d.uso ? `<div>${esc(t('pd_para_que'))} <b>${esc(t('av_uso_' + d.uso))}</b></div>${explicaUso(d)}` : `<div class="nodoc">${esc(t('pd_no_documenta'))}</div>`);
     // ---------- Places and companies (18 Oct 2026, the approved redesign) ----------
     // A place's name, and how sure the page is of it. The source is said as it is: a region the
     // operator publishes, a city it declares, the address database (approximate) or only the
@@ -1683,9 +1688,9 @@
         const f = fuenteDe(d.lugar);
         return `<div class="mono">${esc(d.host)}</div><div>${esc(p.nombre)} · <span class="mono">${esc(p.procesos.join(' · '))}</span></div>${usoTexto(d)}
           ${d.empresa && !d.sede ? `<div>${esc(t('pd_nombre_de').replace('{empresa}', d.empresa))}</div>` : ''}
-          <div>${esc(donde)}${d.asn ? ` <span class="mono">AS${d.asn}</span>` : ''}${!d.sede ? ` <span class="t">(${f.aprox ? esc(t('pd_aprox')) + ' · ' : ''}${esc(f.txt)})</span>` : ''}</div>
+          <div>${esc(donde)}${d.asn ? ` <span class="mono">AS${d.asn}</span><div class="explica">${esc(t('pd_explica_asn'))}</div>` : ''}${!d.sede ? ` <span class="t">(${f.aprox ? esc(t('pd_aprox')) + ' · ' : ''}${esc(f.txt)})</span>` : ''}</div>
           ${d.red && !d.sede && d.red[0] !== '@' && d.red !== d.empresa ? `<div class="t">${esc(t('pd_red_no_es'))}</div>` : ''}
-          ${d.proto ? `<div>${esc((d.vias && d.vias.length ? d.vias : [d.proto + '/' + d.puerto]).join(' · '))}${d.puerto === 443 ? ' ' + esc(t('pd_cifrado_corto')) : d.puerto === 80 ? ' ' + esc(t('pd_sin_cifrar_corto')) : ''} · ${esc(tn('pd_paquetes_n', d.paq))}</div>` : ''}
+          ${d.proto ? `<div>${esc((d.vias && d.vias.length ? d.vias : [d.proto + '/' + d.puerto]).join(' · '))}${d.puerto === 443 ? ' ' + esc(t('pd_cifrado_corto')) : d.puerto === 80 ? ' ' + esc(t('pd_sin_cifrar_corto')) : ''} · ${esc(tn('pd_paquetes_n', d.paq))}<div class="explica">${esc(t(d.puerto === 80 ? 'pd_explica_sin_cifrar' : d.puerto === 443 ? 'pd_explica_cifrado' : 'pd_explica_via'))}</div></div>` : ''}
           <div>${esc(t('pd_enviado'))} <b>${esc(bytes(d.sub))}</b> · ${esc(t('pd_recibido'))} ${esc(bytes(d.baj))}${d.consultas ? ' · ' + esc(tn('pd_consultas', d.consultas)) : ''}${d.bloq ? ' · ' + esc(tn('pd_parados', d.bloq)) : ''}</div>
           <div class="t">${d.primera ? esc(t('pd_primera').replace('{t}', hace(Date.now() - d.primera))) : ''}${dia === null ? '' : ' · ' + esc(t(dia ? 'pd_alli_dia' : 'pd_alli_noche'))}</div>${estado}`;
       }
@@ -1786,7 +1791,7 @@
         else if (est === 'normal' || est === 'cortar') accion = `<div class="insp-corte"><div class="fila"><b>${esc(t('pd_corte_titulo').replace('{empresa}', nombre))}</b>${botonCorte(nombre, ds, true)}</div><p>${esc(tn('pd_cortar_explica', ds.filter((d) => porNombre(d) && !d.cortado).length))} ${esc(t('pd_cortar_reversible'))}</p></div>`;
         else if (est === 'ajeno') accion = `<div class="insp-corte hecho"><div class="fila"><span class="corte-hecho"><span class="hora">${esc(t('pd_estado_cortado'))}</span></span></div><p>${esc(t('pd_cortado_por_otra'))}</p></div>`;
       }
-      return `<div class="insp-cabeza"><h2 id="insp-titulo" class="grande">${esc(nombre)}</h2>${lead ? `<p class="insp-lead" title="${esc(lead)}">${esc(lead)}</p>` : ''}${chips.length ? `<div class="insp-chips">${chips.map((x) => `<span>${esc(x)}</span>`).join('')}</div>` : ''}</div>
+      return `<div class="insp-cabeza"><h2 id="insp-titulo" class="grande">${esc(nombre)}</h2>${lead ? `<p class="insp-lead" title="${esc(lead)}">${esc(lead)}</p>` : ''}${chips.length ? `<div class="insp-chips">${chips.map((x) => `<span>${esc(x)}</span>`).join('')}</div>` : ''}${ds.some((d) => d.uso === 'telemetria') ? `<p class="explica">${esc(t('pd_explica_telemetria').replace('{empresa}', nombre))}</p>` : ''}</div>
         ${cifras([[cuanto(c, ds.reduce((a, d) => a + d.sub, 0)), c ? t('pd_consultas_palabra') : t('pd_enviado_palabra')], [num(ln.length), t('pd_nombres_palabra')], [num(lp.length), t('pd_programas_palabra')]])}
         <div class="insp-lista"><div class="insp-h"><span>${esc(t('pd_nombres_que_usa'))}</span></div>${ln.map((n) => `<button type="button" class="insp-nombre${n.cort ? ' cortada' : ''}" data-dest="${esc(n.d.k)}"><span class="mono">${esc(n.host)}</span><span class="q">${esc(cuanto(n.c, n.sub))}</span></button>`).join('')}</div>
         <div class="insp-lista"><div class="insp-h"><span>${esc(t('pd_quien_llama'))}</span></div><div class="insp-chips progs">${lp.map((q) => `<span>${esc(q.p)} <i>${esc(cuanto(q.c, q.sub))}</i></span>`).join('')}</div></div>
