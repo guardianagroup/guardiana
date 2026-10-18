@@ -40,11 +40,12 @@ BASE = MARCA_FUENTE + f'''
 # leaves empty between its text (WiX ExitDialog: description down to y=147 px; FatalError to
 # 200; UserExit to 213) and the «open the panel» box (from y=253). On the first screen the
 # licence box covers it.
-# 15 Oct 2026, the owner: «mientras duermes» read as if it only happened at night. It happens
-# whenever nobody is watching, so that is what the line says now.
-FRASE = {'es': ('«Mira a quién habla tu PC cuando tú no miras.»', 'Haz que te borren.'),
-         'en': ('“See who your PC talks to when you’re not looking.”', 'Make them delete you.'),
-         'pt': ('«Veja com quem o seu PC fala quando você não olha.»', 'Faça que te apaguem.')}
+# 17 Oct 2026: the phrase of 12 Oct («Mira a quién habla tu PC cuando tú no miras» / «Haz que te
+# borren») was out of date for the owner. Chosen by the committee (Claude, ChatGPT, Grok): what
+# GUARDIANA shows that nobody else does, and who decides.
+FRASE = {'es': ('Tu PC, tu IA y tu antivirus, a la vista.', 'Tú decides qué se corta.'),
+         'en': ('Your PC, your AI and your antivirus, in plain view.', 'You decide what gets cut.'),
+         'pt': ('Seu PC, sua IA e seu antivírus, à vista.', 'Você decide o que bloquear.')}
 def dialogo(zero, idioma):
     a, b = FRASE[idioma]
     return f'''<!doctype html><meta charset=utf-8><style>{BASE}
