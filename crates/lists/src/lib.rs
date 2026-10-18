@@ -15,6 +15,7 @@ pub mod atribucion;
 pub mod dominio;
 mod parse;
 mod red;
+pub mod subastas;
 pub mod ubicacion;
 
 use std::collections::HashMap;
@@ -710,6 +711,17 @@ impl Catalog {
         c.add_source(&SOURCES[0], EASYPRIVACY);
         c.add_source(&SOURCES[1], PETERLOWE);
         c.add_evasion(EVASION_DNS);
+        // «No me subastes» (1.0.46): the names of the advertising auction (bid requests, the
+        // crossing of identifiers between companies, the page's ad program) are advertising.
+        // The lowest rank: a name another list calls a tracker stays a tracker.
+        for (nombre, _) in subastas::nombres() {
+            c.insert(
+                nombre,
+                Category::Publicidad,
+                subastas::OWN_SOURCE_SUBASTAS,
+                None,
+            );
+        }
         c
     }
 

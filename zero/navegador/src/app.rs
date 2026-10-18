@@ -1732,22 +1732,56 @@ fn eventos_pestana(
                         })
                         .map(|h| texto_de(|p| h.GetHeader(w!("Cookie"), p)))
                         .unwrap_or_default();
-                    let r = con_sesion(|s| {
-                        s.peticion_con(id, &url, &metodo, &cuerpo, &cookies, contexto.0)
+                    // 1.0.46 (subastas-1.0.46): Global Privacy Control and the strict
+                    // fingerprint mode, as the person set them.
+                    let (r, gpc, uniforme) = con_sesion(|s| {
+                        (
+                            s.peticion_con(id, &url, &metodo, &cuerpo, &cookies, contexto.0),
+                            s.gpc(),
+                            s.huella_uniforme(),
+                        )
                     })
-                        .unwrap_or(sesion::Respuesta {
+                    .unwrap_or((
+                        sesion::Respuesta {
                             cortar: true,
                             pagina: None,
                             nota: String::new(),
-                        });
+                        },
+                        true,
+                        false,
+                    ));
                     if !r.nota.is_empty() {
                         registra("petición", &format!("{metodo} {url} {}", r.nota));
                     }
                     if !r.cortar {
-                        // Global Privacy Control: «do not sell or share my data», on every request.
+                        // Global Privacy Control: «do not sell or share my data», on every request
+                        // (unless the person turned it off, 1.0.46). With the strict fingerprint
+                        // mode, only the first language goes in `Accept-Language`, as the page
+                        // script says in `navigator.languages`.
                         if url.starts_with("http") && !sesion::es_interna(&url) {
                             if let Ok(h) = req.Headers() {
-                                let _ = h.SetHeader(w!("Sec-GPC"), w!("1"));
+                                if gpc {
+                                    let _ = h.SetHeader(w!("Sec-GPC"), w!("1"));
+                                }
+                                if uniforme {
+                                    let mut hay = BOOL::default();
+                                    if h.Contains(w!("Accept-Language"), &mut hay).is_ok()
+                                        && hay.as_bool()
+                                    {
+                                        let todas =
+                                            texto_de(|p| h.GetHeader(w!("Accept-Language"), p));
+                                        let una = todas
+                                            .split(',')
+                                            .next()
+                                            .and_then(|x| x.split(';').next())
+                                            .map(str::trim)
+                                            .unwrap_or_default();
+                                        if !una.is_empty() && una.len() < 40 {
+                                            let v = Ancho::de(una);
+                                            let _ = h.SetHeader(w!("Accept-Language"), v.p());
+                                        }
+                                    }
+                                }
                             }
                         }
                         return Ok(());

@@ -31,6 +31,24 @@ pub struct Ajustes {
     /// mandate, their marked data and the open lists' dangerous addresses still hold there.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub webs_permitidas: BTreeSet<String>,
+    /// «No me subastes» turned off by the person (1.0.46): on with the protection unless they
+    /// turn it off.
+    #[serde(default)]
+    pub subastas_sin_cortar: bool,
+    /// Webs where the person lets the page's auction program run (its Prebid, its crossings of
+    /// identifiers). The companies the lists call advertising stay cut by the lists.
+    #[serde(default)]
+    pub subastas_permitidas: BTreeSet<String>,
+}
+
+impl Ajustes {
+    /// Whether «No me subastes» cuts on a page of `sitio_pagina` (with the protection on).
+    #[must_use]
+    pub fn corta_subastas(&self, sitio_pagina: &str) -> bool {
+        self.cortar_seguimiento
+            && !self.subastas_sin_cortar
+            && !self.subastas_permitidas.contains(sitio_pagina)
+    }
 }
 
 /// One request the engine is about to send.
@@ -79,6 +97,10 @@ pub enum Motivo {
     ListaRastreo,
     /// Malware, scams or phishing by uBlock Origin's badware list and URLhaus (`filtros`).
     Peligro,
+    /// «No me subastes» (1.0.46): the page's own auction program (Prebid.js by its file name),
+    /// a name of the auction list (`guardiana_lists::subastas`) or another company's crossing of
+    /// identifiers (`crate::subasta`).
+    Subasta,
 }
 
 impl Motivo {
@@ -207,6 +229,19 @@ pub fn decide_con(
                 crate::filtros::Lista::Rastreo => Motivo::ListaRastreo,
                 crate::filtros::Lista::Peligro => Motivo::Peligro,
             })
+    });
+    // «No me subastes» (1.0.46): the auction's own machinery, when the person has not let it run
+    // on this web. Never the page the person opens.
+    let lista = lista.or_else(|| {
+        if p.recurso == Recurso::Documento || !ajustes.corta_subastas(p.sitio_pagina) {
+            return None;
+        }
+        let ruta = url::Url::parse(p.url)
+            .map(|u| u.path().to_string())
+            .unwrap_or_default();
+        let otro_sitio = !destino.sitio.is_empty() && destino.sitio != p.sitio_pagina;
+        crate::subasta::corta(&destino.host, &ruta, otro_sitio, destino.sigue())
+            .then_some(Motivo::Subasta)
     });
     let pagina = p.recurso == Recurso::Documento;
     let corta = |motivo: Motivo, destino: Destino, hallazgos: Vec<Hallazgo>| Decision {

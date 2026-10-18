@@ -1,0 +1,1078 @@
+# Guardiana — lista "subastas" (1.0.46, «Tu visita, a subasta» y «No me subastes»).
+# Mantenida por nosotros, abierta. Dice qué papel tiene un nombre en la subasta de anuncios que
+# ocurre cuando abres una web: quién recibe la petición de puja, quién sincroniza identificadores
+# entre empresas y qué programa de la web pide las pujas. Coincide con el nombre y sus subnombres.
+# Es una etiqueta, nunca un veredicto. La empresa dueña y su país NO se escriben aquí: salen de
+# empresas.txt y empresas-mundo.txt, comprobados uno a uno (un país inventado es peor que un hueco).
+#
+# FORMATO
+#   @id|Sistema|página de baja|fuente   identificadores que unen tu visita entre empresas
+#   @sincroniza                          nombres que solo sirven para cruzar identificadores
+#   @servidor                            el programa de anuncios de la web (pide y sirve las pujas)
+#   @puja                                los nombres a los que Prebid.js manda las peticiones de puja
+#   @pujadores                           `=código sitio`: el código de cada pujador en Prebid.js y
+#                                        el sitio de sus nombres (para saber de quién es)
+#
+# FUENTE de @puja y @pujadores: los adaptadores de pujadores de Prebid.js (Apache-2.0),
+# https://github.com/prebid/Prebid.js, carpeta modules/*BidAdapter.js, commit af1ba21c (10 oct
+# 2026): el código de cada pujador (BIDDER_CODE) y los nombres que escribe en su código. Se quitan
+# las páginas de documentación, consola, privacidad y baja (privacy.criteo.com debe seguir
+# abriéndose: es donde se pide la baja), los nombres de nubes y repartos compartidos y los
+# estáticos de servicios de consumo (s.yimg.com sirve también el correo de Yahoo). Rubicon
+# (Magnite) arma sus nombres en tiempo de ejecución: se añaden a mano los dos que usa.
+#
+# No es la lista entera de quién puja: una web puede pujar desde sus propios servidores
+# («server-side»), y eso no se ve desde tu equipo. La pantalla lo dice siempre.
+
+# Unified ID 2.0 (The Trade Desk). Baja: https://unifiedid.com/docs/getting-started/gs-opt-out
+# («Transparency and Control Portal»), consultada el 18 oct 2026.
+@id|UID2|https://www.transparentadvertising.com/|unifiedid.com
+uidapi.com
+prod.uidapi.com
+# ID5. Página que la propia empresa declaró en el registro de corredores de datos de California
+# (corredores.txt); consultado el 18 oct 2026.
+@id|ID5|https://id5.io|corredores.txt
+id5-sync.com
+eu-1-id5-sync.com
+# LiveRamp RampID / ATS. Baja del identificador del navegador: https://liveramp.com/your-rights/
+# («Browser Specific Opt Out»), consultada el 18 oct 2026.
+@id|RampID|https://optout.liveramp.com/opt_out_cookies|liveramp.com
+rlcdn.com
+# Lotame Panorama ID (crwdcntrl.net es de Lotame en empresas.txt).
+@id|Panorama ID||lotame.com
+crwdcntrl.net
+
+# Cruce de identificadores entre empresas («cookie sync»): su única tarea es que una empresa sepa
+# qué identificador te dio otra. Cada uno está en el código de Prebid.js (sincronización de
+# usuarios de un adaptador) salvo cm.g.doubleclick.net, el de Google, documentado en
+# https://developers.google.com/authorized-buyers/rtb/cookie-guide.
+@sincroniza
+match.adsrvr.org
+cm.g.doubleclick.net
+sync.richaudience.com
+ssp-sync.criteo.com
+gum.criteo.com
+pixel.rubiconproject.com
+eus.rubiconproject.com
+dsum.casalemedia.com
+image8.pubmatic.com
+ads.pubmatic.com
+u.openx.net
+sync.smartadserver.com
+x.bidswitch.net
+cs2.mathilde-ads.com
+pixel-sync.sitescout.com
+
+# El programa de anuncios de la web: pide las pujas o las recibe y elige el anuncio.
+@servidor
+securepubads.g.doubleclick.net
+pubads.g.doubleclick.net
+c.amazon-adsystem.com
+aax.amazon-adsystem.com
+client.aps.amazon-adsystem.com
+web.ads.aps.amazon-adsystem.com
+
+@puja
+1x1.a-mo.net
+a.ads.rmbl.ws
+a.bids.ws
+a.ivstracker.net
+a.teads.tv
+a.videoreach.com
+abs.cookieless-proxistore.com
+abs.proxistore.com
+acdn.adnxs.com
+ad-cdn.technoratimedia.com
+ad.360yield-basic.com
+ad.360yield.com
+ad.ad-stir.com
+ad.adition.com
+ad.adopx.net
+ad.as.amanad.adtdp.com
+ad.holmesmind.com
+ad.invamia.com
+ad.suimad.com
+ad.ventesavenues.in
+ad.vqserve.com
+ad.yieldlab.net
+adapter-analytics.setupad.io
+adapter.bidmatic.io
+adastra-prebid.attekmi.co
+addefend-platform.com
+addigi-prebid.attekmi.co
+ade.clmbtech.com
+adlywise-prebid.attekmi.co
+adm.vidyome.com
+adn-srv.reckoner-api.com
+adn.pilotx.tv
+adnex-prebid.attekmi.co
+adpb.ust-ad.com
+ads-2j0kac.rtb-magicbid.ai
+ads-flipp.com
+ads-sg.momagic.com
+ads-stg.yieldmo.com
+ads.ad2iction.com
+ads.ad4game.com
+ads.betweendigital.com
+ads.biddertmz.com
+ads.dxkulture.com
+ads.dxtech.ai
+ads.futureads.io
+ads.go2net.com.ua
+ads.lfstmedia.com
+ads.madsense.io
+ads.nuba.io
+ads.playground.xyz
+ads.pubmatic.com
+ads.resetsrv.com
+ads.servenobid.com
+ads.smartstream.tv
+ads.smn.rs
+ads.sportslocalmedia.com
+ads.theagenticx.ai
+ads.trustx.org
+ads.viralize.tv
+ads.yieldmo.com
+ads4.krushmedia.com
+adserv.snigelweb.com
+adserver.adotmob.com
+advice.pgs.io
+adx-engine-gray.tec-do.cn
+adx.digitalmatter.services
+adx.videonow.ru
+ai-p-codefuel-ds-rtb-us-east-1-k8s.seccint.com
+aladdin.genieesspv.jp
+amcom-prebid.attekmi.co
+an.cmertv.com
+anzu-prebid.attekmi.co
+ap.lijit.com
+apex.go.sonobi.com
+api.condorx.io
+api.engerio.sk
+api.feedad.com
+api.hypelab.com
+api.prebid.int.us-east-1.bluems.com
+api.primecaster.net
+api.w.inmobi.com
+apps.adsgravity.io
+apps.sascdn.com
+artechnology-prebid.attekmi.co
+as.ck-ie.com
+as.innity.com
+as.vt.open8.com
+asset.popin.cc
+async.resetdigital.co
+at.datawrkz.com
+auction.adpearl.io
+b.finative.cloud
+b.nativendo.de
+backend.andbeyond.media
+backend.pubrise.ai
+be-agent.teqblaze.io
+beacon.bidder.taboola.com
+bes.mobfox.com
+bh.contextweb.com
+bid.contextweb.com
+bid.essrtb.com
+bid.glass
+bid.missena.io
+bid.pubwise.io
+bid.realry.com
+bid.revantage.io
+bid.searchplan.co
+bid.sparteo.com
+bid.sxp.smartclip.net
+bid.virgul.com
+bid.zmaticoo.com
+bidder-us-east-1.getblue.io
+bidder.ablida.net
+bidder.adhash.com
+bidder.cleanmediaads.com
+bidder.doceree.com
+bidder.h12-media.com
+bidder.onomagic.com
+bidder.qwarry.co
+bidder.viously.com
+bidders-us.adelphic.net
+biddigi-auction-service.biddigi25.workers.dev
+bidding-dsp.ad-m.asia
+bidding.rediads.com
+bids.concert.io
+bids.ws
+bl-us.aceex.io
+blobs.omnitagjs.com
+bn.bidfuse.com
+bntb.adsinteractive.com
+btlr.sharethrough.com
+buyer.dspx.tv
+c.holmesmind.com
+c2shb.pubgw.yahoo.com
+capi.connatix.com
+cdn-a.yieldlove.com
+cdn-rtb.sape.ru
+cdn.afp.ai
+cdn.apvdr.com
+cdn.aralego.net
+cdn.bmcdn7.com
+cdn.btloader.com
+cdn.connectad.io
+cdn.deepintent.com
+cdn.dxkulture.com
+cdn.dxtech.ai
+cdn.ex.co
+cdn.holmesmind.com
+cdn.hubvisor.io
+cdn.innity.net
+cdn.mediago.io
+cdn.orangeclickmedia.com
+cdn.performax.cz
+cdn.relevant-digital.com
+cdn.taboola.com
+cdn.undertone.com
+cdn.viqeo.tv
+cdn3.richaudience.com
+cds.connatix.com
+ce.lijit.com
+central.gjirafa.com
+central.mall.tv
+central.sea.integr8.digital
+chip.performax.cz
+client-bids.adsby.bidtheatre.com
+client.aps.amazon-adsystem.com
+cm.adform.net
+cm.anyrtb.com
+colossusssp.com
+cookie.360playvid.com
+cookie.stpd.cloud
+cookies.andbeyond.media
+cookies.nextmillmedia.com
+core.adcluster.com.tr
+core.iprom.net
+cs.admanmedia.com
+cs.axis-marketplace.com
+cs.engagemedia.tv
+cs.gssprt.jp
+cs.iqzone.com
+cs.krushmedia.com
+cs.pgammedia.com
+cs.playdigo.com
+cs.pubcircle.ai
+cs.qt.io
+cs.screencore.io
+cs.startappnetwork.com
+cs.visiblemeasures.com
+cs2.mathilde-ads.com
+csr.onet.pl
+cstb.adsinteractive.com
+csync.al-ad.com
+csync.smilewanted.com
+cxba-s2s.cncpt.dk
+d.adroll.com
+d.audiencerun.com
+d.socdm.com
+d.vidoomy.com
+d11.contentsfeed.com
+d5p.de17a.com
+dai.doceree.com
+dale.performax.cz
+data.dianomi.com
+dcbuyer.dspx.tv
+dco.smartclip.net
+delivery.clickonometrics.pl
+delivery.r2b2.io
+delta.adprime.com
+dev-ads.risemediatech.com
+dev-event.dxmdp.com
+dianomi-bidder-proxy.dianomi.com
+direct.adsrvr.org
+directo.prebidserving.com
+display.bfmio.com
+display.bidder.taboola.com
+dsp.adotmob.com
+dsp.brainx.tech
+dsp.myads.telkomsel.com
+dsum.casalemedia.com
+e.relay.bid
+e.serverbid.com
+east-api.harion-ma.com
+east-backend.mycodemedia.com
+east-node.verben.com
+eb2.3lift.com
+elb.the-ozone-project.com
+endpoint1.qt.io
+endpoint1.smoot.ai
+endpoint2.mathilde-ads.com
+engine.bliink.io
+engine.widespace.com
+eu1.oraki.io
+eu2.adnetwork.agency
+eus.rubiconproject.com
+ex.ingage.tech
+exchange.alkimi-onboarding.com
+exchange.buzzoola.com
+exchange.ops.co
+exchange.postrelease.com
+exchange.pstudio.tadex.id
+fastlane.rubiconproject.com
+felixads-prebid.attekmi.co
+g.eclick.vn
+g.ezoic.net
+g2.gumgum.com
+gacraft.jp
+gat.tpmn.io
+gbid.mediago.io
+gbid.mediagotechnology.com
+genieesspv.jp
+ghb.console.adtarget.com.tr
+gocm.c.appier.net
+goldlayer-api.prod.gbads.net
+goldplayer.prod.gbadtech.io
+gosrv.pixfuture.com
+grid-bidder.criteo.com
+grid.bidswitch.net
+gum.criteo.com
+hb-analytics.nextmillmedia.com
+hb-eu.gammaplatform.com
+hb-jp.gammaplatform.com
+hb-stg.c1exchange.com
+hb-us.gammaplatform.com
+hb.360yield.com
+hb.adingo.jp
+hb.adtrue.com
+hb.adwmg.com
+hb.appush.com
+hb.aralego.com
+hb.collectiveaudience.co
+hb.gammaplatform.com
+hb.greenbids.ai
+hb.hyperbrainz.com
+hb.incrementxserv.com
+hb.jixie.io
+hb.jsrdn.com
+hb.justbidit2.xyz
+hb.minutemedia-prebid.com
+hb.mynativeplatform.com
+hb.nativery.com
+hb.openwebmp.com
+hb.stngo.com
+hb.sweetgum.io
+hb.undertone.com
+hbe198.hybrid.ai
+hbopenbid.pubmatic.com
+helios-ads-qa-core.ssidevops.com
+helloworld.holid.io
+helpers.winr.com.au
+htlb.casalemedia.com
+i.connectad.io
+i.socdm.com
+ib.adnxs-simple.com
+ib.adnxs.com
+image8.pubmatic.com
+img.ak.impact-ad.jp
+in-appadvertising.com
+info.mmnneo.com
+inv-nets.admixer.net
+jambojar-apac-prebid.attekmi.co
+jambojar-prebid.attekmi.co
+jdpmedia-prebid.attekmi.co
+js-sec.indexww.com
+js.adscale.de
+js.datawrkz.com
+js.ssp.cadent.com
+kimberlite.io
+kssp.kbntx.ch
+lb.kiviads.com
+lib-cdn.8pod.com
+lockerdome.com
+logger.impactify.media
+lwadm.com
+mantodea.mantisadnetwork.com
+markapp-apac-prebid.attekmi.co
+markapp-prebid.attekmi.co
+match.adsrvr.org
+matching.kubient.net
+media.grid.bidswitch.net
+meta.resetdigital.co
+mfx.mobilefuse.com
+ml.pubcircle.ai
+mobile.mng-ads.com
+mp.4dex.io
+ms-ads-monitoring-events.presage.io
+ms-cookie-sync.presage.io
+mtrx.go.sonobi.com
+mweb-hb.presage.io
+n.nnowa.com
+native.bidder.taboola.com
+nep.advangelists.com
+nexbid.uk
+npid.amspbs.com
+null.holid.io
+o.clickiocdn.com
+one.elitebidder.com
+onetag-sys.com
+orbidder.otto.de
+p.rfihub.com
+p1.admaru.net
+p2.admaru.net
+pangle.pangleglobal.com
+panxo-sys.com
+pb.adriver.ru
+pb.anyrtb.com
+pb.dmxleo.com
+pb.ladsp.com
+pb.optimizerx.com
+pbam.orangeclickmedia.com
+pbc-rtb.startappnetwork.com
+pbc.adxcg.net
+pbidj.lemmamedia.com
+pbjs.driftpixel.live
+pbjs.iqzonertb.live
+pbjs.kiviads.live
+pbjs.league-m.media
+pbjs.mobkoi.com
+pbjs.pigeoon.com
+pbjs.rbstsystems.live
+pbjs.xe.works
+pbs-front.mediasquare.fr
+pbs-js.prebid-ownadx.com
+pbs.360yield.com
+pbs.btloader.com
+pbs.dailyhunt.in
+pbs.nextmillmedia.com
+pbs.optidigital.com
+pixel-sync.sitescout.com
+pixel.rubiconproject.com
+pjs.srv.stackadapt.com
+player-cdn.beachfrontmedia.com
+player.adtelligent.com
+point.braveglobal.tv
+point.contextualadv.com
+prd-prebid-bidder.adrino.io
+pre.ads.justpremium.com
+prebid-apac.attekmi.co
+prebid-eu.attekmi.co
+prebid-outstream.yieldmo.com
+prebid-server.rubiconproject.com
+prebid.a-mo.net
+prebid.ad.smaato.net
+prebid.adbro.me
+prebid.admanmedia.com
+prebid.admedia.com
+prebid.anyclip.com
+prebid.attekmi.co
+prebid.axis-marketplace.com
+prebid.caroda.io
+prebid.chocolateplatform.co
+prebid.cht.hinet.net
+prebid.deepintent.com
+prebid.ecdrsvc.com
+prebid.eu-central-1.bidder.mediakeys.io
+prebid.intellitxt.com
+prebid.ioadx.com
+prebid.loopmertb.com
+prebid.mediabrama.com
+prebid.mes.glomex.cloud
+prebid.mgid.com
+prebid.optinadserving.com
+prebid.optoutadserving.com
+prebid.publir.com
+prebid.redtram.com
+prebid.rfihub.com
+prebid.rtb.allegro.pl
+prebid.scupio.com
+prebid.searchplan.co
+prebid.setupad.io
+prebid.smilewanted.com
+prebid.tads.xplosion.de
+prebid.the-ozone-project.com
+prebid.vlyby.com
+prebid2.cwi.re
+prebidimpst.publir.com
+prebidjs-bids-us1.sonar-ads.com
+prebidjs-events-us1.sonar-ads.com
+prebidjs-sync-us1.sonar-ads.com
+prg.smartadserver.com
+prisma.nexx360.io
+public.servenobid.com
+pubmatic.bbvms.com
+pubsmart-prebid.attekmi.co
+px-us-e.floxis.tech
+px.c1exchange.com
+qa-ads.nobid.com
+qa-pbs-van.dailyhunt.in
+radiantfusion-prebid.attekmi.co
+reachms.bfmio.com
+recs.engageya.com
+relay.hubvisor.io
+req.adx.ws
+request.czilladx.com
+revphpe.djaxbidder.com
+rt.gsspat.jp
+rt.marphezis.com
+rtb-east.tapnative.com
+rtb-jp.mediago.io
+rtb.aniview.com
+rtb.avantisvideo.com
+rtb.cdn.adtarget.market
+rtb.conative.network
+rtb.d.adup-tech.com
+rtb.dexerto.media
+rtb.dochaseadx.com
+rtb.ehealthcaresolutions.com
+rtb.gamoshi.io
+rtb.gumgum.com
+rtb.lane4.io
+rtb.mfadsrvr.com
+rtb.nexverse.ai
+rtb.openx.net
+rtb.pinelake.media
+rtb.upremium.asia
+rtb.valuad.io
+rtb.vrtcal.com
+rtb.vuukle.com
+rtbf.uncn.jp
+rtbinsight.ru
+rtbtest.send.microad.jp
+s-rtb-pb.send.microad.jp
+s.ad.smaato.net
+s.adroll.com
+s.gamoshi.io
+s.oa.opera.com
+s.richaudience.com
+s.seedtag.com
+s2s.sportslocalmedia.com
+s2s.yieldlove-ad-serving.net
+sa-cs.deliverimp.com
+sa-lb.deliverimp.com
+sapi.bumlam.com
+sb.freeskreen.com
+scripts.jixie.media
+scripts.opti-digital.com
+secure.adnxs.com
+server.cpmstar.com
+server.playdigo.com
+service.e-volution.ai
+service.gnetrtb.com
+shb.richaudience.com
+smartssp-us-east.iqzone.com
+sonic.impactify.media
+sp.gmossp-sp.jp
+spicyrtb.com
+srv.armanet.us
+srv.aso1.net
+srv.freedomadnetwork.com
+ssb-global.smartadserver.com
+ssb.smartadserver.com
+ssc-cms.33across.com
+ssc.33across.com
+ssp-cookie.logan.ai
+ssp-rtb.sape.ru
+ssp-sync.criteo.com
+ssp.360playvid.com
+ssp.ad-plus.com.tr
+ssp.adrelevantis.com
+ssp.advertronic.io
+ssp.afp.ai
+ssp.astraone.io
+ssp.dauup.com
+ssp.disqus.com
+ssp.drift-pixel.ai
+ssp.hybrid.ai
+ssp.otm-r.com
+ssp.theadx.com
+ssp.videowalldirect.com
+ssp.wp.pl
+ssptr.theadx.com
+st.astraone.io
+st.hybrid.ai
+stackup-prebid.attekmi.co
+stagingbidding.rediads.com
+static.cdn.admatic.com.tr
+static.criteo.net
+static.mediagotechnology.com
+supply.bidscube.com
+sync.adnimation.com
+sync.adprime.com
+sync.apester.com
+sync.aralego.com
+sync.bfmio.com
+sync.colossusssp.com
+sync.connectad.io
+sync.copper6.com
+sync.drift-pixel.ai
+sync.illumin.com
+sync.inmobi.com
+sync.kiviads.com
+sync.kueezrtb.com
+sync.lemmadigital.com
+sync.missena.io
+sync.omni-dex.io
+sync.opamarketplace.com
+sync.oraki.io
+sync.programmaticx.ai
+sync.pubrise.ai
+sync.quantumdex.io
+sync.revantage.io
+sync.richaudience.com
+sync.serverbid.com
+sync.sparteo.com
+sync.srv.stackadapt.com
+sync.sweetgum.io
+sync.tagoras.io
+sync.technoratimedia.com
+sync.theagenticx.ai
+sync.twist.win
+sync.videowalldirect.com
+sync2.adnetwork.agency
+syncbf.bidfuse.com
+t-stage.visx.net
+t.ssp.hinet.net
+t.visx.net
+tag.bliink.io
+targeting.unrulymedia.com
+tkprebid.aotter.net
+tlx.3lift.com
+track.adform.net
+tracking.doceree.com
+traffic1.rocketlab.ai
+trc.lhmos.com
+trc.taboola.com
+tredio-prebid.attekmi.co
+trmads.eu
+tube.buzzoola.com
+u.openx.net
+udmserve.net
+umframe.optinadserving.com
+us-e.visiblemeasures.com
+us-east-1.loyal.app
+us-east-ep.engagemedia.tv
+us-east-ep.pinklion.io
+us-east.pgammedia.com
+us.shb-sync.com
+us2.shb-sync.com
+us4.shb-sync.com
+useast.quantumdex.io
+user-sync.adhese.com
+user-sync.fwmrm.net
+userservice.de17a.com
+usersync.mycodemedia.com
+usr.undertone.com
+usync.rocketlab.ai
+usync.smxconv.com
+usync.vrtcal.com
+v.ex.co
+vid.exmpale.com
+visitor.omnitagjs.com
+vpb-server.jwplayer.com
+web-rtb.anyrtb.com
+web.ads.aps.amazon-adsystem.com
+widget.cdn.vidyome.com
+wild.8podx.com
+wls-stckp.shb-sync.com
+x.bidswitch.net
+x.padsquad.com
+x.videobyte.com
+x.yieldlift.com
+y.one.impact-ad.jp
+zero.aidemsrv.com
+
+@pujadores
+=33across 33across.com
+=360playvid 360playvid.com
+=a1media contentsfeed.com
+=a4g ad4game.com
+=ablida ablida.net
+=aceex aceex.io
+=acuityads admanmedia.com
+=ad2iction ad2iction.com
+=adWMG adwmg.com
+=adagio 4dex.io
+=adbro adbro.me
+=adcluster adcluster.com.tr
+=addefend addefend-platform.com
+=adfusion spicyrtb.com
+=adgeneration socdm.com
+=adhash adhash.com
+=adhese adhese.com
+=admaru admaru.net
+=admatic admatic.com.tr
+=admedia admedia.com
+=admixer admixer.net
+=adnimation adnimation.com
+=adnow nnowa.com
+=adot adotmob.com
+=adplus ad-plus.com.tr
+=adprime adprime.com
+=adrelevantis adrelevantis.com
+=adrino adrino.io
+=adriver adriver.ru
+=ads_interactive adsinteractive.com
+=adstir ad-stir.com
+=adtarget adtarget.com.tr
+=adtelligent adtelligent.com
+=adtrgtme adtarget.market
+=adtrue adtrue.com
+=aduptech adup-tech.com
+=advangelists advangelists.com
+=advertising technoratimedia.com
+=advertronic advertronic.io
+=adxcg adxcg.net
+=adyoulike omnitagjs.com
+=afp afp.ai
+=agenticx theagenticx.ai
+=aidem aidemsrv.com
+=aja adtdp.com
+=akcelo sportslocalmedia.com
+=alkimi alkimi-onboarding.com
+=allegro allegro.pl
+=alvads ssidevops.com
+=amx a-mo.net
+=aniview aniview.com
+=anyclip anyclip.com
+=apacdex quantumdex.io
+=apester apester.com
+=appStockSSP al-ad.com
+=appnexus adnxs.com
+=appush appush.com
+=aps amazon-adsystem.com
+=aseal aotter.net
+=aso aso1.net
+=astraone astraone.io
+=audiencerun audiencerun.com
+=axis axis-marketplace.com
+=beachfront bfmio.com
+=beop collectiveaudience.co
+=between adnxs.com
+=beyondmedia andbeyond.media
+=biddigi workers.dev
+=biddo adopx.net
+=bidfuse bidfuse.com
+=bidglass bid.glass
+=bidmatic bidmatic.io
+=bidscube bidscube.com
+=bidtheatre bidtheatre.com
+=big-richmedia hubvisor.io
+=bitmedia bmcdn7.com
+=bliink bliink.io
+=blockthrough btloader.com
+=blue getblue.io
+=bms bluems.com
+=bmtm elitebidder.com
+=boldwin videowalldirect.com
+=brainx brainx.tech
+=brave braveglobal.tv
+=bridgewell scupio.com
+=browsi avantisvideo.com
+=bucksense prebidserving.com
+=buzzoola buzzoola.com
+=c1x c1exchange.com
+=cadent_aperture_mx cadent.com
+=caroda caroda.io
+=ccx clickonometrics.pl
+=chtnw hinet.net
+=clickforce holmesmind.com
+=clickio clickiocdn.com
+=codefuel seccint.com
+=cointraffic adsgravity.io
+=coinzilla czilladx.com
+=colombia clmbtech.com
+=colossusssp colossusssp.com
+=compass deliverimp.com
+=conceptx cncpt.dk
+=concert concert.io
+=condorx condorx.io
+=connatix connatix.com
+=connectad connectad.io
+=consumable serverbid.com
+=contentexchange adnetwork.agency
+=copper6ssp copper6.com
+=cpmstar cpmstar.com
+=craft gacraft.jp
+=criteo criteo.com
+=cwire adnxs.com
+=dailyhunt dailyhunt.in
+=dailymotion dmxleo.com
+=das ocdn.eu
+=datawrkz datawrkz.com
+=deepintent deepintent.com
+=defineMedia conative.network
+=deltaprojects de17a.com
+=dexerto dexerto.media
+=dianomi dianomi.com
+=digitalMatter digitalmatter.services
+=discovery mediago.io
+=distroscale jsrdn.com
+=djax adnxs.com
+=doceree doceree.com
+=docereeadmanager doceree.com
+=dochase dochaseadx.com
+=dpai drift-pixel.ai
+=driftpixel driftpixel.live
+=dsp_geniee gsspat.jp
+=dspx dspx.tv
+=dxkulture dxkulture.com
+=dxtech dxtech.ai
+=e_volution e-volution.ai
+=eclick eclick.vn
+=edge226 dauup.com
+=ehealthcaresolutions ehealthcaresolutions.com
+=eightpod 8pod.com
+=empower virgul.com
+=emtv engagemedia.tv
+=engageya engageya.com
+=engerio engerio.sk
+=equativ sascdn.com
+=ex_geniee genieesspv.jp
+=exco ex.co
+=ezoic ezoic.net
+=feedad feedad.com
+=finative finative.cloud
+=flipp ads-flipp.com
+=floxis floxis.tech
+=fluct adingo.jp
+=freedomadnetwork armanet.us
+=freepass ad-m.asia
+=fwssp fwmrm.net
+=gamma gammaplatform.com
+=gamoshi gamoshi.io
+=gjirafa gjirafa.com
+=glomex glomex.cloud
+=gmossp gmossp-sp.jp
+=gnet gnetrtb.com
+=goldbach gbads.net
+=gopl wp.pl
+=greenbids greenbids.ai
+=grid bidswitch.net
+=gumgum gumgum.com
+=h12media h12-media.com
+=harion harion-ma.com
+=holid holid.io
+=hybrid hybrid.ai
+=hypelab hypelab.com
+=hyperbrainz hyperbrainz.com
+=idx dxmdp.com
+=illumin illumin.com
+=impactify impactify.media
+=improvedigital 360yield.com
+=incrementx incrementxserv.com
+=inmobi inmobi.com
+=innity innity.com
+=insticator ingage.tech
+=integr8 integr8.digital
+=interactiveOffers ioadx.com
+=invamia invamia.com
+=iprom iprom.net
+=iqx iqzonertb.live
+=iqzone iqzone.com
+=ivs ivstracker.net
+=ix casalemedia.com
+=jixie jixie.io
+=justpremium justpremium.com
+=jwplayer adnxs.com
+=kimberlite kimberlite.io
+=kiviads kiviads.com
+=kobler essrtb.com
+=krushmedia krushmedia.com
+=kubient kbntx.ch
+=kueezrtb kueezrtb.com
+=lane4 lane4.io
+=lasso adnxs.com
+=leagueM league-m.media
+=lemmadigital lemmadigital.com
+=lifestreet lfstmedia.com
+=livewrapped lwadm.com
+=lm_kiviads kiviads.live
+=lockerdome lockerdome.com
+=logan logan.ai
+=logicad ladsp.com
+=loopme loopmertb.com
+=loyal loyal.app
+=mabidder ecdrsvc.com
+=madsense madsense.io
+=madvertise mng-ads.com
+=magicbid rtb-magicbid.ai
+=magnite rubiconproject.com
+=malltv mall.tv
+=mantis mantisadnetwork.com
+=mathildeads mathilde-ads.com
+=mcodemedia mycodemedia.com
+=mediaConsortium hubvisor.io
+=mediabrama mediabrama.com
+=mediaeyes upremium.asia
+=mediaforce mfadsrvr.com
+=mediafuse adnxs.com
+=mediago mediago.io
+=mediakeys mediakeys.io
+=mediasniper bumlam.com
+=mediasquare adnxs.com
+=mgid mgid.com
+=microad microad.jp
+=minutemedia minutemedia-prebid.com
+=missena missena.io
+=mobfoxpb mobfox.com
+=mobilefuse mobilefuse.com
+=mobkoi mobkoi.com
+=msft adnxs.com
+=my6sense mynativeplatform.com
+=mytarget mail.ru
+=nativery nativery.com
+=nativo postrelease.com
+=newspassid amspbs.com
+=nexbid nexbid.uk
+=nextMillennium nextmillmedia.com
+=nextroll adroll.com
+=nexverse nexverse.ai
+=nobid servenobid.com
+=nuba nuba.io
+=ocm orangeclickmedia.com
+=ogury presage.io
+=omnidex omni-dex.io
+=oms marphezis.com
+=onetag onetag-sys.com
+=onomagic onomagic.com
+=opamarketplace opamarketplace.com
+=open8 open8.com
+=openweb openwebmp.com
+=openx openx.net
+=operaads adnxs.com
+=oprx optimizerx.com
+=opsco ops.co
+=optidigital opti-digital.com
+=optout optinadserving.com
+=oraki oraki.io
+=orbidder otto.de
+=otm otm-r.com
+=outbrain adnxs.com
+=ownadx prebid-ownadx.com
+=ozone the-ozone-project.com
+=padsquad padsquad.com
+=pangle i18n-pglstatp.com
+=panxo panxo-sys.com
+=performax performax.cz
+=pgamssp pgammedia.com
+=pigeoon pigeoon.com
+=pilotx pilotx.tv
+=pinelake pinelake.media
+=pinkLion pinklion.io
+=pixfuture pixfuture.com
+=playdigo playdigo.com
+=prisma nexx360.io
+=programmaticX programmaticx.ai
+=proxistore cookieless-proxistore.com
+=pstudio adsrvr.org
+=pubcircle pubcircle.ai
+=pubgenius adpearl.io
+=publicgood pgs.io
+=publir publir.com
+=pubmatic pubmatic.com
+=pubrise pubrise.ai
+=pubx primecaster.net
+=pulsepoint contextweb.com
+=pwbid pubwise.io
+=pxyz adnxs.com
+=qt qt.io
+=qwarry qwarry.co
+=r2b2 r2b2.io
+=realry realry.com
+=rediads rediads.com
+=redtram redtram.com
+=relay relay.bid
+=relevantdigital relevant-digital.com
+=resetdigital resetdigital.co
+=revantage revantage.io
+=richaudience richaudience.com
+=risemediatech risemediatech.com
+=robustApps rbstsystems.live
+=rocketlab rocketlab.ai
+=rtbsape sape.ru
+=rubicon rubiconproject.com
+=rumble rmbl.ws
+=screencore screencore.io
+=seedingAlliance nativendo.de
+=seedtag seedtag.com
+=setupad setupad.io
+=sevio adx.ws
+=sharethrough sharethrough.com
+=shinez sweetgum.io
+=shinezRtb sweetgum.io
+=showheroes viralize.tv
+=silverpush chocolateplatform.co
+=slimcut freeskreen.com
+=smaato smaato.net
+=smartadserver smartadserver.com
+=smarthub attekmi.co
+=smartico trmads.eu
+=smartx smartclip.net
+=smartyads ck-ie.com
+=smilewanted smilewanted.com
+=smoot smoot.ai
+=snigel snigelweb.com
+=sonarads sonar-ads.com
+=sonobi sonobi.com
+=sovrn lijit.com
+=sparteo sparteo.com
+=srchbid searchplan.co
+=ssp_geniee genieesspv.jp
+=stackadapt stackadapt.com
+=startio startappnetwork.com
+=stn stngo.com
+=stroeerCore adscale.de
+=stv smartstream.tv
+=suim suimad.com
+=taboola taboola.com
+=tadvertising adsrvr.org
+=tagoras tagoras.io
+=tapnative tapnative.com
+=teads teads.tv
+=teal bids.ws
+=temedya vidyome.com
+=teqBlazeSalesAgent teqblaze.io
+=theadx theadx.com
+=themoneytizer biddertmz.com
+=topon anyrtb.com
+=tpmn adnxs.com
+=trion in-appadvertising.com
+=triplelift 3lift.com
+=truereach momagic.com
+=trustx adnxs.com
+=ttd adsrvr.org
+=twistdigital twist.win
+=ucfunnel aralego.com
+=underdogmedia udmserve.net
+=undertone undertone.com
+=unicorn uncn.jp
+=uniquest ust-ad.com
+=uniquest_widget ust-ad.com
+=unruly unrulymedia.com
+=valuad valuad.io
+=ventes ventesavenues.in
+=verben verben.com
+=viant adelphic.net
+=vibrantmedia intellitxt.com
+=videobyte videobyte.com
+=videoheroes contextualadv.com
+=videonow videonow.ru
+=videoreach videoreach.com
+=vidoomy adform.net
+=viously viously.com
+=viqeo viqeo.tv
+=visiblemeasures visiblemeasures.com
+=visx visx.net
+=vlyby vlyby.com
+=vox hybrid.ai
+=vrtcal vrtcal.com
+=vuukle vuukle.com
+=waardex exmpale.com
+=widespace widespace.com
+=winr adnxs.com
+=wipes reckoner-api.com
+=xe xe.works
+=yahooAds yahoo.com
+=yieldlab adition.com
+=yieldlift yieldlift.com
+=yieldlove yieldlove-ad-serving.net
+=yieldmo yieldmo.com
+=yieldone impact-ad.jp
+=zeta_global rfihub.com
+=zeta_global_ssp disqus.com
+=zmaticoo zmaticoo.com
