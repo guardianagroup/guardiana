@@ -818,7 +818,11 @@
     if (!audios.has(clave) && !pedidas.has(clave)) { pedidas.add(clave); manda({ tipo: 'secure', accion: 'sala_nota', id: a.id }); }
     return notaVoz(audios.get(clave), a.nombre);
   };
+  // A new room starts with nothing of the last one on screen (its voice notes were cached by
+  // number, and a new room's numbers could match).
+  let salaVista = null;
   const pintaSala = (m) => {
+    if (m && m.sala && m.sala.creada !== salaVista) { salaVista = m.sala.creada; for (const k of [...audios.keys()]) if (typeof k === 'string' && k.startsWith('sala-')) audios.delete(k); }
     const s = m.sala;
     $('c-sala-antes').hidden = !!s;
     $('c-sala-abierta').hidden = !s;

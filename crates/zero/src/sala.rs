@@ -269,7 +269,9 @@ impl Sala {
             cambio: true,
             error: None,
             descargas: None,
-            ultimo_archivo: 0,
+            // Each room numbers its files from its own random start (17 Oct 2026: a new room's
+            // first voice note showed the previous room's, cached on the screen by number).
+            ultimo_archivo: u32::from_le_bytes([clave[0], clave[1], clave[2], 0]) << 4,
             turn: None,
             turn_rx: None,
             turn_pedido: 0,
