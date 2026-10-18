@@ -3342,7 +3342,7 @@
     "rg_pulso_apartado": "A proteção está pausada: a licença não está ativa.",
     "rg_pulso_vigilancia_estado": "A vigilância constante notou algo que merece uma olhada.",
     "rg_ir": "Ver",
-    "rg_tira_ventana": "Últimos 5 min",
+    "rg_tira_ventana": "Agora",
     "rg_tira_conexiones": "Conexões",
     "rg_tira_conexiones_uno": "Conexão",
     "rg_tira_empresas": "Empresas",
@@ -3383,6 +3383,19 @@
     "rg_yo_aprox": "{pais} · localização aproximada · escolha sua cidade",
     "rg_precision_baja": "O Windows situa este PC com margem de {km} km: não basta para dizer a cidade. Escolha sua cidade para desenhá-lo onde está.",
     "rg_sin_nombre_red": "Conexão direta com {red}",
-    "rg_sin_nombre": "Conexão direta (sem nome de domínio)"
+    "rg_sin_nombre": "Conexão direta (sem nome de domínio)",
+    "rg_cat_publicidad": "Publicidade",
+    "rg_cat_rastreador": "Rastreamento",
+    "rg_cat_telemetria": "Telemetria",
+    "rg_cat_esperado": "Normal",
+    "rg_cat_desconocido": "Não classificado",
+    "rg_lugar_consultas": "consultas",
+    "rg_lugar_consultas_uno": "consulta",
+    "rg_lugar_empresas": "empresas",
+    "rg_lugar_empresas_uno": "empresa",
+    "rg_lugar_cortadas": "empresas bloqueadas",
+    "rg_lugar_cortadas_uno": "empresa bloqueada",
+    "rg_ventana_dias": "{n} dias",
+    "rg_ventana_dias_uno": "{n} dia"
   }
 }

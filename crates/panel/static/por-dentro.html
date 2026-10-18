@@ -28,7 +28,18 @@
 <div class="globo-herr" id="globo-herr" data-nav-extra>
   <span class="chip-modo corte" id="chip-modo" role="status" hidden></span>
   <span class="chip-vpn" id="vpn" hidden role="status"></span>
-  <button type="button" class="opciones-btn" id="opciones-btn" aria-haspopup="true" aria-expanded="false" aria-controls="opciones"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.6"/><circle cx="6" cy="11.5" r="1.6"/></svg><span data-t="pd_opciones">Opciones</span></button>
+</div>
+<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
+<section class="stage" id="stage" aria-label="Globo en directo" data-t-label="pd_titulo">
+  <div class="lienzo" id="lienzo">
+    <canvas id="gl"></canvas>
+    <canvas id="cv"></canvas>
+    <div class="telemetria" id="telemetria" hidden></div>
+    <div class="zoom" id="zoom" role="group" data-t-label="pd_zoom">
+      <!-- 1.0.46: the globe's options live with its other controls, so the sections row stays as the
+           owner chose it (R1-a). -->
+      <div class="globo-op">
+  <button type="button" class="boton-icono opciones-btn" id="opciones-btn" aria-haspopup="true" aria-expanded="false" aria-controls="opciones" data-t-label="pd_opciones" data-t-title="pd_opciones"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.2 14 5.4 8 8.6 2 5.4z"/><path d="M2 8.2l6 3.2 6-3.2"/><path d="M2 11l6 3.2 6-3.2"/></svg></button>
   <div class="opciones" id="opciones" hidden>
     <div class="op-grupo"><div class="op-t" data-t="pd_op_vista">Qué ver</div>
       <div class="seg pestanas" role="group" data-t-label="pd_vistas">
@@ -55,14 +66,7 @@
       <p class="ayuda-vista" id="ayuda-vista"></p>
     </div>
   </div>
-</div>
-<div id="no-session" class="card hidden"><strong data-t="sin_sesion_titulo"></strong> <span data-t="sin_sesion_texto"></span></div>
-<section class="stage" id="stage" aria-label="Globo en directo" data-t-label="pd_titulo">
-  <div class="lienzo" id="lienzo">
-    <canvas id="gl"></canvas>
-    <canvas id="cv"></canvas>
-    <div class="telemetria" id="telemetria" hidden></div>
-    <div class="zoom" id="zoom" role="group" data-t-label="pd_zoom">
+      </div>
       <button type="button" class="boton-icono" id="zoom-mas" data-t-label="pd_zoom_mas" data-t-title="pd_zoom_mas"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg></button>
       <button type="button" class="boton-icono" id="zoom-menos" data-t-label="pd_zoom_menos" data-t-title="pd_zoom_menos"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg></button>
       <button type="button" class="boton-icono" id="pantalla" data-t-label="pd_pantalla_completa" data-t-title="pd_pantalla_completa"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg></button>
@@ -109,20 +113,20 @@
   <div class="hud" id="hud">
     <div class="riel tira" id="riel">
       <button type="button" class="tira-cifras" id="hud-asa" aria-expanded="false" aria-controls="bandeja" data-t-title="rg_tira_explica">
-        <span class="tira-r" data-t="rg_tira_ventana">Últimos 5 min</span>
+        <span class="tira-r" data-t="rg_tira_ventana">Ahora</span>
         <span class="tira-n"><b id="riel-ahora">0</b> <span id="riel-ahora-t"></span></span>
         <span class="tira-n"><b id="riel-empresas">0</b> <span id="riel-empresas-t"></span></span>
         <span class="tira-n tira-cortadas"><b id="riel-cortadas">0</b> <span id="riel-cortadas-t"></span></span>
       </button>
       <button type="button" class="tira-pulso" id="tira-pulso" aria-controls="bandeja" tabindex="-1" data-t-label="rg_tira_pulso"><canvas id="pulso"></canvas><span class="tira-ejes" aria-hidden="true"><span data-t="rg_tira_hace5">hace 5 min</span><span data-t="rg_tira_ahora">ahora</span></span></button>
       <span class="riel-maxima" id="riel-maxima" hidden></span>
+      <span class="tira-enlaces" id="tira-enlaces" hidden><button type="button" class="btn texto chico" id="ban-todos" data-t="pd_todos_datos">Todos los datos</button><a class="btn texto chico sigue" href="/extracto" data-t="pd_ver_registro">Ver todo el registro</a></span>
       <button type="button" class="boton-icono tira-chev" id="ban-cerrar" hidden data-t-label="rg_tira_cerrar" data-t-title="rg_tira_cerrar"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 6 8 10.5 12.5 6"/></svg></button>
     </div>
     <div class="bandeja" id="bandeja" hidden>
       <div class="ban-cats">
         <div class="ban-cats-t" data-t="rg_cat_titulo">Categoría</div>
         <div class="ban-cats-l" id="ban-cats" role="group" data-t-label="rg_cat_titulo"></div>
-        <div class="ban-cats-pie"><button type="button" class="btn texto chico" id="ban-todos" data-t="pd_todos_datos">Todos los datos</button><a class="btn texto chico sigue" href="/extracto" data-t="pd_ver_registro">Ver todo el registro</a></div>
       </div>
       <div class="ban-panel" data-panel="vivo" role="region" data-t-label="pd_en_vivo">
         <table class="registro-t"><thead><tr><th data-t="pd_col_hora">Hora</th><th data-t="pd_ht_programa">Programa</th><th data-t="pd_ht_destino">Destino</th><th data-t="pd_ht_empresa">Empresa</th><th data-t="pd_ht_pais">País</th><th data-t="pd_ht_estado">Estado</th></tr></thead><tbody id="registro"></tbody></table>

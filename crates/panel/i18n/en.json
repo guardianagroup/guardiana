@@ -3342,7 +3342,7 @@
     "rg_pulso_apartado": "Protection is paused: the license is not active.",
     "rg_pulso_vigilancia_estado": "Constant watch noticed something worth a look.",
     "rg_ir": "View",
-    "rg_tira_ventana": "Last 5 min",
+    "rg_tira_ventana": "Now",
     "rg_tira_conexiones": "Connections",
     "rg_tira_conexiones_uno": "Connection",
     "rg_tira_empresas": "Companies",
@@ -3383,6 +3383,19 @@
     "rg_yo_aprox": "{pais} · approximate location · choose your city",
     "rg_precision_baja": "Windows places this PC within {km} km: not enough to name the city. Choose your city to draw it where it is.",
     "rg_sin_nombre_red": "Direct connection to {red}",
-    "rg_sin_nombre": "Direct connection (no domain name)"
+    "rg_sin_nombre": "Direct connection (no domain name)",
+    "rg_cat_publicidad": "Advertising",
+    "rg_cat_rastreador": "Tracking",
+    "rg_cat_telemetria": "Telemetry",
+    "rg_cat_esperado": "Normal",
+    "rg_cat_desconocido": "Unclassified",
+    "rg_lugar_consultas": "queries",
+    "rg_lugar_consultas_uno": "query",
+    "rg_lugar_empresas": "companies",
+    "rg_lugar_empresas_uno": "company",
+    "rg_lugar_cortadas": "companies blocked",
+    "rg_lugar_cortadas_uno": "company blocked",
+    "rg_ventana_dias": "{n} days",
+    "rg_ventana_dias_uno": "{n} day"
   }
 }

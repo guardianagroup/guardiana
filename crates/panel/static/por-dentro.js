@@ -212,7 +212,7 @@
         const esNuevo = !d;
         if (!d) { d = { k, p: x.programa, ruta: [], tg: 0.3, x: 0, y: 0, vis: true, ema: 0, bloq: x.paradas }; porClave.set(k, d); DEST.push(d); }
         const antes = d.bloq || 0;
-        Object.assign(d, { host: nombreDe(x), destino: x.destino, pais: x.pais, red: x.red, asn: x.asn, proto: x.proto, puerto: x.puerto, vias: x.vias, sub: x.enviados, baj: x.recibidos, paq: x.paquetes, noche: x.noche, primera: x.primera, ultima: x.ultima, doc: x.documentado, uso: x.uso, consultas: x.consultas, bloq: x.paradas, regla: x.regla ?? null, reglas: x.reglas || [], reglaPor: x.regla_por || '', reglaCat: x.regla_categoria || '', cortado: x.regla !== null && x.regla !== undefined, sede: x.sede, empresa: x.empresa || '', lugar: x.lugar || null });
+        Object.assign(d, { host: nombreDe(x), destino: x.destino, pais: x.pais, red: x.red, asn: x.asn, proto: x.proto, puerto: x.puerto, vias: x.vias, sub: x.enviados, baj: x.recibidos, paq: x.paquetes, noche: x.noche, primera: x.primera, ultima: x.ultima, doc: x.documentado, uso: x.uso, consultas: x.consultas, bloq: x.paradas, regla: x.regla ?? null, reglas: x.reglas || [], reglaPor: x.regla_por || '', reglaCat: x.regla_categoria || '', cortado: x.regla !== null && x.regla !== undefined, sede: x.sede, empresa: x.empresa || '', lugar: x.lugar || null, categoria: x.categoria || '' });
         d.ancho = !d.cortado && d.sede && d.bloq > 0;
         if (!st.primeraCarga && esNuevo) {
           d.visto = Date.now();
@@ -231,6 +231,14 @@
           // Opening the page: the latest minutes go to the log at once, without particles.
           const d0 = porClave.get([f.programa, f.destino, f.pais, f.red].join('|'));
           if (d0 && f.enviados > 0) st.eventos.push({ h: ctx.reloj ? ctx.reloj() : hora(f.minuto), prog: prod(d0.p).nombre, host: d0.host, que: `${bytes(f.enviados)} ↑ · ${bytes(f.recibidos)} ↓`, cls: 'o', av: prod(d0.p).tipo === 'antivirus', d: d0 });
+          // 1.0.46: the strip's pulse starts with the minutes already measured (each minute's bytes
+          // spread over its six 10-second steps), so it is not a flat line for five minutes.
+          if (d0 && f.enviados > 0 && f.minuto > r.ahora - 5 * 60000) {
+            for (let k = 0; k < 6; k++) {
+              const i = N_CUBOS - 1 - Math.floor((r.ahora - f.minuto - k * CUBO_MS) / CUBO_MS);
+              if (i >= 0 && i < N_CUBOS) { st.serie[i] += f.enviados / 6; if (st.serieP[d0.p]) st.serieP[d0.p][i] += f.enviados / 6; }
+            }
+          }
           return;
         } else { de = f.enviados; dr = f.recibidos; dp = f.paquetes; }
         if (de <= 0 && dr <= 0) return;
@@ -680,7 +688,8 @@
         const om = Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))) || 1e-6;
         // Higher arcs (18 Oct 2026, the approved mockup): a route reads as a route, not as a line
         // painted on the ground.
-        const alt = 0.02 + 0.13 * om / Math.PI;
+        // 1.0.46 (R1-a): higher still, so each route reads as a curve leaving this computer.
+        const alt = 0.05 + 0.3 * om / Math.PI;
         const dl = Math.hypot(lon1 - yo.lon, lat1 - yo.lat) * RAD, alzaMax = 0.028 + 0.04 * dl / Math.PI;
         const arco = [];
         for (let i = 0; i <= N; i++) {
@@ -689,6 +698,14 @@
           const pl = [(yo.lon + (lon1 - yo.lon) * u) * RAD, (yo.lat + (lat1 - yo.lat) * u) * RAD + alzaMax * Math.sin(Math.PI * u), 0.02];
           const m = T.m;
           arco.push(aPantalla([sx + (pl[0] - sx) * m, sy + (pl[1] - sy) * m, sz + (pl[2] - sz) * m]));
+        }
+        // 1.0.46 (R1-a): seen from above this computer, a route on a great circle through it is a
+        // straight line on the screen; each one bends a little to its left, as in the chosen
+        // design, so routes read as arcs and do not hide each other.
+        if (T.m < 1 && arco.length > 2) {
+          const s0 = arco[0], e0 = arco[arco.length - 1], dx = e0.x - s0.x, dy = e0.y - s0.y, lon = Math.hypot(dx, dy) || 1;
+          const curva = Math.min(0.17 * lon, 64) * (1 - T.m);
+          arco.forEach((q, i) => { const f = curva * Math.sin(Math.PI * i / (arco.length - 1)); q.x += dy / lon * f; q.y -= dx / lon * f; });
         }
         // Every route leaves from this computer itself (18 Oct 2026): the programs that turned around
         // it in their colours are named in the hover, the tray and «Programas».
@@ -942,8 +959,16 @@
         cx.fillStyle = ACERO; cx.beginPath(); cx.arc(x, y, 4, 0, 7); cx.fill();
         const nombre = aprox ? t('rg_yo_aprox').replace('{pais}', nombrePais(st.yo)) : t('pd_tu_pc') + (st.lugar.ciudad ? ' · ' + ciudadCorta(st.lugar.ciudad) : st.yo ? ' · ' + nombrePais(st.yo) : '');
         cx.font = '500 13px "Hanken Grotesk", "Segoe UI", system-ui, sans-serif'; cx.textBaseline = 'middle';
-        cx.lineWidth = 3.2; cx.strokeStyle = 'rgba(2,6,14,.85)'; cx.strokeText(nombre, x + (aprox ? 30 : 18), y + 0.5);
-        cx.fillStyle = aprox ? '#C9DFF2' : '#E8ECF1'; cx.fillText(nombre, x + (aprox ? 30 : 18), y + 0.5); cx.textBaseline = 'alphabetic';
+        cx.lineWidth = 3.2; cx.strokeStyle = 'rgba(2,6,14,.85)'; cx.fillStyle = aprox ? '#C9DFF2' : '#E8ECF1';
+        // 1.0.46: on a narrow screen the name never runs off it: «Colombia» on one line and
+        // «ubicación aproximada · elige tu ciudad» under it.
+        const x0 = x + (aprox ? 30 : 18);
+        if (x0 + cx.measureText(nombre).width > st.W - 8 && nombre.includes(' · ')) {
+          const i = nombre.indexOf(' · '), lineas = [nombre.slice(0, i), nombre.slice(i + 3)];
+          const ancho = Math.max(...lineas.map((l) => cx.measureText(l).width)), xl = Math.max(8, Math.min(x0, st.W - 8 - ancho));
+          lineas.forEach((l, k) => { const yl = y + (xl < x0 ? 30 : 0) + (k - 0.5) * 17; cx.strokeText(l, xl, yl); cx.fillText(l, xl, yl); });
+        } else { cx.strokeText(nombre, x0, y + 0.5); cx.fillText(nombre, x0, y + 0.5); }
+        cx.textBaseline = 'alphabetic';
         st.dianas.push({ x, y, r: aprox ? 24 : 16, tipo: 'yo' });
       }
       cx.globalCompositeOperation = 'lighter';
@@ -1001,7 +1026,7 @@
     const rotulo = (x, y, txt, col, puestos) => {
       // A city name you can read at a glance: sans, semibold, on a near-opaque pill.
       cx.font = '600 12px "Hanken Grotesk", "Segoe UI", system-ui, sans-serif';
-      const w = cx.measureText(txt).width + 16, h = 21;
+      const w = cx.measureText(txt).width + 16, h = 22;
       // A name stays next to its own dot (the owner, 18 Oct 2026: looking at South America he saw
       // «Virginia del Norte» and «Toronto» there). Before, a name that collided was pushed down
       // up to 12 rows and squeezed inside the screen, so it slid far from its place. Now it may
@@ -1016,8 +1041,8 @@
       if (puestos) puestos.push({ x: bx, y: by, w, h });
       cx.fillStyle = 'rgba(3,8,18,.88)'; cx.beginPath(); if (cx.roundRect) cx.roundRect(bx, by, w, h, 5); else cx.rect(bx, by, w, h); cx.fill();
       cx.strokeStyle = 'rgba(255,255,255,.14)'; cx.lineWidth = 1; cx.stroke();
-      cx.fillStyle = col; cx.fillRect(bx + 4, by + 5, 2, h - 10);
-      cx.fillStyle = col; cx.textBaseline = 'middle'; cx.fillText(txt, bx + 10, by + h / 2 + 0.5); cx.textBaseline = 'alphabetic';
+      // 1.0.46: no coloured bar before the name (it read as a stray «|»).
+      cx.fillStyle = col; cx.textBaseline = 'middle'; cx.fillText(txt, bx + 8, by + h / 2 + 0.5); cx.textBaseline = 'alphabetic';
     };
     // Up close, name the measured place. Keep the host as a fallback: the map never invents a
     // city or state when the operator did not publish one.
@@ -1351,7 +1376,8 @@
     };
     const CATS = ['publicidad', 'rastreador', 'telemetria', 'esperado', 'desconocido'];
     const catDe = (d) => (CATS.includes(d.categoria) ? d.categoria : 'desconocido');
-    const nombreCat = (k) => { const n = ctx.categoria ? ctx.categoria(k) : k; return n.charAt(0).toLocaleUpperCase(LOC) + n.slice(1); };
+    // The glossary's words (Publicidad · Rastreo · Telemetría · Normal · Sin clasificar).
+    const nombreCat = (k) => t('rg_cat_' + k);
     let catSel = 'todas';
     const ponBandeja = (abrir, tab) => {
       if (tab) bandeja.tab = tab;
@@ -1360,6 +1386,7 @@
       $('hud').classList.toggle('abierta', abrir);
       $('hud-asa').setAttribute('aria-expanded', String(abrir));
       $('ban-cerrar').hidden = !abrir;
+      $('tira-enlaces').hidden = !abrir;
       document.querySelectorAll('.ban-panel').forEach((p) => { p.hidden = p.dataset.panel !== bandeja.tab; });
       pintaHud();
       requestAnimationFrame(() => { ajusta(); pintaPulso(); });
@@ -1882,7 +1909,7 @@
         return `<div class="insp-fila${est === 'cortado' || est === 'ajeno' ? ' cortada' : ''}"><button type="button" class="insp-abre" data-empresa="${esc(e.nombre)}"><span class="n">${esc(e.nombre)}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg></span><span class="sub">${sub}</span></button><span class="q">${esc(cuanto(e.consultas, e.sub))}</span><span class="a">${botonCorte(e.nombre, e.ds)}</span>${rompe.has(e.nombre) ? `<span class="rompe explica">${esc(rompe.get(e.nombre))}</span>` : ''}</div>`;
       }).join('');
       return `<div class="insp-cabeza"><h2 id="insp-titulo">${esc(nombreLugar(g))}</h2>${linea ? `<p class="insp-sub">${esc(linea)}</p>` : ''}<p class="insp-fuente">${f.aprox ? `<span class="aprox">${esc(t('pd_aprox'))}</span> · ` : ''}${esc(f.txt)}</p></div>
-        ${cifras([[cuanto(c, g.ds.reduce((a, d) => a + d.sub, 0)), c ? t('pd_consultas_palabra') : t('pd_enviado_palabra')], [num(emps.length), t('pd_empresas_palabra')], [num(cortadas), t('pd_cortadas_palabra')]])}
+        ${cifras([[cuanto(c, g.ds.reduce((a, d) => a + d.sub, 0)), c ? t(c === 1 ? 'rg_lugar_consultas_uno' : 'rg_lugar_consultas') : t('pd_enviado_palabra')], [num(emps.length), t(emps.length === 1 ? 'rg_lugar_empresas_uno' : 'rg_lugar_empresas')], [num(cortadas), t(cortadas === 1 ? 'rg_lugar_cortadas_uno' : 'rg_lugar_cortadas')]])}
         <div class="insp-lista"><div class="insp-h"><span>${esc(t(c ? 'pd_empresas_por_consultas' : 'pd_empresas_por_envio'))}</span><span>${esc(t('pd_ventana_corta').replace('{h}', st.datos ? st.datos.ventana_h : 24))}</span></div>${filas}</div>
         <div class="insp-acciones">${cerca(g.lon, g.lat)}</div>`;
     };
@@ -1915,7 +1942,10 @@
           : `<li>${ICONO_OK}<span>${esc(t('rg_rompe_nada'))}</span></li>`;
         if (r.sin_programa) filas += `<li class="t">${esc(tn('qsr_sin_programa', r.sin_programa))}</li>`;
       }
-      return `<div class="insp-bloque"><div class="insp-h"><span>${esc(t('rg_rompe_titulo'))}</span></div><ul class="insp-rompe">${filas}</ul></div>`;
+      // Each block says the window it counts (R7): this one, the days the ledger was asked about.
+      const dias = r && r.desde && r.hasta ? Math.max(1, Math.round((r.hasta - r.desde) / 86400000)) : 0;
+      const ventana = dias ? `<span>${esc(t(dias === 1 ? 'rg_ventana_dias_uno' : 'rg_ventana_dias').replace('{n}', num(dias)))}</span>` : '';
+      return `<div class="insp-bloque"><div class="insp-h"><span>${esc(t('rg_rompe_titulo'))}</span>${ventana}</div><ul class="insp-rompe">${filas}</ul></div>`;
     };
     const vistaEmpresa = (nombre) => {
       const ds = DEST.filter((d) => empresaDe(d) === nombre);
@@ -1948,7 +1978,7 @@
       return `<div class="insp-cabeza"><h2 id="insp-titulo" class="grande">${esc(nombre)}</h2>${meta.length ? `<p class="insp-meta">${meta.join('')}</p>` : ''}${chips.length ? `<div class="insp-chips">${chips.map((x) => `<span>${esc(x)}</span>`).join('')}</div>` : ''}</div>
         <div class="insp-bloque"><div class="insp-h"><span>${esc(t('rg_que_hace'))}</span></div><p class="insp-hace">${esc(lead || t('rg_que_hace_nada'))}</p>${ds.some((d) => d.uso === 'telemetria') ? `<p class="explica">${esc(t('pd_explica_telemetria').replace('{empresa}', nombre))}</p>` : ''}</div>
         ${estado}
-        ${lp.length ? `<div class="insp-bloque"><div class="insp-h"><span>${esc(t('pd_quien_llama'))}</span></div><div class="insp-chips progs">${lp.map((q) => `<span>${esc(q.p)} <i>${esc(cuanto(q.c, q.sub))}</i></span>`).join('')}</div></div>` : ''}
+        ${lp.length ? `<div class="insp-bloque"><div class="insp-h"><span>${esc(t('pd_quien_llama'))}</span><span>${esc(t('pd_ventana_corta').replace('{h}', st.datos ? st.datos.ventana_h : 24))}</span></div><div class="insp-chips progs">${lp.map((q) => `<span>${esc(q.p)} <i>${esc(cuanto(q.c, q.sub))}</i></span>`).join('')}</div></div>` : ''}
         ${rompeHtml(nombre)}
         <details class="insp-nombres"><summary>${esc(t('pd_nombres_que_usa'))} <span class="t">${esc(num(nombres.length))}</span></summary>${ds.slice().sort((a, b) => (b.consultas || 0) - (a.consultas || 0) || b.sub - a.sub).map((d) => `<button type="button" class="insp-nombre${bloqueado(d) ? ' cortada' : ''}" data-dest="${esc(d.k)}"><span class="mono">${esc(d.host)}</span><span class="q">${esc(cuanto(d.consultas || 0, d.sub))}</span></button>`).join('')}</details>`;
     };
@@ -2087,7 +2117,9 @@
     document.addEventListener('click', (e) => {
       const x = e.target;
       if (!x || !x.closest || x === cv || x.closest('.aviso, #ubicacion, #donde, #retrato, #opciones, #opciones-btn')) return;
-      if (abierto && !x.closest('#inspector, [data-fila], [data-dest], [data-prod], [data-red], [data-pais]')) cierraDetalle();
+      // The strip and its table are the inspector's companions: lowering the table or flipping
+      // Protección máxima leaves the open file where it is.
+      if (abierto && !x.closest('#inspector, #hud, [data-fila], [data-dest], [data-prod], [data-red], [data-pais]')) cierraDetalle();
       if (bandeja.abierta && !x.closest('#hud, #inspector')) ponBandeja(false);
     });
     // Cut a company, or give it back: every name of it that can be cut by name, in one go. The
@@ -2548,7 +2580,8 @@
       if (v !== st.vista) { st.part = []; st.estallidos = []; }
       st.vista = v;
       pulsado('.pestanas button', 'vista', v);
-      $('zoom').hidden = v !== 'destinos';
+      // 1.0.46: the globe's options live in this column too; only zooming belongs to the Earth.
+      ['zoom-mas', 'zoom-menos'].forEach((id) => { $(id).hidden = v !== 'destinos'; });
       expl.hidden = v !== 'programas'; stage.dataset.vista = v; pintaExplorador();
       muestraAyuda();
       guarda('guardiana_pd_vista', v);
