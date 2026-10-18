@@ -75,6 +75,11 @@ pub struct Trafico {
     /// it was measured (1.0.24); empty when the operator publishes none. Like the country, it is
     /// about the address and replaces it: the address is still never written.
     pub lugar: String,
+    /// Bytes Windows said this program sent again to there (TCP retransmissions, 1.0.45). Kept
+    /// apart and never added to `enviados`, so a bad line does not look like more data leaving.
+    pub reenviados: u64,
+    /// Connections this program opened to there or accepted from there (1.0.45).
+    pub conexiones: u64,
 }
 
 /// Minute of a Unix ms timestamp.
@@ -97,6 +102,19 @@ impl Ledger {
             self.conn
                 .execute_batch("ALTER TABLE trafico ADD COLUMN lugar TEXT NOT NULL DEFAULT ''")?;
         }
+        // 1.0.45 («Visión profunda»): retransmitted bytes and connections, beside the rest.
+        for col in ["reenviados", "conexiones"] {
+            let tiene: bool = self.conn.query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('trafico') WHERE name = ?1",
+                [col],
+                |r| r.get::<_, i64>(0),
+            )? > 0;
+            if !tiene {
+                self.conn.execute_batch(&format!(
+                    "ALTER TABLE trafico ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0"
+                ))?;
+            }
+        }
         Ok(())
     }
 
@@ -106,12 +124,15 @@ impl Ledger {
         {
             let mut st = tx.prepare_cached(
                 "INSERT INTO trafico (minuto, programa, firma, destino, pais, red, asn, proto, \
-                                      puerto, enviados, recibidos, paquetes, lugar) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13) \
+                                      puerto, enviados, recibidos, paquetes, lugar, reenviados, \
+                                      conexiones) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15) \
                  ON CONFLICT (minuto, programa, firma, destino, pais, red, asn, proto, puerto) \
                  DO UPDATE SET enviados = enviados + excluded.enviados, \
                                recibidos = recibidos + excluded.recibidos, \
                                paquetes = paquetes + excluded.paquetes, \
+                               reenviados = reenviados + excluded.reenviados, \
+                               conexiones = conexiones + excluded.conexiones, \
                                lugar = CASE WHEN excluded.lugar <> '' THEN excluded.lugar \
                                             ELSE lugar END",
             )?;
@@ -131,6 +152,8 @@ impl Ledger {
                     n(f.recibidos),
                     n(f.paquetes),
                     f.lugar,
+                    n(f.reenviados),
+                    n(f.conexiones),
                 ])?;
             }
         }
@@ -143,7 +166,7 @@ impl Ledger {
     pub fn trafico(&self, since: i64, until: i64, programas: &[&str]) -> Result<Vec<Trafico>> {
         let mut st = self.conn.prepare(
             "SELECT minuto, programa, firma, destino, pais, red, asn, proto, puerto, enviados, \
-                    recibidos, paquetes, lugar \
+                    recibidos, paquetes, lugar, reenviados, conexiones \
              FROM trafico WHERE minuto >= ?1 AND minuto < ?2 ORDER BY minuto ASC",
         )?;
         let quiere: Vec<String> = programas.iter().map(|p| p.to_ascii_lowercase()).collect();
@@ -163,6 +186,8 @@ impl Ledger {
                 recibidos: n(r.get(10)?),
                 paquetes: n(r.get(11)?),
                 lugar: r.get(12)?,
+                reenviados: n(r.get(13)?),
+                conexiones: n(r.get(14)?),
             })
         })?;
         let mut out = Vec::new();
@@ -213,6 +238,8 @@ mod tests {
             recibidos: 10,
             paquetes: 2,
             lugar: String::new(),
+            reenviados: 0,
+            conexiones: 1,
         }
     }
 

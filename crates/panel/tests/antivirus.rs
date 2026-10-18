@@ -173,6 +173,7 @@ async fn the_antivirus_page_shows_what_each_antivirus_asked_and_every_official_r
             recibidos: 120_000,
             paquetes: 2_100,
             lugar: "azure:eastus".into(),
+            ..Default::default()
         }])
         .unwrap();
         // One recent minute too, so the live panel has something to show.
@@ -190,6 +191,7 @@ async fn the_antivirus_page_shows_what_each_antivirus_asked_and_every_official_r
             recibidos: 3_000,
             paquetes: 40,
             lugar: String::new(),
+            ..Default::default()
         }])
         .unwrap();
     }

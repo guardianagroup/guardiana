@@ -17,11 +17,20 @@ La regla: nunca «100 % seguro», nunca «invisible», nunca «protegido» sin o
   vigilancia del sistema de archivos: el cebo es un nombre único escrito dentro del archivo, y lo
   único que GUARDIANA ve —como siempre— es si alguien pregunta por ese nombre. Nunca abre el
   archivo, y un programa que lo lea y no siga el enlace no aparece en ningún sitio.
+  Una excepción, apagada de fábrica y solo si la enciendes (1.0.45, «Visión profunda»,
+  Diagnóstico → «Posibles transferencias», solo en Windows): GUARDIANA anota **el nombre** (nunca
+  el contenido ni la carpeta) de los archivos de Documentos, Escritorio, Descargas e Imágenes que
+  abre cada programa, para avisarte si poco después ese programa manda varios megas a una
+  empresa. Frase: «Posible transferencia», nunca «robó» ni «subió tus archivos». Los nombres se
+  quedan 24 horas en este ordenador, no van en ninguna exportación y se borran al apagarlo.
 - **No ve contenido.** Ni páginas, ni mensajes, ni qué se hizo en cada servicio.
 - **Los bytes, solo en Windows.** Desde la 1.0.22, en Windows, anota cuántos datos envía y recibe
   cada programa con cada destino, por minuto (bytes, paquetes, protocolo y puerto), nunca el
   contenido. En Linux, en Mac y en Modo Hogar sigue sin ver cuántos bytes: solo que se preguntó por
-  un nombre, cuándo y cuántas veces.
+  un nombre, cuándo y cuántas veces. Desde la 1.0.45 también los reenvíos de TCP (aparte, sin
+  sumarlos a lo enviado) y las conexiones; no lee el nombre que va dentro de una conexión cifrada
+  (SNI), porque exigiría capturar paquetes, ni el certificado del servidor (TLS 1.3 lo cifra), y no
+  instala ningún certificado ni descifra nada.
 - **No anota respuestas.** Solo consultas: nombre, tipo, dispositivo, hora, categoría, veredicto.
   Frase: «Nunca se guardan las respuestas; solo el país y la red del servidor que respondió, para
   decirte a dónde viajan tus datos[, y, cuando un nombre responde como el rastreador de otra empresa,

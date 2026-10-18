@@ -58,6 +58,20 @@ fn first_address(answers: &[Record]) -> Option<std::net::IpAddr> {
     })
 }
 
+/// The A and AAAA records of an answer after the first, at most [`crate::MAX_OTRAS`] (1.0.45).
+fn other_addresses(answers: &[Record]) -> Vec<std::net::IpAddr> {
+    answers
+        .iter()
+        .filter_map(|r| match &r.data {
+            RData::A(a) => Some(std::net::IpAddr::V4(a.0)),
+            RData::AAAA(a) => Some(std::net::IpAddr::V6(a.0)),
+            _ => None,
+        })
+        .skip(1)
+        .take(crate::MAX_OTRAS)
+        .collect()
+}
+
 /// The aliases an answer went through, following its CNAME records from the name asked: the
 /// chain the device was led along before its address (decision 205). At most
 /// [`crate::MAX_ALIASES`], and a loop stops the walk.
@@ -205,6 +219,7 @@ impl<P: Policy> Handler<P> {
             Ok(lookup) => {
                 let answers = lookup.answers().to_vec();
                 let server = first_address(&answers);
+                let otras = other_addresses(&answers);
                 let aliases = alias_chain(name, &answers);
                 (
                     Answer {
@@ -215,6 +230,7 @@ impl<P: Policy> Handler<P> {
                     Outcome::Forwarded {
                         rcode: ResponseCode::NoError,
                         server,
+                        otras,
                         aliases,
                     },
                 )
@@ -232,6 +248,7 @@ impl<P: Policy> Handler<P> {
                 Outcome::Forwarded {
                     rcode: response_code,
                     server: None,
+                    otras: Vec::new(),
                     aliases: Vec::new(),
                 },
             ),

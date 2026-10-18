@@ -1,0 +1,88 @@
+/* «Visión profunda» (1.0.45). Only the tokens of diseno.css: neutrals and the steel blue; amber
+   for what deserves attention («posible»), green only for what was verified (the chain, the
+   maker's own share), red only for a broken chain. The page's own sheet, so the rest of the panel
+   does not carry it. Heights are classes, not inline styles: the panel's policy forbids those. */
+.vp h2 { font: 600 17px/1.3 var(--display); margin: 0 0 6px; }
+.vp h3 { font: 600 15px/1.3 var(--texto); margin: 0; overflow-wrap: anywhere; }
+.vp-no { margin-top: 16px; }
+.vp-barra { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0; }
+.vp-dias { display: inline-flex; gap: 8px; }
+.vp-vivo { font-size: 12.5px; }
+.vp-cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 0 0 8px; }
+.vp-cifras dt { font: 600 12px/1.3 var(--texto); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.vp-cifras dd { margin: 6px 0 4px; font: 600 22px/1.2 var(--display); color: var(--fg); }
+.vp-cifras small { display: block; font-size: 12px; line-height: 1.4; }
+.vp-cadena { margin: 4px 0 20px; font-size: 13px; }
+.vp-archivos, .vp-defender, .vp-limites { margin: 0 0 20px; }
+.vp-archivos-cab { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: flex-start; }
+.vp-archivos-cab > div { flex: 1 1 320px; }
+.vp-transferencias { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.vp-aviso { border: 1px solid var(--line); border-left: 3px solid var(--aviso); border-radius: var(--r-campo); padding: 10px 12px; background: var(--aviso-suave); color: var(--fg); line-height: 1.45; overflow-wrap: anywhere; }
+.vp-cuando { font: 500 12px/1 var(--mono); color: var(--muted); margin-right: 4px; }
+.vp-defender-valores { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin: 8px 0; }
+.vp-defender-valores dt { color: var(--muted); font-size: 12.5px; }
+.vp-defender-valores dd { margin: 2px 0 0; font-weight: 600; }
+.vp-programas { display: grid; gap: 14px; margin: 10px 0 24px; }
+.vp-programa header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.vp-mini { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px 14px; margin: 0 0 12px; }
+.vp-mini dt { color: var(--muted); font-size: 12px; }
+.vp-mini dd { margin: 2px 0 0; font: 600 14px/1.3 var(--mono); }
+.vp-tabla { overflow-x: auto; }
+.vp-tabla table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.vp-tabla th, .vp-tabla td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.vp-tabla th { color: var(--muted); font-weight: 600; font-size: 12px; }
+.vp-tabla .num { text-align: right; white-space: nowrap; font-family: var(--mono); }
+.vp-ia { margin: 0 0 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.vp-dia { margin: 0 0 12px; }
+.vp-columnas { list-style: none; display: flex; gap: 8px; align-items: flex-end; margin: 8px 0 4px; padding: 0; overflow-x: auto; }
+.vp-columnas li { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 56px; font-size: 11px; }
+.vp-col { display: flex; flex-direction: column; justify-content: flex-end; width: 22px; background: var(--accent-suave); border-radius: 4px 4px 0 0; overflow: hidden; }
+.vp-col i { display: block; width: 100%; background: var(--accent); }
+.vp-leyenda { font-size: 12px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.vp-ley-fab, .vp-ley-resto { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.vp-ley-fab { background: var(--accent); }
+.vp-ley-resto { background: var(--accent-suave); margin-left: 10px; }
+.vp-limites ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); line-height: 1.5; }
+@media (max-width: 560px) { .vp-cifras dd { font-size: 18px; } .vp-tabla table { font-size: 12px; } }
+.vp-h0 { height: 2px; }
+.vp-h5 { height: 4px; }
+.vp-h10 { height: 8px; }
+.vp-h15 { height: 12px; }
+.vp-h20 { height: 16px; }
+.vp-h25 { height: 20px; }
+.vp-h30 { height: 24px; }
+.vp-h35 { height: 28px; }
+.vp-h40 { height: 32px; }
+.vp-h45 { height: 36px; }
+.vp-h50 { height: 40px; }
+.vp-h55 { height: 44px; }
+.vp-h60 { height: 48px; }
+.vp-h65 { height: 52px; }
+.vp-h70 { height: 56px; }
+.vp-h75 { height: 60px; }
+.vp-h80 { height: 64px; }
+.vp-h85 { height: 68px; }
+.vp-h90 { height: 72px; }
+.vp-h95 { height: 76px; }
+.vp-h100 { height: 80px; }
+.vp-f0 { height: 0%; }
+.vp-f5 { height: 5%; }
+.vp-f10 { height: 10%; }
+.vp-f15 { height: 15%; }
+.vp-f20 { height: 20%; }
+.vp-f25 { height: 25%; }
+.vp-f30 { height: 30%; }
+.vp-f35 { height: 35%; }
+.vp-f40 { height: 40%; }
+.vp-f45 { height: 45%; }
+.vp-f50 { height: 50%; }
+.vp-f55 { height: 55%; }
+.vp-f60 { height: 60%; }
+.vp-f65 { height: 65%; }
+.vp-f70 { height: 70%; }
+.vp-f75 { height: 75%; }
+.vp-f80 { height: 80%; }
+.vp-f85 { height: 85%; }
+.vp-f90 { height: 90%; }
+.vp-f95 { height: 95%; }
+.vp-f100 { height: 100%; }

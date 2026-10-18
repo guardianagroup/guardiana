@@ -315,6 +315,7 @@ impl Ledger {
         ledger.ensure_alias_table()?;
         ledger.ensure_vigilancia_table()?;
         ledger.ensure_contratos_tables()?;
+        ledger.ensure_vision_tables()?;
         ledger.migrate_rules_confirmed()?;
         ledger.migrate_events_process()?;
         ledger.migrate_events_server()?;
@@ -812,6 +813,9 @@ impl Ledger {
              DELETE FROM server_bases; DELETE FROM alias_sites; DELETE FROM trafico; \
              DELETE FROM sqlite_sequence WHERE name IN ('events', 'rules', 'outbound', 'gaps', 'changes');",
         )?;
+        // 1.0.45: the traffic minutes were left behind by «Borrar todo» until now, and so would
+        // «Visión profunda»'s rows be.
+        Self::borra_vision_en(&tx)?;
         tx.execute(
             "UPDATE settings SET value = ?1 WHERE key = ?2",
             params![genesis, KEY_ANCHOR],

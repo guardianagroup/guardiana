@@ -50,6 +50,8 @@ pub fn is_self_check(name: &str) -> bool {
 }
 /// Longest alias chain handed to the policy; a longer one is cut there (decision 205).
 pub const MAX_ALIASES: usize = 8;
+/// Most other addresses of an answer handed to the policy beside the first (1.0.45).
+pub const MAX_OTRAS: usize = 16;
 /// TTL of blocked and built-in answers: short, so an undo takes effect fast.
 pub const BUILTIN_TTL: u32 = 30;
 
@@ -174,6 +176,11 @@ pub enum Outcome {
         /// (decision 203); the policy must not store it. `None` for answers with no address (a
         /// name that does not exist, a TXT, an HTTPS record without hints).
         server: Option<std::net::IpAddr>,
+        /// The other addresses of the same answer, after `server`, at most [`MAX_OTRAS`]
+        /// (1.0.45). A program may connect to any of them, and «Visión profunda» must not call
+        /// it «an address no name was seen for» when the name was right there. Memory only, like
+        /// `server`: the policy must not store them.
+        otras: Vec<std::net::IpAddr>,
         /// The aliases (CNAME targets) the answer went through from the name asked to its
         /// address, in order, lowercase, without trailing dot, at most [`MAX_ALIASES`]. Empty for
         /// an answer with no alias. Names only: the policy may look them up in the lists to tell a
