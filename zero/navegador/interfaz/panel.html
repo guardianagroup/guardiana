@@ -228,19 +228,21 @@ body.plegado #franja:hover { background: var(--campo); }
 #z1-que { margin-top: var(--e1); font: var(--t-13); color: var(--gris); }
 .z1-columnas { display: flex; margin-top: var(--e5); font: 600 var(--t-12); letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2); }
 .z1-columnas span:last-child { margin-left: auto; }
-body.vidrio .terceros .tercero { padding: var(--e2) 0; border-bottom: 1px solid var(--line); grid-template-columns: minmax(0, 1fr) 8.75rem; grid-template-rows: auto auto; row-gap: 2px; }
+body.vidrio .terceros .tercero { padding: var(--e2) 0; border-bottom: 1px solid var(--line); grid-template-columns: minmax(0, max-content) minmax(0, 1fr) 8.75rem; grid-template-rows: auto auto; row-gap: 2px; column-gap: var(--e2); }
 body.vidrio .terceros .tercero::before { display: none; }
 body.vidrio .tercero .linea { grid-column: 1 / -1; grid-row: 1; font: var(--t-13); color: var(--tinta); }
 body.vidrio .tercero .linea .mono { font-size: 13px; }
 body.vidrio .tercero .linea .cuenta { display: none; }
 body.vidrio .tercero .quien { grid-column: 1; grid-row: 2; font: var(--t-12); color: var(--gris); }
+/* What else holds for the row (the person's rule, a broker, why) on the same line: a row never
+   changes height when its switch is flipped. */
 body.vidrio .tercero .quien .enlace-empresa { color: var(--gris); }
 body.vidrio .tercero .quien .cat::before { content: ' · '; }
-body.vidrio .tercero .botones { grid-column: 2; grid-row: 2; grid-template-rows: auto; }
+body.vidrio .tercero .botones { grid-column: 3; grid-row: 2; grid-template-rows: auto; }
 body.vidrio .tercero .botones .boton.vacio { display: none; }
-body.vidrio .tercero .chips { grid-column: 1 / -1; grid-row: 3; font: var(--t-12); }
+body.vidrio .tercero .chips { grid-column: 2; grid-row: 2; font: var(--t-12); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 body.vidrio .tercero .chips .chip.estado, body.vidrio .tercero .chips .chip.cat { display: none; }
-body.vidrio .tercero .chips:empty { display: none; }
+body.vidrio .tercero .nota-dato { grid-row: 3; }
 body.vidrio .tercero.cortado .interruptor-estado { color: var(--rojo); font-weight: 600; }
 body.vidrio .lista-resumen { margin: var(--e3) 0 0; font: var(--t-12); color: var(--gris); }
 .z1-acciones { margin-top: var(--e5); display: grid; gap: var(--e3); }
