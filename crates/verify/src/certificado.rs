@@ -388,7 +388,10 @@ pub fn mes_anterior(ahora: i64, zona_min: i64) -> String {
 
 /// The company of a name, its seat and its group: the lists' company, else the registry of data
 /// brokers (the same order the panel uses).
-fn empresa_de(qname: &str) -> Option<(&'static str, Option<&'static str>, Option<&'static str>)> {
+/// A company, its seat and its group.
+type Duena = (&'static str, Option<&'static str>, Option<&'static str>);
+
+fn empresa_de(qname: &str) -> Option<Duena> {
     if let Some(e) = guardiana_lists::company_of(qname) {
         return Some((
             e,
@@ -442,7 +445,10 @@ fn texto_fallo(f: &ChainFault) -> &'static str {
 
 /// The reference list of «did not contact»: the companies with a checked profile in the program
 /// (`fichas.json`, the ones people meet most), each with the names the lists know of it.
-fn referencia() -> (String, Vec<(&'static str, Option<&'static str>, usize)>) {
+/// A reference company: its name, its seat and how many names the lists know of it.
+type Referencia = (&'static str, Option<&'static str>, usize);
+
+fn referencia() -> (String, Vec<Referencia>) {
     let v: serde_json::Value =
         serde_json::from_str(guardiana_lists::FICHAS).unwrap_or(serde_json::Value::Null);
     let mut out = Vec::new();
