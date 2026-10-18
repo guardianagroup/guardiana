@@ -713,7 +713,7 @@
       const dentro = (q, m) => q.v && q.x > m && q.x < st.W - m && q.y > m && q.y < st.H - m;
       cx.save(); cx.lineJoin = 'round'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
       // Countries, biggest first.
-      cx.font = '600 13px "IBM Plex Sans", "Segoe UI", system-ui, sans-serif';
+      cx.font = '600 13px "Hanken Grotesk", "Segoe UI", system-ui, sans-serif';
       const paises = Object.keys(centros).map((c) => ({ c, px: TAM_PAIS[c] * ppg })).filter((p) => p.px >= 38).sort((a, b) => b.px - a.px);
       for (const p of paises) {
         const q = aPantalla(lugar(centros[p.c].lon, centros[p.c].lat, 0.002));
@@ -731,7 +731,7 @@
         if (ciudadesGeo) {
           const cuantas = Math.min(ciudadesGeo.length, Math.round(120 * Math.pow(ppg / 10, 2.2)));
           const c0 = lonLatBajo(st.W / 2, st.H / 2), radio = Math.hypot(st.W, st.H) / 2 / ppg + 2;
-          cx.font = '500 11.5px "IBM Plex Sans", "Segoe UI", system-ui, sans-serif'; cx.textAlign = 'left';
+          cx.font = '500 11.5px "Hanken Grotesk", "Segoe UI", system-ui, sans-serif'; cx.textAlign = 'left';
           let puestas = 0;
           for (let i = 0; i < cuantas && puestas < 70; i++) {
             const c = ciudadesGeo[i];
@@ -801,7 +801,7 @@
         const cima = aPantalla(lugar(L.yo.lon, L.yo.lat, 0.07, 0.06));
         const gr = cx.createLinearGradient(L.cen.x, L.cen.y, cima.x, cima.y); gr.addColorStop(0, 'rgba(63,224,197,.9)'); gr.addColorStop(1, 'rgba(63,224,197,0)');
         cx.strokeStyle = gr; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(L.cen.x, L.cen.y); cx.lineTo(cima.x, cima.y); cx.stroke();
-        cx.drawImage(brillo('#3fe0c5'), L.cen.x - 16, L.cen.y - 16, 32, 32);
+        cx.drawImage(brillo('#6CCBA5'), L.cen.x - 16, L.cen.y - 16, 32, 32);
         st.dianas.push({ x: L.cen.x, y: L.cen.y, r: 16, tipo: 'yo' });
         L.prods.forEach((q) => { cx.drawImage(brillo(q.p.color), q.x - 7, q.y - 7, 14, 14); st.dianas.push({ x: q.x, y: q.y, r: 12, tipo: 'prod', ref: q.p }); });
       }
@@ -858,7 +858,7 @@
     };
     const rotulo = (x, y, txt, col, puestos) => {
       // A city name you can read at a glance: sans, semibold, on a near-opaque pill.
-      cx.font = '600 12px "IBM Plex Sans", "Segoe UI", system-ui, sans-serif';
+      cx.font = '600 12px "Hanken Grotesk", "Segoe UI", system-ui, sans-serif';
       const w = cx.measureText(txt).width + 16, h = 21;
       let bx = Math.min(st.W - w - 6, Math.max(6, x)), by = y - h + 4;
       if (puestos) { let n = 0; while (n++ < 12 && puestos.some((b) => bx < b.x + b.w && bx + w > b.x && by < b.y + b.h && by + h > b.y)) by += h + 2; puestos.push({ x: bx, y: by, w, h }); }
@@ -997,7 +997,7 @@
     const colorDe = (d) => (bloqueado(d) ? '#ff6b7a' : d.doc === false ? '#ffd166' : '#ffb547');
     const etiqueta = (d, x, y, alinea) => {
       const txt = d.host.length > 30 ? d.host.slice(0, 29) + '…' : d.host;
-      cx.font = '500 10.5px "IBM Plex Mono", monospace';
+      cx.font = '500 10.5px "Hanken Grotesk", monospace';
       const w = cx.measureText(txt).width + 12, h = 17;
       const bx = alinea === 'izq' ? x - w - 10 : x + 10, by = y - h / 2;
       const bl = bloqueado(d);
@@ -1153,7 +1153,7 @@
         const { g, w, h: hh } = prepara(c); if (w < 20) return;
         const serie = st.serieP[p.id] || [], n = serie.length || 1, bw = w / n;
         g.fillStyle = 'rgba(118,144,168,.16)'; g.fillRect(0, hh - 1, w, 1);
-        g.fillStyle = p.cortado ? '#ff6b7a' : '#3fe0c5';
+        g.fillStyle = p.cortado ? '#ff6b7a' : '#6CCBA5';
         serie.forEach((v, i) => { if (v > 0) { const a = Math.max(2, Math.sqrt(v / techo) * (hh - 2)); g.fillRect(i * bw + 0.5, hh - 1 - a, Math.max(1, bw - 1.5), a); } });
       });
     };

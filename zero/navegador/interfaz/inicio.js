@@ -253,15 +253,15 @@
     const c = $('lienzo');
     const x = c.getContext('2d');
     await document.fonts.ready;
-    x.fillStyle = '#F4F6FA'; x.fillRect(0, 0, 1200, 630);
+    x.fillStyle = '#06080C'; x.fillRect(0, 0, 1200, 630);
     x.strokeStyle = 'rgba(11,16,32,.05)';
     for (let i = 0; i < 1200; i += 44) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 630); x.stroke(); }
     for (let j = 0; j < 630; j += 44) { x.beginPath(); x.moveTo(0, j); x.lineTo(1200, j); x.stroke(); }
-    x.fillStyle = '#1F4BFF'; x.beginPath(); x.arc(84, 84, 9, 0, Math.PI * 2); x.fill();
-    x.fillStyle = '#0B1020'; x.font = "600 24px Unbounded"; x.fillText('GUARDIANA ZERO', 108, 93);
+    x.fillStyle = '#9CC3E4'; x.beginPath(); x.arc(84, 84, 9, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#E8ECF1'; x.font = "600 24px Schibsted Grotesk"; x.fillText('GUARDIANA ZERO', 108, 93);
     const nombreMes = new Date().toLocaleDateString(document.documentElement.lang, { month: 'long', year: 'numeric' });
-    x.fillStyle = '#5B6275'; x.font = '500 22px "IBM Plex Sans"'; x.fillText(t('mes_titulo') + ' · ' + nombreMes, 72, 170);
-    x.fillStyle = '#0B1020'; x.font = "600 46px Unbounded";
+    x.fillStyle = '#A9B3BE'; x.font = '500 22px "Hanken Grotesk"'; x.fillText(t('mes_titulo') + ' · ' + nombreMes, 72, 170);
+    x.fillStyle = '#E8ECF1'; x.font = "600 46px Schibsted Grotesk";
     const frase = fraseMes(mes, new Date().toLocaleDateString(document.documentElement.lang, { month: 'long' }));
     const palabras = frase.split(' '); let linea = ''; let y = 250;
     for (const p of palabras) {
@@ -269,8 +269,8 @@
       if (x.measureText(prueba).width > 1056) { x.fillText(linea, 72, y); y += 60; linea = p; } else linea = prueba;
     }
     x.fillText(linea, 72, y);
-    x.fillStyle = '#1F4BFF'; x.font = '500 20px "IBM Plex Mono"'; x.fillText('guardianagroup.com', 72, 570);
-    x.fillStyle = '#5B6275'; x.font = '400 18px "IBM Plex Sans"'; x.fillText(t('lema'), 72, 540);
+    x.fillStyle = '#9CC3E4'; x.font = '500 20px "Hanken Grotesk"'; x.fillText('guardianagroup.com', 72, 570);
+    x.fillStyle = '#A9B3BE'; x.font = '400 18px "Hanken Grotesk"'; x.fillText(t('lema'), 72, 540);
     manda({ tipo: 'guardar_imagen', nombre: 'guardiana-zero-mes.png', datos: c.toDataURL('image/png') });
   });
 

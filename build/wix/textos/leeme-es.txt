@@ -9,8 +9,8 @@ Qué ha hecho el instalador
 --------------------------
 - Ha copiado el programa a «Archivos de programa\Guardiana».
 - Ha registrado el servicio «Guardiana», que arranca solo con Windows.
-- Ha creado los accesos «Guardiana» y «Guardiana (menú)» en el menú Inicio, y «Guardiana»
-  en el escritorio.
+- Ha creado el acceso «Guardiana», que abre el panel, en el menú Inicio y en el
+  escritorio.
 - Ha puesto a GUARDIANA como DNS de este equipo, también por IPv6, con una
   copia exacta del ajuste anterior. Si el servicio se para, el equipo recupera
   su DNS de antes; al desinstalar queda tal como estaba.
@@ -38,8 +38,7 @@ si no lo quieres.
 
 Comprobar la instalación
 ------------------------
-Menú «Guardiana (menú)» > opción 13, «Verificar», o en una ventana nueva de
-comandos o de PowerShell:
+En una ventana nueva de comandos o de PowerShell:
     guardiana verify
 
 Antes de instalar: comprueba la huella del archivo .msi y compárala con la de

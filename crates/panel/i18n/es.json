@@ -953,6 +953,7 @@
     "licencia_clave_lead": "La clave llega por correo al pagar. Una conexión a {host}, iniciada por ti, para activarla; después, una comprobación a los 8 días de activarla y otra por periodo de pago (al mes o al año; la licencia Fundador, de un solo pago, una al mes, para que una devolución llegue también aquí). Si una comprobación no se puede hacer (sin internet, la pasarela caída), se vuelve a intentar cada hora hasta que salga. Todas quedan anotadas en «Lo que GUARDIANA sabe de ti». Nada más sale de tu equipo.",
     "licencia_clave_campo": "clave de licencia",
     "licencia_clave_boton": "Activar",
+    "licencia_enlace_listo": "Tu clave ya está escrita, tal como llegó en tu correo. Pulsa «Activar» para confirmarla.",
     "licencia_comprar": "Suscribirme en guardianagroup.com →",
     "licencia_comprar_url": "https://guardianagroup.com/comprar.html",
     "licencia_activada": "Licencia activada.",

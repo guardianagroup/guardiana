@@ -15,6 +15,7 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
+use guardiana_zero::lanzador::{self, Pedido};
 use guardiana_zero::licencia::{Estado as EstadoLicencia, Fallo, Lugar as LugarLicencia};
 use guardiana_zero::sesion::{self, Arranque, Orden, Origen, Perfil, Sesion};
 use guardiana_zero::textos::{Idioma, Textos};
@@ -51,7 +52,7 @@ use windows::Win32::System::DataExchange::COPYDATASTRUCT;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Registry::{
     RegCloseKey, RegEnumKeyExW, RegGetValueW, RegOpenKeyExW, HKEY, HKEY_CURRENT_USER,
-    HKEY_LOCAL_MACHINE, KEY_READ, RRF_RT_REG_DWORD, RRF_RT_REG_QWORD,
+    HKEY_LOCAL_MACHINE, KEY_READ, RRF_RT_REG_QWORD,
 };
 use windows::Win32::System::Threading::{CreateMutexW, WaitForSingleObject};
 use windows::Win32::UI::HiDpi::{
@@ -99,10 +100,6 @@ static TICS_VIGIA: AtomicU32 = AtomicU32::new(0);
 static OCULTA_A_CAPTURAS: AtomicBool = AtomicBool::new(false);
 /// Whether Windows accepted.
 static PROTEGIDA: AtomicBool = AtomicBool::new(false);
-/// Whether the program's own pages are in night colours: a tab showing one of them is painted
-/// in its background colour between a reload and the first paint, never white (the owner,
-/// 17 Oct 2026: reloading GUARDIANA «hace una luz blanca … un fogonazo»).
-static FONDO_OSCURO: AtomicBool = AtomicBool::new(false);
 
 /// A string the way Win32 wants it: UTF-16, ending in zero, alive while it is used.
 struct Ancho(Vec<u16>);
@@ -188,6 +185,15 @@ static LICENCIA: std::sync::Mutex<VecDeque<DeLicencia>> = std::sync::Mutex::new(
 /// One periodic check at a time.
 static COMPROBANDO: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+/// Whether a thread is waiting for GUARDIANA's service (`--panel`, `guardiana://activar`).
+static ESPERANDO_PANEL: AtomicBool = AtomicBool::new(false);
+/// The licence key the last request asked to fill in, taken by that thread when the panel
+/// answers. Kept in memory only, never written to the log.
+static CLAVE_PEDIDA: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+/// What that thread found (the panel's address, or the wait page saying what failed), picked up
+/// by the window on its next tick.
+static DEL_PANEL: std::sync::Mutex<VecDeque<String>> = std::sync::Mutex::new(VecDeque::new());
+
 /// A result from the payment gateway, done away from the window so it never freezes.
 enum DeLicencia {
     Activada(Result<EstadoLicencia, Fallo>),
@@ -217,6 +223,92 @@ fn recoge_licencia() {
             DeLicencia::Version(r) => con_sesion(|s| s.version_encontrada(r)),
         };
         encola(o.unwrap_or_default());
+    }
+}
+
+/// Write ZERO's own wait page for the panel into the browser's folder, in the person's language.
+fn escribe_espera(carpeta: &Path, textos: &Textos) {
+    let ruta = carpeta.join(lanzador::ARCHIVO_ESPERA);
+    let html = lanzador::pagina_espera(textos);
+    if std::fs::read_to_string(&ruta).ok().as_deref() != Some(html.as_str()) {
+        if let Err(e) = std::fs::write(&ruta, html) {
+            registra("página de espera", &e);
+        }
+    }
+}
+
+/// `--panel` and `guardiana://activar` (1.0.44): the panel at once when the service already
+/// answers; otherwise GUARDIANA's tab on ZERO's own wait page, and a thread that waits for the
+/// service (up to [`lanzador::ESPERA_MAXIMA`]) and hands the panel's address to the window. The
+/// person never sees a console, nor a white or navy page in between.
+fn abre_panel(s: &mut Sesion, clave: Option<String>) -> Vec<Orden> {
+    if let Some(url) = lanzador::enlace_si_listo(clave.as_deref()) {
+        return s.abre_guardiana(&url);
+    }
+    *CLAVE_PEDIDA
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = clave;
+    let o = s.abre_guardiana(lanzador::ESPERA);
+    if !ESPERANDO_PANEL.swap(true, Ordering::SeqCst) {
+        let lanzado = std::thread::Builder::new().name("panel".into()).spawn(|| {
+            let r = lanzador::espera_llave(&lanzador::ruta_llave(), lanzador::ESPERA_MAXIMA);
+            let clave = CLAVE_PEDIDA
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take();
+            let url = match r {
+                Ok(llave) => lanzador::enlace(&llave, clave.as_deref()),
+                Err(f) => f.pagina().to_owned(),
+            };
+            DEL_PANEL
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push_back(url);
+            ESPERANDO_PANEL.store(false, Ordering::SeqCst);
+        });
+        if let Err(e) = lanzado {
+            registra("esperar el panel", &e);
+            ESPERANDO_PANEL.store(false, Ordering::SeqCst);
+        }
+    }
+    o
+}
+
+/// Open in GUARDIANA's tab what the waiting thread found.
+fn recoge_panel() {
+    let hechos: Vec<String> = DEL_PANEL
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .drain(..)
+        .collect();
+    for url in hechos {
+        encola(con_sesion(|s| s.abre_guardiana(&url)).unwrap_or_default());
+    }
+}
+
+/// Hand this start's request to the copy that is already running (its own window does it):
+/// `dwData` 1 is an address for GUARDIANA's tab, 2 the panel, with a licence key or empty.
+fn pasa_pedido(otra: HWND, pedido: &Pedido) {
+    let (tipo, texto) = match pedido {
+        Pedido::AbreGuardiana(url) => (1, url.as_str()),
+        Pedido::Panel => (2, ""),
+        Pedido::Activar(clave) => (2, clave.as_str()),
+    };
+    let ancho = Ancho::de(texto);
+    let copia = COPYDATASTRUCT {
+        dwData: tipo,
+        cbData: u32::try_from(ancho.0.len() * 2).unwrap_or_default(),
+        lpData: ancho.0.as_ptr().cast_mut().cast::<c_void>(),
+    };
+    // SAFETY: `copia` and the text it points to live until SendMessageW returns, which is when
+    // the other window has copied them (WM_COPYDATA is synchronous).
+    unsafe {
+        let _ = SendMessageW(
+            otra,
+            WM_COPYDATA,
+            Some(WPARAM(0)),
+            Some(LPARAM((&copia as *const COPYDATASTRUCT) as isize)),
+        );
     }
 }
 
@@ -491,10 +583,11 @@ fn ejecuta(o: Orden) {
                 pon_seguimiento(&v.web, estricto);
             }
         }
-        Orden::Tema { oscuro } => {
-            let col = colores(oscuro);
+        Orden::Tema { .. } => {
+            // 1.0.44: the program is dark only (the website's palette); the frame is repainted
+            // all the same, and every tab gets the colour of what it shows.
+            let col = colores();
             pinta_marco_ventana(hwnd(), &col);
-            FONDO_OSCURO.store(col.oscuro, Ordering::Relaxed);
             let vistas: Vec<(ICoreWebView2Controller, ICoreWebView2)> = con_vistas(|v| {
                 v.pestanas
                     .values()
@@ -1053,18 +1146,16 @@ fn escucha_teclas(c: &ICoreWebView2Controller) -> windows::core::Result<()> {
     unsafe { c.add_AcceleratorKeyPressed(&h, &mut t) }
 }
 
-/// The background of the program's own pages (--bg in interfaz/diseno.css, day or night).
-fn fondo_propio() -> COREWEBVIEW2_COLOR {
-    let (r, g, b) = if FONDO_OSCURO.load(Ordering::Relaxed) {
-        (0x0B, 0x10, 0x20)
-    } else {
-        (0xF4, 0xF6, 0xFA)
-    };
+/// The background of the program's own pages (--bg in interfaz/diseno.css): a tab showing one
+/// of them is painted in it between a reload and the first paint, never white (the owner,
+/// 17 Oct 2026: reloading GUARDIANA «hace una luz blanca … un fogonazo»). Dark only since
+/// 1.0.44, the website's #06080C: nothing flashes navy or white while a page loads.
+const fn fondo_propio() -> COREWEBVIEW2_COLOR {
     COREWEBVIEW2_COLOR {
         A: 255,
-        R: r,
-        G: g,
-        B: b,
+        R: 0x06,
+        G: 0x08,
+        B: 0x0C,
     }
 }
 
@@ -1324,9 +1415,11 @@ fn eventos_pestana(
                     let _ = args.IsRedirected(&mut redirigida);
                     let r = con_sesion(|s| s.navegacion_empieza(id, &url, redirigida.as_bool()));
                     if DEPURA.with(|d| *d) {
+                        // Never the fragment: a licence key from a link travels there.
+                        let sin = url.split('#').next().unwrap_or_default();
                         registra(
                             "navegación",
-                            &format!("{id} {url} {:?}", r.as_ref().map(|x| x.0)),
+                            &format!("{id} {sin} {:?}", r.as_ref().map(|x| x.0)),
                         );
                     }
                     let (cancela, o) = r.unwrap_or((false, Vec::new()));
@@ -1705,6 +1798,7 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
         }
         WM_TIMER => {
             recoge_licencia();
+            recoge_panel();
             encola(con_sesion(Sesion::tic).unwrap_or_default());
             drena();
             // During a call the conversations also run on a 20 ms clock; it stops with the call.
@@ -1763,8 +1857,24 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                 std::slice::from_raw_parts(copia.lpData.cast::<u16>(), copia.cbData as usize / 2)
             };
             let fin = chars.iter().position(|c| *c == 0).unwrap_or(chars.len());
-            let url = String::from_utf16_lossy(&chars[..fin]);
-            encola(con_sesion(|s| s.abre_guardiana(&url)).unwrap_or_default());
+            let texto = String::from_utf16_lossy(&chars[..fin]);
+            if copia.dwData == 2 {
+                // The panel, with a licence key to fill in when it carries one (checked again
+                // here: the window takes nothing on trust).
+                if !texto.is_empty() && !lanzador::es_clave_valida(&texto) {
+                    return LRESULT(0);
+                }
+                let clave = (!texto.is_empty()).then_some(texto);
+                if let (Some(carpeta), Some(t)) = (
+                    con_vistas(|v| v.carpeta_ui.clone()),
+                    con_sesion(|s| s.textos()),
+                ) {
+                    escribe_espera(&carpeta, &t);
+                }
+                encola(con_sesion(|s| abre_panel(s, clave)).unwrap_or_default());
+            } else {
+                encola(con_sesion(|s| s.abre_guardiana(&texto)).unwrap_or_default());
+            }
             drena();
             LRESULT(1)
         }
@@ -1919,32 +2029,11 @@ fn lee_usos() -> Vec<guardiana_zero::vigia::Uso> {
     v
 }
 
-fn tema_oscuro() -> bool {
-    let mut valor = 1u32;
-    let mut largo = std::mem::size_of::<u32>() as u32;
-    let r = unsafe {
-        RegGetValueW(
-            HKEY_CURRENT_USER,
-            w!("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"),
-            w!("AppsUseLightTheme"),
-            RRF_RT_REG_DWORD,
-            None,
-            Some((&mut valor as *mut u32).cast::<c_void>()),
-            Some(&mut largo as *mut u32),
-        )
-    };
-    r == ERROR_SUCCESS && valor == 0
-}
-
-/// The frame's colours: the person's day or night if they chose one, Windows' otherwise.
-fn colores(elegido: Option<bool>) -> Colores {
-    let oscuro = elegido.unwrap_or_else(tema_oscuro);
-    // The same tokens as interfaz/diseno.css: --marco and --card, light and night.
-    let (m, h) = if oscuro {
-        ((0x0B, 0x10, 0x20), (0x14, 0x1A, 0x2E))
-    } else {
-        ((0xE8, 0xEC, 0xF4), (0xFF, 0xFF, 0xFF))
-    };
+/// The frame's colours. Dark only since 1.0.44, the website's palette, whatever day or night
+/// the person or Windows chose: the same tokens as interfaz/diseno.css, --marco and --card.
+fn colores() -> Colores {
+    let oscuro = true;
+    let (m, h) = ((0x06, 0x08, 0x0C), (0x0C, 0x11, 0x18));
     let rgb = |(r, g, b): (u8, u8, u8)| {
         COLORREF(u32::from(r) | (u32::from(g) << 8) | (u32::from(b) << 16))
     };
@@ -2031,13 +2120,11 @@ pub fn arranca() {
     REGISTRO.with(|r| *r.borrow_mut() = Some(datos.join("registro.txt")));
     let idioma = idioma_sistema();
     let textos = Textos::de(Idioma::de_etiqueta(&idioma));
-    let abrir_guardiana = {
-        let mut args = std::env::args();
-        let _ = args.next();
-        match (args.next().as_deref(), args.next()) {
-            (Some("--abrir-guardiana"), Some(url)) => Some(url),
-            _ => None,
-        }
+    // `--abrir-guardiana <url>` (the CLI), `--panel` (the shortcuts and the end of the install)
+    // and `--url guardiana://activar?clave=…` (the licence email), see `lanzador`.
+    let pedido = {
+        let args: Vec<String> = std::env::args().skip(1).collect();
+        lanzador::pedido_de_argumentos(&args)
     };
 
     // One window: a second start of the same version brings the first one forward; a newer
@@ -2074,19 +2161,8 @@ pub fn arranca() {
             let mia = version_de(env!("CARGO_PKG_VERSION")).unwrap_or_default();
             // Up to 1.0.4 nothing wrote the mark: no mark means an older copy.
             if suya.is_some_and(|v| v >= mia) {
-                if let Some(url) = abrir_guardiana.as_deref() {
-                    let ancho = Ancho::de(url);
-                    let copia = COPYDATASTRUCT {
-                        dwData: 1,
-                        cbData: u32::try_from(ancho.0.len() * 2).unwrap_or_default(),
-                        lpData: ancho.0.as_ptr().cast_mut().cast::<c_void>(),
-                    };
-                    let _ = SendMessageW(
-                        otra,
-                        WM_COPYDATA,
-                        Some(WPARAM(0)),
-                        Some(LPARAM((&copia as *const COPYDATASTRUCT) as isize)),
-                    );
+                if let Some(p) = &pedido {
+                    pasa_pedido(otra, p);
                 }
                 if IsIconic(otra).as_bool() {
                     let _ = ShowWindow(otra, SW_RESTORE);
@@ -2182,20 +2258,21 @@ pub fn arranca() {
         .unwrap_or_else(|| base.join("marca"));
     let lugar = LugarLicencia::nuevo(&datos, ancla);
     let _ = LUGAR.set(lugar.clone());
+    escribe_espera(&carpeta_ui, &s.textos());
     let mut iniciales = iniciales;
-    if let Some(url) = abrir_guardiana.as_deref() {
-        let o = s.abre_guardiana(url);
-        if !o.is_empty() {
-            iniciales = o;
-        }
+    let o = match &pedido {
+        Some(Pedido::AbreGuardiana(url)) => s.abre_guardiana(url),
+        Some(p) => abre_panel(&mut s, p.clave().map(str::to_owned)),
+        None => Vec::new(),
+    };
+    if !o.is_empty() {
+        iniciales = o;
     }
     iniciales.extend(s.pon_lugar_licencia(lugar));
     let estricto = s.seguimiento_estricto();
-    let tema_elegido = s.tema_oscuro();
     SESION.with(|c| *c.borrow_mut() = Some(s));
 
-    let col = colores(tema_elegido);
-    FONDO_OSCURO.store(col.oscuro, Ordering::Relaxed);
+    let col = colores();
     let h = match crea_ventana(&col) {
         Ok(h) => h,
         Err(e) => {
@@ -2359,7 +2436,7 @@ fn pinta_marco_ventana(hwnd: HWND, col: &Colores) {
             std::mem::size_of::<COLORREF>() as u32,
         );
         let texto = if col.oscuro {
-            COLORREF(0x00F6_ECE8)
+            COLORREF(0x00F1_ECE8)
         } else {
             COLORREF(0x0020_100B)
         };

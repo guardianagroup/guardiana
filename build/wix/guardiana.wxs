@@ -117,8 +117,17 @@
          limpia»): guardiana.exe is a console program, so a shortcut to it opened a black console
          window that stayed in front while the service came up (the panel waits for its key
          before it lets the console go). Show="minimized" starts that console on the taskbar
-         instead; the "Open Guardiana" box at the end of the install runs this same shortcut. -->
-    <Component Id="Shortcut" Directory="MenuDir" Guid="21398cf1-e897-4661-a755-bb36e4a4eb16">
+         instead; the "Open Guardiana" box at the end of the install runs this same shortcut.
+         18 Oct 2026 (the owner's video of 1.0.43: the console still showed): with GUARDIANA ZERO
+         installed, the default, the shortcuts are ZERO's own further down (a window program,
+         started with its panel argument: no console at all) and these two exist only with ZERO=0. Both sets are called
+         «Guardiana», so the finish box (WixShellExecTarget, [MenuDir]Guardiana.lnk) runs
+         whichever is there. The «Guardiana (menú)» shortcut is gone: `guardiana menu` is the
+         interactive test menu in a console (crates/cli/src/menu.rs), not something to open from
+         the Start menu without a console. -->
+<?ifdef ZeroExe ?>
+    <!-- With ZERO in the package: only when it is left out (ZERO=0). -->
+    <Component Id="Shortcut" Directory="MenuDir" Guid="21398cf1-e897-4661-a755-bb36e4a4eb16" Condition="ZERO=&quot;0&quot;">
       <Shortcut Id="PanelShortcut"
                 Name="Guardiana"
                 Description="!(loc.AbrirPanel)"
@@ -127,11 +136,28 @@
                 Icon="guardiana.ico"
                 Show="minimized"
                 WorkingDirectory="INSTALLFOLDER" />
-      <Shortcut Id="MenuShortcut"
-                Name="!(loc.AccesoMenu)"
-                Description="!(loc.AccesoMenuDescripcion)"
+      <RemoveFolder Id="RemoveMenuDir" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\Guardiana" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="9a1f6c2e-3d47-4b8a-9c05-6e2f1b7d4a10" Condition="ZERO=&quot;0&quot;">
+      <Shortcut Id="DesktopPanelShortcut"
+                Name="Guardiana"
+                Description="!(loc.AbrirPanel)"
                 Target="[INSTALLFOLDER]guardiana.exe"
-                Arguments="menu"
+                Arguments="panel"
+                Icon="guardiana.ico"
+                Show="minimized"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\Guardiana" Name="desktop" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+<?else ?>
+    <Component Id="Shortcut" Directory="MenuDir" Guid="21398cf1-e897-4661-a755-bb36e4a4eb16">
+      <Shortcut Id="PanelShortcut"
+                Name="Guardiana"
+                Description="!(loc.AbrirPanel)"
+                Target="[INSTALLFOLDER]guardiana.exe"
+                Arguments="panel"
                 Icon="guardiana.ico"
                 Show="minimized"
                 WorkingDirectory="INSTALLFOLDER" />
@@ -150,6 +176,7 @@
                 WorkingDirectory="INSTALLFOLDER" />
       <RegistryValue Root="HKCU" Key="Software\Guardiana" Name="desktop" Type="integer" Value="1" KeyPath="yes" />
     </Component>
+<?endif ?>
 
 <?ifdef ZeroExe ?>
     <!-- One program (the owner, 13 Oct 2026: «instalando solo uno ya lo tiene todo»): the browser
@@ -166,9 +193,54 @@
     <Feature Id="Zero" Title="GUARDIANA ZERO" Level="1">
       <Level Value="0" Condition="ZERO=&quot;0&quot;" />
       <ComponentRef Id="ZeroExe" />
+      <ComponentRef Id="ZeroShortcut" />
+      <ComponentRef Id="ZeroDesktopShortcut" />
+      <ComponentRef Id="ZeroProtocolo" />
     </Feature>
     <Component Id="ZeroExe" Directory="ZERODIR" Guid="5e0c7a31-8d24-4f6b-b9a2-3c1d7e8f4a95">
       <File Id="ZeroExeFile" Name="GUARDIANA ZERO.exe" Source="$(var.ZeroExe)" KeyPath="yes" />
+    </Component>
+    <!-- 1.0.44, a clean start: «Guardiana» in the Start menu and on the desktop, and the finish
+         box, open GUARDIANA ZERO with its panel argument (see Arguments). ZERO is a window program, so no console shows;
+         its window opens at once on its own dark wait page and turns into the panel the moment
+         the service answers (crates/zero/src/lanzador.rs). -->
+    <Component Id="ZeroShortcut" Directory="MenuDir" Guid="bc24a3af-c4ba-4297-aa5e-2fac0894c940">
+      <Shortcut Id="ZeroPanelShortcut"
+                Name="Guardiana"
+                Description="!(loc.AbrirPanel)"
+                Target="[ZERODIR]GUARDIANA ZERO.exe"
+                Arguments="--panel"
+                Icon="guardiana.ico"
+                WorkingDirectory="ZERODIR" />
+      <RemoveFolder Id="RemoveMenuDirZero" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\Guardiana" Name="installed-zero" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+    <Component Id="ZeroDesktopShortcut" Directory="DesktopFolder" Guid="0f412e8c-9422-402e-a385-37d6e9f7d380">
+      <Shortcut Id="ZeroDesktopPanelShortcut"
+                Name="Guardiana"
+                Description="!(loc.AbrirPanel)"
+                Target="[ZERODIR]GUARDIANA ZERO.exe"
+                Arguments="--panel"
+                Icon="guardiana.ico"
+                WorkingDirectory="ZERODIR" />
+      <RegistryValue Root="HKCU" Key="Software\Guardiana" Name="desktop-zero" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+    <!-- The licence in one click (1.0.44): the welcome email's «Activar» link is
+         guardiana://activar?clave=<key>. Windows hands it to ZERO, which checks it strictly,
+         opens the panel's licence page with the key filled in and waits for the person's click
+         on «Activar»; nothing is activated by the link alone. Per machine (HKCR is
+         HKLM\Software\Classes here), and only with ZERO, which is what opens it. -->
+    <Component Id="ZeroProtocolo" Directory="ZERODIR" Guid="1a067fbf-813f-4a03-8231-4c1dc16f7a26">
+      <RegistryKey Root="HKCR" Key="guardiana">
+        <RegistryValue Type="string" Value="URL:GUARDIANA" KeyPath="yes" />
+        <RegistryValue Name="URL Protocol" Type="string" Value="" />
+        <RegistryKey Key="DefaultIcon">
+          <RegistryValue Type="string" Value="&quot;[ZERODIR]GUARDIANA ZERO.exe&quot;,0" />
+        </RegistryKey>
+        <RegistryKey Key="shell\open\command">
+          <RegistryValue Type="string" Value="&quot;[ZERODIR]GUARDIANA ZERO.exe&quot; --url &quot;%1&quot;" />
+        </RegistryKey>
+      </RegistryKey>
     </Component>
 <?endif ?>
 

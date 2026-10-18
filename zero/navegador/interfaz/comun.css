@@ -1,11 +1,9 @@
 /* GUARDIANA ZERO — the browser's own pages. Same palette and typefaces as guardianagroup.com
    and the GUARDIANA panel; the fonts travel inside the program (OFL, see fuentes/). */
-@font-face { font-family: 'IBM Plex Sans'; font-weight: 400; font-display: block; src: url(fuentes/IBMPlexSans-400-latin.woff2) format('woff2'); }
-@font-face { font-family: 'IBM Plex Sans'; font-weight: 500; font-display: block; src: url(fuentes/IBMPlexSans-500-latin.woff2) format('woff2'); }
-@font-face { font-family: 'IBM Plex Sans'; font-weight: 600; font-display: block; src: url(fuentes/IBMPlexSans-600-latin.woff2) format('woff2'); }
+@font-face { font-family: 'Schibsted Grotesk'; font-weight: 400 900; font-display: block; src: url(fuentes/SchibstedGrotesk-var.woff) format('woff'); }
+@font-face { font-family: 'Hanken Grotesk'; font-weight: 100 900; font-display: block; src: url(fuentes/HankenGrotesk-var.woff) format('woff'); }
 @font-face { font-family: 'IBM Plex Mono'; font-weight: 400; font-display: block; src: url(fuentes/IBMPlexMono-400-latin.woff2) format('woff2'); }
 @font-face { font-family: 'IBM Plex Mono'; font-weight: 500; font-display: block; src: url(fuentes/IBMPlexMono-500-latin.woff2) format('woff2'); }
-@font-face { font-family: 'Unbounded'; font-weight: 600; font-display: block; src: url(fuentes/Unbounded-latin.woff2) format('woff2'); }
 
 :root {
   /* The palette and the typefaces come from diseno.css, shared with the GUARDIANA panel and
@@ -66,3 +64,6 @@ textarea.campo { resize: vertical; min-height: 84px; line-height: 1.45; }
 /* Anything that unfolds looks like it can be clicked (16 Oct 2026). */
 summary { cursor: pointer; }
 summary:hover { color: var(--accent); }
+
+/* One look only since 17 Oct 2026, as on the website: the day/night switch is gone. */
+.temas { display: none !important; }

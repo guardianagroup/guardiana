@@ -498,11 +498,22 @@ async fn fuente(RutaUrl(archivo): RutaUrl<String>) -> Response {
             include_bytes!("../static/fonts/IBMPlexMono-500-latin.woff2")
         }
         "Unbounded-latin.woff2" => include_bytes!("../static/fonts/Unbounded-latin.woff2"),
+        // The website's two faces since 17 Oct 2026 (Schibsted Grotesk for titles, Hanken
+        // Grotesk for text), the same WOFF files guardianagroup.com serves.
+        "SchibstedGrotesk-var.woff" => {
+            include_bytes!("../static/fonts/SchibstedGrotesk-var.woff")
+        }
+        "HankenGrotesk-var.woff" => include_bytes!("../static/fonts/HankenGrotesk-var.woff"),
         _ => return StatusCode::NOT_FOUND.into_response(),
+    };
+    let tipo = if archivo.ends_with(".woff2") {
+        "font/woff2"
+    } else {
+        "font/woff"
     };
     (
         [
-            (header::CONTENT_TYPE, "font/woff2"),
+            (header::CONTENT_TYPE, tipo),
             (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
         ],
         cuerpo,
@@ -999,6 +1010,29 @@ mod estaticos {
         );
         assert_eq!(guardado(Some("v=otra")), None);
         assert_eq!(guardado(None), None);
+    }
+
+    /// 1.0.44, the licence in one click: ZERO opens `/licencia?t=…#clave=…`. The script reads the
+    /// key from the fragment before the token handling rewrites the address (which drops the
+    /// fragment), only in the licence keys' alphabet, takes it out of the address bar, and on
+    /// the licence page fills the field and focuses «Activar» without sending anything.
+    #[test]
+    fn a_key_from_a_link_is_read_from_the_fragment_and_only_filled_in() {
+        let lee = APP_JS.find("#clave=([A-Za-z0-9_-]{8,100})$").unwrap();
+        let token = APP_JS.find("params.has('t')").unwrap();
+        assert!(lee < token, "the fragment must be read first");
+        let quita = APP_JS[lee..token].find("history.replaceState").unwrap();
+        assert!(quita > 0);
+        let pagina = include_str!("../static/licencia.html");
+        assert!(pagina.contains("id=\"l-clave-boton\""));
+        let rellena = APP_JS.find("if (CLAVE_ENLACE) {").unwrap();
+        let fin = APP_JS[rellena..]
+            .find("$('l-clave').addEventListener('submit'")
+            .unwrap();
+        let bloque = &APP_JS[rellena..rellena + fin];
+        assert!(bloque.contains("$('l-clave-boton').focus()"));
+        assert!(!bloque.contains("api("), "the link alone never activates");
+        assert!(!bloque.contains("submit"), "the link alone never activates");
     }
 }
 

@@ -160,6 +160,50 @@ fn the_three_product_tabs_open_together_and_the_panel_stays_in_front() {
 }
 
 #[test]
+fn zero_opens_its_own_wait_page_and_then_the_panel_in_the_same_tab() {
+    // 1.0.44, `--panel`: the GUARDIANA tab opens on ZERO's own dark page, then the panel.
+    let (mut s, _, _) = abre();
+    let o = s.abre_guardiana(crate::lanzador::ESPERA);
+    assert!(o.iter().any(|x| matches!(
+        x,
+        Orden::CreaPestana { url: Some(u), .. } if u == crate::lanzador::ESPERA
+    )));
+    assert_eq!(s.pestanas.len(), 3);
+    let id = s.pestanas[0].id;
+    assert_eq!(s.activa, id);
+    let e = del_tipo(&o, Origen::Barra, "estado").unwrap_or_default();
+    assert_eq!(e["pestanas"][0]["titulo"], "Radiografías");
+
+    // The service did not answer: the same tab says so.
+    let o = s.abre_guardiana(crate::lanzador::ESPERA_SIN_SERVICIO);
+    assert!(o.iter().any(|x| matches!(
+        x,
+        Orden::Navega { id: i, url } if *i == id && url == crate::lanzador::ESPERA_SIN_SERVICIO
+    )));
+
+    // A `guardiana://activar` link: the licence page with the key in the fragment.
+    let llave = "d".repeat(64);
+    let url = crate::lanzador::enlace(&llave, Some("ABCD-1234-EFGH-5678"));
+    let o = s.abre_guardiana(&url);
+    assert!(o
+        .iter()
+        .any(|x| matches!(x, Orden::Navega { id: i, url: u } if *i == id && u == &url)));
+    assert_eq!(s.pestanas.len(), 3);
+
+    // Nothing else of that shape is taken.
+    for malo in [
+        format!("http://127.0.0.1:7443/licencia?t={llave}#clave=a b"),
+        format!("http://127.0.0.1:7443/licencia?t={llave}#clave=<x>&y"),
+        format!("http://127.0.0.1:7443/licencia?t={llave}"),
+        format!("http://127.0.0.1:7443/otra?t={llave}#clave=ABCD-1234-EFGH"),
+        format!("{}?fallo=otro", crate::lanzador::ESPERA),
+        "https://zero.guardiana/inicio.html".to_owned(),
+    ] {
+        assert!(s.abre_guardiana(&malo).is_empty(), "{malo}");
+    }
+}
+
+#[test]
 fn the_person_drags_the_product_tabs_and_their_order_is_kept() {
     let (mut s, _, _) = abre();
     let url = format!("http://127.0.0.1:7443/?t={}", "a".repeat(64));
