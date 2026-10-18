@@ -63,7 +63,8 @@
     let nombrePais = (c) => c;
     try { const dn = new Intl.DisplayNames([LOC], { type: 'region' }); nombrePais = (c) => { try { return dn.of(c) || c; } catch (_) { return c; } }; } catch (_) {}
     const bytes = (n) => { const u = ['B', 'kB', 'MB', 'GB', 'TB']; let i = 0; n = Number(n || 0); while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; } return (i ? n.toFixed(n < 10 ? 1 : 0) : Math.round(n)) + ' ' + u[i]; };
-    const num = (n) => Number(n || 0).toLocaleString(LOC);
+    // 1.0.46: always with the thousands separator of the language («1.234», never «1234»).
+    const num = (n) => { try { return Number(n || 0).toLocaleString(LOC, { useGrouping: 'always' }); } catch (_) { return Number(n || 0).toLocaleString(LOC); } };
     const pct = (a, b) => (b ? Math.round(a / b * 100) : 0);
     const hora = (ms) => new Date(ms).toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const hace = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? t('pd_hace_s').replace('{n}', s) : s < 3600 ? t('pd_hace_min').replace('{n}', Math.floor(s / 60)) : t('pd_hace_h').replace('{n}', Math.floor(s / 3600)).replace('{m}', String(Math.floor(s % 3600 / 60)).padStart(2, '0')); };
@@ -150,7 +151,8 @@
       PROD.push(o); return o;
     };
     const claveDe = (d) => [d.programa, d.destino, d.pais, d.red].join('|');
-    const nombreDe = (d) => d.destino || (d.red && d.red[0] !== '@' ? t('pd_sin_nombre_red').replace('{red}', d.red) : t('pd_sin_nombre'));
+    // 1.0.46: «no name · Cloudflare» read like a fault; it is a direct connection, said so.
+    const nombreDe = (d) => d.destino || (d.red && d.red[0] !== '@' ? t('rg_sin_nombre_red').replace('{red}', d.red) : t('rg_sin_nombre'));
 
     // ---------- Nothing to draw: said in words, never filled with anything invented ----------
     // The page only draws measurements (the owner, 13 Oct 2026: no example data anywhere). Each
@@ -195,6 +197,8 @@
       if (!ctx.reproduccion) api('/api/secure-en-directo').then((s) => { st.secure = (s && s.conversaciones) || []; }).catch(() => { st.secure = []; });
       const ahora = performance.now(), intervalo = ultimaCarga ? Math.max(1, (ahora - ultimaCarga) / 1000) : 5;
       ultimaCarga = ahora; st.intervalo = intervalo; st.datos = r;
+      // «Datos de ejemplo» (1.0.46): only a sample answer (tests, screenshots) carries `muestra`.
+      if (window.GuardianaShell) window.GuardianaShell.muestra(!!r.muestra);
       pintaVpn(r.vpn);
       r.programas.forEach((p) => {
         let o = PROD.find((x) => x.id === p.id);
@@ -208,14 +212,14 @@
         const esNuevo = !d;
         if (!d) { d = { k, p: x.programa, ruta: [], tg: 0.3, x: 0, y: 0, vis: true, ema: 0, bloq: x.paradas }; porClave.set(k, d); DEST.push(d); }
         const antes = d.bloq || 0;
-        Object.assign(d, { host: nombreDe(x), destino: x.destino, pais: x.pais, red: x.red, asn: x.asn, proto: x.proto, puerto: x.puerto, vias: x.vias, sub: x.enviados, baj: x.recibidos, paq: x.paquetes, noche: x.noche, primera: x.primera, ultima: x.ultima, doc: x.documentado, uso: x.uso, consultas: x.consultas, bloq: x.paradas, regla: x.regla ?? null, reglas: x.reglas || [], reglaPor: x.regla_por || '', reglaCat: x.regla_categoria || '', cortado: x.regla !== null && x.regla !== undefined, sede: x.sede, empresa: x.empresa || '', lugar: x.lugar || null });
+        Object.assign(d, { host: nombreDe(x), destino: x.destino, pais: x.pais, red: x.red, asn: x.asn, proto: x.proto, puerto: x.puerto, vias: x.vias, sub: x.enviados, baj: x.recibidos, paq: x.paquetes, noche: x.noche, primera: x.primera, ultima: x.ultima, doc: x.documentado, uso: x.uso, consultas: x.consultas, bloq: x.paradas, regla: x.regla ?? null, reglas: x.reglas || [], reglaPor: x.regla_por || '', reglaCat: x.regla_categoria || '', cortado: x.regla !== null && x.regla !== undefined, sede: x.sede, empresa: x.empresa || '', lugar: x.lugar || null, categoria: x.categoria || '' });
         d.ancho = !d.cortado && d.sede && d.bloq > 0;
         if (!st.primeraCarga && esNuevo) {
           d.visto = Date.now();
           evento(prod(d.p).nombre, d.host, t('pd_ev_nuevo').replace('{pais}', d.pais || '—').replace('{red}', d.red || '—'), 'n', d);
           if (prod(d.p).tipo === 'antivirus') avisa(t('pd_aviso_nuevo').replace('{prog}', prod(d.p).nombre).replace('{nombre}', d.host).replace('{pais}', d.pais ? nombrePais(d.pais) : '—'));
         }
-        if (!st.primeraCarga && x.paradas > antes) rec.push({ d, env: 0, recb: 0, paq: 0, parada: x.paradas - antes });
+        if (!st.primeraCarga && x.paradas > antes) { rec.push({ d, env: 0, recb: 0, paq: 0, parada: x.paradas - antes }); d.cortT = r.ahora || Date.now(); }
       });
       for (let i = DEST.length - 1; i >= 0; i--) if (!vistos.has(DEST[i].k)) { porClave.delete(DEST[i].k); DEST.splice(i, 1); }
       r.recientes.forEach((f) => {
@@ -227,6 +231,14 @@
           // Opening the page: the latest minutes go to the log at once, without particles.
           const d0 = porClave.get([f.programa, f.destino, f.pais, f.red].join('|'));
           if (d0 && f.enviados > 0) st.eventos.push({ h: ctx.reloj ? ctx.reloj() : hora(f.minuto), prog: prod(d0.p).nombre, host: d0.host, que: `${bytes(f.enviados)} ↑ · ${bytes(f.recibidos)} ↓`, cls: 'o', av: prod(d0.p).tipo === 'antivirus', d: d0 });
+          // 1.0.46: the strip's pulse starts with the minutes already measured (each minute's bytes
+          // spread over its six 10-second steps), so it is not a flat line for five minutes.
+          if (d0 && f.enviados > 0 && f.minuto > r.ahora - 5 * 60000) {
+            for (let k = 0; k < 6; k++) {
+              const i = N_CUBOS - 1 - Math.floor((r.ahora - f.minuto - k * CUBO_MS) / CUBO_MS);
+              if (i >= 0 && i < N_CUBOS) { st.serie[i] += f.enviados / 6; if (st.serieP[d0.p]) st.serieP[d0.p][i] += f.enviados / 6; }
+            }
+          }
           return;
         } else { de = f.enviados; dr = f.recibidos; dp = f.paquetes; }
         if (de <= 0 && dr <= 0) return;
@@ -633,7 +645,9 @@
     // One line per city. A state is not a line: Dallas and Houston each keep their own,
     // however far the view is. Without a published city, the line is the region, or the country.
     const sitioDe = (d) => {
-      const ciudad = d.lugar && d.lugar.ciudad ? d.lugar.ciudad.trim() : '';
+      // 1.0.46 (R9): a city only when its operator publishes it; the address database (DB-IP,
+      // approximate) names its region and country, never a city it may have wrong.
+      const ciudad = d.lugar && d.lugar.ciudad && d.lugar.fuente !== 'base' ? d.lugar.ciudad.trim() : '';
       const region = d.lugar && d.lugar.region ? d.lugar.region.trim() : '';
       const bruto = ((d.lugar && d.lugar.pais) || d.pais || '').trim();
       const pais = bruto && bruto[0] !== '@' ? bruto : '';
@@ -674,7 +688,8 @@
         const om = Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))) || 1e-6;
         // Higher arcs (18 Oct 2026, the approved mockup): a route reads as a route, not as a line
         // painted on the ground.
-        const alt = 0.02 + 0.13 * om / Math.PI;
+        // 1.0.46 (R1-a): higher still, so each route reads as a curve leaving this computer.
+        const alt = 0.05 + 0.3 * om / Math.PI;
         const dl = Math.hypot(lon1 - yo.lon, lat1 - yo.lat) * RAD, alzaMax = 0.028 + 0.04 * dl / Math.PI;
         const arco = [];
         for (let i = 0; i <= N; i++) {
@@ -683,6 +698,14 @@
           const pl = [(yo.lon + (lon1 - yo.lon) * u) * RAD, (yo.lat + (lat1 - yo.lat) * u) * RAD + alzaMax * Math.sin(Math.PI * u), 0.02];
           const m = T.m;
           arco.push(aPantalla([sx + (pl[0] - sx) * m, sy + (pl[1] - sy) * m, sz + (pl[2] - sz) * m]));
+        }
+        // 1.0.46 (R1-a): seen from above this computer, a route on a great circle through it is a
+        // straight line on the screen; each one bends a little to its left, as in the chosen
+        // design, so routes read as arcs and do not hide each other.
+        if (T.m < 1 && arco.length > 2) {
+          const s0 = arco[0], e0 = arco[arco.length - 1], dx = e0.x - s0.x, dy = e0.y - s0.y, lon = Math.hypot(dx, dy) || 1;
+          const curva = Math.min(0.17 * lon, 64) * (1 - T.m);
+          arco.forEach((q, i) => { const f = curva * Math.sin(Math.PI * i / (arco.length - 1)); q.x += dy / lon * f; q.y -= dx / lon * f; });
         }
         // Every route leaves from this computer itself (18 Oct 2026): the programs that turned around
         // it in their colours are named in the hover, the tray and «Programas».
@@ -798,18 +821,58 @@
     const grupoCortado = (g) => g.ds.length > 0 && g.ds.every(bloqueado);
     // Where the computer is drawn and how sure that is: measured by the device or chosen by the
     // person, or only its country, until the person says (the owner, 18 Oct 2026).
-    const yoAproximado = () => !soloMirar && (st.lugar.fuente === 'zona' || st.lugar.fuente === 'pais');
+    // 1.0.46 (R9): measured by Windows with a margin above 5 km is approximate too.
+    const PRECISION_CIUDAD = 5000;
+    const yoAproximado = () => !soloMirar && (st.lugar.fuente === 'zona' || st.lugar.fuente === 'pais' || (st.lugar.fuente === 'equipo' && !(st.lugar.precision <= PRECISION_CIUDAD)));
     const ciudadCorta = (c) => String(c || '').split(',')[0].trim();
     // When each place last changed between cut and allowed (by its stable key).
     const CORTES = new Map();
     const hex2 = (f) => Math.round(Math.max(0, Math.min(1, f)) * 255).toString(16).padStart(2, '0');
+    // 1.0.46 (R3 of the owner's list): pins that would sit on top of each other on the screen are
+    // drawn as one, with how many places it holds; coming closer splits them, because the
+    // distance is measured on the screen. Routes: only the heaviest MAX_RUTAS (and whatever is
+    // open or pointed at), each as wide as it weighs; a cluster draws one route, to its heaviest
+    // place, and the packets of its other places travel on it.
+    const RADIO_CUMULO = 22, MAX_RUTAS = 16;
+    const pesoCumulo = (k) => k.gs.reduce((a, g) => a + pesoGrupo(g), 0);
+    const centroCumulo = (k) => ({ lon: k.gs.reduce((a, g) => a + g.lon, 0) / k.gs.length, lat: k.gs.reduce((a, g) => a + g.lat, 0) / k.gs.length });
+    const cumulos = () => {
+      const orden = GRUPOS.filter((g) => g.base && g.base.v).sort((a, b) => pesoGrupo(b) - pesoGrupo(a) || a.key.localeCompare(b.key));
+      const ks = [];
+      orden.forEach((g) => {
+        const k = ks.find((c) => Math.hypot(c.x - g.base.x, c.y - g.base.y) < RADIO_CUMULO);
+        if (k) { k.gs.push(g); g.cumulo = k; } else { const c = { x: g.base.x, y: g.base.y, gs: [g], rep: g }; c.key = 'k|' + g.key; ks.push(c); g.cumulo = c; }
+      });
+      GRUPOS.forEach((g) => { if (!(g.base && g.base.v)) g.cumulo = null; });
+      return ks;
+    };
     const dibujaTierra = (dt) => {
       const L = layoutTierra(), tt = tiempo();
+      const ahoraT = performance.now();
+      const CUM = cumulos();
+      st.cumulos = CUM;
+      const abiertoK = st.lugarAbierto ? CUM.find((k) => k.gs.some((g) => g.key === st.lugarAbierto)) : null;
+      const sobreK = st.hover && (st.hover.tipo === 'cumulo' ? st.hover.ref : st.hover.ref && st.hover.ref.cumulo) || null;
+      // Who draws a route: one per cluster (its heaviest place) and each place behind the Earth's
+      // edge on its own; the heaviest first, up to MAX_RUTAS, plus what is open or pointed at.
+      const candidatos = CUM.map((k) => ({ g: k.rep, peso: pesoCumulo(k), k }))
+        .concat(GRUPOS.filter((g) => !g.cumulo).map((g) => ({ g, peso: pesoGrupo(g), k: null })))
+        .sort((a, b) => b.peso - a.peso);
+      const conRuta = new Set(candidatos.slice(0, MAX_RUTAS).map((c) => c.g));
+      [abiertoK, sobreK].forEach((k) => { if (k && k.rep) conRuta.add(k.rep); });
+      const pesoMax = Math.max(1, ...candidatos.map((c) => c.peso));
+      GRUPOS.forEach((g) => {
+        g.sinRuta = !conRuta.has(g);
+        // The packets of a place without its own route travel its cluster's, or not at all.
+        if (g.sinRuta) {
+          const rep = g.cumulo && conRuta.has(g.cumulo.rep) ? g.cumulo.rep : null;
+          g.ds.forEach((d) => { if (rep) { d.ruta = rep.ruta; d.tg = rep.tg; } else d.vis = false; });
+        }
+      });
       // Routes (18 Oct 2026, the approved redesign): white, as wide as the place weighs, with a soft
       // veil; a cut route is a red dashed line and nothing travels on it.
-      const pesoMax = Math.max(1, ...GRUPOS.map(pesoGrupo));
-      const ahoraT = performance.now();
-      GRUPOS.forEach((g) => {
+      candidatos.forEach(({ g, peso, k }) => {
+        if (!conRuta.has(g)) return;
         // How a cut is seen (committee Claude + ChatGPT + Grok, 18 Oct 2026; the owner: «que
         // la persona sepa que ha habido un bloqueo… y dónde ha sido»). When the service confirms
         // it, the white line turns red and dashed in 200 ms and stays bright for 1.5 s, so the
@@ -817,10 +880,10 @@
         // never flood the Earth. It does not blink, the globe does not spin towards it, and the
         // packets on it stop. Pointing at the place brings it back to full red. Undone, the red
         // fades back to white in 250 ms; packets come back only with real traffic. With
-        // «reducir movimiento» every change is instant.
-        const cort = grupoCortado(g), prev = CORTES.get(g.key);
-        if (!prev || prev.cort !== cort) CORTES.set(g.key, { cort, t: prev ? ahoraT : -1e9 });
-        const edad = ahoraT - CORTES.get(g.key).t, sobreG = st.hover && (st.hover.ref === g);
+        // «reducir movimiento» every change is instant. A cluster's route is cut when all of it is.
+        const cort = k ? k.gs.every(grupoCortado) : grupoCortado(g), clave = k ? k.key : g.key, prev = CORTES.get(clave);
+        if (!prev || prev.cort !== cort) CORTES.set(clave, { cort, t: prev ? ahoraT : -1e9 });
+        const edad = ahoraT - CORTES.get(clave).t, sobreG = !!(st.hover && (st.hover.ref === g || (k && sobreK === k)));
         if (cort) {
           let a;
           if (reducido || edad > 2200) a = 0.42;
@@ -832,25 +895,39 @@
           return;
         }
         if (!reducido && edad < 250) trazo(g.ruta, 0, 1, ROJO + hex2(0.42 * (1 - edad / 250)), 1.6, [5, 5]);
-        const sw = 0.9 + 1.5 * Math.sqrt(pesoGrupo(g) / pesoMax), sobre = st.hover && (st.hover.ref === g);
-        trazo(g.ruta, 0, 1, BLANCO + (sobre ? '2e' : '1a'), sw * 4);
-        trazo(g.ruta, 0, 1, BLANCO + (sobre ? 'f0' : 'c4'), sobre ? sw + 0.4 : sw);
+        const sw = 0.9 + 1.5 * Math.sqrt(peso / pesoMax);
+        trazo(g.ruta, 0, 1, BLANCO + (sobreG ? '2e' : '1a'), sw * 4);
+        trazo(g.ruta, 0, 1, BLANCO + (sobreG ? 'f0' : 'c4'), sobreG ? sw + 0.4 : sw);
       });
       pelotitas(tt);
       // The pins (15 Oct 2026, the owner: «la gente tiene que saber que tiene que tocar ahí»): a
       // dark disc that cuts the pin out of the city lights, a white ring that says «a control» and
       // a steel dot inside. Pointed at, it grows a little and gets a second ring. A cut place: a
-      // red ring with a cross. Up close, the place is named next to it.
+      // red ring with a cross. Up close, the place is named next to it. A cluster: the same ring,
+      // a little larger, with how many places it holds in the middle.
       cx.globalCompositeOperation = 'source-over';
       const puestos = [], ppg = pxPorGrado(), conNombre = ppg >= 7;
       try { nombresGeo(ppg); } catch (_) {}
-      const nombrados = conNombre ? new Set(GRUPOS.filter((g) => g.base.v).sort((a, b) => pesoGrupo(b) - pesoGrupo(a)).slice(0, ppg >= 20 ? 30 : 16)) : null;
-      GRUPOS.forEach((g) => {
-        if (!g.base.v) return;
-        const d = g.top, cort = grupoCortado(g);
-        const sobre = st.hover && (st.hover.ref === g || st.hover.ref === d);
-        const elegido = st.lugarAbierto === g.key;
-        const x = g.base.x, y = g.base.y, r = sobre || elegido ? 9 : 6.5;
+      const nombrados = conNombre ? new Set(CUM.filter((k) => k.gs.length === 1).sort((a, b) => pesoCumulo(b) - pesoCumulo(a)).slice(0, ppg >= 20 ? 30 : 16).map((k) => k.rep)) : null;
+      CUM.forEach((k) => {
+        const g = k.rep, d = g.top, cort = k.gs.every(grupoCortado);
+        const sobre = sobreK === k;
+        const elegido = abiertoK === k;
+        const x = k.x, y = k.y;
+        if (k.gs.length > 1) {
+          const r = sobre || elegido ? 12 : 10.5;
+          if (sobre || elegido) { cx.strokeStyle = 'rgba(255,255,255,.25)'; cx.lineWidth = 1; cx.beginPath(); cx.arc(x, y, r + 6, 0, 7); cx.stroke(); }
+          cx.fillStyle = 'rgba(2,6,14,.9)'; cx.beginPath(); cx.arc(x, y, r + 2.4, 0, 7); cx.fill();
+          cx.strokeStyle = cort ? ROJO : sobre || elegido ? '#ffffff' : 'rgba(255,255,255,.92)'; cx.lineWidth = sobre || elegido ? 2 : 1.5;
+          cx.beginPath(); cx.arc(x, y, r, 0, 7); cx.stroke();
+          const n = k.gs.length > 99 ? '99+' : String(k.gs.length);
+          cx.font = '700 10.5px "Hanken Grotesk", "Segoe UI", system-ui, sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+          cx.fillStyle = cort ? '#ffd9d3' : '#ffffff'; cx.fillText(n, x, y + 0.5);
+          cx.textAlign = 'left'; cx.textBaseline = 'alphabetic';
+          st.dianas.push({ x, y, r: 20, tipo: 'cumulo', ref: k });
+          return;
+        }
+        const r = sobre || elegido ? 9 : 6.5;
         if (cort) {
           cx.strokeStyle = ROJO + '48'; cx.lineWidth = 1; cx.beginPath(); cx.arc(x, y, 16, 0, 7); cx.stroke();
           cx.fillStyle = 'rgba(2,6,14,.85)'; cx.beginPath(); cx.arc(x, y, 9.4, 0, 7); cx.fill();
@@ -868,8 +945,8 @@
       });
       dibujaSecure(tt, puestos);
       // This computer: steel rings and its name («Tu PC · Cartagena»). Until the person confirms
-      // where it is, it stands at its country with a dashed ring and says so: «Ubicación
-      // aproximada · toca para precisar» (the owner, 18 Oct 2026).
+      // where it is, it stands at its country with a dashed ring and says so: «Colombia ·
+      // ubicación aproximada · elige tu ciudad» (the owner, 18 Oct 2026; R9 of 1.0.46).
       if (L.cen.v) {
         const x = L.cen.x, y = L.cen.y, aprox = yoAproximado();
         if (aprox) {
@@ -880,10 +957,18 @@
         }
         cx.strokeStyle = ACERO + 'b3'; cx.lineWidth = 1.2; cx.beginPath(); cx.arc(x, y, 9, 0, 7); cx.stroke();
         cx.fillStyle = ACERO; cx.beginPath(); cx.arc(x, y, 4, 0, 7); cx.fill();
-        const nombre = aprox ? t('pd_yo_aprox') : t('pd_tu_pc') + (st.lugar.ciudad ? ' · ' + ciudadCorta(st.lugar.ciudad) : st.yo ? ' · ' + nombrePais(st.yo) : '');
-        cx.font = '600 12.5px "Hanken Grotesk", "Segoe UI", system-ui, sans-serif'; cx.textBaseline = 'middle';
-        cx.lineWidth = 3.2; cx.strokeStyle = 'rgba(2,6,14,.85)'; cx.strokeText(nombre, x + (aprox ? 30 : 20), y + 0.5);
-        cx.fillStyle = aprox ? '#C9DFF2' : '#E8ECF1'; cx.fillText(nombre, x + (aprox ? 30 : 20), y + 0.5); cx.textBaseline = 'alphabetic';
+        const nombre = aprox ? t('rg_yo_aprox').replace('{pais}', nombrePais(st.yo)) : t('pd_tu_pc') + (st.lugar.ciudad ? ' · ' + ciudadCorta(st.lugar.ciudad) : st.yo ? ' · ' + nombrePais(st.yo) : '');
+        cx.font = '500 13px "Hanken Grotesk", "Segoe UI", system-ui, sans-serif'; cx.textBaseline = 'middle';
+        cx.lineWidth = 3.2; cx.strokeStyle = 'rgba(2,6,14,.85)'; cx.fillStyle = aprox ? '#C9DFF2' : '#E8ECF1';
+        // 1.0.46: on a narrow screen the name never runs off it: «Colombia» on one line and
+        // «ubicación aproximada · elige tu ciudad» under it.
+        const x0 = x + (aprox ? 30 : 18);
+        if (x0 + cx.measureText(nombre).width > st.W - 8 && nombre.includes(' · ')) {
+          const i = nombre.indexOf(' · '), lineas = [nombre.slice(0, i), nombre.slice(i + 3)];
+          const ancho = Math.max(...lineas.map((l) => cx.measureText(l).width)), xl = Math.max(8, Math.min(x0, st.W - 8 - ancho));
+          lineas.forEach((l, k) => { const yl = y + (xl < x0 ? 30 : 0) + (k - 0.5) * 17; cx.strokeText(l, xl, yl); cx.fillText(l, xl, yl); });
+        } else { cx.strokeText(nombre, x0, y + 0.5); cx.fillText(nombre, x0, y + 0.5); }
+        cx.textBaseline = 'alphabetic';
         st.dianas.push({ x, y, r: aprox ? 24 : 16, tipo: 'yo' });
       }
       cx.globalCompositeOperation = 'lighter';
@@ -941,7 +1026,7 @@
     const rotulo = (x, y, txt, col, puestos) => {
       // A city name you can read at a glance: sans, semibold, on a near-opaque pill.
       cx.font = '600 12px "Hanken Grotesk", "Segoe UI", system-ui, sans-serif';
-      const w = cx.measureText(txt).width + 16, h = 21;
+      const w = cx.measureText(txt).width + 16, h = 22;
       // A name stays next to its own dot (the owner, 18 Oct 2026: looking at South America he saw
       // «Virginia del Norte» and «Toronto» there). Before, a name that collided was pushed down
       // up to 12 rows and squeezed inside the screen, so it slid far from its place. Now it may
@@ -956,8 +1041,8 @@
       if (puestos) puestos.push({ x: bx, y: by, w, h });
       cx.fillStyle = 'rgba(3,8,18,.88)'; cx.beginPath(); if (cx.roundRect) cx.roundRect(bx, by, w, h, 5); else cx.rect(bx, by, w, h); cx.fill();
       cx.strokeStyle = 'rgba(255,255,255,.14)'; cx.lineWidth = 1; cx.stroke();
-      cx.fillStyle = col; cx.fillRect(bx + 4, by + 5, 2, h - 10);
-      cx.fillStyle = col; cx.textBaseline = 'middle'; cx.fillText(txt, bx + 10, by + h / 2 + 0.5); cx.textBaseline = 'alphabetic';
+      // 1.0.46: no coloured bar before the name (it read as a stray «|»).
+      cx.fillStyle = col; cx.textBaseline = 'middle'; cx.fillText(txt, bx + 8, by + h / 2 + 0.5); cx.textBaseline = 'alphabetic';
     };
     // Up close, name the measured place. Keep the host as a fallback: the map never invents a
     // city or state when the operator did not publish one.
@@ -1136,7 +1221,7 @@
         if (!g.ruta || g.ruta.length < 2) return;
         // A cut place has no ball going to it (the owner, 16 Oct 2026: «cuando corto un nombre la
         // línea deja de aparecer pero sigue la pelotita yendo y viniendo»).
-        if (bloqueado(g.top)) return;
+        if (bloqueado(g.top) || g.sinRuta) return;
         const col = BLANCO;
         const fase = ((g.lon * 13 + g.lat * 7) % 1 + 1) % 1;
         const u = Math.abs((tt / 2.6 + fase) % 2 - 1);
@@ -1269,92 +1354,106 @@
     };
     // ---------- The bottom deck ----------
     const prepara = (c) => { const r = c.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2); c.width = Math.max(1, r.width * d); c.height = Math.max(1, r.height * d); const g = c.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0); return { g, w: r.width, h: r.height }; };
-    const sparkline = () => {
-      const { g, w, h } = prepara($('spark'));
-      if (w < 20 || h < 20) return;
-      const ps = prodsVisibles(), suma = new Array(N_CUBOS).fill(0);
-      ps.forEach((p) => (st.serieP[p.id] || []).forEach((v, i) => { suma[i] += v; }));
-      const mx = Math.max(1, ...suma);
-      g.strokeStyle = 'rgba(118,144,168,.18)'; g.lineWidth = 1;
-      for (let k = 1; k < 4; k++) { g.beginPath(); g.moveTo(0, h * k / 4); g.lineTo(w, h * k / 4); g.stroke(); }
-      const n = st.serie.length, X = (i) => i / (n - 1) * w, Y = (v) => h - 3 - v / mx * (h - 9);
-      let base = new Array(n).fill(0);
-      ps.forEach((p) => {
-        const serie = st.serieP[p.id] || [], tope = base.map((b, i) => b + (serie[i] || 0));
-        g.beginPath(); tope.forEach((v, i) => (i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v))));
-        for (let i = n - 1; i >= 0; i--) g.lineTo(X(i), Y(base[i]));
-        g.closePath(); g.fillStyle = p.color + '55'; g.fill();
-        g.beginPath(); tope.forEach((v, i) => (i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v)))); g.strokeStyle = p.color; g.lineWidth = 1.1; g.stroke();
-        base = tope;
-      });
-    };
-    // ---------- The rail and its tray (18 Oct 2026, the approved redesign) ----------
-    // Folded, one line of 48 px at the foot: «● En vivo · 37 conexiones ahora · 2 cortadas ·
-    // Últimos 5 min». Open, a tray of about 280 px with the live log, the last five minutes and
-    // the table of every row with its downloads (what the deck at the foot showed until 1.0.44,
-    // moved, not removed). It always opens folded: on opening, only the Earth.
+    // ---------- The strip and its table (1.0.46, the owner's chosen R1-a and R1-c) ----------
+    // Folded: «ÚLTIMOS 5 MIN · 21 Conexiones · 14 Empresas · 6 Cortadas», the pulse of those five
+    // minutes with a red mark where something was blocked, and «Protección máxima». Each figure
+    // counts exactly what its word says (R7): the connections this computer made in the last five
+    // minutes, the companies behind them, and how many of those connections are blocked; the
+    // table under it lists the same connections, and its categories add up to the same total.
+    // A click on the strip raises the table; the chevron, Esc or a click outside lowers it.
+    // «Todos los datos» (the technical table with its downloads, 15 Oct 2026) stays one click away.
     const bandeja = { abierta: false, tab: 'vivo' };
+    const VENTANA_MS = 5 * 60000;
+    // «Now» on the service's clock: the last answer's time plus what has passed since, so a
+    // computer whose clock is off does not empty the window.
+    const ahoraServicio = () => (st.datos && st.datos.ahora && ultimaCarga ? st.datos.ahora + (performance.now() - ultimaCarga) : Date.now());
+    const cuandoDe = (d) => Math.max(d.ultima || 0, d.cortT || 0);
+    const enVentana = (d, ahora) => cuandoDe(d) > 0 && ahora - cuandoDe(d) < VENTANA_MS;
+    // The connections of the last five minutes, under «Todo · Datos · Antivirus».
+    const conexiones5 = () => {
+      const ids = new Set(PROD.filter(enFiltro).map((p) => p.id)), ahora = ahoraServicio();
+      return DEST.filter((d) => ids.has(d.p) && enVentana(d, ahora));
+    };
+    const CATS = ['publicidad', 'rastreador', 'telemetria', 'esperado', 'desconocido'];
+    const catDe = (d) => (CATS.includes(d.categoria) ? d.categoria : 'desconocido');
+    // The glossary's words (Publicidad · Rastreo · Telemetría · Normal · Sin clasificar).
+    const nombreCat = (k) => t('rg_cat_' + k);
+    let catSel = 'todas';
     const ponBandeja = (abrir, tab) => {
       if (tab) bandeja.tab = tab;
       bandeja.abierta = abrir;
-      $('bandeja').hidden = !abrir; $('riel').hidden = abrir;
+      $('bandeja').hidden = !abrir;
       $('hud').classList.toggle('abierta', abrir);
       $('hud-asa').setAttribute('aria-expanded', String(abrir));
-      document.querySelectorAll('.ban-tabs [data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === bandeja.tab)));
+      $('ban-cerrar').hidden = !abrir;
+      $('tira-enlaces').hidden = !abrir;
       document.querySelectorAll('.ban-panel').forEach((p) => { p.hidden = p.dataset.panel !== bandeja.tab; });
       pintaHud();
-      requestAnimationFrame(() => { try { sparkline(); } catch (_) {} ajusta(); });
+      requestAnimationFrame(() => { ajusta(); pintaPulso(); });
     };
     const hudAmplio = () => bandeja.abierta;
-    document.querySelectorAll('#riel [data-tab]').forEach((b) => b.addEventListener('click', () => ponBandeja(true, b.dataset.tab)));
-    document.querySelectorAll('.ban-tabs [data-tab]').forEach((b) => b.addEventListener('click', () => ponBandeja(true, b.dataset.tab)));
+    $('hud-asa').addEventListener('click', () => ponBandeja(!bandeja.abierta, 'vivo'));
+    $('tira-pulso').addEventListener('click', () => ponBandeja(true, 'vivo'));
     $('ban-cerrar').addEventListener('click', () => { ponBandeja(false); $('hud-asa').focus(); });
+    $('ban-todos').addEventListener('click', () => ponBandeja(true, 'tabla'));
+    $('ht-volver').addEventListener('click', () => ponBandeja(true, 'vivo'));
+    $('ban-cats').addEventListener('click', (e) => { const b = e.target.closest('[data-cat]'); if (!b) return; catSel = b.dataset.cat; pintaHud(); });
     // The company of a destination as the page names it: the one the open lists know, or else the
     // site's own domain. Never the network that carries it (a server on Amazon's network does not
     // mean Amazon uses what is sent, 13 Oct 2026).
     const dominioDe = (h) => { const p = String(h || '').toLowerCase().split('.').filter(Boolean); if (p.length < 2) return h || ''; const n = p.length >= 3 && p[p.length - 1].length === 2 && /^(com|co|net|org|gov|edu|ac|or|ne|gob)$/.test(p[p.length - 2]) ? 3 : 2; return p.slice(-n).join('.'); };
     const empresaDe = (d) => d.empresa || (d.destino ? dominioDe(d.destino) : '') || (d.red && d.red[0] !== '@' ? d.red : '') || d.host;
-    // A state is a word with its dot, never colour alone: cut (red), new (amber: worth a look) or
-    // seen (steel).
-    const estadoFila = (cls, d) => (cls === 'c' || (d && bloqueado(d)) ? `<span class="punto-estado alerta">${esc(t('pd_estado_cortado'))}</span>`
-      : cls === 'n' ? `<span class="punto-estado aviso">${esc(t('pd_estado_nuevo'))}</span>` : `<span class="punto-estado info">${esc(t('pd_estado_observado'))}</span>`);
+    // A state is a word with its dot, never colour alone: blocked (red) or allowed (grey).
+    const estadoFila = (d) => (bloqueado(d) ? `<span class="punto-estado alerta">${esc(t('rg_estado_cortada'))}</span>` : `<span class="punto-estado neutro">${esc(t('rg_estado_permitida'))}</span>`);
+    const horaFila = (ms) => (ctx.reloj ? ctx.reloj() : ms ? hora(ms) : '—');
     const pintaBandeja = () => {
-      // The deck follows «Todo · Datos · Antivirus», like the drawing.
-      const mios = PROD.filter(enFiltro), ids = new Set(mios.map((p) => p.id)), DF = DEST.filter((d) => ids.has(d.p));
-      const amplio = hudAmplio();
-      // The rail: connections now (a route that carried something in the last 15 s) and cuts.
-      const ahoraMs = performance.now();
-      const conexiones = DF.filter((d) => d.ult && ahoraMs - d.ult < 15000 && !bloqueado(d)).length;
-      const cortadas = DF.filter((d) => d.cortado).length + mios.filter((p) => p.cortado).length;
-      $('riel-ahora').textContent = num(conexiones); $('riel-ahora-t').textContent = t(conexiones === 1 ? 'pd_riel_conexiones_uno' : 'pd_riel_conexiones');
-      $('riel-cortadas').textContent = num(cortadas); $('riel-cortadas-t').textContent = t(cortadas === 1 ? 'pd_riel_cortadas_uno' : 'pd_riel_cortadas');
+      const filas5 = conexiones5();
+      const empresas = new Set(filas5.map(empresaDe)).size;
+      const cortadas = filas5.filter(bloqueado).length;
+      const cifra = (id, n, k) => { $(id).textContent = num(n); $(id + '-t').textContent = t(n === 1 ? k + '_uno' : k); };
+      cifra('riel-ahora', filas5.length, 'rg_tira_conexiones');
+      cifra('riel-empresas', empresas, 'rg_tira_empresas');
+      cifra('riel-cortadas', cortadas, 'rg_tira_cortadas');
       $('hud').classList.toggle('con-cortes', cortadas > 0);
-      $('ban-cifras').innerHTML = `<b>${esc(num(conexiones))}</b> ${esc(t(conexiones === 1 ? 'pd_riel_conexiones_uno' : 'pd_riel_conexiones'))} · <b>${esc(num(cortadas))}</b> ${esc(t(cortadas === 1 ? 'pd_riel_cortadas_uno' : 'pd_riel_cortadas'))}`;
-      if (!amplio) return;
+      if (!hudAmplio()) return;
       if (bandeja.tab === 'vivo') {
-        $('registro').innerHTML = st.eventos.filter((e) => st.filtro === 'todo' || (st.filtro === 'av') === !!e.av).slice(0, 40).map((e) => {
-          const d = e.d && porClave.get(e.d.k) ? porClave.get(e.d.k) : e.d;
-          const pais = d && d.pais && d.pais[0] !== '@' ? nombrePais(d.pais) : '—';
-          return `<tr${d ? ` class="enlace-fila" data-dest="${esc(d.k)}" tabindex="0" role="button"` : ''} title="${esc(e.que)}"><td class="t">${esc(e.h)}</td><td>${esc(e.prog)}</td><td class="mono">${esc(e.host)}</td><td class="t">${esc(d ? empresaDe(d) : '—')}</td><td class="t">${esc(pais)}</td><td class="t">${esc(e.que)}</td><td>${estadoFila(e.cls, d)}</td></tr>`;
-        }).join('') || `<tr><td colspan="7" class="t">${esc(t('pd_registro_vacio'))}</td></tr>`;
+        // The categories, with counts that add up to «Todas», which is the strip's «Conexiones».
+        const cuenta = {}; CATS.forEach((k) => { cuenta[k] = 0; }); filas5.forEach((d) => { cuenta[catDe(d)]++; });
+        if (catSel !== 'todas' && !cuenta[catSel]) catSel = 'todas';
+        const boton = (k, nombre, n) => `<button type="button" data-cat="${k}" aria-pressed="${catSel === k}"${n || k === 'todas' ? '' : ' class="cero"'}><span>${esc(nombre)}</span><span class="n">${esc(num(n))}</span></button>`;
+        const cats = boton('todas', t('rg_cat_todas'), filas5.length) + CATS.map((k) => boton(k, nombreCat(k), cuenta[k])).join('');
+        if ($('ban-cats').innerHTML !== cats) $('ban-cats').innerHTML = cats;
+        const vis = (catSel === 'todas' ? filas5 : filas5.filter((d) => catDe(d) === catSel)).sort((a, b) => cuandoDe(b) - cuandoDe(a)).slice(0, 300);
+        $('registro').innerHTML = vis.map((d) => {
+          const pais = d.pais && d.pais[0] !== '@' ? nombrePais(d.pais) : '—';
+          return `<tr class="enlace-fila" data-fila="${esc(d.k)}" tabindex="0" role="button"><td class="t">${esc(horaFila(cuandoDe(d)))}</td><td>${esc(prod(d.p).nombre)}</td><td class="mono" title="${esc(d.host)}">${esc(d.host)}</td><td>${esc(empresaDe(d))}</td><td class="t">${esc(pais)}</td><td>${estadoFila(d)}</td></tr>`;
+        }).join('') || `<tr class="vacia"><td colspan="6" class="t">${esc(t(catSel === 'todas' ? 'rg_tabla_vacia' : 'rg_tabla_vacia_cat'))}</td></tr>`;
       }
-      if (bandeja.tab === 'min5') {
-        $('hud-min').textContent = bytes(mios.reduce((a, p) => a + (st.serieP[p.id] || []).reduce((x, y) => x + y, 0), 0));
-        const pp = {}; DF.forEach((d) => { if (d.pais && d.pais[0] !== '@' && !d.sede) pp[d.pais] = (pp[d.pais] || 0) + d.sub; });
-        const todos = Object.entries(pp).filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]), top = todos, mx = Math.max(1, ...top.map((x) => x[1])), totalP = Math.max(1, todos.reduce((a, x) => a + x[1], 0));
-        $('barras').innerHTML = top.map(([c, v]) => `<div class="enlace-fila" data-pais="${esc(c)}" tabindex="0" role="button"><span>${esc(nombrePais(c))}</span><s data-w="${Math.max(2, v / mx * 100)}"></s><span>${esc(bytes(v))}</span><span class="t">${Math.round(v / totalP * 100)} %</span></div>`).join('') || `<div class="t">—</div>`;
-        estilos($('barras'));
-        $('hud-cortes').textContent = num(cortadas);
-        $('hud-bloqueos').textContent = tn('pd_intentos', DF.reduce((a, d) => a + d.bloq, 0));
-        sparkline();
-        // «Lo que más envía ahora» (13 Oct 2026): the destinations with most sent in the last
-        // minutes, each one a click away from its card.
-        const vivos = DF.filter((d) => d.ema > 0 && !bloqueado(d)).sort((a, b) => b.ema - a.ema).slice(0, 30);
-        $('hud-top').innerHTML = vivos.map((d) => `<li class="enlace-fila" data-dest="${esc(d.k)}" tabindex="0" role="button"><span>${esc(d.host)}</span><span class="o">${esc(bytes(d.ema))}/s</span></li>`).join('') || `<li class="t">${esc(t('pd_top_nada'))}</li>`;
-      }
-      pintaTabla(DF, amplio && bandeja.tab === 'tabla');
+      const mios = PROD.filter(enFiltro), ids = new Set(mios.map((p) => p.id));
+      pintaTabla(DEST.filter((d) => ids.has(d.p)), bandeja.tab === 'tabla');
     };
-    const pintaHud = () => { pintaBandeja(); pintaCorte(); pintaDetalle(); pintaExplorador(); };
+    // The pulse of the last five minutes: what this computer sent, 10 s by 10 s, and a red mark
+    // where something was blocked. Only measurements; an empty stretch is a flat line.
+    const pintaPulso = () => {
+      const c = $('pulso');
+      if (!c || !c.offsetWidth) return;
+      const { g, w, h } = prepara(c);
+      if (w < 40 || h < 12) return;
+      const serie = st.serie, n = serie.length, mx = Math.max(1, ...serie), base = h - 3;
+      const X = (i) => i / (n - 1) * w, Y = (v) => base - Math.sqrt(v / mx) * (h - 12);
+      g.lineJoin = 'round'; g.lineCap = 'round';
+      g.strokeStyle = 'rgba(201,211,222,.78)'; g.lineWidth = 1.1;
+      g.beginPath(); serie.forEach((v, i) => (i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v)))); g.stroke();
+      const ahora = ahoraServicio();
+      const marcas = [...new Set(DEST.filter((d) => bloqueado(d) && (d.cortT || (d.bloq > 0 && d.ultima)) && enVentana(d, ahora)).map((d) => Math.round(cuandoDe(d) / 2000)))];
+      g.strokeStyle = ROJO; g.fillStyle = ROJO; g.lineWidth = 1.6;
+      marcas.forEach((m) => {
+        const x = Math.max(2, Math.min(w - 2, w - (ahora - m * 2000) / VENTANA_MS * w));
+        g.beginPath(); g.moveTo(x - 3, base - 2); g.lineTo(x, base - 13); g.lineTo(x + 3, base - 2); g.stroke();
+        g.beginPath(); g.arc(x, base - 13, 1.6, 0, 7); g.fill();
+      });
+    };
+    const pintaHud = () => { pintaBandeja(); pintaPulso(); pintaCorte(); pintaDetalle(); pintaExplorador(); };
     // The technical table and its downloads: exactly the rows on screen, nothing more. The file is
     // made here and never leaves the computer unless the person sends it.
     let ordenTabla = { k: 'sub', desc: true }, buscaTabla = '';
@@ -1723,7 +1822,7 @@
     };
     const tipYo = () => {
       const aprox = yoAproximado();
-      const nombre = aprox ? t('pd_yo_aprox') : t('pd_tu_pc') + (st.lugar.ciudad ? ' · ' + ciudadCorta(st.lugar.ciudad) : '');
+      const nombre = aprox ? t('rg_yo_aprox').replace('{pais}', nombrePais(st.yo)) : t('pd_tu_pc') + (st.lugar.ciudad ? ' · ' + ciudadCorta(st.lugar.ciudad) : '');
       return `<div class="tip-t">${esc(nombre)}</div><div class="tip-s">${esc(nombrePais(st.yo))} · ${esc(t(esDeDia(st.lugar.lon, st.lugar.lat) ? 'pd_de_dia' : 'pd_de_noche'))}</div><div class="tip-pie">${esc(precisionYo())}${aprox ? '' : '<br>' + esc(tn('pd_vigila_n', PROD.length))}</div>`;
     };
     const textoTip = (hh) => {
@@ -1756,6 +1855,7 @@
           <div>${esc(t('pd_enviado'))} <b>${esc(bytes(ds.reduce((a, d) => a + d.sub, 0)))}</b> · ${esc(t('pd_recibido'))} ${esc(bytes(ds.reduce((a, d) => a + d.baj, 0)))}</div>`;
       }
       if (hh.tipo === 'yo') return tipYo();
+      if (hh.tipo === 'cumulo') return `<div class="tip-t">${esc(t('rg_grupo_tip').replace('{n}', num(hh.ref.gs.length)))}</div><div class="tip-s">${esc(hh.ref.gs.slice(0, 4).map(nombreLugar).join(' · '))}${hh.ref.gs.length > 4 ? ' …' : ''}</div>`;
       if (hh.tipo === 'pais') {
         const c = hh.ref, ds = DEST.filter((d) => d.pais === c), ce = centros[c], dia = ce ? esDeDia(ce.lon, ce.lat) : null;
         const cab = `<b>${esc(nombrePais(c))}</b>${dia === null ? '' : ` <span class="t">· ${esc(t(dia ? 'pd_de_dia' : 'pd_de_noche'))}</span>`}`;
@@ -1771,7 +1871,7 @@
       const { x, y } = st.raton, hh = queHay(x, y);
       cv.style.cursor = hh ? 'pointer' : 'default';
       if (!hh) { tip.hidden = true; st.hover = null; return; }
-      const html = textoTip(hh) + (hh.tipo === 'lugar' || hh.tipo === 'yo' ? '' : `<div class="tip-pie">${esc(t('pd_clic_info'))}</div>`);
+      const html = textoTip(hh) + (hh.tipo === 'lugar' || hh.tipo === 'yo' || hh.tipo === 'cumulo' ? '' : `<div class="tip-pie">${esc(t('pd_clic_info'))}</div>`);
       if (tip.dataset.html !== html) { tip.innerHTML = html; tip.dataset.html = html; estilos(tip); }
       tip.classList.toggle('lugar', hh.tipo === 'lugar');
       tip.hidden = false;
@@ -1809,51 +1909,87 @@
         return `<div class="insp-fila${est === 'cortado' || est === 'ajeno' ? ' cortada' : ''}"><button type="button" class="insp-abre" data-empresa="${esc(e.nombre)}"><span class="n">${esc(e.nombre)}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg></span><span class="sub">${sub}</span></button><span class="q">${esc(cuanto(e.consultas, e.sub))}</span><span class="a">${botonCorte(e.nombre, e.ds)}</span>${rompe.has(e.nombre) ? `<span class="rompe explica">${esc(rompe.get(e.nombre))}</span>` : ''}</div>`;
       }).join('');
       return `<div class="insp-cabeza"><h2 id="insp-titulo">${esc(nombreLugar(g))}</h2>${linea ? `<p class="insp-sub">${esc(linea)}</p>` : ''}<p class="insp-fuente">${f.aprox ? `<span class="aprox">${esc(t('pd_aprox'))}</span> · ` : ''}${esc(f.txt)}</p></div>
-        ${cifras([[cuanto(c, g.ds.reduce((a, d) => a + d.sub, 0)), c ? t('pd_consultas_palabra') : t('pd_enviado_palabra')], [num(emps.length), t('pd_empresas_palabra')], [num(cortadas), t('pd_cortadas_palabra')]])}
+        ${cifras([[cuanto(c, g.ds.reduce((a, d) => a + d.sub, 0)), c ? t(c === 1 ? 'rg_lugar_consultas_uno' : 'rg_lugar_consultas') : t('pd_enviado_palabra')], [num(emps.length), t(emps.length === 1 ? 'rg_lugar_empresas_uno' : 'rg_lugar_empresas')], [num(cortadas), t(cortadas === 1 ? 'rg_lugar_cortadas_uno' : 'rg_lugar_cortadas')]])}
         <div class="insp-lista"><div class="insp-h"><span>${esc(t(c ? 'pd_empresas_por_consultas' : 'pd_empresas_por_envio'))}</span><span>${esc(t('pd_ventana_corta').replace('{h}', st.datos ? st.datos.ventana_h : 24))}</span></div>${filas}</div>
         <div class="insp-acciones">${cerca(g.lon, g.lat)}</div>`;
+    };
+    // The company file (1.0.46, the owner's chosen R1-b): «‹ place» to go back, the name, where
+    // its seat and its server are, «Qué hace», the state box with the standard switch (green
+    // «Permitido»; red «Cortado 14:32» and the sentence of what that means; flipping it back is
+    // the undo), «Quién la llama» with how often, and «Qué se rompe si la cortas» from what this
+    // computer measured (/api/que-se-rompe). Nothing in it is guessed.
+    const ICONO_PIN = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14s4.5-4.2 4.5-7.6A4.5 4.5 0 0 0 3.5 6.4C3.5 9.8 8 14 8 14Z"/><circle cx="8" cy="6.4" r="1.6"/></svg>';
+    const ICONO_SERVIDOR = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3" width="11" height="4" rx="1"/><rect x="2.5" y="9" width="11" height="4" rx="1"/><path d="M5 5h.01M5 11h.01"/></svg>';
+    const ICONO_OJO = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2"/></svg>';
+    const ICONO_OK = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7"/></svg>';
+    // Where its servers are: a city only when the operator publishes it, else the country.
+    const servidorDe = (ds) => {
+      const conLugar = ds.filter((d) => d.lugar && d.lugar.fuente !== 'base' && d.lugar.ciudad).sort((a, b) => b.sub - a.sub)[0];
+      if (conLugar) return ciudadCorta(conLugar.lugar.ciudad.replace(/\s*\(.*\)\s*$/, '')) || nombrePais(conLugar.lugar.pais);
+      const p = ds.filter((d) => !d.sede && d.pais && d.pais[0] !== '@').sort((a, b) => b.sub - a.sub)[0];
+      return p ? nombrePais(p.pais) : '';
+    };
+    const rompeHtml = (nombre) => {
+      if (soloMirar) return '';
+      const r = rompeR.get(nombre);
+      let filas;
+      if (r === undefined) filas = `<li class="t">${esc(t('rg_rompe_mirando'))}</li>`;
+      else if (r === null) filas = `<li class="t">${esc(t('rg_rompe_sin_dato'))}</li>`;
+      else {
+        const p = r.programas || [];
+        filas = p.length
+          ? p.slice(0, 6).map((x) => `<li>${ICONO_OJO}<span>${esc(t('rg_rompe_fila').replace('{programa}', x.programa))}<small>${esc(tn('qsr_veces', x.consultas))}</small></span></li>`).join('')
+          : `<li>${ICONO_OK}<span>${esc(t('rg_rompe_nada'))}</span></li>`;
+        if (r.sin_programa) filas += `<li class="t">${esc(tn('qsr_sin_programa', r.sin_programa))}</li>`;
+      }
+      // Each block says the window it counts (R7): this one, the days the ledger was asked about.
+      const dias = r && r.desde && r.hasta ? Math.max(1, Math.round((r.hasta - r.desde) / 86400000)) : 0;
+      const ventana = dias ? `<span>${esc(t(dias === 1 ? 'rg_ventana_dias_uno' : 'rg_ventana_dias').replace('{n}', num(dias)))}</span>` : '';
+      return `<div class="insp-bloque"><div class="insp-h"><span>${esc(t('rg_rompe_titulo'))}</span>${ventana}</div><ul class="insp-rompe">${filas}</ul></div>`;
     };
     const vistaEmpresa = (nombre) => {
       const ds = DEST.filter((d) => empresaDe(d) === nombre);
       ficha(nombre);
-      const f = fichas.get(nombre), c = consultasDe(ds), est = estadoCorte(nombre, ds);
+      const f = fichas.get(nombre), est = estadoCorte(nombre, ds);
       const lead = unaLinea(nombre) + (f && f.ficha && f.ficha.como_gana ? ' ' + frase(f.ficha.como_gana) : '');
+      const meta = [];
+      if (f && f.pais) meta.push(`<span>${ICONO_PIN}${esc(t('rg_sede').replace('{lugar}', [f.ciudad, f.pais].filter(Boolean).join(', ')))}</span>`);
+      const serv = servidorDe(ds);
+      if (serv) meta.push(`<span>${ICONO_SERVIDOR}${esc(t('rg_servidor').replace('{lugar}', serv))}</span>`);
       const chips = [];
       if (f && f.corredor) chips.push(t('pd_chip_corredor'));
       if (f && f.grupo) chips.push(t('pd_chip_grupo').replace('{g}', f.grupo));
-      if (f && f.pais) chips.push(t('pd_chip_sede').replace('{p}', f.pais));
-      [...new Set(ds.filter((d) => d.lugar).map((d) => d.lugar.ciudad))].slice(0, 2).forEach((ci) => chips.push(t('pd_chip_servidor').replace('{c}', ci)));
       [...new Set(ds.filter((d) => d.uso).map((d) => t('av_uso_' + d.uso)))].forEach((u) => chips.push(u));
-      // Every name it uses, with how often; and who calls it, with how often.
-      const nombres = new Map(), progs = new Map();
-      ds.forEach((d) => {
-        const k = d.host, n = nombres.get(k) || { host: k, c: 0, sub: 0, d, cort: true }; n.c += d.consultas || 0; n.sub += d.sub; n.cort = n.cort && bloqueado(d); if (d.sub > n.d.sub) n.d = d; nombres.set(k, n);
-        const p = prod(d.p).nombre, q = progs.get(p) || { p, c: 0, sub: 0 }; q.c += d.consultas || 0; q.sub += d.sub; progs.set(p, q);
-      });
-      const ln = [...nombres.values()].sort((a, b) => b.c - a.c || b.sub - a.sub);
+      // Who calls it, with how often.
+      const progs = new Map();
+      ds.forEach((d) => { const p = prod(d.p).nombre, q = progs.get(p) || { p, c: 0, sub: 0 }; q.c += d.consultas || 0; q.sub += d.sub; progs.set(p, q); });
       const lp = [...progs.values()].sort((a, b) => b.c - a.c || b.sub - a.sub);
-      const hora = horaCorte(ds), cuantos = ds.filter(porNombre).length;
-      let accion = '';
-      // «Qué se rompe si corto»: asked once when the company opens, so the line is under the
-      // switch before the person cuts, not only after (the customer's request, 18 Oct 2026).
-      if (!soloMirar && est === 'normal' && !rompe.has(nombre) && !rompePedido.has(nombre)) {
-        rompePedido.add(nombre);
-        setTimeout(() => queSeRompe(nombre, ds), 0);
-      }
+      const nombres = [...new Set(ds.map((d) => d.destino).filter(Boolean))];
+      const n = nombres.length || ds.length;
+      const hora = horaCorte(ds);
+      if (!soloMirar && !rompeR.has(nombre) && !rompePedido.has(nombre)) { rompePedido.add(nombre); setTimeout(() => queSeRompe(nombre, ds), 0); }
+      let estado = '';
       if (!soloMirar) {
-        if (est === 'cortado' || est === 'deshacer') accion = `<div class="insp-corte hecho"><div class="fila"><b>${esc(t('pd_corte_titulo').replace('{empresa}', nombre))}</b>${botonCorte(nombre, ds, true)}</div>${rompe.has(nombre) ? `<p class="explica">${esc(rompe.get(nombre))}</p>` : ''}<p>${esc((hora ? t('pd_cortado_explica') : t('pd_cortado_explica_sin')).replace('{h}', hora).replace('{n}', cuantos))}</p></div>`;
-        else if (est === 'normal' || est === 'cortar') accion = `<div class="insp-corte"><div class="fila"><b>${esc(t('pd_corte_titulo').replace('{empresa}', nombre))}</b>${botonCorte(nombre, ds, true)}</div>${rompe.has(nombre) ? `<p class="explica">${esc(rompe.get(nombre))}</p>` : ''}<p>${esc(tn('pd_cortar_explica', ds.filter((d) => porNombre(d) && !d.cortado).length))} ${esc(t('pd_cortar_reversible'))}</p></div>`;
-        else if (est === 'ajeno') accion = `<div class="insp-corte hecho"><div class="fila"><span class="corte-hecho"><span class="hora">${esc(t('pd_estado_cortado'))}</span></span></div><p>${esc(t('pd_cortado_por_otra'))}</p></div>`;
+        if (est === 'cortado' || est === 'deshacer') estado = `<div class="insp-estado cortada">${botonCorte(nombre, ds, true)}<p>${esc(hora ? tn('rg_corte_cortada', n).replace('{h}', hora) : tn('rg_corte_cortada_sin_hora', n))}</p></div>`;
+        else if (est === 'normal' || est === 'cortar') estado = `<div class="insp-estado">${botonCorte(nombre, ds, true)}<p>${esc(tn('rg_corte_permitida', n))}</p></div>`;
+        else if (est === 'ajeno') estado = `<div class="insp-estado cortada"><span class="corte-hecho"><span class="hora">${esc(t('pd_estado_cortado'))}</span></span><p>${esc(t('pd_cortado_por_otra'))}</p></div>`;
+        else estado = `<div class="insp-estado"><p>${esc(t('pd_sin_nombre_no_corta'))}</p></div>`;
       }
-      return `<div class="insp-cabeza"><h2 id="insp-titulo" class="grande">${esc(nombre)}</h2>${lead ? `<p class="insp-lead" title="${esc(lead)}">${esc(lead)}</p>` : ''}${chips.length ? `<div class="insp-chips">${chips.map((x) => `<span>${esc(x)}</span>`).join('')}</div>` : ''}${ds.some((d) => d.uso === 'telemetria') ? `<p class="explica">${esc(t('pd_explica_telemetria').replace('{empresa}', nombre))}</p>` : ''}</div>
-        ${cifras([[cuanto(c, ds.reduce((a, d) => a + d.sub, 0)), c ? t('pd_consultas_palabra') : t('pd_enviado_palabra')], [num(ln.length), t('pd_nombres_palabra')], [num(lp.length), t('pd_programas_palabra')]])}
-        <div class="insp-lista"><div class="insp-h"><span>${esc(t('pd_nombres_que_usa'))}</span></div>${ln.map((n) => `<button type="button" class="insp-nombre${n.cort ? ' cortada' : ''}" data-dest="${esc(n.d.k)}"><span class="mono">${esc(n.host)}</span><span class="q">${esc(cuanto(n.c, n.sub))}</span></button>`).join('')}</div>
-        <div class="insp-lista"><div class="insp-h"><span>${esc(t('pd_quien_llama'))}</span></div><div class="insp-chips progs">${lp.map((q) => `<span>${esc(q.p)} <i>${esc(cuanto(q.c, q.sub))}</i></span>`).join('')}</div></div>
-        ${accion}`;
+      return `<div class="insp-cabeza"><h2 id="insp-titulo" class="grande">${esc(nombre)}</h2>${meta.length ? `<p class="insp-meta">${meta.join('')}</p>` : ''}${chips.length ? `<div class="insp-chips">${chips.map((x) => `<span>${esc(x)}</span>`).join('')}</div>` : ''}</div>
+        <div class="insp-bloque"><div class="insp-h"><span>${esc(t('rg_que_hace'))}</span></div><p class="insp-hace">${esc(lead || t('rg_que_hace_nada'))}</p>${ds.some((d) => d.uso === 'telemetria') ? `<p class="explica">${esc(t('pd_explica_telemetria').replace('{empresa}', nombre))}</p>` : ''}</div>
+        ${estado}
+        ${lp.length ? `<div class="insp-bloque"><div class="insp-h"><span>${esc(t('pd_quien_llama'))}</span><span>${esc(t('pd_ventana_corta').replace('{h}', st.datos ? st.datos.ventana_h : 24))}</span></div><div class="insp-chips progs">${lp.map((q) => `<span>${esc(q.p)} <i>${esc(cuanto(q.c, q.sub))}</i></span>`).join('')}</div></div>` : ''}
+        ${rompeHtml(nombre)}
+        <details class="insp-nombres"><summary>${esc(t('pd_nombres_que_usa'))} <span class="t">${esc(num(nombres.length))}</span></summary>${ds.slice().sort((a, b) => (b.consultas || 0) - (a.consultas || 0) || b.sub - a.sub).map((d) => `<button type="button" class="insp-nombre${bloqueado(d) ? ' cortada' : ''}" data-dest="${esc(d.k)}"><span class="mono">${esc(d.host)}</span><span class="q">${esc(cuanto(d.consultas || 0, d.sub))}</span></button>`).join('')}</details>`;
     };
+    // Several places on one spot (R3): their list, each opening its own.
+    const vistaCumulo = (k) => `<div class="insp-cabeza"><h2 id="insp-titulo">${esc(t('rg_grupo_titulo').replace('{n}', num(k.gs.length)))}</h2><p class="insp-sub">${esc(t('rg_grupo_texto'))}</p></div>
+        <div class="insp-lista">${k.gs.map((g) => `<div class="insp-fila${grupoCortado(g) ? ' cortada' : ''}"><button type="button" class="insp-abre" data-lugar-key="${esc(g.key)}"><span class="n">${esc(nombreLugar(g))}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg></span><span class="sub">${esc([lineaLugar(g), tn('pd_empresas', empresasDe(g.ds).length)].filter(Boolean).join(' · '))}</span></button><span class="q">${esc(cuanto(consultasDe(g.ds), g.ds.reduce((a, d) => a + d.sub, 0)))}</span></div>`).join('')}</div>
+        <div class="insp-acciones">${cerca(centroCumulo(k).lon, centroCumulo(k).lat)}</div>`;
     const htmlDetalle = (hh) => {
       if (hh.tipo === 'lugar') return vistaLugar(hh.ref);
       if (hh.tipo === 'empresa') return vistaEmpresa(hh.ref);
+      if (hh.tipo === 'cumulo') return vistaCumulo(hh.ref);
       let h = `<div class="cuerpo">${textoTip(hh)}</div>`, acciones = '', enlaces = [];
       if (hh.tipo === 'dest') {
         const d = hh.ref, p = prod(d.p);
@@ -1893,7 +2029,7 @@
       enlaces = enlaces.filter(Boolean);
       return h + (acciones ? `<div class="acciones-det">${acciones}</div>` : '') + (enlaces.length ? `<div class="enlaces-det">${enlaces.join('')}</div>` : '');
     };
-    const nombreVista = (hh) => (hh.tipo === 'lugar' ? nombreLugar(hh.ref) : hh.tipo === 'empresa' ? hh.ref : hh.tipo === 'dest' ? hh.ref.host : hh.tipo === 'prod' ? hh.ref.nombre : hh.tipo === 'pais' ? nombrePais(hh.ref) : hh.tipo === 'red' ? hh.ref : hh.tipo === 'resumen' ? t('pd_op_cifras') : t('pd_tu_pc'));
+    const nombreVista = (hh) => (hh.tipo === 'lugar' ? nombreLugar(hh.ref) : hh.tipo === 'empresa' ? hh.ref : hh.tipo === 'dest' ? hh.ref.host : hh.tipo === 'prod' ? hh.ref.nombre : hh.tipo === 'pais' ? nombrePais(hh.ref) : hh.tipo === 'red' ? hh.ref : hh.tipo === 'resumen' ? t('pd_op_cifras') : hh.tipo === 'cumulo' ? t('rg_grupo_titulo').replace('{n}', num(hh.ref.gs.length)) : t('pd_tu_pc'));
     const pintaDetalle = () => {
       if (!abierto) return;
       const pie = $('insp-enlace');
@@ -1907,6 +2043,7 @@
       if (abierto.tipo === 'lugar') abierto.ref = GRUPOS.find((x) => x.key === abierto.ref.key) || abierto.ref;
       if (abierto.tipo === 'dest' && porClave.get(abierto.ref.k)) abierto.ref = porClave.get(abierto.ref.k);
       if (abierto.tipo === 'prod') abierto.ref = PROD.find((p) => p.id === abierto.ref.id) || abierto.ref;
+      if (abierto.tipo === 'cumulo') abierto.ref = (st.cumulos || []).find((k) => k.key === abierto.ref.key) || abierto.ref;
       const html = htmlDetalle(abierto);
       if (html !== htmlPuesto) {
         const foco = document.activeElement && cuerpoDet.contains(document.activeElement) ? [...cuerpoDet.querySelectorAll('button, a')].indexOf(document.activeElement) : -1;
@@ -1922,13 +2059,13 @@
     const muestraVista = () => {
       abierto = pila[pila.length - 1] || null;
       detalle.hidden = !abierto; tip.hidden = true; htmlPuesto = '';
-      const base = pila.find((x) => x.tipo === 'lugar');
-      st.lugarAbierto = base ? base.ref.key : null;
+      const base = pila.find((x) => x.tipo === 'lugar'), bc = pila.find((x) => x.tipo === 'cumulo');
+      st.lugarAbierto = base ? base.ref.key : bc ? bc.ref.rep.key : null;
       lienzo.classList.toggle('con-inspector', !!abierto);
       if (!abierto) { datosAbierto = false; panelDatos.hidden = true; return; }
       const atras = pila.length > 1 ? pila[pila.length - 2] : null;
       $('insp-atras').hidden = !atras; detalle.classList.toggle('con-atras', !!atras);
-      if (atras) $('insp-atras-t').textContent = nombreVista(atras);
+      if (atras) $('insp-atras-t').textContent = atras.tipo === 'lugar' ? [nombreLugar(atras.ref), atras.ref.pais ? nombrePais(atras.ref.pais) : ''].filter((x, i, a) => x && a.indexOf(x) === i).join(' · ') : nombreVista(atras);
       pintaDetalle();
       if (abierto.tipo === 'resumen') pintaDatos();
       detalle.scrollTop = 0;
@@ -1946,6 +2083,7 @@
     detalle.addEventListener('click', (e) => {
       const b = e.target.closest('button'); if (!b || b.disabled || b.classList.contains('interruptor')) return;
       if (b.dataset.empresa) { abreDetalle({ tipo: 'empresa', ref: b.dataset.empresa }); return; }
+      if (b.dataset.lugarKey) { const g = GRUPOS.find((x) => x.key === b.dataset.lugarKey); if (g) abreDetalle({ tipo: 'lugar', ref: g }); return; }
       if (b.dataset.dest) { const d = porClave.get(b.dataset.dest); if (d) abreDetalle({ tipo: 'dest', ref: d }); return; }
       if (b.dataset.cerca) { const [lon, lat] = b.dataset.cerca.split(',').map(Number); vuela(lon, lat); return; }
       if (b.dataset.lugar === 'windows') { precisar(false); return; }
@@ -1963,6 +2101,27 @@
     };
     stage.addEventListener('click', abreDesde);
     stage.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-dest],[data-prod],[data-red],[data-pais]') && e.target.tagName !== 'BUTTON') { e.preventDefault(); abreDesde(e); } });
+    // 1.0.46 (R1-c → R1-b): a row of the table opens its company's file, over its place, so «‹»
+    // goes back to the place as when it was opened from the globe.
+    const abreFila = (k) => {
+      const d = porClave.get(k); if (!d) return;
+      const g = GRUPOS.find((x) => x.ds.includes(d));
+      pila = g ? [{ tipo: 'lugar', ref: g }, { tipo: 'empresa', ref: empresaDe(d) }] : [{ tipo: 'empresa', ref: empresaDe(d) }];
+      muestraVista();
+    };
+    $('registro').addEventListener('click', (e) => { const f = e.target.closest('[data-fila]'); if (f) abreFila(f.dataset.fila); });
+    $('registro').addEventListener('keydown', (e) => { const f = e.target.closest('[data-fila]'); if (f && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); abreFila(f.dataset.fila); } });
+    // A click outside closes what is open (R1-b, R1-c): the inspector, unless the click opened
+    // another view; the table, unless the click was on the strip or in the table. The Earth
+    // itself decides on its own (a click on a pin opens it; a drag never closes anything).
+    document.addEventListener('click', (e) => {
+      const x = e.target;
+      if (!x || !x.closest || x === cv || x.closest('.aviso, #ubicacion, #donde, #retrato, #opciones, #opciones-btn')) return;
+      // The strip and its table are the inspector's companions: lowering the table or flipping
+      // Protección máxima leaves the open file where it is.
+      if (abierto && !x.closest('#inspector, #hud, [data-fila], [data-dest], [data-prod], [data-red], [data-pais]')) cierraDetalle();
+      if (bandeja.abierta && !x.closest('#hud, #inspector')) ponBandeja(false);
+    });
     // Cut a company, or give it back: every name of it that can be cut by name, in one go. The
     // server still asks before cutting what looks necessary, once for the whole company.
     const pregunta = (txt) => new Promise((res) => avisa(txt, [{ texto: t('pd_cortar_igual'), peligro: true, hacer: () => res(true) }, { texto: t('pd_cancelar'), hacer: () => res(false) }]));
@@ -1991,7 +2150,7 @@
     };
     // «Qué se rompe» (18 Oct 2026): a helper of its own (que-se-rompe.js), loaded when it exists;
     // without it the switch says nothing more, never a guess.
-    const rompe = new Map(), rompePedido = new Set();
+    const rompe = new Map(), rompePedido = new Set(), rompeR = new Map();
     let rompeCargado = null;
     const cargaRompe = () => {
       if (window.GuardianaQueSeRompe) return Promise.resolve(true);
@@ -1999,13 +2158,16 @@
       return rompeCargado;
     };
     const queSeRompe = async (nombre, ds) => {
-      if (soloMirar || !(await cargaRompe())) return;
+      if (soloMirar) return;
+      if (!(await cargaRompe())) { rompeR.set(nombre, null); htmlPuesto = ''; pintaDetalle(); return; }
       try {
         const Q = window.GuardianaQueSeRompe, conocida = ds.some((d) => d.empresa === nombre);
         const r = await Q.consultar(api, conocida ? { empresa: nombre } : { dominio: (ds.find((d) => d.destino) || {}).destino || nombre });
+        rompeR.set(nombre, r);
         const linea = Q.resumen(r, { t, tn });
-        if (linea) { rompe.set(nombre, linea); htmlPuesto = ''; pintaDetalle(); }
-      } catch (_) {}
+        if (linea) rompe.set(nombre, linea);
+        htmlPuesto = ''; pintaDetalle();
+      } catch (_) { rompeR.set(nombre, null); htmlPuesto = ''; pintaDetalle(); }
     };
     const conTrabajo = async (clave, que, hacer) => {
       trabajando.set(clave, que);
@@ -2320,13 +2482,13 @@
     const zoomBoton = (f) => { const c = centroVista(); zoomEn(f, c.x, c.y); };
     const zoomInicio = () => { st.dRot = 0; st.dTilt = 0; T.zoomG = 1; T.zoomM = 1; T.px = 0; T.py = 0; PLANO.z = 1; PLANO.px = 0; PLANO.py = 0; st.vuelo = null; };
     // «Ver de cerca»: fly to a place and zoom in on it.
-    const vuela = (lon, lat) => {
+    const vuela = (lon, lat, zoom) => {
       toca();
       if (enPlano()) { const z = Math.max(PLANO.z, 5); PLANO.z = z; const e = escalaPlano(), q = aPlano(lon, lat); PLANO.px += st.W / 2 - q.x; PLANO.py += st.H / 2 - q.y; return; }
       const yo = st.lugar;
       const dos = 2 * Math.PI, dif = ((((-(lon - yo.lon) * RAD - st.dRot) + Math.PI) % dos) + dos) % dos - Math.PI;
       st.vuelo = { t0: performance.now(), de: { r: st.dRot, ti: st.dTilt, zg: T.zoomG, zm: T.zoomM, px: T.px, py: T.py },
-        a: { r: st.dRot + dif, ti: (lat - yo.lat * 0.8) * RAD, zg: Math.max(T.zoomG, 4), zm: Math.max(T.zoomM, 7), px: lon * RAD, py: lat * RAD } };
+        a: { r: st.dRot + dif, ti: (lat - yo.lat * 0.8) * RAD, zg: zoom || Math.max(T.zoomG, 4), zm: Math.max(T.zoomM, 7), px: lon * RAD, py: lat * RAD } };
     };
     const avanzaVuelo = (ahora) => {
       const v = st.vuelo; if (!v) return;
@@ -2389,6 +2551,13 @@
       if (dedos.size || movido) return;
       const r = cv.getBoundingClientRect();
       const hh = queHay(e.clientX - r.left, e.clientY - r.top);
+      // 1.0.46: with the table up, a click on the Earth lowers it (R1-c: «click outside»).
+      if (bandeja.abierta && !hh) { ponBandeja(false); return; }
+      if (hh && hh.tipo === 'cumulo') {
+        if (enGlobo() && T.zoomG < ZOOM.globo[1] * 0.9) { const c = centroCumulo(hh.ref); vuela(c.lon, c.lat, Math.min(ZOOM.globo[1], Math.max(T.zoomG * 2.4, 2))); }
+        else abreDetalle(hh, true);
+        return;
+      }
       if (hh) abreDetalle(hh, true); else cierraDetalle();
     });
     cv.addEventListener('lostpointercapture', (e) => { if (arrastre && arrastre.id === e.pointerId) arrastre = null; suelta(e); });
@@ -2411,7 +2580,8 @@
       if (v !== st.vista) { st.part = []; st.estallidos = []; }
       st.vista = v;
       pulsado('.pestanas button', 'vista', v);
-      $('zoom').hidden = v !== 'destinos';
+      // 1.0.46: the globe's options live in this column too; only zooming belongs to the Earth.
+      ['zoom-mas', 'zoom-menos'].forEach((id) => { $(id).hidden = v !== 'destinos'; });
       expl.hidden = v !== 'programas'; stage.dataset.vista = v; pintaExplorador();
       muestraAyuda();
       guarda('guardiana_pd_vista', v);
@@ -2465,7 +2635,7 @@
       if (st.lugar.fuente === 'zona' || st.lugar.fuente === 'pais') { if (!pintaVpn.avisado) { pintaVpn.avisado = true; avisa(t('pd_vpn_aviso').replace('{n}', VPN.join(', ')), [{ texto: t('pd_corregir'), hacer: abreUbicacion }]); } }
     };
     const pintaYo = () => {
-      const aproximada = st.lugar.fuente === 'zona' || st.lugar.fuente === 'pais';
+      const aproximada = st.lugar.fuente === 'zona' || st.lugar.fuente === 'pais' || yoAproximado();
       etiquetaYo.textContent = t(aproximada ? 'pd_ubicacion_referencia' : 'pd_tu_pais');
       $('yo').textContent = nombrePais(st.yo) + (st.lugar.ciudad && !aproximada ? ' · ' + st.lugar.ciudad : '');
     };
@@ -2496,15 +2666,17 @@
       let g = { lat, lon, ciudad: '', cc: '', precision, fuente: 'equipo' };
       try {
         const m = cercana(await ciudades(), lat, lon);
-        if (m && m.km < 35 && precision <= 25000) g = { lat, lon, ciudad: m.c.n + (m.c.adm ? ', ' + m.c.adm : ''), cc: m.c.cc, precision, fuente: 'equipo' };
+        if (m && m.km < 35 && precision <= PRECISION_CIUDAD) g = { lat, lon, ciudad: m.c.n + (m.c.adm ? ', ' + m.c.adm : ''), cc: m.c.cc, precision, fuente: 'equipo' };
         else g.cc = paisEn(lon, lat) || '';
       } catch (_) { g.cc = paisEn(lon, lat) || ''; }
       if (VPN.length && precision > 1000) {
         if (!callado) avisa(t('pd_vpn_medida').replace('{n}', VPN.join(', ')), [{ texto: t('pd_corregir'), hacer: abreUbicacion }]);
         return;
       }
-      if (precision > 25000) {
-        if (!callado) avisa(t('pd_precisar_impreciso').replace('{km}', String(Math.max(1, Math.round(precision / 1000)))), [{ texto: t('pd_corregir'), hacer: abreUbicacion }]);
+      // 1.0.46 (R9, the owner saw Barranquilla while in Cartagena): a measurement wider than
+      // 5 km never names a city; the computer stays at its country and the person can choose.
+      if (precision > PRECISION_CIUDAD) {
+        if (!callado) avisa(t('rg_precision_baja').replace('{km}', String(Math.max(1, Math.round(precision / 1000)))), [{ texto: t('pd_elegir_ciudad'), hacer: abreUbicacion }]);
         return;
       }
       ponLugarEquipo(g, true);
@@ -2560,7 +2732,7 @@
       // still granted, it is measured again quietly, so a laptop that travelled follows.
       try {
         const g = JSON.parse(localStorage.getItem('guardiana_pd_lugar') || 'null');
-        if (g && Date.now() - g.cuando < 30 * 86400000 && Number.isFinite(g.lat) && Number.isFinite(g.lon) && (g.fuente === 'manual' || Number.isFinite(g.precision))) ponLugarEquipo(g, false);
+        if (g && Date.now() - g.cuando < 30 * 86400000 && Number.isFinite(g.lat) && Number.isFinite(g.lon) && (g.fuente === 'manual' || (Number.isFinite(g.precision) && g.precision <= PRECISION_CIUDAD))) ponLugarEquipo(g, false);
       } catch (_) {}
       try { navigator.permissions.query({ name: 'geolocation' }).then((p) => { if (p.state === 'granted') precisar(true); }).catch(() => {}); } catch (_) {}
     }
@@ -2628,7 +2800,9 @@
     ponProy('globo');
     const f0 = leido('guardiana_pd_filtro');
     st.filtro = ['todo', 'datos', 'av'].includes(f0) ? f0 : 'todo'; pulsado('#filtro button', 'filtro', st.filtro);
-    ponVista(vAntes === 'programas' || vAntes === 'dentro' ? 'programas' : 'destinos');
+    // 1.0.46 (R11): the program always opens on En vivo, the globe; «Programas» is one click away.
+    void vAntes;
+    ponVista('destinos');
     ajusta();
     nombraPantalla(false);
     await cargaReglas();

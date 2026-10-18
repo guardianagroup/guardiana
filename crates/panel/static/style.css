@@ -1124,7 +1124,7 @@ body.universo { display: flex; flex-direction: column; height: 100vh; height: 10
 .universo .ban-panel { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 .universo .ban-panel[hidden] { display: none; }
 .universo table.registro-t { width: 100%; border-collapse: collapse; background: transparent; font-size: 13.5px; table-layout: fixed; }
-.universo table.registro-t th { position: sticky; top: 0; z-index: 1; background: var(--card); padding: 6px 12px 6px 0; border-bottom: 0; font: 500 12.5px var(--texto); text-transform: none; letter-spacing: 0; color: var(--muted-2); text-align: left; }
+.universo table.registro-t th { white-space: nowrap; position: sticky; top: 0; z-index: 1; background: var(--card); padding: 6px 12px 6px 0; border-bottom: 0; font: 500 12.5px var(--texto); text-transform: none; letter-spacing: 0; color: var(--muted-2); text-align: left; }
 .universo table.registro-t td { padding: 0 12px 0 0; height: 36px; border-top: 1px solid #151C25; border-bottom: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
 .universo table.registro-t th:nth-child(1) { width: 96px; } .universo table.registro-t th:nth-child(2) { width: 15%; } .universo table.registro-t th:nth-child(4) { width: 14%; } .universo table.registro-t th:nth-child(5) { width: 12%; } .universo table.registro-t th:nth-child(6) { width: 16%; } .universo table.registro-t th:nth-child(7) { width: 150px; }
 .universo table.registro-t .t { color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -1248,3 +1248,188 @@ header.top .idiomas .lang.actual { border-color: var(--accent); color: var(--acc
 .rv-directo { --rd-bg: #06080C; --rd-card: #0C1118; --rd-line: #1E2631; --rd-fg: #E8ECF1; --rd-muted: #A9B3BE; --rd-dim: #6F7B88; --rd-azul: #9CC3E4; --rd-verde: #6CCBA5; --rd-ambar: #E0B66A; background: var(--card); border-color: var(--line); }
 .rd-escaner i { background: var(--accent); box-shadow: none; }
 .universo .insp-fila .rompe { grid-column: 1 / -1; margin-top: -4px; }
+
+/* ==== 1.0.46 radiografias-globo: the app shell (begin) ==========================================
+   The owner's chosen mockups R1-a…R1-d (18 Oct 2026): a 56 px top bar, a 44 px row with the four
+   sections and their compact menus, a breadcrumb on interior pages. One navigation only. */
+header.top.g-barra { height: var(--s-barra); min-height: var(--s-barra); padding: 0 var(--s-margen); gap: var(--e4); background: var(--bg); border-bottom: 1px solid var(--line); }
+header.top.g-barra .brand { font-size: 15px; letter-spacing: .16em; gap: var(--e3); }
+header.top.g-barra .brand::before { width: 24px; height: 24px; }
+.g-productos { padding: var(--e1); background: #0A0E14; }
+.g-productos .g-producto { height: var(--h-chip); padding: 0 var(--e4) !important; font: var(--t-13); font-weight: 500; }
+.g-productos .g-producto[aria-current] { background: #151C26; color: var(--fg) !important; }
+.g-der { flex: 1 1 0; gap: var(--e4); }
+.g-pulso { appearance: none; display: inline-flex; align-items: center; gap: var(--e2); min-height: var(--h-chip); max-width: 280px; padding: 0 var(--e1); border: 0; border-radius: var(--r-pill); background: transparent; color: var(--fg); font: var(--t-13); font-weight: 500; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-pulso:hover { background: transparent; color: var(--fg); }
+.g-pulso i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; }
+.g-pulso span { overflow: hidden; text-overflow: ellipsis; }
+.g-pulso.atencion { color: var(--aviso); padding: 0 var(--e3); border: 1px solid color-mix(in srgb, var(--aviso) 45%, transparent); background: var(--aviso-suave); }
+.g-pulso.atencion i { background: var(--aviso); }
+.g-pulso:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
+.g-pulso-pop { position: absolute; top: calc(100% + 10px); right: 52px; z-index: 40; width: 340px; padding: 16px 18px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 18px 40px rgba(0, 0, 0, .45); font: 13.5px/1.5 var(--texto); color: var(--muted); }
+.g-pulso-pop[hidden] { display: none; }
+.g-pulso-pop b { display: block; color: var(--fg); font-weight: 600; margin-bottom: 4px; }
+.g-pulso-pop p { margin: 0 0 8px; }
+.g-pulso-pop ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 2px; }
+.g-pulso-pop li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid #151C25; color: var(--fg); }
+.g-pulso-pop .btn.texto { padding: 0; min-height: 0; flex: none; }
+.g-ajustes { flex: none; width: var(--h-boton); height: var(--h-boton); }
+.g-ajustes[aria-expanded="true"] { border-color: #3A4656; color: var(--fg); }
+.g-secciones { height: var(--s-fila2); gap: var(--e6); padding: 0 var(--s-margen); background: var(--bg); border-bottom: 1px solid var(--line); overflow: visible; }
+.g-sec { position: relative; display: flex; align-items: center; height: 100%; gap: 2px; }
+.g-secciones .g-sec-a { position: relative; display: flex; align-items: center; height: 100%; padding: 0; color: var(--muted); text-decoration: none; font: var(--t-15); font-weight: 500; white-space: nowrap; }
+.g-secciones .g-sec-a:hover { color: var(--fg); }
+.g-secciones .g-sec-a[aria-current] { color: var(--fg); }
+.g-secciones .g-sec-a[aria-current]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+.g-sec-chev { appearance: none; position: absolute; left: calc(100% + 2px); top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; min-height: 0; padding: 0; margin-left: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted-2); cursor: pointer; opacity: 0; transition: opacity .15s ease, color .15s ease; }
+.g-sec:hover .g-sec-chev, .g-sec:focus-within .g-sec-chev, .g-sec.abierta .g-sec-chev, .g-sec-chev:focus-visible { opacity: 1; }
+.g-sec-chev:hover { color: var(--fg); background: transparent; }
+.g-sec-chev svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s ease; }
+.g-sec.abierta .g-sec-chev svg { transform: rotate(180deg); }
+.g-sec-chev:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
+/* The section's pages: on hover (with a short bridge so the pointer can travel), on focus, or on
+   the chevron. */
+.g-dd { position: absolute; left: -12px; top: calc(100% - 2px); z-index: 45; display: none; min-width: 240px; padding: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 18px 40px rgba(0, 0, 0, .45); }
+.g-dd::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }
+.g-sec:hover .g-dd, .g-sec:focus-within .g-dd, .g-sec.abierta .g-dd { display: grid; gap: 1px; animation: g-dd-entra .16s ease-out; }
+@keyframes g-dd-entra { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .g-sec .g-dd { animation: none !important; } }
+.g-dd a { display: block; padding: 8px 12px; border-radius: 8px; color: var(--fg); text-decoration: none; font: 500 13.5px/1.3 var(--texto); white-space: nowrap; }
+.g-dd a:hover, .g-dd a:focus-visible { background: var(--campo); outline: none; }
+.g-dd a[aria-current="page"] { color: var(--accent); }
+.g-secciones #g-extra { margin-left: 0; }
+.g-muestra { display: inline-flex; align-items: center; height: var(--e5); padding: 0 var(--e3); border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--muted); font: var(--t-12); white-space: nowrap; flex: none; }
+/* «Sección › Página» on interior pages (R1-d). */
+.g-migas { display: flex; align-items: center; gap: var(--e2); margin: 0 0 var(--e3); font: var(--t-12); color: var(--muted-2); }
+.g-migas a { color: var(--muted-2); text-decoration: none; }
+.g-migas a:hover { color: var(--fg); }
+.g-migas span[aria-current] { color: var(--muted); }
+.g-migas svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 900px) {
+  header.top.g-barra { height: auto; flex-wrap: wrap; padding: 10px 16px; row-gap: 10px; }
+  header.top.g-barra .brand { flex: 1 1 auto; }
+  .g-der { flex: 0 0 auto; gap: 10px; }
+  .g-productos { order: 3; width: 100%; justify-content: center; }
+  .g-secciones { gap: 22px; padding: 0 16px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  .g-pulso-pop { right: 0; width: min(340px, calc(100vw - 32px)); }
+  .g-pulso span { display: inline; }
+}
+@media (max-width: 600px) {
+  .g-sec-chev { opacity: 1; }
+  .g-sec:hover .g-dd, .g-sec:focus-within .g-dd { display: none; }
+  .g-sec.abierta .g-dd { display: grid; position: fixed; left: 16px; right: 16px; min-width: 0; }
+  .g-pulso { max-width: 150px; }
+}
+/* ==== 1.0.46 radiografias-globo: the app shell (end) ============================================ */
+
+/* ==== 1.0.46 radiografias-globo: En vivo (begin) ================================================
+   The owner's chosen R1-a (the globe and the strip at the foot), R1-b (the 400 px company file;
+   the globe moves left and dims) and R1-c (the strip rises into the table). */
+.universo .lienzo.con-inspector #gl { filter: brightness(.66); }
+.universo .lienzo.con-inspector #cv { opacity: .9; }
+.universo .zoom { opacity: .6; transition: opacity .18s ease, right .2s ease; }
+.universo .zoom:hover, .universo .zoom:focus-within { opacity: 1; }
+/* The globe's options, with its other controls (bottom right); the menu opens to their left. */
+.universo .globo-op { position: relative; }
+.universo .zoom [hidden] { display: none !important; }
+.universo .globo-op .opciones { top: auto; bottom: 0; right: calc(100% + var(--e3)); max-height: calc(100vh - 220px); }
+.universo .zoom:has(.opciones:not([hidden])) { opacity: 1; }
+.universo .globo-op .opciones-btn { padding: 0; border-radius: 50%; }
+.universo .globo-op .opciones-btn svg { width: 16px; height: 16px; }
+.globo-herr:not(:has(> :not([hidden]))) { display: none; }
+/* The strip (R1-a): AHORA · three figures · the pulse of five minutes · Protección máxima. */
+.universo .hud { background: var(--bg); border-top: 1px solid var(--line); }
+.universo .riel.tira { display: flex; align-items: center; gap: var(--e6); height: var(--s-franja); padding: 0 var(--s-margen); }
+.universo .riel.tira[hidden] { display: flex; }
+.universo .tira-cifras { appearance: none; display: inline-flex; align-items: center; gap: var(--e6); height: 100%; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--muted); font: var(--t-13); cursor: pointer; white-space: nowrap; flex: none; }
+.universo .tira-cifras:hover { background: transparent; color: var(--fg); }
+.universo .tira-r { font: var(--t-12); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2); }
+.universo .tira-n { display: inline-flex; align-items: baseline; gap: var(--e2); font: var(--t-15); color: var(--muted); }
+.universo .tira-n b { font: var(--t-20); color: var(--fg); font-variant-numeric: tabular-nums; }
+.universo .hud.con-cortes .tira-cortadas b { color: var(--alerta); }
+.universo .tira-pulso { appearance: none; position: relative; flex: 1 1 auto; max-width: 520px; height: var(--e8); min-height: 0; margin: 0 auto; padding: 0 0 var(--e4); border: 0; border-radius: 0; background: transparent; cursor: pointer; }
+.universo .tira-pulso:hover { background: transparent; }
+.universo .tira-pulso canvas { display: block; width: 100%; height: var(--e6); }
+.universo .tira-ejes { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; font: var(--t-12); font-size: 11px; color: var(--muted-2); }
+.universo .riel-maxima { margin-left: 0; gap: var(--e3); flex: none; }
+.universo .riel-maxima > b { font: var(--t-15); font-weight: 600; }
+.universo .tira-enlaces { display: inline-flex; align-items: center; gap: var(--e4); flex: none; }
+.universo .tira-enlaces[hidden] { display: none; }
+.universo .tira-enlaces .btn.texto { min-height: 0; padding: 0; font: var(--t-13); }
+.universo .tira-chev { flex: none; width: var(--h-boton); height: var(--h-boton); background: transparent; }
+.universo .tira-chev[hidden] { display: none; }
+/* The table under it (R1-c). */
+.universo .bandeja { height: 256px; display: grid; grid-template-columns: var(--s-lista) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--e5); padding: 0 var(--s-margen); border-top: 1px solid var(--line); animation: tira-sube var(--m-normal) var(--m-curva); }
+@keyframes tira-sube { from { opacity: 0; transform: translateY(12px); } }
+@media (prefers-reduced-motion: reduce) { .universo .bandeja { animation: none; } }
+@media (min-height: 1000px) { .universo .bandeja { height: 320px; } }
+.universo .ban-cats { display: flex; flex-direction: column; min-height: 0; padding: var(--e4) 0 var(--e3); }
+.universo .ban-cats-t { padding: 0 var(--e3) var(--e2); font: var(--t-12); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2); }
+.universo .ban-cats-l { display: grid; align-content: start; gap: var(--e1) 0; flex: 0 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+.universo .ban-cats-l button { appearance: none; display: flex; align-items: center; justify-content: space-between; gap: var(--e3); width: 100%; min-height: var(--h-chip); padding: 0 var(--e3); border: 0; border-radius: var(--r-control); background: transparent; color: var(--muted); font: var(--t-13); font-weight: 500; text-align: left; cursor: pointer; }
+.universo .ban-cats-l button:hover { background: transparent; color: var(--fg); }
+.universo .ban-cats-l button[aria-pressed="true"] { background: #151C26; color: var(--fg); }
+.universo .ban-cats-l button .n { font: var(--t-12); color: var(--muted-2); font-variant-numeric: tabular-nums; }
+.universo .ban-cats-l button.cero { color: var(--muted-2); }
+.universo .ban-panel { padding-top: var(--e3); min-height: 0; overflow-y: auto; }
+.universo table.registro-t { font: var(--t-13); }
+.universo table.registro-t th { white-space: nowrap; position: sticky; top: 0; height: var(--h-fila); padding: 0 var(--e3); font: var(--t-12); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2); border-bottom: 1px solid var(--line); background: var(--bg); }
+.universo table.registro-t td { height: var(--h-fila); padding: 0 var(--e3); border-top: 0; border-bottom: 1px solid #121821; font-variant-numeric: tabular-nums; }
+.universo table.registro-t th:nth-child(1) { width: 96px; } .universo table.registro-t th:nth-child(2) { width: 14%; } .universo table.registro-t th:nth-child(3) { width: auto; } .universo table.registro-t th:nth-child(4) { width: 13%; } .universo table.registro-t th:nth-child(5) { width: 15%; } .universo table.registro-t th:nth-child(6) { width: 112px; }
+.universo table.registro-t tr.vacia td { height: 64px; white-space: normal; }
+.universo table.registro-t tr.enlace-fila:focus-visible td { background: var(--campo); outline: none; }
+.universo .punto-estado { font-weight: 500; }
+.universo .punto-estado.neutro { color: var(--muted); }
+.universo .punto-estado.neutro::before { background: var(--muted-2); }
+/* The company file (R1-b). */
+.universo .inspector { background: #080B10; }
+.universo .insp-cab > * { top: 24px; }
+.universo .insp-cab .insp-atras { left: 32px; top: 30px; font-size: 13.5px; color: var(--muted); }
+.universo .insp-cab .insp-cerrar { right: 32px; }
+.universo .inspector.con-atras .insp-cuerpo { padding-top: 76px; }
+.universo .insp-cuerpo { padding: 32px 32px 20px; gap: 24px; }
+.universo .insp-cabeza h2.grande { font: var(--t-40); letter-spacing: -.015em; }
+.universo .insp-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 12px 0 0; font-size: 13px; color: var(--muted); }
+.universo .insp-meta span { display: inline-flex; align-items: center; gap: 6px; }
+.universo .insp-meta svg, .universo .insp-rompe svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.universo .insp-bloque { display: grid; gap: 4px; }
+.universo .insp-bloque .insp-h { margin-bottom: 4px; font-size: 12px; }
+.universo .insp-hace { margin: 0; font-size: 15px !important; line-height: 1.55; color: var(--fg); }
+.universo .insp-estado { display: grid; gap: 10px; padding: 16px 16px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.universo .insp-estado.cortada { border-color: rgba(224, 122, 108, .42); background: rgba(224, 122, 108, .06); }
+.universo .insp-estado p { margin: 0; font-size: 13px !important; line-height: 1.5; color: var(--muted); }
+.universo .insp-estado .interruptor-estado { font-size: 14.5px; }
+.universo .insp-rompe { list-style: none; margin: 0; padding: 4px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.universo .insp-rompe li { display: flex; align-items: flex-start; gap: 10px; padding: 11px 0; border-top: 1px solid #151C25; font-size: 13.5px; line-height: 1.4; color: var(--fg); }
+.universo .insp-rompe li:first-child { border-top: 0; }
+.universo .insp-rompe li svg { margin-top: 2px; color: var(--aviso); }
+.universo .insp-rompe li svg:has(path[d^="m3.5"]) { color: var(--ok); }
+.universo .insp-rompe li small { display: block; margin-top: 2px; font-size: 12px; color: var(--muted-2); }
+.universo .insp-rompe li.t { color: var(--muted); font-size: 12.5px; }
+.universo .insp-nombres summary { cursor: pointer; font: 500 12px var(--texto); color: var(--muted-2); padding: 4px 0; }
+.universo .insp-nombres[open] summary { margin-bottom: 4px; }
+.universo .insp-chips.progs span { padding: 5px 12px; border-color: #252E3A; font-weight: 500; }
+@media (max-width: 900px) {
+  .universo .riel.tira { gap: 16px; padding: 0 16px; }
+  .universo .tira-cifras { gap: 16px; }
+  .universo .tira-pulso { display: none; }
+  .universo .riel-maxima { margin-left: auto; }
+  .universo .bandeja { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 0; padding: 0 16px; height: 300px; }
+  .universo .ban-cats { padding: 10px 0 6px; }
+  .universo .ban-cats-t, .universo .tira-enlaces { display: none !important; }
+  .universo .ban-cats-l { display: flex; gap: 6px; overflow-x: auto; }
+  .universo .ban-cats-l button { width: auto; flex: none; gap: 8px; border: 1px solid var(--line); border-radius: 999px; }
+  .universo table.registro-t th:nth-child(2), .universo table.registro-t td:nth-child(2), .universo table.registro-t th:nth-child(4), .universo table.registro-t td:nth-child(4), .universo table.registro-t th:nth-child(5), .universo table.registro-t td:nth-child(5) { display: none; }
+  .universo .insp-cuerpo { padding: 28px 20px 20px; }
+  .universo .insp-cab .insp-atras { left: 20px; } .universo .insp-cab .insp-cerrar { right: 20px; }
+}
+@media (max-width: 600px) {
+  .universo .riel.tira { flex-wrap: wrap; height: auto; padding: 8px 16px; row-gap: 4px; }
+  .universo .tira-cifras { height: 40px; gap: 14px; font-size: 13px; }
+  .universo .tira-r { display: none; }
+  .universo .tira-n b { font-size: 18px; }
+  .universo #riel-ahora-t { display: inline; }
+  .universo .riel-maxima { order: 3; width: auto; height: 36px; margin-left: 0; }
+  .universo .tira-chev { margin-left: auto; }
+}
+/* ==== 1.0.46 radiografias-globo: En vivo (end) ================================================== */
