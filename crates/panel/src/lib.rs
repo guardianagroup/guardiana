@@ -19,6 +19,7 @@ mod expedientes;
 mod medidas;
 mod revision;
 mod universo;
+pub mod vision;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -897,6 +898,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/secure-en-directo", get(universo::secure_en_directo))
         .route("/api/revision", get(revision::ver))
         .route("/api/revision/ahora", post(revision::ahora))
+        .merge(vision::rutas())
         .route("/api/ia/alcance", post(api::alcance))
         .route("/api/ia/alcance/anadir", post(api::alcance_anadir))
         .route("/api/dns/aplicar", post(api::dns_aplicar))

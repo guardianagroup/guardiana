@@ -1795,6 +1795,11 @@
       await window.GuardianaUniverso.iniciar({ api, t, tn, esc, LOC, LANG, cadaTanto, pdf: { pdfDocument, savePdfFile } });
     },
     // «Revisión del ordenador» (1.0.24): its own script (revision.js), loaded before this one.
+    // «Visión profunda» (1.0.45): its own script (vision.js), loaded before this one.
+    async vision() {
+      if (!window.GuardianaVision) return;
+      await window.GuardianaVision.iniciar({ api, t, tn, esc, LOC, LANG, cadaTanto });
+    },
     async revision() {
       if (!window.GuardianaRevision) return;
       await window.GuardianaRevision.iniciar({ api, t, tn, esc, LOC, LANG, pdf: { pdfDocument, savePdfFile } });

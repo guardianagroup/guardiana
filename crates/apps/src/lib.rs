@@ -57,6 +57,10 @@ pub use cortafuegos::{Cortafuegos, Destino, ErrorCorte};
 #[cfg(windows)]
 mod actividad;
 #[cfg(windows)]
+mod archivos;
+#[cfg(windows)]
+mod defender;
+#[cfg(windows)]
 mod firmas;
 #[cfg(windows)]
 mod red;
@@ -131,6 +135,10 @@ pub struct Medida {
     pub recibidos: u64,
     /// Packets either way.
     pub paquetes: u64,
+    /// Bytes sent again there (TCP retransmissions), apart from `enviados` (1.0.45).
+    pub reenviados: u64,
+    /// Connections opened there or accepted from there (1.0.45).
+    pub conexiones: u64,
 }
 
 /// Listens to what the system says about every packet each program sends or receives, and adds
@@ -187,6 +195,147 @@ pub fn diagnostico_red(segundos: u64) -> Result<Vec<(u16, u32, u32, String)>, Er
         let _ = segundos;
         Err(Error::NoSoportado)
     }
+}
+
+/// Listens to which files in the person's own folders each program opens and reads (1.0.45,
+/// «Visión profunda»). Names only, never contents; only while the person has it on.
+pub struct Archivos {
+    #[cfg(windows)]
+    interno: archivos::Sesion,
+}
+
+impl Archivos {
+    /// Starts listening.
+    ///
+    /// # Errors
+    /// [`Error::NoSoportado`] outside Windows; [`Error::Sistema`] when the trace cannot start.
+    pub fn arrancar() -> Result<Self, Error> {
+        #[cfg(windows)]
+        {
+            Ok(Self {
+                interno: archivos::Sesion::arrancar()?,
+            })
+        }
+        #[cfg(not(windows))]
+        {
+            Err(Error::NoSoportado)
+        }
+    }
+
+    /// The openings and reads since the last call.
+    #[must_use]
+    pub fn toma(&self) -> Vec<guardiana_core::vision::Lectura> {
+        #[cfg(windows)]
+        {
+            self.interno.toma()
+        }
+        #[cfg(not(windows))]
+        {
+            Vec::new()
+        }
+    }
+}
+
+/// The person's folders that count as «their files», as Windows names them on disk, and in the
+/// languages OneDrive may name them when it moved them (it does use the localised name).
+const CARPETAS: &[(&str, &[&str])] = &[
+    ("documentos", &["documents", "documentos"]),
+    (
+        "escritorio",
+        &[
+            "desktop",
+            "escritorio",
+            "área de trabalho",
+            "area de trabalho",
+        ],
+    ),
+    ("descargas", &["downloads", "descargas", "transferências"]),
+    ("imagenes", &["pictures", "imágenes", "imagenes", "imagens"]),
+];
+
+/// Whether a path is a file inside one of the person's folders, and which: the folder's key
+/// (`documentos`, `escritorio`, `descargas`, `imagenes`) and the file's own name, without its
+/// folders. Works on the kernel's form (`\Device\HarddiskVolume3\Users\ana\Documents\x.pdf`) and
+/// on the usual one (`C:\Users\…`). Everything else — programs, `AppData`, the system — is `None`,
+/// and so are the files Windows itself keeps there (`desktop.ini`, thumbnails, shortcuts, Office's
+/// `~$` locks, temporary files). A file's alternate stream (`x.pdf:Zone.Identifier`) is the file.
+#[must_use]
+pub fn carpeta_de_usuario(ruta: &str) -> Option<(&'static str, String)> {
+    let partes: Vec<&str> = ruta.split(['\\', '/']).filter(|p| !p.is_empty()).collect();
+    let i = partes
+        .iter()
+        .position(|p| p.eq_ignore_ascii_case("users"))?;
+    // users \ <person> \ [OneDrive…] \ <folder> \ … \ <file>
+    let mut j = i + 2;
+    let siguiente = partes.get(j)?.to_lowercase();
+    if siguiente == "onedrive" || siguiente.starts_with("onedrive - ") {
+        j += 1;
+    }
+    let carpeta = partes.get(j)?.to_lowercase();
+    let clave = CARPETAS
+        .iter()
+        .find(|(_, nombres)| nombres.contains(&carpeta.as_str()))
+        .map(|(k, _)| *k)?;
+    if partes.len() <= j + 1 {
+        return None;
+    }
+    let ultimo = partes.last()?;
+    let archivo = ultimo.split(':').next().unwrap_or(ultimo).trim();
+    let bajo = archivo.to_lowercase();
+    if archivo.is_empty()
+        || bajo == "desktop.ini"
+        || bajo == "thumbs.db"
+        || bajo.starts_with("~$")
+        || bajo.ends_with(".lnk")
+        || bajo.ends_with(".tmp")
+    {
+        return None;
+    }
+    Some((clave, archivo.to_owned()))
+}
+
+/// What Microsoft Defender is set to send to its cloud, as Windows says (1.0.45). Each value is
+/// `None` when it could not be read (not Windows, Defender not there, or the value never set).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize)]
+pub struct DefenderNube {
+    /// `SubmitSamplesConsent`: 0 always ask, 1 send safe samples automatically, 2 never send,
+    /// 3 send all samples automatically (Microsoft's `Set-MpPreference` documentation).
+    pub muestras: Option<u32>,
+    /// The value above comes from a policy (an organisation set it), not the person.
+    pub muestras_directiva: bool,
+    /// `SpynetReporting` (cloud protection, «MAPS»): 0 off, 1 basic, 2 advanced.
+    pub maps: Option<u32>,
+    /// The value above comes from a policy.
+    pub maps_directiva: bool,
+}
+
+/// Reads Defender's cloud settings. Off Windows, nothing is known.
+#[must_use]
+pub fn defender_nube() -> DefenderNube {
+    #[cfg(windows)]
+    {
+        defender::leer()
+    }
+    #[cfg(not(windows))]
+    {
+        DefenderNube::default()
+    }
+}
+
+/// The number `reg.exe query … /v <nombre>` printed for a `REG_DWORD`, or `None`.
+///
+/// The line reads `    SubmitSamplesConsent    REG_DWORD    0x1`.
+#[must_use]
+pub fn lee_dword_de_reg(salida: &str, nombre: &str) -> Option<u32> {
+    salida.lines().find_map(|l| {
+        let mut p = l.split_whitespace();
+        let (n, tipo, valor) = (p.next()?, p.next()?, p.next()?);
+        if !n.eq_ignore_ascii_case(nombre) || tipo != "REG_DWORD" {
+            return None;
+        }
+        let v = valor.trim_start_matches("0x").trim_start_matches("0X");
+        u32::from_str_radix(v, 16).ok()
+    })
 }
 
 /// An antivirus as Windows Security Center lists it.
@@ -365,6 +514,56 @@ pub fn revision_del_equipo_en_vivo(
 
 /// The review's script, so its size and its read-only promise can be checked everywhere.
 pub const REVISION_PS1: &str = include_str!("revision.ps1");
+
+#[cfg(test)]
+mod vision {
+    use super::{carpeta_de_usuario, lee_dword_de_reg};
+
+    #[test]
+    fn only_files_in_the_persons_folders_count_and_only_by_name() {
+        assert_eq!(
+            carpeta_de_usuario(r"\Device\HarddiskVolume3\Users\Ana\Documents\Banco\informe.pdf"),
+            Some(("documentos", "informe.pdf".to_owned()))
+        );
+        assert_eq!(
+            carpeta_de_usuario(r"C:\Users\ana\Desktop\foto.jpg"),
+            Some(("escritorio", "foto.jpg".to_owned()))
+        );
+        assert_eq!(
+            carpeta_de_usuario(r"C:\Users\ana\OneDrive - Acme\Imágenes\a.png"),
+            Some(("imagenes", "a.png".to_owned()))
+        );
+        assert_eq!(
+            carpeta_de_usuario(r"C:\Users\ana\OneDrive\Documentos\x.docx:Zone.Identifier"),
+            Some(("documentos", "x.docx".to_owned()))
+        );
+        assert_eq!(
+            carpeta_de_usuario(r"C:\Users\ana\Downloads\setup.exe").map(|x| x.0),
+            Some("descargas")
+        );
+        for fuera in [
+            r"C:\Users\ana\AppData\Roaming\x.db",
+            r"C:\Windows\System32\kernel32.dll",
+            r"C:\Users\ana\Documents",
+            r"C:\Users\ana\Documents\desktop.ini",
+            r"C:\Users\ana\Desktop\Chrome.lnk",
+            r"C:\Users\ana\Documents\~$carta.docx",
+            r"C:\Program Files\Users\Documents",
+            "",
+        ] {
+            assert_eq!(carpeta_de_usuario(fuera), None, "{fuera}");
+        }
+    }
+
+    #[test]
+    fn a_dword_is_read_from_what_reg_prints() {
+        let s = "\r\nHKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows Defender\\Spynet\r\n    \
+                 SubmitSamplesConsent    REG_DWORD    0x3\r\n\r\n";
+        assert_eq!(lee_dword_de_reg(s, "SubmitSamplesConsent"), Some(3));
+        assert_eq!(lee_dword_de_reg(s, "SpynetReporting"), None);
+        assert_eq!(lee_dword_de_reg("", "SubmitSamplesConsent"), None);
+    }
+}
 
 #[cfg(test)]
 mod revision_script {

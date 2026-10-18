@@ -32,6 +32,7 @@ mod stats;
 pub mod time;
 mod trafico;
 pub mod trampas;
+pub mod vision;
 
 pub use changes::{Change, ChangeKind, ChangeWho};
 pub use error::{Error, Result};

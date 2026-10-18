@@ -303,6 +303,8 @@ fn filas_de_trafico(
                 enviados: m.enviados,
                 recibidos: m.recibidos,
                 paquetes: m.paquetes,
+                reenviados: m.reenviados,
+                conexiones: m.conexiones,
                 // The operator's own place first. Where they publish none, the city the address
                 // database gives, approximate. An anycast address answers from many places.
                 lugar: if s.anycast {
@@ -317,6 +319,67 @@ fn filas_de_trafico(
             }
         })
         .collect()
+}
+
+/// «Visión profunda» (1.0.45), the service's half: the file-name watch (only while the person
+/// has it on), the «posible transferencia» detector fed with every take of traffic, and the
+/// hourly chained summary closed when an hour ends. All in memory but the warnings and the
+/// summary; no address and no content is kept.
+#[derive(Default)]
+struct Vision {
+    detector: guardiana_core::vision::Detector,
+    archivos: Option<guardiana_apps::Archivos>,
+    /// The file session could not open: said once and not retried every ten seconds, until the
+    /// person turns the watch off and on again.
+    archivos_fallo: bool,
+    ultima_hora: i64,
+}
+
+impl Vision {
+    fn paso(&mut self, l: &mut Ledger, filas: &[guardiana_core::Trafico], ahora: i64) {
+        let quiere = l.vision_archivos();
+        match (quiere, self.archivos.is_some()) {
+            (true, false) if !self.archivos_fallo => match guardiana_apps::Archivos::arrancar() {
+                Ok(a) => self.archivos = Some(a),
+                Err(guardiana_apps::Error::NoSoportado) => self.archivos_fallo = true,
+                Err(e) => {
+                    eprintln!("guardiana: {e}");
+                    self.archivos_fallo = true;
+                }
+            },
+            (false, true) => {
+                // Off: the session closes and what it remembered goes with it.
+                self.archivos = None;
+                self.detector = guardiana_core::vision::Detector::new();
+            }
+            (false, false) => self.archivos_fallo = false,
+            _ => {}
+        }
+        if let Some(a) = &self.archivos {
+            for x in a.toma() {
+                self.detector.lectura(x);
+            }
+            for e in guardiana_panel::vision::envios_de(filas, ahora) {
+                self.detector.envio(e);
+            }
+            let nuevas = self.detector.revisa(ahora);
+            if !nuevas.is_empty() {
+                if let Err(e) = l.anota_transferencias(&nuevas) {
+                    eprintln!("guardiana: {e}");
+                }
+            }
+        }
+        let hora = guardiana_core::vision::hora_de(ahora);
+        if hora != self.ultima_hora {
+            self.ultima_hora = hora;
+            if let Err(e) = guardiana_panel::vision::cierra_horas(l, ahora) {
+                eprintln!("guardiana: {e}");
+            }
+            if let Err(e) = l.poda_vision(ahora) {
+                eprintln!("guardiana: {e}");
+            }
+        }
+    }
 }
 
 /// The rules as the resolver matches them. A rule saved before 1.0.2 may hold what was typed
@@ -644,10 +707,12 @@ impl Policy for EnginePolicy {
         // extracto (decisión 203, con el ok del responsable del 11 oct 2026). La dirección no
         // pasa de esta línea. Nada para lo cortado ni para lo que contestó GUARDIANA.
         if let Outcome::Forwarded {
-            server: Some(ip), ..
-        } = outcome
+            server: Some(ip),
+            otras,
+            ..
+        } = &outcome
         {
-            event.server = Some(guardiana_lists::server_info_de(ip));
+            event.server = Some(guardiana_lists::server_info_de(*ip));
             if p.device_id == guardiana_core::SELF_DEVICE_ID {
                 if let Ok(mut m) = self.nombres_ip.lock() {
                     if m.len() >= MAX_NOMBRES_IP {
@@ -657,10 +722,12 @@ impl Policy for EnginePolicy {
                             m.clear();
                         }
                     }
-                    m.insert(
-                        ip,
-                        (q.name.trim_end_matches('.').to_ascii_lowercase(), q.ts),
-                    );
+                    let nombre = q.name.trim_end_matches('.').to_ascii_lowercase();
+                    // 1.0.45: every address of the answer, not only the first, so a program
+                    // that connects to the second one is not shown as «without a name».
+                    for a in std::iter::once(ip).chain(otras.iter()) {
+                        m.insert(*a, (nombre.clone(), q.ts));
+                    }
                 }
             }
         }
@@ -1817,36 +1884,41 @@ async fn run_once<F: Future<Output = ()>>(
             Some(tokio::spawn(async move {
                 let mut cada = tokio::time::interval(Duration::from_secs(TRAFICO_CADA_S));
                 let mut conexion: Option<Ledger> = None;
+                let mut vision = Vision::default();
                 loop {
                     cada.tick().await;
-                    let medidas = red.toma();
-                    if medidas.is_empty() {
-                        continue;
-                    }
-                    let filas = filas_de_trafico(&medidas, &nombres, now_ms());
+                    let ahora = now_ms();
                     if conexion.is_none() {
                         conexion = Ledger::open(&db, identity::genesis()).ok();
                     }
-                    if let Some(l) = conexion.as_mut() {
-                        // «Que GUARDIANA lo mire» apagado (1.0.22): lo que miden los antivirus
-                        // se tira, no se guarda. La lectura de cada vez es la que manda, no una copia.
-                        let filas: Vec<_> = if l.vigilando_antivirus() {
-                            filas
-                        } else {
-                            filas
-                                .into_iter()
-                                .filter(|f| {
-                                    guardiana_lists::antivirus::antivirus_de_programa(&f.programa)
-                                        .is_none()
-                                })
-                                .collect()
-                        };
-                        if filas.is_empty() {
-                            continue;
-                        }
-                        if let Err(e) = l.suma_trafico(&filas) {
-                            eprintln!("guardiana: {e}");
-                        }
+                    let medidas = red.toma();
+                    let filas = filas_de_trafico(&medidas, &nombres, ahora);
+                    let Some(l) = conexion.as_mut() else {
+                        continue;
+                    };
+                    // «Que GUARDIANA lo mire» apagado (1.0.22): lo que miden los antivirus
+                    // se tira, no se guarda. La lectura de cada vez es la que manda, no una copia.
+                    let filas: Vec<_> = if l.vigilando_antivirus() {
+                        filas
+                    } else {
+                        filas
+                            .into_iter()
+                            .filter(|f| {
+                                guardiana_lists::antivirus::antivirus_de_programa(&f.programa)
+                                    .is_none()
+                            })
+                            .collect()
+                    };
+                    // «Visión profunda» (1.0.45): the file watch, the possible transfers and the
+                    // hourly chained summary, from the same rows (what the person chose not to
+                    // keep is not used there either). Every tick, so an hour closes on time even
+                    // when nothing was measured.
+                    vision.paso(l, &filas, ahora);
+                    if filas.is_empty() {
+                        continue;
+                    }
+                    if let Err(e) = l.suma_trafico(&filas) {
+                        eprintln!("guardiana: {e}");
                     }
                 }
             }))
@@ -2520,6 +2592,7 @@ mod aparte_tests {
         s.anota(&Outcome::Forwarded {
             rcode: dns::ResponseCode::NoError,
             server: None,
+            otras: Vec::new(),
             aliases: Vec::new(),
         });
         s.anota(&Outcome::Canary);
