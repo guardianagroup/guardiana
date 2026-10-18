@@ -3055,6 +3055,13 @@ fn maximum_protection_cuts_session_recording_and_can_be_undone() {
 #[test]
 fn the_page_script_gets_a_seed_only_with_maximum_protection() {
     let (mut s, _, id) = con_pagina(true);
+    // 1.0.46: the noise is on with the protection by default; this test is about maximum
+    // protection alone, so the person's own noise is turned off first.
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"huella_ruido","valor":false}"#,
+    );
     let web = "https://www.eltiempo.com/";
     let pide = r#"{"tipo":"zg_cookies_pide","zg":"f1"}"#;
     let huella = |s: &mut Sesion, id: u32, web: &str| -> Value {
@@ -3125,6 +3132,13 @@ fn the_page_script_gets_a_seed_only_with_maximum_protection() {
 #[test]
 fn frames_report_their_reads_and_get_their_answer_back() {
     let (mut s, _, id) = con_pagina(true);
+    // 1.0.46: the noise is on with the protection by default; this test is about maximum
+    // protection alone, so the person's own noise is turned off first.
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"huella_ruido","valor":false}"#,
+    );
     let marco = "https://ads.anuncios.example/frame.html";
     let (r, o) = s.mensaje_de_marco(id, marco, r#"{"tipo":"zg_marco_pide","zg":"m1"}"#);
     assert!(o.is_empty());
