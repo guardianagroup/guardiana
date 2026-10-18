@@ -515,7 +515,10 @@
       const W = st.Wc, H = st.H, asp = W / H, aspU = st.W / H; T.asp = asp;
       const yo = st.lugar;
       // The globe sways a little by itself until the person takes it in hand (13 Oct 2026).
-      const osc = reducido || st.tocado ? 0 : Math.sin(tiempo() * 0.05) * 0.35;
+      // No longer (17 Oct 2026). The owner: «hay veces que las ciudades se arrastraban, se veían
+      // lejos y luego más cerca». The slow sway moved the whole Earth by up to 20° on its own,
+      // so places slid away and came back while he looked. The Earth now stays where he left it.
+      const osc = 0;
       T.osc = osc;
       const rot = -yo.lon * RAD + osc + st.dRot, tilt = Math.max(-1.4, Math.min(1.4, yo.lat * RAD * 0.8 + st.dTilt));
       const g = 1 - T.m;
@@ -689,6 +692,65 @@
       cx.strokeStyle = col; cx.lineWidth = ancho; cx.setLineDash(guion || []); cx.lineDashOffset = desp || 0;
       cx.beginPath(); let ab = false; pts.forEach((q) => { if (!q.v) { ab = false; return; } if (!ab) { cx.moveTo(q.x, q.y); ab = true; } else cx.lineTo(q.x, q.y); }); cx.stroke(); cx.setLineDash([]); cx.lineDashOffset = 0;
     };
+    // ---------- Names on the Earth, as Google Earth does (17 Oct 2026) ----------
+    // The owner: «deberían de salir los países… todos deben de aparecer… si yo me voy lejos,
+    // desaparece, y cuando me acerco, aparece». Each country is named once it is big enough on
+    // the screen to hold its name (its land cells say how big it is), so the large ones show on
+    // the whole globe and the small ones as you come closer. Closer still, cities appear, the
+    // most populous first (ciudades.tsv is in order of population), more of them the closer you
+    // are. Names never overlap: one that would touch another is left out, and they fade in.
+    const TAM_PAIS = (() => {
+      const a = new Float32Array(listaPaises.length + 1);
+      for (let i = 0; i < G.nlat; i++) { const k = Math.cos((G.lat0 - i * G.paso) * RAD); for (let j = 0; j < G.nlon; j++) { const v = celdas[i * G.nlon + j]; if (v) a[v] += k; } }
+      const m = {}; listaPaises.forEach((p, i) => { m[p.c] = Math.max(m[p.c] || 0, Math.sqrt(a[i + 1]) * G.paso); });
+      Object.keys(centros).forEach((c) => { if (!m[c]) m[c] = 0.6; });
+      return m;
+    })();
+    let ciudadesGeo = null, pidiendoCiudades = false;
+    const nombresGeo = (ppg) => {
+      if (T.m > 0.15 && T.m < 0.85) return;
+      const libres = [], choca = (b) => libres.some((o) => b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y);
+      const dentro = (q, m) => q.v && q.x > m && q.x < st.W - m && q.y > m && q.y < st.H - m;
+      cx.save(); cx.lineJoin = 'round'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+      // Countries, biggest first.
+      cx.font = '600 13px "IBM Plex Sans", "Segoe UI", system-ui, sans-serif';
+      const paises = Object.keys(centros).map((c) => ({ c, px: TAM_PAIS[c] * ppg })).filter((p) => p.px >= 38).sort((a, b) => b.px - a.px);
+      for (const p of paises) {
+        const q = aPantalla(lugar(centros[p.c].lon, centros[p.c].lat, 0.002));
+        if (!dentro(q, 20)) continue;
+        const txt = nombrePais(p.c), w = cx.measureText(txt).width + 10, b = { x: q.x - w / 2, y: q.y - 10, w, h: 20 };
+        if (choca(b)) continue;
+        libres.push(b);
+        cx.globalAlpha = Math.min(1, (p.px - 38) / 30) * 0.92;
+        cx.lineWidth = 3.2; cx.strokeStyle = 'rgba(2,6,14,.85)'; cx.strokeText(txt, q.x, q.y);
+        cx.fillStyle = '#f2f5fa'; cx.fillText(txt, q.x, q.y);
+      }
+      // Cities, from about the size of a country on the screen.
+      if (ppg >= 10) {
+        if (!ciudadesGeo && !pidiendoCiudades) { pidiendoCiudades = true; ciudades().then((l) => { ciudadesGeo = l; }).catch(() => { pidiendoCiudades = false; }); }
+        if (ciudadesGeo) {
+          const cuantas = Math.min(ciudadesGeo.length, Math.round(120 * Math.pow(ppg / 10, 2.2)));
+          const c0 = lonLatBajo(st.W / 2, st.H / 2), radio = Math.hypot(st.W, st.H) / 2 / ppg + 2;
+          cx.font = '500 11.5px "IBM Plex Sans", "Segoe UI", system-ui, sans-serif'; cx.textAlign = 'left';
+          let puestas = 0;
+          for (let i = 0; i < cuantas && puestas < 70; i++) {
+            const c = ciudadesGeo[i];
+            if (c0 && (Math.abs(c.la - c0[1]) > radio || Math.abs(((c.lo - c0[0] + 540) % 360) - 180) * Math.cos(c.la * RAD) > radio)) continue;
+            const q = aPantalla(lugar(c.lo, c.la, 0.002));
+            if (!dentro(q, 12)) continue;
+            const w = cx.measureText(c.n).width + 14, b = { x: q.x - 4, y: q.y - 9, w, h: 18 };
+            if (choca(b)) continue;
+            libres.push(b); puestas++;
+            cx.globalAlpha = Math.min(1, (ppg - 10) / 6) * (i < cuantas * 0.7 ? 0.95 : 0.7);
+            cx.fillStyle = 'rgba(2,6,14,.9)'; cx.beginPath(); cx.arc(q.x, q.y, 3.2, 0, 7); cx.fill();
+            cx.fillStyle = '#e6ecf5'; cx.beginPath(); cx.arc(q.x, q.y, 1.8, 0, 7); cx.fill();
+            cx.lineWidth = 3; cx.strokeStyle = 'rgba(2,6,14,.85)'; cx.strokeText(c.n, q.x + 7, q.y);
+            cx.fillStyle = '#dfe6f0'; cx.fillText(c.n, q.x + 7, q.y);
+          }
+        }
+      }
+      cx.restore();
+    };
     const dibujaTierra = (dt) => {
       const L = layoutTierra(), tt = tiempo();
       cx.globalCompositeOperation = 'lighter';
@@ -711,6 +773,7 @@
       // the eye without blinking. Up close, the place is named next to it.
       cx.globalCompositeOperation = 'source-over';
       const puestos = [], ppg = pxPorGrado(), conNombre = ppg >= 7;
+      try { nombresGeo(ppg); } catch (_) {}
       const nombrados = conNombre ? new Set(GRUPOS.filter((g) => g.base.v).sort((a, b) => (b.top.sub + b.top.baj) - (a.top.sub + a.top.baj)).slice(0, ppg >= 20 ? 30 : 16)) : null;
       GRUPOS.forEach((g) => {
         if (!g.base.v) return;
@@ -1873,7 +1936,11 @@
           toca(); st.interactuando = true;
           // Calm (17 Oct 2026, the owner: «el globo es demasiado sensible»): dragging across the whole
           // view turns it about a quarter of a turn, the way a heavy globe on a desk moves.
-          const sensibilidad = 0.5 * Math.PI / Math.max(600, Math.max(st.W || 800, st.H || 600));
+          // Slower still and steady up close (17 Oct 2026, the owner: «sigue siendo muy brusco… tiene
+          // que ser bastante más lento para que haya más control»): a third less than before, and
+          // never faster than the ground under the pointer, so that zoomed in, a drag moves the
+          // land by about half as far as the hand, as in Google Earth, instead of spinning past it.
+          const sensibilidad = Math.min(0.33 * Math.PI / Math.max(600, Math.max(st.W || 800, st.H || 600)), 0.5 * RAD / Math.max(1, pxPorGrado()));
           const dt = Math.max(8, Math.min(80, e.timeStamp - arrastre.t));
           st.dRot += dx * sensibilidad; st.dTilt = Math.max(-1.4, Math.min(1.4, st.dTilt + dy * sensibilidad * 0.82));
           arrastre.vr = dx * sensibilidad * 1000 / dt; arrastre.vt = dy * sensibilidad * 0.82 * 1000 / dt;
@@ -1899,7 +1966,7 @@
     cv.addEventListener('pointercancel', (e) => { if (arrastre && arrastre.id === e.pointerId) arrastre = null; suelta(e); });
     cv.addEventListener('pointerup', (e) => {
       const movido = !!(arrastre && arrastre.id === e.pointerId && arrastre.movido);
-      if (movido && !reducido && dedos.size < 2) st.inercia = { vr: arrastre.vr * 0.5, vt: arrastre.vt * 0.5 };
+      if (movido && !reducido && dedos.size < 2) st.inercia = { vr: arrastre.vr * 0.3, vt: arrastre.vt * 0.3 };
       if (arrastre && arrastre.id === e.pointerId) arrastre = null;
       suelta(e);
       if (dedos.size || movido) return;
@@ -2090,7 +2157,7 @@
       try {
         if (st.inercia && !reducido) {
           st.dRot += st.inercia.vr * dt; st.dTilt = Math.max(-1.4, Math.min(1.4, st.dTilt + st.inercia.vt * dt));
-          const freno = Math.exp(-7 * dt); st.inercia.vr *= freno; st.inercia.vt *= freno;
+          const freno = Math.exp(-9 * dt); st.inercia.vr *= freno; st.inercia.vt *= freno;
           if (Math.hypot(st.inercia.vr, st.inercia.vt) < 0.004) st.inercia = null;
         }
         if (ahora - ultimaTele > 1000) { ultimaTele = ahora; telemetria(); pintaDatos(); }
