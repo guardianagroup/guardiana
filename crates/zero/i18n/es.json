@@ -1382,7 +1382,7 @@
   "esc_como_4": "Llamadas: WebRTC con DTLS-SRTP y Opus; lo que las prepara va dentro de Olm. El cifrado del audio (DTLS) no es poscuántico.",
   "esc_como_5": "Sala de entrega: la clave de 256 bits viaja solo en el enlace; canal ECDH P-256 + AES-256-GCM, y cada archivo con su propia clave AES-256-GCM (STREAM) y su árbol de hashes (RFC 6962). Sin ML-KEM: el navegador del receptor no lo tiene.",
   "esc_como_6": "Tamaños: lo que va entre equipos se rellena a tamaños fijos (Padmé), para que el relé no sepa la longitud de cada mensaje. No oculta cuándo se habla.",
-  "esc_como_7": "En tu disco: la clave de tu identidad y las de las entregas, selladas con DPAPI para tu cuenta de Windows. En Linux y macOS, solo legibles por tu usuario.",
+  "esc_como_7": "En tu disco: la clave de tu identidad y las de las entregas, selladas con DPAPI para tu cuenta de Windows. En macOS, solo legibles por tu usuario.",
   "esc_como_8": "GUARDIANA no guarda direcciones IP ni lee nada: el relé solo pasa bytes cifrados.",
   "ve_titulo": "¿Cómo quieres hablar?",
   "ve_real": "Voz real",

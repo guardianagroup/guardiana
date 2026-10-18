@@ -78,10 +78,11 @@ out="build/out"
 binarios=""
 paquetes_ci=""
 # `--paquetes <carpeta>` (1.0.2): la carpeta trae TODO lo que probó la prueba de cliente de GitHub
-# (los dos binarios, el .deb, el .tar.gz, los tres MSI y la app de Mac, con su SHA256SUMS). Es
-# `--binarios` más los paquetes, que ya no se vuelven a construir aquí: lo que se firma es, byte a
-# byte, lo que se probó. Hace falta desde que no hay Mac: la app de Mac no se puede hacer en otro
-# sitio, y el .deb y el .tar.gz hechos aquí no serían los probados.
+# (el binario de Windows, los tres MSI y la app de Mac, con su SHA256SUMS). Es `--binarios` más
+# los paquetes, que ya no se vuelven a construir aquí: lo que se firma es, byte a byte, lo que se
+# probó. Hace falta desde que no hay Mac: la app de Mac no se puede hacer en otro sitio.
+# Desde 1.0.45 no hay paquetes de Linux (el dueño, 18 oct 2026: «QUITA LINUX. SOLO MAC Y
+# WINDOWS»): ni binario suelto, ni .deb, ni .tar.gz.
 if [ "${1:-}" = "--paquetes" ]; then
     paquetes_ci="${2:?--paquetes necesita la carpeta}"
     set -- --binarios "$paquetes_ci"
@@ -101,7 +102,6 @@ if [ "${1:-}" = "--binarios" ]; then
 else
     build/repro.sh HEAD
 fi
-linux="$out/guardiana-$version-linux-x86_64"
 win="$out/guardiana-$version-windows-x86_64.exe"
 
 # 1 bis. Los paquetes que la gente descarga de verdad. La página de instalación dice, con estas
@@ -112,14 +112,12 @@ win="$out/guardiana-$version-windows-x86_64.exe"
 if [ -n "$paquetes_ci" ]; then
     # Todo viene probado de GitHub: se copia a dist/<versión> sin tocarlo.
     mkdir -p "dist/$version"
-    for f in "guardiana_${version}_amd64.deb" "guardiana-$version-linux-x86_64.tar.gz" \
-             "guardiana-$version-windows-x64.msi" "guardiana-$version-windows-x64-en.msi" \
+    for f in "guardiana-$version-windows-x64.msi" "guardiana-$version-windows-x64-en.msi" \
              "guardiana-$version-windows-x64-pt.msi" "guardiana-$version-macos.app.zip"; do
         [ -f "$paquetes_ci/$f" ] || { echo "release.sh: falta $paquetes_ci/$f" >&2; exit 1; }
         cp "$paquetes_ci/$f" "dist/$version/$f"
     done
 else
-    cp "$linux" target/x86_64-unknown-linux-gnu/release/guardiana
     cp "$win" target/x86_64-pc-windows-gnu/release/guardiana.exe
     build/package.sh --no-build
 fi
@@ -141,8 +139,6 @@ fi
 msi="$paquetes/guardiana-$version-windows-x64.msi"
 msi_en="$paquetes/guardiana-$version-windows-x64-en.msi"
 msi_pt="$paquetes/guardiana-$version-windows-x64-pt.msi"
-deb="$paquetes/guardiana_${version}_amd64.deb"
-tarball="$paquetes/guardiana-$version-linux-x86_64.tar.gz"
 for m in "$msi" "$msi_en" "$msi_pt"; do
     if [ ! -f "$m" ]; then
         echo "release.sh: falta $m." >&2
@@ -154,16 +150,15 @@ for m in "$msi" "$msi_en" "$msi_pt"; do
 done
 
 # 2. minisign signatures over everything that gets published.
-for f in "$linux" "$win" "$msi" "$msi_en" "$msi_pt" "$deb" "$tarball" ${zero:+"$zero"}; do
+for f in "$win" "$msi" "$msi_en" "$msi_pt" ${zero:+"$zero"}; do
     firmar "$f" "guardiana $version $(basename "$f")"
 done
-sha_linux="$(sha256sum "$linux" | cut -d' ' -f1)"
 
 # 2 bis. macOS: the .app can only be built on a Mac, so this step runs when the release machine
 # is one and is skipped, loudly, when it is not. The app is not notarised (Apple asks for a paid
 # developer account): the person sees Gatekeeper's warning and the install page explains it, the
-# same way the Windows one is explained. What replaces notarisation here is the same thing as on
-# Linux: the hash and the minisign signature, published before the download exists.
+# same way the Windows one is explained. What replaces notarisation here is the hash and the
+# minisign signature, published before the download exists.
 mac=""; sha_mac=""; sig_mac=""
 if [ -n "$paquetes_ci" ]; then
     mac="$out/guardiana-$version-macos.app.zip"
@@ -220,9 +215,9 @@ else
 fi
 
 # 5. The ledger line: one entry per file that anyone can download, not only the two raw binaries.
-# `reproducible` says the truth about each one: the two binaries come out of the pinned container
-# and two builds of the same commit give the same hash (comprobado el 20 sep 2026, después de fijar
-# el sello de tiempo del .exe); los envoltorios —MSI, .deb, tarball, .app.zip— se construyen una
+# `reproducible` says the truth about each one: the Windows binary comes out of the pinned
+# container and two builds of the same commit give the same hash (comprobado el 20 sep 2026, después de fijar
+# el sello de tiempo del .exe); los envoltorios —MSI, .app.zip— se construyen una
 # vez y lo que se publica de ellos es su huella y su firma, que es lo que la persona compara.
 entradas=""
 anotar() {  # archivo  reproducible(true|false)  [huella ya firmada]
@@ -233,13 +228,10 @@ anotar() {  # archivo  reproducible(true|false)  [huella ya firmada]
     printf -v fila '%s\t%s\t%s\t%s\t%s\n' "$(basename "$f")" "$sha" "${firmado:-$sha}" "$sig" "$repro"
     entradas="$entradas$fila"
 }
-anotar "$linux" true
 anotar "$win" true "$sha_win_signed"
 anotar "$msi" false
 anotar "$msi_en" false
 anotar "$msi_pt" false
-anotar "$deb" false
-anotar "$tarball" false
 [ -n "$mac" ] && anotar "$mac" false
 [ -n "$zero" ] && anotar "$zero" false
 

@@ -1382,7 +1382,7 @@
   "esc_como_4": "Calls: WebRTC with DTLS-SRTP and Opus; what sets them up goes inside Olm. The audio encryption (DTLS) is not post-quantum.",
   "esc_como_5": "Delivery room: the 256-bit key travels only in the link; ECDH P-256 + AES-256-GCM channel, and each file with its own AES-256-GCM key (STREAM) and its hash tree (RFC 6962). No ML-KEM: the receiver's browser does not have it.",
   "esc_como_6": "Sizes: what goes between computers is padded to fixed sizes (Padmé), so the relay cannot tell the length of each message. It does not hide when you talk.",
-  "esc_como_7": "On your disk: the key of your identity and those of the deliveries, sealed with DPAPI for your Windows account. On Linux and macOS, readable by your user only.",
+  "esc_como_7": "On your disk: the key of your identity and those of the deliveries, sealed with DPAPI for your Windows account. On macOS, readable by your user only.",
   "esc_como_8": "GUARDIANA stores no IP addresses and reads nothing: the relay only passes encrypted bytes.",
   "ve_titulo": "How do you want to talk?",
   "ve_real": "Real voice",
