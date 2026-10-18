@@ -26,6 +26,15 @@
       return `<li><b>${esc(e.empresa)}</b> <span class="ct-meta">${esc(tn('ct_veces', e.veces))} · ${esc(t('ct_desde').replace('{fecha}', fecha(e.desde)))}</span>${nombres ? `<div class="ct-mono">${esc(nombres)}</div>` : ''}</li>`;
     };
 
+    // The cut is a switch, green «Permitido» ↔ red «Cortado», with the word beside it (the owner,
+    // 18 Oct 2026: every cut control is a switch, never a «Cortar» text button). The markup is the
+    // shared `interruptor` component of the redesign; on means cut. Turning it on cuts only what
+    // is new; turning it off undoes that cut.
+    const interruptor = (a, cortado) => `<span class="interruptor-caja chico${cortado ? ' cortado' : ''}">
+        <button type="button" class="interruptor" role="switch" aria-checked="${cortado}" data-accion="${cortado ? 'deshacer' : 'cortar'}" aria-label="${esc(t('ct_interruptor_nuevo').replace('{programa}', a.programa))}"><span class="interruptor-bola" aria-hidden="true"></span></button>
+        <span class="interruptor-estado">${esc(t(cortado ? 'ct_cortado' : 'ct_permitido'))}</span>
+      </span>`;
+
     const pintaAviso = (a) => {
       const abierto = a.estado === 'abierto';
       const deshacible = a.estado === 'cortado' || a.estado === 'cortado_auto';
@@ -47,9 +56,8 @@
         ${a.reglas_texto ? `<p class="ct-nota">${esc(a.reglas_texto)} <a class="enlace" href="/reglas">→</a></p>` : ''}
         ${sinCortar ? `<ul class="ct-nota">${sinCortar}</ul>` : ''}
         <div class="ct-botones">
-          ${abierto ? `<button type="button" class="btn cut chico" data-accion="cortar">${esc(t('ct_accion_cortar'))}</button>
-          <button type="button" class="btn secondary chico" data-accion="aceptar">${esc(t('ct_accion_aceptar'))}</button>` : ''}
-          ${deshacible ? `<button type="button" class="btn secondary chico" data-accion="deshacer">${esc(t('ct_accion_deshacer'))}</button>` : ''}
+          ${abierto || deshacible ? interruptor(a, deshacible) : ''}
+          ${abierto ? `<button type="button" class="btn secondary chico" data-accion="aceptar">${esc(t('ct_accion_aceptar'))}</button>` : ''}
           <button type="button" class="enlace" data-accion="detalle" aria-expanded="${visto}">${esc(t('ct_accion_detalle'))}</button>
         </div>
         <div class="ct-detalle"${visto ? '' : ' hidden'}><div class="rotulo">${esc(t('ct_nombres'))}</div><div class="ct-col"><ul>${detalle}</ul></div></div>
