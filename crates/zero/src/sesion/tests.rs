@@ -131,8 +131,13 @@ fn the_three_product_tabs_open_together_and_the_panel_stays_in_front() {
     let e = del_tipo(&o, Origen::Barra, "estado").unwrap_or_default();
     // The names the owner asked for (15 Oct 2026), so the person knows each tab at a glance.
     assert_eq!(e["pestanas"][0]["titulo"], "Radiografías");
-    assert_eq!(e["pestanas"][1]["titulo"], "Navegador ZERO");
+    // 1.0.46: the browser's own tab is a new tab in ZERO's strip; the selector names products.
+    assert_eq!(e["pestanas"][1]["titulo"], "Nueva pestaña");
     assert_eq!(e["pestanas"][2]["titulo"], "Comunicaciones");
+    assert_eq!(e["pestanas"][0]["producto"], "guardiana");
+    assert_eq!(e["pestanas"][1]["producto"], "zero");
+    assert_eq!(e["pestanas"][2]["producto"], "secure");
+    assert_eq!(e["producto"], "guardiana");
 
     let id = s.pestanas[0].id;
     let o = s.mensaje(
@@ -3580,4 +3585,166 @@ fn a_key_typed_in_guardianas_panel_is_kept_for_the_browser_too() {
         1,
     );
     assert!(s.clave_del_panel.is_none());
+}
+
+// --- 1.0.46 · one navigation, the glass strip, the side summary (zero-1.0.46) ------------------
+
+fn marco_de(o: &[Orden]) -> Option<(i32, i32)> {
+    o.iter().find_map(|x| match x {
+        Orden::Marco { barra, lateral } => Some((*barra, *lateral)),
+        _ => None,
+    })
+}
+
+#[test]
+fn one_navigation_the_selector_moves_between_the_three_products() {
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "a".repeat(64));
+    let _ = s.abre_guardiana(&url);
+    // GUARDIANA's panel in front: ZERO's bar steps aside, the panel draws its own top row.
+    assert_eq!(s.producto(), "guardiana");
+    assert_eq!(marco_de(&s.marco_nuevo()), Some((0, 0)));
+    assert!(
+        s.marco_nuevo().is_empty(),
+        "the same layout is not given twice"
+    );
+    // From the panel's own selector (a message of that page, through the tab's channel).
+    let panel = s.activa();
+    let o = s.mensaje(
+        Origen::Pestana(panel),
+        &url,
+        r#"{"tipo":"zg_producto","producto":"zero"}"#,
+    );
+    assert_eq!(s.producto(), "zero");
+    // The wheel then scrolls what was chosen (Z4).
+    assert!(o.iter().any(|x| matches!(
+        x,
+        Orden::Foco {
+            a: Origen::Pestana(_)
+        }
+    )));
+    let m = s.marco_nuevo();
+    assert_eq!(marco_de(&m), Some((ALTO_ZERO, 0)));
+    assert_eq!(
+        del_tipo(&m, Origen::Barra, "marco").unwrap_or_default()["barra"],
+        140
+    );
+    // A web page cannot ask for it.
+    let web = s.activa();
+    let _ = s.mensaje(
+        Origen::Pestana(web),
+        "https://example.com/",
+        r#"{"tipo":"zg_producto","producto":"guardiana"}"#,
+    );
+    assert_eq!(s.producto(), "zero");
+    // Comunicaciones: only the top row of the bar.
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"producto","producto":"secure"}"#,
+    );
+    assert_eq!(s.producto(), "secure");
+    assert_eq!(marco_de(&s.marco_nuevo()), Some((ALTO_ARRIBA, 0)));
+    // And back to the browser tab the person was on.
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"navegar","texto":"example.com"}"#,
+    );
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"producto","producto":"guardiana"}"#,
+    );
+    assert_eq!(s.activa(), panel);
+}
+
+#[test]
+fn radiografias_without_the_panel_open_asks_the_shell_for_it() {
+    let (mut s, _, _) = abre();
+    let o = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"producto","producto":"guardiana"}"#,
+    );
+    assert_eq!(o, vec![Orden::PideGuardiana]);
+}
+
+#[test]
+fn the_glass_strip_shows_beside_a_web_and_the_summary_opens_to_360() {
+    let (mut s, _, id) = con_pagina(true);
+    let _ = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":null}"#);
+    let _ = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":null}"#);
+    assert_eq!(s.marco(), (ALTO_ZERO, ANCHO_FRANJA));
+    let _ = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"panel","vista":"escudo"}"#);
+    assert_eq!(s.marco(), (ALTO_ZERO, ANCHO_LATERAL));
+    // On the new tab the summary steps aside: the day's diary is there in full (Z1-a).
+    let _ = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"pestana_nueva"}"#);
+    assert_eq!(s.marco(), (ALTO_ZERO, 0));
+    let _ = id;
+}
+
+#[test]
+fn allowing_a_web_is_kept_and_said_in_its_shield() {
+    let (mut s, _, _) = con_pagina(true);
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"permitir_web","valor":true}"#,
+    );
+    let e = del_tipo(&o, Origen::Panel, "escudo").unwrap_or_default();
+    assert_eq!(e["web_permitida"], true);
+    assert!(s.prefs.reglas.webs_permitidas.contains("eltiempo.com"));
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"permitir_web","valor":false}"#,
+    );
+    let e = del_tipo(&o, Origen::Panel, "escudo").unwrap_or_default();
+    assert_eq!(e["web_permitida"], false);
+    assert!(s.prefs.reglas.webs_permitidas.is_empty());
+}
+
+#[test]
+fn the_language_of_the_program_reaches_zero_only_from_guardianas_own_panel() {
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "a".repeat(64));
+    let _ = s.abre_guardiana(&url);
+    let panel = s.activa();
+    let _ = s.mensaje(
+        Origen::Pestana(panel),
+        "https://example.com/",
+        r#"{"tipo":"zg_idioma","idioma":"en"}"#,
+    );
+    assert_eq!(s.textos().idioma().codigo(), "es");
+    let o = s.mensaje(
+        Origen::Pestana(panel),
+        "http://127.0.0.1:7443/por-dentro",
+        r#"{"tipo":"zg_idioma","idioma":"en"}"#,
+    );
+    assert_eq!(s.textos().idioma().codigo(), "en");
+    assert!(del_tipo(&o, Origen::Barra, "textos").is_some());
+    // Nothing else is taken as a language.
+    let _ = s.mensaje(
+        Origen::Pestana(panel),
+        "http://127.0.0.1:7443/",
+        r#"{"tipo":"zg_idioma","idioma":"fr"}"#,
+    );
+    assert_eq!(s.textos().idioma().codigo(), "en");
+}
+
+#[test]
+fn the_window_title_says_guardiana_once() {
+    let (mut s, _, _) = abre();
+    let id = s.activa();
+    if let Some(p) = s.pestana_mut(id) {
+        p.url = "http://127.0.0.1:7443/".into();
+        p.titulo = "GUARDIANA · Radiografía".into();
+    }
+    assert_eq!(
+        s.titulo_ventana(),
+        Orden::Titulo {
+            texto: "GUARDIANA · Radiografía".into()
+        }
+    );
 }

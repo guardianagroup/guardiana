@@ -26,6 +26,11 @@ pub struct Ajustes {
     /// services of `data/grabacion.txt` (decision 206). Only with `cortar_seguimiento`.
     #[serde(default)]
     pub maxima: bool,
+    /// 1.0.46, «Permitir en esta web» (ZERO's side summary): webs (the registrable site of the
+    /// page the person opens) where the lists cut nothing. What the person cut by hand, the
+    /// mandate, their marked data and the open lists' dangerous addresses still hold there.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub webs_permitidas: BTreeSet<String>,
 }
 
 /// One request the engine is about to send.
@@ -233,6 +238,9 @@ pub fn decide_con(
     if ajustes.cortados.contains(&destino.sitio) {
         return corta(Motivo::CorteTuyo, destino, hallazgos);
     }
+    // A web the person allowed: its trackers pass, never a dangerous address.
+    let permitido = permitido
+        || (ajustes.webs_permitidas.contains(p.sitio_pagina) && lista != Some(Motivo::Peligro));
     // A page the person opens is never cut by a list: only what it pulls in from others.
     if ajustes.cortar_seguimiento && !permitido {
         let motivo = match lista {
@@ -269,6 +277,48 @@ mod tests {
             recurso,
             sitio_pagina: "eltiempo.com",
         }
+    }
+
+    #[test]
+    fn a_web_the_person_allowed_lets_its_trackers_pass_and_nothing_else() {
+        let mut a = Ajustes {
+            cortar_seguimiento: true,
+            ..Ajustes::default()
+        };
+        a.webs_permitidas.insert("eltiempo.com".into());
+        let p = pet(
+            "https://stats.g.doubleclick.net/g/collect",
+            b"",
+            Recurso::Imagen,
+        );
+        assert!(!decide(&p, &a, &[], None, None).cortar);
+        // Another web is not touched by it.
+        let otra = Peticion {
+            sitio_pagina: "elespectador.com",
+            ..p.clone()
+        };
+        assert!(decide(&otra, &a, &[], None, None).cortar);
+        // What the person cut by hand still holds there.
+        a.cortados.insert("doubleclick.net".into());
+        assert_eq!(
+            decide(&p, &a, &[], None, None).motivo,
+            Some(Motivo::CorteTuyo)
+        );
+        // And their marked data never leaves for another company.
+        a.cortados.clear();
+        let tinta = formas(&[Marcado {
+            tipo: Tipo::Correo,
+            valor: "ana@correo.co".into(),
+        }]);
+        let con_dato = pet(
+            "https://collect.otra-empresa.io/e",
+            b"{\"email\":\"ana@correo.co\"}",
+            Recurso::Datos,
+        );
+        assert_eq!(
+            decide(&con_dato, &a, &tinta, None, None).motivo,
+            Some(Motivo::Tinta)
+        );
     }
 
     #[test]

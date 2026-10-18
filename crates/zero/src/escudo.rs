@@ -578,6 +578,11 @@ pub struct Dia {
     /// Kept only for the last [`DIAS_WEBS`] days.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub siguen: BTreeMap<String, Sigue>,
+    /// 1.0.46 (ZERO's «Diario de hoy»): the webs on which at least one attempt was cut, so the
+    /// new tab says «N intentos cortados hoy en N webs» with both figures real. Kept like
+    /// `webs`, only for the last [`DIAS_WEBS`] days.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub webs_cortes: BTreeSet<String>,
     /// What pages' pixels tried to tell, counted by network and event: never an amount, a
     /// product or a site. In memory only: on disk it would say which days the person bought
     /// something.
@@ -662,6 +667,11 @@ impl Diario {
             if e.cortados.len() < MAX_SITIOS_DIA {
                 e.cortados.insert(d.destino.sitio.clone());
             }
+            if let Some(p) = pagina {
+                if e.webs_cortes.len() < MAX_WEBS && !e.webs_cortes.contains(p) {
+                    e.webs_cortes.insert(p.to_string());
+                }
+            }
         }
         let sigue = !d.pagina && (d.destino.sigue() || d.destino.corredor.is_some());
         if let (true, Some(p)) = (sigue, pagina) {
@@ -696,9 +706,10 @@ impl Diario {
     pub fn olvida_webs(&mut self, desde: &str) -> bool {
         let mut algo = false;
         for (_, d) in self.dias.range_mut(..desde.to_string()) {
-            if !d.webs.is_empty() || !d.siguen.is_empty() {
+            if !d.webs.is_empty() || !d.siguen.is_empty() || !d.webs_cortes.is_empty() {
                 d.webs.clear();
                 d.siguen.clear();
+                d.webs_cortes.clear();
                 algo = true;
             }
         }
@@ -736,6 +747,17 @@ impl Diario {
             seguidores,
             total,
         }
+    }
+
+    /// On how many distinct webs at least one attempt was cut from `desde` to `hasta`
+    /// (inclusive): the «en N webs» of ZERO's «Diario de hoy».
+    #[must_use]
+    pub fn webs_con_cortes(&self, desde: &str, hasta: &str) -> u32 {
+        let mut webs = BTreeSet::new();
+        for (_, d) in self.dias.range(desde.to_string()..=hasta.to_string()) {
+            webs.extend(d.webs_cortes.iter().map(String::as_str));
+        }
+        u32::try_from(webs.len()).unwrap_or(u32::MAX)
     }
 
     /// Totals from `desde` to `hasta` (inclusive, `AAAA-MM-DD`), distinct counts across days.

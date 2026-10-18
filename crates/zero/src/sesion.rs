@@ -59,6 +59,15 @@ pub const PANEL: &str = "https://zero.guardiana/panel.html";
 pub const CORTES: &str = "https://zero.guardiana/cortes.html";
 /// A company's profile (`?e=<its name>`).
 pub const EMPRESA: &str = "https://zero.guardiana/empresa.html";
+/// 1.0.46 layout, in CSS pixels: the top row alone (Comunicaciones), the whole bar of the
+/// browser (top row 56, tabs 40, address 44), the glass strip beside a web, and the side view.
+pub const ALTO_ARRIBA: i32 = 56;
+/// See [`ALTO_ARRIBA`].
+pub const ALTO_ZERO: i32 = 140;
+/// See [`ALTO_ARRIBA`].
+pub const ANCHO_FRANJA: i32 = 56;
+/// See [`ALTO_ARRIBA`].
+pub const ANCHO_LATERAL: i32 = 360;
 
 /// Whether an address is one of the browser's own pages.
 #[must_use]
@@ -230,6 +239,20 @@ pub enum Orden {
     },
     /// Close the window (the last tab was closed).
     CierraVentana,
+    /// 1.0.46, one navigation only: how the window is laid out for what is in front. `barra` is
+    /// the height of the bar in CSS pixels (0 on GUARDIANA's own panel, which draws its own top
+    /// row; 56 for Comunicaciones, only the top row; 140 for the browser: top row, tabs and
+    /// address). `lateral` is the width of ZERO's side view: 0, 56 (the glass strip beside a
+    /// web) or 360 (the side summary or another view, open).
+    Marco {
+        /// Height of the bar.
+        barra: i32,
+        /// Width of the side view.
+        lateral: i32,
+    },
+    /// 1.0.46: the person chose «Radiografías» and GUARDIANA's tab is not open: the shell opens
+    /// it as `--panel` does (the panel at once, or ZERO's own wait page).
+    PideGuardiana,
     /// Activate a subscription key: one connection to the payment gateway, asked for by the
     /// person. The shell does it away from the window ([`LugarLicencia::activar`]) and gives the result
     /// to [`Sesion::licencia_activada`].
@@ -515,6 +538,10 @@ pub struct Sesion {
     /// This run's secret for the different values maximum protection gives to other companies'
     /// scripts (one seed per site and run, `medidas::semilla`). Never written anywhere.
     secreto: [u8; 32],
+    /// 1.0.46: the last browser tab in front, where «ZERO» in the selector goes back to.
+    ultima_zero: u32,
+    /// 1.0.46: the layout last given to the shell ([`Orden::Marco`]).
+    marco_dado: Option<(i32, i32)>,
 }
 
 fn lee<T: DeserializeOwned + Default>(ruta: &Path) -> T {
@@ -751,6 +778,8 @@ impl Sesion {
             licencia_ilegible: false,
             medidas: medidas::Total::default(),
             secreto: [0; 32],
+            ultima_zero: 0,
+            marco_dado: None,
         };
         azar(&mut s.secreto);
         s.dia_visto = s.hoy();
@@ -1228,8 +1257,10 @@ impl Sesion {
         }
         // The three product tabs carry the names the owner asked for (15 Oct 2026: «radiografías,
         // navegador ZERO, comunicaciones», so the person understands at a glance).
+        // 1.0.46: the browser's product tab is a new tab like any other in ZERO's own strip (the
+        // product's name is in the selector above it, once).
         if p.fija && (p.url == INICIO || p.url.is_empty()) {
-            return self.t("pestana_zero");
+            return self.t("pestana_nueva");
         }
         if p.url.starts_with(SECURE) {
             let t = self.t("pestana_secure");
@@ -1339,6 +1370,8 @@ impl Sesion {
                     "mandato": p.perfil == Perfil::Mandato,
                     "fija": p.fija,
                     "icono": if es_interna(&p.url) { "" } else { p.icono.as_str() },
+                    // 1.0.46: which product it belongs to; ZERO's strip shows only its own.
+                    "producto": Self::producto_de(p),
                 })
             })
             .collect();
@@ -1353,11 +1386,21 @@ impl Sesion {
                 "interna": es_interna(&p.url),
                 // The panel of GUARDIANA on this computer (127.0.0.1): it never leaves it.
                 "local": es_panel_guardiana(&p.url),
+                // 1.0.46: GUARDIANA's own pages read «🔒 GUARDIANA» in the address, never
+                // 127.0.0.1:7443.
+                "guardiana": es_panel_guardiana(&p.url) || p.url.contains("guardiana-arrancando.html"),
                 "mandato": p.perfil == Perfil::Mandato,
                 "favorito": self.favoritos.contiene(&p.url),
             })
         });
-        json!({ "tipo": "estado", "pestanas": pestanas, "activa": activa, "panel": self.panel })
+        json!({
+            "tipo": "estado",
+            "pestanas": pestanas,
+            "activa": activa,
+            "panel": self.panel,
+            "producto": self.producto(),
+            "marco": self.marco().0,
+        })
     }
 
     fn estado(&self) -> Orden {
@@ -1365,9 +1408,16 @@ impl Sesion {
     }
 
     fn titulo_ventana(&self) -> Orden {
+        // The name once (1.0.46, the owner's PC: «GUARDIANA · Radiografía — GUARDIANA ZERO»): a
+        // page whose title already says GUARDIANA is not followed by it again.
         let texto = match self.pestana(self.activa) {
             Some(p) if !es_interna(&p.url) && !p.url.is_empty() => {
-                format!("{} — {}", self.titulo_de(p), self.t("app_nombre"))
+                let t = self.titulo_de(p);
+                if t.to_uppercase().contains("GUARDIANA") {
+                    t
+                } else {
+                    format!("{t} — {}", self.t("app_nombre"))
+                }
             }
             _ => self.t("app_nombre"),
         };
@@ -1412,6 +1462,9 @@ impl Sesion {
             "cortando": self.prefs.reglas.cortar_seguimiento && self.licencia.protege(),
             "maxima": self.prefs.reglas.cortar_seguimiento && self.prefs.reglas.maxima,
             "protege": self.licencia.protege(),
+            // 1.0.46, «Permitir en esta web»: the lists cut nothing on this web.
+            "web_permitida": !p.escudo.sitio.is_empty()
+                && self.prefs.reglas.webs_permitidas.contains(&p.escudo.sitio),
             "resumen": p.escudo.resumen(),
             "terceros": terceros,
             "parametros_quitados": p.escudo.parametros_quitados,
@@ -1454,7 +1507,9 @@ impl Sesion {
         };
         let m = self.msg_escudo(p);
         let mut o = vec![envia(Origen::Barra, &m)];
-        if tambien_panel || self.panel.as_deref() == Some("escudo") {
+        // The glass strip beside a web shows the page's figure even with the summary closed.
+        let franja = self.marco().1 == ANCHO_FRANJA;
+        if tambien_panel || franja || self.panel.as_deref() == Some("escudo") {
             o.push(envia(Origen::Panel, &m));
         }
         o
@@ -1601,6 +1656,10 @@ impl Sesion {
             "hoy": self.diario.total(&hoy, &hoy),
             "mes": self.diario.total(&mes, &hoy),
             "rastro_hoy": self.diario.rastro(&hoy, &hoy, 5),
+            // 1.0.46, «Diario de hoy»: the webs where something was cut, and whether maximum
+            // protection is on (the shortcut to ZERO's settings says it).
+            "webs_cortes": self.diario.webs_con_cortes(&hoy, &hoy),
+            "maxima": self.prefs.reglas.cortar_seguimiento && self.prefs.reglas.maxima,
             "rastro_mes": self.diario.rastro(&mes, &hoy, 5),
             "medidas_sesion": self.medidas.lineas(&self.textos),
         })
@@ -1620,6 +1679,8 @@ impl Sesion {
         let hoy = self.msg_hoy();
         let mut o = self.a_paginas_propias(&hoy);
         o.push(envia(Origen::Panel, &hoy));
+        // 1.0.46: the bar's shield says the day's figure on the new tab (Z1-a, «1.284 hoy»).
+        o.push(envia(Origen::Barra, &hoy));
         o
     }
 
@@ -1636,6 +1697,199 @@ impl Sesion {
             Origen::Panel,
             &json!({ "tipo": "aviso", "texto": self.tf(clave, huecos) }),
         )
+    }
+
+    // --- 1.0.46 · one navigation (zero-1.0.46) ------------------------------------------------
+    // The selector «Radiografías · ZERO · Comunicaciones» is the only way between the three: the
+    // product tabs no longer show in ZERO's strip, and GUARDIANA's panel draws its own top row
+    // (ZERO's bar steps aside there).
+
+    /// The product a tab belongs to: `guardiana` (its product tab), `secure` or `zero`.
+    fn producto_de(p: &Pestana) -> &'static str {
+        if p.fija && Self::clase_fija(p) == "guardiana" {
+            "guardiana"
+        } else if p.url.starts_with(SECURE) {
+            "secure"
+        } else {
+            "zero"
+        }
+    }
+
+    /// The product in front.
+    #[must_use]
+    pub fn producto(&self) -> &'static str {
+        self.pestana(self.activa).map_or("zero", Self::producto_de)
+    }
+
+    /// How the window is laid out now: the bar's height and the side view's width, in CSS
+    /// pixels (see [`Orden::Marco`]). The side summary is about a web: on the browser's own
+    /// pages it steps aside (the new tab has the day's diary in full, Z1-a).
+    #[must_use]
+    pub fn marco(&self) -> (i32, i32) {
+        let Some(p) = self.pestana(self.activa) else {
+            return (ALTO_ZERO, 0);
+        };
+        let producto = Self::producto_de(p);
+        if producto == "guardiana" {
+            return (0, 0);
+        }
+        let barra = if producto == "secure" {
+            ALTO_ARRIBA
+        } else {
+            ALTO_ZERO
+        };
+        let web = producto == "zero" && !es_interna(&p.url) && !p.url.is_empty();
+        let lateral = match self.panel.as_deref() {
+            Some("escudo") if !web => 0,
+            Some(_) => ANCHO_LATERAL,
+            None if web => ANCHO_FRANJA,
+            None => 0,
+        };
+        (barra, lateral)
+    }
+
+    fn msg_marco(&self) -> Value {
+        let (barra, lateral) = self.marco();
+        json!({ "tipo": "marco", "barra": barra, "lateral": lateral, "producto": self.producto() })
+    }
+
+    /// The layout, when it changed since it was last given: the shell places the views, and
+    /// the bar and the side view draw what fits.
+    pub fn marco_nuevo(&mut self) -> Vec<Orden> {
+        let m = self.marco();
+        if self.marco_dado == Some(m) {
+            return Vec::new();
+        }
+        self.marco_dado = Some(m);
+        let v = self.msg_marco();
+        vec![
+            Orden::Marco {
+                barra: m.0,
+                lateral: m.1,
+            },
+            envia(Origen::Barra, &v),
+            envia(Origen::Panel, &v),
+        ]
+    }
+
+    /// The person chose a product in the selector (ZERO's bar, or GUARDIANA's panel inside
+    /// ZERO). The focus goes to what they chose, so the wheel scrolls it at once (Z4: it went
+    /// on scrolling nothing while the focus stayed in the bar).
+    fn elige_producto(&mut self, cual: &str) -> Vec<Orden> {
+        let mut o = match cual {
+            "guardiana" => match self
+                .pestanas
+                .iter()
+                .find(|p| Self::producto_de(p) == "guardiana")
+                .map(|p| p.id)
+            {
+                Some(id) => self.activar(id),
+                None => return vec![Orden::PideGuardiana],
+            },
+            "secure" => match self
+                .pestanas
+                .iter()
+                .find(|p| p.url.starts_with(SECURE))
+                .map(|p| p.id)
+            {
+                Some(id) => self.activar(id),
+                None => {
+                    let id = self.siguiente;
+                    let mut o = vec![self.anade_pestana(Perfil::General, SECURE, true)];
+                    self.ordena_fijas();
+                    o.extend(self.activar(id));
+                    o
+                }
+            },
+            "zero" => {
+                let ultima = Some(self.ultima_zero).filter(|id| {
+                    self.pestana(*id)
+                        .is_some_and(|p| Self::producto_de(p) == "zero")
+                });
+                let id = ultima.or_else(|| {
+                    self.pestanas
+                        .iter()
+                        .rev()
+                        .find(|p| Self::producto_de(p) == "zero")
+                        .map(|p| p.id)
+                });
+                match id {
+                    Some(id) => self.activar(id),
+                    None => return self.nueva_pestana(Perfil::General, INICIO),
+                }
+            }
+            _ => return Vec::new(),
+        };
+        o.push(Orden::Foco {
+            a: Origen::Pestana(self.activa),
+        });
+        o
+    }
+
+    /// The language GUARDIANA speaks (Z5): the panel's `/api/ajustes/idioma`, read by its page
+    /// inside ZERO. The browser follows it and keeps it as its own choice.
+    fn idioma_del_programa(&mut self, idioma: &str) -> Vec<Orden> {
+        if !matches!(idioma, "es" | "en" | "pt") || self.prefs.idioma == idioma {
+            return Vec::new();
+        }
+        self.ajuste("idioma", &Value::String(idioma.to_string()))
+    }
+
+    /// «Permitir en esta web» (Z1-b): the lists cut nothing on the web in front, or again.
+    fn permitir_web(&mut self, si: bool) -> Vec<Orden> {
+        let Some(sitio_web) = self
+            .pestana(self.activa)
+            .filter(|p| !es_interna(&p.url))
+            .map(|p| p.escudo.sitio.clone())
+            .filter(|s| !s.is_empty())
+        else {
+            return Vec::new();
+        };
+        let cambia = if si {
+            self.prefs.reglas.webs_permitidas.insert(sitio_web)
+        } else {
+            self.prefs.reglas.webs_permitidas.remove(&sitio_web)
+        };
+        if cambia {
+            self.guarda_prefs();
+        }
+        self.escudo_activa(true)
+    }
+
+    /// «Recibo firmado de esta página» (Z1-b): the cuts of today on the web in front, signed
+    /// with this browser's receipt key like the day's receipt, into the person's Downloads.
+    fn recibo_pagina(&mut self) -> Vec<Orden> {
+        let Some(web) = self
+            .pestana(self.activa)
+            .filter(|p| !es_interna(&p.url))
+            .map(|p| p.escudo.sitio.clone())
+            .filter(|s| !s.is_empty())
+        else {
+            return Vec::new();
+        };
+        self.guarda_cortes();
+        let hoy = self.hoy();
+        let lista: Vec<Corte> = cortes::lee(&self.datos.join("cortes"), &hoy, &hoy)
+            .into_iter()
+            .filter(|c| c.pagina == web)
+            .collect();
+        let nombre: String = web
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-'))
+            .take(80)
+            .collect();
+        let base = format!("guardiana-zero-recibo-{nombre}-{hoy}");
+        let texto = match self.firma_recibo(&hoy, &hoy, &lista, &base) {
+            Some(r) => self.tf(
+                "recibo_privacidad_guardado",
+                &[("ruta", &r), ("huella", &self.huella_clave())],
+            ),
+            None => self.t("guardar_error"),
+        };
+        vec![envia(
+            Origen::Panel,
+            &json!({ "tipo": "aviso", "texto": texto }),
+        )]
     }
 
     // --- tabs and panel ------------------------------------------------------------------------
@@ -1866,6 +2120,12 @@ impl Sesion {
             return Vec::new();
         }
         self.activa = id;
+        if self
+            .pestana(id)
+            .is_some_and(|p| Self::producto_de(p) == "zero")
+        {
+            self.ultima_zero = id;
+        }
         let mut o = vec![Orden::Activa { id }, self.estado(), self.titulo_ventana()];
         o.extend(self.escudo_activa(false));
         if self.panel.as_deref() == Some("mandato") {
@@ -1993,6 +2253,14 @@ impl Sesion {
                     "zg_molesta" => self.molesta(id),
                     "zg_huella" => self.huella(id, fuente, &m, false),
                     "zg_escribe" => self.escribe(id, fuente, false),
+                    // 1.0.46: GUARDIANA's own panel, open in this tab, asks for another product
+                    // (its selector) or says the language the program speaks.
+                    "zg_producto" if es_panel_guardiana(fuente) => {
+                        self.elige_producto(texto(&m, "producto"))
+                    }
+                    "zg_idioma" if es_panel_guardiana(fuente) => {
+                        self.idioma_del_programa(texto(&m, "idioma"))
+                    }
                     _ => Vec::new(),
                 };
             }
@@ -2078,6 +2346,9 @@ impl Sesion {
                 self.nueva_pestana(Perfil::General, &url)
             }
             "listo" => self.listo(origen, m),
+            "producto" => self.elige_producto(texto(m, "producto")),
+            "permitir_web" => self.permitir_web(si(m, "valor")),
+            "recibo_pagina" => self.recibo_pagina(),
             "secure" => self.secure_accion(origen, m),
             "navegar" => {
                 let id = match origen {
@@ -2117,7 +2388,16 @@ impl Sesion {
             },
             "pestana_activar" => numero(m, "id")
                 .and_then(|n| u32::try_from(n).ok())
-                .map(|id| self.activar(id))
+                .map(|id| {
+                    let mut o = self.activar(id);
+                    // The wheel scrolls what was chosen, not the bar (Z4).
+                    if !o.is_empty() {
+                        o.push(Orden::Foco {
+                            a: Origen::Pestana(id),
+                        });
+                    }
+                    o
+                })
                 .unwrap_or_default(),
             "panel" => match m.get("vista").and_then(Value::as_str) {
                 Some(v) => {
@@ -2325,6 +2605,8 @@ impl Sesion {
                 ];
                 o.extend(self.escudo_activa(false));
                 o.push(envia(Origen::Barra, &self.msg_licencia()));
+                o.push(envia(Origen::Barra, &self.msg_hoy()));
+                o.push(envia(Origen::Barra, &self.msg_marco()));
                 if !self.prefs.bienvenida {
                     o.extend(self.abre_panel("bienvenida"));
                 } else if self.panel.is_none() && self.escudo_a_la_vista() {
@@ -2343,6 +2625,7 @@ impl Sesion {
                     envia(Origen::Panel, &self.msg_libro()),
                     envia(Origen::Panel, &self.msg_mandato()),
                     envia(Origen::Panel, &self.msg_licencia()),
+                    envia(Origen::Panel, &self.msg_marco()),
                 ];
                 if let Some(p) = self.pestana(self.activa) {
                     o.push(envia(Origen::Panel, &self.msg_escudo(p)));
@@ -3304,6 +3587,29 @@ impl Sesion {
     /// what ZERO observes and what it cannot: a cut request never left; what the page's servers
     /// send on their own is not seen.
     fn recibo_cortes(&mut self, id: u32, desde: &str, hasta: &str, lista: &[Corte]) -> Vec<Orden> {
+        let base = if desde == hasta {
+            format!("guardiana-zero-recibo-{hasta}")
+        } else {
+            format!("guardiana-zero-recibo-{desde}-a-{hasta}")
+        };
+        let v = match self.firma_recibo(desde, hasta, lista, &base) {
+            Some(r) => {
+                json!({ "tipo": "guardado", "ruta": r, "texto": self.tf("recibo_privacidad_guardado", &[("ruta", &r), ("huella", &self.huella_clave())]) })
+            }
+            None => json!({ "tipo": "guardado", "ruta": "", "texto": self.t("guardar_error") }),
+        };
+        self.a_pestana(id, &v).into_iter().collect()
+    }
+
+    /// The signed receipt of `lista`, written as `<base>.json` in the person's Downloads: where
+    /// it went, or `None` when it could not be signed or written.
+    fn firma_recibo(
+        &mut self,
+        desde: &str,
+        hasta: &str,
+        lista: &[Corte],
+        base: &str,
+    ) -> Option<String> {
         let filas: Vec<Value> = lista
             .iter()
             .map(|c| {
@@ -3350,23 +3656,14 @@ impl Sesion {
             },
         })
         .to_string();
-        let base = if desde == hasta {
-            format!("guardiana-zero-recibo-{hasta}")
-        } else {
-            format!("guardiana-zero-recibo-{desde}-a-{hasta}")
-        };
-        let ruta = self.nombre_libre(&base, "json");
+        let ruta = self.nombre_libre(base, "json");
         let firmado = self
             .clave_recibos()
             .and_then(|k| recibo::firma(&k, contenido).ok());
-        let v = match firmado.map(|r| escribe_json_ok(&ruta, &r)) {
-            Some(true) => {
-                let r = ruta.display().to_string();
-                json!({ "tipo": "guardado", "ruta": r, "texto": self.tf("recibo_privacidad_guardado", &[("ruta", &r), ("huella", &self.huella_clave())]) })
-            }
-            _ => json!({ "tipo": "guardado", "ruta": "", "texto": self.t("guardar_error") }),
-        };
-        self.a_pestana(id, &v).into_iter().collect()
+        match firmado.map(|r| escribe_json_ok(&ruta, &r)) {
+            Some(true) => Some(ruta.display().to_string()),
+            _ => None,
+        }
     }
 
     /// The engine finished (or failed) saving a PDF the session asked for.
