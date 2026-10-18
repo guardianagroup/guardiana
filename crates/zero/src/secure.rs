@@ -1454,10 +1454,14 @@ impl Secure {
         if self.caducan.is_empty() {
             return;
         }
-        let (idos, quedan): (Vec<(u64, u64)>, Vec<(u64, u64)>) =
-            self.caducan.iter().partition(|(_, t)| *t <= ahora);
-        self.caducan = quedan;
-        for (id, _) in idos {
+        let idos: Vec<u64> = self
+            .caducan
+            .iter()
+            .filter(|(_, t)| *t <= ahora)
+            .map(|(id, _)| *id)
+            .collect();
+        self.caducan.retain(|(_, t)| *t > ahora);
+        for id in idos {
             self.borra_recibido(id);
         }
     }
@@ -4546,7 +4550,9 @@ mod tests {
 
         // Three frames that fail to open within ten seconds: a stop that looks like an
         // interference, with the card, the signed report, and (direct link) the other end's
-        // address for this card only; the person closes it and the card goes.
+        // address for this card only; the person closes it and the card goes. (With the
+        // destruction on an anomaly turned off: the old pause; see the next test for it on.)
+        b.auto_destruccion = false;
         assert!(b.estado_json()["incidente"].is_null());
         b.fallo_abriendo(false);
         assert!(
@@ -4737,6 +4743,8 @@ mod tests {
         b.sas_persona(true, "Ana");
         gira(&mut a, &mut b, 25);
         assert_eq!(b.estado_json()["fase"], "lista");
+        // The old pause (destruction on an anomaly is tested on its own below).
+        b.auto_destruccion = false;
 
         // GUARDIANA's own window and its engine never count; a recorder that is on now does.
         let ahora = ahora_s();
@@ -4818,6 +4826,192 @@ mod tests {
         assert_eq!(a.estado_json()["informe"]["sin_espionaje"], false);
         a.olvida_informe();
         assert!(a.estado_json()["informe"].is_null());
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    /// Two computers verified and talking, through a port on this computer.
+    fn par(base: &Path) -> (Secure, Secure) {
+        let (da, db) = (base.join("a"), base.join("b"));
+        std::fs::create_dir_all(&da).unwrap();
+        std::fs::create_dir_all(&db).unwrap();
+        let mut a = Secure::abre(&da, &da);
+        let mut b = Secure::abre(&db, &db);
+        let puerto = a.escuchar_efimero().unwrap();
+        b.conectar(&format!("127.0.0.1:{puerto}")).unwrap();
+        gira(&mut a, &mut b, 25);
+        a.sas_persona(true, "Bea");
+        b.sas_persona(true, "Ana");
+        gira(&mut a, &mut b, 25);
+        assert_eq!(a.estado_json()["fase"], "lista");
+        assert_eq!(b.estado_json()["fase"], "lista");
+        (a, b)
+    }
+
+    #[test]
+    fn a_recorder_that_starts_destroys_the_talk_on_both_sides_and_leaves_signed_evidence() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let base = std::env::temp_dir().join(format!("guardiana-destruye-{}", std::process::id()));
+        let (mut a, mut b) = par(&base);
+        a.texto("confidencial");
+        gira(&mut a, &mut b, 15);
+        assert_eq!(b.mensajes.last().unwrap().texto, "confidencial");
+        // The shield's lines come from real events.
+        let e = b.estado_json()["escudo"].clone();
+        assert_eq!(e["identidad"]["ok"], true);
+        assert!(e["identidad"]["desde"].as_u64().is_some());
+        assert_eq!(e["cifrado"]["olm"], true);
+        assert!(e["integridad"]["mensajes_ok"].as_u64().unwrap() >= 1);
+        assert_eq!(e["integridad"]["mensajes_mal"], 0);
+        assert_eq!(e["dispositivos"], json!(["este_equipo", "equipo_del_otro"]));
+        // A recorder starts on b's microphone during the talk.
+        let ft = |t: u64| (t + 11_644_473_600) * 10_000_000;
+        let grabador = crate::vigia::de_registro(
+            "C:#Users#x#Grabador.exe",
+            crate::vigia::Recurso::Microfono,
+            ft(ahora_s() + 1),
+            0,
+        )
+        .unwrap();
+        b.vigia(&[grabador]);
+        let d = b.estado_json();
+        assert_eq!(d["fase"], "sola");
+        assert!(b.mensajes.is_empty(), "nothing of the talk stays on screen");
+        assert!(b
+            .destruida()
+            .is_some_and(|d| d["motivo"] == "microfono" && d["programa"] == "Grabador.exe"));
+        // The evidence: the signed chain, on disk, with the program and no message.
+        let dir = base.join("b").join("secure").join("destrucciones");
+        let f = std::fs::read_dir(&dir)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let texto = std::fs::read_to_string(&f).unwrap();
+        let p = Prueba::from_json(&texto).unwrap();
+        assert!(p.verificar().is_ok());
+        assert!(texto.contains("Grabador.exe"));
+        assert!(!texto.contains("confidencial"));
+        assert!(!texto.contains("127.0.0.1"));
+        // The other side got the signed notice and did the same.
+        gira(&mut a, &mut b, 15);
+        assert_eq!(a.estado_json()["fase"], "sola");
+        assert!(a.mensajes.is_empty());
+        assert!(a
+            .destruida()
+            .is_some_and(|d| d["motivo"] == "otro_lado" && d["otro_lado"] == true));
+        a.olvida_destruida();
+        assert!(a.destruida().is_none());
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn a_forged_or_foreign_destruction_notice_is_ignored() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let base = std::env::temp_dir().join(format!("guardiana-falsa-{}", std::process::id()));
+        let (mut a, mut b) = par(&base);
+        let ahora = ahora_s();
+        let inicio = b.inicio_destruccion();
+        let sesion = b.sesion_destruccion(inicio);
+        // Signed by a stranger (the relay, say), or for another conversation: nothing happens.
+        let extrano = Identity::new();
+        b.trama(
+            json!({ "t": "destruir", "motivo": "microfono", "cuando": ahora, "inicio": inicio,
+            "firma": destruccion::firma(&extrano, &sesion, "microfono", ahora) }),
+        );
+        b.trama(json!({ "t": "destruir", "motivo": "microfono", "cuando": ahora, "inicio": inicio + 1000,
+            "firma": destruccion::firma(&a.identidad, &b.sesion_destruccion(inicio + 1000), "microfono", ahora) }));
+        b.trama(json!({ "t": "destruir", "motivo": "microfono", "cuando": ahora - 3600, "inicio": inicio,
+            "firma": destruccion::firma(&a.identidad, &sesion, "microfono", ahora - 3600) }));
+        assert_eq!(b.estado_json()["fase"], "lista");
+        assert!(b.destruida().is_none());
+        // Both sides name the session the same way; a's real notice is obeyed.
+        assert_eq!(a.sesion_destruccion(a.inicio_destruccion()), sesion);
+        b.trama(
+            json!({ "t": "destruir", "motivo": "camara", "cuando": ahora, "inicio": inicio,
+            "firma": destruccion::firma(&a.identidad, &sesion, "camara", ahora) }),
+        );
+        assert_eq!(b.estado_json()["fase"], "sola");
+        assert!(b.destruida().is_some_and(|d| d["motivo"] == "otro_lado"));
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn numbers_that_do_not_match_or_a_burst_of_bad_frames_destroy_the_talk() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let base = std::env::temp_dir().join(format!("guardiana-sas-{}", std::process::id()));
+        let (da, db) = (base.join("a"), base.join("b"));
+        std::fs::create_dir_all(&da).unwrap();
+        std::fs::create_dir_all(&db).unwrap();
+        let mut a = Secure::abre(&da, &da);
+        let mut b = Secure::abre(&db, &db);
+        let puerto = a.escuchar_efimero().unwrap();
+        b.conectar(&format!("127.0.0.1:{puerto}")).unwrap();
+        gira(&mut a, &mut b, 25);
+        assert!(a.numeros().is_some());
+        a.sas_persona(false, "");
+        assert!(a
+            .destruida()
+            .is_some_and(|d| d["motivo"] == "codigo_distinto"));
+        gira(&mut a, &mut b, 15);
+        assert_eq!(b.estado_json()["fase"], "sola");
+        assert!(
+            b.destruida().is_some(),
+            "told with a signed notice before the link closed"
+        );
+        let _ = std::fs::remove_dir_all(&base);
+
+        let (mut a, mut b) = par(&base);
+        a.texto("uno");
+        gira(&mut a, &mut b, 10);
+        b.fallo_abriendo(false);
+        b.fallo_abriendo(false);
+        b.fallo_abriendo(false);
+        assert!(b.destruida().is_some_and(|d| d["motivo"] == "manipulada"));
+        assert!(b.mensajes.is_empty());
+        gira(&mut a, &mut b, 15);
+        assert!(a.destruida().is_some());
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn disappearing_messages_go_from_both_screens_and_frames_are_padded() {
+        let _turno = crate::PRUEBAS_RED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let base = std::env::temp_dir().join(format!("guardiana-temporal-{}", std::process::id()));
+        let (mut a, mut b) = par(&base);
+        a.pon_temporizador(30, true);
+        gira(&mut a, &mut b, 10);
+        assert_eq!(b.temporizador(), 30, "both screens use the same timer");
+        a.texto("se borra");
+        gira(&mut a, &mut b, 10);
+        let t = b.mensajes.last().unwrap().clone();
+        assert_eq!(t.texto, "se borra");
+        assert!(t.caduca.is_some_and(|c| c >= t.t + 30));
+        assert!(a.mensajes.last().unwrap().caduca.is_some());
+        // Time passes (the lines carry their own end): both go.
+        for m in a.mensajes.iter_mut().chain(b.mensajes.iter_mut()) {
+            m.caduca = m.caduca.map(|_| 1);
+        }
+        gira(&mut a, &mut b, 2);
+        assert!(a.mensajes.iter().all(|m| m.texto != "se borra"));
+        assert!(b.mensajes.iter().all(|m| m.texto != "se borra"));
+        // Every frame on the wire is one of a few sizes.
+        let mut v = serde_json::to_vec(&json!({ "t": "latido" })).unwrap();
+        guardiana_secure::relleno::rellena(&mut v, b' ', MAX_FRAME);
+        assert_eq!(v.len(), guardiana_secure::relleno::MINIMO);
+        // Video stays off: a call asked with video is voice.
+        a.llamar(true, "audio/webm;codecs=opus").unwrap();
+        assert_eq!(a.estado_json()["llamada"]["video"], false);
+        assert_eq!(a.estado_json()["video"], false);
+        a.colgar();
         let _ = std::fs::remove_dir_all(base);
     }
 }
