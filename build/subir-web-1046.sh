@@ -25,8 +25,10 @@ do tomar "$n"; done
 echo "2. Compruebo las huellas"
 PYBIN=python
 if ! "$PYBIN" -c "import hashlib" >/dev/null 2>&1; then PYBIN=python3; fi
+export PAQ_WIN WEB_WIN
+PAQ_WIN=$(cygpath -w "$PAQ")
 "$PYBIN" - << "PY"
-import hashlib, pathlib, sys
+import hashlib, os, pathlib, sys
 esp = {
  "guardiana-1.0.46-windows-x86_64.exe": "4a25bca6f9b9662e50e9c50a740e2f90bcefa25102ec73a177d2709e360cd23c",
  "guardiana-1.0.46-windows-x64.msi": "69d1e7dff8a1dca02d5f49d41275bdff46b975278f468c1af657d3d5b7c342e8",
@@ -34,7 +36,7 @@ esp = {
  "guardiana-1.0.46-windows-x64-pt.msi": "e1ba3285c4d7d890a2952733f158c452d1b01d7d9b74fd9f72e5916efd139f00",
  "guardiana-1.0.46-macos.app.zip": "cd043e356e5d330ab88f585a9fded4a6514164dca44996cc80bc5096fdd1c201",
 }
-base = pathlib.Path("/c/Users/franc/Downloads/para-la-web-1046")
+base = pathlib.Path(os.environ["PAQ_WIN"])
 for name, want in esp.items():
     got = hashlib.sha256((base/name).read_bytes()).hexdigest()
     if got != want:
@@ -52,9 +54,10 @@ rm -rf "$WEB/descargas/1.0.46"
 mkdir -p "$WEB/descargas/1.0.46"
 cp -f "$PAQ"/* "$WEB/descargas/1.0.46/"
 echo "4. Actualizo las paginas"
+WEB_WIN=$(cygpath -w "$WEB")
 "$PYBIN" - << "PY"
-import pathlib, re
-web = pathlib.Path("/c/Users/franc/web-guardiana")
+import os, pathlib, re
+web = pathlib.Path(os.environ["WEB_WIN"])
 files = ["instalar.html","index.html","zero.html","es/index.html","en/install.html","en/zero.html","pt/instalar.html","pt/index.html","pt/zero.html"]
 hashes = {
  "3315d15326dd2001ba2e837c95e00ba5886880ad4d86594b589401273335efeb": "69d1e7dff8a1dca02d5f49d41275bdff46b975278f468c1af657d3d5b7c342e8",
