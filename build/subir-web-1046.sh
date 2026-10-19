@@ -77,8 +77,8 @@ for rel in files:
     for a, b in hashes.items():
         t = t.replace(a, b)
     for name, (comma, dot) in sizes.items():
-        t = re.sub(re.escape(name) + r'(</a><br><span class="muted">)[0-9]+,[0-9]+ MB', name + r"\1" + comma, t)
-        t = re.sub(re.escape(name) + r'(</a><br><span class="muted">)[0-9]+\.[0-9]+ MB', name + r"\1" + dot, t)
+        t = re.sub(re.escape(name) + r'(</a><br><span class="muted">)[0-9]+,[0-9]+ MB', lambda m, name=name, comma=comma: name + m.group(1) + comma, t)
+        t = re.sub(re.escape(name) + r'(</a><br><span class="muted">)[0-9]+\.[0-9]+ MB', lambda m, name=name, dot=dot: name + m.group(1) + dot, t)
     if rel == "zero.html":
         t = t.replace("57,8 MB", "55,7 MB")
     elif rel == "en/zero.html":
