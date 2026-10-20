@@ -64,14 +64,22 @@ header { position: fixed; top: 0; left: 0; right: 0; display: flex; align-items:
 .derecha { display: flex; align-items: center; gap: 16px; font: 400 12px/1 var(--mono); color: #8A95A2; letter-spacing: .06em; }
 
 /* The selected door */
-#ficha { position: fixed; left: 40px; bottom: 40px; width: min(340px, calc(100% - 32px)); box-sizing: border-box; display: flex; align-items: center; gap: 18px; padding: 16px 16px 16px 22px; border: 1px solid var(--line); border-radius: var(--r-tarjeta); background: rgba(12,17,24,.8); backdrop-filter: blur(14px); opacity: 0; transform: translateY(8px); transition: opacity 1s 1.8s, transform 1s 1.8s; }
+/* The door under the pointer: an instrument's reading, not a card. A hairline with a steel tick,
+   the door's number, its name and one line. */
+#ficha { position: fixed; left: 40px; bottom: 36px; width: 268px; box-sizing: border-box; display: flex; align-items: flex-end; gap: 16px; padding-top: 14px; border-top: 1px solid var(--line); opacity: 0; transform: translateY(8px); transition: opacity 1s 1.8s, transform 1s 1.8s; }
+#ficha::before { content: ""; position: absolute; left: 0; top: -1px; width: 28px; height: 1px; background: var(--accent); }
 .listo #ficha { opacity: 1; transform: none; }
-#ficha .k { font: 500 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
-#ficha .t { font: 600 19px/1.25 var(--display); margin-top: 8px; }
-#ficha .d { font: 400 14px/1.45 var(--texto); color: var(--muted); margin-top: 4px; }
+#ficha .k { display: flex; align-items: baseline; gap: 6px; font: 500 10.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #8A95A2; }
+#ficha .k #ficha-n { color: var(--accent); }
+#ficha .k .de { margin-left: -4px; }
+#ficha .t { font: 600 15px/1.25 var(--display); margin-top: 9px; letter-spacing: .005em; }
+#ficha .d { font: 400 12.5px/1.45 var(--texto); color: var(--muted); margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#ficha .abrir { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 1px solid #2A3442; color: var(--fg); display: inline-flex; align-items: center; justify-content: center; transition: background .15s, border-color .15s, color .15s; }
+#ficha .abrir:hover { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+#ficha .abrir:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Live: what was just cut */
-#directo { position: fixed; right: 40px; bottom: 40px; width: 300px; opacity: 0; transition: opacity 1s 2.2s; }
+#directo { position: fixed; right: 40px; bottom: 36px; width: 290px; opacity: 0; transition: opacity 1s 2.2s; }
 .listo #directo { opacity: 1; }
 #directo h2 { margin: 0 0 10px; display: flex; align-items: center; gap: 8px; font: 500 11px/1 var(--mono); letter-spacing: .14em; color: #8A95A2; font-weight: 500; }
 #directo h2::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--alerta); animation: respira 1.6s ease-in-out infinite; }
@@ -109,10 +117,19 @@ body.dentro #seccion { visibility: visible; }
 .sin-pagina p { font: 400 16px/1.55 var(--texto); color: var(--muted); max-width: 520px; margin: 0; }
 .sin-pagina[hidden] { display: none; }
 
+/* A narrow window (orbita.js decides, by measuring): «En directo» becomes one line under the
+   status, the door's reading goes under the ring, and the ring shrinks to leave them room. Nothing
+   ever sits on a door. */
+body.estrecho #directo { left: 50%; right: auto; top: 84px; bottom: auto; width: min(460px, calc(100% - 32px)); transform: translateX(-50%); }
+body.estrecho #directo h2 { display: none; }
+body.estrecho #lista li:nth-child(n+2) { display: none; }
+body.estrecho #lista li button { background: rgba(12,17,24,.72); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; grid-template-columns: 1fr auto; }
+body.estrecho #lista .w { display: none; }
+body.estrecho #espera { text-align: center; }
+body.estrecho #ficha { left: 50%; bottom: 16px; width: min(420px, calc(100% - 32px)); transform: translate(-50%, 8px); }
+body.estrecho.listo #ficha { transform: translateX(-50%); }
 @media (max-width: 860px) {
   header { padding: 18px 20px; }
-  #ficha { left: 16px; bottom: 16px; }
-  #directo { display: none; }
   #seccion { left: 12px; right: 12px; top: 72px; bottom: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {

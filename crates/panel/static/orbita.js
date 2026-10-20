@@ -50,15 +50,15 @@
 
   // ---------- The nine doors ----------
   const PUERTAS = [
-    { id: 'hoy', n: 'Hoy', s: 'Lo cortado', d: 'Qué quiso salir, hacia qué empresa y qué país, y por qué se cortó.', url: '/por-dentro' },
-    { id: 'casa', n: 'Casa', s: 'Dispositivos', d: 'Teléfonos, televisor y todo lo que usa la Wi‑Fi, sin instalar nada en ellos.', url: '/dispositivos' },
-    { id: 'radiografia', n: 'Radiografía', s: 'Tu equipo', d: 'Lo que tu ordenador cuenta de ti, en una sola lectura.', url: '/foto' },
+    { id: 'hoy', n: 'Hoy', s: 'Lo cortado', d: 'Cada conexión cortada hoy: empresa, país y motivo.', url: '/por-dentro' },
+    { id: 'casa', n: 'Casa', s: 'Dispositivos', d: 'Los dispositivos de tu red, sin instalar nada en ellos.', url: '/dispositivos' },
+    { id: 'radiografia', n: 'Radiografía', s: 'Tu equipo', d: 'Lo que este equipo revela de ti, en una lectura.', url: '/foto' },
     { id: 'defensa', n: 'Defensa', s: 'En desarrollo', d: 'Llegará cuando esté probada. Hasta entonces, no se promete.', url: null, desarrollo: true },
     { id: 'verificacion', n: 'Verificación', s: 'guardiana verify', d: 'Comprueba que lo instalado es exactamente lo publicado.', url: '/verify' },
-    { id: 'historial', n: 'Historial', s: 'Extracto', d: 'Cada decisión, anotada y encadenada. Puedes auditarla.', url: '/extracto' },
-    { id: 'comunicaciones', n: 'Comunicaciones', s: 'SECURE', d: 'Llamadas y mensajes cifrados de extremo a extremo, sin servidor nuestro en medio.', url: null, aparte: 'Se abre en GUARDIANA SECURE, dentro de ZERO; en Linux y macOS, con «guardiana comunicaciones».' },
-    { id: 'zero', n: 'ZERO', s: 'Navegador', d: 'El navegador que enseña cada corte de la web, en directo.', url: null, aparte: 'ZERO es un programa aparte: se abre en su propia ventana.' },
-    { id: 'ia', n: 'Tu IA', s: 'Mandatos', d: 'Qué puede saber tu IA de ti, con recibo firmado.', url: '/ia' },
+    { id: 'historial', n: 'Historial', s: 'Extracto', d: 'Cada decisión, registrada y encadenada. Auditable.', url: '/extracto' },
+    { id: 'comunicaciones', n: 'Comunicaciones', s: 'SECURE', d: 'Llamadas y mensajes cifrados de extremo a extremo.', url: null, aparte: 'Se abre en GUARDIANA SECURE, dentro de ZERO; en Linux y macOS, con «guardiana comunicaciones».' },
+    { id: 'zero', n: 'ZERO', s: 'Navegador', d: 'El navegador que muestra cada corte, en directo.', url: null, aparte: 'ZERO es un programa aparte: se abre en su propia ventana.' },
+    { id: 'ia', n: 'Tu IA', s: 'Mandatos', d: 'Qué sabe tu IA de ti, con recibo firmado.', url: '/ia' },
   ];
   const nav = $('puertas');
   const NP = PUERTAS.length;
@@ -97,10 +97,11 @@
     sel = (i + NP) % NP;
     PUERTAS.forEach((p, k) => p.el.classList.toggle('on', k === sel));
     const p = PUERTAS[sel];
+    $('ficha-n').textContent = String(sel + 1).padStart(2, '0');
     $('ficha-k').textContent = p.s;
     $('ficha-t').textContent = p.n;
     $('ficha-d').textContent = p.d;
-    $('ficha-a').textContent = p.url || p.desarrollo ? 'Abrir' : 'Ver';
+    $('ficha-a').setAttribute('aria-label', 'Abrir ' + p.n);
   }
   elige(0);
   $('ficha-a').addEventListener('click', (e) => { e.preventDefault(); abre(sel); });
@@ -163,7 +164,14 @@
   const cx2 = cvR.getContext('2d');
   function mide() {
     W = innerWidth; H = innerHeight; DPR = Math.min(devicePixelRatio || 1, 2);
-    U = Math.min(H / 100, W * 0.0062);
+    // The ring's unit. Wide: «En directo» and the door's reading take the two lower corners, so the
+    // ring stays clear of them (the lower doors' labels reach 26.4 units out and 130 px beyond).
+    // Narrow: both move off the corners and the ring keeps clear of the top and bottom lines.
+    const estrecho = W < 1180;
+    document.body.classList.toggle('estrecho', estrecho);
+    if (estrecho) U = Math.max(3, Math.min((H / 2 - 160) / 41, (H / 2 - 150) / 41, (W / 2 - 150) / 40.4));
+    else U = Math.max(3, Math.min(H / 100, W * 0.0062, (W / 2 - 40 - 290 - 24 - 130) / 26.4, (H / 2 - 120) / 41));
+    RAIZ.style.setProperty('--u', U.toFixed(3) + 'px');
     CX = W / 2; CY = H / 2; R = U * 31;
     for (const c of [cvE, cvT, cvR]) { c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); }
     cx2.setTransform(DPR, 0, 0, DPR, 0, 0);
