@@ -76,6 +76,25 @@
 
 <section id="seccion" aria-label="Sección">
   <iframe id="marco" title="Sección"></iframe>
+  <!-- The common section (19 Oct 2026, agreed by the three): three symmetric zones, the show in
+       the middle, the figures on the left, what just happened on the right, and one line below
+       for the moment, the choice and the main action. -->
+  <div id="plantilla" class="plantilla" hidden>
+    <aside class="zona zona-izq" aria-label="Cifras">
+      <div class="k" id="pl-k1">HOY</div>
+      <dl id="pl-cifras"></dl>
+    </aside>
+    <div class="escenario"><canvas id="espectaculo" aria-hidden="true"></canvas><div class="vacio" id="pl-vacio" hidden></div></div>
+    <aside class="zona zona-der" aria-label="En directo">
+      <div class="k">EN DIRECTO</div>
+      <ul id="pl-lista"></ul>
+    </aside>
+    <footer class="pie">
+      <div class="pie-izq"><span class="k" id="pl-nota"></span></div>
+      <div class="modos" role="tablist" aria-label="Forma de verlo" id="pl-modos"></div>
+      <div class="pie-der"><a class="btn" id="pl-accion" href="#"></a></div>
+    </footer>
+  </div>
   <div id="sin-pagina" class="sin-pagina" hidden>
     <div class="k" id="sp-k"></div>
     <h1 id="sp-t"></h1>
@@ -83,6 +102,7 @@
   </div>
 </section>
 
+<script src="/static/orbita-secciones.js"></script>
 <script src="/static/orbita.js"></script>
 </body>
 </html>

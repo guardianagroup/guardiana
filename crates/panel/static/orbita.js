@@ -126,6 +126,14 @@
     $('volver').hidden = false;
     $('donde').hidden = false;
     $('donde').textContent = p.n;
+    // a door with its own show uses the common section (orbita-secciones.js)
+    if (window.GuardianaSecciones && window.GuardianaSecciones.abre(p.id)) {
+      marco.hidden = true; marco.removeAttribute('src'); $('sin-pagina').hidden = true;
+      if (apila) history.pushState({ puerta: p.id }, '', '#' + p.id);
+      setTimeout(() => { if (dentro) $('volver').focus(); }, 900);
+      return;
+    }
+    if (window.GuardianaSecciones) window.GuardianaSecciones.cierra();
     const real = p.url && !DEMO;
     marco.hidden = !real;
     $('sin-pagina').hidden = real;
@@ -148,7 +156,7 @@
     document.body.classList.remove('dentro');
     $('volver').hidden = true;
     $('donde').hidden = true;
-    setTimeout(() => { if (!dentro) marco.removeAttribute('src'); }, 800);
+    setTimeout(() => { if (!dentro) { marco.removeAttribute('src'); if (window.GuardianaSecciones) window.GuardianaSecciones.cierra(); } }, 800);
     setTimeout(() => { const b = PUERTAS[sel].el.querySelector('button'); if (!dentro && b) b.focus({ preventScroll: true }); }, 700);
   }
   const atras = () => { if (history.state && history.state.puerta) history.back(); else cierra(); };

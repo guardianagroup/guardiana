@@ -1111,6 +1111,15 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             }),
         )
         .route(
+            "/static/orbita-secciones.js",
+            get(|| async {
+                static_response(
+                    include_str!("../static/orbita-secciones.js"),
+                    "application/javascript; charset=utf-8",
+                )
+            }),
+        )
+        .route(
             "/static/orbita.css",
             get(|| async {
                 static_response(
