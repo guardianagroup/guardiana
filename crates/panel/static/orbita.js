@@ -51,20 +51,15 @@
   };
 
   // ---------- The nine doors ----------
-  // Names reviewed by the three on 19 Oct 2026 (one or two plain words that translate well):
-  // Hoy/Today/Hoje · Casa/Home/Casa · Radiografía/X-Ray/Raio-X · Defensa/Defense/Defesa ·
-  // Verificación/Verification/Verificação · Historial/History/Histórico · Mensajes/Messages/Mensagens ·
-  // ZERO · Tu IA/Your AI/Sua IA.
+  // Five doors since 20 Oct 2026 (the owner: nine felt wide and heavy). Agreed by Claude, ChatGPT and
+  // Grok: the nine functions stay, grouped, each reachable inside its door. While a door is being
+  // built it says so; ZERO, the one being built now, opens as a preview.
   const PUERTAS = [
-    { id: 'hoy', n: 'Hoy', s: 'Cortes de hoy', d: 'Cada conexión cortada hoy: empresa, país y motivo.', url: '/por-dentro' },
-    { id: 'casa', n: 'Casa', s: 'Dispositivos', d: 'Los dispositivos de tu red, sin instalar nada en ellos.', url: '/dispositivos' },
-    { id: 'radiografia', n: 'Radiografía', s: 'Tu equipo', d: 'Lo que este equipo revela de ti, en una lectura.', url: '/foto' },
-    { id: 'defensa', n: 'Defensa', s: 'En desarrollo', d: 'Llegará cuando esté probada. Hasta entonces, no se promete.', url: null, desarrollo: true },
-    { id: 'verificacion', n: 'Verificación', s: 'Código original', d: 'Comprueba que lo instalado es exactamente lo publicado.', url: '/verify' },
-    { id: 'historial', n: 'Historial', s: 'Cada decisión', d: 'Registradas y encadenadas: si alguien cambia una, se nota.', url: '/extracto' },
-    { id: 'comunicaciones', n: 'Mensajes', s: 'Llamadas cifradas', d: 'Mensajes y llamadas cifrados de extremo a extremo, con GUARDIANA SECURE.', url: null, aparte: 'Se abre en GUARDIANA SECURE, dentro de ZERO; en Linux y macOS, con «guardiana comunicaciones».' },
-    { id: 'zero', n: 'ZERO', s: 'Navegador', d: 'El navegador que muestra cada corte, en directo.', url: null, aparte: 'ZERO es un programa aparte: se abre en su propia ventana.' },
-    { id: 'ia', n: 'Tu IA', s: 'Qué sabe de ti', d: 'Qué sabe tu IA de ti, con recibo firmado.', url: '/ia' },
+    { id: 'hoy', n: 'Hoy', s: 'En construcción', d: 'Los cortes de hoy y el historial completo, encadenado y auditable.', dentro: ['Cortes de hoy', 'Historial'], url: null, construccion: true },
+    { id: 'proteccion', n: 'Protección', s: 'En construcción', d: 'Verificación de que lo instalado es lo publicado, y Defensa cuando esté probada.', dentro: ['Verificación', 'Defensa (en desarrollo)'], url: null, construccion: true },
+    { id: 'zero', n: 'ZERO', s: 'En construcción', d: 'El navegador: busca donde quieras y mira lo que se corta en cada web.', dentro: ['Navegador', 'Buscadores', 'Cortes por página'], url: null, construccion: true, vistaPrevia: true },
+    { id: 'casa', n: 'Casa', s: 'En construcción', d: 'Los dispositivos de tu red y la radiografía de este equipo.', dentro: ['Dispositivos', 'Radiografía'], url: null, construccion: true },
+    { id: 'mensajes', n: 'Mensajes', s: 'En construcción', d: 'Mensajes y llamadas cifrados con GUARDIANA SECURE, y lo que sabe tu IA de ti.', dentro: ['Mensajes y llamadas', 'Tu IA'], url: null, construccion: true },
   ];
   const nav = $('puertas');
   const NP = PUERTAS.length;
@@ -85,7 +80,7 @@
     et.append(p.n);
     const sm = document.createElement('small');
     sm.textContent = p.s;
-    if (p.desarrollo) sm.className = 'desarrollo';
+    if (p.desarrollo || p.construccion) sm.className = 'desarrollo';
     et.appendChild(sm);
     // Placed from the button's box (44 px, centred on the dot).
     if (s > 0.3) { et.style.left = '42px'; et.style.top = '9px'; }
@@ -107,6 +102,7 @@
     PUERTAS.forEach((p, k) => p.el.classList.toggle('on', k === sel));
     const p = PUERTAS[sel];
     $('ficha-n').textContent = String(sel + 1).padStart(2, '0');
+    $('ficha-de').textContent = '/' + String(NP).padStart(2, '0');
     $('ficha-k').textContent = p.s;
     $('ficha-t').textContent = p.n;
     $('ficha-d').textContent = p.d;
@@ -116,13 +112,17 @@
   $('ficha-a').addEventListener('click', (e) => { e.preventDefault(); abre(sel); });
 
   // ---------- A door opened, in the same screen ----------
-  let dentro = false;
+  let dentro = false, limpio = false, limpioDesde = 0;
   const marco = $('marco');
   function abre(i, apila = true) {
     elige(i);
     const p = PUERTAS[sel];
     dentro = true;
     document.body.classList.add('dentro');
+    // ZERO is clean (owner, 20 Oct 2026): no planet behind the browser, and the globe stops
+    // drawing once it has faded out, so the web gets the whole machine.
+    limpio = p.id === 'zero';
+    document.body.classList.toggle('limpio', limpio);
     $('volver').hidden = false;
     $('donde').hidden = false;
     $('donde').textContent = p.n;
@@ -142,10 +142,10 @@
       marco.src = p.url + (p.url.includes('?') ? '&' : '?') + 'orbita=1';
     } else {
       marco.removeAttribute('src');
-      $('sp-k').textContent = p.desarrollo ? 'EN DESARROLLO' : p.s.toUpperCase();
-      $('sp-k').classList.toggle('desarrollo', !!p.desarrollo);
+      $('sp-k').textContent = p.construccion ? 'EN CONSTRUCCIÓN' : p.desarrollo ? 'EN DESARROLLO' : p.s.toUpperCase();
+      $('sp-k').classList.toggle('desarrollo', !!(p.desarrollo || p.construccion));
       $('sp-t').textContent = p.n;
-      $('sp-d').textContent = p.aparte ? p.d + ' ' + p.aparte : (DEMO && p.url ? p.d + ' En el programa, aquí entra la página real.' : p.d);
+      $('sp-d').textContent = p.construccion ? p.d + ' Dentro: ' + (p.dentro || []).join(' · ') + '. Se abrirá cuando esté terminada.' : p.aparte ? p.d + ' ' + p.aparte : (DEMO && p.url ? p.d + ' En el programa, aquí entra la página real.' : p.d);
     }
     if (apila) history.pushState({ puerta: p.id }, '', '#' + p.id);
     setTimeout(() => { if (dentro) $('volver').focus(); }, 900);
@@ -153,7 +153,8 @@
   function cierra() {
     if (!dentro) return;
     dentro = false;
-    document.body.classList.remove('dentro');
+    limpio = false;
+    document.body.classList.remove('dentro', 'limpio');
     $('volver').hidden = true;
     $('donde').hidden = true;
     setTimeout(() => { if (!dentro) { marco.removeAttribute('src'); if (window.GuardianaSecciones) window.GuardianaSecciones.cierra(); } }, 800);
@@ -816,6 +817,8 @@ void main(){
     const t = (now - t0) / 1000;
     impar = !impar;
     if (document.hidden) return;
+    if (!limpio) limpioDesde = now;
+    else if (now - limpioDesde > 1200) return; // faded out: nothing to draw
     if (dentro && impar) return; // behind glass, half the frames are enough
     while (cola.length && cola[0].at <= now / 1000) lanza(cola.shift(), t);
     while (ondas.length && t - ondas[0].t0 > 3) ondas.shift();

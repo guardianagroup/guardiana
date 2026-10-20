@@ -148,6 +148,37 @@ pub const BUSCADORES: &[Buscador] = &[
         plantilla: "https://search.seznam.cz/?q={}",
         privado: false,
     },
+    // The main engines of Japan, Korea, China and Vietnam (20 Oct 2026: ZERO is used worldwide).
+    Buscador {
+        id: "yahoojp",
+        nombre: "Yahoo! JAPAN",
+        plantilla: "https://search.yahoo.co.jp/search?p={}",
+        privado: false,
+    },
+    Buscador {
+        id: "daum",
+        nombre: "Daum",
+        plantilla: "https://search.daum.net/search?q={}",
+        privado: false,
+    },
+    Buscador {
+        id: "sogou",
+        nombre: "Sogou",
+        plantilla: "https://www.sogou.com/web?query={}",
+        privado: false,
+    },
+    Buscador {
+        id: "so360",
+        nombre: "360 Search",
+        plantilla: "https://www.so.com/s?q={}",
+        privado: false,
+    },
+    Buscador {
+        id: "coccoc",
+        nombre: "Cốc Cốc",
+        plantilla: "https://coccoc.com/search#query={}",
+        privado: false,
+    },
 ];
 
 /// The engine with `id`, or the default one.

@@ -43,7 +43,7 @@
 
 <section id="ficha" aria-live="polite">
   <div class="cuerpo">
-    <div class="k"><span id="ficha-n"></span><span class="de">/09</span><span class="sep">·</span><span id="ficha-k"></span></div>
+    <div class="k"><span id="ficha-n"></span><span class="de" id="ficha-de">/05</span><span class="sep">·</span><span id="ficha-k"></span></div>
     <div class="t" id="ficha-t"></div>
     <div class="d" id="ficha-d"></div>
   </div>
@@ -94,8 +94,14 @@
         <span class="ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.6"/><path d="m10.4 10.4 3.4 3.4"/></svg></span>
         <label class="sr" for="pl-q">Busca o escribe una dirección</label>
         <input id="pl-q" type="text" autocomplete="off" spellcheck="false" placeholder="Busca o escribe una dirección">
+        <button type="button" class="motor" id="pl-motor" aria-haspopup="dialog" aria-expanded="false" aria-controls="pl-abanico"><i id="pl-motor-i">D</i><span id="pl-motor-n">DuckDuckGo</span><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></button>
         <span class="escudo-web" id="pl-escudo" hidden><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 1.8 13.2 4v3.8c0 3-2.2 5.4-5.2 6.4-3-1-5.2-3.4-5.2-6.4V4z"/></svg><b id="pl-escudo-n">0</b></span>
       </form>
+      <!-- The fan of search engines (owner, 20 Oct 2026): the main ones of the whole world. -->
+      <div class="abanico" id="pl-abanico" role="dialog" aria-label="Elige buscador" hidden>
+        <div class="ab-cab"><span class="k">ELIGE DÓNDE BUSCA ZERO</span><span class="ab-nota">Los que dicen no guardar quién busca qué van primero.</span></div>
+        <div class="ab-grupos" id="pl-grupos"></div>
+      </div>
       <div class="visor" id="pl-visor" hidden>
         <div class="carga" id="pl-carga"></div>
         <iframe id="pl-web" title="Web"></iframe>

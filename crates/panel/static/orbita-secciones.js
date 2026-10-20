@@ -251,6 +251,53 @@
   // sends (navigate, then open the shield's panel on the right). In the design review a sample page
   // stands in for the web and the cuts are invented, and the screen says so.
   const HOST = window.chrome && window.chrome.webview;
+  // The engines, the same list as ZERO's own (crates/zero/src/direccion.rs), in the fan's groups:
+  // the ones that say they keep no record first, then the general ones, the main one of each
+  // country, and the AIs (outside services, said as such).
+  const MOTORES = [
+    ['Privados', [['duckduckgo', 'DuckDuckGo', 'https://duckduckgo.com/?q={}'], ['brave', 'Brave Search', 'https://search.brave.com/search?q={}'], ['startpage', 'Startpage', 'https://www.startpage.com/do/search?query={}'], ['ecosia', 'Ecosia', 'https://www.ecosia.org/search?q={}'], ['qwant', 'Qwant', 'https://www.qwant.com/?q={}'], ['mojeek', 'Mojeek', 'https://www.mojeek.com/search?q={}'], ['swisscows', 'Swisscows', 'https://swisscows.com/web?query={}'], ['metager', 'MetaGer', 'https://metager.org/meta/meta.ger3?eingabe={}']]],
+    ['Generales', [['google', 'Google', 'https://www.google.com/search?q={}'], ['bing', 'Bing', 'https://www.bing.com/search?q={}'], ['yahoo', 'Yahoo', 'https://search.yahoo.com/search?p={}'], ['youtube', 'YouTube', 'https://www.youtube.com/results?search_query={}'], ['ask', 'Ask', 'https://www.ask.com/web?q={}'], ['aol', 'AOL', 'https://search.aol.com/aol/search?q={}']]],
+    ['Por país', [['yandex', 'Yandex', 'https://yandex.com/search/?text={}', 'RU'], ['baidu', 'Baidu', 'https://www.baidu.com/s?wd={}', 'CN'], ['sogou', 'Sogou', 'https://www.sogou.com/web?query={}', 'CN'], ['so360', '360 Search', 'https://www.so.com/s?q={}', 'CN'], ['naver', 'Naver', 'https://search.naver.com/search.naver?query={}', 'KR'], ['daum', 'Daum', 'https://search.daum.net/search?q={}', 'KR'], ['yahoojp', 'Yahoo! JAPAN', 'https://search.yahoo.co.jp/search?p={}', 'JP'], ['seznam', 'Seznam', 'https://search.seznam.cz/?q={}', 'CZ'], ['coccoc', 'Cốc Cốc', 'https://coccoc.com/search#query={}', 'VN']]],
+    ['Inteligencia artificial', [['chatgpt', 'ChatGPT', 'https://chatgpt.com/?hints=search&q={}', 'IA'], ['perplexity', 'Perplexity', 'https://www.perplexity.ai/search?q={}', 'IA'], ['you', 'You.com', 'https://you.com/search?q={}', 'IA']]],
+  ];
+  const MOTOR = new Map(); MOTORES.forEach(([, l]) => l.forEach((m) => MOTOR.set(m[0], { id: m[0], n: m[1], t: m[2], cc: m[3] || '' })));
+  let motor = MOTOR.get('duckduckgo');
+  try { const g = localStorage.getItem('guardiana_zero_buscador'); if (g && MOTOR.has(g)) motor = MOTOR.get(g); } catch (_) {}
+  const inicial = (n) => n.replace(/[^A-Za-z0-9À-ÿ]/g, '').charAt(0).toUpperCase() || n.charAt(0);
+  function pintaMotor() { $('pl-motor-i').textContent = inicial(motor.n); $('pl-motor-n').textContent = motor.n; $('pl-motor').setAttribute('aria-label', 'Buscador: ' + motor.n + '. Cambiar'); }
+  function abanico(abrir) {
+    const ab = $('pl-abanico'), b = $('pl-motor');
+    if (!abrir) { ab.hidden = true; b.setAttribute('aria-expanded', 'false'); return; }
+    const gr = $('pl-grupos'); gr.innerHTML = '';
+    let k = 0;
+    for (const [g, lista] of MOTORES) {
+      const col = document.createElement('div'); col.className = 'ab-grupo';
+      const h = document.createElement('h3'); h.textContent = g; col.appendChild(h);
+      for (const [id, n, , cc] of lista) {
+        const it = document.createElement('button'); it.type = 'button'; it.className = 'ab-item'; it.setAttribute('role', 'menuitemradio');
+        it.setAttribute('aria-checked', String(id === motor.id)); it.style.animationDelay = (k++ * 18) + 'ms';
+        const i = document.createElement('i'); i.textContent = inicial(n);
+        const s = document.createElement('span'); s.textContent = n;
+        it.append(i, s);
+        if (cc) { const sm = document.createElement('small'); sm.textContent = cc === 'IA' ? 'IA' : nombrePais(cc); it.appendChild(sm); }
+        it.addEventListener('click', () => eligeMotor(id));
+        col.appendChild(it);
+      }
+      gr.appendChild(col);
+    }
+    ab.hidden = false; b.setAttribute('aria-expanded', 'true');
+    setTimeout(() => { const s = gr.querySelector('[aria-checked="true"]'); if (s) s.focus(); }, 60);
+  }
+  function eligeMotor(id) {
+    motor = MOTOR.get(id) || motor;
+    try { localStorage.setItem('guardiana_zero_buscador', motor.id); } catch (_) {}
+    if (HOST) HOST.postMessage({ tipo: 'ajuste', clave: 'buscador', valor: motor.id });
+    pintaMotor(); abanico(false); $('pl-q').placeholder = 'Busca con ' + motor.n + ' o escribe una dirección'; $('pl-q').focus();
+  }
+  $('pl-motor').addEventListener('click', () => abanico($('pl-abanico').hidden));
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('pl-abanico').hidden) { e.stopPropagation(); e.preventDefault(); abanico(false); $('pl-motor').focus(); } }, true);
+  document.addEventListener('click', (e) => { if (!$('pl-abanico').hidden && !e.target.closest('#pl-abanico, #pl-motor')) abanico(false); });
+  pintaMotor(); $('pl-q').placeholder = 'Busca con ' + motor.n + ' o escribe una dirección';
   let pagina = null, ritmo = 0;
   const esDireccion = (t) => /^https?:\/\//i.test(t) || /^[^\s/]+\.[a-z]{2,}(\/\S*)?$/i.test(t);
   const dominioDe = (t) => { try { return new URL(/^https?:/i.test(t) ? t : 'https://' + t).hostname.replace(/^www\./, ''); } catch (_) { return t; } };
@@ -262,33 +309,43 @@
   function navega(texto) {
     if (HOST) { HOST.postMessage({ tipo: 'navegar', texto }); HOST.postMessage({ tipo: 'panel', vista: 'escudo' }); return; }
     if (!DEMO) { $('pl-vacio').hidden = false; $('pl-vacio').textContent = 'Para navegar con GUARDIANA cortando, abre ZERO: la web aparece en el centro y lo que se corta, a la derecha.'; return; }
-    const dir = esDireccion(texto), dom = dir ? dominioDe(texto) : 'buscador.ejemplo';
+    const dir = esDireccion(texto), dom = dir ? dominioDe(texto) : dominioDe(motor.t.replace('{}', ''));
     pagina = { dom, texto };
     clearInterval(generador); clearTimeout(ritmo);
     cifras.webs.clear(); cifras.cortes = 0; cifras.empresas.clear(); cifras.paises.clear(); cifras.pasan = 0;
     $('pl-lista').innerHTML = ''; pintaCifras();
     $('pl-k1').textContent = 'ESTA WEB · DEMOSTRACIÓN'; $('pl-k2').textContent = 'LO QUE CORTA GUARDIANA';
-    $('plantilla').classList.add('navegando');
+    $('plantilla').classList.add('navegando'); $('pl-busca').classList.remove('centro');
     $('pl-visor').hidden = false; $('pl-atras').hidden = false; $('pl-escudo').hidden = false; $('pl-escudo-n').textContent = '0';
     $('pl-q').value = dir ? dom : texto; $('pl-q').blur();
     const carga = $('pl-carga'); carga.style.opacity = '1'; carga.style.width = '0';
     requestAnimationFrame(() => { carga.style.width = '72%'; });
     $('pl-web').onload = () => { carga.style.width = '100%'; setTimeout(() => { carga.style.opacity = '0'; }, 500); };
-    $('pl-web').src = 'static/demo-web.html?d=' + encodeURIComponent(dom) + (dir ? '' : '&q=' + encodeURIComponent(texto));
+    $('pl-web').src = 'static/demo-web.html?d=' + encodeURIComponent(dom) + (dir ? '' : '&q=' + encodeURIComponent(texto) + '&m=' + encodeURIComponent(motor.n));
+    ponDiseno(diseno);
     // what a page asks for while it loads, then a trickle while it is open
     const n = 12 + (Math.random() * 12 | 0);
     for (let i = 0; i < n; i++) setTimeout(() => { if (pagina && pagina.dom === dom) evento(dom, Math.random() < 0.7); }, 250 + i * (2600 / n) + Math.random() * 120);
     const sigue = () => { if (!pagina || pagina.dom !== dom) return; evento(dom, Math.random() < 0.6); ritmo = setTimeout(sigue, 1800 + Math.random() * 2600); };
     ritmo = setTimeout(sigue, 3400);
   }
+  const DISENOS = [['cristal', 'Cristal'], ['simetria', 'Simetría'], ['infinito', 'Infinito']];
+  let diseno = 'cristal'; try { diseno = localStorage.getItem('guardiana_zero_diseno') || diseno; } catch (_) {}
+  function ponDiseno(d) {
+    diseno = d; $('plantilla').dataset.diseno = d;
+    try { localStorage.setItem('guardiana_zero_diseno', d); } catch (_) {}
+    const mods = $('pl-modos'); mods.innerHTML = '';
+    for (const [m, n] of DISENOS) { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'tab'); b.dataset.m = m; b.textContent = n; b.setAttribute('aria-selected', String(m === d)); b.addEventListener('click', () => ponDiseno(m)); mods.appendChild(b); }
+  }
   function nuevaPestana() {
     pagina = null; clearTimeout(ritmo);
-    $('plantilla').classList.remove('navegando');
+    $('plantilla').classList.remove('navegando'); $('pl-busca').classList.add('centro');
     $('pl-visor').hidden = true; $('pl-web').src = 'about:blank'; $('pl-atras').hidden = true; $('pl-escudo').hidden = true;
     $('pl-q').value = '';
     $('pl-k1').textContent = DEMO ? 'HOY · DEMOSTRACIÓN' : 'HOY'; $('pl-k2').textContent = 'EN DIRECTO';
     cifras.webs.clear(); cifras.cortes = 0; cifras.empresas.clear(); cifras.paises.clear(); cifras.pasan = 0;
     $('pl-lista').innerHTML = ''; pintaCifras();
+    delete $('plantilla').dataset.diseno; pintaModos();
     clearInterval(generador); if (DEMO) generador = setInterval(evento, 900);
   }
   $('pl-busca').addEventListener('submit', (e) => { e.preventDefault(); const t = $('pl-q').value.trim(); if (t) navega(t); });
@@ -300,20 +357,23 @@
     for (const b of $('pl-modos').children) b.setAttribute('aria-selected', String(b.dataset.m === m));
     try { localStorage.setItem('guardiana_orbita_zero_modo', m); } catch (_) {}
   }
-  function abre(id) {
-    if (id !== 'zero') return false;
-    activo = id;
-    $('pl-k1').textContent = DEMO ? 'HOY · DEMOSTRACIÓN' : 'HOY';
-    $('pl-nota').textContent = DEMO ? 'DATOS DE DEMOSTRACIÓN · EN ZERO, LOS DE TU NAVEGACIÓN' : 'LO QUE ZERO HA CORTADO HOY';
-    const acc = $('pl-accion'); acc.textContent = 'Abrir ZERO'; acc.onclick = (e) => { e.preventDefault(); };
+  function pintaModos() {
     const mods = $('pl-modos'); mods.innerHTML = '';
     let guardado = 'constelacion'; try { guardado = localStorage.getItem('guardiana_orbita_zero_modo') || guardado; } catch (_) {}
     for (const [m, n] of MODOS) { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'tab'); b.dataset.m = m; b.textContent = n; b.addEventListener('click', () => ponModo(m)); mods.appendChild(b); }
     ponModo(guardado);
+  }
+  function abre(id) {
+    if (id !== 'zero') return false;
+    activo = id;
+    $('pl-k1').textContent = DEMO ? 'HOY · DEMOSTRACIÓN' : 'HOY';
+    $('pl-nota').textContent = DEMO ? 'VISTA PREVIA · EN CONSTRUCCIÓN · DATOS DE DEMOSTRACIÓN' : 'VISTA PREVIA · EN CONSTRUCCIÓN';
+    const acc = $('pl-accion'); acc.textContent = 'Abrir ZERO'; acc.onclick = (e) => { e.preventDefault(); };
+    pintaModos();
     cifras.webs.clear(); cifras.cortes = 0; cifras.empresas.clear(); cifras.paises.clear(); cifras.pasan = 0;
     $('pl-lista').innerHTML = ''; pintaCifras();
     $('plantilla').hidden = false;
-    $('pl-busca').hidden = false; pagina = null; $('plantilla').classList.remove('navegando'); $('pl-visor').hidden = true; $('pl-atras').hidden = true; $('pl-escudo').hidden = true; $('pl-q').value = '';
+    $('pl-busca').hidden = false; $('pl-busca').classList.add('centro'); pagina = null; $('plantilla').classList.remove('navegando'); $('pl-visor').hidden = true; $('pl-atras').hidden = true; $('pl-escudo').hidden = true; $('pl-q').value = '';
     $('pl-k2').textContent = 'EN DIRECTO';
     setTimeout(() => { if (activo === 'zero') $('pl-q').focus({ preventScroll: true }); }, 1000);
     requestAnimationFrame(() => { mide(); if (!raf) raf = requestAnimationFrame(cuadro); });
@@ -324,7 +384,7 @@
   }
   function cierra() {
     activo = null; clearInterval(generador); clearTimeout(ritmo); pagina = null;
-    $('pl-busca').hidden = true; $('pl-visor').hidden = true; $('pl-web').src = 'about:blank'; $('plantilla').classList.remove('navegando');
+    abanico(false); $('pl-busca').hidden = true; $('pl-visor').hidden = true; $('pl-web').src = 'about:blank'; $('plantilla').classList.remove('navegando');
     if (raf) cancelAnimationFrame(raf); raf = 0;
     $('plantilla').hidden = true;
   }

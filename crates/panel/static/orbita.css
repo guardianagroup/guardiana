@@ -136,6 +136,8 @@ body.dentro #anillo, body.dentro #anillo2, body.dentro .cruz, body.dentro #puert
 body.dentro #seccion { opacity: 1; transform: none; transition: opacity .7s .35s, transform .9s cubic-bezier(.2,.7,.2,1) .3s, visibility 0s; }
 #seccion { visibility: hidden; }
 body.dentro #seccion { visibility: visible; }
+/* ZERO: clean and light, nothing behind the browser (owner, 20 Oct 2026) */
+body.dentro.limpio #escena { opacity: 0; transform: scale(.9); transition: transform .9s cubic-bezier(.7,0,.2,1), opacity .6s; }
 #marco { width: 100%; height: 100%; border: 0; background: transparent; display: block; }
 .sin-pagina { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; }
 .sin-pagina .k { font: 500 11px/1 var(--mono); letter-spacing: .16em; color: var(--accent); }
@@ -220,4 +222,49 @@ body.dentro #seccion .plantilla:not([hidden]) .escenario { animation: escenario 
 .visor .filo.late { animation: filo .9s ease-out; }
 @keyframes filo { 0% { background: linear-gradient(transparent, rgba(224,122,108,.9) 50%, transparent); box-shadow: -6px 0 18px rgba(224,122,108,.45); } 100% { background: linear-gradient(transparent, rgba(224,122,108,0) 50%, transparent); box-shadow: none; } }
 .plantilla.navegando canvas { opacity: .0; transition: opacity .6s; }
-.plantilla.navegando .modos { visibility: hidden; }
+
+/* ZERO: the engine button and its fan */
+.motor { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px 0 6px; border-radius: 999px; border: 1px solid #2A3442; background: rgba(12,17,24,.9); color: var(--fg); font: 500 13px/1 var(--texto); white-space: nowrap; transition: border-color .15s, background .15s; }
+.motor:hover, .motor[aria-expanded="true"] { border-color: var(--accent); background: var(--accent-suave); }
+.motor:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.motor i, .ab-item i { font-style: normal; width: 24px; height: 24px; border-radius: 50%; display: inline-grid; place-items: center; font: 700 11px/1 var(--display); color: var(--accent-fg); background: var(--accent); flex: none; }
+.motor svg { color: var(--muted); }
+.abanico { position: absolute; top: 84px; left: 50%; transform: translateX(-50%); width: min(860px, calc(100% - 32px)); box-sizing: border-box; padding: 20px 22px 22px; border-radius: 20px; border: 1px solid #2A3442; background: rgba(8,11,16,.96); box-shadow: 0 40px 120px -30px rgba(0,0,0,.95); z-index: 4; }
+.abanico[hidden] { display: none; }
+.ab-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.ab-nota { font: 400 12px/1.4 var(--texto); color: #8A95A2; }
+.ab-grupos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+.ab-grupo h3 { margin: 0 0 8px; font: 500 10.5px/1 var(--mono); letter-spacing: .14em; color: var(--accent); text-transform: uppercase; }
+.ab-item { all: unset; box-sizing: border-box; cursor: pointer; width: 100%; display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 10px; font: 500 13px/1.2 var(--texto); color: var(--fg); opacity: 0; transform: translateY(8px) rotate(-2deg); transform-origin: left center; animation: abre .45s cubic-bezier(.2,.7,.2,1) forwards; }
+.ab-item small { margin-left: auto; font: 400 10.5px/1 var(--mono); color: #8A95A2; letter-spacing: .06em; }
+.ab-item:hover, .ab-item:focus-visible { background: #141B25; }
+.ab-item[aria-checked="true"] { background: var(--accent-suave); box-shadow: inset 0 0 0 1px rgba(156,195,228,.45); }
+.ab-item i { background: #1E2631; color: var(--fg); }
+.ab-item[aria-checked="true"] i { background: var(--accent); color: var(--accent-fg); }
+@keyframes abre { to { opacity: 1; transform: none; } }
+@media (max-width: 900px) { .ab-grupos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .ab-item { animation: none; opacity: 1; transform: none; } }
+
+/* ZERO: three ways to lay out the browser (chosen below while a web is open) */
+.plantilla.navegando[data-diseno="simetria"] .zona-izq, .plantilla.navegando[data-diseno="infinito"] .zona-izq { visibility: hidden; }
+.plantilla.navegando[data-diseno="simetria"] { grid-template-columns: minmax(0, 6fr) minmax(0, 88fr) minmax(0, 6fr); }
+.plantilla.navegando[data-diseno="simetria"] .zona-der { position: absolute; left: 6%; right: 6%; bottom: 66px; padding: 10px 16px; text-align: left; display: flex; align-items: center; gap: 18px; border-top: 1px solid rgba(30,38,49,.7); background: rgba(6,8,12,.86); z-index: 3; overflow: hidden; }
+.plantilla.navegando[data-diseno="simetria"] .zona-der ul { flex-direction: row; margin: 0; gap: 28px; }
+.plantilla.navegando[data-diseno="simetria"] .zona-der li { flex: none; }
+.plantilla.navegando[data-diseno="simetria"] .zona-der li:nth-child(n+5) { display: none; }
+.plantilla.navegando[data-diseno="simetria"] .visor { bottom: 96px; }
+.plantilla.navegando[data-diseno="infinito"] { grid-template-columns: 0 1fr 0; }
+.plantilla.navegando[data-diseno="infinito"] .escenario { border: 0; }
+.plantilla.navegando[data-diseno="infinito"] .visor { left: 10px; right: 64px; top: 84px; bottom: 10px; border-radius: 10px; }
+.plantilla.navegando[data-diseno="infinito"] .zona-der { position: absolute; right: 0; top: 84px; bottom: 74px; width: 56px; padding: 14px 10px; overflow: hidden; background: rgba(6,8,12,.9); border-left: 1px solid rgba(224,122,108,.25); transition: width .35s cubic-bezier(.2,.7,.2,1); z-index: 3; }
+.plantilla.navegando[data-diseno="infinito"] .zona-der:hover, .plantilla.navegando[data-diseno="infinito"] .zona-der:focus-within { width: 300px; }
+.plantilla.navegando[data-diseno="infinito"] .zona-der .k { writing-mode: vertical-rl; transform: rotate(180deg); }
+.plantilla.navegando[data-diseno="infinito"] .zona-der:hover .k { writing-mode: horizontal-tb; transform: none; }
+.plantilla.navegando[data-diseno="infinito"] .zona-der:not(:hover) ul { opacity: 0; }
+
+/* ZERO on opening: the browser first, big and centred over the show */
+.busca-web.centro { top: calc(50% - 32px); width: min(820px, calc(100% - 48px)); height: 64px; padding-left: 22px; }
+.busca-web.centro input { font-size: 18px; }
+.busca-web.centro::before { content: "ZERO · BUSCA O ESCRIBE UNA DIRECCIÓN"; position: absolute; left: 50%; top: -34px; transform: translateX(-50%); white-space: nowrap; font: 500 11px/1 var(--mono); letter-spacing: .16em; color: #8A95A2; }
+.plantilla:not(.navegando) canvas { opacity: .55; }
+.busca-web.centro ~ .abanico { top: calc(50% + 44px); }
