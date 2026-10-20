@@ -25,6 +25,7 @@
   const DEMO = RAIZ.dataset.demo === '1';
   const TIERRA = RAIZ.dataset.tierra || '/static/tierra/';
   const QUIETO = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const NUBES = new URLSearchParams(location.search).get('nubes') === '1';
   const $ = (id) => document.getElementById(id);
 
   // ---------- The world ----------
@@ -81,14 +82,17 @@
     sm.textContent = p.s;
     if (p.desarrollo) sm.className = 'desarrollo';
     et.appendChild(sm);
-    if (s > 0.3) { et.style.left = '20px'; et.style.top = '-9px'; }
-    else if (s < -0.3) { et.style.right = '20px'; et.style.top = '-9px'; et.style.textAlign = 'right'; }
-    else if (c > 0) { et.style.left = '50%'; et.style.bottom = '20px'; et.style.transform = 'translateX(-50%)'; et.style.textAlign = 'center'; }
-    else { et.style.left = '50%'; et.style.top = '20px'; et.style.transform = 'translateX(-50%)'; et.style.textAlign = 'center'; }
+    // Placed from the button's box (44 px, centred on the dot).
+    if (s > 0.3) { et.style.left = '42px'; et.style.top = '9px'; }
+    else if (s < -0.3) { et.style.right = '42px'; et.style.top = '9px'; et.style.textAlign = 'right'; }
+    else if (c > 0) { et.style.left = '50%'; et.style.bottom = '38px'; et.style.transform = 'translateX(-50%)'; et.style.textAlign = 'center'; }
+    else { et.style.left = '50%'; et.style.top = '38px'; et.style.transform = 'translateX(-50%)'; et.style.textAlign = 'center'; }
     b.addEventListener('mouseenter', () => elige(i));
     b.addEventListener('focus', () => elige(i));
     b.addEventListener('click', () => abre(i));
-    el.append(b, et);
+    // The name is part of the button: the whole door, dot and words, is one thing to press.
+    b.appendChild(et);
+    el.appendChild(b);
     nav.appendChild(el);
     p.el = el;
   });
@@ -308,7 +312,10 @@ void main(){
       };
       tex(0, 'uDia', TIERRA + 'dia.jpg', () => listo());
       tex(1, 'uLuz', TIERRA + 'luces.jpg');
-      tex(2, 'uNub', TIERRA + 'nubes.jpg', () => { G.nubOn = 1; });
+      // The clouds are off since 19 Oct 2026 (the owner: «para que se vea más claro»); `?nubes=1`
+      // brings them back to compare.
+      if (NUBES) tex(2, 'uNub', TIERRA + 'nubes.jpg', () => { G.nubOn = 1; });
+      else { gl.uniform1i(u.uNub, 0); }
       tex(3, 'uAgua', TIERRA + 'agua.png');
     } catch (e) { G = null; }
   }
