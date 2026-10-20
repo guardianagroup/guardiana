@@ -23,6 +23,10 @@
   }
   let token = '';
   try { token = sessionStorage.getItem('guardiana_token') || ''; } catch (_) {}
+  // Inside «Órbita» (19 Oct 2026): a section opened in the planet's own screen brings no bar of its
+  // own; «Órbita» is the way back.
+  const EN_ORBITA = params.has('orbita') && window.top !== window.self;
+  if (EN_ORBITA) document.documentElement.classList.add('en-orbita');
   // Language (decision 45): the person's choice, kept in this browser; otherwise the browser's own.
   let LANG = '';
   try { LANG = localStorage.getItem('guardiana_lang') || ''; } catch (_) {}

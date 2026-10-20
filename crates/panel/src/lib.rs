@@ -190,6 +190,8 @@ async fn tierra(RutaUrl(archivo): RutaUrl<String>) -> Response {
         "dia.jpg" => (include_bytes!("../static/tierra/dia.jpg"), "image/jpeg"),
         "luces.jpg" => (include_bytes!("../static/tierra/luces.jpg"), "image/jpeg"),
         "agua.png" => (include_bytes!("../static/tierra/agua.png"), "image/png"),
+        // The clouds (NASA, public domain), for «Órbita» (19 Oct 2026).
+        "nubes.jpg" => (include_bytes!("../static/tierra/nubes.jpg"), "image/jpeg"),
         // Every city of 15 000 people or more (GeoNames, CC BY 4.0), to name the one nearest to
         // where the computer says it is (1.0.24). Asked only when the person presses the button.
         "ciudades.tsv" => (
@@ -649,10 +651,16 @@ pub(crate) async fn add_security_headers(
     h.insert(
         header::CONTENT_SECURITY_POLICY,
         HeaderValue::from_static(
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'",
         ),
     );
-    h.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    // «Órbita» (19 Oct 2026) opens each section inside its own screen, so a page of the panel may
+    // be framed by the panel itself and by nothing else: `'self'` and SAMEORIGIN, never another
+    // origin.
+    h.insert(
+        header::X_FRAME_OPTIONS,
+        HeaderValue::from_static("SAMEORIGIN"),
+    );
     h.insert(
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),
@@ -1085,6 +1093,30 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/mi-dispositivo", get(api::mi_dispositivo))
         .route("/api/mi-dispositivo/nombre", post(api::mi_nombre))
         .route("/api/mi-dispositivo/compartir", post(api::mi_compartir))
+        // «Órbita» (prototype, 19 Oct 2026): the home screen chosen by the owner, the Earth in
+        // the middle and every section opening inside it. Not the home yet: `/` is unchanged.
+        .route(
+            "/orbita",
+            get(|| async { pagina(include_str!("../static/orbita.html")) }),
+        )
+        .route(
+            "/static/orbita.js",
+            get(|| async {
+                static_response(
+                    include_str!("../static/orbita.js"),
+                    "application/javascript; charset=utf-8",
+                )
+            }),
+        )
+        .route(
+            "/static/orbita.css",
+            get(|| async {
+                static_response(
+                    include_str!("../static/orbita.css"),
+                    "text/css; charset=utf-8",
+                )
+            }),
+        )
         // «Vigilancia» (1.0.45): its page (under Diagnóstico), its script, and the answers for
         // the page and for the top bar's pill and «Pulso del día».
         .route(

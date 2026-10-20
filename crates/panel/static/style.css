@@ -1433,3 +1433,7 @@ header.top.g-barra .brand::before { width: 24px; height: 24px; }
   .universo .tira-chev { margin-left: auto; }
 }
 /* ==== 1.0.46 radiografias-globo: En vivo (end) ================================================== */
+
+/* Inside «Órbita» (19 Oct 2026): the section sits on the planet's glass, without the house bar. */
+html.en-orbita header.top, html.en-orbita #g-secciones { display: none; }
+html.en-orbita, html.en-orbita body { background: transparent; }

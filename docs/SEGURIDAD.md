@@ -19,7 +19,7 @@ con su informe publicado.
 |---|---|---|
 | Panel: sesión | Token de 32 bytes aleatorios por instalación; comparación en tiempo constante; comprobación estricta de `Host` contra el rebinding de DNS; sin cookies. | Correcto. |
 | Panel: quién puede escribir | Todas las rutas que cambian algo exigen el token, salvo las de "mi dispositivo", que solo actúan sobre el propio dispositivo identificado por su IP (límite documentado). | Correcto. |
-| Panel: inyección en pantalla (XSS) | Todo lo que viene de la red (nombres de servicios consultados, nombres de dispositivos que ponen los teléfonos) pasa por el escape HTML; nombres limitados a 60 caracteres; política CSP estricta sin scripts en línea; `frame-ancestors 'none'`; `nosniff`. | Correcto. |
+| Panel: inyección en pantalla (XSS) | Todo lo que viene de la red (nombres de servicios consultados, nombres de dispositivos que ponen los teléfonos) pasa por el escape HTML; nombres limitados a 60 caracteres; política CSP estricta sin scripts en línea; `frame-ancestors 'self'` (solo el propio panel puede enmarcar sus páginas, para «Órbita»; nunca otro origen); `nosniff`. | Correcto. |
 | Extracto (SQLite) | Todas las consultas van con parámetros; el único SQL compuesto solo añade condiciones fijas con `?`. | Correcto. |
 | Órdenes al sistema (`netsh`, `powershell`, `resolvectl`, `nmcli`, `ip`) | Se lanzan con argumentos separados, nunca por una shell; lo que se interpola son índices numéricos y direcciones IP ya analizadas. | Correcto. |
 | Resolutor | Solo atiende consultas estándar (`QUERY`); reenvío con la biblioteca hickory (puertos de origen aleatorios, identificadores aleatorios, EDNS); caché con tope; respuestas de bloqueo con TTL corto. | Correcto. Sin DNSSEC en 1.0 (documentado). |
