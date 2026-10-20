@@ -102,6 +102,31 @@ header { position: fixed; top: 0; left: 0; right: 0; display: flex; align-items:
 .izq { display: flex; align-items: center; gap: 18px; }
 .donde { font: 500 11px/1 var(--mono); letter-spacing: .16em; color: #8A95A2; text-transform: uppercase; }
 
+/* Where this computer is (19 Oct 2026): a chip in the bar, and one calm card over the planet. */
+.lugar-btn { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--line); font: 500 12px/1 var(--texto); letter-spacing: 0; color: var(--muted); }
+.lugar-btn:hover { border-color: #3A4656; color: var(--fg); }
+.lugar-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lugar-btn.falta { color: var(--aviso); border-color: #4A3C22; }
+.lugar { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(6,8,12,.55); backdrop-filter: blur(3px); z-index: 5; }
+.lugar[hidden] { display: none; }
+.lugar-caja { width: min(460px, 100%); box-sizing: border-box; padding: 28px; border: 1px solid var(--line); border-radius: 20px; background: rgba(10,14,20,.94); box-shadow: 0 40px 120px -30px rgba(0,0,0,.9); }
+.lugar-caja .k { font: 500 10.5px/1 var(--mono); letter-spacing: .14em; color: var(--accent); }
+.lugar-caja h2 { margin: 12px 0 8px; font: 600 22px/1.2 var(--display); }
+.lugar-caja p { margin: 0; font: 400 14px/1.5 var(--texto); color: var(--muted); }
+.lugar-caja .hallado { margin-top: 18px; padding: 16px 18px; border: 1px solid #2A3442; border-radius: 14px; background: var(--campo); }
+.lugar-caja .hallado .ciudad { font: 600 20px/1.2 var(--display); }
+.lugar-caja .hallado .dato { margin-top: 6px; font: 400 12px/1.4 var(--mono); color: #8A95A2; }
+.lugar-caja .buscar { margin-top: 18px; }
+.lugar-caja label { display: block; font: 500 12px/1 var(--texto); color: var(--muted); margin-bottom: 8px; }
+.lugar-caja input { width: 100%; box-sizing: border-box; min-height: 44px; padding: 0 14px; border-radius: var(--r-campo); border: 1px solid #2A3442; background: var(--campo); color: var(--fg); font: 400 15px/1 var(--texto); }
+.lugar-caja input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+.lugar-caja .res { margin-top: 8px; max-height: 240px; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.lugar-caja .res button { all: unset; box-sizing: border-box; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 10px; font: 500 14px/1.3 var(--texto); }
+.lugar-caja .res button small { color: #8A95A2; font: 400 12px/1.3 var(--texto); white-space: nowrap; }
+.lugar-caja .res button:hover, .lugar-caja .res button:focus-visible { background: #141B25; }
+.lugar-caja .res p { margin: 8px 4px; font-size: 13px; }
+.lugar-caja .acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+
 /* A door opened: the planet steps back behind glass, still turning and still cutting; the section
    comes forward. Esc, «Órbita» or the system's Back bring the planet home. */
 body.dentro #escena { transform: scale(.62); opacity: .85; transition: transform 1.1s cubic-bezier(.7,0,.2,1), opacity 1.1s; }

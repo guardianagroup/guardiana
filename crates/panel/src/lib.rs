@@ -29,6 +29,7 @@ mod extras;
 mod identificacion;
 // 1.0.46 (radiografias-globo): the program's language, kept by the service (R10).
 mod idioma;
+mod lugar;
 mod medidas;
 mod plan;
 mod revision;
@@ -1029,6 +1030,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             get(|| async { pagina(include_str!("../static/index.html")) }),
         )
         .merge(idioma::rutas())
+        .merge(lugar::rutas())
         // ---- 1.0.46 radiografias-globo: end ----
         .route(
             "/por-dentro.html",

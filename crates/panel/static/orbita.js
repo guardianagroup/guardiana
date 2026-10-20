@@ -26,6 +26,7 @@
   const TIERRA = RAIZ.dataset.tierra || '/static/tierra/';
   const QUIETO = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const NUBES = new URLSearchParams(location.search).get('nubes') === '1';
+  const TOKEN = (() => { try { return sessionStorage.getItem('guardiana_token') || ''; } catch (_) { return ''; } })();
   const $ = (id) => document.getElementById(id);
 
   // ---------- The world ----------
@@ -154,6 +155,8 @@
     if (i >= 0) abre(i, false); else cierra();
   });
   addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !caja.hidden) { e.preventDefault(); cierraLugar(false); return; }
+    if (!caja.hidden) return;
     if (e.key === 'Escape' && dentro) { e.preventDefault(); atras(); return; }
     if (dentro || e.altKey || e.ctrlKey || e.metaKey) return;
     if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
@@ -235,8 +238,8 @@
   });
   const suelta = () => { if (!arrastre) return; arrastre = null; cvT.classList.remove('arrastra'); quietoHasta = performance.now() + 2500; };
   cvT.addEventListener('pointerup', suelta); cvT.addEventListener('pointercancel', suelta);
-  function mira(pais) {
-    const c = centros[pais]; if (!c) return;
+  function mira(pais, punto) {
+    const c = punto || centros[pais]; if (!c) return;
     meta = { lon: c.lon, lat: Math.max(-45, Math.min(45, c.lat)) };
     quietoHasta = performance.now() + 6000;
   }
@@ -341,7 +344,7 @@ void main(){
   const vuelos = [], huellas = [], chispas = [], rotulos = [], destinos = new Map();
   const ROJO = '224,122,108', ACERO = '156,195,228', BLANCO = '232,236,241';
   function lanza(ev, t) {
-    const de = punto(CASA), a = punto(ev.pais);
+    const de = origen(), a = punto(ev.pais);
     if (!de || !a) return;
     const ang = Math.acos(Math.max(-1, Math.min(1, dot(de, a))));
     const alt = 0.05 + 0.24 * ang / Math.PI;
@@ -463,7 +466,7 @@ void main(){
       cx2.beginPath(); cx2.arc(x, y, 1.4 * (1 - e) + 0.4, 0, 7); cx2.fill();
     }
     // the computer: at its country, said to be approximate
-    const qc = pantalla(punto(CASA) || [0, 0, 1]);
+    const qc = pantalla(origen() || [0, 0, 1]);
     if (qc.ve && qc.z > 0) {
       const f = (t % 2.4) / 2.4;
       cx2.strokeStyle = `rgba(${ACERO},${(0.7 * (1 - f)).toFixed(3)})`; cx2.lineWidth = 1.2;
@@ -473,7 +476,7 @@ void main(){
     cx2.globalCompositeOperation = 'source-over';
     if (qc.ve && qc.z > 0) {
       cx2.font = '500 10px "IBM Plex Mono", monospace'; cx2.fillStyle = 'rgba(232,236,241,.82)';
-      cx2.textAlign = 'left'; cx2.fillText('TU EQUIPO · ' + (nombrePais(CASA) || CASA).toUpperCase() + ' (APROX.)', qc.x + 12, qc.y + 4);
+      cx2.textAlign = 'left'; cx2.fillText(etiquetaCasa(), qc.x + 12, qc.y + 4);
     }
     // what was cut, said in words next to where it happened
     const usados = [];
@@ -523,7 +526,7 @@ void main(){
     b.addEventListener('click', () => mira(ev.pais));
     li.appendChild(b);
     lista.insertBefore(li, lista.firstChild);
-    while (lista.children.length > 6) lista.lastChild.remove();
+    while (lista.children.length > 4) lista.lastChild.remove();
     if (DEMO) { cortesDemo++; $('n').textContent = cortesDemo.toLocaleString('es-ES'); }
   }
   function late() {
@@ -556,13 +559,12 @@ void main(){
     };
     setTimeout(genera, 2600);
   } else {
-    const token = (() => { try { return sessionStorage.getItem('guardiana_token') || ''; } catch (_) { return ''; } })();
     let previo = null, fallos = 0;
     const valido = (p) => /^[A-Z]{2}$/.test(p || '') && centros[p];
     const evento = (d, corte) => ({ corte, pais: d.pais, quien: d.empresa || d.red || d.destino || d.programa, programa: d.programa, categoria: CATEGORIA[d.categoria] || '', cuando: d.ultima || Date.now() });
     const toma = async () => {
       try {
-        const r = await fetch('/api/por-dentro', { headers: { 'X-Guardiana-Token': token, 'X-Guardiana-Lang': 'es', 'X-Guardiana-Tz': String(-new Date().getTimezoneOffset()) } });
+        const r = await fetch('/api/por-dentro', { headers: { 'X-Guardiana-Token': TOKEN, 'X-Guardiana-Lang': 'es', 'X-Guardiana-Tz': String(-new Date().getTimezoneOffset()) } });
         if (!r.ok) throw new Error(String(r.status));
         const u = await r.json();
         fallos = 0;
@@ -593,6 +595,204 @@ void main(){
     };
     toma();
   }
+
+
+  // ---------- Where this computer is: its city (19 Oct 2026) ----------
+  // Agreed by Claude, ChatGPT and Grok after the owner asked for «la ciudad, sí o sí»: the system's
+  // own location, several samples, the best one, a city named only when it is within 5 km; or the
+  // city the person chooses from the list that travels with the program. Always confirmed by the
+  // person, kept by the service for the whole program (/api/ajustes/lugar), never an IP address,
+  // never sent anywhere. Until then the computer is drawn at its country and says «aprox.».
+  const PRECISION_CIUDAD = 5000;
+  let LUGAR = null;
+  const origen = () => (LUGAR ? vec(LUGAR.lon, LUGAR.lat) : punto(CASA));
+  const etiquetaCasa = () => (LUGAR ? 'TU EQUIPO · ' + LUGAR.ciudad.toUpperCase() : 'TU EQUIPO · ' + (nombrePais(CASA) || CASA).toUpperCase() + ' (APROX.)');
+  const apiLugar = async (metodo, cuerpo) => {
+    if (DEMO) {
+      if (metodo === 'PUT') { try { localStorage.setItem('guardiana_orbita_demo_lugar', JSON.stringify(cuerpo)); } catch (_) {} return cuerpo; }
+      if (metodo === 'DELETE') { try { localStorage.removeItem('guardiana_orbita_demo_lugar'); } catch (_) {} return null; }
+      try { return JSON.parse(localStorage.getItem('guardiana_orbita_demo_lugar') || 'null'); } catch (_) { return null; }
+    }
+    const r = await fetch('/api/ajustes/lugar', { method: metodo, headers: Object.assign({ 'X-Guardiana-Token': TOKEN }, cuerpo ? { 'Content-Type': 'application/json' } : {}), body: cuerpo ? JSON.stringify(cuerpo) : undefined });
+    if (!r.ok) throw new Error(String(r.status));
+    return (await r.json()).lugar || null;
+  };
+  let CIUDADES = null;
+  const ciudades = async () => {
+    if (CIUDADES) return CIUDADES;
+    const r = await fetch(TIERRA + 'ciudades.tsv');
+    if (!r.ok) throw new Error(String(r.status));
+    const sinTildes = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    CIUDADES = (await r.text()).split('\n').filter((l) => l && l[0] !== '#').map((l) => { const [n, cc, adm, la, lo] = l.split('\t'); return { n, cc, adm: adm || '', la: +la, lo: +lo, k: sinTildes(n + ' ' + (adm || '')) }; });
+    CIUDADES.sinTildes = sinTildes;
+    return CIUDADES;
+  };
+  const cercana = (lista, lat, lon) => {
+    let mejor = null, dm = Infinity;
+    const cl = Math.cos(lat * RAD);
+    for (const c of lista) { const dx = (c.lo - lon) * cl, dy = c.la - lat, d = dx * dx + dy * dy; if (d < dm) { dm = d; mejor = c; } }
+    return mejor ? { c: mejor, km: Math.sqrt(dm) * 111.2 } : null;
+  };
+  const distKm = (a, b) => { const cl = Math.cos(a.lat * RAD), dx = (a.lon - b.lon) * cl, dy = a.lat - b.lat; return Math.sqrt(dx * dx + dy * dy) * 111.2; };
+  const metros = (m) => (m < 1000 ? Math.max(1, Math.round(m)) + ' m' : (m / 1000).toFixed(m < 10000 ? 1 : 0).replace('.', ',') + ' km');
+  function pintaLugar() {
+    const b = $('lugar-btn');
+    $('lugar-nombre').textContent = LUGAR ? LUGAR.ciudad : 'Situar este equipo';
+    b.classList.toggle('falta', !LUGAR);
+    b.setAttribute('aria-label', LUGAR ? 'Este equipo está en ' + LUGAR.ciudad + '. Cambiar' : 'Situar este equipo en su ciudad');
+  }
+  // The card: one calm question over the planet, in a few states.
+  const caja = $('lugar');
+  let candidato = null, medicion = null, antesDelLugar = null;
+  const accion = (texto, clase, hacer) => { const b = document.createElement('button'); b.type = 'button'; b.className = clase; b.textContent = texto; b.addEventListener('click', hacer); $('lugar-acciones').appendChild(b); return b; };
+  function cierraLugar(luego) {
+    caja.hidden = true;
+    if (medicion !== null) { navigator.geolocation.clearWatch(medicion); medicion = null; }
+    if (luego) { try { sessionStorage.setItem('guardiana_orbita_lugar_luego', '1'); } catch (_) {} }
+    if (antesDelLugar && antesDelLugar.focus) antesDelLugar.focus({ preventScroll: true });
+  }
+  function abreLugar(modo, extra) {
+    if (caja.hidden) antesDelLugar = document.activeElement;
+    caja.hidden = false;
+    $('lugar-acciones').innerHTML = '';
+    $('lugar-hallado').hidden = true;
+    $('lugar-buscar').hidden = true;
+    const t = $('lugar-t'), d = $('lugar-d');
+    let primero = null;
+    if (modo === 'inicio') {
+      t.textContent = '¿En qué ciudad está este equipo?';
+      d.textContent = 'Para dibujarlo en su sitio. Se mide con la ubicación de tu sistema o lo eliges tú, y siempre lo confirmas. Se guarda solo en este equipo; GUARDIANA no lo envía a nadie.';
+      primero = accion('Detectar ubicación', 'boton principal', mideLugar);
+      accion('Elegir ciudad', 'boton', () => abreLugar('buscar'));
+      accion('Ahora no', 'boton texto', () => cierraLugar(true));
+    } else if (modo === 'midiendo') {
+      t.textContent = 'Midiendo…';
+      d.textContent = 'Con la ubicación de tu sistema. Si te pregunta, permite el acceso: se toman varias medidas y se queda la mejor. Nada sale de este equipo hacia GUARDIANA.';
+      primero = accion('Elegir ciudad', 'boton', () => abreLugar('buscar'));
+      accion('Cancelar', 'boton texto', () => cierraLugar(false));
+    } else if (modo === 'hallado') {
+      candidato = extra.c;
+      t.textContent = extra.titulo || '¿Es aquí?';
+      d.textContent = extra.texto || 'Confírmalo y el planeta lo dibujará en su sitio.';
+      $('lugar-hallado').hidden = false;
+      $('lugar-ciudad').textContent = candidato.ciudad;
+      $('lugar-dato').textContent = [candidato.region, nombrePais(candidato.pais)].filter(Boolean).join(' · ') + (candidato.precision != null ? ' · precisión ' + metros(candidato.precision) : ' · elegida por ti');
+      primero = accion('Sí, es aquí', 'boton principal', () => confirma(candidato));
+      accion('Elegir otra', 'boton', () => abreLugar('buscar'));
+      accion('Ahora no', 'boton texto', () => cierraLugar(true));
+    } else if (modo === 'buscar') {
+      t.textContent = 'Elige la ciudad de este equipo';
+      d.textContent = (extra && extra.motivo) || 'Escribe su nombre. La lista viaja con el programa: no se consulta nada en internet.';
+      $('lugar-buscar').hidden = false;
+      $('lugar-q').value = ''; $('lugar-res').innerHTML = '';
+      primero = $('lugar-q');
+      if (navigator.geolocation) accion('Detectar ubicación', 'boton', mideLugar);
+      accion('Ahora no', 'boton texto', () => cierraLugar(true));
+    } else if (modo === 'tengo') {
+      t.textContent = 'Este equipo está en ' + LUGAR.ciudad;
+      d.textContent = (LUGAR.fuente === 'sistema' ? 'Medido con la ubicación de tu sistema' + (LUGAR.precision != null ? ' (precisión ' + metros(LUGAR.precision) + ')' : '') : 'Elegido por ti') + ' y confirmado por ti. Se guarda solo en este equipo.';
+      primero = accion('Cerrar', 'boton principal', () => cierraLugar(false));
+      if (navigator.geolocation) accion('Medir de nuevo', 'boton', mideLugar);
+      accion('Elegir otra', 'boton', () => abreLugar('buscar'));
+      accion('Olvidar', 'boton texto', async () => { try { LUGAR = await apiLugar('DELETE'); } catch (_) {} LUGAR = null; pintaLugar(); cierraLugar(false); });
+    }
+    setTimeout(() => { if (!caja.hidden && primero) primero.focus(); }, 30);
+  }
+  async function confirma(c) {
+    const cuerpo = { ciudad: c.ciudad, region: c.region || '', pais: c.pais, lat: c.lat, lon: c.lon, fuente: c.fuente, cuando: Date.now() };
+    if (c.precision != null) cuerpo.precision = c.precision;
+    try { LUGAR = (await apiLugar('PUT', cuerpo)) || cuerpo; }
+    catch (_) { $('lugar-d').textContent = 'No se pudo guardar. Inténtalo de nuevo.'; return; }
+    // «En vivo» reads the same place in this browser until it moves to the service too.
+    try { localStorage.setItem('guardiana_pd_lugar', JSON.stringify({ lat: LUGAR.lat, lon: LUGAR.lon, ciudad: LUGAR.ciudad + (LUGAR.region ? ', ' + LUGAR.region : ''), cc: LUGAR.pais, fuente: LUGAR.fuente === 'manual' ? 'manual' : 'equipo', precision: LUGAR.precision != null ? LUGAR.precision : null, cuando: Date.now() })); } catch (_) {}
+    pintaLugar();
+    cierraLugar(false);
+    mira(null, LUGAR);
+  }
+  // The system's location: several fresh samples for up to 15 s, the best one kept.
+  function mideLugar(callado) {
+    if (!navigator.geolocation) { if (callado !== true) abreLugar('buscar', { motivo: 'Este navegador no da la ubicación del sistema. Elige la ciudad.' }); return; }
+    if (callado !== true) abreLugar('midiendo');
+    if (medicion !== null) navigator.geolocation.clearWatch(medicion);
+    let mejor = null, hecho = false, reloj = 0;
+    const acaba = async (err) => {
+      if (hecho) return; hecho = true; clearTimeout(reloj);
+      if (medicion !== null) { navigator.geolocation.clearWatch(medicion); medicion = null; }
+      if (!mejor) {
+        if (callado === true) return;
+        abreLugar('buscar', { motivo: err && err.code === 1 ? 'La ubicación está desactivada o no se ha permitido (en Windows: Configuración › Privacidad › Ubicación). Elige la ciudad, o actívala y vuelve a detectar.' : 'El sistema no ha dado una ubicación. Elige la ciudad.' });
+        return;
+      }
+      const precision = Number.isFinite(mejor.coords.accuracy) ? mejor.coords.accuracy : Infinity;
+      const lat = mejor.coords.latitude, lon = mejor.coords.longitude;
+      if (precision > PRECISION_CIUDAD) {
+        if (callado !== true) abreLugar('buscar', { motivo: 'La ubicación del sistema solo da una zona de ' + metros(precision) + ' (sin Wi‑Fi suele pasar): no basta para nombrar la ciudad. Elígela tú.' });
+        return;
+      }
+      let m = null;
+      try { m = cercana(await ciudades(), lat, lon); } catch (_) {}
+      if (!m) { if (callado !== true) abreLugar('buscar'); return; }
+      const c = { ciudad: m.c.n, region: m.c.adm, pais: m.c.cc, lat: Math.round(lat * 1000) / 1000, lon: Math.round(lon * 1000) / 1000, fuente: 'sistema', precision: Math.round(precision) };
+      if (callado === true) {
+        // a laptop that travelled: ask only when the new place is clearly another city
+        if (LUGAR && distKm(LUGAR, c) > 30 && caja.hidden) abreLugar('hallado', { c, titulo: 'Parece que este equipo está ahora en ' + c.ciudad, texto: 'La ubicación de tu sistema lo sitúa allí. ¿Lo cambiamos?' });
+        return;
+      }
+      const lejos = m.km > 12;
+      abreLugar('hallado', { c, texto: lejos ? 'Tu punto está a ' + Math.round(m.km) + ' km de ' + m.c.n + ', la población más cercana que conoce el programa. Si tu municipio es otro, elígelo.' : 'Confírmalo y el planeta lo dibujará en su sitio.' });
+    };
+    medicion = navigator.geolocation.watchPosition((pos) => {
+      if (!mejor || (Number.isFinite(pos.coords.accuracy) && pos.coords.accuracy < mejor.coords.accuracy)) mejor = pos;
+      if (mejor && mejor.coords.accuracy <= 100) acaba();
+    }, acaba, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+    reloj = setTimeout(() => acaba(), 15000);
+  }
+  // The search, over the list that travels with the program.
+  $('lugar-q').addEventListener('input', async () => {
+    const res = $('lugar-res');
+    let lista;
+    try { lista = await ciudades(); } catch (_) { res.innerHTML = '<p>No se pudo abrir la lista de ciudades.</p>'; return; }
+    const q = lista.sinTildes($('lugar-q').value.trim());
+    res.innerHTML = '';
+    if (q.length < 2) return;
+    const empieza = [], contiene = [];
+    for (const c of lista) { if (c.k.startsWith(q)) empieza.push(c); else if (c.k.includes(q)) contiene.push(c); if (empieza.length >= 8) break; }
+    const ver = empieza.concat(contiene).slice(0, 8);
+    if (!ver.length) { res.innerHTML = '<p>No está en la lista. Prueba con la ciudad o el municipio más cercano.</p>'; return; }
+    for (const c of ver) {
+      const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'option');
+      const n = document.createElement('span'); n.textContent = c.n + (c.adm ? ' · ' + c.adm : '');
+      const s = document.createElement('small'); s.textContent = nombrePais(c.cc);
+      b.append(n, s);
+      b.addEventListener('click', () => abreLugar('hallado', { c: { ciudad: c.n, region: c.adm, pais: c.cc, lat: c.la, lon: c.lo, fuente: 'manual', precision: null } }));
+      res.appendChild(b);
+    }
+  });
+  $('lugar-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { const b = $('lugar-res').querySelector('button'); if (b) { e.preventDefault(); b.click(); } } });
+  $('lugar-btn').addEventListener('click', () => (LUGAR ? abreLugar('tengo') : abreLugar('inicio')));
+  caja.addEventListener('click', (e) => { if (e.target === caja) cierraLugar(false); });
+  (async () => {
+    try { LUGAR = await apiLugar('GET'); } catch (_) { LUGAR = null; }
+    pintaLugar();
+    if (LUGAR) {
+      mira(null, LUGAR);
+      if (LUGAR.fuente === 'sistema') { try { navigator.permissions.query({ name: 'geolocation' }).then((p) => { if (p.state === 'granted') mideLugar(true); }).catch(() => {}); } catch (_) {} }
+      return;
+    }
+    let luego = false;
+    try { luego = sessionStorage.getItem('guardiana_orbita_lugar_luego') === '1'; } catch (_) {}
+    if (luego) return;
+    // What «En vivo» measured or was told in this browser, offered for confirmation first.
+    let previo = null;
+    try { previo = JSON.parse(localStorage.getItem('guardiana_pd_lugar') || 'null'); } catch (_) {}
+    setTimeout(() => {
+      if (!caja.hidden || dentro) return;
+      if (previo && previo.ciudad && previo.cc && Number.isFinite(previo.lat) && (previo.fuente === 'manual' || (Number.isFinite(previo.precision) && previo.precision <= PRECISION_CIUDAD))) {
+        const [ciudad, region] = String(previo.ciudad).split(', ');
+        abreLugar('hallado', { c: { ciudad, region: region || '', pais: previo.cc, lat: previo.lat, lon: previo.lon, fuente: previo.fuente === 'manual' ? 'manual' : 'sistema', precision: previo.fuente === 'manual' ? null : previo.precision } });
+      } else abreLugar('inicio');
+    }, 3600);
+  })();
 
   // ---------- The loop ----------
   let t0 = performance.now(), ultimo = t0, impar = false, empezado = false;
