@@ -154,10 +154,12 @@ const ENG=[
 ['PRIVACIDAD','Swisscows','Sw','Privacidad · Filtro familiar','Suiza','https://swisscows.com/web?query='],
 ['PRIVACIDAD','MetaGer','Mg','Privacidad · Metabuscador','Alemania','https://metager.org/meta/meta.ger3?eingabe='],
 ['PRIVACIDAD','Ecosia','E','Planta árboles · Resultados de Bing y Google','Alemania','https://www.ecosia.org/search?q='],
-['PRIVACIDAD','Kagi','K','De pago · Sin anuncios','EE. UU.','https://kagi.com/search?q='],
 ['GENERALES','Google','G','General · Índice propio','EE. UU.','https://www.google.com/search?q='],
 ['GENERALES','Bing','B','General · Índice propio','EE. UU.','https://www.bing.com/search?q='],
 ['GENERALES','Yahoo','Y!','General · Resultados de Bing','EE. UU.','https://search.yahoo.com/search?p='],
+['GENERALES','YouTube','YT','Vídeos','EE. UU.','https://www.youtube.com/results?search_query='],
+['GENERALES','Ask','A','General','EE. UU.','https://www.ask.com/web?q='],
+['GENERALES','AOL','AO','General · Resultados de Bing','EE. UU.','https://search.aol.com/aol/search?q='],
 ['POR PAÍS','Yandex','Ya','Índice propio','Rusia','https://yandex.com/search/?text='],
 ['POR PAÍS','Baidu','Ba','Índice propio','China','https://www.baidu.com/s?wd='],
 ['POR PAÍS','Naver','N','Portal · Índice propio','Corea del Sur','https://search.naver.com/search.naver?query='],
@@ -165,6 +167,8 @@ const ENG=[
 ['POR PAÍS','Seznam','Sz','Índice propio','Chequia','https://search.seznam.cz/?q='],
 ['POR PAÍS','Yahoo Japón','YJ','Resultados de Google','Japón','https://search.yahoo.co.jp/search?p='],
 ['POR PAÍS','Sogou','So','Portal','China','https://www.sogou.com/web?query='],
+['POR PAÍS','360 Search','36','Portal','China','https://www.so.com/s?q='],
+['POR PAÍS','Cốc Cốc','CC','Portal','Vietnam','https://coccoc.com/search?query='],
 ['INTELIGENCIA ARTIFICIAL','Perplexity','P','Respuestas con IA · Servicio externo','EE. UU.','https://www.perplexity.ai/search?q='],
 ['INTELIGENCIA ARTIFICIAL','You.com','Yo','Respuestas con IA · Servicio externo','EE. UU.','https://you.com/search?q='],
 ['INTELIGENCIA ARTIFICIAL','ChatGPT','C','Respuestas con IA · Servicio externo','EE. UU.','https://chatgpt.com/?q=']];
@@ -197,6 +201,24 @@ $('#uqueEs').onclick=()=>{clearTimeout(ponUltra.t);panelUltra(!upanel.classList.
 upanel.querySelectorAll('.univ button').forEach(b=>b.onclick=()=>{upanel.querySelectorAll('.univ button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));$('#ulvl').textContent=b.dataset.l;$('#univtxt').textContent='NIVEL '+b.dataset.l.toUpperCase()+' · '+b.dataset.t;clearTimeout(ponUltra.t)});
 document.addEventListener('pointerdown',e=>{if(upanel.classList.contains('show')&&!upanel.contains(e.target)&&e.target.id!=='uqueEs'&&!$('#ultra').contains(e.target))panelUltra(false)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')panelUltra(false)});
+// ---------- In the program (opened from Órbita): ZERO's own window browses for real ----------
+// The same messages the old start section sent: the engine as a setting, then navigate and open the shield's panel.
+const PROD=/[?&]orbita=1/.test(location.search);
+const HOSTZ=(()=>{try{return (window.chrome&&window.chrome.webview)||(parent!==window&&parent.chrome&&parent.chrome.webview)||null}catch(e){return null}})();
+const IDZ={'DuckDuckGo':'duckduckgo','Brave Search':'brave','Startpage':'startpage','Qwant':'qwant','Mojeek':'mojeek','Swisscows':'swisscows','MetaGer':'metager','Ecosia':'ecosia','Google':'google','Bing':'bing','Yahoo':'yahoo','YouTube':'youtube','Ask':'ask','AOL':'aol','Yandex':'yandex','Baidu':'baidu','Naver':'naver','Daum':'daum','Seznam':'seznam','Yahoo Japón':'yahoojp','Sogou':'sogou','360 Search':'so360','Cốc Cốc':'coccoc','Perplexity':'perplexity','You.com':'you','ChatGPT':'chatgpt'};
+function avisaMotor(){if(HOSTZ&&IDZ[selected])try{HOSTZ.postMessage({tipo:'ajuste',clave:'buscador',valor:IDZ[selected]})}catch(e){}}
+{const pb=pintaBoton;pintaBoton=function(){pb();avisaMotor()}}
+if(PROD){
+  {const ow=openWeb;openWeb=function(){const val=input.value.trim();if(!val){input.focus();return}
+    if(HOSTZ){try{HOSTZ.postMessage({tipo:'navegar',texto:val});HOSTZ.postMessage({tipo:'panel',vista:'escudo'})}catch(e){}return}
+    $('.hint').textContent='Para navegar, abre la ventana de ZERO: allí la web aparece en el centro y lo que se corta, a la derecha.';$('.hint').style.opacity='1'}}
+  const aOrbita=()=>{try{const v=parent!==window&&parent.document.getElementById('volver');if(v){v.click();return}}catch(e){}history.back()};
+  $('#back').onclick=aOrbita;$('#back').setAttribute('aria-label','Volver a Órbita');
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!opened&&!showMenu&&!$('#upanel').classList.contains('show')&&!stage.classList.contains('intro'))aOrbita()});
+  setTimeout(()=>{const d=$('#director');if(d)d.remove()},0);document.querySelectorAll('.edge').forEach(e=>e.remove());$('.eyebrow').textContent='';
+}
+pintaBoton();
+
 
 
 
@@ -303,7 +325,7 @@ ENTRADAS.forEach((e,i)=>{const b=document.createElement('button');b.type='button
 const skip=e=>{if(cineStart<0||cineFixed!=null)return;if(e.target&&e.target.closest&&e.target.closest('#director'))return;if(e.type!=='wheel'){e.preventDefault();e.stopPropagation()}endCine()};
 addEventListener('keydown',skip,true);addEventListener('pointerdown',skip,true);addEventListener('wheel',skip,{capture:true,passive:true});
 window.zeroCine={play,red(x){conRed=!!x},at(i,t){cineMode=i;paintDirector();stage.classList.toggle('vivo',!!ENTRADAS[i].rest);stage.classList.add('intro');cineStart=0;cineFixed=t;direct(t)},end:endCine};
-{let i=0;const q=/entrada=(\d)/.exec(location.search);try{const s=parseInt(localStorage.getItem('zeroEntrada2'),10);if(s>=0&&s<ENTRADAS.length)i=s}catch(e){}if(q&&+q[1]<ENTRADAS.length)i=+q[1];play(i)}
+{let i=0;const q=/entrada=(\d)/.exec(location.search);try{const s=parseInt(localStorage.getItem('zeroEntrada2'),10);if(s>=0&&s<ENTRADAS.length)i=s}catch(e){}if(q&&+q[1]<ENTRADAS.length)i=+q[1];if(/[?&]orbita=1/.test(location.search)){i=0;let vista=false;try{vista=sessionStorage.getItem('zeroIntro')==='1';sessionStorage.setItem('zeroIntro','1')}catch(e){}if(vista){cineMode=0;stage.classList.add('vivo');endCine()}else play(i)}else play(i)}
 
 // NÁCAR: Pure WebGL 1, all geometry generated locally. No resources, libraries, or shader imports.
 const gl=canvas.getContext('webgl',{alpha:false,antialias:false,depth:false,powerPreference:'high-performance'});

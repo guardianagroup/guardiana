@@ -1128,6 +1128,30 @@ pub async fn start(config: Config) -> Result<Running, Error> {
                 )
             }),
         )
+        // ZERO's start screen (owner, 20 Oct 2026): opened from Órbita's ZERO door; the browsing
+        // itself is done by ZERO's own window through the messages it already understands.
+        .route(
+            "/static/zero.html",
+            get(|| async { pagina(include_str!("../static/zero.html")) }),
+        )
+        .route(
+            "/static/zero.js",
+            get(|| async {
+                static_response(
+                    include_str!("../static/zero.js"),
+                    "application/javascript; charset=utf-8",
+                )
+            }),
+        )
+        .route(
+            "/static/zero.css",
+            get(|| async {
+                static_response(
+                    include_str!("../static/zero.css"),
+                    "text/css; charset=utf-8",
+                )
+            }),
+        )
         // «Vigilancia» (1.0.45): its page (under Diagnóstico), its script, and the answers for
         // the page and for the top bar's pill and «Pulso del día».
         .route(

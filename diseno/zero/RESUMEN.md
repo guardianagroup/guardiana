@@ -75,6 +75,17 @@ Ideas de la agencia aún por hacer:
 
 **Sonido sintetizado en la propia página**, sin archivos y reducido a lo esencial: un latido doble, el chasquido del primer corte, un golpe grave en la transformación y un único «ting» de cristal. Los navegadores solo dejan sonar audio después de un clic; en el producto suena porque ZERO se abre con un clic desde Órbita. Hay un botón para silenciarlo.
 
+## ESTADO DEL PROGRAMA (20 oct 2026, tarde): ZERO ABIERTO EN ÓRBITA
+- En Órbita hay 5 puertas: Hoy, Protección, ZERO, Casa y Mensajes. **ZERO está «Abierto»**; las otras cuatro, «En construcción».
+- La puerta ZERO abre a pantalla completa la nueva pantalla de inicio (`crates/panel/static/zero.html`, `zero.css` y `zero.js`, con sus rutas añadidas en `crates/panel/src/lib.rs`). Está separada en tres archivos porque el panel prohíbe scripts y estilos incrustados (CSP `script-src 'self'`).
+- Al buscar, envía a la ventana real de ZERO los mismos mensajes que ya entiende: `{tipo:'ajuste', clave:'buscador', valor:id}`, `{tipo:'navegar', texto}` y `{tipo:'panel', vista:'escudo'}`. La navegación y los cortes son reales.
+- Fuera de la ventana de ZERO avisa: «abre la ventana de ZERO».
+- La lista de buscadores coincide con la de ZERO (`crates/zero/src/direccion.rs`): sin Kagi, con YouTube, Ask, AOL, 360 Search y Cốc Cốc.
+- La entrada se ve una vez por sesión. Esc o «‹» vuelven a Órbita.
+- **ULTRA sigue siendo un diseño**, sin Tor real todavía, y su panel lo dice.
+- El código fuente del diseño está en `diseno/zero/`. `patch.py` genera `zero-base.html` a partir del NÁCAR original de ChatGPT.
+- Rama `diseno/orbita`, subida a GitHub.
+
 ## HECHO EN LA RONDA 7 (incluido en `zero-metamorfosis.html`)
 **Selector de buscadores** (dirección de ChatGPT, coincidente con la de Claude):
 - El botón muestra Google por defecto, con su monograma «G».

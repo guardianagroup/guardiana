@@ -57,7 +57,8 @@
   const PUERTAS = [
     { id: 'hoy', n: 'Hoy', s: 'En construcción', d: 'Los cortes de hoy y el historial completo, encadenado y auditable.', dentro: ['Cortes de hoy', 'Historial'], url: null, construccion: true },
     { id: 'proteccion', n: 'Protección', s: 'En construcción', d: 'Verificación de que lo instalado es lo publicado, y Defensa cuando esté probada.', dentro: ['Verificación', 'Defensa (en desarrollo)'], url: null, construccion: true },
-    { id: 'zero', n: 'ZERO', s: 'En construcción', d: 'El navegador: busca donde quieras y mira lo que se corta en cada web.', dentro: ['Navegador', 'Buscadores', 'Cortes por página'], url: null, construccion: true, vistaPrevia: true },
+    // ZERO is open (owner, 20 Oct 2026): the new start screen (zero.html), browsing for real in ZERO's own window.
+    { id: 'zero', n: 'ZERO', s: 'Abierto', d: 'El navegador: busca donde quieras y mira lo que se corta en cada web.', dentro: ['Navegador', 'Buscadores', 'Cortes por página'], url: '/static/zero.html' },
     { id: 'casa', n: 'Casa', s: 'En construcción', d: 'Los dispositivos de tu red y la radiografía de este equipo.', dentro: ['Dispositivos', 'Radiografía'], url: null, construccion: true },
     { id: 'mensajes', n: 'Mensajes', s: 'En construcción', d: 'Mensajes y llamadas cifrados con GUARDIANA SECURE, y lo que sabe tu IA de ti.', dentro: ['Mensajes y llamadas', 'Tu IA'], url: null, construccion: true },
   ];
@@ -127,7 +128,7 @@
     $('donde').hidden = false;
     $('donde').textContent = p.n;
     // a door with its own show uses the common section (orbita-secciones.js)
-    if (window.GuardianaSecciones && window.GuardianaSecciones.abre(p.id)) {
+    if (!p.url && window.GuardianaSecciones && window.GuardianaSecciones.abre(p.id)) {
       marco.hidden = true; marco.removeAttribute('src'); $('sin-pagina').hidden = true;
       if (apila) history.pushState({ puerta: p.id }, '', '#' + p.id);
       setTimeout(() => { if (dentro) $('volver').focus(); }, 900);
