@@ -84,9 +84,26 @@
       <div class="k" id="pl-k1">HOY</div>
       <dl id="pl-cifras"></dl>
     </aside>
-    <div class="escenario"><canvas id="espectaculo" aria-hidden="true"></canvas><div class="vacio" id="pl-vacio" hidden></div></div>
+    <div class="escenario">
+      <canvas id="espectaculo" aria-hidden="true"></canvas>
+      <div class="vacio" id="pl-vacio" hidden></div>
+      <!-- ZERO: the browser on screen (owner, 20 Oct 2026): search, Enter, the web in the middle
+           and on the right what GUARDIANA cuts. -->
+      <form class="busca-web" id="pl-busca" role="search" hidden>
+        <button type="button" class="nav-web" id="pl-atras" aria-label="Atrás" hidden><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button>
+        <span class="ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.6"/><path d="m10.4 10.4 3.4 3.4"/></svg></span>
+        <label class="sr" for="pl-q">Busca o escribe una dirección</label>
+        <input id="pl-q" type="text" autocomplete="off" spellcheck="false" placeholder="Busca o escribe una dirección">
+        <span class="escudo-web" id="pl-escudo" hidden><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 1.8 13.2 4v3.8c0 3-2.2 5.4-5.2 6.4-3-1-5.2-3.4-5.2-6.4V4z"/></svg><b id="pl-escudo-n">0</b></span>
+      </form>
+      <div class="visor" id="pl-visor" hidden>
+        <div class="carga" id="pl-carga"></div>
+        <iframe id="pl-web" title="Web"></iframe>
+        <div class="filo" id="pl-filo" aria-hidden="true"></div>
+      </div>
+    </div>
     <aside class="zona zona-der" aria-label="En directo">
-      <div class="k">EN DIRECTO</div>
+      <div class="k" id="pl-k2">EN DIRECTO</div>
       <ul id="pl-lista"></ul>
     </aside>
     <footer class="pie">

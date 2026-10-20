@@ -46,20 +46,22 @@
   const PROPIOS = [{ n: 'Servidor de la web', p: 'US', c: '' }, { n: 'Contenido (CDN)', p: 'NL', c: '' }, { n: 'Fuentes y estilos', p: 'DE', c: '' }];
   const cifras = { webs: new Set(), cortes: 0, empresas: new Set(), paises: new Set(), pasan: 0 };
   let generador = 0;
-  function evento() {
-    const web = WEBS[Math.random() * WEBS.length | 0];
-    const corte = Math.random() < 0.55;
+  function evento(webFija, corteFijo) {
+    const web = webFija || WEBS[Math.random() * WEBS.length | 0];
+    const corte = corteFijo != null ? corteFijo : Math.random() < 0.55;
     const e = corte ? EMPRESAS[Math.random() * EMPRESAS.length | 0] : PROPIOS[Math.random() * PROPIOS.length | 0];
     const ev = { web, empresa: e.n, pais: e.p, cat: e.c, corte, t: performance.now() / 1000 };
     cifras.webs.add(web);
     if (corte) { cifras.cortes++; cifras.empresas.add(e.n); cifras.paises.add(e.p); } else cifras.pasan++;
     llega(ev);
     pintaCifras();
-    if (corte) anota(ev);
+    if (corte) { anota(ev); if (pagina) golpeEscudo(); }
   }
   function pintaCifras() {
     const dl = $('pl-cifras');
-    const filas = [['Webs visitadas', cifras.webs.size, ''], ['Cortes', cifras.cortes, 'rojo'], ['Empresas cortadas', cifras.empresas.size, ''], ['Países', cifras.paises.size, ''], ['Dejadas pasar', cifras.pasan, '']];
+    const filas = pagina
+      ? [['Cortes en esta web', cifras.cortes, 'rojo'], ['Empresas cortadas', cifras.empresas.size, ''], ['Países', cifras.paises.size, ''], ['Dejadas pasar', cifras.pasan, '']]
+      : [['Webs visitadas', cifras.webs.size, ''], ['Cortes', cifras.cortes, 'rojo'], ['Empresas cortadas', cifras.empresas.size, ''], ['Países', cifras.paises.size, ''], ['Dejadas pasar', cifras.pasan, '']];
     dl.innerHTML = '';
     for (const [k, v, cl] of filas) { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v.toLocaleString('es-ES'); if (cl) dd.className = cl; dl.append(dt, dd); }
   }
@@ -243,6 +245,55 @@
     for (let i = S.rotulos.length - 1; i >= 0; i--) { const r = S.rotulos[i], e = t - r.t0; if (e > 3.2) { S.rotulos.splice(i, 1); continue; } rotulo(r.x, r.y, r.ev, Math.min(1, e / 0.2) * Math.min(1, (3.2 - e) / 0.6)); }
   }
 
+  // ---------- ZERO: the browser on screen (owner, 20 Oct 2026) ----------
+  // Search, Enter: the web appears in the middle and, on the right, what GUARDIANA cuts on it.
+  // Inside ZERO's own window the program does it for real: the same two messages its address bar
+  // sends (navigate, then open the shield's panel on the right). In the design review a sample page
+  // stands in for the web and the cuts are invented, and the screen says so.
+  const HOST = window.chrome && window.chrome.webview;
+  let pagina = null, ritmo = 0;
+  const esDireccion = (t) => /^https?:\/\//i.test(t) || /^[^\s/]+\.[a-z]{2,}(\/\S*)?$/i.test(t);
+  const dominioDe = (t) => { try { return new URL(/^https?:/i.test(t) ? t : 'https://' + t).hostname.replace(/^www\./, ''); } catch (_) { return t; } };
+  function golpeEscudo() {
+    const n = $('pl-escudo-n'); n.textContent = String(cifras.cortes);
+    const e = $('pl-escudo'); e.classList.remove('late'); void e.offsetWidth; e.classList.add('late');
+    const f = $('pl-filo'); f.classList.remove('late'); void f.offsetWidth; f.classList.add('late');
+  }
+  function navega(texto) {
+    if (HOST) { HOST.postMessage({ tipo: 'navegar', texto }); HOST.postMessage({ tipo: 'panel', vista: 'escudo' }); return; }
+    if (!DEMO) { $('pl-vacio').hidden = false; $('pl-vacio').textContent = 'Para navegar con GUARDIANA cortando, abre ZERO: la web aparece en el centro y lo que se corta, a la derecha.'; return; }
+    const dir = esDireccion(texto), dom = dir ? dominioDe(texto) : 'buscador.ejemplo';
+    pagina = { dom, texto };
+    clearInterval(generador); clearTimeout(ritmo);
+    cifras.webs.clear(); cifras.cortes = 0; cifras.empresas.clear(); cifras.paises.clear(); cifras.pasan = 0;
+    $('pl-lista').innerHTML = ''; pintaCifras();
+    $('pl-k1').textContent = 'ESTA WEB · DEMOSTRACIÓN'; $('pl-k2').textContent = 'LO QUE CORTA GUARDIANA';
+    $('plantilla').classList.add('navegando');
+    $('pl-visor').hidden = false; $('pl-atras').hidden = false; $('pl-escudo').hidden = false; $('pl-escudo-n').textContent = '0';
+    $('pl-q').value = dir ? dom : texto; $('pl-q').blur();
+    const carga = $('pl-carga'); carga.style.opacity = '1'; carga.style.width = '0';
+    requestAnimationFrame(() => { carga.style.width = '72%'; });
+    $('pl-web').onload = () => { carga.style.width = '100%'; setTimeout(() => { carga.style.opacity = '0'; }, 500); };
+    $('pl-web').src = 'static/demo-web.html?d=' + encodeURIComponent(dom) + (dir ? '' : '&q=' + encodeURIComponent(texto));
+    // what a page asks for while it loads, then a trickle while it is open
+    const n = 12 + (Math.random() * 12 | 0);
+    for (let i = 0; i < n; i++) setTimeout(() => { if (pagina && pagina.dom === dom) evento(dom, Math.random() < 0.7); }, 250 + i * (2600 / n) + Math.random() * 120);
+    const sigue = () => { if (!pagina || pagina.dom !== dom) return; evento(dom, Math.random() < 0.6); ritmo = setTimeout(sigue, 1800 + Math.random() * 2600); };
+    ritmo = setTimeout(sigue, 3400);
+  }
+  function nuevaPestana() {
+    pagina = null; clearTimeout(ritmo);
+    $('plantilla').classList.remove('navegando');
+    $('pl-visor').hidden = true; $('pl-web').src = 'about:blank'; $('pl-atras').hidden = true; $('pl-escudo').hidden = true;
+    $('pl-q').value = '';
+    $('pl-k1').textContent = DEMO ? 'HOY · DEMOSTRACIÓN' : 'HOY'; $('pl-k2').textContent = 'EN DIRECTO';
+    cifras.webs.clear(); cifras.cortes = 0; cifras.empresas.clear(); cifras.paises.clear(); cifras.pasan = 0;
+    $('pl-lista').innerHTML = ''; pintaCifras();
+    clearInterval(generador); if (DEMO) generador = setInterval(evento, 900);
+  }
+  $('pl-busca').addEventListener('submit', (e) => { e.preventDefault(); const t = $('pl-q').value.trim(); if (t) navega(t); });
+  $('pl-atras').addEventListener('click', nuevaPestana);
+
   const MODOS = [['constelacion', 'Constelación'], ['frontera', 'Frontera'], ['rio', 'Río']];
   function ponModo(m) {
     modo = m; reinicia(); S.estrellas.clear(); S.empresas.clear(); S.canales.clear();
@@ -262,6 +313,9 @@
     cifras.webs.clear(); cifras.cortes = 0; cifras.empresas.clear(); cifras.paises.clear(); cifras.pasan = 0;
     $('pl-lista').innerHTML = ''; pintaCifras();
     $('plantilla').hidden = false;
+    $('pl-busca').hidden = false; pagina = null; $('plantilla').classList.remove('navegando'); $('pl-visor').hidden = true; $('pl-atras').hidden = true; $('pl-escudo').hidden = true; $('pl-q').value = '';
+    $('pl-k2').textContent = 'EN DIRECTO';
+    setTimeout(() => { if (activo === 'zero') $('pl-q').focus({ preventScroll: true }); }, 1000);
     requestAnimationFrame(() => { mide(); if (!raf) raf = requestAnimationFrame(cuadro); });
     clearInterval(generador);
     if (DEMO) { for (let i = 0; i < 6; i++) setTimeout(evento, 400 + i * 260); generador = setInterval(evento, 900); }
@@ -269,7 +323,8 @@
     return true;
   }
   function cierra() {
-    activo = null; clearInterval(generador);
+    activo = null; clearInterval(generador); clearTimeout(ritmo); pagina = null;
+    $('pl-busca').hidden = true; $('pl-visor').hidden = true; $('pl-web').src = 'about:blank'; $('plantilla').classList.remove('navegando');
     if (raf) cancelAnimationFrame(raf); raf = 0;
     $('plantilla').hidden = true;
   }
