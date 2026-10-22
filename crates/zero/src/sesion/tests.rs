@@ -1064,8 +1064,8 @@ fn a_tab_shows_its_site_icon_until_it_leaves_the_site() {
 #[test]
 fn masks_show_enough_to_recognise() {
     assert_eq!(
-        enmascara(Tipo::Correo, "francisco@icloud.com"),
-        "fr•••@icloud.com"
+        enmascara(Tipo::Correo, "marta@icloud.com"),
+        "ma•••@icloud.com"
     );
     assert_eq!(enmascara(Tipo::Telefono, "+573001234567"), "+5•••67");
     assert_eq!(enmascara(Tipo::Nombre, "Ana"), "•••");

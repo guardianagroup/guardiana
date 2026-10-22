@@ -976,7 +976,7 @@
       cx.globalCompositeOperation = 'source-over';
     };
     // ---------- Your own SECURE conversation on your own globe (16 Oct 2026) ----------
-    // Francisco: «que salga en nuestro mapa, el de él y el mío… que la veamos solamente él y
+    // The owner: «que salga en nuestro mapa, el de él y el mío… que la veamos solamente él y
     // yo». Each computer knows where the other one is only by the time zone it said inside the
     // cipher (Bogotá, Prague…), never by an address; the line goes from this computer to that
     // city, in violet, with pulses both ways, faster during a call.

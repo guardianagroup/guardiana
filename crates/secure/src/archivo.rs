@@ -16,7 +16,7 @@ use crate::Error;
 
 /// Bytes of plaintext per block.
 pub const BLOQUE: usize = 64 * 1024;
-/// The largest file this version carries: 1 TiB. Francisco, 15 Oct 2026: «el envío de archivos
+/// The largest file this version carries: 1 TiB. The owner, 15 Oct 2026: «el envío de archivos
 /// grandes hay que incluirlo, lo máximo posible». Nothing here holds the whole file: the
 /// streaming pair ([`Cifrador`], [`Descifrador`]) works one block at a time, so the limit is
 /// the disk, not the memory.

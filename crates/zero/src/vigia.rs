@@ -1,5 +1,5 @@
 //! The watch over the microphone, the camera and the screen while a SECURE conversation is
-//! open. Francisco, 17 Oct 2026: the summary at the end of a call must say «si ha habido
+//! open. The owner, 17 Oct 2026: the summary at the end of a call must say «si ha habido
 //! espionaje, si ha habido grabación».
 //!
 //! Windows keeps, per program, when it last started and stopped using the microphone, the camera

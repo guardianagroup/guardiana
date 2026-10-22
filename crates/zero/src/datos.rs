@@ -424,12 +424,12 @@ mod tests {
     fn a_marked_name_is_found_whatever_its_case() {
         let lista = [Marcado {
             tipo: Tipo::Nombre,
-            valor: "Francisco Salvatierra".into(),
+            valor: "Marta Ortega".into(),
         }];
-        let t = "Hola, soy FRANCISCO SALVATIERRA y vivo en Cartagena";
+        let t = "Hola, soy MARTA ORTEGA y vivo en Cartagena";
         let v = detecta(t, &lista);
         assert_eq!(v.len(), 1);
-        assert_eq!(&t[v[0].inicio..v[0].fin], "FRANCISCO SALVATIERRA");
+        assert_eq!(&t[v[0].inicio..v[0].fin], "MARTA ORTEGA");
         assert_eq!(v[0].clase, Clase::Nombre);
     }
 

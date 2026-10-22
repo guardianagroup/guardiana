@@ -1860,7 +1860,7 @@ mod tests {
     fn an_installation_is_one_notice_and_a_signed_out_account_is_not_a_removal() {
         let mut b = Base::default();
         let sid = "S-1-5-21-7".to_owned();
-        let mut cargadas: BTreeMap<String, String> = [(sid.clone(), "fran".to_owned())].into();
+        let mut cargadas: BTreeMap<String, String> = [(sid.clone(), "marta".to_owned())].into();
         let mut cuenta = entrada(
             "run",
             &format!("HKEY_USERS\\{sid}\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"),
@@ -1890,7 +1890,7 @@ mod tests {
     fn a_changed_privacy_setting_says_which_and_from_what_to_what() {
         let mut b = Base::default();
         let cargadas: BTreeMap<String, String> =
-            [("S-1-5-21-7".to_owned(), "fran".to_owned())].into();
+            [("S-1-5-21-7".to_owned(), "marta".to_owned())].into();
         let mut a: BTreeMap<String, String> = [
             ("telemetria_politica".to_owned(), "sin_fijar".to_owned()),
             ("publicidad:S-1-5-21-7".to_owned(), "0".to_owned()),
@@ -1904,14 +1904,14 @@ mod tests {
         assert_eq!(h.len(), 1);
         assert!(h[0].aviso);
         assert_eq!(h[0].datos["ajuste"], "publicidad");
-        assert_eq!(h[0].datos["cuenta"], "fran");
+        assert_eq!(h[0].datos["cuenta"], "marta");
         assert_eq!(
             (h[0].datos["antes"].as_str(), h[0].datos["despues"].as_str()),
             ("0", "1")
         );
         assert_eq!(
             h[0].texto,
-            "Cambió un ajuste de privacidad: Identificador de publicidad, cuenta fran (0 → 1)"
+            "Cambió un ajuste de privacidad: Identificador de publicidad, cuenta marta (0 → 1)"
         );
         // Not read this time (signed out): left as it was, no change.
         a.remove("publicidad:S-1-5-21-7");
@@ -2052,7 +2052,7 @@ mod tests {
                 "defender": { "servicio": true, "antivirus": true, "tiempo_real": true, "manipulacion": true, "modo": "Normal" },
                 "cortafuegos": [ { "perfil": "Domain", "activo": true } ]
             },
-            "cuentas": { "S-1-5-21-1": "fran" },
+            "cuentas": { "S-1-5-21-1": "marta" },
             "errores": {}
         });
         let f = de_json(&v);
@@ -2065,7 +2065,7 @@ mod tests {
         let p = f.proteccion.unwrap();
         assert!(p.antivirus.unwrap()[0].activo);
         assert!(p.defender.unwrap().al_mando());
-        assert_eq!(f.cuentas["S-1-5-21-1"], "fran");
+        assert_eq!(f.cuentas["S-1-5-21-1"], "marta");
         let vacio = de_json(&serde_json::json!({ "arranque": null, "privacidad": null }));
         assert!(
             vacio.arranque.is_none() && vacio.privacidad.is_none() && vacio.proteccion.is_none()

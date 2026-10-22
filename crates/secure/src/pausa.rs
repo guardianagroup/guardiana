@@ -1,4 +1,4 @@
-//! The automatic stop. Francisco, 15 Oct 2026: «si GUARDIANA detecta un espionaje o un
+//! The automatic stop. The owner, 15 Oct 2026: «si GUARDIANA detecta un espionaje o un
 //! saboteo, que pare automáticamente, aparezca en pantalla por qué hemos parado, y se reanude
 //! donde se quedó cuando veamos que no hay peligro».
 //!

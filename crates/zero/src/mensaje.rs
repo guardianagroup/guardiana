@@ -1,5 +1,5 @@
 //! One message on the screen of a conversation, with everything the big chat apps show about
-//! it (Francisco, 16 Oct 2026: «copia el sistema de Telegram o WhatsApp»): who, when, whether
+//! it (the owner, 16 Oct 2026: «copia el sistema de Telegram o WhatsApp»): who, when, whether
 //! it left, arrived or was seen (✓, ✓✓, ✓✓ green), whether it was edited or deleted, what it
 //! answers, the reactions it got, and — for a call — how it went.
 //!

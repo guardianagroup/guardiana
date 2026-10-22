@@ -1,5 +1,5 @@
 //! The door in the router, opened by the program itself (UPnP IGD), so two people in two
-//! countries can talk without touching anything: Francisco, 15 Oct 2026, «que solo le aparezca
+//! countries can talk without touching anything: the owner, 15 Oct 2026, «que solo le aparezca
 //! en pantalla y darle OK». The result is a short invitation code (the public address and the
 //! port, encoded) the person reads to the other. Nothing here is written to disk, and the code
 //! is shown as a code, never as an address.

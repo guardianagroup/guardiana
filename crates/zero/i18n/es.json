@@ -1098,7 +1098,7 @@
   "sec_c_via_puerta": "Conexión directa entre los equipos (puerto abierto en tu router). El código lleva tu dirección de internet (IP pública): compártelo solo con quien quieras invitar.",
   "sec_c_via_rele": "Conexión a través del servidor intermedio de GUARDIANA: solo pasa datos ya cifrados y no puede leerlos.",
   "sec_c_tu_nombre": "Tu nombre (como te verán los demás)",
-  "sec_c_tu_nombre_ph": "Francisco",
+  "sec_c_tu_nombre_ph": "Marta",
   "sec_c_mas": "Para invitar a más personas, el mismo código:",
   "sec_m_grupo": "Grupo: {n}",
   "sec_s_nuevo": "Se une {n}. Compara los números con esa persona.",

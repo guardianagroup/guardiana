@@ -1098,7 +1098,7 @@
   "sec_c_via_puerta": "Direct connection between the computers (port open on your router). The code contains your internet address (public IP): share it only with people you want to invite.",
   "sec_c_via_rele": "Connection through GUARDIANA’s relay server: it only passes data that is already encrypted and cannot read it.",
   "sec_c_tu_nombre": "Your name (as the others will see you)",
-  "sec_c_tu_nombre_ph": "Francisco",
+  "sec_c_tu_nombre_ph": "Alex",
   "sec_c_mas": "To invite more people, the same code:",
   "sec_m_grupo": "Group: {n}",
   "sec_s_nuevo": "{n} is joining. Compare the numbers with them.",

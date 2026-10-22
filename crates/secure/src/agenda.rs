@@ -3,7 +3,7 @@
 //! Trust on first use, then no silent change: once a name is pinned to a pair of keys, a
 //! message or a call that arrives with other keys under that name is refused and the name is
 //! marked [`Estado::ClaveCambiada`]. There is no «accept anyway»: only a new short-code check
-//! ([`crate::verificar`]) pins the new keys. Francisco, 15 Oct 2026: «tecnología anti
+//! ([`crate::verificar`]) pins the new keys. The owner, 15 Oct 2026: «tecnología anti
 //! suplantación de identidad del máximo nivel».
 //!
 //! The book holds public keys and names only. Wrapping it on disk (DPAPI on Windows) is the

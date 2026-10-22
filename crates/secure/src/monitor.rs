@@ -1,4 +1,4 @@
-//! What the screen shows the whole time SECURE is in use. Francisco, 15 Oct 2026:
+//! What the screen shows the whole time SECURE is in use. The owner, 15 Oct 2026:
 //! «monitoreo en pantalla constante … para que el cliente vea todos los datos posibles».
 //!
 //! Every field here is either a fact this crate produced (keys, counts) or `None`: the screen

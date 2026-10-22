@@ -1,4 +1,4 @@
-//! Group conversations (Francisco, 15 Oct 2026: «que se puedan comunicar más personas para que
+//! Group conversations (the owner, 15 Oct 2026: «que se puedan comunicar más personas para que
 //! hagan una llamada grupal»): the one who invites is the host, and every other member talks to
 //! the host over its own two-way link ([`Secure`]), verified with the host by the short code as
 //! always. The host passes on what each one says, records or sends, to the rest, with the

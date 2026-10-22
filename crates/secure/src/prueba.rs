@@ -1,5 +1,5 @@
 //! The record that is kept when something is seen during a conversation, so it can be shown
-//! later as evidence. Francisco, 15 Oct 2026: «en caso de intento de espionaje o sabotaje debe
+//! later as evidence. The owner, 15 Oct 2026: «en caso de intento de espionaje o sabotaje debe
 //! quedar todo guardado … en PDF y más formatos … como prueba».
 //!
 //! Every entry carries the hash of the one before it (`hash_n = sha256(hash_{n-1} ‖ fields)`),

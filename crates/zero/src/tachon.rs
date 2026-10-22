@@ -110,10 +110,10 @@ mod tests {
     fn data_leaves_marked_and_comes_back_in_place() {
         let marcados = [Marcado {
             tipo: Tipo::Nombre,
-            valor: "Francisco Salvatierra".into(),
+            valor: "Marta Ortega".into(),
         }];
         let t = tacha(
-            "Soy Francisco Salvatierra, mi correo es fran@ejemplo.com. Escribe a fran@ejemplo.com.",
+            "Soy Marta Ortega, mi correo es marta@ejemplo.com. Escribe a marta@ejemplo.com.",
             &marcados,
             &[],
             &Es,
@@ -127,10 +127,7 @@ mod tests {
             "Hola [NOMBRE_1], te escribo a [CORREO_1].",
             &t.sustituciones,
         );
-        assert_eq!(
-            r,
-            "Hola Francisco Salvatierra, te escribo a fran@ejemplo.com."
-        );
+        assert_eq!(r, "Hola Marta Ortega, te escribo a marta@ejemplo.com.");
     }
 
     #[test]

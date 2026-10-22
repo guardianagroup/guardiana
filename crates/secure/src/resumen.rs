@@ -1,5 +1,5 @@
 //! The summary shown when a conversation, a call or a transfer ends, and what the person can
-//! download from it. Francisco, 15 Oct 2026: «resumen detallado en pantalla y descargable
+//! download from it. The owner, 15 Oct 2026: «resumen detallado en pantalla y descargable
 //! después de la llamada o envíos o chats».
 //!
 //! It is built from the monitor and the chain of what was seen, so it says only what was
@@ -24,7 +24,7 @@ pub enum Clase {
     Chat,
     /// A voice call.
     Llamada,
-    /// A video call (Francisco, 15 Oct 2026: «videollamada también»).
+    /// A video call (the owner, 15 Oct 2026: «videollamada también»).
     Videollamada,
     /// Files sent or received.
     Envio,
@@ -62,7 +62,7 @@ pub struct Conexion {
     pub resolucion: Option<String>,
 }
 
-/// What one computer's watch saw over the microphone, the camera and the screen (Francisco,
+/// What one computer's watch saw over the microphone, the camera and the screen (the owner,
 /// 17 Oct 2026: the summary must say «si ha habido espionaje, si ha habido grabación»). Only
 /// what Windows recorded, by program name; `vigilado` is `false` where nothing could be watched
 /// (another system, a phone's browser), and the summary says so instead of «nothing».

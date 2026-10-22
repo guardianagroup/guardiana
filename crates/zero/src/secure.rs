@@ -1173,7 +1173,7 @@ impl Secure {
     /// What Windows recorded about the microphone, the camera and the screen (the window looks
     /// every two seconds while a conversation is open). Another program using one of them during
     /// the conversation goes into the history and the chain with its name and path, and stops
-    /// the conversation while it goes on (Francisco, 15 Oct 2026: «que pare automáticamente»);
+    /// the conversation while it goes on (the owner, 15 Oct 2026: «que pare automáticamente»);
     /// it resumes on its own once that program lets go, or at once if the person says it is
     /// theirs.
     pub fn vigia(&mut self, usos: &[crate::vigia::Uso]) {

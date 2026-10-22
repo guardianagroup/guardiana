@@ -1098,7 +1098,7 @@
   "sec_c_via_puerta": "Conexão direta entre os computadores (porta aberta no seu roteador). O código contém seu endereço de internet (IP público): compartilhe só com quem você quer convidar.",
   "sec_c_via_rele": "Conexão pelo servidor intermediário da GUARDIANA: ele só repassa dados já criptografados e não consegue lê-los.",
   "sec_c_tu_nombre": "Seu nome (como os outros vão ver você)",
-  "sec_c_tu_nombre_ph": "Francisco",
+  "sec_c_tu_nombre_ph": "Marta",
   "sec_c_mas": "Para convidar mais pessoas, o mesmo código:",
   "sec_m_grupo": "Grupo: {n}",
   "sec_s_nuevo": "{n} está entrando. Compare os números com essa pessoa.",
