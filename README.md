@@ -87,7 +87,7 @@ lado, en [`crates/panel/static/fonts`](crates/panel/static/fonts/LEEME.md).
 
 ## Quién lo hace
 
-GUARDIANA es un proyecto de código abierto mantenido por **Francisco Salvatierra Sánchez**
-(GUARDIANA GROUP, Torre Empresarial PRODEGI, piso 18, Bocagrande, Cartagena de Indias, Colombia),
-que firma cada versión con la clave minisign publicada en `build/pubkey/minisign.pub` y responde
-en hola@guardianagroup.com. Web: https://guardianagroup.com.
+GUARDIANA es un proyecto de código abierto de **GUARDIANA GROUP S.A.S.** (Torre Empresarial PRODEGI,
+piso 18, Bocagrande, Cartagena de Indias, Colombia), que firma cada versión con la clave minisign
+publicada en `build/pubkey/minisign.pub` y responde en hola@guardianagroup.com. Web:
+https://guardianagroup.com.

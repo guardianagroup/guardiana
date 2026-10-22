@@ -90,7 +90,7 @@ next to them, in [`crates/panel/static/fonts`](crates/panel/static/fonts/LEEME.m
 
 ## Who makes it
 
-GUARDIANA is an open-source project maintained by **Francisco Salvatierra Sánchez** (GUARDIANA
-GROUP, Torre Empresarial PRODEGI, 18th floor, Bocagrande, Cartagena de Indias, Colombia), who signs
-every release with the minisign key published in `build/pubkey/minisign.pub` and answers at
-hola@guardianagroup.com. Website: https://guardianagroup.com.
+GUARDIANA is an open-source project by **GUARDIANA GROUP S.A.S.** (Torre Empresarial PRODEGI,
+18th floor, Bocagrande, Cartagena de Indias, Colombia), which signs every release with the minisign
+key published in `build/pubkey/minisign.pub` and answers at hola@guardianagroup.com. Website:
+https://guardianagroup.com.

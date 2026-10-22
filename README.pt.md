@@ -86,7 +86,7 @@ ao lado, em [`crates/panel/static/fonts`](crates/panel/static/fonts/LEEME.md).
 
 ## Quem faz
 
-A GUARDIANA é um projeto de código aberto mantido por **Francisco Salvatierra Sánchez** (GUARDIANA
-GROUP, Torre Empresarial PRODEGI, 18º andar, Bocagrande, Cartagena das Índias, Colômbia), que assina
-cada versão com a chave minisign publicada em `build/pubkey/minisign.pub` e responde em
-hola@guardianagroup.com. Site: https://guardianagroup.com.
+A GUARDIANA é um projeto de código aberto da **GUARDIANA GROUP S.A.S.** (Torre Empresarial PRODEGI,
+18º andar, Bocagrande, Cartagena das Índias, Colômbia), que assina cada versão com a chave minisign
+publicada em `build/pubkey/minisign.pub` e responde em hola@guardianagroup.com. Site:
+https://guardianagroup.com.
