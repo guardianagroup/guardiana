@@ -549,6 +549,10 @@ def tarde(tipo, paquete, version):
     code, out = cli("ledger", "--check")
     (ok if code == 0 else mal)("comprobar la cadena del extracto", out.strip()[-300:])
 
+    # 5b. El vigía de las llamadas (1.0.48): con el servicio instalado y corriendo como el sistema.
+    if SISTEMA == "Windows" and tipo == "msi":
+        vigia()
+
     # 6. Stopping the service must not leave the computer without names.
     parar()
     esperar(lambda: servicio() != "running", 20)
@@ -685,6 +689,126 @@ def vigilante(antes):
             mal("el vigilante · al despertar, GUARDIANA es otra vez el DNS", str(dns_actual()))
     code, out = run(["powershell", "-NoProfile", "-Command", "Get-Content $env:ProgramData\\Guardiana\\vigilante.log -Tail 8"])
     nota("registro del vigilante: " + out.strip()[-600:])
+
+
+VIGIA_WEB = "https://guardianagroup.com"
+
+
+def pide_vigia(cabeceras, metodo="GET"):
+    """(código, cabeceras en minúsculas, cuerpo) de /vigia."""
+    req = urllib.request.Request(PANEL + "/vigia", method=metodo)
+    for k, v in cabeceras.items():
+        req.add_header(k, v)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return r.status, {k.lower(): v for k, v in r.headers.items()}, r.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        return e.code, {k.lower(): v for k, v in e.headers.items()}, e.read().decode("utf-8", "replace")
+    except Exception as e:  # noqa: BLE001
+        return 0, {}, str(e)
+
+
+def vigia():
+    """Windows: el vigía de las llamadas (1.0.48) nombra lo que Windows anota, no se nombra a sí mismo ni al
+    programa que pregunta, y solo se deja leer por el panel y por la web de Comunicaciones.
+
+    El runner no tiene micrófono ni nadie espiando: dos copias de PING.EXE corren con nombres elegidos (un
+    «espía» y «AnyDesk.exe») y se escriben las entradas del registro que Windows pone cuando un programa usa el
+    micrófono o captura la pantalla. El servicio, que corre como el sistema, las tiene que ver en el registro de
+    esta cuenta. Todo se quita al terminar."""
+    import winreg
+    base = r"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore"
+    carpeta = tempfile.mkdtemp(prefix="guardiana-vigia-")
+    ping = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "PING.EXE")
+    espia_exe, remoto_exe = "espia-guardiana-prueba.exe", "AnyDesk.exe"
+    hijos, claves = [], []
+    try:
+        for nombre in (espia_exe, remoto_exe):
+            exe = os.path.join(carpeta, nombre)
+            shutil.copy(ping, exe)
+            hijos.append(subprocess.Popen([exe, "-n", "600", "127.0.0.1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+        ahora = (int(time.time() * 1000) + 11_644_473_600_000) * 10_000
+        espia = os.path.join(carpeta, espia_exe).replace("\\", "#")
+        # Quien pregunta (este Python) y GUARDIANA misma, anotados con la cámara y el micrófono: no pueden salir.
+        yo = sys.executable.replace("\\", "#")
+        guardiana = (binario() or r"C:\Program Files\Guardiana\guardiana.exe").replace("\\", "#")
+        for cap, quien in (("microphone", espia), ("graphicsCaptureProgrammatic", espia), ("webcam", yo), ("microphone", guardiana)):
+            ruta = f"{base}\\{cap}\\NonPackaged\\{quien}"
+            with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, ruta, 0, winreg.KEY_WRITE) as k:
+                winreg.SetValueEx(k, "LastUsedTimeStart", 0, winreg.REG_QWORD, ahora)
+                winreg.SetValueEx(k, "LastUsedTimeStop", 0, winreg.REG_QWORD, 0)
+            claves.append(ruta)
+
+        def alertas(v):
+            return v.get("alertas") or [] if isinstance(v, dict) else []
+
+        def hay(v, tipo_, archivo):
+            return any(a.get("tipo") == tipo_ and str(a.get("archivo", "")).lower() == archivo.lower() for a in alertas(v))
+
+        def listo(v):
+            return hay(v, "microfono", espia_exe) and hay(v, "pantalla", espia_exe) and hay(v, "control_remoto", remoto_exe) \
+                and isinstance(v.get("defender_mirado"), int)
+
+        v = {}
+        fin = time.time() + 120
+        while time.time() < fin:
+            code, _, cuerpo = pide_vigia({"x-guardiana-token": token(), "x-guardiana-lang": "es"})
+            try:
+                v = json.loads(cuerpo) if code == 200 else {}
+            except ValueError:
+                v = {}
+            if listo(v):
+                break
+            time.sleep(2)
+        nota("vigía: " + json.dumps(v, ensure_ascii=False)[:3000])
+        (ok if hay(v, "microfono", espia_exe) else mal)("vigía · ve otro programa con el micrófono", espia_exe)
+        (ok if hay(v, "pantalla", espia_exe) else mal)("vigía · ve otro programa capturando la pantalla", espia_exe)
+        (ok if hay(v, "control_remoto", remoto_exe) else mal)("vigía · ve un programa de control remoto en marcha", remoto_exe)
+        (ok if v.get("hay_alertas") is True and v.get("estado") == "alerta" else mal)(
+            "vigía · dice que hay alertas", f"estado={v.get('estado')} hay_alertas={v.get('hay_alertas')}")
+        nombres = [str(a.get("archivo", "")).lower() for a in alertas(v)]
+        (ok if os.path.basename(sys.executable).lower() not in nombres else mal)(
+            "vigía · no avisa del programa que pregunta", f"excluido={v.get('excluido')}")
+        (ok if "guardiana.exe" not in nombres else mal)("vigía · no avisa de GUARDIANA", ", ".join(nombres))
+        # Lo que dice de este runner (Defender, escritorio remoto, control remoto real), para leerlo en la ejecución.
+        propio = {espia_exe.lower(), remoto_exe.lower()}
+        resto = [a.get("texto", "") for a in alertas(v) if str(a.get("archivo", "")).lower() not in propio]
+        resto += [a.get("texto", "") for a in (v.get("avisos") or [])]
+        ok("vigía · lo que ve de este runner aparte de la prueba", " | ".join(resto) or "nada")
+        if v.get("errores"):
+            nota("vigía · lo que falló al leer Defender: " + json.dumps(v.get("errores"), ensure_ascii=False))
+
+        # Quién puede leerlo.
+        code, cab, _ = pide_vigia({})
+        (ok if code == 401 and "access-control-allow-origin" not in cab else mal)("vigía · sin llave ni origen: 401", str(code))
+        code, cab, cuerpo = pide_vigia({"Origin": "https://otra.example"})
+        (ok if code == 403 and "access-control-allow-origin" not in cab and "alertas" not in cuerpo else mal)(
+            "vigía · otra web: 403", f"{code} {cab.get('access-control-allow-origin')}")
+        code, cab, cuerpo = pide_vigia({"Origin": VIGIA_WEB})
+        try:
+            w = json.loads(cuerpo)
+        except ValueError:
+            w = {}
+        bien = code == 200 and cab.get("access-control-allow-origin") == VIGIA_WEB \
+            and "access-control-allow-credentials" not in cab and '"ruta"' not in cuerpo and hay(w, "microfono", espia_exe)
+        (ok if bien else mal)("vigía · la web de Comunicaciones lo lee, sin rutas", f"{code} {cab.get('access-control-allow-origin')}")
+        code, cab, _ = pide_vigia({"Origin": VIGIA_WEB, "Access-Control-Request-Method": "GET",
+                                   "Access-Control-Request-Private-Network": "true"}, metodo="OPTIONS")
+        (ok if code == 204 and cab.get("access-control-allow-private-network") == "true" else mal)(
+            "vigía · la consulta previa de Chrome", f"{code} {cab}")
+    finally:
+        for h in hijos:
+            try:
+                h.kill()
+                h.wait(10)
+            except Exception:  # noqa: BLE001
+                pass
+        for ruta in claves:
+            try:
+                winreg.DeleteKey(winreg.HKEY_CURRENT_USER, ruta)
+            except OSError:
+                pass
+        shutil.rmtree(carpeta, ignore_errors=True)
 
 
 def actualizacion(anterior, nuevo, version):
