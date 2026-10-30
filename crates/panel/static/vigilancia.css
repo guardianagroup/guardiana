@@ -49,6 +49,14 @@
 .vg-vigia li em { font-style: normal; color: var(--muted); white-space: nowrap; }
 .vg-vigia.atencion { border-color: var(--aviso); }
 
+/* «Vigía» (1.0.48): lo que la web de Comunicaciones ve durante una llamada, en vivo. */
+.vg-llamada { display: grid; gap: var(--e2); margin: var(--e4) 0; }
+.vg-llamada.alerta { border-color: var(--aviso); }
+.vg-llamada-cab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e2); }
+.vg-llamada h2, .vg-llamada p { margin: 0; }
+.vg-llamada .vg-lineas li { grid-template-columns: minmax(0, 1fr) auto; }
+.vg-llamada .vg-nota { color: var(--muted); font-size: 12.5px; }
+
 .vg-historial-cab { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--e2); }
 .vg-pie { margin-top: var(--e5); font-size: 12.5px; }
 

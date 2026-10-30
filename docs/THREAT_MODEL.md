@@ -48,6 +48,16 @@ comprobación estricta de la cabecera `Host` (solo `127.0.0.1`, `localhost`, la 
 y `comprobar.guardiana.hogar`), token de sesión en memoria que no se transmite por cookie, sin
 JavaScript de terceros, sin fuentes externas, sin cookies.
 
+Una sola excepción, `GET /vigia` (1.0.48, el vigía de las llamadas): la web de Comunicaciones
+(`https://guardianagroup.com`) pregunta desde el navegador de este mismo ordenador si hay señales de
+espionaje durante una llamada. Sin token, solo con la cabecera `Origin` exactamente
+`https://guardianagroup.com` y solo desde `127.0.0.1`; CORS a ese origen exacto, sin credenciales,
+solo `GET`, ninguna cabecera propia. Contesta qué programa usa el micrófono, la cámara o la pantalla,
+si hay escritorio o control remoto y el estado de Defender, sin rutas ni cuentas, y no cambia nada.
+Otra web recibe siempre `403` (con su `Origin`) o `401` (sin ella), haya lo que haya, así que tampoco
+puede deducirlo. Límite: un programa de este ordenador puede inventarse la `Origin` y ver lo mismo que
+la web; con el token, el panel ve además las rutas. Detalle en `crates/panel/src/vigia.rs`.
+
 ### D. Quien intente entregar un binario manipulado (cadena de suministro, espejo falso)
 Capacidad: sustituir el instalador o el binario. Mitigación (brief §10): compilación reproducible en
 contenedor fijado por digest, `cargo build --locked`, SHA‑256 y firma minisign de cada binario, línea

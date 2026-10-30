@@ -33,6 +33,8 @@ mod medidas;
 mod plan;
 mod revision;
 mod universo;
+// «Vigía» (1.0.48): `GET /vigia`, lo que la web de Comunicaciones pregunta durante una llamada.
+mod vigia;
 mod vigilancia;
 pub mod vision;
 
@@ -143,6 +145,8 @@ pub(crate) struct AppState {
     pub(crate) revision: revision::Revisor,
     /// «Vigilancia» (1.0.45): the constant watch's last looks, in memory.
     pub(crate) vigilancia: vigilancia::Vigilancia,
+    /// «Vigía» (1.0.48): su última mirada, en memoria, para las llamadas y los chats.
+    pub(crate) vigia: vigia::Vigia,
 }
 
 /// A running panel.
@@ -695,9 +699,12 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         cortes,
         revision: revision::Revisor::default(),
         vigilancia: vigilancia::Vigilancia::default(),
+        vigia: vigia::Vigia::default(),
     });
     // The constant watch (1.0.45) runs as long as the panel does.
     vigilancia::Vigilancia::arrancar(&state);
+    // El vigía (1.0.48) también: cada pocos segundos durante una llamada, en reposo si no.
+    vigia::Vigia::arrancar(&state);
 
     let app = Router::new()
         .route("/", get(api::root_page))
@@ -1117,6 +1124,9 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/vigilancia/resumen", get(vigilancia::resumen))
         .route("/api/vigilancia/visto", post(vigilancia::visto))
         .route("/api/vigilancia/ahora", post(vigilancia::ahora))
+        // «Vigía» (1.0.48): solo lectura. Con la llave, el panel; sin ella, solo la web de
+        // Comunicaciones desde este ordenador (CORS a ese origen exacto; vigia.rs explica por qué).
+        .route("/vigia", get(vigia::ver).options(vigia::previa))
         // «Contratos» (1.0.45, «contrato vivo»): its page, script and API, in their own module.
         .merge(contratos::rutas())
         .merge(extras::rutas())

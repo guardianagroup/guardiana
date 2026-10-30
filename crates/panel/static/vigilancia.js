@@ -160,12 +160,33 @@
       }
     }
 
+    // «Vigía» (1.0.48): lo mismo que ve la web de Comunicaciones durante una llamada, en vivo. Con
+    // la llave, el panel ve además la ruta de cada programa.
+    const CHIP_VIGIA = { limpio: 'ok', alerta: 'aviso' };
+    async function cargaVigia() {
+      const r = await api('/vigia');
+      $('vg-llamada').classList.toggle('alerta', r.estado === 'alerta');
+      const chip = $('vg-llamada-estado');
+      chip.className = 'chip ' + (CHIP_VIGIA[r.estado] || '');
+      chip.textContent = tt('vigia_estado_' + r.estado, r.estado);
+      const fila = (a, alerta) => `<li class="${alerta ? 'aviso' : ''}"><span>${esc(a.texto)}</span>${a.ruta ? `<small>${esc(a.ruta)}</small>` : ''}</li>`;
+      const filas = (r.alertas || []).map((a) => fila(a, true)).concat((r.avisos || []).map((a) => fila(a, false)));
+      $('vg-llamada-lista').innerHTML = filas.length ? filas.join('') : `<li class="vacio">${esc(t('vigia_nada'))}</li>`;
+      const notas = [];
+      if (r.mirado) notas.push(t('vigia_mirado').replace('{h}', new Date(r.mirado).toLocaleTimeString(LOC)));
+      if (r.excluido) notas.push(t('vigia_excluido').replace('{x}', r.excluido));
+      $('vg-llamada-mirado').textContent = notas.join(' · ');
+      $('vg-llamada-limites').textContent = r.limites || '';
+    }
+
     $('vg-ahora').addEventListener('click', async () => {
       $('vg-ahora').disabled = true;
       $('vg-ahora').textContent = t('vg_comprobando');
       try { await api('/api/vigilancia/ahora', { method: 'POST', body: {} }); } catch (_) {}
       setTimeout(() => { carga().catch(() => {}); }, 1500);
     });
+    cargaVigia().catch(() => {});
+    cadaTanto(cargaVigia, 3000);
     await carga();
     cadaTanto(carga, 10000);
   }
