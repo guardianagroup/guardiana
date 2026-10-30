@@ -2327,7 +2327,17 @@ async fn run_once<F: Future<Output = ()>>(
                                     }
                                 }
                             }
-                            if !aparte.apartado {
+                            // Only while this resolver really answers on 127.0.0.1 (30 Oct 2026): the DNS watchdog
+                            // (build/wix/vigilante.ps1, a Windows task outside this program) gives the old DNS back
+                            // when nobody answers here, and a service whose loop is alive but whose resolver is not
+                            // must not point the machine back at a silent port every minute.
+                            if !aparte.apartado
+                                && dns::probe::guardian_answers(
+                                    SocketAddr::from(([127, 0, 0, 1], 53)),
+                                    Duration::from_secs(2),
+                                )
+                                .await
+                            {
                                 aparte_del_resolutor(|| reapply_dns_if_dropped(&l));
                             }
                             // A laptop that moved from home to the office: the resolvers that

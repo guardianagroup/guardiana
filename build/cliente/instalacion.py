@@ -578,6 +578,11 @@ def tarde(tipo, paquete, version):
                 extra = run(["tail", "-n", "15", os.path.join(datos(), "guardiana.log")], sudo=True)[1]
             mal("al arrancar, Guardiana vuelve a ser el DNS", f"{dns_actual()} · servicio {servicio()} · {extra[-600:]}")
 
+    # 6b. El vigilante del DNS (30 Oct 2026, el dueño: «que al cliente siempre tenga el internet… todo automático»): si el
+    # servicio muere sin poder devolver el DNS, o se cuelga, una tarea de Windows ajena al programa lo devuelve sola.
+    if SISTEMA == "Windows" and tipo == "msi":
+        vigilante(antes)
+
     # 7. Uninstall: the DNS exactly as it was, and the program gone.
     bien, out = desinstalar(tipo, paquete, carpeta)
     (ok if bien else mal)("desinstalar", out.strip()[-600:])
@@ -596,6 +601,9 @@ def tarde(tipo, paquete, version):
         restaurar_dns(antes)
     hay, cual = hay_internet()
     (ok if hay else mal)("internet después de desinstalar", cual)
+    if SISTEMA == "Windows" and tipo == "msi":
+        code, _ = run(["schtasks", "/Query", "/TN", "\\GUARDIANA\\Vigilante"])
+        (ok if code != 0 else mal)("el vigilante del DNS se va con el programa", "la tarea ya no existe" if code != 0 else "la tarea sigue ahí")
     donde, valor = marca_prueba()
     if not donde:
         mal("la fecha de la prueba se queda, como dice la web", f"no está en {valor}")
@@ -619,6 +627,64 @@ def tarde(tipo, paquete, version):
     bien, out = desinstalar(tipo, paquete, carpeta)
     (ok if bien else mal)("desinstalar otra vez", out.strip()[-300:])
     restaurar_dns(antes)
+
+
+SUSPENDE = r'''
+Add-Type -Name Proc -Namespace Gd -MemberDefinition @"
+[DllImport("ntdll.dll")] public static extern int NtSuspendProcess(IntPtr h);
+[DllImport("ntdll.dll")] public static extern int NtResumeProcess(IntPtr h);
+"@
+foreach ($p in Get-Process -Name guardiana -ErrorAction SilentlyContinue) { [Gd.Proc]::%s($p.Handle) | Out-Null }
+'''
+
+
+def vigilante(antes):
+    """Windows: el vigilante del DNS devuelve el DNS si GUARDIANA muere o se cuelga, y GUARDIANA lo recupera al volver."""
+    code, out = run(["schtasks", "/Query", "/TN", "\\GUARDIANA\\Vigilante", "/V", "/FO", "LIST"])
+    (ok if code == 0 else mal)("el vigilante del DNS está instalado", out.strip()[:300])
+    if code != 0:
+        return
+    if not esperar(lambda: guardiana_primero(dns_actual()), 60):
+        mal("el vigilante · GUARDIANA es el DNS antes de empezar", str(dns_actual()))
+        return
+    # a. Muere sin poder hacer nada (como una cuarentena del antivirus): sin reinicio automático y matado de golpe.
+    run(["sc.exe", "failure", "guardiana", "reset=", "0", "actions=", ""])
+    t0 = time.time()
+    run(["taskkill", "/F", "/IM", "guardiana.exe"])
+    if esperar(lambda: not guardiana_primero(dns_actual()), 150, 2):
+        ok("el vigilante · GUARDIANA muerta: devuelve el DNS", f"en {int(time.time() - t0)} s · {dns_actual()}")
+    else:
+        mal("el vigilante · GUARDIANA muerta: devuelve el DNS", f"{dns_actual()} tras {int(time.time() - t0)} s")
+        restaurar_dns(antes)
+    vaciar_cache()
+    hay, cual = hay_internet()
+    (ok if hay else mal)("el vigilante · internet con GUARDIANA muerta", cual)
+    # b. Vuelve: GUARDIANA es otra vez el DNS ella sola.
+    arrancar()
+    esperar(lambda: servicio() == "running", 40)
+    if esperar(lambda: guardiana_primero(dns_actual()), 90, 2):
+        ok("el vigilante · al volver, GUARDIANA es otra vez el DNS", str(dns_actual()))
+    else:
+        mal("el vigilante · al volver, GUARDIANA es otra vez el DNS", str(dns_actual()))
+        cli("dns", "--apply", "--yes")
+    # c. Colgada (el proceso vivo, pero sin contestar): también devuelve el DNS, y al despertar GUARDIANA lo recupera.
+    if guardiana_primero(dns_actual()):
+        t0 = time.time()
+        ps(SUSPENDE % "NtSuspendProcess")
+        if esperar(lambda: not guardiana_primero(dns_actual()), 150, 2):
+            ok("el vigilante · GUARDIANA colgada: devuelve el DNS", f"en {int(time.time() - t0)} s · {dns_actual()}")
+        else:
+            mal("el vigilante · GUARDIANA colgada: devuelve el DNS", f"{dns_actual()} tras {int(time.time() - t0)} s")
+        vaciar_cache()
+        hay, cual = hay_internet()
+        (ok if hay else mal)("el vigilante · internet con GUARDIANA colgada", cual)
+        ps(SUSPENDE % "NtResumeProcess")
+        if esperar(lambda: guardiana_primero(dns_actual()), 150, 3):
+            ok("el vigilante · al despertar, GUARDIANA es otra vez el DNS", str(dns_actual()))
+        else:
+            mal("el vigilante · al despertar, GUARDIANA es otra vez el DNS", str(dns_actual()))
+    code, out = run(["powershell", "-NoProfile", "-Command", "Get-Content $env:ProgramData\\Guardiana\\vigilante.log -Tail 8"])
+    nota("registro del vigilante: " + out.strip()[-600:])
 
 
 def actualizacion(anterior, nuevo, version):

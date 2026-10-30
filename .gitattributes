@@ -39,3 +39,5 @@ OFL-*.txt -text
 *.wasm binary
 # The IP tables of crates/lists/data (decision 203): bytes, read by offset.
 *.bin binary
+build/wix/vigilante.xml binary
+build/wix/vigilante.ps1 -text
