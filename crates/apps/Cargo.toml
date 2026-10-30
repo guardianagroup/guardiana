@@ -32,5 +32,9 @@ windows-sys = { version = "0.61", features = [
     "Win32_System_Rpc",
     "Win32_Security",
     "Win32_NetworkManagement_WindowsFilteringPlatform",
+    # 1.0.48, «Vigía»: las sesiones de escritorio remoto (WTS) y qué programa abrió una conexión
+    # al panel (la tabla TCP con su proceso), para no avisar del navegador desde el que se llama.
+    "Win32_System_RemoteDesktop",
+    "Win32_NetworkManagement_IpHelper",
 ] }
 sha2 = { workspace = true }

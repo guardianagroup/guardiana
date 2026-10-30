@@ -73,6 +73,8 @@ mod revision;
 mod seguridad;
 #[cfg(windows)]
 mod ventanas;
+// «Vigía» (1.0.48): señales de espionaje durante una llamada o un chat, cada pocos segundos.
+pub mod vigia;
 pub mod vigilancia;
 mod vpn;
 

@@ -1275,7 +1275,7 @@ pub const TIPOS_ARRANQUE: &[&str] = &[
 
 #[cfg(windows)]
 #[allow(unsafe_code)]
-mod win {
+pub(crate) mod win {
     //! The registry, read directly: `unsafe` is denied in this project unless justified, and this
     //! is the justification. A PowerShell every fifteen seconds to read a dozen numbers would cost
     //! more than everything else the watch does; these are Windows' own registry functions, with
@@ -1301,7 +1301,7 @@ mod win {
         s.encode_utf16().chain(std::iter::once(0)).collect()
     }
 
-    struct Clave(HKEY);
+    pub(crate) struct Clave(HKEY);
 
     impl Drop for Clave {
         fn drop(&mut self) {
@@ -1312,7 +1312,7 @@ mod win {
         }
     }
 
-    fn abre(raiz: HKEY, ruta: &str) -> Option<Clave> {
+    pub(crate) fn abre(raiz: HKEY, ruta: &str) -> Option<Clave> {
         let r = ancho(ruta);
         let mut h: HKEY = std::ptr::null_mut();
         // SAFETY: `r` is a NUL-terminated wide string that outlives the call; `h` is ours.
@@ -1322,7 +1322,7 @@ mod win {
     }
 
     impl Clave {
-        fn subclaves(&self) -> Vec<String> {
+        pub(crate) fn subclaves(&self) -> Vec<String> {
             let mut v = Vec::new();
             for i in 0..20_000u32 {
                 // Registry key names are at most 255 characters.
@@ -1350,7 +1350,7 @@ mod win {
             v
         }
 
-        fn qword(&self, nombre: &str) -> u64 {
+        pub(crate) fn qword(&self, nombre: &str) -> u64 {
             let n = ancho(nombre);
             let mut v: u64 = 0;
             let mut tipo: u32 = 0;
@@ -1375,7 +1375,7 @@ mod win {
     }
 
     /// The signed-in accounts (their registry is loaded under HKEY_USERS).
-    fn cuentas() -> Vec<String> {
+    pub(crate) fn cuentas() -> Vec<String> {
         abre(HKEY_USERS, "")
             .map(|k| k.subclaves())
             .unwrap_or_default()
