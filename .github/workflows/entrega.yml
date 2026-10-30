@@ -1,0 +1,44 @@
+# Entrega de los instaladores de una ejecución de candidato.yml para publicarlos en guardianagroup.com (30 Oct 2026, el dueño:
+# «publícalo en la web y que ponga descargar programa GUARDIANA… que se haga desde la web»). Se lanza al subir una rama
+# «pide-entrega-<id de la ejecución>»: copia los instaladores de esa ejecución (sin firmar) a una rama huérfana
+# «entrega-<id>», de donde se llevan a la web. No firma nada ni toca otras ramas.
+name: entrega
+
+on:
+  push:
+    branches: ['pide-entrega-*']
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  entrega:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: el número de la ejecución
+        id: run
+        run: echo "id=${GITHUB_REF_NAME#pide-entrega-}" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: candidato-msi
+          path: entrega
+          run-id: ${{ steps.run.outputs.id }}
+          github-token: ${{ github.token }}
+      - name: la rama con los instaladores
+        run: |
+          set -euo pipefail
+          ls -la entrega
+          (cd entrega && sha256sum *.msi > SHA256SUMS && cat SHA256SUMS)
+          mv entrega /tmp/entrega
+          git config user.name "guardiana-ci"
+          git config user.email "ci@guardianagroup.com"
+          git checkout -q --orphan "entrega-${{ steps.run.outputs.id }}"
+          git rm -rqf .
+          git clean -fdq
+          cp -r /tmp/entrega e
+          git add e
+          git commit -qm "Instaladores de la ejecución ${{ steps.run.outputs.id }} de candidato.yml (sin firmar)"
+          git push -q origin "HEAD:refs/heads/entrega-${{ steps.run.outputs.id }}"
