@@ -174,6 +174,51 @@ main { max-width: calc(var(--s-pagina) + 2 * var(--s-margen)); padding: var(--e8
   .mes .boton { grid-row: auto; grid-column: 1; justify-self: start; }
   .hoy-rastro .rastro li:nth-child(n+2) { border-top: 1px solid var(--linea); }
 }
+
+/* 30 Oct 2026 (dueño: «con la interfaz que tenemos buena de hoy en día»): la portada con el aspecto del ZERO de la web — la
+   marca GUARDIANA / ZERO, la barra de cristal (LENTE), cifras finas en IBM Plex Sans, rótulos en mayúsculas espaciadas y
+   líneas de acero translúcidas. Mismos elementos y mismos identificadores: solo cambia la piel. */
+body { background: radial-gradient(ellipse 75% 50% at 50% 18%, rgba(156,195,228,.075), transparent 70%), radial-gradient(ellipse 60% 40% at 50% 100%, rgba(156,195,228,.04), transparent 70%), var(--bg); background-attachment: fixed; }
+#tema { display: none; }
+.marca { top: 28px; left: 34px; gap: 0; align-items: baseline; }
+.marca i, .marca b, .marca span { display: none; }
+.marca::before { content: 'GUARDIANA'; font: 600 13px/1 var(--texto); letter-spacing: .34em; color: var(--tinta); }
+.marca::after { content: '/ ZERO'; margin-left: .6em; font: 300 13px/1 var(--texto); letter-spacing: .3em; color: var(--accent); }
+main { padding-top: 76px; }
+/* LENTE: la barra de cristal de la web */
+#buscar { position: relative; width: 760px; height: 68px; padding: 6px; border-radius: 24px; border: 1px solid rgba(218,236,250,.31);
+  background: linear-gradient(165deg, rgba(244,246,248,.32), rgba(156,195,228,.08) 9%, rgba(14,23,34,.92) 50%, rgba(141,192,228,.16) 92%, rgba(255,255,255,.34));
+  box-shadow: 0 18px 46px rgba(0,0,0,.8), 0 3px 9px #000, inset 0 2px 2px rgba(255,255,255,.5), inset 0 -4px 8px rgba(0,0,0,.65), 0 0 60px -20px rgba(156,195,228,.35); }
+#buscar::before { content: ''; position: absolute; inset: 6px; border-radius: 18px; border: 1px solid rgba(208,232,249,.13); pointer-events: none;
+  background: linear-gradient(180deg, rgba(59,85,106,.55), rgba(13,20,30,.97) 38%, rgba(8,13,21,.99)); box-shadow: inset 0 3px 8px rgba(218,241,255,.09), inset 0 -5px 12px rgba(0,0,0,.8); }
+#buscar > * { position: relative; z-index: 1; }
+#buscar svg { margin-left: 16px; width: 19px; height: 19px; color: #9CC3E4; }
+#q { font: 400 17px/1.2 var(--texto); color: #F4F6F8; }
+#q::placeholder { color: #8fa9bd; }
+#motor { height: 40px; margin: 0 6px 0 0; padding: 0 30px 0 14px; border: 1px solid rgba(156,195,228,.28); border-radius: 12px; background-color: rgba(10,14,20,.72); color: #dbe9f4; font: 500 13px/1 var(--texto); }
+#motor:hover, #motor:focus-visible { border-color: rgba(156,195,228,.55); background-color: rgba(156,195,228,.14); }
+/* el diario de hoy: rótulo en mayúsculas espaciadas y la cifra fina, como «Tu privacidad hoy» de la web */
+.z1-cap { font: 500 11px/1.3 var(--mono, 'IBM Plex Mono', Consolas, monospace); letter-spacing: .2em; color: #8fa9bd; }
+#z1a-n { font: 300 84px/1 var(--texto); letter-spacing: -.02em; color: #F4F6F8; }
+#z1a-frase { font: 400 20px/1.35 var(--texto); }
+/* los accesos: tarjetas translúcidas con línea de acero que se ilumina */
+.atajo { background: linear-gradient(180deg, rgba(14,21,31,.62), rgba(7,11,17,.72)); border-color: rgba(156,195,228,.16); transition: border-color .15s, background .15s; }
+.atajo:hover { border-color: rgba(156,195,228,.5); background: rgba(156,195,228,.07); }
+.atajo .ico { background: rgba(156,195,228,.08); color: #9CC3E4; }
+/* «Hoy, en directo»: la franja de la web — cristal oscuro, rótulos en mayúsculas espaciadas, cifras finas y separadores */
+.hoy { border-color: rgba(156,195,228,.16); background: linear-gradient(180deg, rgba(14,21,31,.62), rgba(7,11,17,.72)); box-shadow: 0 30px 80px -40px rgba(0,0,0,.9); }
+.hoy-cab h2 { font: 500 11px/1.3 var(--mono, 'IBM Plex Mono', Consolas, monospace); letter-spacing: .2em; text-transform: uppercase; color: #8fa9bd; }
+.hechos { border-top-color: rgba(156,195,228,.12); }
+.hecho { padding: 16px 16px 14px; border-left: 1px solid rgba(156,195,228,.12); }
+.hechos .hecho:first-child { padding-left: 0; border-left: 0; }
+.hecho b { font: 300 32px/1 var(--texto); letter-spacing: -.01em; color: #F4F6F8; }
+.hecho.rojo b { color: var(--rojo); }
+.hecho span { margin-top: 8px; font: 400 12.5px/1.4 var(--texto); color: #8aa0b2; }
+.hechos.segunda .hecho b { font-size: 22px; }
+.hoy .caja, .mes { background: rgba(156,195,228,.03); border-color: rgba(156,195,228,.14); }
+.acciones button { background: rgba(10,14,20,.72); border-color: rgba(156,195,228,.28); color: #dbe9f4; }
+.acciones button:hover { background: rgba(156,195,228,.14); border-color: rgba(156,195,228,.55); color: #F4F6F8; }
+.fav-ic { background: rgba(156,195,228,.06); border-color: rgba(156,195,228,.2); color: #9CC3E4; }
 </style>
 </head>
 <body>

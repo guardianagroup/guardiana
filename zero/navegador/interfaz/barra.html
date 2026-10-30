@@ -105,6 +105,19 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); user-select:
 body.solo-arriba #pestanas, body.solo-arriba #herramientas { display: none; }
 @media (max-width: 900px) { #arriba, #pestanas, #herramientas { padding-left: var(--s-margen-movil); padding-right: var(--s-margen-movil); } #estado-z span { display: none; } .extra { display: none; } }
 @media (max-width: 640px) { .marca span, #estado-z { display: none; } #productos { position: static; transform: none; margin: 0 auto; } #productos button { padding: 0 var(--e3); } .derecha { margin-left: 0; } }
+
+/* 30 Oct 2026 (dueño: «con la interfaz que tenemos buena de hoy en día»): la barra con el aspecto del ZERO de la web — la
+   dirección es la LENTE de cristal en pequeño, el selector de productos y las pestañas con línea de acero translúcida. */
+.marca { font-weight: 600; letter-spacing: .3em; }
+#productos { border-color: rgba(156,195,228,.22); background: rgba(10,14,20,.72); }
+#productos button[aria-current="true"] { background: rgba(156,195,228,.14); color: #F4F6F8; box-shadow: inset 0 0 0 1px rgba(156,195,228,.35); }
+.pestana[aria-selected="true"] { box-shadow: inset 0 1px 0 rgba(156,195,228,.35); }
+#direccion { position: relative; border-radius: 14px; border: 1px solid rgba(218,236,250,.26);
+  background: linear-gradient(180deg, rgba(59,85,106,.42), rgba(10,16,24,.9) 45%, rgba(6,10,16,.95));
+  box-shadow: inset 0 1px 0 rgba(244,246,248,.32), inset 0 -4px 8px rgba(0,0,0,.6), 0 6px 18px -8px rgba(0,0,0,.8); }
+#direccion:focus-within { border-color: rgba(156,195,228,.7); box-shadow: inset 0 1px 0 rgba(244,246,248,.4), inset 0 -4px 8px rgba(0,0,0,.6), 0 0 0 3px rgba(156,195,228,.16), 0 0 26px -6px rgba(156,195,228,.45); }
+#campo-dir { color: #F4F6F8; }
+#campo-dir::placeholder { color: #8fa9bd; }
 </style>
 </head>
 <body>

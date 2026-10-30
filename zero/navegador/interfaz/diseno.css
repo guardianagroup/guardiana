@@ -12,7 +12,7 @@
 :root, :root[data-tema="noche"], :root[data-tema="dia"], :root[data-sigue] {
   /* ground, ink and lines */
   --bg: #06080C; --fg: #E8ECF1; --muted: #A9B3BE; --muted-2: #6F7B88;
-  --card: #0C1118; --line: #1E2631; --campo: #10161E; --marco: #06080C;
+  --card: #0C1118; --line: rgba(156,195,228,.2); --campo: #10161E; --marco: #06080C; /* 27 Oct 2026: líneas en el azul de NÚCLEO */
   /* the one accent: steel */
   --accent: #9CC3E4; --accent-fg: #06080C; --accent-dark: #C9DFF2; --accent-suave: #142231;
   /* states: ok, warning, alert (and info is the steel) */
@@ -21,8 +21,9 @@
   --alerta: #E07A6C; --alerta-suave: #2A1714;
   --sombra: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 32px -14px rgba(0, 0, 0, .7);
   /* type: the website's faces */
-  --display: 'Schibsted Grotesk', 'Hanken Grotesk', system-ui, sans-serif;
-  --texto: 'Hanken Grotesk', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* 27 Oct 2026 (dueño, 11:07: «la base de NÚCLEO en toda la web»): las letras de NÚCLEO, IBM Plex Sans (cada programa las lleva dentro: comun.css y style.css) */
+  --display: 'IBM Plex Sans', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --texto: 'IBM Plex Sans', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   /* spacing and corners: four steps of 4, then 24 and 32; fields 10, cards 16, pills round */
   --e1: 4px; --e2: 8px; --e3: 12px; --e4: 16px; --e5: 24px; --e6: 32px;
@@ -51,10 +52,12 @@
   text-decoration: none; white-space: nowrap; cursor: pointer;
   transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s;
 }
-.boton, .btn.secondary { background: var(--campo); color: var(--fg); border: 1px solid #2A3442; }
-.boton:hover, .btn.secondary:hover { background: #141B25; border-color: #3A4656; color: var(--fg); }
-.btn, .boton.principal { background: var(--accent); color: var(--accent-fg); border: 1px solid var(--accent); }
-.btn:hover, .boton.principal:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: var(--accent-fg); }
+/* 27 Oct 2026: los botones de NÚCLEO. Secundario: píldora con línea de acero que se ilumina al pasar el cursor; principal:
+   relleno de acero con halo, un poco más brillante al pasar el cursor. */
+.boton, .btn.secondary { background: rgba(10,14,20,.72); color: #dbe9f4; border: 1px solid rgba(156,195,228,.28); }
+.boton:hover, .btn.secondary:hover { background: rgba(156,195,228,.14); border-color: rgba(156,195,228,.55); color: #F4F6F8; }
+.btn, .boton.principal { background: var(--accent); color: var(--accent-fg); border: 1px solid var(--accent); box-shadow: 0 18px 60px -26px rgba(156,195,228,.55); }
+.btn:hover, .boton.principal:hover { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); filter: brightness(1.07); box-shadow: 0 18px 60px -22px rgba(156,195,228,.75); }
 .btn.texto, .boton.texto { background: transparent; border: 1px solid transparent; color: var(--accent); padding: 0 6px; }
 .btn.texto:hover, .boton.texto:hover { background: transparent; border-color: transparent; color: var(--accent-dark); text-decoration: underline; text-underline-offset: 3px; }
 .btn.texto.sigue::after, .boton.texto.sigue::after { content: ""; width: 13px; height: 13px; flex: none; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3.5 10.5 8 6 12.5'/%3E%3C/svg%3E") center/contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3.5 10.5 8 6 12.5'/%3E%3C/svg%3E") center/contain no-repeat; }
@@ -96,7 +99,7 @@
 .campo:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-suave); background: var(--card); }
 
 /* Cards: the paper of the receipt. */
-.tarjeta { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-tarjeta); padding: 18px 20px; }
+.tarjeta { background: rgba(12,18,26,.82); border: 1px solid rgba(156,195,228,.22); border-radius: var(--r-tarjeta); padding: 18px 20px; }
 /* Icons everywhere: 1.8 px strokes of the current colour, 20 px by default. */
 .icono { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
