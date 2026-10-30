@@ -133,7 +133,7 @@ main { max-width: calc(var(--s-pagina) + 2 * var(--s-margen)); padding: var(--e8
 #q { font: var(--t-15); }
 #q::placeholder { color: var(--gris); }
 .diario { display: flex; align-items: center; justify-content: center; gap: 72px; width: 960px; max-width: 100%; margin: var(--e8) auto 0; min-height: 380px; }
-#z1a-escudo { width: 288px; height: 348px; flex: none; }
+#z1a-escudo { width: 340px; height: 340px; flex: none; }
 .diario-txt { flex: 1; min-width: 0; max-width: 520px; }
 .z1-cap { font: 600 var(--t-12); letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2); }
 #z1a-n { font: 600 72px/1 var(--texto); letter-spacing: -.035em; margin-top: var(--e4); font-variant-numeric: tabular-nums; }
@@ -219,6 +219,13 @@ main { padding-top: 76px; }
 .acciones button { background: rgba(10,14,20,.72); border-color: rgba(156,195,228,.28); color: #dbe9f4; }
 .acciones button:hover { background: rgba(156,195,228,.14); border-color: rgba(156,195,228,.55); color: #F4F6F8; }
 .fav-ic { background: rgba(156,195,228,.06); border-color: rgba(156,195,228,.2); color: #9CC3E4; }
+/* la Lente de actividad (lente.js): la cifra grande va dentro de la lente; al lado, la frase con la cifra y la leyenda */
+#z1a-n { display: none; }
+#z1a-frase { font-size: 22px; }
+#z1a-frase .cifra { font-weight: 500; color: #F4F6F8; }
+.diario { gap: 64px; }
+.leyenda-z i { border-radius: 2px !important; width: 10px !important; height: 3px !important; }
+.leyenda-z span:nth-child(3) i { width: 3px !important; height: 3px !important; border-radius: 50% !important; }
 </style>
 </head>
 <body>
@@ -323,6 +330,7 @@ main { padding-top: 76px; }
 <script src="interruptor.js"></script>
 <script src="puente.js"></script>
 <script src="escudo-puntos.js"></script>
+<script src="lente.js"></script>
 <script src="inicio.js"></script>
 </body>
 </html>

@@ -274,12 +274,39 @@
     manda({ tipo: 'guardar_imagen', nombre: 'guardiana-zero-mes.png', datos: c.toDataURL('image/png') });
   });
 
+  // --- 30 Oct 2026: la Lente de actividad (lente.js) en lugar del escudo -------------------------------
+  // La serie por minuto: el total del día que se vio al final de cada minuto, guardado en las páginas del programa (cualquier
+  // pestaña nueva ve la última hora que vio cualquier otra). Los cortes de un minuto = su total − el del minuto anterior, solo
+  // si se vieron los dos; si no, «sin registro». A medianoche el total vuelve a 0: ese minuto no se cuenta.
+  const SERIE = 'zero-lente-serie';
+  const minutoAhora = () => Math.floor(Date.now() / 60000);
+  function anotaMinuto(total) {
+    const ahora = minutoAhora();
+    let s = {};
+    try { s = JSON.parse(localStorage.getItem(SERIE) || '{}') || {}; } catch (_) { s = {}; }
+    if (!(Number(s[ahora]) > total)) s[ahora] = total;
+    for (const k of Object.keys(s)) if (ahora - Number(k) > 61 || Number(k) > ahora) delete s[k];
+    try { localStorage.setItem(SERIE, JSON.stringify(s)); } catch (_) {}
+    return s;
+  }
+  function serieHora(s) {
+    const ahora = minutoAhora(), out = [];
+    for (let i = 59; i >= 0; i--) {
+      const m = ahora - i, a = s[m], b = s[m - 1];
+      out.push(a == null || b == null || Number(a) < Number(b) ? null : Number(a) - Number(b));
+    }
+    return out;
+  }
+  // un minuto sin cortes también se ve: cada 20 s se anota el total aunque no llegue nada nuevo
+  setInterval(() => { if (diaUltimo && document.visibilityState === 'visible') pintaDiario(diaUltimo, true); }, 20000);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (diaUltimo) pintaDiario(diaUltimo, true); });
+
   // --- 1.0.46 (zero-1.0.46): «Diario de hoy», Z1-a ------------------------------------------
   // The shield fills with one dot per attempt cut today; amber, those of the last minute this
   // tab saw happen. Every figure is the program's own; with nothing cut yet, it says so.
   const historiaDia = [];
   let diaUltimo = null;
-  function pintaDiario(m) {
+  function pintaDiario(m, soloLente) {
     diaUltimo = m;
     const h = m.hoy || {};
     const total = Number(h.cortadas || 0);
@@ -287,23 +314,23 @@
     const ahora = Date.now();
     historiaDia.push([ahora, total]);
     while (historiaDia.length > 1 && ahora - historiaDia[0][0] > 60000) historiaDia.shift();
-    const ambar = Math.max(0, total - historiaDia[0][1]);
+    const serie = serieHora(anotaMinuto(total));
+    ZeroLente.dibuja($('z1a-escudo'), { numero: n(total), rotulo: t('lente_cortados_hoy'), serie });
+    const vistos = serie.filter((x) => x != null), maxMin = Math.max(0, ...vistos);
+    $('z1a-escudo').setAttribute('aria-label', `${tn('z1_intentos_hoy', total, { webs: tn('z1_webs', webs, { n: n(webs) }) }).replace(/^/, n(total) + ' ')}. ${t('lente_alt_hora', { vistos: n(vistos.length), max: n(maxMin) })}`);
+    if (soloLente) return;
     const fecha = new Date().toLocaleDateString(lang(), { weekday: 'long', day: 'numeric', month: 'long' });
     $('z1a-cap').textContent = t('z1_diario', { fecha });
     $('z1a-n').textContent = n(total);
     const frase = $('z1a-frase');
     if (total > 0) {
       const websTxt = tn('z1_webs', webs, { n: n(webs) });
-      frase.innerHTML = Z.esc(tn('z1_intentos_hoy', total, { webs: '\u0000' })).replace('\u0000', `<span class="ac">${Z.esc(websTxt)}</span>`);
+      frase.innerHTML = `<b class="cifra">${Z.esc(n(total))}</b> ` + Z.esc(tn('z1_intentos_hoy', total, { webs: '\u0000' })).replace('\u0000', `<span class="ac">${Z.esc(websTxt)}</span>`);
     } else {
       frase.textContent = t('z1_cero');
     }
     $('z1a-explica').textContent = m.protege === false ? t('z1_sin_proteccion') : m.cortando === false ? t('z1_solo_mira') : t('z1_explica');
-    const r = ZeroEscudo.dibuja($('z1a-escudo'), { n: total, ambar, minimo: 120, maximo: 1400, semilla: 5 });
-    $('z1a-escudo').setAttribute('aria-label', tn('z1_intentos_hoy', total, { webs: tn('z1_webs', webs, { n: n(webs) }) }));
-    const pp = $('z1a-porpunto');
-    pp.classList.toggle('oculto', r.porPunto <= 1);
-    pp.textContent = r.porPunto > 1 ? t('z1_por_punto', { n: n(r.porPunto) }) : '';
+    $('z1a-porpunto').classList.add('oculto');
     $('z1a-maxima').textContent = t(m.maxima ? 'z1_maxima_si' : 'z1_maxima_no');
   }
   en('hoy', pintaDiario);
