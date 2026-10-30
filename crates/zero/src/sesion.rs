@@ -49,9 +49,14 @@ pub const HOST_INTERNO: &str = "zero.guardiana";
 pub const ORIGEN_INTERNO: &str = "https://zero.guardiana/";
 /// The new tab.
 pub const INICIO: &str = "https://zero.guardiana/inicio.html";
-/// GUARDIANA SECURE, the third product tab. This page is only the door: conversation
-/// keys never live in a ZERO tab or in the DNS service (plan of 14 Oct 2026).
-pub const SECURE: &str = "https://zero.guardiana/secure.html";
+/// Comunicaciones, the third product tab. Since 30 Oct 2026 (the owner: «con la interfaz que
+/// tenemos buena de hoy en día») it is GUARDIANA Comunicaciones as it is on the web today (chat,
+/// calls and group video calls), not the old SECURE page that travelled inside the program: one
+/// Comunicaciones for the web and the program. The page gets no more rights than any other site
+/// (its messages are never taken as the program's own: `es_interna`); only the microphone and the
+/// camera are granted without a second question, because the person already pressed «Llamar» or
+/// «Contestar» (app.rs).
+pub const SECURE: &str = "https://guardianagroup.com/orbita/comunicaciones/";
 /// The bar at the top.
 pub const BARRA: &str = "https://zero.guardiana/barra.html";
 /// The side panel.

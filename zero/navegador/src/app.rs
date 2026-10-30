@@ -1655,10 +1655,11 @@ fn eventos_pestana(
                     };
                     let mut tipo = COREWEBVIEW2_PERMISSION_KIND::default();
                     args.PermissionKind(&mut tipo)?;
-                    // The microphone and the camera for GUARDIANA SECURE's own page (16 Oct
-                    // 2026): the person already chose by pressing «Llamar» or «Contestar»; a
-                    // second question from the engine (or a «no» saved once by mistake) only
-                    // left the other person in silence. Any other page asks as always.
+                    // The microphone and the camera for Comunicaciones (16 Oct 2026; since 30 Oct
+                    // 2026 the web's Comunicaciones, sesion::SECURE): the person already chose by
+                    // pressing «Llamar» or «Contestar»; a second question from the engine (or a
+                    // «no» saved once by mistake) only left the other person in silence. Any other
+                    // page asks as always.
                     if tipo == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE
                         || tipo == COREWEBVIEW2_PERMISSION_KIND_CAMERA
                     {
