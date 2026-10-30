@@ -57,6 +57,9 @@ pub const INICIO: &str = "https://zero.guardiana/inicio.html";
 /// camera are granted without a second question, because the person already pressed «Llamar» or
 /// «Contestar» (app.rs).
 pub const SECURE: &str = "https://guardianagroup.com/orbita/comunicaciones/";
+/// The old SECURE page, still inside the program (secure.html). Nothing opens it since 30 Oct 2026; its
+/// messages keep working for anything that still speaks to it, as the program's own page.
+pub const SECURE_INTERNA: &str = "https://zero.guardiana/secure.html";
 /// The bar at the top.
 pub const BARRA: &str = "https://zero.guardiana/barra.html";
 /// The side panel.

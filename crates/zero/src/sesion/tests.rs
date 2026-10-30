@@ -239,9 +239,10 @@ fn the_comunicaciones_page_buttons_reach_the_conversation() {
     let (mut s, _, _) = abre();
     let _ = s.abre_guardiana(&format!("http://127.0.0.1:7443/?t={}", "c".repeat(64)));
     let id = s.pestanas[2].id;
+    // (since 30 Oct 2026 the Comunicaciones tab is the web's; the old page stays inside the program)
     let o = s.mensaje(
         Origen::Pestana(id),
-        crate::sesion::SECURE,
+        crate::sesion::SECURE_INTERNA,
         r#"{"tipo":"secure","accion":"escuchar","puerto":0}"#,
     );
     let e = del_tipo(&o, Origen::Pestana(id), "secure_estado").unwrap_or_default();
