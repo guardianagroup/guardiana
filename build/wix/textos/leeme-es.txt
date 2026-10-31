@@ -1,19 +1,27 @@
 ﻿GUARDIANA para Windows
 ======================
 
-GUARDIANA te enseña con qué servicios habla tu IA y, con Modo Hogar, cada
-aparato de tu Wi-Fi: lo explica en una frase y bloquea solo lo que tú decidas.
-Todo ocurre en este equipo. Sin cuenta, sin servidor nuestro, cero telemetría.
+GUARDIANA reúne el navegador ZERO, que corta en tiempo real los intentos de
+seguirte y te enseña cada subasta de publicidad; la vigilancia de todo el
+equipo, que muestra a qué empresas se conecta; y el Vigía, que pone en pausa tus
+llamadas de GUARDIANA si otro programa usa tu micrófono, tu cámara o tu
+pantalla. Todo ocurre en este equipo: sin cuenta y sin telemetría.
 
 Qué ha hecho el instalador
 --------------------------
 - Ha copiado el programa a «Archivos de programa\Guardiana».
-- Ha registrado el servicio «Guardiana», que arranca solo con Windows.
+- Ha registrado el servicio «GUARDIANA», que arranca solo con Windows.
+- Ha copiado el navegador GUARDIANA ZERO a «Archivos de programa\Guardiana\ZERO».
 - Ha creado el acceso «Guardiana», que abre el panel, en el menú Inicio y en el
   escritorio.
 - Ha puesto a GUARDIANA como DNS de este equipo, también por IPv6, con una
   copia exacta del ajuste anterior. Si el servicio se para, el equipo recupera
   su DNS de antes; al desinstalar queda tal como estaba.
+- Ha creado la tarea de Windows «GUARDIANA\Vigilante» (en «Archivos de
+  programa\GUARDIANA Vigilante»): cada minuto comprueba que GUARDIANA contesta y,
+  si no, devuelve el DNS de antes, para que el equipo nunca se quede sin internet.
+- Ha añadido la carpeta del programa al PATH y ha registrado los enlaces
+  guardiana:// (activar la licencia desde el correo).
 - No ha abierto ningún puerto a la red. Solo el Modo Hogar, cuando tú lo
   enciendas, abre los puertos en la Wi-Fi de casa; apagarlo los cierra.
 
@@ -31,10 +39,10 @@ pagues o no.
 
 Desinstalar
 -----------
-Configuración > Aplicaciones > Guardiana > Desinstalar. Al desinstalar,
+Configuración > Aplicaciones > GUARDIANA > Desinstalar. Al desinstalar,
 GUARDIANA apaga el Modo Hogar, quita su regla del cortafuegos y deja el DNS
-tal como estaba. El extracto queda en C:\ProgramData\Guardiana; bórralo a mano
-si no lo quieres.
+tal como estaba. El extracto y la carpeta «sistema» (copia del DNS y registro del
+vigilante) quedan en C:\ProgramData\Guardiana; bórralos a mano si no los quieres.
 
 Comprobar la instalación
 ------------------------

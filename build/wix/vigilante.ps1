@@ -12,17 +12,20 @@
 #   2. ¿contesta alguien de verdad en 127.0.0.1:53? Una pregunta DNS por UDP de un nombre de prueba que solo GUARDIANA conoce
 #      (*.prueba.guardiana.hogar). Cualquier respuesta vale: el resolutor está vivo aunque no haya internet.
 #   3. Tres fallos seguidos (unos 15 s): devuelve el DNS de antes de GUARDIANA, exactamente como lo dejó la copia
-#      (dns-anterior.json, junto al extracto); sin copia, «Automático (DHCP)», que es lo que tiene casi todo el mundo.
+#      (sistema\dns-anterior.json, junto al extracto); sin copia, «Automático (DHCP)», que es lo que tiene casi todo el mundo.
 # Cuando el servicio vuelve a contestar, él mismo vuelve a apuntar el equipo a GUARDIANA (cada minuto, solo si su resolutor
 # responde: engine.rs). El vigilante nunca apunta el DNS a ningún sitio: solo lo devuelve.
 #
 # Si GUARDIANA ya no está (desinstalada a medias) y el DNS es el normal, el vigilante se quita a sí mismo.
 $ErrorActionPreference = 'SilentlyContinue'
-$dir = Join-Path $env:ProgramData 'Guardiana'
+# La copia del DNS y el registro, en C:\ProgramData\Guardiana\sistema: solo SYSTEM y Administradores escriben ahí (la carpeta
+# de arriba la puede modificar el usuario de la consola). El vigilante no la crea: la crea y la protege el servicio.
+$dir = Join-Path $env:ProgramData 'Guardiana\sistema'
 $registro = Join-Path $dir 'vigilante.log'
 
 function Anota([string]$texto) {
     try {
+        if (-not (Test-Path -LiteralPath $dir -PathType Container)) { return }
         if ((Test-Path $registro) -and (Get-Item $registro).Length -gt 262144) { Move-Item $registro ($registro + '.1') -Force }
         Add-Content -Path $registro -Value ('{0:yyyy-MM-dd HH:mm:ss} {1}' -f (Get-Date), $texto) -Encoding UTF8
     } catch {}

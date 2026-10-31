@@ -1,23 +1,24 @@
 {\rtf1\ansi\ansicpg1252\deff0{\fonttbl{\f0\fswiss\fcharset0 Segoe UI;}}\f0\fs20
 GUARDIANA for Windows\par
 \par
-GUARDIANA shows you which services your AI talks to and, with Home Mode, every device on your Wi-Fi: it explains each one in a sentence and blocks only what you decide. Everything happens on this PC. No account, no server of ours, zero telemetry.\par
+GUARDIANA brings together the ZERO browser, which cuts tracking attempts in real time and shows you every advertising auction; monitoring of the whole computer, which shows which companies your PC connects to; and the Watch, which pauses your GUARDIANA calls if another program uses your microphone, camera or screen (turn it on in Communications \u8250? Settings). Everything happens on this PC: no account and no telemetry.\par
 \par
 What this installer will do\par
-- Copy the program to \u8220?Program Files\\Guardiana\u8221?.\par
-- Register the \u8220?Guardiana\u8221? service, which starts with Windows.\par
+- Copy the program to \u8220?Program Files\\Guardiana\u8221? and the GUARDIANA ZERO browser to \u8220?Program Files\\Guardiana\\ZERO\u8221?. ZERO uses Microsoft Edge WebView2, which already comes with Windows.\par
+- Register the \u8220?GUARDIANA\u8221? service, which starts with Windows.\par
 - Add the \u8220?Guardiana\u8221? shortcut, which opens the panel, to the Start menu and the desktop.\par
-- Also install GUARDIANA ZERO, the browser that sees the full address of every request, in \u8220?Program Files\\Guardiana\\ZERO\u8221?; the \u8220?Guardiana\u8221? shortcut opens the panel inside it, with no black windows. It uses Microsoft Edge WebView2, which already comes with Windows. It is part of the same program and the same licence; if you do not want it, ignore it or install with ZERO=0.\par
-- Make GUARDIANA this PC's DNS, over IPv6 too, so it starts watching from the first minute. It first keeps an exact copy of your setting; if the service stops, the PC gets its previous DNS back, and uninstalling leaves it exactly as it was.\par
+- Make GUARDIANA this PC's DNS, over IPv6 too. It first keeps an exact copy of your setting; uninstalling leaves it exactly as it was.\par
+- Create the Windows task \u8220?GUARDIANA\\Vigilante\u8221?, which checks every minute that GUARDIANA answers and, if it does not, gives the previous DNS back, so the PC is never left without internet.\par
+- Add the program folder to the PATH, so \u8220?guardiana verify\u8221? works in any console, and register guardiana:// links to activate the licence from the email.\par
 \par
 What it will NOT do\par
-- It does not read what you send or receive: only the service name, the time and the device.\par
-- It opens no port to the network. Only Home Mode, when you turn it on, opens ports on your home Wi-Fi; turning it off closes them.\par
+- It does not read the content of what you send or receive: only the name of the service, the time and the device.\par
+- It does not open any port to the network. Only Home Mode, when you turn it on, opens ports on the home Wi-Fi; turning it off closes them.\par
 \par
 After installing\par
-The panel opens when the installer finishes and within a minute you will see this PC's queries. To put the DNS back as it was without uninstalling: panel, \u8220?Status\u8221?. Blocking one specific name works from the first minute; broad blocks, by category or for the whole home, wait until GUARDIANA has been watching that device for 24 hours.\par
+When it finishes, the panel opens and within a minute you will see this PC's queries. To give the DNS back without uninstalling: panel, \u8220?Status\u8221?.\par
 \par
-Seven days with every feature, no card needed; after that you need a licence (a subscription or a single payment). What was written down stays on your disk, whether you pay or not.\par
+Seven days with everything and no card; after that a licence is needed (subscription or one-time payment). What was recorded stays on your disk, whether you pay or not. Terms: guardianagroup.com/en/terms.html \u183? Privacy: guardianagroup.com/en/privacy.html\par
 \par
-Program licence: GNU GPL 3.0 or later. Open source: you can read it, build it and check that it does what it says. What GUARDIANA does not do is in WHAT_IT_DOES_NOT_DO.md, in the published source code (github.com/guardianagroup/guardiana).\par
+Program licence: GNU GPL 3.0 or later. Open source, which you can read and build: github.com/guardianagroup/guardiana. What GUARDIANA does not do is in WHAT_IT_DOES_NOT_DO.md.\par
 }

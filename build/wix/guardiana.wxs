@@ -43,7 +43,14 @@
            InstallerVersion="500"
            Compressed="yes">
 
-    <SummaryInformation Description="!(loc.Descripcion)" Manufacturer="GUARDIANA GROUP" />
+    <SummaryInformation Description="!(loc.Descripcion)" Manufacturer="GUARDIANA GROUP" Keywords="GUARDIANA" Comments="!(loc.Descripcion)" />
+    <!-- 1.0.49 (revisión del 30 Oct 2026): «Configuración › Aplicaciones» con la web, la ayuda y el contacto, como un programa
+         de marca, y la carpeta donde quedó instalado. -->
+    <Property Id="ARPURLINFOABOUT" Value="https://guardianagroup.com/" />
+    <Property Id="ARPHELPLINK" Value="https://guardianagroup.com/contacto.html" />
+    <Property Id="ARPURLUPDATEINFO" Value="https://guardianagroup.com/instalar.html" />
+    <Property Id="ARPCONTACT" Value="hola@guardianagroup.com" />
+    <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]" After="CostFinalize" Sequence="execute" />
 
     <!-- Two screens only: what the installer does and does not (build/wix/textos/bienvenida-XX.rtf)
          with "Install", then "Finish" with "Open Guardiana" ticked, which opens the panel in the
@@ -68,23 +75,23 @@
     <UI>
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchPanel" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
     </UI>
-    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="!(loc.VersionMasNueva)" />
+    <MajorUpgrade AllowSameVersionUpgrades="yes" IgnoreLanguage="yes" DowngradeErrorMessage="!(loc.VersionMasNueva)" />
     <MediaTemplate EmbedCab="yes" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Guardiana">
         <Directory Id="ZERODIR" Name="ZERO" />
       </Directory>
+      <!-- 1.0.49 (revisión del 30 Oct 2026, grave): el vigilante corre como SYSTEM cada minuto, así que su guion tiene que estar
+           donde solo escriben SYSTEM y Administradores. En C:\ProgramData\Guardiana (1.0.48) heredaba el «Modificar» que el
+           servicio da al usuario de la consola en esa carpeta: cualquier programa de ese usuario podía reescribirlo y ejecutar
+           código como SYSTEM. Fuera de la carpeta del programa, como antes, para que siga ahí si el programa desaparece. -->
+      <Directory Id="VIGILANTEDIR" Name="GUARDIANA Vigilante" />
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="MenuDir" Name="Guardiana" />
     </StandardDirectory>
     <StandardDirectory Id="DesktopFolder" />
-    <!-- Junto al extracto (C:\ProgramData\Guardiana): el vigilante del DNS, fuera de la carpeta del programa, para que siga
-         ahí aunque el programa desaparezca (cuarentena del antivirus, carpeta borrada a mano). -->
-    <StandardDirectory Id="CommonAppDataFolder">
-      <Directory Id="DATOSDIR" Name="Guardiana" />
-    </StandardDirectory>
 
     <!-- The brand icon (build/wix/guardiana.ico): shortcuts and the "Programs" list. -->
     <Icon Id="guardiana.ico" SourceFile="$(var.Icon)" />
@@ -96,6 +103,7 @@
       <ComponentRef Id="Shortcut" />
       <ComponentRef Id="DesktopShortcut" />
       <ComponentRef Id="Vigilante" />
+      <ComponentRef Id="Idioma" />
     </Feature>
 
     <Component Id="Exe" Directory="INSTALLFOLDER" Guid="3ddbdec9-0a69-4313-a914-1b9797819a7f">
@@ -105,7 +113,7 @@
       <Environment Id="PathGuardiana" Name="PATH" Value="[INSTALLFOLDER]" Part="last" Action="set" System="yes" Permanent="no" />
       <ServiceInstall Id="Svc"
                       Name="guardiana"
-                      DisplayName="Guardiana"
+                      DisplayName="GUARDIANA"
                       Description="!(loc.ServicioDescripcion)"
                       Type="ownProcess"
                       Start="auto"
@@ -124,9 +132,16 @@
          Windows (vigilante.xml) que, al encender el equipo y cada minuto, mira si GUARDIANA contesta en 127.0.0.1; si no contesta
          (servicio muerto, colgado, en cuarentena o borrado), devuelve el DNS de antes en unos 15 s. No depende de guardiana.exe.
          La tarea se crea al instalar, actualizar o reparar y se quita al desinstalar (CrearVigilante, QuitarVigilante). -->
-    <Component Id="Vigilante" Directory="DATOSDIR" Guid="b5c40bc7-fddd-435a-91e3-2eae617258de">
+    <Component Id="Vigilante" Directory="VIGILANTEDIR" Guid="904ccb7b-3fc5-4734-9fce-9f0bd8536d8b">
       <File Id="VigilantePs1" Name="vigilante.ps1" Source="$(sys.SOURCEFILEDIR)vigilante.ps1" KeyPath="yes" />
       <File Id="VigilanteXml" Name="vigilante.xml" Source="$(sys.SOURCEFILEDIR)vigilante.xml" />
+    </Component>
+
+    <!-- 1.0.49: el idioma del instalador que se eligió en la web, para GUARDIANA ZERO. Hasta 1.0.48 iba en HKCU dentro de los
+         accesos de «ZERO=0», así que con la instalación normal no se escribía y ZERO abría en inglés (revisión del 30 Oct
+         2026). Ahora, siempre y en HKLM, para todas las cuentas del equipo. -->
+    <Component Id="Idioma" Directory="INSTALLFOLDER" Guid="c1405342-320f-45f1-8892-2f0a6cd1d88a">
+      <RegistryValue Root="HKLM" Key="SOFTWARE\GUARDIANA GROUP\GUARDIANA" Name="idioma" Type="string" Value="$(var.Idioma)" KeyPath="yes" />
     </Component>
 
     <Component Id="Readme" Directory="INSTALLFOLDER" Guid="6ee79eff-4700-48d1-93d8-35f8a726cd99">
@@ -304,7 +319,7 @@
                   Return="ignore" />
     <!-- El vigilante del DNS: la tarea de Windows, creada con los archivos ya en su sitio y quitada al desinstalar de verdad
          (no al actualizar ni al reparar). Nunca hace fallar la instalación. -->
-    <SetProperty Id="CrearVigilante" Value="&quot;[System64Folder]schtasks.exe&quot; /Create /TN &quot;\GUARDIANA\Vigilante&quot; /XML &quot;[DATOSDIR]vigilante.xml&quot; /F" Before="CrearVigilante" Sequence="execute" />
+    <SetProperty Id="CrearVigilante" Value="&quot;[System64Folder]schtasks.exe&quot; /Create /TN &quot;\GUARDIANA\Vigilante&quot; /XML &quot;[VIGILANTEDIR]vigilante.xml&quot; /F" Before="CrearVigilante" Sequence="execute" />
     <CustomAction Id="CrearVigilante"
                   DllEntry="WixQuietExec"
                   BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
@@ -318,7 +333,27 @@
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
+    <!-- 1.0.49 (revisión del 30 Oct 2026): si la instalación se cancela o falla después de crear la tarea o de poner el DNS,
+         Windows deshace los archivos y el servicio; estas tres acciones deshacen también lo nuestro (la tarea, el DNS, y la tarea
+         quitada al desinstalar). -->
+    <SetProperty Id="CrearVigilanteAtras" Value="&quot;[System64Folder]schtasks.exe&quot; /Delete /TN &quot;\GUARDIANA\Vigilante&quot; /F" Before="CrearVigilanteAtras" Sequence="execute" />
+    <CustomAction Id="CrearVigilanteAtras" DllEntry="WixQuietExec" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" Execute="rollback" Impersonate="no" Return="ignore" />
+    <SetProperty Id="ApplyDnsAtras" Value="&quot;[INSTALLFOLDER]guardiana.exe&quot; dns --restore --desinstalando" Before="ApplyDnsAtras" Sequence="execute" />
+    <CustomAction Id="ApplyDnsAtras" DllEntry="WixQuietExec" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" Execute="rollback" Impersonate="no" Return="ignore" />
+    <SetProperty Id="QuitarVigilanteAtras" Value="&quot;[System64Folder]schtasks.exe&quot; /Create /TN &quot;\GUARDIANA\Vigilante&quot; /XML &quot;[VIGILANTEDIR]vigilante.xml&quot; /F" Before="QuitarVigilanteAtras" Sequence="execute" />
+    <CustomAction Id="QuitarVigilanteAtras" DllEntry="WixQuietExec" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" Execute="rollback" Impersonate="no" Return="ignore" />
+    <!-- Lo que dice la barra de progreso mientras corren nuestras acciones (antes, la línea quedaba vacía) -->
+    <UI>
+      <ProgressText Action="CrearVigilante" Message="!(loc.ProgresoVigilante)" />
+      <ProgressText Action="ApplyDns" Message="!(loc.ProgresoDns)" />
+      <ProgressText Action="HomeOff" Message="!(loc.ProgresoHogar)" />
+      <ProgressText Action="RestoreDns" Message="!(loc.ProgresoDevolverDns)" />
+      <ProgressText Action="QuitarVigilante" Message="!(loc.ProgresoQuitarVigilante)" />
+    </UI>
     <InstallExecuteSequence>
+      <Custom Action="CrearVigilanteAtras" Before="CrearVigilante" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED" />
+      <Custom Action="ApplyDnsAtras" Before="ApplyDns" Condition="VIGILAR=&quot;1&quot; AND NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE" />
+      <Custom Action="QuitarVigilanteAtras" Before="QuitarVigilante" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND NOT REINSTALL" />
       <Custom Action="CrearVigilante" After="InstallFiles" Condition="NOT REMOVE~=&quot;ALL&quot;" />
       <Custom Action="QuitarVigilante" After="RestoreDns" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND NOT REINSTALL" />
       <Custom Action="ApplyDns" After="StartServices" Condition="VIGILAR=&quot;1&quot; AND NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE" />

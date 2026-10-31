@@ -185,10 +185,19 @@ pub struct Ledger {
 /// extract that would not open (damaged, or made with another key) left the machine pointed at
 /// 127.0.0.1 with nobody answering and nothing to undo it, even uninstalling (review of
 /// 10 Oct 2026, system serious 1). The file is read only when the extract cannot be.
+///
+/// Since 1.0.49 they live in `sistema/`, a subfolder only SYSTEM and Administrators can write
+/// (`paths::harden_data_dir`): the data folder itself grants «modify» to the console user, and the
+/// copy is applied as SYSTEM, by the service and by the scheduled watcher (review of 30 Oct 2026,
+/// serious). The copies of 1.0.48 and before, in the data folder itself, are removed on start
+/// ([`Ledger::refresca_copias_en_archivo`]) and never read.
 pub const COPIAS_EN_ARCHIVO: [(&str, &str); 2] = [
-    ("dns_backup", "dns-anterior.json"),
-    ("dns_backup_aparcada", "dns-anterior-aparcada.json"),
+    ("dns_backup", "sistema/dns-anterior.json"),
+    ("dns_backup_aparcada", "sistema/dns-anterior-aparcada.json"),
 ];
+
+/// Where the plain copies lived until 1.0.48, writable by the console user: removed, never read.
+pub const COPIAS_ANTIGUAS: [&str; 2] = ["dns-anterior.json", "dns-anterior-aparcada.json"];
 
 /// The plain copy of `key` kept beside the extract at `db` (see [`COPIAS_EN_ARCHIVO`]), for
 /// when the extract itself cannot be opened. `None` when there is none, or it is empty.
@@ -376,6 +385,11 @@ impl Ledger {
                 self.copia_en_archivo(archivo, valor.as_deref().unwrap_or(""));
             }
         }
+        if let Some(dir) = self.conn.path().filter(|p| !p.is_empty()).and_then(|p| Path::new(p).parent().map(Path::to_path_buf)) {
+            for viejo in COPIAS_ANTIGUAS {
+                let _ = std::fs::remove_file(dir.join(viejo));
+            }
+        }
     }
 
     /// The plain copy of one setting, written whole or not at all (a temporary file renamed over
@@ -393,6 +407,9 @@ impl Ledger {
         if valor.trim().is_empty() {
             let _ = std::fs::remove_file(&destino);
             return;
+        }
+        if let Some(p) = destino.parent() {
+            let _ = std::fs::create_dir_all(p);
         }
         let tmp = dir.join(format!("{archivo}.tmp"));
         if std::fs::write(&tmp, valor).is_ok() && std::fs::rename(&tmp, &destino).is_err() {
@@ -1419,14 +1436,14 @@ mod tests {
             copia_junto_al_extracto(&db, "dns_backup").as_deref(),
             Some("{\"copia\":1}")
         );
-        assert!(!dir.join("dns-anterior.json.tmp").exists());
+        assert!(!dir.join("sistema/dns-anterior.json.tmp").exists());
         // Another setting is not copied.
         l.set_setting("otra", "x").unwrap_or_default();
         assert_eq!(copia_junto_al_extracto(&db, "otra"), None);
         // Emptied: the file goes.
         l.set_setting("dns_backup", "").unwrap_or_default();
         assert_eq!(copia_junto_al_extracto(&db, "dns_backup"), None);
-        assert!(!dir.join("dns-anterior.json").exists());
+        assert!(!dir.join("sistema/dns-anterior.json").exists());
         // A copy from before 1.0.13 gets its file when the service starts.
         l.conn
             .execute(
@@ -1434,7 +1451,12 @@ mod tests {
                 [],
             )
             .unwrap_or_default();
+        // 1.0.49: the copy of 1.0.48, in the data folder the console user can modify, goes and is
+        // never read (review of 30 Oct 2026, serious).
+        std::fs::write(dir.join("dns-anterior.json"), "{\"plantada\":1}").unwrap_or_default();
         l.refresca_copias_en_archivo();
+        assert!(!dir.join("dns-anterior.json").exists());
+        assert!(dir.join("sistema/dns-anterior.json").exists());
         assert_eq!(
             copia_junto_al_extracto(&db, "dns_backup").as_deref(),
             Some("{\"vieja\":1}")

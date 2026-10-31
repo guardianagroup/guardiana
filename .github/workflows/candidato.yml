@@ -121,9 +121,16 @@ jobs:
         with:
           name: candidato-msi
           path: paquetes
+      # 1.0.49 (revisión del 30 Oct 2026): la versión desde la que se actualiza es la que ofrece hoy la página de instalar, no la
+      # última del registro (que se quedó en 1.0.46 y su carpeta ya no está en la web), comprobada con su SHA256SUMS y la página.
       - name: la versión que la gente tiene hoy, para actualizar desde ella
         continue-on-error: true
-        run: python build/cliente/descarga.py 'guardiana-{v}-windows-x64.msi' --dir anterior
+        shell: bash
+        run: |
+          set -euo pipefail
+          hoy=$(curl -fsS https://guardianagroup.com/instalar.html | grep -oE '/descargas/[0-9.]+/guardiana-[0-9.]+-windows-x64\.msi' | head -1 | cut -d/ -f3)
+          echo "la página ofrece $hoy"
+          python build/cliente/descarga.py 'guardiana-{v}-windows-x64.msi' --version "$hoy" --sin-registro --dir anterior
       - name: Defender mira los instaladores (solo informa, no falla)
         continue-on-error: true
         shell: pwsh

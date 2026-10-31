@@ -132,7 +132,14 @@ def main():
     ap.add_argument("archivo")
     ap.add_argument("--version")
     ap.add_argument("--dir", default=".")
+    # 1.0.49 (review of 30 Oct 2026): 1.0.47 and 1.0.48 went out without their line in ledger.jsonl
+    # and without .minisig, so the update test had nothing to update from. With --sin-registro the
+    # file is checked against the SHA256SUMS published beside it and against the install page, and
+    # the missing registry and signature are a loud warning instead of a stop.
+    ap.add_argument("--sin-registro", action="store_true")
     a = ap.parse_args()
+    if a.sin_registro and a.version:
+        return sin_registro(a)
     try:
         actual = latest_version()
     except Exception as e:  # noqa: BLE001 - the ledger could not be read: say so, as a result
@@ -224,6 +231,41 @@ def main():
             mal(f"firma ({origen})", str(e))
     # Only a file that checked out is left for the install test: until 1.0.9 it was saved before
     # any check, so a later step could install what had just failed.
+    if not fallos:
+        open(os.path.join(a.dir, name), "wb").write(data)
+    return finish()
+
+
+def sin_registro(a):
+    version = a.version
+    name = a.archivo.replace("{v}", version)
+    os.makedirs(a.dir, exist_ok=True)
+    url = f"{SITE}/descargas/{version}/{name}"
+    try:
+        data = get(url, binary=True)
+        ok("descarga", f"{url} · {len(data)} bytes")
+    except Exception as e:  # noqa: BLE001
+        mal("descarga", f"{url}: {e}")
+        return finish()
+    digest = hashlib.sha256(data).hexdigest()
+    try:
+        sumas = get(f"{SITE}/descargas/{version}/SHA256SUMS")
+        esperado = next((l.split()[0] for l in sumas.splitlines() if l.strip().endswith(name)), None)
+    except Exception as e:  # noqa: BLE001
+        esperado = None
+        mal("SHA256SUMS", str(e))
+    if esperado == digest:
+        ok("SHA256SUMS", f"{name} · {digest[:16]}…")
+    else:
+        mal("SHA256SUMS", f"{name}: el archivo da {digest}, SHA256SUMS dice {esperado}")
+    for lang, path in PAGES.items():
+        try:
+            html = get(SITE + path)
+        except Exception as e:  # noqa: BLE001
+            mal(f"página de instalar ({lang})", f"{path}: {e}")
+            continue
+        (ok if digest in html else mal)(f"huella en la página ({lang})", f"{path} · {digest[:16]}…")
+    print(f"::warning title=sin registro público::{name} coincide con SHA256SUMS, pero {version} no está en ledger.jsonl ni tiene .minisig")
     if not fallos:
         open(os.path.join(a.dir, name), "wb").write(data)
     return finish()

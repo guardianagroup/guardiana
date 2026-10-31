@@ -1,20 +1,27 @@
 ﻿GUARDIANA for Windows
 =====================
 
-GUARDIANA shows you which services your AI talks to and, with Home Mode, every
-device on your Wi-Fi: it explains each one in a sentence and blocks only what you
-decide. Everything happens on this computer. No account, no server of ours,
-zero telemetry.
+GUARDIANA brings together the ZERO browser, which cuts tracking attempts in
+real time and shows you every advertising auction; monitoring of the whole
+computer, which shows which companies it connects to; and the Watch, which
+pauses your GUARDIANA calls if another program uses your microphone, camera or
+screen. Everything happens on this computer: no account and no telemetry.
 
 What the installer did
 ----------------------
 - Copied the program to “Program Files\Guardiana”.
-- Registered the “Guardiana” service, which starts with Windows.
+- Registered the “GUARDIANA” service, which starts with Windows.
+- Copied the GUARDIANA ZERO browser to “Program Files\Guardiana\ZERO”.
 - Added the “Guardiana” shortcut, which opens the panel, to the Start menu and
   the desktop.
 - Made GUARDIANA this computer's DNS, over IPv6 too, with an exact copy of the
   previous setting. If the service stops, the computer gets its previous DNS
   back; uninstalling leaves it exactly as it was.
+- Created the Windows task “GUARDIANA\Vigilante” (in “Program Files\GUARDIANA
+  Vigilante”): every minute it checks that GUARDIANA answers and, if it does not,
+  gives the previous DNS back, so the computer is never left without internet.
+- Added the program folder to the PATH and registered guardiana:// links
+  (to activate the licence from the email).
 - It opened no port to the network. Only Home Mode, when you turn it on, opens
   ports on your home Wi-Fi; turning it off closes them.
 
@@ -32,7 +39,7 @@ stays on your disk, whether you pay or not.
 
 Uninstalling
 ------------
-Settings > Apps > Guardiana > Uninstall. On uninstall, GUARDIANA turns Home
+Settings > Apps > GUARDIANA > Uninstall. On uninstall, GUARDIANA turns Home
 Mode off, removes its firewall rule and puts the DNS back as it was. The
 ledger stays in C:\ProgramData\Guardiana; delete it by hand if you do not
 want it.

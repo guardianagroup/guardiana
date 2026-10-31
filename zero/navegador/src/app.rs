@@ -2251,16 +2251,20 @@ fn carpeta_descargas() -> PathBuf {
 /// Windows's own language is not asked any more: it says where the computer was bought, not what
 /// the person chose.
 fn idioma_sistema() -> String {
-    for ruta in [
-        "Software\\GUARDIANA GROUP\\GUARDIANA ZERO",
-        "Software\\Guardiana",
+    // 1.0.49: also the language of the installer chosen on the website, which GUARDIANA's MSI now
+    // writes for every account in HKLM (until 1.0.48 it was only written with ZERO=0, so ZERO
+    // opened in English after a Spanish or Portuguese install: review of 30 Oct 2026).
+    for (raiz, ruta) in [
+        (HKEY_CURRENT_USER, "Software\\GUARDIANA GROUP\\GUARDIANA ZERO"),
+        (HKEY_CURRENT_USER, "Software\\Guardiana"),
+        (HKEY_LOCAL_MACHINE, "SOFTWARE\\GUARDIANA GROUP\\GUARDIANA"),
     ] {
         let r = ancho(ruta);
         let mut buf = [0u16; 16];
         let mut largo = std::mem::size_of_val(&buf) as u32;
         let e = unsafe {
             RegGetValueW(
-                HKEY_CURRENT_USER,
+                raiz,
                 PCWSTR(r.as_ptr()),
                 w!("idioma"),
                 RRF_RT_REG_SZ,

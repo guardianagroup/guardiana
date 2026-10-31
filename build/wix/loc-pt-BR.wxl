@@ -1,10 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Os textos do instalador em português do Brasil (22 set 2026). -->
 <WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="pt-BR" Codepage="1252">
-  <String Id="Descripcion" Value="GUARDIANA: veja com quem a sua IA fala. Tudo acontece neste computador; sem conta e sem servidor." />
+  <String Id="Descripcion" Value="GUARDIANA: o navegador ZERO, a vigilância de todo o computador e o Vigia. Tudo acontece neste computador, sem conta." />
   <String Id="AbrirPanel" Value="Abrir o painel da GUARDIANA" />
   <String Id="AbrirZero" Value="Abrir o navegador GUARDIANA ZERO" />
   <String Id="VersionMasNueva" Value="Já existe uma versão mais nova da GUARDIANA instalada." />
-  <String Id="ServicioDescripcion" Value="GUARDIANA: veja com quem a sua IA e cada dispositivo da casa falam. Tudo acontece neste computador; sem conta e sem servidor." />
+  <String Id="ServicioDescripcion" Value="GUARDIANA: vigia a quais empresas este computador se conecta e protege o seu DNS. Tudo acontece neste computador, sem conta." />
   <String Id="ArchivoLeeme" Value="LEIAME.txt" />
+  <!-- 1.0.49: la barra de progreso y las pantallas de WixUI con nuestras palabras (revisión del 30 Oct 2026: la primera
+       pedía aceptar un «contrato» que no existe y la última no decía que GUARDIANA quedó en marcha) -->
+  <String Id="ProgresoVigilante" Value="Criando o vigilante do DNS…" />
+  <String Id="ProgresoDns" Value="Configurando o DNS deste computador…" />
+  <String Id="ProgresoHogar" Value="Fechando o Modo Casa…" />
+  <String Id="ProgresoDevolverDns" Value="Devolvendo o DNS de antes…" />
+  <String Id="ProgresoQuitarVigilante" Value="Removendo o vigilante do DNS…" />
+  <String Id="WelcomeEulaDlgTitle" Value="{\WixUI_Font_Title}Antes de instalar a GUARDIANA" />
+  <String Id="WelcomeEulaDlgLicenseAcceptedCheckBox" Value="Li o que a instalação vai fazer e aceito os Termos de uso" />
+  <String Id="ExitDialogTitle" Value="{\WixUI_Font_Bigger}A GUARDIANA está instalada" />
+  <String Id="ExitDialogDescription" Value="O serviço da GUARDIANA já está em funcionamento. Clique em «Concluir» para fechar." />
 </WixLocalization>

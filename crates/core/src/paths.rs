@@ -106,6 +106,26 @@ pub fn harden_data_dir(dir: &Path) -> std::io::Result<()> {
                 .args([dir_s.as_str(), "/grant", &format!("*{sid}:(OI)(CI)M")])
                 .output();
         }
+        // 1.0.49: what SYSTEM applies (the copy of the DNS, read by the service and by the scheduled
+        // watcher) and what SYSTEM writes to (the watcher's log) live in `sistema`, without the
+        // console user's grant: only SYSTEM and Administrators (review of 30 Oct 2026, serious).
+        let sistema = dir.join("sistema");
+        std::fs::create_dir_all(&sistema)?;
+        let sis_s = sistema.to_string_lossy().into_owned();
+        let out = Command::new("icacls")
+            .args([
+                sis_s.as_str(),
+                "/inheritance:r",
+                "/grant:r",
+                "*S-1-5-18:(OI)(CI)F",
+                "*S-1-5-32-544:(OI)(CI)F",
+            ])
+            .output()?;
+        if !out.status.success() {
+            return Err(std::io::Error::other(
+                String::from_utf8_lossy(&out.stderr).into_owned(),
+            ));
+        }
         Ok(())
     }
     #[cfg(not(any(unix, windows)))]

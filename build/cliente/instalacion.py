@@ -586,6 +586,8 @@ def tarde(tipo, paquete, version):
     # servicio muere sin poder devolver el DNS, o se cuelga, una tarea de Windows ajena al programa lo devuelve sola.
     if SISTEMA == "Windows" and tipo == "msi":
         vigilante(antes)
+        permisos_de_lo_que_corre_como_system()
+        idioma_para_zero()
 
     # 7. Uninstall: the DNS exactly as it was, and the program gone.
     bien, out = desinstalar(tipo, paquete, carpeta)
@@ -642,6 +644,41 @@ foreach ($p in Get-Process -Name guardiana -ErrorAction SilentlyContinue) { [Gd.
 '''
 
 
+# 1.0.49 (revisión del 30 Oct 2026, grave): la tarea del vigilante corre como SYSTEM cada minuto. Su guion, su definición y la
+# copia del DNS que aplica tienen que estar donde solo escriben SYSTEM, Administradores o TrustedInstaller; en 1.0.48 estaban en
+# C:\ProgramData\Guardiana, donde el servicio da «Modificar» al usuario de la consola (elevación a SYSTEM).
+SID_QUE_ESCRIBE = ("S-1-5-18", "S-1-5-32-544", "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464", "S-1-3-0")
+
+
+def escriben(ruta):
+    ps = ("$a = Get-Acl -LiteralPath '%s'; $a.Access | Where-Object { $_.AccessControlType -eq 'Allow' -and "
+          "($_.FileSystemRights -band 0xD0116) } | ForEach-Object { try { $_.IdentityReference.Translate("
+          "[Security.Principal.SecurityIdentifier]).Value } catch { [string]$_.IdentityReference } } | Sort-Object -Unique" % ruta)
+    code, out = run(["powershell", "-NoProfile", "-Command", ps])
+    return code, [l.strip() for l in out.splitlines() if l.strip()]
+
+
+def permisos_de_lo_que_corre_como_system():
+    code, out = run(["schtasks", "/Query", "/TN", "\\GUARDIANA\\Vigilante", "/XML"])
+    bien = code == 0 and "GUARDIANA Vigilante\\vigilante.ps1" in out and "ProgramData" not in out
+    (ok if bien else mal)("vigilante · la tarea ejecuta el guion de Archivos de programa", out.strip()[-300:] if not bien else "")
+    for ruta in (r"C:\Program Files\GUARDIANA Vigilante\vigilante.ps1", r"C:\Program Files\GUARDIANA Vigilante\vigilante.xml",
+                 r"C:\ProgramData\Guardiana\sistema", r"C:\ProgramData\Guardiana\sistema\dns-anterior.json"):
+        if not os.path.exists(ruta):
+            mal("vigilante · existe", ruta)
+            continue
+        code, sids = escriben(ruta)
+        otros = [x for x in sids if x not in SID_QUE_ESCRIBE]
+        (ok if code == 0 and not otros else mal)("vigilante · solo SYSTEM y Administradores escriben", f"{ruta} · {', '.join(sids)}")
+    for viejo in (r"C:\ProgramData\Guardiana\vigilante.ps1", r"C:\ProgramData\Guardiana\dns-anterior.json"):
+        (ok if not os.path.exists(viejo) else mal)("vigilante · nada en la carpeta que puede tocar el usuario", viejo)
+
+
+def idioma_para_zero():
+    code, out = run(["reg", "query", r"HKLM\SOFTWARE\GUARDIANA GROUP\GUARDIANA", "/v", "idioma"])
+    (ok if code == 0 and "idioma" in out else mal)("el idioma del instalador queda para ZERO (todas las cuentas)", out.strip()[-200:])
+
+
 def vigilante(antes):
     """Windows: el vigilante del DNS devuelve el DNS si GUARDIANA muere o se cuelga, y GUARDIANA lo recupera al volver."""
     code, out = run(["schtasks", "/Query", "/TN", "\\GUARDIANA\\Vigilante", "/V", "/FO", "LIST"])
@@ -687,7 +724,7 @@ def vigilante(antes):
             ok("el vigilante · al despertar, GUARDIANA es otra vez el DNS", str(dns_actual()))
         else:
             mal("el vigilante · al despertar, GUARDIANA es otra vez el DNS", str(dns_actual()))
-    code, out = run(["powershell", "-NoProfile", "-Command", "Get-Content $env:ProgramData\\Guardiana\\vigilante.log -Tail 8"])
+    code, out = run(["powershell", "-NoProfile", "-Command", "Get-Content $env:ProgramData\\Guardiana\\sistema\\vigilante.log -Tail 8"])
     nota("registro del vigilante: " + out.strip()[-600:])
 
 
