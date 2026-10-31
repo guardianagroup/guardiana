@@ -295,7 +295,7 @@ Seccion 'privacidad' {
   # 1.0.50: Recall (Windows 11 24H2 and later): the optional component and the two documented
   # policies (Policy CSP WindowsAI). Whether a person turned snapshots on is not readable.
   # Read through WMI with a time limit, not DISM (which may wait behind Windows Update and writes its log): review of
-  # 31 Oct 2026. «cuentas» counts every profile of the computer, so a policy read only for the accounts with a session
+  # 31 Oct 2026. "cuentas" counts every profile of the computer, so a policy read only for the accounts with a session
   # never stands for those without one.
   if ([Environment]::OSVersion.Version.Build -ge 26100) {
     try {
