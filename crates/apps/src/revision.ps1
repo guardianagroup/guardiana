@@ -1,4 +1,4 @@
-# GUARDIANA - revision del equipo (1.0.24). Solo lectura: no cambia nada, no instala nada.
+# GUARDIANA - revision del equipo (1.0.24; ampliada en 1.0.50). Solo lectura: no cambia nada, no instala nada.
 # Lo unico que sale a la red son tres preguntas DNS por nombres publicos (dns.google,
 # one.one.one.one y un nombre inventado bajo example.com) a los servidores DNS que usa el equipo.
 $ErrorActionPreference = 'Stop'
@@ -20,6 +20,7 @@ function Seccion([string]$nombre, [scriptblock]$sb) {
   Paso 'hecho' ($nombre + "`t" + $w.ElapsedMilliseconds)
 }
 function Prop($ruta, $nombre) { try { return (Get-ItemProperty -LiteralPath $ruta -Name $nombre -ErrorAction Stop).$nombre } catch { return $null } }
+function Num($v) { if ($null -eq $v) { return $null }; try { return [int]$v } catch { return $null } }
 $USUARIOS = @()
 try { $USUARIOS = @(Get-ChildItem 'Registry::HKEY_USERS' | Where-Object { $_.PSChildName -match '^S-1-5-21-[\d-]+$' } | ForEach-Object { $_.PSChildName }) } catch {}
 $FIRMAS = @{}
@@ -74,7 +75,7 @@ Seccion 'actualizaciones' {
 }
 
 Seccion 'defensa' {
-  $o = [ordered]@{ defender = $null; productos = $null }
+  $o = [ordered]@{ defender = $null; productos = $null; preferencias = $null }
   try {
     $m = Get-MpComputerStatus
     $o.defender = [ordered]@{ servicio = [bool]$m.AMServiceEnabled; antivirus = [bool]$m.AntivirusEnabled; tiempo_real = [bool]$m.RealTimeProtectionEnabled
@@ -82,6 +83,17 @@ Seccion 'defensa' {
       manipulacion = [bool]$m.IsTamperProtected; modo = [string]$m.AMRunningMode }
   } catch {}
   try { $o.productos = @(Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct | ForEach-Object { [ordered]@{ nombre = [string]$_.displayName; estado = [long]$_.productState } }) } catch {}
+  # 1.0.50: what Defender does not scan (its exclusions, which Windows shows only to administrators
+  # and the system account) and what it sends to Microsoft's cloud (MAPS and sample submission).
+  try {
+    $p = Get-MpPreference
+    $ex = @()
+    foreach ($x in @($p.ExclusionPath)) { if ($x) { $ex += [ordered]@{ tipo = 'ruta'; valor = (Corta $x) } } }
+    foreach ($x in @($p.ExclusionProcess)) { if ($x) { $ex += [ordered]@{ tipo = 'programa'; valor = (Corta $x) } } }
+    foreach ($x in @($p.ExclusionExtension)) { if ($x) { $ex += [ordered]@{ tipo = 'extension'; valor = (Corta $x) } } }
+    if (@($ex | Where-Object { ([string]$_.valor) -like 'N/A*' }).Count) { $ex = $null }
+    $o.preferencias = [ordered]@{ exclusiones = $ex; nube = (Num $p.MAPSReporting); muestras = (Num $p.SubmitSamplesConsent); carpetas = (Num $p.EnableControlledFolderAccess) }
+  } catch {}
   $o
 }
 
@@ -97,11 +109,22 @@ Seccion 'sistema' {
   } catch {}
   try { $o.cifrado = @(Get-CimInstance -Namespace root/cimv2/security/microsoftvolumeencryption -ClassName Win32_EncryptableVolume | ForEach-Object { [ordered]@{ unidad = [string]$_.DriveLetter; proteccion = [int]$_.ProtectionStatus } }) } catch {}
   try { $dg = Get-CimInstance -Namespace root/Microsoft/Windows/DeviceGuard -ClassName Win32_DeviceGuard; $o.integridad_memoria = (@($dg.SecurityServicesRunning) -contains 2) } catch {}
+  # 1.0.50: LSA protection as it really started. WinInit writes event 12 in the System log when
+  # LSASS starts as a protected process; Kernel-General's own event 12 marks every start, so its
+  # absence means the log no longer reaches the last start and nothing is concluded.
+  $o.lsa = [ordered]@{ ppl = (Num (Prop 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa' 'RunAsPPL')); protegido = $null }
+  try {
+    $boot = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
+    $ev = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 12; StartTime = $boot.AddMinutes(-2) } -MaxEvents 50 -ErrorAction Stop)
+    $wi = @($ev | Where-Object { ([string]$_.ProviderName) -like '*Wininit*' }).Count
+    $kg = @($ev | Where-Object { ([string]$_.ProviderName) -like '*Kernel-General*' }).Count
+    if ($wi -gt 0) { $o.lsa.protegido = $true } elseif ($kg -gt 0) { $o.lsa.protegido = $false }
+  } catch {}
   $o
 }
 
 Seccion 'acceso' {
-  $o = [ordered]@{ cuentas = $null; rdp = $null; rdp_nla = $null; asistencia = $null; autologon = $false; autologon_clave = $false; fallidos_7d = $null; rdp_entradas_30d = $null; creadas_30d = $null; puertos = $null; carpetas = $null }
+  $o = [ordered]@{ cuentas = $null; rdp = $null; rdp_nla = $null; asistencia = $null; autologon = $false; autologon_clave = $false; fallidos_7d = $null; rdp_entradas_30d = $null; creadas_30d = $null; puertos = $null; carpetas = $null; servicios_remotos = $null; gestion = $null }
   $adm = $null
   try { $adm = @(Get-LocalGroupMember -SID 'S-1-5-32-544' | ForEach-Object { [string]$_.SID }) } catch {}
   try { $o.cuentas = @(Get-LocalUser | ForEach-Object { $es = $null; if ($null -ne $adm) { $es = ($adm -contains [string]$_.SID) }
@@ -129,6 +152,14 @@ Seccion 'acceso' {
     $o.puertos = $l
   } catch {}
   try { $o.carpetas = @(Get-SmbShare | Where-Object { -not $_.Special } | ForEach-Object { [ordered]@{ nombre = [string]$_.Name; ruta = [string]$_.Path } }) } catch {}
+  # 1.0.50: Windows' own ways to be run from another computer (signed by Microsoft, so the services
+  # inventory leaves them out), and whether an organisation manages this computer.
+  try { $o.servicios_remotos = @(Get-CimInstance Win32_Service -Filter "Name='sshd' OR Name='WinRM' OR Name='RemoteRegistry'" | ForEach-Object { [ordered]@{ nombre = [string]$_.Name; estado = [string]$_.State; inicio = [string]$_.StartMode } }) } catch {}
+  $g = [ordered]@{ dominio = $null; nombre_dominio = $null; entra = $null; mdm = $null }
+  try { $cs = Get-CimInstance Win32_ComputerSystem; $g.dominio = [bool]$cs.PartOfDomain; if ($g.dominio) { $g.nombre_dominio = [string]$cs.Domain } } catch {}
+  try { foreach ($ln in @(& "$env:SystemRoot\System32\dsregcmd.exe" /status 2>$null)) { if ([string]$ln -match '^\s*AzureAdJoined\s*:\s*(YES|NO)\s*$') { $g.entra = ($Matches[1] -eq 'YES') } } } catch {}
+  try { $g.mdm = @(Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Enrollments' -ErrorAction Stop | ForEach-Object { $pv = Prop $_.PSPath 'ProviderID'; if ($pv -and (Num (Prop $_.PSPath 'EnrollmentState')) -eq 1) { [string]$pv } } | Select-Object -Unique) } catch { $g.mdm = @() }
+  $o.gestion = $g
   $o
 }
 
@@ -232,7 +263,7 @@ Seccion 'certificados' {
 
 function Usos([string]$raiz, [string]$quien) {
   $out = @()
-  foreach ($cap in 'webcam', 'microphone', 'location') {
+  foreach ($cap in 'webcam', 'microphone', 'location', 'graphicsCaptureProgrammatic', 'graphicsCaptureWithoutBorder') {
     $base = "$raiz\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\$cap"
     if (-not (Test-Path $base)) { continue }
     $ks = @(Get-ChildItem $base -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -ne 'NonPackaged' })
@@ -246,7 +277,7 @@ function Usos([string]$raiz, [string]$quien) {
 }
 
 Seccion 'privacidad' {
-  $o = [ordered]@{ telemetria_politica = $null; telemetria = $null; diagtrack = $null; publicidad = @(); usos = @(); usb = $null; bluetooth = $null }
+  $o = [ordered]@{ telemetria_politica = $null; telemetria = $null; diagtrack = $null; publicidad = @(); usos = @(); usb = $null; bluetooth = $null; recall = $null }
   $o.telemetria_politica = Prop 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection' 'AllowTelemetry'
   $o.telemetria = Prop 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection' 'AllowTelemetry'
   try { $s = Get-Service DiagTrack; $o.diagtrack = [ordered]@{ estado = [string]$s.Status; inicio = [string]$s.StartType } } catch {}
@@ -258,6 +289,18 @@ Seccion 'privacidad' {
   $o.usos += (Usos 'HKLM:' 'equipo')
   try { $o.usb = @(Get-ChildItem 'HKLM:\SYSTEM\CurrentControlSet\Enum\USBSTOR' -ErrorAction Stop | ForEach-Object { Get-ChildItem $_.PSPath } | ForEach-Object { [ordered]@{ nombre = [string](Prop $_.PSPath 'FriendlyName'); id = [string]$_.PSChildName } }) } catch { $o.usb = @() }
   try { $o.bluetooth = @(Get-ChildItem 'HKLM:\SYSTEM\CurrentControlSet\Services\BTHPORT\Parameters\Devices' -ErrorAction Stop | ForEach-Object { $n = Prop $_.PSPath 'Name'; if ($n) { ([Text.Encoding]::UTF8.GetString([byte[]]$n)).Trim([char]0) } } | Where-Object { $_ }) } catch { $o.bluetooth = @() }
+  # 1.0.50: Recall (Windows 11 24H2 and later): the optional component and the two documented
+  # policies (Policy CSP WindowsAI). Whether a person turned snapshots on is not readable.
+  if ([Environment]::OSVersion.Version.Build -ge 26100) {
+    try {
+      $f = Get-WindowsOptionalFeature -Online -FeatureName Recall -ErrorAction Stop
+      if ($f) {
+        $wa = 'SOFTWARE\Policies\Microsoft\Windows\WindowsAI'
+        $o.recall = [ordered]@{ estado = [string]$f.State; permitido = (Num (Prop "HKLM:\$wa" 'AllowRecallEnablement')); sin_capturas = (Num (Prop "HKLM:\$wa" 'DisableAIDataAnalysis'))
+          sin_capturas_cuentas = @($USUARIOS | ForEach-Object { Num (Prop "Registry::HKEY_USERS\$_\$wa" 'DisableAIDataAnalysis') }); cuentas = @($USUARIOS).Count }
+      }
+    } catch {}
+  }
   $o
 }
 
@@ -272,7 +315,10 @@ Seccion 'programas' {
   }
   $ax = @()
   try { $ax = @(Get-AppxPackage -AllUsers -ErrorAction Stop | Where-Object { -not $_.IsFramework -and [string]$_.SignatureKind -ne 'System' } | ForEach-Object { [ordered]@{ nombre = [string]$_.Name; editor = (([string]$_.Publisher -split ',')[0] -replace '^CN=', ''); version = [string]$_.Version; tienda = ([string]$_.SignatureKind -eq 'Store') } }) } catch {}
-  [ordered]@{ instalados = $l; appx = $ax }
+  # 1.0.50: the apps Windows installs for every new account (provisioned in its image).
+  $ap = $null
+  try { $ap = @(Get-AppxProvisionedPackage -Online -ErrorAction Stop | ForEach-Object { [string]$_.DisplayName } | Where-Object { $_ } | Select-Object -Unique) } catch {}
+  [ordered]@{ instalados = $l; appx = $ax; aprovisionados = $ap }
 }
 
 Seccion 'defender_sucesos' {

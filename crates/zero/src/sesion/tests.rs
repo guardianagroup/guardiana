@@ -3736,6 +3736,17 @@ fn the_web_asks_the_panel_only_for_its_readings() {
         Orden::EnviaAPagina { id, json, .. }
             if *id == panel && json.contains("/api/revision/ahora") && json.contains("\"n\":7")
     )));
+    // 1.0.50: the PC Scanner also reads the call watcher and «who sells your data».
+    for ruta in ["/vigia", "/api/quien-vende"] {
+        let o = s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, "GET"));
+        assert!(
+            o.iter().any(|x| matches!(
+                x,
+                Orden::EnviaAPagina { id, json, .. } if *id == panel && json.contains(ruta)
+            )),
+            "{ruta}"
+        );
+    }
     // Nothing that changes a rule, the licence or a setting, nor a reading by another method.
     for (ruta, metodo) in [
         ("/api/reglas", "POST"),
@@ -3745,6 +3756,9 @@ fn the_web_asks_the_panel_only_for_its_readings() {
         ("/api/hogar/activar", "POST"),
         ("http://example.com/", "GET"),
         ("/api/revision?x=1", "GET"),
+        ("/api/quien-vende/ajuste", "POST"),
+        ("/api/quien-vende", "POST"),
+        ("/vigia", "POST"),
     ] {
         assert!(
             s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, metodo))

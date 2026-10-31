@@ -765,6 +765,12 @@ const PANEL_LECTURAS: &[(&str, &str)] = &[
     ("GET", "/api/ia"),
     ("GET", "/api/estado"),
     ("GET", "/api/textos"),
+    // 1.0.50, the PC Scanner (the owner, 31 Oct 2026, 00:10: «Vigía se cambia por escáner pc»):
+    // what the call watcher sees right now (screen capture, a remote session, remote control or a
+    // recorder running, active threats) and who inside this computer sells data. Both only read;
+    // the second's settings switch (`POST /api/quien-vende/ajuste`) stays out.
+    ("GET", "/vigia"),
+    ("GET", "/api/quien-vende"),
 ];
 
 /// ZERO's own wait page for the panel (1.0.44), as it is or saying what failed.

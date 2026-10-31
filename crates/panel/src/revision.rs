@@ -373,7 +373,38 @@ fn claves_inventario(d: &Value) -> Vec<String> {
     for x in arr(&d["programas"]["instalados"]) {
         k.push(format!("programa:{}|{}", s(&x["nombre"]), s(&x["editor"])));
     }
+    for x in arr(&d["defensa"]["preferencias"]["exclusiones"]) {
+        k.push(clave_exclusion(x));
+    }
     k
+}
+
+/// The remembered key of one Defender exclusion (1.0.50).
+fn clave_exclusion(x: &Value) -> String {
+    format!(
+        "exclusion:{}:{}",
+        s(&x["tipo"]),
+        s(&x["valor"]).to_lowercase()
+    )
+}
+
+/// A program's short name from what Windows' consent store keeps (a path or a package name).
+fn nombre_app(app: &str) -> String {
+    app.rsplit('\\')
+        .next()
+        .unwrap_or(app)
+        .split('_')
+        .next()
+        .unwrap_or(app)
+        .to_owned()
+}
+
+/// Microsoft's own packages, by the start of their name (1.0.50).
+fn es_de_microsoft(nombre: &str) -> bool {
+    let n = nombre.to_lowercase();
+    ["microsoft", "windows.", "msteams", "clipchamp."]
+        .iter()
+        .any(|p| n.starts_with(p))
 }
 
 /// «nuevo»: first seen after the first review, within the last 30 days.
@@ -648,12 +679,14 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
     } else {
         proteccion.push(nd("antivirus"));
     }
-    if let Some(m) = def["defender"].as_object() {
-        let activo = m.get("antivirus").and_then(Value::as_bool) == Some(true)
+    let defender_activo = def["defender"].as_object().is_some_and(|m| {
+        m.get("antivirus").and_then(Value::as_bool) == Some(true)
             && !s(m.get("modo").unwrap_or(&Value::Null))
                 .to_lowercase()
-                .contains("passive");
-        if activo {
+                .contains("passive")
+    });
+    if let Some(m) = def["defender"].as_object() {
+        if defender_activo {
             let firmas = m
                 .get("firmas_dias")
                 .and_then(Value::as_i64)
@@ -672,6 +705,34 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
             });
         } else {
             proteccion.push(check("defender", "info", "rv_defender_pasivo"));
+        }
+    }
+    // 1.0.50: what Defender does not scan, while it is the antivirus in charge. Adding exclusions
+    // is a known way for malicious programs to keep it from looking at them.
+    let pref = &def["preferencias"];
+    if defender_activo {
+        if let Some(ex) = lista_de(&pref["exclusiones"]) {
+            let lista: Vec<Item> = ex
+                .iter()
+                .map(|x| {
+                    let mut m = vec![match s(&x["tipo"]).as_str() {
+                        "programa" => "excl_programa",
+                        "extension" => "excl_extension",
+                        _ => "excl_ruta",
+                    }];
+                    if es_nuevo(vistos, &clave_exclusion(x), now) {
+                        m.insert(0, "nuevo");
+                    }
+                    item(s(&x["valor"]), "", m)
+                })
+                .collect();
+            proteccion.push(if lista.is_empty() {
+                check("exclusiones", "ok", "rv_exclusiones_no")
+            } else {
+                check("exclusiones", "aviso", "rv_exclusiones_hay")
+                    .con("n", lista.len())
+                    .items(lista)
+            });
         }
     }
 
@@ -733,6 +794,12 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
     match sis["integridad_memoria"].as_bool() {
         Some(true) => proteccion.push(check("integridad_memoria", "ok", "rv_integridad_ok")),
         Some(false) => proteccion.push(check("integridad_memoria", "info", "rv_integridad_no")),
+        None => {}
+    }
+    // 1.0.50: as LSASS really started last time (WinInit's event), not only as it is set.
+    match sis["lsa"]["protegido"].as_bool() {
+        Some(true) => proteccion.push(check("proteccion_lsa", "ok", "rv_lsa_ok")),
+        Some(false) => proteccion.push(check("proteccion_lsa", "info", "rv_lsa_no")),
         None => {}
     }
 
@@ -831,6 +898,37 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
             .con("n", remotos.len())
             .items(remotos)
     });
+    // 1.0.50: Windows' own remote ways in (signed by Microsoft, so outside the services list).
+    if let Some(sr) = lista_de(&ac["servicios_remotos"]) {
+        let en_marcha: Vec<&Value> = sr.iter().filter(|x| s(&x["estado"]) == "Running").collect();
+        let lista: Vec<Item> = en_marcha
+            .iter()
+            .map(|x| {
+                let n = s(&x["nombre"]);
+                let m = match n.to_lowercase().as_str() {
+                    "sshd" => "srv_ssh",
+                    "winrm" => "srv_winrm",
+                    _ => "srv_registro",
+                };
+                item(n, "", vec![m])
+            })
+            .collect();
+        // WinRM running alone answers nobody until someone configures it to listen.
+        let grave = en_marcha
+            .iter()
+            .any(|x| !s(&x["nombre"]).eq_ignore_ascii_case("winrm"));
+        acceso.push(if lista.is_empty() {
+            check("servicios_remotos", "ok", "rv_servicios_remotos_no")
+        } else {
+            check(
+                "servicios_remotos",
+                if grave { "aviso" } else { "info" },
+                "rv_servicios_remotos_hay",
+            )
+            .con("n", lista.len())
+            .items(lista)
+        });
+    }
     match ac["fallidos_7d"].as_i64() {
         // The script reads at most 5 000 events: at the cap, «5000+».
         Some(n) if n > 500 => acceso.push(check("fallidos", "alerta", "rv_fallidos").con(
@@ -894,6 +992,36 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
                 .con("n", lista.len())
                 .items(lista)
         });
+    }
+    let ge = &ac["gestion"];
+    if ge.is_object() {
+        let mut lista: Vec<Item> = Vec::new();
+        if ge["dominio"].as_bool() == Some(true) {
+            lista.push(item(s(&ge["nombre_dominio"]), "", vec!["dominio"]));
+        }
+        if ge["entra"].as_bool() == Some(true) {
+            lista.push(item("Microsoft Entra", "", vec!["entra"]));
+        }
+        for p in arr(&ge["mdm"]) {
+            let p = s(p);
+            // «MS DM Server» is the provider name Microsoft Intune enrolls with.
+            let t = if p == "MS DM Server" {
+                "Microsoft Intune".to_owned()
+            } else {
+                p.clone()
+            };
+            lista.push(item(t, p, vec!["mdm"]));
+        }
+        let leido = ge["dominio"].is_boolean() || ge["entra"].is_boolean();
+        if !lista.is_empty() {
+            acceso.push(
+                check("gestion", "info", "rv_gestion_si")
+                    .con("n", lista.len())
+                    .items(lista),
+            );
+        } else if leido {
+            acceso.push(check("gestion", "ok", "rv_gestion_no"));
+        }
     }
     if let Some(carpetas) = lista_de(&ac["carpetas"]) {
         let raiz = carpetas.iter().any(|c| {
@@ -1237,14 +1365,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
             .iter()
             .map(|u| {
                 let app = s(&u["app"]);
-                let nombre = app
-                    .rsplit('\\')
-                    .next()
-                    .unwrap_or(&app)
-                    .split('_')
-                    .next()
-                    .unwrap_or(&app)
-                    .to_owned();
+                let nombre = nombre_app(&app);
                 let mut m = Vec::new();
                 if u["hasta"].as_i64() == Some(0) {
                     m.push("en_uso");
@@ -1264,6 +1385,41 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
                 .items(lista)
         });
     }
+    // 1.0.50: the screen, through Windows' own capture (graphicsCapture*). Captures made another
+    // way are not recorded, and the sentence says so; one line per program, its last time.
+    if pr["usos"].is_array() {
+        let mut usos: Vec<&Value> = arr(&pr["usos"])
+            .iter()
+            .filter(|u| s(&u["cap"]).starts_with("graphicsCapture"))
+            .collect();
+        usos.sort_by_key(|u| std::cmp::Reverse(u["desde"].as_i64().unwrap_or(0)));
+        let mut apps: Vec<String> = Vec::new();
+        let mut lista: Vec<Item> = Vec::new();
+        for u in usos {
+            let app = s(&u["app"]);
+            if apps.contains(&app) {
+                continue;
+            }
+            apps.push(app.clone());
+            let mut m = Vec::new();
+            if u["hasta"].as_i64() == Some(0) {
+                m.push("en_uso");
+            }
+            lista.push(item(nombre_app(&app), app, m).en(u["desde"].as_i64()));
+        }
+        let ahora = lista.iter().any(|i| i.marcas.contains(&"en_uso"));
+        privacidad.push(if lista.is_empty() {
+            check("pantalla", "info", "rv_pantalla_nunca")
+        } else if ahora {
+            check("pantalla", "info", "rv_pantalla_ahora")
+                .con("n", lista.len())
+                .items(lista)
+        } else {
+            check("pantalla", "info", "rv_pantalla_hay")
+                .con("n", lista.len())
+                .items(lista)
+        });
+    }
     let nivel = pr["telemetria_politica"]
         .as_i64()
         .or_else(|| pr["telemetria"].as_i64());
@@ -1273,6 +1429,35 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
         Some(n) => check("telemetria", "info", "rv_telemetria_nivel").con("n", n),
         None => check("telemetria", "info", "rv_telemetria_sin_fijar"),
     });
+    // 1.0.50: the service that sends Windows' diagnostic data, as it is now.
+    if let Some(dt) = pr["diagtrack"].as_object() {
+        let estado = s(dt.get("estado").unwrap_or(&Value::Null));
+        let inicio = s(dt.get("inicio").unwrap_or(&Value::Null));
+        if !estado.is_empty() {
+            privacidad.push(if estado == "Running" {
+                check("diagtrack", "info", "rv_diagtrack_activo")
+            } else if inicio == "Disabled" {
+                check("diagtrack", "ok", "rv_diagtrack_apagado")
+            } else {
+                check("diagtrack", "info", "rv_diagtrack_parado")
+            });
+        }
+    }
+    // 1.0.50: what Defender sends to Microsoft's cloud (MAPS and sample submission, in the values
+    // Microsoft documents for Set-MpPreference).
+    if defender_activo {
+        let frase = match (pref["nube"].as_i64(), pref["muestras"].as_i64()) {
+            (Some(0), _) => Some("rv_nube_apagada"),
+            (Some(_), Some(3)) => Some("rv_nube_todas"),
+            (Some(_), Some(1)) => Some("rv_nube_seguras"),
+            (Some(_), Some(0)) => Some("rv_nube_pregunta"),
+            (Some(_), Some(2)) => Some("rv_nube_nunca"),
+            _ => None,
+        };
+        if let Some(f) = frase {
+            privacidad.push(check("defender_nube", "info", f));
+        }
+    }
     let anuncios = arr(&pr["publicidad"])
         .iter()
         .filter(|p| p["activo"].as_bool() == Some(true))
@@ -1284,29 +1469,69 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
             check("publicidad", "ok", "rv_publicidad_no")
         });
     }
+    // 1.0.50: Recall (Windows 11 24H2 and later), by its optional component and the two documented
+    // policies. Whether a person turned snapshots on is not readable, and the sentence says so.
+    if let Some(r) = pr["recall"].as_object() {
+        let num = |k: &str| r.get(k).and_then(Value::as_i64);
+        let estado = s(r.get("estado").unwrap_or(&Value::Null));
+        let cuentas = r
+            .get("cuentas")
+            .and_then(Value::as_u64)
+            .and_then(|c| usize::try_from(c).ok())
+            .unwrap_or(0);
+        let por_cuenta: Vec<i64> = r
+            .get("sin_capturas_cuentas")
+            .map(arr)
+            .unwrap_or(&[])
+            .iter()
+            .filter_map(Value::as_i64)
+            .collect();
+        let sin_capturas = num("sin_capturas") == Some(1)
+            || (cuentas > 0 && por_cuenta.len() == cuentas && por_cuenta.iter().all(|&v| v == 1));
+        privacidad.push(
+            if num("permitido") == Some(0) || estado == "DisabledWithPayloadRemoved" {
+                check("recall", "ok", "rv_recall_quitado")
+            } else if sin_capturas {
+                check("recall", "ok", "rv_recall_sin_capturas")
+            } else if estado == "Enabled" {
+                check("recall", "info", "rv_recall_instalado")
+            } else {
+                check("recall", "ok", "rv_recall_apagado")
+            },
+        );
+    }
     let fabricante = s(&d["equipo"]["fabricante"]).to_lowercase();
     let primera = fabricante
         .split_whitespace()
         .next()
         .unwrap_or("")
         .to_owned();
+    let del_fabricante = |e: &str| {
+        (!primera.is_empty() && primera.len() > 2 && e.contains(&primera))
+            || contiene_alguno(e, FABRICANTES)
+    };
+    let aprovisionados: Vec<String> = arr(&d["programas"]["aprovisionados"])
+        .iter()
+        .map(s)
+        .collect();
     let mut de_fabrica: Vec<Item> = instalados
         .iter()
         .filter(|p| {
             let e = s(&p["editor"]).to_lowercase();
             let n = s(&p["nombre"]).to_lowercase();
-            (!primera.is_empty() && primera.len() > 2 && e.contains(&primera))
-                || contiene_alguno(&e, FABRICANTES)
-                || contiene_alguno(&n, DE_PRUEBA)
+            del_fabricante(e.as_str()) || contiene_alguno(&n, DE_PRUEBA)
         })
         .map(|p| item(s(&p["nombre"]), s(&p["editor"]), Vec::new()))
         .collect();
-    for a in arr(&d["programas"]["appx"]) {
+    let appx = arr(&d["programas"]["appx"]);
+    for a in appx {
         let e = s(&a["editor"]).to_lowercase();
-        if (!primera.is_empty() && primera.len() > 2 && e.contains(&primera))
-            || contiene_alguno(&e, FABRICANTES)
-        {
-            de_fabrica.push(item(s(&a["nombre"]), s(&a["editor"]), vec!["app"]));
+        if del_fabricante(e.as_str()) {
+            let mut m = vec!["app"];
+            if aprovisionados.contains(&s(&a["nombre"])) {
+                m.push("para_cada_cuenta");
+            }
+            de_fabrica.push(item(s(&a["nombre"]), s(&a["editor"]), m));
         }
     }
     if d["programas"].is_object() {
@@ -1316,6 +1541,35 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
             check("fabricante", "info", "rv_fabricante_hay")
                 .con("n", de_fabrica.len())
                 .items(de_fabrica)
+        });
+    }
+    // 1.0.50: apps of other companies that Windows installs for every new account (provisioned in
+    // its image); Microsoft's and the maker's (already above) are left out.
+    if d["programas"]["aprovisionados"].is_array() {
+        let lista: Vec<Item> = aprovisionados
+            .iter()
+            .filter(|n| !es_de_microsoft(n))
+            .filter_map(|n| {
+                let editor = appx
+                    .iter()
+                    .find(|a| s(&a["nombre"]) == **n)
+                    .map(|a| s(&a["editor"]))
+                    .unwrap_or_default();
+                let e = editor.to_lowercase();
+                if e.contains("microsoft") || del_fabricante(e.as_str()) {
+                    return None;
+                }
+                let corto = n.split_once('.').map_or(n.as_str(), |(_, b)| b).to_owned();
+                let detalle = if editor.is_empty() { n.clone() } else { editor };
+                Some(item(corto, detalle, vec!["para_cada_cuenta"]))
+            })
+            .collect();
+        privacidad.push(if lista.is_empty() {
+            check("aprovisionados", "ok", "rv_aprovisionados_no")
+        } else {
+            check("aprovisionados", "info", "rv_aprovisionados_hay")
+                .con("n", lista.len())
+                .items(lista)
         });
     }
     if let Some(usb) = lista_de(&pr["usb"]) {
@@ -1496,6 +1750,31 @@ pub(crate) const FRASES: &[&str] = &[
     "rv_amenazas_hay",
     "rv_analisis",
     "rv_tiempo_real_apagado",
+    "rv_exclusiones_no",
+    "rv_exclusiones_hay",
+    "rv_lsa_ok",
+    "rv_lsa_no",
+    "rv_servicios_remotos_no",
+    "rv_servicios_remotos_hay",
+    "rv_gestion_si",
+    "rv_gestion_no",
+    "rv_pantalla_nunca",
+    "rv_pantalla_hay",
+    "rv_pantalla_ahora",
+    "rv_diagtrack_activo",
+    "rv_diagtrack_parado",
+    "rv_diagtrack_apagado",
+    "rv_nube_apagada",
+    "rv_nube_todas",
+    "rv_nube_seguras",
+    "rv_nube_pregunta",
+    "rv_nube_nunca",
+    "rv_recall_quitado",
+    "rv_recall_sin_capturas",
+    "rv_recall_instalado",
+    "rv_recall_apagado",
+    "rv_aprovisionados_no",
+    "rv_aprovisionados_hay",
 ];
 
 /// Every check id (title `rv_t_<id>`), group (`rv_g_<id>`) and tag (`rv_marca_<x>`).
@@ -1542,6 +1821,15 @@ pub(crate) const IDS: &[&str] = &[
     "amenazas",
     "analisis",
     "tiempo_real_apagado",
+    "exclusiones",
+    "proteccion_lsa",
+    "servicios_remotos",
+    "gestion",
+    "pantalla",
+    "diagtrack",
+    "defender_nube",
+    "recall",
+    "aprovisionados",
 ];
 #[cfg(test)]
 pub(crate) const GRUPOS: &[&str] = &[
@@ -1580,6 +1868,16 @@ pub(crate) const MARCAS: &[&str] = &[
     "app",
     "actuo",
     "detectada",
+    "excl_ruta",
+    "excl_programa",
+    "excl_extension",
+    "srv_ssh",
+    "srv_winrm",
+    "srv_registro",
+    "dominio",
+    "entra",
+    "mdm",
+    "para_cada_cuenta",
 ];
 
 #[cfg(test)]
@@ -1613,7 +1911,31 @@ mod tests {
         assert_eq!(c("certificados").lista.len(), 1, "{:?}", c("certificados"));
         assert_eq!(c("camara").estado, "info");
         assert!(c("camara").lista[0].marcas.contains(&"en_uso"));
-        assert_eq!(c("fabricante").lista.len(), 2, "{:?}", c("fabricante"));
+        assert_eq!(c("fabricante").lista.len(), 3, "{:?}", c("fabricante"));
+        // 1.0.50: the maker's app Windows installs for every new account says so.
+        assert!(c("fabricante")
+            .lista
+            .iter()
+            .any(|i| i.marcas.contains(&"para_cada_cuenta")));
+        assert_eq!(c("exclusiones").estado, "aviso");
+        assert_eq!(c("exclusiones").lista[0].marcas, vec!["excl_ruta"]);
+        assert_eq!(c("proteccion_lsa").estado, "info");
+        assert_eq!(c("servicios_remotos").estado, "ok");
+        assert_eq!(c("gestion").estado, "ok");
+        // One line per program, though it used both kinds of capture.
+        assert_eq!(c("pantalla").lista.len(), 1, "{:?}", c("pantalla"));
+        assert_eq!(c("pantalla").lista[0].t, "obs64.exe");
+        assert_eq!(c("diagtrack").estado, "info");
+        assert_eq!(c("defender_nube").frase, "rv_nube_seguras");
+        assert_eq!(c("recall").frase, "rv_recall_instalado");
+        // Microsoft's and the maker's are left out: only Spotify remains.
+        assert_eq!(
+            c("aprovisionados").lista.len(),
+            1,
+            "{:?}",
+            c("aprovisionados")
+        );
+        assert_eq!(c("aprovisionados").lista[0].t, "SpotifyMusic");
         assert_eq!(c("hosts").estado, "aviso");
         assert_eq!(c("wifi").estado, "ok");
         assert_eq!(c("inicio").estado, "aviso");
