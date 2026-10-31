@@ -74,7 +74,9 @@ def run(cmd, timeout=180, env=None, sudo=False):
     if cmd and cmd[0].lower() in ("powershell", "powershell.exe"):
         # Windows PowerShell 5.1 started from PowerShell 7 (the runner's shell) inherits PS7's module path and then cannot
         # load its own Microsoft.PowerShell.Security (Get-Acl). Without the variable it builds its default path again.
-        entorno.pop("PSModulePath", None)
+        # (os.environ keeps Windows variable names in capitals: PSMODULEPATH)
+        for k in [k for k in entorno if k.upper() == "PSMODULEPATH"]:
+            del entorno[k]
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
                            env=entorno, errors="replace")
