@@ -505,10 +505,15 @@ fn ejecuta(o: Orden) {
         Orden::Envia { a, json } => envia(a, &json),
         // 1.0.50: to the panel on this computer, or to GUARDIANA's web, and only while the tab
         // is still there (it may have moved on since the session decided).
-        Orden::EnviaAPagina { id, prefijo, json } => {
+        Orden::EnviaAPagina {
+            id,
+            prefijo,
+            excepto,
+            json,
+        } => {
             if let Some(v) = vista_de(Origen::Pestana(id)) {
                 let fuente = texto_de(|p| unsafe { v.web.Source(p) });
-                if fuente.starts_with(prefijo) {
+                if fuente.starts_with(prefijo) && !excepto.is_some_and(|e| fuente.starts_with(e)) {
                     let j = Ancho::de(&json);
                     vale("mensaje a la página", unsafe {
                         v.web.PostWebMessageAsJson(j.p())
@@ -1584,8 +1589,32 @@ fn eventos_pestana(
         )?;
         web.add_NavigationCompleted(
             &NavigationCompletedEventHandler::create(Box::new(
-                move |w: Option<ICoreWebView2>, _args| {
+                move |w: Option<ICoreWebView2>,
+                      args: Option<ICoreWebView2NavigationCompletedEventArgs>| {
                     let mut o = con_sesion(|s| s.navegacion_termina(id)).unwrap_or_default();
+                    // 1.0.50 (independent review, M6): whether the page loaded and, if not, whether
+                    // for lack of network (GUARDIANA's web then hands the window to the panel).
+                    if let Some(a) = args {
+                        let mut exito = BOOL::default();
+                        let mut error = COREWEBVIEW2_WEB_ERROR_STATUS_UNKNOWN;
+                        let _ = a.IsSuccess(&mut exito);
+                        let _ = a.WebErrorStatus(&mut error);
+                        let sin_red = !exito.as_bool()
+                            && [
+                                COREWEBVIEW2_WEB_ERROR_STATUS_SERVER_UNREACHABLE,
+                                COREWEBVIEW2_WEB_ERROR_STATUS_TIMEOUT,
+                                COREWEBVIEW2_WEB_ERROR_STATUS_CONNECTION_ABORTED,
+                                COREWEBVIEW2_WEB_ERROR_STATUS_CONNECTION_RESET,
+                                COREWEBVIEW2_WEB_ERROR_STATUS_DISCONNECTED,
+                                COREWEBVIEW2_WEB_ERROR_STATUS_CANNOT_CONNECT,
+                                COREWEBVIEW2_WEB_ERROR_STATUS_HOST_NAME_NOT_RESOLVED,
+                            ]
+                            .contains(&error);
+                        o.extend(
+                            con_sesion(|s| s.resultado_carga(id, exito.as_bool(), sin_red))
+                                .unwrap_or_default(),
+                        );
+                    }
                     if let Some(w) = w {
                         let (mut a, mut b) = (BOOL::default(), BOOL::default());
                         let _ = w.CanGoBack(&mut a);

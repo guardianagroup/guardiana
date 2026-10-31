@@ -374,7 +374,9 @@ fn claves_inventario(d: &Value) -> Vec<String> {
         k.push(format!("programa:{}|{}", s(&x["nombre"]), s(&x["editor"])));
     }
     for x in arr(&d["defensa"]["preferencias"]["exclusiones"]) {
-        k.push(clave_exclusion(x));
+        if recordable(&s(&x["valor"])) {
+            k.push(clave_exclusion(x));
+        }
     }
     k
 }
@@ -388,16 +390,63 @@ fn clave_exclusion(x: &Value) -> String {
     )
 }
 
-/// A program's short name from what Windows' consent store keeps (a path or a package name).
-fn nombre_app(app: &str) -> String {
-    app.rsplit('\\')
-        .next()
-        .unwrap_or(app)
-        .split('_')
-        .next()
-        .unwrap_or(app)
-        .to_owned()
+/// An exclusion that may be remembered: never one that names a computer of the network (a
+/// `\\\\server\\…` path or an address), since no address is kept on disk (decision 203).
+fn recordable(valor: &str) -> bool {
+    !valor.starts_with("\\\\")
+        && !valor
+            .split(['\\', '/', ':'])
+            .any(|t| t.parse::<std::net::IpAddr>().is_ok())
 }
+
+/// An exclusion in a place any program of the person can write to, or of a whole drive, or of a
+/// kind of file that runs: there Defender's blind spot is easy to use.
+fn exclusion_arriesgada(tipo: &str, valor: &str) -> bool {
+    let v = valor.to_lowercase();
+    match tipo {
+        "extension" => {
+            let e = v.trim_start_matches(['.', '*']);
+            [
+                "exe", "dll", "ps1", "bat", "cmd", "vbs", "js", "scr", "msi", "com", "hta", "lnk",
+            ]
+            .contains(&e)
+        }
+        _ => {
+            v.len() <= 3
+                || v.starts_with("\\\\")
+                || [
+                    "\\users\\",
+                    "\\appdata\\",
+                    "\\temp\\",
+                    "\\programdata\\",
+                    "\\downloads\\",
+                    "\\desktop\\",
+                ]
+                .iter()
+                .any(|x| format!("{v}\\").contains(x))
+        }
+    }
+}
+
+/// A program's short name from what Windows' consent store keeps: a path (its file's name) or a
+/// package name (the part before its publisher's tag).
+fn nombre_app(app: &str) -> String {
+    if app.contains('\\') {
+        return app.rsplit('\\').next().unwrap_or(app).to_owned();
+    }
+    app.split('_').next().unwrap_or(app).to_owned()
+}
+
+/// Store prefixes of computer makers' apps, for the provisioned apps no account has any more (so
+/// Windows no longer says their publisher).
+const PREFIJOS_FABRICANTE: &[(&str, &str)] = &[
+    ("ad2f1837.", "HP Inc."),
+    ("e046963f.", "Lenovo"),
+    ("b9eced6f.", "ASUSTeK"),
+    ("dellinc.", "Dell"),
+    ("acerincorporated.", "Acer"),
+    ("samsungelectronicscoltd.", "Samsung"),
+];
 
 /// Microsoft's own packages, by the start of their name (1.0.50).
 fn es_de_microsoft(nombre: &str) -> bool {
@@ -720,18 +769,32 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
                         "extension" => "excl_extension",
                         _ => "excl_ruta",
                     }];
-                    if es_nuevo(vistos, &clave_exclusion(x), now) {
+                    if recordable(&s(&x["valor"])) && es_nuevo(vistos, &clave_exclusion(x), now) {
                         m.insert(0, "nuevo");
+                    }
+                    if exclusion_arriesgada(&s(&x["tipo"]), &s(&x["valor"])) {
+                        m.push("arriesgada");
                     }
                     item(s(&x["valor"]), "", m)
                 })
                 .collect();
+            // A warning when one is new or easy to use; otherwise worth knowing (programs and
+            // organisations add their own).
+            let aviso = lista.iter().any(|i| {
+                i.marcas
+                    .iter()
+                    .any(|m| matches!(*m, "nuevo" | "arriesgada"))
+            });
             proteccion.push(if lista.is_empty() {
                 check("exclusiones", "ok", "rv_exclusiones_no")
             } else {
-                check("exclusiones", "aviso", "rv_exclusiones_hay")
-                    .con("n", lista.len())
-                    .items(lista)
+                check(
+                    "exclusiones",
+                    if aviso { "aviso" } else { "info" },
+                    "rv_exclusiones_hay",
+                )
+                .con("n", lista.len())
+                .items(lista)
             });
         }
     }
@@ -913,10 +976,15 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
                 item(n, "", vec![m])
             })
             .collect();
-        // WinRM running alone answers nobody until someone configures it to listen.
+        // WinRM running alone answers nobody until someone configures it to listen: it counts as
+        // a warning when its ports (5985, 5986, opened by Windows' http.sys, which «puertos»
+        // leaves out with the system's own) are open to the network.
+        let winrm_escucha = arr(&ac["puertos"]).iter().any(|p| {
+            s(&p["alcance"]) == "red" && matches!(p["puerto"].as_i64(), Some(5985 | 5986))
+        });
         let grave = en_marcha
             .iter()
-            .any(|x| !s(&x["nombre"]).eq_ignore_ascii_case("winrm"));
+            .any(|x| !s(&x["nombre"]).eq_ignore_ascii_case("winrm") || winrm_escucha);
         acceso.push(if lista.is_empty() {
             check("servicios_remotos", "ok", "rv_servicios_remotos_no")
         } else {
@@ -1012,7 +1080,7 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
             };
             lista.push(item(t, p, vec!["mdm"]));
         }
-        let leido = ge["dominio"].is_boolean() || ge["entra"].is_boolean();
+        let leido = ge["dominio"].is_boolean() && ge["entra"].is_boolean() && ge["mdm"].is_array();
         if !lista.is_empty() {
             acceso.push(
                 check("gestion", "info", "rv_gestion_si")
@@ -1486,19 +1554,30 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
             .iter()
             .filter_map(Value::as_i64)
             .collect();
-        let sin_capturas = num("sin_capturas") == Some(1)
-            || (cuentas > 0 && por_cuenta.len() == cuentas && por_cuenta.iter().all(|&v| v == 1));
-        privacidad.push(
-            if num("permitido") == Some(0) || estado == "DisabledWithPayloadRemoved" {
-                check("recall", "ok", "rv_recall_quitado")
-            } else if sin_capturas {
-                check("recall", "ok", "rv_recall_sin_capturas")
-            } else if estado == "Enabled" {
-                check("recall", "info", "rv_recall_instalado")
-            } else {
-                check("recall", "ok", "rv_recall_apagado")
-            },
-        );
+        // The two policies are documented for Pro, Enterprise and Education: on Home («Core»)
+        // nothing is concluded from them.
+        let politicas = !s(&d["equipo"]["edicion"]).starts_with("Core");
+        let sin_capturas = politicas
+            && (num("sin_capturas") == Some(1)
+                || (cuentas > 0
+                    && por_cuenta.len() == cuentas
+                    && por_cuenta.iter().all(|&v| v == 1)));
+        let c = if (politicas && num("permitido") == Some(0))
+            || estado == "DisabledWithPayloadRemoved"
+        {
+            Some(check("recall", "ok", "rv_recall_quitado"))
+        } else if sin_capturas {
+            Some(check("recall", "ok", "rv_recall_sin_capturas"))
+        } else if estado.starts_with("Enable") {
+            Some(check("recall", "info", "rv_recall_instalado"))
+        } else if estado.starts_with("Disable") {
+            Some(check("recall", "ok", "rv_recall_apagado"))
+        } else {
+            None
+        };
+        if let Some(c) = c {
+            privacidad.push(c);
+        }
     }
     let fabricante = s(&d["equipo"]["fabricante"]).to_lowercase();
     let primera = fabricante
@@ -1550,10 +1629,18 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
             .iter()
             .filter(|n| !es_de_microsoft(n))
             .filter_map(|n| {
+                let ln = n.to_lowercase();
                 let editor = appx
                     .iter()
                     .find(|a| s(&a["nombre"]) == **n)
                     .map(|a| s(&a["editor"]))
+                    .filter(|e| !e.is_empty())
+                    .or_else(|| {
+                        PREFIJOS_FABRICANTE
+                            .iter()
+                            .find(|(p, _)| ln.starts_with(p))
+                            .map(|(_, m)| (*m).to_owned())
+                    })
                     .unwrap_or_default();
                 let e = editor.to_lowercase();
                 if e.contains("microsoft") || del_fabricante(e.as_str()) {
@@ -1878,6 +1965,7 @@ pub(crate) const MARCAS: &[&str] = &[
     "entra",
     "mdm",
     "para_cada_cuenta",
+    "arriesgada",
 ];
 
 #[cfg(test)]
@@ -1918,7 +2006,10 @@ mod tests {
             .iter()
             .any(|i| i.marcas.contains(&"para_cada_cuenta")));
         assert_eq!(c("exclusiones").estado, "aviso");
-        assert_eq!(c("exclusiones").lista[0].marcas, vec!["excl_ruta"]);
+        assert_eq!(
+            c("exclusiones").lista[0].marcas,
+            vec!["excl_ruta", "arriesgada"]
+        );
         assert_eq!(c("proteccion_lsa").estado, "info");
         assert_eq!(c("servicios_remotos").estado, "ok");
         assert_eq!(c("gestion").estado, "ok");
@@ -2021,6 +2112,24 @@ mod tests {
         v.anota("firma", "x.exe\tNotSigned\t");
         v.anota("firma", "y.exe\tValid\tMicrosoft Corporation");
         assert_eq!((v.firmas, v.sin_firma), (32, 1));
+    }
+
+    #[test]
+    fn exclusions_names_and_what_is_remembered() {
+        // 1.0.50 (independent review, m8 and m10).
+        assert!(exclusion_arriesgada("ruta", "C:\\Users\\Ana\\Juegos"));
+        assert!(exclusion_arriesgada("ruta", "C:\\"));
+        assert!(exclusion_arriesgada("extension", ".exe"));
+        assert!(!exclusion_arriesgada("ruta", "C:\\Program Files\\Backup"));
+        assert!(!exclusion_arriesgada("extension", ".log"));
+        assert!(!recordable("\\\\192.168.1.5\\copias"));
+        assert!(!recordable("D:\\10.0.0.4\\x"));
+        assert!(recordable("C:\\Program Files\\Backup"));
+        assert_eq!(nombre_app("C:\\Apps\\mi_app.exe"), "mi_app.exe");
+        assert_eq!(
+            nombre_app("Microsoft.WindowsSoundRecorder_8wekyb3d8bbwe"),
+            "Microsoft.WindowsSoundRecorder"
+        );
     }
 
     #[test]

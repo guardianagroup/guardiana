@@ -161,6 +161,8 @@ pub struct Opciones {
     pub gpc: bool,
     /// «Huella uniforme» (1.0.46, strict mode): the same generic values for every site.
     pub uniforme: bool,
+    /// 1.0.50: one of the program's own fixed tabs (GUARDIANA's web as the program's window).
+    pub programa: bool,
 }
 
 impl Default for Opciones {
@@ -169,6 +171,7 @@ impl Default for Opciones {
             mandato: false,
             gpc: true,
             uniforme: false,
+            programa: false,
         }
     }
 }
@@ -185,13 +188,20 @@ pub fn guion(o: Opciones) -> String {
         s.push_str(GPC);
         s.push('\n');
     }
+    let mut g = GUION.to_owned();
     if o.uniforme {
-        s.push_str(&GUION.replacen(UNIFORME_NO, UNIFORME_SI, 1));
-    } else {
-        s.push_str(GUION);
+        g = g.replacen(UNIFORME_NO, UNIFORME_SI, 1);
     }
+    if o.programa {
+        g = g.replacen(PROGRAMA_NO, PROGRAMA_SI, 1);
+    }
+    s.push_str(&g);
     s
 }
+
+/// The switch of the program's own tabs inside the script, as written and when on.
+const PROGRAMA_NO: &str = "const programa = false;";
+const PROGRAMA_SI: &str = "const programa = true;";
 
 /// The switch of the strict mode inside the script, as written and when on.
 const UNIFORME_NO: &str = "const uniforme = false;";
@@ -203,6 +213,9 @@ const GUION: &str = r#"(() => {
   // «Huella uniforme» (1.0.46): written `true` here when the person turned the strict mode on
   // before the tab opened (`guion`).
   const uniforme = false;
+  // 1.0.50 (independent review, M5): written `true` here only for the program's own fixed tabs,
+  // the only ones where GUARDIANA's web is the program's window.
+  const programa = false;
   // Frames get this script too (WebView2 runs it in «all future top level document and child
   // frame navigations»): there it only measures, and protects, on the frame's own channel.
   const marco = window.top !== window;
@@ -260,19 +273,128 @@ const GUION: &str = r#"(() => {
       if (l !== 'es' && l !== 'en' && l !== 'pt') { const d = String(navigator.language || 'en').slice(0, 2).toLowerCase(); l = d === 'es' || d === 'pt' ? d : 'en'; }
       return { 'X-Guardiana-Token': tk, 'X-Guardiana-Lang': l, 'X-Guardiana-Tz': String(-new Date().getTimezoneOffset()) };
     };
-    // 1.0.50: one reading for GUARDIANA's web (the Vigía), by the address the program already checked.
+    // 1.0.50 (independent review, 31 Oct 2026): what the web gets of each reading is what the PC Scanner shows, never
+    // what identifies the person or the house: no folders (only the file's name), no account names, no address, no
+    // device of the house, no names visited, no whole detail of the computer. Done here, in the program's own script,
+    // so a web that changed could not ask for more.
+    const limpiaTexto = (s) => String(s)
+      .replace(/S-1-5-\d+(?:-\d+)+/g, '·')
+      .replace(/\b(?:mac|ip):[^\s,;)\]]+/gi, '·')
+      .replace(/\\\\[^\\\s]+\\[^\s,;)\]]*/g, '·')
+      .replace(/[A-Za-z]:\\(?:[^\\\r\n<>|]*\\)*([^\\\r\n<>|]*)/g, (_, f) => f || '·')
+      .replace(/\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b/gi, '·')
+      .replace(/\b(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?\b/g, '·')
+      .replace(/\[?\b(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}\b\]?(?::\d{1,5})?/gi, (x) => (/[0-9a-f]{1,4}:[0-9a-f]{0,4}:/i.test(x) ? '·' : x))
+      .slice(0, 400);
+    const limpiaTodo = (v, k) => {
+      if (typeof v === 'string') return limpiaTexto(v);
+      if (Array.isArray(v)) return v.slice(0, 1000).map((x) => limpiaTodo(x, k));
+      if (v && typeof v === 'object') {
+        const o = {};
+        for (const [c, x] of Object.entries(v)) {
+          if (/^(sid|sids|ruta|rutas|cuenta|device_id|device_name|escucha|upstream|errores|huella|ip|mac|usuario|quien|orden|args|nombre_dominio)$/.test(c)) continue;
+          o[c] = limpiaTodo(x, c);
+        }
+        return o;
+      }
+      return v;
+    };
+    const soloEste = (xs) => (Array.isArray(xs) ? xs.filter((x) => x && (x.device_id === undefined || x.device_id === 'self')) : xs);
+    const numerado = (xs) => (Array.isArray(xs) ? xs.map((x, i) => Object.assign({}, x, { t: '#' + (i + 1) })) : xs);
+    const LIMPIA = {
+      '/api/estado': (j) => {
+        const o = {};
+        for (const c of ['version', 'dns_aplicado', 'listas', 'fuente_red', 'so', 'caducado', 'caducado_plus', 'hogar_aparcado', 'exp_vencidos', 'exp_pronto', 'prueba_dias', 'nivel', 'gratis_tras_plus']) if (c in j) o[c] = j[c];
+        return o;
+      },
+      '/api/ia': (j) => {
+        j.servicios = soloEste(j.servicios);
+        j.alcances = soloEste(j.alcances);
+        j.sin_alcance = Array.isArray(j.sin_alcance) ? j.sin_alcance.filter((x) => Array.isArray(x) && x[0] === 'self').map(() => ['self', null]) : [];
+        return j;
+      },
+      '/api/antivirus': (j) => { j.vistos = soloEste(j.vistos); return j; },
+      '/api/quien-vende': (j) => { delete j.tv; delete j.hogar_activo; return j; },
+      '/api/por-dentro': (j) => {
+        const av = new Set((Array.isArray(j.programas) ? j.programas : []).filter((p) => p && p.tipo === 'antivirus').map((p) => p.id));
+        if (Array.isArray(j.destinos)) j.destinos = j.destinos.filter((d) => d && (/^(telemetria|publicidad|rastreador)$/.test(String(d.categoria)) || av.has(d.programa)));
+        delete j.recientes;
+        return j;
+      },
+      '/api/identificacion': (j) => {
+        for (const c of ['probables', 'sin_identificar']) if (Array.isArray(j[c])) { j['n_' + c] = j[c].length; delete j[c]; }
+        return j;
+      },
+      '/api/revision': (j) => {
+        if (j.equipo && typeof j.equipo === 'object') {
+          const e = {};
+          for (const c of ['fabricante', 'modelo', 'sistema', 'version', 'compilacion', 'ubr', 'edicion', 'display']) if (c in j.equipo) e[c] = j.equipo[c];
+          j.equipo = e;
+        }
+        for (const g of Array.isArray(j.grupos) ? j.grupos : []) {
+          for (const c of Array.isArray(g && g.checks) ? g.checks : []) {
+            if (!c) continue;
+            if (c.id === 'cuentas' || c.id === 'bluetooth' || c.id === 'proxy' || c.id === 'compartido') c.lista = numerado(c.lista);
+            if (c.id === 'gestion' && Array.isArray(c.lista)) c.lista = c.lista.map((x) => (x && Array.isArray(x.marcas) && x.marcas.includes('dominio') ? Object.assign({}, x, { t: '' }) : x));
+          }
+        }
+        if (j.vivo && Array.isArray(j.vivo.pasos)) j.vivo.pasos = j.vivo.pasos.map((p) => (Array.isArray(p) ? [p[0], p[0] === 'firma' ? limpiaTexto(String(p[1] || '').split('\t')[0]) : p[1]] : p));
+        return j;
+      },
+      '/api/vigilancia': (j) => {
+        for (const c of ['historial', 'avisos']) if (Array.isArray(j[c])) j[c] = j[c].map((s) => { const o = Object.assign({}, s); delete o.texto; delete o.hash; return o; });
+        return j;
+      },
+    };
+    LIMPIA['/api/vigilancia/resumen'] = LIMPIA['/api/vigilancia'];
+    LIMPIA['/vigia'] = (j) => {
+      const quita = (x) => (typeof x === 'string' ? x.replace(/ \((?:cuenta|account|conta) [^)]*\)/g, '').replace(/, (?:desde el equipo|from the computer|a partir do computador) [^.]*/g, '') : x);
+      for (const c of ['alertas', 'avisos']) if (Array.isArray(j[c])) j[c] = j[c].map((x) => Object.assign({}, x, { texto: quita(x && x.texto) }));
+      return j;
+    };
+    const paraLaWeb = (ruta, texto) => {
+      let j;
+      try { j = JSON.parse(texto); } catch (_) { return ''; }
+      if (!j || typeof j !== 'object') return '';
+      if (ruta === '/api/textos') return texto;
+      const f = LIMPIA[ruta];
+      try { if (f) j = f(j) || j; } catch (_) { return ''; }
+      return JSON.stringify(limpiaTodo(j, ''));
+    };
+    // 1.0.50: one reading for GUARDIANA's web (the PC Scanner), by the address the program already checked. A second
+    // barrier here (independent review): only a reading's own address, at most four at a time, a new review once a
+    // minute, a new slow look of the watch every 30 s, and the list of antivirus (a PowerShell each time) kept 30 s.
+    const RUTA_OK = /^\/(?:api\/[a-z0-9\-\/]+|vigia)$/;
+    const ESPERA = { 'POST /api/revision/ahora': 60000, 'POST /api/vigilancia/ahora': 30000 };
+    const GUARDA = { 'GET /api/antivirus/detectar': 30000 };
+    const ultimo = new Map(), guardado = new Map();
+    let enVuelo = 0;
     escucha('message', (e) => {
       const m = e && e.data;
-      if (!m || m.tipo !== 'zg_panel_pide' || typeof m.ruta !== 'string' || m.ruta.charAt(0) !== '/') return;
+      if (!m || m.tipo !== 'zg_panel_pide' || typeof m.ruta !== 'string' || !RUTA_OK.test(m.ruta)) return;
+      const post = m.metodo === 'POST';
+      const para = Number(m.para) || 0, n = Number(m.n) || 0;
+      const k = (post ? 'POST ' : 'GET ') + m.ruta;
+      const responde = (estado, datos) => manda({ tipo: 'zg_panel_datos', para, n, estado, datos });
+      const ahora = Date.now();
+      const g = guardado.get(k);
+      if (g && ahora - g.t < GUARDA[k]) { responde(g.estado, g.datos); return; }
+      if (ESPERA[k] && ahora - (ultimo.get(k) || 0) < ESPERA[k]) { responde(429, ''); return; }
+      if (enVuelo >= 4) { responde(429, ''); return; }
+      if (ESPERA[k]) ultimo.set(k, ahora);
       let tk = '';
       try { tk = sessionStorage.getItem('guardiana_token') || ''; } catch (_) {}
-      const post = m.metodo === 'POST';
       const h = cabeceras(tk);
       if (post) h['Content-Type'] = 'application/json';
-      const para = Number(m.para) || 0, n = Number(m.n) || 0;
+      enVuelo++;
       fetch(m.ruta, { method: post ? 'POST' : 'GET', headers: h, body: post ? '{}' : undefined, cache: 'no-store' })
-        .then((r) => r.text().then((t) => manda({ tipo: 'zg_panel_datos', para, n, estado: r.status, datos: t })))
-        .catch(() => manda({ tipo: 'zg_panel_datos', para, n, estado: 0, datos: '' }));
+        .then((r) => r.text().then((t) => {
+          const datos = r.ok || r.status === 402 ? paraLaWeb(m.ruta, t) : '';
+          if (GUARDA[k] && r.ok) guardado.set(k, { t: Date.now(), estado: r.status, datos });
+          responde(r.status, datos);
+        }))
+        .catch(() => responde(0, ''))
+        .finally(() => { enVuelo = Math.max(0, enVuelo - 1); });
     });
     escucha('message', (e) => {
       const m = e && e.data;
@@ -304,8 +426,14 @@ const GUION: &str = r#"(() => {
   // 1.0.50: GUARDIANA's own web (Comunicaciones and Órbita, the program's fixed tabs) knows it is inside the program, and
   // hides its own ways to the other products, which the program's selector already gives. Only that site and only its own
   // top document: any other page sees nothing.
-  if (!marco && location.origin === 'https://guardianagroup.com') {
+  if (!marco && programa && location.origin === 'https://guardianagroup.com') {
     marca('enPrograma');
+    // 1.0.50 (independent review, M1): a reading that sets this computer to work (a review, a slow look of the watch)
+    // only right after the person's own click or key, which the page cannot fake.
+    let gesto = 0;
+    const marcaGesto = (e) => { if (e.isTrusted) gesto = Date.now(); };
+    addEventListener('pointerdown', marcaGesto, { capture: true, passive: true });
+    addEventListener('keydown', marcaGesto, { capture: true, passive: true });
     // 1.0.50 (dueño, 30 Oct 2026, 22:29: «la versión web que teníamos, que ya estaba terminada, quiero que la metas en el
     // programa»): the web fills the window and moves between the program's products itself (Órbita, Comunicaciones,
     // the panel) with `data-producto`; the program checks again that the tab is its own web.
@@ -327,7 +455,12 @@ const GUION: &str = r#"(() => {
       let q = null;
       try { q = JSON.parse(String(e.detail || '')); } catch (_) { return; }
       if (!q || typeof q.ruta !== 'string') return;
-      manda({ tipo: 'zg_panel_pide', n: Number(q.n) || 0, metodo: q.metodo === 'POST' ? 'POST' : 'GET', ruta: q.ruta.slice(0, 80) });
+      const n = Number(q.n) || 0, post = q.metodo === 'POST';
+      if (post && Date.now() - gesto > 3000) {
+        setTimeout(() => document.dispatchEvent(new CustomEvent('guardiana-panel', { detail: JSON.stringify({ n, estado: 428, datos: '' }) })), 0);
+        return;
+      }
+      manda({ tipo: 'zg_panel_pide', n, metodo: post ? 'POST' : 'GET', ruta: q.ruta.slice(0, 80) });
     });
     escucha('message', (e) => {
       const m = e && e.data;

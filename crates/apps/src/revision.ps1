@@ -117,7 +117,7 @@ Seccion 'sistema' {
     $boot = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
     $ev = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 12; StartTime = $boot.AddMinutes(-2) } -MaxEvents 50 -ErrorAction Stop)
     $wi = @($ev | Where-Object { ([string]$_.ProviderName) -like '*Wininit*' }).Count
-    $kg = @($ev | Where-Object { ([string]$_.ProviderName) -like '*Kernel-General*' }).Count
+    $kg = @($ev | Where-Object { ([string]$_.ProviderName) -like '*Kernel-General*' -and $_.TimeCreated -le $boot.AddMinutes(2) }).Count
     if ($wi -gt 0) { $o.lsa.protegido = $true } elseif ($kg -gt 0) { $o.lsa.protegido = $false }
   } catch {}
   $o
@@ -157,8 +157,11 @@ Seccion 'acceso' {
   try { $o.servicios_remotos = @(Get-CimInstance Win32_Service -Filter "Name='sshd' OR Name='WinRM' OR Name='RemoteRegistry'" | ForEach-Object { [ordered]@{ nombre = [string]$_.Name; estado = [string]$_.State; inicio = [string]$_.StartMode } }) } catch {}
   $g = [ordered]@{ dominio = $null; nombre_dominio = $null; entra = $null; mdm = $null }
   try { $cs = Get-CimInstance Win32_ComputerSystem; $g.dominio = [bool]$cs.PartOfDomain; if ($g.dominio) { $g.nombre_dominio = [string]$cs.Domain } } catch {}
-  try { foreach ($ln in @(& "$env:SystemRoot\System32\dsregcmd.exe" /status 2>$null)) { if ([string]$ln -match '^\s*AzureAdJoined\s*:\s*(YES|NO)\s*$') { $g.entra = ($Matches[1] -eq 'YES') } } } catch {}
-  try { $g.mdm = @(Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Enrollments' -ErrorAction Stop | ForEach-Object { $pv = Prop $_.PSPath 'ProviderID'; if ($pv -and (Num (Prop $_.PSPath 'EnrollmentState')) -eq 1) { [string]$pv } } | Select-Object -Unique) } catch { $g.mdm = @() }
+  # Joined to Microsoft Entra: read where Windows keeps it, never with dsregcmd (as the system account on a domain
+  # computer it may run its join tests over the network: independent review, 31 Oct 2026).
+  try { $ji = 'HKLM:\SYSTEM\CurrentControlSet\Control\CloudDomainJoin\JoinInfo'; $g.entra = ((Test-Path $ji) -and (@(Get-ChildItem $ji -ErrorAction Stop).Count -gt 0)) } catch {}
+  $en = 'HKLM:\SOFTWARE\Microsoft\Enrollments'
+  if (Test-Path $en) { try { $g.mdm = @(Get-ChildItem $en -ErrorAction Stop | ForEach-Object { $pv = Prop $_.PSPath 'ProviderID'; if ($pv -and (Num (Prop $_.PSPath 'EnrollmentState')) -eq 1) { [string]$pv } } | Select-Object -Unique) } catch { $g.mdm = $null } } else { $g.mdm = @() }
   $o.gestion = $g
   $o
 }
@@ -291,13 +294,19 @@ Seccion 'privacidad' {
   try { $o.bluetooth = @(Get-ChildItem 'HKLM:\SYSTEM\CurrentControlSet\Services\BTHPORT\Parameters\Devices' -ErrorAction Stop | ForEach-Object { $n = Prop $_.PSPath 'Name'; if ($n) { ([Text.Encoding]::UTF8.GetString([byte[]]$n)).Trim([char]0) } } | Where-Object { $_ }) } catch { $o.bluetooth = @() }
   # 1.0.50: Recall (Windows 11 24H2 and later): the optional component and the two documented
   # policies (Policy CSP WindowsAI). Whether a person turned snapshots on is not readable.
+  # Read through WMI with a time limit, not DISM (which may wait behind Windows Update and writes its log): review of
+  # 31 Oct 2026. «cuentas» counts every profile of the computer, so a policy read only for the accounts with a session
+  # never stands for those without one.
   if ([Environment]::OSVersion.Version.Build -ge 26100) {
     try {
-      $f = Get-WindowsOptionalFeature -Online -FeatureName Recall -ErrorAction Stop
-      if ($f) {
+      $f = @(Get-CimInstance -ClassName Win32_OptionalFeature -Filter "Name='Recall'" -OperationTimeoutSec 30 -ErrorAction Stop)
+      if ($f.Count) {
+        $st = switch ([int]$f[0].InstallState) { 1 { 'Enabled' } 2 { 'Disabled' } 3 { 'DisabledWithPayloadRemoved' } default { 'Unknown' } }
+        $perfiles = 0
+        try { $perfiles = @(Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList' -ErrorAction Stop | Where-Object { $_.PSChildName -match '^S-1-5-21-[\d-]+$' }).Count } catch {}
         $wa = 'SOFTWARE\Policies\Microsoft\Windows\WindowsAI'
-        $o.recall = [ordered]@{ estado = [string]$f.State; permitido = (Num (Prop "HKLM:\$wa" 'AllowRecallEnablement')); sin_capturas = (Num (Prop "HKLM:\$wa" 'DisableAIDataAnalysis'))
-          sin_capturas_cuentas = @($USUARIOS | ForEach-Object { Num (Prop "Registry::HKEY_USERS\$_\$wa" 'DisableAIDataAnalysis') }); cuentas = @($USUARIOS).Count }
+        $o.recall = [ordered]@{ estado = $st; permitido = (Num (Prop "HKLM:\$wa" 'AllowRecallEnablement')); sin_capturas = (Num (Prop "HKLM:\$wa" 'DisableAIDataAnalysis'))
+          sin_capturas_cuentas = @($USUARIOS | ForEach-Object { Num (Prop "Registry::HKEY_USERS\$_\$wa" 'DisableAIDataAnalysis') }); cuentas = [Math]::Max($perfiles, @($USUARIOS).Count) }
       }
     } catch {}
   }
@@ -315,9 +324,13 @@ Seccion 'programas' {
   }
   $ax = @()
   try { $ax = @(Get-AppxPackage -AllUsers -ErrorAction Stop | Where-Object { -not $_.IsFramework -and [string]$_.SignatureKind -ne 'System' } | ForEach-Object { [ordered]@{ nombre = [string]$_.Name; editor = (([string]$_.Publisher -split ',')[0] -replace '^CN=', ''); version = [string]$_.Version; tienda = ([string]$_.SignatureKind -eq 'Store') } }) } catch {}
-  # 1.0.50: the apps Windows installs for every new account (provisioned in its image).
+  # 1.0.50: the apps Windows installs for every new account (provisioned in its image), read from the registry where
+  # Windows lists them (not with DISM, which may wait behind Windows Update and writes its log).
   $ap = $null
-  try { $ap = @(Get-AppxProvisionedPackage -Online -ErrorAction Stop | ForEach-Object { [string]$_.DisplayName } | Where-Object { $_ } | Select-Object -Unique) } catch {}
+  try {
+    $k = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Appx\AppxAllUserStore\Applications'
+    if (Test-Path $k) { $ap = @(Get-ChildItem $k -ErrorAction Stop | ForEach-Object { ([string]$_.PSChildName -split '_')[0] } | Where-Object { $_ } | Select-Object -Unique) }
+  } catch {}
   [ordered]@{ instalados = $l; appx = $ax; aprovisionados = $ap }
 }
 

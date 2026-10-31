@@ -209,6 +209,9 @@ pub enum Orden {
         id: u32,
         /// The address the tab must still be on when the message is posted.
         prefijo: &'static str,
+        /// An address under `prefijo` the tab must not be on (1.0.50: Comunicaciones, which lives
+        /// under Órbita's folder, never gets the computer's readings).
+        excepto: Option<&'static str>,
         /// The message.
         json: String,
     },
@@ -433,6 +436,8 @@ struct Pestana {
     /// Pages this tab has shown: tells the panel when its shield starts again (a reload of the
     /// same site too), the only moment its rows are laid out anew.
     carga: u32,
+    /// 1.0.50: its last page could not load for lack of network (it loads again when chosen).
+    sin_red: bool,
     /// «Tu visita, a subasta» (1.0.46): what this page showed of its ad auctions, in memory.
     subasta: subasta::Pagina,
 }
@@ -488,6 +493,7 @@ impl Pestana {
             enlace: None,
             juzga_primera: false,
             carga: 0,
+            sin_red: false,
             subasta: subasta::Pagina::default(),
         }
     }
@@ -1000,6 +1006,7 @@ impl Sesion {
             mandato: self.perfil_de(id) == Some(Perfil::Mandato),
             gpc: self.gpc(),
             uniforme: self.huella_uniforme(),
+            programa: self.pestana(id).is_some_and(|p| p.fija),
         })
     }
 
@@ -1932,6 +1939,16 @@ impl Sesion {
     /// The person chose a product in the selector (ZERO's bar, or GUARDIANA's panel inside
     /// ZERO). The focus goes to what they chose, so the wheel scrolls it at once (Z4: it went
     /// on scrolling nothing while the focus stayed in the bar).
+    /// Bring GUARDIANA's web tab `id` forward; if its last page could not load for lack of
+    /// network, load it again.
+    fn activa_web(&mut self, id: u32) -> Vec<Orden> {
+        let mut o = self.activar(id);
+        if self.pestana(id).is_some_and(|p| p.sin_red) {
+            o.push(Orden::Recarga { id });
+        }
+        o
+    }
+
     fn elige_producto(&mut self, cual: &str) -> Vec<Orden> {
         let mut o = match cual {
             "guardiana" => match self
@@ -1949,7 +1966,7 @@ impl Sesion {
                 .find(|p| p.url.starts_with(SECURE))
                 .map(|p| p.id)
             {
-                Some(id) => self.activar(id),
+                Some(id) => self.activa_web(id),
                 None => {
                     let id = self.siguiente;
                     let mut o = vec![self.anade_pestana(Perfil::General, SECURE, true)];
@@ -1964,7 +1981,7 @@ impl Sesion {
                 .find(|p| es_orbita(&p.url))
                 .map(|p| p.id)
             {
-                Some(id) => self.activar(id),
+                Some(id) => self.activa_web(id),
                 None => {
                     let id = self.siguiente;
                     let mut o = vec![self.anade_pestana(Perfil::General, ORBITA, true)];
@@ -2013,22 +2030,55 @@ impl Sesion {
         fuente.starts_with(ORBITA) && self.pestana(id).is_some_and(|p| p.fija)
     }
 
+    /// 1.0.50 (independent review, G2): Órbita's own fixed tab, the only one that may ask for this
+    /// computer's readings. Comunicaciones, under the same folder and where people chat with
+    /// others, may move between the products but never reads the computer. The real boundary is
+    /// the site and the fixed tab: a page of the same site loaded in that tab could change its own
+    /// address within the site, so what the web gets is trimmed in the panel's tab too (GUION).
+    fn es_orbita_del_programa(&self, id: u32, fuente: &str) -> bool {
+        es_orbita(fuente)
+            && self
+                .pestana(id)
+                .is_some_and(|p| p.fija && es_orbita(&p.url))
+    }
+
+    /// The fixed tab of the panel on this computer, if it is open.
+    fn panel_fijo(&self) -> Option<u32> {
+        self.pestanas
+            .iter()
+            .find(|p| p.fija && es_panel_guardiana(&p.url))
+            .map(|p| p.id)
+    }
+
+    /// An answer for Órbita's tab that its reading cannot be given (`estado`: 403 not on the list,
+    /// 503 the panel is not open, 413 too large), so the page does not wait for nothing.
+    fn sin_lectura(&self, para: u32, n: u64, estado: u64) -> Vec<Orden> {
+        if !self
+            .pestana(para)
+            .is_some_and(|p| p.fija && es_orbita(&p.url))
+        {
+            return Vec::new();
+        }
+        vec![Orden::EnviaAPagina {
+            id: para,
+            prefijo: ORBITA,
+            excepto: Some(SECURE),
+            json: json!({ "tipo": "zg_panel", "n": n, "estado": estado, "datos": "" }).to_string(),
+        }]
+    }
+
     /// 1.0.50: GUARDIANA's web asks for this computer's connections, to draw them on Órbita.
     /// They are the panel's (its `/api/por-dentro`, read with the panel's own session), so the
     /// question goes to the panel's tab, which answers with `zg_pc_datos`. Nothing is asked
     /// while the panel is not open yet (the web then keeps waiting).
     fn pide_datos_pc(&self, id: u32) -> Vec<Orden> {
-        let Some(panel) = self
-            .pestanas
-            .iter()
-            .find(|p| p.fija && es_panel_guardiana(&p.url))
-            .map(|p| p.id)
-        else {
+        let Some(panel) = self.panel_fijo() else {
             return Vec::new();
         };
         vec![Orden::EnviaAPagina {
             id: panel,
             prefijo: PANEL_LOCAL,
+            excepto: None,
             json: json!({ "tipo": "zg_pc_pide", "para": id }).to_string(),
         }]
     }
@@ -2047,13 +2097,14 @@ impl Sesion {
         }
         if !self
             .pestana(para)
-            .is_some_and(|p| p.fija && p.url.starts_with(ORBITA))
+            .is_some_and(|p| p.fija && es_orbita(&p.url))
         {
             return Vec::new();
         }
         vec![Orden::EnviaAPagina {
             id: para,
             prefijo: ORBITA,
+            excepto: Some(SECURE),
             json: json!({ "tipo": "zg_pc", "datos": datos }).to_string(),
         }]
     }
@@ -2064,24 +2115,20 @@ impl Sesion {
     fn pide_al_panel(&self, id: u32, m: &Value) -> Vec<Orden> {
         let metodo = texto(m, "metodo");
         let ruta = texto(m, "ruta");
+        let n = m.get("n").and_then(Value::as_u64).unwrap_or(0);
         if !PANEL_LECTURAS
             .iter()
             .any(|(a, b)| *a == metodo && *b == ruta)
         {
-            return Vec::new();
+            return self.sin_lectura(id, n, 403);
         }
-        let n = m.get("n").and_then(Value::as_u64).unwrap_or(0);
-        let Some(panel) = self
-            .pestanas
-            .iter()
-            .find(|p| p.fija && es_panel_guardiana(&p.url))
-            .map(|p| p.id)
-        else {
-            return Vec::new();
+        let Some(panel) = self.panel_fijo() else {
+            return self.sin_lectura(id, n, 503);
         };
         vec![Orden::EnviaAPagina {
             id: panel,
             prefijo: PANEL_LOCAL,
+            excepto: None,
             json: json!({ "tipo": "zg_panel_pide", "para": id, "n": n, "metodo": metodo, "ruta": ruta })
                 .to_string(),
         }]
@@ -2096,20 +2143,21 @@ impl Sesion {
             .and_then(|x| u32::try_from(x).ok())
             .unwrap_or(0);
         let datos = texto(m, "datos");
+        let n = m.get("n").and_then(Value::as_u64).unwrap_or(0);
         if datos.len() > 4_000_000 {
-            return Vec::new();
+            return self.sin_lectura(para, n, 413);
         }
         if !self
             .pestana(para)
-            .is_some_and(|p| p.fija && p.url.starts_with(ORBITA))
+            .is_some_and(|p| p.fija && es_orbita(&p.url))
         {
             return Vec::new();
         }
-        let n = m.get("n").and_then(Value::as_u64).unwrap_or(0);
         let estado = m.get("estado").and_then(Value::as_u64).unwrap_or(0);
         vec![Orden::EnviaAPagina {
             id: para,
             prefijo: ORBITA,
+            excepto: Some(SECURE),
             json: json!({ "tipo": "zg_panel", "n": n, "estado": estado, "datos": datos })
                 .to_string(),
         }]
@@ -2575,12 +2623,22 @@ impl Sesion {
                             _ => Vec::new(),
                         }
                     }
-                    "zg_pc_pide" if self.es_web_del_programa(id, fuente) => self.pide_datos_pc(id),
-                    "zg_pc_datos" if es_panel_guardiana(fuente) => self.datos_pc(&m),
-                    "zg_panel_pide" if self.es_web_del_programa(id, fuente) => {
+                    "zg_pc_pide" if self.es_orbita_del_programa(id, fuente) => {
+                        self.pide_datos_pc(id)
+                    }
+                    "zg_pc_datos"
+                        if self.panel_fijo() == Some(id) && es_panel_guardiana(fuente) =>
+                    {
+                        self.datos_pc(&m)
+                    }
+                    "zg_panel_pide" if self.es_orbita_del_programa(id, fuente) => {
                         self.pide_al_panel(id, &m)
                     }
-                    "zg_panel_datos" if es_panel_guardiana(fuente) => self.datos_del_panel(&m),
+                    "zg_panel_datos"
+                        if self.panel_fijo() == Some(id) && es_panel_guardiana(fuente) =>
+                    {
+                        self.datos_del_panel(&m)
+                    }
                     _ => Vec::new(),
                 };
             }
@@ -5067,6 +5125,38 @@ impl Sesion {
             o.push(self.titulo_ventana());
         }
         o
+    }
+
+    /// 1.0.50 (independent review, M6): how a page of tab `id` ended. GUARDIANA's web fills the
+    /// window with no bar of the program, so without network its tab would show only the engine's
+    /// error, with no way out: the panel, which works without network, comes forward instead, and
+    /// choosing the web again loads it again (`elige_producto`).
+    pub fn resultado_carga(&mut self, id: u32, exito: bool, sin_red: bool) -> Vec<Orden> {
+        let activa = self.activa;
+        let Some(p) = self.pestana_mut(id) else {
+            return Vec::new();
+        };
+        if exito {
+            p.sin_red = false;
+            return Vec::new();
+        }
+        if !sin_red {
+            return Vec::new();
+        }
+        p.sin_red = true;
+        if !(p.fija && p.url.starts_with(ORBITA)) || id != activa {
+            return Vec::new();
+        }
+        match self.panel_fijo() {
+            Some(panel) => {
+                let mut o = self.activar(panel);
+                o.push(Orden::Foco {
+                    a: Origen::Pestana(panel),
+                });
+                o
+            }
+            None => vec![Orden::PideGuardiana],
+        }
     }
 
     /// The address a tab shows changed (also within the same page).

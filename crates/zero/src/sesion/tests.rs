@@ -3760,9 +3760,18 @@ fn the_web_asks_the_panel_only_for_its_readings() {
         ("/api/quien-vende", "POST"),
         ("/vigia", "POST"),
     ] {
+        // The panel is not asked; the web is told at once (403), so it does not wait for nothing.
+        let o = s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, metodo));
         assert!(
-            s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, metodo))
-                .is_empty(),
+            !o.iter()
+                .any(|x| matches!(x, Orden::EnviaAPagina { id, .. } if *id == panel)),
+            "{ruta}"
+        );
+        assert!(
+            o.iter().any(|x| matches!(
+                x,
+                Orden::EnviaAPagina { id, json, .. } if *id == orbita && json.contains("\"estado\":403")
+            )),
             "{ruta}"
         );
     }
@@ -3773,8 +3782,8 @@ fn the_web_asks_the_panel_only_for_its_readings() {
     let o = s.mensaje(Origen::Pestana(panel), &url, &datos);
     assert!(o.iter().any(|x| matches!(
         x,
-        Orden::EnviaAPagina { id, prefijo, json }
-            if *id == orbita && *prefijo == ORBITA && json.contains("zg_panel") && json.contains("\"estado\":200")
+        Orden::EnviaAPagina { id, prefijo, excepto: Some(e), json }
+            if *id == orbita && *prefijo == ORBITA && *e == SECURE && json.contains("zg_panel") && json.contains("\"estado\":200")
     )));
     assert!(s
         .mensaje(Origen::Pestana(orbita), ORBITA, &datos)
@@ -3815,7 +3824,7 @@ fn orbita_gets_this_computer_s_connections_from_the_panel_and_nothing_else_does(
     let para = format!("\"para\":{orbita}");
     assert!(o.iter().any(|x| matches!(
         x,
-        Orden::EnviaAPagina { id, prefijo, json }
+        Orden::EnviaAPagina { id, prefijo, excepto: None, json }
             if *id == panel && *prefijo == "http://127.0.0.1:7443/" && json.contains("zg_pc_pide") && json.contains(&para)
     )));
     // The panel answers: the data go to Órbita, as they came, and only there.
@@ -3824,8 +3833,8 @@ fn orbita_gets_this_computer_s_connections_from_the_panel_and_nothing_else_does(
     let o = s.mensaje(Origen::Pestana(panel), &url, &respuesta);
     assert!(o.iter().any(|x| matches!(
         x,
-        Orden::EnviaAPagina { id, prefijo, json }
-            if *id == orbita && *prefijo == ORBITA && json.contains("zg_pc") && json.contains("destinos")
+        Orden::EnviaAPagina { id, prefijo, excepto: Some(e), json }
+            if *id == orbita && *prefijo == ORBITA && *e == SECURE && json.contains("zg_pc") && json.contains("destinos")
     )));
     // No other page can ask, nor answer, nor be answered.
     assert!(s
@@ -4214,4 +4223,88 @@ fn a_letter_to_a_company_of_the_auction_says_what_was_seen_and_is_never_sent() {
     assert!(ruta.contains("guardiana-zero-subasta-eltiempo-com"), "{r}");
     let recibo = fs::read_to_string(ruta).unwrap_or_default();
     assert!(recibo.contains("subastas_en_los_servidores_de_la_web"));
+}
+
+#[test]
+fn comunicaciones_moves_between_products_but_never_reads_the_computer() {
+    // 1.0.50 (independent review, G2): Comunicaciones lives under Órbita's folder, and is where
+    // people chat with others: it may ask for another product, never for the computer's readings.
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "c".repeat(64));
+    let _ = s.abre_programa(&url);
+    let orbita = s.activa();
+    let _ = s.mensaje(
+        Origen::Pestana(orbita),
+        ORBITA,
+        r#"{"tipo":"zg_producto","producto":"secure"}"#,
+    );
+    let com = s.activa();
+    assert_ne!(com, orbita);
+    assert!(s
+        .pestana(com)
+        .is_some_and(|p| p.fija && p.url.starts_with(SECURE)));
+    let pide =
+        json!({ "tipo": "zg_panel_pide", "n": 1, "metodo": "GET", "ruta": "/vigia" }).to_string();
+    assert!(s.mensaje(Origen::Pestana(com), SECURE, &pide).is_empty());
+    assert!(s
+        .mensaje(Origen::Pestana(com), SECURE, r#"{"tipo":"zg_pc_pide"}"#)
+        .is_empty());
+    // An answer meant for it is not given either.
+    let panel = s
+        .pestanas
+        .iter()
+        .find(|p| p.url == url)
+        .map(|p| p.id)
+        .unwrap_or_default();
+    let datos =
+        json!({ "tipo": "zg_panel_datos", "para": com, "n": 1, "estado": 200, "datos": "{}" })
+            .to_string();
+    assert!(s.mensaje(Origen::Pestana(panel), &url, &datos).is_empty());
+    // The way back to Órbita stays.
+    assert!(!s
+        .mensaje(
+            Origen::Pestana(com),
+            SECURE,
+            r#"{"tipo":"zg_producto","producto":"orbita"}"#
+        )
+        .is_empty());
+}
+
+#[test]
+fn without_network_the_panel_comes_forward_and_the_web_loads_again_when_chosen() {
+    // 1.0.50 (independent review, M6).
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "d".repeat(64));
+    let _ = s.abre_programa(&url);
+    let orbita = s.activa();
+    // A page that failed for another reason (a cancelled load) changes nothing.
+    assert!(s.resultado_carga(orbita, false, false).is_empty());
+    assert_eq!(s.activa(), orbita);
+    let _ = s.resultado_carga(orbita, false, true);
+    assert_eq!(s.producto(), "guardiana");
+    let o = s.elige_producto("orbita");
+    assert_eq!(s.activa(), orbita);
+    assert!(o
+        .iter()
+        .any(|x| matches!(x, Orden::Recarga { id } if *id == orbita)));
+    // Once it loads, choosing it again does not reload it.
+    let _ = s.resultado_carga(orbita, true, false);
+    let _ = s.elige_producto("guardiana");
+    let o = s.elige_producto("orbita");
+    assert!(!o.iter().any(|x| matches!(x, Orden::Recarga { .. })));
+}
+
+#[test]
+fn only_the_program_s_own_tabs_get_the_program_s_part_of_the_script() {
+    // 1.0.50 (independent review, M5).
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "e".repeat(64));
+    let _ = s.abre_programa(&url);
+    let orbita = s.activa();
+    assert!(s.guion_pestana(orbita).contains("const programa = true;"));
+    let otra = s.pestanas.iter().find(|p| !p.fija).map(|p| p.id);
+    if let Some(otra) = otra {
+        assert!(s.guion_pestana(otra).contains("const programa = false;"));
+    }
+    assert!(crate::paginas::guion_paginas().contains("const programa = false;"));
 }

@@ -58,6 +58,23 @@ Otra web recibe siempre `403` (con su `Origin`) o `401` (sin ella), haya lo que 
 puede deducirlo. Límite: un programa de este ordenador puede inventarse la `Origin` y ver lo mismo que
 la web; con el token, el panel ve además las rutas. Detalle en `crates/panel/src/vigia.rs`.
 
+Segunda excepción (1.0.50, `Tu PC` y el Escáner PC): la web de GUARDIANA abierta como ventana del
+propio programa (su pestaña fija de Órbita, `https://guardianagroup.com/orbita/`, nunca
+Comunicaciones ni otra pestaña) pide lecturas de este ordenador **a través del programa**, no por la
+red: un evento de la página que el guion del programa convierte en mensaje; la sesión del navegador
+comprueba la pestaña y una lista cerrada de pares método + ruta, todos de solo lectura salvo los dos
+que lanzan una lectura ahora (revisión y vigilancia), y la pestaña del panel hace la pregunta con su
+propia sesión. La llave nunca sale del panel. Como esa web se descarga en cada carga (fuera de
+minisign y Rekor), lo que recibe va recortado en el propio guion del programa: sin carpetas (solo el
+nombre del archivo), sin cuentas, sin direcciones IP ni identificadores de aparatos de la casa, sin
+los nombres que se visitaron y sin el detalle completo del equipo; las lecturas que ponen a trabajar
+al equipo solo pasan justo después de un clic o una tecla de la persona (eventos `isTrusted`, que una
+página no puede fabricar), como mucho cuatro a la vez, una revisión por minuto y una mirada lenta del
+vigía cada 30 s. Lo recibido se queda en la memoria de la página: nada se envía a
+`guardianagroup.com` ni se guarda en el navegador. Límite: una web cambiada podría ver ese resumen
+recortado mientras la página está abierta en el programa. Detalle en `crates/zero/src/sesion.rs`
+(`PANEL_LECTURAS`) y `crates/zero/src/paginas.rs` (`paraLaWeb`).
+
 ### D. Quien intente entregar un binario manipulado (cadena de suministro, espejo falso)
 Capacidad: sustituir el instalador o el binario. Mitigación (brief §10): compilación reproducible en
 contenedor fijado por digest, `cargo build --locked`, SHA‑256 y firma minisign de cada binario, línea
@@ -70,6 +87,9 @@ Capacidad que renunciamos: recibir datos. Mitigación: no hay servidor nuestro a
 hable. Las únicas conexiones salientes son las de la licencia (activarla, que provoca el usuario, y la
 comprobación periódica de la suscripción), cada una anotada en la tabla `outbound` con host, fecha y bytes, y
 visible en `/sabe-de-ti`. Código abierto desde el primer commit para que cualquiera lo compruebe.
+Desde la 1.0.50 la ventana del programa abre la web de GUARDIANA (puntos 1 a 6 de la política de
+privacidad): esa web es una conexión a nuestro sitio, como cualquier visita, y lo que recibe del
+ordenador queda acotado como dice el apartado C.
 
 ### F. Un miembro de la casa que quiera vigilar a otro
 Capacidad: abrir el panel de la casa desde el computador. Mitigación: agregados por dispositivo;
