@@ -219,8 +219,15 @@ const GUION: &str = r#"(() => {
   // and the language GUARDIANA speaks (its /api/ajustes/idioma once the person chose one, or the
   // choice kept by the panel) is ZERO's too (Z5). Absent or not chosen yet, nothing changes.
   // Only that page, only its own top document.
+  // A mark on the page's root element, written as soon as the root exists: this script runs when the document is created,
+  // before its root element, and the page's own first script must already see the mark (1.0.50: with a plain write the
+  // root was still missing and the mark never arrived; found by the web's test, which runs the script the same way).
+  const marca = (k) => {
+    const pon = () => { const r = document.documentElement; if (!r) return false; try { r.dataset[k] = '1'; } catch (_) {} return true; };
+    if (!pon()) new MutationObserver((_, o) => { if (pon()) o.disconnect(); }).observe(document, { childList: true });
+  };
   if (!marco && location.origin === 'http://127.0.0.1:7443') {
-    try { document.documentElement.dataset.enZero = '1'; } catch (_) {}
+    marca('enZero');
     document.addEventListener('click', (e) => {
       const b = e.target && e.target.closest && e.target.closest('[data-producto]');
       if (!b) return;
@@ -285,7 +292,7 @@ const GUION: &str = r#"(() => {
             return {
               e: t(d.empresa, 80) || t(d.red, 80), d: t(d.destino, 120), p: t((l && l.pais) || d.pais, 2).toUpperCase(),
               c: t(l && l.ciudad, 60), la: l ? g(l.lat) : null, lo: l ? g(l.lon) : null, k: t(d.categoria, 32),
-              x: n(d.paradas) > 0 || d.regla != null ? 1 : 0, n: Math.max(1, n(d.consultas) + n(d.paradas)), g: t(d.programa, 60),
+              x: n(d.paradas) > 0 || d.regla != null ? 1 : 0, n: Math.max(1, n(d.consultas)), g: t(d.programa, 60),
             };
           });
           const datos = { v: 1, ahora: n(j.ahora), maxima: !!j.maxima, vigilando: !!j.vigilando, programas: Array.isArray(j.programas) ? j.programas.length : 0, destinos };
@@ -298,7 +305,7 @@ const GUION: &str = r#"(() => {
   // hides its own ways to the other products, which the program's selector already gives. Only that site and only its own
   // top document: any other page sees nothing.
   if (!marco && location.origin === 'https://guardianagroup.com') {
-    try { document.documentElement.dataset.enPrograma = '1'; } catch (_) {}
+    marca('enPrograma');
     // 1.0.50 (dueño, 30 Oct 2026, 22:29: «la versión web que teníamos, que ya estaba terminada, quiero que la metas en el
     // programa»): the web fills the window and moves between the program's products itself (Órbita, Comunicaciones,
     // the panel) with `data-producto`; the program checks again that the tab is its own web.
