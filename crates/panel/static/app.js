@@ -1208,6 +1208,7 @@
         <a href="/por-dentro" class="g-producto" aria-current="true">${esc(t('menu_radiografias'))}</a>
         <button type="button" class="g-producto" data-producto="zero" aria-expanded="false" aria-controls="g-pop">${esc(t('menu_zero'))}</button>
         <button type="button" class="g-producto" data-producto="com" aria-expanded="false" aria-controls="g-pop">${esc(t('menu_comunicaciones'))}</button>
+        <button type="button" class="g-producto" data-producto="orbita" aria-expanded="false" aria-controls="g-pop">${esc(t('menu_orbita'))}</button>
       </nav>
       <div class="g-pop" id="g-pop" role="dialog" hidden></div>
       <div class="g-der">
@@ -1269,7 +1270,9 @@
       const zero = b.dataset.producto === 'zero';
       const orden = so === 'macos' ? '/usr/local/guardiana/guardiana comunicaciones' : 'guardiana comunicaciones';
       pop.dataset.p = b.dataset.producto;
-      pop.innerHTML = `<b>${esc(t(zero ? 'zero_card_titulo' : 'com_card_titulo'))}</b><p>${esc(t(zero ? (fuera ? 'zero_card_texto' : 'menu_zero_texto') : (fuera ? (so === 'macos' ? 'com_card_mac' : 'com_card_linux') : 'menu_com_texto')))}</p>`
+      // 1.0.50: Órbita, the fourth product (inside ZERO the program's own script takes the click before this one).
+      if (b.dataset.producto === 'orbita') pop.innerHTML = `<b>${esc(t('orbita_card_titulo'))}</b><p>${esc(t('menu_orbita_texto'))}</p>`;
+      else pop.innerHTML = `<b>${esc(t(zero ? 'zero_card_titulo' : 'com_card_titulo'))}</b><p>${esc(t(zero ? (fuera ? 'zero_card_texto' : 'menu_zero_texto') : (fuera ? (so === 'macos' ? 'com_card_mac' : 'com_card_linux') : 'menu_com_texto')))}</p>`
         + (!zero && fuera ? `<p><code>${esc(orden)}</code></p>` : '');
       pop.hidden = false; b.setAttribute('aria-expanded', 'true');
       pop.style.left = Math.max(12, b.offsetLeft + b.offsetWidth / 2 - 170) + 'px';

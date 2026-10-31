@@ -225,7 +225,7 @@ const GUION: &str = r#"(() => {
       const b = e.target && e.target.closest && e.target.closest('[data-producto]');
       if (!b) return;
       const p = String(b.dataset.producto || '');
-      const cual = p === 'zero' ? 'zero' : (p === 'com' || p === 'comunicaciones' || p === 'secure') ? 'secure' : (p === 'radiografias' || p === 'guardiana') ? 'guardiana' : '';
+      const cual = p === 'zero' ? 'zero' : (p === 'com' || p === 'comunicaciones' || p === 'secure') ? 'secure' : (p === 'radiografias' || p === 'guardiana') ? 'guardiana' : p === 'orbita' ? 'orbita' : '';
       if (!cual) return;
       e.preventDefault();
       e.stopImmediatePropagation();

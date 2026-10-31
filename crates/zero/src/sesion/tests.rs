@@ -3614,6 +3614,65 @@ fn marco_de(o: &[Orden]) -> Option<(i32, i32)> {
 }
 
 #[test]
+fn orbita_is_the_fourth_product_and_its_tab_is_made_once() {
+    // 1.0.50 (the owner, 30 Oct 2026, 21:05: «todo tiene que ir dentro del programa, es mejor así»).
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "d".repeat(64));
+    let _ = s.abre_guardiana(&url);
+    let antes = s.pestanas.len();
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"producto","producto":"orbita"}"#,
+    );
+    assert_eq!(s.producto(), "orbita");
+    assert_eq!(
+        s.pestanas.len(),
+        antes + 1,
+        "its tab is made the first time"
+    );
+    let orbita = s.activa();
+    assert!(s.pestana(orbita).is_some_and(|p| p.fija && p.url == ORBITA));
+    assert_eq!(marco_de(&s.marco_nuevo()), Some((ALTO_ARRIBA, 0)));
+    // Comunicaciones lives under Órbita's folder and stays its own product.
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"producto","producto":"secure"}"#,
+    );
+    assert_eq!(s.producto(), "secure");
+    // Back to Órbita: the same tab, not a second one.
+    let n = s.pestanas.len();
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"producto","producto":"orbita"}"#,
+    );
+    assert_eq!(s.activa(), orbita);
+    assert_eq!(s.pestanas.len(), n);
+    // From GUARDIANA's own panel selector, through its tab's channel.
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"producto","producto":"guardiana"}"#,
+    );
+    let panel = s.activa();
+    let _ = s.mensaje(
+        Origen::Pestana(panel),
+        &url,
+        r#"{"tipo":"zg_producto","producto":"orbita"}"#,
+    );
+    assert_eq!(s.activa(), orbita);
+    // A web page cannot ask for it.
+    let _ = s.mensaje(
+        Origen::Pestana(orbita),
+        ORBITA,
+        r#"{"tipo":"zg_producto","producto":"guardiana"}"#,
+    );
+    assert_eq!(s.producto(), "orbita");
+}
+
+#[test]
 fn one_navigation_the_selector_moves_between_the_three_products() {
     let (mut s, _, _) = abre();
     let url = format!("http://127.0.0.1:7443/?t={}", "a".repeat(64));

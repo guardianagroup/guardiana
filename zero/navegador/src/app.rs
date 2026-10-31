@@ -1272,11 +1272,14 @@ const fn fondo_propio() -> COREWEBVIEW2_COLOR {
 }
 
 /// What a tab shows before its page paints: the program's colour for its own pages (ZERO's,
-/// SECURE, GUARDIANA's panel and its wait page), white for the web, as every browser does.
+/// GUARDIANA's panel and its wait page, and, since 1.0.50, Comunicaciones and Órbita, which come
+/// from GUARDIANA's web: no white flash when the person picks them), white for the web, as every
+/// browser does.
 fn fondo_para(url: &str) -> COREWEBVIEW2_COLOR {
     if sesion::es_interna(url)
         || url.starts_with("http://127.0.0.1:7443/")
         || url.contains("guardiana-arrancando.html")
+        || url.starts_with(sesion::ORBITA)
     {
         fondo_propio()
     } else {

@@ -60,6 +60,16 @@ pub const SECURE: &str = "https://guardianagroup.com/orbita/comunicaciones/";
 /// The old SECURE page, still inside the program (secure.html). Nothing opens it since 30 Oct 2026; its
 /// messages keep working for anything that still speaks to it, as the program's own page.
 pub const SECURE_INTERNA: &str = "https://zero.guardiana/secure.html";
+/// Órbita, the fourth product (1.0.50; the owner, 30 Oct 2026, 21:05: «todo tiene que ir dentro del
+/// programa, es mejor así»): the map of the internet's infrastructure as it is on the web, like
+/// Comunicaciones, with no more rights than any other site. Its tab is made the first time the
+/// person chooses it, so the program does not draw the planet at every start.
+pub const ORBITA: &str = "https://guardianagroup.com/orbita/";
+
+/// Órbita's own page (Comunicaciones lives under the same folder and is its own product).
+fn es_orbita(url: &str) -> bool {
+    url.starts_with(ORBITA) && !url.starts_with(SECURE)
+}
 /// The bar at the top.
 pub const BARRA: &str = "https://zero.guardiana/barra.html";
 /// The side panel.
@@ -1311,6 +1321,9 @@ impl Sesion {
         if p.fija && (p.url == INICIO || p.url.is_empty()) {
             return self.t("pestana_nueva");
         }
+        if es_orbita(&p.url) {
+            return self.t("pestana_orbita");
+        }
         if p.url.starts_with(SECURE) {
             let t = self.t("pestana_secure");
             return if self.comunicaciones.novedad() {
@@ -1773,6 +1786,8 @@ impl Sesion {
             "guardiana"
         } else if p.url.starts_with(SECURE) {
             "secure"
+        } else if es_orbita(&p.url) {
+            "orbita"
         } else {
             "zero"
         }
@@ -1796,7 +1811,7 @@ impl Sesion {
         if producto == "guardiana" {
             return (0, 0);
         }
-        let barra = if producto == "secure" {
+        let barra = if producto == "secure" || producto == "orbita" {
             ALTO_ARRIBA
         } else {
             ALTO_ZERO
@@ -1859,6 +1874,21 @@ impl Sesion {
                 None => {
                     let id = self.siguiente;
                     let mut o = vec![self.anade_pestana(Perfil::General, SECURE, true)];
+                    self.ordena_fijas();
+                    o.extend(self.activar(id));
+                    o
+                }
+            },
+            "orbita" => match self
+                .pestanas
+                .iter()
+                .find(|p| es_orbita(&p.url))
+                .map(|p| p.id)
+            {
+                Some(id) => self.activar(id),
+                None => {
+                    let id = self.siguiente;
+                    let mut o = vec![self.anade_pestana(Perfil::General, ORBITA, true)];
                     self.ordena_fijas();
                     o.extend(self.activar(id));
                     o
@@ -1983,12 +2013,14 @@ impl Sesion {
             "guardiana"
         } else if p.url.starts_with(SECURE) {
             "secure"
+        } else if es_orbita(&p.url) {
+            "orbita"
         } else {
             "zero"
         }
     }
 
-    /// The three product tabs in the order the person left them.
+    /// The product tabs in the order the person left them.
     fn ordena_fijas(&mut self) {
         let orden = self.prefs.orden_fijas.clone();
         if orden.is_empty() {
