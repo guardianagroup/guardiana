@@ -32,6 +32,7 @@ mod idioma;
 mod medidas;
 mod plan;
 mod revision;
+mod ruta;
 mod universo;
 // «Vigía» (1.0.48): `GET /vigia`, lo que la web de Comunicaciones pregunta durante una llamada.
 mod vigia;
@@ -1066,6 +1067,9 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/secure-en-directo", get(universo::secure_en_directo))
         .route("/api/revision", get(revision::ver))
         .route("/api/revision/ahora", post(revision::ahora))
+        // 1.0.51: the route of the data, hop by hop (src/ruta.rs).
+        .route("/api/ruta", get(ruta::ver))
+        .route("/api/ruta/ahora", post(ruta::ahora))
         .merge(vision::rutas())
         .route("/api/ia/alcance", post(api::alcance))
         .route("/api/ia/alcance/anadir", post(api::alcance_anadir))

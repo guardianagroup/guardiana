@@ -777,6 +777,10 @@ const PANEL_LECTURAS: &[(&str, &str)] = &[
     // the second's settings switch (`POST /api/quien-vende/ajuste`) stays out.
     ("GET", "/vigia"),
     ("GET", "/api/quien-vende"),
+    // 1.0.51 (the owner, 31 Oct 2026, 08:53: «por dónde viaja… qué cable… si viaja por satélite»):
+    // the route of the data, hop by hop, and the order to measure it now (read only: `tracert`).
+    ("GET", "/api/ruta"),
+    ("POST", "/api/ruta/ahora"),
 ];
 
 /// ZERO's own wait page for the panel (1.0.44), as it is or saying what failed.

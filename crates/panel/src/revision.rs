@@ -1732,6 +1732,14 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
         }
     }
 
+    endurecimiento(
+        &d["endurecimiento"],
+        &mut proteccion,
+        &mut acceso,
+        &mut arranque,
+        &mut salida,
+    );
+
     [
         ("proteccion", proteccion),
         ("acceso", acceso),
@@ -1747,6 +1755,290 @@ fn evaluar(d: &Value, vistos: Option<&Vistos>, now: i64) -> Vec<Grupo> {
 }
 
 /// Every sentence key the checks can use (the test below checks the three languages have them).
+/// Programs of Windows itself that wait on UDP for their own work (name resolution on the local
+/// network, discovery, time): not what the person needs to look at.
+const UDP_DE_WINDOWS: &[&str] = &[
+    "system",
+    "svchost",
+    "lsass",
+    "services",
+    "wininit",
+    "spoolsv",
+    "dashost",
+    "searchhost",
+    "searchapp",
+    "lsaiso",
+    "guardiana",
+];
+
+/// Accessibility programs a «Debugger» entry can replace on the sign-in screen: the classic way
+/// to get a system console without a password.
+const ACCESIBILIDAD: &[&str] = &[
+    "sethc.exe",
+    "utilman.exe",
+    "osk.exe",
+    "magnify.exe",
+    "narrator.exe",
+    "displayswitch.exe",
+    "atbroker.exe",
+];
+
+/// 1.0.51 (owner, 31 Oct 2026, 08:46: «hay que vigilar todos los parámetros que seamos capaces de
+/// detectar… el máximo posible»): the defences Windows has beyond the antivirus, the startup
+/// points malicious programs hide in and the ways in and out of the network that the sections
+/// above did not read. A program before 1.0.51 has no such section: then nothing is added.
+fn endurecimiento(
+    e: &Value,
+    proteccion: &mut Vec<Check>,
+    acceso: &mut Vec<Check>,
+    arranque: &mut Vec<Check>,
+    salida: &mut Vec<Check>,
+) {
+    if !e.is_object() {
+        return;
+    }
+    if e.get("error").is_some() {
+        arranque.push(check("arranque_oculto", "nd", "rv_nd"));
+        return;
+    }
+    let n = |k: &str| e[k].as_i64();
+
+    // ---- Protección: what Microsoft Defender and Windows add to the antivirus
+    if e["asr"].is_object() {
+        let bloquea = e["asr"]["bloquea"].as_i64().unwrap_or(0);
+        let audita = e["asr"]["audita"].as_i64().unwrap_or(0);
+        proteccion.push(if bloquea > 0 {
+            check("asr", "ok", "rv_asr_activas")
+                .con("n", bloquea)
+                .con("a", audita)
+        } else if audita > 0 {
+            check("asr", "info", "rv_asr_auditoria").con("n", audita)
+        } else {
+            check("asr", "info", "rv_asr_ninguna")
+        });
+    }
+    let tres = |id: &'static str,
+                v: Option<i64>,
+                ok: &'static str,
+                audita: &'static str,
+                no: &'static str| match v {
+        Some(1) => Some(check(id, "ok", ok)),
+        Some(2) => Some(check(id, "info", audita)),
+        Some(0) => Some(check(id, "info", no)),
+        _ => None,
+    };
+    proteccion.extend(tres(
+        "proteccion_red",
+        n("red"),
+        "rv_red_ok",
+        "rv_red_auditoria",
+        "rv_red_no",
+    ));
+    proteccion.extend(tres(
+        "pua",
+        n("pua"),
+        "rv_pua_ok",
+        "rv_pua_auditoria",
+        "rv_pua_no",
+    ));
+    proteccion.extend(tres(
+        "carpetas_controladas",
+        n("carpetas"),
+        "rv_carpetas_ok",
+        "rv_carpetas_auditoria",
+        "rv_carpetas_no",
+    ));
+    if let Some(cg) = e["credential_guard"].as_bool() {
+        proteccion.push(if cg {
+            check("credential_guard", "ok", "rv_cg_ok")
+        } else {
+            check("credential_guard", "info", "rv_cg_no")
+        });
+    }
+    // SmartScreen is on unless someone turned it off: the value is often missing, and that is on.
+    let apagado =
+        s(&e["smartscreen"]).eq_ignore_ascii_case("off") || n("smartscreen_politica") == Some(0);
+    proteccion.push(if apagado {
+        check("smartscreen", "aviso", "rv_smartscreen_no")
+    } else {
+        check("smartscreen", "ok", "rv_smartscreen_ok")
+    });
+    proteccion.extend(match n("sac") {
+        Some(1) => Some(check("smart_app_control", "ok", "rv_sac_ok")),
+        Some(2) => Some(check("smart_app_control", "info", "rv_sac_evaluacion")),
+        Some(0) => Some(check("smart_app_control", "info", "rv_sac_no")),
+        _ => None,
+    });
+    // The list of vulnerable drivers is on by default since Windows 11 22H2 (build 22621).
+    proteccion.push(match n("drivers") {
+        Some(0) => check("drivers_vulnerables", "aviso", "rv_drivers_no"),
+        Some(_) => check("drivers_vulnerables", "ok", "rv_drivers_ok"),
+        None if n("compilacion").unwrap_or(0) >= 22_621 => {
+            check("drivers_vulnerables", "ok", "rv_drivers_ok")
+        }
+        None => check("drivers_vulnerables", "info", "rv_drivers_nd"),
+    });
+
+    // ---- Arranque: the less visible startup points
+    let mut l: Vec<Item> = Vec::new();
+    let mut grave = false;
+    let shell = s(&e["winlogon"]["shell"]);
+    if !shell.is_empty()
+        && !shell
+            .trim_end_matches(',')
+            .trim()
+            .eq_ignore_ascii_case("explorer.exe")
+    {
+        grave = true;
+        l.push(item(
+            nombre_app(&shell),
+            "Winlogon · Shell",
+            vec!["modificado"],
+        ));
+    }
+    let userinit = s(&e["winlogon"]["userinit"]).to_ascii_lowercase();
+    let otros: Vec<&str> = userinit
+        .split(',')
+        .map(str::trim)
+        .filter(|x| {
+            !x.is_empty() && !x.ends_with("\\system32\\userinit.exe") && *x != "userinit.exe"
+        })
+        .collect();
+    for x in otros {
+        grave = true;
+        l.push(item(
+            nombre_app(x),
+            "Winlogon · Userinit",
+            vec!["modificado"],
+        ));
+    }
+    for a in arr(&e["appinit"]) {
+        if a["carga"].as_bool() == Some(true) {
+            l.push(item(s(&a["dlls"]), "AppInit_DLLs", vec!["appinit"]));
+        }
+    }
+    for x in arr(&e["ifeo"]) {
+        let prog = s(&x["programa"]);
+        let acc = ACCESIBILIDAD.contains(&prog.to_ascii_lowercase().as_str());
+        grave |= acc;
+        l.push(item(
+            prog,
+            s(&x["depurador"]),
+            vec![if acc { "accesibilidad" } else { "depurador" }],
+        ));
+    }
+    for w in arr(&e["wmi"]) {
+        let clase = s(&w["clase"]);
+        if clase == "CommandLineEventConsumer" || clase == "ActiveScriptEventConsumer" {
+            l.push(item(s(&w["nombre"]), clase, vec!["wmi"]));
+        }
+    }
+    arranque.push(if l.is_empty() {
+        check("arranque_oculto", "ok", "rv_oculto_ok")
+    } else {
+        check(
+            "arranque_oculto",
+            if grave { "alerta" } else { "aviso" },
+            "rv_oculto_hay",
+        )
+        .con("n", l.len())
+        .items(l)
+    });
+
+    // ---- Acceso: who waits for the network on UDP, the inbound exceptions and SMB signing
+    if let Some(udp) = lista_de(&e["udp"]) {
+        let mut por: BTreeMap<String, Vec<u64>> = BTreeMap::new();
+        for x in udp {
+            let prog = s(&x["programa"]);
+            let puerto = x["puerto"].as_u64().unwrap_or(0);
+            let base = prog.to_ascii_lowercase();
+            if prog.is_empty()
+                || puerto == 0
+                || puerto >= 49_152
+                || UDP_DE_WINDOWS.iter().any(|w| base.starts_with(w))
+            {
+                continue;
+            }
+            por.entry(prog).or_default().push(puerto);
+        }
+        let l: Vec<Item> = por
+            .into_iter()
+            .map(|(prog, mut ps)| {
+                ps.sort_unstable();
+                ps.dedup();
+                let txt = ps
+                    .iter()
+                    .take(4)
+                    .map(|p| format!("UDP {p}"))
+                    .collect::<Vec<_>>()
+                    .join(" · ");
+                item(prog, txt, Vec::new())
+            })
+            .collect();
+        acceso.push(if l.is_empty() {
+            check("udp", "ok", "rv_udp_ok")
+        } else {
+            check("udp", "info", "rv_udp_hay")
+                .con("n", l.len())
+                .items(l)
+        });
+    }
+    if let Some(reglas) = lista_de(&e["entrada"]) {
+        let mut vistos = std::collections::BTreeSet::new();
+        let l: Vec<Item> = reglas
+            .iter()
+            .filter_map(|r| {
+                let nombre = s(&r["nombre"]);
+                (!nombre.is_empty() && vistos.insert(nombre.clone()))
+                    .then(|| item(nombre, s(&r["perfil"]), Vec::new()))
+            })
+            .take(40)
+            .collect();
+        acceso.push(if l.is_empty() {
+            check("entrada", "ok", "rv_entrada_ok")
+        } else {
+            check("entrada", "info", "rv_entrada_hay")
+                .con("n", reglas.len())
+                .items(l)
+        });
+    }
+    if e["smb_firma"].is_object() {
+        let ok = e["smb_firma"]["servidor"].as_bool() == Some(true)
+            && e["smb_firma"]["cliente"].as_bool() == Some(true);
+        acceso.push(if ok {
+            check("smb_firma", "ok", "rv_smb_firma_ok")
+        } else {
+            check("smb_firma", "info", "rv_smb_firma_no")
+        });
+    }
+
+    // ---- Salida: encrypted DNS, the name rules and the local-network name answers
+    if e["doh_interfaces"].is_number() || e["doh_auto"].is_number() {
+        let k = n("doh_interfaces").unwrap_or(0);
+        salida.push(if k > 0 || n("doh_auto") == Some(2) {
+            check("dns_cifrado", "ok", "rv_doh_si").con("n", k)
+        } else {
+            check("dns_cifrado", "info", "rv_doh_no")
+        });
+    }
+    if let Some(k) = n("nrpt").filter(|&k| k > 0) {
+        salida.push(check("nrpt", "info", "rv_nrpt_hay").con("n", k));
+    }
+    let netbios: Vec<i64> = arr(&e["netbios"])
+        .iter()
+        .filter_map(Value::as_i64)
+        .collect();
+    if e["netbios"].is_array() || e["llmnr"].is_number() {
+        let llmnr_fuera = n("llmnr") == Some(0);
+        let netbios_fuera = !netbios.is_empty() && netbios.iter().all(|&x| x == 2);
+        salida.push(if llmnr_fuera && netbios_fuera {
+            check("llmnr_netbios", "ok", "rv_llmnr_ok")
+        } else {
+            check("llmnr_netbios", "info", "rv_llmnr_activo")
+        });
+    }
+}
+
 #[cfg(test)]
 pub(crate) const FRASES: &[&str] = &[
     "rv_nd",
@@ -1861,6 +2153,41 @@ pub(crate) const FRASES: &[&str] = &[
     "rv_recall_instalado",
     "rv_recall_apagado",
     "rv_aprovisionados_no",
+    "rv_asr_activas",
+    "rv_asr_auditoria",
+    "rv_asr_ninguna",
+    "rv_red_ok",
+    "rv_red_auditoria",
+    "rv_red_no",
+    "rv_pua_ok",
+    "rv_pua_auditoria",
+    "rv_pua_no",
+    "rv_carpetas_ok",
+    "rv_carpetas_auditoria",
+    "rv_carpetas_no",
+    "rv_cg_ok",
+    "rv_cg_no",
+    "rv_smartscreen_ok",
+    "rv_smartscreen_no",
+    "rv_sac_ok",
+    "rv_sac_evaluacion",
+    "rv_sac_no",
+    "rv_drivers_ok",
+    "rv_drivers_no",
+    "rv_drivers_nd",
+    "rv_oculto_ok",
+    "rv_oculto_hay",
+    "rv_udp_ok",
+    "rv_udp_hay",
+    "rv_entrada_ok",
+    "rv_entrada_hay",
+    "rv_smb_firma_ok",
+    "rv_smb_firma_no",
+    "rv_doh_si",
+    "rv_doh_no",
+    "rv_nrpt_hay",
+    "rv_llmnr_ok",
+    "rv_llmnr_activo",
     "rv_aprovisionados_hay",
 ];
 
@@ -1917,6 +2244,21 @@ pub(crate) const IDS: &[&str] = &[
     "defender_nube",
     "recall",
     "aprovisionados",
+    "asr",
+    "proteccion_red",
+    "pua",
+    "carpetas_controladas",
+    "credential_guard",
+    "smartscreen",
+    "smart_app_control",
+    "drivers_vulnerables",
+    "arranque_oculto",
+    "udp",
+    "entrada",
+    "smb_firma",
+    "dns_cifrado",
+    "nrpt",
+    "llmnr_netbios",
 ];
 #[cfg(test)]
 pub(crate) const GRUPOS: &[&str] = &[
@@ -1966,6 +2308,11 @@ pub(crate) const MARCAS: &[&str] = &[
     "mdm",
     "para_cada_cuenta",
     "arriesgada",
+    "modificado",
+    "appinit",
+    "accesibilidad",
+    "depurador",
+    "wmi",
 ];
 
 #[cfg(test)]
@@ -2028,6 +2375,20 @@ mod tests {
         );
         assert_eq!(c("aprovisionados").lista[0].t, "SpotifyMusic");
         assert_eq!(c("hosts").estado, "aviso");
+        // 1.0.51: the hardening section. A lone IFEO entry arrives as an object, not a list.
+        assert_eq!(c("arranque_oculto").estado, "alerta");
+        assert_eq!(c("arranque_oculto").lista[0].marcas, vec!["accesibilidad"]);
+        assert_eq!(c("udp").estado, "info");
+        assert_eq!(c("udp").lista.len(), 1, "{:?}", c("udp"));
+        assert_eq!(c("udp").lista[0].d, "UDP 3478 · UDP 3479");
+        assert_eq!(c("entrada").lista.len(), 1);
+        assert_eq!(c("drivers_vulnerables").estado, "ok");
+        assert_eq!(c("smartscreen").estado, "ok");
+        assert_eq!(c("carpetas_controladas").estado, "info");
+        assert_eq!(c("pua").estado, "ok");
+        assert_eq!(c("smb_firma").estado, "ok");
+        assert_eq!(c("dns_cifrado").frase, "rv_doh_no");
+        assert_eq!(c("llmnr_netbios").estado, "info");
         assert_eq!(c("wifi").estado, "ok");
         assert_eq!(c("inicio").estado, "aviso");
         // The addresses never reach the page's lists.

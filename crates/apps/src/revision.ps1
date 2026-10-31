@@ -344,5 +344,76 @@ Seccion 'defender_sucesos' {
   [ordered]@{ sucesos = $l }
 }
 
+# 1.0.51 (owner, 31 Oct 2026, 08:46: "hay que vigilar todos los parametros que seamos capaces de detectar, el maximo
+# posible"): the defences Windows has beyond the antivirus, the startup points malicious programs hide in, and the
+# ways in and out of the network the sections above did not read. Each read on its own: what fails stays empty.
+function Hoja([string]$s) { if (-not $s) { return $null }; try { return [IO.Path]::GetFileName($s) } catch { return (Corta $s) } }
+Seccion 'endurecimiento' {
+  $o = [ordered]@{ compilacion = [Environment]::OSVersion.Version.Build; asr = $null; red = $null; pua = $null; carpetas = $null; vbs = $null; credential_guard = $null
+    smartscreen = $null; smartscreen_politica = $null; sac = $null; drivers = $null; winlogon = $null; appinit = $null; ifeo = $null; wmi = $null
+    udp = $null; entrada = $null; doh_interfaces = $null; doh_auto = $null; nrpt = $null; llmnr = $null; netbios = $null; smb_firma = $null }
+  try {
+    $p = Get-MpPreference
+    $ids = @($p.AttackSurfaceReductionRules_Ids); $acc = @($p.AttackSurfaceReductionRules_Actions); $bl = 0; $au = 0
+    for ($i = 0; $i -lt $ids.Count; $i++) { if (-not $ids[$i]) { continue }; $a = 0; if ($i -lt $acc.Count) { $a = Num $acc[$i] }; if ($a -eq 1 -or $a -eq 6) { $bl++ } elseif ($a -eq 2) { $au++ } }
+    $o.asr = [ordered]@{ bloquea = $bl; audita = $au }
+    $o.red = Num $p.EnableNetworkProtection
+    $o.pua = Num $p.PUAProtection
+    $o.carpetas = Num $p.EnableControlledFolderAccess
+  } catch {}
+  try { $dg = Get-CimInstance -Namespace root/Microsoft/Windows/DeviceGuard -ClassName Win32_DeviceGuard; $o.vbs = Num $dg.VirtualizationBasedSecurityStatus; $o.credential_guard = (@($dg.SecurityServicesRunning) -contains 1) } catch {}
+  $o.smartscreen = [string](Prop 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer' 'SmartScreenEnabled')
+  $o.smartscreen_politica = Num (Prop 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' 'EnableSmartScreen')
+  $o.sac = Num (Prop 'HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy' 'VerifiedAndReputablePolicyState')
+  $o.drivers = Num (Prop 'HKLM:\SYSTEM\CurrentControlSet\Control\CI\Config' 'VulnerableDriverBlocklistEnable')
+  $wl = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+  $o.winlogon = [ordered]@{ shell = (Corta (Prop $wl 'Shell')); userinit = (Corta (Prop $wl 'Userinit')) }
+  $ai = @()
+  foreach ($k in 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows', 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows NT\CurrentVersion\Windows') {
+    $dlls = [string](Prop $k 'AppInit_DLLs')
+    if ($dlls.Trim()) { $ai += [ordered]@{ dlls = (Hoja (RutaDe $dlls)); carga = ((Num (Prop $k 'LoadAppInit_DLLs')) -eq 1) } }
+  }
+  $o.appinit = $ai
+  try {
+    $o.ifeo = @(Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options' -ErrorAction Stop | ForEach-Object {
+      $dbg = Prop $_.PSPath 'Debugger'
+      if ($dbg) { [ordered]@{ programa = [string]$_.PSChildName; depurador = (Hoja (RutaDe ([string]$dbg))) } } })
+  } catch {}
+  try {
+    $cons = @{}
+    foreach ($c in @(Get-CimInstance -Namespace root/subscription -ClassName __EventConsumer -ErrorAction Stop)) { $cons[[string]$c.Name] = [string]$c.CimClass.CimClassName }
+    $o.wmi = @(Get-CimInstance -Namespace root/subscription -ClassName __FilterToConsumerBinding -ErrorAction Stop | ForEach-Object {
+      $n = [string]$_.Consumer.Name; $cl = [string]$_.Consumer.CimClass.CimClassName
+      if ($cons.ContainsKey($n)) { $cl = $cons[$n] }
+      [ordered]@{ nombre = (Corta $n); clase = $cl } })
+  } catch {}
+  try {
+    $procs = @{}; Get-Process | ForEach-Object { $procs[[int]$_.Id] = [string]$_.ProcessName }
+    $vistos = @{}; $l = @()
+    Get-NetUDPEndpoint | ForEach-Object {
+      $ad = [string]$_.LocalAddress
+      if (-not ($ad -eq '::1' -or $ad.StartsWith('127.'))) {
+        $pr = $procs[[int]$_.OwningProcess]; if ([int]$_.OwningProcess -eq 4) { $pr = 'System' }
+        $k = "$($_.LocalPort)|$pr"
+        if (-not $vistos.ContainsKey($k)) { $vistos[$k] = 1; $l += [ordered]@{ puerto = [int]$_.LocalPort; programa = $pr } }
+      }
+    }
+    $o.udp = $l
+  } catch {}
+  try { $o.entrada = @(Get-NetFirewallRule -Direction Inbound -Action Allow -Enabled True -ErrorAction Stop | Where-Object { -not $_.Group -and -not ([string]$_.DisplayGroup) } | Select-Object -First 200 | ForEach-Object { [ordered]@{ nombre = (Corta $_.DisplayName); perfil = [string]$_.Profile } }) } catch {}
+  try {
+    $n = 0
+    $raiz = 'HKLM:\SYSTEM\CurrentControlSet\Services\Dnscache\InterfaceSpecificParameters'
+    if (Test-Path $raiz) { foreach ($i in @(Get-ChildItem $raiz -ErrorAction Stop)) { foreach ($v in 'Doh', 'Doh6') { $d = Join-Path $i.PSPath "DohInterfaceSettings\$v"; if (Test-Path $d) { foreach ($s in @(Get-ChildItem $d -ErrorAction SilentlyContinue)) { if ((Num (Prop $s.PSPath 'DohFlags')) -gt 0) { $n++ } } } } } }
+    $o.doh_interfaces = $n
+  } catch {}
+  $o.doh_auto = Num (Prop 'HKLM:\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters' 'EnableAutoDoh')
+  try { $o.nrpt = @(Get-DnsClientNrptRule -ErrorAction Stop).Count } catch {}
+  $o.llmnr = Num (Prop 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\DNSClient' 'EnableMulticast')
+  try { $o.netbios = @(Get-CimInstance Win32_NetworkAdapterConfiguration -Filter 'IPEnabled=True' | ForEach-Object { Num $_.TcpipNetbiosOptions }) } catch {}
+  try { $o.smb_firma = [ordered]@{ servidor = [bool](Get-SmbServerConfiguration).RequireSecuritySignature; cliente = [bool](Get-SmbClientConfiguration).RequireSecuritySignature } } catch {}
+  $o
+}
+
 $R.tiempos = $T
 $R | ConvertTo-Json -Depth 8 -Compress

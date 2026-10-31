@@ -365,7 +365,7 @@ const GUION: &str = r#"(() => {
     // barrier here (independent review): only a reading's own address, at most four at a time, a new review once a
     // minute, a new slow look of the watch every 30 s, and the list of antivirus (a PowerShell each time) kept 30 s.
     const RUTA_OK = /^\/(?:api\/[a-z0-9\-\/]+|vigia)$/;
-    const ESPERA = { 'POST /api/revision/ahora': 60000, 'POST /api/vigilancia/ahora': 30000 };
+    const ESPERA = { 'POST /api/revision/ahora': 60000, 'POST /api/vigilancia/ahora': 30000, 'POST /api/ruta/ahora': 60000 };
     const GUARDA = { 'GET /api/antivirus/detectar': 30000 };
     const ultimo = new Map(), guardado = new Map();
     let enVuelo = 0;

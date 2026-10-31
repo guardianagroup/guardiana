@@ -8,8 +8,8 @@
   const FUERTES = new Set(['nuevo', 'sin_firma', 'firma_mala', 'no_existe', 'sin_clave', 'invitado', 'delicado', 'redirigido', 'apagado', 'sin_actualizar', 'en_uso', 'detectada', 'actuo']);
   const GRUPOS = ['proteccion', 'acceso', 'arranque', 'salida', 'privacidad', 'antivirus'];
   // Which sections of revision.ps1 feed each group (the script's own order).
-  const SECCIONES = { proteccion: ['equipo', 'actualizaciones', 'defensa', 'sistema'], acceso: ['acceso'], arranque: ['arranque'], salida: ['salida', 'certificados'], privacidad: ['privacidad', 'programas'], antivirus: ['defender_sucesos'] };
-  const TOTAL_SECCIONES = 11;
+  const SECCIONES = { proteccion: ['equipo', 'actualizaciones', 'defensa', 'sistema', 'endurecimiento'], acceso: ['acceso', 'endurecimiento'], arranque: ['arranque', 'endurecimiento'], salida: ['salida', 'certificados', 'endurecimiento'], privacidad: ['privacidad', 'programas'], antivirus: ['defender_sucesos'] };
+  const TOTAL_SECCIONES = 12; // 1.0.51: «endurecimiento» (defensas avanzadas, arranque oculto y red)
 
   async function iniciar(ctx) {
     const { api, t, esc, LOC } = ctx;
@@ -63,7 +63,7 @@
     // real step the script reports becomes one line; new lines cross the scanning line one at a
     // time (at most four a second) and rise into the tower. Counts appear only once Windows
     // gave them. Nothing is made up to keep it moving.
-    const SECS = ['equipo', 'actualizaciones', 'defensa', 'sistema', 'acceso', 'arranque', 'salida', 'certificados', 'privacidad', 'programas', 'defender_sucesos'];
+    const SECS = ['equipo', 'actualizaciones', 'defensa', 'sistema', 'acceso', 'arranque', 'salida', 'certificados', 'privacidad', 'programas', 'defender_sucesos', 'endurecimiento'];
     const CUENTAS = ['tareas', 'servicios', 'inicio', 'controladores'];
     const ICONO = { firma: 'M7 3h7l5 5v13H7zM14 3v5h5', dns: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18', cuenta: 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01' };
     let visto = 0, cola = [], relojCola = null, seccionActual = '', dnsVistos = [], filas = 0, empezoDirecto = 0, relojDirecto = null;

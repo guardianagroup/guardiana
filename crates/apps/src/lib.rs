@@ -578,6 +578,132 @@ pub fn revision_del_equipo_en_vivo(
 /// The review's script, so its size and its read-only promise can be checked everywhere.
 pub const REVISION_PS1: &str = include_str!("revision.ps1");
 
+/// One hop of a route: its number, the address that answered (none when nothing did) and the
+/// best of its times, in milliseconds.
+pub type Salto = (u32, Option<std::net::IpAddr>, Option<u32>);
+
+/// 1.0.51 (owner, 31 Oct 2026, 08:53: «por dónde viaja… si viaja por cable, qué cable, si viaja
+/// por satélite… lo más preciso posible»): the route to one address, hop by hop, with Windows' own
+/// `tracert` (no administrator rights, nothing installed, nothing written). At most `saltos` hops
+/// and `espera_ms` per answer; the whole trace is stopped after `limite` and what came is kept.
+///
+/// # Errors
+/// [`Error::NoSoportado`] outside Windows; [`Error::Sistema`] when `tracert` cannot be run.
+pub fn traza(
+    ip: std::net::IpAddr,
+    saltos: u8,
+    espera_ms: u32,
+    limite: std::time::Duration,
+) -> Result<Vec<Salto>, Error> {
+    #[cfg(windows)]
+    {
+        use std::io::Read as _;
+        use std::os::windows::process::CommandExt;
+        use std::process::{Command, Stdio};
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let raiz = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_owned());
+        let mut orden = Command::new(format!("{raiz}\\System32\\tracert.exe"));
+        orden
+            .arg("-d")
+            .arg("-h")
+            .arg(saltos.to_string())
+            .arg("-w")
+            .arg(espera_ms.to_string())
+            .arg(if ip.is_ipv4() { "-4" } else { "-6" })
+            .arg(ip.to_string())
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .creation_flags(CREATE_NO_WINDOW);
+        let mut hijo = orden.spawn().map_err(|e| Error::Sistema(e.to_string()))?;
+        let mut salida = hijo.stdout.take();
+        let lector = std::thread::spawn(move || {
+            let mut v = Vec::new();
+            if let Some(s) = salida.as_mut() {
+                let _ = s.read_to_end(&mut v);
+            }
+            v
+        });
+        let inicio = std::time::Instant::now();
+        loop {
+            match hijo.try_wait() {
+                Ok(Some(_)) => break,
+                Ok(None) if inicio.elapsed() > limite => {
+                    let _ = hijo.kill();
+                    let _ = hijo.wait();
+                    break;
+                }
+                Ok(None) => std::thread::sleep(std::time::Duration::from_millis(150)),
+                Err(e) => return Err(Error::Sistema(e.to_string())),
+            }
+        }
+        let v = lector.join().unwrap_or_default();
+        Ok(lee_tracert(&String::from_utf8_lossy(&v)))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (ip, saltos, espera_ms, limite);
+        Err(Error::NoSoportado)
+    }
+}
+
+/// The hops `tracert -d` printed, whatever the language of Windows: a line is a hop when it
+/// starts with its number; its times are the numbers before «ms» (`<1` counts as 1) and its
+/// address is the last word when it is one.
+#[must_use]
+pub fn lee_tracert(texto: &str) -> Vec<Salto> {
+    let mut out = Vec::new();
+    for linea in texto.lines() {
+        let p: Vec<&str> = linea.split_whitespace().collect();
+        let Some(n) = p.first().and_then(|x| x.parse::<u32>().ok()) else {
+            continue;
+        };
+        if p.len() < 2 {
+            continue;
+        }
+        let mut mejor: Option<u32> = None;
+        for (i, t) in p.iter().enumerate().skip(1) {
+            let antes_de_ms = p.get(i + 1).is_some_and(|x| x.eq_ignore_ascii_case("ms"));
+            let v = match t.strip_prefix('<') {
+                Some(r) => r.parse::<u32>().ok(),
+                None if antes_de_ms => t.parse::<u32>().ok(),
+                None => None,
+            };
+            if let Some(v) = v {
+                let v = v.max(1);
+                mejor = Some(mejor.map_or(v, |m| m.min(v)));
+            }
+        }
+        let ip = p.last().and_then(|x| {
+            x.trim_matches(|c| c == '[' || c == ']')
+                .parse::<std::net::IpAddr>()
+                .ok()
+        });
+        out.push((n, ip, mejor));
+    }
+    out
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tracert {
+    #[test]
+    fn hops_are_read_in_any_language() {
+        let es = "\r\nTraza a la dirección 142.250.78.4 sobre caminos de 20 saltos como máximo:\r\n\r\n  1    <1 ms    <1 ms    <1 ms  192.168.1.1\r\n  2     *        *        *     Tiempo de espera agotado para esta solicitud.\r\n  3    12 ms    11 ms    13 ms  200.75.51.132\r\n 10    41 ms    40 ms    44 ms  142.250.78.4\r\n\r\nTraza completa.\r\n";
+        let h = super::lee_tracert(es);
+        assert_eq!(h.len(), 4);
+        assert_eq!(h[0], (1, Some("192.168.1.1".parse().unwrap()), Some(1)));
+        assert_eq!(h[1], (2, None, None));
+        assert_eq!(h[2], (3, Some("200.75.51.132".parse().unwrap()), Some(11)));
+        assert_eq!(h[3].0, 10);
+        let en = "  5    25 ms    24 ms    26 ms  [2001:4860:0:1::1]\n";
+        assert_eq!(
+            super::lee_tracert(en)[0].1,
+            Some("2001:4860:0:1::1".parse().unwrap())
+        );
+    }
+}
+
 #[cfg(test)]
 mod vision {
     use super::{carpeta_de_usuario, lee_dword_de_reg};
