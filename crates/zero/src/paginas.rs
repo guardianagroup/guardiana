@@ -244,6 +244,12 @@ const GUION: &str = r#"(() => {
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', idioma, { once: true }); else idioma();
   }
+  // 1.0.50: GUARDIANA's own web (Comunicaciones and Órbita, the program's fixed tabs) knows it is inside the program, and
+  // hides its own ways to the other products, which the program's selector already gives. Only that site and only its own
+  // top document: any other page sees nothing.
+  if (!marco && location.origin === 'https://guardianagroup.com') {
+    try { document.documentElement.dataset.enPrograma = '1'; } catch (_) {}
+  }
   // 1.0.46 (Z1-b): a click on the web itself folds ZERO's side summary («clic fuera»). Only the
   // fact of a click, never where or on what.
   if (!marco && location.origin !== 'http://127.0.0.1:7443') {
