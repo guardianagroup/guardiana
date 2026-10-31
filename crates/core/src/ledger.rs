@@ -385,7 +385,12 @@ impl Ledger {
                 self.copia_en_archivo(archivo, valor.as_deref().unwrap_or(""));
             }
         }
-        if let Some(dir) = self.conn.path().filter(|p| !p.is_empty()).and_then(|p| Path::new(p).parent().map(Path::to_path_buf)) {
+        if let Some(dir) = self
+            .conn
+            .path()
+            .filter(|p| !p.is_empty())
+            .and_then(|p| Path::new(p).parent().map(Path::to_path_buf))
+        {
             for viejo in COPIAS_ANTIGUAS {
                 let _ = std::fs::remove_file(dir.join(viejo));
             }

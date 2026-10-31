@@ -2255,7 +2255,10 @@ fn idioma_sistema() -> String {
     // writes for every account in HKLM (until 1.0.48 it was only written with ZERO=0, so ZERO
     // opened in English after a Spanish or Portuguese install: review of 30 Oct 2026).
     for (raiz, ruta) in [
-        (HKEY_CURRENT_USER, "Software\\GUARDIANA GROUP\\GUARDIANA ZERO"),
+        (
+            HKEY_CURRENT_USER,
+            "Software\\GUARDIANA GROUP\\GUARDIANA ZERO",
+        ),
         (HKEY_CURRENT_USER, "Software\\Guardiana"),
         (HKEY_LOCAL_MACHINE, "SOFTWARE\\GUARDIANA GROUP\\GUARDIANA"),
     ] {
