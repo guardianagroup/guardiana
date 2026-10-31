@@ -240,14 +240,26 @@ fn escribe_espera(carpeta: &Path, textos: &Textos) {
 /// answers; otherwise GUARDIANA's tab on ZERO's own wait page, and a thread that waits for the
 /// service (up to [`lanzador::ESPERA_MAXIMA`]) and hands the panel's address to the window. The
 /// person never sees a console, nor a white or navy page in between.
-fn abre_panel(s: &mut Sesion, clave: Option<String>) -> Vec<Orden> {
+///
+/// 1.0.50: opening the program (`programa`) shows GUARDIANA's web in front, with the panel
+/// behind it; the person asking for the panel itself, or a licence link, shows the panel.
+fn abre_panel(s: &mut Sesion, clave: Option<String>, programa: bool) -> Vec<Orden> {
+    let la_web_delante = programa && clave.is_none();
     if let Some(url) = lanzador::enlace_si_listo(clave.as_deref()) {
-        return s.abre_guardiana(&url);
+        return if la_web_delante {
+            s.abre_programa(&url)
+        } else {
+            s.abre_guardiana(&url)
+        };
     }
     *CLAVE_PEDIDA
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner) = clave;
-    let o = s.abre_guardiana(lanzador::ESPERA);
+    let o = if la_web_delante {
+        s.abre_programa(lanzador::ESPERA)
+    } else {
+        s.abre_guardiana(lanzador::ESPERA)
+    };
     if !ESPERANDO_PANEL.swap(true, Ordering::SeqCst) {
         let lanzado = std::thread::Builder::new().name("panel".into()).spawn(|| {
             let r = lanzador::espera_llave(&lanzador::ruta_llave(), lanzador::ESPERA_MAXIMA);
@@ -281,7 +293,7 @@ fn recoge_panel() {
         .drain(..)
         .collect();
     for url in hechos {
-        encola(con_sesion(|s| s.abre_guardiana(&url)).unwrap_or_default());
+        encola(con_sesion(|s| s.panel_listo(&url)).unwrap_or_default());
     }
 }
 
@@ -488,9 +500,22 @@ fn ejecuta(o: Orden) {
             coloca();
         }
         Orden::PideGuardiana => {
-            encola(con_sesion(|s| abre_panel(s, None)).unwrap_or_default());
+            encola(con_sesion(|s| abre_panel(s, None, false)).unwrap_or_default());
         }
         Orden::Envia { a, json } => envia(a, &json),
+        // 1.0.50: to the panel on this computer, or to GUARDIANA's web, and only while the tab
+        // is still there (it may have moved on since the session decided).
+        Orden::EnviaAPagina { id, prefijo, json } => {
+            if let Some(v) = vista_de(Origen::Pestana(id)) {
+                let fuente = texto_de(|p| unsafe { v.web.Source(p) });
+                if fuente.starts_with(prefijo) {
+                    let j = Ancho::de(&json);
+                    vale("mensaje a la página", unsafe {
+                        v.web.PostWebMessageAsJson(j.p())
+                    });
+                }
+            }
+        }
         Orden::RespondeFormulario { id, json } => {
             // The answer to the page's own form guard; only its closure listens to it.
             if let Some(v) = vista_de(Origen::Pestana(id)) {
@@ -2034,9 +2059,9 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                 ) {
                     escribe_espera(&carpeta, &t);
                 }
-                encola(con_sesion(|s| abre_panel(s, clave)).unwrap_or_default());
+                encola(con_sesion(|s| abre_panel(s, clave, true)).unwrap_or_default());
             } else {
-                encola(con_sesion(|s| s.abre_guardiana(&texto)).unwrap_or_default());
+                encola(con_sesion(|s| s.abre_programa(&texto)).unwrap_or_default());
             }
             drena();
             LRESULT(1)
@@ -2457,8 +2482,8 @@ pub fn arranca() {
     escribe_espera(&carpeta_ui, &s.textos());
     let mut iniciales = iniciales;
     let o = match &pedido {
-        Some(Pedido::AbreGuardiana(url)) => s.abre_guardiana(url),
-        Some(p) => abre_panel(&mut s, p.clave().map(str::to_owned)),
+        Some(Pedido::AbreGuardiana(url)) => s.abre_programa(url),
+        Some(p) => abre_panel(&mut s, p.clave().map(str::to_owned), true),
         None => Vec::new(),
     };
     if !o.is_empty() {

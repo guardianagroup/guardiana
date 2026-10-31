@@ -201,8 +201,20 @@ pub enum Orden {
         /// What the result is for.
         etiqueta: Option<Etiqueta>,
     },
+    /// 1.0.50: a message to a web page of the program's own, on that tab's channel: the panel
+    /// on this computer (asked for the computer's connections) or GUARDIANA's web (given them,
+    /// to draw them on Órbita). The shell posts it only if the tab is still on `prefijo`.
+    EnviaAPagina {
+        /// The tab.
+        id: u32,
+        /// The address the tab must still be on when the message is posted.
+        prefijo: &'static str,
+        /// The message.
+        json: String,
+    },
     /// The answer to a page's form guard, on the channel only that page's guard listens to.
-    /// The one message a web page ever gets from the browser: which question, yes or no.
+    /// Besides [`Orden::EnviaAPagina`] to the program's own web, the one message a web page
+    /// ever gets from the browser: which question, yes or no.
     RespondeFormulario {
         /// The tab.
         id: u32,
@@ -729,6 +741,14 @@ fn es_enlace_panel_guardiana(url: &str) -> bool {
         .is_some_and(|(token, clave)| llave(token) && crate::lanzador::es_clave_valida(clave))
 }
 
+/// 1.0.50: a licence link (`guardiana://activar`), the one opening that shows the panel itself.
+fn es_enlace_licencia(url: &str) -> bool {
+    url.starts_with("http://127.0.0.1:7443/licencia?t=") && es_enlace_panel_guardiana(url)
+}
+
+/// 1.0.50: where the panel lives on this computer, as a tab's address starts.
+const PANEL_LOCAL: &str = "http://127.0.0.1:7443/";
+
 /// ZERO's own wait page for the panel (1.0.44), as it is or saying what failed.
 fn es_espera_propia(url: &str) -> bool {
     [
@@ -834,6 +854,40 @@ impl Sesion {
     /// loopback panel (or its local wait page, or ZERO's own), never an arbitrary external
     /// address.
     pub fn abre_guardiana(&mut self, url: &str) -> Vec<Orden> {
+        self.abre_guardiana_con(url, true)
+    }
+
+    /// 1.0.50 (dueño, 30 Oct 2026, 22:29: «la versión web que teníamos, que ya estaba terminada,
+    /// quiero que la metas en el programa»): the program opens on GUARDIANA's web, Órbita, which
+    /// fills the window. The panel (the program's own tools, and where the computer's connections
+    /// that Órbita draws come from) still opens, behind it; a licence link brings it forward.
+    pub fn abre_programa(&mut self, url: &str) -> Vec<Orden> {
+        if es_enlace_licencia(url.trim()) {
+            return self.abre_guardiana(url);
+        }
+        let mut o = self.abre_guardiana_con(url, false);
+        if o.is_empty() {
+            return o;
+        }
+        if !matches!(self.producto(), "orbita" | "secure") {
+            o.extend(self.elige_producto("orbita"));
+        }
+        o
+    }
+
+    /// What the wait for the service found (the panel, or why it is not coming) loads in
+    /// GUARDIANA's tab. Since 1.0.50 the web is in front, so the panel only comes forward for a
+    /// licence link, for the page that says what failed, or when the person is already on it.
+    pub fn panel_listo(&mut self, url: &str) -> Vec<Orden> {
+        let u = url.trim();
+        let al_frente = es_enlace_licencia(u)
+            || u == crate::lanzador::ESPERA_SIN_SERVICIO
+            || u == crate::lanzador::ESPERA_SIN_LLAVE
+            || self.producto() == "guardiana";
+        self.abre_guardiana_con(url, al_frente)
+    }
+
+    fn abre_guardiana_con(&mut self, url: &str, al_frente: bool) -> Vec<Orden> {
         let url = url.trim();
         let espera_local = url.starts_with("file:///")
             && url.ends_with("/guardiana-arrancando.html")
@@ -869,13 +923,14 @@ impl Sesion {
             .find(|p| p.fija && Self::clase_fija(p) == "guardiana")
             .map(|p| p.id)
         {
-            return vec![Orden::Navega {
+            let mut o = vec![Orden::Navega {
                 id,
                 url: url.to_owned(),
-            }]
-            .into_iter()
-            .chain(self.activar(id))
-            .collect();
+            }];
+            if al_frente {
+                o.extend(self.activar(id));
+            }
+            return o;
         }
         let mut ordenes = self.nueva_pestana(Perfil::General, url);
         if let Some(mut panel) = self.pestanas.pop() {
@@ -1808,14 +1863,14 @@ impl Sesion {
             return (ALTO_ZERO, 0);
         };
         let producto = Self::producto_de(p);
-        if producto == "guardiana" {
+        // 1.0.50 (dueño, 30 Oct 2026, 22:29: «la versión web que teníamos, que ya estaba
+        // terminada, quiero que la metas en el programa»): GUARDIANA's web (Órbita, and
+        // Comunicaciones from its door) fills the window as the panel does; it has its own ways
+        // between its parts, and the old bar is not drawn over it.
+        if matches!(producto, "guardiana" | "secure" | "orbita") {
             return (0, 0);
         }
-        let barra = if producto == "secure" || producto == "orbita" {
-            ALTO_ARRIBA
-        } else {
-            ALTO_ZERO
-        };
+        let barra = ALTO_ZERO;
         let web = producto == "zero" && !es_interna(&p.url) && !p.url.is_empty();
         let lateral = match self.panel.as_deref() {
             Some("escudo") if !web => 0,
@@ -1926,6 +1981,57 @@ impl Sesion {
             return Vec::new();
         }
         self.ajuste("idioma", &Value::String(idioma.to_string()))
+    }
+
+    /// 1.0.50: a document of GUARDIANA's web in one of the program's own tabs (Órbita, or
+    /// Comunicaciones under it), as the engine says, not as the message claims.
+    fn es_web_del_programa(&self, id: u32, fuente: &str) -> bool {
+        fuente.starts_with(ORBITA) && self.pestana(id).is_some_and(|p| p.fija)
+    }
+
+    /// 1.0.50: GUARDIANA's web asks for this computer's connections, to draw them on Órbita.
+    /// They are the panel's (its `/api/por-dentro`, read with the panel's own session), so the
+    /// question goes to the panel's tab, which answers with `zg_pc_datos`. Nothing is asked
+    /// while the panel is not open yet (the web then keeps waiting).
+    fn pide_datos_pc(&self, id: u32) -> Vec<Orden> {
+        let Some(panel) = self
+            .pestanas
+            .iter()
+            .find(|p| p.fija && es_panel_guardiana(&p.url))
+            .map(|p| p.id)
+        else {
+            return Vec::new();
+        };
+        vec![Orden::EnviaAPagina {
+            id: panel,
+            prefijo: PANEL_LOCAL,
+            json: json!({ "tipo": "zg_pc_pide", "para": id }).to_string(),
+        }]
+    }
+
+    /// 1.0.50: the panel's answer, handed as it came to the web tab that asked, while that tab is
+    /// still GUARDIANA's web in the program. Nothing else gets it.
+    fn datos_pc(&self, m: &Value) -> Vec<Orden> {
+        let para = m
+            .get("para")
+            .and_then(Value::as_u64)
+            .and_then(|x| u32::try_from(x).ok())
+            .unwrap_or(0);
+        let datos = texto(m, "datos");
+        if datos.is_empty() || datos.len() > 400_000 {
+            return Vec::new();
+        }
+        if !self
+            .pestana(para)
+            .is_some_and(|p| p.fija && p.url.starts_with(ORBITA))
+        {
+            return Vec::new();
+        }
+        vec![Orden::EnviaAPagina {
+            id: para,
+            prefijo: ORBITA,
+            json: json!({ "tipo": "zg_pc", "datos": datos }).to_string(),
+        }]
     }
 
     /// A click on the web in front while its side summary is open (Z1-b): it folds back into
@@ -2378,6 +2484,18 @@ impl Sesion {
                     "zg_idioma" if es_panel_guardiana(fuente) => {
                         self.idioma_del_programa(texto(&m, "idioma"))
                     }
+                    // 1.0.50: GUARDIANA's web in the program's own tabs (Órbita and, from its
+                    // door, Comunicaciones) moves between the products and asks for this
+                    // computer's connections. Only those tabs and only those products: any other
+                    // page cannot.
+                    "zg_producto" if self.es_web_del_programa(id, fuente) => {
+                        match texto(&m, "producto") {
+                            p @ ("orbita" | "secure" | "guardiana") => self.elige_producto(p),
+                            _ => Vec::new(),
+                        }
+                    }
+                    "zg_pc_pide" if self.es_web_del_programa(id, fuente) => self.pide_datos_pc(id),
+                    "zg_pc_datos" if es_panel_guardiana(fuente) => self.datos_pc(&m),
                     _ => Vec::new(),
                 };
             }

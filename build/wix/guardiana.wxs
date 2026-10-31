@@ -51,6 +51,12 @@
     <Property Id="ARPURLUPDATEINFO" Value="https://guardianagroup.com/instalar.html" />
     <Property Id="ARPCONTACT" Value="hola@guardianagroup.com" />
     <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]" After="CostFinalize" Sequence="execute" />
+    <!-- 1.0.50 (dueño, 30 Oct 2026, 22:10, con un vídeo: «tardó muchísimo… la persona pensará que no descarga y
+         cancelará»): la pantalla «Instalando GUARDIANA» se quedaba unos 23 segundos con «Estado» vacío y la barra a
+         cero mientras Windows creaba un punto de restauración del sistema antes de empezar. Un programa de ~60 MB que
+         se desinstala limpio desde Configuración no lo necesita: MSIFASTINSTALL=1 lo omite, y la barra avanza desde
+         el primer segundo. -->
+    <Property Id="MSIFASTINSTALL" Value="1" />
 
     <!-- Two screens only: what the installer does and does not (build/wix/textos/bienvenida-XX.rtf)
          with "Install", then "Finish" with "Open Guardiana" ticked, which opens the panel in the

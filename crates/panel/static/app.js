@@ -23,6 +23,13 @@
   }
   let token = '';
   try { token = sessionStorage.getItem('guardiana_token') || ''; } catch (_) {}
+  // 1.0.50 (dueño, 30 Oct 2026, 22:16–22:29: «esa es la órbita vieja… la que tienes que meter en el programa es la que
+  // tiene los cables terrestres»; «borra lo de abajo también, eso no va ahí»): inside the program, GUARDIANA's web is the
+  // program's screen and Órbita draws this computer's connections itself. This panel keeps the program's own tools; its
+  // old globe and that globe's bottom strip are not shown there, and it opens on the 60-second X-ray, which keeps
+  // «Protección máxima».
+  const EN_PROGRAMA = document.documentElement.dataset.enZero === '1';
+  if (EN_PROGRAMA && /^\/(por-dentro(\.html)?)?$/.test(location.pathname)) location.replace('/foto');
   // Language (decision 45): the person's choice, kept in this browser; otherwise the browser's own.
   let LANG = '';
   try { LANG = localStorage.getItem('guardiana_lang') || ''; } catch (_) {}
@@ -1128,6 +1135,7 @@
   const ICONO_AJUSTES = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.6"/><circle cx="6" cy="11.5" r="1.6"/></svg>';
   const ICONO_CHEVRON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 6.5 8 10l3.5-3.5"/></svg>';
   const ICONO_MIGA = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg>';
+  const ICONO_VOLVER = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5"/></svg>';
   // Numbers with the thousands separator of the language, always (Spanish leaves «1234» bare by
   // default; the owner wants «1.234» everywhere).
   const numero = (n) => { try { return Number(n || 0).toLocaleString(LOC, { useGrouping: 'always' }); } catch (_) { return Number(n || 0).toLocaleString(LOC); } };
@@ -1203,13 +1211,19 @@
     const enlace = (p, clase) => `<a href="${p[1]}"${clase ? ` class="${clase}"` : ''}${p[0] === page ? ' aria-current="page"' : ''}>${esc(t(p[2]))}</a>`;
     const impreso = header.querySelector('.print-only') ? ` <span class="print-only">${esc(t('pdf_pie'))}</span>` : '';
     header.classList.add('g-barra');
-    header.innerHTML = `<a class="brand" href="/por-dentro" title="${esc(t('ir_inicio'))}"><span class="brand-txt">GUARDIANA</span></a>${impreso}
-      <nav class="g-productos" aria-label="${esc(t('menu_productos'))}">
+    // 1.0.50: inside the program, one way out of the tools: back to GUARDIANA's web (Órbita), which has the rest.
+    const productos = EN_PROGRAMA
+      ? `<nav class="g-productos g-solo-volver" aria-label="${esc(t('menu_productos'))}">
+        <button type="button" class="g-producto g-volver" data-producto="orbita">${ICONO_VOLVER}<span>${esc(t('menu_volver_orbita'))}</span></button>
+      </nav>`
+      : `<nav class="g-productos" aria-label="${esc(t('menu_productos'))}">
         <a href="/por-dentro" class="g-producto" aria-current="true">${esc(t('menu_radiografias'))}</a>
         <button type="button" class="g-producto" data-producto="zero" aria-expanded="false" aria-controls="g-pop">${esc(t('menu_zero'))}</button>
         <button type="button" class="g-producto" data-producto="com" aria-expanded="false" aria-controls="g-pop">${esc(t('menu_comunicaciones'))}</button>
         <button type="button" class="g-producto" data-producto="orbita" aria-expanded="false" aria-controls="g-pop">${esc(t('menu_orbita'))}</button>
-      </nav>
+      </nav>`;
+    header.innerHTML = `<a class="brand" href="${EN_PROGRAMA ? '/foto' : '/por-dentro'}" title="${esc(t('ir_inicio'))}"><span class="brand-txt">GUARDIANA</span></a>${impreso}
+      ${productos}
       <div class="g-pop" id="g-pop" role="dialog" hidden></div>
       <div class="g-der">
         <button type="button" class="g-pulso${pulso && !pulso.ok ? ' atencion' : ''}" id="g-pulso" aria-haspopup="dialog" aria-expanded="false" aria-controls="g-pulso-pop"><i aria-hidden="true"></i><span>${esc(pulso ? pulso.texto : t('rg_pulso_protegido'))}</span></button>
@@ -1228,7 +1242,7 @@
     sub.setAttribute('aria-label', t('menu_secciones'));
     const extra = document.getElementById('g-extra');
     const chipMuestra = document.getElementById('g-muestra');
-    sub.innerHTML = MENU.map((s) => {
+    sub.innerHTML = MENU.filter((s) => !(EN_PROGRAMA && s.id === 'vivo')).map((s) => {
       const actual = s === seccion ? ' aria-current="true"' : '';
       if (s.paginas.length < 2) return `<div class="g-sec"><a class="g-sec-a" href="${s.paginas[0][1]}"${actual}>${esc(t(s.t))}</a></div>`;
       return `<div class="g-sec" data-sec="${s.id}"><a class="g-sec-a" href="${s.paginas[0][1]}"${actual}>${esc(t(s.t))}</a>`

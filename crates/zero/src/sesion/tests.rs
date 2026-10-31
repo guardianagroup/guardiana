@@ -3633,7 +3633,8 @@ fn orbita_is_the_fourth_product_and_its_tab_is_made_once() {
     );
     let orbita = s.activa();
     assert!(s.pestana(orbita).is_some_and(|p| p.fija && p.url == ORBITA));
-    assert_eq!(marco_de(&s.marco_nuevo()), Some((ALTO_ARRIBA, 0)));
+    // 1.0.50: the web fills the window, as the panel does.
+    assert_eq!(marco_de(&s.marco_nuevo()), Some((0, 0)));
     // Comunicaciones lives under Órbita's folder and stays its own product.
     let _ = s.mensaje(
         Origen::Barra,
@@ -3663,13 +3664,109 @@ fn orbita_is_the_fourth_product_and_its_tab_is_made_once() {
         r#"{"tipo":"zg_producto","producto":"orbita"}"#,
     );
     assert_eq!(s.activa(), orbita);
-    // A web page cannot ask for it.
+    // 1.0.50: GUARDIANA's web in the program's own Órbita tab moves between the products
+    // itself (it fills the window), but only between the program's own three.
+    let _ = s.mensaje(
+        Origen::Pestana(orbita),
+        ORBITA,
+        r#"{"tipo":"zg_producto","producto":"zero"}"#,
+    );
+    assert_eq!(s.producto(), "orbita");
     let _ = s.mensaje(
         Origen::Pestana(orbita),
         ORBITA,
         r#"{"tipo":"zg_producto","producto":"guardiana"}"#,
     );
+    assert_eq!(s.producto(), "guardiana");
+}
+
+#[test]
+fn the_program_opens_on_its_web_and_the_panel_waits_behind_it() {
+    // 1.0.50 (the owner, 30 Oct 2026, 22:29: «la versión web que teníamos, que ya estaba
+    // terminada, quiero que la metas en el programa»).
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "e".repeat(64));
+    let o = s.abre_programa(crate::lanzador::ESPERA);
+    assert!(!o.is_empty());
     assert_eq!(s.producto(), "orbita");
+    assert_eq!(s.marco(), (0, 0));
+    let orbita = s.activa();
+    assert!(s.pestana(orbita).is_some_and(|p| p.fija && p.url == ORBITA));
+    // The service answers: the panel loads in its own tab, behind the web.
+    let o = s.panel_listo(&url);
+    assert!(o
+        .iter()
+        .any(|x| matches!(x, Orden::Navega { url: u, .. } if u == &url)));
+    assert_eq!(s.activa(), orbita);
+    // Opening the program again keeps the web in front, and makes no second Órbita tab.
+    let n = s.pestanas.len();
+    let _ = s.abre_programa(&url);
+    assert_eq!(s.activa(), orbita);
+    assert_eq!(s.pestanas.len(), n);
+    // A licence link shows the panel itself.
+    let licencia = crate::lanzador::enlace(&"e".repeat(64), Some("ABCD-1234-EFGH-5678"));
+    let _ = s.abre_programa(&licencia);
+    assert_eq!(s.producto(), "guardiana");
+}
+
+#[test]
+fn the_panel_comes_forward_when_the_service_did_not_answer() {
+    let (mut s, _, _) = abre();
+    let _ = s.abre_programa(crate::lanzador::ESPERA);
+    assert_eq!(s.producto(), "orbita");
+    let _ = s.panel_listo(crate::lanzador::ESPERA_SIN_SERVICIO);
+    assert_eq!(s.producto(), "guardiana");
+}
+
+#[test]
+fn orbita_gets_this_computer_s_connections_from_the_panel_and_nothing_else_does() {
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "f".repeat(64));
+    let _ = s.abre_programa(&url);
+    let orbita = s.activa();
+    let panel = s
+        .pestanas
+        .iter()
+        .find(|p| p.url == url)
+        .map(|p| p.id)
+        .unwrap_or_default();
+    assert_ne!(panel, orbita);
+    // Órbita asks: the question goes to the panel's tab, saying who asked.
+    let o = s.mensaje(Origen::Pestana(orbita), ORBITA, r#"{"tipo":"zg_pc_pide"}"#);
+    let para = format!("\"para\":{orbita}");
+    assert!(o.iter().any(|x| matches!(
+        x,
+        Orden::EnviaAPagina { id, prefijo, json }
+            if *id == panel && *prefijo == "http://127.0.0.1:7443/" && json.contains("zg_pc_pide") && json.contains(&para)
+    )));
+    // The panel answers: the data go to Órbita, as they came, and only there.
+    let datos = r#"{"v":1,"destinos":[]}"#;
+    let respuesta = json!({ "tipo": "zg_pc_datos", "para": orbita, "datos": datos }).to_string();
+    let o = s.mensaje(Origen::Pestana(panel), &url, &respuesta);
+    assert!(o.iter().any(|x| matches!(
+        x,
+        Orden::EnviaAPagina { id, prefijo, json }
+            if *id == orbita && *prefijo == ORBITA && json.contains("zg_pc") && json.contains("destinos")
+    )));
+    // No other page can ask, nor answer, nor be answered.
+    assert!(s
+        .mensaje(
+            Origen::Pestana(orbita),
+            "https://example.com/",
+            r#"{"tipo":"zg_pc_pide"}"#
+        )
+        .is_empty());
+    assert!(s
+        .mensaje(Origen::Pestana(orbita), ORBITA, &respuesta)
+        .is_empty());
+    let zero = s
+        .pestanas
+        .iter()
+        .find(|p| p.url == crate::sesion::INICIO)
+        .map(|p| p.id)
+        .unwrap_or_default();
+    let otra = json!({ "tipo": "zg_pc_datos", "para": zero, "datos": datos }).to_string();
+    assert!(s.mensaje(Origen::Pestana(panel), &url, &otra).is_empty());
 }
 
 #[test]
@@ -3720,7 +3817,8 @@ fn one_navigation_the_selector_moves_between_the_three_products() {
         r#"{"tipo":"producto","producto":"secure"}"#,
     );
     assert_eq!(s.producto(), "secure");
-    assert_eq!(marco_de(&s.marco_nuevo()), Some((ALTO_ARRIBA, 0)));
+    // 1.0.50: Comunicaciones, GUARDIANA's web, fills the window too.
+    assert_eq!(marco_de(&s.marco_nuevo()), Some((0, 0)));
     // And back to the browser tab the person was on.
     let _ = s.mensaje(
         Origen::Barra,

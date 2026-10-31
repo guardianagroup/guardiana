@@ -243,12 +243,61 @@ const GUION: &str = r#"(() => {
       if (l === 'es' || l === 'en' || l === 'pt') manda({ tipo: 'zg_idioma', idioma: l });
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', idioma, { once: true }); else idioma();
+    // 1.0.50: GUARDIANA's web, which the program shows full window, asks (through the program) for this computer's
+    // connections, to draw them on Órbita. They are this panel's own /api/por-dentro, read here with the panel's session
+    // and handed back trimmed to what the web draws. The program passes the answer only to its own web tab.
+    escucha('message', (e) => {
+      const m = e && e.data;
+      if (!m || m.tipo !== 'zg_pc_pide') return;
+      const para = Number(m.para) || 0;
+      let tk = '';
+      try { tk = sessionStorage.getItem('guardiana_token') || ''; } catch (_) {}
+      fetch('/api/por-dentro', { headers: { 'X-Guardiana-Token': tk }, cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          if (!j || !Array.isArray(j.destinos)) return;
+          const n = (x) => (typeof x === 'number' && isFinite(x) ? x : 0);
+          const t = (x, k) => (typeof x === 'string' ? x.slice(0, k) : '');
+          const g = (x) => (typeof x === 'number' && isFinite(x) ? Math.round(x * 100) / 100 : null);
+          const destinos = j.destinos.slice(0, 150).map((d) => {
+            const l = d && d.lugar && typeof d.lugar === 'object' ? d.lugar : null;
+            return {
+              e: t(d.empresa, 80) || t(d.red, 80), d: t(d.destino, 120), p: t((l && l.pais) || d.pais, 2).toUpperCase(),
+              c: t(l && l.ciudad, 60), la: l ? g(l.lat) : null, lo: l ? g(l.lon) : null, k: t(d.categoria, 32),
+              x: n(d.paradas) > 0 || d.regla != null ? 1 : 0, n: Math.max(1, n(d.consultas) + n(d.paradas)), g: t(d.programa, 60),
+            };
+          });
+          const datos = { v: 1, ahora: n(j.ahora), maxima: !!j.maxima, vigilando: !!j.vigilando, programas: Array.isArray(j.programas) ? j.programas.length : 0, destinos };
+          manda({ tipo: 'zg_pc_datos', para, datos: JSON.stringify(datos) });
+        })
+        .catch(() => {});
+    });
   }
   // 1.0.50: GUARDIANA's own web (Comunicaciones and Órbita, the program's fixed tabs) knows it is inside the program, and
   // hides its own ways to the other products, which the program's selector already gives. Only that site and only its own
   // top document: any other page sees nothing.
   if (!marco && location.origin === 'https://guardianagroup.com') {
     try { document.documentElement.dataset.enPrograma = '1'; } catch (_) {}
+    // 1.0.50 (dueño, 30 Oct 2026, 22:29: «la versión web que teníamos, que ya estaba terminada, quiero que la metas en el
+    // programa»): the web fills the window and moves between the program's products itself (Órbita, Comunicaciones,
+    // the panel) with `data-producto`; the program checks again that the tab is its own web.
+    document.addEventListener('click', (e) => {
+      const b = e.target && e.target.closest && e.target.closest('[data-producto]');
+      if (!b) return;
+      const p = String(b.dataset.producto || '');
+      if (p !== 'orbita' && p !== 'secure' && p !== 'guardiana') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      manda({ tipo: 'zg_producto', producto: p });
+    }, true);
+    // This computer's connections, for Órbita: asked with a page event, answered with another (as text), and nothing
+    // else of the channel reaches the page.
+    document.addEventListener('guardiana-pc-pide', () => manda({ tipo: 'zg_pc_pide' }));
+    escucha('message', (e) => {
+      const m = e && e.data;
+      if (!m || m.tipo !== 'zg_pc' || typeof m.datos !== 'string') return;
+      document.dispatchEvent(new CustomEvent('guardiana-pc', { detail: m.datos }));
+    });
   }
   // 1.0.46 (Z1-b): a click on the web itself folds ZERO's side summary («clic fuera»). Only the
   // fact of a click, never where or on what.

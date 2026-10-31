@@ -3365,6 +3365,7 @@
     "menu_zero": "ZERO",
     "menu_comunicaciones": "Communications",
     "menu_orbita": "Orbit",
+    "menu_volver_orbita": "Back to Orbit",
     "orbita_card_titulo": "Orbit: the map of the internet",
     "menu_orbita_texto": "Submarine and land cables, data centres and satellites, from public sources. On Windows it is a fixed tab of GUARDIANA ZERO; it is also at guardianagroup.com/orbita.",
     "menu_zero_texto": "ZERO is GUARDIANA's browser. Open it from its «GUARDIANA ZERO» shortcut on the desktop or in the Start menu: inside it, X-rays, ZERO, Communications and Orbit are its fixed tabs.",

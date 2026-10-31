@@ -3365,6 +3365,7 @@
     "menu_zero": "ZERO",
     "menu_comunicaciones": "Comunicações",
     "menu_orbita": "Órbita",
+    "menu_volver_orbita": "Voltar à Órbita",
     "orbita_card_titulo": "Órbita: o mapa da internet",
     "menu_orbita_texto": "Cabos submarinos e terrestres, centros de dados e satélites, com dados de fontes públicas. No Windows é uma aba fixa do GUARDIANA ZERO; também está em guardianagroup.com/orbita.",
     "menu_zero_texto": "ZERO é o navegador da GUARDIANA. Abra-o pelo atalho «GUARDIANA ZERO» da área de trabalho ou do menu Iniciar: lá dentro, Radiografias, ZERO, Comunicações e Órbita são as suas abas fixas.",

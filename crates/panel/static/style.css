@@ -1287,6 +1287,9 @@ header.top.g-barra .brand::before { width: 24px; height: 24px; }
 .g-sec:hover .g-sec-chev, .g-sec:focus-within .g-sec-chev, .g-sec.abierta .g-sec-chev, .g-sec-chev:focus-visible { opacity: 1; }
 .g-sec-chev:hover { color: var(--fg); background: transparent; }
 .g-sec-chev svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s ease; }
+/* 1.0.50: inside the program, the tools' one way back to GUARDIANA's web (Órbita). */
+.g-productos.g-solo-volver .g-volver { gap: 8px; color: var(--fg) !important; }
+.g-productos .g-volver svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .g-sec.abierta .g-sec-chev svg { transform: rotate(180deg); }
 .g-sec-chev:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
 /* The section's pages: on hover (with a short bridge so the pointer can travel), on focus, or on
