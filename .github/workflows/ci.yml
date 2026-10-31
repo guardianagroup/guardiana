@@ -88,7 +88,18 @@ jobs:
       - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: cargo-audit,cargo-deny
+      # 1.0.49: the job logs cannot always be read from outside; what fails is written as annotations too.
       - name: audit
-        run: cargo audit
+        shell: bash
+        run: |
+          set +e
+          cargo audit 2>&1 | tee audit.txt; s=${PIPESTATUS[0]}
+          grep -E '^(Crate|Version|Title|ID|Solution|error|warning):' audit.txt | head -40 | sed 's/^/::warning title=cargo audit::/'
+          exit $s
       - name: deny
-        run: cargo deny check
+        shell: bash
+        run: |
+          set +e
+          cargo deny check 2>&1 | tee deny.txt; s=${PIPESTATUS[0]}
+          grep -E '^(error|warning)' deny.txt | head -40 | sed 's/^/::warning title=cargo deny::/'
+          exit $s

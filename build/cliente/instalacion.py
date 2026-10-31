@@ -70,9 +70,14 @@ def run(cmd, timeout=180, env=None, sudo=False):
     """(exit code, stdout+stderr). Never raises: a customer's command either works or does not."""
     if sudo and SISTEMA != "Windows":
         cmd = ["sudo", "-E"] + cmd if env else ["sudo"] + cmd
+    entorno = {**os.environ, **(env or {})}
+    if cmd and cmd[0].lower() in ("powershell", "powershell.exe"):
+        # Windows PowerShell 5.1 started from PowerShell 7 (the runner's shell) inherits PS7's module path and then cannot
+        # load its own Microsoft.PowerShell.Security (Get-Acl). Without the variable it builds its default path again.
+        entorno.pop("PSModulePath", None)
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
-                           env={**os.environ, **(env or {})}, errors="replace")
+                           env=entorno, errors="replace")
         return p.returncode, (p.stdout or "") + (p.stderr or "")
     except subprocess.TimeoutExpired:
         return 124, f"tiempo agotado tras {timeout}s: {' '.join(cmd)}"

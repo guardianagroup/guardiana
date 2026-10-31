@@ -1385,7 +1385,12 @@ impl Sesion {
         let Origen::Pestana(id) = origen else {
             return Vec::new();
         };
-        if !self.pestana(id).is_some_and(|p| p.url.starts_with(SECURE)) {
+        // The old page inside the program (SECURE_INTERNA) is the only one that still speaks to it:
+        // the web's Comunicaciones page cannot send «secure» (it is not the program's own page).
+        if !self
+            .pestana(id)
+            .is_some_and(|p| p.url.starts_with(SECURE) || p.url.starts_with(SECURE_INTERNA))
+        {
             return Vec::new();
         }
         let salidas = self.comunicaciones.accion(m);

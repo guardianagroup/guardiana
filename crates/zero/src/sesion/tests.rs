@@ -239,7 +239,9 @@ fn the_comunicaciones_page_buttons_reach_the_conversation() {
     let (mut s, _, _) = abre();
     let _ = s.abre_guardiana(&format!("http://127.0.0.1:7443/?t={}", "c".repeat(64)));
     let id = s.pestanas[2].id;
-    // (since 30 Oct 2026 the Comunicaciones tab is the web's; the old page stays inside the program)
+    // (since 30 Oct 2026 the Comunicaciones tab is the web's; the old page stays inside the program,
+    // at its own address, and only that page gets the answer)
+    s.pestanas[2].url = crate::sesion::SECURE_INTERNA.to_owned();
     let o = s.mensaje(
         Origen::Pestana(id),
         crate::sesion::SECURE_INTERNA,
