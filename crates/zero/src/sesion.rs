@@ -749,6 +749,24 @@ fn es_enlace_licencia(url: &str) -> bool {
 /// 1.0.50: where the panel lives on this computer, as a tab's address starts.
 const PANEL_LOCAL: &str = "http://127.0.0.1:7443/";
 
+/// 1.0.50 (dueño, 30 Oct 2026, 23:32: «el Vigía… analizar todo lo que sea medible en nuestro PC»):
+/// what GUARDIANA's web may ask the panel for, through the program. The computer's readings, and
+/// the two that start a reading now; nothing that changes a rule, the licence or a setting.
+const PANEL_LECTURAS: &[(&str, &str)] = &[
+    ("GET", "/api/por-dentro"),
+    ("GET", "/api/revision"),
+    ("POST", "/api/revision/ahora"),
+    ("GET", "/api/vigilancia"),
+    ("GET", "/api/vigilancia/resumen"),
+    ("POST", "/api/vigilancia/ahora"),
+    ("GET", "/api/antivirus"),
+    ("GET", "/api/antivirus/detectar"),
+    ("GET", "/api/identificacion"),
+    ("GET", "/api/ia"),
+    ("GET", "/api/estado"),
+    ("GET", "/api/textos"),
+];
+
 /// ZERO's own wait page for the panel (1.0.44), as it is or saying what failed.
 fn es_espera_propia(url: &str) -> bool {
     [
@@ -2034,6 +2052,63 @@ impl Sesion {
         }]
     }
 
+    /// 1.0.50: GUARDIANA's web asks the panel for one of its readings (the Vigía's analysis of
+    /// this computer). Only those in [`PANEL_LECTURAS`], by method and exact address; the panel's
+    /// tab asks its own service with its own session and answers with `zg_panel_datos`.
+    fn pide_al_panel(&self, id: u32, m: &Value) -> Vec<Orden> {
+        let metodo = texto(m, "metodo");
+        let ruta = texto(m, "ruta");
+        if !PANEL_LECTURAS
+            .iter()
+            .any(|(a, b)| *a == metodo && *b == ruta)
+        {
+            return Vec::new();
+        }
+        let n = m.get("n").and_then(Value::as_u64).unwrap_or(0);
+        let Some(panel) = self
+            .pestanas
+            .iter()
+            .find(|p| p.fija && es_panel_guardiana(&p.url))
+            .map(|p| p.id)
+        else {
+            return Vec::new();
+        };
+        vec![Orden::EnviaAPagina {
+            id: panel,
+            prefijo: PANEL_LOCAL,
+            json: json!({ "tipo": "zg_panel_pide", "para": id, "n": n, "metodo": metodo, "ruta": ruta })
+                .to_string(),
+        }]
+    }
+
+    /// 1.0.50: the panel's answer to [`Sesion::pide_al_panel`], handed as it came to the web tab
+    /// that asked, while that tab is still GUARDIANA's web in the program.
+    fn datos_del_panel(&self, m: &Value) -> Vec<Orden> {
+        let para = m
+            .get("para")
+            .and_then(Value::as_u64)
+            .and_then(|x| u32::try_from(x).ok())
+            .unwrap_or(0);
+        let datos = texto(m, "datos");
+        if datos.len() > 4_000_000 {
+            return Vec::new();
+        }
+        if !self
+            .pestana(para)
+            .is_some_and(|p| p.fija && p.url.starts_with(ORBITA))
+        {
+            return Vec::new();
+        }
+        let n = m.get("n").and_then(Value::as_u64).unwrap_or(0);
+        let estado = m.get("estado").and_then(Value::as_u64).unwrap_or(0);
+        vec![Orden::EnviaAPagina {
+            id: para,
+            prefijo: ORBITA,
+            json: json!({ "tipo": "zg_panel", "n": n, "estado": estado, "datos": datos })
+                .to_string(),
+        }]
+    }
+
     /// A click on the web in front while its side summary is open (Z1-b): it folds back into
     /// the glass strip, as with ✕, and stays folded like that.
     fn toque(&mut self, id: u32) -> Vec<Orden> {
@@ -2496,6 +2571,10 @@ impl Sesion {
                     }
                     "zg_pc_pide" if self.es_web_del_programa(id, fuente) => self.pide_datos_pc(id),
                     "zg_pc_datos" if es_panel_guardiana(fuente) => self.datos_pc(&m),
+                    "zg_panel_pide" if self.es_web_del_programa(id, fuente) => {
+                        self.pide_al_panel(id, &m)
+                    }
+                    "zg_panel_datos" if es_panel_guardiana(fuente) => self.datos_del_panel(&m),
                     _ => Vec::new(),
                 };
             }

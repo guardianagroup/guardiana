@@ -246,13 +246,34 @@ const GUION: &str = r#"(() => {
     // 1.0.50: GUARDIANA's web, which the program shows full window, asks (through the program) for this computer's
     // connections, to draw them on Órbita. They are this panel's own /api/por-dentro, read here with the panel's session
     // and handed back trimmed to what the web draws. The program passes the answer only to its own web tab.
+    // The panel's own headers (its session, its language and the person's time zone), as its pages send them.
+    const cabeceras = (tk) => {
+      let l = '';
+      try { l = localStorage.getItem('guardiana_lang') || ''; } catch (_) {}
+      if (l !== 'es' && l !== 'en' && l !== 'pt') { const d = String(navigator.language || 'en').slice(0, 2).toLowerCase(); l = d === 'es' || d === 'pt' ? d : 'en'; }
+      return { 'X-Guardiana-Token': tk, 'X-Guardiana-Lang': l, 'X-Guardiana-Tz': String(-new Date().getTimezoneOffset()) };
+    };
+    // 1.0.50: one reading for GUARDIANA's web (the Vigía), by the address the program already checked.
+    escucha('message', (e) => {
+      const m = e && e.data;
+      if (!m || m.tipo !== 'zg_panel_pide' || typeof m.ruta !== 'string' || m.ruta.charAt(0) !== '/') return;
+      let tk = '';
+      try { tk = sessionStorage.getItem('guardiana_token') || ''; } catch (_) {}
+      const post = m.metodo === 'POST';
+      const h = cabeceras(tk);
+      if (post) h['Content-Type'] = 'application/json';
+      const para = Number(m.para) || 0, n = Number(m.n) || 0;
+      fetch(m.ruta, { method: post ? 'POST' : 'GET', headers: h, body: post ? '{}' : undefined, cache: 'no-store' })
+        .then((r) => r.text().then((t) => manda({ tipo: 'zg_panel_datos', para, n, estado: r.status, datos: t })))
+        .catch(() => manda({ tipo: 'zg_panel_datos', para, n, estado: 0, datos: '' }));
+    });
     escucha('message', (e) => {
       const m = e && e.data;
       if (!m || m.tipo !== 'zg_pc_pide') return;
       const para = Number(m.para) || 0;
       let tk = '';
       try { tk = sessionStorage.getItem('guardiana_token') || ''; } catch (_) {}
-      fetch('/api/por-dentro', { headers: { 'X-Guardiana-Token': tk }, cache: 'no-store' })
+      fetch('/api/por-dentro', { headers: cabeceras(tk), cache: 'no-store' })
         .then((r) => (r.ok ? r.json() : null))
         .then((j) => {
           if (!j || !Array.isArray(j.destinos)) return;
@@ -293,10 +314,19 @@ const GUION: &str = r#"(() => {
     // This computer's connections, for Órbita: asked with a page event, answered with another (as text), and nothing
     // else of the channel reaches the page.
     document.addEventListener('guardiana-pc-pide', () => manda({ tipo: 'zg_pc_pide' }));
+    // 1.0.50 (dueño, 23:32: «el Vigía… analizar todo lo que sea medible en nuestro PC»): one of the panel's readings, by its
+    // address; the program checks it against a short read-only list and the answer comes back as text.
+    document.addEventListener('guardiana-panel-pide', (e) => {
+      let q = null;
+      try { q = JSON.parse(String(e.detail || '')); } catch (_) { return; }
+      if (!q || typeof q.ruta !== 'string') return;
+      manda({ tipo: 'zg_panel_pide', n: Number(q.n) || 0, metodo: q.metodo === 'POST' ? 'POST' : 'GET', ruta: q.ruta.slice(0, 80) });
+    });
     escucha('message', (e) => {
       const m = e && e.data;
-      if (!m || m.tipo !== 'zg_pc' || typeof m.datos !== 'string') return;
-      document.dispatchEvent(new CustomEvent('guardiana-pc', { detail: m.datos }));
+      if (!m) return;
+      if (m.tipo === 'zg_pc' && typeof m.datos === 'string') document.dispatchEvent(new CustomEvent('guardiana-pc', { detail: m.datos }));
+      else if (m.tipo === 'zg_panel') document.dispatchEvent(new CustomEvent('guardiana-panel', { detail: JSON.stringify({ n: Number(m.n) || 0, estado: Number(m.estado) || 0, datos: typeof m.datos === 'string' ? m.datos : '' }) }));
     });
   }
   // 1.0.46 (Z1-b): a click on the web itself folds ZERO's side summary («clic fuera»). Only the

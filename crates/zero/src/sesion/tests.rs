@@ -3710,6 +3710,71 @@ fn the_program_opens_on_its_web_and_the_panel_waits_behind_it() {
 }
 
 #[test]
+fn the_web_asks_the_panel_only_for_its_readings() {
+    // 1.0.50 (the owner, 30 Oct 2026, 23:32: «el Vigía… analizar todo lo que sea medible en
+    // nuestro PC»).
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "9".repeat(64));
+    let _ = s.abre_programa(&url);
+    let orbita = s.activa();
+    let panel = s
+        .pestanas
+        .iter()
+        .find(|p| p.url == url)
+        .map(|p| p.id)
+        .unwrap_or_default();
+    let pide = |ruta: &str, metodo: &str| {
+        json!({ "tipo": "zg_panel_pide", "n": 7, "metodo": metodo, "ruta": ruta }).to_string()
+    };
+    let o = s.mensaje(
+        Origen::Pestana(orbita),
+        ORBITA,
+        &pide("/api/revision/ahora", "POST"),
+    );
+    assert!(o.iter().any(|x| matches!(
+        x,
+        Orden::EnviaAPagina { id, json, .. }
+            if *id == panel && json.contains("/api/revision/ahora") && json.contains("\"n\":7")
+    )));
+    // Nothing that changes a rule, the licence or a setting, nor a reading by another method.
+    for (ruta, metodo) in [
+        ("/api/reglas", "POST"),
+        ("/api/licencia/activar-clave", "POST"),
+        ("/api/revision", "POST"),
+        ("/api/dns/aplicar", "POST"),
+        ("/api/hogar/activar", "POST"),
+        ("http://example.com/", "GET"),
+        ("/api/revision?x=1", "GET"),
+    ] {
+        assert!(
+            s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, metodo))
+                .is_empty(),
+            "{ruta}"
+        );
+    }
+    // The panel's answer goes back to the web that asked, and only there.
+    let datos =
+        json!({ "tipo": "zg_panel_datos", "para": orbita, "n": 7, "estado": 200, "datos": "{}" })
+            .to_string();
+    let o = s.mensaje(Origen::Pestana(panel), &url, &datos);
+    assert!(o.iter().any(|x| matches!(
+        x,
+        Orden::EnviaAPagina { id, prefijo, json }
+            if *id == orbita && *prefijo == ORBITA && json.contains("zg_panel") && json.contains("\"estado\":200")
+    )));
+    assert!(s
+        .mensaje(Origen::Pestana(orbita), ORBITA, &datos)
+        .is_empty());
+    assert!(s
+        .mensaje(
+            Origen::Pestana(orbita),
+            "https://example.com/",
+            &pide("/api/revision", "GET")
+        )
+        .is_empty());
+}
+
+#[test]
 fn the_panel_comes_forward_when_the_service_did_not_answer() {
     let (mut s, _, _) = abre();
     let _ = s.abre_programa(crate::lanzador::ESPERA);
