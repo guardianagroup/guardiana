@@ -16,6 +16,7 @@ members = [
     "crates/secure",
     "crates/rele",
     "crates/escudo",
+    "crates/tunel",
 ]
 
 [workspace.package]
@@ -48,6 +49,7 @@ guardiana-zero = { path = "crates/zero" }
 guardiana-secure = { path = "crates/secure" }
 guardiana-rele = { path = "crates/rele" }
 guardiana-escudo = { path = "crates/escudo" }
+guardiana-tunel = { path = "crates/tunel" }
 
 # --- third-party, each justified (brief §2) ---
 # --- GUARDIANA ZERO, the browser (decision 197). All four were already in the tree through
@@ -118,6 +120,9 @@ ml-kem = { version = "0.3.2", features = ["getrandom", "zeroize"] }
 # zeroize: overwrite keys with zeros when they are dropped (the delivery room, 18 Oct 2026);
 # already in the tree through ml-kem and vodozemac, same version.
 zeroize = "1"
+# x25519-dalek: the VPN's WireGuard keys (guardiana-tunel). Already in the tree through vodozemac, at this version;
+# `static_secrets` keeps the computer's key between runs, as WireGuard needs.
+x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
 
 [workspace.lints.rust]
 # Brief §2: `unsafe` is forbidden unless justified in a comment.

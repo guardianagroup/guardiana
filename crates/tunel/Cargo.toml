@@ -1,0 +1,26 @@
+[package]
+name = "guardiana-tunel"
+description = "GUARDIANA's VPN core: WireGuard keys, the post-quantum preshared key and the anonymous sign-up with a server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+base64 = { workspace = true }
+getrandom = { workspace = true }
+zeroize = { workspace = true }
+# WireGuard's Curve25519 keys (x25519-dalek, already in the tree through vodozemac).
+x25519-dalek = { workspace = true }
+# The post-quantum half of the tunnel's preshared key (ML-KEM-768, FIPS 203), as in guardiana-secure.
+ml-kem = { workspace = true }
+# HKDF-SHA256 for the preshared key; ring is already the workspace's TLS and AEAD library.
+ring = { workspace = true }
+
+[lints]
+workspace = true

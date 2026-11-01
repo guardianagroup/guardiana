@@ -935,6 +935,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "guardiana-tunel"
+version = "1.0.51"
+dependencies = [
+ "base64 0.23.1",
+ "getrandom 0.4.3",
+ "ml-kem",
+ "ring",
+ "serde",
+ "serde_json",
+ "x25519-dalek",
+ "zeroize",
+]
+
+[[package]]
 name = "guardiana-verify"
 version = "1.0.51"
 dependencies = [
