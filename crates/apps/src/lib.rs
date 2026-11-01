@@ -120,6 +120,21 @@ impl Observador {
             None
         }
     }
+
+    /// Who signs the program at `ruta`, once the system has checked it: `Some("")` when it has no
+    /// valid signature, `None` while it has not been checked yet (and always outside Windows).
+    #[must_use]
+    pub fn firma_comprobada(&self, ruta: &str) -> Option<String> {
+        #[cfg(windows)]
+        {
+            self.interno.firma_comprobada(ruta)
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = ruta;
+            None
+        }
+    }
 }
 
 /// What one program sent to and received from one address since the last take (1.0.21).

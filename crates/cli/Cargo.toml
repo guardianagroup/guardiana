@@ -23,6 +23,8 @@ guardiana-service = { workspace = true }
 guardiana-panel = { workspace = true }
 guardiana-devices = { workspace = true }
 guardiana-apps = { workspace = true }
+# El escudo (1.0.52): the antivirus' «primera vez» rule over this computer's queries.
+guardiana-escudo = { workspace = true }
 getrandom = { workspace = true }
 guardiana-verify = { workspace = true }
 guardiana-license = { workspace = true }

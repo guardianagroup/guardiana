@@ -2076,9 +2076,15 @@ async fn run_once<F: Future<Output = ()>>(
         tokio::spawn(async move {
             let mut cada = tokio::time::interval(Duration::from_millis(250));
             let mut conexion: Option<Ledger> = None;
+            // El escudo (1.0.52): «primera vez», with this computer's queries and their programs.
+            let mut escudo =
+                crate::escudo::EscudoVivo::abrir(&db, u64::try_from(now_ms()).unwrap_or(0));
             loop {
                 cada.tick().await;
                 let ahora = now_ms();
+                let ahora_u = u64::try_from(ahora).unwrap_or(0);
+                escudo.repasa(&obs, ahora_u);
+                escudo.guarda_si_toca(ahora_u);
                 let mut listos: Vec<guardiana_core::NewEvent> = Vec::new();
                 if let Ok(mut c) = cola.lock() {
                     while let Some(e) = c.front() {
@@ -2105,6 +2111,7 @@ async fn run_once<F: Future<Output = ()>>(
                 };
                 for mut e in listos {
                     e.process = obs.quien_pidio(&e.qname, e.ts);
+                    escudo.mira(&e, &obs);
                     match l.append(e) {
                         Ok(anotado) => {
                             if imprimir {

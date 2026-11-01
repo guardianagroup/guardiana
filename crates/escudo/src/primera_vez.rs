@@ -5,7 +5,8 @@
 //! client events, `crates/apps/src/ventanas.rs`), the SHA-256 of that program's file and who signs it. This module
 //! remembers since when the home talks to each site and warns, in plain words, when all of these hold at once:
 //!
-//! - the site was never asked for in this home before (and the first days, while the memory fills up, never warn);
+//! - the site was never asked for from this computer before (and the first days, while the memory fills up, never
+//!   warn; the whole home's memory, with the other devices of Home Mode, comes next);
 //! - the program that asks has been checked and **has no signature**;
 //! - it runs from a folder any program can write to (the person's folders, temporary folders, `ProgramData`).
 //!
@@ -69,6 +70,39 @@ pub struct Aviso {
     pub texto: String,
 }
 
+/// What looking at one query gave.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Mirada {
+    /// Nothing to say.
+    Nada,
+    /// A warning for the person.
+    Aviso(Aviso),
+    /// A new site, asked for by a program in a folder anyone can write to, whose signature Windows had not checked yet:
+    /// ask [`Memoria::revisa`] again in a few seconds, when it has.
+    Pendiente,
+}
+
+fn aviso(
+    regla: &'static str,
+    p: &Programa<'_>,
+    sitio: &str,
+    nombre: &str,
+    cuando_ms: u64,
+    fuente: Option<String>,
+    texto: String,
+) -> Aviso {
+    Aviso {
+        regla,
+        programa: p.nombre.to_string(),
+        ruta: p.ruta.to_string(),
+        sitio: sitio.to_string(),
+        nombre: nombre.trim_end_matches('.').to_string(),
+        cuando_ms,
+        fuente,
+        texto,
+    }
+}
+
 /// Since when the home talks to each site.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Memoria {
@@ -100,7 +134,7 @@ impl Memoria {
         ahora_ms < self.desde_ms.saturating_add(DIAS_APRENDIENDO * DIA_MS)
     }
 
-    /// Looks at one query and remembers its site. Returns a warning when the rules in the module notes hold.
+    /// Looks at one query and remembers its site (see the module notes for when it warns).
     pub fn mira(
         &mut self,
         nombre: &str,
@@ -108,25 +142,17 @@ impl Memoria {
         cuando_ms: u64,
         programa: Option<&Programa<'_>>,
         listas: &[Huellas],
-    ) -> Option<Aviso> {
+    ) -> Mirada {
         let sitio = sitio.trim_end_matches('.').to_ascii_lowercase();
         if sitio.is_empty() {
-            return None;
+            return Mirada::Nada;
         }
         let nuevo = !self.vistos.contains_key(&sitio);
         if nuevo {
             self.vistos.insert(sitio.clone(), cuando_ms);
         }
-        let p = programa?;
-        let aviso = |regla, fuente: Option<String>, texto: String| Aviso {
-            regla,
-            programa: p.nombre.to_string(),
-            ruta: p.ruta.to_string(),
-            sitio: sitio.clone(),
-            nombre: nombre.trim_end_matches('.').to_string(),
-            cuando_ms,
-            fuente,
-            texto,
+        let Some(p) = programa else {
+            return Mirada::Nada;
         };
         // a known malicious sample warns at once, learning or not, new site or not
         if let Some(h) = de_hex32(p.sha256) {
@@ -135,18 +161,57 @@ impl Memoria {
                     "«{}» es una muestra maliciosa conocida (según {}) y acaba de pedir «{}».",
                     p.nombre, l.fuente, sitio
                 );
-                return Some(aviso("muestra_conocida", Some(l.fuente.clone()), texto));
+                return Mirada::Aviso(aviso(
+                    "muestra_conocida",
+                    p,
+                    &sitio,
+                    nombre,
+                    cuando_ms,
+                    Some(l.fuente.clone()),
+                    texto,
+                ));
             }
         }
-        if !nuevo || self.aprendiendo(cuando_ms) || p.firma != Firma::SinFirma {
+        if !nuevo || self.aprendiendo(cuando_ms) || carpeta_escribible(p.ruta).is_none() {
+            return Mirada::Nada;
+        }
+        match p.firma {
+            Firma::SinComprobar => Mirada::Pendiente,
+            Firma::Firmado(_) => Mirada::Nada,
+            Firma::SinFirma => self
+                .revisa(nombre, &sitio, cuando_ms, p)
+                .map_or(Mirada::Nada, Mirada::Aviso),
+        }
+    }
+
+    /// Looks again at a query [`Memoria::mira`] left [`Mirada::Pendiente`], now that Windows has checked the program's
+    /// signature: it warns if the program has none and runs from a folder anyone can write to.
+    #[must_use]
+    pub fn revisa(
+        &self,
+        nombre: &str,
+        sitio: &str,
+        cuando_ms: u64,
+        p: &Programa<'_>,
+    ) -> Option<Aviso> {
+        if p.firma != Firma::SinFirma {
             return None;
         }
         let lugar = carpeta_escribible(p.ruta)?;
+        let sitio = sitio.trim_end_matches('.').to_ascii_lowercase();
         let texto = format!(
-            "«{}», sin firma y desde {}, ha pedido «{}», un sitio que nunca se había pedido en tu casa.",
+            "«{}», sin firma y desde {}, ha pedido «{}», un sitio que este equipo no había pedido nunca.",
             p.nombre, lugar, sitio
         );
-        Some(aviso("primera_vez", None, texto))
+        Some(aviso(
+            "primera_vez",
+            p,
+            &sitio,
+            nombre,
+            cuando_ms,
+            None,
+            texto,
+        ))
     }
 
     /// The memory as JSON, to keep it between runs.
@@ -202,6 +267,22 @@ mod tests {
         }
     }
 
+    fn el_aviso(m: Mirada) -> Aviso {
+        match m {
+            Mirada::Aviso(a) => a,
+            otra => Aviso {
+                regla: "ninguno",
+                programa: format!("{otra:?}"),
+                ruta: String::new(),
+                sitio: String::new(),
+                nombre: String::new(),
+                cuando_ms: 0,
+                fuente: None,
+                texto: String::new(),
+            },
+        }
+    }
+
     #[test]
     fn un_programa_descargado_sin_firma_que_llama_a_un_sitio_nuevo() {
         let mut m = Memoria::nueva(0);
@@ -209,17 +290,15 @@ mod tests {
         // mientras aprende, nada
         assert_eq!(
             m.mira("c2.ejemplo.top", "ejemplo.top", DIA, Some(&p), &[]),
-            None
+            Mirada::Nada
         );
-        let a = m
-            .mira(
-                "x.otro-sitio.xyz.",
-                "otro-sitio.xyz",
-                8 * DIA,
-                Some(&p),
-                &[],
-            )
-            .unwrap();
+        let a = el_aviso(m.mira(
+            "x.otro-sitio.xyz.",
+            "otro-sitio.xyz",
+            8 * DIA,
+            Some(&p),
+            &[],
+        ));
         assert_eq!(a.regla, "primera_vez");
         assert_eq!(a.programa, "factura.exe");
         assert_eq!(a.nombre, "x.otro-sitio.xyz");
@@ -227,37 +306,54 @@ mod tests {
         // la segunda vez ya no es la primera
         assert_eq!(
             m.mira("y.otro-sitio.xyz", "otro-sitio.xyz", 9 * DIA, Some(&p), &[]),
-            None
+            Mirada::Nada
         );
     }
 
     #[test]
-    fn firmado_sin_comprobar_o_instalado_no_avisa() {
+    fn sin_comprobar_queda_pendiente_y_se_revisa() {
+        let mut m = Memoria::nueva(0);
+        let sin_mirar = programa(r"C:\Users\ana\Downloads\otro.exe", Firma::SinComprobar, "");
+        assert_eq!(
+            m.mira("a.dos.com", "dos.com", 10 * DIA, Some(&sin_mirar), &[]),
+            Mirada::Pendiente
+        );
+        let ya = programa(r"C:\Users\ana\Downloads\otro.exe", Firma::SinFirma, "");
+        assert_eq!(
+            m.revisa("a.dos.com", "dos.com", 10 * DIA, &ya)
+                .map(|a| a.regla),
+            Some("primera_vez")
+        );
+        let firmado = programa(
+            r"C:\Users\ana\Downloads\otro.exe",
+            Firma::Firmado("Empresa".into()),
+            "",
+        );
+        assert_eq!(m.revisa("a.dos.com", "dos.com", 10 * DIA, &firmado), None);
+    }
+
+    #[test]
+    fn firmado_o_instalado_no_avisa() {
         let mut m = Memoria::nueva(0);
         let firmado = programa(
             r"C:\Users\ana\Downloads\setup.exe",
             Firma::Firmado("Empresa S.A.".into()),
             "",
         );
-        let sin_mirar = programa(r"C:\Users\ana\Downloads\otro.exe", Firma::SinComprobar, "");
         let instalado = programa(r"C:\Program Files\App\app.exe", Firma::SinFirma, "");
         assert_eq!(
             m.mira("a.uno.com", "uno.com", 10 * DIA, Some(&firmado), &[]),
-            None
-        );
-        assert_eq!(
-            m.mira("a.dos.com", "dos.com", 10 * DIA, Some(&sin_mirar), &[]),
-            None
+            Mirada::Nada
         );
         assert_eq!(
             m.mira("a.tres.com", "tres.com", 10 * DIA, Some(&instalado), &[]),
-            None
+            Mirada::Nada
         );
         assert_eq!(
             m.mira("a.cuatro.com", "cuatro.com", 10 * DIA, None, &[]),
-            None
+            Mirada::Nada
         );
-        assert_eq!(m.sitios(), 4);
+        assert_eq!(m.sitios(), 3);
     }
 
     #[test]
@@ -271,15 +367,13 @@ mod tests {
             Firma::Firmado("Alguien".into()),
             &h,
         );
-        let a = m
-            .mira(
-                "www.visto.com",
-                "visto.com",
-                2,
-                Some(&p),
-                std::slice::from_ref(&lista),
-            )
-            .unwrap();
+        let a = el_aviso(m.mira(
+            "www.visto.com",
+            "visto.com",
+            2,
+            Some(&p),
+            std::slice::from_ref(&lista),
+        ));
         assert_eq!(a.regla, "muestra_conocida");
         assert_eq!(a.fuente.as_deref(), Some("lista de prueba"));
     }
@@ -300,7 +394,7 @@ mod tests {
         // ya visto antes de guardarse: no es la primera vez
         assert_eq!(
             r.mira("b.uno.com", "UNO.com", 20 * DIA, Some(&p), &[]),
-            None
+            Mirada::Nada
         );
     }
 

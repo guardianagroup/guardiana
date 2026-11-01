@@ -10,6 +10,7 @@ mod certificado_cmd;
 mod comunicaciones_cmd;
 mod dns_cmd;
 mod engine;
+mod escudo;
 mod export_cmd;
 mod hogar_cmd;
 mod informe_cmd;

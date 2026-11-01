@@ -69,6 +69,7 @@ struct Compartido {
 /// La sesión de sucesos en marcha. Al soltarla, se cierra.
 pub(crate) struct Sesion {
     datos: Arc<Mutex<Compartido>>,
+    firmas: Firmas,
     _traza: UserTrace,
 }
 
@@ -77,6 +78,7 @@ impl Sesion {
         let datos: Arc<Mutex<Compartido>> = Arc::default();
         let para_callback = Arc::clone(&datos);
         let firmas = Firmas::arrancar();
+        let para_sesion = firmas.clone();
         let proveedor = Provider::by_guid(PROVEEDOR)
             .add_callback(move |registro: &EventRecord, esquemas: &SchemaLocator| {
                 anotar(&para_callback, &firmas, registro, esquemas);
@@ -90,8 +92,16 @@ impl Sesion {
             .map_err(|e| Error::Sistema(format!("{e:?}")))?;
         Ok(Self {
             datos,
+            firmas: para_sesion,
             _traza: traza,
         })
+    }
+
+    /// Who signs the program at `ruta`, once Windows has checked it: `Some("")` when it has no valid
+    /// signature, `None` while it has not been checked yet (el escudo, 1.0.52: «sin firma» must mean
+    /// checked and absent, never «not looked at yet»).
+    pub(crate) fn firma_comprobada(&self, ruta: &str) -> Option<String> {
+        self.firmas.comprobada(ruta)
     }
 
     pub(crate) fn quien_pidio(&self, qname: &str, ts_ms: i64) -> Option<Proceso> {

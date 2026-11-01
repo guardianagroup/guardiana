@@ -46,6 +46,14 @@ impl Firmas {
     }
 
     /// Who signs the program at `ruta`, if already checked; asking queues it.
+    /// The signer once checked (`Some("")`: no valid signature), or `None` while not checked yet. Asking
+    /// does not queue a check: [`Firmas::firma_y_version`] already did when the program was seen.
+    pub(crate) fn comprobada(&self, ruta: &str) -> Option<String> {
+        let (m, _) = &*self.estado;
+        let e = m.lock().ok()?;
+        e.hechas.get(ruta).map(|(firma, _)| firma.clone())
+    }
+
     pub(crate) fn de(&self, ruta: &str) -> String {
         self.firma_y_version(ruta).0
     }

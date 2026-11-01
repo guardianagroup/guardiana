@@ -799,6 +799,7 @@ dependencies = [
  "guardiana-core",
  "guardiana-devices",
  "guardiana-dns",
+ "guardiana-escudo",
  "guardiana-license",
  "guardiana-lists",
  "guardiana-panel",
