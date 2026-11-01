@@ -5,8 +5,9 @@
 //! client events, `crates/apps/src/ventanas.rs`), the SHA-256 of that program's file and who signs it. This module
 //! remembers since when the home talks to each site and warns, in plain words, when all of these hold at once:
 //!
-//! - the site was never asked for from this computer before (and the first days, while the memory fills up, never
-//!   warn; the whole home's memory, with the other devices of Home Mode, comes next);
+//! - the site was never asked for from this computer before (the first days, while the memory fills up, only a program
+//!   Windows marked as downloaded from the internet warns; the whole home's memory, with the other devices of Home
+//!   Mode, comes next);
 //! - the program that asks has been checked and **has no signature**;
 //! - it runs from a folder any program can write to (the person's folders, temporary folders, `ProgramData`).
 //!
@@ -181,7 +182,9 @@ impl Memoria {
                 ));
             }
         }
-        if !nuevo || self.aprendiendo(cuando_ms) || donde(p).is_none() {
+        // while learning only the clearest case warns: a program Windows marked as come from the internet (the owner,
+        // 1 Nov 2026, 18:55: «que vea todo lo posible, todo, absolutamente todo»)
+        if !nuevo || donde(p).is_none() || (self.aprendiendo(cuando_ms) && !p.descargado) {
             return Mirada::Nada;
         }
         match p.firma {
@@ -445,6 +448,20 @@ mod tests {
         p.descargado = true;
         let a = el_aviso(m.mira("a.dos.com", "dos.com", 10 * DIA, Some(&p), &[]));
         assert!(a.texto.contains("descargado de internet"), "{}", a.texto);
+        // lo descargado de internet avisa desde el primer día, aunque la memoria aún aprenda
+        let mut nueva = Memoria::nueva(0);
+        let a = el_aviso(nueva.mira("a.tres.com", "tres.com", DIA, Some(&p), &[]));
+        assert_eq!(a.regla, "primera_vez");
+        // lo de una carpeta escribible sin la marca, no hasta que termine de aprender
+        let q = programa(
+            r"C:\Users\ana\AppData\Local\Temp\x.exe",
+            Firma::SinFirma,
+            "",
+        );
+        assert_eq!(
+            nueva.mira("a.cuatro.com", "cuatro.com", DIA, Some(&q), &[]),
+            Mirada::Nada
+        );
     }
 
     #[test]
