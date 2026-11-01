@@ -887,6 +887,7 @@ dependencies = [
  "guardiana-classify",
  "guardiana-core",
  "guardiana-devices",
+ "guardiana-escudo",
  "guardiana-license",
  "guardiana-lists",
  "guardiana-service",

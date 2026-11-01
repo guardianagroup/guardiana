@@ -14,6 +14,8 @@ build = "build.rs"
 guardiana-core = { workspace = true }
 guardiana-lists = { workspace = true }
 guardiana-apps = { workspace = true }
+# El escudo (1.0.52): reading the antivirus' memory for the panel.
+guardiana-escudo = { workspace = true }
 guardiana-service = { workspace = true }
 axum = { workspace = true }
 tokio = { workspace = true }

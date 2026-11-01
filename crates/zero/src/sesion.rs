@@ -777,6 +777,8 @@ const PANEL_LECTURAS: &[(&str, &str)] = &[
     // the second's settings switch (`POST /api/quien-vende/ajuste`) stays out.
     ("GET", "/vigia"),
     ("GET", "/api/quien-vende"),
+    // 1.0.52, the antivirus («el escudo»): its «primera vez» warnings. Read only.
+    ("GET", "/api/escudo"),
     // 1.0.51 (the owner, 31 Oct 2026, 08:53: «por dónde viaja… qué cable… si viaja por satélite»):
     // the route of the data, hop by hop, and the order to measure it now (read only: `tracert`).
     ("GET", "/api/ruta"),

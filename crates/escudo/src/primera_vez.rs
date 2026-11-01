@@ -128,6 +128,12 @@ impl Memoria {
         self.vistos.len()
     }
 
+    /// Until when it only learns (milliseconds since 1970).
+    #[must_use]
+    pub fn aprende_hasta_ms(&self) -> u64 {
+        self.desde_ms.saturating_add(DIAS_APRENDIENDO * DIA_MS)
+    }
+
     /// Whether it is still in its first days, when it only learns.
     #[must_use]
     pub fn aprendiendo(&self, ahora_ms: u64) -> bool {

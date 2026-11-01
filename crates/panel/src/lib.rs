@@ -23,6 +23,8 @@ mod contratos;
 mod derechos;
 mod destinos;
 mod empresa;
+// El escudo (1.0.52): the antivirus' «primera vez» warnings (src/escudo.rs).
+mod escudo;
 mod expedientes;
 // Customer tools of 1.0.45 (18 Oct 2026): their own routes, page and scripts.
 mod extras;
@@ -1066,6 +1068,8 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/por-dentro", get(universo::universo))
         .route("/api/secure-en-directo", get(universo::secure_en_directo))
         .route("/api/revision", get(revision::ver))
+        // 1.0.52: the antivirus' warnings («el escudo», src/escudo.rs).
+        .route("/api/escudo", get(escudo::ver))
         .route("/api/revision/ahora", post(revision::ahora))
         // 1.0.51: the route of the data, hop by hop (src/ruta.rs).
         .route("/api/ruta", get(ruta::ver))
