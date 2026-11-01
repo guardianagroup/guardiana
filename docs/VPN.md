@@ -30,6 +30,27 @@ Una VPN que es a la vez el DNS de la casa, el antivirus y el cortafuegos del mis
    tráfico (relleno y paquetes señuelo, bajo demanda) y servidores sin disco.
 4. **Compilación reproducible, auditoría externa** y, si algún día se decide, móviles (hoy GUARDIANA es solo para PC).
 
+## Lo que ya está (rama `antivirus-vpn`, 1 nov 2026)
+
+`crates/tunel`: las llaves de WireGuard del equipo, la llave precompartida postcuántica (ML-KEM-768 + HKDF-SHA256, nueva
+en cada alta) y el alta anónima con la comprobación de todo lo que dice el servidor (la dirección y el DNS del túnel
+tienen que ser privados y el servidor, un nombre de guardianagroup.com). Probado en Linux, Windows y macOS.
+
+## Los servidores (propuesta para la fase 1)
+
+- WireGuard del núcleo de Linux (`wg0`, UDP 51820) en los servidores actuales, cada uno con su red privada
+  (`10.66.0.0/16`; el servidor y su resolutor en `10.66.0.1`).
+- El alta: `POST https://<servidor>/vpn/alta` (Caddy delante) a un servicio pequeño, aparte del motor, que solo sabe
+  añadir y quitar pares de WireGuard y hacer su mitad de ML-KEM (en Rust, con `crates/tunel`). Recibe la llave pública
+  del equipo y su llave ML-KEM; devuelve la dirección del túnel, la llave pública del servidor, el cifrado ML-KEM y el
+  resolutor.
+- Sin registros: los pares viven solo en la memoria del núcleo y se quitan tras 24 horas sin tráfico. Nada en disco ni
+  en el diario.
+- Contra el abuso, sin guardar nada: puerto 25 cerrado; un tope de altas por minuto; un tope de conexiones nuevas por
+  segundo por par.
+- El resolutor del túnel (Unbound, con DNSSEC) en `10.66.0.1`; el DNS de la casa del programa le manda lo que no corta.
+- El servicio y su configuración van dentro del sello: solo se instalan con la firma del dueño.
+
 ## Reglas
 
 - **Sin registros**: los servidores no guardan qué llave se conecta ni a dónde va. Lo que sí se hace contra el abuso, sin

@@ -17,6 +17,7 @@ members = [
     "crates/rele",
     "crates/escudo",
     "crates/tunel",
+    "crates/tunel-servidor",
 ]
 
 [workspace.package]

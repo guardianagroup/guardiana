@@ -1,0 +1,23 @@
+[package]
+name = "guardiana-tunel-servidor"
+description = "GUARDIANA's VPN, the server half: the anonymous sign-up that adds a WireGuard peer with a post-quantum preshared key"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[[bin]]
+name = "guardiana-tunel-servidor"
+path = "src/main.rs"
+
+[dependencies]
+guardiana-tunel = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+base64 = { workspace = true }
+
+[lints]
+workspace = true

@@ -47,6 +47,16 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
 últimos 12 meses por un laboratorio de su lista, acuerdos firmados y Trusted Signing
 (<https://learn.microsoft.com/en-us/defender-xdr/virus-initiative-criteria>).
 
+## Lo que ya está (rama `antivirus-vpn`, 1 nov 2026)
+
+- `crates/escudo`: huellas (listas compactas con su propia huella), análisis de archivos y carpetas sin seguir
+  enlaces, cuarentena encriptada que devuelve el archivo exactamente igual, y la regla «primera vez».
+- El servicio pasa por «primera vez» cada consulta de este equipo con su programa (`crates/cli/src/escudo.rs`); el
+  observador dice si Windows ya comprobó la firma (si no, la consulta espera hasta un minuto).
+- El panel: `GET /api/escudo` (si aún aprende, cuántos sitios, los avisos); la web dentro del programa puede leerlo.
+- Falta: la pantalla del antivirus en la web del programa, el análisis de Descargas desde el panel y las listas de
+  muestras (decisión del dueño, abajo).
+
 ## Reglas de la casa que se mantienen
 
 - **Nada sale del equipo.** El análisis es local. Nada de subir muestras a ninguna nube.

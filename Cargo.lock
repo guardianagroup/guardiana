@@ -951,6 +951,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "guardiana-tunel-servidor"
+version = "1.0.51"
+dependencies = [
+ "axum",
+ "base64 0.23.1",
+ "guardiana-tunel",
+ "tokio",
+]
+
+[[package]]
 name = "guardiana-verify"
 version = "1.0.51"
 dependencies = [
