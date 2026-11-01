@@ -2,7 +2,9 @@
 //! PC. Quiero que sea el antivirus»; 16:36: «el mejor antivirus de la Tierra… Y siempre código abierto»).
 //!
 //! Phase A1 (docs/ESCUDO.md): a file's SHA-256 against open lists of known malicious samples ([`huellas`]), the
-//! analysis of a file or a folder ([`analisis`]) and a quarantine that can always be undone ([`cuarentena`]).
+//! analysis of a file or a folder ([`analisis`]) and a quarantine that can always be undone ([`cuarentena`]). Phase A3
+//! starts with [`primera_vez`]: a program without a signature, run from a folder anyone can write to, calling a site the
+//! home never asked for.
 //! Everything happens on this computer: nothing is uploaded anywhere.
 //!
 //! A list is never a verdict on its own (docs/LISTS.md): whoever acts on a match also looks at who signs the file, and a
@@ -11,7 +13,9 @@
 pub mod analisis;
 pub mod cuarentena;
 pub mod huellas;
+pub mod primera_vez;
 
 pub use analisis::{analiza, analiza_carpeta, huella_de, Resultado, Veredicto};
 pub use cuarentena::{Cuarentena, Entrada, ErrorCuarentena};
 pub use huellas::{ErrorLista, Huellas};
+pub use primera_vez::{Aviso, Firma, Memoria, Programa};
