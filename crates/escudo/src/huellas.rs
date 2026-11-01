@@ -1,7 +1,10 @@
 //! Fingerprints of known malicious samples (SHA-256), as a compact sorted list.
 //!
-//! The lists come from open sources whose licence allows shipping them (MalwareBazaar, by abuse.ch: CC0) and travel
-//! inside each version of the program, or, if the owner so decides, from GUARDIANA's servers (docs/ESCUDO.md).
+//! A list is used only when its licence allows it for GUARDIANA (docs/ESCUDO.md). Not every «open» list does: the
+//! terms abuse.ch applies since November 2025 ask for-profit users of MalwareBazaar, URLhaus and ThreatFox for a
+//! subscription (only Feodo Tracker, SSL Blacklist and YARAify are CC0), so those are not shipped unless the owner
+//! takes those terms on. Lists travel inside each version of the program, or, if the owner so decides, from
+//! GUARDIANA's servers.
 //!
 //! Binary form (`.huellas`): the eight bytes `GDNHUEL1`, the number of fingerprints (u64, little endian), the
 //! fingerprints sorted and without repeats (32 bytes each), and the SHA-256 of everything before it. A file that does not
@@ -15,7 +18,7 @@ pub const MAGIA: &[u8; 8] = b"GDNHUEL1";
 /// A list of fingerprints, with where it comes from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Huellas {
-    /// Where the list comes from, as each warning shows it (for example «MalwareBazaar (abuse.ch, CC0)»).
+    /// Where the list comes from, as each warning shows it (for example «signature-base, Florian Roth (DRL 1.1)»).
     pub fuente: String,
     lista: Vec<[u8; 32]>,
 }

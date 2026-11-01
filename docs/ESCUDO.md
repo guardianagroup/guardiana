@@ -25,8 +25,12 @@ qué hizo y a quién habló.
 
 **Fase 1 (sin controlador propio; convive con Microsoft Defender).**
 
-- A1 · *Análisis de archivos*: huella SHA-256 de cada archivo contra listas abiertas de muestras conocidas (MalwareBazaar,
-  de abuse.ch, CC0), empezando por Descargas y lo que llega por Comunicaciones y por ZERO; cuarentena reversible.
+- A1 · *Análisis de archivos*: huella SHA-256 de cada archivo contra listas de muestras conocidas cuya licencia lo
+  permita, empezando por Descargas y lo que llega por Comunicaciones y por ZERO; cuarentena reversible.
+  **Licencias, comprobado el 1 nov 2026:** las condiciones de abuse.ch (en vigor desde el 4 nov 2025) no dan
+  MalwareBazaar, URLhaus ni ThreatFox como CC0: el uso con ánimo de lucro puede pedir una suscripción (Spamhaus), y para
+  descargar las listas hace falta una llave de su portal. Solo Feodo Tracker, SSL Blacklist y YARAify son CC0
+  (<https://abuse.ch/terms-of-use/>, <https://bazaar.abuse.ch/export/>). Usarlas es decisión del dueño.
   Crate `crates/escudo` (listas, análisis y cuarentena), probado en Linux y en Windows.
 - A2 · *Reglas*: YARA-X (Rust, BSD-3-Clause) con reglas abiertas de licencia compatible (signature-base y otras con la
   licencia DRL 1.1, que pide citar al autor en cada aviso; LOLBAS, GPL-3.0, para los programas de Windows que se abusan).
