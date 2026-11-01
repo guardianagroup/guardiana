@@ -18,4 +18,4 @@ pub mod primera_vez;
 pub use analisis::{analiza, analiza_carpeta, huella_de, Resultado, Veredicto};
 pub use cuarentena::{Cuarentena, Entrada, ErrorCuarentena};
 pub use huellas::{ErrorLista, Huellas};
-pub use primera_vez::{Aviso, Firma, Memoria, Mirada, Programa};
+pub use primera_vez::{zona_de, Aviso, Firma, Memoria, Mirada, Programa};

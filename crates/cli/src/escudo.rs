@@ -3,6 +3,7 @@
 //! asked. Its memory and its warnings live next to the ledger, in two small files: `escudo-memoria.json` (since when
 //! this computer asks for each site) and `escudo-avisos.jsonl` (the newest warnings, one per line, for the panel).
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use guardiana_apps::Observador;
@@ -37,6 +38,8 @@ pub(crate) struct EscudoVivo {
     ruta_avisos: PathBuf,
     guardada_ms: u64,
     cambios: bool,
+    /// Program file → whether Windows marked it as come from the internet (read once per file).
+    marcas: HashMap<String, bool>,
 }
 
 impl EscudoVivo {
@@ -55,6 +58,7 @@ impl EscudoVivo {
             ruta_avisos: db.with_file_name("escudo-avisos.jsonl"),
             guardada_ms: ahora_ms,
             cambios: false,
+            marcas: HashMap::new(),
         }
     }
 
@@ -68,11 +72,13 @@ impl EscudoVivo {
                 .memoria
                 .mira(&e.qname, &sitio, cuando, None, &self.listas),
             Some(p) => {
+                let descargado = self.descargado(&p.ruta);
                 let programa = Programa {
                     nombre: &p.nombre,
                     ruta: &p.ruta,
                     sha256: &p.sha256,
                     firma: firma_de(obs, &p.ruta, &p.firmado_por),
+                    descargado,
                 };
                 let m = self
                     .memoria
@@ -106,6 +112,7 @@ impl EscudoVivo {
         for p in std::mem::take(&mut self.pendientes) {
             match obs.firma_comprobada(&p.ruta) {
                 Some(f) => {
+                    let descargado = self.descargado(&p.ruta);
                     let programa = Programa {
                         nombre: &p.programa,
                         ruta: &p.ruta,
@@ -115,6 +122,7 @@ impl EscudoVivo {
                         } else {
                             Firma::Firmado(f)
                         },
+                        descargado,
                     };
                     if let Some(a) =
                         self.memoria
@@ -129,6 +137,20 @@ impl EscudoVivo {
                 None => {}
             }
         }
+    }
+
+    /// Whether Windows marked the program's file as come from the internet: its `Zone.Identifier` stream says zone 3
+    /// (the internet) or 4 (untrusted sites). Read once per file; the address it came from is never read.
+    fn descargado(&mut self, ruta: &str) -> bool {
+        if let Some(m) = self.marcas.get(ruta) {
+            return *m;
+        }
+        if self.marcas.len() >= 4_096 {
+            self.marcas.clear();
+        }
+        let m = marca_de_internet(ruta);
+        self.marcas.insert(ruta.to_owned(), m);
+        m
     }
 
     /// Writes the memory down when it changed and enough time has passed.
@@ -165,6 +187,20 @@ impl EscudoVivo {
             eprintln!("guardiana: escudo: {e}");
         }
     }
+}
+
+#[cfg(windows)]
+fn marca_de_internet(ruta: &str) -> bool {
+    !ruta.is_empty()
+        && std::fs::read_to_string(format!("{ruta}:Zone.Identifier"))
+            .ok()
+            .and_then(|t| guardiana_escudo::zona_de(&t))
+            .is_some_and(|z| z >= 3)
+}
+
+#[cfg(not(windows))]
+fn marca_de_internet(_ruta: &str) -> bool {
+    false
 }
 
 /// What is known of a program's signature: Windows' check if it was done, else what the observer already said.

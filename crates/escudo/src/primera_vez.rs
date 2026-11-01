@@ -46,6 +46,9 @@ pub struct Programa<'a> {
     pub sha256: &'a str,
     /// What is known of its signature.
     pub firma: Firma,
+    /// Whether Windows marked its file as come from the internet (the «Mark of the Web»: `Zone.Identifier` with zone
+    /// 3 or 4, see [`zona_de`]).
+    pub descargado: bool,
 }
 
 /// A warning for the person.
@@ -178,7 +181,7 @@ impl Memoria {
                 ));
             }
         }
-        if !nuevo || self.aprendiendo(cuando_ms) || carpeta_escribible(p.ruta).is_none() {
+        if !nuevo || self.aprendiendo(cuando_ms) || donde(p).is_none() {
             return Mirada::Nada;
         }
         match p.firma {
@@ -203,10 +206,10 @@ impl Memoria {
         if p.firma != Firma::SinFirma {
             return None;
         }
-        let lugar = carpeta_escribible(p.ruta)?;
+        let lugar = donde(p)?;
         let sitio = sitio.trim_end_matches('.').to_ascii_lowercase();
         let texto = format!(
-            "«{}», sin firma y desde {}, ha pedido «{}», un sitio que este equipo no había pedido nunca.",
+            "«{}», sin firma y {}, ha pedido «{}», un sitio que este equipo no había pedido nunca.",
             p.nombre, lugar, sitio
         );
         Some(aviso(
@@ -229,6 +232,26 @@ impl Memoria {
     pub fn desde_json(json: &str) -> serde_json::Result<Self> {
         serde_json::from_str(json)
     }
+}
+
+/// Where the program comes from, in plain words, when it is the kind of place the rule is about: downloaded from the
+/// internet (Windows' own mark), or in a folder any program can write to.
+fn donde(p: &Programa<'_>) -> Option<String> {
+    if let Some(carpeta) = carpeta_escribible(p.ruta) {
+        return Some(format!("desde {carpeta}"));
+    }
+    p.descargado.then(|| "descargado de internet".to_string())
+}
+
+/// The zone Windows wrote in a file's `Zone.Identifier` stream (0 this computer, 1 the local network, 2 trusted sites,
+/// 3 the internet, 4 untrusted sites). Its other lines (the address it came from) are never read.
+#[must_use]
+pub fn zona_de(contenido: &str) -> Option<u8> {
+    contenido.lines().find_map(|l| {
+        l.trim()
+            .strip_prefix("ZoneId=")
+            .and_then(|z| z.trim().parse().ok())
+    })
 }
 
 /// When a Windows path is in a folder any program can write to, how to say where, in plain words.
@@ -270,6 +293,7 @@ mod tests {
             ruta,
             sha256,
             firma,
+            descargado: false,
         }
     }
 
@@ -402,6 +426,25 @@ mod tests {
             r.mira("b.uno.com", "UNO.com", 20 * DIA, Some(&p), &[]),
             Mirada::Nada
         );
+    }
+
+    #[test]
+    fn la_marca_de_internet_de_windows() {
+        assert_eq!(
+            zona_de("[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=https://ejemplo.com/a.exe\r\n"),
+            Some(3)
+        );
+        assert_eq!(zona_de("[ZoneTransfer]\nZoneId=0\n"), Some(0));
+        assert_eq!(zona_de("nada"), None);
+        let mut m = Memoria::nueva(0);
+        let mut p = programa(r"D:\Juegos\instalador.exe", Firma::SinFirma, "");
+        assert_eq!(
+            m.mira("a.uno.com", "uno.com", 10 * DIA, Some(&p), &[]),
+            Mirada::Nada
+        );
+        p.descargado = true;
+        let a = el_aviso(m.mira("a.dos.com", "dos.com", 10 * DIA, Some(&p), &[]));
+        assert!(a.texto.contains("descargado de internet"), "{}", a.texto);
     }
 
     #[test]
