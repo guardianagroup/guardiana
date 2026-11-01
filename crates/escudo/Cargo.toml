@@ -1,0 +1,23 @@
+[package]
+name = "guardiana-escudo"
+description = "GUARDIANA's antivirus («el escudo»): known-sample fingerprints, file analysis and a reversible quarantine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+# The file fingerprints (SHA-256); already in the workspace.
+sha2 = { workspace = true }
+# The quarantine's keys; already in the workspace.
+getrandom = { workspace = true }
+# The quarantine's encryption (XChaCha20-Poly1305), the same family the program already uses for files (guardiana-secure).
+chacha20poly1305 = { workspace = true }
+
+[lints]
+workspace = true

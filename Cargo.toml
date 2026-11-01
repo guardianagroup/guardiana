@@ -15,6 +15,7 @@ members = [
     "crates/zero",
     "crates/secure",
     "crates/rele",
+    "crates/escudo",
 ]
 
 [workspace.package]
@@ -46,6 +47,7 @@ guardiana-cli = { path = "crates/cli" }
 guardiana-zero = { path = "crates/zero" }
 guardiana-secure = { path = "crates/secure" }
 guardiana-rele = { path = "crates/rele" }
+guardiana-escudo = { path = "crates/escudo" }
 
 # --- third-party, each justified (brief §2) ---
 # --- GUARDIANA ZERO, the browser (decision 197). All four were already in the tree through

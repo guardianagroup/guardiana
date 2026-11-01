@@ -843,6 +843,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "guardiana-escudo"
+version = "1.0.51"
+dependencies = [
+ "chacha20poly1305",
+ "getrandom 0.4.3",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+]
+
+[[package]]
 name = "guardiana-license"
 version = "1.0.51"
 dependencies = [
