@@ -1,8 +1,9 @@
 # The VPN's adapter on a real Windows (in preparation; docs/VPN.md, owner, 1 Nov 2026, 17:35: «sigue trabajando en la
 # VPN y en el antivirus»). The signed wireguard.dll exactly as WireGuard LLC publishes it (download.wireguard.com), its
 # Authenticode signature checked before anything loads it, and crates/apps/src/wireguard_nt.rs's real test: an adapter
-# created, configured with crates/tunel/src/nt.rs's bytes, brought up and down, and closed. GitHub's Windows runners run
-# as administrators, which the driver needs. Nothing here touches the runner's own network: no route, no firewall rule.
+# created, configured with crates/tunel/src/nt.rs's bytes, brought up and down, and closed. And corte_vpn.rs's: every
+# permit filter of the cut-off switch accepted by Windows, in a dynamic session closed at once (the blocking ones are
+# left out, so the runner's own network is never cut). GitHub's Windows runners run as administrators.
 # CI never holds signing keys and never publishes anything (brief §10).
 name: vpn
 
@@ -12,6 +13,7 @@ on:
     paths:
       - 'crates/tunel/**'
       - 'crates/apps/src/wireguard_nt.rs'
+      - 'crates/apps/src/corte_vpn.rs'
       - 'crates/apps/Cargo.toml'
       - '.github/workflows/vpn.yml'
   workflow_dispatch:
@@ -44,8 +46,14 @@ jobs:
           if (-not $dll) { Write-Output '::error title=wireguard.dll::no está en el .zip (bin\amd64)'; exit 1 }
           $firma = Get-AuthenticodeSignature -FilePath $dll.FullName
           $quien = if ($firma.SignerCertificate) { $firma.SignerCertificate.Subject } else { '' }
+          $huella = (Get-FileHash -Path $dll.FullName -Algorithm SHA256).Hash
           Write-Output "firma: $($firma.Status) · $quien"
-          Write-Output "sha256: $((Get-FileHash -Path $dll.FullName -Algorithm SHA256).Hash)"
+          Write-Output "sha256: $huella"
+          # the 1.1 build seen on 1 Nov 2026 (docs/VPN.md): another one is a new build to look at before trusting it
+          if ($huella -ne 'B1B85E072C45D81358BE29D94C599DC76652F912BE8C0F0A41E2D5D89A6461D3') {
+            Write-Output "::error title=wireguard.dll::otra compilación ($huella): revisarla antes de usarla"
+            exit 1
+          }
           if ($firma.Status -ne 'Valid' -or $quien -notmatch 'WireGuard LLC') {
             Write-Output "::error title=wireguard.dll::firma no válida o de otro firmante ($($firma.Status), $quien)"
             exit 1
@@ -55,7 +63,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          cargo test -p guardiana-apps --locked wireguard_nt -- --ignored --nocapture 2>&1 | tee "$RUNNER_TEMP/test.log" && exit 0
+          cargo test -p guardiana-apps --locked -- --ignored --nocapture wireguard_nt corte_vpn 2>&1 | tee "$RUNNER_TEMP/test.log" && exit 0
           grep -E "^test .* FAILED$|panicked at|^---- " "$RUNNER_TEMP/test.log" | head -20 | while IFS= read -r l; do echo "::error title=adaptador::$l"; done
           grep -A12 "panicked at" "$RUNNER_TEMP/test.log" | head -40 | sed -e 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}' | sed 's/^/::error title=detalle::/'; echo
           exit 1

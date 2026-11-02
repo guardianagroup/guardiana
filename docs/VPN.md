@@ -59,8 +59,16 @@ descubrimiento de vecinos de IPv6, y las máquinas virtuales de Hyper-V entre s�
 sea el resolutor del túnel, y todo lo demás. En una sesión dinámica: si el servicio se para, Windows quita los filtros
 (y el adaptador del túnel desaparece con él).
 
-Pendiente: la parte de Windows que convierte el plan en filtros, el adaptador (`wireguard.dll` por su interfaz pública),
-la dirección, las rutas y el DNS del túnel, y una prueba real en un Windows de la integración continua.
+Hecho y probado en un Windows real (la integración continua de GitHub, como administrador; `.github/workflows/vpn.yml`):
+
+- `crates/apps/src/wireguard_nt.rs` carga `wireguard.dll` (WireGuardNT 1.1, firma de WireGuard LLC válida, SHA-256
+  `B1B85E072C45D81358BE29D94C599DC76652F912BE8C0F0A41E2D5D89A6461D3`, comprobados en cada prueba) y crea un adaptador,
+  le da la configuración de `crates/tunel/src/nt.rs`, lo sube, lo baja y lo cierra (1 nov 2026: correcto).
+- `crates/apps/src/corte_vpn.rs` convierte el plan en filtros de una sesión dinámica; la prueba comprueba que Windows
+  acepta cada filtro que permite (los que bloquean se dejan fuera para no cortar la red del equipo de pruebas).
+
+Pendiente: la dirección, las rutas y el DNS del túnel; el servicio que lo une todo (alta, adaptador, corte) y su
+pantalla; y los servidores (dentro del sello, con la llave del dueño).
 
 ## Los servidores (propuesta para la fase 1)
 

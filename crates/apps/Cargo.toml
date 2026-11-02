@@ -42,7 +42,6 @@ windows-sys = { version = "0.61", features = [
     "Win32_System_LibraryLoader",
 ] }
 sha2 = { workspace = true }
-
-# The VPN adapter's real test on Windows (wireguard_nt.rs): the computer's keys and the configuration's bytes.
-[target.'cfg(windows)'.dev-dependencies]
+# The VPN (in preparation): its cut-off switch's plan (corte_vpn.rs) and, in the adapter's real test, the keys and the
+# configuration's bytes (wireguard_nt.rs). Pure rules, no system calls.
 guardiana-tunel = { workspace = true }
