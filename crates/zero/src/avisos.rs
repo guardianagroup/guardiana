@@ -43,8 +43,11 @@ pub struct Grave {
     pub cuando_ms: u64,
 }
 
-/// The grave warnings in the file's text that came after `visto` (milliseconds since 1970), oldest first, and the new
-/// mark: the time of the newest warning read, grave or not. A line that is not a warning is skipped.
+/// The grave warnings in the file's text written after `visto` (milliseconds since 1970), oldest first, and the new
+/// mark: the time of the newest warning read, grave or not. A warning goes by when it was written (`anotado_ms`), not
+/// by when the thing happened (`cuando_ms`, the only one before 1.0.52's last builds): one can be written a minute
+/// after the fact, once the program's signature is checked, and must not be taken for already seen. A line that is not
+/// a warning is skipped.
 #[must_use]
 pub fn nuevos(texto: &str, visto: u64) -> (Vec<Grave>, u64) {
     let mut marca = visto;
@@ -53,7 +56,10 @@ pub fn nuevos(texto: &str, visto: u64) -> (Vec<Grave>, u64) {
         let Ok(v) = serde_json::from_str::<Value>(linea) else {
             continue;
         };
-        let cuando = v["cuando_ms"].as_u64().unwrap_or(0);
+        let cuando = v["anotado_ms"]
+            .as_u64()
+            .or_else(|| v["cuando_ms"].as_u64())
+            .unwrap_or(0);
         if cuando <= visto {
             continue;
         }
@@ -143,6 +149,14 @@ mod tests {
             r#"{"regla":"guion","programa":"wscript.exe","texto":"cuatro","cuando_ms":300}"#,
         ]
         .join("\n");
+        // escrito después que otro más reciente: cuenta cuando se escribió
+        let tarde = format!(
+            "{texto}\n{}",
+            r#"{"regla":"arranque","programa":"u.exe","texto":"cinco","cuando_ms":150,"anotado_ms":500,"grave":true}"#
+        );
+        let (g, marca) = nuevos(&tarde, 400);
+        assert_eq!((g.len(), marca), (1, 500));
+        assert_eq!(g[0].texto, "cinco");
         let (g, marca) = nuevos(&texto, 0);
         assert_eq!(marca, 400);
         assert_eq!(g.len(), 2);

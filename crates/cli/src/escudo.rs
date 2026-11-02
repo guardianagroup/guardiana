@@ -537,14 +537,23 @@ impl EscudoVivo {
         }
     }
 
-    /// Adds a warning to the panel's file, keeping the newest [`MAX_AVISOS`]; a grave one carries `"grave": true` (a
+    /// Adds a warning to the panel's file, with when it was written (`anotado_ms`), keeping the newest [`MAX_AVISOS`];
+    /// a grave one carries `"grave": true` (a
     /// known sample, a document starting an interpreter, the backups' tools, a program in disguise).
     fn anota(&self, a: &Aviso, grave: bool) {
         let Ok(mut valor) = serde_json::to_value(a) else {
             return;
         };
-        if let (true, Some(o)) = (grave, valor.as_object_mut()) {
-            o.insert("grave".to_owned(), serde_json::Value::Bool(true));
+        if let Some(o) = valor.as_object_mut() {
+            if grave {
+                o.insert("grave".to_owned(), serde_json::Value::Bool(true));
+            }
+            // when it was written: what Windows' notices go by (a warning can be written a minute after the fact,
+            // once the program's signature is checked)
+            o.insert(
+                "anotado_ms".to_owned(),
+                serde_json::Value::from(guardiana_core::time::now_ms()),
+            );
         }
         let Ok(linea) = serde_json::to_string(&valor) else {
             return;
