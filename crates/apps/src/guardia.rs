@@ -52,6 +52,11 @@ struct Compartido {
     lanzados: HashMap<(String, String), i64>,
     contador: secuestro::Contador,
     rafagas: VecDeque<Rafaga>,
+    /// For the real test only: how many openings arrived, and the ones of a «Login Data» file, before any filter.
+    #[cfg(test)]
+    prueba_creados: u64,
+    #[cfg(test)]
+    prueba_login: Vec<String>,
 }
 
 /// The session running. Dropping it closes it.
@@ -257,6 +262,22 @@ fn anotar(
         return;
     };
     let lector = Parser::create(registro, &esquema);
+    #[cfg(test)]
+    {
+        let nombre = lector.try_parse::<String>("FileName");
+        let opciones = lector.try_parse::<u32>("CreateOptions");
+        if let Ok(mut d) = datos.lock() {
+            d.prueba_creados += 1;
+            if let Ok(n) = &nombre {
+                if n.to_lowercase().contains("login data") && d.prueba_login.len() < 20 {
+                    d.prueba_login.push(format!("{pid} {n} {opciones:?}"));
+                }
+            } else if d.prueba_login.len() < 3 {
+                d.prueba_login
+                    .push(format!("FileName ilegible: {nombre:?}"));
+            }
+        }
+    }
     if lector.try_parse::<u32>("CreateOptions").unwrap_or(0) & ES_CARPETA != 0 {
         return;
     }
@@ -362,6 +383,10 @@ mod tests {
         let aperturas = sesion.toma();
         let lanzamientos = sesion.lanzamientos();
         let rafagas = sesion.rafagas();
+        if let Ok(d) = sesion.datos.lock() {
+            println!("aperturas recibidas: {}", d.prueba_creados);
+            println!("de «Login Data»: {:?}", d.prueba_login);
+        }
         let _ = std::fs::remove_dir_all(&carpeta);
         let _ = std::fs::remove_file(&secreto);
         println!("aperturas: {aperturas:?}");

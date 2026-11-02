@@ -39,5 +39,5 @@ jobs:
         run: |
           set -o pipefail
           cargo test -p guardiana-apps --locked -- --ignored --nocapture guardia::tests 2>&1 | tee "$RUNNER_TEMP/test.log" && exit 0
-          grep -E "^test .* FAILED$|panicked at|^---- |^(aperturas|lanzamientos|ráfagas):" "$RUNNER_TEMP/test.log" | head -20 | cut -c1-900 | while IFS= read -r l; do echo "::error title=escudo::$l"; done
+          grep -E "^test .* FAILED$|panicked at|^---- |^(aperturas|lanzamientos|ráfagas|de «Login Data»)" "$RUNNER_TEMP/test.log" | head -20 | cut -c1-900 | while IFS= read -r l; do echo "::error title=escudo::$l"; done
           exit 1
