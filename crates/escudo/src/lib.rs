@@ -4,7 +4,8 @@
 //! Phase A1 (docs/ESCUDO.md): a file's SHA-256 against open lists of known malicious samples ([`huellas`]), the
 //! analysis of a file or a folder ([`analisis`]) and a quarantine that can always be undone ([`cuarentena`]). Phase A3
 //! starts with [`primera_vez`]: a program without a signature, run from a folder anyone can write to, calling a site this
-//! computer never asked for before.
+//! computer never asked for before; and [`ladrones`]: a program that is not the browser opening its saved passwords,
+//! cookies or keys, or a wallet or a messaging session.
 //! Everything happens on this computer: nothing is uploaded anywhere.
 //!
 //! A list is never a verdict on its own (docs/LISTS.md): whoever acts on a match also looks at who signs the file, and a
@@ -13,6 +14,7 @@
 pub mod analisis;
 pub mod cuarentena;
 pub mod huellas;
+pub mod ladrones;
 pub mod primera_vez;
 
 pub use analisis::{analiza, analiza_carpeta, huella_de, Resultado, Veredicto};

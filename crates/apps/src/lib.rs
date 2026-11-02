@@ -62,6 +62,9 @@ mod archivos;
 mod defender;
 #[cfg(windows)]
 mod firmas;
+// El escudo (1.0.52): who opens the saved secrets (browser passwords, cookies, keys, wallets, sessions).
+#[cfg(windows)]
+mod guardia;
 pub mod instalador;
 // «Quién vende tus datos dentro de tu PC» (1.0.46): the system's own advertising settings.
 pub mod privacidad;
@@ -128,6 +131,20 @@ impl Observador {
         #[cfg(windows)]
         {
             self.interno.firma_comprobada(ruta)
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = ruta;
+            None
+        }
+    }
+
+    /// The same, and if the program was never checked, asks for the check now (the answer comes in a later call).
+    #[must_use]
+    pub fn firma(&self, ruta: &str) -> Option<String> {
+        #[cfg(windows)]
+        {
+            self.interno.firma(ruta)
         }
         #[cfg(not(windows))]
         {
@@ -215,6 +232,58 @@ pub fn diagnostico_red(segundos: u64) -> Result<Vec<(u16, u32, u32, String)>, Er
     {
         let _ = segundos;
         Err(Error::NoSoportado)
+    }
+}
+
+/// One opening of a file that holds a saved secret (a browser's passwords, cookies or key, a wallet, a messaging
+/// session) by a program that is not that app's own installed program (el escudo, 1.0.52).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Apertura {
+    /// When (milliseconds since 1970).
+    pub ts: i64,
+    /// The program's file name.
+    pub programa: String,
+    /// The program's full path.
+    pub ruta: String,
+    /// The file it opened, as Windows names it.
+    pub archivo: String,
+}
+
+/// El escudo's watch over saved secrets: on while the service runs, only the openings of those files, names only.
+pub struct Guardia {
+    #[cfg(windows)]
+    interno: guardia::Sesion,
+}
+
+impl Guardia {
+    /// Starts watching.
+    ///
+    /// # Errors
+    /// [`Error::NoSoportado`] outside Windows; [`Error::Sistema`] when the trace cannot start.
+    pub fn arrancar() -> Result<Self, Error> {
+        #[cfg(windows)]
+        {
+            Ok(Self {
+                interno: guardia::Sesion::arrancar()?,
+            })
+        }
+        #[cfg(not(windows))]
+        {
+            Err(Error::NoSoportado)
+        }
+    }
+
+    /// The openings since the last call.
+    #[must_use]
+    pub fn toma(&self) -> Vec<Apertura> {
+        #[cfg(windows)]
+        {
+            self.interno.toma()
+        }
+        #[cfg(not(windows))]
+        {
+            Vec::new()
+        }
     }
 }
 

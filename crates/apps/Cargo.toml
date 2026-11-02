@@ -11,6 +11,8 @@ publish = false
 
 [dependencies]
 guardiana-core = { path = "../core" }
+# El escudo (1.0.52): which files hold a saved secret (pure rules, no system calls).
+guardiana-escudo = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

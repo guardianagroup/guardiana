@@ -104,6 +104,12 @@ impl Sesion {
         self.firmas.comprobada(ruta)
     }
 
+    /// The same, asking for the check when the program was never seen (el escudo's watch over saved secrets).
+    pub(crate) fn firma(&self, ruta: &str) -> Option<String> {
+        let _ = self.firmas.firma_y_version(ruta);
+        self.firmas.comprobada(ruta)
+    }
+
     pub(crate) fn quien_pidio(&self, qname: &str, ts_ms: i64) -> Option<Proceso> {
         let buscado = qname.trim_end_matches('.').to_ascii_lowercase();
         let Ok(mut d) = self.datos.lock() else {
