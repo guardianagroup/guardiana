@@ -3,11 +3,121 @@
 //! things many harmful programs do. The continuous watch already notes every change of Windows Security
 //! (`guardiana_apps::vigilancia`, «Protección» in the panel); this rule turns the ones an antivirus should point at into
 //! warnings: grave when the protection goes off, a plain warning when it was already off at the watch's first look.
+//!
+//! And Microsoft Defender's exclusions: the watch reads them (the service can) and notes each new one. Adding an
+//! exclusion, so the antivirus does not look at a folder, a program or a kind of file, is what many harmful programs do
+//! to hide. A new exclusion always warns, grave when it leaves out much ([`amplia`]); one already there at the first
+//! look warns only when it is that wide.
 
 use crate::primera_vez::Aviso;
 
 /// The name shown where a warning names a program.
 const QUIEN: &str = "Seguridad de Windows";
+
+/// Programs that run whatever they are given: an exclusion of one leaves out everything it runs.
+const INTERPRETES: &[&str] = &[
+    "powershell.exe",
+    "pwsh.exe",
+    "cmd.exe",
+    "wscript.exe",
+    "cscript.exe",
+    "mshta.exe",
+    "rundll32.exe",
+    "regsvr32.exe",
+    "msiexec.exe",
+    "explorer.exe",
+    "svchost.exe",
+    "schtasks.exe",
+    "certutil.exe",
+    "bitsadmin.exe",
+];
+
+/// Kinds of file that run, or carry, programs.
+const EJECUTABLES: &[&str] = &[
+    "exe", "dll", "scr", "com", "pif", "bat", "cmd", "ps1", "psm1", "vbs", "vbe", "js", "jse",
+    "wsf", "wsh", "hta", "msi", "msp", "lnk", "sys", "cpl", "ocx", "jar", "iso", "img", "vhd",
+    "vhdx", "zip", "rar", "7z", "docm", "xlsm", "pptm",
+];
+
+/// Folders where what comes from the internet lands, or anyone can write (their names on disk, also as OneDrive
+/// names them in Spanish and Portuguese).
+const SITIOS: &[&str] = &[
+    "downloads",
+    "descargas",
+    "transferências",
+    "desktop",
+    "escritorio",
+    "área de trabalho",
+    "appdata",
+    "temp",
+    "tmp",
+];
+
+/// The same places as Windows' variables.
+const VARIABLES: &[&str] = &[
+    "%temp%",
+    "%tmp%",
+    "%appdata%",
+    "%localappdata%",
+    "%userprofile%",
+    "%public%",
+];
+
+/// What an exclusion of Microsoft Defender (`ruta:…`, `proceso:…` or `extension:…`, as the continuous watch reads
+/// them) leaves out, in words.
+#[must_use]
+pub fn que_excluye(x: &str) -> String {
+    match x.split_once(':') {
+        Some(("ruta", r)) => format!("la carpeta o el archivo «{r}»"),
+        Some(("proceso", p)) => format!("lo que abre el programa «{p}»"),
+        Some(("extension", e)) => format!("los archivos «.{}»", e.trim_start_matches('.')),
+        _ => format!("«{x}»"),
+    }
+}
+
+/// Whether a lower-case path (with `\`) goes through one of [`SITIOS`] or [`VARIABLES`], or `Users\Public`.
+fn en_sitio(v: &str) -> bool {
+    let partes: Vec<&str> = v.split('\\').collect();
+    partes.iter().any(|p| SITIOS.contains(p))
+        || partes.windows(2).any(|w| w == ["users", "public"])
+        || VARIABLES.iter().any(|x| v.contains(x))
+}
+
+/// Whether an exclusion leaves out much: a whole drive, a folder of the system or a person's whole folder, a place
+/// where downloads land or anyone can write, a program that runs others, a kind of file that runs, or a wildcard.
+#[must_use]
+pub fn amplia(x: &str) -> bool {
+    let Some((tipo, valor)) = x.split_once(':') else {
+        return false;
+    };
+    let v = valor.trim().replace('/', "\\").to_lowercase();
+    if v.contains('*') {
+        return true;
+    }
+    match tipo {
+        "extension" => EJECUTABLES.contains(&v.trim_start_matches('.')),
+        "proceso" => {
+            let nombre = v.rsplit('\\').next().unwrap_or_default();
+            INTERPRETES.contains(&nombre) || en_sitio(&v)
+        }
+        "ruta" => {
+            let partes: Vec<&str> = v
+                .trim_start_matches(r"\\?\")
+                .split('\\')
+                .filter(|p| !p.is_empty())
+                .collect();
+            let unidad = partes.len() <= 1;
+            let del_sistema = partes.len() == 2
+                && matches!(
+                    partes[1],
+                    "users" | "windows" | "program files" | "program files (x86)" | "programdata"
+                );
+            let de_una_persona = partes.len() == 3 && partes[1] == "users";
+            unidad || del_sistema || de_una_persona || en_sitio(&v)
+        }
+        _ => false,
+    }
+}
 
 /// A change the continuous watch noted (its sentence key `frase`, the thing it is about `x`, whether it is now on
 /// `activo`, what identifies it `clave`) as a warning, when it is protection going off. The second value says whether
@@ -55,6 +165,30 @@ pub fn juzga(
             "La protección en tiempo real de Microsoft Defender está apagada. Enciéndela en Seguridad de Windows si no \
              usas otro antivirus."
                 .to_owned(),
+            false,
+        ),
+        "vg_ev_exclusion_nueva" => {
+            let grave = amplia(x);
+            (
+                format!(
+                    "Microsoft Defender tiene una exclusión nueva: ya no analiza {}. {}Si no la añadiste tú, quítala en \
+                     Seguridad de Windows, en las exclusiones de la protección antivirus.",
+                    que_excluye(x),
+                    if grave {
+                        "Es de las que añaden los programas dañinos para que el antivirus no los vea. "
+                    } else {
+                        ""
+                    }
+                ),
+                grave,
+            )
+        }
+        "vg_ev_exclusion_ya" if amplia(x) => (
+            format!(
+                "Microsoft Defender tiene una exclusión muy amplia: no analiza {}. Si no la necesitas, quítala en \
+                 Seguridad de Windows, en las exclusiones de la protección antivirus.",
+                que_excluye(x)
+            ),
             false,
         ),
         "vg_ev_sin_antivirus_ya" => (
@@ -107,6 +241,80 @@ mod tests {
         )
         .unwrap();
         assert!(grave);
+    }
+
+    #[test]
+    fn que_exclusion_deja_fuera_mucho() {
+        for x in [
+            r"ruta:C:\",
+            "ruta:D:",
+            r"ruta:C:\Users",
+            r"ruta:C:\Windows",
+            r"ruta:C:\Program Files (x86)",
+            r"ruta:C:\Users\ana",
+            r"ruta:C:\Users\ana\Downloads",
+            r"ruta:C:\Users\ana\AppData\Roaming\Actualizador",
+            r"ruta:C:\Users\ana\OneDrive\Escritorio\x",
+            r"ruta:C:\Temp",
+            r"ruta:C:\Users\Public\x",
+            r"ruta:%TEMP%\x",
+            r"ruta:C:\*",
+            "proceso:powershell.exe",
+            r"proceso:C:\Windows\System32\WindowsPowerShell\v1.0\PowerShell.exe",
+            r"proceso:C:\Users\ana\AppData\Local\x\x.exe",
+            "extension:exe",
+            "extension:.PS1",
+            "extension:*",
+        ] {
+            assert!(amplia(x), "{x}");
+        }
+        for x in [
+            r"ruta:C:\Juegos",
+            r"ruta:D:\Proyectos\compilaciones",
+            r"ruta:C:\ProgramData\Copias\cache",
+            r"ruta:C:\Users\ana\Documents\Templates",
+            r"proceso:C:\Program Files\Juego\juego.exe",
+            "proceso:juego.exe",
+            "extension:log",
+            "extension:.vmdk",
+            "otra cosa",
+        ] {
+            assert!(!amplia(x), "{x}");
+        }
+        assert_eq!(que_excluye("extension:exe"), "los archivos «.exe»");
+    }
+
+    #[test]
+    fn una_exclusion_nueva_avisa_y_si_es_amplia_es_grave() {
+        let (a, grave) = juzga(
+            "vg_ev_exclusion_nueva",
+            r"ruta:C:\Users\ana\AppData\Roaming\Actualizador",
+            None,
+            "exclusion|x|1",
+            1,
+        )
+        .unwrap();
+        assert!(grave);
+        assert_eq!(
+            (a.regla, a.nombre.as_str()),
+            ("proteccion", "exclusion|x|1")
+        );
+        assert!(a.texto.contains("ya no analiza la carpeta o el archivo «C:\\Users\\ana\\AppData\\Roaming\\Actualizador»"), "{}", a.texto);
+        let (a, grave) = juzga("vg_ev_exclusion_nueva", r"ruta:C:\Juegos", None, "k", 1).unwrap();
+        assert!(!grave);
+        assert!(!a.texto.contains("programas dañinos"), "{}", a.texto);
+        // one already there at the first look: only when it is wide
+        let (_, grave) = juzga("vg_ev_exclusion_ya", "extension:exe", None, "k", 1).unwrap();
+        assert!(!grave);
+        assert_eq!(
+            juzga("vg_ev_exclusion_ya", r"ruta:C:\Juegos", None, "k", 1),
+            None
+        );
+        // one removed: nothing
+        assert_eq!(
+            juzga("vg_ev_exclusion_quitada", "extension:exe", None, "k", 1),
+            None
+        );
     }
 
     #[test]

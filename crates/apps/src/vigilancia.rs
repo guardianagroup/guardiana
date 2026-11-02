@@ -32,6 +32,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
+use guardiana_escudo::proteccion::que_excluye;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -271,6 +272,9 @@ pub struct Proteccion {
     pub defender: Option<Defender>,
     /// Each firewall profile and whether it is on; on a Mac, one entry (`macOS`).
     pub cortafuegos: Option<Vec<(String, bool)>>,
+    /// Microsoft Defender's exclusions, what it does not look at (`ruta:C:\x`, `proceso:x.exe`, `extension:.x`);
+    /// `None` when they could not be read.
+    pub exclusiones: Option<Vec<String>>,
 }
 
 /// One look at what changes slowly.
@@ -378,6 +382,14 @@ pub fn de_json(v: &Value) -> Foto {
                     .into_iter()
                     .map(|x| (s(&x["perfil"]), x["activo"].as_bool().unwrap_or(false)))
                     .filter(|(n, _)| !n.is_empty())
+                    .collect()
+            }),
+            exclusiones: (!p["exclusiones"].is_null()).then(|| {
+                arr(&p["exclusiones"])
+                    .into_iter()
+                    .map(s)
+                    .filter(|x| !x.is_empty())
+                    .take(MAX_EXCLUSIONES)
                     .collect()
             }),
         });
@@ -551,6 +563,9 @@ pub struct Base {
     /// The attention conditions at the last look (`sin_antivirus`, `tiempo_real`…).
     #[serde(default)]
     pub atencion: BTreeSet<String>,
+    /// Microsoft Defender's exclusions at the last look that could read them; `None` until one did.
+    #[serde(default)]
+    pub exclusiones: Option<BTreeSet<String>>,
     /// When each notice was last given, so the same one is not repeated within its window.
     #[serde(default)]
     pub avisados: BTreeMap<String, i64>,
@@ -558,6 +573,10 @@ pub struct Base {
 
 /// The most startup entries remembered; beyond it, the oldest absent ones are forgotten.
 const MAX_RECORDADOS: usize = 6_000;
+/// The most Defender exclusions read in one look.
+const MAX_EXCLUSIONES: usize = 200;
+/// The most findings about exclusions in one look (of each kind).
+const MAX_AVISOS_EXCLUSIONES: usize = 10;
 /// More new startup entries than this in one look (an installation) make one notice, not many.
 const MAX_AVISOS_ARRANQUE: usize = 3;
 /// A camera or microphone notice for the same program is not repeated within this window: a call
@@ -1031,11 +1050,80 @@ impl Base {
                 .texto(format!("{} vuelve a estar activo", texto_atencion(c))),
             );
         }
+        if let Some(ahora_hay) = &p.exclusiones {
+            out.extend(self.mira_exclusiones(ahora_hay, ahora));
+        }
         self.proteccion = hechos;
         self.atencion = atencion;
         if primera {
             self.proteccion_desde = Some(ahora);
         }
+        out
+    }
+
+    /// Microsoft Defender's exclusions against the last look (1.0.52, el escudo): each new one, each one gone, and, the
+    /// first time they could be read, each one already there. An exclusion added is a notice: adding one, so the
+    /// antivirus does not look at a folder or a program, is what many harmful programs do.
+    fn mira_exclusiones(&mut self, ahora_hay: &[String], ahora: i64) -> Vec<Hallazgo> {
+        let ahora_hay: BTreeSet<String> = ahora_hay.iter().cloned().collect();
+        let mut out = Vec::new();
+        // taken out while compared, so the notices' memory (`avisa`) can be written meanwhile
+        match self.exclusiones.take() {
+            None => {
+                for x in ahora_hay.iter().take(MAX_AVISOS_EXCLUSIONES) {
+                    out.push(
+                        Hallazgo::nuevo(
+                            "proteccion",
+                            format!("exclusion|{x}|ya"),
+                            false,
+                            "vg_ev_exclusion_ya",
+                        )
+                        .con("x", x)
+                        .con("que", excluido(x))
+                        .texto(format!(
+                            "Microsoft Defender ya tenía esta exclusión al empezar a vigilar: {}",
+                            que_excluye(x)
+                        )),
+                    );
+                }
+            }
+            Some(antes) => {
+                for x in ahora_hay.difference(&antes).take(MAX_AVISOS_EXCLUSIONES) {
+                    let aviso = self.avisa(&format!("exclusion|{x}"), ahora, VENTANA_AVISO);
+                    out.push(
+                        Hallazgo::nuevo(
+                            "proteccion",
+                            format!("exclusion|{x}|{ahora}"),
+                            aviso,
+                            "vg_ev_exclusion_nueva",
+                        )
+                        .con("x", x)
+                        .con("que", excluido(x))
+                        .texto(format!(
+                            "Microsoft Defender tiene una exclusión nueva: ya no analiza {}",
+                            que_excluye(x)
+                        )),
+                    );
+                }
+                for x in antes.difference(&ahora_hay).take(MAX_AVISOS_EXCLUSIONES) {
+                    out.push(
+                        Hallazgo::nuevo(
+                            "proteccion",
+                            format!("exclusion|{x}|quitada|{ahora}"),
+                            false,
+                            "vg_ev_exclusion_quitada",
+                        )
+                        .con("x", x)
+                        .con("que", excluido(x))
+                        .texto(format!(
+                            "Microsoft Defender vuelve a analizar {}",
+                            que_excluye(x)
+                        )),
+                    );
+                }
+            }
+        }
+        self.exclusiones = Some(ahora_hay);
         out
     }
 }
@@ -1158,6 +1246,15 @@ fn detalle_atencion(c: &str) -> String {
         .to_owned()
 }
 
+/// What an exclusion leaves out, without its kind (`ruta:C:\x` → `C:\x`; an extension with its dot).
+fn excluido(x: &str) -> String {
+    match x.split_once(':') {
+        Some(("extension", e)) => format!(".{}", e.trim_start_matches('.')),
+        Some((_, v)) => v.to_owned(),
+        None => x.to_owned(),
+    }
+}
+
 fn texto_atencion(c: &str) -> String {
     if let Some(p) = c.strip_prefix("cortafuegos:") {
         return format!("El cortafuegos (perfil {p})");
@@ -1224,6 +1321,9 @@ fn frase_vuelve(c: &str) -> &'static str {
 /// Every sentence a finding can carry (keys of the panel's texts), so a test there can check that
 /// each one exists in the three languages.
 pub const FRASES: &[&str] = &[
+    "vg_ev_exclusion_nueva",
+    "vg_ev_exclusion_ya",
+    "vg_ev_exclusion_quitada",
     "vg_ev_uso_empieza",
     "vg_ev_uso_termina",
     "vg_ev_uso_breve",
@@ -1619,6 +1719,7 @@ mod mac {
                 cortafuegos_otros: None,
                 defender: None,
                 cortafuegos: Some(c),
+                exclusiones: None,
             }),
             ..Foto::default()
         }
@@ -1954,6 +2055,7 @@ mod tests {
             cortafuegos_otros: Some(Vec::new()),
             defender: Some(d),
             cortafuegos: Some(perfiles.iter().map(|(p, a)| ((*p).into(), *a)).collect()),
+            exclusiones: None,
         }
     }
 
@@ -2050,7 +2152,8 @@ mod tests {
                 "antivirus": { "nombre": "Microsoft Defender Antivirus", "estado": 397568 },
                 "cortafuegos_otros": [],
                 "defender": { "servicio": true, "antivirus": true, "tiempo_real": true, "manipulacion": true, "modo": "Normal" },
-                "cortafuegos": [ { "perfil": "Domain", "activo": true } ]
+                "cortafuegos": [ { "perfil": "Domain", "activo": true } ],
+                "exclusiones": [ "ruta:C:\\Juegos", "extension:iso", "" ]
             },
             "cuentas": { "S-1-5-21-1": "marta" },
             "errores": {}
@@ -2065,10 +2168,67 @@ mod tests {
         let p = f.proteccion.unwrap();
         assert!(p.antivirus.unwrap()[0].activo);
         assert!(p.defender.unwrap().al_mando());
+        assert_eq!(
+            p.exclusiones.unwrap(),
+            vec![r"ruta:C:\Juegos".to_owned(), "extension:iso".to_owned()],
+            "an empty value is dropped"
+        );
         assert_eq!(f.cuentas["S-1-5-21-1"], "marta");
         let vacio = de_json(&serde_json::json!({ "arranque": null, "privacidad": null }));
         assert!(
             vacio.arranque.is_none() && vacio.privacidad.is_none() && vacio.proteccion.is_none()
+        );
+    }
+
+    #[test]
+    fn a_new_defender_exclusion_is_a_notice_and_one_already_there_is_noted() {
+        let mut b = Base::default();
+        let con = |x: &[&str]| {
+            let mut p = prot(
+                &[("Microsoft Defender Antivirus", true)],
+                defender(true, "Normal"),
+                &[("Public", true)],
+            );
+            p.exclusiones = Some(x.iter().map(|s| (*s).to_owned()).collect());
+            p
+        };
+        // the first reading: what was already there is noted, without a notice
+        let h = b.mira_proteccion(&con(&[r"ruta:C:\Juegos"]), 1_000);
+        assert_eq!(h.len(), 1, "{h:?}");
+        assert_eq!((h[0].frase, h[0].aviso), ("vg_ev_exclusion_ya", false));
+        assert_eq!(h[0].datos["x"], r"ruta:C:\Juegos");
+        assert!(h[0].texto.contains("«C:\\Juegos»"), "{}", h[0].texto);
+        // nothing new: nothing
+        assert!(b
+            .mira_proteccion(&con(&[r"ruta:C:\Juegos"]), 2_000)
+            .is_empty());
+        // two new ones: notices; the one gone: history
+        let h = b.mira_proteccion(
+            &con(&[r"ruta:C:\Users\ana\AppData\Roaming\x", "extension:exe"]),
+            3_000,
+        );
+        let frases: Vec<(&str, bool)> = h.iter().map(|x| (x.frase, x.aviso)).collect();
+        assert_eq!(
+            frases
+                .iter()
+                .filter(|f| **f == ("vg_ev_exclusion_nueva", true))
+                .count(),
+            2,
+            "{frases:?}"
+        );
+        assert!(
+            frases.contains(&("vg_ev_exclusion_quitada", false)),
+            "{frases:?}"
+        );
+        // not read this time (another antivirus in charge, or no rights): nothing is compared
+        let mut sin = con(&[]);
+        sin.exclusiones = None;
+        assert!(b.mira_proteccion(&sin, 4_000).is_empty());
+        assert_eq!(b.exclusiones.as_ref().map(BTreeSet::len), Some(2));
+        assert_eq!(que_excluye("extension:.exe"), "los archivos «.exe»");
+        assert_eq!(
+            que_excluye("proceso:x.exe"),
+            "lo que abre el programa «x.exe»"
         );
     }
 

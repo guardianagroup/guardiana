@@ -1017,6 +1017,7 @@ mod tests {
                     modo: "Normal".into(),
                 }),
                 cortafuegos: Some(vec![("Public".into(), true)]),
+                exclusiones: None,
             }),
             ..Foto::default()
         });

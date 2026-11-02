@@ -72,6 +72,12 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
 - «Protección» (`proteccion.rs`): lo que la vigilancia continua anota de Seguridad de Windows, cuando la protección se
   apaga: la protección en tiempo real o contra alteraciones de Microsoft Defender, o ningún antivirus encendido
   (graves), o un perfil del cortafuegos (aviso). Lo que ya estaba apagado en su primera mirada, aviso sin gravedad.
+  Y las exclusiones de Microsoft Defender (lo que no analiza: una carpeta, un programa o un tipo de archivo), que la
+  vigilancia lee como servicio del sistema: cada una nueva avisa, y es grave si deja fuera mucho (una unidad entera,
+  una carpeta del sistema o la de una persona, Descargas, el Escritorio, AppData o las temporales, un programa que
+  ejecuta otros como PowerShell, o los archivos que ejecutan, como `.exe` o `.ps1`), porque añadir exclusiones así es
+  de lo que hacen los programas dañinos para esconderse. Las que ya estaban en su primera lectura solo avisan si son
+  así de amplias.
 - «Hosts» (`hosts.rs`): el archivo hosts de Windows, cada minuto. Un nombre que ahora va a una dirección de internet
   (no a 0.0.0.0, a este equipo ni a la red de casa) es grave: así se desvía una web a otro servidor sin que ningún DNS
   lo vea. La primera lectura es el punto de partida y se guarda junto al diario (`escudo-hosts.json`).
@@ -97,6 +103,21 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
   la ventana oculta de `zero/navegador/src/avisos.rs` recibe el «cerrar» del instalador al actualizar o desinstalar.
 - Falta: la pantalla del antivirus en la web del programa, el análisis de Descargas desde el panel y las listas de
   muestras (decisión del dueño, abajo).
+
+## Lo que cuesta (medido)
+
+La vigilancia de archivos ve cada archivo que se abre en el equipo, así que tiene que pesar poco. La prueba real
+(`cuanto_cuesta_la_guardia` en `crates/apps/src/guardia.rs`, `.github/workflows/escudo.yml`) la compila como se publica,
+pone en marcha la sesión del escudo y hace que otro proceso cree y lea 20 000 archivos en la carpeta temporal; dice
+cuántas aperturas llegaron y cuánto procesador gastó el proceso del escudo (con la propia medida incluida).
+
+| Fecha (Windows de GitHub) | Aperturas | Procesador | Por apertura | Leyendo los campos |
+|---|---|---|---|---|
+| 1 nov 2026, antes | 183 338 | 438 ms | 2,4 µs | 1,1 µs |
+| 1 nov 2026, búsqueda anclada en `\appdata\` | 183 318 | 281 ms | 1,5 µs | 1,0 µs |
+
+La carpeta temporal está dentro de AppData, el caso más caro de `ladrones::que_es`; por eso la búsqueda mira ahora solo
+donde empieza cada `\appdata\` de la ruta. Lo que queda es sobre todo leer los campos de cada suceso con ferrisetw.
 
 ## Reglas de la casa que se mantienen
 
