@@ -3025,6 +3025,7 @@
     "vg_tipo_carpeta": "Startup folder",
     "vg_tipo_tarea": "scheduled task",
     "vg_tipo_servicio": "service",
+    "vg_tipo_wmi": "WMI subscription",
     "vg_tipo_launchd": "LaunchAgent / LaunchDaemon",
     "vg_tipo_autostart": "desktop autostart",
     "vg_tipo_systemd": "systemd unit",

@@ -286,9 +286,9 @@ fn mira_lento(state: &AppState) {
             if let Ok(l) = state.ledger.lock() {
                 let (mut base, antes) = lee_base(&l, BASE_LENTA);
                 let mut h = Vec::new();
-                // A list read only in part (the tasks or the services did not answer) is not
+                // A list read only in part (the tasks, the services or WMI did not answer) is not
                 // compared: everything missing would look removed, and back next time as new.
-                let parcial = ["arranque", "tareas", "servicios"]
+                let parcial = ["arranque", "tareas", "servicios", "wmi"]
                     .iter()
                     .find_map(|k| f.errores.get(*k).cloned());
                 miradas.insert(

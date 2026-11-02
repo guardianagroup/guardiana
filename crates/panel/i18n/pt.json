@@ -3025,6 +3025,7 @@
     "vg_tipo_carpeta": "pasta Arranque",
     "vg_tipo_tarea": "tarefa agendada",
     "vg_tipo_servicio": "serviço",
+    "vg_tipo_wmi": "assinatura do WMI",
     "vg_tipo_launchd": "LaunchAgent / LaunchDaemon",
     "vg_tipo_autostart": "arranque do ambiente de trabalho",
     "vg_tipo_systemd": "serviço do systemd",

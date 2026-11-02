@@ -5,6 +5,9 @@
 //! The continuous watch already notes every new one (`guardiana_apps::vigilancia`, «Lo que arranca solo» in the
 //! panel); this rule picks the ones an antivirus should point at. A signed program is not judged here, and one whose
 //! signature could not be checked counts only in the Downloads folder, a temporary folder or the Desktop.
+//!
+//! A new WMI event subscription that runs a command or a script ([`juzga_wmi`]) is judged apart: what it runs is often
+//! Windows' own program (PowerShell), so its signature says nothing; the subscription itself is the sign.
 
 use crate::primera_vez::{carpeta_escribible, Aviso, Firma};
 
@@ -227,10 +230,61 @@ pub fn juzga(
     ))
 }
 
+/// A new WMI event subscription that runs a command or a script (`tipo` `wmi` in the continuous watch), called `titulo`,
+/// running `orden`: a way to start on its own that no Run key, folder or task shows, used by intrusions that leave no
+/// file. Rare at home, so always grave. `clave` identifies it (the watch's key).
+#[must_use]
+pub fn juzga_wmi(titulo: &str, orden: &str, clave: &str, cuando_ms: u64) -> (Aviso, bool) {
+    let corta: String = orden.chars().take(160).collect();
+    let mas = if orden.chars().count() > 160 {
+        "…"
+    } else {
+        ""
+    };
+    let texto = format!(
+        "Hay una suscripción de WMI nueva, «{titulo}», que ejecuta «{corta}{mas}» cuando ocurre algo en el equipo. Es \
+         una forma de arrancar solo que no aparece en el Inicio ni en las tareas programadas, y la usan intrusiones que \
+         no dejan archivos. Si no la reconoces, analiza el equipo."
+    );
+    (
+        Aviso {
+            regla: "arranque",
+            programa: titulo.to_owned(),
+            ruta: orden.to_owned(),
+            sitio: String::new(),
+            nombre: clave.to_owned(),
+            cuando_ms,
+            fuente: None,
+            texto,
+        },
+        true,
+    )
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn una_suscripcion_de_wmi_nueva_es_grave() {
+        let largo = format!(
+            "powershell.exe -NoProfile -WindowStyle Hidden -Command {}",
+            "x".repeat(300)
+        );
+        let (a, grave) = juzga_wmi(
+            "Actualizador",
+            &largo,
+            "wmi|commandlineeventconsumer|actualizador",
+            7,
+        );
+        assert!(grave);
+        assert_eq!(a.regla, "arranque");
+        assert_eq!(a.nombre, "wmi|commandlineeventconsumer|actualizador");
+        assert!(a.texto.contains("«Actualizador»"), "{}", a.texto);
+        assert!(a.texto.contains("…»"), "a long command is cut: {}", a.texto);
+        assert!(a.texto.chars().count() < 600, "{}", a.texto);
+    }
 
     fn rutas(orden: &str) -> Vec<String> {
         archivos_en(orden).into_iter().map(|a| a.ruta).collect()

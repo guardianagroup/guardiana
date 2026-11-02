@@ -340,6 +340,7 @@ impl EscudoVivo {
         self.mira_hosts(ahora_ms);
         self.ladrones(obs, ahora_ms);
         self.cadenas();
+        self.credenciales();
         self.arranques_pendientes(obs, ahora_ms);
         if self.pendientes.is_empty() {
             return;
@@ -497,6 +498,41 @@ impl EscudoVivo {
         }
     }
 
+    /// The openings of LSASS that asked to read its memory, through the rule (`guardiana_escudo::credenciales`). The
+    /// same program warns once an hour.
+    fn credenciales(&mut self) {
+        let nuevos = self
+            .guardia
+            .as_ref()
+            .map(Guardia::accesos)
+            .unwrap_or_default();
+        for a in nuevos {
+            let cuando = u64::try_from(a.ts).unwrap_or(0);
+            let Some((aviso, grave)) = guardiana_escudo::credenciales::juzga(
+                &a.programa,
+                &a.ruta,
+                a.acceso,
+                a.concedido,
+                cuando,
+            ) else {
+                continue;
+            };
+            let clave = (aviso.nombre.clone(), "credenciales".to_owned());
+            if self
+                .cadenas_vistas
+                .get(&clave)
+                .is_some_and(|t| cuando.saturating_sub(*t) < REPETIR_CADENA_MS)
+            {
+                continue;
+            }
+            if self.cadenas_vistas.len() > 4_096 {
+                self.cadenas_vistas.clear();
+            }
+            self.cadenas_vistas.insert(clave, cuando);
+            self.anota(&aviso, grave);
+        }
+    }
+
     /// The bursts of the person's files renamed or deleted by one program, once Windows has checked its signature,
     /// through the rule (`guardiana_escudo::secuestro::juzga`). The same program warns once an hour.
     fn secuestros(&mut self, obs: &Observador, ahora_ms: u64) {
@@ -639,8 +675,8 @@ impl EscudoVivo {
     }
 
     /// What the continuous watch noted since the last read: its new autostarts (not Windows' own), each program file in
-    /// what they run waiting for its signature check (`guardiana_escudo::arranque`); and the changes of Windows
-    /// Security (`guardiana_escudo::proteccion`).
+    /// what they run waiting for its signature check (`guardiana_escudo::arranque`), and a new WMI subscription at once;
+    /// and the changes of Windows Security (`guardiana_escudo::proteccion`).
     pub(crate) fn lee_vigilancia(&mut self, l: &Ledger, obs: &Observador, ahora_ms: u64) {
         self.arranque_leido_ms = ahora_ms;
         let Ok(filas) = l.vigilancia(500, Some(self.arranque_ts)) else {
@@ -665,6 +701,19 @@ impl EscudoVivo {
                 continue;
             }
             let texto = |k: &str| d[k].as_str().unwrap_or_default().to_owned();
+            // a WMI subscription is judged as it is: what it runs is often Windows' own program
+            if texto("tipo") == "wmi" {
+                let (aviso, grave) = guardiana_escudo::arranque::juzga_wmi(
+                    &texto("x"),
+                    &texto("ruta"),
+                    &s.clave,
+                    u64::try_from(s.ts).unwrap_or(0),
+                );
+                if !self.ya_avisado(aviso.regla, &aviso.nombre) {
+                    self.anota(&aviso, grave);
+                }
+                continue;
+            }
             for archivo in guardiana_escudo::arranque::archivos_en(&texto("ruta")) {
                 if archivo.exacta {
                     // asks for the check now; the answer comes in a later tick

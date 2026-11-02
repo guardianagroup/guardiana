@@ -162,7 +162,8 @@ pub fn es_motor_web(programa: &str) -> bool {
 /// Something that starts on its own.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Arranque {
-    /// `run`, `runonce`, `carpeta`, `tarea`, `servicio`, `launchd`, `autostart`, `systemd`.
+    /// `run`, `runonce`, `carpeta`, `tarea`, `servicio`, `wmi` (a WMI event subscription that runs a command or a
+    /// script), `launchd`, `autostart`, `systemd`.
     pub tipo: String,
     /// Where it is (the registry key, the folder, the task's folder, the service's start mode).
     pub donde: String,
@@ -1217,6 +1218,7 @@ fn donde_texto(tipo: &str) -> &'static str {
         "carpeta" => "carpeta Inicio",
         "tarea" => "tarea programada",
         "servicio" => "servicio",
+        "wmi" => "suscripción de WMI",
         "launchd" => "LaunchAgents/LaunchDaemons",
         "autostart" => "inicio automático del escritorio",
         "systemd" => "servicio de systemd",
@@ -1422,6 +1424,7 @@ pub const TIPOS_ARRANQUE: &[&str] = &[
     "carpeta",
     "tarea",
     "servicio",
+    "wmi",
     "launchd",
     "autostart",
     "systemd",

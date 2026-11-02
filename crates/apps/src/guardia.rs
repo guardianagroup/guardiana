@@ -14,7 +14,7 @@ use ferrisetw::trace::UserTrace;
 use ferrisetw::EventRecord;
 use guardiana_escudo::{cadenas, disfraz, ladrones, secuestro};
 
-use super::{Apertura, Error, Lanzamiento, Rafaga};
+use super::{Acceso, Apertura, Error, Lanzamiento, Rafaga};
 use crate::ventanas::programa_de;
 
 /// `Microsoft-Windows-Kernel-File`.
@@ -36,6 +36,13 @@ const PROVEEDOR_PROCESOS: &str = "22fb2cd6-0e7b-422b-a0c7-2fad1fd0e716";
 const PALABRAS_PROCESOS: u64 = 0x10;
 /// «ProcessStart».
 const EV_INICIO: u16 = 1;
+/// `Microsoft-Windows-Kernel-Audit-API-Calls`: Windows' own audit of some kernel calls, among them each opening of a
+/// process (its event 5: `TargetProcessId`, `DesiredAccess`, `ReturnCode`; manifest read on 1 Nov 2026).
+const PROVEEDOR_API: &str = "e02a841c-75a3-4fa7-afc8-ae09cf9b7f23";
+/// «OpenProcess».
+const EV_ABRE_PROCESO: u16 = 5;
+/// The most openings of LSASS waiting for the service.
+const MAXIMO_ACCESOS: usize = 64;
 /// The most openings waiting for the service.
 const MAXIMO: usize = 1_024;
 /// The same program opening the same file again within this time is the same opening.
@@ -59,6 +66,10 @@ struct Compartido {
     /// The volumes' device names (`\device\harddiskvolume3`) and their letters (`C:`), read when the session starts:
     /// the kernel names a started program by its device path.
     volumenes: Vec<(String, String)>,
+    /// The openings of LSASS that asked to read its memory, waiting for the service.
+    accesos: VecDeque<Acceso>,
+    /// The same program opening LSASS again within [`REPETICION_MS`] is the same opening: program path → when.
+    accesos_vistos: HashMap<String, i64>,
     /// For the real test only: the openings of a «Login Data» file, before any filter.
     #[cfg(test)]
     prueba_login: Vec<String>,
@@ -76,6 +87,9 @@ mod medida {
     pub(super) static EN_LLAMADA_NS: AtomicU64 = AtomicU64::new(0);
     /// Of those, nanoseconds spent reading an opening's fields (its schema, its options and its file name).
     pub(super) static LEYENDO_NS: AtomicU64 = AtomicU64::new(0);
+    /// The openings of a process that arrived from other programs, and those of LSASS.
+    pub(super) static PROCESOS: AtomicU64 = AtomicU64::new(0);
+    pub(super) static DE_LSASS: AtomicU64 = AtomicU64::new(0);
 
     /// Nanoseconds since `desde`.
     pub(super) fn ns(desde: std::time::Instant) -> u64 {
@@ -107,6 +121,58 @@ fn volumenes() -> Vec<(String, String)> {
         }
     }
     out
+}
+
+/// The process number of LSASS: the `lsass.exe` running from Windows' own folder (a copy elsewhere is not it); 0 when
+/// not found.
+fn pid_de_lsass() -> u32 {
+    use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
+    use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+        TH32CS_SNAPPROCESS,
+    };
+    // SAFETY: a snapshot of the system's processes; the handle is checked and closed below.
+    #[allow(unsafe_code)]
+    let foto = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+    if foto == INVALID_HANDLE_VALUE || foto.is_null() {
+        return 0;
+    }
+    let mut e = PROCESSENTRY32W {
+        dwSize: u32::try_from(std::mem::size_of::<PROCESSENTRY32W>()).unwrap_or(0),
+        ..PROCESSENTRY32W::default()
+    };
+    let mut pid = 0;
+    // SAFETY: `e` carries its size and the snapshot is valid.
+    #[allow(unsafe_code)]
+    let mut hay = unsafe { Process32FirstW(foto, &raw mut e) } != 0;
+    while hay {
+        let largo = e
+            .szExeFile
+            .iter()
+            .position(|&c| c == 0)
+            .unwrap_or(e.szExeFile.len());
+        let nombre = String::from_utf16_lossy(e.szExeFile.get(..largo).unwrap_or(&[]));
+        if nombre.eq_ignore_ascii_case("lsass.exe") {
+            let (_, ruta) = programa_de(e.th32ProcessID);
+            if ruta
+                .to_ascii_lowercase()
+                .ends_with(r"\windows\system32\lsass.exe")
+            {
+                pid = e.th32ProcessID;
+                break;
+            }
+        }
+        // SAFETY: as above.
+        #[allow(unsafe_code)]
+        let siguiente = unsafe { Process32NextW(foto, &raw mut e) } != 0;
+        hay = siguiente;
+    }
+    // SAFETY: the snapshot's handle, closed once.
+    #[allow(unsafe_code)]
+    unsafe {
+        CloseHandle(foto)
+    };
+    pid
 }
 
 /// A device path (`\Device\HarddiskVolume3\Windows\x.exe`) as a drive path (`C:\Windows\x.exe`); as it is when
@@ -178,11 +244,20 @@ impl Sesion {
                 anotar_inicio(&para_procesos, registro, esquemas);
             })
             .build();
+        let para_accesos = Arc::clone(&datos);
+        let lsass = pid_de_lsass();
+        let api = Provider::by_guid(PROVEEDOR_API)
+            .add_filter(EventFilter::ByEventIds(vec![EV_ABRE_PROCESO]))
+            .add_callback(move |registro: &EventRecord, esquemas: &SchemaLocator| {
+                anotar_acceso(&para_accesos, registro, esquemas, yo, lsass);
+            })
+            .build();
         let _ = ferrisetw::trace::stop_trace_by_name(SESION);
         let traza = UserTrace::new()
             .named(SESION.to_owned())
             .enable(proveedor)
             .enable(procesos)
+            .enable(api)
             .start_and_process()
             .map_err(|e| Error::Sistema(format!("{e:?}")))?;
         Ok(Self {
@@ -213,6 +288,82 @@ impl Sesion {
             .lock()
             .map(|mut d| d.lanzamientos.drain(..).collect())
             .unwrap_or_default()
+    }
+
+    /// The openings of LSASS that asked to read its memory (`guardiana_escudo::credenciales`) since the last take.
+    pub(crate) fn accesos(&self) -> Vec<Acceso> {
+        self.datos
+            .lock()
+            .map(|mut d| d.accesos.drain(..).collect())
+            .unwrap_or_default()
+    }
+}
+
+/// A process opened: only LSASS (process `lsass`, found when the session started), and only when the rights asked for
+/// include reading its memory (`guardiana_escudo::credenciales::LEE_MEMORIA`). Almost every opening on the computer
+/// stops at its first field.
+fn anotar_acceso(
+    datos: &Arc<Mutex<Compartido>>,
+    registro: &EventRecord,
+    esquemas: &SchemaLocator,
+    yo: u32,
+    lsass: u32,
+) {
+    if lsass == 0 || registro.event_id() != EV_ABRE_PROCESO {
+        return;
+    }
+    let pid = registro.process_id();
+    if pid == 4 || pid == 0 || pid == yo || pid == lsass {
+        return;
+    }
+    let Ok(esquema) = esquemas.event_schema(registro) else {
+        return;
+    };
+    let lector = Parser::create(registro, &esquema);
+    let objetivo = lector.try_parse::<u32>("TargetProcessId").ok();
+    #[cfg(test)]
+    {
+        use std::sync::atomic::Ordering;
+        medida::PROCESOS.fetch_add(1, Ordering::Relaxed);
+        if objetivo == Some(lsass) {
+            medida::DE_LSASS.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+    if objetivo != Some(lsass) {
+        return;
+    }
+    let acceso = lector.try_parse::<u32>("DesiredAccess").unwrap_or(0);
+    if acceso & guardiana_escudo::credenciales::LEE_MEMORIA == 0 {
+        return;
+    }
+    let concedido = lector.try_parse::<u32>("ReturnCode").ok() == Some(0);
+    let ahora = guardiana_core::time::now_ms();
+    let Ok(mut d) = datos.lock() else {
+        return;
+    };
+    let (programa, ruta) = programa_en(&d, pid);
+    if programa.is_empty() {
+        return;
+    }
+    let clave = ruta.to_ascii_lowercase();
+    if d.accesos_vistos
+        .get(&clave)
+        .is_some_and(|t| ahora - *t < REPETICION_MS)
+    {
+        return;
+    }
+    if d.accesos_vistos.len() > 4_096 {
+        d.accesos_vistos.clear();
+    }
+    d.accesos_vistos.insert(clave, ahora);
+    if d.accesos.len() < MAXIMO_ACCESOS {
+        d.accesos.push_back(Acceso {
+            ts: ahora,
+            programa,
+            ruta,
+            acceso,
+            concedido,
+        });
     }
 }
 
@@ -499,10 +650,14 @@ mod tests {
             "Get-ChildItem -LiteralPath '{}' -File | Rename-Item -NewName {{ $_.Name + '.cifrado' }}",
             carpeta.display()
         ));
+        // LSASS opened by another program with the right to read its memory: only a handle, closed when PowerShell
+        // ends; nothing is read (and Windows may refuse it, which is seen too)
+        powershell("try { $h = (Get-Process -Name lsass).Handle } catch { }");
         std::thread::sleep(Duration::from_secs(4));
         let aperturas = sesion.toma();
         let lanzamientos = sesion.lanzamientos();
         let rafagas = sesion.rafagas();
+        let accesos = sesion.accesos();
         println!(
             "aperturas recibidas: {}",
             medida::CREADOS.load(Ordering::Relaxed)
@@ -515,6 +670,12 @@ mod tests {
         println!("aperturas: {aperturas:?}");
         println!("lanzamientos: {lanzamientos:?}");
         println!("ráfagas: {rafagas:?}");
+        println!(
+            "accesos a LSASS: {accesos:?} (aperturas de procesos: {}, de LSASS: {}, LSASS es {})",
+            medida::PROCESOS.load(Ordering::Relaxed),
+            medida::DE_LSASS.load(Ordering::Relaxed),
+            pid_de_lsass()
+        );
         assert!(
             aperturas.iter().any(
                 |a| a.archivo.to_lowercase().ends_with(r"\default\login data")
@@ -534,6 +695,13 @@ mod tests {
                 .any(|r| r.programa.eq_ignore_ascii_case("powershell.exe")
                     && r.n >= secuestro::UMBRAL),
             "la ráfaga de PowerShell"
+        );
+        assert!(
+            accesos
+                .iter()
+                .any(|a| a.programa.eq_ignore_ascii_case("powershell.exe")
+                    && a.acceso & guardiana_escudo::credenciales::LEE_MEMORIA != 0),
+            "la apertura de LSASS por PowerShell"
         );
     }
 

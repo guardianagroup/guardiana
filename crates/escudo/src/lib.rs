@@ -21,6 +21,7 @@
 pub mod analisis;
 pub mod arranque;
 pub mod cadenas;
+pub mod credenciales;
 pub mod cuarentena;
 pub mod defensor;
 pub mod disfraz;

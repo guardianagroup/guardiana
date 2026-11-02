@@ -13,7 +13,7 @@ $USUARIOS = @()
 try { $USUARIOS = @(Get-ChildItem 'Registry::HKEY_USERS' | Where-Object { $_.PSChildName -match '^S-1-5-21-[\d-]+$' } | ForEach-Object { $_.PSChildName }) } catch {}
 foreach ($sid in $USUARIOS) { $p = Prop "$PERFILES\$sid" 'ProfileImagePath'; if ($p) { $R.cuentas[$sid] = (Split-Path -Leaf ([string]$p)) } }
 
-# ---- What starts on its own: Run and RunOnce, the Startup folders, scheduled tasks, services.
+# ---- What starts on its own: Run and RunOnce, the Startup folders, scheduled tasks, services, WMI subscriptions.
 try {
   $l = New-Object System.Collections.ArrayList
   $raices = @(@{ r = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion'; c = 'equipo' }, @{ r = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion'; c = 'equipo' })
@@ -49,6 +49,20 @@ try {
       [void]$l.Add([ordered]@{ tipo = 'servicio'; donde = [string]$_.StartMode; nombre = [string]$_.Name; visible = [string]$_.DisplayName; ruta = (Corta $_.PathName); cuenta = 'equipo' })
     }
   } catch { $R.errores['servicios'] = (Corta $_.Exception.Message) }
+  # WMI event subscriptions that run a command or a script (1.0.52, el escudo): a way to start on its own that no Run
+  # key, folder or task shows, used by intrusions that leave no file. A class this Windows does not have means none.
+  try {
+    foreach ($clase in 'CommandLineEventConsumer', 'ActiveScriptEventConsumer') {
+      if (-not (Get-CimClass -Namespace root/subscription -ClassName $clase -ErrorAction SilentlyContinue)) { continue }
+      Get-CimInstance -Namespace root/subscription -ClassName $clase -ErrorAction Stop | ForEach-Object {
+        $orden = [string]$_.CommandLineTemplate
+        if (-not $orden) { $orden = [string]$_.ExecutablePath }
+        if (-not $orden) { $orden = [string]$_.ScriptFileName }
+        if (-not $orden) { $orden = [string]$_.ScriptingEngine + ': ' + [string]$_.ScriptText }
+        [void]$l.Add([ordered]@{ tipo = 'wmi'; donde = $clase; nombre = [string]$_.Name; ruta = (Corta $orden); cuenta = 'equipo' })
+      }
+    }
+  } catch { $R.errores['wmi'] = (Corta $_.Exception.Message) }
   $R.arranque = $l
 } catch { $R.errores['arranque'] = (Corta $_.Exception.Message) }
 

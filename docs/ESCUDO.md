@@ -65,6 +65,10 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
   programa sin firma que está en una carpeta donde cualquiera escribe o que llegó de internet. Grave si está en
   Descargas, en una carpeta temporal o en el Escritorio, si llegó de internet o si es un servicio. Un programa firmado
   no se juzga aquí; uno cuya firma no se pudo comprobar, solo en esas tres carpetas.
+  Aparte, las suscripciones de WMI que ejecutan una orden o un guion (`CommandLineEventConsumer`,
+  `ActiveScriptEventConsumer`), que la vigilancia lee como un arranque más: una nueva es grave siempre, porque es una
+  forma de arrancar sola que no sale en el Inicio ni en las tareas y la usan intrusiones que no dejan archivos; lo que
+  ejecuta suele ser un programa de Windows (PowerShell), así que su firma no dice nada.
 - «Secuestro» (`secuestro.rs`): un programa que renombra o borra al menos 100 archivos de la persona (documentos,
   escritorio, imágenes, música, vídeos, descargas, OneDrive) en menos de un minuto, lo que hace un programa de
   secuestro de archivos al encriptarlos. Un programa firmado no se juzga, salvo los intérpretes (PowerShell, la

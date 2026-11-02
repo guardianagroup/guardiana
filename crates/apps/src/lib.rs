@@ -289,6 +289,22 @@ pub struct Rafaga {
     pub n: usize,
 }
 
+/// A program that opened LSASS, the process that keeps the signed-in accounts' credentials, asking to read its memory
+/// (el escudo, 1.0.52; `guardiana_escudo::credenciales`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Acceso {
+    /// When (milliseconds since 1970).
+    pub ts: i64,
+    /// The program's file name.
+    pub programa: String,
+    /// Its full path.
+    pub ruta: String,
+    /// The rights it asked for (Windows' `DesiredAccess`).
+    pub acceso: u32,
+    /// Whether Windows allowed it.
+    pub concedido: bool,
+}
+
 /// El escudo's watch over saved secrets, over program starts and over the person's files: on while the service runs,
 /// names only.
 pub struct Guardia {
@@ -346,6 +362,19 @@ impl Guardia {
         #[cfg(windows)]
         {
             self.interno.lanzamientos()
+        }
+        #[cfg(not(windows))]
+        {
+            Vec::new()
+        }
+    }
+
+    /// The openings of LSASS that asked to read its memory since the last call.
+    #[must_use]
+    pub fn accesos(&self) -> Vec<Acceso> {
+        #[cfg(windows)]
+        {
+            self.interno.accesos()
         }
         #[cfg(not(windows))]
         {
