@@ -85,3 +85,13 @@ jobs:
       - name: medir
         shell: pwsh
         run: ./medir/build/ligero/reposo.ps1 -Exe "$env:GITHUB_WORKSPACE\codigo\target\release\guardiana.exe" -Etiqueta '${{ matrix.cual }}' -Minutos ${{ github.event.inputs.minutos || '10' }}
+      # The native readings of 1.0.55 against what they replace, on this machine, built as they ship: the same answer
+      # (the tests that also run in ci.yml, here with their output) and what each costs (the ignored ones).
+      - name: lo nativo frente a PowerShell y reg
+        if: matrix.cual == 'despues'
+        shell: bash
+        working-directory: codigo
+        run: |
+          set -o pipefail
+          cargo test --release --locked -p guardiana-service -p guardiana-license -- --include-ignored --nocapture --test-threads=1 on_windows_the_native_reading_says_what_powershell_says what_the_minutes_reading_costs en_windows_el_registro_se_lee_como_con_reg lo_que_cuesta_leer_el_ancla 2>&1 | tee "$RUNNER_TEMP/nativo.log"
+          grep -oE "coste: .*" "$RUNNER_TEMP/nativo.log" | sed 's/^/::notice title=nativo::/' || true

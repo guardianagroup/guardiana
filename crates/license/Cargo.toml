@@ -20,5 +20,11 @@ ureq = { workspace = true }
 # Already in the tree: the panel uses it for its token.
 getrandom = { workspace = true }
 
+# windows-sys is already in the tree through other dependencies, same version. 1.0.55: the anchor's registry key is
+# read with Windows' own functions (read only) instead of starting `reg.exe` each time the licence is asked, which the
+# resolver did every thirty seconds (src/ancla/registro.rs). Writing still goes through `reg add`.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Registry"] }
+
 [lints]
 workspace = true

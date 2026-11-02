@@ -77,6 +77,38 @@ public static class Medidor
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern IntPtr OpenProcess(uint acceso, bool hereda, int pid);
 
+    [StructLayout(LayoutKind.Sequential)]
+    struct PRIVILEGIO { public uint Cuantos; public uint LuidBajo; public int LuidAlto; public uint Atributos; }
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool OpenProcessToken(IntPtr proceso, uint acceso, out IntPtr ficha);
+    [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern bool LookupPrivilegeValue(string sistema, string nombre, out long luid);
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool AdjustTokenPrivileges(IntPtr ficha, bool quitarTodos, ref PRIVILEGIO nuevo, int largo, IntPtr previo, IntPtr devuelto);
+    [DllImport("kernel32.dll")]
+    static extern IntPtr GetCurrentProcess();
+
+    /// <summary>
+    /// Enciende SeDebugPrivilege en esta sesión de PowerShell (el administrador lo tiene, apagado): hace falta para
+    /// meter en un trabajo el proceso del servicio, que es de SYSTEM.
+    /// </summary>
+    public static void Depurar()
+    {
+        IntPtr ficha;
+        if (!OpenProcessToken(GetCurrentProcess(), 0x20 | 0x8, out ficha)) throw new Win32Exception();
+        try
+        {
+            long luid;
+            if (!LookupPrivilegeValue(null, "SeDebugPrivilege", out luid)) throw new Win32Exception();
+            PRIVILEGIO p = new PRIVILEGIO();
+            p.Cuantos = 1; p.LuidBajo = (uint)(luid & 0xffffffff); p.LuidAlto = (int)(luid >> 32); p.Atributos = 2;
+            if (!AdjustTokenPrivileges(ficha, false, ref p, 0, IntPtr.Zero, IntPtr.Zero)) throw new Win32Exception();
+            int e = Marshal.GetLastWin32Error();
+            if (e != 0) throw new Win32Exception(e);
+        }
+        finally { CloseHandle(ficha); }
+    }
+
     const uint CREATE_SUSPENDED = 0x4;
     const uint CREATE_NO_WINDOW = 0x08000000;
 

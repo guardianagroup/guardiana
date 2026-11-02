@@ -16,6 +16,16 @@ serde_json = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-service = { workspace = true }
+# windows-sys is already in the tree through other dependencies, same version. 1.0.55: what the watchdog reads every
+# minute (whether Windows still asks Guardiana alone, and what DHCP gives now) is read with Windows' own functions
+# (IP Helper and the registry, read only) instead of two PowerShells a minute (sysdns/windows/nativo.rs).
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_NetworkManagement_Ndis",
+    "Win32_Networking_WinSock",
+    "Win32_System_Registry",
+] }
 
 [lints]
 workspace = true

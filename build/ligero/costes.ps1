@@ -35,14 +35,14 @@ $puerta = "Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' -Poli
 $cuenta = "`$u = (Get-CimInstance Win32_ComputerSystem).UserName; if (`$u) { (New-Object System.Security.Principal.NTAccount(`$u)).Translate([System.Security.Principal.SecurityIdentifier]).Value }"
 
 $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-function Ps($guion) {
+function OrdenPs($guion) {
     # -EncodedCommand solo aquí, para que el guion llegue entero sin pelearse con las comillas; cuesta lo mismo.
     $b = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($guion))
     return """$ps"" -NoProfile -NonInteractive -EncodedCommand $b"
 }
 # Los dos guiones largos, como los pasa el programa (un bloque leído entero), desde un archivo: por la línea de órdenes
 # no caben con holgura.
-function PsArchivo($id, $guion) {
+function OrdenPsArchivo($id, $guion) {
     $f = Join-Path $env:RUNNER_TEMP "ligero-$id.ps1"
     Set-Content -LiteralPath $f -Value $guion -Encoding UTF8
     return """$ps"" -NoProfile -NonInteractive -Command ""& ([scriptblock]::Create([IO.File]::ReadAllText('$f')))"""
@@ -62,17 +62,17 @@ New-Item -ItemType Directory -Force -Path $carpeta | Out-Null
 $BAJA = 0x4000 # BELOW_NORMAL_PRIORITY_CLASS, la de las dos miradas lentas
 $ordenes = @(
     @{ id = 'cmd'; que = 'Un proceso vacío (cmd /c exit), el suelo'; cada = '-'; linea = "cmd.exe /c exit 0"; prio = 0 },
-    @{ id = 'ps_vacio'; que = 'PowerShell sin hacer nada (exit)'; cada = '-'; linea = (Ps 'exit 0'); prio = 0 },
+    @{ id = 'ps_vacio'; que = 'PowerShell sin hacer nada (exit)'; cada = '-'; linea = (OrdenPs 'exit 0'); prio = 0 },
     @{ id = 'reg'; que = 'Ancla de la licencia: reg query (license::status)'; cada = 'cada 30 s con consultas, y 2 por minuto'; linea = "reg.exe query HKLM\SOFTWARE\Guardiana"; prio = 0 },
-    @{ id = 'primario'; que = 'DNS: guardian_is_primary (PRIMARY_SCRIPT)'; cada = 'cada minuto'; linea = (Ps $primario); prio = 0 },
-    @{ id = 'dhcp'; que = 'DNS: upstreams_for (DhcpNameServer)'; cada = 'cada minuto'; linea = (Ps $dhcp); prio = 0 },
-    @{ id = 'foto'; que = 'DNS: snapshot (SNAPSHOT_SCRIPT)'; cada = 'al aplicar o reapuntar'; linea = (Ps $foto); prio = 0 },
-    @{ id = 'resolutores'; que = 'DNS: current_resolvers'; cada = 'al empezar cada vuelta'; linea = (Ps $resolutores); prio = 0 },
-    @{ id = 'puerta'; que = 'Modo Hogar: default_gateway'; cada = 'cada 5 min con Modo Hogar'; linea = (Ps $puerta); prio = 0 },
-    @{ id = 'cuenta'; que = 'Carpeta de datos: la cuenta de la consola (harden_data_dir)'; cada = 'cada 10 min'; linea = (Ps $cuenta); prio = 0 },
+    @{ id = 'primario'; que = 'DNS: guardian_is_primary (PRIMARY_SCRIPT)'; cada = 'cada minuto'; linea = (OrdenPs $primario); prio = 0 },
+    @{ id = 'dhcp'; que = 'DNS: upstreams_for (DhcpNameServer)'; cada = 'cada minuto'; linea = (OrdenPs $dhcp); prio = 0 },
+    @{ id = 'foto'; que = 'DNS: snapshot (SNAPSHOT_SCRIPT)'; cada = 'al aplicar o reapuntar'; linea = (OrdenPs $foto); prio = 0 },
+    @{ id = 'resolutores'; que = 'DNS: current_resolvers'; cada = 'al empezar cada vuelta'; linea = (OrdenPs $resolutores); prio = 0 },
+    @{ id = 'puerta'; que = 'Modo Hogar: default_gateway'; cada = 'cada 5 min con Modo Hogar'; linea = (OrdenPs $puerta); prio = 0 },
+    @{ id = 'cuenta'; que = 'Carpeta de datos: la cuenta de la consola (harden_data_dir)'; cada = 'cada 10 min'; linea = (OrdenPs $cuenta); prio = 0 },
     @{ id = 'icacls'; que = 'Carpeta de datos: un icacls (van 3)'; cada = 'cada 10 min'; linea = "icacls.exe ""$carpeta"" /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F"; prio = 0 },
-    @{ id = 'vigilancia'; que = 'Vigilancia, mirada lenta (vigilancia.ps1)'; cada = 'cada 5 min'; linea = (PsArchivo 'vigilancia' $vigilancia); prio = $BAJA },
-    @{ id = 'defensa'; que = 'Vigía, Defender (defensa.ps1)'; cada = 'cada 10 min'; linea = (PsArchivo 'defensa' $defensa); prio = $BAJA }
+    @{ id = 'vigilancia'; que = 'Vigilancia, mirada lenta (vigilancia.ps1)'; cada = 'cada 5 min'; linea = (OrdenPsArchivo 'vigilancia' $vigilancia); prio = $BAJA },
+    @{ id = 'defensa'; que = 'Vigía, Defender (defensa.ps1)'; cada = 'cada 10 min'; linea = (OrdenPsArchivo 'defensa' $defensa); prio = $BAJA }
 )
 
 # Lo que el equipo gasta sin hacer nada, en ms de procesador por segundo de reloj.

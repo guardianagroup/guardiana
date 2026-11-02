@@ -34,6 +34,12 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(windows)]
 const CLAVE: &str = r"HKLM\SOFTWARE\Guardiana";
+/// The same key, as Windows' own functions name it under `HKEY_LOCAL_MACHINE`.
+#[cfg(windows)]
+const RUTA: &str = r"SOFTWARE\Guardiana";
+
+#[cfg(windows)]
+mod registro;
 
 /// Each value, by its name in the registry and its file name on Linux, macOS and in the test
 /// folder. The trial mark keeps the names 1.0.0 gave it.
@@ -249,13 +255,27 @@ fn escribir_valor(nombre: &str, valor: &str) -> bool {
     }
 }
 
-/// `reg` instead of a crate: one more dependency for a few lines is not worth it, and the
-/// service runs as SYSTEM, which can read and write HKLM. One query for the whole key, so a
-/// status call costs one process, not three.
+/// The anchor's values, read with Windows' own functions (`registro`, 1.0.55): the same text
+/// `reg query` prints, read the same way, without starting a process each time the licence is
+/// asked (the resolver asks every thirty seconds). With `reg query` itself only if a value cannot
+/// be read whole.
 #[cfg(windows)]
 fn registro_leer() -> Vec<(&'static str, String)> {
+    match registro::como_reg_query(registro::HKEY_LOCAL_MACHINE, RUTA) {
+        registro::Lectura::Texto(t) => de_salida_reg(&t),
+        registro::Lectura::SinClave => Vec::new(),
+        registro::Lectura::Fallo(_) => registro_leer_con_reg(CLAVE),
+    }
+}
+
+/// `reg` instead of a crate: one more dependency for a few lines is not worth it, and the
+/// service runs as SYSTEM, which can read and write HKLM. One query for the whole key, so a
+/// status call costs one process, not three. Since 1.0.55 only when Windows' own functions
+/// could not read a value whole (`registro_leer`).
+#[cfg(windows)]
+fn registro_leer_con_reg(clave: &str) -> Vec<(&'static str, String)> {
     let Ok(salida) = std::process::Command::new("reg")
-        .args(["query", CLAVE])
+        .args(["query", clave])
         .output()
     else {
         return Vec::new();
@@ -263,7 +283,13 @@ fn registro_leer() -> Vec<(&'static str, String)> {
     if !salida.status.success() {
         return Vec::new();
     }
-    let texto = String::from_utf8_lossy(&salida.stdout);
+    de_salida_reg(&String::from_utf8_lossy(&salida.stdout))
+}
+
+/// The anchor's values in what `reg query` prints: `name REG_TYPE value` lines, the value up to
+/// its first space; the licence travels as hex.
+#[cfg(windows)]
+fn de_salida_reg(texto: &str) -> Vec<(&'static str, String)> {
     let mut valores = Vec::new();
     for linea in texto.lines() {
         let mut partes = linea.split_whitespace();
@@ -494,5 +520,136 @@ mod tests {
         assert_eq!(des_hex("abc"), None, "longitud impar");
         assert_eq!(des_hex("zz"), None, "no es hex");
         assert_eq!(des_hex(""), Some(String::new()));
+    }
+
+    /// The anchor's keys of this test, under the account's own HKCU (no administrator needed), each
+    /// value written with `reg add` as the program writes them; removed when the test ends.
+    #[cfg(windows)]
+    struct Claves(String);
+
+    #[cfg(windows)]
+    impl Drop for Claves {
+        fn drop(&mut self) {
+            let _ = std::process::Command::new("reg")
+                .args(["delete", &format!(r"HKCU\{}", self.0), "/f"])
+                .output();
+        }
+    }
+
+    /// On a real Windows (GitHub's runner, at every push): what Windows' own functions read from
+    /// the key is what `reg query` read, value by value, whatever the type a value has and the
+    /// letters of its name, so the trial and the licence come out the same (1.0.55).
+    #[cfg(windows)]
+    #[test]
+    fn en_windows_el_registro_se_lee_como_con_reg() {
+        let raiz = Claves(format!(
+            r"Software\GuardianaPruebaLigero-{}",
+            std::process::id()
+        ));
+        let licencia = a_hex(r#"{"clave":"ABC-123","instancia":"i-1","producto":"Pérez"}"#);
+        let casos: [(&str, Vec<(&str, &str, &str)>); 4] = [
+            (
+                "normal",
+                vec![
+                    ("prueba", "REG_SZ", "1793750400000"),
+                    ("visto", "REG_SZ", "1793750500000"),
+                    ("licencia", "REG_SZ", licencia.as_str()),
+                ],
+            ),
+            (
+                "tipos",
+                vec![
+                    ("prueba", "REG_DWORD", "31"),
+                    ("visto", "REG_BINARY", "3132"),
+                    ("licencia", "REG_MULTI_SZ", r"a\0b"),
+                ],
+            ),
+            (
+                "raros",
+                vec![
+                    ("prueba", "REG_QWORD", "31"),
+                    ("visto", "REG_EXPAND_SZ", "%SystemRoot% 12"),
+                    ("licencia", "REG_SZ", ""),
+                ],
+            ),
+            (
+                "letras",
+                vec![
+                    ("Prueba", "REG_SZ", "1793750400000"),
+                    ("VISTO", "REG_SZ", "12"),
+                    ("otro", "REG_SZ", "x y"),
+                ],
+            ),
+        ];
+        for (caso, valores) in &casos {
+            let ruta = format!(r"{}\{caso}", raiz.0);
+            let completa = format!(r"HKCU\{ruta}");
+            for (v, t, d) in valores {
+                let hecho = std::process::Command::new("reg")
+                    .args(["add", &completa, "/v", v, "/t", t, "/d", d, "/f"])
+                    .output()
+                    .is_ok_and(|s| s.status.success());
+                assert!(hecho, "reg add {completa} {v} {t} {d}");
+            }
+            let con_reg = registro_leer_con_reg(&completa);
+            let nativo = registro::como_reg_query(registro::HKEY_CURRENT_USER, &ruta);
+            println!("{caso}: reg {con_reg:?}; nativo {nativo:?}");
+            let texto = match nativo {
+                registro::Lectura::Texto(t) => t,
+                otra => unreachable!("{caso}: {otra:?}"),
+            };
+            assert_eq!(de_salida_reg(&texto), con_reg, "{caso}: {texto}");
+        }
+        let normal =
+            registro::como_reg_query(registro::HKEY_CURRENT_USER, &format!(r"{}\normal", raiz.0));
+        let texto = match normal {
+            registro::Lectura::Texto(t) => t,
+            otra => unreachable!("{otra:?}"),
+        };
+        let leidos = de_salida_reg(&texto);
+        assert_eq!(leidos.len(), 3, "{leidos:?}");
+        assert!(leidos
+            .iter()
+            .any(|(n, v)| *n == LICENCIA.0 && v.contains("Pérez")));
+        // A key that is not there: nothing, both ways.
+        let falta = format!(r"{}\no-esta", raiz.0);
+        assert_eq!(
+            registro::como_reg_query(registro::HKEY_CURRENT_USER, &falta),
+            registro::Lectura::SinClave
+        );
+        assert!(registro_leer_con_reg(&format!(r"HKCU\{falta}")).is_empty());
+    }
+
+    /// What reading the anchor costs here, with Windows' own functions and with `reg query`. Run by
+    /// `.github/workflows/ligero.yml` (`--ignored --nocapture`), which turns the line into a notice.
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "mide; lo lanza ligero.yml"]
+    fn lo_que_cuesta_leer_el_ancla() {
+        let raiz = Claves(format!(
+            r"Software\GuardianaCosteLigero-{}",
+            std::process::id()
+        ));
+        let completa = format!(r"HKCU\{}", raiz.0);
+        for (v, d) in [("prueba", "1793750400000"), ("visto", "1793750500000")] {
+            let _ = std::process::Command::new("reg")
+                .args(["add", &completa, "/v", v, "/t", "REG_SZ", "/d", d, "/f"])
+                .output();
+        }
+        let veces: u32 = 1_000;
+        let t = std::time::Instant::now();
+        for _ in 0..veces {
+            let leido = registro::como_reg_query(registro::HKEY_CURRENT_USER, &raiz.0);
+            assert!(matches!(leido, registro::Lectura::Texto(_)));
+        }
+        let nativo_us = t.elapsed().as_micros() / u128::from(veces);
+        let t = std::time::Instant::now();
+        for _ in 0..5 {
+            assert_eq!(registro_leer_con_reg(&completa).len(), 2);
+        }
+        let reg_ms = t.elapsed().as_millis() / 5;
+        println!(
+            "coste: leer el ancla de la licencia, con las funciones de Windows {nativo_us} µs (media de {veces}); con reg query {reg_ms} ms de reloj (media de 5)"
+        );
     }
 }

@@ -16,12 +16,25 @@
 //!   Windows now sees Guardiana and nothing else; Guardiana keeps asking the old
 //!   resolvers on its own, and when the service stops it gives the machine its
 //!   old DNS back until it starts again (engine::run).
+//!
+//! What the watchdog reads every minute (whether Windows still asks Guardiana alone, and what DHCP
+//! gives now) is read with Windows' own functions since 1.0.55 (`nativo`), and with the PowerShell
+//! below only if those fail: the same answer, without starting PowerShell twice a minute (the
+//! owner, 2 Nov 2026: «se me traba»). Taking the copy, changing the DNS and putting it back stay
+//! with the cmdlets, as they were.
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use serde::{Deserialize, Serialize};
 
 use super::{run_checked, undo_each, Backup, Error, InterfaceDns, Method};
+
+#[cfg(windows)]
+mod nativo;
+
+/// One connected IPv4 interface with resolvers, as [`PRIMARY_SCRIPT`] prints it: its IPv4
+/// resolvers and its IPv6 ones, each in the order Windows lists them.
+type Linea = (Vec<IpAddr>, Vec<IpAddr>);
 
 /// Tunnel (131) and virtual (53) adapters are left alone, in the copy and in the watch: a VPN
 /// brings its own resolver for its own names, and pointing it here sent the office names to the
@@ -319,11 +332,22 @@ pub(crate) fn restore(backup: &Backup) -> Result<(), Error> {
     })
 }
 
-/// Parse one line of [`PRIMARY_SCRIPT`]: whether Windows sees Guardiana and nothing else.
-fn line_is_guarded(line: &str) -> bool {
+/// One line of [`PRIMARY_SCRIPT`]'s output, read: `v4,list|v6,list`.
+fn linea_de_texto(line: &str) -> Linea {
     let (v4, v6) = line.split_once('|').unwrap_or((line, ""));
-    let v4: Vec<IpAddr> = parse_list(v4);
-    let v6 = real_v6(&parse_list(v6));
+    (parse_list(v4), parse_list(v6))
+}
+
+/// Parse one line of [`PRIMARY_SCRIPT`]: whether Windows sees Guardiana and nothing else.
+#[cfg(test)]
+fn line_is_guarded(line: &str) -> bool {
+    let (v4, v6) = linea_de_texto(line);
+    guarded(&v4, &v6)
+}
+
+/// Whether an interface with these resolvers asks Guardiana and nothing else.
+fn guarded(v4: &[IpAddr], v6: &[IpAddr]) -> bool {
+    let v6 = real_v6(v6);
     // An interface with IPv6 resolvers only (a network that hands out no IPv4 DNS) is
     // guarded when those are the guardian: until 1.0.5 it was not even listed, so it was
     // never re-pointed and never seen as still pointed (review of 8 Oct 2026).
@@ -341,35 +365,85 @@ fn line_is_guarded(line: &str) -> bool {
         && (v6.is_empty() || v6 == [IpAddr::V6(Ipv6Addr::LOCALHOST)])
 }
 
-/// Whether every connected interface with resolvers asks Guardiana and only Guardiana,
-/// in both families. `None` when PowerShell could not say.
-pub(crate) fn guardian_is_primary() -> Option<bool> {
+/// What [`PRIMARY_SCRIPT`] prints, asked to PowerShell. `None` when it could not say.
+fn lineas_de_powershell() -> Option<Vec<Linea>> {
     let out = powershell(PRIMARY_SCRIPT).ok()?;
-    let lines: Vec<&str> = out
-        .lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty())
-        .collect();
-    if lines.is_empty() {
+    Some(
+        out.lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .map(linea_de_texto)
+            .collect(),
+    )
+}
+
+/// The connected interfaces with resolvers and their resolvers, read from Windows directly, or
+/// from PowerShell if that fails. `None` when neither could say.
+fn lineas() -> Option<Vec<Linea>> {
+    #[cfg(windows)]
+    if let Ok(v) = nativo::lineas() {
+        return Some(v);
+    }
+    lineas_de_powershell()
+}
+
+/// Whether every connected interface with resolvers asks Guardiana and only Guardiana,
+/// in both families. `None` when Windows could not say.
+pub(crate) fn guardian_is_primary() -> Option<bool> {
+    let lineas = lineas()?;
+    if lineas.is_empty() {
         return None;
     }
-    Some(lines.iter().all(|l| line_is_guarded(l)))
+    Some(lineas.iter().all(|(v4, v6)| guarded(v4, v6)))
 }
 
 /// Whether any connected interface still asks Guardiana. The mirror of [`guardian_is_primary`]:
-/// a undo that left one interface behind is not an undo that is done. `None` when PowerShell
+/// a undo that left one interface behind is not an undo that is done. `None` when Windows
 /// could not say.
 pub(crate) fn guardian_still_set() -> Option<bool> {
-    let out = powershell(PRIMARY_SCRIPT).ok()?;
-    let mut hay = false;
-    let mut alguna = false;
-    for l in out.lines().map(str::trim).filter(|l| !l.is_empty()) {
-        hay = true;
-        let (v4, v6) = l.split_once('|').unwrap_or((l, ""));
-        alguna |= parse_list(v4).contains(&IpAddr::V4(Ipv4Addr::LOCALHOST))
-            || parse_list(v6).contains(&IpAddr::V6(Ipv6Addr::LOCALHOST));
+    let lineas = lineas()?;
+    if lineas.is_empty() {
+        return None;
     }
-    hay.then_some(alguna)
+    Some(lineas.iter().any(|(v4, v6)| {
+        v4.contains(&IpAddr::V4(Ipv4Addr::LOCALHOST))
+            || v6.contains(&IpAddr::V6(Ipv6Addr::LOCALHOST))
+    }))
+}
+
+/// The PowerShell that reads the resolvers DHCP gave each interface in `indices`: one line
+/// `index|list` for each one whose adapter `Get-NetAdapter` shows.
+fn script_dhcp(indices: &[u32]) -> String {
+    indices
+        .iter()
+        .map(|id| {
+            format!(
+                "$g = (Get-NetAdapter -InterfaceIndex {id} -ErrorAction SilentlyContinue).InterfaceGuid; if ($g) {{ '{id}|' + [string](Get-ItemProperty -Path \"HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\$g\" -Name DhcpNameServer -ErrorAction SilentlyContinue).DhcpNameServer }}"
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+/// What [`script_dhcp`] prints, read: the interface index as text and its DHCP resolvers.
+fn dhcp_de_powershell(indices: &[u32]) -> Option<Vec<(String, Vec<IpAddr>)>> {
+    let out = powershell(&script_dhcp(indices)).ok()?;
+    Some(
+        out.lines()
+            .filter_map(|line| line.trim().split_once('|'))
+            .map(|(id, list)| (id.to_owned(), parse_list(list)))
+            .collect(),
+    )
+}
+
+/// The resolvers DHCP gave each interface in `indices`, read from Windows directly, or from
+/// PowerShell if that fails. Empty when neither could say.
+fn dhcp_de(indices: &[u32]) -> Vec<(String, Vec<IpAddr>)> {
+    #[cfg(windows)]
+    if let Ok(v) = nativo::dhcp(indices) {
+        return v.into_iter().map(|(n, l)| (n.to_string(), l)).collect();
+    }
+    dhcp_de_powershell(indices).unwrap_or_default()
 }
 
 /// What Guardiana should forward to right now. Hand-typed resolvers stay the person's
@@ -377,29 +451,16 @@ pub(crate) fn guardian_still_set() -> Option<bool> {
 /// now: a laptop set up at home carries a router address (192.168.1.1) that does not exist
 /// at the office, and with Guardiana as the only resolver that would be no internet at all.
 pub(crate) fn upstreams_for(backup: &Backup) -> Vec<IpAddr> {
-    let automatic: Vec<(u32, &InterfaceDns)> = backup
+    let automatic: Vec<u32> = backup
         .interfaces
         .iter()
         .filter(|i| win_extra(i).is_some_and(|x| x.manual4.is_empty()))
-        .filter_map(|i| indice(i).map(|n| (n, i)))
+        .filter_map(indice)
         .collect();
     let mut dhcp: std::collections::HashMap<String, Vec<IpAddr>> = std::collections::HashMap::new();
     if !automatic.is_empty() {
-        let script = automatic
-            .iter()
-            .map(|(id, _)| {
-                format!(
-                    "$g = (Get-NetAdapter -InterfaceIndex {id} -ErrorAction SilentlyContinue).InterfaceGuid; if ($g) {{ '{id}|' + [string](Get-ItemProperty -Path \"HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\$g\" -Name DhcpNameServer -ErrorAction SilentlyContinue).DhcpNameServer }}"
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("; ");
-        if let Ok(out) = powershell(&script) {
-            for line in out.lines() {
-                if let Some((id, list)) = line.trim().split_once('|') {
-                    dhcp.insert(id.to_owned(), parse_list(list));
-                }
-            }
+        for (id, list) in dhcp_de(&automatic) {
+            dhcp.insert(id, list);
         }
     }
     let mut out: Vec<IpAddr> = Vec::new();
@@ -546,5 +607,143 @@ mod tests {
         assert!(interface_is_gone(gone));
         let denied = "Set-DnsClientServerAddress : Access is denied.\n    + CategoryInfo          : PermissionDenied: (MSFT_DNSClientServerAddress:root/StandardCimv2/...) [Set-DnsClientServerAddress], CimException\n    + FullyQualifiedErrorId : Windows System Error 5,Set-DnsClientServerAddress\n";
         assert!(!interface_is_gone(denied));
+    }
+
+    /// The minute's two answers come from the same lines, whoever read them: a line with only the
+    /// `fec0:` markers or no IPv4 resolvers is guarded, Guardiana in both families is guarded, and
+    /// «still set» is any line that asks it in either family (1.0.55).
+    #[test]
+    fn the_minutes_answers_read_the_lines_as_before() {
+        let l = |s: &str| linea_de_texto(s);
+        for (texto, protegida) in [
+            ("127.0.0.1|::1", true),
+            ("127.0.0.1|fec0:0:0:ffff::1%1,fec0:0:0:ffff::2%1", true),
+            ("|fec0:0:0:ffff::1%1", true),
+            ("|2800:e0::ac1d:f00d:3", true),
+            ("127.0.0.1,1.1.1.1|::1", false),
+            ("192.168.1.1|", false),
+            ("127.0.0.1|2800:e0::ac1d:f00d:3", false),
+        ] {
+            let (v4, v6) = l(texto);
+            assert_eq!(guarded(&v4, &v6), protegida, "{texto}");
+            assert_eq!(line_is_guarded(texto), protegida, "{texto}");
+        }
+        let (v4, v6) = l("192.168.1.1|::1");
+        assert!(v6.contains(&IpAddr::V6(Ipv6Addr::LOCALHOST)) && !v4.is_empty());
+        assert!(script_dhcp(&[7, 12]).contains("Get-NetAdapter -InterfaceIndex 12 "));
+        assert!(script_dhcp(&[7]).starts_with("$g = (Get-NetAdapter -InterfaceIndex 7 "));
+    }
+
+    /// On a real Windows (GitHub's runner, at every push): what Windows' own functions say is what
+    /// the PowerShell they replace says, interface by interface, for both of the minute's questions;
+    /// and the adapters taken for visible are exactly those `Get-NetAdapter` shows (1.0.55).
+    #[cfg(windows)]
+    #[test]
+    fn on_windows_the_native_reading_says_what_powershell_says() {
+        let ordena = |mut v: Vec<Linea>| {
+            v.sort();
+            v
+        };
+        let ps = lineas_de_powershell();
+        let nat = nativo::lineas();
+        println!("PowerShell: {ps:?}\nnativo: {nat:?}");
+        assert!(ps.is_some(), "PowerShell no contestó");
+        assert!(nat.is_ok(), "la lectura nativa falló: {nat:?}");
+        assert_eq!(
+            ordena(nat.clone().unwrap_or_default()),
+            ordena(ps.clone().unwrap_or_default()),
+            "las interfaces y sus resolutores"
+        );
+
+        // Every IPv4 interface, connected or not: DHCP's resolvers, and whether its adapter shows.
+        let texto = powershell(
+            "Get-NetIPInterface -AddressFamily IPv4 | ForEach-Object { [string]$_.InterfaceIndex + '|' + [string][bool](Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue) }",
+        )
+        .unwrap_or_default();
+        println!("interfaces IPv4: {texto}");
+        let filas: Vec<(u32, bool)> = texto
+            .lines()
+            .filter_map(|l| l.trim().split_once('|'))
+            .filter_map(|(n, v)| Some((n.parse().ok()?, v.eq_ignore_ascii_case("true"))))
+            .collect();
+        assert!(!filas.is_empty(), "{texto}");
+        let indices: Vec<u32> = filas.iter().map(|(n, _)| *n).collect();
+        let mut a: Vec<(String, Vec<IpAddr>)> = nativo::dhcp(&indices)
+            .map(|v| v.into_iter().map(|(n, l)| (n.to_string(), l)).collect())
+            .unwrap_or_default();
+        let mut b = dhcp_de_powershell(&indices).unwrap_or_default();
+        a.sort();
+        b.sort();
+        println!("DHCP nativo: {a:?}\nDHCP PowerShell: {b:?}");
+        assert_eq!(a, b, "lo que dio el DHCP");
+        let clase = nativo::adaptadores();
+        assert!(clase.is_ok(), "{clase:?}");
+        let clase = clase.unwrap_or_default();
+        for (n, se_ve) in &filas {
+            let g = nativo::guid_de_indice(*n).unwrap_or_default();
+            assert_eq!(nativo::visible(&clase, &g), *se_ve, "interfaz {n} ({g})");
+        }
+
+        // Every adapter Get-NetAdapter knows, hidden ones too: hidden for one is hidden for the other, and the GUID
+        // of its interface is the adapter's.
+        let texto = powershell(
+            "Get-NetAdapter -IncludeHidden | ForEach-Object { [string]$_.InterfaceGuid + '|' + [string]$_.Hidden + '|' + [string]$_.ifIndex + '|' + [string]$_.InterfaceType + '|' + $_.Name }",
+        )
+        .unwrap_or_default();
+        println!("adaptadores: {texto}");
+        let mut vistos = 0;
+        for l in texto.lines().map(str::trim).filter(|l| !l.is_empty()) {
+            let p: Vec<&str> = l.split('|').collect();
+            let (Some(g), Some(oculto)) = (p.first(), p.get(1)) else {
+                continue;
+            };
+            vistos += 1;
+            assert_eq!(
+                nativo::visible(&clase, g),
+                !oculto.eq_ignore_ascii_case("true"),
+                "{l}"
+            );
+            if let Some(n) = p.get(2).and_then(|x| x.parse::<u32>().ok()) {
+                if let Some(de_windows) = nativo::guid_de_indice(n) {
+                    assert!(de_windows.eq_ignore_ascii_case(g), "{l}: {de_windows}");
+                }
+            }
+        }
+        assert!(vistos > 0, "{texto}");
+    }
+
+    /// What the minute's reading costs here, with Windows' own functions and with PowerShell. Run by
+    /// `.github/workflows/ligero.yml` (`--ignored --nocapture`), which turns the line into a notice.
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "mide; lo lanza ligero.yml"]
+    fn what_the_minutes_reading_costs() {
+        let veces: u32 = 200;
+        let indices: Vec<u32> = powershell(
+            "Get-NetIPInterface -AddressFamily IPv4 | ForEach-Object { $_.InterfaceIndex }",
+        )
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|l| l.trim().parse().ok())
+        .collect();
+        let t = std::time::Instant::now();
+        for _ in 0..veces {
+            assert!(std::hint::black_box(nativo::lineas()).is_ok());
+        }
+        let lineas_us = t.elapsed().as_micros() / u128::from(veces);
+        let t = std::time::Instant::now();
+        for _ in 0..veces {
+            assert!(std::hint::black_box(nativo::dhcp(&indices)).is_ok());
+        }
+        let dhcp_us = t.elapsed().as_micros() / u128::from(veces);
+        let t = std::time::Instant::now();
+        assert!(lineas_de_powershell().is_some());
+        let ps_lineas_ms = t.elapsed().as_millis();
+        let t = std::time::Instant::now();
+        assert!(dhcp_de_powershell(&indices).is_some());
+        let ps_dhcp_ms = t.elapsed().as_millis();
+        println!(
+            "coste: cada minuto, con las funciones de Windows {lineas_us} µs (¿solo GUARDIANA?) y {dhcp_us} µs (el DHCP), media de {veces}; con PowerShell {ps_lineas_ms} ms y {ps_dhcp_ms} ms de reloj"
+        );
     }
 }
