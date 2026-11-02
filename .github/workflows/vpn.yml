@@ -4,6 +4,9 @@
 # created, configured with crates/tunel/src/nt.rs's bytes, brought up and down, and closed. And corte_vpn.rs's: every
 # permit filter of the cut-off switch accepted by Windows, in a dynamic session closed at once (the blocking ones are
 # left out, so the runner's own network is never cut). GitHub's Windows runners run as administrators.
+# And, on Linux, the VPN end to end: GUARDIANA's server (crates/tunel-servidor) with the kernel's WireGuard in one network
+# namespace, a computer's side of the sign-up (crates/tunel/examples/alta_prueba.rs) in another, the post-quantum
+# preshared key derived on both sides, and traffic through the tunnel. Test keys only, made and thrown away here.
 # CI never holds signing keys and never publishes anything (brief §10).
 name: vpn
 
@@ -12,6 +15,7 @@ on:
     branches: ['**']
     paths:
       - 'crates/tunel/**'
+      - 'crates/tunel-servidor/**'
       - 'crates/apps/src/wireguard_nt.rs'
       - 'crates/apps/src/corte_vpn.rs'
       - 'crates/apps/src/red_vpn.rs'
@@ -69,3 +73,58 @@ jobs:
           grep -E "^test .* FAILED$|panicked at|^---- " "$RUNNER_TEMP/test.log" | head -20 | while IFS= read -r l; do echo "::error title=adaptador::$l"; done
           grep -A12 "panicked at" "$RUNNER_TEMP/test.log" | head -40 | sed -e 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}' | sed 's/^/::error title=detalle::/'; echo
           exit 1
+
+  extremo:
+    name: la VPN de extremo a extremo en Linux (alta postcuántica y túnel de verdad)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: el servidor y el lado del equipo
+        run: |
+          cargo build --release --locked -p guardiana-tunel-servidor --bin guardiana-tunel-servidor
+          cargo build --release --locked -p guardiana-tunel --example alta_prueba
+      - name: WireGuard del núcleo y sus herramientas
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq wireguard-tools
+      - name: el alta y el túnel, en dos redes aparte unidas por un cable virtual
+        run: |
+          set -eux
+          sudo ip netns add srv
+          sudo ip netns add cli
+          sudo ip link add v-srv type veth peer name v-cli
+          sudo ip link set v-srv netns srv
+          sudo ip link set v-cli netns cli
+          sudo ip -n srv addr add 192.168.77.1/24 dev v-srv
+          sudo ip -n cli addr add 192.168.77.2/24 dev v-cli
+          for n in srv cli; do sudo ip -n "$n" link set lo up; done
+          sudo ip -n srv link set v-srv up
+          sudo ip -n cli link set v-cli up
+          # the server: its WireGuard (10.66.0.1, the tunnel's network) and GUARDIANA's sign-up service
+          umask 077
+          wg genkey > "$RUNNER_TEMP/srv.key"
+          sudo ip -n srv link add wg0 type wireguard
+          sudo ip netns exec srv wg set wg0 private-key "$RUNNER_TEMP/srv.key" listen-port 51820
+          sudo ip -n srv addr add 10.66.0.1/16 dev wg0
+          sudo ip -n srv link set wg0 up
+          sudo ip netns exec srv ./target/release/guardiana-tunel-servidor --punto prueba.guardianagroup.com:51820 --interfaz wg0 --escucha 192.168.77.1:8793 > "$RUNNER_TEMP/servidor.log" 2>&1 &
+          for i in $(seq 1 50); do sudo ip netns exec cli bash -c 'exec 3<>/dev/tcp/192.168.77.1/8793' 2>/dev/null && break; sleep 0.2; done
+          # the computer: the sign-up, and WireGuard with what it answered (the server's address instead of its name)
+          sudo ip netns exec cli ./target/release/examples/alta_prueba http://192.168.77.1:8793/vpn/alta > "$RUNNER_TEMP/cli.ini"
+          direccion=$(grep '^Address = ' "$RUNNER_TEMP/cli.ini" | cut -d' ' -f3)
+          grep -v -E '^(Address|DNS|MTU) = ' "$RUNNER_TEMP/cli.ini" | sed -E 's#^Endpoint = .*#Endpoint = 192.168.77.1:51820#; s#^AllowedIPs = .*#AllowedIPs = 10.66.0.0/16#' > "$RUNNER_TEMP/cli.conf"
+          sudo ip -n cli link add wg0 type wireguard
+          sudo ip netns exec cli wg setconf wg0 "$RUNNER_TEMP/cli.conf"
+          sudo ip -n cli addr add "$direccion" dev wg0
+          sudo ip -n cli link set wg0 up
+          sudo ip -n cli route add 10.66.0.0/16 dev wg0
+          # traffic through the tunnel: only if both sides derived the same preshared key
+          sudo ip netns exec cli ping -c 3 -W 3 10.66.0.1
+          sudo ip netns exec srv wg show wg0 latest-handshakes | awk '$2 > 0 { ok = 1 } END { exit !ok }'
+          sudo ip netns exec srv wg show wg0 preshared-keys | awk '$2 != "(none)" { ok = 1 } END { exit !ok }'
+          echo "::notice title=vpn::alta postcuántica, saludo de WireGuard y tráfico por el túnel ($direccion → 10.66.0.1)"
+      - name: lo que dijo el servidor
+        if: always()
+        run: cat "$RUNNER_TEMP/servidor.log" || true

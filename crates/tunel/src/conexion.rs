@@ -78,11 +78,15 @@ pub fn pide_alta(host: &str, pide: &Pide) -> Result<Respuesta, ErrorConexion> {
     if !alta::es_servidor(host) {
         return Err(ErrorConexion::Servidor);
     }
-    pide_alta_en(&format!("https://{host}/vpn/alta"), pide)
+    pide_alta_a(&format!("https://{host}/vpn/alta"), pide)
 }
 
-/// The same exchange, with a whole address (the tests use a local one).
-fn pide_alta_en(url: &str, pide: &Pide) -> Result<Respuesta, ErrorConexion> {
+/// The same exchange with a whole address: a test server, or one reached by its address. The program itself uses
+/// [`pide_alta`]; the answer is checked by [`crate::alta::completa`] either way.
+///
+/// # Errors
+/// [`ErrorConexion::Alta`] or [`ErrorConexion::Respuesta`] when the exchange fails.
+pub fn pide_alta_a(url: &str, pide: &Pide) -> Result<Respuesta, ErrorConexion> {
     let cuerpo = serde_json::to_vec(pide).map_err(|e| ErrorConexion::Alta(e.to_string()))?;
     let respuesta = ureq::post(url)
         .config()
@@ -392,20 +396,20 @@ mod tests {
             *k2.lock().unwrap() = k;
             serde_json::to_string(&r).unwrap()
         });
-        let r = pide_alta_en(&url, &p).unwrap();
+        let r = pide_alta_a(&url, &p).unwrap();
         let a = alta::completa(&equipo, &oferta, &r).unwrap();
         assert_eq!(*a.psk, *k_servidor.lock().unwrap());
         assert_eq!(a.direccion, Ipv4Addr::new(10, 66, 9, 9));
         // a server that refuses: its code, and nothing else
         let url = servidor_local(503, |_| "{}".to_owned());
         assert_eq!(
-            pide_alta_en(&url, &p),
+            pide_alta_a(&url, &p),
             Err(ErrorConexion::Alta("el servidor respondió 503".to_owned()))
         );
         // an answer that is not a sign-up
         let url = servidor_local(200, |_| "{\"hola\":1}".to_owned());
         assert!(matches!(
-            pide_alta_en(&url, &p),
+            pide_alta_a(&url, &p),
             Err(ErrorConexion::Respuesta(_))
         ));
     }
