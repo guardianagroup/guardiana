@@ -2,8 +2,10 @@
 # vea todo lo posible, todo, absolutamente todo»): crates/apps/src/guardia.rs's real test starts the escudo's own
 # kernel event session, then, from other processes, opens a file where a browser keeps saved passwords, starts
 # programs and renames a burst of files in the runner's Documents, and checks that the session saw each one. It
-# checks the field names of Windows' kernel channels that the rules read. GitHub's Windows runners run as
-# administrators, which an event session needs. Everything it writes is removed at the end.
+# checks the field names of Windows' kernel channels that the rules read. A second test has another process create
+# and read 20 000 files and says what the session cost in processor time (shown as a notice on the run's page).
+# GitHub's Windows runners run as administrators, which an event session needs. Everything it writes is removed at
+# the end.
 # CI never holds signing keys and never publishes anything (brief §10).
 name: escudo
 
@@ -34,10 +36,15 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      # Built as it ships (release): what it costs is measured on the program people run. With --nocapture a test's
+      # lines follow its name on the same line, so they are looked for anywhere in it.
       - name: la prueba real de la vigilancia
         shell: bash
         run: |
           set -o pipefail
-          cargo test -p guardiana-apps --locked -- --ignored --nocapture --test-threads=1 guardia::tests 2>&1 | tee "$RUNNER_TEMP/test.log" && { grep -E "^coste:" "$RUNNER_TEMP/test.log" | sed 's/^/::notice title=escudo::/'; exit 0; }
-          grep -E "^test .* FAILED$|panicked at|^---- |^(aperturas|lanzamientos|ráfagas|de «Login Data»|coste)" "$RUNNER_TEMP/test.log" | head -20 | cut -c1-900 | while IFS= read -r l; do echo "::error title=escudo::$l"; done
+          if cargo test --release -p guardiana-apps --locked -- --ignored --nocapture --test-threads=1 guardia::tests 2>&1 | tee "$RUNNER_TEMP/test.log"; then
+            grep -oE "coste: .*" "$RUNNER_TEMP/test.log" | sed 's/^/::notice title=escudo::/' || true
+            exit 0
+          fi
+          grep -E "FAILED|panicked at|^---- |aperturas|lanzamientos|ráfagas|Login Data|coste:" "$RUNNER_TEMP/test.log" | head -20 | cut -c1-900 | while IFS= read -r l; do echo "::error title=escudo::$l"; done
           exit 1

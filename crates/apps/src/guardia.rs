@@ -59,11 +59,28 @@ struct Compartido {
     /// The volumes' device names (`\device\harddiskvolume3`) and their letters (`C:`), read when the session starts:
     /// the kernel names a started program by its device path.
     volumenes: Vec<(String, String)>,
-    /// For the real test only: how many openings arrived, and the ones of a «Login Data» file, before any filter.
-    #[cfg(test)]
-    prueba_creados: u64,
+    /// For the real test only: the openings of a «Login Data» file, before any filter.
     #[cfg(test)]
     prueba_login: Vec<String>,
+}
+
+/// For the real tests only: what arrived and what it cost, counted without the lock, so counting weighs next to
+/// nothing.
+#[cfg(test)]
+mod medida {
+    use std::sync::atomic::AtomicU64;
+
+    /// The openings that arrived from other programs, before any filter.
+    pub(super) static CREADOS: AtomicU64 = AtomicU64::new(0);
+    /// Nanoseconds spent inside the file events' callback.
+    pub(super) static EN_LLAMADA_NS: AtomicU64 = AtomicU64::new(0);
+    /// Of those, nanoseconds spent reading an opening's fields (its schema, its options and its file name).
+    pub(super) static LEYENDO_NS: AtomicU64 = AtomicU64::new(0);
+
+    /// Nanoseconds since `desde`.
+    pub(super) fn ns(desde: std::time::Instant) -> u64 {
+        u64::try_from(desde.elapsed().as_nanos()).unwrap_or(u64::MAX)
+    }
 }
 
 /// The most programs remembered from their start.
@@ -145,8 +162,13 @@ impl Sesion {
                 EV_RENOMBRA,
             ]))
             .add_callback(move |registro: &EventRecord, esquemas: &SchemaLocator| {
+                #[cfg(test)]
+                let desde = std::time::Instant::now();
                 anotar(&para_callback, registro, esquemas, yo);
                 anotar_cambio(&para_callback, registro, esquemas, yo);
+                #[cfg(test)]
+                medida::EN_LLAMADA_NS
+                    .fetch_add(medida::ns(desde), std::sync::atomic::Ordering::Relaxed);
             })
             .build();
         let procesos = Provider::by_guid(PROVEEDOR_PROCESOS)
@@ -342,30 +364,18 @@ fn anotar(
     if pid == 4 || pid == 0 || pid == yo {
         return;
     }
+    #[cfg(test)]
+    let leyendo = std::time::Instant::now();
     let Ok(esquema) = esquemas.event_schema(registro) else {
         return;
     };
     let lector = Parser::create(registro, &esquema);
+    let opciones = lector.try_parse::<u32>("CreateOptions").unwrap_or(0);
+    // a folder being opened is not a file: its name is not even read
+    let nombre = ((opciones & ES_CARPETA) == 0).then(|| lector.try_parse::<String>("FileName"));
     #[cfg(test)]
-    {
-        let nombre = lector.try_parse::<String>("FileName");
-        let opciones = lector.try_parse::<u32>("CreateOptions");
-        if let Ok(mut d) = datos.lock() {
-            d.prueba_creados += 1;
-            if let Ok(n) = &nombre {
-                if n.to_lowercase().contains("login data") && d.prueba_login.len() < 20 {
-                    d.prueba_login.push(format!("{pid} {n} {opciones:?}"));
-                }
-            } else if d.prueba_login.len() < 3 {
-                d.prueba_login
-                    .push(format!("FileName ilegible: {nombre:?}"));
-            }
-        }
-    }
-    if lector.try_parse::<u32>("CreateOptions").unwrap_or(0) & ES_CARPETA != 0 {
-        return;
-    }
-    let Ok(archivo) = lector.try_parse::<String>("FileName") else {
+    prueba(datos, pid, nombre.as_ref(), opciones, leyendo);
+    let Some(Ok(archivo)) = nombre else {
         return;
     };
     // the cheap test first: almost every opening on the computer stops here
@@ -416,12 +426,38 @@ fn anotar(
     }
 }
 
+/// For the real tests only: counts an opening and the time spent reading it, and keeps the openings of a «Login Data»
+/// file (or a file name that could not be read) as they arrived, to show them when the test fails.
+#[cfg(test)]
+fn prueba<E: std::fmt::Debug>(
+    datos: &Arc<Mutex<Compartido>>,
+    pid: u32,
+    nombre: Option<&Result<String, E>>,
+    opciones: u32,
+    leyendo: std::time::Instant,
+) {
+    use std::sync::atomic::Ordering;
+    medida::LEYENDO_NS.fetch_add(medida::ns(leyendo), Ordering::Relaxed);
+    medida::CREADOS.fetch_add(1, Ordering::Relaxed);
+    let apunte = match nombre {
+        Some(Ok(n)) if n.contains("Login Data") => format!("{pid} {n} {opciones:#x}"),
+        Some(Err(e)) => format!("FileName ilegible: {e:?}"),
+        _ => return,
+    };
+    if let Ok(mut d) = datos.lock() {
+        if d.prueba_login.len() < 20 {
+            d.prueba_login.push(apunte);
+        }
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use std::path::PathBuf;
     use std::process::Command;
+    use std::sync::atomic::Ordering;
     use std::time::Duration;
 
     fn powershell(orden: &str) {
@@ -467,8 +503,11 @@ mod tests {
         let aperturas = sesion.toma();
         let lanzamientos = sesion.lanzamientos();
         let rafagas = sesion.rafagas();
+        println!(
+            "aperturas recibidas: {}",
+            medida::CREADOS.load(Ordering::Relaxed)
+        );
         if let Ok(d) = sesion.datos.lock() {
-            println!("aperturas recibidas: {}", d.prueba_creados);
             println!("de «Login Data»: {:?}", d.prueba_login);
         }
         let _ = std::fs::remove_dir_all(&carpeta);
@@ -516,13 +555,16 @@ mod tests {
     }
 
     /// On a real Windows, as an administrator: what the escudo's session costs. Another process creates and reads
-    /// 20 000 files; the test says how many openings arrived and the processor time this process spent on them.
+    /// 20 000 files; the test says how many openings arrived, the processor time this process spent in all (Windows'
+    /// delivery of the events included), and how much of it went inside the callback and into reading the fields.
     #[test]
     #[ignore = "necesita Windows como administrador"]
     fn cuanto_cuesta_la_guardia() {
         let sesion = Sesion::arrancar().unwrap();
         std::thread::sleep(Duration::from_secs(3));
-        let antes_eventos = sesion.datos.lock().map(|d| d.prueba_creados).unwrap_or(0);
+        let antes_eventos = medida::CREADOS.load(Ordering::Relaxed);
+        let antes_llamada = medida::EN_LLAMADA_NS.load(Ordering::Relaxed);
+        let antes_leyendo = medida::LEYENDO_NS.load(Ordering::Relaxed);
         let antes = cpu_ms();
         let tmp = std::env::temp_dir().join("guardiana-carga");
         std::fs::create_dir_all(&tmp).unwrap();
@@ -533,20 +575,26 @@ mod tests {
         ));
         std::thread::sleep(Duration::from_secs(5));
         let gastado = cpu_ms().saturating_sub(antes);
-        let eventos = sesion
-            .datos
-            .lock()
-            .map(|d| d.prueba_creados)
-            .unwrap_or(0)
+        let eventos = medida::CREADOS
+            .load(Ordering::Relaxed)
             .saturating_sub(antes_eventos);
+        let llamada_ms = medida::EN_LLAMADA_NS
+            .load(Ordering::Relaxed)
+            .saturating_sub(antes_llamada)
+            / 1_000_000;
+        let leyendo_ms = medida::LEYENDO_NS
+            .load(Ordering::Relaxed)
+            .saturating_sub(antes_leyendo)
+            / 1_000_000;
+        drop(sesion);
         let _ = std::fs::remove_dir_all(&tmp);
-        let por_evento = if eventos > 0 {
-            gastado * 1_000 / eventos
-        } else {
-            0
-        };
+        let por_evento = |ms: u64| ms * 1_000_000 / eventos.max(1);
         println!(
-            "coste: {eventos} aperturas, {gastado} ms de procesador, {por_evento} µs por apertura"
+            "coste: {eventos} aperturas, {gastado} ms de procesador en total ({} ns por apertura), {llamada_ms} ms \
+             dentro de la llamada ({} ns), {leyendo_ms} ms leyendo los campos ({} ns)",
+            por_evento(gastado),
+            por_evento(llamada_ms),
+            por_evento(leyendo_ms)
         );
         assert!(eventos > 20_000, "llegaron {eventos} aperturas");
     }
