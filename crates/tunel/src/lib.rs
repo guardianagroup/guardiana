@@ -8,6 +8,8 @@
 //!   Mullvad's quantum-resistant tunnels.
 //! - [`alta`]: the anonymous sign-up with a GUARDIANA server: the computer sends its public key and an ML-KEM key; the
 //!   server answers with the tunnel's address, its own public key and the ML-KEM ciphertext. No account, no name.
+//! - [`conexion`]: a whole connection, from fresh keys and the sign-up over HTTPS to the server's first handshake, with
+//!   the system's half (opening the tunnel) passed in; if the server does not answer, the tunnel is closed again.
 //! - [`config`]: the tunnel's configuration, ready for the Windows adapter (and printable for tests, without the
 //!   private key).
 //! - [`nt`]: that configuration as the bytes WireGuardNT's driver takes (`wireguard.h`'s structures).
@@ -18,6 +20,7 @@
 //! to the program's firewall, in `guardiana-apps`.
 
 pub mod alta;
+pub mod conexion;
 pub mod config;
 pub mod corte;
 pub mod cuantico;

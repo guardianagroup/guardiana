@@ -77,11 +77,18 @@ Hecho y probado en un Windows real (la integración continua de GitHub, como adm
 - `Adaptador::lee` y `nt::estado_del_par`: lo que el controlador dice del servidor (bytes y último saludo). La prueba
   real comprueba que devuelve la llave dada: la disposición de las estructuras es la buena.
 
+- `crates/tunel/src/conexion.rs` (todos los sistemas, con pruebas): una conexión entera. Llaves nuevas en cada
+  conexión (nada une dos sesiones), el alta por HTTPS a un nombre de guardianagroup.com (sin seguir redirecciones), la
+  respuesta comprobada, el nombre del servidor resuelto antes de abrir el túnel (con el corte puesto ya no se resuelve
+  nada fuera), el túnel abierto por la mitad del sistema y el primer saludo del servidor esperado 8 segundos: si no
+  llega, el túnel se cierra (y el corte con él) y se dice «el servidor no contesta», para no dejar el equipo sin
+  internet. Las pruebas hacen el alta por la red de verdad contra un servidor local y comprueban que los dos lados
+  llegan a la misma llave postcuántica.
+- `crates/apps/src/tunel_win.rs::conecta`: lo mismo con el túnel de Windows (todo dentro y el corte puesto).
+
 Pendiente, en este orden:
 
-1. El servicio: llaves nuevas en cada conexión (sin nada que una dos sesiones), el alta por HTTPS al servidor, resolver
-   su nombre, abrir el túnel entero, esperar el primer saludo (si no llega en unos segundos, todo se deshace y se dice
-   «el servidor no contesta», para no dejar el corte puesto sin internet), y el estado en el panel.
+1. El estado y los botones en el panel del servicio (conectar, desconectar, a qué servidor, desde cuándo, bytes).
 2. Su pantalla, y el `wireguard.dll` firmado dentro del instalador (comprobado como en `vpn.yml`).
 3. Los servidores, dentro del sello (con la llave del dueño), y la primera conexión de verdad.
 

@@ -111,12 +111,7 @@ pub fn completa(llaves: &Llaves, oferta: &Oferta, r: &Respuesta) -> Result<Alta,
         .filter(|p| *p > 0)
         .ok_or(Error::Formato("puerto del servidor"))?;
     let host = host.to_ascii_lowercase();
-    let nombre_valido = host.ends_with(DOMINIO)
-        && host.len() > DOMINIO.len()
-        && host
-            .bytes()
-            .all(|c| c.is_ascii_alphanumeric() || c == b'.' || c == b'-');
-    if !nombre_valido {
+    if !es_servidor(&host) {
         return Err(Error::Formato("servidor"));
     }
     let ct = de_b64(&r.kem).ok_or(Error::Formato("cifrado ML-KEM"))?;
@@ -131,6 +126,17 @@ pub fn completa(llaves: &Llaves, oferta: &Oferta, r: &Respuesta) -> Result<Alta,
         psk,
         caduca_ms: r.caduca_ms,
     })
+}
+
+/// Whether `host` is a GUARDIANA server's name: something under [`DOMINIO`], in letters, digits, dots and dashes.
+#[must_use]
+pub fn es_servidor(host: &str) -> bool {
+    let host = host.to_ascii_lowercase();
+    host.ends_with(DOMINIO)
+        && host.len() > DOMINIO.len()
+        && host
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'.' || c == b'-')
 }
 
 /// Private addresses only (RFC 1918 and the shared range of RFC 6598).

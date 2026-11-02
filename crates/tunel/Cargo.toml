@@ -21,6 +21,9 @@ x25519-dalek = { workspace = true }
 ml-kem = { workspace = true }
 # HKDF-SHA256 for the preshared key; ring is already the workspace's TLS and AEAD library.
 ring = { workspace = true }
+# The sign-up over HTTPS (conexion.rs): the same client, TLS and certificate check the program already uses for its
+# licence (rustls with the system's certificates).
+ureq = { workspace = true }
 
 [lints]
 workspace = true

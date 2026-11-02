@@ -17,6 +17,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use guardiana_tunel::alta::Alta;
+use guardiana_tunel::conexion::{self, Abierto, Conectado, ErrorConexion};
 use guardiana_tunel::llaves::Llaves;
 use guardiana_tunel::{corte, nt};
 
@@ -162,6 +163,36 @@ impl Tunel {
         self.corte = None;
         let _ = self.adaptador.pon(false);
     }
+}
+
+impl Abierto for Tunel {
+    fn saludo_ms(&self) -> Option<u64> {
+        self.estado().and_then(|e| e.ultimo_saludo_ms)
+    }
+
+    fn cierra(self) {
+        Tunel::cierra(self);
+    }
+}
+
+/// A whole connection with the GUARDIANA server called `host` (`guardiana_tunel::conexion`): fresh keys, the sign-up
+/// over HTTPS, the server's address, the tunnel with everything inside and the cut-off switch on (WireGuardNT's library
+/// at `dll`; `servicio` is the service's program file, the only one let out), and the server's first handshake. If the
+/// server does not answer in time, the tunnel is closed again and the computer's network stays as it was.
+///
+/// # Errors
+/// [`ErrorConexion`] with the step that failed.
+pub fn conecta(host: &str, dll: &Path, servicio: &Path) -> Result<Conectado<Tunel>, ErrorConexion> {
+    conexion::conecta(
+        host,
+        conexion::pide_alta,
+        conexion::resuelve,
+        |llaves, alta, extremo| {
+            Tunel::abre(dll, servicio, llaves, alta, extremo, true).map_err(|e| e.to_string())
+        },
+        conexion::ESPERA,
+        || u64::try_from(guardiana_core::time::now_ms()).unwrap_or(0),
+    )
 }
 
 #[cfg(test)]

@@ -949,6 +949,7 @@ dependencies = [
  "ring",
  "serde",
  "serde_json",
+ "ureq",
  "x25519-dalek",
  "zeroize",
 ]
