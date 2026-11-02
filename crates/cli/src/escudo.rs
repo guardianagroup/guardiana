@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use guardiana_apps::{Apertura, Guardia, Observador};
+use guardiana_apps::{Apertura, Guardia, Observador, Rafaga};
 use guardiana_core::{Ledger, NewEvent};
 use guardiana_escudo::arranque::Archivo;
 use guardiana_escudo::{Aviso, Firma, Huellas, Memoria, Mirada, Programa};
@@ -25,6 +25,8 @@ const GUARDAR_CADA_MS: u64 = 5 * 60_000;
 const REPETIR_LADRON_MS: u64 = 24 * 60 * 60_000;
 /// The same program starting the same program warns once an hour.
 const REPETIR_CADENA_MS: u64 = 60 * 60_000;
+/// The same program renaming or deleting many of the person's files warns once an hour.
+const REPETIR_SECUESTRO_MS: u64 = 60 * 60_000;
 /// How often the continuous watch's history is read for new autostarts.
 const ARRANQUE_CADA_MS: u64 = 30_000;
 /// On the first read, the autostarts the watch noted in the last day are looked at too.
@@ -76,6 +78,10 @@ pub(crate) struct EscudoVivo {
     arranque_leido_ms: u64,
     /// New autostarts whose program's signature was not checked yet.
     arranques: Vec<PendienteArranque>,
+    /// Bursts of the person's files renamed or deleted whose program's signature was not checked yet.
+    rafagas: Vec<Rafaga>,
+    /// Program path → when its last burst warned.
+    secuestros_vistos: HashMap<String, u64>,
 }
 
 impl EscudoVivo {
@@ -110,6 +116,8 @@ impl EscudoVivo {
             arranque_ts: i64::try_from(ahora_ms).unwrap_or(0) - ARRANQUE_ATRAS_MS,
             arranque_leido_ms: 0,
             arranques: Vec::new(),
+            rafagas: Vec::new(),
+            secuestros_vistos: HashMap::new(),
         }
     }
 
@@ -157,6 +165,7 @@ impl EscudoVivo {
 
     /// Looks again at the queries that were waiting for a signature check, and at the openings of saved secrets.
     pub(crate) fn repasa(&mut self, obs: &Observador, ahora_ms: u64) {
+        self.secuestros(obs, ahora_ms);
         self.ladrones(obs, ahora_ms);
         self.cadenas();
         self.arranques_pendientes(obs, ahora_ms);
@@ -292,6 +301,59 @@ impl EscudoVivo {
                 self.cadenas_vistas.clear();
             }
             self.cadenas_vistas.insert(clave, cuando);
+            self.anota(&aviso, grave);
+        }
+    }
+
+    /// The bursts of the person's files renamed or deleted by one program, once Windows has checked its signature,
+    /// through the rule (`guardiana_escudo::secuestro::juzga`). The same program warns once an hour.
+    fn secuestros(&mut self, obs: &Observador, ahora_ms: u64) {
+        let nuevas = self
+            .guardia
+            .as_ref()
+            .map(Guardia::rafagas)
+            .unwrap_or_default();
+        if nuevas.is_empty() && self.rafagas.is_empty() {
+            return;
+        }
+        let mut todas = std::mem::take(&mut self.rafagas);
+        todas.extend(nuevas);
+        for r in todas {
+            let cuando = u64::try_from(r.ts).unwrap_or(0);
+            let firma = match obs.firma(&r.ruta) {
+                Some(f) if f.is_empty() => Firma::SinFirma,
+                Some(f) => Firma::Firmado(f),
+                None if ahora_ms.saturating_sub(cuando) < ESPERA_FIRMA_MS => {
+                    if self.rafagas.len() < MAX_PENDIENTES {
+                        self.rafagas.push(r);
+                    }
+                    continue;
+                }
+                None => Firma::SinComprobar,
+            };
+            let descargado = self.descargado(&r.ruta);
+            let Some((aviso, grave)) = guardiana_escudo::secuestro::juzga(
+                &r.programa,
+                &r.ruta,
+                &firma,
+                descargado,
+                r.n,
+                cuando,
+            ) else {
+                continue;
+            };
+            let clave = r.ruta.to_ascii_lowercase();
+            if self
+                .secuestros_vistos
+                .get(&clave)
+                .is_some_and(|t| cuando.saturating_sub(*t) < REPETIR_SECUESTRO_MS)
+            {
+                continue;
+            }
+            if self.secuestros_vistos.len() > 4_096 {
+                self.secuestros_vistos.clear();
+            }
+            self.secuestros_vistos.insert(clave, cuando);
             self.anota(&aviso, grave);
         }
     }

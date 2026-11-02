@@ -265,7 +265,22 @@ pub struct Lanzamiento {
     pub imagen: String,
 }
 
-/// El escudo's watch over saved secrets and over program starts: on while the service runs, names only.
+/// One program that renamed or deleted many of the person's own files in under a minute (el escudo, 1.0.52;
+/// `guardiana_escudo::secuestro`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rafaga {
+    /// When it reached the threshold (milliseconds since 1970).
+    pub ts: i64,
+    /// The program's file name.
+    pub programa: String,
+    /// Its full path.
+    pub ruta: String,
+    /// How many files, at least.
+    pub n: usize,
+}
+
+/// El escudo's watch over saved secrets, over program starts and over the person's files: on while the service runs,
+/// names only.
 pub struct Guardia {
     #[cfg(windows)]
     interno: guardia::Sesion,
@@ -295,6 +310,19 @@ impl Guardia {
         #[cfg(windows)]
         {
             self.interno.toma()
+        }
+        #[cfg(not(windows))]
+        {
+            Vec::new()
+        }
+    }
+
+    /// The bursts of the person's files renamed or deleted since the last call.
+    #[must_use]
+    pub fn rafagas(&self) -> Vec<Rafaga> {
+        #[cfg(windows)]
+        {
+            self.interno.rafagas()
         }
         #[cfg(not(windows))]
         {

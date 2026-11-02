@@ -64,6 +64,10 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
   programa sin firma que está en una carpeta donde cualquiera escribe o que llegó de internet. Grave si está en
   Descargas, en una carpeta temporal o en el Escritorio, si llegó de internet o si es un servicio. Un programa firmado
   no se juzga aquí; uno cuya firma no se pudo comprobar, solo en esas tres carpetas.
+- «Secuestro» (`secuestro.rs`): un programa que renombra o borra al menos 100 archivos de la persona (documentos,
+  escritorio, imágenes, música, vídeos, descargas, OneDrive) en menos de un minuto, lo que hace un programa de
+  secuestro de archivos al encriptarlos. Un programa firmado no se juzga, salvo los intérpretes (PowerShell, la
+  consola, Windows Script Host). Lo que sobrescribe los archivos sin renombrarlos ni borrarlos no lo ve esta regla.
 - El panel: `GET /api/escudo` (si aún aprende, cuántos sitios, los avisos); la web dentro del programa puede leerlo.
 - Falta: la pantalla del antivirus en la web del programa, el análisis de Descargas desde el panel y las listas de
   muestras (decisión del dueño, abajo).

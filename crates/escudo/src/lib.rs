@@ -7,7 +7,8 @@
 //! computer never asked for before; and [`ladrones`]: a program that is not the browser opening its saved passwords,
 //! cookies or keys, or a wallet or a messaging session; and [`cadenas`]: which program started which (a document
 //! starting PowerShell, a downloaded program starting the tools that delete the backups); and [`arranque`]: a new program
-//! that starts on its own with Windows, unsigned, from a folder anyone can write to or come from the internet.
+//! that starts on its own with Windows, unsigned, from a folder anyone can write to or come from the internet; and
+//! [`secuestro`]: one program renaming or deleting many of the person's own files in under a minute.
 //! Everything happens on this computer: nothing is uploaded anywhere.
 //!
 //! A list is never a verdict on its own (docs/LISTS.md): whoever acts on a match also looks at who signs the file, and a
@@ -20,6 +21,7 @@ pub mod cuarentena;
 pub mod huellas;
 pub mod ladrones;
 pub mod primera_vez;
+pub mod secuestro;
 
 pub use analisis::{analiza, analiza_carpeta, huella_de, Resultado, Veredicto};
 pub use cuarentena::{Cuarentena, Entrada, ErrorCuarentena};

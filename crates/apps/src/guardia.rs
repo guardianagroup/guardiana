@@ -12,16 +12,21 @@ use ferrisetw::provider::{EventFilter, Provider};
 use ferrisetw::schema_locator::SchemaLocator;
 use ferrisetw::trace::UserTrace;
 use ferrisetw::EventRecord;
-use guardiana_escudo::{cadenas, ladrones};
+use guardiana_escudo::{cadenas, ladrones, secuestro};
 
-use super::{Apertura, Error, Lanzamiento};
+use super::{Apertura, Error, Lanzamiento, Rafaga};
 use crate::ventanas::programa_de;
 
 /// `Microsoft-Windows-Kernel-File`.
 const PROVEEDOR: &str = "edd08927-9cc4-4e65-b970-c2560fb5c289";
-/// Its create keyword (0x80): the openings, nothing else.
-const PALABRAS: u64 = 0x80;
+/// Its create keyword (0x80): the openings; and its delete-by-path (0x400) and rename-by-path (0x800) keywords.
+const PALABRAS: u64 = 0x80 | 0x400 | 0x800;
 const EV_CREATE: u16 = 12;
+/// «DeletePath» and «RenamePath»: a file deleted or renamed, with its path.
+const EV_BORRA: u16 = 26;
+const EV_RENOMBRA: u16 = 27;
+/// The most bursts waiting for the service.
+const MAXIMO_RAFAGAS: usize = 64;
 /// `FILE_DIRECTORY_FILE` in the create options: a folder being opened is not a file.
 const ES_CARPETA: u32 = 0x1;
 const SESION: &str = "Guardiana-Escudo";
@@ -45,6 +50,8 @@ struct Compartido {
     rutas: HashMap<u32, (String, String, i64)>,
     lanzamientos: VecDeque<Lanzamiento>,
     lanzados: HashMap<(String, String), i64>,
+    contador: secuestro::Contador,
+    rafagas: VecDeque<Rafaga>,
 }
 
 /// The session running. Dropping it closes it.
@@ -61,9 +68,14 @@ impl Sesion {
         let para_procesos = Arc::clone(&datos);
         let proveedor = Provider::by_guid(PROVEEDOR)
             .any(PALABRAS)
-            .add_filter(EventFilter::ByEventIds(vec![EV_CREATE]))
+            .add_filter(EventFilter::ByEventIds(vec![
+                EV_CREATE,
+                EV_BORRA,
+                EV_RENOMBRA,
+            ]))
             .add_callback(move |registro: &EventRecord, esquemas: &SchemaLocator| {
                 anotar(&para_callback, registro, esquemas, yo);
+                anotar_cambio(&para_callback, registro, esquemas, yo);
             })
             .build();
         let procesos = Provider::by_guid(PROVEEDOR_PROCESOS)
@@ -94,6 +106,14 @@ impl Sesion {
             .unwrap_or_default()
     }
 
+    /// The bursts of the person's files renamed or deleted (`guardiana_escudo::secuestro`) since the last take.
+    pub(crate) fn rafagas(&self) -> Vec<Rafaga> {
+        self.datos
+            .lock()
+            .map(|mut d| d.rafagas.drain(..).collect())
+            .unwrap_or_default()
+    }
+
     /// The program starts watched (`guardiana_escudo::cadenas::vigilado`) since the last take, with their parent.
     pub(crate) fn lanzamientos(&self) -> Vec<Lanzamiento> {
         self.datos
@@ -101,6 +121,51 @@ impl Sesion {
             .map(|mut d| d.lanzamientos.drain(..).collect())
             .unwrap_or_default()
     }
+}
+
+/// A file deleted or renamed: only the person's own ([`secuestro::es_personal`]), counted per program; a program that
+/// reaches the threshold within the window becomes a burst for the service.
+fn anotar_cambio(
+    datos: &Arc<Mutex<Compartido>>,
+    registro: &EventRecord,
+    esquemas: &SchemaLocator,
+    yo: u32,
+) {
+    let id = registro.event_id();
+    if id != EV_BORRA && id != EV_RENOMBRA {
+        return;
+    }
+    let pid = registro.process_id();
+    if pid == 4 || pid == 0 || pid == yo {
+        return;
+    }
+    let Ok(esquema) = esquemas.event_schema(registro) else {
+        return;
+    };
+    let lector = Parser::create(registro, &esquema);
+    let Ok(archivo) = lector.try_parse::<String>("FilePath") else {
+        return;
+    };
+    if !secuestro::es_personal(&archivo) {
+        return;
+    }
+    let ahora = guardiana_core::time::now_ms();
+    let Ok(mut d) = datos.lock() else {
+        return;
+    };
+    if !d.contador.anota(pid, u64::try_from(ahora).unwrap_or(0)) {
+        return;
+    }
+    let (programa, ruta) = programa_de(pid);
+    if programa.is_empty() || d.rafagas.len() >= MAXIMO_RAFAGAS {
+        return;
+    }
+    d.rafagas.push_back(Rafaga {
+        ts: ahora,
+        programa,
+        ruta,
+        n: secuestro::UMBRAL,
+    });
 }
 
 /// A program start: only those [`cadenas::vigilado`] cares about, with the program that started it.
