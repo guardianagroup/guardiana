@@ -123,6 +123,15 @@ Decisiones del dueño que lo condicionan: gratuita o de pago; qué servidores y 
   guardar nada: cerrar el puerto 25 de salida y frenar los barridos de puertos.
 - **Sin promesas absolutas**: lo que la VPN no protege se dice en su pantalla.
 
-## Decisiones pendientes del dueño
+## Decisiones (ronda 88, 1 nov 2026, con el encargo del dueño)
 
-Gratuita o de pago; un segundo proveedor y país para las salidas (coste por confirmar); y la política contra el abuso.
+> «Te dejo a ti y a Gemini que toméis la decisión más coherente y os encarguéis vosotros del proyecto.» «Una sola cuota
+> mensual y el cliente tenga todos los servicios en 1 solo programa.» (el dueño, 1 nov 2026, 22:34 y 22:40)
+
+- **Incluida en la licencia de GUARDIANA** (y en los 7 días de prueba), sin cuenta aparte. En la fase 2, el servidor
+  comprobará la licencia sin saber de quién es (fichas con firma ciega).
+- **Servidores de la fase 1**: Hetzner (Helsinki y Núremberg), que incluye 20 TB de tráfico al mes por servidor; Miami
+  (Vultr) después. Se mide el uso real y con eso se recalcula la cuota.
+- **Contra el abuso, sin registros**: puerto 25 cerrado, tope de altas por minuto, tope de conexiones nuevas por segundo
+  por par y pares fuera tras 24 horas sin uso.
+- Detalle y fuentes: `herramientas/agencia-rondas/ronda88/decisiones.md` en el repositorio de la web.

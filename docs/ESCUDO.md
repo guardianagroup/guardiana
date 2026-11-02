@@ -156,8 +156,13 @@ donde empieza cada `\appdata\` de la ruta. Lo que queda es sobre todo leer los c
 - **La cuarentena se puede deshacer** y lo dice: qué archivo, de dónde, por qué y con qué fuente.
 - **Sin cifras inventadas** en las pantallas: cada aviso cita su fuente y la regla.
 
-## Decisión pendiente del dueño
+## Decisiones (ronda 88, 1 nov 2026, con el encargo del dueño)
 
-Las listas viajan hoy dentro de cada versión del programa y el programa no las descarga nunca (`docs/LISTS.md`). Para el
-antivirus hay dos caminos: (a) igual, con cada versión; (b) a diario desde los servidores de GUARDIANA, y solo si dos
-servidores dan la misma lista. El formato de `crates/escudo` vale para los dos.
+- **Las listas viajan con cada versión** del programa, que no las descarga nunca (`docs/LISTS.md`): el camino (a). El (b),
+  a diario desde los servidores de GUARDIANA y solo si dos dan la misma lista, cuando los servidores estén dentro del
+  sello. El formato de `crates/escudo` vale para los dos.
+- **Solo listas de licencia libre**: de abuse.ch, las CC0 (Feodo Tracker, SSL Blacklist, YARAify); MalwareBazaar,
+  URLhaus y ThreatFox no, porque su uso con ánimo de lucro puede pedir una suscripción de pago.
+- **Cuarentena desde la lista de avisos: sí**, solo para archivos que el escudo señaló, nunca en la carpeta de Windows ni
+  en Program Files, y siempre restaurable.
+- Detalle: `herramientas/agencia-rondas/ronda88/decisiones.md` en el repositorio de la web.
