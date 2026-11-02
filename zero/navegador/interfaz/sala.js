@@ -193,9 +193,25 @@
     if (activa && !relojOnda) relojOnda = setInterval(pasoOnda, 100);
     if (!activa && relojOnda) { clearInterval(relojOnda); relojOnda = null; historia.fill(0); }
     const varios = ((m.grupo || {}).nombres || []).length > 2;
-    $('sala-l-movil').hidden = varios || !!(m.movil && m.movil.habla);
+    // 2 Nov 2026 (owner, 08:33: «volver la llamada al PC… solamente con un botón en pantalla»): the same button moves the
+    // call's voice both ways once a phone is linked, without a gap (make before break, crates/zero/src/relevo.rs): «Volver
+    // al PC» while the phone carries it, «Continuar en el teléfono» while this computer does; with no phone yet, the code.
+    const mv = m.movil || null, paso = (mv && mv.paso) || {};
+    const enMovil = !!mv && (!!mv.habla || paso.relevo === 'movil' || paso.relevo === 'pasando');
+    const enlazado = !!mv && !!mv.enganchado && !!mv.aprobado;
+    const modo = activa && enMovil ? 'traer' : activa && enlazado ? 'pasar' : enMovil ? '' : 'qr';
+    const b = $('sala-l-movil');
+    b.hidden = varios || !modo;
+    b.dataset.modo = modo;
+    b.classList.toggle('traer', modo === 'traer');
+    const clave = modo === 'traer' ? 'sala_volver_pc' : 'sala_movil', s = b.querySelector('span');
+    if (b.dataset.tTitle !== clave) { b.dataset.tTitle = clave; b.title = t(clave); b.setAttribute('aria-label', t(clave)); }
+    if (s && s.dataset.t !== clave) { s.dataset.t = clave; s.textContent = t(clave); }
   };
   $('sala-l-movil').addEventListener('click', () => {
+    const modo = $('sala-l-movil').dataset.modo;
+    if (modo === 'traer') { manda({ tipo: 'secure', accion: 'relevo_volver' }); return; }
+    if (modo === 'pasar') { manda({ tipo: 'secure', accion: 'relevo_pasar' }); return; }
     // The code appears in the shield's panel; the person scans it there.
     if (!(E.movil && E.movil.qr)) manda({ tipo: 'secure', accion: 'movil', idioma: lang().slice(0, 2) });
     const q = $('sala-escudo').querySelector('.sala-qr'); if (q) q.scrollIntoView({ block: 'nearest', behavior: 'smooth' });

@@ -4327,7 +4327,7 @@ impl Secure {
         if llegado.is_empty() {
             return;
         }
-        let aprobado = m.aprobado;
+        let mut aprobado = m.aprobado;
         // Call pieces and file pieces change nothing on screen: redrawing (and sending the
         // whole state to the phone) for each one, about eight times a second during a call,
         // was a cause of the stutter (17 Oct 2026 review).
@@ -4343,9 +4343,17 @@ impl Secure {
                     self.novedad = true;
                     self.monitor
                         .anota(ahora_s(), Nivel::Info, "un móvil se ha conectado");
-                    // An accepted phone that comes back during a call takes it again, the
-                    // same way: the computer keeps it until the phone's leg is live.
-                    if aprobado {
+                    // 2 Nov 2026 (the owner, 09:16: «cuando le das, ya se conecta la llamada y
+                    // ya está, súper fácil»): during a call the phone only takes the call over,
+                    // so reading the code on this screen is enough (it is renewed every minute
+                    // nobody uses it): no «Aceptar» here, and «Volver al PC» on either screen
+                    // brings the call back at once.
+                    if !aprobado && self.llamada.is_some() {
+                        self.movil_aprueba();
+                        aprobado = true;
+                    } else if aprobado {
+                        // An accepted phone that comes back during a call takes it again, the
+                        // same way: the computer keeps it until the phone's leg is live.
                         self.relevo_empieza();
                     }
                 }

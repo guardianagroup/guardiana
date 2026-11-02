@@ -204,6 +204,9 @@ aside.monitor > *:not(.sala-escudo):not(.sala-aside-cab) { margin: 0 var(--e5) v
 .secure .boton.redondo:hover { background: var(--campo); border-color: #3A4656; }
 .secure .boton.redondo[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
 .secure .boton.redondo .icono { width: 20px; height: 20px; }
+/* 2 Nov 2026: the phone button shows a computer while it brings the call back («Volver al PC») */
+#sala-l-movil .i-pc, #sala-l-movil.traer .i-movil { display: none; }
+#sala-l-movil.traer .i-pc { display: block; }
 .secure .boton.redondo.colgar { width: 56px; height: 56px; margin-left: var(--e6); background: var(--alerta); border-color: var(--alerta); color: #fff; }
 .secure .boton.redondo.colgar:hover { background: color-mix(in srgb, var(--alerta) 85%, #000); }
 .secure .solo-voz .boton.redondo span { position: absolute; top: calc(100% + var(--e3)); left: 50%; transform: translateX(-50%); width: auto; height: auto; clip: auto; overflow: visible; white-space: nowrap; font: var(--t-12); color: var(--muted); }

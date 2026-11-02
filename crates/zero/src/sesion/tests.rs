@@ -338,7 +338,7 @@ fn web_pages_cannot_command_the_browser() {
     );
     assert!(o.contains(&Orden::Navega {
         id,
-        url: "https://duckduckgo.com/?q=real%20madrid".into()
+        url: "https://www.google.com/search?q=real%20madrid".into()
     }));
     assert!(s
         .mensaje(Origen::Pestana(id), INICIO, r#"{"tipo":"borrar_todo"}"#)
@@ -1024,7 +1024,7 @@ fn today_counts_what_was_decided() {
     assert_eq!(h["hoy"]["cortadas"], 2);
     assert_eq!(h["mes"]["terceros_cortados"], 2);
     assert_eq!(h["mes"]["empresas_cortadas"], 1);
-    assert_eq!(h["motor_id"], "duckduckgo");
+    assert_eq!(h["motor_id"], "google");
     // Erasing everything starts the figures again, in a fresh tab.
     let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"borrar_todo"}"#);
     assert!(o.contains(&Orden::BorraNavegacion));
@@ -1645,7 +1645,7 @@ fn the_new_tab_lists_the_engines_and_can_change_the_one_in_use() {
     let _ = s.navegacion_empieza(id, INICIO, false);
     let _ = s.pagina_nueva(id, INICIO);
     let hoy = s.msg_hoy();
-    assert_eq!(hoy["motor_id"], "duckduckgo");
+    assert_eq!(hoy["motor_id"], "google");
     assert_eq!(
         hoy["motores"].as_array().map(Vec::len),
         Some(BUSCADORES.len())

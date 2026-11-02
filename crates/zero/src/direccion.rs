@@ -20,7 +20,7 @@ pub struct Buscador {
 }
 
 /// The engines on offer, the ones that say they keep no record first (the settings list them
-/// apart). The first is the default: it does not build a profile of the person.
+/// apart).
 pub const BUSCADORES: &[Buscador] = &[
     Buscador {
         id: "duckduckgo",
@@ -150,12 +150,19 @@ pub const BUSCADORES: &[Buscador] = &[
     },
 ];
 
+/// The engine for whoever has not chosen one (2 Nov 2026; the owner, 09:10: «hazlo dentro del
+/// programa para que la gente vaya libremente por todo Google»). ZERO runs on the person's own
+/// computer and connection, so Google answers it like any browser: all of Google, no box of 50
+/// sites. Whoever chose another engine keeps it.
+pub const POR_DEFECTO: &str = "google";
+
 /// The engine with `id`, or the default one.
 #[must_use]
 pub fn buscador(id: &str) -> &'static Buscador {
     BUSCADORES
         .iter()
         .find(|b| b.id == id)
+        .or_else(|| BUSCADORES.iter().find(|b| b.id == POR_DEFECTO))
         .unwrap_or(&BUSCADORES[0])
 }
 
@@ -222,7 +229,9 @@ mod tests {
     #[test]
     fn names_open_and_words_search() {
         let d = buscador("");
-        assert_eq!(d.id, "duckduckgo");
+        assert_eq!(d.id, "google");
+        assert_eq!(buscador("duckduckgo").id, "duckduckgo");
+        assert_eq!(buscador("no-existe").id, "google");
         assert_eq!(a_direccion("elpais.com", d), "https://elpais.com/");
         assert_eq!(
             a_direccion("www.realmadrid.com/es", d),
@@ -239,11 +248,11 @@ mod tests {
         assert_eq!(a_direccion("192.168.1.1", d), "http://192.168.1.1/");
         assert_eq!(
             a_direccion("node.js", d),
-            "https://duckduckgo.com/?q=node.js"
+            "https://www.google.com/search?q=node.js"
         );
         assert_eq!(
             a_direccion("real madrid hoy", d),
-            "https://duckduckgo.com/?q=real%20madrid%20hoy"
+            "https://www.google.com/search?q=real%20madrid%20hoy"
         );
         assert_eq!(
             a_direccion("¿qué es?", buscador("google")),
@@ -251,7 +260,7 @@ mod tests {
         );
         assert_eq!(
             a_direccion("javascript:alert(1)", d),
-            "https://duckduckgo.com/?q=javascript%3Aalert%281%29"
+            "https://www.google.com/search?q=javascript%3Aalert%281%29"
         );
     }
 

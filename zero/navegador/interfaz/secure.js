@@ -755,7 +755,8 @@
     const mv = m.movil;
     const caja = $('c-movil-tarjeta');
     const varios = ((m.grupo || {}).nombres || []).length > 2;
-    $('c-movil').hidden = !!mv || varios;
+    // 2 Nov 2026 (the owner, 09:16: «solamente es pasar la llamada»): the phone is offered only during a call
+    $('c-movil').hidden = !!mv || varios || !(m.llamada && m.llamada.conectada !== false);
     $('c-movil-antes').hidden = !!mv || varios;
     if (!mv) { caja.hidden = true; movilHabla = false; return; }
     caja.hidden = false;

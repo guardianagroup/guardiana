@@ -649,8 +649,7 @@ main:has(> .inicio:not([hidden])) { align-content: safe center; }
       <div class="inicio-otros">
         <button type="button" class="enlace" data-modo="equipos" data-t="sec_inicio_invitacion"></button>
         <span aria-hidden="true">·</span>
-        <button type="button" class="enlace" data-modo="movil" data-t="sec_inicio_mi_movil"></button>
-        <span aria-hidden="true">·</span>
+        <!-- 2 Nov 2026 (the owner, 09:16): the phone only takes over a call of this PC; no «Usar en mi móvil». -->
         <!-- 18 Oct 2026: «Sala de entrega» (entrega.js). -->
         <button type="button" class="enlace" id="ent-abrir" data-t="ent_abrir"></button>
       </div>
@@ -829,7 +828,7 @@ main:has(> .inicio:not([hidden])) { align-content: safe center; }
           <button type="button" class="boton redondo" id="c-pantalla" data-t-title="sec_l_pantalla" hidden><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span data-t="sec_l_pantalla"></span></button>
           <button type="button" class="boton redondo" id="sala-salida" aria-haspopup="menu" aria-expanded="false" data-t-title="sala_l_salida"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg><span data-t="sala_l_salida"></span></button>
           <div class="sala-menu sala-menu-salida" id="sala-salida-menu" role="menu" hidden></div>
-          <button type="button" class="boton redondo" id="sala-l-movil" data-t-title="sala_movil"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg><span data-t="sala_movil"></span></button>
+          <button type="button" class="boton redondo" id="sala-l-movil" data-t-title="sala_movil"><svg class="icono i-movil" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg><svg class="icono i-pc" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg><span data-t="sala_movil"></span></button>
           <button type="button" class="boton redondo colgar" id="c-colgar" data-t-title="sec_l_colgar"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 13.5c4.7-4.7 12.3-4.7 17 0l-2.4 2.4a2 2 0 0 1-2.4.3l-2-1.3a2 2 0 0 1-.9-1.7v-1.3a11 11 0 0 0-5.6 0v1.3a2 2 0 0 1-.9 1.7l-2 1.3a2 2 0 0 1-2.4-.3z"/></svg><span data-t="sec_l_colgar"></span></button>
         </div>
       </div>
