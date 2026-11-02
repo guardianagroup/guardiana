@@ -15,9 +15,6 @@ use std::path::{Path, PathBuf};
 
 use crate::primera_vez::Aviso;
 
-/// The start of every decoy's name: `!!!!` sorts before letters and digits in a folder, `~~~~` after them.
-const PREFIJOS: [&str; 2] = ["!!!!guardiana-senuelo", "~~~~guardiana-senuelo"];
-
 /// The decoys of one folder: the first and the last of it, as documents a ransomware looks for.
 pub const NOMBRES: [&str; 2] = [
     "!!!!GUARDIANA-senuelo-no-tocar.docx",
@@ -36,15 +33,18 @@ pub const CABECERA: &str = "GUARDIANA - archivo señuelo contra el secuestro de 
 lo borres: si un programa lo hace, GUARDIANA lo congela al momento y te pregunta qué hacer. Es seguro tenerlo y no ocupa \
 casi nada.\r\n";
 
-/// Whether a path is one of GUARDIANA's decoys (by its file name).
+/// Whether a path is one of GUARDIANA's decoys (by its file name). Cheap: it is asked for every file opened on the
+/// computer, so almost every name stops at its first four bytes, without allocating.
 #[must_use]
 pub fn es_senuelo(ruta: &str) -> bool {
-    let nombre = ruta
-        .rsplit(['\\', '/'])
-        .next()
-        .unwrap_or_default()
-        .to_lowercase();
-    PREFIJOS.iter().any(|p| nombre.starts_with(p))
+    let nombre = ruta.rsplit(['\\', '/']).next().unwrap_or_default();
+    let b = nombre.as_bytes();
+    if b.len() < 21 || !(b.starts_with(b"!!!!") || b.starts_with(b"~~~~")) {
+        return false;
+    }
+    nombre
+        .get(4..21)
+        .is_some_and(|x| x.eq_ignore_ascii_case("guardiana-senuelo"))
 }
 
 /// A decoy's bytes: its first line says what it is; the rest looks like any document's content (a fixed pseudo-random
@@ -194,7 +194,7 @@ mod tests {
         assert!(!es_senuelo(r"C:\Users\ana\Documents\informe.docx"));
         assert!(!es_senuelo(r"C:\Users\ana\Documents\!!!!otra-cosa.docx"));
         // the first before any letter or digit, the last after them (as NTFS and the explorer order names)
-        let mut v = vec!["0001.docx", "Zeta.pdf", "a.txt", NOMBRES[0], NOMBRES[1]];
+        let mut v = ["0001.docx", "Zeta.pdf", "a.txt", NOMBRES[0], NOMBRES[1]];
         v.sort_by_key(|s| s.to_uppercase());
         assert_eq!(v.first(), Some(&NOMBRES[0]));
         assert_eq!(v.last(), Some(&NOMBRES[1]));

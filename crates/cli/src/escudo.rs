@@ -11,7 +11,7 @@ use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use guardiana_apps::{Apertura, DesdeMedio, Guardia, Observador, Rafaga};
+use guardiana_apps::{Apertura, Contenido, DesdeMedio, Guardia, Observador, Rafaga};
 use guardiana_core::vigilancia::Suceso;
 use guardiana_core::{Ledger, NewEvent};
 use guardiana_escudo::arranque::Archivo;
@@ -33,6 +33,11 @@ const REPETIR_CADENA_MS: u64 = 60 * 60_000;
 const REPETIR_SECUESTRO_MS: u64 = 60 * 60_000;
 /// A file is asked to Microsoft Defender at most once a day.
 const REPETIR_DEFENSOR_MS: u64 = 24 * 60 * 60_000;
+/// How often the decoys against ransomware are looked at (their size and time of writing), and put back when missing.
+const MIRAR_SENUELOS_MS: u64 = 2_000;
+const PLANTAR_SENUELOS_MS: u64 = 60 * 60_000;
+/// How often the programs the person let carry on are read again.
+const LEER_PERMITIDOS_MS: u64 = 30_000;
 
 /// Microsoft Defender's second opinion (`guardiana_escudo::defensor`): a thread of its own runs its scan of one file at
 /// a time (a few seconds each), so the escudo's loop never waits for it. Only on Windows.
@@ -243,6 +248,16 @@ pub(crate) struct EscudoVivo {
     hosts: Option<BTreeMap<String, String>>,
     ruta_hosts: PathBuf,
     hosts_leido_ms: u64,
+    /// The decoys against ransomware (`guardiana_escudo::senuelos`): each one's path and its time of writing as left
+    /// here; when they were last looked at and last planted.
+    senuelos: Vec<(PathBuf, std::time::SystemTime)>,
+    senuelos_mirados_ms: u64,
+    senuelos_plantados_ms: u64,
+    /// The programs the person let carry on after they were frozen (their paths, in lower case), as the panel writes
+    /// them (`escudo-permitidos.jsonl`), and when they were last read.
+    permitidos: std::collections::HashSet<String>,
+    ruta_permitidos: PathBuf,
+    permitidos_leidos_ms: u64,
 }
 
 impl EscudoVivo {
@@ -291,6 +306,12 @@ impl EscudoVivo {
             sin_nombre_vistos: HashMap::new(),
             defensor: Defensor::lanza(),
             defensor_vistos: RefCell::new(HashMap::new()),
+            senuelos: Vec::new(),
+            senuelos_mirados_ms: 0,
+            senuelos_plantados_ms: 0,
+            permitidos: std::collections::HashSet::new(),
+            ruta_permitidos: db.with_file_name("escudo-permitidos.jsonl"),
+            permitidos_leidos_ms: 0,
         }
     }
 
@@ -339,6 +360,9 @@ impl EscudoVivo {
     /// Looks again at the queries that were waiting for a signature check, and at the openings of saved secrets.
     pub(crate) fn repasa(&mut self, obs: &Observador, ahora_ms: u64) {
         self.respuestas_de_defender(ahora_ms);
+        self.lee_permitidos(ahora_ms);
+        self.contenidos(ahora_ms);
+        self.mira_senuelos(ahora_ms);
         self.secuestros(obs, ahora_ms);
         self.mira_hosts(ahora_ms);
         self.ladrones(obs, ahora_ms);
@@ -653,9 +677,167 @@ impl EscudoVivo {
             if self.secuestros_vistos.len() > 4_096 {
                 self.secuestros_vistos.clear();
             }
-            self.secuestros_vistos.insert(clave, cuando);
-            self.anota(&aviso, grave);
+            self.secuestros_vistos.insert(clave.clone(), cuando);
+            // grave (no signature, downloaded, or in a folder anyone writes to): frozen with its family, unless the
+            // person let it carry on before (2 Nov 2026)
+            let congelados = if grave && r.pid != 0 && !self.permitidos.contains(&clave) {
+                guardiana_apps::congela_familia(r.pid)
+            } else {
+                Vec::new()
+            };
+            self.anota_congelado(&aviso, grave, r.pid, cuando, &congelados, "");
         }
+    }
+
+    /// The programs the watch froze the moment it caught them (a decoy deleted or renamed, the backups' deletion):
+    /// each one a warning, with what was frozen. A program the person let carry on before is let go again at once.
+    fn contenidos(&mut self, ahora_ms: u64) {
+        let nuevos: Vec<Contenido> = self
+            .guardia
+            .as_ref()
+            .map(Guardia::contenidos)
+            .unwrap_or_default();
+        for c in nuevos {
+            let cuando = u64::try_from(c.ts).unwrap_or(ahora_ms);
+            if self.permitidos.contains(&c.ruta.to_ascii_lowercase()) {
+                for pid in &c.congelados {
+                    let _ = guardiana_apps::reanuda(*pid);
+                }
+                continue;
+            }
+            let (aviso, grave) = match c.regla {
+                "copias_borradas" => (
+                    guardiana_escudo::contencion::aviso_copias(
+                        &c.programa,
+                        &c.ruta,
+                        &c.padre,
+                        cuando,
+                    ),
+                    true,
+                ),
+                _ => {
+                    let toque = match c.toque {
+                        "borrado" => guardiana_escudo::senuelos::Toque::Borrado,
+                        "renombrado" => guardiana_escudo::senuelos::Toque::Renombrado,
+                        _ => guardiana_escudo::senuelos::Toque::Escrito,
+                    };
+                    let (a, accion) = guardiana_escudo::senuelos::juzga(
+                        &c.programa,
+                        &c.ruta,
+                        &c.archivo,
+                        toque,
+                        cuando,
+                    );
+                    (a, accion == guardiana_escudo::senuelos::Accion::Congelar)
+                }
+            };
+            self.anota_congelado(&aviso, grave, c.pid, cuando, &c.congelados, &c.archivo);
+        }
+    }
+
+    /// The paths of the programs the person let carry on (the panel writes one per line: `{"ruta": …}`).
+    fn lee_permitidos(&mut self, ahora_ms: u64) {
+        if ahora_ms.saturating_sub(self.permitidos_leidos_ms) < LEER_PERMITIDOS_MS {
+            return;
+        }
+        self.permitidos_leidos_ms = ahora_ms;
+        self.permitidos = std::fs::read_to_string(&self.ruta_permitidos)
+            .map(|t| {
+                t.lines()
+                    .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+                    .filter_map(|v| v["ruta"].as_str().map(str::to_ascii_lowercase))
+                    .collect()
+            })
+            .unwrap_or_default();
+    }
+
+    /// The decoys against ransomware: planted when missing (at start and every hour), and looked at every two seconds. One
+    /// written over in place (its size or its time of writing changed) has as author its last opener, which is frozen
+    /// with its family; the decoy is then written again.
+    fn mira_senuelos(&mut self, ahora_ms: u64) {
+        if ahora_ms.saturating_sub(self.senuelos_plantados_ms) >= PLANTAR_SENUELOS_MS {
+            self.senuelos_plantados_ms = ahora_ms;
+            self.senuelos = planta_senuelos();
+        }
+        if ahora_ms.saturating_sub(self.senuelos_mirados_ms) < MIRAR_SENUELOS_MS {
+            return;
+        }
+        self.senuelos_mirados_ms = ahora_ms;
+        let mut tocados = Vec::new();
+        for (ruta, cuando) in &self.senuelos {
+            let cambiado = match std::fs::metadata(ruta) {
+                Ok(m) => {
+                    m.len() != guardiana_escudo::senuelos::TAMANO as u64
+                        || m.modified().ok() != Some(*cuando)
+                }
+                // deleted: the watch saw who did it (a warning already); it is planted again within the hour
+                Err(_) => false,
+            };
+            if cambiado {
+                tocados.push(ruta.clone());
+            }
+        }
+        for ruta in tocados {
+            let archivo = ruta.to_string_lossy().into_owned();
+            let autor = self
+                .guardia
+                .as_ref()
+                .and_then(|g| g.abridor_de_senuelo(&archivo));
+            if let Some((pid, programa, ruta_prog, _)) = autor {
+                let permitido = self.permitidos.contains(&ruta_prog.to_ascii_lowercase());
+                let explorador = programa.eq_ignore_ascii_case("explorer.exe");
+                let congelados = if permitido || explorador {
+                    Vec::new()
+                } else {
+                    guardiana_apps::congela_familia(pid)
+                };
+                if !permitido {
+                    let (aviso, accion) = guardiana_escudo::senuelos::juzga(
+                        &programa,
+                        &ruta_prog,
+                        &archivo,
+                        guardiana_escudo::senuelos::Toque::Escrito,
+                        ahora_ms,
+                    );
+                    let grave = accion == guardiana_escudo::senuelos::Accion::Congelar;
+                    self.anota_congelado(&aviso, grave, pid, ahora_ms, &congelados, &archivo);
+                }
+            }
+            // written again, so the next change is seen too
+            if let Some(nuevo) = escribe_senuelo(&ruta) {
+                if let Some(x) = self.senuelos.iter_mut().find(|(r, _)| *r == ruta) {
+                    x.1 = nuevo;
+                }
+            }
+        }
+    }
+
+    /// A warning that may come with programs frozen: then it carries their numbers and the case's id
+    /// (`c-<when>-<pid>`), which the panel uses to stop them or let them carry on.
+    fn anota_congelado(
+        &self,
+        a: &Aviso,
+        grave: bool,
+        pid: u32,
+        cuando_ms: u64,
+        congelados: &[u32],
+        archivo: &str,
+    ) {
+        let mut extra = serde_json::Map::new();
+        if !congelados.is_empty() {
+            extra.insert("congelados".to_owned(), serde_json::json!(congelados));
+            extra.insert(
+                "incidente".to_owned(),
+                serde_json::Value::String(format!("c-{cuando_ms}-{pid}")),
+            );
+        }
+        if !archivo.is_empty() {
+            extra.insert(
+                "archivo".to_owned(),
+                serde_json::Value::String(archivo.chars().take(400).collect()),
+            );
+        }
+        self.anota_con(a, grave, extra);
     }
 
     /// The connections without a name the traffic counter found, once Windows has checked each program's signature,
@@ -958,10 +1140,15 @@ impl EscudoVivo {
     /// a grave one carries `"grave": true` (a
     /// known sample, a document starting an interpreter, the backups' tools, a program in disguise).
     fn anota(&self, a: &Aviso, grave: bool) {
+        self.anota_con(a, grave, serde_json::Map::new());
+    }
+
+    fn anota_con(&self, a: &Aviso, grave: bool, extra: serde_json::Map<String, serde_json::Value>) {
         let Ok(mut valor) = serde_json::to_value(a) else {
             return;
         };
         if let Some(o) = valor.as_object_mut() {
+            o.extend(extra);
             if grave {
                 o.insert("grave".to_owned(), serde_json::Value::Bool(true));
             }
@@ -1039,4 +1226,92 @@ fn escribe(ruta: &Path, datos: &[u8]) -> std::io::Result<()> {
     let tmp = ruta.with_extension("tmp");
     std::fs::write(&tmp, datos)?;
     std::fs::rename(&tmp, ruta)
+}
+
+/// Plants the decoys against ransomware where they are missing or changed (Windows only): in each account's profile and
+/// its Documents, Desktop and Pictures (only folders of the disk itself: one kept by OneDrive or moved elsewhere is
+/// left alone), and in the public Documents. Each one hidden and marked as a system file, so the explorer does not show
+/// it. The paths and their time of writing.
+fn planta_senuelos() -> Vec<(PathBuf, std::time::SystemTime)> {
+    #[cfg_attr(not(windows), allow(unused_mut))]
+    let mut out = Vec::new();
+    #[cfg(windows)]
+    {
+        use guardiana_escudo::senuelos;
+        let raiz = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".to_owned());
+        let usuarios = PathBuf::from(format!("{raiz}\\Users"));
+        let mut rutas: Vec<PathBuf> = Vec::new();
+        if let Ok(perfiles) = std::fs::read_dir(&usuarios) {
+            for p in perfiles.flatten() {
+                let nombre = p.file_name().to_string_lossy().into_owned();
+                if p.path().is_dir() && senuelos::es_perfil_de_persona(&nombre) {
+                    rutas.extend(senuelos::de_perfil(&p.path()));
+                }
+            }
+        }
+        for n in senuelos::NOMBRES {
+            rutas.push(usuarios.join("Public").join("Documents").join(n));
+        }
+        for ruta in rutas {
+            let Some(carpeta) = ruta.parent() else {
+                continue;
+            };
+            if !carpeta_propia(carpeta) {
+                continue;
+            }
+            let bien = std::fs::metadata(&ruta)
+                .ok()
+                .filter(|m| m.len() == senuelos::TAMANO as u64)
+                .and_then(|m| m.modified().ok());
+            match bien.or_else(|| escribe_senuelo(&ruta)) {
+                Some(cuando) => out.push((ruta, cuando)),
+                None => continue,
+            }
+        }
+    }
+    out
+}
+
+/// Whether a folder is a real folder of the disk, not a link to elsewhere, nor kept by OneDrive.
+#[cfg(windows)]
+fn carpeta_propia(carpeta: &Path) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    /// `FILE_ATTRIBUTE_REPARSE_POINT`: a link, a junction or a folder kept by a cloud service.
+    const ENLACE: u32 = 0x400;
+    let Ok(m) = std::fs::symlink_metadata(carpeta) else {
+        return false;
+    };
+    m.is_dir()
+        && m.file_attributes() & ENLACE == 0
+        && !carpeta
+            .to_string_lossy()
+            .to_ascii_lowercase()
+            .contains("onedrive")
+}
+
+/// Writes one decoy (hidden, a system file) and gives its time of writing.
+fn escribe_senuelo(ruta: &Path) -> Option<std::time::SystemTime> {
+    #[cfg(windows)]
+    {
+        use std::io::Write;
+        use std::os::windows::fs::OpenOptionsExt;
+        /// `FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM`.
+        const OCULTO: u32 = 0x2 | 0x4;
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .attributes(OCULTO)
+            .open(ruta)
+            .ok()?;
+        f.write_all(&guardiana_escudo::senuelos::contenido()).ok()?;
+        f.sync_all().ok()?;
+        drop(f);
+        std::fs::metadata(ruta).ok()?.modified().ok()
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = ruta;
+        None
+    }
 }

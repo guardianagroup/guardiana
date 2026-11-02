@@ -59,6 +59,8 @@ mod actividad;
 #[cfg(windows)]
 mod archivos;
 #[cfg(windows)]
+mod contencion;
+#[cfg(windows)]
 mod defender;
 #[cfg(windows)]
 mod firmas;
@@ -281,6 +283,8 @@ pub struct Lanzamiento {
 pub struct Rafaga {
     /// When it reached the threshold (milliseconds since 1970).
     pub ts: i64,
+    /// The program's process number (to freeze it when the rule finds it grave).
+    pub pid: u32,
     /// The program's file name.
     pub programa: String,
     /// Its full path.
@@ -317,6 +321,77 @@ pub struct DesdeMedio {
     pub ruta: String,
     /// `imagen` (a disc or a mounted ISO or IMG) or `usb` (a removable drive).
     pub medio: &'static str,
+}
+
+/// A program frozen the moment it was caught (el escudo, 2 Nov 2026: `guardiana_escudo::senuelos` and
+/// `guardiana_escudo::contencion`): it touched one of GUARDIANA's decoys, or ordered Windows' backup copies deleted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Contenido {
+    /// When (milliseconds since 1970).
+    pub ts: i64,
+    /// `senuelo` or `copias_borradas`.
+    pub regla: &'static str,
+    /// What it did: `borrado`, `renombrado` or `escrito` (a decoy), `orden` (the backups).
+    pub toque: &'static str,
+    /// The program's process number.
+    pub pid: u32,
+    /// The program's file name.
+    pub programa: String,
+    /// Its full path.
+    pub ruta: String,
+    /// The decoy it touched, or the command line it ran.
+    pub archivo: String,
+    /// The program that started it, when known.
+    pub padre: String,
+    /// The process numbers frozen (it and its family; empty when only said: the person's own file explorer).
+    pub congelados: Vec<u32>,
+}
+
+/// Freezes program `pid` and its family (the programs it started, and those above it that may be frozen; never Windows'
+/// own): the process numbers frozen. Nothing outside Windows.
+#[must_use]
+pub fn congela_familia(pid: u32) -> Vec<u32> {
+    #[cfg(windows)]
+    {
+        contencion::congelar_familia(pid)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = pid;
+        Vec::new()
+    }
+}
+
+/// Lets a frozen program carry on.
+///
+/// # Errors
+/// [`Error::NoSoportado`] outside Windows; [`Error::Sistema`] when Windows refuses or the process is gone.
+pub fn reanuda(pid: u32) -> Result<(), Error> {
+    #[cfg(windows)]
+    {
+        contencion::reanudar(pid).map_err(Error::Sistema)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = pid;
+        Err(Error::NoSoportado)
+    }
+}
+
+/// Stops a program.
+///
+/// # Errors
+/// [`Error::NoSoportado`] outside Windows; [`Error::Sistema`] when Windows refuses or the process is gone.
+pub fn detiene(pid: u32) -> Result<(), Error> {
+    #[cfg(windows)]
+    {
+        contencion::detener(pid).map_err(Error::Sistema)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = pid;
+        Err(Error::NoSoportado)
+    }
 }
 
 /// El escudo's watch over saved secrets, over program starts and over the person's files: on while the service runs,
@@ -406,6 +481,34 @@ impl Guardia {
         #[cfg(not(windows))]
         {
             Vec::new()
+        }
+    }
+
+    /// The programs frozen the moment they were caught since the last call (a decoy touched, the backups' deletion).
+    #[must_use]
+    pub fn contenidos(&self) -> Vec<Contenido> {
+        #[cfg(windows)]
+        {
+            self.interno.contenidos()
+        }
+        #[cfg(not(windows))]
+        {
+            Vec::new()
+        }
+    }
+
+    /// The last program that opened decoy `archivo` (its process number, file name and path, and when), in the last
+    /// minute: who wrote over it, when its content changed.
+    #[must_use]
+    pub fn abridor_de_senuelo(&self, archivo: &str) -> Option<(u32, String, String, i64)> {
+        #[cfg(windows)]
+        {
+            self.interno.abridor_de_senuelo(archivo)
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = archivo;
+            None
         }
     }
 }

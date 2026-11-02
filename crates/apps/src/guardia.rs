@@ -14,7 +14,7 @@ use ferrisetw::trace::UserTrace;
 use ferrisetw::EventRecord;
 use guardiana_escudo::{cadenas, disfraz, engano, ladrones, secuestro};
 
-use super::{Acceso, Apertura, DesdeMedio, Error, Lanzamiento, Rafaga};
+use super::{Acceso, Apertura, Contenido, DesdeMedio, Error, Lanzamiento, Rafaga};
 use crate::ventanas::programa_de;
 
 /// `Microsoft-Windows-Kernel-File`.
@@ -77,9 +77,124 @@ struct Compartido {
     tipos_de_unidad: HashMap<String, (bool, i64)>,
     /// The same program opening LSASS again within [`REPETICION_MS`] is the same opening: program path → when.
     accesos_vistos: HashMap<String, i64>,
+    /// The programs frozen the moment they were caught (a decoy touched, the backups' deletion), waiting for the service.
+    contenidos: VecDeque<Contenido>,
+    /// Each decoy's last opener: its drive path in lower case → (process number, program, path, when).
+    abridores: HashMap<String, (u32, String, String, i64)>,
     /// For the real test only: the openings of a «Login Data» file, before any filter.
     #[cfg(test)]
     prueba_login: Vec<String>,
+}
+
+/// Windows' tools whose command line is read when they start, to see whether they delete the backup copies
+/// (`guardiana_escudo::contencion::borra_copias`).
+const HERRAMIENTAS_COPIAS: &[&str] = &[
+    "vssadmin.exe",
+    "wmic.exe",
+    "wbadmin.exe",
+    "bcdedit.exe",
+    "diskshadow.exe",
+    "powershell.exe",
+    "pwsh.exe",
+];
+
+/// A decoy deleted or renamed by `pid` (el escudo, 2 Nov 2026): the program and its family frozen at once, unless it is
+/// the person's own file explorer, and the case left for the service.
+fn senuelo_tocado(datos: &Arc<Mutex<Compartido>>, pid: u32, archivo_nt: &str, toque: &'static str) {
+    let ahora = guardiana_core::time::now_ms();
+    let (programa, ruta, archivo) = match datos.lock() {
+        Ok(d) => {
+            let (p, r) = programa_en(&d, pid);
+            (p, r, ruta_dos(archivo_nt, &d.volumenes))
+        }
+        Err(_) => return,
+    };
+    if programa.is_empty() {
+        return;
+    }
+    let explorador = programa.eq_ignore_ascii_case("explorer.exe")
+        && ruta
+            .to_ascii_lowercase()
+            .ends_with(r"\windows\explorer.exe");
+    let congelados = if explorador {
+        Vec::new()
+    } else {
+        crate::contencion::congelar_familia(pid)
+    };
+    if let Ok(mut d) = datos.lock() {
+        if d.contenidos.len() < MAXIMO_RAFAGAS {
+            d.contenidos.push_back(Contenido {
+                ts: ahora,
+                regla: "senuelo",
+                toque,
+                pid,
+                programa,
+                ruta,
+                archivo,
+                padre: String::new(),
+                congelados,
+            });
+        }
+    }
+}
+
+/// A decoy opened by `pid`: remembered as its last opener, so a change of its content later has an author.
+fn senuelo_abierto(datos: &Arc<Mutex<Compartido>>, pid: u32, archivo_nt: &str) {
+    let ahora = guardiana_core::time::now_ms();
+    let Ok(mut d) = datos.lock() else {
+        return;
+    };
+    let (programa, ruta) = programa_en(&d, pid);
+    if programa.is_empty() {
+        return;
+    }
+    let clave = ruta_dos(archivo_nt, &d.volumenes).to_lowercase();
+    if d.abridores.len() > 1_024 {
+        d.abridores.retain(|_, (_, _, _, t)| ahora - *t < 60_000);
+    }
+    d.abridores.insert(clave, (pid, programa, ruta, ahora));
+}
+
+/// A program that may delete the backup copies: its command line, read as it starts; if it deletes them, it and its
+/// family are frozen at once and the case is left for the service.
+fn quizas_borra_copias(datos: &Arc<Mutex<Compartido>>, hijo: &str, pid: u32, padre_pid: u32) {
+    if pid == 0
+        || !HERRAMIENTAS_COPIAS
+            .iter()
+            .any(|h| hijo.eq_ignore_ascii_case(h))
+    {
+        return;
+    }
+    let Some(linea) = crate::contencion::linea_de_ordenes(pid) else {
+        return;
+    };
+    if !guardiana_escudo::contencion::borra_copias(hijo, &linea) {
+        return;
+    }
+    let congelados = crate::contencion::congelar_familia(pid);
+    let ahora = guardiana_core::time::now_ms();
+    let Ok(mut d) = datos.lock() else {
+        return;
+    };
+    let (programa, ruta) = programa_en(&d, pid);
+    let padre = programa_en(&d, padre_pid).0;
+    if d.contenidos.len() < MAXIMO_RAFAGAS {
+        d.contenidos.push_back(Contenido {
+            ts: ahora,
+            regla: "copias_borradas",
+            toque: "orden",
+            pid,
+            programa: if programa.is_empty() {
+                hijo.to_owned()
+            } else {
+                programa
+            },
+            ruta,
+            archivo: linea.chars().take(400).collect(),
+            padre,
+            congelados,
+        });
+    }
 }
 
 /// For the real tests only: what arrived and what it cost, counted without the lock, so counting weighs next to
@@ -359,6 +474,25 @@ impl Sesion {
             .map(|mut d| d.accesos.drain(..).collect())
             .unwrap_or_default()
     }
+
+    /// The programs frozen the moment they were caught since the last take.
+    pub(crate) fn contenidos(&self) -> Vec<Contenido> {
+        self.datos
+            .lock()
+            .map(|mut d| d.contenidos.drain(..).collect())
+            .unwrap_or_default()
+    }
+
+    /// The last opener of decoy `archivo` (a drive path) in the last minute.
+    pub(crate) fn abridor_de_senuelo(&self, archivo: &str) -> Option<(u32, String, String, i64)> {
+        let ahora = guardiana_core::time::now_ms();
+        self.datos.lock().ok().and_then(|d| {
+            d.abridores
+                .get(&archivo.to_lowercase())
+                .filter(|(_, _, _, t)| ahora - *t < 60_000)
+                .cloned()
+        })
+    }
 }
 
 /// A process opened: only LSASS (process `lsass`, found when the session started), and only when the rights asked for
@@ -452,6 +586,16 @@ fn anotar_cambio(
     let Ok(archivo) = lector.try_parse::<String>("FilePath") else {
         return;
     };
+    // a decoy deleted or renamed: frozen at once (el escudo, 2 Nov 2026)
+    if guardiana_escudo::senuelos::es_senuelo(&archivo) {
+        let toque = if id == EV_BORRA {
+            "borrado"
+        } else {
+            "renombrado"
+        };
+        senuelo_tocado(datos, pid, &archivo, toque);
+        return;
+    }
     if !secuestro::es_personal(&archivo) {
         return;
     }
@@ -468,6 +612,7 @@ fn anotar_cambio(
     }
     d.rafagas.push_back(Rafaga {
         ts: ahora,
+        pid,
         programa,
         ruta,
         n: secuestro::UMBRAL,
@@ -493,6 +638,9 @@ fn anotar_inicio(datos: &Arc<Mutex<Compartido>>, registro: &EventRecord, esquema
         .to_owned();
     // every start is remembered, so its events can name it after it has ended
     let pid_nuevo = lector.try_parse::<u32>("ProcessID").unwrap_or(0);
+    // a tool that deletes the backup copies (el escudo, 2 Nov 2026): frozen at once
+    let padre_pid = lector.try_parse::<u32>("ParentProcessID").unwrap_or(0);
+    quizas_borra_copias(datos, &hijo, pid_nuevo, padre_pid);
     if pid_nuevo != 0 {
         if let Ok(mut d) = datos.lock() {
             if d.iniciados.len() >= MAX_INICIADOS {
@@ -615,6 +763,11 @@ fn anotar(
     let Some(Ok(archivo)) = nombre else {
         return;
     };
+    // a decoy against ransomware (el escudo, 2 Nov 2026): its opener is remembered (cheap: four bytes for any other)
+    if guardiana_escudo::senuelos::es_senuelo(&archivo) {
+        senuelo_abierto(datos, pid, &archivo);
+        return;
+    }
     // the cheap test first: almost every opening on the computer stops here
     let Some(h) = ladrones::que_es(&archivo) else {
         return;
