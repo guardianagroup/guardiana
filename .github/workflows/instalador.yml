@@ -40,7 +40,9 @@ jobs:
           $v = [regex]::Match($pagina, '/descargas/([0-9.]+)/guardiana-[0-9.]+-windows-x64\.msi').Groups[1].Value
           if (-not $v) { throw "no encuentro la versión publicada en instalar.html" }
           Invoke-WebRequest -UseBasicParsing "https://guardianagroup.com/descargas/$v/guardiana-$v-windows-x64.msi" -OutFile "inst/nueva.msi"
-          $sumas = (Invoke-WebRequest -UseBasicParsing "https://guardianagroup.com/descargas/$v/SHA256SUMS").Content
+          # A archivo y leído como texto: sin tipo de texto, .Content llega en bytes y la comparación no ve nada.
+          Invoke-WebRequest -UseBasicParsing "https://guardianagroup.com/descargas/$v/SHA256SUMS" -OutFile "inst/SHA256SUMS"
+          $sumas = Get-Content "inst/SHA256SUMS" -Raw
           $h = (Get-FileHash inst/nueva.msi -Algorithm SHA256).Hash.ToLower()
           if ($sumas -notmatch "$h\s+guardiana-$v-windows-x64\.msi") { throw "la huella de la $v no es la publicada" }
           Write-Output "publicada: $v · $h"
