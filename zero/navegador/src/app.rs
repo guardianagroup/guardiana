@@ -128,7 +128,7 @@ struct Vista {
 
 struct PestanaW {
     vista: Option<Vista>,
-    /// The engine profile it lives in («general», «aislada-3», «mandato-5»).
+    /// The engine profile it lives in («general», «aislada-3»).
     perfil: String,
     privada: bool,
     /// Where to go once the view exists.
@@ -532,24 +532,13 @@ fn ejecuta(o: Orden) {
             }
         }
         Orden::GuardaPdf { id, ruta } => guarda_pdf(id, ruta),
-        Orden::Ejecuta {
-            id,
-            script,
-            etiqueta,
-        } => {
+        // The hiding rules of the filters: nothing waits for what the script returns (since
+        // 2 Nov 2026 no script's result comes back to the session).
+        Orden::Ejecuta { id, script } => {
             if let Some(v) = vista_de(Origen::Pestana(id)) {
                 let s = Ancho::de(&script);
                 let h = ExecuteScriptCompletedHandler::create(Box::new(
-                    move |r: windows::core::Result<()>, resultado: String| {
-                        if let (Ok(()), Some(e)) = (r, etiqueta) {
-                            encola(
-                                con_sesion(|s| s.script_hecho(e, &resultado)).unwrap_or_default(),
-                            );
-                        } else if let Some(e) = etiqueta {
-                            encola(con_sesion(|s| s.script_hecho(e, "null")).unwrap_or_default());
-                        }
-                        Ok(())
-                    },
+                    |_: windows::core::Result<()>, _: String| Ok(()),
                 ));
                 vale("script", unsafe { v.web.ExecuteScript(s.p(), &h) });
             }
@@ -1400,7 +1389,6 @@ fn crea_pestana(id: u32, perfil: Perfil, url: Option<String>, de: Option<u32>) {
             None => match perfil {
                 Perfil::General => ("general".to_string(), false),
                 Perfil::Aislada => (format!("aislada-{id}"), true),
-                Perfil::Mandato => (format!("mandato-{id}"), true),
             },
         }
     })
@@ -1479,8 +1467,7 @@ fn prepara_pestana(id: u32, c: &ICoreWebView2Controller) -> windows::core::Resul
     }
     coloca();
     // The page script goes in before the first page; then the tab opens (or is handed to the
-    // page that asked for a new window). A mandate's tab gets its own (WebRTC and WebTransport
-    // off), and so do the windows its pages open, which are mandate tabs too.
+    // page that asked for a new window).
     let guion = con_sesion(|s| s.guion_pestana(id)).unwrap_or_default();
     let g = Ancho::de(&guion);
     let web2 = web.clone();

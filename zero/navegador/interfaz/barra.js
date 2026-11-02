@@ -23,7 +23,7 @@
     const propias = lista.filter((p) => !p.producto || p.producto === 'zero');
     for (const p of propias) {
       const el = document.createElement('div');
-      el.className = 'pestana' + (p.cargando ? ' cargando' : '') + (p.mandato ? ' mandato' : '') + (p.aislada ? ' aislada' : '') + (p.fija ? ' fija' : '');
+      el.className = 'pestana' + (p.cargando ? ' cargando' : '') + (p.aislada ? ' aislada' : '') + (p.fija ? ' fija' : '');
       el.setAttribute('role', 'tab');
       el.setAttribute('aria-selected', p.activa ? 'true' : 'false');
       el.dataset.id = p.id;
@@ -66,16 +66,21 @@
   // --- address --------------------------------------------------------------------------------
   const campo = $('campo-dir');
   const vista = $('vista-dir');
+  const formDir = $('direccion');
   let urlActual = '';
   let propiaActual = false;
+  // The person is typing in the address. It holds while the focus moves inside the address (to the
+  // star or to «Ir», with the keyboard): what was typed stays there until the focus leaves it.
+  let editando = false;
+  const dentro = (el) => !!el && formDir.contains(el);
   function pintaDireccion(url, interna, propia) {
     urlActual = url || '';
     propiaActual = !!propia;
-    if (document.activeElement !== campo) campo.value = interna || propia ? '' : urlActual;
+    if (!editando) campo.value = interna || propia ? '' : urlActual;
     // GUARDIANA's own pages on this computer read «🔒 GUARDIANA», never 127.0.0.1:7443 (Z3).
     if (propia) {
       vista.innerHTML = `<span class="propia">GUARDIANA</span>`;
-      const ver = document.activeElement !== campo;
+      const ver = !editando;
       vista.classList.toggle('oculto', !ver);
       campo.style.color = ver ? 'transparent' : '';
       return;
@@ -87,27 +92,40 @@
       if (/^https?:$/.test(u.protocol) && !interna) { host = u.host; resto = (u.pathname === '/' ? '' : u.pathname) + u.search; }
     } catch (_) {}
     vista.innerHTML = host ? `<b>${esc(host)}</b><span>${esc(resto)}</span>` : '';
-    const mostrarVista = !!host && document.activeElement !== campo;
+    const mostrarVista = !!host && !editando;
     vista.classList.toggle('oculto', !mostrarVista);
     campo.style.color = mostrarVista ? 'transparent' : '';
   }
-  campo.addEventListener('focus', () => { campo.value = urlActual.startsWith('https://zero.guardiana') || propiaActual ? '' : urlActual; campo.style.color = ''; vista.classList.add('oculto'); setTimeout(() => campo.select(), 0); });
-  campo.addEventListener('blur', () => pintaDireccion(urlActual, urlActual.startsWith('https://zero.guardiana'), propiaActual));
-  $('direccion').addEventListener('submit', (e) => {
+  campo.addEventListener('focus', (e) => {
+    if (editando && dentro(e.relatedTarget)) return;
+    editando = true;
+    campo.value = urlActual.startsWith('https://zero.guardiana') || propiaActual ? '' : urlActual; campo.style.color = ''; vista.classList.add('oculto'); setTimeout(() => campo.select(), 0);
+  });
+  formDir.addEventListener('focusout', (e) => {
+    if (dentro(e.relatedTarget)) return;
+    editando = false;
+    pintaDireccion(urlActual, urlActual.startsWith('https://zero.guardiana'), propiaActual);
+  });
+  // «Ir» (2 Nov 2026, the owner, 16:50: «falta el botón de Enter… tiene que estar en el navegador»):
+  // a submit button of this same form, so it does exactly what Enter does. Pressed with the mouse
+  // it does not take the focus from the field, as Enter would not.
+  $('ir').addEventListener('mousedown', (e) => e.preventDefault());
+  formDir.addEventListener('submit', (e) => {
     e.preventDefault();
     const texto = campo.value.trim();
     if (!texto) return;
     manda({ tipo: 'navegar', texto });
-    campo.blur();
+    // Done typing, wherever the focus was (the field, or «Ir» reached with the keyboard).
+    const enFoco = document.activeElement;
+    if (dentro(enFoco)) enFoco.blur();
   });
   campo.addEventListener('keydown', (e) => { if (e.key === 'Escape') { campo.value = propiaActual ? '' : urlActual; campo.blur(); } });
 
   // --- buttons ------------------------------------------------------------------------------
   $('atras').addEventListener('click', () => manda({ tipo: 'atras' }));
-  $('b-parar').addEventListener('click', () => manda({ tipo: 'mandato_terminar' }));
   $('adelante').addEventListener('click', () => manda({ tipo: 'adelante' }));
   $('recargar').addEventListener('click', () => manda({ tipo: $('ic-detener').classList.contains('oculto') ? 'recargar' : 'detener' }));
-  const vistas = { 'b-escudo': 'escudo', 'b-mandato': 'mandato', 'b-tachon': 'tachon', 'b-datos': 'datos', 'b-menu': 'ajustes' };
+  const vistas = { 'b-escudo': 'escudo', 'b-menu': 'ajustes' };
   for (const [id, v] of Object.entries(vistas)) {
     $(id).addEventListener('click', () => {
       // On the browser's own pages the shield is the day's: it leads to the day's list of cuts.
@@ -274,8 +292,6 @@
     e.setAttribute('aria-label', e.title);
     e.setAttribute('aria-pressed', String(!!a.favorito));
     for (const [id, v] of Object.entries(vistas)) $(id).classList.toggle('activo', panel === v);
-    $('b-mandato').classList.toggle('activo', panel === 'mandato' || !!a.mandato);
-    $('b-parar').classList.toggle('oculto', !a.mandato);
     anima();
   });
   en('escudo', (m) => { if (m.pestana === activa) pintaEscudo(m); });

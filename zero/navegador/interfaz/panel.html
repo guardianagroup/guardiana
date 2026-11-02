@@ -112,60 +112,16 @@ p { margin: 0 0 10px; }
 .compartir .frase { margin: 0 0 10px; font-weight: 600; }
 .compartir canvas { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--linea); }
 
-/* Mandate ------------------------------------------------------------------------------------- */
-.etiqueta { display: block; font-weight: 500; margin: 14px 0 6px; }
-/* Numbered steps for the AI views: one thing at a time, in order. */
-.pasos-guia { list-style: none; counter-reset: paso; margin: 4px 0 0; padding: 0; }
-.pasos-guia > li { counter-increment: paso; position: relative; padding: 2px 0 14px 34px; border-left: 2px solid var(--linea); margin-left: 11px; }
-.pasos-guia > li:last-child { border-left-color: transparent; }
-.pasos-guia > li::before { content: counter(paso); position: absolute; left: -12px; top: 12px; width: 22px; height: 22px; border-radius: 50%; background: var(--azul); color: var(--sobre); font: 600 12px/22px var(--texto, inherit); text-align: center; }
-.pasos-guia > li > .etiqueta:first-child { margin-top: 12px; }
-.pasos-guia > li.apagado::before { background: var(--linea); color: var(--gris); }
-.pasos-guia > li.apagado > .etiqueta, .pasos-guia > li.apagado > .explica { color: var(--gris); }
-.pasos-guia .explica { margin: 0 0 8px; }
-.ideas-cab { margin: 14px 0 6px; font-size: 12.5px; color: var(--gris); }
-.ideas { display: flex; flex-wrap: wrap; gap: 6px; }
-.idea { border: 1px solid var(--linea); background: var(--hoja); color: var(--tinta); border-radius: 999px; padding: 5px 11px; font-size: 12.5px; cursor: pointer; }
-.idea:hover, .idea.elegida { border-color: var(--azul); color: var(--azul); background: var(--azul-suave); }
-.avanzado { margin-top: 10px; font-size: 13px; }
-.avanzado summary { cursor: pointer; color: var(--gris); }
-.boton.ancho { width: 100%; }
-.ahora { margin: 12px 0 4px; padding: 10px 12px; border-radius: 10px; background: var(--azul-suave); color: var(--tinta); }
+/* Shared by the question before data leaves and the subscription (2 Nov 2026: what stays of the views of the AI's
+   task, the redaction and «Mis datos», which left the browser). */
 .casilla { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; font-size: 13px; color: var(--gris); }
 .casilla input { margin-top: 3px; }
 .tarjeta { border: 1px solid var(--linea); border-radius: 14px; padding: 14px 16px; margin-top: 12px; }
-.tarjeta.viva { border-color: var(--azul); box-shadow: 0 0 0 3px var(--azul-suave); }
-.tarjeta .titulo { font-weight: 600; display: flex; align-items: center; gap: 8px; }
-.tarjeta .titulo i { width: 8px; height: 8px; border-radius: 2px; background: var(--azul); }
-.sitios { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
-.senuelo { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 9px; background: var(--campo); margin: 8px 0 4px; }
-.senuelo code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font-family: var(--mono); font-size: 12.5px; }
 .pasos { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12.5px; max-height: 240px; overflow-y: auto; }
 .pasos li { display: grid; grid-template-columns: auto auto 1fr auto; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--linea); }
 .pasos time { color: var(--gris); font-variant-numeric: tabular-nums; }
-.pasos .que.cortado, .pasos .que.tinta { color: var(--rojo); }
 .pasos .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.recibo { font-family: var(--mono); font-size: 12px; background: var(--campo); border-radius: 9px; padding: 10px 12px; white-space: pre-wrap; word-break: break-word; max-height: 160px; overflow: auto; }
-
-/* Redaction -------------------------------------------------------------------------------------- */
-.tachado { white-space: pre-wrap; word-break: break-word; border-radius: 10px; padding: 12px 14px; background: var(--campo); margin-top: 8px; }
-.tachado mark { background: var(--tinta); color: var(--hoja); border-radius: 4px; padding: 0 4px; font-family: var(--mono); font-size: .9em; }
-table.sust { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
-table.sust td { padding: 5px 0; border-bottom: 1px solid var(--linea); }
-table.sust td:first-child { font-family: var(--mono); width: 45%; }
-
-/* My data ------------------------------------------------------------------------------------- */
-.marcados { list-style: none; margin: 8px 0 0; padding: 0; }
-.marcados li { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--linea); }
-.marcados li .mono { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .nuevo-dato { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; margin-top: 10px; }
-.nuevo-dato select { border: 1px solid var(--linea); background: var(--campo); border-radius: 9px; padding: 0 8px; }
-.entrada { padding: 11px 0; border-bottom: 1px solid var(--linea); }
-.entrada .cab { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
-.entrada .cab b { font-weight: 600; }
-.entrada .datos { font-size: 12.5px; color: var(--gris); margin: 2px 0 6px; }
-.carta { margin-top: 10px; }
-.carta textarea { min-height: 220px; font-size: 12.5px; }
 
 /* Settings ------------------------------------------------------------------------------------ */
 .linea-ajuste { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--linea); }
@@ -343,108 +299,6 @@ body.vidrio #e-pagina-cab, body.vidrio #e-sitio, body.vidrio #e-resumen, body.vi
   <p class="ver-todo"><button class="enlace" id="e-ver-todo" data-t="escudo_ver_todo"></button></p>
 </section>
 
-<section class="vista" id="v-mandato" data-titulo="mandato">
-  <div id="m-nuevo">
-    <p class="explica" data-t="mandato_explica"></p>
-    <p class="ideas-cab" data-t="mandato_ideas"></p>
-    <div class="ideas" id="m-ideas">
-      <button class="idea" data-idea="vuelo" data-t="idea_vuelo"></button>
-      <button class="idea" data-idea="hotel" data-t="idea_hotel"></button>
-      <button class="idea" data-idea="precios" data-t="idea_precios"></button>
-      <button class="idea" data-idea="investigar" data-t="idea_investigar"></button>
-      <button class="idea oculto" data-idea="esta" id="m-idea-esta"></button>
-    </div>
-    <ol class="pasos-guia">
-      <li><label class="etiqueta" for="m-tarea" data-t="mandato_tarea"></label>
-        <textarea class="campo" id="m-tarea" rows="2" data-t-ph="mandato_tarea_ph"></textarea></li>
-      <li><label class="etiqueta" for="m-webs" data-t="mandato_webs"></label>
-        <textarea class="campo" id="m-webs" rows="2" spellcheck="false" data-t-ph="mandato_webs_ph"></textarea>
-        <div class="sitios" id="m-webs-vista"></div></li>
-      <li><label class="etiqueta" for="m-duracion" data-t="mandato_duracion"></label>
-        <select class="campo" id="m-duracion">
-          <option value="15" data-t="mandato_min_15"></option>
-          <option value="30" data-t="mandato_min_30" selected></option>
-          <option value="60" data-t="mandato_min_60"></option>
-          <option value="0" data-t="mandato_sin_limite"></option>
-        </select></li>
-    </ol>
-    <details class="avanzado"><summary data-t="opciones_avanzadas"></summary>
-      <label class="casilla"><input type="checkbox" id="m-estricto" checked><span data-t="mandato_estricto"></span></label>
-    </details>
-    <p class="explica oculto" id="m-error" data-t="mandato_webs_falta" style="color:var(--rojo);margin-top:8px"></p>
-    <div class="fila-acciones"><button class="boton principal ancho" id="m-empezar" data-t="mandato_empezar"></button></div>
-  </div>
-  <div id="m-activo" class="oculto">
-    <div class="tarjeta viva">
-      <div class="titulo"><i></i><span data-t="mandato_activo"></span></div>
-      <p id="m-tarea-txt" style="margin:8px 0 0"></p>
-      <div class="sitios" id="m-sitios"></div>
-      <p class="pequeno" id="m-cuentas"></p>
-      <p class="pequeno gris" id="m-caduca"></p>
-    </div>
-    <p class="explica ahora" data-t="mandato_ahora"></p>
-    <h2 data-t="mandato_en_directo"></h2>
-    <ul class="pasos" id="m-pasos"></ul>
-    <p class="explica pequeno" id="m-pasos-vacio" data-t="mandato_en_directo_vacio"></p>
-    <details class="avanzado"><summary data-t="mandato_senuelo"></summary>
-      <p class="explica" data-t="mandato_senuelo_explica"></p>
-      <div class="senuelo"><code id="m-senuelo"></code><button class="boton chico" id="m-copiar" data-t="copiar"></button></div>
-    </details>
-    <div class="fila-acciones"><button class="boton principal ancho" id="m-terminar" data-t="mandato_terminar"></button></div>
-  </div>
-  <div id="m-recibo" class="oculto">
-    <div class="tarjeta">
-      <div class="titulo" data-t="recibo_titulo"></div>
-      <p class="pequeno" id="r-cuentas" style="margin:8px 0"></p>
-      <p class="explica pequeno" data-t="recibo_explica"></p>
-      <p class="explica pequeno" data-t="recibo_cobertura"></p>
-      <p class="pequeno mono" id="r-huella"></p>
-      <div class="recibo" id="r-json"></div>
-      <div class="fila-acciones"><button class="boton principal" id="r-guardar" data-t="recibo_guardar"></button><button class="boton" id="r-nuevo" data-t="mandato_nueva"></button></div>
-      <p class="explica pequeno" id="r-ruta" style="margin-top:8px"></p>
-    </div>
-  </div>
-</section>
-
-<section class="vista" id="v-tachon" data-titulo="tachon">
-  <p class="explica" data-t="tachon_explica"></p>
-  <ol class="pasos-guia">
-    <li id="t-paso-1"><span class="etiqueta" data-t="tachon_paso_1"></span>
-      <textarea class="campo" id="t-texto" rows="5" data-t-ph="tachon_ph"></textarea>
-      <div id="t-resultado" class="oculto">
-        <p class="pequeno gris" data-t="tachon_resultado"></p>
-        <div class="tachado" id="t-salida"></div>
-        <table class="sust" id="t-tabla"></table>
-      </div>
-      <p class="explica oculto" id="t-nada" data-t="tachon_nada" style="margin-top:8px"></p>
-      <button class="oculto" id="t-tachar"></button></li>
-    <li id="t-paso-2" class="apagado"><span class="etiqueta" data-t="tachon_paso_2"></span>
-      <p class="explica" data-t="tachon_paso_2_explica"></p>
-      <div class="fila-acciones"><button class="boton principal" id="t-pegar" data-t="tachon_pegar" disabled></button><button class="boton" id="t-copiar" data-t="copiar" disabled></button></div></li>
-    <li id="t-paso-3"><span class="etiqueta" data-t="tachon_paso_3"></span>
-      <p class="explica" data-t="tachon_respuesta_explica"></p>
-      <button class="boton" id="t-respuesta" data-t="tachon_respuesta"></button>
-      <div class="tachado oculto" id="t-restaurada"></div></li>
-  </ol>
-  <p class="explica pequeno" data-t="tachon_limite" style="margin-top:16px"></p>
-</section>
-
-<section class="vista" id="v-datos" data-titulo="mis_datos">
-  <h2 style="margin-top:0" data-t="tinta"></h2>
-  <p class="explica" data-t="tinta_explica"></p>
-  <ul class="marcados" id="d-marcados"></ul>
-  <p class="vacio oculto" id="d-marcados-vacio" data-t="tinta_vacia"></p>
-  <form class="nuevo-dato" id="d-nuevo">
-    <select id="d-tipo"></select>
-    <input class="campo" id="d-valor" data-t-ph="tinta_valor_ph" spellcheck="false" autocomplete="off">
-    <button class="boton principal" data-t="tinta_anadir"></button>
-  </form>
-  <h2 data-t="libro"></h2>
-  <p class="explica" data-t="libro_explica"></p>
-  <div id="d-libro"></div>
-  <p class="vacio oculto" id="d-libro-vacio" data-t="libro_vacio"></p>
-</section>
-
 <section class="vista" id="v-ajustes" data-titulo="ajustes">
   <div class="ajuste">
     <input type="checkbox" class="interruptor" id="a-proteccion">
@@ -512,7 +366,6 @@ body.vidrio #e-pagina-cab, body.vidrio #e-sitio, body.vidrio #e-resumen, body.vi
     <p id="f-texto"></p>
     <div class="datos-lista" id="f-datos"></div>
     <p class="pequeno" id="f-corredor" style="color:var(--rojo)"></p>
-    <p class="pequeno oculto" id="f-mandato" data-t="formulario_mandato"></p>
     <label class="casilla" id="f-recordar-caja"><input type="checkbox" id="f-recordar"><span data-t="formulario_recordar"></span></label>
     <div class="fila-acciones"><button class="boton principal" id="f-enviar" data-t="formulario_enviar"></button><button class="boton corta" id="f-no" data-t="formulario_no"></button></div>
   </div>

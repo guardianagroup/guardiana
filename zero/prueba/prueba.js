@@ -120,6 +120,10 @@ function pantalla(nombre) {
 
 (async () => {
   await new Promise((r) => servidor.listen(PUERTO, '127.0.0.1', r));
+  // «Mis datos» left the browser (2 Nov 2026, the owner, 16:50); what a person marked before it left still protects.
+  // The test starts as someone who had marked their email («Tinta»), kept in the data folder as the section kept it.
+  fs.mkdirSync(path.join(base, 'datos'), { recursive: true });
+  fs.writeFileSync(path.join(base, 'datos', 'tinta.json'), JSON.stringify([{ tipo: 'correo', valor: 'ana@correo.co' }]));
   const reglas = ['sitio-prueba.test', '*.doubleclick.net', 'www.google-analytics.com', 'collect.otra-empresa.io', 'www.facebook.com', 'connect.facebook.net', 'www.google.com', 'analytics.tiktok.com', 'scripts.medidor-prueba.io', 'static.hotjar.com', 'marco-prueba.io'].map((h) => `MAP ${h} 127.0.0.1`).join(',');
   const proceso = spawn(exe, [], {
     env: { ...process.env, GUARDIANA_ZERO_DATOS: base, GUARDIANA_ZERO_DEPURA: '1', GUARDIANA_ZERO_ARGS: `--remote-debugging-port=9222 --host-resolver-rules="${reglas}"` },
@@ -280,13 +284,11 @@ function pantalla(nombre) {
   await panel.click('#f-enviar');
   comprueba(await hasta(() => registro.some((r) => r.ruta === '/enviar' && r.cuerpo.includes('ana%40correo.co'))), 'con el «Enviar», el formulario llega');
 
-  // Marked data: a page tries to send the person's email to another company.
-  await barra.click('#b-datos');
-  await hasta(() => panel.evaluate(() => document.querySelector('#v-datos').classList.contains('vista-activa')));
-  await panel.selectOption('#d-tipo', 'correo');
-  await panel.fill('#d-valor', 'ana@correo.co');
-  await panel.click('#d-nuevo button');
-  comprueba(await hasta(async () => (await panel.textContent('#d-marcados')).includes('an•••@correo.co')), 'el dato marcado aparece enmascarado');
+  // 2 Nov 2026 (the owner, 16:50): «Tarea para tu IA», «Preguntar a una IA sin dar tus datos» and «Mis datos» left
+  // the browser: no button, view or page of theirs is left in the bar or the panel.
+  comprueba(await barra.evaluate(() => !document.querySelector('#b-mandato, #b-tachon, #b-datos, #b-parar')), 'la barra ya no lleva la tarea para tu IA, la pregunta a una IA ni «Mis datos»');
+  comprueba(await panel.evaluate(() => !document.querySelector('#v-mandato, #v-tachon, #v-datos')), 'ni el panel sus vistas');
+  // Marked data (the email marked before, see tinta.json above): a page tries to send it to another company.
   const antes = registro.length;
   await web.evaluate(async (p) => {
     try { await fetch(`http://collect.otra-empresa.io:${p}/e`, { method: 'POST', body: JSON.stringify({ email: 'ana@correo.co' }) }); } catch (_) {}
@@ -405,6 +407,9 @@ function pantalla(nombre) {
   const nueva = await paginaQue(nav, (u) => u.endsWith('/inicio.html'));
   comprueba(await hasta(async () => (await nueva.getAttribute('#q', 'placeholder')) === 'Busca en la web o escribe una dirección'), 'la caja de búsqueda es nuestra');
   comprueba(await hasta(() => nueva.evaluate(() => (document.querySelector('#motor').selectedOptions[0] || {}).textContent === 'Google')), 'y lleva dentro el buscador, a la vista (Google por defecto desde el 2 nov 2026)');
+  const primeros = await nueva.evaluate(() => [...document.querySelectorAll('#motor option')].slice(0, 3).map((o) => o.textContent).join(', '));
+  comprueba(primeros === 'Google, Brave Search, DuckDuckGo', `los buscadores, en el orden del dueño: primero Google, después Brave, después DuckDuckGo (${primeros})`);
+  comprueba(await nueva.evaluate(() => !document.querySelector('.acciones, [data-vista="mandato"], [data-vista="tachon"], [data-vista="datos"]')), 'la pestaña nueva ya no lleva la tarea para tu IA, la pregunta a una IA ni «Mis datos»');
   comprueba(await hasta(async () => (await nueva.locator('#favs-rejilla .fav').count()) === 1), 'la web guardada con la estrella sale en la pestaña nueva');
   // The summary is on the first screen (12 Oct 2026): the companies cut today, with no click.
   comprueba(await hasta(async () => (await nueva.locator('#r-empresas li').count()) >= 1), 'el resumen sale directamente en la pestaña nueva, con las empresas');
@@ -496,8 +501,10 @@ function pantalla(nombre) {
 
   // Z4 (1.0.46): the wheel scrolls the page in front right after the bar had the focus.
   await barra.click('#b-menu');
+  // «Ir» (2 Nov 2026, the owner, 16:50): next to the address, for whoever does not press Enter; it does what Enter does.
+  comprueba(await barra.getByRole('button', { name: 'Ir', exact: true }).isVisible(), 'junto a la dirección está el botón «Ir», a la vista y con ese nombre');
   await barra.fill('#campo-dir', `${SITIO}/largo`);
-  await barra.press('#campo-dir', 'Enter');
+  await barra.click('#ir');
   const larga = await paginaQue(nav, (u) => u.startsWith(SITIO + '/largo'));
   await larga.waitForLoadState('load').catch(() => {});
   await espera(1000);
@@ -547,8 +554,8 @@ function pantalla(nombre) {
   comprueba(registro.some((r) => r.host === 'googleads.g.doubleclick.net'), 'pero GUARDIANA ZERO ya no corta: el marco de anuncios llega');
   comprueba(registro.some((r) => r.ruta.includes('utm_source=boletin')), 'ni se limpian las direcciones');
   comprueba(registro.filter((r) => r.ruta === '/cookies-rechazadas').length === rechazosAntes, 'ni se tocan los avisos de cookies');
-  await barra2.click('#b-mandato');
-  comprueba(await hasta(() => panel2.evaluate(() => document.querySelector('#v-licencia').classList.contains('vista-activa'))), 'los mandatos llevan a «Suscripción»');
+  await barra2.click('#b-licencia');
+  comprueba(await hasta(() => panel2.evaluate(() => document.querySelector('#v-licencia').classList.contains('vista-activa'))), 'el aviso de la barra lleva a «Suscripción»');
   comprueba(await hasta(async () => (await panel2.textContent('#l-detalle')).includes('La prueba terminó')), 'que explica qué dejó de hacer');
   await espera(500);
   pantalla('06-prueba-terminada.png');
