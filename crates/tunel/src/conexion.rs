@@ -12,9 +12,12 @@
 //!    again, and the cut-off switch with it: a server that does not answer never leaves the computer without internet.
 //!
 //! And once it is open, if the server stops answering (it restarted and no longer knows this computer's key): a new
-//! sign-up with the same server and the same keys ([`caida`], [`renueva`]), straight to the address already known
-//! ([`pide_alta_en`]), because with the cut-off switch on nothing resolves outside the tunnel. The tunnel and its
-//! cut-off switch stay as they are meanwhile: nothing leaves outside, and the computer is back in a few seconds.
+//! sign-up with the same server and fresh keys ([`caida`], [`renueva`]), straight to the address already known
+//! ([`pide_alta_en`]), because with the cut-off switch on nothing resolves outside the tunnel. For that one request the
+//! tunnel steps aside ([`Abierto::aparta`]: its default route off, so the request goes by the computer's own network,
+//! which the cut-off switch lets only this program use), and takes the route back at once ([`Abierto::vuelve`]).
+//! Fresh keys make the server a new peer: if the answer is lost, the old one is untouched. The cut-off switch stays on
+//! throughout: nothing leaves outside the tunnel, and the computer is back in a few seconds.
 
 use std::net::{Ipv4Addr, SocketAddr, ToSocketAddrs};
 use std::time::{Duration, Instant};
@@ -49,6 +52,17 @@ pub trait Abierto {
     /// # Errors
     /// What the system refused; the tunnel stays open, and closed to everything outside it.
     fn renueva(&mut self, llaves: &Llaves, alta: &Alta, extremo: SocketAddr) -> Result<(), String>;
+    /// Steps aside for a new sign-up: the tunnel's default route off, so this program's own request to the server goes
+    /// by the computer's own network (the cut-off switch, still on, lets nothing else out). [`Abierto::vuelve`] undoes it.
+    ///
+    /// # Errors
+    /// What the system refused.
+    fn aparta(&mut self) -> Result<(), String>;
+    /// The tunnel's default route back after [`Abierto::aparta`].
+    ///
+    /// # Errors
+    /// What the system refused: without the route, nothing goes out at all (the cut-off switch is still on).
+    fn vuelve(&mut self) -> Result<(), String>;
 }
 
 /// Why a connection could not be made.
@@ -297,10 +311,12 @@ fn en_ms(d: Duration) -> u64 {
     u64::try_from(d.as_millis()).unwrap_or(u64::MAX)
 }
 
-/// A new sign-up for a connection that dropped ([`caida`]), with the same server and the same keys: the sign-up made by
-/// `pide` (in the program, [`pide_alta_en`] at the server's known address), its answer checked, and the tunnel given the
-/// server's new preshared key and, if it changed, the new address, its cut-off switch on throughout. Then the server's
-/// handshake is waited for `espera`.
+/// A new sign-up for a connection that dropped ([`caida`]), with the same server and fresh keys (the server takes them as a
+/// new peer: if its answer is lost, the old peer and this computer's old configuration are untouched). The sign-up is made
+/// by `pide` (in the program, [`pide_alta_en`] at the server's known address) with the tunnel stepped aside
+/// ([`Abierto::aparta`]), which takes its default route back right after, whatever happened ([`Abierto::vuelve`]). Then
+/// the answer is checked, the tunnel takes the new keys, the server's new preshared key and its new address, and the
+/// server's handshake is waited for `espera`. The cut-off switch stays on throughout.
 ///
 /// # Errors
 /// [`ErrorConexion`] with the step that failed ([`ErrorConexion::SinSaludo`] when the handshake does not come). The
@@ -311,9 +327,15 @@ pub fn renueva<A: Abierto>(
     espera: Duration,
     ahora_ms: impl Fn() -> u64,
 ) -> Result<(), ErrorConexion> {
-    let (oferta, peticion) = alta::pide(&c.llaves);
-    let respuesta = pide(&c.pedida_a, &peticion)?;
-    let alta = alta::completa(&c.llaves, &oferta, &respuesta)
+    let nuevas = Llaves::nuevas().map_err(|e| ErrorConexion::Alta(e.to_string()))?;
+    let (oferta, peticion) = alta::pide(&nuevas);
+    c.tunel.aparta().map_err(ErrorConexion::Tunel)?;
+    let pedida = pide(&c.pedida_a, &peticion);
+    // the default route back before anything else, whether the sign-up went well or not
+    let vuelta = c.tunel.vuelve();
+    let respuesta = pedida?;
+    vuelta.map_err(ErrorConexion::Tunel)?;
+    let alta = alta::completa(&nuevas, &oferta, &respuesta)
         .map_err(|e| ErrorConexion::Respuesta(e.to_string()))?;
     if alta.host != c.servidor {
         // nothing resolves outside the tunnel now: another name would be another connection
@@ -323,8 +345,9 @@ pub fn renueva<A: Abierto>(
     }
     let antes = ahora_ms();
     c.tunel
-        .renueva(&c.llaves, &alta, c.extremo)
+        .renueva(&nuevas, &alta, c.extremo)
         .map_err(ErrorConexion::Tunel)?;
+    c.llaves = nuevas;
     c.direccion = alta.direccion;
     c.caduca_ms = alta.caduca_ms;
     let limite = Instant::now() + espera;
@@ -380,6 +403,8 @@ mod tests {
         psk: [u8; 32],
         renovado: Option<Ipv4Addr>,
         tras_renovar: Option<u32>,
+        /// What it was asked, in order: «aparta», «vuelve», «renueva».
+        pasos: Rc<std::cell::RefCell<Vec<&'static str>>>,
     }
 
     impl Abierto for Falso {
@@ -398,10 +423,19 @@ mod tests {
             extremo: SocketAddr,
         ) -> Result<(), String> {
             assert_eq!(extremo, "192.0.2.1:51820".parse().unwrap());
+            self.pasos.borrow_mut().push("renueva");
             self.psk = *alta.psk;
             self.renovado = Some(alta.direccion);
             self.preguntas.set(0);
             self.tras = self.tras_renovar;
+            Ok(())
+        }
+        fn aparta(&mut self) -> Result<(), String> {
+            self.pasos.borrow_mut().push("aparta");
+            Ok(())
+        }
+        fn vuelve(&mut self) -> Result<(), String> {
+            self.pasos.borrow_mut().push("vuelve");
             Ok(())
         }
     }
@@ -443,6 +477,7 @@ mod tests {
                     psk: *alta.psk,
                     renovado: None,
                     tras_renovar: None,
+                    pasos: Rc::default(),
                 })
             },
             espera,
@@ -598,6 +633,7 @@ mod tests {
                     psk: *alta.psk,
                     renovado: None,
                     tras_renovar,
+                    pasos: Rc::default(),
                 })
             },
             Duration::from_secs(5),
@@ -626,14 +662,20 @@ mod tests {
     #[test]
     fn una_conexion_caida_vuelve_con_un_alta_nueva_sin_cerrar_el_tunel() {
         let (mut c, srv, cerrado) = conectado(Some(1));
-        let mia = c.llaves.publica_base64();
+        let vieja = c.llaves.publica_base64();
         let k = Rc::new(Cell::new([0u8; 32]));
         let k2 = Rc::clone(&k);
+        let pasos = Rc::clone(&c.tunel.pasos);
+        let p2 = Rc::clone(&pasos);
+        let pedida = Rc::new(std::cell::RefCell::new(String::new()));
+        let pedida2 = Rc::clone(&pedida);
         renueva(
             &mut c,
-            |host, p| {
+            move |host, p| {
                 assert_eq!(host, "vpn.guardianagroup.com", "al mismo servidor");
-                assert_eq!(p.llave, mia, "con las mismas llaves");
+                assert_eq!(*p2.borrow(), vec!["aparta"], "con el túnel apartado");
+                assert_ne!(p.llave, vieja, "con llaves nuevas");
+                pedida2.borrow_mut().clone_from(&p.llave);
                 let (r, psk) = servidor(p, &srv, "10.66.4.4/32");
                 k2.set(psk);
                 Ok(r)
@@ -649,6 +691,34 @@ mod tests {
             k.get(),
             "la llave postcuántica nueva, la misma a los dos lados"
         );
+        assert_eq!(
+            c.llaves.publica_base64(),
+            *pedida.borrow(),
+            "se queda con las llaves nuevas"
+        );
+        assert_eq!(*pasos.borrow(), vec!["aparta", "vuelve", "renueva"]);
+        assert!(!cerrado.get());
+    }
+
+    #[test]
+    fn si_el_alta_nueva_falla_el_tunel_vuelve_y_sigue_con_sus_llaves() {
+        let (mut c, _, cerrado) = conectado(Some(1));
+        let vieja = c.llaves.publica_base64();
+        let pasos = Rc::clone(&c.tunel.pasos);
+        let r = renueva(
+            &mut c,
+            |_, _| Err(ErrorConexion::Alta("tiempo agotado".to_owned())),
+            ESPERA,
+            || 6,
+        );
+        assert_eq!(r, Err(ErrorConexion::Alta("tiempo agotado".to_owned())));
+        assert_eq!(
+            *pasos.borrow(),
+            vec!["aparta", "vuelve"],
+            "la ruta vuelve aunque falle"
+        );
+        assert_eq!(c.llaves.publica_base64(), vieja, "las llaves de antes");
+        assert_eq!(c.tunel.renovado, None);
         assert!(!cerrado.get());
     }
 

@@ -4,7 +4,8 @@
 //!
 //! - the tunnel's address on the adapter (`CreateUnicastIpAddressEntry`), and the old one taken off when a new sign-up
 //!   gives another (`DeleteUnicastIpAddressEntry`);
-//! - a route for each allowed network on the adapter, next hop none, metric 0 (`CreateIpForwardEntry2`);
+//! - a route for each allowed network on the adapter, next hop none, metric 0 (`CreateIpForwardEntry2`), and the default
+//!   ones taken off and put back around a new sign-up (`DeleteIpForwardEntry2`);
 //! - the adapter's settings: no router discovery, no duplicate address detection, no DHCPv6, its MTU, and metric 0 with
 //!   the automatic metric off when it carries the default route (`GetIpInterfaceEntry`, `SetIpInterfaceEntry`);
 //! - its DNS servers, the tunnel's resolvers, with Windows' own `netsh` (every Windows 10 and 11 has it; the newer
@@ -21,12 +22,12 @@
 
 use std::net::IpAddr;
 
-use windows_sys::Win32::Foundation::{ERROR_OBJECT_ALREADY_EXISTS, NO_ERROR};
+use windows_sys::Win32::Foundation::{ERROR_NOT_FOUND, ERROR_OBJECT_ALREADY_EXISTS, NO_ERROR};
 use windows_sys::Win32::NetworkManagement::IpHelper::{
-    CreateIpForwardEntry2, CreateUnicastIpAddressEntry, DeleteUnicastIpAddressEntry,
-    GetIpInterfaceEntry, InitializeIpForwardEntry, InitializeIpInterfaceEntry,
-    InitializeUnicastIpAddressEntry, SetIpInterfaceEntry, MIB_IPFORWARD_ROW2, MIB_IPINTERFACE_ROW,
-    MIB_UNICASTIPADDRESS_ROW,
+    CreateIpForwardEntry2, CreateUnicastIpAddressEntry, DeleteIpForwardEntry2,
+    DeleteUnicastIpAddressEntry, GetIpInterfaceEntry, InitializeIpForwardEntry,
+    InitializeIpInterfaceEntry, InitializeUnicastIpAddressEntry, SetIpInterfaceEntry,
+    MIB_IPFORWARD_ROW2, MIB_IPINTERFACE_ROW, MIB_UNICASTIPADDRESS_ROW,
 };
 use windows_sys::Win32::Networking::WinSock::{
     IpDadStatePreferred, RouterDiscoveryDisabled, AF_INET, AF_INET6, IN6_ADDR_0, IN_ADDR_0,
@@ -94,6 +95,33 @@ pub fn pon_direccion(luid: u64, direccion: &IpAddr, prefijo: u8) -> Result<(), E
     comprueba("CreateUnicastIpAddressEntry", unsafe {
         CreateUnicastIpAddressEntry(&fila)
     })
+}
+
+/// Takes the routes of `redes` (as [`pon_rutas`] put them) off the adapter `luid`. A route that is not there is not an
+/// error: what is asked is that it be gone.
+///
+/// # Errors
+/// [`ErrorRed`] with the call Windows refused.
+pub fn quita_rutas(luid: u64, redes: &[(IpAddr, u8)]) -> Result<(), ErrorRed> {
+    for (red, prefijo) in redes {
+        // SAFETY: a zeroed row, initialised by Windows' own function before any field is set.
+        let mut fila: MIB_IPFORWARD_ROW2 = unsafe { std::mem::zeroed() };
+        // SAFETY: a row owned here.
+        unsafe { InitializeIpForwardEntry(&mut fila) };
+        fila.InterfaceLuid.Value = luid;
+        fila.DestinationPrefix.Prefix = sockaddr(red);
+        fila.DestinationPrefix.PrefixLength = *prefijo;
+        fila.NextHop = sockaddr(&match red {
+            IpAddr::V4(_) => IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
+            IpAddr::V6(_) => IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED),
+        });
+        // SAFETY: a row initialised and filled above, owned for the call.
+        let r = unsafe { DeleteIpForwardEntry2(&fila) };
+        if r != ERROR_NOT_FOUND {
+            comprueba("DeleteIpForwardEntry2", r)?;
+        }
+    }
+    Ok(())
 }
 
 /// Takes `direccion` off the adapter `luid`.

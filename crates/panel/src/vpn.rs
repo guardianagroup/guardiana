@@ -6,11 +6,11 @@
 //! primer saludo del servidor; si no llega, el túnel se cierra y el equipo queda como estaba). Tarda unos segundos, así
 //! que «conectar» la empieza y la página pregunta por el estado. Al parar el servicio, el túnel se cierra con él.
 //!
-//! Mientras está abierta, cada [`VISTAZO`] se mira el último saludo del servidor (1.0.53): si deja de contestar
-//! (`guardiana_tunel::conexion::caida`), «sin respuesta», y la página lo dice con el botón de desconectar; si vuelve a
-//! contestar, otra vez «conectada». Nada sale fuera del túnel mientras tanto. El alta nueva automática
-//! (`guardiana_apps::tunel_win::renueva`) no se usa todavía: la segunda revisión del 2 nov 2026 vio que su petición
-//! entraría en el túnel caído (la ruta por defecto es la del túnel); va en la 1.0.54, con la ruta resuelta y probada.
+//! Mientras está abierta, cada [`VISTAZO`] se mira el último saludo del servidor: si deja de contestar
+//! (`guardiana_tunel::conexion::caida`), «sin respuesta» (1.0.53), y tras un margen por si vuelve solo (era la red de este
+//! equipo), «reconectando» (1.0.54): un alta nueva con llaves nuevas, con el túnel apartado solo para esa petición y el
+//! corte puesto todo el tiempo (`guardiana_apps::tunel_win::renueva`); si no sale, otra cada
+//! `guardiana_tunel::conexion::REINTENTO`. Nada sale fuera del túnel mientras tanto, y se puede desconectar siempre.
 //!
 //! Nada de esto guarda llaves ni a qué servidor se conectó nadie: el estado vive en la memoria del servicio.
 // Handlers answer axum's own `Response` on error, as every module of the panel does (see `api.rs`).
@@ -40,6 +40,8 @@ enum Fase {
     Conectada,
     /// El servidor dejó de contestar; el túnel y su corte siguen puestos.
     SinRespuesta,
+    /// Un alta nueva en curso, con el túnel y su corte puestos.
+    Reconectando,
     Error,
 }
 
@@ -50,6 +52,7 @@ impl Fase {
             Self::Conectando => "conectando",
             Self::Conectada => "conectada",
             Self::SinRespuesta => "sin_respuesta",
+            Self::Reconectando => "reconectando",
             Self::Error => "error",
         }
     }
@@ -177,33 +180,63 @@ impl Vpn {
 
 impl Vpn {
     /// El vigía de la conexión de la generación `gen`, en su propio hilo, hasta que se desconecte (o empiece otra): si el
-    /// servidor deja de contestar, «sin respuesta»; si vuelve, «conectada». No toca el túnel ni su corte.
+    /// servidor deja de contestar, «sin respuesta»; pasado [`guardiana_tunel::conexion::REINTENTO`] sin que vuelva solo, un
+    /// alta nueva («reconectando»), y otra cada `REINTENTO` mientras no salga; en cuanto contesta, «conectada».
     #[cfg(windows)]
     fn vigila(&self, gen: u64) {
         use guardiana_tunel::conexion;
+        // desde cuándo se le nota callado, y el último intento de alta nueva
+        let mut callado_desde: Option<u64> = None;
+        let mut intento: Option<u64> = None;
         loop {
             std::thread::sleep(VISTAZO);
             if self.generacion.load(Ordering::SeqCst) != gen {
                 return;
             }
             let ahora = u64::try_from(guardiana_core::time::now_ms()).unwrap_or(0);
-            let Ok(g) = self.conexion.lock() else {
+            let Ok(mut g) = self.conexion.lock() else {
                 return;
             };
             // desconectada: se acabó
-            let Some(c) = g.as_ref() else {
+            let Some(c) = g.as_mut() else {
                 return;
             };
             let saludo = c.tunel.estado().and_then(|e| e.ultimo_saludo_ms);
-            let callado = conexion::caida(ahora, c.desde_ms, saludo, None);
-            let fase = self.estado().fase;
-            if callado && fase == Fase::Conectada {
+            if !conexion::caida(ahora, c.desde_ms, saludo, None) {
+                callado_desde = None;
+                intento = None;
+                if self.estado().fase != Fase::Conectada {
+                    self.pon(conectada(c));
+                }
+                continue;
+            }
+            // callado: primero se dice, y se da un margen (puede ser la red de este equipo, que vuelve sola)
+            let desde = *callado_desde.get_or_insert(ahora);
+            if self.estado().fase == Fase::Conectada {
                 self.pon(Estado {
                     fase: Fase::SinRespuesta,
                     ..conectada(c)
                 });
-            } else if !callado && fase == Fase::SinRespuesta {
-                self.pon(conectada(c));
+            }
+            if !conexion::caida(ahora, c.desde_ms, saludo, Some(intento.unwrap_or(desde))) {
+                continue;
+            }
+            intento = Some(ahora);
+            self.pon(Estado {
+                fase: Fase::Reconectando,
+                ..conectada(c)
+            });
+            match guardiana_apps::tunel_win::renueva(c) {
+                Ok(()) => {
+                    callado_desde = None;
+                    intento = None;
+                    self.pon(conectada(c));
+                }
+                Err(e) => self.pon(Estado {
+                    fase: Fase::SinRespuesta,
+                    error: e.to_string(),
+                    ..conectada(c)
+                }),
             }
         }
     }
@@ -279,7 +312,7 @@ pub(crate) async fn conecta(
         };
         if matches!(
             e.fase,
-            Fase::Conectando | Fase::Conectada | Fase::SinRespuesta
+            Fase::Conectando | Fase::Conectada | Fase::SinRespuesta | Fase::Reconectando
         ) {
             return Ok(Json(
                 json!({ "ok": false, "motivo": "ya está conectada, o conectando" }),
@@ -309,7 +342,8 @@ pub(crate) async fn conecta(
 }
 
 /// `POST /api/vpn/desconecta`: cierra el túnel (el corte con él); mientras conecta, espera a que termine. Sin respuesta
-/// del servidor, también: es la salida para volver a la conexión normal.
+/// del servidor, también: es la salida para volver a la conexión normal (con un alta nueva en curso, espera a que acabe:
+/// unos segundos).
 pub(crate) async fn desconecta(
     State(state): State<Arc<AppState>>,
     _s: Session,
