@@ -11,6 +11,7 @@
 # quien actualiza. Al final escribe en el registro las fotos distintas entre sí (JPEG en base64, líneas
 # «FOTO|nombre|n|datos») para leerlas sin descargar artefactos, y la lista de ventanas.
 # Escrito el 2 Nov 2026 para la 1.0.54.
+# Ojo: en PowerShell $Antes y $antes (o $Nombre y $nombre) son la misma variable: dentro, otros nombres.
 param(
     [Parameter(Mandatory = $true)] [string]$Instalador,
     [string]$Antes = "",
@@ -161,8 +162,8 @@ $hechos = @{}
 while ((Get-Date) -lt $limite -and -not $acabado) {
     $ws = MiraVentanas
     foreach ($w in $ws) {
-        $nombre = try { $w.Current.Name } catch { "" }
-        if ($nombre -notmatch "GUARDIANA|Guardiana|Windows Installer|Instalaci") { continue }
+        $titulo = try { $w.Current.Name } catch { "" }
+        if ($titulo -notmatch "GUARDIANA|Guardiana|Windows Installer|Instalaci") { continue }
         Arbol $w
         try {
             # La casilla de aceptar: se marca, y si a los 4 s «Instalar» sigue apagado, se prueba de otra manera.
@@ -173,12 +174,12 @@ while ((Get-Date) -lt $limite -and -not $acabado) {
                 $n = $cb.Current.Name
                 if ($n -notmatch "acepto|accept|aceito" -or -not $cb.Current.IsEnabled) { continue }
                 $k = "casilla|$($w.Current.NativeWindowHandle)"
-                $antes = $hechos[$k]
-                if ($null -eq $antes) { $hechos[$k] = @{ n = 0; t = Get-Date }; Marca $cb $n 0; Start-Sleep -Milliseconds 800 }
-                elseif ($instalarApagado -and ((Get-Date) - $antes.t).TotalSeconds -gt 4 -and $antes.n -lt 3) {
-                    $antes.n++; $antes.t = Get-Date
-                    Evento "«Instalar» sigue apagado: otro intento ($($antes.n))"
-                    Marca $cb $n $antes.n; Start-Sleep -Milliseconds 800
+                $previo = $hechos[$k]
+                if ($null -eq $previo) { $hechos[$k] = @{ n = 0; t = Get-Date }; Marca $cb $n 0; Start-Sleep -Milliseconds 800 }
+                elseif ($instalarApagado -and ((Get-Date) - $previo.t).TotalSeconds -gt 4 -and $previo.n -lt 3) {
+                    $previo.n++; $previo.t = Get-Date
+                    Evento "«Instalar» sigue apagado: otro intento ($($previo.n))"
+                    Marca $cb $n $previo.n; Start-Sleep -Milliseconds 800
                 }
             }
             # En la pregunta de Windows por programas abiertos: la primera opción (cerrarlos), como haría casi todo el mundo.
@@ -208,7 +209,7 @@ while ((Get-Date) -lt $limite -and -not $acabado) {
         } catch {
             # Cada error distinto, una vez en el registro (antes se callaban todos y la prueba se quedaba quieta sin decir por qué).
             $m = "$($_.Exception.Message)"
-            if (-not $hechos.ContainsKey("error|$m")) { $hechos["error|$m"] = $true; Evento "error en la ventana «$nombre»: $m" }
+            if (-not $hechos.ContainsKey("error|$m")) { $hechos["error|$m"] = $true; Evento "error en la ventana «$titulo»: $m" }
         }
     }
     Start-Sleep -Milliseconds 150
