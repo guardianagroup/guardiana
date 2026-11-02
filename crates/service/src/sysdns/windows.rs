@@ -668,61 +668,91 @@ mod tests {
             "las interfaces y sus resolutores"
         );
 
-        // Every IPv4 interface, connected or not: DHCP's resolvers, and whether its adapter shows.
-        let texto = powershell(
-            "Get-NetIPInterface -AddressFamily IPv4 | ForEach-Object { [string]$_.InterfaceIndex + '|' + [string][bool](Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue) }",
-        )
-        .unwrap_or_default();
-        println!("interfaces IPv4: {texto}");
-        let filas: Vec<(u32, bool)> = texto
-            .lines()
-            .filter_map(|l| l.trim().split_once('|'))
-            .filter_map(|(n, v)| Some((n.parse().ok()?, v.eq_ignore_ascii_case("true"))))
-            .collect();
-        assert!(!filas.is_empty(), "{texto}");
-        let indices: Vec<u32> = filas.iter().map(|(n, _)| *n).collect();
-        let mut a: Vec<(String, Vec<IpAddr>)> = nativo::dhcp(&indices)
-            .map(|v| v.into_iter().map(|(n, l)| (n.to_string(), l)).collect())
-            .unwrap_or_default();
-        let mut b = dhcp_de_powershell(&indices).unwrap_or_default();
-        a.sort();
-        b.sort();
-        println!("DHCP nativo: {a:?}\nDHCP PowerShell: {b:?}");
-        assert_eq!(a, b, "lo que dio el DHCP");
+        // Every adapter Get-NetAdapter knows, hidden ones too, and what Windows' own functions say
+        // of each; all of it printed before anything is compared, so a runner that differs says why.
         let clase = nativo::adaptadores();
         assert!(clase.is_ok(), "{clase:?}");
         let clase = clase.unwrap_or_default();
-        for (n, se_ve) in &filas {
-            let g = nativo::guid_de_indice(*n).unwrap_or_default();
-            assert_eq!(nativo::visible(&clase, &g), *se_ve, "interfaz {n} ({g})");
-        }
-
-        // Every adapter Get-NetAdapter knows, hidden ones too: hidden for one is hidden for the other, and the GUID
-        // of its interface is the adapter's.
         let texto = powershell(
-            "Get-NetAdapter -IncludeHidden | ForEach-Object { [string]$_.InterfaceGuid + '|' + [string]$_.Hidden + '|' + [string]$_.ifIndex + '|' + [string]$_.InterfaceType + '|' + $_.Name }",
+            "Get-NetAdapter -IncludeHidden | ForEach-Object { [string]$_.InterfaceGuid + '|' + [string]$_.Hidden + '|' + [string]$_.ifIndex + '|' + [string]$_.InterfaceType + '|' + [string]$_.DeviceID + '|' + [string]$_.HardwareInterface + '|' + [string]$_.Virtual + '|' + [string]$_.ConnectorPresent + '|' + $_.Name + '|' + $_.InterfaceDescription }",
         )
         .unwrap_or_default();
-        println!("adaptadores: {texto}");
-        let mut vistos = 0;
+        let mut adaptadores: Vec<(String, bool)> = Vec::new();
         for l in texto.lines().map(str::trim).filter(|l| !l.is_empty()) {
             let p: Vec<&str> = l.split('|').collect();
             let (Some(g), Some(oculto)) = (p.first(), p.get(1)) else {
                 continue;
             };
-            vistos += 1;
-            assert_eq!(
-                nativo::visible(&clase, g),
-                !oculto.eq_ignore_ascii_case("true"),
-                "{l}"
+            let n = p.get(2).and_then(|x| x.parse::<u32>().ok());
+            let de_windows = n.and_then(nativo::guid_de_indice);
+            println!(
+                "adaptador {l} | nativo: clase {:?}, por DeviceID {:?}, GUID de su índice {de_windows:?}, conexión {}",
+                clase.get(&g.to_ascii_uppercase()),
+                p.get(4).and_then(|d| clase.get(&d.to_ascii_uppercase())),
+                nativo::tiene_conexion(g)
             );
-            if let Some(n) = p.get(2).and_then(|x| x.parse::<u32>().ok()) {
-                if let Some(de_windows) = nativo::guid_de_indice(n) {
-                    assert!(de_windows.eq_ignore_ascii_case(g), "{l}: {de_windows}");
+            adaptadores.push(((*g).to_owned(), oculto.eq_ignore_ascii_case("true")));
+        }
+        // Every IPv4 interface, connected or not: whether its adapter shows, and DHCP's resolvers.
+        let texto = powershell(
+            "Get-NetIPInterface -AddressFamily IPv4 | ForEach-Object { [string]$_.InterfaceIndex + '|' + [string][bool](Get-NetAdapter -InterfaceIndex $_.InterfaceIndex -ErrorAction SilentlyContinue) + '|' + $_.InterfaceAlias }",
+        )
+        .unwrap_or_default();
+        let filas: Vec<(u32, bool)> = texto
+            .lines()
+            .filter_map(|l| {
+                let mut p = l.trim().split('|');
+                Some((
+                    p.next()?.parse().ok()?,
+                    p.next()?.eq_ignore_ascii_case("true"),
+                ))
+            })
+            .collect();
+        for (n, se_ve) in &filas {
+            let g = nativo::guid_de_indice(*n);
+            println!(
+                "interfaz IPv4 {n}: Get-NetAdapter {se_ve}; nativo: GUID {g:?}, se ve {:?}",
+                g.as_deref().and_then(|g| nativo::se_ve(&clase, g))
+            );
+        }
+        assert!(!filas.is_empty(), "{texto}");
+        // What the class can tell is what Get-NetAdapter says; what it cannot tell, it does not guess.
+        let mut seguras: Vec<u32> = Vec::new();
+        let mut dudosa = false;
+        for (n, se_ve) in &filas {
+            match nativo::guid_de_indice(*n).and_then(|g| nativo::se_ve(&clase, &g)) {
+                Some(v) => {
+                    assert_eq!(v, *se_ve, "interfaz {n}");
+                    seguras.push(*n);
                 }
+                None if nativo::guid_de_indice(*n).is_none() => {
+                    assert!(!se_ve, "interfaz {n}: sin GUID y Get-NetAdapter la muestra");
+                    seguras.push(*n);
+                }
+                None => dudosa = true,
             }
         }
-        assert!(vistos > 0, "{texto}");
+        let todas: Vec<u32> = filas.iter().map(|(n, _)| *n).collect();
+        assert_eq!(
+            nativo::dhcp(&todas).is_err(),
+            dudosa,
+            "una interfaz dudosa pasa a PowerShell"
+        );
+        let mut a: Vec<(String, Vec<IpAddr>)> = nativo::dhcp(&seguras)
+            .map(|v| v.into_iter().map(|(n, l)| (n.to_string(), l)).collect())
+            .unwrap_or_default();
+        let mut b = dhcp_de_powershell(&seguras).unwrap_or_default();
+        a.sort();
+        b.sort();
+        println!("DHCP nativo: {a:?}\nDHCP PowerShell: {b:?}");
+        assert_eq!(a, b, "lo que dio el DHCP");
+        // And every adapter the class lists: hidden for one is hidden for the other.
+        assert!(!adaptadores.is_empty());
+        for (g, oculto) in &adaptadores {
+            if let Some(v) = nativo::se_ve(&clase, g) {
+                assert_eq!(v, !oculto, "{g}");
+            }
+        }
     }
 
     /// On a real Windows: the default gateway read from Windows directly is the one PowerShell
@@ -751,12 +781,15 @@ mod tests {
     #[ignore = "mide; lo lanza ligero.yml"]
     fn what_the_minutes_reading_costs() {
         let veces: u32 = 200;
+        // The interfaces whose adapter the class lists (the others go to PowerShell).
+        let clase = nativo::adaptadores().unwrap_or_default();
         let indices: Vec<u32> = powershell(
             "Get-NetIPInterface -AddressFamily IPv4 | ForEach-Object { $_.InterfaceIndex }",
         )
         .unwrap_or_default()
         .lines()
         .filter_map(|l| l.trim().parse().ok())
+        .filter(|n| nativo::guid_de_indice(*n).is_some_and(|g| nativo::se_ve(&clase, &g).is_some()))
         .collect();
         let t = std::time::Instant::now();
         for _ in 0..veces {

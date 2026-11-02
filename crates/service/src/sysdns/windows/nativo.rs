@@ -367,16 +367,32 @@ pub(crate) fn adaptadores() -> Result<HashMap<String, bool>, String> {
     Ok(out)
 }
 
-/// Whether `Get-NetAdapter` shows the adapter with this interface GUID: listed, and not hidden.
-pub(crate) fn visible(adaptadores: &HashMap<String, bool>, guid: &str) -> bool {
-    adaptadores.get(&guid.to_ascii_uppercase()) == Some(&false)
+/// Whether the network connections list an adapter with this GUID (its `Connection` key), for the
+/// Windows test's account of each adapter.
+#[cfg(test)]
+pub(crate) fn tiene_conexion(guid: &str) -> bool {
+    abre(&format!(
+        r"SYSTEM\CurrentControlSet\Control\Network\{{4D36E972-E325-11CE-BFC1-08002BE10318}}\{guid}\Connection"
+    ))
+    .is_some()
+}
+
+/// Whether `Get-NetAdapter` shows the adapter with this interface GUID, as far as the network class
+/// says it: `Some(true)` listed and not hidden, `Some(false)` hidden, `None` not listed there, and
+/// then only PowerShell can tell: the callers ask it (1.0.55: on GitHub's runner a virtual switch's
+/// adapter shows in `Get-NetAdapter` with no entry of its own in the class).
+pub(crate) fn se_ve(adaptadores: &HashMap<String, bool>, guid: &str) -> Option<bool> {
+    adaptadores
+        .get(&guid.to_ascii_uppercase())
+        .map(|oculto| !oculto)
 }
 
 /// What `PRIMARY_SCRIPT` prints, without PowerShell: one entry per connected IPv4 interface that is not the loopback
 /// nor a visible tunnel or virtual adapter and has resolvers, in the table's order.
 ///
 /// # Errors
-/// The call of Windows that failed; the caller then asks PowerShell.
+/// The call of Windows that failed, or a tunnel or virtual adapter whose visibility only PowerShell can tell; the
+/// caller then asks PowerShell.
 pub(crate) fn lineas() -> Result<Vec<Linea>, String> {
     let interfaces = interfaces_ipv4()?;
     let dns = resolutores()?;
@@ -392,10 +408,12 @@ pub(crate) fn lineas() -> Result<Vec<Linea>, String> {
             if clase.is_none() {
                 clase = Some(adaptadores()?);
             }
-            let visto = clase
-                .as_ref()
-                .zip(guid(luid))
-                .is_some_and(|(c, g)| visible(c, &g));
+            // An interface Windows has no GUID for is no adapter Get-NetAdapter could show.
+            let visto = match (clase.as_ref(), guid(luid)) {
+                (Some(c), Some(g)) => se_ve(c, &g)
+                    .ok_or_else(|| format!("sin saber si Get-NetAdapter muestra {g}"))?,
+                _ => false,
+            };
             if visto {
                 continue;
             }
@@ -424,7 +442,8 @@ pub(crate) fn guid_de_indice(indice: u32) -> Option<String> {
 /// adapter gives nothing, as there.
 ///
 /// # Errors
-/// When the network class cannot be read; the caller then asks PowerShell.
+/// When the network class cannot be read, or lists nothing for one of the interfaces (then only PowerShell can tell
+/// whether `Get-NetAdapter` shows it); the caller then asks PowerShell.
 pub(crate) fn dhcp(indices: &[u32]) -> Result<Vec<(u32, Vec<IpAddr>)>, String> {
     let clase = adaptadores()?;
     let mut out = Vec::new();
@@ -432,7 +451,7 @@ pub(crate) fn dhcp(indices: &[u32]) -> Result<Vec<(u32, Vec<IpAddr>)>, String> {
         let Some(g) = guid_de_indice(n) else {
             continue;
         };
-        if !visible(&clase, &g) {
+        if !se_ve(&clase, &g).ok_or_else(|| format!("sin saber si Get-NetAdapter muestra {g}"))? {
             continue;
         }
         let lista = abre(&format!("{INTERFACES_TCPIP}\\{g}"))

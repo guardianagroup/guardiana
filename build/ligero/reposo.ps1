@@ -19,9 +19,15 @@ Add-Type -Path (Join-Path $PSScriptRoot 'Medidor.cs')
 # Los procesos que arranque el servicio, desde que arranca: sus hijos directos, por nombre, con la hora.
 $arranques = [System.Collections.Concurrent.ConcurrentQueue[object]]::new()
 $desde = [System.Diagnostics.Stopwatch]::StartNew()
+# De cada powershell.exe, el principio de lo que se le pidió (si sigue vivo al preguntar), para saber qué parte del
+# programa lo arrancó.
 Register-CimIndicationEvent -ClassName Win32_ProcessStartTrace -SourceIdentifier ligero -Action {
     $e = $Event.SourceEventArgs.NewEvent
-    $Event.MessageData[0].Enqueue([pscustomobject]@{ pid = [int]$e.ProcessID; padre = [int]$e.ParentProcessID; nombre = [string]$e.ProcessName; s = $Event.MessageData[1].Elapsed.TotalSeconds })
+    $linea = ''
+    if ([string]$e.ProcessName -eq 'powershell.exe') {
+        try { $linea = [string](Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$e.ProcessID)" -ErrorAction Stop).CommandLine } catch {}
+    }
+    $Event.MessageData[0].Enqueue([pscustomobject]@{ pid = [int]$e.ProcessID; padre = [int]$e.ParentProcessID; nombre = [string]$e.ProcessName; s = $Event.MessageData[1].Elapsed.TotalSeconds; linea = $linea })
 } -MessageData @($arranques, $desde) | Out-Null
 
 & $Exe service install 2>&1 | ForEach-Object { Write-Host "service install: $_" }
@@ -105,10 +111,28 @@ $g1 = (Get-Process -Id $servicio).TotalProcessorTime.TotalMilliseconds
 Unregister-Event -SourceIdentifier ligero
 $udp.Close()
 
+# Qué parte del programa pidió cada PowerShell, por el principio de su orden.
+function QuienPidio([string]$l) {
+    if (-not $l) { return 'powershell (terminó antes de preguntar)' }
+    foreach ($p in @(
+            @('GUARDIANA_FIRMAS', 'firmas (en tanda)'), @('Get-AuthenticodeSignature', 'firmas'),
+            @('$v4 = @(', 'dns: ¿solo GUARDIANA?'),
+            @('$out = @()', 'dns: copia (snapshot)'), @('Get-NetAdapter -InterfaceIndex', 'dns: DHCP'),
+            @('Set-DnsClientServerAddress', 'dns: cambiar o devolver'), @('ExpandProperty ServerAddresses', 'dns: resolutores del sistema'),
+            @('Get-NetRoute', 'puerta de enlace'), @('Win32_ComputerSystem', 'carpeta de datos: cuenta'),
+            @('ReadToEnd', 'mirada lenta (vigilancia.ps1 o defensa.ps1)'), @('TimeZoneInfo', 'zona horaria'))) {
+        if ($l.Contains($p[0])) { return $p[1] }
+    }
+    return 'otro: ' + $l.Substring(0, [math]::Min(90, $l.Length))
+}
 $porNombre = [ordered]@{}
 $alArrancar = [ordered]@{}
+$porQuien = [ordered]@{}
 foreach ($a in @($arranques.ToArray() | Where-Object { $_.padre -eq $servicio })) {
-    if ($a.s -ge $inicioVentana) { $porNombre[$a.nombre] = 1 + [int]$porNombre[$a.nombre] }
+    if ($a.s -ge $inicioVentana) {
+        $porNombre[$a.nombre] = 1 + [int]$porNombre[$a.nombre]
+        if ($a.nombre -eq 'powershell.exe') { $q = QuienPidio $a.linea; $porQuien[$q] = 1 + [int]$porQuien[$q] }
+    }
     else { $alArrancar[$a.nombre] = 1 + [int]$alArrancar[$a.nombre] }
 }
 
@@ -130,6 +154,7 @@ $r = [ordered]@{
     guardiana_cpu_ms_min = [math]::Round(($g1 - $g0) / $min, 0)
     procesos_min = [math]::Round(($t1[1] - $t0[1]) / $min, 2)
     hijos_por_nombre = $porNombre
+    powershell_por_quien = $porQuien
     hijos_al_arrancar = $alArrancar
     segundos_al_arrancar = [math]::Round($inicioVentana, 0)
     equipo_cpu_ms_min = [math]::Round(($e1 - $e0) / $min, 0)
@@ -148,6 +173,8 @@ $r | ConvertTo-Json -Depth 4 | Write-Host
 $nombres = ($porNombre.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join ', '
 $nombresArranque = ($alArrancar.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join ', '
 Write-Host ("::notice title=arranque {0}::en los {1} s desde que arranca el servicio (con el dns --apply): {2}" -f $Etiqueta, $r.segundos_al_arrancar, $nombresArranque)
+$quien = ($porQuien.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join '; '
+Write-Host ("::notice title=powershell {0}::en la ventana, quién pidió cada PowerShell: {1}" -f $Etiqueta, $quien)
 Write-Host ("::notice title=reposo {0}::{1} min con el DNS {2}: servicio y lo que arranca {3} ms de procesador por minuto (guardiana.exe {4}), {5} procesos por minuto (hijos directos en la ventana: {6}); equipo entero {7} ms/min, WmiPrvSE {8} ms/min, Defender {9} ms/min; preguntas a 127.0.0.1: mediana {10} ms, p99 {11} ms, máximo {12} ms, {13} de más de 20 ms, {14} sin respuesta de {15}" -f $Etiqueta, $r.minutos, $(if ($aplicado) { 'apuntado a GUARDIANA' } else { 'SIN apuntar' }), $r.servicio_y_lo_que_arranca_cpu_ms_min, $r.guardiana_cpu_ms_min, $r.procesos_min, $nombres, $r.equipo_cpu_ms_min, $r.wmiprvse_cpu_ms_min, $r.msmpeng_cpu_ms_min, $r.p50_ms, $r.p99_ms, $r.max_ms, $r.mas_de_20_ms, $r.perdidas, ($tiempos.Count + $perdidas))
 if ($env:GITHUB_STEP_SUMMARY) {
     @("### Servicio en reposo: $Etiqueta", '', '```json', ($r | ConvertTo-Json -Depth 4), '```') -join "`n" | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding UTF8
