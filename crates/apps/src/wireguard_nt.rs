@@ -64,7 +64,13 @@ pub fn huella_de(ruta: &Path) -> Result<String, ErrorNt> {
     use sha2::{Digest, Sha256};
     let bytes =
         std::fs::read(ruta).map_err(|e| ErrorNt::Biblioteca(format!("{}: {e}", ruta.display())))?;
-    Ok(format!("{:x}", Sha256::digest(bytes)))
+    Ok(Sha256::digest(bytes)
+        .iter()
+        .fold(String::with_capacity(64), |mut s, b| {
+            use std::fmt::Write as _;
+            let _ = write!(s, "{b:02x}");
+            s
+        }))
 }
 
 /// Refuses any `wireguard.dll` but the one of [`HUELLA_DLL`].
