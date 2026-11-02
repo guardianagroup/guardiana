@@ -128,8 +128,15 @@ pub fn pide_alta_en(host: &str, en: SocketAddr, pide: &Pide) -> Result<Respuesta
 
 /// [`pide_alta_en`] with a whole address (a test server).
 fn pide_alta_a_en(url: &str, en: SocketAddr, pide: &Pide) -> Result<Respuesta, ErrorConexion> {
+    // never through a proxy of the environment: the fixed resolver would send it to the server's address
+    let directa = ureq::config::Config::builder()
+        .timeout_global(Some(PLAZO_ALTA))
+        .http_status_as_error(false)
+        .max_redirects(0)
+        .proxy(None)
+        .build();
     let agente = ureq::Agent::with_parts(
-        configuracion(),
+        directa,
         ureq::unversioned::transport::DefaultConnector::default(),
         Fija(en),
     );

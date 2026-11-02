@@ -6,15 +6,17 @@
 //! primer saludo del servidor; si no llega, el túnel se cierra y el equipo queda como estaba). Tarda unos segundos, así
 //! que «conectar» la empieza y la página pregunta por el estado. Al parar el servicio, el túnel se cierra con él.
 //!
-//! Mientras está abierta, cada [`VISTAZO`] se mira el último saludo del servidor: si deja de contestar (se reinició y ya
-//! no conoce la llave de este equipo), «reconectando»: un alta nueva con el mismo servidor y las mismas llaves, a su
-//! dirección ya sabida, sin quitar el corte (`guardiana_apps::tunel_win::renueva`), cada
-//! `guardiana_tunel::conexion::REINTENTO` hasta que vuelva o se desconecte. Nada sale fuera del túnel mientras tanto.
+//! Mientras está abierta, cada [`VISTAZO`] se mira el último saludo del servidor (1.0.53): si deja de contestar
+//! (`guardiana_tunel::conexion::caida`), «sin respuesta», y la página lo dice con el botón de desconectar; si vuelve a
+//! contestar, otra vez «conectada». Nada sale fuera del túnel mientras tanto. El alta nueva automática
+//! (`guardiana_apps::tunel_win::renueva`) no se usa todavía: la segunda revisión del 2 nov 2026 vio que su petición
+//! entraría en el túnel caído (la ruta por defecto es la del túnel); va en la 1.0.54, con la ruta resuelta y probada.
 //!
 //! Nada de esto guarda llaves ni a qué servidor se conectó nadie: el estado vive en la memoria del servicio.
 // Handlers answer axum's own `Response` on error, as every module of the panel does (see `api.rs`).
 #![allow(clippy::result_large_err)]
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 #[cfg(windows)]
 use std::time::Duration;
@@ -36,8 +38,8 @@ enum Fase {
     Apagada,
     Conectando,
     Conectada,
-    /// El servidor dejó de contestar: un alta nueva, con el túnel y el corte puestos.
-    Reconectando,
+    /// El servidor dejó de contestar; el túnel y su corte siguen puestos.
+    SinRespuesta,
     Error,
 }
 
@@ -47,7 +49,7 @@ impl Fase {
             Self::Apagada => "apagada",
             Self::Conectando => "conectando",
             Self::Conectada => "conectada",
-            Self::Reconectando => "reconectando",
+            Self::SinRespuesta => "sin_respuesta",
             Self::Error => "error",
         }
     }
@@ -71,6 +73,8 @@ const VISTAZO: Duration = Duration::from_secs(10);
 #[derive(Default)]
 pub(crate) struct Vpn {
     estado: Mutex<Estado>,
+    /// Cuántas conexiones se han empezado o cerrado: el vigía de una conexión se acaba en cuanto cambia.
+    generacion: AtomicU64,
     #[cfg(windows)]
     conexion: Mutex<Option<guardiana_apps::tunel_win::Conexion>>,
 }
@@ -107,7 +111,7 @@ impl Vpn {
     /// El estado para la página, con lo que el controlador dice del servidor cuando está conectada.
     fn foto(&self) -> Value {
         let e = self.estado();
-        // sin esperar: mientras se hace un alta nueva (unos segundos) la conexión está ocupada, y el estado sale sin bytes
+        // sin esperar: si la conexión está ocupada en ese momento, el estado sale sin bytes
         #[cfg(windows)]
         let par = self
             .conexion
@@ -131,9 +135,9 @@ impl Vpn {
         })
     }
 
-    /// La conexión entera, fuera del hilo de la página (tarda unos segundos).
+    /// La conexión entera, fuera del hilo de la página (tarda unos segundos). Dice si quedó abierta.
     #[cfg(windows)]
-    fn haz_conexion(&self, host: &str) {
+    fn haz_conexion(&self, host: &str) -> bool {
         let resultado = std::env::current_exe()
             .map_err(|e| e.to_string())
             .and_then(|exe| {
@@ -156,63 +160,50 @@ impl Vpn {
                     *g = Some(c);
                 }
                 self.pon(estado);
-                self.vigila();
+                true
             }
-            Err(error) => self.pon(Estado {
-                fase: Fase::Error,
-                servidor: host.to_owned(),
-                error,
-                ..Estado::default()
-            }),
+            Err(error) => {
+                self.pon(Estado {
+                    fase: Fase::Error,
+                    servidor: host.to_owned(),
+                    error,
+                    ..Estado::default()
+                });
+                false
+            }
         }
     }
 }
 
 impl Vpn {
-    /// Mientras la conexión siga abierta (este mismo hilo, hasta que se desconecte): si el servidor deja de contestar,
-    /// un alta nueva con el túnel y el corte puestos; si no sale, otra cada `REINTENTO`.
+    /// El vigía de la conexión de la generación `gen`, en su propio hilo, hasta que se desconecte (o empiece otra): si el
+    /// servidor deja de contestar, «sin respuesta»; si vuelve, «conectada». No toca el túnel ni su corte.
     #[cfg(windows)]
-    fn vigila(&self) {
+    fn vigila(&self, gen: u64) {
         use guardiana_tunel::conexion;
-        let mut intento: Option<u64> = None;
         loop {
             std::thread::sleep(VISTAZO);
+            if self.generacion.load(Ordering::SeqCst) != gen {
+                return;
+            }
             let ahora = u64::try_from(guardiana_core::time::now_ms()).unwrap_or(0);
-            let Ok(mut g) = self.conexion.lock() else {
+            let Ok(g) = self.conexion.lock() else {
                 return;
             };
             // desconectada: se acabó
-            let Some(c) = g.as_mut() else {
+            let Some(c) = g.as_ref() else {
                 return;
             };
             let saludo = c.tunel.estado().and_then(|e| e.ultimo_saludo_ms);
-            if !conexion::caida(ahora, c.desde_ms, saludo, None) {
-                // contesta: si estaba reconectando, volvió (o volvió sola: era la red de este equipo, no el servidor)
-                if self.estado().fase == Fase::Reconectando {
-                    intento = None;
-                    self.pon(conectada(c));
-                }
-                continue;
-            }
-            if !conexion::caida(ahora, c.desde_ms, saludo, intento) {
-                // callado, pero el último intento fue hace poco
-                continue;
-            }
-            intento = Some(ahora);
-            self.pon(Estado {
-                fase: Fase::Reconectando,
-                ..conectada(c)
-            });
-            match guardiana_apps::tunel_win::renueva(c) {
-                Ok(()) => {
-                    intento = None;
-                    self.pon(conectada(c));
-                }
-                Err(e) => self.pon(Estado {
-                    fase: Fase::Reconectando,
-                    error: e.to_string(),
+            let callado = conexion::caida(ahora, c.desde_ms, saludo, None);
+            let fase = self.estado().fase;
+            if callado && fase == Fase::Conectada {
+                self.pon(Estado {
+                    fase: Fase::SinRespuesta,
                     ..conectada(c)
-                }),
+                });
+            } else if !callado && fase == Fase::SinRespuesta {
+                self.pon(conectada(c));
             }
         }
     }
@@ -288,7 +279,7 @@ pub(crate) async fn conecta(
         };
         if matches!(
             e.fase,
-            Fase::Conectando | Fase::Conectada | Fase::Reconectando
+            Fase::Conectando | Fase::Conectada | Fase::SinRespuesta
         ) {
             return Ok(Json(
                 json!({ "ok": false, "motivo": "ya está conectada, o conectando" }),
@@ -300,16 +291,25 @@ pub(crate) async fn conecta(
             ..Estado::default()
         };
     }
+    let gen = state.vpn.generacion.fetch_add(1, Ordering::SeqCst) + 1;
     #[cfg(windows)]
     {
         let st = Arc::clone(&state);
-        tokio::task::spawn_blocking(move || st.vpn.haz_conexion(&host));
+        tokio::task::spawn_blocking(move || {
+            if st.vpn.haz_conexion(&host) {
+                // el vigía, en un hilo suyo: no retiene el cierre del programa
+                let st = Arc::clone(&st);
+                std::thread::spawn(move || st.vpn.vigila(gen));
+            }
+        });
     }
+    #[cfg(not(windows))]
+    let _ = gen;
     Ok(Json(json!({ "ok": true })))
 }
 
-/// `POST /api/vpn/desconecta`: cierra el túnel (el corte con él); mientras conecta, espera a que termine. Mientras
-/// reconecta, se puede: espera a que acabe el intento en curso (unos segundos) y cierra.
+/// `POST /api/vpn/desconecta`: cierra el túnel (el corte con él); mientras conecta, espera a que termine. Sin respuesta
+/// del servidor, también: es la salida para volver a la conexión normal.
 pub(crate) async fn desconecta(
     State(state): State<Arc<AppState>>,
     _s: Session,
@@ -319,9 +319,11 @@ pub(crate) async fn desconecta(
             json!({ "ok": false, "motivo": "está conectando: espera a que termine" }),
         ));
     }
+    // el vigía de esta conexión se acaba
+    state.vpn.generacion.fetch_add(1, Ordering::SeqCst);
     #[cfg(windows)]
     {
-        // fuera de los hilos de la página: si hay un alta nueva en curso, la conexión está ocupada unos segundos
+        // fuera de los hilos de la página
         let st = Arc::clone(&state);
         let _ = tokio::task::spawn_blocking(move || {
             let abierta = st.vpn.conexion.lock().ok().and_then(|mut g| g.take());
@@ -364,14 +366,14 @@ mod tests {
         assert_eq!(f["error"], "el servidor no contesta");
         // el servidor dejó de contestar con el túnel puesto (desde la 1.0.53)
         v.pon(Estado {
-            fase: Fase::Reconectando,
+            fase: Fase::SinRespuesta,
             servidor: "vpn.guardianagroup.com".into(),
             direccion: "10.66.0.7".into(),
             error: "el servidor aún no contesta".into(),
             ..Estado::default()
         });
         let f = v.foto();
-        assert_eq!(f["fase"], "reconectando");
+        assert_eq!(f["fase"], "sin_respuesta");
         assert_eq!(f["direccion"], "10.66.0.7");
     }
 }

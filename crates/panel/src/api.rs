@@ -63,6 +63,7 @@ pub(crate) fn with_ledger<T>(
 /// there is, else it waits for the first. Without them (they could not be opened), on the main one, as [`with_ledger`].
 /// For the long reads of the reports, so they do not wait behind each other or hold up the resolver's writes; `f` cannot
 /// write (SQLite refuses it on these connections), and the licence's status, which writes, stays on [`with_ledger`].
+/// The whole of `f` reads one snapshot ([`en_una_lectura`]).
 pub(crate) fn with_lectura<T>(
     state: &AppState,
     f: impl FnOnce(&Ledger) -> guardiana_core::Result<T>,
@@ -70,22 +71,36 @@ pub(crate) fn with_lectura<T>(
     let run = || {
         for lector in &state.lectores {
             if let Ok(guard) = lector.try_lock() {
-                return f(&guard).map_err(internal);
+                return en_una_lectura(&guard, f);
             }
         }
         if let Some(primero) = state.lectores.first() {
             let guard = primero
                 .lock()
                 .map_err(|_| internal("ledger reader lock poisoned"))?;
-            return f(&guard).map_err(internal);
+            return en_una_lectura(&guard, f);
         }
         let guard = state
             .ledger
             .lock()
             .map_err(|_| internal("ledger lock poisoned"))?;
-        f(&guard).map_err(internal)
+        en_una_lectura(&guard, f)
     };
     en_hilo_aparte(run)
+}
+
+/// `f` inside one read transaction: every query it makes sees the same moment of the ledger. On a connection of its
+/// own, a report that reads several tables (or a chain and its head) would otherwise see the writes the main connection
+/// made between two of them: the watch's chain checked as broken while a finding was being added (second review of 2 Nov
+/// 2026). Nothing is kept: the transaction is let go (a read has nothing to commit).
+fn en_una_lectura<T>(
+    l: &Ledger,
+    f: impl FnOnce(&Ledger) -> guardiana_core::Result<T>,
+) -> Result<T, Response> {
+    let lectura = l.connection().unchecked_transaction().map_err(internal)?;
+    let r = f(l).map_err(internal);
+    drop(lectura);
+    r
 }
 
 /// `f`, which blocks (a database, a process, the network), without holding up the resolver that
