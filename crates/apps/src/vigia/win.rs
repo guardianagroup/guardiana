@@ -23,9 +23,10 @@ use windows_sys::Win32::System::Diagnostics::ToolHelp::{
 };
 use windows_sys::Win32::System::Registry::{HKEY, HKEY_LOCAL_MACHINE, HKEY_USERS};
 use windows_sys::Win32::System::RemoteDesktop::{
-    ProcessIdToSessionId, WTSClientName, WTSClientProtocolType, WTSEnumerateSessionsW,
-    WTSFreeMemory, WTSQuerySessionInformationW, WTSUserName, WTS_CURRENT_SERVER_HANDLE,
-    WTS_INFO_CLASS, WTS_SESSION_INFOW,
+    ProcessIdToSessionId, WTSClientName, WTSClientProtocolType, WTSDomainName,
+    WTSEnumerateSessionsW, WTSFreeMemory, WTSGetActiveConsoleSessionId,
+    WTSQuerySessionInformationW, WTSUserName, WTS_CURRENT_SERVER_HANDLE, WTS_INFO_CLASS,
+    WTS_SESSION_INFOW,
 };
 
 use super::{de_registro, es_vigilado, Proceso, Sesion, Uso, CAPACIDADES};
@@ -170,6 +171,24 @@ fn texto_de(bytes: &[u8]) -> String {
         .take(256)
         .collect();
     String::from_utf16_lossy(&unidades)
+}
+
+/// La sesión de la consola (la pantalla y el teclado del propio equipo) y su cuenta,
+/// `sesión:dominio\\cuenta`; vacío cuando no hay nadie en ella. `None` si Windows no lo dijo.
+pub(super) fn cuenta_de_consola() -> Option<String> {
+    // SAFETY: sin argumentos; Windows dice qué sesión tiene la consola (0xFFFFFFFF: ninguna).
+    let sesion = unsafe { WTSGetActiveConsoleSessionId() };
+    if sesion == u32::MAX {
+        return Some(String::new());
+    }
+    let usuario = texto_de(&dato_de_sesion(sesion, WTSUserName)?);
+    if usuario.is_empty() {
+        return Some(String::new());
+    }
+    let dominio = dato_de_sesion(sesion, WTSDomainName)
+        .map(|b| texto_de(&b))
+        .unwrap_or_default();
+    Some(format!("{sesion}:{dominio}\\{usuario}"))
 }
 
 /// Las sesiones de Windows: su estado, su protocolo, su cuenta y desde dónde se conectan.

@@ -560,6 +560,21 @@ pub fn lee_rapido(ahora: i64) -> Lectura {
     }
 }
 
+/// Quién está en la consola de este equipo (su pantalla y su teclado), para notar que alguien
+/// entró o cambió de cuenta sin preguntárselo a PowerShell: `sesión:dominio\\cuenta`, vacío cuando
+/// no hay nadie (1.0.55). `None` fuera de Windows o si Windows no lo dijo.
+#[must_use]
+pub fn cuenta_de_consola() -> Option<String> {
+    #[cfg(windows)]
+    {
+        win::cuenta_de_consola()
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
 /// La mirada lenta: Microsoft Defender y el Centro de seguridad, con un PowerShell de solo
 /// lectura y prioridad baja (uno o dos segundos). Llamar fuera del bucle asíncrono.
 ///

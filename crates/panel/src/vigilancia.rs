@@ -69,6 +69,9 @@ pub(crate) struct Vigilancia {
     estado: Mutex<Estado>,
     /// The page asked for a slow look now.
     pedido: AtomicBool,
+    /// Wakes the watch when the page asks (1.0.55): it sleeps its quarter minute in one go instead
+    /// of waking every second to see whether somebody asked.
+    aviso: Arc<tokio::sync::Notify>,
     /// A slow look is running.
     corriendo: AtomicBool,
 }
@@ -143,15 +146,14 @@ impl Vigilancia {
                     ultima_lenta = Some(tokio::time::Instant::now());
                     lanza_lenta(&st);
                 }
+                let aviso = Arc::clone(&st.vigilancia.aviso);
                 drop(st);
-                // Short naps, so a «Comprobar ahora» does not wait for the next quarter minute.
-                for _ in 0..CADA_RAPIDA.as_secs() {
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                    match debil.upgrade() {
-                        Some(st) if st.vigilancia.pedido.load(Ordering::SeqCst) => break,
-                        Some(_) => {}
-                        None => return,
-                    }
+                // Until the next quarter minute, or at once when the page asks («Comprobar ahora»).
+                // Until 1.0.55 it woke every second to see whether it had (the owner, 2 Nov 2026:
+                // «se me traba»).
+                tokio::select! {
+                    () = tokio::time::sleep(CADA_RAPIDA) => {}
+                    () = aviso.notified() => {}
                 }
             }
         });
@@ -898,6 +900,7 @@ pub(crate) async fn visto(
 /// `POST /api/vigilancia/ahora`: look at the slow things now (the page's «Comprobar ahora»).
 pub(crate) async fn ahora(State(state): State<Arc<AppState>>, _s: Session) -> ApiResult<Value> {
     state.vigilancia.pedido.store(true, Ordering::SeqCst);
+    state.vigilancia.aviso.notify_one();
     Ok(Json(json!({ "pedido": true })))
 }
 

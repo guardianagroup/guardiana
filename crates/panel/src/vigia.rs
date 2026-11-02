@@ -75,8 +75,9 @@ pub(crate) struct Vigia {
     lectura: Mutex<Option<Lectura>>,
     /// Cuándo se le preguntó por última vez (ms Unix).
     pedido: AtomicI64,
-    /// Alguien preguntó tras un rato sin hacerlo: que mire ya.
-    despierta: AtomicBool,
+    /// Alguien preguntó tras un rato sin hacerlo: que mire ya. Despierta al bucle en el acto
+    /// (1.0.55): duerme su espera de una vez, en vez de despertarse cada segundo a ver.
+    despierta: Arc<tokio::sync::Notify>,
     /// Una mirada lenta está en curso.
     defensa_corriendo: AtomicBool,
 }
@@ -110,17 +111,15 @@ impl Vigia {
                 if toca {
                     lanza_defensa(&st);
                 }
+                let despierta = Arc::clone(&st.vigia.despierta);
                 drop(st);
                 let espera = if activo { CADA_ACTIVO } else { CADA_REPOSO };
-                // Siestas de un segundo: una pregunta tras un rato despierta al vigía enseguida,
-                // y al cerrar el panel el bucle termina sin retenerlo.
-                for _ in 0..espera.as_secs() {
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                    match debil.upgrade() {
-                        Some(st) if st.vigia.despierta.swap(false, Ordering::SeqCst) => break,
-                        Some(_) => {}
-                        None => return,
-                    }
+                // Una pregunta tras un rato despierta al vigía en el acto, y al cerrar el panel el
+                // bucle termina sin retenerlo (a la vuelta siguiente). Hasta la 1.0.55 se despertaba
+                // cada segundo a ver si alguien había preguntado (el dueño, 2 nov 2026: «se me traba»).
+                tokio::select! {
+                    () = tokio::time::sleep(espera) => {}
+                    () = despierta.notified() => {}
                 }
             }
         });
@@ -277,7 +276,7 @@ pub(crate) async fn ver(State(state): State<Arc<AppState>>, req: Request) -> Res
     let ahora = now_ms();
     let antes = state.vigia.pedido.swap(ahora, Ordering::SeqCst);
     if ahora - antes >= ACTIVO_MS {
-        state.vigia.despierta.store(true, Ordering::SeqCst);
+        state.vigia.despierta.notify_one();
     }
     // El navegador que pregunta: por la conexión (Windows dice qué programa la abrió) y, si no se
     // pudo, por cómo se presenta.

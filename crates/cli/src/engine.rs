@@ -2273,6 +2273,8 @@ async fn run_once<F: Future<Output = ()>>(
     let keep_salud = Arc::clone(&salud);
     let mut aparte = Aparte::default();
     let keep_block_mode = block_mode;
+    // The console's account the data folder was last opened to, and when (1.0.55).
+    let mut endurecida: Option<(String, Instant)> = None;
     let (reconfigure_tx, mut reconfigure) = tokio::sync::oneshot::channel::<()>();
     let (caducado_tx, mut caducado) = tokio::sync::oneshot::channel::<()>();
     let housekeeping = tokio::spawn(async move {
@@ -2410,8 +2412,20 @@ async fn run_once<F: Future<Output = ()>>(
                 _ = ten_min.tick() => {
                     // On Windows the console user may have logged in after the
                     // service started: give them access to their own data.
+                    // Since 1.0.55 only when the console's account changed (read from Windows
+                    // directly), or an hour went by, or the last time did not reach whoever is
+                    // there: each time is a PowerShell and three icacls, and an account that
+                    // already has its access has it (the owner, 2 Nov 2026: «se me traba»).
+                    // Off the threads that answer queries, as the minute's calls.
                     if let Some(dir) = &keep_dir {
-                        let _ = paths::harden_data_dir(dir);
+                        let cuenta = guardiana_apps::vigia::cuenta_de_consola();
+                        if toca_endurecer(cuenta.as_deref(), endurecida.as_ref()) {
+                            let hecho = aparte_del_resolutor(|| paths::harden_data_dir_con_cuenta(dir));
+                            endurecida = match (hecho, cuenta) {
+                                (Ok(dada), Some(c)) if dada || c.is_empty() => Some((c, Instant::now())),
+                                _ => None,
+                            };
+                        }
                     }
                 }
                 _ = hour.tick() => {
@@ -2515,6 +2529,19 @@ async fn run_once<F: Future<Output = ()>>(
     }
     policy_al_cerrar.al_cerrar();
     Ok(exit)
+}
+
+/// How long the data folder is left as it was opened when the console's account is the same.
+const REENDURECER: Duration = Duration::from_secs(60 * 60);
+
+/// Whether the data folder must be opened again to the console's account: when it cannot be told
+/// who is there (outside Windows, or Windows did not say), when it was not done yet or the last
+/// time did not reach whoever is there, when the account changed, and at least once an hour.
+fn toca_endurecer(cuenta: Option<&str>, endurecida: Option<&(String, Instant)>) -> bool {
+    match (cuenta, endurecida) {
+        (Some(c), Some((antes, cuando))) => c != antes || cuando.elapsed() >= REENDURECER,
+        _ => true,
+    }
 }
 
 /// Run a call that talks to the system (PowerShell, resolvectl, networksetup: one to three
@@ -3182,5 +3209,37 @@ mod tests_url_host {
             url_host(IpAddr::V6(Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 1))),
             "[fe80::1]"
         );
+    }
+}
+
+#[cfg(test)]
+mod tests_endurecer {
+    use super::{toca_endurecer, REENDURECER};
+    use std::time::Instant;
+
+    /// The data folder is opened again to the console's account only when it has to (1.0.55): not
+    /// knowing who is there, not done yet, another account, nobody any more, or an hour later.
+    #[test]
+    fn the_data_folder_is_opened_again_only_when_it_has_to() {
+        let ahora = Instant::now();
+        let hecha = ("1:PC\\ana".to_owned(), ahora);
+        assert!(toca_endurecer(None, Some(&hecha)), "sin saber quién está");
+        assert!(toca_endurecer(Some("1:PC\\ana"), None), "aún no se hizo");
+        assert!(
+            !toca_endurecer(Some("1:PC\\ana"), Some(&hecha)),
+            "la misma cuenta"
+        );
+        assert!(
+            toca_endurecer(Some("2:PC\\luis"), Some(&hecha)),
+            "otra cuenta"
+        );
+        assert!(toca_endurecer(Some(""), Some(&hecha)), "ya no hay nadie");
+        if let Some(antes) = ahora.checked_sub(REENDURECER) {
+            let vieja = ("1:PC\\ana".to_owned(), antes);
+            assert!(
+                toca_endurecer(Some("1:PC\\ana"), Some(&vieja)),
+                "una hora después"
+            );
+        }
     }
 }
