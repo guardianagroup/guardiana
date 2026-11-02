@@ -125,6 +125,17 @@ pub mod peso {
     pub const TODO: u8 = 0;
 }
 
+// The order the plan relies on, checked when compiling: the service, the tunnel, loopback and the network underneath
+// above the DNS rules, the tunnel's DNS above any other DNS, and everything blocked below all of them.
+const _: () = assert!(
+    peso::SERVICIO > peso::TUNEL
+        && peso::TUNEL > peso::BUCLE
+        && peso::BUCLE > peso::RED
+        && peso::RED > peso::DNS_SI
+        && peso::DNS_SI > peso::DNS_NO
+        && peso::DNS_NO > peso::TODO
+);
+
 fn en_ale(nombre: &'static str, condiciones: &[Condicion], permite: bool, peso: u8) -> Vec<Filtro> {
     Capa::ALE
         .iter()
@@ -346,8 +357,6 @@ mod tests {
             .filter(|f| f.nombre == "GUARDIANA VPN: otro DNS")
             .count();
         assert_eq!(no, 8);
-        // y el DNS bloqueado queda por encima de «todo lo demás» y por debajo del túnel y del servicio
-        assert!(peso::DNS_NO > peso::TODO && peso::DNS_SI < peso::BUCLE);
     }
 
     #[test]
