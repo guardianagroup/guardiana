@@ -95,8 +95,8 @@ async fn one_language_for_the_whole_program_kept_by_the_service() {
     assert_eq!(v["idioma"], "es");
     assert_eq!(v["elegido"], true);
 
-    // Only the three languages.
-    let (st, _) = pide(
+    // Any of the 42 languages (2 Nov 2026), and nothing else.
+    let (st, b) = pide(
         addr,
         &tk,
         "PUT",
@@ -104,9 +104,29 @@ async fn one_language_for_the_whole_program_kept_by_the_service() {
         r#"{"idioma":"fr"}"#,
     )
     .await;
+    assert_eq!(st, 200, "{b}");
+    let (_, b) = pide(addr, &tk, "GET", "/api/ajustes/idioma", "").await;
+    assert!(b.contains("\"fr\""), "{b}");
+    let (st, _) = pide(
+        addr,
+        &tk,
+        "PUT",
+        "/api/ajustes/idioma",
+        r#"{"idioma":"xx"}"#,
+    )
+    .await;
     assert_eq!(st, 400);
     let (_, b) = pide(addr, &tk, "GET", "/api/ajustes/idioma", "").await;
-    assert!(b.contains("\"es\""), "{b}");
+    assert!(b.contains("\"fr\""), "{b}");
+    let (st, b) = pide(
+        addr,
+        &tk,
+        "PUT",
+        "/api/ajustes/idioma",
+        r#"{"idioma":"es"}"#,
+    )
+    .await;
+    assert_eq!(st, 200, "{b}");
 
     // R11: «/» (where every launch path lands) is En vivo, the globe; the 60-second snapshot
     // keeps its own address.

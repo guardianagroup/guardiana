@@ -4097,13 +4097,20 @@ fn the_language_of_the_program_reaches_zero_only_from_guardianas_own_panel() {
     );
     assert_eq!(s.textos().idioma().codigo(), "en");
     assert!(del_tipo(&o, Origen::Barra, "textos").is_some());
-    // Nothing else is taken as a language.
+    // Any of the 42 languages (2 Nov 2026)…
     let _ = s.mensaje(
         Origen::Pestana(panel),
         "http://127.0.0.1:7443/",
         r#"{"tipo":"zg_idioma","idioma":"fr"}"#,
     );
-    assert_eq!(s.textos().idioma().codigo(), "en");
+    assert_eq!(s.textos().idioma().codigo(), "fr");
+    // …and nothing else is taken as a language.
+    let _ = s.mensaje(
+        Origen::Pestana(panel),
+        "http://127.0.0.1:7443/",
+        r#"{"tipo":"zg_idioma","idioma":"xx"}"#,
+    );
+    assert_eq!(s.textos().idioma().codigo(), "fr");
 }
 
 #[test]
