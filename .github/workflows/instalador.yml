@@ -57,5 +57,7 @@ jobs:
       - name: instalar como una persona, foto a foto
         shell: powershell
         run: |
-          $antes = if ("${{ matrix.caso }}" -eq "actualiza") { (Resolve-Path inst/antes.msi).Path } else { "" }
-          & powershell -NoProfile -ExecutionPolicy Bypass -File build/cliente/fotos_instalador.ps1 -Instalador (Resolve-Path inst/nueva.msi).Path -Antes $antes -Nombre "${{ matrix.caso }}"
+          # -Antes solo si hay versión de antes: Windows PowerShell no pasa un argumento vacío (y el script se paraba sin hacer nada)
+          $argumentos = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "build/cliente/fotos_instalador.ps1", "-Instalador", (Resolve-Path inst/nueva.msi).Path, "-Nombre", "${{ matrix.caso }}")
+          if ("${{ matrix.caso }}" -eq "actualiza") { $argumentos += @("-Antes", (Resolve-Path inst/antes.msi).Path) }
+          & powershell @argumentos

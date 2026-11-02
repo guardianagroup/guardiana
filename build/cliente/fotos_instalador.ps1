@@ -67,7 +67,33 @@ $esBoton = New-Object System.Windows.Automation.PropertyCondition($A::ControlTyp
 $esCasilla = New-Object System.Windows.Automation.PropertyCondition($A::ControlTypeProperty, [System.Windows.Automation.ControlType]::CheckBox)
 $esRadio = New-Object System.Windows.Automation.PropertyCondition($A::ControlTypeProperty, [System.Windows.Automation.ControlType]::RadioButton)
 
+# Un clic de verdad con el ratón, para lo que la automatización no sabe pulsar.
+Add-Type -TypeDefinition @"
+using System; using System.Runtime.InteropServices;
+public static class Raton {
+  [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")] static extern void mouse_event(uint f, uint x, uint y, uint d, UIntPtr e);
+  public static void Clic(int x, int y) { SetCursorPos(x, y); System.Threading.Thread.Sleep(80); mouse_event(2, 0, 0, 0, UIntPtr.Zero); mouse_event(4, 0, 0, 0, UIntPtr.Zero); }
+}
+"@
+
 $vistas = @{}
+$arboles = @{}
+function Arbol($w) {
+    # Una vez por ventana: sus controles (tipo, nombre, si está activo y qué sabe hacer), para ver en el registro qué hay
+    # en cada pantalla aunque la foto no lo diga.
+    $clave = try { "$($w.Current.NativeWindowHandle)|$($w.Current.Name)" } catch { return }
+    if ($arboles.ContainsKey($clave)) { return }
+    $arboles[$clave] = $true
+    foreach ($e in $w.FindAll([System.Windows.Automation.TreeScope]::Descendants, $todas)) {
+        try {
+            $c = $e.Current
+            $pat = ($e.GetSupportedPatterns() | ForEach-Object { $_.ProgrammaticName -replace "PatternIdentifiers.Pattern", "" }) -join ","
+            Evento "  control: $($c.ControlType.ProgrammaticName -replace 'ControlType.', '') «$($c.Name)» activo=$($c.IsEnabled) [$pat]"
+        } catch { }
+    }
+}
+
 function MiraVentanas {
     # Cada ventana nueva de primer nivel, una vez: título, clase y programa.
     $ws = $raiz.FindAll([System.Windows.Automation.TreeScope]::Children, $todas)
@@ -90,7 +116,27 @@ function Pulsa($e, [string]$que) {
         $e.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
         Evento "pulsado: $que"
         return $true
-    } catch { return $false }
+    } catch { Evento "no se pudo pulsar «$que»: $($_.Exception.Message)"; return $false }
+}
+
+# Marcar la casilla de aceptar, con lo que haga falta: la automatización (Toggle o Invoke) y, si la casilla no cambia,
+# un clic de ratón en su cuadrado, como una persona. Cada intento queda en el registro.
+function Marca($cb, [string]$n, [int]$intento) {
+    if ($intento -eq 0) {
+        try {
+            $t = $cb.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
+            if ($t.Current.ToggleState -ne [System.Windows.Automation.ToggleState]::On) { $t.Toggle() }
+            Evento "marcada (Toggle): $n"; return
+        } catch { Evento "Toggle no: $($_.Exception.Message)" }
+    }
+    if ($intento -le 1) {
+        try { $cb.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke(); Evento "marcada (Invoke): $n"; return } catch { Evento "Invoke no: $($_.Exception.Message)" }
+    }
+    try {
+        $r = $cb.Current.BoundingRectangle
+        [Raton]::Clic([int]($r.X + 7), [int]($r.Y + $r.Height / 2))
+        Evento "marcada (clic en $([int]($r.X + 7)),$([int]($r.Y + $r.Height / 2))): $n"
+    } catch { Evento "clic no: $($_.Exception.Message)" }
 }
 
 $sigue = @("Instalar", "Install", "Aceptar", "OK", "Siguiente", "Next")
@@ -106,13 +152,20 @@ while ((Get-Date) -lt $limite -and -not $acabado) {
     foreach ($w in $ws) {
         $nombre = try { $w.Current.Name } catch { "" }
         if ($nombre -notmatch "GUARDIANA|Guardiana|Windows Installer|Instalaci") { continue }
+        Arbol $w
         try {
-            # Casillas para aceptar, marcadas una vez.
+            # La casilla de aceptar: se marca, y si a los 4 s «Instalar» sigue apagado, se prueba de otra manera.
+            $instalarApagado = @($w.FindAll([System.Windows.Automation.TreeScope]::Descendants, $esBoton) | Where-Object { ($_.Current.Name -replace "&", "").Trim() -match "^(Instalar|Install)$" -and -not $_.Current.IsEnabled }).Count -gt 0
             foreach ($cb in $w.FindAll([System.Windows.Automation.TreeScope]::Descendants, $esCasilla)) {
                 $n = $cb.Current.Name
-                if ($n -match "acepto|accept|aceito" -and $cb.Current.IsEnabled) {
-                    $t = $cb.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
-                    if ($t.Current.ToggleState -ne [System.Windows.Automation.ToggleState]::On) { $t.Toggle(); Evento "marcada: $n"; Start-Sleep -Milliseconds 600 }
+                if ($n -notmatch "acepto|accept|aceito" -or -not $cb.Current.IsEnabled) { continue }
+                $k = "casilla|$($w.Current.NativeWindowHandle)"
+                $antes = $hechos[$k]
+                if ($null -eq $antes) { $hechos[$k] = @{ n = 0; t = Get-Date }; Marca $cb $n 0; Start-Sleep -Milliseconds 800 }
+                elseif ($instalarApagado -and ((Get-Date) - $antes.t).TotalSeconds -gt 4 -and $antes.n -lt 3) {
+                    $antes.n++; $antes.t = Get-Date
+                    Evento "«Instalar» sigue apagado: otro intento ($($antes.n))"
+                    Marca $cb $n $antes.n; Start-Sleep -Milliseconds 800
                 }
             }
             # En la pregunta de Windows por programas abiertos: la primera opción (cerrarlos), como haría casi todo el mundo.
@@ -139,7 +192,11 @@ while ((Get-Date) -lt $limite -and -not $acabado) {
                 Start-Sleep -Seconds 2
                 if (Pulsa $porNombre[$cual] $cual) { $hechos["$($w.Current.NativeWindowHandle)|$cual"] = $true }
             }
-        } catch { }
+        } catch {
+            # Cada error distinto, una vez en el registro (antes se callaban todos y la prueba se quedaba quieta sin decir por qué).
+            $m = "$($_.Exception.Message)"
+            if (-not $hechos.ContainsKey("error|$m")) { $hechos["error|$m"] = $true; Evento "error en la ventana «$nombre»: $m" }
+        }
     }
     Start-Sleep -Milliseconds 150
 }
