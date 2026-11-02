@@ -5,12 +5,12 @@
 //! Usage: `guardiana-tunel-servidor --punto motor.guardianagroup.com:51820 [--interfaz wg0] [--escucha 127.0.0.1:8793]
 //! [--dns 10.66.0.1]`
 
-use std::net::{Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 
 use axum::extract::{DefaultBodyLimit, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Json, Router};
@@ -45,6 +45,11 @@ async fn main() {
         }
     };
     let estado = Arc::new(Estado::nuevo(servidor, &punto, dns, Box::new(wg)));
+    // the computers already connected (this service started again: an update, a crash) keep their tunnel and their address
+    if let Err(e) = estado.adopta(ahora_s()) {
+        eprintln!("guardiana-tunel-servidor: no se pudieron leer los pares de WireGuard: {e}");
+        std::process::exit(1);
+    }
     let limpieza = Arc::clone(&estado);
     tokio::spawn(async move {
         let mut cada = tokio::time::interval(Duration::from_secs(600));
@@ -72,13 +77,28 @@ async fn main() {
 }
 
 /// `POST /vpn/alta`.
-async fn alta(State(e): State<Arc<Estado>>, Json(p): Json<Pide>) -> Response {
-    match tokio::task::spawn_blocking(move || e.alta(&p, ahora_s())).await {
+async fn alta(State(e): State<Arc<Estado>>, cabeceras: HeaderMap, Json(p): Json<Pide>) -> Response {
+    let origen = origen(&cabeceras);
+    match tokio::task::spawn_blocking(move || e.alta(&p, origen, ahora_s())).await {
         Ok(Ok(r)) => Json(r).into_response(),
         Ok(Err(ErrorAlta::Formato(_))) => StatusCode::BAD_REQUEST.into_response(),
         Ok(Err(ErrorAlta::Ocupado)) => StatusCode::TOO_MANY_REQUESTS.into_response(),
         Ok(Err(ErrorAlta::Wg(_))) | Err(_) => StatusCode::SERVICE_UNAVAILABLE.into_response(),
     }
+}
+
+/// Who asked, as the web server in front saw it: the last address in `X-Forwarded-For`. Caddy writes that header itself
+/// and does not pass on one a client sent; this service only listens on the machine's own address, behind it.
+fn origen(cabeceras: &HeaderMap) -> Option<IpAddr> {
+    cabeceras
+        .get("x-forwarded-for")?
+        .to_str()
+        .ok()?
+        .rsplit(',')
+        .next()?
+        .trim()
+        .parse()
+        .ok()
 }
 
 fn ahora_s() -> u64 {

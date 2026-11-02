@@ -1,4 +1,5 @@
-//! The server half of GUARDIANA's VPN (docs/VPN.md, «Los servidores»; in preparation, not installed anywhere yet).
+//! The server half of GUARDIANA's VPN (docs/VPN.md, «Los servidores»). On a server it is built and installed by the
+//! website's `zero-motor/vpn.sh`, from a commit fixed there, behind Caddy and with WireGuard's own privilege only.
 //!
 //! One thing only: the anonymous sign-up. A computer sends its WireGuard public key and a fresh ML-KEM-768 key
 //! ([`guardiana_tunel::alta::Pide`]); this side encapsulates a secret to it, derives the same post-quantum preshared key
@@ -6,10 +7,17 @@
 //! ([`guardiana_tunel::alta::Respuesta`]). No account, no name, nothing written to disk: the peers live in the kernel's
 //! memory and in this process's, and a peer without traffic for a day is removed ([`Estado::limpia`]).
 //!
-//! Against abuse, without keeping anything about anyone: a cap of sign-ups per minute for the whole server.
+//! When the service starts again (an update of the server, a crash), it first takes over the peers WireGuard already
+//! has ([`Estado::adopta`]): the computers connected keep their tunnel, and none of their addresses is given to another.
+//!
+//! Against abuse, without keeping anything about anyone: a cap of sign-ups per minute for the whole server, and a smaller
+//! one per origin. The origin is the address the web server in front saw, held only as a hash whose key is drawn again
+//! at every start, in this process's memory, and only for that minute.
 
+use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::net::Ipv4Addr;
+use std::hash::BuildHasher as _;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Mutex;
 
 use guardiana_tunel::alta::{Pide, Respuesta, VERSION};
@@ -17,7 +25,9 @@ use guardiana_tunel::cuantico::{encapsula, psk};
 use guardiana_tunel::llaves::publica_de_base64;
 
 /// Sign-ups the whole server takes per minute.
-pub const ALTAS_POR_MINUTO: usize = 60;
+pub const ALTAS_POR_MINUTO: usize = 600;
+/// Sign-ups one origin may make per minute (an IPv4 address, or an IPv6 /64: what one home or one phone gets).
+pub const ALTAS_POR_ORIGEN: usize = 10;
 /// A peer without a handshake for this long is removed (seconds).
 pub const SIN_USO_S: u64 = 24 * 60 * 60;
 /// A peer that never shook hands is removed after this long (seconds).
@@ -31,6 +41,8 @@ pub trait Wg: Send + Sync {
     fn quita(&self, llave: &str) -> Result<(), String>;
     /// Each peer's last handshake (seconds since 1970; 0 = never).
     fn saludos(&self) -> Result<Vec<(String, u64)>, String>;
+    /// Each peer WireGuard has now, with its allowed addresses as WireGuard writes them (`10.66.0.2/32`).
+    fn direcciones(&self) -> Result<Vec<(String, Vec<String>)>, String>;
 }
 
 /// Why a sign-up was refused.
@@ -45,11 +57,14 @@ pub enum ErrorAlta {
 }
 
 struct Pares {
-    /// Public key (base64) → its address and when it signed up (seconds since 1970).
+    /// Public key (base64) → its address and when it signed up, or was taken over (seconds since 1970).
     por_llave: HashMap<String, (Ipv4Addr, u64)>,
     usadas: HashSet<Ipv4Addr>,
     siguiente: u32,
-    altas: VecDeque<u64>,
+    /// The sign-ups of the last minute: when, and the hash of their origin.
+    altas: VecDeque<(u64, u64)>,
+    /// How many of those came from each origin (by its hash).
+    por_origen: HashMap<u64, usize>,
 }
 
 /// The service's state.
@@ -58,6 +73,8 @@ pub struct Estado {
     punto: String,
     dns: Ipv4Addr,
     wg: Box<dyn Wg>,
+    /// The key of the origins' hash: random, drawn at every start, never written anywhere.
+    clave_origen: RandomState,
     pares: Mutex<Pares>,
 }
 
@@ -75,17 +92,65 @@ impl Estado {
             punto: punto.to_string(),
             dns,
             wg,
+            clave_origen: RandomState::new(),
             pares: Mutex::new(Pares {
                 por_llave: HashMap::new(),
                 usadas: HashSet::new(),
                 siguiente: PRIMERA,
                 altas: VecDeque::new(),
+                por_origen: HashMap::new(),
             }),
         }
     }
 
-    /// A sign-up: checks it, adds the peer with its post-quantum preshared key and answers.
-    pub fn alta(&self, p: &Pide, ahora_s: u64) -> Result<Respuesta, ErrorAlta> {
+    /// Takes over the peers WireGuard already has, once, when the service starts: each keeps its address (and its
+    /// tunnel), none of them is given again, and the next new address comes after the highest one taken. A peer whose
+    /// allowed addresses are not exactly one of this tunnel's was not added by this service, and is removed. Each one
+    /// taken over counts as signed up now: [`Estado::limpia`] removes it after [`SIN_ESTRENAR_S`] if it never shakes
+    /// hands, or [`SIN_USO_S`] after its last handshake. Returns how many it took over.
+    ///
+    /// # Errors
+    /// When WireGuard cannot be read, or a peer cannot be removed.
+    pub fn adopta(&self, ahora_s: u64) -> Result<usize, String> {
+        let actuales = self.wg.direcciones()?;
+        let mut fuera = Vec::new();
+        let tomados = {
+            let mut pares = self.pares.lock().map_err(|_| "estado".to_string())?;
+            let mut mayor: Option<u32> = None;
+            let mut tomados = 0;
+            for (llave, ips) in actuales {
+                match del_tunel(&ips) {
+                    Some(d)
+                        if !pares.usadas.contains(&d) && !pares.por_llave.contains_key(&llave) =>
+                    {
+                        pares.usadas.insert(d);
+                        pares.por_llave.insert(llave, (d, ahora_s));
+                        let n = u32::from(d);
+                        mayor = Some(mayor.map_or(n, |m| m.max(n)));
+                        tomados += 1;
+                    }
+                    _ => fuera.push(llave),
+                }
+            }
+            if let Some(m) = mayor {
+                pares.siguiente = if m >= ULTIMA { PRIMERA } else { m + 1 };
+            }
+            tomados
+        };
+        for llave in &fuera {
+            self.wg.quita(llave)?;
+        }
+        Ok(tomados)
+    }
+
+    /// A sign-up from `origen` (the address the web server in front saw, if it said one): checks it, adds the peer with
+    /// its post-quantum preshared key and answers.
+    pub fn alta(
+        &self,
+        p: &Pide,
+        origen: Option<IpAddr>,
+        ahora_s: u64,
+    ) -> Result<Respuesta, ErrorAlta> {
         if p.v != VERSION {
             return Err(ErrorAlta::Formato("versión"));
         }
@@ -94,31 +159,44 @@ impl Estado {
         let kem = de_b64(&p.kem).ok_or(ErrorAlta::Formato("kem"))?;
         let (ct, secreto) = encapsula(&kem).map_err(|_| ErrorAlta::Formato("kem"))?;
         let k = psk(&secreto, &cliente, &self.servidor).map_err(|_| ErrorAlta::Formato("kem"))?;
-        let direccion = {
+        let origen = self.origen(origen);
+        let (direccion, nueva) = {
             let mut pares = self.pares.lock().map_err(|_| ErrorAlta::Ocupado)?;
             while pares
                 .altas
                 .front()
-                .is_some_and(|t| ahora_s.saturating_sub(*t) >= 60)
+                .is_some_and(|(t, _)| ahora_s.saturating_sub(*t) >= 60)
             {
-                pares.altas.pop_front();
+                if let Some((_, o)) = pares.altas.pop_front() {
+                    let quedan = pares.por_origen.get(&o).map_or(0, |n| n.saturating_sub(1));
+                    if quedan == 0 {
+                        pares.por_origen.remove(&o);
+                    } else {
+                        pares.por_origen.insert(o, quedan);
+                    }
+                }
             }
-            if pares.altas.len() >= ALTAS_POR_MINUTO {
+            let de_este = pares.por_origen.get(&origen).copied().unwrap_or(0);
+            if pares.altas.len() >= ALTAS_POR_MINUTO || de_este >= ALTAS_POR_ORIGEN {
                 return Err(ErrorAlta::Ocupado);
             }
-            pares.altas.push_back(ahora_s);
-            let direccion = match pares.por_llave.get(&llave) {
-                Some((d, _)) => *d,
-                None => asigna(&mut pares).ok_or(ErrorAlta::Ocupado)?,
+            pares.altas.push_back((ahora_s, origen));
+            pares.por_origen.insert(origen, de_este + 1);
+            let (direccion, nueva) = match pares.por_llave.get(&llave) {
+                Some((d, _)) => (*d, false),
+                None => (asigna(&mut pares).ok_or(ErrorAlta::Ocupado)?, true),
             };
             pares.por_llave.insert(llave.clone(), (direccion, ahora_s));
             pares.usadas.insert(direccion);
-            direccion
+            (direccion, nueva)
         };
         if let Err(e) = self.wg.pon(&llave, &b64(&k), direccion) {
-            // sin par en WireGuard, tampoco aquí
-            if let Ok(mut pares) = self.pares.lock() {
-                if pares.por_llave.remove(&llave).is_some() {
+            // a new one WireGuard did not take is not kept here either; one that was already there is still in
+            // WireGuard with its address, and keeps it (were it freed, it could go to another computer and be taken
+            // from this one)
+            if nueva {
+                if let Ok(mut pares) = self.pares.lock() {
+                    pares.por_llave.remove(&llave);
                     pares.usadas.remove(&direccion);
                 }
             }
@@ -165,6 +243,33 @@ impl Estado {
     pub fn pares(&self) -> usize {
         self.pares.lock().map(|p| p.por_llave.len()).unwrap_or(0)
     }
+
+    /// The hash of an origin, with this start's key: an IPv4 address, or the /64 of an IPv6 one (one home or one phone
+    /// gets a whole /64). Without an origin, all such sign-ups share one.
+    fn origen(&self, ip: Option<IpAddr>) -> u64 {
+        let bytes: [u8; 16] = match ip {
+            None => [0; 16],
+            Some(IpAddr::V4(v4)) => v4.to_ipv6_mapped().octets(),
+            Some(IpAddr::V6(v6)) => match v6.to_ipv4_mapped() {
+                Some(v4) => v4.to_ipv6_mapped().octets(),
+                None => {
+                    let mut o = v6.octets();
+                    o[8..].fill(0);
+                    o
+                }
+            },
+        };
+        self.clave_origen.hash_one(bytes)
+    }
+}
+
+/// The one address of this tunnel in a peer's allowed addresses (`10.66.x.y/32`), if that is all it has.
+fn del_tunel(ips: &[String]) -> Option<Ipv4Addr> {
+    let [una] = ips else {
+        return None;
+    };
+    let d: Ipv4Addr = una.strip_suffix("/32")?.parse().ok()?;
+    (PRIMERA..=ULTIMA).contains(&u32::from(d)).then_some(d)
 }
 
 fn asigna(p: &mut Pares) -> Option<Ipv4Addr> {
@@ -262,6 +367,19 @@ impl Wg for WgReal {
             })
             .collect())
     }
+
+    fn direcciones(&self) -> Result<Vec<(String, Vec<String>)>, String> {
+        // one line per peer: its public key, then its allowed addresses separated by spaces, or «(none)»
+        let s = self.wg(&["show", &self.interfaz, "allowed-ips"], None)?;
+        Ok(s.lines()
+            .filter_map(|l| {
+                let mut c = l.split_whitespace();
+                let llave = c.next()?.to_string();
+                let ips = c.filter(|x| *x != "(none)").map(str::to_string).collect();
+                Some((llave, ips))
+            })
+            .collect())
+    }
 }
 
 #[cfg(test)]
@@ -276,10 +394,17 @@ mod tests {
     struct WgDePrueba {
         pares: Mutex<HashMap<String, (String, Ipv4Addr)>>,
         saludos: Mutex<HashMap<String, u64>>,
+        /// Peers this service did not add, with their allowed addresses as WireGuard writes them.
+        ajenos: Mutex<Vec<(String, Vec<String>)>>,
+        /// When set, WireGuard does not take any peer.
+        falla: std::sync::atomic::AtomicBool,
     }
 
     impl Wg for Arc<WgDePrueba> {
         fn pon(&self, llave: &str, psk: &str, direccion: Ipv4Addr) -> Result<(), String> {
+            if self.falla.load(std::sync::atomic::Ordering::SeqCst) {
+                return Err("WireGuard no lo toma".into());
+            }
             self.pares
                 .lock()
                 .unwrap()
@@ -288,6 +413,7 @@ mod tests {
         }
         fn quita(&self, llave: &str) -> Result<(), String> {
             self.pares.lock().unwrap().remove(llave);
+            self.ajenos.lock().unwrap().retain(|(k, _)| k != llave);
             Ok(())
         }
         fn saludos(&self) -> Result<Vec<(String, u64)>, String> {
@@ -299,18 +425,40 @@ mod tests {
                 .map(|(k, v)| (k.clone(), *v))
                 .collect())
         }
+        fn direcciones(&self) -> Result<Vec<(String, Vec<String>)>, String> {
+            let mut todos: Vec<(String, Vec<String>)> = self
+                .pares
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(k, (_, d))| (k.clone(), vec![format!("{d}/32")]))
+                .collect();
+            todos.extend(self.ajenos.lock().unwrap().iter().cloned());
+            Ok(todos)
+        }
+    }
+
+    fn con(wg: &Arc<WgDePrueba>, srv: &Llaves) -> Estado {
+        Estado::nuevo(
+            srv.publica(),
+            "motor.guardianagroup.com:51820",
+            Ipv4Addr::new(10, 66, 0, 1),
+            Box::new(Arc::clone(wg)),
+        )
     }
 
     fn servidor() -> (Estado, Arc<WgDePrueba>, Llaves) {
         let srv = Llaves::nuevas().unwrap();
         let wg = Arc::new(WgDePrueba::default());
-        let e = Estado::nuevo(
-            srv.publica(),
-            "motor.guardianagroup.com:51820",
-            Ipv4Addr::new(10, 66, 0, 1),
-            Box::new(Arc::clone(&wg)),
-        );
-        (e, wg, srv)
+        (con(&wg, &srv), wg, srv)
+    }
+
+    fn nueva() -> Pide {
+        pide(&Llaves::nuevas().unwrap()).1
+    }
+
+    fn ip(s: &str) -> Option<IpAddr> {
+        Some(s.parse().unwrap())
     }
 
     #[test]
@@ -318,7 +466,7 @@ mod tests {
         let (e, wg, _) = servidor();
         let equipo = Llaves::nuevas().unwrap();
         let (oferta, p) = pide(&equipo);
-        let r = e.alta(&p, 1_000).unwrap();
+        let r = e.alta(&p, None, 1_000).unwrap();
         let a = completa(&equipo, &oferta, &r).unwrap();
         let (psk_servidor, direccion) = wg
             .pares
@@ -336,9 +484,9 @@ mod tests {
     fn cada_llave_su_direccion_y_la_misma_si_vuelve() {
         let (e, _, _) = servidor();
         let (uno, dos) = (Llaves::nuevas().unwrap(), Llaves::nuevas().unwrap());
-        let r1 = e.alta(&pide(&uno).1, 1).unwrap();
-        let r2 = e.alta(&pide(&dos).1, 2).unwrap();
-        let r1b = e.alta(&pide(&uno).1, 3).unwrap();
+        let r1 = e.alta(&pide(&uno).1, None, 1).unwrap();
+        let r2 = e.alta(&pide(&dos).1, None, 2).unwrap();
+        let r1b = e.alta(&pide(&uno).1, None, 3).unwrap();
         assert_eq!(r1.direccion, "10.66.0.2/32");
         assert_eq!(r2.direccion, "10.66.0.3/32");
         assert_eq!(r1b.direccion, r1.direccion);
@@ -351,27 +499,155 @@ mod tests {
         let (e, _, _) = servidor();
         let (_, mut p) = pide(&Llaves::nuevas().unwrap());
         p.v = 9;
-        assert_eq!(e.alta(&p, 1), Err(ErrorAlta::Formato("versión")));
+        assert_eq!(e.alta(&p, None, 1), Err(ErrorAlta::Formato("versión")));
         let (_, mut p) = pide(&Llaves::nuevas().unwrap());
         p.llave = "corta".into();
-        assert_eq!(e.alta(&p, 1), Err(ErrorAlta::Formato("llave")));
+        assert_eq!(e.alta(&p, None, 1), Err(ErrorAlta::Formato("llave")));
         let (_, mut p) = pide(&Llaves::nuevas().unwrap());
         p.kem = b64(&[0u8; 32]);
-        assert_eq!(e.alta(&p, 1), Err(ErrorAlta::Formato("kem")));
+        assert_eq!(e.alta(&p, None, 1), Err(ErrorAlta::Formato("kem")));
         assert_eq!(e.pares(), 0);
     }
 
     #[test]
     fn un_tope_de_altas_por_minuto() {
         let (e, _, _) = servidor();
-        for _ in 0..ALTAS_POR_MINUTO {
-            assert!(e.alta(&pide(&Llaves::nuevas().unwrap()).1, 100).is_ok());
+        let origen = |i: u32| Some(IpAddr::V4(Ipv4Addr::from(0xC633_6400 + i)));
+        for i in 0..u32::try_from(ALTAS_POR_MINUTO).unwrap() {
+            assert!(e.alta(&nueva(), origen(i), 100).is_ok());
         }
         assert_eq!(
-            e.alta(&pide(&Llaves::nuevas().unwrap()).1, 110),
+            e.alta(&nueva(), origen(100_000), 110),
             Err(ErrorAlta::Ocupado)
         );
-        assert!(e.alta(&pide(&Llaves::nuevas().unwrap()).1, 161).is_ok());
+        assert!(e.alta(&nueva(), origen(100_001), 161).is_ok());
+    }
+
+    #[test]
+    fn un_tope_por_origen_que_se_olvida_al_pasar_el_minuto() {
+        let (e, _, _) = servidor();
+        let casa = ip("203.0.113.7");
+        for _ in 0..ALTAS_POR_ORIGEN {
+            assert!(e.alta(&nueva(), casa, 100).is_ok());
+        }
+        assert_eq!(e.alta(&nueva(), casa, 110), Err(ErrorAlta::Ocupado));
+        // la misma dirección escrita como IPv6 es el mismo origen
+        assert_eq!(
+            e.alta(&nueva(), ip("::ffff:203.0.113.7"), 110),
+            Err(ErrorAlta::Ocupado)
+        );
+        // otro origen entra; el primero vuelve a entrar pasado el minuto
+        assert!(e.alta(&nueva(), ip("203.0.113.8"), 110).is_ok());
+        assert!(e.alta(&nueva(), casa, 161).is_ok());
+        // y de los de hace más de un minuto no queda nada: solo los dos orígenes de este último minuto
+        let pares = e.pares.lock().unwrap();
+        assert_eq!(pares.por_origen.len(), 2);
+        assert_eq!(pares.altas.len(), 2);
+        assert_eq!(pares.por_origen.get(&e.origen(casa)), Some(&1));
+    }
+
+    #[test]
+    fn en_ipv6_una_casa_es_su_64() {
+        let (e, _, _) = servidor();
+        for i in 1..=ALTAS_POR_ORIGEN {
+            assert!(e
+                .alta(&nueva(), ip(&format!("2001:db8:0:1::{i:x}")), 100)
+                .is_ok());
+        }
+        assert_eq!(
+            e.alta(&nueva(), ip("2001:db8:0:1:ffff::1"), 100),
+            Err(ErrorAlta::Ocupado)
+        );
+        assert!(e.alta(&nueva(), ip("2001:db8:0:2::1"), 100).is_ok());
+        // sin origen (la comprobación del propio servidor) es otro
+        assert!(e.alta(&nueva(), None, 100).is_ok());
+    }
+
+    #[test]
+    fn al_volver_a_arrancar_los_conectados_siguen_con_su_direccion() {
+        let (e, wg, srv) = servidor();
+        let (uno, dos, tres) = (
+            Llaves::nuevas().unwrap(),
+            Llaves::nuevas().unwrap(),
+            Llaves::nuevas().unwrap(),
+        );
+        let r1 = e.alta(&pide(&uno).1, None, 1).unwrap();
+        let r2 = e.alta(&pide(&dos).1, None, 2).unwrap();
+        // lo que WireGuard tiene y este servicio no dio: se quita al arrancar
+        wg.ajenos.lock().unwrap().extend([
+            ("ajeno-red".to_string(), vec!["10.1.2.3/32".to_string()]),
+            (
+                "ajeno-servidor".to_string(),
+                vec!["10.66.0.1/32".to_string()],
+            ),
+            (
+                "ajeno-dos".to_string(),
+                vec!["10.66.9.9/32".to_string(), "10.66.9.10/32".to_string()],
+            ),
+            ("ajeno-nada".to_string(), vec![]),
+            ("ajeno-ancho".to_string(), vec!["10.66.7.0/24".to_string()]),
+        ]);
+        drop(e);
+        // el servicio vuelve a arrancar con el mismo WireGuard
+        let e = con(&wg, &srv);
+        assert_eq!(e.adopta(1_000).unwrap(), 2);
+        assert!(wg.ajenos.lock().unwrap().is_empty());
+        assert_eq!(e.pares(), 2);
+        assert_eq!(wg.pares.lock().unwrap().len(), 2);
+        // uno nuevo recibe una dirección nueva, después de la más alta tomada
+        let r3 = e.alta(&pide(&tres).1, None, 1_001).unwrap();
+        assert_eq!(r3.direccion, "10.66.0.4/32");
+        assert!(r3.direccion != r1.direccion && r3.direccion != r2.direccion);
+        // uno que ya estaba y vuelve a pedir el alta conserva la suya
+        assert_eq!(
+            e.alta(&pide(&uno).1, None, 1_002).unwrap().direccion,
+            r1.direccion
+        );
+        // los tomados se limpian como los demás: «dos» no vuelve a saludar y se va pasados SIN_ESTRENAR_S
+        let ahora = 1_000 + SIN_ESTRENAR_S;
+        for k in [&uno, &tres] {
+            wg.saludos.lock().unwrap().insert(k.publica_base64(), ahora);
+        }
+        assert_eq!(e.limpia(ahora + 1).unwrap(), 1);
+        assert!(!wg.pares.lock().unwrap().contains_key(&dos.publica_base64()));
+        assert_eq!(e.pares(), 2);
+    }
+
+    #[test]
+    fn si_wireguard_no_toma_el_par_la_direccion_de_uno_que_ya_estaba_no_se_suelta() {
+        use std::sync::atomic::Ordering;
+        let (e, wg, _) = servidor();
+        let uno = Llaves::nuevas().unwrap();
+        let r1 = e.alta(&pide(&uno).1, None, 1).unwrap();
+        wg.falla.store(true, Ordering::SeqCst);
+        // uno que ya estaba: falla, pero sigue en WireGuard con su dirección y aquí también
+        assert!(matches!(
+            e.alta(&pide(&uno).1, None, 2),
+            Err(ErrorAlta::Wg(_))
+        ));
+        // uno nuevo: falla y no se queda
+        assert!(matches!(e.alta(&nueva(), None, 3), Err(ErrorAlta::Wg(_))));
+        assert_eq!(e.pares(), 1);
+        wg.falla.store(false, Ordering::SeqCst);
+        let r2 = e.alta(&nueva(), None, 4).unwrap();
+        assert_ne!(r2.direccion, r1.direccion);
+        assert_eq!(
+            e.alta(&pide(&uno).1, None, 5).unwrap().direccion,
+            r1.direccion
+        );
+    }
+
+    #[test]
+    fn tras_la_ultima_direccion_se_vuelve_a_la_primera() {
+        let srv = Llaves::nuevas().unwrap();
+        let wg = Arc::new(WgDePrueba::default());
+        wg.pares.lock().unwrap().insert(
+            "ultimo".into(),
+            ("psk".into(), Ipv4Addr::new(10, 66, 255, 254)),
+        );
+        let e = con(&wg, &srv);
+        assert_eq!(e.adopta(5).unwrap(), 1);
+        assert_eq!(e.alta(&nueva(), None, 6).unwrap().direccion, "10.66.0.2/32");
     }
 
     #[test]
@@ -382,9 +658,9 @@ mod tests {
             Llaves::nuevas().unwrap(),
             Llaves::nuevas().unwrap(),
         );
-        e.alta(&pide(&usada).1, 0).unwrap();
-        e.alta(&pide(&olvidada).1, 0).unwrap();
-        e.alta(&pide(&nueva).1, 2 * SIN_USO_S).unwrap();
+        e.alta(&pide(&usada).1, None, 0).unwrap();
+        e.alta(&pide(&olvidada).1, None, 0).unwrap();
+        e.alta(&pide(&nueva).1, None, 2 * SIN_USO_S).unwrap();
         wg.saludos
             .lock()
             .unwrap()
@@ -398,7 +674,7 @@ mod tests {
             .contains_key(&olvidada.publica_base64()));
         // las direcciones siguen adelante; la liberada volverá a darse al dar la vuelta
         let r = e
-            .alta(&pide(&Llaves::nuevas().unwrap()).1, 2 * SIN_USO_S + 2)
+            .alta(&pide(&Llaves::nuevas().unwrap()).1, None, 2 * SIN_USO_S + 2)
             .unwrap();
         assert_eq!(r.direccion, "10.66.0.5/32");
     }

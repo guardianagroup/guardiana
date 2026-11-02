@@ -117,8 +117,17 @@ Decisiones tomadas en la ronda 88 (1 nov 2026): incluida en la licencia de GUARD
   resolutor.
 - Sin registros: los pares viven solo en la memoria del núcleo y se quitan tras 24 horas sin tráfico. Nada en disco ni
   en el diario.
-- Contra el abuso, sin guardar nada: puerto 25 cerrado; un tope de altas por minuto; un tope de conexiones nuevas por
-  segundo por par.
+- Si el servicio del alta vuelve a arrancar (una actualización, un fallo), primero toma los pares que WireGuard ya
+  tiene (`Estado::adopta`): los equipos conectados siguen con su túnel y su dirección no se da a otro. Lo que no tenga
+  exactamente una dirección del túnel no lo puso el alta, y se quita.
+- Contra el abuso, sin guardar nada: puerto 25 cerrado; un tope de altas por minuto para todo el servidor (600) y otro
+  por origen (10: una dirección IPv4, o un /64 de IPv6). El origen es la dirección que vio Caddy, guardada solo como un
+  resumen con una llave que se sortea en cada arranque, en la memoria del servicio y durante ese minuto. Y un tope de
+  conexiones nuevas por segundo por par.
+- Dónde está (2 nov 2026; dueño, 10:40: «Utilizamos el de Helsinki. Conéctalo ya»): en el servidor de Helsinki, con
+  `zero-motor/vpn.sh` del repositorio de la web, que compila este servicio desde un commit fijado y monta WireGuard,
+  sus reglas de red y Unbound. Entra por la misma actualización que el resto del servidor; pasará al sello cuando el
+  sello esté puesto.
 - El resolutor del túnel (Unbound, con DNSSEC) en `10.66.0.1`; el DNS de la casa del programa le manda lo que no corta.
 - El servicio y su configuración van dentro del sello: solo se instalan con la firma del dueño.
 
