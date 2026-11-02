@@ -415,9 +415,10 @@ mod tests {
         let cortes = crate::cortafuegos::Cortafuegos::abrir().unwrap();
         let r = subcapa_colgada_de(GUID::from_u128(0x6705_1a2e_9c33_4e77_b1a4_2f0e_7c11_9a01));
         eprintln!("otra sesión, con el proveedor de los cortes del antivirus: 0x{r:08x}");
-        assert_ne!(
-            r, 0,
-            "Windows dejó colgar algo del proveedor de otra sesión"
+        // FWP_E_WRONG_SESSION: lo que se vio en el equipo de esa persona (0x8032000c)
+        assert_eq!(
+            r, 0x8032_000c,
+            "otra sesión con el proveedor de los cortes del antivirus: 0x{r:08x}"
         );
         let yo = std::env::current_exe().unwrap();
         let corte = CorteVpn::activa(&permisos(), &yo).unwrap();

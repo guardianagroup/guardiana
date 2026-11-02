@@ -255,7 +255,9 @@
          pedirle que se cierre. Ahora, al pulsar «Instalar» y antes de esa comprobación, se le pide a ZERO que se cierre como con su
          X (guarda lo suyo) y, a los 3 s, lo que quede se termina. Solo al actualizar, reparar o desinstalar; sin ventana de consola
          (WixQuietExec, que en una acción inmediata lee la línea de WixQuietExecCmdLine). «Abrir GUARDIANA» lo vuelve a abrir. -->
-    <SetProperty Id="WixQuietExecCmdLine" Value="&quot;[System64Folder]cmd.exe&quot; /d /c &quot;taskkill /IM &quot;GUARDIANA ZERO.exe&quot; &amp; ping -n 4 127.0.0.1 &gt;nul &amp; taskkill /F /IM &quot;GUARDIANA ZERO.exe&quot;&quot;" Before="CierraZeroAntes" Sequence="execute" Condition="Installed OR WIX_UPGRADE_DETECTED" />
+    <!-- (segunda revisión, 2 Nov 2026) solo los ZERO de quien instala (/FI USERNAME: ni los de otras cuentas ni, con ZERO=0, uno
+         instalado aparte), con las rutas enteras, y sin dar un error en el registro cuando ZERO no estaba abierto (exit /b 0). -->
+    <SetProperty Id="WixQuietExecCmdLine" Value="&quot;[System64Folder]cmd.exe&quot; /d /c &quot;&quot;%SystemRoot%\System32\taskkill.exe&quot; /FI &quot;USERNAME eq %USERDOMAIN%\%USERNAME%&quot; /IM &quot;GUARDIANA ZERO.exe&quot; &amp; &quot;%SystemRoot%\System32\PING.EXE&quot; -n 4 127.0.0.1 &gt;nul &amp; &quot;%SystemRoot%\System32\taskkill.exe&quot; /F /FI &quot;USERNAME eq %USERDOMAIN%\%USERNAME%&quot; /IM &quot;GUARDIANA ZERO.exe&quot; &amp; exit /b 0&quot;" Before="CierraZeroAntes" Sequence="execute" Condition="(Installed OR WIX_UPGRADE_DETECTED) AND NOT (ZERO=&quot;0&quot;)" />
     <CustomAction Id="CierraZeroAntes" DllEntry="WixQuietExec" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" Execute="immediate" Return="ignore" />
     <Icon Id="zero.ico" SourceFile="$(var.ZeroIcon)" />
     <Feature Id="Zero" Title="GUARDIANA ZERO" Level="1">
@@ -399,7 +401,7 @@
     </UI>
     <InstallExecuteSequence>
 <?ifdef ZeroExe ?>
-      <Custom Action="CierraZeroAntes" Before="InstallValidate" Condition="Installed OR WIX_UPGRADE_DETECTED" />
+      <Custom Action="CierraZeroAntes" Before="InstallValidate" Condition="(Installed OR WIX_UPGRADE_DETECTED) AND NOT (ZERO=&quot;0&quot;)" />
 <?endif ?>
       <Custom Action="CrearVigilanteAtras" Before="CrearVigilante" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED" />
       <Custom Action="ApplyDnsAtras" Before="ApplyDns" Condition="VIGILAR=&quot;1&quot; AND NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE" />
