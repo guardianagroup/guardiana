@@ -10,7 +10,7 @@
 // The handler answers with the same error type as the rest of the API (see api.rs).
 #![allow(clippy::result_large_err)]
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path as Ruta, PathBuf};
 use std::sync::Arc;
 
@@ -99,6 +99,7 @@ fn avisos_con_cuarentena(db: &Ruta) -> Vec<Value> {
                 .collect()
         })
         .unwrap_or_default();
+    let decididos = decisiones(db);
     let mut avisos: Vec<Value> = avisos_del_archivo(db)
         .into_iter()
         .map(|(id, mut v)| {
@@ -113,6 +114,18 @@ fn avisos_con_cuarentena(db: &Ruta) -> Vec<Value> {
             if let Some(o) = v.as_object_mut() {
                 o.insert("id".into(), Value::String(id));
                 o.insert("cuarentena".into(), Value::String(estado.into()));
+                // a program frozen with this warning (2 Nov 2026): still frozen, or what the person decided
+                if let Some(caso) = o
+                    .get("incidente")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+                {
+                    let como = decididos
+                        .get(&caso)
+                        .cloned()
+                        .unwrap_or_else(|| "congelado".to_owned());
+                    o.insert("congelado".into(), Value::String(como));
+                }
             }
             v
         })
@@ -140,6 +153,172 @@ pub(crate) async fn ver(State(state): State<Arc<AppState>>, _s: Session) -> ApiR
         sitios: memoria.as_ref().map_or(0, Memoria::sitios),
         avisos,
     }))
+}
+
+/// The decisions on frozen programs (`escudo-decisiones.jsonl`, one per line): case → `detenido` or `reanudado`.
+fn decisiones(db: &Ruta) -> HashMap<String, String> {
+    std::fs::read_to_string(db.with_file_name("escudo-decisiones.jsonl"))
+        .map(|t| {
+            t.lines()
+                .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+                .filter_map(|v| {
+                    Some((
+                        v["incidente"].as_str()?.to_owned(),
+                        v["decision"].as_str()?.to_owned(),
+                    ))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Adds one line to a file of lines next to the ledger.
+fn anade_linea(ruta: &Ruta, v: &Value) {
+    use std::io::Write;
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(ruta)
+    {
+        let _ = writeln!(f, "{v}");
+    }
+}
+
+/// The warning of a frozen case `caso` (`c-<when>-<pid>`), if it is still there and was not decided yet.
+fn caso_abierto(db: &Ruta, caso: &str) -> Result<Value, &'static str> {
+    let es_caso = caso
+        .strip_prefix("c-")
+        .and_then(|r| r.split_once('-'))
+        .is_some_and(|(a, b)| {
+            !a.is_empty() && !b.is_empty() && a.bytes().chain(b.bytes()).all(|c| c.is_ascii_digit())
+        });
+    if !es_caso {
+        return Err("ese caso no existe");
+    }
+    if decisiones(db).contains_key(caso) {
+        return Err("ese caso ya se decidió");
+    }
+    avisos_del_archivo(db)
+        .into_iter()
+        .map(|(_, v)| v)
+        .find(|v| v["incidente"].as_str() == Some(caso))
+        .ok_or("ese caso ya no está")
+}
+
+/// The process numbers frozen in a case, and when it was seen.
+fn congelados_de(v: &Value) -> (Vec<u32>, i64) {
+    let pids = v["congelados"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(Value::as_u64)
+                .filter_map(|x| u32::try_from(x).ok())
+                .collect()
+        })
+        .unwrap_or_default();
+    (pids, v["cuando_ms"].as_i64().unwrap_or(0))
+}
+
+/// `POST /api/escudo/congelado/{caso}/detener`: the frozen programs of a case stopped, and the program's file put in the
+/// quarantine when it can go there (see the module). Only the processes that are still the ones frozen (Windows may have
+/// given their numbers to others since) are touched.
+pub(crate) async fn detener(
+    State(state): State<Arc<AppState>>,
+    _s: Session,
+    Path(caso): Path<String>,
+) -> ApiResult<Value> {
+    let db = state.db_path.clone();
+    let hecho = tokio::task::spawn_blocking(move || {
+        let v = match caso_abierto(&db, &caso) {
+            Ok(v) => v,
+            Err(m) => return json!({ "ok": false, "motivo": m }),
+        };
+        let (pids, cuando) = congelados_de(&v);
+        for pid in &pids {
+            if guardiana_apps::sigue_siendo(*pid, cuando) {
+                let _ = guardiana_apps::detiene(*pid);
+            }
+        }
+        // the program's file, to the quarantine: a moment after stopping it, Windows may still hold it
+        let ruta = v["ruta"].as_str().unwrap_or_default().to_owned();
+        let mut cuarentena = json!({ "ok": false, "motivo": "no se puede poner en cuarentena (está en la carpeta de Windows o de los programas instalados, o ya no está)" });
+        if se_puede(&ruta) {
+            let motivo: String = v["texto"].as_str().unwrap_or_default().chars().take(400).collect();
+            let fuente = format!(
+                "escudo de GUARDIANA, regla «{}»",
+                v["regla"].as_str().unwrap_or_default()
+            );
+            for _ in 0..10 {
+                let r = Cuarentena::en(carpeta_cuarentena(&db))
+                    .map_err(|e| e.to_string())
+                    .and_then(|c| {
+                        c.poner(Ruta::new(&ruta), &motivo, &fuente, u64::try_from(now_ms()).unwrap_or(0))
+                            .map_err(|e| e.to_string())
+                    });
+                match r {
+                    Ok(e) => {
+                        cuarentena = json!({ "ok": true, "id": e.id });
+                        break;
+                    }
+                    Err(m) if m.contains("no se pudo quitar el original") => {
+                        std::thread::sleep(std::time::Duration::from_millis(300));
+                    }
+                    Err(m) => {
+                        cuarentena = json!({ "ok": false, "motivo": m });
+                        break;
+                    }
+                }
+            }
+        }
+        anade_linea(
+            &db.with_file_name("escudo-decisiones.jsonl"),
+            &json!({ "incidente": caso, "decision": "detenido", "cuando_ms": now_ms(), "cuarentena": cuarentena["ok"] }),
+        );
+        json!({ "ok": true, "cuarentena": cuarentena })
+    })
+    .await;
+    Ok(Json(hecho.unwrap_or_else(
+        |_| json!({ "ok": false, "motivo": "no se pudo terminar" }),
+    )))
+}
+
+/// `POST /api/escudo/congelado/{caso}/reanudar`: «es mío, déjalo seguir». The frozen programs carry on, and the program
+/// is not frozen again (`escudo-permitidos.jsonl`, which the service reads). Only from the panel itself: GUARDIANA's web
+/// cannot ask for it.
+pub(crate) async fn reanudar(
+    State(state): State<Arc<AppState>>,
+    _s: Session,
+    Path(caso): Path<String>,
+) -> ApiResult<Value> {
+    let db = state.db_path.clone();
+    let hecho = tokio::task::spawn_blocking(move || {
+        let v = match caso_abierto(&db, &caso) {
+            Ok(v) => v,
+            Err(m) => return json!({ "ok": false, "motivo": m }),
+        };
+        let (pids, cuando) = congelados_de(&v);
+        for pid in &pids {
+            if guardiana_apps::sigue_siendo(*pid, cuando) {
+                let _ = guardiana_apps::reanuda(*pid);
+            }
+        }
+        let ruta = v["ruta"].as_str().unwrap_or_default().to_owned();
+        if !ruta.is_empty() {
+            anade_linea(
+                &db.with_file_name("escudo-permitidos.jsonl"),
+                &json!({ "ruta": ruta, "cuando_ms": now_ms() }),
+            );
+        }
+        anade_linea(
+            &db.with_file_name("escudo-decisiones.jsonl"),
+            &json!({ "incidente": caso, "decision": "reanudado", "cuando_ms": now_ms() }),
+        );
+        json!({ "ok": true })
+    })
+    .await;
+    Ok(Json(hecho.unwrap_or_else(
+        |_| json!({ "ok": false, "motivo": "no se pudo terminar" }),
+    )))
 }
 
 /// `GET /api/escudo/cuarentena`: what is in the quarantine, the newest first, with each file's name.
@@ -273,6 +452,32 @@ mod tests {
         }
         assert!(!protegida(r"C:\Users\ana\Downloads\x.exe"));
         assert!(!se_puede(""));
+    }
+
+    #[test]
+    fn los_casos_congelados() {
+        let dir = std::env::temp_dir().join(format!("guardiana-congelados-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = dir.join("guardiana.db");
+        std::fs::write(
+            dir.join("escudo-avisos.jsonl"),
+            "{\"regla\":\"senuelo\",\"cuando_ms\":5,\"incidente\":\"c-5-77\",\"congelados\":[77,78],\"ruta\":\"C:\\\\x.exe\"}\n",
+        )
+        .unwrap();
+        assert!(caso_abierto(&db, "c-5-77").is_ok());
+        assert_eq!(caso_abierto(&db, "c-5-78"), Err("ese caso ya no está"));
+        assert_eq!(caso_abierto(&db, "../x"), Err("ese caso no existe"));
+        assert_eq!(caso_abierto(&db, "c-5-"), Err("ese caso no existe"));
+        let v = caso_abierto(&db, "c-5-77").unwrap();
+        assert_eq!(congelados_de(&v), (vec![77, 78], 5));
+        anade_linea(
+            &db.with_file_name("escudo-decisiones.jsonl"),
+            &json!({ "incidente": "c-5-77", "decision": "reanudado" }),
+        );
+        assert_eq!(caso_abierto(&db, "c-5-77"), Err("ese caso ya se decidió"));
+        let a = avisos_con_cuarentena(&db);
+        assert_eq!(a[0]["congelado"], "reanudado");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

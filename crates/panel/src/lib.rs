@@ -1081,6 +1081,13 @@ pub async fn start(config: Config) -> Result<Running, Error> {
             "/api/escudo/cuarentena/restaura/{id}",
             post(escudo::restaura),
         )
+        // 2 Nov 2026: a program frozen by the escudo (ransomware's decoys, the backups' deletion): stopped (and its file
+        // to the quarantine) or let carry on
+        .route("/api/escudo/congelado/{id}/detener", post(escudo::detener))
+        .route(
+            "/api/escudo/congelado/{id}/reanudar",
+            post(escudo::reanudar),
+        )
         .route("/api/vpn", get(vpn::ver))
         .route("/api/vpn/conecta", post(vpn::conecta))
         .route("/api/vpn/desconecta", post(vpn::desconecta))

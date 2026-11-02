@@ -362,6 +362,21 @@ pub fn congela_familia(pid: u32) -> Vec<u32> {
     }
 }
 
+/// Whether process `pid` is still the program seen at `ms` (milliseconds since 1970): it exists and was started before
+/// then (a number Windows gave to another program since is not it). `false` outside Windows.
+#[must_use]
+pub fn sigue_siendo(pid: u32, ms: i64) -> bool {
+    #[cfg(windows)]
+    {
+        contencion::sigue_siendo(pid, ms)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (pid, ms);
+        false
+    }
+}
+
 /// Lets a frozen program carry on.
 ///
 /// # Errors

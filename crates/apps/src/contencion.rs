@@ -184,6 +184,33 @@ pub fn congelar_familia(pid: u32) -> Vec<u32> {
         .collect()
 }
 
+/// Whether process `pid` is still the one seen at `ms` (milliseconds since 1970): it exists and was started before
+/// then. A number Windows gave to another program afterwards is not it, and nothing is done to that one.
+#[must_use]
+pub fn sigue_siendo(pid: u32, ms: i64) -> bool {
+    use windows_sys::Win32::Foundation::FILETIME;
+    use windows_sys::Win32::System::Threading::GetProcessTimes;
+    con_proceso(pid, PROCESS_QUERY_LIMITED_INFORMATION, |h| {
+        let mut creado = FILETIME::default();
+        let mut otros = [
+            FILETIME::default(),
+            FILETIME::default(),
+            FILETIME::default(),
+        ];
+        let [a, b, c] = &mut otros;
+        // SAFETY: a process handle with PROCESS_QUERY_LIMITED_INFORMATION and four FILETIMEs owned here.
+        let ok = unsafe { GetProcessTimes(h, &raw mut creado, a, b, c) } != 0;
+        if !ok {
+            return false;
+        }
+        // FILETIME: hundreds of nanoseconds since 1601
+        let t = (u64::from(creado.dwHighDateTime) << 32) | u64::from(creado.dwLowDateTime);
+        let ms_1970 = i64::try_from(t / 10_000).unwrap_or(i64::MAX) - 11_644_473_600_000;
+        ms_1970 <= ms + 1_000
+    })
+    .unwrap_or(false)
+}
+
 /// A running process's command line, as it was started.
 #[must_use]
 pub fn linea_de_ordenes(pid: u32) -> Option<String> {

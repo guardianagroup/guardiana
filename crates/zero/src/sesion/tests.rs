@@ -3791,6 +3791,16 @@ fn the_web_asks_the_panel_only_for_its_readings() {
             "{ruta}"
         );
     }
+    // 2 Nov 2026: stopping a program the escudo froze, by its case.
+    let o = s.mensaje(
+        Origen::Pestana(orbita),
+        ORBITA,
+        &pide("/api/escudo/congelado/c-1793589348314-4412/detener", "POST"),
+    );
+    assert!(o.iter().any(|x| matches!(
+        x,
+        Orden::EnviaAPagina { id, json, .. } if *id == panel && json.contains("c-1793589348314-4412/detener")
+    )));
     // 1.0.52: putting a file the escudo named in the quarantine, by its id.
     let o = s.mensaje(
         Origen::Pestana(orbita),
@@ -3813,6 +3823,14 @@ fn the_web_asks_the_panel_only_for_its_readings() {
         ("/api/quien-vende/ajuste", "POST"),
         ("/api/quien-vende", "POST"),
         ("/vigia", "POST"),
+        // A frozen program: letting it carry on, or a case id that is not one, never from the web.
+        (
+            "/api/escudo/congelado/c-1793589348314-4412/reanudar",
+            "POST",
+        ),
+        ("/api/escudo/congelado/c-1793589348314-4412/detener", "GET"),
+        ("/api/escudo/congelado/c-17x-4412/detener", "POST"),
+        ("/api/escudo/congelado/../detener", "POST"),
         // The quarantine: restoring, an id that is not a warning's, or a path, never from the web.
         ("/api/escudo/cuarentena/restaura/3-1793589348314", "POST"),
         ("/api/escudo/cuarentena/", "POST"),

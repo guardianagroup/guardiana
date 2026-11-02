@@ -810,6 +810,23 @@ fn es_cuarentena(metodo: &str, ruta: &str) -> bool {
             })
 }
 
+/// 2 Nov 2026: `POST /api/escudo/congelado/c-<when>-<pid>/detener`, stopping a program the escudo froze (and putting
+/// its file in the quarantine). GUARDIANA's web may ask for that, by the case's id; letting it carry on
+/// (`…/reanudar`) only from the panel itself.
+fn es_detener_congelado(metodo: &str, ruta: &str) -> bool {
+    metodo == "POST"
+        && ruta
+            .strip_prefix("/api/escudo/congelado/c-")
+            .and_then(|r| r.strip_suffix("/detener"))
+            .and_then(|r| r.split_once('-'))
+            .is_some_and(|(a, b)| {
+                (1..=16).contains(&a.len())
+                    && (1..=10).contains(&b.len())
+                    && a.bytes().all(|c| c.is_ascii_digit())
+                    && b.bytes().all(|c| c.is_ascii_digit())
+            })
+}
+
 /// ZERO's own wait page for the panel (1.0.44), as it is or saying what failed.
 fn es_espera_propia(url: &str) -> bool {
     [
@@ -2181,6 +2198,7 @@ impl Sesion {
             .iter()
             .any(|(a, b)| *a == metodo && *b == ruta)
             && !es_cuarentena(metodo, ruta)
+            && !es_detener_congelado(metodo, ruta)
         {
             return self.sin_lectura(id, n, 403);
         }
