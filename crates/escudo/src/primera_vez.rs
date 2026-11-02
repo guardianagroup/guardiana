@@ -59,7 +59,8 @@ pub struct Aviso {
     /// `lector`, `comprimido`, `navegador`, `guion` or `copias` ([`crate::cadenas`]), `arranque` ([`crate::arranque`]), `secuestro`
     /// ([`crate::secuestro`]), `proteccion` ([`crate::proteccion`]), `hosts` ([`crate::hosts`]),
     /// `sin_nombre` ([`crate::sin_nombre`]), `disfraz` ([`crate::disfraz`]), `engano` ([`crate::engano`]), `medio`
-    /// ([`crate::medios`]), `credenciales` ([`crate::credenciales`]) or `defensor` ([`crate::defensor`]).
+    /// ([`crate::medios`]), `credenciales` ([`crate::credenciales`]), `defensor` ([`crate::defensor`]), `senuelo`
+    /// ([`crate::senuelos`]) or `copias_borradas` ([`crate::contencion`]).
     pub regla: &'static str,
     /// The program's file name.
     pub programa: String,

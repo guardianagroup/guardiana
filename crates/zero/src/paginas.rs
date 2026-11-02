@@ -1470,6 +1470,12 @@ const GUION: &str = r#"(() => {
   } catch (_) {}
 })();"#;
 
+/// The page script, for the tests of other modules (`acceso.rs` keeps its list equal to this one).
+#[cfg(test)]
+pub(crate) fn guion_de_pruebas() -> &'static str {
+    GUION
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1602,10 +1608,4 @@ mod tests {
         assert!(!p.contains("</script><script>alert"));
         assert!(p.contains("location.replace("));
     }
-}
-
-/// The page script, for the tests of other modules (`acceso.rs` keeps its list equal to this one).
-#[cfg(test)]
-pub(crate) fn guion_de_pruebas() -> &'static str {
-    GUION
 }

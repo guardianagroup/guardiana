@@ -21,6 +21,7 @@
 pub mod analisis;
 pub mod arranque;
 pub mod cadenas;
+pub mod contencion;
 pub mod credenciales;
 pub mod cuarentena;
 pub mod defensor;
@@ -33,6 +34,7 @@ pub mod medios;
 pub mod primera_vez;
 pub mod proteccion;
 pub mod secuestro;
+pub mod senuelos;
 pub mod sin_nombre;
 
 pub use analisis::{analiza, analiza_carpeta, huella_de, Resultado, Veredicto};
