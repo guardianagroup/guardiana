@@ -27,7 +27,9 @@ $alto = Join-Path $dir "ALTO"
 $eventos = Join-Path $dir "eventos.txt"
 
 function Ahora { [DateTime]::UtcNow.ToString("HH:mm:ss.fff") }
-function Evento([string]$t) { $l = "$(Ahora)  $t"; Add-Content -Path $eventos -Value $l -Encoding UTF8; Write-Output $l }
+# Write-Host y no Write-Output: lo que escribe no se mezcla con lo que devuelven las funciones (con Write-Output, un «no se pudo
+# pulsar» devolvía también texto y contaba como si se hubiera pulsado)
+function Evento([string]$t) { $l = "$(Ahora)  $t"; Add-Content -Path $eventos -Value $l -Encoding UTF8; Write-Host $l }
 
 $zero = "C:\Program Files\Guardiana\ZERO\GUARDIANA ZERO.exe"
 if ($Antes) {
@@ -73,7 +75,10 @@ using System; using System.Runtime.InteropServices;
 public static class Raton {
   [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
   [DllImport("user32.dll")] static extern void mouse_event(uint f, uint x, uint y, uint d, UIntPtr e);
+  [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
   public static void Clic(int x, int y) { SetCursorPos(x, y); System.Threading.Thread.Sleep(80); mouse_event(2, 0, 0, 0, UIntPtr.Zero); mouse_event(4, 0, 0, 0, UIntPtr.Zero); }
+  // BM_CLICK: el botón (o la casilla) se pulsa como con el ratón y avisa a su ventana (el instalador cambia su propiedad)
+  public static bool Pulsa(IntPtr h) { return PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.Zero); }
 }
 "@
 
@@ -111,8 +116,13 @@ function MiraVentanas {
     return $ws
 }
 
+# Los controles del instalador de Windows llegan a la automatización como «Pane» sin patrones (la vuelta del 2 Nov 2026 lo
+# enseñó): se pulsan con BM_CLICK en su propia ventana, y si no tienen ventana, con Invoke.
 function Pulsa($e, [string]$que) {
+    $h = [IntPtr]::Zero
+    try { $h = [IntPtr]$e.Current.NativeWindowHandle } catch { }
     try {
+        if ($h -ne [IntPtr]::Zero -and [Raton]::Pulsa($h)) { Evento "pulsado (BM_CLICK): $que"; return $true }
         $e.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
         Evento "pulsado: $que"
         return $true
@@ -122,14 +132,15 @@ function Pulsa($e, [string]$que) {
 # Marcar la casilla de aceptar, con lo que haga falta: la automatización (Toggle o Invoke) y, si la casilla no cambia,
 # un clic de ratón en su cuadrado, como una persona. Cada intento queda en el registro.
 function Marca($cb, [string]$n, [int]$intento) {
-    if ($intento -eq 0) {
+    if ($intento -eq 0) { if (Pulsa $cb "casilla: $n") { return } }
+    if ($intento -eq 1) {
         try {
             $t = $cb.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
             if ($t.Current.ToggleState -ne [System.Windows.Automation.ToggleState]::On) { $t.Toggle() }
             Evento "marcada (Toggle): $n"; return
         } catch { Evento "Toggle no: $($_.Exception.Message)" }
     }
-    if ($intento -le 1) {
+    if ($intento -eq 1) {
         try { $cb.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke(); Evento "marcada (Invoke): $n"; return } catch { Evento "Invoke no: $($_.Exception.Message)" }
     }
     try {
@@ -155,8 +166,10 @@ while ((Get-Date) -lt $limite -and -not $acabado) {
         Arbol $w
         try {
             # La casilla de aceptar: se marca, y si a los 4 s «Instalar» sigue apagado, se prueba de otra manera.
-            $instalarApagado = @($w.FindAll([System.Windows.Automation.TreeScope]::Descendants, $esBoton) | Where-Object { ($_.Current.Name -replace "&", "").Trim() -match "^(Instalar|Install)$" -and -not $_.Current.IsEnabled }).Count -gt 0
-            foreach ($cb in $w.FindAll([System.Windows.Automation.TreeScope]::Descendants, $esCasilla)) {
+            # por su nombre, sea del tipo que sea (en el instalador de Windows todos llegan como «Pane»)
+            $controles = @($w.FindAll([System.Windows.Automation.TreeScope]::Descendants, $todas))
+            $instalarApagado = @($controles | Where-Object { ($_.Current.Name -replace "&", "").Trim() -match "^(Instalar|Install)$" -and -not $_.Current.IsEnabled }).Count -gt 0
+            foreach ($cb in $controles) {
                 $n = $cb.Current.Name
                 if ($n -notmatch "acepto|accept|aceito" -or -not $cb.Current.IsEnabled) { continue }
                 $k = "casilla|$($w.Current.NativeWindowHandle)"
@@ -176,7 +189,7 @@ while ((Get-Date) -lt $limite -and -not $acabado) {
                 try { $radios[0].GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select() } catch { }
                 Start-Sleep -Milliseconds 800
             }
-            $botones = @($w.FindAll([System.Windows.Automation.TreeScope]::Descendants, $esBoton) | Where-Object { $_.Current.IsEnabled -and $_.Current.IsOffscreen -eq $false })
+            $botones = @($controles | Where-Object { $_.Current.IsEnabled -and $_.Current.IsOffscreen -eq $false })
             $porNombre = @{}
             foreach ($b in $botones) { $porNombre[($b.Current.Name -replace "&", "").Trim()] = $b }
             # La última pantalla: el primero de $fin que haya, por ese orden («Abrir GUARDIANA» antes que «Cerrar»).
