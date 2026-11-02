@@ -10,8 +10,10 @@
 #   whole machine spent, and how long a cached name takes to come back from 127.0.0.1:53, once a second. Before (the
 #   1.0.54 code, `antes`) and after (the branch dispatched), each built as it ships.
 #
-# Only by hand (workflow_dispatch). It changes the DNS of a throwaway machine and puts it back; it signs nothing and
-# publishes nothing. Results are notices and the run's summary.
+# By hand (workflow_dispatch). GitHub only starts by hand a workflow that is on the default branch or has already run
+# once, so the push trigger below, limited to this branch and to these files, is what lets it run before any merge;
+# nowhere else does it start on its own. It changes the DNS of a throwaway machine and puts it back; it signs nothing
+# and publishes nothing. Results are notices and the run's summary.
 name: ligero
 
 on:
@@ -29,6 +31,11 @@ on:
         description: '«no» skips the idle-service measurement (only the per-command costs)'
         required: false
         default: 'si'
+  push:
+    branches: [ligero-1055]
+    paths:
+      - 'build/ligero/**'
+      - '.github/workflows/ligero.yml'
 
 permissions:
   contents: read
@@ -62,7 +69,7 @@ jobs:
           path: medir
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ matrix.cual == 'antes' && github.event.inputs.antes || github.sha }}
+          ref: ${{ matrix.cual == 'antes' && (github.event.inputs.antes || 'b59071408246e0bd8bcfbf790952fe2beb3feb9b') || github.sha }}
           path: codigo
       - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
         with:
@@ -77,4 +84,4 @@ jobs:
         run: cargo build --release -p guardiana-cli --locked
       - name: medir
         shell: pwsh
-        run: ./medir/build/ligero/reposo.ps1 -Exe "$env:GITHUB_WORKSPACE\codigo\target\release\guardiana.exe" -Etiqueta '${{ matrix.cual }}' -Minutos ${{ github.event.inputs.minutos }}
+        run: ./medir/build/ligero/reposo.ps1 -Exe "$env:GITHUB_WORKSPACE\codigo\target\release\guardiana.exe" -Etiqueta '${{ matrix.cual }}' -Minutos ${{ github.event.inputs.minutos || '10' }}
