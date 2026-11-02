@@ -1,7 +1,13 @@
 //! The VPN's cut-off switch on Windows (in preparation; docs/VPN.md): `guardiana_tunel::corte`'s plan turned into
-//! Windows Filtering Platform filters, in a **dynamic** session of their own, under GUARDIANA's provider and a sublayer
-//! of the VPN's own. Windows removes every one of them the moment the session closes: when this value is dropped, and
+//! Windows Filtering Platform filters, in a **dynamic** session of their own, under a provider and a sublayer of that
+//! session's own. Windows removes every one of them the moment the session closes: when this value is dropped, and
 //! when the service ends for any reason, so a crash never leaves the computer without network.
+//!
+//! The provider and the sublayer get new keys in every session, as WireGuard's own client does: what a dynamic session
+//! adds belongs to it, and no other session can hang anything from it. With fixed keys (GUARDIANA's provider, the same as
+//! the antivirus cuts', `cortafuegos`), the panel's long-lived firewall session owned the provider, and Windows refused
+//! the VPN's sublayer with `FWP_E_WRONG_SESSION` (0x8032000C; «FwpmSubLayerAdd0 = 0x8032000c» on a person's computer,
+//! 2 Nov 2026, 14:07); and two switches at once would refuse each other.
 //!
 //! The plan names the conditions; here each becomes WFP's own: the tunnel's interface by its LUID, the service by its
 //! program file (`FwpmGetAppIdFromFileName0`), loopback by its flag, protocols, ports, addresses and networks, ICMPv6
@@ -19,19 +25,27 @@ use guardiana_tunel::corte::{Capa, Condicion, Filtro};
 use windows_sys::core::GUID;
 use windows_sys::Win32::Foundation::HANDLE;
 use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::*;
+use windows_sys::Win32::System::Rpc::UuidCreate;
 
 use crate::cortafuegos::ErrorCorte;
 
-/// GUARDIANA's provider (the same as the program's other cuts) and the VPN's own sublayer.
-const PROVEEDOR: GUID = GUID::from_u128(0x6705_1a2e_9c33_4e77_b1a4_2f0e_7c11_9a01);
-const SUBCAPA_VPN: GUID = GUID::from_u128(0x6705_1a2e_9c33_4e77_b1a4_2f0e_7c11_9a03);
 /// `RPC_C_AUTHN_WINNT`.
 const RPC_C_AUTHN_WINNT: u32 = 10;
-/// `FWP_E_ALREADY_EXISTS`.
-const YA_EXISTE: u32 = 0x8032_0009;
 
 fn err(llamada: &str, code: u32) -> ErrorCorte {
     ErrorCorte::Sistema(format!("{llamada} = 0x{code:08x}"))
+}
+
+/// A new key for one of this session's objects.
+fn clave_nueva() -> Result<GUID, ErrorCorte> {
+    let mut g = GUID::from_u128(0);
+    // SAFETY: an out-pointer to a GUID owned here.
+    let r = unsafe { UuidCreate(&mut g) };
+    // RPC_S_OK (0), or RPC_S_UUID_LOCAL_ONLY (1824): unique on this computer only, which is all a session's key needs
+    if r != 0 && r != 1824 {
+        return Err(err("UuidCreate", u32::from_ne_bytes(r.to_ne_bytes())));
+    }
+    Ok(g)
 }
 
 fn ancho(s: &str) -> Vec<u16> {
@@ -62,6 +76,9 @@ struct Valores {
 /// The cut-off switch, on. Dropping it closes the dynamic session, and Windows removes every filter.
 pub struct CorteVpn {
     engine: HANDLE,
+    /// This session's provider and sublayer (new keys in every session; see the module's notes).
+    proveedor: GUID,
+    subcapa: GUID,
 }
 
 // The handle is used only through the engine's own calls, which are thread-safe.
@@ -76,6 +93,8 @@ impl CorteVpn {
     /// # Errors
     /// [`ErrorCorte::Sistema`] with the call Windows refused.
     pub fn activa(plan: &[Filtro], servicio: &Path) -> Result<Self, ErrorCorte> {
+        let proveedor = clave_nueva()?;
+        let subcapa = clave_nueva()?;
         // SAFETY: a zeroed FWPM_SESSION0 is a valid "no options" session; only the dynamic flag is set.
         let mut sesion: FWPM_SESSION0 = unsafe { std::mem::zeroed() };
         sesion.flags = FWPM_SESSION_FLAG_DYNAMIC;
@@ -93,8 +112,12 @@ impl CorteVpn {
         if r != 0 {
             return Err(err("FwpmEngineOpen0", r));
         }
-        let corte = Self { engine };
-        corte.asegura_proveedor_y_subcapa()?;
+        let corte = Self {
+            engine,
+            proveedor,
+            subcapa,
+        };
+        corte.pon_proveedor_y_subcapa()?;
         let ruta = ancho(&servicio.to_string_lossy());
         let mut app_id: *mut FWP_BYTE_BLOB = std::ptr::null_mut();
         // SAFETY: a NUL-terminated path owned for the call; the out-pointer is freed below.
@@ -118,28 +141,29 @@ impl CorteVpn {
         resultado.map(|()| corte)
     }
 
-    fn asegura_proveedor_y_subcapa(&self) -> Result<(), ErrorCorte> {
-        let mut nombre = ancho("GUARDIANA");
-        // SAFETY: zeroed provider with our key and a display name owned for the call.
+    /// This session's provider and sublayer: new keys, so neither can already exist (and nothing else hangs from them).
+    fn pon_proveedor_y_subcapa(&self) -> Result<(), ErrorCorte> {
+        let mut nombre = ancho("GUARDIANA — VPN");
+        // SAFETY: zeroed provider with this session's key and a display name owned for the call.
         let mut p: FWPM_PROVIDER0 = unsafe { std::mem::zeroed() };
-        p.providerKey = PROVEEDOR;
+        p.providerKey = self.proveedor;
         p.displayData.name = nombre.as_mut_ptr();
         // SAFETY: valid provider pointer; default security descriptor.
         let r = unsafe { FwpmProviderAdd0(self.engine, &p, std::ptr::null_mut()) };
-        if r != 0 && r != YA_EXISTE {
+        if r != 0 {
             return Err(err("FwpmProviderAdd0", r));
         }
         let mut nombre = ancho("GUARDIANA — VPN, interruptor de corte");
-        let mut clave = PROVEEDOR;
-        // SAFETY: zeroed sublayer with our keys and an owned display name; the highest weight, as WireGuard's.
+        let mut clave = self.proveedor;
+        // SAFETY: zeroed sublayer with this session's keys and an owned display name; the highest weight, as WireGuard's.
         let mut s: FWPM_SUBLAYER0 = unsafe { std::mem::zeroed() };
-        s.subLayerKey = SUBCAPA_VPN;
+        s.subLayerKey = self.subcapa;
         s.providerKey = &mut clave;
         s.displayData.name = nombre.as_mut_ptr();
         s.weight = 0xFFFF;
         // SAFETY: valid sublayer pointer; default security descriptor.
         let r = unsafe { FwpmSubLayerAdd0(self.engine, &s, std::ptr::null_mut()) };
-        if r != 0 && r != YA_EXISTE {
+        if r != 0 {
             return Err(err("FwpmSubLayerAdd0", r));
         }
         Ok(())
@@ -280,12 +304,12 @@ impl CorteVpn {
             .flat_map(|c| Self::condiciones(c, app_id, &mut valores))
             .collect();
         let mut nombre = ancho(f.nombre);
-        let mut prov = PROVEEDOR;
+        let mut prov = self.proveedor;
         // SAFETY: zeroed filter; every field relied on is set below.
         let mut x: FWPM_FILTER0 = unsafe { std::mem::zeroed() };
         x.providerKey = &mut prov;
         x.layerKey = capa_wfp(f.capa);
-        x.subLayerKey = SUBCAPA_VPN;
+        x.subLayerKey = self.subcapa;
         x.displayData.name = nombre.as_mut_ptr();
         x.action.r#type = if f.permite {
             FWP_ACTION_PERMIT
@@ -333,20 +357,83 @@ impl Drop for CorteVpn {
 mod tests {
     use super::*;
 
+    /// The plan without the filters that would block the test machine's own network (everything else, and other DNS).
+    fn permisos() -> Vec<Filtro> {
+        let dns = ["10.66.0.1".parse().unwrap(), "fd66::1".parse().unwrap()];
+        guardiana_tunel::corte::plan(0x0123_4567_89ab_cdef, &dns)
+            .into_iter()
+            .filter(|f| f.permite)
+            .collect()
+    }
+
+    /// What Windows answers when a new dynamic session hangs a sublayer from `proveedor`.
+    fn subcapa_colgada_de(proveedor: GUID) -> u32 {
+        // SAFETY: as in `activa`: a dynamic session of this test's own, with owned values, closed before returning.
+        unsafe {
+            let mut sesion: FWPM_SESSION0 = std::mem::zeroed();
+            sesion.flags = FWPM_SESSION_FLAG_DYNAMIC;
+            let mut engine: HANDLE = std::ptr::null_mut();
+            let r = FwpmEngineOpen0(
+                std::ptr::null(),
+                RPC_C_AUTHN_WINNT,
+                std::ptr::null(),
+                &sesion,
+                &mut engine,
+            );
+            assert_eq!(r, 0, "FwpmEngineOpen0 = 0x{r:08x}");
+            let mut nombre = ancho("GUARDIANA — prueba");
+            let mut clave = proveedor;
+            let mut s: FWPM_SUBLAYER0 = std::mem::zeroed();
+            s.subLayerKey = clave_nueva().unwrap();
+            s.providerKey = &mut clave;
+            s.displayData.name = nombre.as_mut_ptr();
+            let r = FwpmSubLayerAdd0(engine, &s, std::ptr::null_mut());
+            FwpmEngineClose0(engine);
+            r
+        }
+    }
+
     /// On a real Windows, as an administrator: every filter of the plan is accepted by Windows (each condition is
-    /// of a type its field takes), except the ones that would block the test machine's own network (everything else,
-    /// and other DNS), and the session closes cleanly.
+    /// of a type its field takes), except the ones that would block the test machine's own network, and the session
+    /// closes cleanly.
     #[test]
     #[ignore = "necesita Windows como administrador"]
     fn windows_acepta_cada_filtro_del_plan() {
-        let dns = ["10.66.0.1".parse().unwrap(), "fd66::1".parse().unwrap()];
-        let plan: Vec<Filtro> = guardiana_tunel::corte::plan(0x0123_4567_89ab_cdef, &dns)
-            .into_iter()
-            .filter(|f| f.permite)
-            .collect();
+        let plan = permisos();
         assert!(plan.len() > 20);
         let yo = std::env::current_exe().unwrap();
         let corte = CorteVpn::activa(&plan, &yo).unwrap();
         drop(corte);
+    }
+
+    /// With the antivirus cuts' firewall session open (the panel holds it for as long as it runs, under GUARDIANA's
+    /// provider), the switch still goes on: what failed on a person's computer on 2 Nov 2026 («FwpmSubLayerAdd0 =
+    /// 0x8032000c»). The cause is checked too: a sublayer hung from that provider by another session is refused.
+    #[test]
+    #[ignore = "necesita Windows como administrador"]
+    fn con_los_cortes_del_antivirus_abiertos() {
+        let cortes = crate::cortafuegos::Cortafuegos::abrir().unwrap();
+        let r = subcapa_colgada_de(GUID::from_u128(0x6705_1a2e_9c33_4e77_b1a4_2f0e_7c11_9a01));
+        eprintln!("otra sesión, con el proveedor de los cortes del antivirus: 0x{r:08x}");
+        assert_ne!(
+            r, 0,
+            "Windows dejó colgar algo del proveedor de otra sesión"
+        );
+        let yo = std::env::current_exe().unwrap();
+        let corte = CorteVpn::activa(&permisos(), &yo).unwrap();
+        drop(corte);
+        drop(cortes);
+    }
+
+    /// Two switches at once (a reconnection that turns the new one on before the old one is gone) do not refuse
+    /// each other.
+    #[test]
+    #[ignore = "necesita Windows como administrador"]
+    fn dos_a_la_vez() {
+        let yo = std::env::current_exe().unwrap();
+        let a = CorteVpn::activa(&permisos(), &yo).unwrap();
+        let b = CorteVpn::activa(&permisos(), &yo).unwrap();
+        drop(a);
+        drop(b);
     }
 }
