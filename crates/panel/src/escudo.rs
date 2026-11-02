@@ -290,6 +290,12 @@ mod tests {
             .map(|(i, _)| i)
             .collect();
         assert_eq!(ids, vec!["0-5".to_owned(), "2-7".to_owned()]);
+        // a real file outside the protected folders can go; a missing or relative one cannot
+        let archivo = dir.join("sospechoso.bin");
+        std::fs::write(&archivo, b"x").unwrap();
+        assert!(se_puede(&archivo.to_string_lossy()));
+        assert!(!se_puede(&dir.join("no-esta.bin").to_string_lossy()));
+        assert!(!se_puede("relativa.exe"));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

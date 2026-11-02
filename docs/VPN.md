@@ -105,7 +105,7 @@ Pendiente, en este orden:
    instalado.
 3. Los servidores, dentro del sello (con la llave del dueño), y la primera conexión de verdad.
 
-Decisiones del dueño que lo condicionan: gratuita o de pago; qué servidores y países; la política contra el abuso.
+Decisiones tomadas en la ronda 88 (1 nov 2026): incluida en la licencia de GUARDIANA, sin cuenta aparte; servidores de la fase 1, los de Hetzner (Helsinki, Núremberg); contra el abuso sin guardar nada (puerto 25 cerrado, topes de altas y de conexiones nuevas, pares sin uso se quitan).
 
 ## Los servidores (propuesta para la fase 1)
 
