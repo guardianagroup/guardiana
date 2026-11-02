@@ -19,8 +19,9 @@ use crate::api::ApiResult;
 use crate::auth::Session;
 use crate::AppState;
 
-/// En qué está la VPN.
+/// En qué está la VPN. Fuera de Windows nunca llega a conectada ni a error: no se conecta.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[cfg_attr(not(windows), allow(dead_code))]
 enum Fase {
     #[default]
     Apagada,
