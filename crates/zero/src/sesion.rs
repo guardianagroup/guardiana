@@ -4241,7 +4241,7 @@ impl Sesion {
             let (autor, script) = medidas::autor(&u, &web);
             algo |= p.escudo.medidas.huella(*t, autor, script, *r);
         }
-        // The person's own webs only: not an isolated tab, not the AI's.
+        // The person's own webs only: not an isolated tab.
         if propia {
             for (t, _, r) in &lista {
                 self.medidas.huella(&web, *t, *r);
@@ -4439,7 +4439,7 @@ impl Sesion {
         if clases.is_empty() {
             return None;
         }
-        // The decoy has no kind of the person's: it is never approved.
+        // Only the kinds approved for that site are left out of the search.
         Some(
             formas
                 .iter()

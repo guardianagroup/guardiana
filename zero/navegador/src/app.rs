@@ -1754,7 +1754,7 @@ fn eventos_pestana(
                     let metodo = texto_de(|p| req.Method(p));
                     let mut contexto = COREWEBVIEW2_WEB_RESOURCE_CONTEXT::default();
                     args.ResourceContext(&mut contexto)?;
-                    // The body is read when marked data or the decoy might travel in it, when it
+                    // The body is read when marked data might travel in it, when it
                     // goes to a known pixel, which puts there what it tells, or when it goes to
                     // another site, whose size the shield says (decision 206).
                     let cuerpo = if metodo != "GET"
