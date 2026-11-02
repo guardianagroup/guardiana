@@ -2,7 +2,8 @@
 //! application for Windows does to its adapter (`tunnel/addressconfig.go`, MIT, read at its source on 1 Nov 2026),
 //! through Windows' IP Helper:
 //!
-//! - the tunnel's address on the adapter (`CreateUnicastIpAddressEntry`);
+//! - the tunnel's address on the adapter (`CreateUnicastIpAddressEntry`), and the old one taken off when a new sign-up
+//!   gives another (`DeleteUnicastIpAddressEntry`);
 //! - a route for each allowed network on the adapter, next hop none, metric 0 (`CreateIpForwardEntry2`);
 //! - the adapter's settings: no router discovery, no duplicate address detection, no DHCPv6, its MTU, and metric 0 with
 //!   the automatic metric off when it carries the default route (`GetIpInterfaceEntry`, `SetIpInterfaceEntry`);
@@ -22,9 +23,10 @@ use std::net::IpAddr;
 
 use windows_sys::Win32::Foundation::{ERROR_OBJECT_ALREADY_EXISTS, NO_ERROR};
 use windows_sys::Win32::NetworkManagement::IpHelper::{
-    CreateIpForwardEntry2, CreateUnicastIpAddressEntry, GetIpInterfaceEntry,
-    InitializeIpForwardEntry, InitializeIpInterfaceEntry, InitializeUnicastIpAddressEntry,
-    SetIpInterfaceEntry, MIB_IPFORWARD_ROW2, MIB_IPINTERFACE_ROW, MIB_UNICASTIPADDRESS_ROW,
+    CreateIpForwardEntry2, CreateUnicastIpAddressEntry, DeleteUnicastIpAddressEntry,
+    GetIpInterfaceEntry, InitializeIpForwardEntry, InitializeIpInterfaceEntry,
+    InitializeUnicastIpAddressEntry, SetIpInterfaceEntry, MIB_IPFORWARD_ROW2, MIB_IPINTERFACE_ROW,
+    MIB_UNICASTIPADDRESS_ROW,
 };
 use windows_sys::Win32::Networking::WinSock::{
     IpDadStatePreferred, RouterDiscoveryDisabled, AF_INET, AF_INET6, IN6_ADDR_0, IN_ADDR_0,
@@ -91,6 +93,23 @@ pub fn pon_direccion(luid: u64, direccion: &IpAddr, prefijo: u8) -> Result<(), E
     // SAFETY: a row initialised and filled above, owned for the call.
     comprueba("CreateUnicastIpAddressEntry", unsafe {
         CreateUnicastIpAddressEntry(&fila)
+    })
+}
+
+/// Takes `direccion` off the adapter `luid`.
+///
+/// # Errors
+/// [`ErrorRed`] with the call Windows refused (also when the adapter does not have that address).
+pub fn quita_direccion(luid: u64, direccion: &IpAddr) -> Result<(), ErrorRed> {
+    // SAFETY: a zeroed row, initialised by Windows' own function before any field is set.
+    let mut fila: MIB_UNICASTIPADDRESS_ROW = unsafe { std::mem::zeroed() };
+    // SAFETY: a row owned here.
+    unsafe { InitializeUnicastIpAddressEntry(&mut fila) };
+    fila.InterfaceLuid.Value = luid;
+    fila.Address = sockaddr(direccion);
+    // SAFETY: a row initialised and filled above, owned for the call.
+    comprueba("DeleteUnicastIpAddressEntry", unsafe {
+        DeleteUnicastIpAddressEntry(&fila)
     })
 }
 

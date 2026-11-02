@@ -78,6 +78,17 @@ impl From<ErrorCorte> for ErrorTunel {
 pub struct Tunel {
     corte: Option<CorteVpn>,
     adaptador: Adaptador,
+    /// This computer's address in the tunnel now, and the tunnel's resolver (the cut-off switch lets DNS go to it only).
+    direccion: Ipv4Addr,
+    dns: Ipv4Addr,
+}
+
+/// Everything goes inside the tunnel: IPv4 and IPv6.
+fn todas() -> Vec<(IpAddr, u8)> {
+    vec![
+        (IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0),
+        (IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0),
+    ]
 }
 
 impl Tunel {
@@ -97,16 +108,12 @@ impl Tunel {
     ) -> Result<Self, ErrorTunel> {
         let biblioteca = Arc::new(Biblioteca::carga(dll)?);
         let adaptador = Adaptador::crea(&biblioteca, NOMBRE, NOMBRE)?;
-        let todas = vec![
-            (IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0),
-            (IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0),
-        ];
         let par = nt::Par {
             publica: alta.servidor,
             psk: Some(alta.psk.clone()),
             extremo: Some(extremo),
             keepalive: KEEPALIVE,
-            permitidas: todas,
+            permitidas: todas(),
         };
         adaptador.configura(&nt::configuracion(&llaves.secreta_bytes(), None, &[par]))?;
         let luid = adaptador.luid();
@@ -133,7 +140,55 @@ impl Tunel {
             None
         };
         adaptador.pon(true)?;
-        Ok(Self { corte, adaptador })
+        Ok(Self {
+            corte,
+            adaptador,
+            direccion: alta.direccion,
+            dns: alta.dns,
+        })
+    }
+
+    /// A new sign-up with the same server, on the tunnel as it is (`guardiana_tunel::conexion::renueva`): the whole
+    /// configuration again (the same key, the server's new preshared key, its address) and, if the server gave another
+    /// address, that one in place of the old. The cut-off switch is not touched: nothing leaves outside the tunnel
+    /// meanwhile. A different resolver would need another cut-off switch, so it is refused.
+    ///
+    /// # Errors
+    /// [`ErrorTunel`] with the step that failed; the cut-off switch stays on.
+    pub fn renueva(
+        &mut self,
+        llaves: &Llaves,
+        alta: &Alta,
+        extremo: SocketAddr,
+    ) -> Result<(), ErrorTunel> {
+        if alta.dns != self.dns {
+            return Err(ErrorTunel::Corte(
+                "el servidor ha cambiado de resolutor: hay que volver a conectar".to_owned(),
+            ));
+        }
+        let par = nt::Par {
+            publica: alta.servidor,
+            psk: Some(alta.psk.clone()),
+            extremo: Some(extremo),
+            keepalive: KEEPALIVE,
+            permitidas: todas(),
+        };
+        self.adaptador
+            .configura(&nt::configuracion(&llaves.secreta_bytes(), None, &[par]))?;
+        if alta.direccion != self.direccion {
+            let luid = self.adaptador.luid();
+            red_vpn::pon_direccion(luid, &IpAddr::V4(alta.direccion), PREFIJO)?;
+            // the old one, off: with it still there, Windows could keep sending from it
+            let _ = red_vpn::quita_direccion(luid, &IpAddr::V4(self.direccion));
+            self.direccion = alta.direccion;
+        }
+        Ok(())
+    }
+
+    /// This computer's address in the tunnel now.
+    #[must_use]
+    pub fn direccion(&self) -> Ipv4Addr {
+        self.direccion
     }
 
     /// The adapter's LUID.
@@ -176,6 +231,10 @@ impl Abierto for Tunel {
     fn cierra(self) {
         Tunel::cierra(self);
     }
+
+    fn renueva(&mut self, llaves: &Llaves, alta: &Alta, extremo: SocketAddr) -> Result<(), String> {
+        Tunel::renueva(self, llaves, alta, extremo).map_err(|e| e.to_string())
+    }
 }
 
 /// A whole connection with the GUARDIANA server called `host` (`guardiana_tunel::conexion`): fresh keys, the sign-up
@@ -194,8 +253,36 @@ pub fn conecta(host: &str, dll: &Path, servicio: &Path) -> Result<Conectado<Tune
             Tunel::abre(dll, servicio, llaves, alta, extremo, true).map_err(|e| e.to_string())
         },
         conexion::ESPERA,
-        || u64::try_from(guardiana_core::time::now_ms()).unwrap_or(0),
+        ahora_ms,
     )
+}
+
+/// A new sign-up for a connection that dropped (the server stopped answering: `guardiana_tunel::conexion::caida`),
+/// straight to the server's address known from the first one, because with the cut-off switch on nothing resolves
+/// outside the tunnel; the server's certificate is still checked against its name. The tunnel and its cut-off switch stay
+/// on throughout.
+///
+/// # Errors
+/// [`ErrorConexion`] with the step that failed; the tunnel stays open, closed to everything outside, to try again.
+pub fn renueva(c: &mut Conexion) -> Result<(), ErrorConexion> {
+    let (servidor, ip) = (c.servidor.clone(), c.extremo.ip());
+    conexion::renueva(
+        c,
+        move |host, pide| {
+            if host == servidor {
+                conexion::pide_alta_en(host, SocketAddr::new(ip, 443), pide)
+            } else {
+                // the sign-up was asked of another name than the tunnel's end: only the system can find it
+                conexion::pide_alta(host, pide)
+            }
+        },
+        conexion::ESPERA,
+        ahora_ms,
+    )
+}
+
+fn ahora_ms() -> u64 {
+    u64::try_from(guardiana_core::time::now_ms()).unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -235,6 +322,33 @@ mod tests {
         let e = t.estado().unwrap();
         assert_eq!(e.publica, [7; 32]);
         assert_eq!(e.ultimo_saludo_ms, None);
+        // a new sign-up with the same server: another preshared key and another address, on the same adapter
+        let mut t = t;
+        let otra = Alta {
+            direccion: Ipv4Addr::new(10, 66, 7, 4),
+            servidor: [6; 32],
+            psk: zeroize::Zeroizing::new([8; 32]),
+            ..alta
+        };
+        t.renueva(&llaves, &otra, "192.0.2.1:51820".parse().unwrap())
+            .unwrap();
+        assert_eq!(t.direccion(), Ipv4Addr::new(10, 66, 7, 4));
+        let e = t.estado().unwrap();
+        assert_eq!(e.publica, [6; 32]);
+        assert_eq!(e.ultimo_saludo_ms, None);
+        // the old address is gone: taking it off again fails
+        assert!(
+            red_vpn::quita_direccion(t.luid(), &IpAddr::V4(Ipv4Addr::new(10, 66, 7, 3))).is_err()
+        );
+        // another resolver is refused: it would need another cut-off switch
+        let otro_dns = Alta {
+            dns: Ipv4Addr::new(10, 66, 0, 2),
+            psk: zeroize::Zeroizing::new([8; 32]),
+            ..otra
+        };
+        assert!(t
+            .renueva(&llaves, &otro_dns, "192.0.2.1:51820".parse().unwrap())
+            .is_err());
         t.cierra();
     }
 }
