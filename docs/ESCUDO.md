@@ -69,6 +69,12 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
   `ActiveScriptEventConsumer`), que la vigilancia lee como un arranque más: una nueva es grave siempre, porque es una
   forma de arrancar sola que no sale en el Inicio ni en las tareas y la usan intrusiones que no dejan archivos; lo que
   ejecuta suele ser un programa de Windows (PowerShell), así que su firma no dice nada.
+  Y los otros sitios desde donde arranca un programa, como los enseña Autoruns: lo que ejecuta Winlogon al iniciar
+  sesión (Shell y Userinit; un cambio es grave), un «depurador» en las opciones de ejecución de Windows (Image File
+  Execution Options), que abre otro programa cada vez que se abre uno (grave si sustituye a un programa de
+  accesibilidad, como `sethc.exe` o `utilman.exe`, que se abren sin contraseña desde la pantalla de inicio de sesión: la
+  puerta trasera de las «teclas especiales»; o si ejecuta un intérprete o está donde cualquiera escribe), y las DLL que
+  Windows carga en todos los programas (AppInit_DLLs, grave).
 - «Secuestro» (`secuestro.rs`): un programa que renombra o borra al menos 100 archivos de la persona (documentos,
   escritorio, imágenes, música, vídeos, descargas, OneDrive) en menos de un minuto, lo que hace un programa de
   secuestro de archivos al encriptarlos. Un programa firmado no se juzga, salvo los intérpretes (PowerShell, la
@@ -98,6 +104,16 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
 - «Disfraz» (`disfraz.rs`): un programa que se llama como uno de Windows (`svchost.exe`, `lsass.exe`, `csrss.exe`…) y
   arranca desde fuera de la carpeta de Windows, el único sitio donde está el de verdad. Grave. Lo ve la misma vigilancia
   de los inicios de programa que «cadenas».
+- «Engaño» (`engano.rs`): un programa que arranca con un nombre hecho para parecer otra cosa: un documento seguido de
+  la extensión de un programa (`factura.pdf.exe`, que con las extensiones ocultas se ve `factura.pdf`) o un carácter
+  invisible que da la vuelta al texto para esconder el `.exe`. Grave. Lo ve la misma vigilancia de los inicios.
+- «Credenciales» (`credenciales.rs`): un programa que abre la memoria de LSASS, el proceso de Windows que guarda las
+  credenciales de las cuentas con sesión abierta, pidiendo leerla (`PROCESS_VM_READ`): así se roban las contraseñas de
+  un equipo. Lo ve la misma sesión con el canal de auditoría del núcleo (`Microsoft-Windows-Kernel-Audit-API-Calls`,
+  evento 5: `TargetProcessId`, `DesiredAccess`, `ReturnCode`). Lo de Windows y lo instalado en Program Files
+  (antivirus, copias de seguridad) no se juzga; un programa que ejecuta otros (rundll32, PowerShell…) o una herramienta
+  que copia la memoria de un proceso, sí, esté donde esté. Grave, también si Windows lo negó (la protección de LSA):
+  el intento ya es la señal.
 - «Segunda opinión» (`defensor.rs`): en cada aviso grave sobre el archivo de un programa (fuera de la carpeta de
   Windows), se pregunta a Microsoft Defender por ese archivo (`MpCmdRun -Scan -ScanType 3 -File … -DisableRemediation`:
   solo dice, no toca nada; un archivo, una vez al día, en un hilo aparte). Si lo reconoce como amenaza, es otro aviso

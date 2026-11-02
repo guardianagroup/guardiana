@@ -163,7 +163,8 @@ pub fn es_motor_web(programa: &str) -> bool {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Arranque {
     /// `run`, `runonce`, `carpeta`, `tarea`, `servicio`, `wmi` (a WMI event subscription that runs a command or a
-    /// script), `launchd`, `autostart`, `systemd`.
+    /// script), `winlogon` (what Winlogon runs at sign-in, its value in the name), `ifeo` (a «debugger» that replaces a
+    /// program when it starts), `appinit` (DLLs loaded into every program), `launchd`, `autostart`, `systemd`.
     pub tipo: String,
     /// Where it is (the registry key, the folder, the task's folder, the service's start mode).
     pub donde: String,
@@ -1219,6 +1220,9 @@ fn donde_texto(tipo: &str) -> &'static str {
         "tarea" => "tarea programada",
         "servicio" => "servicio",
         "wmi" => "suscripción de WMI",
+        "winlogon" => "inicio de sesión de Windows (Winlogon)",
+        "ifeo" => "depurador de un programa (Image File Execution Options)",
+        "appinit" => "DLL cargada en todos los programas (AppInit_DLLs)",
         "launchd" => "LaunchAgents/LaunchDaemons",
         "autostart" => "inicio automático del escritorio",
         "systemd" => "servicio de systemd",
@@ -1425,6 +1429,9 @@ pub const TIPOS_ARRANQUE: &[&str] = &[
     "tarea",
     "servicio",
     "wmi",
+    "winlogon",
+    "ifeo",
+    "appinit",
     "launchd",
     "autostart",
     "systemd",

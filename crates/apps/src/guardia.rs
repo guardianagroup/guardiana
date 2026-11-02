@@ -12,7 +12,7 @@ use ferrisetw::provider::{EventFilter, Provider};
 use ferrisetw::schema_locator::SchemaLocator;
 use ferrisetw::trace::UserTrace;
 use ferrisetw::EventRecord;
-use guardiana_escudo::{cadenas, disfraz, ladrones, secuestro};
+use guardiana_escudo::{cadenas, disfraz, engano, ladrones, secuestro};
 
 use super::{Acceso, Apertura, Error, Lanzamiento, Rafaga};
 use crate::ventanas::programa_de;
@@ -443,10 +443,10 @@ fn anotar_inicio(datos: &Arc<Mutex<Compartido>>, registro: &EventRecord, esquema
             );
         }
     }
-    // a program wearing the name of one of Windows' own outside Windows' folder (escudo, «disfraz») goes on even
-    // without a parent known
-    let disfrazado = disfraz::sospechoso(&hijo, &imagen);
-    if !cadenas::vigilado(&hijo) && !disfrazado {
+    // a program wearing the name of one of Windows' own outside Windows' folder (escudo, «disfraz»), or a name made
+    // to look like a document («engaño»), goes on even without a parent known
+    let sin_padre = disfraz::sospechoso(&hijo, &imagen) || engano::sospechoso(&hijo).is_some();
+    if !cadenas::vigilado(&hijo) && !sin_padre {
         return;
     }
     let padre_pid = lector.try_parse::<u32>("ParentProcessID").unwrap_or(0);
@@ -458,14 +458,14 @@ fn anotar_inicio(datos: &Arc<Mutex<Compartido>>, registro: &EventRecord, esquema
             .map(|d| programa_en(&d, padre_pid))
             .unwrap_or_default()
     };
-    if padre.is_empty() && !disfrazado {
+    if padre.is_empty() && !sin_padre {
         return;
     }
     let ahora = guardiana_core::time::now_ms();
     let Ok(mut d) = datos.lock() else {
         return;
     };
-    let clave = if disfrazado {
+    let clave = if sin_padre {
         (imagen.to_lowercase(), hijo.to_ascii_lowercase())
     } else {
         (padre_ruta.to_ascii_lowercase(), hijo.to_ascii_lowercase())

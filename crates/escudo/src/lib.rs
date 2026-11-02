@@ -25,6 +25,7 @@ pub mod credenciales;
 pub mod cuarentena;
 pub mod defensor;
 pub mod disfraz;
+pub mod engano;
 pub mod hosts;
 pub mod huellas;
 pub mod ladrones;

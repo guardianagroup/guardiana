@@ -469,6 +469,23 @@ impl EscudoVivo {
                     self.anota(&aviso, grave);
                 }
             }
+            // a name made to look like a document: once an hour per file
+            if let Some((aviso, grave)) =
+                guardiana_escudo::engano::juzga(&l.hijo, &l.imagen, cuando)
+            {
+                let clave = (aviso.nombre.clone(), "engano".to_owned());
+                if !self
+                    .cadenas_vistas
+                    .get(&clave)
+                    .is_some_and(|t| cuando.saturating_sub(*t) < REPETIR_CADENA_MS)
+                {
+                    if self.cadenas_vistas.len() > 4_096 {
+                        self.cadenas_vistas.clear();
+                    }
+                    self.cadenas_vistas.insert(clave, cuando);
+                    self.anota(&aviso, grave);
+                }
+            }
             if l.padre.is_empty() {
                 continue;
             }
@@ -701,16 +718,31 @@ impl EscudoVivo {
                 continue;
             }
             let texto = |k: &str| d[k].as_str().unwrap_or_default().to_owned();
-            // a WMI subscription is judged as it is: what it runs is often Windows' own program
-            if texto("tipo") == "wmi" {
-                let (aviso, grave) = guardiana_escudo::arranque::juzga_wmi(
-                    &texto("x"),
-                    &texto("ruta"),
-                    &s.clave,
-                    u64::try_from(s.ts).unwrap_or(0),
-                );
-                if !self.ya_avisado(aviso.regla, &aviso.nombre) {
-                    self.anota(&aviso, grave);
+            // a WMI subscription, Winlogon, a program's «debugger» and AppInit_DLLs are judged as they are: what they
+            // run is often Windows' own program
+            let tipo = texto("tipo");
+            if matches!(tipo.as_str(), "wmi" | "winlogon" | "ifeo" | "appinit") {
+                let cuando = u64::try_from(s.ts).unwrap_or(0);
+                let juicio = if tipo == "wmi" {
+                    Some(guardiana_escudo::arranque::juzga_wmi(
+                        &texto("x"),
+                        &texto("ruta"),
+                        &s.clave,
+                        cuando,
+                    ))
+                } else {
+                    guardiana_escudo::arranque::juzga_registro(
+                        &tipo,
+                        &texto("x"),
+                        &texto("ruta"),
+                        &s.clave,
+                        cuando,
+                    )
+                };
+                if let Some((aviso, grave)) = juicio {
+                    if !self.ya_avisado(aviso.regla, &aviso.nombre) {
+                        self.anota(&aviso, grave);
+                    }
                 }
                 continue;
             }

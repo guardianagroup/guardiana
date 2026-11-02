@@ -13,7 +13,8 @@ $USUARIOS = @()
 try { $USUARIOS = @(Get-ChildItem 'Registry::HKEY_USERS' | Where-Object { $_.PSChildName -match '^S-1-5-21-[\d-]+$' } | ForEach-Object { $_.PSChildName }) } catch {}
 foreach ($sid in $USUARIOS) { $p = Prop "$PERFILES\$sid" 'ProfileImagePath'; if ($p) { $R.cuentas[$sid] = (Split-Path -Leaf ([string]$p)) } }
 
-# ---- What starts on its own: Run and RunOnce, the Startup folders, scheduled tasks, services, WMI subscriptions.
+# ---- What starts on its own: Run and RunOnce, the Startup folders, scheduled tasks, services, WMI subscriptions,
+# Winlogon, Image File Execution Options and AppInit_DLLs.
 try {
   $l = New-Object System.Collections.ArrayList
   $raices = @(@{ r = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion'; c = 'equipo' }, @{ r = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion'; c = 'equipo' })
@@ -63,6 +64,24 @@ try {
       }
     }
   } catch { $R.errores['wmi'] = (Corta $_.Exception.Message) }
+  # Other places that make a program start, as Autoruns lists them (1.0.52, el escudo): what Winlogon runs at sign-in
+  # (its value is part of the name, so a change counts as new), a 'debugger' that replaces a program each time it
+  # starts (Image File Execution Options) and the DLLs loaded into every program (AppInit_DLLs, when on).
+  try {
+    $w = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+    foreach ($n in 'Shell', 'Userinit') { $v = Prop $w $n; if ($v) { [void]$l.Add([ordered]@{ tipo = 'winlogon'; donde = $w; nombre = ($n + '=' + (Corta $v)); ruta = (Corta $v); cuenta = 'equipo' }) } }
+    $i = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options'
+    if (Test-Path -LiteralPath $i) {
+      Get-ChildItem -LiteralPath $i -ErrorAction SilentlyContinue | ForEach-Object {
+        $d = Prop $_.PSPath 'Debugger'
+        if ($d) { [void]$l.Add([ordered]@{ tipo = 'ifeo'; donde = $i; nombre = [string]$_.PSChildName; ruta = (Corta $d); cuenta = 'equipo' }) }
+      }
+    }
+    foreach ($r in 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows', 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows NT\CurrentVersion\Windows') {
+      $a = [string](Prop $r 'AppInit_DLLs'); $c = Prop $r 'LoadAppInit_DLLs'
+      if ($a.Trim() -and $c -eq 1) { [void]$l.Add([ordered]@{ tipo = 'appinit'; donde = $r; nombre = (Corta $a); ruta = (Corta $a); cuenta = 'equipo' }) }
+    }
+  } catch { $R.errores['otros_arranques'] = (Corta $_.Exception.Message) }
   $R.arranque = $l
 } catch { $R.errores['arranque'] = (Corta $_.Exception.Message) }
 

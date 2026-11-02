@@ -230,6 +230,121 @@ pub fn juzga(
     ))
 }
 
+/// Windows' accessibility programs, which can be opened from the sign-in screen before anyone signs in: a «debugger»
+/// that replaces one of them opens whatever it names there, without a password (the «sticky keys» back door).
+const ACCESIBILIDAD: &[&str] = &[
+    "sethc.exe",
+    "utilman.exe",
+    "osk.exe",
+    "magnify.exe",
+    "narrator.exe",
+    "displayswitch.exe",
+    "atbroker.exe",
+];
+
+/// Programs that run whatever they are given.
+const INTERPRETES: &[&str] = &[
+    "cmd.exe",
+    "powershell.exe",
+    "pwsh.exe",
+    "wscript.exe",
+    "cscript.exe",
+    "mshta.exe",
+    "rundll32.exe",
+    "regsvr32.exe",
+];
+
+/// The file name of the program a command line starts (`"C:\x\a.exe" /b` → `a.exe`), in lower case.
+fn programa_de_orden(orden: &str) -> String {
+    let o = orden.trim().to_lowercase();
+    let ruta = match o.strip_prefix('"') {
+        Some(resto) => resto.split('"').next().unwrap_or_default(),
+        None => o.split_whitespace().next().unwrap_or_default(),
+    };
+    ruta.rsplit(['\\', '/'])
+        .next()
+        .unwrap_or_default()
+        .to_owned()
+}
+
+/// A new entry in one of the other places that make a program start (`tipo` `winlogon`, `ifeo` or `appinit` in the
+/// continuous watch), called `titulo` and running `orden`; `clave` identifies it. Judged as it is, since what these
+/// places run is often Windows' own program. Winlogon and AppInit_DLLs almost never change: grave. A «debugger» is
+/// grave when it replaces an accessibility program, runs an interpreter or lives where anyone can write; another one
+/// (a tool that replaces the Task Manager, say) is a plain warning.
+#[must_use]
+pub fn juzga_registro(
+    tipo: &str,
+    titulo: &str,
+    orden: &str,
+    clave: &str,
+    cuando_ms: u64,
+) -> Option<(Aviso, bool)> {
+    let corta: String = orden.chars().take(160).collect();
+    let (texto, grave) = match tipo {
+        "winlogon" => {
+            let que = if titulo.to_ascii_lowercase().starts_with("userinit") {
+                "el inicio de cada usuario (Userinit)"
+            } else {
+                "el escritorio (Shell)"
+            };
+            (
+                format!(
+                    "Ha cambiado lo que Windows ejecuta al iniciar sesión, {que}: ahora «{corta}». Es un sitio que casi \
+                     nunca cambia y que usan los programas dañinos para arrancar con cada inicio de sesión. Si no lo \
+                     cambiaste tú, analiza el equipo."
+                ),
+                true,
+            )
+        }
+        "ifeo" => {
+            let objetivo = titulo.to_ascii_lowercase();
+            let accesible = ACCESIBILIDAD.contains(&objetivo.as_str());
+            let programa = programa_de_orden(orden);
+            let grave = accesible
+                || INTERPRETES.contains(&programa.as_str())
+                || carpeta_escribible(orden).is_some();
+            let puerta = if accesible {
+                format!(
+                    " «{titulo}» se puede abrir desde la pantalla de inicio de sesión sin contraseña: así se deja una \
+                     puerta trasera en el equipo."
+                )
+            } else {
+                String::new()
+            };
+            (
+                format!(
+                    "Ahora, cada vez que se abre «{titulo}», Windows abre en su lugar «{corta}» (un «depurador» en las \
+                     opciones de ejecución de Windows).{puerta} Si no lo pusiste tú, analiza el equipo."
+                ),
+                grave,
+            )
+        }
+        "appinit" => (
+            format!(
+                "Windows carga ahora «{corta}» dentro de cada programa que arranca (AppInit_DLLs). Es un mecanismo \
+                 antiguo que casi nada legítimo usa, y con el que un programa dañino se mete en todos los demás. Si no \
+                 lo instalaste tú, analiza el equipo."
+            ),
+            true,
+        ),
+        _ => return None,
+    };
+    Some((
+        Aviso {
+            regla: "arranque",
+            programa: titulo.to_owned(),
+            ruta: orden.to_owned(),
+            sitio: String::new(),
+            nombre: clave.to_owned(),
+            cuando_ms,
+            fuente: None,
+            texto,
+        },
+        grave,
+    ))
+}
+
 /// A new WMI event subscription that runs a command or a script (`tipo` `wmi` in the continuous watch), called `titulo`,
 /// running `orden`: a way to start on its own that no Run key, folder or task shows, used by intrusions that leave no
 /// file. Rare at home, so always grave. `clave` identifies it (the watch's key).
@@ -265,6 +380,64 @@ pub fn juzga_wmi(titulo: &str, orden: &str, clave: &str, cuando_ms: u64) -> (Avi
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn los_otros_sitios_de_arranque() {
+        // las teclas especiales con una consola: grave
+        let (a, grave) = juzga_registro(
+            "ifeo",
+            "sethc.exe",
+            r"C:\Windows\System32\cmd.exe",
+            "ifeo|x|sethc.exe",
+            1,
+        )
+        .unwrap();
+        assert!(grave);
+        assert!(a.texto.contains("puerta trasera"), "{}", a.texto);
+        // un depurador que es un intérprete, para cualquier programa: grave
+        let (_, grave) = juzga_registro(
+            "ifeo",
+            "notepad.exe",
+            "\"powershell.exe\" -w hidden",
+            "k",
+            1,
+        )
+        .unwrap();
+        assert!(grave);
+        // el que sustituye al Administrador de tareas desde Program Files: aviso
+        let (a, grave) = juzga_registro(
+            "ifeo",
+            "taskmgr.exe",
+            r#""C:\Program Files\Sysinternals\procexp64.exe""#,
+            "k",
+            1,
+        )
+        .unwrap();
+        assert!(!grave);
+        assert!(!a.texto.contains("puerta trasera"), "{}", a.texto);
+        // Winlogon y AppInit_DLLs: graves
+        let (a, grave) = juzga_registro(
+            "winlogon",
+            r"Userinit=C:\Windows\system32\userinit.exe,C:\Users\ana\AppData\Roaming\x.exe",
+            r"C:\Windows\system32\userinit.exe,C:\Users\ana\AppData\Roaming\x.exe",
+            "k",
+            1,
+        )
+        .unwrap();
+        assert!(grave);
+        assert!(a.texto.contains("Userinit"), "{}", a.texto);
+        assert!(
+            juzga_registro("appinit", "x.dll", r"C:\x\x.dll", "k", 1)
+                .unwrap()
+                .1
+        );
+        assert_eq!(juzga_registro("run", "x", "x.exe", "k", 1), None);
+        assert_eq!(
+            programa_de_orden(r#""C:\Program Files\A\b.exe" /x"#),
+            "b.exe"
+        );
+        assert_eq!(programa_de_orden(r"C:\Windows\cmd.exe /c x"), "cmd.exe");
+    }
 
     #[test]
     fn una_suscripcion_de_wmi_nueva_es_grave() {
