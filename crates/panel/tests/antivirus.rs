@@ -176,9 +176,11 @@ async fn the_antivirus_page_shows_what_each_antivirus_asked_and_every_official_r
             ..Default::default()
         }])
         .unwrap();
-        // One recent minute too, so the live panel has something to show.
+        // One recent minute too, so the live panel has something to show. A minute ago, not two: the minute is rounded
+        // down to its start, and «GUARDIANA por dentro» keeps the last three; at two, a test that began in the last
+        // second of a minute and asked in the next one found nothing (CI on Windows, 2 Nov 2026).
         l.suma_trafico(&[guardiana_core::Trafico {
-            minuto: now - 2 * 60_000,
+            minuto: now - 60_000,
             programa: "MsMpEng.exe".into(),
             firma: "Microsoft Windows Publisher".into(),
             destino: "vortex-win.data.microsoft.com".into(),
