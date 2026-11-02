@@ -7,6 +7,8 @@
 //! que «conectar» la empieza y la página pregunta por el estado. Al parar el servicio, el túnel se cierra con él.
 //!
 //! Nada de esto guarda llaves ni a qué servidor se conectó nadie: el estado vive en la memoria del servicio.
+// Handlers answer axum's own `Response` on error, as every module of the panel does (see `api.rs`).
+#![allow(clippy::result_large_err)]
 
 use std::sync::{Arc, Mutex};
 
