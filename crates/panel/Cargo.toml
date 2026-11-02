@@ -16,6 +16,8 @@ guardiana-lists = { workspace = true }
 guardiana-apps = { workspace = true }
 # El escudo (1.0.52): reading the antivirus' memory for the panel.
 guardiana-escudo = { workspace = true }
+# The VPN (in preparation): which servers are GUARDIANA's, and the driver's word about the tunnel.
+guardiana-tunel = { workspace = true }
 guardiana-service = { workspace = true }
 axum = { workspace = true }
 tokio = { workspace = true }

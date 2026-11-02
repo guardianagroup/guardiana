@@ -85,10 +85,18 @@ Hecho y probado en un Windows real (la integración continua de GitHub, como adm
   internet. Las pruebas hacen el alta por la red de verdad contra un servidor local y comprueban que los dos lados
   llegan a la misma llave postcuántica.
 - `crates/apps/src/tunel_win.rs::conecta`: lo mismo con el túnel de Windows (todo dentro y el corte puesto).
+- `crates/panel/src/vpn.rs`: el estado y los botones en el panel del servicio. `GET /api/vpn` (en qué está, a qué
+  servidor, desde cuándo, la dirección del túnel, los bytes y el último saludo, o por qué no está disponible: fuera de
+  Windows, o sin `wireguard.dll` junto al programa), `POST /api/vpn/conecta` con `{"servidor": "…guardianagroup.com"}`
+  (empieza; la página pregunta cómo va) y `POST /api/vpn/desconecta`. Nada se guarda: al parar el servicio, el túnel
+  se cierra con él.
+- La prueba de extremo a extremo en Linux (`.github/workflows/vpn.yml`, «extremo»): el servidor de GUARDIANA con el
+  WireGuard del núcleo en un espacio de red, el lado del equipo (`crates/tunel/examples/alta_prueba.rs`) en otro, el
+  alta postcuántica por la red y tráfico de verdad por el túnel (solo pasa si los dos lados sacaron la misma llave).
 
 Pendiente, en este orden:
 
-1. El estado y los botones en el panel del servicio (conectar, desconectar, a qué servidor, desde cuándo, bytes).
+1. La pantalla de la VPN en la web del programa (Órbita), con la lista de servidores cuando existan.
 2. Su pantalla, y el `wireguard.dll` firmado dentro del instalador (comprobado como en `vpn.yml`).
 3. Los servidores, dentro del sello (con la llave del dueño), y la primera conexión de verdad.
 

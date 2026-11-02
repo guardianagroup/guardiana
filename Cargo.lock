@@ -894,6 +894,7 @@ dependencies = [
  "guardiana-license",
  "guardiana-lists",
  "guardiana-service",
+ "guardiana-tunel",
  "guardiana-verify",
  "qrcode",
  "serde",

@@ -165,6 +165,9 @@ impl Tunel {
     }
 }
 
+/// A connection made with [`conecta`], its tunel open.
+pub type Conexion = Conectado<Tunel>;
+
 impl Abierto for Tunel {
     fn saludo_ms(&self) -> Option<u64> {
         self.estado().and_then(|e| e.ultimo_saludo_ms)

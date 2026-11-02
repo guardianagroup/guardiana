@@ -40,6 +40,8 @@ mod universo;
 mod vigia;
 mod vigilancia;
 pub mod vision;
+// The VPN (in preparation; docs/VPN.md): its state and the connect and disconnect buttons.
+mod vpn;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -150,6 +152,8 @@ pub(crate) struct AppState {
     pub(crate) vigilancia: vigilancia::Vigilancia,
     /// «Vigía» (1.0.48): su última mirada, en memoria, para las llamadas y los chats.
     pub(crate) vigia: vigia::Vigia,
+    /// La VPN (en preparación): su estado y, en Windows, el túnel abierto.
+    pub(crate) vpn: vpn::Vpn,
 }
 
 /// A running panel.
@@ -703,6 +707,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         revision: revision::Revisor::default(),
         vigilancia: vigilancia::Vigilancia::default(),
         vigia: vigia::Vigia::default(),
+        vpn: vpn::Vpn::default(),
     });
     // The constant watch (1.0.45) runs as long as the panel does.
     vigilancia::Vigilancia::arrancar(&state);
@@ -1070,6 +1075,9 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/revision", get(revision::ver))
         // 1.0.52: the antivirus' warnings («el escudo», src/escudo.rs).
         .route("/api/escudo", get(escudo::ver))
+        .route("/api/vpn", get(vpn::ver))
+        .route("/api/vpn/conecta", post(vpn::conecta))
+        .route("/api/vpn/desconecta", post(vpn::desconecta))
         .route("/api/revision/ahora", post(revision::ahora))
         // 1.0.51: the route of the data, hop by hop (src/ruta.rs).
         .route("/api/ruta", get(ruta::ver))
