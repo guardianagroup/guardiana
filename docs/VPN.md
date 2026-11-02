@@ -74,9 +74,18 @@ Hecho y probado en un Windows real (la integración continua de GitHub, como adm
   interruptor de corte → arriba. La prueba real lo hace entero sin la ruta por defecto ni el corte (para no tocar la red
   del equipo de pruebas).
 
-Pendiente: que el servicio lo use (el alta por HTTPS al servidor, resolver su nombre, abrir y cerrar el túnel, y su
-estado en el panel) y su pantalla; incluir el `wireguard.dll` firmado en el instalador; los servidores (dentro del
-sello, con la llave del dueño); y la primera conexión de verdad con un servidor.
+- `Adaptador::lee` y `nt::estado_del_par`: lo que el controlador dice del servidor (bytes y último saludo). La prueba
+  real comprueba que devuelve la llave dada: la disposición de las estructuras es la buena.
+
+Pendiente, en este orden:
+
+1. El servicio: llaves nuevas en cada conexión (sin nada que una dos sesiones), el alta por HTTPS al servidor, resolver
+   su nombre, abrir el túnel entero, esperar el primer saludo (si no llega en unos segundos, todo se deshace y se dice
+   «el servidor no contesta», para no dejar el corte puesto sin internet), y el estado en el panel.
+2. Su pantalla, y el `wireguard.dll` firmado dentro del instalador (comprobado como en `vpn.yml`).
+3. Los servidores, dentro del sello (con la llave del dueño), y la primera conexión de verdad.
+
+Decisiones del dueño que lo condicionan: gratuita o de pago; qué servidores y países; la política contra el abuso.
 
 ## Los servidores (propuesta para la fase 1)
 
