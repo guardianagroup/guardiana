@@ -9,7 +9,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use guardiana_apps::{Apertura, Guardia, Observador};
-use guardiana_core::NewEvent;
+use guardiana_core::{Ledger, NewEvent};
+use guardiana_escudo::arranque::Archivo;
 use guardiana_escudo::{Aviso, Firma, Huellas, Memoria, Mirada, Programa};
 
 /// Warnings kept, the newest.
@@ -24,6 +25,20 @@ const GUARDAR_CADA_MS: u64 = 5 * 60_000;
 const REPETIR_LADRON_MS: u64 = 24 * 60 * 60_000;
 /// The same program starting the same program warns once an hour.
 const REPETIR_CADENA_MS: u64 = 60 * 60_000;
+/// How often the continuous watch's history is read for new autostarts.
+const ARRANQUE_CADA_MS: u64 = 30_000;
+/// On the first read, the autostarts the watch noted in the last day are looked at too.
+const ARRANQUE_ATRAS_MS: i64 = 24 * 60 * 60_000;
+
+/// A new autostart's program file waiting for Windows to check its signature.
+struct PendienteArranque {
+    titulo: String,
+    tipo: String,
+    clave: String,
+    archivo: Archivo,
+    cuando_ms: u64,
+    visto_ms: u64,
+}
 
 /// A query whose program's signature was not checked yet.
 struct Pendiente {
@@ -54,6 +69,13 @@ pub(crate) struct EscudoVivo {
     ladrones_vistos: HashMap<(String, String, String), u64>,
     /// (parent's path, started program) → when it last warned.
     cadenas_vistas: HashMap<(String, String), u64>,
+    /// The watch's history is read up to this row (its id) and this time (its `ts`).
+    arranque_id: i64,
+    arranque_ts: i64,
+    /// When the history was last read.
+    arranque_leido_ms: u64,
+    /// New autostarts whose program's signature was not checked yet.
+    arranques: Vec<PendienteArranque>,
 }
 
 impl EscudoVivo {
@@ -84,6 +106,10 @@ impl EscudoVivo {
             aperturas: Vec::new(),
             ladrones_vistos: HashMap::new(),
             cadenas_vistas: HashMap::new(),
+            arranque_id: 0,
+            arranque_ts: i64::try_from(ahora_ms).unwrap_or(0) - ARRANQUE_ATRAS_MS,
+            arranque_leido_ms: 0,
+            arranques: Vec::new(),
         }
     }
 
@@ -133,6 +159,7 @@ impl EscudoVivo {
     pub(crate) fn repasa(&mut self, obs: &Observador, ahora_ms: u64) {
         self.ladrones(obs, ahora_ms);
         self.cadenas();
+        self.arranques_pendientes(obs, ahora_ms);
         if self.pendientes.is_empty() {
             return;
         }
@@ -267,6 +294,102 @@ impl EscudoVivo {
             self.cadenas_vistas.insert(clave, cuando);
             self.anota(&aviso, grave);
         }
+    }
+
+    /// Whether it is time to read the continuous watch's history again.
+    pub(crate) fn toca_arranques(&self, ahora_ms: u64) -> bool {
+        ahora_ms.saturating_sub(self.arranque_leido_ms) >= ARRANQUE_CADA_MS
+    }
+
+    /// The new autostarts the continuous watch noted since the last read (not Windows' own): each program file in
+    /// what they run waits for its signature check (`guardiana_escudo::arranque`).
+    pub(crate) fn arranques(&mut self, l: &Ledger, obs: &Observador, ahora_ms: u64) {
+        self.arranque_leido_ms = ahora_ms;
+        let Ok(filas) = l.vigilancia(500, Some(self.arranque_ts)) else {
+            return;
+        };
+        // the newest come first: oldest first here, so the row read last is the newest
+        for s in filas.iter().rev() {
+            if s.id <= self.arranque_id {
+                continue;
+            }
+            self.arranque_id = s.id;
+            self.arranque_ts = s.ts;
+            if s.tipo != "arranque" || s.datos["frase"] != "vg_ev_arranque_nuevo" {
+                continue;
+            }
+            let d = &s.datos["datos"];
+            if d["sistema"] == "true" {
+                continue;
+            }
+            let texto = |k: &str| d[k].as_str().unwrap_or_default().to_owned();
+            for archivo in guardiana_escudo::arranque::archivos_en(&texto("ruta")) {
+                if archivo.exacta {
+                    // asks for the check now; the answer comes in a later tick
+                    let _ = obs.firma(&archivo.ruta);
+                }
+                if self.arranques.len() < MAX_PENDIENTES {
+                    self.arranques.push(PendienteArranque {
+                        titulo: texto("x"),
+                        tipo: texto("tipo"),
+                        clave: s.clave.clone(),
+                        archivo,
+                        cuando_ms: u64::try_from(s.ts).unwrap_or(0),
+                        visto_ms: ahora_ms,
+                    });
+                }
+            }
+        }
+    }
+
+    /// The new autostarts waiting for a signature check, through the rule once Windows has answered (or after
+    /// [`ESPERA_FIRMA_MS`]). A file that is not there, or whose exact path is not known, goes without a signature
+    /// check. The same autostart warns once, also across restarts (the panel's file is the record).
+    fn arranques_pendientes(&mut self, obs: &Observador, ahora_ms: u64) {
+        if self.arranques.is_empty() {
+            return;
+        }
+        for p in std::mem::take(&mut self.arranques) {
+            let existe = p.archivo.exacta && Path::new(&p.archivo.ruta).is_file();
+            let firma = if existe {
+                match obs.firma(&p.archivo.ruta) {
+                    Some(f) if f.is_empty() => Firma::SinFirma,
+                    Some(f) => Firma::Firmado(f),
+                    None if ahora_ms.saturating_sub(p.visto_ms) < ESPERA_FIRMA_MS => {
+                        self.arranques.push(p);
+                        continue;
+                    }
+                    None => Firma::SinComprobar,
+                }
+            } else {
+                Firma::SinComprobar
+            };
+            let descargado = existe && self.descargado(&p.archivo.ruta);
+            let Some((aviso, grave)) = guardiana_escudo::arranque::juzga(
+                &p.titulo,
+                &p.tipo,
+                &p.clave,
+                &p.archivo,
+                &firma,
+                descargado,
+                p.cuando_ms,
+            ) else {
+                continue;
+            };
+            if self.ya_avisado(aviso.regla, &aviso.nombre) {
+                continue;
+            }
+            self.anota(&aviso, grave);
+        }
+    }
+
+    /// Whether the panel's file already holds a warning of this rule about this thing.
+    fn ya_avisado(&self, regla: &str, nombre: &str) -> bool {
+        std::fs::read_to_string(&self.ruta_avisos).is_ok_and(|t| {
+            t.lines()
+                .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+                .any(|v| v["regla"] == regla && v["nombre"] == nombre)
+        })
     }
 
     /// Writes the memory down when it changed and enough time has passed.

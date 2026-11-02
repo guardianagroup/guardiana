@@ -60,6 +60,10 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
   cualquiera escribe) que abre las herramientas de copias de seguridad de Windows.
 - Las dos miran los eventos del núcleo de Windows en la misma sesión (`crates/apps/src/guardia.rs`): solo nombres y
   rutas, nunca el contenido de los archivos.
+- «Arranque» (`arranque.rs`): de lo nuevo que arranca solo con Windows (lo que ya anota la vigilancia continua), el
+  programa sin firma que está en una carpeta donde cualquiera escribe o que llegó de internet. Grave si está en
+  Descargas, en una carpeta temporal o en el Escritorio, si llegó de internet o si es un servicio. Un programa firmado
+  no se juzga aquí; uno cuya firma no se pudo comprobar, solo en esas tres carpetas.
 - El panel: `GET /api/escudo` (si aún aprende, cuántos sitios, los avisos); la web dentro del programa puede leerlo.
 - Falta: la pantalla del antivirus en la web del programa, el análisis de Descargas desde el panel y las listas de
   muestras (decisión del dueño, abajo).
