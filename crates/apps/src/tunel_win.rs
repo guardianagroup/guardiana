@@ -81,13 +81,7 @@ pub struct Tunel {
     /// This computer's address in the tunnel now, and the tunnel's resolver (the cut-off switch lets DNS go to it only).
     direccion: Ipv4Addr,
     dns: Ipv4Addr,
-    /// Whether everything goes inside (the default routes on the adapter, and the cut-off switch).
-    todo: bool,
 }
-
-/// The default routes, IPv4 and IPv6, as the tunnel puts them on its adapter.
-const POR_DEFECTO_V4: (IpAddr, u8) = (IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
-const POR_DEFECTO_V6: (IpAddr, u8) = (IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0);
 
 /// Everything goes inside the tunnel: IPv4 and IPv6.
 fn todas() -> Vec<(IpAddr, u8)> {
@@ -125,11 +119,11 @@ impl Tunel {
         let luid = adaptador.luid();
         red_vpn::pon_direccion(luid, &IpAddr::V4(alta.direccion), PREFIJO)?;
         if todo {
-            red_vpn::pon_rutas(luid, &[POR_DEFECTO_V4])?;
+            red_vpn::pon_rutas(luid, &[(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)])?;
             red_vpn::ajusta(luid, false, Some(MTU), true)?;
             // IPv6 goes inside too when the adapter has it; when it does not, the cut-off switch keeps it from
             // leaving outside the tunnel anyway
-            let _ = red_vpn::pon_rutas(luid, &[POR_DEFECTO_V6]);
+            let _ = red_vpn::pon_rutas(luid, &[(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)]);
             let _ = red_vpn::ajusta(luid, true, Some(MTU), true);
         } else {
             let [a, b, _, _] = alta.direccion.octets();
@@ -151,37 +145,7 @@ impl Tunel {
             adaptador,
             direccion: alta.direccion,
             dns: alta.dns,
-            todo,
         })
-    }
-
-    /// Steps aside for a new sign-up (`guardiana_tunel::conexion::renueva`): the default routes off the adapter, so this
-    /// program's request to the server goes by the computer's own network. The cut-off switch stays on: no other program
-    /// can send anything outside the tunnel meanwhile, and DNS still goes only to the tunnel's resolver. Without the
-    /// default routes (the tunnel of the real test), nothing to do.
-    ///
-    /// # Errors
-    /// [`ErrorTunel`] when Windows refuses.
-    pub fn aparta(&mut self) -> Result<(), ErrorTunel> {
-        if self.todo {
-            let luid = self.adaptador.luid();
-            red_vpn::quita_rutas(luid, &[POR_DEFECTO_V4])?;
-            let _ = red_vpn::quita_rutas(luid, &[POR_DEFECTO_V6]);
-        }
-        Ok(())
-    }
-
-    /// The default routes back on the adapter, after [`Tunel::aparta`].
-    ///
-    /// # Errors
-    /// [`ErrorTunel`] when Windows refuses: then nothing goes out at all (the cut-off switch is still on).
-    pub fn vuelve(&mut self) -> Result<(), ErrorTunel> {
-        if self.todo {
-            let luid = self.adaptador.luid();
-            red_vpn::pon_rutas(luid, &[POR_DEFECTO_V4])?;
-            let _ = red_vpn::pon_rutas(luid, &[POR_DEFECTO_V6]);
-        }
-        Ok(())
     }
 
     /// A new sign-up with the same server, on the tunnel as it is (`guardiana_tunel::conexion::renueva`): the whole
@@ -271,14 +235,6 @@ impl Abierto for Tunel {
     fn renueva(&mut self, llaves: &Llaves, alta: &Alta, extremo: SocketAddr) -> Result<(), String> {
         Tunel::renueva(self, llaves, alta, extremo).map_err(|e| e.to_string())
     }
-
-    fn aparta(&mut self) -> Result<(), String> {
-        Tunel::aparta(self).map_err(|e| e.to_string())
-    }
-
-    fn vuelve(&mut self) -> Result<(), String> {
-        Tunel::vuelve(self).map_err(|e| e.to_string())
-    }
 }
 
 /// A whole connection with the GUARDIANA server called `host` (`guardiana_tunel::conexion`): fresh keys, the sign-up
@@ -301,10 +257,10 @@ pub fn conecta(host: &str, dll: &Path, servicio: &Path) -> Result<Conectado<Tune
     )
 }
 
-/// A new sign-up for a connection that dropped (the server stopped answering: `guardiana_tunel::conexion::caida`), with
-/// fresh keys, straight to the server's address known from the first one (with the cut-off switch on nothing resolves
-/// outside the tunnel; the server's certificate is still checked against its name), with the tunnel stepped aside for
-/// that one request ([`Tunel::aparta`]). The cut-off switch stays on throughout.
+/// A new sign-up for a connection that dropped (the server stopped answering: `guardiana_tunel::conexion::caida`),
+/// straight to the server's address known from the first one, because with the cut-off switch on nothing resolves
+/// outside the tunnel; the server's certificate is still checked against its name. The tunnel and its cut-off switch stay
+/// on throughout.
 ///
 /// # Errors
 /// [`ErrorConexion`] with the step that failed; the tunnel stays open, closed to everything outside, to try again.
@@ -316,12 +272,8 @@ pub fn renueva(c: &mut Conexion) -> Result<(), ErrorConexion> {
             if host == servidor {
                 conexion::pide_alta_en(host, SocketAddr::new(ip, 443), pide)
             } else {
-                // the sign-up was asked of another name than the tunnel's end: nothing can find it with the cut-off
-                // switch on (DNS goes only into the tunnel); disconnecting and connecting again does
-                Err(ErrorConexion::Alta(
-                    "el alta y el túnel tienen nombres distintos: desconecta y vuelve a conectar"
-                        .to_owned(),
-                ))
+                // the sign-up was asked of another name than the tunnel's end: only the system can find it
+                conexion::pide_alta(host, pide)
             }
         },
         conexion::ESPERA,
@@ -388,14 +340,6 @@ mod tests {
         assert!(
             red_vpn::quita_direccion(t.luid(), &IpAddr::V4(Ipv4Addr::new(10, 66, 7, 3))).is_err()
         );
-        // stepping aside and back (no default routes in this test: nothing to do), and the test network's own route taken
-        // off (twice: gone is gone) and put back, as a new sign-up does with the default ones
-        t.aparta().unwrap();
-        t.vuelve().unwrap();
-        let red = [(IpAddr::V4(Ipv4Addr::new(10, 66, 0, 0)), 16)];
-        red_vpn::quita_rutas(t.luid(), &red).unwrap();
-        red_vpn::quita_rutas(t.luid(), &red).unwrap();
-        red_vpn::pon_rutas(t.luid(), &red).unwrap();
         // another resolver is refused: it would need another cut-off switch
         let otro_dns = Alta {
             dns: Ipv4Addr::new(10, 66, 0, 2),
