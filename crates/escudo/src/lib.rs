@@ -10,7 +10,8 @@
 //! that starts on its own with Windows, unsigned, from a folder anyone can write to or come from the internet; and
 //! [`secuestro`]: one program renaming or deleting many of the person's own files in under a minute; and [`proteccion`]:
 //! Windows' own protection (Defender's real-time and tamper protection, the firewall) switched off; and [`hosts`]: a name
-//! sent by the hosts file to an address on the internet.
+//! sent by the hosts file to an address on the internet; and [`sin_nombre`]: a program connecting straight to an address
+//! no name pointed to.
 //! Everything happens on this computer: nothing is uploaded anywhere.
 //!
 //! A list is never a verdict on its own (docs/LISTS.md): whoever acts on a match also looks at who signs the file, and a
@@ -26,6 +27,7 @@ pub mod ladrones;
 pub mod primera_vez;
 pub mod proteccion;
 pub mod secuestro;
+pub mod sin_nombre;
 
 pub use analisis::{analiza, analiza_carpeta, huella_de, Resultado, Veredicto};
 pub use cuarentena::{Cuarentena, Entrada, ErrorCuarentena};

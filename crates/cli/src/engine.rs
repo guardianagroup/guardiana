@@ -304,6 +304,9 @@ struct EnginePolicy {
     /// bounded few thousand: it is how the traffic of a program gets the name of where it went
     /// instead of a bare address, which is never written (decision 203).
     nombres_ip: Arc<Mutex<HashMap<IpAddr, (String, i64)>>>,
+    /// El escudo (1.0.52, «sin nombre»): programs seen connecting straight to an address on the internet that no
+    /// name this computer asked for pointed to, waiting for the escudo's rule. In memory only, bounded.
+    sin_nombre: Arc<Mutex<VecDeque<crate::escudo::SinNombre>>>,
 }
 
 /// The most addresses remembered with their name.
@@ -1912,6 +1915,7 @@ async fn run_once<F: Future<Output = ()>>(
         },
         cola_apps: Arc::default(),
         nombres_ip: Arc::default(),
+        sin_nombre: Arc::default(),
     });
     let policy_al_cerrar = Arc::clone(&policy);
 
@@ -2017,6 +2021,7 @@ async fn run_once<F: Future<Output = ()>>(
     let contador = match guardiana_apps::Red::arrancar() {
         Ok(red) => {
             let nombres = Arc::clone(&policy.nombres_ip);
+            let sin_nombre = Arc::clone(&policy.sin_nombre);
             let db = cfg.db.clone();
             Some(tokio::spawn(async move {
                 let mut cada = tokio::time::interval(Duration::from_secs(TRAFICO_CADA_S));
@@ -2029,6 +2034,7 @@ async fn run_once<F: Future<Output = ()>>(
                         conexion = Ledger::open(&db, identity::genesis()).ok();
                     }
                     let medidas = red.toma();
+                    crate::escudo::anota_sin_nombre(&medidas, &nombres, &sin_nombre, ahora);
                     let filas = filas_de_trafico(&medidas, &nombres, ahora);
                     let Some(l) = conexion.as_mut() else {
                         continue;
@@ -2071,6 +2077,7 @@ async fn run_once<F: Future<Output = ()>>(
     let vaciador = policy.apps.as_ref().map(|obs| {
         let obs = Arc::clone(obs);
         let cola = Arc::clone(&policy.cola_apps);
+        let sin_nombre = Arc::clone(&policy.sin_nombre);
         let db = cfg.db.clone();
         let imprimir = cfg.print_events;
         tokio::spawn(async move {
@@ -2083,6 +2090,7 @@ async fn run_once<F: Future<Output = ()>>(
                 cada.tick().await;
                 let ahora = now_ms();
                 let ahora_u = u64::try_from(ahora).unwrap_or(0);
+                escudo.sin_nombre(&sin_nombre, &obs, ahora_u);
                 escudo.repasa(&obs, ahora_u);
                 escudo.guarda_si_toca(ahora_u);
                 // what the continuous watch noted, every 30 s (el escudo: «arranque» and «protección»)

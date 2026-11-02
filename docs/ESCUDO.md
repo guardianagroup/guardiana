@@ -74,6 +74,12 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
 - «Hosts» (`hosts.rs`): el archivo hosts de Windows, cada minuto. Un nombre que ahora va a una dirección de internet
   (no a 0.0.0.0, a este equipo ni a la red de casa) es grave: así se desvía una web a otro servidor sin que ningún DNS
   lo vea. La primera lectura es el punto de partida y se guarda junto al diario (`escudo-hosts.json`).
+- «Sin nombre» (`sin_nombre.rs`; ronda 87, segunda meta de Gemini: «toda conexión de un proceso debe venir de una
+  consulta DNS»): un programa que se conecta directamente a una dirección de internet a la que no apuntaba ningún nombre
+  que este equipo haya preguntado en las últimas horas. Solo mientras GUARDIANA es el DNS del equipo; sin las locales ni
+  las anycast. Firmado no se juzga; solo avisa de los que están en carpetas donde cualquiera escribe o llegaron de
+  internet (grave sin firma en Descargas, temporales o Escritorio, o descargado). La dirección no se guarda: solo su red y
+  su país.
 - El panel: `GET /api/escudo` (si aún aprende, cuántos sitios, los avisos); la web dentro del programa puede leerlo.
 - Los avisos graves llegan a la persona aunque no abra nada (el dueño, 1 nov 2026, 19:29: «Me parece bien la
   propuesta, sí, buena idea»): `GUARDIANA ZERO.exe --avisos` arranca al iniciar sesión (entrada Run del instalador) y

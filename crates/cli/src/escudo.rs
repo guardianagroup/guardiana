@@ -5,8 +5,10 @@
 //! that the same watch sees. Its memory and its warnings live next to the ledger, in two small files: `escudo-memoria.json` (since when
 //! this computer asks for each site) and `escudo-avisos.jsonl` (the newest warnings, one per line, for the panel).
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use guardiana_apps::{Apertura, Guardia, Observador, Rafaga};
 use guardiana_core::vigilancia::Suceso;
@@ -28,6 +30,89 @@ const REPETIR_LADRON_MS: u64 = 24 * 60 * 60_000;
 const REPETIR_CADENA_MS: u64 = 60 * 60_000;
 /// The same program renaming or deleting many of the person's files warns once an hour.
 const REPETIR_SECUESTRO_MS: u64 = 60 * 60_000;
+/// The most connections without a name waiting for the escudo.
+const MAX_SIN_NOMBRE: usize = 256;
+/// The same program warns once a day for its connections without a name.
+const REPETIR_SIN_NOMBRE_MS: u64 = 24 * 60 * 60_000;
+/// How long a name this computer asked for counts for its address (the traffic's own: six hours).
+const VIGENCIA_NOMBRE_MS: i64 = 6 * 60 * 60_000;
+/// GUARDIANA counts as this computer's DNS when it answered a name within this time; otherwise the rule is quiet
+/// (with another DNS, every connection would look nameless).
+const DNS_RECIENTE_MS: i64 = 10 * 60_000;
+
+/// A program seen connecting straight to an address on the internet that no name pointed to: the traffic counter
+/// finds it, the escudo judges it (`guardiana_escudo::sin_nombre`). The address is not kept: only its network and
+/// country.
+pub(crate) struct SinNombre {
+    programa: String,
+    ruta: String,
+    donde: String,
+    ts: u64,
+}
+
+/// From one take of the traffic: each connection of a program not known to be signed to an address on the internet
+/// (not local, not anycast) that no name answered in the last hours pointed to. Only while GUARDIANA is this computer's
+/// DNS; at most one waiting per program.
+pub(crate) fn anota_sin_nombre(
+    medidas: &[guardiana_apps::Medida],
+    nombres: &Mutex<HashMap<IpAddr, (String, i64)>>,
+    cola: &Mutex<VecDeque<SinNombre>>,
+    ahora: i64,
+) {
+    if medidas.is_empty() {
+        return;
+    }
+    let Ok(nombres) = nombres.lock() else {
+        return;
+    };
+    if !nombres.values().any(|(_, t)| ahora - t < DNS_RECIENTE_MS) {
+        return;
+    }
+    let mut nuevos = Vec::new();
+    for m in medidas {
+        let ruta = &m.proceso.ruta;
+        if ruta.is_empty() || !m.proceso.firmado_por.is_empty() {
+            continue;
+        }
+        if nombres
+            .get(&m.ip)
+            .is_some_and(|(_, t)| ahora - t < VIGENCIA_NOMBRE_MS)
+        {
+            continue;
+        }
+        let s = guardiana_lists::servidor_de(m.ip);
+        if s.local || s.anycast {
+            continue;
+        }
+        let donde = match (s.red, s.pais) {
+            (Some(r), Some(p)) => format!("{}, {p}", r.nombre),
+            (Some(r), None) => r.nombre.to_string(),
+            (None, Some(p)) => p.to_owned(),
+            (None, None) => String::new(),
+        };
+        nuevos.push(SinNombre {
+            programa: m.proceso.nombre.clone(),
+            ruta: ruta.clone(),
+            donde,
+            ts: u64::try_from(ahora).unwrap_or(0),
+        });
+    }
+    drop(nombres);
+    if nuevos.is_empty() {
+        return;
+    }
+    if let Ok(mut c) = cola.lock() {
+        for n in nuevos {
+            if c.len() >= MAX_SIN_NOMBRE {
+                break;
+            }
+            if !c.iter().any(|x| x.ruta == n.ruta) {
+                c.push_back(n);
+            }
+        }
+    }
+}
+
 /// How often the hosts file is read.
 const HOSTS_CADA_MS: u64 = 60_000;
 /// How often the continuous watch's history is read for new autostarts.
@@ -85,6 +170,10 @@ pub(crate) struct EscudoVivo {
     rafagas: Vec<Rafaga>,
     /// Program path → when its last burst warned.
     secuestros_vistos: HashMap<String, u64>,
+    /// Connections without a name whose program's signature was not checked yet, and program path → when it was
+    /// last judged.
+    sin_nombre_pend: Vec<SinNombre>,
+    sin_nombre_vistos: HashMap<String, u64>,
     /// The hosts file as last read (name → address), and where it is kept between restarts.
     hosts: Option<BTreeMap<String, String>>,
     ruta_hosts: PathBuf,
@@ -132,6 +221,8 @@ impl EscudoVivo {
             hosts,
             ruta_hosts,
             hosts_leido_ms: 0,
+            sin_nombre_pend: Vec::new(),
+            sin_nombre_vistos: HashMap::new(),
         }
     }
 
@@ -370,6 +461,63 @@ impl EscudoVivo {
             }
             self.secuestros_vistos.insert(clave, cuando);
             self.anota(&aviso, grave);
+        }
+    }
+
+    /// The connections without a name the traffic counter found, once Windows has checked each program's signature,
+    /// through the rule (`guardiana_escudo::sin_nombre`). A program is judged once a day, warned or not.
+    pub(crate) fn sin_nombre(
+        &mut self,
+        cola: &Mutex<VecDeque<SinNombre>>,
+        obs: &Observador,
+        ahora_ms: u64,
+    ) {
+        let nuevos: Vec<SinNombre> = cola
+            .lock()
+            .map(|mut c| c.drain(..).collect())
+            .unwrap_or_default();
+        if nuevos.is_empty() && self.sin_nombre_pend.is_empty() {
+            return;
+        }
+        let mut todos = std::mem::take(&mut self.sin_nombre_pend);
+        todos.extend(nuevos);
+        for s in todos {
+            let clave = s.ruta.to_lowercase();
+            if self
+                .sin_nombre_vistos
+                .get(&clave)
+                .is_some_and(|t| s.ts.saturating_sub(*t) < REPETIR_SIN_NOMBRE_MS)
+            {
+                continue;
+            }
+            let firma = match obs.firma(&s.ruta) {
+                Some(f) if f.is_empty() => Firma::SinFirma,
+                Some(f) => Firma::Firmado(f),
+                None if ahora_ms.saturating_sub(s.ts) < ESPERA_FIRMA_MS => {
+                    if self.sin_nombre_pend.len() < MAX_PENDIENTES
+                        && !self.sin_nombre_pend.iter().any(|x| x.ruta == s.ruta)
+                    {
+                        self.sin_nombre_pend.push(s);
+                    }
+                    continue;
+                }
+                None => Firma::SinComprobar,
+            };
+            if self.sin_nombre_vistos.len() > 4_096 {
+                self.sin_nombre_vistos.clear();
+            }
+            self.sin_nombre_vistos.insert(clave, s.ts);
+            let descargado = self.descargado(&s.ruta);
+            if let Some((aviso, grave)) = guardiana_escudo::sin_nombre::juzga(
+                &s.programa,
+                &s.ruta,
+                &firma,
+                descargado,
+                &s.donde,
+                s.ts,
+            ) {
+                self.anota(&aviso, grave);
+            }
         }
     }
 
