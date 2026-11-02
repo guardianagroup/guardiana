@@ -699,7 +699,8 @@ impl EscudoVivo {
             .unwrap_or_default();
         for c in nuevos {
             let cuando = u64::try_from(c.ts).unwrap_or(ahora_ms);
-            if self.permitidos.contains(&c.ruta.to_ascii_lowercase()) {
+            // «Es mío» only lets a frozen program go on; with the switch off it silences nothing (second review)
+            if guardiana_apps::CONGELAR && self.permitidos.contains(&c.ruta.to_ascii_lowercase()) {
                 for pid in &c.congelados {
                     let _ = guardiana_apps::reanuda(*pid);
                 }

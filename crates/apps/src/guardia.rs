@@ -101,6 +101,10 @@ const HERRAMIENTAS_COPIAS: &[&str] = &[
 /// A decoy deleted or renamed by `pid` (el escudo, 2 Nov 2026): the program and its family frozen at once, unless it is
 /// the person's own file explorer, and the case left for the service.
 fn senuelo_tocado(datos: &Arc<Mutex<Compartido>>, pid: u32, archivo_nt: &str, toque: &'static str) {
+    // with the switch off no decoy of ours exists: a file with that name is someone else's (second review, 2 Nov 2026)
+    if !crate::CONGELAR {
+        return;
+    }
     let ahora = guardiana_core::time::now_ms();
     let (programa, ruta, archivo) = match datos.lock() {
         Ok(d) => {
