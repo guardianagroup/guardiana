@@ -68,6 +68,9 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
   escritorio, imágenes, música, vídeos, descargas, OneDrive) en menos de un minuto, lo que hace un programa de
   secuestro de archivos al encriptarlos. Un programa firmado no se juzga, salvo los intérpretes (PowerShell, la
   consola, Windows Script Host). Lo que sobrescribe los archivos sin renombrarlos ni borrarlos no lo ve esta regla.
+- «Protección» (`proteccion.rs`): lo que la vigilancia continua anota de Seguridad de Windows, cuando la protección se
+  apaga: la protección en tiempo real o contra alteraciones de Microsoft Defender, o ningún antivirus encendido
+  (graves), o un perfil del cortafuegos (aviso). Lo que ya estaba apagado en su primera mirada, aviso sin gravedad.
 - El panel: `GET /api/escudo` (si aún aprende, cuántos sitios, los avisos); la web dentro del programa puede leerlo.
 - Los avisos graves llegan a la persona aunque no abra nada (el dueño, 1 nov 2026, 19:29: «Me parece bien la
   propuesta, sí, buena idea»): `GUARDIANA ZERO.exe --avisos` arranca al iniciar sesión (entrada Run del instalador) y

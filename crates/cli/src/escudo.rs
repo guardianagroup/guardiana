@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use guardiana_apps::{Apertura, Guardia, Observador, Rafaga};
+use guardiana_core::vigilancia::Suceso;
 use guardiana_core::{Ledger, NewEvent};
 use guardiana_escudo::arranque::Archivo;
 use guardiana_escudo::{Aviso, Firma, Huellas, Memoria, Mirada, Programa};
@@ -359,13 +360,14 @@ impl EscudoVivo {
     }
 
     /// Whether it is time to read the continuous watch's history again.
-    pub(crate) fn toca_arranques(&self, ahora_ms: u64) -> bool {
+    pub(crate) fn toca_vigilancia(&self, ahora_ms: u64) -> bool {
         ahora_ms.saturating_sub(self.arranque_leido_ms) >= ARRANQUE_CADA_MS
     }
 
-    /// The new autostarts the continuous watch noted since the last read (not Windows' own): each program file in
-    /// what they run waits for its signature check (`guardiana_escudo::arranque`).
-    pub(crate) fn arranques(&mut self, l: &Ledger, obs: &Observador, ahora_ms: u64) {
+    /// What the continuous watch noted since the last read: its new autostarts (not Windows' own), each program file in
+    /// what they run waiting for its signature check (`guardiana_escudo::arranque`); and the changes of Windows
+    /// Security (`guardiana_escudo::proteccion`).
+    pub(crate) fn lee_vigilancia(&mut self, l: &Ledger, obs: &Observador, ahora_ms: u64) {
         self.arranque_leido_ms = ahora_ms;
         let Ok(filas) = l.vigilancia(500, Some(self.arranque_ts)) else {
             return;
@@ -377,6 +379,10 @@ impl EscudoVivo {
             }
             self.arranque_id = s.id;
             self.arranque_ts = s.ts;
+            if s.tipo == "proteccion" {
+                self.proteccion(s);
+                continue;
+            }
             if s.tipo != "arranque" || s.datos["frase"] != "vg_ev_arranque_nuevo" {
                 continue;
             }
@@ -443,6 +449,30 @@ impl EscudoVivo {
             }
             self.anota(&aviso, grave);
         }
+    }
+
+    /// A change of Windows Security the continuous watch noted, through the rule (`guardiana_escudo::proteccion`); the
+    /// same change warns once, also across restarts.
+    fn proteccion(&self, s: &Suceso) {
+        let d = &s.datos["datos"];
+        let activo = match d["activo"].as_str() {
+            Some("true") => Some(true),
+            Some("false") => Some(false),
+            _ => None,
+        };
+        let Some((aviso, grave)) = guardiana_escudo::proteccion::juzga(
+            s.datos["frase"].as_str().unwrap_or_default(),
+            d["x"].as_str().unwrap_or_default(),
+            activo,
+            &s.clave,
+            u64::try_from(s.ts).unwrap_or(0),
+        ) else {
+            return;
+        };
+        if self.ya_avisado(aviso.regla, &aviso.nombre) {
+            return;
+        }
+        self.anota(&aviso, grave);
     }
 
     /// Whether the panel's file already holds a warning of this rule about this thing.

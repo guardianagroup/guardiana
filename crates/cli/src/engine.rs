@@ -2085,13 +2085,13 @@ async fn run_once<F: Future<Output = ()>>(
                 let ahora_u = u64::try_from(ahora).unwrap_or(0);
                 escudo.repasa(&obs, ahora_u);
                 escudo.guarda_si_toca(ahora_u);
-                // the new autostarts the continuous watch noted, every 30 s (el escudo, «arranque»)
-                if escudo.toca_arranques(ahora_u) {
+                // what the continuous watch noted, every 30 s (el escudo: «arranque» and «protección»)
+                if escudo.toca_vigilancia(ahora_u) {
                     if conexion.is_none() {
                         conexion = Ledger::open(&db, identity::genesis()).ok();
                     }
                     if let Some(l) = conexion.as_ref() {
-                        escudo.arranques(l, &obs, ahora_u);
+                        escudo.lee_vigilancia(l, &obs, ahora_u);
                     }
                 }
                 let mut listos: Vec<guardiana_core::NewEvent> = Vec::new();
