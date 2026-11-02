@@ -4,7 +4,7 @@
 #
 # Abre el instalador como un doble clic (con todas sus pantallas), pulsa lo que pulsaría una persona
 # (aceptar, «Instalar», «Finalizar» o «Abrir GUARDIANA», y «Aceptar» si Windows pregunta por programas
-# abiertos) y, mientras tanto, saca una foto de la pantalla entera cada cuarto de segundo y apunta cada
+# abiertos) y, mientras tanto, saca una foto de la pantalla entera cada 0,15 s y apunta cada
 # ventana que aparece (título, clase y programa), aunque dure un instante: así se ven las «cosas raras»
 # (dueño, 2 Nov 2026: «Tiene que ser más limpio… una pantalla profesional… nada de tirón ni cosas raras»).
 # Con -Antes instala primero esa versión en silencio y deja abiertos ZERO y sus avisos, como los tiene
@@ -58,7 +58,7 @@ $captura = Start-Job -ArgumentList $dir, $alto -ScriptBlock {
             $bmp.Save((Join-Path $dir ("f-" + [DateTime]::UtcNow.ToString("HHmmss.fff") + ".png")), [System.Drawing.Imaging.ImageFormat]::Png)
             $g.Dispose(); $bmp.Dispose()
         } catch { }
-        Start-Sleep -Milliseconds 250
+        Start-Sleep -Milliseconds 150
     }
 }
 Start-Sleep -Seconds 2
@@ -80,11 +80,16 @@ public static class Raton {
   public static void Clic(int x, int y) { SetCursorPos(x, y); System.Threading.Thread.Sleep(80); mouse_event(2, 0, 0, 0, UIntPtr.Zero); mouse_event(4, 0, 0, 0, UIntPtr.Zero); }
   // BM_CLICK: el botón (o la casilla) se pulsa como con el ratón y avisa a su ventana (el instalador cambia su propiedad)
   public static bool Pulsa(IntPtr h) { return PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.Zero); }
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
 }
 "@
 
 $vistas = @{}
 $arboles = @{}
+# La consola del ordenador de pruebas, minimizada: en la vuelta del 2 Nov 2026 tapaba la ventana de GUARDIANA al abrirse.
+foreach ($w in [System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)) {
+    try { if ($w.Current.ClassName -match "CASCADIA_HOSTING_WINDOW_CLASS|ConsoleWindowClass") { [void][Raton]::ShowWindow([IntPtr]$w.Current.NativeWindowHandle, 6) } } catch { }
+}
 function Arbol($w) {
     # Una vez por ventana: sus controles (tipo, nombre, si está activo y qué sabe hacer), para ver en el registro qué hay
     # en cada pantalla aunque la foto no lo diga.
@@ -201,10 +206,10 @@ while ((Get-Date) -lt $limite -and -not $acabado) {
                     if (Pulsa $porNombre[$cual] $cual) { $acabado = $true; break }
                 }
             }
-            $cual = $sigue | Where-Object { $porNombre.ContainsKey($_) -and -not $hechos.ContainsKey("$($w.Current.NativeWindowHandle)|$_") } | Select-Object -First 1
+            $cual = $sigue | Where-Object { $porNombre.ContainsKey($_) -and -not $hechos.ContainsKey("$($porNombre[$_].Current.NativeWindowHandle)|$_") } | Select-Object -First 1
             if ($cual) {
                 Start-Sleep -Seconds 2
-                if (Pulsa $porNombre[$cual] $cual) { $hechos["$($w.Current.NativeWindowHandle)|$cual"] = $true }
+                if (Pulsa $porNombre[$cual] $cual) { $hechos["$($porNombre[$cual].Current.NativeWindowHandle)|$cual"] = $true }
             }
         } catch {
             # Cada error distinto, una vez en el registro (antes se callaban todos y la prueba se quedaba quieta sin decir por qué).
