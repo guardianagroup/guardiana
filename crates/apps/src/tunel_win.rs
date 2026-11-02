@@ -5,8 +5,12 @@
 //!    server's, the post-quantum preshared key, the server's address and everything allowed (`guardiana_tunel::nt`);
 //! 2. its address, its routes, its settings and its resolver (`red_vpn`);
 //! 3. the cut-off switch (`corte_vpn`, with `guardiana_tunel::corte`'s plan): nothing leaves outside the tunnel but
-//!    the encrypted packets to the server;
+//!    the encrypted packets to the server (UDP, its address and its port; since 1.0.55 nothing else of the service's
+//!    either), and the answers of Home Mode's connections to the house;
 //! 4. the adapter up.
+//!
+//! Before any of it, with everything inside, this computer's LAN address is read while the default route is still the
+//! network's, and kept with the tunnel's resolver (`guardiana_core::tunel_dns`): Home Mode stays on it (1.0.55).
 //!
 //! When anything fails, what was done is undone (dropping the cut-off removes its filters; closing the adapter removes
 //! its address and routes). `todo == false` keeps the computer's own routes and adds no cut-off: only the tunnel's own
@@ -76,16 +80,21 @@ impl From<ErrorCorte> for ErrorTunel {
 }
 
 /// The tunnel, open. Its fields drop in this order: the cut-off switch first, then the adapter, and last the tunnel's
-/// resolver as GUARDIANA's DNS upstream, so no name goes to the network's resolvers while the tunnel is still there.
+/// resolver as GUARDIANA's DNS upstream (with the LAN address from before the tunnel), so no name goes to the network's
+/// resolvers, and Home Mode does not move, while the tunnel is still there.
 pub struct Tunel {
     corte: Option<CorteVpn>,
     adaptador: Adaptador,
-    /// This computer's address in the tunnel now, and the tunnel's resolver (the cut-off switch lets DNS go to it only).
+    /// This computer's address in the tunnel now, and the tunnel's resolver (reached on the tunnel's interface: the
+    /// cut-off switch lets no DNS out anywhere else).
     direccion: Ipv4Addr,
     dns: Ipv4Addr,
+    /// The server's address and port: the cut-off switch lets the encrypted packets go there and nowhere else.
+    extremo: SocketAddr,
     /// With everything inside: GUARDIANA's own resolver forwards only to the tunnel's (`guardiana_core::tunel_dns`).
-    /// The service is the one program the cut-off switch lets out, so until 1.0.54 the names it forwarded went to the
-    /// home router outside the tunnel (second review of 2 Nov 2026).
+    /// The service's packets used to be let out anywhere, so until 1.0.54 the names it forwarded went to the home
+    /// router outside the tunnel (second review of 2 Nov 2026). It also keeps the LAN address from before the tunnel,
+    /// for Home Mode (1.0.55).
     desvio: Option<Desvio>,
 }
 
@@ -112,6 +121,15 @@ impl Tunel {
         extremo: SocketAddr,
         todo: bool,
     ) -> Result<Self, ErrorTunel> {
+        // This computer's LAN address, read before the tunnel takes the default route: from then on the way to
+        // anywhere is the tunnel's, and the same reading gives the tunnel's own address. Home Mode listened there, and
+        // the house lost its DNS (third review of 2 Nov 2026). While the tunnel lives, this one is the LAN's
+        // (`guardiana_core::tunel_dns::lan`).
+        let lan = if todo {
+            guardiana_core::tunel_dns::lan()
+        } else {
+            None
+        };
         let biblioteca = Arc::new(Biblioteca::carga(dll)?);
         let adaptador = Adaptador::crea(&biblioteca, NOMBRE, NOMBRE)?;
         let par = nt::Par {
@@ -127,8 +145,9 @@ impl Tunel {
         if todo {
             red_vpn::pon_rutas(luid, &[(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)])?;
             red_vpn::ajusta(luid, false, Some(MTU), true)?;
-            // IPv6 goes inside too when the adapter has it; when it does not, the cut-off switch keeps it from
-            // leaving outside the tunnel anyway
+            // IPv6 goes inside too when the adapter takes it. The tunnel has no IPv6 address, so this may fail, and it
+            // need not succeed: the cut-off switch lets no IPv6 out of the tunnel but DHCPv6 and neighbour discovery on
+            // the link (`guardiana_tunel::corte`, «IPv6», and its test `nada_de_ipv6_fuera_del_tunel`)
             let _ = red_vpn::pon_rutas(luid, &[(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)]);
             let _ = red_vpn::ajusta(luid, true, Some(MTU), true);
         } else {
@@ -139,12 +158,10 @@ impl Tunel {
         red_vpn::pon_dns(NOMBRE, &[IpAddr::V4(alta.dns)])?;
         // From here on GUARDIANA's resolver asks only the tunnel's, which answers once the tunnel is up: until then a
         // name fails instead of leaving outside. If a later step fails, this goes away with it.
-        let desvio = todo.then(|| Desvio::pon(SocketAddr::new(IpAddr::V4(alta.dns), 53)));
+        let desvio = todo.then(|| Desvio::pon(SocketAddr::new(IpAddr::V4(alta.dns), 53), lan));
+        // Of the service, only the encrypted packets to `extremo` go out of the tunnel (1.0.55)
         let corte = if todo {
-            Some(CorteVpn::activa(
-                &corte::plan(luid, &[IpAddr::V4(alta.dns)]),
-                servicio,
-            )?)
+            Some(CorteVpn::activa(&corte::plan(luid, extremo), servicio)?)
         } else {
             None
         };
@@ -154,6 +171,7 @@ impl Tunel {
             adaptador,
             direccion: alta.direccion,
             dns: alta.dns,
+            extremo,
             desvio,
         })
     }
@@ -161,7 +179,9 @@ impl Tunel {
     /// A new sign-up with the same server, on the tunnel as it is (`guardiana_tunel::conexion::renueva`): the whole
     /// configuration again (the same key, the server's new preshared key, its address) and, if the server gave another
     /// address, that one in place of the old. The cut-off switch is not touched: nothing leaves outside the tunnel
-    /// meanwhile. A different resolver would need another cut-off switch, so it is refused.
+    /// meanwhile. A different resolver, or with the cut-off switch on a different address or port of the server (the
+    /// switch lets the encrypted packets go to the first one only), would need another cut-off switch, so it is
+    /// refused.
     ///
     /// # Errors
     /// [`ErrorTunel`] with the step that failed; the cut-off switch stays on.
@@ -176,6 +196,11 @@ impl Tunel {
                 "el servidor ha cambiado de resolutor: hay que volver a conectar".to_owned(),
             ));
         }
+        if self.corte.is_some() && extremo != self.extremo {
+            return Err(ErrorTunel::Corte(
+                "el servidor ha cambiado de dirección: hay que volver a conectar".to_owned(),
+            ));
+        }
         let par = nt::Par {
             publica: alta.servidor,
             psk: Some(alta.psk.clone()),
@@ -185,6 +210,7 @@ impl Tunel {
         };
         self.adaptador
             .configura(&nt::configuracion(&llaves.secreta_bytes(), None, &[par]))?;
+        self.extremo = extremo;
         if alta.direccion != self.direccion {
             let luid = self.adaptador.luid();
             red_vpn::pon_direccion(luid, &IpAddr::V4(alta.direccion), PREFIJO)?;

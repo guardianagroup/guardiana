@@ -18,12 +18,17 @@
 //! panel con la conexión dentro, el túnel quedaba huérfano y la página decía «apagada». Al parar el servicio para
 //! siempre, el motor la cierra ([`cierra_la_vpn`]).
 //!
+//! Una conexión que termina de abrirse después de un cierre, o después de que empezara otra, se cierra en el acto y no
+//! se guarda (1.0.55, tercera revisión del 2 nov 2026): conectar tarda unos segundos sin el candado puesto, y hasta la
+//! 1.0.55 una que acababa tras [`cierra_la_vpn`] se guardaba y seguía abierta, con su corte, después del cierre. Lo
+//! decide [`guarda_si_sigue`] con la generación.
+//!
 //! Nada de esto guarda llaves ni a qué servidor se conectó nadie: el estado vive en la memoria del servicio.
 // Handlers answer axum's own `Response` on error, as every module of the panel does (see `api.rs`).
 #![allow(clippy::result_large_err)]
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 #[cfg(windows)]
 use std::time::Duration;
 
@@ -79,7 +84,8 @@ const VISTAZO: Duration = Duration::from_secs(10);
 #[derive(Default)]
 pub(crate) struct Vpn {
     estado: Mutex<Estado>,
-    /// Cuántas conexiones se han empezado o cerrado: el vigía de una conexión se acaba en cuanto cambia.
+    /// Cuántas conexiones se han empezado o cerrado: el vigía de una conexión se acaba en cuanto cambia, y una conexión
+    /// que acaba de abrirse solo se guarda si no ha cambiado desde que empezó ([`guarda_si_sigue`]).
     generacion: AtomicU64,
     #[cfg(windows)]
     conexion: Mutex<Option<guardiana_apps::tunel_win::Conexion>>,
@@ -91,19 +97,50 @@ pub(crate) fn global() -> &'static Vpn {
     &VPN
 }
 
-/// Al parar el servicio para siempre: el túnel se cierra (y su corte con él) y la VPN vuelve a «apagada».
+/// Al parar el servicio para siempre: el túnel se cierra (y su corte con él) y la VPN vuelve a «apagada». Una conexión
+/// que aún esté a medias se cierra sola al terminar ([`guarda_si_sigue`]).
 pub fn cierra_la_vpn() {
     let vpn = global();
-    // el vigía de la conexión abierta se acaba
+    // el vigía de la conexión abierta se acaba, y la que esté conectando ya no se guardará: la generación sube antes de
+    // tomar la guardada
     vpn.generacion.fetch_add(1, Ordering::SeqCst);
     #[cfg(windows)]
     {
-        let abierta = vpn.conexion.lock().ok().and_then(|mut g| g.take());
+        // también con el candado envenenado: una conexión que no se cierra aquí seguiría abierta tras el cierre
+        let abierta = vpn
+            .conexion
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
         if let Some(c) = abierta {
             c.tunel.cierra();
         }
     }
     vpn.pon(Estado::default());
+}
+
+/// Lo último de una conexión que acaba de abrirse (1.0.55): se guarda en `sitio` solo si `gen`, la generación con la
+/// que empezó, sigue siendo la de `generacion`, es decir, si nadie cerró la VPN ni empezó otra mientras conectaba; y
+/// entonces `al_guardar` corre con el candado puesto (el estado que ve la página). Si no, se devuelve, para cerrarla
+/// en el acto.
+///
+/// Se mira con el candado de `sitio` puesto, y quien cierra sube la generación antes de tomar lo guardado: o la ve
+/// guardada y la cierra él, o esta ve la generación nueva y no se guarda. Ninguna queda abierta sin que nadie la cierre.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn guarda_si_sigue<C>(
+    generacion: &AtomicU64,
+    gen: u64,
+    sitio: &Mutex<Option<C>>,
+    nueva: C,
+    al_guardar: impl FnOnce(&C),
+) -> Option<C> {
+    let mut guardada = sitio.lock().unwrap_or_else(PoisonError::into_inner);
+    if generacion.load(Ordering::SeqCst) != gen {
+        return Some(nueva);
+    }
+    al_guardar(&nueva);
+    *guardada = Some(nueva);
+    None
 }
 
 /// Por qué la VPN no se puede usar aquí, si no se puede.
@@ -162,9 +199,11 @@ impl Vpn {
         })
     }
 
-    /// La conexión entera, fuera del hilo de la página (tarda unos segundos). Dice si quedó abierta.
+    /// La conexión entera, fuera del hilo de la página (tarda unos segundos), de la generación `gen`. Dice si quedó
+    /// abierta: no, si mientras conectaba se cerró la VPN o empezó otra; entonces se cierra en el acto
+    /// ([`guarda_si_sigue`]).
     #[cfg(windows)]
-    fn haz_conexion(&self, host: &str) -> bool {
+    fn haz_conexion(&self, host: &str, gen: u64) -> bool {
         let resultado = std::env::current_exe()
             .map_err(|e| e.to_string())
             .and_then(|exe| {
@@ -175,27 +214,28 @@ impl Vpn {
                 guardiana_apps::tunel_win::conecta(host, &dll, &exe).map_err(|e| e.to_string())
             });
         match resultado {
-            Ok(c) => {
-                let estado = Estado {
-                    fase: Fase::Conectada,
-                    servidor: c.servidor.clone(),
-                    desde_ms: c.desde_ms,
-                    direccion: c.direccion.to_string(),
-                    error: String::new(),
-                };
-                if let Ok(mut g) = self.conexion.lock() {
-                    *g = Some(c);
+            Ok(c) => match guarda_si_sigue(&self.generacion, gen, &self.conexion, c, |c| {
+                self.pon(conectada(c));
+            }) {
+                None => true,
+                Some(tarde) => {
+                    // la VPN se cerró, o empezó otra, mientras conectaba: esta no sobrevive a ese cierre
+                    tarde.tunel.cierra();
+                    false
                 }
-                self.pon(estado);
-                true
-            }
+            },
             Err(error) => {
-                self.pon(Estado {
-                    fase: Fase::Error,
-                    servidor: host.to_owned(),
-                    error,
-                    ..Estado::default()
-                });
+                // con el candado de la conexión, como al guardarla: tras un cierre, la página dice lo que dejó quien
+                // cerró
+                let _guardada = self.conexion.lock().unwrap_or_else(PoisonError::into_inner);
+                if self.generacion.load(Ordering::SeqCst) == gen {
+                    self.pon(Estado {
+                        fase: Fase::Error,
+                        servidor: host.to_owned(),
+                        error,
+                        ..Estado::default()
+                    });
+                }
                 false
             }
         }
@@ -324,7 +364,7 @@ pub(crate) async fn conecta(
         // la VPN del proceso, no el panel: el motor puede rehacer el panel mientras tanto
         let vpn = state.vpn;
         tokio::task::spawn_blocking(move || {
-            if vpn.haz_conexion(&host) {
+            if vpn.haz_conexion(&host, gen) {
                 // el vigía, en un hilo suyo: no retiene el cierre del programa
                 std::thread::spawn(move || vpn.vigila(gen));
             }
@@ -353,7 +393,11 @@ pub(crate) async fn desconecta(
         // fuera de los hilos de la página
         let vpn = state.vpn;
         let _ = tokio::task::spawn_blocking(move || {
-            let abierta = vpn.conexion.lock().ok().and_then(|mut g| g.take());
+            let abierta = vpn
+                .conexion
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .take();
             if let Some(c) = abierta {
                 c.tunel.cierra();
             }
@@ -375,6 +419,61 @@ mod tests {
     fn la_vpn_es_la_misma_en_cada_vuelta_del_motor() {
         // dos paneles seguidos (el motor rehace el suyo cuando cambia la red) ven la misma VPN
         assert!(std::ptr::eq(global(), global()));
+    }
+
+    /// 1.0.55: una conexión que termina de abrirse después de un cierre (o de que empezara otra) no se guarda: vuelve
+    /// para cerrarla en el acto. La de la generación en vigor sí, con su estado puesto bajo el mismo candado.
+    #[test]
+    fn una_conexion_que_acaba_tras_un_cierre_no_se_guarda() {
+        let generacion = AtomicU64::new(0);
+        let sitio: Mutex<Option<&str>> = Mutex::new(None);
+        // empieza, y nadie cierra mientras conecta: se guarda
+        let gen = generacion.fetch_add(1, Ordering::SeqCst) + 1;
+        let mut puesta = false;
+        assert_eq!(
+            guarda_si_sigue(&generacion, gen, &sitio, "primera", |_| puesta = true),
+            None
+        );
+        assert!(puesta);
+        assert_eq!(*sitio.lock().unwrap(), Some("primera"));
+        // el cierre: sube la generación y después toma la guardada
+        generacion.fetch_add(1, Ordering::SeqCst);
+        assert_eq!(sitio.lock().unwrap().take(), Some("primera"));
+        // una que empezó antes del cierre y acaba después: vuelve, para cerrarla, y nada se guarda ni se pone
+        let mut puesta = false;
+        assert_eq!(
+            guarda_si_sigue(&generacion, gen, &sitio, "tarde", |_| puesta = true),
+            Some("tarde")
+        );
+        assert!(!puesta);
+        assert_eq!(*sitio.lock().unwrap(), None);
+        // y la de una conexión nueva, de la generación en vigor, sí
+        let otra = generacion.fetch_add(1, Ordering::SeqCst) + 1;
+        assert_eq!(
+            guarda_si_sigue(&generacion, otra, &sitio, "nueva", |_| {}),
+            None
+        );
+        assert_eq!(*sitio.lock().unwrap(), Some("nueva"));
+    }
+
+    /// Lo que el corte de la VPN deja entrar al servicio (`guardiana_tunel::corte::HOGAR`, 1.0.55) es lo que sirve el
+    /// Modo Hogar a la casa: su DNS, su panel y su página de comprobación.
+    #[test]
+    fn el_corte_deja_entrar_lo_que_sirve_el_modo_hogar() {
+        use guardiana_service::home;
+        use guardiana_tunel::corte::{HOGAR, TCP, UDP};
+        let casa = std::net::Ipv4Addr::new(192, 168, 1, 10);
+        let (dns, panel) = home::lan_listen_addrs(casa);
+        let comprobar = home::lan_checker_addr(casa);
+        assert_eq!(
+            HOGAR,
+            [
+                (UDP, dns.port()),
+                (TCP, dns.port()),
+                (TCP, panel.port()),
+                (TCP, comprobar.port())
+            ]
+        );
     }
 
     #[test]

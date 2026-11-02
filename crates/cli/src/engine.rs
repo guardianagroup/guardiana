@@ -1514,6 +1514,7 @@ fn arriba_automatico(ledger: &Ledger) -> Result<Vec<SocketAddr>, String> {
                 Fuente::Copia => t.cli("observe.upstream_copia"),
                 Fuente::Sistema => t.cli("observe.upstream_auto"),
                 Fuente::Respaldo => t.cli("observe.upstream_propio"),
+                Fuente::Tunel => t.cli("observe.upstream_tunel"),
             };
             println!(
                 "{}",
@@ -1572,7 +1573,8 @@ fn elegir_arriba(ledger: &Ledger) -> Result<(Fuente, Vec<SocketAddr>, String), b
             })
             .unwrap_or_default()
     };
-    let (fuente, v) = escoger_arriba(
+    let (fuente, v) = escoger_arriba_fuera_del_tunel(
+        guardiana_core::tunel_dns::actual(),
         vivos,
         sistema,
         buenos,
@@ -1580,7 +1582,7 @@ fn elegir_arriba(ledger: &Ledger) -> Result<(Fuente, Vec<SocketAddr>, String), b
         sysdns::default_gateway,
         responden_ahora,
     )?;
-    if fuente != Fuente::Respaldo {
+    if matches!(fuente, Fuente::Copia | Fuente::Sistema) {
         guardar_buenos(ledger, &v);
     }
     Ok((fuente, v, fuente_sistema))
@@ -1622,6 +1624,48 @@ enum Fuente {
     Sistema,
     /// A fallback, because every live answer was this machine.
     Respaldo,
+    /// The tunnel's resolver, because the VPN carries everything and no other was found: never saved, and the pass
+    /// is rebuilt when the VPN closes (see [`escoger_arriba_fuera_del_tunel`]).
+    Tunel,
+}
+
+/// [`escoger_arriba`] with the tunnel's resolver `tunel` (the one in force while the VPN carries everything,
+/// `guardiana_core::tunel_dns`) out of every list, the router included (1.0.55). The system lists it as the tunnel
+/// adapter's DNS, and a pass rebuilt while connected could take it as the network's resolver and save it as a good
+/// one: once the VPN closed, names went to it outside any tunnel. Only that address: a home network may use
+/// 10.66.0.0/16 itself. When nothing else is left, the pass asks the tunnel's resolver, where every name goes anyway
+/// while the VPN is on ([`Fuente::Tunel`]): failing here would stop the service, and the VPN with it.
+fn escoger_arriba_fuera_del_tunel(
+    tunel: Option<SocketAddr>,
+    vivos: Vec<IpAddr>,
+    sistema: impl FnOnce() -> Vec<IpAddr>,
+    buenos: Vec<IpAddr>,
+    copia: Vec<IpAddr>,
+    puerta: impl FnOnce() -> Option<IpAddr>,
+    responde: impl FnMut(&[SocketAddr]) -> bool,
+) -> Result<(Fuente, Vec<SocketAddr>), bool> {
+    let Some(t) = tunel else {
+        return escoger_arriba(vivos, sistema, buenos, copia, puerta, responde);
+    };
+    let fuera = |ips: Vec<IpAddr>| fuera_del_tunel(ips, tunel);
+    match escoger_arriba(
+        fuera(vivos),
+        || fuera(sistema()),
+        fuera(buenos),
+        fuera(copia),
+        || puerta().filter(|ip| *ip != t.ip()),
+        responde,
+    ) {
+        Err(_) => Ok((Fuente::Tunel, vec![t])),
+        elegido => elegido,
+    }
+}
+
+/// `ips` without the address of the tunnel's resolver `tunel`, if there is one.
+fn fuera_del_tunel(ips: Vec<IpAddr>, tunel: Option<SocketAddr>) -> Vec<IpAddr> {
+    ips.into_iter()
+        .filter(|ip| tunel.is_none_or(|t| t.ip() != *ip))
+        .collect()
 }
 
 /// The first list, in the order of [`arriba_automatico`], that holds an address that is not this
@@ -2267,7 +2311,14 @@ async fn run_once<F: Future<Output = ()>>(
     // the cable went in) the pass is rebuilt within 15 seconds with the new network's resolvers.
     // Until 1.0.2 only the minute check noticed, and a Mac waking up elsewhere could go up to a
     // minute without names, asking a router that was not there (review of 5 Oct 2026).
+    // With the VPN on, the address from before the tunnel (`guardiana_core::tunel_dns::lan`): the
+    // same before, during and after it, so the tunnel is no new network, and a real one shows when
+    // it closes (1.0.55; 1.0.54 skipped the comparison while the tunnel lived).
     let lan_inicial = guardiana_devices::local_lan_ipv4();
+    // The tunnel's resolver, when this pass could find no other (`Fuente::Tunel`): once the VPN
+    // closes, the pass is rebuilt with the network's.
+    let del_tunel: Option<SocketAddr> =
+        guardiana_core::tunel_dns::actual().filter(|t| seguir_red && upstreams.contains(t));
     let keep_upstreams: Vec<IpAddr> = upstreams.iter().map(SocketAddr::ip).collect();
     let keep_upstream_addrs: Vec<SocketAddr> = upstreams.clone();
     let keep_salud = Arc::clone(&salud);
@@ -2304,12 +2355,9 @@ async fn run_once<F: Future<Output = ()>>(
                         if let Ok(l) = Ledger::open(&keep_db, identity::genesis()) {
                             if home_lan_wanted(&l, &keep_secret) != home_lan
                                 || block_mode_of(&l) != keep_block_mode
-                                || (seguir_red
-                                    // With the VPN carrying everything, the computer's address is the
-                                    // tunnel's: that is no new network, and rebuilding for it is no use
-                                    // (1.0.54).
-                                    && guardiana_core::tunel_dns::actual().is_none()
-                                    && guardiana_devices::local_lan_ipv4() != lan_inicial)
+                                || (seguir_red && guardiana_devices::local_lan_ipv4() != lan_inicial)
+                                || del_tunel
+                                    .is_some_and(|t| guardiana_core::tunel_dns::actual() != Some(t))
                                 || hogar_sin_puerto
                                     .is_some_and(|a| std::net::UdpSocket::bind(a).is_ok())
                             {
@@ -2392,9 +2440,13 @@ async fn run_once<F: Future<Output = ()>>(
                                 if let Ok(Some(json)) = l.setting(SETTING_BACKUP) {
                                     if let Ok(b) = serde_json::from_str::<Backup>(&json) {
                                         // The same sieve as at the start of the pass: a list
-                                        // that is only this machine is no reason to rebuild.
+                                        // that is only this machine, or the tunnel's resolver,
+                                        // is no reason to rebuild (1.0.55).
                                         let ahora = aparte_del_resolutor(|| {
-                                            sysdns::away_from_self(sysdns::upstreams_for(&b))
+                                            fuera_del_tunel(
+                                                sysdns::away_from_self(sysdns::upstreams_for(&b)),
+                                                guardiana_core::tunel_dns::actual(),
+                                            )
                                         });
                                         if !ahora.is_empty() && ahora != keep_upstreams {
                                             if let Some(tx) = reconfigure_tx.take() {
@@ -2951,6 +3003,72 @@ mod apartarse_tests {
         assert_eq!(
             r,
             Ok((Fuente::Respaldo, vec!["10.10.0.1:53".parse().unwrap()]))
+        );
+    }
+
+    /// 1.0.55: while the VPN carries everything, the tunnel's resolver (the system lists it as the tunnel adapter's
+    /// DNS) is taken from no list, so it is never this pass's network resolver nor saved as a good one. Only that
+    /// address: a home network on 10.66.0.0/16 keeps its own. With nothing else, the pass asks it and says so.
+    #[test]
+    fn the_tunnel_resolver_is_never_taken_for_the_network_s() {
+        let tunel: SocketAddr = "10.66.0.1:53".parse().unwrap();
+        // the system lists the tunnel's adapter and the router: the router
+        let r = escoger_arriba_fuera_del_tunel(
+            Some(tunel),
+            vec![ip("127.0.0.1")],
+            || vec![ip("10.66.0.1"), ip("192.168.1.1")],
+            Vec::new(),
+            Vec::new(),
+            || None,
+            |_| true,
+        );
+        assert_eq!(
+            r,
+            Ok((Fuente::Sistema, vec!["192.168.1.1:53".parse().unwrap()]))
+        );
+        // out of every list, the router's too; another address of its network stays
+        let r = escoger_arriba_fuera_del_tunel(
+            Some(tunel),
+            vec![ip("10.66.0.1")],
+            || vec![ip("10.66.0.1")],
+            vec![ip("10.66.0.1"), ip("10.66.0.2")],
+            vec![ip("10.66.0.1")],
+            || Some(ip("10.66.0.1")),
+            |_| false,
+        );
+        assert_eq!(
+            r,
+            Ok((Fuente::Respaldo, vec!["10.66.0.2:53".parse().unwrap()]))
+        );
+        // nothing else: the tunnel's, for this pass only (only Copia and Sistema are saved)
+        let r = escoger_arriba_fuera_del_tunel(
+            Some(tunel),
+            Vec::new(),
+            || vec![ip("10.66.0.1")],
+            Vec::new(),
+            Vec::new(),
+            || None,
+            |_| true,
+        );
+        assert_eq!(r, Ok((Fuente::Tunel, vec![tunel])));
+        // without the VPN, that address is a resolver like any other
+        let r = escoger_arriba_fuera_del_tunel(
+            None,
+            Vec::new(),
+            || vec![ip("10.66.0.1")],
+            Vec::new(),
+            Vec::new(),
+            || None,
+            |_| true,
+        );
+        assert_eq!(r, Ok((Fuente::Sistema, vec![tunel])));
+        assert_eq!(
+            fuera_del_tunel(vec![ip("10.66.0.1"), ip("10.66.0.2")], Some(tunel)),
+            vec![ip("10.66.0.2")]
+        );
+        assert_eq!(
+            fuera_del_tunel(vec![ip("10.66.0.1")], None),
+            vec![ip("10.66.0.1")]
         );
     }
 

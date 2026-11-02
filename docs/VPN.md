@@ -53,11 +53,60 @@ tienen que ser privados y el servidor, un nombre de guardianagroup.com). Probado
 
 `crates/tunel/src/corte.rs` es el plan, como datos y con pruebas: las mismas reglas que aplica la aplicación de WireGuard
 para Windows (`tunnel/firewall/rules.go`, MIT, leído en su fuente el 1 nov 2026), y lo que pidió la ronda 87 (cortar con
-el Filtering Platform, no con rutas). Permitido: la interfaz del túnel, el propio servicio de GUARDIANA (de él salen los
-paquetes encriptados hacia el servidor), el propio equipo (bucle local, donde vive el DNS de la casa), DHCP y el
-descubrimiento de vecinos de IPv6, y las máquinas virtuales de Hyper-V entre sí. Bloqueado: el DNS a cualquiera que no
-sea el resolutor del túnel, y todo lo demás. En una sesión dinámica: si el servicio se para, Windows quita los filtros
-(y el adaptador del túnel desaparece con él).
+el Filtering Platform, no con rutas), con el permiso del servicio más estrecho que el de WireGuard (1.0.55). Permitido:
+la interfaz del túnel; del propio servicio de GUARDIANA, solo los paquetes encriptados hacia el servidor (UDP, a su
+dirección y a su puerto, en las capas de su familia: los conectores de WireGuardNT son del proceso que sube el
+adaptador, que es el servicio, `PsGetCurrentProcess` en el `Up` de su controlador, leído en su fuente el 2 nov 2026); lo
+que el Modo Hogar sirve a la casa (el DNS en el 53, UDP y TCP; el panel en el 7443 y la página de comprobación en el 80),
+solo de entrada y solo al servicio; el propio equipo (bucle local, donde vive el DNS de la casa), DHCP y el
+descubrimiento de vecinos de IPv6, y las máquinas virtuales de Hyper-V entre sí. Bloqueado: el DNS fuera del túnel, a
+quien sea, y todo lo demás. En una sesión dinámica: si el servicio se para, Windows quita los filtros (y el adaptador del
+túnel desaparece con él).
+
+Lo que cambió en la 1.0.55 (tercera revisión, 2 nov 2026), y por qué:
+
+- **El servicio, solo hacia el servidor.** Hasta la 1.0.55 el corte dejaba al servicio ir a cualquier sitio fuera del
+  túnel, con el peso más alto: salía lo que las rutas mandaran fuera, las de la red de casa y también una que meta un
+  DHCP ajeno (TunnelVision, CVE-2024-3661). Ahora solo el UDP a la dirección y al puerto del servidor. Es el único
+  permiso que una subcapa de debajo no puede deshacer (`FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT`), para que otro cortafuegos
+  no corte el túnel.
+- **Sin excepción de DNS fuera del túnel.** «DNS del túnel» dejaba el puerto 53 hacia `10.66.0.1` sin mirar por qué
+  interfaz: una ruta a `10.66.0.0/17` de un DHCP ajeno se habría llevado el DNS de todos los programas a quien la puso.
+  El resolutor del túnel se alcanza por la interfaz del túnel, que ya está permitida con más peso; el DNS fuera del túnel
+  se corta siempre («DNS fuera del túnel», que repite a propósito lo que ya hace «todo lo demás»: se ve por su nombre en
+  la lista de filtros de Windows y sigue cortando si algún día se añade un permiso por debajo).
+- **El Modo Hogar sigue sirviendo a la casa.** Con el corte puesto, la casa no llegaba al DNS, al panel ni a la página de
+  comprobación del Modo Hogar. Ahora entran esas conexiones, solo esas y solo al servicio; la respuesta vuelve por la
+  misma conexión y el servicio no abre nada hacia la casa. Son permisos que la regla del Modo Hogar en el cortafuegos de
+  Windows (solo la red local, solo en una red privada) aún puede negar. Las pruebas del panel comprueban que la lista del
+  corte (`corte::HOGAR`) es la de `crates/service/src/home.rs`.
+- **El Modo Hogar nunca escucha en la dirección del túnel.** Con la ruta por defecto en el túnel, la dirección de la red
+  que medía GUARDIANA (`guardiana_devices::local_lan_ipv4`, una conexión UDP hacia `192.0.2.1` que no envía nada) era la
+  del túnel, y el Modo Hogar se mudaba allí: los teléfonos de casa se quedaban sin DNS y el servicio contestaba dentro
+  del túnel. El túnel mide la dirección de la red antes de tomar la ruta y la guarda junto a su resolutor
+  (`guardiana_core::tunel_dns::lan`); mientras vive el túnel, esa es la dirección de la red, si el equipo aún la tiene
+  (con otra concesión del DHCP bajo el túnel no hay ninguna hasta que se cierre: el Modo Hogar espera, y el panel no deja
+  de arrancar por escuchar en una dirección que ya no es suya). Por eso el motor ya no se salta la comparación de la
+  dirección mientras dura el túnel (lo que añadió la 1.0.54): antes, durante y después del túnel es la misma, y un
+  cambio de red de verdad se nota al cerrarse.
+- **El resolutor del túnel nunca se guarda como DNS de la red.** Windows lo lista como DNS del adaptador del túnel, y una
+  vuelta del motor hecha con la VPN puesta podía tomarlo y guardarlo como bueno: al cerrarse la VPN, los nombres irían a
+  él fuera del túnel. Ahora se quita de todas las listas mientras la VPN está puesta (solo esa dirección: una red de casa
+  puede usar `10.66.0.0/16`). Si no queda ningún otro, esa vuelta le pregunta a él, no lo guarda y se rehace cuando la VPN
+  se cierra: fallar ahí habría parado el servicio, y la VPN con él.
+- **Una conexión que termina después de un cierre se cierra sola.** Conectar tarda unos segundos sin el candado puesto, y
+  una conexión que acababa después de cerrar la VPN (al parar el servicio) se guardaba y seguía abierta, con su corte. Ahora
+  se guarda solo si su generación sigue siendo la vigente; si no, se cierra en el acto (`crates/panel/src/vpn.rs`,
+  `guarda_si_sigue`).
+- **IPv6.** El túnel no tiene dirección IPv6, y la ruta por defecto de IPv6 en su adaptador puede no entrar (no se mira si
+  entra). Ninguna de las dos cosas deja salir IPv6: fuera del túnel y del bucle local, el plan solo permite de IPv6 el
+  DHCPv6 entre direcciones del enlace y el descubrimiento de vecinos (ICMPv6 133 a 137), y nada del servicio salvo que el
+  servidor sea de IPv6 (y entonces solo el UDP a él). Todo lo demás de IPv6 cae en «todo lo demás».
+
+Las pruebas del plan, en todos los sistemas, le preguntan qué decide para cada conexión como lo decide Windows dentro de
+una subcapa (el peso más alto entre los filtros que casan; dos condiciones del mismo campo valen cualquiera de las dos):
+los paquetes al servidor pasan, de ida y de vuelta; nada más del servicio fuera del túnel, ni hacia la red de casa ni el
+DNS por una ruta ajena; la casa llega a lo del Modo Hogar y a nada más; nada de IPv6 fuera del túnel salvo lo del enlace.
 
 Hecho y probado en un Windows real (la integración continua de GitHub, como administrador; `.github/workflows/vpn.yml`):
 
@@ -65,7 +114,8 @@ Hecho y probado en un Windows real (la integración continua de GitHub, como adm
   `B1B85E072C45D81358BE29D94C599DC76652F912BE8C0F0A41E2D5D89A6461D3`, comprobados en cada prueba) y crea un adaptador,
   le da la configuración de `crates/tunel/src/nt.rs`, lo sube, lo baja y lo cierra (1 nov 2026: correcto).
 - `crates/apps/src/corte_vpn.rs` convierte el plan en filtros de una sesión dinámica; la prueba comprueba que Windows
-  acepta cada filtro que permite (los que bloquean se dejan fuera para no cortar la red del equipo de pruebas).
+  acepta cada filtro que permite (los que bloquean se dejan fuera para no cortar la red del equipo de pruebas), desde la
+  1.0.55 para un servidor de IPv4 y para uno de IPv6.
 
 - `crates/apps/src/red_vpn.rs`: la dirección del túnel, sus rutas (métrica 0), los ajustes del adaptador (sin
   descubrimiento de routers, sin detección de duplicados, sin DHCPv6, MTU 1420) y su resolutor (con `netsh`), como la
@@ -91,10 +141,11 @@ Hecho y probado en un Windows real (la integración continua de GitHub, como adm
   (empieza; la página pregunta cómo va) y `POST /api/vpn/desconecta`. Nada se guarda: al parar el servicio, el túnel
   se cierra con él. La VPN es la del proceso, no la de cada vuelta del motor (1.0.54): el motor rehace el panel
   cuando cambia la red, y hasta la 1.0.54 eso dejaba el túnel huérfano y la página en «apagada».
-- El DNS con la VPN puesta (1.0.54, segunda revisión del 2 nov 2026): el servicio es el único programa que el corte
-  deja salir, y el DNS de GUARDIANA (127.0.0.1) reenviaba al router, fuera del túnel. Ahora, mientras el túnel lleva
-  todo, `guardiana_core::tunel_dns` manda cada nombre solo al resolutor del túnel (`10.66.0.1`), con su propia caché;
-  si no contesta, el nombre falla y nunca sale fuera. Las sondas del motor preguntan también solo a ese resolutor.
+- El DNS con la VPN puesta (1.0.54, segunda revisión del 2 nov 2026): el servicio era el único programa que el corte
+  dejaba salir (hasta la 1.0.55, a cualquier sitio), y el DNS de GUARDIANA (127.0.0.1) reenviaba al router, fuera del
+  túnel. Ahora, mientras el túnel lleva todo, `guardiana_core::tunel_dns` manda cada nombre solo al resolutor del túnel
+  (`10.66.0.1`), con su propia caché; si no contesta, el nombre falla y nunca sale fuera. Las sondas del motor preguntan
+  también solo a ese resolutor.
 - La prueba de extremo a extremo en Linux (`.github/workflows/vpn.yml`, «extremo»): el servidor de GUARDIANA con el
   WireGuard del núcleo en un espacio de red, el lado del equipo (`crates/tunel/examples/alta_prueba.rs`) en otro, el
   alta postcuántica por la red y tráfico de verdad por el túnel (solo pasa si los dos lados sacaron la misma llave).
@@ -109,6 +160,10 @@ Pendiente, en este orden:
    puesto en su lugar, no se carga y se dice). La prueba de cliente (`build/cliente/instalacion.py`) lo comprueba
    instalado.
 3. Los servidores, dentro del sello (con la llave del dueño), y la primera conexión de verdad.
+4. La reconexión automática (quitada en la 1.0.54): el permiso del servicio ya es solo hacia el servidor (1.0.55); falta
+   que el alta nueva salga por una ruta /32 al servidor (o un conector atado a la tarjeta), y entonces el corte tendrá
+   que dejar al servicio también el TCP 443 a esa dirección, que hoy no deja (solo el UDP del túnel).
+   `Tunel::renueva` rechaza otra dirección o puerto del servidor mientras el corte está puesto.
 
 Decisiones tomadas en la ronda 88 (1 nov 2026): incluida en la licencia de GUARDIANA, sin cuenta aparte; servidores de la fase 1, los de Hetzner (Helsinki, Núremberg); contra el abuso sin guardar nada (puerto 25 cerrado, topes de altas y de conexiones nuevas, pares sin uso se quitan).
 
@@ -141,6 +196,16 @@ Decisiones tomadas en la ronda 88 (1 nov 2026): incluida en la licencia de GUARD
 - **Sin registros**: los servidores no guardan qué llave se conecta ni a dónde va. Lo que sí se hace contra el abuso, sin
   guardar nada: cerrar el puerto 25 de salida y frenar los barridos de puertos.
 - **Sin promesas absolutas**: lo que la VPN no protege se dice en su pantalla.
+- **Del servicio, fuera del túnel, solo lo del servidor** (1.0.55): el corte le deja el UDP a la dirección y al puerto del
+  servidor, y nada más; ni hacia la red de casa ni por una ruta que meta un DHCP ajeno. Lo que entra para el Modo Hogar
+  se contesta por la misma conexión.
+- **El DNS, solo por el túnel o al propio equipo** (1.0.55): el corte no tiene excepción de DNS fuera del túnel, ni para la
+  dirección del resolutor del túnel; y ese resolutor no se guarda nunca como DNS de la red.
+- **De IPv6, fuera del túnel, solo lo del enlace** (1.0.55): el corte deja el DHCPv6 y el descubrimiento de vecinos, y nada
+  más (el túnel no tiene dirección IPv6).
+- **La VPN no mueve el Modo Hogar** (1.0.55): sigue en la dirección de la red de casa, la de antes del túnel, nunca en la
+  del túnel.
+- **Una conexión no sobrevive a un cierre** (1.0.55): la que termina de abrirse después se cierra en el acto.
 
 ## Decisiones (ronda 88, 1 nov 2026, con el encargo del dueño)
 

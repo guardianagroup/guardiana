@@ -90,6 +90,7 @@
     "observe.relevo_sin_arriba": "Home Mode: I cannot find where to pass the home’s queries on, so I cannot relay them. If the router still sends the home’s queries here, put its DNS back as it was (or to automatic) now: without that, the phones and the rest are left without internet.",
     "observe.relevo_error": "Home Mode: I cannot listen on the network to pass the home’s queries on ({error}). If the router still sends the home’s queries here, put its DNS back as it was (or to automatic) now.",
     "observe.upstream_propio": "The DNS the network hands out is this very computer (the router gives out its address, as Home Mode asks), and GUARDIANA cannot ask itself: it asks {servers}.",
+    "observe.upstream_tunel": "No DNS of the network was found outside the tunnel: while the VPN carries everything, GUARDIANA asks only the tunnel's resolver ({servers}), and once the VPN closes it looks for the network's again.",
     "observe.solo_propio": "The only DNS this computer knows is itself (the router gives out its address, as Home Mode asks), and GUARDIANA cannot ask itself. Set a fixed DNS on this computer (the router’s or your provider’s) or give one with --upstream IP.",
     "ledger.vacio": "No events yet.",
     "ledger.wipe.palabra": "DELETE",
