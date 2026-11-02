@@ -125,7 +125,7 @@ impl EscudoVivo {
             self.cambios = true;
         }
         if let Mirada::Aviso(a) = mirada {
-            self.anota(&a);
+            self.anota(&a, a.regla == "muestra_conocida");
         }
     }
 
@@ -155,7 +155,7 @@ impl EscudoVivo {
                         self.memoria
                             .revisa(&p.nombre, &p.sitio, p.cuando_ms, &programa)
                     {
-                        self.anota(&a);
+                        self.anota(&a, a.regla == "muestra_conocida");
                     }
                 }
                 None if ahora_ms.saturating_sub(p.cuando_ms) < ESPERA_FIRMA_MS => {
@@ -208,7 +208,7 @@ impl EscudoVivo {
             {
                 continue;
             }
-            let Some((aviso, _grave)) =
+            let Some((aviso, grave)) =
                 guardiana_escudo::ladrones::juzga(&a.programa, &a.ruta, &firma, &a.archivo, cuando)
             else {
                 continue;
@@ -229,7 +229,7 @@ impl EscudoVivo {
                 self.ladrones_vistos.clear();
             }
             self.ladrones_vistos.insert(clave, cuando);
-            self.anota(&aviso);
+            self.anota(&aviso, grave);
         }
     }
 
@@ -244,7 +244,7 @@ impl EscudoVivo {
         for l in nuevos {
             let cuando = u64::try_from(l.ts).unwrap_or(0);
             let descargado = self.descargado(&l.padre_ruta);
-            let Some((aviso, _grave)) = guardiana_escudo::cadenas::juzga(
+            let Some((aviso, grave)) = guardiana_escudo::cadenas::juzga(
                 &l.padre,
                 &l.padre_ruta,
                 descargado,
@@ -265,7 +265,7 @@ impl EscudoVivo {
                 self.cadenas_vistas.clear();
             }
             self.cadenas_vistas.insert(clave, cuando);
-            self.anota(&aviso);
+            self.anota(&aviso, grave);
         }
     }
 
@@ -282,9 +282,16 @@ impl EscudoVivo {
         }
     }
 
-    /// Adds a warning to the panel's file, keeping the newest [`MAX_AVISOS`].
-    fn anota(&self, a: &Aviso) {
-        let Ok(linea) = serde_json::to_string(a) else {
+    /// Adds a warning to the panel's file, keeping the newest [`MAX_AVISOS`]; a grave one carries `"grave": true` (a
+    /// known sample, a document starting an interpreter, the backups' tools, a program in disguise).
+    fn anota(&self, a: &Aviso, grave: bool) {
+        let Ok(mut valor) = serde_json::to_value(a) else {
+            return;
+        };
+        if let (true, Some(o)) = (grave, valor.as_object_mut()) {
+            o.insert("grave".to_owned(), serde_json::Value::Bool(true));
+        }
+        let Ok(linea) = serde_json::to_string(&valor) else {
             return;
         };
         let mut lineas: Vec<String> = std::fs::read_to_string(&self.ruta_avisos)

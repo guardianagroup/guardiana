@@ -55,7 +55,8 @@ pub struct Programa<'a> {
 /// A warning for the person.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Aviso {
-    /// Which rule: `muestra_conocida` or `primera_vez`.
+    /// Which rule: `muestra_conocida` or `primera_vez` (here), `ladron` ([`crate::ladrones`]), or `documento`,
+    /// `navegador`, `guion` or `copias` ([`crate::cadenas`]).
     pub regla: &'static str,
     /// The program's file name.
     pub programa: String,
