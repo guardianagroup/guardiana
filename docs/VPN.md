@@ -89,7 +89,12 @@ Hecho y probado en un Windows real (la integración continua de GitHub, como adm
   servidor, desde cuándo, la dirección del túnel, los bytes y el último saludo, o por qué no está disponible: fuera de
   Windows, o sin `wireguard.dll` junto al programa), `POST /api/vpn/conecta` con `{"servidor": "…guardianagroup.com"}`
   (empieza; la página pregunta cómo va) y `POST /api/vpn/desconecta`. Nada se guarda: al parar el servicio, el túnel
-  se cierra con él.
+  se cierra con él. La VPN es la del proceso, no la de cada vuelta del motor (1.0.54): el motor rehace el panel
+  cuando cambia la red, y hasta la 1.0.54 eso dejaba el túnel huérfano y la página en «apagada».
+- El DNS con la VPN puesta (1.0.54, segunda revisión del 2 nov 2026): el servicio es el único programa que el corte
+  deja salir, y el DNS de GUARDIANA (127.0.0.1) reenviaba al router, fuera del túnel. Ahora, mientras el túnel lleva
+  todo, `guardiana_core::tunel_dns` manda cada nombre solo al resolutor del túnel (`10.66.0.1`), con su propia caché;
+  si no contesta, el nombre falla y nunca sale fuera. Las sondas del motor preguntan también solo a ese resolutor.
 - La prueba de extremo a extremo en Linux (`.github/workflows/vpn.yml`, «extremo»): el servidor de GUARDIANA con el
   WireGuard del núcleo en un espacio de red, el lado del equipo (`crates/tunel/examples/alta_prueba.rs`) en otro, el
   alta postcuántica por la red y tráfico de verdad por el túnel (solo pasa si los dos lados sacaron la misma llave).
