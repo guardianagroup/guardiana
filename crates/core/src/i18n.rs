@@ -10,13 +10,88 @@ use serde::Deserialize;
 
 use crate::model::{Category, DecidedBy, Signal, Verdict};
 
+/// One language of the program: the 42 of guardianagroup.com, in the same order as the website's `idioma.js`
+/// (the owner, 1 Nov 2026, 22:47: «mete los 42 idiomas en el programa»; 2 Nov, 07:48: one program for everyone,
+/// with all of them inside, and the language chosen on the website first).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Idioma {
+    /// The code the program and the website use: `es`, `pt`, `zh-tw`, `pt-pt`…
+    pub codigo: &'static str,
+    /// Its own name, as its readers write it.
+    pub nombre: &'static str,
+    /// The `lang` attribute (BCP 47) and the locale for numbers and dates.
+    pub lang: &'static str,
+    /// Written right to left (Arabic, Persian, Hebrew, Urdu).
+    pub rtl: bool,
+}
+
+macro_rules! idiomas {
+    ($($codigo:literal, $nombre:literal, $lang:literal, $rtl:literal;)*) => {
+        /// The 42 languages, Spanish first (the language the program is written in), then English and Portuguese.
+        pub const IDIOMAS: &[Idioma] = &[$(Idioma { codigo: $codigo, nombre: $nombre, lang: $lang, rtl: $rtl }),*];
+        /// Each language's file (`crates/panel/i18n/<code>.json`), in the order of [`IDIOMAS`]. Spanish, English
+        /// and Portuguese are complete and say every key; the others may say only part of them, and whatever they
+        /// do not say is read in English, key by key.
+        const FUENTES: &[&str] = &[$(include_str!(concat!("../../panel/i18n/", $codigo, ".json"))),*];
+    };
+}
+
+idiomas! {
+    "es", "Español", "es", false;
+    "en", "English", "en", false;
+    "pt", "Português (Brasil)", "pt-BR", false;
+    "fr", "Français", "fr", false;
+    "de", "Deutsch", "de", false;
+    "it", "Italiano", "it", false;
+    "nl", "Nederlands", "nl", false;
+    "sv", "Svenska", "sv", false;
+    "da", "Dansk", "da", false;
+    "nb", "Norsk", "nb", false;
+    "fi", "Suomi", "fi", false;
+    "is", "Íslenska", "is", false;
+    "pl", "Polski", "pl", false;
+    "uk", "Українська", "uk", false;
+    "ru", "Русский", "ru", false;
+    "tr", "Türkçe", "tr", false;
+    "zh", "简体中文", "zh-Hans", false;
+    "ja", "日本語", "ja", false;
+    "ko", "한국어", "ko", false;
+    "hi", "हिन्दी", "hi", false;
+    "bn", "বাংলা", "bn", false;
+    "id", "Bahasa Indonesia", "id", false;
+    "vi", "Tiếng Việt", "vi", false;
+    "th", "ไทย", "th", false;
+    "ar", "العربية", "ar", true;
+    "fa", "فارسی", "fa", true;
+    "he", "עברית", "he", true;
+    "ur", "اردو", "ur", true;
+    "zh-tw", "繁體中文", "zh-Hant", false;
+    "cs", "Čeština", "cs", false;
+    "ro", "Română", "ro", false;
+    "hu", "Magyar", "hu", false;
+    "el", "Ελληνικά", "el", false;
+    "sk", "Slovenčina", "sk", false;
+    "bg", "Български", "bg", false;
+    "hr", "Hrvatski", "hr", false;
+    "ms", "Bahasa Melayu", "ms", false;
+    "fil", "Filipino", "fil", false;
+    "sw", "Kiswahili", "sw", false;
+    "ta", "தமிழ்", "ta", false;
+    "te", "తెలుగు", "te", false;
+    "pt-pt", "Português (Portugal)", "pt-PT", false;
+}
+
+/// How many languages there are.
+const N: usize = 42;
+const _: () = assert!(IDIOMAS.len() == N && FUENTES.len() == N);
+
 /// The Spanish texts, embedded from `crates/panel/i18n/es.json`.
-pub const ES_JSON: &str = include_str!("../../panel/i18n/es.json");
+pub const ES_JSON: &str = FUENTES[0];
 /// The English texts, embedded from `crates/panel/i18n/en.json` (decision 45): same keys, never text in code.
-pub const EN_JSON: &str = include_str!("../../panel/i18n/en.json");
+pub const EN_JSON: &str = FUENTES[1];
 /// The Brazilian Portuguese texts (decision 175): same keys again, because Brazil is the largest
 /// market of the region and the site speaks it since 19 Sep 2026.
-pub const PT_JSON: &str = include_str!("../../panel/i18n/pt.json");
+pub const PT_JSON: &str = FUENTES[2];
 
 /// All interface texts, grouped as in the JSON file.
 #[derive(Debug, Clone, Deserialize)]
@@ -56,70 +131,146 @@ pub struct Texts {
     pub paises: HashMap<String, String>,
 }
 
-static TEXTS: OnceLock<Texts> = OnceLock::new();
-static TEXTS_EN: OnceLock<Texts> = OnceLock::new();
-static TEXTS_PT: OnceLock<Texts> = OnceLock::new();
+static TEXTOS: [OnceLock<Texts>; N] = [const { OnceLock::new() }; N];
+static MEZCLAS: [OnceLock<String>; N] = [const { OnceLock::new() }; N];
 
-/// The Spanish texts. The embedded file is validated by a test, so a
-/// malformed file fails the build's tests rather than the user's session.
+/// The whole file of language `i`, as the program reads it: Spanish, English and Portuguese as written; any other
+/// language over English, key by key, so a text not translated yet reads in English and never as its key (a key
+/// the language says but English does not is left out: it would be a text no page asks for any more).
+fn json_at(i: usize) -> &'static str {
+    match i {
+        0..=2 => FUENTES[i],
+        _ => MEZCLAS[i].get_or_init(|| mezcla(EN_JSON, FUENTES[i])),
+    }
+}
+
+fn mezcla(base: &str, propio: &str) -> String {
+    let mut base: serde_json::Value = serde_json::from_str(base).unwrap_or_default();
+    if let (Some(destino), Ok(serde_json::Value::Object(propio))) = (
+        base.as_object_mut(),
+        serde_json::from_str::<serde_json::Value>(propio),
+    ) {
+        for (seccion, textos) in propio {
+            let (Some(d), serde_json::Value::Object(textos)) = (
+                destino
+                    .get_mut(&seccion)
+                    .and_then(serde_json::Value::as_object_mut),
+                textos,
+            ) else {
+                continue;
+            };
+            for (clave, texto) in textos {
+                let vale = texto.as_str().is_some_and(|s| !s.trim().is_empty());
+                if vale && d.contains_key(&clave) {
+                    d.insert(clave, texto);
+                }
+            }
+        }
+    }
+    base.to_string()
+}
+
+/// The texts of language `i` of [`IDIOMAS`]. The embedded files are validated by tests, so a malformed file fails
+/// the build's tests rather than the user's session.
+fn texts_at(i: usize) -> &'static Texts {
+    TEXTOS[i].get_or_init(|| serde_json::from_str(json_at(i)).unwrap_or_else(|_| Texts::empty()))
+}
+
+/// The Spanish texts.
 pub fn es() -> &'static Texts {
-    TEXTS.get_or_init(|| serde_json::from_str(ES_JSON).unwrap_or_else(|_| Texts::empty()))
+    texts_at(0)
 }
 
 /// The English texts.
 pub fn en() -> &'static Texts {
-    TEXTS_EN.get_or_init(|| serde_json::from_str(EN_JSON).unwrap_or_else(|_| Texts::empty()))
+    texts_at(1)
 }
 
 /// The Portuguese texts.
 pub fn pt() -> &'static Texts {
-    TEXTS_PT.get_or_init(|| serde_json::from_str(PT_JSON).unwrap_or_else(|_| Texts::empty()))
+    texts_at(2)
 }
 
-/// Texts for a language code (`es-CO`, `en-US`, `pt-BR`, `de-DE`...): Spanish, Portuguese or
-/// English when it starts with `es`, `pt` or `en`; English for any other language, because a
-/// person reading German or French is far likelier to read English than Spanish (28 Sep 2026:
-/// a browser in German got the whole panel in Spanish). Spanish stays the answer only when
-/// nothing is said at all — an empty code, or the `C`/`POSIX` locale of a bare system or of the
-/// Windows service — because that is the language the program was written in.
+/// The position in [`IDIOMAS`] of a language tag as systems, browsers and people write it (`es-CO`, `pt_BR.UTF-8`,
+/// `de-DE,de;q=0.9`, `zh-Hant-TW`, `nb-NO`, `pt-PT`…). Each language by its own code, with the names some systems still
+/// use (`no`/`nn` for Norwegian, `tl` for Filipino, `iw` for Hebrew, `in` for Indonesian); Chinese of Taiwan, Hong Kong
+/// or Macao, or written `Hant`, is traditional; Portuguese of Portugal is `pt-pt`, any other Portuguese is Brazil's.
+/// A language the program does not speak reads English, because a person reading it is far likelier to read English
+/// than Spanish (28 Sep 2026: a browser in German got the whole panel in Spanish). Spanish stays the answer only when
+/// nothing is said at all — an empty code, or the `C`/`POSIX` locale of a bare system or of the Windows service —
+/// because that is the language the program was written in.
+#[must_use]
+pub fn indice(etiqueta: &str) -> usize {
+    let primera = etiqueta.split([',', ';']).next().unwrap_or_default();
+    let limpia = primera
+        .split(['.', '@'])
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .replace('_', "-")
+        .to_ascii_lowercase();
+    if limpia.is_empty() || limpia == "c" || limpia == "posix" {
+        return 0;
+    }
+    let mut partes = limpia.split('-');
+    let idioma = partes.next().unwrap_or_default();
+    let resto: Vec<&str> = partes.collect();
+    let codigo = match idioma {
+        "zh" if resto
+            .iter()
+            .any(|x| matches!(*x, "tw" | "hk" | "mo" | "hant")) =>
+        {
+            "zh-tw"
+        }
+        "pt" if resto.contains(&"pt") => "pt-pt",
+        "no" | "nn" => "nb",
+        "tl" => "fil",
+        "iw" => "he",
+        "in" => "id",
+        otro => otro,
+    };
+    IDIOMAS.iter().position(|x| x.codigo == codigo).unwrap_or(1)
+}
+
+/// The language of a tag (see [`indice`]).
+#[must_use]
+pub fn idioma(etiqueta: &str) -> &'static Idioma {
+    &IDIOMAS[indice(etiqueta)]
+}
+
+/// Texts for a language tag (`es-CO`, `en-US`, `pt-BR`, `de-DE`, `zh-TW`…): see [`indice`].
 #[must_use]
 pub fn by_code(code: &str) -> &'static Texts {
-    let code = code.trim().to_ascii_lowercase();
-    let sin_idioma = code.is_empty() || code == "c" || code.starts_with("c.") || code == "posix";
-    if code.starts_with("es") || sin_idioma {
-        es()
-    } else if code.starts_with("pt") {
-        pt()
-    } else {
-        en()
-    }
+    texts_at(indice(code))
+}
+
+/// Where a `Texts` given out by this module is in [`IDIOMAS`] (Spanish for one that was not).
+fn posicion(t: &'static Texts) -> usize {
+    TEXTOS
+        .iter()
+        .position(|c| c.get().is_some_and(|x| std::ptr::eq(x, t)))
+        .unwrap_or(0)
 }
 
 /// The raw JSON behind a `Texts`, for whoever has to hand the whole file over instead of a
-/// sentence — the panel gives it to the browser. It lives here, next to the three constants, so
+/// sentence — the panel gives it to the browser. It lives here, next to the files, so
 /// that adding a language is one place and not a chain of "is it English?" in every caller: that
 /// exact shortcut is what left the panel answering in Spanish to a Portuguese browser.
 #[must_use]
 pub fn json_of(t: &'static Texts) -> &'static str {
-    if std::ptr::eq(t, en()) {
-        EN_JSON
-    } else if std::ptr::eq(t, pt()) {
-        PT_JSON
-    } else {
-        ES_JSON
-    }
+    json_at(posicion(t))
 }
 
-/// The two-letter code of a `Texts`, for a `lang` attribute: the same three constants.
+/// The code of a `Texts` (`es`, `en`, `pt`, `fr`, `zh-tw`…).
 #[must_use]
 pub fn code_of(t: &'static Texts) -> &'static str {
-    if std::ptr::eq(t, en()) {
-        "en"
-    } else if std::ptr::eq(t, pt()) {
-        "pt"
-    } else {
-        "es"
-    }
+    IDIOMAS[posicion(t)].codigo
+}
+
+/// The language of a `Texts`, with its `lang` attribute and its direction.
+#[must_use]
+pub fn idioma_of(t: &'static Texts) -> &'static Idioma {
+    &IDIOMAS[posicion(t)]
 }
 
 /// The language the CLI speaks: `GUARDIANA_LANG` first, then the system's `LC_ALL`, `LC_MESSAGES`
@@ -367,16 +518,72 @@ mod tests {
         assert_eq!(json_of(by_code("es")), ES_JSON);
         assert!(std::ptr::eq(by_code("PT"), pt()));
         assert!(std::ptr::eq(by_code(""), es()));
-        // Any other language reads English, not Spanish; a locale that names no language stays
-        // in Spanish.
-        assert!(std::ptr::eq(by_code("de-DE,de;q=0.9,en;q=0.8"), en()));
-        assert!(std::ptr::eq(by_code("fr"), en()));
-        assert!(std::ptr::eq(by_code("it_IT.UTF-8"), en()));
+        // The 42 languages of the website, each by its own code (2 Nov 2026); a language the program does not speak
+        // reads English, not Spanish; a locale that names no language stays in Spanish.
+        assert_eq!(code_of(by_code("de-DE,de;q=0.9,en;q=0.8")), "de");
+        assert_eq!(code_of(by_code("fr")), "fr");
+        assert_eq!(code_of(by_code("it_IT.UTF-8")), "it");
+        assert_eq!(code_of(by_code("zh-CN")), "zh");
+        assert_eq!(code_of(by_code("zh-Hant-TW")), "zh-tw");
+        assert_eq!(code_of(by_code("zh_HK")), "zh-tw");
+        assert_eq!(code_of(by_code("pt-PT")), "pt-pt");
+        assert_eq!(code_of(by_code("pt-AO")), "pt");
+        assert_eq!(code_of(by_code("no-NO")), "nb");
+        assert_eq!(code_of(by_code("tl")), "fil");
+        assert_eq!(code_of(by_code("iw-IL")), "he");
+        assert!(idioma("ar-SA").rtl && idioma("fa").rtl && idioma("he").rtl && idioma("ur-PK").rtl);
+        assert!(!idioma("es").rtl);
+        assert!(std::ptr::eq(by_code("eu-ES"), en()));
         assert!(std::ptr::eq(by_code("C.UTF-8"), es()));
         assert!(std::ptr::eq(by_code("POSIX"), es()));
         assert!(std::ptr::eq(by_code("es_ES.UTF-8"), es()));
         let reg = "\r\nHKEY_CURRENT_USER\\Control Panel\\International\r\n    LocaleName    REG_SZ    de-DE\r\n\r\n";
         assert_eq!(locale_de_reg(reg).as_deref(), Some("de-DE"));
         assert_eq!(locale_de_reg("ERROR: nada"), None);
+    }
+
+    #[test]
+    fn every_language_reads_every_key() {
+        // Each file is JSON, says only keys that exist, and once read over English has every key of Spanish: a text
+        // not translated yet reads in English, never as its key.
+        let es_v: serde_json::Value = serde_json::from_str(ES_JSON).unwrap();
+        for (i, idioma) in IDIOMAS.iter().enumerate() {
+            let propio: serde_json::Value = serde_json::from_str(FUENTES[i])
+                .unwrap_or_else(|e| panic!("{}.json no es JSON: {e}", idioma.codigo));
+            for (seccion, textos) in propio.as_object().unwrap() {
+                for clave in textos.as_object().unwrap().keys() {
+                    assert!(
+                        es_v[seccion].get(clave).is_some(),
+                        "{}: {seccion}.{clave} ya no existe en español",
+                        idioma.codigo
+                    );
+                }
+            }
+            let v: serde_json::Value = serde_json::from_str(json_at(i)).unwrap();
+            for (seccion, textos) in es_v.as_object().unwrap() {
+                for clave in textos.as_object().unwrap().keys() {
+                    assert!(
+                        v[seccion][clave].as_str().is_some_and(|s| !s.is_empty()),
+                        "{}: falta {seccion}.{clave}",
+                        idioma.codigo
+                    );
+                }
+            }
+            let t = texts_at(i);
+            assert_eq!(code_of(t), idioma.codigo);
+            assert_eq!(
+                by_code(idioma.codigo).panel("nav_antivirus"),
+                t.panel("nav_antivirus")
+            );
+        }
+        // A translated text wins over English; one not translated reads English.
+        let m = mezcla(
+            r#"{"cli":{"a":"one","b":"two"},"panel":{}}"#,
+            r#"{"cli":{"a":"un","c":"de trop","b":"  "}}"#,
+        );
+        let v: serde_json::Value = serde_json::from_str(&m).unwrap();
+        assert_eq!(v["cli"]["a"], "un");
+        assert_eq!(v["cli"]["b"], "two");
+        assert!(v["cli"].get("c").is_none());
     }
 }
