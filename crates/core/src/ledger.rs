@@ -1490,6 +1490,29 @@ mod tests {
         Hash::of(b"dev public key")
     }
 
+    /// What opening the extract costs here, with another connection already open as in the
+    /// service (its housekeeping opened one every 15, 30 and 60 seconds). Run by
+    /// `.github/workflows/ligero.yml` (`--ignored --nocapture`), which turns the line into a notice.
+    #[test]
+    #[ignore = "mide; lo lanza ligero.yml"]
+    fn lo_que_cuesta_abrir_el_extracto() {
+        let dir = std::env::temp_dir().join(format!("guardiana-abrir-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = dir.join("ledger.db");
+        let abierta = Ledger::open(&db, genesis()).unwrap();
+        let veces: u32 = 200;
+        let t = std::time::Instant::now();
+        for _ in 0..veces {
+            let l = Ledger::open(&db, genesis()).unwrap();
+            assert!(l.setting("visto").unwrap().is_none());
+        }
+        let us = t.elapsed().as_micros() / u128::from(veces);
+        drop(abierta);
+        let _ = std::fs::remove_dir_all(&dir);
+        println!("coste: abrir el extracto (con otra conexión abierta) {us} µs por vez, media de {veces}");
+    }
+
     fn ev(ts: i64, name: &str) -> NewEvent {
         NewEvent::observed(ts, "self", "127.0.0.1", name, "A")
     }

@@ -93,5 +93,5 @@ jobs:
         working-directory: codigo
         run: |
           set -o pipefail
-          cargo test --release --locked -p guardiana-service -p guardiana-license -- --include-ignored --nocapture --test-threads=1 on_windows_the_native_reading_says_what_powershell_says what_the_minutes_reading_costs en_windows_el_registro_se_lee_como_con_reg lo_que_cuesta_leer_el_ancla 2>&1 | tee "$RUNNER_TEMP/nativo.log"
+          cargo test --release --locked -p guardiana-service -p guardiana-license -p guardiana-core -- --include-ignored --nocapture --test-threads=1 on_windows_the_native_reading_says_what_powershell_says on_windows_the_native_gateway_is_powershells what_the_minutes_reading_costs en_windows_el_registro_se_lee_como_con_reg lo_que_cuesta_leer_el_ancla lo_que_cuesta_abrir_el_extracto 2>&1 | tee "$RUNNER_TEMP/nativo.log"
           grep -oE "coste: .*" "$RUNNER_TEMP/nativo.log" | sed 's/^/::notice title=nativo::/' || true

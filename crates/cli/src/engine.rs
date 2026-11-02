@@ -1707,11 +1707,15 @@ async fn run_once<F: Future<Output = ()>>(
     first: bool,
 ) -> Result<Exit, Box<dyn Error>> {
     let t = i18n::current();
+    // The console's account the data folder was last opened to, and when (1.0.55): the
+    // housekeeping does it again only when that changes (see `toca_endurecer`).
+    let mut endurecida: Option<(String, Instant)> = None;
     if let Some(parent) = cfg.db.parent() {
         std::fs::create_dir_all(parent)?;
         // Token and extract readable only by the user (brief §8). Not fatal:
         // an unprivileged smoke test on a temp folder keeps working.
-        let _ = paths::harden_data_dir(parent);
+        let cuenta = guardiana_apps::vigia::cuenta_de_consola();
+        endurecida = endurecida_tras(paths::harden_data_dir_con_cuenta(parent), cuenta);
     }
     if first && identity::public_key_is_dev() {
         eprintln!("{}", t.cli("observe.clave_dev"));
@@ -2273,8 +2277,6 @@ async fn run_once<F: Future<Output = ()>>(
     let keep_salud = Arc::clone(&salud);
     let mut aparte = Aparte::default();
     let keep_block_mode = block_mode;
-    // The console's account the data folder was last opened to, and when (1.0.55).
-    let mut endurecida: Option<(String, Instant)> = None;
     let (reconfigure_tx, mut reconfigure) = tokio::sync::oneshot::channel::<()>();
     let (caducado_tx, mut caducado) = tokio::sync::oneshot::channel::<()>();
     let housekeeping = tokio::spawn(async move {
@@ -2421,10 +2423,7 @@ async fn run_once<F: Future<Output = ()>>(
                         let cuenta = guardiana_apps::vigia::cuenta_de_consola();
                         if toca_endurecer(cuenta.as_deref(), endurecida.as_ref()) {
                             let hecho = aparte_del_resolutor(|| paths::harden_data_dir_con_cuenta(dir));
-                            endurecida = match (hecho, cuenta) {
-                                (Ok(dada), Some(c)) if dada || c.is_empty() => Some((c, Instant::now())),
-                                _ => None,
-                            };
+                            endurecida = endurecida_tras(hecho, cuenta);
                         }
                     }
                 }
@@ -2541,6 +2540,19 @@ fn toca_endurecer(cuenta: Option<&str>, endurecida: Option<&(String, Instant)>) 
     match (cuenta, endurecida) {
         (Some(c), Some((antes, cuando))) => c != antes || cuando.elapsed() >= REENDURECER,
         _ => true,
+    }
+}
+
+/// What is written down after opening the data folder: the console's account and the time, when
+/// it was done for whoever is there (nobody, or their access given); nothing otherwise, so the
+/// next ten minutes try again.
+fn endurecida_tras(
+    hecho: std::io::Result<bool>,
+    cuenta: Option<String>,
+) -> Option<(String, Instant)> {
+    match (hecho, cuenta) {
+        (Ok(dada), Some(c)) if dada || c.is_empty() => Some((c, Instant::now())),
+        _ => None,
     }
 }
 
@@ -3214,7 +3226,7 @@ mod tests_url_host {
 
 #[cfg(test)]
 mod tests_endurecer {
-    use super::{toca_endurecer, REENDURECER};
+    use super::{endurecida_tras, toca_endurecer, REENDURECER};
     use std::time::Instant;
 
     /// The data folder is opened again to the console's account only when it has to (1.0.55): not
@@ -3241,5 +3253,14 @@ mod tests_endurecer {
                 "una hora después"
             );
         }
+        // Written down only when it reached whoever is there.
+        assert!(endurecida_tras(Ok(true), Some("1:PC\\ana".into())).is_some());
+        assert!(
+            endurecida_tras(Ok(false), Some(String::new())).is_some(),
+            "nadie"
+        );
+        assert!(endurecida_tras(Ok(false), Some("1:PC\\ana".into())).is_none());
+        assert!(endurecida_tras(Ok(true), None).is_none(), "sin saber quién");
+        assert!(endurecida_tras(Err(std::io::Error::other("x")), Some(String::new())).is_none());
     }
 }

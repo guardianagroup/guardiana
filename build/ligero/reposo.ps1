@@ -16,18 +16,18 @@ param(
 $ErrorActionPreference = 'Stop'
 Add-Type -Path (Join-Path $PSScriptRoot 'Medidor.cs')
 
+# Cada proceso que arranque alguien queda en el registro de seguridad de Windows (suceso 4688) con su orden completa:
+# así se sabe, sin perder ninguno, qué parte del programa arrancó cada uno. Es la máquina de la prueba.
+& auditpol.exe /set /subcategory:"{0cce922b-69ae-11d9-bed3-505054503030}" /success:enable | Out-Null
+& reg.exe add 'HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System\Audit' /v ProcessCreationIncludeCmdLine_Enabled /t REG_DWORD /d 1 /f | Out-Null
+$horaArranque = Get-Date
+
 # Los procesos que arranque el servicio, desde que arranca: sus hijos directos, por nombre, con la hora.
 $arranques = [System.Collections.Concurrent.ConcurrentQueue[object]]::new()
 $desde = [System.Diagnostics.Stopwatch]::StartNew()
-# De cada powershell.exe, el principio de lo que se le pidió (si sigue vivo al preguntar), para saber qué parte del
-# programa lo arrancó.
 Register-CimIndicationEvent -ClassName Win32_ProcessStartTrace -SourceIdentifier ligero -Action {
     $e = $Event.SourceEventArgs.NewEvent
-    $linea = ''
-    if ([string]$e.ProcessName -eq 'powershell.exe') {
-        try { $linea = [string](Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$e.ProcessID)" -ErrorAction Stop).CommandLine } catch {}
-    }
-    $Event.MessageData[0].Enqueue([pscustomobject]@{ pid = [int]$e.ProcessID; padre = [int]$e.ParentProcessID; nombre = [string]$e.ProcessName; s = $Event.MessageData[1].Elapsed.TotalSeconds; linea = $linea })
+    $Event.MessageData[0].Enqueue([pscustomobject]@{ pid = [int]$e.ProcessID; padre = [int]$e.ParentProcessID; nombre = [string]$e.ProcessName; s = $Event.MessageData[1].Elapsed.TotalSeconds })
 } -MessageData @($arranques, $desde) | Out-Null
 
 & $Exe service install 2>&1 | ForEach-Object { Write-Host "service install: $_" }
@@ -68,6 +68,7 @@ function Cpu($nombre) {
 }
 
 $inicioVentana = $desde.Elapsed.TotalSeconds
+$horaVentana = Get-Date
 $t0 = if ($enTrabajo) { [Medidor]::Lleva($trabajo) } else { @(0, 0, 0, 0, 0) }
 $e0 = [Medidor]::EquipoMs(); $w0 = Cpu 'WmiPrvSE'; $d0 = Cpu 'MsMpEng'
 $g0 = (Get-Process -Id $servicio).TotalProcessorTime.TotalMilliseconds
@@ -105,6 +106,7 @@ while ([DateTime]::UtcNow -lt $fin) {
     if ($resto -gt 0) { Start-Sleep -Milliseconds $resto }
 }
 $segundos = $reloj.Elapsed.TotalSeconds
+$horaFin = Get-Date
 $t1 = if ($enTrabajo) { [Medidor]::Lleva($trabajo) } else { @(0, 0, 0, 0, 0) }
 $e1 = [Medidor]::EquipoMs(); $w1 = Cpu 'WmiPrvSE'; $d1 = Cpu 'MsMpEng'
 $g1 = (Get-Process -Id $servicio).TotalProcessorTime.TotalMilliseconds
@@ -113,7 +115,7 @@ $udp.Close()
 
 # Qué parte del programa pidió cada PowerShell, por el principio de su orden.
 function QuienPidio([string]$l) {
-    if (-not $l) { return 'powershell (terminó antes de preguntar)' }
+    if (-not $l) { return 'powershell (sin orden)' }
     foreach ($p in @(
             @('GUARDIANA_FIRMAS', 'firmas (en tanda)'), @('Get-AuthenticodeSignature', 'firmas'),
             @('$v4 = @(', 'dns: ¿solo GUARDIANA?'),
@@ -127,13 +129,22 @@ function QuienPidio([string]$l) {
 }
 $porNombre = [ordered]@{}
 $alArrancar = [ordered]@{}
-$porQuien = [ordered]@{}
 foreach ($a in @($arranques.ToArray() | Where-Object { $_.padre -eq $servicio })) {
-    if ($a.s -ge $inicioVentana) {
-        $porNombre[$a.nombre] = 1 + [int]$porNombre[$a.nombre]
-        if ($a.nombre -eq 'powershell.exe') { $q = QuienPidio $a.linea; $porQuien[$q] = 1 + [int]$porQuien[$q] }
-    }
+    if ($a.s -ge $inicioVentana) { $porNombre[$a.nombre] = 1 + [int]$porNombre[$a.nombre] }
     else { $alArrancar[$a.nombre] = 1 + [int]$alArrancar[$a.nombre] }
+}
+# Del registro de seguridad: cada proceso que arrancó el servicio, con su orden.
+$porQuien = [ordered]@{}
+$porQuienArranque = [ordered]@{}
+$sucesos = @()
+try { $sucesos = @(Get-WinEvent -FilterHashtable @{ LogName = 'Security'; Id = 4688; StartTime = $horaArranque } -ErrorAction Stop) } catch { Write-Host "::warning title=reposo $Etiqueta::sin el registro de seguridad: $_" }
+foreach ($ev in $sucesos) {
+    $padre = [int64]$ev.Properties[7].Value
+    if ($padre -ne $servicio) { continue }
+    $exe = Split-Path -Leaf ([string]$ev.Properties[5].Value)
+    $q = if ($exe -eq 'powershell.exe') { QuienPidio ([string]$ev.Properties[8].Value) } else { $exe }
+    if ($ev.TimeCreated -ge $horaVentana -and $ev.TimeCreated -le $horaFin) { $porQuien[$q] = 1 + [int]$porQuien[$q] }
+    elseif ($ev.TimeCreated -lt $horaVentana) { $porQuienArranque[$q] = 1 + [int]$porQuienArranque[$q] }
 }
 
 & $Exe dns 2>&1 | ForEach-Object { Write-Host "dns: $_" }
@@ -154,7 +165,8 @@ $r = [ordered]@{
     guardiana_cpu_ms_min = [math]::Round(($g1 - $g0) / $min, 0)
     procesos_min = [math]::Round(($t1[1] - $t0[1]) / $min, 2)
     hijos_por_nombre = $porNombre
-    powershell_por_quien = $porQuien
+    por_quien = $porQuien
+    por_quien_al_arrancar = $porQuienArranque
     hijos_al_arrancar = $alArrancar
     segundos_al_arrancar = [math]::Round($inicioVentana, 0)
     equipo_cpu_ms_min = [math]::Round(($e1 - $e0) / $min, 0)
@@ -174,7 +186,9 @@ $nombres = ($porNombre.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)
 $nombresArranque = ($alArrancar.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join ', '
 Write-Host ("::notice title=arranque {0}::en los {1} s desde que arranca el servicio (con el dns --apply): {2}" -f $Etiqueta, $r.segundos_al_arrancar, $nombresArranque)
 $quien = ($porQuien.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join '; '
-Write-Host ("::notice title=powershell {0}::en la ventana, quién pidió cada PowerShell: {1}" -f $Etiqueta, $quien)
+$quienArranque = ($porQuienArranque.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join '; '
+Write-Host ("::notice title=procesos {0}::en la ventana, lo que arrancó el servicio y quién lo pidió: {1}" -f $Etiqueta, $quien)
+Write-Host ("::notice title=procesos al arrancar {0}::desde que arranca hasta la ventana: {1}" -f $Etiqueta, $quienArranque)
 Write-Host ("::notice title=reposo {0}::{1} min con el DNS {2}: servicio y lo que arranca {3} ms de procesador por minuto (guardiana.exe {4}), {5} procesos por minuto (hijos directos en la ventana: {6}); equipo entero {7} ms/min, WmiPrvSE {8} ms/min, Defender {9} ms/min; preguntas a 127.0.0.1: mediana {10} ms, p99 {11} ms, máximo {12} ms, {13} de más de 20 ms, {14} sin respuesta de {15}" -f $Etiqueta, $r.minutos, $(if ($aplicado) { 'apuntado a GUARDIANA' } else { 'SIN apuntar' }), $r.servicio_y_lo_que_arranca_cpu_ms_min, $r.guardiana_cpu_ms_min, $r.procesos_min, $nombres, $r.equipo_cpu_ms_min, $r.wmiprvse_cpu_ms_min, $r.msmpeng_cpu_ms_min, $r.p50_ms, $r.p99_ms, $r.max_ms, $r.mas_de_20_ms, $r.perdidas, ($tiempos.Count + $perdidas))
 if ($env:GITHUB_STEP_SUMMARY) {
     @("### Servicio en reposo: $Etiqueta", '', '```json', ($r | ConvertTo-Json -Depth 4), '```') -join "`n" | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding UTF8
