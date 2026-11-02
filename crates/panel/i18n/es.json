@@ -90,6 +90,7 @@
     "observe.relevo_sin_arriba": "Modo Hogar: no encuentro a quién pasar las consultas de la casa, así que no puedo hacer de relevo. Si el router sigue mandando aquí las consultas de la casa, devuelve ya su DNS a como estaba (o a automático): sin eso, los teléfonos y el resto se quedan sin internet.",
     "observe.relevo_error": "Modo Hogar: no puedo escuchar en la red para pasar las consultas de la casa ({error}). Si el router sigue mandando aquí las consultas de la casa, devuelve ya su DNS a como estaba (o a automático).",
     "observe.upstream_propio": "Los DNS que da la red son este mismo equipo (el router reparte su dirección, como pide el Modo Hogar), y GUARDIANA no puede preguntarse a sí misma: pregunta a {servers}.",
+    "observe.upstream_tunel": "Fuera del túnel no se encuentra ningún DNS de la red: mientras la VPN lo lleva todo, GUARDIANA pregunta solo al resolutor del túnel ({servers}), y cuando la VPN se cierre buscará otra vez el de la red.",
     "observe.solo_propio": "Los únicos DNS que conoce este equipo son él mismo (el router reparte su dirección, como pide el Modo Hogar), y GUARDIANA no puede preguntarse a sí misma. Pon en este equipo un DNS fijo (el del router o el de tu proveedor) o indica uno con --upstream IP.",
     "ledger.vacio": "No hay eventos todavía.",
     "ledger.wipe.palabra": "BORRAR",

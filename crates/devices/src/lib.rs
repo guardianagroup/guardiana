@@ -8,7 +8,7 @@
 mod neighbors;
 
 use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -211,18 +211,13 @@ impl Red {
     }
 }
 
-/// The IPv4 address of the interface that reaches the LAN/default route.
-/// Uses a connected UDP socket, which sends nothing. `None` when offline.
+/// The IPv4 address of the interface that reaches the LAN/default route, read from a connected UDP socket, which sends
+/// nothing. While the VPN carries everything, the one from before the tunnel took the default route: read then, it is
+/// the tunnel's own address, and Home Mode moved its listeners there (1.0.55; `guardiana_core::tunel_dns::lan`).
+/// `None` when offline.
 #[must_use]
 pub fn local_lan_ipv4() -> Option<Ipv4Addr> {
-    let sock = UdpSocket::bind("0.0.0.0:0").ok()?;
-    // Documentation-range address: never actually contacted.
-    sock.connect(SocketAddr::from((Ipv4Addr::new(192, 0, 2, 1), 53)))
-        .ok()?;
-    match sock.local_addr().ok()?.ip() {
-        IpAddr::V4(v4) if !v4.is_loopback() && !v4.is_unspecified() => Some(v4),
-        _ => None,
-    }
+    guardiana_core::tunel_dns::lan()
 }
 
 /// True for RFC 1918 and link-local IPv4, or IPv6 ULA/link-local: a home network.

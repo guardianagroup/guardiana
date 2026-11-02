@@ -90,6 +90,7 @@
     "observe.relevo_sin_arriba": "Modo Casa: não encontro para onde repassar as consultas da casa, então não posso repassá-las. Se o roteador ainda manda para cá as consultas da casa, restaure já o DNS dele ao que era (ou ao automático): sem isso, os celulares e o resto ficam sem internet.",
     "observe.relevo_error": "Modo Casa: não consigo escutar na rede para repassar as consultas da casa ({error}). Se o roteador ainda manda para cá as consultas da casa, restaure já o DNS dele ao que era (ou ao automático).",
     "observe.upstream_propio": "O DNS que a rede entrega é este mesmo computador (o roteador distribui o endereço dele, como pede o Modo Casa), e a GUARDIANA não pode perguntar a si mesma: pergunta a {servers}.",
+    "observe.upstream_tunel": "Fora do túnel não se encontra nenhum DNS da rede: enquanto a VPN leva tudo, a GUARDIANA pergunta só ao resolvedor do túnel ({servers}) e, quando a VPN fechar, volta a procurar o da rede.",
     "observe.solo_propio": "O único DNS que este computador conhece é ele mesmo (o roteador distribui o endereço dele, como pede o Modo Casa), e a GUARDIANA não pode perguntar a si mesma. Coloque neste computador um DNS fixo (o do roteador ou o do seu provedor) ou indique um com --upstream IP.",
     "ledger.vacio": "Ainda não há eventos.",
     "ledger.wipe.palabra": "APAGAR",

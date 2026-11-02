@@ -11,7 +11,10 @@
 //!
 //! The plan names the conditions; here each becomes WFP's own: the tunnel's interface by its LUID, the service by its
 //! program file (`FwpmGetAppIdFromFileName0`), loopback by its flag, protocols, ports, addresses and networks, ICMPv6
-//! types and codes (which WFP keeps in the port fields), and Hyper-V's machine-to-machine flag.
+//! types and codes (which WFP keeps in the port fields), and Hyper-V's machine-to-machine flag. The service's permits
+//! (1.0.55) combine its program file with a protocol, the server's address and port, or a local port: each a field of
+//! both connection-authorisation layers, outgoing and accepted incoming. Only the plan's firm permit, the encrypted
+//! packets to the server, gets `FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT`.
 //!
 //! `unsafe` is used here, as the project allows with justification (see `cortafuegos/ventanas.rs`, the same API): every
 //! value a condition points to is owned here and outlives the call that adds the filter, every result is checked, and
@@ -316,8 +319,9 @@ impl CorteVpn {
         } else {
             FWP_ACTION_BLOCK
         };
-        if f.permite && f.condiciones.contains(&Condicion::Servicio) {
-            // the service's own traffic may not be blocked by a lower sublayer either
+        if f.permite && f.firme {
+            // the encrypted packets to the server may not be blocked by a lower sublayer either; every other permit
+            // (Home Mode's among them) leaves the rest of Windows' firewall to decide after this one (1.0.55)
             x.flags = FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT;
         }
         x.weight.r#type = FWP_UINT8;
@@ -357,10 +361,13 @@ impl Drop for CorteVpn {
 mod tests {
     use super::*;
 
-    /// The plan without the filters that would block the test machine's own network (everything else, and other DNS).
-    fn permisos() -> Vec<Filtro> {
-        let dns = ["10.66.0.1".parse().unwrap(), "fd66::1".parse().unwrap()];
-        guardiana_tunel::corte::plan(0x0123_4567_89ab_cdef, &dns)
+    /// A server reached over IPv4 and one over IPv6 (documentation addresses: nothing is sent to them).
+    const EXTREMOS: [&str; 2] = ["192.0.2.1:51820", "[2001:db8::1]:51820"];
+
+    /// The plan for a server at `extremo` without the filters that would block the test machine's own network
+    /// (everything else, and DNS outside the tunnel).
+    fn permisos(extremo: &str) -> Vec<Filtro> {
+        guardiana_tunel::corte::plan(0x0123_4567_89ab_cdef, extremo.parse().unwrap())
             .into_iter()
             .filter(|f| f.permite)
             .collect()
@@ -395,15 +402,27 @@ mod tests {
 
     /// On a real Windows, as an administrator: every filter of the plan is accepted by Windows (each condition is
     /// of a type its field takes), except the ones that would block the test machine's own network, and the session
-    /// closes cleanly.
+    /// closes cleanly. For a server of each family (1.0.55: the service's permit goes in its family's layers, with
+    /// the server's address, port and protocol), and with Home Mode's permits (the service's program file, a protocol
+    /// and a local port, in the accepted incoming layer).
     #[test]
     #[ignore = "necesita Windows como administrador"]
     fn windows_acepta_cada_filtro_del_plan() {
-        let plan = permisos();
-        assert!(plan.len() > 20);
         let yo = std::env::current_exe().unwrap();
-        let corte = CorteVpn::activa(&plan, &yo).unwrap();
-        drop(corte);
+        for extremo in EXTREMOS {
+            let plan = permisos(extremo);
+            assert!(plan.len() > 20);
+            // the firm permit is the one to the server, in its two layers; Home Mode's are not firm
+            assert_eq!(plan.iter().filter(|f| f.firme).count(), 2, "{extremo}");
+            assert_eq!(
+                plan.iter()
+                    .filter(|f| f.nombre == "GUARDIANA VPN: Modo Hogar" && !f.firme)
+                    .count(),
+                4
+            );
+            let corte = CorteVpn::activa(&plan, &yo).unwrap();
+            drop(corte);
+        }
     }
 
     /// With the antivirus cuts' firewall session open (the panel holds it for as long as it runs, under GUARDIANA's
@@ -421,7 +440,7 @@ mod tests {
             "otra sesión con el proveedor de los cortes del antivirus: 0x{r:08x}"
         );
         let yo = std::env::current_exe().unwrap();
-        let corte = CorteVpn::activa(&permisos(), &yo).unwrap();
+        let corte = CorteVpn::activa(&permisos(EXTREMOS[0]), &yo).unwrap();
         drop(corte);
         drop(cortes);
     }
@@ -432,8 +451,8 @@ mod tests {
     #[ignore = "necesita Windows como administrador"]
     fn dos_a_la_vez() {
         let yo = std::env::current_exe().unwrap();
-        let a = CorteVpn::activa(&permisos(), &yo).unwrap();
-        let b = CorteVpn::activa(&permisos(), &yo).unwrap();
+        let a = CorteVpn::activa(&permisos(EXTREMOS[0]), &yo).unwrap();
+        let b = CorteVpn::activa(&permisos(EXTREMOS[0]), &yo).unwrap();
         drop(a);
         drop(b);
     }

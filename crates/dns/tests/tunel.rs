@@ -122,7 +122,7 @@ async fn con_la_vpn_los_nombres_van_solo_al_resolutor_del_tunel() {
     assert!(antes >= 1);
 
     // with it: only the tunnel's, even for a name the network's cache already holds
-    let desvio = Desvio::pon(tunel);
+    let desvio = Desvio::pon(tunel, None);
     assert_eq!(direcciones(&pregunta(yo, "a.test").await), vec![tunel_ip]);
     assert_eq!(direcciones(&pregunta(yo, "b.test").await), vec![tunel_ip]);
     assert!(en_el_tunel.load(Ordering::SeqCst) >= 2);
@@ -135,7 +135,7 @@ async fn con_la_vpn_los_nombres_van_solo_al_resolutor_del_tunel() {
     assert!(despues > antes);
 
     // a tunnel's resolver that does not answer: the name fails, it never goes to the network's instead
-    let muerto = Desvio::pon("127.0.0.1:1".parse().unwrap());
+    let muerto = Desvio::pon("127.0.0.1:1".parse().unwrap(), None);
     let msg = pregunta(yo, "d.test").await;
     assert_eq!(msg.metadata.response_code, ResponseCode::ServFail);
     assert_eq!(en_la_red.load(Ordering::SeqCst), despues);
