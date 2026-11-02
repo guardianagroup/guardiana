@@ -10,6 +10,7 @@
 //!   server answers with the tunnel's address, its own public key and the ML-KEM ciphertext. No account, no name.
 //! - [`config`]: the tunnel's configuration, ready for the Windows adapter (and printable for tests, without the
 //!   private key).
+//! - [`nt`]: that configuration as the bytes WireGuardNT's driver takes (`wireguard.h`'s structures).
 //!
 //! The Windows half (the WireGuardNT adapter and the firewall rules that keep everything inside the tunnel) lives next
 //! to the program's firewall, in `guardiana-apps`.
@@ -18,6 +19,7 @@ pub mod alta;
 pub mod config;
 pub mod cuantico;
 pub mod llaves;
+pub mod nt;
 
 /// Why something in the tunnel's core could not be done.
 #[derive(Debug, Clone, PartialEq, Eq)]
