@@ -2316,10 +2316,18 @@
       // El escudo (1.0.52) y su cuarentena (ronda 88, 1 nov 2026): los avisos del antivirus del programa, cada uno con
       // «Poner en cuarentena» cuando su archivo puede ir (lo dice el servicio), y lo apartado con «Devolver». La web de
       // GUARDIANA solo puede pedir lo primero; devolver se hace aquí.
+      // Lo congelado (2 nov 2026): un programa que tocó un señuelo o mandó borrar las copias de seguridad, congelado al
+      // momento. Aquí se detiene (y su archivo va a la cuarentena) o se deja seguir si es de la persona.
+      const congelado = (a) => {
+        if (!/^c-\d{1,16}-\d{1,10}$/.test(a.incidente || '') || typeof a.congelado !== 'string') return '';
+        if (a.congelado === 'detenido') return `<span class="tag">${esc(t('esc_detenido'))}</span> `;
+        if (a.congelado === 'reanudado') return `<span class="tag">${esc(t('esc_reanudado'))}</span> `;
+        return `<span class="tag bad">${esc(t('esc_congelado'))}</span> <button data-detener="${esc(a.incidente)}">${esc(t('esc_detener'))}</button> <button class="secondary" data-reanudar="${esc(a.incidente)}">${esc(t('esc_reanudar'))}</button> `;
+      };
       const pintaEscudo = (es, cu) => {
         const avisos = Array.isArray(es.avisos) ? es.avisos : [];
         $('esc-lead').textContent = es.aprendiendo ? t('esc_lead_aprende') : t('esc_lead').replace('{n}', String(es.sitios || 0));
-        $('esc-avisos').innerHTML = avisos.map((a) => `<tr class="${a.grave ? 'bad' : ''}"><td>${esc(horaCorta(a.cuando_ms))}</td><td>${esc(a.programa || '')}</td><td>${esc(t('esc_regla_' + a.regla) === 'esc_regla_' + a.regla ? (a.regla || '') : t('esc_regla_' + a.regla))}</td><td>${esc(a.texto || '')}</td><td>${a.cuarentena === 'posible' ? `<button class="secondary" data-cuarentena="${esc(a.id)}">${esc(t('esc_poner'))}</button>` : a.cuarentena === 'hecha' ? `<span class="tag">${esc(t('esc_hecha'))}</span>` : ''}</td></tr>`).join('');
+        $('esc-avisos').innerHTML = avisos.map((a) => `<tr class="${a.grave ? 'bad' : ''}"><td>${esc(horaCorta(a.cuando_ms))}</td><td>${esc(a.programa || '')}</td><td>${esc(t('esc_regla_' + a.regla) === 'esc_regla_' + a.regla ? (a.regla || '') : t('esc_regla_' + a.regla))}</td><td>${esc(a.texto || '')}</td><td>${congelado(a)}${a.cuarentena === 'posible' ? `<button class="secondary" data-cuarentena="${esc(a.id)}">${esc(t('esc_poner'))}</button>` : a.cuarentena === 'hecha' ? `<span class="tag">${esc(t('esc_hecha'))}</span>` : ''}</td></tr>`).join('');
         $('esc-avisos-vacio').classList.toggle('hidden', avisos.length > 0);
         const entradas = Array.isArray(cu.entradas) ? cu.entradas : [];
         $('esc-cuarentena').innerHTML = entradas.map((e) => `<tr><td>${esc(horaCorta(e.cuando_ms))}</td><td title="${esc(e.ruta || '')}">${esc(e.nombre || '')} <span class="muted">${esc(bytes(Number(e.bytes || 0)))}</span></td><td>${esc(e.motivo || '')}<br><span class="muted">${esc(e.fuente || '')}</span></td><td><button class="secondary" data-restaura="${esc(e.id)}">${esc(t('esc_devolver'))}</button></td></tr>`).join('');
@@ -2330,14 +2338,18 @@
         catch (err) { $('esc-card').classList.add('hidden'); }
       };
       $('esc-card').addEventListener('click', async (e) => {
-        const b = e.target.closest && e.target.closest('button[data-cuarentena], button[data-restaura]');
+        const b = e.target.closest && e.target.closest('button[data-cuarentena], button[data-restaura], button[data-detener], button[data-reanudar]');
         if (!b) return;
         b.disabled = true; $('esc-msg').textContent = '';
         try {
-          const r = b.dataset.cuarentena
-            ? await api('/api/escudo/cuarentena/' + encodeURIComponent(b.dataset.cuarentena), { method: 'POST', body: {} })
-            : await api('/api/escudo/cuarentena/restaura/' + encodeURIComponent(b.dataset.restaura), { method: 'POST', body: {} });
-          $('esc-msg').textContent = r.ok ? t(b.dataset.cuarentena ? 'esc_puesta' : 'esc_devuelta') : t('esc_no') + ' ' + String(r.motivo || '');
+          const d = b.dataset;
+          const ruta = d.cuarentena ? '/api/escudo/cuarentena/' + encodeURIComponent(d.cuarentena)
+            : d.restaura ? '/api/escudo/cuarentena/restaura/' + encodeURIComponent(d.restaura)
+              : d.detener ? '/api/escudo/congelado/' + encodeURIComponent(d.detener) + '/detener'
+                : '/api/escudo/congelado/' + encodeURIComponent(d.reanudar) + '/reanudar';
+          const r = await api(ruta, { method: 'POST', body: {} });
+          const bien = d.cuarentena ? 'esc_puesta' : d.restaura ? 'esc_devuelta' : d.detener ? 'esc_detenido_ok' : 'esc_reanudado_ok';
+          $('esc-msg').textContent = r.ok ? t(bien) : t('esc_no') + ' ' + String(r.motivo || '');
         } catch (err) { $('esc-msg').textContent = t('esc_no') + ' ' + String(err.message || err); }
         b.disabled = false;
         await cargaEscudo();
