@@ -291,7 +291,7 @@
       </RegistryKey>
     </Component>
     <!-- 1.0.52 (the owner, 1 Nov 2026, 19:29, to the proposal of a Windows notice for each grave warning of the
-         antivirus: «Me parece bien la propuesta, sí, buena idea»): ZERO with `--avisos` starts at every sign-in, for
+         antivirus: «Me parece bien la propuesta, sí, buena idea»): ZERO with its notices option («avisos») starts at every sign-in, for
          every account, with no visible window, reads el escudo's warnings and shows Windows' notice of each new grave
          one; a click opens Órbita on the PC Scanner (guardiana://escaner). Its hidden window takes the «close GUARDIANA
          ZERO» above, so an update or an uninstall closes it too. -->
