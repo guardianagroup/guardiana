@@ -969,6 +969,9 @@ pub async fn run<F: Future<Output = ()>>(
             Err(e) => break Err(e),
         }
     };
+    // The VPN lives as long as the process, across passes (1.0.54): stopping for good closes it, cut-off switch
+    // included, before the DNS goes back. Off the runtime's threads: closing the adapter can take a moment.
+    let _ = tokio::task::spawn_blocking(guardiana_panel::cierra_la_vpn).await;
     give_dns_back_while_stopped(&cfg.db);
     result
 }
@@ -1583,9 +1586,22 @@ fn elegir_arriba(ledger: &Ledger) -> Result<(Fuente, Vec<SocketAddr>, String), b
     Ok((fuente, v, fuente_sistema))
 }
 
+/// The upstreams a probe must ask right now: while the VPN carries everything, only the tunnel's
+/// resolver, as every forwarded name does (`guardiana_core::tunel_dns`); a probe to the network's
+/// would leave outside the tunnel. Otherwise the pass's own.
+fn arriba_efectivo(de_la_vuelta: &[SocketAddr]) -> Vec<SocketAddr> {
+    guardiana_core::tunel_dns::actual().map_or_else(|| de_la_vuelta.to_vec(), |t| vec![t])
+}
+
 /// Whether these upstreams answer a question right now. On a thread of its own, with a runtime
 /// of its own: it is called from the middle of the start-up, whatever runtime that is on.
+/// While the VPN carries everything nothing is asked (the question would leave outside the
+/// tunnel) and the answer is no: the list chosen is used only after the VPN, and then the
+/// start-up of the next pass asks again.
 fn responden_ahora(v: &[SocketAddr]) -> bool {
+    if guardiana_core::tunel_dns::actual().is_some() {
+        return false;
+    }
     let v = v.to_vec();
     std::thread::spawn(move || {
         tokio::runtime::Builder::new_current_thread()
@@ -2289,6 +2305,10 @@ async fn run_once<F: Future<Output = ()>>(
                             if home_lan_wanted(&l, &keep_secret) != home_lan
                                 || block_mode_of(&l) != keep_block_mode
                                 || (seguir_red
+                                    // With the VPN carrying everything, the computer's address is the
+                                    // tunnel's: that is no new network, and rebuilding for it is no use
+                                    // (1.0.54).
+                                    && guardiana_core::tunel_dns::actual().is_none()
                                     && guardiana_devices::local_lan_ipv4() != lan_inicial)
                                 || hogar_sin_puerto
                                     .is_some_and(|a| std::net::UdpSocket::bind(a).is_ok())
@@ -2326,7 +2346,8 @@ async fn run_once<F: Future<Output = ()>>(
                             match aparte.minuto(ok, fallos) {
                                 Paso::Nada => {}
                                 Paso::Comprobar => {
-                                    if !dns::upstream_answers(&keep_upstream_addrs, SONDA).await {
+                                    let arriba = arriba_efectivo(&keep_upstream_addrs);
+                                    if !dns::upstream_answers(&arriba, SONDA).await {
                                         let lista = lista_de(&keep_upstream_addrs);
                                         println!(
                                             "{}",
@@ -2339,7 +2360,8 @@ async fn run_once<F: Future<Output = ()>>(
                                     }
                                 }
                                 Paso::Sondear => {
-                                    if dns::upstream_answers(&keep_upstream_addrs, SONDA).await {
+                                    let arriba = arriba_efectivo(&keep_upstream_addrs);
+                                    if dns::upstream_answers(&arriba, SONDA).await {
                                         if aparte_del_resolutor(|| volver_con_arriba(&l)) {
                                             aparte.apartado = false;
                                         }

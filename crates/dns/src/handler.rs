@@ -20,6 +20,8 @@ use crate::{BlockMode, Decision, Outcome, Policy, Query, BUILTIN_TTL, CANARY_NAM
 pub(crate) struct Handler<P: Policy> {
     pub(crate) policy: Arc<P>,
     pub(crate) upstream: TokioResolver,
+    /// The tunnel's resolver, the only one asked while the VPN carries everything.
+    pub(crate) tunel: crate::upstream::DelTunel,
     pub(crate) block_mode: BlockMode,
     pub(crate) canary_enabled: bool,
     pub(crate) checker_ip: Option<Ipv4Addr>,
@@ -215,7 +217,26 @@ impl<P: Policy> Handler<P> {
     }
 
     async fn forward(&self, name: &Name, qtype: RecordType) -> (Answer, Outcome) {
-        match self.upstream.lookup(name.clone(), qtype).await {
+        // With the VPN carrying everything, only the tunnel's resolver, inside the tunnel: never the network's, which
+        // are outside it (`guardiana_core::tunel_dns`, second review of 2 Nov 2026). If its client cannot be built,
+        // the name fails.
+        let del_tunel = match guardiana_core::tunel_dns::actual() {
+            Some(resolutor) => match self.tunel.cliente(resolutor) {
+                Some(cliente) => Some(cliente),
+                None => {
+                    return (
+                        Answer {
+                            code: ResponseCode::ServFail,
+                            ..Answer::default()
+                        },
+                        Outcome::UpstreamFailed,
+                    )
+                }
+            },
+            None => None,
+        };
+        let upstream: &TokioResolver = del_tunel.as_deref().unwrap_or(&self.upstream);
+        match upstream.lookup(name.clone(), qtype).await {
             Ok(lookup) => {
                 let answers = lookup.answers().to_vec();
                 let server = first_address(&answers);

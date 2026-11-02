@@ -10,14 +10,20 @@
 //! (`guardiana_tunel::conexion::caida`), «sin respuesta», y la página lo dice con el botón de desconectar; si vuelve a
 //! contestar, otra vez «conectada». Nada sale fuera del túnel mientras tanto. El alta nueva automática
 //! (`guardiana_apps::tunel_win::renueva`) no se usa todavía: la segunda revisión del 2 nov 2026 vio que su petición
-//! entraría en el túnel caído (la ruta por defecto es la del túnel); va en la 1.0.54, con la ruta resuelta y probada.
+//! entraría en el túnel caído (la ruta por defecto es la del túnel); irá en una versión posterior, con la ruta resuelta y
+//! probada.
+//!
+//! La VPN vive lo que vive el proceso, no lo que dura cada vuelta del motor (1.0.54): el motor rehace el panel cuando
+//! cambia la red, y con la VPN puesta la dirección del equipo pasa a ser la del túnel; hasta la 1.0.54 eso tiraba el
+//! panel con la conexión dentro, el túnel quedaba huérfano y la página decía «apagada». Al parar el servicio para
+//! siempre, el motor la cierra ([`cierra_la_vpn`]).
 //!
 //! Nada de esto guarda llaves ni a qué servidor se conectó nadie: el estado vive en la memoria del servicio.
 // Handlers answer axum's own `Response` on error, as every module of the panel does (see `api.rs`).
 #![allow(clippy::result_large_err)]
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 #[cfg(windows)]
 use std::time::Duration;
 
@@ -77,6 +83,27 @@ pub(crate) struct Vpn {
     generacion: AtomicU64,
     #[cfg(windows)]
     conexion: Mutex<Option<guardiana_apps::tunel_win::Conexion>>,
+}
+
+/// La VPN del proceso: la misma para todas las vueltas del motor y todos los paneles que levante.
+pub(crate) fn global() -> &'static Vpn {
+    static VPN: LazyLock<Vpn> = LazyLock::new(Vpn::default);
+    &VPN
+}
+
+/// Al parar el servicio para siempre: el túnel se cierra (y su corte con él) y la VPN vuelve a «apagada».
+pub fn cierra_la_vpn() {
+    let vpn = global();
+    // el vigía de la conexión abierta se acaba
+    vpn.generacion.fetch_add(1, Ordering::SeqCst);
+    #[cfg(windows)]
+    {
+        let abierta = vpn.conexion.lock().ok().and_then(|mut g| g.take());
+        if let Some(c) = abierta {
+            c.tunel.cierra();
+        }
+    }
+    vpn.pon(Estado::default());
 }
 
 /// Por qué la VPN no se puede usar aquí, si no se puede.
@@ -294,12 +321,12 @@ pub(crate) async fn conecta(
     let gen = state.vpn.generacion.fetch_add(1, Ordering::SeqCst) + 1;
     #[cfg(windows)]
     {
-        let st = Arc::clone(&state);
+        // la VPN del proceso, no el panel: el motor puede rehacer el panel mientras tanto
+        let vpn = state.vpn;
         tokio::task::spawn_blocking(move || {
-            if st.vpn.haz_conexion(&host) {
+            if vpn.haz_conexion(&host) {
                 // el vigía, en un hilo suyo: no retiene el cierre del programa
-                let st = Arc::clone(&st);
-                std::thread::spawn(move || st.vpn.vigila(gen));
+                std::thread::spawn(move || vpn.vigila(gen));
             }
         });
     }
@@ -324,13 +351,13 @@ pub(crate) async fn desconecta(
     #[cfg(windows)]
     {
         // fuera de los hilos de la página
-        let st = Arc::clone(&state);
+        let vpn = state.vpn;
         let _ = tokio::task::spawn_blocking(move || {
-            let abierta = st.vpn.conexion.lock().ok().and_then(|mut g| g.take());
+            let abierta = vpn.conexion.lock().ok().and_then(|mut g| g.take());
             if let Some(c) = abierta {
                 c.tunel.cierra();
             }
-            st.vpn.pon(Estado::default());
+            vpn.pon(Estado::default());
         })
         .await;
     }
@@ -343,6 +370,12 @@ pub(crate) async fn desconecta(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn la_vpn_es_la_misma_en_cada_vuelta_del_motor() {
+        // dos paneles seguidos (el motor rehace el suyo cuando cambia la red) ven la misma VPN
+        assert!(std::ptr::eq(global(), global()));
+    }
 
     #[test]
     fn el_estado_para_la_pagina() {

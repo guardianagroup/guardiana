@@ -336,6 +336,7 @@ pub async fn start<P: Policy>(config: Config, policy: P) -> Result<Running, Erro
     let handler = handler::Handler {
         policy: Arc::new(policy),
         upstream,
+        tunel: upstream::DelTunel::new(&config),
         block_mode: config.block_mode,
         canary_enabled: config.canary_enabled,
         checker_ip: config.checker_ip,

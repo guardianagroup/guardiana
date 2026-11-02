@@ -39,6 +39,7 @@ mod stats;
 pub mod time;
 mod trafico;
 pub mod trampas;
+pub mod tunel_dns;
 pub mod vigilancia;
 pub mod vision;
 

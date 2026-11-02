@@ -16,6 +16,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::path::Path;
 use std::sync::Arc;
 
+use guardiana_core::tunel_dns::Desvio;
 use guardiana_tunel::alta::Alta;
 use guardiana_tunel::conexion::{self, Abierto, Conectado, ErrorConexion};
 use guardiana_tunel::llaves::Llaves;
@@ -74,13 +75,18 @@ impl From<ErrorCorte> for ErrorTunel {
     }
 }
 
-/// The tunnel, open. Its fields drop in this order: the cut-off switch first, then the adapter.
+/// The tunnel, open. Its fields drop in this order: the cut-off switch first, then the adapter, and last the tunnel's
+/// resolver as GUARDIANA's DNS upstream, so no name goes to the network's resolvers while the tunnel is still there.
 pub struct Tunel {
     corte: Option<CorteVpn>,
     adaptador: Adaptador,
     /// This computer's address in the tunnel now, and the tunnel's resolver (the cut-off switch lets DNS go to it only).
     direccion: Ipv4Addr,
     dns: Ipv4Addr,
+    /// With everything inside: GUARDIANA's own resolver forwards only to the tunnel's (`guardiana_core::tunel_dns`).
+    /// The service is the one program the cut-off switch lets out, so until 1.0.54 the names it forwarded went to the
+    /// home router outside the tunnel (second review of 2 Nov 2026).
+    desvio: Option<Desvio>,
 }
 
 /// Everything goes inside the tunnel: IPv4 and IPv6.
@@ -131,6 +137,9 @@ impl Tunel {
             red_vpn::ajusta(luid, false, Some(MTU), false)?;
         }
         red_vpn::pon_dns(NOMBRE, &[IpAddr::V4(alta.dns)])?;
+        // From here on GUARDIANA's resolver asks only the tunnel's, which answers once the tunnel is up: until then a
+        // name fails instead of leaving outside. If a later step fails, this goes away with it.
+        let desvio = todo.then(|| Desvio::pon(SocketAddr::new(IpAddr::V4(alta.dns), 53)));
         let corte = if todo {
             Some(CorteVpn::activa(
                 &corte::plan(luid, &[IpAddr::V4(alta.dns)]),
@@ -145,6 +154,7 @@ impl Tunel {
             adaptador,
             direccion: alta.direccion,
             dns: alta.dns,
+            desvio,
         })
     }
 
@@ -211,6 +221,12 @@ impl Tunel {
     #[must_use]
     pub fn con_corte(&self) -> bool {
         self.corte.is_some()
+    }
+
+    /// Whether GUARDIANA's resolver is forwarding only to the tunnel's (with everything inside).
+    #[must_use]
+    pub fn con_dns_del_tunel(&self) -> bool {
+        self.desvio.is_some()
     }
 
     /// Closes the tunnel: the cut-off switch off, the adapter down and gone.
@@ -319,6 +335,9 @@ mod tests {
         .unwrap();
         assert_ne!(t.luid(), 0);
         assert!(!t.con_corte());
+        // only the tunnel's own network inside: GUARDIANA's resolver keeps the network's resolvers
+        assert!(!t.con_dns_del_tunel());
+        assert_eq!(guardiana_core::tunel_dns::actual(), None);
         let e = t.estado().unwrap();
         assert_eq!(e.publica, [7; 32]);
         assert_eq!(e.ultimo_saludo_ms, None);

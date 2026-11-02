@@ -58,6 +58,7 @@ use tokio::net::TcpListener;
 use tokio::sync::Notify;
 
 pub use auth::{constant_time_eq, load_or_create_token, origin_es_este_panel, TOKEN_FILE};
+pub use vpn::cierra_la_vpn;
 
 /// Default panel port (brief §0).
 pub const DEFAULT_PORT: u16 = 7443;
@@ -156,8 +157,8 @@ pub(crate) struct AppState {
     pub(crate) vigilancia: vigilancia::Vigilancia,
     /// «Vigía» (1.0.48): su última mirada, en memoria, para las llamadas y los chats.
     pub(crate) vigia: vigia::Vigia,
-    /// La VPN (en preparación): su estado y, en Windows, el túnel abierto.
-    pub(crate) vpn: vpn::Vpn,
+    /// La VPN (en preparación): su estado y, en Windows, el túnel abierto. La del proceso: no se va con el panel.
+    pub(crate) vpn: &'static vpn::Vpn,
 }
 
 /// A running panel.
@@ -717,7 +718,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         revision: revision::Revisor::default(),
         vigilancia: vigilancia::Vigilancia::default(),
         vigia: vigia::Vigia::default(),
-        vpn: vpn::Vpn::default(),
+        vpn: vpn::global(),
     });
     // The constant watch (1.0.45) runs as long as the panel does.
     vigilancia::Vigilancia::arrancar(&state);
