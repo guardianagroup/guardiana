@@ -777,13 +777,32 @@ const PANEL_LECTURAS: &[(&str, &str)] = &[
     // the second's settings switch (`POST /api/quien-vende/ajuste`) stays out.
     ("GET", "/vigia"),
     ("GET", "/api/quien-vende"),
-    // 1.0.52, the antivirus («el escudo»): its «primera vez» warnings. Read only.
+    // 1.0.52, the antivirus («el escudo»): its warnings, and what is in its quarantine. Putting a file there
+    // (`POST /api/escudo/cuarentena/<id>`, the owner, 1 Nov 2026, ronda 88) is allowed by [`es_cuarentena`]: by the
+    // warning's id, never a path; restoring (`…/restaura/<id>`) only from the panel itself.
     ("GET", "/api/escudo"),
+    ("GET", "/api/escudo/cuarentena"),
     // 1.0.51 (the owner, 31 Oct 2026, 08:53: «por dónde viaja… qué cable… si viaja por satélite»):
     // the route of the data, hop by hop, and the order to measure it now (read only: `tracert`).
     ("GET", "/api/ruta"),
     ("POST", "/api/ruta/ahora"),
 ];
+
+/// 1.0.52: `POST /api/escudo/cuarentena/<id>`, the id being a warning's (`<línea>-<cuando_ms>`, digits only), the
+/// one address outside [`PANEL_LECTURAS`] GUARDIANA's web may ask the panel for.
+fn es_cuarentena(metodo: &str, ruta: &str) -> bool {
+    metodo == "POST"
+        && ruta
+            .strip_prefix("/api/escudo/cuarentena/")
+            .is_some_and(|id| {
+                id.split_once('-').is_some_and(|(a, b)| {
+                    (1..=6).contains(&a.len())
+                        && (1..=16).contains(&b.len())
+                        && a.bytes().all(|c| c.is_ascii_digit())
+                        && b.bytes().all(|c| c.is_ascii_digit())
+                })
+            })
+}
 
 /// ZERO's own wait page for the panel (1.0.44), as it is or saying what failed.
 fn es_espera_propia(url: &str) -> bool {
@@ -2155,6 +2174,7 @@ impl Sesion {
         if !PANEL_LECTURAS
             .iter()
             .any(|(a, b)| *a == metodo && *b == ruta)
+            && !es_cuarentena(&metodo, &ruta)
         {
             return self.sin_lectura(id, n, 403);
         }

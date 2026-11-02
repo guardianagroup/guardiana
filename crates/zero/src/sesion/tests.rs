@@ -3765,7 +3765,7 @@ fn the_web_asks_the_panel_only_for_its_readings() {
             if *id == panel && json.contains("/api/revision/ahora") && json.contains("\"n\":7")
     )));
     // 1.0.50: the Antivirus also reads the call watcher and «who sells your data».
-    for ruta in ["/vigia", "/api/quien-vende"] {
+    for ruta in ["/vigia", "/api/quien-vende", "/api/escudo/cuarentena"] {
         let o = s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, "GET"));
         assert!(
             o.iter().any(|x| matches!(
@@ -3775,6 +3775,16 @@ fn the_web_asks_the_panel_only_for_its_readings() {
             "{ruta}"
         );
     }
+    // 1.0.52: putting a file the escudo named in the quarantine, by its id.
+    let o = s.mensaje(
+        Origen::Pestana(orbita),
+        ORBITA,
+        &pide("/api/escudo/cuarentena/3-1793589348314", "POST"),
+    );
+    assert!(o.iter().any(|x| matches!(
+        x,
+        Orden::EnviaAPagina { id, json, .. } if *id == panel && json.contains("cuarentena/3-1793589348314")
+    )));
     // Nothing that changes a rule, the licence or a setting, nor a reading by another method.
     for (ruta, metodo) in [
         ("/api/reglas", "POST"),
@@ -3787,6 +3797,13 @@ fn the_web_asks_the_panel_only_for_its_readings() {
         ("/api/quien-vende/ajuste", "POST"),
         ("/api/quien-vende", "POST"),
         ("/vigia", "POST"),
+        // The quarantine: restoring, an id that is not a warning's, or a path, never from the web.
+        ("/api/escudo/cuarentena/restaura/3-1793589348314", "POST"),
+        ("/api/escudo/cuarentena/", "POST"),
+        ("/api/escudo/cuarentena/abc-1", "POST"),
+        ("/api/escudo/cuarentena/3-1793589348314/x", "POST"),
+        ("/api/escudo/cuarentena/3-1793589348314", "GET"),
+        ("/api/escudo/cuarentena/1234567-1", "POST"),
     ] {
         // The panel is not asked; the web is told at once (403), so it does not wait for nothing.
         let o = s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, metodo));
