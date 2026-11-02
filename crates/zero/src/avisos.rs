@@ -3,8 +3,9 @@
 //!
 //! ZERO started with `--avisos` when the person signs in to Windows, with no window, reads the warnings the service
 //! writes for the panel ([`ARCHIVO`], in the system's data folder, which the person at the console can read) and shows a
-//! notice for each new grave one. A click on it opens Órbita on the PC Scanner ([`ENLACE`]). This module decides what
-//! to show and writes the notice; the Windows program shows it. Nothing leaves the computer.
+//! notice for each new grave one. A click on it opens Órbita on the Antivirus ([`ENLACE`]; the PC Scanner until the
+//! owner renamed it, 1 Nov 2026, 21:03: «cámbialo sí»). This module decides what to show and writes the notice; the
+//! Windows program shows it. Nothing leaves the computer.
 
 use std::path::PathBuf;
 use std::time::Duration;
@@ -85,7 +86,7 @@ pub fn nuevos(texto: &str, visto: u64) -> (Vec<Grave>, u64) {
 pub fn notificaciones(graves: &[Grave]) -> Vec<String> {
     if graves.len() > MAXIMO {
         let cuerpo = format!(
-            "El escudo de GUARDIANA tiene {} avisos graves nuevos. Míralos en el Escáner PC.",
+            "El escudo de GUARDIANA tiene {} avisos graves nuevos. Míralos en el Antivirus.",
             graves.len()
         );
         return vec![xml("GUARDIANA · Avisos graves", "", &cuerpo)];
@@ -127,7 +128,7 @@ pub fn xml(titulo: &str, programa: &str, texto: &str) -> String {
     format!(
         "<toast launch=\"{ENLACE}\" activationType=\"protocol\" duration=\"long\">\
          <visual><binding template=\"ToastGeneric\"><text>{}</text>{linea}<text>{}</text></binding></visual>\
-         <actions><action content=\"Ver en el Escáner PC\" activationType=\"protocol\" arguments=\"{ENLACE}\"/></actions>\
+         <actions><action content=\"Ver en el Antivirus\" activationType=\"protocol\" arguments=\"{ENLACE}\"/></actions>\
          </toast>",
         escapa(titulo),
         escapa(&texto)
