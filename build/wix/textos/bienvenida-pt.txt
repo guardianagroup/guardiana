@@ -17,6 +17,6 @@ O que NÃO vai fazer
 Depois de instalar
 Ao terminar, o painel se abre e em um minuto você verá as consultas deste computador. Para devolver o DNS como estava sem desinstalar: painel, «Estado».
 
-Sete dias com tudo e sem cartão; depois é preciso uma licença (assinatura ou pagamento único). O que foi registrado fica no seu disco, pagando ou não. Termos: guardianagroup.com/pt/termos.html · Privacidade: guardianagroup.com/pt/privacidade.html
+Sete dias com tudo e sem cartão. Depois a GUARDIANA continua funcionando de graça, com o histórico das últimas 24 horas; a VPN, o Modo Casa e o histórico completo vêm com a assinatura Plus. O que foi registrado fica no seu disco, pagando ou não. Termos: guardianagroup.com/pt/termos.html · Privacidade: guardianagroup.com/pt/privacidade.html
 
 Licença do programa: GNU GPL 3.0 ou posterior. Código aberto, que você pode ler e compilar: github.com/guardianagroup/guardiana. O que a GUARDIANA não faz está em WHAT_IT_DOES_NOT_DO.md.

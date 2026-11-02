@@ -33,9 +33,10 @@ desinstalar: panel, «Estado». Bloquear un nombre concreto se puede desde el
 primer minuto; los bloqueos anchos, por categoría o para toda la casa, esperan a
 que GUARDIANA lleve 24 horas observando ese aparato.
 
-Son siete días con todo y sin tarjeta, Modo Hogar incluido. Después hace falta
-una licencia (suscripción o pago único); lo anotado se queda en tu disco,
-pagues o no.
+Son siete días con todo y sin tarjeta, Modo Hogar incluido. Después GUARDIANA
+sigue funcionando gratis, con el historial de las últimas 24 horas; la VPN, el
+Modo Hogar y el historial completo van con la suscripción Plus. Lo anotado se
+queda en tu disco, pagues o no.
 
 Desinstalar
 -----------

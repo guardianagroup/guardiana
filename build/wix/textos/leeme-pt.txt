@@ -34,9 +34,10 @@ específico dá para fazer desde o primeiro minuto; os bloqueios amplos, por
 categoria ou para a casa inteira, esperam até que a GUARDIANA tenha observado
 esse aparelho por 24 horas.
 
-São sete dias com tudo e sem cartão, Modo Casa incluído. Depois é preciso uma
-licença (assinatura ou pagamento único); o que foi anotado fica no seu disco,
-pagando ou não.
+São sete dias com tudo e sem cartão, Modo Casa incluído. Depois a GUARDIANA
+continua funcionando de graça, com o histórico das últimas 24 horas; a VPN, o
+Modo Casa e o histórico completo vêm com a assinatura Plus. O que foi anotado
+fica no seu disco, pagando ou não.
 
 Desinstalar
 -----------

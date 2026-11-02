@@ -34,8 +34,9 @@ from the first minute; broad blocks, by category or for the whole home, wait unt
 GUARDIANA has been watching that device for 24 hours.
 
 It is seven days with every feature, Home Mode included, no card needed. After that
-you need a licence (a subscription or a single payment); what was written down
-stays on your disk, whether you pay or not.
+GUARDIANA keeps working for free, with the history of the last 24 hours; the VPN,
+Home Mode and the full history come with the Plus subscription. What was written
+down stays on your disk, whether you pay or not.
 
 Uninstalling
 ------------
