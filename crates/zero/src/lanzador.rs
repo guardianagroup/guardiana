@@ -57,6 +57,9 @@ pub enum Pedido {
     Panel,
     /// `--url guardiana://activar?clave=…`: the panel's licence page with this key filled in.
     Activar(String),
+    /// `--url guardiana://escaner`: Órbita on the PC Scanner (a click on Windows' notice of a grave warning of el
+    /// escudo, 1.0.52; see [`crate::avisos`]).
+    Escaner,
 }
 
 impl Pedido {
@@ -78,9 +81,20 @@ pub fn pedido_de_argumentos(args: &[String]) -> Option<Pedido> {
     match args {
         [a, url] if a == "--abrir-guardiana" => Some(Pedido::AbreGuardiana(url.clone())),
         [a] if a == "--panel" => Some(Pedido::Panel),
-        [a, url] if a == "--url" => clave_de_enlace(url).map(Pedido::Activar),
+        [a, url] if a == "--url" => clave_de_enlace(url)
+            .map(Pedido::Activar)
+            .or_else(|| es_enlace_escaner(url).then_some(Pedido::Escaner)),
         _ => None,
     }
+}
+
+/// Whether a link is exactly `guardiana://escaner` (scheme and host compared without case, one slash after it
+/// allowed, nothing else: no query, no fragment, no user, no port, no path).
+#[must_use]
+pub fn es_enlace_escaner(url: &str) -> bool {
+    let url = url.trim();
+    let url = url.strip_suffix('/').unwrap_or(url);
+    url.eq_ignore_ascii_case(crate::avisos::ENLACE)
 }
 
 /// Whether a licence key has only what a key can have: ASCII letters, digits, `-` and `_`,
@@ -298,6 +312,28 @@ mod tests {
             Some(Pedido::Activar("ABCD-1234-EFGH".into()))
         );
         assert_eq!(pedido_de_argumentos(&args(&[])), None);
+        // el aviso de Windows de un aviso grave del escudo
+        assert_eq!(
+            pedido_de_argumentos(&args(&["--url", "guardiana://escaner"])),
+            Some(Pedido::Escaner)
+        );
+        assert_eq!(
+            pedido_de_argumentos(&args(&["--url", "GUARDIANA://Escaner/"])),
+            Some(Pedido::Escaner)
+        );
+        for malo in [
+            "guardiana://escaner?x=1",
+            "guardiana://escaner#a",
+            "guardiana://escaner.evil.com",
+            "guardiana://escaner/otra",
+            "guardiana://user@escaner",
+        ] {
+            assert_eq!(
+                pedido_de_argumentos(&args(&["--url", malo])),
+                None,
+                "{malo}"
+            );
+        }
         assert_eq!(pedido_de_argumentos(&args(&["--panel", "x"])), None);
         assert_eq!(pedido_de_argumentos(&args(&["--url"])), None);
         assert_eq!(

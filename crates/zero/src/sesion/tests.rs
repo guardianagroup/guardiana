@@ -3710,6 +3710,34 @@ fn the_program_opens_on_its_web_and_the_panel_waits_behind_it() {
 }
 
 #[test]
+fn a_notice_of_the_shield_opens_orbita_on_the_scanner() {
+    // 1.0.52 (the owner, 1 Nov 2026, 19:29): Windows' notice of a grave warning of el escudo.
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "e".repeat(64));
+    let _ = s.abre_programa(&url);
+    let orbita = s.activa();
+    let n = s.pestanas.len();
+    // Órbita open: its own tab goes to the scanner, no second tab.
+    let o = s.abre_escaner();
+    assert_eq!(s.activa(), orbita);
+    assert_eq!(s.pestanas.len(), n);
+    assert!(o.iter().any(
+        |x| matches!(x, Orden::Navega { id, url: u } if *id == orbita && u == &format!("{ORBITA}#escaner"))
+    ));
+    // Órbita closed: a tab of its own, in front.
+    let (mut s, _, _) = abre();
+    let o = s.abre_escaner();
+    let nueva = s.activa();
+    assert!(s
+        .pestana(nueva)
+        .is_some_and(|p| p.fija && p.url == format!("{ORBITA}#escaner")));
+    assert!(o
+        .iter()
+        .any(|x| matches!(x, Orden::CreaPestana { id, .. } if *id == nueva)));
+    assert_eq!(s.producto(), "orbita");
+}
+
+#[test]
 fn the_web_asks_the_panel_only_for_its_readings() {
     // 1.0.50 (the owner, 30 Oct 2026, 23:32: «el Vigía… analizar todo lo que sea medible en
     // nuestro PC»).

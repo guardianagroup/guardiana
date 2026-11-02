@@ -69,6 +69,12 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
   secuestro de archivos al encriptarlos. Un programa firmado no se juzga, salvo los intérpretes (PowerShell, la
   consola, Windows Script Host). Lo que sobrescribe los archivos sin renombrarlos ni borrarlos no lo ve esta regla.
 - El panel: `GET /api/escudo` (si aún aprende, cuántos sitios, los avisos); la web dentro del programa puede leerlo.
+- Los avisos graves llegan a la persona aunque no abra nada (el dueño, 1 nov 2026, 19:29: «Me parece bien la
+  propuesta, sí, buena idea»): `GUARDIANA ZERO.exe --avisos` arranca al iniciar sesión (entrada Run del instalador) y
+  con cada apertura de ZERO, sin ventana visible y uno por persona; lee `escudo-avisos.jsonl` y saca la notificación de
+  Windows de cada aviso grave nuevo (más de tres a la vez: una que los cuenta). Al pulsarla, `guardiana://escaner` abre
+  Órbita en el Escáner PC, cuya portada enseña los avisos graves. Qué se enseña lo decide `crates/zero/src/avisos.rs`;
+  la ventana oculta de `zero/navegador/src/avisos.rs` recibe el «cerrar» del instalador al actualizar o desinstalar.
 - Falta: la pantalla del antivirus en la web del programa, el análisis de Descargas desde el panel y las listas de
   muestras (decisión del dueño, abajo).
 

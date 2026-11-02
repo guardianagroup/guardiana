@@ -239,6 +239,7 @@
       <ComponentRef Id="ZeroShortcut" />
       <ComponentRef Id="ZeroDesktopShortcut" />
       <ComponentRef Id="ZeroProtocolo" />
+      <ComponentRef Id="ZeroAvisos" />
     </Feature>
     <Component Id="ZeroExe" Directory="ZERODIR" Guid="5e0c7a31-8d24-4f6b-b9a2-3c1d7e8f4a95">
       <File Id="ZeroExeFile" Name="GUARDIANA ZERO.exe" Source="$(var.ZeroExe)" KeyPath="yes" />
@@ -284,6 +285,14 @@
           <RegistryValue Type="string" Value="&quot;[ZERODIR]GUARDIANA ZERO.exe&quot; --url &quot;%1&quot;" />
         </RegistryKey>
       </RegistryKey>
+    </Component>
+    <!-- 1.0.52 (the owner, 1 Nov 2026, 19:29, to the proposal of a Windows notice for each grave warning of the
+         antivirus: «Me parece bien la propuesta, sí, buena idea»): ZERO with `--avisos` starts at every sign-in, for
+         every account, with no visible window, reads el escudo's warnings and shows Windows' notice of each new grave
+         one; a click opens Órbita on the PC Scanner (guardiana://escaner). Its hidden window takes the «close GUARDIANA
+         ZERO» above, so an update or an uninstall closes it too. -->
+    <Component Id="ZeroAvisos" Directory="ZERODIR" Guid="82e59daa-fdc2-4868-a561-dd5d3dc53066">
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Run" Name="GUARDIANA avisos" Type="string" Value="&quot;[ZERODIR]GUARDIANA ZERO.exe&quot; --avisos" KeyPath="yes" />
     </Component>
 <?endif ?>
 

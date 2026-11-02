@@ -13,9 +13,17 @@
 #[cfg(windows)]
 mod app;
 #[cfg(windows)]
+mod avisos;
+#[cfg(windows)]
 mod interfaz;
 
 fn main() {
+    // `--avisos`: the notices of el escudo's grave warnings (1.0.52), with no window and nothing else of the browser.
+    #[cfg(windows)]
+    if std::env::args().nth(1).as_deref() == Some("--avisos") {
+        avisos::corre();
+        return;
+    }
     // The rule lists (EasyList, EasyPrivacy, uBlock Origin, URLhaus) are compiled while the
     // window opens, so the first page does not wait for them.
     std::thread::spawn(|| {

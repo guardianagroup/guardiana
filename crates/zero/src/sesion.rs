@@ -911,6 +911,36 @@ impl Sesion {
         o
     }
 
+    /// 1.0.52 (el escudo; the owner, 1 Nov 2026, 19:29): a click on Windows' notice of a grave warning
+    /// (`guardiana://escaner`) opens Órbita on its PC Scanner: in Órbita's tab when it is open (only the address's
+    /// fragment changes, and the page opens the scanner), else in a new one.
+    pub fn abre_escaner(&mut self) -> Vec<Orden> {
+        let url = format!("{ORBITA}#escaner");
+        let mut o = match self
+            .pestanas
+            .iter()
+            .find(|p| es_orbita(&p.url))
+            .map(|p| p.id)
+        {
+            Some(id) => {
+                let mut o = self.activa_web(id);
+                o.push(Orden::Navega { id, url });
+                o
+            }
+            None => {
+                let id = self.siguiente;
+                let mut o = vec![self.anade_pestana(Perfil::General, &url, true)];
+                self.ordena_fijas();
+                o.extend(self.activar(id));
+                o
+            }
+        };
+        o.push(Orden::Foco {
+            a: Origen::Pestana(self.activa),
+        });
+        o
+    }
+
     /// What the wait for the service found (the panel, or why it is not coming) loads in
     /// GUARDIANA's tab. Since 1.0.50 the web is in front, so the panel only comes forward for a
     /// licence link, for the page that says what failed, or when the person is already on it.

@@ -304,6 +304,7 @@ fn pasa_pedido(otra: HWND, pedido: &Pedido) {
         Pedido::AbreGuardiana(url) => (1, url.as_str()),
         Pedido::Panel => (2, ""),
         Pedido::Activar(clave) => (2, clave.as_str()),
+        Pedido::Escaner => (3, ""),
     };
     let ancho = Ancho::de(texto);
     let copia = COPYDATASTRUCT {
@@ -2089,6 +2090,9 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                     escribe_espera(&carpeta, &t);
                 }
                 encola(con_sesion(|s| abre_panel(s, clave, true)).unwrap_or_default());
+            } else if copia.dwData == 3 {
+                // A click on Windows' notice of a grave warning of el escudo: Órbita on the PC Scanner.
+                encola(con_sesion(Sesion::abre_escaner).unwrap_or_default());
             } else {
                 encola(con_sesion(|s| s.abre_programa(&texto)).unwrap_or_default());
             }
@@ -2512,6 +2516,11 @@ pub fn arranca() {
     let mut iniciales = iniciales;
     let o = match &pedido {
         Some(Pedido::AbreGuardiana(url)) => s.abre_programa(url),
+        Some(Pedido::Escaner) => {
+            let mut o = abre_panel(&mut s, None, true);
+            o.extend(s.abre_escaner());
+            o
+        }
         Some(p) => abre_panel(&mut s, p.clave().map(str::to_owned), true),
         None => Vec::new(),
     };
@@ -2549,6 +2558,7 @@ pub fn arranca() {
         });
     });
     encola(iniciales);
+    lanza_avisos();
     // Which relay is nearest, measured once in the background at start: the phone hand-off and
     // the house's room use it too, not only an invitation (17 Oct 2026 review: from Colombia
     // they always went through Germany).
@@ -2574,6 +2584,18 @@ pub fn arranca() {
         .is_ok_and(|t| t.split_whitespace().nth(1) == Some(&std::process::id().to_string()))
     {
         let _ = std::fs::remove_file(&marca);
+    }
+}
+
+/// The notices of el escudo's grave warnings (1.0.52): their own copy of this program, `--avisos`, with no window. It
+/// leaves at once when one is already running for this person; the installer also starts it at sign-in. Not in the
+/// automatic tests (`GUARDIANA_ZERO_DATOS`), which must leave nothing running behind them.
+fn lanza_avisos() {
+    if std::env::var_os("GUARDIANA_ZERO_DATOS").is_some() {
+        return;
+    }
+    if let Ok(yo) = std::env::current_exe() {
+        let _ = std::process::Command::new(yo).arg("--avisos").spawn();
     }
 }
 

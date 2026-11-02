@@ -6,6 +6,7 @@
 // SECURE's state for the page is one big `json!` (16 Oct 2026: past the default limit).
 #![recursion_limit = "256"]
 
+pub mod avisos;
 pub mod campos;
 pub mod cartas;
 pub mod chivatos;
