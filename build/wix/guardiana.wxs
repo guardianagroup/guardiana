@@ -255,7 +255,11 @@
                 Target="[ZERODIR]GUARDIANA ZERO.exe"
                 Arguments="--panel"
                 Icon="guardiana.ico"
-                WorkingDirectory="ZERODIR" />
+                WorkingDirectory="ZERODIR">
+        <!-- 1.0.52: the name Windows' notices of el escudo's grave warnings go out under (crates/zero/src/avisos.rs,
+             AUMID). The program also registers it for each account; the Start menu's shortcut is Windows' own way. -->
+        <ShortcutProperty Key="System.AppUserModel.ID" Value="GuardianaGroup.Guardiana" />
+      </Shortcut>
       <RemoveFolder Id="RemoveMenuDirZero" On="uninstall" />
       <RegistryValue Root="HKCU" Key="Software\Guardiana" Name="installed-zero" Type="integer" Value="1" KeyPath="yes" />
     </Component>
