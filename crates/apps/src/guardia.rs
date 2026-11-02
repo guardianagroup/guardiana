@@ -308,6 +308,7 @@ fn anotar_inicio(datos: &Arc<Mutex<Compartido>>, registro: &EventRecord, esquema
     }
     d.lanzados.insert(clave, ahora);
     if d.lanzamientos.len() < MAXIMO {
+        let imagen = ruta_dos(&imagen, &d.volumenes);
         d.lanzamientos.push_back(Lanzamiento {
             ts: ahora,
             padre,

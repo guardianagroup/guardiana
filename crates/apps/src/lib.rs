@@ -271,7 +271,7 @@ pub struct Lanzamiento {
     pub padre_ruta: String,
     /// The started program's file name.
     pub hijo: String,
-    /// The started program's path, as Windows names it.
+    /// The started program's path (with its drive letter when the volume is mounted on one).
     pub imagen: String,
 }
 

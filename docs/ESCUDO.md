@@ -83,6 +83,10 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
 - «Disfraz» (`disfraz.rs`): un programa que se llama como uno de Windows (`svchost.exe`, `lsass.exe`, `csrss.exe`…) y
   arranca desde fuera de la carpeta de Windows, el único sitio donde está el de verdad. Grave. Lo ve la misma vigilancia
   de los inicios de programa que «cadenas».
+- «Segunda opinión» (`defensor.rs`): en cada aviso grave sobre el archivo de un programa (fuera de la carpeta de
+  Windows), se pregunta a Microsoft Defender por ese archivo (`MpCmdRun -Scan -ScanType 3 -File … -DisableRemediation`:
+  solo dice, no toca nada; un archivo, una vez al día, en un hilo aparte). Si lo reconoce como amenaza, es otro aviso
+  grave con el nombre que le da Defender.
 - El panel: `GET /api/escudo` (si aún aprende, cuántos sitios, los avisos); la web dentro del programa puede leerlo.
 - Los avisos graves llegan a la persona aunque no abra nada (el dueño, 1 nov 2026, 19:29: «Me parece bien la
   propuesta, sí, buena idea»): `GUARDIANA ZERO.exe --avisos` arranca al iniciar sesión (entrada Run del instalador) y

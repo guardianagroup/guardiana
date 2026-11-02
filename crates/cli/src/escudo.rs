@@ -5,6 +5,7 @@
 //! that the same watch sees. Its memory and its warnings live next to the ledger, in two small files: `escudo-memoria.json` (since when
 //! this computer asks for each site) and `escudo-avisos.jsonl` (the newest warnings, one per line, for the panel).
 
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
@@ -30,6 +31,65 @@ const REPETIR_LADRON_MS: u64 = 24 * 60 * 60_000;
 const REPETIR_CADENA_MS: u64 = 60 * 60_000;
 /// The same program renaming or deleting many of the person's files warns once an hour.
 const REPETIR_SECUESTRO_MS: u64 = 60 * 60_000;
+/// A file is asked to Microsoft Defender at most once a day.
+const REPETIR_DEFENSOR_MS: u64 = 24 * 60 * 60_000;
+
+/// Microsoft Defender's second opinion (`guardiana_escudo::defensor`): a thread of its own runs its scan of one file at
+/// a time (a few seconds each), so the escudo's loop never waits for it. Only on Windows.
+#[cfg_attr(not(windows), allow(dead_code))]
+struct Defensor {
+    pide: std::sync::mpsc::Sender<(String, String)>,
+    respuestas: std::sync::mpsc::Receiver<(String, String, Vec<String>)>,
+}
+
+impl Defensor {
+    /// The thread, on Windows; nothing elsewhere.
+    fn lanza() -> Option<Self> {
+        #[cfg(windows)]
+        {
+            let (pide, peticiones) = std::sync::mpsc::channel::<(String, String)>();
+            let (envia, respuestas) = std::sync::mpsc::channel();
+            let hilo = std::thread::Builder::new()
+                .name("escudo-defender".into())
+                .spawn(move || {
+                    for (programa, ruta) in peticiones {
+                        let amenazas = pregunta_a_defender(&ruta);
+                        if envia.send((programa, ruta, amenazas)).is_err() {
+                            break;
+                        }
+                    }
+                });
+            hilo.ok().map(|_| Self { pide, respuestas })
+        }
+        #[cfg(not(windows))]
+        {
+            None
+        }
+    }
+}
+
+/// Microsoft Defender's scan of one file, without remediation (it only says), and the threats it names.
+#[cfg(windows)]
+fn pregunta_a_defender(ruta: &str) -> Vec<String> {
+    let mp = std::env::var_os("ProgramFiles")
+        .map_or_else(|| PathBuf::from(r"C:\Program Files"), PathBuf::from)
+        .join(r"Windows Defender\MpCmdRun.exe");
+    let Ok(salida) = std::process::Command::new(mp)
+        .args([
+            "-Scan",
+            "-ScanType",
+            "3",
+            "-File",
+            ruta,
+            "-DisableRemediation",
+        ])
+        .output()
+    else {
+        return Vec::new();
+    };
+    guardiana_escudo::defensor::amenazas(&String::from_utf8_lossy(&salida.stdout))
+}
+
 /// The most connections without a name waiting for the escudo.
 const MAX_SIN_NOMBRE: usize = 256;
 /// The same program warns once a day for its connections without a name.
@@ -174,6 +234,9 @@ pub(crate) struct EscudoVivo {
     /// last judged.
     sin_nombre_pend: Vec<SinNombre>,
     sin_nombre_vistos: HashMap<String, u64>,
+    /// Microsoft Defender's second opinion on the files of grave warnings, and file → when it was last asked.
+    defensor: Option<Defensor>,
+    defensor_vistos: RefCell<HashMap<String, u64>>,
     /// The hosts file as last read (name → address), and where it is kept between restarts.
     hosts: Option<BTreeMap<String, String>>,
     ruta_hosts: PathBuf,
@@ -223,6 +286,8 @@ impl EscudoVivo {
             hosts_leido_ms: 0,
             sin_nombre_pend: Vec::new(),
             sin_nombre_vistos: HashMap::new(),
+            defensor: Defensor::lanza(),
+            defensor_vistos: RefCell::new(HashMap::new()),
         }
     }
 
@@ -270,6 +335,7 @@ impl EscudoVivo {
 
     /// Looks again at the queries that were waiting for a signature check, and at the openings of saved secrets.
     pub(crate) fn repasa(&mut self, obs: &Observador, ahora_ms: u64) {
+        self.respuestas_de_defender(ahora_ms);
         self.secuestros(obs, ahora_ms);
         self.mira_hosts(ahora_ms);
         self.ladrones(obs, ahora_ms);
@@ -705,6 +771,53 @@ impl EscudoVivo {
         }
     }
 
+    /// Microsoft Defender's answers: a file it names as a known threat is a grave warning of its own.
+    fn respuestas_de_defender(&mut self, ahora_ms: u64) {
+        let Some(d) = &self.defensor else {
+            return;
+        };
+        let respuestas: Vec<_> = d.respuestas.try_iter().collect();
+        for (programa, ruta, amenazas) in respuestas {
+            if let Some((aviso, grave)) =
+                guardiana_escudo::defensor::juzga(&programa, &ruta, &amenazas, ahora_ms)
+            {
+                self.anota(&aviso, grave);
+            }
+        }
+    }
+
+    /// Asks Microsoft Defender about the file of a grave warning: a program file outside Windows' folder that is
+    /// there, once a day.
+    fn pide_segunda_opinion(&self, a: &Aviso) {
+        let Some(d) = &self.defensor else {
+            return;
+        };
+        let ruta = a.ruta.trim();
+        let bajo = ruta.to_lowercase();
+        if a.regla == "defensor"
+            || ruta.is_empty()
+            || bajo.contains(":\\windows\\")
+            || !Path::new(ruta).is_file()
+        {
+            return;
+        }
+        let ahora = u64::try_from(guardiana_core::time::now_ms()).unwrap_or(0);
+        let Ok(mut vistos) = self.defensor_vistos.try_borrow_mut() else {
+            return;
+        };
+        if vistos
+            .get(&bajo)
+            .is_some_and(|t| ahora.saturating_sub(*t) < REPETIR_DEFENSOR_MS)
+        {
+            return;
+        }
+        if vistos.len() > 4_096 {
+            vistos.clear();
+        }
+        vistos.insert(bajo, ahora);
+        let _ = d.pide.send((a.programa.clone(), ruta.to_owned()));
+    }
+
     /// Adds a warning to the panel's file, with when it was written (`anotado_ms`), keeping the newest [`MAX_AVISOS`];
     /// a grave one carries `"grave": true` (a
     /// known sample, a document starting an interpreter, the backups' tools, a program in disguise).
@@ -740,6 +853,9 @@ impl EscudoVivo {
         texto.push('\n');
         if let Err(e) = escribe(&self.ruta_avisos, texto.as_bytes()) {
             eprintln!("guardiana: escudo: {e}");
+        }
+        if grave {
+            self.pide_segunda_opinion(a);
         }
     }
 }

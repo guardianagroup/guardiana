@@ -11,7 +11,8 @@
 //! [`secuestro`]: one program renaming or deleting many of the person's own files in under a minute; and [`proteccion`]:
 //! Windows' own protection (Defender's real-time and tamper protection, the firewall) switched off; and [`hosts`]: a name
 //! sent by the hosts file to an address on the internet; and [`sin_nombre`]: a program connecting straight to an address
-//! no name pointed to; and [`disfraz`]: a program wearing the name of one of Windows' own outside Windows' folder.
+//! no name pointed to; and [`disfraz`]: a program wearing the name of one of Windows' own outside Windows' folder. On
+//! each grave warning about a program's file, [`defensor`] reads Microsoft Defender's own scan of that file.
 //! Everything happens on this computer: nothing is uploaded anywhere.
 //!
 //! A list is never a verdict on its own (docs/LISTS.md): whoever acts on a match also looks at who signs the file, and a
@@ -21,6 +22,7 @@ pub mod analisis;
 pub mod arranque;
 pub mod cadenas;
 pub mod cuarentena;
+pub mod defensor;
 pub mod disfraz;
 pub mod hosts;
 pub mod huellas;
