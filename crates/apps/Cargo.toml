@@ -38,8 +38,11 @@ windows-sys = { version = "0.61", features = [
     # al panel (la tabla TCP con su proceso), para no avisar del navegador desde el que se llama.
     "Win32_System_RemoteDesktop",
     "Win32_NetworkManagement_IpHelper",
-    # The VPN's adapter: wireguard.dll, loaded from its full path (wireguard_nt.rs).
+    # The VPN's adapter: wireguard.dll, loaded from its full path (wireguard_nt.rs); its address, routes and settings
+    # (red_vpn.rs: IP Helper's rows use WinSock's addresses and NDIS's interface ids).
     "Win32_System_LibraryLoader",
+    "Win32_Networking_WinSock",
+    "Win32_NetworkManagement_Ndis",
 ] }
 sha2 = { workspace = true }
 # The VPN (in preparation): its cut-off switch's plan (corte_vpn.rs) and, in the adapter's real test, the keys and the
