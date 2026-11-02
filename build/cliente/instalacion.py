@@ -441,6 +441,17 @@ def tarde(tipo, paquete, version):
     if tipo == "msi":
         zero = r"C:\Program Files\Guardiana\ZERO\GUARDIANA ZERO.exe"
         (ok if os.path.exists(zero) else mal)("GUARDIANA ZERO viene incluido", zero)
+        # 1.0.52: the VPN's WireGuardNT library and its licence, next to the program, exactly the build the service
+        # knows (crates/apps/src/wireguard_nt.rs HUELLA_DLL); an older candidate without them is told, not failed.
+        dll = r"C:\Program Files\Guardiana\wireguard.dll"
+        if os.path.exists(dll):
+            import hashlib
+            huella = hashlib.sha256(open(dll, "rb").read()).hexdigest()
+            (ok if huella == "b1b85e072c45d81358be29d94c599dc76652f912be8c0f0a41e2d5d89a6461d3" else mal)("wireguard.dll es la de WireGuardNT 1.1", huella)
+            lic = r"C:\Program Files\Guardiana\LICENCIA-WIREGUARD-NT.txt"
+            (ok if os.path.exists(lic) else mal)("la licencia de WireGuardNT va al lado", lic)
+        elif CANDIDATO:
+            mal("wireguard.dll viene incluido", dll)
 
     # 2. The panel, and its key.
     if esperar(lambda: panel("/", con_llave=False)[0] == 200, 30):

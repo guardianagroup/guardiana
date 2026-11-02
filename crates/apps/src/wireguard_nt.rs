@@ -50,6 +50,39 @@ impl std::fmt::Display for ErrorNt {
     }
 }
 
+/// The SHA-256 of the `wireguard.dll` (amd64) of WireGuardNT 1.1 as WireGuard LLC publishes it, seen on 1 Nov 2026
+/// (docs/VPN.md; `.github/workflows/vpn.yml` and the installer check the same one, with its Authenticode signature).
+/// The library is loaded only when the file next to the program is exactly that one: another build, or a file someone
+/// put in its place, is refused before anything runs.
+pub const HUELLA_DLL: &str = "b1b85e072c45d81358be29d94c599dc76652f912be8c0f0a41e2d5d89a6461d3";
+
+/// The file's SHA-256, in lowercase hex.
+///
+/// # Errors
+/// [`ErrorNt::Biblioteca`] when it cannot be read.
+pub fn huella_de(ruta: &Path) -> Result<String, ErrorNt> {
+    use sha2::{Digest, Sha256};
+    let bytes =
+        std::fs::read(ruta).map_err(|e| ErrorNt::Biblioteca(format!("{}: {e}", ruta.display())))?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
+/// Refuses any `wireguard.dll` but the one of [`HUELLA_DLL`].
+///
+/// # Errors
+/// [`ErrorNt::Biblioteca`] when the file cannot be read or is another one.
+pub fn comprueba_huella(ruta: &Path) -> Result<(), ErrorNt> {
+    let h = huella_de(ruta)?;
+    if h == HUELLA_DLL {
+        Ok(())
+    } else {
+        Err(ErrorNt::Biblioteca(format!(
+            "{} no es la biblioteca de WireGuardNT 1.1 que GUARDIANA conoce (SHA-256 {h}); no se carga",
+            ruta.display()
+        )))
+    }
+}
+
 fn ancho(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
@@ -116,6 +149,7 @@ impl Biblioteca {
     /// # Errors
     /// [`ErrorNt::Biblioteca`] when the file cannot be loaded or a function is missing.
     pub fn carga(ruta: &Path) -> Result<Self, ErrorNt> {
+        comprueba_huella(ruta)?;
         let r = ancho(&ruta.to_string_lossy());
         // SAFETY: a NUL-terminated full path owned for the call; no file handle; default flags (a full path is
         // loaded from exactly there).
@@ -260,6 +294,24 @@ impl Drop for Adaptador {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    /// Another file where `wireguard.dll` should be is refused before anything loads it, and says why.
+    #[test]
+    fn otra_biblioteca_no_se_carga() {
+        let dir = std::env::temp_dir().join(format!("guardiana-wg-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let falsa = dir.join("wireguard.dll");
+        std::fs::write(&falsa, b"MZ no soy WireGuardNT").unwrap();
+        let e = comprueba_huella(&falsa).unwrap_err().to_string();
+        assert!(
+            e.contains("no es la biblioteca de WireGuardNT 1.1") && e.contains("SHA-256"),
+            "{e}"
+        );
+        assert!(Biblioteca::carga(&falsa).is_err());
+        assert!(comprueba_huella(&dir.join("no-existe.dll")).is_err());
+        assert_eq!(HUELLA_DLL.len(), 64);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     /// On a real Windows, as an administrator, with the signed library at `GUARDIANA_WG_DLL` (the VPN workflow
     /// downloads it and checks its signature): an adapter is created, configured with this crate's bytes, brought

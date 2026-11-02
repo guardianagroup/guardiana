@@ -78,6 +78,29 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/zero-exe"
           cp target/release/guardiana-zero.exe "$GITHUB_WORKSPACE/zero-exe/GUARDIANA ZERO.exe"
           echo "::notice title=GUARDIANA ZERO.exe (dentro de los MSI)::$(sha256sum "$GITHUB_WORKSPACE/zero-exe/GUARDIANA ZERO.exe" | cut -d' ' -f1)"
+      # 1.0.52, the VPN (docs/VPN.md): WireGuardNT's signed wireguard.dll, exactly as WireGuard LLC publishes it, and
+      # its licence, into the three MSI. build/msi.ps1 checks the signature and the SHA-256 pinned in
+      # crates/apps/src/wireguard_nt.rs before it goes in (the service checks the SHA-256 again before loading it).
+      - name: wireguard.dll y su licencia (WireGuardNT 1.1)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $zip = Join-Path $env:RUNNER_TEMP 'wireguard-nt.zip'
+          $dir = Join-Path $env:RUNNER_TEMP 'wireguard-nt'
+          Invoke-WebRequest -Uri 'https://download.wireguard.com/wireguard-nt/wireguard-nt-1.1.zip' -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          $dll = Get-ChildItem -Path $dir -Recurse -Filter wireguard.dll | Where-Object { $_.FullName -match '\\amd64\\' } | Select-Object -First 1
+          if (-not $dll) { Write-Output '::error title=wireguard.dll::no está en el .zip (bin\amd64)'; exit 1 }
+          $lic = Get-ChildItem -Path $dir -Recurse -File | Where-Object { $_.Name -match 'licen' } | Select-Object -First 1
+          if (-not $lic) {
+            $lic = Join-Path $dir 'prebuilt-binaries-license.txt'
+            Invoke-WebRequest -Uri 'https://git.zx2c4.com/wireguard-nt/plain/prebuilt-binaries-license.txt' -OutFile $lic
+            $lic = Get-Item $lic
+          }
+          if ((Get-Content $lic.FullName -Raw) -notmatch 'WireGuard') { Write-Output "::error title=licencia::$($lic.Name) no parece la licencia de WireGuardNT"; exit 1 }
+          Write-Output "licencia: $($lic.Name) · sha256 dll: $((Get-FileHash $dll.FullName -Algorithm SHA256).Hash.ToLower())"
+          "GUARDIANA_WG_DLL=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "GUARDIANA_WG_LIC=$($lic.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: WiX 5 y los tres MSI
         shell: pwsh
         run: |
@@ -89,7 +112,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path msi | Out-Null
           foreach ($idioma in @("es", "en", "pt")) {
             $sufijo = if ($idioma -eq "es") { "" } else { "-$idioma" }
-            $salida = & powershell -NoProfile -ExecutionPolicy Bypass -File build/msi.ps1 -Exe $exe -Version $version -Idioma $idioma -ZeroExe "zero-exe/GUARDIANA ZERO.exe" -Out "msi/guardiana-$version-windows-x64$sufijo.msi" 2>&1 | Out-String
+            $salida = & powershell -NoProfile -ExecutionPolicy Bypass -File build/msi.ps1 -Exe $exe -Version $version -Idioma $idioma -ZeroExe "zero-exe/GUARDIANA ZERO.exe" -WgDll $env:GUARDIANA_WG_DLL -WgLicencia $env:GUARDIANA_WG_LIC -Out "msi/guardiana-$version-windows-x64$sufijo.msi" 2>&1 | Out-String
             Write-Output $salida
             if ($LASTEXITCODE -ne 0) { Write-Output "::error title=msi.ps1 $idioma::$($salida -replace "`r?`n", ' | ')"; exit 1 }
           }

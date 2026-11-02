@@ -21,6 +21,11 @@ param(
     # GUARDIANA ZERO, the browser, inside the same installer (1.0.25): the path to
     # «GUARDIANA ZERO.exe» built from zero/navegador. Without it the MSI carries GUARDIANA alone.
     [string]$ZeroExe = "",
+    # The VPN (1.0.52, docs/VPN.md): WireGuardNT's signed wireguard.dll (amd64) and its licence file, exactly as
+    # WireGuard LLC publishes them. Checked here before they go in: the Authenticode signature (WireGuard LLC, valid)
+    # and the SHA-256 pinned in crates/apps/src/wireguard_nt.rs. Without them the MSI carries no VPN.
+    [string]$WgDll = "",
+    [string]$WgLicencia = "",
     [string]$CertSha1 = "",
     [string]$SignTool = "",
     [string]$TimestampUrl = "http://time.certum.pl"
@@ -69,7 +74,22 @@ if ($ZeroExe) {
     if (-not (Test-Path $zicon)) { throw "Falta $zicon" }
     $conZero = @("-d", "ZeroExe=$ZeroExe", "-d", "ZeroIcon=$zicon")
 }
-& $cmd @pre build -arch x64 -culture $cultura -loc $loc -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d "Version=$Version" -d "Idioma=$Idioma" -d "Lang=$lcid" -d "Exe=$Exe" -d "Readme=$readme" -d "Welcome=$welcome" -d "Dialogo=$dialogo" -d "Icon=$icon" @conZero -o $Out $wxs
+$conVpn = @()
+if ($WgDll) {
+    if (-not (Test-Path $WgDll)) { throw "No existe $WgDll" }
+    if (-not $WgLicencia -or -not (Test-Path $WgLicencia)) { throw "Falta la licencia de WireGuardNT (-WgLicencia)" }
+    $rs = Get-Content (Join-Path (Split-Path -Parent $here) "crates\apps\src\wireguard_nt.rs") -Raw
+    if ($rs -notmatch 'HUELLA_DLL: &str = "([0-9a-f]{64})"') { throw "wireguard_nt.rs no tiene HUELLA_DLL" }
+    $esperada = $Matches[1]
+    $huella = (Get-FileHash -Path $WgDll -Algorithm SHA256).Hash.ToLower()
+    if ($huella -ne $esperada) { throw "wireguard.dll es otra compilacion ($huella); la que conoce el programa es $esperada" }
+    $firma = Get-AuthenticodeSignature -FilePath $WgDll
+    $quien = if ($firma.SignerCertificate) { $firma.SignerCertificate.Subject } else { "" }
+    if ($firma.Status -ne "Valid" -or $quien -notmatch "WireGuard LLC") { throw "wireguard.dll: firma no valida o de otro firmante ($($firma.Status), $quien)" }
+    Write-Host "wireguard.dll: firma valida de WireGuard LLC, sha256 $huella"
+    $conVpn = @("-d", "WgDll=$WgDll", "-d", "WgLicencia=$WgLicencia")
+}
+& $cmd @pre build -arch x64 -culture $cultura -loc $loc -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -d "Version=$Version" -d "Idioma=$Idioma" -d "Lang=$lcid" -d "Exe=$Exe" -d "Readme=$readme" -d "Welcome=$welcome" -d "Dialogo=$dialogo" -d "Icon=$icon" @conZero @conVpn -o $Out $wxs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 # Code signing of the MSI itself (decision 66): the installer is what the person double-clicks, so
 # it must carry the certificate too, not only guardiana.exe. Pass -CertSha1 with the thumbprint of

@@ -97,7 +97,12 @@ Hecho y probado en un Windows real (la integración continua de GitHub, como adm
 Pendiente, en este orden:
 
 1. La pantalla de la VPN en la web del programa (Órbita), con la lista de servidores cuando existan.
-2. Su pantalla, y el `wireguard.dll` firmado dentro del instalador (comprobado como en `vpn.yml`).
+2. ~~El `wireguard.dll` firmado dentro del instalador~~ Hecho (1 nov 2026, noche): `candidato.yml` baja el .zip de
+   WireGuard LLC, `build/msi.ps1` comprueba la firma Authenticode y el SHA-256 fijado en
+   `crates/apps/src/wireguard_nt.rs` (`HUELLA_DLL`) y mete `wireguard.dll` y su licencia (`LICENCIA-WIREGUARD-NT.txt`)
+   junto a `guardiana.exe`; el servicio vuelve a comprobar el SHA-256 antes de cargarla (otra compilación, o un archivo
+   puesto en su lugar, no se carga y se dice). La prueba de cliente (`build/cliente/instalacion.py`) lo comprueba
+   instalado.
 3. Los servidores, dentro del sello (con la llave del dueño), y la primera conexión de verdad.
 
 Decisiones del dueño que lo condicionan: gratuita o de pago; qué servidores y países; la política contra el abuso.

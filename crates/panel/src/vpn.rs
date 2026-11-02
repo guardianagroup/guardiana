@@ -1,7 +1,7 @@
 //! La VPN en el panel (en preparación; docs/VPN.md, «Pendiente» 1): su estado y los botones de conectar y desconectar.
 //!
-//! Solo en Windows, y con el `wireguard.dll` firmado por WireGuard LLC junto al programa (el instalador lo pondrá; aún
-//! no): en otro sistema, o sin él, el estado dice que no está disponible y por qué. La conexión entera la hace
+//! Solo en Windows, y con el `wireguard.dll` firmado por WireGuard LLC junto al programa (lo pone el instalador desde
+//! 1.0.52, con su huella comprobada): en otro sistema, o sin él, el estado dice que no está disponible y por qué. La conexión entera la hace
 //! `guardiana_apps::tunel_win::conecta` (llaves nuevas, alta por HTTPS, túnel con todo dentro y el corte puesto, y el
 //! primer saludo del servidor; si no llega, el túnel se cierra y el equipo queda como estaba). Tarda unos segundos, así
 //! que «conectar» la empieza y la página pregunta por el estado. Al parar el servicio, el túnel se cierra con él.

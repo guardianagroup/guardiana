@@ -166,6 +166,22 @@
          whichever is there. The «Guardiana (menú)» shortcut is gone: `guardiana menu` is the
          interactive test menu in a console (crates/cli/src/menu.rs), not something to open from
          the Start menu without a console. -->
+<?ifdef WgDll ?>
+    <!-- 1.0.52, the VPN (docs/VPN.md): WireGuardNT's signed `wireguard.dll`, exactly as WireGuard LLC publishes it,
+         next to guardiana.exe, with its licence as its own file. build/msi.ps1 and candidato.yml check the Authenticode
+         signature and the SHA-256 (the one in crates/apps/src/wireguard_nt.rs) before it goes in; the service checks
+         the same SHA-256 again before loading it. GUARDIANA calls it only through its public interface. -->
+    <Feature Id="Vpn" Title="VPN (WireGuardNT)" Level="1">
+      <ComponentRef Id="WgDll" />
+      <ComponentRef Id="WgLicencia" />
+    </Feature>
+    <Component Id="WgDll" Directory="INSTALLFOLDER" Guid="7c3e9b52-4a61-4f08-9d2e-5b8a1c6f0d37">
+      <File Id="WgDllFile" Name="wireguard.dll" Source="$(var.WgDll)" KeyPath="yes" />
+    </Component>
+    <Component Id="WgLicencia" Directory="INSTALLFOLDER" Guid="a92f4d16-0b7c-4e35-8f61-2d9c7b3e5a48">
+      <File Id="WgLicenciaFile" Name="LICENCIA-WIREGUARD-NT.txt" Source="$(var.WgLicencia)" KeyPath="yes" />
+    </Component>
+<?endif?>
 <?ifdef ZeroExe ?>
     <!-- With ZERO in the package: only when it is left out (ZERO=0). -->
     <Component Id="Shortcut" Directory="MenuDir" Guid="21398cf1-e897-4661-a755-bb36e4a4eb16" Condition="ZERO=&quot;0&quot;">
