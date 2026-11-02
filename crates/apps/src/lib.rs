@@ -347,10 +347,20 @@ pub struct Contenido {
     pub congelados: Vec<u32>,
 }
 
+/// Whether the watch freezes what it catches and plants its decoys (2 Nov 2026). Off in 1.0.52: the second, independent
+/// review found that a decoy rewritten by the service could be pointed by a link at any file, that a reused process
+/// number or a wrong family could be frozen and stopped, and that «Es mío» could let a Windows tool through for good.
+/// Until that is fixed and tested, the watch only warns: no decoys, nothing frozen.
+pub const CONGELAR: bool = false;
+
 /// Freezes program `pid` and its family (the programs it started, and those above it that may be frozen; never Windows'
-/// own): the process numbers frozen. Nothing outside Windows.
+/// own): the process numbers frozen. Nothing outside Windows, and nothing while [`CONGELAR`] is off.
 #[must_use]
 pub fn congela_familia(pid: u32) -> Vec<u32> {
+    if !CONGELAR {
+        let _ = pid;
+        return Vec::new();
+    }
     #[cfg(windows)]
     {
         contencion::congelar_familia(pid)

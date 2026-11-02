@@ -133,6 +133,24 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
 - Falta: la pantalla del antivirus en la web del programa, el análisis de Descargas desde el panel y las listas de
   muestras (decisión del dueño, abajo).
 
+## La contención, apagada en 1.0.52 (2 nov 2026)
+
+Los señuelos y la congelación al momento (señuelo borrado, renombrado o reescrito; borrado de las copias de seguridad;
+ráfagas graves) están hechos y probados en un Windows de verdad (`escudo.yml`, `contencion::tests`), pero la segunda
+revisión independiente encontró fallos que impiden darlos a la gente todavía. La 1.0.52 sale con el interruptor
+`guardiana_apps::CONGELAR` apagado: el escudo avisa, la cuarentena funciona, no se planta ningún señuelo y no se congela
+nada. Lo que hay que arreglar antes de encenderlo:
+
+1. El servicio (SYSTEM) reescribe un señuelo siguiendo enlaces: un usuario podría apuntarlo a cualquier archivo. Escribir
+   los señuelos sin seguir enlaces (sin puntos de análisis en la ruta) o no reescribirlos.
+2. «Es mío» guarda la ruta del programa para siempre: nunca para las herramientas de Windows (vssadmin, powershell, cmd…).
+3. Números de proceso reutilizados: la familia y el autor se comprueban con la hora de creación de cada proceso, y no se
+   congela lo que se vio hace más de unos segundos.
+4. El propio programa (ZERO y sus WebView2) y los navegadores nunca se congelan como «familia».
+5. Nada se da por congelado si no se congeló; las herramientas de Windows dentro de `C:\Windows` también cuentan.
+6. Congelar dos veces y reanudar una: se reanuda tantas veces como se congeló; un id por caso.
+7. Las decisiones, una sola vez (escritas antes de actuar, con bloqueo).
+
 ## Lo que cuesta (medido)
 
 La vigilancia de archivos ve cada archivo que se abre en el equipo, así que tiene que pesar poco. La prueba real

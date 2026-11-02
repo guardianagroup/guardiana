@@ -712,6 +712,7 @@ impl EscudoVivo {
                         &c.ruta,
                         &c.padre,
                         cuando,
+                        !c.congelados.is_empty(),
                     ),
                     true,
                 ),
@@ -755,6 +756,10 @@ impl EscudoVivo {
     /// written over in place (its size or its time of writing changed) has as author its last opener, which is frozen
     /// with its family; the decoy is then written again.
     fn mira_senuelos(&mut self, ahora_ms: u64) {
+        // off in 1.0.52 (guardiana_apps::CONGELAR): no decoy is planted, looked at or written again
+        if !guardiana_apps::CONGELAR {
+            return;
+        }
         if ahora_ms.saturating_sub(self.senuelos_plantados_ms) >= PLANTAR_SENUELOS_MS {
             self.senuelos_plantados_ms = ahora_ms;
             self.senuelos = planta_senuelos();

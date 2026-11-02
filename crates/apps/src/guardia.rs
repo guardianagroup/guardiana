@@ -116,7 +116,7 @@ fn senuelo_tocado(datos: &Arc<Mutex<Compartido>>, pid: u32, archivo_nt: &str, to
         && ruta
             .to_ascii_lowercase()
             .ends_with(r"\windows\explorer.exe");
-    let congelados = if explorador {
+    let congelados = if explorador || !crate::CONGELAR {
         Vec::new()
     } else {
         crate::contencion::congelar_familia(pid)
@@ -171,7 +171,11 @@ fn quizas_borra_copias(datos: &Arc<Mutex<Compartido>>, hijo: &str, pid: u32, pad
     if !guardiana_escudo::contencion::borra_copias(hijo, &linea) {
         return;
     }
-    let congelados = crate::contencion::congelar_familia(pid);
+    let congelados = if crate::CONGELAR {
+        crate::contencion::congelar_familia(pid)
+    } else {
+        Vec::new()
+    };
     let ahora = guardiana_core::time::now_ms();
     let Ok(mut d) = datos.lock() else {
         return;

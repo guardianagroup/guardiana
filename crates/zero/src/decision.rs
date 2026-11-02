@@ -245,8 +245,11 @@ pub fn decide_con(
     });
     // The checks that a visitor is a person (captchas, anti-fraud: `acceso.rs`, 2 Nov 2026) are never cut by the lists:
     // cutting them is what makes a site treat a person as a robot. The person's own cuts, the mandate and their marked
-    // data still hold, below.
-    let lista = lista.filter(|_| {
+    // data still hold, below; and a site in the lists of danger is cut all the same (second review, 2 Nov 2026).
+    let lista = lista.filter(|m| {
+        if *m == Motivo::Peligro {
+            return true;
+        }
         let ruta = url::Url::parse(p.url)
             .map(|u| u.path().to_string())
             .unwrap_or_default();

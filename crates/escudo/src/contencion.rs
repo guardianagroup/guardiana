@@ -124,9 +124,16 @@ fn base64_decodifica(s: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// The warning for a program that deletes the backup copies: `programa` (the tool) started by `padre`.
+/// The warning for a program that deletes the backup copies: `programa` (the tool) started by `padre`; `congelado`, whether
+/// GUARDIANA froze it (only then does the text say so and offer the choice).
 #[must_use]
-pub fn aviso_copias(programa: &str, ruta: &str, padre: &str, cuando_ms: u64) -> Aviso {
+pub fn aviso_copias(
+    programa: &str,
+    ruta: &str,
+    padre: &str,
+    cuando_ms: u64,
+    congelado: bool,
+) -> Aviso {
     let quien = if padre.is_empty() {
         String::new()
     } else {
@@ -143,7 +150,12 @@ pub fn aviso_copias(programa: &str, ruta: &str, padre: &str, cuando_ms: u64) -> 
         texto: format!(
             "«{programa}»{quien} ha intentado borrar las copias de seguridad de Windows (instantáneas) o desactivar su \
              recuperación. Es lo primero que hace un programa de secuestro de archivos (ransomware) para que no puedas \
-             recuperar nada. GUARDIANA lo ha congelado: elige detenerlo o dejarlo seguir si eres tú quien lo ordenó."
+             recuperar nada. {}",
+            if congelado {
+                "GUARDIANA lo ha congelado: elige detenerlo o dejarlo seguir si eres tú quien lo ordenó."
+            } else {
+                "Si no fuiste tú quien lo ordenó, desconecta el equipo de internet y pasa el examen completo del Antivirus."
+            }
         ),
     }
 }
@@ -244,9 +256,19 @@ mod tests {
             r"C:\Windows\System32\vssadmin.exe",
             "cifra.exe",
             7,
+            true,
         );
         assert_eq!(a.regla, "copias_borradas");
         assert!(a.texto.contains("«cifra.exe»") && a.texto.contains("congelado"));
+        // not frozen (1.0.52, the switch off): the text never says it was
+        let b = aviso_copias(
+            "vssadmin.exe",
+            r"C:\Windows\System32\vssadmin.exe",
+            "cifra.exe",
+            7,
+            false,
+        );
+        assert!(!b.texto.contains("congelado") && b.texto.contains("Antivirus"));
     }
 
     fn codifica(b: &[u8]) -> String {

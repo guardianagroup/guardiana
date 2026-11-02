@@ -631,7 +631,7 @@ const GUION: &str = r#"(() => {
     // noise in what they read is what made them take a person for a robot.
     const ACCESO = ['recaptcha.net', 'hcaptcha.com', 'challenges.cloudflare.com', 'datadome.co', 'captcha-delivery.com', 'px-cloud.net', 'px-cdn.net', 'px-client.net', 'perimeterx.net', 'arkoselabs.com', 'funcaptcha.com', 'geetest.com', 'friendlycaptcha.com', 'frcapi.com', 'mtcaptcha.com'];
     const verificacion = (h, ruta) => ACCESO.some((s) => h === s || h.endsWith('.' + s))
-      || (/^(www\.)?(google\.[a-z.]+|gstatic\.com)$/.test(h) && /^\/recaptcha(\/|$)/.test(ruta));
+      || (/^(www\.)?(google\.(com|[a-z]{2}|(com|co)\.[a-z]{2})|gstatic\.com)$/.test(h) && /^\/recaptcha(\/|$)/.test(ruta));
     const ajeno = (u) => {
       if (proteccion === false || !u[0]) return false;
       let h = '', ruta = '';

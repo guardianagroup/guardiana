@@ -38,13 +38,25 @@ pub fn es_verificacion(host: &str, ruta: &str) -> bool {
     if SITIOS.iter().any(|s| bajo(s)) {
         return true;
     }
-    // reCAPTCHA on Google's own names: only its path, never the rest of google.com or gstatic.com.
+    // reCAPTCHA on Google's own names: only its path, never the rest of google.com or gstatic.com. Google's country names
+    // only (www.google.de, www.google.co.uk, www.google.com.co): never www.google.<anything> (second review, 2 Nov 2026).
     let google = host == "google.com"
         || host == "www.google.com"
-        || host.starts_with("www.google.")
+        || host
+            .strip_prefix("www.google.")
+            .is_some_and(google_de_un_pais)
         || host == "gstatic.com"
         || host == "www.gstatic.com";
     google && (ruta.starts_with("/recaptcha/") || ruta == "/recaptcha")
+}
+
+/// `de`, `co.uk` or `com.co`: a country's ending for Google's own name.
+fn google_de_un_pais(resto: &str) -> bool {
+    let pais = |s: &str| s.len() == 2 && s.bytes().all(|b| b.is_ascii_lowercase());
+    match resto.split_once('.') {
+        None => pais(resto),
+        Some((medio, fin)) => matches!(medio, "com" | "co") && pais(fin),
+    }
 }
 
 #[cfg(test)]
@@ -56,6 +68,8 @@ mod tests {
         for (h, r) in [
             ("www.google.com", "/recaptcha/api.js"),
             ("www.google.com.co", "/recaptcha/api2/anchor"),
+            ("www.google.de", "/recaptcha/api.js"),
+            ("www.google.co.uk", "/recaptcha/api.js"),
             ("www.gstatic.com", "/recaptcha/releases/x/recaptcha__es.js"),
             ("www.recaptcha.net", "/recaptcha/api.js"),
             ("js.hcaptcha.com", "/1/api.js"),
@@ -76,6 +90,11 @@ mod tests {
             ("notdatadome.co", "/tags.js"),
             ("datadome.co.evil.com", "/tags.js"),
             ("cloudflare.com", "/cdn-cgi/trace"),
+            // not Google's: never through, whatever the path (second review, 2 Nov 2026)
+            ("www.google.evil.com", "/recaptcha/api.js"),
+            ("www.google.attacker.xyz", "/recaptcha/api.js"),
+            ("www.google.com.evil.com", "/recaptcha/api.js"),
+            ("www.google.xyz", "/recaptcha/api.js"),
         ] {
             assert!(!es_verificacion(h, r), "{h}{r}");
         }
