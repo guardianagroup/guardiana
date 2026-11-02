@@ -67,8 +67,16 @@ Hecho y probado en un Windows real (la integración continua de GitHub, como adm
 - `crates/apps/src/corte_vpn.rs` convierte el plan en filtros de una sesión dinámica; la prueba comprueba que Windows
   acepta cada filtro que permite (los que bloquean se dejan fuera para no cortar la red del equipo de pruebas).
 
-Pendiente: la dirección, las rutas y el DNS del túnel; el servicio que lo une todo (alta, adaptador, corte) y su
-pantalla; y los servidores (dentro del sello, con la llave del dueño).
+- `crates/apps/src/red_vpn.rs`: la dirección del túnel, sus rutas (métrica 0), los ajustes del adaptador (sin
+  descubrimiento de routers, sin detección de duplicados, sin DHCPv6, MTU 1420) y su resolutor (con `netsh`), como la
+  aplicación de WireGuard para Windows (`tunnel/addressconfig.go`).
+- `crates/apps/src/tunel_win.rs`: todo junto, en orden y deshaciendo si algo falla: adaptador → configuración → red →
+  interruptor de corte → arriba. La prueba real lo hace entero sin la ruta por defecto ni el corte (para no tocar la red
+  del equipo de pruebas).
+
+Pendiente: que el servicio lo use (el alta por HTTPS al servidor, resolver su nombre, abrir y cerrar el túnel, y su
+estado en el panel) y su pantalla; incluir el `wireguard.dll` firmado en el instalador; los servidores (dentro del
+sello, con la llave del dueño); y la primera conexión de verdad con un servidor.
 
 ## Los servidores (propuesta para la fase 1)
 
