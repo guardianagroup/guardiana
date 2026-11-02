@@ -16,13 +16,14 @@ use std::path::Path;
 use std::sync::Arc;
 
 use windows_sys::core::GUID;
-use windows_sys::Win32::Foundation::{FreeLibrary, GetLastError};
+use windows_sys::Win32::Foundation::{FreeLibrary, GetLastError, ERROR_MORE_DATA};
 use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryExW};
 
 type FnCrea = unsafe extern "system" fn(*const u16, *const u16, *const GUID) -> *mut c_void;
 type FnCierra = unsafe extern "system" fn(*mut c_void);
 type FnLuid = unsafe extern "system" fn(*mut c_void, *mut u64);
 type FnConfigura = unsafe extern "system" fn(*mut c_void, *const u8, u32) -> i32;
+type FnLee = unsafe extern "system" fn(*mut c_void, *mut u8, *mut u32) -> i32;
 type FnEstado = unsafe extern "system" fn(*mut c_void, i32) -> i32;
 type FnVersion = unsafe extern "system" fn() -> u32;
 
@@ -66,6 +67,7 @@ pub struct Biblioteca {
     cierra: FnCierra,
     luid: FnLuid,
     configura: FnConfigura,
+    lee: FnLee,
     estado: FnEstado,
     version: FnVersion,
 }
@@ -101,6 +103,7 @@ unsafe fn resuelve(modulo: *mut c_void) -> Result<Biblioteca, ErrorNt> {
             cierra: funcion(modulo, "WireGuardCloseAdapter")?,
             luid: funcion(modulo, "WireGuardGetAdapterLUID")?,
             configura: funcion(modulo, "WireGuardSetConfiguration")?,
+            lee: funcion(modulo, "WireGuardGetConfiguration")?,
             estado: funcion(modulo, "WireGuardSetAdapterState")?,
             version: funcion(modulo, "WireGuardGetRunningDriverVersion")?,
         })
@@ -202,6 +205,36 @@ impl Adaptador {
         Ok(())
     }
 
+    /// The adapter's configuration as the driver has it now, with the peers' counters and last handshake
+    /// (`guardiana_tunel::nt::estado_del_par` reads them). Wiped when dropped (it may carry the private key).
+    ///
+    /// # Errors
+    /// [`ErrorNt::Llamada`] when the driver refused.
+    pub fn lee(&self) -> Result<zeroize::Zeroizing<Vec<u8>>, ErrorNt> {
+        let mut largo: u32 = 4_096;
+        for _ in 0..4 {
+            let mut b = zeroize::Zeroizing::new(vec![0u8; largo as usize]);
+            let mut pedido = largo;
+            // SAFETY: an adapter handle of this library, a buffer owned here of `pedido` bytes, and its length in a
+            // u32 owned here that the driver overwrites with what it needs when the buffer is short.
+            if unsafe { (self.biblioteca.lee)(self.h, b.as_mut_ptr(), &mut pedido) } != 0 {
+                b.truncate(pedido as usize);
+                return Ok(b);
+            }
+            // SAFETY: reads this thread's last error code.
+            let codigo = unsafe { GetLastError() };
+            if codigo != ERROR_MORE_DATA || pedido <= largo {
+                return Err(ErrorNt::Llamada(format!(
+                    "WireGuardGetConfiguration = {codigo}"
+                )));
+            }
+            largo = pedido;
+        }
+        Err(ErrorNt::Llamada(
+            "WireGuardGetConfiguration: el tamaño no se asienta".into(),
+        ))
+    }
+
     /// Brings the adapter up (`true`) or down.
     ///
     /// # Errors
@@ -249,6 +282,11 @@ mod tests {
         let bytes = guardiana_tunel::nt::configuracion(&llaves.secreta_bytes(), None, &[par]);
         assert_eq!(bytes.len(), 80 + 136 + 24);
         a.configura(&bytes).unwrap();
+        // read back: the server's key as given, and no handshake (nobody answers at a documentation address)
+        let leido = a.lee().unwrap();
+        let par = guardiana_tunel::nt::estado_del_par(&leido).unwrap();
+        assert_eq!(par.publica, [7; 32]);
+        assert_eq!(par.ultimo_saludo_ms, None);
         a.pon(true).unwrap();
         assert_ne!(b.version_del_controlador(), 0);
         a.pon(false).unwrap();

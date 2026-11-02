@@ -49,6 +49,6 @@ sha2 = { workspace = true }
 # configuration's bytes (wireguard_nt.rs). Pure rules, no system calls.
 guardiana-tunel = { workspace = true }
 
-# The whole tunnel's real test on Windows (tunel_win.rs) makes up a sign-up, whose preshared key is wiped on drop.
-[target.'cfg(windows)'.dev-dependencies]
+# The adapter's configuration read back from the driver (wireguard_nt.rs) may carry the private key: wiped on drop.
+# The whole tunnel's real test (tunel_win.rs) makes up a sign-up, whose preshared key is wiped too.
 zeroize = { workspace = true }

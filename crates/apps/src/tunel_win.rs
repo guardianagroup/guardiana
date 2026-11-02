@@ -141,6 +141,16 @@ impl Tunel {
         self.adaptador.luid()
     }
 
+    /// The server's peer as the driver has it now: bytes each way and the last handshake (none until the server
+    /// answers); `None` when it cannot be read.
+    #[must_use]
+    pub fn estado(&self) -> Option<nt::EstadoPar> {
+        self.adaptador
+            .lee()
+            .ok()
+            .and_then(|b| nt::estado_del_par(&b))
+    }
+
     /// Whether the cut-off switch is on.
     #[must_use]
     pub fn con_corte(&self) -> bool {
@@ -188,6 +198,9 @@ mod tests {
         .unwrap();
         assert_ne!(t.luid(), 0);
         assert!(!t.con_corte());
+        let e = t.estado().unwrap();
+        assert_eq!(e.publica, [7; 32]);
+        assert_eq!(e.ultimo_saludo_ms, None);
         t.cierra();
     }
 }

@@ -145,6 +145,50 @@ pub fn configuracion(privada: &[u8; 32], puerto: Option<u16>, pares: &[Par]) -> 
     b
 }
 
+/// What the driver says of the first peer when the configuration is read back (`WireGuardGetConfiguration`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EstadoPar {
+    /// Its public key.
+    pub publica: [u8; 32],
+    /// Bytes sent to it.
+    pub enviados: u64,
+    /// Bytes received from it.
+    pub recibidos: u64,
+    /// When the last handshake was, in milliseconds since 1970; `None` when there has been none.
+    pub ultimo_saludo_ms: Option<u64>,
+}
+
+/// 100-nanosecond intervals between 1601-01-01 and 1970-01-01 (Windows' time and Unix's).
+const DE_1601_A_1970: u64 = 116_444_736_000_000_000;
+
+fn lee_u32(b: &[u8], en: usize) -> Option<u32> {
+    Some(u32::from_le_bytes(b.get(en..en + 4)?.try_into().ok()?))
+}
+
+fn lee_u64(b: &[u8], en: usize) -> Option<u64> {
+    Some(u64::from_le_bytes(b.get(en..en + 8)?.try_into().ok()?))
+}
+
+/// The first peer's state in a configuration read back from the driver; `None` when it has no peer or is too short.
+#[must_use]
+pub fn estado_del_par(b: &[u8]) -> Option<EstadoPar> {
+    if lee_u32(b, 72)? == 0 {
+        return None;
+    }
+    let p = TAM_INTERFAZ;
+    let publica: [u8; 32] = b.get(p + 8..p + 40)?.try_into().ok()?;
+    let saludo = lee_u64(b, p + 120)?;
+    Some(EstadoPar {
+        publica,
+        enviados: lee_u64(b, p + 104)?,
+        recibidos: lee_u64(b, p + 112)?,
+        ultimo_saludo_ms: saludo
+            .checked_sub(DE_1601_A_1970)
+            .filter(|d| *d > 0)
+            .map(|d| d / 10_000),
+    })
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -198,6 +242,36 @@ mod tests {
         assert_eq!(b[ip + 18], 0);
         assert_eq!(u32_en(&b, ip + 20), 0);
         assert_eq!(u16_en(&b, ip + 24 + 16), 23);
+    }
+
+    #[test]
+    fn el_estado_del_par_leido_del_controlador() {
+        let par = Par {
+            publica: [3; 32],
+            psk: None,
+            extremo: None,
+            keepalive: 0,
+            permitidas: vec![],
+        };
+        let mut b = configuracion(&[1; 32], None, &[par]).to_vec();
+        // sin saludo todavía
+        let e = estado_del_par(&b).unwrap();
+        assert_eq!(e.publica, [3; 32]);
+        assert_eq!(e.ultimo_saludo_ms, None);
+        // el controlador escribe los contadores y el último saludo (1 nov 2026 00:00 UTC, en su hora de Windows)
+        let p = TAM_INTERFAZ;
+        b[p + 104..p + 112].copy_from_slice(&1_000u64.to_le_bytes());
+        b[p + 112..p + 120].copy_from_slice(&2_000u64.to_le_bytes());
+        let ms: u64 = 1_793_404_800_000;
+        b[p + 120..p + 128].copy_from_slice(&(ms * 10_000 + DE_1601_A_1970).to_le_bytes());
+        let e = estado_del_par(&b).unwrap();
+        assert_eq!(
+            (e.enviados, e.recibidos, e.ultimo_saludo_ms),
+            (1_000, 2_000, Some(ms))
+        );
+        // corto o sin pares: nada
+        assert_eq!(estado_del_par(&b[..100]), None);
+        assert_eq!(estado_del_par(&configuracion(&[1; 32], None, &[])), None);
     }
 
     #[test]
