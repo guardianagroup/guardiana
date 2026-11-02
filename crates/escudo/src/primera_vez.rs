@@ -57,7 +57,7 @@ pub struct Programa<'a> {
 pub struct Aviso {
     /// Which rule: `muestra_conocida` or `primera_vez` (here), `ladron` ([`crate::ladrones`]), or `documento`,
     /// `lector`, `comprimido`, `navegador`, `guion` or `copias` ([`crate::cadenas`]), `arranque` ([`crate::arranque`]), `secuestro`
-    /// ([`crate::secuestro`]) or `proteccion` ([`crate::proteccion`]).
+    /// ([`crate::secuestro`]), `proteccion` ([`crate::proteccion`]) or `hosts` ([`crate::hosts`]).
     pub regla: &'static str,
     /// The program's file name.
     pub programa: String,

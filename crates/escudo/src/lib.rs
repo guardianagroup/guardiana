@@ -9,7 +9,8 @@
 //! starting PowerShell, a downloaded program starting the tools that delete the backups); and [`arranque`]: a new program
 //! that starts on its own with Windows, unsigned, from a folder anyone can write to or come from the internet; and
 //! [`secuestro`]: one program renaming or deleting many of the person's own files in under a minute; and [`proteccion`]:
-//! Windows' own protection (Defender's real-time and tamper protection, the firewall) switched off.
+//! Windows' own protection (Defender's real-time and tamper protection, the firewall) switched off; and [`hosts`]: a name
+//! sent by the hosts file to an address on the internet.
 //! Everything happens on this computer: nothing is uploaded anywhere.
 //!
 //! A list is never a verdict on its own (docs/LISTS.md): whoever acts on a match also looks at who signs the file, and a
@@ -19,6 +20,7 @@ pub mod analisis;
 pub mod arranque;
 pub mod cadenas;
 pub mod cuarentena;
+pub mod hosts;
 pub mod huellas;
 pub mod ladrones;
 pub mod primera_vez;

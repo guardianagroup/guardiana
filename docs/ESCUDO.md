@@ -71,6 +71,9 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
 - «Protección» (`proteccion.rs`): lo que la vigilancia continua anota de Seguridad de Windows, cuando la protección se
   apaga: la protección en tiempo real o contra alteraciones de Microsoft Defender, o ningún antivirus encendido
   (graves), o un perfil del cortafuegos (aviso). Lo que ya estaba apagado en su primera mirada, aviso sin gravedad.
+- «Hosts» (`hosts.rs`): el archivo hosts de Windows, cada minuto. Un nombre que ahora va a una dirección de internet
+  (no a 0.0.0.0, a este equipo ni a la red de casa) es grave: así se desvía una web a otro servidor sin que ningún DNS
+  lo vea. La primera lectura es el punto de partida y se guarda junto al diario (`escudo-hosts.json`).
 - El panel: `GET /api/escudo` (si aún aprende, cuántos sitios, los avisos); la web dentro del programa puede leerlo.
 - Los avisos graves llegan a la persona aunque no abra nada (el dueño, 1 nov 2026, 19:29: «Me parece bien la
   propuesta, sí, buena idea»): `GUARDIANA ZERO.exe --avisos` arranca al iniciar sesión (entrada Run del instalador) y

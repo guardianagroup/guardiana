@@ -5,7 +5,7 @@
 //! that the same watch sees. Its memory and its warnings live next to the ledger, in two small files: `escudo-memoria.json` (since when
 //! this computer asks for each site) and `escudo-avisos.jsonl` (the newest warnings, one per line, for the panel).
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
 use guardiana_apps::{Apertura, Guardia, Observador, Rafaga};
@@ -28,6 +28,8 @@ const REPETIR_LADRON_MS: u64 = 24 * 60 * 60_000;
 const REPETIR_CADENA_MS: u64 = 60 * 60_000;
 /// The same program renaming or deleting many of the person's files warns once an hour.
 const REPETIR_SECUESTRO_MS: u64 = 60 * 60_000;
+/// How often the hosts file is read.
+const HOSTS_CADA_MS: u64 = 60_000;
 /// How often the continuous watch's history is read for new autostarts.
 const ARRANQUE_CADA_MS: u64 = 30_000;
 /// On the first read, the autostarts the watch noted in the last day are looked at too.
@@ -83,12 +85,20 @@ pub(crate) struct EscudoVivo {
     rafagas: Vec<Rafaga>,
     /// Program path → when its last burst warned.
     secuestros_vistos: HashMap<String, u64>,
+    /// The hosts file as last read (name → address), and where it is kept between restarts.
+    hosts: Option<BTreeMap<String, String>>,
+    ruta_hosts: PathBuf,
+    hosts_leido_ms: u64,
 }
 
 impl EscudoVivo {
     /// The memory kept next to the ledger at `db`, or a new one that starts learning now.
     pub(crate) fn abrir(db: &Path, ahora_ms: u64) -> Self {
         let ruta_memoria = db.with_file_name("escudo-memoria.json");
+        let ruta_hosts = db.with_file_name("escudo-hosts.json");
+        let hosts = std::fs::read_to_string(&ruta_hosts)
+            .ok()
+            .and_then(|j| serde_json::from_str::<BTreeMap<String, String>>(&j).ok());
         let memoria = std::fs::read_to_string(&ruta_memoria)
             .ok()
             .and_then(|j| Memoria::desde_json(&j).ok())
@@ -119,6 +129,9 @@ impl EscudoVivo {
             arranques: Vec::new(),
             rafagas: Vec::new(),
             secuestros_vistos: HashMap::new(),
+            hosts,
+            ruta_hosts,
+            hosts_leido_ms: 0,
         }
     }
 
@@ -167,6 +180,7 @@ impl EscudoVivo {
     /// Looks again at the queries that were waiting for a signature check, and at the openings of saved secrets.
     pub(crate) fn repasa(&mut self, obs: &Observador, ahora_ms: u64) {
         self.secuestros(obs, ahora_ms);
+        self.mira_hosts(ahora_ms);
         self.ladrones(obs, ahora_ms);
         self.cadenas();
         self.arranques_pendientes(obs, ahora_ms);
@@ -359,6 +373,32 @@ impl EscudoVivo {
         }
     }
 
+    /// The hosts file, once a minute (`guardiana_escudo::hosts`): a name now sent to an address on the internet is a
+    /// grave warning. The first reading, and each change after it, is kept next to the ledger, so a change made while
+    /// the service was stopped is seen too.
+    fn mira_hosts(&mut self, ahora_ms: u64) {
+        if ahora_ms.saturating_sub(self.hosts_leido_ms) < HOSTS_CADA_MS {
+            return;
+        }
+        self.hosts_leido_ms = ahora_ms;
+        let Ok(texto) = std::fs::read_to_string(ruta_hosts()) else {
+            return;
+        };
+        let ahora = guardiana_escudo::hosts::entradas(&texto);
+        if self.hosts.as_ref() == Some(&ahora) {
+            return;
+        }
+        if let Some(antes) = &self.hosts {
+            if let Some(aviso) = guardiana_escudo::hosts::cambios(antes, &ahora, ahora_ms) {
+                self.anota(&aviso, true);
+            }
+        }
+        if let Ok(j) = serde_json::to_string(&ahora) {
+            let _ = escribe(&self.ruta_hosts, j.as_bytes());
+        }
+        self.hosts = Some(ahora);
+    }
+
     /// Whether it is time to read the continuous watch's history again.
     pub(crate) fn toca_vigilancia(&self, ahora_ms: u64) -> bool {
         ahora_ms.saturating_sub(self.arranque_leido_ms) >= ARRANQUE_CADA_MS
@@ -524,6 +564,20 @@ impl EscudoVivo {
         if let Err(e) = escribe(&self.ruta_avisos, texto.as_bytes()) {
             eprintln!("guardiana: escudo: {e}");
         }
+    }
+}
+
+/// Windows' hosts file (`/etc/hosts` elsewhere).
+fn ruta_hosts() -> PathBuf {
+    #[cfg(windows)]
+    {
+        std::env::var_os("SystemRoot")
+            .map_or_else(|| PathBuf::from(r"C:\Windows"), PathBuf::from)
+            .join(r"System32\drivers\etc\hosts")
+    }
+    #[cfg(not(windows))]
+    {
+        PathBuf::from("/etc/hosts")
     }
 }
 
