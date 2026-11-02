@@ -2174,7 +2174,7 @@ impl Sesion {
         if !PANEL_LECTURAS
             .iter()
             .any(|(a, b)| *a == metodo && *b == ruta)
-            && !es_cuarentena(&metodo, &ruta)
+            && !es_cuarentena(metodo, ruta)
         {
             return self.sin_lectura(id, n, 403);
         }
