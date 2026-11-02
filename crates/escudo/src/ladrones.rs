@@ -174,20 +174,84 @@ const SISTEMA: &[&str] = &[
     "searchfilterhost.exe",
 ];
 
+/// Where every saved secret's folder begins: at a `\appdata\` of the path, or at a `\steam\`.
+const RAIZ: &str = r"\appdata\";
+const STEAM: &str = r"\steam\";
+/// Firefox's profiles.
+const FIREFOX: &str = r"\appdata\roaming\mozilla\firefox\profiles\";
+/// The most places a path's `\appdata\` (or `\steam\`) is remembered at; a path with more (none is so) is searched
+/// whole.
+const MAX_ANCLAS: usize = 4;
+
+/// Where `raiz` starts in `r`, overlapping places too, in order: up to [`MAX_ANCLAS`], on the stack; `None` when
+/// there are more.
+fn anclas(r: &str, raiz: &str) -> Option<([usize; MAX_ANCLAS], usize)> {
+    let mut pos = [0; MAX_ANCLAS];
+    let mut n = 0;
+    let mut desde = 0;
+    while let Some(k) = r.get(desde..).and_then(|resto| resto.find(raiz)) {
+        if n == MAX_ANCLAS {
+            return None;
+        }
+        pos[n] = desde + k;
+        n += 1;
+        // `raiz` starts with `\`, one byte: the next place may begin right after it
+        desde += k + 1;
+    }
+    Some((pos, n))
+}
+
 /// Whether a file (any path Windows gives: `C:\…`, `\\?\C:\…` or `\Device\HarddiskVolume3\…`) holds a saved secret,
-/// and whose. A cheap test on the lower-case path: it runs for every file opened on the computer.
+/// and whose. It runs for every file opened on the computer, so it is cheap: the lower-case path is looked at only
+/// where an `\appdata\` or a `\steam\` of it begins (every folder listed here begins so), never searched along
+/// its length once per folder.
 #[must_use]
 pub fn que_es(ruta: &str) -> Option<Hallazgo> {
     let r = ruta.replace('/', "\\").to_ascii_lowercase();
-    if !r.contains(r"\appdata\") && !r.contains(r"\steam\") {
+    // the quickest test first: almost every path on the computer stops here
+    let (hay_appdata, hay_steam) = (r.contains(RAIZ), r.contains(STEAM));
+    if !hay_appdata && !hay_steam {
         return None;
     }
+    let ninguna = Some(([0; MAX_ANCLAS], 0));
+    let (Some((a, na)), Some((s, ns))) = (
+        if hay_appdata {
+            anclas(&r, RAIZ)
+        } else {
+            ninguna
+        },
+        if hay_steam {
+            anclas(&r, STEAM)
+        } else {
+            ninguna
+        },
+    ) else {
+        return decide(&r, &|carpeta: &str| r.find(carpeta));
+    };
+    let (en_appdata, en_steam) = (&a[..na], &s[..ns]);
+    decide(&r, &|carpeta: &str| {
+        let anclas = if carpeta.starts_with(RAIZ) {
+            en_appdata
+        } else if carpeta.starts_with(STEAM) {
+            en_steam
+        } else {
+            return r.find(carpeta);
+        };
+        anclas
+            .iter()
+            .copied()
+            .find(|&p| r.get(p..).is_some_and(|x| x.starts_with(carpeta)))
+    })
+}
+
+/// [`que_es`] on the lower-case path `r`, with `busca` saying where a folder first appears in it.
+fn decide(r: &str, busca: &dyn Fn(&str) -> Option<usize>) -> Option<Hallazgo> {
     for &(carpeta, tesoro, de, duenos) in APLICACIONES {
-        if r.contains(carpeta) {
+        if busca(carpeta).is_some() {
             return Some(Hallazgo { tesoro, de, duenos });
         }
     }
-    if let Some(i) = r.find(r"\appdata\roaming\mozilla\firefox\profiles\") {
+    if let Some(i) = busca(FIREFOX) {
         let resto = &r[i..];
         let tesoro = if resto.ends_with(r"\logins.json") {
             Tesoro::Contrasenas
@@ -205,7 +269,7 @@ pub fn que_es(ruta: &str) -> Option<Hallazgo> {
         });
     }
     for &(carpeta, de, duenos) in CHROMIUM {
-        let Some(i) = r.find(carpeta) else {
+        let Some(i) = busca(carpeta) else {
             continue;
         };
         let resto = &r[i + carpeta.len()..];
@@ -373,6 +437,77 @@ mod tests {
         );
         assert_eq!(t(r"C:\Users\ana\Documents\Login Data"), None);
         assert_eq!(t(r"C:\Windows\System32\kernel32.dll"), None);
+    }
+
+    #[test]
+    fn cada_carpeta_empieza_donde_se_mira() {
+        // `que_es` only looks where an `\appdata\` or a `\steam\` begins: every folder listed must begin so
+        let carpetas = APLICACIONES
+            .iter()
+            .map(|a| a.0)
+            .chain(CHROMIUM.iter().map(|c| c.0))
+            .chain([FIREFOX]);
+        for c in carpetas {
+            assert!(c.starts_with(RAIZ) || c.starts_with(STEAM), "{c}");
+        }
+    }
+
+    #[test]
+    fn mirar_donde_empieza_da_lo_mismo_que_buscar_a_lo_largo() {
+        let a_lo_largo = |ruta: &str| {
+            let r = ruta.replace('/', "\\").to_ascii_lowercase();
+            if !r.contains(RAIZ) && !r.contains(STEAM) {
+                return None;
+            }
+            decide(&r, &|c: &str| r.find(c))
+        };
+        let mut rutas: Vec<String> = Vec::new();
+        let finales = [
+            "Login Data",
+            r"Default\Login Data",
+            r"Default\Network\Cookies",
+            "Local State",
+            r"Profile 1\Web Data",
+            r"Default\Local Extension Settings\nkbihfbeogaeaoehlefnkodbefgpgknn\1.log",
+            r"Default\IndexedDB\chrome-extension_bfnaelmomeimhlpmgjnjophhpkkoljpa_0\x",
+            r"x1.default\logins.json",
+            r"x1.default\key4.db",
+            r"x1.default\cookies.sqlite",
+            r"cualquier\otra\cosa.tmp",
+            "",
+        ];
+        let carpetas = APLICACIONES
+            .iter()
+            .map(|a| a.0)
+            .chain(CHROMIUM.iter().map(|c| c.0))
+            .chain([FIREFOX, r"\appdata\local\temp\", r"\steam\", r"\appdata\"]);
+        // several `\appdata\`, overlapping ones, more than `MAX_ANCLAS`, `/` for `\` and capitals
+        let antes = [
+            r"C:\Users\ana",
+            r"\Device\HarddiskVolume3\Users\ana",
+            r"C:\Users\ana\AppData",
+            r"C:\AppData\AppData\AppData\AppData\AppData",
+            r"D:\Steam\steam",
+            "c:/users/ANA",
+        ];
+        for c in carpetas {
+            for a in antes {
+                for f in finales {
+                    rutas.push(format!("{a}{c}{f}"));
+                    rutas.push(format!("{a}{}{f}", c.to_uppercase().replace('\\', "/")));
+                }
+            }
+        }
+        rutas.push(r"C:\Windows\System32\kernel32.dll".to_owned());
+        rutas.push(String::new());
+        let mut halladas = 0;
+        for r in &rutas {
+            let (rapida, larga) = (que_es(r), a_lo_largo(r));
+            assert_eq!(rapida, larga, "{r}");
+            halladas += usize::from(rapida.is_some());
+        }
+        // the paths above do hold secrets, so the comparison is not only of «nothing»
+        assert!(halladas > rutas.len() / 4, "{halladas} de {}", rutas.len());
     }
 
     #[test]
