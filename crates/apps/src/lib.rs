@@ -65,7 +65,10 @@ mod firmas;
 // El escudo (1.0.52): who opens the saved secrets (browser passwords, cookies, keys, wallets, sessions).
 #[cfg(windows)]
 mod guardia;
+// The VPN's adapter on Windows (in preparation): WireGuardNT through its signed wireguard.dll.
 pub mod instalador;
+#[cfg(windows)]
+pub mod wireguard_nt;
 // «Quién vende tus datos dentro de tu PC» (1.0.46): the system's own advertising settings.
 pub mod privacidad;
 #[cfg(windows)]

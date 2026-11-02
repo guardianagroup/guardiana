@@ -68,6 +68,12 @@ impl Llaves {
     pub fn secreta_base64(&self) -> Zeroizing<String> {
         Zeroizing::new(b64(&self.secreta.to_bytes()))
     }
+
+    /// The private key's 32 bytes, wiped when dropped: for the Windows adapter's configuration (`crate::nt`).
+    #[must_use]
+    pub fn secreta_bytes(&self) -> Zeroizing<[u8; 32]> {
+        Zeroizing::new(self.secreta.to_bytes())
+    }
 }
 
 /// A public key in base64 (44 characters), as 32 bytes.

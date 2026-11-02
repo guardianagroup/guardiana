@@ -1,0 +1,61 @@
+# The VPN's adapter on a real Windows (in preparation; docs/VPN.md, owner, 1 Nov 2026, 17:35: «sigue trabajando en la
+# VPN y en el antivirus»). The signed wireguard.dll exactly as WireGuard LLC publishes it (download.wireguard.com), its
+# Authenticode signature checked before anything loads it, and crates/apps/src/wireguard_nt.rs's real test: an adapter
+# created, configured with crates/tunel/src/nt.rs's bytes, brought up and down, and closed. GitHub's Windows runners run
+# as administrators, which the driver needs. Nothing here touches the runner's own network: no route, no firewall rule.
+# CI never holds signing keys and never publishes anything (brief §10).
+name: vpn
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'crates/tunel/**'
+      - 'crates/apps/src/wireguard_nt.rs'
+      - 'crates/apps/Cargo.toml'
+      - '.github/workflows/vpn.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  adaptador:
+    name: WireGuardNT en Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: wireguard.dll firmada por WireGuard LLC
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'wireguard-nt.zip'
+          $dir = Join-Path $env:RUNNER_TEMP 'wireguard-nt'
+          Invoke-WebRequest -Uri 'https://download.wireguard.com/wireguard-nt/wireguard-nt-1.1.zip' -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          $dll = Get-ChildItem -Path $dir -Recurse -Filter wireguard.dll | Where-Object { $_.FullName -match '\\amd64\\' } | Select-Object -First 1
+          if (-not $dll) { Write-Output '::error title=wireguard.dll::no está en el .zip (bin\amd64)'; exit 1 }
+          $firma = Get-AuthenticodeSignature -FilePath $dll.FullName
+          $quien = if ($firma.SignerCertificate) { $firma.SignerCertificate.Subject } else { '' }
+          Write-Output "firma: $($firma.Status) · $quien"
+          Write-Output "sha256: $((Get-FileHash -Path $dll.FullName -Algorithm SHA256).Hash)"
+          if ($firma.Status -ne 'Valid' -or $quien -notmatch 'WireGuard LLC') {
+            Write-Output "::error title=wireguard.dll::firma no válida o de otro firmante ($($firma.Status), $quien)"
+            exit 1
+          }
+          "GUARDIANA_WG_DLL=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: la prueba real del adaptador
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test -p guardiana-apps --locked wireguard_nt -- --ignored --nocapture 2>&1 | tee "$RUNNER_TEMP/test.log" && exit 0
+          grep -E "^test .* FAILED$|panicked at|^---- " "$RUNNER_TEMP/test.log" | head -20 | while IFS= read -r l; do echo "::error title=adaptador::$l"; done
+          grep -A12 "panicked at" "$RUNNER_TEMP/test.log" | head -40 | sed -e 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}' | sed 's/^/::error title=detalle::/'; echo
+          exit 1

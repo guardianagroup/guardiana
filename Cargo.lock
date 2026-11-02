@@ -773,6 +773,7 @@ dependencies = [
  "ferrisetw",
  "guardiana-core",
  "guardiana-escudo",
+ "guardiana-tunel",
  "serde",
  "serde_json",
  "sha2 0.11.0",

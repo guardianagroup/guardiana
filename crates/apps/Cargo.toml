@@ -38,5 +38,11 @@ windows-sys = { version = "0.61", features = [
     # al panel (la tabla TCP con su proceso), para no avisar del navegador desde el que se llama.
     "Win32_System_RemoteDesktop",
     "Win32_NetworkManagement_IpHelper",
+    # The VPN's adapter: wireguard.dll, loaded from its full path (wireguard_nt.rs).
+    "Win32_System_LibraryLoader",
 ] }
 sha2 = { workspace = true }
+
+# The VPN adapter's real test on Windows (wireguard_nt.rs): the computer's keys and the configuration's bytes.
+[target.'cfg(windows)'.dev-dependencies]
+guardiana-tunel = { workspace = true }
