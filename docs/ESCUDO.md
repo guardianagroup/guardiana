@@ -165,4 +165,10 @@ donde empieza cada `\appdata\` de la ruta. Lo que queda es sobre todo leer los c
   URLhaus y ThreatFox no, porque su uso con ánimo de lucro puede pedir una suscripción de pago.
 - **Cuarentena desde la lista de avisos: sí**, solo para archivos que el escudo señaló, nunca en la carpeta de Windows ni
   en Program Files, y siempre restaurable.
+  Hecho (1 nov 2026, noche): el panel da a cada aviso su id y si su archivo puede ir (`GET /api/escudo`), lista lo
+  apartado (`GET /api/escudo/cuarentena`), lo pone (`POST /api/escudo/cuarentena/{id}`; también fuera quedan
+  `ProgramData\Microsoft`, y un programa abierto no se mueve: lo dice) y lo devuelve
+  (`POST /api/escudo/cuarentena/restaura/{id}`). ZERO deja pasar desde la web de GUARDIANA solo la lista y el poner,
+  por id; devolver, solo desde el panel («Tu antivirus» → «El escudo»). La portada del Antivirus en la web ya no dice
+  «Solo lectura»: dice exactamente qué puede hacer.
 - Detalle: `herramientas/agencia-rondas/ronda88/decisiones.md` en el repositorio de la web.

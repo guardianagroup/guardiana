@@ -2313,6 +2313,37 @@
       </div>`).join('');
       paint(await api('/api/antivirus'));
       cadaTanto(async () => paint(await api('/api/antivirus')), 10000);
+      // El escudo (1.0.52) y su cuarentena (ronda 88, 1 nov 2026): los avisos del antivirus del programa, cada uno con
+      // «Poner en cuarentena» cuando su archivo puede ir (lo dice el servicio), y lo apartado con «Devolver». La web de
+      // GUARDIANA solo puede pedir lo primero; devolver se hace aquí.
+      const pintaEscudo = (es, cu) => {
+        const avisos = Array.isArray(es.avisos) ? es.avisos : [];
+        $('esc-lead').textContent = es.aprendiendo ? t('esc_lead_aprende') : t('esc_lead').replace('{n}', String(es.sitios || 0));
+        $('esc-avisos').innerHTML = avisos.map((a) => `<tr class="${a.grave ? 'bad' : ''}"><td>${esc(horaCorta(a.cuando_ms))}</td><td>${esc(a.programa || '')}</td><td>${esc(t('esc_regla_' + a.regla) === 'esc_regla_' + a.regla ? (a.regla || '') : t('esc_regla_' + a.regla))}</td><td>${esc(a.texto || '')}</td><td>${a.cuarentena === 'posible' ? `<button class="secondary" data-cuarentena="${esc(a.id)}">${esc(t('esc_poner'))}</button>` : a.cuarentena === 'hecha' ? `<span class="tag">${esc(t('esc_hecha'))}</span>` : ''}</td></tr>`).join('');
+        $('esc-avisos-vacio').classList.toggle('hidden', avisos.length > 0);
+        const entradas = Array.isArray(cu.entradas) ? cu.entradas : [];
+        $('esc-cuarentena').innerHTML = entradas.map((e) => `<tr><td>${esc(horaCorta(e.cuando_ms))}</td><td title="${esc(e.ruta || '')}">${esc(e.nombre || '')} <span class="muted">${esc(bytes(Number(e.bytes || 0)))}</span></td><td>${esc(e.motivo || '')}<br><span class="muted">${esc(e.fuente || '')}</span></td><td><button class="secondary" data-restaura="${esc(e.id)}">${esc(t('esc_devolver'))}</button></td></tr>`).join('');
+        $('esc-cuarentena-vacio').classList.toggle('hidden', entradas.length > 0);
+      };
+      const cargaEscudo = async () => {
+        try { pintaEscudo(await api('/api/escudo'), await api('/api/escudo/cuarentena')); }
+        catch (err) { $('esc-card').classList.add('hidden'); }
+      };
+      $('esc-card').addEventListener('click', async (e) => {
+        const b = e.target.closest && e.target.closest('button[data-cuarentena], button[data-restaura]');
+        if (!b) return;
+        b.disabled = true; $('esc-msg').textContent = '';
+        try {
+          const r = b.dataset.cuarentena
+            ? await api('/api/escudo/cuarentena/' + encodeURIComponent(b.dataset.cuarentena), { method: 'POST', body: {} })
+            : await api('/api/escudo/cuarentena/restaura/' + encodeURIComponent(b.dataset.restaura), { method: 'POST', body: {} });
+          $('esc-msg').textContent = r.ok ? t(b.dataset.cuarentena ? 'esc_puesta' : 'esc_devuelta') : t('esc_no') + ' ' + String(r.motivo || '');
+        } catch (err) { $('esc-msg').textContent = t('esc_no') + ' ' + String(err.message || err); }
+        b.disabled = false;
+        await cargaEscudo();
+      });
+      await cargaEscudo();
+      cadaTanto(cargaEscudo, 15000);
     },
     async ia() {
       const paint = (r) => {
