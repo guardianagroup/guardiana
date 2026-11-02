@@ -107,6 +107,11 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
 - «Engaño» (`engano.rs`): un programa que arranca con un nombre hecho para parecer otra cosa: un documento seguido de
   la extensión de un programa (`factura.pdf.exe`, que con las extensiones ocultas se ve `factura.pdf`) o un carácter
   invisible que da la vuelta al texto para esconder el `.exe`. Grave. Lo ve la misma vigilancia de los inicios.
+- «Medio» (`medios.rs`): un programa que se abre desde un disco o una imagen montada (un archivo ISO o IMG abierto con
+  doble clic: el núcleo lo ve en `\Device\CdRom…`) o desde una unidad extraíble (una memoria USB o una tarjeta). Abrir
+  lo que viene dentro de una imagen recibida por correo o descargada es una vía de entrada frecuente. Firmado, nada;
+  sin firma, grave; sin poder comprobarla, aviso. La prueba real monta una ISO hecha con IMAPI2 y abre un programa
+  desde ella.
 - «Credenciales» (`credenciales.rs`): un programa que abre la memoria de LSASS, el proceso de Windows que guarda las
   credenciales de las cuentas con sesión abierta, pidiendo leerla (`PROCESS_VM_READ`): así se roban las contraseñas de
   un equipo. Lo ve la misma sesión con el canal de auditoría del núcleo (`Microsoft-Windows-Kernel-Audit-API-Calls`,

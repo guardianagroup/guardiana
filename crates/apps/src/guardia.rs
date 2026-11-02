@@ -14,7 +14,7 @@ use ferrisetw::trace::UserTrace;
 use ferrisetw::EventRecord;
 use guardiana_escudo::{cadenas, disfraz, engano, ladrones, secuestro};
 
-use super::{Acceso, Apertura, Error, Lanzamiento, Rafaga};
+use super::{Acceso, Apertura, DesdeMedio, Error, Lanzamiento, Rafaga};
 use crate::ventanas::programa_de;
 
 /// `Microsoft-Windows-Kernel-File`.
@@ -68,6 +68,13 @@ struct Compartido {
     volumenes: Vec<(String, String)>,
     /// The openings of LSASS that asked to read its memory, waiting for the service.
     accesos: VecDeque<Acceso>,
+    /// The programs started from a disc, a disk image or a removable drive, waiting for the service; and program path →
+    /// when, so the same one counts once a minute.
+    desde_medios: VecDeque<DesdeMedio>,
+    medios_vistos: HashMap<String, i64>,
+    /// When the volumes were last read, and each drive letter's kind (removable or not) with when it was asked.
+    volumenes_ms: i64,
+    tipos_de_unidad: HashMap<String, (bool, i64)>,
     /// The same program opening LSASS again within [`REPETICION_MS`] is the same opening: program path → when.
     accesos_vistos: HashMap<String, i64>,
     /// For the real test only: the openings of a «Login Data» file, before any filter.
@@ -121,6 +128,52 @@ fn volumenes() -> Vec<(String, String)> {
         }
     }
     out
+}
+
+/// `DRIVE_REMOVABLE`, what `GetDriveTypeW` says of a USB stick or a memory card.
+const UNIDAD_EXTRAIBLE: u32 = 2;
+/// How long a drive letter's kind is trusted.
+const VIGENCIA_UNIDAD_MS: i64 = 10_000;
+
+/// Where a started program ran from, by its kernel path (`\Device\CdRom0\x.exe`, `\Device\HarddiskVolume7\x.exe`):
+/// a disc or a mounted disk image, a removable drive, or neither. A volume mounted after the session began is not in
+/// the table of letters yet: it is read again (at most every few seconds).
+fn medio_de(nt: &str, d: &mut Compartido) -> Option<guardiana_escudo::medios::Medio> {
+    use guardiana_escudo::medios::Medio;
+    if nt.to_ascii_lowercase().starts_with(r"\device\cdrom") {
+        return Some(Medio::Imagen);
+    }
+    let ahora = guardiana_core::time::now_ms();
+    let mut ruta = ruta_dos(nt, &d.volumenes);
+    if ruta.starts_with('\\') && ahora - d.volumenes_ms > 5_000 {
+        d.volumenes = volumenes();
+        d.volumenes_ms = ahora;
+        ruta = ruta_dos(nt, &d.volumenes);
+    }
+    let letra = ruta
+        .get(..2)
+        .filter(|l| l.ends_with(':'))?
+        .to_ascii_uppercase();
+    if letra == "C:" {
+        return None;
+    }
+    let extraible = match d.tipos_de_unidad.get(&letra) {
+        Some((e, cuando)) if ahora - *cuando < VIGENCIA_UNIDAD_MS => *e,
+        _ => {
+            use windows_sys::Win32::Storage::FileSystem::GetDriveTypeW;
+            let raiz: Vec<u16> = format!("{letra}\\")
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
+            // SAFETY: a NUL-terminated root path owned here.
+            #[allow(unsafe_code)]
+            let tipo = unsafe { GetDriveTypeW(raiz.as_ptr()) };
+            let e = tipo == UNIDAD_EXTRAIBLE;
+            d.tipos_de_unidad.insert(letra, (e, ahora));
+            e
+        }
+    };
+    extraible.then_some(Medio::Usb)
 }
 
 /// The process number of LSASS: the `lsass.exe` running from Windows' own folder (a copy elsewhere is not it); 0 when
@@ -290,6 +343,15 @@ impl Sesion {
             .unwrap_or_default()
     }
 
+    /// The programs started from a disc, a disk image or a removable drive (`guardiana_escudo::medios`) since the last
+    /// take.
+    pub(crate) fn desde_medios(&self) -> Vec<DesdeMedio> {
+        self.datos
+            .lock()
+            .map(|mut d| d.desde_medios.drain(..).collect())
+            .unwrap_or_default()
+    }
+
     /// The openings of LSASS that asked to read its memory (`guardiana_escudo::credenciales`) since the last take.
     pub(crate) fn accesos(&self) -> Vec<Acceso> {
         self.datos
@@ -441,6 +503,30 @@ fn anotar_inicio(datos: &Arc<Mutex<Compartido>>, registro: &EventRecord, esquema
                 pid_nuevo,
                 (hijo.clone(), ruta, guardiana_core::time::now_ms()),
             );
+        }
+    }
+    // a program started from a disc, a mounted disk image or a removable drive (escudo, «medio»)
+    if let Ok(mut d) = datos.lock() {
+        if let Some(medio) = medio_de(&imagen, &mut d) {
+            let ahora = guardiana_core::time::now_ms();
+            let ruta = ruta_dos(&imagen, &d.volumenes);
+            let clave = ruta.to_ascii_lowercase();
+            let repetido = d
+                .medios_vistos
+                .get(&clave)
+                .is_some_and(|t| ahora - *t < REPETICION_MS);
+            if !repetido && d.desde_medios.len() < MAXIMO_RAFAGAS {
+                if d.medios_vistos.len() > 4_096 {
+                    d.medios_vistos.clear();
+                }
+                d.medios_vistos.insert(clave, ahora);
+                d.desde_medios.push_back(DesdeMedio {
+                    ts: ahora,
+                    programa: hijo.clone(),
+                    ruta,
+                    medio: medio.codigo(),
+                });
+            }
         }
     }
     // a program wearing the name of one of Windows' own outside Windows' folder (escudo, «disfraz»), or a name made
@@ -702,6 +788,68 @@ mod tests {
                 .any(|a| a.programa.eq_ignore_ascii_case("powershell.exe")
                     && a.acceso & guardiana_escudo::credenciales::LEE_MEMORIA != 0),
             "la apertura de LSASS por PowerShell"
+        );
+    }
+
+    /// An ISO image with a copy of `whoami.exe`, made with Windows' own IMAPI2, mounted, the program run from it and the
+    /// image taken out again; what the PowerShell says.
+    const ISO: &str = r#"
+$ErrorActionPreference = 'Stop'
+$dir = Join-Path $env:TEMP 'guardiana-iso'
+$iso = Join-Path $env:TEMP 'guardiana-prueba.iso'
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+Copy-Item "$env:SystemRoot\System32\whoami.exe" (Join-Path $dir 'whoami.exe') -Force
+$cp = New-Object CodeDom.Compiler.CompilerParameters
+$cp.CompilerOptions = '/unsafe'
+Add-Type -CompilerParameters $cp -TypeDefinition @'
+public class GuardianaIso {
+  public unsafe static void Escribe(string ruta, object flujo, int bloque, int bloques) {
+    int leidos = 0; byte[] buf = new byte[bloque]; var p = (System.IntPtr)(&leidos);
+    var salida = System.IO.File.OpenWrite(ruta); var entrada = flujo as System.Runtime.InteropServices.ComTypes.IStream;
+    while (bloques-- > 0) { entrada.Read(buf, bloque, p); salida.Write(buf, 0, leidos); }
+    salida.Flush(); salida.Close();
+  }
+}
+'@
+$fsi = New-Object -ComObject IMAPI2FS.MsftFileSystemImage
+$fsi.FileSystemsToCreate = 3
+$fsi.VolumeName = 'GUARDIANA'
+$fsi.Root.AddTree($dir, $false)
+$r = $fsi.CreateResultImage()
+[GuardianaIso]::Escribe($iso, $r.ImageStream, $r.BlockSize, $r.TotalBlocks)
+$letra = (Mount-DiskImage -ImagePath $iso -PassThru | Get-Volume).DriveLetter
+Write-Output "montada en $letra"
+& "$($letra):\whoami.exe" | Out-Null
+Start-Sleep -Seconds 3
+Dismount-DiskImage -ImagePath $iso | Out-Null
+Remove-Item $iso, $dir -Recurse -Force
+"#;
+
+    /// On a real Windows, as an administrator: a program run from a mounted ISO image is seen as come from an image
+    /// (escudo, «medio»).
+    #[test]
+    #[ignore = "necesita Windows como administrador"]
+    fn la_guardia_ve_lo_que_viene_de_una_imagen() {
+        let sesion = Sesion::arrancar().unwrap();
+        std::thread::sleep(Duration::from_secs(3));
+        let salida = Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", ISO])
+            .output()
+            .unwrap();
+        println!(
+            "la imagen: {} {}",
+            String::from_utf8_lossy(&salida.stdout).trim(),
+            String::from_utf8_lossy(&salida.stderr).trim()
+        );
+        assert!(salida.status.success(), "la ISO de prueba");
+        std::thread::sleep(Duration::from_secs(3));
+        let medios = sesion.desde_medios();
+        println!("desde medios: {medios:?}");
+        assert!(
+            medios
+                .iter()
+                .any(|m| m.programa.eq_ignore_ascii_case("whoami.exe") && m.medio == "imagen"),
+            "whoami.exe abierto desde la imagen"
         );
     }
 

@@ -11,7 +11,7 @@ use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use guardiana_apps::{Apertura, Guardia, Observador, Rafaga};
+use guardiana_apps::{Apertura, DesdeMedio, Guardia, Observador, Rafaga};
 use guardiana_core::vigilancia::Suceso;
 use guardiana_core::{Ledger, NewEvent};
 use guardiana_escudo::arranque::Archivo;
@@ -230,6 +230,8 @@ pub(crate) struct EscudoVivo {
     rafagas: Vec<Rafaga>,
     /// Program path → when its last burst warned.
     secuestros_vistos: HashMap<String, u64>,
+    /// Programs started from a disc, a disk image or a removable drive whose signature was not checked yet.
+    medios_pend: Vec<DesdeMedio>,
     /// Connections without a name whose program's signature was not checked yet, and program path → when it was
     /// last judged.
     sin_nombre_pend: Vec<SinNombre>,
@@ -281,6 +283,7 @@ impl EscudoVivo {
             arranques: Vec::new(),
             rafagas: Vec::new(),
             secuestros_vistos: HashMap::new(),
+            medios_pend: Vec::new(),
             hosts,
             ruta_hosts,
             hosts_leido_ms: 0,
@@ -341,6 +344,7 @@ impl EscudoVivo {
         self.ladrones(obs, ahora_ms);
         self.cadenas();
         self.credenciales();
+        self.medios(obs, ahora_ms);
         self.arranques_pendientes(obs, ahora_ms);
         if self.pendientes.is_empty() {
             return;
@@ -500,6 +504,57 @@ impl EscudoVivo {
                 continue;
             };
             let clave = (l.padre_ruta.to_ascii_lowercase(), aviso.nombre.clone());
+            if self
+                .cadenas_vistas
+                .get(&clave)
+                .is_some_and(|t| cuando.saturating_sub(*t) < REPETIR_CADENA_MS)
+            {
+                continue;
+            }
+            if self.cadenas_vistas.len() > 4_096 {
+                self.cadenas_vistas.clear();
+            }
+            self.cadenas_vistas.insert(clave, cuando);
+            self.anota(&aviso, grave);
+        }
+    }
+
+    /// The programs started from a disc, a mounted disk image or a removable drive, once Windows has checked each one's
+    /// signature (or after [`ESPERA_FIRMA_MS`]), through the rule (`guardiana_escudo::medios`). The same file warns once
+    /// an hour.
+    fn medios(&mut self, obs: &Observador, ahora_ms: u64) {
+        let nuevos = self
+            .guardia
+            .as_ref()
+            .map(Guardia::desde_medios)
+            .unwrap_or_default();
+        if nuevos.is_empty() && self.medios_pend.is_empty() {
+            return;
+        }
+        let mut todos = std::mem::take(&mut self.medios_pend);
+        todos.extend(nuevos);
+        for m in todos {
+            let Some(medio) = guardiana_escudo::medios::Medio::de_codigo(m.medio) else {
+                continue;
+            };
+            let cuando = u64::try_from(m.ts).unwrap_or(0);
+            let firma = match obs.firma(&m.ruta) {
+                Some(f) if f.is_empty() => Firma::SinFirma,
+                Some(f) => Firma::Firmado(f),
+                None if ahora_ms.saturating_sub(cuando) < ESPERA_FIRMA_MS => {
+                    if self.medios_pend.len() < MAX_PENDIENTES {
+                        self.medios_pend.push(m);
+                    }
+                    continue;
+                }
+                None => Firma::SinComprobar,
+            };
+            let Some((aviso, grave)) =
+                guardiana_escudo::medios::juzga(&m.programa, &m.ruta, &firma, medio, cuando)
+            else {
+                continue;
+            };
+            let clave = (aviso.nombre.clone(), "medio".to_owned());
             if self
                 .cadenas_vistas
                 .get(&clave)

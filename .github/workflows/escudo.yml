@@ -2,7 +2,8 @@
 # vea todo lo posible, todo, absolutamente todo»): crates/apps/src/guardia.rs's real test starts the escudo's own
 # kernel event session, then, from other processes, opens a file where a browser keeps saved passwords, starts
 # programs, renames a burst of files in the runner's Documents and opens LSASS asking to read its memory (only a
-# handle, nothing is read), and checks that the session saw each one. It
+# handle, nothing is read), and checks that the session saw each one; a third makes an ISO image with Windows' own
+# IMAPI2, mounts it and runs a program from it. It
 # checks the field names of Windows' kernel channels that the rules read. A second test has another process create
 # and read 20 000 files and says what the session cost in processor time (shown as a notice on the run's page).
 # GitHub's Windows runners run as administrators, which an event session needs. Everything it writes is removed at
@@ -47,5 +48,5 @@ jobs:
             grep -oE "coste: .*" "$RUNNER_TEMP/test.log" | sed 's/^/::notice title=escudo::/' || true
             exit 0
           fi
-          grep -E "FAILED|panicked at|^---- |aperturas|lanzamientos|ráfagas|Login Data|coste:|LSASS" "$RUNNER_TEMP/test.log" | head -20 | cut -c1-900 | while IFS= read -r l; do echo "::error title=escudo::$l"; done
+          grep -E "FAILED|panicked at|^---- |aperturas|lanzamientos|ráfagas|Login Data|coste:|LSASS|imagen|medios" "$RUNNER_TEMP/test.log" | head -20 | cut -c1-900 | while IFS= read -r l; do echo "::error title=escudo::$l"; done
           exit 1

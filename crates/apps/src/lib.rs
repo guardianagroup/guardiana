@@ -305,6 +305,20 @@ pub struct Acceso {
     pub concedido: bool,
 }
 
+/// A program started from a disc or a mounted disk image, or from a removable drive (el escudo, 1.0.52;
+/// `guardiana_escudo::medios`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DesdeMedio {
+    /// When (milliseconds since 1970).
+    pub ts: i64,
+    /// The program's file name.
+    pub programa: String,
+    /// Its full path (with its drive letter when the volume has one).
+    pub ruta: String,
+    /// `imagen` (a disc or a mounted ISO or IMG) or `usb` (a removable drive).
+    pub medio: &'static str,
+}
+
 /// El escudo's watch over saved secrets, over program starts and over the person's files: on while the service runs,
 /// names only.
 pub struct Guardia {
@@ -362,6 +376,19 @@ impl Guardia {
         #[cfg(windows)]
         {
             self.interno.lanzamientos()
+        }
+        #[cfg(not(windows))]
+        {
+            Vec::new()
+        }
+    }
+
+    /// The programs started from a disc, a mounted disk image or a removable drive since the last call.
+    #[must_use]
+    pub fn desde_medios(&self) -> Vec<DesdeMedio> {
+        #[cfg(windows)]
+        {
+            self.interno.desde_medios()
         }
         #[cfg(not(windows))]
         {
