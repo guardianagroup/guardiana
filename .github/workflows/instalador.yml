@@ -1,0 +1,59 @@
+# Lo que ve una persona al instalar GUARDIANA en Windows, foto a foto (build/cliente/fotos_instalador.ps1).
+#
+# Dos máquinas nuevas: en una se instala la versión publicada desde cero; en la otra se actualiza desde la
+# anterior con ZERO y sus avisos abiertos, como quien ya lo tiene. Cada una abre el instalador como un doble
+# clic, pulsa lo que pulsaría una persona y deja en el registro las fotos distintas entre sí y cada ventana que
+# apareció, aunque fuera un instante.
+# Escrito el 2 Nov 2026 para la 1.0.54 (dueño: «una pantalla profesional mientras se está instalando… nada de
+# tirón ni cosas raras»; y, a las 13:16, «primero me aparece la página de órbita y luego me aparece la que tiene
+# que aparecer»).
+name: instalador
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [antivirus-vpn]
+    paths:
+      - build/cliente/fotos_instalador.ps1
+      - .github/workflows/instalador.yml
+
+permissions:
+  contents: read
+
+jobs:
+  fotos:
+    name: fotos (${{ matrix.caso }})
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        caso: [nueva, actualiza]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: los instaladores publicados
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path inst | Out-Null
+          $pagina = (Invoke-WebRequest -UseBasicParsing https://guardianagroup.com/instalar.html).Content
+          $v = [regex]::Match($pagina, '/descargas/([0-9.]+)/guardiana-[0-9.]+-windows-x64\.msi').Groups[1].Value
+          if (-not $v) { throw "no encuentro la versión publicada en instalar.html" }
+          Invoke-WebRequest -UseBasicParsing "https://guardianagroup.com/descargas/$v/guardiana-$v-windows-x64.msi" -OutFile "inst/nueva.msi"
+          $sumas = (Invoke-WebRequest -UseBasicParsing "https://guardianagroup.com/descargas/$v/SHA256SUMS").Content
+          $h = (Get-FileHash inst/nueva.msi -Algorithm SHA256).Hash.ToLower()
+          if ($sumas -notmatch "$h\s+guardiana-$v-windows-x64\.msi") { throw "la huella de la $v no es la publicada" }
+          Write-Output "publicada: $v · $h"
+          if ("${{ matrix.caso }}" -eq "actualiza") {
+            # La anterior, de la historia de la web (la 1.0.52, retirada al publicar la 1.0.53), con la huella que se publicó.
+            git clone --quiet --filter=blob:none --no-checkout https://github.com/guardianagroup/guardianagroup.com web
+            cmd /c "git -C web show a08bd3600202a7c45142a75012c83cac792c9644:descargas/1.0.52/guardiana-1.0.52-windows-x64.msi > inst\antes.msi"
+            $h = (Get-FileHash inst/antes.msi -Algorithm SHA256).Hash.ToLower()
+            if ($h -ne "bc1d2a802f954a7a26614667fed44d2054765807b14ce401c98b222d26d1c900") { throw "la huella de la 1.0.52 no es la publicada: $h" }
+            Write-Output "anterior: 1.0.52 · $h"
+          }
+      - name: instalar como una persona, foto a foto
+        shell: powershell
+        run: |
+          $antes = if ("${{ matrix.caso }}" -eq "actualiza") { (Resolve-Path inst/antes.msi).Path } else { "" }
+          & powershell -NoProfile -ExecutionPolicy Bypass -File build/cliente/fotos_instalador.ps1 -Instalador (Resolve-Path inst/nueva.msi).Path -Antes $antes -Nombre "${{ matrix.caso }}"
