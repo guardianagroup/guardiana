@@ -3665,11 +3665,12 @@ fn orbita_is_the_fourth_product_and_its_tab_is_made_once() {
     );
     assert_eq!(s.activa(), orbita);
     // 1.0.50: GUARDIANA's web in the program's own Órbita tab moves between the products
-    // itself (it fills the window), but only between the program's own three.
+    // itself (it fills the window). 2 Nov 2026 (the owner, 08:01): its main cover also opens the
+    // program's own browser («Navegar con ZERO»); anything else it cannot ask for.
     let _ = s.mensaje(
         Origen::Pestana(orbita),
         ORBITA,
-        r#"{"tipo":"zg_producto","producto":"zero"}"#,
+        r#"{"tipo":"zg_producto","producto":"nada"}"#,
     );
     assert_eq!(s.producto(), "orbita");
     let _ = s.mensaje(
@@ -3678,6 +3679,12 @@ fn orbita_is_the_fourth_product_and_its_tab_is_made_once() {
         r#"{"tipo":"zg_producto","producto":"guardiana"}"#,
     );
     assert_eq!(s.producto(), "guardiana");
+    let _ = s.mensaje(
+        Origen::Pestana(orbita),
+        ORBITA,
+        r#"{"tipo":"zg_producto","producto":"zero"}"#,
+    );
+    assert_eq!(s.producto(), "zero");
 }
 
 #[test]
