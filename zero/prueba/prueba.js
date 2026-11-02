@@ -192,8 +192,9 @@ function pantalla(nombre) {
   const n = Number((await barra.textContent('#b-escudo-n')).replace(/\D/g, ''));
   comprueba(n >= 3, `el escudo cuenta los intentos cortados en esta página (${n})`);
   comprueba((await barra.textContent('#b-escudo-que')) === 'en esta página', 'y dice «en esta página»');
-  // One navigation (Z3): the product selector, with ZERO in front.
-  comprueba(await barra.evaluate(() => document.querySelector('#productos [data-producto="zero"]').getAttribute('aria-current') === 'true'), 'el selector de productos marca ZERO');
+  // 2 Nov 2026 (the owner, 08:01: no doors between sections): the bar has no products' selector, only «Inicio» (back to
+  // the main cover, Órbita's tab), and nothing else that leads to another section.
+  comprueba(await barra.evaluate(() => { const b = [...document.querySelectorAll('#productos [data-producto]')]; return b.length === 1 && b[0].dataset.producto === 'orbita'; }), 'la barra solo tiene «Inicio», que vuelve a la portada');
   // Beside a web, the glass strip of 56 px; the summary opens to 360 px.
   comprueba(await hasta(() => panel.evaluate(() => document.body.classList.contains('plegado') || document.querySelector('#v-licencia').classList.contains('vista-activa'))), 'junto a la web, la franja de cristal (o la vista que estaba abierta)');
   comprueba(await hasta(async () => (await barra.textContent('#aviso-corte')).includes('Google')), 'la barra dice a quién cortó');

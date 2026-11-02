@@ -2679,9 +2679,13 @@ impl Sesion {
                     // door, Comunicaciones) moves between the products and asks for this
                     // computer's connections. Only those tabs and only those products: any other
                     // page cannot.
+                    // 2 Nov 2026 (the owner, 07:57 and 08:01): the main cover's «Navegar con ZERO» opens this
+                    // program's own browser, on this computer and its connection, never the servers' engine.
                     "zg_producto" if self.es_web_del_programa(id, fuente) => {
                         match texto(&m, "producto") {
-                            p @ ("orbita" | "secure" | "guardiana") => self.elige_producto(p),
+                            p @ ("orbita" | "secure" | "guardiana" | "zero") => {
+                                self.elige_producto(p)
+                            }
                             _ => Vec::new(),
                         }
                     }

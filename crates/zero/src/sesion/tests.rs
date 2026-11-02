@@ -4332,6 +4332,30 @@ fn comunicaciones_moves_between_products_but_never_reads_the_computer() {
 }
 
 #[test]
+fn the_main_cover_opens_this_programs_own_browser() {
+    // 2 Nov 2026 (the owner, 07:57 and 08:01): «Navegar con ZERO» on the main cover opens the program's own browser, on
+    // this computer and its connection, never the servers' engine; another page cannot ask for it.
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "e".repeat(64));
+    let _ = s.abre_programa(&url);
+    let orbita = s.activa();
+    let _ = s.mensaje(
+        Origen::Pestana(orbita),
+        "https://example.com/",
+        r#"{"tipo":"zg_producto","producto":"zero"}"#,
+    );
+    assert_eq!(s.activa(), orbita);
+    let o = s.mensaje(
+        Origen::Pestana(orbita),
+        ORBITA,
+        r#"{"tipo":"zg_producto","producto":"zero"}"#,
+    );
+    assert!(!o.is_empty());
+    assert_eq!(s.producto(), "zero");
+    assert_ne!(s.activa(), orbita);
+}
+
+#[test]
 fn without_network_the_panel_comes_forward_and_the_web_loads_again_when_chosen() {
     // 1.0.50 (independent review, M6).
     let (mut s, _, _) = abre();

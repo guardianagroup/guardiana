@@ -441,7 +441,7 @@ const GUION: &str = r#"(() => {
       const b = e.target && e.target.closest && e.target.closest('[data-producto]');
       if (!b) return;
       const p = String(b.dataset.producto || '');
-      if (p !== 'orbita' && p !== 'secure' && p !== 'guardiana') return;
+      if (p !== 'orbita' && p !== 'secure' && p !== 'guardiana' && p !== 'zero') return;
       e.preventDefault();
       e.stopImmediatePropagation();
       manda({ tipo: 'zg_producto', producto: p });

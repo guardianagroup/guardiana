@@ -24,6 +24,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); user-select:
 #productos button { height: var(--h-chip); padding: 0 var(--e4); border: 0; border-radius: var(--r-pill); background: none; color: var(--gris); font: 500 var(--t-13); white-space: nowrap; transition: background-color var(--m-rapido), color var(--m-rapido); }
 #productos button:hover { color: var(--tinta); }
 #productos button[aria-current="true"] { background: #151C26; color: var(--tinta); }
+#productos .inicio { display: inline-flex; align-items: center; gap: 6px; color: var(--tinta); }
 .derecha { margin-left: auto; display: flex; align-items: center; gap: var(--e4); }
 #estado-z { display: flex; align-items: center; gap: var(--e2); color: var(--gris); font: 500 var(--t-13); white-space: nowrap; }
 #estado-z i { width: 8px; height: 8px; border-radius: 50%; background: var(--verde); flex: none; }
@@ -123,11 +124,11 @@ body.solo-arriba #pestanas, body.solo-arriba #herramientas { display: none; }
 <body>
 <div id="arriba">
   <span class="marca"><svg viewBox="0 0 20 22" aria-hidden="true"><path d="M5.2 9V6.6a4.8 4.8 0 0 1 9.6 0V9" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="1.5" y="9" width="17" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12.6 13.2a3 3 0 1 0 .3 3.2h-2.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>GUARDIANA</span></span>
+  <!-- 2 Nov 2026 (the owner, 08:01: «desde la principal, uno elige en qué sección va a estar… no quiero que haya una
+       conexión ni puerta entre ellos… tiene que volver a la carátula principal»): no products' selector, only the way back
+       to the main cover (Órbita's tab, which shows it). -->
   <nav id="productos">
-    <button type="button" data-producto="guardiana" data-t="pestana_guardiana"></button>
-    <button type="button" data-producto="zero" aria-current="true">ZERO</button>
-    <button type="button" data-producto="secure" data-t="pestana_secure"></button>
-    <button type="button" data-producto="orbita" data-t="pestana_orbita"></button>
+    <button type="button" data-producto="orbita" class="inicio"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><span data-t="volver_inicio"></span></button>
   </nav>
   <div class="derecha">
     <span id="estado-z" role="status"><i></i><span></span></span>
