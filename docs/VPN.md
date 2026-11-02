@@ -49,6 +49,19 @@ tienen que ser privados y el servidor, un nombre de guardianagroup.com). Probado
   descarga, al lado del programa, llamado solo por su interfaz pública; el código de GUARDIANA sigue abierto. En la
   web, «usa WireGuard» como dato, nunca como respaldo.
 
+## El interruptor de corte (WFP)
+
+`crates/tunel/src/corte.rs` es el plan, como datos y con pruebas: las mismas reglas que aplica la aplicación de WireGuard
+para Windows (`tunnel/firewall/rules.go`, MIT, leído en su fuente el 1 nov 2026), y lo que pidió la ronda 87 (cortar con
+el Filtering Platform, no con rutas). Permitido: la interfaz del túnel, el propio servicio de GUARDIANA (de él salen los
+paquetes encriptados hacia el servidor), el propio equipo (bucle local, donde vive el DNS de la casa), DHCP y el
+descubrimiento de vecinos de IPv6, y las máquinas virtuales de Hyper-V entre sí. Bloqueado: el DNS a cualquiera que no
+sea el resolutor del túnel, y todo lo demás. En una sesión dinámica: si el servicio se para, Windows quita los filtros
+(y el adaptador del túnel desaparece con él).
+
+Pendiente: la parte de Windows que convierte el plan en filtros, el adaptador (`wireguard.dll` por su interfaz pública),
+la dirección, las rutas y el DNS del túnel, y una prueba real en un Windows de la integración continua.
+
 ## Los servidores (propuesta para la fase 1)
 
 - WireGuard del núcleo de Linux (`wg0`, UDP 51820) en los servidores actuales, cada uno con su red privada
