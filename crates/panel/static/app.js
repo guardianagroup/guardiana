@@ -30,20 +30,42 @@
   // «Protección máxima».
   const EN_PROGRAMA = document.documentElement.dataset.enZero === '1';
   if (EN_PROGRAMA && /^\/(por-dentro(\.html)?)?$/.test(location.pathname)) location.replace('/foto');
+  // The 42 languages of the program, as guardiana_core::i18n::IDIOMAS (2 Nov 2026, the owner: «mete los 42 idiomas en el
+  // programa»): code, own name, lang tag, right to left. A test of the panel keeps both lists equal.
+  const IDIOMAS = [['es', 'Español', 'es', 0], ['en', 'English', 'en', 0], ['pt', 'Português (Brasil)', 'pt-BR', 0],
+    ['fr', 'Français', 'fr', 0], ['de', 'Deutsch', 'de', 0], ['it', 'Italiano', 'it', 0], ['nl', 'Nederlands', 'nl', 0],
+    ['sv', 'Svenska', 'sv', 0], ['da', 'Dansk', 'da', 0], ['nb', 'Norsk', 'nb', 0], ['fi', 'Suomi', 'fi', 0], ['is', 'Íslenska', 'is', 0],
+    ['pl', 'Polski', 'pl', 0], ['uk', 'Українська', 'uk', 0], ['ru', 'Русский', 'ru', 0], ['tr', 'Türkçe', 'tr', 0],
+    ['zh', '简体中文', 'zh-Hans', 0], ['ja', '日本語', 'ja', 0], ['ko', '한국어', 'ko', 0], ['hi', 'हिन्दी', 'hi', 0], ['bn', 'বাংলা', 'bn', 0],
+    ['id', 'Bahasa Indonesia', 'id', 0], ['vi', 'Tiếng Việt', 'vi', 0], ['th', 'ไทย', 'th', 0], ['ar', 'العربية', 'ar', 1],
+    ['fa', 'فارسی', 'fa', 1], ['he', 'עברית', 'he', 1], ['ur', 'اردو', 'ur', 1], ['zh-tw', '繁體中文', 'zh-Hant', 0],
+    ['cs', 'Čeština', 'cs', 0], ['ro', 'Română', 'ro', 0], ['hu', 'Magyar', 'hu', 0], ['el', 'Ελληνικά', 'el', 0],
+    ['sk', 'Slovenčina', 'sk', 0], ['bg', 'Български', 'bg', 0], ['hr', 'Hrvatski', 'hr', 0], ['ms', 'Bahasa Melayu', 'ms', 0],
+    ['fil', 'Filipino', 'fil', 0], ['sw', 'Kiswahili', 'sw', 0], ['ta', 'தமிழ்', 'ta', 0], ['te', 'తెలుగు', 'te', 0],
+    ['pt-pt', 'Português (Portugal)', 'pt-PT', 0]];
+  const CODIGOS = IDIOMAS.map((x) => x[0]);
+  // A system or browser tag as one of the 42 (the same rules as guardiana_core::i18n::indice), or '' when none.
+  const codigoDe = (tag) => {
+    const l = String(tag || '').toLowerCase().replace(/_/g, '-').split(/[,;.@]/)[0].trim();
+    const [p, ...r] = l.split('-');
+    const c = p === 'zh' && r.some((x) => ['tw', 'hk', 'mo', 'hant'].includes(x)) ? 'zh-tw'
+      : p === 'pt' && r.includes('pt') ? 'pt-pt' : (p === 'no' || p === 'nn') ? 'nb' : p === 'tl' ? 'fil' : p === 'iw' ? 'he' : p === 'in' ? 'id' : p;
+    return CODIGOS.includes(c) ? c : '';
+  };
   // Language (decision 45): the person's choice, kept in this browser; otherwise the browser's own.
   let LANG = '';
   try { LANG = localStorage.getItem('guardiana_lang') || ''; } catch (_) {}
-  if (LANG !== 'es' && LANG !== 'en' && LANG !== 'pt') {
+  if (!CODIGOS.includes(LANG)) {
     // English first (18 Oct 2026, the owner: «English is the first language on screen»), and the
     // browser's language is no longer a guess of the person's. The one exception is a choice the
     // person did make: inside GUARDIANA ZERO the page speaks the language ZERO runs in, which is
     // the installer's (Spanish or Portuguese MSI) or English. ZERO sets that language on its
     // engine, so there it is what navigator.language says.
     const enZero = !!(window.chrome && window.chrome.webview);
-    const dos = enZero ? (navigator.language || 'en').slice(0, 2).toLowerCase() : 'en';
-    LANG = (dos === 'es' || dos === 'pt') ? dos : 'en';
+    LANG = (enZero && codigoDe(navigator.language)) || 'en';
   }
-  try { document.documentElement.lang = LANG; } catch (_) {}
+  const IDIOMA = IDIOMAS.find((x) => x[0] === LANG) || IDIOMAS[1];
+  try { document.documentElement.lang = IDIOMA[2]; document.documentElement.dir = IDIOMA[3] ? 'rtl' : 'ltr'; } catch (_) {}
   // Night mode (owner's request, 20 Sep 2026). The panel ships with the website's light design;
   // whoever prefers a dark screen chooses it here, and the choice stays in this browser: it is
   // never sent anywhere, because there is nowhere to send it to.
@@ -409,7 +431,7 @@
   // Dates follow the panel's language, not the computer's: someone reading the panel in English
   // on a Spanish machine was getting «18/9/2026», and in English that reads as the 9th of a month
   // that does not exist here. English gets a named month so the two can never be swapped.
-  const LOC = LANG === 'en' ? 'en-GB' : (LANG === 'pt' ? 'pt-BR' : 'es');
+  const LOC = LANG === 'en' ? 'en-GB' : LANG === 'es' ? 'es' : IDIOMA[2];
   const DIA = LANG === 'en' ? { day: 'numeric', month: 'short', year: 'numeric' } : undefined;
   const DIA_HORA = LANG === 'en' ? { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false } : undefined;
   // La hora sola solo vale para hoy: con un filtro, 200 filas abarcan varios días y se leían
@@ -1176,6 +1198,9 @@
     if (on && !chip) { chip = document.createElement('span'); chip.id = 'g-muestra'; chip.className = 'g-muestra'; chip.textContent = t('rg_muestra'); sub.appendChild(chip); }
     if (!on && chip) chip.remove();
   };
+  // The 42 languages in one list, each in its own name and its own direction (2 Nov 2026).
+  const selectorIdioma = () => `<select class="g-idioma" aria-label="${esc(t('menu_idioma'))}">${IDIOMAS.map(([c, n, l, r]) =>
+    `<option value="${c}" lang="${l}" dir="${r ? 'rtl' : 'ltr'}"${c === LANG ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
   // The language, one for the whole program (R10): kept by the service, changed here.
   const cambiaIdioma = async (l) => {
     try { await api('/api/ajustes/idioma', { method: 'PUT', body: { idioma: l } }); } catch (_) {}
@@ -1196,18 +1221,14 @@
       if (!$('lang-toggle')) {
         const b = document.createElement('div');
         b.id = 'lang-toggle'; b.className = 'idiomas';
-        b.innerHTML = ['en', 'es', 'pt'].map((l) => `<button type="button" class="secondary lang${l === LANG ? ' actual' : ''}" lang="${l}"${l === LANG ? ' aria-current="true" disabled' : ` data-lang="${l}"`}>${CORTO0[l]}</button>`).join('');
-        b.querySelectorAll('[data-lang]').forEach((a) => a.addEventListener('click', () => { try { localStorage.setItem('guardiana_lang', a.dataset.lang); } catch (_) {} location.reload(); }));
+        b.innerHTML = selectorIdioma();
+        b.querySelector('select').addEventListener('change', (e) => { try { localStorage.setItem('guardiana_lang', e.target.value); } catch (_) {} location.reload(); });
         header.appendChild(b);
       }
       return;
     }
     const { s: seccion } = enSeccion(page);
-    const CORTO = { en: 'English', es: 'Español', pt: 'Português' };
-    const CAMBIAR = { es: 'Cambiar a español', en: 'Switch to English', pt: 'Mudar para português' };
-    const idiomas = ['en', 'es', 'pt'].map((l) => (l === LANG
-      ? `<button type="button" class="lang actual" lang="${l}" aria-current="true" disabled>${CORTO[l]}</button>`
-      : `<button type="button" class="lang" lang="${l}" data-lang="${l}" aria-label="${esc(CAMBIAR[l])}">${CORTO[l]}</button>`)).join('');
+    const idiomas = selectorIdioma();
     const enlace = (p, clase) => `<a href="${p[1]}"${clase ? ` class="${clase}"` : ''}${p[0] === page ? ' aria-current="page"' : ''}>${esc(t(p[2]))}</a>`;
     const impreso = header.querySelector('.print-only') ? ` <span class="print-only">${esc(t('pdf_pie'))}</span>` : '';
     header.classList.add('g-barra');
@@ -1294,7 +1315,7 @@
     const menu = $('g-menu'), boton = $('g-ajustes');
     function cierraMenu() { menu.hidden = true; boton.setAttribute('aria-expanded', 'false'); }
     boton.addEventListener('click', (e) => { e.stopPropagation(); const abrir = menu.hidden; cierraPop(); cierraMenu(); cierraPulso(); cierraSecciones(); if (abrir) { menu.hidden = false; boton.setAttribute('aria-expanded', 'true'); const a = menu.querySelector('a'); if (a) a.focus(); } });
-    menu.querySelectorAll('[data-lang]').forEach((a) => a.addEventListener('click', () => cambiaIdioma(a.dataset.lang)));
+    menu.querySelectorAll('select.g-idioma').forEach((s) => s.addEventListener('change', () => cambiaIdioma(s.value)));
     // The pill: a click says what it means, in words, and leads where each thing is.
     const pill = $('g-pulso'), pillPop = $('g-pulso-pop');
     function cierraPulso() { pillPop.hidden = true; pill.setAttribute('aria-expanded', 'false'); }
@@ -3508,7 +3529,7 @@
       if (!r.ok) return false;
       const j = await r.json();
       // Until the person chooses, the page keeps its own start (English, or ZERO's installer language).
-      if (!j.elegido || !['en', 'es', 'pt'].includes(j.idioma) || j.idioma === LANG) return false;
+      if (!j.elegido || !CODIGOS.includes(j.idioma) || j.idioma === LANG) return false;
       try { localStorage.setItem('guardiana_lang', j.idioma); } catch (_) {}
       if (sessionStorage.getItem('guardiana_idioma_recarga') === j.idioma) return false;
       try { sessionStorage.setItem('guardiana_idioma_recarga', j.idioma); } catch (_) {}

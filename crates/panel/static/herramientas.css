@@ -20,7 +20,7 @@
 .hx-zona:hover, .hx-zona.sobre { border-color: var(--accent); color: var(--fg); }
 .hx-oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .hx-archivo { margin: var(--e3) 0 var(--e2); overflow-wrap: anywhere; }
-.hx-huellas { margin: var(--e2) 0; padding-left: var(--e5); }
+.hx-huellas { margin: var(--e2) 0; padding-inline-start: var(--e5); }
 .hx-huellas li span { overflow-wrap: anywhere; }
 .hx-datos { display: grid; grid-template-columns: max-content 1fr; gap: var(--e1) var(--e4); margin: var(--e3) 0; }
 .hx-datos div { display: contents; }

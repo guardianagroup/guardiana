@@ -25,8 +25,15 @@ use crate::AppState;
 
 /// The setting's name in the ledger.
 const CLAVE: &str = "idioma_programa";
-/// The languages the program speaks; the first is the one used until the person chooses.
-pub(crate) const IDIOMAS: [&str; 3] = ["en", "es", "pt"];
+/// The language used until the person chooses.
+const PRIMERO: &str = "en";
+
+/// Whether the program speaks `codigo`: one of the 42 of `guardiana_core::i18n::IDIOMAS` (2 Nov 2026).
+fn conocido(codigo: &str) -> bool {
+    guardiana_core::i18n::IDIOMAS
+        .iter()
+        .any(|x| x.codigo == codigo)
+}
 
 pub(crate) fn rutas() -> Router<Arc<AppState>> {
     Router::new().route("/api/ajustes/idioma", get(ver).put(cambiar))
@@ -34,7 +41,7 @@ pub(crate) fn rutas() -> Router<Arc<AppState>> {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub(crate) struct Idioma {
-    /// `en`, `es` or `pt`.
+    /// One of the 42 codes (`en`, `es`, `pt`, `fr`, `zh-tw`…).
     idioma: String,
     /// Whether the person chose it (false: the default, English).
     #[serde(default)]
@@ -44,12 +51,12 @@ pub(crate) struct Idioma {
 /// What is stored, read back as one of the three languages (anything else is the default).
 pub(crate) fn de_ajuste(guardado: Option<&str>) -> Idioma {
     match guardado.map(str::trim) {
-        Some(x) if IDIOMAS.contains(&x) => Idioma {
+        Some(x) if conocido(x) => Idioma {
             idioma: x.to_owned(),
             elegido: true,
         },
         _ => Idioma {
-            idioma: IDIOMAS[0].to_owned(),
+            idioma: PRIMERO.to_owned(),
             elegido: false,
         },
     }
@@ -71,7 +78,7 @@ async fn cambiar(
     Json(body): Json<Cambio>,
 ) -> ApiResult<Idioma> {
     let pedido = body.idioma.trim().to_ascii_lowercase();
-    if !IDIOMAS.contains(&pedido.as_str()) {
+    if !conocido(&pedido) {
         return Err((StatusCode::BAD_REQUEST, "unknown language").into_response());
     }
     with_ledger(&state, |l| l.set_setting(CLAVE, &pedido))?;
@@ -83,7 +90,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn english_until_the_person_chooses_and_only_the_three_languages() {
+    fn english_until_the_person_chooses_and_only_the_program_languages() {
         assert_eq!(
             de_ajuste(None),
             Idioma {
@@ -98,7 +105,28 @@ mod tests {
                 elegido: true
             }
         );
-        assert_eq!(de_ajuste(Some("fr")).idioma, "en");
+        // the 42 languages (2 Nov 2026); anything else is the default
+        assert_eq!(de_ajuste(Some("fr")).idioma, "fr");
+        assert_eq!(de_ajuste(Some("zh-tw")).idioma, "zh-tw");
+        assert_eq!(de_ajuste(Some("xx")).idioma, "en");
         assert!(!de_ajuste(Some("")).elegido);
+    }
+
+    #[test]
+    fn the_pages_offer_the_same_42_languages() {
+        let app = include_str!("../static/app.js");
+        for x in guardiana_core::i18n::IDIOMAS {
+            assert!(
+                app.contains(&format!(
+                    "['{}', '{}', '{}', {}]",
+                    x.codigo,
+                    x.nombre,
+                    x.lang,
+                    u8::from(x.rtl)
+                )),
+                "{} falta en IDIOMAS de app.js",
+                x.codigo
+            );
+        }
     }
 }
