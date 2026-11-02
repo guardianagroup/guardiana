@@ -12,9 +12,9 @@ use ferrisetw::provider::{EventFilter, Provider};
 use ferrisetw::schema_locator::SchemaLocator;
 use ferrisetw::trace::UserTrace;
 use ferrisetw::EventRecord;
-use guardiana_escudo::ladrones;
+use guardiana_escudo::{cadenas, ladrones};
 
-use super::{Apertura, Error};
+use super::{Apertura, Error, Lanzamiento};
 use crate::ventanas::programa_de;
 
 /// `Microsoft-Windows-Kernel-File`.
@@ -25,6 +25,12 @@ const EV_CREATE: u16 = 12;
 /// `FILE_DIRECTORY_FILE` in the create options: a folder being opened is not a file.
 const ES_CARPETA: u32 = 0x1;
 const SESION: &str = "Guardiana-Escudo";
+/// `Microsoft-Windows-Kernel-Process`: every program start, with its parent.
+const PROVEEDOR_PROCESOS: &str = "22fb2cd6-0e7b-422b-a0c7-2fad1fd0e716";
+/// Its process keyword (`WINEVENT_KEYWORD_PROCESS`).
+const PALABRAS_PROCESOS: u64 = 0x10;
+/// «ProcessStart».
+const EV_INICIO: u16 = 1;
 /// The most openings waiting for the service.
 const MAXIMO: usize = 1_024;
 /// The same program opening the same file again within this time is the same opening.
@@ -37,6 +43,8 @@ struct Compartido {
     cola: VecDeque<Apertura>,
     vistas: HashMap<(String, String), i64>,
     rutas: HashMap<u32, (String, String, i64)>,
+    lanzamientos: VecDeque<Lanzamiento>,
+    lanzados: HashMap<(String, String), i64>,
 }
 
 /// The session running. Dropping it closes it.
@@ -50,6 +58,7 @@ impl Sesion {
         let datos: Arc<Mutex<Compartido>> = Arc::default();
         let para_callback = Arc::clone(&datos);
         let yo = std::process::id();
+        let para_procesos = Arc::clone(&datos);
         let proveedor = Provider::by_guid(PROVEEDOR)
             .any(PALABRAS)
             .add_filter(EventFilter::ByEventIds(vec![EV_CREATE]))
@@ -57,10 +66,18 @@ impl Sesion {
                 anotar(&para_callback, registro, esquemas, yo);
             })
             .build();
+        let procesos = Provider::by_guid(PROVEEDOR_PROCESOS)
+            .any(PALABRAS_PROCESOS)
+            .add_filter(EventFilter::ByEventIds(vec![EV_INICIO]))
+            .add_callback(move |registro: &EventRecord, esquemas: &SchemaLocator| {
+                anotar_inicio(&para_procesos, registro, esquemas);
+            })
+            .build();
         let _ = ferrisetw::trace::stop_trace_by_name(SESION);
         let traza = UserTrace::new()
             .named(SESION.to_owned())
             .enable(proveedor)
+            .enable(procesos)
             .start_and_process()
             .map_err(|e| Error::Sistema(format!("{e:?}")))?;
         Ok(Self {
@@ -75,6 +92,68 @@ impl Sesion {
             .lock()
             .map(|mut d| d.cola.drain(..).collect())
             .unwrap_or_default()
+    }
+
+    /// The program starts watched (`guardiana_escudo::cadenas::vigilado`) since the last take, with their parent.
+    pub(crate) fn lanzamientos(&self) -> Vec<Lanzamiento> {
+        self.datos
+            .lock()
+            .map(|mut d| d.lanzamientos.drain(..).collect())
+            .unwrap_or_default()
+    }
+}
+
+/// A program start: only those [`cadenas::vigilado`] cares about, with the program that started it.
+fn anotar_inicio(datos: &Arc<Mutex<Compartido>>, registro: &EventRecord, esquemas: &SchemaLocator) {
+    if registro.event_id() != EV_INICIO {
+        return;
+    }
+    let Ok(esquema) = esquemas.event_schema(registro) else {
+        return;
+    };
+    let lector = Parser::create(registro, &esquema);
+    let Ok(imagen) = lector.try_parse::<String>("ImageName") else {
+        return;
+    };
+    let hijo = imagen
+        .rsplit(['\\', '/'])
+        .next()
+        .unwrap_or_default()
+        .to_owned();
+    if !cadenas::vigilado(&hijo) {
+        return;
+    }
+    let padre_pid = lector.try_parse::<u32>("ParentProcessID").unwrap_or(0);
+    if padre_pid == 0 || padre_pid == 4 {
+        return;
+    }
+    let (padre, padre_ruta) = programa_de(padre_pid);
+    if padre.is_empty() {
+        return;
+    }
+    let ahora = guardiana_core::time::now_ms();
+    let Ok(mut d) = datos.lock() else {
+        return;
+    };
+    let clave = (padre_ruta.to_ascii_lowercase(), hijo.to_ascii_lowercase());
+    if d.lanzados
+        .get(&clave)
+        .is_some_and(|t| ahora - *t < REPETICION_MS)
+    {
+        return;
+    }
+    if d.lanzados.len() > 4_096 {
+        d.lanzados.clear();
+    }
+    d.lanzados.insert(clave, ahora);
+    if d.lanzamientos.len() < MAXIMO {
+        d.lanzamientos.push_back(Lanzamiento {
+            ts: ahora,
+            padre,
+            padre_ruta,
+            hijo,
+            imagen,
+        });
     }
 }
 

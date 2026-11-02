@@ -5,13 +5,15 @@
 //! analysis of a file or a folder ([`analisis`]) and a quarantine that can always be undone ([`cuarentena`]). Phase A3
 //! starts with [`primera_vez`]: a program without a signature, run from a folder anyone can write to, calling a site this
 //! computer never asked for before; and [`ladrones`]: a program that is not the browser opening its saved passwords,
-//! cookies or keys, or a wallet or a messaging session.
+//! cookies or keys, or a wallet or a messaging session; and [`cadenas`]: which program started which (a document
+//! starting PowerShell, a downloaded program starting the tools that delete the backups).
 //! Everything happens on this computer: nothing is uploaded anywhere.
 //!
 //! A list is never a verdict on its own (docs/LISTS.md): whoever acts on a match also looks at who signs the file, and a
 //! file signed by a trusted publisher or in Windows' own catalogue is never quarantined because of a list.
 
 pub mod analisis;
+pub mod cadenas;
 pub mod cuarentena;
 pub mod huellas;
 pub mod ladrones;

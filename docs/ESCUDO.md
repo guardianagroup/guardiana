@@ -53,6 +53,13 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
   enlaces, cuarentena encriptada que devuelve el archivo exactamente igual, y la regla «primera vez».
 - El servicio pasa por «primera vez» cada consulta de este equipo con su programa (`crates/cli/src/escudo.rs`); el
   observador dice si Windows ya comprobó la firma (si no, la consulta espera hasta un minuto).
+- «Ladrones de datos» (`ladrones.rs`): un programa que no es el de la aplicación abre las contraseñas, cookies o
+  llaves guardadas del navegador, una cartera o una sesión de mensajería.
+- «Cadenas» (`cadenas.rs`): qué programa abrió cuál. Un documento de Office que abre una consola o un intérprete, un
+  navegador que abre una consola, un guion que abre otro intérprete, y un programa descargado (o en una carpeta donde
+  cualquiera escribe) que abre las herramientas de copias de seguridad de Windows.
+- Las dos miran los eventos del núcleo de Windows en la misma sesión (`crates/apps/src/guardia.rs`): solo nombres y
+  rutas, nunca el contenido de los archivos.
 - El panel: `GET /api/escudo` (si aún aprende, cuántos sitios, los avisos); la web dentro del programa puede leerlo.
 - Falta: la pantalla del antivirus en la web del programa, el análisis de Descargas desde el panel y las listas de
   muestras (decisión del dueño, abajo).

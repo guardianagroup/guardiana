@@ -249,7 +249,23 @@ pub struct Apertura {
     pub archivo: String,
 }
 
-/// El escudo's watch over saved secrets: on while the service runs, only the openings of those files, names only.
+/// A program start the escudo watches (a command interpreter, a script host, one of Windows' own tools attackers use, or
+/// the backups' tools), with the program that started it (el escudo, 1.0.52).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Lanzamiento {
+    /// When (milliseconds since 1970).
+    pub ts: i64,
+    /// The parent's file name.
+    pub padre: String,
+    /// The parent's full path.
+    pub padre_ruta: String,
+    /// The started program's file name.
+    pub hijo: String,
+    /// The started program's path, as Windows names it.
+    pub imagen: String,
+}
+
+/// El escudo's watch over saved secrets and over program starts: on while the service runs, names only.
 pub struct Guardia {
     #[cfg(windows)]
     interno: guardia::Sesion,
@@ -279,6 +295,19 @@ impl Guardia {
         #[cfg(windows)]
         {
             self.interno.toma()
+        }
+        #[cfg(not(windows))]
+        {
+            Vec::new()
+        }
+    }
+
+    /// The watched program starts since the last call.
+    #[must_use]
+    pub fn lanzamientos(&self) -> Vec<Lanzamiento> {
+        #[cfg(windows)]
+        {
+            self.interno.lanzamientos()
         }
         #[cfg(not(windows))]
         {

@@ -182,13 +182,9 @@ pub fn que_es(ruta: &str) -> Option<Hallazgo> {
     if !r.contains(r"\appdata\") && !r.contains(r"\steam\") {
         return None;
     }
-    for (carpeta, tesoro, de, duenos) in APLICACIONES {
+    for &(carpeta, tesoro, de, duenos) in APLICACIONES {
         if r.contains(carpeta) {
-            return Some(Hallazgo {
-                tesoro: *tesoro,
-                de: *de,
-                duenos: *duenos,
-            });
+            return Some(Hallazgo { tesoro, de, duenos });
         }
     }
     if let Some(i) = r.find(r"\appdata\roaming\mozilla\firefox\profiles\") {
@@ -208,7 +204,7 @@ pub fn que_es(ruta: &str) -> Option<Hallazgo> {
             duenos: &["firefox.exe"],
         });
     }
-    for (carpeta, de, duenos) in CHROMIUM {
+    for &(carpeta, de, duenos) in CHROMIUM {
         let Some(i) = r.find(carpeta) else {
             continue;
         };
@@ -219,11 +215,11 @@ pub fn que_es(ruta: &str) -> Option<Hallazgo> {
             .nth(1)
         {
             match CARTERAS_EXTENSION.iter().find(|(e, _)| id.contains(e)) {
-                Some((_, cartera)) => {
+                Some(&(_, cartera)) => {
                     return Some(Hallazgo {
                         tesoro: Tesoro::Cartera,
-                        de: *cartera,
-                        duenos: *duenos,
+                        de: cartera,
+                        duenos,
                     })
                 }
                 None => return None,
@@ -245,11 +241,7 @@ pub fn que_es(ruta: &str) -> Option<Hallazgo> {
         } else {
             return None;
         };
-        return Some(Hallazgo {
-            tesoro,
-            de: *de,
-            duenos: *duenos,
-        });
+        return Some(Hallazgo { tesoro, de, duenos });
     }
     None
 }

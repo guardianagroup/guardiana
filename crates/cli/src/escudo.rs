@@ -1,7 +1,8 @@
 //! El escudo en marcha (1.0.52, in preparation; docs/ESCUDO.md): the antivirus' behaviour rules. «Primera vez»
 //! (`guardiana_escudo::primera_vez`), fed with this computer's DNS events once the observer has said which program
 //! asked; and «ladrones de datos» (`guardiana_escudo::ladrones`), fed with the openings of saved secrets that the
-//! watch in `guardiana_apps::Guardia` sees. Its memory and its warnings live next to the ledger, in two small files: `escudo-memoria.json` (since when
+//! watch in `guardiana_apps::Guardia` sees; and «cadenas» (`guardiana_escudo::cadenas`), fed with the program starts
+//! that the same watch sees. Its memory and its warnings live next to the ledger, in two small files: `escudo-memoria.json` (since when
 //! this computer asks for each site) and `escudo-avisos.jsonl` (the newest warnings, one per line, for the panel).
 
 use std::collections::HashMap;
@@ -21,6 +22,8 @@ const ESPERA_FIRMA_MS: u64 = 60_000;
 const GUARDAR_CADA_MS: u64 = 5 * 60_000;
 /// The same program touching the same kind of secret of the same app warns once a day.
 const REPETIR_LADRON_MS: u64 = 24 * 60 * 60_000;
+/// The same program starting the same program warns once an hour.
+const REPETIR_CADENA_MS: u64 = 60 * 60_000;
 
 /// A query whose program's signature was not checked yet.
 struct Pendiente {
@@ -49,6 +52,8 @@ pub(crate) struct EscudoVivo {
     aperturas: Vec<Apertura>,
     /// (program, app, kind of secret) → when it last warned.
     ladrones_vistos: HashMap<(String, String, String), u64>,
+    /// (parent's path, started program) → when it last warned.
+    cadenas_vistas: HashMap<(String, String), u64>,
 }
 
 impl EscudoVivo {
@@ -78,6 +83,7 @@ impl EscudoVivo {
             },
             aperturas: Vec::new(),
             ladrones_vistos: HashMap::new(),
+            cadenas_vistas: HashMap::new(),
         }
     }
 
@@ -126,6 +132,7 @@ impl EscudoVivo {
     /// Looks again at the queries that were waiting for a signature check, and at the openings of saved secrets.
     pub(crate) fn repasa(&mut self, obs: &Observador, ahora_ms: u64) {
         self.ladrones(obs, ahora_ms);
+        self.cadenas();
         if self.pendientes.is_empty() {
             return;
         }
@@ -222,6 +229,42 @@ impl EscudoVivo {
                 self.ladrones_vistos.clear();
             }
             self.ladrones_vistos.insert(clave, cuando);
+            self.anota(&aviso);
+        }
+    }
+
+    /// The program starts the watch saw, each with the program that started it, through the rule
+    /// (`guardiana_escudo::cadenas::juzga`), with whether Windows marked the parent's file as come from the internet.
+    fn cadenas(&mut self) {
+        let nuevos = self
+            .guardia
+            .as_ref()
+            .map(Guardia::lanzamientos)
+            .unwrap_or_default();
+        for l in nuevos {
+            let cuando = u64::try_from(l.ts).unwrap_or(0);
+            let descargado = self.descargado(&l.padre_ruta);
+            let Some((aviso, _grave)) = guardiana_escudo::cadenas::juzga(
+                &l.padre,
+                &l.padre_ruta,
+                descargado,
+                &l.hijo,
+                cuando,
+            ) else {
+                continue;
+            };
+            let clave = (l.padre_ruta.to_ascii_lowercase(), aviso.nombre.clone());
+            if self
+                .cadenas_vistas
+                .get(&clave)
+                .is_some_and(|t| cuando.saturating_sub(*t) < REPETIR_CADENA_MS)
+            {
+                continue;
+            }
+            if self.cadenas_vistas.len() > 4_096 {
+                self.cadenas_vistas.clear();
+            }
+            self.cadenas_vistas.insert(clave, cuando);
             self.anota(&aviso);
         }
     }
