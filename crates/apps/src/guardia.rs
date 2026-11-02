@@ -310,3 +310,82 @@ fn anotar(
         });
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use std::process::Command;
+    use std::time::Duration;
+
+    fn powershell(orden: &str) {
+        let estado = Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", orden])
+            .status()
+            .unwrap();
+        assert!(estado.success(), "{orden}");
+    }
+
+    /// On a real Windows, as an administrator (the escudo workflow): the escudo's own session sees, from other
+    /// processes, a saved secret opened (a file where Chrome keeps its passwords), program starts with their parent,
+    /// and a burst of the person's files renamed. It checks the kernel channels' field names this module reads.
+    #[test]
+    #[ignore = "necesita Windows como administrador"]
+    fn la_guardia_ve_de_verdad() {
+        let sesion = Sesion::arrancar().unwrap();
+        std::thread::sleep(Duration::from_secs(3));
+        // a saved secret, opened by another program (cmd's «type»)
+        let local = PathBuf::from(std::env::var_os("LOCALAPPDATA").unwrap());
+        let chrome = local.join(r"Google\Chrome\User Data\Default");
+        std::fs::create_dir_all(&chrome).unwrap();
+        let secreto = chrome.join("Login Data");
+        std::fs::write(&secreto, b"prueba").unwrap();
+        let estado = Command::new("cmd")
+            .args(["/c", "type"])
+            .arg(&secreto)
+            .status()
+            .unwrap();
+        assert!(estado.success());
+        // a burst: PowerShell renames 120 files in the person's Documents
+        let perfil = PathBuf::from(std::env::var_os("USERPROFILE").unwrap());
+        let carpeta = perfil.join(r"Documents\guardiana-prueba-escudo");
+        std::fs::create_dir_all(&carpeta).unwrap();
+        for i in 0..120 {
+            std::fs::write(carpeta.join(format!("f{i}.txt")), b"x").unwrap();
+        }
+        powershell(&format!(
+            "Get-ChildItem -LiteralPath '{}' -File | Rename-Item -NewName {{ $_.Name + '.cifrado' }}",
+            carpeta.display()
+        ));
+        std::thread::sleep(Duration::from_secs(4));
+        let aperturas = sesion.toma();
+        let lanzamientos = sesion.lanzamientos();
+        let rafagas = sesion.rafagas();
+        let _ = std::fs::remove_dir_all(&carpeta);
+        let _ = std::fs::remove_file(&secreto);
+        println!("aperturas: {aperturas:?}");
+        println!("lanzamientos: {lanzamientos:?}");
+        println!("ráfagas: {rafagas:?}");
+        assert!(
+            aperturas.iter().any(
+                |a| a.archivo.to_lowercase().ends_with(r"\default\login data")
+                    && a.programa.eq_ignore_ascii_case("cmd.exe")
+            ),
+            "la apertura de «Login Data» por cmd.exe"
+        );
+        assert!(
+            lanzamientos
+                .iter()
+                .any(|l| l.hijo.eq_ignore_ascii_case("powershell.exe") && !l.padre.is_empty()),
+            "el inicio de PowerShell con su padre"
+        );
+        assert!(
+            rafagas
+                .iter()
+                .any(|r| r.programa.eq_ignore_ascii_case("powershell.exe")
+                    && r.n >= secuestro::UMBRAL),
+            "la ráfaga de PowerShell"
+        );
+    }
+}

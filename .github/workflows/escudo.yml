@@ -1,0 +1,43 @@
+# El escudo (the antivirus, 1.0.52 in preparation; docs/ESCUDO.md) on a real Windows (owner, 1 Nov 2026, 18:55: «que
+# vea todo lo posible, todo, absolutamente todo»): crates/apps/src/guardia.rs's real test starts the escudo's own
+# kernel event session, then, from other processes, opens a file where a browser keeps saved passwords, starts
+# programs and renames a burst of files in the runner's Documents, and checks that the session saw each one. It
+# checks the field names of Windows' kernel channels that the rules read. GitHub's Windows runners run as
+# administrators, which an event session needs. Everything it writes is removed at the end.
+# CI never holds signing keys and never publishes anything (brief §10).
+name: escudo
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'crates/apps/src/guardia.rs'
+      - 'crates/apps/src/lib.rs'
+      - 'crates/escudo/**'
+      - '.github/workflows/escudo.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  guardia:
+    name: la vigilancia del escudo en Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: la prueba real de la vigilancia
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test -p guardiana-apps --locked -- --ignored --nocapture guardia::tests 2>&1 | tee "$RUNNER_TEMP/test.log" && exit 0
+          grep -E "^test .* FAILED$|panicked at|^---- |^(aperturas|lanzamientos|ráfagas):" "$RUNNER_TEMP/test.log" | head -20 | cut -c1-900 | while IFS= read -r l; do echo "::error title=escudo::$l"; done
+          exit 1
