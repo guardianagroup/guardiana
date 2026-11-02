@@ -404,7 +404,7 @@ function pantalla(nombre) {
   // The new tab: our search box with its engine inside, and the day's cuts one click away.
   const nueva = await paginaQue(nav, (u) => u.endsWith('/inicio.html'));
   comprueba(await hasta(async () => (await nueva.getAttribute('#q', 'placeholder')) === 'Busca en la web o escribe una dirección'), 'la caja de búsqueda es nuestra');
-  comprueba(await hasta(() => nueva.evaluate(() => (document.querySelector('#motor').selectedOptions[0] || {}).textContent === 'DuckDuckGo')), 'y lleva dentro el buscador, a la vista');
+  comprueba(await hasta(() => nueva.evaluate(() => (document.querySelector('#motor').selectedOptions[0] || {}).textContent === 'Google')), 'y lleva dentro el buscador, a la vista (Google por defecto desde el 2 nov 2026)');
   comprueba(await hasta(async () => (await nueva.locator('#favs-rejilla .fav').count()) === 1), 'la web guardada con la estrella sale en la pestaña nueva');
   // The summary is on the first screen (12 Oct 2026): the companies cut today, with no click.
   comprueba(await hasta(async () => (await nueva.locator('#r-empresas li').count()) >= 1), 'el resumen sale directamente en la pestaña nueva, con las empresas');
