@@ -1073,8 +1073,14 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/por-dentro", get(universo::universo))
         .route("/api/secure-en-directo", get(universo::secure_en_directo))
         .route("/api/revision", get(revision::ver))
-        // 1.0.52: the antivirus' warnings («el escudo», src/escudo.rs).
+        // 1.0.52: the antivirus' warnings («el escudo», src/escudo.rs) and its quarantine.
         .route("/api/escudo", get(escudo::ver))
+        .route("/api/escudo/cuarentena", get(escudo::cuarentena))
+        .route("/api/escudo/cuarentena/{id}", post(escudo::poner))
+        .route(
+            "/api/escudo/cuarentena/restaura/{id}",
+            post(escudo::restaura),
+        )
         .route("/api/vpn", get(vpn::ver))
         .route("/api/vpn/conecta", post(vpn::conecta))
         .route("/api/vpn/desconecta", post(vpn::desconecta))
