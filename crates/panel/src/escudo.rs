@@ -78,20 +78,20 @@ fn protegida(ruta: &str) -> bool {
 
 /// Whether the file a warning names can go to the quarantine now.
 fn se_puede(ruta: &str) -> bool {
-    !ruta.is_empty()
-        && Ruta::new(ruta).is_absolute()
-        && !protegida(ruta)
-        && Ruta::new(ruta).is_file()
+    if ruta.is_empty() || !Ruta::new(ruta).is_absolute() || protegida(ruta) {
+        return false;
+    }
+    // The canonical path too: links, `..`, short 8.3 names and `\\?\` prefixes are resolved by Windows there.
+    let Ok(canonica) = std::fs::canonicalize(ruta) else {
+        return false;
+    };
+    canonica.is_file() && !protegida(&canonica.to_string_lossy())
 }
 
-/// `GET /api/escudo`: the rules' state and their warnings, each with its id and whether its file can go to the
-/// quarantine (`cuarentena`: `posible`, `hecha` or empty).
-pub(crate) async fn ver(State(state): State<Arc<AppState>>, _s: Session) -> ApiResult<Escudo> {
-    let memoria = std::fs::read_to_string(state.db_path.with_file_name("escudo-memoria.json"))
-        .ok()
-        .and_then(|j| Memoria::desde_json(&j).ok());
-    let ahora = u64::try_from(now_ms()).unwrap_or(0);
-    let en_cuarentena: HashSet<String> = Cuarentena::en(carpeta_cuarentena(&state.db_path))
+/// The newest [`MAX`] warnings, each with its id and whether its file can go to the quarantine (`cuarentena`: `posible`,
+/// `hecha` or empty). Looks at files: not for the page's thread.
+fn avisos_con_cuarentena(db: &Ruta) -> Vec<Value> {
+    let en_cuarentena: HashSet<String> = Cuarentena::en(carpeta_cuarentena(db))
         .map(|c| {
             c.lista()
                 .into_iter()
@@ -99,7 +99,7 @@ pub(crate) async fn ver(State(state): State<Arc<AppState>>, _s: Session) -> ApiR
                 .collect()
         })
         .unwrap_or_default();
-    let mut avisos: Vec<Value> = avisos_del_archivo(&state.db_path)
+    let mut avisos: Vec<Value> = avisos_del_archivo(db)
         .into_iter()
         .map(|(id, mut v)| {
             let ruta = v["ruta"].as_str().unwrap_or_default().to_owned();
@@ -119,6 +119,21 @@ pub(crate) async fn ver(State(state): State<Arc<AppState>>, _s: Session) -> ApiR
         .collect();
     avisos.reverse();
     avisos.truncate(MAX);
+    avisos
+}
+
+/// `GET /api/escudo`: the rules' state and their warnings, each with its id and whether its file can go to the
+/// quarantine (`cuarentena`: `posible`, `hecha` or empty).
+pub(crate) async fn ver(State(state): State<Arc<AppState>>, _s: Session) -> ApiResult<Escudo> {
+    let memoria = std::fs::read_to_string(state.db_path.with_file_name("escudo-memoria.json"))
+        .ok()
+        .and_then(|j| Memoria::desde_json(&j).ok());
+    let ahora = u64::try_from(now_ms()).unwrap_or(0);
+    // Files are looked at (the quarantine's list, each warning's file): off the page's thread.
+    let db = state.db_path.clone();
+    let avisos = tokio::task::spawn_blocking(move || avisos_con_cuarentena(&db))
+        .await
+        .unwrap_or_default();
     Ok(Json(Escudo {
         aprendiendo: memoria.as_ref().is_none_or(|m| m.aprendiendo(ahora)),
         aprende_hasta_ms: memoria.as_ref().map_or(0, Memoria::aprende_hasta_ms),
