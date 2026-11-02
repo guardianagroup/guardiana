@@ -11,6 +11,11 @@ name: instalador
 
 on:
   workflow_dispatch:
+    inputs:
+      candidato:
+        description: 'Número de una ejecución de «candidato»: se prueba su instalador (desde cero, y actualizando desde lo publicado)'
+        required: false
+        default: ''
   push:
     branches: [antivirus-vpn]
     paths:
@@ -19,6 +24,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   fotos:
@@ -31,11 +37,20 @@ jobs:
         caso: [nueva, actualiza]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: el instalador del candidato
+        if: ${{ inputs.candidato != '' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: candidato-msi
+          path: candidato
+          run-id: ${{ inputs.candidato }}
+          github-token: ${{ github.token }}
       - name: los instaladores publicados
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Force -Path inst | Out-Null
+          $candidato = "${{ inputs.candidato }}"
           $pagina = (Invoke-WebRequest -UseBasicParsing https://guardianagroup.com/instalar.html).Content
           $v = [regex]::Match($pagina, '/descargas/([0-9.]+)/guardiana-[0-9.]+-windows-x64\.msi').Groups[1].Value
           if (-not $v) { throw "no encuentro la versión publicada en instalar.html" }
@@ -46,7 +61,14 @@ jobs:
           $h = (Get-FileHash inst/nueva.msi -Algorithm SHA256).Hash.ToLower()
           if ($sumas -notmatch "$h\s+guardiana-$v-windows-x64\.msi") { throw "la huella de la $v no es la publicada" }
           Write-Output "publicada: $v · $h"
-          if ("${{ matrix.caso }}" -eq "actualiza") {
+          if ($candidato) {
+            # el candidato es «la nueva»; al actualizar, «la de antes» es la publicada (lo que tiene la gente hoy)
+            Move-Item inst/nueva.msi inst/antes.msi
+            $m = Get-ChildItem candidato -Filter "guardiana-*-windows-x64.msi" | Select-Object -First 1
+            if (-not $m) { throw "el candidato $candidato no trae el MSI en español" }
+            Copy-Item $m.FullName inst/nueva.msi
+            Write-Output "candidato: $($m.Name) · $((Get-FileHash inst/nueva.msi -Algorithm SHA256).Hash.ToLower())"
+          } elseif ("${{ matrix.caso }}" -eq "actualiza") {
             # La anterior, de la historia de la web (la 1.0.52, retirada al publicar la 1.0.53), con la huella que se publicó.
             git clone --quiet --filter=blob:none --no-checkout https://github.com/guardianagroup/guardianagroup.com web
             cmd /c "git -C web show a08bd3600202a7c45142a75012c83cac792c9644:descargas/1.0.52/guardiana-1.0.52-windows-x64.msi > inst\antes.msi"

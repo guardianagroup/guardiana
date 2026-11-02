@@ -248,6 +248,15 @@
          its file is replaced or removed. -->
     <Property Id="ZERO" Value="1" Secure="yes" />
     <util:CloseApplication Id="CerrarZero" Target="GUARDIANA ZERO.exe" CloseMessage="yes" RebootPrompt="no" Timeout="30" />
+    <!-- 2 Nov 2026 (las fotos del instalador al actualizar, build/cliente/fotos_instalador.ps1: «Archivos en uso» con GUARDIANA ZERO
+         dos veces, «Shutting down applications» y, a veces, un aviso en inglés, «The setup was unable to automatically close all
+         requested applications»; el dueño: «nada de tirón ni cosas raras»): CerrarZero corre justo antes de InstallFiles, después
+         de la comprobación de Windows que saca esos avisos (InstallValidate), y los avisos de ZERO corren sin ventana a la que
+         pedirle que se cierre. Ahora, al pulsar «Instalar» y antes de esa comprobación, se le pide a ZERO que se cierre como con su
+         X (guarda lo suyo) y, a los 3 s, lo que quede se termina. Solo al actualizar, reparar o desinstalar; sin ventana de consola
+         (WixQuietExec, que en una acción inmediata lee la línea de WixQuietExecCmdLine). «Abrir GUARDIANA» lo vuelve a abrir. -->
+    <SetProperty Id="WixQuietExecCmdLine" Value="&quot;[System64Folder]cmd.exe&quot; /d /c &quot;taskkill /IM &quot;GUARDIANA ZERO.exe&quot; &amp; ping -n 4 127.0.0.1 &gt;nul &amp; taskkill /F /IM &quot;GUARDIANA ZERO.exe&quot;&quot;" Before="CierraZeroAntes" Sequence="execute" Condition="Installed OR WIX_UPGRADE_DETECTED" />
+    <CustomAction Id="CierraZeroAntes" DllEntry="WixQuietExec" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" Execute="immediate" Return="ignore" />
     <Icon Id="zero.ico" SourceFile="$(var.ZeroIcon)" />
     <Feature Id="Zero" Title="GUARDIANA ZERO" Level="1">
       <Level Value="0" Condition="ZERO=&quot;0&quot;" />
@@ -379,6 +388,9 @@
     <CustomAction Id="QuitarVigilanteAtras" DllEntry="WixQuietExec" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" Execute="rollback" Impersonate="no" Return="ignore" />
     <!-- Lo que dice la barra de progreso mientras corren nuestras acciones (antes, la línea quedaba vacía) -->
     <UI>
+<?ifdef ZeroExe ?>
+      <ProgressText Action="CierraZeroAntes" Message="!(loc.ProgresoCerrarZero)" />
+<?endif ?>
       <ProgressText Action="CrearVigilante" Message="!(loc.ProgresoVigilante)" />
       <ProgressText Action="ApplyDns" Message="!(loc.ProgresoDns)" />
       <ProgressText Action="HomeOff" Message="!(loc.ProgresoHogar)" />
@@ -386,6 +398,9 @@
       <ProgressText Action="QuitarVigilante" Message="!(loc.ProgresoQuitarVigilante)" />
     </UI>
     <InstallExecuteSequence>
+<?ifdef ZeroExe ?>
+      <Custom Action="CierraZeroAntes" Before="InstallValidate" Condition="Installed OR WIX_UPGRADE_DETECTED" />
+<?endif ?>
       <Custom Action="CrearVigilanteAtras" Before="CrearVigilante" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED" />
       <Custom Action="ApplyDnsAtras" Before="ApplyDns" Condition="VIGILAR=&quot;1&quot; AND NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE" />
       <Custom Action="QuitarVigilanteAtras" Before="QuitarVigilante" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND NOT REINSTALL" />

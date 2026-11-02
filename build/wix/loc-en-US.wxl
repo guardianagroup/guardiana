@@ -10,6 +10,7 @@
   <String Id="ArchivoLeeme" Value="README.txt" />
   <!-- 1.0.49: la barra de progreso y las pantallas de WixUI con nuestras palabras (revisión del 30 Oct 2026: la primera
        pedía aceptar un «contrato» que no existe y la última no decía que GUARDIANA quedó en marcha) -->
+  <String Id="ProgresoCerrarZero" Value="Closing GUARDIANA ZERO to update it…" />
   <String Id="ProgresoVigilante" Value="Creating the DNS watcher…" />
   <String Id="ProgresoDns" Value="Setting up this computer’s DNS…" />
   <String Id="ProgresoHogar" Value="Closing Home Mode…" />
