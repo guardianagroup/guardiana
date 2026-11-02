@@ -16,6 +16,7 @@ on:
     branches: ['**']
     paths:
       - 'crates/apps/src/guardia.rs'
+      - 'crates/apps/src/contencion.rs'
       - 'crates/apps/src/lib.rs'
       - 'crates/escudo/**'
       - '.github/workflows/escudo.yml'
@@ -44,7 +45,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          if cargo test --release -p guardiana-apps --locked -- --ignored --nocapture --test-threads=1 guardia::tests 2>&1 | tee "$RUNNER_TEMP/test.log"; then
+          if cargo test --release -p guardiana-apps --locked -- --ignored --nocapture --test-threads=1 guardia::tests contencion::tests 2>&1 | tee "$RUNNER_TEMP/test.log"; then
             grep -oE "coste: .*" "$RUNNER_TEMP/test.log" | sed 's/^/::notice title=escudo::/' || true
             exit 0
           fi
