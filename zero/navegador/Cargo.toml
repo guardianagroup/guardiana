@@ -20,7 +20,7 @@ path = "src/main.rs"
 [workspace]
 
 [dependencies]
-# The browser's brain: tabs, cuts, figures, mandates, receipts (this repository).
+# The browser's brain: tabs, cuts, figures, receipts (this repository).
 guardiana-zero = { path = "../../crates/zero" }
 serde_json = "1"
 

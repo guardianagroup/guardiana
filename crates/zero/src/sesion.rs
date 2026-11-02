@@ -33,12 +33,11 @@ use crate::favoritos::{self, Favoritos};
 use crate::fecha;
 use crate::libro::Libro;
 use crate::licencia::{Estado as EstadoLicencia, Fallo, Lugar as LugarLicencia};
-use crate::mandato::{Mandato, Recurso};
+use crate::mandato::Recurso;
 use crate::medidas::{self, Tecnica};
 use crate::paginas;
-use crate::recibo::{self, Recibo};
+use crate::recibo;
 use crate::subasta;
-use crate::tachon::{self, Sustitucion};
 use crate::textos::{Idioma, Textos};
 use crate::tinta::{self, Forma, Marcado, Tipo};
 use crate::url_limpia;
@@ -114,17 +113,6 @@ pub enum Perfil {
     General,
     /// An isolated tab: its own private session, gone when it closes.
     Aislada,
-    /// A mandate's tab: a private session limited to the mandate's sites.
-    Mandato,
-}
-
-/// Which script result the session is waiting for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Etiqueta {
-    /// Pasting the redacted text into the AI's page.
-    Pegar,
-    /// Reading the selected answer, to put the data back in the panel.
-    Seleccion,
 }
 
 /// What the shell must do.
@@ -191,15 +179,12 @@ pub enum Orden {
         /// The message.
         json: String,
     },
-    /// Run a script in a tab; with an `etiqueta`, its result comes back to
-    /// [`Sesion::script_hecho`].
+    /// Run a script in a tab (the hiding rules of the filters); nothing waits for its result.
     Ejecuta {
         /// The tab.
         id: u32,
         /// The script.
         script: String,
-        /// What the result is for.
-        etiqueta: Option<Etiqueta>,
     },
     /// 1.0.50: a message to a web page of the program's own, on that tab's channel: the panel
     /// on this computer (asked for the computer's connections) or GUARDIANA's web (given them,
@@ -347,10 +332,6 @@ pub(crate) fn azar(buf: &mut [u8]) {
     }
 }
 
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
-}
-
 /// What the person chose, kept between runs.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
@@ -369,11 +350,11 @@ struct Preferencias {
     /// Leave pop-ups as they come (the person turned «remove pop-ups» off; it is on unless
     /// they do).
     emergentes_sin_tocar: bool,
-    /// Sites where the form guard does not ask (outside mandates).
+    /// Sites where the form guard does not ask.
     sin_preguntar: BTreeSet<String>,
-    /// The person closed the shield: it no longer opens by itself at start (the owner, 10 Oct
-    /// 2026: open from the start, live, until the person closes it).
-    escudo_cerrado: bool,
+    // 2 Nov 2026 (the owner, 16:43: «el escudo… predeterminado abierto»): whether the person closed
+    // the shield is no longer kept here; it lasts for one session (`Sesion::escudo_cerrado`). A
+    // value older versions wrote is ignored when read and gone at the next save.
     /// The order the person gave the three product tabs by dragging them (16 Oct 2026, «que
     /// se puedan separar para que el cliente lo ponga a su gusto»): `guardiana`, `zero`,
     /// `secure`. Empty: the first order.
@@ -507,7 +488,6 @@ struct Pregunta {
     sitio: String,
     host: String,
     clases: Vec<Clase>,
-    mandato: bool,
 }
 
 /// The browser's state.
@@ -525,9 +505,12 @@ pub struct Sesion {
     zona: i32,
     textos: Textos,
     prefs: Preferencias,
+    /// The data the person marked while «Mis datos» was in the browser (`tinta.json`): it is
+    /// still read and still protected (cut on its way to another company, asked about in a
+    /// form), with no view of its own since 2 Nov 2026 (the owner, 16:50); «Borrar todo» forgets
+    /// it.
     tinta: Vec<Marcado>,
     formas: Vec<Forma>,
-    formas_mandato: Vec<Forma>,
     libro: Libro,
     diario: Diario,
     favoritos: Favoritos,
@@ -535,17 +518,15 @@ pub struct Sesion {
     activa: u32,
     siguiente: u32,
     panel: Option<String>,
-    mandato: Option<Mandato>,
-    terminado: Option<Mandato>,
-    recibo: Option<Recibo>,
-    tachon: Vec<Sustitucion>,
+    /// The person closed the shield beside the pages: it stays closed until the browser closes,
+    /// and opens again at the next start (2 Nov 2026, the owner, 16:43: «predeterminado abierto»).
+    escudo_cerrado: bool,
     preguntas: BTreeMap<u64, Pregunta>,
     siguiente_pregunta: u64,
     pulsos: Vec<Value>,
     sucios: BTreeSet<u32>,
     diario_sucio: bool,
     libro_sucio: bool,
-    mandato_sucio: bool,
     hoy_sucio: bool,
     ultimo_guardado: i64,
     ultimo_hoy: i64,
@@ -679,24 +660,6 @@ fn lista_buscadores() -> Vec<Value> {
 
 fn sin_fragmento(url: &str) -> &str {
     url.split('#').next().unwrap_or(url)
-}
-
-/// A marked value as the panel shows it: enough to recognise it, not enough to read it over a
-/// shoulder.
-fn enmascara(tipo: Tipo, valor: &str) -> String {
-    let v: Vec<char> = valor.chars().collect();
-    if tipo == Tipo::Correo {
-        if let Some((local, dominio)) = valor.split_once('@') {
-            let l: String = local.chars().take(2).collect();
-            return format!("{l}•••@{dominio}");
-        }
-    }
-    if v.len() <= 4 {
-        return "•••".into();
-    }
-    let ini: String = v.iter().take(2).collect();
-    let fin: String = v[v.len() - 2..].iter().collect();
-    format!("{ini}•••{fin}")
 }
 
 const fn clase_de(tipo: Tipo) -> Option<Clase> {
@@ -872,7 +835,6 @@ impl Sesion {
             zona: 0,
             textos: Textos::de(idioma),
             formas: tinta::formas(&tinta),
-            formas_mandato: Vec::new(),
             tinta,
             prefs,
             libro,
@@ -882,17 +844,13 @@ impl Sesion {
             activa: 0,
             siguiente: 1,
             panel: None,
-            mandato: None,
-            terminado: None,
-            recibo: None,
-            tachon: Vec::new(),
+            escudo_cerrado: false,
             preguntas: BTreeMap::new(),
             siguiente_pregunta: 1,
             pulsos: Vec::new(),
             sucios: BTreeSet::new(),
             diario_sucio: false,
             libro_sucio: false,
-            mandato_sucio: false,
             hoy_sucio: false,
             ultimo_guardado: 0,
             ultimo_hoy: 0,
@@ -1076,12 +1034,10 @@ impl Sesion {
         paginas::guion_paginas()
     }
 
-    /// The script the pages of tab `id` get first: a mandate's tab gets also WebRTC and
-    /// WebTransport turned off (see [`paginas::guion_mandato`]).
+    /// The script the pages of tab `id` get first (see [`paginas::guion`]).
     #[must_use]
     pub fn guion_pestana(&self, id: u32) -> String {
         paginas::guion(paginas::Opciones {
-            mandato: self.perfil_de(id) == Some(Perfil::Mandato),
             gpc: self.gpc(),
             uniforme: self.huella_uniforme(),
             programa: self.pestana(id).is_some_and(|p| p.fija),
@@ -1165,9 +1121,8 @@ impl Sesion {
         }
     }
 
-    /// A new state for the subscription. When protection goes off, an open mandate ends (its
-    /// sites are no longer enforced) and the engine's own tracking prevention goes back to its
-    /// default.
+    /// A new state for the subscription. When protection goes off, the engine's own tracking
+    /// prevention goes back to its default.
     fn cambia_licencia(&mut self, e: EstadoLicencia) -> Vec<Orden> {
         if e == self.licencia {
             return Vec::new();
@@ -1181,9 +1136,6 @@ impl Sesion {
         }
         let mut o = Vec::new();
         if antes != self.licencia.protege() {
-            if !self.licencia.protege() && self.mandato.is_some() {
-                o.extend(self.cierra_mandato());
-            }
             o.push(Orden::Seguimiento {
                 estricto: self.seguimiento_estricto(),
             });
@@ -1286,16 +1238,13 @@ impl Sesion {
         self.panel.is_some()
     }
 
-    /// Whether a request of this tab to `url` needs its body read: marked data or a mandate's
-    /// decoy might travel in it, it goes to a known pixel, which puts there what it tells
-    /// («Los chivatos»), or it goes to another site, whose body's size the shield says
-    /// (decision 206: only its length is kept).
+    /// Whether a request of this tab to `url` needs its body read: marked data might travel in
+    /// it, it goes to a known pixel, which puts there what it tells («Los chivatos»), or it goes
+    /// to another site, whose body's size the shield says (decision 206: only its length is
+    /// kept).
     #[must_use]
     pub fn necesita_cuerpo(&self, id: u32, url: &str) -> bool {
-        !self.tinta.is_empty()
-            || self.perfil_de(id) == Some(Perfil::Mandato)
-            || crate::chivatos::interesa(url)
-            || self.a_otro_sitio(id, url)
+        !self.tinta.is_empty() || crate::chivatos::interesa(url) || self.a_otro_sitio(id, url)
     }
 
     /// While protecting, a request of tab `id` to another site than the page's (or from a tab
@@ -1345,10 +1294,6 @@ impl Sesion {
 
     fn guarda_prefs(&self) {
         escribe_json(&self.datos.join("preferencias.json"), &self.prefs);
-    }
-
-    fn guarda_tinta(&self) {
-        escribe_json(&self.datos.join("tinta.json"), &self.tinta);
     }
 
     fn guarda_favoritos(&self) {
@@ -1459,17 +1404,6 @@ impl Sesion {
 
     fn rehace_formas(&mut self) {
         self.formas = tinta::formas(&self.tinta);
-        self.formas_mandato = match &self.mandato {
-            Some(m) => {
-                let mut lista = self.tinta.clone();
-                lista.push(Marcado {
-                    tipo: Tipo::Senuelo,
-                    valor: m.senuelo.clone(),
-                });
-                tinta::formas(&lista)
-            }
-            None => Vec::new(),
-        };
     }
 
     // --- what the browser's pages are told ------------------------------------------------------
@@ -1598,7 +1532,6 @@ impl Sesion {
                     "activa": p.id == self.activa,
                     "cargando": p.cargando,
                     "aislada": p.perfil == Perfil::Aislada,
-                    "mandato": p.perfil == Perfil::Mandato,
                     "fija": p.fija,
                     "icono": if es_interna(&p.url) { "" } else { p.icono.as_str() },
                     // 1.0.46: which product it belongs to; ZERO's strip shows only its own.
@@ -1620,7 +1553,6 @@ impl Sesion {
                 // 1.0.46: GUARDIANA's own pages read «🔒 GUARDIANA» in the address, never
                 // 127.0.0.1:7443.
                 "guardiana": es_panel_guardiana(&p.url) || p.url.contains("guardiana-arrancando.html"),
-                "mandato": p.perfil == Perfil::Mandato,
                 "favorito": self.favoritos.contiene(&p.url),
             })
         });
@@ -1810,79 +1742,6 @@ impl Sesion {
 
     fn msg_acerca(&self) -> Value {
         json!({ "tipo": "acerca", "version": self.version, "motor": self.motor })
-    }
-
-    fn msg_tinta(&self) -> Value {
-        let lista: Vec<Value> = self
-            .tinta
-            .iter()
-            .map(|m| json!({ "tipo": m.tipo, "visible": enmascara(m.tipo, &m.valor) }))
-            .collect();
-        json!({ "tipo": "tinta", "lista": lista })
-    }
-
-    fn msg_libro(&self) -> Value {
-        let entradas: Vec<Value> = self
-            .libro
-            .recientes()
-            .into_iter()
-            .take(300)
-            .map(|e| {
-                json!({
-                    "sitio": e.sitio,
-                    "empresa": e.empresa,
-                    "pais": e.pais,
-                    "corredor": e.corredor.as_ref().map(|c| c.0.clone()),
-                    "clases": e.clases.iter().map(|c| c.clave().trim_start_matches("dato_")).collect::<Vec<_>>(),
-                    "ultima": e.ultima,
-                    "veces": e.veces,
-                    "carta": e.carta,
-                })
-            })
-            .collect();
-        json!({ "tipo": "libro", "entradas": entradas })
-    }
-
-    fn cuentas(m: &Mandato) -> Value {
-        let (visitas, sitios, cortes, datos) = m.cuentas();
-        json!({ "visitas": visitas, "sitios": sitios, "cortes": cortes, "datos": datos })
-    }
-
-    fn mandato_visible(m: &Mandato) -> Value {
-        let desde = m.pasos.len().saturating_sub(40);
-        json!({
-            "id": m.id,
-            "tarea": m.tarea,
-            "permitidos": m.permitidos,
-            "estricto": m.estricto,
-            "senuelo": m.senuelo,
-            "inicio": m.inicio,
-            "fin": m.fin,
-            "caduca": m.caduca,
-            "pasos": &m.pasos[desde..],
-        })
-    }
-
-    fn msg_mandato(&self) -> Value {
-        let sitio_actual = self
-            .pestana(self.activa)
-            .filter(|p| p.url.starts_with("http"))
-            .map(|p| p.escudo.sitio.clone())
-            .unwrap_or_default();
-        if let Some(m) = &self.mandato {
-            return json!({
-                "tipo": "mandato", "estado": "activo", "mandato": Self::mandato_visible(m),
-                "cuentas": Self::cuentas(m), "sitio_actual": sitio_actual,
-            });
-        }
-        if let (Some(m), Some(r)) = (&self.terminado, &self.recibo) {
-            return json!({
-                "tipo": "mandato", "estado": "terminado", "mandato": Self::mandato_visible(m),
-                "cuentas": Self::cuentas(m), "recibo": r, "sitio_actual": sitio_actual,
-                "huella": recibo::huella_de(r),
-            });
-        }
-        json!({ "tipo": "mandato", "estado": "ninguno", "sitio_actual": sitio_actual })
     }
 
     fn msg_hoy(&self) -> Value {
@@ -2248,13 +2107,12 @@ impl Sesion {
     }
 
     /// A click on the web in front while its side summary is open (Z1-b): it folds back into
-    /// the glass strip, as with ✕, and stays folded like that.
+    /// the glass strip, as with ✕, and stays folded like that until the browser closes.
     fn toque(&mut self, id: u32) -> Vec<Orden> {
         if id != self.activa || self.panel.as_deref() != Some("escudo") {
             return Vec::new();
         }
-        self.prefs.escudo_cerrado = true;
-        self.guarda_prefs();
+        self.escudo_cerrado = true;
         self.panel = None;
         self.cierra_del_todo()
     }
@@ -2554,12 +2412,15 @@ impl Sesion {
         }
         let mut o = vec![Orden::Activa { id }, self.estado(), self.titulo_ventana()];
         o.extend(self.escudo_activa(false));
-        if self.panel.as_deref() == Some("mandato") {
-            o.push(envia(Origen::Panel, &self.msg_mandato()));
-        }
         o
     }
 
+    /// Close tab `id` (a product's own tab stays: it is brought forward instead). When it was the
+    /// one in front, the browser stays the browser (2 Nov 2026; the owner, 16:47: «la cierro… y en
+    /// vez de seguir aquí… me saca directamente del navegador a la pantalla principal de
+    /// Órbita»): the nearest tab of ZERO comes forward, the one to its right first, then the one
+    /// to its left; with none left, a new tab of ZERO opens. Another product's tab never comes
+    /// forward only because it was next to it. The window closes only when no tab is left at all.
     fn cerrar(&mut self, id: u32) -> Vec<Orden> {
         let Some(i) = self.pestanas.iter().position(|p| p.id == id) else {
             return Vec::new();
@@ -2567,23 +2428,24 @@ impl Sesion {
         if self.pestanas[i].fija {
             return self.activar(id);
         }
-        let p = self.pestanas.remove(i);
+        self.pestanas.remove(i);
         self.preguntas.retain(|_, q| q.pestana != id);
         let mut o = vec![Orden::CierraPestana { id }];
-        if p.perfil == Perfil::Mandato
-            && self.mandato.is_some()
-            && !self.pestanas.iter().any(|q| q.perfil == Perfil::Mandato)
-        {
-            o.extend(self.termina_mandato());
-        }
         if self.pestanas.is_empty() {
             o.push(Orden::CierraVentana);
             return o;
         }
         if self.activa == id || self.pestana(self.activa).is_none() {
-            let j = i.min(self.pestanas.len() - 1);
-            let nueva = self.pestanas[j].id;
-            o.extend(self.activar(nueva));
+            let de_zero = |q: &&Pestana| Self::producto_de(q) == "zero";
+            let cerca = self.pestanas[i..]
+                .iter()
+                .find(de_zero)
+                .or_else(|| self.pestanas[..i].iter().rev().find(de_zero))
+                .map(|q| q.id);
+            match cerca {
+                Some(nueva) => o.extend(self.activar(nueva)),
+                None => o.extend(self.nueva_pestana(Perfil::General, INICIO)),
+            }
         } else {
             o.push(self.estado());
         }
@@ -2592,10 +2454,7 @@ impl Sesion {
 
     fn abre_panel(&mut self, vista: &str) -> Vec<Orden> {
         let vista = match vista {
-            // Mandates and redaction are the subscription's: without it, the panel says so.
-            "mandato" | "tachon" if !self.licencia.protege() => "licencia",
-            "escudo" | "mandato" | "tachon" | "datos" | "ajustes" | "formulario" | "bienvenida"
-            | "licencia" => vista,
+            "escudo" | "ajustes" | "formulario" | "bienvenida" | "licencia" => vista,
             _ => "escudo",
         };
         // Leaving a question unanswered is answering «no»: the form stays where it was.
@@ -2612,11 +2471,6 @@ impl Sesion {
                 o.extend(self.escudo_activa(true));
                 o.push(envia(Origen::Panel, &self.msg_hoy()));
             }
-            "mandato" => o.push(envia(Origen::Panel, &self.msg_mandato())),
-            "datos" => {
-                o.push(envia(Origen::Panel, &self.msg_tinta()));
-                o.push(envia(Origen::Panel, &self.msg_libro()));
-            }
             "ajustes" => {
                 o.push(envia(Origen::Panel, &self.msg_ajustes()));
                 o.push(envia(Origen::Panel, &self.msg_acerca()));
@@ -2629,10 +2483,10 @@ impl Sesion {
         o
     }
 
-    /// Whether the shield stays open beside the pages: unless the person closed it, and only
-    /// while there is protection to show.
+    /// Whether the shield stays open beside the pages: from every start, unless the person closed
+    /// it in this session, and only while there is protection to show.
     fn escudo_a_la_vista(&self) -> bool {
-        !self.prefs.escudo_cerrado && self.prefs.bienvenida && self.licencia.protege()
+        !self.escudo_cerrado && self.prefs.bienvenida && self.licencia.protege()
     }
 
     /// Done with a view (a question answered, settings closed): back to the shield while the
@@ -2772,16 +2626,9 @@ impl Sesion {
 
     fn orden_de_pagina(&mut self, origen: Origen, tipo: &str, m: &Value) -> Vec<Orden> {
         let activa = self.activa;
-        let de_pago = matches!(
-            tipo,
-            "mandato_empezar"
-                | "mandato_anadir"
-                | "tachar"
-                | "tachon_pegar"
-                | "tinta_anadir"
-                | "carta"
-                | "subasta_carta"
-        );
+        // The paid tool left in the panel (2 Nov 2026: «Tarea para tu IA», «Preguntar a una IA sin
+        // dar tus datos» and «Mis datos» left the browser, the owner, 16:50).
+        let de_pago = tipo == "subasta_carta";
         if de_pago && !self.licencia.protege() {
             let mut o = self.abre_panel("licencia");
             // An unreadable file is not an ended trial: the panel says what happened.
@@ -2916,16 +2763,15 @@ impl Sesion {
                 .unwrap_or_default(),
             "panel" => match m.get("vista").and_then(Value::as_str) {
                 Some(v) => {
-                    if v == "escudo" && self.prefs.escudo_cerrado {
-                        self.prefs.escudo_cerrado = false;
-                        self.guarda_prefs();
+                    if v == "escudo" {
+                        self.escudo_cerrado = false;
                     }
                     self.abre_panel(v)
                 }
-                // The person closing the shield: it stays closed, now and at the next start.
+                // The person closing the shield: it stays closed until the browser closes; the
+                // next start opens it again (2 Nov 2026, the owner, 16:43). Nothing is written.
                 None if self.panel.as_deref() == Some("escudo") => {
-                    self.prefs.escudo_cerrado = true;
-                    self.guarda_prefs();
+                    self.escudo_cerrado = true;
                     self.panel = None;
                     self.cierra_del_todo()
                 }
@@ -3008,22 +2854,6 @@ impl Sesion {
             "bloquear_sitio" | "desbloquear_sitio" | "bloquear_todo" => {
                 self.regla(tipo, texto(m, "sitio"))
             }
-            "tinta_anadir" => self.tinta_anadir(texto(m, "dato"), texto(m, "valor")),
-            "tinta_quitar" => self.tinta_quitar(numero(m, "indice")),
-            "carta" => self.carta(
-                texto(m, "sitio"),
-                texto(m, "ley"),
-                texto(m, "nombre"),
-                texto(m, "correo"),
-            ),
-            "carta_hecha" => {
-                let ahora = (self.reloj)();
-                if let Some(e) = self.libro.entradas.get_mut(texto(m, "sitio")) {
-                    e.carta = Some(ahora);
-                    self.guarda_libro();
-                }
-                Vec::new()
-            }
             "abrir_correo" => {
                 let url = format!(
                     "mailto:?subject={}&body={}",
@@ -3031,50 +2861,6 @@ impl Sesion {
                     codifica(texto(m, "cuerpo"))
                 );
                 vec![Orden::AbreFuera { url }]
-            }
-            "mandato_empezar" => self.mandato_empezar(m),
-            "mandato_previa" => {
-                let webs: Vec<String> = m
-                    .get("webs")
-                    .and_then(Value::as_array)
-                    .map(|a| {
-                        a.iter()
-                            .filter_map(Value::as_str)
-                            .take(80)
-                            .map(str::to_string)
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                vec![envia(
-                    Origen::Panel,
-                    &json!({ "tipo": "mandato_previa", "permitidos": crate::mandato::sitios_de(&webs) }),
-                )]
-            }
-            "mandato_terminar" => self.cierra_mandato(),
-            "mandato_nuevo" => {
-                self.terminado = None;
-                self.recibo = None;
-                vec![envia(Origen::Panel, &self.msg_mandato())]
-            }
-            "mandato_anadir" => self.mandato_anadir(texto(m, "sitio")),
-            "recibo_guardar" => self.recibo_guardar(),
-            "tachar" => self.tachar(texto(m, "texto")),
-            "tachon_pegar" => self.tachon_pegar(texto(m, "texto")),
-            "tachon_respuesta" => {
-                if self.pestana(activa).is_some_and(|p| !es_interna(&p.url)) {
-                    vec![Orden::Ejecuta {
-                        id: activa,
-                        script:
-                            "(() => String(window.getSelection ? window.getSelection() : ''))()"
-                                .into(),
-                        etiqueta: Some(Etiqueta::Seleccion),
-                    }]
-                } else {
-                    vec![envia(
-                        Origen::Panel,
-                        &json!({ "tipo": "restaurado", "texto": "" }),
-                    )]
-                }
             }
             "formulario_respuesta" => self.formulario_respuesta(
                 numero(m, "id").unwrap_or(0),
@@ -3136,9 +2922,6 @@ impl Sesion {
                     envia(Origen::Panel, &self.msg_ajustes()),
                     envia(Origen::Panel, &self.msg_hoy()),
                     envia(Origen::Panel, &self.msg_acerca()),
-                    envia(Origen::Panel, &self.msg_tinta()),
-                    envia(Origen::Panel, &self.msg_libro()),
-                    envia(Origen::Panel, &self.msg_mandato()),
                     envia(Origen::Panel, &self.msg_licencia()),
                     envia(Origen::Panel, &self.msg_marco()),
                 ];
@@ -3298,9 +3081,6 @@ impl Sesion {
                     self.titulo_ventana(),
                     envia(Origen::Panel, &self.msg_ajustes()),
                     envia(Origen::Panel, &self.msg_acerca()),
-                    envia(Origen::Panel, &self.msg_tinta()),
-                    envia(Origen::Panel, &self.msg_libro()),
-                    envia(Origen::Panel, &self.msg_mandato()),
                 ];
                 if let Some(vista) = &self.panel {
                     o.push(envia(
@@ -3364,45 +3144,6 @@ impl Sesion {
         }
         self.guarda_prefs();
         self.escudo_activa(true)
-    }
-
-    fn tinta_anadir(&mut self, dato: &str, valor: &str) -> Vec<Orden> {
-        let valor = valor.trim();
-        let tipo = match dato {
-            "correo" => Tipo::Correo,
-            "telefono" => Tipo::Telefono,
-            "documento" => Tipo::Documento,
-            "nombre" => Tipo::Nombre,
-            _ => Tipo::Otro,
-        };
-        let largo = valor.chars().count();
-        if !(5..=200).contains(&largo) || self.tinta.len() >= 40 {
-            return vec![self.aviso("tinta_no_valido", &[])];
-        }
-        if !self
-            .tinta
-            .iter()
-            .any(|m| m.valor.eq_ignore_ascii_case(valor))
-        {
-            self.tinta.push(Marcado {
-                tipo,
-                valor: valor.to_string(),
-            });
-            self.rehace_formas();
-            self.guarda_tinta();
-        }
-        vec![envia(Origen::Panel, &self.msg_tinta())]
-    }
-
-    fn tinta_quitar(&mut self, indice: Option<u64>) -> Vec<Orden> {
-        if let Some(i) = indice.and_then(|i| usize::try_from(i).ok()) {
-            if i < self.tinta.len() {
-                self.tinta.remove(i);
-                self.rehace_formas();
-                self.guarda_tinta();
-            }
-        }
-        vec![envia(Origen::Panel, &self.msg_tinta())]
     }
 
     /// «Descargar la carta» on a company's profile: the deletion letter to that company, under the
@@ -3612,99 +3353,7 @@ impl Sesion {
         .collect()
     }
 
-    /// The letter for a site of the book. The name and the e-mail come from the page's boxes
-    /// (the owner, 12 Oct 2026: «que la persona ponga el nombre y el email… y ya quede la carta
-    /// descargada con el nombre y todo»); when they are empty, from the marked data, if any.
-    fn carta(&self, s: &str, ley: &str, nombre: &str, correo: &str) -> Vec<Orden> {
-        let Some(e) = self.libro.entradas.get(s) else {
-            return Vec::new();
-        };
-        let ley = match ley {
-            "co" => Ley::Co,
-            "ue" => Ley::Ue,
-            "ca" => Ley::Ca,
-            "br" => Ley::Br,
-            _ => Ley::Otro,
-        };
-        let primero = |t: Tipo| {
-            self.tinta
-                .iter()
-                .find(|m| m.tipo == t)
-                .map(|m| m.valor.clone())
-                .unwrap_or_default()
-        };
-        let c = carta(
-            &self.textos,
-            ley,
-            e,
-            &dicho(nombre, || primero(Tipo::Nombre)),
-            &dicho(correo, || primero(Tipo::Correo)),
-            &self.hoy(),
-        );
-        vec![envia(
-            Origen::Panel,
-            &json!({ "tipo": "carta", "sitio": s, "asunto": c.asunto, "cuerpo": c.cuerpo }),
-        )]
-    }
-
-    // --- mandates ------------------------------------------------------------------------------
-
-    fn mandato_empezar(&mut self, m: &Value) -> Vec<Orden> {
-        if self.mandato.is_some() {
-            return vec![envia(Origen::Panel, &self.msg_mandato())];
-        }
-        let webs: Vec<String> = m
-            .get("webs")
-            .and_then(Value::as_array)
-            .map(|a| {
-                a.iter()
-                    .filter_map(Value::as_str)
-                    .take(40)
-                    .map(str::to_string)
-                    .collect()
-            })
-            .unwrap_or_default();
-        let mut semilla = [0u8; 16];
-        azar(&mut semilla);
-        let mut id = [0u8; 8];
-        azar(&mut id);
-        let mut md = Mandato::nuevo(
-            hex(&id),
-            texto(m, "tarea"),
-            &webs,
-            tinta::senuelo(&semilla),
-            (self.reloj)(),
-        );
-        if md.permitidos.is_empty() {
-            return vec![self.aviso("mandato_webs_falta", &[])];
-        }
-        md.estricto = si(m, "estricto");
-        // A mandate can end on its own: the AI's permission does not outlive the task.
-        let minutos = numero(m, "minutos").unwrap_or(0).min(8 * 60);
-        if minutos > 0 {
-            md.caduca = md.inicio + i64::try_from(minutos).unwrap_or(0) * 60_000;
-        }
-        let primera = format!("https://{}/", md.permitidos[0]);
-        self.mandato = Some(md);
-        self.terminado = None;
-        self.recibo = None;
-        self.rehace_formas();
-        let mut o = self.nueva_pestana(Perfil::Mandato, &primera);
-        o.push(envia(Origen::Panel, &self.msg_mandato()));
-        o
-    }
-
-    fn mandato_anadir(&mut self, s: &str) -> Vec<Orden> {
-        let s = sitio(s);
-        let ahora = (self.reloj)();
-        if let Some(md) = self.mandato.as_mut() {
-            if !s.is_empty() && !md.permitidos.contains(&s) {
-                md.permitidos.push(s.clone());
-                md.anota(ahora, "permitido", &s, "");
-            }
-        }
-        vec![envia(Origen::Panel, &self.msg_mandato())]
-    }
+    // --- receipts ------------------------------------------------------------------------------
 
     fn cobertura_vista(&self) -> Vec<&'static str> {
         let mut v = vec![
@@ -3744,76 +3393,6 @@ impl Sesion {
         Some(nueva)
     }
 
-    /// End the mandate: sign what happened and keep the receipt.
-    fn termina_mandato(&mut self) -> Vec<Orden> {
-        let Some(mut md) = self.mandato.take() else {
-            return Vec::new();
-        };
-        md.fin = (self.reloj)();
-        self.rehace_formas();
-        // The receipt says what it saw and what it could not see (decision 197).
-        let contenido = json!({
-            "programa": "GUARDIANA ZERO",
-            "version": self.version,
-            "mandato": md,
-            "cobertura": {
-                "observado": self.cobertura_vista(),
-                // Turned off in the pages of the task's tab: the request filter would not see
-                // them (review of 10 Oct 2026, grave 4).
-                // In the pages and their frames, by the page script: a worker, or an empty frame
-                // the page makes itself, may still reach them (said in `recibo_cobertura`).
-                "apagado": ["webrtc", "webtransport"],
-                "apagado_en": "paginas_y_marcos",
-                "no_observado": [
-                    "otras_aplicaciones_del_equipo",
-                    "lo_que_cada_servidor_hace_con_lo_recibido",
-                    "otras_pestanas",
-                    "conexiones_webrtc_entre_equipos",
-                    "conexiones_webtransport",
-                    "anticipacion_dns_del_motor",
-                    "cabeceras_de_las_peticiones",
-                ],
-                "nota": self.t("recibo_cobertura"),
-            },
-        })
-        .to_string();
-        let recibo = self
-            .clave_recibos()
-            .and_then(|k| recibo::firma(&k, contenido).ok());
-        if let Some(r) = &recibo {
-            let dia = fecha::dia(md.fin, self.zona);
-            escribe_json(
-                &self
-                    .datos
-                    .join("recibos")
-                    .join(format!("{dia}-{}.json", md.id)),
-                r,
-            );
-        }
-        self.recibo = recibo;
-        self.terminado = Some(md);
-        let mut o = self.abre_panel("mandato");
-        if self.recibo.is_none() {
-            o.push(self.aviso("recibo_error", &[]));
-        }
-        o
-    }
-
-    /// End the mandate and close its tabs: whatever drove them has no tab left to use.
-    fn cierra_mandato(&mut self) -> Vec<Orden> {
-        let mut o = self.termina_mandato();
-        let ids: Vec<u32> = self
-            .pestanas
-            .iter()
-            .filter(|p| p.perfil == Perfil::Mandato)
-            .map(|p| p.id)
-            .collect();
-        for id in ids {
-            o.extend(self.cerrar(id));
-        }
-        o
-    }
-
     fn nombre_libre(&self, base: &str, ext: &str) -> PathBuf {
         let primera = self.descargas.join(format!("{base}.{ext}"));
         if !primera.exists() {
@@ -3823,70 +3402,6 @@ impl Sesion {
             .map(|n| self.descargas.join(format!("{base} ({n}).{ext}")))
             .find(|p| !p.exists())
             .unwrap_or(primera)
-    }
-
-    fn recibo_guardar(&self) -> Vec<Orden> {
-        let (Some(r), Some(md)) = (&self.recibo, &self.terminado) else {
-            return Vec::new();
-        };
-        let dia = fecha::dia(md.fin, self.zona);
-        let corto: String = md.id.chars().take(8).collect();
-        let ruta = self.nombre_libre(&format!("guardiana-zero-recibo-{dia}-{corto}"), "json");
-        let Ok(b) = serde_json::to_vec_pretty(r) else {
-            return Vec::new();
-        };
-        match escribe(&ruta, &b) {
-            Ok(()) => {
-                let ruta = ruta.display().to_string();
-                vec![envia(
-                    Origen::Panel,
-                    &json!({ "tipo": "guardado", "ruta": ruta, "texto": self.tf("guardado_en", &[("ruta", &ruta)]) }),
-                )]
-            }
-            Err(_) => vec![self.aviso("guardar_error", &[])],
-        }
-    }
-
-    // --- redaction -----------------------------------------------------------------------------
-
-    fn tachar(&mut self, t: &str) -> Vec<Orden> {
-        let t: String = t.chars().take(20_000).collect();
-        let r = tachon::tacha(&t, &self.tinta, &self.tachon, &self.textos);
-        self.tachon = r.sustituciones.clone();
-        let usadas: Vec<Value> = r
-            .sustituciones
-            .iter()
-            .filter(|s| r.texto.contains(&s.marca))
-            .map(|s| json!({ "marca": s.marca, "clave": s.clase.clave() }))
-            .collect();
-        vec![envia(
-            Origen::Panel,
-            &json!({ "tipo": "tachado", "texto": r.texto, "sustituciones": usadas }),
-        )]
-    }
-
-    fn tachon_pegar(&self, t: &str) -> Vec<Orden> {
-        let activa = self.activa;
-        if self.pestana(activa).is_none_or(|p| es_interna(&p.url)) {
-            return vec![self.aviso("tachon_sin_campo", &[])];
-        }
-        let literal = serde_json::to_string(t).unwrap_or_else(|_| "\"\"".into());
-        let script = format!(
-            "(() => {{ const t = {literal}; let e = document.activeElement; \
-             while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement; \
-             if (!e || !(e.isContentEditable || e.tagName === 'TEXTAREA' || (e.tagName === 'INPUT' && /^(text|search|email|url|tel|)$/.test(e.type)))) return 'sin_campo'; \
-             e.focus(); if (!document.execCommand('insertText', false, t)) {{ e.value = (e.value || '') + t; e.dispatchEvent(new Event('input', {{ bubbles: true }})); }} return 'ok'; }})()"
-        );
-        vec![
-            Orden::Foco {
-                a: Origen::Pestana(activa),
-            },
-            Orden::Ejecuta {
-                id: activa,
-                script,
-                etiqueta: Some(Etiqueta::Pegar),
-            },
-        ]
     }
 
     /// The days a period covers: `hoy`, `7` (days), `mes` (this month) or `31` (days).
@@ -3924,8 +3439,9 @@ impl Sesion {
                 .collect()
         };
         // Companies and countries are those from outside, as «Hoy» counts them: a whole page the
-        // person (or the AI, a step outside its task) opened and that was cut is a request cut,
-        // in the total and the list, not a company that tried anything.
+        // person (or, in cuts kept from before 2 Nov 2026, the AI of a task, a step outside it)
+        // opened and that was cut is a request cut, in the total and the list, not a company
+        // that tried anything.
         let de_fuera: Vec<Corte> = lista
             .iter()
             .filter(|c| {
@@ -4205,32 +3721,6 @@ impl Sesion {
             json!({ "tipo": "guardado", "ruta": "", "texto": self.t("guardar_error") })
         };
         self.a_pestana(id, &v).into_iter().collect()
-    }
-
-    /// The result of a script the session asked for (as JSON, the way the engine returns it).
-    pub fn script_hecho(&mut self, etiqueta: Etiqueta, resultado: &str) -> Vec<Orden> {
-        let valor: Value = serde_json::from_str(resultado).unwrap_or(Value::Null);
-        match etiqueta {
-            Etiqueta::Pegar => {
-                if valor.as_str() == Some("ok") {
-                    Vec::new()
-                } else {
-                    vec![self.aviso("tachon_sin_campo", &[])]
-                }
-            }
-            Etiqueta::Seleccion => {
-                let sel = valor.as_str().unwrap_or("").trim().to_string();
-                let texto = if sel.is_empty() {
-                    String::new()
-                } else {
-                    tachon::restaura(&sel, &self.tachon)
-                };
-                vec![envia(
-                    Origen::Panel,
-                    &json!({ "tipo": "restaurado", "texto": texto }),
-                )]
-            }
-        }
     }
 
     // --- the form guard ------------------------------------------------------------------------
@@ -4535,7 +4025,6 @@ impl Sesion {
         let ambito = match p.perfil {
             Perfil::General => format!("general|{web}"),
             Perfil::Aislada => format!("aislada-{id}|{web}"),
-            Perfil::Mandato => format!("mandato|{web}"),
         };
         // A company the person unblocked gets the real values too: «Desbloquear» undoes this as
         // it undoes the rest of maximum protection (from the next page on).
@@ -4752,7 +4241,7 @@ impl Sesion {
             let (autor, script) = medidas::autor(&u, &web);
             algo |= p.escudo.medidas.huella(*t, autor, script, *r);
         }
-        // The person's own webs only: not an isolated tab, not the AI's.
+        // The person's own webs only: not an isolated tab.
         if propia {
             for (t, _, r) in &lista {
                 self.medidas.huella(&web, *t, *r);
@@ -4829,7 +4318,6 @@ impl Sesion {
             return Vec::new();
         };
         let titulo = self.titulo_de(p);
-        let mandato = p.perfil == Perfil::Mandato && self.mandato.is_some();
         let valores: Vec<String> = m
             .get("valores")
             .and_then(Value::as_array)
@@ -4862,7 +4350,7 @@ impl Sesion {
             .entradas
             .get(&s)
             .is_some_and(|e| encontradas.iter().all(|c| e.clases.contains(c)));
-        if !mandato && (ya_lo_tiene || self.prefs.sin_preguntar.contains(&s)) {
+        if ya_lo_tiene || self.prefs.sin_preguntar.contains(&s) {
             let ahora = (self.reloj)();
             // An isolated tab leaves nothing behind, not even a line in the book.
             if !self.es_aislada(id) {
@@ -4891,7 +4379,6 @@ impl Sesion {
                 sitio: s.clone(),
                 host,
                 clases: encontradas.clone(),
-                mandato,
             },
         );
         let mut o = self.abre_panel("formulario");
@@ -4900,7 +4387,7 @@ impl Sesion {
             Origen::Panel,
             &json!({
                 "tipo": "pregunta_formulario", "id": n, "sitio": s, "datos": datos,
-                "corredor": corredor, "mandato": mandato, "pestana": titulo,
+                "corredor": corredor, "pestana": titulo,
             }),
         ));
         o
@@ -4952,7 +4439,7 @@ impl Sesion {
         if clases.is_empty() {
             return None;
         }
-        // The decoy has no kind of the person's: it is never approved.
+        // Only the kinds approved for that site are left out of the search.
         Some(
             formas
                 .iter()
@@ -4987,14 +4474,7 @@ impl Sesion {
                 p.escudo.ultimo_envio = Some(ahora);
                 Self::permite_envio(p, &q.sitio, &q.clases, ahora);
             }
-            if q.mandato {
-                if let Some(md) = self.mandato.as_mut() {
-                    let detalle: Vec<&str> = q.clases.iter().map(|c| c.clave()).collect();
-                    md.anota(ahora, "dato", &q.sitio, &detalle.join(","));
-                    self.mandato_sucio = true;
-                }
-            }
-            if recordar && !q.mandato && !aislada {
+            if recordar && !aislada {
                 self.prefs.sin_preguntar.insert(q.sitio.clone());
                 self.guarda_prefs();
             }
@@ -5030,10 +4510,6 @@ impl Sesion {
         self.diario = Diario::default();
         self.subastas = subasta::Diario::default();
         self.medidas = medidas::Total::default();
-        self.mandato = None;
-        self.terminado = None;
-        self.recibo = None;
-        self.tachon.clear();
         self.preguntas.clear();
         self.rehace_formas();
         let mut o = vec![Orden::BorraNavegacion];
@@ -5043,12 +4519,7 @@ impl Sesion {
         for id in ids {
             o.extend(self.cerrar(id));
         }
-        o.extend([
-            envia(Origen::Panel, &self.msg_tinta()),
-            envia(Origen::Panel, &self.msg_libro()),
-            envia(Origen::Panel, &self.msg_mandato()),
-            self.aviso("borrado", &[]),
-        ]);
+        o.push(self.aviso("borrado", &[]));
         o
     }
 
@@ -5183,11 +4654,7 @@ impl Sesion {
         // rules of EasyList and uBlock filters for this host, while the protection is on.
         if es_web && self.prefs.reglas.cortar_seguimiento && self.licencia.protege() {
             if let Some(script) = host_de(url).and_then(|h| crate::filtros::guion_ocultar(&h)) {
-                o.push(Orden::Ejecuta {
-                    id,
-                    script,
-                    etiqueta: None,
-                });
+                o.push(Orden::Ejecuta { id, script });
             }
         }
         self.sucios.insert(id);
@@ -5434,19 +4901,9 @@ impl Sesion {
             Recurso::Ventana if p.escudo.sitio.is_empty() => p.abridor.clone().unwrap_or_default(),
             _ => p.escudo.sitio.clone(),
         };
-        let mandato = if p.perfil == Perfil::Mandato {
-            self.mandato.as_ref()
-        } else {
-            None
-        };
-        let (formas, senuelo) = if mandato.is_some() {
-            (&self.formas_mandato, Some(self.tinta.len()))
-        } else {
-            (&self.formas, None)
-        };
         // What the person approved sending to this site a moment ago goes there.
-        let sin_permiso = self.formas_sin_permiso(p, &destino.sitio, formas, ahora);
-        let formas: &[Forma] = sin_permiso.as_deref().unwrap_or(formas);
+        let sin_permiso = self.formas_sin_permiso(p, &destino.sitio, &self.formas, ahora);
+        let formas: &[Forma] = sin_permiso.as_deref().unwrap_or(&self.formas);
         let con_cuerpo = matches!(
             metodo.to_ascii_uppercase().as_str(),
             "POST" | "PUT" | "PATCH"
@@ -5457,14 +4914,8 @@ impl Sesion {
             recurso,
             sitio_pagina: &sitio_pagina,
         };
-        decide_con(
-            &peticion,
-            destino,
-            &self.prefs.reglas,
-            formas,
-            senuelo,
-            mandato,
-        )
+        // No task for an AI any more (2 Nov 2026, the owner, 16:50): no decoy and no task's sites.
+        decide_con(&peticion, destino, &self.prefs.reglas, formas, None, None)
     }
 
     /// One request about to leave a tab. `contexto` is the engine's resource context.
@@ -5543,22 +4994,6 @@ impl Sesion {
                     nota: String::new(),
                 };
             }
-        }
-        if self.pestanas[i].perfil == Perfil::Mandato && self.mandato.is_none() {
-            // Its mandate ended: the tab is closing and nothing more leaves it.
-            let documento = recurso_de_contexto(contexto) == Recurso::Documento;
-            return Respuesta {
-                cortar: true,
-                nota: String::new(),
-                pagina: documento.then(|| {
-                    paginas::pagina_cortada(
-                        &self.textos,
-                        &self.t("pagina_cortada_mandato_fin"),
-                        url,
-                        &self.prefs.tema,
-                    )
-                }),
-            };
         }
         // The address is read once, here, and its parts go to everything below.
         let dir = url::Url::parse(url).ok();
@@ -5660,7 +5095,7 @@ impl Sesion {
         // An isolated tab writes nothing to disk, neither the day's figures nor the list of
         // cuts (review of 10 Oct 2026, grave 7): its shield shows them while it is open.
         let aislada = perfil == Perfil::Aislada;
-        // The person's own webs of the day: not an isolated tab, and not the AI's mandate tab.
+        // The person's own webs of the day: not an isolated tab.
         let web = (perfil == Perfil::General && !es_interna(&p.url) && !p.escudo.sitio.is_empty())
             .then(|| p.escudo.sitio.clone());
         if let (Some(s), false) = (&empresa_subasta, aislada) {
@@ -5710,7 +5145,9 @@ impl Sesion {
                 recurso,
                 dato,
                 aislada: p.perfil == Perfil::Aislada,
-                mandato: p.perfil == Perfil::Mandato,
+                // No tab of a task for an AI since 2 Nov 2026; the field stays for the cuts the
+                // log already holds.
+                mandato: false,
                 codigo: &p.escudo.codigo,
                 tras_envio: p
                     .escudo
@@ -5759,28 +5196,6 @@ impl Sesion {
                 self.libro_sucio = true;
             }
         }
-        if perfil == Perfil::Mandato {
-            if let Some(md) = self.mandato.as_mut() {
-                if recurso == Recurso::Documento && !d.cortar {
-                    md.anota(ahora, "visita", &d.destino.sitio, "");
-                }
-                if !d.cortar && !d.hallazgos.is_empty() {
-                    let como = d.hallazgos.first().map_or("", |h| h.como);
-                    md.anota(ahora, "dato", &d.destino.sitio, como);
-                }
-                match d.motivo {
-                    Some(Motivo::FueraDeMandato) => {
-                        md.anota(ahora, "cortado", &d.destino.sitio, "");
-                    }
-                    Some(Motivo::Tinta | Motivo::Senuelo) => {
-                        let como = d.hallazgos.first().map_or("", |h| h.como);
-                        md.anota(ahora, "tinta", &d.destino.sitio, como);
-                    }
-                    _ => {}
-                }
-                self.mandato_sucio = true;
-            }
-        }
         self.sucios.insert(id);
         self.diario_sucio = true;
         let nota = if self.depura {
@@ -5823,11 +5238,7 @@ impl Sesion {
                     ) if recurso == Recurso::Ventana => {
                         self.tf("pagina_cortada_ventana", &[("sitio", s)])
                     }
-                    Some(Motivo::FueraDeMandato) => {
-                        self.tf("pagina_cortada_mandato", &[("sitio", s)])
-                    }
                     Some(Motivo::CorteTuyo) => self.tf("pagina_cortada_tuya", &[("sitio", s)]),
-                    Some(Motivo::Senuelo) => self.t("pagina_cortada_senuelo"),
                     Some(Motivo::Tinta) => {
                         let dato = d
                             .hallazgos
@@ -5879,14 +5290,6 @@ impl Sesion {
             self.licencia_pedida = ahora;
             o.push(Orden::ComprobarLicencia);
         }
-        if self
-            .mandato
-            .as_ref()
-            .is_some_and(|m| m.caduca > 0 && ahora >= m.caduca)
-        {
-            o.extend(self.cierra_mandato());
-            o.push(self.aviso("mandato_caducado", &[]));
-        }
         if !self.pulsos.is_empty() {
             let lista = std::mem::take(&mut self.pulsos);
             o.push(envia(
@@ -5896,15 +5299,6 @@ impl Sesion {
         }
         if self.sucios.remove(&self.activa) {
             o.extend(self.escudo_activa(false));
-        }
-        if self.mandato_sucio {
-            self.mandato_sucio = false;
-            if self.panel.as_deref() == Some("mandato") {
-                o.push(envia(Origen::Panel, &self.msg_mandato()));
-            }
-        }
-        if self.libro_sucio && self.panel.as_deref() == Some("datos") {
-            o.push(envia(Origen::Panel, &self.msg_libro()));
         }
         // Midnight: yesterday's figures must not stay under today's date on an open new tab, and
         // the oldest day of the log goes.
@@ -5984,11 +5378,8 @@ impl Sesion {
         ]
     }
 
-    /// The window is closing: a running mandate ends with its receipt, and everything is saved.
+    /// The window is closing: everything is saved.
     pub fn cierra(&mut self) {
-        if self.mandato.is_some() {
-            let _ = self.termina_mandato();
-        }
         self.guarda_cortes();
         self.guarda_diario();
         self.guarda_subastas();

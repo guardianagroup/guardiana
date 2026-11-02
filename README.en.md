@@ -27,9 +27,8 @@ Portuguese.
 
 A browser of our own for Windows 10 and 11. It cuts what websites call behind your back (trackers,
 advertising and registered data brokers) and shows every cut live: which company, from which country
-and why. It removes tracking tags from addresses, keeps your marked data from going out to another
-company, opens mandates for your AI with a signed receipt, and redacts your data before you ask it
-anything. The first 7 days are free; after that it comes with the GUARDIANA subscription (the same key).
+and why. It removes tracking tags from addresses and asks before a form sends your data to a website
+that did not have it yet. The first 7 days are free; after that it comes with the GUARDIANA subscription (the same key).
 
 - Download, hash and signature: [guardianagroup.com/en/zero.html](https://guardianagroup.com/en/zero.html);
   in `ledger.jsonl`, its lines are the ones with version `zero-<version>`.

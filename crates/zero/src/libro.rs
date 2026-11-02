@@ -1,6 +1,8 @@
-//! «Quién tiene mis datos»: every site that received personal data from this browser, which
-//! kinds, and when. Built from what actually left (the form guard and the marked values), not
-//! from guesses, so one button can ask exactly those companies to delete it.
+//! The book: every site that received personal data from this browser, which kinds, and when.
+//! Built from what actually left (the form guard and the marked values), not from guesses. Since
+//! 2 Nov 2026 it has no view of its own («Mis datos» left the browser, the owner, 16:50): the form
+//! guard reads it so it does not ask twice, and a company's profile reads it for its deletion
+//! letter.
 
 use std::collections::BTreeMap;
 
@@ -31,7 +33,8 @@ pub struct Entrada {
     pub ultima: i64,
     /// How many times.
     pub veces: u32,
-    /// When a deletion letter was prepared for it, if ever.
+    /// When a deletion letter was prepared for it from «Mis datos», if ever: kept for books
+    /// written before that view left the browser (2 Nov 2026).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub carta: Option<i64>,
 }
@@ -75,14 +78,6 @@ impl Libro {
         e.ultima = e.ultima.max(ts);
         e.veces += 1;
     }
-
-    /// Entries, most recent first.
-    #[must_use]
-    pub fn recientes(&self) -> Vec<&Entrada> {
-        let mut v: Vec<&Entrada> = self.entradas.values().collect();
-        v.sort_by_key(|e| std::cmp::Reverse(e.ultima));
-        v
-    }
 }
 
 #[cfg(test)]
@@ -100,6 +95,5 @@ mod tests {
         assert_eq!(t.clases, vec![Clase::Correo, Clase::Telefono]);
         assert_eq!((t.primera, t.ultima, t.veces), (10, 20, 2));
         assert!(l.entradas["33across.com"].corredor.is_some());
-        assert_eq!(l.recientes()[0].sitio, "tienda.co");
     }
 }

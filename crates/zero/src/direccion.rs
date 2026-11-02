@@ -19,9 +19,24 @@ pub struct Buscador {
     pub privado: bool,
 }
 
-/// The engines on offer, the ones that say they keep no record first (the settings list them
-/// apart).
+/// The engines on offer, in the order the box and the settings show them (2 Nov 2026; the owner,
+/// 16:47: «primero Google, después Brave, después DuckDuckGo, y luego ya Tor, y luego el resto»):
+/// Google, Brave, DuckDuckGo, then the rest as they were. Tor is not here: this browser has no way
+/// to reach the Tor network (no Tor of its own and no proxy to one), and an entry that only says
+/// «Tor» without going through it would be a lie.
 pub const BUSCADORES: &[Buscador] = &[
+    Buscador {
+        id: "google",
+        nombre: "Google",
+        plantilla: "https://www.google.com/search?q={}",
+        privado: false,
+    },
+    Buscador {
+        id: "brave",
+        nombre: "Brave Search",
+        plantilla: "https://search.brave.com/search?q={}",
+        privado: true,
+    },
     Buscador {
         id: "duckduckgo",
         nombre: "DuckDuckGo",
@@ -32,12 +47,6 @@ pub const BUSCADORES: &[Buscador] = &[
         id: "startpage",
         nombre: "Startpage",
         plantilla: "https://www.startpage.com/do/search?query={}",
-        privado: true,
-    },
-    Buscador {
-        id: "brave",
-        nombre: "Brave Search",
-        plantilla: "https://search.brave.com/search?q={}",
         privado: true,
     },
     Buscador {
@@ -69,12 +78,6 @@ pub const BUSCADORES: &[Buscador] = &[
         nombre: "MetaGer",
         plantilla: "https://metager.org/meta/meta.ger3?eingabe={}",
         privado: true,
-    },
-    Buscador {
-        id: "google",
-        nombre: "Google",
-        plantilla: "https://www.google.com/search?q={}",
-        privado: false,
     },
     Buscador {
         id: "bing",
@@ -265,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    fn every_engine_is_https_with_one_query_and_the_private_ones_come_first() {
+    fn every_engine_is_https_with_one_query_in_the_owners_order() {
         let mut vistos = std::collections::BTreeSet::new();
         for b in BUSCADORES {
             assert!(vistos.insert(b.id), "{} twice", b.id);
@@ -273,11 +276,37 @@ mod tests {
             assert_eq!(b.plantilla.matches("{}").count(), 1, "{}", b.id);
             assert_eq!(buscador(b.id).id, b.id);
         }
-        let primer_otro = BUSCADORES
+        // 2 Nov 2026 (the owner, 16:47): Google, Brave, DuckDuckGo, then the rest as they were.
+        let ids: Vec<&str> = BUSCADORES.iter().map(|b| b.id).collect();
+        assert_eq!(
+            ids,
+            [
+                "google",
+                "brave",
+                "duckduckgo",
+                "startpage",
+                "ecosia",
+                "qwant",
+                "mojeek",
+                "swisscows",
+                "metager",
+                "bing",
+                "chatgpt",
+                "perplexity",
+                "yahoo",
+                "youtube",
+                "you",
+                "ask",
+                "aol",
+                "yandex",
+                "baidu",
+                "naver",
+                "seznam",
+            ]
+        );
+        // Nothing that claims the Tor network: this browser cannot reach it.
+        assert!(BUSCADORES
             .iter()
-            .position(|b| !b.privado)
-            .unwrap_or(BUSCADORES.len());
-        assert!(BUSCADORES[primer_otro..].iter().all(|b| !b.privado));
-        assert!(BUSCADORES[0].privado);
+            .all(|b| !b.id.contains("tor") && !b.plantilla.contains(".onion")));
     }
 }

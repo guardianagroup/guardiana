@@ -1,4 +1,5 @@
-// The side panel: the shield in real time, the mandate, the redaction, my data and settings.
+// The side panel: the shield in real time, the settings, the subscription and the question before
+// data leaves (2 Nov 2026: the AI's task, the redaction and «Mis datos» left the browser).
 'use strict';
 (() => {
   const { manda, en, t, tn, esc, $, n } = Z;
@@ -426,208 +427,13 @@
     if (!fraseTarjeta) return;
     navigator.clipboard.writeText(fraseTarjeta).then(() => { $('e-tarjeta-copiar').textContent = t('copiado'); setTimeout(() => { $('e-tarjeta-copiar').textContent = t('chivatos_copiar'); }, 1500); });
   });
+  // Where the card was saved, said under it.
+  en('guardado', (m) => { if (m.que === 'chivatos') $('e-tarjeta-guardada').textContent = m.texto || m.ruta || ''; });
   $('e-recargar').addEventListener('click', () => { manda({ tipo: 'recargar' }); $('e-recarga').classList.add('oculto'); });
   $('e-ver-todo').addEventListener('click', () => manda({ tipo: 'abrir_cortes' }));
   $('e-proteccion').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'cortar_seguimiento', valor: e.target.checked }));
   $('e-maxima-activar').addEventListener('click', () => { manda({ tipo: 'ajuste', clave: 'maxima', valor: true }); $('e-recarga').classList.remove('oculto'); });
   $('e-maxima-quitar').addEventListener('click', () => manda({ tipo: 'ajuste', clave: 'maxima', valor: false }));
-
-  // --- mandate ---------------------------------------------------------------------------------
-  let sitioActual = '';
-  // Ideas to start from: they fill the task and the websites, and the person changes what they
-  // want. The websites are the same everywhere; the task is written in the person's language.
-  const IDEAS = {
-    vuelo: ['google.com', 'skyscanner.com', 'kayak.com'],
-    hotel: ['booking.com', 'airbnb.com', 'google.com'],
-    precios: ['amazon.com', 'ebay.com', 'google.com'],
-    investigar: ['wikipedia.org', 'google.com', 'britannica.com'],
-  };
-  // What the websites box will allow, as the person types: the program answers with the exact
-  // list the limit will use (each website's registrable site, entries that are not websites left
-  // out), and that same list is what starts the mandate.
-  const trozos = () => $('m-webs').value.split(/[\s,;]+/).map((w) => w.trim()).filter(Boolean);
-  let permitidos = [];
-  let previaTimer = 0;
-  function vistaWebs() {
-    clearTimeout(previaTimer);
-    previaTimer = setTimeout(() => manda({ tipo: 'mandato_previa', webs: trozos() }), 200);
-  }
-  en('mandato_previa', (m) => {
-    permitidos = m.permitidos || [];
-    $('m-webs-vista').innerHTML = permitidos.length
-      ? `<span class="pequeno gris">${esc(t('mandato_podra'))}</span>` + permitidos.map((w) => `<span class="chip azul mono">${esc(w)}</span>`).join('')
-      : '';
-  });
-  $('m-webs').addEventListener('input', () => { vistaWebs(); $('m-error').classList.add('oculto'); });
-  document.querySelectorAll('#m-ideas .idea').forEach((b) => b.addEventListener('click', () => {
-    document.querySelectorAll('#m-ideas .idea').forEach((x) => x.classList.toggle('elegida', x === b));
-    const idea = b.dataset.idea;
-    if (idea === 'esta') {
-      $('m-tarea').value = t('idea_esta_tarea', { sitio: sitioActual });
-      $('m-webs').value = sitioActual;
-    } else {
-      $('m-tarea').value = t('idea_' + idea + '_tarea');
-      $('m-webs').value = IDEAS[idea].join(', ');
-    }
-    vistaWebs();
-    $('m-tarea').focus();
-  }));
-  $('m-empezar').addEventListener('click', () => {
-    const webs = trozos();
-    $('m-error').classList.toggle('oculto', webs.length > 0);
-    if (!webs.length) return;
-    manda({ tipo: 'mandato_empezar', tarea: $('m-tarea').value, webs, estricto: $('m-estricto').checked, minutos: Number($('m-duracion').value) });
-  });
-  $('m-terminar').addEventListener('click', () => manda({ tipo: 'mandato_terminar' }));
-  $('m-copiar').addEventListener('click', () => { navigator.clipboard.writeText($('m-senuelo').textContent).then(() => { $('m-copiar').textContent = t('copiado'); setTimeout(() => { $('m-copiar').textContent = t('copiar'); }, 1500); }); });
-  $('r-guardar').addEventListener('click', () => manda({ tipo: 'recibo_guardar' }));
-  $('r-nuevo').addEventListener('click', () => manda({ tipo: 'mandato_nuevo' }));
-  en('mandato', (m) => {
-    sitioActual = m.sitio_actual || '';
-    const estado = m.estado || 'ninguno';
-    $('m-nuevo').classList.toggle('oculto', estado !== 'ninguno');
-    $('m-activo').classList.toggle('oculto', estado !== 'activo');
-    $('m-recibo').classList.toggle('oculto', estado !== 'terminado');
-    const esta = $('m-idea-esta');
-    esta.classList.toggle('oculto', !sitioActual);
-    esta.textContent = sitioActual ? t('idea_esta', { sitio: sitioActual }) : '';
-    vistaWebs();
-    const md = m.mandato;
-    const cuentas = m.cuentas ? t('mandato_cuentas', { visitas: n(m.cuentas.visitas), sitios: n(m.cuentas.sitios), cortes: n(m.cuentas.cortes), datos: n(m.cuentas.datos) }) : '';
-    if (estado === 'activo' && md) {
-      $('m-tarea-txt').textContent = md.tarea || '';
-      $('m-sitios').innerHTML = md.permitidos.map((s) => `<span class="chip azul mono">${esc(s)}</span>`).join('');
-      $('m-cuentas').textContent = cuentas;
-      $('m-senuelo').textContent = md.senuelo;
-      $('m-caduca').textContent = md.caduca ? t('mandato_termina', { hora: new Date(md.caduca).toLocaleTimeString(document.documentElement.lang, { hour: '2-digit', minute: '2-digit' }) }) : '';
-      const pasos = (md.pasos || []).slice(-40).reverse();
-      $('m-pasos-vacio').classList.toggle('oculto', pasos.length > 0);
-      $('m-pasos').innerHTML = pasos.map((p) => `<li><time>${esc(hora(p.ts))}</time><span class="que ${esc(p.que)}">${esc(t('mandato_paso_' + p.que))}</span><span class="mono">${esc(p.sitio)}</span>`
-        + (p.que === 'cortado' && !md.permitidos.includes(p.sitio) ? `<button class="boton chico deja" data-sitio="${esc(p.sitio)}">${esc(t('mandato_anadir_corto'))}</button>` : '<span></span>') + '</li>').join('');
-      $('m-pasos').querySelectorAll('button[data-sitio]').forEach((b) => {
-        b.title = t('mandato_anadir_web', { sitio: b.dataset.sitio });
-        b.addEventListener('click', () => manda({ tipo: 'mandato_anadir', sitio: b.dataset.sitio }));
-      });
-    }
-    if (estado === 'terminado') {
-      $('r-cuentas').textContent = cuentas;
-      $('r-json').textContent = m.recibo ? JSON.stringify(m.recibo, null, 1) : '';
-      $('r-ruta').textContent = '';
-      $('r-huella').textContent = m.huella ? t('recibo_huella', { huella: m.huella }) : '';
-    }
-  });
-  en('guardado', (m) => {
-    if (m.que === 'chivatos') $('e-tarjeta-guardada').textContent = m.texto || m.ruta || '';
-    else $('r-ruta').textContent = m.texto || m.ruta || '';
-  });
-
-  // --- redaction --------------------------------------------------------------------------------
-  let tachado = null;
-  $('t-tachar').addEventListener('click', () => manda({ tipo: 'tachar', texto: $('t-texto').value }));
-  // What the AI will receive appears as the person writes: no button to find first.
-  let tacharTimer = 0;
-  $('t-texto').addEventListener('input', () => {
-    clearTimeout(tacharTimer);
-    tacharTimer = setTimeout(() => manda({ tipo: 'tachar', texto: $('t-texto').value }), 350);
-  });
-  en('tachado', (m) => {
-    tachado = m;
-    const listo = !!(m.texto && m.texto.trim());
-    $('t-paso-2').classList.toggle('apagado', !listo);
-    $('t-pegar').disabled = !listo;
-    $('t-copiar').disabled = !listo;
-    const hay = (m.sustituciones || []).length > 0;
-    $('t-resultado').classList.toggle('oculto', !hay && !m.texto);
-    $('t-nada').classList.toggle('oculto', hay || !m.texto);
-    let html = esc(m.texto || '');
-    for (const s of m.sustituciones || []) html = html.split(esc(s.marca)).join(`<mark>${esc(s.marca)}</mark>`);
-    $('t-salida').innerHTML = html;
-    $('t-tabla').innerHTML = (m.sustituciones || []).map((s) => `<tr><td>${esc(s.marca)}</td><td>${esc(t(s.clave))}</td></tr>`).join('');
-  });
-  $('t-pegar').addEventListener('click', () => { if (tachado) manda({ tipo: 'tachon_pegar', texto: tachado.texto }); });
-  $('t-copiar').addEventListener('click', () => { if (tachado) navigator.clipboard.writeText(tachado.texto).then(() => { $('t-copiar').textContent = t('copiado'); setTimeout(() => { $('t-copiar').textContent = t('copiar'); }, 1500); }); });
-  $('t-respuesta').addEventListener('click', () => manda({ tipo: 'tachon_respuesta' }));
-  en('restaurado', (m) => {
-    const caja = $('t-restaurada');
-    caja.classList.remove('oculto');
-    caja.textContent = m.texto || t('tachon_seleccion_vacia');
-  });
-
-  // --- my data ----------------------------------------------------------------------------------
-  const TIPOS = ['correo', 'telefono', 'documento', 'nombre', 'otro'];
-  const LEYES = ['co', 'ue', 'ca', 'br', 'otro'];
-  function pintaTipos() { $('d-tipo').innerHTML = TIPOS.map((x) => `<option value="${x}">${esc(t('dato_' + x))}</option>`).join(''); }
-  $('d-nuevo').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const valor = $('d-valor').value.trim();
-    if (!valor) return;
-    manda({ tipo: 'tinta_anadir', dato: $('d-tipo').value, valor });
-    $('d-valor').value = '';
-  });
-  en('tinta', (m) => {
-    const lista = m.lista || [];
-    $('d-marcados').innerHTML = lista.map((x, i) => `<li><span class="chip">${esc(t('dato_' + x.tipo))}</span><span class="mono">${esc(x.visible)}</span><button class="boton chico" data-i="${i}">${esc(t('tinta_quitar'))}</button></li>`).join('');
-    $('d-marcados').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => manda({ tipo: 'tinta_quitar', indice: Number(b.dataset.i) })));
-    $('d-marcados-vacio').classList.toggle('oculto', lista.length > 0);
-  });
-  en('libro', (m) => {
-    const entradas = m.entradas || [];
-    $('d-libro-vacio').classList.toggle('oculto', entradas.length > 0);
-    $('d-libro').replaceChildren(...entradas.map((e) => {
-      const d = document.createElement('div');
-      d.className = 'entrada';
-      const datos = (e.clases || []).map((c) => t('dato_' + c)).join(', ');
-      d.innerHTML = `<div class="cab"><button class="enlace-empresa" data-empresa="${esc(e.empresa || e.sitio)}"><b>${esc(e.empresa || e.sitio)}</b></button>${e.empresa ? `<span class="mono gris">${esc(e.sitio)}</span>` : ''}${e.pais ? `<span class="gris pequeno">${esc(pais(e.pais))}</span>` : ''}${e.corredor ? `<span class="chip rojo">${esc(t('corredor_etiqueta'))}</span>` : ''}</div>`
-        + `<div class="datos">${esc(t('libro_fila', { datos, veces: n(e.veces), fecha: fecha(e.ultima) }))}</div>`
-        + `<button class="boton chico">${esc(t('libro_carta'))}</button><div class="carta oculto"></div>`;
-      const caja = d.querySelector('.carta');
-      d.querySelector('button').addEventListener('click', () => {
-        caja.classList.toggle('oculto');
-        if (!caja.classList.contains('oculto') && !caja.dataset.listo) {
-          caja.dataset.listo = '1';
-          caja.innerHTML = `<label class="etiqueta">${esc(t('carta_tu_nombre'))}</label><input class="campo nombre" type="text" autocomplete="name" spellcheck="false">`
-            + `<label class="etiqueta">${esc(t('carta_tu_correo'))}</label><input class="campo correo-tuyo" type="email" autocomplete="email" spellcheck="false">`
-            + `<label class="etiqueta"><input type="checkbox" class="recordar"> ${esc(t('carta_recordar'))}</label>`
-            + `<label class="etiqueta">${esc(t('ley'))}</label><select class="campo">${LEYES.map((l) => `<option value="${l}">${esc(t('ley_' + l))}</option>`).join('')}</select>`
-            + `<label class="etiqueta">${esc(t('libro_carta'))}</label><input class="campo asunto" readonly><textarea class="campo" readonly style="margin-top:6px"></textarea>`
-            + `<div class="fila-acciones"><button class="boton principal copiar">${esc(t('carta_copiar'))}</button><button class="boton correo">${esc(t('carta_correo'))}</button></div><p class="explica pequeno" style="margin-top:8px">${esc(t('carta_nota'))}</p>`;
-          const sel = caja.querySelector('select');
-          const nombre = caja.querySelector('.nombre'), correo = caja.querySelector('.correo-tuyo'), recordar = caja.querySelector('.recordar');
-          try {
-            const g = JSON.parse(localStorage.getItem('guardiana_carta_datos') || 'null');
-            if (g && typeof g === 'object') { nombre.value = String(g.nombre || ''); correo.value = String(g.correo || ''); recordar.checked = true; }
-          } catch (_) {}
-          // The letter is made with what is typed; kept in this browser only when asked.
-          const pide = () => {
-            try {
-              if (recordar.checked) localStorage.setItem('guardiana_carta_datos', JSON.stringify({ nombre: nombre.value.trim(), correo: correo.value.trim() }));
-              else localStorage.removeItem('guardiana_carta_datos');
-            } catch (_) {}
-            manda({ tipo: 'carta', sitio: e.sitio, ley: sel.value, nombre: nombre.value.trim(), correo: correo.value.trim() });
-          };
-          sel.addEventListener('change', pide);
-          nombre.addEventListener('change', pide);
-          correo.addEventListener('change', pide);
-          recordar.addEventListener('change', pide);
-          caja.querySelector('.copiar').addEventListener('click', () => {
-            navigator.clipboard.writeText(caja.querySelector('.asunto').value + '\n\n' + caja.querySelector('textarea').value);
-            manda({ tipo: 'carta_hecha', sitio: e.sitio });
-          });
-          caja.querySelector('.correo').addEventListener('click', () => { manda({ tipo: 'abrir_correo', asunto: caja.querySelector('.asunto').value, cuerpo: caja.querySelector('textarea').value }); manda({ tipo: 'carta_hecha', sitio: e.sitio }); });
-          d.dataset.sitio = e.sitio;
-          pide();
-        }
-      });
-      d.dataset.sitio = e.sitio;
-      return d;
-    }));
-  });
-  en('carta', (m) => {
-    const d = [...document.querySelectorAll('.entrada')].find((x) => x.dataset.sitio === m.sitio);
-    if (!d) return;
-    d.querySelector('.carta .asunto').value = m.asunto;
-    d.querySelector('.carta textarea').value = m.cuerpo;
-  });
 
   // --- settings ---------------------------------------------------------------------------------
   en('ajustes', (m) => {
@@ -638,12 +444,10 @@
     $('a-importar-caja').classList.toggle('oculto', !imp.length);
     $('a-importar').innerHTML = imp.map((x) => `<button class="boton chico" data-de="${esc(x)}">${esc(x)}</button>`).join(' ');
     $('e-proteccion').checked = !!m.cortar_seguimiento;
-    // One plain list, with no headings: the engines that say they keep no record of who searches
-    // what go first (the owner, 10 Oct 2026).
+    // One plain list, with no headings, in the program's order (2 Nov 2026, the owner, 16:47:
+    // Google, Brave, DuckDuckGo, then the rest).
     const opcion = (b) => `<option value="${esc(b.id)}"${b.id === m.buscador ? ' selected' : ''}>${esc(b.nombre)}</option>`;
-    const todos = m.buscadores || [];
-    $('a-buscador').innerHTML = todos.filter((b) => b.privado).map(opcion).join('')
-      + todos.filter((b) => !b.privado).map(opcion).join('');
+    $('a-buscador').innerHTML = (m.buscadores || []).map(opcion).join('');
     $('a-idioma').value = m.idioma || '';
     document.querySelectorAll('.temas button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tema === (m.tema || ''))));
     $('a-borrar-palabra').placeholder = t('borrar_confirma', { palabra: t('borrar_palabra') });
@@ -695,8 +499,6 @@
     $('f-texto').textContent = t('formulario_texto', { sitio: m.sitio, datos: (m.datos || []).map((c) => t(c)).join(', ') });
     $('f-datos').innerHTML = (m.datos || []).map((c) => `<span class="chip ambar">${esc(t(c))}</span>`).join('');
     $('f-corredor').textContent = m.corredor ? t('formulario_corredor', { sitio: m.sitio }) : '';
-    $('f-mandato').classList.toggle('oculto', !m.mandato);
-    $('f-recordar-caja').classList.toggle('oculto', !!m.mandato);
     $('f-recordar').checked = false;
   });
   const responde = (enviar) => { if (preguntaId != null) manda({ tipo: 'formulario_respuesta', id: preguntaId, enviar, recordar: $('f-recordar').checked }); preguntaId = null; };
@@ -709,7 +511,6 @@
 
   en('textos', () => {
     try { const dn = new Intl.DisplayNames([document.documentElement.lang], { type: 'region' }); pais = (c) => { try { return dn.of(c); } catch (_) { return c; } }; } catch (_) {}
-    pintaTipos();
     if (vista) muestra(vista);
     if (lic) pintaLicencia(lic);
   });

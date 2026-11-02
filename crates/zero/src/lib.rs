@@ -43,7 +43,6 @@ pub mod secure;
 pub mod servidor;
 pub mod sesion;
 pub mod subasta;
-pub mod tachon;
 pub mod textos;
 pub mod tinta;
 pub mod url_limpia;

@@ -1,6 +1,6 @@
 [package]
 name = "guardiana-zero"
-description = "GUARDIANA ZERO: the browser's portable core (destinations, marked data, redaction, mandates, signed receipts, data book)"
+description = "GUARDIANA ZERO: the browser's portable core (destinations, marked data, signed receipts, data book)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

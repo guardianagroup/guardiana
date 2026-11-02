@@ -266,25 +266,32 @@ fn the_comunicaciones_page_buttons_reach_the_conversation() {
         .is_empty());
 }
 
+/// 2 Nov 2026 (the owner, 16:43: «el escudo… quiero que aparezca predeterminado abierto»): open at
+/// every start; closed by the person (✕, Esc or a click on the web), it stays closed for that
+/// session only, and nothing about it is written down.
 #[test]
-fn the_shield_opens_by_itself_until_the_person_closes_it() {
+fn the_shield_is_open_at_every_start_and_closing_it_lasts_one_session() {
     let (mut s, _, _) = con_pagina(true);
     let datos = s.datos.clone();
+    let reabre = |datos: &Path| {
+        Sesion::abre(Arranque {
+            datos: datos.to_path_buf(),
+            descargas: datos.join("descargas"),
+            idioma_sistema: "es-CO".into(),
+            version: "0.1.0".into(),
+            reloj,
+        })
+        .0
+    };
+    let abierto_al_empezar = |s: &mut Sesion| {
+        let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"listo","vista":"barra"}"#);
+        o.contains(&Orden::Panel { abierto: true })
+            && del_tipo(&o, Origen::Panel, "vista").unwrap_or_default()["vista"] == "escudo"
+    };
     s.cierra();
     // The next start: the shield is open as soon as the bar is there.
-    let (mut s, _) = Sesion::abre(Arranque {
-        datos: datos.clone(),
-        descargas: datos.join("descargas"),
-        idioma_sistema: "es-CO".into(),
-        version: "0.1.0".into(),
-        reloj,
-    });
-    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"listo","vista":"barra"}"#);
-    assert!(o.contains(&Orden::Panel { abierto: true }));
-    assert_eq!(
-        del_tipo(&o, Origen::Panel, "vista").unwrap_or_default()["vista"],
-        "escudo"
-    );
+    let mut s = reabre(datos.as_path());
+    assert!(abierto_al_empezar(&mut s));
     // Settings, closed: back to the shield, not to nothing.
     let _ = s.mensaje(
         Origen::Barra,
@@ -296,24 +303,46 @@ fn the_shield_opens_by_itself_until_the_person_closes_it() {
         del_tipo(&o, Origen::Panel, "vista").unwrap_or_default()["vista"],
         "escudo"
     );
-    // The shield, closed: closed, and still closed at the next start.
+    // The shield, closed: closed for the rest of this session (settings closed again lead to
+    // nothing, not to the shield)...
     let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"panel","vista":null}"#);
     assert!(o.contains(&Orden::Panel { abierto: false }));
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"panel","vista":"ajustes"}"#,
+    );
+    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"panel","vista":null}"#);
+    assert!(o.contains(&Orden::Panel { abierto: false }));
+    // ...and open again at the next start: nothing was written.
     s.cierra();
-    let (mut s, _) = Sesion::abre(Arranque {
-        datos: datos.clone(),
-        descargas: datos.join("descargas"),
-        idioma_sistema: "es-CO".into(),
-        version: "0.1.0".into(),
-        reloj,
-    });
-    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"listo","vista":"barra"}"#);
-    assert!(!o.contains(&Orden::Panel { abierto: true }));
-    // Opened again with the shield button: it opens by itself again from then on.
-    let _ = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":"escudo"}"#);
+    let escrito = fs::read_to_string(datos.join("preferencias.json")).unwrap_or_default();
+    assert!(!escrito.contains("escudo_cerrado"), "{escrito}");
+    let mut s = reabre(datos.as_path());
+    assert!(abierto_al_empezar(&mut s));
+    // A click on the web folds it for the session too, and the next start opens it again.
+    let id = s.activa();
+    let _ = abre_pagina(&mut s, id, "https://www.eltiempo.com/");
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        "https://www.eltiempo.com/",
+        r#"{"tipo":"zg_toque"}"#,
+    );
+    assert!(o.contains(&Orden::Panel { abierto: false }));
+    assert!(!s.escudo_a_la_vista());
     s.cierra();
-    let p: Preferencias = lee(&datos.join("preferencias.json"));
-    assert!(!p.escudo_cerrado);
+    let mut s = reabre(datos.as_path());
+    assert!(abierto_al_empezar(&mut s));
+    // A value older versions wrote («closed at every start») is ignored.
+    s.cierra();
+    let mut p: Value = serde_json::from_str(
+        &fs::read_to_string(datos.join("preferencias.json")).unwrap_or_default(),
+    )
+    .unwrap_or_default();
+    p["escudo_cerrado"] = json!(true);
+    let _ = fs::write(datos.join("preferencias.json"), p.to_string());
+    let mut s = reabre(datos.as_path());
+    assert!(abierto_al_empezar(&mut s));
 }
 
 #[test]
@@ -323,8 +352,8 @@ fn web_pages_cannot_command_the_browser() {
     for m in [
         r#"{"tipo":"borrar_todo"}"#,
         r#"{"tipo":"navegar","texto":"evil.example"}"#,
-        r#"{"tipo":"tinta_anadir","dato":"correo","valor":"x@y.co"}"#,
-        r#"{"tipo":"panel","vista":"datos"}"#,
+        r#"{"tipo":"ajuste","clave":"cortar_seguimiento","valor":false}"#,
+        r#"{"tipo":"panel","vista":"ajustes"}"#,
     ] {
         assert!(s.mensaje(Origen::Pestana(id), web, m).is_empty());
         // Not from a web page pretending to be the bar either.
@@ -689,13 +718,7 @@ fn tracking_parameters_are_removed_before_the_page_opens() {
 #[test]
 fn marked_data_never_reaches_a_third_party_and_the_book_says_who_got_it() {
     let (mut s, _, id) = con_pagina(false);
-    let o = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        r#"{"tipo":"tinta_anadir","dato":"correo","valor":"ana@correo.co"}"#,
-    );
-    let t = del_tipo(&o, Origen::Panel, "tinta").unwrap_or_default();
-    assert_eq!(t["lista"][0]["visible"], "an•••@correo.co");
+    marca_correo(&mut s);
     assert!(s.necesita_cuerpo(id, "https://collect.otra-empresa.io/e"));
     let r = s.peticion(
         id,
@@ -738,105 +761,6 @@ fn marked_data_never_reaches_a_third_party_and_the_book_says_who_got_it() {
     let o = s.tic();
     let e = del_tipo(&o, Origen::Barra, "escudo").unwrap_or_default();
     assert_eq!(e["datos_salvados"], 2);
-}
-
-#[test]
-fn a_mandate_keeps_its_tab_inside_and_signs_what_happened() {
-    let (mut s, d, _) = con_pagina(false);
-    let o = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        r#"{"tipo":"mandato_empezar","tarea":"Busca un vuelo","webs":["avianca.com"],"estricto":true}"#,
-    );
-    let Some(Orden::CreaPestana {
-        id: m,
-        perfil: Perfil::Mandato,
-        url: Some(u),
-        ..
-    }) = o.first().cloned()
-    else {
-        unreachable!("the mandate opens its own tab: {o:?}");
-    };
-    assert_eq!(u, "https://avianca.com/");
-    let estado = del_tipo(&o, Origen::Panel, "mandato").unwrap_or_default();
-    assert_eq!(estado["estado"], "activo");
-    let senuelo = estado["mandato"]["senuelo"]
-        .as_str()
-        .unwrap_or_default()
-        .to_string();
-    assert!(senuelo.ends_with("@guardiana-zero.invalid"));
-    assert!(!abre_pagina(&mut s, m, "https://www.avianca.com/").cortar);
-    // A page that talks the AI into going elsewhere: the tab does not go.
-    let r = abre_pagina(&mut s, m, "https://evil.example/robar");
-    assert!(r.cortar);
-    assert!(r.pagina.unwrap_or_default().contains("evil.example"));
-    // The decoy leaving, even to an allowed site, is caught.
-    let r = s.peticion(
-        m,
-        "https://www.avianca.com/api",
-        "POST",
-        format!("{{\"email\":\"{senuelo}\"}}").as_bytes(),
-        8,
-    );
-    assert!(r.cortar);
-    // Other tabs are not limited by the mandate.
-    let _ = s.peticion(1, "https://evil.example/", "GET", b"", 3);
-    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"mandato_terminar"}"#);
-    assert!(o.contains(&Orden::CierraPestana { id: m }));
-    let fin = del_tipo(&o, Origen::Panel, "mandato").unwrap_or_default();
-    assert_eq!(fin["estado"], "terminado");
-    assert_eq!(fin["cuentas"]["visitas"], 1);
-    assert_eq!(fin["cuentas"]["cortes"], 2);
-    let r: Recibo =
-        serde_json::from_value(fin["recibo"].clone()).unwrap_or_else(|e| unreachable!("{e}"));
-    assert_eq!(recibo::comprueba(&r), Ok(()));
-    assert!(r.contenido.contains("Busca un vuelo"));
-    // Kept in the data folder, and saved to Downloads when asked.
-    let guardados = fs::read_dir(d.join("datos").join("recibos"))
-        .map(Iterator::count)
-        .unwrap_or(0);
-    assert_eq!(guardados, 1);
-    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"recibo_guardar"}"#);
-    let g = del_tipo(&o, Origen::Panel, "guardado").unwrap_or_default();
-    let ruta = PathBuf::from(g["ruta"].as_str().unwrap_or_default());
-    assert!(ruta.starts_with(d.join("descargas")));
-    assert!(ruta.exists());
-    // The receipt says what it could not see.
-    assert!(r.contenido.contains("otras_aplicaciones_del_equipo"));
-}
-
-#[test]
-fn a_mandate_ends_on_its_own_when_its_time_is_up() {
-    static AHORA: AtomicU64 = AtomicU64::new(1_791_553_171_000);
-    fn reloj_movil() -> i64 {
-        i64::try_from(AHORA.load(Ordering::SeqCst)).unwrap_or(0)
-    }
-    let d = carpeta();
-    let (mut s, _) = Sesion::abre(Arranque {
-        datos: d.join("datos"),
-        descargas: d.join("descargas"),
-        idioma_sistema: "es".into(),
-        version: "0.1.0".into(),
-        reloj: reloj_movil,
-    });
-    let o = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        r#"{"tipo":"mandato_empezar","tarea":"Compara precios","webs":["exito.com"],"estricto":true,"minutos":15}"#,
-    );
-    let Some(Orden::CreaPestana { id: m, .. }) = o.first().cloned() else {
-        unreachable!("{o:?}");
-    };
-    AHORA.fetch_add(14 * 60_000, Ordering::SeqCst);
-    assert!(!s.tic().contains(&Orden::CierraPestana { id: m }));
-    AHORA.fetch_add(2 * 60_000, Ordering::SeqCst);
-    let o = s.tic();
-    assert!(o.contains(&Orden::CierraPestana { id: m }));
-    assert_eq!(
-        del_tipo(&o, Origen::Panel, "mandato").unwrap_or_default()["estado"],
-        "terminado"
-    );
-    assert!(del_tipo(&o, Origen::Panel, "aviso").is_some());
 }
 
 #[test]
@@ -886,45 +810,6 @@ fn the_form_guard_asks_once_per_site_and_kind() {
     assert!(
         matches!(o.first(), Some(Orden::RespondeFormulario { json, .. }) if json.contains(r#""id":3"#))
     );
-}
-
-#[test]
-fn redaction_hides_data_from_the_ai_and_puts_it_back_only_in_the_panel() {
-    let (mut s, _, id) = con_pagina(false);
-    let _ = abre_pagina(&mut s, id, "https://chat.ia.example/");
-    let o = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        r#"{"tipo":"tachar","texto":"Escribe a ana@correo.co y llama al 3001234567"}"#,
-    );
-    let t = del_tipo(&o, Origen::Panel, "tachado").unwrap_or_default();
-    let texto = t["texto"].as_str().unwrap_or_default().to_string();
-    assert!(!texto.contains("ana@correo.co"));
-    assert!(!texto.contains("3001234567"));
-    assert_eq!(t["sustituciones"].as_array().map(Vec::len), Some(2));
-    let o = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        &json!({ "tipo": "tachon_pegar", "texto": texto }).to_string(),
-    );
-    assert!(o.contains(&Orden::Foco {
-        a: Origen::Pestana(id)
-    }));
-    assert!(
-        matches!(&o[1], Orden::Ejecuta { etiqueta: Some(Etiqueta::Pegar), script, .. } if script.contains("execCommand"))
-    );
-    let marca = t["sustituciones"][0]["marca"]
-        .as_str()
-        .unwrap_or_default()
-        .to_string();
-    let o = s.script_hecho(
-        Etiqueta::Seleccion,
-        &serde_json::to_string(&format!("Listo, escribí a {marca}.")).unwrap_or_default(),
-    );
-    let r = del_tipo(&o, Origen::Panel, "restaurado").unwrap_or_default();
-    assert_eq!(r["texto"], "Listo, escribí a ana@correo.co.");
-    let o = s.script_hecho(Etiqueta::Pegar, "\"sin_campo\"");
-    assert!(del_tipo(&o, Origen::Panel, "aviso").is_some());
 }
 
 #[test]
@@ -1065,16 +950,6 @@ fn a_tab_shows_its_site_icon_until_it_leaves_the_site() {
 }
 
 #[test]
-fn masks_show_enough_to_recognise() {
-    assert_eq!(
-        enmascara(Tipo::Correo, "marta@icloud.com"),
-        "ma•••@icloud.com"
-    );
-    assert_eq!(enmascara(Tipo::Telefono, "+573001234567"), "+5•••67");
-    assert_eq!(enmascara(Tipo::Nombre, "Ana"), "•••");
-}
-
-#[test]
 fn the_bar_shows_an_address_only_once_the_page_is_there() {
     let (mut s, _, id) = con_pagina(false);
     // A page starts a navigation that never arrives (stopped, a 204, a download).
@@ -1093,11 +968,7 @@ fn the_bar_shows_an_address_only_once_the_page_is_there() {
 #[test]
 fn a_page_cannot_carry_marked_data_away_by_opening_another_site() {
     let (mut s, _, id) = con_pagina(false);
-    let _ = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        r#"{"tipo":"tinta_anadir","dato":"correo","valor":"ana@correo.co"}"#,
-    );
+    marca_correo(&mut s);
     let r = abre_pagina(&mut s, id, "https://tracker.example/r?e=ana%40correo.co");
     assert!(r.cortar);
     assert!(r.pagina.unwrap_or_default().contains("tracker.example"));
@@ -1114,11 +985,7 @@ fn a_page_cannot_carry_marked_data_away_by_opening_another_site() {
 #[test]
 fn websockets_unknown_tabs_and_rented_names_are_checked_too() {
     let (mut s, _, id) = con_pagina(false);
-    let _ = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        r#"{"tipo":"tinta_anadir","dato":"correo","valor":"ana@correo.co"}"#,
-    );
+    marca_correo(&mut s);
     assert!(
         s.peticion(
             id,
@@ -1140,61 +1007,6 @@ fn websockets_unknown_tabs_and_rented_names_are_checked_too() {
         s.peticion(id, "https://luis.github.io/c", "POST", b"ana@correo.co", 8)
             .cortar
     );
-}
-
-#[test]
-fn the_decoy_is_caught_hashed_too() {
-    let (mut s, _, id) = con_pagina(false);
-    let o = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        r#"{"tipo":"mandato_empezar","tarea":"","webs":["avianca.com"],"estricto":true}"#,
-    );
-    let Some(Orden::CreaPestana { id: m, .. }) = o.first().cloned() else {
-        unreachable!("{o:?}");
-    };
-    let senuelo = s
-        .mandato
-        .as_ref()
-        .map(|x| x.senuelo.clone())
-        .unwrap_or_default();
-    let _ = abre_pagina(&mut s, m, "https://www.avianca.com/");
-    let sha = {
-        use sha2::{Digest, Sha256};
-        Sha256::digest(senuelo.as_bytes())
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect::<String>()
-    };
-    let r = s.peticion(
-        m,
-        &format!("https://www.avianca.com/p?h={sha}"),
-        "GET",
-        b"",
-        3,
-    );
-    assert!(r.cortar);
-    // Even the page's own site taking it is in the cut list, so «datos detenidos» on the new
-    // tab and the list it opens always say the same.
-    assert_eq!(s.msg_hoy()["hoy"]["datos_salvados"], 1);
-    let _ = s.navegacion_empieza(id, CORTES, false);
-    let _ = s.pagina_nueva(id, CORTES);
-    let o = s.mensaje(
-        Origen::Pestana(id),
-        CORTES,
-        r#"{"tipo":"cortes","periodo":"hoy"}"#,
-    );
-    let c = del_tipo(&o, Origen::Pestana(id), "cortes").unwrap_or_default();
-    let de_dato = c["lista"]
-        .as_array()
-        .map(|l| {
-            l.iter()
-                .filter(|x| x["motivo"] == "senuelo" || x["motivo"] == "tinta")
-                .count()
-        })
-        .unwrap_or_default();
-    assert_eq!(de_dato, 1);
-    assert_eq!(c["lista"][0]["mandato"], true);
 }
 
 #[test]
@@ -1405,26 +1217,15 @@ fn after_the_trial_it_browses_without_protection_until_a_key_is_activated() {
         !s.peticion(id, "https://example.com/?utm_source=x", "GET", b"", 1)
             .cortar
     );
-    // The paid tools open the subscription view instead.
-    for m in [
-        r#"{"tipo":"mandato_empezar","tarea":"x","webs":["avianca.com"],"estricto":true}"#,
-        r#"{"tipo":"tachar","texto":"hola"}"#,
-        r#"{"tipo":"tinta_anadir","dato":"correo","valor":"ana@example.com"}"#,
-    ] {
-        let o = s.mensaje(Origen::Panel, PANEL, m);
-        assert!(!o.iter().any(|x| matches!(x, Orden::CreaPestana { .. })));
-        let v = del_tipo(&o, Origen::Panel, "vista").unwrap_or_default();
-        assert_eq!(v["vista"], "licencia", "{m}");
-    }
+    // The paid tool opens the subscription view instead.
     let o = s.mensaje(
-        Origen::Barra,
-        BARRA,
-        r#"{"tipo":"panel","vista":"mandato"}"#,
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"subasta_carta","sitio":"criteo.com","carta":"acceso"}"#,
     );
-    assert_eq!(
-        del_tipo(&o, Origen::Panel, "vista").unwrap_or_default()["vista"],
-        "licencia"
-    );
+    assert!(!o.iter().any(|x| matches!(x, Orden::CreaPestana { .. })));
+    let v = del_tipo(&o, Origen::Panel, "vista").unwrap_or_default();
+    assert_eq!(v["vista"], "licencia");
     // A web page cannot ask for an activation; the panel can, and the shell does it.
     assert!(s
         .mensaje(
@@ -1483,21 +1284,6 @@ fn after_the_trial_it_browses_without_protection_until_a_key_is_activated() {
     );
 }
 
-/// A mandate that is open when the trial ends is closed: its limits would no longer be enforced.
-#[test]
-fn a_mandate_open_when_the_trial_ends_is_closed() {
-    let (mut s, _, _) = con_pagina(false);
-    let _ = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        r#"{"tipo":"mandato_empezar","tarea":"x","webs":["avianca.com"],"estricto":true}"#,
-    );
-    assert!(s.mandato.is_some());
-    let o = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
-    assert!(s.mandato.is_none());
-    assert!(o.iter().any(|x| matches!(x, Orden::CierraPestana { .. })));
-}
-
 /// A licence file that cannot be read (here a folder in its place) neither turns the trial into
 /// a free browser for ever nor goes unsaid: the bar and the panel say it at once, the browser
 /// protects for a day from the start, or from the last good reading, and then stops until the
@@ -1554,8 +1340,12 @@ fn an_unreadable_licence_protects_for_one_day_and_says_so() {
     assert_eq!(l["estado"], "ilegible");
     assert_eq!(l["protege"], false);
     assert!(!s.peticion(id, tracker, "GET", b"", 3).cortar);
-    // The paid tools open the subscription view, without saying that a trial ended.
-    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"tachar","texto":"hola"}"#);
+    // The paid tool opens the subscription view, without saying that a trial ended.
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"subasta_carta","sitio":"criteo.com","carta":"acceso"}"#,
+    );
     assert_eq!(
         del_tipo(&o, Origen::Panel, "vista").unwrap_or_default()["vista"],
         "licencia"
@@ -1649,6 +1439,25 @@ fn the_new_tab_lists_the_engines_and_can_change_the_one_in_use() {
     assert_eq!(
         hoy["motores"].as_array().map(Vec::len),
         Some(BUSCADORES.len())
+    );
+    // In the owner's order (2 Nov 2026, 16:47), the same in the box and in the settings.
+    let nombres = |v: &Value| -> Vec<String> {
+        v.as_array()
+            .map(|l| {
+                l.iter()
+                    .take(3)
+                    .map(|b| b["nombre"].as_str().unwrap_or_default().to_string())
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    assert_eq!(
+        nombres(&hoy["motores"]),
+        ["Google", "Brave Search", "DuckDuckGo"]
+    );
+    assert_eq!(
+        nombres(&s.msg_ajustes()["buscadores"]),
+        nombres(&hoy["motores"])
     );
     let _ = s.mensaje(Origen::Pestana(id), INICIO, r#"{"tipo":"listo"}"#);
     let o = s.mensaje(
@@ -1919,11 +1728,7 @@ fn after_the_trial_the_shield_no_longer_says_cut() {
 #[test]
 fn an_isolated_tab_writes_nothing_to_the_book() {
     let (mut s, _, _) = con_pagina(false);
-    let _ = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        r#"{"tipo":"tinta_anadir","dato":"correo","valor":"ana@correo.co"}"#,
-    );
+    marca_correo(&mut s);
     let _ = s.tecla(u32::from('N'), true, true, false);
     let id = s.activa();
     assert!(s.es_aislada(id));
@@ -1975,12 +1780,18 @@ fn fila_de(s: &mut Sesion, sitio: &str) -> Value {
         .unwrap_or_default()
 }
 
+/// Data the person marked while «Mis datos» was in the browser: it keeps protecting (2 Nov 2026,
+/// the owner, 16:50: the section left; what it marked did not).
+fn marca(s: &mut Sesion, tipo: Tipo, valor: &str) {
+    s.tinta.push(Marcado {
+        tipo,
+        valor: valor.to_string(),
+    });
+    s.rehace_formas();
+}
+
 fn marca_correo(s: &mut Sesion) {
-    let _ = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        r#"{"tipo":"tinta_anadir","dato":"correo","valor":"ana@correo.co"}"#,
-    );
+    marca(s, Tipo::Correo, "ana@correo.co");
 }
 
 /// Review of 10 Oct 2026, grave 1: Meta's pixel lives on `www.facebook.com`, which the lists
@@ -2238,66 +2049,6 @@ fn an_approved_sending_carries_on_in_the_window_it_opens() {
     assert!(!s.peticion(m, fuga, "GET", b"", 1).cortar);
 }
 
-#[test]
-fn the_approval_never_covers_a_mandate_s_decoy() {
-    let (mut s, _, _) = con_pagina(false);
-    marca_correo(&mut s);
-    let o = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        r#"{"tipo":"mandato_empezar","tarea":"","webs":["avianca.com"],"estricto":true}"#,
-    );
-    let Some(Orden::CreaPestana { id: m, .. }) = o.first().cloned() else {
-        unreachable!("{o:?}");
-    };
-    let senuelo = s
-        .mandato
-        .as_ref()
-        .map(|x| x.senuelo.clone())
-        .unwrap_or_default();
-    let web = "https://www.avianca.com/reservar";
-    let _ = abre_pagina(&mut s, m, web);
-    let o = s.mensaje(
-        Origen::Pestana(m),
-        web,
-        &json!({ "tipo": "zg_formulario", "zg": "f", "id": 1, "accion": "https://www.avianca.com/pago", "valores": [senuelo, "ana@correo.co"] })
-            .to_string(),
-    );
-    let q = del_tipo(&o, Origen::Panel, "pregunta_formulario").unwrap_or_default();
-    assert_eq!(q["mandato"], true);
-    let _ = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        &json!({ "tipo": "formulario_respuesta", "id": q["id"], "enviar": true, "recordar": false })
-            .to_string(),
-    );
-    // The person's own email was approved: it goes.
-    assert!(
-        !s.peticion(
-            m,
-            "https://www.avianca.com/api/pago",
-            "POST",
-            b"email=ana%40correo.co",
-            8
-        )
-        .cortar
-    );
-    // The decoy is nobody's: it is caught, approval or not, in the page and in a new window.
-    let robo = format!("{{\"email\":\"{senuelo}\"}}");
-    let r = s.peticion(
-        m,
-        "https://www.avianca.com/api/pago",
-        "POST",
-        robo.as_bytes(),
-        8,
-    );
-    assert!(r.cortar);
-    let (n, _) = s.ventana_nueva(m, "").unwrap_or_default();
-    let fuga = format!("https://www.avianca.com/p?e={senuelo}");
-    let _ = s.navegacion_empieza(n, &fuga, false);
-    assert!(s.peticion(n, &fuga, "GET", b"", 3).cortar);
-}
-
 /// Grave 6: a window a page opens leaves from that page.
 #[test]
 fn a_new_window_cannot_carry_marked_data_away_either() {
@@ -2421,45 +2172,6 @@ fn a_site_cut_only_in_part_says_so_and_goes_back_to_that_part() {
     assert!(
         !s.peticion(id, "https://www.google.com/recaptcha/api.js", "GET", b"", 6)
             .cortar
-    );
-}
-
-/// Media 8 in a mandate: what is outside the task is cut, and no button of the shield changes
-/// that (the task's own panel adds sites).
-#[test]
-fn outside_the_task_the_row_is_cut_and_fixed() {
-    let (mut s, _, _) = con_pagina(false);
-    let o = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        r#"{"tipo":"mandato_empezar","tarea":"","webs":["avianca.com"],"estricto":true}"#,
-    );
-    let Some(Orden::CreaPestana { id: m, .. }) = o.first().cloned() else {
-        unreachable!("{o:?}");
-    };
-    let _ = abre_pagina(&mut s, m, "https://www.avianca.com/");
-    assert!(
-        s.peticion(m, "https://evil.example/p.png?d=1", "GET", b"", 3)
-            .cortar
-    );
-    let f = fila_de(&mut s, "evil.example");
-    assert_eq!(f["ahora"], "cortado");
-    assert_eq!(f["por"], "fuera_de_mandato");
-    assert_eq!(f["fijo"], true);
-    // The task's tab turns off what its filter would not see, and the receipt says so.
-    assert!(s.guion_pestana(m).contains("WebTransport"));
-    assert!(!s.guion_pestana(1).contains("WebTransport"));
-    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"mandato_terminar"}"#);
-    let fin = del_tipo(&o, Origen::Panel, "mandato").unwrap_or_default();
-    let contenido = fin["recibo"]["contenido"].as_str().unwrap_or_default();
-    assert!(
-        contenido.contains(r#""apagado":["webrtc","webtransport"]"#),
-        "{contenido}"
-    );
-    // Said where: in the pages and their frames, not everywhere.
-    assert!(
-        contenido.contains(r#""apagado_en":"paginas_y_marcos""#),
-        "{contenido}"
     );
 }
 
@@ -2604,11 +2316,7 @@ fn the_card_is_saved_as_a_png_of_its_own_name() {
 fn two_approved_sendings_to_one_site_add_up() {
     let (mut s, _, id) = con_pagina(false);
     marca_correo(&mut s);
-    let _ = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        r#"{"tipo":"tinta_anadir","dato":"telefono","valor":"+57 300 123 4567"}"#,
-    );
+    marca(&mut s, Tipo::Telefono, "+57 300 123 4567");
     let web = "https://www.tienda.co/pagar";
     let _ = abre_pagina(&mut s, id, web);
     for (n, valor) in [(1, "ana@correo.co"), (2, "3001234567")] {
@@ -4424,4 +4132,174 @@ fn only_the_program_s_own_tabs_get_the_program_s_part_of_the_script() {
         assert!(s.guion_pestana(otra).contains("const programa = false;"));
     }
     assert!(crate::paginas::guion_paginas().contains("const programa = false;"));
+}
+
+/// 2 Nov 2026 (the owner, 16:47: «estoy en YouTube… la cierro… en vez de seguir aquí… me saca
+/// directamente del navegador a la pantalla principal de Órbita»): closing a tab of the browser
+/// brings forward the nearest tab of the browser, the one to its right first, then the one to its
+/// left, and with none left a new tab of it; never Órbita, Comunicaciones or GUARDIANA because they
+/// were next to it.
+#[test]
+fn closing_a_tab_of_the_browser_stays_in_the_browser() {
+    let (mut s, _, _) = abre();
+    let _ = s.abre_programa(&format!("http://127.0.0.1:7443/?t={}", "a".repeat(64)));
+    let producto = |s: &Sesion, id: u32| s.pestana(id).map_or("", Sesion::producto_de);
+    // The program's own tabs: GUARDIANA, ZERO's new tab, Comunicaciones and Órbita, in front.
+    assert_eq!(s.producto(), "orbita");
+    let orbita = s.activa();
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"producto","producto":"zero"}"#,
+    );
+    let inicio = s.activa();
+    assert_eq!(producto(&s, inicio), "zero");
+    // YouTube, from ZERO's new tab: a tab of its own, the last one of all.
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"navegar","texto":"youtube.com"}"#,
+    );
+    let youtube = s.activa();
+    assert_ne!(youtube, inicio);
+    assert_eq!(s.pestanas.last().map(|p| p.id), Some(youtube));
+    let cierra = |s: &mut Sesion, id: u32| {
+        s.mensaje(
+            Origen::Barra,
+            BARRA,
+            &json!({ "tipo": "pestana_cerrar", "id": id }).to_string(),
+        )
+    };
+    let o = cierra(&mut s, youtube);
+    assert!(o.contains(&Orden::CierraPestana { id: youtube }));
+    assert!(o.contains(&Orden::Activa { id: inicio }), "{o:?}");
+    assert!(!o.contains(&Orden::Activa { id: orbita }));
+    assert_eq!(s.producto(), "zero");
+    // Two of its tabs: closing the one in front brings the one to its right, then the one to its
+    // left.
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"navegar","texto":"example.com"}"#,
+    );
+    let a = s.activa();
+    let _ = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"pestana_nueva"}"#);
+    let b = s.activa();
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        &json!({ "tipo": "pestana_activar", "id": a }).to_string(),
+    );
+    let o = cierra(&mut s, a);
+    assert!(o.contains(&Orden::Activa { id: b }), "{o:?}");
+    let o = cierra(&mut s, b);
+    assert!(o.contains(&Orden::Activa { id: inicio }), "{o:?}");
+    // A tab that was not in front closes without moving anything.
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"navegar","texto":"example.com"}"#,
+    );
+    let c = s.activa();
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        &json!({ "tipo": "pestana_activar", "id": inicio }).to_string(),
+    );
+    let o = cierra(&mut s, c);
+    assert!(!o.iter().any(|x| matches!(x, Orden::Activa { .. })));
+    assert_eq!(s.activa(), inicio);
+    // No tab of the browser left: a new one opens, in front.
+    let _ = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"pestana_nueva"}"#);
+    let ultima = s.activa();
+    s.pestanas.retain(|p| p.id != inicio);
+    let o = cierra(&mut s, ultima);
+    let Some(nueva) = o.iter().find_map(|x| match x {
+        Orden::CreaPestana {
+            id,
+            perfil: Perfil::General,
+            url: Some(u),
+            de: None,
+        } if u == INICIO => Some(*id),
+        _ => None,
+    }) else {
+        unreachable!("a new tab of the browser opens: {o:?}");
+    };
+    assert!(o.contains(&Orden::Activa { id: nueva }));
+    assert_eq!(s.producto(), "zero");
+    assert!(!o.contains(&Orden::CierraVentana));
+}
+
+/// What the person marked while «Mis datos» was in the browser is still read at the start and
+/// still protected; «Borrar todo» forgets it (2 Nov 2026, the owner, 16:50: the section left).
+#[test]
+fn data_marked_before_is_still_read_and_still_protected() {
+    let d = carpeta();
+    let datos = d.join("datos");
+    let _ = fs::create_dir_all(&datos);
+    let _ = fs::write(
+        datos.join("tinta.json"),
+        r#"[{"tipo":"correo","valor":"ana@correo.co"}]"#,
+    );
+    let (mut s, _) = Sesion::abre(Arranque {
+        datos: datos.clone(),
+        descargas: d.join("descargas"),
+        idioma_sistema: "es-CO".into(),
+        version: "0.1.0".into(),
+        reloj,
+    });
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"bienvenida","cortar":false}"#,
+    );
+    let id = s.activa();
+    assert!(!abre_pagina(&mut s, id, "https://www.eltiempo.com/").cortar);
+    assert!(
+        s.peticion(
+            id,
+            "https://collect.otra-empresa.io/e",
+            "POST",
+            br#"{"email":"ana@correo.co"}"#,
+            8,
+        )
+        .cortar
+    );
+    let _ = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"borrar_todo"}"#);
+    assert!(s.tinta.is_empty());
+    assert!(!datos.join("tinta.json").exists());
+}
+
+/// 2 Nov 2026 (the owner, 16:50: «quita la sección de tarea para tu IA… la de pregunta a una IA
+/// sin dar tus datos… y la de mis datos»): asking the panel for any of the three shows the shield,
+/// their old messages do nothing, and the panel no longer receives them.
+#[test]
+fn the_three_sections_that_left_the_browser_are_gone() {
+    let (mut s, _, _) = con_pagina(true);
+    for v in ["mandato", "tachon", "datos"] {
+        let o = s.mensaje(
+            Origen::Barra,
+            BARRA,
+            &json!({ "tipo": "panel", "vista": v }).to_string(),
+        );
+        assert_eq!(
+            del_tipo(&o, Origen::Panel, "vista").unwrap_or_default()["vista"],
+            "escudo",
+            "{v}"
+        );
+    }
+    for m in [
+        r#"{"tipo":"mandato_empezar","tarea":"x","webs":["avianca.com"],"estricto":true}"#,
+        r#"{"tipo":"tachar","texto":"ana@correo.co"}"#,
+        r#"{"tipo":"tinta_anadir","dato":"correo","valor":"ana@correo.co"}"#,
+        r#"{"tipo":"carta","sitio":"eltiempo.com","ley":"co"}"#,
+    ] {
+        assert!(s.mensaje(Origen::Panel, PANEL, m).is_empty(), "{m}");
+    }
+    assert!(s.tinta.is_empty());
+    assert_eq!(s.pestanas.len(), 1);
+    let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"listo","vista":"panel"}"#);
+    for tipo in ["mandato", "tinta", "libro"] {
+        assert!(del_tipo(&o, Origen::Panel, tipo).is_none(), "{tipo}");
+    }
 }

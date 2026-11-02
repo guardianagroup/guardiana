@@ -12,7 +12,6 @@
     const texto = $('q').value.trim();
     if (texto) manda({ tipo: 'navegar', texto });
   });
-  document.querySelectorAll('.acciones button').forEach((b) => b.addEventListener('click', () => manda({ tipo: 'panel', vista: b.dataset.vista })));
   $('encender').addEventListener('click', () => manda({ tipo: 'ajuste', clave: 'cortar_seguimiento', valor: true }));
   // Choosing the engine right in the search box; the program keeps it and says where searches go.
   $('motor').addEventListener('change', (e) => {
@@ -23,10 +22,9 @@
     const sel = $('motor');
     if (!m.motores || sel.matches(':focus')) { if (m.motor_id) sel.value = m.motor_id; return; }
     const opcion = (b) => `<option value="${Z.esc(b.id)}"${b.id === m.motor_id ? ' selected' : ''}>${Z.esc(b.nombre)}</option>`;
-    // One plain list: the engines that say they keep no record of who searches what go first,
-    // with no heading (the owner, 10 Oct 2026: a heading repeating their claim is not ours to make).
-    sel.innerHTML = m.motores.filter((b) => b.privado).map(opcion).join('')
-      + m.motores.filter((b) => !b.privado).map(opcion).join('');
+    // One plain list, with no heading, in the program's order (2 Nov 2026, the owner, 16:47:
+    // Google, Brave, DuckDuckGo, then the rest).
+    sel.innerHTML = m.motores.map(opcion).join('');
     sel.value = m.motor_id;
   }
 

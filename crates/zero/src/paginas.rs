@@ -100,47 +100,6 @@ pub fn guion_paginas() -> String {
     guion(Opciones::default())
 }
 
-/// The script of a mandate's tab: WebRTC and WebTransport turned off, then the same as every
-/// page. It runs in every frame it reaches; a frame made from the page's own code, which the
-/// engine may not give this script first, is cleaned when the page reaches into it
-/// (`contentWindow`, `contentDocument`). A page that still found a way would use a connection
-/// GUARDIANA ZERO does not see, and the receipt says so (review of 10 Oct 2026, grave 4).
-#[must_use]
-pub fn guion_mandato() -> String {
-    guion(Opciones {
-        mandato: true,
-        ..Opciones::default()
-    })
-}
-
-const APAGA_CONEXIONES: &str = r#"(() => {
-  'use strict';
-  const NOMBRES = ['RTCPeerConnection', 'webkitRTCPeerConnection', 'RTCDataChannel', 'RTCSessionDescription', 'RTCIceCandidate', 'RTCRtpSender', 'RTCRtpReceiver', 'RTCRtpTransceiver', 'WebTransport'];
-  const apaga = (w) => {
-    for (const k of NOMBRES) {
-      try { delete w[k]; } catch (_) {}
-      try { Object.defineProperty(w, k, { value: undefined, configurable: false, writable: false, enumerable: false }); } catch (_) {}
-    }
-  };
-  apaga(window);
-  for (const [C, k] of [[window.HTMLIFrameElement, 'contentWindow'], [window.HTMLIFrameElement, 'contentDocument'], [window.HTMLFrameElement, 'contentWindow'], [window.HTMLFrameElement, 'contentDocument'], [window.HTMLObjectElement, 'contentWindow'], [window.HTMLObjectElement, 'contentDocument']]) {
-    if (!C) continue;
-    const d = Object.getOwnPropertyDescriptor(C.prototype, k);
-    if (!d || !d.get) continue;
-    const leer = d.get;
-    try {
-      Object.defineProperty(C.prototype, k, {
-        configurable: false, enumerable: d.enumerable,
-        get: function () {
-          const r = leer.call(this);
-          try { const w = k === 'contentWindow' ? r : (r && r.defaultView); if (w) apaga(w); } catch (_) {}
-          return r;
-        },
-      });
-    } catch (_) {}
-  }
-})();"#;
-
 /// Global Privacy Control in the page (`navigator.globalPrivacyControl`): the person does not
 /// want their data sold or shared. On unless the person turns it off (1.0.46); the shell sends
 /// `Sec-GPC: 1` with it.
@@ -155,8 +114,6 @@ const GPC: &str = r#"(() => {
 /// change under it).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Opciones {
-    /// A mandate's tab: WebRTC and WebTransport off first.
-    pub mandato: bool,
     /// Global Privacy Control.
     pub gpc: bool,
     /// «Huella uniforme» (1.0.46, strict mode): the same generic values for every site.
@@ -168,7 +125,6 @@ pub struct Opciones {
 impl Default for Opciones {
     fn default() -> Self {
         Self {
-            mandato: false,
             gpc: true,
             uniforme: false,
             programa: false,
@@ -180,10 +136,6 @@ impl Default for Opciones {
 #[must_use]
 pub fn guion(o: Opciones) -> String {
     let mut s = String::new();
-    if o.mandato {
-        s.push_str(APAGA_CONEXIONES);
-        s.push('\n');
-    }
     if o.gpc {
         s.push_str(GPC);
         s.push('\n');
@@ -1589,17 +1541,6 @@ mod tests {
         assert!(marcos < g.find("'zg_subasta'").unwrap_or(0));
         assert!(g.contains("if (m.adstxt === true) { leeAdsTxt(); return; }"));
         assert!(!g.contains("__zg"));
-    }
-
-    #[test]
-    fn a_mandate_s_tab_turns_webrtc_and_webtransport_off_first() {
-        let g = guion_mandato();
-        let apaga = g.find("RTCPeerConnection").unwrap_or(usize::MAX);
-        assert!(g.contains("'WebTransport'"));
-        assert!(apaga < g.find("globalPrivacyControl").unwrap_or(0));
-        // Every other tab keeps them.
-        assert!(!guion_paginas().contains("RTCPeerConnection"));
-        assert!(!guion_paginas().contains("WebTransport"));
     }
 
     #[test]

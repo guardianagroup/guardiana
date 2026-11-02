@@ -23,8 +23,8 @@ fica anotada no próprio extrato.
 
 Um navegador próprio para Windows 10 e 11. Corta o que os sites chamam por trás (rastreadores,
 publicidade e corretoras de dados inscritas) e mostra cada corte ao vivo: qual empresa, de que país e
-por quê. Tira as etiquetas de rastreamento dos endereços, não deixa seus dados marcados saírem para outra
-empresa, abre mandatos para a sua IA com recibo assinado e risca seus dados antes de você perguntar algo a ela.
+por quê. Tira as etiquetas de rastreamento dos endereços e pergunta antes que um formulário envie seus dados
+a um site que ainda não os tinha.
 Os primeiros 7 dias são grátis; depois ele vem incluído na assinatura da GUARDIANA (a mesma chave).
 
 - Download, impressão digital e assinatura: [guardianagroup.com/pt/zero.html](https://guardianagroup.com/pt/zero.html);

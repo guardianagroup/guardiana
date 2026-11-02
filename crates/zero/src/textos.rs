@@ -197,12 +197,6 @@ impl Textos {
     }
 }
 
-impl crate::tachon::Etiquetas for Textos {
-    fn etiqueta(&self, clase: crate::datos::Clase) -> String {
-        self.t(&format!("marca_{}", clase.clave()))
-    }
-}
-
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -235,10 +229,6 @@ mod tests {
                 crate::datos::Clase::Otro,
             ] {
                 assert_ne!(t.t(c.clave()), c.clave());
-                assert_ne!(
-                    t.t(&format!("marca_{}", c.clave())),
-                    format!("marca_{}", c.clave())
-                );
             }
             for ley in ["co", "ue", "ca", "br", "otro"] {
                 for parte in ["asunto", "cuerpo"] {
