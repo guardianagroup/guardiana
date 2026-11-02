@@ -48,7 +48,7 @@ use guardiana_lists::atribucion::{
 use guardiana_lists::ubicacion::{self, Evidencia, Precision, Ubicacion};
 use serde::Serialize;
 
-use crate::api::{with_ledger, ApiResult};
+use crate::api::{with_lectura, with_ledger, ApiResult};
 use crate::auth::{Lang, Session};
 use crate::AppState;
 
@@ -429,7 +429,7 @@ pub(crate) async fn api(
     let hasta = now_ms();
     // The last 24 hours at the free level, whatever was asked (display only: nothing is pruned).
     let desde = crate::plan::desde(&state, hasta - dias * 24 * 3_600_000, hasta);
-    let (filas, alias) = with_ledger(&state, move |l| {
+    let (filas, alias) = with_lectura(&state, move |l| {
         let filas = l.destinations_by_network(desde, hasta)?;
         let mut nombres: Vec<&str> = filas.iter().map(|f| f.qname.as_str()).collect();
         nombres.dedup();

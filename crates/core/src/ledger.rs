@@ -310,6 +310,16 @@ impl Ledger {
         Self::init(Connection::open(path)?, genesis)
     }
 
+    /// Another connection to the ledger at `path`, for reading only: the panel's long reports read on these, so they
+    /// do not wait behind each other on the one connection that writes (2 Nov 2026, the Antivirus report's «No
+    /// medido»). The same file, with `query_only` (SQLite refuses any write on it) and its own `busy_timeout`. Nothing of
+    /// the schema runs here: the file must already have been opened with [`Ledger::open`] in this same process.
+    pub fn abre_lectura(path: &Path) -> Result<Self> {
+        let conn = Connection::open(path)?;
+        conn.execute_batch("PRAGMA busy_timeout = 5000; PRAGMA query_only = 1;")?;
+        Ok(Self { conn })
+    }
+
     /// An in-memory ledger, for tests and dry runs.
     pub fn open_in_memory(genesis: Hash) -> Result<Self> {
         Self::init(Connection::open_in_memory()?, genesis)
@@ -1948,6 +1958,21 @@ mod tests {
         assert_eq!(solo(ServerFilter::Local), 0);
         assert!(l.check().unwrap().is_ok());
         assert_eq!(l.server_buckets().unwrap().len(), 4);
+    }
+
+    /// A reading connection sees what the main one wrote, and cannot write (2 Nov 2026).
+    #[test]
+    fn a_reading_connection_reads_and_cannot_write() {
+        let (dir, path) = temp_db("lectura");
+        let l = Ledger::open(&path, genesis()).unwrap();
+        l.set_setting("prueba", "uno").unwrap();
+        let r = Ledger::abre_lectura(&path).unwrap();
+        assert_eq!(r.setting("prueba").unwrap().as_deref(), Some("uno"));
+        assert!(r.set_setting("prueba", "dos").is_err());
+        l.set_setting("prueba", "tres").unwrap();
+        assert_eq!(r.setting("prueba").unwrap().as_deref(), Some("tres"));
+        drop((l, r));
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     fn temp_db(tag: &str) -> (std::path::PathBuf, std::path::PathBuf) {

@@ -59,6 +59,35 @@ pub(crate) fn with_ledger<T>(
     en_hilo_aparte(run)
 }
 
+/// Run `f`, a read, on one of the panel's read-only connections to the ledger (`AppState::lectores`): a free one if
+/// there is, else it waits for the first. Without them (they could not be opened), on the main one, as [`with_ledger`].
+/// For the long reads of the reports, so they do not wait behind each other or hold up the resolver's writes; `f` cannot
+/// write (SQLite refuses it on these connections), and the licence's status, which writes, stays on [`with_ledger`].
+pub(crate) fn with_lectura<T>(
+    state: &AppState,
+    f: impl FnOnce(&Ledger) -> guardiana_core::Result<T>,
+) -> Result<T, Response> {
+    let run = || {
+        for lector in &state.lectores {
+            if let Ok(guard) = lector.try_lock() {
+                return f(&guard).map_err(internal);
+            }
+        }
+        if let Some(primero) = state.lectores.first() {
+            let guard = primero
+                .lock()
+                .map_err(|_| internal("ledger reader lock poisoned"))?;
+            return f(&guard).map_err(internal);
+        }
+        let guard = state
+            .ledger
+            .lock()
+            .map_err(|_| internal("ledger lock poisoned"))?;
+        f(&guard).map_err(internal)
+    };
+    en_hilo_aparte(run)
+}
+
 /// `f`, which blocks (a database, a process, the network), without holding up the resolver that
 /// shares these threads: "in place" on a multi-threaded runtime, as it is on a runtime with one
 /// thread (the tests), which cannot hand its other tasks away.
@@ -1039,7 +1068,7 @@ pub(crate) struct IaView {
 /// an agent talks, never what it reads: that limit is written on the page itself.
 pub(crate) async fn ia(State(state): State<Arc<AppState>>, _s: Session) -> ApiResult<IaView> {
     let now = now_ms();
-    let view = with_ledger(&state, |l| {
+    let view = with_lectura(&state, |l| {
         let devices = l.devices()?;
         // Per (device, AI service): how many queries for each distinct name, and the last time.
         type PorServicio =
@@ -1968,6 +1997,13 @@ pub(crate) async fn borrar(
         return Err((StatusCode::BAD_REQUEST, "confirmation word required").into_response());
     }
     let counts = with_ledger(&state, |l| {
+        // the read-only connections, held while wiping: a read in course would keep the write-ahead log, with names in
+        // it, from being cut to nothing
+        let _lectores: Vec<_> = state
+            .lectores
+            .iter()
+            .filter_map(|m| m.lock().ok())
+            .collect();
         l.wipe()?;
         l.table_counts()
     })?;

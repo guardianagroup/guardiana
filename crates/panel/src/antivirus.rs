@@ -34,7 +34,7 @@ use guardiana_core::{Category, SELF_DEVICE_ID};
 use guardiana_lists::antivirus::{self, Antivirus};
 use serde::Serialize;
 
-use crate::api::{with_ledger, ApiResult};
+use crate::api::{with_lectura, with_ledger, ApiResult};
 use crate::auth::{Session, Zona};
 use crate::AppState;
 
@@ -605,7 +605,7 @@ pub(crate) async fn vista(
     let now = now_ms();
     // The week with Plus, the last 24 hours at the free level (display only).
     let semana = crate::plan::desde(&state, now - DIAS * 24 * HOUR_MS, now);
-    let (filas, devices, trafico, recientes, vigilando, con_ruta) = with_ledger(&state, |l| {
+    let (filas, devices, trafico, recientes, vigilando, con_ruta) = with_lectura(&state, |l| {
         Ok((
             l.program_names(semana, now + 1, zona)?,
             l.devices()?,
@@ -883,9 +883,13 @@ pub(crate) async fn export(
 /// `/api/antivirus/detectar`: which antivirus Windows Security Center lists as installed, and
 /// whether each is on and up to date (1.0.21, the «Analizar mi antivirus» button). Read-only.
 pub(crate) async fn detectar(_s: Session) -> ApiResult<DeteccionView> {
-    let (lista, aviso) = match guardiana_apps::antivirus_instalados() {
-        Ok(l) => (l, None),
-        Err(guardiana_apps::Error::NoSoportado) => (Vec::new(), Some("no_windows".to_owned())),
+    // a PowerShell on Windows: off the page's threads, which the resolver shares
+    let (lista, aviso) = match tokio::task::spawn_blocking(guardiana_apps::antivirus_instalados)
+        .await
+    {
+        Ok(Ok(l)) => (l, None),
+        Ok(Err(guardiana_apps::Error::NoSoportado)) => (Vec::new(), Some("no_windows".to_owned())),
+        Ok(Err(e)) => (Vec::new(), Some(e.to_string())),
         Err(e) => (Vec::new(), Some(e.to_string())),
     };
     // Say which of the detected products GUARDIANA's list knows (so the page can link to it).

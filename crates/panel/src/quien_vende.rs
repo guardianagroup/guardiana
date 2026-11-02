@@ -39,7 +39,7 @@ use guardiana_core::{Action, MatchKind, Rule, SELF_DEVICE_ID};
 use guardiana_lists::quien_vende::{self as lista, Caso};
 use serde::{Deserialize, Serialize};
 
-use crate::api::{with_ledger, ApiResult};
+use crate::api::{with_lectura, ApiResult};
 use crate::auth::Session;
 use crate::extensiones;
 use crate::AppState;
@@ -466,7 +466,7 @@ fn lee_sistema() -> Sistema {
 async fn ver(State(state): State<Arc<AppState>>, _s: Session) -> ApiResult<Vista> {
     let hasta = now_ms();
     let desde = crate::plan::desde(&state, hasta - 7 * DAY_MS, hasta);
-    let (grupos, nombres_prog, reglas, devices, hogar, detalle) = with_ledger(&state, |l| {
+    let (grupos, nombres_prog, reglas, devices, hogar, detalle) = with_lectura(&state, |l| {
         let g = l.names_grouped(desde, hasta + 1)?;
         let p = l.program_names(desde, hasta + 1, 0)?;
         let r = l.active_rules(hasta)?;

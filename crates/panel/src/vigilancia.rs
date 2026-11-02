@@ -35,7 +35,7 @@ use guardiana_core::{local_day_index, local_midnight, Ledger};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::api::{with_ledger, ApiResult};
+use crate::api::{with_lectura, with_ledger, ApiResult};
 use crate::auth::{Session, Zona};
 use crate::AppState;
 
@@ -763,7 +763,7 @@ fn lee(
 ) -> Result<Lectura, axum::response::Response> {
     let ahora = now_ms();
     let medianoche = local_midnight(local_day_index(ahora, zona), zona);
-    let (base_usos, base, historial, hoy, visto, cadena_rota) = with_ledger(state, |l| {
+    let (base_usos, base, historial, hoy, visto, cadena_rota) = with_lectura(state, |l| {
         let (bu, _) = lee_base(l, BASE_USOS);
         let (b, _) = lee_base(l, BASE_LENTA);
         let historial = l.vigilancia(historial_n.max(50), None)?;

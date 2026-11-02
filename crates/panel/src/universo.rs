@@ -22,7 +22,7 @@ use guardiana_core::{Action, Category, MatchKind, SELF_DEVICE_ID};
 use guardiana_lists::antivirus;
 use serde::Serialize;
 
-use crate::api::{with_ledger, ApiResult};
+use crate::api::{with_lectura, ApiResult};
 use crate::auth::{Session, Zona};
 use crate::AppState;
 
@@ -485,7 +485,7 @@ pub(crate) async fn universo(
 ) -> ApiResult<Universo> {
     let now = now_ms();
     let desde = now - VENTANA_H * HOUR_MS;
-    let (filas, nombres, rules, vigilando, con_ruta) = with_ledger(&state, |l| {
+    let (filas, nombres, rules, vigilando, con_ruta) = with_lectura(&state, |l| {
         Ok((
             l.trafico(desde, now + 1, &[])?,
             l.program_names(desde, now + 1, zona)?,

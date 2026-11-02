@@ -123,6 +123,10 @@ impl std::error::Error for Error {}
 /// Shared state of every handler.
 pub(crate) struct AppState {
     pub(crate) ledger: Mutex<Ledger>,
+    /// Two more connections to the ledger, read-only, for the long reports (`api::with_lectura`): the Antivirus
+    /// report asks for several at once, and on `ledger` alone each waited for the one before it until the page gave up
+    /// («No medido», 2 Nov 2026). Empty if they could not be opened: then everything goes through `ledger`.
+    pub(crate) lectores: Vec<Mutex<Ledger>>,
     /// One change of the system DNS at a time: two «apply» clicks in the same second could
     /// take the second snapshot after the first apply and keep Guardiana's own address as
     /// «the original» (review of 8 Oct 2026).
@@ -684,6 +688,11 @@ pub(crate) async fn add_security_headers(
 pub async fn start(config: Config) -> Result<Running, Error> {
     let token = load_or_create_token(&config.token_path).map_err(Error::Token)?;
     let ledger = Ledger::open(&config.db_path, config.genesis).map_err(Error::Ledger)?;
+    // after `open`, which leaves the file and its schema ready
+    let lectores = (0..2)
+        .filter_map(|_| Ledger::abre_lectura(&config.db_path).ok())
+        .map(Mutex::new)
+        .collect();
     // Open the firewall once and re-apply whatever the person had chosen to cut.
     let cortes = antivirus::CortesAntivirus::nuevo(&ledger);
     let mut allowed_hosts = vec![
@@ -694,6 +703,7 @@ pub async fn start(config: Config) -> Result<Running, Error> {
     allowed_hosts.extend(config.extra_hosts.iter().cloned());
     let state = Arc::new(AppState {
         ledger: Mutex::new(ledger),
+        lectores,
         dns_cambio: tokio::sync::Mutex::new(()),
         licencia_cambio: tokio::sync::Mutex::new(()),
         token: token.clone(),
