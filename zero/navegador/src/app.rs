@@ -2091,7 +2091,7 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                 }
                 encola(con_sesion(|s| abre_panel(s, clave, true)).unwrap_or_default());
             } else if copia.dwData == 3 {
-                // A click on Windows' notice of a grave warning of el escudo: Órbita on the PC Scanner.
+                // A click on Windows' notice of a grave warning of el escudo: Órbita on the Antivirus.
                 encola(con_sesion(Sesion::abre_escaner).unwrap_or_default());
             } else {
                 encola(con_sesion(|s| s.abre_programa(&texto)).unwrap_or_default());

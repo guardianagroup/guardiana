@@ -293,7 +293,7 @@
     <!-- 1.0.52 (the owner, 1 Nov 2026, 19:29, to the proposal of a Windows notice for each grave warning of the
          antivirus: «Me parece bien la propuesta, sí, buena idea»): ZERO with its notices option («avisos») starts at every sign-in, for
          every account, with no visible window, reads el escudo's warnings and shows Windows' notice of each new grave
-         one; a click opens Órbita on the PC Scanner (guardiana://escaner). Its hidden window takes the «close GUARDIANA
+         one; a click opens Órbita on the Antivirus (guardiana://escaner). Its hidden window takes the «close GUARDIANA
          ZERO» above, so an update or an uninstall closes it too. -->
     <Component Id="ZeroAvisos" Directory="ZERODIR" Guid="82e59daa-fdc2-4868-a561-dd5d3dc53066">
       <RegistryValue Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Run" Name="GUARDIANA avisos" Type="string" Value="&quot;[ZERODIR]GUARDIANA ZERO.exe&quot; --avisos" KeyPath="yes" />

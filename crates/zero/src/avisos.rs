@@ -3,8 +3,8 @@
 //!
 //! ZERO started with `--avisos` when the person signs in to Windows, with no window, reads the warnings the service
 //! writes for the panel ([`ARCHIVO`], in the system's data folder, which the person at the console can read) and shows a
-//! notice for each new grave one. A click on it opens Órbita on the Antivirus ([`ENLACE`]; the PC Scanner until the
-//! owner renamed it, 1 Nov 2026, 21:03: «cámbialo sí»). This module decides what to show and writes the notice; the
+//! notice for each new grave one. A click on it opens Órbita on the Antivirus ([`ENLACE`]; «Escáner PC» until the
+//! owner renamed it, 1 Nov 2026, 21:34: «cmbialo si»). This module decides what to show and writes the notice; the
 //! Windows program shows it. Nothing leaves the computer.
 
 use std::path::PathBuf;

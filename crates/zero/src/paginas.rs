@@ -273,7 +273,7 @@ const GUION: &str = r#"(() => {
       if (l !== 'es' && l !== 'en' && l !== 'pt') { const d = String(navigator.language || 'en').slice(0, 2).toLowerCase(); l = d === 'es' || d === 'pt' ? d : 'en'; }
       return { 'X-Guardiana-Token': tk, 'X-Guardiana-Lang': l, 'X-Guardiana-Tz': String(-new Date().getTimezoneOffset()) };
     };
-    // 1.0.50 (independent review, 31 Oct 2026): what the web gets of each reading is what the PC Scanner shows, never
+    // 1.0.50 (independent review, 31 Oct 2026): what the web gets of each reading is what the Antivirus shows, never
     // what identifies the person or the house: no folders (only the file's name), no account names, no address, no
     // device of the house, no names visited, no whole detail of the computer. Done here, in the program's own script,
     // so a web that changed could not ask for more.
@@ -361,7 +361,7 @@ const GUION: &str = r#"(() => {
       try { if (f) j = f(j) || j; } catch (_) { return ''; }
       return JSON.stringify(limpiaTodo(j, ''));
     };
-    // 1.0.50: one reading for GUARDIANA's web (the PC Scanner), by the address the program already checked. A second
+    // 1.0.50: one reading for GUARDIANA's web (the Antivirus), by the address the program already checked. A second
     // barrier here (independent review): only a reading's own address, at most four at a time, a new review once a
     // minute, a new slow look of the watch every 30 s, and the list of antivirus (a PowerShell each time) kept 30 s.
     const RUTA_OK = /^\/(?:api\/[a-z0-9\-\/]+|vigia)$/;

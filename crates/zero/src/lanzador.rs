@@ -57,7 +57,7 @@ pub enum Pedido {
     Panel,
     /// `--url guardiana://activar?clave=…`: the panel's licence page with this key filled in.
     Activar(String),
-    /// `--url guardiana://escaner`: Órbita on the PC Scanner (a click on Windows' notice of a grave warning of el
+    /// `--url guardiana://escaner`: Órbita on the Antivirus (a click on Windows' notice of a grave warning of el
     /// escudo, 1.0.52; see [`crate::avisos`]).
     Escaner,
 }

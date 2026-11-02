@@ -14,7 +14,8 @@ Ningún antivirus doméstico une hoy, en un solo programa y sin nube, estas cuat
 2. **Los programas y sus archivos** (`crates/apps`): quién firma cada programa (`firmas.rs`), qué archivos de la persona
    abre (`archivos.rs`, eventos del núcleo de Windows con ETW) y el cortafuegos de Windows (`cortafuegos.rs`, WFP).
 3. **El Vigía** (`crates/apps/src/vigia*`, `crates/panel/src/vigia.rs`): micrófono, cámara, pantalla y control remoto.
-4. **El Escáner PC** (`revision.rs` y `revision.ps1`): la seguridad de Windows en solo lectura.
+4. **La revisión de Windows del Antivirus** (antes «Escáner PC»; `revision.rs` y `revision.ps1`): la seguridad de
+   Windows en solo lectura.
 
 El escudo las cruza. Ejemplos de lo que busca: un programa descargado y sin firma que pide un nombre que la casa no había
 visto nunca; un proceso en segundo plano que abre las contraseñas o las cookies del navegador; un programa que mira la
@@ -40,7 +41,7 @@ qué hizo y a quién habló.
 - A4 · *AMSI*: los guiones (PowerShell, JScript, VBScript, macros) se analizan justo antes de ejecutarse.
 
 **Fase 2.** Modelo local pequeño para ejecutables (sin nube), memoria de los procesos, señuelos contra el ransomware y
-limpieza completa de lo que deja un programa malicioso (lo que el Escáner PC ya encuentra: arranque, tareas, servicios).
+limpieza completa de lo que deja un programa malicioso (lo que el Antivirus ya encuentra: arranque, tareas, servicios).
 
 **Fases 3 y 4 (necesitan decisión y papeles de la empresa).** Controlador propio (minifiltro): certificado EV y alta en el
 Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección en tiempo real, certificado en los
@@ -92,7 +93,7 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
   propuesta, sí, buena idea»): `GUARDIANA ZERO.exe --avisos` arranca al iniciar sesión (entrada Run del instalador) y
   con cada apertura de ZERO, sin ventana visible y uno por persona; lee `escudo-avisos.jsonl` y saca la notificación de
   Windows de cada aviso grave nuevo (más de tres a la vez: una que los cuenta). Al pulsarla, `guardiana://escaner` abre
-  Órbita en el Escáner PC, cuya portada enseña los avisos graves. Qué se enseña lo decide `crates/zero/src/avisos.rs`;
+  Órbita en el Antivirus, cuya portada enseña los avisos graves. Qué se enseña lo decide `crates/zero/src/avisos.rs`;
   la ventana oculta de `zero/navegador/src/avisos.rs` recibe el «cerrar» del instalador al actualizar o desinstalar.
 - Falta: la pantalla del antivirus en la web del programa, el análisis de Descargas desde el panel y las listas de
   muestras (decisión del dueño, abajo).

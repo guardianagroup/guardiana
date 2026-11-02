@@ -58,7 +58,7 @@ Otra web recibe siempre `403` (con su `Origin`) o `401` (sin ella), haya lo que 
 puede deducirlo. Límite: un programa de este ordenador puede inventarse la `Origin` y ver lo mismo que
 la web; con el token, el panel ve además las rutas. Detalle en `crates/panel/src/vigia.rs`.
 
-Segunda excepción (1.0.50, `Tu PC` y el Escáner PC): la web de GUARDIANA abierta como ventana del
+Segunda excepción (1.0.50, `Tu PC` y el Antivirus): la web de GUARDIANA abierta como ventana del
 propio programa (su pestaña fija de Órbita, `https://guardianagroup.com/orbita/`, nunca
 Comunicaciones ni otra pestaña) pide lecturas de este ordenador **a través del programa**, no por la
 red: un evento de la página que el guion del programa convierte en mensaje; la sesión del navegador

@@ -3764,7 +3764,7 @@ fn the_web_asks_the_panel_only_for_its_readings() {
         Orden::EnviaAPagina { id, json, .. }
             if *id == panel && json.contains("/api/revision/ahora") && json.contains("\"n\":7")
     )));
-    // 1.0.50: the PC Scanner also reads the call watcher and «who sells your data».
+    // 1.0.50: the Antivirus also reads the call watcher and «who sells your data».
     for ruta in ["/vigia", "/api/quien-vende"] {
         let o = s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, "GET"));
         assert!(

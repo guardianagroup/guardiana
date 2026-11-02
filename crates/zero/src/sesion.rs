@@ -771,7 +771,7 @@ const PANEL_LECTURAS: &[(&str, &str)] = &[
     ("GET", "/api/ia"),
     ("GET", "/api/estado"),
     ("GET", "/api/textos"),
-    // 1.0.50, the PC Scanner (the owner, 31 Oct 2026, 00:10: «Vigía se cambia por escáner pc»):
+    // 1.0.50, the Antivirus (first «Escáner PC»; the owner, 31 Oct 2026, 00:10: «Vigía se cambia por escáner pc»):
     // what the call watcher sees right now (screen capture, a remote session, remote control or a
     // recorder running, active threats) and who inside this computer sells data. Both only read;
     // the second's settings switch (`POST /api/quien-vende/ajuste`) stays out.
@@ -912,7 +912,7 @@ impl Sesion {
     }
 
     /// 1.0.52 (el escudo; the owner, 1 Nov 2026, 19:29): a click on Windows' notice of a grave warning
-    /// (`guardiana://escaner`) opens Órbita on its PC Scanner: in Órbita's tab when it is open (only the address's
+    /// (`guardiana://escaner`) opens Órbita on its Antivirus: in Órbita's tab when it is open (only the address's
     /// fragment changes, and the page opens the scanner), else in a new one.
     pub fn abre_escaner(&mut self) -> Vec<Orden> {
         let url = format!("{ORBITA}#escaner");
