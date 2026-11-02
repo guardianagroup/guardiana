@@ -36,6 +36,19 @@ Una VPN que es a la vez el DNS de la casa, el antivirus y el cortafuegos del mis
 en cada alta) y el alta anónima con la comprobación de todo lo que dice el servidor (la dirección y el DNS del túnel
 tienen que ser privados y el servidor, un nombre de guardianagroup.com). Probado en Linux, Windows y macOS.
 
+## El adaptador de Windows: WireGuardNT (licencias comprobadas el 1 nov 2026)
+
+- El código de WireGuardNT (el controlador y su biblioteca) es GPLv2
+  (<https://git.zx2c4.com/wireguard-nt/about/>).
+- Los binarios firmados que publica WireGuard LLC (`wireguard.dll`, en el .zip de
+  <https://download.wireguard.com/wireguard-nt/>) tienen su propia licencia
+  (<https://git.zx2c4.com/wireguard-nt/tree/prebuilt-binaries-license.txt>): se pueden distribuir **junto a un programa
+  que los use solo a través de su interfaz pública** (`wireguard.h`), sin modificarlos, sin quitar sus avisos de
+  propiedad y sin usar el nombre de WireGuard para respaldar el producto sin su permiso por escrito.
+- Así lo hace la propia aplicación de WireGuard para Windows. Para GUARDIANA: el `wireguard.dll` firmado, tal cual se
+  descarga, al lado del programa, llamado solo por su interfaz pública; el código de GUARDIANA sigue abierto. En la
+  web, «usa WireGuard» como dato, nunca como respaldo.
+
 ## Los servidores (propuesta para la fase 1)
 
 - WireGuard del núcleo de Linux (`wg0`, UDP 51820) en los servidores actuales, cada uno con su red privada
