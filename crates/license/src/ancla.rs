@@ -547,7 +547,7 @@ mod tests {
             std::process::id()
         ));
         let licencia = a_hex(r#"{"clave":"ABC-123","instancia":"i-1","producto":"Pérez"}"#);
-        let casos: [(&str, Vec<(&str, &str, &str)>); 4] = [
+        let casos = [
             (
                 "normal",
                 vec![

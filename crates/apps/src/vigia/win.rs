@@ -282,6 +282,8 @@ pub(super) fn defensa() -> Result<String, Error> {
         .creation_flags(CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS)
         .spawn()
         .map_err(|e| Error::Sistema(e.to_string()))?;
+    // Trabajo de fondo: también en modo de eficiencia y con la memoria en prioridad baja (1.0.55).
+    let _ = crate::vigilancia::fondo::de_fondo(&hijo);
     if let Some(mut entrada) = hijo.stdin.take() {
         entrada
             .write_all(super::SCRIPT_DEFENSA.as_bytes())
