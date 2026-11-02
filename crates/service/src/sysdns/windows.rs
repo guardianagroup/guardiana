@@ -446,6 +446,19 @@ fn dhcp_de(indices: &[u32]) -> Vec<(String, Vec<IpAddr>)> {
     dhcp_de_powershell(indices).unwrap_or_default()
 }
 
+/// The next hops of the default routes, best first, read from Windows directly; `None` when that
+/// failed (the caller asks PowerShell).
+pub(crate) fn saltos_por_defecto() -> Option<Vec<IpAddr>> {
+    #[cfg(windows)]
+    {
+        nativo::saltos_por_defecto().ok()
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
 /// What Guardiana should forward to right now. Hand-typed resolvers stay the person's
 /// choice wherever the machine goes. Automatic ones follow the network the machine is on
 /// now: a laptop set up at home carries a router address (192.168.1.1) that does not exist
@@ -710,6 +723,25 @@ mod tests {
             }
         }
         assert!(vistos > 0, "{texto}");
+    }
+
+    /// On a real Windows: the default gateway read from Windows directly is the one PowerShell
+    /// gives (1.0.55).
+    #[cfg(windows)]
+    #[test]
+    fn on_windows_the_native_gateway_is_powershells() {
+        let ps = powershell(
+            "Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' -PolicyStore ActiveStore -ErrorAction SilentlyContinue | ForEach-Object { $m = $_.RouteMetric + (Get-NetIPInterface -InterfaceIndex $_.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue).InterfaceMetric; [pscustomobject]@{ M = $m; H = $_.NextHop } } | Sort-Object M | Select-Object -ExpandProperty H",
+        );
+        let nat = nativo::saltos_por_defecto();
+        println!("PowerShell: {ps:?}\nnativo: {nat:?}");
+        assert!(ps.is_ok() && nat.is_ok());
+        let de_ps = super::super::parse_next_hops(&ps.unwrap_or_default());
+        let de_nat = nat
+            .unwrap_or_default()
+            .into_iter()
+            .find(|ip| super::super::a_gateway(*ip));
+        assert_eq!(de_nat, de_ps);
     }
 
     /// What the minute's reading costs here, with Windows' own functions and with PowerShell. Run by

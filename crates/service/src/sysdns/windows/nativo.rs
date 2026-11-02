@@ -34,9 +34,11 @@ use windows_sys::Win32::Foundation::{
 };
 use windows_sys::Win32::NetworkManagement::IpHelper::{
     ConvertInterfaceIndexToLuid, ConvertInterfaceLuidToAlias, ConvertInterfaceLuidToGuid,
-    FreeMibTable, GetAdaptersAddresses, GetIpInterfaceTable, GAA_FLAG_INCLUDE_ALL_INTERFACES,
+    FreeMibTable, GetAdaptersAddresses, GetIpForwardTable2, GetIpInterfaceEntry,
+    GetIpInterfaceTable, InitializeIpInterfaceEntry, GAA_FLAG_INCLUDE_ALL_INTERFACES,
     GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_FRIENDLY_NAME, GAA_FLAG_SKIP_MULTICAST,
-    GAA_FLAG_SKIP_UNICAST, IP_ADAPTER_ADDRESSES_LH, MIB_IPINTERFACE_ROW, MIB_IPINTERFACE_TABLE,
+    GAA_FLAG_SKIP_UNICAST, IP_ADAPTER_ADDRESSES_LH, MIB_IPFORWARD_ROW2, MIB_IPFORWARD_TABLE2,
+    MIB_IPINTERFACE_ROW, MIB_IPINTERFACE_TABLE,
 };
 use windows_sys::Win32::NetworkManagement::Ndis::NET_LUID_LH;
 use windows_sys::Win32::Networking::WinSock::{
@@ -439,4 +441,63 @@ pub(crate) fn dhcp(indices: &[u32]) -> Result<Vec<(u32, Vec<IpAddr>)>, String> {
         out.push((n, super::parse_list(&lista)));
     }
     Ok(out)
+}
+
+/// The next hops of the IPv4 default routes (0.0.0.0/0, the active ones), the lowest route metric
+/// plus its interface's metric first, as `default_gateway`'s PowerShell lists them (`Get-NetRoute`
+/// and `Get-NetIPInterface`): the caller takes the first that is a gateway.
+///
+/// # Errors
+/// The call of Windows that failed; the caller then asks PowerShell.
+pub(crate) fn saltos_por_defecto() -> Result<Vec<IpAddr>, String> {
+    let mut tabla: *mut MIB_IPFORWARD_TABLE2 = std::ptr::null_mut();
+    // SAFETY: Windows allocates the table and writes its address into `tabla`, which is ours.
+    let e = unsafe { GetIpForwardTable2(AF_INET, &raw mut tabla) };
+    if e != NO_ERROR || tabla.is_null() {
+        return Err(format!("GetIpForwardTable2 = {e}"));
+    }
+    // SAFETY: the table holds `NumEntries` rows from `Table` on; they are read within that (an
+    // IPv4 table: its addresses are IPv4 ones), and the table is freed once, right after.
+    let rutas: Vec<(u64, u32, Ipv4Addr)> = unsafe {
+        let n = usize::try_from((*tabla).NumEntries)
+            .unwrap_or(0)
+            .min(1 << 20);
+        let primera = (&raw const (*tabla).Table).cast::<MIB_IPFORWARD_ROW2>();
+        (0..n)
+            .filter_map(|i| {
+                let f = &*primera.add(i);
+                let destino = f.DestinationPrefix.Prefix.Ipv4;
+                let por_defecto = f.DestinationPrefix.PrefixLength == 0
+                    && destino.sin_family == AF_INET
+                    && destino.sin_addr.S_un.S_addr == 0;
+                por_defecto.then(|| {
+                    let salto = f.NextHop.Ipv4.sin_addr.S_un.S_addr.to_ne_bytes();
+                    (f.InterfaceLuid.Value, f.Metric, Ipv4Addr::from(salto))
+                })
+            })
+            .collect()
+    };
+    // SAFETY: as above; the table is not used after this.
+    unsafe { FreeMibTable(tabla.cast_const().cast()) };
+    let mut con_metrica: Vec<(u64, IpAddr)> = Vec::with_capacity(rutas.len());
+    for (luid, metrica, salto) in rutas {
+        let mut fila = MIB_IPINTERFACE_ROW::default();
+        // SAFETY: a row owned here, initialised by Windows' own function before it is filled.
+        unsafe { InitializeIpInterfaceEntry(&raw mut fila) };
+        fila.Family = AF_INET;
+        fila.InterfaceLuid = NET_LUID_LH { Value: luid };
+        // SAFETY: a row with its family and interface set, owned for the call; Windows fills the
+        // rest. An interface it no longer knows adds nothing, as `$null` added nothing there.
+        let de_la_interfaz = if unsafe { GetIpInterfaceEntry(&raw mut fila) } == NO_ERROR {
+            fila.Metric
+        } else {
+            0
+        };
+        con_metrica.push((
+            u64::from(metrica) + u64::from(de_la_interfaz),
+            IpAddr::V4(salto),
+        ));
+    }
+    con_metrica.sort_by_key(|(m, _)| *m);
+    Ok(con_metrica.into_iter().map(|(_, ip)| ip).collect())
 }

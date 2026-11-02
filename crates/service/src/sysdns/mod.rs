@@ -515,6 +515,11 @@ pub fn default_gateway() -> Option<IpAddr> {
     }
     #[cfg(target_os = "windows")]
     {
+        // With Windows' own functions since 1.0.55: the same routes and metrics, without a
+        // PowerShell every five minutes while Home Mode is on. PowerShell if they fail.
+        if let Some(saltos) = windows::saltos_por_defecto() {
+            return saltos.into_iter().find(|ip| a_gateway(*ip));
+        }
         parse_next_hops(&run(
             "powershell",
             &[
