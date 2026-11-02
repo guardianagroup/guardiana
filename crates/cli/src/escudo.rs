@@ -385,6 +385,23 @@ impl EscudoVivo {
             .unwrap_or_default();
         for l in nuevos {
             let cuando = u64::try_from(l.ts).unwrap_or(0);
+            // a program wearing the name of one of Windows' own outside Windows' folder: once an hour per file
+            if let Some((aviso, grave)) =
+                guardiana_escudo::disfraz::juzga(&l.hijo, &l.imagen, cuando)
+            {
+                let clave = (aviso.nombre.clone(), "disfraz".to_owned());
+                if !self
+                    .cadenas_vistas
+                    .get(&clave)
+                    .is_some_and(|t| cuando.saturating_sub(*t) < REPETIR_CADENA_MS)
+                {
+                    self.cadenas_vistas.insert(clave, cuando);
+                    self.anota(&aviso, grave);
+                }
+            }
+            if l.padre.is_empty() {
+                continue;
+            }
             let descargado = self.descargado(&l.padre_ruta);
             let Some((aviso, grave)) = guardiana_escudo::cadenas::juzga(
                 &l.padre,

@@ -80,6 +80,9 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
   las anycast. Firmado no se juzga; solo avisa de los que están en carpetas donde cualquiera escribe o llegaron de
   internet (grave sin firma en Descargas, temporales o Escritorio, o descargado). La dirección no se guarda: solo su red y
   su país.
+- «Disfraz» (`disfraz.rs`): un programa que se llama como uno de Windows (`svchost.exe`, `lsass.exe`, `csrss.exe`…) y
+  arranca desde fuera de la carpeta de Windows, el único sitio donde está el de verdad. Grave. Lo ve la misma vigilancia
+  de los inicios de programa que «cadenas».
 - El panel: `GET /api/escudo` (si aún aprende, cuántos sitios, los avisos); la web dentro del programa puede leerlo.
 - Los avisos graves llegan a la persona aunque no abra nada (el dueño, 1 nov 2026, 19:29: «Me parece bien la
   propuesta, sí, buena idea»): `GUARDIANA ZERO.exe --avisos` arranca al iniciar sesión (entrada Run del instalador) y
