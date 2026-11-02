@@ -395,6 +395,9 @@ impl EscudoVivo {
                     .get(&clave)
                     .is_some_and(|t| cuando.saturating_sub(*t) < REPETIR_CADENA_MS)
                 {
+                    if self.cadenas_vistas.len() > 4_096 {
+                        self.cadenas_vistas.clear();
+                    }
                     self.cadenas_vistas.insert(clave, cuando);
                     self.anota(&aviso, grave);
                 }

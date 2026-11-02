@@ -53,11 +53,11 @@ fn sin_volumen(ruta: &str) -> String {
 }
 
 /// Whether a started program, by its file name and path, wears the name of one of Windows' own programs outside
-/// Windows' folder. A path that cannot be read says nothing.
+/// Windows' folder. Only a whole path counts: a bare name, or no path, says nothing.
 #[must_use]
 pub fn sospechoso(nombre: &str, ruta: &str) -> bool {
     let n = nombre.to_ascii_lowercase();
-    if ruta.trim().is_empty() || !DE_WINDOWS.contains(&n.as_str()) {
+    if !ruta.contains(['\\', '/']) || !DE_WINDOWS.contains(&n.as_str()) {
         return false;
     }
     !sin_volumen(ruta).starts_with(r"\windows\")
@@ -115,6 +115,8 @@ mod tests {
             r"C:\Users\ana\AppData\Local\Temp\chrome.exe"
         ));
         assert!(!sospechoso("svchost.exe", ""));
+        // solo el nombre, sin carpeta: no se sabe dónde está
+        assert!(!sospechoso("svchost.exe", "svchost.exe"));
     }
 
     #[test]
