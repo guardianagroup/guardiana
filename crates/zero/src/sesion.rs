@@ -1780,7 +1780,8 @@ impl Sesion {
     }
 
     fn msg_textos(&self) -> Value {
-        json!({ "tipo": "textos", "textos": self.textos.todos(), "idioma": self.textos.idioma().codigo() })
+        // 2 Nov 2026, the 42 languages: with its `lang` and its direction, so the interface sets them
+        json!({ "tipo": "textos", "textos": self.textos.todos(), "idioma": self.textos.idioma().codigo(), "lang": self.textos.idioma().lang(), "rtl": self.textos.idioma().rtl() })
     }
 
     fn msg_ajustes(&self) -> Value {
@@ -2096,7 +2097,10 @@ impl Sesion {
     /// The language GUARDIANA speaks (Z5): the panel's `/api/ajustes/idioma`, read by its page
     /// inside ZERO. The browser follows it and keeps it as its own choice.
     fn idioma_del_programa(&mut self, idioma: &str) -> Vec<Orden> {
-        if !matches!(idioma, "es" | "en" | "pt") || self.prefs.idioma == idioma {
+        let conocido = guardiana_core::i18n::IDIOMAS
+            .iter()
+            .any(|x| x.codigo == idioma);
+        if !conocido || self.prefs.idioma == idioma {
             return Vec::new();
         }
         self.ajuste("idioma", &Value::String(idioma.to_string()))
@@ -3275,7 +3279,7 @@ impl Sesion {
             }
             "idioma" => {
                 let v = valor.as_str().unwrap_or("");
-                if !matches!(v, "" | "es" | "en" | "pt") {
+                if !v.is_empty() && !guardiana_core::i18n::IDIOMAS.iter().any(|x| x.codigo == v) {
                     return Vec::new();
                 }
                 self.prefs.idioma = v.to_string();

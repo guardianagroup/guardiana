@@ -1,58 +1,108 @@
-//! The browser's texts in Spanish, English and Portuguese (`i18n/*.json`), never inside the code.
-//! The language follows the system's: Spanish and Portuguese by their own name, English for
-//! everything else, the same rule as guardianagroup.com and the GUARDIANA panel.
+//! The browser's texts in the 42 languages of guardianagroup.com (`i18n/<code>.json`), never inside the code. The
+//! language follows the program's choice or the system's; a text not translated yet into a language reads in English,
+//! and in Spanish (the language it is written in) only when English lacks it too. The list of languages is the one of
+//! `guardiana_core::i18n::IDIOMAS` (2 Nov 2026, the owner: «mete los 42 idiomas en el programa»).
 
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
-const ES: &str = include_str!("../i18n/es.json");
-const EN: &str = include_str!("../i18n/en.json");
-const PT: &str = include_str!("../i18n/pt.json");
+use guardiana_core::i18n::IDIOMAS;
 
-/// A language of the browser.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Idioma {
-    /// Spanish.
-    Es,
-    /// English.
-    En,
-    /// Portuguese.
-    Pt,
+macro_rules! fuentes {
+    ($($codigo:literal),* $(,)?) => {
+        /// Each language's file, in the order of `IDIOMAS`.
+        const FUENTES: &[&str] = &[$(include_str!(concat!("../i18n/", $codigo, ".json"))),*];
+        /// Their codes, to check the order against `IDIOMAS`.
+        const CODIGOS: &[&str] = &[$($codigo),*];
+    };
 }
 
+fuentes!(
+    "es", "en", "pt", "fr", "de", "it", "nl", "sv", "da", "nb", "fi", "is", "pl", "uk", "ru", "tr",
+    "zh", "ja", "ko", "hi", "bn", "id", "vi", "th", "ar", "fa", "he", "ur", "zh-tw", "cs", "ro",
+    "hu", "el", "sk", "bg", "hr", "ms", "fil", "sw", "ta", "te", "pt-pt",
+);
+
+const N: usize = 42;
+const _: () = assert!(FUENTES.len() == N && CODIGOS.len() == N && IDIOMAS.len() == N);
+
+/// A language of the browser: its place in `guardiana_core::i18n::IDIOMAS`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Idioma(usize);
+
+#[allow(non_upper_case_globals)]
 impl Idioma {
-    /// From a system or browser tag (`es-CO`, `pt-BR`, `en-US`, `fr-FR`...).
+    /// Spanish.
+    pub const Es: Self = Self(0);
+    /// English.
+    pub const En: Self = Self(1);
+    /// Brazilian Portuguese.
+    pub const Pt: Self = Self(2);
+
+    /// From a system or browser tag (`es-CO`, `pt-BR`, `en-US`, `fr-FR`, `zh-TW`…): each of the 42 by its own code;
+    /// any other language reads English (`guardiana_core::i18n::indice`).
     #[must_use]
     pub fn de_etiqueta(tag: &str) -> Self {
-        let t = tag.trim().to_ascii_lowercase();
-        if t.starts_with("es") {
-            Self::Es
-        } else if t.starts_with("pt") {
-            Self::Pt
-        } else {
-            Self::En
-        }
+        Self(guardiana_core::i18n::indice(tag))
     }
 
-    /// Two-letter code.
+    /// Its code (`es`, `zh-tw`, `pt-pt`…).
     #[must_use]
-    pub const fn codigo(self) -> &'static str {
-        match self {
-            Self::Es => "es",
-            Self::En => "en",
-            Self::Pt => "pt",
+    pub fn codigo(self) -> &'static str {
+        IDIOMAS.get(self.0).map_or("en", |x| x.codigo)
+    }
+
+    /// Its `lang` attribute (BCP 47).
+    #[must_use]
+    pub fn lang(self) -> &'static str {
+        IDIOMAS.get(self.0).map_or("en", |x| x.lang)
+    }
+
+    /// Written right to left.
+    #[must_use]
+    pub fn rtl(self) -> bool {
+        IDIOMAS.get(self.0).is_some_and(|x| x.rtl)
+    }
+
+    /// How it writes numbers: the thousands' separator, the decimal one, and from how many digits it groups them (the
+    /// common usage of each language: a dot or a space for thousands and a comma for decimals in most of Europe,
+    /// the other way round in English and in Asia; Spanish and Portuguese keep four digits together).
+    #[must_use]
+    pub fn separadores(self) -> (char, char, usize) {
+        match self.codigo() {
+            "es" | "pt" => ('.', ',', 5),
+            "de" | "it" | "nl" | "da" | "id" | "tr" | "el" | "ro" | "hr" | "vi" | "is" => {
+                ('.', ',', 4)
+            }
+            "fr" | "pt-pt" | "pl" | "fi" | "sv" | "nb" | "uk" | "ru" | "cs" | "sk" | "hu"
+            | "bg" => ('\u{202f}', ',', 5),
+            _ => (',', '.', 4),
         }
     }
 }
 
 type Mapa = BTreeMap<String, String>;
 
-static MAPAS: OnceLock<[Mapa; 3]> = OnceLock::new();
+static MAPAS: [OnceLock<Mapa>; N] = [const { OnceLock::new() }; N];
+static COMPLETOS: [OnceLock<Mapa>; N] = [const { OnceLock::new() }; N];
 
-fn mapas() -> &'static [Mapa; 3] {
-    MAPAS.get_or_init(|| {
-        let lee = |s: &str| serde_json::from_str::<Mapa>(s).unwrap_or_default();
-        [lee(ES), lee(EN), lee(PT)]
+/// The texts a language's file says.
+fn propio(i: usize) -> &'static Mapa {
+    MAPAS[i].get_or_init(|| serde_json::from_str::<Mapa>(FUENTES[i]).unwrap_or_default())
+}
+
+/// A language's texts over English, over Spanish: every key, as the interface gets them.
+fn completo(i: usize) -> &'static Mapa {
+    COMPLETOS[i].get_or_init(|| {
+        let mut m = propio(0).clone();
+        m.extend(propio(1).iter().map(|(k, v)| (k.clone(), v.clone())));
+        m.extend(
+            propio(i)
+                .iter()
+                .filter(|(_, v)| !v.trim().is_empty())
+                .map(|(k, v)| (k.clone(), v.clone())),
+        );
+        m
     })
 }
 
@@ -75,31 +125,23 @@ impl Textos {
         self.idioma
     }
 
-    /// The text for `clave`, falling back to Spanish and then to the key itself (which the tests
-    /// make sure never happens).
+    fn i(&self) -> usize {
+        self.idioma.0.min(N - 1)
+    }
+
+    /// The text for `clave`, in the language, else in English, else in Spanish, and as a last resort the key itself
+    /// (which the tests make sure never happens).
     #[must_use]
     pub fn t(&self, clave: &str) -> String {
-        let [es, en, pt] = mapas();
-        let m = match self.idioma {
-            Idioma::Es => es,
-            Idioma::En => en,
-            Idioma::Pt => pt,
-        };
-        m.get(clave)
-            .or_else(|| es.get(clave))
+        completo(self.i())
+            .get(clave)
             .cloned()
             .unwrap_or_else(|| clave.to_string())
     }
 
-    /// Whether the language (or Spanish, its fallback) has a text for `clave`.
+    /// Whether the language (or English or Spanish, its fallbacks) has a text for `clave`.
     fn tiene(&self, clave: &str) -> bool {
-        let [es, en, pt] = mapas();
-        let m = match self.idioma {
-            Idioma::Es => es,
-            Idioma::En => en,
-            Idioma::Pt => pt,
-        };
-        m.contains_key(clave) || es.contains_key(clave)
+        completo(self.i()).contains_key(clave)
     }
 
     /// The text for `clave` with every `{hueco}` filled.
@@ -128,19 +170,16 @@ impl Textos {
         }
     }
 
-    /// A count written the person's way: `12.345` in Spanish and Portuguese, `12,345` in English
-    /// (four digits stay together in Spanish and Portuguese, as the pages write them).
+    /// A count written the person's way: `12.345` in Spanish and Portuguese, `12,345` in English, `12 345` in French
+    /// (see [`Idioma::separadores`]).
     #[must_use]
     pub fn numero(&self, n: u64) -> String {
         let s = n.to_string();
-        let (sep, desde) = match self.idioma {
-            Idioma::En => (',', 4),
-            Idioma::Es | Idioma::Pt => ('.', 5),
-        };
+        let (sep, _, desde) = self.idioma.separadores();
         if s.len() < desde {
             return s;
         }
-        let mut out = String::with_capacity(s.len() + s.len() / 3);
+        let mut out = String::with_capacity(s.len() + s.len() / 3 * 3);
         for (i, c) in s.chars().enumerate() {
             if i > 0 && (s.len() - i) % 3 == 0 {
                 out.push(sep);
@@ -150,15 +189,11 @@ impl Textos {
         out
     }
 
-    /// Every text of the language, for the interface (sent once when it opens).
+    /// Every text of the language, for the interface (sent once when it opens): over English and Spanish, so a text
+    /// not translated yet still reads in English.
     #[must_use]
     pub fn todos(&self) -> &'static Mapa {
-        let [es, en, pt] = mapas();
-        match self.idioma {
-            Idioma::Es => es,
-            Idioma::En => en,
-            Idioma::Pt => pt,
-        }
+        completo(self.i())
     }
 }
 
@@ -169,12 +204,13 @@ impl crate::tachon::Etiquetas for Textos {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
     #[test]
     fn the_three_languages_have_the_same_keys() {
-        let [es, en, pt] = mapas();
+        let (es, en, pt) = (propio(0), propio(1), propio(2));
         assert!(!es.is_empty());
         let falta = |a: &Mapa, b: &Mapa| -> Vec<String> {
             a.keys().filter(|k| !b.contains_key(*k)).cloned().collect()
@@ -241,6 +277,36 @@ mod tests {
     fn languages_follow_the_system() {
         assert_eq!(Idioma::de_etiqueta("es-CO"), Idioma::Es);
         assert_eq!(Idioma::de_etiqueta("pt-BR"), Idioma::Pt);
-        assert_eq!(Idioma::de_etiqueta("fr-FR"), Idioma::En);
+        assert_eq!(Idioma::de_etiqueta("fr-FR").codigo(), "fr");
+        assert_eq!(Idioma::de_etiqueta("zh-TW").codigo(), "zh-tw");
+        assert!(Idioma::de_etiqueta("ar-SA").rtl());
+        assert_eq!(Idioma::de_etiqueta("eu-ES"), Idioma::En);
+    }
+
+    #[test]
+    fn the_42_languages_read_every_key() {
+        // the files in the order of the program's list; each one JSON with only keys that exist; read over English, every
+        // key of Spanish (2 Nov 2026)
+        for (i, c) in CODIGOS.iter().enumerate() {
+            assert_eq!(*c, IDIOMAS[i].codigo);
+            let suyo: Mapa = serde_json::from_str(FUENTES[i])
+                .map_err(|e| format!("{c}: {e}"))
+                .unwrap();
+            for k in suyo.keys() {
+                assert!(
+                    propio(0).contains_key(k),
+                    "{c}: {k} ya no existe en español"
+                );
+            }
+            let t = Textos::de(Idioma(i));
+            for k in propio(0).keys() {
+                assert_ne!(t.t(k), *k, "{c}: falta {k}");
+            }
+        }
+        assert_eq!(
+            Textos::de(Idioma::de_etiqueta("fr")).numero(12_345),
+            "12\u{202f}345"
+        );
+        assert_eq!(Textos::de(Idioma::de_etiqueta("de")).numero(1234), "1.234");
     }
 }

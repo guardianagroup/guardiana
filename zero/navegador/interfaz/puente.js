@@ -24,7 +24,9 @@ const Z = (() => {
     if (!m || typeof m !== 'object') return;
     if (m.tipo === 'textos') {
       T = m.textos || {};
-      document.documentElement.lang = m.idioma || 'es';
+      // 2 Nov 2026, the 42 languages: the language's own tag, and right to left in Arabic, Persian, Hebrew and Urdu
+      document.documentElement.lang = m.lang || m.idioma || 'es';
+      document.documentElement.dir = m.rtl === true ? 'rtl' : 'ltr';
       pintaTextos(document);
     }
     if (m.tipo === 'tema') document.documentElement.dataset.tema = m.tema || '';

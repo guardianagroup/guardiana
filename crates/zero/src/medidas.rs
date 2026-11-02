@@ -851,9 +851,10 @@ pub fn tamano(bytes: u64, idioma: Idioma) -> String {
     } else {
         format!("{:.1} MB", bytes as f64 / MB as f64)
     };
-    match idioma {
-        Idioma::En => s,
-        Idioma::Es | Idioma::Pt => s.replacen('.', ",", 1),
+    // the language's decimal separator (2 Nov 2026: the 42 languages)
+    match idioma.separadores().1 {
+        '.' => s,
+        d => s.replacen('.', &d.to_string(), 1),
     }
 }
 
