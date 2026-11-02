@@ -5,7 +5,10 @@
 //! - the tunnel's address on the adapter (`CreateUnicastIpAddressEntry`);
 //! - a route for each allowed network on the adapter, next hop none, metric 0 (`CreateIpForwardEntry2`);
 //! - the adapter's settings: no router discovery, no duplicate address detection, no DHCPv6, its MTU, and metric 0 with
-//!   the automatic metric off when it carries the default route (`GetIpInterfaceEntry`, `SetIpInterfaceEntry`).
+//!   the automatic metric off when it carries the default route (`GetIpInterfaceEntry`, `SetIpInterfaceEntry`);
+//! - its DNS servers, the tunnel's resolvers, with Windows' own `netsh` (every Windows 10 and 11 has it; the newer
+//!   `SetInterfaceDnsSettings` is missing before Windows 10 2004, and linking it would stop the program from starting
+//!   there).
 //!
 //! The encrypted packets to the server do not loop into the tunnel: WireGuardNT itself sends them by the best route
 //! other than its own adapter (WireGuard's application adds no exception route either). All of it goes with the
@@ -135,13 +138,13 @@ pub fn ajusta(luid: u64, v6: bool, mtu: Option<u32>, por_defecto: bool) -> Resul
     })?;
     fila.RouterDiscoveryBehavior = RouterDiscoveryDisabled;
     fila.DadTransmits = 0;
-    fila.ManagedAddressConfigurationSupported = 0;
-    fila.OtherStatefulConfigurationSupported = 0;
+    fila.ManagedAddressConfigurationSupported = false;
+    fila.OtherStatefulConfigurationSupported = false;
     if let Some(m) = mtu {
         fila.NlMtu = m;
     }
     if por_defecto {
-        fila.UseAutomaticMetric = 0;
+        fila.UseAutomaticMetric = false;
         fila.Metric = 0;
     }
     if !v6 {
@@ -154,26 +157,84 @@ pub fn ajusta(luid: u64, v6: bool, mtu: Option<u32>, por_defecto: bool) -> Resul
     })
 }
 
+/// The tunnel's resolvers as the DNS servers of the adapter called `alias` (the name it was created with), for each
+/// family that has one; nothing registered in DNS.
+///
+/// # Errors
+/// [`ErrorRed`] when `netsh` could not run or refused.
+pub fn pon_dns(alias: &str, servidores: &[IpAddr]) -> Result<(), ErrorRed> {
+    let netsh = std::env::var_os("SystemRoot")
+        .map_or_else(
+            || std::path::PathBuf::from(r"C:\Windows"),
+            std::path::PathBuf::from,
+        )
+        .join(r"System32\netsh.exe");
+    for (familia, v6) in [("ipv4", false), ("ipv6", true)] {
+        let de_esta: Vec<&IpAddr> = servidores.iter().filter(|s| s.is_ipv6() == v6).collect();
+        for (i, s) in de_esta.iter().enumerate() {
+            let nombre = format!("name={alias}");
+            let direccion = s.to_string();
+            let mut orden = std::process::Command::new(&netsh);
+            if i == 0 {
+                orden.args([
+                    "interface",
+                    familia,
+                    "set",
+                    "dnsservers",
+                    &nombre,
+                    "source=static",
+                    &format!("address={direccion}"),
+                    "register=none",
+                    "validate=no",
+                ]);
+            } else {
+                orden.args([
+                    "interface",
+                    familia,
+                    "add",
+                    "dnsservers",
+                    &nombre,
+                    &format!("address={direccion}"),
+                    &format!("index={}", i + 1),
+                    "validate=no",
+                ]);
+            }
+            let salida = orden
+                .output()
+                .map_err(|e| ErrorRed(format!("netsh: {e}")))?;
+            if !salida.status.success() {
+                return Err(ErrorRed(format!(
+                    "netsh {familia} {direccion}: {}",
+                    String::from_utf8_lossy(&salida.stdout).trim()
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use crate::wireguard_nt::{Adaptador, Biblioteca};
     use std::path::Path;
+    use std::sync::Arc;
 
     /// On a real Windows, as an administrator, with WireGuardNT at `GUARDIANA_WG_DLL`: an adapter gets the tunnel's
     /// address, a route to the tunnel's own network (never the default route: the test machine's network stays as it
-    /// is) and its settings; closing the adapter takes them away.
+    /// is), its settings and its resolver; closing the adapter takes them away.
     #[test]
     #[ignore = "necesita Windows como administrador y wireguard.dll en GUARDIANA_WG_DLL"]
     fn la_red_del_tunel_en_un_adaptador_de_verdad() {
         let ruta = std::env::var_os("GUARDIANA_WG_DLL").unwrap();
-        let b = Biblioteca::carga(Path::new(&ruta)).unwrap();
+        let b = Arc::new(Biblioteca::carga(Path::new(&ruta)).unwrap());
         let a = Adaptador::crea(&b, "GUARDIANA red", "GUARDIANA").unwrap();
         let luid = a.luid();
         pon_direccion(luid, &"10.66.7.2".parse().unwrap(), 16).unwrap();
         pon_rutas(luid, &[("10.66.0.0".parse().unwrap(), 16)]).unwrap();
         ajusta(luid, false, Some(1420), false).unwrap();
+        pon_dns("GUARDIANA red", &["10.66.0.1".parse().unwrap()]).unwrap();
         a.pon(true).unwrap();
         a.pon(false).unwrap();
     }

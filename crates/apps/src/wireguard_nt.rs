@@ -13,6 +13,7 @@
 
 use std::ffi::c_void;
 use std::path::Path;
+use std::sync::Arc;
 
 use windows_sys::core::GUID;
 use windows_sys::Win32::Foundation::{FreeLibrary, GetLastError};
@@ -143,23 +144,27 @@ impl Biblioteca {
 
 impl Drop for Biblioteca {
     fn drop(&mut self) {
-        // SAFETY: the module this value loaded; every adapter borrows the library, so none outlives it.
+        // SAFETY: the module this value loaded; every adapter holds the library, so none outlives it.
         unsafe { FreeLibrary(self.modulo) };
     }
 }
 
-/// One WireGuardNT adapter, created by this program. Closed (and gone) when dropped.
-pub struct Adaptador<'a> {
-    biblioteca: &'a Biblioteca,
+/// One WireGuardNT adapter, created by this program. Closed (and gone) when dropped; it keeps the library loaded.
+pub struct Adaptador {
+    biblioteca: Arc<Biblioteca>,
     h: *mut c_void,
 }
 
-impl<'a> Adaptador<'a> {
+// The handle is the driver's; its control calls may come from any thread.
+unsafe impl Send for Adaptador {}
+unsafe impl Sync for Adaptador {}
+
+impl Adaptador {
     /// Creates the adapter `nombre`, of the tunnel type `tipo` (the group Windows lists it under).
     ///
     /// # Errors
     /// [`ErrorNt::Llamada`] when the driver refused (it needs the system's account or an administrator's).
-    pub fn crea(biblioteca: &'a Biblioteca, nombre: &str, tipo: &str) -> Result<Self, ErrorNt> {
+    pub fn crea(biblioteca: &Arc<Biblioteca>, nombre: &str, tipo: &str) -> Result<Self, ErrorNt> {
         let n = ancho(nombre);
         let t = ancho(tipo);
         // SAFETY: two NUL-terminated names owned for the call; no requested GUID (Windows picks one).
@@ -167,7 +172,10 @@ impl<'a> Adaptador<'a> {
         if h.is_null() {
             return Err(ultimo_error("WireGuardCreateAdapter"));
         }
-        Ok(Self { biblioteca, h })
+        Ok(Self {
+            biblioteca: Arc::clone(biblioteca),
+            h,
+        })
     }
 
     /// The adapter's LUID: what Windows' routing, addresses and firewall call it by.
@@ -208,7 +216,7 @@ impl<'a> Adaptador<'a> {
     }
 }
 
-impl Drop for Adaptador<'_> {
+impl Drop for Adaptador {
     fn drop(&mut self) {
         // SAFETY: the handle this value created, closed once.
         unsafe { (self.biblioteca.cierra)(self.h) };
@@ -227,7 +235,7 @@ mod tests {
     #[ignore = "necesita Windows como administrador y wireguard.dll en GUARDIANA_WG_DLL"]
     fn un_adaptador_de_verdad() {
         let ruta = std::env::var_os("GUARDIANA_WG_DLL").unwrap();
-        let b = Biblioteca::carga(Path::new(&ruta)).unwrap();
+        let b = Arc::new(Biblioteca::carga(Path::new(&ruta)).unwrap());
         let a = Adaptador::crea(&b, "GUARDIANA prueba", "GUARDIANA").unwrap();
         assert_ne!(a.luid(), 0);
         let llaves = guardiana_tunel::llaves::Llaves::nuevas().unwrap();
