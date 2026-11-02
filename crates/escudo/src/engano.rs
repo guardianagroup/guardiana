@@ -44,8 +44,8 @@ pub fn sospechoso(nombre: &str) -> Option<&'static str> {
     partes.next()?;
     if EJECUTABLES.contains(&ultima) && DOCUMENTOS.contains(&penultima) {
         return Some(
-            "su nombre termina como un documento seguido de la extensión de un programa: con las extensiones ocultas, \
-             Windows lo enseña como un documento",
+            "su nombre termina como un documento seguido de la extensión de un programa, y con las extensiones \
+             ocultas Windows lo enseña como un documento",
         );
     }
     None
