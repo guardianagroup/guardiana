@@ -55,6 +55,10 @@ pub(crate) const RUTAS_PLUS: &[(Option<Method>, &str)] = &[
     (Some(Method::GET), "/api/expedientes/"),
     (Some(Method::GET), "/api/borrado/carta"),
     (Some(Method::POST), "/api/borrado/envios"),
+    // The VPN: connecting is Plus (trial, subscription or Lifetime), because every connection is real traffic on a
+    // server (the owner, 2 Nov 2026, 17:01: «lo que realmente vamos a dejar es de pago, va a ser la VPN, las llamadas
+    // ultra»). Its state and «Desconectar» stay free: a tunnel opened during the trial can always be closed.
+    (Some(Method::POST), "/api/vpn/conecta"),
     // Other branches of 1.0.45.
     (None, "/api/vigilancia"),
     (None, "/api/contratos"),
@@ -228,6 +232,10 @@ mod tests {
         assert!(!es_plus(&Method::POST, "/api/antivirus/cortar"));
         assert!(!es_plus(&Method::GET, "/api/extracto/exportar"));
         assert!(!es_plus(&Method::GET, "/api/licencia"));
+        // The VPN: connecting is Plus; its state and disconnecting never are.
+        assert!(es_plus(&Method::POST, "/api/vpn/conecta"));
+        assert!(!es_plus(&Method::GET, "/api/vpn"));
+        assert!(!es_plus(&Method::POST, "/api/vpn/desconecta"));
     }
 
     #[test]
