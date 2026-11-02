@@ -3765,8 +3765,24 @@ fn the_web_asks_the_panel_only_for_its_readings() {
             if *id == panel && json.contains("/api/revision/ahora") && json.contains("\"n\":7")
     )));
     // 1.0.50: the Antivirus also reads the call watcher and «who sells your data».
-    for ruta in ["/vigia", "/api/quien-vende", "/api/escudo/cuarentena"] {
+    for ruta in [
+        "/vigia",
+        "/api/quien-vende",
+        "/api/escudo/cuarentena",
+        "/api/vpn",
+    ] {
         let o = s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, "GET"));
+        assert!(
+            o.iter().any(|x| matches!(
+                x,
+                Orden::EnviaAPagina { id, json, .. } if *id == panel && json.contains(ruta)
+            )),
+            "{ruta}"
+        );
+    }
+    // 1.0.52: the VPN's two orders go through (the gesture rule is the panel tab's, tested with the page's script).
+    for ruta in ["/api/vpn/conecta", "/api/vpn/desconecta"] {
+        let o = s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, "POST"));
         assert!(
             o.iter().any(|x| matches!(
                 x,

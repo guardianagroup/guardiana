@@ -786,6 +786,12 @@ const PANEL_LECTURAS: &[(&str, &str)] = &[
     // the route of the data, hop by hop, and the order to measure it now (read only: `tracert`).
     ("GET", "/api/ruta"),
     ("POST", "/api/ruta/ahora"),
+    // 1.0.52, the VPN (the owner, 1 Nov 2026: «VPN como sección propia»): its state, and the two orders, which the
+    // panel takes only right after a real click (see the gesture rule above). No server is named from the web: the
+    // panel connects to GUARDIANA's default one.
+    ("GET", "/api/vpn"),
+    ("POST", "/api/vpn/conecta"),
+    ("POST", "/api/vpn/desconecta"),
 ];
 
 /// 1.0.52: `POST /api/escudo/cuarentena/<id>`, the id being a warning's (`<línea>-<cuando_ms>`, digits only), the

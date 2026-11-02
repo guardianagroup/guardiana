@@ -158,23 +158,45 @@ pub(crate) async fn ver(State(state): State<Arc<AppState>>, _s: Session) -> ApiR
 }
 
 /// Lo que pide «conectar».
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub(crate) struct Pedido {
-    /// El servidor: un nombre de guardianagroup.com.
+    /// El servidor: un nombre de guardianagroup.com. Vacío (o sin cuerpo, como pide la web de GUARDIANA a través de
+    /// ZERO): el de [`SERVIDOR`].
+    #[serde(default)]
     servidor: String,
 }
 
-/// `POST /api/vpn/conecta` `{"servidor": "…guardianagroup.com"}`: empieza a conectar; la página pregunta a
+/// El servidor al que se conecta quien no elige uno: el nombre que tendrá el primer extremo (Helsinki) cuando esté
+/// dentro del sello (docs/VPN.md). Hasta entonces el nombre no resuelve y la conexión lo dice.
+pub(crate) const SERVIDOR: &str = "vpn.guardianagroup.com";
+
+/// `POST /api/vpn/conecta` `{"servidor": "…guardianagroup.com"}` (o `{}`): empieza a conectar; la página pregunta a
 /// `GET /api/vpn` cómo va.
 pub(crate) async fn conecta(
     State(state): State<Arc<AppState>>,
     _s: Session,
-    Json(p): Json<Pedido>,
+    cuerpo: axum::body::Bytes,
 ) -> ApiResult<Value> {
     if let Some(motivo) = no_disponible() {
         return Ok(Json(json!({ "ok": false, "motivo": motivo })));
     }
-    let host = p.servidor.trim().to_ascii_lowercase();
+    // Sin cuerpo, o `{}`: el servidor por defecto. Otra cosa que no sea el JSON del pedido: se dice.
+    let pedido = if cuerpo.iter().all(u8::is_ascii_whitespace) {
+        Pedido::default()
+    } else {
+        match serde_json::from_slice::<Pedido>(&cuerpo) {
+            Ok(p) => p,
+            Err(_) => {
+                return Ok(Json(
+                    json!({ "ok": false, "motivo": "el pedido no se entiende" }),
+                ))
+            }
+        }
+    };
+    let host = match pedido.servidor.trim() {
+        "" => SERVIDOR.to_owned(),
+        s => s.to_ascii_lowercase(),
+    };
     if !guardiana_tunel::alta::es_servidor(&host) {
         return Ok(Json(
             json!({ "ok": false, "motivo": "ese servidor no es de GUARDIANA" }),
