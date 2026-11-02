@@ -275,6 +275,10 @@ pub struct Proteccion {
     /// Microsoft Defender's exclusions, what it does not look at (`ruta:C:\x`, `proceso:x.exe`, `extension:.x`);
     /// `None` when they could not be read.
     pub exclusiones: Option<Vec<String>>,
+    /// When each event log was last emptied, as Windows itself records it (Unix ms): `seguridad`, the Security log;
+    /// `otro`, any other (the System log's record). A log never emptied, or whose record is gone, is missing; `None`
+    /// when not read.
+    pub vaciados: Option<BTreeMap<String, i64>>,
 }
 
 /// One look at what changes slowly.
@@ -390,6 +394,12 @@ pub fn de_json(v: &Value) -> Foto {
                     .map(s)
                     .filter(|x| !x.is_empty())
                     .take(MAX_EXCLUSIONES)
+                    .collect()
+            }),
+            vaciados: p["vaciados"].as_object().map(|o| {
+                o.iter()
+                    .filter(|(k, _)| matches!(k.as_str(), "seguridad" | "otro"))
+                    .filter_map(|(k, t)| t.as_i64().map(|t| (k.clone(), t)))
                     .collect()
             }),
         });
@@ -566,6 +576,9 @@ pub struct Base {
     /// Microsoft Defender's exclusions at the last look that could read them; `None` until one did.
     #[serde(default)]
     pub exclusiones: Option<BTreeSet<String>>,
+    /// When each event log had last been emptied, at the last look that read it; `None` until one did.
+    #[serde(default)]
+    pub vaciados: Option<BTreeMap<String, i64>>,
     /// When each notice was last given, so the same one is not repeated within its window.
     #[serde(default)]
     pub avisados: BTreeMap<String, i64>,
@@ -1053,6 +1066,9 @@ impl Base {
         if let Some(ahora_hay) = &p.exclusiones {
             out.extend(self.mira_exclusiones(ahora_hay, ahora));
         }
+        if let Some(v) = &p.vaciados {
+            out.extend(self.mira_vaciados(v, ahora));
+        }
         self.proteccion = hechos;
         self.atencion = atencion;
         if primera {
@@ -1124,6 +1140,45 @@ impl Base {
             }
         }
         self.exclusiones = Some(ahora_hay);
+        out
+    }
+
+    /// The event logs emptied since the last look (1.0.52, el escudo). The first reading is the starting point: what
+    /// was emptied before the watch began is not news.
+    fn mira_vaciados(&mut self, ahora_hay: &BTreeMap<String, i64>, ahora: i64) -> Vec<Hallazgo> {
+        let mut out = Vec::new();
+        if let Some(antes) = self.vaciados.take() {
+            for (registro, &cuando) in ahora_hay {
+                if antes.get(registro).is_some_and(|&t| t >= cuando) {
+                    continue;
+                }
+                let seguridad = registro == "seguridad";
+                let aviso = self.avisa(&format!("vaciado|{registro}"), ahora, VENTANA_AVISO);
+                out.push(
+                    Hallazgo::nuevo(
+                        "proteccion",
+                        format!("vaciado|{registro}|{cuando}"),
+                        aviso,
+                        if seguridad {
+                            "vg_ev_vaciado_seguridad"
+                        } else {
+                            "vg_ev_vaciado_otro"
+                        },
+                    )
+                    .con("x", registro)
+                    .con("vaciado", cuando)
+                    .texto(
+                        if seguridad {
+                            "Se ha vaciado el registro de seguridad de Windows"
+                        } else {
+                            "Se ha vaciado un registro de eventos de Windows"
+                        }
+                        .to_owned(),
+                    ),
+                );
+            }
+        }
+        self.vaciados = Some(ahora_hay.clone());
         out
     }
 }
@@ -1324,6 +1379,8 @@ pub const FRASES: &[&str] = &[
     "vg_ev_exclusion_nueva",
     "vg_ev_exclusion_ya",
     "vg_ev_exclusion_quitada",
+    "vg_ev_vaciado_seguridad",
+    "vg_ev_vaciado_otro",
     "vg_ev_uso_empieza",
     "vg_ev_uso_termina",
     "vg_ev_uso_breve",
@@ -1720,6 +1777,7 @@ mod mac {
                 defender: None,
                 cortafuegos: Some(c),
                 exclusiones: None,
+                vaciados: None,
             }),
             ..Foto::default()
         }
@@ -2056,6 +2114,7 @@ mod tests {
             defender: Some(d),
             cortafuegos: Some(perfiles.iter().map(|(p, a)| ((*p).into(), *a)).collect()),
             exclusiones: None,
+            vaciados: None,
         }
     }
 
@@ -2153,7 +2212,8 @@ mod tests {
                 "cortafuegos_otros": [],
                 "defender": { "servicio": true, "antivirus": true, "tiempo_real": true, "manipulacion": true, "modo": "Normal" },
                 "cortafuegos": [ { "perfil": "Domain", "activo": true } ],
-                "exclusiones": [ "ruta:C:\\Juegos", "extension:iso", "" ]
+                "exclusiones": [ "ruta:C:\\Juegos", "extension:iso", "" ],
+                "vaciados": { "seguridad": 1_700_000_000_000_i64, "aplicacion": 1, "otro": "no" }
             },
             "cuentas": { "S-1-5-21-1": "marta" },
             "errores": {}
@@ -2172,6 +2232,11 @@ mod tests {
             p.exclusiones.unwrap(),
             vec![r"ruta:C:\Juegos".to_owned(), "extension:iso".to_owned()],
             "an empty value is dropped"
+        );
+        assert_eq!(
+            p.vaciados.unwrap().into_iter().collect::<Vec<_>>(),
+            vec![("seguridad".to_owned(), 1_700_000_000_000)],
+            "only the two logs, with a time"
         );
         assert_eq!(f.cuentas["S-1-5-21-1"], "marta");
         let vacio = de_json(&serde_json::json!({ "arranque": null, "privacidad": null }));
@@ -2230,6 +2295,38 @@ mod tests {
             que_excluye("proceso:x.exe"),
             "lo que abre el programa «x.exe»"
         );
+    }
+
+    #[test]
+    fn an_event_log_emptied_after_the_first_look_is_a_notice() {
+        let mut b = Base::default();
+        let con = |v: &[(&str, i64)]| {
+            let mut p = prot(
+                &[("Microsoft Defender Antivirus", true)],
+                defender(true, "Normal"),
+                &[("Public", true)],
+            );
+            p.vaciados = Some(v.iter().map(|(k, t)| ((*k).to_owned(), *t)).collect());
+            p
+        };
+        // the first reading is the starting point, however recent
+        assert!(b.mira_proteccion(&con(&[("otro", 500)]), 1_000).is_empty());
+        assert!(b.mira_proteccion(&con(&[("otro", 500)]), 2_000).is_empty());
+        // the Security log emptied, and another one again
+        let h = b.mira_proteccion(&con(&[("otro", 2_500), ("seguridad", 2_400)]), 3_000);
+        let frases: Vec<(&str, bool)> = h.iter().map(|x| (x.frase, x.aviso)).collect();
+        assert_eq!(
+            frases,
+            vec![
+                ("vg_ev_vaciado_otro", true),
+                ("vg_ev_vaciado_seguridad", true)
+            ]
+        );
+        assert_eq!(h[1].datos["vaciado"], "2400");
+        // nothing new: nothing
+        assert!(b
+            .mira_proteccion(&con(&[("otro", 2_500), ("seguridad", 2_400)]), 4_000)
+            .is_empty());
     }
 
     #[test]

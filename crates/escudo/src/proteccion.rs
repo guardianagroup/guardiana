@@ -8,6 +8,10 @@
 //! exclusion, so the antivirus does not look at a folder, a program or a kind of file, is what many harmful programs do
 //! to hide. A new exclusion always warns, grave when it leaves out much ([`amplia`]); one already there at the first
 //! look warns only when it is that wide.
+//!
+//! And the event logs emptied: Windows records it itself (in the Security log, when that one is emptied; in the System
+//! log, for any other), and the watch reads when. Emptying the Security log, where Windows notes sign-ins and changes of
+//! rights, is how an intruder wipes the trail: grave. Another log: a warning (cleaning programs do it too).
 
 use crate::primera_vez::Aviso;
 
@@ -191,6 +195,19 @@ pub fn juzga(
             ),
             false,
         ),
+        "vg_ev_vaciado_seguridad" => (
+            "Alguien ha vaciado el registro de seguridad de Windows, donde Windows anota los inicios de sesión y los \
+             cambios de permisos. Vaciarlo es de lo que hace un intruso para borrar su rastro. Si no fuiste tú, \
+             analiza el equipo."
+                .to_owned(),
+            true,
+        ),
+        "vg_ev_vaciado_otro" => (
+            "Alguien ha vaciado un registro de eventos de Windows. Lo hacen algunos programas de limpieza, y también \
+             quien quiere borrar su rastro. Si no fuiste tú ni un programa tuyo, analiza el equipo."
+                .to_owned(),
+            false,
+        ),
         "vg_ev_sin_antivirus_ya" => (
             "Ningún antivirus tiene la protección encendida en este equipo. Enciende la de Microsoft Defender en \
              Seguridad de Windows si no usas otro."
@@ -315,6 +332,22 @@ mod tests {
             juzga("vg_ev_exclusion_quitada", "extension:exe", None, "k", 1),
             None
         );
+    }
+
+    #[test]
+    fn vaciar_el_registro_de_seguridad_es_grave() {
+        let (a, grave) = juzga(
+            "vg_ev_vaciado_seguridad",
+            "seguridad",
+            None,
+            "vaciado|seguridad|5",
+            5,
+        )
+        .unwrap();
+        assert!(grave);
+        assert_eq!(a.nombre, "vaciado|seguridad|5");
+        let (_, grave) = juzga("vg_ev_vaciado_otro", "otro", None, "k", 5).unwrap();
+        assert!(!grave);
     }
 
     #[test]

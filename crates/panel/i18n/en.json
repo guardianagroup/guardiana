@@ -3076,6 +3076,8 @@
     "vg_ev_exclusion_nueva": "Microsoft Defender has a new exclusion and no longer scans: {que}",
     "vg_ev_exclusion_ya": "Microsoft Defender already had an exclusion when the watch started: {que}",
     "vg_ev_exclusion_quitada": "Microsoft Defender removed an exclusion and scans again: {que}",
+    "vg_ev_vaciado_seguridad": "Windows' Security event log was cleared",
+    "vg_ev_vaciado_otro": "A Windows event log was cleared",
     "vg_ev_tiempo_real_apagado": "Microsoft Defender's real-time protection was turned off",
     "vg_ev_tiempo_real_ya": "Microsoft Defender's real-time protection was already off when the watch started",
     "vg_ev_tiempo_real_vuelve": "Microsoft Defender's real-time protection is back on",

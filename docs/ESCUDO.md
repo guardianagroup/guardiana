@@ -78,6 +78,10 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
   ejecuta otros como PowerShell, o los archivos que ejecutan, como `.exe` o `.ps1`), porque añadir exclusiones así es
   de lo que hacen los programas dañinos para esconderse. Las que ya estaban en su primera lectura solo avisan si son
   así de amplias.
+  Y cuándo se vació por última vez cada registro de eventos de Windows (lo anota el propio Windows: 1102 en el de
+  seguridad, 104 en el del sistema para los demás). Vaciar el de seguridad, donde Windows apunta los inicios de sesión
+  y los cambios de permisos, es como un intruso borra su rastro: grave. Otro registro: aviso (también lo hacen algunos
+  programas de limpieza). La primera lectura es el punto de partida.
 - «Hosts» (`hosts.rs`): el archivo hosts de Windows, cada minuto. Un nombre que ahora va a una dirección de internet
   (no a 0.0.0.0, a este equipo ni a la red de casa) es grave: así se desvía una web a otro servidor sin que ningún DNS
   lo vea. La primera lectura es el punto de partida y se guarda junto al diario (`escudo-hosts.json`).

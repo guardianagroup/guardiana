@@ -3076,6 +3076,8 @@
     "vg_ev_exclusion_nueva": "O Microsoft Defender tem uma exclusão nova e já não analisa: {que}",
     "vg_ev_exclusion_ya": "O Microsoft Defender já tinha uma exclusão quando a vigilância começou: {que}",
     "vg_ev_exclusion_quitada": "O Microsoft Defender tirou uma exclusão e volta a analisar: {que}",
+    "vg_ev_vaciado_seguridad": "O registro de segurança do Windows foi esvaziado",
+    "vg_ev_vaciado_otro": "Um registro de eventos do Windows foi esvaziado",
     "vg_ev_tiempo_real_apagado": "A proteção em tempo real do Microsoft Defender foi desligada",
     "vg_ev_tiempo_real_ya": "A proteção em tempo real do Microsoft Defender já estava desligada quando a vigilância começou",
     "vg_ev_tiempo_real_vuelve": "A proteção em tempo real do Microsoft Defender voltou a estar ligada",

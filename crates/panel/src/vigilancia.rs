@@ -1018,6 +1018,7 @@ mod tests {
                 }),
                 cortafuegos: Some(vec![("Public".into(), true)]),
                 exclusiones: None,
+                vaciados: None,
             }),
             ..Foto::default()
         });

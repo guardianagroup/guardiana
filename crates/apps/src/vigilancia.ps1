@@ -71,7 +71,7 @@ try {
 
 # ---- Whether the antivirus and the firewall are on, as Windows Security Center and Defender say.
 try {
-  $o = [ordered]@{ antivirus = $null; cortafuegos_otros = $null; defender = $null; cortafuegos = $null; exclusiones = $null }
+  $o = [ordered]@{ antivirus = $null; cortafuegos_otros = $null; defender = $null; cortafuegos = $null; exclusiones = $null; vaciados = $null }
   try { $o.antivirus = @(Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct | ForEach-Object { [ordered]@{ nombre = [string]$_.displayName; estado = [long]$_.productState } }) } catch {}
   try { $o.cortafuegos_otros = @(Get-CimInstance -Namespace root/SecurityCenter2 -ClassName FirewallProduct | ForEach-Object { [ordered]@{ nombre = [string]$_.displayName; estado = [long]$_.productState } }) } catch {}
   try {
@@ -79,13 +79,21 @@ try {
     $o.defender = [ordered]@{ servicio = [bool]$m.AMServiceEnabled; antivirus = [bool]$m.AntivirusEnabled; tiempo_real = [bool]$m.RealTimeProtectionEnabled; manipulacion = [bool]$m.IsTamperProtected; modo = [string]$m.AMRunningMode }
   } catch {}
   # Defender's exclusions: what it does not look at (1.0.52, el escudo). Only an administrator reads them; the service
-  # does (otherwise each value says «N/A…» and nothing is kept).
+  # does (otherwise each value says 'N/A...' and nothing is kept).
   try {
     $q = Get-MpPreference
     $x = New-Object System.Collections.ArrayList
     $tipos = [ordered]@{ ruta = $q.ExclusionPath; proceso = $q.ExclusionProcess; extension = $q.ExclusionExtension }
     foreach ($k in $tipos.Keys) { foreach ($v in @($tipos[$k])) { $t = [string]$v; if ($t -and -not $t.StartsWith('N/A')) { [void]$x.Add($k + ':' + (Corta $t)) } } }
     $o.exclusiones = @($x)
+  } catch {}
+  # When the event logs were last emptied (1.0.52, el escudo): the Security log's own record of it (1102) and the
+  # System log's (104, any other log). Emptying them is how an intruder wipes the trail. No such event: none kept.
+  try {
+    $va = [ordered]@{}
+    try { $e = Get-WinEvent -FilterHashtable @{ LogName = 'Security'; Id = 1102 } -MaxEvents 1 -ErrorAction Stop; $va.seguridad = ([DateTimeOffset]$e.TimeCreated).ToUnixTimeMilliseconds() } catch {}
+    try { $e = Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Eventlog'; Id = 104 } -MaxEvents 1 -ErrorAction Stop; $va.otro = ([DateTimeOffset]$e.TimeCreated).ToUnixTimeMilliseconds() } catch {}
+    $o.vaciados = $va
   } catch {}
   try { $o.cortafuegos = @(Get-NetFirewallProfile | ForEach-Object { [ordered]@{ perfil = [string]$_.Name; activo = ([string]$_.Enabled -eq 'True') } }) } catch {}
   $R.proteccion = $o
