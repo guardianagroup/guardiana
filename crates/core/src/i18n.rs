@@ -549,7 +549,8 @@ mod tests {
         let es_v: serde_json::Value = serde_json::from_str(ES_JSON).unwrap();
         for (i, idioma) in IDIOMAS.iter().enumerate() {
             let propio: serde_json::Value = serde_json::from_str(FUENTES[i])
-                .unwrap_or_else(|e| panic!("{}.json no es JSON: {e}", idioma.codigo));
+                .map_err(|e| format!("{}.json no es JSON: {e}", idioma.codigo))
+                .unwrap();
             for (seccion, textos) in propio.as_object().unwrap() {
                 for clave in textos.as_object().unwrap().keys() {
                     assert!(
