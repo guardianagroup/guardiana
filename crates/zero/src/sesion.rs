@@ -4654,11 +4654,7 @@ impl Sesion {
         // rules of EasyList and uBlock filters for this host, while the protection is on.
         if es_web && self.prefs.reglas.cortar_seguimiento && self.licencia.protege() {
             if let Some(script) = host_de(url).and_then(|h| crate::filtros::guion_ocultar(&h)) {
-                o.push(Orden::Ejecuta {
-                    id,
-                    script,
-                    etiqueta: None,
-                });
+                o.push(Orden::Ejecuta { id, script });
             }
         }
         self.sucios.insert(id);
