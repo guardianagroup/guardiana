@@ -497,4 +497,57 @@ mod tests {
             "la ráfaga de PowerShell"
         );
     }
+
+    /// This process's processor time so far (kernel and user), in milliseconds.
+    fn cpu_ms() -> u64 {
+        use windows_sys::Win32::Foundation::FILETIME;
+        use windows_sys::Win32::System::Threading::{GetCurrentProcess, GetProcessTimes};
+        let cero = FILETIME {
+            dwLowDateTime: 0,
+            dwHighDateTime: 0,
+        };
+        let (mut c, mut s, mut k, mut u) = (cero, cero, cero, cero);
+        // SAFETY: this process's own pseudo-handle and four FILETIMEs owned here.
+        #[allow(unsafe_code)]
+        let ok = unsafe { GetProcessTimes(GetCurrentProcess(), &mut c, &mut s, &mut k, &mut u) };
+        assert_ne!(ok, 0);
+        let a = |f: FILETIME| (u64::from(f.dwHighDateTime) << 32) | u64::from(f.dwLowDateTime);
+        (a(k) + a(u)) / 10_000
+    }
+
+    /// On a real Windows, as an administrator: what the escudo's session costs. Another process creates and reads
+    /// 20 000 files; the test says how many openings arrived and the processor time this process spent on them.
+    #[test]
+    #[ignore = "necesita Windows como administrador"]
+    fn cuanto_cuesta_la_guardia() {
+        let sesion = Sesion::arrancar().unwrap();
+        std::thread::sleep(Duration::from_secs(3));
+        let antes_eventos = sesion.datos.lock().map(|d| d.prueba_creados).unwrap_or(0);
+        let antes = cpu_ms();
+        let tmp = std::env::temp_dir().join("guardiana-carga");
+        std::fs::create_dir_all(&tmp).unwrap();
+        powershell(&format!(
+            "$d = '{}'; 1..20000 | ForEach-Object {{ [IO.File]::WriteAllText(\"$d\\f$_.txt\", 'x') }}; \
+             Get-ChildItem -LiteralPath $d -File | ForEach-Object {{ [void][IO.File]::ReadAllBytes($_.FullName) }}",
+            tmp.display()
+        ));
+        std::thread::sleep(Duration::from_secs(5));
+        let gastado = cpu_ms().saturating_sub(antes);
+        let eventos = sesion
+            .datos
+            .lock()
+            .map(|d| d.prueba_creados)
+            .unwrap_or(0)
+            .saturating_sub(antes_eventos);
+        let _ = std::fs::remove_dir_all(&tmp);
+        let por_evento = if eventos > 0 {
+            gastado * 1_000 / eventos
+        } else {
+            0
+        };
+        println!(
+            "coste: {eventos} aperturas, {gastado} ms de procesador, {por_evento} µs por apertura"
+        );
+        assert!(eventos > 20_000, "llegaron {eventos} aperturas");
+    }
 }

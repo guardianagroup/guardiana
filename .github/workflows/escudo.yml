@@ -38,6 +38,6 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          cargo test -p guardiana-apps --locked -- --ignored --nocapture guardia::tests 2>&1 | tee "$RUNNER_TEMP/test.log" && exit 0
-          grep -E "^test .* FAILED$|panicked at|^---- |^(aperturas|lanzamientos|ráfagas|de «Login Data»)" "$RUNNER_TEMP/test.log" | head -20 | cut -c1-900 | while IFS= read -r l; do echo "::error title=escudo::$l"; done
+          cargo test -p guardiana-apps --locked -- --ignored --nocapture --test-threads=1 guardia::tests 2>&1 | tee "$RUNNER_TEMP/test.log" && { grep -E "^coste:" "$RUNNER_TEMP/test.log" | sed 's/^/::notice title=escudo::/'; exit 0; }
+          grep -E "^test .* FAILED$|panicked at|^---- |^(aperturas|lanzamientos|ráfagas|de «Login Data»|coste)" "$RUNNER_TEMP/test.log" | head -20 | cut -c1-900 | while IFS= read -r l; do echo "::error title=escudo::$l"; done
           exit 1
