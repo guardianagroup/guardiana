@@ -2,6 +2,8 @@
 //! attacks are visible in that alone, before any file is known as malicious:
 //!
 //! - an Office program (a document with macros) starting a command interpreter or a script host;
+//! - a PDF reader or a mail program starting a command interpreter, a script host or one of Windows' own tools;
+//! - an archive manager starting a script host or a command interpreter (a script opened from inside a compressed file);
 //! - a browser starting a command interpreter or a script host;
 //! - a script host starting another interpreter or Windows' own tools to load code;
 //! - a program downloaded from the internet, or run from a folder anyone can write to, starting the tools that delete
@@ -21,6 +23,25 @@ const OFFICE: &[(&str, &str)] = &[
     ("mspub.exe", "Publisher"),
     ("onenote.exe", "OneNote"),
     ("visio.exe", "Visio"),
+];
+
+/// PDF readers and mail programs: they open what arrives attached.
+const LECTORES: &[(&str, &str)] = &[
+    ("acrord32.exe", "Adobe Acrobat Reader"),
+    ("acrobat.exe", "Adobe Acrobat"),
+    ("foxitpdfreader.exe", "Foxit PDF Reader"),
+    ("foxitreader.exe", "Foxit Reader"),
+    ("sumatrapdf.exe", "SumatraPDF"),
+    ("thunderbird.exe", "Thunderbird"),
+];
+
+/// Archive managers: a script opened from inside a compressed file starts from them.
+const COMPRIMIDOS: &[(&str, &str)] = &[
+    ("winrar.exe", "WinRAR"),
+    ("7zfm.exe", "7-Zip"),
+    ("7zg.exe", "7-Zip"),
+    ("bandizip.exe", "Bandizip"),
+    ("peazip.exe", "PeaZip"),
 ];
 
 const NAVEGADORES: &[(&str, &str)] = &[
@@ -129,6 +150,23 @@ pub fn juzga(
         );
         return Some((aviso("documento", texto), true));
     }
+    if let Some(lector) = nombre_en(padre, LECTORES) {
+        let texto = format!(
+            "{lector} ha abierto {lanzado}. Un lector de PDF o de correo no necesita hacerlo: así empiezan muchos ataques \
+             con archivos adjuntos. Si no lo esperabas, ciérralo y no vuelvas a abrir ese archivo."
+        );
+        return Some((aviso("lector", texto), true));
+    }
+    if let Some(comprimido) = nombre_en(padre, COMPRIMIDOS) {
+        if nombre_en(hijo, INTERPRETES).is_some() {
+            let texto = format!(
+                "{comprimido} ha abierto {lanzado} desde un archivo comprimido. Es una forma habitual de colar un guion \
+                 dañino. Si no lo esperabas, ciérralo y borra ese archivo comprimido."
+            );
+            return Some((aviso("comprimido", texto), false));
+        }
+        return None;
+    }
     if let Some(navegador) = nombre_en(padre, NAVEGADORES) {
         if nombre_en(hijo, INTERPRETES).is_some() {
             let texto = format!(
@@ -230,6 +268,47 @@ mod tests {
                 r"C:\Program Files\Backup\backup.exe",
                 false,
                 "vssadmin.exe",
+                1
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn un_pdf_o_un_comprimido_que_abre_un_interprete() {
+        let (a, grave) = juzga(
+            "AcroRd32.exe",
+            r"C:\Program Files\Adobe\AcroRd32.exe",
+            false,
+            "cmd.exe",
+            1,
+        )
+        .unwrap();
+        assert!(grave);
+        assert_eq!(a.regla, "lector");
+        assert!(
+            a.texto
+                .starts_with("Adobe Acrobat Reader ha abierto la consola"),
+            "{}",
+            a.texto
+        );
+        let (a, grave) = juzga(
+            "WinRAR.exe",
+            r"C:\Program Files\WinRAR\WinRAR.exe",
+            false,
+            "wscript.exe",
+            1,
+        )
+        .unwrap();
+        assert!(!grave);
+        assert_eq!(a.regla, "comprimido");
+        // un instalador de herramientas desde el comprimido, no
+        assert_eq!(
+            juzga(
+                "7zFM.exe",
+                r"C:\Program Files\7-Zip\7zFM.exe",
+                false,
+                "msbuild.exe",
                 1
             ),
             None

@@ -56,7 +56,7 @@ pub struct Programa<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Aviso {
     /// Which rule: `muestra_conocida` or `primera_vez` (here), `ladron` ([`crate::ladrones`]), or `documento`,
-    /// `navegador`, `guion` or `copias` ([`crate::cadenas`]), `arranque` ([`crate::arranque`]) or `secuestro`
+    /// `lector`, `comprimido`, `navegador`, `guion` or `copias` ([`crate::cadenas`]), `arranque` ([`crate::arranque`]) or `secuestro`
     /// ([`crate::secuestro`]).
     pub regla: &'static str,
     /// The program's file name.
