@@ -87,6 +87,8 @@ pub mod corte_vpn;
 #[cfg(windows)]
 pub mod red_vpn;
 #[cfg(windows)]
+pub mod tunel_win;
+#[cfg(windows)]
 pub mod wireguard_nt;
 
 /// Listens to what the system says about who asked for each name.

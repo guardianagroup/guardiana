@@ -15,6 +15,7 @@ on:
       - 'crates/apps/src/wireguard_nt.rs'
       - 'crates/apps/src/corte_vpn.rs'
       - 'crates/apps/src/red_vpn.rs'
+      - 'crates/apps/src/tunel_win.rs'
       - 'crates/apps/Cargo.toml'
       - '.github/workflows/vpn.yml'
   workflow_dispatch:
@@ -64,7 +65,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          cargo test -p guardiana-apps --locked -- --ignored --nocapture wireguard_nt corte_vpn red_vpn 2>&1 | tee "$RUNNER_TEMP/test.log" && exit 0
+          cargo test -p guardiana-apps --locked -- --ignored --nocapture wireguard_nt corte_vpn red_vpn tunel_win 2>&1 | tee "$RUNNER_TEMP/test.log" && exit 0
           grep -E "^test .* FAILED$|panicked at|^---- " "$RUNNER_TEMP/test.log" | head -20 | while IFS= read -r l; do echo "::error title=adaptador::$l"; done
           grep -A12 "panicked at" "$RUNNER_TEMP/test.log" | head -40 | sed -e 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}' | sed 's/^/::error title=detalle::/'; echo
           exit 1

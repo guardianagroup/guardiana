@@ -48,3 +48,7 @@ sha2 = { workspace = true }
 # The VPN (in preparation): its cut-off switch's plan (corte_vpn.rs) and, in the adapter's real test, the keys and the
 # configuration's bytes (wireguard_nt.rs). Pure rules, no system calls.
 guardiana-tunel = { workspace = true }
+
+# The whole tunnel's real test on Windows (tunel_win.rs) makes up a sign-up, whose preshared key is wiped on drop.
+[target.'cfg(windows)'.dev-dependencies]
+zeroize = { workspace = true }

@@ -50,6 +50,9 @@ fn capa_wfp(c: Capa) -> GUID {
 }
 
 /// The values the conditions of one filter point to, kept alive (and not moved) while the filter is added.
+// Boxes inside the vectors on purpose: the conditions hold pointers into each value, and a vector of the values
+// themselves would move them when it grows.
+#[allow(clippy::vec_box)]
 struct Valores {
     u64s: Vec<Box<u64>>,
     v6: Vec<Box<FWP_BYTE_ARRAY16>>,
