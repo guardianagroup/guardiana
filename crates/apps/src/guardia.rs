@@ -52,11 +52,74 @@ struct Compartido {
     lanzados: HashMap<(String, String), i64>,
     contador: secuestro::Contador,
     rafagas: VecDeque<Rafaga>,
+    /// Every program started since the session began: process number → (name, path, when). A program that has
+    /// already ended when its events arrive (a `cmd /c` that opened a secret and left; the real test found it) is
+    /// still named from here; a live one is asked to Windows first, so a reused number is never misnamed.
+    iniciados: HashMap<u32, (String, String, i64)>,
+    /// The volumes' device names (`\device\harddiskvolume3`) and their letters (`C:`), read when the session starts:
+    /// the kernel names a started program by its device path.
+    volumenes: Vec<(String, String)>,
     /// For the real test only: how many openings arrived, and the ones of a «Login Data» file, before any filter.
     #[cfg(test)]
     prueba_creados: u64,
     #[cfg(test)]
     prueba_login: Vec<String>,
+}
+
+/// The most programs remembered from their start.
+const MAX_INICIADOS: usize = 8_192;
+
+/// The volumes' device names and their letters, as Windows maps them now (`QueryDosDeviceW` for `A:` to `Z:`).
+fn volumenes() -> Vec<(String, String)> {
+    use windows_sys::Win32::Storage::FileSystem::QueryDosDeviceW;
+    let mut out = Vec::new();
+    for letra in b'A'..=b'Z' {
+        let unidad = format!("{}:", char::from(letra));
+        let nombre: Vec<u16> = unidad.encode_utf16().chain(std::iter::once(0)).collect();
+        let mut buf = [0u16; 512];
+        // SAFETY: a NUL-terminated drive name and a buffer owned here, with its length in characters.
+        #[allow(unsafe_code)]
+        let n = unsafe { QueryDosDeviceW(nombre.as_ptr(), buf.as_mut_ptr(), 512) };
+        if n == 0 {
+            continue;
+        }
+        let fin = buf.iter().position(|c| *c == 0).unwrap_or(0);
+        let dispositivo = String::from_utf16_lossy(&buf[..fin]).to_ascii_lowercase();
+        if !dispositivo.is_empty() {
+            out.push((dispositivo, unidad));
+        }
+    }
+    out
+}
+
+/// A device path (`\Device\HarddiskVolume3\Windows\x.exe`) as a drive path (`C:\Windows\x.exe`); as it is when
+/// no volume matches.
+fn ruta_dos(nt: &str, volumenes: &[(String, String)]) -> String {
+    let bajo = nt.to_ascii_lowercase();
+    for (dispositivo, unidad) in volumenes {
+        if let Some(resto) = bajo.strip_prefix(dispositivo.as_str()) {
+            if resto.starts_with('\\') {
+                return format!(
+                    "{unidad}{}",
+                    nt.get(dispositivo.len()..).unwrap_or_default()
+                );
+            }
+        }
+    }
+    nt.to_owned()
+}
+
+/// The program behind a process number: Windows' word while it runs; else what its start said, when it started
+/// during this session.
+fn programa_en(d: &Compartido, pid: u32) -> (String, String) {
+    let vivo = programa_de(pid);
+    if !vivo.0.is_empty() {
+        return vivo;
+    }
+    d.iniciados
+        .get(&pid)
+        .map(|(n, r, _)| (n.clone(), r.clone()))
+        .unwrap_or_default()
 }
 
 /// The session running. Dropping it closes it.
@@ -68,6 +131,9 @@ pub(crate) struct Sesion {
 impl Sesion {
     pub(crate) fn arrancar() -> Result<Self, Error> {
         let datos: Arc<Mutex<Compartido>> = Arc::default();
+        if let Ok(mut d) = datos.lock() {
+            d.volumenes = volumenes();
+        }
         let para_callback = Arc::clone(&datos);
         let yo = std::process::id();
         let para_procesos = Arc::clone(&datos);
@@ -161,7 +227,7 @@ fn anotar_cambio(
     if !d.contador.anota(pid, u64::try_from(ahora).unwrap_or(0)) {
         return;
     }
-    let (programa, ruta) = programa_de(pid);
+    let (programa, ruta) = programa_en(&d, pid);
     if programa.is_empty() || d.rafagas.len() >= MAXIMO_RAFAGAS {
         return;
     }
@@ -190,6 +256,20 @@ fn anotar_inicio(datos: &Arc<Mutex<Compartido>>, registro: &EventRecord, esquema
         .next()
         .unwrap_or_default()
         .to_owned();
+    // every start is remembered, so its events can name it after it has ended
+    let pid_nuevo = lector.try_parse::<u32>("ProcessID").unwrap_or(0);
+    if pid_nuevo != 0 {
+        if let Ok(mut d) = datos.lock() {
+            if d.iniciados.len() >= MAX_INICIADOS {
+                d.iniciados.clear();
+            }
+            let ruta = ruta_dos(&imagen, &d.volumenes);
+            d.iniciados.insert(
+                pid_nuevo,
+                (hijo.clone(), ruta, guardiana_core::time::now_ms()),
+            );
+        }
+    }
     // a program wearing the name of one of Windows' own outside Windows' folder (escudo, «disfraz») goes on even
     // without a parent known
     let disfrazado = disfraz::sospechoso(&hijo, &imagen);
@@ -200,7 +280,10 @@ fn anotar_inicio(datos: &Arc<Mutex<Compartido>>, registro: &EventRecord, esquema
     let (padre, padre_ruta) = if padre_pid == 0 || padre_pid == 4 {
         (String::new(), String::new())
     } else {
-        programa_de(padre_pid)
+        datos
+            .lock()
+            .map(|d| programa_en(&d, padre_pid))
+            .unwrap_or_default()
     };
     if padre.is_empty() && !disfrazado {
         return;
@@ -303,7 +386,7 @@ fn anotar(
             if d.rutas.len() > 4_096 {
                 d.rutas.clear();
             }
-            let (n, r) = programa_de(pid);
+            let (n, r) = programa_en(&d, pid);
             d.rutas.insert(pid, (n.clone(), r.clone(), ahora));
             (n, r)
         }

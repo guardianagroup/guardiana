@@ -43,6 +43,8 @@ windows-sys = { version = "0.61", features = [
     "Win32_System_LibraryLoader",
     "Win32_Networking_WinSock",
     "Win32_NetworkManagement_Ndis",
+    # El escudo: the volumes' device names, to turn the kernel's device paths into drive paths (guardia.rs).
+    "Win32_Storage_FileSystem",
 ] }
 sha2 = { workspace = true }
 # The VPN (in preparation): its cut-off switch's plan (corte_vpn.rs) and, in the adapter's real test, the keys and the
