@@ -627,10 +627,16 @@ const GUION: &str = r#"(() => {
     // Whether the caller is another company's script: decided once per name and document, and
     // «no» while the browser has not answered yet (so it stays the same all along).
     const decididos = new Map();
+    // The checks that a visitor is a person (captchas and anti-fraud, `acceso.rs`, 2 Nov 2026) read the browser as it is:
+    // noise in what they read is what made them take a person for a robot.
+    const ACCESO = ['recaptcha.net', 'hcaptcha.com', 'challenges.cloudflare.com', 'datadome.co', 'captcha-delivery.com', 'px-cloud.net', 'px-cdn.net', 'px-client.net', 'perimeterx.net', 'arkoselabs.com', 'funcaptcha.com', 'geetest.com', 'friendlycaptcha.com', 'frcapi.com', 'mtcaptcha.com'];
+    const verificacion = (h, ruta) => ACCESO.some((s) => h === s || h.endsWith('.' + s))
+      || (/^(www\.)?(google\.[a-z.]+|gstatic\.com)$/.test(h) && /^\/recaptcha(\/|$)/.test(ruta));
     const ajeno = (u) => {
       if (proteccion === false || !u[0]) return false;
-      let h = '';
-      try { h = new U(u[0]).hostname.toLowerCase(); } catch (_) { return false; }
+      let h = '', ruta = '';
+      try { const x = new U(u[0]); h = x.hostname.toLowerCase(); ruta = x.pathname; } catch (_) { return false; }
+      if (verificacion(h, ruta)) return false;
       if (decididos.has(h)) return decididos.get(h);
       const bajo = (s) => h === s || h.endsWith('.' + s);
       const si = !!proteccion && !bajo(proteccion.sitio) && !proteccion.propios.some(bajo);
@@ -1596,4 +1602,10 @@ mod tests {
         assert!(!p.contains("</script><script>alert"));
         assert!(p.contains("location.replace("));
     }
+}
+
+/// The page script, for the tests of other modules (`acceso.rs` keeps its list equal to this one).
+#[cfg(test)]
+pub(crate) fn guion_de_pruebas() -> &'static str {
+    GUION
 }

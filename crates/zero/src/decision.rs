@@ -243,6 +243,15 @@ pub fn decide_con(
         crate::subasta::corta(&destino.host, &ruta, otro_sitio, destino.sigue())
             .then_some(Motivo::Subasta)
     });
+    // The checks that a visitor is a person (captchas, anti-fraud: `acceso.rs`, 2 Nov 2026) are never cut by the lists:
+    // cutting them is what makes a site treat a person as a robot. The person's own cuts, the mandate and their marked
+    // data still hold, below.
+    let lista = lista.filter(|_| {
+        let ruta = url::Url::parse(p.url)
+            .map(|u| u.path().to_string())
+            .unwrap_or_default();
+        !crate::acceso::es_verificacion(&destino.host, &ruta)
+    });
     let pagina = p.recurso == Recurso::Documento;
     let corta = |motivo: Motivo, destino: Destino, hallazgos: Vec<Hallazgo>| Decision {
         cortar: true,
@@ -531,6 +540,17 @@ mod tests {
             )
             .0
         );
+        // The checks that a visitor is a person are never cut by the lists, even with maximum protection (2 Nov 2026).
+        let mut m = a.clone();
+        m.maxima = true;
+        for url in [
+            "https://js.datadome.co/tags.js",
+            "https://challenges.cloudflare.com/turnstile/v0/api.js",
+            "https://js.hcaptcha.com/1/api.js",
+            "https://client.px-cloud.net/PX1/main.min.js",
+        ] {
+            assert!(!corta(&m, url, b"", Recurso::Script).0, "{url}");
+        }
         // Telemetry (Sentry) only with maximum protection.
         let sentry = "https://o4505.ingest.sentry.io/api/1/envelope/";
         assert!(!corta(&a, sentry, b"{}", Recurso::Datos).0);
