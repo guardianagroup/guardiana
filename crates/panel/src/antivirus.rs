@@ -49,8 +49,9 @@ const CLAVE_CORTES: &str = "antivirus_cortes";
 /// panel when the network changes, and a slow look could keep the old panel's state alive a while
 /// after, and with it, until then, its own firewall session. GUARDIANA's provider and sublayer have
 /// fixed keys, and Windows does not let a dynamic session hang anything from another's
-/// (`FWP_E_WRONG_SESSION`, seen for the VPN's sublayer in 1.0.54): the new panel's cuts were refused
-/// without a word, and when the old state went, its session took every cut with it.
+/// (`FWP_E_WRONG_SESSION`: seen for the VPN's sublayer in 1.0.54, and for these cuts by this
+/// module's Windows test): the new panel's cuts were refused without a word, and when the old state
+/// went, its session took every cut with it.
 #[derive(Default)]
 pub(crate) struct CortesAntivirus {
     /// Opened by the first panel start that can (on Windows, running as the system), and kept for
@@ -1190,7 +1191,11 @@ mod en_windows {
             "otra sesión: {:?}; su corte: {corte:?}",
             otra.as_ref().err()
         );
-        assert!(!matches!(corte, Ok(Ok(_))), "{corte:?}");
+        // FWP_E_WRONG_SESSION, as for the VPN's sublayer in 1.0.54
+        assert!(
+            matches!(&corte, Ok(Err(e)) if e.to_string().contains("0x8032000c")),
+            "{corte:?}"
+        );
         drop(otra);
         let _ = std::fs::remove_dir_all(&dir);
     }
