@@ -257,8 +257,8 @@ fn escribir_valor(nombre: &str, valor: &str) -> bool {
 
 /// The anchor's values, read with Windows' own functions (`registro`, 1.0.55): the same text
 /// `reg query` prints, read the same way, without starting a process each time the licence is
-/// asked (the resolver asks every thirty seconds). With `reg query` itself only if a value cannot
-/// be read whole.
+/// asked (the resolver asks every thirty seconds). With `reg query` itself only if the key is
+/// there and cannot be opened, or a value cannot be read whole.
 #[cfg(windows)]
 fn registro_leer() -> Vec<(&'static str, String)> {
     match registro::como_reg_query(registro::HKEY_LOCAL_MACHINE, RUTA) {
@@ -618,6 +618,22 @@ mod tests {
             registro::Lectura::SinClave
         );
         assert!(registro_leer_con_reg(&format!(r"HKCU\{falta}")).is_empty());
+    }
+
+    /// A key that is there but this account may not open is not «no key»: only one that is not
+    /// there is, and the rest goes to `reg` (review of ligero-1055). `HKLM\SECURITY` is on every
+    /// Windows and only the system may read it; the runner's administrator is refused.
+    #[cfg(windows)]
+    #[test]
+    fn en_windows_una_clave_que_no_se_puede_abrir_no_es_una_que_falta() {
+        let cerrada = registro::como_reg_query(registro::HKEY_LOCAL_MACHINE, "SECURITY");
+        println!(r"HKLM\SECURITY: {cerrada:?}");
+        assert_ne!(cerrada, registro::Lectura::SinClave);
+        let falta = format!(r"SOFTWARE\GuardianaPruebaNoEsta-{}", std::process::id());
+        assert_eq!(
+            registro::como_reg_query(registro::HKEY_LOCAL_MACHINE, &falta),
+            registro::Lectura::SinClave
+        );
     }
 
     /// What reading the anchor costs here, with Windows' own functions and with `reg query`. Run by
