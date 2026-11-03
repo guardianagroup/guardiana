@@ -3,10 +3,18 @@
 #   powershell -File build/cliente/fotos_instalador.ps1 -Instalador <.msi o .exe> [-Antes <.msi>] [-Nombre fotos]
 #
 # Abre el instalador como un doble clic (con todas sus pantallas), pulsa lo que pulsaría una persona
-# (aceptar, «Instalar», «Finalizar» o «Abrir GUARDIANA», y «Aceptar» si Windows pregunta por programas
-# abiertos) y, mientras tanto, saca una foto de la pantalla entera cada 0,15 s y apunta cada
-# ventana que aparece (título, clase y programa), aunque dure un instante: así se ven las «cosas raras»
-# (dueño, 2 Nov 2026: «Tiene que ser más limpio… una pantalla profesional… nada de tirón ni cosas raras»).
+# (aceptar los términos, «Instalar», y «Aceptar» si Windows pregunta por programas abiertos) y, mientras
+# tanto, saca una foto de la pantalla entera cada 0,15 s y apunta cada ventana que aparece (título, clase
+# y programa), aunque dure un instante: así se ven las «cosas raras» (dueño, 2 Nov 2026: «Tiene que ser
+# más limpio… una pantalla profesional… nada de tirón ni cosas raras»).
+# Desde el 3 nov 2026 (el dueño: «hay que darle a la tecla finalizar, si no, no funciona… quiero que lo
+# quites») no hay nada que pulsar al final. Sale bien solo si, antes de -Segundos, la ventana del instalador
+# se cierra sola (su proceso termina sin que nadie pulse nada) y se abre una ventana de GUARDIANA de un
+# proceso nuevo (la de ZERO, clase GuardianaZeroVentana, o con ZERO=0 el panel en el navegador). Si el
+# instalador se queda en una última pantalla («Finalizar», «Cerrar»…), es un fallo: se apunta, se deja para
+# la foto y se pulsa para que termine. Si no sale bien, el script termina con error.
+# Solo se pulsa dentro de las ventanas del instalador (msiexec): al actualizar, ZERO de la versión anterior
+# está abierto con su página, y en la vuelta del 3 nov 2026 se pulsó un «Siguiente» de esa página.
 # Con -Antes instala primero esa versión en silencio y deja abiertos ZERO y sus avisos, como los tiene
 # quien actualiza. Al final escribe en el registro las fotos distintas entre sí (JPEG en base64, líneas
 # «FOTO|nombre|n|datos») para leerlas sin descargar artefactos, y la lista de ventanas.
@@ -107,6 +115,19 @@ function Arbol($w) {
     }
 }
 
+# El programa de cada ventana, por su proceso (una vez por proceso).
+$programas = @{}
+function Programa([int]$id) {
+    if (-not $programas.ContainsKey($id)) { $programas[$id] = try { (Get-Process -Id $id -ErrorAction Stop).ProcessName } catch { "?" } }
+    return $programas[$id]
+}
+# Una ventana de GUARDIANA: la de ZERO (su clase, desde la página de espera hasta el panel) o, con ZERO=0, el panel en el navegador.
+function EsGuardiana($c) {
+    if ($c.ClassName -eq "GuardianaZeroVentana") { return $true }
+    return ($c.Name -match "GUARDIANA" -and (Programa $c.ProcessId) -match "^(msedge|chrome|firefox|brave|opera)$")
+}
+# Las ventanas de GUARDIANA vistas, por «proceso|ventana», con la hora a la que aparecieron.
+$deGuardiana = @{}
 function MiraVentanas {
     # Cada ventana nueva de primer nivel, una vez: título, clase y programa.
     $ws = $raiz.FindAll([System.Windows.Automation.TreeScope]::Children, $todas)
@@ -116,9 +137,10 @@ function MiraVentanas {
             $clave = "$($c.NativeWindowHandle)|$($c.Name)"
             if (-not $vistas.ContainsKey($clave)) {
                 $vistas[$clave] = $true
-                $proc = try { (Get-Process -Id $c.ProcessId).ProcessName } catch { "?" }
-                Evento "ventana: «$($c.Name)» · clase $($c.ClassName) · $proc ($($c.ProcessId))"
+                Evento "ventana: «$($c.Name)» · clase $($c.ClassName) · $(Programa $c.ProcessId) ($($c.ProcessId))"
             }
+            $k = "$($c.ProcessId)|$($c.NativeWindowHandle)"
+            if (-not $deGuardiana.ContainsKey($k) -and (EsGuardiana $c)) { $deGuardiana[$k] = @{ t = Get-Date; nombre = $c.Name; proceso = $c.ProcessId } }
         } catch { }
     }
     return $ws
@@ -178,16 +200,41 @@ function Marca($cb, [string]$n, [int]$intento) {
 $sigue = @("Instalar", "Install", "Aceptar", "OK", "Siguiente", "Next")
 $fin = @("Abrir GUARDIANA", "Open GUARDIANA", "Abrir o GUARDIANA", "Finalizar", "Finish", "Concluir", "Cerrar", "Close", "Fechar")
 
+# Lo que ya estaba abierto de GUARDIANA antes del instalador (al actualizar, ZERO de la versión anterior): no cuenta como
+# «se abrió al terminar»; vale solo una ventana de un proceso nuevo.
+$null = MiraVentanas
+$previos = @{}
+foreach ($v in $deGuardiana.Values) { $previos[$v.proceso] = $true }
+if ($previos.Count) { Evento "ya abierto de GUARDIANA antes de instalar: procesos $($previos.Keys -join ', ')" }
+
 Evento "abriendo el instalador como un doble clic: $Instalador"
+$inicio = Get-Date
 $proceso = Start-Process -FilePath $Instalador -PassThru
-$limite = (Get-Date).AddSeconds($Segundos)
-$acabado = $false
+$null = $proceso.Handle  # sin esto, ExitCode llega vacío cuando el proceso ya terminó
+Evento "el instalador es el proceso $($proceso.Id)"
+$limite = $inicio.AddSeconds($Segundos)
+$cerrado = $null   # cuándo terminó solo el proceso del instalador
+$abierto = $null   # la ventana de GUARDIANA que se abrió (de un proceso nuevo)
+$ultima = $null    # el botón de una última pantalla, si el instalador se quedó en una
 $hechos = @{}
-while ((Get-Date) -lt $limite -and -not $acabado) {
+while ((Get-Date) -lt $limite -and -not ($cerrado -and $abierto)) {
     $ws = MiraVentanas
+    if (-not $abierto) {
+        foreach ($v in $deGuardiana.Values) {
+            if (-not $previos.ContainsKey($v.proceso)) { $abierto = $v; Evento "se abrió GUARDIANA: «$($v.nombre)» (proceso $($v.proceso))"; break }
+        }
+    }
+    if (-not $cerrado -and $proceso -and $proceso.HasExited) { $cerrado = Get-Date; Evento "el instalador se cerró solo (código $($proceso.ExitCode))" }
     foreach ($w in $ws) {
         $titulo = try { $w.Current.Name } catch { "" }
-        if ($titulo -notmatch "GUARDIANA|Guardiana|Windows Installer|Instalaci") { continue }
+        # Solo las ventanas del instalador (Windows Installer y sus diálogos): nunca dentro de GUARDIANA ni de otro programa.
+        $deMsiexec = try { (Programa $w.Current.ProcessId) -eq "msiexec" } catch { $false }
+        if (-not $deMsiexec) { continue }
+        if ($null -eq $proceso) {
+            # Si Windows no devolvió el proceso al abrir el .msi, el del instalador es el de su ventana.
+            $proceso = try { Get-Process -Id $w.Current.ProcessId -ErrorAction Stop } catch { $null }
+            if ($proceso) { $null = $proceso.Handle; Evento "el instalador es el proceso $($proceso.Id) (por su ventana)" }
+        }
         Arbol $w
         try {
             # La casilla de aceptar: se marca, y si a los 4 s «Instalar» sigue apagado, se prueba de otra manera.
@@ -217,12 +264,17 @@ while ((Get-Date) -lt $limite -and -not $acabado) {
             $botones = @($controles | Where-Object { $_.Current.IsEnabled -and $_.Current.IsOffscreen -eq $false })
             $porNombre = @{}
             foreach ($b in $botones) { $porNombre[($b.Current.Name -replace "&", "").Trim()] = $b }
-            # La última pantalla: el primero de $fin que haya, por ese orden («Abrir GUARDIANA» antes que «Cerrar»).
+            # Una última pantalla (sin «Instalar» y con «Finalizar», «Cerrar»…): desde el 3 nov 2026 no tiene que salir, ni la de
+            # error ni la de cancelar. Es un fallo: se apunta, se deja 3 s para la foto y se pulsa para que el instalador termine.
             if (-not $porNombre.ContainsKey("Instalar") -and -not $porNombre.ContainsKey("Install")) {
                 $cual = $fin | Where-Object { $porNombre.ContainsKey($_) } | Select-Object -First 1
-                if ($cual) {
+                if ($cual -and -not $hechos.ContainsKey("fin|$cual")) {
+                    $hechos["fin|$cual"] = $true
+                    $ultima = $cual
+                    Evento "FALLO: el instalador se quedó en una última pantalla («$titulo»), con «$cual»"
                     Start-Sleep -Seconds 3
-                    if (Pulsa $porNombre[$cual] $cual) { $acabado = $true; break }
+                    [void](Pulsa $porNombre[$cual] $cual)
+                    continue
                 }
             }
             $cual = $sigue | Where-Object { $porNombre.ContainsKey($_) -and -not $hechos.ContainsKey("$($porNombre[$_].Current.NativeWindowHandle)|$_") } | Select-Object -First 1
@@ -238,7 +290,18 @@ while ((Get-Date) -lt $limite -and -not $acabado) {
     }
     Start-Sleep -Milliseconds 150
 }
-if (-not $acabado) { Evento "AVISO: no llegó a la última pantalla en $Segundos s" }
+if (-not $cerrado -and $proceso -and $proceso.HasExited) { $cerrado = Get-Date; Evento "el instalador se cerró solo (código $($proceso.ExitCode))" }
+$bien = $cerrado -and $abierto -and -not $ultima
+if ($bien) {
+    $resultado = "bien: el instalador se cerró solo a los $([int]($cerrado - $inicio).TotalSeconds) s y se abrió GUARDIANA («$($abierto.nombre)») a los $([int]($abierto.t - $inicio).TotalSeconds) s, sin pulsar nada al final"
+} else {
+    $que = @()
+    if (-not $cerrado) { $que += "el instalador no se cerró solo en $Segundos s" }
+    if ($ultima) { $que += "se quedó en una última pantalla con «$ultima»" }
+    if (-not $abierto) { $que += "no se abrió ninguna ventana de GUARDIANA" }
+    $resultado = "FALLO: $($que -join '; ')"
+}
+Evento "RESULTADO: $resultado"
 # Lo que pasa después de cerrar el instalador (lo que se abre solo).
 $despues = (Get-Date).AddSeconds(45)
 while ((Get-Date) -lt $despues) { $null = MiraVentanas; Start-Sleep -Milliseconds 150 }
@@ -291,3 +354,5 @@ Write-Output "::endgroup::"
 Write-Output "::group::ventanas y pasos ($Nombre)"
 Get-Content $eventos -Encoding UTF8
 Write-Output "::endgroup::"
+if ($bien) { Write-Output "::notice title=instalador ($Nombre)::$resultado" }
+else { Write-Output "::error title=instalador ($Nombre)::$resultado"; exit 1 }

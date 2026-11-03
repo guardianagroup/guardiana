@@ -17,6 +17,23 @@
   <String Id="ProgresoQuitarVigilante" Value="Removendo o vigilante do DNS…" />
   <String Id="WelcomeEulaDlgTitle" Value="{\WixUI_Font_Title}Antes de instalar a GUARDIANA" />
   <String Id="WelcomeEulaDlgLicenseAcceptedCheckBox" Value="Li o que a instalação vai fazer e aceito os Termos de uso" />
-  <String Id="ExitDialogTitle" Value="{\WixUI_Font_Bigger}A GUARDIANA está instalada" />
-  <String Id="ExitDialogDescription" Value="O serviço da GUARDIANA já está em funcionamento. Clique em «Concluir» para fechar." />
+  <!-- 3 nov 2026: a tela final não aparece mais ao instalar (a GUARDIANA abre sozinha e a janela fecha), então
+       ExitDialogTitle e ExitDialogDescription, com o seu «Clique em «Concluir» para fechar», saíram: só «msiexec /a» a
+       mostraria, com os textos do WixUI. A página enquanto instala (InstalandoDlg) e o que diz em cada passo: -->
+  <String Id="InstalandoTitulo" Value="Instalando a GUARDIANA no seu PC" />
+  <String Id="InstalandoProteccion" Value="Iniciando a proteção" />
+  <String Id="InstalandoZero" Value="Preparando o navegador GUARDIANA ZERO" />
+  <String Id="InstalandoDns" Value="Colocando a GUARDIANA como DNS deste PC" />
+  <String Id="ProgresoAbrir" Value="Abrindo a GUARDIANA…" />
+  <String Id="PasoPreparar" Value="Preparando as mudanças…" />
+  <String Id="PasoWindows" Value="Registrando as mudanças no Windows…" />
+  <String Id="PasoParaServicio" Value="Parando o serviço da GUARDIANA…" />
+  <String Id="PasoQuitaServicio" Value="Removendo o serviço da GUARDIANA…" />
+  <String Id="PasoRegistraServicio" Value="Registrando o serviço da GUARDIANA…" />
+  <String Id="PasoArrancaServicio" Value="Iniciando o serviço da GUARDIANA…" />
+  <String Id="PasoQuitaArchivos" Value="Removendo os arquivos da GUARDIANA…" />
+  <String Id="PasoCopiaArchivos" Value="Copiando os arquivos da GUARDIANA…" />
+  <String Id="PasoAccesos" Value="Criando os atalhos da GUARDIANA…" />
+  <String Id="PasoTerminar" Value="Concluindo…" />
+  <String Id="PasoDeshacer" Value="Desfazendo as mudanças…" />
 </WixLocalization>
