@@ -97,10 +97,12 @@ impl Cortafuegos {
         }
     }
 
-    /// Removes the filters with these ids. Ones already gone are ignored.
+    /// Removes the filters with these ids, trying every one. Ones already gone are gone: not an
+    /// error, and forgotten like the ones removed.
     ///
     /// # Errors
-    /// [`ErrorCorte::Sistema`] when Windows refuses a delete for a reason other than «not found».
+    /// [`ErrorCorte::Sistema`] when Windows refuses a delete for a reason other than «not found»:
+    /// the first such refusal, once every id was tried.
     pub fn quitar(&self, ids: &[u64]) -> Result<(), ErrorCorte> {
         #[cfg(windows)]
         {

@@ -1097,6 +1097,63 @@ mod en_windows {
     use super::*;
     use guardiana_core::{Hash, Ledger, NewEvent, Proceso};
 
+    /// A folder of the test's own, empty but for an empty file named as one of Malwarebytes'
+    /// programs, which nothing runs: what is cut. Its path, as the ledger would give it.
+    fn carpeta(nombre: &str) -> (std::path::PathBuf, String) {
+        let dir =
+            std::env::temp_dir().join(format!("guardiana-cortes-{nombre}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let programa = dir.join("mbamservice.exe");
+        std::fs::write(&programa, b"").unwrap();
+        (dir, programa.display().to_string())
+    }
+
+    /// The process's firewall, opened if no test opened it yet (with a ledger that wants nothing).
+    fn abierto() -> &'static guardiana_apps::Cortafuegos {
+        let (dir, _) = carpeta("abrir");
+        let l = Ledger::open(&dir.join("ledger.db"), Hash::of(b"antivirus cuts test key")).unwrap();
+        global().al_arrancar(&l);
+        drop(l);
+        let _ = std::fs::remove_dir_all(&dir);
+        global().cortafuegos.get().expect("the firewall opened")
+    }
+
+    /// Letting a product through goes through even when one of its filters is already gone, as
+    /// after a removal that failed part-way (review of arreglos-1055: «not found» was read under the
+    /// code of another error, and every let-through stopped at it until the service restarted); and
+    /// asking Windows how many filters are in place counts a gone one as gone, not as a failure.
+    #[test]
+    #[ignore = "necesita Windows como administrador"]
+    fn dejar_pasar_sigue_con_un_filtro_que_ya_no_esta() {
+        let cf = abierto();
+        let (dir, programa) = carpeta("ya-no-esta");
+        let cortes = global();
+        assert_eq!(
+            cortes
+                .aplica_rutas("Malwarebytes", true, &[programa])
+                .unwrap(),
+            2
+        );
+        let ids = cortes
+            .puesto
+            .lock()
+            .unwrap()
+            .get("Malwarebytes")
+            .cloned()
+            .unwrap_or_default();
+        assert_eq!(ids.len(), 2);
+        // One goes behind the panel's back; asked again, it is gone, not an error.
+        cf.quitar(&ids[..1]).unwrap();
+        cf.quitar(&ids[..1]).unwrap();
+        assert_eq!(cf.cuantos().unwrap(), 1);
+        // The let-through still goes through, and takes the other one off.
+        assert_eq!(cortes.aplica_rutas("Malwarebytes", false, &[]).unwrap(), 0);
+        assert_eq!(cf.cuantos().unwrap(), 0);
+        assert!(cortes.cortados().is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[tokio::test]
     #[ignore = "necesita Windows como administrador"]
     async fn los_cortes_siguen_al_rehacer_el_panel_con_el_viejo_vivo() {

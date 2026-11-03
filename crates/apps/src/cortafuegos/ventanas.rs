@@ -26,8 +26,9 @@ const SUBCAPA: GUID = GUID::from_u128(0x6705_1a2e_9c33_4e77_b1a4_2f0e_7c11_9a02)
 const RPC_C_AUTHN_WINNT: u32 = 10;
 /// `FWP_E_ALREADY_EXISTS`.
 const YA_EXISTE: u32 = 0x8032_0009;
-/// `FWP_E_FILTER_NOT_FOUND`.
-const FILTRO_NO_ESTA: u32 = 0x8032_0005;
+/// `FWP_E_FILTER_NOT_FOUND`. Until 1.0.55 this said 0x8032_0005, which is `FWP_E_PROVIDER_NOT_FOUND`:
+/// a filter already gone was taken for a refusal (review of arreglos-1055).
+const FILTRO_NO_ESTA: u32 = 0x8032_0003;
 
 fn err(llamada: &str, code: u32) -> ErrorCorte {
     ErrorCorte::Sistema(format!("{llamada} = 0x{code:08x}"))
@@ -243,18 +244,26 @@ impl Motor {
         Ok(id)
     }
 
+    /// Removes the filters with these ids, every one of them: one already gone is gone, which is
+    /// what was asked, and is forgotten like the ones removed now. A refusal for another reason does
+    /// not stop the rest; the first is returned once all were tried, and only those ids are kept.
     pub(crate) fn quitar(&self, ids: &[u64]) -> Result<(), ErrorCorte> {
+        let mut primero = None;
+        let mut quedan = Vec::new();
         for &id in ids {
-            // SAFETY: deleting by id; a filter already gone returns not-found, which is fine.
+            // SAFETY: deleting by id; a filter already gone answers «not found».
             let r = unsafe { FwpmFilterDeleteById0(self.engine, id) };
             if r != 0 && r != FILTRO_NO_ESTA {
-                return Err(err("FwpmFilterDeleteById0", r));
+                quedan.push(id);
+                if primero.is_none() {
+                    primero = Some(err("FwpmFilterDeleteById0", r));
+                }
             }
         }
         if let Ok(mut g) = self.ids.lock() {
-            g.retain(|x| !ids.contains(x));
+            g.retain(|x| !ids.contains(x) || quedan.contains(x));
         }
-        Ok(())
+        primero.map_or(Ok(()), Err)
     }
 
     pub(crate) fn quitar_todo(&self) -> Result<u64, ErrorCorte> {
