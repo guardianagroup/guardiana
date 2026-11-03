@@ -106,7 +106,52 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); user-select:
 /* Comunicaciones: only the top row. */
 body.solo-arriba #pestanas, body.solo-arriba #herramientas { display: none; }
 @media (max-width: 900px) { #arriba, #pestanas, #herramientas { padding-left: var(--s-margen-movil); padding-right: var(--s-margen-movil); } #estado-z span { display: none; } }
-@media (max-width: 640px) { .marca span, #estado-z { display: none; } #productos { position: static; transform: none; margin: 0 auto; } #productos button { padding: 0 var(--e3); } .derecha { margin-left: 0; } }
+@media (max-width: 640px) { .marca span, #estado-z { display: none; } #productos button { padding: 0 var(--e3); } }
+
+/* 2 Nov 2026 (the owner, 16:50): ZERO's three protections beside «Protegido», and the VPN while it is on. «Inicio» is no
+   longer pinned to the middle of the window: it sits in the middle of what is left between the name and the right-hand
+   group, so nothing overlaps at any width. */
+#productos { position: static; transform: none; margin: 0 auto; }
+.derecha { margin-left: 0; }
+#protecciones { display: flex; align-items: center; gap: var(--e2); }
+.prot { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 4px 0 9px; border-radius: var(--r-pill); color: var(--tinta); font: 500 12px/1 var(--texto); white-space: nowrap; cursor: pointer; }
+.prot:hover { background: var(--campo); }
+.prot-t { transition: color var(--m-rapido); }
+.prot:has(input:not(:checked)) .prot-t { color: var(--gris); }
+.prot-ic { display: none; width: 15px; height: 15px; flex: none; color: var(--tinta); }
+.prot:has(input:not(:checked)) .prot-ic { color: var(--gris); }
+/* A plain on/off switch: on, the knob to the right on the steel of the main buttons; off, to the left on grey, with its
+   name greyed too. (The red and green of the cut switch say «cut» and «allowed» of one company; these say whether a
+   protection is on.) */
+.prot input[type="checkbox"].interruptor { width: 32px; height: 18px; border-radius: 9px; background: #2A3441; }
+.prot input[type="checkbox"].interruptor::before { top: 2px; left: 2px; width: 14px; height: 14px; transform: none; background: #C7D0DA; box-shadow: none; }
+.prot input[type="checkbox"].interruptor:checked { background: var(--accent); }
+.prot input[type="checkbox"].interruptor:checked::before { transform: translateX(14px); background: var(--accent-fg); }
+.prot:hover input[type="checkbox"].interruptor { filter: brightness(1.12); }
+#vpn { display: flex; align-items: center; gap: var(--e2); height: var(--h-chip); padding: 0 4px 0 var(--e3); border: 1px solid var(--linea); border-radius: var(--r-pill); background: var(--card); color: var(--tinta); font: 600 12px/1 var(--texto); white-space: nowrap; }
+#vpn.oculto { display: none; }
+#vpn > i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--verde); }
+#vpn[data-fase="conectando"] > i { background: var(--ambar); animation: vpn-late 1.2s ease-in-out infinite; }
+#vpn[data-fase="sin_respuesta"] { border-color: var(--rojo); }
+#vpn[data-fase="sin_respuesta"] > i { background: var(--rojo); }
+@keyframes vpn-late { 50% { opacity: .35; } }
+#vpn-estado { max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
+#vpn-desconectar { height: 26px; padding: 0 var(--e3); border: 0; border-radius: var(--r-pill); background: var(--campo); color: var(--tinta); font: 600 12px/1 var(--texto); white-space: nowrap; }
+#vpn[data-fase="sin_respuesta"] #vpn-desconectar { background: var(--rojo); color: var(--sobre); }
+#vpn-desconectar:hover:not(:disabled) { filter: brightness(1.15); }
+#vpn-desconectar:disabled { opacity: .7; cursor: progress; }
+#vpn-desconectar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Narrower: the protections keep their switch and a drawing (their names stay their accessible names and tooltips),
+   the VPN keeps its dot and «Desconectar»; very narrow, the protections stay in «Ajustes» only. */
+@media (max-width: 1000px) { .prot-t { display: none; } .prot-ic { display: block; } }
+@media (max-width: 1240px) { body.con-vpn .prot-t { display: none; } body.con-vpn .prot-ic { display: block; } }
+@media (max-width: 960px) { #vpn-estado { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
+@media (max-width: 720px) { body.con-vpn .marca span, body.con-vpn #estado-z { display: none; } }
+@media (max-width: 600px) { body.con-vpn #protecciones { display: none; } }
+@media (max-width: 460px) { #protecciones { display: none; } }
+/* Over GUARDIANA's own pages (Órbita, the panel) only the top row shows, and only for the VPN: ZERO's settings and state
+   belong to the browser. */
+body.solo-arriba #protecciones, body.solo-arriba #estado-z, body.solo-arriba #b-menu { display: none; }
 
 /* 30 Oct 2026 (dueño: «con la interfaz que tenemos buena de hoy en día»): la barra con el aspecto del ZERO de la web — la
    dirección es la LENTE de cristal en pequeño, el selector de productos y las pestañas con línea de acero translúcida. */
@@ -132,6 +177,21 @@ body.solo-arriba #pestanas, body.solo-arriba #herramientas { display: none; }
     <button type="button" data-producto="orbita" class="inicio"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><span data-t="volver_inicio"></span></button>
   </nav>
   <div class="derecha">
+    <!-- 2 Nov 2026 (the VPN review): while GUARDIANA's VPN connects, is connected or its server does not answer, its state
+         and «Desconectar», which closes it through the panel's own tab on this computer: no page of the web, so it works
+         with no internet at all. -->
+    <div id="vpn" class="oculto" role="group">
+      <i aria-hidden="true"></i><span id="vpn-estado" role="status"></span>
+      <button type="button" id="vpn-desconectar"></button>
+    </div>
+    <!-- 2 Nov 2026 (the owner, 16:50: «está demasiado escondido… que aparezca ya en la pantalla del navegador»): the three
+         protections of «Ajustes», beside «Protegido». The same settings (`ajuste`), so the bar, the settings and the
+         shield always say the same. -->
+    <div id="protecciones" role="group">
+      <label class="prot" data-clave="cortar_seguimiento" data-nombre="barra_rastreadores" data-explica="proteccion"><svg class="prot-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.8 8S4 4 8 4s6.2 4 6.2 4S12 12 8 12 1.8 8 1.8 8z"/><circle cx="8" cy="8" r="1.8"/><path d="M2.5 13.5l11-11"/></svg><span class="prot-t" data-t="barra_rastreadores"></span><input type="checkbox" class="interruptor" role="switch"></label>
+      <label class="prot" data-clave="rechazar_cookies" data-nombre="barra_cookies" data-explica="cookies_ajuste"><svg class="prot-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.6 8.6A5.6 5.6 0 1 1 7.4 2.4a2 2 0 0 0 2.4 2.4 2 2 0 0 0 3.8 3.8z"/><path d="M5.6 7.2h.01M9 10.6h.01M5.6 10.8h.01" stroke-width="2"/></svg><span class="prot-t" data-t="barra_cookies"></span><input type="checkbox" class="interruptor" role="switch"></label>
+      <label class="prot" data-clave="quitar_emergentes" data-nombre="barra_emergentes" data-explica="emergentes_ajuste"><svg class="prot-ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.8" y="5" width="9" height="9" rx="1.5"/><path d="M5 5V3.6A1.6 1.6 0 0 1 6.6 2h5.8A1.6 1.6 0 0 1 14 3.6v5.8A1.6 1.6 0 0 1 12.4 11H10.8"/></svg><span class="prot-t" data-t="barra_emergentes"></span><input type="checkbox" class="interruptor" role="switch"></label>
+    </div>
     <span id="estado-z" role="status"><i></i><span></span></span>
     <button id="b-menu" data-t-title="ajustes"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.6"/><circle cx="6" cy="11.5" r="1.6"/></svg></button>
   </div>

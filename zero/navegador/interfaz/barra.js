@@ -237,6 +237,56 @@
   }
   $('b-licencia').addEventListener('click', () => manda({ tipo: 'panel', vista: panel === 'licencia' ? null : 'licencia' }));
 
+  // --- ZERO's three protections, beside «Protegido» (2 Nov 2026, the owner, 16:50: «está demasiado escondido… que
+  // aparezca ya en la pantalla del navegador») ---------------------------------------------------------------------------
+  // The same settings as «Ajustes» and the shield (`ajuste`). What the program says always wins: the switch shows the
+  // state the session sends back in «estado», so the three places never disagree.
+  const PROTECCIONES = [...document.querySelectorAll('#protecciones .prot')];
+  for (const l of PROTECCIONES) {
+    const x = l.querySelector('input');
+    x.addEventListener('change', () => manda({ tipo: 'ajuste', clave: l.dataset.clave, valor: x.checked }));
+  }
+  function nombraProtecciones() {
+    $('protecciones').setAttribute('aria-label', t('barra_protecciones'));
+    for (const l of PROTECCIONES) {
+      // Its own name, even when only its drawing shows; the setting's whole sentence on hover.
+      l.querySelector('input').setAttribute('aria-label', t(l.dataset.nombre));
+      l.title = t(l.dataset.explica);
+    }
+  }
+  function pintaProtecciones(p) {
+    if (!p) return;
+    for (const l of PROTECCIONES) l.querySelector('input').checked = p[l.dataset.clave] !== false;
+  }
+  en('estado', (m) => pintaProtecciones(m.protecciones));
+  en('textos', nombraProtecciones);
+
+  // --- GUARDIANA's VPN (2 Nov 2026, the VPN review) -----------------------------------------------------------------------
+  // While it connects, is connected or its server does not answer, its state and «Desconectar». The program asks the
+  // service through the panel's own tab on this computer: no page of the web, so it works with no internet at all.
+  const VPN_FASES = { conectando: 'vpn_conectando', conectada: 'vpn_conectada', sin_respuesta: 'vpn_sin_respuesta' };
+  let vpnUltimo = null;
+  function pintaVpn(m) {
+    vpnUltimo = m;
+    const caja = $('vpn');
+    const clave = VPN_FASES[m.fase];
+    caja.classList.toggle('oculto', !clave);
+    document.body.classList.toggle('con-vpn', !!clave);
+    if (!clave) return;
+    caja.dataset.fase = m.fase;
+    caja.setAttribute('aria-label', t('vpn_titulo'));
+    const estado = $('vpn-estado');
+    estado.textContent = m.aviso ? t(m.aviso) : t(clave);
+    estado.title = estado.textContent;
+    const b = $('vpn-desconectar');
+    b.disabled = !!m.desconectando;
+    b.textContent = t(m.desconectando ? 'vpn_desconectando' : 'vpn_desconectar');
+    caja.title = m.fase === 'sin_respuesta' ? t('vpn_sin_respuesta_explica') : '';
+  }
+  $('vpn-desconectar').addEventListener('click', () => manda({ tipo: 'vpn_desconectar' }));
+  en('vpn', pintaVpn);
+  en('textos', () => { if (vpnUltimo) pintaVpn(vpnUltimo); });
+
   // --- 1.0.46: the top row, GUARDIANA's in the three products ---------------------------------
   // The selector is the only navigation between them (Z3); the state says, in words, what ZERO
   // does now: cutting, or only watching (the person said no). At every plan (2 Nov 2026).

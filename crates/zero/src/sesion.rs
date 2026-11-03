@@ -490,6 +490,39 @@ struct Pregunta {
     clases: Vec<Clase>,
 }
 
+/// 2 Nov 2026 (the VPN review): GUARDIANA's VPN as its service says it is, read through the panel's own tab on this
+/// computer (`GET /api/vpn`, the gateway GUARDIANA's web already uses), so the bar shows it and closes it with no page
+/// of the web: when the VPN's server stops answering, its cut leaves no internet and the web cannot load.
+#[derive(Debug, Default)]
+struct Vpn {
+    /// `apagada`, `conectando`, `conectada`, `sin_respuesta` or `error`; empty until the service answers.
+    fase: String,
+    /// The reading in flight: its number and when it left.
+    pedida: Option<(u64, i64)>,
+    /// The «Desconectar» in flight: its number and when it left.
+    desconectando: Option<(u64, i64)>,
+    /// When to read again; `i64::MAX` while the VPN is off, until something says it may have moved.
+    proxima: i64,
+    /// Readings the panel could not answer in a row (the wait grows with them).
+    fallos: u32,
+    /// What the last «Desconectar» could not do (a key of the texts), until the state changes.
+    aviso: Option<&'static str>,
+    /// The numbers of this browser's own requests to the panel (`para` 0).
+    n: u64,
+}
+
+/// How often the VPN is read while it is on (connecting, connected, or its server not answering).
+const VPN_CADA_MS: i64 = 3_000;
+/// The first wait after a reading the panel could not answer; it doubles up to a minute.
+const VPN_REINTENTO_MS: i64 = 5_000;
+/// A reading or an order with no answer for this long is given up.
+const VPN_SIN_RESPUESTA_MS: i64 = 10_000;
+
+/// The VPN is on: the bar shows it with «Desconectar».
+fn vpn_activa(fase: &str) -> bool {
+    matches!(fase, "conectando" | "conectada" | "sin_respuesta")
+}
+
 /// The browser's state.
 #[derive(Debug)]
 pub struct Sesion {
@@ -579,6 +612,8 @@ pub struct Sesion {
     /// «Tu visita, a subasta» (1.0.46): auctions and distinct companies by day (`subastas.json`).
     subastas: subasta::Diario,
     subastas_sucio: bool,
+    /// GUARDIANA's VPN, for the bar (2 Nov 2026).
+    vpn: Vpn,
 }
 
 fn lee<T: DeserializeOwned + Default>(ruta: &Path) -> T {
@@ -877,6 +912,7 @@ impl Sesion {
             marco_dado: None,
             subastas: subastas_dia,
             subastas_sucio: false,
+            vpn: Vpn::default(),
         };
         azar(&mut s.secreto);
         s.dia_visto = s.hoy();
@@ -1554,6 +1590,13 @@ impl Sesion {
             "panel": self.panel,
             "producto": self.producto(),
             "marco": self.marco().0,
+            // 2 Nov 2026 (the owner, 16:50: «que aparezca ya en la pantalla del navegador»): the three switches of the
+            // bar, the same settings as «Ajustes» and the shield.
+            "protecciones": {
+                "cortar_seguimiento": self.prefs.reglas.cortar_seguimiento,
+                "rechazar_cookies": !self.prefs.cookies_sin_tocar,
+                "quitar_emergentes": !self.prefs.emergentes_sin_tocar,
+            },
         })
     }
 
@@ -1824,7 +1867,13 @@ impl Sesion {
         // Comunicaciones from its door) fills the window as the panel does; it has its own ways
         // between its parts, and the old bar is not drawn over it.
         if matches!(producto, "guardiana" | "secure" | "orbita") {
-            return (0, 0);
+            // 2 Nov 2026 (the VPN review): over them too, only the top row, while the VPN's server does not answer or
+            // GUARDIANA's web cannot load with the VPN on: its «Desconectar» must always be at hand.
+            return if self.vpn_sobre_todo() {
+                (ALTO_ARRIBA, 0)
+            } else {
+                (0, 0)
+            };
         }
         let barra = ALTO_ZERO;
         let web = producto == "zero" && !es_interna(&p.url) && !p.url.is_empty();
@@ -2040,7 +2089,7 @@ impl Sesion {
     /// 1.0.50: GUARDIANA's web asks the panel for one of its readings (the Vigía's analysis of
     /// this computer). Only those in [`PANEL_LECTURAS`], by method and exact address; the panel's
     /// tab asks its own service with its own session and answers with `zg_panel_datos`.
-    fn pide_al_panel(&self, id: u32, m: &Value) -> Vec<Orden> {
+    fn pide_al_panel(&mut self, id: u32, m: &Value) -> Vec<Orden> {
         let metodo = texto(m, "metodo");
         let ruta = texto(m, "ruta");
         let n = m.get("n").and_then(Value::as_u64).unwrap_or(0);
@@ -2055,6 +2104,12 @@ impl Sesion {
         let Some(panel) = self.panel_fijo() else {
             return self.sin_lectura(id, n, 503);
         };
+        // 2 Nov 2026: the web connects or closes the VPN; the bar reads it again soon after.
+        if metodo == "POST" && ruta.starts_with("/api/vpn/") {
+            let pronto = (self.reloj)() + 1_500;
+            self.vpn.proxima = self.vpn.proxima.min(pronto);
+            self.vpn.fallos = 0;
+        }
         vec![Orden::EnviaAPagina {
             id: panel,
             prefijo: PANEL_LOCAL,
@@ -2066,12 +2121,16 @@ impl Sesion {
 
     /// 1.0.50: the panel's answer to [`Sesion::pide_al_panel`], handed as it came to the web tab
     /// that asked, while that tab is still GUARDIANA's web in the program.
-    fn datos_del_panel(&self, m: &Value) -> Vec<Orden> {
+    fn datos_del_panel(&mut self, m: &Value) -> Vec<Orden> {
         let para = m
             .get("para")
             .and_then(Value::as_u64)
             .and_then(|x| u32::try_from(x).ok())
             .unwrap_or(0);
+        // 2 Nov 2026: an answer for this browser itself (no tab is number 0): the VPN.
+        if para == 0 {
+            return self.vpn_respuesta(m);
+        }
         let datos = texto(m, "datos");
         let n = m.get("n").and_then(Value::as_u64).unwrap_or(0);
         if datos.len() > 4_000_000 {
@@ -2091,6 +2150,148 @@ impl Sesion {
             json: json!({ "tipo": "zg_panel", "n": n, "estado": estado, "datos": datos })
                 .to_string(),
         }]
+    }
+
+    // --- GUARDIANA's VPN in the bar (2 Nov 2026, the VPN review) ---------------------------------------------------------
+
+    /// A request of this browser itself for the panel's own tab (`para` 0, no tab has that number), which asks its
+    /// service on this computer with its own session; the answer comes back to [`Sesion::vpn_respuesta`].
+    fn al_panel(panel: u32, n: u64, metodo: &str, ruta: &str) -> Orden {
+        Orden::EnviaAPagina {
+            id: panel,
+            prefijo: PANEL_LOCAL,
+            excepto: None,
+            json: json!({ "tipo": "zg_panel_pide", "para": 0, "n": n, "metodo": metodo, "ruta": ruta })
+                .to_string(),
+        }
+    }
+
+    fn msg_vpn(&self) -> Value {
+        json!({
+            "tipo": "vpn",
+            "fase": self.vpn.fase,
+            "desconectando": self.vpn.desconectando.is_some(),
+            "aviso": self.vpn.aviso,
+        })
+    }
+
+    /// The VPN's reading, at its pace: while it is on, every [`VPN_CADA_MS`]; while it is off, only when something says
+    /// it may have moved (the browser just started, the web asked the panel to connect it, the bar closed it).
+    fn vpn_tic(&mut self, ahora: i64) -> Vec<Orden> {
+        let mut o = Vec::new();
+        if self
+            .vpn
+            .desconectando
+            .is_some_and(|(_, t)| ahora - t >= VPN_SIN_RESPUESTA_MS)
+        {
+            self.vpn.desconectando = None;
+            self.vpn.aviso = Some("vpn_no_desconecta");
+            self.vpn.proxima = ahora;
+            o.push(envia(Origen::Barra, &self.msg_vpn()));
+        }
+        if let Some((_, t)) = self.vpn.pedida {
+            if ahora - t < VPN_SIN_RESPUESTA_MS {
+                return o;
+            }
+            self.vpn.pedida = None;
+        }
+        if ahora < self.vpn.proxima {
+            return o;
+        }
+        let Some(panel) = self.panel_fijo() else {
+            return o;
+        };
+        self.vpn.n += 1;
+        let n = self.vpn.n;
+        self.vpn.pedida = Some((n, ahora));
+        // Asked again later if nothing answers (the panel's page may still be loading).
+        self.vpn.proxima = ahora + VPN_CADA_MS;
+        o.push(Self::al_panel(panel, n, "GET", "/api/vpn"));
+        o
+    }
+
+    /// The panel's answer to one of this browser's own requests: the VPN's state, or what «Desconectar» did.
+    fn vpn_respuesta(&mut self, m: &Value) -> Vec<Orden> {
+        let n = m.get("n").and_then(Value::as_u64).unwrap_or(0);
+        let estado = m.get("estado").and_then(Value::as_u64).unwrap_or(0);
+        let datos: Value = serde_json::from_str(texto(m, "datos")).unwrap_or(Value::Null);
+        let ahora = (self.reloj)();
+        if self.vpn.desconectando.is_some_and(|(x, _)| x == n) {
+            self.vpn.desconectando = None;
+            let hecho = estado == 200 && datos.get("ok").and_then(Value::as_bool) == Some(true);
+            self.vpn.aviso = if hecho {
+                None
+            } else if self.vpn.fase == "conectando"
+                || texto(&datos, "motivo").contains("conectando")
+            {
+                // The service closes a connection only once it finished connecting.
+                Some("vpn_espera_conectar")
+            } else {
+                Some("vpn_no_desconecta")
+            };
+            // The state again at once: «apagada» when it worked.
+            self.vpn.pedida = None;
+            self.vpn.proxima = ahora;
+            self.vpn.fallos = 0;
+            return vec![envia(Origen::Barra, &self.msg_vpn())];
+        }
+        if !self.vpn.pedida.is_some_and(|(x, _)| x == n) {
+            return Vec::new();
+        }
+        self.vpn.pedida = None;
+        let fase = match texto(&datos, "fase") {
+            f @ ("apagada" | "conectando" | "conectada" | "sin_respuesta" | "error") => f,
+            _ => "",
+        };
+        if estado != 200 || fase.is_empty() {
+            // The panel could not answer (its session not ready, the service starting): later, each time a little later.
+            let espera = VPN_REINTENTO_MS.saturating_mul(1 << self.vpn.fallos.min(4));
+            self.vpn.fallos = self.vpn.fallos.saturating_add(1);
+            self.vpn.proxima = ahora + espera.min(60_000);
+            return Vec::new();
+        }
+        self.vpn.fallos = 0;
+        self.vpn.proxima = if vpn_activa(fase) {
+            ahora + VPN_CADA_MS
+        } else {
+            i64::MAX
+        };
+        if fase == self.vpn.fase {
+            return Vec::new();
+        }
+        self.vpn.fase = fase.to_owned();
+        self.vpn.aviso = None;
+        vec![envia(Origen::Barra, &self.msg_vpn())]
+    }
+
+    /// «Desconectar» on the bar's VPN chip: `POST /api/vpn/desconecta` through the panel's own tab, on this computer.
+    fn vpn_desconectar(&mut self) -> Vec<Orden> {
+        if self.vpn.desconectando.is_some() {
+            return Vec::new();
+        }
+        let Some(panel) = self.panel_fijo() else {
+            self.vpn.aviso = Some("vpn_sin_panel");
+            return vec![envia(Origen::Barra, &self.msg_vpn())];
+        };
+        self.vpn.n += 1;
+        let n = self.vpn.n;
+        self.vpn.desconectando = Some((n, (self.reloj)()));
+        self.vpn.aviso = None;
+        vec![
+            Self::al_panel(panel, n, "POST", "/api/vpn/desconecta"),
+            envia(Origen::Barra, &self.msg_vpn()),
+        ]
+    }
+
+    /// The top row over GUARDIANA's own pages too (Órbita, the panel, Comunicaciones), for the VPN's «Desconectar»:
+    /// while its server does not answer, or while GUARDIANA's web cannot load with the VPN on.
+    fn vpn_sobre_todo(&self) -> bool {
+        self.vpn.fase == "sin_respuesta"
+            || (vpn_activa(&self.vpn.fase)
+                && self
+                    .pestanas
+                    .iter()
+                    .any(|p| p.fija && es_orbita(&p.url) && p.sin_red))
     }
 
     /// A click on the web in front while its side summary is open (Z1-b): it folds back into
@@ -2650,6 +2851,8 @@ impl Sesion {
             }
             "subasta_recibo" => self.subasta_recibo(origen),
             "subasta_carta" => self.subasta_carta(origen, m),
+            // 2 Nov 2026 (the VPN review): the bar's «Desconectar», only from the bar itself.
+            "vpn_desconectar" if origen == Origen::Barra => self.vpn_desconectar(),
             "subasta_adstxt" => {
                 let Some(p) = self.pestana(activa) else {
                     return Vec::new();
@@ -2850,9 +3053,12 @@ impl Sesion {
                 self.prefs.reglas.cortar_seguimiento = si(m, "cortar");
                 self.prefs.bienvenida = true;
                 self.guarda_prefs();
-                let mut o = vec![Orden::Seguimiento {
-                    estricto: self.seguimiento_estricto(),
-                }];
+                let mut o = vec![
+                    Orden::Seguimiento {
+                        estricto: self.seguimiento_estricto(),
+                    },
+                    self.estado(),
+                ];
                 o.extend(self.cierra_panel());
                 o.extend(self.escudo_activa(false));
                 o.extend(self.hoy_a_todos());
@@ -2887,6 +3093,7 @@ impl Sesion {
                 o.push(envia(Origen::Barra, &self.msg_licencia()));
                 o.push(envia(Origen::Barra, &self.msg_hoy()));
                 o.push(envia(Origen::Barra, &self.msg_marco()));
+                o.push(envia(Origen::Barra, &self.msg_vpn()));
                 if !self.prefs.bienvenida {
                     o.extend(self.abre_panel("bienvenida"));
                 } else if self.panel.is_none() && self.escudo_a_la_vista() {
@@ -2967,6 +3174,8 @@ impl Sesion {
                         estricto: self.seguimiento_estricto(),
                     },
                     envia(Origen::Panel, &self.msg_ajustes()),
+                    // The bar's switches (2 Nov 2026) say the same at once.
+                    self.estado(),
                 ];
                 o.extend(self.escudo_activa(false));
                 o.extend(self.hoy_a_todos());
@@ -3005,7 +3214,7 @@ impl Sesion {
                     self.prefs.reglas.maxima = false;
                 }
                 self.guarda_prefs();
-                let mut o = vec![envia(Origen::Panel, &self.msg_ajustes())];
+                let mut o = vec![envia(Origen::Panel, &self.msg_ajustes()), self.estado()];
                 o.extend(self.escudo_activa(false));
                 o
             }
@@ -3016,7 +3225,7 @@ impl Sesion {
                     self.prefs.reglas.maxima = false;
                 }
                 self.guarda_prefs();
-                let mut o = vec![envia(Origen::Panel, &self.msg_ajustes())];
+                let mut o = vec![envia(Origen::Panel, &self.msg_ajustes()), self.estado()];
                 o.extend(self.escudo_activa(false));
                 o
             }
@@ -5221,6 +5430,7 @@ impl Sesion {
             self.licencia_pedida = ahora;
             o.push(Orden::ComprobarLicencia);
         }
+        o.extend(self.vpn_tic(ahora));
         if !self.pulsos.is_empty() {
             let lista = std::mem::take(&mut self.pulsos);
             o.push(envia(

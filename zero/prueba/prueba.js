@@ -188,6 +188,28 @@ function pantalla(nombre) {
   comprueba(await web.evaluate(() => !(window.chrome && window.chrome.webview)), 'la página no ve el canal con el navegador');
   comprueba(await hasta(async () => vio('sitio-prueba.test', '/cookies-rechazadas')), 'el aviso de cookies se rechaza solo («Rechazar todo»)');
   comprueba(!vio('sitio-prueba.test', '/cookies-aceptadas'), 'y no se acepta nada');
+  // 2 Nov 2026 (the owner, 16:50: «que aparezca ya en la pantalla del navegador»): the three protections beside «Protegido»,
+  // as switches with their names, the same settings as «Ajustes».
+  for (const nombre of ['Rastreadores y anuncios', 'Avisos de cookies', 'Ventanas emergentes']) {
+    const sw = barra.getByRole('switch', { name: nombre, exact: true });
+    comprueba((await sw.isVisible()) && (await sw.isChecked()), `en la barra, «${nombre}» a la vista y encendido`);
+  }
+  await barra.getByRole('switch', { name: 'Avisos de cookies', exact: true }).click();
+  comprueba(await hasta(() => panel.evaluate(() => document.getElementById('a-cookies').checked === false)), 'apagar «Avisos de cookies» en la barra lo apaga en «Ajustes»');
+  await barra.getByRole('switch', { name: 'Avisos de cookies', exact: true }).click();
+  comprueba(await hasta(() => panel.evaluate(() => document.getElementById('a-cookies').checked === true)), 'y encenderlo en la barra lo enciende');
+  pantalla('z2-interruptores.png');
+  // The VPN (2 Nov 2026, the VPN review): no chip while there is none; given a VPN whose server does not answer (as the
+  // program would say it), the chip and its «Desconectar», which reaches the program. Here there is no GUARDIANA service
+  // behind, so the program answers that there is no VPN and the chip goes.
+  comprueba(await barra.evaluate(() => document.getElementById('vpn').classList.contains('oculto')), 'sin VPN, la barra no enseña su chip');
+  await barra.evaluate(() => Z.recibe({ tipo: 'vpn', fase: 'sin_respuesta', desconectando: false, aviso: null }));
+  const chip = barra.getByRole('group', { name: 'VPN de GUARDIANA' });
+  comprueba(await hasta(async () => (await chip.isVisible()) && (await chip.textContent()).includes('VPN sin respuesta')), 'con la VPN sin respuesta, su chip lo dice junto a «Protegido»');
+  await espera(300);
+  pantalla('z4-vpn.png');
+  await chip.getByRole('button', { name: 'Desconectar', exact: true }).click();
+  comprueba(await hasta(() => barra.evaluate(() => document.getElementById('vpn').classList.contains('oculto'))), '«Desconectar» llega al programa, que contesta (sin servicio de GUARDIANA aquí: sin VPN, el chip se va)');
   // The star keeps the page in the favourites.
   await barra.click('#estrella');
   comprueba(await hasta(() => barra.evaluate(() => document.querySelector('#estrella').getAttribute('aria-pressed') === 'true')), 'la estrella guarda la web en favoritos');

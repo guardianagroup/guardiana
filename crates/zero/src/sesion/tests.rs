@@ -4291,3 +4291,203 @@ fn the_three_sections_that_left_the_browser_are_gone() {
         assert!(del_tipo(&o, Origen::Panel, tipo).is_none(), "{tipo}");
     }
 }
+
+/// 2 Nov 2026 (the owner, 16:50: «está demasiado escondido… que aparezca ya en la pantalla del navegador»): the bar's
+/// three switches are the settings' own. Their state goes with every «estado»; a switch of the bar changes the
+/// setting (and the settings and the shield say so), and a change in the settings reaches the bar.
+#[test]
+fn the_bar_shows_and_changes_the_three_protections() {
+    let (mut s, _, id) = con_pagina(true);
+    let prot = |o: &[Orden]| {
+        del_tipo(o, Origen::Barra, "estado").unwrap_or_default()["protecciones"].clone()
+    };
+    let todas =
+        json!({ "cortar_seguimiento": true, "rechazar_cookies": true, "quitar_emergentes": true });
+    assert_eq!(s.msg_estado()["protecciones"], todas);
+    // From the bar: cookie notices left as they come.
+    let o = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"ajuste","clave":"rechazar_cookies","valor":false}"#,
+    );
+    assert_eq!(prot(&o)["rechazar_cookies"], false);
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "ajustes").unwrap_or_default()["rechazar_cookies"],
+        false
+    );
+    // Pop-ups, the same.
+    let o = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"ajuste","clave":"quitar_emergentes","valor":false}"#,
+    );
+    assert_eq!(prot(&o)["quitar_emergentes"], false);
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "ajustes").unwrap_or_default()["quitar_emergentes"],
+        false
+    );
+    // Trackers and ads: the engine's own prevention follows, and the shield says it only watches.
+    let o = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"ajuste","clave":"cortar_seguimiento","valor":false}"#,
+    );
+    assert!(o.contains(&Orden::Seguimiento { estricto: false }));
+    assert_eq!(prot(&o)["cortar_seguimiento"], false);
+    assert_eq!(
+        del_tipo(&o, Origen::Barra, "escudo").unwrap_or_default()["cortando"],
+        false
+    );
+    // From the settings (maximum protection turns all three on): the bar hears it.
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"maxima","valor":true}"#,
+    );
+    assert_eq!(prot(&o), todas);
+    // A web page cannot touch them.
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        "https://www.eltiempo.com/",
+        r#"{"tipo":"ajuste","clave":"rechazar_cookies","valor":false}"#,
+    );
+    assert!(o.is_empty());
+    assert_eq!(s.msg_estado()["protecciones"], todas);
+}
+
+/// 2 Nov 2026 (the VPN review): the VPN in the bar, from GUARDIANA's service on this computer through the panel's own
+/// tab, with no page of the web. Read once at the start and, while it is on, every few seconds; the chip shows while
+/// it connects, is connected or its server does not answer; «Desconectar» sends `POST /api/vpn/desconecta`; with the
+/// server not answering, the top row comes over GUARDIANA's own pages too.
+#[test]
+fn the_vpn_shows_in_the_bar_and_closes_from_it() {
+    static AHORA: AtomicU64 = AtomicU64::new(1_791_553_171_000);
+    fn reloj_movil() -> i64 {
+        i64::try_from(AHORA.load(Ordering::SeqCst)).unwrap_or(0)
+    }
+    let pasa = |ms: u64| {
+        AHORA.fetch_add(ms, Ordering::SeqCst);
+    };
+    let d = carpeta();
+    let (mut s, _) = Sesion::abre(Arranque {
+        datos: d.join("datos"),
+        descargas: d.join("descargas"),
+        idioma_sistema: "es".into(),
+        version: "0.1.0".into(),
+        reloj: reloj_movil,
+    });
+    let vpn = |o: &[Orden]| del_tipo(o, Origen::Barra, "vpn").unwrap_or_default();
+    let desconectar = r#"{"tipo":"vpn_desconectar"}"#;
+    // Without the panel's tab (ZERO on its own), nothing is asked, and «Desconectar» says why.
+    assert!(!s
+        .tic()
+        .iter()
+        .any(|x| matches!(x, Orden::EnviaAPagina { .. })));
+    let o = s.mensaje(Origen::Barra, BARRA, desconectar);
+    assert_eq!(vpn(&o)["aviso"], "vpn_sin_panel");
+
+    let url = format!("http://127.0.0.1:7443/?t={}", "9".repeat(64));
+    let _ = s.abre_programa(&url);
+    let orbita = s.activa();
+    let panel = s
+        .pestanas
+        .iter()
+        .find(|p| p.url == url)
+        .map(|p| p.id)
+        .unwrap_or_default();
+    // What this browser asked the panel's tab for itself (`para` 0), by method and address: its number.
+    let pide = |o: &[Orden], metodo: &str, ruta: &str| -> Option<u64> {
+        o.iter().find_map(|x| match x {
+            Orden::EnviaAPagina {
+                id, prefijo, json, ..
+            } if *id == panel && *prefijo == PANEL_LOCAL => {
+                let v: Value = serde_json::from_str(json).ok()?;
+                (v["tipo"] == "zg_panel_pide"
+                    && v["para"] == 0
+                    && v["metodo"] == metodo
+                    && v["ruta"] == ruta)
+                    .then(|| v["n"].as_u64())
+                    .flatten()
+            }
+            _ => None,
+        })
+    };
+    let responde = |s: &mut Sesion, n: u64, estado: u64, datos: Value| -> Vec<Orden> {
+        let m = json!({ "tipo": "zg_panel_datos", "para": 0, "n": n, "estado": estado, "datos": datos.to_string() });
+        s.mensaje(Origen::Pestana(panel), &url, &m.to_string())
+    };
+
+    // At the start: one reading, and nothing more while it is in flight.
+    let n = pide(&s.tic(), "GET", "/api/vpn").unwrap_or_default();
+    assert!(n > 0);
+    pasa(1_000);
+    assert!(pide(&s.tic(), "GET", "/api/vpn").is_none());
+    // Off: the chip stays hidden, and nothing more is asked.
+    let o = responde(&mut s, n, 200, json!({ "fase": "apagada" }));
+    assert_eq!(vpn(&o)["fase"], "apagada");
+    pasa(60_000);
+    assert!(pide(&s.tic(), "GET", "/api/vpn").is_none());
+
+    // The web connects it through the panel: read again soon after, then every few seconds while it is on.
+    let conecta =
+        json!({ "tipo": "zg_panel_pide", "n": 3, "metodo": "POST", "ruta": "/api/vpn/conecta" });
+    let _ = s.mensaje(Origen::Pestana(orbita), ORBITA, &conecta.to_string());
+    pasa(2_000);
+    let n = pide(&s.tic(), "GET", "/api/vpn").unwrap_or_default();
+    let v = vpn(&responde(&mut s, n, 200, json!({ "fase": "conectando" })));
+    assert_eq!(
+        (v["fase"].as_str(), v["desconectando"].as_bool()),
+        (Some("conectando"), Some(false))
+    );
+    pasa(1_000);
+    assert!(pide(&s.tic(), "GET", "/api/vpn").is_none());
+    pasa(2_500);
+    assert!(pide(&s.tic(), "GET", "/api/vpn").is_some());
+    // «Desconectar» while it still connects: the service says to wait, and the bar says so.
+    let o = s.mensaje(Origen::Barra, BARRA, desconectar);
+    let d1 = pide(&o, "POST", "/api/vpn/desconecta").unwrap_or_default();
+    assert_eq!(vpn(&o)["desconectando"], true);
+    let motivo = json!({ "ok": false, "motivo": "está conectando: espera a que termine" });
+    let v = vpn(&responde(&mut s, d1, 200, motivo));
+    assert_eq!(
+        (v["aviso"].as_str(), v["desconectando"].as_bool()),
+        (Some("vpn_espera_conectar"), Some(false))
+    );
+    // Connected: over Órbita, the web keeps the whole window while all is well.
+    pasa(500);
+    let n = pide(&s.tic(), "GET", "/api/vpn").unwrap_or_default();
+    let v = vpn(&responde(&mut s, n, 200, json!({ "fase": "conectada" })));
+    assert_eq!(
+        (v["fase"].as_str(), v["aviso"].is_null()),
+        (Some("conectada"), true)
+    );
+    assert_eq!(s.activa(), orbita);
+    assert_eq!(s.marco(), (0, 0));
+    // The server stops answering: the chip says so, and the top row comes over Órbita with «Desconectar».
+    pasa(3_000);
+    let n = pide(&s.tic(), "GET", "/api/vpn").unwrap_or_default();
+    let o = responde(&mut s, n, 200, json!({ "fase": "sin_respuesta" }));
+    assert_eq!(vpn(&o)["fase"], "sin_respuesta");
+    assert_eq!(s.marco(), (ALTO_ARRIBA, 0));
+    // «Desconectar»: through the panel's tab, once at a time; never from a web page or the side panel.
+    let o = s.mensaje(Origen::Barra, BARRA, desconectar);
+    let d2 = pide(&o, "POST", "/api/vpn/desconecta").unwrap_or_default();
+    assert!(d2 > d1);
+    assert!(s.mensaje(Origen::Barra, BARRA, desconectar).is_empty());
+    assert!(s
+        .mensaje(Origen::Pestana(orbita), ORBITA, desconectar)
+        .is_empty());
+    assert!(s.mensaje(Origen::Panel, PANEL, desconectar).is_empty());
+    let o = responde(&mut s, d2, 200, json!({ "ok": true }));
+    assert_eq!(vpn(&o)["desconectando"], false);
+    // Read again at once: off, and the window is the web's again.
+    let n = pide(&s.tic(), "GET", "/api/vpn").unwrap_or_default();
+    let o = responde(&mut s, n, 200, json!({ "fase": "apagada" }));
+    assert_eq!(vpn(&o)["fase"], "apagada");
+    assert_eq!(s.marco(), (0, 0));
+    // An answer to nothing that was asked changes nothing.
+    assert!(responde(&mut s, 999, 200, json!({ "fase": "conectada" })).is_empty());
+    // When the bar loads, it is told the state.
+    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"listo","vista":"barra"}"#);
+    assert_eq!(vpn(&o)["fase"], "apagada");
+}
