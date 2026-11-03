@@ -132,7 +132,9 @@ impl Default for Opciones {
     }
 }
 
-/// The script of a tab with these options.
+/// The script of a tab with these options. 1.0.55 («más rápido»): only the parts the tab can use. A web tab gets
+/// neither the bridge of GUARDIANA's panel nor the one of GUARDIANA's web (only the program's own fixed tabs show
+/// them), and the strict mode's part only when it is on: less script to read in every page and frame.
 #[must_use]
 pub fn guion(o: Opciones) -> String {
     let mut s = String::new();
@@ -143,12 +145,32 @@ pub fn guion(o: Opciones) -> String {
     let mut g = GUION.to_owned();
     if o.uniforme {
         g = g.replacen(UNIFORME_NO, UNIFORME_SI, 1);
+    } else {
+        g = sin_parte(&g, "uniforme");
     }
     if o.programa {
         g = g.replacen(PROGRAMA_NO, PROGRAMA_SI, 1);
+    } else {
+        g = sin_parte(&g, "programa");
     }
     s.push_str(&g);
     s
+}
+
+/// The script without its parts marked `/*<nombre>*/ … /*</nombre>*/`.
+fn sin_parte(guion: &str, nombre: &str) -> String {
+    let (abre, cierra) = (format!("/*<{nombre}>*/"), format!("/*</{nombre}>*/"));
+    let mut out = String::with_capacity(guion.len());
+    let mut resto = guion;
+    while let Some(i) = resto.find(&abre) {
+        let Some(j) = resto[i..].find(&cierra) else {
+            break;
+        };
+        out.push_str(&resto[..i]);
+        resto = &resto[i + j + cierra.len()..];
+    }
+    out.push_str(resto);
+    out
 }
 
 /// The switch of the program's own tabs inside the script, as written and when on.
@@ -191,6 +213,7 @@ const GUION: &str = r#"(() => {
     const pon = () => { const r = document.documentElement; if (!r) return false; try { r.dataset[k] = '1'; } catch (_) {} return true; };
     if (!pon()) new MutationObserver((_, o) => { if (pon()) o.disconnect(); }).observe(document, { childList: true });
   };
+  /*<programa>*/
   if (!marco && location.origin === 'http://127.0.0.1:7443') {
     marca('enZero');
     document.addEventListener('click', (e) => {
@@ -375,9 +398,11 @@ const GUION: &str = r#"(() => {
         .catch(() => {});
     });
   }
+  /*</programa>*/
   // 1.0.50: GUARDIANA's own web (Comunicaciones and Órbita, the program's fixed tabs) knows it is inside the program, and
   // hides its own ways to the other products, which the program's selector already gives. Only that site and only its own
   // top document: any other page sees nothing.
+  /*<programa>*/
   if (!marco && programa && location.origin === 'https://guardianagroup.com') {
     marca('enPrograma');
     // 1.0.50 (independent review, M1): a reading that sets this computer to work (a review, a slow look of the watch)
@@ -421,6 +446,7 @@ const GUION: &str = r#"(() => {
       else if (m.tipo === 'zg_panel') document.dispatchEvent(new CustomEvent('guardiana-panel', { detail: JSON.stringify({ n: Number(m.n) || 0, estado: Number(m.estado) || 0, datos: typeof m.datos === 'string' ? m.datos : '' }) }));
     });
   }
+  /*</programa>*/
   // 1.0.46 (Z1-b): a click on the web itself folds ZERO's side summary («clic fuera»). Only the
   // fact of a click, never where or on what.
   if (!marco && location.origin !== 'http://127.0.0.1:7443') {
@@ -516,6 +542,7 @@ const GUION: &str = r#"(() => {
     // graphics card (below). What stays real, and the settings page says so: the time zone (pages
     // would show wrong hours), the pixel ratio (CSS reveals it anyway), the fonts installed, the
     // address the server sees, and the canvas, which gets the per-site noise instead.
+    /*<uniforme>*/
     if (uniforme) {
       try {
         const SP = window.Screen && Screen.prototype;
@@ -559,6 +586,7 @@ const GUION: &str = r#"(() => {
         if (NP && 'getBattery' in NP) { try { delete NP.getBattery; } catch (_) {} }
       } catch (_) {}
     }
+    /*</uniforme>*/
     // The web addresses on the stack, closest first, without the trap's own frames (V8's
     // captureStackTrace starts below `desde`), their line numbers or their queries.
     const pila = (desde) => {
@@ -1495,8 +1523,51 @@ mod tests {
         // (1.0.46): plugins never.
         assert!(!g.contains("'plugins'"));
         assert!(g.contains("const uniforme = false;") && !g.contains("const uniforme = true;"));
-        let fuera = g.find("if (uniforme) {").unwrap_or(0);
-        assert!(fuera > 0 && fuera < g.find("'hardwareConcurrency'").unwrap_or(0));
+        // 1.0.55: the strict mode's part only in a tab that has it on.
+        assert!(!g.contains("if (uniforme) {") && !g.contains("'hardwareConcurrency'"));
+        let estricto = guion(Opciones {
+            uniforme: true,
+            ..Opciones::default()
+        });
+        let fuera = estricto.find("if (uniforme) {").unwrap_or(0);
+        assert!(fuera > 0 && fuera < estricto.find("'hardwareConcurrency'").unwrap_or(0));
+    }
+
+    /// 1.0.55 («más rápido»): a web tab's script carries only what it can use; the program's fixed tabs keep the
+    /// bridges of GUARDIANA's panel and web, and every page keeps what protects and measures it.
+    #[test]
+    fn a_web_tab_gets_only_the_parts_it_can_use() {
+        let web = guion(Opciones::default());
+        let programa = guion(Opciones {
+            programa: true,
+            ..Opciones::default()
+        });
+        for parte in [
+            "zg_panel_pide",
+            "guardiana-panel-pide",
+            "enPrograma",
+            "enZero",
+        ] {
+            assert!(!web.contains(parte), "{parte}");
+            assert!(programa.contains(parte), "{parte}");
+        }
+        assert!(
+            web.len() + 10_000 < programa.len(),
+            "{} {}",
+            web.len(),
+            programa.len()
+        );
+        for parte in [
+            "zg_huella",
+            "zg_cookies_pide",
+            "HTMLFormElement.prototype",
+            "zg_toque",
+            "zg_subasta",
+            "const programa = false;",
+        ] {
+            assert!(web.contains(parte), "{parte}");
+        }
+        assert!(!web.contains("/*<") && !web.contains("/*</"));
     }
 
     #[test]
