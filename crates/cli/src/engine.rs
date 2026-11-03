@@ -957,6 +957,7 @@ pub async fn run<F: Future<Output = ()>>(
     shutdown: F,
 ) -> Result<(), Box<dyn Error>> {
     tokio::pin!(shutdown);
+    contrastar_lectura_nativa(&cfg.db);
     let mut first = true;
     let result = loop {
         match run_once(&cfg, shutdown.as_mut(), first).await {
@@ -974,6 +975,31 @@ pub async fn run<F: Future<Output = ()>>(
     let _ = tokio::task::spawn_blocking(guardiana_panel::cierra_la_vpn).await;
     give_dns_back_while_stopped(&cfg.db);
     result
+}
+
+/// How long after the start the DNS is read both ways once (`sysdns::contrasta_lectura_nativa`):
+/// the computer is busy starting then, and its network may still be coming up.
+const CONTRASTE_TRAS: Duration = Duration::from_secs(60);
+
+/// Once per process, a minute after the start and in a thread of its own (it starts a PowerShell):
+/// whether Windows' own functions read the DNS here as the PowerShell they replace does. If they do
+/// not, the rest of this process asks PowerShell, and it is said once (review of ligero-1055).
+/// Windows only: elsewhere there is nothing to compare.
+fn contrastar_lectura_nativa(db: &std::path::Path) {
+    if !cfg!(windows) {
+        return;
+    }
+    let db = db.to_path_buf();
+    std::thread::spawn(move || {
+        std::thread::sleep(CONTRASTE_TRAS);
+        let copia = Ledger::open(&db, identity::genesis())
+            .ok()
+            .and_then(|l| l.setting(SETTING_BACKUP).ok().flatten())
+            .and_then(|j| serde_json::from_str::<Backup>(&j).ok());
+        if let Some(d) = sysdns::contrasta_lectura_nativa(copia.as_ref()) {
+            eprintln!("guardiana: {d}");
+        }
+    });
 }
 
 /// While it runs, Guardiana is the machine's resolver, so a stopped service must not leave the
