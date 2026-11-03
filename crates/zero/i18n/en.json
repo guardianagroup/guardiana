@@ -1359,6 +1359,8 @@
   "vpn_espera_conectar": "Still connecting: try again in a few seconds",
   "vpn_no_desconecta": "Could not disconnect: try again",
   "vpn_sin_panel": "GUARDIANA is not answering on this computer: it cannot be disconnected from here",
+  "vpn_reconectando": "VPN: not connecting",
+  "vpn_estricto_no_conecta": "The VPN is not connecting: nothing goes out until it comes back or you turn it off. «Desconectar» turns it off and takes you back to your normal connection.",
   "z1_franja_titulo": "Open this site's shield",
   "z1_escudo_web": "This site's shield",
   "z1_plegar": "Collapse",

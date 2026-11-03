@@ -12,6 +12,8 @@
   <String Id="ProgresoCerrarZero" Value="Fechando o GUARDIANA ZERO para atualizá-lo…" />
   <String Id="ProgresoVigilante" Value="Criando o vigilante do DNS…" />
   <String Id="ProgresoDns" Value="Configurando o DNS deste computador…" />
+  <String Id="ApagarVpn" Value="Desligar a VPN da GUARDIANA" />
+  <String Id="ProgresoApagarVpn" Value="Tirando o bloqueio da VPN…" />
   <String Id="ProgresoHogar" Value="Fechando o Modo Casa…" />
   <String Id="ProgresoDevolverDns" Value="Devolvendo o DNS de antes…" />
   <String Id="ProgresoQuitarVigilante" Value="Removendo o vigilante do DNS…" />

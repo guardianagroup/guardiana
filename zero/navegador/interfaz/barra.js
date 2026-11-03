@@ -264,7 +264,9 @@
   // --- GUARDIANA's VPN (2 Nov 2026, the VPN review) -----------------------------------------------------------------------
   // While it connects, is connected or its server does not answer, its state and «Desconectar». The program asks the
   // service through the panel's own tab on this computer: no page of the web, so it works with no internet at all.
-  const VPN_FASES = { conectando: 'vpn_conectando', conectada: 'vpn_conectada', sin_respuesta: 'vpn_sin_respuesta' };
+  // 3 Nov 2026, strict mode (ronda 91): «reconectando», its server silent and the tunnel down: nothing leaves until it
+  // comes back or the person turns it off, and the chip says so with «Desconectar».
+  const VPN_FASES = { conectando: 'vpn_conectando', conectada: 'vpn_conectada', sin_respuesta: 'vpn_sin_respuesta', reconectando: 'vpn_reconectando' };
   let vpnUltimo = null;
   function pintaVpn(m) {
     vpnUltimo = m;
@@ -281,7 +283,8 @@
     const b = $('vpn-desconectar');
     b.disabled = !!m.desconectando;
     b.textContent = t(m.desconectando ? 'vpn_desconectando' : 'vpn_desconectar');
-    caja.title = m.fase === 'sin_respuesta' ? t('vpn_sin_respuesta_explica') : '';
+    const callada = m.fase === 'sin_respuesta' || m.fase === 'reconectando';
+    caja.title = callada ? t(m.estricto ? 'vpn_estricto_no_conecta' : 'vpn_sin_respuesta_explica') : '';
   }
   $('vpn-desconectar').addEventListener('click', () => manda({ tipo: 'vpn_desconectar' }));
   en('vpn', pintaVpn);

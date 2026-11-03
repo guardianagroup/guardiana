@@ -13,6 +13,8 @@
   <String Id="ProgresoCerrarZero" Value="Closing GUARDIANA ZERO to update it…" />
   <String Id="ProgresoVigilante" Value="Creating the DNS watcher…" />
   <String Id="ProgresoDns" Value="Setting up this computer’s DNS…" />
+  <String Id="ApagarVpn" Value="Turn off GUARDIANA&apos;s VPN" />
+  <String Id="ProgresoApagarVpn" Value="Removing the VPN&apos;s block…" />
   <String Id="ProgresoHogar" Value="Closing Home Mode…" />
   <String Id="ProgresoDevolverDns" Value="Giving the previous DNS back…" />
   <String Id="ProgresoQuitarVigilante" Value="Removing the DNS watcher…" />

@@ -3525,8 +3525,13 @@ fn the_web_asks_the_panel_only_for_its_readings() {
             "{ruta}"
         );
     }
-    // 1.0.52: the VPN's two orders go through (the gesture rule is the panel tab's, tested with the page's script).
-    for ruta in ["/api/vpn/conecta", "/api/vpn/desconecta"] {
+    // 1.0.52: the VPN's two orders go through (the gesture rule is the panel tab's, tested with the page's script);
+    // 3 Nov 2026, strict mode's switch too (ronda 91).
+    for ruta in [
+        "/api/vpn/conecta",
+        "/api/vpn/desconecta",
+        "/api/vpn/estricto",
+    ] {
         let o = s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, "POST"));
         assert!(
             o.iter().any(|x| matches!(
@@ -4532,6 +4537,102 @@ fn the_vpn_shows_in_the_bar_and_closes_from_it() {
     // When the bar loads, it is told the state.
     let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"listo","vista":"barra"}"#);
     assert_eq!(vpn(&o)["fase"], "apagada");
+}
+
+/// 3 Nov 2026, strict mode (ronda 91): while its server does not answer, the tunnel is down and nothing leaves
+/// («reconectando»). The chip stays, with «Desconectar» and whether strict mode is on; the top row comes over GUARDIANA's
+/// own pages too, as with the server silent; and it is read again every few seconds, as any VPN that is on.
+#[test]
+fn the_strict_vpn_reconnecting_keeps_the_chip_and_its_way_out() {
+    static AHORA: AtomicU64 = AtomicU64::new(1_791_553_171_000);
+    fn reloj_movil() -> i64 {
+        i64::try_from(AHORA.load(Ordering::SeqCst)).unwrap_or(0)
+    }
+    let pasa = |ms: u64| {
+        AHORA.fetch_add(ms, Ordering::SeqCst);
+    };
+    let d = carpeta();
+    let (mut s, _) = Sesion::abre(Arranque {
+        datos: d.join("datos"),
+        descargas: d.join("descargas"),
+        idioma_sistema: "es".into(),
+        version: "0.1.0".into(),
+        reloj: reloj_movil,
+    });
+    let vpn = |o: &[Orden]| del_tipo(o, Origen::Barra, "vpn").unwrap_or_default();
+    let url = format!("http://127.0.0.1:7443/?t={}", "9".repeat(64));
+    let _ = s.abre_programa(&url);
+    let panel = s
+        .pestanas
+        .iter()
+        .find(|p| p.url == url)
+        .map(|p| p.id)
+        .unwrap_or_default();
+    // The reading this browser asked the panel's tab for itself: its number.
+    let lectura = |o: &[Orden]| -> Option<u64> {
+        o.iter().find_map(|x| match x {
+            Orden::EnviaAPagina {
+                id, prefijo, json, ..
+            } if *id == panel && *prefijo == PANEL_LOCAL => {
+                let v: Value = serde_json::from_str(json).ok()?;
+                (v["tipo"] == "zg_panel_pide"
+                    && v["para"] == 0
+                    && v["metodo"] == "GET"
+                    && v["ruta"] == "/api/vpn")
+                    .then(|| v["n"].as_u64())
+                    .flatten()
+            }
+            _ => None,
+        })
+    };
+    let responde = |s: &mut Sesion, n: u64, datos: Value| -> Vec<Orden> {
+        let m = json!({ "tipo": "zg_panel_datos", "para": 0, "n": n, "estado": 200, "datos": datos.to_string() });
+        s.mensaje(Origen::Pestana(panel), &url, &m.to_string())
+    };
+    let n = lectura(&s.tic()).unwrap_or_default();
+    let v = vpn(&responde(
+        &mut s,
+        n,
+        json!({ "fase": "conectada", "estricto": true }),
+    ));
+    assert_eq!(
+        (v["fase"].as_str(), v["estricto"].as_bool()),
+        (Some("conectada"), Some(true))
+    );
+    assert_eq!(s.marco(), (0, 0));
+    // The server stops answering: the tunnel closes, the block stays, and «Desconectar» comes over everything.
+    pasa(3_500);
+    let n = lectura(&s.tic()).unwrap_or_default();
+    let o = responde(
+        &mut s,
+        n,
+        json!({ "fase": "reconectando", "estricto": true, "bloqueado": true }),
+    );
+    let v = vpn(&o);
+    assert_eq!(
+        (v["fase"].as_str(), v["estricto"].as_bool()),
+        (Some("reconectando"), Some(true))
+    );
+    assert_eq!(s.marco(), (ALTO_ARRIBA, 0));
+    // Still on: read again every few seconds; strict mode turned off in the meantime is told to the bar.
+    pasa(3_500);
+    let n = lectura(&s.tic()).unwrap_or_default();
+    assert!(n > 0);
+    let o = responde(
+        &mut s,
+        n,
+        json!({ "fase": "reconectando", "estricto": false }),
+    );
+    assert_eq!(vpn(&o)["estricto"], false);
+    // The same again: nothing to tell.
+    pasa(3_500);
+    let n = lectura(&s.tic()).unwrap_or_default();
+    assert!(responde(
+        &mut s,
+        n,
+        json!({ "fase": "reconectando", "estricto": false })
+    )
+    .is_empty());
 }
 
 /// A measure, not a check (1.0.55, «más rápido»): how long the session takes to decide one request, over a page's

@@ -13,8 +13,9 @@
   leaves it for the panel). Until 28 Sep 2026 that step was a button in the panel,
   and a person who installed and did not find the button saw an empty panel and
   concluded the program did not work. On uninstall: the service is
-  stopped, then Home Mode is closed (firewall rule removed) and the DNS is
-  restored exactly as it was, then the service is deleted and the files removed.
+  stopped, then the VPN's strict-mode block is taken out of Windows, Home Mode is
+  closed (firewall rule removed) and the DNS is restored exactly as it was, then
+  the service is deleted and the files removed.
   The extract in ProgramData\Guardiana stays: it belongs to the user.
   UpgradeCode never changes between versions (it is what makes upgrades replace
   the previous version instead of installing twice).
@@ -174,12 +175,27 @@
     <Feature Id="Vpn" Title="VPN (WireGuardNT)" Level="1">
       <ComponentRef Id="WgDll" />
       <ComponentRef Id="WgLicencia" />
+      <ComponentRef Id="ApagarVpnShortcut" />
     </Feature>
     <Component Id="WgDll" Directory="INSTALLFOLDER" Guid="7c3e9b52-4a61-4f08-9d2e-5b8a1c6f0d37">
       <File Id="WgDllFile" Name="wireguard.dll" Source="$(var.WgDll)" KeyPath="yes" />
     </Component>
     <Component Id="WgLicencia" Directory="INSTALLFOLDER" Guid="a92f4d16-0b7c-4e35-8f61-2d9c7b3e5a48">
       <File Id="WgLicenciaFile" Name="LICENCIA-WIREGUARD-NT.txt" Source="$(var.WgLicencia)" KeyPath="yes" />
+    </Component>
+    <!-- 3 Nov 2026, the VPN's strict mode (ronda 91; docs/VPN.md, «Modo estricto»): its block lives in Windows apart from
+         the service, so it holds when the service stops. The way out with the service stopped, from the Start menu:
+         `guardiana vpn apaga` (with its Start menu switch) turns the VPN off and takes the block out of Windows; without
+         an administrator's rights it asks Windows for them itself, and its window waits for Enter. -->
+    <Component Id="ApagarVpnShortcut" Directory="MenuDir" Guid="81b90423-e9cf-4ee0-8d7a-f11f447efed1">
+      <Shortcut Id="ApagarVpn"
+                Name="!(loc.ApagarVpn)"
+                Description="!(loc.ApagarVpn)"
+                Target="[INSTALLFOLDER]guardiana.exe"
+                Arguments="vpn apaga --menu"
+                Icon="guardiana.ico"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\Guardiana" Name="apagar-vpn" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 <?endif?>
 <?ifdef ZeroExe ?>
@@ -345,6 +361,17 @@
                   Execute="deferred"
                   Impersonate="no"
                   Return="ignore" />
+    <!-- 3 Nov 2026, the VPN's strict mode (ronda 91): its block is persistent in Windows' filtering platform, with
+         boot-time filters too, and it is the VPN's, not the service's: stopping the service (the step before) leaves it
+         on purpose, as an update must. Uninstalling takes it away, with what was kept of the VPN (sistema/vpn.json).
+         Not on upgrade or repair, as the steps around it. -->
+    <SetProperty Id="VpnApaga" Value="&quot;[INSTALLFOLDER]guardiana.exe&quot; vpn apaga --desinstalando" Before="VpnApaga" Sequence="execute" />
+    <CustomAction Id="VpnApaga"
+                  DllEntry="WixQuietExec"
+                  BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
     <SetProperty Id="RestoreDns" Value="&quot;[INSTALLFOLDER]guardiana.exe&quot; dns --restore --desinstalando" Before="RestoreDns" Sequence="execute" />
     <CustomAction Id="RestoreDns"
                   DllEntry="WixQuietExec"
@@ -395,6 +422,7 @@
 <?endif ?>
       <ProgressText Action="CrearVigilante" Message="!(loc.ProgresoVigilante)" />
       <ProgressText Action="ApplyDns" Message="!(loc.ProgresoDns)" />
+      <ProgressText Action="VpnApaga" Message="!(loc.ProgresoApagarVpn)" />
       <ProgressText Action="HomeOff" Message="!(loc.ProgresoHogar)" />
       <ProgressText Action="RestoreDns" Message="!(loc.ProgresoDevolverDns)" />
       <ProgressText Action="QuitarVigilante" Message="!(loc.ProgresoQuitarVigilante)" />
@@ -409,7 +437,8 @@
       <Custom Action="CrearVigilante" After="InstallFiles" Condition="NOT REMOVE~=&quot;ALL&quot;" />
       <Custom Action="QuitarVigilante" After="RestoreDns" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND NOT REINSTALL" />
       <Custom Action="ApplyDns" After="StartServices" Condition="VIGILAR=&quot;1&quot; AND NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE" />
-      <Custom Action="HomeOff" After="StopServices" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND NOT REINSTALL" />
+      <Custom Action="VpnApaga" After="StopServices" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND NOT REINSTALL" />
+      <Custom Action="HomeOff" After="VpnApaga" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND NOT REINSTALL" />
       <Custom Action="RestoreDns" After="HomeOff" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND NOT REINSTALL" />
     </InstallExecuteSequence>
   </Package>

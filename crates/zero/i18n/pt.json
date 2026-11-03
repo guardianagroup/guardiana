@@ -1359,6 +1359,8 @@
   "vpn_espera_conectar": "Ainda conectando: tente de novo em alguns segundos",
   "vpn_no_desconecta": "Não foi possível desconectar: tente de novo",
   "vpn_sin_panel": "A GUARDIANA não responde neste computador: não dá para desconectar daqui",
+  "vpn_reconectando": "VPN: não conecta",
+  "vpn_estricto_no_conecta": "A VPN não conecta: nada sai até ela voltar ou você desligá-la. «Desconectar» a desliga e volta à sua conexão normal.",
   "z1_franja_titulo": "Abrir o escudo deste site",
   "z1_escudo_web": "Escudo deste site",
   "z1_plegar": "Recolher",

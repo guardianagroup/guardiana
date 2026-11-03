@@ -60,8 +60,9 @@ adaptador, que es el servicio, `PsGetCurrentProcess` en el `Up` de su controlado
 que el Modo Hogar sirve a la casa (el DNS en el 53, UDP y TCP; el panel en el 7443 y la página de comprobación en el 80),
 solo de entrada y solo al servicio; el propio equipo (bucle local, donde vive el DNS de la casa), DHCP y el
 descubrimiento de vecinos de IPv6, y las máquinas virtuales de Hyper-V entre sí. Bloqueado: el DNS fuera del túnel, a
-quien sea, y todo lo demás. En una sesión dinámica: si el servicio se para, Windows quita los filtros (y el adaptador del
-túnel desaparece con él).
+quien sea, y todo lo demás. Sin el modo estricto, en una sesión dinámica: si el servicio se para, Windows quita los
+filtros (y el adaptador del túnel desaparece con él). Con el modo estricto (más abajo, encendido salvo que la persona lo
+apague), el mismo plan vive en Windows aparte del servicio y sigue cuando el servicio no está.
 
 Lo que cambió en la 1.0.55 (tercera revisión, 2 nov 2026), y por qué:
 
@@ -135,15 +136,16 @@ Hecho y probado en un Windows real (la integración continua de GitHub, como adm
   conexión (nada une dos sesiones), el alta por HTTPS a un nombre de guardianagroup.com (sin seguir redirecciones), la
   respuesta comprobada, el nombre del servidor resuelto antes de abrir el túnel (con el corte puesto ya no se resuelve
   nada fuera), el túnel abierto por la mitad del sistema y el primer saludo del servidor esperado 8 segundos: si no
-  llega, el túnel se cierra (y el corte con él) y se dice «el servidor no contesta», para no dejar el equipo sin
-  internet. Las pruebas hacen el alta por la red de verdad contra un servidor local y comprueban que los dos lados
+  llega, el túnel se cierra y se dice «el servidor no contesta». Sin el modo estricto, el corte se va con él (lo que la
+  ronda 91 llamó «se suelta a los 8 s»); con el modo estricto, el bloqueo sigue y se vuelve a intentar (más abajo). Las
+  pruebas hacen el alta por la red de verdad contra un servidor local y comprueban que los dos lados
   llegan a la misma llave postcuántica.
 - `crates/apps/src/tunel_win.rs::conecta`: lo mismo con el túnel de Windows (todo dentro y el corte puesto).
 - `crates/panel/src/vpn.rs`: el estado y los botones en el panel del servicio. `GET /api/vpn` (en qué está, a qué
   servidor, desde cuándo, la dirección del túnel, los bytes y el último saludo, o por qué no está disponible: fuera de
   Windows, o sin `wireguard.dll` junto al programa), `POST /api/vpn/conecta` con `{"servidor": "…guardianagroup.com"}`
-  (empieza; la página pregunta cómo va) y `POST /api/vpn/desconecta`. Nada se guarda: al parar el servicio, el túnel
-  se cierra con él. La VPN es la del proceso, no la de cada vuelta del motor (1.0.54): el motor rehace el panel
+  (empieza; la página pregunta cómo va) y `POST /api/vpn/desconecta`. Sin el modo estricto nada se guarda: al parar el
+  servicio, el túnel se cierra con él (el modo estricto, más abajo). La VPN es la del proceso, no la de cada vuelta del motor (1.0.54): el motor rehace el panel
   cuando cambia la red, y hasta la 1.0.54 eso dejaba el túnel huérfano y la página en «apagada».
 - El DNS con la VPN puesta (1.0.54, segunda revisión del 2 nov 2026): el servicio era el único programa que el corte
   dejaba salir (hasta la 1.0.55, a cualquier sitio), y el DNS de GUARDIANA (127.0.0.1) reenviaba al router, fuera del
@@ -178,6 +180,107 @@ Hecho y probado en un Windows real (la integración continua de GitHub, como adm
   WireGuard del núcleo en un espacio de red, el lado del equipo (`crates/tunel/examples/alta_prueba.rs`) en otro, el
   alta postcuántica por la red y tráfico de verdad por el túnel (solo pasa si los dos lados sacaron la misma llave).
 
+## El modo estricto (ronda 91, 3 nov 2026)
+
+> «Que la página web no lo pueda detectar… No se puede caer entre medias… Ahí tenemos que ser impecables.» (decisión de la
+> agencia en la ronda 91, la prioridad número uno del dueño; `herramientas/agencia-rondas/ronda91/decisiones.md`, §1 y
+> §6.1, en el repositorio de la web)
+
+Encendido salvo que la persona lo apague (un interruptor, «Modo estricto», en la página de la VPN de Órbita). Mientras la
+VPN debe estar encendida, nada sale del equipo fuera del túnel, también cuando GUARDIANA no está:
+
+- **El bloqueo vive en Windows, aparte del servicio.** `crates/tunel/src/corte.rs` (`estricto`) parte el plan de siempre
+  por lo que debe durar cada filtro, y `crates/apps/src/corte_vpn.rs` (`pon_estricto`) lo pone desde una sesión que no es
+  dinámica: **filtros persistentes** (`FWPM_FILTER_FLAG_PERSISTENT`: siguen si el servicio se cae o lo matan, durante una
+  actualización, al reiniciar el servicio de filtrado de Windows y el equipo) bajo un proveedor y una subcapa
+  persistentes; y los bloqueos, con lo que mantiene viva la red de debajo, otra vez como **filtros de arranque**
+  (`FWPM_FILTER_FLAG_BOOTTIME`: desde que arranca el equipo hasta que el servicio de filtrado carga los persistentes;
+  Microsoft no deja que un filtro sea las dos cosas). Windows los acepta en la subcapa propia (prueba real en `vpn.yml`,
+  3 nov 2026: 24 persistentes y 15 de arranque con solo los permisos; 36 y 27 con el bloqueo entero); si no los aceptara
+  allí, irían a su subcapa universal. Cada conjunto se cambia en una transacción, que quita el de antes y pone el nuevo:
+  nunca hay un momento sin bloqueo.
+- **Lo que dura lo que el túnel**: el permiso de la interfaz del túnel va a la misma subcapa desde una sesión dinámica del
+  servicio (`PermisoTunel`), así que se va con el adaptador, que se va con el proceso. Con el túnel abierto, el modo
+  estricto decide lo mismo que el corte de siempre, más un permiso: el alta nueva del servicio con su servidor (TCP a su
+  HTTPS, solo de salida, no firme), porque con el túnel caído no hay otro camino hasta él (la prueba
+  `el_modo_estricto_conectado_decide_como_el_corte_de_siempre`).
+- **Claves fijas**, para que el servicio, `guardiana vpn apaga` y el desinstalador encuentren y quiten siempre lo suyo, lo
+  pusiera la versión que lo pusiera (`crates/tunel/src/estricto.rs`, `claves`): el proveedor
+  `36694406-4925-4a21-9e16-0031b0e144b5` («GUARDIANA — VPN, modo estricto»), la subcapa
+  `50573eae-5843-4fc2-aefc-12aeda4a7908` (peso 0xFFFF), los filtros persistentes `329dccb1-2e23-4244-bf84-61d4a4b7xxxx`
+  y los de arranque `53fb6f77-c067-462b-9aca-6a6337d8xxxx`, donde `xxxx` es su sitio en el plan (hasta 64; quitar prueba
+  las 64). El proveedor nombra el servicio `guardiana`: al arrancar, Windows solo carga sus filtros persistentes mientras
+  ese servicio exista y arranque con el equipo, así que una desinstalación que no pudiera quitarlos no deja nada en vigor
+  tras el siguiente reinicio.
+- **Lo que la persona quiere, guardado**: `sistema/vpn.json` en la carpeta de datos (solo el sistema y los
+  administradores escriben ahí): el modo estricto, si la VPN está encendida, su servidor y las direcciones del servidor
+  (con el bloqueo puesto no se resuelve ningún nombre fuera del túnel, así que el alta nueva va a la dirección que ya se
+  sabe; su certificado se sigue comprobando con su nombre). Ni llaves ni a dónde se va. Sin el modo estricto no se guarda
+  la VPN encendida: acaba con el servicio, como siempre.
+- **Al arrancar, el servicio reconcilia** (`estricto::al_arrancar`, lo primero de `engine::run`): si la VPN debe seguir
+  encendida en el modo estricto, el bloqueo vuelve a ponerse en el acto (con el archivo del programa como esté, también
+  tras una actualización) y el túnel se levanta otra vez; si ya no se quiere, lo que quedó en Windows se quita. Así pasan
+  el fallo y el reinicio del servicio, la actualización (que para el servicio, lo cambia y lo arranca) y el reinicio del
+  equipo, hasta que el servicio levanta el túnel. Al parar, el servicio cierra el túnel y deja el bloqueo.
+- **Sin vuelta a la conexión normal.** Si el servidor no contesta al primer saludo (los 8 s de siempre), el túnel se
+  cierra, el bloqueo sigue y se vuelve a intentar (alta nueva, túnel nuevo: a los 5 s, a los 15 y luego cada 30); si deja
+  de contestar con el túnel abierto (200 s sin saludo), igual. Si el primer alta no contesta, el bloqueo se pone ya con lo
+  que se sabe del servidor. La página dice «reconectando» y el aviso: «La VPN no conecta: no sale nada hasta que vuelva o
+  la apagues tú». Tras un reposo del equipo, el servidor tiene su margen entero otra vez antes de darlo por caído.
+  Cambiar de servidor (`POST /api/vpn/conecta` con otro) mantiene el bloqueo todo el rato; con el túnel caído, el nombre
+  del servidor nuevo no resuelve y se sigue con el de antes.
+- **El DNS y el IPv6**, como siempre: cada salida con su resolutor (Unbound en `10.66.0.1`, por el túnel), ningún DNS
+  fuera del túnel, nada de IPv6 fuera de él salvo lo del enlace.
+- **La licencia**: conectar sigue siendo de Plus; la VPN que el servicio levanta al arrancar es la que la persona ya tenía
+  encendida, y sigue hasta que la apague (como seguía hasta ahora una conexión hecha en la prueba).
+
+Las salidas, siempre (tan importantes como el bloqueo):
+
+1. **«Desconectar»** (el botón de Órbita, el chip de la barra de ZERO, `POST /api/vpn/desconecta`), en cualquier fase,
+   también conectando o reconectando: la VPN apagada en lo guardado (primero, para que el próximo arranque quite lo que
+   quede si algo falla), el túnel cerrado y todo lo del modo estricto fuera de Windows. Con el candado de los cambios y la
+   generación: una conexión a medias nunca vuelve a poner el bloqueo después.
+2. **`guardiana vpn apaga`**, también con el servicio parado: le pide al servicio que desconecte (con la llave del panel) y,
+   siempre, lo quita directamente por sus claves fijas y deja la VPN apagada en lo guardado. Necesita administrador; **la
+   entrada «Apagar la VPN de GUARDIANA» del menú Inicio** lo ejecuta y, sin permisos, se los pide a Windows ella misma.
+   `guardiana vpn estado [--json]` dice lo guardado y lo que Windows tiene.
+3. **El arranque del servicio**, cuando el modo estricto ya no se quiere (lo apagaron, o la VPN quedó apagada): quita lo
+   que quedó.
+4. **El interruptor**: apagar el modo estricto con el servidor sin contestar es volver a la conexión normal, como haría la
+   VPN sin él; con el túnel abierto, el cambio no deja ni un momento sin corte (primero el corte nuevo, luego se va el
+   viejo).
+5. **La desinstalación**: el instalador ejecuta `guardiana vpn apaga --desinstalando` después de parar el servicio (no al
+   actualizar ni al reparar), y `guardiana service uninstall` lo hace también. Si algo fallara, el proveedor nombra el
+   servicio: sin él, Windows no carga los filtros persistentes en el siguiente arranque.
+
+**El Modo Hogar con el modo estricto.** Sin excepción de red local de salida (TunnelVision, CVE-2024-3661, y TunnelCrack):
+de lo que sale fuera del túnel, solo el servicio hacia su servidor, la petición de DHCP a la difusión, DHCPv6 a sus
+direcciones de multidifusión y el descubrimiento de vecinos; la casa, y una «red local» que un DHCP ajeno anuncie sobre
+direcciones públicas, se cortan como cualquier sitio (la prueba `sin_excepcion_de_la_red_local`). Los permisos de entrada
+del Modo Hogar (53 UDP y TCP, 7443 y 80 TCP, solo al servicio, solo de entrada) **se quedan**: contestan a los
+dispositivos de la casa en la conexión que cada uno abre (Windows autoriza la conexión al aceptarla y sus respuestas
+viajan en ella; el servicio no puede abrir ninguna hacia la casa) y no llevan fuera nada del tráfico de este equipo; lo
+que esos dispositivos preguntan al DNS de GUARDIANA sale por el túnel, al resolutor del túnel, como lo de este equipo, y
+con el túnel caído no sale. La regla del Modo Hogar en el cortafuegos de Windows (solo la red local, solo en una red
+privada) sigue decidiendo después, porque estos permisos no son firmes. Quitarlos dejaría a la casa sin DNS mientras la
+VPN está puesta, sin ganar nada contra una fuga.
+
+Pruebas: las del plan y de lo guardado, en los tres sistemas (`corte.rs`, `estricto.rs`); las reales en Windows, como
+administrador (`.github/workflows/vpn.yml`): que Windows acepta cada filtro persistente y de arranque con sus claves, que
+volver a ponerlos no los duplica, que el permiso del túnel va en la misma subcapa y que quitar lo quita todo
+(`corte_vpn`); con un servidor que no contesta (192.0.2.1, una dirección de documentación), que nada sale ni con el túnel
+puesto ni al cerrarse, y que al quitar el bloqueo la red vuelve (`tunel_win`); y el trabajo «estricto», con el servicio de
+verdad: el bloqueo al arrancar, nada por la tarjeta (WSAEACCES), «reconectando» con el aviso en `GET /api/vpn`, el bloqueo
+que sigue con el servicio muerto y con el servicio parado, «Desconectar» que lo quita todo y devuelve la red, el arranque
+que quita lo que quedó con el modo estricto apagado, y `guardiana vpn apaga` con el servicio parado. Lo que la integración
+continua no puede probar: el efecto de los filtros de arranque en un reinicio de verdad, ni el instalador entero.
+
+La API (para la web): `GET /api/vpn` añade `"estricto"` (bool, el interruptor), `"bloqueado"` (bool, el bloqueo está en
+Windows), `"aviso"` (el aviso en el idioma de la persona, o vacío), `"estricto_titulo"` y `"estricto_linea"` (el nombre
+del interruptor y su línea, en su idioma), y la fase `"reconectando"`. `POST /api/vpn/estricto` con
+`{"activo": true|false}` (o sin cuerpo: lo contrario de lo que está) contesta `{"ok": true, "estricto": bool}` o
+`{"ok": false, "motivo": "…"}`; no es de Plus, y por ZERO solo tras un clic de verdad, como `conecta`.
+
 Pendiente, en este orden:
 
 1. La pantalla de la VPN en la web del programa (Órbita), con la lista de servidores cuando existan.
@@ -189,10 +292,10 @@ Pendiente, en este orden:
    instalado.
 3. Los servidores, dentro del sello (con la llave del dueño). La primera conexión de verdad ya está hecha (3 nov 2026,
    «de verdad» en `.github/workflows/vpn.yml`, más arriba).
-4. La reconexión automática (quitada en la 1.0.54): el permiso del servicio ya es solo hacia el servidor (1.0.55); falta
-   que el alta nueva salga por una ruta /32 al servidor (o un conector atado a la tarjeta), y entonces el corte tendrá
-   que dejar al servicio también el TCP 443 a esa dirección, que hoy no deja (solo el UDP del túnel).
-   `Tunel::renueva` rechaza otra dirección o puerto del servidor mientras el corte está puesto.
+4. ~~La reconexión automática~~ Hecha en el modo estricto (ronda 91, 3 nov 2026, más arriba): el túnel caído se cierra,
+   el bloqueo sigue, y el alta nueva sale por la tarjeta al TCP 443 del servidor, el único permiso que el bloqueo añade
+   para el servicio; luego, túnel nuevo. Sin el modo estricto sigue sin reconexión automática. `Tunel::renueva` (alta
+   nueva sin cerrar el túnel) sigue sin usarse.
 
 Decisiones tomadas en la ronda 88 (1 nov 2026): incluida en la licencia de GUARDIANA, sin cuenta aparte; servidores de la fase 1, los de Hetzner (Helsinki, Núremberg); contra el abuso sin guardar nada (puerto 25 cerrado, topes de altas y de conexiones nuevas, pares sin uso se quitan).
 
@@ -235,6 +338,12 @@ Decisiones tomadas en la ronda 88 (1 nov 2026): incluida en la licencia de GUARD
 - **La VPN no mueve el Modo Hogar** (1.0.55): sigue en la dirección de la red de casa, la de antes del túnel, nunca en la
   del túnel.
 - **Una conexión no sobrevive a un cierre** (1.0.55): la que termina de abrirse después se cierra en el acto.
+- **Con el modo estricto, el bloqueo es de la VPN, no del servicio** (ronda 91): persistente y de arranque, se queda
+  cuando el servicio se cae, se para o el equipo se reinicia, y solo lo quita apagar la VPN.
+- **Siempre hay una salida** (ronda 91): «Desconectar» en cualquier fase, `guardiana vpn apaga` con el servicio parado (y
+  su entrada en el menú Inicio), el arranque del servicio cuando ya no se quiere y la desinstalación.
+- **Sin excepción de red local de salida en el modo estricto** (ronda 91): el Modo Hogar contesta a la casa por las
+  conexiones que la casa abre, y nada más.
 
 ## Decisiones (ronda 88, 1 nov 2026, con el encargo del dueño)
 

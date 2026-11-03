@@ -30,6 +30,8 @@ on:
       - 'crates/apps/src/cortafuegos.rs'
       - 'crates/apps/src/cortafuegos/**'
       - 'crates/panel/src/antivirus.rs'
+      - 'crates/panel/src/vpn.rs'
+      - 'crates/cli/src/vpn_cmd.rs'
       - 'crates/apps/Cargo.toml'
       - '.github/workflows/vpn.yml'
   workflow_dispatch:
@@ -79,7 +81,9 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          cargo test -p guardiana-apps --locked -- --ignored --nocapture wireguard_nt corte_vpn red_vpn tunel_win 2>&1 | tee "$RUNNER_TEMP/test.log" && exit 0
+          # one at a time: the tunnel's resolver and strict mode's objects in Windows are the whole process's and the
+          # whole computer's
+          cargo test -p guardiana-apps --locked -- --ignored --nocapture --test-threads=1 wireguard_nt corte_vpn red_vpn tunel_win 2>&1 | tee "$RUNNER_TEMP/test.log" && exit 0
           grep -E "^test .* FAILED$|panicked at|^---- " "$RUNNER_TEMP/test.log" | head -20 | while IFS= read -r l; do echo "::error title=adaptador::$l"; done
           grep -A12 "panicked at" "$RUNNER_TEMP/test.log" | head -40 | sed -e 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}' | sed 's/^/::error title=detalle::/'; echo
           exit 1
@@ -106,6 +110,157 @@ jobs:
           grep -E "^test .* FAILED$|panicked at|^---- " "$RUNNER_TEMP/test.log" | head -20 | while IFS= read -r l; do echo "::error title=cortes::$l"; done
           grep -A12 "panicked at" "$RUNNER_TEMP/test.log" | head -40 | sed -e 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}' | sed 's/^/::error title=detalle::/'; echo
           exit 1
+
+  # Strict mode (ronda 91; docs/VPN.md, «Modo estricto»), with GUARDIANA's real service on this runner, as an
+  # administrator, and a server that never answers (192.0.2.1, a documentation address: a black hole). What is kept says
+  # the VPN is on in strict mode; the service, at its start, puts the block and keeps trying. Then: nothing leaves by
+  # the network card (Windows refuses a TCP connection, WSAEACCES) and the panel says «reconectando» with the notice;
+  # the service killed, and then stopped as an update stops it: the block stays (persistent filters, outliving the
+  # process); «Desconectar» (POST /api/vpn/desconecta) takes it all away and the network is back; a block left with
+  # strict mode off in what is kept is removed by the service's start; and `guardiana vpn apaga`, with the service
+  # stopped, removes it too. The runner's network is cut for those moments (its link with GitHub may pause), and
+  # whatever happens, the last step takes the block and the service away.
+  estricto:
+    name: el modo estricto con el servicio de verdad y un servidor que no contesta
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: wireguard.dll firmada por WireGuard LLC
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'wireguard-nt.zip'
+          $dir = Join-Path $env:RUNNER_TEMP 'wireguard-nt'
+          Invoke-WebRequest -Uri 'https://download.wireguard.com/wireguard-nt/wireguard-nt-1.1.zip' -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          $dll = Get-ChildItem -Path $dir -Recurse -Filter wireguard.dll | Where-Object { $_.FullName -match '\\amd64\\' } | Select-Object -First 1
+          if (-not $dll) { Write-Output '::error title=wireguard.dll::no está en el .zip (bin\amd64)'; exit 1 }
+          $huella = (Get-FileHash -Path $dll.FullName -Algorithm SHA256).Hash
+          $firma = Get-AuthenticodeSignature -FilePath $dll.FullName
+          $quien = if ($firma.SignerCertificate) { $firma.SignerCertificate.Subject } else { '' }
+          if ($huella -ne 'B1B85E072C45D81358BE29D94C599DC76652F912BE8C0F0A41E2D5D89A6461D3' -or $firma.Status -ne 'Valid' -or $quien -notmatch 'WireGuard LLC') {
+            Write-Output "::error title=wireguard.dll::otra compilación o firma no válida ($huella, $($firma.Status), $quien)"
+            exit 1
+          }
+          "GUARDIANA_WG_DLL=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      # Built before anything is cut.
+      - name: compilar guardiana.exe
+        run: cargo build -p guardiana-cli --locked
+      - name: el servicio, su bloqueo y sus salidas
+        timeout-minutes: 20
+        shell: pwsh
+        run: |
+          $g = Join-Path $env:GITHUB_WORKSPACE 'target\debug\guardiana.exe'
+          Copy-Item $env:GUARDIANA_WG_DLL (Join-Path (Split-Path $g) 'wireguard.dll') -Force
+          $datos = Join-Path $env:ProgramData 'Guardiana'
+          $deseo = Join-Path $datos 'sistema\vpn.json'
+          $fallos = New-Object System.Collections.Generic.List[string]
+          $inicio = Get-Date
+          function Linea($t) { Write-Output ("[{0,6:N1} s] {1}" -f ((Get-Date) - $inicio).TotalSeconds, $t) }
+          function Bien($ok, $que) { if ($ok) { Linea "BIEN $que" } else { Linea "MAL  $que"; $fallos.Add($que) } }
+          function Estado { & $g vpn estado --json | Out-String | ConvertFrom-Json }
+          # a TCP connection to the internet: «conecta», «cortada» (Windows refused it: WSAEACCES, the filter) or what failed
+          function Fuera {
+            $c = New-Object System.Net.Sockets.TcpClient
+            try {
+              $t = $c.ConnectAsync('1.1.1.1', 443)
+              if ($t.Wait(5000) -and $c.Connected) { 'conecta' } else { 'sin respuesta' }
+            } catch {
+              $e = $_.Exception
+              while ($e.InnerException) { $e = $e.InnerException }
+              if ($e -is [System.Net.Sockets.SocketException] -and $e.ErrorCode -eq 10013) { 'cortada' } else { $e.Message }
+            } finally { $c.Dispose() }
+          }
+          function Espera($segundos, [scriptblock]$si) {
+            $hasta = (Get-Date).AddSeconds($segundos)
+            while ((Get-Date) -lt $hasta) { if (& $si) { return $true }; Start-Sleep -Milliseconds 500 }
+            return $false
+          }
+          function Panel($metodo, $ruta) {
+            $llave = (Get-Content (Join-Path $datos 'panel.token') -Raw).Trim()
+            Invoke-RestMethod -Method $metodo -Uri "http://127.0.0.1:7443$ruta" -Headers @{ 'X-Guardiana-Token' = $llave; 'X-Guardiana-Lang' = 'es' } -TimeoutSec 60
+          }
+          function Pon($estricto, $encendida) {
+            New-Item -ItemType Directory -Force -Path (Split-Path $deseo) | Out-Null
+            [ordered]@{ estricto = $estricto; encendida = $encendida; servidor = 'prueba.guardianagroup.com'; alta = '192.0.2.1:443'; punto = 'prueba.guardianagroup.com'; extremo = '192.0.2.1:51820' } | ConvertTo-Json | Set-Content -Path $deseo -Encoding utf8
+          }
+          function Para { & $g service stop | Out-Null; Espera 60 { (Get-Service guardiana).Status -eq 'Stopped' } }
+          function Arranca { & $g service start | Out-Null; Espera 60 { (Get-Service guardiana).Status -eq 'Running' } }
+          function Bloqueado { $e = Estado; $e.persistentes -gt 0 }
+          function Limpio { $e = Estado; $e.persistentes -eq 0 -and $e.arranque -eq 0 -and -not $e.objetos }
+          try {
+            Bien ((Fuera) -eq 'conecta') 'antes, la red sale'
+            # 1. the VPN on in strict mode, with a server that never answers: the service's start puts the block
+            Pon $true $true
+            & $g service install | Out-Null
+            Bien (Espera 60 { Bloqueado }) 'al arrancar, el servicio pone el bloqueo del modo estricto'
+            Linea "estado: $(Estado | ConvertTo-Json -Compress)"
+            Bien ((Estado).arranque -gt 0) 'con sus filtros de arranque'
+            Bien ((Fuera) -eq 'cortada') 'con el servidor sin contestar, nada sale por la tarjeta (WSAEACCES)'
+            Bien (Espera 90 { try { (Panel 'GET' '/api/vpn').fase -eq 'reconectando' } catch { $false } }) 'el panel dice «reconectando»'
+            $v = Panel 'GET' '/api/vpn'
+            Linea "GET /api/vpn: $($v | ConvertTo-Json -Compress)"
+            Bien ($v.estricto -eq $true -and $v.bloqueado -eq $true -and "$($v.aviso)".StartsWith('La VPN no conecta')) 'con el modo estricto, el bloqueo y el aviso'
+            # 2. the service killed: the block stays, and Windows starts it again
+            $proceso = (Get-CimInstance Win32_Service -Filter "Name='guardiana'").ProcessId
+            Stop-Process -Id $proceso -Force
+            Start-Sleep -Seconds 2
+            Bien (Bloqueado) 'el servicio muerto: el bloqueo sigue'
+            Bien ((Fuera) -eq 'cortada') 'el servicio muerto: nada sale'
+            Bien (Espera 90 { (Get-Service guardiana).Status -eq 'Running' }) 'Windows vuelve a arrancar el servicio'
+            # 3. stopped, as an update stops it: the block stays
+            Bien (Para) 'parado'
+            Bien (Bloqueado) 'parado (una actualización): el bloqueo sigue'
+            Bien ((Fuera) -eq 'cortada') 'parado: nada sale'
+            # 4. «Desconectar»: everything goes, the normal connection is back
+            Bien (Arranca) 'arrancado otra vez'
+            Bien (Espera 60 { try { $null -ne (Panel 'GET' '/api/vpn').fase } catch { $false } }) 'el panel contesta'
+            $r = Panel 'POST' '/api/vpn/desconecta'
+            Bien ($r.ok -eq $true) "Desconectar: $($r | ConvertTo-Json -Compress)"
+            Bien (Limpio) 'Desconectar quita el bloqueo entero'
+            Bien (-not (Estado).encendida) 'y la VPN queda apagada en lo guardado'
+            Bien (Espera 30 { (Fuera) -eq 'conecta' }) 'tras Desconectar, la red sale otra vez'
+            # 5. a block left behind and strict mode off in what is kept: the service's start removes it
+            Pon $true $true
+            Bien ((Para) -and (Arranca) -and (Espera 60 { Bloqueado })) 'otra vez el bloqueo'
+            Bien ((Para) -and (Bloqueado)) 'con el servicio parado, el bloqueo queda'
+            Pon $false $true
+            Bien (Arranca) 'arrancado con el modo estricto apagado'
+            Bien (Espera 60 { Limpio }) 'al arrancar, el servicio quita lo que quedó del modo estricto'
+            Bien (Espera 30 { (Fuera) -eq 'conecta' }) 'y la red sale'
+            # 6. `guardiana vpn apaga` with the service stopped
+            Pon $true $true
+            Bien ((Para) -and (Arranca) -and (Espera 60 { Bloqueado })) 'otra vez el bloqueo'
+            Bien ((Para) -and (Bloqueado)) 'con el servicio parado, el bloqueo queda'
+            & $g vpn apaga
+            Bien ($LASTEXITCODE -eq 0) 'guardiana vpn apaga termina bien'
+            Bien (Limpio) 'guardiana vpn apaga, con el servicio parado, lo quita todo'
+            Bien (-not (Estado).encendida) 'y deja la VPN apagada en lo guardado'
+            Bien (Espera 30 { (Fuera) -eq 'conecta' }) 'y la red sale'
+          } finally {
+            & $g vpn apaga | Out-Null
+            & $g service uninstall | Out-Null
+          }
+          if ($fallos.Count -gt 0) {
+            foreach ($f in $fallos) { Write-Output "::error title=modo estricto::$f" }
+            exit 1
+          }
+          Write-Output "::notice title=modo estricto::todas las comprobaciones, bien"
+      - name: lo que quede, fuera (siempre)
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $g = Join-Path $env:GITHUB_WORKSPACE 'target\debug\guardiana.exe'
+          if (Test-Path $g) {
+            & $g vpn apaga
+            & $g service uninstall
+            & $g vpn estado --json
+          }
 
   extremo:
     name: la VPN de extremo a extremo en Linux (alta postcuántica y túnel de verdad)

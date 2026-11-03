@@ -462,6 +462,10 @@ mod tests {
     #[test]
     #[ignore = "necesita Windows como administrador y wireguard.dll en GUARDIANA_WG_DLL"]
     fn el_tunel_entero_sin_tocar_la_red_del_equipo() {
+        // one tunnel at a time: the tunnel's resolver is the whole process's (strict mode's test puts it too)
+        let _uno = crate::corte_vpn::EN_PRUEBA
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let ruta = std::env::var_os("GUARDIANA_WG_DLL").unwrap();
         let llaves = Llaves::nuevas().unwrap();
         let alta = Alta {
