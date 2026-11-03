@@ -1176,6 +1176,22 @@ mod en_windows {
         cortes.aplica_rutas("Malwarebytes", false, &[]).unwrap();
         assert_eq!(windows_tiene(), 0);
         nuevo.shutdown().await;
+        // The cause: while the process's session holds GUARDIANA's provider and sublayer, another
+        // dynamic session cannot hang a cut from them, which until 1.0.55 was every panel rebuilt
+        // while the old one's state lived.
+        let otra = guardiana_apps::Cortafuegos::abrir();
+        let corte = otra.as_ref().map(|o| {
+            o.cortar(
+                &programa.display().to_string(),
+                &guardiana_apps::Destino::default(),
+            )
+        });
+        println!(
+            "otra sesión: {:?}; su corte: {corte:?}",
+            otra.as_ref().err()
+        );
+        assert!(!matches!(corte, Ok(Ok(_))), "{corte:?}");
+        drop(otra);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
