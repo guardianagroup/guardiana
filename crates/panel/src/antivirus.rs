@@ -108,9 +108,13 @@ struct Estado {
     cortafuegos: Option<guardiana_apps::Cortafuegos>,
     /// Product name → each of its executables' paths → the ids of the filters blocking it.
     puestos: HashMap<String, BTreeMap<String, Vec<u64>>>,
-    /// Product name → its paths skipped because no file was there, looked at again every
-    /// [`CADA_SALTADAS`] until one appears.
+    /// Product name → its paths not cut that should be, looked at again every [`CADA_SALTADAS`]
+    /// until they are: skipped because no file was there, or refused by Windows (a cut that could
+    /// not be put back in a new session among them, review of arreglos-1056).
     saltadas: HashMap<String, BTreeSet<String>>,
+    /// Of those, the ones Windows refused with their file there, already said: they are tried again
+    /// at every look, and said only once.
+    rechazadas: BTreeSet<String>,
     /// Whether the thread that looks at them is running: it ends when nothing waits any more.
     vigilando: bool,
 }
@@ -315,7 +319,12 @@ impl Estado {
 
     /// When there is no session yet, or Windows no longer has it or one of its cuts (its filtering
     /// service restarted): a new session, with every cut in place put back in it before the old one
-    /// goes; a path whose file is gone waits for it. Whether a new session was opened.
+    /// goes; a path whose file is gone waits for it. A cut the new session does not take is never
+    /// dropped (review of arreglos-1056: one transient refusal was enough, and that program then
+    /// ran uncut until the next panel start). While the old session still answers it holds that
+    /// cut, so it stays as it is, with every cut it holds, and the new one goes, to be tried again
+    /// at the next look; once Windows no longer has it, nothing holds the cut any more, and it
+    /// waits to be put back, tried again at every look. Whether a new session was opened.
     fn rehace_si_perdida(&mut self) -> bool {
         if self.sana() {
             return false;
@@ -323,13 +332,9 @@ impl Estado {
         let Ok(nuevo) = guardiana_apps::Cortafuegos::abrir() else {
             return false;
         };
-        if self.cortafuegos.is_some() {
-            eprintln!(
-                "guardiana: Windows ya no tenía la sesión de los cortes del antivirus, o alguno de sus cortes: se abre otra y se vuelven a poner"
-            );
-        }
         let mut puestos: HashMap<String, BTreeMap<String, Vec<u64>>> = HashMap::new();
         let mut sin_archivo: Vec<(String, String)> = Vec::new();
+        let mut fallidas: Vec<(String, String)> = Vec::new();
         for (producto, rutas) in &self.puestos {
             let cortadas = puestos.entry(producto.clone()).or_default();
             for ruta in rutas.keys() {
@@ -341,16 +346,39 @@ impl Estado {
                     Ok(ids) => {
                         cortadas.insert(ruta.clone(), ids);
                     }
-                    Err(e) => eprintln!(
-                        "guardiana: el corte de {producto} no se pudo volver a poner en {ruta}: {e}"
-                    ),
+                    Err(e) => {
+                        eprintln!(
+                            "guardiana: el corte de {producto} no se pudo volver a poner en {ruta}: {e}"
+                        );
+                        fallidas.push((producto.clone(), ruta.clone()));
+                    }
                 }
             }
         }
+        if !fallidas.is_empty()
+            && self
+                .cortafuegos
+                .as_ref()
+                .is_some_and(|cf| cf.sigue_abierto())
+        {
+            // The new session goes here, with what it took.
+            eprintln!(
+                "guardiana: los cortes del antivirus siguen en su sesión, que Windows aún tiene: alguno no se pudo poner en otra nueva, y se volverá a intentar"
+            );
+            return false;
+        }
+        if self.cortafuegos.is_some() {
+            eprintln!(
+                "guardiana: Windows ya no tenía la sesión de los cortes del antivirus, o alguno de sus cortes: se abre otra y se vuelven a poner"
+            );
+        }
         self.puestos = puestos;
-        // The old session goes here, once the new one holds every cut.
+        // The old session goes here, once the new one holds every cut it could take.
         self.cortafuegos = Some(nuevo);
-        for (producto, ruta) in sin_archivo {
+        // What it could not take was said just now, and is not said again at every look.
+        self.rechazadas
+            .extend(fallidas.iter().map(|(_, ruta)| ruta.clone()));
+        for (producto, ruta) in sin_archivo.into_iter().chain(fallidas) {
             let mut esperan = self.saltadas.remove(&producto).unwrap_or_default();
             esperan.insert(ruta);
             esperan_un_archivo(&mut self.saltadas, &mut self.vigilando, &producto, esperan);
@@ -370,6 +398,7 @@ impl Estado {
             puestos,
             saltadas,
             vigilando,
+            ..
         } = self;
         let Some(cf) = cortafuegos.as_ref() else {
             return Err(guardiana_apps::ErrorCorte::NoSoportado);
@@ -428,15 +457,18 @@ impl Estado {
         Ok(n)
     }
 
-    /// Cuts what appeared at the paths skipped because no file was there; what is still missing
-    /// keeps waiting. A path Windows will not cut is said once and left to the next time the cut is
-    /// put (a panel start, or the person). Whether anything still waits: when nothing does, the
-    /// thread that looks ends, marked under the same lock.
+    /// Cuts what appeared at the paths waiting, and what Windows takes now of what it refused;
+    /// what is still missing, or still refused, keeps waiting. A path Windows will not cut is said
+    /// once and tried again at every look, until it is cut or the product is let through (review
+    /// of arreglos-1056: it was left to the next time the cut was put, and so would be a cut that
+    /// could not be put back in a new session). Whether anything still waits: when nothing does,
+    /// the thread that looks ends, marked under the same lock.
     fn corta_lo_que_aparecio(&mut self) -> bool {
         let Estado {
             cortafuegos,
             puestos,
             saltadas,
+            rechazadas,
             vigilando,
         } = self;
         let Some(cf) = cortafuegos.as_ref() else {
@@ -457,9 +489,12 @@ impl Estado {
                             sitio.insert(ids);
                         }
                         Err(e) => {
-                            eprintln!(
-                                "guardiana: el corte de {producto} no pudo poner {ruta}: {e}"
-                            );
+                            if rechazadas.insert(ruta.clone()) {
+                                eprintln!(
+                                    "guardiana: el corte de {producto} no pudo poner {ruta}: {e}"
+                                );
+                            }
+                            return true;
                         }
                     }
                 }
@@ -467,6 +502,8 @@ impl Estado {
             });
         }
         saltadas.retain(|_, rutas| !rutas.is_empty());
+        // What waits no more (cut, let through or forgotten) is not remembered as refused.
+        rechazadas.retain(|r| saltadas.values().any(|rutas| rutas.contains(r)));
         *vigilando = !saltadas.is_empty();
         *vigilando
     }
@@ -1642,6 +1679,86 @@ mod en_windows {
         assert_ne!(despues, antes);
         assert_eq!(en_windows(), 2);
         assert_eq!(cortes.aplica_rutas("Malwarebytes", false, &[]).unwrap(), 0);
+        assert_eq!(en_windows(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A cut that cannot be put in a new session is not lost (review of arreglos-1056: it was
+    /// dropped and the old session closed, and that program ran uncut until the next panel start).
+    /// While the session in use still answers, it stays as it is, with every cut it holds, and the
+    /// new one goes; once Windows no longer has it, the other cuts go into a new one, and that one
+    /// waits to be put back and is tried again at every look. Here one program's cut is kept under
+    /// a path Windows refuses (it has a `|`), and one of its two filters is gone: the session does
+    /// not look whole, and that cut cannot be put in another one.
+    #[test]
+    #[ignore = "necesita Windows como administrador"]
+    fn un_corte_que_no_se_puede_volver_a_poner_no_se_pierde() {
+        arranca();
+        let (dir, programa) = carpeta("no-se-pierde");
+        let otro_programa = otro(&dir, "Malwarebytes.exe");
+        let mala = dir.join("mal|nombre.exe").display().to_string();
+        let cortes = global();
+        assert_eq!(
+            cortes
+                .aplica_rutas("Malwarebytes", true, &[programa.clone(), otro_programa])
+                .unwrap(),
+            4
+        );
+        let ids = {
+            let mut e = cortes.estado.lock().unwrap();
+            let cortadas = e.puestos.get_mut("Malwarebytes").unwrap();
+            let ids = cortadas.remove(&programa).unwrap();
+            cortadas.insert(mala.clone(), ids.clone());
+            e.cortafuegos.as_ref().unwrap().quitar(&ids[..1]).unwrap();
+            ids
+        };
+        // The next change of a cut looks at the session: it still answers, so it stays.
+        assert_eq!(
+            cortes
+                .aplica_rutas("Microsoft Defender", true, &[])
+                .unwrap(),
+            0
+        );
+        assert!(
+            ids_de("Malwarebytes").contains(&ids[1]),
+            "the same session, with the same filters"
+        );
+        assert_eq!(
+            con_sesion(|cf| cf.cuantos_de(&ids[1..]).unwrap()),
+            1,
+            "what was left of the cut still holds"
+        );
+        assert_eq!(en_windows(), 3);
+        // Windows loses the session, and its cuts with it: the other program's go into a new one,
+        // and the one Windows refuses waits, and still waits after a look that could not put it.
+        cortes.estado.lock().unwrap().cortafuegos = None;
+        assert_eq!(
+            cortes
+                .aplica_rutas("Microsoft Defender", true, &[])
+                .unwrap(),
+            0
+        );
+        assert_eq!(en_windows(), 2, "the other program is cut again");
+        let espera = || {
+            cortes
+                .estado
+                .lock()
+                .unwrap()
+                .saltadas
+                .get("Malwarebytes")
+                .is_some_and(|r| r.contains(&mala))
+        };
+        assert!(espera(), "it waits to be put back");
+        std::thread::sleep(CADA_SALTADAS + std::time::Duration::from_secs(5));
+        assert!(espera(), "a look that could not put it does not drop it");
+        assert_eq!(cortes.aplica_rutas("Malwarebytes", false, &[]).unwrap(), 0);
+        assert!(!espera());
+        assert_eq!(
+            cortes
+                .aplica_rutas("Microsoft Defender", false, &[])
+                .unwrap(),
+            0
+        );
         assert_eq!(en_windows(), 0);
         let _ = std::fs::remove_dir_all(&dir);
     }
