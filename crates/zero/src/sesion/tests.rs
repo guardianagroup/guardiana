@@ -4491,3 +4491,99 @@ fn the_vpn_shows_in_the_bar_and_closes_from_it() {
     let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"listo","vista":"barra"}"#);
     assert_eq!(vpn(&o)["fase"], "apagada");
 }
+
+/// A measure, not a check (1.0.55, «más rápido»): how long the session takes to decide one request, over a page's
+/// own files, trackers, an advert frame and posts to other companies, with the day's bookkeeping. Run with
+/// `cargo test -p guardiana-zero --lib -- --ignored --nocapture cuanto_tarda`.
+#[test]
+#[ignore = "a measure, not a check"]
+fn cuanto_tarda_una_peticion() {
+    let (mut s, _, id) = con_pagina(true);
+    let pedidos: [(&str, &str, i32); 8] = [
+        ("https://www.eltiempo.com/static/app.js", "GET", 6),
+        (
+            "https://img.eltiempo.com/2026/10/13/foto-1200x800.jpg?w=800",
+            "GET",
+            3,
+        ),
+        (
+            "https://securepubads.g.doubleclick.net/tag/js/gpt.js",
+            "GET",
+            6,
+        ),
+        (
+            "https://www.google-analytics.com/g/collect?v=2&tid=G-1&cid=1.2",
+            "POST",
+            8,
+        ),
+        (
+            "https://googleads.g.doubleclick.net/pagead/ads?client=ca-pub-1",
+            "GET",
+            2,
+        ),
+        ("https://collect.otra-empresa.io/e", "POST", 8),
+        ("https://fonts.gstatic.com/s/roboto/v30/a.woff2", "GET", 5),
+        ("https://api.eltiempo.com/v1/clima?ciudad=bogota", "POST", 8),
+    ];
+    let cuerpo = vec![b'x'; 2_000];
+    // The lists are compiled once per process: the first request pays for it.
+    let t = std::time::Instant::now();
+    let _ = s.peticion(id, pedidos[0].0, "GET", b"", 6);
+    let primera = t.elapsed();
+    let vueltas = 2_000;
+    let mut cortadas = 0;
+    let t = std::time::Instant::now();
+    for i in 0..vueltas {
+        for (url, metodo, contexto) in pedidos {
+            let c: &[u8] = if metodo == "POST" { &cuerpo } else { b"" };
+            if s.peticion(id, url, metodo, c, contexto).cortar {
+                cortadas += 1;
+            }
+        }
+        if i % 100 == 0 {
+            // The beat empties what the bar is told, as in the program.
+            let _ = s.tic();
+        }
+    }
+    let total = t.elapsed();
+    let n = vueltas * pedidos.len();
+    println!(
+        "medida peticion: {n} peticiones en {total:?}, {:.1} µs cada una ({cortadas} cortadas); la primera, con las listas, {primera:?}",
+        total.as_secs_f64() * 1e6 / n as f64
+    );
+}
+
+/// A measure, not a check (1.0.55): what a save of the beat costs with a year of figures (400 days, 60 companies a
+/// day, the webs of the last month): making its bytes, and writing them.
+#[test]
+#[ignore = "a measure, not a check"]
+fn cuanto_tarda_guardar_el_diario() {
+    let (mut s, d, _) = con_pagina(true);
+    for dia in 0..400 {
+        let mut e = escudo::Dia::default();
+        for k in 0..60 {
+            e.terceros
+                .insert(format!("empresa-{k}.com"), format!("Empresa {k}"));
+            if k % 3 == 0 {
+                e.cortados.insert(format!("empresa-{k}.com"));
+            }
+        }
+        if dia >= 369 {
+            for w in 0..30 {
+                e.webs.insert(format!("web-{w}.com"));
+            }
+        }
+        e.cortadas = 1_000;
+        s.diario.dias.insert(format!("2025-d{dia:03}"), e);
+    }
+    let t = std::time::Instant::now();
+    let bytes = serde_json::to_vec(&s.diario).unwrap_or_default();
+    let hacer = t.elapsed();
+    let t = std::time::Instant::now();
+    let _ = escribe(&d.join("datos").join("diario-medida.json"), &bytes);
+    let escribir = t.elapsed();
+    println!(
+        "medida guardar: diario de {} KB: hacer los bytes {hacer:?}, escribirlos {escribir:?}",
+        bytes.len() / 1024
+    );
+}

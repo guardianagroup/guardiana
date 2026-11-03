@@ -614,6 +614,9 @@ pub struct Sesion {
     subastas_sucio: bool,
     /// GUARDIANA's VPN, for the bar (2 Nov 2026).
     vpn: Vpn,
+    /// 1.0.55 («más rápido»), only while explaining decisions (the automatic tests): how long each save of the beat
+    /// held the window's thread, in µs.
+    guardados_us: Vec<u32>,
 }
 
 fn lee<T: DeserializeOwned + Default>(ruta: &Path) -> T {
@@ -913,6 +916,7 @@ impl Sesion {
             subastas: subastas_dia,
             subastas_sucio: false,
             vpn: Vpn::default(),
+            guardados_us: Vec::new(),
         };
         azar(&mut s.secreto);
         s.dia_visto = s.hoy();
@@ -5457,6 +5461,7 @@ impl Sesion {
         }
         if ahora - self.ultimo_guardado >= 15_000 {
             self.ultimo_guardado = ahora;
+            let desde = self.depura.then(std::time::Instant::now);
             if self.diario_sucio {
                 self.guarda_diario();
             }
@@ -5467,8 +5472,21 @@ impl Sesion {
             if self.libro_sucio {
                 self.guarda_libro();
             }
+            if let Some(t) = desde {
+                if self.guardados_us.len() < 10_000 {
+                    self.guardados_us
+                        .push(u32::try_from(t.elapsed().as_micros()).unwrap_or(u32::MAX));
+                }
+            }
         }
         o
+    }
+
+    /// 1.0.55 («más rápido»): how long each save of the beat held the window's thread, in µs, while explaining
+    /// decisions ([`Sesion::pon_depuracion`], the automatic tests); empty otherwise.
+    #[must_use]
+    pub fn tiempos_guardado(&self) -> Vec<u32> {
+        self.guardados_us.clone()
     }
 
     /// A key the engine reports as an accelerator. `Some` when the browser handles it.

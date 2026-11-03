@@ -19,6 +19,15 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 const fallos = [];
 const bien = [];
 const comprueba = (ok, que) => { (ok ? bien : fallos).push(que); console.log(`${ok ? 'OK  ' : 'FALLO'} ${que}`); };
+// 1.0.55 («más rápido»): how long pages took to load in the real window, for the run's annotations (a measure, never a
+// failure): the engine's own Navigation Timing of the page, in ms.
+const cargas = [];
+async function midecarga(que, pagina) {
+  try {
+    const n = await pagina.evaluate(() => { const e = performance.getEntriesByType('navigation')[0]; return e ? { respuesta: e.responseStart - e.startTime, dom: e.domContentLoadedEventEnd - e.startTime, carga: e.loadEventEnd - e.startTime } : null; });
+    if (n) cargas.push(`${que}: primera respuesta ${n.respuesta.toFixed(1)} ms, DOM listo ${n.dom.toFixed(1)} ms, carga completa ${n.carga.toFixed(1)} ms`);
+  } catch (_) {}
+}
 const esc = (s) => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
 
 // --- the test site: one page that pulls from trackers, a form, and a leak ------------------
@@ -176,6 +185,7 @@ function pantalla(nombre) {
   const web = await paginaQue(nav, (u) => u.startsWith(SITIO));
   await web.waitForLoadState('load').catch(() => {});
   await espera(1500);
+  await midecarga('página de prueba (rastreadores, aviso de cookies, formulario)', web);
   const vio = (host, ruta) => registro.some((r) => r.host === host && (!ruta || r.ruta.startsWith(ruta)));
   const doc = registro.find((r) => r.host === 'sitio-prueba.test' && r.ruta.startsWith('/prueba'));
   comprueba(doc && doc.ruta === '/prueba?id=7', `las etiquetas de rastreo se quitan antes de salir (${doc && doc.ruta})`);
@@ -530,6 +540,7 @@ function pantalla(nombre) {
   const larga = await paginaQue(nav, (u) => u.startsWith(SITIO + '/largo'));
   await larga.waitForLoadState('load').catch(() => {});
   await espera(1000);
+  await midecarga('página larga, sin terceros', larga);
   rueda(proceso.pid);
   comprueba(await hasta(async () => (await larga.evaluate(() => window.scrollY)) > 0, 6000), `la rueda del ratón desplaza la página en cuanto se carga (Z4, ${await larga.evaluate(() => window.scrollY).catch(() => -1)} px)`);
 
@@ -571,6 +582,7 @@ function pantalla(nombre) {
   const web2 = await paginaQue(nav2, (u) => u.startsWith(SITIO));
   await web2.waitForLoadState('load').catch(() => {});
   await espera(1500);
+  await midecarga('página de prueba, segundo arranque', web2);
   comprueba(registro.some((r) => r.host === 'sitio-prueba.test' && r.ruta.startsWith('/prueba')), 'las páginas se siguen abriendo');
   // The same protection as during the trial: the ad frame is cut, the address is cleaned, the cookie notice refused.
   comprueba(!registro.some((r) => r.host === 'googleads.g.doubleclick.net') && !registro.some((r) => r.host === 'stats.g.doubleclick.net'), 'y GUARDIANA ZERO sigue cortando: ni el marco de anuncios ni el píxel salen');
@@ -600,6 +612,11 @@ function pantalla(nombre) {
     const terceros = reg.split(/\r?\n/).filter((l) => /tercero=true|navegación|crear|preparar|motor|guion/.test(l)).join('\n');
     console.log(`::warning title=registro.txt::${esc(terceros.slice(-12000))}`);
   }
+  // 1.0.55: the window's own figures (only with GUARDIANA_ZERO_DEPURA, one line per run) and the pages' loads.
+  let tiempos = '';
+  try { tiempos = fs.readFileSync(path.join(base, 'datos', 'tiempos.txt'), 'utf8'); } catch (_) {}
+  for (const l of tiempos.split(/\r?\n/).filter(Boolean)) console.log(`::notice title=tiempos::${esc(l)}`);
+  for (const c of cargas) console.log(`::notice title=carga::${esc(c)}`);
   for (const f of fallos) console.log(`::error title=prueba de punta a punta::${esc(f)}`);
   console.log(`::notice title=prueba de punta a punta::${bien.length} bien, ${fallos.length} fallos`);
   servidor.close();
