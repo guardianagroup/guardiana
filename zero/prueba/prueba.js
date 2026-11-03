@@ -19,6 +19,15 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 const fallos = [];
 const bien = [];
 const comprueba = (ok, que) => { (ok ? bien : fallos).push(que); console.log(`${ok ? 'OK  ' : 'FALLO'} ${que}`); };
+// 1.0.55 («más rápido»): how long pages took to load in the real window, for the run's annotations (a measure, never a
+// failure): the engine's own Navigation Timing of the page, in ms.
+const cargas = [];
+async function midecarga(que, pagina) {
+  try {
+    const n = await pagina.evaluate(() => { const e = performance.getEntriesByType('navigation')[0]; return e ? { respuesta: e.responseStart - e.startTime, dom: e.domContentLoadedEventEnd - e.startTime, carga: e.loadEventEnd - e.startTime } : null; });
+    if (n) cargas.push(`${que}: primera respuesta ${n.respuesta.toFixed(1)} ms, DOM listo ${n.dom.toFixed(1)} ms, carga completa ${n.carga.toFixed(1)} ms`);
+  } catch (_) {}
+}
 const esc = (s) => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
 
 // --- the test site: one page that pulls from trackers, a form, and a leak ------------------
@@ -176,6 +185,7 @@ function pantalla(nombre) {
   const web = await paginaQue(nav, (u) => u.startsWith(SITIO));
   await web.waitForLoadState('load').catch(() => {});
   await espera(1500);
+  await midecarga('página de prueba (rastreadores, aviso de cookies, formulario)', web);
   const vio = (host, ruta) => registro.some((r) => r.host === host && (!ruta || r.ruta.startsWith(ruta)));
   const doc = registro.find((r) => r.host === 'sitio-prueba.test' && r.ruta.startsWith('/prueba'));
   comprueba(doc && doc.ruta === '/prueba?id=7', `las etiquetas de rastreo se quitan antes de salir (${doc && doc.ruta})`);
@@ -188,6 +198,28 @@ function pantalla(nombre) {
   comprueba(await web.evaluate(() => !(window.chrome && window.chrome.webview)), 'la página no ve el canal con el navegador');
   comprueba(await hasta(async () => vio('sitio-prueba.test', '/cookies-rechazadas')), 'el aviso de cookies se rechaza solo («Rechazar todo»)');
   comprueba(!vio('sitio-prueba.test', '/cookies-aceptadas'), 'y no se acepta nada');
+  // 2 Nov 2026 (the owner, 16:50: «que aparezca ya en la pantalla del navegador»): the three protections beside «Protegido»,
+  // as switches with their names, the same settings as «Ajustes».
+  for (const nombre of ['Rastreadores y anuncios', 'Avisos de cookies', 'Ventanas emergentes']) {
+    const sw = barra.getByRole('switch', { name: nombre, exact: true });
+    comprueba((await sw.isVisible()) && (await sw.isChecked()), `en la barra, «${nombre}» a la vista y encendido`);
+  }
+  await barra.getByRole('switch', { name: 'Avisos de cookies', exact: true }).click();
+  comprueba(await hasta(() => panel.evaluate(() => document.getElementById('a-cookies').checked === false)), 'apagar «Avisos de cookies» en la barra lo apaga en «Ajustes»');
+  await barra.getByRole('switch', { name: 'Avisos de cookies', exact: true }).click();
+  comprueba(await hasta(() => panel.evaluate(() => document.getElementById('a-cookies').checked === true)), 'y encenderlo en la barra lo enciende');
+  pantalla('z2-interruptores.png');
+  // The VPN (2 Nov 2026, the VPN review): no chip while there is none; given a VPN whose server does not answer (as the
+  // program would say it), the chip and its «Desconectar», which reaches the program. Here there is no GUARDIANA service
+  // behind, so the program answers that there is no VPN and the chip goes.
+  comprueba(await barra.evaluate(() => document.getElementById('vpn').classList.contains('oculto')), 'sin VPN, la barra no enseña su chip');
+  await barra.evaluate(() => Z.recibe({ tipo: 'vpn', fase: 'sin_respuesta', desconectando: false, aviso: null }));
+  const chip = barra.getByRole('group', { name: 'VPN de GUARDIANA' });
+  comprueba(await hasta(async () => (await chip.isVisible()) && (await chip.textContent()).includes('VPN sin respuesta')), 'con la VPN sin respuesta, su chip lo dice junto a «Protegido»');
+  await espera(300);
+  pantalla('z4-vpn.png');
+  await chip.getByRole('button', { name: 'Desconectar', exact: true }).click();
+  comprueba(await hasta(() => barra.evaluate(() => document.getElementById('vpn').classList.contains('oculto'))), '«Desconectar» llega al programa, que contesta (sin servicio de GUARDIANA aquí: sin VPN, el chip se va)');
   // The star keeps the page in the favourites.
   await barra.click('#estrella');
   comprueba(await hasta(() => barra.evaluate(() => document.querySelector('#estrella').getAttribute('aria-pressed') === 'true')), 'la estrella guarda la web en favoritos');
@@ -508,6 +540,7 @@ function pantalla(nombre) {
   const larga = await paginaQue(nav, (u) => u.startsWith(SITIO + '/largo'));
   await larga.waitForLoadState('load').catch(() => {});
   await espera(1000);
+  await midecarga('página larga, sin terceros', larga);
   rueda(proceso.pid);
   comprueba(await hasta(async () => (await larga.evaluate(() => window.scrollY)) > 0, 6000), `la rueda del ratón desplaza la página en cuanto se carga (Z4, ${await larga.evaluate(() => window.scrollY).catch(() => -1)} px)`);
 
@@ -526,7 +559,8 @@ function pantalla(nombre) {
   comprueba((leer('libro.json') || { entradas: {} }).entradas['sitio-prueba.test'] !== undefined, 'el libro anota quién recibió el correo');
 
   // Eight days later, without a subscription: the trial mark says it started eight days ago.
-  // The browser opens pages and does nothing of its own (decided 9 Oct 2026).
+  // The browser keeps protecting the same, for free (2 Nov 2026, the owner, 17:01: «El navegador, sí, también quiero que
+  // lo dejes gratis»); the bar says the plan, quietly.
   fs.writeFileSync(path.join(base, 'marca', 'prueba-empezada'), String(Date.now() - 8 * 86400000));
   registro.length = 0;
   salio = null;
@@ -539,24 +573,24 @@ function pantalla(nombre) {
   const nav2 = await chromium.connectOverCDP('http://127.0.0.1:9222');
   const barra2 = await paginaQue(nav2, (u) => u.endsWith('/barra.html'));
   const panel2 = await paginaQue(nav2, (u) => u.endsWith('/panel.html'));
-  comprueba(await hasta(async () => (await barra2.textContent('#b-licencia')) === 'Prueba terminada: sin protección'), `la barra dice que ya no protege (${await barra2.textContent('#b-licencia')})`);
-  comprueba(await barra2.evaluate(() => document.querySelector('#b-escudo').classList.contains('oculto')), 'y el escudo, que no contaría nada, deja su sitio');
+  comprueba(await hasta(async () => (await barra2.textContent('#b-licencia')) === 'GUARDIANA Gratis'), `la barra dice el plan: GUARDIANA Gratis (${await barra2.textContent('#b-licencia')})`);
+  comprueba(await barra2.evaluate(() => !document.querySelector('#b-escudo').classList.contains('oculto') && !/sin protecci/i.test(document.body.innerText)), 'y el escudo sigue en su sitio: nada dice «sin protección»');
+  comprueba(await barra2.evaluate(() => document.querySelector('#estado-z span').textContent === 'Protegido'), 'arriba sigue diciendo «Protegido»');
   const rechazosAntes = registro.filter((r) => r.ruta === '/cookies-rechazadas').length;
   await barra2.fill('#campo-dir', `${SITIO}/prueba?utm_source=boletin&id=7`);
   await barra2.press('#campo-dir', 'Enter');
   const web2 = await paginaQue(nav2, (u) => u.startsWith(SITIO));
   await web2.waitForLoadState('load').catch(() => {});
   await espera(1500);
+  await midecarga('página de prueba, segundo arranque', web2);
   comprueba(registro.some((r) => r.host === 'sitio-prueba.test' && r.ruta.startsWith('/prueba')), 'las páginas se siguen abriendo');
-  // Only the engine's own tracking prevention remains (balanced, Microsoft Edge's default): it
-  // still stops some known trackers by itself. What GUARDIANA ZERO cut and the engine does not,
-  // the ad frame, now arrives.
-  comprueba(registro.some((r) => r.host === 'googleads.g.doubleclick.net'), 'pero GUARDIANA ZERO ya no corta: el marco de anuncios llega');
-  comprueba(registro.some((r) => r.ruta.includes('utm_source=boletin')), 'ni se limpian las direcciones');
-  comprueba(registro.filter((r) => r.ruta === '/cookies-rechazadas').length === rechazosAntes, 'ni se tocan los avisos de cookies');
+  // The same protection as during the trial: the ad frame is cut, the address is cleaned, the cookie notice refused.
+  comprueba(!registro.some((r) => r.host === 'googleads.g.doubleclick.net') && !registro.some((r) => r.host === 'stats.g.doubleclick.net'), 'y GUARDIANA ZERO sigue cortando: ni el marco de anuncios ni el píxel salen');
+  comprueba(!registro.some((r) => r.ruta.includes('utm_source=boletin')) && registro.some((r) => r.host === 'sitio-prueba.test' && r.ruta === '/prueba?id=7'), 'y sigue limpiando las direcciones');
+  comprueba(await hasta(async () => registro.filter((r) => r.ruta === '/cookies-rechazadas').length > rechazosAntes), 'y sigue rechazando los avisos de cookies');
   await barra2.click('#b-licencia');
-  comprueba(await hasta(() => panel2.evaluate(() => document.querySelector('#v-licencia').classList.contains('vista-activa'))), 'el aviso de la barra lleva a «Suscripción»');
-  comprueba(await hasta(async () => (await panel2.textContent('#l-detalle')).includes('La prueba terminó')), 'que explica qué dejó de hacer');
+  comprueba(await hasta(() => panel2.evaluate(() => document.querySelector('#v-licencia').classList.contains('vista-activa'))), 'el plan de la barra lleva a «Suscripción»');
+  comprueba(await hasta(async () => { const d = await panel2.textContent('#l-detalle'); return d.includes('La prueba terminó') && d.includes('GUARDIANA Gratis') && d.includes('sigue protegiendo igual'); }), `que dice el plan y que ZERO sigue protegiendo igual (${await panel2.textContent('#l-detalle')})`);
   await espera(500);
   pantalla('06-prueba-terminada.png');
   await panel2.screenshot({ path: path.join(salida, 'panel-suscripcion.png') }).catch(() => {});
@@ -565,7 +599,7 @@ function pantalla(nombre) {
   await panel2.click('#l-activar');
   comprueba(await hasta(async () => (await panel2.textContent('#l-error')).length > 10, 60000), `una clave que no vale dice por qué (${await panel2.textContent('#l-error')})`);
   comprueba(await hasta(async () => (await panel2.textContent('#l-conexiones')).includes('dodopayments.com')), 'y la conexión con la pasarela queda anotada');
-  comprueba(await barra2.evaluate(() => !document.querySelector('#b-licencia').classList.contains('oculto')), 'sin clave válida sigue sin proteger');
+  comprueba((await barra2.textContent('#b-licencia')) === 'GUARDIANA Gratis', 'sin clave válida sigue en GUARDIANA Gratis, protegiendo');
   try { execSync('taskkill /IM guardiana-zero.exe', { stdio: 'ignore' }); } catch (_) {}
   comprueba(await hasta(async () => salio !== null, 20000), 'cierra otra vez sin forzar');
 })().catch((e) => { comprueba(false, `la prueba se interrumpió: ${e && e.message}`); }).finally(() => {
@@ -578,6 +612,11 @@ function pantalla(nombre) {
     const terceros = reg.split(/\r?\n/).filter((l) => /tercero=true|navegación|crear|preparar|motor|guion/.test(l)).join('\n');
     console.log(`::warning title=registro.txt::${esc(terceros.slice(-12000))}`);
   }
+  // 1.0.55: the window's own figures (only with GUARDIANA_ZERO_DEPURA, one line per run) and the pages' loads.
+  let tiempos = '';
+  try { tiempos = fs.readFileSync(path.join(base, 'datos', 'tiempos.txt'), 'utf8'); } catch (_) {}
+  for (const l of tiempos.split(/\r?\n/).filter(Boolean)) console.log(`::notice title=tiempos::${esc(l)}`);
+  for (const c of cargas) console.log(`::notice title=carga::${esc(c)}`);
   for (const f of fallos) console.log(`::error title=prueba de punta a punta::${esc(f)}`);
   console.log(`::notice title=prueba de punta a punta::${bien.length} bien, ${fallos.length} fallos`);
   servidor.close();

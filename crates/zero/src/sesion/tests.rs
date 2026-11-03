@@ -719,7 +719,10 @@ fn tracking_parameters_are_removed_before_the_page_opens() {
 fn marked_data_never_reaches_a_third_party_and_the_book_says_who_got_it() {
     let (mut s, _, id) = con_pagina(false);
     marca_correo(&mut s);
-    assert!(s.necesita_cuerpo(id, "https://collect.otra-empresa.io/e"));
+    assert_eq!(
+        s.cuerpo_para(id, "https://collect.otra-empresa.io/e", "POST"),
+        Cuerpo::Entero
+    );
     let r = s.peticion(
         id,
         "https://collect.otra-empresa.io/e",
@@ -1168,12 +1171,16 @@ fn every_cut_can_be_examined_one_by_one_and_saved() {
         .is_empty());
 }
 
-/// When the seven days end without a subscription the browser keeps opening pages, and does
-/// nothing of its own: no cut, no cleaning, no question, no mandate (decided 9 Oct 2026). A key
-/// that is activated brings everything back.
+/// When the seven days end without a subscription the browser keeps protecting the same, for
+/// free (2 Nov 2026, the owner, 17:01: «El navegador, sí, también quiero que lo dejes gratis»):
+/// it cuts, cleans addresses and refuses cookie notices, its shield stays beside the pages, and
+/// the letter to an auction's company asks for no plan. The licence says the plan, and a key still
+/// activates Plus, which only GUARDIANA's relays need.
 #[test]
-fn after_the_trial_it_browses_without_protection_until_a_key_is_activated() {
+fn after_the_trial_the_browser_keeps_protecting_for_free() {
     let (mut s, _, id) = con_pagina(true);
+    let rastreador = "https://stats.g.doubleclick.net/g/collect";
+    let web = "https://www.eltiempo.com/";
     let o = s.pon_licencia(EstadoLicencia::Prueba {
         termina: reloj() + 86_400_000,
         dias: 1,
@@ -1181,51 +1188,55 @@ fn after_the_trial_it_browses_without_protection_until_a_key_is_activated() {
     let l = del_tipo(&o, Origen::Barra, "licencia").unwrap_or_default();
     assert_eq!(l["estado"], "prueba");
     assert_eq!(l["dias"], 1);
-    assert!(
-        s.peticion(
-            id,
-            "https://stats.g.doubleclick.net/g/collect",
-            "GET",
-            b"",
-            3
-        )
-        .cortar
-    );
+    assert_eq!(l["nivel"], "plus");
+    assert!(s.peticion(id, rastreador, "GET", b"", 3).cortar);
 
     let o = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
-    assert!(o.contains(&Orden::Seguimiento { estricto: false }));
-    assert!(!s.seguimiento_estricto());
-    let l = del_tipo(&o, Origen::Barra, "licencia").unwrap_or_default();
-    assert_eq!(l["estado"], "prueba_terminada");
-    assert_eq!(l["protege"], false);
-    let e = del_tipo(&o, Origen::Panel, "escudo").unwrap_or_default();
-    assert_eq!(e["cortando"], false);
-    // Pages open; nothing is cut, no address is cleaned.
-    assert!(
-        !s.peticion(
-            id,
-            "https://stats.g.doubleclick.net/g/collect",
-            "GET",
-            b"",
-            3
-        )
-        .cortar
+    // Nothing of the protection moves: no order to the engine, the same shield and figures.
+    assert!(!o.iter().any(|x| matches!(x, Orden::Seguimiento { .. })));
+    assert!(s.seguimiento_estricto());
+    assert_eq!(s.nivel(), guardiana_license::Nivel::Gratis);
+    for a in [Origen::Barra, Origen::Panel] {
+        let l = del_tipo(&o, a, "licencia").unwrap_or_default();
+        assert_eq!(l["estado"], "prueba_terminada", "{a:?}");
+        assert_eq!(l["nivel"], "gratis", "{a:?}");
+        assert!(l.get("protege").is_none(), "{a:?}");
+    }
+    let e = s.pestana(id).map(|p| s.msg_escudo(p)).unwrap_or_default();
+    assert_eq!(e["cortando"], true);
+    assert!(e.get("protege").is_none());
+    assert_eq!(s.msg_hoy()["cortando"], true);
+    assert!(s.msg_ajustes().get("sub_protege").is_none());
+    assert!(s.escudo_a_la_vista());
+    // Trackers are cut as during the trial; cookie notices are still refused.
+    assert!(s.peticion(id, rastreador, "GET", b"", 3).cortar);
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        web,
+        r#"{"tipo":"zg_cookies_pide","zg":"f1"}"#,
     );
-    let (cancela, _) = s.navegacion_empieza(id, "https://example.com/?utm_source=x", true);
-    assert!(!cancela);
-    assert!(
-        !s.peticion(id, "https://example.com/?utm_source=x", "GET", b"", 1)
-            .cortar
-    );
-    // The paid tool opens the subscription view instead.
+    let cookies = o
+        .iter()
+        .find_map(|x| match x {
+            Orden::RespondeFormulario { json, .. } => serde_json::from_str::<Value>(json).ok(),
+            _ => None,
+        })
+        .unwrap_or_default();
+    assert_eq!(cookies["cookies"], true);
+    // The letter to a company of the page's auction is not answered with the subscription.
     let o = s.mensaje(
         Origen::Panel,
         PANEL,
         r#"{"tipo":"subasta_carta","sitio":"criteo.com","carta":"acceso"}"#,
     );
-    assert!(!o.iter().any(|x| matches!(x, Orden::CreaPestana { .. })));
-    let v = del_tipo(&o, Origen::Panel, "vista").unwrap_or_default();
-    assert_eq!(v["vista"], "licencia");
+    assert!(del_tipo(&o, Origen::Panel, "vista").is_none());
+    assert!(del_tipo(&o, Origen::Panel, "aviso").is_none());
+    // A redirect with tracking tags is still opened clean.
+    let (cancela, o) = s.navegacion_empieza(id, "https://example.com/?utm_source=x", true);
+    assert!(cancela);
+    assert!(o.iter().any(
+        |x| matches!(x, Orden::Navega { id: a, url } if *a == id && url == "https://example.com/")
+    ));
     // A web page cannot ask for an activation; the panel can, and the shell does it.
     assert!(s
         .mensaje(
@@ -1253,7 +1264,8 @@ fn after_the_trial_it_browses_without_protection_until_a_key_is_activated() {
     let o = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"licencia_comprar"}"#);
     assert!(o.iter().any(|x| matches!(x, Orden::CreaPestana { url: Some(u), .. } if u == "https://guardianagroup.com/comprar.html")));
 
-    // An activation that failed says why; one that worked brings protection back.
+    // An activation that failed says why; one that worked gives Plus, and the protection is the
+    // same as before it.
     let o = s.licencia_activada(Err(Fallo::Limite));
     let l = del_tipo(&o, Origen::Panel, "licencia").unwrap_or_default();
     assert!(l["error"]
@@ -1267,29 +1279,26 @@ fn after_the_trial_it_browses_without_protection_until_a_key_is_activated() {
         caduca: None,
         fallida: false,
     }));
-    assert!(o.contains(&Orden::Seguimiento { estricto: true }));
-    assert_eq!(
-        del_tipo(&o, Origen::Panel, "licencia").unwrap_or_default()["error"],
-        Value::Null
-    );
+    assert!(!o.iter().any(|x| matches!(x, Orden::Seguimiento { .. })));
+    let l = del_tipo(&o, Origen::Panel, "licencia").unwrap_or_default();
+    assert_eq!(l["error"], Value::Null);
+    assert_eq!(l["nivel"], "plus");
     assert!(
-        s.peticion(
-            id,
-            "https://stats.g.doubleclick.net/g/collect",
-            "GET",
-            b"",
-            3
-        )
-        .cortar
+        del_tipo(&o, Origen::Panel, "aviso").unwrap_or_default()["texto"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Plus")
     );
+    assert_eq!(s.nivel(), guardiana_license::Nivel::Plus);
+    assert!(s.peticion(id, rastreador, "GET", b"", 3).cortar);
 }
 
 /// A licence file that cannot be read (here a folder in its place) neither turns the trial into
-/// a free browser for ever nor goes unsaid: the bar and the panel say it at once, the browser
-/// protects for a day from the start, or from the last good reading, and then stops until the
-/// file can be read again (review of 10 Oct 2026).
+/// Plus for ever nor goes unsaid: the bar and the panel say it at once, Plus holds for a day from
+/// the start, or from the last good reading, and then the free level until the file can be read
+/// again (review of 10 Oct 2026). The browser protects all along (2 Nov 2026).
 #[test]
-fn an_unreadable_licence_protects_for_one_day_and_says_so() {
+fn an_unreadable_licence_is_said_and_never_stops_the_protection() {
     const DIA: u64 = 86_400_000;
     static AHORA: AtomicU64 = AtomicU64::new(1_791_553_171_000);
     fn reloj_movil() -> i64 {
@@ -1311,7 +1320,7 @@ fn an_unreadable_licence_protects_for_one_day_and_says_so() {
         let l = del_tipo(&o, a, "licencia").unwrap_or_default();
         assert_eq!(l["estado"], "desconocido");
         assert_eq!(l["ilegible"], true, "{a:?}");
-        assert_eq!(l["protege"], true);
+        assert_eq!(l["nivel"], "plus");
         assert!(l["donde_datos"]
             .as_str()
             .unwrap_or_default()
@@ -1326,37 +1335,26 @@ fn an_unreadable_licence_protects_for_one_day_and_says_so() {
     let _ = abre_pagina(&mut s, id, "https://www.eltiempo.com/");
     assert!(s.peticion(id, tracker, "GET", b"", 3).cortar);
 
-    // A minute short of the day: still protecting, nothing new to say.
+    // A minute short of the day: still Plus, nothing new to say.
     AHORA.fetch_add(DIA - 60_000, Ordering::SeqCst);
     let o = s.tic();
-    assert!(s.protege());
+    assert_eq!(s.nivel(), guardiana_license::Nivel::Plus);
     assert!(del_tipo(&o, Origen::Barra, "licencia").is_none());
-    // The day is over: no protection, and the bar and the panel say why.
+    // The day is over: the free level, said in the bar and the panel; the protection stays.
     AHORA.fetch_add(60_000, Ordering::SeqCst);
     let o = s.tic();
-    assert!(!s.protege());
-    assert!(o.contains(&Orden::Seguimiento { estricto: false }));
+    assert_eq!(s.nivel(), guardiana_license::Nivel::Gratis);
+    assert!(!o.iter().any(|x| matches!(x, Orden::Seguimiento { .. })));
     let l = del_tipo(&o, Origen::Barra, "licencia").unwrap_or_default();
     assert_eq!(l["estado"], "ilegible");
-    assert_eq!(l["protege"], false);
-    assert!(!s.peticion(id, tracker, "GET", b"", 3).cortar);
-    // The paid tool opens the subscription view, without saying that a trial ended.
-    let o = s.mensaje(
-        Origen::Panel,
-        PANEL,
-        r#"{"tipo":"subasta_carta","sitio":"criteo.com","carta":"acceso"}"#,
-    );
-    assert_eq!(
-        del_tipo(&o, Origen::Panel, "vista").unwrap_or_default()["vista"],
-        "licencia"
-    );
-    assert!(del_tipo(&o, Origen::Panel, "aviso").is_none());
-    // Read again (as the shell's check does): protection is back, and the notice goes.
+    assert_eq!(l["nivel"], "gratis");
+    assert!(s.peticion(id, tracker, "GET", b"", 3).cortar);
+    // Read again (as the shell's check does): Plus is back, and the notice goes.
     let o = s.pon_licencia(EstadoLicencia::Prueba {
         termina: reloj_movil() + 3 * 86_400_000,
         dias: 3,
     });
-    assert!(s.protege());
+    assert_eq!(s.nivel(), guardiana_license::Nivel::Plus);
     let l = del_tipo(&o, Origen::Barra, "licencia").unwrap_or_default();
     assert_eq!(
         (l["estado"].as_str(), l["ilegible"].as_bool()),
@@ -1373,10 +1371,11 @@ fn an_unreadable_licence_protects_for_one_day_and_says_so() {
     );
     AHORA.fetch_add(DIA - 120_000, Ordering::SeqCst);
     let _ = s.tic();
-    assert!(s.protege());
+    assert_eq!(s.nivel(), guardiana_license::Nivel::Plus);
     AHORA.fetch_add(60_000, Ordering::SeqCst);
     let _ = s.tic();
-    assert!(!s.protege());
+    assert_eq!(s.nivel(), guardiana_license::Nivel::Gratis);
+    assert!(s.peticion(id, tracker, "GET", b"", 3).cortar);
 }
 
 #[test]
@@ -1535,7 +1534,6 @@ fn cookie_notices_are_dealt_with_only_when_told_and_shown_in_the_shield() {
     let o = s.mensaje(Origen::Pestana(id), web, pide);
     let r = respuesta(&o);
     assert_eq!(r["zg"], "f1");
-    assert!(s.protege());
     assert_eq!(r["cookies"], true);
     // The consent audit: two tracking companies before the notice is answered…
     let _ = s.peticion(
@@ -1565,15 +1563,13 @@ fn cookie_notices_are_dealt_with_only_when_told_and_shown_in_the_shield() {
         web,
         r#"{"tipo":"zg_cookies","zg":"f1","gestor":"OneTrust","accion":"rechazado"}"#,
     );
-    if s.protege() {
-        let e = del_tipo(&o, Origen::Barra, "escudo").unwrap_or_default();
-        assert_eq!(e["cookies"]["gestor"], "OneTrust");
-        assert_eq!(e["cookies"]["accion"], "rechazado");
-        assert_eq!(e["auditoria"]["antes"]["empresas"], 2, "{e}");
-        assert_eq!(e["auditoria"]["antes"]["peticiones"], 3, "{e}");
-        assert_eq!(e["auditoria"]["despues"]["empresas"], 0, "{e}");
-        assert_eq!(e["gpc"], true);
-    }
+    let e = del_tipo(&o, Origen::Barra, "escudo").unwrap_or_default();
+    assert_eq!(e["cookies"]["gestor"], "OneTrust");
+    assert_eq!(e["cookies"]["accion"], "rechazado");
+    assert_eq!(e["auditoria"]["antes"]["empresas"], 2, "{e}");
+    assert_eq!(e["auditoria"]["antes"]["peticiones"], 3, "{e}");
+    assert_eq!(e["auditoria"]["despues"]["empresas"], 0, "{e}");
+    assert_eq!(e["gpc"], true);
     // …and one after it.
     let _ = s.peticion(
         id,
@@ -1608,7 +1604,7 @@ fn cookie_notices_are_dealt_with_only_when_told_and_shown_in_the_shield() {
     assert_eq!(s.msg_ajustes()["rechazar_cookies"], false);
     let o = s.mensaje(Origen::Pestana(id), web, pide);
     assert_eq!(respuesta(&o)["cookies"], false);
-    // Back on, but the trial is over: no.
+    // Back on, after the trial too: yes (the browser is free, 2 Nov 2026).
     let _ = s.mensaje(
         Origen::Panel,
         PANEL,
@@ -1616,7 +1612,7 @@ fn cookie_notices_are_dealt_with_only_when_told_and_shown_in_the_shield() {
     );
     let _ = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
     let o = s.mensaje(Origen::Pestana(id), web, pide);
-    assert_eq!(respuesta(&o)["cookies"], false);
+    assert_eq!(respuesta(&o)["cookies"], true);
 }
 
 #[test]
@@ -1701,26 +1697,21 @@ fn the_shield_shows_the_whole_day_above_the_page() {
     );
 }
 
+/// After the trial the shield still says what it cut, and still cuts (2 Nov 2026, the owner, 17:01).
 #[test]
-fn after_the_trial_the_shield_no_longer_says_cut() {
+fn after_the_trial_the_shield_still_says_cut() {
     let (mut s, _, id) = con_pagina(true);
-    let _ = s.peticion(id, "https://stats.g.doubleclick.net/a", "GET", b"", 3);
-    let _ = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
-    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":"escudo"}"#);
-    let o = if del_tipo(&o, Origen::Panel, "escudo").is_some() {
-        o
-    } else {
-        s.tic()
-    };
-    if let Some(e) =
-        del_tipo(&o, Origen::Panel, "escudo").or_else(|| del_tipo(&o, Origen::Barra, "escudo"))
-    {
-        for t in e["terceros"].as_array().into_iter().flatten() {
-            assert_eq!(t["ahora"], "pasa");
-        }
-    }
     assert!(
-        !s.peticion(id, "https://stats.g.doubleclick.net/b", "GET", b"", 3)
+        s.peticion(id, "https://stats.g.doubleclick.net/a", "GET", b"", 3)
+            .cortar
+    );
+    let _ = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
+    let e = s.pestana(id).map(|p| s.msg_escudo(p)).unwrap_or_default();
+    let filas = e["terceros"].as_array().cloned().unwrap_or_default();
+    assert!(!filas.is_empty(), "{e}");
+    assert!(filas.iter().all(|t| t["ahora"] == "cortado"), "{e}");
+    assert!(
+        s.peticion(id, "https://stats.g.doubleclick.net/b", "GET", b"", 3)
             .cortar
     );
 }
@@ -2215,8 +2206,14 @@ fn the_shield_says_what_the_pixels_tried_to_tell() {
     let (mut s, d, id) = con_pagina(true);
     let _ = abre_pagina(&mut s, id, "https://www.tienda.co/gracias");
     // A pixel's body is read even without marked data.
-    assert!(s.necesita_cuerpo(id, "https://analytics.tiktok.com/api/v2/pixel"));
-    assert!(!s.necesita_cuerpo(id, "https://www.tienda.co/api"));
+    assert_eq!(
+        s.cuerpo_para(id, "https://analytics.tiktok.com/api/v2/pixel", "POST"),
+        Cuerpo::Entero
+    );
+    assert_eq!(
+        s.cuerpo_para(id, "https://www.tienda.co/api", "POST"),
+        Cuerpo::Nada
+    );
     marca_correo(&mut s);
     let em = sha256_hex("ana@correo.co");
     let meta = format!(
@@ -2569,14 +2566,14 @@ fn reads_for_a_fingerprint_are_counted_by_the_script_that_asked() {
         s.msg_hoy()["medidas_sesion"].as_array().map(Vec::len),
         Some(1)
     );
-    // Without the trial or a subscription, nothing is measured.
+    // After the trial it is measured the same (the browser is free, 2 Nov 2026).
     let _ = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
     let _ = s.mensaje(
         Origen::Pestana(id),
         "https://www.elpais.com/",
         &huella(json!([{ "t": "canvas", "u": [] }])),
     );
-    assert!(s.pestana(id).is_some_and(|p| p.escudo.medidas.vacia()));
+    assert!(s.pestana(id).is_some_and(|p| !p.escudo.medidas.vacia()));
 }
 
 /// Decision 206: session recording services by their names, whether one got a request after the
@@ -2681,15 +2678,46 @@ fn an_isolated_tab_is_measured_on_its_shield_only() {
     assert_eq!(s.msg_hoy()["medidas_sesion"], json!([]));
 }
 
-/// The shell reads the body of a request to another site while protecting (its size is
-/// measured), and not of one to the page's own site when nothing else needs it.
+/// 1.0.55 («más rápido»): the shell copies a request's body only when what it carries matters (marked data might
+/// travel in it, or it goes to a known pixel). A post to another site is only measured, with no copy; if it is cut,
+/// its bytes come afterwards, so «Lo que se cortó» still names what it carried. After the trial, the same.
 #[test]
-fn bodies_to_other_sites_are_read_for_their_size() {
+fn bodies_are_copied_only_when_what_they_carry_matters() {
     let (mut s, _, id) = con_pagina(true);
-    assert!(s.necesita_cuerpo(id, "https://collect.otra-empresa.io/e"));
-    assert!(!s.necesita_cuerpo(id, "https://www.eltiempo.com/api"));
+    let otra = "https://collect.otra-empresa.io/e";
+    assert_eq!(s.cuerpo_para(id, otra, "POST"), Cuerpo::Tamano);
+    assert_eq!(s.cuerpo_para(id, otra, "GET"), Cuerpo::Nada);
+    assert_eq!(
+        s.cuerpo_para(id, "https://www.eltiempo.com/api", "POST"),
+        Cuerpo::Nada
+    );
+    assert_eq!(
+        s.cuerpo_para(id, "https://www.facebook.com/tr", "POST"),
+        Cuerpo::Entero
+    );
+    // An uncut post to another company: measured, nothing asked afterwards.
+    let r = s.peticion_medida(id, otra, "POST", 3_000, "", 8);
+    assert!(!r.cortar && !r.cuerpo);
+    // A cut one: its bytes are asked for, and its line names what they carried.
+    let url = "https://stats.g.doubleclick.net/r/collect";
+    assert_eq!(s.cuerpo_para(id, url, "POST"), Cuerpo::Tamano);
+    let r = s.peticion_medida(id, url, "POST", 24, "", 8);
+    assert!(r.cortar && r.cuerpo);
+    s.cuerpo_del_corte(id, url, b"cid=123.456&en=page_view");
+    assert!(s.cortes_pend.last().is_some_and(
+        |c| c.host == "stats.g.doubleclick.net" && c.campos_cuerpo.iter().any(|x| x == "cid")
+    ));
+    // Bytes for a request that was not the last one cut are not taken.
+    s.cuerpo_del_corte(id, url, b"otra=1");
+    assert!(s
+        .cortes_pend
+        .last()
+        .is_some_and(|c| !c.campos_cuerpo.iter().any(|x| x == "otra")));
     let _ = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
-    assert!(!s.necesita_cuerpo(id, "https://collect.otra-empresa.io/e"));
+    assert_eq!(s.cuerpo_para(id, otra, "POST"), Cuerpo::Tamano);
+    // With marked data, every body is read whole: the data might travel in it.
+    marca_correo(&mut s);
+    assert_eq!(s.cuerpo_para(id, otra, "POST"), Cuerpo::Entero);
 }
 
 /// Decision 206, approved by the owner: maximum protection also cuts the session recording
@@ -4302,4 +4330,300 @@ fn the_three_sections_that_left_the_browser_are_gone() {
     for tipo in ["mandato", "tinta", "libro"] {
         assert!(del_tipo(&o, Origen::Panel, tipo).is_none(), "{tipo}");
     }
+}
+
+/// 2 Nov 2026 (the owner, 16:50: «está demasiado escondido… que aparezca ya en la pantalla del navegador»): the bar's
+/// three switches are the settings' own. Their state goes with every «estado»; a switch of the bar changes the
+/// setting (and the settings and the shield say so), and a change in the settings reaches the bar.
+#[test]
+fn the_bar_shows_and_changes_the_three_protections() {
+    let (mut s, _, id) = con_pagina(true);
+    let prot = |o: &[Orden]| {
+        del_tipo(o, Origen::Barra, "estado").unwrap_or_default()["protecciones"].clone()
+    };
+    let todas =
+        json!({ "cortar_seguimiento": true, "rechazar_cookies": true, "quitar_emergentes": true });
+    assert_eq!(s.msg_estado()["protecciones"], todas);
+    // From the bar: cookie notices left as they come.
+    let o = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"ajuste","clave":"rechazar_cookies","valor":false}"#,
+    );
+    assert_eq!(prot(&o)["rechazar_cookies"], false);
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "ajustes").unwrap_or_default()["rechazar_cookies"],
+        false
+    );
+    // Pop-ups, the same.
+    let o = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"ajuste","clave":"quitar_emergentes","valor":false}"#,
+    );
+    assert_eq!(prot(&o)["quitar_emergentes"], false);
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "ajustes").unwrap_or_default()["quitar_emergentes"],
+        false
+    );
+    // Trackers and ads: the engine's own prevention follows, and the shield says it only watches.
+    let o = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"ajuste","clave":"cortar_seguimiento","valor":false}"#,
+    );
+    assert!(o.contains(&Orden::Seguimiento { estricto: false }));
+    assert_eq!(prot(&o)["cortar_seguimiento"], false);
+    assert_eq!(
+        del_tipo(&o, Origen::Barra, "escudo").unwrap_or_default()["cortando"],
+        false
+    );
+    // From the settings (maximum protection turns all three on): the bar hears it.
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"maxima","valor":true}"#,
+    );
+    assert_eq!(prot(&o), todas);
+    // A web page cannot touch them.
+    let o = s.mensaje(
+        Origen::Pestana(id),
+        "https://www.eltiempo.com/",
+        r#"{"tipo":"ajuste","clave":"rechazar_cookies","valor":false}"#,
+    );
+    assert!(o.is_empty());
+    assert_eq!(s.msg_estado()["protecciones"], todas);
+}
+
+/// 2 Nov 2026 (the VPN review): the VPN in the bar, from GUARDIANA's service on this computer through the panel's own
+/// tab, with no page of the web. Read once at the start and, while it is on, every few seconds; the chip shows while
+/// it connects, is connected or its server does not answer; «Desconectar» sends `POST /api/vpn/desconecta`; with the
+/// server not answering, the top row comes over GUARDIANA's own pages too.
+#[test]
+fn the_vpn_shows_in_the_bar_and_closes_from_it() {
+    static AHORA: AtomicU64 = AtomicU64::new(1_791_553_171_000);
+    fn reloj_movil() -> i64 {
+        i64::try_from(AHORA.load(Ordering::SeqCst)).unwrap_or(0)
+    }
+    let pasa = |ms: u64| {
+        AHORA.fetch_add(ms, Ordering::SeqCst);
+    };
+    let d = carpeta();
+    let (mut s, _) = Sesion::abre(Arranque {
+        datos: d.join("datos"),
+        descargas: d.join("descargas"),
+        idioma_sistema: "es".into(),
+        version: "0.1.0".into(),
+        reloj: reloj_movil,
+    });
+    let vpn = |o: &[Orden]| del_tipo(o, Origen::Barra, "vpn").unwrap_or_default();
+    let desconectar = r#"{"tipo":"vpn_desconectar"}"#;
+    // Without the panel's tab (ZERO on its own), nothing is asked, and «Desconectar» says why.
+    assert!(!s
+        .tic()
+        .iter()
+        .any(|x| matches!(x, Orden::EnviaAPagina { .. })));
+    let o = s.mensaje(Origen::Barra, BARRA, desconectar);
+    assert_eq!(vpn(&o)["aviso"], "vpn_sin_panel");
+
+    let url = format!("http://127.0.0.1:7443/?t={}", "9".repeat(64));
+    let _ = s.abre_programa(&url);
+    let orbita = s.activa();
+    let panel = s
+        .pestanas
+        .iter()
+        .find(|p| p.url == url)
+        .map(|p| p.id)
+        .unwrap_or_default();
+    // What this browser asked the panel's tab for itself (`para` 0), by method and address: its number.
+    let pide = |o: &[Orden], metodo: &str, ruta: &str| -> Option<u64> {
+        o.iter().find_map(|x| match x {
+            Orden::EnviaAPagina {
+                id, prefijo, json, ..
+            } if *id == panel && *prefijo == PANEL_LOCAL => {
+                let v: Value = serde_json::from_str(json).ok()?;
+                (v["tipo"] == "zg_panel_pide"
+                    && v["para"] == 0
+                    && v["metodo"] == metodo
+                    && v["ruta"] == ruta)
+                    .then(|| v["n"].as_u64())
+                    .flatten()
+            }
+            _ => None,
+        })
+    };
+    let responde = |s: &mut Sesion, n: u64, estado: u64, datos: Value| -> Vec<Orden> {
+        let m = json!({ "tipo": "zg_panel_datos", "para": 0, "n": n, "estado": estado, "datos": datos.to_string() });
+        s.mensaje(Origen::Pestana(panel), &url, &m.to_string())
+    };
+
+    // At the start: one reading, and nothing more while it is in flight.
+    let n = pide(&s.tic(), "GET", "/api/vpn").unwrap_or_default();
+    assert!(n > 0);
+    pasa(1_000);
+    assert!(pide(&s.tic(), "GET", "/api/vpn").is_none());
+    // Off: the chip stays hidden, and nothing more is asked.
+    let o = responde(&mut s, n, 200, json!({ "fase": "apagada" }));
+    assert_eq!(vpn(&o)["fase"], "apagada");
+    pasa(60_000);
+    assert!(pide(&s.tic(), "GET", "/api/vpn").is_none());
+
+    // The web connects it through the panel: read again soon after, then every few seconds while it is on.
+    let conecta =
+        json!({ "tipo": "zg_panel_pide", "n": 3, "metodo": "POST", "ruta": "/api/vpn/conecta" });
+    let _ = s.mensaje(Origen::Pestana(orbita), ORBITA, &conecta.to_string());
+    pasa(2_000);
+    let n = pide(&s.tic(), "GET", "/api/vpn").unwrap_or_default();
+    let v = vpn(&responde(&mut s, n, 200, json!({ "fase": "conectando" })));
+    assert_eq!(
+        (v["fase"].as_str(), v["desconectando"].as_bool()),
+        (Some("conectando"), Some(false))
+    );
+    pasa(1_000);
+    assert!(pide(&s.tic(), "GET", "/api/vpn").is_none());
+    pasa(2_500);
+    assert!(pide(&s.tic(), "GET", "/api/vpn").is_some());
+    // «Desconectar» while it still connects: the service says to wait, and the bar says so.
+    let o = s.mensaje(Origen::Barra, BARRA, desconectar);
+    let d1 = pide(&o, "POST", "/api/vpn/desconecta").unwrap_or_default();
+    assert_eq!(vpn(&o)["desconectando"], true);
+    let motivo = json!({ "ok": false, "motivo": "está conectando: espera a que termine" });
+    let v = vpn(&responde(&mut s, d1, 200, motivo));
+    assert_eq!(
+        (v["aviso"].as_str(), v["desconectando"].as_bool()),
+        (Some("vpn_espera_conectar"), Some(false))
+    );
+    // Connected: over Órbita, the web keeps the whole window while all is well.
+    pasa(500);
+    let n = pide(&s.tic(), "GET", "/api/vpn").unwrap_or_default();
+    let v = vpn(&responde(&mut s, n, 200, json!({ "fase": "conectada" })));
+    assert_eq!(
+        (v["fase"].as_str(), v["aviso"].is_null()),
+        (Some("conectada"), true)
+    );
+    assert_eq!(s.activa(), orbita);
+    assert_eq!(s.marco(), (0, 0));
+    // The server stops answering: the chip says so, and the top row comes over Órbita with «Desconectar».
+    pasa(3_000);
+    let n = pide(&s.tic(), "GET", "/api/vpn").unwrap_or_default();
+    let o = responde(&mut s, n, 200, json!({ "fase": "sin_respuesta" }));
+    assert_eq!(vpn(&o)["fase"], "sin_respuesta");
+    assert_eq!(s.marco(), (ALTO_ARRIBA, 0));
+    // «Desconectar»: through the panel's tab, once at a time; never from a web page or the side panel.
+    let o = s.mensaje(Origen::Barra, BARRA, desconectar);
+    let d2 = pide(&o, "POST", "/api/vpn/desconecta").unwrap_or_default();
+    assert!(d2 > d1);
+    assert!(s.mensaje(Origen::Barra, BARRA, desconectar).is_empty());
+    assert!(s
+        .mensaje(Origen::Pestana(orbita), ORBITA, desconectar)
+        .is_empty());
+    assert!(s.mensaje(Origen::Panel, PANEL, desconectar).is_empty());
+    let o = responde(&mut s, d2, 200, json!({ "ok": true }));
+    assert_eq!(vpn(&o)["desconectando"], false);
+    // Read again at once: off, and the window is the web's again.
+    let n = pide(&s.tic(), "GET", "/api/vpn").unwrap_or_default();
+    let o = responde(&mut s, n, 200, json!({ "fase": "apagada" }));
+    assert_eq!(vpn(&o)["fase"], "apagada");
+    assert_eq!(s.marco(), (0, 0));
+    // An answer to nothing that was asked changes nothing.
+    assert!(responde(&mut s, 999, 200, json!({ "fase": "conectada" })).is_empty());
+    // When the bar loads, it is told the state.
+    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"listo","vista":"barra"}"#);
+    assert_eq!(vpn(&o)["fase"], "apagada");
+}
+
+/// A measure, not a check (1.0.55, «más rápido»): how long the session takes to decide one request, over a page's
+/// own files, trackers, an advert frame and posts to other companies, with the day's bookkeeping. Run with
+/// `cargo test -p guardiana-zero --lib -- --ignored --nocapture cuanto_tarda`.
+#[test]
+#[ignore = "a measure, not a check"]
+fn cuanto_tarda_una_peticion() {
+    let (mut s, _, id) = con_pagina(true);
+    let pedidos: [(&str, &str, i32); 8] = [
+        ("https://www.eltiempo.com/static/app.js", "GET", 6),
+        (
+            "https://img.eltiempo.com/2026/10/13/foto-1200x800.jpg?w=800",
+            "GET",
+            3,
+        ),
+        (
+            "https://securepubads.g.doubleclick.net/tag/js/gpt.js",
+            "GET",
+            6,
+        ),
+        (
+            "https://www.google-analytics.com/g/collect?v=2&tid=G-1&cid=1.2",
+            "POST",
+            8,
+        ),
+        (
+            "https://googleads.g.doubleclick.net/pagead/ads?client=ca-pub-1",
+            "GET",
+            2,
+        ),
+        ("https://collect.otra-empresa.io/e", "POST", 8),
+        ("https://fonts.gstatic.com/s/roboto/v30/a.woff2", "GET", 5),
+        ("https://api.eltiempo.com/v1/clima?ciudad=bogota", "POST", 8),
+    ];
+    let cuerpo = vec![b'x'; 2_000];
+    // The lists are compiled once per process: the first request pays for it.
+    let t = std::time::Instant::now();
+    let _ = s.peticion(id, pedidos[0].0, "GET", b"", 6);
+    let primera = t.elapsed();
+    let vueltas = 2_000;
+    let mut cortadas = 0;
+    let t = std::time::Instant::now();
+    for i in 0..vueltas {
+        for (url, metodo, contexto) in pedidos {
+            let c: &[u8] = if metodo == "POST" { &cuerpo } else { b"" };
+            if s.peticion(id, url, metodo, c, contexto).cortar {
+                cortadas += 1;
+            }
+        }
+        if i % 100 == 0 {
+            // The beat empties what the bar is told, as in the program.
+            let _ = s.tic();
+        }
+    }
+    let total = t.elapsed();
+    let n = vueltas * pedidos.len();
+    println!(
+        "medida peticion: {n} peticiones en {total:?}, {:.1} µs cada una ({cortadas} cortadas); la primera, con las listas, {primera:?}",
+        total.as_secs_f64() * 1e6 / n as f64
+    );
+}
+
+/// A measure, not a check (1.0.55): what a save of the beat costs with a year of figures (400 days, 60 companies a
+/// day, the webs of the last month): making its bytes, and writing them.
+#[test]
+#[ignore = "a measure, not a check"]
+fn cuanto_tarda_guardar_el_diario() {
+    let (mut s, d, _) = con_pagina(true);
+    for dia in 0..400 {
+        let mut e = escudo::Dia::default();
+        for k in 0..60 {
+            e.terceros
+                .insert(format!("empresa-{k}.com"), format!("Empresa {k}"));
+            if k % 3 == 0 {
+                e.cortados.insert(format!("empresa-{k}.com"));
+            }
+        }
+        if dia >= 369 {
+            for w in 0..30 {
+                e.webs.insert(format!("web-{w}.com"));
+            }
+        }
+        e.cortadas = 1_000;
+        s.diario.dias.insert(format!("2025-d{dia:03}"), e);
+    }
+    let t = std::time::Instant::now();
+    let bytes = serde_json::to_vec(&s.diario).unwrap_or_default();
+    let hacer = t.elapsed();
+    let t = std::time::Instant::now();
+    let _ = escribe(&d.join("datos").join("diario-medida.json"), &bytes);
+    let escribir = t.elapsed();
+    println!(
+        "medida guardar: diario de {} KB: hacer los bytes {hacer:?}, escribirlos {escribir:?}",
+        bytes.len() / 1024
+    );
 }

@@ -13,6 +13,6 @@ Qué NO va a hacer
 - No lee lo que escribes ni lo que ves: el navegador solo decide, en tu equipo, qué peticiones de las páginas salen y cuáles no.
 
 Después de instalar
-Los primeros 7 días son gratis y sin cuenta; después va incluido en la suscripción de GUARDIANA. Tus ajustes, tus datos marcados y tus cifras se guardan solo en este PC, en AppData\Local\GUARDIANA ZERO, y se quedan aunque desinstales.
+GUARDIANA ZERO es gratis y sin cuenta: protege igual con o sin suscripción. La suscripción de GUARDIANA (Plus) añade el servidor intermedio de Comunicaciones; los primeros 7 días lo tienes sin tarjeta. Tus ajustes y tus cifras se guardan solo en este PC, en AppData\Local\GUARDIANA ZERO, y se quedan aunque desinstales.
 
 Licencia del programa: GNU GPL 3.0 o posterior. Código abierto: puedes leerlo, compilarlo y comprobar que hace lo que dice (github.com/guardianagroup/guardiana).

@@ -76,6 +76,16 @@ jobs:
           grep -E "^test .* FAILED$|panicked at|^---- " "$RUNNER_TEMP/test.log" | head -30 | while IFS= read -r l; do echo "::error title=cargo test::$l"; done
           grep -A12 "panicked at" "$RUNNER_TEMP/test.log" | head -60 | sed -e 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}' | sed 's/^/::error title=detalle::/'; echo
           exit 1
+      - name: medidas de ZERO (no comprueban nada)
+        # 1.0.55 («más rápido»): what GUARDIANA ZERO's brain takes per request, per save of its beat and to compile its
+        # lists, in this test build on this runner. Figures to compare between commits, as annotations; never a failure.
+        if: matrix.os == 'ubuntu-latest'
+        continue-on-error: true
+        env:
+          GUARDIANA_LANG: es
+        shell: bash
+        run: |
+          cargo test -p guardiana-zero --lib --locked -- --ignored --nocapture cuanto_tarda 2>&1 | grep -E "^(medida|compilar)" | sed 's/^/::notice title=medida::/' || true
 
   supply-chain:
     name: audit and deny

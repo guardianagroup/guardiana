@@ -327,7 +327,8 @@
     } else {
       frase.textContent = t('z1_cero');
     }
-    $('z1a-explica').textContent = m.protege === false ? t('z1_sin_proteccion') : m.cortando === false ? t('z1_solo_mira') : t('z1_explica');
+    // At every plan the same (2 Nov 2026: the browser is free); only what the person chose changes it.
+    $('z1a-explica').textContent = m.cortando === false ? t('z1_solo_mira') : t('z1_explica');
     $('z1a-porpunto').classList.add('oculto');
     $('z1a-maxima').textContent = t(m.maxima ? 'z1_maxima_si' : 'z1_maxima_no');
   }

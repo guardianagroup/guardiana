@@ -45,7 +45,7 @@ use windows::Win32::Graphics::Gdi::{
     CreateSolidBrush, GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
 };
 use windows::Win32::System::Com::{
-    CoInitializeEx, CoTaskMemFree, COINIT_APARTMENTTHREADED, STREAM_SEEK_SET,
+    CoInitializeEx, CoTaskMemFree, COINIT_APARTMENTTHREADED, STREAM_SEEK_END, STREAM_SEEK_SET,
 };
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -175,6 +175,165 @@ thread_local! {
     static COLA: RefCell<VecDeque<Orden>> = const { RefCell::new(VecDeque::new()) };
     static REGISTRO: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
     static DEPURA: bool = std::env::var_os("GUARDIANA_ZERO_DEPURA").is_some();
+    static TIEMPOS: RefCell<Tiempos> = RefCell::new(Tiempos::default());
+}
+
+/// 1.0.55 («más rápido»), only with GUARDIANA_ZERO_DEPURA (the automatic tests): how long the window's own thread
+/// spends on each request the engine hands it and on each beat of the session, how many request bodies it copied, and
+/// when the start reached each step. Written to `tiempos.txt` beside the data when the window closes; a normal run
+/// keeps none of it.
+#[derive(Default)]
+struct Tiempos {
+    peticiones: Vec<u32>,
+    tics: Vec<u32>,
+    cuerpos: u64,
+    bytes_copiados: u64,
+    tamanos: u64,
+    arranque: Vec<(&'static str, u128)>,
+}
+
+/// When this run started, for [`marca_arranque`].
+static ARRANQUE: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+
+fn depura() -> bool {
+    DEPURA.with(|d| *d)
+}
+
+/// One step of the start, the first time it is reached (only with GUARDIANA_ZERO_DEPURA).
+fn marca_arranque(que: &'static str) {
+    if !depura() {
+        return;
+    }
+    let Some(t0) = ARRANQUE.get() else {
+        return;
+    };
+    let ms = t0.elapsed().as_millis();
+    TIEMPOS.with(|t| {
+        let mut t = t.borrow_mut();
+        if !t.arranque.iter().any(|(q, _)| *q == que) {
+            t.arranque.push((que, ms));
+        }
+    });
+}
+
+/// Writes down, when it ends, how long it lived: a request the engine handed over, or a beat of the session (only
+/// with GUARDIANA_ZERO_DEPURA).
+struct Cronometro {
+    desde: Option<std::time::Instant>,
+    tic: bool,
+}
+
+impl Cronometro {
+    fn peticion() -> Self {
+        Self {
+            desde: depura().then(std::time::Instant::now),
+            tic: false,
+        }
+    }
+
+    fn tic() -> Self {
+        Self {
+            desde: depura().then(std::time::Instant::now),
+            tic: true,
+        }
+    }
+}
+
+impl Drop for Cronometro {
+    fn drop(&mut self) {
+        let Some(t) = self.desde else {
+            return;
+        };
+        let us = u32::try_from(t.elapsed().as_micros()).unwrap_or(u32::MAX);
+        TIEMPOS.with(|m| {
+            let mut m = m.borrow_mut();
+            let l = if self.tic {
+                &mut m.tics
+            } else {
+                &mut m.peticiones
+            };
+            if l.len() < 500_000 {
+                l.push(us);
+            }
+        });
+    }
+}
+
+/// A body copied from a request (`copiado`) or only measured: counted for `tiempos.txt`.
+fn cuenta_cuerpo(copiado: Option<usize>) {
+    if !depura() {
+        return;
+    }
+    TIEMPOS.with(|t| {
+        let mut t = t.borrow_mut();
+        match copiado {
+            Some(n) => {
+                t.cuerpos += 1;
+                t.bytes_copiados += u64::try_from(n).unwrap_or(u64::MAX);
+            }
+            None => t.tamanos += 1,
+        }
+    });
+}
+
+/// The run's figures, in one line of `tiempos.txt`, when the window closes (only with GUARDIANA_ZERO_DEPURA).
+fn escribe_tiempos(guardados: &[u32]) {
+    if !depura() {
+        return;
+    }
+    let Some(dir) = REGISTRO.with(|r| {
+        r.borrow()
+            .as_ref()
+            .and_then(|p| p.parent().map(Path::to_path_buf))
+    }) else {
+        return;
+    };
+    let reparto = |l: &[u32]| -> String {
+        let mut v = l.to_vec();
+        v.sort_unstable();
+        match v.last() {
+            None => "n=0".to_string(),
+            Some(max) => {
+                let p = |q: usize| v.get((v.len() - 1) * q / 100).copied().unwrap_or(0);
+                format!(
+                    "n={} p50={}µs p95={}µs p99={}µs max={}µs",
+                    v.len(),
+                    p(50),
+                    p(95),
+                    p(99),
+                    max
+                )
+            }
+        }
+    };
+    let linea = TIEMPOS.with(|t| {
+        let t = t.borrow();
+        let arranque = t
+            .arranque
+            .iter()
+            .map(|(q, ms)| format!("{q} {ms} ms"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!(
+            "{} {}: peticiones {}; cuerpos copiados {} ({} bytes), tamaños sin copiar {}; tic {}; guardados del tic {}; arranque: {}\n",
+            sesion::ahora_sistema(),
+            env!("CARGO_PKG_VERSION"),
+            reparto(&t.peticiones),
+            t.cuerpos,
+            t.bytes_copiados,
+            t.tamanos,
+            reparto(&t.tics),
+            reparto(guardados),
+            arranque
+        )
+    });
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("tiempos.txt"))
+    {
+        let _ = f.write_all(linea.as_bytes());
+    }
 }
 
 /// Where the subscription lives, for the worker threads that talk to the payment gateway.
@@ -1175,6 +1334,9 @@ fn escucha_mensajes(web: &ICoreWebView2, origen: Origen) -> windows::core::Resul
             let Some(args) = args else {
                 return Ok(());
             };
+            if origen == Origen::Barra {
+                marca_arranque("barra");
+            }
             let fuente = texto_de(|p| unsafe { args.Source(p) });
             let json = texto_de(|p| unsafe { args.WebMessageAsJson(p) });
             encola(con_sesion(|s| s.mensaje(origen, &fuente, &json)).unwrap_or_default());
@@ -1494,6 +1656,28 @@ fn prepara_pestana(id: u32, c: &ICoreWebView2Controller) -> windows::core::Resul
     unsafe { web.AddScriptToExecuteOnDocumentCreated(g.p(), &hecho) }
 }
 
+/// The size of a request's body without copying it (1.0.55, «más rápido»): its `Content-Length`, or else the size of
+/// the stream the engine holds (put back at its start). `None` when neither says.
+fn tamano_cuerpo(
+    req: &ICoreWebView2WebResourceRequest,
+    cabeceras: Option<&ICoreWebView2HttpRequestHeaders>,
+) -> Option<u64> {
+    if let Some(h) = cabeceras {
+        let mut hay = BOOL::default();
+        if unsafe { h.Contains(w!("Content-Length"), &mut hay) }.is_ok() && hay.as_bool() {
+            let n = texto_de(|p| unsafe { h.GetHeader(w!("Content-Length"), p) });
+            if let Ok(n) = n.trim().parse::<u64>() {
+                return Some(n);
+            }
+        }
+    }
+    let flujo = unsafe { req.Content() }.ok()?;
+    let mut fin = 0u64;
+    let medido = unsafe { flujo.Seek(0, STREAM_SEEK_END, Some(&mut fin as *mut u64)) }.is_ok();
+    let _ = unsafe { flujo.Seek(0, STREAM_SEEK_SET, None) };
+    medido.then_some(fin)
+}
+
 fn lee_cuerpo(req: &ICoreWebView2WebResourceRequest) -> Vec<u8> {
     let Ok(flujo) = (unsafe { req.Content() }) else {
         return Vec::new();
@@ -1579,6 +1763,7 @@ fn eventos_pestana(
             &NavigationCompletedEventHandler::create(Box::new(
                 move |w: Option<ICoreWebView2>,
                       args: Option<ICoreWebView2NavigationCompletedEventArgs>| {
+                    marca_arranque("primera página");
                     let mut o = con_sesion(|s| s.navegacion_termina(id)).unwrap_or_default();
                     // 1.0.50 (independent review, M6): whether the page loaded and, if not, whether
                     // for lack of network (GUARDIANA's web then hands the window to the panel).
@@ -1740,6 +1925,8 @@ fn eventos_pestana(
         web.add_WebResourceRequested(
             &WebResourceRequestedEventHandler::create(Box::new(
                 move |_w, args: Option<ICoreWebView2WebResourceRequestedEventArgs>| {
+                    // 1.0.55: how long this request holds the window's thread (only in the automatic tests).
+                    let _cronometro = Cronometro::peticion();
                     let Some(args) = args else {
                         return Ok(());
                     };
@@ -1754,48 +1941,70 @@ fn eventos_pestana(
                     let metodo = texto_de(|p| req.Method(p));
                     let mut contexto = COREWEBVIEW2_WEB_RESOURCE_CONTEXT::default();
                     args.ResourceContext(&mut contexto)?;
-                    // The body is read when marked data might travel in it, when it
-                    // goes to a known pixel, which puts there what it tells, or when it goes to
-                    // another site, whose size the shield says (decision 206).
-                    let cuerpo = if metodo != "GET"
-                        && metodo != "HEAD"
-                        && con_sesion(|s| s.necesita_cuerpo(id, &url)) == Some(true)
-                    {
-                        lee_cuerpo(&req)
+                    // The body's bytes are read when what it carries matters: marked data might
+                    // travel in it, it goes to a known pixel, which puts there what it tells, or it
+                    // carries the licence key. To another site, only its size, without copying it
+                    // (the shield says it, decision 206), and its bytes only if it is cut (1.0.55).
+                    let que = if metodo == "GET" || metodo == "HEAD" {
+                        sesion::Cuerpo::Nada
                     } else {
-                        Vec::new()
+                        con_sesion(|s| s.cuerpo_para(id, &url, &metodo))
+                            .unwrap_or(sesion::Cuerpo::Nada)
                     };
-                    // If the session cannot answer, nothing leaves (it never happens; if it did, the
-                    // safe side is the cut).
+                    let cabeceras = req.Headers().ok();
                     // The names of its cookies go with it (never their values): a cut says how
                     // the destination knows you from one site to the next.
-                    let cookies = req
-                        .Headers()
-                        .ok()
+                    let cookies = cabeceras
+                        .as_ref()
                         .filter(|h| {
                             let mut hay = BOOL::default();
                             h.Contains(w!("Cookie"), &mut hay).is_ok() && hay.as_bool()
                         })
                         .map(|h| texto_de(|p| h.GetHeader(w!("Cookie"), p)))
                         .unwrap_or_default();
+                    let medido = if que == sesion::Cuerpo::Tamano {
+                        tamano_cuerpo(&req, cabeceras.as_ref())
+                    } else {
+                        None
+                    };
+                    let cuerpo = if que == sesion::Cuerpo::Entero
+                        || (que == sesion::Cuerpo::Tamano && medido.is_none())
+                    {
+                        let c = lee_cuerpo(&req);
+                        cuenta_cuerpo(Some(c.len()));
+                        c
+                    } else {
+                        if medido.is_some() {
+                            cuenta_cuerpo(None);
+                        }
+                        Vec::new()
+                    };
+                    // If the session cannot answer, nothing leaves (it never happens; if it did, the
+                    // safe side is the cut).
                     // 1.0.46 (subastas-1.0.46): Global Privacy Control and the strict
                     // fingerprint mode, as the person set them.
                     let (r, gpc, uniforme) = con_sesion(|s| {
-                        (
-                            s.peticion_con(id, &url, &metodo, &cuerpo, &cookies, contexto.0),
-                            s.gpc(),
-                            s.huella_uniforme(),
-                        )
+                        let r = match medido {
+                            Some(n) => s.peticion_medida(id, &url, &metodo, n, &cookies, contexto.0),
+                            None => s.peticion_con(id, &url, &metodo, &cuerpo, &cookies, contexto.0),
+                        };
+                        (r, s.gpc(), s.huella_uniforme())
                     })
                     .unwrap_or((
                         sesion::Respuesta {
                             cortar: true,
-                            pagina: None,
-                            nota: String::new(),
+                            ..sesion::Respuesta::default()
                         },
                         true,
                         false,
                     ));
+                    if r.cuerpo {
+                        // Cut while only its size was known: its bytes, for its line in «Lo que se
+                        // cortó». It never leaves.
+                        let c = lee_cuerpo(&req);
+                        cuenta_cuerpo(Some(c.len()));
+                        con_sesion(|s| s.cuerpo_del_corte(id, &url, &c));
+                    }
                     if !r.nota.is_empty() {
                         registra("petición", &format!("{metodo} {url} {}", r.nota));
                     }
@@ -2004,7 +2213,10 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
         WM_TIMER => {
             recoge_licencia();
             recoge_panel();
-            encola(con_sesion(Sesion::tic).unwrap_or_default());
+            let cronometro = Cronometro::tic();
+            let o = con_sesion(Sesion::tic).unwrap_or_default();
+            drop(cronometro);
+            encola(o);
             drena();
             // During a call the conversations also run on a 20 ms clock; it stops with the call.
             let llamada = con_sesion(|s| s.en_llamada()).unwrap_or(false);
@@ -2098,6 +2310,7 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
         }
         WM_CLOSE => {
             con_sesion(Sesion::cierra);
+            escribe_tiempos(&con_sesion(|s| s.tiempos_guardado()).unwrap_or_default());
             let todas: Vec<Vista> = con_vistas(|v| {
                 let mut l: Vec<Vista> = std::mem::take(&mut v.pestanas)
                     .into_values()
@@ -2346,6 +2559,7 @@ fn aviso(textos: &Textos, titulo: &str, cuerpo: &str) {
 /// Start: one window per person (a second start brings the first one forward), the engine, the
 /// bar, the panel and the first tab.
 pub fn arranca() {
+    let _ = ARRANQUE.set(std::time::Instant::now());
     unsafe {
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
         let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
@@ -2486,6 +2700,7 @@ pub fn arranca() {
         reloj: sesion::ahora_sistema,
     });
     let mut s = s;
+    marca_arranque("sesión");
     s.pon_depuracion(DEPURA.with(|d| *d));
     s.pon_resolutor(Some(guardiana_zero::servidor::del_sistema));
     // The subscription: seven days of the browser's own, kept in its data folder and, a second
@@ -2527,6 +2742,7 @@ pub fn arranca() {
             return;
         }
     };
+    marca_arranque("ventana");
     VISTAS.with(|v| {
         *v.borrow_mut() = Some(Vistas {
             hwnd: h,
@@ -2738,6 +2954,7 @@ fn crea_entorno(
                 }
                 _ => return Ok(()),
             };
+            marca_arranque("motor");
             let version = texto_de(|p| unsafe { entorno.BrowserVersionString(p) });
             con_sesion(|s| s.pon_motor(&version));
             con_vistas(|v| v.entorno = Some(entorno));

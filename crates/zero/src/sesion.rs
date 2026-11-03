@@ -14,7 +14,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 
 use base64::Engine as _;
@@ -31,6 +30,8 @@ use crate::dominio::{host_de, sitio};
 use crate::escudo::{self, Diario, Tercero};
 use crate::favoritos::{self, Favoritos};
 use crate::fecha;
+// A whole file or nothing: a crash never leaves half a settings file.
+use crate::guardado::escribe;
 use crate::libro::Libro;
 use crate::licencia::{Estado as EstadoLicencia, Fallo, Lugar as LugarLicencia};
 use crate::mandato::Recurso;
@@ -296,6 +297,35 @@ pub struct Respuesta {
     pub pagina: Option<String>,
     /// Only when debugging (`pon_depuracion`): how it was read, for the browser's own log.
     pub nota: String,
+    /// 1.0.55: cut while only its body's size was known ([`Sesion::peticion_medida`]): its bytes, now, to
+    /// [`Sesion::cuerpo_del_corte`], so «Lo que se cortó» names what it carried. It never leaves.
+    pub cuerpo: bool,
+}
+
+/// What the shell gives of a request's body ([`Sesion::cuerpo_para`], 1.0.55, «más rápido»).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cuerpo {
+    /// Nothing of it.
+    Nada,
+    /// Only its size, without copying it: its `Content-Length`, or the size of the stream the engine holds
+    /// ([`Sesion::peticion_medida`]).
+    Tamano,
+    /// The bytes themselves ([`Sesion::peticion_con`]).
+    Entero,
+}
+
+/// A method whose body the browser looks at.
+fn con_cuerpo(metodo: &str) -> bool {
+    ["POST", "PUT", "PATCH"]
+        .iter()
+        .any(|m| metodo.eq_ignore_ascii_case(m))
+}
+
+/// The licence key typed in GUARDIANA's own panel, on its way to the panel's service: the browser activates itself with
+/// it too (17 Oct 2026).
+fn es_activacion(metodo: &str, url: &str) -> bool {
+    metodo.eq_ignore_ascii_case("POST")
+        && url.starts_with("http://127.0.0.1:7443/api/licencia/activar-clave")
 }
 
 /// How the shell starts a session.
@@ -490,6 +520,39 @@ struct Pregunta {
     clases: Vec<Clase>,
 }
 
+/// 2 Nov 2026 (the VPN review): GUARDIANA's VPN as its service says it is, read through the panel's own tab on this
+/// computer (`GET /api/vpn`, the gateway GUARDIANA's web already uses), so the bar shows it and closes it with no page
+/// of the web: when the VPN's server stops answering, its cut leaves no internet and the web cannot load.
+#[derive(Debug, Default)]
+struct Vpn {
+    /// `apagada`, `conectando`, `conectada`, `sin_respuesta` or `error`; empty until the service answers.
+    fase: String,
+    /// The reading in flight: its number and when it left.
+    pedida: Option<(u64, i64)>,
+    /// The «Desconectar» in flight: its number and when it left.
+    desconectando: Option<(u64, i64)>,
+    /// When to read again; `i64::MAX` while the VPN is off, until something says it may have moved.
+    proxima: i64,
+    /// Readings the panel could not answer in a row (the wait grows with them).
+    fallos: u32,
+    /// What the last «Desconectar» could not do (a key of the texts), until the state changes.
+    aviso: Option<&'static str>,
+    /// The numbers of this browser's own requests to the panel (`para` 0).
+    n: u64,
+}
+
+/// How often the VPN is read while it is on (connecting, connected, or its server not answering).
+const VPN_CADA_MS: i64 = 3_000;
+/// The first wait after a reading the panel could not answer; it doubles up to a minute.
+const VPN_REINTENTO_MS: i64 = 5_000;
+/// A reading or an order with no answer for this long is given up.
+const VPN_SIN_RESPUESTA_MS: i64 = 10_000;
+
+/// The VPN is on: the bar shows it with «Desconectar».
+fn vpn_activa(fase: &str) -> bool {
+    matches!(fase, "conectando" | "conectada" | "sin_respuesta")
+}
+
 /// The browser's state.
 #[derive(Debug)]
 pub struct Sesion {
@@ -523,7 +586,9 @@ pub struct Sesion {
     escudo_cerrado: bool,
     preguntas: BTreeMap<u64, Pregunta>,
     siguiente_pregunta: u64,
-    pulsos: Vec<Value>,
+    /// What the bar's guard line is told on the next beat: tab, whether it was cut, and who (1.0.55: kept plain, made
+    /// into JSON once per beat instead of once per request).
+    pulsos: Vec<(u32, bool, String)>,
     sucios: BTreeSet<u32>,
     diario_sucio: bool,
     libro_sucio: bool,
@@ -545,8 +610,9 @@ pub struct Sesion {
     /// Where the servers of names nobody owns are (`servidor`): off until the shell gives the
     /// system's resolver, so tests never touch the network.
     servidores: crate::servidor::Servidores,
-    /// The subscription. Unknown until the shell gives the place it lives in: the browser works
-    /// (for at most a day if the place cannot be read).
+    /// The subscription: it says the plan (Plus or the free level), never whether the browser
+    /// protects (2 Nov 2026). Unknown until the shell gives the place it lives in (Plus meanwhile,
+    /// for at most a day if the place cannot be read).
     licencia: EstadoLicencia,
     /// Where the subscription lives (`None` in tests that do not need it).
     lugar: Option<LugarLicencia>,
@@ -578,6 +644,31 @@ pub struct Sesion {
     /// «Tu visita, a subasta» (1.0.46): auctions and distinct companies by day (`subastas.json`).
     subastas: subasta::Diario,
     subastas_sucio: bool,
+    /// GUARDIANA's VPN, for the bar (2 Nov 2026).
+    vpn: Vpn,
+    /// 1.0.55 («más rápido»), only while explaining decisions (the automatic tests): how long each save of the beat
+    /// held the window's thread, in µs.
+    guardados_us: Vec<u32>,
+    /// 1.0.55 («más rápido»): the saves of the beat go to a thread of their own (`guardado`).
+    escritor: crate::guardado::Escritor,
+    /// 1.0.55: the request just cut with only its body's size known, whose bytes the shell gives next
+    /// ([`Respuesta::cuerpo`], [`Sesion::cuerpo_del_corte`]).
+    sin_cuerpo: Option<SinCuerpo>,
+}
+
+/// A request cut while only its body's size was known (1.0.55): where its line in «Lo que se cortó» is, so its bytes,
+/// given right after, say what it carried.
+#[derive(Debug)]
+struct SinCuerpo {
+    id: u32,
+    url: String,
+    cookies: String,
+    /// Its line among the cuts not yet written.
+    indice: usize,
+    ts: i64,
+    host: String,
+    ruta: String,
+    quien: String,
 }
 
 fn lee<T: DeserializeOwned + Default>(ruta: &Path) -> T {
@@ -585,16 +676,6 @@ fn lee<T: DeserializeOwned + Default>(ruta: &Path) -> T {
         .ok()
         .and_then(|b| serde_json::from_slice(&b).ok())
         .unwrap_or_default()
-}
-
-/// Write a whole file or nothing: a crash never leaves half a settings file.
-fn escribe(ruta: &Path, contenido: &[u8]) -> io::Result<()> {
-    if let Some(dir) = ruta.parent() {
-        fs::create_dir_all(dir)?;
-    }
-    let tmp = ruta.with_extension("tmp");
-    fs::write(&tmp, contenido)?;
-    fs::rename(&tmp, ruta)
 }
 
 /// The same, saying whether it was written (a file the person asked for).
@@ -876,6 +957,14 @@ impl Sesion {
             marco_dado: None,
             subastas: subastas_dia,
             subastas_sucio: false,
+            vpn: Vpn::default(),
+            guardados_us: Vec::new(),
+            escritor: if cfg!(test) {
+                crate::guardado::Escritor::aqui()
+            } else {
+                crate::guardado::Escritor::en_hilo()
+            },
+            sin_cuerpo: None,
         };
         azar(&mut s.secreto);
         s.dia_visto = s.hoy();
@@ -1051,11 +1140,11 @@ impl Sesion {
         !self.prefs.gpc_apagado
     }
 
-    /// The strict fingerprint mode is on (and the browser protects): new tabs get it, and the
-    /// shell sends only the first language in `Accept-Language`.
+    /// The strict fingerprint mode is on: new tabs get it, and the shell sends only the first
+    /// language in `Accept-Language`.
     #[must_use]
     pub const fn huella_uniforme(&self) -> bool {
-        self.prefs.huella_uniforme && self.licencia.protege()
+        self.prefs.huella_uniforme
     }
 
     /// How names are resolved to place the servers of names nobody owns (the shell gives the
@@ -1067,15 +1156,15 @@ impl Sesion {
     /// Whether the engine's tracking prevention should be strict.
     #[must_use]
     pub const fn seguimiento_estricto(&self) -> bool {
-        self.prefs.reglas.cortar_seguimiento && self.licencia.protege()
+        self.prefs.reglas.cortar_seguimiento
     }
 
-    /// Whether the browser does its own work now: the trial or a subscription is on (or not known
-    /// yet, for at most a day). Without either it still opens pages, and does nothing else
-    /// (decided 9 Oct 2026).
+    /// The level the licence gives now. The browser protects the same at both (2 Nov 2026, the
+    /// owner, 17:01: «El navegador, sí, también quiero que lo dejes gratis»); only GUARDIANA's
+    /// relays, which cost money for every byte, need Plus.
     #[must_use]
-    pub const fn protege(&self) -> bool {
-        self.licencia.protege()
+    pub const fn nivel(&self) -> guardiana_license::Nivel {
+        self.licencia.nivel()
     }
 
     /// Where the subscription lives. Reads it at once (the first run ever starts the seven days).
@@ -1104,7 +1193,7 @@ impl Sesion {
 
     /// The licence file could not be read. For a day from the start, or from the last good
     /// reading, the browser keeps what it knew and the bar and the panel say so; after that it
-    /// stops protecting until a reading works again.
+    /// counts as the free level until a reading works again (browsing keeps its protection).
     fn licencia_sin_leer(&mut self, ahora: i64) -> Vec<Orden> {
         let ya = std::mem::replace(&mut self.licencia_ilegible, true);
         let fin = self.licencia_ok + crate::licencia::GRACIA_ILEGIBLE_MS;
@@ -1121,29 +1210,20 @@ impl Sesion {
         }
     }
 
-    /// A new state for the subscription. When protection goes off, the engine's own tracking
-    /// prevention goes back to its default.
+    /// A new state for the subscription. The browser's protection does not change with it (2 Nov
+    /// 2026); the relays do.
     fn cambia_licencia(&mut self, e: EstadoLicencia) -> Vec<Orden> {
         if e == self.licencia {
             return Vec::new();
         }
-        let antes = self.licencia.protege();
         self.licencia = e;
         if !cfg!(test) {
-            // The relay's call service (TURN) costs money per minute: only while the licence
-            // protects (trial or subscription), never after it (the free plan, 18 Oct 2026).
-            crate::rele::permite_turn(self.licencia.protege());
+            // The relay's call service (TURN) and its TCP line cost money for every byte: only
+            // with Plus (the trial or a subscription), never at the free level (18 Oct 2026). The
+            // one thing in ZERO that stays Plus (2 Nov 2026).
+            crate::rele::permite_turn(self.licencia.nivel() == guardiana_license::Nivel::Plus);
         }
-        let mut o = Vec::new();
-        if antes != self.licencia.protege() {
-            o.push(Orden::Seguimiento {
-                estricto: self.seguimiento_estricto(),
-            });
-            o.extend(self.escudo_activa(true));
-            o.extend(self.hoy_a_todos());
-        }
-        o.extend(self.avisa_licencia());
-        o
+        self.avisa_licencia()
     }
 
     /// The result of an activation the shell did ([`Orden::ActivaLicencia`]).
@@ -1154,7 +1234,7 @@ impl Sesion {
                 self.licencia_error = None;
                 let mut o = self.pon_licencia(e);
                 o.extend(self.avisa_licencia());
-                o.push(self.aviso("licencia_activada", &[]));
+                o.push(self.aviso("licencia_activada_plus", &[]));
                 o
             }
             Err(f) => {
@@ -1174,7 +1254,8 @@ impl Sesion {
         let mut m = json!({
             "tipo": "licencia",
             "estado": self.licencia.nombre(),
-            "protege": self.licencia.protege(),
+            // The plan, as the panel and the bar show it: «plus» or «gratis».
+            "nivel": self.licencia.nivel().nombre(),
             "ocupada": self.licencia_ocupada,
             "error": self.licencia_error,
             "comprar": self.t("licencia_comprar_url"),
@@ -1238,23 +1319,32 @@ impl Sesion {
         self.panel.is_some()
     }
 
-    /// Whether a request of this tab to `url` needs its body read: marked data might travel in
-    /// it, it goes to a known pixel, which puts there what it tells («Los chivatos»), or it goes
-    /// to another site, whose body's size the shield says (decision 206: only its length is
-    /// kept).
+    /// What the shell must give of the body of a request of this tab to `url` (1.0.55, «más rápido»): the bytes when
+    /// marked data might travel in it or it goes to a known pixel, which puts there what it tells («Los chivatos»);
+    /// only its size, without copying it, when it goes to another site (the shield says how much it carried, decision
+    /// 206: only its length is kept); nothing otherwise. The same bodies as before are read whole; the others are no
+    /// longer copied just to be measured.
     #[must_use]
-    pub fn necesita_cuerpo(&self, id: u32, url: &str) -> bool {
-        !self.tinta.is_empty() || crate::chivatos::interesa(url) || self.a_otro_sitio(id, url)
+    pub fn cuerpo_para(&self, id: u32, url: &str, metodo: &str) -> Cuerpo {
+        if !con_cuerpo(metodo) {
+            return Cuerpo::Nada;
+        }
+        if !self.tinta.is_empty() || crate::chivatos::interesa(url) {
+            return Cuerpo::Entero;
+        }
+        if self.a_otro_sitio(id, url) {
+            Cuerpo::Tamano
+        } else {
+            Cuerpo::Nada
+        }
     }
 
-    /// While protecting, a request of tab `id` to another site than the page's (or from a tab
-    /// with no web page yet): its body's size is measured.
+    /// A request of tab `id` to another site than the page's (or from a tab with no web page
+    /// yet): its body's size is measured.
     fn a_otro_sitio(&self, id: u32, url: &str) -> bool {
-        self.licencia.protege()
-            && self.pestana(id).is_some_and(|p| {
-                host_de(url)
-                    .is_some_and(|h| p.escudo.sitio.is_empty() || sitio(&h) != p.escudo.sitio)
-            })
+        self.pestana(id).is_some_and(|p| {
+            host_de(url).is_some_and(|h| p.escudo.sitio.is_empty() || sitio(&h) != p.escudo.sitio)
+        })
     }
 
     fn t(&self, clave: &str) -> String {
@@ -1369,18 +1459,25 @@ impl Sesion {
         o
     }
 
+    // 1.0.55 («más rápido»): the bytes here, from the state at this moment; the writing on the saves' own thread.
     fn guarda_libro(&mut self) {
-        escribe_json(&self.datos.join("libro.json"), &self.libro);
+        if let Ok(b) = serde_json::to_vec(&self.libro) {
+            self.escritor.escribe(self.datos.join("libro.json"), b);
+        }
         self.libro_sucio = false;
     }
 
     fn guarda_diario(&mut self) {
-        escribe_json(&self.datos.join("diario.json"), &self.diario);
+        if let Ok(b) = serde_json::to_vec(&self.diario) {
+            self.escritor.escribe(self.datos.join("diario.json"), b);
+        }
         self.diario_sucio = false;
     }
 
     fn guarda_subastas(&mut self) {
-        escribe_json(&self.datos.join("subastas.json"), &self.subastas);
+        if let Ok(b) = serde_json::to_vec(&self.subastas) {
+            self.escritor.escribe(self.datos.join("subastas.json"), b);
+        }
         self.subastas_sucio = false;
     }
 
@@ -1563,6 +1660,13 @@ impl Sesion {
             "panel": self.panel,
             "producto": self.producto(),
             "marco": self.marco().0,
+            // 2 Nov 2026 (the owner, 16:50: «que aparezca ya en la pantalla del navegador»): the three switches of the
+            // bar, the same settings as «Ajustes» and the shield.
+            "protecciones": {
+                "cortar_seguimiento": self.prefs.reglas.cortar_seguimiento,
+                "rechazar_cookies": !self.prefs.cookies_sin_tocar,
+                "quitar_emergentes": !self.prefs.emergentes_sin_tocar,
+            },
         })
     }
 
@@ -1595,16 +1699,15 @@ impl Sesion {
 
     fn msg_escudo(&self, p: &Pestana) -> Value {
         // What holds now for each site, from what each of its requests was: cut, partly cut
-        // (some requests, or only those that carried your data, or only those outside the
-        // task), or passing; and by which rule, so its button offers the way back. Without the
-        // trial or a subscription nothing is cut, and the shield says so.
+        // (some requests, or only those that carried your data), or passing; and by which rule,
+        // so its button offers the way back.
         // In the order each one first showed up on this page: a row never moves.
         let mut filas: Vec<&Tercero> = p.escudo.terceros.values().collect();
         filas.sort_by_key(|t| t.orden);
         let terceros: Vec<Value> = filas
             .into_iter()
             .map(|t| {
-                let e = t.estado(&self.prefs.reglas, self.licencia.protege());
+                let e = t.estado(&self.prefs.reglas);
                 let mut v = serde_json::to_value(t).unwrap_or(Value::Null);
                 if let Some(o) = v.as_object_mut() {
                     o.insert("ahora".into(), json!(e.ahora));
@@ -1622,9 +1725,8 @@ impl Sesion {
             "pestana": p.id,
             "carga": p.carga,
             "sitio": if es_interna(&p.url) { "" } else { p.escudo.sitio.as_str() },
-            "cortando": self.prefs.reglas.cortar_seguimiento && self.licencia.protege(),
+            "cortando": self.prefs.reglas.cortar_seguimiento,
             "maxima": self.prefs.reglas.cortar_seguimiento && self.prefs.reglas.maxima,
-            "protege": self.licencia.protege(),
             // 1.0.46, «Permitir en esta web»: the lists cut nothing on this web.
             "web_permitida": !p.escudo.sitio.is_empty()
                 && self.prefs.reglas.webs_permitidas.contains(&p.escudo.sitio),
@@ -1736,7 +1838,6 @@ impl Sesion {
             "huella_ruido": !self.prefs.huella_sin_ruido || self.prefs.reglas.maxima,
             "huella_uniforme": self.prefs.huella_uniforme,
             "subastas_permitidas": self.prefs.reglas.subastas_permitidas,
-            "sub_protege": self.licencia.protege(),
         })
     }
 
@@ -1749,8 +1850,7 @@ impl Sesion {
         let mes = fecha::primero_del_mes(&hoy);
         json!({
             "tipo": "hoy",
-            "cortando": self.prefs.reglas.cortar_seguimiento && self.licencia.protege(),
-            "protege": self.licencia.protege(),
+            "cortando": self.prefs.reglas.cortar_seguimiento,
             "motor_id": buscador(&self.prefs.buscador).id,
             "motores": lista_buscadores(),
             "hoy": self.diario.total(&hoy, &hoy),
@@ -1837,7 +1937,13 @@ impl Sesion {
         // Comunicaciones from its door) fills the window as the panel does; it has its own ways
         // between its parts, and the old bar is not drawn over it.
         if matches!(producto, "guardiana" | "secure" | "orbita") {
-            return (0, 0);
+            // 2 Nov 2026 (the VPN review): over them too, only the top row, while the VPN's server does not answer or
+            // GUARDIANA's web cannot load with the VPN on: its «Desconectar» must always be at hand.
+            return if self.vpn_sobre_todo() {
+                (ALTO_ARRIBA, 0)
+            } else {
+                (0, 0)
+            };
         }
         let barra = ALTO_ZERO;
         let web = producto == "zero" && !es_interna(&p.url) && !p.url.is_empty();
@@ -2053,7 +2159,7 @@ impl Sesion {
     /// 1.0.50: GUARDIANA's web asks the panel for one of its readings (the Vigía's analysis of
     /// this computer). Only those in [`PANEL_LECTURAS`], by method and exact address; the panel's
     /// tab asks its own service with its own session and answers with `zg_panel_datos`.
-    fn pide_al_panel(&self, id: u32, m: &Value) -> Vec<Orden> {
+    fn pide_al_panel(&mut self, id: u32, m: &Value) -> Vec<Orden> {
         let metodo = texto(m, "metodo");
         let ruta = texto(m, "ruta");
         let n = m.get("n").and_then(Value::as_u64).unwrap_or(0);
@@ -2068,6 +2174,12 @@ impl Sesion {
         let Some(panel) = self.panel_fijo() else {
             return self.sin_lectura(id, n, 503);
         };
+        // 2 Nov 2026: the web connects or closes the VPN; the bar reads it again soon after.
+        if metodo == "POST" && ruta.starts_with("/api/vpn/") {
+            let pronto = (self.reloj)() + 1_500;
+            self.vpn.proxima = self.vpn.proxima.min(pronto);
+            self.vpn.fallos = 0;
+        }
         vec![Orden::EnviaAPagina {
             id: panel,
             prefijo: PANEL_LOCAL,
@@ -2079,12 +2191,16 @@ impl Sesion {
 
     /// 1.0.50: the panel's answer to [`Sesion::pide_al_panel`], handed as it came to the web tab
     /// that asked, while that tab is still GUARDIANA's web in the program.
-    fn datos_del_panel(&self, m: &Value) -> Vec<Orden> {
+    fn datos_del_panel(&mut self, m: &Value) -> Vec<Orden> {
         let para = m
             .get("para")
             .and_then(Value::as_u64)
             .and_then(|x| u32::try_from(x).ok())
             .unwrap_or(0);
+        // 2 Nov 2026: an answer for this browser itself (no tab is number 0): the VPN.
+        if para == 0 {
+            return self.vpn_respuesta(m);
+        }
         let datos = texto(m, "datos");
         let n = m.get("n").and_then(Value::as_u64).unwrap_or(0);
         if datos.len() > 4_000_000 {
@@ -2104,6 +2220,148 @@ impl Sesion {
             json: json!({ "tipo": "zg_panel", "n": n, "estado": estado, "datos": datos })
                 .to_string(),
         }]
+    }
+
+    // --- GUARDIANA's VPN in the bar (2 Nov 2026, the VPN review) ---------------------------------------------------------
+
+    /// A request of this browser itself for the panel's own tab (`para` 0, no tab has that number), which asks its
+    /// service on this computer with its own session; the answer comes back to [`Sesion::vpn_respuesta`].
+    fn al_panel(panel: u32, n: u64, metodo: &str, ruta: &str) -> Orden {
+        Orden::EnviaAPagina {
+            id: panel,
+            prefijo: PANEL_LOCAL,
+            excepto: None,
+            json: json!({ "tipo": "zg_panel_pide", "para": 0, "n": n, "metodo": metodo, "ruta": ruta })
+                .to_string(),
+        }
+    }
+
+    fn msg_vpn(&self) -> Value {
+        json!({
+            "tipo": "vpn",
+            "fase": self.vpn.fase,
+            "desconectando": self.vpn.desconectando.is_some(),
+            "aviso": self.vpn.aviso,
+        })
+    }
+
+    /// The VPN's reading, at its pace: while it is on, every [`VPN_CADA_MS`]; while it is off, only when something says
+    /// it may have moved (the browser just started, the web asked the panel to connect it, the bar closed it).
+    fn vpn_tic(&mut self, ahora: i64) -> Vec<Orden> {
+        let mut o = Vec::new();
+        if self
+            .vpn
+            .desconectando
+            .is_some_and(|(_, t)| ahora - t >= VPN_SIN_RESPUESTA_MS)
+        {
+            self.vpn.desconectando = None;
+            self.vpn.aviso = Some("vpn_no_desconecta");
+            self.vpn.proxima = ahora;
+            o.push(envia(Origen::Barra, &self.msg_vpn()));
+        }
+        if let Some((_, t)) = self.vpn.pedida {
+            if ahora - t < VPN_SIN_RESPUESTA_MS {
+                return o;
+            }
+            self.vpn.pedida = None;
+        }
+        if ahora < self.vpn.proxima {
+            return o;
+        }
+        let Some(panel) = self.panel_fijo() else {
+            return o;
+        };
+        self.vpn.n += 1;
+        let n = self.vpn.n;
+        self.vpn.pedida = Some((n, ahora));
+        // Asked again later if nothing answers (the panel's page may still be loading).
+        self.vpn.proxima = ahora + VPN_CADA_MS;
+        o.push(Self::al_panel(panel, n, "GET", "/api/vpn"));
+        o
+    }
+
+    /// The panel's answer to one of this browser's own requests: the VPN's state, or what «Desconectar» did.
+    fn vpn_respuesta(&mut self, m: &Value) -> Vec<Orden> {
+        let n = m.get("n").and_then(Value::as_u64).unwrap_or(0);
+        let estado = m.get("estado").and_then(Value::as_u64).unwrap_or(0);
+        let datos: Value = serde_json::from_str(texto(m, "datos")).unwrap_or(Value::Null);
+        let ahora = (self.reloj)();
+        if self.vpn.desconectando.is_some_and(|(x, _)| x == n) {
+            self.vpn.desconectando = None;
+            let hecho = estado == 200 && datos.get("ok").and_then(Value::as_bool) == Some(true);
+            self.vpn.aviso = if hecho {
+                None
+            } else if self.vpn.fase == "conectando"
+                || texto(&datos, "motivo").contains("conectando")
+            {
+                // The service closes a connection only once it finished connecting.
+                Some("vpn_espera_conectar")
+            } else {
+                Some("vpn_no_desconecta")
+            };
+            // The state again at once: «apagada» when it worked.
+            self.vpn.pedida = None;
+            self.vpn.proxima = ahora;
+            self.vpn.fallos = 0;
+            return vec![envia(Origen::Barra, &self.msg_vpn())];
+        }
+        if !self.vpn.pedida.is_some_and(|(x, _)| x == n) {
+            return Vec::new();
+        }
+        self.vpn.pedida = None;
+        let fase = match texto(&datos, "fase") {
+            f @ ("apagada" | "conectando" | "conectada" | "sin_respuesta" | "error") => f,
+            _ => "",
+        };
+        if estado != 200 || fase.is_empty() {
+            // The panel could not answer (its session not ready, the service starting): later, each time a little later.
+            let espera = VPN_REINTENTO_MS.saturating_mul(1 << self.vpn.fallos.min(4));
+            self.vpn.fallos = self.vpn.fallos.saturating_add(1);
+            self.vpn.proxima = ahora + espera.min(60_000);
+            return Vec::new();
+        }
+        self.vpn.fallos = 0;
+        self.vpn.proxima = if vpn_activa(fase) {
+            ahora + VPN_CADA_MS
+        } else {
+            i64::MAX
+        };
+        if fase == self.vpn.fase {
+            return Vec::new();
+        }
+        self.vpn.fase = fase.to_owned();
+        self.vpn.aviso = None;
+        vec![envia(Origen::Barra, &self.msg_vpn())]
+    }
+
+    /// «Desconectar» on the bar's VPN chip: `POST /api/vpn/desconecta` through the panel's own tab, on this computer.
+    fn vpn_desconectar(&mut self) -> Vec<Orden> {
+        if self.vpn.desconectando.is_some() {
+            return Vec::new();
+        }
+        let Some(panel) = self.panel_fijo() else {
+            self.vpn.aviso = Some("vpn_sin_panel");
+            return vec![envia(Origen::Barra, &self.msg_vpn())];
+        };
+        self.vpn.n += 1;
+        let n = self.vpn.n;
+        self.vpn.desconectando = Some((n, (self.reloj)()));
+        self.vpn.aviso = None;
+        vec![
+            Self::al_panel(panel, n, "POST", "/api/vpn/desconecta"),
+            envia(Origen::Barra, &self.msg_vpn()),
+        ]
+    }
+
+    /// The top row over GUARDIANA's own pages too (Órbita, the panel, Comunicaciones), for the VPN's «Desconectar»:
+    /// while its server does not answer, or while GUARDIANA's web cannot load with the VPN on.
+    fn vpn_sobre_todo(&self) -> bool {
+        self.vpn.fase == "sin_respuesta"
+            || (vpn_activa(&self.vpn.fase)
+                && self
+                    .pestanas
+                    .iter()
+                    .any(|p| p.fija && es_orbita(&p.url) && p.sin_red))
     }
 
     /// A click on the web in front while its side summary is open (Z1-b): it folds back into
@@ -2484,9 +2742,9 @@ impl Sesion {
     }
 
     /// Whether the shield stays open beside the pages: from every start, unless the person closed
-    /// it in this session, and only while there is protection to show.
+    /// it in this session (at every state of the licence: the browser is free, 2 Nov 2026).
     fn escudo_a_la_vista(&self) -> bool {
-        !self.escudo_cerrado && self.prefs.bienvenida && self.licencia.protege()
+        !self.escudo_cerrado && self.prefs.bienvenida
     }
 
     /// Done with a view (a question answered, settings closed): back to the shield while the
@@ -2626,17 +2884,9 @@ impl Sesion {
 
     fn orden_de_pagina(&mut self, origen: Origen, tipo: &str, m: &Value) -> Vec<Orden> {
         let activa = self.activa;
-        // The paid tool left in the panel (2 Nov 2026: «Tarea para tu IA», «Preguntar a una IA sin
-        // dar tus datos» and «Mis datos» left the browser, the owner, 16:50).
-        let de_pago = tipo == "subasta_carta";
-        if de_pago && !self.licencia.protege() {
-            let mut o = self.abre_panel("licencia");
-            // An unreadable file is not an ended trial: the panel says what happened.
-            if !matches!(self.licencia, EstadoLicencia::Ilegible { .. }) {
-                o.push(self.aviso("licencia_hace_falta", &[]));
-            }
-            return o;
-        }
+        // No tool of the browser waits for a plan any more (2 Nov 2026, the owner, 17:01): the
+        // letters to a company are written here and sent by the person, nothing crosses a server
+        // of ours.
         match tipo {
             // --- 1.0.46 «Tu visita, a subasta» (subastas-1.0.46) -------------------------------
             "subasta_permitir" => {
@@ -2671,6 +2921,8 @@ impl Sesion {
             }
             "subasta_recibo" => self.subasta_recibo(origen),
             "subasta_carta" => self.subasta_carta(origen, m),
+            // 2 Nov 2026 (the VPN review): the bar's «Desconectar», only from the bar itself.
+            "vpn_desconectar" if origen == Origen::Barra => self.vpn_desconectar(),
             "subasta_adstxt" => {
                 let Some(p) = self.pestana(activa) else {
                     return Vec::new();
@@ -2871,9 +3123,12 @@ impl Sesion {
                 self.prefs.reglas.cortar_seguimiento = si(m, "cortar");
                 self.prefs.bienvenida = true;
                 self.guarda_prefs();
-                let mut o = vec![Orden::Seguimiento {
-                    estricto: self.seguimiento_estricto(),
-                }];
+                let mut o = vec![
+                    Orden::Seguimiento {
+                        estricto: self.seguimiento_estricto(),
+                    },
+                    self.estado(),
+                ];
                 o.extend(self.cierra_panel());
                 o.extend(self.escudo_activa(false));
                 o.extend(self.hoy_a_todos());
@@ -2908,6 +3163,7 @@ impl Sesion {
                 o.push(envia(Origen::Barra, &self.msg_licencia()));
                 o.push(envia(Origen::Barra, &self.msg_hoy()));
                 o.push(envia(Origen::Barra, &self.msg_marco()));
+                o.push(envia(Origen::Barra, &self.msg_vpn()));
                 if !self.prefs.bienvenida {
                     o.extend(self.abre_panel("bienvenida"));
                 } else if self.panel.is_none() && self.escudo_a_la_vista() {
@@ -2988,6 +3244,8 @@ impl Sesion {
                         estricto: self.seguimiento_estricto(),
                     },
                     envia(Origen::Panel, &self.msg_ajustes()),
+                    // The bar's switches (2 Nov 2026) say the same at once.
+                    self.estado(),
                 ];
                 o.extend(self.escudo_activa(false));
                 o.extend(self.hoy_a_todos());
@@ -3026,7 +3284,7 @@ impl Sesion {
                     self.prefs.reglas.maxima = false;
                 }
                 self.guarda_prefs();
-                let mut o = vec![envia(Origen::Panel, &self.msg_ajustes())];
+                let mut o = vec![envia(Origen::Panel, &self.msg_ajustes()), self.estado()];
                 o.extend(self.escudo_activa(false));
                 o
             }
@@ -3037,7 +3295,7 @@ impl Sesion {
                     self.prefs.reglas.maxima = false;
                 }
                 self.guarda_prefs();
-                let mut o = vec![envia(Origen::Panel, &self.msg_ajustes())];
+                let mut o = vec![envia(Origen::Panel, &self.msg_ajustes()), self.estado()];
                 o.extend(self.escudo_activa(false));
                 o
             }
@@ -3727,36 +3985,6 @@ impl Sesion {
 
     // --- 1.0.46 «Tu visita, a subasta» (subastas-1.0.46) ---------------------------------------
 
-    /// A request of a tab while the browser does not protect (Free): only the auction view
-    /// learns from it; nothing is cut, counted elsewhere or written but the day's two figures.
-    fn subasta_sin_proteccion(&mut self, id: u32, url: &str) {
-        let Ok(dir) = url::Url::parse(url) else {
-            return;
-        };
-        let host = dir
-            .host_str()
-            .map(crate::dominio::normaliza_host)
-            .unwrap_or_default();
-        if host.is_empty() {
-            return;
-        }
-        let hoy = self.hoy();
-        let destino = crate::destino::clasifica_en(&host, dir.path());
-        let Some(p) = self.pestanas.iter_mut().find(|p| p.id == id) else {
-            return;
-        };
-        let otro = !destino.sitio.is_empty() && destino.sitio != p.subasta.sitio;
-        if p.subasta
-            .anota_peticion(&dir, &host, otro, destino.sigue(), false)
-        {
-            if p.perfil != Perfil::Aislada {
-                self.subastas.empresa(&hoy, &destino.sitio);
-                self.subastas_sucio = true;
-            }
-            self.sucios.insert(id);
-        }
-    }
-
     /// A report of the page script about the page's auction (`zg_subasta`), from the page the
     /// tab shows now and with that page's token.
     fn subasta_mensaje(&mut self, id: u32, fuente: &str, m: &Value) -> Vec<Orden> {
@@ -3795,20 +4023,15 @@ impl Sesion {
         let hoy = self.hoy();
         let semana = fecha::dia_antes(ahora, self.zona, 6);
         let r = &self.prefs.reglas;
-        let protege = self.licencia.protege();
         let mut v = p.subasta.vista();
         if let Some(o) = v.as_object_mut() {
             o.insert("hoy".into(), self.subastas.suma(&hoy, &hoy));
             o.insert("semana".into(), self.subastas.suma(&semana, &hoy));
-            o.insert("protege".into(), json!(protege));
             o.insert(
                 "activo".into(),
-                json!(protege && r.cortar_seguimiento && !r.subastas_sin_cortar),
+                json!(r.cortar_seguimiento && !r.subastas_sin_cortar),
             );
-            o.insert(
-                "corta".into(),
-                json!(protege && r.corta_subastas(&p.subasta.sitio)),
-            );
+            o.insert("corta".into(), json!(r.corta_subastas(&p.subasta.sitio)));
             o.insert(
                 "permitida".into(),
                 json!(r.subastas_permitidas.contains(&p.subasta.sitio)),
@@ -3987,7 +4210,7 @@ impl Sesion {
     /// page (decision 206), or `null`.
     fn cookies_pide(&self, id: u32, fuente: &str, m: &Value) -> Vec<Orden> {
         let ficha: String = texto(m, "zg").chars().take(64).collect();
-        let si = self.licencia.protege() && !self.prefs.cookies_sin_tocar;
+        let si = !self.prefs.cookies_sin_tocar;
         vec![Orden::RespondeFormulario {
             id,
             json: json!({
@@ -4009,10 +4232,7 @@ impl Sesion {
         let r = &self.prefs.reglas;
         // 1.0.46: on with the protection unless the person turned the noise off; maximum
         // protection always has it.
-        if !(self.licencia.protege()
-            && r.cortar_seguimiento
-            && (r.maxima || !self.prefs.huella_sin_ruido))
-        {
+        if !(r.cortar_seguimiento && (r.maxima || !self.prefs.huella_sin_ruido)) {
             return Value::Null;
         }
         let Some(p) = self.pestana(id) else {
@@ -4040,7 +4260,7 @@ impl Sesion {
     /// The guard dealt with the page's cookie notice: the shield says so. Only the managers the
     /// guard knows, and only when it was told to act.
     fn cookies_hecho(&mut self, id: u32, m: &Value) -> Vec<Orden> {
-        if !self.licencia.protege() || self.prefs.cookies_sin_tocar {
+        if self.prefs.cookies_sin_tocar {
             return Vec::new();
         }
         let gestor: String = texto(m, "gestor").chars().take(40).collect();
@@ -4194,9 +4414,6 @@ impl Sesion {
     /// From a frame (`marco`, see [`Self::mensaje_de_marco`]) the reads belong to the page the tab
     /// shows; with no web address on the stack, to the frame's own address.
     fn huella(&mut self, id: u32, fuente: &str, m: &Value, marco: bool) -> Vec<Orden> {
-        if !self.licencia.protege() {
-            return Vec::new();
-        }
         let lista: Vec<(Tecnica, Vec<String>, bool)> = m
             .get("lista")
             .and_then(Value::as_array)
@@ -4340,7 +4557,7 @@ impl Sesion {
             id,
             json: json!({ "zg": ficha, "id": id_pagina, "enviar": enviar }).to_string(),
         };
-        if encontradas.is_empty() || host.is_empty() || !self.licencia.protege() {
+        if encontradas.is_empty() || host.is_empty() {
             return vec![responde(true)];
         }
         // A site that already has these kinds of data from you is not asked about again; the
@@ -4490,6 +4707,8 @@ impl Sesion {
     // --- everything else -------------------------------------------------------------------------
 
     fn borrar_todo(&mut self) -> Vec<Orden> {
+        // A save still on its way must not bring back what is erased now.
+        self.escritor.espera();
         for f in [
             "tinta.json",
             "libro.json",
@@ -4581,14 +4800,13 @@ impl Sesion {
     ) -> (bool, Vec<Orden>) {
         let es_web =
             (url.starts_with("http://") || url.starts_with("https://")) && !es_interna(url);
-        let protege = self.licencia.protege();
         let Some(p) = self.pestana_mut(id) else {
             return (false, Vec::new());
         };
         // A server redirect to an address with tracking tags (a redirect is always a GET here):
         // cancelled and opened clean. Pages the person opens are cleaned when their request
         // leaves (`peticion`), which also keeps form posts intact.
-        if redirigida && es_web && protege {
+        if redirigida && es_web {
             if let Some((limpia, n)) = url_limpia::limpia(url) {
                 p.quitados += u32::try_from(n).unwrap_or(u32::MAX);
                 p.limpiando = Some(sin_fragmento(url).to_string());
@@ -4652,7 +4870,7 @@ impl Sesion {
         }
         // The boxes the cut adverts leave empty are hidden too, as Brave does: the hiding
         // rules of EasyList and uBlock filters for this host, while the protection is on.
-        if es_web && self.prefs.reglas.cortar_seguimiento && self.licencia.protege() {
+        if es_web && self.prefs.reglas.cortar_seguimiento {
             if let Some(script) = host_de(url).and_then(|h| crate::filtros::guion_ocultar(&h)) {
                 o.push(Orden::Ejecuta { id, script });
             }
@@ -4831,9 +5049,9 @@ impl Sesion {
         Some((id, o))
     }
 
-    /// Whether pop-ups are dealt with: the subscription on and «remove pop-ups» on.
-    fn emergentes_activas(&self) -> bool {
-        self.licencia.protege() && !self.prefs.emergentes_sin_tocar
+    /// Whether pop-ups are dealt with: «remove pop-ups» on (at every state of the licence).
+    const fn emergentes_activas(&self) -> bool {
+        !self.prefs.emergentes_sin_tocar
     }
 
     /// A window tab `de` asks to open to `url`, judged before it opens like something its page
@@ -4904,13 +5122,9 @@ impl Sesion {
         // What the person approved sending to this site a moment ago goes there.
         let sin_permiso = self.formas_sin_permiso(p, &destino.sitio, &self.formas, ahora);
         let formas: &[Forma] = sin_permiso.as_deref().unwrap_or(&self.formas);
-        let con_cuerpo = matches!(
-            metodo.to_ascii_uppercase().as_str(),
-            "POST" | "PUT" | "PATCH"
-        );
         let peticion = Peticion {
             url,
-            cuerpo: if con_cuerpo { cuerpo } else { &[] },
+            cuerpo: if con_cuerpo(metodo) { cuerpo } else { &[] },
             recurso,
             sitio_pagina: &sitio_pagina,
         };
@@ -4941,10 +5155,68 @@ impl Sesion {
         cookies: &str,
         contexto: i32,
     ) -> Respuesta {
-        if metodo.eq_ignore_ascii_case("POST")
-            && url.starts_with("http://127.0.0.1:7443/api/licencia/activar-clave")
-            && !matches!(self.licencia, EstadoLicencia::Suscrita { .. })
-        {
+        self.decide_peticion(id, url, metodo, cuerpo, None, cookies, contexto)
+    }
+
+    /// 1.0.55 («más rápido»): the same for a body the shell only measured, without copying it ([`Cuerpo::Tamano`]):
+    /// `tamano` bytes. When it is cut, the answer asks for its bytes ([`Respuesta::cuerpo`]), so its line in «Lo que se
+    /// cortó» names what it carried; nothing else needs them.
+    pub fn peticion_medida(
+        &mut self,
+        id: u32,
+        url: &str,
+        metodo: &str,
+        tamano: u64,
+        cookies: &str,
+        contexto: i32,
+    ) -> Respuesta {
+        self.decide_peticion(id, url, metodo, &[], Some(tamano), cookies, contexto)
+    }
+
+    /// 1.0.55: the bytes of the request just cut with only its size known ([`Respuesta::cuerpo`]): its line in «Lo que
+    /// se cortó», and what the screen can show of it, name what it carried. It never left; nothing else changes.
+    pub fn cuerpo_del_corte(&mut self, id: u32, url: &str, cuerpo: &[u8]) {
+        let Some(sc) = self.sin_cuerpo.take() else {
+            return;
+        };
+        if sc.id != id || sc.url != url || cuerpo.is_empty() {
+            return;
+        }
+        if let Some(c) = self.cortes_pend.get_mut(sc.indice) {
+            if c.ts == sc.ts && c.host == sc.host && c.ruta == sc.ruta {
+                c.campos_cuerpo = crate::campos::nombres_cuerpo(cuerpo);
+            }
+        }
+        let visto = crate::campos::muestra(&sc.host, url, cuerpo, &sc.cookies);
+        if visto.is_empty() {
+            return;
+        }
+        match self.vistos.back_mut() {
+            Some(v) if v.0 == sc.ts && v.1 == sc.host && v.2 == sc.ruta => v.4 = visto,
+            _ => {
+                if self.vistos.len() >= MAX_VISTOS_MEMORIA {
+                    self.vistos.pop_front();
+                }
+                self.vistos
+                    .push_back((sc.ts, sc.host, sc.ruta, sc.quien, visto));
+            }
+        }
+    }
+
+    /// One request, with its body (`tamano` `None`) or only its size (`Some`).
+    #[allow(clippy::too_many_arguments)]
+    fn decide_peticion(
+        &mut self,
+        id: u32,
+        url: &str,
+        metodo: &str,
+        cuerpo: &[u8],
+        tamano: Option<u64>,
+        cookies: &str,
+        contexto: i32,
+    ) -> Respuesta {
+        self.sin_cuerpo = None;
+        if es_activacion(metodo, url) && !matches!(self.licencia, EstadoLicencia::Suscrita { .. }) {
             self.clave_del_panel = serde_json::from_slice::<Value>(cuerpo)
                 .ok()
                 .and_then(|v| v.get("clave").and_then(Value::as_str).map(str::to_owned))
@@ -4954,21 +5226,14 @@ impl Sesion {
         let web = ["http://", "https://", "ws://", "wss://"]
             .iter()
             .any(|e| url.starts_with(e));
-        if !web || es_interna(url) || !self.licencia.protege() {
-            // Without the trial or a subscription the browser opens pages and does nothing of
-            // its own: no cut, no cleaning, no count. It still shows the page's ad auction
-            // (1.0.46: the auction view is in every plan); nothing of it is cut.
-            if web && !es_interna(url) {
-                self.subasta_sin_proteccion(id, url);
-            }
+        if !web || es_interna(url) {
             return Respuesta::default();
         }
         let ahora = (self.reloj)();
         let hoy = self.hoy();
         let corta = Respuesta {
             cortar: true,
-            pagina: None,
-            nota: String::new(),
+            ..Respuesta::default()
         };
         let Some(i) = self.pestanas.iter().position(|p| p.id == id) else {
             // A tab the session no longer has (closing, or never known): nothing leaves it.
@@ -4991,7 +5256,7 @@ impl Sesion {
                 return Respuesta {
                     cortar: true,
                     pagina: Some(paginas::reabre(&limpia)),
-                    nota: String::new(),
+                    ..Respuesta::default()
                 };
             }
         }
@@ -5003,15 +5268,15 @@ impl Sesion {
             .map(crate::dominio::normaliza_host)
             .unwrap_or_default();
         let destino = crate::destino::clasifica_en(&host, dir.as_ref().map_or("", url::Url::path));
-        // The size of its body, when the shell read it (`necesita_cuerpo`); otherwise not known,
-        // never guessed. An empty body read and a body the engine did not give look the same,
-        // so both count as not known.
-        let con_cuerpo = matches!(
-            metodo.to_ascii_uppercase().as_str(),
-            "POST" | "PUT" | "PATCH"
-        );
-        let bytes = (con_cuerpo && !cuerpo.is_empty() && self.necesita_cuerpo(id, url))
-            .then(|| u64::try_from(cuerpo.len()).unwrap_or(u64::MAX));
+        // The size of its body, when the shell read it or measured it (`cuerpo_para`); otherwise
+        // not known, never guessed. An empty body and a body the engine did not give look the
+        // same, so both count as not known.
+        let con_cuerpo = con_cuerpo(metodo);
+        let bytes = match tamano {
+            _ if !con_cuerpo => None,
+            Some(n) => (n > 0).then_some(n),
+            None => (!cuerpo.is_empty()).then(|| u64::try_from(cuerpo.len()).unwrap_or(u64::MAX)),
+        };
         let recurso = {
             let p = &self.pestanas[i];
             let mut r = recurso_de_contexto(contexto);
@@ -5168,13 +5433,25 @@ impl Sesion {
                     visto,
                 ));
             }
+            // 1.0.55: only its size was known; its bytes come next, for this line.
+            if con_cuerpo && tamano.is_some_and(|n| n > 0) {
+                self.sin_cuerpo = Some(SinCuerpo {
+                    id,
+                    url: url.to_owned(),
+                    cookies: cookies.to_owned(),
+                    indice: self.cortes_pend.len(),
+                    ts: corte.ts,
+                    host: corte.host.clone(),
+                    ruta: corte.ruta.clone(),
+                    quien: corte.quien.clone(),
+                });
+            }
             self.cortes_pend.push(corte);
         }
         if d.de_fuera() {
             if self.pulsos.len() < 2000 {
-                self.pulsos.push(
-                    json!({ "pestana": id, "cortado": d.cortar, "quien": d.destino.quien() }),
-                );
+                self.pulsos
+                    .push((id, d.cortar, d.destino.quien().to_string()));
             }
             self.hoy_sucio = true;
         }
@@ -5258,6 +5535,7 @@ impl Sesion {
             cortar: true,
             pagina,
             nota,
+            cuerpo: self.sin_cuerpo.is_some(),
         }
     }
 
@@ -5290,8 +5568,12 @@ impl Sesion {
             self.licencia_pedida = ahora;
             o.push(Orden::ComprobarLicencia);
         }
+        o.extend(self.vpn_tic(ahora));
         if !self.pulsos.is_empty() {
-            let lista = std::mem::take(&mut self.pulsos);
+            let lista: Vec<Value> = std::mem::take(&mut self.pulsos)
+                .into_iter()
+                .map(|(pestana, cortado, quien)| json!({ "pestana": pestana, "cortado": cortado, "quien": quien }))
+                .collect();
             o.push(envia(
                 Origen::Barra,
                 &json!({ "tipo": "pulsos", "lista": lista }),
@@ -5316,6 +5598,7 @@ impl Sesion {
         }
         if ahora - self.ultimo_guardado >= 15_000 {
             self.ultimo_guardado = ahora;
+            let desde = self.depura.then(std::time::Instant::now);
             if self.diario_sucio {
                 self.guarda_diario();
             }
@@ -5326,8 +5609,21 @@ impl Sesion {
             if self.libro_sucio {
                 self.guarda_libro();
             }
+            if let Some(t) = desde {
+                if self.guardados_us.len() < 10_000 {
+                    self.guardados_us
+                        .push(u32::try_from(t.elapsed().as_micros()).unwrap_or(u32::MAX));
+                }
+            }
         }
         o
+    }
+
+    /// 1.0.55 («más rápido»): how long each save of the beat held the window's thread, in µs, while explaining
+    /// decisions ([`Sesion::pon_depuracion`], the automatic tests); empty otherwise.
+    #[must_use]
+    pub fn tiempos_guardado(&self) -> Vec<u32> {
+        self.guardados_us.clone()
     }
 
     /// A key the engine reports as an accelerator. `Some` when the browser handles it.
@@ -5385,6 +5681,8 @@ impl Sesion {
         self.guarda_subastas();
         self.guarda_libro();
         self.guarda_prefs();
+        // Everything on disk before the window goes.
+        self.escritor.espera();
     }
 }
 

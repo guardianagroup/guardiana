@@ -14,7 +14,7 @@
   const { manda, en, t, tn, esc } = Z;
   let caja = null;          // the section given by montar
   let datos = null;         // the last `subasta` of the shield's message
-  let pagina = null;        // what the frame said of the page (sitio, protege…)
+  let pagina = null;        // what the frame said of the page (sitio, cortando…)
   let carta = null;         // the last letter written, while it is for this site
   let recibo = '';          // the receipt's answer, while it is for this site
   let abierto = false;      // «El rastro de tus datos» unfolded
@@ -162,7 +162,6 @@
   }
 
   function interruptor(d) {
-    if (!d.protege) return '<p class="sub-nota">' + esc(t('sub_plus')) + '</p>';
     if (!d.activo) return '<p class="sub-nota">' + esc(t('sub_apagado')) + '</p>';
     const G = window.GuardianaInterruptor;
     if (!G) return '';
@@ -262,16 +261,12 @@
     const x = document.getElementById(id);
     if (x) x.addEventListener('change', (e) => manda({ tipo: 'ajuste', clave, valor: e.target.checked }));
   }
+  // Every one of them at every plan (2 Nov 2026, the owner, 17:01: the browser is free).
   en('ajustes', (m) => {
     for (const [id, clave] of ajustes) {
       const x = document.getElementById(id);
-      if (!x) continue;
-      x.checked = m[clave] === true;
-      // GPC is a request any plan can send; the rest are protections of Plus.
-      x.disabled = clave !== 'gpc' && m.sub_protege === false;
+      if (x) x.checked = m[clave] === true;
     }
-    const plus = document.getElementById('sub-a-plus');
-    if (plus) plus.classList.toggle('oculto', m.sub_protege !== false);
   });
 
   window.ZeroSubasta = {

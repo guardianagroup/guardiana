@@ -258,7 +258,7 @@
     }
     // «Permitir en esta web»: the standard switch, «Permitido» when the lists cut nothing here.
     const caja = $('z1-permitir');
-    caja.classList.toggle('oculto', !m.sitio || !m.protege);
+    caja.classList.toggle('oculto', !m.sitio);
     const G = window.GuardianaInterruptor;
     if (G && m.sitio) {
       $('z1-permitir-sw').innerHTML = G.html({ cortado: !m.web_permitida, texto: { permitido: t('interruptor_permitido'), cortado: t('interruptor_cortado'), cortando: t('interruptor_cortando'), permitiendo: t('interruptor_permitiendo') }, etiqueta: t('z1_permitir'), chico: true });
@@ -269,7 +269,7 @@
     const sub = $('zero-subasta');
     if (window.ZeroSubasta && typeof window.ZeroSubasta.montar === 'function') {
       try {
-        window.ZeroSubasta.montar(sub, { sitio: m.sitio || '', pestana: m.pestana, carga: m.carga || 0, cortando: !!m.cortando, protege: !!m.protege, resumen: r, terceros: m.terceros || [], idioma: document.documentElement.lang || 'en' });
+        window.ZeroSubasta.montar(sub, { sitio: m.sitio || '', pestana: m.pestana, carga: m.carga || 0, cortando: !!m.cortando, resumen: r, terceros: m.terceros || [], idioma: document.documentElement.lang || 'en' });
       } catch (e) { console.error(e); }
     }
   }
@@ -299,7 +299,6 @@
     $('e-resumen').textContent = r.empresas ? `${tn('escudo_resumen', r.empresas, { empresas: n(r.empresas) })} ${tn('escudo_resumen_cortadas', r.cortadas, { cortadas: n(r.cortadas) })}` : '';
     $('e-proteccion').checked = !!m.cortando;
     $('e-maxima').classList.toggle('encendida', !!m.maxima);
-    $('e-maxima').classList.toggle('oculto', !m.protege);
     $('e-maxima-activa').classList.toggle('oculto', !m.maxima);
     pintaFilas(m);
     const hechos = [];
@@ -307,7 +306,7 @@
     if (m.datos_salvados) hechos.push(tn('datos_salvados', m.datos_salvados, { n: n(m.datos_salvados) }));
     if (m.cookies) hechos.push(t(m.cookies.accion === 'rechazado' ? 'cookies_rechazado' : 'cookies_escondido', { gestor: m.cookies.gestor }));
     if (m.molestas) hechos.push(tn('molestas_cerradas', m.molestas, { n: n(m.molestas) }));
-    if (m.gpc && m.protege) hechos.push(t('gpc_enviada'));
+    if (m.gpc) hechos.push(t('gpc_enviada'));
     let html = hechos.map((h) => `<span>${esc(h)}</span>`).join('');
     // Pop-ups not opened: the last one can still be opened, if the person wanted it.
     if (m.emergentes) {
@@ -518,52 +517,46 @@
 
   // --- subscription -------------------------------------------------------------------------------
   // Every line is drawn from the state the program sends; the dates in the person's language.
+  // The browser protects the same at every plan (2 Nov 2026, the owner, 17:01: «El navegador, sí, también quiero que
+  // lo dejes gratis»): these lines say the plan, never that the protection stops.
   let lic = null;
   function lineaLicencia(m) {
     switch (m.estado) {
       case 'prueba': return tn('licencia_prueba', m.dias, { d: n(m.dias), fecha: fecha(m.termina) });
       case 'suscrita': return t('licencia_suscrita', { fecha: fecha(m.desde) });
-      case 'prueba_terminada': return t('licencia_prueba_terminada', { fecha: fecha(m.desde) });
-      case 'suscripcion_terminada': return t('licencia_terminada_' + (m.motivo || 'cancelada'), { fecha: fecha(m.desde) });
-      case 'ilegible': return t('licencia_ilegible_fin', { datos: m.donde_datos || '' });
+      case 'prueba_terminada': return t('licencia_prueba_terminada_gratis', { fecha: fecha(m.desde) });
+      case 'suscripcion_terminada': return t('licencia_terminada_gratis_' + (m.motivo || 'cancelada'), { fecha: fecha(m.desde) });
+      case 'ilegible': return t('licencia_ilegible_fin_gratis', { datos: m.donde_datos || '' });
       default: return '';
     }
   }
-  // The short form, where there is room for one line only.
-  function pastillaLicencia(m) {
-    if (m.estado === 'prueba_terminada') return t('licencia_pastilla_terminada');
-    if (m.estado === 'ilegible') return t('licencia_pastilla_ilegible_fin');
-    return t('licencia_pastilla_sin_suscripcion');
-  }
   function pintaLicencia(m) {
     lic = m;
-    const terminada = m.protege === false;
+    const gratis = m.nivel === 'gratis';
     const suscrita = m.estado === 'suscrita';
     // The licence file cannot be read right now: said first, above what was last known.
-    const sinLeer = !terminada && m.ilegible ? t('licencia_ilegible', { datos: m.donde_datos || '' }) : '';
+    const sinLeer = !gratis && m.ilegible ? t('licencia_ilegible_plus', { datos: m.donde_datos || '' }) : '';
     const caja = $('l-caja');
-    caja.classList.toggle('sin-proteccion', terminada);
     caja.classList.toggle('prueba', m.estado === 'prueba' || !!sinLeer);
     caja.classList.toggle('oculto', m.estado === 'desconocido' && !sinLeer);
-    // The end-of-trial text says everything itself; the others get their detail below.
-    $('l-estado').textContent = terminada ? '' : (sinLeer || lineaLicencia(m));
-    $('l-estado').classList.toggle('oculto', terminada);
+    // The free plan's text says everything itself; the others get their detail below.
+    $('l-estado').textContent = gratis ? '' : (sinLeer || lineaLicencia(m));
+    $('l-estado').classList.toggle('oculto', gratis);
     let detalle = '';
-    if (terminada) detalle = lineaLicencia(m);
-    else if (sinLeer) detalle = lineaLicencia(m);
-    else if (m.estado === 'prueba') detalle = t('licencia_al_terminar');
+    if (gratis || sinLeer) detalle = lineaLicencia(m);
+    else if (m.estado === 'prueba') detalle = t('licencia_al_terminar_gratis');
     else if (suscrita) {
       const partes = [];
       if (m.periodo === 0 || m.periodo === 30 || m.periodo === 365) partes.push(t('licencia_periodo_' + m.periodo));
-      if (m.fallida && m.caduca) partes.push(t('licencia_fallida', { fecha: fecha(m.caduca) }));
+      if (m.fallida && m.caduca) partes.push(t('licencia_fallida_plus', { fecha: fecha(m.caduca) }));
       else if (m.proxima && m.periodo !== 0) partes.push(t('licencia_proxima', { fecha: fecha(m.proxima) }));
       detalle = partes.join(' ');
     }
     $('l-detalle').textContent = detalle;
-    $('l-detalle').style.color = terminada ? 'var(--tinta)' : '';
+    $('l-detalle').style.color = gratis ? 'var(--tinta)' : '';
     $('l-comprar-caja').classList.toggle('oculto', suscrita);
     $('l-clave-caja').classList.toggle('oculto', suscrita && !m.fallida);
-    $('l-activar').classList.toggle('principal', terminada);
+    $('l-activar').classList.toggle('principal', gratis);
     $('l-activar').disabled = !!m.ocupada;
     $('l-ocupada').classList.toggle('oculto', !m.ocupada);
     $('l-error').classList.toggle('oculto', !m.error);
@@ -572,14 +565,8 @@
     $('l-conexiones').innerHTML = con.map((c) => `<li><time>${esc(fecha(c.ms))} ${esc(hora(c.ms))}</time><span><span class="mono">${esc(c.host)}</span> · ${esc(t(c.version ? 'conexion_version' : (c.pedida ? 'licencia_conexion_pedida' : 'licencia_conexion_periodica')))}</span></li>`).join('');
     $('l-conexiones-vacio').classList.toggle('oculto', con.length > 0);
     $('l-donde').textContent = m.donde_datos ? t('licencia_donde', { datos: m.donde_datos, ancla: m.donde_ancla }) : '';
-    // Where the shield is, the same news; in the settings, one line.
-    $('e-licencia').classList.toggle('oculto', !terminada);
-    $('e-licencia-txt').textContent = terminada ? lineaLicencia(m) : '';
-    $('e-proteccion').disabled = terminada;
-    $('a-proteccion').disabled = terminada;
-    $('a-cookies').disabled = terminada;
-    $('a-emergentes').disabled = terminada;
-    $('a-licencia').textContent = terminada ? pastillaLicencia(m) : (m.ilegible ? t('licencia_pastilla_ilegible') : lineaLicencia(m));
+    // In the settings, one line: the plan.
+    $('a-licencia').textContent = m.ilegible || m.estado === 'ilegible' ? t('licencia_pastilla_ilegible') : gratis ? t('licencia_pastilla_gratis') : lineaLicencia(m);
   }
   en('licencia', pintaLicencia);
   $('l-comprar').addEventListener('click', () => manda({ tipo: 'licencia_comprar' }));
@@ -587,7 +574,6 @@
     e.preventDefault();
     manda({ tipo: 'licencia_activar', clave: $('l-clave').value });
   });
-  $('e-licencia-ver').addEventListener('click', () => manda({ tipo: 'panel', vista: 'licencia' }));
   $('a-licencia-ver').addEventListener('click', () => manda({ tipo: 'panel', vista: 'licencia' }));
   let avisoTimer = 0;
   en('aviso', (m) => {
