@@ -1,0 +1,219 @@
+//! `guardiana vpn apaga | estado` (strict mode, ronda 91; docs/VPN.md, «Modo estricto»): the way out that works with
+//! GUARDIANA's service stopped. Strict mode's block lives in Windows apart from the service, so it holds when the
+//! service crashes, stops or the computer restarts; this command takes it away whether the service answers or not:
+//!
+//! 1. when the service answers on this computer, it is asked to switch the VPN off (`POST /api/vpn/desconecta`, with the
+//!    panel's key, as «Desconectar» does): it closes the tunnel and removes the block itself;
+//! 2. always, and directly: the VPN off in what is kept (`sistema/vpn.json`; `--desinstalando` removes the file) and every
+//!    filter, the sublayer and the provider of strict mode out of Windows, by their fixed keys
+//!    (`guardiana_panel::quita_el_bloqueo`). That needs an administrator: from the Start menu's entry (`--menu`) the
+//!    command asks Windows for the rights itself, and waits for Enter before its window closes.
+//!
+//! `estado` says what is kept and what Windows has (`--json` for the tests).
+//!
+//! Every sentence printed comes from `crates/panel/i18n/es.json` (`cli.vpn.*`).
+
+use std::error::Error;
+use std::io::{Read, Write};
+use std::net::{SocketAddr, TcpStream};
+use std::time::Duration;
+
+use guardiana_core::i18n::{self, Texts};
+use guardiana_core::paths;
+
+use crate::args::Opts;
+
+/// `guardiana vpn [estado | apaga]`.
+pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
+    let t = i18n::current();
+    match opts
+        .positional()
+        .first()
+        .map(String::as_str)
+        .unwrap_or("estado")
+    {
+        "apaga" | "apagar" | "off" => apaga(t, opts),
+        "estado" | "status" => {
+            estado(t, opts.has("json"));
+            Ok(())
+        }
+        _ => {
+            println!("{}", t.cli("vpn.uso"));
+            Ok(())
+        }
+    }
+}
+
+/// The VPN off, and strict mode's block out of Windows, with the service running or not.
+fn apaga(t: &Texts, opts: &Opts) -> Result<(), Box<dyn Error>> {
+    let menu = opts.has("menu");
+    let por_el_servicio = pide_al_servicio();
+    let resultado = guardiana_panel::quita_el_bloqueo(opts.has("desinstalando"));
+    let salida = match resultado {
+        Ok(q) => {
+            println!(
+                "{}",
+                t.cli(if por_el_servicio || q.filtros > 0 {
+                    "vpn.apagada"
+                } else {
+                    "vpn.nada"
+                })
+            );
+            Ok(())
+        }
+        // the service already did it; this process only lacked the rights to look
+        Err(_) if por_el_servicio => {
+            println!("{}", t.cli("vpn.apagada"));
+            Ok(())
+        }
+        Err(e) if e.sin_permiso => {
+            if menu && !opts.has("elevado") {
+                println!("{}", t.cli("vpn.pide_permiso"));
+                if pide_permiso() {
+                    // the window with the rights says the rest
+                    return Ok(());
+                }
+            }
+            eprintln!("{}", t.cli("vpn.privilegios"));
+            Err("".into())
+        }
+        Err(e) => {
+            eprintln!("{}", t.cli("vpn.fallo").replace("{e}", &e.motivo));
+            Err("".into())
+        }
+    };
+    if menu {
+        println!("{}", t.cli("vpn.intro"));
+        let mut linea = String::new();
+        let _ = std::io::stdin().read_line(&mut linea);
+    }
+    salida
+}
+
+/// What is kept and what Windows has of strict mode.
+fn estado(t: &Texts, json: bool) {
+    let e = guardiana_panel::estado_del_modo_estricto();
+    if json {
+        println!("{}", serde_json::to_string(&e).unwrap_or_default());
+        return;
+    }
+    println!(
+        "{}",
+        t.cli("vpn.estado")
+            .replace(
+                "{estricto}",
+                t.cli(if e.estricto {
+                    "vpn.encendido"
+                } else {
+                    "vpn.apagado"
+                })
+            )
+            .replace(
+                "{vpn}",
+                t.cli(if e.encendida {
+                    "vpn.la_vpn_encendida"
+                } else {
+                    "vpn.la_vpn_apagada"
+                })
+            )
+            .replace("{persistentes}", &e.persistentes.to_string())
+            .replace("{arranque}", &e.arranque.to_string())
+    );
+    if let Some(no) = e.error {
+        eprintln!("{}", t.cli("vpn.fallo").replace("{e}", &no));
+    }
+}
+
+/// `POST /api/vpn/desconecta` to GUARDIANA's service on this computer, with the panel's key, as «Desconectar» does:
+/// whether it answered that the VPN is off. `false` when the service does not answer or the key cannot be read.
+fn pide_al_servicio() -> bool {
+    let Ok(llave) = std::fs::read_to_string(paths::data_dir().join(guardiana_panel::TOKEN_FILE))
+    else {
+        return false;
+    };
+    let llave = llave.trim();
+    if llave.len() != 64 || !llave.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return false;
+    }
+    let puerto = guardiana_panel::DEFAULT_PORT;
+    let Ok(mut s) = TcpStream::connect_timeout(
+        &SocketAddr::from(([127, 0, 0, 1], puerto)),
+        Duration::from_secs(2),
+    ) else {
+        return false;
+    };
+    // closing the tunnel can take a few seconds
+    let _ = s.set_read_timeout(Some(Duration::from_secs(40)));
+    let _ = s.set_write_timeout(Some(Duration::from_secs(5)));
+    let pedido = format!(
+        "POST /api/vpn/desconecta HTTP/1.1\r\nHost: 127.0.0.1:{puerto}\r\nX-Guardiana-Token: {llave}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    );
+    if s.write_all(pedido.as_bytes()).is_err() {
+        return false;
+    }
+    let mut respuesta = String::new();
+    let _ = s.read_to_string(&mut respuesta);
+    contesto_que_si(&respuesta)
+}
+
+/// Whether the panel's answer says the VPN is off: `200` and `"ok":true`.
+fn contesto_que_si(respuesta: &str) -> bool {
+    respuesta.starts_with("HTTP/1.1 200") && respuesta.contains("\"ok\":true")
+}
+
+/// From the Start menu's entry, without an administrator's rights: the same command again, with Windows asked for them
+/// (its own window says what happened). Whether Windows started it.
+#[cfg(windows)]
+fn pide_permiso() -> bool {
+    let Ok(exe) = std::env::current_exe() else {
+        return false;
+    };
+    let ruta = exe.to_string_lossy().replace('\'', "''");
+    std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            &format!(
+                "Start-Process -FilePath '{ruta}' -ArgumentList 'vpn','apaga','--menu','--elevado' -Verb RunAs"
+            ),
+        ])
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
+/// Only Windows has an entry in a Start menu for this.
+#[cfg(not(windows))]
+fn pide_permiso() -> bool {
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn solo_un_si_del_panel_cuenta() {
+        assert!(contesto_que_si(
+            "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n\r\n{\"ok\":true}"
+        ));
+        assert!(!contesto_que_si(
+            "HTTP/1.1 200 OK\r\n\r\n{\"ok\":false,\"motivo\":\"x\"}"
+        ));
+        assert!(!contesto_que_si(
+            "HTTP/1.1 401 Unauthorized\r\n\r\nsession token required"
+        ));
+        assert!(!contesto_que_si(""));
+    }
+
+    /// Off Windows there is no block: `apaga` says the VPN was already off, and `estado` reads what is kept.
+    #[test]
+    fn el_estado_se_lee_sin_windows() {
+        let e = guardiana_panel::estado_del_modo_estricto();
+        #[cfg(not(windows))]
+        assert_eq!((e.persistentes, e.arranque, e.objetos), (0, 0, false));
+        let texto = serde_json::to_string(&e).unwrap_or_default();
+        assert!(texto.contains("\"estricto\":"));
+        assert!(texto.contains("\"persistentes\":"));
+    }
+}

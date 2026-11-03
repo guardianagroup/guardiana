@@ -24,6 +24,7 @@ mod service_cmd;
 mod show;
 mod trampa_cmd;
 mod verify_cmd;
+mod vpn_cmd;
 
 use std::error::Error;
 
@@ -113,6 +114,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         Some("trampa" | "trampas") => trampa_cmd::run(&opts),
         Some("verify" | "verificar") => verify_cmd::run(&opts),
         Some("certificado") => certificado_cmd::run(&opts),
+        // Strict mode's way out (ronda 91): works with the service stopped.
+        Some("vpn") => vpn_cmd::run(&opts),
         Some("version" | "--version" | "-V") => {
             println!("guardiana {}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -162,6 +165,8 @@ mod tests {
             include_str!("show.rs"),
             include_str!("trampa_cmd.rs"),
             include_str!("verify_cmd.rs"),
+            include_str!("vpn_cmd.rs"),
+            include_str!("../../panel/src/vpn.rs"),
             include_str!("../../panel/src/api.rs"),
             include_str!("../../verify/src/lib.rs"),
             include_str!("../../service/src/sysdns/mod.rs"),

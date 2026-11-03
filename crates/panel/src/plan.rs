@@ -57,7 +57,8 @@ pub(crate) const RUTAS_PLUS: &[(Option<Method>, &str)] = &[
     (Some(Method::POST), "/api/borrado/envios"),
     // The VPN: connecting is Plus (trial, subscription or Lifetime), because every connection is real traffic on a
     // server (the owner, 2 Nov 2026, 17:01: «lo que realmente vamos a dejar es de pago, va a ser la VPN, las llamadas
-    // ultra»). Its state and «Desconectar» stay free: a tunnel opened during the trial can always be closed.
+    // ultra»). Its state, «Desconectar» and strict mode's switch stay free: a tunnel opened during the trial can always
+    // be closed, and strict mode's block always removed.
     (Some(Method::POST), "/api/vpn/conecta"),
     // Other branches of 1.0.45.
     (None, "/api/vigilancia"),
@@ -236,6 +237,8 @@ mod tests {
         assert!(es_plus(&Method::POST, "/api/vpn/conecta"));
         assert!(!es_plus(&Method::GET, "/api/vpn"));
         assert!(!es_plus(&Method::POST, "/api/vpn/desconecta"));
+        // Strict mode (ronda 91) is a safety setting, and turning it off is a way out: never Plus.
+        assert!(!es_plus(&Method::POST, "/api/vpn/estricto"));
     }
 
     #[test]

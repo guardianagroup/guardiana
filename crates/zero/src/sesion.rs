@@ -525,8 +525,11 @@ struct Pregunta {
 /// of the web: when the VPN's server stops answering, its cut leaves no internet and the web cannot load.
 #[derive(Debug, Default)]
 struct Vpn {
-    /// `apagada`, `conectando`, `conectada`, `sin_respuesta` or `error`; empty until the service answers.
+    /// `apagada`, `conectando`, `conectada`, `sin_respuesta`, `reconectando` (strict mode) or `error`; empty until the
+    /// service answers.
     fase: String,
+    /// Strict mode is on (the service's `estricto`): with its server silent, nothing leaves until it answers.
+    estricto: bool,
     /// The reading in flight: its number and when it left.
     pedida: Option<(u64, i64)>,
     /// The «Desconectar» in flight: its number and when it left.
@@ -548,9 +551,18 @@ const VPN_REINTENTO_MS: i64 = 5_000;
 /// A reading or an order with no answer for this long is given up.
 const VPN_SIN_RESPUESTA_MS: i64 = 10_000;
 
-/// The VPN is on: the bar shows it with «Desconectar».
+/// The VPN is on: the bar shows it with «Desconectar». `reconectando` is strict mode's (ronda 91): its server does not
+/// answer, the tunnel is down and nothing leaves until it comes back or the person turns it off.
 fn vpn_activa(fase: &str) -> bool {
-    matches!(fase, "conectando" | "conectada" | "sin_respuesta")
+    matches!(
+        fase,
+        "conectando" | "conectada" | "sin_respuesta" | "reconectando"
+    )
+}
+
+/// The VPN is on and its server does not answer: no internet until it does, so «Desconectar» must be at hand.
+fn vpn_callada(fase: &str) -> bool {
+    matches!(fase, "sin_respuesta" | "reconectando")
 }
 
 /// The browser's state.
@@ -836,6 +848,9 @@ const PANEL_LECTURAS: &[(&str, &str)] = &[
     ("GET", "/api/vpn"),
     ("POST", "/api/vpn/conecta"),
     ("POST", "/api/vpn/desconecta"),
+    // 3 Nov 2026, strict mode (ronda 91): its switch, a POST like the two above, so the panel's tab takes it only right
+    // after a real click; its state comes in `GET /api/vpn`.
+    ("POST", "/api/vpn/estricto"),
     // 3 Nov 2026, Ultra (the owner, 00:20: «empezar ya la versión ultra»): the level in force (`plus` or
     // `gratis`), so Comunicaciones in the program knows whether an Ultra invitation can be created here.
     // Read only; the key never leaves the panel.
@@ -2244,6 +2259,7 @@ impl Sesion {
         json!({
             "tipo": "vpn",
             "fase": self.vpn.fase,
+            "estricto": self.vpn.estricto,
             "desconectando": self.vpn.desconectando.is_some(),
             "aviso": self.vpn.aviso,
         })
@@ -2314,9 +2330,11 @@ impl Sesion {
         }
         self.vpn.pedida = None;
         let fase = match texto(&datos, "fase") {
-            f @ ("apagada" | "conectando" | "conectada" | "sin_respuesta" | "error") => f,
+            f @ ("apagada" | "conectando" | "conectada" | "sin_respuesta" | "reconectando"
+            | "error") => f,
             _ => "",
         };
+        let estricto = datos.get("estricto").and_then(Value::as_bool) == Some(true);
         if estado != 200 || fase.is_empty() {
             // The panel could not answer (its session not ready, the service starting): later, each time a little later.
             let espera = VPN_REINTENTO_MS.saturating_mul(1 << self.vpn.fallos.min(4));
@@ -2330,11 +2348,14 @@ impl Sesion {
         } else {
             i64::MAX
         };
-        if fase == self.vpn.fase {
+        if fase == self.vpn.fase && estricto == self.vpn.estricto {
             return Vec::new();
         }
+        if fase != self.vpn.fase {
+            self.vpn.aviso = None;
+        }
         self.vpn.fase = fase.to_owned();
-        self.vpn.aviso = None;
+        self.vpn.estricto = estricto;
         vec![envia(Origen::Barra, &self.msg_vpn())]
     }
 
@@ -2360,7 +2381,7 @@ impl Sesion {
     /// The top row over GUARDIANA's own pages too (Órbita, the panel, Comunicaciones), for the VPN's «Desconectar»:
     /// while its server does not answer, or while GUARDIANA's web cannot load with the VPN on.
     fn vpn_sobre_todo(&self) -> bool {
-        self.vpn.fase == "sin_respuesta"
+        vpn_callada(&self.vpn.fase)
             || (vpn_activa(&self.vpn.fase)
                 && self
                     .pestanas

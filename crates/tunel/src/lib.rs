@@ -15,6 +15,8 @@
 //! - [`nt`]: that configuration as the bytes WireGuardNT's driver takes (`wireguard.h`'s structures).
 //! - [`corte`]: the cut-off switch, as the plan of Windows Filtering Platform filters that keeps everything inside
 //!   the tunnel (the same rules as WireGuard's own application for Windows).
+//! - [`estricto`]: strict mode (ronda 91): what the person wants of the VPN, kept on disk so the block outlives the
+//!   service, the fixed keys of what it leaves in Windows, and what the service does with both when it starts.
 //!
 //! The Windows half (the WireGuardNT adapter and the firewall rules that keep everything inside the tunnel) lives next
 //! to the program's firewall, in `guardiana-apps`.
@@ -24,6 +26,7 @@ pub mod conexion;
 pub mod config;
 pub mod corte;
 pub mod cuantico;
+pub mod estricto;
 pub mod llaves;
 pub mod nt;
 

@@ -49,6 +49,9 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
         }
         "uninstall" | "quitar" => {
             daemon::uninstall().map_err(|e| report(t, e))?;
+            // Strict mode's block (ronda 91) lives in Windows apart from the service: with the service gone, it goes
+            // too, and what was kept of the VPN with it.
+            let _ = guardiana_panel::quita_el_bloqueo(true);
             println!("{}", t.cli("servicio.quitado"));
             Ok(())
         }

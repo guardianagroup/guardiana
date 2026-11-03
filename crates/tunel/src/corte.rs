@@ -26,8 +26,18 @@
 //! server's endpoint is itself IPv6 (then UDP to that endpoint alone). Everything else of IPv6 meets «todo lo demás»
 //! (the test `nada_de_ipv6_fuera_del_tunel`).
 //!
+//! Strict mode ([`estricto`]; ronda 91, docs/VPN.md «Modo estricto»): the same filters, split by how long each must
+//! live in Windows. Everything but the tunnel's own interface goes in as persistent filters, which stay when the service
+//! crashes, stops for an update or the computer restarts, with one more permit for the service: a new sign-up with its
+//! server (TCP to its HTTPS), since with the tunnel down nothing else can reach it. The blocks and the network
+//! underneath go in once more as boot-time filters, for the computer's start. The tunnel's own permit ([`del_tunel`])
+//! stays in a dynamic session of the service, so it goes with the adapter. The house's inbound permits stay too: they
+//! answer the house's devices on the connections those open, and carry none of this computer's own traffic out (the test
+//! `sin_excepcion_de_la_red_local`).
+//!
 //! Pure data: no Windows call here, so it is tested on every system; the service turns each [`Filtro`] into a filter
-//! of a dynamic WFP session (removed by Windows itself if the service ends).
+//! of a dynamic WFP session (removed by Windows itself if the service ends), or of strict mode's persistent and
+//! boot-time sets.
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
@@ -204,12 +214,79 @@ fn enlace() -> (Ipv6Addr, u8) {
 /// go: the one thing of the service's let out of the tunnel).
 #[must_use]
 pub fn plan(luid: u64, extremo: SocketAddr) -> Vec<Filtro> {
-    use Condicion::{Icmp, LocalRed, Protocolo, PuertoLocal, PuertoRemoto, Remota, RemotaRed};
-    let mut f = Vec::new();
-    // The encrypted packets to the server and the server's answers: UDP, its address and its port, in its family's two
-    // layers. Nothing else of the service's leaves outside the tunnel.
-    for capa in Capa::de_la_familia(extremo.is_ipv6()) {
-        f.push(Filtro {
+    let mut f = al_servidor(extremo);
+    f.extend(del_tunel(luid));
+    f.extend(del_equipo());
+    f.extend(de_la_red());
+    f.extend(maquinas_virtuales());
+    f.extend(del_hogar());
+    f.extend(bloqueos());
+    f
+}
+
+/// Where strict mode lets GUARDIANA's service reach its server outside the tunnel (docs/VPN.md, «Modo estricto»): the
+/// encrypted packets' endpoint and the server's HTTPS, where a new sign-up goes while the tunnel is down.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Servidor {
+    /// Where the encrypted packets go (UDP); `None` until a sign-up has said it.
+    pub extremo: Option<SocketAddr>,
+    /// Where a new sign-up goes (TCP, the server's HTTPS): with the block on, no name resolves outside the tunnel.
+    pub alta: Option<SocketAddr>,
+}
+
+/// Strict mode's block (docs/VPN.md, «Modo estricto»), by how long each part lives in Windows. The tunnel's own
+/// interface is not here: its permit ([`del_tunel`]) lives in a dynamic session of the service, so it goes with the
+/// adapter, which goes with the service.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Estricto {
+    /// Persistent filters: they stay through the service's crash, an update and a restart of the computer, until
+    /// GUARDIANA removes them. All of [`plan`] but the tunnel's interface, with the server known so far, and the
+    /// service's sign-up to its server.
+    pub persistentes: Vec<Filtro>,
+    /// Boot-time filters, enforced from the computer's start until Windows' filtering service has loaded the persistent
+    /// ones: the blocks, this computer talking to itself, and what keeps the network underneath working (DHCP and IPv6
+    /// neighbour discovery). Nothing of the service's: it starts later.
+    pub arranque: Vec<Filtro>,
+}
+
+/// Strict mode's block for the server known so far (`servidor`). With nothing known, nothing of the service's leaves
+/// either.
+#[must_use]
+pub fn estricto(servidor: Servidor) -> Estricto {
+    let mut persistentes = servidor.extremo.map(al_servidor).unwrap_or_default();
+    persistentes.extend(servidor.alta.map(al_alta));
+    persistentes.extend(del_equipo());
+    persistentes.extend(de_la_red());
+    persistentes.extend(maquinas_virtuales());
+    persistentes.extend(del_hogar());
+    persistentes.extend(bloqueos());
+    let mut arranque = del_equipo();
+    arranque.extend(de_la_red());
+    arranque.extend(bloqueos());
+    Estricto {
+        persistentes,
+        arranque,
+    }
+}
+
+/// Everything on the tunnel's interface (`luid`), in the four connection-authorisation layers.
+#[must_use]
+pub fn del_tunel(luid: u64) -> Vec<Filtro> {
+    en_ale(
+        "GUARDIANA VPN: el túnel",
+        &[Condicion::Interfaz(luid)],
+        true,
+        peso::TUNEL,
+    )
+}
+
+/// The encrypted packets to the server and the server's answers: UDP, its address and its port, in its family's two
+/// layers. Nothing else of the service's leaves outside the tunnel (but strict mode's sign-up, [`al_alta`]).
+fn al_servidor(extremo: SocketAddr) -> Vec<Filtro> {
+    use Condicion::{Protocolo, PuertoRemoto, Remota};
+    Capa::de_la_familia(extremo.is_ipv6())
+        .into_iter()
+        .map(|capa| Filtro {
             nombre: "GUARDIANA VPN: el servicio, solo al servidor",
             capa,
             condiciones: vec![
@@ -221,20 +298,44 @@ pub fn plan(luid: u64, extremo: SocketAddr) -> Vec<Filtro> {
             permite: true,
             firme: true,
             peso: peso::SERVICIO,
-        });
+        })
+        .collect()
+}
+
+/// Strict mode's only other way out for the service: a new sign-up with its server while the tunnel is down (TCP to the
+/// server's HTTPS, its address and port). Outgoing only, the answers come back in the same connection; not firm: the
+/// rest of Windows' firewall still decides after it.
+fn al_alta(alta: SocketAddr) -> Filtro {
+    use Condicion::{Protocolo, PuertoRemoto, Remota};
+    Filtro {
+        nombre: "GUARDIANA VPN: el servicio, el alta en su servidor",
+        capa: Capa::de_la_familia(alta.is_ipv6())[0],
+        condiciones: vec![
+            Condicion::Servicio,
+            Protocolo(TCP),
+            Remota(alta.ip()),
+            PuertoRemoto(alta.port()),
+        ],
+        permite: true,
+        firme: false,
+        peso: peso::SERVICIO,
     }
-    f.extend(en_ale(
-        "GUARDIANA VPN: el túnel",
-        &[Condicion::Interfaz(luid)],
-        true,
-        peso::TUNEL,
-    ));
-    f.extend(en_ale(
+}
+
+/// This computer talking to itself (loopback: GUARDIANA's DNS lives there), in the four layers.
+fn del_equipo() -> Vec<Filtro> {
+    en_ale(
         "GUARDIANA VPN: este equipo",
         &[Condicion::Bucle],
         true,
         peso::BUCLE,
-    ));
+    )
+}
+
+/// The network underneath: DHCP v4 and v6, and IPv6 neighbour discovery.
+fn de_la_red() -> Vec<Filtro> {
+    use Condicion::{Icmp, LocalRed, Protocolo, PuertoLocal, PuertoRemoto, Remota, RemotaRed};
+    let mut f = Vec::new();
     // DHCP v4: the request to the broadcast address, and its answer
     f.push(filtro(
         "GUARDIANA VPN: DHCP",
@@ -322,38 +423,55 @@ pub fn plan(luid: u64, extremo: SocketAddr) -> Vec<Filtro> {
         con(icmp(137), RemotaRed(red, largo)),
         peso::RED,
     ));
-    // Hyper-V's virtual machines among themselves
-    for capa in [Capa::SaleMac, Capa::EntraMac] {
-        f.push(filtro(
-            "GUARDIANA VPN: máquinas virtuales",
-            capa,
-            vec![Condicion::EntreMaquinasVirtuales],
-            peso::RED,
-        ));
-    }
-    // Home Mode: the house asking the service for its DNS, its panel and its checker page, on the LAN's IPv4 address
-    // (where Home Mode listens). Inbound only; the answers go back in the connection each one opened. Not firm: Windows'
-    // own rule for Home Mode (only the local network, only a private one) still decides after this.
-    for (protocolo, puerto) in HOGAR {
-        f.push(filtro(
-            "GUARDIANA VPN: Modo Hogar",
-            Capa::AceptaV4,
-            vec![
-                Condicion::Servicio,
-                Protocolo(protocolo),
-                PuertoLocal(puerto),
-            ],
-            peso::HOGAR,
-        ));
-    }
-    // DNS outside the tunnel, to anyone. «Todo lo demás» blocks it too; this says so by name in Windows' list of
-    // filters, and keeps it blocked if a permit is ever added below it.
+    f
+}
+
+/// Hyper-V's virtual machines among themselves (the Ethernet layers).
+fn maquinas_virtuales() -> Vec<Filtro> {
+    [Capa::SaleMac, Capa::EntraMac]
+        .into_iter()
+        .map(|capa| {
+            filtro(
+                "GUARDIANA VPN: máquinas virtuales",
+                capa,
+                vec![Condicion::EntreMaquinasVirtuales],
+                peso::RED,
+            )
+        })
+        .collect()
+}
+
+/// Home Mode: the house asking the service for its DNS, its panel and its checker page, on the LAN's IPv4 address
+/// (where Home Mode listens). Inbound only; the answers go back in the connection each one opened. Not firm: Windows'
+/// own rule for Home Mode (only the local network, only a private one) still decides after this.
+fn del_hogar() -> Vec<Filtro> {
+    HOGAR
+        .into_iter()
+        .map(|(protocolo, puerto)| {
+            filtro(
+                "GUARDIANA VPN: Modo Hogar",
+                Capa::AceptaV4,
+                vec![
+                    Condicion::Servicio,
+                    Condicion::Protocolo(protocolo),
+                    Condicion::PuertoLocal(puerto),
+                ],
+                peso::HOGAR,
+            )
+        })
+        .collect()
+}
+
+/// DNS outside the tunnel, to anyone, and everything else. «Todo lo demás» blocks DNS too; its own filter says so by
+/// name in Windows' list of filters, and keeps it blocked if a permit is ever added below it.
+fn bloqueos() -> Vec<Filtro> {
+    let mut f = Vec::new();
     for capa in Capa::ALE {
         for protocolo in [UDP, TCP] {
             f.push(Filtro {
                 nombre: "GUARDIANA VPN: DNS fuera del túnel",
                 capa,
-                condiciones: vec![Protocolo(protocolo), PuertoRemoto(53)],
+                condiciones: vec![Condicion::Protocolo(protocolo), Condicion::PuertoRemoto(53)],
                 permite: false,
                 firme: false,
                 peso: peso::DNS_NO,
@@ -773,5 +891,242 @@ mod tests {
         let mut pide = sale(false, TARJETA, UDP, "255.255.255.255:67");
         pide.puerto_local = 68;
         assert_eq!(decide(&p, &pide), Some(true));
+    }
+
+    /// The server's HTTPS in the tests, where strict mode's new sign-up goes.
+    fn alta() -> SocketAddr {
+        "203.0.113.7:443".parse().unwrap()
+    }
+
+    /// The server as strict mode knows it once a sign-up answered.
+    fn conocido() -> Servidor {
+        Servidor {
+            extremo: Some(extremo()),
+            alta: Some(alta()),
+        }
+    }
+
+    /// Flows of every kind: of the service or of another program, out or in, through the network card or the tunnel.
+    fn flujos() -> Vec<Flujo> {
+        let mut v = Vec::new();
+        for servicio in [true, false] {
+            for (protocolo, a) in [
+                (UDP, "203.0.113.7:51820"),
+                (UDP, "203.0.113.7:51821"),
+                (TCP, "203.0.113.8:443"),
+                (TCP, "192.168.1.20:80"),
+                (UDP, "192.168.1.1:53"),
+                (UDP, "10.66.0.1:53"),
+                (TCP, "198.51.100.9:443"),
+                (UDP, "8.8.8.8:53"),
+                (TCP, "[2606:4700::1111]:443"),
+                (UDP, "[2001:4860:4860::8888]:53"),
+            ] {
+                for interfaz in [TARJETA, TUNEL] {
+                    v.push(sale(servicio, interfaz, protocolo, a));
+                    for puerto in [53, 80, 7443, 50000] {
+                        v.push(entra(servicio, interfaz, protocolo, a, puerto));
+                    }
+                }
+            }
+        }
+        v
+    }
+
+    /// Strict mode with the tunnel up decides as the switch of always (the block in Windows and the tunnel's own permit
+    /// share one sublayer): the only thing it adds is the service's new sign-up with its server, going out.
+    #[test]
+    fn el_modo_estricto_conectado_decide_como_el_corte_de_siempre() {
+        let normal = plan(TUNEL, extremo());
+        let mut conectado = estricto(conocido()).persistentes;
+        conectado.extend(del_tunel(TUNEL));
+        for f in flujos() {
+            assert_eq!(decide(&conectado, &f), decide(&normal, &f), "{f:?}");
+        }
+        assert_eq!(
+            decide(&conectado, &sale(true, TARJETA, TCP, "203.0.113.7:443")),
+            Some(true)
+        );
+        assert_eq!(
+            decide(&normal, &sale(true, TARJETA, TCP, "203.0.113.7:443")),
+            Some(false)
+        );
+        assert_eq!(
+            decide(&conectado, &sale(false, TARJETA, TCP, "203.0.113.7:443")),
+            Some(false)
+        );
+        assert_eq!(
+            decide(
+                &conectado,
+                &entra(true, TARJETA, TCP, "203.0.113.7:443", 50000)
+            ),
+            Some(false)
+        );
+        // y el único permiso firme sigue siendo el de los paquetes encriptados
+        assert_eq!(conectado.iter().filter(|f| f.firme).count(), 2);
+    }
+
+    /// Strict mode with the tunnel down (the server does not answer, the service crashed or stopped for an update, the
+    /// computer restarting): nothing leaves but the service's way to its server, and the house still reaches Home Mode.
+    #[test]
+    fn sin_tunel_nada_sale_salvo_el_camino_al_servidor() {
+        let p = estricto(conocido()).persistentes;
+        assert_eq!(
+            decide(&p, &sale(true, TARJETA, UDP, "203.0.113.7:51820")),
+            Some(true)
+        );
+        assert_eq!(
+            decide(&p, &entra(true, TARJETA, UDP, "203.0.113.7:51820", 50000)),
+            Some(true)
+        );
+        assert_eq!(
+            decide(&p, &sale(true, TARJETA, TCP, "203.0.113.7:443")),
+            Some(true)
+        );
+        for servicio in [true, false] {
+            for (protocolo, a) in [
+                (TCP, "198.51.100.9:443"),
+                (UDP, "198.51.100.9:443"),
+                (UDP, "8.8.8.8:53"),
+                (TCP, "1.1.1.1:53"),
+                (UDP, "10.66.0.1:53"),
+                (TCP, "192.168.1.1:80"),
+                (UDP, "192.168.1.20:5353"),
+                (TCP, "[2606:4700::1111]:443"),
+                (UDP, "[fe80::1]:53"),
+            ] {
+                // por la tarjeta, y por la interfaz de un túnel que ya no está
+                for interfaz in [TARJETA, TUNEL] {
+                    assert_eq!(
+                        decide(&p, &sale(servicio, interfaz, protocolo, a)),
+                        Some(false),
+                        "{servicio} {interfaz} {protocolo} {a}"
+                    );
+                }
+            }
+        }
+        // otro programa, ni al servidor
+        assert_eq!(
+            decide(&p, &sale(false, TARJETA, UDP, "203.0.113.7:51820")),
+            Some(false)
+        );
+        assert_eq!(
+            decide(&p, &sale(false, TARJETA, TCP, "203.0.113.7:443")),
+            Some(false)
+        );
+        // el propio equipo, DHCP y lo que el Modo Hogar sirve a la casa siguen
+        let mut propio = sale(false, 1, UDP, "127.0.0.1:53");
+        propio.bucle = true;
+        assert_eq!(decide(&p, &propio), Some(true));
+        let mut pide = sale(false, TARJETA, UDP, "255.255.255.255:67");
+        pide.puerto_local = 68;
+        assert_eq!(decide(&p, &pide), Some(true));
+        assert_eq!(
+            decide(&p, &entra(true, TARJETA, UDP, "192.168.1.20:51515", 53)),
+            Some(true)
+        );
+        // sin servidor conocido, nada del servicio sale: de él, solo lo que el Modo Hogar contesta a la casa
+        let nada = estricto(Servidor::default()).persistentes;
+        assert_eq!(
+            decide(&nada, &sale(true, TARJETA, UDP, "203.0.113.7:51820")),
+            Some(false)
+        );
+        assert_eq!(
+            decide(&nada, &sale(true, TARJETA, TCP, "203.0.113.7:443")),
+            Some(false)
+        );
+        for f in &nada {
+            if f.permite && f.condiciones.contains(&Condicion::Servicio) {
+                assert_eq!(f.nombre, "GUARDIANA VPN: Modo Hogar");
+            }
+        }
+    }
+
+    /// While the computer starts, before Windows' filtering service has loaded anything: only this computer talking to
+    /// itself and the network underneath; nothing else, and nothing of the service's (it starts later).
+    #[test]
+    fn al_arrancar_el_equipo_solo_la_red_de_debajo() {
+        let arranque = estricto(conocido()).arranque;
+        assert!(arranque
+            .iter()
+            .all(|f| !f.condiciones.contains(&Condicion::Servicio)
+                && Capa::ALE.contains(&f.capa)
+                && !f.firme));
+        for servicio in [true, false] {
+            for (protocolo, a) in [
+                (UDP, "203.0.113.7:51820"),
+                (TCP, "203.0.113.7:443"),
+                (TCP, "198.51.100.9:443"),
+                (UDP, "192.168.1.1:53"),
+                (TCP, "[2606:4700::1111]:443"),
+            ] {
+                assert_eq!(
+                    decide(&arranque, &sale(servicio, TARJETA, protocolo, a)),
+                    Some(false),
+                    "{servicio} {protocolo} {a}"
+                );
+            }
+            assert_eq!(
+                decide(
+                    &arranque,
+                    &entra(servicio, TARJETA, TCP, "192.168.1.20:51515", 7443)
+                ),
+                Some(false)
+            );
+        }
+        let mut propio = sale(false, 1, TCP, "127.0.0.1:7443");
+        propio.bucle = true;
+        assert_eq!(decide(&arranque, &propio), Some(true));
+        let mut pide = sale(false, TARJETA, UDP, "255.255.255.255:67");
+        pide.puerto_local = 68;
+        assert_eq!(decide(&arranque, &pide), Some(true));
+        let mut vecino = sale(false, TARJETA, ICMP6, "[fe80::1]:0");
+        vecino.puerto_local = 135;
+        assert_eq!(decide(&arranque, &vecino), Some(true));
+    }
+
+    /// TunnelVision and TunnelCrack (ronda 91): strict mode has no exception for the local network going out. Of what
+    /// goes out off the tunnel, only the service to its server, DHCP's request to the broadcast address, DHCPv6 to its
+    /// multicast addresses and neighbour discovery; the house, and a «local» network a stranger's DHCP announces over
+    /// public addresses, are blocked like anywhere else.
+    #[test]
+    fn sin_excepcion_de_la_red_local() {
+        let e = estricto(conocido());
+        for p in [&e.persistentes, &e.arranque] {
+            for f in p
+                .iter()
+                .filter(|f| f.permite && matches!(f.capa, Capa::ConectaV4 | Capa::ConectaV6))
+            {
+                let al_servidor = f.condiciones.contains(&Condicion::Servicio)
+                    && f.condiciones
+                        .iter()
+                        .any(|c| matches!(c, Condicion::Remota(ip) if *ip == extremo().ip()));
+                assert!(
+                    al_servidor
+                        || f.condiciones == [Condicion::Bucle]
+                        || f.nombre.starts_with("GUARDIANA VPN: DHCP")
+                        || f.nombre == "GUARDIANA VPN: descubrimiento de vecinos",
+                    "{}",
+                    f.nombre
+                );
+            }
+            for servicio in [true, false] {
+                for (protocolo, a) in [
+                    (TCP, "192.168.1.20:80"),
+                    (UDP, "192.168.1.1:53"),
+                    (TCP, "10.0.0.5:445"),
+                    (TCP, "172.16.0.9:443"),
+                    (UDP, "[fe80::20]:5353"),
+                    (TCP, "203.0.113.50:443"),
+                    (TCP, "198.51.100.1:80"),
+                ] {
+                    assert_eq!(
+                        decide(p, &sale(servicio, TARJETA, protocolo, a)),
+                        Some(false),
+                        "{servicio} {protocolo} {a}"
+                    );
+                }
+            }
+        }
     }
 }

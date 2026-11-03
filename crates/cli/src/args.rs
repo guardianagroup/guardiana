@@ -20,6 +20,11 @@ const SWITCHES: &[&str] = &[
     "self-test",
     "no-open",
     "dominios",
+    // `guardiana vpn apaga` (strict mode): from the Start menu's entry, with the rights Windows gave it, from the
+    // uninstaller.
+    "menu",
+    "elevado",
+    "desinstalando",
 ];
 
 /// Parsed options after the command word.

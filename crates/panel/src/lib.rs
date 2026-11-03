@@ -59,7 +59,10 @@ use tokio::sync::Notify;
 
 pub use antivirus::comprueba_los_cortes;
 pub use auth::{constant_time_eq, load_or_create_token, origin_es_este_panel, TOKEN_FILE};
-pub use vpn::cierra_la_vpn;
+pub use vpn::{
+    cierra_la_vpn, estado_del_modo_estricto, quita_el_bloqueo, vpn_al_arrancar, BloqueoQuitado,
+    EstadoEstricto, NoSeQuito,
+};
 
 /// Default panel port (brief §0).
 pub const DEFAULT_PORT: u16 = 7443;
@@ -1138,6 +1141,8 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/vpn", get(vpn::ver))
         .route("/api/vpn/conecta", post(vpn::conecta))
         .route("/api/vpn/desconecta", post(vpn::desconecta))
+        // Strict mode (ronda 91): its switch; its state is in `GET /api/vpn`.
+        .route("/api/vpn/estricto", post(vpn::modo_estricto))
         .route("/api/revision/ahora", post(revision::ahora))
         // 1.0.51: the route of the data, hop by hop (src/ruta.rs).
         .route("/api/ruta", get(ruta::ver))

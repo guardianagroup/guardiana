@@ -957,6 +957,10 @@ pub async fn run<F: Future<Output = ()>>(
     shutdown: F,
 ) -> Result<(), Box<dyn Error>> {
     tokio::pin!(shutdown);
+    // Strict mode (ronda 91; docs/VPN.md): before anything else, what is left of its block in Windows and nobody wants
+    // any more is removed, and a VPN meant to be on in strict mode is brought back, its block held meanwhile. First, so a
+    // pass that fails later has done it already. Off the runtime's threads: it asks Windows' filter engine.
+    let _ = tokio::task::spawn_blocking(guardiana_panel::vpn_al_arrancar).await;
     contrastar_lectura_nativa(&cfg.db);
     let mut first = true;
     let result = loop {
@@ -971,7 +975,9 @@ pub async fn run<F: Future<Output = ()>>(
         }
     };
     // The VPN lives as long as the process, across passes (1.0.54): stopping for good closes it, cut-off switch
-    // included, before the DNS goes back. Off the runtime's threads: closing the adapter can take a moment.
+    // included, before the DNS goes back. Off the runtime's threads: closing the adapter can take a moment. In strict
+    // mode (ronda 91) the block stays in Windows: a stop (an update, a restart) is not turning the VPN off, and the next
+    // start brings the tunnel back.
     let _ = tokio::task::spawn_blocking(guardiana_panel::cierra_la_vpn).await;
     give_dns_back_while_stopped(&cfg.db);
     result
