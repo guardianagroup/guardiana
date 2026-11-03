@@ -40,6 +40,42 @@ use crate::AppState;
 
 /// Settings key: the antivirus products whose outgoing traffic the person has chosen to cut.
 const CLAVE_CORTES: &str = "antivirus_cortes";
+/// Settings key: the paths of each product cut, kept with it so that a restart cuts them again at
+/// the first panel start, even when its programs asked no name this week (review of
+/// arreglos-1055: an antivirus that connected at boot before asking one ran uncut until then).
+const CLAVE_RUTAS: &str = "antivirus_cortes_rutas";
+
+/// The paths kept with each product cut.
+fn rutas_guardadas(ledger: &guardiana_core::Ledger) -> BTreeMap<String, BTreeSet<String>> {
+    ledger
+        .setting(CLAVE_RUTAS)
+        .ok()
+        .flatten()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+/// Keeps `rutas` with the paths of `producto`; `None` forgets them all (the product is let through).
+fn guarda_rutas(
+    ledger: &guardiana_core::Ledger,
+    producto: &str,
+    rutas: Option<&[String]>,
+) -> guardiana_core::Result<()> {
+    let mut todas = rutas_guardadas(ledger);
+    match rutas {
+        Some(r) => todas
+            .entry(producto.to_owned())
+            .or_default()
+            .extend(r.iter().cloned()),
+        None => {
+            todas.remove(producto);
+        }
+    }
+    ledger.set_setting(
+        CLAVE_RUTAS,
+        &serde_json::to_string(&todas).unwrap_or_else(|_| "{}".to_owned()),
+    )
+}
 
 /// Manages the clean cut of what an antivirus sends out (1.0.22). It holds the one long-lived
 /// firewall session (dynamic: the cuts vanish if GUARDIANA stops) and, per product and path, the
@@ -123,8 +159,8 @@ fn esperan_un_archivo(
 impl CortesAntivirus {
     /// At every panel start: opens the firewall if it is not open yet (when on Windows and running
     /// as the system), or again, with every cut put back, if Windows lost it; and cuts, for whatever
-    /// the person had chosen to cut, the paths seen this week that are not cut yet; what is cut
-    /// stays. Never fails the panel: if the firewall cannot open, cutting is simply unavailable and
+    /// the person had chosen to cut, the paths kept with the cut and those seen this week that are
+    /// not cut yet; what is cut stays. Never fails the panel: if the firewall cannot open, cutting is simply unavailable and
     /// every attempt says so. A cut that cannot be put is written down (until 1.0.55 nothing said
     /// it).
     pub(crate) fn al_arrancar(&self, ledger: &guardiana_core::Ledger) {
@@ -135,10 +171,24 @@ impl CortesAntivirus {
                 return;
             }
         }
+        let guardadas = rutas_guardadas(ledger);
         for prod in self.querados(ledger) {
-            let rutas = Self::rutas_de(ledger, &prod);
+            // The paths kept with the cut, and those seen this week, which are kept too.
+            let mut rutas: Vec<String> = guardadas
+                .get(&prod)
+                .map(|r| r.iter().cloned().collect())
+                .unwrap_or_default();
+            let ya = rutas.len();
+            for r in Self::rutas_de(ledger, &prod) {
+                if !rutas.contains(&r) {
+                    rutas.push(r);
+                }
+            }
             if let Err(e) = self.aplica_rutas(&prod, true, &rutas) {
                 eprintln!("guardiana: el corte de {prod} no se pudo volver a poner: {e}");
+            }
+            if rutas.len() > ya {
+                let _ = guarda_rutas(ledger, &prod, Some(&rutas));
             }
         }
     }
@@ -275,7 +325,7 @@ impl Estado {
         };
         if self.cortafuegos.is_some() {
             eprintln!(
-                "guardiana: Windows ya no tenía la sesión de los cortes del antivirus: se abre otra y se vuelven a poner"
+                "guardiana: Windows ya no tenía la sesión de los cortes del antivirus, o alguno de sus cortes: se abre otra y se vuelven a poner"
             );
         }
         let mut puestos: HashMap<String, BTreeMap<String, Vec<u64>>> = HashMap::new();
@@ -972,7 +1022,9 @@ fn pon_corte(
         l.set_setting(
             CLAVE_CORTES,
             &serde_json::to_string(&set).unwrap_or_else(|_| "[]".to_owned()),
-        )
+        )?;
+        // Its paths go with it, so a restart cuts them at once.
+        guarda_rutas(l, producto, cortar.then_some(rutas))
     })?;
     Ok(filtros)
 }
@@ -1187,6 +1239,41 @@ mod tests {
     use super::*;
     use guardiana_core::ProgramName;
 
+    /// The paths of a cut are kept with it in the ledger and come back whole, added to, never
+    /// twice; letting the product through forgets them, and only its (review of arreglos-1055):
+    /// what a restart cuts again at the first panel start, even with nothing seen this week.
+    #[test]
+    fn las_rutas_de_un_corte_se_guardan_con_el_y_se_olvidan_al_dejarlo_pasar() {
+        let dir =
+            std::env::temp_dir().join(format!("guardiana-rutas-cortes-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let l = guardiana_core::Ledger::open(
+            &dir.join("ledger.db"),
+            guardiana_core::Hash::of(b"antivirus paths test key"),
+        )
+        .unwrap();
+        assert!(rutas_guardadas(&l).is_empty());
+        let r = |s: &str| s.to_owned();
+        let mb = [r(r"C:\a\mbamservice.exe"), r(r"C:\b\Malwarebytes.exe")];
+        guarda_rutas(&l, "Malwarebytes", Some(&mb)).unwrap();
+        let mas = [
+            r(r"C:\a\mbamservice.exe"),
+            r(r"C:\c\MBVpnTunnelService.exe"),
+        ];
+        guarda_rutas(&l, "Malwarebytes", Some(&mas)).unwrap();
+        guarda_rutas(&l, "Avast", Some(&[r(r"C:\av\AvastSvc.exe")])).unwrap();
+        let g = rutas_guardadas(&l);
+        assert_eq!(g["Malwarebytes"].len(), 3, "{g:?}");
+        assert!(g["Avast"].contains(r"C:\av\AvastSvc.exe"));
+        guarda_rutas(&l, "Malwarebytes", None).unwrap();
+        let g = rutas_guardadas(&l);
+        assert!(!g.contains_key("Malwarebytes"), "{g:?}");
+        assert_eq!(g.len(), 1);
+        drop(l);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     fn fila(programa: &str, firma: &str, qname: &str, n: u64, cat: Category) -> ProgramName {
         ProgramName {
             device_id: SELF_DEVICE_ID.into(),
@@ -1361,6 +1448,28 @@ mod en_windows {
             .get(producto)
             .map(|r| r.values().flatten().copied().collect())
             .unwrap_or_default()
+    }
+
+    /// A restart cuts the paths kept with a cut at the first panel start, even when its programs
+    /// asked no name this week (review of arreglos-1055): here the ledger has no query at all.
+    #[test]
+    #[ignore = "necesita Windows como administrador"]
+    fn al_arrancar_se_cortan_las_rutas_guardadas_aunque_no_se_vieran() {
+        arranca();
+        let (dir, programa) = carpeta("guardadas");
+        let l = Ledger::open(&dir.join("ledger.db"), Hash::of(b"antivirus cuts test key")).unwrap();
+        l.set_setting(CLAVE_CORTES, r#"["Malwarebytes"]"#).unwrap();
+        guarda_rutas(&l, "Malwarebytes", Some(std::slice::from_ref(&programa))).unwrap();
+        global().al_arrancar(&l);
+        assert_eq!(ids_de("Malwarebytes").len(), 2);
+        assert_eq!(en_windows(), 2);
+        assert_eq!(
+            global().aplica_rutas("Malwarebytes", false, &[]).unwrap(),
+            0
+        );
+        assert_eq!(en_windows(), 0);
+        drop(l);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Letting a product through goes through even when one of its filters is already gone, as
