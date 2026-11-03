@@ -81,10 +81,11 @@ pub struct RuntimeInfo {
 /// Panel configuration.
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// Addresses to bind: loopback always; the LAN address too in Home Mode.
+    /// Addresses the panel cannot run without: loopback. When one cannot be bound the start fails, and nothing is left
+    /// listening (1.0.55).
     pub listen: Vec<SocketAddr>,
-    /// Addresses that are nice to have (the LAN port 80 for the checker
-    /// page); a bind failure there is reported, not fatal.
+    /// Addresses that are nice to have (in Home Mode, the LAN's panel and its port 80 for the
+    /// checker page); a bind failure there is reported, not fatal.
     pub optional_listen: Vec<SocketAddr>,
     /// Ledger database (the panel opens its own connection).
     pub db_path: PathBuf,
@@ -185,9 +186,17 @@ impl Running {
 
     /// Ask every listener to stop and wait for them.
     pub async fn shutdown(self) {
-        self.stop.notify_waiters();
-        for t in self.tasks {
-            let _ = t.await;
+        for mut t in self.tasks {
+            // Said again until each one ends: a task that has not run yet starts waiting for the signal only when it
+            // first runs, and `notify_waiters` reaches only those already waiting (a shutdown right after the start
+            // waited for ever, 1.0.55).
+            loop {
+                self.stop.notify_waiters();
+                tokio::select! {
+                    _ = &mut t => break,
+                    () = tokio::time::sleep(std::time::Duration::from_millis(20)) => {}
+                }
+            }
         }
     }
 }
@@ -1191,22 +1200,30 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         ))
         .with_state(state.clone());
 
-    let stop = Arc::new(Notify::new());
-    let mut addrs = Vec::new();
-    let mut tasks = Vec::new();
+    // Every address is bound before any of them serves (1.0.55): a required one that cannot be bound fails the start
+    // with nothing serving, and the ones bound so far close as this returns. Until 1.0.55 the loopback panel was
+    // already serving when the LAN's could not be bound; nothing stopped it, it kept the panel's port, and every later
+    // pass failed to open the panel at all (second review of 1.0.55). The watchers started above hold the state only
+    // weakly: they end with it.
+    let mut abiertas = Vec::new();
     let mut failed_optional = Vec::new();
     let required = config.listen.iter().map(|a| (*a, true));
     let optional = config.optional_listen.iter().map(|a| (*a, false));
     for (listen, must) in required.chain(optional) {
-        let listener = match TcpListener::bind(listen).await {
-            Ok(l) => l,
-            Err(e) if must => return Err(Error::Bind(listen, e)),
-            Err(e) => {
-                failed_optional.push((listen, e.to_string()));
-                continue;
+        match TcpListener::bind(listen).await {
+            Ok(l) => {
+                let bound = l.local_addr().map_err(|e| Error::Bind(listen, e))?;
+                abiertas.push((bound, l));
             }
-        };
-        addrs.push(listener.local_addr().map_err(|e| Error::Bind(listen, e))?);
+            Err(e) if must => return Err(Error::Bind(listen, e)),
+            Err(e) => failed_optional.push((listen, e.to_string())),
+        }
+    }
+    let stop = Arc::new(Notify::new());
+    let mut addrs = Vec::new();
+    let mut tasks = Vec::new();
+    for (bound, listener) in abiertas {
+        addrs.push(bound);
         let stop_signal = stop.clone();
         let app = app.clone();
         tasks.push(tokio::spawn(async move {

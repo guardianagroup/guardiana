@@ -128,3 +128,85 @@ jobs:
       - name: lo que dijo el servidor
         if: always()
         run: cat "$RUNNER_TEMP/servidor.log" || true
+
+  # The first real connection (docs/VPN.md, «Pendiente» 3): only when launched by hand (gh workflow run vpn.yml), never
+  # on a push. crates/apps/examples/vpn_de_verdad.rs connects this runner to vpn.guardianagroup.com with everything inside
+  # the tunnel and the cut-off switch on, checks through the tunnel (the tunnel's resolver answers, the public address
+  # is the server's) and outside it (the gateway, and a public resolver asked from the network card, are cut before they
+  # leave), disconnects and checks the network is back. Safe for the runner: `conecta` closes the tunnel and its switch
+  # when the server does not answer in 8 s; the program closes them on every path and a watchdog does it at 150 s; and
+  # the switch is a dynamic WFP session and the adapter belongs to the process, so both go with it if it dies. While the
+  # tunnel is up the runner's own traffic goes through it too (or nowhere): its link with GitHub may pause for that
+  # minute.
+  de_verdad:
+    name: la primera conexión de verdad, con el corte puesto (solo a mano)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: wireguard.dll firmada por WireGuard LLC
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'wireguard-nt.zip'
+          $dir = Join-Path $env:RUNNER_TEMP 'wireguard-nt'
+          Invoke-WebRequest -Uri 'https://download.wireguard.com/wireguard-nt/wireguard-nt-1.1.zip' -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          $dll = Get-ChildItem -Path $dir -Recurse -Filter wireguard.dll | Where-Object { $_.FullName -match '\\amd64\\' } | Select-Object -First 1
+          if (-not $dll) { Write-Output '::error title=wireguard.dll::no está en el .zip (bin\amd64)'; exit 1 }
+          $firma = Get-AuthenticodeSignature -FilePath $dll.FullName
+          $quien = if ($firma.SignerCertificate) { $firma.SignerCertificate.Subject } else { '' }
+          $huella = (Get-FileHash -Path $dll.FullName -Algorithm SHA256).Hash
+          Write-Output "firma: $($firma.Status) · $quien"
+          Write-Output "sha256: $huella"
+          if ($huella -ne 'B1B85E072C45D81358BE29D94C599DC76652F912BE8C0F0A41E2D5D89A6461D3') {
+            Write-Output "::error title=wireguard.dll::otra compilación ($huella): revisarla antes de usarla"
+            exit 1
+          }
+          if ($firma.Status -ne 'Valid' -or $quien -notmatch 'WireGuard LLC') {
+            Write-Output "::error title=wireguard.dll::firma no válida o de otro firmante ($($firma.Status), $quien)"
+            exit 1
+          }
+          "GUARDIANA_WG_DLL=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      # Built before connecting: with the switch on, nothing is fetched outside the tunnel.
+      - name: compilar el programa de la prueba
+        run: cargo build -p guardiana-apps --example vpn_de_verdad --locked
+      - name: la red del equipo, antes
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Get-NetIPConfiguration | Format-List InterfaceAlias, IPv4Address, IPv4DefaultGateway, DNSServer
+          Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' | Format-Table InterfaceAlias, NextHop, RouteMetric -AutoSize
+          Resolve-DnsName vpn.guardianagroup.com -Type A -ErrorAction SilentlyContinue | Format-Table Name, Type, IPAddress -AutoSize
+      # What the Filtering Platform blocks, in Windows' own record (Security events 5157 and 5152; GUIDs from
+      # learn.microsoft.com, «WFP auditing and logging»): a UDP datagram it drops tells the program nothing, so the check
+      # reads it there (the first run, 3 Nov 2026, had no answer and no WSAEACCES for the DNS queries from the card).
+      - name: que Windows anote lo que corta el Filtering Platform
+        shell: cmd
+        run: |
+          auditpol /set /subcategory:"{0CCE9226-69AE-11D9-BED3-505054503030}" /failure:enable || exit /b 1
+          auditpol /set /subcategory:"{0CCE9225-69AE-11D9-BED3-505054503030}" /failure:enable || exit /b 1
+          auditpol /get /subcategory:"{0CCE9226-69AE-11D9-BED3-505054503030},{0CCE9225-69AE-11D9-BED3-505054503030}"
+      - name: conectar, comprobar y desconectar
+        timeout-minutes: 8
+        shell: pwsh
+        env:
+          GUARDIANA_VPN_SERVIDOR: vpn.guardianagroup.com
+        run: |
+          & (Join-Path $env:GITHUB_WORKSPACE 'target\debug\examples\vpn_de_verdad.exe')
+          $codigo = $LASTEXITCODE
+          if ($codigo -ne 0) { Write-Output "::error title=vpn de verdad::el programa terminó con $codigo (lo que falló está en el registro de este paso)" }
+          exit $codigo
+      - name: la red del equipo, después (siempre)
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Get-NetAdapter -IncludeHidden | Format-Table Name, Status, InterfaceDescription -AutoSize
+          Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' | Format-Table InterfaceAlias, NextHop, RouteMetric -AutoSize
+          Resolve-DnsName github.com -Type A -ErrorAction SilentlyContinue | Select-Object -First 2 | Format-Table Name, IPAddress -AutoSize
+          try { "dirección pública: " + (Invoke-RestMethod -Uri 'https://api.ipify.org' -TimeoutSec 15) } catch { "sin dirección pública: $_" }
