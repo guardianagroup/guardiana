@@ -1996,8 +1996,10 @@ async fn run_once<F: Future<Output = ()>>(
     // Home Mode (brief §7): also listen on the private LAN address, answer the
     // checker name with it, and turn the Firefox canary on by default.
     let mut home_lan: Option<std::net::Ipv4Addr> = None;
-    let mut panel_listen: Vec<SocketAddr> = vec![cfg.panel_listen];
+    let panel_listen: Vec<SocketAddr> = vec![cfg.panel_listen];
     let mut panel_optional: Vec<SocketAddr> = Vec::new();
+    // The panel's own address on the LAN, in Home Mode.
+    let mut panel_lan: Option<SocketAddr> = None;
     if fuera_de_casa {
         println!("{}", t.cli("observe.hogar_otra_red"));
     }
@@ -2013,7 +2015,12 @@ async fn run_once<F: Future<Output = ()>>(
                 dns_cfg.optional_listen.push(dns_addr);
                 dns_cfg.checker_ip = Some(lan);
                 dns_cfg.canary_enabled = true;
-                panel_listen.push(panel_addr);
+                // Optional too, like the DNS (1.0.55): a LAN address the panel could not open (the
+                // address moved, another program holds the port) failed the whole panel start,
+                // 127.0.0.1 included. Now this computer keeps its panel, and the 15-second check
+                // tries the LAN's again once the port is free.
+                panel_optional.push(panel_addr);
+                panel_lan = Some(panel_addr);
                 panel_optional.push(home::lan_checker_addr(lan));
                 home_lan = Some(lan);
                 // The rules of the firewall, written again by this program on every start:
@@ -2260,13 +2267,21 @@ async fn run_once<F: Future<Output = ()>>(
                     println!("{}", t.cli("observe.panel_nota"));
                 }
                 for (addr, why) in &p.failed_optional {
-                    println!(
-                        "{}",
-                        t.cli("observe.puerto80")
-                            .replace("{addr}", &addr.to_string())
-                            .replace("{ip}", &url_host(addr.ip()))
-                            .replace("{motivo}", why)
-                    );
+                    if panel_lan == Some(*addr) {
+                        eprintln!(
+                            "{}",
+                            t.cli("observe.hogar_puerto_ocupado")
+                                .replace("{addr}", &addr.to_string())
+                        );
+                    } else {
+                        println!(
+                            "{}",
+                            t.cli("observe.puerto80")
+                                .replace("{addr}", &addr.to_string())
+                                .replace("{ip}", &url_host(addr.ip()))
+                                .replace("{motivo}", why)
+                        );
+                    }
                 }
                 if first && cfg.open_browser {
                     open_in_browser(&p.url());
@@ -2301,6 +2316,12 @@ async fn run_once<F: Future<Output = ()>>(
     let hogar_sin_puerto: Option<SocketAddr> = home_lan
         .filter(|lan| !running.udp_addrs.iter().any(|a| a.ip() == IpAddr::V4(*lan)))
         .map(|lan| SocketAddr::new(IpAddr::V4(lan), cfg.listen.port()));
+    // The same for the panel's port on the LAN (1.0.55).
+    let panel_sin_puerto: Option<SocketAddr> = panel_lan.filter(|a| {
+        panel
+            .as_ref()
+            .is_some_and(|p| p.failed_optional.iter().any(|(f, _)| f == a))
+    });
     // What the resolver forwards to in this pass, to notice when the network changes it.
     // Only when the upstreams came automatically: a person who typed --upstream chose. It was
     // Windows-only until 1 Oct 2026; macOS reads the DHCP lease now, and Linux asks whoever
@@ -2360,6 +2381,8 @@ async fn run_once<F: Future<Output = ()>>(
                                     .is_some_and(|t| guardiana_core::tunel_dns::actual() != Some(t))
                                 || hogar_sin_puerto
                                     .is_some_and(|a| std::net::UdpSocket::bind(a).is_ok())
+                                || panel_sin_puerto
+                                    .is_some_and(|a| std::net::TcpListener::bind(a).is_ok())
                             {
                                 if let Some(tx) = reconfigure_tx.take() {
                                     let _ = tx.send(());

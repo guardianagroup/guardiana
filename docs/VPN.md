@@ -88,7 +88,11 @@ Lo que cambió en la 1.0.55 (tercera revisión, 2 nov 2026), y por qué:
   (con otra concesión del DHCP bajo el túnel no hay ninguna hasta que se cierre: el Modo Hogar espera, y el panel no deja
   de arrancar por escuchar en una dirección que ya no es suya). Por eso el motor ya no se salta la comparación de la
   dirección mientras dura el túnel (lo que añadió la 1.0.54): antes, durante y después del túnel es la misma, y un
-  cambio de red de verdad se nota al cerrarse.
+  cambio de red de verdad se nota al cerrarse. Y el panel en la red de casa es opcional, como su DNS (segunda revisión
+  de la 1.0.55): si no se puede abrir, el equipo sigue con su panel en 127.0.0.1 y la comprobación de cada 15 segundos lo
+  vuelve a intentar. Hasta entonces era obligatorio, y cuando fallaba el panel de 127.0.0.1 ya estaba sirviendo, nadie lo
+  paraba y las vueltas siguientes no podían abrir el panel; ahora `guardiana_panel::start` abre todas las direcciones
+  antes de servir ninguna, y si una obligatoria falla no deja nada escuchando.
 - **El resolutor del túnel nunca se guarda como DNS de la red.** Windows lo lista como DNS del adaptador del túnel, y una
   vuelta del motor hecha con la VPN puesta podía tomarlo y guardarlo como bueno: al cerrarse la VPN, los nombres irían a
   él fuera del túnel. Ahora se quita de todas las listas mientras la VPN está puesta (solo esa dirección: una red de casa
@@ -146,6 +150,14 @@ Hecho y probado en un Windows real (la integración continua de GitHub, como adm
   túnel. Ahora, mientras el túnel lleva todo, `guardiana_core::tunel_dns` manda cada nombre solo al resolutor del túnel
   (`10.66.0.1`), con su propia caché; si no contesta, el nombre falla y nunca sale fuera. Las sondas del motor preguntan
   también solo a ese resolutor.
+- La primera conexión de verdad (`.github/workflows/vpn.yml`, «de verdad», solo cuando se lanza a mano;
+  `crates/apps/examples/vpn_de_verdad.rs`): un Windows de la integración continua, como administrador, se conecta a
+  `vpn.guardianagroup.com` con `tunel_win::conecta` (todo dentro y el corte puesto) y comprueba, con un plazo en cada
+  paso: el saludo del servidor; que el resolutor del túnel contesta; que la dirección pública que ve un servicio de eco
+  por HTTPS es la del servidor (la que da su nombre antes de conectar); que la puerta de enlace y un DNS público
+  preguntado desde la tarjeta, fuera del túnel, se cortan antes de salir (Windows lo dice: WSAEACCES); y, ya
+  desconectado, que la red vuelve. Desconecta siempre: en cada camino, y a los 150 s un vigilante cierra el túnel y
+  sale; si el proceso muere, Windows quita los filtros y el adaptador con él.
 - La prueba de extremo a extremo en Linux (`.github/workflows/vpn.yml`, «extremo»): el servidor de GUARDIANA con el
   WireGuard del núcleo en un espacio de red, el lado del equipo (`crates/tunel/examples/alta_prueba.rs`) en otro, el
   alta postcuántica por la red y tráfico de verdad por el túnel (solo pasa si los dos lados sacaron la misma llave).
