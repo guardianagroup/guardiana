@@ -45,6 +45,13 @@ fn is_admin() -> bool {
         .is_ok_and(|o| String::from_utf8_lossy(&o.stdout).trim() == "0")
 }
 
+/// What asks Windows to run this program again as administrator. The program's path and the
+/// choice travel in two environment variables, as data, never inside the command (1.0.55): a
+/// folder with Windows' typographic quotes in its name (‘ ’, which PowerShell also takes for
+/// quotes) broke the single-quoted literal it went in until then.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+const ELEVAR: &str = "Start-Process -FilePath $env:GUARDIANA_PROGRAMA -ArgumentList 'menu','--choice',$env:GUARDIANA_OPCION -Verb RunAs";
+
 /// Re-run this program elevated with `menu --choice N`. Windows only; on
 /// other systems the user is told to use sudo.
 fn relaunch_elevated(choice: &str) -> bool {
@@ -53,13 +60,10 @@ fn relaunch_elevated(choice: &str) -> bool {
     };
     #[cfg(target_os = "windows")]
     {
-        let script = format!(
-            "Start-Process -FilePath '{}' -ArgumentList 'menu','--choice','{}' -Verb RunAs",
-            exe.display().to_string().replace('\'', "''"),
-            choice
-        );
         std::process::Command::new("powershell")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .args(["-NoProfile", "-NonInteractive", "-Command", ELEVAR])
+            .env("GUARDIANA_PROGRAMA", &exe)
+            .env("GUARDIANA_OPCION", choice)
             .status()
             .is_ok_and(|s| s.success())
     }
@@ -250,3 +254,19 @@ pub(crate) const SELF_TEST_NAMES: &[&str] = &[
     "dns.google",
     "use-application-dns.net",
 ];
+
+#[cfg(test)]
+mod tests {
+    /// The program's path and the choice are no part of the elevation's command: they travel as
+    /// data (1.0.55).
+    #[test]
+    fn the_elevation_takes_the_path_as_data() {
+        assert!(super::ELEVAR.contains("-FilePath $env:GUARDIANA_PROGRAMA "));
+        assert!(super::ELEVAR.contains(",$env:GUARDIANA_OPCION "));
+        assert!(
+            !super::ELEVAR.contains("''"),
+            "no literal escaped by doubling"
+        );
+        assert!(super::ELEVAR.is_ascii());
+    }
+}

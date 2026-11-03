@@ -23,10 +23,12 @@ fn panel_responde() -> bool {
 /// applies when it loads it. The service's write is not atomic, and a read in between gave an
 /// empty key in the wait page's link (second pass, 8 Oct 2026).
 fn llave_completa(path: &std::path::Path) -> bool {
-    std::fs::read_to_string(path).is_ok_and(|t| {
-        let t = t.trim();
-        t.len() == 64 && t.bytes().all(|b| b.is_ascii_hexdigit())
-    })
+    std::fs::read_to_string(path).is_ok_and(|t| es_llave(t.trim()))
+}
+
+/// A whole key: 64 hexadecimal characters, as the panel writes it and as it accepts it.
+fn es_llave(t: &str) -> bool {
+    t.len() == 64 && t.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 /// Waits, up to [`ESPERA_ARRANQUE`], for the token file to hold a whole key (the service
@@ -333,10 +335,19 @@ pub fn run(_opts: &Opts) -> Result<(), Box<dyn Error>> {
             };
         t.cli(clave).replace("{ruta}", &path.display().to_string())
     })?;
+    // Anything in the file that is not a whole key is no key, and must not reach the address: on
+    // Windows that goes through `cmd /C start`, which would read a `&` or a `|` in it as a command
+    // of its own (1.0.55).
+    let token = token.trim();
+    if !es_llave(token) {
+        return Err(t
+            .cli("panel.sin_token")
+            .replace("{ruta}", &path.display().to_string())
+            .into());
+    }
     let url = format!(
-        "http://127.0.0.1:{}/?t={}",
-        guardiana_panel::DEFAULT_PORT,
-        token.trim()
+        "http://127.0.0.1:{}/?t={token}",
+        guardiana_panel::DEFAULT_PORT
     );
     // Through sudo, the browser would open as the administrator, or not at all: the link is
     // given to the person to open in their own.
@@ -378,7 +389,18 @@ pub fn run(_opts: &Opts) -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use super::url_de_archivo;
+    use super::{es_llave, url_de_archivo};
+
+    /// Only a whole key goes into the address the browser is opened with: nothing a `cmd` could
+    /// read as a command of its own (1.0.55).
+    #[test]
+    fn only_a_whole_key_reaches_the_address() {
+        assert!(es_llave(&"a1".repeat(32)));
+        assert!(!es_llave(&"a1".repeat(31)));
+        assert!(!es_llave(&format!("{}&calc", "a".repeat(59))));
+        assert!(!es_llave(&format!("{}|x^y", "0".repeat(60))));
+        assert!(!es_llave(""));
+    }
 
     #[test]
     fn the_wait_page_address_has_no_spaces() {
