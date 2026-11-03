@@ -23,7 +23,7 @@
 // The handler answers with the same error type as the rest of the API (see api.rs).
 #![allow(clippy::result_large_err)]
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Arc, LazyLock, Mutex, OnceLock, PoisonError};
 
 use axum::extract::State;
@@ -59,15 +59,62 @@ pub(crate) struct CortesAntivirus {
     /// Opened by the first panel start that can (on Windows, running as the system), and kept for
     /// the whole process.
     cortafuegos: OnceLock<guardiana_apps::Cortafuegos>,
-    /// Product name → each of its executables' paths → the ids of the filters blocking it. Its lock
-    /// makes one change of the cuts at a time, an old panel's and the new one's alike.
-    puesto: Mutex<HashMap<String, BTreeMap<String, Vec<u64>>>>,
+    /// What is cut, and what waits for a file to be cut. Its lock makes one change of the cuts at a
+    /// time, an old panel's and the new one's alike.
+    estado: Mutex<Estado>,
+}
+
+/// The cuts in place and the paths waiting for a file, behind [`CortesAntivirus`]'s one lock.
+#[derive(Default)]
+struct Estado {
+    /// Product name → each of its executables' paths → the ids of the filters blocking it.
+    puestos: HashMap<String, BTreeMap<String, Vec<u64>>>,
+    /// Product name → its paths skipped because no file was there, looked at again every
+    /// [`CADA_SALTADAS`] until one appears.
+    saltadas: HashMap<String, BTreeSet<String>>,
+    /// Whether the thread that looks at them is running: it ends when nothing waits any more.
+    vigilando: bool,
 }
 
 /// The cuts of the process: the same for every pass of the engine and every panel it starts.
 pub(crate) fn global() -> &'static CortesAntivirus {
     static CORTES: LazyLock<CortesAntivirus> = LazyLock::new(CortesAntivirus::default);
     &CORTES
+}
+
+/// How often the paths skipped because no file was there are looked at again.
+const CADA_SALTADAS: std::time::Duration = std::time::Duration::from_secs(15);
+
+/// Whether no file is at `ruta`: only «not found» counts; a path that cannot be looked at is tried,
+/// and Windows says what it says.
+fn no_esta(ruta: &str) -> bool {
+    matches!(std::path::Path::new(ruta).try_exists(), Ok(false))
+}
+
+/// Keeps `esperan` as the paths of `producto` waiting for a file, and makes sure something looks at
+/// them: a thread of its own, started only when some path waits, that looks every
+/// [`CADA_SALTADAS`] and cuts a file that appeared, and ends when nothing waits any more. Called
+/// with the cuts' lock held, as is the thread's look, so one of them always sees the other.
+fn esperan_un_archivo(
+    saltadas: &mut HashMap<String, BTreeSet<String>>,
+    vigilando: &mut bool,
+    producto: &str,
+    esperan: BTreeSet<String>,
+) {
+    if esperan.is_empty() {
+        saltadas.remove(producto);
+        return;
+    }
+    saltadas.insert(producto.to_owned(), esperan);
+    if !*vigilando {
+        *vigilando = true;
+        std::thread::spawn(|| loop {
+            std::thread::sleep(CADA_SALTADAS);
+            if !global().corta_lo_que_aparecio() {
+                return;
+            }
+        });
+    }
 }
 
 impl CortesAntivirus {
@@ -80,7 +127,7 @@ impl CortesAntivirus {
         {
             // One opening at a time: of two at once, the session left over would close and take
             // GUARDIANA's provider and sublayer with it, if it had added them.
-            let _a_la_vez = self.puesto.lock().unwrap_or_else(PoisonError::into_inner);
+            let _a_la_vez = self.estado.lock().unwrap_or_else(PoisonError::into_inner);
             if self.cortafuegos.get().is_none() {
                 if let Ok(cf) = guardiana_apps::Cortafuegos::abrir() {
                     let _ = self.cortafuegos.set(cf);
@@ -165,22 +212,42 @@ impl CortesAntivirus {
         let Some(cf) = self.cortafuegos.get() else {
             return Err(guardiana_apps::ErrorCorte::NoSoportado);
         };
-        let mut puesto = self.puesto.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut estado = self.estado.lock().unwrap_or_else(PoisonError::into_inner);
+        let Estado {
+            puestos,
+            saltadas,
+            vigilando,
+        } = &mut *estado;
         if !cortar {
-            let ids: Vec<u64> = puesto
+            let ids: Vec<u64> = puestos
                 .get(producto)
                 .map(|r| r.values().flatten().copied().collect())
                 .unwrap_or_default();
             cf.quitar(&ids)?;
-            puesto.remove(producto);
+            puestos.remove(producto);
+            saltadas.remove(producto);
             return Ok(0);
         }
-        let cortadas = puesto.entry(producto.to_owned()).or_default();
-        // The paths not cut yet; if one cannot be cut, the ones added now are taken off again and
-        // what was there before stays as it was.
+        let cortadas = puestos.entry(producto.to_owned()).or_default();
+        let mut esperan = saltadas.get(producto).cloned().unwrap_or_default();
+        let mut saltadas_ahora = 0;
+        // The paths not cut yet. One with no file at it (an update moved the program, or it was
+        // uninstalled) has nothing to cut, and Windows refuses it: it is skipped, said once, and waits
+        // for a file (review of arreglos-1055: until then it failed the whole set). If one that is
+        // there cannot be cut, the ones added now are taken off again and what was there before
+        // stays as it was.
         let mut nuevas: Vec<(String, Vec<u64>)> = Vec::new();
         for ruta in rutas {
             if cortadas.contains_key(ruta) || nuevas.iter().any(|(r, _)| r == ruta) {
+                continue;
+            }
+            if no_esta(ruta) {
+                if esperan.insert(ruta.clone()) {
+                    eprintln!(
+                        "guardiana: el corte de {producto} salta {ruta}: ya no está en el disco"
+                    );
+                    saltadas_ahora += 1;
+                }
                 continue;
             }
             match cf.cortar(ruta, &guardiana_apps::Destino::default()) {
@@ -188,20 +255,73 @@ impl CortesAntivirus {
                 Err(e) => {
                     let hechos: Vec<u64> = nuevas.into_iter().flat_map(|(_, ids)| ids).collect();
                     let _ = cf.quitar(&hechos);
+                    esperan_un_archivo(saltadas, vigilando, producto, esperan);
                     return Err(e);
                 }
             }
         }
+        if saltadas_ahora > 0 && rutas.iter().all(|r| no_esta(r)) {
+            eprintln!("guardiana: nada que cortar de {producto}: ninguno de sus archivos está en el disco");
+        }
+        for (ruta, _) in &nuevas {
+            esperan.remove(ruta);
+        }
         cortadas.extend(nuevas);
-        Ok(cortadas.values().map(Vec::len).sum())
+        let n: usize = cortadas.values().map(Vec::len).sum();
+        esperan_un_archivo(saltadas, vigilando, producto, esperan);
+        Ok(n)
+    }
+
+    /// Cuts what appeared at the paths skipped because no file was there; what is still missing
+    /// keeps waiting. A path Windows will not cut is said once and left to the next time the cut is
+    /// put (a panel start, or the person). Whether anything still waits: when nothing does, the
+    /// thread that looks ends, marked under the same lock.
+    fn corta_lo_que_aparecio(&self) -> bool {
+        let mut estado = self.estado.lock().unwrap_or_else(PoisonError::into_inner);
+        let Estado {
+            puestos,
+            saltadas,
+            vigilando,
+        } = &mut *estado;
+        let Some(cf) = self.cortafuegos.get() else {
+            *vigilando = false;
+            return false;
+        };
+        for (producto, rutas) in saltadas.iter_mut() {
+            let cortadas = puestos.entry(producto.clone()).or_default();
+            rutas.retain(|ruta| {
+                if no_esta(ruta) {
+                    return true;
+                }
+                if let std::collections::btree_map::Entry::Vacant(sitio) =
+                    cortadas.entry(ruta.clone())
+                {
+                    match cf.cortar(ruta, &guardiana_apps::Destino::default()) {
+                        Ok(ids) => {
+                            sitio.insert(ids);
+                        }
+                        Err(e) => {
+                            eprintln!(
+                                "guardiana: el corte de {producto} no pudo poner {ruta}: {e}"
+                            );
+                        }
+                    }
+                }
+                false
+            });
+        }
+        saltadas.retain(|_, rutas| !rutas.is_empty());
+        *vigilando = !saltadas.is_empty();
+        *vigilando
     }
 
     /// Which products are cut right now (have filters in place).
     pub(crate) fn cortados(&self) -> Vec<String> {
-        self.puesto
+        self.estado
             .lock()
-            .map(|m| {
-                m.iter()
+            .map(|e| {
+                e.puestos
+                    .iter()
                     .filter(|(_, r)| r.values().any(|ids| !ids.is_empty()))
                     .map(|(k, _)| k.clone())
                     .collect()
@@ -1136,12 +1256,46 @@ mod en_windows {
     /// The ids of the filters in place for `producto`, path by path.
     fn ids_de(producto: &str) -> Vec<u64> {
         global()
-            .puesto
+            .estado
             .lock()
             .unwrap()
+            .puestos
             .get(producto)
             .map(|r| r.values().flatten().copied().collect())
             .unwrap_or_default()
+    }
+
+    /// A path with no file at it is skipped, and the paths that are there are cut; with every path
+    /// gone nothing is cut and nothing fails; a file that appears later at a skipped path is cut at
+    /// the next look at the skipped paths (review of arreglos-1055).
+    #[test]
+    #[ignore = "necesita Windows como administrador"]
+    fn una_ruta_que_ya_no_esta_se_salta_y_se_corta_cuando_aparece() {
+        let cf = abierto();
+        let (dir, esta) = carpeta("saltadas");
+        let falta = dir.join("otra").join("mbamservice.exe");
+        let falta_s = falta.display().to_string();
+        let cortes = global();
+        let pon = |rutas: &[String]| cortes.aplica_rutas("Malwarebytes", true, rutas);
+        // Every path gone: nothing is cut, and it is no error.
+        assert_eq!(pon(&[falta_s.clone()]).unwrap(), 0);
+        assert_eq!(cf.cuantos().unwrap(), 0);
+        assert!(cortes.cortados().is_empty());
+        // One gone and one there: the one there is cut.
+        assert_eq!(pon(&[esta, falta_s]).unwrap(), 2);
+        assert_eq!(cf.cuantos().unwrap(), 2);
+        // The file appears at the skipped path: cut at the next look.
+        std::fs::create_dir_all(dir.join("otra")).unwrap();
+        std::fs::write(&falta, b"").unwrap();
+        let hasta = std::time::Instant::now() + CADA_SALTADAS * 3;
+        while ids_de("Malwarebytes").len() < 4 && std::time::Instant::now() < hasta {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+        }
+        assert_eq!(ids_de("Malwarebytes").len(), 4, "cut once it appeared");
+        assert_eq!(cf.cuantos().unwrap(), 4);
+        assert_eq!(cortes.aplica_rutas("Malwarebytes", false, &[]).unwrap(), 0);
+        assert_eq!(cf.cuantos().unwrap(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Putting a product's cut back with fewer paths (one of its programs asked no name this week)
