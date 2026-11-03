@@ -214,8 +214,33 @@ const GUION: &str = r#"(() => {
     if (!pon()) new MutationObserver((_, o) => { if (pon()) o.disconnect(); }).observe(document, { childList: true });
   };
   /*<programa>*/
+  // 3 Nov 2026 (the owner: «el margen de arriba es demasiado ancho… hazlo más fino… ganemos más espacio en pantalla»): the
+  // window has no title bar of Windows; the program draws its three buttons over the top right of the window, 138 by 44
+  // CSS pixels. GUARDIANA's web and panel, which fill the window, are told so (data-barra-titulo on the root) and say
+  // whether their top row is now the title bar (room for the buttons, the parts that move the window marked with
+  // `app-region`) through their own CSS: `--zero-barra-titulo: 1` on the body. Read once the page's styles are in (when
+  // its first scripts have run and when it has loaded) and whenever the page asks (`guardiana-barra-titulo`, a view
+  // without such a top row); only a change is sent. Until a page says so, ZERO keeps its own top row over it.
+  const barraTitulo = () => {
+    marca('barraTitulo');
+    let dicho = null;
+    const di = () => {
+      let v = '';
+      try { if (document.body) v = getComputedStyle(document.body).getPropertyValue('--zero-barra-titulo').trim(); } catch (_) {}
+      const propia = v === '1';
+      if (propia === dicho) return;
+      dicho = propia;
+      manda({ tipo: 'zg_titulo', propia });
+    };
+    document.addEventListener('DOMContentLoaded', di, { once: true });
+    addEventListener('load', di, { once: true });
+    document.addEventListener('guardiana-barra-titulo', di);
+  };
+  /*</programa>*/
+  /*<programa>*/
   if (!marco && location.origin === 'http://127.0.0.1:7443') {
     marca('enZero');
+    barraTitulo();
     document.addEventListener('click', (e) => {
       const b = e.target && e.target.closest && e.target.closest('[data-producto]');
       if (!b) return;
@@ -405,6 +430,7 @@ const GUION: &str = r#"(() => {
   /*<programa>*/
   if (!marco && programa && location.origin === 'https://guardianagroup.com') {
     marca('enPrograma');
+    barraTitulo();
     // 1.0.50 (independent review, M1): a reading that sets this computer to work (a review, a slow look of the watch)
     // only right after the person's own click or key, which the page cannot fake.
     let gesto = 0;
@@ -1547,6 +1573,10 @@ mod tests {
             "guardiana-panel-pide",
             "enPrograma",
             "enZero",
+            // 3 Nov 2026: only GUARDIANA's own pages in the program's tabs may be the window's title bar.
+            "barraTitulo",
+            "zg_titulo",
+            "--zero-barra-titulo",
         ] {
             assert!(!web.contains(parte), "{parte}");
             assert!(programa.contains(parte), "{parte}");

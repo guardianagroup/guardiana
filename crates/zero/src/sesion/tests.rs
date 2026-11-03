@@ -3349,6 +3349,86 @@ fn marco_de(o: &[Orden]) -> Option<(i32, i32)> {
     })
 }
 
+/// 3 Nov 2026: what GUARDIANA's web or panel in the program's tab `id` says once its own top row is the window's title
+/// bar (the page script reads it from the page's own CSS, `--zero-barra-titulo: 1`).
+fn barra_propia(s: &mut Sesion, id: u32, fuente: &str) -> Vec<Orden> {
+    s.mensaje(
+        Origen::Pestana(id),
+        fuente,
+        r#"{"tipo":"zg_titulo","propia":true}"#,
+    )
+}
+
+#[test]
+fn guardianas_own_pages_are_the_title_bar_once_they_say_so() {
+    // 3 Nov 2026 (the owner: «el margen de arriba es demasiado ancho… hazlo más fino… ganemos más espacio en pantalla»):
+    // no title bar of Windows; the top row is the title bar, 44 high, with the window's buttons at its right.
+    assert_eq!(ALTO_ARRIBA, crate::barra_titulo::ALTO);
+    assert_eq!((ALTO_ARRIBA, ALTO_ZERO), (44, 132));
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "c".repeat(64));
+    let _ = s.abre_programa(&url);
+    let orbita = s.activa();
+    assert_eq!(s.producto(), "orbita");
+    // While it loads (or a web from before the change, which says nothing): ZERO's top row over it, so the window can
+    // always be moved and nothing of the page is under its buttons.
+    assert_eq!(s.marco(), (ALTO_ARRIBA, 0));
+    assert!(s.pagina_del_programa(orbita, ORBITA));
+    // Its top row is the title bar: the web has the whole window.
+    assert_eq!(
+        marco_de(&barra_propia(&mut s, orbita, ORBITA)),
+        Some((0, 0))
+    );
+    // A page of the site whose top row is not (it says so, or says nothing more): the top row comes back over it.
+    let multas = "https://guardianagroup.com/orbita/multas/";
+    let o = s.mensaje(
+        Origen::Pestana(orbita),
+        multas,
+        r#"{"tipo":"zg_titulo","propia":false}"#,
+    );
+    assert_eq!(marco_de(&o), Some((ALTO_ARRIBA, 0)));
+    let _ = barra_propia(&mut s, orbita, ORBITA);
+    assert_eq!(s.marco(), (0, 0));
+    // A page that could not load shows the engine's error, with no top row: ZERO's comes back over it.
+    let _ = s.resultado_carga(orbita, false, false);
+    assert_eq!(s.marco(), (ALTO_ARRIBA, 0));
+    let _ = barra_propia(&mut s, orbita, ORBITA);
+    assert_eq!(s.marco(), (0, 0));
+    // The document that sent it, as the engine says, decides: another page in that tab cannot.
+    assert!(s
+        .mensaje(
+            Origen::Pestana(orbita),
+            "https://example.com/",
+            r#"{"tipo":"zg_titulo","propia":false}"#
+        )
+        .is_empty());
+    assert_eq!(s.marco(), (0, 0));
+    assert!(!s.pagina_del_programa(orbita, "https://example.com/"));
+    // A tab of the browser cannot either, not even with GUARDIANA's web in it: ZERO's top row stays over it.
+    let _ = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"pestana_nueva"}"#);
+    let otra = s.activa();
+    assert_ne!(otra, orbita);
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        &json!({ "tipo": "navegar", "texto": ORBITA }).to_string(),
+    );
+    assert!(!s.pagina_del_programa(otra, ORBITA));
+    assert!(barra_propia(&mut s, otra, ORBITA).is_empty());
+    assert_ne!(s.marco().0, 0);
+    // GUARDIANA's panel on this computer, in its own tab, says it too.
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"producto","producto":"guardiana"}"#,
+    );
+    let panel = s.activa();
+    assert!(s.pagina_del_programa(panel, &url));
+    assert_eq!(s.marco(), (ALTO_ARRIBA, 0));
+    let _ = barra_propia(&mut s, panel, &url);
+    assert_eq!(s.marco(), (0, 0));
+}
+
 #[test]
 fn orbita_is_the_fourth_product_and_its_tab_is_made_once() {
     // 1.0.50 (the owner, 30 Oct 2026, 21:05: «todo tiene que ir dentro del programa, es mejor así»).
@@ -3369,8 +3449,13 @@ fn orbita_is_the_fourth_product_and_its_tab_is_made_once() {
     );
     let orbita = s.activa();
     assert!(s.pestana(orbita).is_some_and(|p| p.fija && p.url == ORBITA));
-    // 1.0.50: the web fills the window, as the panel does.
-    assert_eq!(marco_de(&s.marco_nuevo()), Some((0, 0)));
+    // 1.0.50: the web fills the window, as the panel does. 3 Nov 2026: once it says that its own top row is the
+    // window's title bar; until then ZERO's top row stays over it.
+    assert_eq!(marco_de(&s.marco_nuevo()), Some((ALTO_ARRIBA, 0)));
+    assert_eq!(
+        marco_de(&barra_propia(&mut s, orbita, ORBITA)),
+        Some((0, 0))
+    );
     // Comunicaciones lives under Órbita's folder and stays its own product.
     let _ = s.mensaje(
         Origen::Barra,
@@ -3432,9 +3517,10 @@ fn the_program_opens_on_its_web_and_the_panel_waits_behind_it() {
     let o = s.abre_programa(crate::lanzador::ESPERA);
     assert!(!o.is_empty());
     assert_eq!(s.producto(), "orbita");
-    assert_eq!(s.marco(), (0, 0));
     let orbita = s.activa();
     assert!(s.pestana(orbita).is_some_and(|p| p.fija && p.url == ORBITA));
+    let _ = barra_propia(&mut s, orbita, ORBITA);
+    assert_eq!(s.marco(), (0, 0));
     // The service answers: the panel loads in its own tab, behind the web.
     let o = s.panel_listo(&url);
     assert!(o
@@ -3686,9 +3772,14 @@ fn one_navigation_the_selector_moves_between_the_three_products() {
     let (mut s, _, _) = abre();
     let url = format!("http://127.0.0.1:7443/?t={}", "a".repeat(64));
     let _ = s.abre_guardiana(&url);
-    // GUARDIANA's panel in front: ZERO's bar steps aside, the panel draws its own top row.
+    // GUARDIANA's panel in front: ZERO's bar steps aside, the panel draws its own top row (once it says it is the
+    // window's title bar, 3 Nov 2026).
     assert_eq!(s.producto(), "guardiana");
-    assert_eq!(marco_de(&s.marco_nuevo()), Some((0, 0)));
+    let guardiana = s.activa();
+    assert_eq!(
+        marco_de(&barra_propia(&mut s, guardiana, &url)),
+        Some((0, 0))
+    );
     assert!(
         s.marco_nuevo().is_empty(),
         "the same layout is not given twice"
@@ -3710,9 +3801,10 @@ fn one_navigation_the_selector_moves_between_the_three_products() {
     )));
     let m = s.marco_nuevo();
     assert_eq!(marco_de(&m), Some((ALTO_ZERO, 0)));
+    // 3 Nov 2026: the top row (the title bar, 44), the tabs (44) and the address (44).
     assert_eq!(
         del_tipo(&m, Origen::Barra, "marco").unwrap_or_default()["barra"],
-        144
+        132
     );
     // A web page cannot ask for it.
     let web = s.activa();
@@ -3729,8 +3821,14 @@ fn one_navigation_the_selector_moves_between_the_three_products() {
         r#"{"tipo":"producto","producto":"secure"}"#,
     );
     assert_eq!(s.producto(), "secure");
-    // 1.0.50: Comunicaciones, GUARDIANA's web, fills the window too.
-    assert_eq!(marco_de(&s.marco_nuevo()), Some((0, 0)));
+    // 1.0.50: Comunicaciones, GUARDIANA's web, fills the window too (3 Nov 2026: once its top row says it is the title
+    // bar; until then, only ZERO's top row over it).
+    assert_eq!(marco_de(&s.marco_nuevo()), Some((ALTO_ARRIBA, 0)));
+    let secure = s.activa();
+    assert_eq!(
+        marco_de(&barra_propia(&mut s, secure, SECURE)),
+        Some((0, 0))
+    );
     // And back to the browser tab the person was on.
     let _ = s.mensaje(
         Origen::Barra,
@@ -4431,6 +4529,7 @@ fn the_vpn_shows_in_the_bar_and_closes_from_it() {
     let url = format!("http://127.0.0.1:7443/?t={}", "9".repeat(64));
     let _ = s.abre_programa(&url);
     let orbita = s.activa();
+    let _ = barra_propia(&mut s, orbita, ORBITA);
     let panel = s
         .pestanas
         .iter()

@@ -79,12 +79,16 @@ pub const CORTES: &str = "https://zero.guardiana/cortes.html";
 /// A company's profile (`?e=<its name>`).
 pub const EMPRESA: &str = "https://zero.guardiana/empresa.html";
 /// 1.0.46 layout, in CSS pixels: the top row alone (Comunicaciones), the whole bar of the
-/// browser (top row `--s-barra` 56, tabs `--s-fila2` 44, address 44), the glass strip beside a
+/// browser (top row, tabs `--s-fila2` 44, address 44), the glass strip beside a
 /// web (`--s-cristal`) and the side view (`--s-cristal-abierto`): the design system's tokens
 /// (`interfaz/diseno.css`, «SISTEMA 1.0.46»).
-pub const ALTO_ARRIBA: i32 = 56;
+///
+/// 3 Nov 2026 (the owner: «el margen de arriba es demasiado ancho… hazlo más fino… ganemos más espacio en pantalla»): the
+/// window has no title bar of Windows any more, and the top row is the title bar, with the window's own buttons at its
+/// right ([`crate::barra_titulo`]): 44, no longer 56.
+pub const ALTO_ARRIBA: i32 = crate::barra_titulo::ALTO;
 /// See [`ALTO_ARRIBA`].
-pub const ALTO_ZERO: i32 = 144;
+pub const ALTO_ZERO: i32 = ALTO_ARRIBA + 44 + 44;
 /// See [`ALTO_ARRIBA`].
 pub const ANCHO_FRANJA: i32 = 56;
 /// See [`ALTO_ARRIBA`].
@@ -262,10 +266,11 @@ pub enum Orden {
     /// Close the window (the last tab was closed).
     CierraVentana,
     /// 1.0.46, one navigation only: how the window is laid out for what is in front. `barra` is
-    /// the height of the bar in CSS pixels (0 on GUARDIANA's own panel, which draws its own top
-    /// row; 56 for Comunicaciones, only the top row; 144 for the browser: top row, tabs and
-    /// address). `lateral` is the width of ZERO's side view: 0, 56 (the glass strip beside a
-    /// web) or 360 (the side summary or another view, open).
+    /// the height of the bar in CSS pixels (0 on GUARDIANA's own web and panel, whose own top row
+    /// is the title bar; [`ALTO_ARRIBA`], only the top row, over them while they do not say so;
+    /// [`ALTO_ZERO`] for the browser: top row, tabs and address). `lateral` is the width of ZERO's
+    /// side view: 0, 56 (the glass strip beside a web) or 360 (the side summary or another view,
+    /// open).
     Marco {
         /// Height of the bar.
         barra: i32,
@@ -449,6 +454,10 @@ struct Pestana {
     carga: u32,
     /// 1.0.50: its last page could not load for lack of network (it loads again when chosen).
     sin_red: bool,
+    /// 3 Nov 2026: GUARDIANA's web or panel in this program's tab said that its top row is the window's title bar (room
+    /// for the window's buttons at its right, and the window moves from it). Until it says so, and after a page that
+    /// could not load, ZERO's own top row stays over it.
+    barra_propia: bool,
     /// «Tu visita, a subasta» (1.0.46): what this page showed of its ad auctions, in memory.
     subasta: subasta::Pagina,
 }
@@ -505,6 +514,7 @@ impl Pestana {
             juzga_primera: false,
             carga: 0,
             sin_red: false,
+            barra_propia: false,
             subasta: subasta::Pagina::default(),
         }
     }
@@ -1943,7 +1953,10 @@ impl Sesion {
         if matches!(producto, "guardiana" | "secure" | "orbita") {
             // 2 Nov 2026 (the VPN review): over them too, only the top row, while the VPN's server does not answer or
             // GUARDIANA's web cannot load with the VPN on: its «Desconectar» must always be at hand.
-            return if self.vpn_sobre_todo() {
+            // 3 Nov 2026: and while the page in front has not said that its own top row is the window's title bar (a
+            // page still loading, one that could not load, or a web or panel from before): the window always has a top
+            // row to be moved from, with its buttons where nothing of the page is under them.
+            return if self.vpn_sobre_todo() || !p.barra_propia {
                 (ALTO_ARRIBA, 0)
             } else {
                 (0, 0)
@@ -2091,6 +2104,26 @@ impl Sesion {
             && self
                 .pestana(id)
                 .is_some_and(|p| p.fija && es_orbita(&p.url))
+    }
+
+    /// 3 Nov 2026: whether the page at `url` in tab `id` is GUARDIANA's own (its web, Órbita and Comunicaciones, or its
+    /// panel on this computer) in one of the program's own tabs: the pages whose top row may be the window's title bar.
+    /// Only there may a page mark the parts of its top row that move the window (`app-region`), and only there is its
+    /// zoom fixed, so its top row always meets the window's buttons. Any other page gets neither, also in the browser's
+    /// own first tab.
+    #[must_use]
+    pub fn pagina_del_programa(&self, id: u32, url: &str) -> bool {
+        (url.starts_with(ORBITA) || es_panel_guardiana(url))
+            && self.pestana(id).is_some_and(|p| p.fija)
+    }
+
+    /// 3 Nov 2026: the page in tab `id` says whether its top row is the window's title bar; the window is laid out
+    /// again at once if that changes what it shows.
+    fn barra_propia(&mut self, id: u32, propia: bool) -> Vec<Orden> {
+        if let Some(p) = self.pestana_mut(id) {
+            p.barra_propia = propia;
+        }
+        self.marco_nuevo()
     }
 
     /// The fixed tab of the panel on this computer, if it is open.
@@ -2829,6 +2862,11 @@ impl Sesion {
                     }
                     "zg_pc_pide" if self.es_orbita_del_programa(id, fuente) => {
                         self.pide_datos_pc(id)
+                    }
+                    // 3 Nov 2026: GUARDIANA's web and panel, in the program's own tabs, say whether their top row is the
+                    // window's title bar. Only those pages in those tabs: any other page cannot take ZERO's top row away.
+                    "zg_titulo" if self.pagina_del_programa(id, fuente) => {
+                        self.barra_propia(id, si(&m, "propia"))
                     }
                     "zg_pc_datos"
                         if self.panel_fijo() == Some(id) && es_panel_guardiana(fuente) =>
@@ -4917,6 +4955,8 @@ impl Sesion {
             p.sin_red = false;
             return Vec::new();
         }
+        // 3 Nov 2026: what shows now is the engine's error, which has no top row of its own: ZERO's comes over it.
+        p.barra_propia = false;
         if !sin_red {
             return Vec::new();
         }
