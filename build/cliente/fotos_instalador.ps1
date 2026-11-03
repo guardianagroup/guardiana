@@ -81,6 +81,8 @@ public static class Raton {
   // BM_CLICK: el botón (o la casilla) se pulsa como con el ratón y avisa a su ventana (el instalador cambia su propiedad)
   public static bool Pulsa(IntPtr h) { return PostMessage(h, 0x00F5, IntPtr.Zero, IntPtr.Zero); }
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr h, uint f);
 }
 "@
 
@@ -124,9 +126,25 @@ function MiraVentanas {
 
 # Los controles del instalador de Windows llegan a la automatización como «Pane» sin patrones (la vuelta del 2 Nov 2026 lo
 # enseñó): se pulsan con BM_CLICK en su propia ventana, y si no tienen ventana, con Invoke.
+# La ventana del instalador, delante antes de pulsar nada (vuelta del 3 Nov 2026: al actualizar, ZERO de la versión
+# anterior se abrió a pantalla completa encima; con el diálogo detrás, BM_CLICK no marcó la casilla y el clic de ratón
+# cayó en ZERO). Una persona tendría el instalador delante: así se prueba lo que ella vería.
+function Delante($e) {
+    try {
+        $h = [IntPtr]$e.Current.NativeWindowHandle
+        if ($h -eq [IntPtr]::Zero) { return }
+        $raiz = [Raton]::GetAncestor($h, 2)
+        if ($raiz -eq [IntPtr]::Zero) { $raiz = $h }
+        [void][Raton]::ShowWindow($raiz, 9)
+        [void][Raton]::SetForegroundWindow($raiz)
+        Start-Sleep -Milliseconds 200
+    } catch { }
+}
+
 function Pulsa($e, [string]$que) {
     $h = [IntPtr]::Zero
     try { $h = [IntPtr]$e.Current.NativeWindowHandle } catch { }
+    Delante $e
     try {
         if ($h -ne [IntPtr]::Zero -and [Raton]::Pulsa($h)) { Evento "pulsado (BM_CLICK): $que"; return $true }
         $e.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
@@ -138,6 +156,7 @@ function Pulsa($e, [string]$que) {
 # Marcar la casilla de aceptar, con lo que haga falta: la automatización (Toggle o Invoke) y, si la casilla no cambia,
 # un clic de ratón en su cuadrado, como una persona. Cada intento queda en el registro.
 function Marca($cb, [string]$n, [int]$intento) {
+    Delante $cb
     if ($intento -eq 0) { if (Pulsa $cb "casilla: $n") { return } }
     if ($intento -eq 1) {
         try {
