@@ -105,23 +105,24 @@ pub fn interpreta(salida: &str) -> Firma {
     }
 }
 
-/// The script, for the file at `ruta`. The path goes as a literal between single quotes with its
-/// own quotes doubled: nothing in a file name can become a command.
-#[must_use]
-pub fn guion(ruta: &str) -> String {
-    let literal = ruta.replace('\'', "''");
-    format!(
-        "[Console]::OutputEncoding = [Text.Encoding]::UTF8; \
-         $s = Get-AuthenticodeSignature -LiteralPath '{literal}'; \
-         $c = $s.SignerCertificate; $t = $s.TimeStamperCertificate; \
-         [pscustomobject]@{{ estado = [string]$s.Status; mensaje = [string]$s.StatusMessage; \
-         tipo = [string]$s.SignatureType; \
-         editor = $(if ($c) {{ $c.GetNameInfo(0, $false) }} else {{ '' }}); \
-         emisor = $(if ($c) {{ $c.GetNameInfo(0, $true) }} else {{ '' }}); \
-         hasta = $(if ($c) {{ $c.NotAfter.ToString('yyyy-MM-dd') }} else {{ '' }}); \
-         sello = $(if ($t) {{ $t.GetNameInfo(0, $false) }} else {{ '' }}) }} | ConvertTo-Json -Compress"
-    )
-}
+/// The environment variable the file's path travels in, from this program to the PowerShell.
+pub const VARIABLE: &str = "GUARDIANA_INSTALADOR";
+
+/// The script, the same for every file: the path is read from [`VARIABLE`], as data, and never
+/// written into the command (1.0.55). Until then it went between single quotes with its own quotes
+/// doubled, and PowerShell also takes Windows' typographic quotes (‘ ’, and “ ” in a double-quoted
+/// text) for quotes, so those characters in a path could close the literal: the panel's copy has a
+/// name of the service's own (random digits and a known extension), but a path with them must
+/// never be able to turn into a command in a PowerShell the service runs.
+pub const GUION: &str = "[Console]::OutputEncoding = [Text.Encoding]::UTF8; \
+     $s = Get-AuthenticodeSignature -LiteralPath $env:GUARDIANA_INSTALADOR; \
+     $c = $s.SignerCertificate; $t = $s.TimeStamperCertificate; \
+     [pscustomobject]@{ estado = [string]$s.Status; mensaje = [string]$s.StatusMessage; \
+     tipo = [string]$s.SignatureType; \
+     editor = $(if ($c) { $c.GetNameInfo(0, $false) } else { '' }); \
+     emisor = $(if ($c) { $c.GetNameInfo(0, $true) } else { '' }); \
+     hasta = $(if ($c) { $c.NotAfter.ToString('yyyy-MM-dd') } else { '' }); \
+     sello = $(if ($t) { $t.GetNameInfo(0, $false) } else { '' }) } | ConvertTo-Json -Compress";
 
 /// Check the file at `ruta`. Blocks for the second or two PowerShell takes: call it off the
 /// async runtime.
@@ -132,9 +133,9 @@ pub fn comprobar(ruta: &std::path::Path) -> Firma {
         use std::os::windows::process::CommandExt;
         // CREATE_NO_WINDOW: no console flashing when this runs from the service.
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        let orden = guion(&ruta.to_string_lossy());
         match std::process::Command::new("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &orden])
+            .args(["-NoProfile", "-NonInteractive", "-Command", GUION])
+            .env(VARIABLE, ruta)
             .creation_flags(CREATE_NO_WINDOW)
             .output()
         {
@@ -194,10 +195,47 @@ mod tests {
         );
     }
 
+    /// The path is no part of the command: the script reads it from its variable, and nothing in
+    /// it is written from outside (1.0.55).
     #[test]
-    fn a_quote_in_the_path_cannot_close_the_literal() {
-        let g = guion("C:\\x\\a'; Remove-Item C:\\ -Recurse; '.exe");
-        assert!(g.contains("-LiteralPath 'C:\\x\\a''; Remove-Item C:\\ -Recurse; ''.exe'"));
+    fn the_path_travels_as_data_never_in_the_command() {
+        assert!(GUION.contains(&format!("-LiteralPath $env:{VARIABLE};")));
+        assert!(!GUION.contains("-LiteralPath '"));
+        assert!(GUION.is_ascii());
+    }
+
+    /// On a real Windows: a file whose name carries every kind of quote PowerShell knows (‘ ’ “ ”
+    /// and the plain one), its escape (`) and a subexpression is found and checked, and nothing in
+    /// its name runs; a file that is not there says nothing.
+    #[cfg(windows)]
+    #[test]
+    fn on_windows_no_quote_in_a_file_name_becomes_a_command() {
+        let carpeta =
+            std::env::temp_dir().join(format!("guardiana-instalador-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&carpeta);
+        // Relative: a command that ran would make it in the PowerShell's working folder, this
+        // test's.
+        let marca = format!("ligero-instalador-{}", std::process::id());
+        let orden = format!("New-Item -ItemType File -Path {marca}");
+        let nombres = [
+            format!("a\u{2018}; {orden}; \u{2019}b.txt"),
+            format!("c\u{201C}$({orden})\u{201D}d.txt"),
+            format!("e'; {orden}; 'f`$({orden})`g.txt"),
+        ];
+        for nombre in &nombres {
+            let ruta = carpeta.join(nombre);
+            assert!(std::fs::write(&ruta, b"x").is_ok(), "{nombre}");
+            let f = comprobar(&ruta);
+            println!("{nombre}: {f:?}");
+            // Windows answered about this very file (a missing one gives no status at all).
+            assert_ne!(f.estado, Estado::NoDisponible, "{nombre}: {f:?}");
+            let falta = comprobar(&carpeta.join(format!("no-{nombre}")));
+            assert_eq!(falta.estado, Estado::NoDisponible, "{nombre}: {falta:?}");
+        }
+        let ejecutada = std::path::Path::new(&marca).exists();
+        let _ = std::fs::remove_file(&marca);
+        let _ = std::fs::remove_dir_all(&carpeta);
+        assert!(!ejecutada, "un nombre de archivo ejecutó una orden");
     }
 
     #[cfg(not(windows))]

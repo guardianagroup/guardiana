@@ -1440,6 +1440,10 @@ pub const TIPOS_ARRANQUE: &[&str] = &[
 // ---------------------------------------------------------------------------------------------
 // Windows.
 
+// 1.0.55: the slow looks' PowerShell in efficiency mode and at low memory priority.
+#[cfg(windows)]
+pub(crate) mod fondo;
+
 #[cfg(windows)]
 #[allow(unsafe_code)]
 pub(crate) mod win {
@@ -1653,6 +1657,8 @@ pub(crate) mod win {
             .creation_flags(CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS)
             .spawn()
             .map_err(|e| Error::Sistema(e.to_string()))?;
+        // It is background work: efficiency mode and low memory priority too (1.0.55).
+        let _ = super::fondo::de_fondo(&hijo);
         if let Some(mut entrada) = hijo.stdin.take() {
             entrada
                 .write_all(super::SCRIPT.as_bytes())

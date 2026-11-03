@@ -23,9 +23,10 @@ use windows_sys::Win32::System::Diagnostics::ToolHelp::{
 };
 use windows_sys::Win32::System::Registry::{HKEY, HKEY_LOCAL_MACHINE, HKEY_USERS};
 use windows_sys::Win32::System::RemoteDesktop::{
-    ProcessIdToSessionId, WTSClientName, WTSClientProtocolType, WTSEnumerateSessionsW,
-    WTSFreeMemory, WTSQuerySessionInformationW, WTSUserName, WTS_CURRENT_SERVER_HANDLE,
-    WTS_INFO_CLASS, WTS_SESSION_INFOW,
+    ProcessIdToSessionId, WTSClientName, WTSClientProtocolType, WTSDomainName,
+    WTSEnumerateSessionsW, WTSFreeMemory, WTSGetActiveConsoleSessionId,
+    WTSQuerySessionInformationW, WTSUserName, WTS_CURRENT_SERVER_HANDLE, WTS_INFO_CLASS,
+    WTS_SESSION_INFOW,
 };
 
 use super::{de_registro, es_vigilado, Proceso, Sesion, Uso, CAPACIDADES};
@@ -172,6 +173,24 @@ fn texto_de(bytes: &[u8]) -> String {
     String::from_utf16_lossy(&unidades)
 }
 
+/// La sesión de la consola (la pantalla y el teclado del propio equipo) y su cuenta,
+/// `sesión:dominio\\cuenta`; vacío cuando no hay nadie en ella. `None` si Windows no lo dijo.
+pub(super) fn cuenta_de_consola() -> Option<String> {
+    // SAFETY: sin argumentos; Windows dice qué sesión tiene la consola (0xFFFFFFFF: ninguna).
+    let sesion = unsafe { WTSGetActiveConsoleSessionId() };
+    if sesion == u32::MAX {
+        return Some(String::new());
+    }
+    let usuario = texto_de(&dato_de_sesion(sesion, WTSUserName)?);
+    if usuario.is_empty() {
+        return Some(String::new());
+    }
+    let dominio = dato_de_sesion(sesion, WTSDomainName)
+        .map(|b| texto_de(&b))
+        .unwrap_or_default();
+    Some(format!("{sesion}:{dominio}\\{usuario}"))
+}
+
 /// Las sesiones de Windows: su estado, su protocolo, su cuenta y desde dónde se conectan.
 pub(super) fn sesiones() -> Option<Vec<Sesion>> {
     let mut lista: *mut WTS_SESSION_INFOW = std::ptr::null_mut();
@@ -282,6 +301,8 @@ pub(super) fn defensa() -> Result<String, Error> {
         .creation_flags(CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS)
         .spawn()
         .map_err(|e| Error::Sistema(e.to_string()))?;
+    // Trabajo de fondo: también en modo de eficiencia y con la memoria en prioridad baja (1.0.55).
+    let _ = crate::vigilancia::fondo::de_fondo(&hijo);
     if let Some(mut entrada) = hijo.stdin.take() {
         entrada
             .write_all(super::SCRIPT_DEFENSA.as_bytes())

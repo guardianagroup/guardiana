@@ -1751,11 +1751,15 @@ async fn run_once<F: Future<Output = ()>>(
     first: bool,
 ) -> Result<Exit, Box<dyn Error>> {
     let t = i18n::current();
+    // The console's account the data folder was last opened to, and when (1.0.55): the
+    // housekeeping does it again only when that changes (see `toca_endurecer`).
+    let mut endurecida: Option<(String, Instant)> = None;
     if let Some(parent) = cfg.db.parent() {
         std::fs::create_dir_all(parent)?;
         // Token and extract readable only by the user (brief §8). Not fatal:
         // an unprivileged smoke test on a temp folder keeps working.
-        let _ = paths::harden_data_dir(parent);
+        let cuenta = guardiana_apps::vigia::cuenta_de_consola();
+        endurecida = endurecida_tras(paths::harden_data_dir_con_cuenta(parent), cuenta);
     }
     if first && identity::public_key_is_dev() {
         eprintln!("{}", t.cli("observe.clave_dev"));
@@ -2462,8 +2466,17 @@ async fn run_once<F: Future<Output = ()>>(
                 _ = ten_min.tick() => {
                     // On Windows the console user may have logged in after the
                     // service started: give them access to their own data.
+                    // Since 1.0.55 only when the console's account changed (read from Windows
+                    // directly), or an hour went by, or the last time did not reach whoever is
+                    // there: each time is a PowerShell and three icacls, and an account that
+                    // already has its access has it (the owner, 2 Nov 2026: «se me traba»).
+                    // Off the threads that answer queries, as the minute's calls.
                     if let Some(dir) = &keep_dir {
-                        let _ = paths::harden_data_dir(dir);
+                        let cuenta = guardiana_apps::vigia::cuenta_de_consola();
+                        if toca_endurecer(cuenta.as_deref(), endurecida.as_ref()) {
+                            let hecho = aparte_del_resolutor(|| paths::harden_data_dir_con_cuenta(dir));
+                            endurecida = endurecida_tras(hecho, cuenta);
+                        }
                     }
                 }
                 _ = hour.tick() => {
@@ -2567,6 +2580,32 @@ async fn run_once<F: Future<Output = ()>>(
     }
     policy_al_cerrar.al_cerrar();
     Ok(exit)
+}
+
+/// How long the data folder is left as it was opened when the console's account is the same.
+const REENDURECER: Duration = Duration::from_secs(60 * 60);
+
+/// Whether the data folder must be opened again to the console's account: when it cannot be told
+/// who is there (outside Windows, or Windows did not say), when it was not done yet or the last
+/// time did not reach whoever is there, when the account changed, and at least once an hour.
+fn toca_endurecer(cuenta: Option<&str>, endurecida: Option<&(String, Instant)>) -> bool {
+    match (cuenta, endurecida) {
+        (Some(c), Some((antes, cuando))) => c != antes || cuando.elapsed() >= REENDURECER,
+        _ => true,
+    }
+}
+
+/// What is written down after opening the data folder: the console's account and the time, when
+/// it was done for whoever is there (nobody, or their access given); nothing otherwise, so the
+/// next ten minutes try again.
+fn endurecida_tras(
+    hecho: std::io::Result<bool>,
+    cuenta: Option<String>,
+) -> Option<(String, Instant)> {
+    match (hecho, cuenta) {
+        (Ok(dada), Some(c)) if dada || c.is_empty() => Some((c, Instant::now())),
+        _ => None,
+    }
 }
 
 /// Run a call that talks to the system (PowerShell, resolvectl, networksetup: one to three
@@ -3300,5 +3339,46 @@ mod tests_url_host {
             url_host(IpAddr::V6(Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 1))),
             "[fe80::1]"
         );
+    }
+}
+
+#[cfg(test)]
+mod tests_endurecer {
+    use super::{endurecida_tras, toca_endurecer, REENDURECER};
+    use std::time::Instant;
+
+    /// The data folder is opened again to the console's account only when it has to (1.0.55): not
+    /// knowing who is there, not done yet, another account, nobody any more, or an hour later.
+    #[test]
+    fn the_data_folder_is_opened_again_only_when_it_has_to() {
+        let ahora = Instant::now();
+        let hecha = ("1:PC\\ana".to_owned(), ahora);
+        assert!(toca_endurecer(None, Some(&hecha)), "sin saber quién está");
+        assert!(toca_endurecer(Some("1:PC\\ana"), None), "aún no se hizo");
+        assert!(
+            !toca_endurecer(Some("1:PC\\ana"), Some(&hecha)),
+            "la misma cuenta"
+        );
+        assert!(
+            toca_endurecer(Some("2:PC\\luis"), Some(&hecha)),
+            "otra cuenta"
+        );
+        assert!(toca_endurecer(Some(""), Some(&hecha)), "ya no hay nadie");
+        if let Some(antes) = ahora.checked_sub(REENDURECER) {
+            let vieja = ("1:PC\\ana".to_owned(), antes);
+            assert!(
+                toca_endurecer(Some("1:PC\\ana"), Some(&vieja)),
+                "una hora después"
+            );
+        }
+        // Written down only when it reached whoever is there.
+        assert!(endurecida_tras(Ok(true), Some("1:PC\\ana".into())).is_some());
+        assert!(
+            endurecida_tras(Ok(false), Some(String::new())).is_some(),
+            "nadie"
+        );
+        assert!(endurecida_tras(Ok(false), Some("1:PC\\ana".into())).is_none());
+        assert!(endurecida_tras(Ok(true), None).is_none(), "sin saber quién");
+        assert!(endurecida_tras(Err(std::io::Error::other("x")), Some(String::new())).is_none());
     }
 }

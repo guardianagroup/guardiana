@@ -64,10 +64,18 @@ pub fn ledger_path() -> PathBuf {
 /// rights, so `guardiana panel` and `guardiana verify` work without
 /// elevation. Best effort: the caller decides what to do with an error.
 pub fn harden_data_dir(dir: &Path) -> std::io::Result<()> {
+    harden_data_dir_con_cuenta(dir).map(|_| ())
+}
+
+/// [`harden_data_dir`], saying whether the account at the console got its access: `false` on
+/// Windows when nobody was there or its account could not be told, so the caller tries again
+/// later (1.0.55: the service no longer redoes it every ten minutes for an account that already
+/// has it). Elsewhere `true` once the folder is closed.
+pub fn harden_data_dir_con_cuenta(dir: &Path) -> std::io::Result<bool> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
+        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700)).map(|()| true)
     }
     #[cfg(windows)]
     {
@@ -101,11 +109,11 @@ pub fn harden_data_dir(dir: &Path) -> std::io::Result<()> {
             .output()?;
         let sid = String::from_utf8_lossy(&sid.stdout).trim().to_owned();
         // Nobody at the console yet (service start at boot): the grant happens on a later pass.
-        if sid_de_cuenta(&sid) {
-            let _ = Command::new("icacls")
+        let concedido = sid_de_cuenta(&sid)
+            && Command::new("icacls")
                 .args([dir_s.as_str(), "/grant", &format!("*{sid}:(OI)(CI)M")])
-                .output();
-        }
+                .output()
+                .is_ok_and(|o| o.status.success());
         // 1.0.49: what SYSTEM applies (the copy of the DNS, read by the service and by the scheduled
         // watcher) and what SYSTEM writes to (the watcher's log) live in `sistema`, without the
         // console user's grant: only SYSTEM and Administrators (review of 30 Oct 2026, serious).
@@ -126,12 +134,12 @@ pub fn harden_data_dir(dir: &Path) -> std::io::Result<()> {
                 String::from_utf8_lossy(&out.stderr).into_owned(),
             ));
         }
-        Ok(())
+        Ok(concedido)
     }
     #[cfg(not(any(unix, windows)))]
     {
         let _ = dir;
-        Ok(())
+        Ok(true)
     }
 }
 

@@ -1,0 +1,97 @@
+# «Ligero» (1.0.55). The owner, 2 Nov 2026, 16:53–16:55: his PCs stutter («se me traba»), the simple ones most, and
+# he wants everything as fluid as possible. This measures, on a real Windows that GitHub lends for the run, what the
+# program does by itself in the background and what each thing costs, so that what is changed is changed on numbers:
+#
+# - `costes`: every command the service starts on its own (PowerShell, reg, icacls), once to warm up and then five
+#   times, inside a Windows job object: processor time, processes, memory, disk, and what the whole machine spent
+#   meanwhile (the work a command leaves to WmiPrvSE or Defender). Nothing is built.
+# - `reposo`: the engine as the service runs it, with the machine's DNS pointed at it as the installer leaves it, for
+#   some minutes with nobody asking anything: its processor time and its children's, the processes it starts, what the
+#   whole machine spent, and how long a cached name takes to come back from 127.0.0.1:53, once a second. Before (the
+#   1.0.54 code, `antes`) and after (the branch dispatched), each built as it ships.
+#
+# By hand (workflow_dispatch). GitHub only starts by hand a workflow that is on the default branch or has already run
+# once, so the push trigger below, limited to this branch and to these files, is what lets it run before any merge;
+# nowhere else does it start on its own. It changes the DNS of a throwaway machine and puts it back; it signs nothing
+# and publishes nothing. Results are notices and the run's summary.
+name: ligero
+
+on:
+  workflow_dispatch:
+    inputs:
+      antes:
+        description: 'Commit to compare against (default: 1.0.54, b590714)'
+        required: false
+        default: 'b59071408246e0bd8bcfbf790952fe2beb3feb9b'
+      minutos:
+        description: 'Minutes of idle service measured in each build'
+        required: false
+        default: '10'
+      reposo:
+        description: '«no» skips the idle-service measurement (only the per-command costs)'
+        required: false
+        default: 'si'
+  push:
+    branches: [ligero-1055]
+    paths:
+      - 'build/ligero/**'
+      - '.github/workflows/ligero.yml'
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  costes:
+    name: lo que cuesta cada orden
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: medir
+        shell: pwsh
+        run: ./build/ligero/costes.ps1 -Veces 5
+
+  reposo:
+    name: servicio en reposo (${{ matrix.cual }})
+    if: github.event.inputs.reposo != 'no'
+    runs-on: windows-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        cual: [antes, despues]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: medir
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ matrix.cual == 'antes' && (github.event.inputs.antes || 'b59071408246e0bd8bcfbf790952fe2beb3feb9b') || github.sha }}
+          path: codigo
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: codigo
+          key: ligero-${{ matrix.cual }}
+      - name: compilar como se publica
+        shell: bash
+        working-directory: codigo
+        run: cargo build --release -p guardiana-cli --locked
+      - name: medir
+        shell: pwsh
+        run: ./medir/build/ligero/reposo.ps1 -Exe "$env:GITHUB_WORKSPACE\codigo\target\release\guardiana.exe" -Etiqueta '${{ matrix.cual }}' -Minutos ${{ github.event.inputs.minutos || '10' }}
+      # The native readings of 1.0.55 against what they replace, on this machine, built as they ship: the same answer
+      # (the tests that also run in ci.yml, here with their output) and what each costs (the ignored ones).
+      - name: lo nativo frente a PowerShell y reg
+        if: matrix.cual == 'despues'
+        shell: bash
+        working-directory: codigo
+        run: |
+          set -o pipefail
+          cargo test --release --locked -p guardiana-service -p guardiana-license -p guardiana-core -- --include-ignored --nocapture --test-threads=1 on_windows_the_native_reading_says_what_powershell_says on_windows_the_native_gateway_is_powershells what_the_minutes_reading_costs en_windows_el_registro_se_lee_como_con_reg lo_que_cuesta_leer_el_ancla lo_que_cuesta_abrir_el_extracto 2>&1 | tee "$RUNNER_TEMP/nativo.log"
+          grep -oE "coste: .*" "$RUNNER_TEMP/nativo.log" | sed 's/^/::notice title=nativo::/' || true
