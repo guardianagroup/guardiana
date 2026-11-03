@@ -1,0 +1,7 @@
+Idiomas PARADOS por el dueño (3 nov 01:10, «los idiomas lo dejamos para el final»): bn ta te th vi id a medias (trozos en sus carpetas); sin empezar: ms fil sw is zh-tw
+Pendientes de lanzar (máx. 20 agentes a la vez): id ms fil sw is zh-tw
+Hechos y unidos al programa: fr de it pt-pt ru ko nl pl zh ar tr ja da nb sv fi cs hu bg sk ro uk hr el he fa ur hi (falta «ir» de ZERO en todos: tanda nueva; notas «el panel no está en <idioma>» a revisar; contradicciones del español: lente_cert_lead «firmado», «Dejar entrar», lente_estado_s2)
+
+Tanda delta (#70), claves cuyo español cambió el 2 nov 23:40: p|panel|lente_cert_lead p|panel|lente_estado_s2 z|sec_g_sala_vacia z|sec_sala_nivel z|sec_c_sin_puerta z|sec_c_mensaje_invitacion (retraducir en todos los idiomas ya hechos o con esos trozos hechos)
+Barrido «cifrado» (español): OJO, z|medida_cifrado, medida_cifrado_cortado, medida_sesion_cifrado(_uno), medida_nota_cifrado hablan de un hash (SHA-256/MD5), no de encriptar: ahí va «en forma de hash» / «convertido en hash», nunca «encriptado».
+PDF de las cartas: WinAnsi pierde ă ș ț (rumano) y cualquier letra fuera de Latin-1: revisar qué PDFs salen en otros idiomas.
