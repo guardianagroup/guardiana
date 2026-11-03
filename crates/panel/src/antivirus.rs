@@ -125,6 +125,15 @@ pub(crate) fn global() -> &'static CortesAntivirus {
     &CORTES
 }
 
+/// The service's look at the antivirus cuts, every minute (review of arreglos-1056): whether
+/// Windows still has their session and every cut in place, and if not, a new session with them.
+/// Until then only a panel start, a change by the person or a path waiting for a file looked, and
+/// after a restart of Windows' filtering service every cut could stay gone for hours. A few calls
+/// to the filter engine and no PowerShell; nothing at all while nothing is cut.
+pub fn comprueba_los_cortes() {
+    global().comprueba();
+}
+
 /// How often the paths skipped because no file was there are looked at again.
 const CADA_SALTADAS: std::time::Duration = std::time::Duration::from_secs(15);
 
@@ -278,6 +287,20 @@ impl CortesAntivirus {
         let mut estado = self.estado.lock().unwrap_or_else(PoisonError::into_inner);
         estado.rehace_si_perdida();
         estado.corta_lo_que_aparecio()
+    }
+
+    /// [`comprueba_los_cortes`]: with something cut, the session made whole again if Windows lost
+    /// it or one of its cuts; with nothing cut, nothing (there is nothing to lose, and a path
+    /// waiting for a file has its own look).
+    fn comprueba(&self) {
+        let mut estado = self.estado.lock().unwrap_or_else(PoisonError::into_inner);
+        let hay_cortes = estado
+            .puestos
+            .values()
+            .any(|r| r.values().any(|ids| !ids.is_empty()));
+        if hay_cortes {
+            estado.rehace_si_perdida();
+        }
     }
 
     /// Which products are cut right now (have filters in place).
@@ -1311,6 +1334,22 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// The minute's look does nothing while nothing is cut: no session is opened for it, not even
+    /// with a path waiting for a file, which has a look of its own (review of arreglos-1056: it
+    /// must stay cheap). On Windows as an administrator, a look that worked here would open one.
+    #[test]
+    fn la_mirada_de_cada_minuto_no_hace_nada_sin_cortes() {
+        let cortes = CortesAntivirus::default();
+        cortes.comprueba();
+        assert!(!cortes.disponible());
+        cortes.estado.lock().unwrap().saltadas.insert(
+            "Malwarebytes".to_owned(),
+            BTreeSet::from([r"C:\no-esta\mbamservice.exe".to_owned()]),
+        );
+        cortes.comprueba();
+        assert!(!cortes.disponible());
+    }
+
     fn fila(programa: &str, firma: &str, qname: &str, n: u64, cat: Category) -> ProgramName {
         ProgramName {
             device_id: SELF_DEVICE_ID.into(),
@@ -1759,6 +1798,40 @@ mod en_windows {
                 .unwrap(),
             0
         );
+        assert_eq!(en_windows(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The minute's look puts back the cuts of a session Windows lost, with nobody doing anything
+    /// (review of arreglos-1056: only a panel start, a change by the person or a path waiting for
+    /// a file did, and after a restart of Windows' filtering service every cut could stay gone for
+    /// hours). Here the session really closes, as with that restart, and one with none of its
+    /// cuts is put in its place.
+    #[test]
+    #[ignore = "necesita Windows como administrador"]
+    fn la_mirada_de_cada_minuto_vuelve_a_poner_los_cortes_perdidos() {
+        arranca();
+        let (dir, programa) = carpeta("cada-minuto");
+        let cortes = global();
+        assert_eq!(
+            cortes
+                .aplica_rutas("Malwarebytes", true, &[programa])
+                .unwrap(),
+            2
+        );
+        let antes = ids_de("Malwarebytes");
+        {
+            let mut e = cortes.estado.lock().unwrap();
+            e.cortafuegos = Some(guardiana_apps::Cortafuegos::abrir().unwrap());
+            let cf = e.cortafuegos.as_ref().unwrap();
+            assert_eq!(cf.cuantos_de(&antes).unwrap(), 0, "Windows removed them");
+        }
+        crate::comprueba_los_cortes();
+        let despues = ids_de("Malwarebytes");
+        assert_eq!(despues.len(), 2);
+        assert_ne!(despues, antes);
+        assert_eq!(en_windows(), 2);
+        assert_eq!(cortes.aplica_rutas("Malwarebytes", false, &[]).unwrap(), 0);
         assert_eq!(en_windows(), 0);
         let _ = std::fs::remove_dir_all(&dir);
     }

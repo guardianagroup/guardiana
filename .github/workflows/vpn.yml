@@ -8,8 +8,8 @@
 # rebuilt while the old one's state is still alive keeps the cuts in Windows' filter engine, once the old state is gone
 # too; a let-through goes through with a filter already gone; putting a cut back with fewer paths keeps the earlier ones;
 # a path with no file is skipped and cut when the file appears; another session opened first takes nothing with it; a
-# session Windows lost is opened again with its cuts; a cut that cannot be put in a new session is not lost (empty files
-# of the tests' own are what is cut, and they are let through).
+# session Windows lost is opened again with its cuts, by the minute's look too; a cut that cannot be put in a new session
+# is not lost (empty files of the tests' own are what is cut, and they are let through).
 # And, on Linux, the VPN end to end: GUARDIANA's server (crates/tunel-servidor) with the kernel's WireGuard in one network
 # namespace, a computer's side of the sign-up (crates/tunel/examples/alta_prueba.rs) in another, the post-quantum
 # preshared key derived on both sides, and traffic through the tunnel. Test keys only, made and thrown away here.

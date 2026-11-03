@@ -2461,6 +2461,11 @@ async fn run_once<F: Future<Output = ()>>(
                         })
                         .await;
                     }
+                    // The antivirus cuts (review of arreglos-1056): whether Windows still has their
+                    // session and every cut, and if not they are put back; after a restart of its
+                    // filtering service they waited for the next panel start, maybe for hours. A few
+                    // calls to the filter engine, and none while nothing is cut.
+                    aparte_del_resolutor(guardiana_panel::comprueba_los_cortes);
                     if let Ok(l) = Ledger::open(&keep_db, identity::genesis()) {
                         // Se mira cada minuto, no cada hora: el día que termina la prueba, el
                         // programa tiene que apartarse ese día, no hasta una hora después.
