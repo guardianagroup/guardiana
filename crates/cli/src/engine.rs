@@ -1516,6 +1516,20 @@ async fn esperar_licencia(
     }
 }
 
+/// Returns once the panel could bind `addr`, looked at every 15 seconds as a running pass's check
+/// does; never while something else holds it, nor when there is nothing to wait for.
+async fn hasta_poder_abrir(addr: Option<SocketAddr>) {
+    match addr {
+        None => std::future::pending().await,
+        Some(addr) => loop {
+            tokio::time::sleep(Duration::from_secs(15)).await;
+            if guardiana_panel::se_puede_abrir(addr) {
+                break;
+            }
+        },
+    }
+}
+
 /// Whether the program may watch right now: the trial or a subscription is on.
 fn puede_funcionar(ledger: &Ledger, secret: &str) -> bool {
     guardiana_license::status(ledger, secret, now_ms())
@@ -1873,6 +1887,7 @@ async fn run_once<F: Future<Output = ()>>(
                 dev_key: identity::public_key_is_dev(),
             },
         });
+        let mut panel_sin_arrancar: Option<SocketAddr> = None;
         let panel = match panel_cfg {
             Some(pc) => match guardiana_panel::start(pc).await {
                 Ok(p) => {
@@ -1886,7 +1901,10 @@ async fn run_once<F: Future<Output = ()>>(
                     }
                     Some(p)
                 }
-                Err(_) => None,
+                Err(e) => {
+                    panel_sin_arrancar = e.por_reintentar();
+                    None
+                }
             },
             None => None,
         };
@@ -1927,7 +1945,10 @@ async fn run_once<F: Future<Output = ()>>(
                     Exit::Reconfigure
                 }
                 Vuelta::Relevo => Exit::Reconfigure,
-            }
+            },
+            // No panel because its address was taken: the pass is rebuilt once it can be bound, as
+            // a running pass does (review of vpn-1055b; «Desconectar» the VPN is always free).
+            () = hasta_poder_abrir(panel_sin_arrancar) => Exit::Reconfigure,
         };
         if let Some(p) = panel {
             p.shutdown().await;
@@ -2285,6 +2306,7 @@ async fn run_once<F: Future<Output = ()>>(
     }
 
     // The panel runs in the same process, with its own ledger connection.
+    let mut panel_sin_arrancar: Option<SocketAddr> = None;
     let panel = match panel_cfg {
         Some(pc) => match guardiana_panel::start(pc).await {
             Ok(p) => {
@@ -2324,6 +2346,7 @@ async fn run_once<F: Future<Output = ()>>(
                     t.cli("observe.panel_error")
                         .replace("{error}", &e.to_string())
                 );
+                panel_sin_arrancar = e.por_reintentar();
                 None
             }
         },
@@ -2346,12 +2369,17 @@ async fn run_once<F: Future<Output = ()>>(
     let hogar_sin_puerto: Option<SocketAddr> = home_lan
         .filter(|lan| !running.udp_addrs.iter().any(|a| a.ip() == IpAddr::V4(*lan)))
         .map(|lan| SocketAddr::new(IpAddr::V4(lan), cfg.listen.port()));
-    // The same for the panel's port on the LAN (1.0.55).
-    let panel_sin_puerto: Option<SocketAddr> = panel_lan.filter(|a| {
-        panel
-            .as_ref()
-            .is_some_and(|p| p.failed_optional.iter().any(|(f, _)| f == a))
-    });
+    // The same for the panel's port on the LAN (1.0.55), and for the whole panel when its loopback
+    // address could not be bound (review of vpn-1055b): with the VPN connected, the panel is the way
+    // to disconnect it. Only once the address can be bound, so a port that stays taken rebuilds
+    // nothing.
+    let panel_sin_puerto: Option<SocketAddr> = panel_lan
+        .filter(|a| {
+            panel
+                .as_ref()
+                .is_some_and(|p| p.failed_optional.iter().any(|(f, _)| f == a))
+        })
+        .or(panel_sin_arrancar);
     // What the resolver forwards to in this pass, to notice when the network changes it.
     // Only when the upstreams came automatically: a person who typed --upstream chose. It was
     // Windows-only until 1 Oct 2026; macOS reads the DHCP lease now, and Linux asks whoever
@@ -2411,8 +2439,7 @@ async fn run_once<F: Future<Output = ()>>(
                                     .is_some_and(|t| guardiana_core::tunel_dns::actual() != Some(t))
                                 || hogar_sin_puerto
                                     .is_some_and(|a| std::net::UdpSocket::bind(a).is_ok())
-                                || panel_sin_puerto
-                                    .is_some_and(|a| std::net::TcpListener::bind(a).is_ok())
+                                || panel_sin_puerto.is_some_and(guardiana_panel::se_puede_abrir)
                             {
                                 if let Some(tx) = reconfigure_tx.take() {
                                     let _ = tx.send(());

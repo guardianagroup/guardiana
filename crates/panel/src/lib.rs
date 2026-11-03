@@ -122,6 +122,29 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+impl Error {
+    /// After a start that failed, the address to try again once it can be bound: the required one
+    /// that could not be (review of vpn-1055b: nothing tried again, and with the VPN connected there
+    /// was no panel to disconnect it from). `None` for any other failure: a token file or a ledger
+    /// that will not open is not fixed by a free port, and trying again would rebuild everything
+    /// every few seconds for nothing.
+    #[must_use]
+    pub fn por_reintentar(&self) -> Option<SocketAddr> {
+        match self {
+            Self::Bind(addr, _) => Some(*addr),
+            Self::Token(_) | Self::Ledger(_) => None,
+        }
+    }
+}
+
+/// Whether the panel could bind `addr` right now. It is bound and let go at once, so nothing is
+/// left listening: what is asked before a pass is rebuilt for an address the panel could not open,
+/// so that it is not rebuilt while something else holds it.
+#[must_use]
+pub fn se_puede_abrir(addr: SocketAddr) -> bool {
+    std::net::TcpListener::bind(addr).is_ok()
+}
+
 /// Shared state of every handler.
 pub(crate) struct AppState {
     pub(crate) ledger: Mutex<Ledger>,

@@ -1,6 +1,7 @@
 //! The panel's listeners (second review of 1.0.55): a required address that cannot be bound fails the start with
 //! nothing left listening; an optional one (in Home Mode, the LAN's panel and its checker page) is reported and
-//! skipped; and a shutdown right after a start ends, and frees the ports.
+//! skipped; and a shutdown right after a start ends, and frees the ports. A start that failed on its address says
+//! which one to try again, and it is tried only once it can be bound (review of vpn-1055b).
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -9,7 +10,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use guardiana_core::{Hash, Ledger};
-use guardiana_panel::{start, Config, Error, RuntimeInfo};
+use guardiana_panel::{se_puede_abrir, start, Config, Error, RuntimeInfo};
 
 fn genesis() -> Hash {
     Hash::of(b"panel listeners test key")
@@ -115,4 +116,47 @@ async fn un_cierre_justo_tras_el_arranque_termina() {
         .await
         .expect("the shutdown ends");
     drop(Ocupa::bind(propia).expect("the panel's port is free after the shutdown"));
+}
+
+/// With its loopback address taken there is no panel at all, and with the VPN connected no way to disconnect it
+/// (review of vpn-1055b). The failed start says which address to try again; while that stays taken it cannot be
+/// opened, time after time, so the engine's 15-second check rebuilds nothing; once it is free it can (and asking
+/// leaves nothing listening), and the start that follows takes it. A start that failed for another reason (here its
+/// token file cannot be written) is not one a free port fixes: there is nothing to try again.
+#[tokio::test]
+async fn sin_panel_su_direccion_se_reintenta_solo_cuando_se_puede_abrir() {
+    let rutas = prepara("reintento");
+    let ocupada = Ocupa::bind("127.0.0.1:0").unwrap();
+    let tomada = ocupada.local_addr().unwrap();
+    let fallo = start(config(&rutas, vec![tomada], Vec::new()))
+        .await
+        .err()
+        .expect("no panel while its address is taken");
+    assert_eq!(fallo.por_reintentar(), Some(tomada), "{fallo:?}");
+    for _ in 0..3 {
+        assert!(!se_puede_abrir(tomada), "still taken: nothing to rebuild");
+    }
+    drop(ocupada);
+    assert!(se_puede_abrir(tomada), "free again");
+    assert!(!contesta(tomada), "asking leaves nothing listening");
+    let p = start(config(&rutas, vec![tomada], Vec::new()))
+        .await
+        .expect("it starts once its address is free");
+    assert_eq!(p.addrs, vec![tomada]);
+    assert!(contesta(tomada));
+    tokio::time::timeout(Duration::from_secs(30), p.shutdown())
+        .await
+        .expect("the shutdown ends");
+    // the token file inside the ledger's file, which no folder can be
+    let (db, _) = &rutas;
+    let sin_llave = Config {
+        token_path: db.join("panel.token"),
+        ..config(&rutas, vec![libre()], Vec::new())
+    };
+    let fallo = start(sin_llave)
+        .await
+        .err()
+        .expect("no token file, no panel");
+    assert!(matches!(fallo, Error::Token(_)), "{fallo:?}");
+    assert_eq!(fallo.por_reintentar(), None);
 }
