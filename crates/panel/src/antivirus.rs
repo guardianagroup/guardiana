@@ -1475,7 +1475,7 @@ mod en_windows {
         let cortes = global();
         assert_eq!(
             cortes
-                .aplica_rutas("Malwarebytes", true, &[programa.clone()])
+                .aplica_rutas("Malwarebytes", true, std::slice::from_ref(&programa))
                 .unwrap(),
             2
         );
@@ -1550,7 +1550,7 @@ mod en_windows {
         let cortes = global();
         let pon = |rutas: &[String]| cortes.aplica_rutas("Malwarebytes", true, rutas);
         // Every path gone: nothing is cut, and it is no error.
-        assert_eq!(pon(&[falta_s.clone()]).unwrap(), 0);
+        assert_eq!(pon(std::slice::from_ref(&falta_s)).unwrap(), 0);
         assert_eq!(en_windows(), 0);
         assert!(cortes.cortados().is_empty());
         // One gone and one there: the one there is cut.
@@ -1583,7 +1583,11 @@ mod en_windows {
         let pon = |rutas: &[String]| cortes.aplica_rutas("Malwarebytes", true, rutas).unwrap();
         assert_eq!(pon(&[a.clone(), b.clone()]), 4);
         let antes = ids_de("Malwarebytes");
-        assert_eq!(pon(&[a.clone()]), 4, "the cut of the path left out stays");
+        assert_eq!(
+            pon(std::slice::from_ref(&a)),
+            4,
+            "the cut of the path left out stays"
+        );
         assert_eq!(pon(&[]), 4);
         assert_eq!(pon(&[b.clone(), a.clone()]), 4, "nothing is put twice");
         assert_eq!(ids_de("Malwarebytes"), antes);
