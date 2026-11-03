@@ -13,15 +13,18 @@
 //! own: the browser's data folder and a second one outside it (the shell picks both). Deleting
 //! both starts the week again; the panel says where they are, as GUARDIANA's does.
 //!
-//! When neither the trial nor a subscription is on, the browser keeps opening pages, but it does
-//! nothing of its own: it cuts nothing, cleans no address, does not watch marked data and makes
-//! no mandates. It never locks the person out of their tabs (the owner's choice, same day).
+//! The browser is free (2 Nov 2026, the owner, 17:01: «El navegador, sí, también quiero que lo
+//! dejes gratis»): it protects the same at every state of the licence, during the trial, with a
+//! subscription and without either. Cutting, cleaning addresses, the form guard and the shield do
+//! not ask for it. What the licence still opens is Plus ([`Estado::nivel`]): GUARDIANA's relays
+//! for Comunicaciones (the call service and its TCP line), which cost money for every byte that
+//! crosses them (the free plan of 18 Oct 2026).
 //!
 //! When the licence file cannot be read (locked, or a folder in its place), the browser keeps
 //! what it last knew for at most [`GRACIA_ILEGIBLE_MS`], counted from the start or from the last
-//! good reading, and the bar and the panel say so all along; after that it stops protecting until
-//! it can read the file again (review of 10 Oct 2026: an unreadable file must not turn the trial
-//! into a free browser for ever, nor be hidden).
+//! good reading, and the bar and the panel say so all along; after that it counts as the free
+//! level until it can read the file again (review of 10 Oct 2026: an unreadable file must not turn
+//! the trial into Plus for ever, nor be hidden). Browsing keeps all its protection meanwhile.
 
 use std::path::{Path, PathBuf};
 
@@ -65,8 +68,8 @@ pub const GRACIA_ILEGIBLE_MS: i64 = 24 * 60 * 60 * 1000;
 /// Where the subscription stands.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Estado {
-    /// Not read yet, or unreadable right now (a locked file, a folder in its place): the browser
-    /// works, for at most [`GRACIA_ILEGIBLE_MS`], and the next reading says.
+    /// Not read yet, or unreadable right now (a locked file, a folder in its place): Plus, for at
+    /// most [`GRACIA_ILEGIBLE_MS`], and the next reading says.
     Desconocido,
     /// The seven free days are running.
     Prueba {
@@ -100,24 +103,27 @@ pub enum Estado {
         /// `cancelada`, `sin_comprobar` or `rechazada`.
         motivo: String,
     },
-    /// The licence file could not be read for [`GRACIA_ILEGIBLE_MS`]: no protection until a
+    /// The licence file could not be read for [`GRACIA_ILEGIBLE_MS`]: the free level until a
     /// reading works again.
     Ilegible {
-        /// When protection stopped, Unix ms.
+        /// When Plus stopped, Unix ms.
         desde: i64,
     },
 }
 
 impl Estado {
-    /// Whether the browser does its own work: cutting, cleaning, the form guard, mandates.
+    /// The level the licence gives: Plus with the trial or a subscription (and while it is not
+    /// known yet, for at most [`GRACIA_ILEGIBLE_MS`]), the free level otherwise. The browser
+    /// protects the same at both (2 Nov 2026); only GUARDIANA's relays, which cost money for
+    /// every byte, need Plus.
     #[must_use]
-    pub const fn protege(&self) -> bool {
-        !matches!(
-            self,
+    pub const fn nivel(&self) -> lic::Nivel {
+        match self {
             Self::PruebaTerminada { .. }
-                | Self::SuscripcionTerminada { .. }
-                | Self::Ilegible { .. }
-        )
+            | Self::SuscripcionTerminada { .. }
+            | Self::Ilegible { .. } => lic::Nivel::Gratis,
+            Self::Desconocido | Self::Prueba { .. } | Self::Suscrita { .. } => lic::Nivel::Plus,
+        }
     }
 
     /// From GUARDIANA's plan.
@@ -405,7 +411,7 @@ mod tests {
     /// two folders of the person's own. The only test in this crate that touches the process's
     /// mark folder.
     #[test]
-    fn siete_dias_propios_y_despues_sin_proteccion() {
+    fn siete_dias_de_plus_y_despues_gratis() {
         let base = std::env::temp_dir().join(format!("zero-licencia-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
         let datos = base.join("datos");
@@ -421,7 +427,7 @@ mod tests {
                 dias: 7
             }
         );
-        assert!(e.protege());
+        assert_eq!(e.nivel(), lic::Nivel::Plus);
         assert!(
             ancla.join("prueba-empezada").exists(),
             "la segunda marca, fuera de los datos"
@@ -447,7 +453,7 @@ mod tests {
                 desde: t0 + 7 * DIA
             }
         );
-        assert!(!e.protege());
+        assert_eq!(e.nivel(), lic::Nivel::Gratis);
 
         // An empty key is refused before anything leaves.
         assert_eq!(lugar.activar("  ", t0 + 8 * DIA), Err(Fallo::Vacia));
@@ -469,7 +475,7 @@ mod tests {
         };
         let e = Estado::de_plan(&p);
         assert_eq!(e.nombre(), "suscripcion_terminada");
-        assert!(!e.protege());
+        assert_eq!(e.nivel(), lic::Nivel::Gratis);
         let p = lic::Plan::Plus {
             origen: "clave".into(),
             desde: 1,
@@ -481,7 +487,7 @@ mod tests {
             comprobacion: Some(lic::Comprobacion::Fallida),
         };
         let e = Estado::de_plan(&p);
-        assert!(e.protege());
+        assert_eq!(e.nivel(), lic::Nivel::Plus);
         assert!(matches!(
             e,
             Estado::Suscrita {
@@ -490,15 +496,16 @@ mod tests {
                 ..
             }
         ));
-        assert!(
-            Estado::Desconocido.protege(),
-            "sin saber, el navegador funciona"
+        assert_eq!(
+            Estado::Desconocido.nivel(),
+            lic::Nivel::Plus,
+            "sin saber, nada se le quita a quien pagó"
         );
         assert_eq!(Fallo::Limite.clave().0, "licencia_err_limite");
     }
 
     /// A folder where the licence file should be: nothing can be read (and nothing is sent), and
-    /// the state that follows a day of that does not protect.
+    /// the state that follows a day of that is the free level.
     #[test]
     fn a_licence_file_that_cannot_be_read_gives_no_state() {
         let base =
@@ -515,7 +522,7 @@ mod tests {
         let e = Estado::Ilegible {
             desde: t0 + GRACIA_ILEGIBLE_MS,
         };
-        assert!(!e.protege());
+        assert_eq!(e.nivel(), lic::Nivel::Gratis);
         assert_eq!(e.nombre(), "ilegible");
         let _ = std::fs::remove_dir_all(&base);
     }

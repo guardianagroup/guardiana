@@ -545,8 +545,9 @@ pub struct Sesion {
     /// Where the servers of names nobody owns are (`servidor`): off until the shell gives the
     /// system's resolver, so tests never touch the network.
     servidores: crate::servidor::Servidores,
-    /// The subscription. Unknown until the shell gives the place it lives in: the browser works
-    /// (for at most a day if the place cannot be read).
+    /// The subscription: it says the plan (Plus or the free level), never whether the browser
+    /// protects (2 Nov 2026). Unknown until the shell gives the place it lives in (Plus meanwhile,
+    /// for at most a day if the place cannot be read).
     licencia: EstadoLicencia,
     /// Where the subscription lives (`None` in tests that do not need it).
     lugar: Option<LugarLicencia>,
@@ -1051,11 +1052,11 @@ impl Sesion {
         !self.prefs.gpc_apagado
     }
 
-    /// The strict fingerprint mode is on (and the browser protects): new tabs get it, and the
-    /// shell sends only the first language in `Accept-Language`.
+    /// The strict fingerprint mode is on: new tabs get it, and the shell sends only the first
+    /// language in `Accept-Language`.
     #[must_use]
     pub const fn huella_uniforme(&self) -> bool {
-        self.prefs.huella_uniforme && self.licencia.protege()
+        self.prefs.huella_uniforme
     }
 
     /// How names are resolved to place the servers of names nobody owns (the shell gives the
@@ -1067,15 +1068,15 @@ impl Sesion {
     /// Whether the engine's tracking prevention should be strict.
     #[must_use]
     pub const fn seguimiento_estricto(&self) -> bool {
-        self.prefs.reglas.cortar_seguimiento && self.licencia.protege()
+        self.prefs.reglas.cortar_seguimiento
     }
 
-    /// Whether the browser does its own work now: the trial or a subscription is on (or not known
-    /// yet, for at most a day). Without either it still opens pages, and does nothing else
-    /// (decided 9 Oct 2026).
+    /// The level the licence gives now. The browser protects the same at both (2 Nov 2026, the
+    /// owner, 17:01: «El navegador, sí, también quiero que lo dejes gratis»); only GUARDIANA's
+    /// relays, which cost money for every byte, need Plus.
     #[must_use]
-    pub const fn protege(&self) -> bool {
-        self.licencia.protege()
+    pub const fn nivel(&self) -> guardiana_license::Nivel {
+        self.licencia.nivel()
     }
 
     /// Where the subscription lives. Reads it at once (the first run ever starts the seven days).
@@ -1104,7 +1105,7 @@ impl Sesion {
 
     /// The licence file could not be read. For a day from the start, or from the last good
     /// reading, the browser keeps what it knew and the bar and the panel say so; after that it
-    /// stops protecting until a reading works again.
+    /// counts as the free level until a reading works again (browsing keeps its protection).
     fn licencia_sin_leer(&mut self, ahora: i64) -> Vec<Orden> {
         let ya = std::mem::replace(&mut self.licencia_ilegible, true);
         let fin = self.licencia_ok + crate::licencia::GRACIA_ILEGIBLE_MS;
@@ -1121,29 +1122,20 @@ impl Sesion {
         }
     }
 
-    /// A new state for the subscription. When protection goes off, the engine's own tracking
-    /// prevention goes back to its default.
+    /// A new state for the subscription. The browser's protection does not change with it (2 Nov
+    /// 2026); the relays do.
     fn cambia_licencia(&mut self, e: EstadoLicencia) -> Vec<Orden> {
         if e == self.licencia {
             return Vec::new();
         }
-        let antes = self.licencia.protege();
         self.licencia = e;
         if !cfg!(test) {
-            // The relay's call service (TURN) costs money per minute: only while the licence
-            // protects (trial or subscription), never after it (the free plan, 18 Oct 2026).
-            crate::rele::permite_turn(self.licencia.protege());
+            // The relay's call service (TURN) and its TCP line cost money for every byte: only
+            // with Plus (the trial or a subscription), never at the free level (18 Oct 2026). The
+            // one thing in ZERO that stays Plus (2 Nov 2026).
+            crate::rele::permite_turn(self.licencia.nivel() == guardiana_license::Nivel::Plus);
         }
-        let mut o = Vec::new();
-        if antes != self.licencia.protege() {
-            o.push(Orden::Seguimiento {
-                estricto: self.seguimiento_estricto(),
-            });
-            o.extend(self.escudo_activa(true));
-            o.extend(self.hoy_a_todos());
-        }
-        o.extend(self.avisa_licencia());
-        o
+        self.avisa_licencia()
     }
 
     /// The result of an activation the shell did ([`Orden::ActivaLicencia`]).
@@ -1154,7 +1146,7 @@ impl Sesion {
                 self.licencia_error = None;
                 let mut o = self.pon_licencia(e);
                 o.extend(self.avisa_licencia());
-                o.push(self.aviso("licencia_activada", &[]));
+                o.push(self.aviso("licencia_activada_plus", &[]));
                 o
             }
             Err(f) => {
@@ -1174,7 +1166,8 @@ impl Sesion {
         let mut m = json!({
             "tipo": "licencia",
             "estado": self.licencia.nombre(),
-            "protege": self.licencia.protege(),
+            // The plan, as the panel and the bar show it: «plus» or «gratis».
+            "nivel": self.licencia.nivel().nombre(),
             "ocupada": self.licencia_ocupada,
             "error": self.licencia_error,
             "comprar": self.t("licencia_comprar_url"),
@@ -1247,14 +1240,12 @@ impl Sesion {
         !self.tinta.is_empty() || crate::chivatos::interesa(url) || self.a_otro_sitio(id, url)
     }
 
-    /// While protecting, a request of tab `id` to another site than the page's (or from a tab
-    /// with no web page yet): its body's size is measured.
+    /// A request of tab `id` to another site than the page's (or from a tab with no web page
+    /// yet): its body's size is measured.
     fn a_otro_sitio(&self, id: u32, url: &str) -> bool {
-        self.licencia.protege()
-            && self.pestana(id).is_some_and(|p| {
-                host_de(url)
-                    .is_some_and(|h| p.escudo.sitio.is_empty() || sitio(&h) != p.escudo.sitio)
-            })
+        self.pestana(id).is_some_and(|p| {
+            host_de(url).is_some_and(|h| p.escudo.sitio.is_empty() || sitio(&h) != p.escudo.sitio)
+        })
     }
 
     fn t(&self, clave: &str) -> String {
@@ -1595,16 +1586,15 @@ impl Sesion {
 
     fn msg_escudo(&self, p: &Pestana) -> Value {
         // What holds now for each site, from what each of its requests was: cut, partly cut
-        // (some requests, or only those that carried your data, or only those outside the
-        // task), or passing; and by which rule, so its button offers the way back. Without the
-        // trial or a subscription nothing is cut, and the shield says so.
+        // (some requests, or only those that carried your data), or passing; and by which rule,
+        // so its button offers the way back.
         // In the order each one first showed up on this page: a row never moves.
         let mut filas: Vec<&Tercero> = p.escudo.terceros.values().collect();
         filas.sort_by_key(|t| t.orden);
         let terceros: Vec<Value> = filas
             .into_iter()
             .map(|t| {
-                let e = t.estado(&self.prefs.reglas, self.licencia.protege());
+                let e = t.estado(&self.prefs.reglas);
                 let mut v = serde_json::to_value(t).unwrap_or(Value::Null);
                 if let Some(o) = v.as_object_mut() {
                     o.insert("ahora".into(), json!(e.ahora));
@@ -1622,9 +1612,8 @@ impl Sesion {
             "pestana": p.id,
             "carga": p.carga,
             "sitio": if es_interna(&p.url) { "" } else { p.escudo.sitio.as_str() },
-            "cortando": self.prefs.reglas.cortar_seguimiento && self.licencia.protege(),
+            "cortando": self.prefs.reglas.cortar_seguimiento,
             "maxima": self.prefs.reglas.cortar_seguimiento && self.prefs.reglas.maxima,
-            "protege": self.licencia.protege(),
             // 1.0.46, «Permitir en esta web»: the lists cut nothing on this web.
             "web_permitida": !p.escudo.sitio.is_empty()
                 && self.prefs.reglas.webs_permitidas.contains(&p.escudo.sitio),
@@ -1736,7 +1725,6 @@ impl Sesion {
             "huella_ruido": !self.prefs.huella_sin_ruido || self.prefs.reglas.maxima,
             "huella_uniforme": self.prefs.huella_uniforme,
             "subastas_permitidas": self.prefs.reglas.subastas_permitidas,
-            "sub_protege": self.licencia.protege(),
         })
     }
 
@@ -1749,8 +1737,7 @@ impl Sesion {
         let mes = fecha::primero_del_mes(&hoy);
         json!({
             "tipo": "hoy",
-            "cortando": self.prefs.reglas.cortar_seguimiento && self.licencia.protege(),
-            "protege": self.licencia.protege(),
+            "cortando": self.prefs.reglas.cortar_seguimiento,
             "motor_id": buscador(&self.prefs.buscador).id,
             "motores": lista_buscadores(),
             "hoy": self.diario.total(&hoy, &hoy),
@@ -2484,9 +2471,9 @@ impl Sesion {
     }
 
     /// Whether the shield stays open beside the pages: from every start, unless the person closed
-    /// it in this session, and only while there is protection to show.
+    /// it in this session (at every state of the licence: the browser is free, 2 Nov 2026).
     fn escudo_a_la_vista(&self) -> bool {
-        !self.escudo_cerrado && self.prefs.bienvenida && self.licencia.protege()
+        !self.escudo_cerrado && self.prefs.bienvenida
     }
 
     /// Done with a view (a question answered, settings closed): back to the shield while the
@@ -2626,17 +2613,9 @@ impl Sesion {
 
     fn orden_de_pagina(&mut self, origen: Origen, tipo: &str, m: &Value) -> Vec<Orden> {
         let activa = self.activa;
-        // The paid tool left in the panel (2 Nov 2026: «Tarea para tu IA», «Preguntar a una IA sin
-        // dar tus datos» and «Mis datos» left the browser, the owner, 16:50).
-        let de_pago = tipo == "subasta_carta";
-        if de_pago && !self.licencia.protege() {
-            let mut o = self.abre_panel("licencia");
-            // An unreadable file is not an ended trial: the panel says what happened.
-            if !matches!(self.licencia, EstadoLicencia::Ilegible { .. }) {
-                o.push(self.aviso("licencia_hace_falta", &[]));
-            }
-            return o;
-        }
+        // No tool of the browser waits for a plan any more (2 Nov 2026, the owner, 17:01): the
+        // letters to a company are written here and sent by the person, nothing crosses a server
+        // of ours.
         match tipo {
             // --- 1.0.46 «Tu visita, a subasta» (subastas-1.0.46) -------------------------------
             "subasta_permitir" => {
@@ -3727,36 +3706,6 @@ impl Sesion {
 
     // --- 1.0.46 «Tu visita, a subasta» (subastas-1.0.46) ---------------------------------------
 
-    /// A request of a tab while the browser does not protect (Free): only the auction view
-    /// learns from it; nothing is cut, counted elsewhere or written but the day's two figures.
-    fn subasta_sin_proteccion(&mut self, id: u32, url: &str) {
-        let Ok(dir) = url::Url::parse(url) else {
-            return;
-        };
-        let host = dir
-            .host_str()
-            .map(crate::dominio::normaliza_host)
-            .unwrap_or_default();
-        if host.is_empty() {
-            return;
-        }
-        let hoy = self.hoy();
-        let destino = crate::destino::clasifica_en(&host, dir.path());
-        let Some(p) = self.pestanas.iter_mut().find(|p| p.id == id) else {
-            return;
-        };
-        let otro = !destino.sitio.is_empty() && destino.sitio != p.subasta.sitio;
-        if p.subasta
-            .anota_peticion(&dir, &host, otro, destino.sigue(), false)
-        {
-            if p.perfil != Perfil::Aislada {
-                self.subastas.empresa(&hoy, &destino.sitio);
-                self.subastas_sucio = true;
-            }
-            self.sucios.insert(id);
-        }
-    }
-
     /// A report of the page script about the page's auction (`zg_subasta`), from the page the
     /// tab shows now and with that page's token.
     fn subasta_mensaje(&mut self, id: u32, fuente: &str, m: &Value) -> Vec<Orden> {
@@ -3795,20 +3744,15 @@ impl Sesion {
         let hoy = self.hoy();
         let semana = fecha::dia_antes(ahora, self.zona, 6);
         let r = &self.prefs.reglas;
-        let protege = self.licencia.protege();
         let mut v = p.subasta.vista();
         if let Some(o) = v.as_object_mut() {
             o.insert("hoy".into(), self.subastas.suma(&hoy, &hoy));
             o.insert("semana".into(), self.subastas.suma(&semana, &hoy));
-            o.insert("protege".into(), json!(protege));
             o.insert(
                 "activo".into(),
-                json!(protege && r.cortar_seguimiento && !r.subastas_sin_cortar),
+                json!(r.cortar_seguimiento && !r.subastas_sin_cortar),
             );
-            o.insert(
-                "corta".into(),
-                json!(protege && r.corta_subastas(&p.subasta.sitio)),
-            );
+            o.insert("corta".into(), json!(r.corta_subastas(&p.subasta.sitio)));
             o.insert(
                 "permitida".into(),
                 json!(r.subastas_permitidas.contains(&p.subasta.sitio)),
@@ -3987,7 +3931,7 @@ impl Sesion {
     /// page (decision 206), or `null`.
     fn cookies_pide(&self, id: u32, fuente: &str, m: &Value) -> Vec<Orden> {
         let ficha: String = texto(m, "zg").chars().take(64).collect();
-        let si = self.licencia.protege() && !self.prefs.cookies_sin_tocar;
+        let si = !self.prefs.cookies_sin_tocar;
         vec![Orden::RespondeFormulario {
             id,
             json: json!({
@@ -4009,10 +3953,7 @@ impl Sesion {
         let r = &self.prefs.reglas;
         // 1.0.46: on with the protection unless the person turned the noise off; maximum
         // protection always has it.
-        if !(self.licencia.protege()
-            && r.cortar_seguimiento
-            && (r.maxima || !self.prefs.huella_sin_ruido))
-        {
+        if !(r.cortar_seguimiento && (r.maxima || !self.prefs.huella_sin_ruido)) {
             return Value::Null;
         }
         let Some(p) = self.pestana(id) else {
@@ -4040,7 +3981,7 @@ impl Sesion {
     /// The guard dealt with the page's cookie notice: the shield says so. Only the managers the
     /// guard knows, and only when it was told to act.
     fn cookies_hecho(&mut self, id: u32, m: &Value) -> Vec<Orden> {
-        if !self.licencia.protege() || self.prefs.cookies_sin_tocar {
+        if self.prefs.cookies_sin_tocar {
             return Vec::new();
         }
         let gestor: String = texto(m, "gestor").chars().take(40).collect();
@@ -4194,9 +4135,6 @@ impl Sesion {
     /// From a frame (`marco`, see [`Self::mensaje_de_marco`]) the reads belong to the page the tab
     /// shows; with no web address on the stack, to the frame's own address.
     fn huella(&mut self, id: u32, fuente: &str, m: &Value, marco: bool) -> Vec<Orden> {
-        if !self.licencia.protege() {
-            return Vec::new();
-        }
         let lista: Vec<(Tecnica, Vec<String>, bool)> = m
             .get("lista")
             .and_then(Value::as_array)
@@ -4340,7 +4278,7 @@ impl Sesion {
             id,
             json: json!({ "zg": ficha, "id": id_pagina, "enviar": enviar }).to_string(),
         };
-        if encontradas.is_empty() || host.is_empty() || !self.licencia.protege() {
+        if encontradas.is_empty() || host.is_empty() {
             return vec![responde(true)];
         }
         // A site that already has these kinds of data from you is not asked about again; the
@@ -4581,14 +4519,13 @@ impl Sesion {
     ) -> (bool, Vec<Orden>) {
         let es_web =
             (url.starts_with("http://") || url.starts_with("https://")) && !es_interna(url);
-        let protege = self.licencia.protege();
         let Some(p) = self.pestana_mut(id) else {
             return (false, Vec::new());
         };
         // A server redirect to an address with tracking tags (a redirect is always a GET here):
         // cancelled and opened clean. Pages the person opens are cleaned when their request
         // leaves (`peticion`), which also keeps form posts intact.
-        if redirigida && es_web && protege {
+        if redirigida && es_web {
             if let Some((limpia, n)) = url_limpia::limpia(url) {
                 p.quitados += u32::try_from(n).unwrap_or(u32::MAX);
                 p.limpiando = Some(sin_fragmento(url).to_string());
@@ -4652,7 +4589,7 @@ impl Sesion {
         }
         // The boxes the cut adverts leave empty are hidden too, as Brave does: the hiding
         // rules of EasyList and uBlock filters for this host, while the protection is on.
-        if es_web && self.prefs.reglas.cortar_seguimiento && self.licencia.protege() {
+        if es_web && self.prefs.reglas.cortar_seguimiento {
             if let Some(script) = host_de(url).and_then(|h| crate::filtros::guion_ocultar(&h)) {
                 o.push(Orden::Ejecuta { id, script });
             }
@@ -4831,9 +4768,9 @@ impl Sesion {
         Some((id, o))
     }
 
-    /// Whether pop-ups are dealt with: the subscription on and «remove pop-ups» on.
-    fn emergentes_activas(&self) -> bool {
-        self.licencia.protege() && !self.prefs.emergentes_sin_tocar
+    /// Whether pop-ups are dealt with: «remove pop-ups» on (at every state of the licence).
+    const fn emergentes_activas(&self) -> bool {
+        !self.prefs.emergentes_sin_tocar
     }
 
     /// A window tab `de` asks to open to `url`, judged before it opens like something its page
@@ -4954,13 +4891,7 @@ impl Sesion {
         let web = ["http://", "https://", "ws://", "wss://"]
             .iter()
             .any(|e| url.starts_with(e));
-        if !web || es_interna(url) || !self.licencia.protege() {
-            // Without the trial or a subscription the browser opens pages and does nothing of
-            // its own: no cut, no cleaning, no count. It still shows the page's ad auction
-            // (1.0.46: the auction view is in every plan); nothing of it is cut.
-            if web && !es_interna(url) {
-                self.subasta_sin_proteccion(id, url);
-            }
+        if !web || es_interna(url) {
             return Respuesta::default();
         }
         let ahora = (self.reloj)();

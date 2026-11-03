@@ -214,48 +214,43 @@
   }
 
   // --- the subscription ---------------------------------------------------------------------------
-  // Said in the bar only when it matters: in the trial's last two days, while the licence file
-  // cannot be read, and when the browser no longer protects (then the shield, which would count
-  // nothing, gives its place to it).
-  const PASTILLA_SIN = { prueba_terminada: 'licencia_pastilla_terminada', ilegible: 'licencia_pastilla_ilegible_fin' };
+  // The browser protects the same at every plan (2 Nov 2026, the owner, 17:01: «El navegador, sí, también quiero que lo
+  // dejes gratis»). The bar says the plan only where it said it before: in the trial's last two days, while the licence
+  // file cannot be read, and, quietly, the free plan once the trial or the subscription is over.
   let licencia = null;
   function pintaLicencia(m) {
     licencia = m;
     const b = $('b-licencia');
-    const sin = m.protege === false;
+    const ilegible = !!m.ilegible || m.estado === 'ilegible';
+    const gratis = m.nivel === 'gratis' && !ilegible;
     let texto = '';
-    if (sin) texto = t(PASTILLA_SIN[m.estado] || 'licencia_pastilla_sin_suscripcion');
-    else if (m.ilegible) texto = t('licencia_pastilla_ilegible');
+    if (ilegible) texto = t('licencia_pastilla_ilegible');
+    else if (gratis) texto = t('licencia_pastilla_gratis');
     else if (m.estado === 'prueba' && m.dias <= 2) texto = tn('licencia_pastilla_dias', m.dias, { d: Z.n(m.dias) });
     b.textContent = texto;
     b.classList.toggle('oculto', !texto);
-    b.classList.toggle('sin-proteccion', sin);
+    b.classList.toggle('gratis', gratis);
     // While the file cannot be read, the whole sentence (with where it is) on hover.
-    const titulo = !sin && m.ilegible ? t('licencia_ilegible', { datos: m.donde_datos || '' }) : t('licencia_boton_titulo');
+    const titulo = ilegible ? t(m.estado === 'ilegible' ? 'licencia_ilegible_fin_gratis' : 'licencia_ilegible_plus', { datos: m.donde_datos || '' }) : t('licencia_boton_titulo');
     b.title = titulo;
     b.setAttribute('aria-label', titulo);
-    $('b-escudo').classList.toggle('oculto', sin);
   }
   $('b-licencia').addEventListener('click', () => manda({ tipo: 'panel', vista: panel === 'licencia' ? null : 'licencia' }));
 
   // --- 1.0.46: the top row, GUARDIANA's in the three products ---------------------------------
   // The selector is the only navigation between them (Z3); the state says, in words, what ZERO
-  // does now: cutting, only watching (the person said no, or maximum is off and nothing is cut),
-  // or not protecting (no trial or subscription).
+  // does now: cutting, or only watching (the person said no). At every plan (2 Nov 2026).
   for (const b of document.querySelectorAll('#productos [data-producto]')) {
     b.addEventListener('click', () => manda({ tipo: 'producto', producto: b.dataset.producto }));
   }
   function pintaEstadoZ() {
     const el = $('estado-z');
     const h = hoyUltimo || {};
-    const sin = (licencia && licencia.protege === false) || h.protege === false;
-    const mirando = !sin && h.cortando === false;
-    el.classList.toggle('sin', sin);
+    const mirando = h.cortando === false;
     el.classList.toggle('mirando', mirando);
-    el.querySelector('span').textContent = t(sin ? 'z1_estado_sin' : mirando ? 'z1_estado_mirando' : 'z1_estado_protegido');
+    el.querySelector('span').textContent = t(mirando ? 'z1_estado_mirando' : 'z1_estado_protegido');
   }
   en('hoy', (m) => { hoyUltimo = m; pintaPastilla(); pintaEstadoZ(); });
-  en('licencia', () => pintaEstadoZ());
   en('marco', (m) => { document.body.classList.toggle('solo-arriba', Number(m.barra) > 0 && Number(m.barra) <= 56); });
   en('textos', () => { $('productos').setAttribute('aria-label', t('z1_productos')); pintaPastilla(); pintaEstadoZ(); });
   en('licencia', pintaLicencia);

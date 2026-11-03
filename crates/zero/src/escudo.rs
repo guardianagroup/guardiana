@@ -140,19 +140,10 @@ impl Tercero {
         (self.vistas > 0 && n >= self.vistas, n > 0)
     }
 
-    /// What holds now for the site with the person's settings (`protege` false: nothing is
-    /// cut, the trial or the subscription is over).
+    /// What holds now for the site with the person's settings (at every state of the licence
+    /// since 2 Nov 2026: the browser is free).
     #[must_use]
-    pub fn estado(&self, a: &Ajustes, protege: bool) -> Estado {
-        if !protege {
-            return Estado {
-                ahora: "pasa",
-                regla: None,
-                por: None,
-                deshace: false,
-                dato: false,
-            };
-        }
+    pub fn estado(&self, a: &Ajustes) -> Estado {
         if a.cortados.contains(&self.sitio) {
             return Estado {
                 ahora: "cortado",

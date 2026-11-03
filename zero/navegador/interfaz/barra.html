@@ -29,7 +29,6 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); user-select:
 #estado-z { display: flex; align-items: center; gap: var(--e2); color: var(--gris); font: 500 var(--t-13); white-space: nowrap; }
 #estado-z i { width: 8px; height: 8px; border-radius: 50%; background: var(--verde); flex: none; }
 #estado-z.mirando i { background: var(--ambar); }
-#estado-z.sin i { background: var(--rojo); }
 #b-menu { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--linea); background: var(--card); color: var(--gris); display: grid; place-items: center; flex: none; padding: 0; }
 #b-menu:hover, #b-menu.activo { color: var(--tinta); border-color: #3A4656; }
 #b-menu svg { width: 16px; height: 16px; }
@@ -98,7 +97,8 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); user-select:
 @keyframes late { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--rojo) 45%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
 
 #b-licencia { height: var(--h-chip); padding: 0 var(--e3); border: 1px solid var(--ambar); border-radius: var(--r-pill); background: var(--ambar-suave); color: var(--tinta); font: 600 var(--t-13); flex: none; white-space: nowrap; }
-#b-licencia.sin-proteccion { border-color: var(--rojo); background: var(--rojo); color: var(--sobre); }
+/* The free plan (2 Nov 2026: ZERO protects the same at every plan): said quietly, not as a warning. */
+#b-licencia.gratis { border-color: var(--linea); background: none; color: var(--gris); font-weight: 500; }
 #b-licencia:hover { filter: brightness(1.05); }
 #guardia { position: absolute; left: 0; right: 0; bottom: -1px; width: 100%; height: 2px; display: block; }
 #herramientas:hover #guardia { height: 4px; }
