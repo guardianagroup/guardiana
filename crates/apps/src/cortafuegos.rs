@@ -13,8 +13,8 @@
 //!   does not read anything, does not break TLS. Blocking is not deception.
 //! - It is by the program's file (its path). All instances of that file are covered; moving the
 //!   file needs the rule renewed.
-//! - It is always reversible: every filter carries GUARDIANA's own provider and sublayer, so they
-//!   can be found and removed, and nothing else is touched.
+//! - It is always reversible: every filter carries GUARDIANA's own provider and sublayer (new keys
+//!   in every session), so they can be found and removed, and nothing else is touched.
 //!
 //! On anything but Windows this is not available and every call says so.
 
@@ -145,6 +145,43 @@ impl Cortafuegos {
         {
             Err(ErrorCorte::NoSoportado)
         }
+    }
+
+    /// How many of the filters with these ids are in place right now, asked to Windows itself.
+    ///
+    /// # Errors
+    /// [`ErrorCorte::Sistema`] when Windows refuses the lookup.
+    pub fn cuantos_de(&self, ids: &[u64]) -> Result<usize, ErrorCorte> {
+        #[cfg(windows)]
+        {
+            self.interno.cuantos_de(ids)
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = ids;
+            Err(ErrorCorte::NoSoportado)
+        }
+    }
+
+    /// Whether Windows still has this firewall's session. After a restart of Windows' filtering
+    /// service it does not, and every cut it held is gone: the caller opens a new one and puts the
+    /// cuts back.
+    #[must_use]
+    pub fn sigue_abierto(&self) -> bool {
+        #[cfg(windows)]
+        {
+            self.interno.viva()
+        }
+        #[cfg(not(windows))]
+        {
+            false
+        }
+    }
+
+    /// This session's provider key, for the tests of another session hanging from it.
+    #[cfg(all(test, windows))]
+    pub(crate) fn proveedor(&self) -> windows_sys::core::GUID {
+        self.interno.proveedor
     }
 }
 

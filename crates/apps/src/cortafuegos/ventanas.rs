@@ -7,6 +7,12 @@
 //! reversible»). While GUARDIANA runs, the service keeps the wanted set in the ledger and
 //! re-applies it on start.
 //!
+//! The provider and the sublayer get new keys in every session, as the VPN's switch (`corte_vpn`):
+//! what a dynamic session adds belongs to it, and no other session can hang anything from it. With
+//! fixed keys, a session opened first by another process (an elevated `guardiana`, for a moment)
+//! owned them, and this one could add no cut until the service restarted (review of
+//! arreglos-1055).
+//!
 //! `unsafe` is used here, as the project allows with justification (CLAUDE.md): there is no safe
 //! wrapper for WFP. Every call is checked, every buffer is owned and sized, the engine handle is
 //! closed on drop, and a failure returns an error, never a silent wrong state.
@@ -16,16 +22,12 @@ use std::net::IpAddr;
 use windows_sys::core::GUID;
 use windows_sys::Win32::Foundation::{HANDLE, HANDLE as HFW};
 use windows_sys::Win32::NetworkManagement::WindowsFilteringPlatform::*;
+use windows_sys::Win32::System::Rpc::UuidCreate;
 
 use super::{Destino, ErrorCorte};
 
-/// GUARDIANA's own provider and sublayer, so its filters can always be told apart and removed.
-const PROVEEDOR: GUID = GUID::from_u128(0x6705_1a2e_9c33_4e77_b1a4_2f0e_7c11_9a01);
-const SUBCAPA: GUID = GUID::from_u128(0x6705_1a2e_9c33_4e77_b1a4_2f0e_7c11_9a02);
 /// `RPC_C_AUTHN_WINNT`.
 const RPC_C_AUTHN_WINNT: u32 = 10;
-/// `FWP_E_ALREADY_EXISTS`.
-const YA_EXISTE: u32 = 0x8032_0009;
 /// `FWP_E_FILTER_NOT_FOUND`. Until 1.0.55 this said 0x8032_0005, which is `FWP_E_PROVIDER_NOT_FOUND`:
 /// a filter already gone was taken for a refusal (review of arreglos-1055).
 const FILTRO_NO_ESTA: u32 = 0x8032_0003;
@@ -38,10 +40,25 @@ fn ancho(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-/// The filter engine with GUARDIANA's provider and sublayer in place, and the ids of the filters
-/// it has added this run.
+/// A new key for one of this session's objects.
+fn clave_nueva() -> Result<GUID, ErrorCorte> {
+    let mut g = GUID::from_u128(0);
+    // SAFETY: an out-pointer to a GUID owned here.
+    let r = unsafe { UuidCreate(&mut g) };
+    // RPC_S_OK (0), or RPC_S_UUID_LOCAL_ONLY (1824): unique on this computer only, which is all a session's key needs
+    if r != 0 && r != 1824 {
+        return Err(err("UuidCreate", u32::from_ne_bytes(r.to_ne_bytes())));
+    }
+    Ok(g)
+}
+
+/// The filter engine with this session's own provider and sublayer in place, and the ids of the
+/// filters it has added.
 pub(crate) struct Motor {
     engine: HFW,
+    /// This session's provider and sublayer (new keys in every session; see the module's notes).
+    pub(crate) proveedor: GUID,
+    subcapa: GUID,
     ids: std::sync::Mutex<Vec<u64>>,
 }
 
@@ -51,6 +68,8 @@ unsafe impl Sync for Motor {}
 
 impl Motor {
     pub(crate) fn abrir() -> Result<Self, ErrorCorte> {
+        let proveedor = clave_nueva()?;
+        let subcapa = clave_nueva()?;
         // A dynamic session: everything we add is cleaned up when this process ends.
         // SAFETY: a zeroed FWPM_SESSION0 is a valid "no options" session; we set only the flag.
         let mut sesion: FWPM_SESSION0 = unsafe { std::mem::zeroed() };
@@ -71,6 +90,8 @@ impl Motor {
         }
         let motor = Self {
             engine,
+            proveedor,
+            subcapa,
             ids: std::sync::Mutex::new(Vec::new()),
         };
         motor.asegura_proveedor()?;
@@ -78,37 +99,57 @@ impl Motor {
         Ok(motor)
     }
 
+    /// This session's provider: a new key, so it cannot already exist.
     fn asegura_proveedor(&self) -> Result<(), ErrorCorte> {
         let mut nombre = ancho("GUARDIANA");
-        // SAFETY: zeroed provider with our key and a display name we own for the call.
+        // SAFETY: zeroed provider with this session's key and a display name we own for the call.
         let mut p: FWPM_PROVIDER0 = unsafe { std::mem::zeroed() };
-        p.providerKey = PROVEEDOR;
+        p.providerKey = self.proveedor;
         p.displayData.name = nombre.as_mut_ptr();
         // SAFETY: valid provider pointer; security descriptor null (default).
         let r = unsafe { FwpmProviderAdd0(self.engine, &p, std::ptr::null_mut()) };
-        if r == 0 || r == YA_EXISTE {
+        if r == 0 {
             Ok(())
         } else {
             Err(err("FwpmProviderAdd0", r))
         }
     }
 
+    /// This session's sublayer, hung from its provider.
     fn asegura_subcapa(&self) -> Result<(), ErrorCorte> {
         let mut nombre = ancho("GUARDIANA — cortes del antivirus");
-        let mut clave = PROVEEDOR;
-        // SAFETY: zeroed sublayer with our keys and an owned display name.
+        let mut clave = self.proveedor;
+        // SAFETY: zeroed sublayer with this session's keys and an owned display name.
         let mut s: FWPM_SUBLAYER0 = unsafe { std::mem::zeroed() };
-        s.subLayerKey = SUBCAPA;
+        s.subLayerKey = self.subcapa;
         s.providerKey = &mut clave;
         s.displayData.name = nombre.as_mut_ptr();
         s.weight = 0x8000;
         // SAFETY: valid sublayer pointer; default security descriptor.
         let r = unsafe { FwpmSubLayerAdd0(self.engine, &s, std::ptr::null_mut()) };
-        if r == 0 || r == YA_EXISTE {
+        if r == 0 {
             Ok(())
         } else {
             Err(err("FwpmSubLayerAdd0", r))
         }
+    }
+
+    /// Whether Windows still has this session: its sublayer can be asked for. After a restart of
+    /// Windows' filtering service the session is gone, and everything it added with it.
+    pub(crate) fn viva(&self) -> bool {
+        let mut s: *mut FWPM_SUBLAYER0 = std::ptr::null_mut();
+        // SAFETY: a lookup by key into an out-pointer owned here; what Windows gives back is freed
+        // once, right after.
+        let r = unsafe { FwpmSubLayerGetByKey0(self.engine, &self.subcapa, &mut s) };
+        if r != 0 || s.is_null() {
+            return false;
+        }
+        // SAFETY: given by FwpmSubLayerGetByKey0 and not used after this.
+        unsafe {
+            let mut p = s.cast::<core::ffi::c_void>();
+            FwpmFreeMemory0(&mut p);
+        }
+        true
     }
 
     pub(crate) fn cortar(&self, ruta: &str, destino: &Destino) -> Result<Vec<u64>, ErrorCorte> {
@@ -218,7 +259,7 @@ impl Motor {
         }
 
         let mut nombre = ancho("GUARDIANA corta el antivirus");
-        let mut prov = PROVEEDOR;
+        let mut prov = self.proveedor;
         // SAFETY: zeroed filter; we set every field we rely on.
         let mut f: FWPM_FILTER0 = unsafe { std::mem::zeroed() };
         f.providerKey = &mut prov;
@@ -227,7 +268,7 @@ impl Motor {
         } else {
             FWPM_LAYER_ALE_AUTH_CONNECT_V6
         };
-        f.subLayerKey = SUBCAPA;
+        f.subLayerKey = self.subcapa;
         f.displayData.name = nombre.as_mut_ptr();
         f.action.r#type = FWP_ACTION_BLOCK;
         // Let the system weight it (FWP_EMPTY): no pointer to keep alive.
@@ -277,8 +318,13 @@ impl Motor {
     /// what this process remembers is no proof that a cut is in place (review of vpn-1055b).
     pub(crate) fn cuantos(&self) -> Result<usize, ErrorCorte> {
         let ids: Vec<u64> = self.ids.lock().map(|g| g.clone()).unwrap_or_default();
+        self.cuantos_de(&ids)
+    }
+
+    /// How many of the filters with these ids Windows has right now, asked to Windows itself.
+    pub(crate) fn cuantos_de(&self, ids: &[u64]) -> Result<usize, ErrorCorte> {
         let mut n = 0;
-        for id in ids {
+        for &id in ids {
             let mut f: *mut FWPM_FILTER0 = std::ptr::null_mut();
             // SAFETY: a lookup by id into an out-pointer owned here; what Windows gives back is freed
             // once, right after.
