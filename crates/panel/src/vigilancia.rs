@@ -160,14 +160,19 @@ impl Vigilancia {
     }
 }
 
-/// Runs a slow look off the runtime, unless one is running.
+/// Runs a slow look off the runtime, unless one is running. While its PowerShell runs the panel is
+/// held only weakly (review of vpn-1055b): one the engine rebuilds meanwhile is not kept alive by it.
 fn lanza_lenta(state: &Arc<AppState>) {
     if state.vigilancia.corriendo.swap(true, Ordering::SeqCst) {
         return;
     }
-    let st = Arc::clone(state);
+    let debil = Arc::downgrade(state);
     tokio::task::spawn_blocking(move || {
-        mira_lento(&st);
+        let foto = vg::foto();
+        let Some(st) = debil.upgrade() else {
+            return;
+        };
+        mira_lento(&st, foto);
         st.vigilancia.corriendo.store(false, Ordering::SeqCst);
     });
 }
@@ -266,9 +271,8 @@ fn mira_rapido(state: &AppState) {
     }
 }
 
-/// What starts on its own, the privacy settings and the protection, now.
-fn mira_lento(state: &AppState) {
-    let r = vg::foto();
+/// What starts on its own, the privacy settings and the protection, from the look just taken.
+fn mira_lento(state: &AppState, r: Result<Foto, guardiana_apps::Error>) {
     let ahora = now_ms();
     let mut miradas: BTreeMap<&'static str, Mirada> = BTreeMap::new();
     match r {

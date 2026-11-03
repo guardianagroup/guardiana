@@ -425,14 +425,15 @@ mod tests {
         }
     }
 
-    /// With the antivirus cuts' firewall session open (the panel holds it for as long as it runs, under GUARDIANA's
-    /// provider), the switch still goes on: what failed on a person's computer on 2 Nov 2026 («FwpmSubLayerAdd0 =
-    /// 0x8032000c»). The cause is checked too: a sublayer hung from that provider by another session is refused.
+    /// With the antivirus cuts' firewall session open (the service holds it for as long as it runs, under a provider of
+    /// that session's own since 1.0.55), the switch still goes on: what failed on a person's computer on 2 Nov 2026
+    /// («FwpmSubLayerAdd0 = 0x8032000c»), when that provider had a fixed key. The cause is checked too: a sublayer hung
+    /// from that session's provider by another session is refused.
     #[test]
     #[ignore = "necesita Windows como administrador"]
     fn con_los_cortes_del_antivirus_abiertos() {
         let cortes = crate::cortafuegos::Cortafuegos::abrir().unwrap();
-        let r = subcapa_colgada_de(GUID::from_u128(0x6705_1a2e_9c33_4e77_b1a4_2f0e_7c11_9a01));
+        let r = subcapa_colgada_de(cortes.proveedor());
         eprintln!("otra sesión, con el proveedor de los cortes del antivirus: 0x{r:08x}");
         // FWP_E_WRONG_SESSION: lo que se vio en el equipo de esa persona (0x8032000c)
         assert_eq!(

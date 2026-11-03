@@ -13,7 +13,9 @@
 
 #![allow(unsafe_code)]
 
-use windows_sys::Win32::Foundation::{ERROR_MORE_DATA, ERROR_NO_MORE_ITEMS, ERROR_SUCCESS};
+use windows_sys::Win32::Foundation::{
+    ERROR_FILE_NOT_FOUND, ERROR_MORE_DATA, ERROR_NO_MORE_ITEMS, ERROR_SUCCESS,
+};
 #[cfg(test)]
 pub(crate) use windows_sys::Win32::System::Registry::HKEY_CURRENT_USER;
 use windows_sys::Win32::System::Registry::{
@@ -28,9 +30,10 @@ pub(crate) use windows_sys::Win32::System::Registry::{HKEY, HKEY_LOCAL_MACHINE};
 pub(crate) enum Lectura {
     /// Its values, as `reg query` prints them.
     Texto(String),
-    /// The key cannot be opened here (it is not there, or this account may not read it): `reg query` fails then too.
+    /// The key is not there: `reg query` fails then too.
     SinClave,
-    /// A value could not be read whole: the caller asks `reg` itself.
+    /// The key is there but could not be opened (this account may not read it, or anything else but «not found»), or
+    /// a value could not be read whole: the caller asks `reg` itself, and goes by what it says.
     Fallo(u32),
 }
 
@@ -106,8 +109,13 @@ pub(crate) fn como_reg_query(raiz: HKEY, ruta: &str) -> Lectura {
     // SAFETY: `r` is a NUL-terminated wide string that outlives the call; `h` is ours. The registry view is the
     // process's own, as for the `reg` it would start.
     let e = unsafe { RegOpenKeyExW(raiz, r.as_ptr(), 0, KEY_READ, &raw mut h) };
-    if e != ERROR_SUCCESS || h.is_null() {
+    // Only «not found» means there is no key; any other failure is `reg`'s to tell (review of ligero-1055: until
+    // then every failure read as no key).
+    if e == ERROR_FILE_NOT_FOUND {
         return Lectura::SinClave;
+    }
+    if e != ERROR_SUCCESS || h.is_null() {
+        return Lectura::Fallo(e);
     }
     let clave = Clave(h);
     let mut texto = String::new();

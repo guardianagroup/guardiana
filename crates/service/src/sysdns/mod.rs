@@ -761,6 +761,25 @@ pub fn upstreams_for(backup: &Backup) -> Vec<IpAddr> {
         .collect()
 }
 
+/// Once, shortly after the service starts, off the runtime's threads (on Windows it starts a
+/// PowerShell, and waits between tries): whether Windows' own functions read the DNS of this
+/// computer as the PowerShell they replace (since 1.0.55) does, `copia` being the DNS copy, if
+/// there is one. When they do not, this process asks PowerShell from then on, and the answer says
+/// what each read, to be written down once (review of ligero-1055: the test that compares them
+/// runs on GitHub's runner only). `None` when they agree or it cannot be told, and off Windows.
+#[must_use]
+pub fn contrasta_lectura_nativa(copia: Option<&Backup>) -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        windows::contrasta_lectura_nativa(copia)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = copia;
+        None
+    }
+}
+
 /// Whether a name asked through this machine's own resolver really arrives at Guardiana.
 ///
 /// It asks a fresh `<something>.prueba.guardiana.hogar`, which only Guardiana answers (with

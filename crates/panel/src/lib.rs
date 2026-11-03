@@ -122,6 +122,29 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+impl Error {
+    /// After a start that failed, the address to try again once it can be bound: the required one
+    /// that could not be (review of vpn-1055b: nothing tried again, and with the VPN connected there
+    /// was no panel to disconnect it from). `None` for any other failure: a token file or a ledger
+    /// that will not open is not fixed by a free port, and trying again would rebuild everything
+    /// every few seconds for nothing.
+    #[must_use]
+    pub fn por_reintentar(&self) -> Option<SocketAddr> {
+        match self {
+            Self::Bind(addr, _) => Some(*addr),
+            Self::Token(_) | Self::Ledger(_) => None,
+        }
+    }
+}
+
+/// Whether the panel could bind `addr` right now. It is bound and let go at once, so nothing is
+/// left listening: what is asked before a pass is rebuilt for an address the panel could not open,
+/// so that it is not rebuilt while something else holds it.
+#[must_use]
+pub fn se_puede_abrir(addr: SocketAddr) -> bool {
+    std::net::TcpListener::bind(addr).is_ok()
+}
+
 /// Shared state of every handler.
 pub(crate) struct AppState {
     pub(crate) ledger: Mutex<Ledger>,
@@ -150,8 +173,9 @@ pub(crate) struct AppState {
     /// pointed yet (review of 10 Oct 2026, panel 15): it is asked again after thirty seconds.
     pub(crate) primario: Mutex<Option<(std::time::Instant, Option<bool>)>>,
     /// The clean cut of what an antivirus sends out (1.0.22), with its one long-lived firewall
-    /// session. Unavailable (and said so) off Windows or when not running as the system.
-    pub(crate) cortes: antivirus::CortesAntivirus,
+    /// session. Unavailable (and said so) off Windows or when not running as the system. The
+    /// process's, as the VPN: it does not go with the panel (review of vpn-1055b).
+    pub(crate) cortes: &'static antivirus::CortesAntivirus,
     /// «Revisión del ordenador» (1.0.24): the last review, in memory.
     pub(crate) revision: revision::Revisor,
     /// «Vigilancia» (1.0.45): the constant watch's last looks, in memory.
@@ -703,8 +727,10 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .filter_map(|_| Ledger::abre_lectura(&config.db_path).ok())
         .map(Mutex::new)
         .collect();
-    // Open the firewall once and re-apply whatever the person had chosen to cut.
-    let cortes = antivirus::CortesAntivirus::nuevo(&ledger);
+    // The process's firewall, opened by the first start that can, and whatever the person had
+    // chosen to cut put back.
+    let cortes = antivirus::global();
+    cortes.al_arrancar(&ledger);
     let mut allowed_hosts = vec![
         "127.0.0.1".to_owned(),
         "localhost".to_owned(),

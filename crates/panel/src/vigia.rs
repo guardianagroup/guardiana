@@ -136,12 +136,13 @@ fn mira_rapido(st: &AppState) {
 }
 
 /// La mirada lenta, fuera del bucle, si no hay otra en curso. Si falla, queda anotado cuándo y
-/// por qué: no se reintenta en cada vuelta.
+/// por qué: no se reintenta en cada vuelta. Mientras corre su PowerShell, el panel solo se guarda
+/// débil (revisión de vpn-1055b): uno que el motor rehace mientras tanto no sigue vivo por ella.
 fn lanza_defensa(st: &Arc<AppState>) {
     if st.vigia.defensa_corriendo.swap(true, Ordering::SeqCst) {
         return;
     }
-    let st = Arc::clone(st);
+    let debil = Arc::downgrade(st);
     tokio::task::spawn_blocking(move || {
         let ahora = now_ms();
         let d = vg::lee_defensa(ahora).unwrap_or_else(|e| {
@@ -152,6 +153,9 @@ fn lanza_defensa(st: &Arc<AppState>) {
             d.errores.insert("powershell".to_owned(), e.to_string());
             d
         });
+        let Some(st) = debil.upgrade() else {
+            return;
+        };
         if let Ok(mut l) = st.vigia.lectura.lock() {
             if let Some(x) = l.as_mut() {
                 x.defensa = Some(d);

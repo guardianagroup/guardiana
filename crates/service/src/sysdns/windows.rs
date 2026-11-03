@@ -22,6 +22,11 @@
 //! below only if those fail: the same answer, without starting PowerShell twice a minute (the
 //! owner, 2 Nov 2026: «se me traba»). Taking the copy, changing the DNS and putting it back stay
 //! with the cmdlets, as they were.
+//!
+//! The test that compares both readings runs on GitHub's runner only, so the service compares them
+//! once more on the computer itself, shortly after it starts ([`contrasta_lectura_nativa`]): if they
+//! differ there, that process asks PowerShell from then on, as until 1.0.54, and says so once
+//! (review of ligero-1055).
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
@@ -35,6 +40,11 @@ mod nativo;
 /// One connected IPv4 interface with resolvers, as [`PRIMARY_SCRIPT`] prints it: its IPv4
 /// resolvers and its IPv6 ones, each in the order Windows lists them.
 type Linea = (Vec<IpAddr>, Vec<IpAddr>);
+
+/// Set when, on this computer, Windows' own functions did not read the DNS as the PowerShell they
+/// replace ([`contrasta_lectura_nativa`]): from then on this process asks PowerShell.
+#[cfg(windows)]
+static SOLO_POWERSHELL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Tunnel (131) and virtual (53) adapters are left alone, in the copy and in the watch: a VPN
 /// brings its own resolver for its own names, and pointing it here sent the office names to the
@@ -378,11 +388,13 @@ fn lineas_de_powershell() -> Option<Vec<Linea>> {
 }
 
 /// The connected interfaces with resolvers and their resolvers, read from Windows directly, or
-/// from PowerShell if that fails. `None` when neither could say.
+/// from PowerShell if that fails or did not read as PowerShell here. `None` when neither could say.
 fn lineas() -> Option<Vec<Linea>> {
     #[cfg(windows)]
-    if let Ok(v) = nativo::lineas() {
-        return Some(v);
+    if !SOLO_POWERSHELL.load(std::sync::atomic::Ordering::SeqCst) {
+        if let Ok(v) = nativo::lineas() {
+            return Some(v);
+        }
     }
     lineas_de_powershell()
 }
@@ -437,13 +449,155 @@ fn dhcp_de_powershell(indices: &[u32]) -> Option<Vec<(String, Vec<IpAddr>)>> {
 }
 
 /// The resolvers DHCP gave each interface in `indices`, read from Windows directly, or from
-/// PowerShell if that fails. Empty when neither could say.
+/// PowerShell if that fails or did not read as PowerShell here. Empty when neither could say.
 fn dhcp_de(indices: &[u32]) -> Vec<(String, Vec<IpAddr>)> {
     #[cfg(windows)]
-    if let Ok(v) = nativo::dhcp(indices) {
-        return v.into_iter().map(|(n, l)| (n.to_string(), l)).collect();
+    if !SOLO_POWERSHELL.load(std::sync::atomic::Ordering::SeqCst) {
+        if let Ok(v) = nativo::dhcp(indices) {
+            return v.into_iter().map(|(n, l)| (n.to_string(), l)).collect();
+        }
     }
     dhcp_de_powershell(indices).unwrap_or_default()
+}
+
+/// One way of reading, side by side with the other at the service's start: the minute's lines and
+/// DHCP's resolvers for the copy's automatic interfaces, each sorted (the order of the interfaces
+/// tells nothing). `None` for what that way could not read, or was not asked.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct Lectura {
+    lineas: Option<Vec<Linea>>,
+    dhcp: Option<Vec<(String, Vec<IpAddr>)>>,
+}
+
+/// What the comparison at the service's start concluded.
+#[derive(Debug, PartialEq, Eq)]
+enum Contraste {
+    /// Both say the same, or there was nothing native to compare.
+    Igual,
+    /// PowerShell says something else, and the network did not change meanwhile: what each said.
+    Distinta(String),
+    /// Nothing can be told yet: PowerShell did not answer, or the network changed while it read.
+    Dudosa,
+}
+
+fn ordenadas<T: Ord>(mut v: Vec<T>) -> Vec<T> {
+    v.sort();
+    v
+}
+
+/// Windows' own reading taken before and after PowerShell's, and PowerShell's: they differ only
+/// when PowerShell says something else of what Windows said the same both times (a network that
+/// changed meanwhile proves nothing). What Windows' own functions could not read is not compared:
+/// the minute asks PowerShell for it anyway.
+fn contraste(antes: &Lectura, ps: &Lectura, despues: &Lectura) -> Contraste {
+    if antes != despues {
+        return Contraste::Dudosa;
+    }
+    let mut distinto = Vec::new();
+    let mut dudosa = false;
+    if let Some(n) = &antes.lineas {
+        match &ps.lineas {
+            Some(p) if p != n => {
+                distinto.push(format!("interfaces: nativo {n:?}, PowerShell {p:?}"));
+            }
+            Some(_) => {}
+            None => dudosa = true,
+        }
+    }
+    if let Some(n) = &antes.dhcp {
+        match &ps.dhcp {
+            Some(p) if p != n => distinto.push(format!("DHCP: nativo {n:?}, PowerShell {p:?}")),
+            Some(_) => {}
+            None => dudosa = true,
+        }
+    }
+    if !distinto.is_empty() {
+        Contraste::Distinta(distinto.join("; "))
+    } else if dudosa {
+        Contraste::Dudosa
+    } else {
+        Contraste::Igual
+    }
+}
+
+/// What Windows' own functions read now, for the comparison.
+#[cfg(windows)]
+fn lectura_nativa(indices: &[u32]) -> Lectura {
+    let dhcp = if indices.is_empty() {
+        None
+    } else {
+        nativo::dhcp(indices)
+            .ok()
+            .map(|v| ordenadas(v.into_iter().map(|(n, l)| (n.to_string(), l)).collect()))
+    };
+    Lectura {
+        lineas: nativo::lineas().ok().map(ordenadas),
+        dhcp,
+    }
+}
+
+/// What PowerShell reads of what Windows' own functions could read in `nativa`; the rest is not
+/// asked.
+fn lectura_de_powershell(nativa: &Lectura, indices: &[u32]) -> Lectura {
+    Lectura {
+        lineas: nativa
+            .lineas
+            .as_ref()
+            .and_then(|_| lineas_de_powershell())
+            .map(ordenadas),
+        dhcp: nativa
+            .dhcp
+            .as_ref()
+            .and_then(|_| dhcp_de_powershell(indices))
+            .map(ordenadas),
+    }
+}
+
+/// One comparison: Windows' own reading, PowerShell's, and Windows' own again.
+#[cfg(windows)]
+fn contrasta_una_vez(indices: &[u32]) -> Contraste {
+    let antes = lectura_nativa(indices);
+    let ps = lectura_de_powershell(&antes, indices);
+    let despues = lectura_nativa(indices);
+    contraste(&antes, &ps, &despues)
+}
+
+/// How many times the comparison at the start is made while it cannot tell, and how far apart.
+const CONTRASTES: u32 = 3;
+const ENTRE_CONTRASTES: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Once, when the service starts, in a thread of its own (it starts a PowerShell, and waits between
+/// tries): whether Windows' own functions read here what the PowerShell they replace reads, for the
+/// minute's two questions and for DHCP's resolvers of the copy's automatic interfaces. When they do
+/// not, this process asks PowerShell from then on, and the answer is what each said, to be written
+/// down once. `None` when they agree, when it could not be told after a few tries (the network kept
+/// changing, PowerShell did not answer: the native reading stays, as before), and off Windows.
+pub(crate) fn contrasta_lectura_nativa(copia: Option<&Backup>) -> Option<String> {
+    #[cfg(windows)]
+    {
+        let indices = copia.map(automaticas).unwrap_or_default();
+        for vez in 0..CONTRASTES {
+            if vez > 0 {
+                std::thread::sleep(ENTRE_CONTRASTES);
+            }
+            match contrasta_una_vez(&indices) {
+                Contraste::Igual => return None,
+                Contraste::Distinta(d) => {
+                    SOLO_POWERSHELL.store(true, std::sync::atomic::Ordering::SeqCst);
+                    return Some(format!(
+                        "las funciones de Windows no leen el DNS de este equipo como PowerShell ({d}); hasta que el servicio vuelva a arrancar, se lee con PowerShell"
+                    ));
+                }
+                Contraste::Dudosa => {}
+            }
+        }
+        None
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = copia;
+        None
+    }
 }
 
 /// The next hops of the default routes, best first, read from Windows directly; `None` when that
@@ -459,17 +613,23 @@ pub(crate) fn saltos_por_defecto() -> Option<Vec<IpAddr>> {
     }
 }
 
+/// The indices of the copy's interfaces whose IPv4 resolvers came from DHCP: the ones whose
+/// resolvers follow the network the machine is on.
+fn automaticas(backup: &Backup) -> Vec<u32> {
+    backup
+        .interfaces
+        .iter()
+        .filter(|i| win_extra(i).is_some_and(|x| x.manual4.is_empty()))
+        .filter_map(indice)
+        .collect()
+}
+
 /// What Guardiana should forward to right now. Hand-typed resolvers stay the person's
 /// choice wherever the machine goes. Automatic ones follow the network the machine is on
 /// now: a laptop set up at home carries a router address (192.168.1.1) that does not exist
 /// at the office, and with Guardiana as the only resolver that would be no internet at all.
 pub(crate) fn upstreams_for(backup: &Backup) -> Vec<IpAddr> {
-    let automatic: Vec<u32> = backup
-        .interfaces
-        .iter()
-        .filter(|i| win_extra(i).is_some_and(|x| x.manual4.is_empty()))
-        .filter_map(indice)
-        .collect();
+    let automatic = automaticas(backup);
     let mut dhcp: std::collections::HashMap<String, Vec<IpAddr>> = std::collections::HashMap::new();
     if !automatic.is_empty() {
         for (id, list) in dhcp_de(&automatic) {
@@ -647,6 +807,56 @@ mod tests {
         assert!(script_dhcp(&[7]).starts_with("$g = (Get-NetAdapter -InterfaceIndex 7 "));
     }
 
+    /// The comparison at the service's start (review of ligero-1055): only a difference that holds
+    /// on both sides of PowerShell's reading sends the process to PowerShell; a network that changed
+    /// meanwhile, or a PowerShell that did not answer, tells nothing yet; the same answer, or nothing
+    /// native to compare, changes nothing.
+    #[test]
+    fn the_start_comparison_moves_to_powershell_only_on_a_real_difference() {
+        let lineas = |s: &str| Some(vec![linea_de_texto(s)]);
+        let dhcp = |s: &str| Some(vec![("7".to_owned(), parse_list(s))]);
+        let guardada = Lectura {
+            lineas: lineas("127.0.0.1|::1"),
+            dhcp: dhcp("192.168.1.1"),
+        };
+        let otra = Lectura {
+            lineas: lineas("192.168.1.1|"),
+            ..guardada.clone()
+        };
+        assert_eq!(contraste(&guardada, &guardada, &guardada), Contraste::Igual);
+        assert!(matches!(
+            contraste(&guardada, &otra, &guardada),
+            Contraste::Distinta(d) if d.starts_with("interfaces") && d.contains("192.168.1.1")
+        ));
+        // the network changed while PowerShell read: nothing is proven
+        assert_eq!(contraste(&guardada, &otra, &otra), Contraste::Dudosa);
+        // PowerShell did not answer
+        assert_eq!(
+            contraste(&guardada, &Lectura::default(), &guardada),
+            Contraste::Dudosa
+        );
+        // nothing native to compare: the minute asks PowerShell already
+        let nada = Lectura::default();
+        assert_eq!(contraste(&nada, &otra, &nada), Contraste::Igual);
+        // DHCP's resolvers count too, on their own
+        let otro_dhcp = Lectura {
+            dhcp: dhcp("10.0.0.1"),
+            ..guardada.clone()
+        };
+        assert!(matches!(
+            contraste(&guardada, &otro_dhcp, &guardada),
+            Contraste::Distinta(d) if d.starts_with("DHCP")
+        ));
+        let sin_lineas = Lectura {
+            lineas: None,
+            ..guardada.clone()
+        };
+        assert_eq!(
+            contraste(&sin_lineas, &guardada, &sin_lineas),
+            Contraste::Igual
+        );
+    }
+
     /// On a real Windows (GitHub's runner, at every push): what Windows' own functions say is what
     /// the PowerShell they replace says, interface by interface, for both of the minute's questions;
     /// and the adapters taken for visible are exactly those `Get-NetAdapter` shows (1.0.55).
@@ -753,6 +963,13 @@ mod tests {
                 assert_eq!(v, !oculto, "{g}");
             }
         }
+        // The check the service makes once at its start, with the copy it would take here: nothing
+        // that sends this runner to PowerShell (review of ligero-1055).
+        let copia = snapshot(0).ok();
+        let indices = copia.as_ref().map(automaticas).unwrap_or_default();
+        let r = contrasta_una_vez(&indices);
+        println!("al arrancar, con las interfaces automáticas {indices:?}: {r:?}");
+        assert!(!matches!(r, Contraste::Distinta(_)), "{r:?}");
     }
 
     /// On a real Windows: the default gateway read from Windows directly is the one PowerShell
