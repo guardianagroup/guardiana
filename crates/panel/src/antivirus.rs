@@ -23,7 +23,7 @@
 // The handler answers with the same error type as the rest of the API (see api.rs).
 #![allow(clippy::result_large_err)]
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, LazyLock, Mutex, OnceLock, PoisonError};
 
 use axum::extract::State;
@@ -42,8 +42,10 @@ use crate::AppState;
 const CLAVE_CORTES: &str = "antivirus_cortes";
 
 /// Manages the clean cut of what an antivirus sends out (1.0.22). It holds the one long-lived
-/// firewall session (dynamic: the cuts vanish if GUARDIANA stops) and, per product, the ids of
-/// the filters in place. The wanted set is kept in the ledger, so a restart re-applies it.
+/// firewall session (dynamic: the cuts vanish if GUARDIANA stops) and, per product and path, the
+/// ids of the filters in place. The wanted set is kept in the ledger, so a restart re-applies it.
+/// Once in place, a cut stays until the person lets the product through (review of
+/// arreglos-1055): putting it back only adds the paths not cut yet.
 ///
 /// The process's, not each panel's, as the VPN is (review of vpn-1055b): the engine rebuilds the
 /// panel when the network changes, and a slow look could keep the old panel's state alive a while
@@ -57,9 +59,9 @@ pub(crate) struct CortesAntivirus {
     /// Opened by the first panel start that can (on Windows, running as the system), and kept for
     /// the whole process.
     cortafuegos: OnceLock<guardiana_apps::Cortafuegos>,
-    /// Product name → the filter ids blocking its executables. Its lock makes one change of the
-    /// cuts at a time, an old panel's and the new one's alike.
-    puesto: Mutex<HashMap<String, Vec<u64>>>,
+    /// Product name → each of its executables' paths → the ids of the filters blocking it. Its lock
+    /// makes one change of the cuts at a time, an old panel's and the new one's alike.
+    puesto: Mutex<HashMap<String, BTreeMap<String, Vec<u64>>>>,
 }
 
 /// The cuts of the process: the same for every pass of the engine and every panel it starts.
@@ -70,10 +72,10 @@ pub(crate) fn global() -> &'static CortesAntivirus {
 
 impl CortesAntivirus {
     /// At every panel start: opens the firewall if it is not open yet (when on Windows and running
-    /// as the system), and puts back whatever the person had chosen to cut, with the paths seen this
-    /// week. Never fails the panel: if the firewall cannot open, cutting is simply unavailable and
-    /// every attempt says so. A cut that cannot be put back is written down (until 1.0.55 nothing
-    /// said it), and the filters already in place for it stay.
+    /// as the system), and cuts, for whatever the person had chosen to cut, the paths seen this week
+    /// that are not cut yet; what is cut stays. Never fails the panel: if the firewall cannot open,
+    /// cutting is simply unavailable and every attempt says so. A cut that cannot be put is written
+    /// down (until 1.0.55 nothing said it).
     pub(crate) fn al_arrancar(&self, ledger: &guardiana_core::Ledger) {
         {
             // One opening at a time: of two at once, the session left over would close and take
@@ -149,8 +151,11 @@ impl CortesAntivirus {
             .collect()
     }
 
-    /// Put the cut on (`cortar`) or take it off, over these executable paths. Returns the number
-    /// of filters now in place for the product.
+    /// Put the cut on (`cortar`) or take it off. On, over these executable paths: the ones not cut
+    /// yet are added, and every cut already in place stays (review of arreglos-1055: putting a cut
+    /// back with only this week's paths took off those of a program that asked no name for a week,
+    /// at every rebuild of the panel). Off, every filter of the product goes: only the person's
+    /// «let through» takes a cut off. Returns the number of filters now in place for the product.
     fn aplica_rutas(
         &self,
         producto: &str,
@@ -161,32 +166,34 @@ impl CortesAntivirus {
             return Err(guardiana_apps::ErrorCorte::NoSoportado);
         };
         let mut puesto = self.puesto.lock().unwrap_or_else(PoisonError::into_inner);
-        let previos = puesto.get(producto).cloned().unwrap_or_default();
         if !cortar {
-            cf.quitar(&previos)?;
+            let ids: Vec<u64> = puesto
+                .get(producto)
+                .map(|r| r.values().flatten().copied().collect())
+                .unwrap_or_default();
+            cf.quitar(&ids)?;
             puesto.remove(producto);
             return Ok(0);
         }
-        // The new filters first and what was there after, so re-applying after an update tracks
-        // new paths without letting the program out in between; and a new set that cannot be put
-        // whole is taken off again, leaving the old one as it was.
-        let mut ids = Vec::new();
+        let cortadas = puesto.entry(producto.to_owned()).or_default();
+        // The paths not cut yet; if one cannot be cut, the ones added now are taken off again and
+        // what was there before stays as it was.
+        let mut nuevas: Vec<(String, Vec<u64>)> = Vec::new();
         for ruta in rutas {
+            if cortadas.contains_key(ruta) || nuevas.iter().any(|(r, _)| r == ruta) {
+                continue;
+            }
             match cf.cortar(ruta, &guardiana_apps::Destino::default()) {
-                Ok(nuevos) => ids.extend(nuevos),
+                Ok(ids) => nuevas.push((ruta.clone(), ids)),
                 Err(e) => {
-                    let _ = cf.quitar(&ids);
+                    let hechos: Vec<u64> = nuevas.into_iter().flat_map(|(_, ids)| ids).collect();
+                    let _ = cf.quitar(&hechos);
                     return Err(e);
                 }
             }
         }
-        if cf.quitar(&previos).is_err() {
-            // Still in place: kept, so letting the program through takes them off too.
-            ids.extend(previos);
-        }
-        let n = ids.len();
-        puesto.insert(producto.to_owned(), ids);
-        Ok(n)
+        cortadas.extend(nuevas);
+        Ok(cortadas.values().map(Vec::len).sum())
     }
 
     /// Which products are cut right now (have filters in place).
@@ -195,7 +202,7 @@ impl CortesAntivirus {
             .lock()
             .map(|m| {
                 m.iter()
-                    .filter(|(_, v)| !v.is_empty())
+                    .filter(|(_, r)| r.values().any(|ids| !ids.is_empty()))
                     .map(|(k, _)| k.clone())
                     .collect()
             })
@@ -1119,6 +1126,52 @@ mod en_windows {
         global().cortafuegos.get().expect("the firewall opened")
     }
 
+    /// One more empty file in `dir`, named as another of Malwarebytes' programs.
+    fn otro(dir: &std::path::Path, nombre: &str) -> String {
+        let p = dir.join(nombre);
+        std::fs::write(&p, b"").unwrap();
+        p.display().to_string()
+    }
+
+    /// The ids of the filters in place for `producto`, path by path.
+    fn ids_de(producto: &str) -> Vec<u64> {
+        global()
+            .puesto
+            .lock()
+            .unwrap()
+            .get(producto)
+            .map(|r| r.values().flatten().copied().collect())
+            .unwrap_or_default()
+    }
+
+    /// Putting a product's cut back with fewer paths (one of its programs asked no name this week)
+    /// keeps the cuts already in place, and nothing is put twice: only the paths not cut yet are
+    /// added, and only letting the product through takes filters off (review of arreglos-1055).
+    #[test]
+    #[ignore = "necesita Windows como administrador"]
+    fn volver_a_poner_con_menos_rutas_deja_los_cortes_de_antes() {
+        let cf = abierto();
+        let (dir, a) = carpeta("menos-rutas");
+        let b = otro(&dir, "Malwarebytes.exe");
+        let cortes = global();
+        let pon = |rutas: &[String]| cortes.aplica_rutas("Malwarebytes", true, rutas).unwrap();
+        assert_eq!(pon(&[a.clone(), b.clone()]), 4);
+        let antes = ids_de("Malwarebytes");
+        assert_eq!(pon(&[a.clone()]), 4, "the cut of the path left out stays");
+        assert_eq!(pon(&[]), 4);
+        assert_eq!(pon(&[b.clone(), a.clone()]), 4, "nothing is put twice");
+        assert_eq!(ids_de("Malwarebytes"), antes);
+        assert_eq!(cf.cuantos().unwrap(), 4);
+        // A path not cut yet is added to them.
+        let c = otro(&dir, "MBVpnTunnelService.exe");
+        assert_eq!(pon(&[c]), 6);
+        assert_eq!(cf.cuantos().unwrap(), 6);
+        // Only letting it through takes them off.
+        assert_eq!(cortes.aplica_rutas("Malwarebytes", false, &[]).unwrap(), 0);
+        assert_eq!(cf.cuantos().unwrap(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// Letting a product through goes through even when one of its filters is already gone, as
     /// after a removal that failed part-way (review of arreglos-1055: «not found» was read under the
     /// code of another error, and every let-through stopped at it until the service restarted); and
@@ -1135,13 +1188,7 @@ mod en_windows {
                 .unwrap(),
             2
         );
-        let ids = cortes
-            .puesto
-            .lock()
-            .unwrap()
-            .get("Malwarebytes")
-            .cloned()
-            .unwrap_or_default();
+        let ids = ids_de("Malwarebytes");
         assert_eq!(ids.len(), 2);
         // One goes behind the panel's back; asked again, it is gone, not an error.
         cf.quitar(&ids[..1]).unwrap();
@@ -1197,15 +1244,7 @@ mod en_windows {
             info: crate::RuntimeInfo::default(),
         };
         let cortes = global();
-        let ids = || {
-            cortes
-                .puesto
-                .lock()
-                .unwrap()
-                .get("Malwarebytes")
-                .cloned()
-                .unwrap_or_default()
-        };
+        let ids = || ids_de("Malwarebytes");
         let windows_tiene = || {
             cortes
                 .cortafuegos
@@ -1216,12 +1255,13 @@ mod en_windows {
         };
 
         let viejo = crate::start(config()).await.expect("the first panel");
-        assert_eq!(ids().len(), 2, "one filter per family");
+        let primeros = ids();
+        assert_eq!(primeros.len(), 2, "one filter per family");
         assert_eq!(windows_tiene(), 2);
         // The next pass, while the first one's state is still alive; and then the old one goes.
         let nuevo = crate::start(config()).await.expect("the panel rebuilt");
         let puestos = ids();
-        assert_eq!(puestos.len(), 2, "{puestos:?}");
+        assert_eq!(puestos, primeros, "the cut in place stays, not put twice");
         viejo.shutdown().await;
         assert_eq!(ids(), puestos);
         assert_eq!(
