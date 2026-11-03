@@ -317,6 +317,18 @@ impl CortesAntivirus {
             .unwrap_or_default()
     }
 
+    /// What «let everything through» lets through: every product cut, with a path waiting to be
+    /// cut, or that the person asked to cut, even with nothing of it cut (review of arreglos-1056:
+    /// a product whose files were all gone was cut nowhere, so it stayed wanted, and was cut when
+    /// one appeared and again at every start).
+    fn por_dejar_pasar(&self, ledger: &guardiana_core::Ledger) -> BTreeSet<String> {
+        let mut todos: BTreeSet<String> = self.querados(ledger).into_iter().collect();
+        todos.extend(self.cortados());
+        let estado = self.estado.lock().unwrap_or_else(PoisonError::into_inner);
+        todos.extend(estado.saltadas.keys().cloned());
+        todos
+    }
+
     /// Whether cutting is available at all on this machine.
     pub(crate) fn disponible(&self) -> bool {
         self.estado
@@ -423,19 +435,24 @@ impl Estado {
             vigilando,
             ..
         } = self;
-        let Some(cf) = cortafuegos.as_ref() else {
-            return Err(guardiana_apps::ErrorCorte::NoSoportado);
-        };
         if !cortar {
-            let ids: Vec<u64> = puestos
-                .get(producto)
-                .map(|r| r.values().flatten().copied().collect())
-                .unwrap_or_default();
-            cf.quitar(&ids)?;
+            // With no session there is nothing of GUARDIANA's in Windows to take off, and the
+            // product is let through all the same (review of arreglos-1056: «let everything
+            // through» would stop at a product still wanted there).
+            if let Some(cf) = cortafuegos.as_ref() {
+                let ids: Vec<u64> = puestos
+                    .get(producto)
+                    .map(|r| r.values().flatten().copied().collect())
+                    .unwrap_or_default();
+                cf.quitar(&ids)?;
+            }
             puestos.remove(producto);
             saltadas.remove(producto);
             return Ok(0);
         }
+        let Some(cf) = cortafuegos.as_ref() else {
+            return Err(guardiana_apps::ErrorCorte::NoSoportado);
+        };
         let cortadas = puestos.entry(producto.to_owned()).or_default();
         let mut esperan = saltadas.get(producto).cloned().unwrap_or_default();
         let mut saltadas_ahora = 0;
@@ -1138,9 +1155,11 @@ pub(crate) async fn maxima(
             filtros += pon_corte(&state, producto, true, rutas)?;
         }
     } else {
-        // Let through everything that is cut, seen or not (it may no longer be listed).
-        for producto in state.cortes.cortados() {
-            pon_corte(&state, &producto, false, &[])?;
+        // Let through everything that is cut, waits to be or is wanted, seen or not (it may no
+        // longer be listed): see `CortesAntivirus::por_dejar_pasar`.
+        let todos = with_ledger(&state, |l| Ok(state.cortes.por_dejar_pasar(l)))?;
+        for producto in &todos {
+            pon_corte(&state, producto, false, &[])?;
         }
     }
     Ok(axum::Json(CortarView {
@@ -1348,6 +1367,37 @@ mod tests {
         );
         cortes.comprueba();
         assert!(!cortes.disponible());
+    }
+
+    /// «Let everything through» reaches every product the person asked to cut and every one with a
+    /// path waiting, even with nothing of it cut; and letting one through goes through with no
+    /// firewall at all, and it waits no more (review of arreglos-1056: a product whose files were
+    /// all gone was not let through, and was cut when one appeared).
+    #[test]
+    fn dejar_pasar_todo_llega_a_lo_que_se_quiere_cortar_y_a_lo_que_espera() {
+        let dir =
+            std::env::temp_dir().join(format!("guardiana-dejar-pasar-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let l = guardiana_core::Ledger::open(
+            &dir.join("ledger.db"),
+            guardiana_core::Hash::of(b"antivirus let-through test key"),
+        )
+        .unwrap();
+        l.set_setting(CLAVE_CORTES, r#"["Malwarebytes"]"#).unwrap();
+        let cortes = CortesAntivirus::default();
+        cortes.estado.lock().unwrap().saltadas.insert(
+            "Avast".to_owned(),
+            BTreeSet::from([r"C:\no-esta\AvastSvc.exe".to_owned()]),
+        );
+        assert_eq!(
+            cortes.por_dejar_pasar(&l),
+            BTreeSet::from(["Avast".to_owned(), "Malwarebytes".to_owned()])
+        );
+        assert_eq!(cortes.aplica_rutas("Avast", false, &[]).unwrap(), 0);
+        assert!(cortes.estado.lock().unwrap().saltadas.is_empty());
+        drop(l);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     fn fila(programa: &str, firma: &str, qname: &str, n: u64, cat: Category) -> ProgramName {

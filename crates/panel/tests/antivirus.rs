@@ -449,3 +449,61 @@ async fn the_antivirus_page_shows_what_each_antivirus_asked_and_every_official_r
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// «Let everything through» lets through a product the person asked to cut even when nothing of it
+/// is cut (review of arreglos-1056): with its files all gone it waits for one, and it stayed wanted,
+/// cut when one appeared and again at every start. Here its one kept path has no file: on Windows
+/// as an administrator it waits, elsewhere there is no firewall at all. Afterwards the ledger
+/// wants nothing of it and keeps no path of it.
+#[tokio::test]
+async fn dejar_pasar_todo_olvida_tambien_lo_que_no_esta_cortado() {
+    let dir = std::env::temp_dir().join(format!("guardiana-panel-av-todo-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let db = dir.join("ledger.db");
+    let falta = dir
+        .join("no-esta")
+        .join("mbamservice.exe")
+        .display()
+        .to_string();
+    {
+        let l = Ledger::open(&db, genesis()).unwrap();
+        l.set_setting("antivirus_cortes", r#"["Malwarebytes"]"#)
+            .unwrap();
+        l.set_setting(
+            "antivirus_cortes_rutas",
+            &serde_json::json!({ "Malwarebytes": [falta] }).to_string(),
+        )
+        .unwrap();
+    }
+    let running = start(Config {
+        listen: vec!["127.0.0.1:0".parse().unwrap()],
+        optional_listen: Vec::new(),
+        db_path: db.clone(),
+        genesis: genesis(),
+        token_path: dir.join("panel.token"),
+        extra_hosts: Vec::new(),
+        info: RuntimeInfo::default(),
+    })
+    .await
+    .expect("the panel starts");
+    let (status, body) = post(
+        running.addrs[0],
+        &running.token,
+        "/api/antivirus/maxima",
+        r#"{"activa":false}"#,
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let l = Ledger::open(&db, genesis()).unwrap();
+    let quiere = l.setting("antivirus_cortes").unwrap().unwrap_or_default();
+    assert!(!quiere.contains("Malwarebytes"), "{quiere}");
+    let rutas = l
+        .setting("antivirus_cortes_rutas")
+        .unwrap()
+        .unwrap_or_default();
+    assert!(!rutas.contains("Malwarebytes"), "{rutas}");
+    drop(l);
+    running.shutdown().await;
+    let _ = std::fs::remove_dir_all(&dir);
+}
