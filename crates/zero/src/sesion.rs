@@ -14,7 +14,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 
 use base64::Engine as _;
@@ -31,6 +30,8 @@ use crate::dominio::{host_de, sitio};
 use crate::escudo::{self, Diario, Tercero};
 use crate::favoritos::{self, Favoritos};
 use crate::fecha;
+// A whole file or nothing: a crash never leaves half a settings file.
+use crate::guardado::escribe;
 use crate::libro::Libro;
 use crate::licencia::{Estado as EstadoLicencia, Fallo, Lugar as LugarLicencia};
 use crate::mandato::Recurso;
@@ -296,6 +297,35 @@ pub struct Respuesta {
     pub pagina: Option<String>,
     /// Only when debugging (`pon_depuracion`): how it was read, for the browser's own log.
     pub nota: String,
+    /// 1.0.55: cut while only its body's size was known ([`Sesion::peticion_medida`]): its bytes, now, to
+    /// [`Sesion::cuerpo_del_corte`], so «Lo que se cortó» names what it carried. It never leaves.
+    pub cuerpo: bool,
+}
+
+/// What the shell gives of a request's body ([`Sesion::cuerpo_para`], 1.0.55, «más rápido»).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cuerpo {
+    /// Nothing of it.
+    Nada,
+    /// Only its size, without copying it: its `Content-Length`, or the size of the stream the engine holds
+    /// ([`Sesion::peticion_medida`]).
+    Tamano,
+    /// The bytes themselves ([`Sesion::peticion_con`]).
+    Entero,
+}
+
+/// A method whose body the browser looks at.
+fn con_cuerpo(metodo: &str) -> bool {
+    ["POST", "PUT", "PATCH"]
+        .iter()
+        .any(|m| metodo.eq_ignore_ascii_case(m))
+}
+
+/// The licence key typed in GUARDIANA's own panel, on its way to the panel's service: the browser activates itself with
+/// it too (17 Oct 2026).
+fn es_activacion(metodo: &str, url: &str) -> bool {
+    metodo.eq_ignore_ascii_case("POST")
+        && url.starts_with("http://127.0.0.1:7443/api/licencia/activar-clave")
 }
 
 /// How the shell starts a session.
@@ -556,7 +586,9 @@ pub struct Sesion {
     escudo_cerrado: bool,
     preguntas: BTreeMap<u64, Pregunta>,
     siguiente_pregunta: u64,
-    pulsos: Vec<Value>,
+    /// What the bar's guard line is told on the next beat: tab, whether it was cut, and who (1.0.55: kept plain, made
+    /// into JSON once per beat instead of once per request).
+    pulsos: Vec<(u32, bool, String)>,
     sucios: BTreeSet<u32>,
     diario_sucio: bool,
     libro_sucio: bool,
@@ -617,6 +649,26 @@ pub struct Sesion {
     /// 1.0.55 («más rápido»), only while explaining decisions (the automatic tests): how long each save of the beat
     /// held the window's thread, in µs.
     guardados_us: Vec<u32>,
+    /// 1.0.55 («más rápido»): the saves of the beat go to a thread of their own (`guardado`).
+    escritor: crate::guardado::Escritor,
+    /// 1.0.55: the request just cut with only its body's size known, whose bytes the shell gives next
+    /// ([`Respuesta::cuerpo`], [`Sesion::cuerpo_del_corte`]).
+    sin_cuerpo: Option<SinCuerpo>,
+}
+
+/// A request cut while only its body's size was known (1.0.55): where its line in «Lo que se cortó» is, so its bytes,
+/// given right after, say what it carried.
+#[derive(Debug)]
+struct SinCuerpo {
+    id: u32,
+    url: String,
+    cookies: String,
+    /// Its line among the cuts not yet written.
+    indice: usize,
+    ts: i64,
+    host: String,
+    ruta: String,
+    quien: String,
 }
 
 fn lee<T: DeserializeOwned + Default>(ruta: &Path) -> T {
@@ -624,16 +676,6 @@ fn lee<T: DeserializeOwned + Default>(ruta: &Path) -> T {
         .ok()
         .and_then(|b| serde_json::from_slice(&b).ok())
         .unwrap_or_default()
-}
-
-/// Write a whole file or nothing: a crash never leaves half a settings file.
-fn escribe(ruta: &Path, contenido: &[u8]) -> io::Result<()> {
-    if let Some(dir) = ruta.parent() {
-        fs::create_dir_all(dir)?;
-    }
-    let tmp = ruta.with_extension("tmp");
-    fs::write(&tmp, contenido)?;
-    fs::rename(&tmp, ruta)
 }
 
 /// The same, saying whether it was written (a file the person asked for).
@@ -917,6 +959,12 @@ impl Sesion {
             subastas_sucio: false,
             vpn: Vpn::default(),
             guardados_us: Vec::new(),
+            escritor: if cfg!(test) {
+                crate::guardado::Escritor::aqui()
+            } else {
+                crate::guardado::Escritor::en_hilo()
+            },
+            sin_cuerpo: None,
         };
         azar(&mut s.secreto);
         s.dia_visto = s.hoy();
@@ -1271,13 +1319,24 @@ impl Sesion {
         self.panel.is_some()
     }
 
-    /// Whether a request of this tab to `url` needs its body read: marked data might travel in
-    /// it, it goes to a known pixel, which puts there what it tells («Los chivatos»), or it goes
-    /// to another site, whose body's size the shield says (decision 206: only its length is
-    /// kept).
+    /// What the shell must give of the body of a request of this tab to `url` (1.0.55, «más rápido»): the bytes when
+    /// marked data might travel in it or it goes to a known pixel, which puts there what it tells («Los chivatos»);
+    /// only its size, without copying it, when it goes to another site (the shield says how much it carried, decision
+    /// 206: only its length is kept); nothing otherwise. The same bodies as before are read whole; the others are no
+    /// longer copied just to be measured.
     #[must_use]
-    pub fn necesita_cuerpo(&self, id: u32, url: &str) -> bool {
-        !self.tinta.is_empty() || crate::chivatos::interesa(url) || self.a_otro_sitio(id, url)
+    pub fn cuerpo_para(&self, id: u32, url: &str, metodo: &str) -> Cuerpo {
+        if !con_cuerpo(metodo) {
+            return Cuerpo::Nada;
+        }
+        if !self.tinta.is_empty() || crate::chivatos::interesa(url) {
+            return Cuerpo::Entero;
+        }
+        if self.a_otro_sitio(id, url) {
+            Cuerpo::Tamano
+        } else {
+            Cuerpo::Nada
+        }
     }
 
     /// A request of tab `id` to another site than the page's (or from a tab with no web page
@@ -1400,18 +1459,25 @@ impl Sesion {
         o
     }
 
+    // 1.0.55 («más rápido»): the bytes here, from the state at this moment; the writing on the saves' own thread.
     fn guarda_libro(&mut self) {
-        escribe_json(&self.datos.join("libro.json"), &self.libro);
+        if let Ok(b) = serde_json::to_vec(&self.libro) {
+            self.escritor.escribe(self.datos.join("libro.json"), b);
+        }
         self.libro_sucio = false;
     }
 
     fn guarda_diario(&mut self) {
-        escribe_json(&self.datos.join("diario.json"), &self.diario);
+        if let Ok(b) = serde_json::to_vec(&self.diario) {
+            self.escritor.escribe(self.datos.join("diario.json"), b);
+        }
         self.diario_sucio = false;
     }
 
     fn guarda_subastas(&mut self) {
-        escribe_json(&self.datos.join("subastas.json"), &self.subastas);
+        if let Ok(b) = serde_json::to_vec(&self.subastas) {
+            self.escritor.escribe(self.datos.join("subastas.json"), b);
+        }
         self.subastas_sucio = false;
     }
 
@@ -4641,6 +4707,8 @@ impl Sesion {
     // --- everything else -------------------------------------------------------------------------
 
     fn borrar_todo(&mut self) -> Vec<Orden> {
+        // A save still on its way must not bring back what is erased now.
+        self.escritor.espera();
         for f in [
             "tinta.json",
             "libro.json",
@@ -5054,13 +5122,9 @@ impl Sesion {
         // What the person approved sending to this site a moment ago goes there.
         let sin_permiso = self.formas_sin_permiso(p, &destino.sitio, &self.formas, ahora);
         let formas: &[Forma] = sin_permiso.as_deref().unwrap_or(&self.formas);
-        let con_cuerpo = matches!(
-            metodo.to_ascii_uppercase().as_str(),
-            "POST" | "PUT" | "PATCH"
-        );
         let peticion = Peticion {
             url,
-            cuerpo: if con_cuerpo { cuerpo } else { &[] },
+            cuerpo: if con_cuerpo(metodo) { cuerpo } else { &[] },
             recurso,
             sitio_pagina: &sitio_pagina,
         };
@@ -5091,10 +5155,68 @@ impl Sesion {
         cookies: &str,
         contexto: i32,
     ) -> Respuesta {
-        if metodo.eq_ignore_ascii_case("POST")
-            && url.starts_with("http://127.0.0.1:7443/api/licencia/activar-clave")
-            && !matches!(self.licencia, EstadoLicencia::Suscrita { .. })
-        {
+        self.decide_peticion(id, url, metodo, cuerpo, None, cookies, contexto)
+    }
+
+    /// 1.0.55 («más rápido»): the same for a body the shell only measured, without copying it ([`Cuerpo::Tamano`]):
+    /// `tamano` bytes. When it is cut, the answer asks for its bytes ([`Respuesta::cuerpo`]), so its line in «Lo que se
+    /// cortó» names what it carried; nothing else needs them.
+    pub fn peticion_medida(
+        &mut self,
+        id: u32,
+        url: &str,
+        metodo: &str,
+        tamano: u64,
+        cookies: &str,
+        contexto: i32,
+    ) -> Respuesta {
+        self.decide_peticion(id, url, metodo, &[], Some(tamano), cookies, contexto)
+    }
+
+    /// 1.0.55: the bytes of the request just cut with only its size known ([`Respuesta::cuerpo`]): its line in «Lo que
+    /// se cortó», and what the screen can show of it, name what it carried. It never left; nothing else changes.
+    pub fn cuerpo_del_corte(&mut self, id: u32, url: &str, cuerpo: &[u8]) {
+        let Some(sc) = self.sin_cuerpo.take() else {
+            return;
+        };
+        if sc.id != id || sc.url != url || cuerpo.is_empty() {
+            return;
+        }
+        if let Some(c) = self.cortes_pend.get_mut(sc.indice) {
+            if c.ts == sc.ts && c.host == sc.host && c.ruta == sc.ruta {
+                c.campos_cuerpo = crate::campos::nombres_cuerpo(cuerpo);
+            }
+        }
+        let visto = crate::campos::muestra(&sc.host, url, cuerpo, &sc.cookies);
+        if visto.is_empty() {
+            return;
+        }
+        match self.vistos.back_mut() {
+            Some(v) if v.0 == sc.ts && v.1 == sc.host && v.2 == sc.ruta => v.4 = visto,
+            _ => {
+                if self.vistos.len() >= MAX_VISTOS_MEMORIA {
+                    self.vistos.pop_front();
+                }
+                self.vistos
+                    .push_back((sc.ts, sc.host, sc.ruta, sc.quien, visto));
+            }
+        }
+    }
+
+    /// One request, with its body (`tamano` `None`) or only its size (`Some`).
+    #[allow(clippy::too_many_arguments)]
+    fn decide_peticion(
+        &mut self,
+        id: u32,
+        url: &str,
+        metodo: &str,
+        cuerpo: &[u8],
+        tamano: Option<u64>,
+        cookies: &str,
+        contexto: i32,
+    ) -> Respuesta {
+        self.sin_cuerpo = None;
+        if es_activacion(metodo, url) && !matches!(self.licencia, EstadoLicencia::Suscrita { .. }) {
             self.clave_del_panel = serde_json::from_slice::<Value>(cuerpo)
                 .ok()
                 .and_then(|v| v.get("clave").and_then(Value::as_str).map(str::to_owned))
@@ -5111,8 +5233,7 @@ impl Sesion {
         let hoy = self.hoy();
         let corta = Respuesta {
             cortar: true,
-            pagina: None,
-            nota: String::new(),
+            ..Respuesta::default()
         };
         let Some(i) = self.pestanas.iter().position(|p| p.id == id) else {
             // A tab the session no longer has (closing, or never known): nothing leaves it.
@@ -5135,7 +5256,7 @@ impl Sesion {
                 return Respuesta {
                     cortar: true,
                     pagina: Some(paginas::reabre(&limpia)),
-                    nota: String::new(),
+                    ..Respuesta::default()
                 };
             }
         }
@@ -5147,15 +5268,15 @@ impl Sesion {
             .map(crate::dominio::normaliza_host)
             .unwrap_or_default();
         let destino = crate::destino::clasifica_en(&host, dir.as_ref().map_or("", url::Url::path));
-        // The size of its body, when the shell read it (`necesita_cuerpo`); otherwise not known,
-        // never guessed. An empty body read and a body the engine did not give look the same,
-        // so both count as not known.
-        let con_cuerpo = matches!(
-            metodo.to_ascii_uppercase().as_str(),
-            "POST" | "PUT" | "PATCH"
-        );
-        let bytes = (con_cuerpo && !cuerpo.is_empty() && self.necesita_cuerpo(id, url))
-            .then(|| u64::try_from(cuerpo.len()).unwrap_or(u64::MAX));
+        // The size of its body, when the shell read it or measured it (`cuerpo_para`); otherwise
+        // not known, never guessed. An empty body and a body the engine did not give look the
+        // same, so both count as not known.
+        let con_cuerpo = con_cuerpo(metodo);
+        let bytes = match tamano {
+            _ if !con_cuerpo => None,
+            Some(n) => (n > 0).then_some(n),
+            None => (!cuerpo.is_empty()).then(|| u64::try_from(cuerpo.len()).unwrap_or(u64::MAX)),
+        };
         let recurso = {
             let p = &self.pestanas[i];
             let mut r = recurso_de_contexto(contexto);
@@ -5312,13 +5433,25 @@ impl Sesion {
                     visto,
                 ));
             }
+            // 1.0.55: only its size was known; its bytes come next, for this line.
+            if con_cuerpo && tamano.is_some_and(|n| n > 0) {
+                self.sin_cuerpo = Some(SinCuerpo {
+                    id,
+                    url: url.to_owned(),
+                    cookies: cookies.to_owned(),
+                    indice: self.cortes_pend.len(),
+                    ts: corte.ts,
+                    host: corte.host.clone(),
+                    ruta: corte.ruta.clone(),
+                    quien: corte.quien.clone(),
+                });
+            }
             self.cortes_pend.push(corte);
         }
         if d.de_fuera() {
             if self.pulsos.len() < 2000 {
-                self.pulsos.push(
-                    json!({ "pestana": id, "cortado": d.cortar, "quien": d.destino.quien() }),
-                );
+                self.pulsos
+                    .push((id, d.cortar, d.destino.quien().to_string()));
             }
             self.hoy_sucio = true;
         }
@@ -5402,6 +5535,7 @@ impl Sesion {
             cortar: true,
             pagina,
             nota,
+            cuerpo: self.sin_cuerpo.is_some(),
         }
     }
 
@@ -5436,7 +5570,10 @@ impl Sesion {
         }
         o.extend(self.vpn_tic(ahora));
         if !self.pulsos.is_empty() {
-            let lista = std::mem::take(&mut self.pulsos);
+            let lista: Vec<Value> = std::mem::take(&mut self.pulsos)
+                .into_iter()
+                .map(|(pestana, cortado, quien)| json!({ "pestana": pestana, "cortado": cortado, "quien": quien }))
+                .collect();
             o.push(envia(
                 Origen::Barra,
                 &json!({ "tipo": "pulsos", "lista": lista }),
@@ -5544,6 +5681,8 @@ impl Sesion {
         self.guarda_subastas();
         self.guarda_libro();
         self.guarda_prefs();
+        // Everything on disk before the window goes.
+        self.escritor.espera();
     }
 }
 

@@ -45,7 +45,7 @@ use windows::Win32::Graphics::Gdi::{
     CreateSolidBrush, GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
 };
 use windows::Win32::System::Com::{
-    CoInitializeEx, CoTaskMemFree, COINIT_APARTMENTTHREADED, STREAM_SEEK_SET,
+    CoInitializeEx, CoTaskMemFree, COINIT_APARTMENTTHREADED, STREAM_SEEK_END, STREAM_SEEK_SET,
 };
 use windows::Win32::System::DataExchange::COPYDATASTRUCT;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -1656,6 +1656,28 @@ fn prepara_pestana(id: u32, c: &ICoreWebView2Controller) -> windows::core::Resul
     unsafe { web.AddScriptToExecuteOnDocumentCreated(g.p(), &hecho) }
 }
 
+/// The size of a request's body without copying it (1.0.55, «más rápido»): its `Content-Length`, or else the size of
+/// the stream the engine holds (put back at its start). `None` when neither says.
+fn tamano_cuerpo(
+    req: &ICoreWebView2WebResourceRequest,
+    cabeceras: Option<&ICoreWebView2HttpRequestHeaders>,
+) -> Option<u64> {
+    if let Some(h) = cabeceras {
+        let mut hay = BOOL::default();
+        if unsafe { h.Contains(w!("Content-Length"), &mut hay) }.is_ok() && hay.as_bool() {
+            let n = texto_de(|p| unsafe { h.GetHeader(w!("Content-Length"), p) });
+            if let Ok(n) = n.trim().parse::<u64>() {
+                return Some(n);
+            }
+        }
+    }
+    let flujo = unsafe { req.Content() }.ok()?;
+    let mut fin = 0u64;
+    let medido = unsafe { flujo.Seek(0, STREAM_SEEK_END, Some(&mut fin as *mut u64)) }.is_ok();
+    let _ = unsafe { flujo.Seek(0, STREAM_SEEK_SET, None) };
+    medido.then_some(fin)
+}
+
 fn lee_cuerpo(req: &ICoreWebView2WebResourceRequest) -> Vec<u8> {
     let Ok(flujo) = (unsafe { req.Content() }) else {
         return Vec::new();
@@ -1919,50 +1941,70 @@ fn eventos_pestana(
                     let metodo = texto_de(|p| req.Method(p));
                     let mut contexto = COREWEBVIEW2_WEB_RESOURCE_CONTEXT::default();
                     args.ResourceContext(&mut contexto)?;
-                    // The body is read when marked data might travel in it, when it
-                    // goes to a known pixel, which puts there what it tells, or when it goes to
-                    // another site, whose size the shield says (decision 206).
-                    let cuerpo = if metodo != "GET"
-                        && metodo != "HEAD"
-                        && con_sesion(|s| s.necesita_cuerpo(id, &url)) == Some(true)
-                    {
-                        let c = lee_cuerpo(&req);
-                        cuenta_cuerpo(Some(c.len()));
-                        c
+                    // The body's bytes are read when what it carries matters: marked data might
+                    // travel in it, it goes to a known pixel, which puts there what it tells, or it
+                    // carries the licence key. To another site, only its size, without copying it
+                    // (the shield says it, decision 206), and its bytes only if it is cut (1.0.55).
+                    let que = if metodo == "GET" || metodo == "HEAD" {
+                        sesion::Cuerpo::Nada
                     } else {
-                        Vec::new()
+                        con_sesion(|s| s.cuerpo_para(id, &url, &metodo))
+                            .unwrap_or(sesion::Cuerpo::Nada)
                     };
-                    // If the session cannot answer, nothing leaves (it never happens; if it did, the
-                    // safe side is the cut).
+                    let cabeceras = req.Headers().ok();
                     // The names of its cookies go with it (never their values): a cut says how
                     // the destination knows you from one site to the next.
-                    let cookies = req
-                        .Headers()
-                        .ok()
+                    let cookies = cabeceras
+                        .as_ref()
                         .filter(|h| {
                             let mut hay = BOOL::default();
                             h.Contains(w!("Cookie"), &mut hay).is_ok() && hay.as_bool()
                         })
                         .map(|h| texto_de(|p| h.GetHeader(w!("Cookie"), p)))
                         .unwrap_or_default();
+                    let medido = if que == sesion::Cuerpo::Tamano {
+                        tamano_cuerpo(&req, cabeceras.as_ref())
+                    } else {
+                        None
+                    };
+                    let cuerpo = if que == sesion::Cuerpo::Entero
+                        || (que == sesion::Cuerpo::Tamano && medido.is_none())
+                    {
+                        let c = lee_cuerpo(&req);
+                        cuenta_cuerpo(Some(c.len()));
+                        c
+                    } else {
+                        if medido.is_some() {
+                            cuenta_cuerpo(None);
+                        }
+                        Vec::new()
+                    };
+                    // If the session cannot answer, nothing leaves (it never happens; if it did, the
+                    // safe side is the cut).
                     // 1.0.46 (subastas-1.0.46): Global Privacy Control and the strict
                     // fingerprint mode, as the person set them.
                     let (r, gpc, uniforme) = con_sesion(|s| {
-                        (
-                            s.peticion_con(id, &url, &metodo, &cuerpo, &cookies, contexto.0),
-                            s.gpc(),
-                            s.huella_uniforme(),
-                        )
+                        let r = match medido {
+                            Some(n) => s.peticion_medida(id, &url, &metodo, n, &cookies, contexto.0),
+                            None => s.peticion_con(id, &url, &metodo, &cuerpo, &cookies, contexto.0),
+                        };
+                        (r, s.gpc(), s.huella_uniforme())
                     })
                     .unwrap_or((
                         sesion::Respuesta {
                             cortar: true,
-                            pagina: None,
-                            nota: String::new(),
+                            ..sesion::Respuesta::default()
                         },
                         true,
                         false,
                     ));
+                    if r.cuerpo {
+                        // Cut while only its size was known: its bytes, for its line in «Lo que se
+                        // cortó». It never leaves.
+                        let c = lee_cuerpo(&req);
+                        cuenta_cuerpo(Some(c.len()));
+                        con_sesion(|s| s.cuerpo_del_corte(id, &url, &c));
+                    }
                     if !r.nota.is_empty() {
                         registra("petición", &format!("{metodo} {url} {}", r.nota));
                     }

@@ -719,7 +719,10 @@ fn tracking_parameters_are_removed_before_the_page_opens() {
 fn marked_data_never_reaches_a_third_party_and_the_book_says_who_got_it() {
     let (mut s, _, id) = con_pagina(false);
     marca_correo(&mut s);
-    assert!(s.necesita_cuerpo(id, "https://collect.otra-empresa.io/e"));
+    assert_eq!(
+        s.cuerpo_para(id, "https://collect.otra-empresa.io/e", "POST"),
+        Cuerpo::Entero
+    );
     let r = s.peticion(
         id,
         "https://collect.otra-empresa.io/e",
@@ -2203,8 +2206,14 @@ fn the_shield_says_what_the_pixels_tried_to_tell() {
     let (mut s, d, id) = con_pagina(true);
     let _ = abre_pagina(&mut s, id, "https://www.tienda.co/gracias");
     // A pixel's body is read even without marked data.
-    assert!(s.necesita_cuerpo(id, "https://analytics.tiktok.com/api/v2/pixel"));
-    assert!(!s.necesita_cuerpo(id, "https://www.tienda.co/api"));
+    assert_eq!(
+        s.cuerpo_para(id, "https://analytics.tiktok.com/api/v2/pixel", "POST"),
+        Cuerpo::Entero
+    );
+    assert_eq!(
+        s.cuerpo_para(id, "https://www.tienda.co/api", "POST"),
+        Cuerpo::Nada
+    );
     marca_correo(&mut s);
     let em = sha256_hex("ana@correo.co");
     let meta = format!(
@@ -2669,15 +2678,46 @@ fn an_isolated_tab_is_measured_on_its_shield_only() {
     assert_eq!(s.msg_hoy()["medidas_sesion"], json!([]));
 }
 
-/// The shell reads the body of a request to another site (its size is measured), and not of one
-/// to the page's own site when nothing else needs it; after the trial the same.
+/// 1.0.55 («más rápido»): the shell copies a request's body only when what it carries matters (marked data might
+/// travel in it, or it goes to a known pixel). A post to another site is only measured, with no copy; if it is cut,
+/// its bytes come afterwards, so «Lo que se cortó» still names what it carried. After the trial, the same.
 #[test]
-fn bodies_to_other_sites_are_read_for_their_size() {
+fn bodies_are_copied_only_when_what_they_carry_matters() {
     let (mut s, _, id) = con_pagina(true);
-    assert!(s.necesita_cuerpo(id, "https://collect.otra-empresa.io/e"));
-    assert!(!s.necesita_cuerpo(id, "https://www.eltiempo.com/api"));
+    let otra = "https://collect.otra-empresa.io/e";
+    assert_eq!(s.cuerpo_para(id, otra, "POST"), Cuerpo::Tamano);
+    assert_eq!(s.cuerpo_para(id, otra, "GET"), Cuerpo::Nada);
+    assert_eq!(
+        s.cuerpo_para(id, "https://www.eltiempo.com/api", "POST"),
+        Cuerpo::Nada
+    );
+    assert_eq!(
+        s.cuerpo_para(id, "https://www.facebook.com/tr", "POST"),
+        Cuerpo::Entero
+    );
+    // An uncut post to another company: measured, nothing asked afterwards.
+    let r = s.peticion_medida(id, otra, "POST", 3_000, "", 8);
+    assert!(!r.cortar && !r.cuerpo);
+    // A cut one: its bytes are asked for, and its line names what they carried.
+    let url = "https://stats.g.doubleclick.net/r/collect";
+    assert_eq!(s.cuerpo_para(id, url, "POST"), Cuerpo::Tamano);
+    let r = s.peticion_medida(id, url, "POST", 24, "", 8);
+    assert!(r.cortar && r.cuerpo);
+    s.cuerpo_del_corte(id, url, b"cid=123.456&en=page_view");
+    assert!(s.cortes_pend.last().is_some_and(
+        |c| c.host == "stats.g.doubleclick.net" && c.campos_cuerpo.iter().any(|x| x == "cid")
+    ));
+    // Bytes for a request that was not the last one cut are not taken.
+    s.cuerpo_del_corte(id, url, b"otra=1");
+    assert!(s
+        .cortes_pend
+        .last()
+        .is_some_and(|c| !c.campos_cuerpo.iter().any(|x| x == "otra")));
     let _ = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
-    assert!(s.necesita_cuerpo(id, "https://collect.otra-empresa.io/e"));
+    assert_eq!(s.cuerpo_para(id, otra, "POST"), Cuerpo::Tamano);
+    // With marked data, every body is read whole: the data might travel in it.
+    marca_correo(&mut s);
+    assert_eq!(s.cuerpo_para(id, otra, "POST"), Cuerpo::Entero);
 }
 
 /// Decision 206, approved by the owner: maximum protection also cuts the session recording
