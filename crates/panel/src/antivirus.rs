@@ -44,18 +44,40 @@ const CLAVE_CORTES: &str = "antivirus_cortes";
 /// the first panel start, even when its programs asked no name this week (review of
 /// arreglos-1055: an antivirus that connected at boot before asking one ran uncut until then).
 const CLAVE_RUTAS: &str = "antivirus_cortes_rutas";
+/// Settings key: the paths of each product cut that had no file at the last panel start; one
+/// still gone at the next is forgotten (review of arreglos-1056: after an update moved a program,
+/// its old path stayed kept, and waited for, for as long as the cut lasted).
+const CLAVE_AUSENTES: &str = "antivirus_cortes_rutas_ausentes";
 
-/// The paths kept with each product cut.
-fn rutas_guardadas(ledger: &guardiana_core::Ledger) -> BTreeMap<String, BTreeSet<String>> {
+/// Product → paths, as the ledger keeps them under `clave` (empty when it keeps none).
+fn mapa(ledger: &guardiana_core::Ledger, clave: &str) -> BTreeMap<String, BTreeSet<String>> {
     ledger
-        .setting(CLAVE_RUTAS)
+        .setting(clave)
         .ok()
         .flatten()
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or_default()
 }
 
-/// Keeps `rutas` with the paths of `producto`; `None` forgets them all (the product is let through).
+/// Keeps `rutas` (product → paths) in the ledger under `clave`.
+fn guarda_mapa(
+    ledger: &guardiana_core::Ledger,
+    clave: &str,
+    rutas: &BTreeMap<String, BTreeSet<String>>,
+) -> guardiana_core::Result<()> {
+    ledger.set_setting(
+        clave,
+        &serde_json::to_string(rutas).unwrap_or_else(|_| "{}".to_owned()),
+    )
+}
+
+/// The paths kept with each product cut.
+fn rutas_guardadas(ledger: &guardiana_core::Ledger) -> BTreeMap<String, BTreeSet<String>> {
+    mapa(ledger, CLAVE_RUTAS)
+}
+
+/// Keeps `rutas` with the paths of `producto`; `None` forgets them all (the product is let
+/// through), and which of them had no file at the last panel start.
 fn guarda_rutas(
     ledger: &guardiana_core::Ledger,
     producto: &str,
@@ -69,12 +91,50 @@ fn guarda_rutas(
             .extend(r.iter().cloned()),
         None => {
             todas.remove(producto);
+            let mut ausentes = mapa(ledger, CLAVE_AUSENTES);
+            if ausentes.remove(producto).is_some() {
+                guarda_mapa(ledger, CLAVE_AUSENTES, &ausentes)?;
+            }
         }
     }
-    ledger.set_setting(
-        CLAVE_RUTAS,
-        &serde_json::to_string(&todas).unwrap_or_else(|_| "{}".to_owned()),
-    )
+    guarda_mapa(ledger, CLAVE_RUTAS, &todas)
+}
+
+/// Forgets `olvidar` from the paths kept with `producto`.
+fn olvida_rutas(
+    ledger: &guardiana_core::Ledger,
+    producto: &str,
+    olvidar: &BTreeSet<String>,
+) -> guardiana_core::Result<()> {
+    let mut todas = rutas_guardadas(ledger);
+    if let Some(r) = todas.get_mut(producto) {
+        r.retain(|ruta| !olvidar.contains(ruta));
+    }
+    guarda_mapa(ledger, CLAVE_RUTAS, &todas)
+}
+
+/// Of the paths of a product cut, the ones gone for good, to forget: no file now (`falta`), none
+/// at the last panel start either (`antes`: one read is no proof, and a program being updated can
+/// be missing for a moment), and not cut now (a filter in place stays with its path until the
+/// person lets the product through). And every one with no file now, for the next panel start.
+fn rutas_idas(
+    rutas: &[String],
+    antes: Option<&BTreeSet<String>>,
+    cortadas: &BTreeSet<String>,
+    falta: impl Fn(&str) -> bool,
+) -> (BTreeSet<String>, BTreeSet<String>) {
+    let mut olvidar = BTreeSet::new();
+    let mut faltan = BTreeSet::new();
+    for ruta in rutas {
+        if !falta(ruta.as_str()) {
+            continue;
+        }
+        if antes.is_some_and(|a| a.contains(ruta)) && !cortadas.contains(ruta) {
+            olvidar.insert(ruta.clone());
+        }
+        faltan.insert(ruta.clone());
+    }
+    (olvidar, faltan)
 }
 
 /// Manages the clean cut of what an antivirus sends out (1.0.22). It holds the one long-lived
@@ -108,9 +168,13 @@ struct Estado {
     cortafuegos: Option<guardiana_apps::Cortafuegos>,
     /// Product name → each of its executables' paths → the ids of the filters blocking it.
     puestos: HashMap<String, BTreeMap<String, Vec<u64>>>,
-    /// Product name → its paths skipped because no file was there, looked at again every
-    /// [`CADA_SALTADAS`] until one appears.
+    /// Product name → its paths not cut that should be, looked at again every [`CADA_SALTADAS`]
+    /// until they are: skipped because no file was there, or refused by Windows (a cut that could
+    /// not be put back in a new session among them, review of arreglos-1056).
     saltadas: HashMap<String, BTreeSet<String>>,
+    /// Of those, the ones Windows refused with their file there, already said: they are tried again
+    /// at every look, and said only once.
+    rechazadas: BTreeSet<String>,
     /// Whether the thread that looks at them is running: it ends when nothing waits any more.
     vigilando: bool,
 }
@@ -119,6 +183,15 @@ struct Estado {
 pub(crate) fn global() -> &'static CortesAntivirus {
     static CORTES: LazyLock<CortesAntivirus> = LazyLock::new(CortesAntivirus::default);
     &CORTES
+}
+
+/// The service's look at the antivirus cuts, every minute (review of arreglos-1056): whether
+/// Windows still has their session and every cut in place, and if not, a new session with them.
+/// Until then only a panel start, a change by the person or a path waiting for a file looked, and
+/// after a restart of Windows' filtering service every cut could stay gone for hours. A few calls
+/// to the filter engine and no PowerShell; nothing at all while nothing is cut.
+pub fn comprueba_los_cortes() {
+    global().comprueba();
 }
 
 /// How often the paths skipped because no file was there are looked at again.
@@ -162,7 +235,7 @@ impl CortesAntivirus {
     /// the person had chosen to cut, the paths kept with the cut and those seen this week that are
     /// not cut yet; what is cut stays. Never fails the panel: if the firewall cannot open, cutting is simply unavailable and
     /// every attempt says so. A cut that cannot be put is written down (until 1.0.55 nothing said
-    /// it).
+    /// it). A path gone for good ([`rutas_idas`]) is forgotten.
     pub(crate) fn al_arrancar(&self, ledger: &guardiana_core::Ledger) {
         {
             let mut estado = self.estado.lock().unwrap_or_else(PoisonError::into_inner);
@@ -172,6 +245,8 @@ impl CortesAntivirus {
             }
         }
         let guardadas = rutas_guardadas(ledger);
+        let ausentes_antes = mapa(ledger, CLAVE_AUSENTES);
+        let mut ausentes: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         for prod in self.querados(ledger) {
             // The paths kept with the cut, and those seen this week, which are kept too.
             let mut rutas: Vec<String> = guardadas
@@ -184,13 +259,55 @@ impl CortesAntivirus {
                     rutas.push(r);
                 }
             }
+            let nuevas = rutas.len() > ya;
+            // A path gone for good (an update moved the program, or it was uninstalled) is kept,
+            // put and waited for no more (review of arreglos-1056: it was kept for ever, the
+            // thread looked at it every 15 seconds, and every start said it skipped it). One gone
+            // only now is skipped and waits, as before.
+            let (olvidar, faltan) = rutas_idas(
+                &rutas,
+                ausentes_antes.get(&prod),
+                &self.cortadas_de(&prod),
+                no_esta,
+            );
+            if !olvidar.is_empty() {
+                rutas.retain(|r| !olvidar.contains(r));
+                self.olvida(&prod, &olvidar);
+                let _ = olvida_rutas(ledger, &prod, &olvidar);
+            }
+            if !faltan.is_empty() {
+                ausentes.insert(prod.clone(), faltan);
+            }
             if let Err(e) = self.aplica_rutas(&prod, true, &rutas) {
                 eprintln!("guardiana: el corte de {prod} no se pudo volver a poner: {e}");
             }
-            if rutas.len() > ya {
+            if nuevas {
                 let _ = guarda_rutas(ledger, &prod, Some(&rutas));
             }
         }
+        if ausentes != ausentes_antes {
+            let _ = guarda_mapa(ledger, CLAVE_AUSENTES, &ausentes);
+        }
+    }
+
+    /// The paths of `producto` cut right now.
+    fn cortadas_de(&self, producto: &str) -> BTreeSet<String> {
+        self.estado
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .puestos
+            .get(producto)
+            .map(|r| r.keys().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    /// `olvidar`, paths of `producto` gone for good ([`rutas_idas`]), wait for a file no more.
+    fn olvida(&self, producto: &str, olvidar: &BTreeSet<String>) {
+        let mut estado = self.estado.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(esperan) = estado.saltadas.get_mut(producto) {
+            esperan.retain(|ruta| !olvidar.contains(ruta));
+        }
+        estado.saltadas.retain(|_, esperan| !esperan.is_empty());
     }
 
     /// The products the person asked to cut, from the ledger.
@@ -276,6 +393,20 @@ impl CortesAntivirus {
         estado.corta_lo_que_aparecio()
     }
 
+    /// [`comprueba_los_cortes`]: with something cut, the session made whole again if Windows lost
+    /// it or one of its cuts; with nothing cut, nothing (there is nothing to lose, and a path
+    /// waiting for a file has its own look).
+    fn comprueba(&self) {
+        let mut estado = self.estado.lock().unwrap_or_else(PoisonError::into_inner);
+        let hay_cortes = estado
+            .puestos
+            .values()
+            .any(|r| r.values().any(|ids| !ids.is_empty()));
+        if hay_cortes {
+            estado.rehace_si_perdida();
+        }
+    }
+
     /// Which products are cut right now (have filters in place).
     pub(crate) fn cortados(&self) -> Vec<String> {
         self.estado
@@ -288,6 +419,18 @@ impl CortesAntivirus {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// What «let everything through» lets through: every product cut, with a path waiting to be
+    /// cut, or that the person asked to cut, even with nothing of it cut (review of arreglos-1056:
+    /// a product whose files were all gone was cut nowhere, so it stayed wanted, and was cut when
+    /// one appeared and again at every start).
+    fn por_dejar_pasar(&self, ledger: &guardiana_core::Ledger) -> BTreeSet<String> {
+        let mut todos: BTreeSet<String> = self.querados(ledger).into_iter().collect();
+        todos.extend(self.cortados());
+        let estado = self.estado.lock().unwrap_or_else(PoisonError::into_inner);
+        todos.extend(estado.saltadas.keys().cloned());
+        todos
     }
 
     /// Whether cutting is available at all on this machine.
@@ -315,7 +458,12 @@ impl Estado {
 
     /// When there is no session yet, or Windows no longer has it or one of its cuts (its filtering
     /// service restarted): a new session, with every cut in place put back in it before the old one
-    /// goes; a path whose file is gone waits for it. Whether a new session was opened.
+    /// goes; a path whose file is gone waits for it. A cut the new session does not take is never
+    /// dropped (review of arreglos-1056: one transient refusal was enough, and that program then
+    /// ran uncut until the next panel start). While the old session still answers it holds that
+    /// cut, so it stays as it is, with every cut it holds, and the new one goes, to be tried again
+    /// at the next look; once Windows no longer has it, nothing holds the cut any more, and it
+    /// waits to be put back, tried again at every look. Whether a new session was opened.
     fn rehace_si_perdida(&mut self) -> bool {
         if self.sana() {
             return false;
@@ -323,13 +471,9 @@ impl Estado {
         let Ok(nuevo) = guardiana_apps::Cortafuegos::abrir() else {
             return false;
         };
-        if self.cortafuegos.is_some() {
-            eprintln!(
-                "guardiana: Windows ya no tenía la sesión de los cortes del antivirus, o alguno de sus cortes: se abre otra y se vuelven a poner"
-            );
-        }
         let mut puestos: HashMap<String, BTreeMap<String, Vec<u64>>> = HashMap::new();
         let mut sin_archivo: Vec<(String, String)> = Vec::new();
+        let mut fallidas: Vec<(String, String)> = Vec::new();
         for (producto, rutas) in &self.puestos {
             let cortadas = puestos.entry(producto.clone()).or_default();
             for ruta in rutas.keys() {
@@ -341,16 +485,39 @@ impl Estado {
                     Ok(ids) => {
                         cortadas.insert(ruta.clone(), ids);
                     }
-                    Err(e) => eprintln!(
-                        "guardiana: el corte de {producto} no se pudo volver a poner en {ruta}: {e}"
-                    ),
+                    Err(e) => {
+                        eprintln!(
+                            "guardiana: el corte de {producto} no se pudo volver a poner en {ruta}: {e}"
+                        );
+                        fallidas.push((producto.clone(), ruta.clone()));
+                    }
                 }
             }
         }
+        if !fallidas.is_empty()
+            && self
+                .cortafuegos
+                .as_ref()
+                .is_some_and(|cf| cf.sigue_abierto())
+        {
+            // The new session goes here, with what it took.
+            eprintln!(
+                "guardiana: los cortes del antivirus siguen en su sesión, que Windows aún tiene: alguno no se pudo poner en otra nueva, y se volverá a intentar"
+            );
+            return false;
+        }
+        if self.cortafuegos.is_some() {
+            eprintln!(
+                "guardiana: Windows ya no tenía la sesión de los cortes del antivirus, o alguno de sus cortes: se abre otra y se vuelven a poner"
+            );
+        }
         self.puestos = puestos;
-        // The old session goes here, once the new one holds every cut.
+        // The old session goes here, once the new one holds every cut it could take.
         self.cortafuegos = Some(nuevo);
-        for (producto, ruta) in sin_archivo {
+        // What it could not take was said just now, and is not said again at every look.
+        self.rechazadas
+            .extend(fallidas.iter().map(|(_, ruta)| ruta.clone()));
+        for (producto, ruta) in sin_archivo.into_iter().chain(fallidas) {
             let mut esperan = self.saltadas.remove(&producto).unwrap_or_default();
             esperan.insert(ruta);
             esperan_un_archivo(&mut self.saltadas, &mut self.vigilando, &producto, esperan);
@@ -370,20 +537,26 @@ impl Estado {
             puestos,
             saltadas,
             vigilando,
+            ..
         } = self;
-        let Some(cf) = cortafuegos.as_ref() else {
-            return Err(guardiana_apps::ErrorCorte::NoSoportado);
-        };
         if !cortar {
-            let ids: Vec<u64> = puestos
-                .get(producto)
-                .map(|r| r.values().flatten().copied().collect())
-                .unwrap_or_default();
-            cf.quitar(&ids)?;
+            // With no session there is nothing of GUARDIANA's in Windows to take off, and the
+            // product is let through all the same (review of arreglos-1056: «let everything
+            // through» would stop at a product still wanted there).
+            if let Some(cf) = cortafuegos.as_ref() {
+                let ids: Vec<u64> = puestos
+                    .get(producto)
+                    .map(|r| r.values().flatten().copied().collect())
+                    .unwrap_or_default();
+                cf.quitar(&ids)?;
+            }
             puestos.remove(producto);
             saltadas.remove(producto);
             return Ok(0);
         }
+        let Some(cf) = cortafuegos.as_ref() else {
+            return Err(guardiana_apps::ErrorCorte::NoSoportado);
+        };
         let cortadas = puestos.entry(producto.to_owned()).or_default();
         let mut esperan = saltadas.get(producto).cloned().unwrap_or_default();
         let mut saltadas_ahora = 0;
@@ -428,15 +601,18 @@ impl Estado {
         Ok(n)
     }
 
-    /// Cuts what appeared at the paths skipped because no file was there; what is still missing
-    /// keeps waiting. A path Windows will not cut is said once and left to the next time the cut is
-    /// put (a panel start, or the person). Whether anything still waits: when nothing does, the
-    /// thread that looks ends, marked under the same lock.
+    /// Cuts what appeared at the paths waiting, and what Windows takes now of what it refused;
+    /// what is still missing, or still refused, keeps waiting. A path Windows will not cut is said
+    /// once and tried again at every look, until it is cut or the product is let through (review
+    /// of arreglos-1056: it was left to the next time the cut was put, and so would be a cut that
+    /// could not be put back in a new session). Whether anything still waits: when nothing does,
+    /// the thread that looks ends, marked under the same lock.
     fn corta_lo_que_aparecio(&mut self) -> bool {
         let Estado {
             cortafuegos,
             puestos,
             saltadas,
+            rechazadas,
             vigilando,
         } = self;
         let Some(cf) = cortafuegos.as_ref() else {
@@ -457,9 +633,12 @@ impl Estado {
                             sitio.insert(ids);
                         }
                         Err(e) => {
-                            eprintln!(
-                                "guardiana: el corte de {producto} no pudo poner {ruta}: {e}"
-                            );
+                            if rechazadas.insert(ruta.clone()) {
+                                eprintln!(
+                                    "guardiana: el corte de {producto} no pudo poner {ruta}: {e}"
+                                );
+                            }
+                            return true;
                         }
                     }
                 }
@@ -467,6 +646,8 @@ impl Estado {
             });
         }
         saltadas.retain(|_, rutas| !rutas.is_empty());
+        // What waits no more (cut, let through or forgotten) is not remembered as refused.
+        rechazadas.retain(|r| saltadas.values().any(|rutas| rutas.contains(r)));
         *vigilando = !saltadas.is_empty();
         *vigilando
     }
@@ -1078,9 +1259,11 @@ pub(crate) async fn maxima(
             filtros += pon_corte(&state, producto, true, rutas)?;
         }
     } else {
-        // Let through everything that is cut, seen or not (it may no longer be listed).
-        for producto in state.cortes.cortados() {
-            pon_corte(&state, &producto, false, &[])?;
+        // Let through everything that is cut, waits to be or is wanted, seen or not (it may no
+        // longer be listed): see `CortesAntivirus::por_dejar_pasar`.
+        let todos = with_ledger(&state, |l| Ok(state.cortes.por_dejar_pasar(l)))?;
+        for producto in &todos {
+            pon_corte(&state, producto, false, &[])?;
         }
     }
     Ok(axum::Json(CortarView {
@@ -1270,6 +1453,111 @@ mod tests {
         let g = rutas_guardadas(&l);
         assert!(!g.contains_key("Malwarebytes"), "{g:?}");
         assert_eq!(g.len(), 1);
+        drop(l);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The minute's look does nothing while nothing is cut: no session is opened for it, not even
+    /// with a path waiting for a file, which has a look of its own (review of arreglos-1056: it
+    /// must stay cheap). On Windows as an administrator, a look that worked here would open one.
+    #[test]
+    fn la_mirada_de_cada_minuto_no_hace_nada_sin_cortes() {
+        let cortes = CortesAntivirus::default();
+        cortes.comprueba();
+        assert!(!cortes.disponible());
+        cortes.estado.lock().unwrap().saltadas.insert(
+            "Malwarebytes".to_owned(),
+            BTreeSet::from([r"C:\no-esta\mbamservice.exe".to_owned()]),
+        );
+        cortes.comprueba();
+        assert!(!cortes.disponible());
+    }
+
+    /// «Let everything through» reaches every product the person asked to cut and every one with a
+    /// path waiting, even with nothing of it cut; and letting one through goes through with no
+    /// firewall at all, and it waits no more (review of arreglos-1056: a product whose files were
+    /// all gone was not let through, and was cut when one appeared).
+    #[test]
+    fn dejar_pasar_todo_llega_a_lo_que_se_quiere_cortar_y_a_lo_que_espera() {
+        let dir =
+            std::env::temp_dir().join(format!("guardiana-dejar-pasar-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let l = guardiana_core::Ledger::open(
+            &dir.join("ledger.db"),
+            guardiana_core::Hash::of(b"antivirus let-through test key"),
+        )
+        .unwrap();
+        l.set_setting(CLAVE_CORTES, r#"["Malwarebytes"]"#).unwrap();
+        let cortes = CortesAntivirus::default();
+        cortes.estado.lock().unwrap().saltadas.insert(
+            "Avast".to_owned(),
+            BTreeSet::from([r"C:\no-esta\AvastSvc.exe".to_owned()]),
+        );
+        assert_eq!(
+            cortes.por_dejar_pasar(&l),
+            BTreeSet::from(["Avast".to_owned(), "Malwarebytes".to_owned()])
+        );
+        assert_eq!(cortes.aplica_rutas("Avast", false, &[]).unwrap(), 0);
+        assert!(cortes.estado.lock().unwrap().saltadas.is_empty());
+        drop(l);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Only a path with no file at two panel starts in a row, and not cut now, is forgotten; one
+    /// gone only now is kept, and waits as before; and forgetting it, or letting the product
+    /// through, takes it out of what the ledger keeps (review of arreglos-1056: after an update
+    /// moved a program, its old path was kept and waited for as long as the cut lasted).
+    #[test]
+    fn solo_se_olvida_una_ruta_que_falta_dos_arranques_seguidos() {
+        let r = |s: &str| s.to_owned();
+        let falta = |ruta: &str| ruta.starts_with("falta");
+        let rutas = [
+            r("esta"),
+            r("falta-ahora"),
+            r("falta-otra-vez"),
+            r("falta-pero-cortada"),
+        ];
+        let antes = BTreeSet::from([r("esta"), r("falta-otra-vez"), r("falta-pero-cortada")]);
+        let cortadas = BTreeSet::from([r("falta-pero-cortada")]);
+        let (olvidar, faltan) = rutas_idas(&rutas, Some(&antes), &cortadas, falta);
+        assert_eq!(olvidar, BTreeSet::from([r("falta-otra-vez")]));
+        assert_eq!(
+            faltan,
+            BTreeSet::from([
+                r("falta-ahora"),
+                r("falta-otra-vez"),
+                r("falta-pero-cortada")
+            ])
+        );
+        // At the first start nothing had been seen gone: nothing is forgotten.
+        let (ninguna, _) = rutas_idas(&rutas, None, &BTreeSet::new(), falta);
+        assert!(ninguna.is_empty());
+        let dir = std::env::temp_dir().join(format!("guardiana-rutas-idas-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let l = guardiana_core::Ledger::open(
+            &dir.join("ledger.db"),
+            guardiana_core::Hash::of(b"antivirus gone paths test key"),
+        )
+        .unwrap();
+        guarda_rutas(&l, "Malwarebytes", Some(&rutas)).unwrap();
+        olvida_rutas(&l, "Malwarebytes", &olvidar).unwrap();
+        let g = rutas_guardadas(&l);
+        assert_eq!(g["Malwarebytes"].len(), 3, "{g:?}");
+        assert!(!g["Malwarebytes"].contains("falta-otra-vez"));
+        guarda_mapa(
+            &l,
+            CLAVE_AUSENTES,
+            &BTreeMap::from([(r("Malwarebytes"), faltan)]),
+        )
+        .unwrap();
+        guarda_rutas(&l, "Malwarebytes", None).unwrap();
+        assert!(rutas_guardadas(&l).is_empty());
+        assert!(
+            mapa(&l, CLAVE_AUSENTES).is_empty(),
+            "letting it through forgets them too"
+        );
         drop(l);
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -1643,6 +1931,167 @@ mod en_windows {
         assert_eq!(en_windows(), 2);
         assert_eq!(cortes.aplica_rutas("Malwarebytes", false, &[]).unwrap(), 0);
         assert_eq!(en_windows(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A cut that cannot be put in a new session is not lost (review of arreglos-1056: it was
+    /// dropped and the old session closed, and that program ran uncut until the next panel start).
+    /// While the session in use still answers, it stays as it is, with every cut it holds, and the
+    /// new one goes; once Windows no longer has it, the other cuts go into a new one, and that one
+    /// waits to be put back and is tried again at every look. Here one program's cut is kept under
+    /// a path Windows refuses (it has a `|`), and one of its two filters is gone: the session does
+    /// not look whole, and that cut cannot be put in another one.
+    #[test]
+    #[ignore = "necesita Windows como administrador"]
+    fn un_corte_que_no_se_puede_volver_a_poner_no_se_pierde() {
+        arranca();
+        let (dir, programa) = carpeta("no-se-pierde");
+        let otro_programa = otro(&dir, "Malwarebytes.exe");
+        let mala = dir.join("mal|nombre.exe").display().to_string();
+        let cortes = global();
+        assert_eq!(
+            cortes
+                .aplica_rutas("Malwarebytes", true, &[programa.clone(), otro_programa])
+                .unwrap(),
+            4
+        );
+        let ids = {
+            let mut e = cortes.estado.lock().unwrap();
+            let cortadas = e.puestos.get_mut("Malwarebytes").unwrap();
+            let ids = cortadas.remove(&programa).unwrap();
+            cortadas.insert(mala.clone(), ids.clone());
+            e.cortafuegos.as_ref().unwrap().quitar(&ids[..1]).unwrap();
+            ids
+        };
+        // The next change of a cut looks at the session: it still answers, so it stays.
+        assert_eq!(
+            cortes
+                .aplica_rutas("Microsoft Defender", true, &[])
+                .unwrap(),
+            0
+        );
+        assert!(
+            ids_de("Malwarebytes").contains(&ids[1]),
+            "the same session, with the same filters"
+        );
+        assert_eq!(
+            con_sesion(|cf| cf.cuantos_de(&ids[1..]).unwrap()),
+            1,
+            "what was left of the cut still holds"
+        );
+        assert_eq!(en_windows(), 3);
+        // Windows loses the session, and its cuts with it: the other program's go into a new one,
+        // and the one Windows refuses waits, and still waits after a look that could not put it.
+        cortes.estado.lock().unwrap().cortafuegos = None;
+        assert_eq!(
+            cortes
+                .aplica_rutas("Microsoft Defender", true, &[])
+                .unwrap(),
+            0
+        );
+        assert_eq!(en_windows(), 2, "the other program is cut again");
+        let espera = || {
+            cortes
+                .estado
+                .lock()
+                .unwrap()
+                .saltadas
+                .get("Malwarebytes")
+                .is_some_and(|r| r.contains(&mala))
+        };
+        assert!(espera(), "it waits to be put back");
+        std::thread::sleep(CADA_SALTADAS + std::time::Duration::from_secs(5));
+        assert!(espera(), "a look that could not put it does not drop it");
+        assert_eq!(cortes.aplica_rutas("Malwarebytes", false, &[]).unwrap(), 0);
+        assert!(!espera());
+        assert_eq!(
+            cortes
+                .aplica_rutas("Microsoft Defender", false, &[])
+                .unwrap(),
+            0
+        );
+        assert_eq!(en_windows(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The minute's look puts back the cuts of a session Windows lost, with nobody doing anything
+    /// (review of arreglos-1056: only a panel start, a change by the person or a path waiting for
+    /// a file did, and after a restart of Windows' filtering service every cut could stay gone for
+    /// hours). Here the session really closes, as with that restart, and one with none of its
+    /// cuts is put in its place.
+    #[test]
+    #[ignore = "necesita Windows como administrador"]
+    fn la_mirada_de_cada_minuto_vuelve_a_poner_los_cortes_perdidos() {
+        arranca();
+        let (dir, programa) = carpeta("cada-minuto");
+        let cortes = global();
+        assert_eq!(
+            cortes
+                .aplica_rutas("Malwarebytes", true, &[programa])
+                .unwrap(),
+            2
+        );
+        let antes = ids_de("Malwarebytes");
+        {
+            let mut e = cortes.estado.lock().unwrap();
+            e.cortafuegos = Some(guardiana_apps::Cortafuegos::abrir().unwrap());
+            let cf = e.cortafuegos.as_ref().unwrap();
+            assert_eq!(cf.cuantos_de(&antes).unwrap(), 0, "Windows removed them");
+        }
+        crate::comprueba_los_cortes();
+        let despues = ids_de("Malwarebytes");
+        assert_eq!(despues.len(), 2);
+        assert_ne!(despues, antes);
+        assert_eq!(en_windows(), 2);
+        assert_eq!(cortes.aplica_rutas("Malwarebytes", false, &[]).unwrap(), 0);
+        assert_eq!(en_windows(), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A kept path with no file at two panel starts in a row is forgotten: no longer kept with the
+    /// cut nor waited for, while the one that is there stays kept and cut (review of
+    /// arreglos-1056: after an update moved a program, its old path stayed kept and waited for as
+    /// long as the cut lasted, and every start said it skipped it).
+    #[test]
+    #[ignore = "necesita Windows como administrador"]
+    fn una_ruta_guardada_que_falta_dos_arranques_seguidos_se_olvida() {
+        arranca();
+        let (dir, esta) = carpeta("olvido");
+        let falta = dir
+            .join("vieja")
+            .join("mbamservice.exe")
+            .display()
+            .to_string();
+        let l = Ledger::open(&dir.join("ledger.db"), Hash::of(b"antivirus cuts test key")).unwrap();
+        l.set_setting(CLAVE_CORTES, r#"["Malwarebytes"]"#).unwrap();
+        guarda_rutas(&l, "Malwarebytes", Some(&[esta.clone(), falta.clone()])).unwrap();
+        let espera = || {
+            global()
+                .estado
+                .lock()
+                .unwrap()
+                .saltadas
+                .get("Malwarebytes")
+                .is_some_and(|r| r.contains(&falta))
+        };
+        // The first start: the one gone is skipped and waits, and stays kept.
+        global().al_arrancar(&l);
+        assert_eq!(ids_de("Malwarebytes").len(), 2);
+        assert!(espera());
+        assert!(rutas_guardadas(&l)["Malwarebytes"].contains(&falta));
+        // The next one: still gone, so it is forgotten.
+        global().al_arrancar(&l);
+        assert!(!espera(), "it waits no more");
+        let g = rutas_guardadas(&l);
+        assert!(!g["Malwarebytes"].contains(&falta), "{g:?}");
+        assert!(g["Malwarebytes"].contains(&esta), "{g:?}");
+        assert_eq!(ids_de("Malwarebytes").len(), 2);
+        assert_eq!(
+            global().aplica_rutas("Malwarebytes", false, &[]).unwrap(),
+            0
+        );
+        assert_eq!(en_windows(), 0);
+        drop(l);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

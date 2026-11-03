@@ -4,11 +4,13 @@
 # created, configured with crates/tunel/src/nt.rs's bytes, brought up and down, and closed. And corte_vpn.rs's: every
 # permit filter of the cut-off switch accepted by Windows, in a dynamic session closed at once (the blocking ones are
 # left out, so the runner's own network is never cut). GitHub's Windows runners run as administrators.
-# And the antivirus cuts' (crates/panel/src/antivirus.rs, reviews of vpn-1055b and arreglos-1055): a panel rebuilt while
-# the old one's state is still alive keeps the cuts in Windows' filter engine, once the old state is gone too; a
-# let-through goes through with a filter already gone; putting a cut back with fewer paths keeps the earlier ones; a path
-# with no file is skipped and cut when the file appears; another session opened first takes nothing with it; a session
-# Windows lost is opened again with its cuts (empty files of the tests' own are what is cut, and they are let through).
+# And the antivirus cuts' (crates/panel/src/antivirus.rs, reviews of vpn-1055b, arreglos-1055 and arreglos-1056): a panel
+# rebuilt while the old one's state is still alive keeps the cuts in Windows' filter engine, once the old state is gone
+# too; a let-through goes through with a filter already gone; putting a cut back with fewer paths keeps the earlier ones;
+# a path with no file is skipped and cut when the file appears, and a kept one still gone at the next panel start is
+# forgotten; another session opened first takes nothing with it; a session Windows lost is opened again with its cuts, by
+# the minute's look too; a cut that cannot be put in a new session is not lost (empty files of the tests' own are what is
+# cut, and they are let through).
 # And, on Linux, the VPN end to end: GUARDIANA's server (crates/tunel-servidor) with the kernel's WireGuard in one network
 # namespace, a computer's side of the sign-up (crates/tunel/examples/alta_prueba.rs) in another, the post-quantum
 # preshared key derived on both sides, and traffic through the tunnel. Test keys only, made and thrown away here.

@@ -57,6 +57,7 @@ use guardiana_core::{Hash, Ledger};
 use tokio::net::TcpListener;
 use tokio::sync::Notify;
 
+pub use antivirus::comprueba_los_cortes;
 pub use auth::{constant_time_eq, load_or_create_token, origin_es_este_panel, TOKEN_FILE};
 pub use vpn::cierra_la_vpn;
 
