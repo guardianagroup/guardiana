@@ -129,10 +129,11 @@ impl Cortafuegos {
         }
     }
 
-    /// How many of GUARDIANA's filters are in place right now.
+    /// How many of the filters this firewall added are in place right now, asked to Windows itself,
+    /// not to what this process remembers.
     ///
     /// # Errors
-    /// [`ErrorCorte::Sistema`] when Windows refuses the enumeration.
+    /// [`ErrorCorte::Sistema`] when Windows refuses the lookup.
     pub fn cuantos(&self) -> Result<usize, ErrorCorte> {
         #[cfg(windows)]
         {

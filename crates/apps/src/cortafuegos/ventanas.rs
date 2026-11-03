@@ -26,6 +26,8 @@ const SUBCAPA: GUID = GUID::from_u128(0x6705_1a2e_9c33_4e77_b1a4_2f0e_7c11_9a02)
 const RPC_C_AUTHN_WINNT: u32 = 10;
 /// `FWP_E_ALREADY_EXISTS`.
 const YA_EXISTE: u32 = 0x8032_0009;
+/// `FWP_E_FILTER_NOT_FOUND`.
+const FILTRO_NO_ESTA: u32 = 0x8032_0005;
 
 fn err(llamada: &str, code: u32) -> ErrorCorte {
     ErrorCorte::Sistema(format!("{llamada} = 0x{code:08x}"))
@@ -245,9 +247,7 @@ impl Motor {
         for &id in ids {
             // SAFETY: deleting by id; a filter already gone returns not-found, which is fine.
             let r = unsafe { FwpmFilterDeleteById0(self.engine, id) };
-            if r != 0 && r != 0x8032_0005
-            /* FWP_E_FILTER_NOT_FOUND */
-            {
+            if r != 0 && r != FILTRO_NO_ESTA {
                 return Err(err("FwpmFilterDeleteById0", r));
             }
         }
@@ -264,8 +264,28 @@ impl Motor {
         Ok(n)
     }
 
+    /// How many of the filters this session added Windows has right now, asked to Windows itself:
+    /// what this process remembers is no proof that a cut is in place (review of vpn-1055b).
     pub(crate) fn cuantos(&self) -> Result<usize, ErrorCorte> {
-        Ok(self.ids.lock().map(|g| g.len()).unwrap_or(0))
+        let ids: Vec<u64> = self.ids.lock().map(|g| g.clone()).unwrap_or_default();
+        let mut n = 0;
+        for id in ids {
+            let mut f: *mut FWPM_FILTER0 = std::ptr::null_mut();
+            // SAFETY: a lookup by id into an out-pointer owned here; what Windows gives back is freed
+            // once, right after.
+            let r = unsafe { FwpmFilterGetById0(self.engine, id, &mut f) };
+            if r == 0 && !f.is_null() {
+                n += 1;
+                // SAFETY: given by FwpmFilterGetById0 and not used after this.
+                unsafe {
+                    let mut p = f.cast::<core::ffi::c_void>();
+                    FwpmFreeMemory0(&mut p);
+                }
+            } else if r != 0 && r != FILTRO_NO_ESTA {
+                return Err(err("FwpmFilterGetById0", r));
+            }
+        }
+        Ok(n)
     }
 }
 
