@@ -59,10 +59,10 @@
     <Property Id="MSIFASTINSTALL" Value="1" />
 
     <!-- Two screens only: what the installer does and does not (build/wix/textos/bienvenida-XX.rtf)
-         with "Install", then "Finish" with "Open Guardiana" ticked, which opens the panel in the
-         browser as the user (not elevated). No folder choice, no options. Everything a person
-         reads comes from build/wix/loc-<culture>.wxl, so the same package builds in Spanish,
-         English and Portuguese: whoever downloads from the English page must not be handed a
+         with "Install", then GUARDIANA's own page while it installs (InstalandoDlg, further down). When it
+         ends, the window closes by itself and GUARDIANA opens (LaunchPanel). No folder choice, no options.
+         Everything a person reads comes from build/wix/loc-<culture>.wxl, so the same package builds in
+         Spanish, English and Portuguese: whoever downloads from the English page must not be handed a
          Spanish installer (22 Sep 2026). -->
     <ui:WixUI Id="WixUI_Minimal" />
     <WixVariable Id="WixUILicenseRtf" Value="$(var.Welcome)" />
@@ -74,12 +74,65 @@
          Windows shows it in every screen and in «Aplicaciones instaladas». -->
     <WixVariable Id="WixUIDialogBmp" Value="$(var.Dialogo)" />
     <WixVariable Id="WixUIBannerBmp" Value="$(sys.SOURCEFILEDIR)banner.bmp" />
-    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="!(loc.AbrirPanel)" />
-    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <!-- 3 nov 2026 (el dueño, 09:21: «hay que darle a la tecla finalizar, si no, no funciona. Eso quiero que lo quites para
+         que… se instale automáticamente todo»): hasta 1.0.56 el panel se abría solo al pulsar «Finalizar» en la última
+         pantalla, y quien la cerraba o no la veía se quedaba sin nada abierto. Ahora GUARDIANA se abre sola al terminar de
+         instalar y la ventana del instalador se cierra sola: ya no hay última pantalla.
+         LaunchPanel corre en la secuencia de la interfaz, justo después de ExecuteAction: en el proceso del instalador que
+         abrió la persona, con su usuario y sin elevar (el UAC eleva solo la parte que instala), y solo si la instalación salió
+         bien (si ExecuteAction falla o se cancela, la secuencia termina ahí, en FatalError o UserExit, como siempre).
+         «NOT Installed AND NOT REMOVE»: al instalar por primera vez y al actualizar (una versión nueva es otro producto, así que
+         Installed está vacío; WIX_UPGRADE_DETECTED tiene el producto anterior, y REMOVE=ALL es de la sesión que quita ese
+         anterior, no de esta), nunca al reparar ni al quitar (Installed). Con /qn, /qb o /passive Windows no corre la
+         secuencia de la interfaz: una instalación en silencio no abre nada. Return="ignore": si abrirlo fallara, la
+         instalación, que ya terminó bien, no se da por fallida. WixShellExecTarget se pone tras CostFinalize, mucho antes. -->
     <SetProperty Id="WixShellExecTarget" Value="[MenuDir]Guardiana.lnk" After="CostFinalize" Sequence="ui" />
-    <CustomAction Id="LaunchPanel" DllEntry="WixShellExec" Impersonate="yes" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" />
+    <CustomAction Id="LaunchPanel" DllEntry="WixShellExec" Impersonate="yes" Return="ignore" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" />
+    <!-- La pantalla final de WixUI (ExitDialog) ya no sale al terminar bien. Quitar su fila (Suppress) no vale: Windows
+         Installer exige un diálogo o una acción en el puesto -1 de InstallUISequence (ICE20) y la compilación fallaría; la
+         fila se queda con una condición que nunca se cumple. Las de error (FatalError, -3) y cancelar (UserExit, -2) siguen
+         como estaban. ProgressDlg, la ventana blanca de WixUI, sale solo al reparar o quitar (Installed); al instalar y al
+         actualizar sale la página de GUARDIANA, InstalandoDlg. -->
+    <InstallUISequence>
+      <Show Dialog="override ProgressDlg" Before="ExecuteAction" Condition="Installed" />
+      <Show Dialog="InstalandoDlg" After="ProgressDlg" Condition="NOT Installed" />
+      <Custom Action="LaunchPanel" After="ExecuteAction" Condition="NOT Installed AND NOT REMOVE" />
+      <Show Dialog="override ExitDialog" OnExit="success" Condition="0" />
+    </InstallUISequence>
+    <!-- 3 nov 2026 (el dueño, 09:23: «mientras se instala y tarda un poquito, que salga la pantalla de un instalador bien
+         bonita… o una página entera de Guardiana se está instalando en tu programa. Algo muy profesional»): la pantalla
+         mientras se instala es una página de GUARDIANA, del tamaño de las demás (370x270, la misma ventana que la de los
+         términos, que no cambia), hecha solo con lo que trae Windows Installer: el dibujo de fondo (instalando.bmp, de
+         build/wix/imagenes.py: fondo oscuro, el símbolo y el nombre, y una esfera tranquila con su red, como la portada del
+         programa), el título grande, debajo el paso de ahora (ActionText: los textos de ProgressText, en el idioma del
+         instalador), una barra fina de Windows y tres líneas de lo que está pasando, cada una solo cuando es verdad (ZERO, si
+         va en el paquete y no se quitó con ZERO=0; el DNS, solo la primera vez y con VIGILAR=1, las mismas condiciones que
+         ApplyDns). Letra Segoe UI en colores claros y texto transparente sobre el dibujo; Windows lo escala con el resto del
+         diálogo al 125 % o al 150 %. Debajo, la misma franja de botones que en las otras pantallas, solo con «Cancelar». -->
+    <Binary Id="GuardianaInstalando" SourceFile="$(sys.SOURCEFILEDIR)instalando.bmp" />
     <UI>
-      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchPanel" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+      <TextStyle Id="Guardiana_Titulo" FaceName="Segoe UI Semibold" Size="16" Red="232" Green="236" Blue="241" />
+      <TextStyle Id="Guardiana_Paso" FaceName="Segoe UI" Size="9" Red="156" Green="195" Blue="228" />
+      <TextStyle Id="Guardiana_Linea" FaceName="Segoe UI" Size="9" Red="169" Green="179" Blue="190" />
+      <Dialog Id="InstalandoDlg" Width="370" Height="270" Title="!(loc.ProgressDlg_Title)" Modeless="yes">
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Default="yes" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+        <Control Id="Fondo" Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="GuardianaInstalando" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Titulo" Type="Text" X="18" Y="116" Width="334" Height="24" Transparent="yes" NoPrefix="yes" Text="{\Guardiana_Titulo}!(loc.InstalandoTitulo)" />
+        <Control Id="Paso" Type="Text" X="18" Y="141" Width="334" Height="13" Transparent="yes" NoPrefix="yes" Text="{\Guardiana_Paso}!(loc.PasoPreparar)">
+          <Subscribe Event="ActionText" Attribute="Text" />
+        </Control>
+        <Control Id="Barra" Type="ProgressBar" X="18" Y="161" Width="334" Height="5" Text="!(loc.ProgressDlgProgressBar)">
+          <Subscribe Event="SetProgress" Attribute="Progress" />
+        </Control>
+        <Control Id="LineaProteccion" Type="Text" X="18" Y="178" Width="334" Height="13" Transparent="yes" NoPrefix="yes" Text="{\Guardiana_Linea}!(loc.InstalandoProteccion)" />
+<?ifdef ZeroExe ?>
+        <Control Id="LineaZero" Type="Text" X="18" Y="191" Width="334" Height="13" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="ZERO &lt;&gt; &quot;0&quot;" Text="{\Guardiana_Linea}!(loc.InstalandoZero)" />
+<?endif ?>
+        <Control Id="LineaDns" Type="Text" X="18" Y="204" Width="334" Height="13" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="VIGILAR = &quot;1&quot; AND NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE" Text="{\Guardiana_Linea}!(loc.InstalandoDns)" />
+      </Dialog>
     </UI>
     <MajorUpgrade AllowSameVersionUpgrades="yes" IgnoreLanguage="yes" DowngradeErrorMessage="!(loc.VersionMasNueva)" />
     <MediaTemplate EmbedCab="yes" />
