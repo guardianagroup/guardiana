@@ -4,13 +4,16 @@
 //!
 //! Usage: `guardiana-tunel-servidor --punto motor.guardianagroup.com:51820 [--interfaz wg0] [--escucha 127.0.0.1:8793]
 //! [--dns 10.66.0.1]`
+//!
+//! `POST /vpn/alta` is the sign-up; `GET /vpn/alta`, the echo: the address a website sees from whoever asks (from inside
+//! the tunnel, this server's own public one), with nothing kept (3 Nov 2026; docs/VPN.md, «Las salidas»).
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 
 use axum::extract::{DefaultBodyLimit, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use axum::{Json, Router};
@@ -59,8 +62,23 @@ async fn main() {
             let _ = tokio::task::spawn_blocking(move || e.limpia(ahora_s())).await;
         }
     });
+    // This server's public address, the one its traffic out leaves with: its endpoint's name resolved here, once (the
+    // echo of `GET /vpn/alta` says it to whoever asks from inside the tunnel).
+    let publica = std::net::ToSocketAddrs::to_socket_addrs(&punto)
+        .ok()
+        .and_then(|mut v| v.find(SocketAddr::is_ipv4))
+        .map(|a| a.ip());
     let app = Router::new()
-        .route("/vpn/alta", post(alta))
+        .route(
+            "/vpn/alta",
+            post(alta).get(move |cabeceras: HeaderMap| async move {
+                let vista = guardiana_tunel_servidor::ip_vista(origen(&cabeceras), publica);
+                (
+                    [(header::CONTENT_TYPE, "application/json")],
+                    guardiana_tunel_servidor::eco(vista),
+                )
+            }),
+        )
         .layer(DefaultBodyLimit::max(8 * 1024))
         .with_state(estado);
     let escuchador = match tokio::net::TcpListener::bind(escucha).await {

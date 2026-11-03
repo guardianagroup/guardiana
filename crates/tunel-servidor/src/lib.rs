@@ -382,6 +382,27 @@ impl Wg for WgReal {
     }
 }
 
+/// The address a website sees from whoever asked (3 Nov 2026, «lo que una web ve»; docs/VPN.md, «Las salidas»), from
+/// `origen`, the address the web server in front saw: from inside the tunnel (`10.66.0.0/16`, the addresses this server
+/// gives), this server's own public address `publica`, the one its traffic out leaves with; from outside, `origen`
+/// itself. Nothing is kept. `None` when it cannot be told.
+#[must_use]
+pub fn ip_vista(origen: Option<IpAddr>, publica: Option<IpAddr>) -> Option<IpAddr> {
+    match origen? {
+        IpAddr::V4(a) if a.octets()[..2] == [10, 66] => publica,
+        otra => Some(otra),
+    }
+}
+
+/// The answer of `GET /vpn/alta`, the echo: `{"v":1,"ip":"…"}`, or `null` for the address when it cannot be told.
+#[must_use]
+pub fn eco(ip: Option<IpAddr>) -> String {
+    match ip {
+        Some(ip) => format!("{{\"v\":{VERSION},\"ip\":\"{ip}\"}}"),
+        None => format!("{{\"v\":{VERSION},\"ip\":null}}"),
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -677,5 +698,33 @@ mod tests {
             .alta(&pide(&Llaves::nuevas().unwrap()).1, None, 2 * SIN_USO_S + 2)
             .unwrap();
         assert_eq!(r.direccion, "10.66.0.5/32");
+    }
+
+    /// What a website sees: from inside the tunnel, this server's public address; from outside, the one that asked.
+    #[test]
+    fn el_eco_dice_lo_que_ve_una_web() {
+        let publica: IpAddr = "62.238.17.121".parse().unwrap();
+        let dentro: IpAddr = "10.66.3.7".parse().unwrap();
+        let fuera: IpAddr = "203.0.113.9".parse().unwrap();
+        assert_eq!(ip_vista(Some(dentro), Some(publica)), Some(publica));
+        assert_eq!(ip_vista(Some(fuera), Some(publica)), Some(fuera));
+        assert_eq!(ip_vista(Some(dentro), None), None);
+        assert_eq!(ip_vista(None, Some(publica)), None);
+        let v6: IpAddr = "2001:db8::9".parse().unwrap();
+        assert_eq!(ip_vista(Some(v6), Some(publica)), Some(v6));
+        // another private network is not the tunnel's
+        let otra: IpAddr = "10.67.0.1".parse().unwrap();
+        assert_eq!(ip_vista(Some(otra), Some(publica)), Some(otra));
+        assert_eq!(
+            eco(Some(publica)),
+            format!("{{\"v\":{VERSION},\"ip\":\"62.238.17.121\"}}")
+        );
+        assert_eq!(eco(None), format!("{{\"v\":{VERSION},\"ip\":null}}"));
+        // what the program reads of it
+        assert_eq!(
+            guardiana_tunel::salidas::ip_del_eco(&eco(Some(publica))),
+            Some(publica)
+        );
+        assert_eq!(guardiana_tunel::salidas::ip_del_eco(&eco(None)), None);
     }
 }
