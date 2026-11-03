@@ -836,6 +836,10 @@ const PANEL_LECTURAS: &[(&str, &str)] = &[
     ("GET", "/api/vpn"),
     ("POST", "/api/vpn/conecta"),
     ("POST", "/api/vpn/desconecta"),
+    // 3 Nov 2026, Ultra (the owner, 00:20: «empezar ya la versión ultra»): the level in force (`plus` or
+    // `gratis`), so Comunicaciones in the program knows whether an Ultra invitation can be created here.
+    // Read only; the key never leaves the panel.
+    ("GET", "/api/plan"),
 ];
 
 /// 1.0.52: `POST /api/escudo/cuarentena/<id>`, the id being a warning's (`<línea>-<cuando_ms>`, digits only), the

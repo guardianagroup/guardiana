@@ -3513,6 +3513,8 @@ fn the_web_asks_the_panel_only_for_its_readings() {
         "/api/quien-vende",
         "/api/escudo/cuarentena",
         "/api/vpn",
+        // 3 Nov 2026: the level in force, for Ultra.
+        "/api/plan",
     ] {
         let o = s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, "GET"));
         assert!(
