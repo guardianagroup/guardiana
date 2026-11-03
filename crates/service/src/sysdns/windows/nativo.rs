@@ -387,12 +387,21 @@ pub(crate) fn se_ve(adaptadores: &HashMap<String, bool>, guid: &str) -> Option<b
         .map(|oculto| !oculto)
 }
 
+/// The resolvers `GetAdaptersAddresses` gave the interface `luid`. One it did not list at all (it came between the two
+/// reads, or went) is not an interface without resolvers but one nobody can say anything of: an error, and the
+/// caller asks PowerShell (review of ligero-1055; until then it read as «no resolvers»).
+fn de_la_interfaz(dns: &HashMap<u64, Linea>, luid: u64) -> Result<Linea, String> {
+    dns.get(&luid)
+        .cloned()
+        .ok_or_else(|| format!("la interfaz {luid:#x} no está en GetAdaptersAddresses"))
+}
+
 /// What `PRIMARY_SCRIPT` prints, without PowerShell: one entry per connected IPv4 interface that is not the loopback
 /// nor a visible tunnel or virtual adapter and has resolvers, in the table's order.
 ///
 /// # Errors
-/// The call of Windows that failed, or a tunnel or virtual adapter whose visibility only PowerShell can tell; the
-/// caller then asks PowerShell.
+/// The call of Windows that failed, a tunnel or virtual adapter whose visibility only PowerShell can tell, or a
+/// connected interface `GetAdaptersAddresses` did not list; the caller then asks PowerShell.
 pub(crate) fn lineas() -> Result<Vec<Linea>, String> {
     let interfaces = interfaces_ipv4()?;
     let dns = resolutores()?;
@@ -418,7 +427,7 @@ pub(crate) fn lineas() -> Result<Vec<Linea>, String> {
                 continue;
             }
         }
-        let (v4, v6) = dns.get(&luid).cloned().unwrap_or_default();
+        let (v4, v6) = de_la_interfaz(&dns, luid)?;
         if !v4.is_empty() || !v6.is_empty() {
             out.push((v4, v6));
         }
@@ -519,4 +528,24 @@ pub(crate) fn saltos_por_defecto() -> Result<Vec<IpAddr>, String> {
     }
     con_metrica.sort_by_key(|(m, _)| *m);
     Ok(con_metrica.into_iter().map(|(_, ip)| ip).collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A connected interface `GetAdaptersAddresses` did not list is no answer, so the minute asks PowerShell; one it
+    /// listed without resolvers is an interface without resolvers (review of ligero-1055).
+    #[test]
+    fn una_interfaz_que_falta_en_la_lista_no_es_una_sin_resolutores() {
+        let guardiana: Linea = (
+            vec![IpAddr::V4(Ipv4Addr::LOCALHOST)],
+            vec![IpAddr::V6(Ipv6Addr::LOCALHOST)],
+        );
+        let dns: HashMap<u64, Linea> =
+            HashMap::from([(7, (Vec::new(), Vec::new())), (9, guardiana.clone())]);
+        assert_eq!(de_la_interfaz(&dns, 7), Ok((Vec::new(), Vec::new())));
+        assert_eq!(de_la_interfaz(&dns, 9), Ok(guardiana));
+        assert!(de_la_interfaz(&dns, 8).is_err());
+    }
 }
