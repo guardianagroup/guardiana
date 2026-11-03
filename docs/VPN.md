@@ -168,6 +168,12 @@ Hecho y probado en un Windows real (la integración continua de GitHub, como adm
     desde la tarjeta no tuvo respuesta, pero sin aviso de Windows al programa: no prueba por sí solo que lo cortara el
     filtro, y por eso la prueba lee ahora el registro de Windows. El enlace del equipo de pruebas con GitHub no se
     cortó (unos 11 s con el túnel puesto).
+  - La segunda (3 nov 2026, 00:40 UTC, con el registro de Windows): las 13 comprobaciones, bien. Conectada en 2,2 s; la
+    dirección pública, la del servidor; la puerta de enlace, cortada con WSAEACCES y anotada por Windows (suceso 5157,
+    de salida, TCP, capa de conexión); el DNS a 1.1.1.1 y 8.8.8.8 desde la tarjeta, sin respuesta y anotado por
+    Windows como cortado por el filtro (suceso 5157, de salida, UDP, capa de conexión, y otro filtro que el del TCP,
+    como corresponde al plan, que corta el DNS fuera del túnel con un filtro propio); y al desconectar, la red vuelve. El
+    enlace con GitHub tampoco se cortó (unos 14 s con el túnel puesto).
 - La prueba de extremo a extremo en Linux (`.github/workflows/vpn.yml`, «extremo»): el servidor de GUARDIANA con el
   WireGuard del núcleo en un espacio de red, el lado del equipo (`crates/tunel/examples/alta_prueba.rs`) en otro, el
   alta postcuántica por la red y tráfico de verdad por el túnel (solo pasa si los dos lados sacaron la misma llave).
@@ -181,7 +187,8 @@ Pendiente, en este orden:
    junto a `guardiana.exe`; el servicio vuelve a comprobar el SHA-256 antes de cargarla (otra compilación, o un archivo
    puesto en su lugar, no se carga y se dice). La prueba de cliente (`build/cliente/instalacion.py`) lo comprueba
    instalado.
-3. Los servidores, dentro del sello (con la llave del dueño), y la primera conexión de verdad.
+3. Los servidores, dentro del sello (con la llave del dueño). La primera conexión de verdad ya está hecha (3 nov 2026,
+   «de verdad» en `.github/workflows/vpn.yml`, más arriba).
 4. La reconexión automática (quitada en la 1.0.54): el permiso del servicio ya es solo hacia el servidor (1.0.55); falta
    que el alta nueva salga por una ruta /32 al servidor (o un conector atado a la tarjeta), y entonces el corte tendrá
    que dejar al servicio también el TCP 443 a esa dirección, que hoy no deja (solo el UDP del túnel).
