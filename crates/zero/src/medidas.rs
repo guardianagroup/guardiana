@@ -1046,12 +1046,12 @@ mod tests {
         let l = p.lineas(&t);
         assert_eq!(
             l[0].texto,
-            "En la dirección de una petición a Meta iba un correo y un teléfono en forma cifrada"
+            "En la dirección de una petición a Meta iba un correo y un teléfono en forma de código (hash)"
         );
         assert_eq!(l[0].estado, "paso");
         assert_eq!(
             l[1].texto,
-            "Una petición a Pinterest intentó llevar en su dirección un correo en forma cifrada"
+            "Una petición a Pinterest intentó llevar en su dirección un correo en forma de código (hash)"
         );
         assert_eq!(l[1].estado, "cortado");
         // Nothing of the value is in what is shown.
@@ -1139,7 +1139,7 @@ mod tests {
             [
                 "En 2 webs, algún script intentó leer la huella de tu equipo (canvas, WebGL)",
                 "En 1 web había un servicio de grabación de sesiones: Microsoft Clarity",
-                "1 empresa recibió o intentó recibir un correo, un teléfono o un nombre cifrado en la dirección: Meta",
+                "1 empresa recibió o intentó recibir un correo, un teléfono o un nombre en forma de código (hash) en la dirección: Meta",
                 "Envíos con datos a otras empresas: salieron 1 (100 B) y se cortaron 0",
             ]
         );

@@ -2613,7 +2613,7 @@ fn recording_hashed_addresses_and_bodies_are_measured_without_changing_any_cut()
         let textos: Vec<&str> = l.iter().map(|(t, _)| t.as_str()).collect();
         if cortar {
             assert!(textos.contains(&"Esta página intentó cargar un servicio de grabación de sesiones (Microsoft Clarity), e intentó enviarle datos después de que escribieras en un campo"), "{textos:?}");
-            assert!(textos.contains(&"Una petición a Meta intentó llevar en su dirección un correo en forma cifrada"), "{textos:?}");
+            assert!(textos.contains(&"Una petición a Meta intentó llevar en su dirección un correo en forma de código (hash)"), "{textos:?}");
             assert!(
                 textos.contains(&"Salió 1 envío con datos hacia otras empresas: 100 B"),
                 "{textos:?}"
@@ -2626,7 +2626,7 @@ fn recording_hashed_addresses_and_bodies_are_measured_without_changing_any_cut()
             assert!(textos.contains(&"Esta página carga un servicio de grabación de sesiones (Microsoft Clarity), y le envió datos después de que escribieras en un campo"), "{textos:?}");
             assert!(
                 textos.contains(
-                    &"En la dirección de una petición a Meta iba un correo en forma cifrada"
+                    &"En la dirección de una petición a Meta iba un correo en forma de código (hash)"
                 ),
                 "{textos:?}"
             );
